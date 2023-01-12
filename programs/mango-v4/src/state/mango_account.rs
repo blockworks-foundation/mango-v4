@@ -86,7 +86,9 @@ pub struct MangoAccount {
     /// Init health as calculated during HealthReginBegin, rounded up.
     pub health_region_begin_init_health: i64,
 
-    pub reserved: [u8; 240],
+    pub frozen_until: i64,
+
+    pub reserved: [u8; 232],
 
     // dynamic
     pub header_version: u8,
@@ -120,7 +122,8 @@ impl MangoAccount {
             padding: Default::default(),
             net_deposits: 0,
             health_region_begin_init_health: 0,
-            reserved: [0; 240],
+            frozen_until: 0,
+            reserved: [0; 232],
             header_version: DEFAULT_MANGO_ACCOUNT_VERSION,
             padding3: Default::default(),
             padding4: Default::default(),
@@ -201,9 +204,10 @@ pub struct MangoAccountFixed {
     pub net_deposits: i64,
     pub perp_spot_transfers: i64,
     pub health_region_begin_init_health: i64,
-    pub reserved: [u8; 240],
+    pub frozen_until: u64,
+    pub reserved: [u8; 232],
 }
-const_assert_eq!(size_of::<MangoAccountFixed>(), 32 * 4 + 8 + 3 * 8 + 240);
+const_assert_eq!(size_of::<MangoAccountFixed>(), 32 * 4 + 8 + 3 * 8 + 8 + 232);
 const_assert_eq!(size_of::<MangoAccountFixed>(), 400);
 const_assert_eq!(size_of::<MangoAccountFixed>() % 8, 0);
 
@@ -212,6 +216,11 @@ impl MangoAccountFixed {
         std::str::from_utf8(&self.name)
             .unwrap()
             .trim_matches(char::from(0))
+    }
+
+    pub fn is_operational(&self) -> bool {
+        let now_ts: u64 = Clock::get().unwrap().unix_timestamp.try_into().unwrap();
+        self.frozen_until < now_ts
     }
 
     pub fn is_owner_or_delegate(&self, ix_signer: Pubkey) -> bool {
@@ -227,7 +236,7 @@ impl MangoAccountFixed {
     }
 
     pub fn set_being_liquidated(&mut self, b: bool) {
-        self.being_liquidated = if b { 1 } else { 0 };
+        self.being_liquidated = u8::from(b);
     }
 
     pub fn is_in_health_region(&self) -> bool {
@@ -235,7 +244,7 @@ impl MangoAccountFixed {
     }
 
     pub fn set_in_health_region(&mut self, b: bool) {
-        self.in_health_region = if b { 1 } else { 0 };
+        self.in_health_region = u8::from(b);
     }
 
     pub fn maybe_recover_from_being_liquidated(&mut self, init_health: I80F48) -> bool {
@@ -456,7 +465,7 @@ impl<
     ) -> Result<(&TokenPosition, usize)> {
         self.all_token_positions()
             .enumerate()
-            .find_map(|(raw_index, p)| p.is_active_for_token(token_index).then(|| (p, raw_index)))
+            .find_map(|(raw_index, p)| p.is_active_for_token(token_index).then_some((p, raw_index)))
             .ok_or_else(|| {
                 error_msg_typed!(
                     MangoError::TokenPositionDoesNotExist,
@@ -541,12 +550,8 @@ impl<
         market_index: PerpMarketIndex,
         client_order_id: u64,
     ) -> Option<&PerpOpenOrder> {
-        for oo in self.all_perp_orders() {
-            if oo.market == market_index && oo.client_id == client_order_id {
-                return Some(&oo);
-            }
-        }
-        None
+        self.all_perp_orders()
+            .find(|&oo| oo.market == market_index && oo.client_id == client_order_id)
     }
 
     pub fn perp_find_order_with_order_id(
@@ -554,12 +559,8 @@ impl<
         market_index: PerpMarketIndex,
         order_id: u128,
     ) -> Option<&PerpOpenOrder> {
-        for oo in self.all_perp_orders() {
-            if oo.market == market_index && oo.id == order_id {
-                return Some(&oo);
-            }
-        }
-        None
+        self.all_perp_orders()
+            .find(|&oo| oo.market == market_index && oo.id == order_id)
     }
 
     pub fn being_liquidated(&self) -> bool {
@@ -609,7 +610,7 @@ impl<
         let raw_index = self
             .all_token_positions()
             .enumerate()
-            .find_map(|(raw_index, p)| p.is_active_for_token(token_index).then(|| raw_index))
+            .find_map(|(raw_index, p)| p.is_active_for_token(token_index).then_some(raw_index))
             .ok_or_else(|| {
                 error_msg_typed!(
                     MangoError::TokenPositionDoesNotExist,
@@ -684,7 +685,7 @@ impl<
         let token_position = self.token_position_mut_by_raw_index(raw_index);
         assert!(token_position.in_use_count == 0);
         emit!(DeactivateTokenPositionLog {
-            mango_group: mango_group,
+            mango_group,
             mango_account: mango_account_pubkey,
             token_index: token_position.token_index,
             cumulative_deposit_interest: token_position.cumulative_deposit_interest,
@@ -812,7 +813,7 @@ impl<
         let perp_position = self.perp_position_mut(perp_market_index)?;
 
         emit!(DeactivatePerpPositionLog {
-            mango_group: mango_group,
+            mango_group,
             mango_account: mango_account_pubkey,
             market_index: perp_market_index,
             cumulative_long_funding: perp_position.cumulative_long_funding,

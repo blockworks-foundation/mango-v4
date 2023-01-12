@@ -7,7 +7,7 @@ use crate::logs::PerpMarketMetaDataLog;
 #[derive(Accounts)]
 pub struct PerpEditMarket<'info> {
     #[account(
-        has_one = admin,
+        has_one = admin
     )]
     pub group: AccountLoader<'info, Group>,
     pub admin: Signer<'info>,
@@ -141,7 +141,7 @@ pub fn perp_edit_market(
         perp_market.set_elligible_for_group_insurance_fund(group_insurance_fund);
     }
     if let Some(trusted_market) = trusted_market_opt {
-        perp_market.trusted_market = if trusted_market { 1 } else { 0 };
+        perp_market.trusted_market = u8::from(trusted_market);
     }
 
     if let Some(settle_fee_flat) = settle_fee_flat_opt {
@@ -173,7 +173,7 @@ pub fn perp_edit_market(
     }
 
     if let Some(reduce_only) = reduce_only_opt {
-        perp_market.reduce_only = if reduce_only { 1 } else { 0 };
+        perp_market.reduce_only = u8::from(reduce_only);
     };
 
     emit!(PerpMarketMetaDataLog {

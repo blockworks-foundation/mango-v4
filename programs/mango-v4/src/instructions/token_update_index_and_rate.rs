@@ -26,6 +26,9 @@ pub mod compute_budget {
 /// or ComputeBudget instructions.
 #[derive(Accounts)]
 pub struct TokenUpdateIndexAndRate<'info> {
+    #[account(
+        constraint = group.load()?.is_operational() @ MangoError::GroupIsHalted
+    )]
     pub group: AccountLoader<'info, Group>, // Required for group metadata parsing
 
     #[account(
@@ -116,7 +119,7 @@ pub fn token_update_index_and_rate(ctx: Context<TokenUpdateIndexAndRate>) -> Res
         some_bank
             .stable_price_model
             .update(now_ts as u64, price.to_num());
-        let stable_price_model = some_bank.stable_price_model.clone();
+        let stable_price_model = some_bank.stable_price_model;
 
         emit!(UpdateIndexLog {
             mango_group: mint_info.group.key(),
@@ -153,7 +156,7 @@ pub fn token_update_index_and_rate(ctx: Context<TokenUpdateIndexAndRate>) -> Res
 
             bank.avg_utilization = new_avg_utilization;
 
-            bank.stable_price_model = stable_price_model.clone();
+            bank.stable_price_model = stable_price_model;
         }
     }
 

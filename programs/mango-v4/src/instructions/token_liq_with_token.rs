@@ -13,11 +13,15 @@ use crate::util::checked_math as cm;
 
 #[derive(Accounts)]
 pub struct TokenLiqWithToken<'info> {
+    #[account(
+        constraint = group.load()?.is_operational() @ MangoError::GroupIsHalted
+    )]
     pub group: AccountLoader<'info, Group>,
 
     #[account(
         mut,
-        has_one = group
+        has_one = group,
+        constraint = liqor.load()?.is_operational() @ MangoError::AccountIsFrozen
         // liqor_owner is checked at #1
     )]
     pub liqor: AccountLoader<'info, MangoAccountFixed>,
@@ -25,7 +29,8 @@ pub struct TokenLiqWithToken<'info> {
 
     #[account(
         mut,
-        has_one = group
+        has_one = group,
+        constraint = liqee.load()?.is_operational() @ MangoError::AccountIsFrozen
     )]
     pub liqee: AccountLoader<'info, MangoAccountFixed>,
 }
@@ -50,7 +55,11 @@ pub fn token_liq_with_token(
             .is_owner_or_delegate(ctx.accounts.liqor_owner.key()),
         MangoError::SomeError
     );
-    require!(!liqor.fixed.being_liquidated(), MangoError::BeingLiquidated);
+    require_msg_typed!(
+        !liqor.fixed.being_liquidated(),
+        MangoError::BeingLiquidated,
+        "liqor account"
+    );
 
     let mut liqee = ctx.accounts.liqee.load_full_mut()?;
 
@@ -58,6 +67,7 @@ pub fn token_liq_with_token(
     let mut liqee_health_cache = new_health_cache(&liqee.borrow(), &account_retriever)
         .context("create liqee health cache")?;
     let init_health = liqee_health_cache.health(HealthType::Init);
+    liqee_health_cache.require_after_phase1_liquidation()?;
 
     // Once maint_health falls below 0, we want to start liquidating,
     // we want to allow liquidation to continue until init_health is positive,
@@ -190,9 +200,9 @@ pub fn token_liq_with_token(
 
     // Update the health cache
     liqee_health_cache
-        .adjust_token_balance(&liab_bank, cm!(liqee_liab_native_after - liqee_liab_native))?;
+        .adjust_token_balance(liab_bank, cm!(liqee_liab_native_after - liqee_liab_native))?;
     liqee_health_cache.adjust_token_balance(
-        &asset_bank,
+        asset_bank,
         cm!(liqee_assets_native_after - liqee_asset_native),
     )?;
 

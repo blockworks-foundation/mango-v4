@@ -136,14 +136,7 @@ async fn test_basic() -> Result<(), TransportError> {
     //
     // TEST: Compute the account health
     //
-    send_tx(solana, ComputeAccountDataInstruction { account })
-        .await
-        .unwrap();
-    let health_data = solana
-        .program_log_events::<mango_v4::events::MangoAccountData>()
-        .pop()
-        .unwrap();
-    assert_eq!(health_data.init_health.to_num::<i64>(), 60);
+    assert_eq!(account_init_health(solana, account).await.round(), 60.0);
 
     //
     // TEST: Withdraw funds

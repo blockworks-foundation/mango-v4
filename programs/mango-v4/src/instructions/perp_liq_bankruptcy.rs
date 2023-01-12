@@ -17,6 +17,7 @@ use crate::logs::{emit_perp_balances, PerpLiqBankruptcyLog, TokenBalanceLog};
 pub struct PerpLiqBankruptcy<'info> {
     #[account(
         has_one = insurance_vault,
+        constraint = group.load()?.is_operational() @ MangoError::GroupIsHalted
     )]
     pub group: AccountLoader<'info, Group>,
 
@@ -25,7 +26,8 @@ pub struct PerpLiqBankruptcy<'info> {
 
     #[account(
         mut,
-        has_one = group
+        has_one = group,
+        constraint = liqor.load()?.is_operational() @ MangoError::AccountIsFrozen
         // liqor_owner is checked at #1
     )]
     pub liqor: AccountLoader<'info, MangoAccountFixed>,
@@ -33,7 +35,8 @@ pub struct PerpLiqBankruptcy<'info> {
 
     #[account(
         mut,
-        has_one = group
+        has_one = group,
+        constraint = liqee.load()?.is_operational() @ MangoError::AccountIsFrozen
     )]
     pub liqee: AccountLoader<'info, MangoAccountFixed>,
 

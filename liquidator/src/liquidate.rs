@@ -247,6 +247,7 @@ impl<'a> LiquidateHelper<'a> {
         Ok(Some(sig))
     }
 
+    /*
     async fn perp_settle_pnl(&self) -> anyhow::Result<Option<Signature>> {
         let perp_settle_health = self.health_cache.perp_settle_health();
         let mut perp_settleable_pnl = self
@@ -257,6 +258,7 @@ impl<'a> LiquidateHelper<'a> {
                     return None;
                 }
                 let pnl = pp.quote_position_native();
+                // TODO: outdated: must account for perp settle limit
                 let settleable_pnl = if pnl > 0 {
                     pnl
                 } else if pnl < 0 && perp_settle_health > 0 {
@@ -320,12 +322,13 @@ impl<'a> LiquidateHelper<'a> {
         }
         return Ok(None);
     }
+    */
 
-    async fn perp_liq_bankruptcy(&self) -> anyhow::Result<Option<Signature>> {
-        if self.health_cache.has_liquidatable_assets() {
+    async fn perp_liq_quote_and_bankruptcy(&self) -> anyhow::Result<Option<Signature>> {
+        if !self.health_cache.in_phase3_liquidation() {
             return Ok(None);
         }
-        let mut perp_bankruptcies = self
+        let mut perp_negative_pnl = self
             .liqee
             .active_perp_positions()
             .filter_map(|pp| {
@@ -336,24 +339,24 @@ impl<'a> LiquidateHelper<'a> {
                 Some((pp.market_index, quote))
             })
             .collect::<Vec<(PerpMarketIndex, I80F48)>>();
-        perp_bankruptcies.sort_by(|a, b| a.1.cmp(&b.1));
+        perp_negative_pnl.sort_by(|a, b| a.1.cmp(&b.1));
 
-        if perp_bankruptcies.is_empty() {
+        if perp_negative_pnl.is_empty() {
             return Ok(None);
         }
-        let (perp_market_index, _) = perp_bankruptcies.first().unwrap();
+        let (perp_market_index, _) = perp_negative_pnl.first().unwrap();
 
         let sig = self
             .client
-            .perp_liq_bankruptcy(
+            .perp_liq_quote_and_bankruptcy(
                 (self.pubkey, &self.liqee),
                 *perp_market_index,
-                // Always use the max amount, since the health effect is always positive
+                // Always use the max amount, since the health effect is >= 0
                 u64::MAX,
             )
             .await?;
         log::info!(
-            "Liquidated bankruptcy for perp market on account {}, market index {}, maint_health was {}, tx sig {:?}",
+            "Liquidated negative perp pnl on account {}, market index {}, maint_health was {}, tx sig {:?}",
             self.pubkey,
             perp_market_index,
             self.maint_health,
@@ -564,13 +567,20 @@ impl<'a> LiquidateHelper<'a> {
         //     return Ok(txsig);
         // }
 
-        // Try to close orders before touching the user's positions
+        //
+        // Phase 1: Try to close orders before touching the user's positions
+        //
+        // TODO: All these close ix could be in one transaction.
         if let Some(txsig) = self.perp_close_orders().await? {
             return Ok(txsig);
         }
         if let Some(txsig) = self.serum3_close_orders().await? {
             return Ok(txsig);
         }
+
+        //
+        // Phase 2: token, perp base, TODO: perp positive trusted pnl
+        //
 
         if let Some(txsig) = self.perp_liq_base_position().await? {
             return Ok(txsig);
@@ -581,16 +591,20 @@ impl<'a> LiquidateHelper<'a> {
         // It's possible that some positive pnl can't be settled (if there's
         // no liquid counterparty) and that some negative pnl can't be settled
         // (if the liqee isn't liquid enough).
-        if let Some(txsig) = self.perp_settle_pnl().await? {
-            return Ok(txsig);
-        }
+        // if let Some(txsig) = self.perp_settle_pnl().await? {
+        //     return Ok(txsig);
+        // }
 
         if let Some(txsig) = self.token_liq().await? {
             return Ok(txsig);
         }
 
-        // Socialize/insurance fund unsettleable negative pnl
-        if let Some(txsig) = self.perp_liq_bankruptcy().await? {
+        //
+        // Phase 3: perp and token bankruptcy
+        //
+
+        // Negative pnl: take over (paid by liqee or insurance) or socialize the loss
+        if let Some(txsig) = self.perp_liq_quote_and_bankruptcy().await? {
             return Ok(txsig);
         }
 

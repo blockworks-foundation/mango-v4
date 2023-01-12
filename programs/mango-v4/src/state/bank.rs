@@ -931,7 +931,7 @@ mod tests {
                 let mut account = TokenPosition {
                     indexed_position: I80F48::ZERO,
                     token_index: 0,
-                    in_use_count: if is_in_use { 1 } else { 0 },
+                    in_use_count: u8::from(is_in_use),
                     cumulative_deposit_interest: 0.0,
                     cumulative_borrow_interest: 0.0,
                     previous_index: I80F48::ZERO,

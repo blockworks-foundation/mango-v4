@@ -11,11 +11,15 @@ use crate::state::{Group, MangoAccountFixed, MangoAccountLoader, PerpMarket};
 
 #[derive(Accounts)]
 pub struct PerpSettlePnl<'info> {
+    #[account(
+        constraint = group.load()?.is_operational() @ MangoError::GroupIsHalted
+    )]
     pub group: AccountLoader<'info, Group>,
 
     #[account(
         mut,
         has_one = group,
+        constraint = settler.load()?.is_operational() @ MangoError::AccountIsFrozen
         // settler_owner is checked at #1
     )]
     pub settler: AccountLoader<'info, MangoAccountFixed>,
@@ -25,10 +29,17 @@ pub struct PerpSettlePnl<'info> {
     pub perp_market: AccountLoader<'info, PerpMarket>,
 
     // This account MUST be profitable
-    #[account(mut, has_one = group)]
+    #[account(mut,
+        has_one = group,
+        constraint = account_a.load()?.is_operational() @ MangoError::AccountIsFrozen
+    )]
     pub account_a: AccountLoader<'info, MangoAccountFixed>,
     // This account MUST have a loss
-    #[account(mut, has_one = group)]
+    #[account(
+        mut,
+        has_one = group,
+        constraint = account_b.load()?.is_operational() @ MangoError::AccountIsFrozen
+    )]
     pub account_b: AccountLoader<'info, MangoAccountFixed>,
 
     /// CHECK: Oracle can have different account types, constrained by address in perp_market
@@ -81,19 +92,12 @@ pub fn perp_settle_pnl(ctx: Context<PerpSettlePnl>) -> Result<()> {
         a_maint_health = a_cache.health(HealthType::Maint);
     };
 
-    // Account B is the one that must have negative pnl. Check how much of that may be actualized
-    // given the account's health. In that, we only care about the health of spot assets on the account.
-    // Example: With +100 USDC and -2 SOL (-80 USD) and -500 USD PNL the account may still settle
-    //   100 - 1.1*80 = 12 USD perp pnl, even though the overall health is already negative.
-    //   Further settlement would convert perp-losses into token-losses and isn't allowed.
-    require!(b_settle_health >= 0, MangoError::HealthMustBePositive);
-
-    let mut bank = ctx.accounts.settle_bank.load_mut()?;
+    let mut settle_bank = ctx.accounts.settle_bank.load_mut()?;
     let perp_market = ctx.accounts.perp_market.load()?;
 
     // Verify that the bank is the quote currency bank
     require!(
-        bank.token_index == settle_token_index,
+        settle_bank.token_index == settle_token_index,
         MangoError::InvalidBank
     );
 
@@ -103,20 +107,16 @@ pub fn perp_settle_pnl(ctx: Context<PerpSettlePnl>) -> Result<()> {
         None, // staleness checked in health
     )?;
 
-    // Fetch perp positions for accounts
+    // Fetch perp position and pnl
     let a_perp_position = account_a.perp_position_mut(perp_market_index)?;
     let b_perp_position = account_b.perp_position_mut(perp_market_index)?;
-
-    // Settle funding before settling any PnL
     a_perp_position.settle_funding(&perp_market);
     b_perp_position.settle_funding(&perp_market);
-
-    // Calculate PnL for each account
     let a_pnl = a_perp_position.pnl_for_price(&perp_market, oracle_price)?;
     let b_pnl = b_perp_position.pnl_for_price(&perp_market, oracle_price)?;
 
-    // Account A must be profitable, and B must be unprofitable
-    // PnL must be opposite signs for there to be a settlement
+    // PnL must have opposite signs for there to be a settlement:
+    // Account A must be profitable, and B must be unprofitable.
     require_msg_typed!(
         a_pnl.is_positive(),
         MangoError::ProfitabilityMismatch,
@@ -130,12 +130,11 @@ pub fn perp_settle_pnl(ctx: Context<PerpSettlePnl>) -> Result<()> {
         b_pnl
     );
 
-    // Cap settlement of unrealized pnl
-    // Settles at most x100% each hour
+    // Apply pnl settle limits
     let now_ts: u64 = Clock::get()?.unix_timestamp.try_into().unwrap();
     a_perp_position.update_settle_limit(&perp_market, now_ts);
-    b_perp_position.update_settle_limit(&perp_market, now_ts);
     let a_settleable_pnl = a_perp_position.apply_pnl_settle_limit(&perp_market, a_pnl);
+    b_perp_position.update_settle_limit(&perp_market, now_ts);
     let b_settleable_pnl = b_perp_position.apply_pnl_settle_limit(&perp_market, b_pnl);
 
     require_msg_typed!(
@@ -153,11 +152,23 @@ pub fn perp_settle_pnl(ctx: Context<PerpSettlePnl>) -> Result<()> {
         b_pnl
     );
 
-    // Settle for the maximum possible capped to b's settle health
+    // Check how much of account b's negative pnl may be actualized given the health.
+    // In that, we only care about the health of spot assets on the account.
+    // Example: With +100 USDC and -2 SOL (-80 USD) and -500 USD PNL the account may still settle
+    //   100 - 1.1*80 = 12 USD perp pnl, even though the overall health is already negative.
+    //   Further settlement would convert perp-losses into unbacked token-losses and isn't allowed.
+    require_msg_typed!(
+        b_settle_health >= 0,
+        MangoError::HealthMustBePositive,
+        "account b settle health is negative: {}",
+        b_settle_health
+    );
+
+    // Settle for the maximum possible capped to target's settle health
     let settlement = a_settleable_pnl
-        .abs()
-        .min(b_settleable_pnl.abs())
-        .min(b_settle_health);
+        .min(-b_settleable_pnl)
+        .min(b_settle_health)
+        .max(I80F48::ZERO);
     require_msg_typed!(
         settlement >= 0,
         MangoError::SettlementAmountMustBePositive,
@@ -167,34 +178,125 @@ pub fn perp_settle_pnl(ctx: Context<PerpSettlePnl>) -> Result<()> {
         b_settle_health,
     );
 
-    // Settle
+    let fee = compute_settle_fee(&perp_market, a_init_health, a_maint_health, settlement)?;
+
     a_perp_position.record_settle(settlement);
     b_perp_position.record_settle(-settlement);
-
     emit_perp_balances(
         ctx.accounts.group.key(),
         ctx.accounts.account_a.key(),
-        perp_market.perp_market_index,
         a_perp_position,
         &perp_market,
     );
-
     emit_perp_balances(
         ctx.accounts.group.key(),
         ctx.accounts.account_b.key(),
-        perp_market.perp_market_index,
         b_perp_position,
         &perp_market,
     );
 
-    // A percentage fee is paid to the settler when account_a's health is low.
-    // That's because the settlement could avoid it getting liquidated.
-    let low_health_fee = if a_init_health < 0 {
+    // Update the accounts' perp_spot_transfer statistics.
+    //
+    // Applying the fee here means that it decreases the displayed perp pnl.
+    // Think about it like this: a's pnl reduces by `settlement` and spot increases by `settlement - fee`.
+    // That means that it managed to extract `settlement - fee` from perp interactions.
+    let settlement_i64 = settlement.round_to_zero().checked_to_num::<i64>().unwrap();
+    let fee_i64 = fee.round_to_zero().checked_to_num::<i64>().unwrap();
+    cm!(a_perp_position.perp_spot_transfers += settlement_i64 - fee_i64);
+    cm!(b_perp_position.perp_spot_transfers -= settlement_i64);
+    cm!(account_a.fixed.perp_spot_transfers += settlement_i64 - fee_i64);
+    cm!(account_b.fixed.perp_spot_transfers -= settlement_i64);
+
+    // Transfer token balances
+    // The fee is paid by the account with positive unsettled pnl
+    let a_token_position = account_a.token_position_mut(settle_token_index)?.0;
+    let b_token_position = account_b.token_position_mut(settle_token_index)?.0;
+    settle_bank.deposit(a_token_position, cm!(settlement - fee), now_ts)?;
+    // Don't charge loan origination fees on borrows created via settling:
+    // Even small loan origination fees could accumulate if a perp position is
+    // settled back and forth repeatedly.
+    settle_bank.withdraw_without_fee(b_token_position, settlement, now_ts, oracle_price)?;
+
+    emit!(TokenBalanceLog {
+        mango_group: ctx.accounts.group.key(),
+        mango_account: ctx.accounts.account_a.key(),
+        token_index: settle_token_index,
+        indexed_position: a_token_position.indexed_position.to_bits(),
+        deposit_index: settle_bank.deposit_index.to_bits(),
+        borrow_index: settle_bank.borrow_index.to_bits(),
+    });
+
+    emit!(TokenBalanceLog {
+        mango_group: ctx.accounts.group.key(),
+        mango_account: ctx.accounts.account_b.key(),
+        token_index: settle_token_index,
+        indexed_position: b_token_position.indexed_position.to_bits(),
+        deposit_index: settle_bank.deposit_index.to_bits(),
+        borrow_index: settle_bank.borrow_index.to_bits(),
+    });
+
+    // settler might be the same as account a or b
+    drop(account_a);
+    drop(account_b);
+
+    let mut settler = ctx.accounts.settler.load_full_mut()?;
+    // account constraint #1
+    require!(
+        settler
+            .fixed
+            .is_owner_or_delegate(ctx.accounts.settler_owner.key()),
+        MangoError::SomeError
+    );
+
+    let (settler_token_position, settler_token_raw_index, _) =
+        settler.ensure_token_position(settle_token_index)?;
+    let settler_token_position_active = settle_bank.deposit(settler_token_position, fee, now_ts)?;
+
+    emit!(TokenBalanceLog {
+        mango_group: ctx.accounts.group.key(),
+        mango_account: ctx.accounts.settler.key(),
+        token_index: settler_token_position.token_index,
+        indexed_position: settler_token_position.indexed_position.to_bits(),
+        deposit_index: settle_bank.deposit_index.to_bits(),
+        borrow_index: settle_bank.borrow_index.to_bits(),
+    });
+
+    if !settler_token_position_active {
+        settler
+            .deactivate_token_position_and_log(settler_token_raw_index, ctx.accounts.settler.key());
+    }
+
+    emit!(PerpSettlePnlLog {
+        mango_group: ctx.accounts.group.key(),
+        mango_account_a: ctx.accounts.account_a.key(),
+        mango_account_b: ctx.accounts.account_b.key(),
+        perp_market_index,
+        settlement: settlement.to_bits(),
+        settler: ctx.accounts.settler.key(),
+        fee: fee.to_bits(),
+    });
+
+    msg!("settled pnl = {}, fee = {}", settlement, fee);
+    Ok(())
+}
+
+pub fn compute_settle_fee(
+    perp_market: &PerpMarket,
+    source_init_health: I80F48,
+    source_maint_health: I80F48,
+    settlement: I80F48,
+) -> Result<I80F48> {
+    // A percentage fee is paid to the settler when the source account's health is low.
+    // That's because the settlement could avoid it getting liquidated: settling will
+    // increase its health by actualizing positive perp pnl.
+    let low_health_fee = if source_init_health < 0 {
         let fee_fraction = I80F48::from_num(perp_market.settle_fee_fraction_low_health);
-        if a_maint_health < 0 {
+        if source_maint_health < 0 {
             cm!(settlement * fee_fraction)
         } else {
-            cm!(settlement * fee_fraction * (-a_init_health / (a_maint_health - a_init_health)))
+            cm!(settlement
+                * fee_fraction
+                * (-source_init_health / (source_maint_health - source_init_health)))
         }
     } else {
         I80F48::ZERO
@@ -213,86 +315,5 @@ pub fn perp_settle_pnl(ctx: Context<PerpSettlePnl>) -> Result<()> {
     // Safety check to prevent any accidental negative transfer
     require!(fee >= 0, MangoError::SettlementAmountMustBePositive);
 
-    // Update the account's net_settled with the new PnL.
-    // Applying the fee here means that it decreases the displayed perp pnl.
-    let settlement_i64 = settlement.round_to_zero().checked_to_num::<i64>().unwrap();
-    let fee_i64 = fee.round_to_zero().checked_to_num::<i64>().unwrap();
-    cm!(a_perp_position.perp_spot_transfers += settlement_i64 - fee_i64);
-    cm!(b_perp_position.perp_spot_transfers -= settlement_i64);
-    cm!(account_a.fixed.perp_spot_transfers += settlement_i64 - fee_i64);
-    cm!(account_b.fixed.perp_spot_transfers -= settlement_i64);
-
-    let now_ts: u64 = Clock::get()?.unix_timestamp.try_into().unwrap();
-
-    // Transfer token balances
-    // The fee is paid by the account with positive unsettled pnl
-    let a_token_position = account_a.token_position_mut(settle_token_index)?.0;
-    let b_token_position = account_b.token_position_mut(settle_token_index)?.0;
-    bank.deposit(a_token_position, cm!(settlement - fee), now_ts)?;
-    // Don't charge loan origination fees on borrows created via settling:
-    // Even small loan origination fees could accumulate if a perp position is
-    // settled back and forth repeatedly.
-    bank.withdraw_without_fee(b_token_position, settlement, now_ts, oracle_price)?;
-
-    emit!(TokenBalanceLog {
-        mango_group: ctx.accounts.group.key(),
-        mango_account: ctx.accounts.settler.key(),
-        token_index: settle_token_index,
-        indexed_position: a_token_position.indexed_position.to_bits(),
-        deposit_index: bank.deposit_index.to_bits(),
-        borrow_index: bank.borrow_index.to_bits(),
-    });
-
-    emit!(TokenBalanceLog {
-        mango_group: ctx.accounts.group.key(),
-        mango_account: ctx.accounts.settler.key(),
-        token_index: settle_token_index,
-        indexed_position: b_token_position.indexed_position.to_bits(),
-        deposit_index: bank.deposit_index.to_bits(),
-        borrow_index: bank.borrow_index.to_bits(),
-    });
-
-    // settler might be the same as account a or b
-    drop(account_a);
-    drop(account_b);
-
-    let mut settler = ctx.accounts.settler.load_full_mut()?;
-    // account constraint #1
-    require!(
-        settler
-            .fixed
-            .is_owner_or_delegate(ctx.accounts.settler_owner.key()),
-        MangoError::SomeError
-    );
-
-    let (settler_token_position, settler_token_raw_index, _) =
-        settler.ensure_token_position(settle_token_index)?;
-    let settler_token_position_active = bank.deposit(settler_token_position, fee, now_ts)?;
-
-    emit!(TokenBalanceLog {
-        mango_group: ctx.accounts.group.key(),
-        mango_account: ctx.accounts.settler.key(),
-        token_index: settler_token_position.token_index,
-        indexed_position: settler_token_position.indexed_position.to_bits(),
-        deposit_index: bank.deposit_index.to_bits(),
-        borrow_index: bank.borrow_index.to_bits(),
-    });
-
-    if !settler_token_position_active {
-        settler
-            .deactivate_token_position_and_log(settler_token_raw_index, ctx.accounts.settler.key());
-    }
-
-    emit!(PerpSettlePnlLog {
-        mango_group: ctx.accounts.group.key(),
-        mango_account_a: ctx.accounts.account_a.key(),
-        mango_account_b: ctx.accounts.account_b.key(),
-        perp_market_index: perp_market_index,
-        settlement: settlement.to_bits(),
-        settler: ctx.accounts.settler.key(),
-        fee: fee.to_bits(),
-    });
-
-    msg!("settled pnl = {}, fee = {}", settlement, fee);
-    Ok(())
+    Ok(fee)
 }

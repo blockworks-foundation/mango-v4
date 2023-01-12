@@ -11,6 +11,9 @@ use crate::logs::{emit_perp_balances, PerpLiqBasePositionLog};
 
 #[derive(Accounts)]
 pub struct PerpLiqBasePosition<'info> {
+    #[account(
+        constraint = group.load()?.is_operational() @ MangoError::GroupIsHalted
+    )]
     pub group: AccountLoader<'info, Group>,
 
     #[account(mut, has_one = group, has_one = oracle)]
@@ -21,13 +24,18 @@ pub struct PerpLiqBasePosition<'info> {
 
     #[account(
         mut,
-        has_one = group
+        has_one = group,
+        constraint = liqor.load()?.is_operational() @ MangoError::AccountIsFrozen
         // liqor_owner is checked at #1
     )]
     pub liqor: AccountLoader<'info, MangoAccountFixed>,
     pub liqor_owner: Signer<'info>,
 
-    #[account(mut, has_one = group)]
+    #[account(
+        mut,
+        has_one = group,
+        constraint = liqee.load()?.is_operational() @ MangoError::AccountIsFrozen
+    )]
     pub liqee: AccountLoader<'info, MangoAccountFixed>,
 }
 
@@ -45,7 +53,11 @@ pub fn perp_liq_base_position(
             .is_owner_or_delegate(ctx.accounts.liqor_owner.key()),
         MangoError::SomeError
     );
-    require!(!liqor.fixed.being_liquidated(), MangoError::BeingLiquidated);
+    require_msg_typed!(
+        !liqor.fixed.being_liquidated(),
+        MangoError::BeingLiquidated,
+        "liqor account"
+    );
 
     let mut liqee = ctx.accounts.liqee.load_full_mut()?;
 
@@ -57,6 +69,7 @@ pub fn perp_liq_base_position(
             .context("create liqee health cache")?
     };
     let liqee_init_health = liqee_health_cache.health(HealthType::Init);
+    liqee_health_cache.require_after_phase1_liquidation()?;
 
     // Once maint_health falls below 0, we want to start liquidating,
     // we want to allow liquidation to continue until init_health is positive,
@@ -95,11 +108,6 @@ pub fn perp_liq_base_position(
         .ensure_perp_position(perp_market_index, perp_market.settle_token_index)?
         .0;
     let liqee_base_lots = liqee_perp_position.base_position_lots();
-
-    require!(
-        !liqee_perp_position.has_open_orders(),
-        MangoError::HasOpenPerpOrders
-    );
 
     // Settle funding
     liqee_perp_position.settle_funding(&perp_market);
@@ -173,7 +181,6 @@ pub fn perp_liq_base_position(
     emit_perp_balances(
         ctx.accounts.group.key(),
         ctx.accounts.liqor.key(),
-        perp_market.perp_market_index,
         liqor_perp_position,
         &perp_market,
     );
@@ -181,7 +188,6 @@ pub fn perp_liq_base_position(
     emit_perp_balances(
         ctx.accounts.group.key(),
         ctx.accounts.liqee.key(),
-        perp_market.perp_market_index,
         liqee_perp_position,
         &perp_market,
     );
@@ -191,7 +197,7 @@ pub fn perp_liq_base_position(
         perp_market_index: perp_market.perp_market_index,
         liqor: ctx.accounts.liqor.key(),
         liqee: ctx.accounts.liqee.key(),
-        base_transfer: base_transfer,
+        base_transfer,
         quote_transfer: quote_transfer.to_bits(),
         price: oracle_price.to_bits(),
     });

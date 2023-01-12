@@ -12,13 +12,20 @@ use crate::logs::{emit_perp_balances, PerpSettleFeesLog, TokenBalanceLog};
 
 #[derive(Accounts)]
 pub struct PerpSettleFees<'info> {
+    #[account(
+        constraint = group.load()?.is_operational() @ MangoError::GroupIsHalted
+    )]
     pub group: AccountLoader<'info, Group>,
 
     #[account(mut, has_one = group, has_one = oracle)]
     pub perp_market: AccountLoader<'info, PerpMarket>,
 
     // This account MUST have a loss
-    #[account(mut, has_one = group)]
+    #[account(
+        mut,
+        has_one = group,
+        constraint = account.load()?.is_operational() @ MangoError::AccountIsFrozen
+    )]
     pub account: AccountLoader<'info, MangoAccountFixed>,
 
     /// CHECK: Oracle can have different account types, constrained by address in perp_market
@@ -91,7 +98,6 @@ pub fn perp_settle_fees(ctx: Context<PerpSettleFees>, max_settle_amount: u64) ->
     emit_perp_balances(
         ctx.accounts.group.key(),
         ctx.accounts.account.key(),
-        perp_market.perp_market_index,
         perp_position,
         &perp_market,
     );

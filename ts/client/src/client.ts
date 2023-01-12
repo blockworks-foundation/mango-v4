@@ -129,6 +129,7 @@ export class MangoClient {
     group: Group,
     admin?: PublicKey,
     fastListingAdmin?: PublicKey,
+    securityAdmin?: PublicKey,
     testing?: number,
     version?: number,
   ): Promise<TransactionSignature> {
@@ -136,9 +137,23 @@ export class MangoClient {
       .groupEdit(
         admin ?? null,
         fastListingAdmin ?? null,
+        securityAdmin ?? null,
         testing ?? null,
         version ?? null,
       )
+      .accounts({
+        group: group.publicKey,
+        admin: (this.program.provider as AnchorProvider).wallet.publicKey,
+      })
+      .rpc();
+  }
+
+  public async groupToggleHalt(
+    group: Group,
+    halt: boolean,
+  ): Promise<TransactionSignature> {
+    return await this.program.methods
+      .groupToggleHalt(halt)
       .accounts({
         group: group.publicKey,
         admin: (this.program.provider as AnchorProvider).wallet.publicKey,
@@ -653,6 +668,21 @@ export class MangoClient {
       [ix],
       group.addressLookupTablesList,
     );
+  }
+
+  public async toggleMangoAccountFreeze(
+    group: Group,
+    mangoAccount: MangoAccount,
+    freeze: boolean,
+  ): Promise<TransactionSignature> {
+    return await this.program.methods
+      .accountToggleFreeze(freeze)
+      .accounts({
+        group: group.publicKey,
+        account: mangoAccount.publicKey,
+        admin: (this.program.provider as AnchorProvider).wallet.publicKey,
+      })
+      .rpc();
   }
 
   public async getMangoAccount(

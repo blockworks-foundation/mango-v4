@@ -45,6 +45,7 @@ pub mod mango_v4 {
         ctx: Context<GroupEdit>,
         admin_opt: Option<Pubkey>,
         fast_listing_admin_opt: Option<Pubkey>,
+        security_admin_opt: Option<Pubkey>,
         testing_opt: Option<u8>,
         version_opt: Option<u8>,
     ) -> Result<()> {
@@ -52,9 +53,14 @@ pub mod mango_v4 {
             ctx,
             admin_opt,
             fast_listing_admin_opt,
+            security_admin_opt,
             testing_opt,
             version_opt,
         )
+    }
+
+    pub fn group_toggle_halt(ctx: Context<GroupToggleHalt>, halted: bool) -> Result<()> {
+        instructions::group_toggle_halt(ctx, halted)
     }
 
     pub fn group_close(ctx: Context<GroupClose>) -> Result<()> {
@@ -214,6 +220,10 @@ pub mod mango_v4 {
         delegate_opt: Option<Pubkey>,
     ) -> Result<()> {
         instructions::account_edit(ctx, name_opt, delegate_opt)
+    }
+
+    pub fn account_toggle_freeze(ctx: Context<AccountToggleFreeze>, freeze: bool) -> Result<()> {
+        instructions::account_toggle_freeze(ctx, freeze)
     }
 
     pub fn account_close(ctx: Context<AccountClose>, force_close: bool) -> Result<()> {
@@ -720,11 +730,11 @@ pub mod mango_v4 {
         instructions::perp_liq_force_cancel_orders(ctx, limit)
     }
 
-    pub fn perp_liq_bankruptcy(
-        ctx: Context<PerpLiqBankruptcy>,
+    pub fn perp_liq_quote_and_bankruptcy(
+        ctx: Context<PerpLiqQuoteAndBankruptcy>,
         max_liab_transfer: u64,
     ) -> Result<()> {
-        instructions::perp_liq_bankruptcy(ctx, max_liab_transfer)
+        instructions::perp_liq_quote_and_bankruptcy(ctx, max_liab_transfer)
     }
 
     pub fn alt_set(ctx: Context<AltSet>, index: u8) -> Result<()> {

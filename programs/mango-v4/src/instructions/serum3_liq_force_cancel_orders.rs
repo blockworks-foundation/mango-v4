@@ -14,9 +14,16 @@ use crate::state::*;
 
 #[derive(Accounts)]
 pub struct Serum3LiqForceCancelOrders<'info> {
+    #[account(
+        constraint = group.load()?.is_operational() @ MangoError::GroupIsHalted
+    )]
     pub group: AccountLoader<'info, Group>,
 
-    #[account(mut, has_one = group)]
+    // Allow force cancel even if account is frozen
+    #[account(
+        mut,
+        has_one = group
+    )]
     pub account: AccountLoader<'info, MangoAccountFixed>,
 
     #[account(mut)]
