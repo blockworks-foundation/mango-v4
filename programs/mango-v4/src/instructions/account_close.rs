@@ -15,6 +15,7 @@ pub struct AccountClose<'info> {
         mut,
         has_one = group,
         has_one = owner,
+        constraint = account.load()?.is_operational() @ MangoError::AccountIsFrozen,
         close = sol_destination
     )]
     pub account: AccountLoader<'info, MangoAccountFixed>,

@@ -31,6 +31,9 @@ pub mod jupiter_mainnet_3 {
 /// 4. the mango group
 #[derive(Accounts)]
 pub struct FlashLoanBegin<'info> {
+    #[account(
+        constraint = account.load()?.is_operational() @ MangoError::AccountIsFrozen
+    )]
     pub account: AccountLoader<'info, MangoAccountFixed>,
     // owner is checked at #1
     pub owner: Signer<'info>,
@@ -53,7 +56,10 @@ pub struct FlashLoanBegin<'info> {
 /// 4. the mango group
 #[derive(Accounts)]
 pub struct FlashLoanEnd<'info> {
-    #[account(mut)]
+    #[account(
+        mut,
+        constraint = account.load()?.is_operational() @ MangoError::AccountIsFrozen
+    )]
     pub account: AccountLoader<'info, MangoAccountFixed>,
     // owner is checked at #1
     pub owner: Signer<'info>,

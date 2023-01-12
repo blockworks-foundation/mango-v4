@@ -12,7 +12,11 @@ pub struct PerpLiqForceCancelOrders<'info> {
     )]
     pub group: AccountLoader<'info, Group>,
 
-    #[account(mut, has_one = group)]
+    // Allow force cancel even if account is frozen
+    #[account(
+        mut,
+        has_one = group
+    )]
     pub account: AccountLoader<'info, MangoAccountFixed>,
 
     #[account(

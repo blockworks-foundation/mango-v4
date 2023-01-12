@@ -20,7 +20,8 @@ pub struct TokenLiqWithToken<'info> {
 
     #[account(
         mut,
-        has_one = group
+        has_one = group,
+        constraint = liqor.load()?.is_operational() @ MangoError::AccountIsFrozen
         // liqor_owner is checked at #1
     )]
     pub liqor: AccountLoader<'info, MangoAccountFixed>,
@@ -28,7 +29,8 @@ pub struct TokenLiqWithToken<'info> {
 
     #[account(
         mut,
-        has_one = group
+        has_one = group,
+        constraint = liqee.load()?.is_operational() @ MangoError::AccountIsFrozen
     )]
     pub liqee: AccountLoader<'info, MangoAccountFixed>,
 }

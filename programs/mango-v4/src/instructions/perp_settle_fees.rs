@@ -21,7 +21,11 @@ pub struct PerpSettleFees<'info> {
     pub perp_market: AccountLoader<'info, PerpMarket>,
 
     // This account MUST have a loss
-    #[account(mut, has_one = group)]
+    #[account(
+        mut,
+        has_one = group,
+        constraint = account.load()?.is_operational() @ MangoError::AccountIsFrozen
+    )]
     pub account: AccountLoader<'info, MangoAccountFixed>,
 
     /// CHECK: Oracle can have different account types, constrained by address in perp_market

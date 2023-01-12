@@ -31,6 +31,7 @@ export class MangoAccount {
       netDeposits: BN;
       perpSpotTransfers: BN;
       healthRegionBeginInitHealth: BN;
+      frozenUntil: BN;
       headerVersion: number;
       tokens: unknown;
       serum3: unknown;
@@ -50,6 +51,7 @@ export class MangoAccount {
       obj.netDeposits,
       obj.perpSpotTransfers,
       obj.healthRegionBeginInitHealth,
+      obj.frozenUntil,
       obj.headerVersion,
       obj.tokens as TokenPositionDto[],
       obj.serum3 as Serum3PositionDto[],
@@ -71,6 +73,7 @@ export class MangoAccount {
     public netDeposits: BN,
     public perpSpotTransfers: BN,
     public healthRegionBeginInitHealth: BN,
+    public frozenUntil: BN,
     public headerVersion: number,
     tokens: TokenPositionDto[],
     serum3: Serum3PositionDto[],
@@ -132,6 +135,10 @@ export class MangoAccount {
     return this.delegate.equals(
       (client.program.provider as AnchorProvider).wallet.publicKey,
     );
+  }
+
+  public isOperational(): boolean {
+    return this.frozenUntil.lt(new BN(Date.now() / 1000));
   }
 
   public tokensActive(): TokenPosition[] {

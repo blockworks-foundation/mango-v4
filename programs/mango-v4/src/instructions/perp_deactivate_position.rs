@@ -12,7 +12,8 @@ pub struct PerpDeactivatePosition<'info> {
 
     #[account(
         mut,
-        has_one = group
+        has_one = group,
+        constraint = account.load()?.is_operational() @ MangoError::AccountIsFrozen
         // owner is checked at #1
     )]
     pub account: AccountLoader<'info, MangoAccountFixed>,

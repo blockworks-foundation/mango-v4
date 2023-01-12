@@ -1023,6 +1023,32 @@ export type MangoV4 = {
       ]
     },
     {
+      "name": "aaccountToggleFreeze",
+      "accounts": [
+        {
+          "name": "group",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "account",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "admin",
+          "isMut": false,
+          "isSigner": true
+        }
+      ],
+      "args": [
+        {
+          "name": "freeze",
+          "type": "bool"
+        }
+      ]
+    },
+    {
       "name": "accountClose",
       "accounts": [
         {
@@ -4003,11 +4029,15 @@ export type MangoV4 = {
             "type": "i64"
           },
           {
+            "name": "frozenUntil",
+            "type": "i64"
+          },
+          {
             "name": "reserved",
             "type": {
               "array": [
                 "u8",
-                240
+                232
               ]
             }
           },
@@ -5426,11 +5456,15 @@ export type MangoV4 = {
             "type": "i64"
           },
           {
+            "name": "frozenUntil",
+            "type": "u64"
+          },
+          {
             "name": "reserved",
             "type": {
               "array": [
                 "u8",
-                240
+                232
               ]
             }
           }
@@ -7673,6 +7707,11 @@ export type MangoV4 = {
       "code": 6037,
       "name": "HasLiquidatableTrustedPerpPnl",
       "msg": "has liquidatable trusted perp pnl"
+    },
+    {
+      "code": 6038,
+      "name": "AccountIsFrozen",
+      "msg": "account is frozen"
     }
   ]
 };
@@ -8702,6 +8741,32 @@ export const IDL: MangoV4 = {
       ]
     },
     {
+      "name": "aaccountToggleFreeze",
+      "accounts": [
+        {
+          "name": "group",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "account",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "admin",
+          "isMut": false,
+          "isSigner": true
+        }
+      ],
+      "args": [
+        {
+          "name": "freeze",
+          "type": "bool"
+        }
+      ]
+    },
+    {
       "name": "accountClose",
       "accounts": [
         {
@@ -11682,11 +11747,15 @@ export const IDL: MangoV4 = {
             "type": "i64"
           },
           {
+            "name": "frozenUntil",
+            "type": "i64"
+          },
+          {
             "name": "reserved",
             "type": {
               "array": [
                 "u8",
-                240
+                232
               ]
             }
           },
@@ -13105,11 +13174,15 @@ export const IDL: MangoV4 = {
             "type": "i64"
           },
           {
+            "name": "frozenUntil",
+            "type": "u64"
+          },
+          {
             "name": "reserved",
             "type": {
               "array": [
                 "u8",
-                240
+                232
               ]
             }
           }
@@ -15352,6 +15425,11 @@ export const IDL: MangoV4 = {
       "code": 6037,
       "name": "HasLiquidatableTrustedPerpPnl",
       "msg": "has liquidatable trusted perp pnl"
+    },
+    {
+      "code": 6038,
+      "name": "AccountIsFrozen",
+      "msg": "account is frozen"
     }
   ]
 };
