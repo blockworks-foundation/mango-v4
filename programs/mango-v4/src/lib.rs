@@ -222,7 +222,7 @@ pub mod mango_v4 {
         instructions::account_edit(ctx, name_opt, delegate_opt)
     }
 
-    pub fn aaccount_toggle_freeze(ctx: Context<AccountToggleFreeze>, freeze: bool) -> Result<()> {
+    pub fn account_toggle_freeze(ctx: Context<AccountToggleFreeze>, freeze: bool) -> Result<()> {
         instructions::account_toggle_freeze(ctx, freeze)
     }
 
