@@ -310,12 +310,13 @@ impl HealthCache {
         let prices = &perp_info.prices;
         let base_lot_size = I80F48::from(perp_info.base_lot_size);
 
-        // If the price is sufficiently good then health will just increase from trading
-        // TODO: This is not actually correct, since perp health for untrusted markets can't go above 0
+        // If the price is sufficiently good then health will just increase from trading.
+        // It's ok to ignore the pnl_asset_weight here because we'll jump out early if this
+        // slope is >=0, and the extra asset weight would just decrease it.
         let final_health_slope = if direction == 1 {
-            perp_info.init_asset_weight * prices.asset(health_type) - price
+            perp_info.init_base_asset_weight * prices.asset(health_type) - price
         } else {
-            price - perp_info.init_liab_weight * prices.liab(health_type)
+            price - perp_info.init_base_liab_weight * prices.liab(health_type)
         };
         if final_health_slope >= 0 {
             return Ok(i64::MAX);
@@ -374,8 +375,7 @@ impl HealthCache {
             let perp_info = &start_cache.perp_infos[perp_info_index];
             let start_health_uncapped = start_health
                 - perp_info.health_contribution(HealthType::Init)
-                + perp_info.uncapped_health_contribution(HealthType::Init);
-
+                + perp_info.unweighted_health_contribution(HealthType::Init);
             // We add 1 here because health is computed for truncated base_lots and we want to guarantee
             // zero_health_ratio <= 0.
             let zero_health_amount = case1_start_i80f48
@@ -938,10 +938,12 @@ mod tests {
         let base_lot_size = 100;
         let default_perp_info = |x| PerpInfo {
             perp_market_index: 0,
-            maint_asset_weight: I80F48::from_num(1.0 - x),
-            init_asset_weight: I80F48::from_num(1.0 - x),
-            maint_liab_weight: I80F48::from_num(1.0 + x),
-            init_liab_weight: I80F48::from_num(1.0 + x),
+            maint_base_asset_weight: I80F48::from_num(1.0 - x),
+            init_base_asset_weight: I80F48::from_num(1.0 - x),
+            maint_base_liab_weight: I80F48::from_num(1.0 + x),
+            init_base_liab_weight: I80F48::from_num(1.0 + x),
+            maint_pnl_asset_weight: I80F48::from_num(0.6),
+            init_pnl_asset_weight: I80F48::from_num(0.6),
             base_lot_size,
             base_lots: 0,
             bids_base_lots: 0,
@@ -949,7 +951,6 @@ mod tests {
             quote: I80F48::ZERO,
             prices: Prices::new_single_price(I80F48::from_num(2.0)),
             has_open_orders: false,
-            trusted_market: false,
         };
 
         let health_cache = HealthCache {
@@ -1088,7 +1089,7 @@ mod tests {
             )
             .unwrap();
 
-        let mut perp1 = mock_perp_market(group, oracle1.pubkey, 1.0, 9, 0.2, 0.1);
+        let mut perp1 = mock_perp_market(group, oracle1.pubkey, 1.0, 9, (0.2, 0.1), (0.05, 0.02));
         perp1.data().long_funding = I80F48::from_num(10.1);
         let perpaccount = account.ensure_perp_position(9, 1).unwrap().0;
         perpaccount.record_trade(perp1.data(), 10, I80F48::from(-110));
@@ -1126,8 +1127,8 @@ mod tests {
 
         let mut oo1 = TestAccount::<OpenOrders>::new_zeroed();
 
-        let mut perp1 = mock_perp_market(group, oracle1.pubkey, 1.0, 9, 0.2, 0.1);
-        let mut perp2 = mock_perp_market(group, oracle2.pubkey, 5.0, 8, 0.2, 0.1);
+        let mut perp1 = mock_perp_market(group, oracle1.pubkey, 1.0, 9, (0.2, 0.1), (0.05, 0.02));
+        let mut perp2 = mock_perp_market(group, oracle2.pubkey, 5.0, 8, (0.2, 0.1), (0.05, 0.02));
 
         let oracle1_account_info = oracle1.as_account_info();
         let oracle2_account_info = oracle2.as_account_info();
@@ -1180,7 +1181,7 @@ mod tests {
             )
             .unwrap();
 
-        let mut perp1 = mock_perp_market(group, oracle1.pubkey, 1.0, 9, 0.2, 0.1);
+        let mut perp1 = mock_perp_market(group, oracle1.pubkey, 1.0, 9, (0.2, 0.1), (0.05, 0.02));
         perp1.data().stable_price_model.stable_price = 0.5;
         let perpaccount = account3.ensure_perp_position(9, 1).unwrap().0;
         perpaccount.record_trade(perp1.data(), 10, I80F48::from(-100));

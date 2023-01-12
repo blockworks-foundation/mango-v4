@@ -26,8 +26,8 @@ pub struct PerpMarket {
     /// Lookup indices
     pub perp_market_index: PerpMarketIndex,
 
-    /// May this market contribute positive values to health?
-    pub trusted_market: u8,
+    // Used to store trusted_market here
+    pub blocked1: u8,
 
     /// Is this market covered by the group insurance fund?
     pub group_insurance_fund: u8,
@@ -56,10 +56,10 @@ pub struct PerpMarket {
 
     // These weights apply to the base asset, the quote token is always assumed to be
     // the health-reference token and have 1 for price and weights
-    pub maint_asset_weight: I80F48,
-    pub init_asset_weight: I80F48,
-    pub maint_liab_weight: I80F48,
-    pub init_liab_weight: I80F48,
+    pub maint_base_asset_weight: I80F48,
+    pub init_base_asset_weight: I80F48,
+    pub maint_base_liab_weight: I80F48,
+    pub init_base_liab_weight: I80F48,
 
     pub open_interest: i64,
 
@@ -114,8 +114,12 @@ pub struct PerpMarket {
     pub settle_pnl_limit_window_size_ts: u64,
 
     pub reduce_only: u8,
+    pub padding4: [u8; 7],
 
-    pub reserved: [u8; 1943],
+    pub maint_pnl_asset_weight: I80F48,
+    pub init_pnl_asset_weight: I80F48,
+
+    pub reserved: [u8; 1904],
 }
 
 const_assert_eq!(
@@ -149,7 +153,9 @@ const_assert_eq!(
         + 8
         + 8
         + 1
-        + 1943
+        + 7
+        + 2 * 16
+        + 1904
 );
 const_assert_eq!(size_of::<PerpMarket>(), 2808);
 const_assert_eq!(size_of::<PerpMarket>() % 8, 0);
@@ -171,10 +177,6 @@ impl PerpMarket {
 
     pub fn set_elligible_for_group_insurance_fund(&mut self, v: bool) {
         self.group_insurance_fund = u8::from(v);
-    }
-
-    pub fn trusted_market(&self) -> bool {
-        self.trusted_market == 1
     }
 
     pub fn settle_pnl_limit_factor(&self) -> I80F48 {
@@ -288,8 +290,8 @@ impl PerpMarket {
         oracle_price: I80F48,
     ) -> bool {
         match side {
-            Side::Bid => native_price <= cm!(self.maint_liab_weight * oracle_price),
-            Side::Ask => native_price >= cm!(self.maint_asset_weight * oracle_price),
+            Side::Bid => native_price <= cm!(self.maint_base_liab_weight * oracle_price),
+            Side::Ask => native_price >= cm!(self.maint_base_asset_weight * oracle_price),
         }
     }
 
@@ -319,7 +321,7 @@ impl PerpMarket {
             group: Pubkey::new_unique(),
             settle_token_index: 0,
             perp_market_index: 0,
-            trusted_market: 0,
+            blocked1: 0,
             group_insurance_fund: 0,
             bump: 0,
             base_decimals: 0,
@@ -336,10 +338,10 @@ impl PerpMarket {
             stable_price_model: StablePriceModel::default(),
             quote_lot_size: 1,
             base_lot_size: 1,
-            maint_asset_weight: I80F48::from(1),
-            init_asset_weight: I80F48::from(1),
-            maint_liab_weight: I80F48::from(1),
-            init_liab_weight: I80F48::from(1),
+            maint_base_asset_weight: I80F48::from(1),
+            init_base_asset_weight: I80F48::from(1),
+            maint_base_liab_weight: I80F48::from(1),
+            init_base_liab_weight: I80F48::from(1),
             open_interest: 0,
             seq_num: 0,
             registration_time: 0,
@@ -362,7 +364,10 @@ impl PerpMarket {
             padding3: Default::default(),
             settle_pnl_limit_window_size_ts: 24 * 60 * 60,
             reduce_only: 0,
-            reserved: [0; 1943],
+            padding4: Default::default(),
+            maint_pnl_asset_weight: I80F48::ONE,
+            init_pnl_asset_weight: I80F48::ONE,
+            reserved: [0; 1904],
         }
     }
 }
