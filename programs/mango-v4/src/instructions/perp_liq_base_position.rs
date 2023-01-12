@@ -45,7 +45,11 @@ pub fn perp_liq_base_position(
             .is_owner_or_delegate(ctx.accounts.liqor_owner.key()),
         MangoError::SomeError
     );
-    require!(!liqor.fixed.being_liquidated(), MangoError::BeingLiquidated);
+    require_msg_typed!(
+        !liqor.fixed.being_liquidated(),
+        MangoError::BeingLiquidated,
+        "liqor account"
+    );
 
     let mut liqee = ctx.accounts.liqee.load_full_mut()?;
 

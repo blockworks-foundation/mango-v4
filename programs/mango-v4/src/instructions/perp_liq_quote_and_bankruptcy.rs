@@ -98,7 +98,11 @@ pub fn perp_liq_quote_and_bankruptcy(
             .is_owner_or_delegate(ctx.accounts.liqor_owner.key()),
         MangoError::SomeError
     );
-    require!(!liqor.fixed.being_liquidated(), MangoError::BeingLiquidated);
+    require_msg_typed!(
+        !liqor.fixed.being_liquidated(),
+        MangoError::BeingLiquidated,
+        "liqor account"
+    );
 
     let mut liqee_health_cache = {
         let retriever = ScanningAccountRetriever::new(ctx.remaining_accounts, &mango_group)
