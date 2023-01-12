@@ -91,7 +91,6 @@ pub fn perp_settle_fees(ctx: Context<PerpSettleFees>, max_settle_amount: u64) ->
     emit_perp_balances(
         ctx.accounts.group.key(),
         ctx.accounts.account.key(),
-        perp_market.perp_market_index,
         perp_position,
         &perp_market,
     );
