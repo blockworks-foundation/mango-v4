@@ -677,7 +677,7 @@ export class MangoClient {
     freeze: boolean,
   ): Promise<TransactionSignature> {
     return await this.program.methods
-      .aaccountToggleFreeze(freeze)
+      .accountToggleFreeze(freeze)
       .accounts({
         group: group.publicKey,
         account: mangoAccount.publicKey,

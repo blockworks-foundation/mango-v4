@@ -1023,7 +1023,7 @@ export type MangoV4 = {
       ]
     },
     {
-      "name": "aaccountToggleFreeze",
+      "name": "accountToggleFreeze",
       "accounts": [
         {
           "name": "group",
@@ -8741,7 +8741,7 @@ export const IDL: MangoV4 = {
       ]
     },
     {
-      "name": "aaccountToggleFreeze",
+      "name": "accountToggleFreeze",
       "accounts": [
         {
           "name": "group",
