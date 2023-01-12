@@ -671,6 +671,21 @@ export class MangoClient {
     );
   }
 
+  public async toggleMangoAccountFreeze(
+    group: Group,
+    mangoAccount: MangoAccount,
+    freeze: boolean,
+  ): Promise<TransactionSignature> {
+    return await this.program.methods
+      .aaccountToggleFreeze(freeze)
+      .accounts({
+        group: group.publicKey,
+        account: mangoAccount.publicKey,
+        admin: (this.program.provider as AnchorProvider).wallet.publicKey,
+      })
+      .rpc();
+  }
+
   public async getMangoAccount(
     mangoAccount: MangoAccount | PublicKey,
   ): Promise<MangoAccount> {

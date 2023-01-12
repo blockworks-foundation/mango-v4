@@ -86,7 +86,9 @@ pub struct MangoAccount {
     /// Init health as calculated during HealthReginBegin, rounded up.
     pub health_region_begin_init_health: i64,
 
-    pub reserved: [u8; 240],
+    pub frozen_until: i64,
+
+    pub reserved: [u8; 232],
 
     // dynamic
     pub header_version: u8,
@@ -120,7 +122,8 @@ impl MangoAccount {
             padding: Default::default(),
             net_deposits: 0,
             health_region_begin_init_health: 0,
-            reserved: [0; 240],
+            frozen_until: 0,
+            reserved: [0; 232],
             header_version: DEFAULT_MANGO_ACCOUNT_VERSION,
             padding3: Default::default(),
             padding4: Default::default(),
@@ -201,9 +204,10 @@ pub struct MangoAccountFixed {
     pub net_deposits: i64,
     pub perp_spot_transfers: i64,
     pub health_region_begin_init_health: i64,
-    pub reserved: [u8; 240],
+    pub frozen_until: u64,
+    pub reserved: [u8; 232],
 }
-const_assert_eq!(size_of::<MangoAccountFixed>(), 32 * 4 + 8 + 3 * 8 + 240);
+const_assert_eq!(size_of::<MangoAccountFixed>(), 32 * 4 + 8 + 3 * 8 + 8 + 232);
 const_assert_eq!(size_of::<MangoAccountFixed>(), 400);
 const_assert_eq!(size_of::<MangoAccountFixed>() % 8, 0);
 
@@ -212,6 +216,11 @@ impl MangoAccountFixed {
         std::str::from_utf8(&self.name)
             .unwrap()
             .trim_matches(char::from(0))
+    }
+
+    pub fn is_operational(&self) -> bool {
+        let now_ts: u64 = Clock::get().unwrap().unix_timestamp.try_into().unwrap();
+        self.frozen_until < now_ts
     }
 
     pub fn is_owner_or_delegate(&self, ix_signer: Pubkey) -> bool {

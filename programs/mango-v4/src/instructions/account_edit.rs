@@ -14,7 +14,8 @@ pub struct AccountEdit<'info> {
     #[account(
         mut,
         has_one = group,
-        has_one = owner
+        has_one = owner,
+        constraint = account.load()?.is_operational() @ MangoError::AccountIsFrozen
     )]
     pub account: AccountLoader<'info, MangoAccountFixed>,
     pub owner: Signer<'info>,

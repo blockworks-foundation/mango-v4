@@ -18,7 +18,10 @@ pub struct HealthRegionBegin<'info> {
     #[account(address = tx_instructions::ID)]
     pub instructions: UncheckedAccount<'info>,
 
-    #[account(mut)]
+    #[account(
+        mut,
+        constraint = account.load()?.is_operational() @ MangoError::AccountIsFrozen
+    )]
     pub account: AccountLoader<'info, MangoAccountFixed>,
 }
 
@@ -27,7 +30,10 @@ pub struct HealthRegionBegin<'info> {
 /// remaining_accounts: health accounts for account
 #[derive(Accounts)]
 pub struct HealthRegionEnd<'info> {
-    #[account(mut)]
+    #[account(
+        mut,
+        constraint = account.load()?.is_operational() @ MangoError::AccountIsFrozen
+    )]
     pub account: AccountLoader<'info, MangoAccountFixed>,
 }
 
