@@ -20,6 +20,8 @@ pub struct AccountToggleFreeze<'info> {
     pub admin: Signer<'info>,
 }
 
+// Freezing an account, prevents all instructions involving account (also settling and liquidation), except
+// perp consume events and force cancellation of orders
 pub fn account_toggle_freeze(ctx: Context<AccountToggleFreeze>, freeze: bool) -> Result<()> {
     let mut account = ctx.accounts.account.load_full_mut()?;
     if freeze {

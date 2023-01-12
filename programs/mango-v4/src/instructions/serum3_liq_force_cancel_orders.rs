@@ -19,10 +19,10 @@ pub struct Serum3LiqForceCancelOrders<'info> {
     )]
     pub group: AccountLoader<'info, Group>,
 
+    // Allow force cancel even if account is frozen
     #[account(
         mut,
-        has_one = group,
-        constraint = account.load()?.is_operational() @ MangoError::AccountIsFrozen
+        has_one = group
     )]
     pub account: AccountLoader<'info, MangoAccountFixed>,
 
