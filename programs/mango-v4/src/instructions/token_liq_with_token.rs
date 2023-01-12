@@ -200,9 +200,9 @@ pub fn token_liq_with_token(
 
     // Update the health cache
     liqee_health_cache
-        .adjust_token_balance(&liab_bank, cm!(liqee_liab_native_after - liqee_liab_native))?;
+        .adjust_token_balance(liab_bank, cm!(liqee_liab_native_after - liqee_liab_native))?;
     liqee_health_cache.adjust_token_balance(
-        &asset_bank,
+        asset_bank,
         cm!(liqee_assets_native_after - liqee_asset_native),
     )?;
 
