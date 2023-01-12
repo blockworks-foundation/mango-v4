@@ -270,7 +270,7 @@ pub fn perp_settle_pnl(ctx: Context<PerpSettlePnl>) -> Result<()> {
         mango_group: ctx.accounts.group.key(),
         mango_account_a: ctx.accounts.account_a.key(),
         mango_account_b: ctx.accounts.account_b.key(),
-        perp_market_index: perp_market_index,
+        perp_market_index,
         settlement: settlement.to_bits(),
         settler: ctx.accounts.settler.key(),
         fee: fee.to_bits(),

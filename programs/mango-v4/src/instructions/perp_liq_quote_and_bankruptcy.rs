@@ -219,7 +219,7 @@ pub fn perp_liq_quote_and_bankruptcy(
                 mango_group,
                 liqee: ctx.accounts.liqee.key(),
                 liqor: ctx.accounts.liqor.key(),
-                perp_market_index: perp_market_index,
+                perp_market_index,
                 settlement: settlement.to_bits(),
             });
 
