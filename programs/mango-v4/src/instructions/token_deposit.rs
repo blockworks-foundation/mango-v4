@@ -15,6 +15,9 @@ use crate::logs::{DepositLog, TokenBalanceLog};
 // Same as TokenDeposit, but without the owner signing
 #[derive(Accounts)]
 pub struct TokenDepositIntoExisting<'info> {
+    #[account(
+        constraint = group.load()?.is_operational() @ MangoError::GroupIsHalted
+    )]
     pub group: AccountLoader<'info, Group>,
 
     #[account(mut, has_one = group)]
@@ -45,6 +48,9 @@ pub struct TokenDepositIntoExisting<'info> {
 
 #[derive(Accounts)]
 pub struct TokenDeposit<'info> {
+    #[account(
+        constraint = group.load()?.is_operational() @ MangoError::GroupIsHalted
+    )]
     pub group: AccountLoader<'info, Group>,
 
     #[account(mut, has_one = group, has_one = owner)]

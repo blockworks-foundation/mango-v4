@@ -16,7 +16,7 @@ use crate::logs::TokenMetaDataLog;
 #[derive(Accounts)]
 pub struct TokenEdit<'info> {
     #[account(
-        has_one = admin,
+        has_one = admin
     )]
     pub group: AccountLoader<'info, Group>,
     pub admin: Signer<'info>,

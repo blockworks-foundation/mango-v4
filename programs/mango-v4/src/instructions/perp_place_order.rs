@@ -11,6 +11,9 @@ use crate::state::{
 
 #[derive(Accounts)]
 pub struct PerpPlaceOrder<'info> {
+    #[account(
+        constraint = group.load()?.is_operational() @ MangoError::GroupIsHalted
+    )]
     pub group: AccountLoader<'info, Group>,
 
     #[account(mut, has_one = group)]

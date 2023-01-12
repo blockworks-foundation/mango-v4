@@ -11,6 +11,9 @@ use crate::logs::{emit_perp_balances, PerpLiqBasePositionLog};
 
 #[derive(Accounts)]
 pub struct PerpLiqBasePosition<'info> {
+    #[account(
+        constraint = group.load()?.is_operational() @ MangoError::GroupIsHalted
+    )]
     pub group: AccountLoader<'info, Group>,
 
     #[account(mut, has_one = group, has_one = oracle)]

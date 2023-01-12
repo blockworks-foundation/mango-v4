@@ -1,10 +1,14 @@
 use anchor_lang::prelude::*;
 
+use crate::error::MangoError;
 use crate::state::*;
 use crate::util::checked_math as cm;
 
 #[derive(Accounts)]
 pub struct AccountExpand<'info> {
+    #[account(
+        constraint = group.load()?.is_operational() @ MangoError::GroupIsHalted
+    )]
     pub group: AccountLoader<'info, Group>,
 
     #[account(
