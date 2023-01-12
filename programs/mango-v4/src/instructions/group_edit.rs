@@ -7,7 +7,6 @@ pub struct GroupEdit<'info> {
     #[account(
         mut,
         has_one = admin,
-        constraint = group.load()?.is_operational()
     )]
     pub group: AccountLoader<'info, Group>,
     pub admin: Signer<'info>,

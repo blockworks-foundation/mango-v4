@@ -13,7 +13,7 @@ use crate::logs::{emit_perp_balances, PerpSettleFeesLog, TokenBalanceLog};
 #[derive(Accounts)]
 pub struct PerpSettleFees<'info> {
     #[account(
-        constraint = group.load()?.is_operational()
+        constraint = group.load()?.is_operational() @ MangoError::GroupIsHalted
     )]
     pub group: AccountLoader<'info, Group>,
 

@@ -22,7 +22,7 @@ use crate::logs::{
 pub struct TokenLiqBankruptcy<'info> {
     #[account(
         has_one = insurance_vault,
-        constraint = group.load()?.is_operational()
+        constraint = group.load()?.is_operational() @ MangoError::GroupIsHalted
     )]
     pub group: AccountLoader<'info, Group>,
 

@@ -9,7 +9,7 @@ pub struct AltSet<'info> {
     #[account(
         mut,
         has_one = admin,
-        constraint = group.load()?.is_operational()
+        constraint = group.load()?.is_operational() @ MangoError::GroupIsHalted
     )]
     pub group: AccountLoader<'info, Group>,
     pub admin: Signer<'info>,

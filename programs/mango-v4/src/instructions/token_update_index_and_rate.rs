@@ -27,7 +27,7 @@ pub mod compute_budget {
 #[derive(Accounts)]
 pub struct TokenUpdateIndexAndRate<'info> {
     #[account(
-        constraint = group.load()?.is_operational()
+        constraint = group.load()?.is_operational() @ MangoError::GroupIsHalted
     )]
     pub group: AccountLoader<'info, Group>, // Required for group metadata parsing
 

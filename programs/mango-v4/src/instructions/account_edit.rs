@@ -7,7 +7,7 @@ use crate::util::fill_from_str;
 #[derive(Accounts)]
 pub struct AccountEdit<'info> {
     #[account(
-        constraint = group.load()?.is_operational()
+        constraint = group.load()?.is_operational() @ MangoError::GroupIsHalted
     )]
     pub group: AccountLoader<'info, Group>,
 

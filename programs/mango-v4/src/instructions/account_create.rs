@@ -8,7 +8,7 @@ use crate::util::fill_from_str;
 #[instruction(account_num: u32, token_count: u8, serum3_count: u8, perp_count: u8, perp_oo_count: u8)]
 pub struct AccountCreate<'info> {
     #[account(
-        constraint = group.load()?.is_operational()
+        constraint = group.load()?.is_operational() @ MangoError::GroupIsHalted
     )]
     pub group: AccountLoader<'info, Group>,
 

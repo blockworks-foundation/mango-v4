@@ -7571,6 +7571,11 @@ export type MangoV4 = {
       "code": 6031,
       "name": "MarketInReduceOnlyMode",
       "msg": "market is in reduce only mode"
+    },
+    {
+      "code": 6032,
+      "name": "GroupIsHalted",
+      "msg": "group is halted"
     }
   ]
 };
@@ -15148,6 +15153,11 @@ export const IDL: MangoV4 = {
       "code": 6031,
       "name": "MarketInReduceOnlyMode",
       "msg": "market is in reduce only mode"
+    },
+    {
+      "code": 6032,
+      "name": "GroupIsHalted",
+      "msg": "group is halted"
     }
   ]
 };

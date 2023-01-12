@@ -7,7 +7,7 @@ use crate::state::*;
 #[derive(Accounts)]
 pub struct AccountClose<'info> {
     #[account(
-        constraint = group.load()?.is_operational()
+        constraint = group.load()?.is_operational() @ MangoError::GroupIsHalted
     )]
     pub group: AccountLoader<'info, Group>,
 

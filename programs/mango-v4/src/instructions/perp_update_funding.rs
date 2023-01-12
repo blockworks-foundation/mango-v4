@@ -1,12 +1,13 @@
 use anchor_lang::prelude::*;
 
 use crate::accounts_zerocopy::*;
+use crate::error::MangoError;
 use crate::state::{BookSide, Group, Orderbook, PerpMarket};
 
 #[derive(Accounts)]
 pub struct PerpUpdateFunding<'info> {
     #[account(
-        constraint = group.load()?.is_operational()
+        constraint = group.load()?.is_operational() @ MangoError::GroupIsHalted
     )]
     pub group: AccountLoader<'info, Group>, // Required for group metadata parsing
 

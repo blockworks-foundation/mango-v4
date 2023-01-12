@@ -2,13 +2,13 @@ use anchor_lang::prelude::*;
 use anchor_spl::token::Mint;
 use fixed::types::I80F48;
 
-use crate::state::*;
+use crate::{state::*, error::MangoError};
 
 #[derive(Accounts)]
 pub struct StubOracleCreate<'info> {
     #[account(
         has_one = admin,
-        constraint = group.load()?.is_operational()
+        constraint = group.load()?.is_operational() @ MangoError::GroupIsHalted
     )]
     pub group: AccountLoader<'info, Group>,
 

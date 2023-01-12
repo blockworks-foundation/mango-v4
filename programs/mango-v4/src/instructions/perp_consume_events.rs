@@ -10,7 +10,7 @@ use crate::logs::{emit_perp_balances, FillLog};
 #[derive(Accounts)]
 pub struct PerpConsumeEvents<'info> {
     #[account(
-        constraint = group.load()?.is_operational()
+        constraint = group.load()?.is_operational() @ MangoError::GroupIsHalted
     )]
     pub group: AccountLoader<'info, Group>,
 

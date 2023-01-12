@@ -19,7 +19,7 @@ const FIRST_BANK_NUM: u32 = 0;
 pub struct TokenRegister<'info> {
     #[account(
         has_one = admin,
-        constraint = group.load()?.is_operational()
+        constraint = group.load()?.is_operational() @ MangoError::GroupIsHalted
     )]
     pub group: AccountLoader<'info, Group>,
     pub admin: Signer<'info>,

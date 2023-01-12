@@ -16,7 +16,7 @@ use crate::util::checked_math as cm;
 #[derive(Accounts)]
 pub struct TokenWithdraw<'info> {
     #[account(
-        constraint = group.load()?.is_operational()
+        constraint = group.load()?.is_operational() @ MangoError::GroupIsHalted
     )]
     pub group: AccountLoader<'info, Group>,
 

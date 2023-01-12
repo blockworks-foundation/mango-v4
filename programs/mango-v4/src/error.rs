@@ -69,6 +69,8 @@ pub enum MangoError {
     TokenInReduceOnlyMode,
     #[msg("market is in reduce only mode")]
     MarketInReduceOnlyMode,
+    #[msg("group is halted")]
+    GroupIsHalted,
 }
 
 impl MangoError {

@@ -12,7 +12,7 @@ use crate::state::{Group, MangoAccountFixed, MangoAccountLoader, PerpMarket};
 #[derive(Accounts)]
 pub struct PerpSettlePnl<'info> {
     #[account(
-        constraint = group.load()?.is_operational()
+        constraint = group.load()?.is_operational() @ MangoError::GroupIsHalted
     )]
     pub group: AccountLoader<'info, Group>,
 

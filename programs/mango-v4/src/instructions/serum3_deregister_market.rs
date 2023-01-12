@@ -1,7 +1,7 @@
 use anchor_lang::prelude::*;
 use anchor_spl::token::Token;
 
-use crate::state::*;
+use crate::{state::*, error::MangoError};
 
 #[derive(Accounts)]
 pub struct Serum3DeregisterMarket<'info> {
@@ -9,7 +9,7 @@ pub struct Serum3DeregisterMarket<'info> {
         mut,
         has_one = admin,
         constraint = group.load()?.is_testing(),
-        constraint = group.load()?.is_operational()
+        constraint = group.load()?.is_operational() @ MangoError::GroupIsHalted
     )]
     pub group: AccountLoader<'info, Group>,
     pub admin: Signer<'info>,

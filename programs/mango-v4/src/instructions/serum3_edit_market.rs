@@ -7,7 +7,6 @@ use crate::state::*;
 pub struct Serum3EditMarket<'info> {
     #[account(
         has_one = admin,
-        constraint = group.load()?.is_operational(),
         constraint = group.load()?.serum3_supported()
     )]
     pub group: AccountLoader<'info, Group>,

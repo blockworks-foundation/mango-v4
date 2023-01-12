@@ -13,7 +13,7 @@ use crate::logs::PerpMarketMetaDataLog;
 pub struct PerpCreateMarket<'info> {
     #[account(
         has_one = admin,
-        constraint = group.load()?.is_operational(),
+        constraint = group.load()?.is_operational() @ MangoError::GroupIsHalted,
         constraint = group.load()?.perps_supported(),
     )]
     pub group: AccountLoader<'info, Group>,

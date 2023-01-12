@@ -16,8 +16,7 @@ use crate::logs::TokenMetaDataLog;
 #[derive(Accounts)]
 pub struct TokenEdit<'info> {
     #[account(
-        has_one = admin,
-        constraint = group.load()?.is_operational()
+        has_one = admin
     )]
     pub group: AccountLoader<'info, Group>,
     pub admin: Signer<'info>,
