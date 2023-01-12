@@ -8,14 +8,13 @@ use borsh::BorshSerialize;
 pub fn emit_perp_balances(
     mango_group: Pubkey,
     mango_account: Pubkey,
-    market_index: u16,
     pp: &PerpPosition,
     pm: &PerpMarket,
 ) {
     emit!(PerpBalanceLog {
         mango_group,
         mango_account,
-        market_index,
+        market_index: pm.perp_market_index,
         base_position: pp.base_position_lots(),
         quote_position: pp.quote_position_native().to_bits(),
         long_settled_funding: pp.long_settled_funding.to_bits(),
@@ -212,6 +211,8 @@ pub struct TokenLiqBankruptcyLog {
     pub insurance_token_index: u16,
     pub insurance_transfer: i128,
     pub socialized_loss: i128,
+    pub starting_liab_deposit_index: i128,
+    pub ending_liab_deposit_index: i128,
 }
 
 #[event]
@@ -286,6 +287,19 @@ pub struct PerpLiqBankruptcyLog {
     pub perp_market_index: u16,
     pub insurance_transfer: i128,
     pub socialized_loss: i128,
+    pub starting_long_funding: i128,
+    pub starting_short_funding: i128,
+    pub ending_long_funding: i128,
+    pub ending_short_funding: i128,
+}
+
+#[event]
+pub struct PerpLiqQuoteAndBankruptcyLog {
+    pub mango_group: Pubkey,
+    pub liqee: Pubkey,
+    pub liqor: Pubkey,
+    pub perp_market_index: u16,
+    pub settlement: i128,
 }
 
 #[event]

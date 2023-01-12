@@ -4,8 +4,7 @@ use fixed::types::I80F48;
 
 use crate::error::*;
 use crate::state::{
-    Bank, MangoAccountFixed, MangoAccountRef, PerpMarket, PerpMarketIndex, PerpPosition,
-    Serum3MarketIndex, TokenIndex,
+    Bank, MangoAccountRef, PerpMarket, PerpMarketIndex, PerpPosition, Serum3MarketIndex, TokenIndex,
 };
 use crate::util::checked_math as cm;
 
@@ -135,6 +134,8 @@ pub struct Serum3Info {
     pub base_index: usize,
     pub quote_index: usize,
     pub market_index: Serum3MarketIndex,
+    /// The open orders account has no free or reserved funds
+    pub has_zero_funds: bool,
 }
 
 impl Serum3Info {
@@ -328,29 +329,6 @@ impl HealthCache {
         health
     }
 
-    pub fn check_health_pre(&self, account: &mut MangoAccountFixed) -> Result<I80F48> {
-        let pre_health = self.health(HealthType::Init);
-        msg!("pre_health: {}", pre_health);
-        account.maybe_recover_from_being_liquidated(pre_health);
-        require!(!account.being_liquidated(), MangoError::BeingLiquidated);
-        Ok(pre_health)
-    }
-
-    pub fn check_health_post(
-        &self,
-        account: &mut MangoAccountFixed,
-        pre_health: I80F48,
-    ) -> Result<()> {
-        let post_health = self.health(HealthType::Init);
-        msg!("post_health: {}", post_health);
-        require!(
-            post_health >= 0 || post_health > pre_health,
-            MangoError::HealthMustBePositiveOrIncrease
-        );
-        account.maybe_recover_from_being_liquidated(post_health);
-        Ok(())
-    }
-
     pub fn token_info(&self, token_index: TokenIndex) -> Result<&TokenInfo> {
         Ok(&self.token_infos[self.token_info_index(token_index)?])
     }
@@ -446,13 +424,94 @@ impl HealthCache {
         })
     }
 
+    pub fn has_serum3_open_orders_funds(&self) -> bool {
+        self.serum3_infos.iter().any(|si| !si.has_zero_funds)
+    }
+
+    pub fn has_perp_open_orders(&self) -> bool {
+        self.perp_infos.iter().any(|p| p.has_open_orders)
+    }
+
+    pub fn has_perp_base_positions(&self) -> bool {
+        self.perp_infos.iter().any(|p| p.base_lots != 0)
+    }
+
+    pub fn has_perp_positive_trusted_pnl_without_base_position(&self) -> bool {
+        self.perp_infos
+            .iter()
+            .any(|p| p.trusted_market && p.base_lots == 0 && p.quote > 0)
+    }
+
+    pub fn has_perp_negative_pnl(&self) -> bool {
+        self.perp_infos.iter().any(|p| p.quote < 0)
+    }
+
+    /// Phase1 is spot/perp order cancellation and spot settlement since
+    /// neither of these come at a cost to the liqee
+    pub fn has_phase1_liquidatable(&self) -> bool {
+        self.has_serum3_open_orders_funds() || self.has_perp_open_orders()
+    }
+
+    pub fn require_after_phase1_liquidation(&self) -> Result<()> {
+        require!(
+            !self.has_serum3_open_orders_funds(),
+            MangoError::HasOpenOrUnsettledSerum3Orders
+        );
+        require!(!self.has_perp_open_orders(), MangoError::HasOpenPerpOrders);
+        Ok(())
+    }
+
+    pub fn in_phase1_liquidation(&self) -> bool {
+        self.has_phase1_liquidatable()
+    }
+
+    /// Phase2 is for:
+    /// - token-token liquidation
+    /// - liquidation of perp base positions
+    /// - bringing positive trusted perp pnl into the spot realm
+    pub fn has_phase2_liquidatable(&self) -> bool {
+        self.has_spot_assets() && self.has_spot_borrows()
+            || self.has_perp_base_positions()
+            || self.has_perp_positive_trusted_pnl_without_base_position()
+    }
+
+    pub fn require_after_phase2_liquidation(&self) -> Result<()> {
+        self.require_after_phase1_liquidation()?;
+        require!(
+            !self.has_spot_assets() || !self.has_spot_borrows(),
+            MangoError::HasLiquidatableTokenPosition
+        );
+        require!(
+            !self.has_perp_base_positions(),
+            MangoError::HasLiquidatablePerpBasePosition
+        );
+        require!(
+            !self.has_perp_positive_trusted_pnl_without_base_position(),
+            MangoError::HasLiquidatableTrustedPerpPnl
+        );
+        Ok(())
+    }
+
+    pub fn in_phase2_liquidation(&self) -> bool {
+        !self.has_phase1_liquidatable() && self.has_phase2_liquidatable()
+    }
+
+    /// Phase3 is bankruptcy:
+    /// - token bankruptcy
+    /// - perp bankruptcy
+    pub fn has_phase3_liquidatable(&self) -> bool {
+        self.has_spot_borrows() || self.has_perp_negative_pnl()
+    }
+
+    pub fn in_phase3_liquidation(&self) -> bool {
+        !self.has_phase1_liquidatable()
+            && !self.has_phase2_liquidatable()
+            && self.has_phase3_liquidatable()
+    }
+
     pub fn has_liquidatable_assets(&self) -> bool {
         let spot_liquidatable = self.has_spot_assets();
-        // can use serum3_liq_force_cancel_orders
-        let serum3_cancelable = self
-            .serum3_infos
-            .iter()
-            .any(|si| si.reserved_base != 0 || si.reserved_quote != 0);
+        let serum3_cancelable = self.has_serum3_open_orders_funds();
         let perp_liquidatable = self.perp_infos.iter().any(|p| {
             // can use perp_liq_base_position
             p.base_lots != 0
@@ -475,6 +534,21 @@ impl HealthCache {
             .iter()
             .any(|p| p.quote.is_negative() || p.base_lots != 0);
         self.has_spot_borrows() || perp_borrows
+    }
+
+    pub fn has_liquidatable_spot_or_perp_base(&self) -> bool {
+        let spot_liquidatable = self.has_spot_assets();
+        let serum3_cancelable = self.has_serum3_open_orders_funds();
+        let perp_liquidatable = self.perp_infos.iter().any(|p| {
+            // can use perp_liq_base_position
+            p.base_lots != 0
+            // can use perp_liq_force_cancel_orders
+            || p.has_open_orders
+            // A remaining quote position can be reduced with perp_settle_pnl and that can improve health.
+            // However, since it's not guaranteed that there is a counterparty, a positive perp quote position
+            // does not prevent bankruptcy.
+        });
+        spot_liquidatable || serum3_cancelable || perp_liquidatable
     }
 
     pub(crate) fn compute_serum3_reservations(
@@ -671,6 +745,9 @@ pub fn new_health_cache(
             base_index,
             quote_index,
             market_index: serum_account.market_index,
+            has_zero_funds: oo.native_coin_total == 0
+                && oo.native_pc_total == 0
+                && oo.referrer_rebates_accrued == 0,
         });
     }
 

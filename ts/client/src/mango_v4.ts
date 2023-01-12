@@ -3391,16 +3391,11 @@ export type MangoV4 = {
       ]
     },
     {
-      "name": "perpLiqBankruptcy",
+      "name": "perpLiqQuoteAndBankruptcy",
       "accounts": [
         {
           "name": "group",
           "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "perpMarket",
-          "isMut": true,
           "isSigner": false
         },
         {
@@ -3416,6 +3411,16 @@ export type MangoV4 = {
         {
           "name": "liqee",
           "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "perpMarket",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "oracle",
+          "isMut": false,
           "isSigner": false
         },
         {
@@ -4813,6 +4818,13 @@ export type MangoV4 = {
           {
             "name": "marketIndex",
             "type": "u16"
+          },
+          {
+            "name": "hasZeroFunds",
+            "docs": [
+              "The open orders account has no free or reserved funds"
+            ],
+            "type": "bool"
           }
         ]
       }
@@ -7077,6 +7089,16 @@ export type MangoV4 = {
           "name": "socializedLoss",
           "type": "i128",
           "index": false
+        },
+        {
+          "name": "startingLiabDepositIndex",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "endingLiabDepositIndex",
+          "type": "i128",
+          "index": false
         }
       ]
     },
@@ -7342,6 +7364,56 @@ export type MangoV4 = {
           "name": "socializedLoss",
           "type": "i128",
           "index": false
+        },
+        {
+          "name": "startingLongFunding",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "startingShortFunding",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "endingLongFunding",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "endingShortFunding",
+          "type": "i128",
+          "index": false
+        }
+      ]
+    },
+    {
+      "name": "PerpLiqQuoteAndBankruptcyLog",
+      "fields": [
+        {
+          "name": "mangoGroup",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "liqee",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "liqor",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "perpMarketIndex",
+          "type": "u16",
+          "index": false
+        },
+        {
+          "name": "settlement",
+          "type": "i128",
+          "index": false
         }
       ]
     },
@@ -7576,6 +7648,31 @@ export type MangoV4 = {
       "code": 6032,
       "name": "GroupIsHalted",
       "msg": "group is halted"
+    },
+    {
+      "code": 6033,
+      "name": "PerpHasBaseLots",
+      "msg": "the perp position has non-zero base lots"
+    },
+    {
+      "code": 6034,
+      "name": "HasOpenOrUnsettledSerum3Orders",
+      "msg": "there are open or unsettled serum3 orders"
+    },
+    {
+      "code": 6035,
+      "name": "HasLiquidatableTokenPosition",
+      "msg": "has liquidatable token position"
+    },
+    {
+      "code": 6036,
+      "name": "HasLiquidatablePerpBasePosition",
+      "msg": "has liquidatable perp base position"
+    },
+    {
+      "code": 6037,
+      "name": "HasLiquidatableTrustedPerpPnl",
+      "msg": "has liquidatable trusted perp pnl"
     }
   ]
 };
@@ -10973,16 +11070,11 @@ export const IDL: MangoV4 = {
       ]
     },
     {
-      "name": "perpLiqBankruptcy",
+      "name": "perpLiqQuoteAndBankruptcy",
       "accounts": [
         {
           "name": "group",
           "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "perpMarket",
-          "isMut": true,
           "isSigner": false
         },
         {
@@ -10998,6 +11090,16 @@ export const IDL: MangoV4 = {
         {
           "name": "liqee",
           "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "perpMarket",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "oracle",
+          "isMut": false,
           "isSigner": false
         },
         {
@@ -12395,6 +12497,13 @@ export const IDL: MangoV4 = {
           {
             "name": "marketIndex",
             "type": "u16"
+          },
+          {
+            "name": "hasZeroFunds",
+            "docs": [
+              "The open orders account has no free or reserved funds"
+            ],
+            "type": "bool"
           }
         ]
       }
@@ -14659,6 +14768,16 @@ export const IDL: MangoV4 = {
           "name": "socializedLoss",
           "type": "i128",
           "index": false
+        },
+        {
+          "name": "startingLiabDepositIndex",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "endingLiabDepositIndex",
+          "type": "i128",
+          "index": false
         }
       ]
     },
@@ -14924,6 +15043,56 @@ export const IDL: MangoV4 = {
           "name": "socializedLoss",
           "type": "i128",
           "index": false
+        },
+        {
+          "name": "startingLongFunding",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "startingShortFunding",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "endingLongFunding",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "endingShortFunding",
+          "type": "i128",
+          "index": false
+        }
+      ]
+    },
+    {
+      "name": "PerpLiqQuoteAndBankruptcyLog",
+      "fields": [
+        {
+          "name": "mangoGroup",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "liqee",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "liqor",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "perpMarketIndex",
+          "type": "u16",
+          "index": false
+        },
+        {
+          "name": "settlement",
+          "type": "i128",
+          "index": false
         }
       ]
     },
@@ -15158,6 +15327,31 @@ export const IDL: MangoV4 = {
       "code": 6032,
       "name": "GroupIsHalted",
       "msg": "group is halted"
+    },
+    {
+      "code": 6033,
+      "name": "PerpHasBaseLots",
+      "msg": "the perp position has non-zero base lots"
+    },
+    {
+      "code": 6034,
+      "name": "HasOpenOrUnsettledSerum3Orders",
+      "msg": "there are open or unsettled serum3 orders"
+    },
+    {
+      "code": 6035,
+      "name": "HasLiquidatableTokenPosition",
+      "msg": "has liquidatable token position"
+    },
+    {
+      "code": 6036,
+      "name": "HasLiquidatablePerpBasePosition",
+      "msg": "has liquidatable perp base position"
+    },
+    {
+      "code": 6037,
+      "name": "HasLiquidatableTrustedPerpPnl",
+      "msg": "has liquidatable trusted perp pnl"
     }
   ]
 };

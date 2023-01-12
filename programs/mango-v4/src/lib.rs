@@ -726,11 +726,11 @@ pub mod mango_v4 {
         instructions::perp_liq_force_cancel_orders(ctx, limit)
     }
 
-    pub fn perp_liq_bankruptcy(
-        ctx: Context<PerpLiqBankruptcy>,
+    pub fn perp_liq_quote_and_bankruptcy(
+        ctx: Context<PerpLiqQuoteAndBankruptcy>,
         max_liab_transfer: u64,
     ) -> Result<()> {
-        instructions::perp_liq_bankruptcy(ctx, max_liab_transfer)
+        instructions::perp_liq_quote_and_bankruptcy(ctx, max_liab_transfer)
     }
 
     pub fn alt_set(ctx: Context<AltSet>, index: u8) -> Result<()> {
