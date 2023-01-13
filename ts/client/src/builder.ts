@@ -1,3 +1,5 @@
+// https://github.com/Vincent-Pang/builder-pattern
+
 export type IBuilder<T> = {
   [k in keyof T]-?: ((arg: T[k]) => IBuilder<T>) & (() => T[k]);
 } & {
