@@ -1,11 +1,11 @@
 use fixed::types::I80F48;
 
-pub trait ClampedToNum {
+pub trait ClampToInt {
     fn clamp_to_i64(&self) -> i64;
     fn clamp_to_u64(&self) -> u64;
 }
 
-impl ClampedToNum for I80F48 {
+impl ClampToInt for I80F48 {
     fn clamp_to_i64(&self) -> i64 {
         if *self <= i64::MIN {
             i64::MIN
@@ -27,7 +27,7 @@ impl ClampedToNum for I80F48 {
     }
 }
 
-impl ClampedToNum for f64 {
+impl ClampToInt for f64 {
     fn clamp_to_i64(&self) -> i64 {
         if *self <= i64::MIN as f64 {
             i64::MIN
@@ -49,7 +49,7 @@ impl ClampedToNum for f64 {
     }
 }
 
-impl ClampedToNum for u64 {
+impl ClampToInt for u64 {
     fn clamp_to_i64(&self) -> i64 {
         if *self >= i64::MAX as u64 {
             i64::MAX

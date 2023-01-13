@@ -58,7 +58,7 @@ import {
 } from './utils';
 import { sendTransaction } from './utils/rpc';
 
-enum AccountRetriever {
+export enum AccountRetriever {
   Scanning,
   Fixed,
 }
@@ -2657,9 +2657,7 @@ export class MangoClient {
     );
   }
 
-  /// private
-
-  private buildHealthRemainingAccounts(
+  public buildHealthRemainingAccounts(
     retriever: AccountRetriever,
     group: Group,
     mangoAccounts: MangoAccount[],
@@ -2699,12 +2697,12 @@ export class MangoClient {
     const tokenPositionIndices = mangoAccount.tokens.map((t) => t.tokenIndex);
     for (const bank of banks) {
       const tokenPositionExists =
-        tokenPositionIndices.indexOf(bank.tokenIndex) > 0;
+        tokenPositionIndices.indexOf(bank.tokenIndex) > -1;
       if (!tokenPositionExists) {
         const inactiveTokenPosition = tokenPositionIndices.findIndex(
           (index) => index === TokenPosition.TokenIndexUnset,
         );
-        if (inactiveTokenPosition) {
+        if (inactiveTokenPosition != -1) {
           tokenPositionIndices[inactiveTokenPosition] = bank.tokenIndex;
         }
       }
@@ -2724,12 +2722,12 @@ export class MangoClient {
     const perpPositionIndices = mangoAccount.perps.map((p) => p.marketIndex);
     for (const perpMarket of perpMarkets) {
       const perpPositionExists =
-        perpPositionIndices.indexOf(perpMarket.perpMarketIndex) > 0;
+        perpPositionIndices.indexOf(perpMarket.perpMarketIndex) > -1;
       if (!perpPositionExists) {
-        const inactivePerpPosition = perpPositionIndices.find(
+        const inactivePerpPosition = perpPositionIndices.findIndex(
           (perpIdx) => perpIdx === PerpPosition.PerpMarketIndexUnset,
         );
-        if (inactivePerpPosition) {
+        if (inactivePerpPosition != -1) {
           perpPositionIndices[inactivePerpPosition] =
             perpMarket.perpMarketIndex;
         }
@@ -2753,15 +2751,16 @@ export class MangoClient {
       const ooPositionExists =
         serumPositionIndices.findIndex(
           (i) => i.marketIndex === serum3Market.marketIndex,
-        ) > 0;
+        ) > -1;
       if (!ooPositionExists) {
-        const inactiveSerumPosition = serumPositionIndices.find(
+        const inactiveSerumPosition = serumPositionIndices.findIndex(
           (serumPos) =>
             serumPos.marketIndex === Serum3Orders.Serum3MarketIndexUnset,
         );
-        if (inactiveSerumPosition) {
-          inactiveSerumPosition.marketIndex = serum3Market.marketIndex;
-          inactiveSerumPosition.openOrders = openOrderPk;
+        if (inactiveSerumPosition != -1) {
+          serumPositionIndices[inactiveSerumPosition].marketIndex =
+            serum3Market.marketIndex;
+          serumPositionIndices[inactiveSerumPosition].openOrders = openOrderPk;
         }
       }
     }

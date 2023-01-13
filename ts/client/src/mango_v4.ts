@@ -1,5 +1,5 @@
 export type MangoV4 = {
-  "version": "0.1.0",
+  "version": "0.2.0",
   "name": "mango_v4",
   "instructions": [
     {
@@ -4030,7 +4030,7 @@ export type MangoV4 = {
           },
           {
             "name": "frozenUntil",
-            "type": "i64"
+            "type": "u64"
           },
           {
             "name": "reserved",
@@ -7717,7 +7717,7 @@ export type MangoV4 = {
 };
 
 export const IDL: MangoV4 = {
-  "version": "0.1.0",
+  "version": "0.2.0",
   "name": "mango_v4",
   "instructions": [
     {
@@ -11748,7 +11748,7 @@ export const IDL: MangoV4 = {
           },
           {
             "name": "frozenUntil",
-            "type": "i64"
+            "type": "u64"
           },
           {
             "name": "reserved",

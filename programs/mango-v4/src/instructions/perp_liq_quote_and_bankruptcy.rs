@@ -118,24 +118,8 @@ pub fn perp_liq_quote_and_bankruptcy(
     let liqee_settle_health = liqee_health_cache.perp_settle_health();
     liqee_health_cache.require_after_phase2_liquidation()?;
 
-    // Once maint_health falls below 0, we want to start liquidating,
-    // we want to allow liquidation to continue until init_health is positive,
-    // to prevent constant oscillation between the two states
-    if liqee.being_liquidated() {
-        if liqee
-            .fixed
-            .maybe_recover_from_being_liquidated(liqee_init_health)
-        {
-            msg!("Liqee init_health above zero");
-            return Ok(());
-        }
-    } else {
-        let maint_health = liqee_health_cache.health(HealthType::Maint);
-        require!(
-            maint_health < I80F48::ZERO,
-            MangoError::HealthMustBeNegative
-        );
-        liqee.fixed.set_being_liquidated(true);
+    if !liqee.check_liquidatable(&liqee_health_cache)? {
+        return Ok(());
     }
 
     // check positions exist/create them, done early for nicer error messages

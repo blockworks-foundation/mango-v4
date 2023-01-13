@@ -537,21 +537,6 @@ impl HealthCache {
         self.has_spot_borrows() || perp_borrows
     }
 
-    pub fn has_liquidatable_spot_or_perp_base(&self) -> bool {
-        let spot_liquidatable = self.has_spot_assets();
-        let serum3_cancelable = self.has_serum3_open_orders_funds();
-        let perp_liquidatable = self.perp_infos.iter().any(|p| {
-            // can use perp_liq_base_position
-            p.base_lots != 0
-            // can use perp_liq_force_cancel_orders
-            || p.has_open_orders
-            // A remaining quote position can be reduced with perp_settle_pnl and that can improve health.
-            // However, since it's not guaranteed that there is a counterparty, a positive perp quote position
-            // does not prevent bankruptcy.
-        });
-        spot_liquidatable || serum3_cancelable || perp_liquidatable
-    }
-
     pub(crate) fn compute_serum3_reservations(
         &self,
         health_type: HealthType,
