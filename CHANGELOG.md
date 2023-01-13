@@ -4,7 +4,7 @@ Update this for each program release and mainnet deployment.
 
 ## not on mainnet
 
-### v0.1.2, 2023-1-13
+### v0.2.0, 2023-1-13
 
 Deployment: date, tx
 

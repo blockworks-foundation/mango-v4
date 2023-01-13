@@ -1094,7 +1094,7 @@ dependencies = [
 
 [[package]]
 name = "cli"
-version = "0.1.2"
+version = "0.2.0"
 dependencies = [
  "anchor-client",
  "anchor-lang",
@@ -1118,7 +1118,7 @@ dependencies = [
 
 [[package]]
 name = "client"
-version = "0.1.2"
+version = "0.2.0"
 dependencies = [
  "anchor-client",
  "anchor-lang",
@@ -2846,7 +2846,7 @@ dependencies = [
 
 [[package]]
 name = "keeper"
-version = "0.1.2"
+version = "0.2.0"
 dependencies = [
  "anchor-client",
  "anchor-lang",
@@ -3121,7 +3121,7 @@ dependencies = [
 
 [[package]]
 name = "mango-v4"
-version = "0.1.2"
+version = "0.2.0"
 dependencies = [
  "anchor-lang",
  "anchor-spl",
