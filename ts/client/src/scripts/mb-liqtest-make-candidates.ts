@@ -12,8 +12,8 @@ import {
 import { Builder } from '../builder';
 import { MangoClient } from '../client';
 import {
-  defaultPerpEditParams,
-  defaultTokenEditParams,
+  NullPerpEditParams,
+  NullTokenEditParams,
 } from '../clientIxParamBuilder';
 import { MANGO_V4_ID } from '../constants';
 
@@ -107,7 +107,7 @@ async function main() {
     await client.tokenEdit(
       group,
       bank.mint,
-      Builder(defaultTokenEditParams).resetStablePrice(true).build(),
+      Builder(NullTokenEditParams).resetStablePrice(true).build(),
     );
   }
   async function setPerpPrice(
@@ -119,7 +119,7 @@ async function main() {
     await client.perpEditMarket(
       group,
       perpMarket.perpMarketIndex,
-      Builder(defaultPerpEditParams).oracle(perpMarket.oracle).build(),
+      Builder(NullPerpEditParams).oracle(perpMarket.oracle).build(),
     );
   }
 
@@ -203,7 +203,7 @@ async function main() {
     await client.tokenEdit(
       group,
       buyMint,
-      Builder(defaultTokenEditParams)
+      Builder(NullTokenEditParams)
         .oracle(group.getFirstBankByMint(buyMint).oracle)
         .maintAssetWeight(1.0)
         .initAssetWeight(1.0)
@@ -229,7 +229,7 @@ async function main() {
       await client.tokenEdit(
         group,
         buyMint,
-        Builder(defaultTokenEditParams)
+        Builder(NullTokenEditParams)
           .oracle(group.getFirstBankByMint(buyMint).oracle)
           .maintAssetWeight(0.9)
           .initAssetWeight(0.8)

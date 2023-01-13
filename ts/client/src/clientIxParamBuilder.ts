@@ -26,7 +26,7 @@ export interface TokenEditParams {
   reduceOnly: boolean | null;
 }
 
-export const defaultTokenEditParams: TokenEditParams = {
+export const NullTokenEditParams: TokenEditParams = {
   oracle: null,
   oracleConfig: null,
   groupInsuranceFund: null,
@@ -79,7 +79,7 @@ export interface PerpEditParams {
   reduceOnly: boolean | null;
 }
 
-export const defaultPerpEditParams: PerpEditParams = {
+export const NullPerpEditParams: PerpEditParams = {
   oracle: null,
   oracleConfig: null,
   baseDecimals: null,
