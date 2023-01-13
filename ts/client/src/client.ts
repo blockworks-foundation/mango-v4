@@ -55,6 +55,7 @@ import {
   createAssociatedTokenAccountIdempotentInstruction,
   getAssociatedTokenAddress,
   toNative,
+  U64_MAX_BN,
 } from './utils';
 import { sendTransaction } from './utils/rpc';
 
@@ -837,17 +838,14 @@ export class MangoClient {
     const instructions: TransactionInstruction[] = [];
     for (const token of mangoAccount.tokensActive()) {
       const bank = group.getFirstBankByTokenIndex(token.tokenIndex);
-      const nativeAmount = token.balance(bank).data;
-      if (!nativeAmount.isZero()) {
-        const withdrawIx = await this.tokenWithdrawNativeIx(
-          group,
-          mangoAccount,
-          bank.mint,
-          nativeAmount,
-          false,
-        );
-        instructions.push(...withdrawIx);
-      }
+      const withdrawIx = await this.tokenWithdrawNativeIx(
+        group,
+        mangoAccount,
+        bank.mint,
+        U64_MAX_BN,
+        false,
+      );
+      instructions.push(...withdrawIx);
     }
 
     for (const serum3Account of mangoAccount.serum3Active()) {
