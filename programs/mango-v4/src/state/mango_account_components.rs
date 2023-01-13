@@ -6,7 +6,7 @@ use static_assertions::const_assert_eq;
 use std::cmp::Ordering;
 use std::mem::size_of;
 
-use crate::i80f48::ClampedToNum;
+use crate::i80f48::ClampToInt;
 use crate::state::*;
 
 pub const FREE_ORDER_SLOT: PerpMarketIndex = PerpMarketIndex::MAX;
