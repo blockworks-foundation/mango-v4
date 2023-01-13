@@ -837,14 +837,17 @@ export class MangoClient {
     const instructions: TransactionInstruction[] = [];
     for (const token of mangoAccount.tokensActive()) {
       const bank = group.getFirstBankByTokenIndex(token.tokenIndex);
-      const withdrawIx = await this.tokenWithdrawNativeIx(
-        group,
-        mangoAccount,
-        bank.mint,
-        new BN(token.balance(bank).toNumber()),
-        false,
-      );
-      instructions.push(...withdrawIx);
+      const nativeAmount = token.balance(bank).data;
+      if (!nativeAmount.isZero()) {
+        const withdrawIx = await this.tokenWithdrawNativeIx(
+          group,
+          mangoAccount,
+          bank.mint,
+          nativeAmount,
+          false,
+        );
+        instructions.push(...withdrawIx);
+      }
     }
 
     for (const serum3Account of mangoAccount.serum3Active()) {
@@ -1049,7 +1052,7 @@ export class MangoClient {
         [bank],
         [],
       );
-    console.log(healthRemainingAccounts, '@@@');
+
     const ix = await this.program.methods
       .tokenWithdraw(new BN(nativeAmount), allowBorrow)
       .accounts({
@@ -2707,7 +2710,6 @@ export class MangoClient {
         }
       }
     }
-    console.log(tokenPositionIndices);
     const mintInfos = tokenPositionIndices
       .filter((tokenIndex) => tokenIndex !== TokenPosition.TokenIndexUnset)
       .map((tokenIndex) => group.mintInfosMapByTokenIndex.get(tokenIndex)!);
