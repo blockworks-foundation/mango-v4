@@ -114,7 +114,7 @@ async function main() {
         } native amount ${nativeFlooredNumber} `,
       );
 
-      await client.tokenWithdrawNative(
+      const withdrawIx = await client.tokenWithdrawNativeIx(
         group,
         mangoAccount,
         group.getFirstBankByTokenIndex(token.tokenIndex).mint,
@@ -122,6 +122,10 @@ async function main() {
           nativeFlooredNumber - 1,
         ) /* see comment in token_withdraw in program */,
         false,
+      );
+      await this.sendAndConfirmTransaction(
+        [...withdrawIx],
+        group.addressLookupTablesList,
       );
     }
 

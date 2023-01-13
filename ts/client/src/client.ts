@@ -829,13 +829,46 @@ export class MangoClient {
     );
   }
 
-  //withdraw all assets, close oo, deactivating perp positions, close account
   public async emptyAndCloseMangoAccount(
     group: Group,
     mangoAccount: MangoAccount,
     forceClose = false,
   ): Promise<TransactionSignature> {
-    const ix = await this.program.methods
+    const instructions: TransactionInstruction[] = [];
+    for (const token of mangoAccount.tokensActive()) {
+      const bank = group.getFirstBankByTokenIndex(token.tokenIndex);
+      const withdrawIx = await this.tokenWithdrawNativeIx(
+        group,
+        mangoAccount,
+        bank.mint,
+        new BN(token.balance(bank).toNumber()),
+        false,
+      );
+      instructions.push(...withdrawIx);
+    }
+
+    for (const serum3Account of mangoAccount.serum3Active()) {
+      const serum3Market = group.serum3MarketsMapByMarketIndex.get(
+        serum3Account.marketIndex,
+      )!.serumMarketExternal!;
+      const closeOOIx = await this.serum3CloseOpenOrdersIx(
+        group,
+        mangoAccount,
+        serum3Market,
+      );
+      instructions.push(closeOOIx);
+    }
+
+    for (const perp of mangoAccount.perpActive()) {
+      const deactivatingPositionIx = await this.perpDeactivatePositionIx(
+        group,
+        mangoAccount,
+        perp.marketIndex,
+      );
+      instructions.push(deactivatingPositionIx);
+    }
+
+    const closeIx = await this.program.methods
       .accountClose(forceClose)
       .accounts({
         group: group.publicKey,
@@ -844,9 +877,10 @@ export class MangoClient {
         solDestination: mangoAccount.owner,
       })
       .instruction();
+    instructions.push(closeIx);
 
     return await this.sendAndConfirmTransaction(
-      [ix],
+      [...instructions],
       group.addressLookupTablesList,
     );
   }
@@ -1783,11 +1817,11 @@ export class MangoClient {
     );
   }
 
-  public async perpDeactivatePosition(
+  public async perpDeactivatePositionIx(
     group: Group,
     mangoAccount: MangoAccount,
     perpMarketIndex: PerpMarketIndex,
-  ): Promise<TransactionSignature> {
+  ): Promise<TransactionInstruction> {
     const perpMarket = group.getPerpMarketByMarketIndex(perpMarketIndex);
     const healthRemainingAccounts: PublicKey[] =
       this.buildHealthRemainingAccounts(
@@ -1811,7 +1845,23 @@ export class MangoClient {
             ({ pubkey: pk, isWritable: false, isSigner: false } as AccountMeta),
         ),
       )
-      .rpc();
+      .instruction();
+  }
+
+  public async perpDeactivatePosition(
+    group: Group,
+    mangoAccount: MangoAccount,
+    perpMarketIndex: PerpMarketIndex,
+  ): Promise<TransactionSignature> {
+    const ix = await this.perpDeactivatePositionIx(
+      group,
+      mangoAccount,
+      perpMarketIndex,
+    );
+    return await this.sendAndConfirmTransaction(
+      [ix],
+      group.addressLookupTablesList,
+    );
   }
 
   public async perpPlaceOrder(
