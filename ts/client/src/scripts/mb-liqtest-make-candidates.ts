@@ -336,14 +336,15 @@ async function main() {
     await setBankPrice(collateralBank, PRICES['SOL'] * 4);
 
     try {
+      // placing this order decreases maint health by (0.9 - 1)*$0.06 = $-0.006
       await client.perpPlaceOrder(
         group,
         mangoAccount,
         group.perpMarketsMapByName.get('MNGO-PERP')?.perpMarketIndex!,
         PerpOrderSide.bid,
         0.001, // ui price that won't get hit
-        1.1, // ui base quantity, 11 base lots, 1.1 MNGO, $0.022
-        0.022, // ui quote quantity
+        3.0, // ui base quantity, 30 base lots, 3.0 MNGO, $0.06
+        0.06, // ui quote quantity
         4200,
         PerpOrderType.limit,
         false,
@@ -508,6 +509,102 @@ async function main() {
         mangoAccount,
         perpIndex,
         PerpOrderSide.ask,
+        0.02,
+        1.1, // ui base quantity, 11 base lots, $0.022
+        0.022, // ui quote quantity
+        4201,
+        PerpOrderType.market,
+        false,
+        0,
+        5,
+      );
+      await client.perpConsumeAllEvents(group, perpIndex);
+    } finally {
+      await setPerpPrice(perpMarket, PRICES['MNGO']);
+      await setBankPrice(collateralBank, PRICES['SOL']);
+    }
+  }
+
+  // assets and negative perp pnl (but no position)
+  {
+    const name = 'LIQTEST, perp negative pnl';
+
+    console.log(`Creating mangoaccount...`);
+    let mangoAccount = await createMangoAccount(name);
+    console.log(
+      `...created mangoAccount ${mangoAccount.publicKey} for ${name}`,
+    );
+
+    const perpMarket = group.perpMarketsMapByName.get('MNGO-PERP')!;
+    const perpIndex = perpMarket.perpMarketIndex;
+    const liabMint = new PublicKey(MAINNET_MINTS.get('USDC')!);
+    const collateralMint = new PublicKey(MAINNET_MINTS.get('SOL')!);
+    const collateralBank = group.banksMapByName.get('SOL')![0];
+
+    await client.tokenDepositNative(
+      group,
+      mangoAccount,
+      collateralMint,
+      new BN(300000),
+    ); // valued as $0.0045 maint collateral
+    await mangoAccount.reload(client);
+
+    try {
+      await setBankPrice(collateralBank, PRICES['SOL'] * 10);
+
+      // Execute two trades that leave the account with -$0.011 negative pnl
+      await setPerpPrice(perpMarket, PRICES['MNGO'] / 2);
+      await client.perpPlaceOrder(
+        group,
+        fundingAccount,
+        perpIndex,
+        PerpOrderSide.bid,
+        0.01,
+        1.1, // ui base quantity, 11 base lots, $0.011
+        0.011, // ui quote quantity
+        4200,
+        PerpOrderType.limit,
+        false,
+        0,
+        5,
+      );
+      await client.perpPlaceOrder(
+        group,
+        mangoAccount,
+        perpIndex,
+        PerpOrderSide.ask,
+        0.01,
+        1.1, // ui base quantity, 11 base lots, $0.011
+        0.011, // ui quote quantity
+        4200,
+        PerpOrderType.market,
+        false,
+        0,
+        5,
+      );
+      await client.perpConsumeAllEvents(group, perpIndex);
+
+      await setPerpPrice(perpMarket, PRICES['MNGO']);
+
+      await client.perpPlaceOrder(
+        group,
+        fundingAccount,
+        perpIndex,
+        PerpOrderSide.ask,
+        0.02,
+        1.1, // ui base quantity, 11 base lots, $0.022
+        0.022, // ui quote quantity
+        4201,
+        PerpOrderType.limit,
+        false,
+        0,
+        5,
+      );
+      await client.perpPlaceOrder(
+        group,
+        mangoAccount,
+        perpIndex,
+        PerpOrderSide.bid,
         0.02,
         1.1, // ui base quantity, 11 base lots, $0.022
         0.022, // ui quote quantity
