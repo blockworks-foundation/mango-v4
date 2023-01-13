@@ -9,6 +9,9 @@ use crate::logs::{emit_perp_balances, FillLog};
 
 #[derive(Accounts)]
 pub struct PerpConsumeEvents<'info> {
+    #[account(
+        constraint = group.load()?.is_operational() @ MangoError::GroupIsHalted
+    )]
     pub group: AccountLoader<'info, Group>,
 
     #[account(
@@ -71,7 +74,6 @@ pub fn perp_consume_events(ctx: Context<PerpConsumeEvents>, limit: usize) -> Res
                             emit_perp_balances(
                                 ctx.accounts.group.key(),
                                 fill.maker,
-                                perp_market.perp_market_index,
                                 ma.perp_position(perp_market.perp_market_index).unwrap(),
                                 &perp_market,
                             );
@@ -123,14 +125,12 @@ pub fn perp_consume_events(ctx: Context<PerpConsumeEvents>, limit: usize) -> Res
                                     emit_perp_balances(
                                         ctx.accounts.group.key(),
                                         fill.maker,
-                                        perp_market.perp_market_index,
                                         maker.perp_position(perp_market.perp_market_index).unwrap(),
                                         &perp_market,
                                     );
                                     emit_perp_balances(
                                         ctx.accounts.group.key(),
                                         fill.taker,
-                                        perp_market.perp_market_index,
                                         taker.perp_position(perp_market.perp_market_index).unwrap(),
                                         &perp_market,
                                     );

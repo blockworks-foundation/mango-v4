@@ -8,10 +8,14 @@ use crate::state::*;
 
 #[derive(Accounts)]
 pub struct Serum3CancelAllOrders<'info> {
+    #[account(
+        constraint = group.load()?.is_operational() @ MangoError::GroupIsHalted
+    )]
     pub group: AccountLoader<'info, Group>,
 
     #[account(
-        has_one = group
+        has_one = group,
+        constraint = account.load()?.is_operational() @ MangoError::AccountIsFrozen
         // owner is checked at #1
     )]
     pub account: AccountLoader<'info, MangoAccountFixed>,

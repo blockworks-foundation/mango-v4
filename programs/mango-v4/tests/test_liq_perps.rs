@@ -1,10 +1,11 @@
 #![cfg(feature = "test-bpf")]
 
+use anchor_lang::prelude::Pubkey;
 use fixed::types::I80F48;
 use solana_program_test::*;
 use solana_sdk::transport::TransportError;
 
-use mango_v4::state::*;
+use mango_v4::state::{PerpMarketIndex, *};
 use program_test::*;
 
 use mango_setup::*;
@@ -180,7 +181,8 @@ async fn test_liq_perps_force_cancel() -> Result<(), TransportError> {
 
 #[tokio::test]
 async fn test_liq_perps_base_position_and_bankruptcy() -> Result<(), TransportError> {
-    let test_builder = TestContextBuilder::new();
+    let mut test_builder = TestContextBuilder::new();
+    test_builder.test().set_compute_max_units(100_000); // PerpLiqQuoteAndBankruptcy takes a lot of CU
     let context = test_builder.start_default().await;
     let solana = &context.solana.clone();
 
@@ -306,10 +308,6 @@ async fn test_liq_perps_base_position_and_bankruptcy() -> Result<(), TransportEr
     //
     // SETUP: Trade perps between accounts
     //
-    // health was 1000 + 1 * 0.8 = 1000.8 before
-    // after this order it is changed by -20*100*(1.4-1) = -800 for the short
-    // and 20*100*(0.6-1) = -800 for the long
-    //
     send_tx(
         solana,
         PerpPlaceOrderInstruction {
@@ -352,25 +350,29 @@ async fn test_liq_perps_base_position_and_bankruptcy() -> Result<(), TransportEr
     .await
     .unwrap();
 
+    // health was 1000 before;
+    // after this order exchange it is changed by
+    //   20*100*(0.6-1) = -800 for the long account0
+    //   20*100*(1-1.4) = -800 for the short account1
+    // (100 is base lot size)
+    assert_eq!(
+        account_init_health(solana, account_0).await.round(),
+        1000.0 - 800.0
+    );
+    assert_eq!(
+        account_init_health(solana, account_1).await.round(),
+        1000.0 - 800.0
+    );
+
     //
     // SETUP: Change the oracle to make health go negative for account_0
+    // perp base value decreases from 2000 * 0.6 to 2000 * 0.6 * 0.6, i.e. -480
     //
     set_bank_stub_oracle_price(solana, group, base_token, admin, 0.6).await;
-
-    // verify health is bad: can't withdraw
-    assert!(send_tx(
-        solana,
-        TokenWithdrawInstruction {
-            amount: 1,
-            allow_borrow: false,
-            account: account_0,
-            owner,
-            token_account: payer_mint_accounts[0],
-            bank_index: 0,
-        }
-    )
-    .await
-    .is_err());
+    assert_eq!(
+        account_init_health(solana, account_0).await.round(),
+        200.0 - 480.0
+    );
 
     //
     // TEST: Liquidate base position with limit
@@ -403,6 +405,13 @@ async fn test_liq_perps_base_position_and_bankruptcy() -> Result<(), TransportEr
         -20.0 * 100.0 + liq_amount,
         0.1
     ));
+    assert!(assert_equal(
+        liqee_data.perps[0].realized_trade_pnl_native,
+        liq_amount - 1000.0,
+        0.1
+    ));
+    // stable price is 1.0, so 0.2 * 1000
+    assert_eq!(liqee_data.perps[0].settle_pnl_limit_realized_trade, -201);
 
     //
     // TEST: Liquidate base position max
@@ -588,22 +597,6 @@ async fn test_liq_perps_base_position_and_bankruptcy() -> Result<(), TransportEr
     ));
 
     //
-    // TEST: Can't trigger perp bankruptcy yet, account_1 isn't bankrupt
-    //
-    assert!(send_tx(
-        solana,
-        PerpLiqBankruptcyInstruction {
-            liqor,
-            liqor_owner: owner,
-            liqee: account_1,
-            perp_market,
-            max_liab_transfer: u64::MAX,
-        }
-    )
-    .await
-    .is_err());
-
-    //
     // SETUP: We want pnl settling to cause a negative quote position,
     // thus we deposit some base token collateral. To be able to do that,
     // we need to temporarily raise health > 0, deposit, then bring health
@@ -629,6 +622,13 @@ async fn test_liq_perps_base_position_and_bankruptcy() -> Result<(), TransportEr
     //
     // TEST: Can settle-pnl even though health is negative
     //
+    let liqor_data = solana.get_account::<MangoAccount>(liqor).await;
+    let perp_market_data = solana.get_account::<PerpMarket>(perp_market).await;
+    let liqor_max_settle = liqor_data.perps[0]
+        .available_settle_limit(&perp_market_data)
+        .1;
+    let account_1_quote_before = account_position(solana, account_1, quote_token.bank).await;
+
     send_tx(
         solana,
         PerpSettlePnlInstruction {
@@ -643,9 +643,10 @@ async fn test_liq_perps_base_position_and_bankruptcy() -> Result<(), TransportEr
     .await
     .unwrap();
 
-    let liqee_settle_health_before = 999.0 + 1.0 * 2.0 * 0.8;
-    let remaining_pnl =
-        20.0 * 100.0 - liq_amount_3 - liq_amount_4 - liq_amount_5 + liqee_settle_health_before;
+    let liqee_settle_health_before: f64 = 999.0 + 1.0 * 2.0 * 0.8;
+    // the liqor's settle limit means we can't settle everything
+    let settle_amount = liqee_settle_health_before.min(liqor_max_settle as f64);
+    let remaining_pnl = 20.0 * 100.0 - liq_amount_3 - liq_amount_4 - liq_amount_5 + settle_amount;
     assert!(remaining_pnl < 0.0);
     let liqee_data = solana.get_account::<MangoAccount>(account_1).await;
     assert_eq!(liqee_data.perps[0].base_position_lots(), 0);
@@ -656,7 +657,7 @@ async fn test_liq_perps_base_position_and_bankruptcy() -> Result<(), TransportEr
     ));
     assert_eq!(
         account_position(solana, account_1, quote_token.bank).await,
-        -2
+        account_1_quote_before - settle_amount as i64
     );
     assert_eq!(
         account_position(solana, account_1, base_token.bank).await,
@@ -664,52 +665,16 @@ async fn test_liq_perps_base_position_and_bankruptcy() -> Result<(), TransportEr
     );
 
     //
-    // TEST: Still can't trigger perp bankruptcy, account_1 has token collateral left
+    // TEST: Can liquidate/bankruptcy away remaining negative pnl
     //
-    assert!(send_tx(
-        solana,
-        PerpLiqBankruptcyInstruction {
-            liqor,
-            liqor_owner: owner,
-            liqee: account_1,
-            perp_market,
-            max_liab_transfer: u64::MAX,
-        }
-    )
-    .await
-    .is_err());
-
-    //
-    // SETUP: Liquidate token collateral
-    //
+    let liqee_before = solana.get_account::<MangoAccount>(account_1).await;
+    let liqor_before = solana.get_account::<MangoAccount>(liqor).await;
+    let liqee_settle_limit_before = liqee_before.perps[0]
+        .available_settle_limit(&perp_market_data)
+        .0;
     send_tx(
         solana,
-        TokenLiqWithTokenInstruction {
-            liqee: account_1,
-            liqor: liqor,
-            liqor_owner: owner,
-            asset_token_index: base_token.index,
-            liab_token_index: quote_token.index,
-            max_liab_transfer: I80F48::MAX,
-            asset_bank_index: 0,
-            liab_bank_index: 0,
-        },
-    )
-    .await
-    .unwrap();
-    assert_eq!(
-        account_position(solana, account_1, quote_token.bank).await,
-        0
-    );
-    assert!(account_position_closed(solana, account_1, base_token.bank).await);
-
-    //
-    // TEST: Now perp-bankruptcy will work, eat the insurance vault and socialize losses
-    //
-    let liqor_before = account_position_f64(solana, liqor, quote_token.bank).await;
-    send_tx(
-        solana,
-        PerpLiqBankruptcyInstruction {
+        PerpLiqQuoteAndBankruptcyInstruction {
             liqor,
             liqor_owner: owner,
             liqee: account_1,
@@ -719,29 +684,47 @@ async fn test_liq_perps_base_position_and_bankruptcy() -> Result<(), TransportEr
     )
     .await
     .unwrap();
+    let liqee_after = solana.get_account::<MangoAccount>(account_1).await;
+    let liqor_data = solana.get_account::<MangoAccount>(liqor).await;
+    let quote_bank = solana.get_account::<Bank>(tokens[0].bank).await;
+
+    // the amount of spot the liqor received: full insurance fund, plus what was still settleable
+    let liq_spot_amount = insurance_vault_funding as f64 + (-liqee_settle_limit_before) as f64;
+    // the amount of perp quote transfered
+    let liq_perp_quote_amount =
+        (insurance_vault_funding as f64) / 1.05 + (-liqee_settle_limit_before) as f64;
 
     // insurance fund was depleted and the liqor received it
     assert_eq!(solana.token_account_balance(insurance_vault).await, 0);
-    let liqor_data = solana.get_account::<MangoAccount>(liqor).await;
-    let quote_bank = solana.get_account::<Bank>(tokens[0].bank).await;
     assert!(assert_equal(
         liqor_data.tokens[0].native(&quote_bank),
-        liqor_before + insurance_vault_funding as f64,
+        liqor_before.tokens[0].native(&quote_bank).to_num::<f64>() + liq_spot_amount,
         0.1
     ));
 
-    // liqee's position is gone
-    let liqee_data = solana.get_account::<MangoAccount>(account_1).await;
-    assert_eq!(liqee_data.perps[0].base_position_lots(), 0);
+    // liqor took over the max possible negative pnl
     assert!(assert_equal(
-        liqee_data.perps[0].quote_position_native(),
-        0.0,
+        liqor_data.perps[0].quote_position_native(),
+        liqor_before.perps[0]
+            .quote_position_native()
+            .to_num::<f64>()
+            - liq_perp_quote_amount,
         0.1
     ));
+
+    // liqee exited liquidation
+    assert!(account_init_health(solana, account_1).await >= 0.0);
+    assert_eq!(liqee_after.being_liquidated, 0);
 
     // the remainder got socialized via funding payments
-    let socialized_amount = -remaining_pnl - 100.0 / 1.05;
     let perp_market = solana.get_account::<PerpMarket>(perp_market).await;
+    let pnl_before = liqee_before.perps[0]
+        .pnl_for_price(&perp_market, I80F48::ONE)
+        .unwrap();
+    let pnl_after = liqee_after.perps[0]
+        .pnl_for_price(&perp_market, I80F48::ONE)
+        .unwrap();
+    let socialized_amount = (pnl_after - pnl_before).to_num::<f64>() - liq_perp_quote_amount;
     assert!(assert_equal(
         perp_market.long_funding,
         socialized_amount / 20.0,
@@ -752,6 +735,466 @@ async fn test_liq_perps_base_position_and_bankruptcy() -> Result<(), TransportEr
         -socialized_amount / 20.0,
         0.1
     ));
+
+    Ok(())
+}
+
+#[tokio::test]
+async fn test_liq_perps_bankruptcy() -> Result<(), TransportError> {
+    let mut test_builder = TestContextBuilder::new();
+    test_builder.test().set_compute_max_units(200_000); // PerpLiqQuoteAndBankruptcy takes a lot of CU
+    let context = test_builder.start_default().await;
+    let solana = &context.solana.clone();
+
+    let admin = TestKeypair::new();
+    let owner = context.users[0].key;
+    let payer = context.users[1].key;
+    let mints = &context.mints[0..3];
+    let payer_mint_accounts = &context.users[1].token_accounts[0..3];
+
+    //
+    // SETUP: Create a group and an account to fill the vaults
+    //
+
+    let GroupWithTokens {
+        group,
+        tokens,
+        insurance_vault,
+        ..
+    } = GroupWithTokensConfig {
+        admin,
+        payer,
+        mints: mints.to_vec(),
+        zero_token_is_quote: true,
+        ..GroupWithTokensConfig::default()
+    }
+    .create(solana)
+    .await;
+
+    send_tx(
+        solana,
+        TokenEditWeights {
+            group,
+            admin,
+            mint: mints[2].pubkey,
+            maint_liab_weight: 1.0,
+            maint_asset_weight: 1.0,
+            init_liab_weight: 1.0,
+            init_asset_weight: 1.0,
+        },
+    )
+    .await
+    .unwrap();
+
+    let fund_insurance = |amount: u64| async move {
+        let mut tx = ClientTransaction::new(solana);
+        tx.add_instruction_direct(
+            spl_token::instruction::transfer(
+                &spl_token::ID,
+                &payer_mint_accounts[0],
+                &insurance_vault,
+                &payer.pubkey(),
+                &[&payer.pubkey()],
+                amount,
+            )
+            .unwrap(),
+        );
+        tx.add_signer(payer);
+        tx.send().await.unwrap();
+    };
+
+    let quote_token = &tokens[0]; // USDC, 1/1 weights, price 1, never changed
+    let base_token = &tokens[1]; // used for perp market
+    let collateral_token = &tokens[2]; // used for adjusting account health
+
+    // deposit some funds, to the vaults aren't empty
+    let liqor = create_funded_account(
+        &solana,
+        group,
+        owner,
+        250,
+        &context.users[1],
+        mints,
+        10000,
+        0,
+    )
+    .await;
+
+    // all perp markets used here default to price = 1.0, base_lot_size = 100
+    let price_lots = 100;
+
+    let context_ref = &context;
+    let mut perp_market_index: PerpMarketIndex = 0;
+    let setup_perp_inner = |perp_market_index: PerpMarketIndex,
+                            health: i64,
+                            pnl: i64,
+                            settle_limit: i64| async move {
+        // price used later to produce negative pnl with a short:
+        // doubling the price leads to -100 pnl
+        let adj_price = 1.0 + pnl as f64 / -100.0;
+        let adj_price_lots = (price_lots as f64 * adj_price) as i64;
+
+        let mango_v4::accounts::PerpCreateMarket { perp_market, .. } = send_tx(
+            solana,
+            PerpCreateMarketInstruction {
+                group,
+                admin,
+                payer,
+                perp_market_index,
+                quote_lot_size: 1,
+                base_lot_size: 100,
+                maint_asset_weight: 0.8,
+                init_asset_weight: 0.6,
+                maint_liab_weight: 1.2,
+                init_liab_weight: 1.4,
+                liquidation_fee: 0.05,
+                maker_fee: 0.0,
+                taker_fee: 0.0,
+                group_insurance_fund: true,
+                // adjust this factur such that we get the desired settle limit in the end
+                settle_pnl_limit_factor: (settle_limit as f32 + 0.1).min(0.0)
+                    / (-1.0 * 100.0 * adj_price) as f32,
+                settle_pnl_limit_window_size_ts: 24 * 60 * 60,
+                ..PerpCreateMarketInstruction::with_new_book_and_queue(&solana, base_token).await
+            },
+        )
+        .await
+        .unwrap();
+        set_perp_stub_oracle_price(solana, group, perp_market, &base_token, admin, 1.0).await;
+        set_bank_stub_oracle_price(solana, group, &collateral_token, admin, 1.0).await;
+
+        //
+        // SETUP: accounts
+        //
+        let deposit_amount = 1000;
+        let helper_account = create_funded_account(
+            &solana,
+            group,
+            owner,
+            perp_market_index as u32 * 2,
+            &context_ref.users[1],
+            &mints[2..3],
+            deposit_amount,
+            0,
+        )
+        .await;
+        let account = create_funded_account(
+            &solana,
+            group,
+            owner,
+            perp_market_index as u32 * 2 + 1,
+            &context_ref.users[1],
+            &mints[2..3],
+            deposit_amount,
+            0,
+        )
+        .await;
+
+        //
+        // SETUP: Trade perps between accounts twice to generate pnl, settle_limit
+        //
+        let mut tx = ClientTransaction::new(solana);
+        tx.add_instruction(PerpPlaceOrderInstruction {
+            account: helper_account,
+            perp_market,
+            owner,
+            side: Side::Bid,
+            price_lots,
+            max_base_lots: 1,
+            max_quote_lots: i64::MAX,
+            client_order_id: 0,
+            reduce_only: false,
+        })
+        .await;
+        tx.add_instruction(PerpPlaceOrderInstruction {
+            account: account,
+            perp_market,
+            owner,
+            side: Side::Ask,
+            price_lots,
+            max_base_lots: 1,
+            max_quote_lots: i64::MAX,
+            client_order_id: 0,
+            reduce_only: false,
+        })
+        .await;
+        tx.add_instruction(PerpConsumeEventsInstruction {
+            perp_market,
+            mango_accounts: vec![account, helper_account],
+        })
+        .await;
+        tx.send().await.unwrap();
+
+        set_perp_stub_oracle_price(solana, group, perp_market, &base_token, admin, adj_price).await;
+        let mut tx = ClientTransaction::new(solana);
+        tx.add_instruction(PerpPlaceOrderInstruction {
+            account: helper_account,
+            perp_market,
+            owner,
+            side: Side::Ask,
+            price_lots: adj_price_lots,
+            max_base_lots: 1,
+            max_quote_lots: i64::MAX,
+            client_order_id: 0,
+            reduce_only: false,
+        })
+        .await;
+        tx.add_instruction(PerpPlaceOrderInstruction {
+            account: account,
+            perp_market,
+            owner,
+            side: Side::Bid,
+            price_lots: adj_price_lots,
+            max_base_lots: 1,
+            max_quote_lots: i64::MAX,
+            client_order_id: 0,
+            reduce_only: false,
+        })
+        .await;
+        tx.add_instruction(PerpConsumeEventsInstruction {
+            perp_market,
+            mango_accounts: vec![account, helper_account],
+        })
+        .await;
+        tx.send().await.unwrap();
+
+        set_perp_stub_oracle_price(solana, group, perp_market, &base_token, admin, 1.0).await;
+
+        // Adjust target health:
+        // full health = 1000 * collat price * 1.0 + pnl
+        set_bank_stub_oracle_price(
+            solana,
+            group,
+            &collateral_token,
+            admin,
+            (health - pnl) as f64 / 1000.0,
+        )
+        .await;
+
+        // Verify we got it right
+        let account_data = solana.get_account::<MangoAccount>(account).await;
+        assert_eq!(account_data.perps[0].quote_position_native(), pnl);
+        assert_eq!(
+            account_data.perps[0].settle_pnl_limit_realized_trade,
+            settle_limit
+        );
+        assert_eq!(
+            account_init_health(solana, account).await.round(),
+            health as f64
+        );
+
+        (perp_market, account)
+    };
+    let mut setup_perp = |health: i64, pnl: i64, settle_limit: i64| {
+        let out = setup_perp_inner(perp_market_index, health, pnl, settle_limit);
+        perp_market_index += 1;
+        out
+    };
+
+    let limit_prec = |f: f64| (f * 1000.0).round() / 1000.0;
+
+    let liq_event_amounts = || {
+        let settlement = solana
+            .program_log_events::<mango_v4::logs::PerpLiqQuoteAndBankruptcyLog>()
+            .pop()
+            .map(|v| limit_prec(I80F48::from_bits(v.settlement).to_num::<f64>()))
+            .unwrap_or(0.0);
+        let (insur, loss) = solana
+            .program_log_events::<mango_v4::logs::PerpLiqBankruptcyLog>()
+            .pop()
+            .map(|v| {
+                (
+                    I80F48::from_bits(v.insurance_transfer).to_num::<u64>(),
+                    limit_prec(I80F48::from_bits(v.socialized_loss).to_num::<f64>()),
+                )
+            })
+            .unwrap_or((0, 0.0));
+        (settlement, insur, loss)
+    };
+
+    let liqor_info = |perp_market: Pubkey| async move {
+        let perp_market = solana.get_account::<PerpMarket>(perp_market).await;
+        let liqor_data = solana.get_account::<MangoAccount>(liqor).await;
+        let liqor_perp = liqor_data
+            .perps
+            .iter()
+            .find(|p| p.market_index == perp_market.perp_market_index)
+            .unwrap()
+            .clone();
+        (liqor_data, liqor_perp)
+    };
+
+    {
+        let (perp_market, account) = setup_perp(-28, -50, -10).await;
+        let liqor_quote_before = account_position(solana, liqor, quote_token.bank).await;
+
+        send_tx(
+            solana,
+            PerpLiqQuoteAndBankruptcyInstruction {
+                liqor,
+                liqor_owner: owner,
+                liqee: account,
+                perp_market,
+                max_liab_transfer: 1,
+            },
+        )
+        .await
+        .unwrap();
+        assert_eq!(liq_event_amounts(), (1.0, 0, 0.0));
+
+        assert_eq!(
+            account_position(solana, account, quote_token.bank).await,
+            -1
+        );
+        assert_eq!(
+            account_position(solana, liqor, quote_token.bank).await,
+            liqor_quote_before + 1
+        );
+        let acc_data = solana.get_account::<MangoAccount>(account).await;
+        assert_eq!(acc_data.perps[0].quote_position_native(), -49);
+        assert_eq!(acc_data.being_liquidated, 1);
+        let (_liqor_data, liqor_perp) = liqor_info(perp_market).await;
+        assert_eq!(liqor_perp.quote_position_native(), -1);
+    }
+
+    {
+        let (perp_market, account) = setup_perp(-28, -50, -10).await;
+        fund_insurance(2).await;
+        let liqor_quote_before = account_position(solana, liqor, quote_token.bank).await;
+
+        send_tx(
+            solana,
+            PerpLiqQuoteAndBankruptcyInstruction {
+                liqor,
+                liqor_owner: owner,
+                liqee: account,
+                perp_market,
+                max_liab_transfer: 11,
+            },
+        )
+        .await
+        .unwrap();
+        assert_eq!(liq_event_amounts(), (10.0, 2, 27.0));
+
+        assert_eq!(
+            account_position(solana, account, quote_token.bank).await,
+            -10
+        );
+        assert_eq!(
+            account_position(solana, liqor, quote_token.bank).await,
+            liqor_quote_before + 12
+        );
+        let acc_data = solana.get_account::<MangoAccount>(account).await;
+        assert!(assert_equal(
+            acc_data.perps[0].quote_position_native(),
+            -50.0 + 11.0 + 27.0,
+            0.1
+        ));
+        assert_eq!(acc_data.being_liquidated, 0);
+        let (_liqor_data, liqor_perp) = liqor_info(perp_market).await;
+        assert_eq!(liqor_perp.quote_position_native(), -11);
+    }
+
+    {
+        let (perp_market, account) = setup_perp(-28, -50, -10).await;
+        fund_insurance(5).await;
+
+        send_tx(
+            solana,
+            PerpLiqQuoteAndBankruptcyInstruction {
+                liqor,
+                liqor_owner: owner,
+                liqee: account,
+                perp_market,
+                max_liab_transfer: 16,
+            },
+        )
+        .await
+        .unwrap();
+        assert_eq!(
+            liq_event_amounts(),
+            (10.0, 5, limit_prec(28.0 - 5.0 / 1.05))
+        );
+    }
+
+    // no insurance
+    {
+        let (perp_market, account) = setup_perp(-28, -50, -10).await;
+
+        send_tx(
+            solana,
+            PerpLiqQuoteAndBankruptcyInstruction {
+                liqor,
+                liqor_owner: owner,
+                liqee: account,
+                perp_market,
+                max_liab_transfer: u64::MAX,
+            },
+        )
+        .await
+        .unwrap();
+        assert_eq!(liq_event_amounts(), (10.0, 0, limit_prec(28.0)));
+    }
+
+    // no settlement: no settle health
+    {
+        let (perp_market, account) = setup_perp(-200, -50, -10).await;
+        fund_insurance(5).await;
+
+        send_tx(
+            solana,
+            PerpLiqQuoteAndBankruptcyInstruction {
+                liqor,
+                liqor_owner: owner,
+                liqee: account,
+                perp_market,
+                max_liab_transfer: u64::MAX,
+            },
+        )
+        .await
+        .unwrap();
+        assert_eq!(liq_event_amounts(), (0.0, 5, limit_prec(50.0 - 5.0 / 1.05)));
+    }
+
+    // no settlement: no settle limit
+    {
+        let (perp_market, account) = setup_perp(-40, -50, 0).await;
+        // no insurance
+
+        send_tx(
+            solana,
+            PerpLiqQuoteAndBankruptcyInstruction {
+                liqor,
+                liqor_owner: owner,
+                liqee: account,
+                perp_market,
+                max_liab_transfer: u64::MAX,
+            },
+        )
+        .await
+        .unwrap();
+        assert_eq!(liq_event_amounts(), (0.0, 0, limit_prec(40.0)));
+    }
+
+    // no socialized loss: fully covered by insurance fund
+    {
+        let (perp_market, account) = setup_perp(-40, -50, -5).await;
+        fund_insurance(42).await;
+
+        send_tx(
+            solana,
+            PerpLiqQuoteAndBankruptcyInstruction {
+                liqor,
+                liqor_owner: owner,
+                liqee: account,
+                perp_market,
+                max_liab_transfer: u64::MAX,
+            },
+        )
+        .await
+        .unwrap();
+        assert_eq!(liq_event_amounts(), (5.0, 42, 0.0));
+    }
 
     Ok(())
 }

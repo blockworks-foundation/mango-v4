@@ -607,7 +607,7 @@ impl Bank {
             .checked_mul_int(self.net_borrows_in_window.into())
             .unwrap();
         if net_borrows_quote > self.net_borrow_limit_per_window_quote {
-            return Err(error_msg_typed!(BankNetBorrowsLimitReached,
+            return Err(error_msg_typed!(MangoError::BankNetBorrowsLimitReached,
                     "net_borrows_in_window ({:?}) exceeds net_borrow_limit_per_window_quote ({:?}) for last_net_borrows_window_start_ts ({:?}) ",
                     self.net_borrows_in_window, self.net_borrow_limit_per_window_quote, self.last_net_borrows_window_start_ts
 
@@ -931,7 +931,7 @@ mod tests {
                 let mut account = TokenPosition {
                     indexed_position: I80F48::ZERO,
                     token_index: 0,
-                    in_use_count: if is_in_use { 1 } else { 0 },
+                    in_use_count: u8::from(is_in_use),
                     cumulative_deposit_interest: 0.0,
                     cumulative_borrow_interest: 0.0,
                     previous_index: I80F48::ZERO,

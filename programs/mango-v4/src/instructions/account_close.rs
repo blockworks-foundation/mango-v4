@@ -6,12 +6,16 @@ use crate::state::*;
 
 #[derive(Accounts)]
 pub struct AccountClose<'info> {
+    #[account(
+        constraint = group.load()?.is_operational() @ MangoError::GroupIsHalted
+    )]
     pub group: AccountLoader<'info, Group>,
 
     #[account(
         mut,
         has_one = group,
         has_one = owner,
+        constraint = account.load()?.is_operational() @ MangoError::AccountIsFrozen,
         close = sol_destination
     )]
     pub account: AccountLoader<'info, MangoAccountFixed>,

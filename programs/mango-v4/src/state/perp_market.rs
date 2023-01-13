@@ -97,9 +97,17 @@ pub struct PerpMarket {
     pub settle_fee_fraction_low_health: f32,
 
     // Pnl settling limits
-    /// Fraction of perp base value (i.e. base_lots * entry_price_in_lots) of unrealized
-    /// positive pnl that can be settled each window.
+    /// Controls the strictness of the settle limit.
     /// Set to a negative value to disable the limit.
+    ///
+    /// This factor applies to the settle limit in two ways
+    /// - for the unrealized pnl settle limit, the factor is multiplied with the stable perp base value
+    ///   (i.e. limit_factor * base_native * stable_price)
+    /// - when increasing the realized pnl settle limit (stored per PerpPosition), the factor is
+    ///   multiplied with the stable value of the perp pnl being realized
+    ///   (i.e. limit_factor * reduced_native * stable_price)
+    ///
+    /// See also PerpPosition::settle_pnl_limit_realized_trade
     pub settle_pnl_limit_factor: f32,
     pub padding3: [u8; 4],
     /// Window size in seconds for the perp settlement limit
@@ -162,7 +170,7 @@ impl PerpMarket {
     }
 
     pub fn set_elligible_for_group_insurance_fund(&mut self, v: bool) {
-        self.group_insurance_fund = if v { 1 } else { 0 };
+        self.group_insurance_fund = u8::from(v);
     }
 
     pub fn trusted_market(&self) -> bool {

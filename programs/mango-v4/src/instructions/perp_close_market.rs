@@ -1,12 +1,13 @@
 use anchor_lang::prelude::*;
 use anchor_spl::token::Token;
 
-use crate::state::*;
+use crate::{error::MangoError, state::*};
 
 #[derive(Accounts)]
 pub struct PerpCloseMarket<'info> {
     #[account(
         constraint = group.load()?.is_testing(),
+        constraint = group.load()?.is_operational() @ MangoError::GroupIsHalted,
         has_one = admin,
     )]
     pub group: AccountLoader<'info, Group>,

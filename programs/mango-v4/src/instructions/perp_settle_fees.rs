@@ -12,13 +12,20 @@ use crate::logs::{emit_perp_balances, PerpSettleFeesLog, TokenBalanceLog};
 
 #[derive(Accounts)]
 pub struct PerpSettleFees<'info> {
+    #[account(
+        constraint = group.load()?.is_operational() @ MangoError::GroupIsHalted
+    )]
     pub group: AccountLoader<'info, Group>,
 
     #[account(mut, has_one = group, has_one = oracle)]
     pub perp_market: AccountLoader<'info, PerpMarket>,
 
     // This account MUST have a loss
-    #[account(mut, has_one = group)]
+    #[account(
+        mut,
+        has_one = group,
+        constraint = account.load()?.is_operational() @ MangoError::AccountIsFrozen
+    )]
     pub account: AccountLoader<'info, MangoAccountFixed>,
 
     /// CHECK: Oracle can have different account types, constrained by address in perp_market
@@ -72,18 +79,25 @@ pub fn perp_settle_fees(ctx: Context<PerpSettleFees>, max_settle_amount: u64) ->
         MangoError::ProfitabilityMismatch
     );
 
+    let settleable_pnl = perp_position.apply_pnl_settle_limit(&perp_market, pnl);
+    require!(
+        settleable_pnl.is_negative(),
+        MangoError::ProfitabilityMismatch
+    );
+
     // Settle for the maximum possible capped to max_settle_amount
-    let settlement = pnl
+    let settlement = settleable_pnl
         .abs()
         .min(perp_market.fees_accrued.abs())
         .min(I80F48::from(max_settle_amount));
+    require!(settlement >= 0, MangoError::SettlementAmountMustBePositive);
+
     perp_position.record_settle(-settlement); // settle the negative pnl on the user perp position
     perp_market.fees_accrued = cm!(perp_market.fees_accrued - settlement);
 
     emit_perp_balances(
         ctx.accounts.group.key(),
         ctx.accounts.account.key(),
-        perp_market.perp_market_index,
         perp_position,
         &perp_market,
     );

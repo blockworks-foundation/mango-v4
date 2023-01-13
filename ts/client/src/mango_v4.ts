@@ -1,5 +1,5 @@
 export type MangoV4 = {
-  "version": "0.1.0",
+  "version": "0.1.2",
   "name": "mango_v4",
   "instructions": [
     {
@@ -122,6 +122,12 @@ export type MangoV4 = {
           }
         },
         {
+          "name": "securityAdminOpt",
+          "type": {
+            "option": "publicKey"
+          }
+        },
+        {
           "name": "testingOpt",
           "type": {
             "option": "u8"
@@ -132,6 +138,27 @@ export type MangoV4 = {
           "type": {
             "option": "u8"
           }
+        }
+      ]
+    },
+    {
+      "name": "groupToggleHalt",
+      "accounts": [
+        {
+          "name": "group",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "admin",
+          "isMut": false,
+          "isSigner": true
+        }
+      ],
+      "args": [
+        {
+          "name": "halted",
+          "type": "bool"
         }
       ]
     },
@@ -992,6 +1019,32 @@ export type MangoV4 = {
           "type": {
             "option": "publicKey"
           }
+        }
+      ]
+    },
+    {
+      "name": "accountToggleFreeze",
+      "accounts": [
+        {
+          "name": "group",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "account",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "admin",
+          "isMut": false,
+          "isSigner": true
+        }
+      ],
+      "args": [
+        {
+          "name": "freeze",
+          "type": "bool"
         }
       ]
     },
@@ -3364,16 +3417,11 @@ export type MangoV4 = {
       ]
     },
     {
-      "name": "perpLiqBankruptcy",
+      "name": "perpLiqQuoteAndBankruptcy",
       "accounts": [
         {
           "name": "group",
           "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "perpMarket",
-          "isMut": true,
           "isSigner": false
         },
         {
@@ -3389,6 +3437,16 @@ export type MangoV4 = {
         {
           "name": "liqee",
           "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "perpMarket",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "oracle",
+          "isMut": false,
           "isSigner": false
         },
         {
@@ -3851,11 +3909,15 @@ export type MangoV4 = {
             "type": "u8"
           },
           {
+            "name": "halted",
+            "type": "u8"
+          },
+          {
             "name": "padding2",
             "type": {
               "array": [
                 "u8",
-                5
+                4
               ]
             }
           },
@@ -3869,11 +3931,15 @@ export type MangoV4 = {
             }
           },
           {
+            "name": "securityAdmin",
+            "type": "publicKey"
+          },
+          {
             "name": "reserved",
             "type": {
               "array": [
                 "u8",
-                1920
+                1888
               ]
             }
           }
@@ -3963,11 +4029,15 @@ export type MangoV4 = {
             "type": "i64"
           },
           {
+            "name": "frozenUntil",
+            "type": "u64"
+          },
+          {
             "name": "reserved",
             "type": {
               "array": [
                 "u8",
-                240
+                232
               ]
             }
           },
@@ -4460,9 +4530,17 @@ export type MangoV4 = {
           {
             "name": "settlePnlLimitFactor",
             "docs": [
-              "Fraction of perp base value (i.e. base_lots * entry_price_in_lots) of unrealized",
-              "positive pnl that can be settled each window.",
-              "Set to a negative value to disable the limit."
+              "Controls the strictness of the settle limit.",
+              "Set to a negative value to disable the limit.",
+              "",
+              "This factor applies to the settle limit in two ways",
+              "- for the unrealized pnl settle limit, the factor is multiplied with the stable perp base value",
+              "(i.e. limit_factor * base_native * stable_price)",
+              "- when increasing the realized pnl settle limit (stored per PerpPosition), the factor is",
+              "multiplied with the stable value of the perp pnl being realized",
+              "(i.e. limit_factor * reduced_native * stable_price)",
+              "",
+              "See also PerpPosition::settle_pnl_limit_realized_trade"
             ],
             "type": "f32"
           },
@@ -4770,6 +4848,13 @@ export type MangoV4 = {
           {
             "name": "marketIndex",
             "type": "u16"
+          },
+          {
+            "name": "hasZeroFunds",
+            "docs": [
+              "The open orders account has no free or reserved funds"
+            ],
+            "type": "bool"
           }
         ]
       }
@@ -5094,10 +5179,22 @@ export type MangoV4 = {
           },
           {
             "name": "settlePnlLimitWindow",
+            "docs": [
+              "Index of the current settle pnl limit window"
+            ],
             "type": "u32"
           },
           {
             "name": "settlePnlLimitSettledInCurrentWindowNative",
+            "docs": [
+              "Amount of realized trade pnl and unrealized pnl that was already settled this window.",
+              "",
+              "Will be negative when negative pnl was settled.",
+              "",
+              "Note that this will be adjusted for bookkeeping reasons when the realized_trade settle",
+              "limitchanges and is not useable for actually tracking how much pnl was settled",
+              "on balance."
+            ],
             "type": "i64"
           },
           {
@@ -5127,7 +5224,7 @@ export type MangoV4 = {
           {
             "name": "longSettledFunding",
             "docs": [
-              "Already settled funding"
+              "Already settled long funding"
             ],
             "type": {
               "defined": "I80F48"
@@ -5135,6 +5232,9 @@ export type MangoV4 = {
           },
           {
             "name": "shortSettledFunding",
+            "docs": [
+              "Already settled short funding"
+            ],
             "type": {
               "defined": "I80F48"
             }
@@ -5142,26 +5242,29 @@ export type MangoV4 = {
           {
             "name": "bidsBaseLots",
             "docs": [
-              "Base lots in bids"
+              "Base lots in open bids"
             ],
             "type": "i64"
           },
           {
             "name": "asksBaseLots",
             "docs": [
-              "Base lots in asks"
+              "Base lots in open asks"
             ],
             "type": "i64"
           },
           {
             "name": "takerBaseLots",
             "docs": [
-              "Amount that's on EventQueue waiting to be processed"
+              "Amount of base lots on the EventQueue waiting to be processed"
             ],
             "type": "i64"
           },
           {
             "name": "takerQuoteLots",
+            "docs": [
+              "Amount of quote lots on the EventQueue waiting to be processed"
+            ],
             "type": "i64"
           },
           {
@@ -5186,20 +5289,52 @@ export type MangoV4 = {
           },
           {
             "name": "avgEntryPricePerBaseLot",
+            "docs": [
+              "The native average entry price for the base lots of the current position.",
+              "Reset to 0 when the base position reaches or crosses 0."
+            ],
             "type": "f64"
           },
           {
-            "name": "realizedPnlNative",
+            "name": "realizedTradePnlNative",
+            "docs": [
+              "Amount of pnl that was realized by bringing the base position closer to 0.",
+              "",
+              "The settlement of this type of pnl is limited by settle_pnl_limit_realized_trade.",
+              "Settling pnl reduces this value once other_pnl below is exhausted."
+            ],
             "type": {
               "defined": "I80F48"
             }
+          },
+          {
+            "name": "realizedOtherPnlNative",
+            "docs": [
+              "Amount of pnl realized from fees, funding and liquidation.",
+              "",
+              "This type of realized pnl is always settleable.",
+              "Settling pnl reduces this value first."
+            ],
+            "type": {
+              "defined": "I80F48"
+            }
+          },
+          {
+            "name": "settlePnlLimitRealizedTrade",
+            "docs": [
+              "Settle limit contribution from realized pnl.",
+              "",
+              "Every time pnl is realized, this is increased by a fraction of the stable",
+              "value of the realization. It magnitude decreases when realized pnl drops below its value."
+            ],
+            "type": "i64"
           },
           {
             "name": "reserved",
             "type": {
               "array": [
                 "u8",
-                128
+                104
               ]
             }
           }
@@ -5321,11 +5456,15 @@ export type MangoV4 = {
             "type": "i64"
           },
           {
+            "name": "frozenUntil",
+            "type": "u64"
+          },
+          {
             "name": "reserved",
             "type": {
               "array": [
                 "u8",
-                240
+                232
               ]
             }
           }
@@ -6984,6 +7123,16 @@ export type MangoV4 = {
           "name": "socializedLoss",
           "type": "i128",
           "index": false
+        },
+        {
+          "name": "startingLiabDepositIndex",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "endingLiabDepositIndex",
+          "type": "i128",
+          "index": false
         }
       ]
     },
@@ -7249,6 +7398,56 @@ export type MangoV4 = {
           "name": "socializedLoss",
           "type": "i128",
           "index": false
+        },
+        {
+          "name": "startingLongFunding",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "startingShortFunding",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "endingLongFunding",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "endingShortFunding",
+          "type": "i128",
+          "index": false
+        }
+      ]
+    },
+    {
+      "name": "PerpLiqQuoteAndBankruptcyLog",
+      "fields": [
+        {
+          "name": "mangoGroup",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "liqee",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "liqor",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "perpMarketIndex",
+          "type": "u16",
+          "index": false
+        },
+        {
+          "name": "settlement",
+          "type": "i128",
+          "index": false
         }
       ]
     },
@@ -7478,12 +7677,47 @@ export type MangoV4 = {
       "code": 6031,
       "name": "MarketInReduceOnlyMode",
       "msg": "market is in reduce only mode"
+    },
+    {
+      "code": 6032,
+      "name": "GroupIsHalted",
+      "msg": "group is halted"
+    },
+    {
+      "code": 6033,
+      "name": "PerpHasBaseLots",
+      "msg": "the perp position has non-zero base lots"
+    },
+    {
+      "code": 6034,
+      "name": "HasOpenOrUnsettledSerum3Orders",
+      "msg": "there are open or unsettled serum3 orders"
+    },
+    {
+      "code": 6035,
+      "name": "HasLiquidatableTokenPosition",
+      "msg": "has liquidatable token position"
+    },
+    {
+      "code": 6036,
+      "name": "HasLiquidatablePerpBasePosition",
+      "msg": "has liquidatable perp base position"
+    },
+    {
+      "code": 6037,
+      "name": "HasLiquidatableTrustedPerpPnl",
+      "msg": "has liquidatable trusted perp pnl"
+    },
+    {
+      "code": 6038,
+      "name": "AccountIsFrozen",
+      "msg": "account is frozen"
     }
   ]
 };
 
 export const IDL: MangoV4 = {
-  "version": "0.1.0",
+  "version": "0.1.2",
   "name": "mango_v4",
   "instructions": [
     {
@@ -7606,6 +7840,12 @@ export const IDL: MangoV4 = {
           }
         },
         {
+          "name": "securityAdminOpt",
+          "type": {
+            "option": "publicKey"
+          }
+        },
+        {
           "name": "testingOpt",
           "type": {
             "option": "u8"
@@ -7616,6 +7856,27 @@ export const IDL: MangoV4 = {
           "type": {
             "option": "u8"
           }
+        }
+      ]
+    },
+    {
+      "name": "groupToggleHalt",
+      "accounts": [
+        {
+          "name": "group",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "admin",
+          "isMut": false,
+          "isSigner": true
+        }
+      ],
+      "args": [
+        {
+          "name": "halted",
+          "type": "bool"
         }
       ]
     },
@@ -8476,6 +8737,32 @@ export const IDL: MangoV4 = {
           "type": {
             "option": "publicKey"
           }
+        }
+      ]
+    },
+    {
+      "name": "accountToggleFreeze",
+      "accounts": [
+        {
+          "name": "group",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "account",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "admin",
+          "isMut": false,
+          "isSigner": true
+        }
+      ],
+      "args": [
+        {
+          "name": "freeze",
+          "type": "bool"
         }
       ]
     },
@@ -10848,16 +11135,11 @@ export const IDL: MangoV4 = {
       ]
     },
     {
-      "name": "perpLiqBankruptcy",
+      "name": "perpLiqQuoteAndBankruptcy",
       "accounts": [
         {
           "name": "group",
           "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "perpMarket",
-          "isMut": true,
           "isSigner": false
         },
         {
@@ -10873,6 +11155,16 @@ export const IDL: MangoV4 = {
         {
           "name": "liqee",
           "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "perpMarket",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "oracle",
+          "isMut": false,
           "isSigner": false
         },
         {
@@ -11335,11 +11627,15 @@ export const IDL: MangoV4 = {
             "type": "u8"
           },
           {
+            "name": "halted",
+            "type": "u8"
+          },
+          {
             "name": "padding2",
             "type": {
               "array": [
                 "u8",
-                5
+                4
               ]
             }
           },
@@ -11353,11 +11649,15 @@ export const IDL: MangoV4 = {
             }
           },
           {
+            "name": "securityAdmin",
+            "type": "publicKey"
+          },
+          {
             "name": "reserved",
             "type": {
               "array": [
                 "u8",
-                1920
+                1888
               ]
             }
           }
@@ -11447,11 +11747,15 @@ export const IDL: MangoV4 = {
             "type": "i64"
           },
           {
+            "name": "frozenUntil",
+            "type": "u64"
+          },
+          {
             "name": "reserved",
             "type": {
               "array": [
                 "u8",
-                240
+                232
               ]
             }
           },
@@ -11944,9 +12248,17 @@ export const IDL: MangoV4 = {
           {
             "name": "settlePnlLimitFactor",
             "docs": [
-              "Fraction of perp base value (i.e. base_lots * entry_price_in_lots) of unrealized",
-              "positive pnl that can be settled each window.",
-              "Set to a negative value to disable the limit."
+              "Controls the strictness of the settle limit.",
+              "Set to a negative value to disable the limit.",
+              "",
+              "This factor applies to the settle limit in two ways",
+              "- for the unrealized pnl settle limit, the factor is multiplied with the stable perp base value",
+              "(i.e. limit_factor * base_native * stable_price)",
+              "- when increasing the realized pnl settle limit (stored per PerpPosition), the factor is",
+              "multiplied with the stable value of the perp pnl being realized",
+              "(i.e. limit_factor * reduced_native * stable_price)",
+              "",
+              "See also PerpPosition::settle_pnl_limit_realized_trade"
             ],
             "type": "f32"
           },
@@ -12254,6 +12566,13 @@ export const IDL: MangoV4 = {
           {
             "name": "marketIndex",
             "type": "u16"
+          },
+          {
+            "name": "hasZeroFunds",
+            "docs": [
+              "The open orders account has no free or reserved funds"
+            ],
+            "type": "bool"
           }
         ]
       }
@@ -12578,10 +12897,22 @@ export const IDL: MangoV4 = {
           },
           {
             "name": "settlePnlLimitWindow",
+            "docs": [
+              "Index of the current settle pnl limit window"
+            ],
             "type": "u32"
           },
           {
             "name": "settlePnlLimitSettledInCurrentWindowNative",
+            "docs": [
+              "Amount of realized trade pnl and unrealized pnl that was already settled this window.",
+              "",
+              "Will be negative when negative pnl was settled.",
+              "",
+              "Note that this will be adjusted for bookkeeping reasons when the realized_trade settle",
+              "limitchanges and is not useable for actually tracking how much pnl was settled",
+              "on balance."
+            ],
             "type": "i64"
           },
           {
@@ -12611,7 +12942,7 @@ export const IDL: MangoV4 = {
           {
             "name": "longSettledFunding",
             "docs": [
-              "Already settled funding"
+              "Already settled long funding"
             ],
             "type": {
               "defined": "I80F48"
@@ -12619,6 +12950,9 @@ export const IDL: MangoV4 = {
           },
           {
             "name": "shortSettledFunding",
+            "docs": [
+              "Already settled short funding"
+            ],
             "type": {
               "defined": "I80F48"
             }
@@ -12626,26 +12960,29 @@ export const IDL: MangoV4 = {
           {
             "name": "bidsBaseLots",
             "docs": [
-              "Base lots in bids"
+              "Base lots in open bids"
             ],
             "type": "i64"
           },
           {
             "name": "asksBaseLots",
             "docs": [
-              "Base lots in asks"
+              "Base lots in open asks"
             ],
             "type": "i64"
           },
           {
             "name": "takerBaseLots",
             "docs": [
-              "Amount that's on EventQueue waiting to be processed"
+              "Amount of base lots on the EventQueue waiting to be processed"
             ],
             "type": "i64"
           },
           {
             "name": "takerQuoteLots",
+            "docs": [
+              "Amount of quote lots on the EventQueue waiting to be processed"
+            ],
             "type": "i64"
           },
           {
@@ -12670,20 +13007,52 @@ export const IDL: MangoV4 = {
           },
           {
             "name": "avgEntryPricePerBaseLot",
+            "docs": [
+              "The native average entry price for the base lots of the current position.",
+              "Reset to 0 when the base position reaches or crosses 0."
+            ],
             "type": "f64"
           },
           {
-            "name": "realizedPnlNative",
+            "name": "realizedTradePnlNative",
+            "docs": [
+              "Amount of pnl that was realized by bringing the base position closer to 0.",
+              "",
+              "The settlement of this type of pnl is limited by settle_pnl_limit_realized_trade.",
+              "Settling pnl reduces this value once other_pnl below is exhausted."
+            ],
             "type": {
               "defined": "I80F48"
             }
+          },
+          {
+            "name": "realizedOtherPnlNative",
+            "docs": [
+              "Amount of pnl realized from fees, funding and liquidation.",
+              "",
+              "This type of realized pnl is always settleable.",
+              "Settling pnl reduces this value first."
+            ],
+            "type": {
+              "defined": "I80F48"
+            }
+          },
+          {
+            "name": "settlePnlLimitRealizedTrade",
+            "docs": [
+              "Settle limit contribution from realized pnl.",
+              "",
+              "Every time pnl is realized, this is increased by a fraction of the stable",
+              "value of the realization. It magnitude decreases when realized pnl drops below its value."
+            ],
+            "type": "i64"
           },
           {
             "name": "reserved",
             "type": {
               "array": [
                 "u8",
-                128
+                104
               ]
             }
           }
@@ -12805,11 +13174,15 @@ export const IDL: MangoV4 = {
             "type": "i64"
           },
           {
+            "name": "frozenUntil",
+            "type": "u64"
+          },
+          {
             "name": "reserved",
             "type": {
               "array": [
                 "u8",
-                240
+                232
               ]
             }
           }
@@ -14468,6 +14841,16 @@ export const IDL: MangoV4 = {
           "name": "socializedLoss",
           "type": "i128",
           "index": false
+        },
+        {
+          "name": "startingLiabDepositIndex",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "endingLiabDepositIndex",
+          "type": "i128",
+          "index": false
         }
       ]
     },
@@ -14733,6 +15116,56 @@ export const IDL: MangoV4 = {
           "name": "socializedLoss",
           "type": "i128",
           "index": false
+        },
+        {
+          "name": "startingLongFunding",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "startingShortFunding",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "endingLongFunding",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "endingShortFunding",
+          "type": "i128",
+          "index": false
+        }
+      ]
+    },
+    {
+      "name": "PerpLiqQuoteAndBankruptcyLog",
+      "fields": [
+        {
+          "name": "mangoGroup",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "liqee",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "liqor",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "perpMarketIndex",
+          "type": "u16",
+          "index": false
+        },
+        {
+          "name": "settlement",
+          "type": "i128",
+          "index": false
         }
       ]
     },
@@ -14962,6 +15395,41 @@ export const IDL: MangoV4 = {
       "code": 6031,
       "name": "MarketInReduceOnlyMode",
       "msg": "market is in reduce only mode"
+    },
+    {
+      "code": 6032,
+      "name": "GroupIsHalted",
+      "msg": "group is halted"
+    },
+    {
+      "code": 6033,
+      "name": "PerpHasBaseLots",
+      "msg": "the perp position has non-zero base lots"
+    },
+    {
+      "code": 6034,
+      "name": "HasOpenOrUnsettledSerum3Orders",
+      "msg": "there are open or unsettled serum3 orders"
+    },
+    {
+      "code": 6035,
+      "name": "HasLiquidatableTokenPosition",
+      "msg": "has liquidatable token position"
+    },
+    {
+      "code": 6036,
+      "name": "HasLiquidatablePerpBasePosition",
+      "msg": "has liquidatable perp base position"
+    },
+    {
+      "code": 6037,
+      "name": "HasLiquidatableTrustedPerpPnl",
+      "msg": "has liquidatable trusted perp pnl"
+    },
+    {
+      "code": 6038,
+      "name": "AccountIsFrozen",
+      "msg": "account is frozen"
     }
   ]
 };

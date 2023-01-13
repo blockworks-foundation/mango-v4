@@ -223,7 +223,7 @@ async function main(): Promise<void> {
     CLUSTER,
     MANGO_V4_ID[CLUSTER],
     {
-      idsSource: 'get-program-accounts',
+      idsSource: 'api',
     },
   );
 

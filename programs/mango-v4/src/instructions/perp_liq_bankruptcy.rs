@@ -17,6 +17,7 @@ use crate::logs::{emit_perp_balances, PerpLiqBankruptcyLog, TokenBalanceLog};
 pub struct PerpLiqBankruptcy<'info> {
     #[account(
         has_one = insurance_vault,
+        constraint = group.load()?.is_operational() @ MangoError::GroupIsHalted
     )]
     pub group: AccountLoader<'info, Group>,
 
@@ -25,7 +26,8 @@ pub struct PerpLiqBankruptcy<'info> {
 
     #[account(
         mut,
-        has_one = group
+        has_one = group,
+        constraint = liqor.load()?.is_operational() @ MangoError::AccountIsFrozen
         // liqor_owner is checked at #1
     )]
     pub liqor: AccountLoader<'info, MangoAccountFixed>,
@@ -33,7 +35,8 @@ pub struct PerpLiqBankruptcy<'info> {
 
     #[account(
         mut,
-        has_one = group
+        has_one = group,
+        constraint = liqee.load()?.is_operational() @ MangoError::AccountIsFrozen
     )]
     pub liqee: AccountLoader<'info, MangoAccountFixed>,
 
@@ -178,8 +181,8 @@ pub fn perp_liq_bankruptcy(ctx: Context<PerpLiqBankruptcy>, max_liab_transfer: u
         let liqor_perp_position = liqor
             .ensure_perp_position(perp_market.perp_market_index, settle_token_index)?
             .0;
-        liqee_perp_position.record_bankruptcy_quote_change(insurance_liab_transfer);
-        liqor_perp_position.record_bankruptcy_quote_change(-insurance_liab_transfer);
+        liqee_perp_position.record_settle(-insurance_liab_transfer);
+        liqor_perp_position.record_liquidation_quote_change(-insurance_liab_transfer);
 
         emit_perp_balances(
             ctx.accounts.group.key(),
@@ -195,7 +198,7 @@ pub fn perp_liq_bankruptcy(ctx: Context<PerpLiqBankruptcy>, max_liab_transfer: u
     let mut socialized_loss = I80F48::ZERO;
     if insurance_fund_exhausted && remaining_liab.is_positive() {
         perp_market.socialize_loss(-remaining_liab)?;
-        liqee_perp_position.record_bankruptcy_quote_change(remaining_liab);
+        liqee_perp_position.record_settle(-remaining_liab);
         require_eq!(liqee_perp_position.quote_position_native(), 0);
         socialized_loss = remaining_liab;
     }

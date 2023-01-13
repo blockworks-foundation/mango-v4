@@ -19,6 +19,7 @@ const FIRST_BANK_NUM: u32 = 0;
 pub struct TokenRegister<'info> {
     #[account(
         has_one = admin,
+        constraint = group.load()?.is_operational() @ MangoError::GroupIsHalted
     )]
     pub group: AccountLoader<'info, Group>,
     pub admin: Signer<'info>,
@@ -158,7 +159,7 @@ pub fn token_register(
     let oracle_price =
         bank.oracle_price(&AccountInfoRef::borrow(ctx.accounts.oracle.as_ref())?, None)?;
     bank.stable_price_model
-        .reset_to_price(oracle_price.to_num(), now_ts.try_into().unwrap());
+        .reset_to_price(oracle_price.to_num(), now_ts);
 
     let mut mint_info = ctx.accounts.mint_info.load_init()?;
     *mint_info = MintInfo {

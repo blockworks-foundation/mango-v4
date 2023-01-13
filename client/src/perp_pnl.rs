@@ -60,7 +60,7 @@ pub async fn fetch_top(
             perp_pos.settle_funding(&perp_market);
             perp_pos.update_settle_limit(&perp_market, now_ts);
             let pnl = perp_pos.pnl_for_price(&perp_market, oracle_price).unwrap();
-            let limited_pnl = perp_pos.apply_pnl_settle_limit(pnl, &perp_market);
+            let limited_pnl = perp_pos.apply_pnl_settle_limit(&perp_market, pnl);
             if limited_pnl >= 0 && direction == Direction::MaxNegative
                 || limited_pnl <= 0 && direction == Direction::MaxPositive
             {

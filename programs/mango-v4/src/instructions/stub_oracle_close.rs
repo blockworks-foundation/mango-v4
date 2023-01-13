@@ -1,13 +1,14 @@
 use anchor_lang::prelude::*;
 use anchor_spl::token::Token;
 
-use crate::state::*;
+use crate::{error::MangoError, state::*};
 
 #[derive(Accounts)]
 pub struct StubOracleClose<'info> {
     #[account(
-        constraint = group.load()?.is_testing(),
         has_one = admin,
+        constraint = group.load()?.is_operational() @ MangoError::GroupIsHalted,
+        constraint = group.load()?.is_testing(),
     )]
     pub group: AccountLoader<'info, Group>,
     pub admin: Signer<'info>,
