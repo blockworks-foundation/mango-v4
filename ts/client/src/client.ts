@@ -1049,7 +1049,7 @@ export class MangoClient {
         [bank],
         [],
       );
-
+    console.log(healthRemainingAccounts, '@@@');
     const ix = await this.program.methods
       .tokenWithdraw(new BN(nativeAmount), allowBorrow)
       .accounts({
@@ -2709,7 +2709,7 @@ export class MangoClient {
         }
       }
     }
-
+    console.log(tokenPositionIndices);
     const mintInfos = tokenPositionIndices
       .filter((tokenIndex) => tokenIndex !== TokenPosition.TokenIndexUnset)
       .map((tokenIndex) => group.mintInfosMapByTokenIndex.get(tokenIndex)!);
