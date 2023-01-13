@@ -1,42 +1,55 @@
 # Mango v4 Program Change Log
 
-Update this for each mainnet deployment.
+Update this for each program release and mainnet deployment.
 
 ## not on mainnet
 
+### v0.1.2, 2023-1-13
+
+Deployment: date, tx
+
+- Add an optional security authority with the ability to halt a group or
+  temporarily freeze user accounts.
+- Extend perp pnl settle limits to apply to realized pnl
+- Rename perp_liq_bankruptcy to perp_liq_quote_and_bankruptcy and extend it to
+  cover taking over the liqee's negative pnl while the settle limits and perp
+  settle health allow it.
+- Perp bankruptcy is now allowed when settling is impossible, even when there are
+  spot assets remaining.
+
 ## mainnet
 
-Jan 5, 2023 Central European Standard Time
+### Jan 5, 2023 Central European Standard Time
 
 - Change max staleness slots from -1 to 600 for trustless token registering
 
-Jan 4, 2023 Central European Standard Time
+### Jan 4, 2023 Central European Standard Time
 
 - Reduce only mode for tokens, and perp markets
 - Perp settlement applies no loan origination fee
 
-Dec 16, 2022 at 16:40 Central European Standard Time
+### Dec 16, 2022 at 16:40 Central European Standard Time
 
-Oct 8, 2022 at 14:38:31 Central European Summer Time
+### Oct 8, 2022 at 14:38:31 Central European Summer Time
 https://explorer.solana.com/tx/3m8EDohkgwJZyiwpGXztBWARWQVxyhnSNDVuH467D7FPS2wxJerr79HhdhDEed5hpConHgGsKHvxtW1HJP6GixX9
 
-Oct 8, 2022 at 14:38:31 Central European Summer Time
+### Oct 8, 2022 at 14:38:31 Central European Summer Time
 https://explorer.solana.com/tx/3m8EDohkgwJZyiwpGXztBWARWQVxyhnSNDVuH467D7FPS2wxJerr79HhdhDEed5hpConHgGsKHvxtW1HJP6GixX9
 
 - New ix `TokenDepositIntoExisting`
 
-Sep 1, 2022 at 10:24:35 Central European Summer Time
+### Sep 1, 2022 at 10:24:35 Central European Summer Time
 https://explorer.solana.com/tx/3NnX13A3QwsREKKKo3iYR4jqgoongpCjdhhXuJ3y5iP6FwfPcNieVop623tpgPbyreC7m7KtphwdWdoHYE5YC394
 
 - Add HealthRegionBegin, -End instructions
 - Add explicit "oracle" account argument for TokenDeposit and TokenWithdraw instructions
 
-Aug 20, 2022 at 19:58:29 Central European Summer Time
+### Aug 20, 2022 at 19:58:29 Central European Summer Time
 https://explorer.solana.com/tx/3R4frko1AekQKJmmQ5T6k3mdXF9uZVHTR7oocdspTPsc82xX7qrbgnG61r28UdhCxsjMxtQHgBqMc37FSvoHQfCN
 
 - loan fee logging for off-chain services
 
-Aug 18, 2022 at 17:17:40 Central European Summer Time
+### Aug 18, 2022 at 17:17:40 Central European Summer Time
 https://explorer.solana.com/tx/4Xnyswcwx98y6khw8ptNVmdhQZwJjuNy2BvmQg2pJayoThFiw8kmS2ecRAg5cg2DncvW3NQgn2vtP8mCUtv6Q1yB
 
 - liq_token_bankruptcy: removed liab_token_index argument
@@ -82,13 +95,13 @@ https://explorer.solana.com/tx/4Xnyswcwx98y6khw8ptNVmdhQZwJjuNy2BvmQg2pJayoThFiw
   marginTrade takes inputMintPk and outputMintPk instead of inputToken and outputToken
   marginTrade takes flashLoanType as an argument
 
-Aug 8, 2022 at 18:56:04 Central European Summer Time
+### Aug 8, 2022 at 18:56:04 Central European Summer Time
 https://explorer.solana.com/tx/yjZggRTrcDNquMkftNvBKLv77Dk4xp5yQPYXgN3qvBHTBWWJVhLPGHxqpGwosmEq3j8byHZMa13oxLLerBWUdgW
 
 - improved logging for off chain services
 - `AccountCreate` ix takes explicit input for sizes of various features
 
-Aug 4, 2022 at 09:30:00 Central European Summer Time
+### Aug 4, 2022 at 09:30:00 Central European Summer Time
 
 ts/client changes
 
@@ -114,7 +127,7 @@ New features
 - `TokenRegistration` and `TokenRegisterTrustless` ixs dont take a bank_num anymore, hardcoded to 0.
 - Enforced a minimum maximum rate of 50% so that rates don't fall so low that they cannot recover.
 
-Jul 14, 2022 at 09:33:52 Central European Summer Time
+### Jul 14, 2022 at 09:33:52 Central European Summer Time
 https://explorer.solana.com/tx/vZ5hP1vGp37fgzBfG9nb4nfA5ZdmYgk8meq53YPR4ReFxrcTwBUxTYBQUgnfAnq9u5fH36S3QTfb9mVkBXt5A6C
 
 - Account data was rearranged to put fields that are often used with gPA first
