@@ -509,6 +509,45 @@ async function makePerpMarketReduceOnly() {
   );
 }
 
+async function makePerpMarketUntrusted() {
+  const result = await buildAdminClient();
+  const client = result[0];
+  const admin = result[1];
+  const creator = result[2];
+
+  const group = await client.getGroupForCreator(creator.publicKey, GROUP_NUM);
+  const perpMarket = group.getPerpMarketByName('BTC-PERP');
+  await client.perpEditMarket(
+    group,
+    perpMarket.perpMarketIndex,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    false,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+  );
+}
+
 async function createAndPopulateAlt() {
   const result = await buildAdminClient();
   const client = result[0];
@@ -669,6 +708,7 @@ async function main() {
   try {
     // await registerPerpMarkets();
     // await makePerpMarketReduceOnly();
+    // await makePerpMarketUntrusted();
   } catch (error) {
     console.log(error);
   }
