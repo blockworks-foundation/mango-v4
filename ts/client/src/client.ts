@@ -955,7 +955,7 @@ export class MangoClient {
         AccountRetriever.Fixed,
         group,
         [mangoAccount],
-        [bank],
+        [],
         [],
       );
 
