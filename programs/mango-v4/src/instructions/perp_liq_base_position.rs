@@ -71,24 +71,8 @@ pub fn perp_liq_base_position(
     let liqee_init_health = liqee_health_cache.health(HealthType::Init);
     liqee_health_cache.require_after_phase1_liquidation()?;
 
-    // Once maint_health falls below 0, we want to start liquidating,
-    // we want to allow liquidation to continue until init_health is positive,
-    // to prevent constant oscillation between the two states
-    if liqee.being_liquidated() {
-        if liqee
-            .fixed
-            .maybe_recover_from_being_liquidated(liqee_init_health)
-        {
-            msg!("Liqee init_health above zero");
-            return Ok(());
-        }
-    } else {
-        let maint_health = liqee_health_cache.health(HealthType::Maint);
-        require!(
-            maint_health < I80F48::ZERO,
-            MangoError::HealthMustBeNegative
-        );
-        liqee.fixed.set_being_liquidated(true);
+    if !liqee.check_liquidatable(&liqee_health_cache)? {
+        return Ok(());
     }
 
     let mut perp_market = ctx.accounts.perp_market.load_mut()?;
