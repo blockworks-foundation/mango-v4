@@ -22,7 +22,9 @@ import {
   Serum3SelfTradeBehavior,
   Serum3Side,
 } from '../accounts/serum3';
+import { Builder } from '../builder';
 import { MangoClient } from '../client';
+import { defaultPerpEditParams } from '../clientIxParamBuilder';
 import { MANGO_V4_ID, OPENBOOK_PROGRAM_ID } from '../constants';
 import { buildVersionedTx, toNative } from '../utils';
 
@@ -481,31 +483,7 @@ async function makePerpMarketReduceOnly() {
   await client.perpEditMarket(
     group,
     perpMarket.perpMarketIndex,
-    null,
-    null,
-    null,
-    null,
-    null,
-    null,
-    null,
-    null,
-    null,
-    null,
-    null,
-    null,
-    null,
-    null,
-    null,
-    null,
-    null,
-    null,
-    null,
-    null,
-    null,
-    null,
-    null,
-    null,
-    true,
+    Builder(defaultPerpEditParams).reduceOnly(true).build(),
   );
 }
 
@@ -520,31 +498,7 @@ async function makePerpMarketUntrusted() {
   await client.perpEditMarket(
     group,
     perpMarket.perpMarketIndex,
-    null,
-    null,
-    null,
-    null,
-    null,
-    null,
-    null,
-    null,
-    null,
-    null,
-    null,
-    null,
-    null,
-    null,
-    null,
-    false,
-    null,
-    null,
-    null,
-    null,
-    null,
-    null,
-    null,
-    null,
-    null,
+    Builder(defaultPerpEditParams).trustedMarket(false).build(),
   );
 }
 

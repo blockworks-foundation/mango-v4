@@ -9,7 +9,12 @@ import {
   Serum3SelfTradeBehavior,
   Serum3Side,
 } from '../accounts/serum3';
+import { Builder } from '../builder';
 import { MangoClient } from '../client';
+import {
+  defaultPerpEditParams,
+  defaultTokenEditParams,
+} from '../clientIxParamBuilder';
 import { MANGO_V4_ID } from '../constants';
 
 //
@@ -102,28 +107,7 @@ async function main() {
     await client.tokenEdit(
       group,
       bank.mint,
-      null,
-      null,
-      null,
-      null,
-      null,
-      null,
-      null,
-      null,
-      null,
-      null,
-      null,
-      null,
-      null,
-      null,
-      null,
-      null,
-      null,
-      null,
-      null,
-      true,
-      null,
-      null,
+      Builder(defaultTokenEditParams).resetStablePrice(true).build(),
     );
   }
   async function setPerpPrice(
@@ -135,31 +119,7 @@ async function main() {
     await client.perpEditMarket(
       group,
       perpMarket.perpMarketIndex,
-      perpMarket.oracle,
-      null,
-      null,
-      null,
-      null,
-      null,
-      null,
-      null,
-      null,
-      null,
-      null,
-      null,
-      null,
-      null,
-      null,
-      null,
-      null,
-      null,
-      null,
-      null,
-      null,
-      null,
-      null,
-      null,
-      null,
+      Builder(defaultPerpEditParams).oracle(perpMarket.oracle).build(),
     );
   }
 
@@ -243,28 +203,11 @@ async function main() {
     await client.tokenEdit(
       group,
       buyMint,
-      group.getFirstBankByMint(buyMint).oracle,
-      null,
-      null,
-      null,
-      null,
-      null,
-      1.0,
-      1.0,
-      null,
-      null,
-      null,
-      null,
-      null,
-      null,
-      null,
-      null,
-      null,
-      null,
-      null,
-      null,
-      null,
-      null,
+      Builder(defaultTokenEditParams)
+        .oracle(group.getFirstBankByMint(buyMint).oracle)
+        .maintAssetWeight(1.0)
+        .initAssetWeight(1.0)
+        .build(),
     );
     try {
       // At a price of $1/ui-SOL we can buy 0.1 ui-SOL for the 100k native-USDC we have.
@@ -286,28 +229,11 @@ async function main() {
       await client.tokenEdit(
         group,
         buyMint,
-        group.getFirstBankByMint(buyMint).oracle,
-        null,
-        null,
-        null,
-        null,
-        null,
-        0.9,
-        0.8,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
+        Builder(defaultTokenEditParams)
+          .oracle(group.getFirstBankByMint(buyMint).oracle)
+          .maintAssetWeight(0.9)
+          .initAssetWeight(0.8)
+          .build(),
       );
     }
   }
