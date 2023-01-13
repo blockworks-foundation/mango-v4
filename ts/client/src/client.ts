@@ -830,7 +830,7 @@ export class MangoClient {
   }
 
   //withdraw all assets, close oo, deactivating perp positions, close account
-  public async totalCloseMangoAccount(
+  public async emptyAndCloseMangoAccount(
     group: Group,
     mangoAccount: MangoAccount,
     forceClose = false,
@@ -959,22 +959,27 @@ export class MangoClient {
     allowBorrow: boolean,
   ): Promise<TransactionSignature> {
     const nativeAmount = toNative(amount, group.getMintDecimals(mintPk));
-    return await this.tokenWithdrawNative(
+    const ixes = await this.tokenWithdrawNativeIx(
       group,
       mangoAccount,
       mintPk,
       nativeAmount,
       allowBorrow,
     );
+
+    return await this.sendAndConfirmTransaction(
+      [...ixes],
+      group.addressLookupTablesList,
+    );
   }
 
-  public async tokenWithdrawNative(
+  public async tokenWithdrawNativeIx(
     group: Group,
     mangoAccount: MangoAccount,
     mintPk: PublicKey,
     nativeAmount: BN,
     allowBorrow: boolean,
-  ): Promise<TransactionSignature> {
+  ): Promise<TransactionInstruction[]> {
     const bank = group.getFirstBankByMint(mintPk);
 
     const tokenAccountPk = await getAssociatedTokenAddress(
@@ -1030,10 +1035,7 @@ export class MangoClient {
       )
       .instruction();
 
-    return await this.sendAndConfirmTransaction(
-      [...preInstructions, ix, ...postInstructions],
-      group.addressLookupTablesList,
-    );
+    return [...preInstructions, ix, ...postInstructions];
   }
 
   // Serum
