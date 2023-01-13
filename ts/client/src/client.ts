@@ -833,44 +833,67 @@ export class MangoClient {
   public async emptyAndCloseMangoAccount(
     group: Group,
     mangoAccount: MangoAccount,
-    forceClose = false,
   ): Promise<TransactionSignature> {
     const instructions: TransactionInstruction[] = [];
-    for (const token of mangoAccount.tokensActive()) {
+    const healthAccountsToExclude: PublicKey[] = [];
+
+    for (const serum3Account of mangoAccount.serum3Active()) {
+      const serum3Market = group.serum3MarketsMapByMarketIndex.get(
+        serum3Account.marketIndex,
+      )!;
+
+      const openOrders = mangoAccount.serum3.find(
+        (account) => account.marketIndex === serum3Market.marketIndex,
+      )!.openOrders;
+
+      const closeOOIx = await this.serum3CloseOpenOrdersIx(
+        group,
+        mangoAccount,
+        serum3Market.serumMarketExternal,
+      );
+      healthAccountsToExclude.push(openOrders);
+      instructions.push(closeOOIx);
+    }
+
+    for (const perp of mangoAccount.perpActive()) {
+      const perpMarketIndex = perp.marketIndex;
+      const perpMarket = group.getPerpMarketByMarketIndex(perpMarketIndex);
+      const deactivatingPositionIx = await this.perpDeactivatePositionIx(
+        group,
+        mangoAccount,
+        perpMarketIndex,
+      );
+      healthAccountsToExclude.push(perpMarket.publicKey);
+      instructions.push(deactivatingPositionIx);
+    }
+
+    for (const index in mangoAccount.tokensActive()) {
+      const indexNum = Number(index);
+      const accountsToExclude = [...healthAccountsToExclude];
+      const token = mangoAccount.tokensActive()[indexNum];
       const bank = group.getFirstBankByTokenIndex(token.tokenIndex);
+      //to withdraw from all token accounts we need to exclude previous tokens pubkeys
+      //used to build health remaining accounts
+      if (indexNum !== 0) {
+        for (let i = indexNum; i--; i >= 0) {
+          const prevToken = mangoAccount.tokensActive()[i];
+          const prevBank = group.getFirstBankByTokenIndex(prevToken.tokenIndex);
+          accountsToExclude.push(prevBank.publicKey, prevBank.oracle);
+        }
+      }
       const withdrawIx = await this.tokenWithdrawNativeIx(
         group,
         mangoAccount,
         bank.mint,
         U64_MAX_BN,
         false,
+        [...accountsToExclude],
       );
       instructions.push(...withdrawIx);
     }
 
-    for (const serum3Account of mangoAccount.serum3Active()) {
-      const serum3Market = group.serum3MarketsMapByMarketIndex.get(
-        serum3Account.marketIndex,
-      )!.serumMarketExternal!;
-      const closeOOIx = await this.serum3CloseOpenOrdersIx(
-        group,
-        mangoAccount,
-        serum3Market,
-      );
-      instructions.push(closeOOIx);
-    }
-
-    for (const perp of mangoAccount.perpActive()) {
-      const deactivatingPositionIx = await this.perpDeactivatePositionIx(
-        group,
-        mangoAccount,
-        perp.marketIndex,
-      );
-      instructions.push(deactivatingPositionIx);
-    }
-
     const closeIx = await this.program.methods
-      .accountClose(forceClose)
+      .accountClose(false)
       .accounts({
         group: group.publicKey,
         account: mangoAccount.publicKey,
@@ -955,7 +978,7 @@ export class MangoClient {
         AccountRetriever.Fixed,
         group,
         [mangoAccount],
-        [],
+        [bank],
         [],
       );
 
@@ -1014,6 +1037,7 @@ export class MangoClient {
     mintPk: PublicKey,
     nativeAmount: BN,
     allowBorrow: boolean,
+    healthAccountsToExclude: PublicKey[] = [],
   ): Promise<TransactionInstruction[]> {
     const bank = group.getFirstBankByMint(mintPk);
 
@@ -1063,10 +1087,21 @@ export class MangoClient {
         tokenAccount: tokenAccountPk,
       })
       .remainingAccounts(
-        healthRemainingAccounts.map(
-          (pk) =>
-            ({ pubkey: pk, isWritable: false, isSigner: false } as AccountMeta),
-        ),
+        healthRemainingAccounts
+          .filter(
+            (accounts) =>
+              !healthAccountsToExclude.find((accountsToExclude) =>
+                accounts.equals(accountsToExclude),
+              ),
+          )
+          .map(
+            (pk) =>
+              ({
+                pubkey: pk,
+                isWritable: false,
+                isSigner: false,
+              } as AccountMeta),
+          ),
       )
       .instruction();
 
