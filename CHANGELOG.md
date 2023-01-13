@@ -4,9 +4,11 @@ Update this for each program release and mainnet deployment.
 
 ## not on mainnet
 
+## mainnet
+
 ### v0.2.0, 2023-1-13
 
-Deployment: date, tx
+Deployment: Jan 13, 2023 at 11:31:05 Central European Standard Time, https://explorer.solana.com/tx/4yGRUk6QwntvC4umECDPDZJNcbevSJ1fdZi75Mz9rGa9SHKzUtjMF3V5FCTkzBZqAETQTccqv63BYw6yX8JNxiur
 
 - Add an optional security authority with the ability to halt a group or
   temporarily freeze user accounts.
@@ -16,8 +18,6 @@ Deployment: date, tx
   settle health allow it.
 - Perp bankruptcy is now allowed when settling is impossible, even when there are
   spot assets remaining.
-
-## mainnet
 
 ### Jan 5, 2023 Central European Standard Time
 
