@@ -86,7 +86,7 @@ pub struct MangoAccount {
     /// Init health as calculated during HealthReginBegin, rounded up.
     pub health_region_begin_init_health: i64,
 
-    pub frozen_until: i64,
+    pub frozen_until: u64,
 
     pub reserved: [u8; 232],
 
