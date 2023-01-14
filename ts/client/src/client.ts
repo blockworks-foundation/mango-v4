@@ -45,6 +45,7 @@ import {
   Serum3Side,
   generateSerum3MarketExternalVaultSignerAddress,
 } from './accounts/serum3';
+import { PerpEditParams, TokenEditParams } from './clientIxParamBuilder';
 import { OPENBOOK_PROGRAM_ID } from './constants';
 import { Id } from './ids';
 import { IDL, MangoV4 } from './mango_v4';
@@ -310,64 +311,43 @@ export class MangoClient {
   public async tokenEdit(
     group: Group,
     mintPk: PublicKey,
-    oracle: PublicKey | null,
-    oracleConfig: OracleConfigParams | null,
-    groupInsuranceFund: boolean | null,
-    interestRateParams: InterestRateParams | null,
-    loanFeeRate: number | null,
-    loanOriginationFeeRate: number | null,
-    maintAssetWeight: number | null,
-    initAssetWeight: number | null,
-    maintLiabWeight: number | null,
-    initLiabWeight: number | null,
-    liquidationFee: number | null,
-    stablePriceDelayIntervalSeconds: number | null,
-    stablePriceDelayGrowthLimit: number | null,
-    stablePriceGrowthLimit: number | null,
-    minVaultToDepositsRatio: number | null,
-    netBorrowLimitPerWindowQuote: number | null,
-    netBorrowLimitWindowSizeTs: number | null,
-    borrowWeightScaleStartQuote: number | null,
-    depositWeightScaleStartQuote: number | null,
-    resetStablePrice: boolean | null,
-    resetNetBorrowLimit: boolean | null,
-    reduceOnly: boolean | null,
+    params: TokenEditParams,
   ): Promise<TransactionSignature> {
     const bank = group.getFirstBankByMint(mintPk);
     const mintInfo = group.mintInfosMapByTokenIndex.get(bank.tokenIndex)!;
 
     return await this.program.methods
       .tokenEdit(
-        oracle,
-        oracleConfig,
-        groupInsuranceFund,
-        interestRateParams,
-        loanFeeRate,
-        loanOriginationFeeRate,
-        maintAssetWeight,
-        initAssetWeight,
-        maintLiabWeight,
-        initLiabWeight,
-        liquidationFee,
-        stablePriceDelayIntervalSeconds,
-        stablePriceDelayGrowthLimit,
-        stablePriceGrowthLimit,
-        minVaultToDepositsRatio,
-        netBorrowLimitPerWindowQuote !== null
-          ? new BN(netBorrowLimitPerWindowQuote)
+        params.oracle,
+        params.oracleConfig,
+        params.groupInsuranceFund,
+        params.interestRateParams,
+        params.loanFeeRate,
+        params.loanOriginationFeeRate,
+        params.maintAssetWeight,
+        params.initAssetWeight,
+        params.maintLiabWeight,
+        params.initLiabWeight,
+        params.liquidationFee,
+        params.stablePriceDelayIntervalSeconds,
+        params.stablePriceDelayGrowthLimit,
+        params.stablePriceGrowthLimit,
+        params.minVaultToDepositsRatio,
+        params.netBorrowLimitPerWindowQuote !== null
+          ? new BN(params.netBorrowLimitPerWindowQuote)
           : null,
-        netBorrowLimitWindowSizeTs !== null
-          ? new BN(netBorrowLimitWindowSizeTs)
+        params.netBorrowLimitWindowSizeTs !== null
+          ? new BN(params.netBorrowLimitWindowSizeTs)
           : null,
-        borrowWeightScaleStartQuote,
-        depositWeightScaleStartQuote,
-        resetStablePrice ?? false,
-        resetNetBorrowLimit ?? false,
-        reduceOnly,
+        params.borrowWeightScaleStartQuote,
+        params.depositWeightScaleStartQuote,
+        params.resetStablePrice ?? false,
+        params.resetNetBorrowLimit ?? false,
+        params.reduceOnly,
       )
       .accounts({
         group: group.publicKey,
-        oracle: oracle ?? bank.oracle,
+        oracle: params.oracle ?? bank.oracle,
         admin: (this.program.provider as AnchorProvider).wallet.publicKey,
         mintInfo: mintInfo.publicKey,
       })
@@ -1653,67 +1633,43 @@ export class MangoClient {
   public async perpEditMarket(
     group: Group,
     perpMarketIndex: PerpMarketIndex,
-    oracle: PublicKey | null, // TODO: stable price resetting should be a separate flag
-    oracleConfig: OracleConfigParams | null,
-    baseDecimals: number | null,
-    maintAssetWeight: number | null,
-    initAssetWeight: number | null,
-    maintLiabWeight: number | null,
-    initLiabWeight: number | null,
-    liquidationFee: number | null,
-    makerFee: number | null,
-    takerFee: number | null,
-    feePenalty: number | null,
-    minFunding: number | null,
-    maxFunding: number | null,
-    impactQuantity: number | null,
-    groupInsuranceFund: boolean | null,
-    trustedMarket: boolean | null,
-    settleFeeFlat: number | null,
-    settleFeeAmountThreshold: number | null,
-    settleFeeFractionLowHealth: number | null,
-    stablePriceDelayIntervalSeconds: number | null,
-    stablePriceDelayGrowthLimit: number | null,
-    stablePriceGrowthLimit: number | null,
-    settlePnlLimitFactor: number | null,
-    settlePnlLimitWindowSize: number | null,
-    reduceOnly: boolean | null,
+    params: PerpEditParams,
   ): Promise<TransactionSignature> {
     const perpMarket = group.getPerpMarketByMarketIndex(perpMarketIndex);
 
     return await this.program.methods
       .perpEditMarket(
-        oracle,
-        oracleConfig,
-        baseDecimals,
-        maintAssetWeight,
-        initAssetWeight,
-        maintLiabWeight,
-        initLiabWeight,
-        liquidationFee,
-        makerFee,
-        takerFee,
-        minFunding,
-        maxFunding,
-        impactQuantity !== null ? new BN(impactQuantity) : null,
-        groupInsuranceFund,
-        trustedMarket,
-        feePenalty,
-        settleFeeFlat,
-        settleFeeAmountThreshold,
-        settleFeeFractionLowHealth,
-        stablePriceDelayIntervalSeconds,
-        stablePriceDelayGrowthLimit,
-        stablePriceGrowthLimit,
-        settlePnlLimitFactor,
-        settlePnlLimitWindowSize !== null
-          ? new BN(settlePnlLimitWindowSize)
+        params.oracle,
+        params.oracleConfig,
+        params.baseDecimals,
+        params.maintAssetWeight,
+        params.initAssetWeight,
+        params.maintLiabWeight,
+        params.initLiabWeight,
+        params.liquidationFee,
+        params.makerFee,
+        params.takerFee,
+        params.minFunding,
+        params.maxFunding,
+        params.impactQuantity !== null ? new BN(params.impactQuantity) : null,
+        params.groupInsuranceFund,
+        params.trustedMarket,
+        params.feePenalty,
+        params.settleFeeFlat,
+        params.settleFeeAmountThreshold,
+        params.settleFeeFractionLowHealth,
+        params.stablePriceDelayIntervalSeconds,
+        params.stablePriceDelayGrowthLimit,
+        params.stablePriceGrowthLimit,
+        params.settlePnlLimitFactor,
+        params.settlePnlLimitWindowSize !== null
+          ? new BN(params.settlePnlLimitWindowSize)
           : null,
-        reduceOnly,
+        params.reduceOnly,
       )
       .accounts({
         group: group.publicKey,
-        oracle: oracle ?? perpMarket.oracle,
+        oracle: params.oracle ?? perpMarket.oracle,
         admin: (this.program.provider as AnchorProvider).wallet.publicKey,
         perpMarket: perpMarket.publicKey,
       })
