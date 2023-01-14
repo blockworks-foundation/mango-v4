@@ -1303,7 +1303,13 @@ export class PerpPosition {
       .sub(unsettledFunding)
       .add(takerQuote);
 
-    return baseLots.mul(lotsToQuote).add(quoteCurrent);
+    const uncappedEquity = baseLots.mul(lotsToQuote).add(quoteCurrent);
+
+    if (perpMarket.trustedMarket) {
+      return uncappedEquity;
+    } else {
+      return baseLots.mul(lotsToQuote).add(quoteCurrent).min(ZERO_I80F48());
+    }
   }
 
   public hasOpenOrders(): boolean {
