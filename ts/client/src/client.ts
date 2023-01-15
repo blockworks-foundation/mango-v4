@@ -842,16 +842,12 @@ export class MangoClient {
         serum3Account.marketIndex,
       )!;
 
-      const openOrders = mangoAccount.serum3.find(
-        (account) => account.marketIndex === serum3Market.marketIndex,
-      )!.openOrders;
-
       const closeOOIx = await this.serum3CloseOpenOrdersIx(
         group,
         mangoAccount,
         serum3Market.serumMarketExternal,
       );
-      healthAccountsToExclude.push(openOrders);
+      healthAccountsToExclude.push(serum3Account.openOrders);
       instructions.push(closeOOIx);
     }
 
