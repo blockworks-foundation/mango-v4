@@ -1,5 +1,5 @@
 export type MangoV4 = {
-  "version": "0.2.0",
+  "version": "0.3.0",
   "name": "mango_v4",
   "instructions": [
     {
@@ -2508,19 +2508,27 @@ export type MangoV4 = {
           "type": "i64"
         },
         {
-          "name": "maintAssetWeight",
+          "name": "maintBaseAssetWeight",
           "type": "f32"
         },
         {
-          "name": "initAssetWeight",
+          "name": "initBaseAssetWeight",
           "type": "f32"
         },
         {
-          "name": "maintLiabWeight",
+          "name": "maintBaseLiabWeight",
           "type": "f32"
         },
         {
-          "name": "initLiabWeight",
+          "name": "initBaseLiabWeight",
+          "type": "f32"
+        },
+        {
+          "name": "maintPnlAssetWeight",
+          "type": "f32"
+        },
+        {
+          "name": "initPnlAssetWeight",
           "type": "f32"
         },
         {
@@ -2549,10 +2557,6 @@ export type MangoV4 = {
         },
         {
           "name": "groupInsuranceFund",
-          "type": "bool"
-        },
-        {
-          "name": "trustedMarket",
           "type": "bool"
         },
         {
@@ -2631,25 +2635,37 @@ export type MangoV4 = {
           }
         },
         {
-          "name": "maintAssetWeightOpt",
+          "name": "maintBaseAssetWeightOpt",
           "type": {
             "option": "f32"
           }
         },
         {
-          "name": "initAssetWeightOpt",
+          "name": "initBaseAssetWeightOpt",
           "type": {
             "option": "f32"
           }
         },
         {
-          "name": "maintLiabWeightOpt",
+          "name": "maintBaseLiabWeightOpt",
           "type": {
             "option": "f32"
           }
         },
         {
-          "name": "initLiabWeightOpt",
+          "name": "initBaseLiabWeightOpt",
+          "type": {
+            "option": "f32"
+          }
+        },
+        {
+          "name": "maintPnlAssetWeightOpt",
+          "type": {
+            "option": "f32"
+          }
+        },
+        {
+          "name": "initPnlAssetWeightOpt",
           "type": {
             "option": "f32"
           }
@@ -2692,12 +2708,6 @@ export type MangoV4 = {
         },
         {
           "name": "groupInsuranceFundOpt",
-          "type": {
-            "option": "bool"
-          }
-        },
-        {
-          "name": "trustedMarketOpt",
           "type": {
             "option": "bool"
           }
@@ -4308,10 +4318,7 @@ export type MangoV4 = {
             "type": "u16"
           },
           {
-            "name": "trustedMarket",
-            "docs": [
-              "May this market contribute positive values to health?"
-            ],
+            "name": "blocked1",
             "type": "u8"
           },
           {
@@ -4386,25 +4393,25 @@ export type MangoV4 = {
             "type": "i64"
           },
           {
-            "name": "maintAssetWeight",
+            "name": "maintBaseAssetWeight",
             "type": {
               "defined": "I80F48"
             }
           },
           {
-            "name": "initAssetWeight",
+            "name": "initBaseAssetWeight",
             "type": {
               "defined": "I80F48"
             }
           },
           {
-            "name": "maintLiabWeight",
+            "name": "maintBaseLiabWeight",
             "type": {
               "defined": "I80F48"
             }
           },
           {
-            "name": "initLiabWeight",
+            "name": "initBaseLiabWeight",
             "type": {
               "defined": "I80F48"
             }
@@ -4565,11 +4572,32 @@ export type MangoV4 = {
             "type": "u8"
           },
           {
+            "name": "padding4",
+            "type": {
+              "array": [
+                "u8",
+                7
+              ]
+            }
+          },
+          {
+            "name": "maintPnlAssetWeight",
+            "type": {
+              "defined": "I80F48"
+            }
+          },
+          {
+            "name": "initPnlAssetWeight",
+            "type": {
+              "defined": "I80F48"
+            }
+          },
+          {
             "name": "reserved",
             "type": {
               "array": [
                 "u8",
-                1943
+                1904
               ]
             }
           }
@@ -4869,25 +4897,37 @@ export type MangoV4 = {
             "type": "u16"
           },
           {
-            "name": "maintAssetWeight",
+            "name": "maintBaseAssetWeight",
             "type": {
               "defined": "I80F48"
             }
           },
           {
-            "name": "initAssetWeight",
+            "name": "initBaseAssetWeight",
             "type": {
               "defined": "I80F48"
             }
           },
           {
-            "name": "maintLiabWeight",
+            "name": "maintBaseLiabWeight",
             "type": {
               "defined": "I80F48"
             }
           },
           {
-            "name": "initLiabWeight",
+            "name": "initBaseLiabWeight",
+            "type": {
+              "defined": "I80F48"
+            }
+          },
+          {
+            "name": "maintPnlAssetWeight",
+            "type": {
+              "defined": "I80F48"
+            }
+          },
+          {
+            "name": "initPnlAssetWeight",
             "type": {
               "defined": "I80F48"
             }
@@ -4922,10 +4962,6 @@ export type MangoV4 = {
           },
           {
             "name": "hasOpenOrders",
-            "type": "bool"
-          },
-          {
-            "name": "trustedMarket",
             "type": "bool"
           }
         ]
@@ -7717,7 +7753,7 @@ export type MangoV4 = {
 };
 
 export const IDL: MangoV4 = {
-  "version": "0.2.0",
+  "version": "0.3.0",
   "name": "mango_v4",
   "instructions": [
     {
@@ -10226,19 +10262,27 @@ export const IDL: MangoV4 = {
           "type": "i64"
         },
         {
-          "name": "maintAssetWeight",
+          "name": "maintBaseAssetWeight",
           "type": "f32"
         },
         {
-          "name": "initAssetWeight",
+          "name": "initBaseAssetWeight",
           "type": "f32"
         },
         {
-          "name": "maintLiabWeight",
+          "name": "maintBaseLiabWeight",
           "type": "f32"
         },
         {
-          "name": "initLiabWeight",
+          "name": "initBaseLiabWeight",
+          "type": "f32"
+        },
+        {
+          "name": "maintPnlAssetWeight",
+          "type": "f32"
+        },
+        {
+          "name": "initPnlAssetWeight",
           "type": "f32"
         },
         {
@@ -10267,10 +10311,6 @@ export const IDL: MangoV4 = {
         },
         {
           "name": "groupInsuranceFund",
-          "type": "bool"
-        },
-        {
-          "name": "trustedMarket",
           "type": "bool"
         },
         {
@@ -10349,25 +10389,37 @@ export const IDL: MangoV4 = {
           }
         },
         {
-          "name": "maintAssetWeightOpt",
+          "name": "maintBaseAssetWeightOpt",
           "type": {
             "option": "f32"
           }
         },
         {
-          "name": "initAssetWeightOpt",
+          "name": "initBaseAssetWeightOpt",
           "type": {
             "option": "f32"
           }
         },
         {
-          "name": "maintLiabWeightOpt",
+          "name": "maintBaseLiabWeightOpt",
           "type": {
             "option": "f32"
           }
         },
         {
-          "name": "initLiabWeightOpt",
+          "name": "initBaseLiabWeightOpt",
+          "type": {
+            "option": "f32"
+          }
+        },
+        {
+          "name": "maintPnlAssetWeightOpt",
+          "type": {
+            "option": "f32"
+          }
+        },
+        {
+          "name": "initPnlAssetWeightOpt",
           "type": {
             "option": "f32"
           }
@@ -10410,12 +10462,6 @@ export const IDL: MangoV4 = {
         },
         {
           "name": "groupInsuranceFundOpt",
-          "type": {
-            "option": "bool"
-          }
-        },
-        {
-          "name": "trustedMarketOpt",
           "type": {
             "option": "bool"
           }
@@ -12026,10 +12072,7 @@ export const IDL: MangoV4 = {
             "type": "u16"
           },
           {
-            "name": "trustedMarket",
-            "docs": [
-              "May this market contribute positive values to health?"
-            ],
+            "name": "blocked1",
             "type": "u8"
           },
           {
@@ -12104,25 +12147,25 @@ export const IDL: MangoV4 = {
             "type": "i64"
           },
           {
-            "name": "maintAssetWeight",
+            "name": "maintBaseAssetWeight",
             "type": {
               "defined": "I80F48"
             }
           },
           {
-            "name": "initAssetWeight",
+            "name": "initBaseAssetWeight",
             "type": {
               "defined": "I80F48"
             }
           },
           {
-            "name": "maintLiabWeight",
+            "name": "maintBaseLiabWeight",
             "type": {
               "defined": "I80F48"
             }
           },
           {
-            "name": "initLiabWeight",
+            "name": "initBaseLiabWeight",
             "type": {
               "defined": "I80F48"
             }
@@ -12283,11 +12326,32 @@ export const IDL: MangoV4 = {
             "type": "u8"
           },
           {
+            "name": "padding4",
+            "type": {
+              "array": [
+                "u8",
+                7
+              ]
+            }
+          },
+          {
+            "name": "maintPnlAssetWeight",
+            "type": {
+              "defined": "I80F48"
+            }
+          },
+          {
+            "name": "initPnlAssetWeight",
+            "type": {
+              "defined": "I80F48"
+            }
+          },
+          {
             "name": "reserved",
             "type": {
               "array": [
                 "u8",
-                1943
+                1904
               ]
             }
           }
@@ -12587,25 +12651,37 @@ export const IDL: MangoV4 = {
             "type": "u16"
           },
           {
-            "name": "maintAssetWeight",
+            "name": "maintBaseAssetWeight",
             "type": {
               "defined": "I80F48"
             }
           },
           {
-            "name": "initAssetWeight",
+            "name": "initBaseAssetWeight",
             "type": {
               "defined": "I80F48"
             }
           },
           {
-            "name": "maintLiabWeight",
+            "name": "maintBaseLiabWeight",
             "type": {
               "defined": "I80F48"
             }
           },
           {
-            "name": "initLiabWeight",
+            "name": "initBaseLiabWeight",
+            "type": {
+              "defined": "I80F48"
+            }
+          },
+          {
+            "name": "maintPnlAssetWeight",
+            "type": {
+              "defined": "I80F48"
+            }
+          },
+          {
+            "name": "initPnlAssetWeight",
             "type": {
               "defined": "I80F48"
             }
@@ -12640,10 +12716,6 @@ export const IDL: MangoV4 = {
           },
           {
             "name": "hasOpenOrders",
-            "type": "bool"
-          },
-          {
-            "name": "trustedMarket",
             "type": "bool"
           }
         ]

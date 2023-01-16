@@ -88,10 +88,10 @@ mod tests {
         let mut perp_market = PerpMarket::zeroed();
         perp_market.quote_lot_size = 1;
         perp_market.base_lot_size = 1;
-        perp_market.maint_asset_weight = I80F48::ONE;
-        perp_market.maint_liab_weight = I80F48::ONE;
-        perp_market.init_asset_weight = I80F48::ONE;
-        perp_market.init_liab_weight = I80F48::ONE;
+        perp_market.maint_base_asset_weight = I80F48::ONE;
+        perp_market.maint_base_liab_weight = I80F48::ONE;
+        perp_market.init_base_asset_weight = I80F48::ONE;
+        perp_market.init_base_liab_weight = I80F48::ONE;
 
         (perp_market, oracle_price, event_queue, book)
     }

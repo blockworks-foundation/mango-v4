@@ -108,17 +108,19 @@ pub fn mock_perp_market(
     oracle: Pubkey,
     price: f64,
     market_index: PerpMarketIndex,
-    init_weights: f64,
-    maint_weights: f64,
+    base_weights: (f64, f64),
+    pnl_weights: (f64, f64),
 ) -> TestAccount<PerpMarket> {
     let mut pm = TestAccount::<PerpMarket>::new_zeroed();
     pm.data().group = group;
     pm.data().oracle = oracle;
     pm.data().perp_market_index = market_index;
-    pm.data().init_asset_weight = I80F48::from_num(1.0 - init_weights);
-    pm.data().init_liab_weight = I80F48::from_num(1.0 + init_weights);
-    pm.data().maint_asset_weight = I80F48::from_num(1.0 - maint_weights);
-    pm.data().maint_liab_weight = I80F48::from_num(1.0 + maint_weights);
+    pm.data().init_base_asset_weight = I80F48::from_num(1.0 - base_weights.0);
+    pm.data().init_base_liab_weight = I80F48::from_num(1.0 + base_weights.0);
+    pm.data().maint_base_asset_weight = I80F48::from_num(1.0 - base_weights.1);
+    pm.data().maint_base_liab_weight = I80F48::from_num(1.0 + base_weights.1);
+    pm.data().init_pnl_asset_weight = I80F48::from_num(1.0 - pnl_weights.0);
+    pm.data().maint_pnl_asset_weight = I80F48::from_num(1.0 - pnl_weights.1);
     pm.data().quote_lot_size = 100;
     pm.data().base_lot_size = 10;
     pm.data().stable_price_model.reset_to_price(price, 0);

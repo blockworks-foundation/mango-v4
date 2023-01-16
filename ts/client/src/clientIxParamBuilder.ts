@@ -55,10 +55,12 @@ export interface PerpEditParams {
   oracle: PublicKey | null;
   oracleConfig: OracleConfigParams | null;
   baseDecimals: number | null;
-  maintAssetWeight: number | null;
-  initAssetWeight: number | null;
-  maintLiabWeight: number | null;
-  initLiabWeight: number | null;
+  maintBaseAssetWeight: number | null;
+  initBaseAssetWeight: number | null;
+  maintBaseLiabWeight: number | null;
+  initBaseLiabWeight: number | null;
+  maintPnlAssetWeight: number | null;
+  initPnlAssetWeight: number | null;
   liquidationFee: number | null;
   makerFee: number | null;
   takerFee: number | null;
@@ -67,7 +69,6 @@ export interface PerpEditParams {
   maxFunding: number | null;
   impactQuantity: number | null;
   groupInsuranceFund: boolean | null;
-  trustedMarket: boolean | null;
   settleFeeFlat: number | null;
   settleFeeAmountThreshold: number | null;
   settleFeeFractionLowHealth: number | null;
@@ -83,10 +84,12 @@ export const NullPerpEditParams: PerpEditParams = {
   oracle: null,
   oracleConfig: null,
   baseDecimals: null,
-  maintAssetWeight: null,
-  initAssetWeight: null,
-  maintLiabWeight: null,
-  initLiabWeight: null,
+  maintBaseAssetWeight: null,
+  initBaseAssetWeight: null,
+  maintBaseLiabWeight: null,
+  initBaseLiabWeight: null,
+  maintPnlAssetWeight: null,
+  initPnlAssetWeight: null,
   liquidationFee: null,
   makerFee: null,
   takerFee: null,
@@ -95,7 +98,6 @@ export const NullPerpEditParams: PerpEditParams = {
   maxFunding: null,
   impactQuantity: null,
   groupInsuranceFund: null,
-  trustedMarket: null,
   settleFeeFlat: null,
   settleFeeAmountThreshold: null,
   settleFeeFractionLowHealth: null,

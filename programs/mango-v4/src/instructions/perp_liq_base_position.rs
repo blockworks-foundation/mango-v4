@@ -99,63 +99,62 @@ pub fn perp_liq_base_position(
 
     // Take over the liqee's base in exchange for quote
     require_msg!(liqee_base_lots != 0, "liqee base position is zero");
-    let (base_transfer, quote_transfer) =
-        if liqee_base_lots > 0 {
-            require_msg!(
-                max_base_transfer > 0,
-                "max_base_transfer must be positive when liqee's base_position is positive"
-            );
+    let (base_transfer, quote_transfer) = if liqee_base_lots > 0 {
+        require_msg!(
+            max_base_transfer > 0,
+            "max_base_transfer must be positive when liqee's base_position is positive"
+        );
 
-            // health gets reduced by `base * price * perp_init_asset_weight`
-            // and increased by `base * price * (1 - liq_fee) * quote_init_asset_weight`
-            let quote_init_asset_weight = I80F48::ONE;
-            let fee_factor = cm!(I80F48::ONE - perp_market.liquidation_fee);
-            let health_per_lot = cm!(price_per_lot
-                * (-perp_market.init_asset_weight + quote_init_asset_weight * fee_factor));
+        // health gets reduced by `base * price * perp_init_asset_weight`
+        // and increased by `base * price * (1 - liq_fee) * quote_init_asset_weight`
+        let quote_init_asset_weight = I80F48::ONE;
+        let fee_factor = cm!(I80F48::ONE - perp_market.liquidation_fee);
+        let health_per_lot = cm!(price_per_lot
+            * (-perp_market.init_base_asset_weight + quote_init_asset_weight * fee_factor));
 
-            // number of lots to transfer to bring health to zero, rounded up
-            let base_transfer_for_zero: i64 = cm!(-liqee_init_health / health_per_lot)
-                .checked_ceil()
-                .unwrap()
-                .checked_to_num()
-                .unwrap();
+        // number of lots to transfer to bring health to zero, rounded up
+        let base_transfer_for_zero: i64 = cm!(-liqee_init_health / health_per_lot)
+            .checked_ceil()
+            .unwrap()
+            .checked_to_num()
+            .unwrap();
 
-            let base_transfer = base_transfer_for_zero
-                .min(liqee_base_lots)
-                .min(max_base_transfer)
-                .max(0);
-            let quote_transfer = cm!(-I80F48::from(base_transfer) * price_per_lot * fee_factor);
+        let base_transfer = base_transfer_for_zero
+            .min(liqee_base_lots)
+            .min(max_base_transfer)
+            .max(0);
+        let quote_transfer = cm!(-I80F48::from(base_transfer) * price_per_lot * fee_factor);
 
-            (base_transfer, quote_transfer) // base > 0, quote < 0
-        } else {
-            // liqee_base_lots < 0
-            require_msg!(
-                max_base_transfer < 0,
-                "max_base_transfer must be negative when liqee's base_position is positive"
-            );
+        (base_transfer, quote_transfer) // base > 0, quote < 0
+    } else {
+        // liqee_base_lots < 0
+        require_msg!(
+            max_base_transfer < 0,
+            "max_base_transfer must be negative when liqee's base_position is positive"
+        );
 
-            // health gets increased by `base * price * perp_init_liab_weight`
-            // and reduced by `base * price * (1 + liq_fee) * quote_init_liab_weight`
-            let quote_init_liab_weight = I80F48::ONE;
-            let fee_factor = cm!(I80F48::ONE + perp_market.liquidation_fee);
-            let health_per_lot = cm!(price_per_lot
-                * (perp_market.init_liab_weight - quote_init_liab_weight * fee_factor));
+        // health gets increased by `base * price * perp_init_liab_weight`
+        // and reduced by `base * price * (1 + liq_fee) * quote_init_liab_weight`
+        let quote_init_liab_weight = I80F48::ONE;
+        let fee_factor = cm!(I80F48::ONE + perp_market.liquidation_fee);
+        let health_per_lot = cm!(price_per_lot
+            * (perp_market.init_base_liab_weight - quote_init_liab_weight * fee_factor));
 
-            // (negative) number of lots to transfer to bring health to zero, rounded away from zero
-            let base_transfer_for_zero: i64 = cm!(liqee_init_health / health_per_lot)
-                .checked_floor()
-                .unwrap()
-                .checked_to_num()
-                .unwrap();
+        // (negative) number of lots to transfer to bring health to zero, rounded away from zero
+        let base_transfer_for_zero: i64 = cm!(liqee_init_health / health_per_lot)
+            .checked_floor()
+            .unwrap()
+            .checked_to_num()
+            .unwrap();
 
-            let base_transfer = base_transfer_for_zero
-                .max(liqee_base_lots)
-                .max(max_base_transfer)
-                .min(0);
-            let quote_transfer = cm!(-I80F48::from(base_transfer) * price_per_lot * fee_factor);
+        let base_transfer = base_transfer_for_zero
+            .max(liqee_base_lots)
+            .max(max_base_transfer)
+            .min(0);
+        let quote_transfer = cm!(-I80F48::from(base_transfer) * price_per_lot * fee_factor);
 
-            (base_transfer, quote_transfer) // base < 0, quote > 0
-        };
+        (base_transfer, quote_transfer) // base < 0, quote > 0
+    };
 
     // Execute the transfer. This is essentially a forced trade and updates the
     // liqee and liqors entry and break even prices.

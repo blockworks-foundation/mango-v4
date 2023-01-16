@@ -209,10 +209,12 @@ pub(crate) struct Serum3Reserved {
 #[derive(Clone, AnchorDeserialize, AnchorSerialize, Debug)]
 pub struct PerpInfo {
     pub perp_market_index: PerpMarketIndex,
-    pub maint_asset_weight: I80F48,
-    pub init_asset_weight: I80F48,
-    pub maint_liab_weight: I80F48,
-    pub init_liab_weight: I80F48,
+    pub maint_base_asset_weight: I80F48,
+    pub init_base_asset_weight: I80F48,
+    pub maint_base_liab_weight: I80F48,
+    pub init_base_liab_weight: I80F48,
+    pub maint_pnl_asset_weight: I80F48,
+    pub init_pnl_asset_weight: I80F48,
     pub base_lot_size: i64,
     pub base_lots: i64,
     pub bids_base_lots: i64,
@@ -221,7 +223,6 @@ pub struct PerpInfo {
     pub quote: I80F48,
     pub prices: Prices,
     pub has_open_orders: bool,
-    pub trusted_market: bool,
 }
 
 impl PerpInfo {
@@ -237,10 +238,12 @@ impl PerpInfo {
 
         Ok(Self {
             perp_market_index: perp_market.perp_market_index,
-            init_asset_weight: perp_market.init_asset_weight,
-            init_liab_weight: perp_market.init_liab_weight,
-            maint_asset_weight: perp_market.maint_asset_weight,
-            maint_liab_weight: perp_market.maint_liab_weight,
+            init_base_asset_weight: perp_market.init_base_asset_weight,
+            init_base_liab_weight: perp_market.init_base_liab_weight,
+            maint_base_asset_weight: perp_market.maint_base_asset_weight,
+            maint_base_liab_weight: perp_market.maint_base_liab_weight,
+            init_pnl_asset_weight: perp_market.init_pnl_asset_weight,
+            maint_pnl_asset_weight: perp_market.maint_pnl_asset_weight,
             base_lot_size: perp_market.base_lot_size,
             base_lots,
             bids_base_lots: perp_position.bids_base_lots,
@@ -248,14 +251,15 @@ impl PerpInfo {
             quote: quote_current,
             prices,
             has_open_orders: perp_position.has_open_orders(),
-            trusted_market: perp_market.trusted_market(),
         })
     }
 
     /// Total health contribution from perp balances
     ///
-    /// Due to isolation of perp markets, users may never borrow against perp
-    /// positions in untrusted without settling first: perp health is capped at zero.
+    /// For fully isolated perp markets, users may never borrow against unsettled
+    /// positive perp pnl, there pnl_asset_weight == 0 and there can't be positive
+    /// health contributions from these perp market. We sometimes call these markets
+    /// "untrusted markets".
     ///
     /// Users need to settle their perp pnl with other perp market participants
     /// in order to realize their gains if they want to use them as collateral.
@@ -264,32 +268,43 @@ impl PerpInfo {
     /// zero (if users could borrow against their perp balances they might now
     /// be bankrupt) or suddenly increase a lot (if users could borrow against perp
     /// balances they could now borrow other assets).
+    ///
+    /// Other markets may be liquid enough that we have enough confidence to allow
+    /// users to borrow against unsettled positive pnl to some extend. In these cases,
+    /// the pnl asset weights would be >0.
     #[inline(always)]
     pub fn health_contribution(&self, health_type: HealthType) -> I80F48 {
-        let c = self.uncapped_health_contribution(health_type);
+        let contribution = self.unweighted_health_contribution(health_type);
 
-        if self.trusted_market {
-            c
+        if contribution > 0 {
+            let asset_weight = match health_type {
+                HealthType::Init => self.init_pnl_asset_weight,
+                HealthType::Maint => self.maint_pnl_asset_weight,
+            };
+
+            cm!(asset_weight * contribution)
         } else {
-            c.min(I80F48::ZERO)
+            contribution
         }
     }
 
     #[inline(always)]
-    pub fn uncapped_health_contribution(&self, health_type: HealthType) -> I80F48 {
+    pub fn unweighted_health_contribution(&self, health_type: HealthType) -> I80F48 {
         let order_execution_case = |orders_base_lots: i64, order_price: I80F48| {
             let net_base_native =
                 I80F48::from(cm!((self.base_lots + orders_base_lots) * self.base_lot_size));
             let (weight, base_price) = match (health_type, net_base_native.is_negative()) {
-                (HealthType::Init, true) => (self.init_liab_weight, self.prices.liab(health_type)),
+                (HealthType::Init, true) => {
+                    (self.init_base_liab_weight, self.prices.liab(health_type))
+                }
                 (HealthType::Init, false) => {
-                    (self.init_asset_weight, self.prices.asset(health_type))
+                    (self.init_base_asset_weight, self.prices.asset(health_type))
                 }
                 (HealthType::Maint, true) => {
-                    (self.maint_liab_weight, self.prices.liab(health_type))
+                    (self.maint_base_liab_weight, self.prices.liab(health_type))
                 }
                 (HealthType::Maint, false) => {
-                    (self.maint_asset_weight, self.prices.asset(health_type))
+                    (self.maint_base_asset_weight, self.prices.asset(health_type))
                 }
             };
             // Total value of the order-execution adjusted base position
@@ -437,10 +452,10 @@ impl HealthCache {
         self.perp_infos.iter().any(|p| p.base_lots != 0)
     }
 
-    pub fn has_perp_positive_trusted_pnl_without_base_position(&self) -> bool {
+    pub fn has_perp_positive_maint_pnl_without_base_position(&self) -> bool {
         self.perp_infos
             .iter()
-            .any(|p| p.trusted_market && p.base_lots == 0 && p.quote > 0)
+            .any(|p| p.maint_pnl_asset_weight > 0 && p.base_lots == 0 && p.quote > 0)
     }
 
     pub fn has_perp_negative_pnl(&self) -> bool {
@@ -473,7 +488,7 @@ impl HealthCache {
     pub fn has_phase2_liquidatable(&self) -> bool {
         self.has_spot_assets() && self.has_spot_borrows()
             || self.has_perp_base_positions()
-            || self.has_perp_positive_trusted_pnl_without_base_position()
+            || self.has_perp_positive_maint_pnl_without_base_position()
     }
 
     pub fn require_after_phase2_liquidation(&self) -> Result<()> {
@@ -487,7 +502,7 @@ impl HealthCache {
             MangoError::HasLiquidatablePerpBasePosition
         );
         require!(
-            !self.has_perp_positive_trusted_pnl_without_base_position(),
+            !self.has_perp_positive_maint_pnl_without_base_position(),
             MangoError::HasLiquidatableTrustedPerpPnl
         );
         Ok(())
@@ -636,12 +651,8 @@ impl HealthCache {
         }
 
         for perp_info in self.perp_infos.iter() {
-            if perp_info.trusted_market {
-                let positive_contrib = perp_info
-                    .uncapped_health_contribution(health_type)
-                    .max(I80F48::ZERO);
-                cm!(health += positive_contrib);
-            }
+            let positive_contrib = perp_info.health_contribution(health_type).max(I80F48::ZERO);
+            cm!(health += positive_contrib);
         }
         health
     }
@@ -842,7 +853,7 @@ mod tests {
         oo1.data().native_coin_free = 3;
         oo1.data().referrer_rebates_accrued = 2;
 
-        let mut perp1 = mock_perp_market(group, oracle2.pubkey, 5.0, 9, 0.2, 0.1);
+        let mut perp1 = mock_perp_market(group, oracle2.pubkey, 5.0, 9, (0.2, 0.1), (0.05, 0.02));
         let perpaccount = account.ensure_perp_position(9, 1).unwrap().0;
         perpaccount.record_trade(perp1.data(), 3, -I80F48::from(310u16));
         perpaccount.bids_base_lots = 7;
@@ -966,7 +977,7 @@ mod tests {
         oo2.data().native_pc_total = testcase.oo_1_3.0;
         oo2.data().native_coin_total = testcase.oo_1_3.1;
 
-        let mut perp1 = mock_perp_market(group, oracle2.pubkey, 5.0, 9, 0.2, 0.1);
+        let mut perp1 = mock_perp_market(group, oracle2.pubkey, 5.0, 9, (0.2, 0.1), (0.05, 0.02));
         let perpaccount = account.ensure_perp_position(9, 1).unwrap().0;
         perpaccount.record_trade(
             perp1.data(),
@@ -1033,27 +1044,27 @@ mod tests {
                 ..Default::default()
             },
             TestHealth1Case {
-                // 2
+                // 2: weighted positive perp pnl
                 perp1: (-1, 100, 0, 0),
-                expected_health: 0.0,
+                expected_health: 0.95 * (100.0 - 1.2 * 1.0 * base_lots_to_quote),
                 ..Default::default()
             },
             TestHealth1Case {
-                // 3
+                // 3: negative perp pnl is not weighted
                 perp1: (1, -100, 0, 0),
                 expected_health: -100.0 + 0.8 * 1.0 * base_lots_to_quote,
                 ..Default::default()
             },
             TestHealth1Case {
-                // 4
+                // 4: perp health
                 perp1: (10, 100, 0, 0),
-                expected_health: 0.0,
+                expected_health: 0.95 * (100.0 + 0.8 * 10.0 * base_lots_to_quote),
                 ..Default::default()
             },
             TestHealth1Case {
-                // 5
+                // 5: perp health
                 perp1: (30, -100, 0, 0),
-                expected_health: 0.0,
+                expected_health: 0.95 * (-100.0 + 0.8 * 30.0 * base_lots_to_quote),
                 ..Default::default()
             },
             TestHealth1Case { // 6, reserved oo funds
