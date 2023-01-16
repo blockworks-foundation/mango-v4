@@ -426,12 +426,13 @@ async function registerPerpMarkets() {
     1.05,
     0.0125,
     -0.0001,
+    1,
+    1,
     0.0004,
     5, // note: quote native
     -0.05,
     0.05,
     100, // if btc is at 20k, this is 200$
-    true,
     true,
     1000, // solana tx fee is currently 50 native quote at a sol price of 10$
     1000000,
@@ -456,12 +457,13 @@ async function registerPerpMarkets() {
     1.01,
     0.0025,
     -0.0001,
+    1,
+    1,
     0.0004,
     5,
     -0.05,
     0.05,
     1000, // if mngo price 1 cent, this is 10$
-    false,
     false,
     1000,
     1000000,
@@ -484,21 +486,6 @@ async function makePerpMarketReduceOnly() {
     group,
     perpMarket.perpMarketIndex,
     Builder(NullPerpEditParams).reduceOnly(true).build(),
-  );
-}
-
-async function makePerpMarketUntrusted() {
-  const result = await buildAdminClient();
-  const client = result[0];
-  const admin = result[1];
-  const creator = result[2];
-
-  const group = await client.getGroupForCreator(creator.publicKey, GROUP_NUM);
-  const perpMarket = group.getPerpMarketByName('BTC-PERP');
-  await client.perpEditMarket(
-    group,
-    perpMarket.perpMarketIndex,
-    Builder(NullPerpEditParams).trustedMarket(false).build(),
   );
 }
 
@@ -662,7 +649,6 @@ async function main() {
   try {
     // await registerPerpMarkets();
     // await makePerpMarketReduceOnly();
-    // await makePerpMarketUntrusted();
   } catch (error) {
     console.log(error);
   }

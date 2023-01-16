@@ -206,13 +206,11 @@ export class HealthCache {
       health.iadd(contrib);
     }
     for (const perpInfo of this.perpInfos) {
-      if (perpInfo.trustedMarket) {
-        const positiveContrib = perpInfo
-          .uncappedHealthContribution(HealthType.maint)
-          .max(ZERO_I80F48());
-        // console.log(` - pi ${positiveContrib}`);
-        health.iadd(positiveContrib);
-      }
+      const positiveContrib = perpInfo
+        .healthContribution(HealthType.maint)
+        .max(ZERO_I80F48());
+      // console.log(` - pi ${positiveContrib}`);
+      health.iadd(positiveContrib);
     }
     return health;
   }
@@ -1052,8 +1050,12 @@ export class HealthCache {
     // If the price is sufficiently good then health will just increase from trading
     const finalHealthSlope =
       direction == 1
-        ? perpInfo.initAssetWeight.mul(prices.asset(HealthType.init)).sub(price)
-        : price.sub(perpInfo.initLiabWeight.mul(prices.liab(HealthType.init)));
+        ? perpInfo.initBaseAssetWeight
+            .mul(prices.asset(HealthType.init))
+            .sub(price)
+        : price.sub(
+            perpInfo.initBaseLiabWeight.mul(prices.liab(HealthType.init)),
+          );
     if (finalHealthSlope.gte(ZERO_I80F48())) {
       return MAX_I80F48();
     }
@@ -1123,7 +1125,7 @@ export class HealthCache {
       const perpInfo = startCache.perpInfos[perpInfoIndex];
       const startHealthUncapped = startHealth
         .sub(perpInfo.healthContribution(HealthType.init))
-        .add(perpInfo.uncappedHealthContribution(HealthType.init));
+        .add(perpInfo.unweightedHealthContribution(HealthType.init));
 
       const zeroHealthAmount = case1Start
         .sub(startHealthUncapped.div(finalHealthSlope).div(baseLotSize))
@@ -1420,10 +1422,12 @@ export class Serum3Info {
 export class PerpInfo {
   constructor(
     public perpMarketIndex: number,
-    public maintAssetWeight: I80F48,
-    public initAssetWeight: I80F48,
-    public maintLiabWeight: I80F48,
-    public initLiabWeight: I80F48,
+    public maintBaseAssetWeight: I80F48,
+    public initBaseAssetWeight: I80F48,
+    public maintBaseLiabWeight: I80F48,
+    public initBaseLiabWeight: I80F48,
+    public maintPnlAssetWeight: I80F48,
+    public initPnlAssetWeight: I80F48,
     public baseLotSize: BN,
     public baseLots: BN,
     public bidsBaseLots: BN,
@@ -1431,16 +1435,17 @@ export class PerpInfo {
     public quote: I80F48,
     public prices: Prices,
     public hasOpenOrders: boolean,
-    public trustedMarket: boolean,
   ) {}
 
   static fromDto(dto: PerpInfoDto): PerpInfo {
     return new PerpInfo(
       dto.perpMarketIndex,
-      I80F48.from(dto.maintAssetWeight),
-      I80F48.from(dto.initAssetWeight),
-      I80F48.from(dto.maintLiabWeight),
-      I80F48.from(dto.initLiabWeight),
+      I80F48.from(dto.maintBaseAssetWeight),
+      I80F48.from(dto.initBaseAssetWeight),
+      I80F48.from(dto.maintBaseLiabWeight),
+      I80F48.from(dto.initBaseLiabWeight),
+      I80F48.from(dto.maintPnlAssetWeight),
+      I80F48.from(dto.initPnlAssetWeight),
       dto.baseLotSize,
       dto.baseLots,
       dto.bidsBaseLots,
@@ -1451,7 +1456,6 @@ export class PerpInfo {
         I80F48.from(dto.prices.stable),
       ),
       dto.hasOpenOrders,
-      dto.trustedMarket,
     );
   }
 
@@ -1473,10 +1477,12 @@ export class PerpInfo {
 
     return new PerpInfo(
       perpMarket.perpMarketIndex,
-      perpMarket.maintAssetWeight,
-      perpMarket.initAssetWeight,
-      perpMarket.maintLiabWeight,
-      perpMarket.initLiabWeight,
+      perpMarket.maintBaseAssetWeight,
+      perpMarket.initBaseAssetWeight,
+      perpMarket.maintBaseLiabWeight,
+      perpMarket.initBaseLiabWeight,
+      perpMarket.maintPnlAssetWeight,
+      perpMarket.initPnlAssetWeight,
       perpMarket.baseLotSize,
       baseLots,
       perpPosition.bidsBaseLots,
@@ -1487,17 +1493,22 @@ export class PerpInfo {
         I80F48.fromNumber(perpMarket.stablePriceModel.stablePrice),
       ),
       perpPosition.hasOpenOrders(),
-      perpMarket.trustedMarket,
     );
   }
 
   healthContribution(healthType: HealthType | undefined): I80F48 {
-    return this.trustedMarket
-      ? this.uncappedHealthContribution(healthType)
-      : this.uncappedHealthContribution(healthType).min(ZERO_I80F48());
+    const contrib = this.unweightedHealthContribution(healthType);
+    if (contrib.gt(ZERO_I80F48())) {
+      const assetWeight =
+        healthType == HealthType.init
+          ? this.initPnlAssetWeight
+          : this.maintPnlAssetWeight;
+      return assetWeight.mul(contrib);
+    }
+    return contrib;
   }
 
-  uncappedHealthContribution(healthType: HealthType | undefined): I80F48 {
+  unweightedHealthContribution(healthType: HealthType | undefined): I80F48 {
     function orderExecutionCase(
       pi: PerpInfo,
       ordersBaseLots: BN,
@@ -1510,18 +1521,18 @@ export class PerpInfo {
       let weight, basePrice;
       if (healthType == HealthType.init) {
         if (netBaseNative.isNeg()) {
-          weight = pi.initLiabWeight;
+          weight = pi.initBaseLiabWeight;
           basePrice = pi.prices.liab(healthType);
         } else {
-          weight = pi.initAssetWeight;
+          weight = pi.initBaseAssetWeight;
           basePrice = pi.prices.asset(healthType);
         }
       } else {
         if (netBaseNative.isNeg()) {
-          weight = pi.maintLiabWeight;
+          weight = pi.maintBaseLiabWeight;
           basePrice = pi.prices.liab(healthType);
         } else {
-          weight = pi.maintAssetWeight;
+          weight = pi.maintBaseAssetWeight;
           basePrice = pi.prices.asset(healthType);
         }
       }
@@ -1557,10 +1568,12 @@ export class PerpInfo {
   static emptyFromPerpMarket(perpMarket: PerpMarket): PerpInfo {
     return new PerpInfo(
       perpMarket.perpMarketIndex,
-      perpMarket.maintAssetWeight,
-      perpMarket.initAssetWeight,
-      perpMarket.maintLiabWeight,
-      perpMarket.initLiabWeight,
+      perpMarket.maintBaseAssetWeight,
+      perpMarket.initBaseAssetWeight,
+      perpMarket.maintBaseLiabWeight,
+      perpMarket.initBaseLiabWeight,
+      perpMarket.maintPnlAssetWeight,
+      perpMarket.initPnlAssetWeight,
       perpMarket.baseLotSize,
       new BN(0),
       new BN(0),
@@ -1571,7 +1584,6 @@ export class PerpInfo {
         I80F48.fromNumber(perpMarket.stablePriceModel.stablePrice),
       ),
       false,
-      perpMarket.trustedMarket,
     );
   }
 
@@ -1580,7 +1592,7 @@ export class PerpInfo {
       this.baseLots
     }, quote: ${this.quote}, oraclePrice: ${
       this.prices.oracle
-    }, uncapped health contribution ${this.uncappedHealthContribution(
+    }, uncapped health contribution ${this.unweightedHealthContribution(
       HealthType.init,
     )}`;
   }
@@ -1641,10 +1653,12 @@ export class Serum3InfoDto {
 
 export class PerpInfoDto {
   perpMarketIndex: number;
-  maintAssetWeight: I80F48Dto;
-  initAssetWeight: I80F48Dto;
-  maintLiabWeight: I80F48Dto;
-  initLiabWeight: I80F48Dto;
+  maintBaseAssetWeight: I80F48Dto;
+  initBaseAssetWeight: I80F48Dto;
+  maintBaseLiabWeight: I80F48Dto;
+  initBaseLiabWeight: I80F48Dto;
+  maintPnlAssetWeight: I80F48Dto;
+  initPnlAssetWeight: I80F48Dto;
   public baseLotSize: BN;
   public baseLots: BN;
   public bidsBaseLots: BN;
@@ -1652,5 +1666,4 @@ export class PerpInfoDto {
   quote: I80F48Dto;
   prices: { oracle: I80F48Dto; stable: I80F48Dto };
   hasOpenOrders: boolean;
-  trustedMarket: boolean;
 }
