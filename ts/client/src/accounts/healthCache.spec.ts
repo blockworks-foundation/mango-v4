@@ -31,17 +31,19 @@ function mockBankAndOracle(
 
 function mockPerpMarket(
   perpMarketIndex: number,
-  maintWeight: number,
-  initWeight: number,
+  maintBaseWeight: number,
+  initBaseWeight: number,
   baseLotSize: number,
   price: number,
 ): PerpMarket {
   return {
     perpMarketIndex,
-    maintAssetWeight: I80F48.fromNumber(1 - maintWeight),
-    initAssetWeight: I80F48.fromNumber(1 - initWeight),
-    maintLiabWeight: I80F48.fromNumber(1 + maintWeight),
-    initLiabWeight: I80F48.fromNumber(1 + initWeight),
+    maintBaseAssetWeight: I80F48.fromNumber(1 - maintBaseWeight),
+    initBaseAssetWeight: I80F48.fromNumber(1 - initBaseWeight),
+    maintBaseLiabWeight: I80F48.fromNumber(1 + maintBaseWeight),
+    initBaseLiabWeight: I80F48.fromNumber(1 + initBaseWeight),
+    maintPnlAssetWeight: I80F48.fromNumber(1 - 0.02),
+    initPnlAssetWeight: I80F48.fromNumber(1 - 0.05),
     price: I80F48.fromNumber(price),
     stablePriceModel: { stablePrice: price } as StablePriceModel,
     quoteLotSize: new BN(100),
@@ -231,7 +233,9 @@ describe('Health Cache', () => {
       const hc = new HealthCache([ti1, ti2, ti3], [si1, si2], [pi1]);
       const health = hc.health(HealthType.init).toNumber();
       console.log(
-        ` - case "${fixture.name}" health ${health.toFixed(3).padStart(10)}`,
+        ` - case "${fixture.name}" health ${health
+          .toFixed(3)
+          .padStart(10)}, expected ${fixture.expectedHealth}`,
       );
       expect(health - fixture.expectedHealth).lessThan(0.0000001);
     }
@@ -276,18 +280,18 @@ describe('Health Cache', () => {
     });
 
     testFixture({
-      name: '2',
+      name: '2: weighted positive perp pnl',
       token1: 0,
       token2: 0,
       token3: 0,
       oo12: [0, 0],
       oo13: [0, 0],
-      perp1: [-10, 100, 0, 0],
-      expectedHealth: 0,
+      perp1: [-1, 100, 0, 0],
+      expectedHealth: 0.95 * (100.0 - 1.2 * 1.0 * baseLotsToQuote),
     });
 
     testFixture({
-      name: '3',
+      name: '3: negative perp pnl is not weighted',
       token1: 0,
       token2: 0,
       token3: 0,
@@ -298,25 +302,25 @@ describe('Health Cache', () => {
     });
 
     testFixture({
-      name: '4',
+      name: '4: perp health',
       token1: 0,
       token2: 0,
       token3: 0,
       oo12: [0, 0],
       oo13: [0, 0],
       perp1: [10, 100, 0, 0],
-      expectedHealth: 0,
+      expectedHealth: 0.95 * (100.0 + 0.8 * 10.0 * baseLotsToQuote),
     });
 
     testFixture({
-      name: '5',
+      name: '5: perp health',
       token1: 0,
       token2: 0,
       token3: 0,
       oo12: [0, 0],
       oo13: [0, 0],
       perp1: [30, -100, 0, 0],
-      expectedHealth: 0,
+      expectedHealth: 0.95 * (-100.0 + 0.8 * 30.0 * baseLotsToQuote),
     });
 
     testFixture({
@@ -326,7 +330,7 @@ describe('Health Cache', () => {
       token3: -10,
       oo12: [1, 1],
       oo13: [1, 1],
-      perp1: [30, -100, 0, 0],
+      perp1: [0, 0, 0, 0],
       expectedHealth:
         // tokens
         -100.0 * 1.2 -
