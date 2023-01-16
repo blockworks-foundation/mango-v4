@@ -159,7 +159,7 @@ pub fn perp_liq_quote_and_bankruptcy(
         liqee_perp_position.settle_funding(&perp_market);
         liqor_perp_position.settle_funding(&perp_market);
 
-        let liqee_pnl = liqee_perp_position.pnl_for_price(&perp_market, oracle_price)?;
+        let liqee_pnl = liqee_perp_position.unsettled_pnl(&perp_market, oracle_price)?;
         // TODO: deal with positive liqee pnl! Maybe another instruction?
         require!(liqee_pnl < 0, MangoError::ProfitabilityMismatch);
 
@@ -221,7 +221,7 @@ pub fn perp_liq_quote_and_bankruptcy(
     //
     let insurance_transfer = if settlement == max_settlement_liqee {
         let liqee_perp_position = liqee.perp_position_mut(perp_market_index)?;
-        let liqee_pnl = liqee_perp_position.pnl_for_price(&perp_market, oracle_price)?;
+        let liqee_pnl = liqee_perp_position.unsettled_pnl(&perp_market, oracle_price)?;
 
         let max_liab_transfer_from_liqee = (-liqee_pnl).min(-liqee_init_health).max(I80F48::ZERO);
         let liab_transfer = max_liab_transfer_from_liqee

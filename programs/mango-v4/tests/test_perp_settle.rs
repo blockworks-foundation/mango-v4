@@ -390,6 +390,14 @@ async fn test_perp_settle_pnl() -> Result<(), TransportError> {
             mango_account_1.perp_spot_transfers, -expected_total_settle,
             "net_settled on account 1 updated with loss from settlement"
         );
+        assert_eq!(
+            mango_account_0.perps[0].perp_spot_transfers, expected_total_settle,
+            "net_settled on account 0 updated with profit from settlement"
+        );
+        assert_eq!(
+            mango_account_1.perps[0].perp_spot_transfers, -expected_total_settle,
+            "net_settled on account 1 updated with loss from settlement"
+        );
     }
 
     // Change the oracle to a reasonable price in other direction
