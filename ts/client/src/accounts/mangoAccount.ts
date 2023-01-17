@@ -1323,7 +1323,7 @@ export class PerpPosition {
   }
 
   public getAverageEntryPrice(perpMarket: PerpMarket): I80F48 {
-    return I80F48.fromNumber(this.avgEntryPricePerBaseLot).mul(
+    return I80F48.fromNumber(this.avgEntryPricePerBaseLot).div(
       I80F48.fromI64(perpMarket.baseLotSize),
     );
   }
