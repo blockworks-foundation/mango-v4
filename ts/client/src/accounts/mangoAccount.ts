@@ -175,7 +175,6 @@ export class MangoAccount {
 
   public getPerpPosition(
     perpMarketIndex: PerpMarketIndex,
-    useEventQueue?: boolean,
   ): PerpPosition | undefined {
     return this.perps.find((pp) => pp.marketIndex == perpMarketIndex);
   }
@@ -1180,6 +1179,7 @@ export class PerpPosition {
       I80F48.from(dto.realizedTradePnlNative),
       I80F48.from(dto.realizedOtherPnlNative),
       dto.settlePnlLimitRealizedTrade,
+      I80F48.from(dto.realizedPnlForPositionNative),
     );
   }
 
@@ -1208,6 +1208,7 @@ export class PerpPosition {
       ZERO_I80F48(),
       ZERO_I80F48(),
       new BN(0),
+      ZERO_I80F48(),
     );
   }
 
@@ -1233,6 +1234,7 @@ export class PerpPosition {
     public realizedTradePnlNative: I80F48,
     public realizedOtherPnlNative: I80F48,
     public settlePnlLimitRealizedTrade: BN,
+    public realizedPnlForPositionNative: I80F48,
   ) {}
 
   isActive(): boolean {
@@ -1459,6 +1461,7 @@ export class PerpPositionDto {
     public realizedTradePnlNative: I80F48Dto,
     public realizedOtherPnlNative: I80F48Dto,
     public settlePnlLimitRealizedTrade: BN,
+    public realizedPnlForPositionNative: I80F48Dto,
   ) {}
 }
 

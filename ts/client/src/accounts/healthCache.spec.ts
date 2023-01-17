@@ -111,6 +111,7 @@ describe('Health Cache', () => {
       ZERO_I80F48(),
       ZERO_I80F48(),
       new BN(0),
+      ZERO_I80F48(),
     );
     const pi1 = PerpInfo.fromPerpPosition(pM, pp);
 
@@ -227,6 +228,7 @@ describe('Health Cache', () => {
         ZERO_I80F48(),
         ZERO_I80F48(),
         new BN(0),
+        ZERO_I80F48(),
       );
       const pi1 = PerpInfo.fromPerpPosition(pM, pp);
 

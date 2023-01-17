@@ -5366,11 +5366,26 @@ export type MangoV4 = {
             "type": "i64"
           },
           {
+            "name": "realizedPnlForPositionNative",
+            "docs": [
+              "Trade pnl, fees, funding that were added over the current position's lifetime.",
+              "",
+              "Reset when the position changes sign or goes to zero.",
+              "Not decreased by settling.",
+              "",
+              "This is tracked for display purposes: this value plus the difference between entry",
+              "price and current price of the base position is the overall pnl."
+            ],
+            "type": {
+              "defined": "I80F48"
+            }
+          },
+          {
             "name": "reserved",
             "type": {
               "array": [
                 "u8",
-                104
+                88
               ]
             }
           }
@@ -13120,11 +13135,26 @@ export const IDL: MangoV4 = {
             "type": "i64"
           },
           {
+            "name": "realizedPnlForPositionNative",
+            "docs": [
+              "Trade pnl, fees, funding that were added over the current position's lifetime.",
+              "",
+              "Reset when the position changes sign or goes to zero.",
+              "Not decreased by settling.",
+              "",
+              "This is tracked for display purposes: this value plus the difference between entry",
+              "price and current price of the base position is the overall pnl."
+            ],
+            "type": {
+              "defined": "I80F48"
+            }
+          },
+          {
             "name": "reserved",
             "type": {
               "array": [
                 "u8",
-                104
+                88
               ]
             }
           }
