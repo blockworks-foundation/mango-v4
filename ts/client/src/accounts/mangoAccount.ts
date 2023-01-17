@@ -1327,10 +1327,6 @@ export class PerpPosition {
   }
 
   public getAverageEntryPriceUi(perpMarket: PerpMarket): number {
-    if (perpMarket.perpMarketIndex !== this.marketIndex) {
-      throw new Error("PerpPosition doesn't belong to the given market!");
-    }
-
     return perpMarket.priceNativeToUi(
       this.getAverageEntryPrice(perpMarket).toNumber(),
     );
