@@ -48,7 +48,7 @@ export class StubOracle {
 }
 
 // https://gist.github.com/microwavedcola1/b741a11e6ee273a859f3ef00b35ac1f0
-export function parseSwitcboardOracleV1(accountInfo: AccountInfo<Buffer>): {
+export function parseSwitchboardOracleV1(accountInfo: AccountInfo<Buffer>): {
   price: number;
   lastUpdatedSlot: number;
 } {
@@ -59,14 +59,14 @@ export function parseSwitcboardOracleV1(accountInfo: AccountInfo<Buffer>): {
   return { price, lastUpdatedSlot };
 }
 
-export function parseSwitcboardOracleV2(
+export function parseSwitchboardOracleV2(
   program: SwitchboardProgram,
   accountInfo: AccountInfo<Buffer>,
 ): { price: number; lastUpdatedSlot: number } {
   const price = program.decodeLatestAggregatorValue(accountInfo)!.toNumber();
   const lastUpdatedSlot = program
     .decodeAggregator(accountInfo)
-    .previousConfirmedRoundSlot!.toNumber();
+    .latestConfirmedRound!.roundOpenSlot!.toNumber();
 
   if (!price || !lastUpdatedSlot)
     throw new Error('Unable to parse Switchboard Oracle V2');
@@ -86,21 +86,21 @@ export async function parseSwitchboardOracle(
     if (!sbv2DevnetProgram) {
       sbv2DevnetProgram = await SwitchboardProgram.loadDevnet(connection);
     }
-    return parseSwitcboardOracleV2(sbv2DevnetProgram, accountInfo);
+    return parseSwitchboardOracleV2(sbv2DevnetProgram, accountInfo);
   }
 
   if (accountInfo.owner.equals(SwitchboardProgram.mainnetPid)) {
     if (!sbv2MainnetProgram) {
       sbv2MainnetProgram = await SwitchboardProgram.loadMainnet(connection);
     }
-    return parseSwitcboardOracleV2(sbv2MainnetProgram, accountInfo);
+    return parseSwitchboardOracleV2(sbv2MainnetProgram, accountInfo);
   }
 
   if (
     accountInfo.owner.equals(SBV1_DEVNET_PID) ||
     accountInfo.owner.equals(SBV1_MAINNET_PID)
   ) {
-    return parseSwitcboardOracleV1(accountInfo);
+    return parseSwitchboardOracleV1(accountInfo);
   }
 
   throw new Error(`Should not be reached!`);
