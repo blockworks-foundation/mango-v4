@@ -112,8 +112,8 @@ pub fn perp_settle_pnl(ctx: Context<PerpSettlePnl>) -> Result<()> {
     let b_perp_position = account_b.perp_position_mut(perp_market_index)?;
     a_perp_position.settle_funding(&perp_market);
     b_perp_position.settle_funding(&perp_market);
-    let a_pnl = a_perp_position.pnl_for_price(&perp_market, oracle_price)?;
-    let b_pnl = b_perp_position.pnl_for_price(&perp_market, oracle_price)?;
+    let a_pnl = a_perp_position.unsettled_pnl(&perp_market, oracle_price)?;
+    let b_pnl = b_perp_position.unsettled_pnl(&perp_market, oracle_price)?;
 
     // PnL must have opposite signs for there to be a settlement:
     // Account A must be profitable, and B must be unprofitable.

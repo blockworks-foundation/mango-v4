@@ -70,7 +70,7 @@ pub fn perp_settle_fees(ctx: Context<PerpSettleFees>, max_settle_amount: u64) ->
     perp_position.settle_funding(&perp_market);
 
     // Calculate PnL
-    let pnl = perp_position.pnl_for_price(&perp_market, oracle_price)?;
+    let pnl = perp_position.unsettled_pnl(&perp_market, oracle_price)?;
 
     // Account perp position must have a loss to be able to settle against the fee account
     require!(pnl.is_negative(), MangoError::ProfitabilityMismatch);
