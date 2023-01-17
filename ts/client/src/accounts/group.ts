@@ -292,15 +292,17 @@ export class Group {
             throw new Error(
               `Undefined accountInfo object in reloadBankOraclePrices for ${bank.oracle}!`,
             );
-          const { price, uiPrice } = await this.decodePriceFromOracleAi(
-            coder,
-            bank.oracle,
-            ai,
-            this.getMintDecimals(bank.mint),
-            client,
-          );
+          const { price, uiPrice, lastUpdatedSlot } =
+            await this.decodePriceFromOracleAi(
+              coder,
+              bank.oracle,
+              ai,
+              this.getMintDecimals(bank.mint),
+              client,
+            );
           bank._price = price;
           bank._uiPrice = uiPrice;
+          bank._oracleLastUpdatedSlot = lastUpdatedSlot;
         }
       }
     }
@@ -324,15 +326,18 @@ export class Group {
           throw new Error(
             `Undefined ai object in reloadPerpMarketOraclePrices for ${perpMarket.oracle}!`,
           );
-        const { price, uiPrice } = await this.decodePriceFromOracleAi(
-          coder,
-          perpMarket.oracle,
-          ai,
-          perpMarket.baseDecimals,
-          client,
-        );
+
+        const { price, uiPrice, lastUpdatedSlot } =
+          await this.decodePriceFromOracleAi(
+            coder,
+            perpMarket.oracle,
+            ai,
+            perpMarket.baseDecimals,
+            client,
+          );
         perpMarket._price = price;
         perpMarket._uiPrice = uiPrice;
+        perpMarket._oracleLastUpdatedSlot = lastUpdatedSlot;
       }),
     );
   }
@@ -343,8 +348,8 @@ export class Group {
     ai: AccountInfo<Buffer>,
     baseDecimals: number,
     client: MangoClient,
-  ): Promise<{ price: I80F48; uiPrice: number }> {
-    let price, uiPrice;
+  ): Promise<{ price: I80F48; uiPrice: number; lastUpdatedSlot: number }> {
+    let price, uiPrice, lastUpdatedSlot;
     if (
       !BorshAccountsCoder.accountDiscriminator('stubOracle').compare(
         ai.data.slice(0, 8),
@@ -353,21 +358,54 @@ export class Group {
       const stubOracle = coder.decode('stubOracle', ai.data);
       price = new I80F48(stubOracle.price.val);
       uiPrice = this.toUiPrice(price, baseDecimals);
+      lastUpdatedSlot = stubOracle.lastUpdated.val;
     } else if (isPythOracle(ai)) {
-      uiPrice = parsePriceData(ai.data).previousPrice;
+      const priceData = parsePriceData(ai.data);
+      uiPrice = priceData.previousPrice;
       price = this.toNativePrice(uiPrice, baseDecimals);
+      lastUpdatedSlot = parseInt(priceData.lastSlot.toString());
     } else if (isSwitchboardOracle(ai)) {
-      uiPrice = await parseSwitchboardOracle(
+      const priceData = await parseSwitchboardOracle(
         ai,
         client.program.provider.connection,
       );
+      uiPrice = priceData.price;
       price = this.toNativePrice(uiPrice, baseDecimals);
+      lastUpdatedSlot = priceData.lastUpdatedSlot;
     } else {
       throw new Error(
         `Unknown oracle provider (parsing not implemented) for oracle ${oracle}, with owner ${ai.owner}!`,
       );
     }
-    return { price, uiPrice };
+    return { price, uiPrice, lastUpdatedSlot };
+  }
+
+  private async decodeLastUpdatedSlotFromOracleAi(
+    coder: BorshAccountsCoder<string>,
+    oracle: PublicKey,
+    ai: AccountInfo<Buffer>,
+    client: MangoClient,
+  ): Promise<{ lastUpdatedSlot: number }> {
+    let lastUpdatedSlot: number;
+    if (
+      !BorshAccountsCoder.accountDiscriminator('stubOracle').compare(
+        ai.data.slice(0, 8),
+      )
+    ) {
+      const stubOracle = coder.decode('stubOracle', ai.data);
+      lastUpdatedSlot = stubOracle.lastUpdated.val;
+    } else if (isPythOracle(ai)) {
+      lastUpdatedSlot = parseInt(parsePriceData(ai.data).lastSlot.toString());
+    } else if (isSwitchboardOracle(ai)) {
+      lastUpdatedSlot = (
+        await parseSwitchboardOracle(ai, client.program.provider.connection)
+      ).lastUpdatedSlot;
+    } else {
+      throw new Error(
+        `Unknown oracle provider (parsing not implemented) for oracle ${oracle}, with owner ${ai.owner}!`,
+      );
+    }
+    return { lastUpdatedSlot };
   }
 
   public async reloadVaults(client: MangoClient): Promise<void> {

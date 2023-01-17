@@ -59,6 +59,7 @@ export class Bank implements BankForHealth {
   public util1: I80F48;
   public _price: I80F48 | undefined;
   public _uiPrice: number | undefined;
+  public _oracleLastUpdatedSlot: number | undefined;
   public collectedFeesNative: I80F48;
   public loanFeeRate: I80F48;
   public loanOriginationFeeRate: I80F48;
@@ -235,6 +236,7 @@ export class Bank implements BankForHealth {
     this.dust = I80F48.from(dust);
     this._price = undefined;
     this._uiPrice = undefined;
+    this._oracleLastUpdatedSlot = undefined;
   }
 
   toString(): string {
@@ -349,6 +351,15 @@ export class Bank implements BankForHealth {
       );
     }
     return this._uiPrice;
+  }
+
+  get oracleLastUpdatedSlot(): number {
+    if (!this._oracleLastUpdatedSlot) {
+      throw new Error(
+        `Undefined oracleLastUpdatedSlot for bank ${this.publicKey} with tokenIndex ${this.tokenIndex}!`,
+      );
+    }
+    return this._oracleLastUpdatedSlot;
   }
 
   nativeDeposits(): I80F48 {
