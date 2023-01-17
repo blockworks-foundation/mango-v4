@@ -380,34 +380,6 @@ export class Group {
     return { price, uiPrice, lastUpdatedSlot };
   }
 
-  private async decodeLastUpdatedSlotFromOracleAi(
-    coder: BorshAccountsCoder<string>,
-    oracle: PublicKey,
-    ai: AccountInfo<Buffer>,
-    client: MangoClient,
-  ): Promise<{ lastUpdatedSlot: number }> {
-    let lastUpdatedSlot: number;
-    if (
-      !BorshAccountsCoder.accountDiscriminator('stubOracle').compare(
-        ai.data.slice(0, 8),
-      )
-    ) {
-      const stubOracle = coder.decode('stubOracle', ai.data);
-      lastUpdatedSlot = stubOracle.lastUpdated.val;
-    } else if (isPythOracle(ai)) {
-      lastUpdatedSlot = parseInt(parsePriceData(ai.data).lastSlot.toString());
-    } else if (isSwitchboardOracle(ai)) {
-      lastUpdatedSlot = (
-        await parseSwitchboardOracle(ai, client.program.provider.connection)
-      ).lastUpdatedSlot;
-    } else {
-      throw new Error(
-        `Unknown oracle provider (parsing not implemented) for oracle ${oracle}, with owner ${ai.owner}!`,
-      );
-    }
-    return { lastUpdatedSlot };
-  }
-
   public async reloadVaults(client: MangoClient): Promise<void> {
     const vaultPks = Array.from(this.banksMapByMint.values())
       .flat()
