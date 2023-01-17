@@ -17,7 +17,8 @@ use itertools::Itertools;
 
 use mango_v4::instructions::{Serum3OrderType, Serum3SelfTradeBehavior, Serum3Side};
 use mango_v4::state::{
-    Bank, Group, MangoAccountValue, PerpMarketIndex, Serum3MarketIndex, TokenIndex,
+    Bank, Group, MangoAccountValue, PerpMarketIndex, PlaceOrderType, Serum3MarketIndex, Side,
+    TokenIndex,
 };
 
 use solana_address_lookup_table_program::state::AddressLookupTable;
@@ -280,13 +281,15 @@ impl MangoClient {
     pub async fn derive_health_check_remaining_account_metas(
         &self,
         affected_tokens: Vec<TokenIndex>,
-        writable_banks: bool,
+        writable_banks: Vec<TokenIndex>,
+        affected_perp_markets: Vec<PerpMarketIndex>,
     ) -> anyhow::Result<Vec<AccountMeta>> {
         let account = self.mango_account().await?;
         self.context.derive_health_check_remaining_account_metas(
             &account,
             affected_tokens,
             writable_banks,
+            affected_perp_markets,
         )
     }
 
@@ -315,7 +318,7 @@ impl MangoClient {
         let mint_info = token.mint_info;
 
         let health_check_metas = self
-            .derive_health_check_remaining_account_metas(vec![token_index], false)
+            .derive_health_check_remaining_account_metas(vec![token_index], vec![], vec![])
             .await?;
 
         let ix = Instruction {
@@ -357,7 +360,7 @@ impl MangoClient {
         let mint_info = token.mint_info;
 
         let health_check_metas = self
-            .derive_health_check_remaining_account_metas(vec![token_index], false)
+            .derive_health_check_remaining_account_metas(vec![token_index], vec![], vec![])
             .await?;
 
         let ixs = vec![
@@ -504,7 +507,7 @@ impl MangoClient {
         let open_orders = account.serum3_orders(s3.market_index).unwrap().open_orders;
 
         let health_check_metas = self
-            .derive_health_check_remaining_account_metas(vec![], false)
+            .derive_health_check_remaining_account_metas(vec![], vec![], vec![])
             .await?;
 
         // https://github.com/project-serum/serum-ts/blob/master/packages/serum/src/market.ts#L1306
@@ -689,7 +692,7 @@ impl MangoClient {
 
         let health_remaining_ams = self
             .context
-            .derive_health_check_remaining_account_metas(liqee.1, vec![], false)
+            .derive_health_check_remaining_account_metas(liqee.1, vec![], vec![], vec![])
             .unwrap();
 
         let ix = Instruction {
@@ -768,6 +771,95 @@ impl MangoClient {
     //
     // Perps
     //
+    pub async fn perp_place_order(
+        &self,
+        market_index: PerpMarketIndex,
+        side: Side,
+        price_lots: i64,
+        max_base_lots: i64,
+        max_quote_lots: i64,
+        client_order_id: u64,
+        order_type: PlaceOrderType,
+        reduce_only: bool,
+        expiry_timestamp: u64,
+        limit: u8,
+    ) -> anyhow::Result<Signature> {
+        let perp = self.context.perp(market_index);
+
+        let health_check_metas = self
+            .derive_health_check_remaining_account_metas(
+                vec![],
+                vec![],
+                vec![perp.market.perp_market_index],
+            )
+            .await?;
+
+        let ix = Instruction {
+            program_id: mango_v4::id(),
+            accounts: {
+                let mut ams = anchor_lang::ToAccountMetas::to_account_metas(
+                    &mango_v4::accounts::PerpPlaceOrder {
+                        group: self.group(),
+                        account: self.mango_account_address,
+                        owner: self.owner(),
+                        perp_market: perp.address,
+                        bids: perp.market.bids,
+                        asks: perp.market.asks,
+                        event_queue: perp.market.event_queue,
+                        oracle: perp.market.oracle,
+                    },
+                    None,
+                );
+                ams.extend(health_check_metas.into_iter());
+                ams
+            },
+            data: anchor_lang::InstructionData::data(&mango_v4::instruction::PerpPlaceOrder {
+                side,
+                price_lots,
+                max_base_lots,
+                max_quote_lots,
+                client_order_id,
+                order_type,
+                reduce_only,
+                expiry_timestamp,
+                limit,
+            }),
+        };
+        self.send_and_confirm_owner_tx(vec![ix]).await
+    }
+
+    pub async fn perp_deactivate_position(
+        &self,
+        market_index: PerpMarketIndex,
+    ) -> anyhow::Result<Signature> {
+        let perp = self.context.perp(market_index);
+
+        let health_check_metas = self
+            .derive_health_check_remaining_account_metas(vec![], vec![], vec![])
+            .await?;
+
+        let ix = Instruction {
+            program_id: mango_v4::id(),
+            accounts: {
+                let mut ams = anchor_lang::ToAccountMetas::to_account_metas(
+                    &mango_v4::accounts::PerpDeactivatePosition {
+                        group: self.group(),
+                        account: self.mango_account_address,
+                        owner: self.owner(),
+                        perp_market: perp.address,
+                    },
+                    None,
+                );
+                ams.extend(health_check_metas.into_iter());
+                ams
+            },
+            data: anchor_lang::InstructionData::data(
+                &mango_v4::instruction::PerpDeactivatePosition {},
+            ),
+        };
+        self.send_and_confirm_owner_tx(vec![ix]).await
+    }
+
     pub async fn perp_settle_pnl(
         &self,
         market_index: PerpMarketIndex,
@@ -816,7 +908,7 @@ impl MangoClient {
 
         let health_remaining_ams = self
             .context
-            .derive_health_check_remaining_account_metas(liqee.1, vec![], false)
+            .derive_health_check_remaining_account_metas(liqee.1, vec![], vec![], vec![])
             .unwrap();
 
         let ix = Instruction {
@@ -1180,7 +1272,8 @@ impl MangoClient {
         let health_ams = self
             .derive_health_check_remaining_account_metas(
                 vec![source_token.token_index, target_token.token_index],
-                true,
+                vec![source_token.token_index, target_token.token_index],
+                vec![],
             )
             .await
             .context("building health accounts")?;
