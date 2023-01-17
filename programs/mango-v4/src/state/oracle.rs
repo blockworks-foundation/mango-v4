@@ -167,22 +167,19 @@ pub fn oracle_price(
                 return Err(MangoError::OracleConfidence.into());
             }
 
-            // The aggregation pub slot is the time that the aggregate was computed from published data
-            // that was at most 25 slots old. That means it underestimates the actual staleness, potentially
-            // significantly.
-            let agg_pub_slot = price_account.agg.pub_slot;
+            // The last_slot is when the price was actually updated
+            let last_slot = price_account.last_slot;
             if config.max_staleness_slots >= 0
                 && price_account
-                    .agg
-                    .pub_slot
+                    .last_slot
                     .saturating_add(config.max_staleness_slots as u64)
                     < staleness_slot
             {
                 msg!(
-                    "Pyth price too stale; pubkey {} price: {} pub slot: {}",
+                    "Pyth price too stale; pubkey {} price: {} last slot: {}",
                     acc_info.key(),
                     price.to_num::<f64>(),
-                    agg_pub_slot,
+                    last_slot,
                 );
 
                 return Err(MangoError::OracleStale.into());
