@@ -56,6 +56,7 @@ import {
   createAssociatedTokenAccountIdempotentInstruction,
   getAssociatedTokenAddress,
   toNative,
+  U64_MAX_BN,
 } from './utils';
 import { sendTransaction } from './utils/rpc';
 
@@ -809,6 +810,81 @@ export class MangoClient {
     );
   }
 
+  public async emptyAndCloseMangoAccount(
+    group: Group,
+    mangoAccount: MangoAccount,
+  ): Promise<TransactionSignature> {
+    const instructions: TransactionInstruction[] = [];
+    const healthAccountsToExclude: PublicKey[] = [];
+
+    for (const serum3Account of mangoAccount.serum3Active()) {
+      const serum3Market = group.serum3MarketsMapByMarketIndex.get(
+        serum3Account.marketIndex,
+      )!;
+
+      const closeOOIx = await this.serum3CloseOpenOrdersIx(
+        group,
+        mangoAccount,
+        serum3Market.serumMarketExternal,
+      );
+      healthAccountsToExclude.push(serum3Account.openOrders);
+      instructions.push(closeOOIx);
+    }
+
+    for (const perp of mangoAccount.perpActive()) {
+      const perpMarketIndex = perp.marketIndex;
+      const perpMarket = group.getPerpMarketByMarketIndex(perpMarketIndex);
+      const deactivatingPositionIx = await this.perpDeactivatePositionIx(
+        group,
+        mangoAccount,
+        perpMarketIndex,
+      );
+      healthAccountsToExclude.push(perpMarket.publicKey);
+      instructions.push(deactivatingPositionIx);
+    }
+
+    for (const index in mangoAccount.tokensActive()) {
+      const indexNum = Number(index);
+      const accountsToExclude = [...healthAccountsToExclude];
+      const token = mangoAccount.tokensActive()[indexNum];
+      const bank = group.getFirstBankByTokenIndex(token.tokenIndex);
+      //to withdraw from all token accounts we need to exclude previous tokens pubkeys
+      //used to build health remaining accounts
+      if (indexNum !== 0) {
+        for (let i = indexNum; i--; i >= 0) {
+          const prevToken = mangoAccount.tokensActive()[i];
+          const prevBank = group.getFirstBankByTokenIndex(prevToken.tokenIndex);
+          accountsToExclude.push(prevBank.publicKey, prevBank.oracle);
+        }
+      }
+      const withdrawIx = await this.tokenWithdrawNativeIx(
+        group,
+        mangoAccount,
+        bank.mint,
+        U64_MAX_BN,
+        false,
+        [...accountsToExclude],
+      );
+      instructions.push(...withdrawIx);
+    }
+
+    const closeIx = await this.program.methods
+      .accountClose(false)
+      .accounts({
+        group: group.publicKey,
+        account: mangoAccount.publicKey,
+        owner: (this.program.provider as AnchorProvider).wallet.publicKey,
+        solDestination: mangoAccount.owner,
+      })
+      .instruction();
+    instructions.push(closeIx);
+
+    return await this.sendAndConfirmTransaction(
+      [...instructions],
+      group.addressLookupTablesList,
+    );
+  }
+
   public async tokenDeposit(
     group: Group,
     mangoAccount: MangoAccount,
@@ -917,22 +993,28 @@ export class MangoClient {
     allowBorrow: boolean,
   ): Promise<TransactionSignature> {
     const nativeAmount = toNative(amount, group.getMintDecimals(mintPk));
-    return await this.tokenWithdrawNative(
+    const ixes = await this.tokenWithdrawNativeIx(
       group,
       mangoAccount,
       mintPk,
       nativeAmount,
       allowBorrow,
     );
+
+    return await this.sendAndConfirmTransaction(
+      [...ixes],
+      group.addressLookupTablesList,
+    );
   }
 
-  public async tokenWithdrawNative(
+  public async tokenWithdrawNativeIx(
     group: Group,
     mangoAccount: MangoAccount,
     mintPk: PublicKey,
     nativeAmount: BN,
     allowBorrow: boolean,
-  ): Promise<TransactionSignature> {
+    healthAccountsToExclude: PublicKey[] = [],
+  ): Promise<TransactionInstruction[]> {
     const bank = group.getFirstBankByMint(mintPk);
 
     const tokenAccountPk = await getAssociatedTokenAddress(
@@ -981,17 +1063,25 @@ export class MangoClient {
         tokenAccount: tokenAccountPk,
       })
       .remainingAccounts(
-        healthRemainingAccounts.map(
-          (pk) =>
-            ({ pubkey: pk, isWritable: false, isSigner: false } as AccountMeta),
-        ),
+        healthRemainingAccounts
+          .filter(
+            (accounts) =>
+              !healthAccountsToExclude.find((accountsToExclude) =>
+                accounts.equals(accountsToExclude),
+              ),
+          )
+          .map(
+            (pk) =>
+              ({
+                pubkey: pk,
+                isWritable: false,
+                isSigner: false,
+              } as AccountMeta),
+          ),
       )
       .instruction();
 
-    return await this.sendAndConfirmTransaction(
-      [...preInstructions, ix, ...postInstructions],
-      group.addressLookupTablesList,
-    );
+    return [...preInstructions, ix, ...postInstructions];
   }
 
   // Serum
@@ -1718,11 +1808,11 @@ export class MangoClient {
     );
   }
 
-  public async perpDeactivatePosition(
+  public async perpDeactivatePositionIx(
     group: Group,
     mangoAccount: MangoAccount,
     perpMarketIndex: PerpMarketIndex,
-  ): Promise<TransactionSignature> {
+  ): Promise<TransactionInstruction> {
     const perpMarket = group.getPerpMarketByMarketIndex(perpMarketIndex);
     const healthRemainingAccounts: PublicKey[] =
       this.buildHealthRemainingAccounts(
@@ -1746,7 +1836,23 @@ export class MangoClient {
             ({ pubkey: pk, isWritable: false, isSigner: false } as AccountMeta),
         ),
       )
-      .rpc();
+      .instruction();
+  }
+
+  public async perpDeactivatePosition(
+    group: Group,
+    mangoAccount: MangoAccount,
+    perpMarketIndex: PerpMarketIndex,
+  ): Promise<TransactionSignature> {
+    const ix = await this.perpDeactivatePositionIx(
+      group,
+      mangoAccount,
+      perpMarketIndex,
+    );
+    return await this.sendAndConfirmTransaction(
+      [ix],
+      group.addressLookupTablesList,
+    );
   }
 
   public async perpPlaceOrder(
@@ -2592,7 +2698,6 @@ export class MangoClient {
         }
       }
     }
-
     const mintInfos = tokenPositionIndices
       .filter((tokenIndex) => tokenIndex !== TokenPosition.TokenIndexUnset)
       .map((tokenIndex) => group.mintInfosMapByTokenIndex.get(tokenIndex)!);
