@@ -4,6 +4,14 @@ Update this for each program release and mainnet deployment.
 
 ## not on mainnet
 
+### v0.3.0, 2023-1-17
+
+Deployment: --
+
+- Add perp market pnl asset weights, replacing the "trusted market" flag (#391)
+- Add tracking of realized PnL over a position's lifetime to perp positions (#392)
+- Fix oracle staleness detection for pyth oracles (#393)
+
 ## mainnet
 
 ### v0.2.0, 2023-1-13
