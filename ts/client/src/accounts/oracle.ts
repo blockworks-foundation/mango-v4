@@ -48,21 +48,25 @@ export class StubOracle {
 }
 
 // https://gist.github.com/microwavedcola1/b741a11e6ee273a859f3ef00b35ac1f0
-export function parseSwitcboardOracleV1(
-  accountInfo: AccountInfo<Buffer>,
-): { price: number, lastUpdatedSlot: number } {
+export function parseSwitcboardOracleV1(accountInfo: AccountInfo<Buffer>): {
+  price: number;
+  lastUpdatedSlot: number;
+} {
   const price = accountInfo.data.readDoubleLE(1 + 32 + 4 + 4);
-  const lastUpdatedSlot = parseInt(accountInfo.data.readBigUInt64LE(1 + 32 + 4 + 4 + 8).toString())
-  return { price, lastUpdatedSlot }
+  const lastUpdatedSlot = parseInt(
+    accountInfo.data.readBigUInt64LE(1 + 32 + 4 + 4 + 8).toString(),
+  );
+  return { price, lastUpdatedSlot };
 }
 
 export function parseSwitcboardOracleV2(
   program: SwitchboardProgram,
   accountInfo: AccountInfo<Buffer>,
-): { price: number, lastUpdatedSlot: number } {
-  const price =
-    program.decodeLatestAggregatorValue(accountInfo)!.toNumber();
-  const lastUpdatedSlot = program.decodeAggregator(accountInfo).previousConfirmedRoundSlot!.toNumber();
+): { price: number; lastUpdatedSlot: number } {
+  const price = program.decodeLatestAggregatorValue(accountInfo)!.toNumber();
+  const lastUpdatedSlot = program
+    .decodeAggregator(accountInfo)
+    .previousConfirmedRoundSlot!.toNumber();
 
   if (!price || !lastUpdatedSlot)
     throw new Error('Unable to parse Switchboard Oracle V2');
@@ -77,7 +81,7 @@ export function parseSwitcboardOracleV2(
 export async function parseSwitchboardOracle(
   accountInfo: AccountInfo<Buffer>,
   connection: Connection,
-): Promise<{ price: number, lastUpdatedSlot: number }> {
+): Promise<{ price: number; lastUpdatedSlot: number }> {
   if (accountInfo.owner.equals(SwitchboardProgram.devnetPid)) {
     if (!sbv2DevnetProgram) {
       sbv2DevnetProgram = await SwitchboardProgram.loadDevnet(connection);
