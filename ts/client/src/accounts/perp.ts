@@ -3,6 +3,7 @@ import { utf8 } from '@project-serum/anchor/dist/cjs/utils/bytes';
 import { PublicKey } from '@solana/web3.js';
 import Big from 'big.js';
 import { MangoClient } from '../client';
+import { RUST_U64_MAX } from '../constants';
 import { I80F48, I80F48Dto, ZERO_I80F48 } from '../numbers/I80F48';
 import { Modify } from '../types';
 import { As, U64_MAX_BN, toNative, toUiDecimals } from '../utils';
@@ -29,10 +30,10 @@ export type ParsedFillEvent = Modify<
 export class PerpMarket {
   public name: string;
   public oracleConfig: OracleConfig;
-  public maintAssetWeight: I80F48;
-  public initAssetWeight: I80F48;
-  public maintLiabWeight: I80F48;
-  public initLiabWeight: I80F48;
+  public maintBaseAssetWeight: I80F48;
+  public initBaseAssetWeight: I80F48;
+  public maintBaseLiabWeight: I80F48;
+  public initBaseLiabWeight: I80F48;
   public liquidationFee: I80F48;
   public makerFee: I80F48;
   public takerFee: I80F48;
@@ -42,6 +43,9 @@ export class PerpMarket {
   public shortFunding: I80F48;
   public feesAccrued: I80F48;
   public feesSettled: I80F48;
+  public maintPnlAssetWeight: I80F48;
+  public initPnlAssetWeight: I80F48;
+
   public _price: I80F48;
   public _uiPrice: number;
 
@@ -58,7 +62,6 @@ export class PerpMarket {
       group: PublicKey;
       settleTokenIndex: number;
       perpMarketIndex: number;
-      trustedMarket: number;
       groupInsuranceFund: number;
       baseDecimals: number;
       name: number[];
@@ -70,10 +73,10 @@ export class PerpMarket {
       stablePriceModel: StablePriceModel;
       quoteLotSize: BN;
       baseLotSize: BN;
-      maintAssetWeight: I80F48Dto;
-      initAssetWeight: I80F48Dto;
-      maintLiabWeight: I80F48Dto;
-      initLiabWeight: I80F48Dto;
+      maintBaseAssetWeight: I80F48Dto;
+      initBaseAssetWeight: I80F48Dto;
+      maintBaseLiabWeight: I80F48Dto;
+      initBaseLiabWeight: I80F48Dto;
       openInterest: BN;
       seqNum: BN;
       registrationTime: BN;
@@ -95,6 +98,8 @@ export class PerpMarket {
       settlePnlLimitFactor: number;
       settlePnlLimitWindowSizeTs: BN;
       reduceOnly: number;
+      maintPnlAssetWeight: I80F48Dto;
+      initPnlAssetWeight: I80F48Dto;
     },
   ): PerpMarket {
     return new PerpMarket(
@@ -102,7 +107,6 @@ export class PerpMarket {
       obj.group,
       obj.settleTokenIndex as TokenIndex,
       obj.perpMarketIndex as PerpMarketIndex,
-      obj.trustedMarket == 1,
       obj.groupInsuranceFund == 1,
       obj.baseDecimals,
       obj.name,
@@ -114,10 +118,10 @@ export class PerpMarket {
       obj.stablePriceModel,
       obj.quoteLotSize,
       obj.baseLotSize,
-      obj.maintAssetWeight,
-      obj.initAssetWeight,
-      obj.maintLiabWeight,
-      obj.initLiabWeight,
+      obj.maintBaseAssetWeight,
+      obj.initBaseAssetWeight,
+      obj.maintBaseLiabWeight,
+      obj.initBaseLiabWeight,
       obj.openInterest,
       obj.seqNum,
       obj.registrationTime,
@@ -139,6 +143,8 @@ export class PerpMarket {
       obj.settlePnlLimitFactor,
       obj.settlePnlLimitWindowSizeTs,
       obj.reduceOnly == 1,
+      obj.maintPnlAssetWeight,
+      obj.initPnlAssetWeight,
     );
   }
 
@@ -147,7 +153,6 @@ export class PerpMarket {
     public group: PublicKey,
     public settleTokenIndex: TokenIndex,
     public perpMarketIndex: PerpMarketIndex, // TODO rename to marketIndex?
-    public trustedMarket: boolean,
     public groupInsuranceFund: boolean,
     public baseDecimals: number,
     name: number[],
@@ -159,10 +164,10 @@ export class PerpMarket {
     public stablePriceModel: StablePriceModel,
     public quoteLotSize: BN,
     public baseLotSize: BN,
-    maintAssetWeight: I80F48Dto,
-    initAssetWeight: I80F48Dto,
-    maintLiabWeight: I80F48Dto,
-    initLiabWeight: I80F48Dto,
+    maintBaseAssetWeight: I80F48Dto,
+    initBaseAssetWeight: I80F48Dto,
+    maintBaseLiabWeight: I80F48Dto,
+    initBaseLiabWeight: I80F48Dto,
     public openInterest: BN,
     public seqNum: BN,
     public registrationTime: BN,
@@ -181,19 +186,21 @@ export class PerpMarket {
     public settleFeeFlat: number,
     public settleFeeAmountThreshold: number,
     public settleFeeFractionLowHealth: number,
-    settlePnlLimitFactor: number,
-    settlePnlLimitWindowSizeTs: BN,
+    public settlePnlLimitFactor: number,
+    public settlePnlLimitWindowSizeTs: BN,
     public reduceOnly: boolean,
+    maintPnlAssetWeight: I80F48Dto,
+    initPnlAssetWeight: I80F48Dto,
   ) {
     this.name = utf8.decode(new Uint8Array(name)).split('\x00')[0];
     this.oracleConfig = {
       confFilter: I80F48.from(oracleConfig.confFilter),
       maxStalenessSlots: oracleConfig.maxStalenessSlots,
     } as OracleConfig;
-    this.maintAssetWeight = I80F48.from(maintAssetWeight);
-    this.initAssetWeight = I80F48.from(initAssetWeight);
-    this.maintLiabWeight = I80F48.from(maintLiabWeight);
-    this.initLiabWeight = I80F48.from(initLiabWeight);
+    this.maintBaseAssetWeight = I80F48.from(maintBaseAssetWeight);
+    this.initBaseAssetWeight = I80F48.from(initBaseAssetWeight);
+    this.maintBaseLiabWeight = I80F48.from(maintBaseLiabWeight);
+    this.initBaseLiabWeight = I80F48.from(initBaseLiabWeight);
     this.liquidationFee = I80F48.from(liquidationFee);
     this.makerFee = I80F48.from(makerFee);
     this.takerFee = I80F48.from(takerFee);
@@ -203,6 +210,8 @@ export class PerpMarket {
     this.shortFunding = I80F48.from(shortFunding);
     this.feesAccrued = I80F48.from(feesAccrued);
     this.feesSettled = I80F48.from(feesSettled);
+    this.maintPnlAssetWeight = I80F48.from(maintPnlAssetWeight);
+    this.initPnlAssetWeight = I80F48.from(initPnlAssetWeight);
 
     this.priceLotsToUiConverter = new Big(10)
       .pow(baseDecimals - QUOTE_DECIMALS)
@@ -248,9 +257,9 @@ export class PerpMarket {
   insidePriceLimit(side: PerpOrderSide, orderPrice: number): boolean {
     return (
       (side === PerpOrderSide.bid &&
-        orderPrice <= this.maintLiabWeight.toNumber() * this.uiPrice) ||
+        orderPrice <= this.maintBaseLiabWeight.toNumber() * this.uiPrice) ||
       (side === PerpOrderSide.ask &&
-        orderPrice >= this.maintAssetWeight.toNumber() * this.uiPrice)
+        orderPrice >= this.maintBaseAssetWeight.toNumber() * this.uiPrice)
     );
   }
 
@@ -412,22 +421,21 @@ export class PerpMarket {
     direction: 'negative' | 'positive',
     count = 2,
   ): Promise<{ account: MangoAccount; settleablePnl: I80F48 }[]> {
-    let accs = (await client.getAllMangoAccounts(group))
-      .filter((acc) =>
-        // need a perp position in this market
-        acc.perpPositionExistsForMarket(this),
-      )
+    let accountsWithSettleablePnl = (await client.getAllMangoAccounts(group))
+      .filter((acc) => acc.perpPositionExistsForMarket(this))
       .map((acc) => {
+        const pp = acc
+          .perpActive()
+          .find((pp) => pp.marketIndex === this.perpMarketIndex)!;
+        pp.updateSettleLimit(this);
+
         return {
           account: acc,
-          settleablePnl: acc
-            .perpActive()
-            .find((pp) => pp.marketIndex === this.perpMarketIndex)!
-            .getPnl(this),
+          settleablePnl: pp.getSettleablePnl(this),
         };
       });
 
-    accs = accs
+    accountsWithSettleablePnl = accountsWithSettleablePnl
       .filter(
         (acc) =>
           // need perp positions with -ve pnl to settle +ve pnl and vice versa
@@ -444,10 +452,12 @@ export class PerpMarket {
 
     if (direction === 'negative') {
       let stable = 0;
-      for (let i = 0; i < accs.length; i++) {
-        const acc = accs[i];
+      for (let i = 0; i < accountsWithSettleablePnl.length; i++) {
+        const acc = accountsWithSettleablePnl[i];
         const nextPnl =
-          i + 1 < accs.length ? accs[i + 1].settleablePnl : ZERO_I80F48();
+          i + 1 < accountsWithSettleablePnl.length
+            ? accountsWithSettleablePnl[i + 1].settleablePnl
+            : ZERO_I80F48();
 
         const perpSettleHealth = acc.account.getPerpSettleHealth(group);
         acc.settleablePnl =
@@ -467,7 +477,7 @@ export class PerpMarket {
       }
     }
 
-    accs.sort((a, b) =>
+    accountsWithSettleablePnl.sort((a, b) =>
       direction === 'negative'
         ? // most negative
           a.settleablePnl.cmp(b.settleablePnl)
@@ -475,7 +485,7 @@ export class PerpMarket {
           b.settleablePnl.cmp(a.settleablePnl),
     );
 
-    return accs.slice(0, count);
+    return accountsWithSettleablePnl.slice(0, count);
   }
 
   toString(): string {
@@ -484,13 +494,13 @@ export class PerpMarket {
       '\n perpMarketIndex -' +
       this.perpMarketIndex +
       '\n maintAssetWeight -' +
-      this.maintAssetWeight.toString() +
+      this.maintBaseAssetWeight.toString() +
       '\n initAssetWeight -' +
-      this.initAssetWeight.toString() +
+      this.initBaseAssetWeight.toString() +
       '\n maintLiabWeight -' +
-      this.maintLiabWeight.toString() +
+      this.maintBaseLiabWeight.toString() +
       '\n initLiabWeight -' +
-      this.initLiabWeight.toString() +
+      this.initBaseLiabWeight.toString() +
       '\n liquidationFee -' +
       this.liquidationFee.toString() +
       '\n makerFee -' +
@@ -853,7 +863,7 @@ export class PerpOrder {
 
     return new PerpOrder(
       type === BookSideType.bids
-        ? new BN('18446744073709551615').sub(leafNode.key.maskn(64))
+        ? RUST_U64_MAX().sub(leafNode.key.maskn(64))
         : leafNode.key.maskn(64),
       leafNode.key,
       leafNode.owner,

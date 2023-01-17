@@ -1,6 +1,5 @@
 use anchor_lang::prelude::*;
 use anchor_spl::token::{Token, TokenAccount};
-use fixed::types::I80F48;
 
 use crate::error::*;
 use crate::health::*;
@@ -14,9 +13,16 @@ use crate::state::*;
 
 #[derive(Accounts)]
 pub struct Serum3LiqForceCancelOrders<'info> {
+    #[account(
+        constraint = group.load()?.is_operational() @ MangoError::GroupIsHalted
+    )]
     pub group: AccountLoader<'info, Group>,
 
-    #[account(mut, has_one = group)]
+    // Allow force cancel even if account is frozen
+    #[account(
+        mut,
+        has_one = group
+    )]
     pub account: AccountLoader<'info, MangoAccountFixed>,
 
     #[account(mut)]
@@ -119,22 +125,21 @@ pub fn serum3_liq_force_cancel_orders(
         let health_cache =
             new_health_cache(&account.borrow(), &retriever).context("create health cache")?;
 
-        if account.being_liquidated() {
-            let init_health = health_cache.health(HealthType::Init);
-            if account
-                .fixed
-                .maybe_recover_from_being_liquidated(init_health)
-            {
-                msg!("Liqee init_health above zero");
-                return Ok(());
+        {
+            let result = account.check_liquidatable(&health_cache);
+            if account.fixed.is_operational() {
+                if !result? {
+                    return Ok(());
+                }
+            } else {
+                // Frozen accounts can always have their orders cancelled
+                if let Err(Error::AnchorError(ref inner)) = result {
+                    if inner.error_code_number != MangoError::HealthMustBeNegative as u32 {
+                        // propagate all unexpected errors
+                        result?;
+                    }
+                }
             }
-        } else {
-            let maint_health = health_cache.health(HealthType::Maint);
-            require!(
-                maint_health < I80F48::ZERO,
-                MangoError::HealthMustBeNegative
-            );
-            account.fixed.set_being_liquidated(true);
         }
 
         health_cache

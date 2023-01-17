@@ -1,7 +1,7 @@
 use anchor_lang::prelude::*;
 use anchor_spl::token::{self, CloseAccount, Token, TokenAccount};
 
-use crate::{accounts_zerocopy::LoadZeroCopyRef, state::*};
+use crate::{accounts_zerocopy::LoadZeroCopyRef, error::MangoError, state::*};
 use anchor_lang::AccountsClose;
 
 /// In addition to these accounts, there must be remaining_accounts:
@@ -9,8 +9,9 @@ use anchor_lang::AccountsClose;
 #[derive(Accounts)]
 pub struct TokenDeregister<'info> {
     #[account(
-        constraint = group.load()?.is_testing(),
         has_one = admin,
+        constraint = group.load()?.is_operational() @ MangoError::GroupIsHalted,
+        constraint = group.load()?.is_testing(),
     )]
     pub group: AccountLoader<'info, Group>,
     pub admin: Signer<'info>,

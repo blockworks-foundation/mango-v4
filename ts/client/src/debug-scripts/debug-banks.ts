@@ -36,7 +36,6 @@ async function main(): Promise<void> {
 
   const group = await client.getGroupForCreator(admin.publicKey, GROUP_NUM);
   console.log(`Group ${group.publicKey.toBase58()}`);
-  console.log(`${group.toString()}`);
 
   const banks = Array.from(group.banksMapByMint.values()).flat();
   const banksMapUsingTokenIndex = new Map(
@@ -48,11 +47,7 @@ async function main(): Promise<void> {
   );
 
   const mangoAccounts = await client.getAllMangoAccounts(group);
-  mangoAccounts.forEach((mangoAccount) =>
-    console.log(
-      `MangoAccount pk - ${mangoAccount.publicKey}, owner - ${mangoAccount.owner}`,
-    ),
-  );
+
   mangoAccounts.map((mangoAccount) =>
     mangoAccount.tokensActive().forEach((token) => {
       const bank = banksMapUsingTokenIndex.get(token.tokenIndex);
@@ -103,6 +98,7 @@ async function main(): Promise<void> {
       `\n ${'tokenIndex'.padEnd(40)} ${bank.tokenIndex}` +
       `\n ${'bank'.padEnd(40)} ${bank.publicKey}` +
       `\n ${'vault'.padEnd(40)} ${bank.vault}` +
+      `\n ${'oracle'.padEnd(40)} ${bank.oracle}` +
       `\n ${'mint'.padEnd(40)} ${bank.mint}` +
       `\n ${'price'.padEnd(40)} ${bank.price?.toNumber()}` +
       `\n ${'uiPrice'.padEnd(40)} ${bank.uiPrice}` +

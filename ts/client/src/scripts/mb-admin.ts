@@ -22,7 +22,9 @@ import {
   Serum3SelfTradeBehavior,
   Serum3Side,
 } from '../accounts/serum3';
+import { Builder } from '../builder';
 import { MangoClient } from '../client';
+import { NullPerpEditParams } from '../clientIxParamBuilder';
 import { MANGO_V4_ID, OPENBOOK_PROGRAM_ID } from '../constants';
 import { buildVersionedTx, toNative } from '../utils';
 
@@ -422,6 +424,8 @@ async function registerPerpMarkets() {
     0.95,
     1.025,
     1.05,
+    1,
+    1,
     0.0125,
     -0.0001,
     0.0004,
@@ -429,7 +433,6 @@ async function registerPerpMarkets() {
     -0.05,
     0.05,
     100, // if btc is at 20k, this is 200$
-    true,
     true,
     1000, // solana tx fee is currently 50 native quote at a sol price of 10$
     1000000,
@@ -452,6 +455,8 @@ async function registerPerpMarkets() {
     0.99, // 100x leverage
     1.005,
     1.01,
+    0,
+    0,
     0.0025,
     -0.0001,
     0.0004,
@@ -459,7 +464,6 @@ async function registerPerpMarkets() {
     -0.05,
     0.05,
     1000, // if mngo price 1 cent, this is 10$
-    false,
     false,
     1000,
     1000000,
@@ -481,31 +485,7 @@ async function makePerpMarketReduceOnly() {
   await client.perpEditMarket(
     group,
     perpMarket.perpMarketIndex,
-    null,
-    null,
-    null,
-    null,
-    null,
-    null,
-    null,
-    null,
-    null,
-    null,
-    null,
-    null,
-    null,
-    null,
-    null,
-    null,
-    null,
-    null,
-    null,
-    null,
-    null,
-    null,
-    null,
-    null,
-    true,
+    Builder(NullPerpEditParams).reduceOnly(true).build(),
   );
 }
 

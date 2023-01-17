@@ -69,6 +69,20 @@ pub enum MangoError {
     TokenInReduceOnlyMode,
     #[msg("market is in reduce only mode")]
     MarketInReduceOnlyMode,
+    #[msg("group is halted")]
+    GroupIsHalted,
+    #[msg("the perp position has non-zero base lots")]
+    PerpHasBaseLots,
+    #[msg("there are open or unsettled serum3 orders")]
+    HasOpenOrUnsettledSerum3Orders,
+    #[msg("has liquidatable token position")]
+    HasLiquidatableTokenPosition,
+    #[msg("has liquidatable perp base position")]
+    HasLiquidatablePerpBasePosition,
+    #[msg("has liquidatable trusted perp pnl")]
+    HasLiquidatableTrustedPerpPnl,
+    #[msg("account is frozen")]
+    AccountIsFrozen,
 }
 
 impl MangoError {
@@ -149,17 +163,17 @@ macro_rules! error_msg {
 
 /// Creates an Error with a particular message, using format!() style arguments
 ///
-/// Example: error_msg!("index {} not found", index)
+/// Example: error_msg_typed!(TokenPositionMissing, "index {} not found", index)
 #[macro_export]
 macro_rules! error_msg_typed {
-    ($code:ident, $($arg:tt)*) => {
-        error!(MangoError::$code).context(format!($($arg)*))
+    ($code:expr, $($arg:tt)*) => {
+        error!($code).context(format!($($arg)*))
     };
 }
 
 /// Like anchor's require!(), but with a customizable message
 ///
-/// Example: require!(condition, "the condition on account {} was violated", account_key);
+/// Example: require_msg!(condition, "the condition on account {} was violated", account_key);
 #[macro_export]
 macro_rules! require_msg {
     ($invariant:expr, $($arg:tt)*) => {
@@ -169,6 +183,19 @@ macro_rules! require_msg {
     };
 }
 
+/// Like anchor's require!(), but with a customizable message and type
+///
+/// Example: require_msg_typed!(condition, "the condition on account {} was violated", account_key);
+#[macro_export]
+macro_rules! require_msg_typed {
+    ($invariant:expr, $code:expr, $($arg:tt)*) => {
+        if !($invariant) {
+            return Err(error_msg_typed!($code, $($arg)*));
+        }
+    };
+}
+
 pub use error_msg;
 pub use error_msg_typed;
 pub use require_msg;
+pub use require_msg_typed;

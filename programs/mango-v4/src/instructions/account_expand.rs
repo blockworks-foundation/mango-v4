@@ -1,16 +1,21 @@
 use anchor_lang::prelude::*;
 
+use crate::error::MangoError;
 use crate::state::*;
 use crate::util::checked_math as cm;
 
 #[derive(Accounts)]
 pub struct AccountExpand<'info> {
+    #[account(
+        constraint = group.load()?.is_operational() @ MangoError::GroupIsHalted
+    )]
     pub group: AccountLoader<'info, Group>,
 
     #[account(
         mut,
         has_one = group,
-        has_one = owner
+        has_one = owner,
+        constraint = account.load()?.is_operational() @ MangoError::AccountIsFrozen
     )]
     pub account: AccountLoader<'info, MangoAccountFixed>,
     pub owner: Signer<'info>,

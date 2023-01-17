@@ -305,7 +305,7 @@ impl<'a, 'info> ScanningAccountRetriever<'a, 'info> {
     fn bank_index(&self, token_index: TokenIndex) -> Result<usize> {
         Ok(*self.token_index_map.get(&token_index).ok_or_else(|| {
             error_msg_typed!(
-                TokenPositionDoesNotExist,
+                MangoError::TokenPositionDoesNotExist,
                 "token index {} not found",
                 token_index
             )
@@ -436,8 +436,22 @@ mod tests {
         let oo1key = oo1.pubkey;
         oo1.data().native_pc_total = 20;
 
-        let mut perp1 = mock_perp_market(group, oracle2.pubkey, oracle2_price, 9, 0.2, 0.1);
-        let mut perp2 = mock_perp_market(group, oracle1.pubkey, oracle1_price, 8, 0.2, 0.1);
+        let mut perp1 = mock_perp_market(
+            group,
+            oracle2.pubkey,
+            oracle2_price,
+            9,
+            (0.2, 0.1),
+            (0.05, 0.02),
+        );
+        let mut perp2 = mock_perp_market(
+            group,
+            oracle1.pubkey,
+            oracle1_price,
+            8,
+            (0.2, 0.1),
+            (0.05, 0.02),
+        );
 
         let oracle1_account_info = oracle1.as_account_info();
         let oracle2_account_info = oracle2.as_account_info();

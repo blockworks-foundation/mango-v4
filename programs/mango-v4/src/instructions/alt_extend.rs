@@ -2,12 +2,14 @@ use anchor_lang::prelude::*;
 use solana_address_lookup_table_program as solana_alt;
 
 use crate::address_lookup_table_program;
+use crate::error::MangoError;
 use crate::state::*;
 
 #[derive(Accounts)]
 pub struct AltExtend<'info> {
     #[account(
         has_one = admin,
+        constraint = group.load()?.is_operational() @ MangoError::GroupIsHalted
     )]
     pub group: AccountLoader<'info, Group>,
     pub admin: Signer<'info>,

@@ -45,6 +45,7 @@ pub mod mango_v4 {
         ctx: Context<GroupEdit>,
         admin_opt: Option<Pubkey>,
         fast_listing_admin_opt: Option<Pubkey>,
+        security_admin_opt: Option<Pubkey>,
         testing_opt: Option<u8>,
         version_opt: Option<u8>,
     ) -> Result<()> {
@@ -52,9 +53,14 @@ pub mod mango_v4 {
             ctx,
             admin_opt,
             fast_listing_admin_opt,
+            security_admin_opt,
             testing_opt,
             version_opt,
         )
+    }
+
+    pub fn group_toggle_halt(ctx: Context<GroupToggleHalt>, halted: bool) -> Result<()> {
+        instructions::group_toggle_halt(ctx, halted)
     }
 
     pub fn group_close(ctx: Context<GroupClose>) -> Result<()> {
@@ -214,6 +220,10 @@ pub mod mango_v4 {
         delegate_opt: Option<Pubkey>,
     ) -> Result<()> {
         instructions::account_edit(ctx, name_opt, delegate_opt)
+    }
+
+    pub fn account_toggle_freeze(ctx: Context<AccountToggleFreeze>, freeze: bool) -> Result<()> {
+        instructions::account_toggle_freeze(ctx, freeze)
     }
 
     pub fn account_close(ctx: Context<AccountClose>, force_close: bool) -> Result<()> {
@@ -424,10 +434,12 @@ pub mod mango_v4 {
         base_decimals: u8,
         quote_lot_size: i64,
         base_lot_size: i64,
-        maint_asset_weight: f32,
-        init_asset_weight: f32,
-        maint_liab_weight: f32,
-        init_liab_weight: f32,
+        maint_base_asset_weight: f32,
+        init_base_asset_weight: f32,
+        maint_base_liab_weight: f32,
+        init_base_liab_weight: f32,
+        maint_pnl_asset_weight: f32,
+        init_pnl_asset_weight: f32,
         liquidation_fee: f32,
         maker_fee: f32,
         taker_fee: f32,
@@ -435,7 +447,6 @@ pub mod mango_v4 {
         max_funding: f32,
         impact_quantity: i64,
         group_insurance_fund: bool,
-        trusted_market: bool,
         fee_penalty: f32,
         settle_fee_flat: f32,
         settle_fee_amount_threshold: f32,
@@ -453,10 +464,12 @@ pub mod mango_v4 {
             base_decimals,
             quote_lot_size,
             base_lot_size,
-            maint_asset_weight,
-            init_asset_weight,
-            maint_liab_weight,
-            init_liab_weight,
+            maint_base_asset_weight,
+            init_base_asset_weight,
+            maint_base_liab_weight,
+            init_base_liab_weight,
+            maint_pnl_asset_weight,
+            init_pnl_asset_weight,
             liquidation_fee,
             maker_fee,
             taker_fee,
@@ -464,7 +477,6 @@ pub mod mango_v4 {
             max_funding,
             impact_quantity,
             group_insurance_fund,
-            trusted_market,
             fee_penalty,
             settle_fee_flat,
             settle_fee_amount_threshold,
@@ -480,10 +492,12 @@ pub mod mango_v4 {
         oracle_opt: Option<Pubkey>,
         oracle_config_opt: Option<OracleConfigParams>,
         base_decimals_opt: Option<u8>,
-        maint_asset_weight_opt: Option<f32>,
-        init_asset_weight_opt: Option<f32>,
-        maint_liab_weight_opt: Option<f32>,
-        init_liab_weight_opt: Option<f32>,
+        maint_base_asset_weight_opt: Option<f32>,
+        init_base_asset_weight_opt: Option<f32>,
+        maint_base_liab_weight_opt: Option<f32>,
+        init_base_liab_weight_opt: Option<f32>,
+        maint_pnl_asset_weight_opt: Option<f32>,
+        init_pnl_asset_weight_opt: Option<f32>,
         liquidation_fee_opt: Option<f32>,
         maker_fee_opt: Option<f32>,
         taker_fee_opt: Option<f32>,
@@ -491,7 +505,6 @@ pub mod mango_v4 {
         max_funding_opt: Option<f32>,
         impact_quantity_opt: Option<i64>,
         group_insurance_fund_opt: Option<bool>,
-        trusted_market_opt: Option<bool>,
         fee_penalty_opt: Option<f32>,
         settle_fee_flat_opt: Option<f32>,
         settle_fee_amount_threshold_opt: Option<f32>,
@@ -508,10 +521,12 @@ pub mod mango_v4 {
             oracle_opt,
             oracle_config_opt,
             base_decimals_opt,
-            maint_asset_weight_opt,
-            init_asset_weight_opt,
-            maint_liab_weight_opt,
-            init_liab_weight_opt,
+            maint_base_asset_weight_opt,
+            init_base_asset_weight_opt,
+            maint_base_liab_weight_opt,
+            init_base_liab_weight_opt,
+            maint_pnl_asset_weight_opt,
+            init_pnl_asset_weight_opt,
             liquidation_fee_opt,
             maker_fee_opt,
             taker_fee_opt,
@@ -519,7 +534,6 @@ pub mod mango_v4 {
             max_funding_opt,
             impact_quantity_opt,
             group_insurance_fund_opt,
-            trusted_market_opt,
             fee_penalty_opt,
             settle_fee_flat_opt,
             settle_fee_amount_threshold_opt,
@@ -720,11 +734,11 @@ pub mod mango_v4 {
         instructions::perp_liq_force_cancel_orders(ctx, limit)
     }
 
-    pub fn perp_liq_bankruptcy(
-        ctx: Context<PerpLiqBankruptcy>,
+    pub fn perp_liq_quote_and_bankruptcy(
+        ctx: Context<PerpLiqQuoteAndBankruptcy>,
         max_liab_transfer: u64,
     ) -> Result<()> {
-        instructions::perp_liq_bankruptcy(ctx, max_liab_transfer)
+        instructions::perp_liq_quote_and_bankruptcy(ctx, max_liab_transfer)
     }
 
     pub fn alt_set(ctx: Context<AltSet>, index: u8) -> Result<()> {

@@ -73,10 +73,10 @@ async fn test_perp_settle_pnl() -> Result<(), TransportError> {
             perp_market_index: 0,
             quote_lot_size: 10,
             base_lot_size: 100,
-            maint_asset_weight: 0.975,
-            init_asset_weight: 0.95,
-            maint_liab_weight: 1.025,
-            init_liab_weight: 1.05,
+            maint_base_asset_weight: 0.975,
+            init_base_asset_weight: 0.95,
+            maint_base_liab_weight: 1.025,
+            init_base_liab_weight: 1.05,
             liquidation_fee: 0.012,
             maker_fee: 0.0002,
             taker_fee: 0.000,
@@ -103,10 +103,10 @@ async fn test_perp_settle_pnl() -> Result<(), TransportError> {
             perp_market_index: 1,
             quote_lot_size: 10,
             base_lot_size: 100,
-            maint_asset_weight: 0.975,
-            init_asset_weight: 0.95,
-            maint_liab_weight: 1.025,
-            init_liab_weight: 1.05,
+            maint_base_asset_weight: 0.975,
+            init_base_asset_weight: 0.95,
+            maint_base_liab_weight: 1.025,
+            init_base_liab_weight: 1.05,
             liquidation_fee: 0.012,
             maker_fee: 0.0002,
             taker_fee: 0.000,
@@ -390,6 +390,14 @@ async fn test_perp_settle_pnl() -> Result<(), TransportError> {
             mango_account_1.perp_spot_transfers, -expected_total_settle,
             "net_settled on account 1 updated with loss from settlement"
         );
+        assert_eq!(
+            mango_account_0.perps[0].perp_spot_transfers, expected_total_settle,
+            "net_settled on account 0 updated with profit from settlement"
+        );
+        assert_eq!(
+            mango_account_1.perps[0].perp_spot_transfers, -expected_total_settle,
+            "net_settled on account 1 updated with loss from settlement"
+        );
     }
 
     // Change the oracle to a reasonable price in other direction
@@ -576,10 +584,10 @@ async fn test_perp_settle_pnl_fees() -> Result<(), TransportError> {
             perp_market_index: 0,
             quote_lot_size: 10,
             base_lot_size: 100,
-            maint_asset_weight: 1.0,
-            init_asset_weight: 1.0,
-            maint_liab_weight: 1.0,
-            init_liab_weight: 1.0,
+            maint_base_asset_weight: 1.0,
+            init_base_asset_weight: 1.0,
+            maint_base_liab_weight: 1.0,
+            init_base_liab_weight: 1.0,
             liquidation_fee: 0.0,
             maker_fee: 0.0,
             taker_fee: 0.0,
@@ -838,6 +846,7 @@ async fn test_perp_pnl_settle_limit() -> Result<(), TransportError> {
     //
     // TEST: Create a perp market
     //
+    let settle_pnl_limit_factor = 0.8;
     let mango_v4::accounts::PerpCreateMarket { perp_market, .. } = send_tx(
         solana,
         PerpCreateMarketInstruction {
@@ -847,14 +856,14 @@ async fn test_perp_pnl_settle_limit() -> Result<(), TransportError> {
             perp_market_index: 0,
             quote_lot_size: 10,
             base_lot_size: 100,
-            maint_asset_weight: 0.975,
-            init_asset_weight: 0.95,
-            maint_liab_weight: 1.025,
-            init_liab_weight: 1.05,
+            maint_base_asset_weight: 0.975,
+            init_base_asset_weight: 0.95,
+            maint_base_liab_weight: 1.025,
+            init_base_liab_weight: 1.05,
             liquidation_fee: 0.012,
-            maker_fee: 0.0002,
-            taker_fee: 0.000,
-            settle_pnl_limit_factor: 0.2,
+            maker_fee: 0.0,
+            taker_fee: 0.0,
+            settle_pnl_limit_factor,
             settle_pnl_limit_window_size_ts: 24 * 60 * 60,
             ..PerpCreateMarketInstruction::with_new_book_and_queue(&solana, &tokens[1]).await
         },
@@ -868,17 +877,7 @@ async fn test_perp_pnl_settle_limit() -> Result<(), TransportError> {
     };
 
     // Set the initial oracle price
-    send_tx(
-        solana,
-        StubOracleSetInstruction {
-            group,
-            admin,
-            mint: mints[1].pubkey,
-            price: 1000.0,
-        },
-    )
-    .await
-    .unwrap();
+    set_perp_stub_oracle_price(&solana, group, perp_market, &tokens[1], admin, 1000.0).await;
 
     //
     // Place orders and create a position
@@ -927,32 +926,41 @@ async fn test_perp_pnl_settle_limit() -> Result<(), TransportError> {
     .await
     .unwrap();
 
-    // Manipulate the price
+    // Manipulate the price (without adjusting stable price)
+    let price_factor = 3;
     send_tx(
         solana,
         StubOracleSetInstruction {
             group,
             admin,
             mint: mints[1].pubkey,
-            price: 10000.0, // 10x original price
+            price: price_factor as f64 * 1000.0,
         },
     )
     .await
     .unwrap();
 
-    // Settle Pnl
-    // attempt 1 - settle max possible,
-    // since b has very large deposits, b's health will not interfere,
-    // the pnl cap enforced would be relative to the avg_entry_price
+    //
+    // Test 1: settle max possible, limited by unrealized pnl settle limit
+    //
+    // a has lots of positive unrealized pnl, b has negative unrealized pnl.
+    // Since b has very large deposits, b's health will not interfere.
+    // The pnl settle limit is relative to the stable price
     let market = solana.get_account::<PerpMarket>(perp_market).await;
     let mango_account_0 = solana.get_account::<MangoAccount>(account_0).await;
     let mango_account_1 = solana.get_account::<MangoAccount>(account_1).await;
-    let mango_account_1_expected_qpn_after_settle = mango_account_1.perps[0]
-        .quote_position_native()
-        + (market.settle_pnl_limit_factor()
-            * I80F48::from_num(mango_account_0.perps[0].avg_entry_price(&market))
+    let account_1_settle_limits = mango_account_1.perps[0].available_settle_limit(&market);
+    assert_eq!(account_1_settle_limits, (-80000, 80000));
+    let account_1_settle_limit = I80F48::from(account_1_settle_limits.0.abs());
+    assert_eq!(
+        account_1_settle_limit,
+        (market.settle_pnl_limit_factor()
+            * market.stable_price()
             * mango_account_0.perps[0].base_position_native(&market))
-        .abs();
+        .round()
+    );
+    let mango_account_1_expected_qpn_after_settle =
+        mango_account_1.perps[0].quote_position_native() + account_1_settle_limit.round();
     send_tx(
         solana,
         PerpSettlePnlInstruction {
@@ -966,13 +974,26 @@ async fn test_perp_pnl_settle_limit() -> Result<(), TransportError> {
     )
     .await
     .unwrap();
+    let mango_account_0 = solana.get_account::<MangoAccount>(account_0).await;
     let mango_account_1 = solana.get_account::<MangoAccount>(account_1).await;
     assert_eq!(
         mango_account_1.perps[0].quote_position_native().round(),
         mango_account_1_expected_qpn_after_settle.round()
     );
-    // attempt 2 - as we are in the same window, and we settled max. possible in previous attempt,
-    // we can't settle anymore amount
+    // neither account has any settle limit left
+    assert_eq!(
+        mango_account_0.perps[0].available_settle_limit(&market).1,
+        0
+    );
+    assert_eq!(
+        mango_account_1.perps[0].available_settle_limit(&market).0,
+        0
+    );
+
+    //
+    // Test 2: Once the settle limit is exhausted, we can't settle more
+    //
+    // we are in the same window, and we settled max. possible in previous attempt
     let result = send_tx(
         solana,
         PerpSettlePnlInstruction {
@@ -989,6 +1010,217 @@ async fn test_perp_pnl_settle_limit() -> Result<(), TransportError> {
         &result,
         MangoError::ProfitabilityMismatch.into(),
         "Account A has no settleable positive pnl left".to_string(),
+    );
+
+    //
+    // Test 3: realizing the pnl does not allow further settling
+    //
+    send_tx(
+        solana,
+        PerpPlaceOrderInstruction {
+            account: account_1,
+            perp_market,
+            owner,
+            side: Side::Bid,
+            price_lots: 3 * price_lots,
+            max_base_lots: 1,
+            max_quote_lots: i64::MAX,
+            client_order_id: 0,
+            reduce_only: false,
+        },
+    )
+    .await
+    .unwrap();
+
+    send_tx(
+        solana,
+        PerpPlaceOrderInstruction {
+            account: account_0,
+            perp_market,
+            owner,
+            side: Side::Ask,
+            price_lots: 3 * price_lots,
+            max_base_lots: 1,
+            max_quote_lots: i64::MAX,
+            client_order_id: 0,
+            reduce_only: false,
+        },
+    )
+    .await
+    .unwrap();
+
+    send_tx(
+        solana,
+        PerpConsumeEventsInstruction {
+            perp_market,
+            mango_accounts: vec![account_0, account_1],
+        },
+    )
+    .await
+    .unwrap();
+
+    let mango_account_0 = solana.get_account::<MangoAccount>(account_0).await;
+    let mango_account_1 = solana.get_account::<MangoAccount>(account_1).await;
+    assert_eq!(
+        mango_account_0.perps[0].realized_trade_pnl_native,
+        I80F48::from(200_000 - 80_000)
+    );
+    assert_eq!(
+        mango_account_1.perps[0].realized_trade_pnl_native,
+        I80F48::from(-200_000 + 80_000)
+    );
+    // neither account has any settle limit left (check for 1 because of the ceil()ing)
+    assert_eq!(
+        mango_account_0.perps[0].available_settle_limit(&market).1,
+        1
+    );
+    assert_eq!(
+        mango_account_1.perps[0].available_settle_limit(&market).0,
+        -1
+    );
+    // check that realized pnl settle limit was set up correctly
+    assert_eq!(
+        mango_account_0.perps[0].settle_pnl_limit_realized_trade,
+        (0.8 * 1.0 * 100.0 * 1000.0) as i64 + 1
+    ); // +1 just for rounding
+
+    // settle 1
+    let account_1_quote_before = mango_account_1.perps[0].quote_position_native();
+    send_tx(
+        solana,
+        PerpSettlePnlInstruction {
+            settler,
+            settler_owner,
+            account_a: account_0,
+            account_b: account_1,
+            perp_market,
+            settle_bank: tokens[0].bank,
+        },
+    )
+    .await
+    .unwrap();
+
+    // indeed settled 1
+    let mango_account_0 = solana.get_account::<MangoAccount>(account_0).await;
+    let mango_account_1 = solana.get_account::<MangoAccount>(account_1).await;
+    assert_eq!(
+        mango_account_1.perps[0].quote_position_native() - account_1_quote_before,
+        I80F48::from(1)
+    );
+
+    //
+    // Test 4: Move to a new settle window and check the realized pnl settle limit
+    //
+    // This time account 0's realized pnl settle limit kicks in.
+    //
+    let account_1_quote_before = mango_account_1.perps[0].quote_position_native();
+    let account_0_realized_limit = mango_account_0.perps[0].settle_pnl_limit_realized_trade;
+
+    send_tx(
+        solana,
+        PerpSetSettleLimitWindow {
+            group,
+            admin,
+            perp_market,
+            window_size_ts: 10000, // guaranteed to move windows, resetting the limits
+        },
+    )
+    .await
+    .unwrap();
+
+    send_tx(
+        solana,
+        PerpSettlePnlInstruction {
+            settler,
+            settler_owner,
+            account_a: account_0,
+            account_b: account_1,
+            perp_market,
+            settle_bank: tokens[0].bank,
+        },
+    )
+    .await
+    .unwrap();
+
+    let mango_account_0 = solana.get_account::<MangoAccount>(account_0).await;
+    let mango_account_1 = solana.get_account::<MangoAccount>(account_1).await;
+    // successful settle of expected amount
+    assert_eq!(
+        mango_account_1.perps[0].quote_position_native() - account_1_quote_before,
+        I80F48::from(account_0_realized_limit)
+    );
+    // account0's limit gets reduced to the realized pnl amount left over
+    assert_eq!(
+        mango_account_0.perps[0].settle_pnl_limit_realized_trade,
+        mango_account_0.perps[0]
+            .realized_trade_pnl_native
+            .to_num::<i64>()
+    );
+
+    // can't settle again
+    assert!(send_tx(
+        solana,
+        PerpSettlePnlInstruction {
+            settler,
+            settler_owner,
+            account_a: account_0,
+            account_b: account_1,
+            perp_market,
+            settle_bank: tokens[0].bank,
+        },
+    )
+    .await
+    .is_err());
+
+    //
+    // Test 5: in a new settle window, the remaining pnl can be settled
+    //
+
+    let account_1_quote_before = mango_account_1.perps[0].quote_position_native();
+    let account_0_realized_limit = mango_account_0.perps[0].settle_pnl_limit_realized_trade;
+
+    send_tx(
+        solana,
+        PerpSetSettleLimitWindow {
+            group,
+            admin,
+            perp_market,
+            window_size_ts: 5000, // guaranteed to move windows, resetting the limits
+        },
+    )
+    .await
+    .unwrap();
+
+    send_tx(
+        solana,
+        PerpSettlePnlInstruction {
+            settler,
+            settler_owner,
+            account_a: account_0,
+            account_b: account_1,
+            perp_market,
+            settle_bank: tokens[0].bank,
+        },
+    )
+    .await
+    .unwrap();
+
+    let mango_account_0 = solana.get_account::<MangoAccount>(account_0).await;
+    let mango_account_1 = solana.get_account::<MangoAccount>(account_1).await;
+    // successful settle of expected amount
+    assert_eq!(
+        mango_account_1.perps[0].quote_position_native() - account_1_quote_before,
+        I80F48::from(account_0_realized_limit)
+    );
+    // account0's limit gets reduced to the realized pnl amount left over
+    assert_eq!(mango_account_0.perps[0].settle_pnl_limit_realized_trade, 0);
+    assert_eq!(
+        mango_account_0.perps[0].realized_trade_pnl_native,
+        I80F48::from(0)
+    );
+    assert_eq!(
+        mango_account_1.perps[0].realized_trade_pnl_native,
+        I80F48::from(0)
     );
 
     Ok(())

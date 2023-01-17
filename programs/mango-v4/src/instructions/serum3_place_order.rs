@@ -135,11 +135,15 @@ pub enum Serum3Side {
 
 #[derive(Accounts)]
 pub struct Serum3PlaceOrder<'info> {
+    #[account(
+        constraint = group.load()?.is_operational() @ MangoError::GroupIsHalted
+    )]
     pub group: AccountLoader<'info, Group>,
 
     #[account(
         mut,
-        has_one = group
+        has_one = group,
+        constraint = account.load()?.is_operational() @ MangoError::AccountIsFrozen
         // owner is checked at #1
     )]
     pub account: AccountLoader<'info, MangoAccountFixed>,

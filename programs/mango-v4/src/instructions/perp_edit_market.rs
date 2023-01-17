@@ -7,7 +7,7 @@ use crate::logs::PerpMarketMetaDataLog;
 #[derive(Accounts)]
 pub struct PerpEditMarket<'info> {
     #[account(
-        has_one = admin,
+        has_one = admin
     )]
     pub group: AccountLoader<'info, Group>,
     pub admin: Signer<'info>,
@@ -28,10 +28,12 @@ pub fn perp_edit_market(
     oracle_opt: Option<Pubkey>,
     oracle_config_opt: Option<OracleConfigParams>,
     base_decimals_opt: Option<u8>,
-    maint_asset_weight_opt: Option<f32>,
-    init_asset_weight_opt: Option<f32>,
-    maint_liab_weight_opt: Option<f32>,
-    init_liab_weight_opt: Option<f32>,
+    maint_base_asset_weight_opt: Option<f32>,
+    init_base_asset_weight_opt: Option<f32>,
+    maint_base_liab_weight_opt: Option<f32>,
+    init_base_liab_weight_opt: Option<f32>,
+    maint_pnl_asset_weight_opt: Option<f32>,
+    init_pnl_asset_weight_opt: Option<f32>,
     liquidation_fee_opt: Option<f32>,
     maker_fee_opt: Option<f32>,
     taker_fee_opt: Option<f32>,
@@ -39,7 +41,6 @@ pub fn perp_edit_market(
     max_funding_opt: Option<f32>,
     impact_quantity_opt: Option<i64>,
     group_insurance_fund_opt: Option<bool>,
-    trusted_market_opt: Option<bool>,
     fee_penalty_opt: Option<f32>,
     settle_fee_flat_opt: Option<f32>,
     settle_fee_amount_threshold_opt: Option<f32>,
@@ -82,17 +83,23 @@ pub fn perp_edit_market(
     // quote_lot_size
     // base_lot_size
 
-    if let Some(maint_asset_weight) = maint_asset_weight_opt {
-        perp_market.maint_asset_weight = I80F48::from_num(maint_asset_weight);
+    if let Some(maint_base_asset_weight) = maint_base_asset_weight_opt {
+        perp_market.maint_base_asset_weight = I80F48::from_num(maint_base_asset_weight);
     }
-    if let Some(init_asset_weight) = init_asset_weight_opt {
-        perp_market.init_asset_weight = I80F48::from_num(init_asset_weight);
+    if let Some(init_base_asset_weight) = init_base_asset_weight_opt {
+        perp_market.init_base_asset_weight = I80F48::from_num(init_base_asset_weight);
     }
-    if let Some(maint_liab_weight) = maint_liab_weight_opt {
-        perp_market.maint_liab_weight = I80F48::from_num(maint_liab_weight);
+    if let Some(maint_base_liab_weight) = maint_base_liab_weight_opt {
+        perp_market.maint_base_liab_weight = I80F48::from_num(maint_base_liab_weight);
     }
-    if let Some(init_liab_weight) = init_liab_weight_opt {
-        perp_market.init_liab_weight = I80F48::from_num(init_liab_weight);
+    if let Some(init_base_liab_weight) = init_base_liab_weight_opt {
+        perp_market.init_base_liab_weight = I80F48::from_num(init_base_liab_weight);
+    }
+    if let Some(maint_pnl_asset_weight) = maint_pnl_asset_weight_opt {
+        perp_market.maint_pnl_asset_weight = I80F48::from_num(maint_pnl_asset_weight);
+    }
+    if let Some(init_pnl_asset_weight) = init_pnl_asset_weight_opt {
+        perp_market.init_pnl_asset_weight = I80F48::from_num(init_pnl_asset_weight);
     }
     if let Some(liquidation_fee) = liquidation_fee_opt {
         perp_market.liquidation_fee = I80F48::from_num(liquidation_fee);
@@ -140,9 +147,6 @@ pub fn perp_edit_market(
     if let Some(group_insurance_fund) = group_insurance_fund_opt {
         perp_market.set_elligible_for_group_insurance_fund(group_insurance_fund);
     }
-    if let Some(trusted_market) = trusted_market_opt {
-        perp_market.trusted_market = if trusted_market { 1 } else { 0 };
-    }
 
     if let Some(settle_fee_flat) = settle_fee_flat_opt {
         perp_market.settle_fee_flat = settle_fee_flat;
@@ -173,7 +177,7 @@ pub fn perp_edit_market(
     }
 
     if let Some(reduce_only) = reduce_only_opt {
-        perp_market.reduce_only = if reduce_only { 1 } else { 0 };
+        perp_market.reduce_only = u8::from(reduce_only);
     };
 
     emit!(PerpMarketMetaDataLog {

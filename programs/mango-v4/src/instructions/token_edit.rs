@@ -16,7 +16,7 @@ use crate::logs::TokenMetaDataLog;
 #[derive(Accounts)]
 pub struct TokenEdit<'info> {
     #[account(
-        has_one = admin,
+        has_one = admin
     )]
     pub group: AccountLoader<'info, Group>,
     pub admin: Signer<'info>,
@@ -91,7 +91,7 @@ pub fn token_edit(
         }
 
         if let Some(group_insurance_fund) = group_insurance_fund_opt {
-            mint_info.group_insurance_fund = if group_insurance_fund { 1 } else { 0 };
+            mint_info.group_insurance_fund = u8::from(group_insurance_fund);
         };
 
         // unchanged -
@@ -172,7 +172,7 @@ pub fn token_edit(
         }
 
         if let Some(reduce_only) = reduce_only_opt {
-            bank.reduce_only = if reduce_only { 1 } else { 0 };
+            bank.reduce_only = u8::from(reduce_only);
         };
 
         // unchanged -

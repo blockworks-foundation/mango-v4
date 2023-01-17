@@ -17,6 +17,7 @@ const FIRST_BANK_NUM: u32 = 0;
 pub struct TokenRegisterTrustless<'info> {
     #[account(
         has_one = fast_listing_admin,
+        constraint = group.load()?.is_operational() @ MangoError::GroupIsHalted
     )]
     pub group: AccountLoader<'info, Group>,
     pub fast_listing_admin: Signer<'info>,
@@ -72,7 +73,7 @@ pub fn token_register_trustless(
 ) -> Result<()> {
     require_neq!(token_index, 0);
 
-    let net_borrow_limit_window_size_ts = 24 * 60 * 60 as u64;
+    let net_borrow_limit_window_size_ts = 24 * 60 * 60u64;
     let now_ts: u64 = Clock::get()?.unix_timestamp.try_into().unwrap();
 
     let mut bank = ctx.accounts.bank.load_init()?;
@@ -133,7 +134,7 @@ pub fn token_register_trustless(
     let oracle_price =
         bank.oracle_price(&AccountInfoRef::borrow(ctx.accounts.oracle.as_ref())?, None)?;
     bank.stable_price_model
-        .reset_to_price(oracle_price.to_num(), now_ts.try_into().unwrap());
+        .reset_to_price(oracle_price.to_num(), now_ts);
 
     let mut mint_info = ctx.accounts.mint_info.load_init()?;
     *mint_info = MintInfo {
@@ -155,7 +156,7 @@ pub fn token_register_trustless(
     emit!(TokenMetaDataLog {
         mango_group: ctx.accounts.group.key(),
         mint: ctx.accounts.mint.key(),
-        token_index: token_index,
+        token_index,
         mint_decimals: ctx.accounts.mint.decimals,
         oracle: ctx.accounts.oracle.key(),
         mint_info: ctx.accounts.mint_info.key(),

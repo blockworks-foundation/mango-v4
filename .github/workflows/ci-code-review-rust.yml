@@ -23,17 +23,12 @@ env:
   CARGO_TERM_COLOR: always
   SOLANA_VERSION: '1.14.9'
   RUST_TOOLCHAIN: '1.65.0'
-  LOG_PROGRAM: 'm43thNJ58XCjL798ZSq6JGAG1BnWskhdq5or6kcnfsD'
-
-defaults:
-  run:
-    working-directory: ./
+  LOG_PROGRAM: '4MangoMjqJ2firMokCjjGgoK8d4MXcrgL7XJaL3w6fVg'
 
 jobs:
-  lint:
-    name: Lint
+  format:
+    name: Format
     runs-on: ubuntu-latest
-    if: (github.actor != 'dependabot[bot]')
     steps:
       - name: Checkout
         uses: actions/checkout@v3
@@ -41,31 +36,15 @@ jobs:
       - name: Checkout submodules
         run: git submodule update --init
 
-      - name: Install Linux dependencies
-        run: sudo apt-get update && sudo apt-get install -y pkg-config build-essential libudev-dev
+      - name: Set Rust version
+        run: rustup toolchain install ${{ env.RUST_TOOLCHAIN }} --component rustfmt
 
-      - name: Install Rust
-        uses: actions-rs/toolchain@v1
-        with:
-          override: true
-          profile: minimal
-          toolchain: ${{ env.RUST_TOOLCHAIN }}
-          components: rustfmt, clippy
-
-      - name: Cache dependencies
-        uses: Swatinem/rust-cache@v2
-        
       - name: Run fmt
         run: cargo fmt -- --check
 
-      - name: Run clippy
-        # The --allow args are due to clippy scanning anchor
-        run: cargo clippy --no-deps -- --deny=warnings --allow=clippy::style --allow=clippy::complexity --allow=clippy::manual-retain --allow=clippy::crate-in-macro-def --allow=clippy::result-large-err
-
-  tests:
-    name: Run tests
+  clippy:
+    name: Clippy
     runs-on: ubuntu-latest
-    if: (github.actor != 'dependabot[bot]')
     steps:
       - name: Checkout
         uses: actions/checkout@v3
@@ -73,15 +52,31 @@ jobs:
       - name: Checkout submodules
         run: git submodule update --init
 
-      - name: Install Linux dependencies
-        run: sudo apt-get update && sudo apt-get install -y pkg-config build-essential libudev-dev
+      - name: Cache dependencies
+        uses: Swatinem/rust-cache@v2
 
-      - name: Install Rust
-        uses: actions-rs/toolchain@v1
-        with:
-          override: true
-          profile: minimal
-          toolchain: ${{ env.RUST_TOOLCHAIN }}
+      - name: Set Rust version
+        run: rustup toolchain install ${{ env.RUST_TOOLCHAIN }} --component clippy
+
+      - name: Run clippy
+        # The --allow args are due to clippy scanning anchor
+        run: cargo clippy --no-deps -- --deny=warnings --allow=clippy::style --allow=clippy::complexity --allow=clippy::manual-retain --allow=clippy::crate-in-macro-def --allow=clippy::result-large-err --allow=clippy::derive_partial_eq_without_eq
+
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Checkout submodules
+        run: git submodule update --init
+
+      - name: Cache dependencies
+        uses: Swatinem/rust-cache@v2
+
+      - name: Set Rust version
+        run: rustup toolchain install ${{ env.RUST_TOOLCHAIN }}
 
       - name: Install Solana
         run: |
@@ -97,10 +92,6 @@ jobs:
           cargo build-bpf || true
           cargo +bpf build-bpf
 
-      - name: Run unit tests
-        continue-on-error: true
-        run: cargo test --lib
-
         # Run bpf tests and output to runner and log
       - name: Run bpf tests
         run: cargo +bpf test-bpf 2> >(tee raw-test-bpf.log >&2)
@@ -115,8 +106,7 @@ jobs:
   process-logs:
     name: Process logs
     runs-on: ubuntu-latest
-    if: (github.actor != 'dependabot[bot]')
-    needs: [lint, tests]
+    needs: [format, clippy, test]
     steps:
       - name: Download raw log
         uses: actions/download-artifact@v3

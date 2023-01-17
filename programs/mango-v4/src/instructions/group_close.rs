@@ -1,4 +1,4 @@
-use crate::state::*;
+use crate::{error::MangoError, state::*};
 use anchor_lang::prelude::*;
 use anchor_spl::token::{self, CloseAccount, Token, TokenAccount};
 
@@ -6,9 +6,10 @@ use anchor_spl::token::{self, CloseAccount, Token, TokenAccount};
 pub struct GroupClose<'info> {
     #[account(
         mut,
-        constraint = group.load()?.is_testing(),
         has_one = admin,
         has_one = insurance_vault,
+        constraint = group.load()?.is_testing(),
+        constraint = group.load()?.is_operational() @ MangoError::GroupIsHalted,
         close = sol_destination
     )]
     pub group: AccountLoader<'info, Group>,

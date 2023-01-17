@@ -13,6 +13,7 @@ pub struct Serum3RegisterMarket<'info> {
     #[account(
         mut,
         has_one = admin,
+        constraint = group.load()?.is_operational() @ MangoError::GroupIsHalted,
         constraint = group.load()?.serum3_supported()
     )]
     pub group: AccountLoader<'info, Group>,
@@ -103,7 +104,7 @@ pub fn serum3_register_market(
     emit!(Serum3RegisterMarketLog {
         mango_group: ctx.accounts.group.key(),
         serum_market: ctx.accounts.serum_market.key(),
-        market_index: market_index,
+        market_index,
         base_token_index: base_bank.token_index,
         quote_token_index: quote_bank.token_index,
         serum_program: ctx.accounts.serum_program.key(),

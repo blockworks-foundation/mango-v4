@@ -45,6 +45,7 @@ import {
   Serum3Side,
   generateSerum3MarketExternalVaultSignerAddress,
 } from './accounts/serum3';
+import { PerpEditParams, TokenEditParams } from './clientIxParamBuilder';
 import { OPENBOOK_PROGRAM_ID } from './constants';
 import { Id } from './ids';
 import { IDL, MangoV4 } from './mango_v4';
@@ -55,6 +56,7 @@ import {
   createAssociatedTokenAccountIdempotentInstruction,
   getAssociatedTokenAddress,
   toNative,
+  U64_MAX_BN,
 } from './utils';
 import { sendTransaction } from './utils/rpc';
 
@@ -129,6 +131,7 @@ export class MangoClient {
     group: Group,
     admin?: PublicKey,
     fastListingAdmin?: PublicKey,
+    securityAdmin?: PublicKey,
     testing?: number,
     version?: number,
   ): Promise<TransactionSignature> {
@@ -136,9 +139,23 @@ export class MangoClient {
       .groupEdit(
         admin ?? null,
         fastListingAdmin ?? null,
+        securityAdmin ?? null,
         testing ?? null,
         version ?? null,
       )
+      .accounts({
+        group: group.publicKey,
+        admin: (this.program.provider as AnchorProvider).wallet.publicKey,
+      })
+      .rpc();
+  }
+
+  public async groupToggleHalt(
+    group: Group,
+    halt: boolean,
+  ): Promise<TransactionSignature> {
+    return await this.program.methods
+      .groupToggleHalt(halt)
       .accounts({
         group: group.publicKey,
         admin: (this.program.provider as AnchorProvider).wallet.publicKey,
@@ -163,8 +180,7 @@ export class MangoClient {
   public async getGroup(groupPk: PublicKey): Promise<Group> {
     const groupAccount = await this.program.account.group.fetch(groupPk);
     const group = Group.from(groupPk, groupAccount);
-    const ids: Id | undefined = await this.getIds(groupPk);
-    await group.reloadAll(this, ids);
+    await group.reloadAll(this);
     return group;
   }
 
@@ -296,64 +312,43 @@ export class MangoClient {
   public async tokenEdit(
     group: Group,
     mintPk: PublicKey,
-    oracle: PublicKey | null,
-    oracleConfig: OracleConfigParams | null,
-    groupInsuranceFund: boolean | null,
-    interestRateParams: InterestRateParams | null,
-    loanFeeRate: number | null,
-    loanOriginationFeeRate: number | null,
-    maintAssetWeight: number | null,
-    initAssetWeight: number | null,
-    maintLiabWeight: number | null,
-    initLiabWeight: number | null,
-    liquidationFee: number | null,
-    stablePriceDelayIntervalSeconds: number | null,
-    stablePriceDelayGrowthLimit: number | null,
-    stablePriceGrowthLimit: number | null,
-    minVaultToDepositsRatio: number | null,
-    netBorrowLimitPerWindowQuote: number | null,
-    netBorrowLimitWindowSizeTs: number | null,
-    borrowWeightScaleStartQuote: number | null,
-    depositWeightScaleStartQuote: number | null,
-    resetStablePrice: boolean | null,
-    resetNetBorrowLimit: boolean | null,
-    reduceOnly: boolean | null,
+    params: TokenEditParams,
   ): Promise<TransactionSignature> {
     const bank = group.getFirstBankByMint(mintPk);
     const mintInfo = group.mintInfosMapByTokenIndex.get(bank.tokenIndex)!;
 
     return await this.program.methods
       .tokenEdit(
-        oracle,
-        oracleConfig,
-        groupInsuranceFund,
-        interestRateParams,
-        loanFeeRate,
-        loanOriginationFeeRate,
-        maintAssetWeight,
-        initAssetWeight,
-        maintLiabWeight,
-        initLiabWeight,
-        liquidationFee,
-        stablePriceDelayIntervalSeconds,
-        stablePriceDelayGrowthLimit,
-        stablePriceGrowthLimit,
-        minVaultToDepositsRatio,
-        netBorrowLimitPerWindowQuote !== null
-          ? new BN(netBorrowLimitPerWindowQuote)
+        params.oracle,
+        params.oracleConfig,
+        params.groupInsuranceFund,
+        params.interestRateParams,
+        params.loanFeeRate,
+        params.loanOriginationFeeRate,
+        params.maintAssetWeight,
+        params.initAssetWeight,
+        params.maintLiabWeight,
+        params.initLiabWeight,
+        params.liquidationFee,
+        params.stablePriceDelayIntervalSeconds,
+        params.stablePriceDelayGrowthLimit,
+        params.stablePriceGrowthLimit,
+        params.minVaultToDepositsRatio,
+        params.netBorrowLimitPerWindowQuote !== null
+          ? new BN(params.netBorrowLimitPerWindowQuote)
           : null,
-        netBorrowLimitWindowSizeTs !== null
-          ? new BN(netBorrowLimitWindowSizeTs)
+        params.netBorrowLimitWindowSizeTs !== null
+          ? new BN(params.netBorrowLimitWindowSizeTs)
           : null,
-        borrowWeightScaleStartQuote,
-        depositWeightScaleStartQuote,
-        resetStablePrice ?? false,
-        resetNetBorrowLimit ?? false,
-        reduceOnly,
+        params.borrowWeightScaleStartQuote,
+        params.depositWeightScaleStartQuote,
+        params.resetStablePrice ?? false,
+        params.resetNetBorrowLimit ?? false,
+        params.reduceOnly,
       )
       .accounts({
         group: group.publicKey,
-        oracle: oracle ?? bank.oracle,
+        oracle: params.oracle ?? bank.oracle,
         admin: (this.program.provider as AnchorProvider).wallet.publicKey,
         mintInfo: mintInfo.publicKey,
       })
@@ -656,6 +651,21 @@ export class MangoClient {
     );
   }
 
+  public async toggleMangoAccountFreeze(
+    group: Group,
+    mangoAccount: MangoAccount,
+    freeze: boolean,
+  ): Promise<TransactionSignature> {
+    return await this.program.methods
+      .accountToggleFreeze(freeze)
+      .accounts({
+        group: group.publicKey,
+        account: mangoAccount.publicKey,
+        admin: (this.program.provider as AnchorProvider).wallet.publicKey,
+      })
+      .rpc();
+  }
+
   public async getMangoAccount(
     mangoAccount: MangoAccount | PublicKey,
   ): Promise<MangoAccount> {
@@ -800,6 +810,81 @@ export class MangoClient {
     );
   }
 
+  public async emptyAndCloseMangoAccount(
+    group: Group,
+    mangoAccount: MangoAccount,
+  ): Promise<TransactionSignature> {
+    const instructions: TransactionInstruction[] = [];
+    const healthAccountsToExclude: PublicKey[] = [];
+
+    for (const serum3Account of mangoAccount.serum3Active()) {
+      const serum3Market = group.serum3MarketsMapByMarketIndex.get(
+        serum3Account.marketIndex,
+      )!;
+
+      const closeOOIx = await this.serum3CloseOpenOrdersIx(
+        group,
+        mangoAccount,
+        serum3Market.serumMarketExternal,
+      );
+      healthAccountsToExclude.push(serum3Account.openOrders);
+      instructions.push(closeOOIx);
+    }
+
+    for (const perp of mangoAccount.perpActive()) {
+      const perpMarketIndex = perp.marketIndex;
+      const perpMarket = group.getPerpMarketByMarketIndex(perpMarketIndex);
+      const deactivatingPositionIx = await this.perpDeactivatePositionIx(
+        group,
+        mangoAccount,
+        perpMarketIndex,
+      );
+      healthAccountsToExclude.push(perpMarket.publicKey);
+      instructions.push(deactivatingPositionIx);
+    }
+
+    for (const index in mangoAccount.tokensActive()) {
+      const indexNum = Number(index);
+      const accountsToExclude = [...healthAccountsToExclude];
+      const token = mangoAccount.tokensActive()[indexNum];
+      const bank = group.getFirstBankByTokenIndex(token.tokenIndex);
+      //to withdraw from all token accounts we need to exclude previous tokens pubkeys
+      //used to build health remaining accounts
+      if (indexNum !== 0) {
+        for (let i = indexNum; i--; i >= 0) {
+          const prevToken = mangoAccount.tokensActive()[i];
+          const prevBank = group.getFirstBankByTokenIndex(prevToken.tokenIndex);
+          accountsToExclude.push(prevBank.publicKey, prevBank.oracle);
+        }
+      }
+      const withdrawIx = await this.tokenWithdrawNativeIx(
+        group,
+        mangoAccount,
+        bank.mint,
+        U64_MAX_BN,
+        false,
+        [...accountsToExclude],
+      );
+      instructions.push(...withdrawIx);
+    }
+
+    const closeIx = await this.program.methods
+      .accountClose(false)
+      .accounts({
+        group: group.publicKey,
+        account: mangoAccount.publicKey,
+        owner: (this.program.provider as AnchorProvider).wallet.publicKey,
+        solDestination: mangoAccount.owner,
+      })
+      .instruction();
+    instructions.push(closeIx);
+
+    return await this.sendAndConfirmTransaction(
+      [...instructions],
+      group.addressLookupTablesList,
+    );
+  }
+
   public async tokenDeposit(
     group: Group,
     mangoAccount: MangoAccount,
@@ -908,22 +993,28 @@ export class MangoClient {
     allowBorrow: boolean,
   ): Promise<TransactionSignature> {
     const nativeAmount = toNative(amount, group.getMintDecimals(mintPk));
-    return await this.tokenWithdrawNative(
+    const ixes = await this.tokenWithdrawNativeIx(
       group,
       mangoAccount,
       mintPk,
       nativeAmount,
       allowBorrow,
     );
+
+    return await this.sendAndConfirmTransaction(
+      [...ixes],
+      group.addressLookupTablesList,
+    );
   }
 
-  public async tokenWithdrawNative(
+  public async tokenWithdrawNativeIx(
     group: Group,
     mangoAccount: MangoAccount,
     mintPk: PublicKey,
     nativeAmount: BN,
     allowBorrow: boolean,
-  ): Promise<TransactionSignature> {
+    healthAccountsToExclude: PublicKey[] = [],
+  ): Promise<TransactionInstruction[]> {
     const bank = group.getFirstBankByMint(mintPk);
 
     const tokenAccountPk = await getAssociatedTokenAddress(
@@ -972,17 +1063,25 @@ export class MangoClient {
         tokenAccount: tokenAccountPk,
       })
       .remainingAccounts(
-        healthRemainingAccounts.map(
-          (pk) =>
-            ({ pubkey: pk, isWritable: false, isSigner: false } as AccountMeta),
-        ),
+        healthRemainingAccounts
+          .filter(
+            (accounts) =>
+              !healthAccountsToExclude.find((accountsToExclude) =>
+                accounts.equals(accountsToExclude),
+              ),
+          )
+          .map(
+            (pk) =>
+              ({
+                pubkey: pk,
+                isWritable: false,
+                isSigner: false,
+              } as AccountMeta),
+          ),
       )
       .instruction();
 
-    return await this.sendAndConfirmTransaction(
-      [...preInstructions, ix, ...postInstructions],
-      group.addressLookupTablesList,
-    );
+    return [...preInstructions, ix, ...postInstructions];
   }
 
   // Serum
@@ -1512,10 +1611,12 @@ export class MangoClient {
     baseDecimals: number,
     quoteLotSize: number,
     baseLotSize: number,
-    maintAssetWeight: number,
-    initAssetWeight: number,
-    maintLiabWeight: number,
-    initLiabWeight: number,
+    maintBaseAssetWeight: number,
+    initBaseAssetWeight: number,
+    maintBaseLiabWeight: number,
+    initBaseLiabWeight: number,
+    maintPnlAssetWeight: number,
+    initPnlAssetWeight: number,
     liquidationFee: number,
     makerFee: number,
     takerFee: number,
@@ -1524,7 +1625,6 @@ export class MangoClient {
     maxFunding: number,
     impactQuantity: number,
     groupInsuranceFund: boolean,
-    trustedMarket: boolean,
     settleFeeFlat: number,
     settleFeeAmountThreshold: number,
     settleFeeFractionLowHealth: number,
@@ -1551,10 +1651,12 @@ export class MangoClient {
         baseDecimals,
         new BN(quoteLotSize),
         new BN(baseLotSize),
-        maintAssetWeight,
-        initAssetWeight,
-        maintLiabWeight,
-        initLiabWeight,
+        maintBaseAssetWeight,
+        initBaseAssetWeight,
+        maintBaseLiabWeight,
+        initBaseLiabWeight,
+        maintPnlAssetWeight,
+        initPnlAssetWeight,
         liquidationFee,
         makerFee,
         takerFee,
@@ -1562,7 +1664,6 @@ export class MangoClient {
         maxFunding,
         new BN(impactQuantity),
         groupInsuranceFund,
-        trustedMarket,
         feePenalty,
         settleFeeFlat,
         settleFeeAmountThreshold,
@@ -1624,67 +1725,44 @@ export class MangoClient {
   public async perpEditMarket(
     group: Group,
     perpMarketIndex: PerpMarketIndex,
-    oracle: PublicKey | null, // TODO: stable price resetting should be a separate flag
-    oracleConfig: OracleConfigParams | null,
-    baseDecimals: number | null,
-    maintAssetWeight: number | null,
-    initAssetWeight: number | null,
-    maintLiabWeight: number | null,
-    initLiabWeight: number | null,
-    liquidationFee: number | null,
-    makerFee: number | null,
-    takerFee: number | null,
-    feePenalty: number | null,
-    minFunding: number | null,
-    maxFunding: number | null,
-    impactQuantity: number | null,
-    groupInsuranceFund: boolean | null,
-    trustedMarket: boolean | null,
-    settleFeeFlat: number | null,
-    settleFeeAmountThreshold: number | null,
-    settleFeeFractionLowHealth: number | null,
-    stablePriceDelayIntervalSeconds: number | null,
-    stablePriceDelayGrowthLimit: number | null,
-    stablePriceGrowthLimit: number | null,
-    settlePnlLimitFactor: number | null,
-    settlePnlLimitWindowSize: number | null,
-    reduceOnly: boolean | null,
+    params: PerpEditParams,
   ): Promise<TransactionSignature> {
     const perpMarket = group.getPerpMarketByMarketIndex(perpMarketIndex);
 
     return await this.program.methods
       .perpEditMarket(
-        oracle,
-        oracleConfig,
-        baseDecimals,
-        maintAssetWeight,
-        initAssetWeight,
-        maintLiabWeight,
-        initLiabWeight,
-        liquidationFee,
-        makerFee,
-        takerFee,
-        minFunding,
-        maxFunding,
-        impactQuantity !== null ? new BN(impactQuantity) : null,
-        groupInsuranceFund,
-        trustedMarket,
-        feePenalty,
-        settleFeeFlat,
-        settleFeeAmountThreshold,
-        settleFeeFractionLowHealth,
-        stablePriceDelayIntervalSeconds,
-        stablePriceDelayGrowthLimit,
-        stablePriceGrowthLimit,
-        settlePnlLimitFactor,
-        settlePnlLimitWindowSize !== null
-          ? new BN(settlePnlLimitWindowSize)
+        params.oracle,
+        params.oracleConfig,
+        params.baseDecimals,
+        params.maintBaseAssetWeight,
+        params.initBaseAssetWeight,
+        params.maintBaseLiabWeight,
+        params.initBaseLiabWeight,
+        params.maintPnlAssetWeight,
+        params.initPnlAssetWeight,
+        params.liquidationFee,
+        params.makerFee,
+        params.takerFee,
+        params.minFunding,
+        params.maxFunding,
+        params.impactQuantity !== null ? new BN(params.impactQuantity) : null,
+        params.groupInsuranceFund,
+        params.feePenalty,
+        params.settleFeeFlat,
+        params.settleFeeAmountThreshold,
+        params.settleFeeFractionLowHealth,
+        params.stablePriceDelayIntervalSeconds,
+        params.stablePriceDelayGrowthLimit,
+        params.stablePriceGrowthLimit,
+        params.settlePnlLimitFactor,
+        params.settlePnlLimitWindowSize !== null
+          ? new BN(params.settlePnlLimitWindowSize)
           : null,
-        reduceOnly,
+        params.reduceOnly,
       )
       .accounts({
         group: group.publicKey,
-        oracle: oracle ?? perpMarket.oracle,
+        oracle: params.oracle ?? perpMarket.oracle,
         admin: (this.program.provider as AnchorProvider).wallet.publicKey,
         perpMarket: perpMarket.publicKey,
       })
@@ -1730,11 +1808,11 @@ export class MangoClient {
     );
   }
 
-  public async perpDeactivatePosition(
+  public async perpDeactivatePositionIx(
     group: Group,
     mangoAccount: MangoAccount,
     perpMarketIndex: PerpMarketIndex,
-  ): Promise<TransactionSignature> {
+  ): Promise<TransactionInstruction> {
     const perpMarket = group.getPerpMarketByMarketIndex(perpMarketIndex);
     const healthRemainingAccounts: PublicKey[] =
       this.buildHealthRemainingAccounts(
@@ -1758,7 +1836,23 @@ export class MangoClient {
             ({ pubkey: pk, isWritable: false, isSigner: false } as AccountMeta),
         ),
       )
-      .rpc();
+      .instruction();
+  }
+
+  public async perpDeactivatePosition(
+    group: Group,
+    mangoAccount: MangoAccount,
+    perpMarketIndex: PerpMarketIndex,
+  ): Promise<TransactionSignature> {
+    const ix = await this.perpDeactivatePositionIx(
+      group,
+      mangoAccount,
+      perpMarketIndex,
+    );
+    return await this.sendAndConfirmTransaction(
+      [ix],
+      group.addressLookupTablesList,
+    );
   }
 
   public async perpPlaceOrder(
@@ -2604,7 +2698,6 @@ export class MangoClient {
         }
       }
     }
-
     const mintInfos = tokenPositionIndices
       .filter((tokenIndex) => tokenIndex !== TokenPosition.TokenIndexUnset)
       .map((tokenIndex) => group.mintInfosMapByTokenIndex.get(tokenIndex)!);

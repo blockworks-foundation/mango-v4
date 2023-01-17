@@ -31,15 +31,19 @@ pub struct Group {
 
     pub version: u8,
 
-    pub padding2: [u8; 5],
+    pub halted: u8,
+
+    pub padding2: [u8; 4],
 
     pub address_lookup_tables: [Pubkey; 20],
 
-    pub reserved: [u8; 1920],
+    pub security_admin: Pubkey,
+
+    pub reserved: [u8; 1888],
 }
 const_assert_eq!(
     size_of::<Group>(),
-    32 * 5 + 4 + 4 + 1 + 1 + 6 + 20 * 32 + 1920
+    32 + 4 + 32 * 2 + 4 + 32 * 2 + 4 + 4 + 20 * 32 + 32 + 1888
 );
 const_assert_eq!(size_of::<Group>(), 2736);
 const_assert_eq!(size_of::<Group>() % 8, 0);
@@ -59,6 +63,10 @@ impl Group {
 
     pub fn perps_supported(&self) -> bool {
         self.is_testing() || self.version > 1
+    }
+
+    pub fn is_operational(&self) -> bool {
+        self.halted == 0
     }
 }
 
