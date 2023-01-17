@@ -48,21 +48,29 @@ export class StubOracle {
 }
 
 // https://gist.github.com/microwavedcola1/b741a11e6ee273a859f3ef00b35ac1f0
-export function parseSwitcboardOracleV1(
-  accountInfo: AccountInfo<Buffer>,
-): number {
-  return accountInfo.data.readDoubleLE(1 + 32 + 4 + 4);
+export function parseSwitchboardOracleV1(accountInfo: AccountInfo<Buffer>): {
+  price: number;
+  lastUpdatedSlot: number;
+} {
+  const price = accountInfo.data.readDoubleLE(1 + 32 + 4 + 4);
+  const lastUpdatedSlot = parseInt(
+    accountInfo.data.readBigUInt64LE(1 + 32 + 4 + 4 + 8).toString(),
+  );
+  return { price, lastUpdatedSlot };
 }
 
-export function parseSwitcboardOracleV2(
+export function parseSwitchboardOracleV2(
   program: SwitchboardProgram,
   accountInfo: AccountInfo<Buffer>,
-): number {
-  const aggregatorAccountData =
-    program.decodeLatestAggregatorValue(accountInfo);
-  if (!aggregatorAccountData)
+): { price: number; lastUpdatedSlot: number } {
+  const price = program.decodeLatestAggregatorValue(accountInfo)!.toNumber();
+  const lastUpdatedSlot = program
+    .decodeAggregator(accountInfo)
+    .latestConfirmedRound!.roundOpenSlot!.toNumber();
+
+  if (!price || !lastUpdatedSlot)
     throw new Error('Unable to parse Switchboard Oracle V2');
-  return aggregatorAccountData?.toNumber();
+  return { price, lastUpdatedSlot };
 }
 
 /**
@@ -73,26 +81,26 @@ export function parseSwitcboardOracleV2(
 export async function parseSwitchboardOracle(
   accountInfo: AccountInfo<Buffer>,
   connection: Connection,
-): Promise<number> {
+): Promise<{ price: number; lastUpdatedSlot: number }> {
   if (accountInfo.owner.equals(SwitchboardProgram.devnetPid)) {
     if (!sbv2DevnetProgram) {
       sbv2DevnetProgram = await SwitchboardProgram.loadDevnet(connection);
     }
-    return parseSwitcboardOracleV2(sbv2DevnetProgram, accountInfo);
+    return parseSwitchboardOracleV2(sbv2DevnetProgram, accountInfo);
   }
 
   if (accountInfo.owner.equals(SwitchboardProgram.mainnetPid)) {
     if (!sbv2MainnetProgram) {
       sbv2MainnetProgram = await SwitchboardProgram.loadMainnet(connection);
     }
-    return parseSwitcboardOracleV2(sbv2MainnetProgram, accountInfo);
+    return parseSwitchboardOracleV2(sbv2MainnetProgram, accountInfo);
   }
 
   if (
     accountInfo.owner.equals(SBV1_DEVNET_PID) ||
     accountInfo.owner.equals(SBV1_MAINNET_PID)
   ) {
-    return parseSwitcboardOracleV1(accountInfo);
+    return parseSwitchboardOracleV1(accountInfo);
   }
 
   throw new Error(`Should not be reached!`);

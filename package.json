@@ -32,7 +32,6 @@
     "validate": "npm run typecheck && npm run lint && npm run format"
   },
   "devDependencies": {
-    "@jup-ag/core": "^1.0.0-beta.28",
     "@tsconfig/recommended": "^1.0.1",
     "@types/bs58": "^4.0.1",
     "@types/chai": "^4.3.0",
