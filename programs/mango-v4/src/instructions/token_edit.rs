@@ -5,6 +5,7 @@ use fixed::types::I80F48;
 use super::InterestRateParams;
 use crate::accounts_zerocopy::{AccountInfoRef, LoadMutZeroCopyRef};
 
+use crate::error::MangoError;
 use crate::state::*;
 
 use crate::logs::TokenMetaDataLog;
@@ -15,9 +16,6 @@ use crate::logs::TokenMetaDataLog;
 /// in MintInfo order.
 #[derive(Accounts)]
 pub struct TokenEdit<'info> {
-    #[account(
-        has_one = admin
-    )]
     pub group: AccountLoader<'info, Group>,
     pub admin: Signer<'info>,
 
@@ -58,6 +56,44 @@ pub fn token_edit(
     reset_net_borrow_limit: bool,
     reduce_only_opt: Option<bool>,
 ) -> Result<()> {
+    let group = ctx.accounts.group.load()?;
+
+    if oracle_opt.is_none()
+        && oracle_config_opt.is_none()
+        && group_insurance_fund_opt.is_none()
+        && interest_rate_params_opt.is_none()
+        && loan_fee_rate_opt.is_none()
+        && loan_origination_fee_rate_opt.is_none()
+        && maint_asset_weight_opt.is_none()
+        && init_asset_weight_opt.is_none()
+        && maint_liab_weight_opt.is_none()
+        && init_liab_weight_opt.is_none()
+        && liquidation_fee_opt.is_none()
+        && stable_price_delay_interval_seconds_opt.is_none()
+        && stable_price_delay_growth_limit_opt.is_none()
+        && stable_price_growth_limit_opt.is_none()
+        && min_vault_to_deposits_ratio_opt.is_none()
+        && net_borrow_limit_per_window_quote_opt.is_none()
+        && net_borrow_limit_window_size_ts_opt.is_none()
+        && borrow_weight_scale_start_quote_opt.is_none()
+        && deposit_weight_scale_start_quote_opt.is_none()
+        && !reset_stable_price
+        && !reset_net_borrow_limit
+        // security admin can bring to reduce only mode
+        && reduce_only_opt.is_some()
+    {
+        require!(
+            group.admin == ctx.accounts.admin.key()
+                || group.security_admin == ctx.accounts.admin.key(),
+            MangoError::SomeError
+        );
+    } else {
+        require!(
+            group.admin == ctx.accounts.admin.key(),
+            MangoError::SomeError
+        );
+    }
+
     let mut mint_info = ctx.accounts.mint_info.load_mut()?;
     mint_info.verify_banks_ais(ctx.remaining_accounts)?;
 

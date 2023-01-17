@@ -1,4 +1,4 @@
-use crate::{accounts_zerocopy::AccountInfoRef, state::*};
+use crate::{accounts_zerocopy::AccountInfoRef, error::MangoError, state::*};
 use anchor_lang::prelude::*;
 use fixed::types::I80F48;
 
@@ -6,9 +6,6 @@ use crate::logs::PerpMarketMetaDataLog;
 
 #[derive(Accounts)]
 pub struct PerpEditMarket<'info> {
-    #[account(
-        has_one = admin
-    )]
     pub group: AccountLoader<'info, Group>,
     pub admin: Signer<'info>,
 
@@ -52,6 +49,48 @@ pub fn perp_edit_market(
     settle_pnl_limit_window_size_ts_opt: Option<u64>,
     reduce_only_opt: Option<bool>,
 ) -> Result<()> {
+    let group = ctx.accounts.group.load()?;
+
+    if oracle_opt.is_none()
+        && oracle_config_opt.is_none()
+        && base_decimals_opt.is_none()
+        && maint_base_asset_weight_opt.is_none()
+        && init_base_asset_weight_opt.is_none()
+        && maint_base_liab_weight_opt.is_none()
+        && init_base_liab_weight_opt.is_none()
+        && maint_pnl_asset_weight_opt.is_none()
+        && init_pnl_asset_weight_opt.is_none()
+        && liquidation_fee_opt.is_none()
+        && maker_fee_opt.is_none()
+        && taker_fee_opt.is_none()
+        && min_funding_opt.is_none()
+        && max_funding_opt.is_none()
+        && impact_quantity_opt.is_none()
+        && group_insurance_fund_opt.is_none()
+        && fee_penalty_opt.is_none()
+        && settle_fee_flat_opt.is_none()
+        && settle_fee_amount_threshold_opt.is_none()
+        && settle_fee_fraction_low_health_opt.is_none()
+        && stable_price_delay_interval_seconds_opt.is_none()
+        && stable_price_delay_growth_limit_opt.is_none()
+        && stable_price_growth_limit_opt.is_none()
+        && settle_pnl_limit_factor_opt.is_none()
+        && settle_pnl_limit_window_size_ts_opt.is_none()
+        // security admin can bring to reduce only mode
+        && reduce_only_opt.is_some()
+    {
+        require!(
+            group.admin == ctx.accounts.admin.key()
+                || group.security_admin == ctx.accounts.admin.key(),
+            MangoError::SomeError
+        );
+    } else {
+        require!(
+            group.admin == ctx.accounts.admin.key(),
+            MangoError::SomeError
+        );
+    }
+
     let mut perp_market = ctx.accounts.perp_market.load_mut()?;
 
     // note: unchanged fields are inline, and match exact definition in perp_register_market
