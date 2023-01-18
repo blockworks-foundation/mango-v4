@@ -3,6 +3,7 @@ use num_enum::{IntoPrimitive, TryFromPrimitive};
 use static_assertions::const_assert_eq;
 
 use super::*;
+use crate::util::checked_math as cm;
 
 #[derive(
     Eq,
@@ -157,6 +158,28 @@ impl BookSide {
             sum += item.node.quantity;
         }
         sum
+    }
+
+    /// Return the price of the order closest to the spread
+    pub fn best_price(&self, now_ts: u64, oracle_price_lots: i64) -> Option<i64> {
+        Some(
+            self.iter_valid(now_ts, oracle_price_lots)
+                .next()?
+                .price_lots,
+        )
+    }
+
+    /// Walk up the book `quantity` units and return the price at that level. If `quantity` units
+    /// not on book, return None
+    pub fn impact_price(&self, quantity: i64, now_ts: u64, oracle_price_lots: i64) -> Option<i64> {
+        let mut sum: i64 = 0;
+        for order in self.iter_valid(now_ts, oracle_price_lots) {
+            cm!(sum += order.node.quantity);
+            if sum >= quantity {
+                return Some(order.price_lots);
+            }
+        }
+        None
     }
 }
 

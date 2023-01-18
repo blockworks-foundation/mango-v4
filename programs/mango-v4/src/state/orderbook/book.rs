@@ -40,36 +40,6 @@ impl<'a> Orderbook<'a> {
         }
     }
 
-    pub fn best_price(&self, now_ts: u64, oracle_price_lots: i64, side: Side) -> Option<i64> {
-        Some(
-            self.bookside(side)
-                .iter_valid(now_ts, oracle_price_lots)
-                .next()?
-                .price_lots,
-        )
-    }
-
-    /// Walk up the book `quantity` units and return the price at that level. If `quantity` units
-    /// not on book, return None
-    pub fn impact_price(
-        &self,
-        side: Side,
-        quantity: i64,
-        now_ts: u64,
-        oracle_price_lots: i64,
-    ) -> Option<i64> {
-        let mut sum: i64 = 0;
-        let bookside = self.bookside(side);
-        let iter = bookside.iter_valid(now_ts, oracle_price_lots);
-        for order in iter {
-            cm!(sum += order.node.quantity);
-            if sum >= quantity {
-                return Some(order.price_lots);
-            }
-        }
-        None
-    }
-
     #[allow(clippy::too_many_arguments)]
     pub fn new_order(
         &mut self,
