@@ -451,7 +451,7 @@ impl<'a> LiquidationState<'a> {
 }
 
 fn start_chain_data_metrics(chain: Arc<RwLock<chain_data::ChainData>>, metrics: &metrics::Metrics) {
-    let mut interval = tokio::time::interval(std::time::Duration::from_secs(5));
+    let mut interval = tokio::time::interval(std::time::Duration::from_secs(600));
 
     let mut metric_slots_count = metrics.register_u64("chain_data_slots_count".into());
     let mut metric_accounts_count = metrics.register_u64("chain_data_accounts_count".into());
