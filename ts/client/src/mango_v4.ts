@@ -1,5 +1,5 @@
 export type MangoV4 = {
-  "version": "0.3.0",
+  "version": "0.4.0",
   "name": "mango_v4",
   "instructions": [
     {
@@ -542,7 +542,11 @@ export type MangoV4 = {
         {
           "name": "oracle",
           "isMut": false,
-          "isSigner": false
+          "isSigner": false,
+          "docs": [
+            "The oracle account is optional and only used when reset_stable_price is set.",
+            ""
+          ]
         }
       ],
       "args": [
@@ -2610,7 +2614,11 @@ export type MangoV4 = {
         {
           "name": "oracle",
           "isMut": false,
-          "isSigner": false
+          "isSigner": false,
+          "docs": [
+            "The oracle account is optional and only used when reset_stable_price is set.",
+            ""
+          ]
         }
       ],
       "args": [
@@ -2771,6 +2779,10 @@ export type MangoV4 = {
           "type": {
             "option": "bool"
           }
+        },
+        {
+          "name": "resetStablePrice",
+          "type": "bool"
         }
       ]
     },
@@ -7768,7 +7780,7 @@ export type MangoV4 = {
 };
 
 export const IDL: MangoV4 = {
-  "version": "0.3.0",
+  "version": "0.4.0",
   "name": "mango_v4",
   "instructions": [
     {
@@ -8311,7 +8323,11 @@ export const IDL: MangoV4 = {
         {
           "name": "oracle",
           "isMut": false,
-          "isSigner": false
+          "isSigner": false,
+          "docs": [
+            "The oracle account is optional and only used when reset_stable_price is set.",
+            ""
+          ]
         }
       ],
       "args": [
@@ -10379,7 +10395,11 @@ export const IDL: MangoV4 = {
         {
           "name": "oracle",
           "isMut": false,
-          "isSigner": false
+          "isSigner": false,
+          "docs": [
+            "The oracle account is optional and only used when reset_stable_price is set.",
+            ""
+          ]
         }
       ],
       "args": [
@@ -10540,6 +10560,10 @@ export const IDL: MangoV4 = {
           "type": {
             "option": "bool"
           }
+        },
+        {
+          "name": "resetStablePrice",
+          "type": "bool"
         }
       ]
     },

@@ -2681,6 +2681,7 @@ fn perp_edit_instruction_default() -> mango_v4::instruction::PerpEditMarket {
         settle_pnl_limit_factor_opt: None,
         settle_pnl_limit_window_size_ts: None,
         reduce_only_opt: None,
+        reset_stable_price: false,
     }
 }
 
@@ -2703,7 +2704,7 @@ impl ClientInstruction for PerpResetStablePriceModel {
         let perp_market: PerpMarket = account_loader.load(&self.perp_market).await.unwrap();
 
         let instruction = Self::Instruction {
-            oracle_opt: Some(perp_market.oracle),
+            reset_stable_price: true,
             ..perp_edit_instruction_default()
         };
 

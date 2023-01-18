@@ -1759,6 +1759,7 @@ export class MangoClient {
           ? new BN(params.settlePnlLimitWindowSize)
           : null,
         params.reduceOnly,
+        params.resetStablePrice ?? false,
       )
       .accounts({
         group: group.publicKey,
