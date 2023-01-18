@@ -981,7 +981,18 @@ export class MangoAccount {
 
     res =
       this.perpActive().length > 0
-        ? res + '\n perps:' + JSON.stringify(this.perpActive(), null, 4)
+        ? res +
+          '\n perps:' +
+          JSON.stringify(
+            this.perpActive().map((p) =>
+              p.toString(
+                group,
+                group?.getPerpMarketByMarketIndex(p.marketIndex),
+              ),
+            ),
+            null,
+            4,
+          )
         : res + '';
 
     res =
@@ -1469,6 +1480,30 @@ export class PerpPosition {
       this.getUnsettledPnl(perpMarket),
       perpMarket,
     );
+  }
+
+  toString(group?: Group, perpMarket?: PerpMarket): string {
+    return perpMarket && group
+      ? 'market - ' +
+          perpMarket.name +
+          ', basePositionLots - ' +
+          perpMarket.baseLotsToUi(this.basePositionLots) +
+          ', quotePositiveNative - ' +
+          toUiDecimals(
+            this.quotePositionNative.toNumber(),
+            group.getMintDecimalsByTokenIndex(perpMarket.settleTokenIndex),
+          ) +
+          ', bidsBaseLots - ' +
+          perpMarket.baseLotsToUi(this.bidsBaseLots) +
+          ', asksBaseLots - ' +
+          perpMarket.baseLotsToUi(this.asksBaseLots) +
+          ', takerBaseLots - ' +
+          perpMarket.baseLotsToUi(this.takerBaseLots) +
+          ', takerQuoteLots - ' +
+          perpMarket.quoteLotsToUi(this.takerQuoteLots) +
+          ', unsettled pnl - ' +
+          this.getUnsettledPnlUi(group!, perpMarket!).toString()
+      : '';
   }
 }
 
