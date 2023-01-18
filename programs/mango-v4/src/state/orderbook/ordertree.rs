@@ -26,6 +26,15 @@ pub enum OrderTreeType {
     Asks,
 }
 
+impl OrderTreeType {
+    pub fn side(&self) -> Side {
+        match *self {
+            Self::Bids => Side::Bid,
+            Self::Asks => Side::Ask,
+        }
+    }
+}
+
 #[zero_copy]
 #[derive(bytemuck::Pod, bytemuck::Zeroable)]
 pub struct OrderTreeRoot {

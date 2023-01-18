@@ -92,10 +92,7 @@ impl BookSide {
     pub fn remove_worst(&mut self, now_ts: u64, oracle_price_lots: i64) -> Option<(LeafNode, i64)> {
         let worst_fixed = self.nodes.find_worst(&self.roots[0]);
         let worst_pegged = self.nodes.find_worst(&self.roots[1]);
-        let side = match self.nodes.order_tree_type() {
-            OrderTreeType::Bids => Side::Bid,
-            OrderTreeType::Asks => Side::Ask,
-        };
+        let side = self.nodes.order_tree_type().side();
         let worse = rank_orders(
             side,
             worst_fixed,
@@ -138,6 +135,28 @@ impl BookSide {
     ) -> Option<LeafNode> {
         let root = &mut self.roots[component as usize];
         self.nodes.remove_by_key(root, search_key)
+    }
+
+    pub fn side(&self) -> Side {
+        self.nodes.order_tree_type().side()
+    }
+
+    /// Return the quantity of orders that can be matched by an order at `limit_price_lots`
+    pub fn quantity_at_price(
+        &self,
+        limit_price_lots: i64,
+        now_ts: u64,
+        oracle_price_lots: i64,
+    ) -> i64 {
+        let side = self.side();
+        let mut sum = 0;
+        for item in self.iter_valid(now_ts, oracle_price_lots) {
+            if side.is_price_better(limit_price_lots, item.price_lots) {
+                break;
+            }
+            sum += item.node.quantity;
+        }
+        sum
     }
 }
 

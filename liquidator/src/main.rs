@@ -228,11 +228,18 @@ async fn main() -> anyhow::Result<()> {
         refresh_timeout: Duration::from_secs(30),
     };
 
+    let rebalancer = rebalance::Rebalancer {
+        mango_client: &mango_client,
+        account_fetcher: &account_fetcher,
+        mango_account_address: cli.liqor_mango_account,
+        config: rebalance_config,
+    };
+
     let mut liquidation = LiquidationState {
         mango_client: &mango_client,
         account_fetcher: &account_fetcher,
         liquidation_config: liq_config,
-        rebalance_config: rebalance_config.clone(),
+        rebalancer: &rebalancer,
         accounts_with_errors: Default::default(),
         error_skip_threshold: 5,
         error_skip_duration: std::time::Duration::from_secs(120),
@@ -320,7 +327,7 @@ async fn main() -> anyhow::Result<()> {
 
             _ = rebalance_interval.tick() => {
                 if one_snapshot_done {
-                    if let Err(err) = rebalance::zero_all_non_quote(&mango_client, &account_fetcher, &cli.liqor_mango_account, &rebalance_config).await {
+                    if let Err(err) = rebalancer.zero_all_non_quote().await {
                         log::error!("failed to rebalance liqor: {:?}", err);
 
                         // Workaround: We really need a sequence enforcer in the liquidator since we don't want to
@@ -342,8 +349,8 @@ struct ErrorTracking {
 struct LiquidationState<'a> {
     mango_client: &'a MangoClient,
     account_fetcher: &'a chain_data::AccountFetcher,
+    rebalancer: &'a rebalance::Rebalancer<'a>,
     liquidation_config: liquidate::Config,
-    rebalance_config: rebalance::Config,
     accounts_with_errors: HashMap<Pubkey, ErrorTracking>,
     error_skip_threshold: u64,
     error_skip_duration: std::time::Duration,
@@ -376,15 +383,7 @@ impl<'a> LiquidationState<'a> {
             return Ok(());
         }
 
-        let liqor = &self.mango_client.mango_account_address;
-        if let Err(err) = rebalance::zero_all_non_quote(
-            self.mango_client,
-            self.account_fetcher,
-            liqor,
-            &self.rebalance_config,
-        )
-        .await
-        {
+        if let Err(err) = self.rebalancer.zero_all_non_quote().await {
             log::error!("failed to rebalance liqor: {:?}", err);
         }
         Ok(())
