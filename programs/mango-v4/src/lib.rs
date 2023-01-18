@@ -515,6 +515,7 @@ pub mod mango_v4 {
         settle_pnl_limit_factor_opt: Option<f32>,
         settle_pnl_limit_window_size_ts: Option<u64>,
         reduce_only_opt: Option<bool>,
+        reset_stable_price: bool,
     ) -> Result<()> {
         instructions::perp_edit_market(
             ctx,
@@ -544,6 +545,7 @@ pub mod mango_v4 {
             settle_pnl_limit_factor_opt,
             settle_pnl_limit_window_size_ts,
             reduce_only_opt,
+            reset_stable_price,
         )
     }
 
