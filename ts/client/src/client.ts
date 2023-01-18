@@ -53,10 +53,10 @@ import { I80F48 } from './numbers/I80F48';
 import { FlashLoanType, InterestRateParams, OracleConfigParams } from './types';
 import {
   I64_MAX_BN,
+  U64_MAX_BN,
   createAssociatedTokenAccountIdempotentInstruction,
   getAssociatedTokenAddress,
   toNative,
-  U64_MAX_BN,
 } from './utils';
 import { sendTransaction } from './utils/rpc';
 
@@ -540,16 +540,24 @@ export class MangoClient {
 
   // MangoAccount
 
-  public async getOrCreateMangoAccount(group: Group): Promise<MangoAccount> {
+  public async getOrCreateMangoAccount(
+    group: Group,
+    loadSerum3Oo = false,
+  ): Promise<MangoAccount> {
     const clientOwner = (this.program.provider as AnchorProvider).wallet
       .publicKey;
     let mangoAccounts = await this.getMangoAccountsForOwner(
       group,
       (this.program.provider as AnchorProvider).wallet.publicKey,
+      loadSerum3Oo,
     );
     if (mangoAccounts.length === 0) {
       await this.createMangoAccount(group);
-      mangoAccounts = await this.getMangoAccountsForOwner(group, clientOwner);
+      mangoAccounts = await this.getMangoAccountsForOwner(
+        group,
+        clientOwner,
+        loadSerum3Oo,
+      );
     }
     return mangoAccounts.sort((a, b) => a.accountNum - b.accountNum)[0];
   }
@@ -593,6 +601,7 @@ export class MangoClient {
     serum3Count?: number,
     perpCount?: number,
     perpOoCount?: number,
+    loadSerum3Oo = false,
   ): Promise<MangoAccount | undefined> {
     const accNum = accountNumber ?? 0;
     await this.createMangoAccount(
@@ -608,6 +617,7 @@ export class MangoClient {
       group,
       (this.program.provider as AnchorProvider).wallet.publicKey,
       accNum,
+      loadSerum3Oo,
     );
   }
 
@@ -668,28 +678,39 @@ export class MangoClient {
 
   public async getMangoAccount(
     mangoAccount: MangoAccount | PublicKey,
+    loadSerum3Oo = false,
   ): Promise<MangoAccount> {
     const mangoAccountPk =
       mangoAccount instanceof MangoAccount
         ? mangoAccount.publicKey
         : mangoAccount;
-    return MangoAccount.from(
+    const mangoAccount_ = MangoAccount.from(
       mangoAccountPk,
       await this.program.account.mangoAccount.fetch(mangoAccountPk),
     );
+    if (loadSerum3Oo) {
+      await mangoAccount_?.reloadSerum3OpenOrders(this);
+    }
+    return mangoAccount_;
   }
 
   public async getMangoAccountForPublicKey(
     mangoAccountPk: PublicKey,
+    loadSerum3Oo = false,
   ): Promise<MangoAccount> {
-    return MangoAccount.from(
+    const mangoAccount = MangoAccount.from(
       mangoAccountPk,
       await this.program.account.mangoAccount.fetch(mangoAccountPk),
     );
+    if (loadSerum3Oo) {
+      await mangoAccount?.reloadSerum3OpenOrders(this);
+    }
+    return mangoAccount;
   }
 
   public async getMangoAccountWithSlot(
     mangoAccountPk: PublicKey,
+    loadSerum3Oo = false,
   ): Promise<{ slot: number; value: MangoAccount } | undefined> {
     const resp =
       await this.program.provider.connection.getAccountInfoAndContext(
@@ -701,6 +722,9 @@ export class MangoClient {
       resp.value.data,
     );
     const mangoAccount = MangoAccount.from(mangoAccountPk, decodedMangoAccount);
+    if (loadSerum3Oo) {
+      await mangoAccount?.reloadSerum3OpenOrders(this);
+    }
     return { slot: resp.context.slot, value: mangoAccount };
   }
 
@@ -708,11 +732,16 @@ export class MangoClient {
     group: Group,
     ownerPk: PublicKey,
     accountNumber: number,
+    loadSerum3Oo = false,
   ): Promise<MangoAccount | undefined> {
     const mangoAccounts = await this.getMangoAccountsForOwner(group, ownerPk);
     const foundMangoAccount = mangoAccounts.find(
       (a) => a.accountNum == accountNumber,
     );
+
+    if (loadSerum3Oo) {
+      await foundMangoAccount?.reloadSerum3OpenOrders(this);
+    }
 
     return foundMangoAccount;
   }
@@ -720,8 +749,9 @@ export class MangoClient {
   public async getMangoAccountsForOwner(
     group: Group,
     ownerPk: PublicKey,
+    loadSerum3Oo = false,
   ): Promise<MangoAccount[]> {
-    return (
+    const accounts = (
       await this.program.account.mangoAccount.all([
         {
           memcmp: {
@@ -739,13 +769,22 @@ export class MangoClient {
     ).map((pa) => {
       return MangoAccount.from(pa.publicKey, pa.account);
     });
+
+    if (loadSerum3Oo) {
+      await Promise.all(
+        accounts.map(async (a) => await a.reloadSerum3OpenOrders(this)),
+      );
+    }
+
+    return accounts;
   }
 
   public async getMangoAccountsForDelegate(
     group: Group,
     delegate: PublicKey,
+    loadSerum3Oo = false,
   ): Promise<MangoAccount[]> {
-    return (
+    const accounts = (
       await this.program.account.mangoAccount.all([
         {
           memcmp: {
@@ -763,10 +802,21 @@ export class MangoClient {
     ).map((pa) => {
       return MangoAccount.from(pa.publicKey, pa.account);
     });
+
+    if (loadSerum3Oo) {
+      await Promise.all(
+        accounts.map(async (a) => await a.reloadSerum3OpenOrders(this)),
+      );
+    }
+
+    return accounts;
   }
 
-  public async getAllMangoAccounts(group: Group): Promise<MangoAccount[]> {
-    return (
+  public async getAllMangoAccounts(
+    group: Group,
+    loadSerum3Oo = false,
+  ): Promise<MangoAccount[]> {
+    const accounts = (
       await this.program.account.mangoAccount.all([
         {
           memcmp: {
@@ -778,6 +828,14 @@ export class MangoClient {
     ).map((pa) => {
       return MangoAccount.from(pa.publicKey, pa.account);
     });
+
+    if (loadSerum3Oo) {
+      await Promise.all(
+        accounts.map(async (a) => await a.reloadSerum3OpenOrders(this)),
+      );
+    }
+
+    return accounts;
   }
 
   /**

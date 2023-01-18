@@ -432,15 +432,7 @@ export class PerpMarket {
     count = 2,
   ): Promise<{ account: MangoAccount; settleablePnl: I80F48 }[]> {
     let accountsWithSettleablePnl = (
-      await Promise.all(
-        await (
-          await client.getAllMangoAccounts(group)
-        ).map(async (a) => {
-          // Need to load serum oo accounts to compute settle perp health
-          await a.reloadAccountData(client);
-          return a;
-        }),
-      )
+      await await client.getAllMangoAccounts(group, true)
     )
       .filter((acc) => acc.perpPositionExistsForMarket(this))
       .map((acc) => {
