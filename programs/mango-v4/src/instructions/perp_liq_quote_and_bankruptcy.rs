@@ -15,6 +15,10 @@ use crate::state::*;
 
 #[derive(Accounts)]
 pub struct PerpLiqQuoteAndBankruptcy<'info> {
+    #[account(
+        has_one = insurance_vault,
+        constraint = group.load()?.is_operational() @ MangoError::GroupIsHalted
+    )]
     pub group: AccountLoader<'info, Group>,
 
     #[account(

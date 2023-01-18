@@ -39,7 +39,6 @@ pub fn perp_cancel_all_orders_by_side(
     limit: u8,
 ) -> Result<()> {
     let mut account = ctx.accounts.account.load_full_mut()?;
-    require_keys_eq!(account.fixed.group, ctx.accounts.group.key());
     require!(
         account.fixed.is_owner_or_delegate(ctx.accounts.owner.key()),
         MangoError::SomeError

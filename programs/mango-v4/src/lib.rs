@@ -457,8 +457,8 @@ pub mod mango_v4 {
     ) -> Result<()> {
         instructions::perp_create_market(
             ctx,
-            settle_token_index,
             perp_market_index,
+            settle_token_index,
             name,
             oracle_config,
             base_decimals,
