@@ -45,6 +45,7 @@ pub struct PerpSettlePnl<'info> {
     /// CHECK: Oracle can have different account types, constrained by address in perp_market
     pub oracle: UncheckedAccount<'info>,
 
+    // bank correctness is checked at #2
     #[account(mut, has_one = group)]
     pub settle_bank: AccountLoader<'info, Bank>,
 
@@ -95,7 +96,7 @@ pub fn perp_settle_pnl(ctx: Context<PerpSettlePnl>) -> Result<()> {
     let mut settle_bank = ctx.accounts.settle_bank.load_mut()?;
     let perp_market = ctx.accounts.perp_market.load()?;
 
-    // Verify that the bank is the quote currency bank
+    // Verify that the bank is the quote currency bank (#2)
     require!(
         settle_bank.token_index == settle_token_index,
         MangoError::InvalidBank

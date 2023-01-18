@@ -20,6 +20,7 @@ pub struct PerpPlaceOrder<'info> {
         mut,
         has_one = group,
         constraint = account.load()?.is_operational() @ MangoError::AccountIsFrozen
+        // owner is checked at #1
     )]
     pub account: AccountLoader<'info, MangoAccountFixed>,
     pub owner: Signer<'info>,
@@ -73,6 +74,7 @@ pub fn perp_place_order(ctx: Context<PerpPlaceOrder>, mut order: Order, limit: u
     }
 
     let mut account = ctx.accounts.account.load_full_mut()?;
+    // account constraint #1
     require!(
         account.fixed.is_owner_or_delegate(ctx.accounts.owner.key()),
         MangoError::SomeError
