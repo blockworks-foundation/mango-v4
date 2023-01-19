@@ -1,4 +1,4 @@
-programs:
+program:
 - 'programs/**'
 client:
 - 'ts/client/**'
@@ -8,8 +8,8 @@ keeper:
 - 'keeper/**'
 ci:
 - '.github/workflows/**'
-dependencies:
+dependency:
 - '*.lock'
-docs:
+documentation:
 - '*.md'
 - '**/LICENCE'
