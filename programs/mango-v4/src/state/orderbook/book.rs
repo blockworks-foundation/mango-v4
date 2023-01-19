@@ -155,8 +155,6 @@ impl<'a> Orderbook<'a> {
             let match_base_lots = remaining_base_lots
                 .min(best_opposing.node.quantity)
                 .min(max_match_by_quote);
-            let done =
-                match_base_lots == max_match_by_quote || match_base_lots == remaining_base_lots;
 
             let match_quote_lots = cm!(match_base_lots * best_opposing_price);
             cm!(remaining_base_lots -= match_base_lots);
@@ -195,10 +193,6 @@ impl<'a> Orderbook<'a> {
             );
             event_queue.push_back(cast(fill)).unwrap();
             limit -= 1;
-
-            if done {
-                break;
-            }
         }
         let total_quote_lots_taken = cm!(order.max_quote_lots - remaining_quote_lots);
 
