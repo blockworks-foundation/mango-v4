@@ -25,12 +25,51 @@ pub struct PerpConsumeEvents<'info> {
     pub event_queue: AccountLoader<'info, EventQueue>,
 }
 
+/// Load a mango account by key from the list of account infos.
+///
+/// Message and return Ok() if it's missing, to lock in successful processing
+/// of previous events.
+///
+/// Special handling for testing groups, where events for accounts with bad
+/// owners (most likely due to force closure of the account) are being skipped.
+macro_rules! load_mango_account {
+    ($name:ident, $key:expr, $ais:expr, $group:expr, $event_queue:expr) => {
+        let loader = match $ais.iter().find(|ai| ai.key == &$key) {
+            None => {
+                msg!(
+                    "Unable to find {} account {}",
+                    stringify!($name),
+                    $key.to_string()
+                );
+                return Ok(());
+            }
+
+            Some(ai) => {
+                if $group.is_testing() && ai.owner != &crate::id() {
+                    msg!(
+                        "Mango account ({}) not owned by mango program",
+                        stringify!($name)
+                    );
+                    $event_queue.pop_front()?;
+                    continue;
+                }
+
+                let mal: AccountLoader<MangoAccountFixed> = AccountLoader::try_from(ai)?;
+                mal
+            }
+        };
+        let mut $name = loader.load_full_mut()?;
+    };
+}
+
 pub fn perp_consume_events(ctx: Context<PerpConsumeEvents>, limit: usize) -> Result<()> {
     let group = ctx.accounts.group.load()?;
+    let group_key = ctx.accounts.group.key();
 
     let limit = std::cmp::min(limit, 8);
 
     let mut perp_market = ctx.accounts.perp_market.load_mut()?;
+    let perp_market_index = perp_market.perp_market_index;
     let mut event_queue = ctx.accounts.event_queue.load_mut()?;
     let mango_account_ais = &ctx.remaining_accounts;
 
@@ -46,103 +85,43 @@ pub fn perp_consume_events(ctx: Context<PerpConsumeEvents>, limit: usize) -> Res
 
                 // handle self trade separately because of rust borrow checker
                 if fill.maker == fill.taker {
-                    match mango_account_ais.iter().find(|ai| ai.key == &fill.maker) {
-                        None => {
-                            msg!("Unable to find account {}", fill.maker.to_string());
-                            return Ok(());
-                        }
-
-                        Some(ai) => {
-                            if group.is_testing() && ai.owner != &crate::id() {
-                                msg!("Mango account (maker+taker) not owned by mango program");
-                                event_queue.pop_front()?;
-                                continue;
-                            }
-
-                            let mal: AccountLoader<MangoAccountFixed> =
-                                AccountLoader::try_from(ai)?;
-                            let mut ma = mal.load_full_mut()?;
-                            ma.execute_perp_maker(
-                                perp_market.perp_market_index,
-                                &mut perp_market,
-                                fill,
-                            )?;
-                            ma.execute_perp_taker(
-                                perp_market.perp_market_index,
-                                &mut perp_market,
-                                fill,
-                            )?;
-                            emit_perp_balances(
-                                ctx.accounts.group.key(),
-                                fill.maker,
-                                ma.perp_position(perp_market.perp_market_index).unwrap(),
-                                &perp_market,
-                            );
-                        }
-                    };
+                    load_mango_account!(
+                        maker_taker,
+                        fill.maker,
+                        mango_account_ais,
+                        group,
+                        event_queue
+                    );
+                    maker_taker.execute_perp_maker(perp_market_index, &mut perp_market, fill)?;
+                    maker_taker.execute_perp_taker(perp_market_index, &mut perp_market, fill)?;
+                    emit_perp_balances(
+                        group_key,
+                        fill.maker,
+                        maker_taker.perp_position(perp_market_index).unwrap(),
+                        &perp_market,
+                    );
                 } else {
-                    match mango_account_ais.iter().find(|ai| ai.key == &fill.maker) {
-                        None => {
-                            msg!("Unable to find maker account {}", fill.maker.to_string());
-                            return Ok(());
-                        }
-                        Some(ai) => {
-                            if group.is_testing() && ai.owner != &crate::id() {
-                                msg!("Mango account (maker) not owned by mango program");
-                                event_queue.pop_front()?;
-                                continue;
-                            }
+                    load_mango_account!(maker, fill.maker, mango_account_ais, group, event_queue);
+                    load_mango_account!(taker, fill.taker, mango_account_ais, group, event_queue);
 
-                            let mal: AccountLoader<MangoAccountFixed> =
-                                AccountLoader::try_from(ai)?;
-                            let mut maker = mal.load_full_mut()?;
-
-                            match mango_account_ais.iter().find(|ai| ai.key == &fill.taker) {
-                                None => {
-                                    msg!("Unable to find taker account {}", fill.taker.to_string());
-                                    return Ok(());
-                                }
-                                Some(ai) => {
-                                    if group.is_testing() && ai.owner != &crate::id() {
-                                        msg!("Mango account (taker) not owned by mango program");
-                                        event_queue.pop_front()?;
-                                        continue;
-                                    }
-
-                                    let mal: AccountLoader<MangoAccountFixed> =
-                                        AccountLoader::try_from(ai)?;
-                                    let mut taker = mal.load_full_mut()?;
-
-                                    maker.execute_perp_maker(
-                                        perp_market.perp_market_index,
-                                        &mut perp_market,
-                                        fill,
-                                    )?;
-                                    taker.execute_perp_taker(
-                                        perp_market.perp_market_index,
-                                        &mut perp_market,
-                                        fill,
-                                    )?;
-                                    emit_perp_balances(
-                                        ctx.accounts.group.key(),
-                                        fill.maker,
-                                        maker.perp_position(perp_market.perp_market_index).unwrap(),
-                                        &perp_market,
-                                    );
-                                    emit_perp_balances(
-                                        ctx.accounts.group.key(),
-                                        fill.taker,
-                                        taker.perp_position(perp_market.perp_market_index).unwrap(),
-                                        &perp_market,
-                                    );
-                                }
-                            };
-                        }
-                    };
+                    maker.execute_perp_maker(perp_market_index, &mut perp_market, fill)?;
+                    taker.execute_perp_taker(perp_market_index, &mut perp_market, fill)?;
+                    emit_perp_balances(
+                        group_key,
+                        fill.maker,
+                        maker.perp_position(perp_market_index).unwrap(),
+                        &perp_market,
+                    );
+                    emit_perp_balances(
+                        group_key,
+                        fill.taker,
+                        taker.perp_position(perp_market_index).unwrap(),
+                        &perp_market,
+                    );
                 }
                 emit!(FillLog {
-                    mango_group: ctx.accounts.group.key(),
-                    market_index: perp_market.perp_market_index,
+                    mango_group: group_key,
+                    market_index: perp_market_index,
                     taker_side: fill.taker_side as u8,
                     maker_slot: fill.maker_slot,
                     maker_out: fill.maker_out(),
@@ -162,25 +141,8 @@ pub fn perp_consume_events(ctx: Context<PerpConsumeEvents>, limit: usize) -> Res
             }
             EventType::Out => {
                 let out: &OutEvent = cast_ref(event);
-
-                match mango_account_ais.iter().find(|ai| ai.key == &out.owner) {
-                    None => {
-                        msg!("Unable to find account {}", out.owner.to_string());
-                        return Ok(());
-                    }
-                    Some(ai) => {
-                        if group.is_testing() && ai.owner != &crate::id() {
-                            msg!("Mango account (event owner) not owned by mango program");
-                            event_queue.pop_front()?;
-                            continue;
-                        }
-
-                        let mal: AccountLoader<MangoAccountFixed> = AccountLoader::try_from(ai)?;
-                        let mut ma = mal.load_full_mut()?;
-
-                        ma.remove_perp_order(out.owner_slot as usize, out.quantity)?;
-                    }
-                };
+                load_mango_account!(owner, out.owner, mango_account_ais, group, event_queue);
+                owner.remove_perp_order(out.owner_slot as usize, out.quantity)?;
             }
             EventType::Liquidate => {
                 // This is purely for record keeping. Can be removed if program logs are superior
