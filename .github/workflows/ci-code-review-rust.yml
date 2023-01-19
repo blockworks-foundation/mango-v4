@@ -180,10 +180,3 @@ jobs:
         with:
           name: cu-per-ix-clean
           path: cu-per-ix-clean.log
-  
-  all-pass:
-      name: All tests pass 🚀
-      needs: ['format', 'clippy', 'test', 'sca']
-      runs-on: ubuntu-latest
-      steps:
-        - run: echo ok
