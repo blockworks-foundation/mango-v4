@@ -84,6 +84,10 @@ impl<'a> Orderbook<'a> {
         let opposing_bookside = self.bookside_mut(other_side);
         for best_opposing in opposing_bookside.iter_all_including_invalid(now_ts, oracle_price_lots)
         {
+            if remaining_base_lots == 0 || remaining_quote_lots == 0 {
+                break;
+            }
+
             if !best_opposing.is_valid() {
                 // Remove the order from the book unless we've done that enough
                 if number_of_dropped_expired_orders < DROP_EXPIRED_ORDER_LIMIT {
@@ -121,8 +125,6 @@ impl<'a> Orderbook<'a> {
             let match_base_lots = remaining_base_lots
                 .min(best_opposing.node.quantity)
                 .min(max_match_by_quote);
-            let done =
-                match_base_lots == max_match_by_quote || match_base_lots == remaining_base_lots;
 
             let match_quote_lots = cm!(match_base_lots * best_opposing_price);
             cm!(remaining_base_lots -= match_base_lots);
@@ -161,10 +163,6 @@ impl<'a> Orderbook<'a> {
             );
             event_queue.push_back(cast(fill)).unwrap();
             limit -= 1;
-
-            if done {
-                break;
-            }
         }
         let total_quote_lots_taken = cm!(order.max_quote_lots - remaining_quote_lots);
 
