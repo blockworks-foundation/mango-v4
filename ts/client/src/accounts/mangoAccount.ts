@@ -985,7 +985,10 @@ export class MangoAccount {
           '\n perps:' +
           JSON.stringify(
             this.perpActive().map((p) =>
-              p.toString(group?.getPerpMarketByMarketIndex(p.marketIndex)),
+              p.toString(
+                group,
+                group?.getPerpMarketByMarketIndex(p.marketIndex),
+              ),
             ),
             null,
             4,
@@ -1290,7 +1293,10 @@ export class PerpPosition {
       throw new Error("PerpPosition doesn't belong to the given market!");
     }
 
-    return perpMarket.settleTokenNativeToUi(this.getEquity(perpMarket));
+    return toUiDecimals(
+      this.getEquity(perpMarket),
+      group.getMintDecimalsByTokenIndex(perpMarket.settleTokenIndex),
+    );
   }
 
   public getEquity(perpMarket: PerpMarket): I80F48 {
@@ -1365,10 +1371,11 @@ export class PerpPosition {
       this.getAverageEntryPrice(perpMarket),
     );
 
-    return perpMarket.settleTokenNativeToUi(
+    return toUiDecimals(
       this.realizedPnlForPositionNative.add(
         this.getBasePositionNative(perpMarket).mul(priceChange),
       ),
+      group.getMintDecimalsByTokenIndex(perpMarket.settleTokenIndex),
     );
   }
 
@@ -1382,8 +1389,11 @@ export class PerpPosition {
     );
   }
 
-  public getUnsettledPnlUi(perpMarket: PerpMarket): number {
-    return perpMarket.settleTokenNativeToUi(this.getUnsettledPnl(perpMarket));
+  public getUnsettledPnlUi(group: Group, perpMarket: PerpMarket): number {
+    return toUiDecimals(
+      this.getUnsettledPnl(perpMarket),
+      group.getMintDecimalsByTokenIndex(perpMarket.settleTokenIndex),
+    );
   }
 
   public updateSettleLimit(perpMarket: PerpMarket): void {
@@ -1472,14 +1482,17 @@ export class PerpPosition {
     );
   }
 
-  toString(perpMarket?: PerpMarket): string {
-    return perpMarket
+  toString(group?: Group, perpMarket?: PerpMarket): string {
+    return perpMarket && group
       ? 'market - ' +
           perpMarket.name +
           ', basePositionLots - ' +
           perpMarket.baseLotsToUi(this.basePositionLots) +
           ', quotePositiveNative - ' +
-          perpMarket.settleTokenNativeToUi(this.quotePositionNative) +
+          toUiDecimals(
+            this.quotePositionNative.toNumber(),
+            group.getMintDecimalsByTokenIndex(perpMarket.settleTokenIndex),
+          ) +
           ', bidsBaseLots - ' +
           perpMarket.baseLotsToUi(this.bidsBaseLots) +
           ', asksBaseLots - ' +
@@ -1489,7 +1502,7 @@ export class PerpPosition {
           ', takerQuoteLots - ' +
           perpMarket.quoteLotsToUi(this.takerQuoteLots) +
           ', unsettled pnl - ' +
-          this.getUnsettledPnlUi(perpMarket!).toString()
+          this.getUnsettledPnlUi(group!, perpMarket!).toString()
       : '';
   }
 }

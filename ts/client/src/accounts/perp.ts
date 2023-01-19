@@ -58,7 +58,6 @@ export class PerpMarket {
   private _asks: BookSide;
 
   static from(
-    group: Group,
     publicKey: PublicKey,
     obj: {
       group: PublicKey;
@@ -107,7 +106,6 @@ export class PerpMarket {
     return new PerpMarket(
       publicKey,
       obj.group,
-      group.getMintDecimalsByTokenIndex(obj.settleTokenIndex as TokenIndex),
       obj.settleTokenIndex as TokenIndex,
       obj.perpMarketIndex as PerpMarketIndex,
       obj.groupInsuranceFund == 1,
@@ -154,7 +152,6 @@ export class PerpMarket {
   constructor(
     public publicKey: PublicKey,
     public group: PublicKey,
-    public settleTokenMintDecimals: number,
     public settleTokenIndex: TokenIndex,
     public perpMarketIndex: PerpMarketIndex, // TODO rename to marketIndex?
     public groupInsuranceFund: boolean,
@@ -416,9 +413,6 @@ export class PerpMarket {
     return parseFloat(quantity.toString()) * this.quoteLotsToUiConverter;
   }
 
-  public settleTokenNativeToUi(nativeAmount: I80F48): number {
-    return toUiDecimals(nativeAmount, this.settleTokenMintDecimals);
-  }
   /**
    * Returns a list of (upto count) accounts, and the pnl that is settle'able on this perp market,
    * the list is sorted ascending for 'negative' direction and descending for 'positive' direction.

@@ -1849,7 +1849,7 @@ export class MangoClient {
     ];
 
     return (await this.program.account.perpMarket.all(filters)).map((tuple) =>
-      PerpMarket.from(group, tuple.publicKey, tuple.account),
+      PerpMarket.from(tuple.publicKey, tuple.account),
     );
   }
 
