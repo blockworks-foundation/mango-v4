@@ -28,7 +28,6 @@ import {
   makeInitSequenceEnforcerAccountIx,
   seqEnforcerProgramIds,
 } from './sequence-enforcer-util';
-import * as defaultParams from './params/default.json';
 
 // Future
 // * use async nodejs logging
@@ -248,7 +247,7 @@ async function fullMarketMaker() {
   );
 
   // Load mango account
-  let mangoAccount = await client.getMangoAccountForPublicKey(
+  let mangoAccount = await client.getMangoAccount(
     new PublicKey(MANGO_ACCOUNT_PK),
   );
   console.log(

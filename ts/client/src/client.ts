@@ -694,20 +694,6 @@ export class MangoClient {
     return mangoAccount_;
   }
 
-  public async getMangoAccountForPublicKey(
-    mangoAccountPk: PublicKey,
-    loadSerum3Oo = false,
-  ): Promise<MangoAccount> {
-    const mangoAccount = MangoAccount.from(
-      mangoAccountPk,
-      await this.program.account.mangoAccount.fetch(mangoAccountPk),
-    );
-    if (loadSerum3Oo) {
-      await mangoAccount?.reloadSerum3OpenOrders(this);
-    }
-    return mangoAccount;
-  }
-
   public async getMangoAccountWithSlot(
     mangoAccountPk: PublicKey,
     loadSerum3Oo = false,
@@ -734,14 +720,14 @@ export class MangoClient {
     accountNumber: number,
     loadSerum3Oo = false,
   ): Promise<MangoAccount | undefined> {
-    const mangoAccounts = await this.getMangoAccountsForOwner(group, ownerPk);
+    const mangoAccounts = await this.getMangoAccountsForOwner(
+      group,
+      ownerPk,
+      loadSerum3Oo,
+    );
     const foundMangoAccount = mangoAccounts.find(
       (a) => a.accountNum == accountNumber,
     );
-
-    if (loadSerum3Oo) {
-      await foundMangoAccount?.reloadSerum3OpenOrders(this);
-    }
 
     return foundMangoAccount;
   }
