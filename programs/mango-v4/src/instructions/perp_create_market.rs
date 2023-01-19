@@ -49,8 +49,8 @@ pub struct PerpCreateMarket<'info> {
 #[allow(clippy::too_many_arguments)]
 pub fn perp_create_market(
     ctx: Context<PerpCreateMarket>,
-    settle_token_index: TokenIndex,
     perp_market_index: PerpMarketIndex,
+    settle_token_index: TokenIndex,
     name: String,
     oracle_config: OracleConfigParams,
     base_decimals: u8,

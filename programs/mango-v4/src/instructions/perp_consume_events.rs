@@ -17,6 +17,7 @@ pub struct PerpConsumeEvents<'info> {
     #[account(
         mut,
         has_one = group,
+        has_one = event_queue,
     )]
     pub perp_market: AccountLoader<'info, PerpMarket>,
 
