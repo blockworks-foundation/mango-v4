@@ -90,7 +90,7 @@ export class MangoAccount {
 
   public async reload(client: MangoClient): Promise<MangoAccount> {
     const mangoAccount = await client.getMangoAccount(this);
-    await mangoAccount.reloadAccountData(client);
+    await mangoAccount.reloadSerum3OpenOrders(client);
     Object.assign(this, mangoAccount);
     return mangoAccount;
   }
@@ -99,12 +99,12 @@ export class MangoAccount {
     client: MangoClient,
   ): Promise<{ value: MangoAccount; slot: number }> {
     const resp = await client.getMangoAccountWithSlot(this.publicKey);
-    await resp?.value.reloadAccountData(client);
+    await resp?.value.reloadSerum3OpenOrders(client);
     Object.assign(this, resp?.value);
     return { value: resp!.value, slot: resp!.slot };
   }
 
-  async reloadAccountData(client: MangoClient): Promise<MangoAccount> {
+  async reloadSerum3OpenOrders(client: MangoClient): Promise<MangoAccount> {
     const serum3Active = this.serum3Active();
     const ais =
       await client.program.provider.connection.getMultipleAccountsInfo(

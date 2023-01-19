@@ -431,7 +431,9 @@ export class PerpMarket {
     direction: 'negative' | 'positive',
     count = 2,
   ): Promise<{ account: MangoAccount; settleablePnl: I80F48 }[]> {
-    let accountsWithSettleablePnl = (await client.getAllMangoAccounts(group))
+    let accountsWithSettleablePnl = (
+      await client.getAllMangoAccounts(group, true)
+    )
       .filter((acc) => acc.perpPositionExistsForMarket(this))
       .map((acc) => {
         const pp = acc
