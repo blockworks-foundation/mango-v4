@@ -51,19 +51,19 @@ async function main(): Promise<void> {
           getBasePositionUiAgg += pp.getBasePositionUi(perpMarket);
           longSettledFundingAgg += pp.longSettledFunding.toNumber();
           shortSettledFundingAgg += pp.shortSettledFunding.toNumber();
-          console.log(` - ${mangoAccount.publicKey.toBase58().padStart(45)}`);
-          console.log(
-            `    - unsettled pnl ${pp
-              .getUnsettledPnlUi(group, perpMarket)
-              .toFixed(4)
-              .padStart(10)}`,
-          );
-          console.log(
-            `    - base position ${pp
-              .getBasePositionUi(perpMarket)
-              .toFixed(4)
-              .padStart(10)}`,
-          );
+          // console.log(` - ${mangoAccount.publicKey.toBase58().padStart(45)}`);
+          // console.log(
+          //   `    - unsettled pnl ${pp
+          //     .getUnsettledPnlUi(group, perpMarket)
+          //     .toFixed(4)
+          //     .padStart(10)}`,
+          // );
+          // console.log(
+          //   `    - base position ${pp
+          //     .getBasePositionUi(perpMarket)
+          //     .toFixed(4)
+          //     .padStart(10)}`,
+          // );
           // console.log(
           //   `    - avgEntryPricePerBaseLot ${pp.avgEntryPricePerBaseLot}`,
           // );
