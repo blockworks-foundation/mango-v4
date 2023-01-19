@@ -114,6 +114,10 @@ impl<'a> Orderbook<'a> {
         let opposing_bookside = self.bookside_mut(other_side);
         for best_opposing in opposing_bookside.iter_all_including_invalid(now_ts, oracle_price_lots)
         {
+            if remaining_base_lots == 0 || remaining_quote_lots == 0 {
+                break;
+            }
+
             if !best_opposing.is_valid() {
                 // Remove the order from the book unless we've done that enough
                 if number_of_dropped_expired_orders < DROP_EXPIRED_ORDER_LIMIT {
