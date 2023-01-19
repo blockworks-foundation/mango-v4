@@ -6,55 +6,11 @@ on:
 
 jobs:
   label:
-    name: Add PR labels
+    permissions:
+      contents: read
+      pull-requests: write
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
-
-      - uses: dorny/paths-filter@v2
-        id: changes
-        with:
-          filters: |
-            programs:
-              - 'programs/**'
-            client:
-              - 'ts/client/**'
-            liquidator:
-              - 'liquidator/**'
-            keeper:
-              - 'keeper/**'
-            ci:
-              - '.github/workflows/**'
-            docs:
-              - '*.md'
-              - '**/LICENCE'
-      
-      - if: steps.changes.outputs.programs == 'true'
-        uses: andymckay/labeler@1.0.4
-        with:
-          add-labels: "programs"
-
-      - if: steps.changes.outputs.extension == 'client'
-        uses: andymckay/labeler@1.0.4
-        with:
-          add-labels: "client"
-      
-      - if: steps.changes.outputs.extension == 'liquidator'
-        uses: andymckay/labeler@1.0.4
-        with:
-          add-labels: "liquidator"
-      
-      - if: steps.changes.outputs.extension == 'keeper'
-        uses: andymckay/labeler@1.0.4
-        with:
-          add-labels: "keeper"
-      
-      - if: steps.changes.outputs.ci == 'true'
-        uses: andymckay/labeler@1.0.4
-        with:
-          add-labels: "ci"
-
-      - if: steps.changes.outputs.docs == 'true'
-        uses: andymckay/labeler@1.0.4
-        with:
-          add-labels: "docs"
+    - uses: actions/labeler@v4
+      with:
+        repo-token: "${{ secrets.GITHUB_TOKEN }}"
