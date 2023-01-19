@@ -252,7 +252,7 @@ export class Group {
           ids.getPerpMarkets(),
         )
       ).map((account, index) =>
-        PerpMarket.from(ids.getPerpMarkets()[index], account as any),
+        PerpMarket.from(this, ids.getPerpMarkets()[index], account as any),
       );
     } else {
       perpMarkets = await client.perpGetMarkets(this);
