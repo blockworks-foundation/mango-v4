@@ -7,7 +7,8 @@ on:
             'keeper/**',
             'lib/**',
             'liquidator/**',
-            'anchor/cli/**']
+            'anchor/cli/**',
+            'Cargo.lock']
   pull_request: 
     branches: ['main', 'dev']
     paths: ['cli/**',
@@ -16,7 +17,8 @@ on:
             'keeper/**',
             'lib/**',
             'liquidator/**',
-            'anchor/cli/**']
+            'anchor/cli/**',
+            'Cargo.lock']
   workflow_dispatch: # Pick branch manually
 
 env:
@@ -101,7 +103,43 @@ jobs:
         with:
           name: raw-test-bpf
           path: raw-test-bpf.log
+  
+  sca:
+    name: Dependency Scan
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
 
+      # Report all vulnerabilities in security tab
+      - name: Report on all vulnerabilities
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'fs'
+          scan-ref: 'Cargo.lock'
+          ignore-unfixed: true
+          hide-progress: true
+          format: 'sarif'
+          output: 'trivy-results.sarif'
+          
+      # Fail the job on critical vulnerabiliies with fix available
+      - name: Fail on critical vulnerabilities
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'fs'
+          scan-ref: 'Cargo.lock'
+          ignore-unfixed: true
+          hide-progress: true
+          format: 'table'
+          severity: 'CRITICAL'
+          exit-code: '1'
+
+      - name: Upload output
+        uses: github/codeql-action/upload-sarif@v2
+        if: always()
+        with:
+          sarif_file: 'trivy-results.sarif'
+  
   # Download logs and process them
   process-logs:
     name: Process logs
