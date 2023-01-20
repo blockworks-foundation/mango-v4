@@ -86,6 +86,15 @@ pub async fn loop_update_index_and_rate(
 ) {
     let mut interval = time::interval(Duration::from_secs(interval));
     loop {
+        if mango_client
+            .context
+            .new_tokens_listed(&mango_client.client.rpc_async())
+            .await
+            .unwrap()
+        {
+            std::process::abort();
+        }
+
         interval.tick().await;
 
         let client = mango_client.clone();
@@ -161,6 +170,15 @@ pub async fn loop_consume_events(
 ) {
     let mut interval = time::interval(Duration::from_secs(interval));
     loop {
+        if mango_client
+            .context
+            .new_perp_markets_listed(&mango_client.client.rpc_async())
+            .await
+            .unwrap()
+        {
+            std::process::abort();
+        }
+
         interval.tick().await;
 
         let client = mango_client.clone();
@@ -276,6 +294,15 @@ pub async fn loop_update_funding(
 ) {
     let mut interval = time::interval(Duration::from_secs(interval));
     loop {
+        if mango_client
+            .context
+            .new_perp_markets_listed(&mango_client.client.rpc_async())
+            .await
+            .unwrap()
+        {
+            std::process::abort();
+        }
+
         interval.tick().await;
 
         let client = mango_client.clone();
