@@ -1,7 +1,7 @@
 import { BN } from '@project-serum/anchor';
 import { OpenOrders } from '@project-serum/serum';
 import { PublicKey } from '@solana/web3.js';
-import _ from 'lodash';
+import { cloneDeep } from 'lodash';
 import {
   HUNDRED_I80F48,
   I80F48,
@@ -346,7 +346,7 @@ export class HealthCache {
     }[],
     healthType: HealthType = HealthType.init,
   ): I80F48 {
-    const adjustedCache: HealthCache = _.cloneDeep(this);
+    const adjustedCache: HealthCache = cloneDeep(this);
     // HealthCache.logHealthCache('beforeChange', adjustedCache);
     for (const change of nativeTokenChanges) {
       const bank: Bank = group.getFirstBankByMint(change.mintPk);
@@ -423,7 +423,7 @@ export class HealthCache {
     serum3Market: Serum3Market,
     healthType: HealthType = HealthType.init,
   ): I80F48 {
-    const adjustedCache: HealthCache = _.cloneDeep(this);
+    const adjustedCache: HealthCache = cloneDeep(this);
     const quoteIndex = adjustedCache.getOrCreateTokenInfoIndex(quoteBank);
 
     // Move token balance to reserved funds in open orders,
@@ -454,7 +454,7 @@ export class HealthCache {
     serum3Market: Serum3Market,
     healthType: HealthType = HealthType.init,
   ): I80F48 {
-    const adjustedCache: HealthCache = _.cloneDeep(this);
+    const adjustedCache: HealthCache = cloneDeep(this);
     const baseIndex = adjustedCache.getOrCreateTokenInfoIndex(baseBank);
 
     // Move token balance to reserved funds in open orders,
@@ -521,7 +521,7 @@ export class HealthCache {
     price: I80F48,
     healthType: HealthType = HealthType.init,
   ): I80F48 {
-    const clonedHealthCache: HealthCache = _.cloneDeep(this);
+    const clonedHealthCache: HealthCache = cloneDeep(this);
     const perpInfoIndex =
       clonedHealthCache.getOrCreatePerpInfoIndex(perpMarket);
     clonedHealthCache.adjustPerpInfo(perpInfoIndex, price, side, baseLots);
@@ -781,7 +781,7 @@ export class HealthCache {
     const initialRatio = this.healthRatio(HealthType.init);
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
 
-    const healthCacheClone: HealthCache = _.cloneDeep(this);
+    const healthCacheClone: HealthCache = cloneDeep(this);
     const sourceIndex = healthCacheClone.getOrCreateTokenInfoIndex(sourceBank);
     const targetIndex = healthCacheClone.getOrCreateTokenInfoIndex(targetBank);
 
@@ -815,7 +815,7 @@ export class HealthCache {
     // The maximum will be at one of these points (ignoring serum3 effects).
 
     function cacheAfterSwap(amount: I80F48): HealthCache {
-      const adjustedCache: HealthCache = _.cloneDeep(healthCacheClone);
+      const adjustedCache: HealthCache = cloneDeep(healthCacheClone);
       // adjustedCache.logHealthCache('beforeSwap', adjustedCache);
       // TODO: make a copy of the bank, apply amount, recompute weights,
       // and set the new weights on the tokenInfos
@@ -912,7 +912,7 @@ export class HealthCache {
     side: Serum3Side,
     minRatio: I80F48,
   ): I80F48 {
-    const healthCacheClone: HealthCache = _.cloneDeep(this);
+    const healthCacheClone: HealthCache = cloneDeep(this);
 
     const baseIndex = healthCacheClone.getOrCreateTokenInfoIndex(baseBank);
     const quoteIndex = healthCacheClone.getOrCreateTokenInfoIndex(quoteBank);
@@ -987,7 +987,7 @@ export class HealthCache {
     // console.log(` - zeroAmountRatio ${zeroAmountRatio.toLocaleString()}`);
 
     function cacheAfterPlacingOrder(amount: I80F48): HealthCache {
-      const adjustedCache: HealthCache = _.cloneDeep(healthCacheClone);
+      const adjustedCache: HealthCache = cloneDeep(healthCacheClone);
       // adjustedCache.logHealthCache(` before placing order ${amount}`);
       // TODO: there should also be some issue with oracle vs stable price here;
       // probably better to pass in not the quote amount but the base or quote native amount
@@ -1038,7 +1038,7 @@ export class HealthCache {
     side: PerpOrderSide,
     minRatio: I80F48,
   ): I80F48 {
-    const healthCacheClone: HealthCache = _.cloneDeep(this);
+    const healthCacheClone: HealthCache = cloneDeep(this);
 
     const initialRatio = this.healthRatio(HealthType.init);
     if (initialRatio.lt(ZERO_I80F48())) {
@@ -1066,7 +1066,7 @@ export class HealthCache {
     }
 
     function cacheAfterTrade(baseLots: BN): HealthCache {
-      const adjustedCache: HealthCache = _.cloneDeep(healthCacheClone);
+      const adjustedCache: HealthCache = cloneDeep(healthCacheClone);
       // adjustedCache.logHealthCache(' -- before trade');
       adjustedCache.adjustPerpInfo(perpInfoIndex, price, side, baseLots);
       // adjustedCache.logHealthCache(' -- after trade');
