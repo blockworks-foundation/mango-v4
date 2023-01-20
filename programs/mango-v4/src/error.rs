@@ -83,6 +83,8 @@ pub enum MangoError {
     HasLiquidatableTrustedPerpPnl,
     #[msg("account is frozen")]
     AccountIsFrozen,
+    #[msg("has open perp taker fills")]
+    HasOpenPerpTakerFills,
 }
 
 impl MangoError {
