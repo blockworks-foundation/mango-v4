@@ -44,10 +44,6 @@ impl EventQueue {
         self.header.count() == self.buf.len()
     }
 
-    pub fn empty(&self) -> bool {
-        self.header.count() == 0
-    }
-
     pub fn push_back(&mut self, value: AnyEvent) -> std::result::Result<(), AnyEvent> {
         if self.full() {
             return Err(value);
@@ -63,21 +59,21 @@ impl EventQueue {
     }
 
     pub fn peek_front(&self) -> Option<&AnyEvent> {
-        if self.empty() {
+        if self.is_empty() {
             return None;
         }
         Some(&self.buf[self.header.head()])
     }
 
     pub fn peek_front_mut(&mut self) -> Option<&mut AnyEvent> {
-        if self.empty() {
+        if self.is_empty() {
             return None;
         }
         Some(&mut self.buf[self.header.head()])
     }
 
     pub fn pop_front(&mut self) -> Result<AnyEvent> {
-        require!(!self.empty(), MangoError::SomeError);
+        require!(!self.is_empty(), MangoError::SomeError);
 
         let value = self.buf[self.header.head()];
 
