@@ -189,10 +189,34 @@ async function debugUser(
         ),
     );
     console.log(
+      `- simHealthRatioWithSerum3BidUiChanges  ${serum3Market.name} ` +
+        mangoAccount.simHealthRatioWithSerum3BidUiChanges(
+          group,
+          mangoAccount.getMaxQuoteForSerum3BidUi(
+            group,
+            serum3Market.serumMarketExternal,
+          ),
+          serum3Market.serumMarketExternal,
+          HealthType.init,
+        ),
+    );
+    console.log(
       `getMaxBaseForSerum3AskUi ${serum3Market.name} ` +
         mangoAccount.getMaxBaseForSerum3AskUi(
           group,
           serum3Market.serumMarketExternal,
+        ),
+    );
+    console.log(
+      `- simHealthRatioWithSerum3BidUiChanges  ${serum3Market.name} ` +
+        mangoAccount.simHealthRatioWithSerum3AskUiChanges(
+          group,
+          mangoAccount.getMaxBaseForSerum3AskUi(
+            group,
+            serum3Market.serumMarketExternal,
+          ),
+          serum3Market.serumMarketExternal,
+          HealthType.init,
         ),
     );
   }
