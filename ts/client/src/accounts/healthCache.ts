@@ -281,6 +281,7 @@ export class HealthCache {
 
     for (const tokenInfo of this.tokenInfos) {
       const contrib = tokenInfo.healthContribution(healthType);
+      // console.log(` - ti contrib ${contrib.toLocaleString()}`);
       if (contrib.isPos()) {
         assets.iadd(contrib);
       } else {
@@ -295,6 +296,7 @@ export class HealthCache {
         res.tokenMaxReserved,
         res.serum3Reserved[index],
       );
+      // console.log(` - si contrib ${contrib.toLocaleString()}`);
       if (contrib.isPos()) {
         assets.iadd(contrib);
       } else {
@@ -303,6 +305,7 @@ export class HealthCache {
     }
     for (const perpInfo of this.perpInfos) {
       const contrib = perpInfo.healthContribution(healthType);
+      // console.log(` - pi contrib ${contrib.toLocaleString()}`);
       if (contrib.isPos()) {
         assets.iadd(contrib);
       } else {
@@ -310,7 +313,9 @@ export class HealthCache {
       }
     }
 
-    // console.log(` - assets ${assets}, liabs ${liabs}`);
+    // console.log(
+    //   ` - assets ${assets.toLocaleString()}, liabs ${liabs.toLocaleString()}`,
+    // );
 
     if (liabs.gt(I80F48.fromNumber(0.001))) {
       return HUNDRED_I80F48().mul(assets.sub(liabs).div(liabs));
@@ -1395,6 +1400,9 @@ export class Serum3Info {
       quoteMaxReserved,
       marketReserved.allReservedAsQuote,
     );
+
+    // console.log(` - healthBase ${healthBase.toLocaleString()}`);
+    // console.log(` - healthQuote ${healthQuote.toLocaleString()}`);
 
     return healthBase.min(healthQuote);
   }
