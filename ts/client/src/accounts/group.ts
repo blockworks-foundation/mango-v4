@@ -157,7 +157,9 @@ export class Group {
     for (const bank of banks) {
       // ensure that freshly fetched banks have valid price until we fetch oracles again
       const oldBanks = oldbanksMapByTokenIndex.get(bank.tokenIndex);
-      if (oldBanks && oldBanks.length > 0) _.merge(bank, oldBanks[0]);
+      if (oldBanks && oldBanks.length > 0) {
+        _.merge(bank, oldBanks[0]);
+      }
 
       const mintId = bank.mint.toString();
       if (this.banksMapByMint.has(mintId)) {
@@ -272,7 +274,9 @@ export class Group {
       const oldPerpMarket = oldPerpMarketByMarketIndex.get(
         perpMarket.perpMarketIndex,
       );
-      if (oldPerpMarket) _.merge(perpMarket, oldPerpMarket);
+      if (oldPerpMarket) {
+        _.merge(perpMarket, oldPerpMarket);
+      }
     }
 
     this.perpMarketsMapByName = new Map(
