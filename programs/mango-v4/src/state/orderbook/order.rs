@@ -154,6 +154,7 @@ impl Order {
             }
             _ => fixed_price_data(price_lots)?,
         };
+        require_gte!(price_lots, 1);
         Ok((price_lots, price_data))
     }
 
