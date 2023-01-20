@@ -767,6 +767,10 @@ impl PerpOpenOrder {
     pub fn side_and_tree(&self) -> SideAndOrderTree {
         SideAndOrderTree::try_from(self.side_and_tree).unwrap()
     }
+
+    pub fn is_active_for_market(&self, perp_market_index: PerpMarketIndex) -> bool {
+        self.market == perp_market_index
+    }
 }
 
 #[macro_export]
