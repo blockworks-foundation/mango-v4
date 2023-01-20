@@ -1,7 +1,7 @@
 use crate::state::MangoAccountRefMut;
 use crate::{
     error::*,
-    state::{orderbook::bookside::*, EventQueue, PerpMarket, FREE_ORDER_SLOT},
+    state::{orderbook::bookside::*, EventQueue, PerpMarket},
 };
 use anchor_lang::prelude::*;
 use bytemuck::cast;
@@ -280,7 +280,7 @@ impl<'a> Orderbook<'a> {
     ) -> Result<()> {
         for i in 0..mango_account.header.perp_oo_count() {
             let oo = mango_account.perp_order_by_raw_index(i);
-            if oo.market == FREE_ORDER_SLOT || oo.market != perp_market.perp_market_index {
+            if !oo.is_active_for_market(perp_market.perp_market_index) {
                 continue;
             }
 
