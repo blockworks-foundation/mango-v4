@@ -8,6 +8,7 @@ import {
   PublicKey,
 } from '@solana/web3.js';
 import BN from 'bn.js';
+import { cloneDeep, merge } from 'lodash';
 import { MangoClient } from '../client';
 import { OPENBOOK_PROGRAM_ID } from '../constants';
 import { Id } from '../ids';
@@ -149,10 +150,17 @@ export class Group {
       banks = await client.getBanksForGroup(this);
     }
 
+    const oldbanksMapByTokenIndex = cloneDeep(this.banksMapByTokenIndex);
     this.banksMapByName = new Map();
     this.banksMapByMint = new Map();
     this.banksMapByTokenIndex = new Map();
     for (const bank of banks) {
+      // ensure that freshly fetched banks have valid price until we fetch oracles again
+      const oldBanks = oldbanksMapByTokenIndex.get(bank.tokenIndex);
+      if (oldBanks && oldBanks.length > 0) {
+        merge(bank, oldBanks[0]);
+      }
+
       const mintId = bank.mint.toString();
       if (this.banksMapByMint.has(mintId)) {
         this.banksMapByMint.get(mintId)?.push(bank);
@@ -256,6 +264,19 @@ export class Group {
       );
     } else {
       perpMarkets = await client.perpGetMarkets(this);
+    }
+
+    // ensure that freshly fetched perp markets have valid price until we fetch oracles again
+    const oldPerpMarketByMarketIndex = cloneDeep(
+      this.perpMarketsMapByMarketIndex,
+    );
+    for (const perpMarket of perpMarkets) {
+      const oldPerpMarket = oldPerpMarketByMarketIndex.get(
+        perpMarket.perpMarketIndex,
+      );
+      if (oldPerpMarket) {
+        merge(perpMarket, oldPerpMarket);
+      }
     }
 
     this.perpMarketsMapByName = new Map(
