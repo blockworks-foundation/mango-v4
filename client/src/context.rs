@@ -335,6 +335,21 @@ impl MangoGroupContext {
             .chain(serum_oos.map(to_account_meta))
             .collect())
     }
+
+    pub async fn new_tokens_listed(&self, rpc: &RpcClientAsync) -> anyhow::Result<bool> {
+        let mint_infos = fetch_mint_infos(rpc, mango_v4::id(), self.group).await?;
+        Ok(mint_infos.len() > self.tokens.len())
+    }
+
+    pub async fn new_serum3_markets_listed(&self, rpc: &RpcClientAsync) -> anyhow::Result<bool> {
+        let serum3_markets = fetch_serum3_markets(rpc, mango_v4::id(), self.group).await?;
+        Ok(serum3_markets.len() > self.serum3_markets.len())
+    }
+
+    pub async fn new_perp_markets_listed(&self, rpc: &RpcClientAsync) -> anyhow::Result<bool> {
+        let new_perp_markets = fetch_perp_markets(rpc, mango_v4::id(), self.group).await?;
+        Ok(new_perp_markets.len() > self.perp_markets.len())
+    }
 }
 
 fn from_serum_style_pubkey(d: [u64; 4]) -> Pubkey {

@@ -53,6 +53,9 @@ struct Cli {
     #[clap(long, env, default_value_t = 5)]
     interval_update_funding: u64,
 
+    #[clap(long, env, default_value_t = 120)]
+    interval_check_new_listings_and_abort: u64,
+
     #[clap(long, env, default_value_t = 10)]
     timeout: u64,
 }
@@ -126,6 +129,7 @@ async fn main() -> Result<(), anyhow::Error> {
                 cli.interval_update_banks,
                 cli.interval_consume_events,
                 cli.interval_update_funding,
+                cli.interval_check_new_listings_and_abort,
             )
             .await
         }
