@@ -1,7 +1,6 @@
 import { AnchorProvider, Wallet } from '@project-serum/anchor';
-import { Cluster, Connection, Keypair } from '@solana/web3.js';
+import { Cluster, Connection, Keypair, PublicKey } from '@solana/web3.js';
 import * as dotenv from 'dotenv';
-import fs from 'fs';
 import { MangoClient } from '../client';
 import { MANGO_V4_ID } from '../constants';
 dotenv.config();
@@ -10,7 +9,8 @@ const CLUSTER_URL =
   process.env.CLUSTER_URL_OVERRIDE || process.env.MB_CLUSTER_URL;
 const PAYER_KEYPAIR =
   process.env.PAYER_KEYPAIR_OVERRIDE || process.env.MB_PAYER_KEYPAIR;
-const GROUP_NUM = Number(process.env.GROUP_NUM || 0);
+const GROUP_PK =
+  process.env.GROUP_PK || '78b8f4cGCwmZ9ysPFMWLaLTkkaYnUjwMJYStWe5RTSSX';
 const CLUSTER: Cluster =
   (process.env.CLUSTER_OVERRIDE as Cluster) || 'mainnet-beta';
 
@@ -18,20 +18,13 @@ async function main(): Promise<void> {
   const options = AnchorProvider.defaultOptions();
   const connection = new Connection(CLUSTER_URL!, options);
 
-  const admin = Keypair.fromSecretKey(
-    Buffer.from(JSON.parse(fs.readFileSync(PAYER_KEYPAIR!, 'utf-8'))),
-  );
+  const wallet = new Wallet(new Keypair());
+  const provider = new AnchorProvider(connection, wallet, options);
+  const client = MangoClient.connect(provider, CLUSTER, MANGO_V4_ID[CLUSTER], {
+    idsSource: 'get-program-accounts',
+  });
 
-  const adminWallet = new Wallet(admin);
-  const adminProvider = new AnchorProvider(connection, adminWallet, options);
-  const client = MangoClient.connect(
-    adminProvider,
-    CLUSTER,
-    MANGO_V4_ID[CLUSTER],
-    { idsSource: 'get-program-accounts' },
-  );
-
-  const group = await client.getGroupForCreator(admin.publicKey, GROUP_NUM);
+  const group = await client.getGroup(new PublicKey(GROUP_PK));
   const mangoAccounts = await client.getAllMangoAccounts(group);
 
   Array.from(group.perpMarketsMapByMarketIndex.values())
