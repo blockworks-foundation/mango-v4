@@ -40,7 +40,7 @@ async function main(): Promise<void> {
           .perpActive()
           .find((pp) => pp.marketIndex === perpMarket.perpMarketIndex);
         if (pp) {
-          getUnsettledPnlUiAgg += pp.getUnsettledPnlUi(group, perpMarket);
+          getUnsettledPnlUiAgg += pp.getUnsettledPnlUi(perpMarket);
           getBasePositionUiAgg += pp.getBasePositionUi(perpMarket);
           longSettledFundingAgg += pp.longSettledFunding.toNumber();
           shortSettledFundingAgg += pp.shortSettledFunding.toNumber();
