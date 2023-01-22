@@ -31,6 +31,7 @@ export class Group {
       groupNum: number;
       admin: PublicKey;
       fastListingAdmin: PublicKey;
+      securityAdmin: PublicKey;
       insuranceMint: PublicKey;
       insuranceVault: PublicKey;
       testing: number;
@@ -45,6 +46,7 @@ export class Group {
       obj.groupNum,
       obj.admin,
       obj.fastListingAdmin,
+      obj.securityAdmin,
       obj.insuranceMint,
       obj.insuranceVault,
       obj.testing,
@@ -73,6 +75,7 @@ export class Group {
     public groupNum: number,
     public admin: PublicKey,
     public fastListingAdmin: PublicKey,
+    public securityAdmin: PublicKey,
     public insuranceMint: PublicKey,
     public insuranceVault: PublicKey,
     public testing: number,
