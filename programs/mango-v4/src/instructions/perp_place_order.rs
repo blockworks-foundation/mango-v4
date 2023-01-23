@@ -47,7 +47,11 @@ pub struct PerpPlaceOrder<'info> {
 
 // TODO
 #[allow(clippy::too_many_arguments)]
-pub fn perp_place_order(ctx: Context<PerpPlaceOrder>, mut order: Order, limit: u8) -> Result<()> {
+pub fn perp_place_order(
+    ctx: Context<PerpPlaceOrder>,
+    mut order: Order,
+    limit: u8,
+) -> Result<Option<u128>> {
     require_gte!(order.max_base_lots, 0);
     require_gte!(order.max_quote_lots, 0);
 
@@ -149,7 +153,7 @@ pub fn perp_place_order(ctx: Context<PerpPlaceOrder>, mut order: Order, limit: u
     };
     order.max_base_lots = max_base_lots;
 
-    book.new_order(
+    let order_id_opt = book.new_order(
         order,
         &mut perp_market,
         &mut event_queue,
@@ -169,5 +173,5 @@ pub fn perp_place_order(ctx: Context<PerpPlaceOrder>, mut order: Order, limit: u
         account.check_health_post(&health_cache, pre_health)?;
     }
 
-    Ok(())
+    Ok(order_id_opt)
 }

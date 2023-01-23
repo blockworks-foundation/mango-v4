@@ -51,7 +51,7 @@ impl<'a> Orderbook<'a> {
         mango_account_pk: &Pubkey,
         now_ts: u64,
         mut limit: u8,
-    ) -> std::result::Result<(), Error> {
+    ) -> std::result::Result<Option<u128>, Error> {
         let side = order.side;
         let other_side = side.invert_side();
         let market = perp_market;
@@ -269,7 +269,11 @@ impl<'a> Orderbook<'a> {
             )?;
         }
 
-        Ok(())
+        if post_target.is_some() {
+            Ok(Some(order_id))
+        } else {
+            Ok(None)
+        }
     }
 
     /// Cancels up to `limit` orders that are listed on the mango account for the given perp market.
