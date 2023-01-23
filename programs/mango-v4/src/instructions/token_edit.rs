@@ -5,6 +5,7 @@ use fixed::types::I80F48;
 use super::InterestRateParams;
 use crate::accounts_zerocopy::{AccountInfoRef, LoadMutZeroCopyRef};
 
+use crate::error::MangoError;
 use crate::state::*;
 
 use crate::logs::TokenMetaDataLog;
@@ -15,10 +16,8 @@ use crate::logs::TokenMetaDataLog;
 /// in MintInfo order.
 #[derive(Accounts)]
 pub struct TokenEdit<'info> {
-    #[account(
-        has_one = admin
-    )]
     pub group: AccountLoader<'info, Group>,
+    // group <-> admin relation is checked at #1
     pub admin: Signer<'info>,
 
     #[account(
@@ -60,27 +59,23 @@ pub fn token_edit(
     reset_net_borrow_limit: bool,
     reduce_only_opt: Option<bool>,
 ) -> Result<()> {
+    let group = ctx.accounts.group.load()?;
+
     let mut mint_info = ctx.accounts.mint_info.load_mut()?;
     mint_info.verify_banks_ais(ctx.remaining_accounts)?;
 
+    let mut require_group_admin = false;
     for ai in ctx.remaining_accounts.iter() {
         let mut bank = ai.load_mut::<Bank>()?;
 
-        // note: unchanged fields are inline, and match exact definition in register_token
-        // please maintain, and don't remove, makes it easy to reason about which support admin modification
-
-        // unchanged -
-        // name
-        // group
-        // mint
-        // vault
-
         if let Some(oracle_config) = oracle_config_opt.as_ref() {
             bank.oracle_config = oracle_config.to_oracle_config();
+            require_group_admin = true;
         };
         if let Some(oracle) = oracle_opt {
             bank.oracle = oracle;
             mint_info.oracle = oracle;
+            require_group_admin = true;
         }
         if reset_stable_price {
             require_keys_eq!(bank.oracle, ctx.accounts.oracle.key());
@@ -90,20 +85,13 @@ pub fn token_edit(
                 oracle_price.to_num(),
                 Clock::get()?.unix_timestamp.try_into().unwrap(),
             );
+            require_group_admin = true;
         }
 
         if let Some(group_insurance_fund) = group_insurance_fund_opt {
             mint_info.group_insurance_fund = u8::from(group_insurance_fund);
+            require_group_admin = true;
         };
-
-        // unchanged -
-        // deposit_index
-        // borrow_index
-        // cached_indexed_total_deposits
-        // cached_indexed_total_borrows
-        // indexed_deposits
-        // indexed_borrows
-        // last_updated
 
         if let Some(ref interest_rate_params) = interest_rate_params_opt {
             // TODO: add a require! verifying relation between the parameters
@@ -113,79 +101,113 @@ pub fn token_edit(
             bank.util1 = I80F48::from_num(interest_rate_params.util1);
             bank.rate1 = I80F48::from_num(interest_rate_params.rate1);
             bank.max_rate = I80F48::from_num(interest_rate_params.max_rate);
+            require_group_admin = true;
         }
-
-        // unchanged -
-        // collected_fees_native
 
         if let Some(loan_origination_fee_rate) = loan_origination_fee_rate_opt {
             bank.loan_origination_fee_rate = I80F48::from_num(loan_origination_fee_rate);
+            require_group_admin = true;
         }
         if let Some(loan_fee_rate) = loan_fee_rate_opt {
             bank.loan_fee_rate = I80F48::from_num(loan_fee_rate);
+            require_group_admin = true;
         }
 
         if let Some(maint_asset_weight) = maint_asset_weight_opt {
             bank.maint_asset_weight = I80F48::from_num(maint_asset_weight);
+            require_group_admin = true;
         }
         if let Some(init_asset_weight) = init_asset_weight_opt {
+            require_gte!(
+                init_asset_weight,
+                0.0,
+                MangoError::InitAssetWeightCantBeNegative
+            );
+
+            let old_init_asset_weight = bank.init_asset_weight;
             bank.init_asset_weight = I80F48::from_num(init_asset_weight);
+
+            // security admin can only reduce init_base_asset_weight
+            if old_init_asset_weight < bank.init_asset_weight {
+                require_group_admin = true;
+            }
         }
         if let Some(maint_liab_weight) = maint_liab_weight_opt {
             bank.maint_liab_weight = I80F48::from_num(maint_liab_weight);
+            require_group_admin = true;
         }
         if let Some(init_liab_weight) = init_liab_weight_opt {
             bank.init_liab_weight = I80F48::from_num(init_liab_weight);
+            require_group_admin = true;
         }
         if let Some(liquidation_fee) = liquidation_fee_opt {
             bank.liquidation_fee = I80F48::from_num(liquidation_fee);
+            require_group_admin = true;
         }
 
         if let Some(stable_price_delay_interval_seconds) = stable_price_delay_interval_seconds_opt {
             // Updating this makes the old delay values slightly inconsistent
             bank.stable_price_model.delay_interval_seconds = stable_price_delay_interval_seconds;
+            require_group_admin = true;
         }
         if let Some(stable_price_delay_growth_limit) = stable_price_delay_growth_limit_opt {
             bank.stable_price_model.delay_growth_limit = stable_price_delay_growth_limit;
+            require_group_admin = true;
         }
         if let Some(stable_price_growth_limit) = stable_price_growth_limit_opt {
             bank.stable_price_model.stable_growth_limit = stable_price_growth_limit;
+            require_group_admin = true;
         }
 
         if let Some(min_vault_to_deposits_ratio) = min_vault_to_deposits_ratio_opt {
             bank.min_vault_to_deposits_ratio = min_vault_to_deposits_ratio;
+            require_group_admin = true;
         }
         if let Some(net_borrow_limit_per_window_quote) = net_borrow_limit_per_window_quote_opt {
             bank.net_borrow_limit_per_window_quote = net_borrow_limit_per_window_quote;
+            require_group_admin = true;
         }
         if let Some(net_borrow_limit_window_size_ts) = net_borrow_limit_window_size_ts_opt {
             bank.net_borrow_limit_window_size_ts = net_borrow_limit_window_size_ts;
+            require_group_admin = true;
         }
         if reset_net_borrow_limit {
             bank.net_borrows_in_window = 0;
             bank.last_net_borrows_window_start_ts = 0;
+            require_group_admin = true;
         }
 
         if let Some(borrow_weight_scale_start_quote) = borrow_weight_scale_start_quote_opt {
             bank.borrow_weight_scale_start_quote = borrow_weight_scale_start_quote;
+            require_group_admin = true;
         }
         if let Some(deposit_weight_scale_start_quote) = deposit_weight_scale_start_quote_opt {
             bank.deposit_weight_scale_start_quote = deposit_weight_scale_start_quote;
+            require_group_admin = true;
         }
 
         if let Some(reduce_only) = reduce_only_opt {
             bank.reduce_only = u8::from(reduce_only);
-        };
 
-        // unchanged -
-        // dust
-        // flash_loan_token_account_initial
-        // flash_loan_approved_amount
-        // token_index
-        // bump
-        // mint_decimals
-        // bank_num
-        // reserved
+            // security admin can only enable reduce_only
+            if !reduce_only {
+                require_group_admin = true;
+            }
+        };
+    }
+
+    // account constraint #1
+    if require_group_admin {
+        require!(
+            group.admin == ctx.accounts.admin.key(),
+            MangoError::SomeError
+        );
+    } else {
+        require!(
+            group.admin == ctx.accounts.admin.key()
+                || group.security_admin == ctx.accounts.admin.key(),
+            MangoError::SomeError
+        );
     }
 
     // Assumes that there is at least one bank

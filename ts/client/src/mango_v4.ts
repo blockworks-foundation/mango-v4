@@ -7927,11 +7927,16 @@ export type MangoV4 = {
     },
     {
       "code": 6039,
+      "name": "InitAssetWeightCantBeNegative",
+      "msg": "Init Asset Weight can't be negative"
+    },
+    {
+      "code": 6040,
       "name": "HasOpenPerpTakerFills",
       "msg": "has open perp taker fills"
     },
     {
-      "code": 6040,
+      "code": 6041,
       "name": "DepositLimit",
       "msg": "deposit crosses the current group deposit limit"
     }
@@ -15867,11 +15872,16 @@ export const IDL: MangoV4 = {
     },
     {
       "code": 6039,
+      "name": "InitAssetWeightCantBeNegative",
+      "msg": "Init Asset Weight can't be negative"
+    },
+    {
+      "code": 6040,
       "name": "HasOpenPerpTakerFills",
       "msg": "has open perp taker fills"
     },
     {
-      "code": 6040,
+      "code": 6041,
       "name": "DepositLimit",
       "msg": "deposit crosses the current group deposit limit"
     }

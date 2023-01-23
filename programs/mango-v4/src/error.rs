@@ -83,6 +83,8 @@ pub enum MangoError {
     HasLiquidatableTrustedPerpPnl,
     #[msg("account is frozen")]
     AccountIsFrozen,
+    #[msg("Init Asset Weight can't be negative")]
+    InitAssetWeightCantBeNegative,
     #[msg("has open perp taker fills")]
     HasOpenPerpTakerFills,
     #[msg("deposit crosses the current group deposit limit")]
