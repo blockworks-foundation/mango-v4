@@ -1900,6 +1900,23 @@ export class MangoClient {
     );
   }
 
+  public async perpZeroOutForMarket(
+    group: Group,
+    mangoAccount: MangoAccount,
+    perpMarketIndex: PerpMarketIndex,
+  ): Promise<TransactionSignature> {
+    const perpMarket = group.getPerpMarketByMarketIndex(perpMarketIndex);
+    return await this.program.methods
+      .perpZeroOutForMarket()
+      .accounts({
+        group: group.publicKey,
+        account: mangoAccount.publicKey,
+        perpMarket: perpMarket.publicKey,
+        admin: group.admin,
+      })
+      .rpc();
+  }
+
   public async perpPlaceOrder(
     group: Group,
     mangoAccount: MangoAccount,
