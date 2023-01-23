@@ -189,7 +189,8 @@ impl<'a, 'info> DepositCommon<'a, 'info> {
         // Since depositing can only increase health, we can skip the usual pre-health computation.
         // Also, TokenDeposit is one of the rare instructions that is allowed even during being_liquidated.
         //
-        // TEMPORARY: check is disabled, since we want to enforce a temporary deposit limit
+        // TEMPORARY: (https://github.com/blockworks-foundation/mango-v4/pull/415/files)
+        // check is disabled, since we want to enforce a temporary deposit limit
         // if !account.fixed.is_in_health_region()
         {
             let retriever =
