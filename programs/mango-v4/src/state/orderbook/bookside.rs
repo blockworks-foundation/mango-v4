@@ -3,6 +3,7 @@ use num_enum::{IntoPrimitive, TryFromPrimitive};
 use static_assertions::const_assert_eq;
 
 use super::*;
+use crate::util::checked_math as cm;
 
 #[derive(
     Eq,
@@ -92,10 +93,7 @@ impl BookSide {
     pub fn remove_worst(&mut self, now_ts: u64, oracle_price_lots: i64) -> Option<(LeafNode, i64)> {
         let worst_fixed = self.nodes.find_worst(&self.roots[0]);
         let worst_pegged = self.nodes.find_worst(&self.roots[1]);
-        let side = match self.nodes.order_tree_type() {
-            OrderTreeType::Bids => Side::Bid,
-            OrderTreeType::Asks => Side::Ask,
-        };
+        let side = self.nodes.order_tree_type().side();
         let worse = rank_orders(
             side,
             worst_fixed,
@@ -138,6 +136,50 @@ impl BookSide {
     ) -> Option<LeafNode> {
         let root = &mut self.roots[component as usize];
         self.nodes.remove_by_key(root, search_key)
+    }
+
+    pub fn side(&self) -> Side {
+        self.nodes.order_tree_type().side()
+    }
+
+    /// Return the quantity of orders that can be matched by an order at `limit_price_lots`
+    pub fn quantity_at_price(
+        &self,
+        limit_price_lots: i64,
+        now_ts: u64,
+        oracle_price_lots: i64,
+    ) -> i64 {
+        let side = self.side();
+        let mut sum = 0;
+        for item in self.iter_valid(now_ts, oracle_price_lots) {
+            if side.is_price_better(limit_price_lots, item.price_lots) {
+                break;
+            }
+            sum += item.node.quantity;
+        }
+        sum
+    }
+
+    /// Return the price of the order closest to the spread
+    pub fn best_price(&self, now_ts: u64, oracle_price_lots: i64) -> Option<i64> {
+        Some(
+            self.iter_valid(now_ts, oracle_price_lots)
+                .next()?
+                .price_lots,
+        )
+    }
+
+    /// Walk up the book `quantity` units and return the price at that level. If `quantity` units
+    /// not on book, return None
+    pub fn impact_price(&self, quantity: i64, now_ts: u64, oracle_price_lots: i64) -> Option<i64> {
+        let mut sum: i64 = 0;
+        for order in self.iter_valid(now_ts, oracle_price_lots) {
+            cm!(sum += order.node.quantity);
+            if sum >= quantity {
+                return Some(order.price_lots);
+            }
+        }
+        None
     }
 }
 

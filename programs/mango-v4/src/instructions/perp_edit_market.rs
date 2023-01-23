@@ -16,6 +16,8 @@ pub struct PerpEditMarket<'info> {
     )]
     pub perp_market: AccountLoader<'info, PerpMarket>,
 
+    /// The oracle account is optional and only used when reset_stable_price is set.
+    ///
     /// CHECK: The oracle can be one of several different account types
     pub oracle: UncheckedAccount<'info>,
 }
@@ -49,6 +51,7 @@ pub fn perp_edit_market(
     settle_pnl_limit_factor_opt: Option<f32>,
     settle_pnl_limit_window_size_ts_opt: Option<u64>,
     reduce_only_opt: Option<bool>,
+    reset_stable_price: bool,
 ) -> Result<()> {
     let group = ctx.accounts.group.load()?;
 
@@ -62,8 +65,9 @@ pub fn perp_edit_market(
     };
     if let Some(oracle) = oracle_opt {
         perp_market.oracle = oracle;
-
-        require_keys_eq!(oracle, ctx.accounts.oracle.key());
+    }
+    if reset_stable_price {
+        require_keys_eq!(perp_market.oracle, ctx.accounts.oracle.key());
         let oracle_price = perp_market
             .oracle_price(&AccountInfoRef::borrow(ctx.accounts.oracle.as_ref())?, None)?;
         perp_market.stable_price_model.reset_to_price(

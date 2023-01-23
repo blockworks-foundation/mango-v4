@@ -13,10 +13,10 @@ pub struct PerpUpdateFunding<'info> {
 
     #[account(
         mut,
+        has_one = group,
         has_one = bids,
         has_one = asks,
         has_one = oracle,
-        constraint = perp_market.load()?.group.key() == group.key(),
     )]
     pub perp_market: AccountLoader<'info, PerpMarket>,
     #[account(mut)]

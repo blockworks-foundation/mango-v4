@@ -48,6 +48,7 @@ export class PerpMarket {
 
   public _price: I80F48;
   public _uiPrice: number;
+  public _oracleLastUpdatedSlot: number;
 
   private priceLotsToUiConverter: number;
   private baseLotsToUiConverter: number;
@@ -246,6 +247,15 @@ export class PerpMarket {
     return this._uiPrice;
   }
 
+  get oracleLastUpdatedSlot(): number {
+    if (!this._oracleLastUpdatedSlot) {
+      throw new Error(
+        `Undefined oracleLastUpdatedSlot for perpMarket ${this.publicKey} with marketIndex ${this.perpMarketIndex}!`,
+      );
+    }
+    return this._oracleLastUpdatedSlot;
+  }
+
   get minOrderSize(): number {
     return this.baseLotsToUiConverter;
   }
@@ -421,7 +431,9 @@ export class PerpMarket {
     direction: 'negative' | 'positive',
     count = 2,
   ): Promise<{ account: MangoAccount; settleablePnl: I80F48 }[]> {
-    let accountsWithSettleablePnl = (await client.getAllMangoAccounts(group))
+    let accountsWithSettleablePnl = (
+      await client.getAllMangoAccounts(group, true)
+    )
       .filter((acc) => acc.perpPositionExistsForMarket(this))
       .map((acc) => {
         const pp = acc

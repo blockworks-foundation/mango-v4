@@ -21,6 +21,7 @@ pub fn group_edit(
     security_admin_opt: Option<Pubkey>,
     testing_opt: Option<u8>,
     version_opt: Option<u8>,
+    deposit_limit_quote_opt: Option<u64>,
 ) -> Result<()> {
     let mut group = ctx.accounts.group.load_mut()?;
 
@@ -42,6 +43,10 @@ pub fn group_edit(
 
     if let Some(version) = version_opt {
         group.version = version;
+    }
+
+    if let Some(deposit_limit_quote) = deposit_limit_quote_opt {
+        group.deposit_limit_quote = deposit_limit_quote;
     }
 
     Ok(())

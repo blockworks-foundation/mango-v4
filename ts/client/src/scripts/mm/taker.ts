@@ -31,7 +31,7 @@ async function settlePnl(
   const pp = mangoAccount
     .perpActive()
     .find((pp) => pp.marketIndex === perpMarket.perpMarketIndex)!;
-  const pnl = pp.getPnl(perpMarket);
+  const pnl = pp.getUnsettledPnl(perpMarket);
 
   console.log(
     `Avg entry price - ${pp.getAverageEntryPriceUi(
@@ -177,7 +177,7 @@ async function main() {
   );
 
   // Load mango account
-  let mangoAccount = await client.getMangoAccountForPublicKey(
+  let mangoAccount = await client.getMangoAccount(
     new PublicKey(MANGO_ACCOUNT_PK),
   );
   await mangoAccount.reload(client);

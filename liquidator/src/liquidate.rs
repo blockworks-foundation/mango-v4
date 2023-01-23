@@ -168,7 +168,7 @@ impl<'a> LiquidateHelper<'a> {
         > = stream::iter(self.liqee.active_perp_positions())
             .then(|pp| async {
                 let base_lots = pp.base_position_lots();
-                if base_lots == 0 {
+                if base_lots == 0 || pp.has_open_taker_fills() {
                     return Ok(None);
                 }
                 let perp = self.client.context.perp(pp.market_index);
@@ -505,7 +505,7 @@ impl<'a> LiquidateHelper<'a> {
     }
 
     async fn token_liq_bankruptcy(&self) -> anyhow::Result<Option<Signature>> {
-        if !self.health_cache.can_call_spot_bankruptcy() {
+        if !self.health_cache.in_phase3_liquidation() || !self.health_cache.has_spot_borrows() {
             return Ok(None);
         }
 
@@ -557,7 +557,7 @@ impl<'a> LiquidateHelper<'a> {
         Ok(Some(sig))
     }
 
-    async fn send_liq_tx(&self) -> anyhow::Result<Signature> {
+    async fn send_liq_tx(&self) -> anyhow::Result<Option<Signature>> {
         // TODO: Should we make an attempt to settle positive PNL first?
         // The problem with it is that small market movements can continuously create
         // small amounts of new positive PNL while base_position > 0.
@@ -572,10 +572,18 @@ impl<'a> LiquidateHelper<'a> {
         //
         // TODO: All these close ix could be in one transaction.
         if let Some(txsig) = self.perp_close_orders().await? {
-            return Ok(txsig);
+            return Ok(Some(txsig));
         }
         if let Some(txsig) = self.serum3_close_orders().await? {
-            return Ok(txsig);
+            return Ok(Some(txsig));
+        }
+
+        if self.health_cache.has_phase1_liquidatable() {
+            anyhow::bail!(
+                "Don't know what to do with phase1 liquidatable account {}, maint_health was {}",
+                self.pubkey,
+                self.maint_health
+            );
         }
 
         //
@@ -583,7 +591,7 @@ impl<'a> LiquidateHelper<'a> {
         //
 
         if let Some(txsig) = self.perp_liq_base_position().await? {
-            return Ok(txsig);
+            return Ok(Some(txsig));
         }
 
         // Now that the perp base positions are zeroed the perp pnl won't
@@ -596,7 +604,24 @@ impl<'a> LiquidateHelper<'a> {
         // }
 
         if let Some(txsig) = self.token_liq().await? {
-            return Ok(txsig);
+            return Ok(Some(txsig));
+        }
+
+        if self.health_cache.has_perp_open_fills() {
+            log::info!(
+                "Account {} has open perp fills, maint_health {}, waiting...",
+                self.pubkey,
+                self.maint_health
+            );
+            return Ok(None);
+        }
+
+        if self.health_cache.has_phase2_liquidatable() {
+            anyhow::bail!(
+                "Don't know what to do with phase2 liquidatable account {}, maint_health was {}",
+                self.pubkey,
+                self.maint_health
+            );
         }
 
         //
@@ -605,12 +630,12 @@ impl<'a> LiquidateHelper<'a> {
 
         // Negative pnl: take over (paid by liqee or insurance) or socialize the loss
         if let Some(txsig) = self.perp_liq_quote_and_bankruptcy().await? {
-            return Ok(txsig);
+            return Ok(Some(txsig));
         }
 
         // Socialize/insurance fund unliquidatable borrows
         if let Some(txsig) = self.token_liq_bankruptcy().await? {
-            return Ok(txsig);
+            return Ok(Some(txsig));
         }
 
         // TODO: What about unliquidatable positive perp pnl?
@@ -670,7 +695,7 @@ pub async fn maybe_liquidate_account(
     );
 
     // try liquidating
-    let txsig = LiquidateHelper {
+    let maybe_txsig = LiquidateHelper {
         client: mango_client,
         account_fetcher,
         pubkey,
@@ -684,16 +709,18 @@ pub async fn maybe_liquidate_account(
     .send_liq_tx()
     .await?;
 
-    let slot = account_fetcher.transaction_max_slot(&[txsig]).await?;
-    if let Err(e) = account_fetcher
-        .refresh_accounts_via_rpc_until_slot(
-            &[*pubkey, mango_client.mango_account_address],
-            slot,
-            config.refresh_timeout,
-        )
-        .await
-    {
-        log::info!("could not refresh after liquidation: {}", e);
+    if let Some(txsig) = maybe_txsig {
+        let slot = account_fetcher.transaction_max_slot(&[txsig]).await?;
+        if let Err(e) = account_fetcher
+            .refresh_accounts_via_rpc_until_slot(
+                &[*pubkey, mango_client.mango_account_address],
+                slot,
+                config.refresh_timeout,
+            )
+            .await
+        {
+            log::info!("could not refresh after liquidation: {}", e);
+        }
     }
 
     Ok(true)

@@ -13,10 +13,6 @@ use crate::util::checked_math as cm;
 use super::*;
 
 impl HealthCache {
-    pub fn can_call_spot_bankruptcy(&self) -> bool {
-        !self.has_liquidatable_assets() && self.has_spot_borrows()
-    }
-
     pub fn is_liquidatable(&self) -> bool {
         if self.being_liquidated {
             self.health(HealthType::Init).is_negative()
@@ -951,6 +947,7 @@ mod tests {
             quote: I80F48::ZERO,
             prices: Prices::new_single_price(I80F48::from_num(2.0)),
             has_open_orders: false,
+            has_open_fills: false,
         };
 
         let health_cache = HealthCache {

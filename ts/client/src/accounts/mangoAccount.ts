@@ -90,7 +90,7 @@ export class MangoAccount {
 
   public async reload(client: MangoClient): Promise<MangoAccount> {
     const mangoAccount = await client.getMangoAccount(this);
-    await mangoAccount.reloadAccountData(client);
+    await mangoAccount.reloadSerum3OpenOrders(client);
     Object.assign(this, mangoAccount);
     return mangoAccount;
   }
@@ -99,12 +99,12 @@ export class MangoAccount {
     client: MangoClient,
   ): Promise<{ value: MangoAccount; slot: number }> {
     const resp = await client.getMangoAccountWithSlot(this.publicKey);
-    await resp?.value.reloadAccountData(client);
+    await resp?.value.reloadSerum3OpenOrders(client);
     Object.assign(this, resp?.value);
     return { value: resp!.value, slot: resp!.slot };
   }
 
-  async reloadAccountData(client: MangoClient): Promise<MangoAccount> {
+  async reloadSerum3OpenOrders(client: MangoClient): Promise<MangoAccount> {
     const serum3Active = this.serum3Active();
     const ais =
       await client.program.provider.connection.getMultipleAccountsInfo(
@@ -175,7 +175,6 @@ export class MangoAccount {
 
   public getPerpPosition(
     perpMarketIndex: PerpMarketIndex,
-    useEventQueue?: boolean,
   ): PerpPosition | undefined {
     return this.perps.find((pp) => pp.marketIndex == perpMarketIndex);
   }
@@ -982,7 +981,15 @@ export class MangoAccount {
 
     res =
       this.perpActive().length > 0
-        ? res + '\n perps:' + JSON.stringify(this.perpActive(), null, 4)
+        ? res +
+          '\n perps:' +
+          JSON.stringify(
+            this.perpActive().map((p) =>
+              p.toString(group?.getPerpMarketByMarketIndex(p.marketIndex)),
+            ),
+            null,
+            4,
+          )
         : res + '';
 
     res =
@@ -1180,6 +1187,7 @@ export class PerpPosition {
       I80F48.from(dto.realizedTradePnlNative),
       I80F48.from(dto.realizedOtherPnlNative),
       dto.settlePnlLimitRealizedTrade,
+      I80F48.from(dto.realizedPnlForPositionNative),
     );
   }
 
@@ -1208,6 +1216,7 @@ export class PerpPosition {
       ZERO_I80F48(),
       ZERO_I80F48(),
       new BN(0),
+      ZERO_I80F48(),
     );
   }
 
@@ -1233,10 +1242,15 @@ export class PerpPosition {
     public realizedTradePnlNative: I80F48,
     public realizedOtherPnlNative: I80F48,
     public settlePnlLimitRealizedTrade: BN,
+    public realizedPnlForPositionNative: I80F48,
   ) {}
 
   isActive(): boolean {
     return this.marketIndex !== PerpPosition.PerpMarketIndexUnset;
+  }
+
+  public getBasePositionNative(perpMarket: PerpMarket): I80F48 {
+    return I80F48.fromI64(this.basePositionLots.mul(perpMarket.baseLotSize));
   }
 
   public getBasePositionUi(
@@ -1271,15 +1285,12 @@ export class PerpPosition {
     return ZERO_I80F48();
   }
 
-  public getEquityUi(group: Group, perpMarket: PerpMarket): number {
+  public getEquityUi(perpMarket: PerpMarket): number {
     if (perpMarket.perpMarketIndex !== this.marketIndex) {
       throw new Error("PerpPosition doesn't belong to the given market!");
     }
 
-    return toUiDecimals(
-      this.getEquity(perpMarket),
-      group.getMintDecimalsByTokenIndex(perpMarket.settleTokenIndex),
-    );
+    return toUiDecimalsForQuote(this.getEquity(perpMarket));
   }
 
   public getEquity(perpMarket: PerpMarket): I80F48 {
@@ -1316,13 +1327,15 @@ export class PerpPosition {
     );
   }
 
-  public getAverageEntryPriceUi(perpMarket: PerpMarket): number {
-    if (perpMarket.perpMarketIndex !== this.marketIndex) {
-      throw new Error("PerpPosition doesn't belong to the given market!");
-    }
+  public getAverageEntryPrice(perpMarket: PerpMarket): I80F48 {
+    return I80F48.fromNumber(this.avgEntryPricePerBaseLot).div(
+      I80F48.fromI64(perpMarket.baseLotSize),
+    );
+  }
 
+  public getAverageEntryPriceUi(perpMarket: PerpMarket): number {
     return perpMarket.priceNativeToUi(
-      this.avgEntryPricePerBaseLot / perpMarket.baseLotSize.toNumber(),
+      this.getAverageEntryPrice(perpMarket).toNumber(),
     );
   }
 
@@ -1340,16 +1353,34 @@ export class PerpPosition {
     );
   }
 
-  public getPnl(perpMarket: PerpMarket): I80F48 {
+  public cumulativePnlOverPositionLifetimeUi(perpMarket: PerpMarket): number {
+    if (perpMarket.perpMarketIndex !== this.marketIndex) {
+      throw new Error("PerpPosition doesn't belong to the given market!");
+    }
+
+    const priceChange = perpMarket.price.sub(
+      this.getAverageEntryPrice(perpMarket),
+    );
+
+    return toUiDecimalsForQuote(
+      this.realizedPnlForPositionNative.add(
+        this.getBasePositionNative(perpMarket).mul(priceChange),
+      ),
+    );
+  }
+
+  public getUnsettledPnl(perpMarket: PerpMarket): I80F48 {
     if (perpMarket.perpMarketIndex !== this.marketIndex) {
       throw new Error("PerpPosition doesn't belong to the given market!");
     }
 
     return this.quotePositionNative.add(
-      I80F48.fromI64(this.basePositionLots.mul(perpMarket.baseLotSize)).mul(
-        perpMarket.price,
-      ),
+      this.getBasePositionNative(perpMarket).mul(perpMarket.price),
     );
+  }
+
+  public getUnsettledPnlUi(perpMarket: PerpMarket): number {
+    return toUiDecimalsForQuote(this.getUnsettledPnl(perpMarket));
   }
 
   public updateSettleLimit(perpMarket: PerpMarket): void {
@@ -1432,7 +1463,31 @@ export class PerpPosition {
       throw new Error("PerpPosition doesn't belong to the given market!");
     }
 
-    return this.applyPnlSettleLimit(this.getPnl(perpMarket), perpMarket);
+    return this.applyPnlSettleLimit(
+      this.getUnsettledPnl(perpMarket),
+      perpMarket,
+    );
+  }
+
+  toString(perpMarket?: PerpMarket): string {
+    return perpMarket
+      ? 'market - ' +
+          perpMarket.name +
+          ', basePositionLots - ' +
+          perpMarket.baseLotsToUi(this.basePositionLots) +
+          ', quotePositive - ' +
+          toUiDecimalsForQuote(this.quotePositionNative.toNumber()) +
+          ', bidsBaseLots - ' +
+          perpMarket.baseLotsToUi(this.bidsBaseLots) +
+          ', asksBaseLots - ' +
+          perpMarket.baseLotsToUi(this.asksBaseLots) +
+          ', takerBaseLots - ' +
+          perpMarket.baseLotsToUi(this.takerBaseLots) +
+          ', takerQuoteLots - ' +
+          perpMarket.quoteLotsToUi(this.takerQuoteLots) +
+          ', unsettled pnl - ' +
+          this.getUnsettledPnlUi(perpMarket!).toString()
+      : '';
   }
 }
 
@@ -1459,6 +1514,7 @@ export class PerpPositionDto {
     public realizedTradePnlNative: I80F48Dto,
     public realizedOtherPnlNative: I80F48Dto,
     public settlePnlLimitRealizedTrade: BN,
+    public realizedPnlForPositionNative: I80F48Dto,
   ) {}
 }
 

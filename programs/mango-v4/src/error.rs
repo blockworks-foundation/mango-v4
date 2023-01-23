@@ -85,6 +85,10 @@ pub enum MangoError {
     AccountIsFrozen,
     #[msg("Init Asset Weight can't be negative")]
     InitAssetWeightCantBeNegative,
+    #[msg("has open perp taker fills")]
+    HasOpenPerpTakerFills,
+    #[msg("deposit crosses the current group deposit limit")]
+    DepositLimit,
 }
 
 impl MangoError {

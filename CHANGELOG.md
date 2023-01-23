@@ -6,6 +6,14 @@ Update this for each program release and mainnet deployment.
 
 ## mainnet
 
+### v0.3.0, 2023-1-17
+
+Deployment: Jan 17, 2023 at 14:57:12 Central European Standard Time, https://explorer.solana.com/tx/5uGKvLwcBjPkUAKtFGqKdwm6pHXFaMGkF44P8rhJrRbmTGwgKShkSoVvLvqDNvJYa4iMftiQgZW7gG9tQaXjmrEk
+
+- Add perp market pnl asset weights, replacing the "trusted market" flag (#391)
+- Add tracking of realized PnL over a position's lifetime to perp positions (#392)
+- Fix oracle staleness detection for pyth oracles (#393)
+
 ### v0.2.0, 2023-1-13
 
 Deployment: Jan 13, 2023 at 11:31:05 Central European Standard Time, https://explorer.solana.com/tx/4yGRUk6QwntvC4umECDPDZJNcbevSJ1fdZi75Mz9rGa9SHKzUtjMF3V5FCTkzBZqAETQTccqv63BYw6yX8JNxiur

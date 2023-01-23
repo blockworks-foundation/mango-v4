@@ -719,10 +719,10 @@ async fn test_liq_perps_base_position_and_bankruptcy() -> Result<(), TransportEr
     // the remainder got socialized via funding payments
     let perp_market = solana.get_account::<PerpMarket>(perp_market).await;
     let pnl_before = liqee_before.perps[0]
-        .pnl_for_price(&perp_market, I80F48::ONE)
+        .unsettled_pnl(&perp_market, I80F48::ONE)
         .unwrap();
     let pnl_after = liqee_after.perps[0]
-        .pnl_for_price(&perp_market, I80F48::ONE)
+        .unsettled_pnl(&perp_market, I80F48::ONE)
         .unwrap();
     let socialized_amount = (pnl_after - pnl_before).to_num::<f64>() - liq_perp_quote_amount;
     assert!(assert_equal(

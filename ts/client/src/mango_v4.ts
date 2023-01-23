@@ -1,5 +1,5 @@
 export type MangoV4 = {
-  "version": "0.3.0",
+  "version": "0.4.0",
   "name": "mango_v4",
   "instructions": [
     {
@@ -137,6 +137,12 @@ export type MangoV4 = {
           "name": "versionOpt",
           "type": {
             "option": "u8"
+          }
+        },
+        {
+          "name": "depositLimitQuoteOpt",
+          "type": {
+            "option": "u64"
           }
         }
       ]
@@ -542,7 +548,11 @@ export type MangoV4 = {
         {
           "name": "oracle",
           "isMut": false,
-          "isSigner": false
+          "isSigner": false,
+          "docs": [
+            "The oracle account is optional and only used when reset_stable_price is set.",
+            ""
+          ]
         }
       ],
       "args": [
@@ -2610,7 +2620,11 @@ export type MangoV4 = {
         {
           "name": "oracle",
           "isMut": false,
-          "isSigner": false
+          "isSigner": false,
+          "docs": [
+            "The oracle account is optional and only used when reset_stable_price is set.",
+            ""
+          ]
         }
       ],
       "args": [
@@ -2771,6 +2785,10 @@ export type MangoV4 = {
           "type": {
             "option": "bool"
           }
+        },
+        {
+          "name": "resetStablePrice",
+          "type": "bool"
         }
       ]
     },
@@ -2842,6 +2860,32 @@ export type MangoV4 = {
           "name": "perpMarket",
           "isMut": false,
           "isSigner": false
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "perpZeroOutForMarket",
+      "accounts": [
+        {
+          "name": "group",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "account",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "perpMarket",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "admin",
+          "isMut": false,
+          "isSigner": true
         }
       ],
       "args": []
@@ -3945,11 +3989,15 @@ export type MangoV4 = {
             "type": "publicKey"
           },
           {
+            "name": "depositLimitQuote",
+            "type": "u64"
+          },
+          {
             "name": "reserved",
             "type": {
               "array": [
                 "u8",
-                1888
+                1880
               ]
             }
           }
@@ -4308,17 +4356,27 @@ export type MangoV4 = {
           },
           {
             "name": "settleTokenIndex",
+            "docs": [
+              "Token index that settlements happen in.",
+              "",
+              "Currently required to be 0, USDC. In the future settlement",
+              "may be allowed to happen in other tokens."
+            ],
             "type": "u16"
           },
           {
             "name": "perpMarketIndex",
             "docs": [
-              "Lookup indices"
+              "Index of this perp market. Other data, like the MangoAccount's PerpPosition",
+              "reference this market via this index. Unique for this group's perp markets."
             ],
             "type": "u16"
           },
           {
             "name": "blocked1",
+            "docs": [
+              "Field used to contain the trusted_market flag and is now unused."
+            ],
             "type": "u8"
           },
           {
@@ -4337,10 +4395,18 @@ export type MangoV4 = {
           },
           {
             "name": "baseDecimals",
+            "docs": [
+              "Number of decimals used for the base token.",
+              "",
+              "Used to convert the oracle's price into a native/native price."
+            ],
             "type": "u8"
           },
           {
             "name": "name",
+            "docs": [
+              "Name. Trailing zero bytes are ignored."
+            ],
             "type": {
               "array": [
                 "u8",
@@ -4350,28 +4416,46 @@ export type MangoV4 = {
           },
           {
             "name": "bids",
+            "docs": [
+              "Address of the BookSide account for bids"
+            ],
             "type": "publicKey"
           },
           {
             "name": "asks",
+            "docs": [
+              "Address of the BookSide account for asks"
+            ],
             "type": "publicKey"
           },
           {
             "name": "eventQueue",
+            "docs": [
+              "Address of the EventQueue account"
+            ],
             "type": "publicKey"
           },
           {
             "name": "oracle",
+            "docs": [
+              "Oracle account address"
+            ],
             "type": "publicKey"
           },
           {
             "name": "oracleConfig",
+            "docs": [
+              "Oracle configuration"
+            ],
             "type": {
               "defined": "OracleConfig"
             }
           },
           {
             "name": "stablePriceModel",
+            "docs": [
+              "Maintains a stable price based on the oracle price that is less volatile."
+            ],
             "type": {
               "defined": "StablePriceModel"
             }
@@ -4379,21 +4463,31 @@ export type MangoV4 = {
           {
             "name": "quoteLotSize",
             "docs": [
-              "Number of quote native that reresents min tick"
+              "Number of quote native in a quote lot. Must be a power of 10.",
+              "",
+              "Primarily useful for increasing the tick size on the market: A lot price",
+              "of 1 becomes a native price of quote_lot_size/base_lot_size becomes a",
+              "ui price of quote_lot_size*base_decimals/base_lot_size/quote_decimals."
             ],
             "type": "i64"
           },
           {
             "name": "baseLotSize",
             "docs": [
-              "Represents number of base native quantity",
-              "e.g. if base decimals for underlying asset are 6, base lot size is 100, and base position is 10000, then",
-              "UI position is 1"
+              "Number of base native in a base lot. Must be a power of 10.",
+              "",
+              "Example: If base decimals for the underlying asset is 6, base lot size",
+              "is 100 and and base position lots is 10_000 then base position native is",
+              "1_000_000 and base position ui is 1."
             ],
             "type": "i64"
           },
           {
             "name": "maintBaseAssetWeight",
+            "docs": [
+              "These weights apply to the base position. The quote position has",
+              "no explicit weight (but may be covered by the overall pnl asset weight)."
+            ],
             "type": {
               "defined": "I80F48"
             }
@@ -4418,6 +4512,9 @@ export type MangoV4 = {
           },
           {
             "name": "openInterest",
+            "docs": [
+              "Number of base lot pairs currently active in the market. Always >= 0."
+            ],
             "type": "i64"
           },
           {
@@ -4429,12 +4526,15 @@ export type MangoV4 = {
           },
           {
             "name": "registrationTime",
+            "docs": [
+              "Timestamp in seconds that the market was registered at."
+            ],
             "type": "u64"
           },
           {
             "name": "minFunding",
             "docs": [
-              "Funding"
+              "Minimal funding rate per day, must be <= 0."
             ],
             "type": {
               "defined": "I80F48"
@@ -4442,22 +4542,38 @@ export type MangoV4 = {
           },
           {
             "name": "maxFunding",
+            "docs": [
+              "Maximal funding rate per day, must be >= 0."
+            ],
             "type": {
               "defined": "I80F48"
             }
           },
           {
             "name": "impactQuantity",
+            "docs": [
+              "For funding, get the impact price this many base lots deep into the book."
+            ],
             "type": "i64"
           },
           {
             "name": "longFunding",
+            "docs": [
+              "Current long funding value. Increasing it means that every long base lot",
+              "needs to pay that amount in funding.",
+              "",
+              "PerpPosition uses and tracks it settle funding. Updated by the perp",
+              "keeper instruction."
+            ],
             "type": {
               "defined": "I80F48"
             }
           },
           {
             "name": "shortFunding",
+            "docs": [
+              "See long_funding."
+            ],
             "type": {
               "defined": "I80F48"
             }
@@ -4472,7 +4588,8 @@ export type MangoV4 = {
           {
             "name": "liquidationFee",
             "docs": [
-              "Fees"
+              "Fees",
+              "Fee for base position liquidation"
             ],
             "type": {
               "defined": "I80F48"
@@ -4480,12 +4597,18 @@ export type MangoV4 = {
           },
           {
             "name": "makerFee",
+            "docs": [
+              "Fee when matching maker orders. May be negative."
+            ],
             "type": {
               "defined": "I80F48"
             }
           },
           {
             "name": "takerFee",
+            "docs": [
+              "Fee for taker orders, may not be negative."
+            ],
             "type": {
               "defined": "I80F48"
             }
@@ -4510,6 +4633,9 @@ export type MangoV4 = {
           },
           {
             "name": "feePenalty",
+            "docs": [
+              "Fee (in quote native) to charge for ioc orders"
+            ],
             "type": "f32"
           },
           {
@@ -4569,6 +4695,10 @@ export type MangoV4 = {
           },
           {
             "name": "reduceOnly",
+            "docs": [
+              "If true, users may no longer increase their market exposure. Only actions",
+              "that reduce their position are still allowed."
+            ],
             "type": "u8"
           },
           {
@@ -4582,6 +4712,9 @@ export type MangoV4 = {
           },
           {
             "name": "maintPnlAssetWeight",
+            "docs": [
+              "Weights for full perp market health, if positive"
+            ],
             "type": {
               "defined": "I80F48"
             }
@@ -4962,6 +5095,10 @@ export type MangoV4 = {
           },
           {
             "name": "hasOpenOrders",
+            "type": "bool"
+          },
+          {
+            "name": "hasOpenFills",
             "type": "bool"
           }
         ]
@@ -5366,11 +5503,26 @@ export type MangoV4 = {
             "type": "i64"
           },
           {
+            "name": "realizedPnlForPositionNative",
+            "docs": [
+              "Trade pnl, fees, funding that were added over the current position's lifetime.",
+              "",
+              "Reset when the position changes sign or goes to zero.",
+              "Not decreased by settling.",
+              "",
+              "This is tracked for display purposes: this value plus the difference between entry",
+              "price and current price of the base position is the overall pnl."
+            ],
+            "type": {
+              "defined": "I80F48"
+            }
+          },
+          {
             "name": "reserved",
             "type": {
               "array": [
                 "u8",
-                104
+                88
               ]
             }
           }
@@ -5641,14 +5793,23 @@ export type MangoV4 = {
         "fields": [
           {
             "name": "tag",
+            "docs": [
+              "NodeTag"
+            ],
             "type": "u8"
           },
           {
             "name": "ownerSlot",
+            "docs": [
+              "Index into the owning MangoAccount's PerpOpenOrders"
+            ],
             "type": "u8"
           },
           {
             "name": "orderType",
+            "docs": [
+              "PostOrderType, this was added for TradingView move order"
+            ],
             "type": "u8"
           },
           {
@@ -5680,24 +5841,39 @@ export type MangoV4 = {
           {
             "name": "key",
             "docs": [
-              "The binary tree key"
+              "The binary tree key, see new_node_key()"
             ],
             "type": "u128"
           },
           {
             "name": "owner",
+            "docs": [
+              "Address of the owning MangoAccount"
+            ],
             "type": "publicKey"
           },
           {
             "name": "quantity",
+            "docs": [
+              "Number of base lots to buy or sell, always >=1"
+            ],
             "type": "i64"
           },
           {
             "name": "timestamp",
+            "docs": [
+              "The time the order was placed"
+            ],
             "type": "u64"
           },
           {
             "name": "pegLimit",
+            "docs": [
+              "If the effective price of an oracle pegged order exceeds this limit,",
+              "it will be considered invalid and may be removed.",
+              "",
+              "Only applicable in the oracle_pegged OrderTree"
+            ],
             "type": "i64"
           },
           {
@@ -7748,12 +7924,27 @@ export type MangoV4 = {
       "code": 6038,
       "name": "AccountIsFrozen",
       "msg": "account is frozen"
+    },
+    {
+      "code": 6039,
+      "name": "InitAssetWeightCantBeNegative",
+      "msg": "Init Asset Weight can't be negative"
+    },
+    {
+      "code": 6040,
+      "name": "HasOpenPerpTakerFills",
+      "msg": "has open perp taker fills"
+    },
+    {
+      "code": 6041,
+      "name": "DepositLimit",
+      "msg": "deposit crosses the current group deposit limit"
     }
   ]
 };
 
 export const IDL: MangoV4 = {
-  "version": "0.3.0",
+  "version": "0.4.0",
   "name": "mango_v4",
   "instructions": [
     {
@@ -7891,6 +8082,12 @@ export const IDL: MangoV4 = {
           "name": "versionOpt",
           "type": {
             "option": "u8"
+          }
+        },
+        {
+          "name": "depositLimitQuoteOpt",
+          "type": {
+            "option": "u64"
           }
         }
       ]
@@ -8296,7 +8493,11 @@ export const IDL: MangoV4 = {
         {
           "name": "oracle",
           "isMut": false,
-          "isSigner": false
+          "isSigner": false,
+          "docs": [
+            "The oracle account is optional and only used when reset_stable_price is set.",
+            ""
+          ]
         }
       ],
       "args": [
@@ -10364,7 +10565,11 @@ export const IDL: MangoV4 = {
         {
           "name": "oracle",
           "isMut": false,
-          "isSigner": false
+          "isSigner": false,
+          "docs": [
+            "The oracle account is optional and only used when reset_stable_price is set.",
+            ""
+          ]
         }
       ],
       "args": [
@@ -10525,6 +10730,10 @@ export const IDL: MangoV4 = {
           "type": {
             "option": "bool"
           }
+        },
+        {
+          "name": "resetStablePrice",
+          "type": "bool"
         }
       ]
     },
@@ -10596,6 +10805,32 @@ export const IDL: MangoV4 = {
           "name": "perpMarket",
           "isMut": false,
           "isSigner": false
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "perpZeroOutForMarket",
+      "accounts": [
+        {
+          "name": "group",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "account",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "perpMarket",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "admin",
+          "isMut": false,
+          "isSigner": true
         }
       ],
       "args": []
@@ -11699,11 +11934,15 @@ export const IDL: MangoV4 = {
             "type": "publicKey"
           },
           {
+            "name": "depositLimitQuote",
+            "type": "u64"
+          },
+          {
             "name": "reserved",
             "type": {
               "array": [
                 "u8",
-                1888
+                1880
               ]
             }
           }
@@ -12062,17 +12301,27 @@ export const IDL: MangoV4 = {
           },
           {
             "name": "settleTokenIndex",
+            "docs": [
+              "Token index that settlements happen in.",
+              "",
+              "Currently required to be 0, USDC. In the future settlement",
+              "may be allowed to happen in other tokens."
+            ],
             "type": "u16"
           },
           {
             "name": "perpMarketIndex",
             "docs": [
-              "Lookup indices"
+              "Index of this perp market. Other data, like the MangoAccount's PerpPosition",
+              "reference this market via this index. Unique for this group's perp markets."
             ],
             "type": "u16"
           },
           {
             "name": "blocked1",
+            "docs": [
+              "Field used to contain the trusted_market flag and is now unused."
+            ],
             "type": "u8"
           },
           {
@@ -12091,10 +12340,18 @@ export const IDL: MangoV4 = {
           },
           {
             "name": "baseDecimals",
+            "docs": [
+              "Number of decimals used for the base token.",
+              "",
+              "Used to convert the oracle's price into a native/native price."
+            ],
             "type": "u8"
           },
           {
             "name": "name",
+            "docs": [
+              "Name. Trailing zero bytes are ignored."
+            ],
             "type": {
               "array": [
                 "u8",
@@ -12104,28 +12361,46 @@ export const IDL: MangoV4 = {
           },
           {
             "name": "bids",
+            "docs": [
+              "Address of the BookSide account for bids"
+            ],
             "type": "publicKey"
           },
           {
             "name": "asks",
+            "docs": [
+              "Address of the BookSide account for asks"
+            ],
             "type": "publicKey"
           },
           {
             "name": "eventQueue",
+            "docs": [
+              "Address of the EventQueue account"
+            ],
             "type": "publicKey"
           },
           {
             "name": "oracle",
+            "docs": [
+              "Oracle account address"
+            ],
             "type": "publicKey"
           },
           {
             "name": "oracleConfig",
+            "docs": [
+              "Oracle configuration"
+            ],
             "type": {
               "defined": "OracleConfig"
             }
           },
           {
             "name": "stablePriceModel",
+            "docs": [
+              "Maintains a stable price based on the oracle price that is less volatile."
+            ],
             "type": {
               "defined": "StablePriceModel"
             }
@@ -12133,21 +12408,31 @@ export const IDL: MangoV4 = {
           {
             "name": "quoteLotSize",
             "docs": [
-              "Number of quote native that reresents min tick"
+              "Number of quote native in a quote lot. Must be a power of 10.",
+              "",
+              "Primarily useful for increasing the tick size on the market: A lot price",
+              "of 1 becomes a native price of quote_lot_size/base_lot_size becomes a",
+              "ui price of quote_lot_size*base_decimals/base_lot_size/quote_decimals."
             ],
             "type": "i64"
           },
           {
             "name": "baseLotSize",
             "docs": [
-              "Represents number of base native quantity",
-              "e.g. if base decimals for underlying asset are 6, base lot size is 100, and base position is 10000, then",
-              "UI position is 1"
+              "Number of base native in a base lot. Must be a power of 10.",
+              "",
+              "Example: If base decimals for the underlying asset is 6, base lot size",
+              "is 100 and and base position lots is 10_000 then base position native is",
+              "1_000_000 and base position ui is 1."
             ],
             "type": "i64"
           },
           {
             "name": "maintBaseAssetWeight",
+            "docs": [
+              "These weights apply to the base position. The quote position has",
+              "no explicit weight (but may be covered by the overall pnl asset weight)."
+            ],
             "type": {
               "defined": "I80F48"
             }
@@ -12172,6 +12457,9 @@ export const IDL: MangoV4 = {
           },
           {
             "name": "openInterest",
+            "docs": [
+              "Number of base lot pairs currently active in the market. Always >= 0."
+            ],
             "type": "i64"
           },
           {
@@ -12183,12 +12471,15 @@ export const IDL: MangoV4 = {
           },
           {
             "name": "registrationTime",
+            "docs": [
+              "Timestamp in seconds that the market was registered at."
+            ],
             "type": "u64"
           },
           {
             "name": "minFunding",
             "docs": [
-              "Funding"
+              "Minimal funding rate per day, must be <= 0."
             ],
             "type": {
               "defined": "I80F48"
@@ -12196,22 +12487,38 @@ export const IDL: MangoV4 = {
           },
           {
             "name": "maxFunding",
+            "docs": [
+              "Maximal funding rate per day, must be >= 0."
+            ],
             "type": {
               "defined": "I80F48"
             }
           },
           {
             "name": "impactQuantity",
+            "docs": [
+              "For funding, get the impact price this many base lots deep into the book."
+            ],
             "type": "i64"
           },
           {
             "name": "longFunding",
+            "docs": [
+              "Current long funding value. Increasing it means that every long base lot",
+              "needs to pay that amount in funding.",
+              "",
+              "PerpPosition uses and tracks it settle funding. Updated by the perp",
+              "keeper instruction."
+            ],
             "type": {
               "defined": "I80F48"
             }
           },
           {
             "name": "shortFunding",
+            "docs": [
+              "See long_funding."
+            ],
             "type": {
               "defined": "I80F48"
             }
@@ -12226,7 +12533,8 @@ export const IDL: MangoV4 = {
           {
             "name": "liquidationFee",
             "docs": [
-              "Fees"
+              "Fees",
+              "Fee for base position liquidation"
             ],
             "type": {
               "defined": "I80F48"
@@ -12234,12 +12542,18 @@ export const IDL: MangoV4 = {
           },
           {
             "name": "makerFee",
+            "docs": [
+              "Fee when matching maker orders. May be negative."
+            ],
             "type": {
               "defined": "I80F48"
             }
           },
           {
             "name": "takerFee",
+            "docs": [
+              "Fee for taker orders, may not be negative."
+            ],
             "type": {
               "defined": "I80F48"
             }
@@ -12264,6 +12578,9 @@ export const IDL: MangoV4 = {
           },
           {
             "name": "feePenalty",
+            "docs": [
+              "Fee (in quote native) to charge for ioc orders"
+            ],
             "type": "f32"
           },
           {
@@ -12323,6 +12640,10 @@ export const IDL: MangoV4 = {
           },
           {
             "name": "reduceOnly",
+            "docs": [
+              "If true, users may no longer increase their market exposure. Only actions",
+              "that reduce their position are still allowed."
+            ],
             "type": "u8"
           },
           {
@@ -12336,6 +12657,9 @@ export const IDL: MangoV4 = {
           },
           {
             "name": "maintPnlAssetWeight",
+            "docs": [
+              "Weights for full perp market health, if positive"
+            ],
             "type": {
               "defined": "I80F48"
             }
@@ -12716,6 +13040,10 @@ export const IDL: MangoV4 = {
           },
           {
             "name": "hasOpenOrders",
+            "type": "bool"
+          },
+          {
+            "name": "hasOpenFills",
             "type": "bool"
           }
         ]
@@ -13120,11 +13448,26 @@ export const IDL: MangoV4 = {
             "type": "i64"
           },
           {
+            "name": "realizedPnlForPositionNative",
+            "docs": [
+              "Trade pnl, fees, funding that were added over the current position's lifetime.",
+              "",
+              "Reset when the position changes sign or goes to zero.",
+              "Not decreased by settling.",
+              "",
+              "This is tracked for display purposes: this value plus the difference between entry",
+              "price and current price of the base position is the overall pnl."
+            ],
+            "type": {
+              "defined": "I80F48"
+            }
+          },
+          {
             "name": "reserved",
             "type": {
               "array": [
                 "u8",
-                104
+                88
               ]
             }
           }
@@ -13395,14 +13738,23 @@ export const IDL: MangoV4 = {
         "fields": [
           {
             "name": "tag",
+            "docs": [
+              "NodeTag"
+            ],
             "type": "u8"
           },
           {
             "name": "ownerSlot",
+            "docs": [
+              "Index into the owning MangoAccount's PerpOpenOrders"
+            ],
             "type": "u8"
           },
           {
             "name": "orderType",
+            "docs": [
+              "PostOrderType, this was added for TradingView move order"
+            ],
             "type": "u8"
           },
           {
@@ -13434,24 +13786,39 @@ export const IDL: MangoV4 = {
           {
             "name": "key",
             "docs": [
-              "The binary tree key"
+              "The binary tree key, see new_node_key()"
             ],
             "type": "u128"
           },
           {
             "name": "owner",
+            "docs": [
+              "Address of the owning MangoAccount"
+            ],
             "type": "publicKey"
           },
           {
             "name": "quantity",
+            "docs": [
+              "Number of base lots to buy or sell, always >=1"
+            ],
             "type": "i64"
           },
           {
             "name": "timestamp",
+            "docs": [
+              "The time the order was placed"
+            ],
             "type": "u64"
           },
           {
             "name": "pegLimit",
+            "docs": [
+              "If the effective price of an oracle pegged order exceeds this limit,",
+              "it will be considered invalid and may be removed.",
+              "",
+              "Only applicable in the oracle_pegged OrderTree"
+            ],
             "type": "i64"
           },
           {
@@ -15502,6 +15869,21 @@ export const IDL: MangoV4 = {
       "code": 6038,
       "name": "AccountIsFrozen",
       "msg": "account is frozen"
+    },
+    {
+      "code": 6039,
+      "name": "InitAssetWeightCantBeNegative",
+      "msg": "Init Asset Weight can't be negative"
+    },
+    {
+      "code": 6040,
+      "name": "HasOpenPerpTakerFills",
+      "msg": "has open perp taker fills"
+    },
+    {
+      "code": 6041,
+      "name": "DepositLimit",
+      "msg": "deposit crosses the current group deposit limit"
     }
   ]
 };

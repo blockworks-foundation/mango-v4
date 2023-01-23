@@ -8,6 +8,7 @@ import {
   PublicKey,
 } from '@solana/web3.js';
 import BN from 'bn.js';
+import { cloneDeep, merge } from 'lodash';
 import { MangoClient } from '../client';
 import { OPENBOOK_PROGRAM_ID } from '../constants';
 import { Id } from '../ids';
@@ -30,6 +31,7 @@ export class Group {
       groupNum: number;
       admin: PublicKey;
       fastListingAdmin: PublicKey;
+      securityAdmin: PublicKey;
       insuranceMint: PublicKey;
       insuranceVault: PublicKey;
       testing: number;
@@ -44,6 +46,7 @@ export class Group {
       obj.groupNum,
       obj.admin,
       obj.fastListingAdmin,
+      obj.securityAdmin,
       obj.insuranceMint,
       obj.insuranceVault,
       obj.testing,
@@ -72,6 +75,7 @@ export class Group {
     public groupNum: number,
     public admin: PublicKey,
     public fastListingAdmin: PublicKey,
+    public securityAdmin: PublicKey,
     public insuranceMint: PublicKey,
     public insuranceVault: PublicKey,
     public testing: number,
@@ -149,10 +153,17 @@ export class Group {
       banks = await client.getBanksForGroup(this);
     }
 
+    const oldbanksMapByTokenIndex = cloneDeep(this.banksMapByTokenIndex);
     this.banksMapByName = new Map();
     this.banksMapByMint = new Map();
     this.banksMapByTokenIndex = new Map();
     for (const bank of banks) {
+      // ensure that freshly fetched banks have valid price until we fetch oracles again
+      const oldBanks = oldbanksMapByTokenIndex.get(bank.tokenIndex);
+      if (oldBanks && oldBanks.length > 0) {
+        merge(bank, oldBanks[0]);
+      }
+
       const mintId = bank.mint.toString();
       if (this.banksMapByMint.has(mintId)) {
         this.banksMapByMint.get(mintId)?.push(bank);
@@ -258,6 +269,19 @@ export class Group {
       perpMarkets = await client.perpGetMarkets(this);
     }
 
+    // ensure that freshly fetched perp markets have valid price until we fetch oracles again
+    const oldPerpMarketByMarketIndex = cloneDeep(
+      this.perpMarketsMapByMarketIndex,
+    );
+    for (const perpMarket of perpMarkets) {
+      const oldPerpMarket = oldPerpMarketByMarketIndex.get(
+        perpMarket.perpMarketIndex,
+      );
+      if (oldPerpMarket) {
+        merge(perpMarket, oldPerpMarket);
+      }
+    }
+
     this.perpMarketsMapByName = new Map(
       perpMarkets.map((perpMarket) => [perpMarket.name, perpMarket]),
     );
@@ -292,15 +316,17 @@ export class Group {
             throw new Error(
               `Undefined accountInfo object in reloadBankOraclePrices for ${bank.oracle}!`,
             );
-          const { price, uiPrice } = await this.decodePriceFromOracleAi(
-            coder,
-            bank.oracle,
-            ai,
-            this.getMintDecimals(bank.mint),
-            client,
-          );
+          const { price, uiPrice, lastUpdatedSlot } =
+            await this.decodePriceFromOracleAi(
+              coder,
+              bank.oracle,
+              ai,
+              this.getMintDecimals(bank.mint),
+              client,
+            );
           bank._price = price;
           bank._uiPrice = uiPrice;
+          bank._oracleLastUpdatedSlot = lastUpdatedSlot;
         }
       }
     }
@@ -324,15 +350,18 @@ export class Group {
           throw new Error(
             `Undefined ai object in reloadPerpMarketOraclePrices for ${perpMarket.oracle}!`,
           );
-        const { price, uiPrice } = await this.decodePriceFromOracleAi(
-          coder,
-          perpMarket.oracle,
-          ai,
-          perpMarket.baseDecimals,
-          client,
-        );
+
+        const { price, uiPrice, lastUpdatedSlot } =
+          await this.decodePriceFromOracleAi(
+            coder,
+            perpMarket.oracle,
+            ai,
+            perpMarket.baseDecimals,
+            client,
+          );
         perpMarket._price = price;
         perpMarket._uiPrice = uiPrice;
+        perpMarket._oracleLastUpdatedSlot = lastUpdatedSlot;
       }),
     );
   }
@@ -343,8 +372,8 @@ export class Group {
     ai: AccountInfo<Buffer>,
     baseDecimals: number,
     client: MangoClient,
-  ): Promise<{ price: I80F48; uiPrice: number }> {
-    let price, uiPrice;
+  ): Promise<{ price: I80F48; uiPrice: number; lastUpdatedSlot: number }> {
+    let price, uiPrice, lastUpdatedSlot;
     if (
       !BorshAccountsCoder.accountDiscriminator('stubOracle').compare(
         ai.data.slice(0, 8),
@@ -353,21 +382,26 @@ export class Group {
       const stubOracle = coder.decode('stubOracle', ai.data);
       price = new I80F48(stubOracle.price.val);
       uiPrice = this.toUiPrice(price, baseDecimals);
+      lastUpdatedSlot = stubOracle.lastUpdated.val;
     } else if (isPythOracle(ai)) {
-      uiPrice = parsePriceData(ai.data).previousPrice;
+      const priceData = parsePriceData(ai.data);
+      uiPrice = priceData.previousPrice;
       price = this.toNativePrice(uiPrice, baseDecimals);
+      lastUpdatedSlot = parseInt(priceData.lastSlot.toString());
     } else if (isSwitchboardOracle(ai)) {
-      uiPrice = await parseSwitchboardOracle(
+      const priceData = await parseSwitchboardOracle(
         ai,
         client.program.provider.connection,
       );
+      uiPrice = priceData.price;
       price = this.toNativePrice(uiPrice, baseDecimals);
+      lastUpdatedSlot = priceData.lastUpdatedSlot;
     } else {
       throw new Error(
         `Unknown oracle provider (parsing not implemented) for oracle ${oracle}, with owner ${ai.owner}!`,
       );
     }
-    return { price, uiPrice };
+    return { price, uiPrice, lastUpdatedSlot };
   }
 
   public async reloadVaults(client: MangoClient): Promise<void> {

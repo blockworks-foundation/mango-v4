@@ -48,6 +48,7 @@ pub mod mango_v4 {
         security_admin_opt: Option<Pubkey>,
         testing_opt: Option<u8>,
         version_opt: Option<u8>,
+        deposit_limit_quote_opt: Option<u64>,
     ) -> Result<()> {
         instructions::group_edit(
             ctx,
@@ -56,6 +57,7 @@ pub mod mango_v4 {
             security_admin_opt,
             testing_opt,
             version_opt,
+            deposit_limit_quote_opt,
         )
     }
 
@@ -457,8 +459,8 @@ pub mod mango_v4 {
     ) -> Result<()> {
         instructions::perp_create_market(
             ctx,
-            settle_token_index,
             perp_market_index,
+            settle_token_index,
             name,
             oracle_config,
             base_decimals,
@@ -515,6 +517,7 @@ pub mod mango_v4 {
         settle_pnl_limit_factor_opt: Option<f32>,
         settle_pnl_limit_window_size_ts: Option<u64>,
         reduce_only_opt: Option<bool>,
+        reset_stable_price: bool,
     ) -> Result<()> {
         instructions::perp_edit_market(
             ctx,
@@ -544,6 +547,7 @@ pub mod mango_v4 {
             settle_pnl_limit_factor_opt,
             settle_pnl_limit_window_size_ts,
             reduce_only_opt,
+            reset_stable_price,
         )
     }
 
@@ -553,6 +557,10 @@ pub mod mango_v4 {
 
     pub fn perp_deactivate_position(ctx: Context<PerpDeactivatePosition>) -> Result<()> {
         instructions::perp_deactivate_position(ctx)
+    }
+
+    pub fn perp_zero_out_for_market(ctx: Context<PerpZeroOutForMarket>) -> Result<()> {
+        instructions::perp_zero_out_for_market(ctx)
     }
 
     #[allow(clippy::too_many_arguments)]

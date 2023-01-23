@@ -21,12 +21,17 @@ pub struct PerpMarket {
     // ABI: Clients rely on this being at offset 8
     pub group: Pubkey,
 
+    /// Token index that settlements happen in.
+    ///
+    /// Currently required to be 0, USDC. In the future settlement
+    /// may be allowed to happen in other tokens.
     pub settle_token_index: TokenIndex,
 
-    /// Lookup indices
+    /// Index of this perp market. Other data, like the MangoAccount's PerpPosition
+    /// reference this market via this index. Unique for this group's perp markets.
     pub perp_market_index: PerpMarketIndex,
 
-    // Used to store trusted_market here
+    /// Field used to contain the trusted_market flag and is now unused.
     pub blocked1: u8,
 
     /// Is this market covered by the group insurance fund?
@@ -35,56 +40,92 @@ pub struct PerpMarket {
     /// PDA bump
     pub bump: u8,
 
+    /// Number of decimals used for the base token.
+    ///
+    /// Used to convert the oracle's price into a native/native price.
     pub base_decimals: u8,
 
+    /// Name. Trailing zero bytes are ignored.
     pub name: [u8; 16],
 
+    /// Address of the BookSide account for bids
     pub bids: Pubkey,
+    /// Address of the BookSide account for asks
     pub asks: Pubkey,
+    /// Address of the EventQueue account
     pub event_queue: Pubkey,
 
+    /// Oracle account address
     pub oracle: Pubkey,
+    /// Oracle configuration
     pub oracle_config: OracleConfig,
+    /// Maintains a stable price based on the oracle price that is less volatile.
     pub stable_price_model: StablePriceModel,
 
-    /// Number of quote native that reresents min tick
+    /// Number of quote native in a quote lot. Must be a power of 10.
+    ///
+    /// Primarily useful for increasing the tick size on the market: A lot price
+    /// of 1 becomes a native price of quote_lot_size/base_lot_size becomes a
+    /// ui price of quote_lot_size*base_decimals/base_lot_size/quote_decimals.
     pub quote_lot_size: i64,
-    /// Represents number of base native quantity
-    /// e.g. if base decimals for underlying asset are 6, base lot size is 100, and base position is 10000, then
-    /// UI position is 1
+
+    /// Number of base native in a base lot. Must be a power of 10.
+    ///
+    /// Example: If base decimals for the underlying asset is 6, base lot size
+    /// is 100 and and base position lots is 10_000 then base position native is
+    /// 1_000_000 and base position ui is 1.
     pub base_lot_size: i64,
 
-    // These weights apply to the base asset, the quote token is always assumed to be
-    // the health-reference token and have 1 for price and weights
+    /// These weights apply to the base position. The quote position has
+    /// no explicit weight (but may be covered by the overall pnl asset weight).
     pub maint_base_asset_weight: I80F48,
     pub init_base_asset_weight: I80F48,
     pub maint_base_liab_weight: I80F48,
     pub init_base_liab_weight: I80F48,
 
+    /// Number of base lot pairs currently active in the market. Always >= 0.
     pub open_interest: i64,
 
     /// Total number of orders seen
     pub seq_num: u64,
 
+    /// Timestamp in seconds that the market was registered at.
     pub registration_time: u64,
 
-    /// Funding
+    // Funding
+    /// Minimal funding rate per day, must be <= 0.
     pub min_funding: I80F48,
+    /// Maximal funding rate per day, must be >= 0.
     pub max_funding: I80F48,
+    /// For funding, get the impact price this many base lots deep into the book.
     pub impact_quantity: i64,
+
+    /// Current long funding value. Increasing it means that every long base lot
+    /// needs to pay that amount in funding.
+    ///
+    /// PerpPosition uses and tracks it settle funding. Updated by the perp
+    /// keeper instruction.
     pub long_funding: I80F48,
+    /// See long_funding.
     pub short_funding: I80F48,
     /// timestamp that funding was last updated in
     pub funding_last_updated: u64,
 
     /// Fees
+
+    /// Fee for base position liquidation
     pub liquidation_fee: I80F48,
+    /// Fee when matching maker orders. May be negative.
     pub maker_fee: I80F48,
+    /// Fee for taker orders, may not be negative.
     pub taker_fee: I80F48,
+
     /// Fees accrued in native quote currency
     pub fees_accrued: I80F48,
     /// Fees settled in native quote currency
     pub fees_settled: I80F48,
+
+    /// Fee (in quote native) to charge for ioc orders
     pub fee_penalty: f32,
 
     // Settling incentives
@@ -113,9 +154,13 @@ pub struct PerpMarket {
     /// Window size in seconds for the perp settlement limit
     pub settle_pnl_limit_window_size_ts: u64,
 
+    /// If true, users may no longer increase their market exposure. Only actions
+    /// that reduce their position are still allowed.
     pub reduce_only: u8,
+
     pub padding4: [u8; 7],
 
+    /// Weights for full perp market health, if positive
     pub maint_pnl_asset_weight: I80F48,
     pub init_pnl_asset_weight: I80F48,
 
@@ -221,8 +266,12 @@ impl PerpMarket {
         let oracle_price_lots = self.native_price_to_lot(oracle_price);
 
         // Get current book price & compare it to index price
-        let bid = book.impact_price(Side::Bid, self.impact_quantity, now_ts, oracle_price_lots);
-        let ask = book.impact_price(Side::Ask, self.impact_quantity, now_ts, oracle_price_lots);
+        let bid =
+            book.bookside(Side::Bid)
+                .impact_price(self.impact_quantity, now_ts, oracle_price_lots);
+        let ask =
+            book.bookside(Side::Ask)
+                .impact_price(self.impact_quantity, now_ts, oracle_price_lots);
 
         let diff_price = match (bid, ask) {
             (Some(bid), Some(ask)) => {

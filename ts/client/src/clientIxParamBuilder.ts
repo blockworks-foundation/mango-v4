@@ -78,6 +78,7 @@ export interface PerpEditParams {
   settlePnlLimitFactor: number | null;
   settlePnlLimitWindowSize: number | null;
   reduceOnly: boolean | null;
+  resetStablePrice: boolean | null;
 }
 
 export const NullPerpEditParams: PerpEditParams = {
@@ -107,4 +108,5 @@ export const NullPerpEditParams: PerpEditParams = {
   settlePnlLimitFactor: null,
   settlePnlLimitWindowSize: null,
   reduceOnly: null,
+  resetStablePrice: null,
 };

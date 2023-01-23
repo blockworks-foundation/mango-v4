@@ -14,6 +14,7 @@ pub struct PerpCancelAllOrders<'info> {
         mut,
         has_one = group,
         constraint = account.load()?.is_operational() @ MangoError::AccountIsFrozen
+        // owner is checked at #1
     )]
     pub account: AccountLoader<'info, MangoAccountFixed>,
     pub owner: Signer<'info>,
@@ -33,6 +34,7 @@ pub struct PerpCancelAllOrders<'info> {
 
 pub fn perp_cancel_all_orders(ctx: Context<PerpCancelAllOrders>, limit: u8) -> Result<()> {
     let mut account = ctx.accounts.account.load_full_mut()?;
+    // account constraint #1
     require!(
         account.fixed.is_owner_or_delegate(ctx.accounts.owner.key()),
         MangoError::SomeError

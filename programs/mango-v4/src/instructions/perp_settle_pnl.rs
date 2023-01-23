@@ -45,6 +45,7 @@ pub struct PerpSettlePnl<'info> {
     /// CHECK: Oracle can have different account types, constrained by address in perp_market
     pub oracle: UncheckedAccount<'info>,
 
+    // bank correctness is checked at #2
     #[account(mut, has_one = group)]
     pub settle_bank: AccountLoader<'info, Bank>,
 
@@ -95,7 +96,7 @@ pub fn perp_settle_pnl(ctx: Context<PerpSettlePnl>) -> Result<()> {
     let mut settle_bank = ctx.accounts.settle_bank.load_mut()?;
     let perp_market = ctx.accounts.perp_market.load()?;
 
-    // Verify that the bank is the quote currency bank
+    // Verify that the bank is the quote currency bank (#2)
     require!(
         settle_bank.token_index == settle_token_index,
         MangoError::InvalidBank
@@ -112,8 +113,8 @@ pub fn perp_settle_pnl(ctx: Context<PerpSettlePnl>) -> Result<()> {
     let b_perp_position = account_b.perp_position_mut(perp_market_index)?;
     a_perp_position.settle_funding(&perp_market);
     b_perp_position.settle_funding(&perp_market);
-    let a_pnl = a_perp_position.pnl_for_price(&perp_market, oracle_price)?;
-    let b_pnl = b_perp_position.pnl_for_price(&perp_market, oracle_price)?;
+    let a_pnl = a_perp_position.unsettled_pnl(&perp_market, oracle_price)?;
+    let b_pnl = b_perp_position.unsettled_pnl(&perp_market, oracle_price)?;
 
     // PnL must have opposite signs for there to be a settlement:
     // Account A must be profitable, and B must be unprofitable.

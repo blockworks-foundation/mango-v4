@@ -88,6 +88,11 @@ pub fn perp_liq_base_position(
 
     // Fetch perp positions for accounts, creating for the liqor if needed
     let liqee_perp_position = liqee.perp_position_mut(perp_market_index)?;
+    require!(
+        !liqee_perp_position.has_open_taker_fills(),
+        MangoError::HasOpenPerpTakerFills
+    );
+
     let liqor_perp_position = liqor
         .ensure_perp_position(perp_market_index, perp_market.settle_token_index)?
         .0;

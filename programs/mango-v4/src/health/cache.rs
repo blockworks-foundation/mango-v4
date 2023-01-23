@@ -223,6 +223,7 @@ pub struct PerpInfo {
     pub quote: I80F48,
     pub prices: Prices,
     pub has_open_orders: bool,
+    pub has_open_fills: bool,
 }
 
 impl PerpInfo {
@@ -251,6 +252,7 @@ impl PerpInfo {
             quote: quote_current,
             prices,
             has_open_orders: perp_position.has_open_orders(),
+            has_open_fills: perp_position.has_open_taker_fills(),
         })
     }
 
@@ -342,6 +344,22 @@ impl HealthCache {
         };
         self.health_sum(health_type, sum);
         health
+    }
+
+    /// Sum of only the positive health components (assets) and
+    /// sum of absolute values of all negative health components (liabs, always >= 0)
+    pub fn health_assets_and_liabs(&self, health_type: HealthType) -> (I80F48, I80F48) {
+        let mut assets = I80F48::ZERO;
+        let mut liabs = I80F48::ZERO;
+        let sum = |contrib| {
+            if contrib > 0 {
+                cm!(assets += contrib);
+            } else {
+                cm!(liabs -= contrib);
+            }
+        };
+        self.health_sum(health_type, sum);
+        (assets, liabs)
     }
 
     pub fn token_info(&self, token_index: TokenIndex) -> Result<&TokenInfo> {
@@ -452,6 +470,10 @@ impl HealthCache {
         self.perp_infos.iter().any(|p| p.base_lots != 0)
     }
 
+    pub fn has_perp_open_fills(&self) -> bool {
+        self.perp_infos.iter().any(|p| p.has_open_fills)
+    }
+
     pub fn has_perp_positive_maint_pnl_without_base_position(&self) -> bool {
         self.perp_infos
             .iter()
@@ -483,11 +505,13 @@ impl HealthCache {
 
     /// Phase2 is for:
     /// - token-token liquidation
-    /// - liquidation of perp base positions
+    /// - liquidation of perp base positions (an open fill isn't liquidatable, but
+    ///   it changes the base position, so need to wait for it to be processed...)
     /// - bringing positive trusted perp pnl into the spot realm
     pub fn has_phase2_liquidatable(&self) -> bool {
         self.has_spot_assets() && self.has_spot_borrows()
             || self.has_perp_base_positions()
+            || self.has_perp_open_fills()
             || self.has_perp_positive_maint_pnl_without_base_position()
     }
 
@@ -500,6 +524,10 @@ impl HealthCache {
         require!(
             !self.has_perp_base_positions(),
             MangoError::HasLiquidatablePerpBasePosition
+        );
+        require!(
+            !self.has_perp_open_fills(),
+            MangoError::HasOpenPerpTakerFills
         );
         require!(
             !self.has_perp_positive_maint_pnl_without_base_position(),
@@ -525,31 +553,8 @@ impl HealthCache {
             && self.has_phase3_liquidatable()
     }
 
-    pub fn has_liquidatable_assets(&self) -> bool {
-        let spot_liquidatable = self.has_spot_assets();
-        let serum3_cancelable = self.has_serum3_open_orders_funds();
-        let perp_liquidatable = self.perp_infos.iter().any(|p| {
-            // can use perp_liq_base_position
-            p.base_lots != 0
-            // can use perp_liq_force_cancel_orders
-            || p.has_open_orders
-            // A remaining quote position can be reduced with perp_settle_pnl and that can improve health.
-            // However, since it's not guaranteed that there is a counterparty, a positive perp quote position
-            // does not prevent bankruptcy.
-        });
-        spot_liquidatable || serum3_cancelable || perp_liquidatable
-    }
-
     pub fn has_spot_borrows(&self) -> bool {
         self.token_infos.iter().any(|ti| ti.balance_native < 0)
-    }
-
-    pub fn has_borrows(&self) -> bool {
-        let perp_borrows = self
-            .perp_infos
-            .iter()
-            .any(|p| p.quote.is_negative() || p.base_lots != 0);
-        self.has_spot_borrows() || perp_borrows
     }
 
     pub(crate) fn compute_serum3_reservations(
@@ -598,7 +603,7 @@ impl HealthCache {
         (token_max_reserved, serum3_reserved)
     }
 
-    fn health_sum(&self, health_type: HealthType, mut action: impl FnMut(I80F48)) {
+    pub(crate) fn health_sum(&self, health_type: HealthType, mut action: impl FnMut(I80F48)) {
         for token_info in self.token_infos.iter() {
             let contrib = token_info.health_contribution(health_type);
             action(contrib);
@@ -655,22 +660,6 @@ impl HealthCache {
             cm!(health += positive_contrib);
         }
         health
-    }
-
-    /// Sum of only the positive health components (assets) and
-    /// sum of absolute values of all negative health components (liabs, always >= 0)
-    pub fn health_assets_and_liabs(&self, health_type: HealthType) -> (I80F48, I80F48) {
-        let mut assets = I80F48::ZERO;
-        let mut liabs = I80F48::ZERO;
-        let sum = |contrib| {
-            if contrib > 0 {
-                cm!(assets += contrib);
-            } else {
-                cm!(liabs -= contrib);
-            }
-        };
-        self.health_sum(health_type, sum);
-        (assets, liabs)
     }
 }
 
