@@ -21,7 +21,7 @@ pub fn group_edit(
     security_admin_opt: Option<Pubkey>,
     testing_opt: Option<u8>,
     version_opt: Option<u8>,
-    deposit_limit_quote_opt: Option<u64>,
+    deposit_limit_quote_opt: Option<i64>,
 ) -> Result<()> {
     let mut group = ctx.accounts.group.load_mut()?;
 
