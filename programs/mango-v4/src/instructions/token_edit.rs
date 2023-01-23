@@ -116,8 +116,13 @@ pub fn token_edit(
             require_group_admin = true;
         }
         if let Some(init_asset_weight) = init_asset_weight_opt {
+            let old_init_asset_weight = bank.init_asset_weight;
             bank.init_asset_weight = I80F48::from_num(init_asset_weight);
-            require_group_admin = true;
+
+            // security admin can only reduce init_base_asset_weight
+            if old_init_asset_weight < bank.init_asset_weight {
+                require_group_admin = true;
+            }
         }
         if let Some(maint_liab_weight) = maint_liab_weight_opt {
             bank.maint_liab_weight = I80F48::from_num(maint_liab_weight);
@@ -175,6 +180,11 @@ pub fn token_edit(
 
         if let Some(reduce_only) = reduce_only_opt {
             bank.reduce_only = u8::from(reduce_only);
+
+            // security admin can only enable reduce_only
+            if bank.reduce_only == u8::from(false) {
+                require_group_admin = true;
+            }
         };
     }
 

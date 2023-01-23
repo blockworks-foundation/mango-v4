@@ -78,8 +78,13 @@ pub fn perp_edit_market(
         require_group_admin = true;
     }
     if let Some(init_base_asset_weight) = init_base_asset_weight_opt {
+        let old_init_base_asset_weight = perp_market.init_base_asset_weight;
         perp_market.init_base_asset_weight = I80F48::from_num(init_base_asset_weight);
-        require_group_admin = true;
+
+        // security admin can only reduce init_base_asset_weight
+        if old_init_base_asset_weight < perp_market.init_base_asset_weight {
+            require_group_admin = true;
+        }
     }
     if let Some(maint_base_liab_weight) = maint_base_liab_weight_opt {
         perp_market.maint_base_liab_weight = I80F48::from_num(maint_base_liab_weight);
@@ -176,6 +181,11 @@ pub fn perp_edit_market(
 
     if let Some(reduce_only) = reduce_only_opt {
         perp_market.reduce_only = u8::from(reduce_only);
+
+        // security admin can only enable reduce_only
+        if perp_market.reduce_only == u8::from(false) {
+            require_group_admin = true;
+        }
     };
 
     // account constraint #1
