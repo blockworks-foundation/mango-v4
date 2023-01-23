@@ -45,6 +45,7 @@ struct Cli {
     command: Command,
 
     #[clap(long, env, default_value_t = 60)]
+    // TODO: use duration type from rust instead of u64 for all these below intervals
     interval_update_banks: u64,
 
     #[clap(long, env, default_value_t = 5)]
