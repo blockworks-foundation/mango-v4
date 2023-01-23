@@ -182,7 +182,7 @@ pub fn token_edit(
             bank.reduce_only = u8::from(reduce_only);
 
             // security admin can only enable reduce_only
-            if bank.reduce_only == u8::from(false) {
+            if !reduce_only {
                 require_group_admin = true;
             }
         };

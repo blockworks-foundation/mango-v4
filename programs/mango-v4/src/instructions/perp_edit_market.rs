@@ -84,6 +84,11 @@ pub fn perp_edit_market(
         // security admin can only reduce init_base_asset_weight
         if old_init_base_asset_weight < perp_market.init_base_asset_weight {
             require_group_admin = true;
+        } else {
+            require!(
+                perp_market.init_base_asset_weight >= I80F48::ZERO,
+                MangoError::SomeError
+            );
         }
     }
     if let Some(maint_base_liab_weight) = maint_base_liab_weight_opt {
@@ -183,7 +188,7 @@ pub fn perp_edit_market(
         perp_market.reduce_only = u8::from(reduce_only);
 
         // security admin can only enable reduce_only
-        if perp_market.reduce_only == u8::from(false) {
+        if !reduce_only {
             require_group_admin = true;
         }
     };
