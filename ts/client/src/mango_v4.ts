@@ -138,6 +138,12 @@ export type MangoV4 = {
           "type": {
             "option": "u8"
           }
+        },
+        {
+          "name": "depositLimitQuoteOpt",
+          "type": {
+            "option": "u64"
+          }
         }
       ]
     },
@@ -3983,11 +3989,15 @@ export type MangoV4 = {
             "type": "publicKey"
           },
           {
+            "name": "depositLimitQuote",
+            "type": "u64"
+          },
+          {
             "name": "reserved",
             "type": {
               "array": [
                 "u8",
-                1888
+                1880
               ]
             }
           }
@@ -5085,6 +5095,10 @@ export type MangoV4 = {
           },
           {
             "name": "hasOpenOrders",
+            "type": "bool"
+          },
+          {
+            "name": "hasOpenFills",
             "type": "bool"
           }
         ]
@@ -7910,6 +7924,16 @@ export type MangoV4 = {
       "code": 6038,
       "name": "AccountIsFrozen",
       "msg": "account is frozen"
+    },
+    {
+      "code": 6039,
+      "name": "HasOpenPerpTakerFills",
+      "msg": "has open perp taker fills"
+    },
+    {
+      "code": 6040,
+      "name": "DepositLimit",
+      "msg": "deposit crosses the current group deposit limit"
     }
   ]
 };
@@ -8054,6 +8078,12 @@ export const IDL: MangoV4 = {
           "type": {
             "option": "u8"
           }
+        },
+        {
+          "name": "depositLimitQuoteOpt",
+          "type": {
+            "option": "u64"
+          }
         }
       ]
     },
@@ -11899,11 +11929,15 @@ export const IDL: MangoV4 = {
             "type": "publicKey"
           },
           {
+            "name": "depositLimitQuote",
+            "type": "u64"
+          },
+          {
             "name": "reserved",
             "type": {
               "array": [
                 "u8",
-                1888
+                1880
               ]
             }
           }
@@ -13001,6 +13035,10 @@ export const IDL: MangoV4 = {
           },
           {
             "name": "hasOpenOrders",
+            "type": "bool"
+          },
+          {
+            "name": "hasOpenFills",
             "type": "bool"
           }
         ]
@@ -15826,6 +15864,16 @@ export const IDL: MangoV4 = {
       "code": 6038,
       "name": "AccountIsFrozen",
       "msg": "account is frozen"
+    },
+    {
+      "code": 6039,
+      "name": "HasOpenPerpTakerFills",
+      "msg": "has open perp taker fills"
+    },
+    {
+      "code": 6040,
+      "name": "DepositLimit",
+      "msg": "deposit crosses the current group deposit limit"
     }
   ]
 };

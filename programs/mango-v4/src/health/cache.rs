@@ -346,6 +346,22 @@ impl HealthCache {
         health
     }
 
+    /// Sum of only the positive health components (assets) and
+    /// sum of absolute values of all negative health components (liabs, always >= 0)
+    pub fn health_assets_and_liabs(&self, health_type: HealthType) -> (I80F48, I80F48) {
+        let mut assets = I80F48::ZERO;
+        let mut liabs = I80F48::ZERO;
+        let sum = |contrib| {
+            if contrib > 0 {
+                cm!(assets += contrib);
+            } else {
+                cm!(liabs -= contrib);
+            }
+        };
+        self.health_sum(health_type, sum);
+        (assets, liabs)
+    }
+
     pub fn token_info(&self, token_index: TokenIndex) -> Result<&TokenInfo> {
         Ok(&self.token_infos[self.token_info_index(token_index)?])
     }

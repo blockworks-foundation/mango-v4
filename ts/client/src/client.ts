@@ -134,6 +134,7 @@ export class MangoClient {
     securityAdmin?: PublicKey,
     testing?: number,
     version?: number,
+    depositLimitQuote?: number,
   ): Promise<TransactionSignature> {
     return await this.program.methods
       .groupEdit(
@@ -142,6 +143,7 @@ export class MangoClient {
         securityAdmin ?? null,
         testing ?? null,
         version ?? null,
+        depositLimitQuote !== undefined ? new BN(depositLimitQuote) : null,
       )
       .accounts({
         group: group.publicKey,
