@@ -1912,6 +1912,7 @@ export class MangoClient {
         group: group.publicKey,
         account: mangoAccount.publicKey,
         perpMarket: perpMarket.publicKey,
+        admin: group.admin,
       })
       .rpc();
   }

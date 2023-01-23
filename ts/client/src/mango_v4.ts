@@ -2875,6 +2875,11 @@ export type MangoV4 = {
           "name": "perpMarket",
           "isMut": false,
           "isSigner": false
+        },
+        {
+          "name": "admin",
+          "isMut": false,
+          "isSigner": true
         }
       ],
       "args": []
@@ -10786,6 +10791,11 @@ export const IDL: MangoV4 = {
           "name": "perpMarket",
           "isMut": false,
           "isSigner": false
+        },
+        {
+          "name": "admin",
+          "isMut": false,
+          "isSigner": true
         }
       ],
       "args": []
