@@ -40,6 +40,7 @@ pub struct Group {
     pub security_admin: Pubkey,
 
     // Deposit limit for a mango account in quote native, enforced on quote value of account assets
+    // Set to -1, to disable
     pub deposit_limit_quote: i64,
 
     pub reserved: [u8; 1880],
