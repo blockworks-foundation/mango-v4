@@ -189,11 +189,13 @@ impl<'a, 'info> DepositCommon<'a, 'info> {
         // Since depositing can only increase health, we can skip the usual pre-health computation.
         // Also, TokenDeposit is one of the rare instructions that is allowed even during being_liquidated.
         //
-        if !account.fixed.is_in_health_region() {
+        // TEMPORARY: check is disabled, since we want to enforce a temporary deposit limit
+        // if !account.fixed.is_in_health_region()
+        {
             let retriever =
                 new_fixed_order_account_retriever(remaining_accounts, &account.borrow())?;
-            let health = compute_health(&account.borrow(), HealthType::Init, &retriever)
-                .context("post-deposit init health")?;
+            let cache = new_health_cache(&account.borrow(), &retriever)?;
+            let health = cache.health(HealthType::Init);
             msg!("health: {}", health);
             let was_being_liquidated = account.being_liquidated();
             let recovered = account.fixed.maybe_recover_from_being_liquidated(health);
@@ -201,6 +203,23 @@ impl<'a, 'info> DepositCommon<'a, 'info> {
                 !was_being_liquidated || recovered,
                 MangoError::DepositsIntoLiquidatingMustRecover
             );
+
+            let assets = cache
+                .health_assets_and_liabs(HealthType::Init)
+                .0
+                .round_to_zero()
+                .checked_to_num::<u64>()
+                .unwrap();
+            let group = self.group.load()?;
+
+            if assets < group.deposit_limit_quote {
+                return err!(MangoError::DepositLimit).with_context(|| {
+                    format!(
+                        "assets ({:?}) can't cross deposit limit on the group ({:?})",
+                        assets, group.deposit_limit_quote,
+                    )
+                });
+            }
         }
 
         //

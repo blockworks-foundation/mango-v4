@@ -39,11 +39,13 @@ pub struct Group {
 
     pub security_admin: Pubkey,
 
-    pub reserved: [u8; 1888],
+    pub deposit_limit_quote: u64,
+
+    pub reserved: [u8; 1880],
 }
 const_assert_eq!(
     size_of::<Group>(),
-    32 + 4 + 32 * 2 + 4 + 32 * 2 + 4 + 4 + 20 * 32 + 32 + 1888
+    32 + 4 + 32 * 2 + 4 + 32 * 2 + 4 + 4 + 20 * 32 + 32 + 8 + 1880
 );
 const_assert_eq!(size_of::<Group>(), 2736);
 const_assert_eq!(size_of::<Group>() % 8, 0);

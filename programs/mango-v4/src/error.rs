@@ -85,6 +85,8 @@ pub enum MangoError {
     AccountIsFrozen,
     #[msg("has open perp taker fills")]
     HasOpenPerpTakerFills,
+    #[msg("deposit crosses the current group deposit limit")]
+    DepositLimit,
 }
 
 impl MangoError {
