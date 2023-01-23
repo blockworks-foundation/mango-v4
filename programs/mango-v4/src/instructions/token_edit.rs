@@ -119,7 +119,7 @@ pub fn token_edit(
             require_gte!(
                 init_asset_weight,
                 0.0,
-                MangoError::InitAssetWeightMustBePositive
+                MangoError::InitAssetWeightCantBeNegative
             );
 
             let old_init_asset_weight = bank.init_asset_weight;

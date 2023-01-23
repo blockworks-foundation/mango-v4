@@ -81,7 +81,7 @@ pub fn perp_edit_market(
         require_gte!(
             init_base_asset_weight,
             0.0,
-            MangoError::InitAssetWeightMustBePositive
+            MangoError::InitAssetWeightCantBeNegative
         );
 
         let old_init_base_asset_weight = perp_market.init_base_asset_weight;
