@@ -204,6 +204,7 @@ impl<'a, 'info> DepositCommon<'a, 'info> {
                 MangoError::DepositsIntoLiquidatingMustRecover
             );
 
+            // temporary deposit limit on entire account
             let assets = cache
                 .health_assets_and_liabs(HealthType::Init)
                 .0
@@ -211,8 +212,7 @@ impl<'a, 'info> DepositCommon<'a, 'info> {
                 .checked_to_num::<u64>()
                 .unwrap();
             let group = self.group.load()?;
-
-            if assets < group.deposit_limit_quote {
+            if assets > group.deposit_limit_quote {
                 return err!(MangoError::DepositLimit).with_context(|| {
                     format!(
                         "assets ({:?}) can't cross deposit limit on the group ({:?})",
