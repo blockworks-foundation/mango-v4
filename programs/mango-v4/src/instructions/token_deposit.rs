@@ -208,10 +208,10 @@ impl<'a, 'info> DepositCommon<'a, 'info> {
             .health_assets_and_liabs(HealthType::Init)
             .0
             .round_to_zero()
-            .checked_to_num::<i64>()
+            .checked_to_num::<u64>()
             .unwrap();
         let group = self.group.load()?;
-        if group.deposit_limit_quote >= 0 && assets > group.deposit_limit_quote {
+        if group.deposit_limit_quote > 0 && assets > group.deposit_limit_quote {
             require_msg_typed!(
                 assets <= group.deposit_limit_quote,
                 MangoError::DepositLimit,
