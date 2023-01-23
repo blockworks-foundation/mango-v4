@@ -230,7 +230,7 @@ pub fn perp_edit_market(
     if let Some(group_insurance_fund) = group_insurance_fund_opt {
         msg!(
             "Group insurance fund: old - {:?}, new - {:?}",
-            mint_info.group_insurance_fund,
+            perp_market.group_insurance_fund,
             group_insurance_fund
         );
         perp_market.set_elligible_for_group_insurance_fund(group_insurance_fund);

@@ -98,25 +98,29 @@ pub fn token_edit(
         }
 
         if let Some(group_insurance_fund) = group_insurance_fund_opt {
-            msg!("Group insurance fund: old - {:?}, new - {:?}", mint_info.group_insurance_fund, group_insurance_fund);
+            msg!(
+                "Group insurance fund: old - {:?}, new - {:?}",
+                mint_info.group_insurance_fund,
+                group_insurance_fund
+            );
             mint_info.group_insurance_fund = u8::from(group_insurance_fund);
             require_group_admin = true;
         };
 
         if let Some(ref interest_rate_params) = interest_rate_params_opt {
             // TODO: add a require! verifying relation between the parameters
-            msg!("Interest rate params: old - adjustment_factor {:?}, util0 {:?}, rate0 {:?}, util1 {:?}, rate1 {:?}, max_rate {:?}, new - adjustment_factor {:?}, util0 {:?}, rate0 {:?}, util1 {:?}, rate1 {:?}, max_rate {:?}", bank.adjustment_factor,            
+            msg!("Interest rate params: old - adjustment_factor {:?}, util0 {:?}, rate0 {:?}, util1 {:?}, rate1 {:?}, max_rate {:?}, new - adjustment_factor {:?}, util0 {:?}, rate0 {:?}, util1 {:?}, rate1 {:?}, max_rate {:?}", bank.adjustment_factor,
             bank.util0,
             bank.rate0,
             bank.util1,
             bank.rate1,
             bank.max_rate,
-            interest_rate_params.adjustment_factor,            
+            interest_rate_params.adjustment_factor,
             interest_rate_params.util0,
             interest_rate_params.rate0,
             interest_rate_params.util1,
             interest_rate_params.rate1,
-            interest_rate_params.max_rate,        
+            interest_rate_params.max_rate,
         );
             bank.adjustment_factor = I80F48::from_num(interest_rate_params.adjustment_factor);
             bank.util0 = I80F48::from_num(interest_rate_params.util0);
@@ -128,23 +132,39 @@ pub fn token_edit(
         }
 
         if let Some(loan_origination_fee_rate) = loan_origination_fee_rate_opt {
-            msg!("Loan origination fee rate: old - {:?}, new - {:?}", bank.loan_origination_fee_rate, loan_origination_fee_rate);
+            msg!(
+                "Loan origination fee rate: old - {:?}, new - {:?}",
+                bank.loan_origination_fee_rate,
+                loan_origination_fee_rate
+            );
             bank.loan_origination_fee_rate = I80F48::from_num(loan_origination_fee_rate);
             require_group_admin = true;
         }
         if let Some(loan_fee_rate) = loan_fee_rate_opt {
-            msg!("Loan fee fee rate: old - {:?}, new - {:?}", bank.loan_fee_rate, loan_fee_rate);
+            msg!(
+                "Loan fee fee rate: old - {:?}, new - {:?}",
+                bank.loan_fee_rate,
+                loan_fee_rate
+            );
             bank.loan_fee_rate = I80F48::from_num(loan_fee_rate);
             require_group_admin = true;
         }
 
         if let Some(maint_asset_weight) = maint_asset_weight_opt {
-            msg!("Maint asset weight: old - {:?}, new - {:?}", bank.maint_asset_weight, maint_asset_weight);
+            msg!(
+                "Maint asset weight: old - {:?}, new - {:?}",
+                bank.maint_asset_weight,
+                maint_asset_weight
+            );
             bank.maint_asset_weight = I80F48::from_num(maint_asset_weight);
             require_group_admin = true;
         }
         if let Some(init_asset_weight) = init_asset_weight_opt {
-            msg!("Init asset weight: old - {:?}, new - {:?}", bank.init_asset_weight, init_asset_weight);
+            msg!(
+                "Init asset weight: old - {:?}, new - {:?}",
+                bank.init_asset_weight,
+                init_asset_weight
+            );
             require_gte!(
                 init_asset_weight,
                 0.0,
@@ -160,50 +180,86 @@ pub fn token_edit(
             }
         }
         if let Some(maint_liab_weight) = maint_liab_weight_opt {
-            msg!("Maint liab weight: old - {:?}, new - {:?}", bank.maint_liab_weight, maint_liab_weight);
+            msg!(
+                "Maint liab weight: old - {:?}, new - {:?}",
+                bank.maint_liab_weight,
+                maint_liab_weight
+            );
             bank.maint_liab_weight = I80F48::from_num(maint_liab_weight);
             require_group_admin = true;
         }
         if let Some(init_liab_weight) = init_liab_weight_opt {
-            msg!("Init liab weight: old - {:?}, new - {:?}", bank.init_liab_weight, init_liab_weight);
+            msg!(
+                "Init liab weight: old - {:?}, new - {:?}",
+                bank.init_liab_weight,
+                init_liab_weight
+            );
             bank.init_liab_weight = I80F48::from_num(init_liab_weight);
             require_group_admin = true;
         }
         if let Some(liquidation_fee) = liquidation_fee_opt {
-            msg!("Liquidation fee: old - {:?}, new - {:?}", bank.liquidation_fee, liquidation_fee);
+            msg!(
+                "Liquidation fee: old - {:?}, new - {:?}",
+                bank.liquidation_fee,
+                liquidation_fee
+            );
             bank.liquidation_fee = I80F48::from_num(liquidation_fee);
             require_group_admin = true;
         }
 
         if let Some(stable_price_delay_interval_seconds) = stable_price_delay_interval_seconds_opt {
-            msg!("Stable price delay interval seconds: old - {:?}, new - {:?}", bank.stable_price_model.delay_interval_seconds, stable_price_delay_interval_seconds);
+            msg!(
+                "Stable price delay interval seconds: old - {:?}, new - {:?}",
+                bank.stable_price_model.delay_interval_seconds,
+                stable_price_delay_interval_seconds
+            );
             // Updating this makes the old delay values slightly inconsistent
             bank.stable_price_model.delay_interval_seconds = stable_price_delay_interval_seconds;
             require_group_admin = true;
         }
         if let Some(stable_price_delay_growth_limit) = stable_price_delay_growth_limit_opt {
-            msg!("Stable price delay growth limit: old - {:?}, new - {:?}", bank.stable_price_model.delay_growth_limit, stable_price_delay_growth_limit);
+            msg!(
+                "Stable price delay growth limit: old - {:?}, new - {:?}",
+                bank.stable_price_model.delay_growth_limit,
+                stable_price_delay_growth_limit
+            );
             bank.stable_price_model.delay_growth_limit = stable_price_delay_growth_limit;
             require_group_admin = true;
         }
         if let Some(stable_price_growth_limit) = stable_price_growth_limit_opt {
-            msg!("Stable price growth limit: old - {:?}, new - {:?}", bank.stable_price_model.stable_growth_limit, stable_price_growth_limit);
+            msg!(
+                "Stable price growth limit: old - {:?}, new - {:?}",
+                bank.stable_price_model.stable_growth_limit,
+                stable_price_growth_limit
+            );
             bank.stable_price_model.stable_growth_limit = stable_price_growth_limit;
             require_group_admin = true;
         }
 
         if let Some(min_vault_to_deposits_ratio) = min_vault_to_deposits_ratio_opt {
-            msg!("Min vault to deposits ratio: old - {:?}, new - {:?}", bank.min_vault_to_deposits_ratio, min_vault_to_deposits_ratio);
+            msg!(
+                "Min vault to deposits ratio: old - {:?}, new - {:?}",
+                bank.min_vault_to_deposits_ratio,
+                min_vault_to_deposits_ratio
+            );
             bank.min_vault_to_deposits_ratio = min_vault_to_deposits_ratio;
             require_group_admin = true;
         }
         if let Some(net_borrow_limit_per_window_quote) = net_borrow_limit_per_window_quote_opt {
-            msg!("Net borrow limit per window quote: old - {:?}, new - {:?}", bank.net_borrow_limit_per_window_quote, net_borrow_limit_per_window_quote);
+            msg!(
+                "Net borrow limit per window quote: old - {:?}, new - {:?}",
+                bank.net_borrow_limit_per_window_quote,
+                net_borrow_limit_per_window_quote
+            );
             bank.net_borrow_limit_per_window_quote = net_borrow_limit_per_window_quote;
             require_group_admin = true;
         }
         if let Some(net_borrow_limit_window_size_ts) = net_borrow_limit_window_size_ts_opt {
-            msg!("Net borrow limit window size ts: old - {:?}, new - {:?}", bank.net_borrow_limit_window_size_ts, net_borrow_limit_window_size_ts);
+            msg!(
+                "Net borrow limit window size ts: old - {:?}, new - {:?}",
+                bank.net_borrow_limit_window_size_ts,
+                net_borrow_limit_window_size_ts
+            );
             bank.net_borrow_limit_window_size_ts = net_borrow_limit_window_size_ts;
             require_group_admin = true;
         }
@@ -215,18 +271,30 @@ pub fn token_edit(
         }
 
         if let Some(borrow_weight_scale_start_quote) = borrow_weight_scale_start_quote_opt {
-            msg!("Borrow weight scale start quote: old - {:?}, new - {:?}", bank.borrow_weight_scale_start_quote, borrow_weight_scale_start_quote);
+            msg!(
+                "Borrow weight scale start quote: old - {:?}, new - {:?}",
+                bank.borrow_weight_scale_start_quote,
+                borrow_weight_scale_start_quote
+            );
             bank.borrow_weight_scale_start_quote = borrow_weight_scale_start_quote;
             require_group_admin = true;
         }
         if let Some(deposit_weight_scale_start_quote) = deposit_weight_scale_start_quote_opt {
-            msg!("Deposit weight scale start quote: old - {:?}, new - {:?}", bank.deposit_weight_scale_start_quote, deposit_weight_scale_start_quote);
+            msg!(
+                "Deposit weight scale start quote: old - {:?}, new - {:?}",
+                bank.deposit_weight_scale_start_quote,
+                deposit_weight_scale_start_quote
+            );
             bank.deposit_weight_scale_start_quote = deposit_weight_scale_start_quote;
             require_group_admin = true;
         }
 
         if let Some(reduce_only) = reduce_only_opt {
-            msg!("Reduce only: old - {:?}, new - {:?}", bank.reduce_only, u8::from(reduce_only));
+            msg!(
+                "Reduce only: old - {:?}, new - {:?}",
+                bank.reduce_only,
+                u8::from(reduce_only)
+            );
             bank.reduce_only = u8::from(reduce_only);
 
             // security admin can only enable reduce_only
