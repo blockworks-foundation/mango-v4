@@ -24,6 +24,11 @@ pub fn serum3_edit_market(
     reduce_only_opt: Option<bool>,
 ) -> Result<()> {
     if let Some(reduce_only) = reduce_only_opt {
+        msg!(
+            "Reduce only: old - {:?}, new - {:?}",
+            perp_market.reduce_only,
+            u8::from(reduce_only)
+        );
         ctx.accounts.market.load_mut()?.reduce_only = u8::from(reduce_only);
     };
     Ok(())
