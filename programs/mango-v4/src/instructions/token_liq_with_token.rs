@@ -283,7 +283,7 @@ pub fn token_liq_with_token(
         liab_transfer: liab_transfer.to_bits(),
         asset_price: asset_price.to_bits(),
         liab_price: liab_price.to_bits(),
-        bankruptcy: !liqee_health_cache.has_liquidatable_assets() & liqee_init_health.is_negative()
+        bankruptcy: !liqee_health_cache.has_phase2_liquidatable() & liqee_init_health.is_negative()
     });
 
     Ok(())

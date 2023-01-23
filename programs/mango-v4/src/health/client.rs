@@ -13,16 +13,28 @@ use crate::util::checked_math as cm;
 use super::*;
 
 impl HealthCache {
-    pub fn can_call_spot_bankruptcy(&self) -> bool {
-        !self.has_liquidatable_assets() && self.has_spot_borrows()
-    }
-
     pub fn is_liquidatable(&self) -> bool {
         if self.being_liquidated {
             self.health(HealthType::Init).is_negative()
         } else {
             self.health(HealthType::Maint).is_negative()
         }
+    }
+
+    /// Sum of only the positive health components (assets) and
+    /// sum of absolute values of all negative health components (liabs, always >= 0)
+    pub fn health_assets_and_liabs(&self, health_type: HealthType) -> (I80F48, I80F48) {
+        let mut assets = I80F48::ZERO;
+        let mut liabs = I80F48::ZERO;
+        let sum = |contrib| {
+            if contrib > 0 {
+                cm!(assets += contrib);
+            } else {
+                cm!(liabs -= contrib);
+            }
+        };
+        self.health_sum(health_type, sum);
+        (assets, liabs)
     }
 
     /// The health ratio is
@@ -951,6 +963,7 @@ mod tests {
             quote: I80F48::ZERO,
             prices: Prices::new_single_price(I80F48::from_num(2.0)),
             has_open_orders: false,
+            has_open_fills: false,
         };
 
         let health_cache = HealthCache {

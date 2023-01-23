@@ -575,12 +575,22 @@ impl PerpPosition {
         cm!(self.quote_position_native += quote_change_native);
     }
 
-    /// Does the perp position have any open orders or fill events?
+    /// Does the user have any orders on the book?
+    ///
+    /// Note that it's possible they were matched already: This only becomes
+    /// false when the fill event is processed or the orders are cancelled.
     pub fn has_open_orders(&self) -> bool {
-        self.asks_base_lots != 0
-            || self.bids_base_lots != 0
-            || self.taker_base_lots != 0
-            || self.taker_quote_lots != 0
+        self.asks_base_lots != 0 || self.bids_base_lots != 0
+    }
+
+    // Did the user take orders and hasn't been filled yet?
+    pub fn has_open_taker_fills(&self) -> bool {
+        self.taker_base_lots != 0 || self.taker_quote_lots != 0
+    }
+
+    /// Are there any open orders or fills that haven't been processed yet?
+    pub fn has_open_orders_or_fills(&self) -> bool {
+        self.has_open_orders() || self.has_open_taker_fills()
     }
 
     /// Calculate the average entry price of the position, in native/native units
