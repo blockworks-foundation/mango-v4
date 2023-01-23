@@ -116,6 +116,12 @@ pub fn token_edit(
             require_group_admin = true;
         }
         if let Some(init_asset_weight) = init_asset_weight_opt {
+            require_gte!(
+                init_asset_weight,
+                0.0,
+                MangoError::InitAssetWeightMustBePositive
+            );
+
             let old_init_asset_weight = bank.init_asset_weight;
             bank.init_asset_weight = I80F48::from_num(init_asset_weight);
 

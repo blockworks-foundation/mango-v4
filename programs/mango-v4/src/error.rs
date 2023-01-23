@@ -83,6 +83,8 @@ pub enum MangoError {
     HasLiquidatableTrustedPerpPnl,
     #[msg("account is frozen")]
     AccountIsFrozen,
+    #[msg("Init Asset Weight must be positive")]
+    InitAssetWeightMustBePositive,
 }
 
 impl MangoError {
