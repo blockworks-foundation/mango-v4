@@ -48,6 +48,7 @@ pub mod mango_v4 {
         security_admin_opt: Option<Pubkey>,
         testing_opt: Option<u8>,
         version_opt: Option<u8>,
+        deposit_limit_quote_opt: Option<u64>,
     ) -> Result<()> {
         instructions::group_edit(
             ctx,
@@ -56,6 +57,7 @@ pub mod mango_v4 {
             security_admin_opt,
             testing_opt,
             version_opt,
+            deposit_limit_quote_opt,
         )
     }
 
