@@ -4,6 +4,17 @@ Update this for each program release and mainnet deployment.
 
 ## not on mainnet
 
+### v0.4.0, 2023-1-24
+
+Deployment: ---
+
+- Perp instruction constraint fixes (#399)
+- Documentation and cleanup from perp code audit (#400, #401, #406, #410, #412)
+- Perp: Don't generate fill events with zero quantity (#404)
+- Perp: add testing instruction to fix inconsistency from deleted accounts/markets (#413)
+- Add program token deposit limit (#415)
+- Allow security admin to set markets to reduce only or reduce init asset weight (#394)
+
 ## mainnet
 
 ### v0.3.0, 2023-1-17
