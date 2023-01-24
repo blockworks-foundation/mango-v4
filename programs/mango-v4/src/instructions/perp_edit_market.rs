@@ -65,6 +65,7 @@ pub fn perp_edit_market(
     };
     if let Some(oracle) = oracle_opt {
         perp_market.oracle = oracle;
+        require_group_admin = true;
     }
     if reset_stable_price {
         require_keys_eq!(perp_market.oracle, ctx.accounts.oracle.key());
