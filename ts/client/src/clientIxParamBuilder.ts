@@ -225,59 +225,66 @@ export const TrueIxGateParams: IxGateParams = {
 // build ix gate e.g. buildIxGate(Builder(TrueIxGateParams).TokenDeposit(false).build()).toNumber(),
 export function buildIxGate(p: IxGateParams): BN {
   const ixGate = new BN(0);
-  ixGate.ior(p.AccountClose ? new BN(0) : new BN(1).ushln(0));
-  ixGate.ior(p.AccountCreate ? new BN(0) : new BN(1).ushln(1));
-  ixGate.ior(p.AccountEdit ? new BN(0) : new BN(1).ushln(2));
-  ixGate.ior(p.AccountExpand ? new BN(0) : new BN(1).ushln(3));
-  ixGate.ior(p.AccountToggleFreeze ? new BN(0) : new BN(1).ushln(4));
-  ixGate.ior(p.AltExtend ? new BN(0) : new BN(1).ushln(5));
-  ixGate.ior(p.AltSet ? new BN(0) : new BN(1).ushln(6));
-  ixGate.ior(p.FlashLoan ? new BN(0) : new BN(1).ushln(7));
-  ixGate.ior(p.GroupClose ? new BN(0) : new BN(1).ushln(8));
-  ixGate.ior(p.GroupCreate ? new BN(0) : new BN(1).ushln(9));
 
-  ixGate.ior(p.PerpCancelAllOrders ? new BN(0) : new BN(1).ushln(10));
-  ixGate.ior(p.PerpCancelAllOrdersBySide ? new BN(0) : new BN(1).ushln(11));
-  ixGate.ior(p.PerpCancelOrder ? new BN(0) : new BN(1).ushln(12));
-  ixGate.ior(
-    p.PerpCancelOrderByClientOrderId ? new BN(0) : new BN(1).ushln(13),
-  );
-  ixGate.ior(p.PerpCloseMarket ? new BN(0) : new BN(1).ushln(14));
-  ixGate.ior(p.PerpConsumeEvents ? new BN(0) : new BN(1).ushln(15));
-  ixGate.ior(p.PerpCreateMarket ? new BN(0) : new BN(1).ushln(16));
-  ixGate.ior(p.PerpDeactivatePosition ? new BN(0) : new BN(1).ushln(17));
-  ixGate.ior(p.PerpLiqBasePosition ? new BN(0) : new BN(1).ushln(18));
-  ixGate.ior(p.PerpLiqForceCancelOrders ? new BN(0) : new BN(1).ushln(19));
-
-  ixGate.ior(p.PerpLiqQuoteAndBankruptcy ? new BN(0) : new BN(1).ushln(20));
-  ixGate.ior(p.PerpPlaceOrder ? new BN(0) : new BN(1).ushln(21));
-  ixGate.ior(p.PerpSettleFees ? new BN(0) : new BN(1).ushln(22));
-  ixGate.ior(p.PerpSettlePnl ? new BN(0) : new BN(1).ushln(23));
-  ixGate.ior(p.PerpUpdateFunding ? new BN(0) : new BN(1).ushln(24));
-  ixGate.ior(p.Serum3CancelAllOrders ? new BN(0) : new BN(1).ushln(25));
-  ixGate.ior(p.Serum3CancelOrder ? new BN(0) : new BN(1).ushln(26));
-  ixGate.ior(p.Serum3CloseOpenOrders ? new BN(0) : new BN(1).ushln(27));
-  ixGate.ior(p.Serum3CreateOpenOrders ? new BN(0) : new BN(1).ushln(28));
-  ixGate.ior(p.Serum3DeregisterMarket ? new BN(0) : new BN(1).ushln(29));
-
-  ixGate.ior(p.Serum3EditMarket ? new BN(0) : new BN(1).ushln(30));
-  ixGate.ior(p.Serum3LiqForceCancelOrders ? new BN(0) : new BN(1).ushln(31));
-  ixGate.ior(p.Serum3PlaceOrder ? new BN(0) : new BN(1).ushln(32));
-  ixGate.ior(p.Serum3RegisterMarket ? new BN(0) : new BN(1).ushln(33));
-  ixGate.ior(p.Serum3SettleFunds ? new BN(0) : new BN(1).ushln(34));
-  ixGate.ior(p.StubOracleClose ? new BN(0) : new BN(1).ushln(35));
-  ixGate.ior(p.StubOracleCreate ? new BN(0) : new BN(1).ushln(36));
-  ixGate.ior(p.StubOracleSet ? new BN(0) : new BN(1).ushln(37));
-  ixGate.ior(p.TokenAddBank ? new BN(0) : new BN(1).ushln(38));
-  ixGate.ior(p.TokenDeposit ? new BN(0) : new BN(1).ushln(39));
-
-  ixGate.ior(p.TokenDeregister ? new BN(0) : new BN(1).ushln(40));
-  ixGate.ior(p.TokenLiqBankruptcy ? new BN(0) : new BN(1).ushln(41));
-  ixGate.ior(p.TokenLiqWithToken ? new BN(0) : new BN(1).ushln(42));
-  ixGate.ior(p.TokenRegister ? new BN(0) : new BN(1).ushln(43));
-  ixGate.ior(p.TokenRegisterTrustless ? new BN(0) : new BN(1).ushln(44));
-  ixGate.ior(p.TokenUpdateIndexAndRate ? new BN(0) : new BN(1).ushln(45));
-  ixGate.ior(p.TokenWithdraw ? new BN(0) : new BN(1).ushln(46));
+  function toggleIx(
+    ixGate: BN,
+    p: IxGateParams,
+    propName: string,
+    index: number,
+  ): void {
+    if (p[propName] === undefined) {
+      throw new Error(`Unknown property ${propName}`);
+    }
+    ixGate.ior(p[propName] ? new BN(0) : new BN(1).ushln(index));
+  }
+  toggleIx(ixGate, p, 'AccountClose', 0);
+  toggleIx(ixGate, p, 'AccountCreate', 1);
+  toggleIx(ixGate, p, 'AccountEdit', 2);
+  toggleIx(ixGate, p, 'AccountExpand', 3);
+  toggleIx(ixGate, p, 'AccountToggleFreeze', 4);
+  toggleIx(ixGate, p, 'AltExtend', 5);
+  toggleIx(ixGate, p, 'AltSet', 6);
+  toggleIx(ixGate, p, 'FlashLoan', 7);
+  toggleIx(ixGate, p, 'GroupClose', 8);
+  toggleIx(ixGate, p, 'GroupCreate', 9);
+  toggleIx(ixGate, p, 'HealthRegion', 10);
+  toggleIx(ixGate, p, 'PerpCancelAllOrders', 11);
+  toggleIx(ixGate, p, 'PerpCancelAllOrdersBySide', 12);
+  toggleIx(ixGate, p, 'PerpCancelOrder', 13);
+  toggleIx(ixGate, p, 'PerpCancelOrderByClientOrderId', 14);
+  toggleIx(ixGate, p, 'PerpCloseMarket', 15);
+  toggleIx(ixGate, p, 'PerpConsumeEvents', 16);
+  toggleIx(ixGate, p, 'PerpCreateMarket', 17);
+  toggleIx(ixGate, p, 'PerpDeactivatePosition', 18);
+  toggleIx(ixGate, p, 'PerpLiqBasePosition', 19);
+  toggleIx(ixGate, p, 'PerpLiqForceCancelOrders', 20);
+  toggleIx(ixGate, p, 'PerpLiqQuoteAndBankruptcy', 21);
+  toggleIx(ixGate, p, 'PerpPlaceOrder', 22);
+  toggleIx(ixGate, p, 'PerpSettleFees', 23);
+  toggleIx(ixGate, p, 'PerpSettlePnl', 24);
+  toggleIx(ixGate, p, 'PerpUpdateFunding', 25);
+  toggleIx(ixGate, p, 'Serum3CancelAllOrders', 26);
+  toggleIx(ixGate, p, 'Serum3CancelOrder', 27);
+  toggleIx(ixGate, p, 'Serum3CloseOpenOrders', 28);
+  toggleIx(ixGate, p, 'Serum3CreateOpenOrders', 29);
+  toggleIx(ixGate, p, 'Serum3DeregisterMarket', 30);
+  toggleIx(ixGate, p, 'Serum3EditMarket', 31);
+  toggleIx(ixGate, p, 'Serum3LiqForceCancelOrders', 32);
+  toggleIx(ixGate, p, 'Serum3PlaceOrder', 33);
+  toggleIx(ixGate, p, 'Serum3RegisterMarket', 34);
+  toggleIx(ixGate, p, 'Serum3SettleFunds', 35);
+  toggleIx(ixGate, p, 'StubOracleClose', 36);
+  toggleIx(ixGate, p, 'StubOracleCreate', 37);
+  toggleIx(ixGate, p, 'StubOracleSet', 38);
+  toggleIx(ixGate, p, 'TokenAddBank', 39);
+  toggleIx(ixGate, p, 'TokenDeposit', 40);
+  toggleIx(ixGate, p, 'TokenDeregister', 41);
+  toggleIx(ixGate, p, 'TokenLiqBankruptcy', 42);
+  toggleIx(ixGate, p, 'TokenLiqWithToken', 43);
+  toggleIx(ixGate, p, 'TokenRegister', 44);
+  toggleIx(ixGate, p, 'TokenRegisterTrustless', 45);
+  toggleIx(ixGate, p, 'TokenUpdateIndexAndRate', 46);
+  toggleIx(ixGate, p, 'TokenWithdraw', 47);
 
   return ixGate;
 }

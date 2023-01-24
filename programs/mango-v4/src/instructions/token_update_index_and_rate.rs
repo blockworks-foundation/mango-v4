@@ -2,7 +2,7 @@ use anchor_lang::prelude::*;
 
 use crate::error::MangoError;
 use crate::logs::{UpdateIndexLog, UpdateRateLog};
-use crate::state::{HOUR, IxGate};
+use crate::state::{IxGate, HOUR};
 use crate::{
     accounts_zerocopy::{AccountInfoRef, LoadMutZeroCopyRef, LoadZeroCopyRef},
     state::{Bank, Group, MintInfo},

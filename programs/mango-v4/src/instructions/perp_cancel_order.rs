@@ -1,7 +1,9 @@
 use anchor_lang::prelude::*;
 
 use crate::error::*;
-use crate::state::{BookSide, Group, MangoAccountFixed, MangoAccountLoader, Orderbook, PerpMarket, IxGate};
+use crate::state::{
+    BookSide, Group, IxGate, MangoAccountFixed, MangoAccountLoader, Orderbook, PerpMarket,
+};
 
 #[derive(Accounts)]
 pub struct PerpCancelOrder<'info> {

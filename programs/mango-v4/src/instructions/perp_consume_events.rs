@@ -2,7 +2,7 @@ use anchor_lang::prelude::*;
 use bytemuck::cast_ref;
 
 use crate::error::MangoError;
-use crate::state::{EventQueue, MangoAccountFixed, MangoAccountLoader, IxGate};
+use crate::state::{EventQueue, IxGate, MangoAccountFixed, MangoAccountLoader};
 use crate::state::{EventType, FillEvent, Group, OutEvent, PerpMarket};
 
 use crate::logs::{emit_perp_balances, FillLog};

@@ -2,7 +2,7 @@ use anchor_lang::prelude::*;
 
 use crate::accounts_zerocopy::*;
 use crate::error::MangoError;
-use crate::state::{BookSide, Group, Orderbook, PerpMarket, IxGate};
+use crate::state::{BookSide, Group, IxGate, Orderbook, PerpMarket};
 
 #[derive(Accounts)]
 pub struct PerpUpdateFunding<'info> {

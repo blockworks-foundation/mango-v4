@@ -2,7 +2,7 @@ use anchor_lang::prelude::*;
 
 use crate::error::MangoError;
 use crate::state::{
-    BookSide, Group, MangoAccountFixed, MangoAccountLoader, Orderbook, PerpMarket, Side, IxGate,
+    BookSide, Group, IxGate, MangoAccountFixed, MangoAccountLoader, Orderbook, PerpMarket, Side,
 };
 
 #[derive(Accounts)]

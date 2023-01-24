@@ -1,12 +1,12 @@
 #![cfg(feature = "test-bpf")]
 
-use fixed::types::I80F48;
 use solana_program_test::*;
 use solana_sdk::transport::TransportError;
 
 use mango_v4::state::*;
 use program_test::*;
 
+use mango_setup::*;
 mod program_test;
 
 #[tokio::test]
@@ -19,13 +19,12 @@ async fn test_ix_gate_set() -> Result<(), TransportError> {
     let payer = context.users[1].key;
     let mints = &context.mints[0..1];
     let payer_mint0_account = context.users[1].token_accounts[0];
-    let dust_threshold = 0.01;
 
     //
     // SETUP: Create a group, account, register a token (mint0)
     //
 
-    let mango_setup::GroupWithTokens { group, tokens, .. } = mango_setup::GroupWithTokensConfig {
+    let mango_setup::GroupWithTokens { group, .. } = mango_setup::GroupWithTokensConfig {
         admin,
         payer,
         mints: mints.to_vec(),
@@ -34,22 +33,17 @@ async fn test_ix_gate_set() -> Result<(), TransportError> {
     .create(solana)
     .await;
 
-    let account = send_tx(
-        solana,
-        AccountCreateInstruction {
-            account_num: 0,
-            token_count: 8,
-            serum3_count: 7,
-            perp_count: 0,
-            perp_oo_count: 0,
-            group,
-            owner,
-            payer,
-        },
+    let account = create_funded_account(
+        &solana,
+        group,
+        owner,
+        0,
+        &context.users[1],
+        &mints[0..1],
+        10,
+        0,
     )
-    .await
-    .unwrap()
-    .account;
+    .await;
 
     send_tx(
         solana,

@@ -9,7 +9,6 @@ use mango_v4::instructions::{
     InterestRateParams, Serum3OrderType, Serum3SelfTradeBehavior, Serum3Side,
 };
 use mango_v4::state::{MangoAccount, MangoAccountValue};
-use solana_program::example_mocks::solana_sdk::signature::{Keypair, Signer};
 use solana_program::instruction::Instruction;
 use solana_program_test::BanksClientError;
 use solana_sdk::instruction;
@@ -3629,6 +3628,7 @@ impl ClientInstruction for ComputeAccountDataInstruction {
 }
 
 pub struct HealthRegionBeginInstruction {
+    pub group: Pubkey,
     pub account: Pubkey,
 }
 #[async_trait::async_trait(?Send)]
@@ -3657,6 +3657,7 @@ impl ClientInstruction for HealthRegionBeginInstruction {
         .await;
 
         let accounts = Self::Accounts {
+            group: self.group,
             instructions: solana_program::sysvar::instructions::id(),
             account: self.account,
         };
@@ -3673,6 +3674,7 @@ impl ClientInstruction for HealthRegionBeginInstruction {
 }
 
 pub struct HealthRegionEndInstruction {
+    pub group: Pubkey,
     pub account: Pubkey,
     pub affected_bank: Option<Pubkey>,
 }
@@ -3702,6 +3704,7 @@ impl ClientInstruction for HealthRegionEndInstruction {
         .await;
 
         let accounts = Self::Accounts {
+            group: self.group,
             account: self.account,
         };
 
