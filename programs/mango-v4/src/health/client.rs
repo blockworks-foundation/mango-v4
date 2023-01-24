@@ -275,13 +275,6 @@ impl HealthCache {
         Ok(amount)
     }
 
-    fn perp_info_index(&self, perp_market_index: PerpMarketIndex) -> Result<usize> {
-        self.perp_infos
-            .iter()
-            .position(|pi| pi.perp_market_index == perp_market_index)
-            .ok_or_else(|| error_msg!("perp market index {} not found", perp_market_index))
-    }
-
     /// NOTE: keep getMaxSourceForTokenSwap in ts/client in sync with changes here
     pub fn max_perp_for_health_ratio(
         &self,

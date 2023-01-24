@@ -2803,6 +2803,48 @@ impl ClientInstruction for PerpMakeReduceOnly {
     }
 }
 
+pub struct PerpChangeWeights {
+    pub group: Pubkey,
+    pub admin: TestKeypair,
+    pub perp_market: Pubkey,
+    pub init_pnl_asset_weight: f32,
+    pub maint_pnl_asset_weight: f32,
+}
+
+#[async_trait::async_trait(?Send)]
+impl ClientInstruction for PerpChangeWeights {
+    type Accounts = mango_v4::accounts::PerpEditMarket;
+    type Instruction = mango_v4::instruction::PerpEditMarket;
+    async fn to_instruction(
+        &self,
+        account_loader: impl ClientAccountLoader + 'async_trait,
+    ) -> (Self::Accounts, instruction::Instruction) {
+        let program_id = mango_v4::id();
+
+        let perp_market: PerpMarket = account_loader.load(&self.perp_market).await.unwrap();
+
+        let instruction = Self::Instruction {
+            init_pnl_asset_weight_opt: Some(self.init_pnl_asset_weight),
+            maint_pnl_asset_weight_opt: Some(self.maint_pnl_asset_weight),
+            ..perp_edit_instruction_default()
+        };
+
+        let accounts = Self::Accounts {
+            group: self.group,
+            admin: self.admin.pubkey(),
+            perp_market: self.perp_market,
+            oracle: perp_market.oracle,
+        };
+
+        let instruction = make_instruction(program_id, &accounts, instruction);
+        (accounts, instruction)
+    }
+
+    fn signers(&self) -> Vec<TestKeypair> {
+        vec![self.admin]
+    }
+}
+
 pub struct PerpCloseMarketInstruction {
     pub admin: TestKeypair,
     pub perp_market: Pubkey,

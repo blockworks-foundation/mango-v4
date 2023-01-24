@@ -379,6 +379,23 @@ impl HealthCache {
             })
     }
 
+    pub fn perp_info(&self, perp_market_index: PerpMarketIndex) -> Result<&PerpInfo> {
+        Ok(&self.perp_infos[self.perp_info_index(perp_market_index)?])
+    }
+
+    pub(crate) fn perp_info_index(&self, perp_market_index: PerpMarketIndex) -> Result<usize> {
+        self.perp_infos
+            .iter()
+            .position(|t| t.perp_market_index == perp_market_index)
+            .ok_or_else(|| {
+                error_msg_typed!(
+                    MangoError::PerpPositionDoesNotExist,
+                    "perp market index {} not found",
+                    perp_market_index
+                )
+            })
+    }
+
     /// Changes the cached user account token balance.
     pub fn adjust_token_balance(&mut self, bank: &Bank, change: I80F48) -> Result<()> {
         let entry_index = self.token_info_index(bank.token_index)?;
