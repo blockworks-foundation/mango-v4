@@ -80,7 +80,7 @@ const defaultInterestRate = {
 
 async function buildAdminClient(): Promise<[MangoClient, Keypair, Keypair]> {
   const admin = Keypair.fromSecretKey(
-    Buffer.from(JSON.parse(fs.readFileSync(MB_PAYER2_KEYPAIR!, 'utf-8'))),
+    Buffer.from(JSON.parse(fs.readFileSync(MB_PAYER3_KEYPAIR!, 'utf-8'))),
   );
 
   const options = AnchorProvider.defaultOptions();
@@ -444,7 +444,7 @@ async function registerPerpMarkets() {
     group,
     new PublicKey(MAINNET_ORACLES.get('MNGO')!),
     1,
-    'MNGO-PERP',
+    'MNGO-PERP-OLD',
     defaultOracleConfig,
     6,
     100, // 0.0001$ is the min tick
@@ -479,7 +479,7 @@ async function makePerpMarketReduceOnly() {
   const creator = result[2];
 
   const group = await client.getGroupForCreator(creator.publicKey, GROUP_NUM);
-  const perpMarket = group.getPerpMarketByName('MNGO-PERP');
+  const perpMarket = group.getPerpMarketByName('MNGO-PERP-OLD');
   await client.perpEditMarket(
     group,
     perpMarket.perpMarketIndex,
