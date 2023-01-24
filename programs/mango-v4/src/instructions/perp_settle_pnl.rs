@@ -7,12 +7,13 @@ use crate::error::*;
 use crate::health::{new_health_cache, HealthType, ScanningAccountRetriever};
 use crate::logs::{emit_perp_balances, PerpSettlePnlLog, TokenBalanceLog};
 use crate::state::Bank;
+use crate::state::IxGate;
 use crate::state::{Group, MangoAccountFixed, MangoAccountLoader, PerpMarket};
 
 #[derive(Accounts)]
 pub struct PerpSettlePnl<'info> {
     #[account(
-        constraint = group.load()?.is_operational() @ MangoError::GroupIsHalted
+        constraint = group.load()?.is_ix_enabled(IxGate::PerpSettlePnl) @ MangoError::IxIsDisabled,
     )]
     pub group: AccountLoader<'info, Group>,
 

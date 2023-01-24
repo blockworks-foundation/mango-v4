@@ -69,8 +69,6 @@ pub enum MangoError {
     TokenInReduceOnlyMode,
     #[msg("market is in reduce only mode")]
     MarketInReduceOnlyMode,
-    #[msg("group is halted")]
-    GroupIsHalted,
     #[msg("the perp position has non-zero base lots")]
     PerpHasBaseLots,
     #[msg("there are open or unsettled serum3 orders")]
@@ -89,6 +87,8 @@ pub enum MangoError {
     HasOpenPerpTakerFills,
     #[msg("deposit crosses the current group deposit limit")]
     DepositLimit,
+    #[msg("ix is disabled")]
+    IxIsDisabled,
 }
 
 impl MangoError {

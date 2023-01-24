@@ -14,7 +14,7 @@ use crate::serum3_cpi::load_open_orders_ref;
 #[derive(Accounts)]
 pub struct Serum3CancelOrder<'info> {
     #[account(
-        constraint = group.load()?.is_operational() @ MangoError::GroupIsHalted
+        constraint = group.load()?.is_ix_enabled(IxGate::Serum3CancelOrder) @ MangoError::IxIsDisabled,
     )]
     pub group: AccountLoader<'info, Group>,
 

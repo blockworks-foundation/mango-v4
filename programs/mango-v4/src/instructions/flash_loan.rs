@@ -97,6 +97,11 @@ pub fn flash_loan_begin<'key, 'accounts, 'remaining, 'info>(
 
     let group_al = AccountLoader::<Group>::try_from(group_ai)?;
     let group = group_al.load()?;
+    require!(
+        group.is_ix_enabled(IxGate::FlashLoan),
+        MangoError::IxIsDisabled
+    );
+
     let group_seeds = group_seeds!(group);
     let seeds = [&group_seeds[..]];
 

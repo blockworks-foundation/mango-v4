@@ -1,12 +1,12 @@
 use anchor_lang::prelude::*;
 
 use crate::error::*;
-use crate::state::{BookSide, Group, MangoAccountFixed, MangoAccountLoader, Orderbook, PerpMarket};
+use crate::state::{BookSide, Group, MangoAccountFixed, MangoAccountLoader, Orderbook, PerpMarket, IxGate};
 
 #[derive(Accounts)]
 pub struct PerpCancelOrder<'info> {
     #[account(
-        constraint = group.load()?.is_operational() @ MangoError::GroupIsHalted
+        constraint = group.load()?.is_ix_enabled(IxGate::PerpCancelOrder) @ MangoError::IxIsDisabled,
     )]
     pub group: AccountLoader<'info, Group>,
 

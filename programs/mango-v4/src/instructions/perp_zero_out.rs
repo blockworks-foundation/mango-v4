@@ -7,7 +7,6 @@ use crate::state::*;
 pub struct PerpZeroOutForMarket<'info> {
     #[account(
         has_one = admin,
-        constraint = group.load()?.is_operational() @ MangoError::GroupIsHalted,
         constraint = group.load()?.is_testing()
     )]
     pub group: AccountLoader<'info, Group>,

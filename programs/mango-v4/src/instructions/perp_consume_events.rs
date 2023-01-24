@@ -2,7 +2,7 @@ use anchor_lang::prelude::*;
 use bytemuck::cast_ref;
 
 use crate::error::MangoError;
-use crate::state::{EventQueue, MangoAccountFixed, MangoAccountLoader};
+use crate::state::{EventQueue, MangoAccountFixed, MangoAccountLoader, IxGate};
 use crate::state::{EventType, FillEvent, Group, OutEvent, PerpMarket};
 
 use crate::logs::{emit_perp_balances, FillLog};
@@ -10,7 +10,7 @@ use crate::logs::{emit_perp_balances, FillLog};
 #[derive(Accounts)]
 pub struct PerpConsumeEvents<'info> {
     #[account(
-        constraint = group.load()?.is_operational() @ MangoError::GroupIsHalted
+        constraint = group.load()?.is_ix_enabled(IxGate::PerpConsumeEvents) @ MangoError::IxIsDisabled,
     )]
     pub group: AccountLoader<'info, Group>,
 

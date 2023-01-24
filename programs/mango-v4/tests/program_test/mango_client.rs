@@ -9,6 +9,7 @@ use mango_v4::instructions::{
     InterestRateParams, Serum3OrderType, Serum3SelfTradeBehavior, Serum3Side,
 };
 use mango_v4::state::{MangoAccount, MangoAccountValue};
+use solana_program::example_mocks::solana_sdk::signature::{Keypair, Signer};
 use solana_program::instruction::Instruction;
 use solana_program_test::BanksClientError;
 use solana_sdk::instruction;
@@ -1500,6 +1501,38 @@ impl ClientInstruction for GroupCreateInstruction {
 
     fn signers(&self) -> Vec<TestKeypair> {
         vec![self.creator, self.payer]
+    }
+}
+
+pub struct IxGateSetInstruction {
+    pub group: Pubkey,
+    pub admin: TestKeypair,
+    pub ix_gate: u128,
+}
+#[async_trait::async_trait(?Send)]
+impl ClientInstruction for IxGateSetInstruction {
+    type Accounts = mango_v4::accounts::IxGateSet;
+    type Instruction = mango_v4::instruction::IxGateSet;
+    async fn to_instruction(
+        &self,
+        _account_loader: impl ClientAccountLoader + 'async_trait,
+    ) -> (Self::Accounts, instruction::Instruction) {
+        let program_id = mango_v4::id();
+        let instruction = Self::Instruction {
+            ix_gate: self.ix_gate,
+        };
+
+        let accounts = Self::Accounts {
+            group: self.group,
+            admin: self.admin.pubkey(),
+        };
+
+        let instruction = make_instruction(program_id, &accounts, instruction);
+        (accounts, instruction)
+    }
+
+    fn signers(&self) -> Vec<TestKeypair> {
+        vec![self.admin]
     }
 }
 
