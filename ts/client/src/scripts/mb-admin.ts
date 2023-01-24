@@ -177,7 +177,7 @@ async function setDepositLimit() {
     new PublicKey('DSiGNQaKhFCSZbg4HczqCtPAPb1xV51c9GfbfqcVKTB4'),
     undefined,
     undefined,
-    toNative(100, 6),
+    toNative(200, 6),
   );
 }
 
