@@ -188,13 +188,14 @@ impl<'a, 'info> DepositCommon<'a, 'info> {
         //
         let retriever = new_fixed_order_account_retriever(remaining_accounts, &account.borrow())?;
         let cache = new_health_cache(&account.borrow(), &retriever)?;
-        let health = cache.health(HealthType::Init);
-        msg!("health: {}", health);
 
         // Since depositing can only increase health, we can skip the usual pre-health computation.
         // Also, TokenDeposit is one of the rare instructions that is allowed even during being_liquidated.
-        //
+        // Being in a health region always means being_liquidated is false, so it's safe to gate the check.
         if !account.fixed.is_in_health_region() {
+            let health = cache.health(HealthType::Init);
+            msg!("health: {}", health);
+
             let was_being_liquidated = account.being_liquidated();
             let recovered = account.fixed.maybe_recover_from_being_liquidated(health);
             require!(
@@ -204,14 +205,14 @@ impl<'a, 'info> DepositCommon<'a, 'info> {
         }
 
         // Group level deposit limit on account
-        let assets = cache
-            .health_assets_and_liabs(HealthType::Init)
-            .0
-            .round_to_zero()
-            .checked_to_num::<u64>()
-            .unwrap();
         let group = self.group.load()?;
-        if group.deposit_limit_quote > 0 && assets > group.deposit_limit_quote {
+        if group.deposit_limit_quote > 0 {
+            let assets = cache
+                .health_assets_and_liabs(HealthType::Init)
+                .0
+                .round_to_zero()
+                .checked_to_num::<u64>()
+                .unwrap();
             require_msg_typed!(
                 assets <= group.deposit_limit_quote,
                 MangoError::DepositLimit,
