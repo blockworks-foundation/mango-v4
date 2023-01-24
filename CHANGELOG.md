@@ -4,9 +4,11 @@ Update this for each program release and mainnet deployment.
 
 ## not on mainnet
 
+## mainnet
+
 ### v0.4.0, 2023-1-24
 
-Deployment: ---
+Deployment: Jan 24, 2023 at 10:21:59 Central European Standard Time, https://explorer.solana.com/tx/3C5vSUrC2xJhAeaDjRMuhE1Gnbj72gDKPRibpFk2gP2afoaFquY8GgUeBwhNoP25QtPvTJG3NZmZBoHoSgvrEWGH
 
 - Perp instruction constraint fixes (#399)
 - Documentation and cleanup from perp code audit (#400, #401, #406, #410, #412)
@@ -14,8 +16,6 @@ Deployment: ---
 - Perp: add testing instruction to fix inconsistency from deleted accounts/markets (#413)
 - Add program token deposit limit (#415)
 - Allow security admin to set markets to reduce only or reduce init asset weight (#394)
-
-## mainnet
 
 ### v0.3.0, 2023-1-17
 
