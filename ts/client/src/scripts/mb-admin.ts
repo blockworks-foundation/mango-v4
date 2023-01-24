@@ -161,6 +161,26 @@ async function changeAdmin() {
   );
 }
 
+async function setDepositLimit() {
+  const result = await buildAdminClient();
+  const client = result[0];
+  const admin = result[1];
+  const creator = result[2];
+
+  const group = await client.getGroupForCreator(creator.publicKey, GROUP_NUM);
+
+  console.log(`Setting a deposit limit...`);
+  await client.groupEdit(
+    group,
+    new PublicKey('DSiGNQaKhFCSZbg4HczqCtPAPb1xV51c9GfbfqcVKTB4'),
+    new PublicKey('DSiGNQaKhFCSZbg4HczqCtPAPb1xV51c9GfbfqcVKTB4'),
+    new PublicKey('DSiGNQaKhFCSZbg4HczqCtPAPb1xV51c9GfbfqcVKTB4'),
+    undefined,
+    undefined,
+    toNative(100, 6),
+  );
+}
+
 async function registerTokens() {
   const result = await buildAdminClient();
   const client = result[0];
@@ -630,6 +650,7 @@ async function main() {
   try {
     // await createGroup();
     // await changeAdmin();
+    // await setDepositLimit();
   } catch (error) {
     console.log(error);
   }
