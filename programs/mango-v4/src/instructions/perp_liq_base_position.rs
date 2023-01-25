@@ -1,5 +1,5 @@
 use anchor_lang::prelude::*;
-use anchor_spl::token::{self, Token, TokenAccount};
+use anchor_spl::token::TokenAccount;
 use checked_math as cm;
 use fixed::types::I80F48;
 
@@ -81,11 +81,16 @@ pub fn perp_liq_base_position(
     let mut liqee = ctx.accounts.liqee.load_full_mut()?;
 
     // Initial liqee health check
-    let mut liqee_health_cache = {
+    let mut liqee_health_cache;
+    let liqor_settle_health;
+    {
         let account_retriever = ScanningAccountRetriever::new(ctx.remaining_accounts, group_pk)
             .context("create account retriever")?;
-        new_health_cache(&liqee.borrow(), &account_retriever)
-            .context("create liqee health cache")?
+        liqee_health_cache = new_health_cache(&liqee.borrow(), &account_retriever)
+            .context("create liqee health cache")?;
+        liqor_settle_health = new_health_cache(&liqor.borrow(), &account_retriever)
+            .context("create liqor health cache")?
+            .perp_settle_health();
     };
     let liqee_init_health = liqee_health_cache.health(HealthType::Init);
     liqee_health_cache.require_after_phase1_liquidation()?;
@@ -131,8 +136,10 @@ pub fn perp_liq_base_position(
     // Max settleable on the liqee?
     let now_ts: u64 = Clock::get()?.unix_timestamp.try_into().unwrap();
     liqee_perp_position.update_settle_limit(&perp_market, now_ts);
-    let max_settle =
-        liqee_perp_position.apply_pnl_settle_limit(&perp_market, I80F48::from(max_quote_transfer));
+    let liqee_positive_settle_limit = liqee_perp_position.available_settle_limit(&perp_market).1;
+    let max_settle = I80F48::from(max_quote_transfer)
+        .min(liqor_settle_health)
+        .max(I80F48::ZERO);
 
     // Take over the liqee's base in exchange for quote
     let liqee_base_lots = liqee_perp_position.base_position_lots();
@@ -154,7 +161,7 @@ pub fn perp_liq_base_position(
         // and increased by `base * price * (1 - liq_fee) * quote_init_asset_weight`
         let quote_init_asset_weight = I80F48::ONE;
         direction = -1;
-        fee_factor = cm!(I80F48::ONE - perp_market.liquidation_fee);
+        fee_factor = cm!(I80F48::ONE - perp_market.base_liquidation_fee);
         unweighted_health_per_lot = cm!(price_per_lot
             * (-perp_market.init_base_asset_weight + quote_init_asset_weight * fee_factor));
     } else {
@@ -168,7 +175,7 @@ pub fn perp_liq_base_position(
         // and reduced by `base * price * (1 + liq_fee) * quote_init_liab_weight`
         let quote_init_liab_weight = I80F48::ONE;
         direction = 1;
-        fee_factor = cm!(I80F48::ONE + perp_market.liquidation_fee);
+        fee_factor = cm!(I80F48::ONE + perp_market.base_liquidation_fee);
         unweighted_health_per_lot = cm!(price_per_lot
             * (perp_market.init_base_liab_weight - quote_init_liab_weight * fee_factor));
     };
@@ -220,10 +227,10 @@ pub fn perp_liq_base_position(
     // Step 2: in markets with overall weight >0 it's possible to liquidate further
     //
     let step2_health_limit = liqee_init_health_after_step1.min(I80F48::ZERO);
+    let weighted_health_per_lot =
+        cm!(unweighted_health_per_lot * perp_market.init_pnl_asset_weight);
     let step2_base =
         if unweighted_perp_init_after_step1 >= 0 && perp_market.init_pnl_asset_weight > 0 {
-            let weighted_health_per_lot =
-                cm!(unweighted_health_per_lot * perp_market.init_pnl_asset_weight);
             cm!(-step2_health_limit / weighted_health_per_lot)
                 .checked_ceil()
                 .unwrap()
@@ -234,6 +241,8 @@ pub fn perp_liq_base_position(
         } else {
             0
         };
+    let liqee_init_health_after_step2 =
+        cm!(liqee_init_health_after_step1 + I80F48::from(step2_base) * weighted_health_per_lot);
     msg!("step2: {} lots", step2_base);
 
     //
@@ -242,60 +251,89 @@ pub fn perp_liq_base_position(
     //
     let base_transfer = cm!(direction * (step1_base + step2_base));
     let quote_transfer = cm!(-I80F48::from(base_transfer) * price_per_lot * fee_factor);
-    msg!(
-        "transfering: {} base lots and {} quote",
-        base_transfer,
-        quote_transfer
-    );
-
-    // TODO: remove?!
-    require!(
-        base_transfer != 0,
-        MangoError::NoLiquidatablePerpBasePosition
-    );
-
-    liqee_perp_position.record_trade(&mut perp_market, base_transfer, quote_transfer);
-    liqor_perp_position.record_trade(&mut perp_market, -base_transfer, -quote_transfer);
+    if base_transfer != 0 {
+        msg!(
+            "transfering: {} base lots and {} quote",
+            base_transfer,
+            quote_transfer
+        );
+        liqee_perp_position.record_trade(&mut perp_market, base_transfer, quote_transfer);
+        liqor_perp_position.record_trade(&mut perp_market, -base_transfer, -quote_transfer);
+    }
 
     //
     // Step 3: Let the liqor take over positive pnl
     //
-    {
-        // Limit requested max-settle by settle limit on the liqee
+    let step3_settlement = if liqee_init_health_after_step2 < 0 {
+        let spot_gain_per_settle = cm!(I80F48::ONE - perp_market.positive_pnl_liquidation_fee);
+        let health_per_settle = cm!(spot_gain_per_settle - perp_market.init_pnl_asset_weight);
+        let settle_for_zero = cm!(-liqee_init_health_after_step2 / health_per_settle)
+            .checked_ceil()
+            .unwrap();
         let liqee_pnl = liqee_perp_position.unsettled_pnl(&perp_market, oracle_price)?;
-        let settlement = liqee_pnl.min(max_settle).max(I80F48::ZERO);
+
+        // Allow settling *more* than the liqee_positive_settle_limit. In exchange, the liqor
+        // also can't settle fully immediately and just takes over a fractional chunk of the limit.
+        let settlement = liqee_pnl
+            .min(max_settle)
+            .min(settle_for_zero)
+            .max(I80F48::ZERO);
+        let limit_transfer = {
+            // take care, liqee_limit may be i64::MAX
+            let liqee_limit: i128 = liqee_positive_settle_limit.into();
+            let settle = settlement.checked_floor().unwrap().to_num::<i128>();
+            let total = liqee_pnl.checked_ceil().unwrap().to_num::<i128>();
+            let liqor_limit: i64 = cm!(liqee_limit * settle / total).try_into().unwrap();
+            I80F48::from(liqor_limit).min(settlement)
+        };
+
+        // The liqor pays less than the full amount to receive the positive pnl
+        let token_transfer = cm!(settlement * spot_gain_per_settle);
 
         if settlement > 0 {
-            // TODO: wrong, the liqee's settle limit must partially transfer over somehow!
-            liqor_perp_position.record_liquidation_quote_change(settlement);
+            liqor_perp_position.record_liquidation_quote_change(settlement, limit_transfer);
             liqee_perp_position.record_settle(settlement);
 
             // Update the accounts' perp_spot_transfer statistics.
-            let settlement_i64 = settlement.round_to_zero().checked_to_num::<i64>().unwrap();
-            cm!(liqor_perp_position.perp_spot_transfers += settlement_i64);
-            cm!(liqee_perp_position.perp_spot_transfers -= settlement_i64);
-            cm!(liqor.fixed.perp_spot_transfers += settlement_i64);
-            cm!(liqee.fixed.perp_spot_transfers -= settlement_i64);
+            let transfer_i64 = token_transfer
+                .round_to_zero()
+                .checked_to_num::<i64>()
+                .unwrap();
+            cm!(liqor_perp_position.perp_spot_transfers -= transfer_i64);
+            cm!(liqee_perp_position.perp_spot_transfers += transfer_i64);
+            cm!(liqor.fixed.perp_spot_transfers -= transfer_i64);
+            cm!(liqee.fixed.perp_spot_transfers += transfer_i64);
 
             // Transfer token balance
             let liqor_token_position = liqor.token_position_mut(settle_token_index)?.0;
             let liqee_token_position = liqee.token_position_mut(settle_token_index)?.0;
-            settle_bank.deposit(liqee_token_position, settlement, now_ts)?;
+            settle_bank.deposit(liqee_token_position, token_transfer, now_ts)?;
             settle_bank.withdraw_without_fee(
                 liqor_token_position,
-                settlement,
+                token_transfer,
                 now_ts,
                 oracle_price,
             )?;
             liqee_health_cache.adjust_token_balance(&settle_bank, settlement)?;
-
-            msg!("liquidated pnl = {}", settlement);
         }
+        msg!("step3: pnl = {}, quote = {}", settlement, token_transfer);
+
+        settlement
+    } else {
+        I80F48::ZERO
     };
+
+    // Skip out if this instruction had nothing to do
+    if base_transfer == 0 && step3_settlement == 0 {
+        return Ok(());
+    }
 
     //
     // Wrap up
     //
+
+    let liqee_perp_position = liqee.perp_position_mut(perp_market_index)?;
+    let liqor_perp_position = liqor.perp_position_mut(perp_market_index)?;
 
     emit_perp_balances(
         ctx.accounts.group.key(),
@@ -329,6 +367,7 @@ pub fn perp_liq_base_position(
         .maybe_recover_from_being_liquidated(liqee_init_health_after);
     require_gte!(liqee_init_health_after, liqee_init_health);
 
+    drop(settle_bank);
     drop(perp_market);
 
     // Check liqor's health

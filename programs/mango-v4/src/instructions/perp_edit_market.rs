@@ -114,7 +114,7 @@ pub fn perp_edit_market(
         require_group_admin = true;
     }
     if let Some(liquidation_fee) = liquidation_fee_opt {
-        perp_market.liquidation_fee = I80F48::from_num(liquidation_fee);
+        perp_market.base_liquidation_fee = I80F48::from_num(liquidation_fee);
         require_group_admin = true;
     }
 

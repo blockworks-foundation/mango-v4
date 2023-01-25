@@ -442,7 +442,7 @@ pub mod mango_v4 {
         init_base_liab_weight: f32,
         maint_pnl_asset_weight: f32,
         init_pnl_asset_weight: f32,
-        liquidation_fee: f32,
+        base_liquidation_fee: f32,
         maker_fee: f32,
         taker_fee: f32,
         min_funding: f32,
@@ -456,6 +456,7 @@ pub mod mango_v4 {
         settle_token_index: TokenIndex,
         settle_pnl_limit_factor: f32,
         settle_pnl_limit_window_size_ts: u64,
+        positive_pnl_liquidation_fee: f32,
     ) -> Result<()> {
         instructions::perp_create_market(
             ctx,
@@ -472,7 +473,7 @@ pub mod mango_v4 {
             init_base_liab_weight,
             maint_pnl_asset_weight,
             init_pnl_asset_weight,
-            liquidation_fee,
+            base_liquidation_fee,
             maker_fee,
             taker_fee,
             min_funding,
@@ -485,6 +486,7 @@ pub mod mango_v4 {
             settle_fee_fraction_low_health,
             settle_pnl_limit_factor,
             settle_pnl_limit_window_size_ts,
+            positive_pnl_liquidation_fee,
         )
     }
 
@@ -500,7 +502,7 @@ pub mod mango_v4 {
         init_base_liab_weight_opt: Option<f32>,
         maint_pnl_asset_weight_opt: Option<f32>,
         init_pnl_asset_weight_opt: Option<f32>,
-        liquidation_fee_opt: Option<f32>,
+        base_liquidation_fee_opt: Option<f32>,
         maker_fee_opt: Option<f32>,
         taker_fee_opt: Option<f32>,
         min_funding_opt: Option<f32>,
@@ -530,7 +532,7 @@ pub mod mango_v4 {
             init_base_liab_weight_opt,
             maint_pnl_asset_weight_opt,
             init_pnl_asset_weight_opt,
-            liquidation_fee_opt,
+            base_liquidation_fee_opt,
             maker_fee_opt,
             taker_fee_opt,
             min_funding_opt,
@@ -731,8 +733,9 @@ pub mod mango_v4 {
     pub fn perp_liq_base_position(
         ctx: Context<PerpLiqBasePosition>,
         max_base_transfer: i64,
+        max_quote_transfer: u64,
     ) -> Result<()> {
-        instructions::perp_liq_base_position(ctx, max_base_transfer)
+        instructions::perp_liq_base_position(ctx, max_base_transfer, max_quote_transfer)
     }
 
     pub fn perp_liq_force_cancel_orders(

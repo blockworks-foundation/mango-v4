@@ -495,6 +495,7 @@ impl HealthCache {
             (p.base_lots != 0 && (unweighted < 0 || allow_positive_contribution))
             // can increase liqee health by moving positive unsettled pnl to spot
             // while unweighted health >= 0
+            // TODO: this really depends on the settle limit availability!
             || unweighted > 0
         })
     }

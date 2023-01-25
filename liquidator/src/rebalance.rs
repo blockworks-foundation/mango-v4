@@ -277,13 +277,13 @@ impl<'a> Rebalancer<'a> {
                 let (side, order_price, oo_lots) = if effective_lots > 0 {
                     (
                         Side::Ask,
-                        oracle_price * (I80F48::ONE - perp.market.liquidation_fee),
+                        oracle_price * (I80F48::ONE - perp.market.base_liquidation_fee),
                         perp_position.asks_base_lots,
                     )
                 } else {
                     (
                         Side::Bid,
-                        oracle_price * (I80F48::ONE + perp.market.liquidation_fee),
+                        oracle_price * (I80F48::ONE + perp.market.base_liquidation_fee),
                         perp_position.bids_base_lots,
                     )
                 };

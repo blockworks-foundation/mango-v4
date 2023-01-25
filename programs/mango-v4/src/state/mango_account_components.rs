@@ -738,9 +738,9 @@ impl PerpPosition {
     }
 
     /// Adds immediately-settleable realized pnl when a liqor takes over pnl during liquidation
-    pub fn record_liquidation_quote_change(&mut self, change: I80F48) {
+    pub fn record_liquidation_quote_change(&mut self, change: I80F48, limit_change: I80F48) {
         self.change_quote_position(change);
-        cm!(self.realized_other_pnl_native += change);
+        cm!(self.realized_other_pnl_native += limit_change);
     }
 }
 
@@ -1065,7 +1065,7 @@ mod tests {
         pos.record_trading_fee(I80F48::from(-70));
         assert_eq!(pos.realized_other_pnl_native, I80F48::from(70));
 
-        pos.record_liquidation_quote_change(I80F48::from(30));
+        pos.record_liquidation_quote_change(I80F48::from(30), I80F48::from(30));
         assert_eq!(pos.realized_other_pnl_native, I80F48::from(100));
 
         // Buy 1 @ 10,000

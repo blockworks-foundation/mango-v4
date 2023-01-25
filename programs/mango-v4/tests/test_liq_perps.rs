@@ -63,7 +63,7 @@ async fn test_liq_perps_force_cancel() -> Result<(), TransportError> {
             init_base_asset_weight: 0.6,
             maint_base_liab_weight: 1.2,
             init_base_liab_weight: 1.4,
-            liquidation_fee: 0.05,
+            base_liquidation_fee: 0.05,
             maker_fee: 0.0,
             taker_fee: 0.0,
             settle_pnl_limit_factor: 0.2,
@@ -268,7 +268,7 @@ async fn test_liq_perps_base_position_and_bankruptcy() -> Result<(), TransportEr
             init_base_asset_weight: 0.6,
             maint_base_liab_weight: 1.2,
             init_base_liab_weight: 1.4,
-            liquidation_fee: 0.05,
+            base_liquidation_fee: 0.05,
             maker_fee: 0.0,
             taker_fee: 0.0,
             group_insurance_fund: true,
@@ -388,6 +388,7 @@ async fn test_liq_perps_base_position_and_bankruptcy() -> Result<(), TransportEr
             liqee: account_0,
             perp_market,
             max_base_transfer: 10,
+            max_quote_transfer: 0,
         },
     )
     .await
@@ -427,6 +428,7 @@ async fn test_liq_perps_base_position_and_bankruptcy() -> Result<(), TransportEr
             liqee: account_0,
             perp_market,
             max_base_transfer: i64::MAX,
+            max_quote_transfer: 0,
         },
     )
     .await
@@ -494,6 +496,7 @@ async fn test_liq_perps_base_position_and_bankruptcy() -> Result<(), TransportEr
             liqee: account_1,
             perp_market,
             max_base_transfer: -10,
+            max_quote_transfer: 0,
         },
     )
     .await
@@ -526,6 +529,7 @@ async fn test_liq_perps_base_position_and_bankruptcy() -> Result<(), TransportEr
             liqee: account_1,
             perp_market,
             max_base_transfer: i64::MIN,
+            max_quote_transfer: 0,
         },
     )
     .await
@@ -578,6 +582,7 @@ async fn test_liq_perps_base_position_and_bankruptcy() -> Result<(), TransportEr
             liqee: account_1,
             perp_market,
             max_base_transfer: i64::MIN,
+            max_quote_transfer: 0,
         },
     )
     .await
@@ -828,7 +833,7 @@ async fn test_liq_perps_base_position_overall_weight() -> Result<(), TransportEr
             init_base_liab_weight: 1.5,
             maint_pnl_asset_weight: 0.0,
             init_pnl_asset_weight: 0.0,
-            liquidation_fee: 0.05,
+            base_liquidation_fee: 0.05,
             maker_fee: 0.0,
             taker_fee: 0.0,
             group_insurance_fund: true,
@@ -967,9 +972,9 @@ async fn test_liq_perps_base_position_overall_weight() -> Result<(), TransportEr
     );
 
     //
-    // TEST: Can't liquidate base if health wouldn't go up
+    // TEST: Can't liquidate base if health wouldn't go up: no effect
     //
-    let result = send_tx(
+    send_tx(
         solana,
         PerpLiqBasePositionInstruction {
             liqor,
@@ -977,14 +982,17 @@ async fn test_liq_perps_base_position_overall_weight() -> Result<(), TransportEr
             liqee: account_0,
             perp_market,
             max_base_transfer: i64::MAX,
+            max_quote_transfer: 0,
         },
     )
-    .await;
-    assert_mango_error(
-        &result,
-        MangoError::NoLiquidatablePerpBasePosition.into(),
-        "no liquidatable base position".to_string(),
-    );
+    .await
+    .unwrap();
+
+    let liqor_data = solana.get_account::<MangoAccount>(liqor).await;
+    assert_eq!(liqor_data.perps[0].base_position_lots(), 0);
+    assert_eq!(liqor_data.perps[0].quote_position_native(), 0);
+    let liqee_data = solana.get_account::<MangoAccount>(account_0).await;
+    assert_eq!(liqee_data.perps[0].base_position_lots(), 10);
 
     //
     // TEST: can liquidate to increase perp health until >= 0
@@ -1006,6 +1014,7 @@ async fn test_liq_perps_base_position_overall_weight() -> Result<(), TransportEr
             liqee: account_0,
             perp_market,
             max_base_transfer: i64::MAX,
+            max_quote_transfer: 0,
         },
     )
     .await
@@ -1055,6 +1064,7 @@ async fn test_liq_perps_base_position_overall_weight() -> Result<(), TransportEr
             liqee: account_0,
             perp_market,
             max_base_transfer: i64::MAX,
+            max_quote_transfer: 0,
         },
     )
     .await
@@ -1176,7 +1186,7 @@ async fn test_liq_perps_bankruptcy() -> Result<(), TransportError> {
                 init_base_asset_weight: 0.6,
                 maint_base_liab_weight: 1.2,
                 init_base_liab_weight: 1.4,
-                liquidation_fee: 0.05,
+                base_liquidation_fee: 0.05,
                 maker_fee: 0.0,
                 taker_fee: 0.0,
                 group_insurance_fund: true,
