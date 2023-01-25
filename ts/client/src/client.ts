@@ -1919,7 +1919,7 @@ export class MangoClient {
       .rpc();
   }
 
-  // perpPlaceOrder ix returns an optioanl order id,
+  // perpPlaceOrder ix returns an optional, custom order id,
   // but, since we use a customer tx sender, this method
   // doesn't return it
   public async perpPlaceOrder(
