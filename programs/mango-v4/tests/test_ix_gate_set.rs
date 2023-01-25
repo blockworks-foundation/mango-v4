@@ -45,21 +45,6 @@ async fn test_ix_gate_set() -> Result<(), TransportError> {
     )
     .await;
 
-    send_tx(
-        solana,
-        TokenDepositInstruction {
-            amount: 10,
-            reduce_only: false,
-            account,
-            owner,
-            token_account: payer_mint0_account,
-            token_authority: payer.clone(),
-            bank_index: 0,
-        },
-    )
-    .await
-    .unwrap();
-
     let group_data: Group = solana.get_account(group).await;
     assert!(group_data.is_ix_enabled(IxGate::TokenDeposit));
 

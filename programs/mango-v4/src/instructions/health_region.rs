@@ -37,13 +37,7 @@ pub struct HealthRegionBegin<'info> {
 #[derive(Accounts)]
 pub struct HealthRegionEnd<'info> {
     #[account(
-        constraint = group.load()?.is_ix_enabled(IxGate::HealthRegion) @ MangoError::IxIsDisabled,
-    )]
-    pub group: AccountLoader<'info, Group>,
-
-    #[account(
         mut,
-        has_one = group,
         constraint = account.load()?.is_operational() @ MangoError::AccountIsFrozen
     )]
     pub account: AccountLoader<'info, MangoAccountFixed>,

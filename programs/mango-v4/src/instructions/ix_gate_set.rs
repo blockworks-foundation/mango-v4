@@ -18,7 +18,7 @@ pub fn ix_gate_set(ctx: Context<IxGateSet>, ix_gate: u128) -> Result<()> {
     msg!("old  {:?}, new {:?}", group.ix_gate, ix_gate);
 
     let mut require_group_admin = false;
-    for i in 0..=47 {
+    for i in 0..128 {
         // only admin can re-enable
         if group.ix_gate & (1 << i) == 1 && ix_gate & (1 << i) == 0 {
             require_group_admin = true;
@@ -95,9 +95,9 @@ pub fn ix_gate_set(ctx: Context<IxGateSet>, ix_gate: u128) -> Result<()> {
 fn log_if_changed(group: &Group, ix_gate: u128, ix: IxGate) {
     let old = group.is_ix_enabled(ix);
     let new = ix_gate & (1 << ix as u128) == 0;
-    if old == new {
+    if old != new {
         msg!(
-            "{:?} ix old {:?}, new {:?}",
+            "{:?} ix old {}, new {}",
             ix,
             if old { "enabled" } else { "disabled" },
             if new { "enabled" } else { "disabled" }

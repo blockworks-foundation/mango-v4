@@ -3628,7 +3628,6 @@ impl ClientInstruction for ComputeAccountDataInstruction {
 }
 
 pub struct HealthRegionBeginInstruction {
-    pub group: Pubkey,
     pub account: Pubkey,
 }
 #[async_trait::async_trait(?Send)]
@@ -3657,7 +3656,7 @@ impl ClientInstruction for HealthRegionBeginInstruction {
         .await;
 
         let accounts = Self::Accounts {
-            group: self.group,
+            group: account.fixed.group,
             instructions: solana_program::sysvar::instructions::id(),
             account: self.account,
         };
@@ -3674,7 +3673,6 @@ impl ClientInstruction for HealthRegionBeginInstruction {
 }
 
 pub struct HealthRegionEndInstruction {
-    pub group: Pubkey,
     pub account: Pubkey,
     pub affected_bank: Option<Pubkey>,
 }
@@ -3704,7 +3702,6 @@ impl ClientInstruction for HealthRegionEndInstruction {
         .await;
 
         let accounts = Self::Accounts {
-            group: self.group,
             account: self.account,
         };
 
