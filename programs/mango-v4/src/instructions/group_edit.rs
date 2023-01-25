@@ -26,7 +26,7 @@ pub fn group_edit(
     let mut group = ctx.accounts.group.load_mut()?;
 
     if let Some(admin) = admin_opt {
-        require_keys_neq!(admin, Pubkey::default(), MangoError::SomeError);
+        require_keys_neq!(admin, Pubkey::default());
         msg!("Admin old {:?}, new {:?}", group.admin, admin);
         group.admin = admin;
     }
