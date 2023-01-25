@@ -1,7 +1,5 @@
 use anchor_lang::prelude::*;
-use anchor_spl::token;
-use anchor_spl::token::Token;
-use anchor_spl::token::TokenAccount;
+use anchor_spl::token::{self, Token, TokenAccount};
 use checked_math as cm;
 use fixed::types::I80F48;
 
@@ -188,8 +186,6 @@ pub fn perp_liq_quote_and_bankruptcy(
             cm!(liqee_perp_position.perp_spot_transfers -= settlement_i64);
             cm!(liqor.fixed.perp_spot_transfers += settlement_i64);
             cm!(liqee.fixed.perp_spot_transfers -= settlement_i64);
-
-            let now_ts: u64 = Clock::get()?.unix_timestamp.try_into().unwrap();
 
             // Transfer token balance
             let liqor_token_position = liqor.token_position_mut(settle_token_index)?.0;

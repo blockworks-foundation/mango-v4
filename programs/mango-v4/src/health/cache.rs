@@ -487,6 +487,18 @@ impl HealthCache {
         self.perp_infos.iter().any(|p| p.base_lots != 0)
     }
 
+    pub fn has_perp_phase2_liquidatable(&self) -> bool {
+        self.perp_infos.iter().any(|p| {
+            let unweighted = p.unweighted_health_contribution(HealthType::Init);
+            let allow_positive_contribution = p.init_pnl_asset_weight > 0;
+            // can liquidate base lots and doing so would increase health
+            (p.base_lots != 0 && (unweighted < 0 || allow_positive_contribution))
+            // can increase liqee health by moving positive unsettled pnl to spot
+            // while unweighted health >= 0
+            || unweighted > 0
+        })
+    }
+
     pub fn has_perp_open_fills(&self) -> bool {
         self.perp_infos.iter().any(|p| p.has_open_fills)
     }
