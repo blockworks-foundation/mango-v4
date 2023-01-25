@@ -1,6 +1,6 @@
 use anchor_lang::prelude::*;
 
-use crate::{error::MangoError, state::*};
+use crate::state::*;
 
 #[derive(Accounts)]
 pub struct GroupEdit<'info> {
