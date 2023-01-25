@@ -45,6 +45,9 @@ async fn test_ix_gate_set() -> Result<(), TransportError> {
     )
     .await;
 
+    //
+    // test disabling one ix
+    //
     let group_data: Group = solana.get_account(group).await;
     assert!(group_data.is_ix_enabled(IxGate::TokenDeposit));
 
@@ -90,6 +93,21 @@ async fn test_ix_gate_set() -> Result<(), TransportError> {
             owner,
             token_account: payer_mint0_account,
             bank_index: 0,
+        },
+    )
+    .await
+    .unwrap();
+
+    //
+    // test cu budget, ix has a lot of logging
+    // e.g. consumed 66190 of 75000 compute units
+    //
+    send_tx(
+        solana,
+        IxGateSetInstruction {
+            group,
+            admin,
+            ix_gate: u128::MAX,
         },
     )
     .await
