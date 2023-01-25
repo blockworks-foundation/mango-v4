@@ -86,7 +86,7 @@ pub fn token_edit(
             require_group_admin = true;
         }
         if reset_stable_price {
-            msg!("Stable price resetted");
+            msg!("Stable price reset");
             require_keys_eq!(bank.oracle, ctx.accounts.oracle.key());
             let oracle_price =
                 bank.oracle_price(&AccountInfoRef::borrow(ctx.accounts.oracle.as_ref())?, None)?;
@@ -109,7 +109,8 @@ pub fn token_edit(
 
         if let Some(ref interest_rate_params) = interest_rate_params_opt {
             // TODO: add a require! verifying relation between the parameters
-            msg!("Interest rate params: old - adjustment_factor {:?}, util0 {:?}, rate0 {:?}, util1 {:?}, rate1 {:?}, max_rate {:?}, new - adjustment_factor {:?}, util0 {:?}, rate0 {:?}, util1 {:?}, rate1 {:?}, max_rate {:?}", bank.adjustment_factor,
+            msg!("Interest rate params: old - adjustment_factor {:?}, util0 {:?}, rate0 {:?}, util1 {:?}, rate1 {:?}, max_rate {:?}, new - adjustment_factor {:?}, util0 {:?}, rate0 {:?}, util1 {:?}, rate1 {:?}, max_rate {:?}", 
+            bank.adjustment_factor,
             bank.util0,
             bank.rate0,
             bank.util1,
@@ -264,7 +265,7 @@ pub fn token_edit(
             require_group_admin = true;
         }
         if reset_net_borrow_limit {
-            msg!("Net borrow limit resetted");
+            msg!("Net borrow limit reset");
             bank.net_borrows_in_window = 0;
             bank.last_net_borrows_window_start_ts = 0;
             require_group_admin = true;

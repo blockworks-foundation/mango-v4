@@ -71,11 +71,11 @@ pub fn perp_edit_market(
         require_group_admin = true;
     };
     if let Some(oracle) = oracle_opt {
-        msg!("Oracle: old - {:?}, new - {:?}", perp_market.oracle, oracle,);
+        msg!("Oracle: old - {:?}, new - {:?}", perp_market.oracle, oracle);
         perp_market.oracle = oracle;
     }
     if reset_stable_price {
-        msg!("Stable price resetted");
+        msg!("Stable price reset");
         require_keys_eq!(perp_market.oracle, ctx.accounts.oracle.key());
         let oracle_price = perp_market
             .oracle_price(&AccountInfoRef::borrow(ctx.accounts.oracle.as_ref())?, None)?;
