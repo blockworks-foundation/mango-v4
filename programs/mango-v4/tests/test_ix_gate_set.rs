@@ -100,8 +100,17 @@ async fn test_ix_gate_set() -> Result<(), TransportError> {
 
     //
     // test cu budget, ix has a lot of logging
-    // e.g. consumed 66190 of 75000 compute units
-    //
+    // e.g. Program 4MangoMjqJ2firMokCjjGgoK8d4MXcrgL7XJaL3w6fVg consumed 66986 of 75000 compute units
+    send_tx(
+        solana,
+        IxGateSetInstruction {
+            group,
+            admin,
+            ix_gate: 0u128,
+        },
+    )
+    .await
+    .unwrap();
     send_tx(
         solana,
         IxGateSetInstruction {
