@@ -2975,7 +2975,10 @@ export type MangoV4 = {
           "name": "limit",
           "type": "u8"
         }
-      ]
+      ],
+      "returns": {
+        "option": "u128"
+      }
     },
     {
       "name": "perpPlaceOrderPegged",
@@ -3070,7 +3073,10 @@ export type MangoV4 = {
           "name": "maxOracleStalenessSlots",
           "type": "i32"
         }
-      ]
+      ],
+      "returns": {
+        "option": "u128"
+      }
     },
     {
       "name": "perpCancelOrder",
@@ -10920,7 +10926,10 @@ export const IDL: MangoV4 = {
           "name": "limit",
           "type": "u8"
         }
-      ]
+      ],
+      "returns": {
+        "option": "u128"
+      }
     },
     {
       "name": "perpPlaceOrderPegged",
@@ -11015,7 +11024,10 @@ export const IDL: MangoV4 = {
           "name": "maxOracleStalenessSlots",
           "type": "i32"
         }
-      ]
+      ],
+      "returns": {
+        "option": "u128"
+      }
     },
     {
       "name": "perpCancelOrder",
