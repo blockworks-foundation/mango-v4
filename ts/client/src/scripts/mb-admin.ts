@@ -24,7 +24,10 @@ import {
 } from '../accounts/serum3';
 import { Builder } from '../builder';
 import { MangoClient } from '../client';
-import { NullPerpEditParams } from '../clientIxParamBuilder';
+import {
+  NullPerpEditParams,
+  NullTokenEditParams,
+} from '../clientIxParamBuilder';
 import { MANGO_V4_ID, OPENBOOK_PROGRAM_ID } from '../constants';
 import { buildVersionedTx, toNative } from '../utils';
 
@@ -47,8 +50,8 @@ const MAINNET_ORACLES = new Map([
   ['ETH', 'JBu1AL4obBcCMqKBBxhpWCNUt136ijcuMZLFvTP7iWdB'],
   ['SOL', 'H6ARHf6YXhGYeQfUzQNGk6rDNnLBQKrenN712K4AQJEG'],
   ['MSOL', 'E4v1BBgoso9s64TQvmyownAVJbhbEPGyzA3qn4n46qj9'],
-  ['MNGO', '79wm3jjcPr6RaNQ4DGvP5KxG1mNd3gEBsg6FsNVFezK4'], // pyth
-  // ['MNGO', '5xUoyPG9PeowJvfai5jD985LiRvo58isaHrmmcBohi3Y'], // switchboard
+  // ['MNGO', '79wm3jjcPr6RaNQ4DGvP5KxG1mNd3gEBsg6FsNVFezK4'], // pyth
+  ['MNGO', '5xUoyPG9PeowJvfai5jD985LiRvo58isaHrmmcBohi3Y'], // switchboard
   ['BTC', 'GVXRSBjFk6e6J3NbVPXohDJetcTjaeeuykUpbQF8UoMU'],
   ['BONK', '4SZ1qb4MtSUrZcoeaeQ3BDzVCyqxw3VwSFpPiMTmn4GE'],
 ]);
@@ -492,6 +495,25 @@ async function registerPerpMarkets() {
   );
 }
 
+async function changeTokenOracle() {
+  const result = await buildAdminClient();
+  const client = result[0];
+  const admin = result[1];
+  const creator = result[2];
+
+  const group = await client.getGroupForCreator(creator.publicKey, GROUP_NUM);
+  const bank = group.getFirstBankByMint(
+    new PublicKey(MAINNET_MINTS.get('MNGO')!),
+  );
+  await client.tokenEdit(
+    group,
+    bank.mint,
+    Builder(NullTokenEditParams)
+      .oracle(new PublicKey(MAINNET_ORACLES.get('MNGO')!))
+      .build(),
+  );
+}
+
 async function makePerpMarketReduceOnly() {
   const result = await buildAdminClient();
   const client = result[0];
@@ -656,6 +678,7 @@ async function main() {
   }
   try {
     // await registerTokens();
+    // await changeTokenOracle();
   } catch (error) {
     console.log(error);
   }
