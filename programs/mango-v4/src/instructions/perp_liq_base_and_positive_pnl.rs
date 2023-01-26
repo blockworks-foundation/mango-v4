@@ -140,7 +140,6 @@ pub fn perp_liq_base_and_positive_pnl(
 
     // Take over the liqee's base in exchange for quote
     let liqee_base_lots = liqee_perp_position.base_position_lots();
-    require_msg!(liqee_base_lots != 0, "liqee base position is zero");
     // Each lot the base position gets closer to 0, the unweighted perp health contribution
     // increases by this amount.
     let unweighted_health_per_lot;
@@ -150,8 +149,8 @@ pub fn perp_liq_base_and_positive_pnl(
     let fee_factor;
     if liqee_base_lots > 0 {
         require_msg!(
-            max_base_transfer > 0,
-            "max_base_transfer must be positive when liqee's base_position is positive"
+            max_base_transfer >= 0,
+            "max_base_transfer can't be negative when liqee's base_position is positive"
         );
 
         // the unweighted perp health contribution gets reduced by `base * price * perp_init_asset_weight`
@@ -162,10 +161,10 @@ pub fn perp_liq_base_and_positive_pnl(
         unweighted_health_per_lot = cm!(price_per_lot
             * (-perp_market.init_base_asset_weight + quote_init_asset_weight * fee_factor));
     } else {
-        // liqee_base_lots < 0
+        // liqee_base_lots <= 0
         require_msg!(
-            max_base_transfer < 0,
-            "max_base_transfer must be negative when liqee's base_position is positive"
+            max_base_transfer <= 0,
+            "max_base_transfer can't be positive when liqee's base_position is positive"
         );
 
         // health gets increased by `base * price * perp_init_liab_weight`

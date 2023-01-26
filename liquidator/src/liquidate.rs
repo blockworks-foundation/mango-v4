@@ -162,13 +162,14 @@ impl<'a> LiquidateHelper<'a> {
         Ok(Some(sig))
     }
 
-    async fn perp_liq_base_position(&self) -> anyhow::Result<Option<Signature>> {
+    async fn perp_liq_base_and_positive_pnl(&self) -> anyhow::Result<Option<Signature>> {
         let all_perp_base_positions: anyhow::Result<
             Vec<Option<(PerpMarketIndex, i64, I80F48, I80F48)>>,
         > = stream::iter(self.liqee.active_perp_positions())
             .then(|pp| async {
                 let base_lots = pp.base_position_lots();
-                if base_lots == 0 || pp.has_open_taker_fills() {
+                if (base_lots == 0 && pp.quote_position_native() <= 0) || pp.has_open_taker_fills()
+                {
                     return Ok(None);
                 }
                 let perp = self.client.context.perp(pp.market_index);
@@ -231,7 +232,7 @@ impl<'a> LiquidateHelper<'a> {
 
         let sig = self
             .client
-            .perp_liq_base_position(
+            .perp_liq_base_and_positive_pnl(
                 (self.pubkey, &self.liqee),
                 *perp_market_index,
                 side_signum * max_base_transfer_abs,
@@ -348,7 +349,7 @@ impl<'a> LiquidateHelper<'a> {
 
         let sig = self
             .client
-            .perp_liq_quote_and_bankruptcy(
+            .perp_liq_negative_pnl_and_bankruptcy(
                 (self.pubkey, &self.liqee),
                 *perp_market_index,
                 // Always use the max amount, since the health effect is >= 0
@@ -587,21 +588,12 @@ impl<'a> LiquidateHelper<'a> {
         }
 
         //
-        // Phase 2: token, perp base, TODO: perp positive trusted pnl
+        // Phase 2: token, perp base, perp positive pnl
         //
 
-        if let Some(txsig) = self.perp_liq_base_position().await? {
+        if let Some(txsig) = self.perp_liq_base_and_positive_pnl().await? {
             return Ok(Some(txsig));
         }
-
-        // Now that the perp base positions are zeroed the perp pnl won't
-        // fluctuate with the oracle price anymore.
-        // It's possible that some positive pnl can't be settled (if there's
-        // no liquid counterparty) and that some negative pnl can't be settled
-        // (if the liqee isn't liquid enough).
-        // if let Some(txsig) = self.perp_settle_pnl().await? {
-        //     return Ok(txsig);
-        // }
 
         if let Some(txsig) = self.token_liq().await? {
             return Ok(Some(txsig));

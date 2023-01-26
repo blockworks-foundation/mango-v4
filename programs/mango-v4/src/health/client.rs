@@ -395,6 +395,63 @@ impl HealthCache {
 
         Ok(base_lots.round_to_zero().to_num())
     }
+
+    pub fn max_borrow_for_health_fn(
+        &self,
+        account: &MangoAccountValue,
+        bank: &Bank,
+        min_fn_value: I80F48,
+        target_fn: fn(&HealthCache) -> I80F48,
+    ) -> Result<I80F48> {
+        let health_type = HealthType::Init;
+
+        // Fail if the health cache (or consequently the account) don't have existing
+        // positions for the source and target token index.
+        let token_info_index = find_token_info_index(&self.token_infos, bank.token_index)?;
+
+        let token = &self.token_infos[token_info_index];
+
+        // TODO: here
+        let cache_after_borrow = |amount: I80F48| -> Result<Option<HealthCache>> {
+            use std::time::SystemTime;
+            let now_ts = SystemTime::now()
+                .duration_since(SystemTime::UNIX_EPOCH)
+                .expect("system time after epoch start")
+                .as_secs();
+
+            let mut source_position = account.token_position(source_bank.token_index)?.clone();
+            let mut target_position = account.token_position(target_bank.token_index)?.clone();
+
+            let target_amount = cm!(amount * price);
+
+            let mut source_bank = source_bank.clone();
+            source_bank.withdraw_with_fee(
+                &mut source_position,
+                amount,
+                now_ts,
+                source_oracle_price,
+            )?;
+            let mut target_bank = target_bank.clone();
+            target_bank.deposit(&mut target_position, target_amount, now_ts)?;
+
+            let mut resulting_cache = self.clone();
+            resulting_cache.adjust_token_balance(&source_bank, -amount)?;
+            resulting_cache.adjust_token_balance(&target_bank, target_amount)?;
+
+            match maybe_cache {
+                Ok(cache) => Ok(Some(cache)),
+                // Special case net borrow errors: We want to be able to find a good
+                // swap amount even if the max swap is limited by the net borrow limit.
+                Err(Error::AnchorError(err))
+                    if err.error_code_number
+                        == MangoError::BankNetBorrowsLimitReached.error_code() =>
+                {
+                    Ok(None)
+                }
+                Err(err) => Err(err),
+            }
+        };
+    }
 }
 
 fn scan_right_until_less_than(
