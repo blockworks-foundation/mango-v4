@@ -181,73 +181,99 @@ pub fn perp_liq_base_and_positive_pnl(
     };
     assert!(unweighted_health_per_lot > 0);
 
+    let spot_gain_per_settled = cm!(I80F48::ONE - perp_market.positive_pnl_liquidation_fee);
+    let init_overall_asset_weight = perp_market.init_pnl_asset_weight;
+    let expected_perp_health = |unweighted: I80F48| {
+        if unweighted < 0 {
+            unweighted
+        } else if unweighted < max_settle {
+            cm!(unweighted * spot_gain_per_settled)
+        } else {
+            let unsettled = cm!(unweighted - max_settle);
+            cm!(max_settle * spot_gain_per_settled + unsettled * init_overall_asset_weight)
+        }
+    };
+
+    // Several steps of perp base position reduction will follow, and they'll update
+    // these variables
+    let mut base_reduction = 0;
+    let mut current_expected_health = liqee_init_health;
+    let perp_info = liqee_health_cache.perp_info(perp_market_index)?;
+    let mut current_unweighted_perp_health =
+        perp_info.unweighted_health_contribution(HealthType::Init);
+    let mut current_expected_perp_health = expected_perp_health(current_unweighted_perp_health);
+
+    let reduce_base = |step: &str, health_amount: I80F48, health_per_lot: I80F48| {
+        // How much are we willing to increase the unweighted perp health?
+        let health_limit = health_amount
+            .min(-current_expected_health)
+            .max(I80F48::ZERO);
+        // How many lots to transfer?
+        let base_lots = cm!(health_limit / health_per_lot)
+            .checked_ceil() // overshoot to aim for init_health >= 0
+            .unwrap()
+            .checked_to_num::<i64>()
+            .unwrap()
+            .min(liqee_base_lots.abs() - base_reduction)
+            .min(max_base_transfer.abs() - base_reduction)
+            .max(0);
+        let unweighted_change = cm!(I80F48::from(base_lots) * unweighted_health_per_lot);
+        let new_unweighted_perp = cm!(current_unweighted_perp_health + unweighted_change);
+        let new_expected_perp = expected_perp_health(new_unweighted_perp);
+        let new_expected_health =
+            cm!(current_expected_health + (new_expected_perp - current_expected_perp_health));
+        msg!(
+            "{}: {} lots, health {} -> {}, unweighted perp {} -> {}",
+            step,
+            base_lots,
+            current_expected_health,
+            new_expected_health,
+            current_unweighted_perp_health,
+            new_unweighted_perp
+        );
+
+        base_reduction += base_lots;
+        current_expected_health = new_expected_health;
+        current_unweighted_perp_health = new_unweighted_perp;
+        current_expected_perp_health = new_expected_perp;
+    };
+
     //
     // Step 1: Reduce the perp base position, increasing unweighted perp health.
     // Do this as until it's just above max_settle. While it's <= 0, this action will definitely
     // increase overall health, and between 0..max_settle it'll increase health because
     // step 3 will convert the positive pnl into spot.
     //
-    let perp_info = liqee_health_cache.perp_info(perp_market_index)?;
-    let unweighted_perp_init = perp_info.unweighted_health_contribution(HealthType::Init);
-    let weighted_perp_init =
-        perp_info.weigh_health_contribution(unweighted_perp_init, HealthType::Init);
-    // How much are we willing to increase the unweighted perp health?
-    let step1_health_limit = cm!(max_settle - unweighted_perp_init)
-        .min(-liqee_init_health)
-        .max(I80F48::ZERO);
-    // How many lots to transfer?
-    let step1_base = cm!(step1_health_limit / unweighted_health_per_lot)
-        .checked_ceil() // overshoot to aim for init_health >= 0
-        .unwrap()
-        .checked_to_num::<i64>()
-        .unwrap()
-        .min(liqee_base_lots.abs())
-        .min(max_base_transfer.abs());
-    let step1_unweighted_perp_init_change =
-        cm!(I80F48::from(step1_base) * unweighted_health_per_lot);
-    let unweighted_perp_init_after_step1 =
-        cm!(unweighted_perp_init + step1_unweighted_perp_init_change);
-    let weighted_perp_init_after_step1 =
-        perp_info.weigh_health_contribution(unweighted_perp_init_after_step1, HealthType::Init);
-    let liqee_init_health_after_step1 =
-        cm!(liqee_init_health - weighted_perp_init + weighted_perp_init_after_step1);
-    msg!(
-        "step1: {} lots, health {} -> {}, unweighted perp {} -> {}",
-        step1_base,
-        liqee_init_health,
-        liqee_init_health_after_step1,
-        unweighted_perp_init,
-        unweighted_perp_init_after_step1
-    );
+    if current_unweighted_perp_health < 0 {
+        reduce_base(
+            "step 1",
+            -current_unweighted_perp_health,
+            unweighted_health_per_lot,
+        );
+    }
 
     //
-    // Step 2: in markets with overall perp weight >0, reduce the base position further to
-    // increase health more even though the perp contribution already is >=0.
+    // Step 2: reduce base position into max_settle
     //
-    let step2_health_limit = (-liqee_init_health_after_step1).max(I80F48::ZERO);
-    let weighted_health_per_lot =
-        cm!(unweighted_health_per_lot * perp_market.init_pnl_asset_weight);
-    let step2_base =
-        if unweighted_perp_init_after_step1 >= 0 && perp_market.init_pnl_asset_weight > 0 {
-            cm!(step2_health_limit / weighted_health_per_lot)
-                .checked_ceil() // overshoot to aim for init_health >= 0
-                .unwrap()
-                .checked_to_num::<i64>()
-                .unwrap()
-                .min(liqee_base_lots.abs() - step1_base)
-                .min(max_base_transfer.abs() - step1_base)
-        } else {
-            0
-        };
-    let liqee_init_health_after_step2 =
-        cm!(liqee_init_health_after_step1 + I80F48::from(step2_base) * weighted_health_per_lot);
-    msg!("step2: {} lots", step2_base);
+    if current_unweighted_perp_health >= 0 && current_unweighted_perp_health < max_settle {
+        let settled_health_per_lot = cm!(unweighted_health_per_lot * spot_gain_per_settled);
+        reduce_base("step 2", max_settle, settled_health_per_lot);
+    }
 
     //
-    // Execute the step 1 + step2 transfer. This is essentially a forced trade and updates the
+    // Step 3: bla
+    //
+    if current_unweighted_perp_health >= max_settle && perp_market.init_pnl_asset_weight > 0 {
+        let weighted_health_per_lot =
+            cm!(unweighted_health_per_lot * perp_market.init_pnl_asset_weight);
+        reduce_base("step 3", I80F48::MAX, weighted_health_per_lot);
+    }
+
+    //
+    // Execute the base reduction. This is essentially a forced trade and updates the
     // liqee and liqors entry and break even prices.
     //
-    let base_transfer = cm!(direction * (step1_base + step2_base));
+    let base_transfer = cm!(direction * base_reduction);
     let quote_transfer = cm!(-I80F48::from(base_transfer) * price_per_lot * fee_factor);
     if base_transfer != 0 {
         msg!(
@@ -262,6 +288,7 @@ pub fn perp_liq_base_and_positive_pnl(
     //
     // Step 3: Let the liqor take over positive pnl
     //
+    // TODO: figure out the minimal amount that needs to be transfered
     let step3_settlement = if liqee_init_health_after_step2 < 0 {
         let spot_gain_per_settle = cm!(I80F48::ONE - perp_market.positive_pnl_liquidation_fee);
         let health_per_settle = cm!(spot_gain_per_settle - perp_market.init_pnl_asset_weight);

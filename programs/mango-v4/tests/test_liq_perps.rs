@@ -750,7 +750,7 @@ async fn test_liq_perps_base_position_and_bankruptcy() -> Result<(), TransportEr
 #[tokio::test]
 async fn test_liq_perps_base_position_overall_weight() -> Result<(), TransportError> {
     let mut test_builder = TestContextBuilder::new();
-    test_builder.test().set_compute_max_units(100_000); // PerpLiqNegativePnlAndBankruptcy takes a lot of CU
+    test_builder.test().set_compute_max_units(130_000); // PerpLiqNegativePnlAndBankruptcy takes a lot of CU
     let context = test_builder.start_default().await;
     let solana = &context.solana.clone();
 
@@ -798,7 +798,7 @@ async fn test_liq_perps_base_position_overall_weight() -> Result<(), TransportEr
         tx.send().await.unwrap();
     }
 
-    let _quote_token = &tokens[0];
+    let quote_token = &tokens[0];
     let base_token = &tokens[1];
     let borrow_token = &tokens[2];
 
@@ -834,6 +834,7 @@ async fn test_liq_perps_base_position_overall_weight() -> Result<(), TransportEr
             maint_pnl_asset_weight: 0.0,
             init_pnl_asset_weight: 0.0,
             base_liquidation_fee: 0.05,
+            positive_pnl_liquidation_fee: 0.05,
             maker_fee: 0.0,
             taker_fee: 0.0,
             group_insurance_fund: true,
@@ -963,7 +964,7 @@ async fn test_liq_perps_base_position_overall_weight() -> Result<(), TransportEr
     );
 
     //
-    // SETUP: Increase the price of the borrow account_0 becomes liquidatable
+    // SETUP: Increase the price of the borrow so account_0 becomes liquidatable
     //
     set_bank_stub_oracle_price(solana, group, &borrow_token, admin, 10.0).await;
     assert_eq!(
@@ -995,16 +996,85 @@ async fn test_liq_perps_base_position_overall_weight() -> Result<(), TransportEr
     assert_eq!(liqee_data.perps[0].base_position_lots(), 10);
 
     //
+    // TEST: Can take over existing positive pnl without eating base position
+    //
+    send_tx(
+        solana,
+        PerpLiqBaseAndPositivePnlInstruction {
+            liqor,
+            liqor_owner: owner,
+            liqee: account_0,
+            perp_market,
+            max_base_transfer: i64::MAX,
+            max_quote_transfer: 100,
+        },
+    )
+    .await
+    .unwrap();
+
+    let liqor_data = solana.get_account::<MangoAccount>(liqor).await;
+    assert_eq!(liqor_data.perps[0].base_position_lots(), 0);
+    assert_eq!(liqor_data.perps[0].quote_position_native(), 100);
+    assert_eq!(
+        account_position(solana, liqor, quote_token.bank).await,
+        10000 - 95
+    );
+    let liqee_data = solana.get_account::<MangoAccount>(account_0).await;
+    assert_eq!(liqee_data.perps[0].base_position_lots(), 10);
+    assert_eq!(liqee_data.perps[0].quote_position_native(), -10100);
+    assert_eq!(
+        account_position(solana, account_0, quote_token.bank).await,
+        10000 + 95
+    );
+
+    //
+    // TEST: Being willing to take over more positive pnl can trigger more base liquidation
+    //
+    send_tx(
+        solana,
+        PerpLiqBaseAndPositivePnlInstruction {
+            liqor,
+            liqor_owner: owner,
+            liqee: account_0,
+            perp_market,
+            max_base_transfer: i64::MAX,
+            max_quote_transfer: 600,
+        },
+    )
+    .await
+    .unwrap();
+
+    let liqor_data = solana.get_account::<MangoAccount>(liqor).await;
+    assert_eq!(liqor_data.perps[0].base_position_lots(), 1);
+    assert!(assert_equal(
+        liqor_data.perps[0].quote_position_native(),
+        100.0 + 600.0 - 2100.0 * 0.95,
+        0.1
+    ));
+    assert_eq!(
+        account_position(solana, liqor, quote_token.bank).await,
+        10000 - 95 - 570
+    );
+    let liqee_data = solana.get_account::<MangoAccount>(account_0).await;
+    assert_eq!(liqee_data.perps[0].base_position_lots(), 9);
+    assert!(assert_equal(
+        liqee_data.perps[0].quote_position_native(),
+        -10000.0 - 100.0 - 600.0 + 2100.0 * 0.95,
+        0.1
+    ));
+    assert_eq!(
+        account_position(solana, account_0, quote_token.bank).await,
+        10000 + 95 + 570
+    );
+
+    //
     // TEST: can liquidate to increase perp health until >= 0
     //
 
-    // perp base value goes to 10*19*100*0.5
-    // unweighted perp health is -10*1*100*0.5 = -500
+    // perp base value goes to 9*19*100*0.5
+    // unweighted perp health changes by -9*2*100*0.5 = -900
+    // this makes the perp health contribution negative!
     set_perp_stub_oracle_price(solana, group, perp_market, &base_token, admin, 19.0).await;
-    assert_eq!(
-        account_init_health(solana, account_0).await.round(),
-        (10000.0f64 - 10.0 * 1000.5 * 1.4 - 500.0).round()
-    );
 
     send_tx(
         solana,
@@ -1021,27 +1091,17 @@ async fn test_liq_perps_base_position_overall_weight() -> Result<(), TransportEr
     .unwrap();
 
     // liquidated one base lot only, even though health is still negative!
-    // (in fact, health went up exactly by 500, to bring the perp health contribution to 0)
-    assert_eq!(
-        account_init_health(solana, account_0).await.round(),
-        (10000.0f64 - 10.0 * 1000.5 * 1.4).round()
-    );
     let liqor_data = solana.get_account::<MangoAccount>(liqor).await;
-    assert_eq!(liqor_data.perps[0].base_position_lots(), 1);
+    assert_eq!(liqor_data.perps[0].base_position_lots(), 2);
     let liqee_data = solana.get_account::<MangoAccount>(account_0).await;
-    assert_eq!(liqee_data.perps[0].base_position_lots(), 9);
+    assert_eq!(liqee_data.perps[0].base_position_lots(), 8);
 
     //
-    // TEST: if overall perp health weight is >0, we can liquidate as much as is needed
-    // to reach positive health
+    // TEST: if overall perp health weight is >0, we can liquidate the base position further
     //
 
     // reduce the price some more, so the liq instruction can do some of step1 and step2
     set_perp_stub_oracle_price(solana, group, perp_market, &base_token, admin, 17.0).await;
-    assert_eq!(
-        account_init_health(solana, account_0).await.round(),
-        (10000.0f64 - 10.0 * 1000.5 * 1.4 - 545.0).round() // 545 is not derived systematically
-    );
 
     send_tx(
         solana,
@@ -1063,7 +1123,7 @@ async fn test_liq_perps_base_position_overall_weight() -> Result<(), TransportEr
             liqor_owner: owner,
             liqee: account_0,
             perp_market,
-            max_base_transfer: i64::MAX,
+            max_base_transfer: 3,
             max_quote_transfer: 0,
         },
     )
@@ -1071,9 +1131,31 @@ async fn test_liq_perps_base_position_overall_weight() -> Result<(), TransportEr
     .unwrap();
 
     let liqor_data = solana.get_account::<MangoAccount>(liqor).await;
-    assert_eq!(liqor_data.perps[0].base_position_lots(), 10);
+    assert_eq!(liqor_data.perps[0].base_position_lots(), 5);
+    let liqee_data = solana.get_account::<MangoAccount>(account_0).await;
+    assert_eq!(liqee_data.perps[0].base_position_lots(), 5);
+
+    //
+    // TEST: can take over the positive pnl to bring the account's quote to zero
+    //
+
+    send_tx(
+        solana,
+        PerpLiqBaseAndPositivePnlInstruction {
+            liqor,
+            liqor_owner: owner,
+            liqee: account_0,
+            perp_market,
+            max_base_transfer: i64::MAX,
+            max_quote_transfer: u64::MAX,
+        },
+    )
+    .await
+    .unwrap();
+
     let liqee_data = solana.get_account::<MangoAccount>(account_0).await;
     assert_eq!(liqee_data.perps[0].base_position_lots(), 0);
+    assert_eq!(liqee_data.perps[0].quote_position_native(), 0);
 
     Ok(())
 }
