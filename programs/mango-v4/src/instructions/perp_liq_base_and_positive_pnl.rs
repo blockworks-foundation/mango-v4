@@ -191,8 +191,10 @@ pub fn perp_liq_base_and_positive_pnl(
         }
     };
 
+    //
     // Several steps of perp base position reduction will follow, and they'll update
     // these variables
+    //
     let mut base_reduction = 0;
     let mut current_expected_health = liqee_init_health;
     let perp_info = liqee_health_cache.perp_info(perp_market_index)?;
@@ -243,10 +245,8 @@ pub fn perp_liq_base_and_positive_pnl(
     };
 
     //
-    // Step 1: Reduce the perp base position, increasing unweighted perp health.
-    // Do this as until it's just above max_settle. While it's <= 0, this action will definitely
-    // increase overall health, and between 0..max_settle it'll increase health because
-    // step 3 will convert the positive pnl into spot.
+    // Step 1: While the perp unsettled health is negative, any perp base position reduction
+    // directly increases it for the full amount.
     //
     if current_unweighted_perp_health < 0 {
         reduce_base(
@@ -258,7 +258,8 @@ pub fn perp_liq_base_and_positive_pnl(
     }
 
     //
-    // Step 2: reduce base position into max_settle
+    // Step 2: If perp unsettled health is positive but below max_settle, perp base position reductions
+    // benefit account health slightly less because of the settlement liquidation fee.
     //
     if current_unweighted_perp_health >= 0 && current_unweighted_perp_health < max_settle {
         let settled_health_per_lot = cm!(unweighted_health_per_lot * spot_gain_per_settled);
@@ -271,7 +272,7 @@ pub fn perp_liq_base_and_positive_pnl(
     }
 
     //
-    // Step 3: bla
+    // Step 3: Above that, perp base positions only benefit account health if the pnl asset weight is positive
     //
     if current_unweighted_perp_health >= max_settle && perp_market.init_pnl_asset_weight > 0 {
         let weighted_health_per_lot =
@@ -301,7 +302,7 @@ pub fn perp_liq_base_and_positive_pnl(
     }
 
     //
-    // Step 3: Let the liqor take over positive pnl
+    // Step 4: Let the liqor take over positive pnl until the account health is positive
     //
     let final_weighted_perp_health =
         perp_info.weigh_health_contribution(current_unweighted_perp_health, HealthType::Init);
