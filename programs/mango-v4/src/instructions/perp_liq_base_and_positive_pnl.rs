@@ -81,16 +81,11 @@ pub fn perp_liq_base_and_positive_pnl(
     let mut liqee = ctx.accounts.liqee.load_full_mut()?;
 
     // Initial liqee health check
-    let mut liqee_health_cache;
-    let liqor_settle_health;
-    {
+    let mut liqee_health_cache = {
         let account_retriever = ScanningAccountRetriever::new(ctx.remaining_accounts, group_pk)
             .context("create account retriever")?;
-        liqee_health_cache = new_health_cache(&liqee.borrow(), &account_retriever)
-            .context("create liqee health cache")?;
-        liqor_settle_health = new_health_cache(&liqor.borrow(), &account_retriever)
-            .context("create liqor health cache")?
-            .perp_settle_health();
+        new_health_cache(&liqee.borrow(), &account_retriever)
+            .context("create liqee health cache")?
     };
     let liqee_init_health = liqee_health_cache.health(HealthType::Init);
     liqee_health_cache.require_after_phase1_liquidation()?;
@@ -137,9 +132,11 @@ pub fn perp_liq_base_and_positive_pnl(
     let now_ts: u64 = Clock::get()?.unix_timestamp.try_into().unwrap();
     liqee_perp_position.update_settle_limit(&perp_market, now_ts);
     let liqee_positive_settle_limit = liqee_perp_position.available_settle_limit(&perp_market).1;
-    let max_settle = I80F48::from(max_quote_transfer)
-        .min(liqor_settle_health)
-        .max(I80F48::ZERO);
+
+    // The max settleable amount does not need to be constrained by the liqor's perp settle health,
+    // because taking over perp pnl decreases liqor health: every unit of pnl taken costs
+    // (1-positive_pnl_liq_fee) USDC and only gains init_pnl_asset_weight in perp health.
+    let max_settle = I80F48::from(max_quote_transfer);
 
     // Take over the liqee's base in exchange for quote
     let liqee_base_lots = liqee_perp_position.base_position_lots();
