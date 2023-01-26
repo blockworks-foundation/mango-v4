@@ -7539,7 +7539,7 @@ export type MangoV4 = {
       ]
     },
     {
-      "name": "PerpLiqBasePositionLog",
+      "name": "PerpLiqBaseAndPositivePnlLog",
       "fields": [
         {
           "name": "mangoGroup",
@@ -7634,7 +7634,7 @@ export type MangoV4 = {
       ]
     },
     {
-      "name": "PerpLiqQuoteAndBankruptcyLog",
+      "name": "PerpLiqNegativePnlAndBankruptcyLog",
       "fields": [
         {
           "name": "mangoGroup",
@@ -15484,7 +15484,7 @@ export const IDL: MangoV4 = {
       ]
     },
     {
-      "name": "PerpLiqBasePositionLog",
+      "name": "PerpLiqBaseAndPositivePnlLog",
       "fields": [
         {
           "name": "mangoGroup",
@@ -15579,7 +15579,7 @@ export const IDL: MangoV4 = {
       ]
     },
     {
-      "name": "PerpLiqQuoteAndBankruptcyLog",
+      "name": "PerpLiqNegativePnlAndBankruptcyLog",
       "fields": [
         {
           "name": "mangoGroup",

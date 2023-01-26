@@ -951,7 +951,7 @@ impl MangoClient {
             program_id: mango_v4::id(),
             accounts: {
                 let mut ams = anchor_lang::ToAccountMetas::to_account_metas(
-                    &mango_v4::accounts::PerpLiqBasePosition {
+                    &mango_v4::accounts::PerpLiqBaseAndPositivePnl {
                         group: self.group(),
                         perp_market: perp.address,
                         oracle: perp.market.oracle,
@@ -964,9 +964,9 @@ impl MangoClient {
                 ams.extend(health_remaining_ams.into_iter());
                 ams
             },
-            data: anchor_lang::InstructionData::data(&mango_v4::instruction::PerpLiqBasePosition {
-                max_base_transfer,
-            }),
+            data: anchor_lang::InstructionData::data(
+                &mango_v4::instruction::PerpLiqBaseAndPositivePnl { max_base_transfer },
+            ),
         };
         self.send_and_confirm_owner_tx(vec![ix]).await
     }
@@ -995,7 +995,7 @@ impl MangoClient {
             program_id: mango_v4::id(),
             accounts: {
                 let mut ams = anchor_lang::ToAccountMetas::to_account_metas(
-                    &mango_v4::accounts::PerpLiqQuoteAndBankruptcy {
+                    &mango_v4::accounts::PerpLiqNegativePnlAndBankruptcy {
                         group: self.group(),
                         perp_market: perp.address,
                         oracle: perp.market.oracle,
@@ -1014,7 +1014,7 @@ impl MangoClient {
                 ams
             },
             data: anchor_lang::InstructionData::data(
-                &mango_v4::instruction::PerpLiqQuoteAndBankruptcy { max_liab_transfer },
+                &mango_v4::instruction::PerpLiqNegativePnlAndBankruptcy { max_liab_transfer },
             ),
         };
         self.send_and_confirm_owner_tx(vec![ix]).await

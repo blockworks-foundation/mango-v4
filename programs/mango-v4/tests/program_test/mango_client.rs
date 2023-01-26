@@ -3395,7 +3395,7 @@ impl ClientInstruction for PerpLiqForceCancelOrdersInstruction {
     }
 }
 
-pub struct PerpLiqBasePositionInstruction {
+pub struct PerpLiqBaseAndPositivePnlInstruction {
     pub liqor: Pubkey,
     pub liqor_owner: TestKeypair,
     pub liqee: Pubkey,
@@ -3404,9 +3404,9 @@ pub struct PerpLiqBasePositionInstruction {
     pub max_quote_transfer: u64,
 }
 #[async_trait::async_trait(?Send)]
-impl ClientInstruction for PerpLiqBasePositionInstruction {
-    type Accounts = mango_v4::accounts::PerpLiqBasePosition;
-    type Instruction = mango_v4::instruction::PerpLiqBasePosition;
+impl ClientInstruction for PerpLiqBaseAndPositivePnlInstruction {
+    type Accounts = mango_v4::accounts::PerpLiqBaseAndPositivePnl;
+    type Instruction = mango_v4::instruction::PerpLiqBaseAndPositivePnl;
     async fn to_instruction(
         &self,
         account_loader: impl ClientAccountLoader + 'async_trait,
@@ -3472,7 +3472,7 @@ impl ClientInstruction for PerpLiqBasePositionInstruction {
     }
 }
 
-pub struct PerpLiqQuoteAndBankruptcyInstruction {
+pub struct PerpLiqNegativePnlAndBankruptcyInstruction {
     pub liqor: Pubkey,
     pub liqor_owner: TestKeypair,
     pub liqee: Pubkey,
@@ -3480,9 +3480,9 @@ pub struct PerpLiqQuoteAndBankruptcyInstruction {
     pub max_liab_transfer: u64,
 }
 #[async_trait::async_trait(?Send)]
-impl ClientInstruction for PerpLiqQuoteAndBankruptcyInstruction {
-    type Accounts = mango_v4::accounts::PerpLiqQuoteAndBankruptcy;
-    type Instruction = mango_v4::instruction::PerpLiqQuoteAndBankruptcy;
+impl ClientInstruction for PerpLiqNegativePnlAndBankruptcyInstruction {
+    type Accounts = mango_v4::accounts::PerpLiqNegativePnlAndBankruptcy;
+    type Instruction = mango_v4::instruction::PerpLiqNegativePnlAndBankruptcy;
     async fn to_instruction(
         &self,
         account_loader: impl ClientAccountLoader + 'async_trait,

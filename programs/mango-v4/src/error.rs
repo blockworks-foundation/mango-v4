@@ -79,8 +79,8 @@ pub enum MangoError {
     HasLiquidatableTokenPosition,
     #[msg("has liquidatable perp base position")]
     HasLiquidatablePerpBasePosition,
-    #[msg("has liquidatable trusted perp pnl")]
-    HasLiquidatableTrustedPerpPnl,
+    #[msg("has liquidatable positive perp pnl")]
+    HasLiquidatablePositivePerpPnl,
     #[msg("account is frozen")]
     AccountIsFrozen,
     #[msg("Init Asset Weight can't be negative")]

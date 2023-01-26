@@ -491,27 +491,14 @@ impl HealthCache {
         self.perp_infos.iter().any(|p| p.base_lots != 0)
     }
 
-    pub fn has_perp_phase2_liquidatable(&self) -> bool {
-        self.perp_infos.iter().any(|p| {
-            let unweighted = p.unweighted_health_contribution(HealthType::Init);
-            let allow_positive_contribution = p.init_pnl_asset_weight > 0;
-            // can liquidate base lots and doing so would increase health
-            (p.base_lots != 0 && (unweighted < 0 || allow_positive_contribution))
-            // can increase liqee health by moving positive unsettled pnl to spot
-            // while unweighted health >= 0
-            // TODO: this really depends on the settle limit availability!
-            || unweighted > 0
-        })
-    }
-
     pub fn has_perp_open_fills(&self) -> bool {
         self.perp_infos.iter().any(|p| p.has_open_fills)
     }
 
-    pub fn has_perp_positive_maint_pnl_without_base_position(&self) -> bool {
+    pub fn has_perp_positive_pnl_no_base(&self) -> bool {
         self.perp_infos
             .iter()
-            .any(|p| p.maint_pnl_asset_weight > 0 && p.base_lots == 0 && p.quote > 0)
+            .any(|p| p.base_lots == 0 && p.quote > 0)
     }
 
     pub fn has_perp_negative_pnl(&self) -> bool {
@@ -546,7 +533,7 @@ impl HealthCache {
         self.has_spot_assets() && self.has_spot_borrows()
             || self.has_perp_base_positions()
             || self.has_perp_open_fills()
-            || self.has_perp_positive_maint_pnl_without_base_position()
+            || self.has_perp_positive_pnl_no_base()
     }
 
     pub fn require_after_phase2_liquidation(&self) -> Result<()> {
@@ -564,8 +551,8 @@ impl HealthCache {
             MangoError::HasOpenPerpTakerFills
         );
         require!(
-            !self.has_perp_positive_maint_pnl_without_base_position(),
-            MangoError::HasLiquidatableTrustedPerpPnl
+            !self.has_perp_positive_pnl_no_base(),
+            MangoError::HasLiquidatablePositivePerpPnl
         );
         Ok(())
     }

@@ -269,7 +269,7 @@ pub struct Serum3RegisterMarketLog {
 }
 
 #[event]
-pub struct PerpLiqBasePositionLog {
+pub struct PerpLiqBaseAndPositivePnlLog {
     pub mango_group: Pubkey,
     pub perp_market_index: u16,
     pub liqor: Pubkey,
@@ -294,7 +294,7 @@ pub struct PerpLiqBankruptcyLog {
 }
 
 #[event]
-pub struct PerpLiqQuoteAndBankruptcyLog {
+pub struct PerpLiqNegativePnlAndBankruptcyLog {
     pub mango_group: Pubkey,
     pub liqee: Pubkey,
     pub liqor: Pubkey,

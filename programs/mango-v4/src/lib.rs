@@ -730,12 +730,12 @@ pub mod mango_v4 {
         instructions::perp_settle_fees(ctx, max_settle_amount)
     }
 
-    pub fn perp_liq_base_position(
-        ctx: Context<PerpLiqBasePosition>,
+    pub fn perp_liq_base_and_positive_pnl(
+        ctx: Context<PerpLiqBaseAndPositivePnl>,
         max_base_transfer: i64,
         max_quote_transfer: u64,
     ) -> Result<()> {
-        instructions::perp_liq_base_position(ctx, max_base_transfer, max_quote_transfer)
+        instructions::perp_liq_base_and_positive_pnl(ctx, max_base_transfer, max_quote_transfer)
     }
 
     pub fn perp_liq_force_cancel_orders(
@@ -745,11 +745,11 @@ pub mod mango_v4 {
         instructions::perp_liq_force_cancel_orders(ctx, limit)
     }
 
-    pub fn perp_liq_quote_and_bankruptcy(
-        ctx: Context<PerpLiqQuoteAndBankruptcy>,
+    pub fn perp_liq_negative_pnl_and_bankruptcy(
+        ctx: Context<PerpLiqNegativePnlAndBankruptcy>,
         max_liab_transfer: u64,
     ) -> Result<()> {
-        instructions::perp_liq_quote_and_bankruptcy(ctx, max_liab_transfer)
+        instructions::perp_liq_negative_pnl_and_bankruptcy(ctx, max_liab_transfer)
     }
 
     pub fn alt_set(ctx: Context<AltSet>, index: u8) -> Result<()> {
