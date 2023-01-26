@@ -203,7 +203,13 @@ pub fn perp_liq_base_and_positive_pnl(
         perp_info.unweighted_health_contribution(HealthType::Init);
     let mut current_expected_perp_health = expected_perp_health(current_unweighted_perp_health);
 
-    let reduce_base = |step: &str, health_amount: I80F48, health_per_lot: I80F48| {
+    let initial_weighted_perp_health =
+        perp_info.weigh_health_contribution(current_unweighted_perp_health, HealthType::Init);
+
+    let mut reduce_base = |step: &str,
+                           health_amount: I80F48,
+                           health_per_lot: I80F48,
+                           current_unweighted_perp_health: &mut I80F48| {
         // How much are we willing to increase the unweighted perp health?
         let health_limit = health_amount
             .min(-current_expected_health)
@@ -218,7 +224,8 @@ pub fn perp_liq_base_and_positive_pnl(
             .min(max_base_transfer.abs() - base_reduction)
             .max(0);
         let unweighted_change = cm!(I80F48::from(base_lots) * unweighted_health_per_lot);
-        let new_unweighted_perp = cm!(current_unweighted_perp_health + unweighted_change);
+        let current_unweighted = *current_unweighted_perp_health;
+        let new_unweighted_perp = cm!(current_unweighted + unweighted_change);
         let new_expected_perp = expected_perp_health(new_unweighted_perp);
         let new_expected_health =
             cm!(current_expected_health + (new_expected_perp - current_expected_perp_health));
@@ -228,13 +235,13 @@ pub fn perp_liq_base_and_positive_pnl(
             base_lots,
             current_expected_health,
             new_expected_health,
-            current_unweighted_perp_health,
+            current_unweighted,
             new_unweighted_perp
         );
 
         base_reduction += base_lots;
         current_expected_health = new_expected_health;
-        current_unweighted_perp_health = new_unweighted_perp;
+        *current_unweighted_perp_health = new_unweighted_perp;
         current_expected_perp_health = new_expected_perp;
     };
 
@@ -246,9 +253,10 @@ pub fn perp_liq_base_and_positive_pnl(
     //
     if current_unweighted_perp_health < 0 {
         reduce_base(
-            "step 1",
+            "negative",
             -current_unweighted_perp_health,
             unweighted_health_per_lot,
+            &mut current_unweighted_perp_health,
         );
     }
 
@@ -257,7 +265,12 @@ pub fn perp_liq_base_and_positive_pnl(
     //
     if current_unweighted_perp_health >= 0 && current_unweighted_perp_health < max_settle {
         let settled_health_per_lot = cm!(unweighted_health_per_lot * spot_gain_per_settled);
-        reduce_base("step 2", max_settle, settled_health_per_lot);
+        reduce_base(
+            "settleable",
+            cm!(max_settle - current_unweighted_perp_health),
+            settled_health_per_lot,
+            &mut current_unweighted_perp_health,
+        );
     }
 
     //
@@ -266,7 +279,12 @@ pub fn perp_liq_base_and_positive_pnl(
     if current_unweighted_perp_health >= max_settle && perp_market.init_pnl_asset_weight > 0 {
         let weighted_health_per_lot =
             cm!(unweighted_health_per_lot * perp_market.init_pnl_asset_weight);
-        reduce_base("step 3", I80F48::MAX, weighted_health_per_lot);
+        reduce_base(
+            "positive",
+            I80F48::MAX,
+            weighted_health_per_lot,
+            &mut current_unweighted_perp_health,
+        );
     }
 
     //
@@ -288,11 +306,13 @@ pub fn perp_liq_base_and_positive_pnl(
     //
     // Step 3: Let the liqor take over positive pnl
     //
-    // TODO: figure out the minimal amount that needs to be transfered
-    let step3_settlement = if liqee_init_health_after_step2 < 0 {
-        let spot_gain_per_settle = cm!(I80F48::ONE - perp_market.positive_pnl_liquidation_fee);
-        let health_per_settle = cm!(spot_gain_per_settle - perp_market.init_pnl_asset_weight);
-        let settle_for_zero = cm!(-liqee_init_health_after_step2 / health_per_settle)
+    let final_weighted_perp_health =
+        perp_info.weigh_health_contribution(current_unweighted_perp_health, HealthType::Init);
+    let current_actual_health =
+        cm!(liqee_init_health - initial_weighted_perp_health + final_weighted_perp_health);
+    let step3_settlement = if current_actual_health < 0 {
+        let health_per_settle = cm!(spot_gain_per_settled - perp_market.init_pnl_asset_weight);
+        let settle_for_zero = cm!(-current_actual_health / health_per_settle)
             .checked_ceil()
             .unwrap();
         let liqee_pnl = liqee_perp_position.unsettled_pnl(&perp_market, oracle_price)?;
@@ -313,7 +333,7 @@ pub fn perp_liq_base_and_positive_pnl(
         };
 
         // The liqor pays less than the full amount to receive the positive pnl
-        let token_transfer = cm!(settlement * spot_gain_per_settle);
+        let token_transfer = cm!(settlement * spot_gain_per_settled);
 
         if settlement > 0 {
             liqor_perp_position.record_liquidation_pnl_takeover(settlement, limit_transfer);
@@ -339,9 +359,9 @@ pub fn perp_liq_base_and_positive_pnl(
                 now_ts,
                 oracle_price,
             )?;
-            liqee_health_cache.adjust_token_balance(&settle_bank, settlement)?;
+            liqee_health_cache.adjust_token_balance(&settle_bank, token_transfer)?;
         }
-        msg!("step3: pnl = {}, quote = {}", settlement, token_transfer);
+        msg!("pnl: {}, quote = {}", settlement, token_transfer);
 
         settlement
     } else {
@@ -391,6 +411,11 @@ pub fn perp_liq_base_and_positive_pnl(
         .fixed
         .maybe_recover_from_being_liquidated(liqee_init_health_after);
     require_gte!(liqee_init_health_after, liqee_init_health);
+    msg!(
+        "liqee health: {} -> {}",
+        liqee_init_health,
+        liqee_init_health_after
+    );
 
     drop(settle_bank);
     drop(perp_market);

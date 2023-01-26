@@ -5,10 +5,7 @@ use fixed::types::I80F48;
 use solana_program_test::*;
 use solana_sdk::transport::TransportError;
 
-use mango_v4::{
-    error::MangoError,
-    state::{PerpMarketIndex, *},
-};
+use mango_v4::state::{PerpMarketIndex, *};
 use program_test::*;
 
 use mango_setup::*;
@@ -185,7 +182,7 @@ async fn test_liq_perps_force_cancel() -> Result<(), TransportError> {
 #[tokio::test]
 async fn test_liq_perps_base_position_and_bankruptcy() -> Result<(), TransportError> {
     let mut test_builder = TestContextBuilder::new();
-    test_builder.test().set_compute_max_units(100_000); // PerpLiqNegativePnlAndBankruptcy takes a lot of CU
+    test_builder.test().set_compute_max_units(150_000); // PerpLiqBaseAndPositivePnl takes a lot of CU
     let context = test_builder.start_default().await;
     let solana = &context.solana.clone();
 
@@ -750,7 +747,7 @@ async fn test_liq_perps_base_position_and_bankruptcy() -> Result<(), TransportEr
 #[tokio::test]
 async fn test_liq_perps_base_position_overall_weight() -> Result<(), TransportError> {
     let mut test_builder = TestContextBuilder::new();
-    test_builder.test().set_compute_max_units(130_000); // PerpLiqNegativePnlAndBankruptcy takes a lot of CU
+    test_builder.test().set_compute_max_units(150_000); // PerpLiqNegativePnlAndBankruptcy takes a lot of CU
     let context = test_builder.start_default().await;
     let solana = &context.solana.clone();
 
@@ -1136,7 +1133,7 @@ async fn test_liq_perps_base_position_overall_weight() -> Result<(), TransportEr
     assert_eq!(liqee_data.perps[0].base_position_lots(), 5);
 
     //
-    // TEST: can take over the positive pnl to bring the account's quote to zero
+    // TEST: can bring the account to just above >0 health if desired
     //
 
     send_tx(
@@ -1154,8 +1151,10 @@ async fn test_liq_perps_base_position_overall_weight() -> Result<(), TransportEr
     .unwrap();
 
     let liqee_data = solana.get_account::<MangoAccount>(account_0).await;
-    assert_eq!(liqee_data.perps[0].base_position_lots(), 0);
-    assert_eq!(liqee_data.perps[0].quote_position_native(), 0);
+    assert_eq!(liqee_data.perps[0].base_position_lots(), 2);
+    let health = account_init_health(solana, account_0).await;
+    assert!(health > 0.0);
+    assert!(health < 1.0);
 
     Ok(())
 }
