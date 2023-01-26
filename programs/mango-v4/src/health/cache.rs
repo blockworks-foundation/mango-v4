@@ -277,16 +277,20 @@ impl PerpInfo {
     #[inline(always)]
     pub fn health_contribution(&self, health_type: HealthType) -> I80F48 {
         let contribution = self.unweighted_health_contribution(health_type);
+        self.weigh_health_contribution(contribution, health_type)
+    }
 
-        if contribution > 0 {
+    #[inline(always)]
+    pub fn weigh_health_contribution(&self, unweighted: I80F48, health_type: HealthType) -> I80F48 {
+        if unweighted > 0 {
             let asset_weight = match health_type {
                 HealthType::Init => self.init_pnl_asset_weight,
                 HealthType::Maint => self.maint_pnl_asset_weight,
             };
 
-            cm!(asset_weight * contribution)
+            cm!(asset_weight * unweighted)
         } else {
-            contribution
+            unweighted
         }
     }
 

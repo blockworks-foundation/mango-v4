@@ -177,7 +177,7 @@ pub fn perp_liq_quote_and_bankruptcy(
             .min(I80F48::from(max_liab_transfer))
             .max(I80F48::ZERO);
         if settlement > 0 {
-            liqor_perp_position.record_liquidation_quote_change(-settlement, -settlement);
+            liqor_perp_position.record_liquidation_quote_change(-settlement);
             liqee_perp_position.record_settle(-settlement);
 
             // Update the accounts' perp_spot_transfer statistics.
@@ -271,10 +271,7 @@ pub fn perp_liq_quote_and_bankruptcy(
             // transfer perp quote loss from the liqee to the liqor
             let liqor_perp_position = liqor.perp_position_mut(perp_market_index)?;
             liqee_perp_position.record_settle(-insurance_liab_transfer);
-            liqor_perp_position.record_liquidation_quote_change(
-                -insurance_liab_transfer,
-                -insurance_liab_transfer,
-            );
+            liqor_perp_position.record_liquidation_quote_change(-insurance_liab_transfer);
         }
 
         // Socialize loss if the insurance fund is exhausted
