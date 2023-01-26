@@ -9,7 +9,7 @@ use crate::state::*;
 pub struct AltExtend<'info> {
     #[account(
         has_one = admin,
-        constraint = group.load()?.is_operational() @ MangoError::GroupIsHalted
+        constraint = group.load()?.is_ix_enabled(IxGate::AltExtend) @ MangoError::IxIsDisabled,
     )]
     pub group: AccountLoader<'info, Group>,
     pub admin: Signer<'info>,

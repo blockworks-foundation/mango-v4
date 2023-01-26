@@ -61,8 +61,8 @@ pub mod mango_v4 {
         )
     }
 
-    pub fn group_toggle_halt(ctx: Context<GroupToggleHalt>, halted: bool) -> Result<()> {
-        instructions::group_toggle_halt(ctx, halted)
+    pub fn ix_gate_set(ctx: Context<IxGateSet>, ix_gate: u128) -> Result<()> {
+        instructions::ix_gate_set(ctx, ix_gate)
     }
 
     pub fn group_close(ctx: Context<GroupClose>) -> Result<()> {

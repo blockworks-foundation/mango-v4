@@ -1503,6 +1503,38 @@ impl ClientInstruction for GroupCreateInstruction {
     }
 }
 
+pub struct IxGateSetInstruction {
+    pub group: Pubkey,
+    pub admin: TestKeypair,
+    pub ix_gate: u128,
+}
+#[async_trait::async_trait(?Send)]
+impl ClientInstruction for IxGateSetInstruction {
+    type Accounts = mango_v4::accounts::IxGateSet;
+    type Instruction = mango_v4::instruction::IxGateSet;
+    async fn to_instruction(
+        &self,
+        _account_loader: impl ClientAccountLoader + 'async_trait,
+    ) -> (Self::Accounts, instruction::Instruction) {
+        let program_id = mango_v4::id();
+        let instruction = Self::Instruction {
+            ix_gate: self.ix_gate,
+        };
+
+        let accounts = Self::Accounts {
+            group: self.group,
+            admin: self.admin.pubkey(),
+        };
+
+        let instruction = make_instruction(program_id, &accounts, instruction);
+        (accounts, instruction)
+    }
+
+    fn signers(&self) -> Vec<TestKeypair> {
+        vec![self.admin]
+    }
+}
+
 pub struct GroupCloseInstruction {
     pub admin: TestKeypair,
     pub group: Pubkey,
@@ -3624,6 +3656,7 @@ impl ClientInstruction for HealthRegionBeginInstruction {
         .await;
 
         let accounts = Self::Accounts {
+            group: account.fixed.group,
             instructions: solana_program::sysvar::instructions::id(),
             account: self.account,
         };

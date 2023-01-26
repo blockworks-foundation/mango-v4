@@ -12,7 +12,7 @@ use crate::logs::{emit_perp_balances, PerpLiqBasePositionLog};
 #[derive(Accounts)]
 pub struct PerpLiqBasePosition<'info> {
     #[account(
-        constraint = group.load()?.is_operational() @ MangoError::GroupIsHalted
+        constraint = group.load()?.is_ix_enabled(IxGate::PerpLiqBasePosition) @ MangoError::IxIsDisabled,
     )]
     pub group: AccountLoader<'info, Group>,
 

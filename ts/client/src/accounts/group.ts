@@ -36,7 +36,7 @@ export class Group {
       insuranceVault: PublicKey;
       testing: number;
       version: number;
-      halted: number;
+      ixGate: BN;
       addressLookupTables: PublicKey[];
     },
   ): Group {
@@ -51,7 +51,7 @@ export class Group {
       obj.insuranceVault,
       obj.testing,
       obj.version,
-      obj.halted,
+      obj.ixGate,
       obj.addressLookupTables,
       [], // addressLookupTablesList
       new Map(), // banksMapByName
@@ -80,7 +80,7 @@ export class Group {
     public insuranceVault: PublicKey,
     public testing: number,
     public version: number,
-    public halted: number,
+    public ixGate: BN,
     public addressLookupTables: PublicKey[],
     public addressLookupTablesList: AddressLookupTableAccount[],
     public banksMapByName: Map<string, Bank[]>,
@@ -96,10 +96,6 @@ export class Group {
     public mintInfosMapByMint: Map<string, MintInfo>,
     public vaultAmountsMap: Map<string, BN>,
   ) {}
-
-  public isOperational(): boolean {
-    return this.halted === 0;
-  }
 
   public async reloadAll(client: MangoClient): Promise<void> {
     const ids: Id | undefined = await client.getIds(this.publicKey);

@@ -17,7 +17,7 @@ use crate::state::*;
 pub struct PerpLiqQuoteAndBankruptcy<'info> {
     #[account(
         has_one = insurance_vault,
-        constraint = group.load()?.is_operational() @ MangoError::GroupIsHalted
+        constraint = group.load()?.is_ix_enabled(IxGate::PerpLiqQuoteAndBankruptcy) @ MangoError::IxIsDisabled,
     )]
     pub group: AccountLoader<'info, Group>,
 

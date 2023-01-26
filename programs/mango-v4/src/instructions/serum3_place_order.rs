@@ -136,7 +136,7 @@ pub enum Serum3Side {
 #[derive(Accounts)]
 pub struct Serum3PlaceOrder<'info> {
     #[account(
-        constraint = group.load()?.is_operational() @ MangoError::GroupIsHalted
+        constraint = group.load()?.is_ix_enabled(IxGate::Serum3PlaceOrder) @ MangoError::IxIsDisabled,
     )]
     pub group: AccountLoader<'info, Group>,
 

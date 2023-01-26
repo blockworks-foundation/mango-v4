@@ -148,7 +148,7 @@ export type MangoV4 = {
       ]
     },
     {
-      "name": "groupToggleHalt",
+      "name": "ixGateSet",
       "accounts": [
         {
           "name": "group",
@@ -163,8 +163,8 @@ export type MangoV4 = {
       ],
       "args": [
         {
-          "name": "halted",
-          "type": "bool"
+          "name": "ixGate",
+          "type": "u128"
         }
       ]
     },
@@ -3969,15 +3969,11 @@ export type MangoV4 = {
             "type": "u8"
           },
           {
-            "name": "halted",
-            "type": "u8"
-          },
-          {
             "name": "padding2",
             "type": {
               "array": [
                 "u8",
-                4
+                5
               ]
             }
           },
@@ -3999,11 +3995,15 @@ export type MangoV4 = {
             "type": "u64"
           },
           {
+            "name": "ixGate",
+            "type": "u128"
+          },
+          {
             "name": "reserved",
             "type": {
               "array": [
                 "u8",
-                1880
+                1864
               ]
             }
           }
@@ -6457,6 +6457,171 @@ export type MangoV4 = {
       }
     },
     {
+      "name": "IxGate",
+      "docs": [
+        "Enum for lookup into ix gate",
+        "note:",
+        "total ix files 56,",
+        "ix files included 47,",
+        "ix files not included 9,",
+        "- Benchmark,",
+        "- ComputeAccountData,",
+        "- GroupCreate",
+        "- GroupEdit",
+        "- HealthRegion",
+        "- IxGateSet,",
+        "- PerpZeroOut,",
+        "- PerpEditMarket,",
+        "- TokenEdit,"
+      ],
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "AccountClose"
+          },
+          {
+            "name": "AccountCreate"
+          },
+          {
+            "name": "AccountEdit"
+          },
+          {
+            "name": "AccountExpand"
+          },
+          {
+            "name": "AccountToggleFreeze"
+          },
+          {
+            "name": "AltExtend"
+          },
+          {
+            "name": "AltSet"
+          },
+          {
+            "name": "FlashLoan"
+          },
+          {
+            "name": "GroupClose"
+          },
+          {
+            "name": "GroupCreate"
+          },
+          {
+            "name": "PerpCancelAllOrders"
+          },
+          {
+            "name": "PerpCancelAllOrdersBySide"
+          },
+          {
+            "name": "PerpCancelOrder"
+          },
+          {
+            "name": "PerpCancelOrderByClientOrderId"
+          },
+          {
+            "name": "PerpCloseMarket"
+          },
+          {
+            "name": "PerpConsumeEvents"
+          },
+          {
+            "name": "PerpCreateMarket"
+          },
+          {
+            "name": "PerpDeactivatePosition"
+          },
+          {
+            "name": "PerpLiqBasePosition"
+          },
+          {
+            "name": "PerpLiqForceCancelOrders"
+          },
+          {
+            "name": "PerpLiqQuoteAndBankruptcy"
+          },
+          {
+            "name": "PerpPlaceOrder"
+          },
+          {
+            "name": "PerpSettleFees"
+          },
+          {
+            "name": "PerpSettlePnl"
+          },
+          {
+            "name": "PerpUpdateFunding"
+          },
+          {
+            "name": "Serum3CancelAllOrders"
+          },
+          {
+            "name": "Serum3CancelOrder"
+          },
+          {
+            "name": "Serum3CloseOpenOrders"
+          },
+          {
+            "name": "Serum3CreateOpenOrders"
+          },
+          {
+            "name": "Serum3DeregisterMarket"
+          },
+          {
+            "name": "Serum3EditMarket"
+          },
+          {
+            "name": "Serum3LiqForceCancelOrders"
+          },
+          {
+            "name": "Serum3PlaceOrder"
+          },
+          {
+            "name": "Serum3RegisterMarket"
+          },
+          {
+            "name": "Serum3SettleFunds"
+          },
+          {
+            "name": "StubOracleClose"
+          },
+          {
+            "name": "StubOracleCreate"
+          },
+          {
+            "name": "StubOracleSet"
+          },
+          {
+            "name": "TokenAddBank"
+          },
+          {
+            "name": "TokenDeposit"
+          },
+          {
+            "name": "TokenDeregister"
+          },
+          {
+            "name": "TokenLiqBankruptcy"
+          },
+          {
+            "name": "TokenLiqWithToken"
+          },
+          {
+            "name": "TokenRegister"
+          },
+          {
+            "name": "TokenRegisterTrustless"
+          },
+          {
+            "name": "TokenUpdateIndexAndRate"
+          },
+          {
+            "name": "TokenWithdraw"
+          }
+        ]
+      }
+    },
+    {
       "name": "OracleType",
       "type": {
         "kind": "enum",
@@ -7898,53 +8063,53 @@ export type MangoV4 = {
     },
     {
       "code": 6032,
-      "name": "GroupIsHalted",
-      "msg": "group is halted"
-    },
-    {
-      "code": 6033,
       "name": "PerpHasBaseLots",
       "msg": "the perp position has non-zero base lots"
     },
     {
-      "code": 6034,
+      "code": 6033,
       "name": "HasOpenOrUnsettledSerum3Orders",
       "msg": "there are open or unsettled serum3 orders"
     },
     {
-      "code": 6035,
+      "code": 6034,
       "name": "HasLiquidatableTokenPosition",
       "msg": "has liquidatable token position"
     },
     {
-      "code": 6036,
+      "code": 6035,
       "name": "HasLiquidatablePerpBasePosition",
       "msg": "has liquidatable perp base position"
     },
     {
-      "code": 6037,
+      "code": 6036,
       "name": "HasLiquidatableTrustedPerpPnl",
       "msg": "has liquidatable trusted perp pnl"
     },
     {
-      "code": 6038,
+      "code": 6037,
       "name": "AccountIsFrozen",
       "msg": "account is frozen"
     },
     {
-      "code": 6039,
+      "code": 6038,
       "name": "InitAssetWeightCantBeNegative",
       "msg": "Init Asset Weight can't be negative"
     },
     {
-      "code": 6040,
+      "code": 6039,
       "name": "HasOpenPerpTakerFills",
       "msg": "has open perp taker fills"
     },
     {
-      "code": 6041,
+      "code": 6040,
       "name": "DepositLimit",
       "msg": "deposit crosses the current group deposit limit"
+    },
+    {
+      "code": 6041,
+      "name": "IxIsDisabled",
+      "msg": "ix is disabled"
     }
   ]
 };
@@ -8099,7 +8264,7 @@ export const IDL: MangoV4 = {
       ]
     },
     {
-      "name": "groupToggleHalt",
+      "name": "ixGateSet",
       "accounts": [
         {
           "name": "group",
@@ -8114,8 +8279,8 @@ export const IDL: MangoV4 = {
       ],
       "args": [
         {
-          "name": "halted",
-          "type": "bool"
+          "name": "ixGate",
+          "type": "u128"
         }
       ]
     },
@@ -11920,15 +12085,11 @@ export const IDL: MangoV4 = {
             "type": "u8"
           },
           {
-            "name": "halted",
-            "type": "u8"
-          },
-          {
             "name": "padding2",
             "type": {
               "array": [
                 "u8",
-                4
+                5
               ]
             }
           },
@@ -11950,11 +12111,15 @@ export const IDL: MangoV4 = {
             "type": "u64"
           },
           {
+            "name": "ixGate",
+            "type": "u128"
+          },
+          {
             "name": "reserved",
             "type": {
               "array": [
                 "u8",
-                1880
+                1864
               ]
             }
           }
@@ -14408,6 +14573,171 @@ export const IDL: MangoV4 = {
       }
     },
     {
+      "name": "IxGate",
+      "docs": [
+        "Enum for lookup into ix gate",
+        "note:",
+        "total ix files 56,",
+        "ix files included 47,",
+        "ix files not included 9,",
+        "- Benchmark,",
+        "- ComputeAccountData,",
+        "- GroupCreate",
+        "- GroupEdit",
+        "- HealthRegion",
+        "- IxGateSet,",
+        "- PerpZeroOut,",
+        "- PerpEditMarket,",
+        "- TokenEdit,"
+      ],
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "AccountClose"
+          },
+          {
+            "name": "AccountCreate"
+          },
+          {
+            "name": "AccountEdit"
+          },
+          {
+            "name": "AccountExpand"
+          },
+          {
+            "name": "AccountToggleFreeze"
+          },
+          {
+            "name": "AltExtend"
+          },
+          {
+            "name": "AltSet"
+          },
+          {
+            "name": "FlashLoan"
+          },
+          {
+            "name": "GroupClose"
+          },
+          {
+            "name": "GroupCreate"
+          },
+          {
+            "name": "PerpCancelAllOrders"
+          },
+          {
+            "name": "PerpCancelAllOrdersBySide"
+          },
+          {
+            "name": "PerpCancelOrder"
+          },
+          {
+            "name": "PerpCancelOrderByClientOrderId"
+          },
+          {
+            "name": "PerpCloseMarket"
+          },
+          {
+            "name": "PerpConsumeEvents"
+          },
+          {
+            "name": "PerpCreateMarket"
+          },
+          {
+            "name": "PerpDeactivatePosition"
+          },
+          {
+            "name": "PerpLiqBasePosition"
+          },
+          {
+            "name": "PerpLiqForceCancelOrders"
+          },
+          {
+            "name": "PerpLiqQuoteAndBankruptcy"
+          },
+          {
+            "name": "PerpPlaceOrder"
+          },
+          {
+            "name": "PerpSettleFees"
+          },
+          {
+            "name": "PerpSettlePnl"
+          },
+          {
+            "name": "PerpUpdateFunding"
+          },
+          {
+            "name": "Serum3CancelAllOrders"
+          },
+          {
+            "name": "Serum3CancelOrder"
+          },
+          {
+            "name": "Serum3CloseOpenOrders"
+          },
+          {
+            "name": "Serum3CreateOpenOrders"
+          },
+          {
+            "name": "Serum3DeregisterMarket"
+          },
+          {
+            "name": "Serum3EditMarket"
+          },
+          {
+            "name": "Serum3LiqForceCancelOrders"
+          },
+          {
+            "name": "Serum3PlaceOrder"
+          },
+          {
+            "name": "Serum3RegisterMarket"
+          },
+          {
+            "name": "Serum3SettleFunds"
+          },
+          {
+            "name": "StubOracleClose"
+          },
+          {
+            "name": "StubOracleCreate"
+          },
+          {
+            "name": "StubOracleSet"
+          },
+          {
+            "name": "TokenAddBank"
+          },
+          {
+            "name": "TokenDeposit"
+          },
+          {
+            "name": "TokenDeregister"
+          },
+          {
+            "name": "TokenLiqBankruptcy"
+          },
+          {
+            "name": "TokenLiqWithToken"
+          },
+          {
+            "name": "TokenRegister"
+          },
+          {
+            "name": "TokenRegisterTrustless"
+          },
+          {
+            "name": "TokenUpdateIndexAndRate"
+          },
+          {
+            "name": "TokenWithdraw"
+          }
+        ]
+      }
+    },
+    {
       "name": "OracleType",
       "type": {
         "kind": "enum",
@@ -15849,53 +16179,53 @@ export const IDL: MangoV4 = {
     },
     {
       "code": 6032,
-      "name": "GroupIsHalted",
-      "msg": "group is halted"
-    },
-    {
-      "code": 6033,
       "name": "PerpHasBaseLots",
       "msg": "the perp position has non-zero base lots"
     },
     {
-      "code": 6034,
+      "code": 6033,
       "name": "HasOpenOrUnsettledSerum3Orders",
       "msg": "there are open or unsettled serum3 orders"
     },
     {
-      "code": 6035,
+      "code": 6034,
       "name": "HasLiquidatableTokenPosition",
       "msg": "has liquidatable token position"
     },
     {
-      "code": 6036,
+      "code": 6035,
       "name": "HasLiquidatablePerpBasePosition",
       "msg": "has liquidatable perp base position"
     },
     {
-      "code": 6037,
+      "code": 6036,
       "name": "HasLiquidatableTrustedPerpPnl",
       "msg": "has liquidatable trusted perp pnl"
     },
     {
-      "code": 6038,
+      "code": 6037,
       "name": "AccountIsFrozen",
       "msg": "account is frozen"
     },
     {
-      "code": 6039,
+      "code": 6038,
       "name": "InitAssetWeightCantBeNegative",
       "msg": "Init Asset Weight can't be negative"
     },
     {
-      "code": 6040,
+      "code": 6039,
       "name": "HasOpenPerpTakerFills",
       "msg": "has open perp taker fills"
     },
     {
-      "code": 6041,
+      "code": 6040,
       "name": "DepositLimit",
       "msg": "deposit crosses the current group deposit limit"
+    },
+    {
+      "code": 6041,
+      "name": "IxIsDisabled",
+      "msg": "ix is disabled"
     }
   ]
 };

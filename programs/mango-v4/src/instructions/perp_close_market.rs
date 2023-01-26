@@ -7,7 +7,7 @@ use crate::{error::MangoError, state::*};
 pub struct PerpCloseMarket<'info> {
     #[account(
         constraint = group.load()?.is_testing(),
-        constraint = group.load()?.is_operational() @ MangoError::GroupIsHalted,
+        constraint = group.load()?.is_ix_enabled(IxGate::PerpCloseMarket) @ MangoError::IxIsDisabled,
         has_one = admin,
     )]
     pub group: AccountLoader<'info, Group>,

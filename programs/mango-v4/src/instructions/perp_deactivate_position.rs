@@ -6,7 +6,7 @@ use crate::state::*;
 #[derive(Accounts)]
 pub struct PerpDeactivatePosition<'info> {
     #[account(
-        constraint = group.load()?.is_operational() @ MangoError::GroupIsHalted
+        constraint = group.load()?.is_ix_enabled(IxGate::PerpDeactivatePosition) @ MangoError::IxIsDisabled,
     )]
     pub group: AccountLoader<'info, Group>,
 
