@@ -174,26 +174,14 @@ impl HealthCache {
         }
 
         let cache_after_swap = |amount: I80F48| -> Result<Option<HealthCache>> {
-            let maybe_cache = self.cache_after_swap(
+            ignore_net_borrow_limit_errors(self.cache_after_swap(
                 account,
                 source_bank,
                 source_oracle_price,
                 target_bank,
                 amount,
                 price,
-            );
-            match maybe_cache {
-                Ok(cache) => Ok(Some(cache)),
-                // Special case net borrow errors: We want to be able to find a good
-                // swap amount even if the max swap is limited by the net borrow limit.
-                Err(Error::AnchorError(err))
-                    if err.error_code_number
-                        == MangoError::BankNetBorrowsLimitReached.error_code() =>
-                {
-                    Ok(None)
-                }
-                Err(err) => Err(err),
-            }
+            ))
         };
         let fn_value_after_swap = |amount| {
             Ok(cache_after_swap(amount)?
@@ -408,49 +396,44 @@ impl HealthCache {
         // Fail if the health cache (or consequently the account) don't have existing
         // positions for the source and target token index.
         let token_info_index = find_token_info_index(&self.token_infos, bank.token_index)?;
-
         let token = &self.token_infos[token_info_index];
 
-        // TODO: here
-        let cache_after_borrow = |amount: I80F48| -> Result<Option<HealthCache>> {
+        let cache_after_borrow = |amount: I80F48| -> Result<HealthCache> {
             use std::time::SystemTime;
             let now_ts = SystemTime::now()
                 .duration_since(SystemTime::UNIX_EPOCH)
                 .expect("system time after epoch start")
                 .as_secs();
 
-            let mut source_position = account.token_position(source_bank.token_index)?.clone();
-            let mut target_position = account.token_position(target_bank.token_index)?.clone();
+            let mut position = account.token_position(bank.token_index)?.clone();
 
-            let target_amount = cm!(amount * price);
-
-            let mut source_bank = source_bank.clone();
-            source_bank.withdraw_with_fee(
-                &mut source_position,
-                amount,
-                now_ts,
-                source_oracle_price,
-            )?;
-            let mut target_bank = target_bank.clone();
-            target_bank.deposit(&mut target_position, target_amount, now_ts)?;
+            let mut bank = bank.clone();
+            bank.withdraw_with_fee(&mut position, amount, now_ts, token.prices.oracle)?;
 
             let mut resulting_cache = self.clone();
-            resulting_cache.adjust_token_balance(&source_bank, -amount)?;
-            resulting_cache.adjust_token_balance(&target_bank, target_amount)?;
+            resulting_cache.adjust_token_balance(&bank, -amount)?;
 
-            match maybe_cache {
-                Ok(cache) => Ok(Some(cache)),
-                // Special case net borrow errors: We want to be able to find a good
-                // swap amount even if the max swap is limited by the net borrow limit.
-                Err(Error::AnchorError(err))
-                    if err.error_code_number
-                        == MangoError::BankNetBorrowsLimitReached.error_code() =>
-                {
-                    Ok(None)
-                }
-                Err(err) => Err(err),
-            }
+            Ok(resulting_cache)
         };
+        let fn_value_after_borrow = |amount: I80F48| -> Result<I80F48> {
+            Ok(ignore_net_borrow_limit_errors(cache_after_borrow(amount))?
+                .as_ref()
+                .map(target_fn)
+                .unwrap_or(I80F48::MIN))
+        };
+
+        // At most withdraw all deposits plus enough borrows to bring health to zero
+        let limit = token.balance_native.max(I80F48::ZERO)
+            + self.health(health_type) / token.init_liab_weight;
+
+        binary_search(
+            I80F48::ZERO,
+            target_fn(self),
+            limit,
+            min_fn_value,
+            I80F48::ONE,
+            fn_value_after_borrow,
+        )
     }
 }
 
@@ -580,6 +563,20 @@ fn find_maximum(
         Ok((mid, mid_value))
     } else {
         Ok((right, right_value))
+    }
+}
+
+fn ignore_net_borrow_limit_errors(maybe_cache: Result<HealthCache>) -> Result<Option<HealthCache>> {
+    match maybe_cache {
+        Ok(cache) => Ok(Some(cache)),
+        // Special case net borrow errors: We want to be able to find a good
+        // swap amount even if the max swap is limited by the net borrow limit.
+        Err(Error::AnchorError(err))
+            if err.error_code_number == MangoError::BankNetBorrowsLimitReached.error_code() =>
+        {
+            Ok(None)
+        }
+        Err(err) => Err(err),
     }
 }
 

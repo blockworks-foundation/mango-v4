@@ -308,9 +308,9 @@ pub fn perp_liq_base_and_positive_pnl(
         perp_info.weigh_health_contribution(current_unweighted_perp_health, HealthType::Init);
     let current_actual_health =
         cm!(liqee_init_health - initial_weighted_perp_health + final_weighted_perp_health);
-    let step3_possible =
+    let settle_possible =
         current_actual_health < 0 && current_unweighted_perp_health > 0 && max_settle > 0;
-    let step3_settlement = if step3_possible {
+    let settlement = if settle_possible {
         let health_per_settle = cm!(spot_gain_per_settled - perp_market.init_pnl_asset_weight);
         let settle_for_zero = cm!(-current_actual_health / health_per_settle)
             .checked_ceil()
@@ -370,7 +370,7 @@ pub fn perp_liq_base_and_positive_pnl(
     };
 
     // Skip out if this instruction had nothing to do
-    if base_transfer == 0 && step3_settlement == 0 {
+    if base_transfer == 0 && settlement == 0 {
         return Ok(());
     }
 
