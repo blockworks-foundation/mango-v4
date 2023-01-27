@@ -301,13 +301,16 @@ pub fn perp_liq_base_and_positive_pnl(
     }
 
     //
-    // Step 4: Let the liqor take over positive pnl until the account health is positive
+    // Step 4: Let the liqor take over positive pnl until the account health is positive,
+    // but only while the unweighted perp health is positive (otherwise it would decrease liqee health!)
     //
     let final_weighted_perp_health =
         perp_info.weigh_health_contribution(current_unweighted_perp_health, HealthType::Init);
     let current_actual_health =
         cm!(liqee_init_health - initial_weighted_perp_health + final_weighted_perp_health);
-    let step3_settlement = if current_actual_health < 0 {
+    let step3_possible =
+        current_actual_health < 0 && current_unweighted_perp_health > 0 && max_settle > 0;
+    let step3_settlement = if step3_possible {
         let health_per_settle = cm!(spot_gain_per_settled - perp_market.init_pnl_asset_weight);
         let settle_for_zero = cm!(-current_actual_health / health_per_settle)
             .checked_ceil()
@@ -319,6 +322,7 @@ pub fn perp_liq_base_and_positive_pnl(
         let settlement = liqee_pnl
             .min(max_settle)
             .min(settle_for_zero)
+            .min(current_unweighted_perp_health)
             .max(I80F48::ZERO);
         let limit_transfer = {
             // take care, liqee_limit may be i64::MAX
