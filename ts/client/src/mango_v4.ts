@@ -1462,6 +1462,11 @@ export type MangoV4 = {
           ]
         },
         {
+          "name": "group",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
           "name": "account",
           "isMut": true,
           "isSigner": false
@@ -6462,13 +6467,12 @@ export type MangoV4 = {
         "Enum for lookup into ix gate",
         "note:",
         "total ix files 56,",
-        "ix files included 47,",
-        "ix files not included 9,",
+        "ix files included 48,",
+        "ix files not included 8,",
         "- Benchmark,",
         "- ComputeAccountData,",
         "- GroupCreate",
         "- GroupEdit",
-        "- HealthRegion",
         "- IxGateSet,",
         "- PerpZeroOut,",
         "- PerpEditMarket,",
@@ -6506,6 +6510,9 @@ export type MangoV4 = {
           },
           {
             "name": "GroupCreate"
+          },
+          {
+            "name": "HealthRegion"
           },
           {
             "name": "PerpCancelAllOrders"
@@ -8063,53 +8070,58 @@ export type MangoV4 = {
     },
     {
       "code": 6032,
+      "name": "GroupIsHalted",
+      "msg": "group is halted"
+    },
+    {
+      "code": 6033,
       "name": "PerpHasBaseLots",
       "msg": "the perp position has non-zero base lots"
     },
     {
-      "code": 6033,
+      "code": 6034,
       "name": "HasOpenOrUnsettledSerum3Orders",
       "msg": "there are open or unsettled serum3 orders"
     },
     {
-      "code": 6034,
+      "code": 6035,
       "name": "HasLiquidatableTokenPosition",
       "msg": "has liquidatable token position"
     },
     {
-      "code": 6035,
+      "code": 6036,
       "name": "HasLiquidatablePerpBasePosition",
       "msg": "has liquidatable perp base position"
     },
     {
-      "code": 6036,
+      "code": 6037,
       "name": "HasLiquidatableTrustedPerpPnl",
       "msg": "has liquidatable trusted perp pnl"
     },
     {
-      "code": 6037,
+      "code": 6038,
       "name": "AccountIsFrozen",
       "msg": "account is frozen"
     },
     {
-      "code": 6038,
+      "code": 6039,
       "name": "InitAssetWeightCantBeNegative",
       "msg": "Init Asset Weight can't be negative"
     },
     {
-      "code": 6039,
+      "code": 6040,
       "name": "HasOpenPerpTakerFills",
       "msg": "has open perp taker fills"
     },
     {
-      "code": 6040,
+      "code": 6041,
       "name": "DepositLimit",
       "msg": "deposit crosses the current group deposit limit"
     },
     {
-      "code": 6041,
+      "code": 6042,
       "name": "IxIsDisabled",
-      "msg": "ix is disabled"
+      "msg": "instruction is disabled"
     }
   ]
 };
@@ -9578,6 +9590,11 @@ export const IDL: MangoV4 = {
           ]
         },
         {
+          "name": "group",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
           "name": "account",
           "isMut": true,
           "isSigner": false
@@ -14578,13 +14595,12 @@ export const IDL: MangoV4 = {
         "Enum for lookup into ix gate",
         "note:",
         "total ix files 56,",
-        "ix files included 47,",
-        "ix files not included 9,",
+        "ix files included 48,",
+        "ix files not included 8,",
         "- Benchmark,",
         "- ComputeAccountData,",
         "- GroupCreate",
         "- GroupEdit",
-        "- HealthRegion",
         "- IxGateSet,",
         "- PerpZeroOut,",
         "- PerpEditMarket,",
@@ -14622,6 +14638,9 @@ export const IDL: MangoV4 = {
           },
           {
             "name": "GroupCreate"
+          },
+          {
+            "name": "HealthRegion"
           },
           {
             "name": "PerpCancelAllOrders"
@@ -16179,53 +16198,58 @@ export const IDL: MangoV4 = {
     },
     {
       "code": 6032,
+      "name": "GroupIsHalted",
+      "msg": "group is halted"
+    },
+    {
+      "code": 6033,
       "name": "PerpHasBaseLots",
       "msg": "the perp position has non-zero base lots"
     },
     {
-      "code": 6033,
+      "code": 6034,
       "name": "HasOpenOrUnsettledSerum3Orders",
       "msg": "there are open or unsettled serum3 orders"
     },
     {
-      "code": 6034,
+      "code": 6035,
       "name": "HasLiquidatableTokenPosition",
       "msg": "has liquidatable token position"
     },
     {
-      "code": 6035,
+      "code": 6036,
       "name": "HasLiquidatablePerpBasePosition",
       "msg": "has liquidatable perp base position"
     },
     {
-      "code": 6036,
+      "code": 6037,
       "name": "HasLiquidatableTrustedPerpPnl",
       "msg": "has liquidatable trusted perp pnl"
     },
     {
-      "code": 6037,
+      "code": 6038,
       "name": "AccountIsFrozen",
       "msg": "account is frozen"
     },
     {
-      "code": 6038,
+      "code": 6039,
       "name": "InitAssetWeightCantBeNegative",
       "msg": "Init Asset Weight can't be negative"
     },
     {
-      "code": 6039,
+      "code": 6040,
       "name": "HasOpenPerpTakerFills",
       "msg": "has open perp taker fills"
     },
     {
-      "code": 6040,
+      "code": 6041,
       "name": "DepositLimit",
       "msg": "deposit crosses the current group deposit limit"
     },
     {
-      "code": 6041,
+      "code": 6042,
       "name": "IxIsDisabled",
-      "msg": "ix is disabled"
+      "msg": "instruction is disabled"
     }
   ]
 };
