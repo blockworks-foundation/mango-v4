@@ -8,10 +8,10 @@ use crate::error::*;
 use crate::health::*;
 use crate::state::*;
 
-use crate::logs::{emit_perp_balances, PerpLiqBaseAndPositivePnlLog};
+use crate::logs::{emit_perp_balances, PerpLiqBaseOrPositivePnlLog};
 
 #[derive(Accounts)]
-pub struct PerpLiqBaseAndPositivePnl<'info> {
+pub struct PerpLiqBaseOrPositivePnl<'info> {
     #[account(
         constraint = group.load()?.is_operational() @ MangoError::GroupIsHalted
     )]
@@ -54,8 +54,8 @@ pub struct PerpLiqBaseAndPositivePnl<'info> {
     pub settle_oracle: UncheckedAccount<'info>,
 }
 
-pub fn perp_liq_base_and_positive_pnl(
-    ctx: Context<PerpLiqBaseAndPositivePnl>,
+pub fn perp_liq_base_or_positive_pnl(
+    ctx: Context<PerpLiqBaseOrPositivePnl>,
     mut max_base_transfer: i64,
     max_quote_transfer: u64,
 ) -> Result<()> {
@@ -395,7 +395,7 @@ pub fn perp_liq_base_and_positive_pnl(
         &perp_market,
     );
 
-    emit!(PerpLiqBaseAndPositivePnlLog {
+    emit!(PerpLiqBaseOrPositivePnlLog {
         mango_group: ctx.accounts.group.key(),
         perp_market_index: perp_market.perp_market_index,
         liqor: ctx.accounts.liqor.key(),

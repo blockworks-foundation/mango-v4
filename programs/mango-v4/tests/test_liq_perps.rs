@@ -182,7 +182,7 @@ async fn test_liq_perps_force_cancel() -> Result<(), TransportError> {
 #[tokio::test]
 async fn test_liq_perps_base_position_and_bankruptcy() -> Result<(), TransportError> {
     let mut test_builder = TestContextBuilder::new();
-    test_builder.test().set_compute_max_units(120_000); // PerpLiqBaseAndPositivePnl takes a lot of CU
+    test_builder.test().set_compute_max_units(120_000); // PerpLiqBaseOrPositivePnl takes a lot of CU
     let context = test_builder.start_default().await;
     let solana = &context.solana.clone();
 
@@ -379,7 +379,7 @@ async fn test_liq_perps_base_position_and_bankruptcy() -> Result<(), TransportEr
     //
     send_tx(
         solana,
-        PerpLiqBaseAndPositivePnlInstruction {
+        PerpLiqBaseOrPositivePnlInstruction {
             liqor,
             liqor_owner: owner,
             liqee: account_0,
@@ -419,7 +419,7 @@ async fn test_liq_perps_base_position_and_bankruptcy() -> Result<(), TransportEr
     //
     send_tx(
         solana,
-        PerpLiqBaseAndPositivePnlInstruction {
+        PerpLiqBaseOrPositivePnlInstruction {
             liqor,
             liqor_owner: owner,
             liqee: account_0,
@@ -487,7 +487,7 @@ async fn test_liq_perps_base_position_and_bankruptcy() -> Result<(), TransportEr
     //
     send_tx(
         solana,
-        PerpLiqBaseAndPositivePnlInstruction {
+        PerpLiqBaseOrPositivePnlInstruction {
             liqor,
             liqor_owner: owner,
             liqee: account_1,
@@ -520,7 +520,7 @@ async fn test_liq_perps_base_position_and_bankruptcy() -> Result<(), TransportEr
     //
     send_tx(
         solana,
-        PerpLiqBaseAndPositivePnlInstruction {
+        PerpLiqBaseOrPositivePnlInstruction {
             liqor,
             liqor_owner: owner,
             liqee: account_1,
@@ -573,7 +573,7 @@ async fn test_liq_perps_base_position_and_bankruptcy() -> Result<(), TransportEr
     //
     send_tx(
         solana,
-        PerpLiqBaseAndPositivePnlInstruction {
+        PerpLiqBaseOrPositivePnlInstruction {
             liqor,
             liqor_owner: owner,
             liqee: account_1,
@@ -679,7 +679,7 @@ async fn test_liq_perps_base_position_and_bankruptcy() -> Result<(), TransportEr
         .0;
     send_tx(
         solana,
-        PerpLiqNegativePnlAndBankruptcyInstruction {
+        PerpLiqNegativePnlOrBankruptcyInstruction {
             liqor,
             liqor_owner: owner,
             liqee: account_1,
@@ -747,7 +747,7 @@ async fn test_liq_perps_base_position_and_bankruptcy() -> Result<(), TransportEr
 #[tokio::test]
 async fn test_liq_perps_base_position_overall_weight() -> Result<(), TransportError> {
     let mut test_builder = TestContextBuilder::new();
-    test_builder.test().set_compute_max_units(120_000); // PerpLiqNegativePnlAndBankruptcy takes a lot of CU
+    test_builder.test().set_compute_max_units(120_000); // PerpLiqNegativePnlOrBankruptcy takes a lot of CU
     let context = test_builder.start_default().await;
     let solana = &context.solana.clone();
 
@@ -974,7 +974,7 @@ async fn test_liq_perps_base_position_overall_weight() -> Result<(), TransportEr
     //
     send_tx(
         solana,
-        PerpLiqBaseAndPositivePnlInstruction {
+        PerpLiqBaseOrPositivePnlInstruction {
             liqor,
             liqor_owner: owner,
             liqee: account_0,
@@ -997,7 +997,7 @@ async fn test_liq_perps_base_position_overall_weight() -> Result<(), TransportEr
     //
     send_tx(
         solana,
-        PerpLiqBaseAndPositivePnlInstruction {
+        PerpLiqBaseOrPositivePnlInstruction {
             liqor,
             liqor_owner: owner,
             liqee: account_0,
@@ -1029,7 +1029,7 @@ async fn test_liq_perps_base_position_overall_weight() -> Result<(), TransportEr
     //
     send_tx(
         solana,
-        PerpLiqBaseAndPositivePnlInstruction {
+        PerpLiqBaseOrPositivePnlInstruction {
             liqor,
             liqor_owner: owner,
             liqee: account_0,
@@ -1075,7 +1075,7 @@ async fn test_liq_perps_base_position_overall_weight() -> Result<(), TransportEr
 
     send_tx(
         solana,
-        PerpLiqBaseAndPositivePnlInstruction {
+        PerpLiqBaseOrPositivePnlInstruction {
             liqor,
             liqor_owner: owner,
             liqee: account_0,
@@ -1115,7 +1115,7 @@ async fn test_liq_perps_base_position_overall_weight() -> Result<(), TransportEr
 
     send_tx(
         solana,
-        PerpLiqBaseAndPositivePnlInstruction {
+        PerpLiqBaseOrPositivePnlInstruction {
             liqor,
             liqor_owner: owner,
             liqee: account_0,
@@ -1138,7 +1138,7 @@ async fn test_liq_perps_base_position_overall_weight() -> Result<(), TransportEr
 
     send_tx(
         solana,
-        PerpLiqBaseAndPositivePnlInstruction {
+        PerpLiqBaseOrPositivePnlInstruction {
             liqor,
             liqor_owner: owner,
             liqee: account_0,
@@ -1162,7 +1162,7 @@ async fn test_liq_perps_base_position_overall_weight() -> Result<(), TransportEr
 #[tokio::test]
 async fn test_liq_perps_bankruptcy() -> Result<(), TransportError> {
     let mut test_builder = TestContextBuilder::new();
-    test_builder.test().set_compute_max_units(200_000); // PerpLiqNegativePnlAndBankruptcy takes a lot of CU
+    test_builder.test().set_compute_max_units(200_000); // PerpLiqNegativePnlOrBankruptcy takes a lot of CU
     let context = test_builder.start_default().await;
     let solana = &context.solana.clone();
 
@@ -1415,7 +1415,7 @@ async fn test_liq_perps_bankruptcy() -> Result<(), TransportError> {
 
     let liq_event_amounts = || {
         let settlement = solana
-            .program_log_events::<mango_v4::logs::PerpLiqNegativePnlAndBankruptcyLog>()
+            .program_log_events::<mango_v4::logs::PerpLiqNegativePnlOrBankruptcyLog>()
             .pop()
             .map(|v| limit_prec(I80F48::from_bits(v.settlement).to_num::<f64>()))
             .unwrap_or(0.0);
@@ -1450,7 +1450,7 @@ async fn test_liq_perps_bankruptcy() -> Result<(), TransportError> {
 
         send_tx(
             solana,
-            PerpLiqNegativePnlAndBankruptcyInstruction {
+            PerpLiqNegativePnlOrBankruptcyInstruction {
                 liqor,
                 liqor_owner: owner,
                 liqee: account,
@@ -1484,7 +1484,7 @@ async fn test_liq_perps_bankruptcy() -> Result<(), TransportError> {
 
         send_tx(
             solana,
-            PerpLiqNegativePnlAndBankruptcyInstruction {
+            PerpLiqNegativePnlOrBankruptcyInstruction {
                 liqor,
                 liqor_owner: owner,
                 liqee: account,
@@ -1521,7 +1521,7 @@ async fn test_liq_perps_bankruptcy() -> Result<(), TransportError> {
 
         send_tx(
             solana,
-            PerpLiqNegativePnlAndBankruptcyInstruction {
+            PerpLiqNegativePnlOrBankruptcyInstruction {
                 liqor,
                 liqor_owner: owner,
                 liqee: account,
@@ -1543,7 +1543,7 @@ async fn test_liq_perps_bankruptcy() -> Result<(), TransportError> {
 
         send_tx(
             solana,
-            PerpLiqNegativePnlAndBankruptcyInstruction {
+            PerpLiqNegativePnlOrBankruptcyInstruction {
                 liqor,
                 liqor_owner: owner,
                 liqee: account,
@@ -1563,7 +1563,7 @@ async fn test_liq_perps_bankruptcy() -> Result<(), TransportError> {
 
         send_tx(
             solana,
-            PerpLiqNegativePnlAndBankruptcyInstruction {
+            PerpLiqNegativePnlOrBankruptcyInstruction {
                 liqor,
                 liqor_owner: owner,
                 liqee: account,
@@ -1583,7 +1583,7 @@ async fn test_liq_perps_bankruptcy() -> Result<(), TransportError> {
 
         send_tx(
             solana,
-            PerpLiqNegativePnlAndBankruptcyInstruction {
+            PerpLiqNegativePnlOrBankruptcyInstruction {
                 liqor,
                 liqor_owner: owner,
                 liqee: account,
@@ -1603,7 +1603,7 @@ async fn test_liq_perps_bankruptcy() -> Result<(), TransportError> {
 
         send_tx(
             solana,
-            PerpLiqNegativePnlAndBankruptcyInstruction {
+            PerpLiqNegativePnlOrBankruptcyInstruction {
                 liqor,
                 liqor_owner: owner,
                 liqee: account,

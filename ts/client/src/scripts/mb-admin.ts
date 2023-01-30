@@ -426,8 +426,8 @@ async function registerPerpMarkets() {
     0.95,
     1.025,
     1.05,
-    1,
-    1,
+    0.95,
+    0.9,
     0.0125,
     -0.0001,
     0.0004,
@@ -442,6 +442,7 @@ async function registerPerpMarkets() {
     0,
     1.0,
     2 * 60 * 60,
+    0.025,
   );
 
   await client.perpCreateMarket(
@@ -473,6 +474,7 @@ async function registerPerpMarkets() {
     0,
     1.0,
     2 * 60 * 60,
+    0.2, // 20% positive pnl liquidation fee?
   );
 }
 

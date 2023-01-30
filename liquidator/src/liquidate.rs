@@ -162,7 +162,7 @@ impl<'a> LiquidateHelper<'a> {
         Ok(Some(sig))
     }
 
-    async fn perp_liq_base_and_positive_pnl(&self) -> anyhow::Result<Option<Signature>> {
+    async fn perp_liq_base_or_positive_pnl(&self) -> anyhow::Result<Option<Signature>> {
         let all_perp_base_positions: anyhow::Result<
             Vec<Option<(PerpMarketIndex, i64, I80F48, I80F48)>>,
         > = stream::iter(self.liqee.active_perp_positions())
@@ -269,7 +269,7 @@ impl<'a> LiquidateHelper<'a> {
 
         let sig = self
             .client
-            .perp_liq_base_and_positive_pnl(
+            .perp_liq_base_or_positive_pnl(
                 (self.pubkey, &self.liqee),
                 *perp_market_index,
                 side_signum * max_base_transfer_abs,
@@ -363,7 +363,7 @@ impl<'a> LiquidateHelper<'a> {
     }
     */
 
-    async fn perp_liq_quote_and_bankruptcy(&self) -> anyhow::Result<Option<Signature>> {
+    async fn perp_liq_negative_pnl_or_bankruptcy(&self) -> anyhow::Result<Option<Signature>> {
         if !self.health_cache.in_phase3_liquidation() {
             return Ok(None);
         }
@@ -387,7 +387,7 @@ impl<'a> LiquidateHelper<'a> {
 
         let sig = self
             .client
-            .perp_liq_negative_pnl_and_bankruptcy(
+            .perp_liq_negative_pnl_or_bankruptcy(
                 (self.pubkey, &self.liqee),
                 *perp_market_index,
                 // Always use the max amount, since the health effect is >= 0
@@ -629,7 +629,7 @@ impl<'a> LiquidateHelper<'a> {
         // Phase 2: token, perp base, perp positive pnl
         //
 
-        if let Some(txsig) = self.perp_liq_base_and_positive_pnl().await? {
+        if let Some(txsig) = self.perp_liq_base_or_positive_pnl().await? {
             return Ok(Some(txsig));
         }
 
@@ -659,7 +659,7 @@ impl<'a> LiquidateHelper<'a> {
         //
 
         // Negative pnl: take over (paid by liqee or insurance) or socialize the loss
-        if let Some(txsig) = self.perp_liq_quote_and_bankruptcy().await? {
+        if let Some(txsig) = self.perp_liq_negative_pnl_or_bankruptcy().await? {
             return Ok(Some(txsig));
         }
 

@@ -520,6 +520,7 @@ pub mod mango_v4 {
         settle_pnl_limit_window_size_ts: Option<u64>,
         reduce_only_opt: Option<bool>,
         reset_stable_price: bool,
+        positive_pnl_liquidation_fee: Option<f32>,
     ) -> Result<()> {
         instructions::perp_edit_market(
             ctx,
@@ -550,6 +551,7 @@ pub mod mango_v4 {
             settle_pnl_limit_window_size_ts,
             reduce_only_opt,
             reset_stable_price,
+            positive_pnl_liquidation_fee,
         )
     }
 
@@ -730,12 +732,12 @@ pub mod mango_v4 {
         instructions::perp_settle_fees(ctx, max_settle_amount)
     }
 
-    pub fn perp_liq_base_and_positive_pnl(
-        ctx: Context<PerpLiqBaseAndPositivePnl>,
+    pub fn perp_liq_base_or_positive_pnl(
+        ctx: Context<PerpLiqBaseOrPositivePnl>,
         max_base_transfer: i64,
         max_quote_transfer: u64,
     ) -> Result<()> {
-        instructions::perp_liq_base_and_positive_pnl(ctx, max_base_transfer, max_quote_transfer)
+        instructions::perp_liq_base_or_positive_pnl(ctx, max_base_transfer, max_quote_transfer)
     }
 
     pub fn perp_liq_force_cancel_orders(
@@ -745,11 +747,11 @@ pub mod mango_v4 {
         instructions::perp_liq_force_cancel_orders(ctx, limit)
     }
 
-    pub fn perp_liq_negative_pnl_and_bankruptcy(
-        ctx: Context<PerpLiqNegativePnlAndBankruptcy>,
+    pub fn perp_liq_negative_pnl_or_bankruptcy(
+        ctx: Context<PerpLiqNegativePnlOrBankruptcy>,
         max_liab_transfer: u64,
     ) -> Result<()> {
-        instructions::perp_liq_negative_pnl_and_bankruptcy(ctx, max_liab_transfer)
+        instructions::perp_liq_negative_pnl_or_bankruptcy(ctx, max_liab_transfer)
     }
 
     pub fn alt_set(ctx: Context<AltSet>, index: u8) -> Result<()> {

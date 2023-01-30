@@ -243,10 +243,10 @@ async function main() {
       0.95,
       1.025,
       1.05,
+      0.95,
+      0.9,
       0.012,
       0.0002,
-      1,
-      1,
       0.0,
       0,
       0.05,
@@ -259,6 +259,7 @@ async function main() {
       0,
       1.0,
       2 * 60 * 60,
+      0.025,
     );
     await group.reloadAll(client);
     const perpMarket = group.getPerpMarketByMarketIndex(0 as PerpMarketIndex);

@@ -7,12 +7,12 @@ use crate::accounts_zerocopy::*;
 use crate::error::*;
 use crate::health::{compute_health, new_health_cache, HealthType, ScanningAccountRetriever};
 use crate::logs::{
-    emit_perp_balances, PerpLiqBankruptcyLog, PerpLiqNegativePnlAndBankruptcyLog, TokenBalanceLog,
+    emit_perp_balances, PerpLiqBankruptcyLog, PerpLiqNegativePnlOrBankruptcyLog, TokenBalanceLog,
 };
 use crate::state::*;
 
 #[derive(Accounts)]
-pub struct PerpLiqNegativePnlAndBankruptcy<'info> {
+pub struct PerpLiqNegativePnlOrBankruptcy<'info> {
     #[account(
         has_one = insurance_vault,
         constraint = group.load()?.is_operational() @ MangoError::GroupIsHalted
@@ -64,7 +64,7 @@ pub struct PerpLiqNegativePnlAndBankruptcy<'info> {
     pub token_program: Program<'info, Token>,
 }
 
-impl<'info> PerpLiqNegativePnlAndBankruptcy<'info> {
+impl<'info> PerpLiqNegativePnlOrBankruptcy<'info> {
     pub fn transfer_ctx(&self) -> CpiContext<'_, '_, '_, 'info, token::Transfer<'info>> {
         let program = self.token_program.to_account_info();
         let accounts = token::Transfer {
@@ -76,8 +76,8 @@ impl<'info> PerpLiqNegativePnlAndBankruptcy<'info> {
     }
 }
 
-pub fn perp_liq_negative_pnl_and_bankruptcy(
-    ctx: Context<PerpLiqNegativePnlAndBankruptcy>,
+pub fn perp_liq_negative_pnl_or_bankruptcy(
+    ctx: Context<PerpLiqNegativePnlOrBankruptcy>,
     max_liab_transfer: u64,
 ) -> Result<()> {
     let mango_group = ctx.accounts.group.key();
@@ -199,7 +199,7 @@ pub fn perp_liq_negative_pnl_and_bankruptcy(
             )?;
             liqee_health_cache.adjust_token_balance(&settle_bank, -settlement)?;
 
-            emit!(PerpLiqNegativePnlAndBankruptcyLog {
+            emit!(PerpLiqNegativePnlOrBankruptcyLog {
                 mango_group,
                 liqee: ctx.accounts.liqee.key(),
                 liqor: ctx.accounts.liqor.key(),

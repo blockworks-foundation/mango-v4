@@ -61,7 +61,7 @@ export interface PerpEditParams {
   initBaseLiabWeight: number | null;
   maintPnlAssetWeight: number | null;
   initPnlAssetWeight: number | null;
-  liquidationFee: number | null;
+  baseLiquidationFee: number | null;
   makerFee: number | null;
   takerFee: number | null;
   feePenalty: number | null;
@@ -79,6 +79,7 @@ export interface PerpEditParams {
   settlePnlLimitWindowSize: number | null;
   reduceOnly: boolean | null;
   resetStablePrice: boolean | null;
+  positivePnlLiquidationFee: number | null;
 }
 
 export const NullPerpEditParams: PerpEditParams = {
@@ -91,7 +92,7 @@ export const NullPerpEditParams: PerpEditParams = {
   initBaseLiabWeight: null,
   maintPnlAssetWeight: null,
   initPnlAssetWeight: null,
-  liquidationFee: null,
+  baseLiquidationFee: null,
   makerFee: null,
   takerFee: null,
   feePenalty: null,
@@ -109,4 +110,5 @@ export const NullPerpEditParams: PerpEditParams = {
   settlePnlLimitWindowSize: null,
   reduceOnly: null,
   resetStablePrice: null,
+  positivePnlLiquidationFee: null,
 };

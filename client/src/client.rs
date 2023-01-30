@@ -934,7 +934,7 @@ impl MangoClient {
         self.send_and_confirm_permissionless_tx(vec![ix]).await
     }
 
-    pub async fn perp_liq_base_and_positive_pnl(
+    pub async fn perp_liq_base_or_positive_pnl(
         &self,
         liqee: (&Pubkey, &MangoAccountValue),
         market_index: PerpMarketIndex,
@@ -953,7 +953,7 @@ impl MangoClient {
             program_id: mango_v4::id(),
             accounts: {
                 let mut ams = anchor_lang::ToAccountMetas::to_account_metas(
-                    &mango_v4::accounts::PerpLiqBaseAndPositivePnl {
+                    &mango_v4::accounts::PerpLiqBaseOrPositivePnl {
                         group: self.group(),
                         perp_market: perp.address,
                         oracle: perp.market.oracle,
@@ -970,7 +970,7 @@ impl MangoClient {
                 ams
             },
             data: anchor_lang::InstructionData::data(
-                &mango_v4::instruction::PerpLiqBaseAndPositivePnl {
+                &mango_v4::instruction::PerpLiqBaseOrPositivePnl {
                     max_base_transfer,
                     max_quote_transfer,
                 },
@@ -979,7 +979,7 @@ impl MangoClient {
         self.send_and_confirm_owner_tx(vec![ix]).await
     }
 
-    pub async fn perp_liq_negative_pnl_and_bankruptcy(
+    pub async fn perp_liq_negative_pnl_or_bankruptcy(
         &self,
         liqee: (&Pubkey, &MangoAccountValue),
         market_index: PerpMarketIndex,
@@ -1003,7 +1003,7 @@ impl MangoClient {
             program_id: mango_v4::id(),
             accounts: {
                 let mut ams = anchor_lang::ToAccountMetas::to_account_metas(
-                    &mango_v4::accounts::PerpLiqNegativePnlAndBankruptcy {
+                    &mango_v4::accounts::PerpLiqNegativePnlOrBankruptcy {
                         group: self.group(),
                         perp_market: perp.address,
                         oracle: perp.market.oracle,
@@ -1022,7 +1022,7 @@ impl MangoClient {
                 ams
             },
             data: anchor_lang::InstructionData::data(
-                &mango_v4::instruction::PerpLiqNegativePnlAndBankruptcy { max_liab_transfer },
+                &mango_v4::instruction::PerpLiqNegativePnlOrBankruptcy { max_liab_transfer },
             ),
         };
         self.send_and_confirm_owner_tx(vec![ix]).await

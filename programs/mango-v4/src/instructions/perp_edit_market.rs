@@ -34,7 +34,7 @@ pub fn perp_edit_market(
     init_base_liab_weight_opt: Option<f32>,
     maint_pnl_asset_weight_opt: Option<f32>,
     init_pnl_asset_weight_opt: Option<f32>,
-    liquidation_fee_opt: Option<f32>,
+    base_liquidation_fee_opt: Option<f32>,
     maker_fee_opt: Option<f32>,
     taker_fee_opt: Option<f32>,
     min_funding_opt: Option<f32>,
@@ -52,6 +52,7 @@ pub fn perp_edit_market(
     settle_pnl_limit_window_size_ts_opt: Option<u64>,
     reduce_only_opt: Option<bool>,
     reset_stable_price: bool,
+    positive_pnl_liquidation_fee_opt: Option<f32>,
 ) -> Result<()> {
     let group = ctx.accounts.group.load()?;
 
@@ -113,8 +114,8 @@ pub fn perp_edit_market(
         perp_market.init_pnl_asset_weight = I80F48::from_num(init_pnl_asset_weight);
         require_group_admin = true;
     }
-    if let Some(liquidation_fee) = liquidation_fee_opt {
-        perp_market.base_liquidation_fee = I80F48::from_num(liquidation_fee);
+    if let Some(base_liquidation_fee) = base_liquidation_fee_opt {
+        perp_market.base_liquidation_fee = I80F48::from_num(base_liquidation_fee);
         require_group_admin = true;
     }
 
@@ -198,6 +199,11 @@ pub fn perp_edit_market(
             require_group_admin = true;
         }
     };
+
+    if let Some(positive_pnl_liquidation_fee) = positive_pnl_liquidation_fee_opt {
+        perp_market.positive_pnl_liquidation_fee = I80F48::from_num(positive_pnl_liquidation_fee);
+        require_group_admin = true;
+    }
 
     // account constraint #1
     if require_group_admin {
