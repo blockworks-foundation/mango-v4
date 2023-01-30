@@ -12,7 +12,15 @@ export {
   Serum3SelfTradeBehavior,
   Serum3Side,
 } from './accounts/serum3';
-export * from './clientIxParamBuilder';
+export {
+  IxGateParams,
+  NullPerpEditParams,
+  NullTokenEditParams,
+  PerpEditParams,
+  TokenEditParams,
+  TrueIxGateParams,
+  buildIxGate,
+} from './clientIxParamBuilder';
 export * from './constants';
 export * from './numbers/I80F48';
 export * from './utils';
