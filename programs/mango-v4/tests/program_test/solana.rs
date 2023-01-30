@@ -3,7 +3,7 @@
 use std::cell::RefCell;
 use std::sync::{Arc, RwLock};
 
-use crate::utils::TestKeypair;
+use super::utils::TestKeypair;
 use anchor_lang::AccountDeserialize;
 use anchor_spl::token::TokenAccount;
 use solana_program::{program_pack::Pack, rent::*, system_instruction};
