@@ -517,10 +517,10 @@ pub mod mango_v4 {
         stable_price_delay_growth_limit_opt: Option<f32>,
         stable_price_growth_limit_opt: Option<f32>,
         settle_pnl_limit_factor_opt: Option<f32>,
-        settle_pnl_limit_window_size_ts: Option<u64>,
+        settle_pnl_limit_window_size_ts_opt: Option<u64>,
         reduce_only_opt: Option<bool>,
         reset_stable_price: bool,
-        positive_pnl_liquidation_fee: Option<f32>,
+        positive_pnl_liquidation_fee_opt: Option<f32>,
     ) -> Result<()> {
         instructions::perp_edit_market(
             ctx,
@@ -548,10 +548,10 @@ pub mod mango_v4 {
             stable_price_delay_growth_limit_opt,
             stable_price_growth_limit_opt,
             settle_pnl_limit_factor_opt,
-            settle_pnl_limit_window_size_ts,
+            settle_pnl_limit_window_size_ts_opt,
             reduce_only_opt,
             reset_stable_price,
-            positive_pnl_liquidation_fee,
+            positive_pnl_liquidation_fee_opt,
         )
     }
 

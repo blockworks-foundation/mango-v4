@@ -2681,9 +2681,10 @@ fn perp_edit_instruction_default() -> mango_v4::instruction::PerpEditMarket {
         stable_price_delay_growth_limit_opt: None,
         stable_price_growth_limit_opt: None,
         settle_pnl_limit_factor_opt: None,
-        settle_pnl_limit_window_size_ts: None,
+        settle_pnl_limit_window_size_ts_opt: None,
         reduce_only_opt: None,
         reset_stable_price: false,
+        positive_pnl_liquidation_fee_opt: None,
     }
 }
 
@@ -2746,7 +2747,7 @@ impl ClientInstruction for PerpSetSettleLimitWindow {
         let perp_market: PerpMarket = account_loader.load(&self.perp_market).await.unwrap();
 
         let instruction = Self::Instruction {
-            settle_pnl_limit_window_size_ts: Some(self.window_size_ts),
+            settle_pnl_limit_window_size_ts_opt: Some(self.window_size_ts),
             ..perp_edit_instruction_default()
         };
 
