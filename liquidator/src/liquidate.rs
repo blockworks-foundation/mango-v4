@@ -202,6 +202,7 @@ impl<'a> LiquidateHelper<'a> {
 
         // Liquidate the highest-value perp base position
         let (perp_market_index, base_lots, price, _) = perp_base_positions.last().unwrap();
+        let perp = self.client.context.perp(*perp_market_index);
 
         let (side, side_signum) = if *base_lots > 0 {
             (Side::Bid, 1)
@@ -209,26 +210,62 @@ impl<'a> LiquidateHelper<'a> {
             (Side::Ask, -1)
         };
 
-        // Compute the max number of base_lots the liqor is willing to take
-        let max_base_transfer_abs = {
+        // Compute the max number of base_lots and positive pnl the liqor is willing to take
+        // TODO: This is risky for the liqor. It should track how much pnl is usually settleable
+        // in the market before agreeding to take it over. Also, the liqor should check how much
+        // settle limit it's going to get along with the unsettled pnl.
+        let (max_base_transfer_abs, max_quote_transfer) = {
             let mut liqor = self
                 .account_fetcher
                 .fetch_fresh_mango_account(&self.client.mango_account_address)
                 .await
                 .context("getting liquidator account")?;
             liqor.ensure_perp_position(*perp_market_index, QUOTE_TOKEN_INDEX)?;
-            let health_cache =
+            let mut health_cache =
                 health_cache::new(&self.client.context, self.account_fetcher, &liqor)
                     .await
                     .expect("always ok");
-            health_cache.max_perp_for_health_ratio(
+            let quote_bank = self
+                .client
+                .first_bank(QUOTE_TOKEN_INDEX)
+                .await
+                .context("getting quote bank")?;
+            let max_usdc_borrow = health_cache.max_borrow_for_health_ratio(
+                &liqor,
+                &quote_bank,
+                self.liqor_min_health_ratio,
+            )?;
+            // Ideally we'd predict how much positive pnl we're going to take over and then allocate
+            // the base and quote amount accordingly. This just goes with allocating a fraction of the
+            // available amount to quote and the rest to base.
+            let allowed_usdc_borrow = I80F48::from_num(0.25) * max_usdc_borrow;
+            // Perp overall asset weights > 0 mean that we get some health back for every unit of unsettled pnl
+            // and hence we can take over more than the pure-borrow amount.
+            let max_perp_unsettled_leverage = I80F48::from_num(0.95);
+            let perp_unsettled_cost = I80F48::ONE
+                - perp
+                    .market
+                    .init_pnl_asset_weight
+                    .min(max_perp_unsettled_leverage);
+            let max_quote_transfer = allowed_usdc_borrow / perp_unsettled_cost;
+
+            // Update the health cache so we can determine how many base lots the liqor can take on,
+            // assuming that the max_quote_transfer amount of positive unsettled pnl was taken over.
+            health_cache.adjust_token_balance(&quote_bank, -allowed_usdc_borrow)?;
+
+            let max_base_transfer = health_cache.max_perp_for_health_ratio(
                 *perp_market_index,
                 *price,
                 side,
                 self.liqor_min_health_ratio,
-            )?
+            )?;
+
+            (
+                max_base_transfer,
+                max_quote_transfer.floor().to_num::<u64>(),
+            )
         };
-        log::info!("computed max_base_transfer to be {max_base_transfer_abs}");
+        log::info!("computed max_base_transfer: {max_base_transfer_abs}, max_quote_transfer: max_quote_transfer");
 
         let sig = self
             .client
@@ -236,6 +273,7 @@ impl<'a> LiquidateHelper<'a> {
                 (self.pubkey, &self.liqee),
                 *perp_market_index,
                 side_signum * max_base_transfer_abs,
+                max_quote_transfer,
             )
             .await?;
         log::info!(
