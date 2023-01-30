@@ -2595,7 +2595,7 @@ pub struct PerpCreateMarketInstruction {
 impl PerpCreateMarketInstruction {
     pub async fn with_new_book_and_queue(
         solana: &SolanaCookie,
-        base: &crate::mango_setup::Token,
+        base: &super::mango_setup::Token,
     ) -> Self {
         PerpCreateMarketInstruction {
             bids: solana

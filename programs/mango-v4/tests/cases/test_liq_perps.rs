@@ -1,18 +1,4 @@
-#![cfg(feature = "test-bpf")]
-
-use anchor_lang::prelude::Pubkey;
-use fixed::types::I80F48;
-use solana_program_test::*;
-use solana_sdk::transport::TransportError;
-
-use mango_v4::state::{PerpMarketIndex, *};
-use program_test::*;
-
-use mango_setup::*;
-
-mod program_test;
-
-use utils::assert_equal_fixed_f64 as assert_equal;
+use super::*;
 
 #[tokio::test]
 async fn test_liq_perps_force_cancel() -> Result<(), TransportError> {

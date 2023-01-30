@@ -1,10 +1,4 @@
-#![cfg(feature = "test-bpf")]
-
-use program_test::*;
-use solana_program_test::*;
-use solana_sdk::transport::TransportError;
-
-mod program_test;
+use super::*;
 
 #[tokio::test]
 async fn test_benchmark() -> Result<(), TransportError> {
