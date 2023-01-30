@@ -1,6 +1,6 @@
 {
   "name": "@blockworks-foundation/mango-v4",
-  "version": "0.0.4",
+  "version": "0.4.2",
   "description": "Typescript Client for mango-v4 program.",
   "repository": "https://github.com/blockworks-foundation/mango-v4",
   "author": {
@@ -64,12 +64,12 @@
     "@solana/web3.js": "^1.63.1",
     "@switchboard-xyz/sbv2-lite": "^0.1.6",
     "big.js": "^6.1.1",
-    "bs58": "^5.0.0",
     "binance-api-node": "^0.12.0",
-    "node-kraken-api": "^2.2.2",
-    "ftx-api": "^1.1.13",
+    "bs58": "^5.0.0",
     "cross-fetch": "^3.1.5",
-    "dotenv": "^16.0.3"
+    "dotenv": "^16.0.3",
+    "ftx-api": "^1.1.13",
+    "node-kraken-api": "^2.2.2"
   },
   "resolutions": {
     "@project-serum/anchor/@solana/web3.js": "1.63.1"
