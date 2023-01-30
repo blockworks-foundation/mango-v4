@@ -53,11 +53,7 @@ impl HealthCache {
         amount: I80F48,
         price: I80F48,
     ) -> Result<Self> {
-        use std::time::SystemTime;
-        let now_ts = SystemTime::now()
-            .duration_since(SystemTime::UNIX_EPOCH)
-            .expect("system time after epoch start")
-            .as_secs();
+        let now_ts = system_epoch_secs();
 
         let mut source_position = account.token_position(source_bank.token_index)?.clone();
         let mut target_position = account.token_position(target_bank.token_index)?.clone();
@@ -384,13 +380,18 @@ impl HealthCache {
         Ok(base_lots.round_to_zero().to_num())
     }
 
-    pub fn max_borrow_for_health_fn(
+    fn max_borrow_for_health_fn(
         &self,
         account: &MangoAccountValue,
         bank: &Bank,
         min_fn_value: I80F48,
         target_fn: fn(&HealthCache) -> I80F48,
     ) -> Result<I80F48> {
+        // If we're already below ratio, stop
+        if target_fn(self) <= min_fn_value {
+            return Ok(I80F48::ZERO);
+        }
+
         let health_type = HealthType::Init;
 
         // Fail if the health cache (or consequently the account) don't have existing
@@ -399,11 +400,7 @@ impl HealthCache {
         let token = &self.token_infos[token_info_index];
 
         let cache_after_borrow = |amount: I80F48| -> Result<HealthCache> {
-            use std::time::SystemTime;
-            let now_ts = SystemTime::now()
-                .duration_since(SystemTime::UNIX_EPOCH)
-                .expect("system time after epoch start")
-                .as_secs();
+            let now_ts = system_epoch_secs();
 
             let mut position = account.token_position(bank.token_index)?.clone();
 
@@ -423,8 +420,12 @@ impl HealthCache {
         };
 
         // At most withdraw all deposits plus enough borrows to bring health to zero
+        // (ensure this works with zero asset weight)
         let limit = token.balance_native.max(I80F48::ZERO)
-            + self.health(health_type) / token.init_liab_weight;
+            + self.health(health_type).max(I80F48::ZERO) / token.init_liab_weight;
+        if limit <= 0 {
+            return Ok(I80F48::ZERO);
+        }
 
         binary_search(
             I80F48::ZERO,
@@ -434,6 +435,17 @@ impl HealthCache {
             I80F48::ONE,
             fn_value_after_borrow,
         )
+    }
+
+    pub fn max_borrow_for_health_ratio(
+        &self,
+        account: &MangoAccountValue,
+        bank: &Bank,
+        min_ratio: I80F48,
+    ) -> Result<I80F48> {
+        self.max_borrow_for_health_fn(account, bank, min_ratio, |cache| {
+            cache.health_ratio(HealthType::Init)
+        })
     }
 }
 
@@ -580,6 +592,14 @@ fn ignore_net_borrow_limit_errors(maybe_cache: Result<HealthCache>) -> Result<Op
     }
 }
 
+fn system_epoch_secs() -> u64 {
+    use std::time::SystemTime;
+    SystemTime::now()
+        .duration_since(SystemTime::UNIX_EPOCH)
+        .expect("system time after epoch start")
+        .as_secs()
+}
+
 #[cfg(test)]
 mod tests {
     use super::super::test::*;
@@ -596,18 +616,20 @@ mod tests {
         }
     }
 
-    #[test]
-    fn test_max_swap() {
-        let default_token_info = |x| TokenInfo {
+    fn default_token_info(x: f64, price: f64) -> TokenInfo {
+        TokenInfo {
             token_index: 0,
             maint_asset_weight: I80F48::from_num(1.0 - x),
             init_asset_weight: I80F48::from_num(1.0 - x),
             maint_liab_weight: I80F48::from_num(1.0 + x),
             init_liab_weight: I80F48::from_num(1.0 + x),
-            prices: Prices::new_single_price(I80F48::from_num(2.0)),
+            prices: Prices::new_single_price(I80F48::from_num(price)),
             balance_native: I80F48::ZERO,
-        };
+        }
+    }
 
+    #[test]
+    fn test_max_swap() {
         let buffer = MangoAccount::default_for_tests().try_to_vec().unwrap();
         let mut account = MangoAccountValue::from_bytes(&buffer).unwrap();
         account.ensure_token_position(0).unwrap();
@@ -628,18 +650,15 @@ mod tests {
             token_infos: vec![
                 TokenInfo {
                     token_index: 0,
-                    prices: Prices::new_single_price(I80F48::from_num(2.0)),
-                    ..default_token_info(0.1)
+                    ..default_token_info(0.1, 2.0)
                 },
                 TokenInfo {
                     token_index: 1,
-                    prices: Prices::new_single_price(I80F48::from_num(3.0)),
-                    ..default_token_info(0.2)
+                    ..default_token_info(0.2, 3.0)
                 },
                 TokenInfo {
                     token_index: 2,
-                    prices: Prices::new_single_price(I80F48::from_num(4.0)),
-                    ..default_token_info(0.3)
+                    ..default_token_info(0.3, 4.0)
                 },
             ],
             serum3_infos: vec![],
@@ -969,15 +988,6 @@ mod tests {
 
     #[test]
     fn test_max_perp() {
-        let default_token_info = |x| TokenInfo {
-            token_index: 0,
-            maint_asset_weight: I80F48::from_num(1.0 - x),
-            init_asset_weight: I80F48::from_num(1.0 - x),
-            maint_liab_weight: I80F48::from_num(1.0 + x),
-            init_liab_weight: I80F48::from_num(1.0 + x),
-            prices: Prices::new_single_price(I80F48::from_num(2.0)),
-            balance_native: I80F48::ZERO,
-        };
         let base_lot_size = 100;
         let default_perp_info = |x| PerpInfo {
             perp_market_index: 0,
@@ -1000,9 +1010,8 @@ mod tests {
         let health_cache = HealthCache {
             token_infos: vec![TokenInfo {
                 token_index: 0,
-                prices: Prices::new_single_price(I80F48::from_num(1.0)),
                 balance_native: I80F48::ZERO,
-                ..default_token_info(0.0)
+                ..default_token_info(0.0, 1.0)
             }],
             serum3_infos: vec![],
             perp_infos: vec![PerpInfo {
@@ -1264,5 +1273,103 @@ mod tests {
             compute_health(&account3.borrow(), HealthType::Maint, &retriever).unwrap(),
             0.9 * 1.0 * 10.0 * 10.0 - 100.0
         ));
+    }
+
+    #[test]
+    fn test_max_borrow() {
+        let buffer = MangoAccount::default_for_tests().try_to_vec().unwrap();
+        let mut account = MangoAccountValue::from_bytes(&buffer).unwrap();
+        account.ensure_token_position(0).unwrap();
+        account.ensure_token_position(1).unwrap();
+
+        let group = Pubkey::new_unique();
+        let (mut bank0, _) = mock_bank_and_oracle(group, 0, 1.0, 0.0, 0.0);
+        let bank0_data = bank0.data();
+
+        let health_cache = HealthCache {
+            token_infos: vec![
+                TokenInfo {
+                    token_index: 0,
+                    ..default_token_info(0.0, 1.0)
+                },
+                TokenInfo {
+                    token_index: 1,
+                    ..default_token_info(0.2, 2.0)
+                },
+            ],
+            serum3_infos: vec![],
+            perp_infos: vec![],
+            being_liquidated: false,
+        };
+
+        assert_eq!(health_cache.health(HealthType::Init), I80F48::ZERO);
+        assert_eq!(health_cache.health_ratio(HealthType::Init), I80F48::MAX);
+        assert_eq!(
+            health_cache
+                .max_borrow_for_health_ratio(&account, bank0_data, I80F48::from(50))
+                .unwrap(),
+            I80F48::ZERO
+        );
+
+        let find_max_borrow = |c: &HealthCache, ratio: f64| {
+            let max_borrow = c
+                .max_borrow_for_health_ratio(&account, bank0_data, I80F48::from_num(ratio))
+                .unwrap();
+            // compute the health ratio we'd get when executing the trade
+            let actual_ratio = {
+                let mut c = c.clone();
+                c.token_infos[0].balance_native -= max_borrow;
+                c.health_ratio(HealthType::Init).to_num::<f64>()
+            };
+            // the ratio for borrowing one native token extra
+            let plus_ratio = {
+                let mut c = c.clone();
+                c.token_infos[0].balance_native -= max_borrow + I80F48::ONE;
+                c.health_ratio(HealthType::Init).to_num::<f64>()
+            };
+            (max_borrow, actual_ratio, plus_ratio)
+        };
+        let check_max_borrow = |c: &HealthCache, ratio: f64| -> f64 {
+            let initial_ratio = c.health_ratio(HealthType::Init).to_num::<f64>();
+            let (max_borrow, actual_ratio, plus_ratio) = find_max_borrow(c, ratio);
+            println!(
+                    "checking target ratio {ratio}: initial ratio: {initial_ratio}, actual ratio: {actual_ratio}, plus ratio: {plus_ratio}, borrow: {max_borrow}",
+                );
+            let max_binary_search_error = 0.1;
+            if initial_ratio >= ratio {
+                assert!(ratio <= actual_ratio);
+                assert!(plus_ratio - max_binary_search_error <= ratio);
+            }
+            max_borrow.to_num::<f64>()
+        };
+
+        {
+            let mut health_cache = health_cache.clone();
+            health_cache.token_infos[0].balance_native = I80F48::from_num(100.0);
+            assert_eq!(check_max_borrow(&health_cache, 50.0), 100.0);
+        }
+        {
+            let mut health_cache = health_cache.clone();
+            health_cache.token_infos[1].balance_native = I80F48::from_num(50.0); // price 2, so 2*50*0.8 = 80 health
+            check_max_borrow(&health_cache, 100.0);
+            check_max_borrow(&health_cache, 50.0);
+            check_max_borrow(&health_cache, 0.0);
+        }
+        {
+            let mut health_cache = health_cache.clone();
+            health_cache.token_infos[0].balance_native = I80F48::from_num(50.0);
+            health_cache.token_infos[1].balance_native = I80F48::from_num(50.0);
+            check_max_borrow(&health_cache, 100.0);
+            check_max_borrow(&health_cache, 50.0);
+            check_max_borrow(&health_cache, 0.0);
+        }
+        {
+            let mut health_cache = health_cache.clone();
+            health_cache.token_infos[0].balance_native = I80F48::from_num(-50.0);
+            health_cache.token_infos[1].balance_native = I80F48::from_num(50.0);
+            check_max_borrow(&health_cache, 100.0);
+            check_max_borrow(&health_cache, 50.0);
+            check_max_borrow(&health_cache, 0.0);
+        }
     }
 }
