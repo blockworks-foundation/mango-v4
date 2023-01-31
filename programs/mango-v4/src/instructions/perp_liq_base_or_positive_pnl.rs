@@ -97,7 +97,6 @@ pub fn perp_liq_base_or_positive_pnl(
     let mut perp_market = ctx.accounts.perp_market.load_mut()?;
     let perp_market_index = perp_market.perp_market_index;
     let settle_token_index = perp_market.settle_token_index;
-    let base_lot_size = I80F48::from(perp_market.base_lot_size);
 
     let mut settle_bank = ctx.accounts.settle_bank.load_mut()?;
     // account constraint #2
@@ -111,7 +110,6 @@ pub fn perp_liq_base_or_positive_pnl(
         &AccountInfoRef::borrow(ctx.accounts.oracle.as_ref())?,
         None, // checked in health
     )?;
-    let price_per_lot = cm!(base_lot_size * oracle_price);
 
     // Fetch perp positions for accounts, creating for the liqor if needed
     let liqee_perp_position = liqee.perp_position_mut(perp_market_index)?;
@@ -124,13 +122,111 @@ pub fn perp_liq_base_or_positive_pnl(
         .ensure_perp_position(perp_market_index, perp_market.settle_token_index)?
         .0;
 
-    // Settle funding
+    // Settle funding, update limit
     liqee_perp_position.settle_funding(&perp_market);
     liqor_perp_position.settle_funding(&perp_market);
-
-    // Max settleable on the liqee?
     let now_ts: u64 = Clock::get()?.unix_timestamp.try_into().unwrap();
     liqee_perp_position.update_settle_limit(&perp_market, now_ts);
+
+    //
+    // Perform the liquidation
+    //
+    let (base_transfer, quote_transfer, settlement) = liquidation_action(
+        &mut perp_market,
+        &mut settle_bank,
+        &mut liqor.borrow_mut(),
+        &mut liqee.borrow_mut(),
+        &mut liqee_health_cache,
+        liqee_init_health,
+        now_ts,
+        max_base_transfer,
+        max_quote_transfer,
+    )?;
+
+    // Skip out if this instruction had nothing to do
+    if base_transfer == 0 && settlement == 0 {
+        return Ok(());
+    }
+
+    //
+    // Wrap up
+    //
+
+    let liqee_perp_position = liqee.perp_position_mut(perp_market_index)?;
+    let liqor_perp_position = liqor.perp_position_mut(perp_market_index)?;
+
+    emit_perp_balances(
+        ctx.accounts.group.key(),
+        ctx.accounts.liqor.key(),
+        liqor_perp_position,
+        &perp_market,
+    );
+
+    emit_perp_balances(
+        ctx.accounts.group.key(),
+        ctx.accounts.liqee.key(),
+        liqee_perp_position,
+        &perp_market,
+    );
+
+    emit!(PerpLiqBaseOrPositivePnlLog {
+        mango_group: ctx.accounts.group.key(),
+        perp_market_index: perp_market.perp_market_index,
+        liqor: ctx.accounts.liqor.key(),
+        liqee: ctx.accounts.liqee.key(),
+        base_transfer,
+        quote_transfer: quote_transfer.to_bits(),
+        price: oracle_price.to_bits(),
+    });
+
+    // Check liqee health again
+    let liqee_init_health_after = liqee_health_cache.health(HealthType::Init);
+    liqee
+        .fixed
+        .maybe_recover_from_being_liquidated(liqee_init_health_after);
+    require_gte!(liqee_init_health_after, liqee_init_health);
+    msg!(
+        "liqee health: {} -> {}",
+        liqee_init_health,
+        liqee_init_health_after
+    );
+
+    drop(settle_bank);
+    drop(perp_market);
+
+    // Check liqor's health
+    if !liqor.fixed.is_in_health_region() {
+        let account_retriever = ScanningAccountRetriever::new(ctx.remaining_accounts, group_pk)
+            .context("create account retriever end")?;
+        let liqor_health = compute_health(&liqor.borrow(), HealthType::Init, &account_retriever)
+            .context("compute liqor health")?;
+        require!(liqor_health >= 0, MangoError::HealthMustBePositive);
+    }
+
+    Ok(())
+}
+
+pub(crate) fn liquidation_action(
+    perp_market: &mut PerpMarket,
+    settle_bank: &mut Bank,
+    liqor: &mut MangoAccountRefMut,
+    liqee: &mut MangoAccountRefMut,
+    liqee_health_cache: &mut HealthCache,
+    liqee_init_health: I80F48,
+    now_ts: u64,
+    max_base_transfer: i64,
+    max_quote_transfer: u64,
+) -> Result<(i64, I80F48, I80F48)> {
+    let perp_market_index = perp_market.perp_market_index;
+    let settle_token_index = perp_market.settle_token_index;
+
+    let liqee_perp_position = liqee.perp_position_mut(perp_market_index)?;
+    let liqor_perp_position = liqor.perp_position_mut(perp_market_index)?;
+
+    let perp_info = liqee_health_cache.perp_info(perp_market_index)?;
+    let oracle_price = perp_info.prices.oracle;
+    let price_per_lot = cm!(I80F48::from(perp_market.base_lot_size) * oracle_price);
+
     let liqee_positive_settle_limit = liqee_perp_position.available_settle_limit(&perp_market).1;
 
     // The max settleable amount does not need to be constrained by the liqor's perp settle health,
@@ -164,7 +260,7 @@ pub fn perp_liq_base_or_positive_pnl(
         // liqee_base_lots <= 0
         require_msg!(
             max_base_transfer <= 0,
-            "max_base_transfer can't be positive when liqee's base_position is positive"
+            "max_base_transfer can't be positive when liqee's base_position is negative"
         );
 
         // health gets increased by `base * price * perp_init_liab_weight`
@@ -177,8 +273,12 @@ pub fn perp_liq_base_or_positive_pnl(
     };
     assert!(unweighted_health_per_lot > 0);
 
+    // Amount of settle token received for each token that is settled
     let spot_gain_per_settled = cm!(I80F48::ONE - perp_market.positive_pnl_liquidation_fee);
+
     let init_overall_asset_weight = perp_market.init_pnl_asset_weight;
+
+    // The overall health contribution from perp including spot health increases from settling pnl
     let expected_perp_health = |unweighted: I80F48| {
         if unweighted < 0 {
             unweighted
@@ -195,14 +295,13 @@ pub fn perp_liq_base_or_positive_pnl(
     // these variables
     //
     let mut base_reduction = 0;
-    let mut current_expected_health = liqee_init_health;
-    let perp_info = liqee_health_cache.perp_info(perp_market_index)?;
     let mut current_unweighted_perp_health =
         perp_info.unweighted_health_contribution(HealthType::Init);
-    let mut current_expected_perp_health = expected_perp_health(current_unweighted_perp_health);
-
     let initial_weighted_perp_health =
         perp_info.weigh_health_contribution(current_unweighted_perp_health, HealthType::Init);
+    let mut current_expected_perp_health = expected_perp_health(current_unweighted_perp_health);
+    let mut current_expected_health =
+        cm!(liqee_init_health + current_expected_perp_health - initial_weighted_perp_health);
 
     let mut reduce_base = |step: &str,
                            health_amount: I80F48,
@@ -296,8 +395,8 @@ pub fn perp_liq_base_or_positive_pnl(
             base_transfer,
             quote_transfer
         );
-        liqee_perp_position.record_trade(&mut perp_market, base_transfer, quote_transfer);
-        liqor_perp_position.record_trade(&mut perp_market, -base_transfer, -quote_transfer);
+        liqee_perp_position.record_trade(perp_market, base_transfer, quote_transfer);
+        liqor_perp_position.record_trade(perp_market, -base_transfer, -quote_transfer);
     }
 
     //
@@ -369,66 +468,341 @@ pub fn perp_liq_base_or_positive_pnl(
         I80F48::ZERO
     };
 
-    // Skip out if this instruction had nothing to do
-    if base_transfer == 0 && settlement == 0 {
-        return Ok(());
-    }
-
-    //
-    // Wrap up
-    //
-
     let liqee_perp_position = liqee.perp_position_mut(perp_market_index)?;
-    let liqor_perp_position = liqor.perp_position_mut(perp_market_index)?;
-
-    emit_perp_balances(
-        ctx.accounts.group.key(),
-        ctx.accounts.liqor.key(),
-        liqor_perp_position,
-        &perp_market,
-    );
-
-    emit_perp_balances(
-        ctx.accounts.group.key(),
-        ctx.accounts.liqee.key(),
-        liqee_perp_position,
-        &perp_market,
-    );
-
-    emit!(PerpLiqBaseOrPositivePnlLog {
-        mango_group: ctx.accounts.group.key(),
-        perp_market_index: perp_market.perp_market_index,
-        liqor: ctx.accounts.liqor.key(),
-        liqee: ctx.accounts.liqee.key(),
-        base_transfer,
-        quote_transfer: quote_transfer.to_bits(),
-        price: oracle_price.to_bits(),
-    });
-
-    // Check liqee health again
     liqee_health_cache.recompute_perp_info(liqee_perp_position, &perp_market)?;
-    let liqee_init_health_after = liqee_health_cache.health(HealthType::Init);
-    liqee
-        .fixed
-        .maybe_recover_from_being_liquidated(liqee_init_health_after);
-    require_gte!(liqee_init_health_after, liqee_init_health);
-    msg!(
-        "liqee health: {} -> {}",
-        liqee_init_health,
-        liqee_init_health_after
-    );
 
-    drop(settle_bank);
-    drop(perp_market);
+    Ok((base_transfer, quote_transfer, settlement))
+}
 
-    // Check liqor's health
-    if !liqor.fixed.is_in_health_region() {
-        let account_retriever = ScanningAccountRetriever::new(ctx.remaining_accounts, group_pk)
-            .context("create account retriever end")?;
-        let liqor_health = compute_health(&liqor.borrow(), HealthType::Init, &account_retriever)
-            .context("compute liqor health")?;
-        require!(liqor_health >= 0, MangoError::HealthMustBePositive);
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::health::{self, test::*};
+
+    #[derive(Clone)]
+    struct TestSetup {
+        group: Pubkey,
+        settle_bank: TestAccount<Bank>,
+        settle_oracle: TestAccount<StubOracle>,
+        perp_market: TestAccount<PerpMarket>,
+        perp_oracle: TestAccount<StubOracle>,
+        liqee: MangoAccountValue,
+        liqor: MangoAccountValue,
     }
 
-    Ok(())
+    impl TestSetup {
+        fn new() -> Self {
+            let group = Pubkey::new_unique();
+            let (settle_bank, settle_oracle) = mock_bank_and_oracle(group, 0, 1.0, 0.0, 0.0);
+            let (_bank2, perp_oracle) = mock_bank_and_oracle(group, 4, 1.0, 0.5, 0.3);
+            let mut perp_market =
+                mock_perp_market(group, perp_oracle.pubkey, 1.0, 9, (0.2, 0.1), (0.05, 0.02));
+            perp_market.data().base_lot_size = 1;
+
+            let liqee_buffer = MangoAccount::default_for_tests().try_to_vec().unwrap();
+            let mut liqee = MangoAccountValue::from_bytes(&liqee_buffer).unwrap();
+            {
+                liqee.ensure_token_position(0).unwrap();
+                liqee.ensure_perp_position(9, 0).unwrap();
+            }
+
+            let liqor_buffer = MangoAccount::default_for_tests().try_to_vec().unwrap();
+            let mut liqor = MangoAccountValue::from_bytes(&liqor_buffer).unwrap();
+            {
+                liqor.ensure_token_position(0).unwrap();
+                liqor.ensure_perp_position(9, 0).unwrap();
+            }
+
+            Self {
+                group,
+                settle_bank,
+                settle_oracle,
+                perp_market,
+                perp_oracle,
+                liqee,
+                liqor,
+            }
+        }
+
+        fn run(&self, max_base: i64, max_quote: u64) -> Result<Self> {
+            let mut setup = self.clone();
+
+            let ais = vec![
+                setup.settle_bank.as_account_info(),
+                setup.settle_oracle.as_account_info(),
+                setup.perp_market.as_account_info(),
+                setup.perp_oracle.as_account_info(),
+            ];
+            let retriever =
+                ScanningAccountRetriever::new_with_staleness(&ais, &setup.group, None).unwrap();
+
+            let mut liqee_health_cache =
+                health::new_health_cache(&setup.liqee.borrow(), &retriever).unwrap();
+            let liqee_init_health = liqee_health_cache.health(HealthType::Init);
+
+            drop(retriever);
+            drop(ais);
+
+            liquidation_action(
+                setup.perp_market.data(),
+                setup.settle_bank.data(),
+                &mut setup.liqor.borrow_mut(),
+                &mut setup.liqee.borrow_mut(),
+                &mut liqee_health_cache,
+                liqee_init_health,
+                0,
+                max_base,
+                max_quote,
+            )?;
+
+            Ok(setup)
+        }
+    }
+
+    // these are macros because as functions, the borrow checker doesn't realize they only borrow one field
+    fn token_p(account: &mut MangoAccountValue) -> &mut TokenPosition {
+        account.token_position_mut(0).unwrap().0
+    }
+    fn perp_p(account: &mut MangoAccountValue) -> &mut PerpPosition {
+        account.perp_position_mut(9).unwrap()
+    }
+
+    macro_rules! assert_eq_f {
+        ($value:expr, $expected:expr, $max_error:expr) => {
+            let value = $value;
+            let expected = $expected;
+            let ok = (value.to_num::<f64>() - expected).abs() < $max_error;
+            assert!(ok, "value: {value}, expected: {expected}");
+        };
+    }
+
+    #[test]
+    fn test_liq_base_or_positive_pnl() {
+        let no_extra = |_setup: &mut TestSetup| {};
+        let test_cases = vec![
+            (
+                "nothing",
+                (0.9, 0.9),
+                (0.0, 0, 0.0, 100.0),
+                (0.0, 0, 0.0, 100.0),
+                (0, 100),
+                no_extra,
+            ),
+            //
+            // liquidate base position when perp health is negative
+            //
+            (
+                "neg base liq 1: limited",
+                (0.5, 0.5),
+                (5.0, -10, 0.0, 100.0),
+                (5.0, -9, -1.0, 100.0),
+                (-1, 100),
+                no_extra,
+            ),
+            (
+                "neg base liq 2: base to zero",
+                (0.5, 0.5),
+                (5.0, -10, 0.0, 100.0),
+                (5.0, 0, -10.0, 100.0),
+                (-20, 100),
+                no_extra,
+            ),
+            (
+                "neg base liq 3: health positive",
+                (0.5, 0.5),
+                (5.0, -4, 0.0, 100.0),
+                (5.0, -2, -2.0, 100.0),
+                (-20, 100),
+                no_extra,
+            ),
+            (
+                "pos base liq 1: limited",
+                (0.5, 0.5),
+                (5.0, 20, -20.0, 100.0),
+                (5.0, 19, -19.0, 100.0),
+                (1, 100),
+                no_extra,
+            ),
+            (
+                "pos base liq 2: base to zero",
+                (0.5, 0.5),
+                (0.0, 20, -30.0, 100.0),
+                (0.0, 0, -10.0, 100.0),
+                (100, 100),
+                no_extra,
+            ),
+            (
+                "pos base liq 3: health positive",
+                (0.5, 0.5),
+                (5.0, 20, -20.0, 100.0),
+                (5.0, 10, -10.0, 100.0),
+                (100, 100),
+                no_extra,
+            ),
+            //
+            // liquidate base position when perp health is positive and overall asset weight is positive
+            //
+            (
+                "base liq, pos perp health 1: until health positive",
+                (0.5, 1.0),
+                (-20.0, 20, 5.0, 100.0),
+                (-20.0, 10, 15.0, 100.0),
+                (100, 100),
+                no_extra,
+            ),
+            (
+                "base liq, pos perp health 2-1: settle until health positive",
+                (0.5, 0.5),
+                (-19.0, 20, 10.0, 100.0),
+                (-1.0, 20, -8.0, 82.0),
+                (100, 100),
+                no_extra,
+            ),
+            (
+                "base liq, pos perp health 2-2: base+settle until health positive",
+                (0.5, 0.5),
+                (-25.0, 20, 10.0, 100.0),
+                (0.0, 10, -5.0, 75.0),
+                (100, 100),
+                no_extra,
+            ),
+            (
+                "base liq, pos perp health 2-3: base+settle until pnl limit",
+                (0.5, 0.5),
+                (-23.0, 20, 10.0, 100.0),
+                (-2.0, 10, -1.0, 79.0),
+                (100, 21),
+                no_extra,
+            ),
+            (
+                "base liq, pos perp health 2-4: base+settle until base limit",
+                (0.5, 0.5),
+                (-25.0, 20, 10.0, 100.0),
+                (-4.0, 18, -9.0, 79.0),
+                (2, 100),
+                no_extra,
+            ),
+            (
+                "base liq, pos perp health 2-5: base+settle until both limits",
+                (0.5, 0.5),
+                (-25.0, 20, 10.0, 100.0),
+                (-4.0, 16, -7.0, 79.0),
+                (4, 21),
+                no_extra,
+            ),
+            (
+                "base liq, pos perp health 4: liq some base, then settle some",
+                (0.5, 0.5),
+                (-20.0, 20, 10.0, 100.0),
+                (-15.0, 10, 15.0, 95.0),
+                (10, 5),
+                no_extra,
+            ),
+            (
+                "base liq, pos perp health 5: base to zero even without settlement",
+                (0.5, 0.5),
+                (-20.0, 20, 10.0, 100.0),
+                (-20.0, 0, 30.0, 100.0),
+                (100, 0),
+                no_extra,
+            ),
+            //
+            // liquidate base position when perp health is positive but overall asset weight is zero
+            //
+            (
+                "base liq, pos perp health 6: don't touch base without settlement",
+                (0.5, 0.0),
+                (-20.0, 20, 10.0, 100.0),
+                (-20.0, 20, 10.0, 100.0),
+                (10, 0),
+                no_extra,
+            ),
+            (
+                "base liq, pos perp health 7: settlement without base",
+                (0.5, 0.0),
+                (-20.0, 20, 10.0, 100.0),
+                (-15.0, 20, 5.0, 95.0),
+                (10, 5),
+                no_extra,
+            ),
+            (
+                "base liq, pos perp health 8: settlement enables base",
+                (0.5, 0.0),
+                (-30.0, 20, 10.0, 100.0),
+                (-7.5, 15, -7.5, 77.5),
+                (5, 30),
+                no_extra,
+            ),
+            (
+                "base liq, pos perp health 9: until health positive",
+                (0.5, 0.0),
+                (-25.0, 20, 10.0, 100.0),
+                (0.0, 10, -5.0, 75.0),
+                (200, 200),
+                no_extra,
+            ),
+        ];
+
+        for (
+            name,
+            (base_weight, overall_weight),
+            (init_liqee_spot, init_liqee_base, init_liqee_quote, init_liqor_spot),
+            (exp_liqee_spot, exp_liqee_base, exp_liqee_quote, exp_liqor_spot),
+            (max_base, max_quote),
+            extra_setup,
+        ) in test_cases
+        {
+            println!("test: {name}");
+            let mut setup = TestSetup::new();
+            {
+                let pm = setup.perp_market.data();
+                pm.init_base_asset_weight = I80F48::from_num(base_weight);
+                pm.init_base_liab_weight = I80F48::from_num(2.0 - base_weight);
+                pm.init_pnl_asset_weight = I80F48::from_num(overall_weight);
+            }
+            extra_setup(&mut setup);
+            {
+                perp_p(&mut setup.liqee).record_trade(
+                    setup.perp_market.data(),
+                    init_liqee_base,
+                    I80F48::from_num(init_liqee_quote),
+                );
+
+                let settle_bank = setup.settle_bank.data();
+                settle_bank
+                    .change_without_fee(
+                        token_p(&mut setup.liqee),
+                        I80F48::from_num(init_liqee_spot),
+                        0,
+                        I80F48::from(1),
+                    )
+                    .unwrap();
+                settle_bank
+                    .change_without_fee(
+                        token_p(&mut setup.liqor),
+                        I80F48::from_num(init_liqor_spot),
+                        0,
+                        I80F48::from(1),
+                    )
+                    .unwrap();
+            }
+
+            let mut result = setup.run(max_base, max_quote).unwrap();
+
+            let liqee_perp = perp_p(&mut result.liqee);
+            assert_eq!(liqee_perp.base_position_lots(), exp_liqee_base);
+            assert_eq_f!(liqee_perp.quote_position_native(), exp_liqee_quote, 0.01);
+            let settle_bank = result.settle_bank.data();
+            assert_eq_f!(
+                token_p(&mut result.liqee).native(settle_bank),
+                exp_liqee_spot,
+                0.01
+            );
+            assert_eq_f!(
+                token_p(&mut result.liqor).native(settle_bank),
+                exp_liqor_spot,
+                0.01
+            );
+        }
+    }
 }
