@@ -9,7 +9,7 @@ pub struct GroupClose<'info> {
         has_one = admin,
         has_one = insurance_vault,
         constraint = group.load()?.is_testing(),
-        constraint = group.load()?.is_operational() @ MangoError::GroupIsHalted,
+        constraint = group.load()?.is_ix_enabled(IxGate::GroupClose) @ MangoError::IxIsDisabled,
         close = sol_destination
     )]
     pub group: AccountLoader<'info, Group>,

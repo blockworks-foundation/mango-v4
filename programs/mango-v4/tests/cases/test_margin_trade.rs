@@ -1,11 +1,4 @@
-#![cfg(feature = "test-bpf")]
-
-use program_test::*;
-use solana_program_test::*;
-
-use mango_setup::*;
-
-mod program_test;
+use super::*;
 
 // This is an unspecific happy-case test that just runs a few instructions to check
 // that they work in principle. It should be split up / renamed.

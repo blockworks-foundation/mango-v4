@@ -15,7 +15,7 @@ use crate::state::*;
 pub struct PerpLiqNegativePnlOrBankruptcy<'info> {
     #[account(
         has_one = insurance_vault,
-        constraint = group.load()?.is_operational() @ MangoError::GroupIsHalted
+        constraint = group.load()?.is_ix_enabled(IxGate::PerpLiqNegativePnlOrBankruptcy) @ MangoError::IxIsDisabled,
     )]
     pub group: AccountLoader<'info, Group>,
 

@@ -14,7 +14,7 @@ use crate::logs::{LoanOriginationFeeInstruction, WithdrawLoanOriginationFeeLog};
 #[derive(Accounts)]
 pub struct Serum3SettleFunds<'info> {
     #[account(
-        constraint = group.load()?.is_operational() @ MangoError::GroupIsHalted
+        constraint = group.load()?.is_ix_enabled(IxGate::Serum3SettleFunds) @ MangoError::IxIsDisabled,
     )]
     pub group: AccountLoader<'info, Group>,
 

@@ -6,6 +6,7 @@ use crate::accounts_zerocopy::*;
 use crate::error::*;
 use crate::health::{compute_health, new_fixed_order_account_retriever, HealthType};
 use crate::state::Bank;
+use crate::state::IxGate;
 use crate::state::{Group, MangoAccountFixed, MangoAccountLoader, PerpMarket};
 
 use crate::logs::{emit_perp_balances, PerpSettleFeesLog, TokenBalanceLog};
@@ -13,7 +14,7 @@ use crate::logs::{emit_perp_balances, PerpSettleFeesLog, TokenBalanceLog};
 #[derive(Accounts)]
 pub struct PerpSettleFees<'info> {
     #[account(
-        constraint = group.load()?.is_operational() @ MangoError::GroupIsHalted
+        constraint = group.load()?.is_ix_enabled(IxGate::PerpSettleFees) @ MangoError::IxIsDisabled,
     )]
     pub group: AccountLoader<'info, Group>,
 

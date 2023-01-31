@@ -1,17 +1,4 @@
-#![cfg(all(feature = "test-bpf"))]
-
-use anchor_lang::prelude::Pubkey;
-use fixed::types::I80F48;
-use fixed_macro::types::I80F48;
-use mango_v4::state::*;
-use program_test::*;
-use solana_program_test::*;
-use solana_sdk::transport::TransportError;
-
-use mango_setup::*;
-use utils::assert_equal_fixed_f64 as assert_equal;
-
-mod program_test;
+use super::*;
 
 #[tokio::test]
 async fn test_perp_fixed() -> Result<(), TransportError> {

@@ -1,17 +1,8 @@
-#![cfg(feature = "test-bpf")]
-
-use anchor_lang::prelude::*;
-use solana_program_test::*;
-
-use program_test::*;
-
-use mango_setup::*;
-
-mod program_test;
+use super::*;
 
 // Check opening and closing positions
 #[tokio::test]
-async fn test_position_lifetime() -> Result<()> {
+async fn test_position_lifetime() -> Result<(), TransportError> {
     let context = TestContext::new().await;
     let solana = &context.solana.clone();
 

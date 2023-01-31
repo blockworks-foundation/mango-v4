@@ -45,7 +45,12 @@ import {
   Serum3Side,
   generateSerum3MarketExternalVaultSignerAddress,
 } from './accounts/serum3';
-import { PerpEditParams, TokenEditParams } from './clientIxParamBuilder';
+import {
+  IxGateParams,
+  PerpEditParams,
+  TokenEditParams,
+  buildIxGate,
+} from './clientIxParamBuilder';
 import { OPENBOOK_PROGRAM_ID } from './constants';
 import { Id } from './ids';
 import { IDL, MangoV4 } from './mango_v4';
@@ -134,7 +139,7 @@ export class MangoClient {
     securityAdmin?: PublicKey,
     testing?: number,
     version?: number,
-    depositLimitQuote?: number,
+    depositLimitQuote?: BN,
   ): Promise<TransactionSignature> {
     return await this.program.methods
       .groupEdit(
@@ -143,7 +148,7 @@ export class MangoClient {
         securityAdmin ?? null,
         testing ?? null,
         version ?? null,
-        depositLimitQuote !== undefined ? new BN(depositLimitQuote) : null,
+        depositLimitQuote !== undefined ? depositLimitQuote : null,
       )
       .accounts({
         group: group.publicKey,
@@ -152,12 +157,12 @@ export class MangoClient {
       .rpc();
   }
 
-  public async groupToggleHalt(
+  public async ixGateSet(
     group: Group,
-    halt: boolean,
+    ixGateParams: IxGateParams,
   ): Promise<TransactionSignature> {
     return await this.program.methods
-      .groupToggleHalt(halt)
+      .ixGateSet(buildIxGate(ixGateParams))
       .accounts({
         group: group.publicKey,
         admin: (this.program.provider as AnchorProvider).wallet.publicKey,
@@ -1922,6 +1927,9 @@ export class MangoClient {
       .rpc();
   }
 
+  // perpPlaceOrder ix returns an optional, custom order id,
+  // but, since we use a customer tx sender, this method
+  // doesn't return it
   public async perpPlaceOrder(
     group: Group,
     mangoAccount: MangoAccount,

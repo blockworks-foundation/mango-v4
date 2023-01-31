@@ -89,6 +89,8 @@ pub enum MangoError {
     HasOpenPerpTakerFills,
     #[msg("deposit crosses the current group deposit limit")]
     DepositLimit,
+    #[msg("instruction is disabled")]
+    IxIsDisabled,
     #[msg("no liquidatable perp base position")]
     NoLiquidatablePerpBasePosition,
 }

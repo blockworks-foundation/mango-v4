@@ -13,7 +13,7 @@ use crate::logs::{emit_perp_balances, PerpLiqBaseOrPositivePnlLog};
 #[derive(Accounts)]
 pub struct PerpLiqBaseOrPositivePnl<'info> {
     #[account(
-        constraint = group.load()?.is_operational() @ MangoError::GroupIsHalted
+        constraint = group.load()?.is_ix_enabled(IxGate::PerpLiqBaseOrPositivePnl) @ MangoError::IxIsDisabled
     )]
     pub group: AccountLoader<'info, Group>,
 

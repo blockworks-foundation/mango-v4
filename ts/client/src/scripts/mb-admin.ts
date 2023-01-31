@@ -24,7 +24,10 @@ import {
 } from '../accounts/serum3';
 import { Builder } from '../builder';
 import { MangoClient } from '../client';
-import { NullPerpEditParams } from '../clientIxParamBuilder';
+import {
+  NullPerpEditParams,
+  NullTokenEditParams,
+} from '../clientIxParamBuilder';
 import { MANGO_V4_ID, OPENBOOK_PROGRAM_ID } from '../constants';
 import { buildVersionedTx, toNative } from '../utils';
 
@@ -47,8 +50,8 @@ const MAINNET_ORACLES = new Map([
   ['ETH', 'JBu1AL4obBcCMqKBBxhpWCNUt136ijcuMZLFvTP7iWdB'],
   ['SOL', 'H6ARHf6YXhGYeQfUzQNGk6rDNnLBQKrenN712K4AQJEG'],
   ['MSOL', 'E4v1BBgoso9s64TQvmyownAVJbhbEPGyzA3qn4n46qj9'],
-  ['MNGO', '79wm3jjcPr6RaNQ4DGvP5KxG1mNd3gEBsg6FsNVFezK4'], // pyth
-  // ['MNGO', '5xUoyPG9PeowJvfai5jD985LiRvo58isaHrmmcBohi3Y'], // switchboard
+  // ['MNGO', '79wm3jjcPr6RaNQ4DGvP5KxG1mNd3gEBsg6FsNVFezK4'], // pyth
+  ['MNGO', '5xUoyPG9PeowJvfai5jD985LiRvo58isaHrmmcBohi3Y'], // switchboard
   ['BTC', 'GVXRSBjFk6e6J3NbVPXohDJetcTjaeeuykUpbQF8UoMU'],
   ['BONK', '4SZ1qb4MtSUrZcoeaeQ3BDzVCyqxw3VwSFpPiMTmn4GE'],
 ]);
@@ -58,11 +61,7 @@ const MAINNET_SERUM3_MARKETS = new Map([
   ['SOL/USDC', '8BnEgHoWFysVcuFFX7QztDmzuH8r5ZFvyP3sYwn1XTh6'],
 ]);
 
-const {
-  MB_CLUSTER_URL,
-  MB_PAYER_KEYPAIR,
-  MB_PAYER3_KEYPAIR: MB_PAYER2_KEYPAIR,
-} = process.env;
+const { MB_CLUSTER_URL, MB_PAYER_KEYPAIR, MB_PAYER3_KEYPAIR } = process.env;
 
 const MIN_VAULT_TO_DEPOSITS_RATIO = 0.2;
 const NET_BORROWS_WINDOW_SIZE_TS = 24 * 60 * 60;
@@ -84,7 +83,7 @@ const defaultInterestRate = {
 
 async function buildAdminClient(): Promise<[MangoClient, Keypair, Keypair]> {
   const admin = Keypair.fromSecretKey(
-    Buffer.from(JSON.parse(fs.readFileSync(MB_PAYER2_KEYPAIR!, 'utf-8'))),
+    Buffer.from(JSON.parse(fs.readFileSync(MB_PAYER3_KEYPAIR!, 'utf-8'))),
   );
 
   const options = AnchorProvider.defaultOptions();
@@ -162,6 +161,26 @@ async function changeAdmin() {
     new PublicKey('DSiGNQaKhFCSZbg4HczqCtPAPb1xV51c9GfbfqcVKTB4'),
     new PublicKey('DSiGNQaKhFCSZbg4HczqCtPAPb1xV51c9GfbfqcVKTB4'),
     new PublicKey('DSiGNQaKhFCSZbg4HczqCtPAPb1xV51c9GfbfqcVKTB4'),
+  );
+}
+
+async function setDepositLimit() {
+  const result = await buildAdminClient();
+  const client = result[0];
+  const admin = result[1];
+  const creator = result[2];
+
+  const group = await client.getGroupForCreator(creator.publicKey, GROUP_NUM);
+
+  console.log(`Setting a deposit limit...`);
+  await client.groupEdit(
+    group,
+    new PublicKey('DSiGNQaKhFCSZbg4HczqCtPAPb1xV51c9GfbfqcVKTB4'),
+    new PublicKey('DSiGNQaKhFCSZbg4HczqCtPAPb1xV51c9GfbfqcVKTB4'),
+    new PublicKey('DSiGNQaKhFCSZbg4HczqCtPAPb1xV51c9GfbfqcVKTB4'),
+    undefined,
+    undefined,
+    toNative(200, 6),
   );
 }
 
@@ -449,7 +468,7 @@ async function registerPerpMarkets() {
     group,
     new PublicKey(MAINNET_ORACLES.get('MNGO')!),
     1,
-    'MNGO-PERP',
+    'MNGO-PERP-OLD',
     defaultOracleConfig,
     6,
     100, // 0.0001$ is the min tick
@@ -478,6 +497,25 @@ async function registerPerpMarkets() {
   );
 }
 
+async function changeTokenOracle() {
+  const result = await buildAdminClient();
+  const client = result[0];
+  const admin = result[1];
+  const creator = result[2];
+
+  const group = await client.getGroupForCreator(creator.publicKey, GROUP_NUM);
+  const bank = group.getFirstBankByMint(
+    new PublicKey(MAINNET_MINTS.get('MNGO')!),
+  );
+  await client.tokenEdit(
+    group,
+    bank.mint,
+    Builder(NullTokenEditParams)
+      .oracle(new PublicKey(MAINNET_ORACLES.get('MNGO')!))
+      .build(),
+  );
+}
+
 async function makePerpMarketReduceOnly() {
   const result = await buildAdminClient();
   const client = result[0];
@@ -485,7 +523,7 @@ async function makePerpMarketReduceOnly() {
   const creator = result[2];
 
   const group = await client.getGroupForCreator(creator.publicKey, GROUP_NUM);
-  const perpMarket = group.getPerpMarketByName('MNGO-PERP');
+  const perpMarket = group.getPerpMarketByName('MNGO-PERP-OLD');
   await client.perpEditMarket(
     group,
     perpMarket.perpMarketIndex,
@@ -636,11 +674,13 @@ async function main() {
   try {
     // await createGroup();
     // await changeAdmin();
+    // await setDepositLimit();
   } catch (error) {
     console.log(error);
   }
   try {
     // await registerTokens();
+    // await changeTokenOracle();
   } catch (error) {
     console.log(error);
   }

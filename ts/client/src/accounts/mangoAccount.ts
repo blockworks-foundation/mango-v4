@@ -155,6 +155,12 @@ export class MangoAccount {
     );
   }
 
+  public perpOrderExistsForMarket(perpMarket: PerpMarket): boolean {
+    return this.perpOpenOrders.some(
+      (poo) => poo.isActive() && poo.orderMarket == perpMarket.perpMarketIndex,
+    );
+  }
+
   public perpActive(): PerpPosition[] {
     return this.perps.filter((perp) => perp.isActive());
   }
@@ -1526,15 +1532,19 @@ export class PerpOo {
 
   constructor(
     public sideAndTree: any,
-    public orderMarket: 0,
+    public orderMarket: number,
     public clientId: BN,
     public id: BN,
   ) {}
+
+  isActive(): boolean {
+    return this.orderMarket !== PerpOo.OrderMarketUnset;
+  }
 }
 export class PerpOoDto {
   constructor(
     public sideAndTree: any,
-    public market: 0,
+    public market: number,
     public clientId: BN,
     public id: BN,
   ) {}

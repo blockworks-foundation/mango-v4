@@ -1,13 +1,4 @@
-#![cfg(all(feature = "test-bpf"))]
-
-use fixed::types::I80F48;
-use mango_setup::*;
-use mango_v4::{error::MangoError, state::*};
-use program_test::*;
-use solana_program_test::*;
-use solana_sdk::transport::TransportError;
-
-mod program_test;
+use super::*;
 
 #[tokio::test]
 async fn test_perp_settle_fees() -> Result<(), TransportError> {

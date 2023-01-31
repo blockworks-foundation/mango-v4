@@ -1,18 +1,6 @@
-#![cfg(feature = "test-bpf")]
-#![allow(dead_code)]
+use super::*;
 
-use solana_program_test::*;
-use solana_sdk::{pubkey::Pubkey, transport::TransportError};
-
-use mango_v4::instructions::{
-    OpenOrdersSlim, Serum3OrderType, Serum3SelfTradeBehavior, Serum3Side,
-};
-use mango_v4::state::Serum3Orders;
-use program_test::*;
-
-mod program_test;
-
-use mango_setup::*;
+use mango_v4::instructions::{Serum3OrderType, Serum3SelfTradeBehavior, Serum3Side};
 use std::sync::Arc;
 
 struct SerumOrderPlacer {
@@ -138,10 +126,6 @@ impl SerumOrderPlacer {
             .find(|s| s.open_orders == self.open_orders)
             .unwrap();
         orders.clone()
-    }
-
-    async fn open_orders(&self) -> OpenOrdersSlim {
-        OpenOrdersSlim::from_oo(&self.serum.load_open_orders(self.open_orders).await)
     }
 }
 

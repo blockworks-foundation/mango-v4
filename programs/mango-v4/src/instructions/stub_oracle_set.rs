@@ -7,7 +7,7 @@ use crate::{error::MangoError, state::*};
 pub struct StubOracleSet<'info> {
     #[account(
         has_one = admin,
-        constraint = group.load()?.is_operational() @ MangoError::GroupIsHalted
+        constraint = group.load()?.is_ix_enabled(IxGate::StubOracleSet) @ MangoError::IxIsDisabled,
     )]
     pub group: AccountLoader<'info, Group>,
 

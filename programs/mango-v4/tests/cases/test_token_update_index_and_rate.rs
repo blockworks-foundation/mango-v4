@@ -1,14 +1,4 @@
-#![cfg(feature = "test-bpf")]
-
-use mango_v4::state::*;
-use solana_program_test::*;
-use solana_sdk::transport::TransportError;
-
-use mango_setup::*;
-use program_test::*;
-use utils::assert_equal_fixed_f64 as assert_equal;
-
-mod program_test;
+use super::*;
 
 #[tokio::test]
 async fn test_token_update_index_and_rate() -> Result<(), TransportError> {

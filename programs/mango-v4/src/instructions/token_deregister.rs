@@ -10,7 +10,7 @@ use anchor_lang::AccountsClose;
 pub struct TokenDeregister<'info> {
     #[account(
         has_one = admin,
-        constraint = group.load()?.is_operational() @ MangoError::GroupIsHalted,
+        constraint = group.load()?.is_ix_enabled(IxGate::TokenDeregister) @ MangoError::IxIsDisabled,
         constraint = group.load()?.is_testing(),
     )]
     pub group: AccountLoader<'info, Group>,

@@ -61,14 +61,23 @@ pub fn perp_edit_market(
     let mut require_group_admin = false;
 
     if let Some(oracle_config) = oracle_config_opt {
+        msg!(
+        "Oracle config: old - conf_filter {:?}, max_staleness_slots {:?},  new - conf_filter {:?}, max_staleness_slots {:?}",
+        perp_market.oracle_config.conf_filter,
+        perp_market.oracle_config.max_staleness_slots,
+        oracle_config.conf_filter,
+        oracle_config.max_staleness_slots
+    );
         perp_market.oracle_config = oracle_config.to_oracle_config();
         require_group_admin = true;
     };
     if let Some(oracle) = oracle_opt {
+        msg!("Oracle: old - {:?}, new - {:?}", perp_market.oracle, oracle);
         perp_market.oracle = oracle;
         require_group_admin = true;
     }
     if reset_stable_price {
+        msg!("Stable price reset");
         require_keys_eq!(perp_market.oracle, ctx.accounts.oracle.key());
         let oracle_price = perp_market
             .oracle_price(&AccountInfoRef::borrow(ctx.accounts.oracle.as_ref())?, None)?;
@@ -80,10 +89,20 @@ pub fn perp_edit_market(
     }
 
     if let Some(maint_base_asset_weight) = maint_base_asset_weight_opt {
+        msg!(
+            "Maint base asset weight: old - {:?}, new - {:?}",
+            perp_market.maint_base_asset_weight,
+            maint_base_asset_weight
+        );
         perp_market.maint_base_asset_weight = I80F48::from_num(maint_base_asset_weight);
         require_group_admin = true;
     }
     if let Some(init_base_asset_weight) = init_base_asset_weight_opt {
+        msg!(
+            "Init base asset weight: old - {:?}, new - {:?}",
+            perp_market.init_base_asset_weight,
+            init_base_asset_weight
+        );
         require_gte!(
             init_base_asset_weight,
             0.0,
@@ -99,99 +118,209 @@ pub fn perp_edit_market(
         }
     }
     if let Some(maint_base_liab_weight) = maint_base_liab_weight_opt {
+        msg!(
+            "Maint base liab weight: old - {:?}, new - {:?}",
+            perp_market.maint_base_liab_weight,
+            maint_base_liab_weight
+        );
         perp_market.maint_base_liab_weight = I80F48::from_num(maint_base_liab_weight);
         require_group_admin = true;
     }
     if let Some(init_base_liab_weight) = init_base_liab_weight_opt {
+        msg!(
+            "Init base liab weight: old - {:?}, new - {:?}",
+            perp_market.init_base_liab_weight,
+            init_base_liab_weight
+        );
         perp_market.init_base_liab_weight = I80F48::from_num(init_base_liab_weight);
         require_group_admin = true;
     }
     if let Some(maint_pnl_asset_weight) = maint_pnl_asset_weight_opt {
+        msg!(
+            "Maint pnl asset weight: old - {:?}, new - {:?}",
+            perp_market.maint_pnl_asset_weight,
+            maint_pnl_asset_weight
+        );
         perp_market.maint_pnl_asset_weight = I80F48::from_num(maint_pnl_asset_weight);
         require_group_admin = true;
     }
     if let Some(init_pnl_asset_weight) = init_pnl_asset_weight_opt {
+        msg!(
+            "Init pnl asset weight: old - {:?}, new - {:?}",
+            perp_market.init_pnl_asset_weight,
+            init_pnl_asset_weight
+        );
         perp_market.init_pnl_asset_weight = I80F48::from_num(init_pnl_asset_weight);
         require_group_admin = true;
     }
     if let Some(base_liquidation_fee) = base_liquidation_fee_opt {
+        msg!(
+            "Base liquidation fee: old - {:?}, new - {:?}",
+            perp_market.base_liquidation_fee,
+            base_liquidation_fee
+        );
         perp_market.base_liquidation_fee = I80F48::from_num(base_liquidation_fee);
         require_group_admin = true;
     }
 
     if let Some(maker_fee) = maker_fee_opt {
+        msg!(
+            "Maker fee: old - {:?}, new - {:?}",
+            perp_market.maker_fee,
+            maker_fee
+        );
         perp_market.maker_fee = I80F48::from_num(maker_fee);
         require_group_admin = true;
     }
     if let Some(taker_fee) = taker_fee_opt {
+        msg!(
+            "Taker fee: old - {:?}, new - {:?}",
+            perp_market.taker_fee,
+            taker_fee
+        );
         perp_market.taker_fee = I80F48::from_num(taker_fee);
         require_group_admin = true;
     }
 
     if let Some(min_funding) = min_funding_opt {
+        msg!(
+            "Min funding: old - {:?}, new - {:?}",
+            perp_market.min_funding,
+            min_funding
+        );
         perp_market.min_funding = I80F48::from_num(min_funding);
         require_group_admin = true;
     }
     if let Some(max_funding) = max_funding_opt {
+        msg!(
+            "Max funding: old - {:?}, new - {:?}",
+            perp_market.max_funding,
+            max_funding
+        );
         perp_market.max_funding = I80F48::from_num(max_funding);
         require_group_admin = true;
     }
     if let Some(impact_quantity) = impact_quantity_opt {
+        msg!(
+            "Impact quantity: old - {:?}, new - {:?}",
+            perp_market.impact_quantity,
+            impact_quantity
+        );
         perp_market.impact_quantity = impact_quantity;
         require_group_admin = true;
     }
     if let Some(fee_penalty) = fee_penalty_opt {
+        msg!(
+            "Fee penalty: old - {:?}, new - {:?}",
+            perp_market.fee_penalty,
+            fee_penalty
+        );
         perp_market.fee_penalty = fee_penalty;
         require_group_admin = true;
     }
 
     if let Some(base_decimals) = base_decimals_opt {
+        msg!(
+            "Base decimals: old - {:?}, new - {:?}",
+            perp_market.base_decimals,
+            base_decimals
+        );
         perp_market.base_decimals = base_decimals;
         require_group_admin = true;
     }
 
     if let Some(group_insurance_fund) = group_insurance_fund_opt {
+        msg!(
+            "Group insurance fund: old - {:?}, new - {:?}",
+            perp_market.group_insurance_fund,
+            group_insurance_fund
+        );
         perp_market.set_elligible_for_group_insurance_fund(group_insurance_fund);
         require_group_admin = true;
     }
 
     if let Some(settle_fee_flat) = settle_fee_flat_opt {
+        msg!(
+            "Settle fee flat: old - {:?}, new - {:?}",
+            perp_market.settle_fee_flat,
+            settle_fee_flat
+        );
         perp_market.settle_fee_flat = settle_fee_flat;
         require_group_admin = true;
     }
     if let Some(settle_fee_amount_threshold) = settle_fee_amount_threshold_opt {
+        msg!(
+            "Settle fee amount threshold: old - {:?}, new - {:?}",
+            perp_market.settle_fee_amount_threshold,
+            settle_fee_amount_threshold
+        );
         perp_market.settle_fee_amount_threshold = settle_fee_amount_threshold;
         require_group_admin = true;
     }
     if let Some(settle_fee_fraction_low_health) = settle_fee_fraction_low_health_opt {
+        msg!(
+            "Settle fee fraction low health: old - {:?}, new - {:?}",
+            perp_market.settle_fee_fraction_low_health,
+            settle_fee_fraction_low_health
+        );
         perp_market.settle_fee_fraction_low_health = settle_fee_fraction_low_health;
         require_group_admin = true;
     }
 
     if let Some(stable_price_delay_interval_seconds) = stable_price_delay_interval_seconds_opt {
         // Updating this makes the old delay values slightly inconsistent
+        msg!(
+            "Stable price delay interval seconds: old - {:?}, new - {:?}",
+            perp_market.stable_price_model.delay_interval_seconds,
+            stable_price_delay_interval_seconds
+        );
         perp_market.stable_price_model.delay_interval_seconds = stable_price_delay_interval_seconds;
         require_group_admin = true;
     }
     if let Some(stable_price_delay_growth_limit) = stable_price_delay_growth_limit_opt {
+        msg!(
+            "Stable price delay growth limit: old - {:?}, new - {:?}",
+            perp_market.stable_price_model.delay_growth_limit,
+            stable_price_delay_growth_limit
+        );
         perp_market.stable_price_model.delay_growth_limit = stable_price_delay_growth_limit;
         require_group_admin = true;
     }
     if let Some(stable_price_growth_limit) = stable_price_growth_limit_opt {
+        msg!(
+            "Stable price growth limit: old - {:?}, new - {:?}",
+            perp_market.stable_price_model.stable_growth_limit,
+            stable_price_growth_limit
+        );
         perp_market.stable_price_model.stable_growth_limit = stable_price_growth_limit;
         require_group_admin = true;
     }
 
-    if let Some(settle_pnl_limit_factor_opt) = settle_pnl_limit_factor_opt {
-        perp_market.settle_pnl_limit_factor = settle_pnl_limit_factor_opt;
+    if let Some(settle_pnl_limit_factor) = settle_pnl_limit_factor_opt {
+        msg!(
+            "Settle pnl limit factor: old - {:?}, new - {:?}",
+            perp_market.settle_pnl_limit_factor,
+            settle_pnl_limit_factor
+        );
+        perp_market.settle_pnl_limit_factor = settle_pnl_limit_factor;
         require_group_admin = true;
     }
     if let Some(settle_pnl_limit_window_size_ts) = settle_pnl_limit_window_size_ts_opt {
+        msg!(
+            "Settle pnl limit window size ts: old - {:?}, new - {:?}",
+            perp_market.settle_pnl_limit_window_size_ts,
+            settle_pnl_limit_window_size_ts
+        );
         perp_market.settle_pnl_limit_window_size_ts = settle_pnl_limit_window_size_ts;
         require_group_admin = true;
     }
 
     if let Some(reduce_only) = reduce_only_opt {
+        msg!(
+            "Reduce only: old - {:?}, new - {:?}",
+            perp_market.reduce_only,
+            u8::from(reduce_only)
+        );
         perp_market.reduce_only = u8::from(reduce_only);
 
         // security admin can only enable reduce_only
@@ -201,6 +330,11 @@ pub fn perp_edit_market(
     };
 
     if let Some(positive_pnl_liquidation_fee) = positive_pnl_liquidation_fee_opt {
+        msg!(
+            "Positive pnl liquidation fee: old - {:?}, new - {:?}",
+            perp_market.positive_pnl_liquidation_fee,
+            positive_pnl_liquidation_fee
+        );
         perp_market.positive_pnl_liquidation_fee = I80F48::from_num(positive_pnl_liquidation_fee);
         require_group_admin = true;
     }

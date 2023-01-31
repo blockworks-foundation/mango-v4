@@ -1,15 +1,4 @@
-#![cfg(feature = "test-bpf")]
-
-use fixed::types::I80F48;
-use mango_v4::state::*;
-use solana_program_test::*;
-use solana_sdk::transport::TransportError;
-
-use program_test::*;
-
-use mango_setup::*;
-
-mod program_test;
+use super::*;
 
 // Try to reach compute limits in health checks by having many different tokens in an account
 #[tokio::test]

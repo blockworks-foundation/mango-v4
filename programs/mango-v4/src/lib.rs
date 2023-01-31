@@ -61,8 +61,8 @@ pub mod mango_v4 {
         )
     }
 
-    pub fn group_toggle_halt(ctx: Context<GroupToggleHalt>, halted: bool) -> Result<()> {
-        instructions::group_toggle_halt(ctx, halted)
+    pub fn ix_gate_set(ctx: Context<IxGateSet>, ix_gate: u128) -> Result<()> {
+        instructions::ix_gate_set(ctx, ix_gate)
     }
 
     pub fn group_close(ctx: Context<GroupClose>) -> Result<()> {
@@ -596,7 +596,7 @@ pub mod mango_v4 {
         // Use this to limit compute used during order matching.
         // When the limit is reached, processing stops and the instruction succeeds.
         limit: u8,
-    ) -> Result<()> {
+    ) -> Result<Option<u128>> {
         require_gte!(price_lots, 0);
 
         use crate::state::{Order, OrderParams};
@@ -604,7 +604,7 @@ pub mod mango_v4 {
             Some(t) => t,
             None => {
                 msg!("Order is already expired");
-                return Ok(());
+                return Ok(None);
             }
         };
         let order = Order {
@@ -664,7 +664,7 @@ pub mod mango_v4 {
         //
         // WARNING: Not currently implemented.
         max_oracle_staleness_slots: i32,
-    ) -> Result<()> {
+    ) -> Result<Option<u128>> {
         require_gte!(peg_limit, -1);
         require_eq!(max_oracle_staleness_slots, -1); // unimplemented
 
@@ -673,7 +673,7 @@ pub mod mango_v4 {
             Some(t) => t,
             None => {
                 msg!("Order is already expired");
-                return Ok(());
+                return Ok(None);
             }
         };
         let order = Order {

@@ -1,13 +1,4 @@
-#![cfg(feature = "test-bpf")]
-
-use fixed::types::I80F48;
-use solana_program_test::*;
-use solana_sdk::transport::TransportError;
-
-use mango_v4::state::*;
-use program_test::*;
-
-mod program_test;
+use super::*;
 
 // This is an unspecific happy-case test that just runs a few instructions to check
 // that they work in principle. It should be split up / renamed.
