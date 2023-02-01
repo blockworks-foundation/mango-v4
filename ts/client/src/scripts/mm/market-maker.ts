@@ -11,7 +11,7 @@ import fs from 'fs';
 import { Kraken } from 'node-kraken-api';
 import path from 'path';
 import { Group } from '../../accounts/group';
-import { MangoAccount } from '../../accounts/mangoAccount';
+import { HealthType, MangoAccount } from '../../accounts/mangoAccount';
 import {
   BookSide,
   PerpMarket,
@@ -326,7 +326,7 @@ async function fullMarketMaker() {
   // Loop indefinitely
   while (control.isRunning) {
     try {
-      console.log(`Refreshing state`);
+      console.log(`\nRefreshing state`);
       refreshState(client, group, mangoAccount, marketContexts).then(
         (result) => (state = result),
       );
@@ -429,6 +429,11 @@ async function makeMarketUpdateInstructions(
 
   const basePos = mangoAccount.perpPositionExistsForMarket(mc.perpMarket)
     ? mangoAccount.getPerpPositionUi(group, perpMarketIndex, true)
+    : 0;
+  const unsettledPnl = mangoAccount.perpPositionExistsForMarket(mc.perpMarket)
+    ? mangoAccount
+        .getPerpPosition(perpMarketIndex)!
+        .getUnsettledPnlUi(group, perpMarket)
     : 0;
   const lean = (-leanCoeff * basePos) / size;
   const pfQuoteLeanCoeff = params.pfQuoteLeanCoeff || 0.001; // How much to move if pf pos is equal to equity
@@ -655,7 +660,7 @@ async function makeMarketUpdateInstructions(
       }
 
       console.log(
-        `Requoting for market ${mc.perpMarket.name} sentBid: ${
+        `\nRequoting for market ${mc.perpMarket.name} sentBid: ${
           mc.sentBidPrice
         } newBid: ${bookAdjBid} sentAsk: ${
           mc.sentAskPrice
@@ -663,6 +668,21 @@ async function makeMarketUpdateInstructions(
           1,
         )} aggBid: ${aggBid} addAsk: ${aggAsk}`,
       );
+
+      console.log(
+        `Health ratio ${mangoAccount
+          .getHealthRatio(group, HealthType.maint)
+          .toFixed(3)}, maint health ${toUiDecimalsForQuote(
+          mangoAccount.getHealth(group, HealthType.maint),
+        ).toFixed(3)}, account equity ${equity.toFixed(
+          3,
+        )}, base position ${Math.abs(basePos).toFixed(3)} ${
+          basePos >= 0 ? 'LONG' : 'SHORT'
+        }, notional ${Math.abs(basePos * perpMarket.uiPrice).toFixed(
+          3,
+        )}, unsettled Pnl ${unsettledPnl.toFixed(3)}`,
+      );
+
       mc.sentBidPrice = bookAdjBid.toNumber();
       mc.sentAskPrice = bookAdjAsk.toNumber();
       mc.lastOrderUpdate = Date.now() / 1000;
