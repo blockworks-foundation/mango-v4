@@ -84,12 +84,6 @@ pub fn perp_liq_quote_and_bankruptcy(
 ) -> Result<()> {
     let mango_group = ctx.accounts.group.key();
 
-    // Cannot settle with yourself
-    require!(
-        ctx.accounts.liqor.key() != ctx.accounts.liqee.key(),
-        MangoError::SomeError
-    );
-
     let (perp_market_index, settle_token_index) = {
         let perp_market = ctx.accounts.perp_market.load()?;
         (
@@ -98,6 +92,7 @@ pub fn perp_liq_quote_and_bankruptcy(
         )
     };
 
+    require_keys_neq!(ctx.accounts.liqor.key(), ctx.accounts.liqee.key());
     let mut liqee = ctx.accounts.liqee.load_full_mut()?;
     let mut liqor = ctx.accounts.liqor.load_full_mut()?;
     // account constraint #1
