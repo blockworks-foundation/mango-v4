@@ -155,11 +155,6 @@ pub fn perp_liq_base_or_positive_pnl(
             max_quote_transfer,
         )?;
 
-    // Skip out if this instruction had nothing to do
-    if base_transfer == 0 && pnl_transfer == 0 {
-        return Ok(());
-    }
-
     //
     // Wrap up
     //
@@ -204,17 +199,19 @@ pub fn perp_liq_base_or_positive_pnl(
         });
     }
 
-    emit!(PerpLiqBaseOrPositivePnlLog {
-        mango_group: ctx.accounts.group.key(),
-        perp_market_index: perp_market.perp_market_index,
-        liqor: ctx.accounts.liqor.key(),
-        liqee: ctx.accounts.liqee.key(),
-        base_transfer,
-        quote_transfer: quote_transfer.to_bits(),
-        pnl_transfer: pnl_transfer.to_bits(),
-        pnl_settle_limit_transfer: pnl_settle_limit_transfer.to_bits(),
-        price: oracle_price.to_bits(),
-    });
+    if base_transfer != 0 || pnl_transfer != 0 {
+        emit!(PerpLiqBaseOrPositivePnlLog {
+            mango_group: ctx.accounts.group.key(),
+            perp_market_index: perp_market.perp_market_index,
+            liqor: ctx.accounts.liqor.key(),
+            liqee: ctx.accounts.liqee.key(),
+            base_transfer,
+            quote_transfer: quote_transfer.to_bits(),
+            pnl_transfer: pnl_transfer.to_bits(),
+            pnl_settle_limit_transfer: pnl_settle_limit_transfer.to_bits(),
+            price: oracle_price.to_bits(),
+        });
+    }
 
     // Check liqee health again
     let liqee_init_health_after = liqee_health_cache.health(HealthType::Init);
@@ -505,7 +502,12 @@ pub(crate) fn liquidation_action(
             )?;
             liqee_health_cache.adjust_token_balance(&settle_bank, token_transfer)?;
         }
-        msg!("pnl: {}, quote = {}", pnl_transfer, token_transfer);
+        msg!(
+            "pnl {} was transferred to liqor for quote {} with settle limit {}",
+            pnl_transfer,
+            token_transfer,
+            limit_transfer
+        );
 
         (pnl_transfer, limit_transfer)
     } else {
