@@ -8,7 +8,7 @@ use crate::error::*;
 use crate::health::*;
 use crate::state::*;
 
-use crate::logs::{emit_perp_balances, PerpLiqBaseOrPositivePnlLog};
+use crate::logs::{emit_perp_balances, PerpLiqBaseOrPositivePnlLog, TokenBalanceLog};
 
 #[derive(Accounts)]
 pub struct PerpLiqBaseOrPositivePnl<'info> {
@@ -142,20 +142,21 @@ pub fn perp_liq_base_or_positive_pnl(
     //
     // Perform the liquidation
     //
-    let (base_transfer, quote_transfer, settlement) = liquidation_action(
-        &mut perp_market,
-        &mut settle_bank,
-        &mut liqor.borrow_mut(),
-        &mut liqee.borrow_mut(),
-        &mut liqee_health_cache,
-        liqee_init_health,
-        now_ts,
-        max_base_transfer,
-        max_quote_transfer,
-    )?;
+    let (base_transfer, quote_transfer, pnl_transfer, pnl_settle_limit_transfer) =
+        liquidation_action(
+            &mut perp_market,
+            &mut settle_bank,
+            &mut liqor.borrow_mut(),
+            &mut liqee.borrow_mut(),
+            &mut liqee_health_cache,
+            liqee_init_health,
+            now_ts,
+            max_base_transfer,
+            max_quote_transfer,
+        )?;
 
     // Skip out if this instruction had nothing to do
-    if base_transfer == 0 && settlement == 0 {
+    if base_transfer == 0 && pnl_transfer == 0 {
         return Ok(());
     }
 
@@ -180,6 +181,29 @@ pub fn perp_liq_base_or_positive_pnl(
         &perp_market,
     );
 
+    if pnl_transfer != 0 {
+        let liqee_token_position = liqee.token_position(settle_token_index)?;
+        let liqor_token_position = liqor.token_position(settle_token_index)?;
+
+        emit!(TokenBalanceLog {
+            mango_group: ctx.accounts.group.key(),
+            mango_account: ctx.accounts.liqee.key(),
+            token_index: settle_token_index,
+            indexed_position: liqee_token_position.indexed_position.to_bits(),
+            deposit_index: settle_bank.deposit_index.to_bits(),
+            borrow_index: settle_bank.borrow_index.to_bits(),
+        });
+
+        emit!(TokenBalanceLog {
+            mango_group: ctx.accounts.group.key(),
+            mango_account: ctx.accounts.liqor.key(),
+            token_index: settle_token_index,
+            indexed_position: liqor_token_position.indexed_position.to_bits(),
+            deposit_index: settle_bank.deposit_index.to_bits(),
+            borrow_index: settle_bank.borrow_index.to_bits(),
+        });
+    }
+
     emit!(PerpLiqBaseOrPositivePnlLog {
         mango_group: ctx.accounts.group.key(),
         perp_market_index: perp_market.perp_market_index,
@@ -187,6 +211,8 @@ pub fn perp_liq_base_or_positive_pnl(
         liqee: ctx.accounts.liqee.key(),
         base_transfer,
         quote_transfer: quote_transfer.to_bits(),
+        pnl_transfer: pnl_transfer.to_bits(),
+        pnl_settle_limit_transfer: pnl_settle_limit_transfer.to_bits(),
         price: oracle_price.to_bits(),
     });
 
@@ -227,7 +253,7 @@ pub(crate) fn liquidation_action(
     now_ts: u64,
     max_base_transfer: i64,
     max_quote_transfer: u64,
-) -> Result<(i64, I80F48, I80F48)> {
+) -> Result<(i64, I80F48, I80F48, I80F48)> {
     let perp_market_index = perp_market.perp_market_index;
     let settle_token_index = perp_market.settle_token_index;
 
@@ -420,11 +446,11 @@ pub(crate) fn liquidation_action(
         perp_info.weigh_health_contribution(current_unweighted_perp_health, HealthType::Init);
     let current_actual_health =
         cm!(liqee_init_health - initial_weighted_perp_health + final_weighted_perp_health);
-    let settle_possible =
+    let pnl_transfer_possible =
         current_actual_health < 0 && current_unweighted_perp_health > 0 && max_settle > 0;
-    let settlement = if settle_possible {
-        let health_per_settle = cm!(spot_gain_per_settled - perp_market.init_pnl_asset_weight);
-        let settle_for_zero = cm!(-current_actual_health / health_per_settle)
+    let (pnl_transfer, limit_transfer) = if pnl_transfer_possible {
+        let health_per_transfer = cm!(spot_gain_per_settled - perp_market.init_pnl_asset_weight);
+        let transfer_for_zero = cm!(-current_actual_health / health_per_transfer)
             .checked_ceil()
             .unwrap();
         let liqee_pnl = liqee_perp_position.unsettled_pnl(&perp_market, oracle_price)?;
@@ -436,26 +462,26 @@ pub(crate) fn liquidation_action(
         // base position to zero and would need to deal with that in bankruptcy. Also, the settle
         // limit changes with the base position price, so it'd be hard to say when this liquidation
         // step is done.
-        let settlement = liqee_pnl
+        let pnl_transfer = liqee_pnl
             .min(max_settle)
-            .min(settle_for_zero)
+            .min(transfer_for_zero)
             .min(current_unweighted_perp_health)
             .max(I80F48::ZERO);
         let limit_transfer = {
             // take care, liqee_limit may be i64::MAX
             let liqee_limit: i128 = liqee_positive_settle_limit.into();
-            let settle = settlement.checked_floor().unwrap().to_num::<i128>();
+            let settle = pnl_transfer.checked_floor().unwrap().to_num::<i128>();
             let total = liqee_pnl.checked_ceil().unwrap().to_num::<i128>();
             let liqor_limit: i64 = cm!(liqee_limit * settle / total).try_into().unwrap();
-            I80F48::from(liqor_limit).min(settlement).max(I80F48::ONE)
+            I80F48::from(liqor_limit).min(pnl_transfer).max(I80F48::ONE)
         };
 
         // The liqor pays less than the full amount to receive the positive pnl
-        let token_transfer = cm!(settlement * spot_gain_per_settled);
+        let token_transfer = cm!(pnl_transfer * spot_gain_per_settled);
 
-        if settlement > 0 {
-            liqor_perp_position.record_liquidation_pnl_takeover(settlement, limit_transfer);
-            liqee_perp_position.record_settle(settlement);
+        if pnl_transfer > 0 {
+            liqor_perp_position.record_liquidation_pnl_takeover(pnl_transfer, limit_transfer);
+            liqee_perp_position.record_settle(pnl_transfer);
 
             // Update the accounts' perp_spot_transfer statistics.
             let transfer_i64 = token_transfer
@@ -479,17 +505,17 @@ pub(crate) fn liquidation_action(
             )?;
             liqee_health_cache.adjust_token_balance(&settle_bank, token_transfer)?;
         }
-        msg!("pnl: {}, quote = {}", settlement, token_transfer);
+        msg!("pnl: {}, quote = {}", pnl_transfer, token_transfer);
 
-        settlement
+        (pnl_transfer, limit_transfer)
     } else {
-        I80F48::ZERO
+        (I80F48::ZERO, I80F48::ZERO)
     };
 
     let liqee_perp_position = liqee.perp_position_mut(perp_market_index)?;
     liqee_health_cache.recompute_perp_info(liqee_perp_position, &perp_market)?;
 
-    Ok((base_transfer, quote_transfer, settlement))
+    Ok((base_transfer, quote_transfer, pnl_transfer, limit_transfer))
 }
 
 #[cfg(test)]

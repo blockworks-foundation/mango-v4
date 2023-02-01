@@ -276,6 +276,8 @@ pub struct PerpLiqBaseOrPositivePnlLog {
     pub liqee: Pubkey,
     pub base_transfer: i64,
     pub quote_transfer: i128,
+    pub pnl_transfer: i128,
+    pub pnl_settle_limit_transfer: i128,
     pub price: i128,
 }
 
