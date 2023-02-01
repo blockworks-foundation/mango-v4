@@ -3469,7 +3469,7 @@ export type MangoV4 = {
           "type": "i64"
         },
         {
-          "name": "maxQuoteTransfer",
+          "name": "maxPnlTransfer",
           "type": "u64"
         }
       ]
@@ -11647,7 +11647,7 @@ export const IDL: MangoV4 = {
           "type": "i64"
         },
         {
-          "name": "maxQuoteTransfer",
+          "name": "maxPnlTransfer",
           "type": "u64"
         }
       ]
