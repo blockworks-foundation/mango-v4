@@ -2539,11 +2539,11 @@ export type MangoV4 = {
           "type": "f32"
         },
         {
-          "name": "maintPnlAssetWeight",
+          "name": "maintOverallAssetWeight",
           "type": "f32"
         },
         {
-          "name": "initPnlAssetWeight",
+          "name": "initOverallAssetWeight",
           "type": "f32"
         },
         {
@@ -2678,13 +2678,13 @@ export type MangoV4 = {
           }
         },
         {
-          "name": "maintPnlAssetWeightOpt",
+          "name": "maintOverallAssetWeightOpt",
           "type": {
             "option": "f32"
           }
         },
         {
-          "name": "initPnlAssetWeightOpt",
+          "name": "initOverallAssetWeightOpt",
           "type": {
             "option": "f32"
           }
@@ -4722,7 +4722,7 @@ export type MangoV4 = {
             }
           },
           {
-            "name": "maintPnlAssetWeight",
+            "name": "maintOverallAssetWeight",
             "docs": [
               "Weights for full perp market health, if positive"
             ],
@@ -4731,7 +4731,7 @@ export type MangoV4 = {
             }
           },
           {
-            "name": "initPnlAssetWeight",
+            "name": "initOverallAssetWeight",
             "type": {
               "defined": "I80F48"
             }
@@ -5065,13 +5065,13 @@ export type MangoV4 = {
             }
           },
           {
-            "name": "maintPnlAssetWeight",
+            "name": "maintOverallAssetWeight",
             "type": {
               "defined": "I80F48"
             }
           },
           {
-            "name": "initPnlAssetWeight",
+            "name": "initOverallAssetWeight",
             "type": {
               "defined": "I80F48"
             }
@@ -10667,11 +10667,11 @@ export const IDL: MangoV4 = {
           "type": "f32"
         },
         {
-          "name": "maintPnlAssetWeight",
+          "name": "maintOverallAssetWeight",
           "type": "f32"
         },
         {
-          "name": "initPnlAssetWeight",
+          "name": "initOverallAssetWeight",
           "type": "f32"
         },
         {
@@ -10806,13 +10806,13 @@ export const IDL: MangoV4 = {
           }
         },
         {
-          "name": "maintPnlAssetWeightOpt",
+          "name": "maintOverallAssetWeightOpt",
           "type": {
             "option": "f32"
           }
         },
         {
-          "name": "initPnlAssetWeightOpt",
+          "name": "initOverallAssetWeightOpt",
           "type": {
             "option": "f32"
           }
@@ -12850,7 +12850,7 @@ export const IDL: MangoV4 = {
             }
           },
           {
-            "name": "maintPnlAssetWeight",
+            "name": "maintOverallAssetWeight",
             "docs": [
               "Weights for full perp market health, if positive"
             ],
@@ -12859,7 +12859,7 @@ export const IDL: MangoV4 = {
             }
           },
           {
-            "name": "initPnlAssetWeight",
+            "name": "initOverallAssetWeight",
             "type": {
               "defined": "I80F48"
             }
@@ -13193,13 +13193,13 @@ export const IDL: MangoV4 = {
             }
           },
           {
-            "name": "maintPnlAssetWeight",
+            "name": "maintOverallAssetWeight",
             "type": {
               "defined": "I80F48"
             }
           },
           {
-            "name": "initPnlAssetWeight",
+            "name": "initOverallAssetWeight",
             "type": {
               "defined": "I80F48"
             }

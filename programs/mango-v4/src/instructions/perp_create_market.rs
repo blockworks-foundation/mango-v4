@@ -60,8 +60,8 @@ pub fn perp_create_market(
     init_base_asset_weight: f32,
     maint_base_liab_weight: f32,
     init_base_liab_weight: f32,
-    maint_pnl_asset_weight: f32,
-    init_pnl_asset_weight: f32,
+    maint_overall_asset_weight: f32,
+    init_overall_asset_weight: f32,
     liquidation_fee: f32,
     maker_fee: f32,
     taker_fee: f32,
@@ -134,8 +134,8 @@ pub fn perp_create_market(
         settle_pnl_limit_window_size_ts,
         reduce_only: 0,
         padding4: Default::default(),
-        maint_pnl_asset_weight: I80F48::from_num(maint_pnl_asset_weight),
-        init_pnl_asset_weight: I80F48::from_num(init_pnl_asset_weight),
+        maint_overall_asset_weight: I80F48::from_num(maint_overall_asset_weight),
+        init_overall_asset_weight: I80F48::from_num(init_overall_asset_weight),
         reserved: [0; 1904],
     };
 
