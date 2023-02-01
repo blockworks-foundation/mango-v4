@@ -60,8 +60,8 @@ export interface PerpEditParams {
   initBaseAssetWeight: number | null;
   maintBaseLiabWeight: number | null;
   initBaseLiabWeight: number | null;
-  maintPnlAssetWeight: number | null;
-  initPnlAssetWeight: number | null;
+  maintOverallAssetWeight: number | null;
+  initOverallAssetWeight: number | null;
   liquidationFee: number | null;
   makerFee: number | null;
   takerFee: number | null;
@@ -90,8 +90,8 @@ export const NullPerpEditParams: PerpEditParams = {
   initBaseAssetWeight: null,
   maintBaseLiabWeight: null,
   initBaseLiabWeight: null,
-  maintPnlAssetWeight: null,
-  initPnlAssetWeight: null,
+  maintOverallAssetWeight: null,
+  initOverallAssetWeight: null,
   liquidationFee: null,
   makerFee: null,
   takerFee: null,
