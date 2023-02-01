@@ -7785,6 +7785,16 @@ export type MangoV4 = {
           "index": false
         },
         {
+          "name": "pnlTransfer",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "pnlSettleLimitTransfer",
+          "type": "i128",
+          "index": false
+        },
+        {
           "name": "price",
           "type": "i128",
           "index": false
@@ -15949,6 +15959,16 @@ export const IDL: MangoV4 = {
         },
         {
           "name": "quoteTransfer",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "pnlTransfer",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "pnlSettleLimitTransfer",
           "type": "i128",
           "index": false
         },
