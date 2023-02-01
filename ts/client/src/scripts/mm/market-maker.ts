@@ -433,7 +433,7 @@ async function makeMarketUpdateInstructions(
   const unsettledPnl = mangoAccount.perpPositionExistsForMarket(mc.perpMarket)
     ? mangoAccount
         .getPerpPosition(perpMarketIndex)!
-        .getUnsettledPnlUi(group, perpMarket)
+        .getUnsettledPnlUi(perpMarket)
     : 0;
   const lean = (-leanCoeff * basePos) / size;
   const pfQuoteLeanCoeff = params.pfQuoteLeanCoeff || 0.001; // How much to move if pf pos is equal to equity
