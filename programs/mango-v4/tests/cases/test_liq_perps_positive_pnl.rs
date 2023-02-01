@@ -407,7 +407,7 @@ async fn test_liq_perps_positive_pnl() -> Result<(), TransportError> {
     .unwrap();
 
     let liqee_data = solana.get_account::<MangoAccount>(account_0).await;
-    assert_eq!(liqee_data.perps[0].base_position_lots(), 2);
+    assert_eq!(liqee_data.perps[0].base_position_lots(), 3);
     let health = account_init_health(solana, account_0).await;
     assert!(health > 0.0);
     assert!(health < 1.0);

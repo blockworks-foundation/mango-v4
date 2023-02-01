@@ -632,16 +632,16 @@ impl PerpPosition {
         }
     }
 
-    /// Returns the (min_pnl, max_pnl) range of quote-native pnl that may still be settled
-    /// this settle window.
+    /// Returns the (min_pnl, max_pnl) range of quote-native pnl that can be settled this window.
     ///
-    /// The available settle limit is a combination of three factors:
+    /// It contains contributions from three factors:
     /// - a fraction of the base position stable value, which gives settlement limit
     ///   equally in both directions
-    /// - the stored realized pnl settle limit, which adds an extra settlement allowance
+    /// - the stored realized trade settle limit, which adds an extra settlement allowance
     ///   in a single direction
-    /// - the amount that was already settled, which shifts both edges
-    pub fn available_settle_limit(&self, market: &PerpMarket) -> (i64, i64) {
+    /// - the stored realized other settle limit, which adds an extra settlement allowance
+    ///   in a single direction
+    pub fn settle_limit(&self, market: &PerpMarket) -> (i64, i64) {
         assert_eq!(self.market_index, market.perp_market_index);
         if market.settle_pnl_limit_factor < 0.0 {
             return (i64::MIN, i64::MAX);
@@ -652,10 +652,9 @@ impl PerpPosition {
             .abs()
             .to_num::<f64>();
         let unrealized = (market.settle_pnl_limit_factor as f64 * position_value).clamp_to_i64();
-        let used = self.settle_pnl_limit_settled_in_current_window_native;
 
-        let mut min_pnl = (-unrealized).saturating_sub(used);
-        let mut max_pnl = unrealized.saturating_sub(used);
+        let mut min_pnl = -unrealized;
+        let mut max_pnl = unrealized;
 
         let realized_trade = self.settle_pnl_limit_realized_trade;
         if realized_trade >= 0 {
@@ -671,7 +670,28 @@ impl PerpPosition {
             min_pnl = min_pnl.saturating_add(realized_other.floor().clamp_to_i64());
         };
 
+        // the min/max here is just for safety
         (min_pnl.min(0), max_pnl.max(0))
+    }
+
+    /// Returns the (min_pnl, max_pnl) range of quote-native pnl that may still be settled
+    /// this settle window.
+    ///
+    /// The available settle limit is the settle_limit() adjusted for the amount of limit
+    /// that was already used up this window.
+    pub fn available_settle_limit(&self, market: &PerpMarket) -> (i64, i64) {
+        assert_eq!(self.market_index, market.perp_market_index);
+        if market.settle_pnl_limit_factor < 0.0 {
+            return (i64::MIN, i64::MAX);
+        }
+
+        let (mut min_pnl, mut max_pnl) = self.settle_limit(market);
+        let used = self.settle_pnl_limit_settled_in_current_window_native;
+
+        min_pnl = min_pnl.saturating_sub(used).min(0);
+        max_pnl = max_pnl.saturating_sub(used).max(0);
+
+        (min_pnl, max_pnl)
     }
 
     /// Given some pnl, applies the pnl settle limit and returns the reduced pnl.

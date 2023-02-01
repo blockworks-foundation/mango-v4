@@ -238,7 +238,7 @@ pub(crate) fn liquidation_action(
     let oracle_price = perp_info.prices.oracle;
     let price_per_lot = cm!(I80F48::from(perp_market.base_lot_size) * oracle_price);
 
-    let liqee_positive_settle_limit = liqee_perp_position.available_settle_limit(&perp_market).1;
+    let liqee_positive_settle_limit = liqee_perp_position.settle_limit(&perp_market).1;
 
     // The max settleable amount does not need to be constrained by the liqor's perp settle health,
     // because taking over perp quote decreases liqor health: every unit of quote taken costs
@@ -595,15 +595,13 @@ mod tests {
 
     #[test]
     fn test_liq_base_or_positive_pnl() {
-        let no_extra = |_setup: &mut TestSetup| {};
         let test_cases = vec![
             (
                 "nothing",
                 (0.9, 0.9),
-                (0.0, 0, 0.0, 100.0),
-                (0.0, 0, 0.0, 100.0),
+                (0.0, 0, 0.0),
+                (0.0, 0, 0.0),
                 (0, 100),
-                no_extra,
             ),
             //
             // liquidate base position when perp health is negative
@@ -611,50 +609,44 @@ mod tests {
             (
                 "neg base liq 1: limited",
                 (0.5, 0.5),
-                (5.0, -10, 0.0, 100.0),
-                (5.0, -9, -1.0, 100.0),
+                (5.0, -10, 0.0),
+                (5.0, -9, -1.0),
                 (-1, 100),
-                no_extra,
             ),
             (
                 "neg base liq 2: base to zero",
                 (0.5, 0.5),
-                (5.0, -10, 0.0, 100.0),
-                (5.0, 0, -10.0, 100.0),
+                (5.0, -10, 0.0),
+                (5.0, 0, -10.0),
                 (-20, 100),
-                no_extra,
             ),
             (
                 "neg base liq 3: health positive",
                 (0.5, 0.5),
-                (5.0, -4, 0.0, 100.0),
-                (5.0, -2, -2.0, 100.0),
+                (5.0, -4, 0.0),
+                (5.0, -2, -2.0),
                 (-20, 100),
-                no_extra,
             ),
             (
                 "pos base liq 1: limited",
                 (0.5, 0.5),
-                (5.0, 20, -20.0, 100.0),
-                (5.0, 19, -19.0, 100.0),
+                (5.0, 20, -20.0),
+                (5.0, 19, -19.0),
                 (1, 100),
-                no_extra,
             ),
             (
                 "pos base liq 2: base to zero",
                 (0.5, 0.5),
-                (0.0, 20, -30.0, 100.0),
-                (0.0, 0, -10.0, 100.0),
+                (0.0, 20, -30.0),
+                (0.0, 0, -10.0),
                 (100, 100),
-                no_extra,
             ),
             (
                 "pos base liq 3: health positive",
                 (0.5, 0.5),
-                (5.0, 20, -20.0, 100.0),
-                (5.0, 10, -10.0, 100.0),
+                (5.0, 20, -20.0),
+                (5.0, 10, -10.0),
                 (100, 100),
-                no_extra,
             ),
             //
             // liquidate base position when perp health is positive and overall asset weight is positive
@@ -662,66 +654,58 @@ mod tests {
             (
                 "base liq, pos perp health 1: until health positive",
                 (0.5, 1.0),
-                (-20.0, 20, 5.0, 100.0),
-                (-20.0, 10, 15.0, 100.0),
+                (-20.0, 20, 5.0),
+                (-20.0, 10, 15.0),
                 (100, 100),
-                no_extra,
             ),
             (
                 "base liq, pos perp health 2-1: settle until health positive",
                 (0.5, 0.5),
-                (-19.0, 20, 10.0, 100.0),
-                (-1.0, 20, -8.0, 82.0),
+                (-19.0, 20, 10.0),
+                (-1.0, 20, -8.0),
                 (100, 100),
-                no_extra,
             ),
             (
                 "base liq, pos perp health 2-2: base+settle until health positive",
                 (0.5, 0.5),
-                (-25.0, 20, 10.0, 100.0),
-                (0.0, 10, -5.0, 75.0),
+                (-25.0, 20, 10.0),
+                (0.0, 10, -5.0),
                 (100, 100),
-                no_extra,
             ),
             (
                 "base liq, pos perp health 2-3: base+settle until pnl limit",
                 (0.5, 0.5),
-                (-23.0, 20, 10.0, 100.0),
-                (-2.0, 10, -1.0, 79.0),
+                (-23.0, 20, 10.0),
+                (-2.0, 10, -1.0),
                 (100, 21),
-                no_extra,
             ),
             (
                 "base liq, pos perp health 2-4: base+settle until base limit",
                 (0.5, 0.5),
-                (-25.0, 20, 10.0, 100.0),
-                (-4.0, 18, -9.0, 79.0),
+                (-25.0, 20, 10.0),
+                (-4.0, 18, -9.0),
                 (2, 100),
-                no_extra,
             ),
             (
                 "base liq, pos perp health 2-5: base+settle until both limits",
                 (0.5, 0.5),
-                (-25.0, 20, 10.0, 100.0),
-                (-4.0, 16, -7.0, 79.0),
+                (-25.0, 20, 10.0),
+                (-4.0, 16, -7.0),
                 (4, 21),
-                no_extra,
             ),
             (
                 "base liq, pos perp health 4: liq some base, then settle some",
                 (0.5, 0.5),
-                (-20.0, 20, 10.0, 100.0),
-                (-15.0, 10, 15.0, 95.0),
+                (-20.0, 20, 10.0),
+                (-15.0, 10, 15.0),
                 (10, 5),
-                no_extra,
             ),
             (
                 "base liq, pos perp health 5: base to zero even without settlement",
                 (0.5, 0.5),
-                (-20.0, 20, 10.0, 100.0),
-                (-20.0, 0, 30.0, 100.0),
+                (-20.0, 20, 10.0),
+                (-20.0, 0, 30.0),
                 (100, 0),
-                no_extra,
             ),
             //
             // liquidate base position when perp health is positive but overall asset weight is zero
@@ -729,44 +713,39 @@ mod tests {
             (
                 "base liq, pos perp health 6: don't touch base without settlement",
                 (0.5, 0.0),
-                (-20.0, 20, 10.0, 100.0),
-                (-20.0, 20, 10.0, 100.0),
+                (-20.0, 20, 10.0),
+                (-20.0, 20, 10.0),
                 (10, 0),
-                no_extra,
             ),
             (
                 "base liq, pos perp health 7: settlement without base",
                 (0.5, 0.0),
-                (-20.0, 20, 10.0, 100.0),
-                (-15.0, 20, 5.0, 95.0),
+                (-20.0, 20, 10.0),
+                (-15.0, 20, 5.0),
                 (10, 5),
-                no_extra,
             ),
             (
                 "base liq, pos perp health 8: settlement enables base",
                 (0.5, 0.0),
-                (-30.0, 20, 10.0, 100.0),
-                (-7.5, 15, -7.5, 77.5),
+                (-30.0, 20, 10.0),
+                (-7.5, 15, -7.5),
                 (5, 30),
-                no_extra,
             ),
             (
                 "base liq, pos perp health 9: until health positive",
                 (0.5, 0.0),
-                (-25.0, 20, 10.0, 100.0),
-                (0.0, 10, -5.0, 75.0),
+                (-25.0, 20, 10.0),
+                (0.0, 10, -5.0),
                 (200, 200),
-                no_extra,
             ),
         ];
 
         for (
             name,
             (base_weight, overall_weight),
-            (init_liqee_spot, init_liqee_base, init_liqee_quote, init_liqor_spot),
-            (exp_liqee_spot, exp_liqee_base, exp_liqee_quote, exp_liqor_spot),
+            (init_liqee_spot, init_liqee_base, init_liqee_quote),
+            (exp_liqee_spot, exp_liqee_base, exp_liqee_quote),
             (max_base, max_quote),
-            extra_setup,
         ) in test_cases
         {
             println!("test: {name}");
@@ -777,7 +756,6 @@ mod tests {
                 pm.init_base_liab_weight = I80F48::from_num(2.0 - base_weight);
                 pm.init_pnl_asset_weight = I80F48::from_num(overall_weight);
             }
-            extra_setup(&mut setup);
             {
                 perp_p(&mut setup.liqee).record_trade(
                     setup.perp_market.data(),
@@ -797,7 +775,7 @@ mod tests {
                 settle_bank
                     .change_without_fee(
                         token_p(&mut setup.liqor),
-                        I80F48::from_num(init_liqor_spot),
+                        I80F48::from_num(1000.0),
                         0,
                         I80F48::from(1),
                     )
@@ -809,6 +787,16 @@ mod tests {
             let liqee_perp = perp_p(&mut result.liqee);
             assert_eq!(liqee_perp.base_position_lots(), exp_liqee_base);
             assert_eq_f!(liqee_perp.quote_position_native(), exp_liqee_quote, 0.01);
+            let liqor_perp = perp_p(&mut result.liqor);
+            assert_eq!(
+                liqor_perp.base_position_lots(),
+                -(exp_liqee_base - init_liqee_base)
+            );
+            assert_eq_f!(
+                liqor_perp.quote_position_native(),
+                -(exp_liqee_quote - init_liqee_quote),
+                0.01
+            );
             let settle_bank = result.settle_bank.data();
             assert_eq_f!(
                 token_p(&mut result.liqee).native(settle_bank),
@@ -817,7 +805,7 @@ mod tests {
             );
             assert_eq_f!(
                 token_p(&mut result.liqor).native(settle_bank),
-                exp_liqor_spot,
+                1000.0 - (exp_liqee_spot - init_liqee_spot),
                 0.01
             );
         }
