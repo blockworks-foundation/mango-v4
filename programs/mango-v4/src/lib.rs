@@ -735,9 +735,9 @@ pub mod mango_v4 {
     pub fn perp_liq_base_or_positive_pnl(
         ctx: Context<PerpLiqBaseOrPositivePnl>,
         max_base_transfer: i64,
-        max_quote_transfer: u64,
+        max_pnl_transfer: u64,
     ) -> Result<()> {
-        instructions::perp_liq_base_or_positive_pnl(ctx, max_base_transfer, max_quote_transfer)
+        instructions::perp_liq_base_or_positive_pnl(ctx, max_base_transfer, max_pnl_transfer)
     }
 
     pub fn perp_liq_force_cancel_orders(

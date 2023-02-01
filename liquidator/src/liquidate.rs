@@ -214,7 +214,7 @@ impl<'a> LiquidateHelper<'a> {
         // TODO: This is risky for the liqor. It should track how much pnl is usually settleable
         // in the market before agreeding to take it over. Also, the liqor should check how much
         // settle limit it's going to get along with the unsettled pnl.
-        let (max_base_transfer_abs, max_quote_transfer) = {
+        let (max_base_transfer_abs, max_pnl_transfer) = {
             let mut liqor = self
                 .account_fetcher
                 .fetch_fresh_mango_account(&self.client.mango_account_address)
@@ -247,7 +247,7 @@ impl<'a> LiquidateHelper<'a> {
                     .market
                     .init_pnl_asset_weight
                     .min(max_perp_unsettled_leverage);
-            let max_quote_transfer = allowed_usdc_borrow / perp_unsettled_cost;
+            let max_pnl_transfer = allowed_usdc_borrow / perp_unsettled_cost;
 
             // Update the health cache so we can determine how many base lots the liqor can take on,
             // assuming that the max_quote_transfer amount of positive unsettled pnl was taken over.
@@ -260,12 +260,9 @@ impl<'a> LiquidateHelper<'a> {
                 self.liqor_min_health_ratio,
             )?;
 
-            (
-                max_base_transfer,
-                max_quote_transfer.floor().to_num::<u64>(),
-            )
+            (max_base_transfer, max_pnl_transfer.floor().to_num::<u64>())
         };
-        log::info!("computed max_base_transfer: {max_base_transfer_abs}, max_quote_transfer: max_quote_transfer");
+        log::info!("computed max_base_transfer: {max_base_transfer_abs}, max_pnl_transfer: {max_pnl_transfer}");
 
         let sig = self
             .client
@@ -273,7 +270,7 @@ impl<'a> LiquidateHelper<'a> {
                 (self.pubkey, &self.liqee),
                 *perp_market_index,
                 side_signum * max_base_transfer_abs,
-                max_quote_transfer,
+                max_pnl_transfer,
             )
             .await?;
         log::info!(

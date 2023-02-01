@@ -939,7 +939,7 @@ impl MangoClient {
         liqee: (&Pubkey, &MangoAccountValue),
         market_index: PerpMarketIndex,
         max_base_transfer: i64,
-        max_quote_transfer: u64,
+        max_pnl_transfer: u64,
     ) -> anyhow::Result<Signature> {
         let perp = self.context.perp(market_index);
         let settle_token_info = self.context.token(perp.market.settle_token_index);
@@ -972,7 +972,7 @@ impl MangoClient {
             data: anchor_lang::InstructionData::data(
                 &mango_v4::instruction::PerpLiqBaseOrPositivePnl {
                     max_base_transfer,
-                    max_quote_transfer,
+                    max_pnl_transfer,
                 },
             ),
         };

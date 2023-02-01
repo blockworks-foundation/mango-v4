@@ -236,7 +236,7 @@ async fn test_liq_perps_positive_pnl() -> Result<(), TransportError> {
             liqee: account_0,
             perp_market,
             max_base_transfer: i64::MAX,
-            max_quote_transfer: 0,
+            max_pnl_transfer: 0,
         },
     )
     .await
@@ -259,7 +259,7 @@ async fn test_liq_perps_positive_pnl() -> Result<(), TransportError> {
             liqee: account_0,
             perp_market,
             max_base_transfer: i64::MAX,
-            max_quote_transfer: 100,
+            max_pnl_transfer: 100,
         },
     )
     .await
@@ -291,7 +291,7 @@ async fn test_liq_perps_positive_pnl() -> Result<(), TransportError> {
             liqee: account_0,
             perp_market,
             max_base_transfer: i64::MAX,
-            max_quote_transfer: 600,
+            max_pnl_transfer: 600,
         },
     )
     .await
@@ -337,7 +337,7 @@ async fn test_liq_perps_positive_pnl() -> Result<(), TransportError> {
             liqee: account_0,
             perp_market,
             max_base_transfer: i64::MAX,
-            max_quote_transfer: 0,
+            max_pnl_transfer: 0,
         },
     )
     .await
@@ -377,7 +377,7 @@ async fn test_liq_perps_positive_pnl() -> Result<(), TransportError> {
             liqee: account_0,
             perp_market,
             max_base_transfer: 3,
-            max_quote_transfer: 0,
+            max_pnl_transfer: 0,
         },
     )
     .await
@@ -400,7 +400,7 @@ async fn test_liq_perps_positive_pnl() -> Result<(), TransportError> {
             liqee: account_0,
             perp_market,
             max_base_transfer: i64::MAX,
-            max_quote_transfer: u64::MAX,
+            max_pnl_transfer: u64::MAX,
         },
     )
     .await

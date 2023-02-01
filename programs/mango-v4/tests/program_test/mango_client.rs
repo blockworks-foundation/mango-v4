@@ -3434,7 +3434,7 @@ pub struct PerpLiqBaseOrPositivePnlInstruction {
     pub liqee: Pubkey,
     pub perp_market: Pubkey,
     pub max_base_transfer: i64,
-    pub max_quote_transfer: u64,
+    pub max_pnl_transfer: u64,
 }
 #[async_trait::async_trait(?Send)]
 impl ClientInstruction for PerpLiqBaseOrPositivePnlInstruction {
@@ -3447,7 +3447,7 @@ impl ClientInstruction for PerpLiqBaseOrPositivePnlInstruction {
         let program_id = mango_v4::id();
         let instruction = Self::Instruction {
             max_base_transfer: self.max_base_transfer,
-            max_quote_transfer: self.max_quote_transfer,
+            max_pnl_transfer: self.max_pnl_transfer,
         };
 
         let perp_market: PerpMarket = account_loader.load(&self.perp_market).await.unwrap();
