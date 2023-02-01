@@ -54,6 +54,17 @@ pub struct PerpLiqBaseOrPositivePnl<'info> {
     pub settle_oracle: UncheckedAccount<'info>,
 }
 
+/// This instruction deals with increasing health by:
+/// - reducing the liqee's base position
+/// - taking over the liqee's positive pnl
+///
+/// It's a combined instruction because reducing the base position is not necessarily
+/// a health-increasing action when perp overall asset weight = 0. There, the pnl
+/// takeover can allow further base position to be reduced.
+///
+/// Taking over negative pnl - or positive pnl when the unweighted perp health contributin
+/// is negative - never increases liqee health. That's why it's relegated to the
+/// separate liq_negative_pnl_or_bankruptcy instruction instead.
 pub fn perp_liq_base_or_positive_pnl(
     ctx: Context<PerpLiqBaseOrPositivePnl>,
     mut max_base_transfer: i64,
@@ -230,7 +241,7 @@ pub(crate) fn liquidation_action(
     let liqee_positive_settle_limit = liqee_perp_position.available_settle_limit(&perp_market).1;
 
     // The max settleable amount does not need to be constrained by the liqor's perp settle health,
-    // because taking over perp pnl decreases liqor health: every unit of pnl taken costs
+    // because taking over perp quote decreases liqor health: every unit of quote taken costs
     // (1-positive_pnl_liq_fee) USDC and only gains init_pnl_asset_weight in perp health.
     let max_settle = I80F48::from(max_quote_transfer);
 
@@ -278,7 +289,9 @@ pub(crate) fn liquidation_action(
 
     let init_overall_asset_weight = perp_market.init_pnl_asset_weight;
 
-    // The overall health contribution from perp including spot health increases from settling pnl
+    // The overall health contribution from perp including spot health increases from settling pnl.
+    // This is needed in order to reduce the base position the right amount when taking into
+    // account the settlement that will happen afterwards.
     let expected_perp_health = |unweighted: I80F48| {
         if unweighted < 0 {
             unweighted
@@ -416,8 +429,13 @@ pub(crate) fn liquidation_action(
             .unwrap();
         let liqee_pnl = liqee_perp_position.unsettled_pnl(&perp_market, oracle_price)?;
 
-        // Allow settling *more* than the liqee_positive_settle_limit. In exchange, the liqor
+        // Allow taking over *more* than the liqee_positive_settle_limit. In exchange, the liqor
         // also can't settle fully immediately and just takes over a fractional chunk of the limit.
+        //
+        // If this takeover were limited by the settle limit, then we couldn't always bring the liqee
+        // base position to zero and would need to deal with that in bankruptcy. Also, the settle
+        // limit changes with the base position price, so it'd be hard to say when this liquidation
+        // step is done.
         let settlement = liqee_pnl
             .min(max_settle)
             .min(settle_for_zero)
@@ -559,7 +577,6 @@ mod tests {
         }
     }
 
-    // these are macros because as functions, the borrow checker doesn't realize they only borrow one field
     fn token_p(account: &mut MangoAccountValue) -> &mut TokenPosition {
         account.token_position_mut(0).unwrap().0
     }
