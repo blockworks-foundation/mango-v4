@@ -1434,8 +1434,8 @@ export class PerpInfo {
     public initBaseAssetWeight: I80F48,
     public maintBaseLiabWeight: I80F48,
     public initBaseLiabWeight: I80F48,
-    public maintPnlAssetWeight: I80F48,
-    public initPnlAssetWeight: I80F48,
+    public maintOverallAssetWeight: I80F48,
+    public initOverallAssetWeight: I80F48,
     public baseLotSize: BN,
     public baseLots: BN,
     public bidsBaseLots: BN,
@@ -1452,8 +1452,8 @@ export class PerpInfo {
       I80F48.from(dto.initBaseAssetWeight),
       I80F48.from(dto.maintBaseLiabWeight),
       I80F48.from(dto.initBaseLiabWeight),
-      I80F48.from(dto.maintPnlAssetWeight),
-      I80F48.from(dto.initPnlAssetWeight),
+      I80F48.from(dto.maintOverallAssetWeight),
+      I80F48.from(dto.initOverallAssetWeight),
       dto.baseLotSize,
       dto.baseLots,
       dto.bidsBaseLots,
@@ -1489,8 +1489,8 @@ export class PerpInfo {
       perpMarket.initBaseAssetWeight,
       perpMarket.maintBaseLiabWeight,
       perpMarket.initBaseLiabWeight,
-      perpMarket.maintPnlAssetWeight,
-      perpMarket.initPnlAssetWeight,
+      perpMarket.maintOverallAssetWeight,
+      perpMarket.initOverallAssetWeight,
       perpMarket.baseLotSize,
       baseLots,
       perpPosition.bidsBaseLots,
@@ -1509,8 +1509,8 @@ export class PerpInfo {
     if (contrib.gt(ZERO_I80F48())) {
       const assetWeight =
         healthType == HealthType.init
-          ? this.initPnlAssetWeight
-          : this.maintPnlAssetWeight;
+          ? this.initOverallAssetWeight
+          : this.maintOverallAssetWeight;
       return assetWeight.mul(contrib);
     }
     return contrib;
@@ -1580,8 +1580,8 @@ export class PerpInfo {
       perpMarket.initBaseAssetWeight,
       perpMarket.maintBaseLiabWeight,
       perpMarket.initBaseLiabWeight,
-      perpMarket.maintPnlAssetWeight,
-      perpMarket.initPnlAssetWeight,
+      perpMarket.maintOverallAssetWeight,
+      perpMarket.initOverallAssetWeight,
       perpMarket.baseLotSize,
       new BN(0),
       new BN(0),
@@ -1665,8 +1665,8 @@ export class PerpInfoDto {
   initBaseAssetWeight: I80F48Dto;
   maintBaseLiabWeight: I80F48Dto;
   initBaseLiabWeight: I80F48Dto;
-  maintPnlAssetWeight: I80F48Dto;
-  initPnlAssetWeight: I80F48Dto;
+  maintOverallAssetWeight: I80F48Dto;
+  initOverallAssetWeight: I80F48Dto;
   public baseLotSize: BN;
   public baseLots: BN;
   public bidsBaseLots: BN;

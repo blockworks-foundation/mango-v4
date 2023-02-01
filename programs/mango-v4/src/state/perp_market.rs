@@ -161,8 +161,8 @@ pub struct PerpMarket {
     pub padding4: [u8; 7],
 
     /// Weights for full perp market health, if positive
-    pub maint_pnl_asset_weight: I80F48,
-    pub init_pnl_asset_weight: I80F48,
+    pub maint_overall_asset_weight: I80F48,
+    pub init_overall_asset_weight: I80F48,
 
     pub positive_pnl_liquidation_fee: I80F48,
 
@@ -416,8 +416,8 @@ impl PerpMarket {
             settle_pnl_limit_window_size_ts: 24 * 60 * 60,
             reduce_only: 0,
             padding4: Default::default(),
-            maint_pnl_asset_weight: I80F48::ONE,
-            init_pnl_asset_weight: I80F48::ONE,
+            maint_overall_asset_weight: I80F48::ONE,
+            init_overall_asset_weight: I80F48::ONE,
             positive_pnl_liquidation_fee: I80F48::ZERO,
             reserved: [0; 1888],
         }

@@ -84,8 +84,8 @@ async fn test_liq_perps_positive_pnl() -> Result<(), TransportError> {
             init_base_asset_weight: 0.5,
             maint_base_liab_weight: 1.2,
             init_base_liab_weight: 1.5,
-            maint_pnl_asset_weight: 0.0,
-            init_pnl_asset_weight: 0.0,
+            maint_overall_asset_weight: 0.0,
+            init_overall_asset_weight: 0.0,
             base_liquidation_fee: 0.05,
             positive_pnl_liquidation_fee: 0.05,
             maker_fee: 0.0,
@@ -362,8 +362,8 @@ async fn test_liq_perps_positive_pnl() -> Result<(), TransportError> {
             group,
             admin,
             perp_market,
-            init_pnl_asset_weight: 0.6,
-            maint_pnl_asset_weight: 0.8,
+            init_overall_asset_weight: 0.6,
+            maint_overall_asset_weight: 0.8,
         },
     )
     .await

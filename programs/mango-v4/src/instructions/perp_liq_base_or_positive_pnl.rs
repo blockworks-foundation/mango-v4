@@ -75,6 +75,7 @@ pub fn perp_liq_base_or_positive_pnl(
 
     let group_pk = &ctx.accounts.group.key();
 
+    require_keys_neq!(ctx.accounts.liqor.key(), ctx.accounts.liqee.key());
     let mut liqor = ctx.accounts.liqor.load_full_mut()?;
     // account constraint #1
     require!(
@@ -265,7 +266,7 @@ pub(crate) fn liquidation_action(
 
     // The max settleable amount does not need to be constrained by the liqor's perp settle health,
     // because taking over perp quote decreases liqor health: every unit of quote taken costs
-    // (1-positive_pnl_liq_fee) USDC and only gains init_pnl_asset_weight in perp health.
+    // (1-positive_pnl_liq_fee) USDC and only gains init_overall_asset_weight in perp health.
     let max_pnl_transfer = I80F48::from(max_pnl_transfer);
 
     // Take over the liqee's base in exchange for quote
@@ -310,7 +311,7 @@ pub(crate) fn liquidation_action(
     // Amount of settle token received for each token that is settled
     let spot_gain_per_settled = cm!(I80F48::ONE - perp_market.positive_pnl_liquidation_fee);
 
-    let init_overall_asset_weight = perp_market.init_pnl_asset_weight;
+    let init_overall_asset_weight = perp_market.init_overall_asset_weight;
 
     // The overall health contribution from perp including spot health increases from settling pnl.
     // This is needed in order to reduce the base position the right amount when taking into
@@ -408,9 +409,8 @@ pub(crate) fn liquidation_action(
     //
     // Step 3: Above that, perp base positions only benefit account health if the pnl asset weight is positive
     //
-    if current_unweighted_perp_health >= max_pnl_transfer && perp_market.init_pnl_asset_weight > 0 {
-        let weighted_health_per_lot =
-            cm!(unweighted_health_per_lot * perp_market.init_pnl_asset_weight);
+    if current_unweighted_perp_health >= max_pnl_transfer && init_overall_asset_weight > 0 {
+        let weighted_health_per_lot = cm!(unweighted_health_per_lot * init_overall_asset_weight);
         reduce_base(
             "positive",
             I80F48::MAX,
@@ -446,7 +446,7 @@ pub(crate) fn liquidation_action(
     let pnl_transfer_possible =
         current_actual_health < 0 && current_unweighted_perp_health > 0 && max_pnl_transfer > 0;
     let (pnl_transfer, limit_transfer) = if pnl_transfer_possible {
-        let health_per_transfer = cm!(spot_gain_per_settled - perp_market.init_pnl_asset_weight);
+        let health_per_transfer = cm!(spot_gain_per_settled - init_overall_asset_weight);
         let transfer_for_zero = cm!(-current_actual_health / health_per_transfer)
             .checked_ceil()
             .unwrap();
@@ -782,7 +782,7 @@ mod tests {
                 let pm = setup.perp_market.data();
                 pm.init_base_asset_weight = I80F48::from_num(base_weight);
                 pm.init_base_liab_weight = I80F48::from_num(2.0 - base_weight);
-                pm.init_pnl_asset_weight = I80F48::from_num(overall_weight);
+                pm.init_overall_asset_weight = I80F48::from_num(overall_weight);
             }
             {
                 perp_p(&mut setup.liqee).record_trade(

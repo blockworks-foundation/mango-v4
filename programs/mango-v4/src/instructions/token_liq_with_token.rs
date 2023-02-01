@@ -47,6 +47,7 @@ pub fn token_liq_with_token(
     let mut account_retriever = ScanningAccountRetriever::new(ctx.remaining_accounts, group_pk)
         .context("create account retriever")?;
 
+    require_keys_neq!(ctx.accounts.liqor.key(), ctx.accounts.liqee.key());
     let mut liqor = ctx.accounts.liqor.load_full_mut()?;
     // account constraint #1
     require!(

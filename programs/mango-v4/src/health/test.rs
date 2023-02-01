@@ -120,8 +120,8 @@ pub fn mock_perp_market(
     pm.data().init_base_liab_weight = I80F48::from_num(1.0 + base_weights.0);
     pm.data().maint_base_asset_weight = I80F48::from_num(1.0 - base_weights.1);
     pm.data().maint_base_liab_weight = I80F48::from_num(1.0 + base_weights.1);
-    pm.data().init_pnl_asset_weight = I80F48::from_num(1.0 - pnl_weights.0);
-    pm.data().maint_pnl_asset_weight = I80F48::from_num(1.0 - pnl_weights.1);
+    pm.data().init_overall_asset_weight = I80F48::from_num(1.0 - pnl_weights.0);
+    pm.data().maint_overall_asset_weight = I80F48::from_num(1.0 - pnl_weights.1);
     pm.data().quote_lot_size = 100;
     pm.data().base_lot_size = 10;
     pm.data().stable_price_model.reset_to_price(price, 0);

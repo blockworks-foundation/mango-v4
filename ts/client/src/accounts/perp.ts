@@ -43,8 +43,8 @@ export class PerpMarket {
   public shortFunding: I80F48;
   public feesAccrued: I80F48;
   public feesSettled: I80F48;
-  public maintPnlAssetWeight: I80F48;
-  public initPnlAssetWeight: I80F48;
+  public maintOverallAssetWeight: I80F48;
+  public initOverallAssetWeight: I80F48;
 
   public _price: I80F48;
   public _uiPrice: number;
@@ -99,8 +99,8 @@ export class PerpMarket {
       settlePnlLimitFactor: number;
       settlePnlLimitWindowSizeTs: BN;
       reduceOnly: number;
-      maintPnlAssetWeight: I80F48Dto;
-      initPnlAssetWeight: I80F48Dto;
+      maintOverallAssetWeight: I80F48Dto;
+      initOverallAssetWeight: I80F48Dto;
       positivePnlLiquidationFee: I80F48Dto;
     },
   ): PerpMarket {
@@ -145,8 +145,8 @@ export class PerpMarket {
       obj.settlePnlLimitFactor,
       obj.settlePnlLimitWindowSizeTs,
       obj.reduceOnly == 1,
-      obj.maintPnlAssetWeight,
-      obj.initPnlAssetWeight,
+      obj.maintOverallAssetWeight,
+      obj.initOverallAssetWeight,
       obj.positivePnlLiquidationFee,
     );
   }
@@ -192,8 +192,8 @@ export class PerpMarket {
     public settlePnlLimitFactor: number,
     public settlePnlLimitWindowSizeTs: BN,
     public reduceOnly: boolean,
-    maintPnlAssetWeight: I80F48Dto,
-    initPnlAssetWeight: I80F48Dto,
+    maintOverallAssetWeight: I80F48Dto,
+    initOverallAssetWeight: I80F48Dto,
     positivePnlLiquidationFee: I80F48Dto,
   ) {
     this.name = utf8.decode(new Uint8Array(name)).split('\x00')[0];
@@ -214,8 +214,8 @@ export class PerpMarket {
     this.shortFunding = I80F48.from(shortFunding);
     this.feesAccrued = I80F48.from(feesAccrued);
     this.feesSettled = I80F48.from(feesSettled);
-    this.maintPnlAssetWeight = I80F48.from(maintPnlAssetWeight);
-    this.initPnlAssetWeight = I80F48.from(initPnlAssetWeight);
+    this.maintOverallAssetWeight = I80F48.from(maintOverallAssetWeight);
+    this.initOverallAssetWeight = I80F48.from(initOverallAssetWeight);
 
     this.priceLotsToUiConverter = new Big(10)
       .pow(baseDecimals - QUOTE_DECIMALS)

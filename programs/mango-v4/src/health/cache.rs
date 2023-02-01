@@ -213,8 +213,8 @@ pub struct PerpInfo {
     pub init_base_asset_weight: I80F48,
     pub maint_base_liab_weight: I80F48,
     pub init_base_liab_weight: I80F48,
-    pub maint_pnl_asset_weight: I80F48,
-    pub init_pnl_asset_weight: I80F48,
+    pub maint_overall_asset_weight: I80F48,
+    pub init_overall_asset_weight: I80F48,
     pub base_lot_size: i64,
     pub base_lots: i64,
     pub bids_base_lots: i64,
@@ -243,8 +243,8 @@ impl PerpInfo {
             init_base_liab_weight: perp_market.init_base_liab_weight,
             maint_base_asset_weight: perp_market.maint_base_asset_weight,
             maint_base_liab_weight: perp_market.maint_base_liab_weight,
-            init_pnl_asset_weight: perp_market.init_pnl_asset_weight,
-            maint_pnl_asset_weight: perp_market.maint_pnl_asset_weight,
+            init_overall_asset_weight: perp_market.init_overall_asset_weight,
+            maint_overall_asset_weight: perp_market.maint_overall_asset_weight,
             base_lot_size: perp_market.base_lot_size,
             base_lots,
             bids_base_lots: perp_position.bids_base_lots,
@@ -284,8 +284,8 @@ impl PerpInfo {
     pub fn weigh_health_contribution(&self, unweighted: I80F48, health_type: HealthType) -> I80F48 {
         if unweighted > 0 {
             let asset_weight = match health_type {
-                HealthType::Init => self.init_pnl_asset_weight,
-                HealthType::Maint => self.maint_pnl_asset_weight,
+                HealthType::Init => self.init_overall_asset_weight,
+                HealthType::Maint => self.maint_overall_asset_weight,
             };
 
             cm!(asset_weight * unweighted)

@@ -2579,8 +2579,8 @@ pub struct PerpCreateMarketInstruction {
     pub init_base_asset_weight: f32,
     pub maint_base_liab_weight: f32,
     pub init_base_liab_weight: f32,
-    pub maint_pnl_asset_weight: f32,
-    pub init_pnl_asset_weight: f32,
+    pub maint_overall_asset_weight: f32,
+    pub init_overall_asset_weight: f32,
     pub base_liquidation_fee: f32,
     pub positive_pnl_liquidation_fee: f32,
     pub maker_fee: f32,
@@ -2637,8 +2637,8 @@ impl ClientInstruction for PerpCreateMarketInstruction {
             init_base_asset_weight: self.init_base_asset_weight,
             maint_base_liab_weight: self.maint_base_liab_weight,
             init_base_liab_weight: self.init_base_liab_weight,
-            maint_pnl_asset_weight: self.maint_pnl_asset_weight,
-            init_pnl_asset_weight: self.init_pnl_asset_weight,
+            maint_overall_asset_weight: self.maint_overall_asset_weight,
+            init_overall_asset_weight: self.init_overall_asset_weight,
             base_liquidation_fee: self.base_liquidation_fee,
             maker_fee: self.maker_fee,
             taker_fee: self.taker_fee,
@@ -2696,8 +2696,8 @@ fn perp_edit_instruction_default() -> mango_v4::instruction::PerpEditMarket {
         init_base_asset_weight_opt: None,
         maint_base_liab_weight_opt: None,
         init_base_liab_weight_opt: None,
-        maint_pnl_asset_weight_opt: None,
-        init_pnl_asset_weight_opt: None,
+        maint_overall_asset_weight_opt: None,
+        init_overall_asset_weight_opt: None,
         base_liquidation_fee_opt: None,
         maker_fee_opt: None,
         taker_fee_opt: None,
@@ -2842,8 +2842,8 @@ pub struct PerpChangeWeights {
     pub group: Pubkey,
     pub admin: TestKeypair,
     pub perp_market: Pubkey,
-    pub init_pnl_asset_weight: f32,
-    pub maint_pnl_asset_weight: f32,
+    pub init_overall_asset_weight: f32,
+    pub maint_overall_asset_weight: f32,
 }
 
 #[async_trait::async_trait(?Send)]
@@ -2859,8 +2859,8 @@ impl ClientInstruction for PerpChangeWeights {
         let perp_market: PerpMarket = account_loader.load(&self.perp_market).await.unwrap();
 
         let instruction = Self::Instruction {
-            init_pnl_asset_weight_opt: Some(self.init_pnl_asset_weight),
-            maint_pnl_asset_weight_opt: Some(self.maint_pnl_asset_weight),
+            init_overall_asset_weight_opt: Some(self.init_overall_asset_weight),
+            maint_overall_asset_weight_opt: Some(self.maint_overall_asset_weight),
             ..perp_edit_instruction_default()
         };
 

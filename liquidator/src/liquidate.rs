@@ -245,7 +245,7 @@ impl<'a> LiquidateHelper<'a> {
             let perp_unsettled_cost = I80F48::ONE
                 - perp
                     .market
-                    .init_pnl_asset_weight
+                    .init_overall_asset_weight
                     .min(max_perp_unsettled_leverage);
             let max_pnl_transfer = allowed_usdc_borrow / perp_unsettled_cost;
 

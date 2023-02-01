@@ -32,8 +32,8 @@ pub fn perp_edit_market(
     init_base_asset_weight_opt: Option<f32>,
     maint_base_liab_weight_opt: Option<f32>,
     init_base_liab_weight_opt: Option<f32>,
-    maint_pnl_asset_weight_opt: Option<f32>,
-    init_pnl_asset_weight_opt: Option<f32>,
+    maint_overall_asset_weight_opt: Option<f32>,
+    init_overall_asset_weight_opt: Option<f32>,
     base_liquidation_fee_opt: Option<f32>,
     maker_fee_opt: Option<f32>,
     taker_fee_opt: Option<f32>,
@@ -135,22 +135,22 @@ pub fn perp_edit_market(
         perp_market.init_base_liab_weight = I80F48::from_num(init_base_liab_weight);
         require_group_admin = true;
     }
-    if let Some(maint_pnl_asset_weight) = maint_pnl_asset_weight_opt {
+    if let Some(maint_overall_asset_weight) = maint_overall_asset_weight_opt {
         msg!(
             "Maint pnl asset weight: old - {:?}, new - {:?}",
-            perp_market.maint_pnl_asset_weight,
-            maint_pnl_asset_weight
+            perp_market.maint_overall_asset_weight,
+            maint_overall_asset_weight
         );
-        perp_market.maint_pnl_asset_weight = I80F48::from_num(maint_pnl_asset_weight);
+        perp_market.maint_overall_asset_weight = I80F48::from_num(maint_overall_asset_weight);
         require_group_admin = true;
     }
-    if let Some(init_pnl_asset_weight) = init_pnl_asset_weight_opt {
+    if let Some(init_overall_asset_weight) = init_overall_asset_weight_opt {
         msg!(
             "Init pnl asset weight: old - {:?}, new - {:?}",
-            perp_market.init_pnl_asset_weight,
-            init_pnl_asset_weight
+            perp_market.init_overall_asset_weight,
+            init_overall_asset_weight
         );
-        perp_market.init_pnl_asset_weight = I80F48::from_num(init_pnl_asset_weight);
+        perp_market.init_overall_asset_weight = I80F48::from_num(init_overall_asset_weight);
         require_group_admin = true;
     }
     if let Some(base_liquidation_fee) = base_liquidation_fee_opt {
