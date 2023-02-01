@@ -557,6 +557,7 @@ mod tests {
                 PostOrderType::Limit,
                 1,
                 -1,
+                0,
             )
         };
 
@@ -649,6 +650,7 @@ mod tests {
                 PostOrderType::Limit,
                 1,
                 -1,
+                0,
             )
         };
 

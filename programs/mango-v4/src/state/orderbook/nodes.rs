@@ -179,11 +179,14 @@ pub struct LeafNode {
     /// Only applicable in the oracle_pegged OrderTree
     pub peg_limit: i64,
 
-    pub reserved: [u8; 40],
+    /// User defined id for this order, used in FillEvents
+    pub client_order_id: u64,
+
+    pub reserved: [u8; 32],
 }
 const_assert_eq!(
     size_of::<LeafNode>(),
-    4 + 1 + 1 + 1 + 1 + 16 + 32 + 8 + 8 + 8 + 40
+    4 + 1 + 1 + 1 + 1 + 16 + 32 + 8 + 8 + 8 + 8 + 32
 );
 const_assert_eq!(size_of::<LeafNode>(), NODE_SIZE);
 const_assert_eq!(size_of::<LeafNode>() % 8, 0);
@@ -199,6 +202,7 @@ impl LeafNode {
         order_type: PostOrderType,
         time_in_force: u16,
         peg_limit: i64,
+        client_order_id: u64,
     ) -> Self {
         Self {
             tag: NodeTag::LeafNode.into(),
@@ -212,7 +216,8 @@ impl LeafNode {
             quantity,
             timestamp,
             peg_limit,
-            reserved: [0; 40],
+            client_order_id,
+            reserved: [0; 32],
         }
     }
 

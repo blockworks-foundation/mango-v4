@@ -144,11 +144,10 @@ impl<'a> Orderbook<'a> {
                 now_ts,
                 event_queue.header.seq_num,
                 best_opposing.node.owner,
-                best_opposing.node.key,
+                best_opposing.node.client_order_id,
                 market.maker_fee,
                 best_opposing.node.timestamp,
                 *mango_account_pk,
-                order_id,
                 order.client_order_id,
                 market.taker_fee,
                 best_opposing_price,
@@ -245,6 +244,7 @@ impl<'a> Orderbook<'a> {
                 PostOrderType::Limit, // TODO: Support order types? needed?
                 order.time_in_force,
                 order.peg_limit(),
+                order.client_order_id,
             );
             let _result = bookside.insert_leaf(order_tree_target, &new_order)?;
 
