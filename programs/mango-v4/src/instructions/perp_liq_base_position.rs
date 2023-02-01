@@ -45,6 +45,7 @@ pub fn perp_liq_base_position(
 ) -> Result<()> {
     let group_pk = &ctx.accounts.group.key();
 
+    require_keys_neq!(ctx.accounts.liqor.key(), ctx.accounts.liqee.key());
     let mut liqor = ctx.accounts.liqor.load_full_mut()?;
     // account constraint #1
     require!(

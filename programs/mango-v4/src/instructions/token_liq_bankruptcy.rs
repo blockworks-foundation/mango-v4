@@ -84,6 +84,8 @@ pub fn token_liq_bankruptcy(
     let (bank_ais, health_ais) = &ctx.remaining_accounts.split_at(liab_mint_info.num_banks());
     liab_mint_info.verify_banks_ais(bank_ais)?;
 
+    require_keys_neq!(ctx.accounts.liqor.key(), ctx.accounts.liqee.key());
+
     let mut liqor = ctx.accounts.liqor.load_full_mut()?;
     // account constraint #1
     require!(

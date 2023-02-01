@@ -57,8 +57,9 @@ pub struct PerpSettlePnl<'info> {
 
 pub fn perp_settle_pnl(ctx: Context<PerpSettlePnl>) -> Result<()> {
     // Cannot settle with yourself
-    require!(
-        ctx.accounts.account_a.key() != ctx.accounts.account_b.key(),
+    require_keys_neq!(
+        ctx.accounts.account_a.key(),
+        ctx.accounts.account_b.key(),
         MangoError::CannotSettleWithSelf
     );
 
