@@ -82,6 +82,10 @@ struct Cli {
 
     #[clap(long, env, default_value = "1")]
     rebalance_slippage: f64,
+
+    /// prioritize each transaction with this many microlamports/cu
+    #[clap(long, env, default_value = "0")]
+    prioritization_micro_lamports: u64,
 }
 
 pub fn encode_address(addr: &Pubkey) -> String {
@@ -107,7 +111,13 @@ async fn main() -> anyhow::Result<()> {
     let rpc_timeout = Duration::from_secs(10);
     let cluster = Cluster::Custom(rpc_url.clone(), ws_url.clone());
     let commitment = CommitmentConfig::processed();
-    let client = Client::new(cluster.clone(), commitment, &liqor_owner, Some(rpc_timeout));
+    let client = Client::new(
+        cluster.clone(),
+        commitment,
+        &liqor_owner,
+        Some(rpc_timeout),
+        cli.prioritization_micro_lamports,
+    );
 
     // The representation of current on-chain account data
     let chain_data = Arc::new(RwLock::new(chain_data::ChainData::new()));
