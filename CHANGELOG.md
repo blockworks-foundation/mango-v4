@@ -4,9 +4,11 @@ Update this for each program release and mainnet deployment.
 
 ## not on mainnet
 
+## mainnet
+
 ### v0.5.0, 2023-2-2
 
-Deployment: -
+Deployment: Feb 2, 2023 at 10:51:02 Central European Standard Time, https://explorer.solana.com/tx/eVGLcy3y8Vi9sMDKQbKdRKZa6dpjTjdP5HyDFXXQFqAaS1CXCg2QnFC1hgE8F8unWfgpmXC8PvmuRMhmQEE1YzK
 
 - Log old and new values in edit instructions (#418)
 - PerpPlaceOrder returns order id (#417)
@@ -16,8 +18,6 @@ Deployment: -
 - Significant changes to perp liquidation instructions (#424)
 - Reorganize perp fill events to save bytes and have client order ids (#426)
 - Add market index to serum3 events (#429)
-
-## mainnet
 
 ### v0.4.0, 2023-1-24
 
