@@ -3,7 +3,7 @@ use crate::error::*;
 use crate::health::*;
 use crate::state::*;
 
-use crate::logs::{Serum3OpenOrdersBalanceLog, TokenBalanceLog};
+use crate::logs::{Serum3OpenOrdersBalanceLogV2, TokenBalanceLog};
 use crate::serum3_cpi::{load_market_state, load_open_orders_ref};
 use anchor_lang::prelude::*;
 use anchor_spl::token::{Token, TokenAccount};
@@ -328,9 +328,10 @@ pub fn serum3_place_order(
         let open_orders = load_open_orders_ref(oo_ai)?;
         let after_oo = OpenOrdersSlim::from_oo(&open_orders);
 
-        emit!(Serum3OpenOrdersBalanceLog {
+        emit!(Serum3OpenOrdersBalanceLogV2 {
             mango_group: ctx.accounts.group.key(),
             mango_account: ctx.accounts.account.key(),
+            market_index: serum_market.market_index,
             base_token_index: serum_market.base_token_index,
             quote_token_index: serum_market.quote_token_index,
             base_total: after_oo.native_coin_total,
