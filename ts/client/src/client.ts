@@ -1910,23 +1910,6 @@ export class MangoClient {
     );
   }
 
-  public async perpZeroOutForMarket(
-    group: Group,
-    mangoAccount: MangoAccount,
-    perpMarketIndex: PerpMarketIndex,
-  ): Promise<TransactionSignature> {
-    const perpMarket = group.getPerpMarketByMarketIndex(perpMarketIndex);
-    return await this.program.methods
-      .perpZeroOutForMarket()
-      .accounts({
-        group: group.publicKey,
-        account: mangoAccount.publicKey,
-        perpMarket: perpMarket.publicKey,
-        admin: group.admin,
-      })
-      .rpc();
-  }
-
   // perpPlaceOrder ix returns an optional, custom order id,
   // but, since we use a customer tx sender, this method
   // doesn't return it
