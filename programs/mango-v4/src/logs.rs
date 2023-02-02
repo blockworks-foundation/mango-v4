@@ -97,6 +97,32 @@ pub struct FillLog {
     pub seq_num: u64, // note: usize same as u64
 
     pub maker: Pubkey,
+    pub maker_order_id: u128,
+    pub maker_fee: i128,
+
+    // Timestamp of when the maker order was placed; copied over from the LeafNode
+    pub maker_timestamp: u64,
+
+    pub taker: Pubkey,
+    pub taker_order_id: u128,
+    pub taker_client_order_id: u64,
+    pub taker_fee: i128,
+
+    pub price: i64,
+    pub quantity: i64, // number of base lots
+}
+
+#[event]
+pub struct FillLogV2 {
+    pub mango_group: Pubkey,
+    pub market_index: u16,
+    pub taker_side: u8, // side from the taker's POV
+    pub maker_slot: u8,
+    pub maker_out: bool, // true if maker order quantity == 0
+    pub timestamp: u64,
+    pub seq_num: u64, // note: usize same as u64
+
+    pub maker: Pubkey,
     pub maker_client_order_id: u64,
     pub maker_fee: f32,
 

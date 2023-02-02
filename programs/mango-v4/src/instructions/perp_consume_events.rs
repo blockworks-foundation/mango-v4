@@ -5,7 +5,7 @@ use crate::error::MangoError;
 use crate::state::{EventQueue, IxGate, MangoAccountFixed, MangoAccountLoader};
 use crate::state::{EventType, FillEvent, Group, OutEvent, PerpMarket};
 
-use crate::logs::{emit_perp_balances, FillLog};
+use crate::logs::{emit_perp_balances, FillLogV2};
 
 #[derive(Accounts)]
 pub struct PerpConsumeEvents<'info> {
@@ -119,7 +119,7 @@ pub fn perp_consume_events(ctx: Context<PerpConsumeEvents>, limit: usize) -> Res
                         &perp_market,
                     );
                 }
-                emit!(FillLog {
+                emit!(FillLogV2 {
                     mango_group: group_key,
                     market_index: perp_market_index,
                     taker_side: fill.taker_side as u8,
