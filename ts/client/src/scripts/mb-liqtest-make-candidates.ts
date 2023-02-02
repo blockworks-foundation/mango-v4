@@ -153,16 +153,12 @@ async function main() {
       try {
         await setBankPrice(bank, PRICES[liabName] / 2);
 
-        const withdrawIx = await client.tokenWithdrawNativeIx(
+        await client.tokenWithdrawNative(
           group,
           mangoAccount,
           liabMint,
           new BN(liabAmount),
           true,
-        );
-        await this.sendAndConfirmTransaction(
-          [...withdrawIx],
-          group.addressLookupTablesList,
         );
       } finally {
         // restore the oracle
@@ -378,16 +374,12 @@ async function main() {
       await setBankPrice(collateralBank, PRICES['SOL'] * 10);
 
       // Spot-borrow more than the collateral is worth
-      const withdrawIx = await client.tokenWithdrawNativeIx(
+      await client.tokenWithdrawNative(
         group,
         mangoAccount,
         liabMint,
         new BN(-5000),
         true,
-      );
-      await this.sendAndConfirmTransaction(
-        [...withdrawIx],
-        group.addressLookupTablesList,
       );
       await mangoAccount.reload(client);
 
