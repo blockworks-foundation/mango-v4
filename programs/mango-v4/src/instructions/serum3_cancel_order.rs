@@ -8,7 +8,7 @@ use crate::state::*;
 use super::Serum3Side;
 
 use super::{OpenOrdersAmounts, OpenOrdersSlim};
-use crate::logs::Serum3OpenOrdersBalanceLog;
+use crate::logs::Serum3OpenOrdersBalanceLogV2;
 use crate::serum3_cpi::load_open_orders_ref;
 
 #[derive(Accounts)]
@@ -96,9 +96,10 @@ pub fn serum3_cancel_order(
     let oo_ai = &ctx.accounts.open_orders.as_ref();
     let open_orders = load_open_orders_ref(oo_ai)?;
     let after_oo = OpenOrdersSlim::from_oo(&open_orders);
-    emit!(Serum3OpenOrdersBalanceLog {
+    emit!(Serum3OpenOrdersBalanceLogV2 {
         mango_group: ctx.accounts.group.key(),
         mango_account: ctx.accounts.account.key(),
+        market_index: serum_market.market_index,
         base_token_index: serum_market.base_token_index,
         quote_token_index: serum_market.quote_token_index,
         base_total: after_oo.native_base_total(),
