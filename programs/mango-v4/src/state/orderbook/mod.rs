@@ -244,8 +244,10 @@ mod tests {
         // Add lots and fees to make sure to exercise unit conversion
         market.base_lot_size = 10;
         market.quote_lot_size = 100;
-        market.maker_fee = I80F48::from_num(-0.001f64);
-        market.taker_fee = I80F48::from_num(0.01f64);
+        let maker_fee = I80F48::from_num(-0.001f32);
+        let taker_fee = I80F48::from_num(0.01f32);
+        market.maker_fee = maker_fee;
+        market.taker_fee = taker_fee;
 
         let buffer = MangoAccount::default_for_tests().try_to_vec().unwrap();
         let mut maker = MangoAccountValue::from_bytes(&buffer).unwrap();
@@ -286,6 +288,10 @@ mod tests {
             u8::MAX,
         )
         .unwrap();
+        let order =
+            order_tree_leaf_by_key(&book.bids, maker.perp_order_by_raw_index(0).id).unwrap();
+        assert_eq!(order.client_order_id, 42);
+        assert_eq!(order.quantity, bid_quantity);
         assert_eq!(
             maker.perp_order_mut_by_raw_index(0).market,
             market.perp_market_index
@@ -352,10 +358,7 @@ mod tests {
 
         // fees were immediately accrued
         let match_quote = I80F48::from(match_quantity * price_lots * market.quote_lot_size);
-        assert_eq!(
-            market.fees_accrued,
-            match_quote * (market.maker_fee + market.taker_fee)
-        );
+        assert_eq!(market.fees_accrued, match_quote * (maker_fee + taker_fee));
 
         // the taker account is updated
         assert_eq!(taker.perp_order_by_raw_index(0).market, FREE_ORDER_SLOT);
@@ -372,7 +375,7 @@ mod tests {
         assert_eq!(taker.perp_position_by_raw_index(0).base_position_lots(), 0);
         assert_eq!(
             taker.perp_position_by_raw_index(0).quote_position_native(),
-            -match_quote * market.taker_fee
+            -match_quote * taker_fee
         );
 
         // the fill gets added to the event queue
@@ -385,8 +388,8 @@ mod tests {
         assert_eq!(fill.taker_client_order_id, 43);
         assert_eq!(fill.maker, maker_pk);
         assert_eq!(fill.taker, taker_pk);
-        assert_eq!(fill.maker_fee, market.maker_fee);
-        assert_eq!(fill.taker_fee, market.taker_fee);
+        assert_eq!(fill.maker_fee, maker_fee.to_num::<f32>());
+        assert_eq!(fill.taker_fee, taker_fee.to_num::<f32>());
 
         // simulate event queue processing
         maker
@@ -411,7 +414,7 @@ mod tests {
         );
         assert_eq!(
             maker.perp_position_by_raw_index(0).quote_position_native(),
-            -match_quote - match_quote * market.maker_fee
+            -match_quote - match_quote * maker_fee
         );
 
         assert_eq!(taker.perp_position_by_raw_index(0).bids_base_lots, 0);
@@ -424,7 +427,7 @@ mod tests {
         );
         assert_eq!(
             taker.perp_position_by_raw_index(0).quote_position_native(),
-            match_quote - match_quote * market.taker_fee
+            match_quote - match_quote * taker_fee
         );
     }
 

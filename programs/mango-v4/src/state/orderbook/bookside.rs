@@ -206,8 +206,19 @@ mod tests {
         let mut order_tree = new_order_tree(order_tree_type);
         let mut root_fixed = OrderTreeRoot::zeroed();
         let mut root_pegged = OrderTreeRoot::zeroed();
-        let new_leaf =
-            |key: u128| LeafNode::new(0, key, Pubkey::default(), 0, 1, PostOrderType::Limit, 0, -1);
+        let new_leaf = |key: u128| {
+            LeafNode::new(
+                0,
+                key,
+                Pubkey::default(),
+                0,
+                1,
+                PostOrderType::Limit,
+                0,
+                -1,
+                0,
+            )
+        };
 
         // add 100 leaves to each BookSide, mostly random
         let mut keys = vec![];
@@ -301,6 +312,7 @@ mod tests {
                 PostOrderType::Limit,
                 tif,
                 peg_limit,
+                0,
             )
         };
         let mut add_fixed = |price: i64, tif: u16| {
