@@ -1180,6 +1180,28 @@ export class MangoClient {
     return [...preInstructions, ix, ...postInstructions];
   }
 
+  public async tokenWithdrawNative(
+    group: Group,
+    mangoAccount: MangoAccount,
+    mintPk: PublicKey,
+    nativeAmount: BN,
+    allowBorrow: boolean,
+    healthAccountsToExclude: PublicKey[] = [],
+  ): Promise<TransactionSignature> {
+    const ixs = await this.tokenWithdrawNativeIx(
+      group,
+      mangoAccount,
+      mintPk,
+      nativeAmount,
+      allowBorrow,
+      healthAccountsToExclude,
+    );
+    return await this.sendAndConfirmTransaction(
+      ixs,
+      group.addressLookupTablesList,
+    );
+  }
+
   // Serum
 
   public async serum3RegisterMarket(
