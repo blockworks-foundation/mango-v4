@@ -246,7 +246,7 @@ async fn test_perp_reduce_only() -> Result<(), TransportError> {
             init_base_asset_weight: 0.95,
             maint_base_liab_weight: 1.025,
             init_base_liab_weight: 1.05,
-            liquidation_fee: 0.012,
+            base_liquidation_fee: 0.012,
             maker_fee: 0.0002,
             taker_fee: 0.000,
             settle_pnl_limit_factor: -1.,

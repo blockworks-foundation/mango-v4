@@ -44,9 +44,9 @@ pub fn ix_gate_set(ctx: Context<IxGateSet>, ix_gate: u128) -> Result<()> {
     log_if_changed(&group, ix_gate, IxGate::PerpConsumeEvents);
     log_if_changed(&group, ix_gate, IxGate::PerpCreateMarket);
     log_if_changed(&group, ix_gate, IxGate::PerpDeactivatePosition);
-    log_if_changed(&group, ix_gate, IxGate::PerpLiqBasePosition);
+    log_if_changed(&group, ix_gate, IxGate::PerpLiqBaseOrPositivePnl);
     log_if_changed(&group, ix_gate, IxGate::PerpLiqForceCancelOrders);
-    log_if_changed(&group, ix_gate, IxGate::PerpLiqQuoteAndBankruptcy);
+    log_if_changed(&group, ix_gate, IxGate::PerpLiqNegativePnlOrBankruptcy);
     log_if_changed(&group, ix_gate, IxGate::PerpPlaceOrder);
     log_if_changed(&group, ix_gate, IxGate::PerpSettleFees);
     log_if_changed(&group, ix_gate, IxGate::PerpSettlePnl);

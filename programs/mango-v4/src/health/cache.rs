@@ -277,16 +277,20 @@ impl PerpInfo {
     #[inline(always)]
     pub fn health_contribution(&self, health_type: HealthType) -> I80F48 {
         let contribution = self.unweighted_health_contribution(health_type);
+        self.weigh_health_contribution(contribution, health_type)
+    }
 
-        if contribution > 0 {
+    #[inline(always)]
+    pub fn weigh_health_contribution(&self, unweighted: I80F48, health_type: HealthType) -> I80F48 {
+        if unweighted > 0 {
             let asset_weight = match health_type {
                 HealthType::Init => self.init_overall_asset_weight,
                 HealthType::Maint => self.maint_overall_asset_weight,
             };
 
-            cm!(asset_weight * contribution)
+            cm!(asset_weight * unweighted)
         } else {
-            contribution
+            unweighted
         }
     }
 
@@ -375,6 +379,23 @@ impl HealthCache {
                     MangoError::TokenPositionDoesNotExist,
                     "token index {} not found",
                     token_index
+                )
+            })
+    }
+
+    pub fn perp_info(&self, perp_market_index: PerpMarketIndex) -> Result<&PerpInfo> {
+        Ok(&self.perp_infos[self.perp_info_index(perp_market_index)?])
+    }
+
+    pub(crate) fn perp_info_index(&self, perp_market_index: PerpMarketIndex) -> Result<usize> {
+        self.perp_infos
+            .iter()
+            .position(|t| t.perp_market_index == perp_market_index)
+            .ok_or_else(|| {
+                error_msg_typed!(
+                    MangoError::PerpPositionDoesNotExist,
+                    "perp market index {} not found",
+                    perp_market_index
                 )
             })
     }
@@ -474,10 +495,10 @@ impl HealthCache {
         self.perp_infos.iter().any(|p| p.has_open_fills)
     }
 
-    pub fn has_perp_positive_maint_pnl_without_base_position(&self) -> bool {
+    pub fn has_perp_positive_pnl_no_base(&self) -> bool {
         self.perp_infos
             .iter()
-            .any(|p| p.maint_overall_asset_weight > 0 && p.base_lots == 0 && p.quote > 0)
+            .any(|p| p.base_lots == 0 && p.quote > 0)
     }
 
     pub fn has_perp_negative_pnl(&self) -> bool {
@@ -512,7 +533,7 @@ impl HealthCache {
         self.has_spot_assets() && self.has_spot_borrows()
             || self.has_perp_base_positions()
             || self.has_perp_open_fills()
-            || self.has_perp_positive_maint_pnl_without_base_position()
+            || self.has_perp_positive_pnl_no_base()
     }
 
     pub fn require_after_phase2_liquidation(&self) -> Result<()> {
@@ -530,8 +551,8 @@ impl HealthCache {
             MangoError::HasOpenPerpTakerFills
         );
         require!(
-            !self.has_perp_positive_maint_pnl_without_base_position(),
-            MangoError::HasLiquidatableTrustedPerpPnl
+            !self.has_perp_positive_pnl_no_base(),
+            MangoError::HasLiquidatablePositivePerpPnl
         );
         Ok(())
     }

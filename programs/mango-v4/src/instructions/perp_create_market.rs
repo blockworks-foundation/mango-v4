@@ -62,7 +62,7 @@ pub fn perp_create_market(
     init_base_liab_weight: f32,
     maint_overall_asset_weight: f32,
     init_overall_asset_weight: f32,
-    liquidation_fee: f32,
+    base_liquidation_fee: f32,
     maker_fee: f32,
     taker_fee: f32,
     min_funding: f32,
@@ -75,6 +75,7 @@ pub fn perp_create_market(
     settle_fee_fraction_low_health: f32,
     settle_pnl_limit_factor: f32,
     settle_pnl_limit_window_size_ts: u64,
+    positive_pnl_liquidation_fee: f32,
 ) -> Result<()> {
     // Settlement tokens that aren't USDC aren't fully implemented, the main missing steps are:
     // - In health: the perp health needs to be adjusted by the settlement token weights.
@@ -120,7 +121,7 @@ pub fn perp_create_market(
         long_funding: I80F48::ZERO,
         short_funding: I80F48::ZERO,
         funding_last_updated: now_ts,
-        liquidation_fee: I80F48::from_num(liquidation_fee),
+        base_liquidation_fee: I80F48::from_num(base_liquidation_fee),
         maker_fee: I80F48::from_num(maker_fee),
         taker_fee: I80F48::from_num(taker_fee),
         fees_accrued: I80F48::ZERO,
@@ -136,7 +137,8 @@ pub fn perp_create_market(
         padding4: Default::default(),
         maint_overall_asset_weight: I80F48::from_num(maint_overall_asset_weight),
         init_overall_asset_weight: I80F48::from_num(init_overall_asset_weight),
-        reserved: [0; 1904],
+        positive_pnl_liquidation_fee: I80F48::from_num(positive_pnl_liquidation_fee),
+        reserved: [0; 1888],
     };
 
     let oracle_price =

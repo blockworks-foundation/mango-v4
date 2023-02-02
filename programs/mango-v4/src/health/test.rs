@@ -19,6 +19,7 @@ impl MyZeroCopy for StubOracle {}
 impl MyZeroCopy for Bank {}
 impl MyZeroCopy for PerpMarket {}
 
+#[derive(Clone)]
 pub struct TestAccount<T> {
     pub bytes: Vec<u8>,
     pub pubkey: Pubkey,

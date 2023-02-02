@@ -114,7 +114,7 @@ pub struct PerpMarket {
     /// Fees
 
     /// Fee for base position liquidation
-    pub liquidation_fee: I80F48,
+    pub base_liquidation_fee: I80F48,
     /// Fee when matching maker orders. May be negative.
     pub maker_fee: I80F48,
     /// Fee for taker orders, may not be negative.
@@ -164,7 +164,9 @@ pub struct PerpMarket {
     pub maint_overall_asset_weight: I80F48,
     pub init_overall_asset_weight: I80F48,
 
-    pub reserved: [u8; 1904],
+    pub positive_pnl_liquidation_fee: I80F48,
+
+    pub reserved: [u8; 1888],
 }
 
 const_assert_eq!(
@@ -199,8 +201,8 @@ const_assert_eq!(
         + 8
         + 1
         + 7
-        + 2 * 16
-        + 1904
+        + 3 * 16
+        + 1888
 );
 const_assert_eq!(size_of::<PerpMarket>(), 2808);
 const_assert_eq!(size_of::<PerpMarket>() % 8, 0);
@@ -400,7 +402,7 @@ impl PerpMarket {
             long_funding: I80F48::ZERO,
             short_funding: I80F48::ZERO,
             funding_last_updated: 0,
-            liquidation_fee: I80F48::ZERO,
+            base_liquidation_fee: I80F48::ZERO,
             maker_fee: I80F48::ZERO,
             taker_fee: I80F48::ZERO,
             fees_accrued: I80F48::ZERO,
@@ -416,7 +418,8 @@ impl PerpMarket {
             padding4: Default::default(),
             maint_overall_asset_weight: I80F48::ONE,
             init_overall_asset_weight: I80F48::ONE,
-            reserved: [0; 1904],
+            positive_pnl_liquidation_fee: I80F48::ZERO,
+            reserved: [0; 1888],
         }
     }
 }

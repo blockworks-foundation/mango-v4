@@ -2547,7 +2547,7 @@ export type MangoV4 = {
           "type": "f32"
         },
         {
-          "name": "liquidationFee",
+          "name": "baseLiquidationFee",
           "type": "f32"
         },
         {
@@ -2601,6 +2601,10 @@ export type MangoV4 = {
         {
           "name": "settlePnlLimitWindowSizeTs",
           "type": "u64"
+        },
+        {
+          "name": "positivePnlLiquidationFee",
+          "type": "f32"
         }
       ]
     },
@@ -2690,7 +2694,7 @@ export type MangoV4 = {
           }
         },
         {
-          "name": "liquidationFeeOpt",
+          "name": "baseLiquidationFeeOpt",
           "type": {
             "option": "f32"
           }
@@ -2780,7 +2784,7 @@ export type MangoV4 = {
           }
         },
         {
-          "name": "settlePnlLimitWindowSizeTs",
+          "name": "settlePnlLimitWindowSizeTsOpt",
           "type": {
             "option": "u64"
           }
@@ -2794,6 +2798,12 @@ export type MangoV4 = {
         {
           "name": "resetStablePrice",
           "type": "bool"
+        },
+        {
+          "name": "positivePnlLiquidationFeeOpt",
+          "type": {
+            "option": "f32"
+          }
         }
       ]
     },
@@ -3405,7 +3415,7 @@ export type MangoV4 = {
       ]
     },
     {
-      "name": "perpLiqBasePosition",
+      "name": "perpLiqBaseOrPositivePnl",
       "accounts": [
         {
           "name": "group",
@@ -3436,12 +3446,31 @@ export type MangoV4 = {
           "name": "liqee",
           "isMut": true,
           "isSigner": false
+        },
+        {
+          "name": "settleBank",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "settleVault",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "settleOracle",
+          "isMut": false,
+          "isSigner": false
         }
       ],
       "args": [
         {
           "name": "maxBaseTransfer",
           "type": "i64"
+        },
+        {
+          "name": "maxPnlTransfer",
+          "type": "u64"
         }
       ]
     },
@@ -3482,7 +3511,7 @@ export type MangoV4 = {
       ]
     },
     {
-      "name": "perpLiqQuoteAndBankruptcy",
+      "name": "perpLiqNegativePnlOrBankruptcy",
       "accounts": [
         {
           "name": "group",
@@ -4597,7 +4626,7 @@ export type MangoV4 = {
             "type": "u64"
           },
           {
-            "name": "liquidationFee",
+            "name": "baseLiquidationFee",
             "docs": [
               "Fees",
               "Fee for base position liquidation"
@@ -4737,11 +4766,17 @@ export type MangoV4 = {
             }
           },
           {
+            "name": "positivePnlLiquidationFee",
+            "type": {
+              "defined": "I80F48"
+            }
+          },
+          {
             "name": "reserved",
             "type": {
               "array": [
                 "u8",
-                1904
+                1888
               ]
             }
           }
@@ -6539,13 +6574,13 @@ export type MangoV4 = {
             "name": "PerpDeactivatePosition"
           },
           {
-            "name": "PerpLiqBasePosition"
+            "name": "PerpLiqBaseOrPositivePnl"
           },
           {
             "name": "PerpLiqForceCancelOrders"
           },
           {
-            "name": "PerpLiqQuoteAndBankruptcy"
+            "name": "PerpLiqNegativePnlOrBankruptcy"
           },
           {
             "name": "PerpPlaceOrder"
@@ -7717,7 +7752,7 @@ export type MangoV4 = {
       ]
     },
     {
-      "name": "PerpLiqBasePositionLog",
+      "name": "PerpLiqBaseOrPositivePnlLog",
       "fields": [
         {
           "name": "mangoGroup",
@@ -7746,6 +7781,16 @@ export type MangoV4 = {
         },
         {
           "name": "quoteTransfer",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "pnlTransfer",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "pnlSettleLimitTransfer",
           "type": "i128",
           "index": false
         },
@@ -7812,7 +7857,7 @@ export type MangoV4 = {
       ]
     },
     {
-      "name": "PerpLiqQuoteAndBankruptcyLog",
+      "name": "PerpLiqNegativePnlOrBankruptcyLog",
       "fields": [
         {
           "name": "mangoGroup",
@@ -8095,8 +8140,8 @@ export type MangoV4 = {
     },
     {
       "code": 6037,
-      "name": "HasLiquidatableTrustedPerpPnl",
-      "msg": "has liquidatable trusted perp pnl"
+      "name": "HasLiquidatablePositivePerpPnl",
+      "msg": "has liquidatable positive perp pnl"
     },
     {
       "code": 6038,
@@ -8122,6 +8167,11 @@ export type MangoV4 = {
       "code": 6042,
       "name": "IxIsDisabled",
       "msg": "instruction is disabled"
+    },
+    {
+      "code": 6043,
+      "name": "NoLiquidatablePerpBasePosition",
+      "msg": "no liquidatable perp base position"
     }
   ]
 };
@@ -10675,7 +10725,7 @@ export const IDL: MangoV4 = {
           "type": "f32"
         },
         {
-          "name": "liquidationFee",
+          "name": "baseLiquidationFee",
           "type": "f32"
         },
         {
@@ -10729,6 +10779,10 @@ export const IDL: MangoV4 = {
         {
           "name": "settlePnlLimitWindowSizeTs",
           "type": "u64"
+        },
+        {
+          "name": "positivePnlLiquidationFee",
+          "type": "f32"
         }
       ]
     },
@@ -10818,7 +10872,7 @@ export const IDL: MangoV4 = {
           }
         },
         {
-          "name": "liquidationFeeOpt",
+          "name": "baseLiquidationFeeOpt",
           "type": {
             "option": "f32"
           }
@@ -10908,7 +10962,7 @@ export const IDL: MangoV4 = {
           }
         },
         {
-          "name": "settlePnlLimitWindowSizeTs",
+          "name": "settlePnlLimitWindowSizeTsOpt",
           "type": {
             "option": "u64"
           }
@@ -10922,6 +10976,12 @@ export const IDL: MangoV4 = {
         {
           "name": "resetStablePrice",
           "type": "bool"
+        },
+        {
+          "name": "positivePnlLiquidationFeeOpt",
+          "type": {
+            "option": "f32"
+          }
         }
       ]
     },
@@ -11533,7 +11593,7 @@ export const IDL: MangoV4 = {
       ]
     },
     {
-      "name": "perpLiqBasePosition",
+      "name": "perpLiqBaseOrPositivePnl",
       "accounts": [
         {
           "name": "group",
@@ -11564,12 +11624,31 @@ export const IDL: MangoV4 = {
           "name": "liqee",
           "isMut": true,
           "isSigner": false
+        },
+        {
+          "name": "settleBank",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "settleVault",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "settleOracle",
+          "isMut": false,
+          "isSigner": false
         }
       ],
       "args": [
         {
           "name": "maxBaseTransfer",
           "type": "i64"
+        },
+        {
+          "name": "maxPnlTransfer",
+          "type": "u64"
         }
       ]
     },
@@ -11610,7 +11689,7 @@ export const IDL: MangoV4 = {
       ]
     },
     {
-      "name": "perpLiqQuoteAndBankruptcy",
+      "name": "perpLiqNegativePnlOrBankruptcy",
       "accounts": [
         {
           "name": "group",
@@ -12725,7 +12804,7 @@ export const IDL: MangoV4 = {
             "type": "u64"
           },
           {
-            "name": "liquidationFee",
+            "name": "baseLiquidationFee",
             "docs": [
               "Fees",
               "Fee for base position liquidation"
@@ -12865,11 +12944,17 @@ export const IDL: MangoV4 = {
             }
           },
           {
+            "name": "positivePnlLiquidationFee",
+            "type": {
+              "defined": "I80F48"
+            }
+          },
+          {
             "name": "reserved",
             "type": {
               "array": [
                 "u8",
-                1904
+                1888
               ]
             }
           }
@@ -14667,13 +14752,13 @@ export const IDL: MangoV4 = {
             "name": "PerpDeactivatePosition"
           },
           {
-            "name": "PerpLiqBasePosition"
+            "name": "PerpLiqBaseOrPositivePnl"
           },
           {
             "name": "PerpLiqForceCancelOrders"
           },
           {
-            "name": "PerpLiqQuoteAndBankruptcy"
+            "name": "PerpLiqNegativePnlOrBankruptcy"
           },
           {
             "name": "PerpPlaceOrder"
@@ -15845,7 +15930,7 @@ export const IDL: MangoV4 = {
       ]
     },
     {
-      "name": "PerpLiqBasePositionLog",
+      "name": "PerpLiqBaseOrPositivePnlLog",
       "fields": [
         {
           "name": "mangoGroup",
@@ -15874,6 +15959,16 @@ export const IDL: MangoV4 = {
         },
         {
           "name": "quoteTransfer",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "pnlTransfer",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "pnlSettleLimitTransfer",
           "type": "i128",
           "index": false
         },
@@ -15940,7 +16035,7 @@ export const IDL: MangoV4 = {
       ]
     },
     {
-      "name": "PerpLiqQuoteAndBankruptcyLog",
+      "name": "PerpLiqNegativePnlOrBankruptcyLog",
       "fields": [
         {
           "name": "mangoGroup",
@@ -16223,8 +16318,8 @@ export const IDL: MangoV4 = {
     },
     {
       "code": 6037,
-      "name": "HasLiquidatableTrustedPerpPnl",
-      "msg": "has liquidatable trusted perp pnl"
+      "name": "HasLiquidatablePositivePerpPnl",
+      "msg": "has liquidatable positive perp pnl"
     },
     {
       "code": 6038,
@@ -16250,6 +16345,11 @@ export const IDL: MangoV4 = {
       "code": 6042,
       "name": "IxIsDisabled",
       "msg": "instruction is disabled"
+    },
+    {
+      "code": 6043,
+      "name": "NoLiquidatablePerpBasePosition",
+      "msg": "no liquidatable perp base position"
     }
   ]
 };

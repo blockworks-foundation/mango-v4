@@ -228,8 +228,8 @@ async function main() {
       0.8,
       1.1,
       1.2,
-      1,
-      1,
+      0.95,
+      0.9,
       0.05,
       -0.001,
       0.002,
@@ -244,6 +244,7 @@ async function main() {
       0,
       -1.0,
       2 * 60 * 60,
+      0.025,
     );
   } catch (error) {
     console.log(error);

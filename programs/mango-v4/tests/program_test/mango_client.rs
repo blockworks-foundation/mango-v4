@@ -2581,7 +2581,8 @@ pub struct PerpCreateMarketInstruction {
     pub init_base_liab_weight: f32,
     pub maint_overall_asset_weight: f32,
     pub init_overall_asset_weight: f32,
-    pub liquidation_fee: f32,
+    pub base_liquidation_fee: f32,
+    pub positive_pnl_liquidation_fee: f32,
     pub maker_fee: f32,
     pub taker_fee: f32,
     pub group_insurance_fund: bool,
@@ -2638,7 +2639,7 @@ impl ClientInstruction for PerpCreateMarketInstruction {
             init_base_liab_weight: self.init_base_liab_weight,
             maint_overall_asset_weight: self.maint_overall_asset_weight,
             init_overall_asset_weight: self.init_overall_asset_weight,
-            liquidation_fee: self.liquidation_fee,
+            base_liquidation_fee: self.base_liquidation_fee,
             maker_fee: self.maker_fee,
             taker_fee: self.taker_fee,
             max_funding: 0.05,
@@ -2652,6 +2653,7 @@ impl ClientInstruction for PerpCreateMarketInstruction {
             settle_fee_fraction_low_health: self.settle_fee_fraction_low_health,
             settle_pnl_limit_factor: self.settle_pnl_limit_factor,
             settle_pnl_limit_window_size_ts: self.settle_pnl_limit_window_size_ts,
+            positive_pnl_liquidation_fee: self.positive_pnl_liquidation_fee,
         };
 
         let perp_market = Pubkey::find_program_address(
@@ -2696,7 +2698,7 @@ fn perp_edit_instruction_default() -> mango_v4::instruction::PerpEditMarket {
         init_base_liab_weight_opt: None,
         maint_overall_asset_weight_opt: None,
         init_overall_asset_weight_opt: None,
-        liquidation_fee_opt: None,
+        base_liquidation_fee_opt: None,
         maker_fee_opt: None,
         taker_fee_opt: None,
         min_funding_opt: None,
@@ -2711,9 +2713,10 @@ fn perp_edit_instruction_default() -> mango_v4::instruction::PerpEditMarket {
         stable_price_delay_growth_limit_opt: None,
         stable_price_growth_limit_opt: None,
         settle_pnl_limit_factor_opt: None,
-        settle_pnl_limit_window_size_ts: None,
+        settle_pnl_limit_window_size_ts_opt: None,
         reduce_only_opt: None,
         reset_stable_price: false,
+        positive_pnl_liquidation_fee_opt: None,
     }
 }
 
@@ -2776,7 +2779,7 @@ impl ClientInstruction for PerpSetSettleLimitWindow {
         let perp_market: PerpMarket = account_loader.load(&self.perp_market).await.unwrap();
 
         let instruction = Self::Instruction {
-            settle_pnl_limit_window_size_ts: Some(self.window_size_ts),
+            settle_pnl_limit_window_size_ts_opt: Some(self.window_size_ts),
             ..perp_edit_instruction_default()
         };
 
@@ -2816,6 +2819,48 @@ impl ClientInstruction for PerpMakeReduceOnly {
 
         let instruction = Self::Instruction {
             reduce_only_opt: Some(true),
+            ..perp_edit_instruction_default()
+        };
+
+        let accounts = Self::Accounts {
+            group: self.group,
+            admin: self.admin.pubkey(),
+            perp_market: self.perp_market,
+            oracle: perp_market.oracle,
+        };
+
+        let instruction = make_instruction(program_id, &accounts, instruction);
+        (accounts, instruction)
+    }
+
+    fn signers(&self) -> Vec<TestKeypair> {
+        vec![self.admin]
+    }
+}
+
+pub struct PerpChangeWeights {
+    pub group: Pubkey,
+    pub admin: TestKeypair,
+    pub perp_market: Pubkey,
+    pub init_overall_asset_weight: f32,
+    pub maint_overall_asset_weight: f32,
+}
+
+#[async_trait::async_trait(?Send)]
+impl ClientInstruction for PerpChangeWeights {
+    type Accounts = mango_v4::accounts::PerpEditMarket;
+    type Instruction = mango_v4::instruction::PerpEditMarket;
+    async fn to_instruction(
+        &self,
+        account_loader: impl ClientAccountLoader + 'async_trait,
+    ) -> (Self::Accounts, instruction::Instruction) {
+        let program_id = mango_v4::id();
+
+        let perp_market: PerpMarket = account_loader.load(&self.perp_market).await.unwrap();
+
+        let instruction = Self::Instruction {
+            init_overall_asset_weight_opt: Some(self.init_overall_asset_weight),
+            maint_overall_asset_weight_opt: Some(self.maint_overall_asset_weight),
             ..perp_edit_instruction_default()
         };
 
@@ -3383,17 +3428,18 @@ impl ClientInstruction for PerpLiqForceCancelOrdersInstruction {
     }
 }
 
-pub struct PerpLiqBasePositionInstruction {
+pub struct PerpLiqBaseOrPositivePnlInstruction {
     pub liqor: Pubkey,
     pub liqor_owner: TestKeypair,
     pub liqee: Pubkey,
     pub perp_market: Pubkey,
     pub max_base_transfer: i64,
+    pub max_pnl_transfer: u64,
 }
 #[async_trait::async_trait(?Send)]
-impl ClientInstruction for PerpLiqBasePositionInstruction {
-    type Accounts = mango_v4::accounts::PerpLiqBasePosition;
-    type Instruction = mango_v4::instruction::PerpLiqBasePosition;
+impl ClientInstruction for PerpLiqBaseOrPositivePnlInstruction {
+    type Accounts = mango_v4::accounts::PerpLiqBaseOrPositivePnl;
+    type Instruction = mango_v4::instruction::PerpLiqBaseOrPositivePnl;
     async fn to_instruction(
         &self,
         account_loader: impl ClientAccountLoader + 'async_trait,
@@ -3401,9 +3447,11 @@ impl ClientInstruction for PerpLiqBasePositionInstruction {
         let program_id = mango_v4::id();
         let instruction = Self::Instruction {
             max_base_transfer: self.max_base_transfer,
+            max_pnl_transfer: self.max_pnl_transfer,
         };
 
         let perp_market: PerpMarket = account_loader.load(&self.perp_market).await.unwrap();
+        let group_key = perp_market.group;
         let liqor = account_loader
             .load_mango_account(&self.liqor)
             .await
@@ -3423,13 +3471,28 @@ impl ClientInstruction for PerpLiqBasePositionInstruction {
         )
         .await;
 
+        let group = account_loader.load::<Group>(&group_key).await.unwrap();
+        let quote_mint_info = Pubkey::find_program_address(
+            &[
+                b"MintInfo".as_ref(),
+                group_key.as_ref(),
+                group.insurance_mint.as_ref(),
+            ],
+            &program_id,
+        )
+        .0;
+        let quote_mint_info: MintInfo = account_loader.load(&quote_mint_info).await.unwrap();
+
         let accounts = Self::Accounts {
-            group: liqor.fixed.group,
+            group: group_key,
             perp_market: self.perp_market,
             oracle: perp_market.oracle,
             liqor: self.liqor,
             liqor_owner: self.liqor_owner.pubkey(),
             liqee: self.liqee,
+            settle_bank: quote_mint_info.first_bank(),
+            settle_vault: quote_mint_info.first_vault(),
+            settle_oracle: quote_mint_info.oracle,
         };
         let mut instruction = make_instruction(program_id, &accounts, instruction);
         instruction.accounts.extend(health_check_metas);
@@ -3442,7 +3505,7 @@ impl ClientInstruction for PerpLiqBasePositionInstruction {
     }
 }
 
-pub struct PerpLiqQuoteAndBankruptcyInstruction {
+pub struct PerpLiqNegativePnlOrBankruptcyInstruction {
     pub liqor: Pubkey,
     pub liqor_owner: TestKeypair,
     pub liqee: Pubkey,
@@ -3450,9 +3513,9 @@ pub struct PerpLiqQuoteAndBankruptcyInstruction {
     pub max_liab_transfer: u64,
 }
 #[async_trait::async_trait(?Send)]
-impl ClientInstruction for PerpLiqQuoteAndBankruptcyInstruction {
-    type Accounts = mango_v4::accounts::PerpLiqQuoteAndBankruptcy;
-    type Instruction = mango_v4::instruction::PerpLiqQuoteAndBankruptcy;
+impl ClientInstruction for PerpLiqNegativePnlOrBankruptcyInstruction {
+    type Accounts = mango_v4::accounts::PerpLiqNegativePnlOrBankruptcy;
+    type Instruction = mango_v4::instruction::PerpLiqNegativePnlOrBankruptcy;
     async fn to_instruction(
         &self,
         account_loader: impl ClientAccountLoader + 'async_trait,

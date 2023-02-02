@@ -62,7 +62,7 @@ export interface PerpEditParams {
   initBaseLiabWeight: number | null;
   maintOverallAssetWeight: number | null;
   initOverallAssetWeight: number | null;
-  liquidationFee: number | null;
+  baseLiquidationFee: number | null;
   makerFee: number | null;
   takerFee: number | null;
   feePenalty: number | null;
@@ -80,6 +80,7 @@ export interface PerpEditParams {
   settlePnlLimitWindowSize: number | null;
   reduceOnly: boolean | null;
   resetStablePrice: boolean | null;
+  positivePnlLiquidationFee: number | null;
 }
 
 export const NullPerpEditParams: PerpEditParams = {
@@ -92,7 +93,7 @@ export const NullPerpEditParams: PerpEditParams = {
   initBaseLiabWeight: null,
   maintOverallAssetWeight: null,
   initOverallAssetWeight: null,
-  liquidationFee: null,
+  baseLiquidationFee: null,
   makerFee: null,
   takerFee: null,
   feePenalty: null,
@@ -110,6 +111,7 @@ export const NullPerpEditParams: PerpEditParams = {
   settlePnlLimitWindowSize: null,
   reduceOnly: null,
   resetStablePrice: null,
+  positivePnlLiquidationFee: null,
 };
 
 // Use with TrueIxGateParams and buildIxGate
@@ -135,9 +137,9 @@ export interface IxGateParams {
   PerpCreateMarket: boolean;
   PerpDeactivatePosition: boolean;
   PerpEditMarket: boolean;
-  PerpLiqBasePosition: boolean;
+  PerpLiqBaseOrPositivePnl: boolean;
   PerpLiqForceCancelOrders: boolean;
-  PerpLiqQuoteAndBankruptcy: boolean;
+  PerpLiqNegativePnlOrBankruptcy: boolean;
   PerpPlaceOrder: boolean;
   PerpSettleFees: boolean;
   PerpSettlePnl: boolean;
@@ -190,9 +192,9 @@ export const TrueIxGateParams: IxGateParams = {
   PerpCreateMarket: true,
   PerpDeactivatePosition: true,
   PerpEditMarket: true,
-  PerpLiqBasePosition: true,
+  PerpLiqBaseOrPositivePnl: true,
   PerpLiqForceCancelOrders: true,
-  PerpLiqQuoteAndBankruptcy: true,
+  PerpLiqNegativePnlOrBankruptcy: true,
   PerpPlaceOrder: true,
   PerpSettleFees: true,
   PerpSettlePnl: true,
@@ -256,9 +258,9 @@ export function buildIxGate(p: IxGateParams): BN {
   toggleIx(ixGate, p, 'PerpConsumeEvents', 16);
   toggleIx(ixGate, p, 'PerpCreateMarket', 17);
   toggleIx(ixGate, p, 'PerpDeactivatePosition', 18);
-  toggleIx(ixGate, p, 'PerpLiqBasePosition', 19);
+  toggleIx(ixGate, p, 'PerpLiqBaseOrPositivePnl', 19);
   toggleIx(ixGate, p, 'PerpLiqForceCancelOrders', 20);
-  toggleIx(ixGate, p, 'PerpLiqQuoteAndBankruptcy', 21);
+  toggleIx(ixGate, p, 'PerpLiqNegativePnlOrBankruptcy', 21);
   toggleIx(ixGate, p, 'PerpPlaceOrder', 22);
   toggleIx(ixGate, p, 'PerpSettleFees', 23);
   toggleIx(ixGate, p, 'PerpSettlePnl', 24);

@@ -1668,7 +1668,7 @@ export class MangoClient {
     initBaseLiabWeight: number,
     maintOverallAssetWeight: number,
     initOverallAssetWeight: number,
-    liquidationFee: number,
+    baseLiquidationFee: number,
     makerFee: number,
     takerFee: number,
     feePenalty: number,
@@ -1682,6 +1682,7 @@ export class MangoClient {
     settleTokenIndex: number,
     settlePnlLimitFactor: number,
     settlePnlLimitWindowSize: number,
+    positivePnlLiquidationFee: number,
   ): Promise<TransactionSignature> {
     const bids = new Keypair();
     const asks = new Keypair();
@@ -1708,7 +1709,7 @@ export class MangoClient {
         initBaseLiabWeight,
         maintOverallAssetWeight,
         initOverallAssetWeight,
-        liquidationFee,
+        baseLiquidationFee,
         makerFee,
         takerFee,
         minFunding,
@@ -1722,6 +1723,7 @@ export class MangoClient {
         settleTokenIndex,
         settlePnlLimitFactor,
         new BN(settlePnlLimitWindowSize),
+        positivePnlLiquidationFee,
       )
       .accounts({
         group: group.publicKey,
@@ -1791,7 +1793,7 @@ export class MangoClient {
         params.initBaseLiabWeight,
         params.maintOverallAssetWeight,
         params.initOverallAssetWeight,
-        params.liquidationFee,
+        params.baseLiquidationFee,
         params.makerFee,
         params.takerFee,
         params.minFunding,
@@ -1811,6 +1813,7 @@ export class MangoClient {
           : null,
         params.reduceOnly,
         params.resetStablePrice ?? false,
+        params.positivePnlLiquidationFee,
       )
       .accounts({
         group: group.publicKey,

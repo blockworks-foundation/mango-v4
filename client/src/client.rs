@@ -934,13 +934,15 @@ impl MangoClient {
         self.send_and_confirm_permissionless_tx(vec![ix]).await
     }
 
-    pub async fn perp_liq_base_position(
+    pub async fn perp_liq_base_or_positive_pnl(
         &self,
         liqee: (&Pubkey, &MangoAccountValue),
         market_index: PerpMarketIndex,
         max_base_transfer: i64,
+        max_pnl_transfer: u64,
     ) -> anyhow::Result<Signature> {
         let perp = self.context.perp(market_index);
+        let settle_token_info = self.context.token(perp.market.settle_token_index);
 
         let health_remaining_ams = self
             .derive_liquidation_health_check_remaining_account_metas(liqee.1, &[])
@@ -951,27 +953,33 @@ impl MangoClient {
             program_id: mango_v4::id(),
             accounts: {
                 let mut ams = anchor_lang::ToAccountMetas::to_account_metas(
-                    &mango_v4::accounts::PerpLiqBasePosition {
+                    &mango_v4::accounts::PerpLiqBaseOrPositivePnl {
                         group: self.group(),
                         perp_market: perp.address,
                         oracle: perp.market.oracle,
                         liqor: self.mango_account_address,
                         liqor_owner: self.owner(),
                         liqee: *liqee.0,
+                        settle_bank: settle_token_info.mint_info.first_bank(),
+                        settle_vault: settle_token_info.mint_info.first_vault(),
+                        settle_oracle: settle_token_info.mint_info.oracle,
                     },
                     None,
                 );
                 ams.extend(health_remaining_ams.into_iter());
                 ams
             },
-            data: anchor_lang::InstructionData::data(&mango_v4::instruction::PerpLiqBasePosition {
-                max_base_transfer,
-            }),
+            data: anchor_lang::InstructionData::data(
+                &mango_v4::instruction::PerpLiqBaseOrPositivePnl {
+                    max_base_transfer,
+                    max_pnl_transfer,
+                },
+            ),
         };
         self.send_and_confirm_owner_tx(vec![ix]).await
     }
 
-    pub async fn perp_liq_quote_and_bankruptcy(
+    pub async fn perp_liq_negative_pnl_or_bankruptcy(
         &self,
         liqee: (&Pubkey, &MangoAccountValue),
         market_index: PerpMarketIndex,
@@ -995,7 +1003,7 @@ impl MangoClient {
             program_id: mango_v4::id(),
             accounts: {
                 let mut ams = anchor_lang::ToAccountMetas::to_account_metas(
-                    &mango_v4::accounts::PerpLiqQuoteAndBankruptcy {
+                    &mango_v4::accounts::PerpLiqNegativePnlOrBankruptcy {
                         group: self.group(),
                         perp_market: perp.address,
                         oracle: perp.market.oracle,
@@ -1014,7 +1022,7 @@ impl MangoClient {
                 ams
             },
             data: anchor_lang::InstructionData::data(
-                &mango_v4::instruction::PerpLiqQuoteAndBankruptcy { max_liab_transfer },
+                &mango_v4::instruction::PerpLiqNegativePnlOrBankruptcy { max_liab_transfer },
             ),
         };
         self.send_and_confirm_owner_tx(vec![ix]).await
