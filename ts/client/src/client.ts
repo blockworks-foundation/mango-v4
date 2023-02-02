@@ -2755,6 +2755,7 @@ export class MangoClient {
     return await this.program.methods
       .healthRegionBegin()
       .accounts({
+        group: group.publicKey,
         account: account.publicKey,
         instructions: SYSVAR_INSTRUCTIONS_PUBKEY,
       })
