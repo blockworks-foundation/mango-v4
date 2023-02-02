@@ -4,6 +4,19 @@ Update this for each program release and mainnet deployment.
 
 ## not on mainnet
 
+### v0.5.0, 2023-2-2
+
+Deployment: -
+
+- Log old and new values in edit instructions (#418)
+- PerpPlaceOrder returns order id (#417)
+- Prevent setting the group admin to the default address (#423)
+- Allow security admin to disable individual instructions (#419)
+- Rename pnl_asset_weight to overall_asset_weight (#427)
+- Significant changes to perp liquidation instructions (#424)
+- Reorganize perp fill events to save bytes and have client order ids (#426)
+- Add market index to serum3 events (#429)
+
 ## mainnet
 
 ### v0.4.0, 2023-1-24
