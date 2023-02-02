@@ -1,4 +1,8 @@
+_work in progress_
+
 ## Development
+
+See DEVELOPING.md
 
 ### Dependencies
 
@@ -16,18 +20,23 @@ Consider setting the git option `submodule.recurse=true`.
 
 - devnet: 4MangoMjqJ2firMokCjjGgoK8d4MXcrgL7XJaL3w6fVg
 - mainnet-beta: 4MangoMjqJ2firMokCjjGgoK8d4MXcrgL7XJaL3w6fVg
+- primary mango group on mainnet-beta: 78b8f4cGCwmZ9ysPFMWLaLTkkaYnUjwMJYStWe5RTSSX
 
-### Notes
+### Release
 
-For testing latest program changes while developing,
-just run below scripts in given order form any branch,
-these set of scripts should more or less always work,
-bump up GROUP_NUM if you unsure if previous GROUP_NUM has not been cleanly closed or setup with older program code
+Here are steps followed while performing a program deployment to mainnet-beta
 
-```
-./release-to-devnet.sh
-GROUP_NUM=4 yarn ts-node ts/client/src/scripts/devnet-admin.ts
-GROUP_NUM=4 yarn ts-node ts/client/src/scripts/devnet-user.ts
-GROUP_NUM=4 yarn ts-node ts/client/src/scripts/devnet-user-close-account.ts
-GROUP_NUM=4 yarn ts-node ts/client/src/scripts/devnet-admin-close.ts
-```
+- review diff of last deployed tag to mainnet-beta, e.g. https://github.com/blockworks-foundation/mango-v4/compare/program-v0.4.0..dev, pay special attention to account layout changes, backward compatibility of newly introduced account fields, etc.
+- update changelog
+- add a git tag e.g. `program-v0.0.1`, should match the version the program has
+- deploy to mainnet-beta
+- merge code to `main` branch
+- notify other contributors for bringing in changes from new release by merging `main` into their branch, e.g. `ts-client` and `deploy-mm`
+- notify other contributors for appropriately handling offchain services e.g. scrapers, market makers, etc.
+- bump program version in `Cargo.toml` on dev branch for next release
+
+Here are steps followed while performing a npm package release
+note: the UI currently uses code directly from github, pointing to the ts-client branch
+
+- use `yarn publish` to release a new package, ensure compatibility with program release to mainnet-beta
+- fix the tag auto added by yarn to match our internal convention, see script `fix-npm-tag.sh`, tags should look like this e.g.`npm-v0.0.1`, note: the npm package version/tag should not necessarily match the latest program deployment
