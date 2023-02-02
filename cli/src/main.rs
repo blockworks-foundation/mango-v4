@@ -115,6 +115,7 @@ impl Rpc {
             commitment: solana_sdk::commitment_config::CommitmentConfig::confirmed(),
             fee_payer: Arc::new(fee_payer),
             timeout: None,
+            prioritization_micro_lamports: 5,
         })
     }
 }
