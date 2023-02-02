@@ -5923,11 +5923,18 @@ export type MangoV4 = {
             "type": "i64"
           },
           {
+            "name": "clientOrderId",
+            "docs": [
+              "User defined id for this order, used in FillEvents"
+            ],
+            "type": "u64"
+          },
+          {
             "name": "reserved",
             "type": {
               "array": [
                 "u8",
-                40
+                32
               ]
             }
           }
@@ -6113,13 +6120,12 @@ export type MangoV4 = {
             "type": "publicKey"
           },
           {
-            "name": "makerOrderId",
-            "type": "u128"
-          },
-          {
-            "name": "makerFee",
+            "name": "padding2",
             "type": {
-              "defined": "I80F48"
+              "array": [
+                "u8",
+                32
+              ]
             }
           },
           {
@@ -6131,17 +6137,25 @@ export type MangoV4 = {
             "type": "publicKey"
           },
           {
-            "name": "takerOrderId",
-            "type": "u128"
+            "name": "padding3",
+            "type": {
+              "array": [
+                "u8",
+                16
+              ]
+            }
           },
           {
             "name": "takerClientOrderId",
             "type": "u64"
           },
           {
-            "name": "takerFee",
+            "name": "padding4",
             "type": {
-              "defined": "I80F48"
+              "array": [
+                "u8",
+                16
+              ]
             }
           },
           {
@@ -6153,11 +6167,23 @@ export type MangoV4 = {
             "type": "i64"
           },
           {
+            "name": "makerClientOrderId",
+            "type": "u64"
+          },
+          {
+            "name": "makerFee",
+            "type": "f32"
+          },
+          {
+            "name": "takerFee",
+            "type": "f32"
+          },
+          {
             "name": "reserved",
             "type": {
               "array": [
                 "u8",
-                24
+                8
               ]
             }
           }
@@ -7200,6 +7226,91 @@ export type MangoV4 = {
         {
           "name": "takerFee",
           "type": "i128",
+          "index": false
+        },
+        {
+          "name": "price",
+          "type": "i64",
+          "index": false
+        },
+        {
+          "name": "quantity",
+          "type": "i64",
+          "index": false
+        }
+      ]
+    },
+    {
+      "name": "FillLogV2",
+      "fields": [
+        {
+          "name": "mangoGroup",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "marketIndex",
+          "type": "u16",
+          "index": false
+        },
+        {
+          "name": "takerSide",
+          "type": "u8",
+          "index": false
+        },
+        {
+          "name": "makerSlot",
+          "type": "u8",
+          "index": false
+        },
+        {
+          "name": "makerOut",
+          "type": "bool",
+          "index": false
+        },
+        {
+          "name": "timestamp",
+          "type": "u64",
+          "index": false
+        },
+        {
+          "name": "seqNum",
+          "type": "u64",
+          "index": false
+        },
+        {
+          "name": "maker",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "makerClientOrderId",
+          "type": "u64",
+          "index": false
+        },
+        {
+          "name": "makerFee",
+          "type": "f32",
+          "index": false
+        },
+        {
+          "name": "makerTimestamp",
+          "type": "u64",
+          "index": false
+        },
+        {
+          "name": "taker",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "takerClientOrderId",
+          "type": "u64",
+          "index": false
+        },
+        {
+          "name": "takerFee",
+          "type": "f32",
           "index": false
         },
         {
@@ -14101,11 +14212,18 @@ export const IDL: MangoV4 = {
             "type": "i64"
           },
           {
+            "name": "clientOrderId",
+            "docs": [
+              "User defined id for this order, used in FillEvents"
+            ],
+            "type": "u64"
+          },
+          {
             "name": "reserved",
             "type": {
               "array": [
                 "u8",
-                40
+                32
               ]
             }
           }
@@ -14291,13 +14409,12 @@ export const IDL: MangoV4 = {
             "type": "publicKey"
           },
           {
-            "name": "makerOrderId",
-            "type": "u128"
-          },
-          {
-            "name": "makerFee",
+            "name": "padding2",
             "type": {
-              "defined": "I80F48"
+              "array": [
+                "u8",
+                32
+              ]
             }
           },
           {
@@ -14309,17 +14426,25 @@ export const IDL: MangoV4 = {
             "type": "publicKey"
           },
           {
-            "name": "takerOrderId",
-            "type": "u128"
+            "name": "padding3",
+            "type": {
+              "array": [
+                "u8",
+                16
+              ]
+            }
           },
           {
             "name": "takerClientOrderId",
             "type": "u64"
           },
           {
-            "name": "takerFee",
+            "name": "padding4",
             "type": {
-              "defined": "I80F48"
+              "array": [
+                "u8",
+                16
+              ]
             }
           },
           {
@@ -14331,11 +14456,23 @@ export const IDL: MangoV4 = {
             "type": "i64"
           },
           {
+            "name": "makerClientOrderId",
+            "type": "u64"
+          },
+          {
+            "name": "makerFee",
+            "type": "f32"
+          },
+          {
+            "name": "takerFee",
+            "type": "f32"
+          },
+          {
             "name": "reserved",
             "type": {
               "array": [
                 "u8",
-                24
+                8
               ]
             }
           }
@@ -15378,6 +15515,91 @@ export const IDL: MangoV4 = {
         {
           "name": "takerFee",
           "type": "i128",
+          "index": false
+        },
+        {
+          "name": "price",
+          "type": "i64",
+          "index": false
+        },
+        {
+          "name": "quantity",
+          "type": "i64",
+          "index": false
+        }
+      ]
+    },
+    {
+      "name": "FillLogV2",
+      "fields": [
+        {
+          "name": "mangoGroup",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "marketIndex",
+          "type": "u16",
+          "index": false
+        },
+        {
+          "name": "takerSide",
+          "type": "u8",
+          "index": false
+        },
+        {
+          "name": "makerSlot",
+          "type": "u8",
+          "index": false
+        },
+        {
+          "name": "makerOut",
+          "type": "bool",
+          "index": false
+        },
+        {
+          "name": "timestamp",
+          "type": "u64",
+          "index": false
+        },
+        {
+          "name": "seqNum",
+          "type": "u64",
+          "index": false
+        },
+        {
+          "name": "maker",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "makerClientOrderId",
+          "type": "u64",
+          "index": false
+        },
+        {
+          "name": "makerFee",
+          "type": "f32",
+          "index": false
+        },
+        {
+          "name": "makerTimestamp",
+          "type": "u64",
+          "index": false
+        },
+        {
+          "name": "taker",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "takerClientOrderId",
+          "type": "u64",
+          "index": false
+        },
+        {
+          "name": "takerFee",
+          "type": "f32",
           "index": false
         },
         {
