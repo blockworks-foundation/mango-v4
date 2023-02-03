@@ -649,7 +649,7 @@ export class HealthCache {
     minStep: I80F48,
     fun: (I80F48) => I80F48,
   ): I80F48 {
-    const maxIterations = 40;
+    const maxIterations = 50;
     const targetError = I80F48.fromNumber(0.1);
     const rightValue = fun(right);
 
