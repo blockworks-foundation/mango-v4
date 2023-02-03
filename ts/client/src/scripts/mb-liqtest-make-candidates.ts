@@ -123,7 +123,7 @@ async function main() {
     await client.perpEditMarket(
       group,
       perpMarket.perpMarketIndex,
-      Builder(NullPerpEditParams).oracle(perpMarket.oracle).build(),
+      Builder(NullPerpEditParams).resetStablePrice(true).build(),
     );
   }
 
