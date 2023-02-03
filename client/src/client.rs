@@ -1136,7 +1136,7 @@ impl MangoClient {
         input_mint: Pubkey,
         output_mint: Pubkey,
         amount: u64,
-        slippage: f64,
+        slippage: u64,
         swap_mode: JupiterSwapMode,
     ) -> anyhow::Result<jupiter::QueryRoute> {
         let quote = self
@@ -1191,7 +1191,7 @@ impl MangoClient {
         input_mint: Pubkey,
         output_mint: Pubkey,
         amount: u64,
-        slippage: f64,
+        slippage: u64,
         swap_mode: JupiterSwapMode,
     ) -> anyhow::Result<Signature> {
         let source_token = self.context.token_by_mint(&input_mint)?;
