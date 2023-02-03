@@ -1,0 +1,7 @@
+app = "mango-v4-mm"
+kill_signal = "SIGINT"
+kill_timeout = 5
+processes = []
+
+[build]
+  dockerfile = "./Dockerfile.mm"
