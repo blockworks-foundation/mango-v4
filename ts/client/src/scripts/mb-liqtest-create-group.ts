@@ -45,6 +45,8 @@ const NET_BORROWS_LIMIT_NATIVE = 1 * Math.pow(10, 7) * Math.pow(10, 6);
 
 async function main() {
   const options = AnchorProvider.defaultOptions();
+  options.commitment = 'processed';
+  options.preflightCommitment = 'finalized';
   const connection = new Connection(process.env.CLUSTER_URL!, options);
 
   const admin = Keypair.fromSecretKey(
@@ -63,7 +65,8 @@ async function main() {
     MANGO_V4_ID['mainnet-beta'],
     {
       idsSource: 'get-program-accounts',
-      prioritizationFee: 5,
+      prioritizationFee: 100,
+      txConfirmationCommitment: 'confirmed',
     },
   );
 

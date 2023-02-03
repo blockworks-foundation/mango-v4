@@ -17,7 +17,9 @@ export async function sendTransaction(
 ): Promise<string> {
   const connection = provider.connection;
   const latestBlockhash = await connection.getLatestBlockhash(
-    opts.preflightCommitment,
+    opts.preflightCommitment ??
+      provider.opts.preflightCommitment ??
+      'finalized',
   );
 
   const payer = (provider as AnchorProvider).wallet;
@@ -50,7 +52,7 @@ export async function sendTransaction(
   }
 
   const signature = await connection.sendRawTransaction(vtx.serialize(), {
-    skipPreflight: true,
+    skipPreflight: true, // mergedOpts.skipPreflight,
   });
 
   // const signature = await connection.sendTransactionss(
@@ -68,6 +70,7 @@ export async function sendTransaction(
     }
   }
 
+  const txConfirmationCommitment = opts.txConfirmationCommitment ?? 'processed';
   let status: any;
   if (
     latestBlockhash.blockhash != null &&
@@ -80,12 +83,13 @@ export async function sendTransaction(
           blockhash: latestBlockhash.blockhash,
           lastValidBlockHeight: latestBlockhash.lastValidBlockHeight,
         },
-        'processed',
+        txConfirmationCommitment,
       )
     ).value;
   } else {
-    status = (await connection.confirmTransaction(signature, 'processed'))
-      .value;
+    status = (
+      await connection.confirmTransaction(signature, txConfirmationCommitment)
+    ).value;
   }
 
   if (status.err) {
