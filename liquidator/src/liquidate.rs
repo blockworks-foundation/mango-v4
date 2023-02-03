@@ -33,7 +33,7 @@ pub async fn jupiter_market_can_buy(
     // TODO: configurable
     // TODO: cache this, no need to recheck often
     let quote_amount = 10_000_000u64;
-    let slippage = 1.0;
+    let slippage = 100;
     mango_client
         .jupiter_route(
             quote_token_mint,
@@ -61,7 +61,7 @@ pub async fn jupiter_market_can_sell(
     // TODO: configurable
     // TODO: cache this, no need to recheck often
     let quote_amount = 10_000_000u64;
-    let slippage = 1.0;
+    let slippage = 100;
     mango_client
         .jupiter_route(
             token_mint,

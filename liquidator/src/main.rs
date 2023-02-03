@@ -80,8 +80,8 @@ struct Cli {
     #[clap(long, env, default_value = "50")]
     min_health_ratio: f64,
 
-    #[clap(long, env, default_value = "1")]
-    rebalance_slippage: f64,
+    #[clap(long, env, default_value = "100")]
+    rebalance_slippage_bps: u64,
 
     /// prioritize each transaction with this many microlamports/cu
     #[clap(long, env, default_value = "0")]
@@ -232,7 +232,7 @@ async fn main() -> anyhow::Result<()> {
 
     let mut rebalance_interval = tokio::time::interval(Duration::from_secs(5));
     let rebalance_config = rebalance::Config {
-        slippage: cli.rebalance_slippage,
+        slippage_bps: cli.rebalance_slippage_bps,
         // TODO: config
         borrow_settle_excess: 1.05,
         refresh_timeout: Duration::from_secs(30),

@@ -77,7 +77,7 @@ struct JupiterSwap {
     amount: u64,
 
     #[clap(short, long)]
-    slippage: f64,
+    slippage_bps: u64,
 
     #[clap(flatten)]
     rpc: Rpc,
@@ -178,7 +178,7 @@ async fn main() -> Result<(), anyhow::Error> {
                     input_mint,
                     output_mint,
                     cmd.amount,
-                    cmd.slippage,
+                    cmd.slippage_bps,
                     client::JupiterSwapMode::ExactIn,
                 )
                 .await?;
