@@ -104,15 +104,14 @@ export class MangoClient {
   }
 
   /// Transactions
-  private async sendAndConfirmTransaction(
+  public async sendAndConfirmTransaction(
     ixs: TransactionInstruction[],
-    alts: AddressLookupTableAccount[] = [],
     opts: any = {},
   ): Promise<string> {
     return await sendTransaction(
       this.program.provider as AnchorProvider,
       ixs,
-      alts,
+      opts.alts ?? [],
       {
         postSendTxCallback: this.postSendTxCallback,
         prioritizationFee: this.prioritizationFee,
@@ -120,6 +119,17 @@ export class MangoClient {
         ...opts,
       },
     );
+  }
+
+  private async sendAndConfirmTransactionForGroup(
+    group: Group,
+    ixs: TransactionInstruction[],
+    opts: any = {},
+  ): Promise<string> {
+    return await this.sendAndConfirmTransaction(ixs, {
+      alts: group.addressLookupTablesList,
+      ...opts,
+    });
   }
 
   // Group
@@ -164,10 +174,7 @@ export class MangoClient {
         admin: (this.program.provider as AnchorProvider).wallet.publicKey,
       })
       .instruction();
-    return await this.sendAndConfirmTransaction(
-      [ix],
-      group.addressLookupTablesList,
-    );
+    return await this.sendAndConfirmTransactionForGroup(group, [ix]);
   }
 
   public async ixGateSet(
@@ -181,10 +188,7 @@ export class MangoClient {
         admin: (this.program.provider as AnchorProvider).wallet.publicKey,
       })
       .instruction();
-    return await this.sendAndConfirmTransaction(
-      [ix],
-      group.addressLookupTablesList,
-    );
+    return await this.sendAndConfirmTransactionForGroup(group, [ix]);
   }
 
   public async groupClose(group: Group): Promise<TransactionSignature> {
@@ -199,10 +203,7 @@ export class MangoClient {
           .publicKey,
       })
       .instruction();
-    return await this.sendAndConfirmTransaction(
-      [ix],
-      group.addressLookupTablesList,
-    );
+    return await this.sendAndConfirmTransactionForGroup(group, [ix]);
   }
 
   public async getGroup(groupPk: PublicKey): Promise<Group> {
@@ -314,10 +315,7 @@ export class MangoClient {
         rent: SYSVAR_RENT_PUBKEY,
       })
       .instruction();
-    return await this.sendAndConfirmTransaction(
-      [ix],
-      group.addressLookupTablesList,
-    );
+    return await this.sendAndConfirmTransactionForGroup(group, [ix]);
   }
 
   public async tokenRegisterTrustless(
@@ -339,10 +337,7 @@ export class MangoClient {
         rent: SYSVAR_RENT_PUBKEY,
       })
       .instruction();
-    return await this.sendAndConfirmTransaction(
-      [ix],
-      group.addressLookupTablesList,
-    );
+    return await this.sendAndConfirmTransactionForGroup(group, [ix]);
   }
 
   public async tokenEdit(
@@ -396,10 +391,7 @@ export class MangoClient {
         } as AccountMeta,
       ])
       .instruction();
-    return await this.sendAndConfirmTransaction(
-      [ix],
-      group.addressLookupTablesList,
-    );
+    return await this.sendAndConfirmTransactionForGroup(group, [ix]);
   }
 
   public async tokenDeregister(
@@ -443,10 +435,10 @@ export class MangoClient {
       )
       .instruction();
 
-    return await this.sendAndConfirmTransaction(
-      [...preInstructions, ix],
-      group.addressLookupTablesList,
-    );
+    return await this.sendAndConfirmTransactionForGroup(group, [
+      ...preInstructions,
+      ix,
+    ]);
   }
 
   public async getBanksForGroup(group: Group): Promise<Bank[]> {
@@ -519,10 +511,7 @@ export class MangoClient {
         payer: (this.program.provider as AnchorProvider).wallet.publicKey,
       })
       .instruction();
-    return await this.sendAndConfirmTransaction(
-      [ix],
-      group.addressLookupTablesList,
-    );
+    return await this.sendAndConfirmTransactionForGroup(group, [ix]);
   }
 
   public async stubOracleClose(
@@ -538,10 +527,7 @@ export class MangoClient {
           .publicKey,
       })
       .instruction();
-    return await this.sendAndConfirmTransaction(
-      [ix],
-      group.addressLookupTablesList,
-    );
+    return await this.sendAndConfirmTransactionForGroup(group, [ix]);
   }
 
   public async stubOracleSet(
@@ -557,10 +543,7 @@ export class MangoClient {
         oracle: oraclePk,
       })
       .instruction();
-    return await this.sendAndConfirmTransaction(
-      [ix],
-      group.addressLookupTablesList,
-    );
+    return await this.sendAndConfirmTransactionForGroup(group, [ix]);
   }
 
   public async getStubOracle(
@@ -639,10 +622,7 @@ export class MangoClient {
       })
       .instruction();
 
-    return await this.sendAndConfirmTransaction(
-      [ix],
-      group.addressLookupTablesList,
-    );
+    return await this.sendAndConfirmTransactionForGroup(group, [ix]);
   }
 
   public async createAndFetchMangoAccount(
@@ -690,10 +670,7 @@ export class MangoClient {
         payer: (this.program.provider as AnchorProvider).wallet.publicKey,
       })
       .instruction();
-    return await this.sendAndConfirmTransaction(
-      [ix],
-      group.addressLookupTablesList,
-    );
+    return await this.sendAndConfirmTransactionForGroup(group, [ix]);
   }
 
   public async editMangoAccount(
@@ -711,10 +688,37 @@ export class MangoClient {
       })
       .instruction();
 
-    return await this.sendAndConfirmTransaction(
-      [ix],
-      group.addressLookupTablesList,
-    );
+    return await this.sendAndConfirmTransactionForGroup(group, [ix]);
+  }
+
+  public async computeAccountData(
+    group: Group,
+    mangoAccount: MangoAccount,
+  ): Promise<TransactionSignature> {
+    const healthRemainingAccounts: PublicKey[] =
+      this.buildHealthRemainingAccounts(
+        AccountRetriever.Fixed,
+        group,
+        [mangoAccount],
+        [],
+        [],
+      );
+
+    const ix = await this.program.methods
+      .computeAccountData()
+      .accounts({
+        group: group.publicKey,
+        account: mangoAccount.publicKey,
+      })
+      .remainingAccounts(
+        healthRemainingAccounts.map(
+          (pk) =>
+            ({ pubkey: pk, isWritable: false, isSigner: false } as AccountMeta),
+        ),
+      )
+      .instruction();
+
+    return await this.sendAndConfirmTransactionForGroup(group, [ix]);
   }
 
   public async toggleMangoAccountFreeze(
@@ -730,10 +734,7 @@ export class MangoClient {
         admin: (this.program.provider as AnchorProvider).wallet.publicKey,
       })
       .instruction();
-    return await this.sendAndConfirmTransaction(
-      [ix],
-      group.addressLookupTablesList,
-    );
+    return await this.sendAndConfirmTransactionForGroup(group, [ix]);
   }
 
   public async getMangoAccount(
@@ -908,10 +909,7 @@ export class MangoClient {
       })
       .instruction();
 
-    return await this.sendAndConfirmTransaction(
-      [ix],
-      group.addressLookupTablesList,
-    );
+    return await this.sendAndConfirmTransactionForGroup(group, [ix]);
   }
 
   public async emptyAndCloseMangoAccount(
@@ -983,10 +981,7 @@ export class MangoClient {
       .instruction();
     instructions.push(closeIx);
 
-    return await this.sendAndConfirmTransaction(
-      [...instructions],
-      group.addressLookupTablesList,
-    );
+    return await this.sendAndConfirmTransactionForGroup(group, instructions);
   }
 
   public async tokenDeposit(
@@ -1082,9 +1077,9 @@ export class MangoClient {
       )
       .instruction();
 
-    return await this.sendAndConfirmTransaction(
+    return await this.sendAndConfirmTransactionForGroup(
+      group,
       [...preInstructions, ix, ...postInstructions],
-      group.addressLookupTablesList,
       { additionalSigners },
     );
   }
@@ -1105,10 +1100,7 @@ export class MangoClient {
       allowBorrow,
     );
 
-    return await this.sendAndConfirmTransaction(
-      [...ixes],
-      group.addressLookupTablesList,
-    );
+    return await this.sendAndConfirmTransactionForGroup(group, ixes);
   }
 
   public async tokenWithdrawNativeIx(
@@ -1204,10 +1196,7 @@ export class MangoClient {
       allowBorrow,
       healthAccountsToExclude,
     );
-    return await this.sendAndConfirmTransaction(
-      ixs,
-      group.addressLookupTablesList,
-    );
+    return await this.sendAndConfirmTransactionForGroup(group, ixs);
   }
 
   // Serum
@@ -1232,10 +1221,7 @@ export class MangoClient {
         payer: (this.program.provider as AnchorProvider).wallet.publicKey,
       })
       .instruction();
-    return await this.sendAndConfirmTransaction(
-      [ix],
-      group.addressLookupTablesList,
-    );
+    return await this.sendAndConfirmTransactionForGroup(group, [ix]);
   }
 
   public async serum3deregisterMarket(
@@ -1263,10 +1249,7 @@ export class MangoClient {
           .publicKey,
       })
       .instruction();
-    return await this.sendAndConfirmTransaction(
-      [ix],
-      group.addressLookupTablesList,
-    );
+    return await this.sendAndConfirmTransactionForGroup(group, [ix]);
   }
 
   public async serum3GetMarkets(
@@ -1334,10 +1317,7 @@ export class MangoClient {
         payer: (this.program.provider as AnchorProvider).wallet.publicKey,
       })
       .instruction();
-    return await this.sendAndConfirmTransaction(
-      [ix],
-      group.addressLookupTablesList,
-    );
+    return await this.sendAndConfirmTransactionForGroup(group, [ix]);
   }
 
   public async serum3CreateOpenOrdersIx(
@@ -1571,10 +1551,10 @@ export class MangoClient {
       externalMarketPk,
     );
 
-    return await this.sendAndConfirmTransaction(
-      [...placeOrderIxes, settleIx],
-      group.addressLookupTablesList,
-    );
+    return await this.sendAndConfirmTransactionForGroup(group, [
+      ...placeOrderIxes,
+      settleIx,
+    ]);
   }
 
   public async serum3CancelAllOrders(
@@ -1608,10 +1588,7 @@ export class MangoClient {
       })
       .instruction();
 
-    return await this.sendAndConfirmTransaction(
-      [ix],
-      group.addressLookupTablesList,
-    );
+    return await this.sendAndConfirmTransactionForGroup(group, [ix]);
   }
 
   public async serum3SettleFundsIx(
@@ -1674,10 +1651,7 @@ export class MangoClient {
       externalMarketPk,
     );
 
-    return await this.sendAndConfirmTransaction(
-      [ix],
-      group.addressLookupTablesList,
-    );
+    return await this.sendAndConfirmTransactionForGroup(group, [ix]);
   }
 
   public async serum3CancelOrderIx(
@@ -1732,10 +1706,7 @@ export class MangoClient {
       this.serum3SettleFundsIx(group, mangoAccount, externalMarketPk),
     ]);
 
-    return await this.sendAndConfirmTransaction(
-      ixes,
-      group.addressLookupTablesList,
-    );
+    return await this.sendAndConfirmTransactionForGroup(group, ixes);
   }
 
   /// perps
@@ -1856,9 +1827,9 @@ export class MangoClient {
         newAccountPubkey: eventQueue.publicKey,
       }),
     ];
-    return await this.sendAndConfirmTransaction(
+    return await this.sendAndConfirmTransactionForGroup(
+      group,
       [...preInstructions, ix],
-      group.addressLookupTablesList,
       {
         additionalSigners: [bids, asks, eventQueue],
       },
@@ -1912,10 +1883,7 @@ export class MangoClient {
         perpMarket: perpMarket.publicKey,
       })
       .instruction();
-    return await this.sendAndConfirmTransaction(
-      [ix],
-      group.addressLookupTablesList,
-    );
+    return await this.sendAndConfirmTransactionForGroup(group, [ix]);
   }
 
   public async perpCloseMarket(
@@ -1937,10 +1905,7 @@ export class MangoClient {
           .publicKey,
       })
       .instruction();
-    return await this.sendAndConfirmTransaction(
-      [ix],
-      group.addressLookupTablesList,
-    );
+    return await this.sendAndConfirmTransactionForGroup(group, [ix]);
   }
 
   public async perpGetMarkets(group: Group): Promise<PerpMarket[]> {
@@ -2002,10 +1967,7 @@ export class MangoClient {
       mangoAccount,
       perpMarketIndex,
     );
-    return await this.sendAndConfirmTransaction(
-      [ix],
-      group.addressLookupTablesList,
-    );
+    return await this.sendAndConfirmTransactionForGroup(group, [ix]);
   }
 
   public async perpZeroOutForMarket(
@@ -2023,10 +1985,7 @@ export class MangoClient {
         admin: group.admin,
       })
       .instruction();
-    return await this.sendAndConfirmTransaction(
-      [ix],
-      group.addressLookupTablesList,
-    );
+    return await this.sendAndConfirmTransactionForGroup(group, [ix]);
   }
 
   // perpPlaceOrder ix returns an optional, custom order id,
@@ -2061,10 +2020,7 @@ export class MangoClient {
       limit,
     );
 
-    return await this.sendAndConfirmTransaction(
-      [ix],
-      group.addressLookupTablesList,
-    );
+    return await this.sendAndConfirmTransactionForGroup(group, [ix]);
   }
 
   public async perpPlaceOrderIx(
@@ -2155,10 +2111,7 @@ export class MangoClient {
       limit,
     );
 
-    return await this.sendAndConfirmTransaction(
-      [ix],
-      group.addressLookupTablesList,
-    );
+    return await this.sendAndConfirmTransactionForGroup(group, [ix]);
   }
 
   public async perpPlaceOrderPeggedIx(
@@ -2254,10 +2207,7 @@ export class MangoClient {
       orderId,
     );
 
-    return await this.sendAndConfirmTransaction(
-      [ix],
-      group.addressLookupTablesList,
-    );
+    return await this.sendAndConfirmTransactionForGroup(group, [ix]);
   }
 
   public async perpCancelAllOrders(
@@ -2273,10 +2223,7 @@ export class MangoClient {
       limit,
     );
 
-    return await this.sendAndConfirmTransaction(
-      [ix],
-      group.addressLookupTablesList,
-    );
+    return await this.sendAndConfirmTransactionForGroup(group, [ix]);
   }
 
   public async perpCancelAllOrdersIx(
@@ -2338,10 +2285,7 @@ export class MangoClient {
       )
       .instruction();
 
-    return await this.sendAndConfirmTransaction(
-      [ix],
-      group.addressLookupTablesList,
-    );
+    return await this.sendAndConfirmTransactionForGroup(group, [ix]);
   }
 
   async perpSettleFees(
@@ -2378,10 +2322,7 @@ export class MangoClient {
       )
       .instruction();
 
-    return await this.sendAndConfirmTransaction(
-      [ix],
-      group.addressLookupTablesList,
-    );
+    return await this.sendAndConfirmTransactionForGroup(group, [ix]);
   }
 
   public async perpConsumeEvents(
@@ -2405,10 +2346,7 @@ export class MangoClient {
         ),
       )
       .instruction();
-    return await this.sendAndConfirmTransaction(
-      [ix],
-      group.addressLookupTablesList,
-    );
+    return await this.sendAndConfirmTransactionForGroup(group, [ix]);
   }
 
   public async perpConsumeAllEvents(
@@ -2603,14 +2541,15 @@ export class MangoClient {
       ])
       .instruction();
 
-    return await this.sendAndConfirmTransaction(
+    return await this.sendAndConfirmTransactionForGroup(
+      group,
       [
         ...preInstructions,
         flashLoanBeginIx,
         ...userDefinedInstructions.filter((ix) => ix.keys.length > 2),
         flashLoanEndIx,
       ],
-      [...group.addressLookupTablesList, ...userDefinedAlts],
+      { alts: [...group.addressLookupTablesList, ...userDefinedAlts] },
     );
   }
 
@@ -2637,10 +2576,7 @@ export class MangoClient {
         } as AccountMeta,
       ])
       .instruction();
-    return await this.sendAndConfirmTransaction(
-      [ix],
-      group.addressLookupTablesList,
-    );
+    return await this.sendAndConfirmTransactionForGroup(group, [ix]);
   }
 
   /// liquidations
@@ -2690,10 +2626,7 @@ export class MangoClient {
       .remainingAccounts(parsedHealthAccounts)
       .instruction();
 
-    return await this.sendAndConfirmTransaction(
-      [ix],
-      group.addressLookupTablesList,
-    );
+    return await this.sendAndConfirmTransactionForGroup(group, [ix]);
   }
 
   public async altSet(
@@ -2710,10 +2643,7 @@ export class MangoClient {
       })
       .instruction();
 
-    return await this.sendAndConfirmTransaction(
-      [ix],
-      group.addressLookupTablesList,
-    );
+    return await this.sendAndConfirmTransactionForGroup(group, [ix]);
   }
 
   public async altExtend(
@@ -2731,10 +2661,7 @@ export class MangoClient {
         addressLookupTable,
       })
       .instruction();
-    return await this.sendAndConfirmTransaction(
-      [ix],
-      group.addressLookupTablesList,
-    );
+    return await this.sendAndConfirmTransactionForGroup(group, [ix]);
   }
 
   public async healthRegionBeginIx(
@@ -3057,9 +2984,9 @@ export class MangoClient {
     ]);
     transactionInstructions.push(cancelOrderIx, placeOrderIx);
 
-    return await this.sendAndConfirmTransaction(
+    return await this.sendAndConfirmTransactionForGroup(
+      group,
       transactionInstructions,
-      group.addressLookupTablesList,
     );
   }
   public async modifySerum3Order(
@@ -3100,9 +3027,9 @@ export class MangoClient {
     ]);
     transactionInstructions.push(cancelOrderIx, settleIx, ...placeOrderIx);
 
-    return await this.sendAndConfirmTransaction(
+    return await this.sendAndConfirmTransactionForGroup(
+      group,
       transactionInstructions,
-      group.addressLookupTablesList,
     );
   }
 }
