@@ -8,7 +8,7 @@ import {
 import fs from 'fs';
 import { MangoClient } from '../client';
 import { MANGO_V4_ID } from '../constants';
-import { buildVersionedTx } from '../utils';
+import { sendTransaction } from '../utils/rpc';
 
 //
 // Script which depoys a new mango group, and registers 3 tokens
@@ -275,11 +275,7 @@ async function createAndPopulateAlt(client: MangoClient, admin: Keypair) {
         payer: admin.publicKey,
         recentSlot: await connection.getSlot('finalized'),
       });
-      const createTx = await buildVersionedTx(
-        client.program.provider as AnchorProvider,
-        [createIx[0]],
-      );
-      let sig = await connection.sendTransaction(createTx);
+      let sig = await client.sendAndConfirmTransaction([createIx[0]]);
       console.log(
         `...created ALT ${createIx[1]} https://explorer.solana.com/tx/${sig}`,
       );
@@ -359,13 +355,7 @@ async function createAndPopulateAlt(client: MangoClient, admin: Keypair) {
         authority: admin.publicKey,
         addresses,
       });
-      const extendTx = await buildVersionedTx(
-        client.program.provider as AnchorProvider,
-        [extendIx],
-      );
-      let sig = await client.program.provider.connection.sendTransaction(
-        extendTx,
-      );
+      const sig = await client.sendAndConfirmTransaction([extendIx]);
       console.log(`https://explorer.solana.com/tx/${sig}`);
     }
 
