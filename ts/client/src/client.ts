@@ -18,6 +18,7 @@ import {
   SystemProgram,
   TransactionInstruction,
   TransactionSignature,
+  Commitment,
 } from '@solana/web3.js';
 import bs58 from 'bs58';
 import { Bank, MintInfo, TokenIndex } from './accounts/bank';
@@ -76,12 +77,14 @@ export type MangoClientOptions = {
   idsSource?: IdsSource;
   postSendTxCallback?: ({ txid }: { txid: string }) => void;
   prioritizationFee?: number;
+  txConfirmationCommitment?: Commitment;
 };
 
 export class MangoClient {
   private idsSource: IdsSource;
   private postSendTxCallback?: ({ txid }) => void;
   private prioritizationFee: number;
+  private txConfirmationCommitment: Commitment;
 
   constructor(
     public program: Program<MangoV4>,
@@ -92,6 +95,10 @@ export class MangoClient {
     this.idsSource = opts?.idsSource || 'get-program-accounts';
     this.prioritizationFee = opts?.prioritizationFee || 0;
     this.postSendTxCallback = opts?.postSendTxCallback;
+    this.txConfirmationCommitment =
+      opts?.txConfirmationCommitment ??
+      (program.provider as AnchorProvider).opts.commitment ??
+      'processed';
     // TODO: evil side effect, but limited backtraces are a nightmare
     Error.stackTraceLimit = 1000;
   }
@@ -109,6 +116,7 @@ export class MangoClient {
       {
         postSendTxCallback: this.postSendTxCallback,
         prioritizationFee: this.prioritizationFee,
+        txConfirmationCommitment: this.txConfirmationCommitment,
         ...opts,
       },
     );
