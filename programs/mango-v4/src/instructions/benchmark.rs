@@ -125,8 +125,8 @@ pub fn benchmark(_ctx: Context<Benchmark>) -> Result<()> {
     {
         let s = clock.slot as i128;
         let t = clock.unix_timestamp as i128;
-        let a = I80F48::from_bits(s << 64 + s);
-        let b = I80F48::from_bits(t << 64 + t);
+        let a = I80F48::from_bits((s << 64) + s);
+        let b = I80F48::from_bits((t << 64) + t);
         division_i80f48(a, b); // 1000 - 5000 CU
         division_i128(a.to_bits(), b.to_bits()); // 100 - 2000 CU
         division_i80f48_30bit(a, b); // 300 CU
@@ -138,8 +138,8 @@ pub fn benchmark(_ctx: Context<Benchmark>) -> Result<()> {
     {
         let s = clock.slot as u128;
         let t = clock.unix_timestamp as u128;
-        let a = U80F48::from_bits(s << 64 + s);
-        let b = U80F48::from_bits(t << 64 + t);
+        let a = U80F48::from_bits((s << 64) + s);
+        let b = U80F48::from_bits((t << 64) + t);
         division_u80f48(a, b); // 1000 - 5000 CU
     }
 
