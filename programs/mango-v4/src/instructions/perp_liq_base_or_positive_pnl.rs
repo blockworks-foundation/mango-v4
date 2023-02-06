@@ -577,7 +577,7 @@ mod tests {
             }
         }
 
-        fn run(&self, max_base: i64, max_pnl: u64) -> Result<Self> {
+        fn liqee_health_cache(&self) -> HealthCache {
             let mut setup = self.clone();
 
             let ais = vec![
@@ -589,12 +589,14 @@ mod tests {
             let retriever =
                 ScanningAccountRetriever::new_with_staleness(&ais, &setup.group, None).unwrap();
 
-            let mut liqee_health_cache =
-                health::new_health_cache(&setup.liqee.borrow(), &retriever).unwrap();
-            let liqee_init_health = liqee_health_cache.health(HealthType::Init);
+            health::new_health_cache(&setup.liqee.borrow(), &retriever).unwrap()
+        }
 
-            drop(retriever);
-            drop(ais);
+        fn run(&self, max_base: i64, max_pnl: u64) -> Result<Self> {
+            let mut setup = self.clone();
+
+            let mut liqee_health_cache = setup.liqee_health_cache();
+            let liqee_init_health = liqee_health_cache.health(HealthType::Init);
 
             liquidation_action(
                 setup.perp_market.data(),
@@ -844,5 +846,58 @@ mod tests {
                 0.01
             );
         }
+    }
+
+    #[test]
+    fn test_liq_base_or_positive_pnl_stable_price() {
+        let mut setup = TestSetup::new();
+        {
+            let pm = setup.perp_market.data();
+            pm.stable_price_model.stable_price = 0.5;
+        }
+        {
+            perp_p(&mut setup.liqee).record_trade(
+                setup.perp_market.data(),
+                10,
+                I80F48::from_num(-10),
+            );
+
+            let settle_bank = setup.settle_bank.data();
+            settle_bank
+                .change_without_fee(
+                    token_p(&mut setup.liqee),
+                    I80F48::from_num(5.0),
+                    0,
+                    I80F48::from(1),
+                )
+                .unwrap();
+            settle_bank
+                .change_without_fee(
+                    token_p(&mut setup.liqor),
+                    I80F48::from_num(1000.0),
+                    0,
+                    I80F48::from(1),
+                )
+                .unwrap();
+        }
+
+        let hc = setup.liqee_health_cache();
+        assert_eq_f!(
+            hc.health(HealthType::Init),
+            5.0 + (-10.0 + 10.0 * 0.5 * 0.8),
+            0.1
+        );
+
+        let mut result = setup.run(100, 0).unwrap();
+
+        let liqee_perp = perp_p(&mut result.liqee);
+        assert_eq!(liqee_perp.base_position_lots(), 8);
+
+        let hc = result.liqee_health_cache();
+        assert_eq_f!(
+            hc.health(HealthType::Init),
+            5.0 + (-8.0 + 8.0 * 0.5 * 0.8),
+            0.1
+        );
     }
 }

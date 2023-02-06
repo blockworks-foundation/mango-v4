@@ -67,7 +67,7 @@ pub fn token_liq_with_token(
     // Initial liqee health check
     let mut liqee_health_cache = new_health_cache(&liqee.borrow(), &account_retriever)
         .context("create liqee health cache")?;
-    let init_health = liqee_health_cache.health(HealthType::Init);
+    let liqee_init_health = liqee_health_cache.health(HealthType::Init);
     liqee_health_cache.require_after_phase1_liquidation()?;
 
     if !liqee.check_liquidatable(&liqee_health_cache)? {
@@ -78,7 +78,44 @@ pub fn token_liq_with_token(
     // Transfer some liab_token from liqor to liqee and
     // transfer some asset_token from liqee to liqor.
     //
+    let now_ts = Clock::get()?.unix_timestamp.try_into().unwrap();
+    liquidation_action(
+        &mut account_retriever,
+        liab_token_index,
+        asset_token_index,
+        &mut liqor.borrow_mut(),
+        ctx.accounts.liqor.key(),
+        &mut liqee.borrow_mut(),
+        ctx.accounts.liqee.key(),
+        &mut liqee_health_cache,
+        liqee_init_health,
+        now_ts,
+        max_liab_transfer,
+    )?;
 
+    // Check liqor's health
+    if !liqor.fixed.is_in_health_region() {
+        let liqor_health = compute_health(&liqor.borrow(), HealthType::Init, &account_retriever)
+            .context("compute liqor health")?;
+        require!(liqor_health >= 0, MangoError::HealthMustBePositive);
+    }
+
+    Ok(())
+}
+
+pub(crate) fn liquidation_action(
+    account_retriever: &mut ScanningAccountRetriever,
+    liab_token_index: TokenIndex,
+    asset_token_index: TokenIndex,
+    liqor: &mut MangoAccountRefMut,
+    liqor_key: Pubkey,
+    liqee: &mut MangoAccountRefMut,
+    liqee_key: Pubkey,
+    liqee_health_cache: &mut HealthCache,
+    liqee_init_health: I80F48,
+    now_ts: u64,
+    max_liab_transfer: I80F48,
+) -> Result<()> {
     // Get the mut banks and oracle prices
     //
     // This must happen _after_ the health computation, since immutable borrows of
@@ -149,7 +186,7 @@ pub fn token_liq_with_token(
     //   y = x * lopa / aop   (native asset tokens, see above)
     //
     // Result: x = -init_health / (ilw * lilp - iaw * lopa * aiap / aop)
-    let liab_needed = cm!(-init_health
+    let liab_needed = cm!(-liqee_init_health
         / (liab_init_liab_price * init_liab_weight
             - liab_oracle_price_adjusted
                 * init_asset_weight
@@ -173,11 +210,8 @@ pub fn token_liq_with_token(
 
     // Apply the balance changes to the liqor and liqee accounts
     let liqee_liab_position = liqee.token_position_mut_by_raw_index(liqee_liab_raw_index);
-    let liqee_liab_active = liab_bank.deposit_with_dusting(
-        liqee_liab_position,
-        liab_transfer,
-        Clock::get()?.unix_timestamp.try_into().unwrap(),
-    )?;
+    let liqee_liab_active =
+        liab_bank.deposit_with_dusting(liqee_liab_position, liab_transfer, now_ts)?;
     let liqee_liab_indexed_position = liqee_liab_position.indexed_position;
 
     let (liqor_liab_position, liqor_liab_raw_index, _) =
@@ -185,7 +219,7 @@ pub fn token_liq_with_token(
     let (liqor_liab_active, loan_origination_fee) = liab_bank.withdraw_with_fee(
         liqor_liab_position,
         liab_transfer,
-        Clock::get()?.unix_timestamp.try_into().unwrap(),
+        now_ts,
         liab_oracle_price,
     )?;
     let liqor_liab_indexed_position = liqor_liab_position.indexed_position;
@@ -193,18 +227,14 @@ pub fn token_liq_with_token(
 
     let (liqor_asset_position, liqor_asset_raw_index, _) =
         liqor.ensure_token_position(asset_token_index)?;
-    let liqor_asset_active = asset_bank.deposit(
-        liqor_asset_position,
-        asset_transfer,
-        Clock::get()?.unix_timestamp.try_into().unwrap(),
-    )?;
+    let liqor_asset_active = asset_bank.deposit(liqor_asset_position, asset_transfer, now_ts)?;
     let liqor_asset_indexed_position = liqor_asset_position.indexed_position;
 
     let liqee_asset_position = liqee.token_position_mut_by_raw_index(liqee_asset_raw_index);
     let liqee_asset_active = asset_bank.withdraw_without_fee_with_dusting(
         liqee_asset_position,
         asset_transfer,
-        Clock::get()?.unix_timestamp.try_into().unwrap(),
+        now_ts,
         asset_oracle_price,
     )?;
     let liqee_asset_indexed_position = liqee_asset_position.indexed_position;
@@ -226,8 +256,8 @@ pub fn token_liq_with_token(
 
     // liqee asset
     emit!(TokenBalanceLog {
-        mango_group: ctx.accounts.group.key(),
-        mango_account: ctx.accounts.liqee.key(),
+        mango_group: liqee.fixed.group,
+        mango_account: liqee_key,
         token_index: asset_token_index,
         indexed_position: liqee_asset_indexed_position.to_bits(),
         deposit_index: asset_bank.deposit_index.to_bits(),
@@ -235,8 +265,8 @@ pub fn token_liq_with_token(
     });
     // liqee liab
     emit!(TokenBalanceLog {
-        mango_group: ctx.accounts.group.key(),
-        mango_account: ctx.accounts.liqee.key(),
+        mango_group: liqee.fixed.group,
+        mango_account: liqee_key,
         token_index: liab_token_index,
         indexed_position: liqee_liab_indexed_position.to_bits(),
         deposit_index: liab_bank.deposit_index.to_bits(),
@@ -244,8 +274,8 @@ pub fn token_liq_with_token(
     });
     // liqor asset
     emit!(TokenBalanceLog {
-        mango_group: ctx.accounts.group.key(),
-        mango_account: ctx.accounts.liqor.key(),
+        mango_group: liqee.fixed.group,
+        mango_account: liqor_key,
         token_index: asset_token_index,
         indexed_position: liqor_asset_indexed_position.to_bits(),
         deposit_index: asset_bank.deposit_index.to_bits(),
@@ -253,8 +283,8 @@ pub fn token_liq_with_token(
     });
     // liqor liab
     emit!(TokenBalanceLog {
-        mango_group: ctx.accounts.group.key(),
-        mango_account: ctx.accounts.liqor.key(),
+        mango_group: liqee.fixed.group,
+        mango_account: liqor_key,
         token_index: liab_token_index,
         indexed_position: liqor_liab_indexed_position.to_bits(),
         deposit_index: liab_bank.deposit_index.to_bits(),
@@ -263,8 +293,8 @@ pub fn token_liq_with_token(
 
     if loan_origination_fee.is_positive() {
         emit!(WithdrawLoanOriginationFeeLog {
-            mango_group: ctx.accounts.group.key(),
-            mango_account: ctx.accounts.liqor.key(),
+            mango_group: liqee.fixed.group,
+            mango_account: liqor_key,
             token_index: liab_token_index,
             loan_origination_fee: loan_origination_fee.to_bits(),
             instruction: LoanOriginationFeeInstruction::LiqTokenWithToken
@@ -273,16 +303,16 @@ pub fn token_liq_with_token(
 
     // Since we use a scanning account retriever, it's safe to deactivate inactive token positions
     if !liqee_asset_active {
-        liqee.deactivate_token_position_and_log(liqee_asset_raw_index, ctx.accounts.liqee.key());
+        liqee.deactivate_token_position_and_log(liqee_asset_raw_index, liqee_key);
     }
     if !liqee_liab_active {
-        liqee.deactivate_token_position_and_log(liqee_liab_raw_index, ctx.accounts.liqee.key());
+        liqee.deactivate_token_position_and_log(liqee_liab_raw_index, liqee_key);
     }
     if !liqor_asset_active {
-        liqor.deactivate_token_position_and_log(liqor_asset_raw_index, ctx.accounts.liqor.key());
+        liqor.deactivate_token_position_and_log(liqor_asset_raw_index, liqor_key);
     }
     if !liqor_liab_active {
-        liqor.deactivate_token_position_and_log(liqor_liab_raw_index, ctx.accounts.liqor.key())
+        liqor.deactivate_token_position_and_log(liqor_liab_raw_index, liqor_key)
     }
 
     // Check liqee health again
@@ -291,17 +321,10 @@ pub fn token_liq_with_token(
         .fixed
         .maybe_recover_from_being_liquidated(liqee_init_health);
 
-    // Check liqor's health
-    if !liqor.fixed.is_in_health_region() {
-        let liqor_health = compute_health(&liqor.borrow(), HealthType::Init, &account_retriever)
-            .context("compute liqor health")?;
-        require!(liqor_health >= 0, MangoError::HealthMustBePositive);
-    }
-
     emit!(TokenLiqWithTokenLog {
-        mango_group: ctx.accounts.group.key(),
-        liqee: ctx.accounts.liqee.key(),
-        liqor: ctx.accounts.liqor.key(),
+        mango_group: liqee.fixed.group,
+        liqee: liqee_key,
+        liqor: liqor_key,
         asset_token_index,
         liab_token_index,
         asset_transfer: asset_transfer.to_bits(),
@@ -312,4 +335,181 @@ pub fn token_liq_with_token(
     });
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::health::{self, test::*};
+
+    #[derive(Clone)]
+    struct TestSetup {
+        group: Pubkey,
+        asset_bank: TestAccount<Bank>,
+        liab_bank: TestAccount<Bank>,
+        asset_oracle: TestAccount<StubOracle>,
+        liab_oracle: TestAccount<StubOracle>,
+        liqee: MangoAccountValue,
+        liqor: MangoAccountValue,
+    }
+
+    impl TestSetup {
+        fn new() -> Self {
+            let group = Pubkey::new_unique();
+            let (asset_bank, asset_oracle) = mock_bank_and_oracle(group, 0, 1.0, 0.0, 0.0);
+            let (liab_bank, liab_oracle) = mock_bank_and_oracle(group, 1, 1.0, 0.0, 0.0);
+
+            let liqee_buffer = MangoAccount::default_for_tests().try_to_vec().unwrap();
+            let mut liqee = MangoAccountValue::from_bytes(&liqee_buffer).unwrap();
+            {
+                liqee.ensure_token_position(0).unwrap();
+                liqee.ensure_token_position(1).unwrap();
+            }
+
+            let liqor_buffer = MangoAccount::default_for_tests().try_to_vec().unwrap();
+            let mut liqor = MangoAccountValue::from_bytes(&liqor_buffer).unwrap();
+            {
+                liqor.ensure_token_position(0).unwrap();
+                liqor.ensure_token_position(1).unwrap();
+            }
+
+            Self {
+                group,
+                asset_bank,
+                liab_bank,
+                asset_oracle,
+                liab_oracle,
+                liqee,
+                liqor,
+            }
+        }
+
+        fn liqee_health_cache(&self) -> HealthCache {
+            let mut setup = self.clone();
+
+            let ais = vec![
+                setup.asset_bank.as_account_info(),
+                setup.liab_bank.as_account_info(),
+                setup.asset_oracle.as_account_info(),
+                setup.liab_oracle.as_account_info(),
+            ];
+            let retriever =
+                ScanningAccountRetriever::new_with_staleness(&ais, &setup.group, None).unwrap();
+
+            health::new_health_cache(&setup.liqee.borrow(), &retriever).unwrap()
+        }
+
+        fn run(&self, max_liab_transfer: I80F48) -> Result<Self> {
+            let mut setup = self.clone();
+
+            let ais = vec![
+                setup.asset_bank.as_account_info(),
+                setup.liab_bank.as_account_info(),
+                setup.asset_oracle.as_account_info(),
+                setup.liab_oracle.as_account_info(),
+            ];
+            let mut retriever =
+                ScanningAccountRetriever::new_with_staleness(&ais, &setup.group, None).unwrap();
+
+            let mut liqee_health_cache =
+                health::new_health_cache(&setup.liqee.borrow(), &retriever).unwrap();
+            let liqee_init_health = liqee_health_cache.health(HealthType::Init);
+
+            liquidation_action(
+                &mut retriever,
+                1,
+                0,
+                &mut setup.liqor.borrow_mut(),
+                Pubkey::new_unique(),
+                &mut setup.liqee.borrow_mut(),
+                Pubkey::new_unique(),
+                &mut liqee_health_cache,
+                liqee_init_health,
+                0,
+                max_liab_transfer,
+            )?;
+
+            drop(retriever);
+            drop(ais);
+
+            Ok(setup)
+        }
+    }
+
+    fn asset_p(account: &mut MangoAccountValue) -> &mut TokenPosition {
+        account.token_position_mut(0).unwrap().0
+    }
+    fn liab_p(account: &mut MangoAccountValue) -> &mut TokenPosition {
+        account.token_position_mut(1).unwrap().0
+    }
+
+    macro_rules! assert_eq_f {
+        ($value:expr, $expected:expr, $max_error:expr) => {
+            let value = $value;
+            let expected = $expected;
+            let ok = (value.to_num::<f64>() - expected).abs() < $max_error;
+            assert!(ok, "value: {value}, expected: {expected}");
+        };
+    }
+
+    #[test]
+    fn test_liq_with_token_stable_price() {
+        let mut setup = TestSetup::new();
+        {
+            let ab = setup.asset_bank.data();
+            ab.stable_price_model.stable_price = 0.5;
+            let lb = setup.liab_bank.data();
+            lb.stable_price_model.stable_price = 1.25;
+        }
+        {
+            let asset_bank = setup.asset_bank.data();
+            asset_bank
+                .change_without_fee(
+                    asset_p(&mut setup.liqee),
+                    I80F48::from_num(10.0),
+                    0,
+                    I80F48::from(1),
+                )
+                .unwrap();
+            asset_bank
+                .change_without_fee(
+                    asset_p(&mut setup.liqor),
+                    I80F48::from_num(1000.0),
+                    0,
+                    I80F48::from(1),
+                )
+                .unwrap();
+
+            let liab_bank = setup.liab_bank.data();
+            liab_bank
+                .change_without_fee(
+                    liab_p(&mut setup.liqor),
+                    I80F48::from_num(1000.0),
+                    0,
+                    I80F48::from(1),
+                )
+                .unwrap();
+            liab_bank
+                .change_without_fee(
+                    liab_p(&mut setup.liqee),
+                    I80F48::from_num(-5.0),
+                    0,
+                    I80F48::from(1),
+                )
+                .unwrap();
+        }
+
+        let hc = setup.liqee_health_cache();
+        assert_eq_f!(hc.health(HealthType::Init), 10.0 * 0.5 - 5.0 * 1.25, 0.1);
+
+        let mut result = setup.run(I80F48::from(100)).unwrap();
+
+        let liqee_asset = asset_p(&mut result.liqee);
+        assert_eq_f!(liqee_asset.native(&result.asset_bank.data()), 8.335, 0.01);
+        let liqee_liab = liab_p(&mut result.liqee);
+        assert_eq_f!(liqee_liab.native(&result.liab_bank.data()), -3.335, 0.01);
+
+        let hc = result.liqee_health_cache();
+        assert_eq_f!(hc.health(HealthType::Init), 0.0, 0.01);
+    }
 }
