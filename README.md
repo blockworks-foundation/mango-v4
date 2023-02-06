@@ -27,10 +27,10 @@ Consider setting the git option `submodule.recurse=true`.
 Here are steps followed while performing a program deployment to mainnet-beta
 
 - review diff of last deployed tag to mainnet-beta, e.g. https://github.com/blockworks-foundation/mango-v4/compare/program-v0.4.0..dev, pay special attention to account layout changes, backward compatibility of newly introduced account fields, etc.
-- update changelog
-- add a git tag e.g. `program-v0.0.1`, should match the version the program has
 - deploy to mainnet-beta
-- merge code to `main` branch
+- update changelog with deploy timestamp and tx
+- add a git tag e.g. `program-v0.0.1`, should match the version the program has
+- reset `main` to currently deployed tag
 - notify other contributors for bringing in changes from new release by merging `main` into their branch, e.g. `ts-client` and `deploy-mm`
 - notify other contributors for appropriately handling offchain services e.g. scrapers, market makers, etc.
 - bump program version in `Cargo.toml` on dev branch for next release
