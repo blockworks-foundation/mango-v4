@@ -4,8 +4,9 @@ use super::*;
 // that they work in principle. It should be split up / renamed.
 #[tokio::test]
 async fn test_margin_trade() -> Result<(), BanksClientError> {
-    let builder = TestContextBuilder::new();
-    let context = builder.start_default().await;
+    let mut test_builder = TestContextBuilder::new();
+    test_builder.test().set_compute_max_units(100_000);
+    let context = test_builder.start_default().await;
     let solana = &context.solana.clone();
 
     let admin = TestKeypair::new();
