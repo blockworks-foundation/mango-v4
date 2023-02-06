@@ -2,12 +2,15 @@ name: Publish Docker Image to GCR
 
 on:
   push:
-    branches: [dev,main]
-    paths: ['.github/ci-docker-publish.yml',
-            'programs/**',
-            'client/**',
-            'keeper/**',
-            'liquidator/**']
+    branches: [main]
+    paths:
+      [
+        '.github/ci-docker-publish.yml',
+        'programs/**',
+        'client/**',
+        'keeper/**',
+        'liquidator/**',
+      ]
   workflow_call:
     secrets:
       GCR_PROJECT:
