@@ -260,7 +260,8 @@ pub(crate) fn liquidation_action(
 
     let perp_info = liqee_health_cache.perp_info(perp_market_index)?;
     let oracle_price = perp_info.prices.oracle;
-    let price_per_lot = cm!(I80F48::from(perp_market.base_lot_size) * oracle_price);
+    let base_lot_size = I80F48::from(perp_market.base_lot_size);
+    let oracle_price_per_lot = cm!(base_lot_size * oracle_price);
 
     let liqee_positive_settle_limit = liqee_perp_position.settle_limit(&perp_market).1;
 
@@ -289,8 +290,11 @@ pub(crate) fn liquidation_action(
         let quote_init_asset_weight = I80F48::ONE;
         direction = -1;
         fee_factor = cm!(I80F48::ONE - perp_market.base_liquidation_fee);
-        unweighted_health_per_lot = cm!(price_per_lot
-            * (-perp_market.init_base_asset_weight + quote_init_asset_weight * fee_factor));
+        let asset_price = perp_info.prices.asset(HealthType::Init);
+        unweighted_health_per_lot = cm!(-asset_price
+            * base_lot_size
+            * perp_market.init_base_asset_weight
+            + oracle_price_per_lot * quote_init_asset_weight * fee_factor);
     } else {
         // liqee_base_lots <= 0
         require_msg!(
@@ -303,8 +307,11 @@ pub(crate) fn liquidation_action(
         let quote_init_liab_weight = I80F48::ONE;
         direction = 1;
         fee_factor = cm!(I80F48::ONE + perp_market.base_liquidation_fee);
-        unweighted_health_per_lot = cm!(price_per_lot
-            * (perp_market.init_base_liab_weight - quote_init_liab_weight * fee_factor));
+        let liab_price = perp_info.prices.liab(HealthType::Init);
+        unweighted_health_per_lot = cm!(liab_price
+            * base_lot_size
+            * perp_market.init_base_liab_weight
+            - oracle_price_per_lot * quote_init_liab_weight * fee_factor);
     };
     assert!(unweighted_health_per_lot > 0);
 
@@ -424,7 +431,7 @@ pub(crate) fn liquidation_action(
     // liqee and liqors entry and break even prices.
     //
     let base_transfer = cm!(direction * base_reduction);
-    let quote_transfer = cm!(-I80F48::from(base_transfer) * price_per_lot * fee_factor);
+    let quote_transfer = cm!(-I80F48::from(base_transfer) * oracle_price_per_lot * fee_factor);
     if base_transfer != 0 {
         msg!(
             "transfering: {} base lots and {} quote",

@@ -83,9 +83,9 @@ pub fn token_liq_with_token(
     //
     // This must happen _after_ the health computation, since immutable borrows of
     // the bank are not allowed at the same time.
-    let (asset_bank, asset_price, opt_liab_bank_and_price) =
+    let (asset_bank, asset_oracle_price, opt_liab_bank_and_price) =
         account_retriever.banks_mut_and_oracles(asset_token_index, liab_token_index)?;
-    let (liab_bank, liab_price) = opt_liab_bank_and_price.unwrap();
+    let (liab_bank, liab_oracle_price) = opt_liab_bank_and_price.unwrap();
 
     // The main complication here is that we can't keep the liqee_asset_position and liqee_liab_position
     // borrows alive at the same time. Possibly adding get_mut_pair() would be helpful.
@@ -102,37 +102,61 @@ pub fn token_liq_with_token(
     // Liquidation fees work by giving the liqor more assets than the oracle price would
     // indicate. Specifically we choose
     //   assets =
-    //     liabs * liab_price/asset_price * (1 + liab_liq_fee + asset_liq_fee)
-    // Which means that we use a increased liab price and reduced asset price for the conversion.
+    //     liabs * liab_oracle_price/asset_oracle_price * (1 + liab_liq_fee + asset_liq_fee)
+    // Which means that we use a increased liab oracle price and reduced asset oracle price for
+    // the conversion.
     // It would be more fully correct to use (1+liab_liq_fee)*(1+asset_liq_fee), but for small
     // fee amounts that is nearly identical.
     // For simplicity we write
-    //   assets = liabs * liab_price / asset_price * fee_factor
-    //   assets = liabs * liab_price_adjusted / asset_price
+    //   assets = liabs * liab_oracle_price / asset_oracle_price * fee_factor
+    //   assets = liabs * liab_oracle_price_adjusted / asset_oracle_price
+    //          = liabs * lopa / aop
     let fee_factor = cm!(I80F48::ONE + asset_bank.liquidation_fee + liab_bank.liquidation_fee);
-    let liab_price_adjusted = cm!(liab_price * fee_factor);
+    let liab_oracle_price_adjusted = cm!(liab_oracle_price * fee_factor);
 
     let init_asset_weight = asset_bank.init_asset_weight;
     let init_liab_weight = liab_bank.init_liab_weight;
 
+    // The price the health computation uses for a liability of one native liab token
+    let liab_init_liab_price = liqee_health_cache
+        .token_info(liab_token_index)
+        .unwrap()
+        .prices
+        .liab(HealthType::Init);
+    // Health price for an asset of one native asset token
+    let asset_init_asset_price = liqee_health_cache
+        .token_info(asset_token_index)
+        .unwrap()
+        .prices
+        .asset(HealthType::Init);
+
     // How much asset would need to be exchanged to liab in order to bring health to 0?
     //
     // That means: what is x (unit: native liab tokens) such that
-    //   init_health + x * ilw * lp - y * iaw * ap = 0
+    //   init_health
+    //     + x * ilw * lilp     health gain from reducing liabs
+    //     - y * iaw * aiap     health loss from paying asset
+    //     = 0
     // where
-    //   ilw = init_liab_weight, lp = liab_price
-    //   iap = init_asset_weight, ap = asset_price
-    //   ff = fee_factor, lpa = lp * ff
+    //   ilw = init_liab_weight,
+    //   lilp = liab_init_liab_price,
+    //   lopa = liab_oracle_price_adjusted, (see above)
+    //   iap = init_asset_weight,
+    //   aiap = asset_init_asset_price,
+    //   aop = asset_oracle_price
+    //   ff = fee_factor
     // and the asset cost of getting x native units of liab is:
-    //   y = x * lp / ap * ff = x * lpa / ap   (native asset tokens)
+    //   y = x * lopa / aop   (native asset tokens, see above)
     //
-    // Result: x = -init_health / (lp * ilw - iaw * lpa)
-    let liab_needed =
-        cm!(-init_health
-            / (liab_price * init_liab_weight - init_asset_weight * liab_price_adjusted));
+    // Result: x = -init_health / (ilw * lilp - iaw * lopa * aiap / aop)
+    let liab_needed = cm!(-init_health
+        / (liab_init_liab_price * init_liab_weight
+            - liab_oracle_price_adjusted
+                * init_asset_weight
+                * (asset_init_asset_price / asset_oracle_price)));
 
     // How much liab can we get at most for the asset balance?
-    let liab_possible = cm!(liqee_asset_native * asset_price / liab_price_adjusted);
+    let liab_possible = cm!(liqee_asset_native * asset_oracle_price / liab_oracle_price_adjusted);
 
     // The amount of liab native tokens we will transfer
     let liab_transfer = min(
@@ -141,7 +165,7 @@ pub fn token_liq_with_token(
     );
 
     // The amount of asset native tokens we will give up for them
-    let asset_transfer = cm!(liab_transfer * liab_price_adjusted / asset_price);
+    let asset_transfer = cm!(liab_transfer * liab_oracle_price_adjusted / asset_oracle_price);
 
     // During liquidation, we mustn't leave small positive balances in the liqee. Those
     // could break bankruptcy-detection. Thus we dust them even if the token position
@@ -162,7 +186,7 @@ pub fn token_liq_with_token(
         liqor_liab_position,
         liab_transfer,
         Clock::get()?.unix_timestamp.try_into().unwrap(),
-        liab_price,
+        liab_oracle_price,
     )?;
     let liqor_liab_indexed_position = liqor_liab_position.indexed_position;
     let liqee_liab_native_after = liqee_liab_position.native(liab_bank);
@@ -181,7 +205,7 @@ pub fn token_liq_with_token(
         liqee_asset_position,
         asset_transfer,
         Clock::get()?.unix_timestamp.try_into().unwrap(),
-        asset_price,
+        asset_oracle_price,
     )?;
     let liqee_asset_indexed_position = liqee_asset_position.indexed_position;
     let liqee_assets_native_after = liqee_asset_position.native(asset_bank);
@@ -282,8 +306,8 @@ pub fn token_liq_with_token(
         liab_token_index,
         asset_transfer: asset_transfer.to_bits(),
         liab_transfer: liab_transfer.to_bits(),
-        asset_price: asset_price.to_bits(),
-        liab_price: liab_price.to_bits(),
+        asset_price: asset_oracle_price.to_bits(),
+        liab_price: liab_oracle_price.to_bits(),
         bankruptcy: !liqee_health_cache.has_phase2_liquidatable() & liqee_init_health.is_negative()
     });
 
