@@ -23,11 +23,14 @@ import { MangoClient } from '../../client';
 import { MANGO_V4_ID } from '../../constants';
 import { toUiDecimalsForQuote } from '../../utils';
 import { sendTransaction } from '../../utils/rpc';
+import * as defaultParams from './params/default.json';
 import {
   makeCheckAndSetSequenceNumberIx,
   makeInitSequenceEnforcerAccountIx,
   seqEnforcerProgramIds,
 } from './sequence-enforcer-util';
+
+console.log(defaultParams);
 
 // Future
 // * use async nodejs logging

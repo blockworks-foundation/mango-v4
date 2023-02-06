@@ -476,7 +476,7 @@ fn binary_search(
     min_step: I80F48,
     fun: impl Fn(I80F48) -> Result<I80F48>,
 ) -> Result<I80F48> {
-    let max_iterations = 20;
+    let max_iterations = 50;
     let target_error = I80F48!(0.1);
     let right_value = fun(right)?;
     require_msg!(

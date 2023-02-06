@@ -6,6 +6,19 @@ Update this for each program release and mainnet deployment.
 
 ## mainnet
 
+### v0.5.0, 2023-2-2
+
+Deployment: Feb 2, 2023 at 10:51:02 Central European Standard Time, https://explorer.solana.com/tx/eVGLcy3y8Vi9sMDKQbKdRKZa6dpjTjdP5HyDFXXQFqAaS1CXCg2QnFC1hgE8F8unWfgpmXC8PvmuRMhmQEE1YzK
+
+- Log old and new values in edit instructions (#418)
+- PerpPlaceOrder returns order id (#417)
+- Prevent setting the group admin to the default address (#423)
+- Allow security admin to disable individual instructions (#419)
+- Rename pnl_asset_weight to overall_asset_weight (#427)
+- Significant changes to perp liquidation instructions (#424)
+- Reorganize perp fill events to save bytes and have client order ids (#426)
+- Add market index to serum3 events (#429)
+
 ### v0.4.0, 2023-1-24
 
 Deployment: Jan 24, 2023 at 10:21:59 Central European Standard Time, https://explorer.solana.com/tx/3C5vSUrC2xJhAeaDjRMuhE1Gnbj72gDKPRibpFk2gP2afoaFquY8GgUeBwhNoP25QtPvTJG3NZmZBoHoSgvrEWGH

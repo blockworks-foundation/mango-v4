@@ -15,7 +15,7 @@ use std::{collections::HashMap, time::Duration};
 #[derive(Clone)]
 pub struct Config {
     /// Maximum slippage allowed in Jupiter
-    pub slippage: f64,
+    pub slippage_bps: u64,
     /// When closing borrows, the rebalancer can't close token positions exactly.
     /// Instead it purchases too much and then gets rid of the excess in a second step.
     /// If this is 1.05, then it'll swap borrow_value * 1.05 quote token into borrow token.
@@ -160,7 +160,7 @@ impl<'a> Rebalancer<'a> {
                         quote_mint,
                         token_mint,
                         input_amount.to_num::<u64>(),
-                        self.config.slippage,
+                        self.config.slippage_bps,
                         client::JupiterSwapMode::ExactIn,
                     )
                     .await?;
@@ -192,7 +192,7 @@ impl<'a> Rebalancer<'a> {
                         token_mint,
                         quote_mint,
                         amount.to_num::<u64>(),
-                        self.config.slippage,
+                        self.config.slippage_bps,
                         client::JupiterSwapMode::ExactIn,
                     )
                     .await?;

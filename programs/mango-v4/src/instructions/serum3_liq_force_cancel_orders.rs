@@ -7,7 +7,7 @@ use crate::instructions::{
     apply_vault_difference, charge_loan_origination_fees, OODifference, OpenOrdersAmounts,
     OpenOrdersSlim,
 };
-use crate::logs::Serum3OpenOrdersBalanceLog;
+use crate::logs::Serum3OpenOrdersBalanceLogV2;
 use crate::serum3_cpi::load_open_orders_ref;
 use crate::state::*;
 
@@ -187,9 +187,10 @@ pub fn serum3_liq_force_cancel_orders(
         let open_orders = load_open_orders_ref(oo_ai)?;
         let after_oo = OpenOrdersSlim::from_oo(&open_orders);
 
-        emit!(Serum3OpenOrdersBalanceLog {
+        emit!(Serum3OpenOrdersBalanceLogV2 {
             mango_group: ctx.accounts.group.key(),
             mango_account: ctx.accounts.account.key(),
+            market_index: serum_market.market_index,
             base_token_index: serum_market.base_token_index,
             quote_token_index: serum_market.quote_token_index,
             base_total: after_oo.native_base_total(),

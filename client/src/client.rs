@@ -47,6 +47,7 @@ pub struct Client {
     pub fee_payer: Arc<Keypair>,
     pub commitment: CommitmentConfig,
     pub timeout: Option<Duration>,
+    pub prioritization_micro_lamports: u64,
 }
 
 impl Client {
@@ -55,12 +56,14 @@ impl Client {
         commitment: CommitmentConfig,
         fee_payer: &Keypair,
         timeout: Option<Duration>,
+        prioritization_micro_lamports: u64,
     ) -> Self {
         Self {
             cluster,
             fee_payer: Arc::new(fee_payer.clone()),
             commitment,
             timeout,
+            prioritization_micro_lamports,
         }
     }
 
@@ -168,8 +171,6 @@ impl MangoClient {
         account_num: u32,
         mango_account_name: &str,
     ) -> anyhow::Result<(Pubkey, Signature)> {
-        let rpc = client.rpc_async();
-
         let account = Pubkey::find_program_address(
             &[
                 group.as_ref(),
@@ -208,7 +209,7 @@ impl MangoClient {
             payer: payer.pubkey(),
             signers: vec![owner, payer],
         }
-        .send_and_confirm(&rpc)
+        .send_and_confirm(&client)
         .await?;
 
         Ok((account, txsig))
@@ -1135,7 +1136,7 @@ impl MangoClient {
         input_mint: Pubkey,
         output_mint: Pubkey,
         amount: u64,
-        slippage: f64,
+        slippage: u64,
         swap_mode: JupiterSwapMode,
     ) -> anyhow::Result<jupiter::QueryRoute> {
         let quote = self
@@ -1190,7 +1191,7 @@ impl MangoClient {
         input_mint: Pubkey,
         output_mint: Pubkey,
         amount: u64,
-        slippage: f64,
+        slippage: u64,
         swap_mode: JupiterSwapMode,
     ) -> anyhow::Result<Signature> {
         let source_token = self.context.token_by_mint(&input_mint)?;
@@ -1351,7 +1352,6 @@ impl MangoClient {
             }),
         });
 
-        let rpc = self.client.rpc_async();
         let payer = self.owner.pubkey(); // maybe use fee_payer? but usually it's the same
         let mut address_lookup_tables = self.mango_address_lookup_tables().await?;
         address_lookup_tables.extend(jup_alts.into_iter());
@@ -1362,7 +1362,7 @@ impl MangoClient {
             payer,
             signers: vec![&self.owner],
         }
-        .send_and_confirm(&rpc)
+        .send_and_confirm(&self.client)
         .await
     }
 
@@ -1447,7 +1447,7 @@ impl MangoClient {
             payer: self.client.fee_payer.pubkey(),
             signers: vec![&self.owner, &*self.client.fee_payer],
         }
-        .send_and_confirm(&self.client.rpc_async())
+        .send_and_confirm(&self.client)
         .await
     }
 
@@ -1461,7 +1461,7 @@ impl MangoClient {
             payer: self.client.fee_payer.pubkey(),
             signers: vec![&*self.client.fee_payer],
         }
-        .send_and_confirm(&self.client.rpc_async())
+        .send_and_confirm(&self.client)
         .await
     }
 }
@@ -1516,8 +1516,17 @@ impl<'a> TransactionBuilder<'a> {
         Ok(tx)
     }
 
-    pub async fn send_and_confirm(self, rpc: &RpcClientAsync) -> anyhow::Result<Signature> {
-        let tx = self.transaction(rpc).await?;
+    pub async fn send_and_confirm(mut self, client: &Client) -> anyhow::Result<Signature> {
+        let rpc = client.rpc_async();
+        if client.prioritization_micro_lamports != 0 {
+            self.instructions.insert(
+                0,
+                solana_sdk::compute_budget::ComputeBudgetInstruction::set_compute_unit_price(
+                    client.prioritization_micro_lamports,
+                ),
+            )
+        }
+        let tx = self.transaction(&rpc).await?;
         rpc.send_and_confirm_transaction(&tx)
             .await
             .map_err(prettify_solana_client_error)

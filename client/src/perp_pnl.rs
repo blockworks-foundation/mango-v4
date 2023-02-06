@@ -52,6 +52,9 @@ pub async fn fetch_top(
                 return None;
             }
             let mango_acc = mango_acc.unwrap();
+            if mango_acc.fixed.group != perp_market.group {
+                return None;
+            }
             let perp_pos = mango_acc.perp_position(perp_market_index);
             if perp_pos.is_err() {
                 return None;

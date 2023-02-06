@@ -1,5 +1,5 @@
 export type MangoV4 = {
-  "version": "0.5.0",
+  "version": "0.6.0",
   "name": "mango_v4",
   "instructions": [
     {
@@ -7555,6 +7555,61 @@ export type MangoV4 = {
       ]
     },
     {
+      "name": "Serum3OpenOrdersBalanceLogV2",
+      "fields": [
+        {
+          "name": "mangoGroup",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "mangoAccount",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "marketIndex",
+          "type": "u16",
+          "index": false
+        },
+        {
+          "name": "baseTokenIndex",
+          "type": "u16",
+          "index": false
+        },
+        {
+          "name": "quoteTokenIndex",
+          "type": "u16",
+          "index": false
+        },
+        {
+          "name": "baseTotal",
+          "type": "u64",
+          "index": false
+        },
+        {
+          "name": "baseFree",
+          "type": "u64",
+          "index": false
+        },
+        {
+          "name": "quoteTotal",
+          "type": "u64",
+          "index": false
+        },
+        {
+          "name": "quoteFree",
+          "type": "u64",
+          "index": false
+        },
+        {
+          "name": "referrerRebatesAccrued",
+          "type": "u64",
+          "index": false
+        }
+      ]
+    },
+    {
       "name": "WithdrawLoanOriginationFeeLog",
       "fields": [
         {
@@ -8262,7 +8317,7 @@ export type MangoV4 = {
 };
 
 export const IDL: MangoV4 = {
-  "version": "0.5.0",
+  "version": "0.6.0",
   "name": "mango_v4",
   "instructions": [
     {
@@ -15778,6 +15833,61 @@ export const IDL: MangoV4 = {
         {
           "name": "mangoAccount",
           "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "baseTokenIndex",
+          "type": "u16",
+          "index": false
+        },
+        {
+          "name": "quoteTokenIndex",
+          "type": "u16",
+          "index": false
+        },
+        {
+          "name": "baseTotal",
+          "type": "u64",
+          "index": false
+        },
+        {
+          "name": "baseFree",
+          "type": "u64",
+          "index": false
+        },
+        {
+          "name": "quoteTotal",
+          "type": "u64",
+          "index": false
+        },
+        {
+          "name": "quoteFree",
+          "type": "u64",
+          "index": false
+        },
+        {
+          "name": "referrerRebatesAccrued",
+          "type": "u64",
+          "index": false
+        }
+      ]
+    },
+    {
+      "name": "Serum3OpenOrdersBalanceLogV2",
+      "fields": [
+        {
+          "name": "mangoGroup",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "mangoAccount",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "marketIndex",
+          "type": "u16",
           "index": false
         },
         {

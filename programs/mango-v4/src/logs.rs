@@ -204,6 +204,21 @@ pub struct Serum3OpenOrdersBalanceLog {
     pub referrer_rebates_accrued: u64,
 }
 
+#[event]
+pub struct Serum3OpenOrdersBalanceLogV2 {
+    pub mango_group: Pubkey,
+    pub mango_account: Pubkey,
+    pub market_index: u16,
+    pub base_token_index: u16,
+    pub quote_token_index: u16,
+    pub base_total: u64,
+    pub base_free: u64,
+    /// this field does not include the referrer_rebates; need to add that in to get true total
+    pub quote_total: u64,
+    pub quote_free: u64,
+    pub referrer_rebates_accrued: u64,
+}
+
 #[derive(PartialEq, Copy, Clone, Debug, AnchorSerialize, AnchorDeserialize)]
 #[repr(u8)]
 pub enum LoanOriginationFeeInstruction {

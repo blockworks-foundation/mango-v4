@@ -8,7 +8,7 @@ import {
 import fs from 'fs';
 import { MangoClient } from '../client';
 import { MANGO_V4_ID } from '../constants';
-import { buildVersionedTx } from '../utils';
+import { sendTransaction } from '../utils/rpc';
 
 //
 // Script which depoys a new mango group, and registers 3 tokens
@@ -45,6 +45,8 @@ const NET_BORROWS_LIMIT_NATIVE = 1 * Math.pow(10, 7) * Math.pow(10, 6);
 
 async function main() {
   const options = AnchorProvider.defaultOptions();
+  options.commitment = 'processed';
+  options.preflightCommitment = 'finalized';
   const connection = new Connection(process.env.CLUSTER_URL!, options);
 
   const admin = Keypair.fromSecretKey(
@@ -63,6 +65,8 @@ async function main() {
     MANGO_V4_ID['mainnet-beta'],
     {
       idsSource: 'get-program-accounts',
+      prioritizationFee: 100,
+      txConfirmationCommitment: 'confirmed',
     },
   );
 
@@ -228,8 +232,8 @@ async function main() {
       0.8,
       1.1,
       1.2,
-      0.95,
-      0.9,
+      0.0,
+      0.0,
       0.05,
       -0.001,
       0.002,
@@ -271,11 +275,7 @@ async function createAndPopulateAlt(client: MangoClient, admin: Keypair) {
         payer: admin.publicKey,
         recentSlot: await connection.getSlot('finalized'),
       });
-      const createTx = await buildVersionedTx(
-        client.program.provider as AnchorProvider,
-        [createIx[0]],
-      );
-      let sig = await connection.sendTransaction(createTx);
+      let sig = await client.sendAndConfirmTransaction([createIx[0]]);
       console.log(
         `...created ALT ${createIx[1]} https://explorer.solana.com/tx/${sig}`,
       );
@@ -355,13 +355,7 @@ async function createAndPopulateAlt(client: MangoClient, admin: Keypair) {
         authority: admin.publicKey,
         addresses,
       });
-      const extendTx = await buildVersionedTx(
-        client.program.provider as AnchorProvider,
-        [extendIx],
-      );
-      let sig = await client.program.provider.connection.sendTransaction(
-        extendTx,
-      );
+      const sig = await client.sendAndConfirmTransaction([extendIx]);
       console.log(`https://explorer.solana.com/tx/${sig}`);
     }
 
