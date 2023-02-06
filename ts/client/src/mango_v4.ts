@@ -2880,32 +2880,6 @@ export type MangoV4 = {
       "args": []
     },
     {
-      "name": "perpZeroOutForMarket",
-      "accounts": [
-        {
-          "name": "group",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "account",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "perpMarket",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "admin",
-          "isMut": false,
-          "isSigner": true
-        }
-      ],
-      "args": []
-    },
-    {
       "name": "perpPlaceOrder",
       "accounts": [
         {
@@ -11219,32 +11193,6 @@ export const IDL: MangoV4 = {
           "name": "perpMarket",
           "isMut": false,
           "isSigner": false
-        }
-      ],
-      "args": []
-    },
-    {
-      "name": "perpZeroOutForMarket",
-      "accounts": [
-        {
-          "name": "group",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "account",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "perpMarket",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "admin",
-          "isMut": false,
-          "isSigner": true
         }
       ],
       "args": []

@@ -563,10 +563,6 @@ pub mod mango_v4 {
         instructions::perp_deactivate_position(ctx)
     }
 
-    pub fn perp_zero_out_for_market(ctx: Context<PerpZeroOutForMarket>) -> Result<()> {
-        instructions::perp_zero_out_for_market(ctx)
-    }
-
     #[allow(clippy::too_many_arguments)]
     pub fn perp_place_order(
         ctx: Context<PerpPlaceOrder>,

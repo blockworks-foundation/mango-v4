@@ -9,6 +9,7 @@ import {
   AccountMeta,
   AddressLookupTableAccount,
   Cluster,
+  Commitment,
   Keypair,
   MemcmpFilter,
   PublicKey,
@@ -18,7 +19,6 @@ import {
   SystemProgram,
   TransactionInstruction,
   TransactionSignature,
-  Commitment,
 } from '@solana/web3.js';
 import bs58 from 'bs58';
 import { Bank, MintInfo, TokenIndex } from './accounts/bank';
@@ -1967,24 +1967,6 @@ export class MangoClient {
       mangoAccount,
       perpMarketIndex,
     );
-    return await this.sendAndConfirmTransactionForGroup(group, [ix]);
-  }
-
-  public async perpZeroOutForMarket(
-    group: Group,
-    mangoAccount: MangoAccount,
-    perpMarketIndex: PerpMarketIndex,
-  ): Promise<TransactionSignature> {
-    const perpMarket = group.getPerpMarketByMarketIndex(perpMarketIndex);
-    const ix = await this.program.methods
-      .perpZeroOutForMarket()
-      .accounts({
-        group: group.publicKey,
-        account: mangoAccount.publicKey,
-        perpMarket: perpMarket.publicKey,
-        admin: group.admin,
-      })
-      .instruction();
     return await this.sendAndConfirmTransactionForGroup(group, [ix]);
   }
 
