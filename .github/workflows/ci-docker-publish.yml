@@ -61,6 +61,7 @@ jobs:
           push: true
           tags: |
             us-docker.pkg.dev/${{ env.PROJECT_ID }}/gcr.io/${{ env.IMAGE }}:${{ github.sha }}
+            us-docker.pkg.dev/${{ env.PROJECT_ID }}/gcr.io/${{ env.IMAGE }}:${{ github.ref_name }}
             us-docker.pkg.dev/${{ env.PROJECT_ID }}/gcr.io/${{ env.IMAGE }}:latest
           cache-from: type=gha
           cache-to: type=gha,mode=max
@@ -73,6 +74,7 @@ jobs:
           push: true
           tags: |
             us-docker.pkg.dev/${{ env.PROJECT_ID }}/gcr.io/${{ env.IMAGE }}-liquidator:${{ github.sha }}
+            us-docker.pkg.dev/${{ env.PROJECT_ID }}/gcr.io/${{ env.IMAGE }}-liquidator:${{ github.ref_name }}
             us-docker.pkg.dev/${{ env.PROJECT_ID }}/gcr.io/${{ env.IMAGE }}-liquidator:latest
       # Build and push the keeper runtime image
       - name: Build and Push Keeper
@@ -83,4 +85,5 @@ jobs:
           push: true
           tags: |
             us-docker.pkg.dev/${{ env.PROJECT_ID }}/gcr.io/${{ env.IMAGE }}-keeper:${{ github.sha }}
+            us-docker.pkg.dev/${{ env.PROJECT_ID }}/gcr.io/${{ env.IMAGE }}-keeper:${{ github.ref_name }}
             us-docker.pkg.dev/${{ env.PROJECT_ID }}/gcr.io/${{ env.IMAGE }}-keeper:latest
