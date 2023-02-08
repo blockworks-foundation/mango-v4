@@ -77,7 +77,7 @@ impl OracleConfigParams {
     pub fn to_oracle_config(&self) -> OracleConfig {
         OracleConfig {
             conf_filter: I80F48::from_num(self.conf_filter),
-            max_staleness_slots: self.max_staleness_slots.map(|v| v as i64).unwrap_or(-1),
+            max_staleness_slots: self.max_staleness_slots.map(|v| v as i64).unwrap_or(120),
             reserved: [0; 72],
         }
     }
