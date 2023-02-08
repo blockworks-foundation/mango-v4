@@ -260,7 +260,8 @@ pub(crate) fn liquidation_action(
 
     let perp_info = liqee_health_cache.perp_info(perp_market_index)?;
     let oracle_price = perp_info.prices.oracle;
-    let price_per_lot = cm!(I80F48::from(perp_market.base_lot_size) * oracle_price);
+    let base_lot_size = I80F48::from(perp_market.base_lot_size);
+    let oracle_price_per_lot = cm!(base_lot_size * oracle_price);
 
     let liqee_positive_settle_limit = liqee_perp_position.settle_limit(&perp_market).1;
 
@@ -289,8 +290,11 @@ pub(crate) fn liquidation_action(
         let quote_init_asset_weight = I80F48::ONE;
         direction = -1;
         fee_factor = cm!(I80F48::ONE - perp_market.base_liquidation_fee);
-        unweighted_health_per_lot = cm!(price_per_lot
-            * (-perp_market.init_base_asset_weight + quote_init_asset_weight * fee_factor));
+        let asset_price = perp_info.prices.asset(HealthType::Init);
+        unweighted_health_per_lot = cm!(-asset_price
+            * base_lot_size
+            * perp_market.init_base_asset_weight
+            + oracle_price_per_lot * quote_init_asset_weight * fee_factor);
     } else {
         // liqee_base_lots <= 0
         require_msg!(
@@ -303,8 +307,11 @@ pub(crate) fn liquidation_action(
         let quote_init_liab_weight = I80F48::ONE;
         direction = 1;
         fee_factor = cm!(I80F48::ONE + perp_market.base_liquidation_fee);
-        unweighted_health_per_lot = cm!(price_per_lot
-            * (perp_market.init_base_liab_weight - quote_init_liab_weight * fee_factor));
+        let liab_price = perp_info.prices.liab(HealthType::Init);
+        unweighted_health_per_lot = cm!(liab_price
+            * base_lot_size
+            * perp_market.init_base_liab_weight
+            - oracle_price_per_lot * quote_init_liab_weight * fee_factor);
     };
     assert!(unweighted_health_per_lot > 0);
 
@@ -424,7 +431,7 @@ pub(crate) fn liquidation_action(
     // liqee and liqors entry and break even prices.
     //
     let base_transfer = cm!(direction * base_reduction);
-    let quote_transfer = cm!(-I80F48::from(base_transfer) * price_per_lot * fee_factor);
+    let quote_transfer = cm!(-I80F48::from(base_transfer) * oracle_price_per_lot * fee_factor);
     if base_transfer != 0 {
         msg!(
             "transfering: {} base lots and {} quote",
@@ -570,7 +577,7 @@ mod tests {
             }
         }
 
-        fn run(&self, max_base: i64, max_pnl: u64) -> Result<Self> {
+        fn liqee_health_cache(&self) -> HealthCache {
             let mut setup = self.clone();
 
             let ais = vec![
@@ -582,12 +589,14 @@ mod tests {
             let retriever =
                 ScanningAccountRetriever::new_with_staleness(&ais, &setup.group, None).unwrap();
 
-            let mut liqee_health_cache =
-                health::new_health_cache(&setup.liqee.borrow(), &retriever).unwrap();
-            let liqee_init_health = liqee_health_cache.health(HealthType::Init);
+            health::new_health_cache(&setup.liqee.borrow(), &retriever).unwrap()
+        }
 
-            drop(retriever);
-            drop(ais);
+        fn run(&self, max_base: i64, max_pnl: u64) -> Result<Self> {
+            let mut setup = self.clone();
+
+            let mut liqee_health_cache = setup.liqee_health_cache();
+            let liqee_init_health = liqee_health_cache.health(HealthType::Init);
 
             liquidation_action(
                 setup.perp_market.data(),
@@ -837,5 +846,58 @@ mod tests {
                 0.01
             );
         }
+    }
+
+    #[test]
+    fn test_liq_base_or_positive_pnl_stable_price() {
+        let mut setup = TestSetup::new();
+        {
+            let pm = setup.perp_market.data();
+            pm.stable_price_model.stable_price = 0.5;
+        }
+        {
+            perp_p(&mut setup.liqee).record_trade(
+                setup.perp_market.data(),
+                10,
+                I80F48::from_num(-10),
+            );
+
+            let settle_bank = setup.settle_bank.data();
+            settle_bank
+                .change_without_fee(
+                    token_p(&mut setup.liqee),
+                    I80F48::from_num(5.0),
+                    0,
+                    I80F48::from(1),
+                )
+                .unwrap();
+            settle_bank
+                .change_without_fee(
+                    token_p(&mut setup.liqor),
+                    I80F48::from_num(1000.0),
+                    0,
+                    I80F48::from(1),
+                )
+                .unwrap();
+        }
+
+        let hc = setup.liqee_health_cache();
+        assert_eq_f!(
+            hc.health(HealthType::Init),
+            5.0 + (-10.0 + 10.0 * 0.5 * 0.8),
+            0.1
+        );
+
+        let mut result = setup.run(100, 0).unwrap();
+
+        let liqee_perp = perp_p(&mut result.liqee);
+        assert_eq!(liqee_perp.base_position_lots(), 8);
+
+        let hc = result.liqee_health_cache();
+        assert_eq_f!(
+            hc.health(HealthType::Init),
+            5.0 + (-8.0 + 8.0 * 0.5 * 0.8),
+            0.1
+        );
     }
 }
