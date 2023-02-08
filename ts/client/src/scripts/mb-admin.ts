@@ -516,6 +516,23 @@ async function changeTokenOracle() {
   );
 }
 
+async function makeTokenReduceonly() {
+  const result = await buildAdminClient();
+  const client = result[0];
+  const admin = result[1];
+  const creator = result[2];
+
+  const group = await client.getGroupForCreator(creator.publicKey, GROUP_NUM);
+  const bank = group.getFirstBankByMint(
+    new PublicKey(MAINNET_MINTS.get('DAI')!),
+  );
+  await client.tokenEdit(
+    group,
+    bank.mint,
+    Builder(NullTokenEditParams).reduceOnly(true).build(),
+  );
+}
+
 async function makePerpMarketReduceOnly() {
   const result = await buildAdminClient();
   const client = result[0];
@@ -681,6 +698,7 @@ async function main() {
   try {
     // await registerTokens();
     // await changeTokenOracle();
+    // await makeTokenReduceonly();
   } catch (error) {
     console.log(error);
   }
