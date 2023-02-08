@@ -79,8 +79,8 @@ pub fn token_withdraw(ctx: Context<TokenWithdraw>, amount: u64, allow_borrow: bo
             new_fixed_order_account_retriever(ctx.remaining_accounts, &account.borrow())?;
         let health_cache =
             new_health_cache(&account.borrow(), &retriever).context("pre-withdraw init health")?;
-        let pre_health = account.check_health_pre(&health_cache)?;
-        Some((health_cache, pre_health))
+        let pre_init_health = account.check_health_pre(&health_cache)?;
+        Some((health_cache, pre_init_health))
     } else {
         None
     };
@@ -159,9 +159,9 @@ pub fn token_withdraw(ctx: Context<TokenWithdraw>, amount: u64, allow_borrow: bo
     //
     // Health check
     //
-    if let Some((mut health_cache, pre_health)) = pre_health_opt {
+    if let Some((mut health_cache, pre_init_health)) = pre_health_opt {
         health_cache.adjust_token_balance(&bank, cm!(native_position_after - native_position))?;
-        account.check_health_post(&health_cache, pre_health)?;
+        account.check_health_post(&health_cache, pre_init_health)?;
     }
 
     //

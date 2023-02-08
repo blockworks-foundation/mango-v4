@@ -260,8 +260,8 @@ pub fn serum3_place_order(
             new_fixed_order_account_retriever(ctx.remaining_accounts, &account.borrow())?;
         let health_cache =
             new_health_cache(&account.borrow(), &retriever).context("pre-withdraw init health")?;
-        let pre_health = account.check_health_pre(&health_cache)?;
-        Some((health_cache, pre_health))
+        let pre_init_health = account.check_health_pre(&health_cache)?;
+        Some((health_cache, pre_init_health))
     } else {
         None
     };
@@ -383,10 +383,10 @@ pub fn serum3_place_order(
     //
     // Health check
     //
-    if let Some((mut health_cache, pre_health)) = pre_health_opt {
+    if let Some((mut health_cache, pre_init_health)) = pre_health_opt {
         vault_difference.adjust_health_cache(&mut health_cache, &payer_bank)?;
         oo_difference.adjust_health_cache(&mut health_cache, &serum_market)?;
-        account.check_health_post(&health_cache, pre_health)?;
+        account.check_health_post(&health_cache, pre_init_health)?;
     }
 
     // TODO: enforce min_vault_to_deposits_ratio

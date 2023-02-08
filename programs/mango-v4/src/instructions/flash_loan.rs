@@ -366,7 +366,7 @@ pub fn flash_loan_end<'key, 'accounts, 'remaining, 'info>(
     // Check health before balance adjustments
     let retriever = new_fixed_order_account_retriever(health_ais, &account.borrow())?;
     let health_cache = new_health_cache(&account.borrow(), &retriever)?;
-    let pre_health = account.check_health_pre(&health_cache)?;
+    let pre_init_health = account.check_health_pre(&health_cache)?;
 
     // Prices for logging and net borrow checks
     let mut oracle_prices = vec![];
@@ -464,7 +464,7 @@ pub fn flash_loan_end<'key, 'accounts, 'remaining, 'info>(
     // Check health after account position changes
     let retriever = new_fixed_order_account_retriever(health_ais, &account.borrow())?;
     let health_cache = new_health_cache(&account.borrow(), &retriever)?;
-    account.check_health_post(&health_cache, pre_health)?;
+    account.check_health_post(&health_cache, pre_init_health)?;
 
     // Deactivate inactive token accounts after health check
     for raw_token_index in deactivated_token_positions {

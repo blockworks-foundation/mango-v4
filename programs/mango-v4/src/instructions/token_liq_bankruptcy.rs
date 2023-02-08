@@ -108,7 +108,7 @@ pub fn token_liq_bankruptcy(
     liqee_health_cache.require_after_phase2_liquidation()?;
     liqee.fixed.set_being_liquidated(true);
 
-    let (liab_bank, liab_price, opt_quote_bank_and_price) =
+    let (liab_bank, liab_oracle_price, opt_quote_bank_and_price) =
         account_retriever.banks_mut_and_oracles(liab_token_index, QUOTE_TOKEN_INDEX)?;
     let mut liab_deposit_index = liab_bank.deposit_index;
     let liab_borrow_index = liab_bank.borrow_index;
@@ -123,7 +123,7 @@ pub fn token_liq_bankruptcy(
     } else {
         cm!(I80F48::ONE + liab_bank.liquidation_fee)
     };
-    let liab_price_adjusted = cm!(liab_price * liab_fee_factor);
+    let liab_price_adjusted = cm!(liab_oracle_price * liab_fee_factor);
 
     let liab_transfer_unrounded = remaining_liab_loss.min(max_liab_transfer);
 
@@ -193,8 +193,12 @@ pub fn token_liq_bankruptcy(
             // transfer liab from liqee to liqor
             let (liqor_liab, liqor_liab_raw_token_index, _) =
                 liqor.ensure_token_position(liab_token_index)?;
-            let (liqor_liab_active, loan_origination_fee) =
-                liab_bank.withdraw_with_fee(liqor_liab, liab_transfer, now_ts, liab_price)?;
+            let (liqor_liab_active, loan_origination_fee) = liab_bank.withdraw_with_fee(
+                liqor_liab,
+                liab_transfer,
+                now_ts,
+                liab_oracle_price,
+            )?;
 
             // liqor liab
             emit!(TokenBalanceLog {
@@ -307,10 +311,10 @@ pub fn token_liq_bankruptcy(
         .adjust_token_balance(&liab_bank, cm!(end_liab_native - initial_liab_native))?;
 
     // Check liqee health again
-    let liqee_init_health = liqee_health_cache.health(HealthType::Init);
+    let liqee_liq_end_health = liqee_health_cache.health(HealthType::LiquidationEnd);
     liqee
         .fixed
-        .maybe_recover_from_being_liquidated(liqee_init_health);
+        .maybe_recover_from_being_liquidated(liqee_liq_end_health);
 
     if !liqee_liab_active {
         liqee.deactivate_token_position_and_log(liqee_raw_token_index, ctx.accounts.liqee.key());
@@ -322,7 +326,7 @@ pub fn token_liq_bankruptcy(
         liqor: ctx.accounts.liqor.key(),
         liab_token_index,
         initial_liab_native: initial_liab_native.to_bits(),
-        liab_price: liab_price.to_bits(),
+        liab_price: liab_oracle_price.to_bits(),
         insurance_token_index: QUOTE_TOKEN_INDEX,
         insurance_transfer: insurance_transfer_i80f48.to_bits(),
         socialized_loss: socialized_loss.to_bits(),

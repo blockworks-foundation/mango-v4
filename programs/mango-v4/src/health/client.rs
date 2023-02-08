@@ -15,7 +15,7 @@ use super::*;
 impl HealthCache {
     pub fn is_liquidatable(&self) -> bool {
         if self.being_liquidated {
-            self.health(HealthType::Init).is_negative()
+            self.health(HealthType::LiquidationEnd).is_negative()
         } else {
             self.health(HealthType::Maint).is_negative()
         }
@@ -162,7 +162,7 @@ impl HealthCache {
         // This is just the highest final slope we can get. If the health weights are
         // scaled because the collateral or borrow limits are exceeded, health will decrease
         // more quickly than this number.
-        let final_health_slope = -source.init_liab_weight * source.prices.liab(health_type)
+        let final_health_slope = -source.init_scaled_liab_weight * source.prices.liab(health_type)
             + target.init_asset_weight * target.prices.asset(health_type) * price;
         if final_health_slope >= 0 {
             // TODO: not true if weights scaled with deposits/borrows
@@ -422,7 +422,7 @@ impl HealthCache {
         // At most withdraw all deposits plus enough borrows to bring health to zero
         // (ensure this works with zero asset weight)
         let limit = token.balance_native.max(I80F48::ZERO)
-            + self.health(health_type).max(I80F48::ZERO) / token.init_liab_weight;
+            + self.health(health_type).max(I80F48::ZERO) / token.init_scaled_liab_weight;
         if limit <= 0 {
             return Ok(I80F48::ZERO);
         }
@@ -621,8 +621,10 @@ mod tests {
             token_index: 0,
             maint_asset_weight: I80F48::from_num(1.0 - x),
             init_asset_weight: I80F48::from_num(1.0 - x),
+            init_scaled_asset_weight: I80F48::from_num(1.0 - x),
             maint_liab_weight: I80F48::from_num(1.0 + x),
             init_liab_weight: I80F48::from_num(1.0 + x),
+            init_scaled_liab_weight: I80F48::from_num(1.0 + x),
             prices: Prices::new_single_price(I80F48::from_num(price)),
             balance_native: I80F48::ZERO,
         }

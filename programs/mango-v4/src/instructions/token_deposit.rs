@@ -193,7 +193,7 @@ impl<'a, 'info> DepositCommon<'a, 'info> {
         // Also, TokenDeposit is one of the rare instructions that is allowed even during being_liquidated.
         // Being in a health region always means being_liquidated is false, so it's safe to gate the check.
         if !account.fixed.is_in_health_region() {
-            let health = cache.health(HealthType::Init);
+            let health = cache.health(HealthType::LiquidationEnd);
             msg!("health: {}", health);
 
             let was_being_liquidated = account.being_liquidated();

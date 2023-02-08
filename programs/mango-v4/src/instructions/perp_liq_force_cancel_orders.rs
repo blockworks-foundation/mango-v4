@@ -84,7 +84,7 @@ pub fn perp_liq_force_cancel_orders(
     //
     // Health check at the end
     //
-    let init_health = health_cache.health(HealthType::Init);
+    let init_health = health_cache.health(HealthType::LiquidationEnd);
     account
         .fixed
         .maybe_recover_from_being_liquidated(init_health);

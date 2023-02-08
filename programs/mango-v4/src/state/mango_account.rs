@@ -247,10 +247,10 @@ impl MangoAccountFixed {
         self.in_health_region = u8::from(b);
     }
 
-    pub fn maybe_recover_from_being_liquidated(&mut self, init_health: I80F48) -> bool {
+    pub fn maybe_recover_from_being_liquidated(&mut self, liq_end_health: I80F48) -> bool {
         // This is used as threshold to flip flag instead of 0 because of dust issues
         let one_native_usdc = I80F48::ONE;
-        if self.being_liquidated() && init_health > -one_native_usdc {
+        if self.being_liquidated() && liq_end_health > -one_native_usdc {
             self.set_being_liquidated(false);
             true
         } else {
@@ -941,30 +941,37 @@ impl<
     }
 
     pub fn check_health_pre(&mut self, health_cache: &HealthCache) -> Result<I80F48> {
-        let pre_health = health_cache.health(HealthType::Init);
-        msg!("pre_health: {}", pre_health);
+        let pre_init_health = health_cache.health(HealthType::Init);
+        msg!("pre_init_health: {}", pre_init_health);
+
+        // We can skip computing LiquidationEnd health if Init health > 0, because
+        // LiquidationEnd health >= Init health.
         self.fixed_mut()
-            .maybe_recover_from_being_liquidated(pre_health);
+            .maybe_recover_from_being_liquidated(pre_init_health);
+        if self.fixed().being_liquidated() {
+            let liq_end_health = health_cache.health(HealthType::LiquidationEnd);
+            self.fixed_mut()
+                .maybe_recover_from_being_liquidated(liq_end_health);
+        }
         require!(
             !self.fixed().being_liquidated(),
             MangoError::BeingLiquidated
         );
-        Ok(pre_health)
+
+        Ok(pre_init_health)
     }
 
     pub fn check_health_post(
         &mut self,
         health_cache: &HealthCache,
-        pre_health: I80F48,
+        pre_init_health: I80F48,
     ) -> Result<()> {
-        let post_health = health_cache.health(HealthType::Init);
-        msg!("post_health: {}", post_health);
+        let post_init_health = health_cache.health(HealthType::Init);
+        msg!("post_init_health: {}", post_init_health);
         require!(
-            post_health >= 0 || post_health > pre_health,
+            post_init_health >= 0 || post_init_health > pre_init_health,
             MangoError::HealthMustBePositiveOrIncrease
         );
-        self.fixed_mut()
-            .maybe_recover_from_being_liquidated(post_health);
         Ok(())
     }
 
@@ -973,10 +980,10 @@ impl<
         // we want to allow liquidation to continue until init_health is positive,
         // to prevent constant oscillation between the two states
         if self.being_liquidated() {
-            let init_health = health_cache.health(HealthType::Init);
+            let liq_end_health = health_cache.health(HealthType::LiquidationEnd);
             if self
                 .fixed_mut()
-                .maybe_recover_from_being_liquidated(init_health)
+                .maybe_recover_from_being_liquidated(liq_end_health)
             {
                 msg!("Liqee init_health above zero");
                 return Ok(false);

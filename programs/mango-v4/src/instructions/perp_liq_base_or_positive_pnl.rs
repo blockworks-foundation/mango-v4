@@ -99,7 +99,7 @@ pub fn perp_liq_base_or_positive_pnl(
         new_health_cache(&liqee.borrow(), &account_retriever)
             .context("create liqee health cache")?
     };
-    let liqee_init_health = liqee_health_cache.health(HealthType::Init);
+    let liqee_liq_end_health = liqee_health_cache.health(HealthType::LiquidationEnd);
     liqee_health_cache.require_after_phase1_liquidation()?;
 
     if !liqee.check_liquidatable(&liqee_health_cache)? {
@@ -150,7 +150,7 @@ pub fn perp_liq_base_or_positive_pnl(
             &mut liqor.borrow_mut(),
             &mut liqee.borrow_mut(),
             &mut liqee_health_cache,
-            liqee_init_health,
+            liqee_liq_end_health,
             now_ts,
             max_base_transfer,
             max_pnl_transfer,
@@ -215,15 +215,15 @@ pub fn perp_liq_base_or_positive_pnl(
     }
 
     // Check liqee health again
-    let liqee_init_health_after = liqee_health_cache.health(HealthType::Init);
+    let liqee_liq_end_health_after = liqee_health_cache.health(HealthType::LiquidationEnd);
     liqee
         .fixed
-        .maybe_recover_from_being_liquidated(liqee_init_health_after);
-    require_gte!(liqee_init_health_after, liqee_init_health);
+        .maybe_recover_from_being_liquidated(liqee_liq_end_health_after);
+    require_gte!(liqee_liq_end_health_after, liqee_liq_end_health);
     msg!(
-        "liqee health: {} -> {}",
-        liqee_init_health,
-        liqee_init_health_after
+        "liqee liq end health: {} -> {}",
+        liqee_liq_end_health,
+        liqee_liq_end_health_after
     );
 
     drop(settle_bank);
@@ -247,7 +247,7 @@ pub(crate) fn liquidation_action(
     liqor: &mut MangoAccountRefMut,
     liqee: &mut MangoAccountRefMut,
     liqee_health_cache: &mut HealthCache,
-    liqee_init_health: I80F48,
+    liqee_liq_end_health: I80F48,
     now_ts: u64,
     max_base_transfer: i64,
     max_pnl_transfer: u64,
@@ -290,7 +290,7 @@ pub(crate) fn liquidation_action(
         let quote_init_asset_weight = I80F48::ONE;
         direction = -1;
         fee_factor = cm!(I80F48::ONE - perp_market.base_liquidation_fee);
-        let asset_price = perp_info.prices.asset(HealthType::Init);
+        let asset_price = perp_info.prices.asset(HealthType::LiquidationEnd);
         unweighted_health_per_lot = cm!(-asset_price
             * base_lot_size
             * perp_market.init_base_asset_weight
@@ -307,7 +307,7 @@ pub(crate) fn liquidation_action(
         let quote_init_liab_weight = I80F48::ONE;
         direction = 1;
         fee_factor = cm!(I80F48::ONE + perp_market.base_liquidation_fee);
-        let liab_price = perp_info.prices.liab(HealthType::Init);
+        let liab_price = perp_info.prices.liab(HealthType::LiquidationEnd);
         unweighted_health_per_lot = cm!(liab_price
             * base_lot_size
             * perp_market.init_base_liab_weight
@@ -340,12 +340,12 @@ pub(crate) fn liquidation_action(
     //
     let mut base_reduction = 0;
     let mut current_unweighted_perp_health =
-        perp_info.unweighted_health_contribution(HealthType::Init);
-    let initial_weighted_perp_health =
-        perp_info.weigh_health_contribution(current_unweighted_perp_health, HealthType::Init);
+        perp_info.unweighted_health_contribution(HealthType::LiquidationEnd);
+    let initial_weighted_perp_health = perp_info
+        .weigh_health_contribution(current_unweighted_perp_health, HealthType::LiquidationEnd);
     let mut current_expected_perp_health = expected_perp_health(current_unweighted_perp_health);
     let mut current_expected_health =
-        cm!(liqee_init_health + current_expected_perp_health - initial_weighted_perp_health);
+        cm!(liqee_liq_end_health + current_expected_perp_health - initial_weighted_perp_health);
 
     let mut reduce_base = |step: &str,
                            health_amount: I80F48,
@@ -446,10 +446,10 @@ pub(crate) fn liquidation_action(
     // Step 4: Let the liqor take over positive pnl until the account health is positive,
     // but only while the unweighted perp health is positive (otherwise it would decrease liqee health!)
     //
-    let final_weighted_perp_health =
-        perp_info.weigh_health_contribution(current_unweighted_perp_health, HealthType::Init);
+    let final_weighted_perp_health = perp_info
+        .weigh_health_contribution(current_unweighted_perp_health, HealthType::LiquidationEnd);
     let current_actual_health =
-        cm!(liqee_init_health - initial_weighted_perp_health + final_weighted_perp_health);
+        cm!(liqee_liq_end_health - initial_weighted_perp_health + final_weighted_perp_health);
     let pnl_transfer_possible =
         current_actual_health < 0 && current_unweighted_perp_health > 0 && max_pnl_transfer > 0;
     let (pnl_transfer, limit_transfer) = if pnl_transfer_possible {
@@ -596,7 +596,7 @@ mod tests {
             let mut setup = self.clone();
 
             let mut liqee_health_cache = setup.liqee_health_cache();
-            let liqee_init_health = liqee_health_cache.health(HealthType::Init);
+            let liqee_liq_end_health = liqee_health_cache.health(HealthType::LiquidationEnd);
 
             liquidation_action(
                 setup.perp_market.data(),
@@ -604,7 +604,7 @@ mod tests {
                 &mut setup.liqor.borrow_mut(),
                 &mut setup.liqee.borrow_mut(),
                 &mut liqee_health_cache,
-                liqee_init_health,
+                liqee_liq_end_health,
                 0,
                 max_base,
                 max_pnl,
@@ -848,18 +848,21 @@ mod tests {
         }
     }
 
+    // Checks that the stable price does _not_ affect the liquidation target amount
     #[test]
     fn test_liq_base_or_positive_pnl_stable_price() {
         let mut setup = TestSetup::new();
         {
             let pm = setup.perp_market.data();
             pm.stable_price_model.stable_price = 0.5;
+            pm.init_base_asset_weight = I80F48::from_num(0.6);
+            pm.maint_base_asset_weight = I80F48::from_num(0.8);
         }
         {
             perp_p(&mut setup.liqee).record_trade(
                 setup.perp_market.data(),
-                10,
-                I80F48::from_num(-10),
+                30,
+                I80F48::from_num(-30),
             );
 
             let settle_bank = setup.settle_bank.data();
@@ -884,19 +887,29 @@ mod tests {
         let hc = setup.liqee_health_cache();
         assert_eq_f!(
             hc.health(HealthType::Init),
-            5.0 + (-10.0 + 10.0 * 0.5 * 0.8),
+            5.0 + (-30.0 + 30.0 * 0.5 * 0.6), // init + stable
+            0.1
+        );
+        assert_eq_f!(
+            hc.health(HealthType::LiquidationEnd),
+            5.0 + (-30.0 + 30.0 * 0.6), // init + oracle
+            0.1
+        );
+        assert_eq_f!(
+            hc.health(HealthType::Maint),
+            5.0 + (-30.0 + 30.0 * 0.8), // maint + oracle
             0.1
         );
 
         let mut result = setup.run(100, 0).unwrap();
 
         let liqee_perp = perp_p(&mut result.liqee);
-        assert_eq!(liqee_perp.base_position_lots(), 8);
+        assert_eq!(liqee_perp.base_position_lots(), 12);
 
         let hc = result.liqee_health_cache();
         assert_eq_f!(
-            hc.health(HealthType::Init),
-            5.0 + (-8.0 + 8.0 * 0.5 * 0.8),
+            hc.health(HealthType::LiquidationEnd),
+            5.0 + (-12.0 + 12.0 * 0.6),
             0.1
         );
     }
