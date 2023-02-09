@@ -1218,18 +1218,22 @@ export class TokenInfo {
   }
 
   static fromBank(bank: BankForHealth, nativeBalance?: I80F48): TokenInfo {
+    const p = new Prices(
+      bank.price,
+      I80F48.fromNumber(bank.stablePriceModel.stablePrice),
+    );
+    // Use the liab price for computing weight scaling, because it's pessimistic and
+    // causes the most unfavorable scaling.
+    const liabPrice = p.liab(HealthType.init);
     return new TokenInfo(
       bank.tokenIndex,
       bank.maintAssetWeight,
       bank.initAssetWeight,
-      bank.scaledInitAssetWeight(),
+      bank.scaledInitAssetWeight(liabPrice),
       bank.maintLiabWeight,
       bank.initLiabWeight,
-      bank.scaledInitLiabWeight(),
-      new Prices(
-        bank.price,
-        I80F48.fromNumber(bank.stablePriceModel.stablePrice),
-      ),
+      bank.scaledInitLiabWeight(liabPrice),
+      p,
       nativeBalance ? nativeBalance : ZERO_I80F48(),
     );
   }
