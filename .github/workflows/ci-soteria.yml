@@ -36,7 +36,7 @@ jobs:
         uses: Swatinem/rust-cache@v2
 
       - name: Set Rust version
-        run: rustup toolchain install ${{ env.RUST_TOOLCHAIN }} --component clippy
+        run: rustup toolchain install ${{ env.RUST_TOOLCHAIN }}
 
       - name: Install Solana
         run: |
