@@ -1380,6 +1380,8 @@ export class PerpPosition {
       throw new Error("PerpPosition doesn't belong to the given market!");
     }
 
+    this.updateSettleLimit(perpMarket);
+
     return this.quotePositionNative.add(
       this.getBasePositionNative(perpMarket).mul(perpMarket.price),
     );
