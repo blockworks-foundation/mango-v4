@@ -1468,11 +1468,39 @@ export class PerpPosition {
     if (perpMarket.perpMarketIndex !== this.marketIndex) {
       throw new Error("PerpPosition doesn't belong to the given market!");
     }
-
+    this.updateSettleLimit(perpMarket);
     return this.applyPnlSettleLimit(
       this.getUnsettledPnl(perpMarket),
       perpMarket,
     );
+  }
+
+  getSettleablePnlUi(perpMarket: PerpMarket): number {
+    return toUiDecimalsForQuote(this.getSettleablePnl(perpMarket));
+  }
+
+  public canSettlePnl(
+    group: Group,
+    perpMarket: PerpMarket,
+    account: MangoAccount,
+  ): boolean {
+    const unsettledPnl = this.getUnsettledPnl(perpMarket);
+    const settleablePnl = this.getSettleablePnl(perpMarket);
+    const perpSettleHealth = account.getPerpSettleHealth(group);
+
+    if (
+      unsettledPnl.isNeg() &&
+      settleablePnl.isNeg() &&
+      perpSettleHealth.gte(ZERO_I80F48())
+    ) {
+      return true;
+    }
+
+    if (unsettledPnl.isPos() && settleablePnl.isPos()) {
+      return true;
+    }
+
+    return false;
   }
 
   toString(perpMarket?: PerpMarket): string {
