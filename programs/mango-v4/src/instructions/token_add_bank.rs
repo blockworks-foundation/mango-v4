@@ -9,7 +9,7 @@ use crate::state::*;
 pub struct TokenAddBank<'info> {
     #[account(
         has_one = admin,
-        constraint = group.load()?.is_operational() @ MangoError::GroupIsHalted,
+        constraint = group.load()?.is_ix_enabled(IxGate::TokenAddBank) @ MangoError::IxIsDisabled,
         constraint = group.load()?.multiple_banks_supported()
     )]
     pub group: AccountLoader<'info, Group>,

@@ -8,13 +8,13 @@ use crate::serum3_cpi::load_open_orders_ref;
 use crate::state::*;
 
 use super::{apply_vault_difference, OpenOrdersAmounts, OpenOrdersSlim};
-use crate::logs::Serum3OpenOrdersBalanceLog;
+use crate::logs::Serum3OpenOrdersBalanceLogV2;
 use crate::logs::{LoanOriginationFeeInstruction, WithdrawLoanOriginationFeeLog};
 
 #[derive(Accounts)]
 pub struct Serum3SettleFunds<'info> {
     #[account(
-        constraint = group.load()?.is_operational() @ MangoError::GroupIsHalted
+        constraint = group.load()?.is_ix_enabled(IxGate::Serum3SettleFunds) @ MangoError::IxIsDisabled,
     )]
     pub group: AccountLoader<'info, Group>,
 
@@ -188,9 +188,10 @@ pub fn serum3_settle_funds(ctx: Context<Serum3SettleFunds>) -> Result<()> {
     let oo_ai = &ctx.accounts.open_orders.as_ref();
     let open_orders = load_open_orders_ref(oo_ai)?;
     let after_oo = OpenOrdersSlim::from_oo(&open_orders);
-    emit!(Serum3OpenOrdersBalanceLog {
+    emit!(Serum3OpenOrdersBalanceLogV2 {
         mango_group: ctx.accounts.group.key(),
         mango_account: ctx.accounts.account.key(),
+        market_index: serum_market.market_index,
         base_token_index: serum_market.base_token_index,
         quote_token_index: serum_market.quote_token_index,
         base_total: after_oo.native_base_total(),

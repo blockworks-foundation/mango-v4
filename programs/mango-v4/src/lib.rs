@@ -48,6 +48,7 @@ pub mod mango_v4 {
         security_admin_opt: Option<Pubkey>,
         testing_opt: Option<u8>,
         version_opt: Option<u8>,
+        deposit_limit_quote_opt: Option<u64>,
     ) -> Result<()> {
         instructions::group_edit(
             ctx,
@@ -56,11 +57,12 @@ pub mod mango_v4 {
             security_admin_opt,
             testing_opt,
             version_opt,
+            deposit_limit_quote_opt,
         )
     }
 
-    pub fn group_toggle_halt(ctx: Context<GroupToggleHalt>, halted: bool) -> Result<()> {
-        instructions::group_toggle_halt(ctx, halted)
+    pub fn ix_gate_set(ctx: Context<IxGateSet>, ix_gate: u128) -> Result<()> {
+        instructions::ix_gate_set(ctx, ix_gate)
     }
 
     pub fn group_close(ctx: Context<GroupClose>) -> Result<()> {
@@ -438,9 +440,9 @@ pub mod mango_v4 {
         init_base_asset_weight: f32,
         maint_base_liab_weight: f32,
         init_base_liab_weight: f32,
-        maint_pnl_asset_weight: f32,
-        init_pnl_asset_weight: f32,
-        liquidation_fee: f32,
+        maint_overall_asset_weight: f32,
+        init_overall_asset_weight: f32,
+        base_liquidation_fee: f32,
         maker_fee: f32,
         taker_fee: f32,
         min_funding: f32,
@@ -454,11 +456,12 @@ pub mod mango_v4 {
         settle_token_index: TokenIndex,
         settle_pnl_limit_factor: f32,
         settle_pnl_limit_window_size_ts: u64,
+        positive_pnl_liquidation_fee: f32,
     ) -> Result<()> {
         instructions::perp_create_market(
             ctx,
-            settle_token_index,
             perp_market_index,
+            settle_token_index,
             name,
             oracle_config,
             base_decimals,
@@ -468,9 +471,9 @@ pub mod mango_v4 {
             init_base_asset_weight,
             maint_base_liab_weight,
             init_base_liab_weight,
-            maint_pnl_asset_weight,
-            init_pnl_asset_weight,
-            liquidation_fee,
+            maint_overall_asset_weight,
+            init_overall_asset_weight,
+            base_liquidation_fee,
             maker_fee,
             taker_fee,
             min_funding,
@@ -483,6 +486,7 @@ pub mod mango_v4 {
             settle_fee_fraction_low_health,
             settle_pnl_limit_factor,
             settle_pnl_limit_window_size_ts,
+            positive_pnl_liquidation_fee,
         )
     }
 
@@ -496,9 +500,9 @@ pub mod mango_v4 {
         init_base_asset_weight_opt: Option<f32>,
         maint_base_liab_weight_opt: Option<f32>,
         init_base_liab_weight_opt: Option<f32>,
-        maint_pnl_asset_weight_opt: Option<f32>,
-        init_pnl_asset_weight_opt: Option<f32>,
-        liquidation_fee_opt: Option<f32>,
+        maint_overall_asset_weight_opt: Option<f32>,
+        init_overall_asset_weight_opt: Option<f32>,
+        base_liquidation_fee_opt: Option<f32>,
         maker_fee_opt: Option<f32>,
         taker_fee_opt: Option<f32>,
         min_funding_opt: Option<f32>,
@@ -513,8 +517,10 @@ pub mod mango_v4 {
         stable_price_delay_growth_limit_opt: Option<f32>,
         stable_price_growth_limit_opt: Option<f32>,
         settle_pnl_limit_factor_opt: Option<f32>,
-        settle_pnl_limit_window_size_ts: Option<u64>,
+        settle_pnl_limit_window_size_ts_opt: Option<u64>,
         reduce_only_opt: Option<bool>,
+        reset_stable_price: bool,
+        positive_pnl_liquidation_fee_opt: Option<f32>,
     ) -> Result<()> {
         instructions::perp_edit_market(
             ctx,
@@ -525,9 +531,9 @@ pub mod mango_v4 {
             init_base_asset_weight_opt,
             maint_base_liab_weight_opt,
             init_base_liab_weight_opt,
-            maint_pnl_asset_weight_opt,
-            init_pnl_asset_weight_opt,
-            liquidation_fee_opt,
+            maint_overall_asset_weight_opt,
+            init_overall_asset_weight_opt,
+            base_liquidation_fee_opt,
             maker_fee_opt,
             taker_fee_opt,
             min_funding_opt,
@@ -542,8 +548,10 @@ pub mod mango_v4 {
             stable_price_delay_growth_limit_opt,
             stable_price_growth_limit_opt,
             settle_pnl_limit_factor_opt,
-            settle_pnl_limit_window_size_ts,
+            settle_pnl_limit_window_size_ts_opt,
             reduce_only_opt,
+            reset_stable_price,
+            positive_pnl_liquidation_fee_opt,
         )
     }
 
@@ -553,6 +561,10 @@ pub mod mango_v4 {
 
     pub fn perp_deactivate_position(ctx: Context<PerpDeactivatePosition>) -> Result<()> {
         instructions::perp_deactivate_position(ctx)
+    }
+
+    pub fn perp_zero_out_for_market(ctx: Context<PerpZeroOutForMarket>) -> Result<()> {
+        instructions::perp_zero_out_for_market(ctx)
     }
 
     #[allow(clippy::too_many_arguments)]
@@ -584,7 +596,7 @@ pub mod mango_v4 {
         // Use this to limit compute used during order matching.
         // When the limit is reached, processing stops and the instruction succeeds.
         limit: u8,
-    ) -> Result<()> {
+    ) -> Result<Option<u128>> {
         require_gte!(price_lots, 0);
 
         use crate::state::{Order, OrderParams};
@@ -592,7 +604,7 @@ pub mod mango_v4 {
             Some(t) => t,
             None => {
                 msg!("Order is already expired");
-                return Ok(());
+                return Ok(None);
             }
         };
         let order = Order {
@@ -652,7 +664,7 @@ pub mod mango_v4 {
         //
         // WARNING: Not currently implemented.
         max_oracle_staleness_slots: i32,
-    ) -> Result<()> {
+    ) -> Result<Option<u128>> {
         require_gte!(peg_limit, -1);
         require_eq!(max_oracle_staleness_slots, -1); // unimplemented
 
@@ -661,7 +673,7 @@ pub mod mango_v4 {
             Some(t) => t,
             None => {
                 msg!("Order is already expired");
-                return Ok(());
+                return Ok(None);
             }
         };
         let order = Order {
@@ -720,11 +732,12 @@ pub mod mango_v4 {
         instructions::perp_settle_fees(ctx, max_settle_amount)
     }
 
-    pub fn perp_liq_base_position(
-        ctx: Context<PerpLiqBasePosition>,
+    pub fn perp_liq_base_or_positive_pnl(
+        ctx: Context<PerpLiqBaseOrPositivePnl>,
         max_base_transfer: i64,
+        max_pnl_transfer: u64,
     ) -> Result<()> {
-        instructions::perp_liq_base_position(ctx, max_base_transfer)
+        instructions::perp_liq_base_or_positive_pnl(ctx, max_base_transfer, max_pnl_transfer)
     }
 
     pub fn perp_liq_force_cancel_orders(
@@ -734,11 +747,11 @@ pub mod mango_v4 {
         instructions::perp_liq_force_cancel_orders(ctx, limit)
     }
 
-    pub fn perp_liq_quote_and_bankruptcy(
-        ctx: Context<PerpLiqQuoteAndBankruptcy>,
+    pub fn perp_liq_negative_pnl_or_bankruptcy(
+        ctx: Context<PerpLiqNegativePnlOrBankruptcy>,
         max_liab_transfer: u64,
     ) -> Result<()> {
-        instructions::perp_liq_quote_and_bankruptcy(ctx, max_liab_transfer)
+        instructions::perp_liq_negative_pnl_or_bankruptcy(ctx, max_liab_transfer)
     }
 
     pub fn alt_set(ctx: Context<AltSet>, index: u8) -> Result<()> {

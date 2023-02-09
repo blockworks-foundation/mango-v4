@@ -2,13 +2,13 @@ use anchor_lang::prelude::*;
 
 use crate::error::MangoError;
 use crate::state::{
-    BookSide, Group, MangoAccountFixed, MangoAccountLoader, Orderbook, PerpMarket, Side,
+    BookSide, Group, IxGate, MangoAccountFixed, MangoAccountLoader, Orderbook, PerpMarket, Side,
 };
 
 #[derive(Accounts)]
 pub struct PerpCancelAllOrdersBySide<'info> {
     #[account(
-        constraint = group.load()?.is_operational() @ MangoError::GroupIsHalted
+        constraint = group.load()?.is_ix_enabled(IxGate::PerpCancelAllOrdersBySide) @ MangoError::IxIsDisabled,
     )]
     pub group: AccountLoader<'info, Group>,
 
@@ -16,6 +16,7 @@ pub struct PerpCancelAllOrdersBySide<'info> {
         mut,
         has_one = group,
         constraint = account.load()?.is_operational() @ MangoError::AccountIsFrozen
+        // owner is checked at #1
     )]
     pub account: AccountLoader<'info, MangoAccountFixed>,
     pub owner: Signer<'info>,
@@ -39,7 +40,7 @@ pub fn perp_cancel_all_orders_by_side(
     limit: u8,
 ) -> Result<()> {
     let mut account = ctx.accounts.account.load_full_mut()?;
-    require_keys_eq!(account.fixed.group, ctx.accounts.group.key());
+    // account constraint #1
     require!(
         account.fixed.is_owner_or_delegate(ctx.accounts.owner.key()),
         MangoError::SomeError

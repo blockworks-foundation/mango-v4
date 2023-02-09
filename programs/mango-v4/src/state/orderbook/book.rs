@@ -1,7 +1,7 @@
-use crate::state::MangoAccountRefMut;
+use crate::state::{MangoAccountRefMut, PerpPosition};
 use crate::{
     error::*,
-    state::{orderbook::bookside::*, EventQueue, PerpMarket, FREE_ORDER_SLOT},
+    state::{orderbook::bookside::*, EventQueue, PerpMarket},
 };
 use anchor_lang::prelude::*;
 use bytemuck::cast;
@@ -40,36 +40,6 @@ impl<'a> Orderbook<'a> {
         }
     }
 
-    pub fn best_price(&self, now_ts: u64, oracle_price_lots: i64, side: Side) -> Option<i64> {
-        Some(
-            self.bookside(side)
-                .iter_valid(now_ts, oracle_price_lots)
-                .next()?
-                .price_lots,
-        )
-    }
-
-    /// Walk up the book `quantity` units and return the price at that level. If `quantity` units
-    /// not on book, return None
-    pub fn impact_price(
-        &self,
-        side: Side,
-        quantity: i64,
-        now_ts: u64,
-        oracle_price_lots: i64,
-    ) -> Option<i64> {
-        let mut sum: i64 = 0;
-        let bookside = self.bookside(side);
-        let iter = bookside.iter_valid(now_ts, oracle_price_lots);
-        for order in iter {
-            cm!(sum += order.node.quantity);
-            if sum >= quantity {
-                return Some(order.price_lots);
-            }
-        }
-        None
-    }
-
     #[allow(clippy::too_many_arguments)]
     pub fn new_order(
         &mut self,
@@ -81,7 +51,7 @@ impl<'a> Orderbook<'a> {
         mango_account_pk: &Pubkey,
         now_ts: u64,
         mut limit: u8,
-    ) -> std::result::Result<(), Error> {
+    ) -> std::result::Result<Option<u128>, Error> {
         let side = order.side;
         let other_side = side.invert_side();
         let market = perp_market;
@@ -89,18 +59,15 @@ impl<'a> Orderbook<'a> {
         let post_only = order.is_post_only();
         let mut post_target = order.post_target();
         let (price_lots, price_data) = order.price(now_ts, oracle_price_lots, self)?;
-
-        if post_target.is_some() {
-            // price limit check computed lazily to save CU on average
-            let native_price = market.lot_to_native_price(price_lots);
-            if !market.inside_price_limit(side, native_price, oracle_price) {
-                msg!("Posting on book disallowed due to price limits, order price {:?}, oracle price {:?}", native_price, oracle_price);
-                post_target = None;
-            }
-        }
+        let perp_position = mango_account.perp_position_mut(market.perp_market_index)?;
 
         // generate new order id
         let order_id = market.gen_order_id(side, price_data);
+
+        // IOC orders have a fee penalty applied regardless of match
+        if order.needs_penalty_fee() {
+            apply_penalty(market, perp_position)?;
+        }
 
         // Iterate through book and match against this new order.
         //
@@ -114,6 +81,10 @@ impl<'a> Orderbook<'a> {
         let opposing_bookside = self.bookside_mut(other_side);
         for best_opposing in opposing_bookside.iter_all_including_invalid(now_ts, oracle_price_lots)
         {
+            if remaining_base_lots == 0 || remaining_quote_lots == 0 {
+                break;
+            }
+
             if !best_opposing.is_valid() {
                 // Remove the order from the book unless we've done that enough
                 if number_of_dropped_expired_orders < DROP_EXPIRED_ORDER_LIMIT {
@@ -151,12 +122,11 @@ impl<'a> Orderbook<'a> {
             let match_base_lots = remaining_base_lots
                 .min(best_opposing.node.quantity)
                 .min(max_match_by_quote);
-            let done =
-                match_base_lots == max_match_by_quote || match_base_lots == remaining_base_lots;
 
             let match_quote_lots = cm!(match_base_lots * best_opposing_price);
             cm!(remaining_base_lots -= match_base_lots);
             cm!(remaining_quote_lots -= match_quote_lots);
+            assert!(remaining_quote_lots >= 0);
 
             let new_best_opposing_quantity = cm!(best_opposing.node.quantity - match_base_lots);
             let maker_out = new_best_opposing_quantity == 0;
@@ -167,11 +137,6 @@ impl<'a> Orderbook<'a> {
                 matched_order_changes.push((best_opposing.handle, new_best_opposing_quantity));
             }
 
-            // Record the taker trade in the account already, even though it will only be
-            // realized when the fill event gets executed
-            let perp_account = mango_account.perp_position_mut(market.perp_market_index)?;
-            perp_account.add_taker_trade(side, match_base_lots, match_quote_lots);
-
             let fill = FillEvent::new(
                 side,
                 maker_out,
@@ -179,11 +144,10 @@ impl<'a> Orderbook<'a> {
                 now_ts,
                 event_queue.header.seq_num,
                 best_opposing.node.owner,
-                best_opposing.node.key,
+                best_opposing.node.client_order_id,
                 market.maker_fee,
                 best_opposing.node.timestamp,
                 *mango_account_pk,
-                order_id,
                 order.client_order_id,
                 market.taker_fee,
                 best_opposing_price,
@@ -191,12 +155,18 @@ impl<'a> Orderbook<'a> {
             );
             event_queue.push_back(cast(fill)).unwrap();
             limit -= 1;
-
-            if done {
-                break;
-            }
         }
         let total_quote_lots_taken = cm!(order.max_quote_lots - remaining_quote_lots);
+        let total_base_lots_taken = cm!(order.max_base_lots - remaining_base_lots);
+        assert!(total_quote_lots_taken >= 0);
+        assert!(total_base_lots_taken >= 0);
+
+        // Record the taker trade in the account already, even though it will only be
+        // realized when the fill event gets executed
+        if total_quote_lots_taken > 0 || total_base_lots_taken > 0 {
+            perp_position.add_taker_trade(side, total_base_lots_taken, total_quote_lots_taken);
+            apply_fees(market, perp_position, total_quote_lots_taken)?;
+        }
 
         // Apply changes to matched asks (handles invalidate on delete!)
         for (handle, new_quantity) in matched_order_changes {
@@ -211,10 +181,22 @@ impl<'a> Orderbook<'a> {
             let _removed_leaf = opposing_bookside.remove_by_key(component, key).unwrap();
         }
 
+        //
+        // Place remainder on the book if requested
+        //
+
         // If there are still quantity unmatched, place on the book
         let book_base_quantity = remaining_base_lots.min(remaining_quote_lots / price_lots);
         if book_base_quantity <= 0 {
             post_target = None;
+        }
+        if post_target.is_some() {
+            // price limit check computed lazily to save CU on average
+            let native_price = market.lot_to_native_price(price_lots);
+            if !market.inside_price_limit(side, native_price, oracle_price) {
+                msg!("Posting on book disallowed due to price limits, order price {:?}, oracle price {:?}", native_price, oracle_price);
+                post_target = None;
+            }
         }
         if let Some(order_tree_target) = post_target {
             let bookside = self.bookside_mut(side);
@@ -262,6 +244,7 @@ impl<'a> Orderbook<'a> {
                 PostOrderType::Limit, // TODO: Support order types? needed?
                 order.time_in_force,
                 order.peg_limit(),
+                order.client_order_id,
             );
             let _result = bookside.insert_leaf(order_tree_target, &new_order)?;
 
@@ -286,18 +269,11 @@ impl<'a> Orderbook<'a> {
             )?;
         }
 
-        // if there were matched taker quote apply ref fees
-        // we know ref_fee_rate is not None if total_quote_taken > 0
-        if total_quote_lots_taken > 0 {
-            apply_fees(market, mango_account, total_quote_lots_taken)?;
+        if post_target.is_some() {
+            Ok(Some(order_id))
+        } else {
+            Ok(None)
         }
-
-        // IOC orders have a fee penalty applied regardless of match
-        if order.needs_penalty_fee() {
-            apply_penalty(market, mango_account)?;
-        }
-
-        Ok(())
     }
 
     /// Cancels up to `limit` orders that are listed on the mango account for the given perp market.
@@ -312,7 +288,7 @@ impl<'a> Orderbook<'a> {
     ) -> Result<()> {
         for i in 0..mango_account.header.perp_oo_count() {
             let oo = mango_account.perp_order_by_raw_index(i);
-            if oo.market == FREE_ORDER_SLOT || oo.market != perp_market.perp_market_index {
+            if !oo.is_active_for_market(perp_market.perp_market_index) {
                 continue;
             }
 
@@ -362,42 +338,33 @@ impl<'a> Orderbook<'a> {
 /// both the maker and taker fees.
 fn apply_fees(
     market: &mut PerpMarket,
-    mango_account: &mut MangoAccountRefMut,
-    total_quote_taken: i64,
+    perp_position: &mut PerpPosition,
+    quote_lots: i64,
 ) -> Result<()> {
-    let taker_quote_native = I80F48::from_num(
-        market
-            .quote_lot_size
-            .checked_mul(total_quote_taken)
-            .unwrap(),
-    );
+    let quote_native = I80F48::from_num(market.quote_lot_size.checked_mul(quote_lots).unwrap());
 
-    // Track maker fees immediately: they can be negative and applying them later
-    // risks that fees_accrued is settled to 0 before they apply. It going negative
-    // breaks assumptions.
-    // The maker fees apply to the maker's account only when the fill event is consumed.
-    let maker_fees = cm!(taker_quote_native * market.maker_fee);
-
-    let taker_fees = cm!(taker_quote_native * market.taker_fee);
+    let maker_fees = cm!(quote_native * market.maker_fee);
+    let taker_fees = cm!(quote_native * market.taker_fee);
 
     // taker fees should never be negative
     require_gte!(taker_fees, 0);
 
-    let perp_account = mango_account.perp_position_mut(market.perp_market_index)?;
-    perp_account.record_trading_fee(taker_fees);
+    // The maker fees apply to the maker's account only when the fill event is consumed.
+    perp_position.record_trading_fee(taker_fees);
+    cm!(perp_position.taker_volume += taker_fees.to_num::<u64>());
+
+    // Accrue maker fees immediately: they can be negative and applying them later
+    // risks that fees_accrued is settled to 0 before they apply. It going negative
+    // breaks assumptions.
     cm!(market.fees_accrued += taker_fees + maker_fees);
-    cm!(perp_account.taker_volume += taker_fees.to_num::<u64>());
 
     Ok(())
 }
 
 /// Applies a fixed penalty fee to the account, and update the market's fees_accrued
-fn apply_penalty(market: &mut PerpMarket, mango_account: &mut MangoAccountRefMut) -> Result<()> {
-    let perp_account = mango_account.perp_position_mut(market.perp_market_index)?;
+fn apply_penalty(market: &mut PerpMarket, perp_position: &mut PerpPosition) -> Result<()> {
     let fee_penalty = I80F48::from_num(market.fee_penalty);
-
-    perp_account.record_trading_fee(fee_penalty);
+    perp_position.record_trading_fee(fee_penalty);
     cm!(market.fees_accrued += fee_penalty);
-
     Ok(())
 }

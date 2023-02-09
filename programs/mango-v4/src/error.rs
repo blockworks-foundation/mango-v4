@@ -79,10 +79,20 @@ pub enum MangoError {
     HasLiquidatableTokenPosition,
     #[msg("has liquidatable perp base position")]
     HasLiquidatablePerpBasePosition,
-    #[msg("has liquidatable trusted perp pnl")]
-    HasLiquidatableTrustedPerpPnl,
+    #[msg("has liquidatable positive perp pnl")]
+    HasLiquidatablePositivePerpPnl,
     #[msg("account is frozen")]
     AccountIsFrozen,
+    #[msg("Init Asset Weight can't be negative")]
+    InitAssetWeightCantBeNegative,
+    #[msg("has open perp taker fills")]
+    HasOpenPerpTakerFills,
+    #[msg("deposit crosses the current group deposit limit")]
+    DepositLimit,
+    #[msg("instruction is disabled")]
+    IxIsDisabled,
+    #[msg("no liquidatable perp base position")]
+    NoLiquidatablePerpBasePosition,
 }
 
 impl MangoError {

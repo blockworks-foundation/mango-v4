@@ -113,6 +113,31 @@ pub struct FillLog {
 }
 
 #[event]
+pub struct FillLogV2 {
+    pub mango_group: Pubkey,
+    pub market_index: u16,
+    pub taker_side: u8, // side from the taker's POV
+    pub maker_slot: u8,
+    pub maker_out: bool, // true if maker order quantity == 0
+    pub timestamp: u64,
+    pub seq_num: u64, // note: usize same as u64
+
+    pub maker: Pubkey,
+    pub maker_client_order_id: u64,
+    pub maker_fee: f32,
+
+    // Timestamp of when the maker order was placed; copied over from the LeafNode
+    pub maker_timestamp: u64,
+
+    pub taker: Pubkey,
+    pub taker_client_order_id: u64,
+    pub taker_fee: f32,
+
+    pub price: i64,
+    pub quantity: i64, // number of base lots
+}
+
+#[event]
 pub struct PerpUpdateFundingLog {
     pub mango_group: Pubkey,
     pub market_index: u16,
@@ -169,6 +194,21 @@ pub struct TokenLiqWithTokenLog {
 pub struct Serum3OpenOrdersBalanceLog {
     pub mango_group: Pubkey,
     pub mango_account: Pubkey,
+    pub base_token_index: u16,
+    pub quote_token_index: u16,
+    pub base_total: u64,
+    pub base_free: u64,
+    /// this field does not include the referrer_rebates; need to add that in to get true total
+    pub quote_total: u64,
+    pub quote_free: u64,
+    pub referrer_rebates_accrued: u64,
+}
+
+#[event]
+pub struct Serum3OpenOrdersBalanceLogV2 {
+    pub mango_group: Pubkey,
+    pub mango_account: Pubkey,
+    pub market_index: u16,
     pub base_token_index: u16,
     pub quote_token_index: u16,
     pub base_total: u64,
@@ -269,13 +309,15 @@ pub struct Serum3RegisterMarketLog {
 }
 
 #[event]
-pub struct PerpLiqBasePositionLog {
+pub struct PerpLiqBaseOrPositivePnlLog {
     pub mango_group: Pubkey,
     pub perp_market_index: u16,
     pub liqor: Pubkey,
     pub liqee: Pubkey,
     pub base_transfer: i64,
     pub quote_transfer: i128,
+    pub pnl_transfer: i128,
+    pub pnl_settle_limit_transfer: i128,
     pub price: i128,
 }
 
@@ -294,7 +336,7 @@ pub struct PerpLiqBankruptcyLog {
 }
 
 #[event]
-pub struct PerpLiqQuoteAndBankruptcyLog {
+pub struct PerpLiqNegativePnlOrBankruptcyLog {
     pub mango_group: Pubkey,
     pub liqee: Pubkey,
     pub liqor: Pubkey,

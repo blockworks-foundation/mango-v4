@@ -551,7 +551,7 @@ impl<
         client_order_id: u64,
     ) -> Option<&PerpOpenOrder> {
         self.all_perp_orders()
-            .find(|&oo| oo.market == market_index && oo.client_id == client_order_id)
+            .find(|&oo| oo.is_active_for_market(market_index) && oo.client_id == client_order_id)
     }
 
     pub fn perp_find_order_with_order_id(
@@ -560,7 +560,7 @@ impl<
         order_id: u128,
     ) -> Option<&PerpOpenOrder> {
         self.all_perp_orders()
-            .find(|&oo| oo.market == market_index && oo.id == order_id)
+            .find(|&oo| oo.is_active_for_market(market_index) && oo.id == order_id)
     }
 
     pub fn being_liquidated(&self) -> bool {
@@ -898,7 +898,7 @@ impl<
         let side = fill.taker_side().invert_side();
         let (base_change, quote_change) = fill.base_quote_change(side);
         let quote = cm!(I80F48::from(perp_market.quote_lot_size) * I80F48::from(quote_change));
-        let fees = cm!(quote.abs() * fill.maker_fee);
+        let fees = cm!(quote.abs() * I80F48::from_num(fill.maker_fee));
         pa.record_trading_fee(fees);
         pa.record_trade(perp_market, base_change, quote);
 

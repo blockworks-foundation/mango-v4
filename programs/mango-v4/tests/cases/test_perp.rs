@@ -1,17 +1,4 @@
-#![cfg(all(feature = "test-bpf"))]
-
-use anchor_lang::prelude::Pubkey;
-use fixed::types::I80F48;
-use fixed_macro::types::I80F48;
-use mango_v4::state::*;
-use program_test::*;
-use solana_program_test::*;
-use solana_sdk::transport::TransportError;
-
-use mango_setup::*;
-use utils::assert_equal_fixed_f64 as assert_equal;
-
-mod program_test;
+use super::*;
 
 #[tokio::test]
 async fn test_perp_fixed() -> Result<(), TransportError> {
@@ -81,7 +68,7 @@ async fn test_perp_fixed() -> Result<(), TransportError> {
             init_base_asset_weight: 0.95,
             maint_base_liab_weight: 1.025,
             init_base_liab_weight: 1.05,
-            liquidation_fee: 0.012,
+            base_liquidation_fee: 0.012,
             maker_fee: -0.0001,
             taker_fee: 0.0002,
             settle_pnl_limit_factor: -1.0,
@@ -525,7 +512,7 @@ async fn test_perp_oracle_peg() -> Result<(), TransportError> {
             init_base_asset_weight: 0.95,
             maint_base_liab_weight: 1.025,
             init_base_liab_weight: 1.05,
-            liquidation_fee: 0.012,
+            base_liquidation_fee: 0.012,
             maker_fee: -0.0001,
             taker_fee: 0.0002,
             settle_pnl_limit_factor: 0.2,
@@ -907,7 +894,7 @@ async fn test_perp_realize_partially() -> Result<(), TransportError> {
             init_base_asset_weight: 0.95,
             maint_base_liab_weight: 1.025,
             init_base_liab_weight: 1.05,
-            liquidation_fee: 0.012,
+            base_liquidation_fee: 0.012,
             maker_fee: 0.0000,
             taker_fee: 0.0000,
             settle_pnl_limit_factor: -1.0,

@@ -99,8 +99,9 @@ impl Order {
         order_book: &Orderbook,
     ) -> i64 {
         if order_type == PostOrderType::PostOnlySlide {
-            if let Some(best_other_price) =
-                order_book.best_price(now_ts, oracle_price_lots, self.side.invert_side())
+            if let Some(best_other_price) = order_book
+                .bookside(self.side.invert_side())
+                .best_price(now_ts, oracle_price_lots)
             {
                 post_only_slide_limit(self.side, best_other_price, price_lots)
             } else {
@@ -153,6 +154,7 @@ impl Order {
             }
             _ => fixed_price_data(price_lots)?,
         };
+        require_gte!(price_lots, 1);
         Ok((price_lots, price_data))
     }
 

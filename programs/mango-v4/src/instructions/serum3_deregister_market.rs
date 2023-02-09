@@ -9,7 +9,7 @@ pub struct Serum3DeregisterMarket<'info> {
         mut,
         has_one = admin,
         constraint = group.load()?.is_testing(),
-        constraint = group.load()?.is_operational() @ MangoError::GroupIsHalted
+        constraint = group.load()?.is_ix_enabled(IxGate::Serum3DeregisterMarket) @ MangoError::IxIsDisabled,
     )]
     pub group: AccountLoader<'info, Group>,
     pub admin: Signer<'info>,

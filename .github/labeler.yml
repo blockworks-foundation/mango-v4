@@ -1,0 +1,15 @@
+program:
+- 'programs/**'
+client:
+- 'ts/client/**'
+liquidator:
+- 'liquidator/**'
+keeper:
+- 'keeper/**'
+ci:
+- '.github/workflows/**'
+dependency:
+- '*.lock'
+documentation:
+- '*.md'
+- '**/LICENCE'

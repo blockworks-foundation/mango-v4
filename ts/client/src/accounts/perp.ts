@@ -34,7 +34,7 @@ export class PerpMarket {
   public initBaseAssetWeight: I80F48;
   public maintBaseLiabWeight: I80F48;
   public initBaseLiabWeight: I80F48;
-  public liquidationFee: I80F48;
+  public baseLiquidationFee: I80F48;
   public makerFee: I80F48;
   public takerFee: I80F48;
   public minFunding: I80F48;
@@ -43,8 +43,8 @@ export class PerpMarket {
   public shortFunding: I80F48;
   public feesAccrued: I80F48;
   public feesSettled: I80F48;
-  public maintPnlAssetWeight: I80F48;
-  public initPnlAssetWeight: I80F48;
+  public maintOverallAssetWeight: I80F48;
+  public initOverallAssetWeight: I80F48;
 
   public _price: I80F48;
   public _uiPrice: number;
@@ -87,7 +87,7 @@ export class PerpMarket {
       longFunding: I80F48Dto;
       shortFunding: I80F48Dto;
       fundingLastUpdated: BN;
-      liquidationFee: I80F48Dto;
+      baseLiquidationFee: I80F48Dto;
       makerFee: I80F48Dto;
       takerFee: I80F48Dto;
       feesAccrued: I80F48Dto;
@@ -99,8 +99,9 @@ export class PerpMarket {
       settlePnlLimitFactor: number;
       settlePnlLimitWindowSizeTs: BN;
       reduceOnly: number;
-      maintPnlAssetWeight: I80F48Dto;
-      initPnlAssetWeight: I80F48Dto;
+      maintOverallAssetWeight: I80F48Dto;
+      initOverallAssetWeight: I80F48Dto;
+      positivePnlLiquidationFee: I80F48Dto;
     },
   ): PerpMarket {
     return new PerpMarket(
@@ -132,7 +133,7 @@ export class PerpMarket {
       obj.longFunding,
       obj.shortFunding,
       obj.fundingLastUpdated,
-      obj.liquidationFee,
+      obj.baseLiquidationFee,
       obj.makerFee,
       obj.takerFee,
       obj.feesAccrued,
@@ -144,8 +145,9 @@ export class PerpMarket {
       obj.settlePnlLimitFactor,
       obj.settlePnlLimitWindowSizeTs,
       obj.reduceOnly == 1,
-      obj.maintPnlAssetWeight,
-      obj.initPnlAssetWeight,
+      obj.maintOverallAssetWeight,
+      obj.initOverallAssetWeight,
+      obj.positivePnlLiquidationFee,
     );
   }
 
@@ -178,7 +180,7 @@ export class PerpMarket {
     longFunding: I80F48Dto,
     shortFunding: I80F48Dto,
     public fundingLastUpdated: BN,
-    liquidationFee: I80F48Dto,
+    baseLiquidationFee: I80F48Dto,
     makerFee: I80F48Dto,
     takerFee: I80F48Dto,
     feesAccrued: I80F48Dto,
@@ -190,8 +192,9 @@ export class PerpMarket {
     public settlePnlLimitFactor: number,
     public settlePnlLimitWindowSizeTs: BN,
     public reduceOnly: boolean,
-    maintPnlAssetWeight: I80F48Dto,
-    initPnlAssetWeight: I80F48Dto,
+    maintOverallAssetWeight: I80F48Dto,
+    initOverallAssetWeight: I80F48Dto,
+    positivePnlLiquidationFee: I80F48Dto,
   ) {
     this.name = utf8.decode(new Uint8Array(name)).split('\x00')[0];
     this.oracleConfig = {
@@ -202,7 +205,7 @@ export class PerpMarket {
     this.initBaseAssetWeight = I80F48.from(initBaseAssetWeight);
     this.maintBaseLiabWeight = I80F48.from(maintBaseLiabWeight);
     this.initBaseLiabWeight = I80F48.from(initBaseLiabWeight);
-    this.liquidationFee = I80F48.from(liquidationFee);
+    this.baseLiquidationFee = I80F48.from(baseLiquidationFee);
     this.makerFee = I80F48.from(makerFee);
     this.takerFee = I80F48.from(takerFee);
     this.minFunding = I80F48.from(minFunding);
@@ -211,8 +214,8 @@ export class PerpMarket {
     this.shortFunding = I80F48.from(shortFunding);
     this.feesAccrued = I80F48.from(feesAccrued);
     this.feesSettled = I80F48.from(feesSettled);
-    this.maintPnlAssetWeight = I80F48.from(maintPnlAssetWeight);
-    this.initPnlAssetWeight = I80F48.from(initPnlAssetWeight);
+    this.maintOverallAssetWeight = I80F48.from(maintOverallAssetWeight);
+    this.initOverallAssetWeight = I80F48.from(initOverallAssetWeight);
 
     this.priceLotsToUiConverter = new Big(10)
       .pow(baseDecimals - QUOTE_DECIMALS)
@@ -431,7 +434,9 @@ export class PerpMarket {
     direction: 'negative' | 'positive',
     count = 2,
   ): Promise<{ account: MangoAccount; settleablePnl: I80F48 }[]> {
-    let accountsWithSettleablePnl = (await client.getAllMangoAccounts(group))
+    let accountsWithSettleablePnl = (
+      await client.getAllMangoAccounts(group, true)
+    )
       .filter((acc) => acc.perpPositionExistsForMarket(this))
       .map((acc) => {
         const pp = acc
@@ -511,8 +516,8 @@ export class PerpMarket {
       this.maintBaseLiabWeight.toString() +
       '\n initLiabWeight -' +
       this.initBaseLiabWeight.toString() +
-      '\n liquidationFee -' +
-      this.liquidationFee.toString() +
+      '\n baseLiquidationFee -' +
+      this.baseLiquidationFee.toString() +
       '\n makerFee -' +
       this.makerFee.toString() +
       '\n takerFee -' +

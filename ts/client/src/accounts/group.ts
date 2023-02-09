@@ -8,6 +8,7 @@ import {
   PublicKey,
 } from '@solana/web3.js';
 import BN from 'bn.js';
+import { cloneDeep, merge } from 'lodash';
 import { MangoClient } from '../client';
 import { OPENBOOK_PROGRAM_ID } from '../constants';
 import { Id } from '../ids';
@@ -30,11 +31,12 @@ export class Group {
       groupNum: number;
       admin: PublicKey;
       fastListingAdmin: PublicKey;
+      securityAdmin: PublicKey;
       insuranceMint: PublicKey;
       insuranceVault: PublicKey;
       testing: number;
       version: number;
-      halted: number;
+      ixGate: BN;
       addressLookupTables: PublicKey[];
     },
   ): Group {
@@ -44,11 +46,12 @@ export class Group {
       obj.groupNum,
       obj.admin,
       obj.fastListingAdmin,
+      obj.securityAdmin,
       obj.insuranceMint,
       obj.insuranceVault,
       obj.testing,
       obj.version,
-      obj.halted,
+      obj.ixGate,
       obj.addressLookupTables,
       [], // addressLookupTablesList
       new Map(), // banksMapByName
@@ -72,11 +75,12 @@ export class Group {
     public groupNum: number,
     public admin: PublicKey,
     public fastListingAdmin: PublicKey,
+    public securityAdmin: PublicKey,
     public insuranceMint: PublicKey,
     public insuranceVault: PublicKey,
     public testing: number,
     public version: number,
-    public halted: number,
+    public ixGate: BN,
     public addressLookupTables: PublicKey[],
     public addressLookupTablesList: AddressLookupTableAccount[],
     public banksMapByName: Map<string, Bank[]>,
@@ -92,10 +96,6 @@ export class Group {
     public mintInfosMapByMint: Map<string, MintInfo>,
     public vaultAmountsMap: Map<string, BN>,
   ) {}
-
-  public isOperational(): boolean {
-    return this.halted === 0;
-  }
 
   public async reloadAll(client: MangoClient): Promise<void> {
     const ids: Id | undefined = await client.getIds(this.publicKey);
@@ -149,10 +149,17 @@ export class Group {
       banks = await client.getBanksForGroup(this);
     }
 
+    const oldbanksMapByTokenIndex = cloneDeep(this.banksMapByTokenIndex);
     this.banksMapByName = new Map();
     this.banksMapByMint = new Map();
     this.banksMapByTokenIndex = new Map();
     for (const bank of banks) {
+      // ensure that freshly fetched banks have valid price until we fetch oracles again
+      const oldBanks = oldbanksMapByTokenIndex.get(bank.tokenIndex);
+      if (oldBanks && oldBanks.length > 0) {
+        merge(bank, oldBanks[0]);
+      }
+
       const mintId = bank.mint.toString();
       if (this.banksMapByMint.has(mintId)) {
         this.banksMapByMint.get(mintId)?.push(bank);
@@ -256,6 +263,19 @@ export class Group {
       );
     } else {
       perpMarkets = await client.perpGetMarkets(this);
+    }
+
+    // ensure that freshly fetched perp markets have valid price until we fetch oracles again
+    const oldPerpMarketByMarketIndex = cloneDeep(
+      this.perpMarketsMapByMarketIndex,
+    );
+    for (const perpMarket of perpMarkets) {
+      const oldPerpMarket = oldPerpMarketByMarketIndex.get(
+        perpMarket.perpMarketIndex,
+      );
+      if (oldPerpMarket) {
+        merge(perpMarket, oldPerpMarket);
+      }
     }
 
     this.perpMarketsMapByName = new Map(

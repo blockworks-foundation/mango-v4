@@ -16,7 +16,7 @@ use crate::logs::{DepositLog, TokenBalanceLog};
 #[derive(Accounts)]
 pub struct TokenDepositIntoExisting<'info> {
     #[account(
-        constraint = group.load()?.is_operational() @ MangoError::GroupIsHalted
+        constraint = group.load()?.is_ix_enabled(IxGate::TokenDeposit) @ MangoError::IxIsDisabled,
     )]
     pub group: AccountLoader<'info, Group>,
 
@@ -53,7 +53,7 @@ pub struct TokenDepositIntoExisting<'info> {
 #[derive(Accounts)]
 pub struct TokenDeposit<'info> {
     #[account(
-        constraint = group.load()?.is_operational() @ MangoError::GroupIsHalted
+        constraint = group.load()?.is_ix_enabled(IxGate::TokenDeposit) @ MangoError::IxIsDisabled,
     )]
     pub group: AccountLoader<'info, Group>,
 
@@ -186,20 +186,39 @@ impl<'a, 'info> DepositCommon<'a, 'info> {
         //
         // Health computation
         //
+        let retriever = new_fixed_order_account_retriever(remaining_accounts, &account.borrow())?;
+        let cache = new_health_cache(&account.borrow(), &retriever)?;
+
         // Since depositing can only increase health, we can skip the usual pre-health computation.
         // Also, TokenDeposit is one of the rare instructions that is allowed even during being_liquidated.
-        //
+        // Being in a health region always means being_liquidated is false, so it's safe to gate the check.
         if !account.fixed.is_in_health_region() {
-            let retriever =
-                new_fixed_order_account_retriever(remaining_accounts, &account.borrow())?;
-            let health = compute_health(&account.borrow(), HealthType::Init, &retriever)
-                .context("post-deposit init health")?;
+            let health = cache.health(HealthType::Init);
             msg!("health: {}", health);
+
             let was_being_liquidated = account.being_liquidated();
             let recovered = account.fixed.maybe_recover_from_being_liquidated(health);
             require!(
                 !was_being_liquidated || recovered,
                 MangoError::DepositsIntoLiquidatingMustRecover
+            );
+        }
+
+        // Group level deposit limit on account
+        let group = self.group.load()?;
+        if group.deposit_limit_quote > 0 {
+            let assets = cache
+                .health_assets_and_liabs(HealthType::Init)
+                .0
+                .round_to_zero()
+                .checked_to_num::<u64>()
+                .unwrap();
+            require_msg_typed!(
+                assets <= group.deposit_limit_quote,
+                MangoError::DepositLimit,
+                "assets ({}) can't cross deposit limit on the group ({})",
+                assets,
+                group.deposit_limit_quote
             );
         }
 

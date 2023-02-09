@@ -44,10 +44,6 @@ impl EventQueue {
         self.header.count() == self.buf.len()
     }
 
-    pub fn empty(&self) -> bool {
-        self.header.count() == 0
-    }
-
     pub fn push_back(&mut self, value: AnyEvent) -> std::result::Result<(), AnyEvent> {
         if self.full() {
             return Err(value);
@@ -63,21 +59,21 @@ impl EventQueue {
     }
 
     pub fn peek_front(&self) -> Option<&AnyEvent> {
-        if self.empty() {
+        if self.is_empty() {
             return None;
         }
         Some(&self.buf[self.header.head()])
     }
 
     pub fn peek_front_mut(&mut self) -> Option<&mut AnyEvent> {
-        if self.empty() {
+        if self.is_empty() {
             return None;
         }
         Some(&mut self.buf[self.header.head()])
     }
 
     pub fn pop_front(&mut self) -> Result<AnyEvent> {
-        require!(!self.empty(), MangoError::SomeError);
+        require!(!self.is_empty(), MangoError::SomeError);
 
         let value = self.buf[self.header.head()];
 
@@ -190,20 +186,22 @@ pub struct FillEvent {
     pub seq_num: u64,
 
     pub maker: Pubkey,
-    pub maker_order_id: u128,
-    pub maker_fee: I80F48,
+    pub padding2: [u8; 32],
 
     // Timestamp of when the maker order was placed; copied over from the LeafNode
     pub maker_timestamp: u64,
 
     pub taker: Pubkey,
-    pub taker_order_id: u128,
+    pub padding3: [u8; 16],
     pub taker_client_order_id: u64,
-    pub taker_fee: I80F48,
+    pub padding4: [u8; 16],
 
     pub price: i64,
     pub quantity: i64, // number of quote lots
-    pub reserved: [u8; 24],
+    pub maker_client_order_id: u64,
+    pub maker_fee: f32,
+    pub taker_fee: f32,
+    pub reserved: [u8; 8],
 }
 const_assert_eq!(size_of::<FillEvent>() % 8, 0);
 const_assert_eq!(size_of::<FillEvent>(), EVENT_SIZE);
@@ -217,12 +215,10 @@ impl FillEvent {
         timestamp: u64,
         seq_num: u64,
         maker: Pubkey,
-        maker_order_id: u128,
+        maker_client_order_id: u64,
         maker_fee: I80F48,
         maker_timestamp: u64,
-
         taker: Pubkey,
-        taker_order_id: u128,
         taker_client_order_id: u64,
         taker_fee: I80F48,
         price: i64,
@@ -233,20 +229,22 @@ impl FillEvent {
             taker_side: taker_side.into(),
             maker_out: maker_out.into(),
             maker_slot,
-            padding: Default::default(),
             timestamp,
             seq_num,
             maker,
-            maker_order_id,
-            maker_fee,
+            maker_client_order_id,
+            maker_fee: maker_fee.to_num::<f32>(),
             maker_timestamp,
             taker,
-            taker_order_id,
             taker_client_order_id,
-            taker_fee,
+            taker_fee: taker_fee.to_num::<f32>(),
             price,
             quantity,
-            reserved: [0; 24],
+            padding: Default::default(),
+            padding2: Default::default(),
+            padding3: Default::default(),
+            padding4: Default::default(),
+            reserved: [0; 8],
         }
     }
 

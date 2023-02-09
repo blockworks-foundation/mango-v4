@@ -1,15 +1,4 @@
-#![cfg(feature = "test-bpf")]
-
-use fixed::types::I80F48;
-use mango_v4::state::*;
-use solana_program_test::*;
-use solana_sdk::transport::TransportError;
-
-use program_test::*;
-
-use mango_setup::*;
-
-mod program_test;
+use super::*;
 
 // Try to reach compute limits in health checks by having many different tokens in an account
 #[tokio::test]
@@ -219,7 +208,7 @@ async fn test_health_compute_perp() -> Result<(), TransportError> {
                 init_base_asset_weight: 0.95,
                 maint_base_liab_weight: 1.025,
                 init_base_liab_weight: 1.05,
-                liquidation_fee: 0.012,
+                base_liquidation_fee: 0.012,
                 maker_fee: 0.0002,
                 taker_fee: 0.000,
                 settle_pnl_limit_factor: 0.2,

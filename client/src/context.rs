@@ -221,31 +221,31 @@ impl MangoGroupContext {
         &self,
         account: &MangoAccountValue,
         affected_tokens: Vec<TokenIndex>,
-        writable_banks: bool,
+        writable_banks: Vec<TokenIndex>,
+        affected_perp_markets: Vec<PerpMarketIndex>,
     ) -> anyhow::Result<Vec<AccountMeta>> {
+        let mut account = account.clone();
+        for affected_token_index in affected_tokens {
+            account.ensure_token_position(affected_token_index)?;
+        }
+        for affected_perp_market_index in affected_perp_markets {
+            let settle_token_index = self
+                .perp(affected_perp_market_index)
+                .market
+                .settle_token_index;
+            account.ensure_perp_position(affected_perp_market_index, settle_token_index)?;
+        }
+
         // figure out all the banks/oracles that need to be passed for the health check
         let mut banks = vec![];
         let mut oracles = vec![];
         for position in account.active_token_positions() {
             let mint_info = self.mint_info(position.token_index);
-            banks.push(mint_info.first_bank());
+            banks.push((
+                mint_info.first_bank(),
+                writable_banks.iter().any(|&ti| ti == position.token_index),
+            ));
             oracles.push(mint_info.oracle);
-        }
-        for affected_token_index in affected_tokens {
-            if !account
-                .active_token_positions()
-                .any(|p| p.token_index == affected_token_index)
-            {
-                // If there is not yet an active position for the token, we need to pass
-                // the bank/oracle for health check anyway.
-                let new_position = account
-                    .all_token_positions()
-                    .position(|p| !p.is_active())
-                    .unwrap();
-                let mint_info = self.mint_info(affected_token_index);
-                banks.insert(new_position, mint_info.first_bank());
-                oracles.insert(new_position, mint_info.oracle);
-            }
         }
 
         let serum_oos = account.active_serum3_orders().map(|&s| s.open_orders);
@@ -264,9 +264,9 @@ impl MangoGroupContext {
 
         Ok(banks
             .iter()
-            .map(|&pubkey| AccountMeta {
+            .map(|&(pubkey, is_writable)| AccountMeta {
                 pubkey,
-                is_writable: writable_banks,
+                is_writable,
                 is_signer: false,
             })
             .chain(oracles.into_iter().map(to_account_meta))
@@ -334,6 +334,21 @@ impl MangoGroupContext {
             .chain(perp_oracles.map(to_account_meta))
             .chain(serum_oos.map(to_account_meta))
             .collect())
+    }
+
+    pub async fn new_tokens_listed(&self, rpc: &RpcClientAsync) -> anyhow::Result<bool> {
+        let mint_infos = fetch_mint_infos(rpc, mango_v4::id(), self.group).await?;
+        Ok(mint_infos.len() > self.tokens.len())
+    }
+
+    pub async fn new_serum3_markets_listed(&self, rpc: &RpcClientAsync) -> anyhow::Result<bool> {
+        let serum3_markets = fetch_serum3_markets(rpc, mango_v4::id(), self.group).await?;
+        Ok(serum3_markets.len() > self.serum3_markets.len())
+    }
+
+    pub async fn new_perp_markets_listed(&self, rpc: &RpcClientAsync) -> anyhow::Result<bool> {
+        let new_perp_markets = fetch_perp_markets(rpc, mango_v4::id(), self.group).await?;
+        Ok(new_perp_markets.len() > self.perp_markets.len())
     }
 }
 
