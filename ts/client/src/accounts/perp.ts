@@ -442,11 +442,10 @@ export class PerpMarket {
         const pp = acc
           .perpActive()
           .find((pp) => pp.marketIndex === this.perpMarketIndex)!;
-        pp.updateSettleLimit(this);
 
         return {
           account: acc,
-          settleablePnl: pp.getSettleablePnl(this),
+          settleablePnl: pp.getSettleablePnl(group, this, acc),
         };
       });
 
