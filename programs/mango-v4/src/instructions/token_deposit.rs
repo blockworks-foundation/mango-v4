@@ -237,7 +237,7 @@ impl<'a, 'info> DepositCommon<'a, 'info> {
             mango_account: self.account.key(),
             signer: self.token_authority.key(),
             token_index,
-            quantity: amount,
+            quantity: amount_i80f48.to_num::<u64>(),
             price: oracle_price.to_bits(),
         });
 
