@@ -460,7 +460,7 @@ mod tests {
         {
             let ab = setup.asset_bank.data();
             ab.stable_price_model.stable_price = 0.5;
-            ab.deposit_weight_scale_start_quote = 202.5;
+            ab.deposit_weight_scale_start_quote = 505.0;
             let lb = setup.liab_bank.data();
             lb.stable_price_model.stable_price = 1.25;
             lb.borrow_weight_scale_start_quote = 3.75;
@@ -506,7 +506,7 @@ mod tests {
         }
 
         let hc = setup.liqee_health_cache();
-        let asset_scale = 202.5 / (1010.0 * 0.5);
+        let asset_scale = 505.0 / 1010.0;
         let liab_scale = 9.0 * 1.25 / 3.75;
         assert_eq_f!(
             hc.health(HealthType::Init),

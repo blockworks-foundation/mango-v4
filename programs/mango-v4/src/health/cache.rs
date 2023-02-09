@@ -728,14 +728,17 @@ pub fn new_health_cache(
             oracle: oracle_price,
             stable: bank.stable_price(),
         };
+        // Use the liab price for computing weight scaling, because it's pessimistic and
+        // causes the most unfavorable scaling.
+        let liab_price = prices.liab(HealthType::Init);
         token_infos.push(TokenInfo {
             token_index: bank.token_index,
             maint_asset_weight: bank.maint_asset_weight,
             init_asset_weight: bank.init_asset_weight,
-            init_scaled_asset_weight: bank.scaled_init_asset_weight(prices.asset(HealthType::Init)),
+            init_scaled_asset_weight: bank.scaled_init_asset_weight(liab_price),
             maint_liab_weight: bank.maint_liab_weight,
             init_liab_weight: bank.init_liab_weight,
-            init_scaled_liab_weight: bank.scaled_init_liab_weight(prices.liab(HealthType::Init)),
+            init_scaled_liab_weight: bank.scaled_init_liab_weight(liab_price),
             prices,
             balance_native: native,
         });
