@@ -1,5 +1,5 @@
 export type MangoV4 = {
-  "version": "0.3.0",
+  "version": "0.5.0",
   "name": "mango_v4",
   "instructions": [
     {
@@ -138,11 +138,17 @@ export type MangoV4 = {
           "type": {
             "option": "u8"
           }
+        },
+        {
+          "name": "depositLimitQuoteOpt",
+          "type": {
+            "option": "u64"
+          }
         }
       ]
     },
     {
-      "name": "groupToggleHalt",
+      "name": "ixGateSet",
       "accounts": [
         {
           "name": "group",
@@ -157,8 +163,8 @@ export type MangoV4 = {
       ],
       "args": [
         {
-          "name": "halted",
-          "type": "bool"
+          "name": "ixGate",
+          "type": "u128"
         }
       ]
     },
@@ -542,7 +548,11 @@ export type MangoV4 = {
         {
           "name": "oracle",
           "isMut": false,
-          "isSigner": false
+          "isSigner": false,
+          "docs": [
+            "The oracle account is optional and only used when reset_stable_price is set.",
+            ""
+          ]
         }
       ],
       "args": [
@@ -1450,6 +1460,11 @@ export type MangoV4 = {
           "docs": [
             "Instructions Sysvar for instruction introspection"
           ]
+        },
+        {
+          "name": "group",
+          "isMut": false,
+          "isSigner": false
         },
         {
           "name": "account",
@@ -2524,15 +2539,15 @@ export type MangoV4 = {
           "type": "f32"
         },
         {
-          "name": "maintPnlAssetWeight",
+          "name": "maintOverallAssetWeight",
           "type": "f32"
         },
         {
-          "name": "initPnlAssetWeight",
+          "name": "initOverallAssetWeight",
           "type": "f32"
         },
         {
-          "name": "liquidationFee",
+          "name": "baseLiquidationFee",
           "type": "f32"
         },
         {
@@ -2586,6 +2601,10 @@ export type MangoV4 = {
         {
           "name": "settlePnlLimitWindowSizeTs",
           "type": "u64"
+        },
+        {
+          "name": "positivePnlLiquidationFee",
+          "type": "f32"
         }
       ]
     },
@@ -2610,7 +2629,11 @@ export type MangoV4 = {
         {
           "name": "oracle",
           "isMut": false,
-          "isSigner": false
+          "isSigner": false,
+          "docs": [
+            "The oracle account is optional and only used when reset_stable_price is set.",
+            ""
+          ]
         }
       ],
       "args": [
@@ -2659,19 +2682,19 @@ export type MangoV4 = {
           }
         },
         {
-          "name": "maintPnlAssetWeightOpt",
+          "name": "maintOverallAssetWeightOpt",
           "type": {
             "option": "f32"
           }
         },
         {
-          "name": "initPnlAssetWeightOpt",
+          "name": "initOverallAssetWeightOpt",
           "type": {
             "option": "f32"
           }
         },
         {
-          "name": "liquidationFeeOpt",
+          "name": "baseLiquidationFeeOpt",
           "type": {
             "option": "f32"
           }
@@ -2761,7 +2784,7 @@ export type MangoV4 = {
           }
         },
         {
-          "name": "settlePnlLimitWindowSizeTs",
+          "name": "settlePnlLimitWindowSizeTsOpt",
           "type": {
             "option": "u64"
           }
@@ -2770,6 +2793,16 @@ export type MangoV4 = {
           "name": "reduceOnlyOpt",
           "type": {
             "option": "bool"
+          }
+        },
+        {
+          "name": "resetStablePrice",
+          "type": "bool"
+        },
+        {
+          "name": "positivePnlLiquidationFeeOpt",
+          "type": {
+            "option": "f32"
           }
         }
       ]
@@ -2842,6 +2875,32 @@ export type MangoV4 = {
           "name": "perpMarket",
           "isMut": false,
           "isSigner": false
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "perpZeroOutForMarket",
+      "accounts": [
+        {
+          "name": "group",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "account",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "perpMarket",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "admin",
+          "isMut": false,
+          "isSigner": true
         }
       ],
       "args": []
@@ -2931,7 +2990,10 @@ export type MangoV4 = {
           "name": "limit",
           "type": "u8"
         }
-      ]
+      ],
+      "returns": {
+        "option": "u128"
+      }
     },
     {
       "name": "perpPlaceOrderPegged",
@@ -3026,7 +3088,10 @@ export type MangoV4 = {
           "name": "maxOracleStalenessSlots",
           "type": "i32"
         }
-      ]
+      ],
+      "returns": {
+        "option": "u128"
+      }
     },
     {
       "name": "perpCancelOrder",
@@ -3350,7 +3415,7 @@ export type MangoV4 = {
       ]
     },
     {
-      "name": "perpLiqBasePosition",
+      "name": "perpLiqBaseOrPositivePnl",
       "accounts": [
         {
           "name": "group",
@@ -3381,12 +3446,31 @@ export type MangoV4 = {
           "name": "liqee",
           "isMut": true,
           "isSigner": false
+        },
+        {
+          "name": "settleBank",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "settleVault",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "settleOracle",
+          "isMut": false,
+          "isSigner": false
         }
       ],
       "args": [
         {
           "name": "maxBaseTransfer",
           "type": "i64"
+        },
+        {
+          "name": "maxPnlTransfer",
+          "type": "u64"
         }
       ]
     },
@@ -3427,7 +3511,7 @@ export type MangoV4 = {
       ]
     },
     {
-      "name": "perpLiqQuoteAndBankruptcy",
+      "name": "perpLiqNegativePnlOrBankruptcy",
       "accounts": [
         {
           "name": "group",
@@ -3919,15 +4003,11 @@ export type MangoV4 = {
             "type": "u8"
           },
           {
-            "name": "halted",
-            "type": "u8"
-          },
-          {
             "name": "padding2",
             "type": {
               "array": [
                 "u8",
-                4
+                5
               ]
             }
           },
@@ -3945,11 +4025,19 @@ export type MangoV4 = {
             "type": "publicKey"
           },
           {
+            "name": "depositLimitQuote",
+            "type": "u64"
+          },
+          {
+            "name": "ixGate",
+            "type": "u128"
+          },
+          {
             "name": "reserved",
             "type": {
               "array": [
                 "u8",
-                1888
+                1864
               ]
             }
           }
@@ -4308,17 +4396,27 @@ export type MangoV4 = {
           },
           {
             "name": "settleTokenIndex",
+            "docs": [
+              "Token index that settlements happen in.",
+              "",
+              "Currently required to be 0, USDC. In the future settlement",
+              "may be allowed to happen in other tokens."
+            ],
             "type": "u16"
           },
           {
             "name": "perpMarketIndex",
             "docs": [
-              "Lookup indices"
+              "Index of this perp market. Other data, like the MangoAccount's PerpPosition",
+              "reference this market via this index. Unique for this group's perp markets."
             ],
             "type": "u16"
           },
           {
             "name": "blocked1",
+            "docs": [
+              "Field used to contain the trusted_market flag and is now unused."
+            ],
             "type": "u8"
           },
           {
@@ -4337,10 +4435,18 @@ export type MangoV4 = {
           },
           {
             "name": "baseDecimals",
+            "docs": [
+              "Number of decimals used for the base token.",
+              "",
+              "Used to convert the oracle's price into a native/native price."
+            ],
             "type": "u8"
           },
           {
             "name": "name",
+            "docs": [
+              "Name. Trailing zero bytes are ignored."
+            ],
             "type": {
               "array": [
                 "u8",
@@ -4350,28 +4456,46 @@ export type MangoV4 = {
           },
           {
             "name": "bids",
+            "docs": [
+              "Address of the BookSide account for bids"
+            ],
             "type": "publicKey"
           },
           {
             "name": "asks",
+            "docs": [
+              "Address of the BookSide account for asks"
+            ],
             "type": "publicKey"
           },
           {
             "name": "eventQueue",
+            "docs": [
+              "Address of the EventQueue account"
+            ],
             "type": "publicKey"
           },
           {
             "name": "oracle",
+            "docs": [
+              "Oracle account address"
+            ],
             "type": "publicKey"
           },
           {
             "name": "oracleConfig",
+            "docs": [
+              "Oracle configuration"
+            ],
             "type": {
               "defined": "OracleConfig"
             }
           },
           {
             "name": "stablePriceModel",
+            "docs": [
+              "Maintains a stable price based on the oracle price that is less volatile."
+            ],
             "type": {
               "defined": "StablePriceModel"
             }
@@ -4379,21 +4503,31 @@ export type MangoV4 = {
           {
             "name": "quoteLotSize",
             "docs": [
-              "Number of quote native that reresents min tick"
+              "Number of quote native in a quote lot. Must be a power of 10.",
+              "",
+              "Primarily useful for increasing the tick size on the market: A lot price",
+              "of 1 becomes a native price of quote_lot_size/base_lot_size becomes a",
+              "ui price of quote_lot_size*base_decimals/base_lot_size/quote_decimals."
             ],
             "type": "i64"
           },
           {
             "name": "baseLotSize",
             "docs": [
-              "Represents number of base native quantity",
-              "e.g. if base decimals for underlying asset are 6, base lot size is 100, and base position is 10000, then",
-              "UI position is 1"
+              "Number of base native in a base lot. Must be a power of 10.",
+              "",
+              "Example: If base decimals for the underlying asset is 6, base lot size",
+              "is 100 and and base position lots is 10_000 then base position native is",
+              "1_000_000 and base position ui is 1."
             ],
             "type": "i64"
           },
           {
             "name": "maintBaseAssetWeight",
+            "docs": [
+              "These weights apply to the base position. The quote position has",
+              "no explicit weight (but may be covered by the overall pnl asset weight)."
+            ],
             "type": {
               "defined": "I80F48"
             }
@@ -4418,6 +4552,9 @@ export type MangoV4 = {
           },
           {
             "name": "openInterest",
+            "docs": [
+              "Number of base lot pairs currently active in the market. Always >= 0."
+            ],
             "type": "i64"
           },
           {
@@ -4429,12 +4566,15 @@ export type MangoV4 = {
           },
           {
             "name": "registrationTime",
+            "docs": [
+              "Timestamp in seconds that the market was registered at."
+            ],
             "type": "u64"
           },
           {
             "name": "minFunding",
             "docs": [
-              "Funding"
+              "Minimal funding rate per day, must be <= 0."
             ],
             "type": {
               "defined": "I80F48"
@@ -4442,22 +4582,38 @@ export type MangoV4 = {
           },
           {
             "name": "maxFunding",
+            "docs": [
+              "Maximal funding rate per day, must be >= 0."
+            ],
             "type": {
               "defined": "I80F48"
             }
           },
           {
             "name": "impactQuantity",
+            "docs": [
+              "For funding, get the impact price this many base lots deep into the book."
+            ],
             "type": "i64"
           },
           {
             "name": "longFunding",
+            "docs": [
+              "Current long funding value. Increasing it means that every long base lot",
+              "needs to pay that amount in funding.",
+              "",
+              "PerpPosition uses and tracks it settle funding. Updated by the perp",
+              "keeper instruction."
+            ],
             "type": {
               "defined": "I80F48"
             }
           },
           {
             "name": "shortFunding",
+            "docs": [
+              "See long_funding."
+            ],
             "type": {
               "defined": "I80F48"
             }
@@ -4470,9 +4626,10 @@ export type MangoV4 = {
             "type": "u64"
           },
           {
-            "name": "liquidationFee",
+            "name": "baseLiquidationFee",
             "docs": [
-              "Fees"
+              "Fees",
+              "Fee for base position liquidation"
             ],
             "type": {
               "defined": "I80F48"
@@ -4480,12 +4637,18 @@ export type MangoV4 = {
           },
           {
             "name": "makerFee",
+            "docs": [
+              "Fee when matching maker orders. May be negative."
+            ],
             "type": {
               "defined": "I80F48"
             }
           },
           {
             "name": "takerFee",
+            "docs": [
+              "Fee for taker orders, may not be negative."
+            ],
             "type": {
               "defined": "I80F48"
             }
@@ -4510,6 +4673,9 @@ export type MangoV4 = {
           },
           {
             "name": "feePenalty",
+            "docs": [
+              "Fee (in quote native) to charge for ioc orders"
+            ],
             "type": "f32"
           },
           {
@@ -4569,6 +4735,10 @@ export type MangoV4 = {
           },
           {
             "name": "reduceOnly",
+            "docs": [
+              "If true, users may no longer increase their market exposure. Only actions",
+              "that reduce their position are still allowed."
+            ],
             "type": "u8"
           },
           {
@@ -4581,13 +4751,22 @@ export type MangoV4 = {
             }
           },
           {
-            "name": "maintPnlAssetWeight",
+            "name": "maintOverallAssetWeight",
+            "docs": [
+              "Weights for full perp market health, if positive"
+            ],
             "type": {
               "defined": "I80F48"
             }
           },
           {
-            "name": "initPnlAssetWeight",
+            "name": "initOverallAssetWeight",
+            "type": {
+              "defined": "I80F48"
+            }
+          },
+          {
+            "name": "positivePnlLiquidationFee",
             "type": {
               "defined": "I80F48"
             }
@@ -4597,7 +4776,7 @@ export type MangoV4 = {
             "type": {
               "array": [
                 "u8",
-                1904
+                1888
               ]
             }
           }
@@ -4921,13 +5100,13 @@ export type MangoV4 = {
             }
           },
           {
-            "name": "maintPnlAssetWeight",
+            "name": "maintOverallAssetWeight",
             "type": {
               "defined": "I80F48"
             }
           },
           {
-            "name": "initPnlAssetWeight",
+            "name": "initOverallAssetWeight",
             "type": {
               "defined": "I80F48"
             }
@@ -4962,6 +5141,10 @@ export type MangoV4 = {
           },
           {
             "name": "hasOpenOrders",
+            "type": "bool"
+          },
+          {
+            "name": "hasOpenFills",
             "type": "bool"
           }
         ]
@@ -5656,14 +5839,23 @@ export type MangoV4 = {
         "fields": [
           {
             "name": "tag",
+            "docs": [
+              "NodeTag"
+            ],
             "type": "u8"
           },
           {
             "name": "ownerSlot",
+            "docs": [
+              "Index into the owning MangoAccount's PerpOpenOrders"
+            ],
             "type": "u8"
           },
           {
             "name": "orderType",
+            "docs": [
+              "PostOrderType, this was added for TradingView move order"
+            ],
             "type": "u8"
           },
           {
@@ -5695,32 +5887,54 @@ export type MangoV4 = {
           {
             "name": "key",
             "docs": [
-              "The binary tree key"
+              "The binary tree key, see new_node_key()"
             ],
             "type": "u128"
           },
           {
             "name": "owner",
+            "docs": [
+              "Address of the owning MangoAccount"
+            ],
             "type": "publicKey"
           },
           {
             "name": "quantity",
+            "docs": [
+              "Number of base lots to buy or sell, always >=1"
+            ],
             "type": "i64"
           },
           {
             "name": "timestamp",
+            "docs": [
+              "The time the order was placed"
+            ],
             "type": "u64"
           },
           {
             "name": "pegLimit",
+            "docs": [
+              "If the effective price of an oracle pegged order exceeds this limit,",
+              "it will be considered invalid and may be removed.",
+              "",
+              "Only applicable in the oracle_pegged OrderTree"
+            ],
             "type": "i64"
+          },
+          {
+            "name": "clientOrderId",
+            "docs": [
+              "User defined id for this order, used in FillEvents"
+            ],
+            "type": "u64"
           },
           {
             "name": "reserved",
             "type": {
               "array": [
                 "u8",
-                40
+                32
               ]
             }
           }
@@ -5906,13 +6120,12 @@ export type MangoV4 = {
             "type": "publicKey"
           },
           {
-            "name": "makerOrderId",
-            "type": "u128"
-          },
-          {
-            "name": "makerFee",
+            "name": "padding2",
             "type": {
-              "defined": "I80F48"
+              "array": [
+                "u8",
+                32
+              ]
             }
           },
           {
@@ -5924,17 +6137,25 @@ export type MangoV4 = {
             "type": "publicKey"
           },
           {
-            "name": "takerOrderId",
-            "type": "u128"
+            "name": "padding3",
+            "type": {
+              "array": [
+                "u8",
+                16
+              ]
+            }
           },
           {
             "name": "takerClientOrderId",
             "type": "u64"
           },
           {
-            "name": "takerFee",
+            "name": "padding4",
             "type": {
-              "defined": "I80F48"
+              "array": [
+                "u8",
+                16
+              ]
             }
           },
           {
@@ -5946,11 +6167,23 @@ export type MangoV4 = {
             "type": "i64"
           },
           {
+            "name": "makerClientOrderId",
+            "type": "u64"
+          },
+          {
+            "name": "makerFee",
+            "type": "f32"
+          },
+          {
+            "name": "takerFee",
+            "type": "f32"
+          },
+          {
             "name": "reserved",
             "type": {
               "array": [
                 "u8",
-                24
+                8
               ]
             }
           }
@@ -6282,6 +6515,173 @@ export type MangoV4 = {
           },
           {
             "name": "Serum3SettleFunds"
+          },
+          {
+            "name": "TokenWithdraw"
+          }
+        ]
+      }
+    },
+    {
+      "name": "IxGate",
+      "docs": [
+        "Enum for lookup into ix gate",
+        "note:",
+        "total ix files 56,",
+        "ix files included 48,",
+        "ix files not included 8,",
+        "- Benchmark,",
+        "- ComputeAccountData,",
+        "- GroupCreate",
+        "- GroupEdit",
+        "- IxGateSet,",
+        "- PerpZeroOut,",
+        "- PerpEditMarket,",
+        "- TokenEdit,"
+      ],
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "AccountClose"
+          },
+          {
+            "name": "AccountCreate"
+          },
+          {
+            "name": "AccountEdit"
+          },
+          {
+            "name": "AccountExpand"
+          },
+          {
+            "name": "AccountToggleFreeze"
+          },
+          {
+            "name": "AltExtend"
+          },
+          {
+            "name": "AltSet"
+          },
+          {
+            "name": "FlashLoan"
+          },
+          {
+            "name": "GroupClose"
+          },
+          {
+            "name": "GroupCreate"
+          },
+          {
+            "name": "HealthRegion"
+          },
+          {
+            "name": "PerpCancelAllOrders"
+          },
+          {
+            "name": "PerpCancelAllOrdersBySide"
+          },
+          {
+            "name": "PerpCancelOrder"
+          },
+          {
+            "name": "PerpCancelOrderByClientOrderId"
+          },
+          {
+            "name": "PerpCloseMarket"
+          },
+          {
+            "name": "PerpConsumeEvents"
+          },
+          {
+            "name": "PerpCreateMarket"
+          },
+          {
+            "name": "PerpDeactivatePosition"
+          },
+          {
+            "name": "PerpLiqBaseOrPositivePnl"
+          },
+          {
+            "name": "PerpLiqForceCancelOrders"
+          },
+          {
+            "name": "PerpLiqNegativePnlOrBankruptcy"
+          },
+          {
+            "name": "PerpPlaceOrder"
+          },
+          {
+            "name": "PerpSettleFees"
+          },
+          {
+            "name": "PerpSettlePnl"
+          },
+          {
+            "name": "PerpUpdateFunding"
+          },
+          {
+            "name": "Serum3CancelAllOrders"
+          },
+          {
+            "name": "Serum3CancelOrder"
+          },
+          {
+            "name": "Serum3CloseOpenOrders"
+          },
+          {
+            "name": "Serum3CreateOpenOrders"
+          },
+          {
+            "name": "Serum3DeregisterMarket"
+          },
+          {
+            "name": "Serum3EditMarket"
+          },
+          {
+            "name": "Serum3LiqForceCancelOrders"
+          },
+          {
+            "name": "Serum3PlaceOrder"
+          },
+          {
+            "name": "Serum3RegisterMarket"
+          },
+          {
+            "name": "Serum3SettleFunds"
+          },
+          {
+            "name": "StubOracleClose"
+          },
+          {
+            "name": "StubOracleCreate"
+          },
+          {
+            "name": "StubOracleSet"
+          },
+          {
+            "name": "TokenAddBank"
+          },
+          {
+            "name": "TokenDeposit"
+          },
+          {
+            "name": "TokenDeregister"
+          },
+          {
+            "name": "TokenLiqBankruptcy"
+          },
+          {
+            "name": "TokenLiqWithToken"
+          },
+          {
+            "name": "TokenRegister"
+          },
+          {
+            "name": "TokenRegisterTrustless"
+          },
+          {
+            "name": "TokenUpdateIndexAndRate"
           },
           {
             "name": "TokenWithdraw"
@@ -6841,6 +7241,91 @@ export type MangoV4 = {
       ]
     },
     {
+      "name": "FillLogV2",
+      "fields": [
+        {
+          "name": "mangoGroup",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "marketIndex",
+          "type": "u16",
+          "index": false
+        },
+        {
+          "name": "takerSide",
+          "type": "u8",
+          "index": false
+        },
+        {
+          "name": "makerSlot",
+          "type": "u8",
+          "index": false
+        },
+        {
+          "name": "makerOut",
+          "type": "bool",
+          "index": false
+        },
+        {
+          "name": "timestamp",
+          "type": "u64",
+          "index": false
+        },
+        {
+          "name": "seqNum",
+          "type": "u64",
+          "index": false
+        },
+        {
+          "name": "maker",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "makerClientOrderId",
+          "type": "u64",
+          "index": false
+        },
+        {
+          "name": "makerFee",
+          "type": "f32",
+          "index": false
+        },
+        {
+          "name": "makerTimestamp",
+          "type": "u64",
+          "index": false
+        },
+        {
+          "name": "taker",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "takerClientOrderId",
+          "type": "u64",
+          "index": false
+        },
+        {
+          "name": "takerFee",
+          "type": "f32",
+          "index": false
+        },
+        {
+          "name": "price",
+          "type": "i64",
+          "index": false
+        },
+        {
+          "name": "quantity",
+          "type": "i64",
+          "index": false
+        }
+      ]
+    },
+    {
       "name": "PerpUpdateFundingLog",
       "fields": [
         {
@@ -7056,6 +7541,61 @@ export type MangoV4 = {
         {
           "name": "mangoAccount",
           "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "baseTokenIndex",
+          "type": "u16",
+          "index": false
+        },
+        {
+          "name": "quoteTokenIndex",
+          "type": "u16",
+          "index": false
+        },
+        {
+          "name": "baseTotal",
+          "type": "u64",
+          "index": false
+        },
+        {
+          "name": "baseFree",
+          "type": "u64",
+          "index": false
+        },
+        {
+          "name": "quoteTotal",
+          "type": "u64",
+          "index": false
+        },
+        {
+          "name": "quoteFree",
+          "type": "u64",
+          "index": false
+        },
+        {
+          "name": "referrerRebatesAccrued",
+          "type": "u64",
+          "index": false
+        }
+      ]
+    },
+    {
+      "name": "Serum3OpenOrdersBalanceLogV2",
+      "fields": [
+        {
+          "name": "mangoGroup",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "mangoAccount",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "marketIndex",
+          "type": "u16",
           "index": false
         },
         {
@@ -7378,7 +7918,7 @@ export type MangoV4 = {
       ]
     },
     {
-      "name": "PerpLiqBasePositionLog",
+      "name": "PerpLiqBaseOrPositivePnlLog",
       "fields": [
         {
           "name": "mangoGroup",
@@ -7407,6 +7947,16 @@ export type MangoV4 = {
         },
         {
           "name": "quoteTransfer",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "pnlTransfer",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "pnlSettleLimitTransfer",
           "type": "i128",
           "index": false
         },
@@ -7473,7 +8023,7 @@ export type MangoV4 = {
       ]
     },
     {
-      "name": "PerpLiqQuoteAndBankruptcyLog",
+      "name": "PerpLiqNegativePnlOrBankruptcyLog",
       "fields": [
         {
           "name": "mangoGroup",
@@ -7756,19 +8306,44 @@ export type MangoV4 = {
     },
     {
       "code": 6037,
-      "name": "HasLiquidatableTrustedPerpPnl",
-      "msg": "has liquidatable trusted perp pnl"
+      "name": "HasLiquidatablePositivePerpPnl",
+      "msg": "has liquidatable positive perp pnl"
     },
     {
       "code": 6038,
       "name": "AccountIsFrozen",
       "msg": "account is frozen"
+    },
+    {
+      "code": 6039,
+      "name": "InitAssetWeightCantBeNegative",
+      "msg": "Init Asset Weight can't be negative"
+    },
+    {
+      "code": 6040,
+      "name": "HasOpenPerpTakerFills",
+      "msg": "has open perp taker fills"
+    },
+    {
+      "code": 6041,
+      "name": "DepositLimit",
+      "msg": "deposit crosses the current group deposit limit"
+    },
+    {
+      "code": 6042,
+      "name": "IxIsDisabled",
+      "msg": "instruction is disabled"
+    },
+    {
+      "code": 6043,
+      "name": "NoLiquidatablePerpBasePosition",
+      "msg": "no liquidatable perp base position"
     }
   ]
 };
 
 export const IDL: MangoV4 = {
-  "version": "0.3.0",
+  "version": "0.5.0",
   "name": "mango_v4",
   "instructions": [
     {
@@ -7907,11 +8482,17 @@ export const IDL: MangoV4 = {
           "type": {
             "option": "u8"
           }
+        },
+        {
+          "name": "depositLimitQuoteOpt",
+          "type": {
+            "option": "u64"
+          }
         }
       ]
     },
     {
-      "name": "groupToggleHalt",
+      "name": "ixGateSet",
       "accounts": [
         {
           "name": "group",
@@ -7926,8 +8507,8 @@ export const IDL: MangoV4 = {
       ],
       "args": [
         {
-          "name": "halted",
-          "type": "bool"
+          "name": "ixGate",
+          "type": "u128"
         }
       ]
     },
@@ -8311,7 +8892,11 @@ export const IDL: MangoV4 = {
         {
           "name": "oracle",
           "isMut": false,
-          "isSigner": false
+          "isSigner": false,
+          "docs": [
+            "The oracle account is optional and only used when reset_stable_price is set.",
+            ""
+          ]
         }
       ],
       "args": [
@@ -9219,6 +9804,11 @@ export const IDL: MangoV4 = {
           "docs": [
             "Instructions Sysvar for instruction introspection"
           ]
+        },
+        {
+          "name": "group",
+          "isMut": false,
+          "isSigner": false
         },
         {
           "name": "account",
@@ -10293,15 +10883,15 @@ export const IDL: MangoV4 = {
           "type": "f32"
         },
         {
-          "name": "maintPnlAssetWeight",
+          "name": "maintOverallAssetWeight",
           "type": "f32"
         },
         {
-          "name": "initPnlAssetWeight",
+          "name": "initOverallAssetWeight",
           "type": "f32"
         },
         {
-          "name": "liquidationFee",
+          "name": "baseLiquidationFee",
           "type": "f32"
         },
         {
@@ -10355,6 +10945,10 @@ export const IDL: MangoV4 = {
         {
           "name": "settlePnlLimitWindowSizeTs",
           "type": "u64"
+        },
+        {
+          "name": "positivePnlLiquidationFee",
+          "type": "f32"
         }
       ]
     },
@@ -10379,7 +10973,11 @@ export const IDL: MangoV4 = {
         {
           "name": "oracle",
           "isMut": false,
-          "isSigner": false
+          "isSigner": false,
+          "docs": [
+            "The oracle account is optional and only used when reset_stable_price is set.",
+            ""
+          ]
         }
       ],
       "args": [
@@ -10428,19 +11026,19 @@ export const IDL: MangoV4 = {
           }
         },
         {
-          "name": "maintPnlAssetWeightOpt",
+          "name": "maintOverallAssetWeightOpt",
           "type": {
             "option": "f32"
           }
         },
         {
-          "name": "initPnlAssetWeightOpt",
+          "name": "initOverallAssetWeightOpt",
           "type": {
             "option": "f32"
           }
         },
         {
-          "name": "liquidationFeeOpt",
+          "name": "baseLiquidationFeeOpt",
           "type": {
             "option": "f32"
           }
@@ -10530,7 +11128,7 @@ export const IDL: MangoV4 = {
           }
         },
         {
-          "name": "settlePnlLimitWindowSizeTs",
+          "name": "settlePnlLimitWindowSizeTsOpt",
           "type": {
             "option": "u64"
           }
@@ -10539,6 +11137,16 @@ export const IDL: MangoV4 = {
           "name": "reduceOnlyOpt",
           "type": {
             "option": "bool"
+          }
+        },
+        {
+          "name": "resetStablePrice",
+          "type": "bool"
+        },
+        {
+          "name": "positivePnlLiquidationFeeOpt",
+          "type": {
+            "option": "f32"
           }
         }
       ]
@@ -10611,6 +11219,32 @@ export const IDL: MangoV4 = {
           "name": "perpMarket",
           "isMut": false,
           "isSigner": false
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "perpZeroOutForMarket",
+      "accounts": [
+        {
+          "name": "group",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "account",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "perpMarket",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "admin",
+          "isMut": false,
+          "isSigner": true
         }
       ],
       "args": []
@@ -10700,7 +11334,10 @@ export const IDL: MangoV4 = {
           "name": "limit",
           "type": "u8"
         }
-      ]
+      ],
+      "returns": {
+        "option": "u128"
+      }
     },
     {
       "name": "perpPlaceOrderPegged",
@@ -10795,7 +11432,10 @@ export const IDL: MangoV4 = {
           "name": "maxOracleStalenessSlots",
           "type": "i32"
         }
-      ]
+      ],
+      "returns": {
+        "option": "u128"
+      }
     },
     {
       "name": "perpCancelOrder",
@@ -11119,7 +11759,7 @@ export const IDL: MangoV4 = {
       ]
     },
     {
-      "name": "perpLiqBasePosition",
+      "name": "perpLiqBaseOrPositivePnl",
       "accounts": [
         {
           "name": "group",
@@ -11150,12 +11790,31 @@ export const IDL: MangoV4 = {
           "name": "liqee",
           "isMut": true,
           "isSigner": false
+        },
+        {
+          "name": "settleBank",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "settleVault",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "settleOracle",
+          "isMut": false,
+          "isSigner": false
         }
       ],
       "args": [
         {
           "name": "maxBaseTransfer",
           "type": "i64"
+        },
+        {
+          "name": "maxPnlTransfer",
+          "type": "u64"
         }
       ]
     },
@@ -11196,7 +11855,7 @@ export const IDL: MangoV4 = {
       ]
     },
     {
-      "name": "perpLiqQuoteAndBankruptcy",
+      "name": "perpLiqNegativePnlOrBankruptcy",
       "accounts": [
         {
           "name": "group",
@@ -11688,15 +12347,11 @@ export const IDL: MangoV4 = {
             "type": "u8"
           },
           {
-            "name": "halted",
-            "type": "u8"
-          },
-          {
             "name": "padding2",
             "type": {
               "array": [
                 "u8",
-                4
+                5
               ]
             }
           },
@@ -11714,11 +12369,19 @@ export const IDL: MangoV4 = {
             "type": "publicKey"
           },
           {
+            "name": "depositLimitQuote",
+            "type": "u64"
+          },
+          {
+            "name": "ixGate",
+            "type": "u128"
+          },
+          {
             "name": "reserved",
             "type": {
               "array": [
                 "u8",
-                1888
+                1864
               ]
             }
           }
@@ -12077,17 +12740,27 @@ export const IDL: MangoV4 = {
           },
           {
             "name": "settleTokenIndex",
+            "docs": [
+              "Token index that settlements happen in.",
+              "",
+              "Currently required to be 0, USDC. In the future settlement",
+              "may be allowed to happen in other tokens."
+            ],
             "type": "u16"
           },
           {
             "name": "perpMarketIndex",
             "docs": [
-              "Lookup indices"
+              "Index of this perp market. Other data, like the MangoAccount's PerpPosition",
+              "reference this market via this index. Unique for this group's perp markets."
             ],
             "type": "u16"
           },
           {
             "name": "blocked1",
+            "docs": [
+              "Field used to contain the trusted_market flag and is now unused."
+            ],
             "type": "u8"
           },
           {
@@ -12106,10 +12779,18 @@ export const IDL: MangoV4 = {
           },
           {
             "name": "baseDecimals",
+            "docs": [
+              "Number of decimals used for the base token.",
+              "",
+              "Used to convert the oracle's price into a native/native price."
+            ],
             "type": "u8"
           },
           {
             "name": "name",
+            "docs": [
+              "Name. Trailing zero bytes are ignored."
+            ],
             "type": {
               "array": [
                 "u8",
@@ -12119,28 +12800,46 @@ export const IDL: MangoV4 = {
           },
           {
             "name": "bids",
+            "docs": [
+              "Address of the BookSide account for bids"
+            ],
             "type": "publicKey"
           },
           {
             "name": "asks",
+            "docs": [
+              "Address of the BookSide account for asks"
+            ],
             "type": "publicKey"
           },
           {
             "name": "eventQueue",
+            "docs": [
+              "Address of the EventQueue account"
+            ],
             "type": "publicKey"
           },
           {
             "name": "oracle",
+            "docs": [
+              "Oracle account address"
+            ],
             "type": "publicKey"
           },
           {
             "name": "oracleConfig",
+            "docs": [
+              "Oracle configuration"
+            ],
             "type": {
               "defined": "OracleConfig"
             }
           },
           {
             "name": "stablePriceModel",
+            "docs": [
+              "Maintains a stable price based on the oracle price that is less volatile."
+            ],
             "type": {
               "defined": "StablePriceModel"
             }
@@ -12148,21 +12847,31 @@ export const IDL: MangoV4 = {
           {
             "name": "quoteLotSize",
             "docs": [
-              "Number of quote native that reresents min tick"
+              "Number of quote native in a quote lot. Must be a power of 10.",
+              "",
+              "Primarily useful for increasing the tick size on the market: A lot price",
+              "of 1 becomes a native price of quote_lot_size/base_lot_size becomes a",
+              "ui price of quote_lot_size*base_decimals/base_lot_size/quote_decimals."
             ],
             "type": "i64"
           },
           {
             "name": "baseLotSize",
             "docs": [
-              "Represents number of base native quantity",
-              "e.g. if base decimals for underlying asset are 6, base lot size is 100, and base position is 10000, then",
-              "UI position is 1"
+              "Number of base native in a base lot. Must be a power of 10.",
+              "",
+              "Example: If base decimals for the underlying asset is 6, base lot size",
+              "is 100 and and base position lots is 10_000 then base position native is",
+              "1_000_000 and base position ui is 1."
             ],
             "type": "i64"
           },
           {
             "name": "maintBaseAssetWeight",
+            "docs": [
+              "These weights apply to the base position. The quote position has",
+              "no explicit weight (but may be covered by the overall pnl asset weight)."
+            ],
             "type": {
               "defined": "I80F48"
             }
@@ -12187,6 +12896,9 @@ export const IDL: MangoV4 = {
           },
           {
             "name": "openInterest",
+            "docs": [
+              "Number of base lot pairs currently active in the market. Always >= 0."
+            ],
             "type": "i64"
           },
           {
@@ -12198,12 +12910,15 @@ export const IDL: MangoV4 = {
           },
           {
             "name": "registrationTime",
+            "docs": [
+              "Timestamp in seconds that the market was registered at."
+            ],
             "type": "u64"
           },
           {
             "name": "minFunding",
             "docs": [
-              "Funding"
+              "Minimal funding rate per day, must be <= 0."
             ],
             "type": {
               "defined": "I80F48"
@@ -12211,22 +12926,38 @@ export const IDL: MangoV4 = {
           },
           {
             "name": "maxFunding",
+            "docs": [
+              "Maximal funding rate per day, must be >= 0."
+            ],
             "type": {
               "defined": "I80F48"
             }
           },
           {
             "name": "impactQuantity",
+            "docs": [
+              "For funding, get the impact price this many base lots deep into the book."
+            ],
             "type": "i64"
           },
           {
             "name": "longFunding",
+            "docs": [
+              "Current long funding value. Increasing it means that every long base lot",
+              "needs to pay that amount in funding.",
+              "",
+              "PerpPosition uses and tracks it settle funding. Updated by the perp",
+              "keeper instruction."
+            ],
             "type": {
               "defined": "I80F48"
             }
           },
           {
             "name": "shortFunding",
+            "docs": [
+              "See long_funding."
+            ],
             "type": {
               "defined": "I80F48"
             }
@@ -12239,9 +12970,10 @@ export const IDL: MangoV4 = {
             "type": "u64"
           },
           {
-            "name": "liquidationFee",
+            "name": "baseLiquidationFee",
             "docs": [
-              "Fees"
+              "Fees",
+              "Fee for base position liquidation"
             ],
             "type": {
               "defined": "I80F48"
@@ -12249,12 +12981,18 @@ export const IDL: MangoV4 = {
           },
           {
             "name": "makerFee",
+            "docs": [
+              "Fee when matching maker orders. May be negative."
+            ],
             "type": {
               "defined": "I80F48"
             }
           },
           {
             "name": "takerFee",
+            "docs": [
+              "Fee for taker orders, may not be negative."
+            ],
             "type": {
               "defined": "I80F48"
             }
@@ -12279,6 +13017,9 @@ export const IDL: MangoV4 = {
           },
           {
             "name": "feePenalty",
+            "docs": [
+              "Fee (in quote native) to charge for ioc orders"
+            ],
             "type": "f32"
           },
           {
@@ -12338,6 +13079,10 @@ export const IDL: MangoV4 = {
           },
           {
             "name": "reduceOnly",
+            "docs": [
+              "If true, users may no longer increase their market exposure. Only actions",
+              "that reduce their position are still allowed."
+            ],
             "type": "u8"
           },
           {
@@ -12350,13 +13095,22 @@ export const IDL: MangoV4 = {
             }
           },
           {
-            "name": "maintPnlAssetWeight",
+            "name": "maintOverallAssetWeight",
+            "docs": [
+              "Weights for full perp market health, if positive"
+            ],
             "type": {
               "defined": "I80F48"
             }
           },
           {
-            "name": "initPnlAssetWeight",
+            "name": "initOverallAssetWeight",
+            "type": {
+              "defined": "I80F48"
+            }
+          },
+          {
+            "name": "positivePnlLiquidationFee",
             "type": {
               "defined": "I80F48"
             }
@@ -12366,7 +13120,7 @@ export const IDL: MangoV4 = {
             "type": {
               "array": [
                 "u8",
-                1904
+                1888
               ]
             }
           }
@@ -12690,13 +13444,13 @@ export const IDL: MangoV4 = {
             }
           },
           {
-            "name": "maintPnlAssetWeight",
+            "name": "maintOverallAssetWeight",
             "type": {
               "defined": "I80F48"
             }
           },
           {
-            "name": "initPnlAssetWeight",
+            "name": "initOverallAssetWeight",
             "type": {
               "defined": "I80F48"
             }
@@ -12731,6 +13485,10 @@ export const IDL: MangoV4 = {
           },
           {
             "name": "hasOpenOrders",
+            "type": "bool"
+          },
+          {
+            "name": "hasOpenFills",
             "type": "bool"
           }
         ]
@@ -13425,14 +14183,23 @@ export const IDL: MangoV4 = {
         "fields": [
           {
             "name": "tag",
+            "docs": [
+              "NodeTag"
+            ],
             "type": "u8"
           },
           {
             "name": "ownerSlot",
+            "docs": [
+              "Index into the owning MangoAccount's PerpOpenOrders"
+            ],
             "type": "u8"
           },
           {
             "name": "orderType",
+            "docs": [
+              "PostOrderType, this was added for TradingView move order"
+            ],
             "type": "u8"
           },
           {
@@ -13464,32 +14231,54 @@ export const IDL: MangoV4 = {
           {
             "name": "key",
             "docs": [
-              "The binary tree key"
+              "The binary tree key, see new_node_key()"
             ],
             "type": "u128"
           },
           {
             "name": "owner",
+            "docs": [
+              "Address of the owning MangoAccount"
+            ],
             "type": "publicKey"
           },
           {
             "name": "quantity",
+            "docs": [
+              "Number of base lots to buy or sell, always >=1"
+            ],
             "type": "i64"
           },
           {
             "name": "timestamp",
+            "docs": [
+              "The time the order was placed"
+            ],
             "type": "u64"
           },
           {
             "name": "pegLimit",
+            "docs": [
+              "If the effective price of an oracle pegged order exceeds this limit,",
+              "it will be considered invalid and may be removed.",
+              "",
+              "Only applicable in the oracle_pegged OrderTree"
+            ],
             "type": "i64"
+          },
+          {
+            "name": "clientOrderId",
+            "docs": [
+              "User defined id for this order, used in FillEvents"
+            ],
+            "type": "u64"
           },
           {
             "name": "reserved",
             "type": {
               "array": [
                 "u8",
-                40
+                32
               ]
             }
           }
@@ -13675,13 +14464,12 @@ export const IDL: MangoV4 = {
             "type": "publicKey"
           },
           {
-            "name": "makerOrderId",
-            "type": "u128"
-          },
-          {
-            "name": "makerFee",
+            "name": "padding2",
             "type": {
-              "defined": "I80F48"
+              "array": [
+                "u8",
+                32
+              ]
             }
           },
           {
@@ -13693,17 +14481,25 @@ export const IDL: MangoV4 = {
             "type": "publicKey"
           },
           {
-            "name": "takerOrderId",
-            "type": "u128"
+            "name": "padding3",
+            "type": {
+              "array": [
+                "u8",
+                16
+              ]
+            }
           },
           {
             "name": "takerClientOrderId",
             "type": "u64"
           },
           {
-            "name": "takerFee",
+            "name": "padding4",
             "type": {
-              "defined": "I80F48"
+              "array": [
+                "u8",
+                16
+              ]
             }
           },
           {
@@ -13715,11 +14511,23 @@ export const IDL: MangoV4 = {
             "type": "i64"
           },
           {
+            "name": "makerClientOrderId",
+            "type": "u64"
+          },
+          {
+            "name": "makerFee",
+            "type": "f32"
+          },
+          {
+            "name": "takerFee",
+            "type": "f32"
+          },
+          {
             "name": "reserved",
             "type": {
               "array": [
                 "u8",
-                24
+                8
               ]
             }
           }
@@ -14051,6 +14859,173 @@ export const IDL: MangoV4 = {
           },
           {
             "name": "Serum3SettleFunds"
+          },
+          {
+            "name": "TokenWithdraw"
+          }
+        ]
+      }
+    },
+    {
+      "name": "IxGate",
+      "docs": [
+        "Enum for lookup into ix gate",
+        "note:",
+        "total ix files 56,",
+        "ix files included 48,",
+        "ix files not included 8,",
+        "- Benchmark,",
+        "- ComputeAccountData,",
+        "- GroupCreate",
+        "- GroupEdit",
+        "- IxGateSet,",
+        "- PerpZeroOut,",
+        "- PerpEditMarket,",
+        "- TokenEdit,"
+      ],
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "AccountClose"
+          },
+          {
+            "name": "AccountCreate"
+          },
+          {
+            "name": "AccountEdit"
+          },
+          {
+            "name": "AccountExpand"
+          },
+          {
+            "name": "AccountToggleFreeze"
+          },
+          {
+            "name": "AltExtend"
+          },
+          {
+            "name": "AltSet"
+          },
+          {
+            "name": "FlashLoan"
+          },
+          {
+            "name": "GroupClose"
+          },
+          {
+            "name": "GroupCreate"
+          },
+          {
+            "name": "HealthRegion"
+          },
+          {
+            "name": "PerpCancelAllOrders"
+          },
+          {
+            "name": "PerpCancelAllOrdersBySide"
+          },
+          {
+            "name": "PerpCancelOrder"
+          },
+          {
+            "name": "PerpCancelOrderByClientOrderId"
+          },
+          {
+            "name": "PerpCloseMarket"
+          },
+          {
+            "name": "PerpConsumeEvents"
+          },
+          {
+            "name": "PerpCreateMarket"
+          },
+          {
+            "name": "PerpDeactivatePosition"
+          },
+          {
+            "name": "PerpLiqBaseOrPositivePnl"
+          },
+          {
+            "name": "PerpLiqForceCancelOrders"
+          },
+          {
+            "name": "PerpLiqNegativePnlOrBankruptcy"
+          },
+          {
+            "name": "PerpPlaceOrder"
+          },
+          {
+            "name": "PerpSettleFees"
+          },
+          {
+            "name": "PerpSettlePnl"
+          },
+          {
+            "name": "PerpUpdateFunding"
+          },
+          {
+            "name": "Serum3CancelAllOrders"
+          },
+          {
+            "name": "Serum3CancelOrder"
+          },
+          {
+            "name": "Serum3CloseOpenOrders"
+          },
+          {
+            "name": "Serum3CreateOpenOrders"
+          },
+          {
+            "name": "Serum3DeregisterMarket"
+          },
+          {
+            "name": "Serum3EditMarket"
+          },
+          {
+            "name": "Serum3LiqForceCancelOrders"
+          },
+          {
+            "name": "Serum3PlaceOrder"
+          },
+          {
+            "name": "Serum3RegisterMarket"
+          },
+          {
+            "name": "Serum3SettleFunds"
+          },
+          {
+            "name": "StubOracleClose"
+          },
+          {
+            "name": "StubOracleCreate"
+          },
+          {
+            "name": "StubOracleSet"
+          },
+          {
+            "name": "TokenAddBank"
+          },
+          {
+            "name": "TokenDeposit"
+          },
+          {
+            "name": "TokenDeregister"
+          },
+          {
+            "name": "TokenLiqBankruptcy"
+          },
+          {
+            "name": "TokenLiqWithToken"
+          },
+          {
+            "name": "TokenRegister"
+          },
+          {
+            "name": "TokenRegisterTrustless"
+          },
+          {
+            "name": "TokenUpdateIndexAndRate"
           },
           {
             "name": "TokenWithdraw"
@@ -14610,6 +15585,91 @@ export const IDL: MangoV4 = {
       ]
     },
     {
+      "name": "FillLogV2",
+      "fields": [
+        {
+          "name": "mangoGroup",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "marketIndex",
+          "type": "u16",
+          "index": false
+        },
+        {
+          "name": "takerSide",
+          "type": "u8",
+          "index": false
+        },
+        {
+          "name": "makerSlot",
+          "type": "u8",
+          "index": false
+        },
+        {
+          "name": "makerOut",
+          "type": "bool",
+          "index": false
+        },
+        {
+          "name": "timestamp",
+          "type": "u64",
+          "index": false
+        },
+        {
+          "name": "seqNum",
+          "type": "u64",
+          "index": false
+        },
+        {
+          "name": "maker",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "makerClientOrderId",
+          "type": "u64",
+          "index": false
+        },
+        {
+          "name": "makerFee",
+          "type": "f32",
+          "index": false
+        },
+        {
+          "name": "makerTimestamp",
+          "type": "u64",
+          "index": false
+        },
+        {
+          "name": "taker",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "takerClientOrderId",
+          "type": "u64",
+          "index": false
+        },
+        {
+          "name": "takerFee",
+          "type": "f32",
+          "index": false
+        },
+        {
+          "name": "price",
+          "type": "i64",
+          "index": false
+        },
+        {
+          "name": "quantity",
+          "type": "i64",
+          "index": false
+        }
+      ]
+    },
+    {
       "name": "PerpUpdateFundingLog",
       "fields": [
         {
@@ -14825,6 +15885,61 @@ export const IDL: MangoV4 = {
         {
           "name": "mangoAccount",
           "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "baseTokenIndex",
+          "type": "u16",
+          "index": false
+        },
+        {
+          "name": "quoteTokenIndex",
+          "type": "u16",
+          "index": false
+        },
+        {
+          "name": "baseTotal",
+          "type": "u64",
+          "index": false
+        },
+        {
+          "name": "baseFree",
+          "type": "u64",
+          "index": false
+        },
+        {
+          "name": "quoteTotal",
+          "type": "u64",
+          "index": false
+        },
+        {
+          "name": "quoteFree",
+          "type": "u64",
+          "index": false
+        },
+        {
+          "name": "referrerRebatesAccrued",
+          "type": "u64",
+          "index": false
+        }
+      ]
+    },
+    {
+      "name": "Serum3OpenOrdersBalanceLogV2",
+      "fields": [
+        {
+          "name": "mangoGroup",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "mangoAccount",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "marketIndex",
+          "type": "u16",
           "index": false
         },
         {
@@ -15147,7 +16262,7 @@ export const IDL: MangoV4 = {
       ]
     },
     {
-      "name": "PerpLiqBasePositionLog",
+      "name": "PerpLiqBaseOrPositivePnlLog",
       "fields": [
         {
           "name": "mangoGroup",
@@ -15176,6 +16291,16 @@ export const IDL: MangoV4 = {
         },
         {
           "name": "quoteTransfer",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "pnlTransfer",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "pnlSettleLimitTransfer",
           "type": "i128",
           "index": false
         },
@@ -15242,7 +16367,7 @@ export const IDL: MangoV4 = {
       ]
     },
     {
-      "name": "PerpLiqQuoteAndBankruptcyLog",
+      "name": "PerpLiqNegativePnlOrBankruptcyLog",
       "fields": [
         {
           "name": "mangoGroup",
@@ -15525,13 +16650,38 @@ export const IDL: MangoV4 = {
     },
     {
       "code": 6037,
-      "name": "HasLiquidatableTrustedPerpPnl",
-      "msg": "has liquidatable trusted perp pnl"
+      "name": "HasLiquidatablePositivePerpPnl",
+      "msg": "has liquidatable positive perp pnl"
     },
     {
       "code": 6038,
       "name": "AccountIsFrozen",
       "msg": "account is frozen"
+    },
+    {
+      "code": 6039,
+      "name": "InitAssetWeightCantBeNegative",
+      "msg": "Init Asset Weight can't be negative"
+    },
+    {
+      "code": 6040,
+      "name": "HasOpenPerpTakerFills",
+      "msg": "has open perp taker fills"
+    },
+    {
+      "code": 6041,
+      "name": "DepositLimit",
+      "msg": "deposit crosses the current group deposit limit"
+    },
+    {
+      "code": 6042,
+      "name": "IxIsDisabled",
+      "msg": "instruction is disabled"
+    },
+    {
+      "code": 6043,
+      "name": "NoLiquidatablePerpBasePosition",
+      "msg": "no liquidatable perp base position"
     }
   ]
 };

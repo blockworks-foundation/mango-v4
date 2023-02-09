@@ -3,9 +3,9 @@ name: Code Review - TypeScript
 on:
   pull_request: 
     branches: ['main', 'dev']
-    paths: ['ts/**']
+    paths: ['ts/**', 'yarn.lock']
   push:
-    paths: ['ts/**']
+    paths: ['ts/**', 'yarn.lock']
 
 jobs:
   format:
@@ -46,8 +46,8 @@ jobs:
     - name: Lint
       run: yarn lint
 
-  unit-test:
-    name: Unit Test
+  test:
+    name: Test
     runs-on: ubuntu-latest
     steps:
     - name: Checkout code
@@ -65,7 +65,7 @@ jobs:
     - name: Run Test
       run: yarn test
 
-  semgrep:
+  sast:
     name: Security Scan
     runs-on: ubuntu-latest
     container:
@@ -85,3 +85,60 @@ jobs:
         if: always()
         with:
           sarif_file: semgrep-results.sarif
+  
+  sca:
+    name: Dependency Scan
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      # Report all vulnerabilities in security tab
+      - name: Report on all vulnerabilities
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'fs'
+          scan-ref: 'yarn.lock'
+          ignore-unfixed: true
+          hide-progress: true
+          format: 'sarif'
+          output: 'trivy-results.sarif'
+          
+      # Fail the job on critical vulnerabiliies with fix available
+      - name: Fail on critical vulnerabilities
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'fs'
+          scan-ref: 'yarn.lock'
+          ignore-unfixed: true
+          hide-progress: true
+          format: 'table'
+          severity: 'CRITICAL'
+          exit-code: '1'
+
+      - name: Upload output
+        uses: github/codeql-action/upload-sarif@v2
+        if: always()
+        with:
+          sarif_file: 'trivy-results.sarif'
+  
+  yarn-pass:
+      name: Yarn tests pass
+      needs: ['format', 'lint', 'test']
+      runs-on: ubuntu-latest
+      steps:
+        - run: echo ok
+
+  security-pass:
+      name: Security tests pass
+      needs: ['sca', 'sast']
+      runs-on: ubuntu-latest
+      steps:
+        - run: echo ok
+
+  all-pass:
+      name: All tests pass 🚀
+      needs: ['yarn-pass', 'security-pass']
+      runs-on: ubuntu-latest
+      steps:
+        - run: echo ok

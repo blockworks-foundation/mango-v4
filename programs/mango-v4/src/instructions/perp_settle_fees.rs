@@ -6,6 +6,7 @@ use crate::accounts_zerocopy::*;
 use crate::error::*;
 use crate::health::{compute_health, new_fixed_order_account_retriever, HealthType};
 use crate::state::Bank;
+use crate::state::IxGate;
 use crate::state::{Group, MangoAccountFixed, MangoAccountLoader, PerpMarket};
 
 use crate::logs::{emit_perp_balances, PerpSettleFeesLog, TokenBalanceLog};
@@ -13,7 +14,7 @@ use crate::logs::{emit_perp_balances, PerpSettleFeesLog, TokenBalanceLog};
 #[derive(Accounts)]
 pub struct PerpSettleFees<'info> {
     #[account(
-        constraint = group.load()?.is_operational() @ MangoError::GroupIsHalted
+        constraint = group.load()?.is_ix_enabled(IxGate::PerpSettleFees) @ MangoError::IxIsDisabled,
     )]
     pub group: AccountLoader<'info, Group>,
 
@@ -31,6 +32,7 @@ pub struct PerpSettleFees<'info> {
     /// CHECK: Oracle can have different account types, constrained by address in perp_market
     pub oracle: UncheckedAccount<'info>,
 
+    // bank correctness is checked at #2
     #[account(mut, has_one = group)]
     pub settle_bank: AccountLoader<'info, Bank>,
 
@@ -47,12 +49,12 @@ pub fn perp_settle_fees(ctx: Context<PerpSettleFees>, max_settle_amount: u64) ->
     );
 
     let mut account = ctx.accounts.account.load_full_mut()?;
-    let mut bank = ctx.accounts.settle_bank.load_mut()?;
+    let mut settle_bank = ctx.accounts.settle_bank.load_mut()?;
     let mut perp_market = ctx.accounts.perp_market.load_mut()?;
 
-    // Verify that the bank is the quote currency bank
+    // Verify that the bank is the quote currency bank (#2)
     require_eq!(
-        bank.token_index,
+        settle_bank.token_index,
         perp_market.settle_token_index,
         MangoError::InvalidBank
     );
@@ -118,7 +120,7 @@ pub fn perp_settle_fees(ctx: Context<PerpSettleFees>, max_settle_amount: u64) ->
     let token_position = account
         .token_position_mut(perp_market.settle_token_index)?
         .0;
-    bank.withdraw_without_fee(
+    settle_bank.withdraw_without_fee(
         token_position,
         settlement,
         Clock::get()?.unix_timestamp.try_into().unwrap(),
@@ -132,8 +134,8 @@ pub fn perp_settle_fees(ctx: Context<PerpSettleFees>, max_settle_amount: u64) ->
         mango_account: ctx.accounts.account.key(),
         token_index: perp_market.settle_token_index,
         indexed_position: token_position.indexed_position.to_bits(),
-        deposit_index: bank.deposit_index.to_bits(),
-        borrow_index: bank.borrow_index.to_bits(),
+        deposit_index: settle_bank.deposit_index.to_bits(),
+        borrow_index: settle_bank.borrow_index.to_bits(),
     });
 
     emit!(PerpSettleFeesLog {
@@ -144,7 +146,7 @@ pub fn perp_settle_fees(ctx: Context<PerpSettleFees>, max_settle_amount: u64) ->
     });
 
     // Bank & perp_market are dropped to prevent re-borrow from remaining_accounts
-    drop(bank);
+    drop(settle_bank);
     drop(perp_market);
 
     // Verify that the result of settling did not violate the health of the account that lost money

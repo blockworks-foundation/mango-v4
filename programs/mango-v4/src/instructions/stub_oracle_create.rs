@@ -8,7 +8,7 @@ use crate::{error::MangoError, state::*};
 pub struct StubOracleCreate<'info> {
     #[account(
         has_one = admin,
-        constraint = group.load()?.is_operational() @ MangoError::GroupIsHalted
+        constraint = group.load()?.is_ix_enabled(IxGate::StubOracleCreate) @ MangoError::IxIsDisabled,
     )]
     pub group: AccountLoader<'info, Group>,
 

@@ -6,7 +6,7 @@ use crate::state::*;
 #[derive(Accounts)]
 pub struct Serum3CreateOpenOrders<'info> {
     #[account(
-        constraint = group.load()?.is_operational() @ MangoError::GroupIsHalted
+        constraint = group.load()?.is_ix_enabled(IxGate::Serum3CreateOpenOrders) @ MangoError::IxIsDisabled,
     )]
     pub group: AccountLoader<'info, Group>,
 

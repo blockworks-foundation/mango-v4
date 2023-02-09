@@ -26,11 +26,7 @@ async function debugUser(
   group: Group,
   mangoAccount: MangoAccount,
 ): Promise<void> {
-  // Log only tokens
-  console.log(mangoAccount.toString(group, true));
-
-  // Turn on, to see serum and perp stuff
-  // console.log(mangoAccount.toString(group));
+  console.log(mangoAccount.toString(group));
 
   await mangoAccount.reload(client);
 
@@ -193,10 +189,34 @@ async function debugUser(
         ),
     );
     console.log(
+      `- simHealthRatioWithSerum3BidUiChanges  ${serum3Market.name} ` +
+        mangoAccount.simHealthRatioWithSerum3BidUiChanges(
+          group,
+          mangoAccount.getMaxQuoteForSerum3BidUi(
+            group,
+            serum3Market.serumMarketExternal,
+          ),
+          serum3Market.serumMarketExternal,
+          HealthType.init,
+        ),
+    );
+    console.log(
       `getMaxBaseForSerum3AskUi ${serum3Market.name} ` +
         mangoAccount.getMaxBaseForSerum3AskUi(
           group,
           serum3Market.serumMarketExternal,
+        ),
+    );
+    console.log(
+      `- simHealthRatioWithSerum3BidUiChanges  ${serum3Market.name} ` +
+        mangoAccount.simHealthRatioWithSerum3AskUiChanges(
+          group,
+          mangoAccount.getMaxBaseForSerum3AskUi(
+            group,
+            serum3Market.serumMarketExternal,
+          ),
+          serum3Market.serumMarketExternal,
+          HealthType.init,
         ),
     );
   }
@@ -237,23 +257,7 @@ async function main(): Promise<void> {
     const userWallet = new Wallet(user);
     console.log(`User ${userWallet.publicKey.toBase58()}`);
 
-    // 1. mango account for owner
-    const mangoAccounts = await client.getMangoAccountsForOwner(
-      group,
-      user.publicKey,
-    );
-
-    // 2. mango account by pubkey
-    // const mangoAccounts = await Promise.all([
-    //   await client.getMangoAccount({
-    //     publicKey: new PublicKey(
-    //       '6mqHfpJqnXcu6RgDYZSVW9CQXQPFyRYhgvdzvWXN9mPW',
-    //     ),
-    //   } as any),
-    // ]);
-
-    // 3. all mango accounts
-    // const mangoAccounts = await client.getAllMangoAccounts(group);
+    const mangoAccounts = await client.getAllMangoAccounts(group);
 
     for (const mangoAccount of mangoAccounts) {
       if (

@@ -1,15 +1,6 @@
-#![cfg(feature = "test-bpf")]
-
-use fixed::types::I80F48;
-use solana_program_test::*;
-use solana_sdk::transport::TransportError;
+use super::*;
 
 use mango_v4::instructions::{Serum3OrderType, Serum3SelfTradeBehavior, Serum3Side};
-use program_test::*;
-
-use mango_setup::*;
-
-mod program_test;
 
 #[tokio::test]
 async fn test_liq_tokens_force_cancel() -> Result<(), TransportError> {

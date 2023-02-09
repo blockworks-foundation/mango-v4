@@ -21,6 +21,7 @@ pub async fn runner(
     interval_update_banks: u64,
     interval_consume_events: u64,
     interval_update_funding: u64,
+    interval_check_new_listings_and_abort: u64,
 ) -> Result<(), anyhow::Error> {
     let handles1 = mango_client
         .context
@@ -73,10 +74,35 @@ pub async fn runner(
         futures::future::join_all(handles1),
         futures::future::join_all(handles2),
         futures::future::join_all(handles3),
+        loop_check_new_listings_and_abort(
+            mango_client.clone(),
+            interval_check_new_listings_and_abort
+        ),
         debugging_handle
     );
 
     Ok(())
+}
+
+pub async fn loop_check_new_listings_and_abort(mango_client: Arc<MangoClient>, interval: u64) {
+    let mut interval = time::interval(Duration::from_secs(interval));
+    loop {
+        if mango_client
+            .context
+            .new_tokens_listed(&mango_client.client.rpc_async())
+            .await
+            .unwrap()
+            || mango_client
+                .context
+                .new_perp_markets_listed(&mango_client.client.rpc_async())
+                .await
+                .unwrap()
+        {
+            std::process::abort();
+        }
+
+        interval.tick().await;
+    }
 }
 
 pub async fn loop_update_index_and_rate(

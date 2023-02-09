@@ -2,7 +2,7 @@ use anchor_lang::prelude::*;
 
 use crate::error::MangoError;
 use crate::logs::{UpdateIndexLog, UpdateRateLog};
-use crate::state::HOUR;
+use crate::state::{IxGate, HOUR};
 use crate::{
     accounts_zerocopy::{AccountInfoRef, LoadMutZeroCopyRef, LoadZeroCopyRef},
     state::{Bank, Group, MintInfo},
@@ -27,7 +27,7 @@ pub mod compute_budget {
 #[derive(Accounts)]
 pub struct TokenUpdateIndexAndRate<'info> {
     #[account(
-        constraint = group.load()?.is_operational() @ MangoError::GroupIsHalted
+        constraint = group.load()?.is_ix_enabled(IxGate::TokenUpdateIndexAndRate) @ MangoError::IxIsDisabled,
     )]
     pub group: AccountLoader<'info, Group>, // Required for group metadata parsing
 

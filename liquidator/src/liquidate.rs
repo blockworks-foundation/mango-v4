@@ -162,13 +162,14 @@ impl<'a> LiquidateHelper<'a> {
         Ok(Some(sig))
     }
 
-    async fn perp_liq_base_position(&self) -> anyhow::Result<Option<Signature>> {
+    async fn perp_liq_base_or_positive_pnl(&self) -> anyhow::Result<Option<Signature>> {
         let all_perp_base_positions: anyhow::Result<
             Vec<Option<(PerpMarketIndex, i64, I80F48, I80F48)>>,
         > = stream::iter(self.liqee.active_perp_positions())
             .then(|pp| async {
                 let base_lots = pp.base_position_lots();
-                if base_lots == 0 {
+                if (base_lots == 0 && pp.quote_position_native() <= 0) || pp.has_open_taker_fills()
+                {
                     return Ok(None);
                 }
                 let perp = self.client.context.perp(pp.market_index);
@@ -201,6 +202,7 @@ impl<'a> LiquidateHelper<'a> {
 
         // Liquidate the highest-value perp base position
         let (perp_market_index, base_lots, price, _) = perp_base_positions.last().unwrap();
+        let perp = self.client.context.perp(*perp_market_index);
 
         let (side, side_signum) = if *base_lots > 0 {
             (Side::Bid, 1)
@@ -208,33 +210,67 @@ impl<'a> LiquidateHelper<'a> {
             (Side::Ask, -1)
         };
 
-        // Compute the max number of base_lots the liqor is willing to take
-        let max_base_transfer_abs = {
+        // Compute the max number of base_lots and positive pnl the liqor is willing to take
+        // TODO: This is risky for the liqor. It should track how much pnl is usually settleable
+        // in the market before agreeding to take it over. Also, the liqor should check how much
+        // settle limit it's going to get along with the unsettled pnl.
+        let (max_base_transfer_abs, max_pnl_transfer) = {
             let mut liqor = self
                 .account_fetcher
                 .fetch_fresh_mango_account(&self.client.mango_account_address)
                 .await
                 .context("getting liquidator account")?;
             liqor.ensure_perp_position(*perp_market_index, QUOTE_TOKEN_INDEX)?;
-            let health_cache =
+            let mut health_cache =
                 health_cache::new(&self.client.context, self.account_fetcher, &liqor)
                     .await
                     .expect("always ok");
-            health_cache.max_perp_for_health_ratio(
+            let quote_bank = self
+                .client
+                .first_bank(QUOTE_TOKEN_INDEX)
+                .await
+                .context("getting quote bank")?;
+            let max_usdc_borrow = health_cache.max_borrow_for_health_ratio(
+                &liqor,
+                &quote_bank,
+                self.liqor_min_health_ratio,
+            )?;
+            // Ideally we'd predict how much positive pnl we're going to take over and then allocate
+            // the base and quote amount accordingly. This just goes with allocating a fraction of the
+            // available amount to quote and the rest to base.
+            let allowed_usdc_borrow = I80F48::from_num(0.25) * max_usdc_borrow;
+            // Perp overall asset weights > 0 mean that we get some health back for every unit of unsettled pnl
+            // and hence we can take over more than the pure-borrow amount.
+            let max_perp_unsettled_leverage = I80F48::from_num(0.95);
+            let perp_unsettled_cost = I80F48::ONE
+                - perp
+                    .market
+                    .init_overall_asset_weight
+                    .min(max_perp_unsettled_leverage);
+            let max_pnl_transfer = allowed_usdc_borrow / perp_unsettled_cost;
+
+            // Update the health cache so we can determine how many base lots the liqor can take on,
+            // assuming that the max_quote_transfer amount of positive unsettled pnl was taken over.
+            health_cache.adjust_token_balance(&quote_bank, -allowed_usdc_borrow)?;
+
+            let max_base_transfer = health_cache.max_perp_for_health_ratio(
                 *perp_market_index,
                 *price,
                 side,
                 self.liqor_min_health_ratio,
-            )?
+            )?;
+
+            (max_base_transfer, max_pnl_transfer.floor().to_num::<u64>())
         };
-        log::info!("computed max_base_transfer to be {max_base_transfer_abs}");
+        log::info!("computed max_base_transfer: {max_base_transfer_abs}, max_pnl_transfer: {max_pnl_transfer}");
 
         let sig = self
             .client
-            .perp_liq_base_position(
+            .perp_liq_base_or_positive_pnl(
                 (self.pubkey, &self.liqee),
                 *perp_market_index,
                 side_signum * max_base_transfer_abs,
+                max_pnl_transfer,
             )
             .await?;
         log::info!(
@@ -324,7 +360,7 @@ impl<'a> LiquidateHelper<'a> {
     }
     */
 
-    async fn perp_liq_quote_and_bankruptcy(&self) -> anyhow::Result<Option<Signature>> {
+    async fn perp_liq_negative_pnl_or_bankruptcy(&self) -> anyhow::Result<Option<Signature>> {
         if !self.health_cache.in_phase3_liquidation() {
             return Ok(None);
         }
@@ -348,7 +384,7 @@ impl<'a> LiquidateHelper<'a> {
 
         let sig = self
             .client
-            .perp_liq_quote_and_bankruptcy(
+            .perp_liq_negative_pnl_or_bankruptcy(
                 (self.pubkey, &self.liqee),
                 *perp_market_index,
                 // Always use the max amount, since the health effect is >= 0
@@ -505,7 +541,7 @@ impl<'a> LiquidateHelper<'a> {
     }
 
     async fn token_liq_bankruptcy(&self) -> anyhow::Result<Option<Signature>> {
-        if !self.health_cache.can_call_spot_bankruptcy() {
+        if !self.health_cache.in_phase3_liquidation() || !self.health_cache.has_spot_borrows() {
             return Ok(None);
         }
 
@@ -557,7 +593,7 @@ impl<'a> LiquidateHelper<'a> {
         Ok(Some(sig))
     }
 
-    async fn send_liq_tx(&self) -> anyhow::Result<Signature> {
+    async fn send_liq_tx(&self) -> anyhow::Result<Option<Signature>> {
         // TODO: Should we make an attempt to settle positive PNL first?
         // The problem with it is that small market movements can continuously create
         // small amounts of new positive PNL while base_position > 0.
@@ -572,31 +608,47 @@ impl<'a> LiquidateHelper<'a> {
         //
         // TODO: All these close ix could be in one transaction.
         if let Some(txsig) = self.perp_close_orders().await? {
-            return Ok(txsig);
+            return Ok(Some(txsig));
         }
         if let Some(txsig) = self.serum3_close_orders().await? {
-            return Ok(txsig);
+            return Ok(Some(txsig));
+        }
+
+        if self.health_cache.has_phase1_liquidatable() {
+            anyhow::bail!(
+                "Don't know what to do with phase1 liquidatable account {}, maint_health was {}",
+                self.pubkey,
+                self.maint_health
+            );
         }
 
         //
-        // Phase 2: token, perp base, TODO: perp positive trusted pnl
+        // Phase 2: token, perp base, perp positive pnl
         //
 
-        if let Some(txsig) = self.perp_liq_base_position().await? {
-            return Ok(txsig);
+        if let Some(txsig) = self.perp_liq_base_or_positive_pnl().await? {
+            return Ok(Some(txsig));
         }
-
-        // Now that the perp base positions are zeroed the perp pnl won't
-        // fluctuate with the oracle price anymore.
-        // It's possible that some positive pnl can't be settled (if there's
-        // no liquid counterparty) and that some negative pnl can't be settled
-        // (if the liqee isn't liquid enough).
-        // if let Some(txsig) = self.perp_settle_pnl().await? {
-        //     return Ok(txsig);
-        // }
 
         if let Some(txsig) = self.token_liq().await? {
-            return Ok(txsig);
+            return Ok(Some(txsig));
+        }
+
+        if self.health_cache.has_perp_open_fills() {
+            log::info!(
+                "Account {} has open perp fills, maint_health {}, waiting...",
+                self.pubkey,
+                self.maint_health
+            );
+            return Ok(None);
+        }
+
+        if self.health_cache.has_phase2_liquidatable() {
+            anyhow::bail!(
+                "Don't know what to do with phase2 liquidatable account {}, maint_health was {}",
+                self.pubkey,
+                self.maint_health
+            );
         }
 
         //
@@ -604,13 +656,13 @@ impl<'a> LiquidateHelper<'a> {
         //
 
         // Negative pnl: take over (paid by liqee or insurance) or socialize the loss
-        if let Some(txsig) = self.perp_liq_quote_and_bankruptcy().await? {
-            return Ok(txsig);
+        if let Some(txsig) = self.perp_liq_negative_pnl_or_bankruptcy().await? {
+            return Ok(Some(txsig));
         }
 
         // Socialize/insurance fund unliquidatable borrows
         if let Some(txsig) = self.token_liq_bankruptcy().await? {
-            return Ok(txsig);
+            return Ok(Some(txsig));
         }
 
         // TODO: What about unliquidatable positive perp pnl?
@@ -670,7 +722,7 @@ pub async fn maybe_liquidate_account(
     );
 
     // try liquidating
-    let txsig = LiquidateHelper {
+    let maybe_txsig = LiquidateHelper {
         client: mango_client,
         account_fetcher,
         pubkey,
@@ -684,16 +736,18 @@ pub async fn maybe_liquidate_account(
     .send_liq_tx()
     .await?;
 
-    let slot = account_fetcher.transaction_max_slot(&[txsig]).await?;
-    if let Err(e) = account_fetcher
-        .refresh_accounts_via_rpc_until_slot(
-            &[*pubkey, mango_client.mango_account_address],
-            slot,
-            config.refresh_timeout,
-        )
-        .await
-    {
-        log::info!("could not refresh after liquidation: {}", e);
+    if let Some(txsig) = maybe_txsig {
+        let slot = account_fetcher.transaction_max_slot(&[txsig]).await?;
+        if let Err(e) = account_fetcher
+            .refresh_accounts_via_rpc_until_slot(
+                &[*pubkey, mango_client.mango_account_address],
+                slot,
+                config.refresh_timeout,
+            )
+            .await
+        {
+            log::info!("could not refresh after liquidation: {}", e);
+        }
     }
 
     Ok(true)

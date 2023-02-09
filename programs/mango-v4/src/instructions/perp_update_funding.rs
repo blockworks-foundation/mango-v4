@@ -2,21 +2,21 @@ use anchor_lang::prelude::*;
 
 use crate::accounts_zerocopy::*;
 use crate::error::MangoError;
-use crate::state::{BookSide, Group, Orderbook, PerpMarket};
+use crate::state::{BookSide, Group, IxGate, Orderbook, PerpMarket};
 
 #[derive(Accounts)]
 pub struct PerpUpdateFunding<'info> {
     #[account(
-        constraint = group.load()?.is_operational() @ MangoError::GroupIsHalted
+        constraint = group.load()?.is_ix_enabled(IxGate::PerpUpdateFunding) @ MangoError::IxIsDisabled,
     )]
     pub group: AccountLoader<'info, Group>, // Required for group metadata parsing
 
     #[account(
         mut,
+        has_one = group,
         has_one = bids,
         has_one = asks,
         has_one = oracle,
-        constraint = perp_market.load()?.group.key() == group.key(),
     )]
     pub perp_market: AccountLoader<'info, PerpMarket>,
     #[account(mut)]

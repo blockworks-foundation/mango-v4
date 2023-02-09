@@ -1,14 +1,4 @@
-#![cfg(feature = "test-bpf")]
-
-use solana_program_test::*;
-use solana_sdk::transport::TransportError;
-
-use mango_v4::state::*;
-use program_test::*;
-
-use mango_setup::*;
-
-mod program_test;
+use super::*;
 
 #[tokio::test]
 async fn test_delegate() -> Result<(), TransportError> {

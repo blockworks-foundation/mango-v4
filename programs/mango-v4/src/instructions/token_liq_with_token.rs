@@ -14,7 +14,7 @@ use crate::util::checked_math as cm;
 #[derive(Accounts)]
 pub struct TokenLiqWithToken<'info> {
     #[account(
-        constraint = group.load()?.is_operational() @ MangoError::GroupIsHalted
+        constraint = group.load()?.is_ix_enabled(IxGate::TokenLiqWithToken) @ MangoError::IxIsDisabled,
     )]
     pub group: AccountLoader<'info, Group>,
 
@@ -47,6 +47,7 @@ pub fn token_liq_with_token(
     let mut account_retriever = ScanningAccountRetriever::new(ctx.remaining_accounts, group_pk)
         .context("create account retriever")?;
 
+    require_keys_neq!(ctx.accounts.liqor.key(), ctx.accounts.liqee.key());
     let mut liqor = ctx.accounts.liqor.load_full_mut()?;
     // account constraint #1
     require!(
@@ -283,7 +284,7 @@ pub fn token_liq_with_token(
         liab_transfer: liab_transfer.to_bits(),
         asset_price: asset_price.to_bits(),
         liab_price: liab_price.to_bits(),
-        bankruptcy: !liqee_health_cache.has_liquidatable_assets() & liqee_init_health.is_negative()
+        bankruptcy: !liqee_health_cache.has_phase2_liquidatable() & liqee_init_health.is_negative()
     });
 
     Ok(())

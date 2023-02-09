@@ -28,7 +28,7 @@ async function main() {
   );
 
   // Load mango account
-  let mangoAccount = await client.getMangoAccountForPublicKey(
+  let mangoAccount = await client.getMangoAccount(
     new PublicKey(MANGO_ACCOUNT_PK),
   );
   await mangoAccount.reload(client);

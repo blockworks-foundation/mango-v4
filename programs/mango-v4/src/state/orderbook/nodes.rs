@@ -36,6 +36,9 @@ pub fn new_node_key(side: Side, price_data: u64, seq_num: u64) -> u128 {
     upper | (seq_num as u128)
 }
 
+/// Creates price data for an oracle pegged order from the price offset
+///
+/// Reverse of oracle_pegged_price_offset()
 pub fn oracle_pegged_price_data(price_offset_lots: i64) -> u64 {
     // Price data is used for ordering in the bookside's top bits of the u128 key.
     // Map i64::MIN to be 0 and i64::MAX to u64::MAX, that way comparisons on the
@@ -44,15 +47,24 @@ pub fn oracle_pegged_price_data(price_offset_lots: i64) -> u64 {
     (price_offset_lots as u64).wrapping_add(u64::MAX / 2 + 1)
 }
 
+/// Retrieves the price offset (in lots) from an oracle pegged order's price data
+///
+/// Reverse of oracle_pegged_price_data()
 pub fn oracle_pegged_price_offset(price_data: u64) -> i64 {
     price_data.wrapping_sub(u64::MAX / 2 + 1) as i64
 }
 
+/// Creates price data for a fixed order's price
+///
+/// Reverse of fixed_price_lots()
 pub fn fixed_price_data(price_lots: i64) -> Result<u64> {
     require_gte!(price_lots, 1);
     Ok(price_lots as u64)
 }
 
+/// Retrieves the price (in lots) from a fixed order's price data
+///
+/// Reverse of fixed_price_data().
 pub fn fixed_price_lots(price_data: u64) -> i64 {
     assert!(price_data <= i64::MAX as u64);
     price_data as i64
@@ -132,9 +144,14 @@ impl InnerNode {
 )]
 #[repr(C)]
 pub struct LeafNode {
-    pub tag: u8, // NodeTag
+    /// NodeTag
+    pub tag: u8,
+
+    /// Index into the owning MangoAccount's PerpOpenOrders
     pub owner_slot: u8,
-    pub order_type: u8, // PostOrderType, this was added for TradingView move order
+
+    /// PostOrderType, this was added for TradingView move order
+    pub order_type: u8,
 
     pub padding: [u8; 1],
 
@@ -144,23 +161,32 @@ pub struct LeafNode {
 
     pub padding2: [u8; 2],
 
-    /// The binary tree key
+    /// The binary tree key, see new_node_key()
     pub key: u128,
 
+    /// Address of the owning MangoAccount
     pub owner: Pubkey,
+
+    /// Number of base lots to buy or sell, always >=1
     pub quantity: i64,
 
-    // The time the order was placed
+    /// The time the order was placed
     pub timestamp: u64,
 
-    // Only applicable in the oracle_pegged OrderTree
+    /// If the effective price of an oracle pegged order exceeds this limit,
+    /// it will be considered invalid and may be removed.
+    ///
+    /// Only applicable in the oracle_pegged OrderTree
     pub peg_limit: i64,
 
-    pub reserved: [u8; 40],
+    /// User defined id for this order, used in FillEvents
+    pub client_order_id: u64,
+
+    pub reserved: [u8; 32],
 }
 const_assert_eq!(
     size_of::<LeafNode>(),
-    4 + 1 + 1 + 1 + 1 + 16 + 32 + 8 + 8 + 8 + 40
+    4 + 1 + 1 + 1 + 1 + 16 + 32 + 8 + 8 + 8 + 8 + 32
 );
 const_assert_eq!(size_of::<LeafNode>(), NODE_SIZE);
 const_assert_eq!(size_of::<LeafNode>() % 8, 0);
@@ -176,6 +202,7 @@ impl LeafNode {
         order_type: PostOrderType,
         time_in_force: u16,
         peg_limit: i64,
+        client_order_id: u64,
     ) -> Self {
         Self {
             tag: NodeTag::LeafNode.into(),
@@ -189,10 +216,14 @@ impl LeafNode {
             quantity,
             timestamp,
             peg_limit,
-            reserved: [0; 40],
+            client_order_id,
+            reserved: [0; 32],
         }
     }
 
+    /// The order's price_data as stored in the key
+    ///
+    /// Needs to be unpacked differently for fixed and oracle pegged orders.
     #[inline(always)]
     pub fn price_data(&self) -> u64 {
         (self.key >> 64) as u64
@@ -208,6 +239,7 @@ impl LeafNode {
         }
     }
 
+    /// Returns if the order is expired at `now_ts`
     #[inline(always)]
     pub fn is_expired(&self, now_ts: u64) -> bool {
         self.time_in_force > 0 && now_ts >= self.timestamp + self.time_in_force as u64

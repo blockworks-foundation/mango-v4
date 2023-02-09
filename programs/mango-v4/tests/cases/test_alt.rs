@@ -1,14 +1,4 @@
-#![cfg(feature = "test-bpf")]
-
-use solana_program_test::*;
-use solana_sdk::pubkey::Pubkey;
-use solana_sdk::transport::TransportError;
-
-use mango_setup::*;
-use mango_v4::state::*;
-use program_test::*;
-
-mod program_test;
+use super::*;
 
 #[tokio::test]
 async fn test_alt() -> Result<(), TransportError> {

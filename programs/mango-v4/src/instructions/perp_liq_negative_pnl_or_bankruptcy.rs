@@ -1,7 +1,5 @@
 use anchor_lang::prelude::*;
-use anchor_spl::token;
-use anchor_spl::token::Token;
-use anchor_spl::token::TokenAccount;
+use anchor_spl::token::{self, Token, TokenAccount};
 use checked_math as cm;
 use fixed::types::I80F48;
 
@@ -9,12 +7,16 @@ use crate::accounts_zerocopy::*;
 use crate::error::*;
 use crate::health::{compute_health, new_health_cache, HealthType, ScanningAccountRetriever};
 use crate::logs::{
-    emit_perp_balances, PerpLiqBankruptcyLog, PerpLiqQuoteAndBankruptcyLog, TokenBalanceLog,
+    emit_perp_balances, PerpLiqBankruptcyLog, PerpLiqNegativePnlOrBankruptcyLog, TokenBalanceLog,
 };
 use crate::state::*;
 
 #[derive(Accounts)]
-pub struct PerpLiqQuoteAndBankruptcy<'info> {
+pub struct PerpLiqNegativePnlOrBankruptcy<'info> {
+    #[account(
+        has_one = insurance_vault,
+        constraint = group.load()?.is_ix_enabled(IxGate::PerpLiqNegativePnlOrBankruptcy) @ MangoError::IxIsDisabled,
+    )]
     pub group: AccountLoader<'info, Group>,
 
     #[account(
@@ -62,7 +64,7 @@ pub struct PerpLiqQuoteAndBankruptcy<'info> {
     pub token_program: Program<'info, Token>,
 }
 
-impl<'info> PerpLiqQuoteAndBankruptcy<'info> {
+impl<'info> PerpLiqNegativePnlOrBankruptcy<'info> {
     pub fn transfer_ctx(&self) -> CpiContext<'_, '_, '_, 'info, token::Transfer<'info>> {
         let program = self.token_program.to_account_info();
         let accounts = token::Transfer {
@@ -74,17 +76,11 @@ impl<'info> PerpLiqQuoteAndBankruptcy<'info> {
     }
 }
 
-pub fn perp_liq_quote_and_bankruptcy(
-    ctx: Context<PerpLiqQuoteAndBankruptcy>,
+pub fn perp_liq_negative_pnl_or_bankruptcy(
+    ctx: Context<PerpLiqNegativePnlOrBankruptcy>,
     max_liab_transfer: u64,
 ) -> Result<()> {
     let mango_group = ctx.accounts.group.key();
-
-    // Cannot settle with yourself
-    require!(
-        ctx.accounts.liqor.key() != ctx.accounts.liqee.key(),
-        MangoError::SomeError
-    );
 
     let (perp_market_index, settle_token_index) = {
         let perp_market = ctx.accounts.perp_market.load()?;
@@ -94,6 +90,7 @@ pub fn perp_liq_quote_and_bankruptcy(
         )
     };
 
+    require_keys_neq!(ctx.accounts.liqor.key(), ctx.accounts.liqee.key());
     let mut liqee = ctx.accounts.liqee.load_full_mut()?;
     let mut liqor = ctx.accounts.liqor.load_full_mut()?;
     // account constraint #1
@@ -185,8 +182,6 @@ pub fn perp_liq_quote_and_bankruptcy(
             cm!(liqor.fixed.perp_spot_transfers += settlement_i64);
             cm!(liqee.fixed.perp_spot_transfers -= settlement_i64);
 
-            let now_ts: u64 = Clock::get()?.unix_timestamp.try_into().unwrap();
-
             // Transfer token balance
             let liqor_token_position = liqor.token_position_mut(settle_token_index)?.0;
             let liqee_token_position = liqee.token_position_mut(settle_token_index)?.0;
@@ -199,7 +194,7 @@ pub fn perp_liq_quote_and_bankruptcy(
             )?;
             liqee_health_cache.adjust_token_balance(&settle_bank, -settlement)?;
 
-            emit!(PerpLiqQuoteAndBankruptcyLog {
+            emit!(PerpLiqNegativePnlOrBankruptcyLog {
                 mango_group,
                 liqee: ctx.accounts.liqee.key(),
                 liqor: ctx.accounts.liqor.key(),
@@ -235,7 +230,7 @@ pub fn perp_liq_quote_and_bankruptcy(
             0
         };
 
-        let liquidation_fee_factor = cm!(I80F48::ONE + perp_market.liquidation_fee);
+        let liquidation_fee_factor = cm!(I80F48::ONE + perp_market.base_liquidation_fee);
 
         // Amount given to the liqor from the insurance fund
         let insurance_transfer = cm!(liab_transfer * liquidation_fee_factor)

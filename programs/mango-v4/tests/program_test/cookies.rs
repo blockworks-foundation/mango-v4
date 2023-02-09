@@ -1,6 +1,6 @@
 use solana_program::pubkey::*;
 
-use crate::utils::*;
+use super::utils::*;
 
 #[derive(Debug, Clone, Copy)]
 pub struct MintCookie {

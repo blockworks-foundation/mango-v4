@@ -1,11 +1,4 @@
-#![cfg(all(feature = "test-bpf"))]
-
-use mango_setup::*;
-use program_test::*;
-use solana_program_test::*;
-use solana_sdk::transport::TransportError;
-
-mod program_test;
+use super::*;
 
 #[tokio::test]
 async fn test_bank_utilization_based_borrow_limit() -> Result<(), TransportError> {

@@ -7,12 +7,13 @@ use crate::error::*;
 use crate::health::{new_health_cache, HealthType, ScanningAccountRetriever};
 use crate::logs::{emit_perp_balances, PerpSettlePnlLog, TokenBalanceLog};
 use crate::state::Bank;
+use crate::state::IxGate;
 use crate::state::{Group, MangoAccountFixed, MangoAccountLoader, PerpMarket};
 
 #[derive(Accounts)]
 pub struct PerpSettlePnl<'info> {
     #[account(
-        constraint = group.load()?.is_operational() @ MangoError::GroupIsHalted
+        constraint = group.load()?.is_ix_enabled(IxGate::PerpSettlePnl) @ MangoError::IxIsDisabled,
     )]
     pub group: AccountLoader<'info, Group>,
 
@@ -45,6 +46,7 @@ pub struct PerpSettlePnl<'info> {
     /// CHECK: Oracle can have different account types, constrained by address in perp_market
     pub oracle: UncheckedAccount<'info>,
 
+    // bank correctness is checked at #2
     #[account(mut, has_one = group)]
     pub settle_bank: AccountLoader<'info, Bank>,
 
@@ -55,8 +57,9 @@ pub struct PerpSettlePnl<'info> {
 
 pub fn perp_settle_pnl(ctx: Context<PerpSettlePnl>) -> Result<()> {
     // Cannot settle with yourself
-    require!(
-        ctx.accounts.account_a.key() != ctx.accounts.account_b.key(),
+    require_keys_neq!(
+        ctx.accounts.account_a.key(),
+        ctx.accounts.account_b.key(),
         MangoError::CannotSettleWithSelf
     );
 
@@ -95,7 +98,7 @@ pub fn perp_settle_pnl(ctx: Context<PerpSettlePnl>) -> Result<()> {
     let mut settle_bank = ctx.accounts.settle_bank.load_mut()?;
     let perp_market = ctx.accounts.perp_market.load()?;
 
-    // Verify that the bank is the quote currency bank
+    // Verify that the bank is the quote currency bank (#2)
     require!(
         settle_bank.token_index == settle_token_index,
         MangoError::InvalidBank

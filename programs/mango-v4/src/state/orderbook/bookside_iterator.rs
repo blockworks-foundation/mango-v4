@@ -50,8 +50,12 @@ pub enum OrderState {
     Skipped,
 }
 
+/// Returns the state and current price of an oracle pegged order.
+///
 /// For pegged orders with offsets that let the price escape the 1..i64::MAX range,
 /// this function returns Skipped and clamps `price` to that range.
+///
+/// Orders that exceed their peg_limit will have Invalid state.
 fn oracle_pegged_price(oracle_price_lots: i64, node: &LeafNode, side: Side) -> (OrderState, i64) {
     let price_data = node.price_data();
     let price_offset = oracle_pegged_price_offset(price_data);
@@ -66,7 +70,10 @@ fn oracle_pegged_price(oracle_price_lots: i64, node: &LeafNode, side: Side) -> (
     (OrderState::Skipped, price.max(1))
 }
 
-fn key_for_price(key: u128, price_lots: i64) -> u128 {
+/// Replace the price data in a binary tree `key` with the fixed order price data at `price_lots`.
+///
+/// Used to convert oracle pegged keys into a form that allows comparison with fixed order keys.
+fn key_for_fixed_price(key: u128, price_lots: i64) -> u128 {
     // We know this can never fail, because oracle pegged price will always be >= 1
     assert!(price_lots >= 1);
     let price_data = fixed_price_data(price_lots).unwrap();
@@ -75,6 +82,7 @@ fn key_for_price(key: u128, price_lots: i64) -> u128 {
     upper | lower
 }
 
+/// Helper for the iterator returning a fixed order
 fn fixed_to_result(fixed: (NodeHandle, &LeafNode), now_ts: u64) -> BookSideIterItem {
     let (handle, node) = fixed;
     let expired = node.is_expired(now_ts);
@@ -93,6 +101,7 @@ fn fixed_to_result(fixed: (NodeHandle, &LeafNode), now_ts: u64) -> BookSideIterI
     }
 }
 
+/// Helper for the iterator returning a pegged order
 fn oracle_pegged_to_result(
     pegged: (NodeHandle, &LeafNode, i64, OrderState),
     now_ts: u64,
@@ -110,7 +119,9 @@ fn oracle_pegged_to_result(
     }
 }
 
-/// Returns (better, worse); will return the same value twice if no second order passed in
+/// Compares the `fixed` and `oracle_pegged` order and returns the one that would match first.
+///
+/// (or the worse one, if `return_worse` is set)
 pub fn rank_orders<'a>(
     side: Side,
     fixed: Option<(NodeHandle, &'a LeafNode)>,
@@ -133,7 +144,7 @@ pub fn rank_orders<'a>(
                 |a, b| a < b
             };
 
-            if is_better(f.1.key, key_for_price(o.1.key, o.2)) ^ return_worse {
+            if is_better(f.1.key, key_for_fixed_price(o.1.key, o.2)) ^ return_worse {
                 Some(fixed_to_result(f, now_ts))
             } else {
                 Some(oracle_pegged_to_result(o, now_ts))

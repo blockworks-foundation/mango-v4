@@ -1,13 +1,4 @@
-#![cfg(all(feature = "test-bpf"))]
-
-use fixed::types::I80F48;
-use mango_setup::*;
-use mango_v4::{error::MangoError, state::*};
-use program_test::*;
-use solana_program_test::*;
-use solana_sdk::transport::TransportError;
-
-mod program_test;
+use super::*;
 
 #[tokio::test]
 async fn test_perp_settle_fees() -> Result<(), TransportError> {
@@ -156,7 +147,7 @@ async fn test_perp_settle_fees() -> Result<(), TransportError> {
             init_base_asset_weight: 0.95,
             maint_base_liab_weight: 1.025,
             init_base_liab_weight: 1.05,
-            liquidation_fee: 0.012,
+            base_liquidation_fee: 0.012,
             maker_fee: 0.0002,
             taker_fee: 0.000,
             settle_pnl_limit_factor: 0.2,
@@ -186,7 +177,7 @@ async fn test_perp_settle_fees() -> Result<(), TransportError> {
             init_base_asset_weight: 0.95,
             maint_base_liab_weight: 1.025,
             init_base_liab_weight: 1.05,
-            liquidation_fee: 0.012,
+            base_liquidation_fee: 0.012,
             maker_fee: 0.0002,
             taker_fee: 0.000,
             settle_pnl_limit_factor: 0.2,
