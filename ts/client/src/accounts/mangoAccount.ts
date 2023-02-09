@@ -1479,7 +1479,7 @@ export class PerpPosition {
       perpMarket,
     );
     if (limitedUnsettled.lt(ZERO_I80F48())) {
-      return limitedUnsettled.max(perpSettleHealth.max(ZERO_I80F48().neg()));
+      return limitedUnsettled.max(perpSettleHealth.max(ZERO_I80F48()).neg());
     }
     return limitedUnsettled;
   }
