@@ -1499,23 +1499,7 @@ export class PerpPosition {
     perpMarket: PerpMarket,
     account: MangoAccount,
   ): boolean {
-    const unsettledPnl = this.getUnsettledPnl(perpMarket);
-    const settleablePnl = this.getSettleablePnl(group, perpMarket, account);
-    const perpSettleHealth = account.getPerpSettleHealth(group);
-
-    if (
-      unsettledPnl.isNeg() &&
-      settleablePnl.isNeg() &&
-      perpSettleHealth.gte(ZERO_I80F48())
-    ) {
-      return true;
-    }
-
-    if (unsettledPnl.isPos() && settleablePnl.isPos()) {
-      return true;
-    }
-
-    return false;
+    return !this.getSettleablePnl(group, perpMarket, account).eq(ZERO_I80F48());
   }
 
   toString(perpMarket?: PerpMarket): string {
