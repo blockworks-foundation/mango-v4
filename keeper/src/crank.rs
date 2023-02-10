@@ -7,7 +7,6 @@ use anchor_lang::{__private::bytemuck::cast_ref, solana_program};
 use futures::Future;
 use mango_v4::state::{EventQueue, EventType, FillEvent, OutEvent, PerpMarket, TokenIndex};
 use solana_sdk::{
-    compute_budget::ComputeBudgetInstruction,
     instruction::{AccountMeta, Instruction},
     pubkey::Pubkey,
 };

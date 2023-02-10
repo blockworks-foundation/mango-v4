@@ -104,7 +104,10 @@ async fn main() -> Result<(), anyhow::Error> {
                 commitment,
                 owner.clone(),
                 Some(Duration::from_secs(cli.timeout)),
-                cli.prioritization_micro_lamports,
+                client::TransactionBuilderConfig {
+                    prioritization_micro_lamports: (cli.prioritization_micro_lamports > 0)
+                        .then_some(cli.prioritization_micro_lamports),
+                },
             ),
             cli.mango_account,
             owner.clone(),

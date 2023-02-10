@@ -1,5 +1,5 @@
 use clap::{Args, Parser, Subcommand};
-use client::MangoClient;
+use client::{MangoClient, TransactionBuilderConfig};
 use solana_sdk::pubkey::Pubkey;
 use std::str::FromStr;
 use std::sync::Arc;
@@ -110,13 +110,15 @@ enum Command {
 impl Rpc {
     fn client(&self, override_fee_payer: Option<&str>) -> anyhow::Result<client::Client> {
         let fee_payer = client::keypair_from_cli(override_fee_payer.unwrap_or(&self.fee_payer));
-        Ok(client::Client {
-            cluster: anchor_client::Cluster::from_str(&self.url)?,
-            commitment: solana_sdk::commitment_config::CommitmentConfig::confirmed(),
-            fee_payer: Arc::new(fee_payer),
-            timeout: None,
-            prioritization_micro_lamports: 5,
-        })
+        Ok(client::Client::new(
+            anchor_client::Cluster::from_str(&self.url)?,
+            solana_sdk::commitment_config::CommitmentConfig::confirmed(),
+            Arc::new(fee_payer),
+            None,
+            TransactionBuilderConfig {
+                prioritization_micro_lamports: Some(5),
+            },
+        ))
     }
 }
 
