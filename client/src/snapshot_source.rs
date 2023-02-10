@@ -1,5 +1,7 @@
 use jsonrpc_core_client::transports::http;
 
+use mango_v4::accounts_zerocopy::*;
+use mango_v4::state::{MangoAccountFixed, MangoAccountLoadedRef};
 use solana_account_decoder::{UiAccount, UiAccountEncoding};
 use solana_client::{
     rpc_config::{RpcAccountInfoConfig, RpcContextConfig, RpcProgramAccountsConfig},
@@ -15,9 +17,22 @@ use std::str::FromStr;
 use std::time::Duration;
 use tokio::time;
 
-use client::chain_data;
+use crate::chain_data;
+use crate::AnyhowWrap;
 
-use crate::{util::is_mango_account, AnyhowWrap};
+pub fn is_mango_account<'a>(
+    account: &'a AccountSharedData,
+    group_id: &Pubkey,
+) -> Option<MangoAccountLoadedRef<'a>> {
+    // check owner, discriminator
+    let fixed = account.load::<MangoAccountFixed>().ok()?;
+    if fixed.group != *group_id {
+        return None;
+    }
+
+    let data = account.data();
+    MangoAccountLoadedRef::from_bytes(&data[8..]).ok()
+}
 
 #[derive(Clone)]
 pub struct AccountUpdate {
@@ -73,7 +88,6 @@ impl AccountSnapshot {
 
 pub struct Config {
     pub rpc_http_url: String,
-    pub mango_program: Pubkey,
     pub mango_group: Pubkey,
     pub get_multiple_accounts_count: usize,
     pub parallel_rpc_requests: usize,
@@ -109,7 +123,7 @@ async fn feed_snapshots(
     // Get all accounts of the mango program
     let response = rpc_client
         .get_program_accounts(
-            config.mango_program.to_string(),
+            mango_v4::id().to_string(),
             Some(all_accounts_config.clone()),
         )
         .await
@@ -156,9 +170,7 @@ async fn feed_snapshots(
     let oo_account_pubkeys = snapshot
         .accounts
         .iter()
-        .filter_map(|update| {
-            is_mango_account(&update.account, &config.mango_program, &config.mango_group)
-        })
+        .filter_map(|update| is_mango_account(&update.account, &config.mango_group))
         .flat_map(|mango_account| {
             mango_account
                 .active_serum3_orders()

@@ -15,8 +15,7 @@ use log::*;
 use std::{str::FromStr, sync::Arc, time::Duration};
 use tokio_stream::StreamMap;
 
-use client::chain_data;
-
+use crate::chain_data;
 use crate::AnyhowWrap;
 
 #[derive(Clone)]
@@ -50,7 +49,6 @@ pub enum Message {
 
 pub struct Config {
     pub rpc_ws_url: String,
-    pub mango_program: Pubkey,
     pub serum_program: Pubkey,
     pub open_orders_authority: Pubkey,
 }
@@ -94,7 +92,7 @@ async fn feed_data(
     };
     let mut mango_sub = client
         .program_subscribe(
-            config.mango_program.to_string(),
+            mango_v4::id().to_string(),
             Some(all_accounts_config.clone()),
         )
         .map_err_anyhow()?;

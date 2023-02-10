@@ -3,9 +3,7 @@ use solana_client::{
 };
 use solana_sdk::transaction::Transaction;
 use solana_sdk::{
-    clock::Slot,
-    commitment_config::CommitmentConfig,
-    signature::{Keypair, Signature},
+    clock::Slot, commitment_config::CommitmentConfig, signature::Signature,
     transaction::uses_durable_nonce,
 };
 
@@ -26,13 +24,15 @@ use std::{thread, time};
 //     Err(anyhow!("Retry failed"))
 // }
 
-pub trait MyClone {
-    fn clone(&self) -> Self;
+pub trait AnyhowWrap {
+    type Value;
+    fn map_err_anyhow(self) -> anyhow::Result<Self::Value>;
 }
 
-impl MyClone for Keypair {
-    fn clone(&self) -> Keypair {
-        Self::from_bytes(&self.to_bytes()).unwrap()
+impl<T, E: std::fmt::Debug> AnyhowWrap for Result<T, E> {
+    type Value = T;
+    fn map_err_anyhow(self) -> anyhow::Result<Self::Value> {
+        self.map_err(|err| anyhow::anyhow!("{:?}", err))
     }
 }
 

@@ -1124,6 +1124,7 @@ dependencies = [
  "anchor-lang",
  "anchor-spl",
  "anyhow",
+ "async-channel",
  "async-once-cell",
  "async-trait",
  "base64 0.13.1",
@@ -1132,6 +1133,8 @@ dependencies = [
  "fixed-macro",
  "futures 0.3.25",
  "itertools 0.10.5",
+ "jsonrpc-core 18.0.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "jsonrpc-core-client",
  "log 0.4.17",
  "mango-v4",
  "pyth-sdk-solana",
@@ -1143,10 +1146,12 @@ dependencies = [
  "solana-account-decoder",
  "solana-address-lookup-table-program",
  "solana-client",
+ "solana-rpc",
  "solana-sdk",
  "spl-associated-token-account",
  "thiserror",
  "tokio",
+ "tokio-stream",
 ]
 
 [[package]]

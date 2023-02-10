@@ -4,7 +4,10 @@ use std::time::Duration;
 
 use anchor_client::Cluster;
 use clap::Parser;
-use client::{chain_data, keypair_from_cli, Client, MangoClient, MangoGroupContext};
+use client::{
+    chain_data, keypair_from_cli, snapshot_source, websocket_source, Client, MangoClient,
+    MangoGroupContext,
+};
 use log::*;
 use mango_v4::state::{PerpMarketIndex, TokenIndex};
 
@@ -16,9 +19,7 @@ use std::collections::HashSet;
 pub mod liquidate;
 pub mod metrics;
 pub mod rebalance;
-pub mod snapshot_source;
 pub mod util;
-pub mod websocket_source;
 
 use crate::util::{is_mango_account, is_mango_bank, is_mint_info, is_perp_market};
 
@@ -26,18 +27,6 @@ use crate::util::{is_mango_account, is_mango_bank, is_mint_info, is_perp_market}
 // longer periods of time
 #[global_allocator]
 static ALLOC: jemallocator::Jemalloc = jemallocator::Jemalloc;
-
-trait AnyhowWrap {
-    type Value;
-    fn map_err_anyhow(self) -> anyhow::Result<Self::Value>;
-}
-
-impl<T, E: std::fmt::Debug> AnyhowWrap for Result<T, E> {
-    type Value = T;
-    fn map_err_anyhow(self) -> anyhow::Result<Self::Value> {
-        self.map_err(|err| anyhow::anyhow!("{:?}", err))
-    }
-}
 
 #[derive(Parser, Debug)]
 #[clap()]
@@ -103,7 +92,7 @@ async fn main() -> anyhow::Result<()> {
     };
     let cli = Cli::parse_from(args);
 
-    let liqor_owner = keypair_from_cli(&cli.liqor_owner);
+    let liqor_owner = Arc::new(keypair_from_cli(&cli.liqor_owner));
 
     let rpc_url = cli.rpc_url;
     let ws_url = rpc_url.replace("https", "wss");
@@ -114,7 +103,7 @@ async fn main() -> anyhow::Result<()> {
     let client = Client::new(
         cluster.clone(),
         commitment,
-        &liqor_owner,
+        liqor_owner.clone(),
         Some(rpc_timeout),
         cli.prioritization_micro_lamports,
     );
@@ -148,8 +137,6 @@ async fn main() -> anyhow::Result<()> {
     // FUTURE: decouple feed setup and liquidator business logic
     // feed should send updates to a channel which liquidator can consume
 
-    let mango_program = mango_v4::ID;
-
     solana_logger::setup_with_default("info");
     info!("startup");
 
@@ -162,7 +149,6 @@ async fn main() -> anyhow::Result<()> {
     websocket_source::start(
         websocket_source::Config {
             rpc_ws_url: ws_url.clone(),
-            mango_program,
             serum_program: cli.serum_program,
             open_orders_authority: mango_group,
         },
@@ -183,7 +169,6 @@ async fn main() -> anyhow::Result<()> {
     snapshot_source::start(
         snapshot_source::Config {
             rpc_http_url: rpc_url.clone(),
-            mango_program,
             mango_group,
             get_multiple_accounts_count: cli.get_multiple_accounts_count,
             parallel_rpc_requests: cli.parallel_rpc_requests,
@@ -270,7 +255,7 @@ async fn main() -> anyhow::Result<()> {
                 // specific program logic using the mirrored data
                 if let websocket_source::Message::Account(account_write) = message {
 
-                    if is_mango_account(&account_write.account, &mango_program, &mango_group).is_some() {
+                    if is_mango_account(&account_write.account, &mango_group).is_some() {
 
                         // e.g. to render debug logs RUST_LOG="liquidator=debug"
                         log::debug!("change to mango account {}...", &account_write.pubkey.to_string()[0..3]);
@@ -288,12 +273,12 @@ async fn main() -> anyhow::Result<()> {
                         ).await?;
                     }
 
-                    if is_mango_bank(&account_write.account, &mango_program, &mango_group).is_some() || oracles.contains(&account_write.pubkey) {
+                    if is_mango_bank(&account_write.account, &mango_group).is_some() || oracles.contains(&account_write.pubkey) {
                         if !one_snapshot_done {
                             continue;
                         }
 
-                        if is_mango_bank(&account_write.account, &mango_program, &mango_group).is_some() {
+                        if is_mango_bank(&account_write.account, &mango_group).is_some() {
                             log::debug!("change to bank {}", &account_write.pubkey);
                         }
 
@@ -314,14 +299,14 @@ async fn main() -> anyhow::Result<()> {
 
                 // Track all mango account pubkeys
                 for update in message.accounts.iter() {
-                    if is_mango_account(&update.account, &mango_program, &mango_group).is_some() {
+                    if is_mango_account(&update.account, &mango_group).is_some() {
                         mango_accounts.insert(update.pubkey);
                     }
-                    if let Some(mint_info) = is_mint_info(&update.account, &mango_program, &mango_group) {
+                    if let Some(mint_info) = is_mint_info(&update.account, &mango_group) {
                         mint_infos.insert(mint_info.token_index, update.pubkey);
                         oracles.insert(mint_info.oracle);
                     }
-                    if let Some(perp_market) = is_perp_market(&update.account, &mango_program, &mango_group) {
+                    if let Some(perp_market) = is_perp_market(&update.account, &mango_group) {
                         perp_markets.insert(perp_market.perp_market_index, update.pubkey);
                     }
                 }
