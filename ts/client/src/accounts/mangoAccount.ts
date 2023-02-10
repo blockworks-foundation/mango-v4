@@ -1580,4 +1580,5 @@ export class PerpOoDto {
 export class HealthType {
   static maint = { maint: {} };
   static init = { init: {} };
+  static liquidationEnd = { liquidationEnd: {} };
 }

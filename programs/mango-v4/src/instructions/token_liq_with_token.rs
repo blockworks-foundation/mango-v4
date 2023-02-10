@@ -67,7 +67,7 @@ pub fn token_liq_with_token(
     // Initial liqee health check
     let mut liqee_health_cache = new_health_cache(&liqee.borrow(), &account_retriever)
         .context("create liqee health cache")?;
-    let liqee_init_health = liqee_health_cache.health(HealthType::Init);
+    let liqee_liq_end_health = liqee_health_cache.health(HealthType::LiquidationEnd);
     liqee_health_cache.require_after_phase1_liquidation()?;
 
     if !liqee.check_liquidatable(&liqee_health_cache)? {
@@ -88,7 +88,7 @@ pub fn token_liq_with_token(
         &mut liqee.borrow_mut(),
         ctx.accounts.liqee.key(),
         &mut liqee_health_cache,
-        liqee_init_health,
+        liqee_liq_end_health,
         now_ts,
         max_liab_transfer,
     )?;
@@ -112,7 +112,7 @@ pub(crate) fn liquidation_action(
     liqee: &mut MangoAccountRefMut,
     liqee_key: Pubkey,
     liqee_health_cache: &mut HealthCache,
-    liqee_init_health: I80F48,
+    liqee_liq_end_health: I80F48,
     now_ts: u64,
     max_liab_transfer: I80F48,
 ) -> Result<()> {
@@ -154,43 +154,43 @@ pub(crate) fn liquidation_action(
     let init_asset_weight = asset_bank.init_asset_weight;
     let init_liab_weight = liab_bank.init_liab_weight;
 
-    // The price the health computation uses for a liability of one native liab token
-    let liab_init_liab_price = liqee_health_cache
+    // The price the LiquidationEnd health computation uses for a liability of one native liab token
+    let liab_liq_end_price = liqee_health_cache
         .token_info(liab_token_index)
         .unwrap()
         .prices
-        .liab(HealthType::Init);
+        .liab(HealthType::LiquidationEnd);
     // Health price for an asset of one native asset token
-    let asset_init_asset_price = liqee_health_cache
+    let asset_liq_end_price = liqee_health_cache
         .token_info(asset_token_index)
         .unwrap()
         .prices
-        .asset(HealthType::Init);
+        .asset(HealthType::LiquidationEnd);
 
     // How much asset would need to be exchanged to liab in order to bring health to 0?
     //
     // That means: what is x (unit: native liab tokens) such that
     //   init_health
-    //     + x * ilw * lilp     health gain from reducing liabs
-    //     - y * iaw * aiap     health loss from paying asset
+    //     + x * ilw * llep     health gain from reducing liabs
+    //     - y * iaw * alep     health loss from paying asset
     //     = 0
     // where
     //   ilw = init_liab_weight,
-    //   lilp = liab_init_liab_price,
+    //   llep = liab_liq_end_price,
     //   lopa = liab_oracle_price_adjusted, (see above)
     //   iap = init_asset_weight,
-    //   aiap = asset_init_asset_price,
+    //   alep = asset_liq_end_price,
     //   aop = asset_oracle_price
     //   ff = fee_factor
     // and the asset cost of getting x native units of liab is:
     //   y = x * lopa / aop   (native asset tokens, see above)
     //
-    // Result: x = -init_health / (ilw * lilp - iaw * lopa * aiap / aop)
-    let liab_needed = cm!(-liqee_init_health
-        / (liab_init_liab_price * init_liab_weight
+    // Result: x = -init_health / (ilw * llep - iaw * lopa * alep / aop)
+    let liab_needed = cm!(-liqee_liq_end_health
+        / (liab_liq_end_price * init_liab_weight
             - liab_oracle_price_adjusted
                 * init_asset_weight
-                * (asset_init_asset_price / asset_oracle_price)));
+                * (asset_liq_end_price / asset_oracle_price)));
 
     // How much liab can we get at most for the asset balance?
     let liab_possible = cm!(liqee_asset_native * asset_oracle_price / liab_oracle_price_adjusted);
@@ -316,10 +316,10 @@ pub(crate) fn liquidation_action(
     }
 
     // Check liqee health again
-    let liqee_init_health = liqee_health_cache.health(HealthType::Init);
+    let liqee_liq_end_health = liqee_health_cache.health(HealthType::LiquidationEnd);
     liqee
         .fixed
-        .maybe_recover_from_being_liquidated(liqee_init_health);
+        .maybe_recover_from_being_liquidated(liqee_liq_end_health);
 
     emit!(TokenLiqWithTokenLog {
         mango_group: liqee.fixed.group,
@@ -331,7 +331,8 @@ pub(crate) fn liquidation_action(
         liab_transfer: liab_transfer.to_bits(),
         asset_price: asset_oracle_price.to_bits(),
         liab_price: liab_oracle_price.to_bits(),
-        bankruptcy: !liqee_health_cache.has_phase2_liquidatable() & liqee_init_health.is_negative()
+        bankruptcy: !liqee_health_cache.has_phase2_liquidatable()
+            & liqee_liq_end_health.is_negative()
     });
 
     Ok(())
@@ -413,7 +414,7 @@ mod tests {
 
             let mut liqee_health_cache =
                 health::new_health_cache(&setup.liqee.borrow(), &retriever).unwrap();
-            let liqee_init_health = liqee_health_cache.health(HealthType::Init);
+            let liqee_liq_end_health = liqee_health_cache.health(HealthType::LiquidationEnd);
 
             liquidation_action(
                 &mut retriever,
@@ -424,7 +425,7 @@ mod tests {
                 &mut setup.liqee.borrow_mut(),
                 Pubkey::new_unique(),
                 &mut liqee_health_cache,
-                liqee_init_health,
+                liqee_liq_end_health,
                 0,
                 max_liab_transfer,
             )?;
@@ -452,14 +453,19 @@ mod tests {
         };
     }
 
+    // Check that stable price and weight scaling does not affect liquidation targets
     #[test]
     fn test_liq_with_token_stable_price() {
         let mut setup = TestSetup::new();
         {
             let ab = setup.asset_bank.data();
             ab.stable_price_model.stable_price = 0.5;
+            ab.deposit_weight_scale_start_quote = 505.0;
             let lb = setup.liab_bank.data();
             lb.stable_price_model.stable_price = 1.25;
+            lb.borrow_weight_scale_start_quote = 3.75;
+            lb.init_liab_weight = I80F48::from_num(1.4);
+            lb.maint_liab_weight = I80F48::from_num(1.2);
         }
         {
             let asset_bank = setup.asset_bank.data();
@@ -492,7 +498,7 @@ mod tests {
             liab_bank
                 .change_without_fee(
                     liab_p(&mut setup.liqee),
-                    I80F48::from_num(-5.0),
+                    I80F48::from_num(-9.0),
                     0,
                     I80F48::from(1),
                 )
@@ -500,16 +506,24 @@ mod tests {
         }
 
         let hc = setup.liqee_health_cache();
-        assert_eq_f!(hc.health(HealthType::Init), 10.0 * 0.5 - 5.0 * 1.25, 0.1);
+        let asset_scale = 505.0 / 1010.0;
+        let liab_scale = 9.0 * 1.25 / 3.75;
+        assert_eq_f!(
+            hc.health(HealthType::Init),
+            10.0 * 0.5 * asset_scale - 9.0 * 1.25 * 1.4 * liab_scale,
+            0.1
+        );
+        assert_eq_f!(hc.health(HealthType::LiquidationEnd), 10.0 - 9.0 * 1.4, 0.1);
+        assert_eq_f!(hc.health(HealthType::Maint), 10.0 - 9.0 * 1.2, 0.1);
 
         let mut result = setup.run(I80F48::from(100)).unwrap();
 
         let liqee_asset = asset_p(&mut result.liqee);
-        assert_eq_f!(liqee_asset.native(&result.asset_bank.data()), 8.335, 0.01);
+        assert_eq_f!(liqee_asset.native(&result.asset_bank.data()), 3.5, 0.01);
         let liqee_liab = liab_p(&mut result.liqee);
-        assert_eq_f!(liqee_liab.native(&result.liab_bank.data()), -3.335, 0.01);
+        assert_eq_f!(liqee_liab.native(&result.liab_bank.data()), -2.5, 0.01);
 
         let hc = result.liqee_health_cache();
-        assert_eq_f!(hc.health(HealthType::Init), 0.0, 0.01);
+        assert_eq_f!(hc.health(HealthType::LiquidationEnd), 0.0, 0.01);
     }
 }

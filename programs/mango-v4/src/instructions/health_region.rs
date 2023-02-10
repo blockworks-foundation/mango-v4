@@ -94,8 +94,9 @@ pub fn health_region_begin<'key, 'accounts, 'remaining, 'info>(
 
     // Compute pre-health and store it on the account
     let health_cache = new_health_cache(&account.borrow(), &account_retriever)?;
-    let pre_health = account.check_health_pre(&health_cache)?;
-    account.fixed.health_region_begin_init_health = pre_health.ceil().checked_to_num().unwrap();
+    let pre_init_health = account.check_health_pre(&health_cache)?;
+    account.fixed.health_region_begin_init_health =
+        pre_init_health.ceil().checked_to_num().unwrap();
 
     Ok(())
 }
@@ -115,8 +116,8 @@ pub fn health_region_end<'key, 'accounts, 'remaining, 'info>(
         .context("create account retriever")?;
     let health_cache = new_health_cache(&account.borrow(), &account_retriever)?;
 
-    let pre_health = I80F48::from(account.fixed.health_region_begin_init_health);
-    account.check_health_post(&health_cache, pre_health)?;
+    let pre_init_health = I80F48::from(account.fixed.health_region_begin_init_health);
+    account.check_health_post(&health_cache, pre_init_health)?;
     account.fixed.health_region_begin_init_health = 0;
 
     Ok(())

@@ -108,8 +108,8 @@ pub fn perp_place_order(
             new_fixed_order_account_retriever(ctx.remaining_accounts, &account.borrow())?;
         let health_cache =
             new_health_cache(&account.borrow(), &retriever).context("pre-withdraw init health")?;
-        let pre_health = account.check_health_pre(&health_cache)?;
-        Some((health_cache, pre_health))
+        let pre_init_health = account.check_health_pre(&health_cache)?;
+        Some((health_cache, pre_init_health))
     } else {
         None
     };
@@ -168,10 +168,10 @@ pub fn perp_place_order(
     //
     // Health check
     //
-    if let Some((mut health_cache, pre_health)) = pre_health_opt {
+    if let Some((mut health_cache, pre_init_health)) = pre_health_opt {
         let perp_position = account.perp_position(perp_market_index)?;
         health_cache.recompute_perp_info(perp_position, &perp_market)?;
-        account.check_health_post(&health_cache, pre_health)?;
+        account.check_health_post(&health_cache, pre_init_health)?;
     }
 
     Ok(order_id_opt)

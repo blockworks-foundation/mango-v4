@@ -32,34 +32,41 @@ impl Prices {
     /// The liability price to use for the given health type
     #[inline(always)]
     pub fn liab(&self, health_type: HealthType) -> I80F48 {
-        if health_type == HealthType::Maint {
-            self.oracle
-        } else {
-            self.oracle.max(self.stable)
+        match health_type {
+            HealthType::Maint | HealthType::LiquidationEnd => self.oracle,
+            HealthType::Init => self.oracle.max(self.stable),
         }
     }
 
     /// The asset price to use for the given health type
     #[inline(always)]
     pub fn asset(&self, health_type: HealthType) -> I80F48 {
-        if health_type == HealthType::Maint {
-            self.oracle
-        } else {
-            self.oracle.min(self.stable)
+        match health_type {
+            HealthType::Maint | HealthType::LiquidationEnd => self.oracle,
+            HealthType::Init => self.oracle.min(self.stable),
         }
     }
 }
 
-/// There are two types of health, initial health used for opening new positions and maintenance
-/// health used for liquidations. They are both calculated as a weighted sum of the assets
-/// minus the liabilities but the maint. health uses slightly larger weights for assets and
-/// slightly smaller weights for the liabilities. Zero is used as the bright line for both
-/// i.e. if your init health falls below zero, you cannot open new positions and if your maint. health
-/// falls below zero you will be liquidated.
+/// There are three types of health:
+/// - initial health ("init"): users can only open new positions if it's >= 0
+/// - maintenance health ("maint"): users get liquidated if it's < 0
+/// - liquidation end health: once liquidation started (see being_liquidated), it
+///   only stops once this is >= 0
+///
+/// The ordering is
+///   init health <= liquidation end health <= maint health
+///
+/// The different health types are realized by using different weights and prices:
+/// - init health: init weights with scaling, stable-price adjusted prices
+/// - liq end health: init weights without scaling, oracle prices
+/// - maint health: maint weights, oracle prices
+///
 #[derive(PartialEq, Copy, Clone, AnchorSerialize, AnchorDeserialize)]
 pub enum HealthType {
     Init,
-    Maint,
+    Maint, // aka LiquidationStart
+    LiquidationEnd,
 }
 
 /// Computes health for a mango account given a set of account infos
@@ -88,8 +95,10 @@ pub struct TokenInfo {
     pub token_index: TokenIndex,
     pub maint_asset_weight: I80F48,
     pub init_asset_weight: I80F48,
+    pub init_scaled_asset_weight: I80F48,
     pub maint_liab_weight: I80F48,
     pub init_liab_weight: I80F48,
+    pub init_scaled_liab_weight: I80F48,
     pub prices: Prices,
     pub balance_native: I80F48,
 }
@@ -98,7 +107,8 @@ impl TokenInfo {
     #[inline(always)]
     fn asset_weight(&self, health_type: HealthType) -> I80F48 {
         match health_type {
-            HealthType::Init => self.init_asset_weight,
+            HealthType::Init => self.init_scaled_asset_weight,
+            HealthType::LiquidationEnd => self.init_asset_weight,
             HealthType::Maint => self.maint_asset_weight,
         }
     }
@@ -106,7 +116,8 @@ impl TokenInfo {
     #[inline(always)]
     fn liab_weight(&self, health_type: HealthType) -> I80F48 {
         match health_type {
-            HealthType::Init => self.init_liab_weight,
+            HealthType::Init => self.init_scaled_liab_weight,
+            HealthType::LiquidationEnd => self.init_liab_weight,
             HealthType::Maint => self.maint_liab_weight,
         }
     }
@@ -284,7 +295,7 @@ impl PerpInfo {
     pub fn weigh_health_contribution(&self, unweighted: I80F48, health_type: HealthType) -> I80F48 {
         if unweighted > 0 {
             let asset_weight = match health_type {
-                HealthType::Init => self.init_overall_asset_weight,
+                HealthType::Init | HealthType::LiquidationEnd => self.init_overall_asset_weight,
                 HealthType::Maint => self.maint_overall_asset_weight,
             };
 
@@ -299,20 +310,22 @@ impl PerpInfo {
         let order_execution_case = |orders_base_lots: i64, order_price: I80F48| {
             let net_base_native =
                 I80F48::from(cm!((self.base_lots + orders_base_lots) * self.base_lot_size));
-            let (weight, base_price) = match (health_type, net_base_native.is_negative()) {
-                (HealthType::Init, true) => {
-                    (self.init_base_liab_weight, self.prices.liab(health_type))
+            let weight = match (health_type, net_base_native.is_negative()) {
+                (HealthType::Init, true) | (HealthType::LiquidationEnd, true) => {
+                    self.init_base_liab_weight
                 }
-                (HealthType::Init, false) => {
-                    (self.init_base_asset_weight, self.prices.asset(health_type))
+                (HealthType::Init, false) | (HealthType::LiquidationEnd, false) => {
+                    self.init_base_asset_weight
                 }
-                (HealthType::Maint, true) => {
-                    (self.maint_base_liab_weight, self.prices.liab(health_type))
-                }
-                (HealthType::Maint, false) => {
-                    (self.maint_base_asset_weight, self.prices.asset(health_type))
-                }
+                (HealthType::Maint, true) => self.maint_base_liab_weight,
+                (HealthType::Maint, false) => self.maint_base_asset_weight,
             };
+            let base_price = if net_base_native.is_negative() {
+                self.prices.liab(health_type)
+            } else {
+                self.prices.asset(health_type)
+            };
+
             // Total value of the order-execution adjusted base position
             let base_health = cm!(net_base_native * weight * base_price);
 
@@ -407,9 +420,10 @@ impl HealthCache {
 
         // Note: resetting the weights here assumes that the change has been applied to
         // the passed in bank already
-        entry.init_asset_weight =
+        entry.init_scaled_asset_weight =
             bank.scaled_init_asset_weight(entry.prices.asset(HealthType::Init));
-        entry.init_liab_weight = bank.scaled_init_liab_weight(entry.prices.liab(HealthType::Init));
+        entry.init_scaled_liab_weight =
+            bank.scaled_init_liab_weight(entry.prices.liab(HealthType::Init));
 
         // Work around the fact that -((-x) * y) == x * y does not hold for I80F48:
         // We need to make sure that if balance is before * price, then change = -before
@@ -714,12 +728,17 @@ pub fn new_health_cache(
             oracle: oracle_price,
             stable: bank.stable_price(),
         };
+        // Use the liab price for computing weight scaling, because it's pessimistic and
+        // causes the most unfavorable scaling.
+        let liab_price = prices.liab(HealthType::Init);
         token_infos.push(TokenInfo {
             token_index: bank.token_index,
             maint_asset_weight: bank.maint_asset_weight,
-            init_asset_weight: bank.scaled_init_asset_weight(prices.asset(HealthType::Init)),
+            init_asset_weight: bank.init_asset_weight,
+            init_scaled_asset_weight: bank.scaled_init_asset_weight(liab_price),
             maint_liab_weight: bank.maint_liab_weight,
-            init_liab_weight: bank.scaled_init_liab_weight(prices.liab(HealthType::Init)),
+            init_liab_weight: bank.init_liab_weight,
+            init_scaled_liab_weight: bank.scaled_init_liab_weight(liab_price),
             prices,
             balance_native: native,
         });

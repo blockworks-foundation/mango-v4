@@ -1165,14 +1165,22 @@ export class Prices {
   constructor(public oracle: I80F48, public stable: I80F48) {}
 
   public liab(healthType: HealthType | undefined): I80F48 {
-    if (healthType === HealthType.maint || healthType === undefined) {
+    if (
+      healthType === HealthType.maint ||
+      healthType === HealthType.liquidationEnd ||
+      healthType === undefined
+    ) {
       return this.oracle;
     }
     return this.oracle.max(this.stable);
   }
 
   public asset(healthType: HealthType | undefined): I80F48 {
-    if (healthType === HealthType.maint || healthType === undefined) {
+    if (
+      healthType === HealthType.maint ||
+      healthType === HealthType.liquidationEnd ||
+      healthType === undefined
+    ) {
       return this.oracle;
     }
     return this.oracle.min(this.stable);
@@ -1184,8 +1192,10 @@ export class TokenInfo {
     public tokenIndex: TokenIndex,
     public maintAssetWeight: I80F48,
     public initAssetWeight: I80F48,
+    public initScaledAssetWeight: I80F48,
     public maintLiabWeight: I80F48,
     public initLiabWeight: I80F48,
+    public initScaledLiabWeight: I80F48,
     public prices: Prices,
     public balanceNative: I80F48,
   ) {}
@@ -1195,8 +1205,10 @@ export class TokenInfo {
       dto.tokenIndex as TokenIndex,
       I80F48.from(dto.maintAssetWeight),
       I80F48.from(dto.initAssetWeight),
+      I80F48.from(dto.initScaledAssetWeight),
       I80F48.from(dto.maintLiabWeight),
       I80F48.from(dto.initLiabWeight),
+      I80F48.from(dto.initScaledLiabWeight),
       new Prices(
         I80F48.from(dto.prices.oracle),
         I80F48.from(dto.prices.stable),
@@ -1206,30 +1218,44 @@ export class TokenInfo {
   }
 
   static fromBank(bank: BankForHealth, nativeBalance?: I80F48): TokenInfo {
+    const p = new Prices(
+      bank.price,
+      I80F48.fromNumber(bank.stablePriceModel.stablePrice),
+    );
+    // Use the liab price for computing weight scaling, because it's pessimistic and
+    // causes the most unfavorable scaling.
+    const liabPrice = p.liab(HealthType.init);
     return new TokenInfo(
       bank.tokenIndex,
       bank.maintAssetWeight,
-      bank.scaledInitAssetWeight(),
+      bank.initAssetWeight,
+      bank.scaledInitAssetWeight(liabPrice),
       bank.maintLiabWeight,
-      bank.scaledInitLiabWeight(),
-      new Prices(
-        bank.price,
-        I80F48.fromNumber(bank.stablePriceModel.stablePrice),
-      ),
+      bank.initLiabWeight,
+      bank.scaledInitLiabWeight(liabPrice),
+      p,
       nativeBalance ? nativeBalance : ZERO_I80F48(),
     );
   }
 
   assetWeight(healthType: HealthType): I80F48 {
-    return healthType == HealthType.init
-      ? this.initAssetWeight
-      : this.maintAssetWeight;
+    if (healthType == HealthType.init) {
+      return this.initScaledAssetWeight;
+    } else if (healthType == HealthType.liquidationEnd) {
+      return this.initAssetWeight;
+    }
+    // healthType == HealthType.maint
+    return this.maintAssetWeight;
   }
 
   liabWeight(healthType: HealthType): I80F48 {
-    return healthType == HealthType.init
-      ? this.initLiabWeight
-      : this.maintLiabWeight;
+    if (healthType == HealthType.init) {
+      return this.initScaledLiabWeight;
+    } else if (healthType == HealthType.liquidationEnd) {
+      return this.initLiabWeight;
+    }
+    // healthType == HealthType.maint
+    return this.maintLiabWeight;
   }
 
   healthContribution(healthType?: HealthType): I80F48 {
@@ -1508,7 +1534,7 @@ export class PerpInfo {
     const contrib = this.unweightedHealthContribution(healthType);
     if (contrib.gt(ZERO_I80F48())) {
       const assetWeight =
-        healthType == HealthType.init
+        healthType == HealthType.init || healthType == HealthType.liquidationEnd
           ? this.initOverallAssetWeight
           : this.maintOverallAssetWeight;
       return assetWeight.mul(contrib);
@@ -1527,22 +1553,29 @@ export class PerpInfo {
       );
 
       let weight, basePrice;
-      if (healthType == HealthType.init) {
+      if (
+        healthType == HealthType.init ||
+        healthType == HealthType.liquidationEnd
+      ) {
         if (netBaseNative.isNeg()) {
           weight = pi.initBaseLiabWeight;
-          basePrice = pi.prices.liab(healthType);
         } else {
           weight = pi.initBaseAssetWeight;
-          basePrice = pi.prices.asset(healthType);
         }
-      } else {
+      }
+      // healthType == HealthType.maint
+      else {
         if (netBaseNative.isNeg()) {
           weight = pi.maintBaseLiabWeight;
-          basePrice = pi.prices.liab(healthType);
         } else {
           weight = pi.maintBaseAssetWeight;
-          basePrice = pi.prices.asset(healthType);
         }
+      }
+
+      if (netBaseNative.isNeg()) {
+        basePrice = pi.prices.liab(healthType);
+      } else {
+        basePrice = pi.prices.asset(healthType);
       }
 
       // Total value of the order-execution adjusted base position
@@ -1615,8 +1648,10 @@ export class TokenInfoDto {
   tokenIndex: number;
   maintAssetWeight: I80F48Dto;
   initAssetWeight: I80F48Dto;
+  initScaledAssetWeight: I80F48Dto;
   maintLiabWeight: I80F48Dto;
   initLiabWeight: I80F48Dto;
+  initScaledLiabWeight: I80F48Dto;
   prices: { oracle: I80F48Dto; stable: I80F48Dto };
   balanceNative: I80F48Dto;
 
@@ -1624,16 +1659,20 @@ export class TokenInfoDto {
     tokenIndex: number,
     maintAssetWeight: I80F48Dto,
     initAssetWeight: I80F48Dto,
+    initScaledAssetWeight: I80F48Dto,
     maintLiabWeight: I80F48Dto,
     initLiabWeight: I80F48Dto,
+    initScaledLiabWeight: I80F48Dto,
     prices: { oracle: I80F48Dto; stable: I80F48Dto },
     balanceNative: I80F48Dto,
   ) {
     this.tokenIndex = tokenIndex;
     this.maintAssetWeight = maintAssetWeight;
     this.initAssetWeight = initAssetWeight;
+    this.initScaledAssetWeight = initScaledAssetWeight;
     this.maintLiabWeight = maintLiabWeight;
     this.initLiabWeight = initLiabWeight;
+    this.initScaledLiabWeight = initScaledLiabWeight;
     this.prices = prices;
     this.balanceNative = balanceNative;
   }
