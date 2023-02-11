@@ -2,7 +2,7 @@ name: Build Docs
 
 on:
   push:
-    branches: [ pan/docs ]
+    branches: [ main, dev ]
 
   workflow_dispatch:
 
