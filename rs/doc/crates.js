@@ -1,0 +1,1 @@
+window.ALL_CRATES = ["client","mango_v4"];

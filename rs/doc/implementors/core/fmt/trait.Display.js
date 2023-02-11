@@ -1,0 +1,4 @@
+(function() {var implementors = {
+"client":[["impl <a class=\"trait\" href=\"https://doc.rust-lang.org/1.67.0/core/fmt/trait.Display.html\" title=\"trait core::fmt::Display\">Display</a> for <a class=\"enum\" href=\"client/enum.MangoClientError.html\" title=\"enum client::MangoClientError\">MangoClientError</a>"]],
+"mango_v4":[["impl <a class=\"trait\" href=\"https://doc.rust-lang.org/1.67.0/core/fmt/trait.Display.html\" title=\"trait core::fmt::Display\">Display</a> for <a class=\"enum\" href=\"mango_v4/error/enum.MangoError.html\" title=\"enum mango_v4::error::MangoError\">MangoError</a>"]]
+};if (window.register_implementors) {window.register_implementors(implementors);} else {window.pending_implementors = implementors;}})()

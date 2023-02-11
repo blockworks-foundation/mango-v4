@@ -1,0 +1,3 @@
+(function() {var implementors = {
+"mango_v4":[["impl Id for <a class=\"struct\" href=\"mango_v4/program/struct.MangoV4.html\" title=\"struct mango_v4::program::MangoV4\">MangoV4</a>"],["impl Id for <a class=\"struct\" href=\"mango_v4/struct.Mango.html\" title=\"struct mango_v4::Mango\">Mango</a>"]]
+};if (window.register_implementors) {window.register_implementors(implementors);} else {window.pending_implementors = implementors;}})()

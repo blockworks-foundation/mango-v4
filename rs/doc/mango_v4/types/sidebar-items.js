@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"struct":[["I80F48",""],["PerpMarketIndex",""],["Serum3MarketIndex",""],["TokenIndex","Nothing in Rust shall use these types. They only exist so that the Anchor IDL knows about them and typescript can deserialize it."]]};
