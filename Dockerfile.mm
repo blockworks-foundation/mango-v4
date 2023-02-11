@@ -17,7 +17,8 @@ WORKDIR /app
 COPY . .
 
 RUN yarn install && yarn run build
-FROM debian:bullseye
+
+FROM debian:bullseye as run
 
 LABEL fly_launch_runtime="nodejs"
 
