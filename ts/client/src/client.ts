@@ -941,7 +941,7 @@ export class MangoClient {
         mangoAccount,
         perpMarketIndex,
       );
-      healthAccountsToExclude.push(perpMarket.publicKey);
+      healthAccountsToExclude.push(perpMarket.publicKey, perpMarket.oracle);
       instructions.push(deactivatingPositionIx);
     }
 
