@@ -172,13 +172,8 @@ pub fn token_edit(
                 MangoError::InitAssetWeightCantBeNegative
             );
 
-            let old_init_asset_weight = bank.init_asset_weight;
             bank.init_asset_weight = I80F48::from_num(init_asset_weight);
-
-            // security admin can only reduce init_base_asset_weight
-            if old_init_asset_weight < bank.init_asset_weight {
-                require_group_admin = true;
-            }
+            require_group_admin = true;
         }
         if let Some(maint_liab_weight) = maint_liab_weight_opt {
             msg!(

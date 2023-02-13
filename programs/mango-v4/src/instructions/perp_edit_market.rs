@@ -109,13 +109,8 @@ pub fn perp_edit_market(
             MangoError::InitAssetWeightCantBeNegative
         );
 
-        let old_init_base_asset_weight = perp_market.init_base_asset_weight;
         perp_market.init_base_asset_weight = I80F48::from_num(init_base_asset_weight);
-
-        // security admin can only reduce init_base_asset_weight
-        if old_init_base_asset_weight < perp_market.init_base_asset_weight {
-            require_group_admin = true;
-        }
+        require_group_admin = true;
     }
     if let Some(maint_base_liab_weight) = maint_base_liab_weight_opt {
         msg!(
