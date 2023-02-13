@@ -42,7 +42,7 @@
 </span><span class="kw">pub struct </span>AccountToggleFreeze&lt;<span class="lifetime">&#39;info</span>&gt; {
     <span class="attr">#[account(
         constraint = group.load()<span class="question-mark">?</span>.is_ix_enabled(IxGate::AccountToggleFreeze) @ MangoError::IxIsDisabled,
-        constraint = group.load()<span class="question-mark">?</span>.admin == admin.key() || group.load()<span class="question-mark">?</span>.security_admin == admin.key(),
+        constraint = group.load()<span class="question-mark">?</span>.admin == admin.key()
     )]
     </span><span class="kw">pub </span>group: AccountLoader&lt;<span class="lifetime">&#39;info</span>, Group&gt;,
 
