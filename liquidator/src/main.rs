@@ -5,8 +5,8 @@ use std::time::Duration;
 use anchor_client::Cluster;
 use clap::Parser;
 use client::{
-    chain_data, keypair_from_cli, snapshot_source, websocket_source, Client, MangoClient,
-    MangoGroupContext,
+    account_update_stream, chain_data, keypair_from_cli, snapshot_source, websocket_source,
+    AsyncChannelSendUnlessFull, Client, MangoClient, MangoGroupContext,
 };
 use log::*;
 use mango_v4::state::{PerpMarketIndex, TokenIndex};
@@ -142,10 +142,11 @@ async fn main() -> anyhow::Result<()> {
 
     let metrics = metrics::start();
 
+    let (account_update_sender, account_update_receiver) =
+        async_channel::unbounded::<account_update_stream::Message>();
+
     // Sourcing account and slot data from solana via websockets
     // FUTURE: websocket feed should take which accounts to listen to as an input
-    let (websocket_sender, websocket_receiver) =
-        async_channel::unbounded::<websocket_source::Message>();
     websocket_source::start(
         websocket_source::Config {
             rpc_ws_url: ws_url.clone(),
@@ -153,18 +154,16 @@ async fn main() -> anyhow::Result<()> {
             open_orders_authority: mango_group,
         },
         mango_oracles.clone(),
-        websocket_sender,
+        account_update_sender.clone(),
     );
 
     let first_websocket_slot = websocket_source::get_next_create_bank_slot(
-        websocket_receiver.clone(),
+        account_update_receiver.clone(),
         Duration::from_secs(10),
     )
     .await?;
 
     // Getting solana account snapshots via jsonrpc
-    let (snapshot_sender, snapshot_receiver) =
-        async_channel::unbounded::<snapshot_source::AccountSnapshot>();
     // FUTURE: of what to fetch a snapshot - should probably take as an input
     snapshot_source::start(
         snapshot_source::Config {
@@ -176,25 +175,12 @@ async fn main() -> anyhow::Result<()> {
             min_slot: first_websocket_slot + 10,
         },
         mango_oracles,
-        snapshot_sender,
+        account_update_sender,
     );
 
     start_chain_data_metrics(chain_data.clone(), &metrics);
 
-    // Addresses of the MangoAccounts belonging to the mango program.
-    // Needed to check health of them all when the cache updates.
-    let mut mango_accounts = HashSet::<Pubkey>::new();
-
-    let mut mint_infos = HashMap::<TokenIndex, Pubkey>::new();
-    let mut oracles = HashSet::<Pubkey>::new();
-    let mut perp_markets = HashMap::<PerpMarketIndex, Pubkey>::new();
-
-    // Is the first snapshot done? Only start checking account health when it is.
-    let mut one_snapshot_done = false;
-
-    let mut metric_websocket_queue_len = metrics.register_u64("websocket_queue_length".into());
-    let mut metric_snapshot_queue_len = metrics.register_u64("snapshot_queue_length".into());
-    let mut metric_mango_accounts = metrics.register_u64("mango_accounts".into());
+    let shared_state = Arc::new(RwLock::new(SharedState::default()));
 
     //
     // mango client setup
@@ -223,117 +209,188 @@ async fn main() -> anyhow::Result<()> {
         refresh_timeout: Duration::from_secs(30),
     };
 
-    let rebalancer = rebalance::Rebalancer {
-        mango_client: &mango_client,
-        account_fetcher: &account_fetcher,
+    let rebalancer = Arc::new(rebalance::Rebalancer {
+        mango_client: mango_client.clone(),
+        account_fetcher: account_fetcher.clone(),
         mango_account_address: cli.liqor_mango_account,
         config: rebalance_config,
-    };
+    });
 
     let mut liquidation = LiquidationState {
-        mango_client: &mango_client,
-        account_fetcher: &account_fetcher,
+        mango_client,
+        account_fetcher,
         liquidation_config: liq_config,
-        rebalancer: &rebalancer,
+        rebalancer: rebalancer.clone(),
         accounts_with_errors: Default::default(),
         error_skip_threshold: 5,
         error_skip_duration: std::time::Duration::from_secs(120),
         error_reset_duration: std::time::Duration::from_secs(360),
     };
 
+    let (liquidation_trigger_sender, liquidation_trigger_receiver) =
+        async_channel::bounded::<()>(1);
+
     info!("main loop");
-    loop {
-        tokio::select! {
-            message = websocket_receiver.recv() => {
 
-                metric_websocket_queue_len.set(websocket_receiver.len() as u64);
-                let message = message.expect("channel not closed");
+    // Job to update chain_data and notify the liquidation job when a new check is needed.
+    tokio::spawn({
+        use account_update_stream::Message;
 
-                // build a model of slots and accounts in `chain_data`
-                websocket_source::update_chain_data(&mut chain_data.write().unwrap(), message.clone());
+        let shared_state = shared_state.clone();
 
-                // specific program logic using the mirrored data
-                if let websocket_source::Message::Account(account_write) = message {
+        let mut metric_account_update_queue_len =
+            metrics.register_u64("account_update_queue_length".into());
+        let mut metric_mango_accounts = metrics.register_u64("mango_accounts".into());
 
-                    if is_mango_account(&account_write.account, &mango_group).is_some() {
+        let mut mint_infos = HashMap::<TokenIndex, Pubkey>::new();
+        let mut oracles = HashSet::<Pubkey>::new();
+        let mut perp_markets = HashMap::<PerpMarketIndex, Pubkey>::new();
 
-                        // e.g. to render debug logs RUST_LOG="liquidator=debug"
-                        log::debug!("change to mango account {}...", &account_write.pubkey.to_string()[0..3]);
+        async move {
+            loop {
+                let message = account_update_receiver
+                    .recv()
+                    .await
+                    .expect("channel not closed");
+                metric_account_update_queue_len.set(account_update_receiver.len() as u64);
 
-                        // Track all MangoAccounts: we need to iterate over them later
-                        mango_accounts.insert(account_write.pubkey);
-                        metric_mango_accounts.set(mango_accounts.len() as u64);
+                message.update_chain_data(&mut chain_data.write().unwrap());
 
-                        if !one_snapshot_done {
-                            continue;
+                match message {
+                    Message::Account(account_write) => {
+                        let mut state = shared_state.write().unwrap();
+                        if is_mango_account(&account_write.account, &mango_group).is_some() {
+                            // e.g. to render debug logs RUST_LOG="liquidator=debug"
+                            log::debug!(
+                                "change to mango account {}...",
+                                &account_write.pubkey.to_string()[0..3]
+                            );
+
+                            // Track all MangoAccounts: we need to iterate over them later
+                            state.mango_accounts.insert(account_write.pubkey);
+                            metric_mango_accounts.set(state.mango_accounts.len() as u64);
+
+                            if !state.health_check_all {
+                                state.health_check_accounts.push(account_write.pubkey);
+                            }
+                            liquidation_trigger_sender.send_unless_full(()).unwrap();
+                        } else {
+                            let mut must_check_all = false;
+                            if is_mango_bank(&account_write.account, &mango_group).is_some() {
+                                log::debug!("change to bank {}", &account_write.pubkey);
+                                must_check_all = true;
+                            }
+                            if is_perp_market(&account_write.account, &mango_group).is_some() {
+                                log::debug!("change to perp market {}", &account_write.pubkey);
+                                must_check_all = true;
+                            }
+                            if oracles.contains(&account_write.pubkey) {
+                                log::debug!("change to oracle {}", &account_write.pubkey);
+                                must_check_all = true;
+                            }
+                            if must_check_all {
+                                state.health_check_all = true;
+                                liquidation_trigger_sender.send_unless_full(()).unwrap();
+                            }
                         }
-
-                        liquidation.maybe_liquidate_one_and_rebalance(
-                            std::iter::once(&account_write.pubkey),
-                        ).await?;
                     }
-
-                    if is_mango_bank(&account_write.account, &mango_group).is_some() || oracles.contains(&account_write.pubkey) {
-                        if !one_snapshot_done {
-                            continue;
+                    Message::Snapshot(snapshot) => {
+                        let mut state = shared_state.write().unwrap();
+                        // Track all mango account pubkeys
+                        for update in snapshot.iter() {
+                            if is_mango_account(&update.account, &mango_group).is_some() {
+                                state.mango_accounts.insert(update.pubkey);
+                            }
+                            if let Some(mint_info) = is_mint_info(&update.account, &mango_group) {
+                                mint_infos.insert(mint_info.token_index, update.pubkey);
+                                oracles.insert(mint_info.oracle);
+                            }
+                            if let Some(perp_market) = is_perp_market(&update.account, &mango_group)
+                            {
+                                perp_markets.insert(perp_market.perp_market_index, update.pubkey);
+                                oracles.insert(perp_market.oracle);
+                            }
                         }
+                        metric_mango_accounts.set(state.mango_accounts.len() as u64);
 
-                        if is_mango_bank(&account_write.account, &mango_group).is_some() {
-                            log::debug!("change to bank {}", &account_write.pubkey);
-                        }
+                        state.one_snapshot_done = true;
+                        state.health_check_all = true;
 
-                        if oracles.contains(&account_write.pubkey) {
-                            log::debug!("change to oracle {}", &account_write.pubkey);
-                        }
-
-                        liquidation.maybe_liquidate_one_and_rebalance(
-                            mango_accounts.iter(),
-                        ).await?;
+                        liquidation_trigger_sender.send_unless_full(()).unwrap();
                     }
-                }
-            },
-
-            message = snapshot_receiver.recv() => {
-                metric_snapshot_queue_len.set(snapshot_receiver.len() as u64);
-                let message = message.expect("channel not closed");
-
-                // Track all mango account pubkeys
-                for update in message.accounts.iter() {
-                    if is_mango_account(&update.account, &mango_group).is_some() {
-                        mango_accounts.insert(update.pubkey);
-                    }
-                    if let Some(mint_info) = is_mint_info(&update.account, &mango_group) {
-                        mint_infos.insert(mint_info.token_index, update.pubkey);
-                        oracles.insert(mint_info.oracle);
-                    }
-                    if let Some(perp_market) = is_perp_market(&update.account, &mango_group) {
-                        perp_markets.insert(perp_market.perp_market_index, update.pubkey);
-                    }
-                }
-                metric_mango_accounts.set(mango_accounts.len() as u64);
-
-                snapshot_source::update_chain_data(&mut chain_data.write().unwrap(), message);
-                one_snapshot_done = true;
-
-                liquidation.maybe_liquidate_one_and_rebalance(
-                    mango_accounts.iter(),
-                ).await?;
-            },
-
-            _ = rebalance_interval.tick() => {
-                if one_snapshot_done {
-                    if let Err(err) = rebalancer.zero_all_non_quote().await {
-                        log::error!("failed to rebalance liqor: {:?}", err);
-
-                        // Workaround: We really need a sequence enforcer in the liquidator since we don't want to
-                        // accidentally send a similar tx again when we incorrectly believe an earlier one got forked
-                        // off. For now, hard sleep on error to avoid the most frequent error cases.
-                        std::thread::sleep(Duration::from_secs(10));
-                    }
+                    _ => {}
                 }
             }
         }
-    }
+    });
+
+    // Rebalancing job
+    tokio::spawn({
+        let shared_state = shared_state.clone();
+        async move {
+            loop {
+                rebalance_interval.tick().await;
+                if !shared_state.read().unwrap().one_snapshot_done {
+                    continue;
+                }
+                if let Err(err) = rebalancer.zero_all_non_quote().await {
+                    log::error!("failed to rebalance liqor: {:?}", err);
+
+                    // Workaround: We really need a sequence enforcer in the liquidator since we don't want to
+                    // accidentally send a similar tx again when we incorrectly believe an earlier one got forked
+                    // off. For now, hard sleep on error to avoid the most frequent error cases.
+                    std::thread::sleep(Duration::from_secs(10));
+                }
+            }
+        }
+    });
+
+    // Liquidation job
+    tokio::spawn({
+        async move {
+            loop {
+                liquidation_trigger_receiver.recv().await.unwrap();
+
+                let account_addresses;
+                {
+                    let mut state = shared_state.write().unwrap();
+                    if !state.one_snapshot_done {
+                        continue;
+                    }
+                    account_addresses = if state.health_check_all {
+                        state.mango_accounts.iter().cloned().collect()
+                    } else {
+                        state.health_check_accounts.clone()
+                    };
+                    state.health_check_all = false;
+                    state.health_check_accounts = vec![];
+                }
+
+                liquidation
+                    .maybe_liquidate_one_and_rebalance(account_addresses.iter())
+                    .await
+                    .unwrap();
+            }
+        }
+    });
+
+    Ok(())
+}
+
+#[derive(Default)]
+struct SharedState {
+    /// Addresses of the MangoAccounts belonging to the mango program.
+    /// Needed to check health of them all when the cache updates.
+    mango_accounts: HashSet<Pubkey>,
+
+    /// Is the first snapshot done? Only start checking account health when it is.
+    one_snapshot_done: bool,
+
+    /// Accounts whose health might have changed
+    health_check_accounts: Vec<Pubkey>,
+
+    /// Check all accounts?
+    health_check_all: bool,
 }
 
 struct ErrorTracking {
@@ -341,10 +398,10 @@ struct ErrorTracking {
     last_at: std::time::Instant,
 }
 
-struct LiquidationState<'a> {
-    mango_client: &'a MangoClient,
-    account_fetcher: &'a chain_data::AccountFetcher,
-    rebalancer: &'a rebalance::Rebalancer<'a>,
+struct LiquidationState {
+    mango_client: Arc<MangoClient>,
+    account_fetcher: Arc<chain_data::AccountFetcher>,
+    rebalancer: Arc<rebalance::Rebalancer>,
     liquidation_config: liquidate::Config,
     accounts_with_errors: HashMap<Pubkey, ErrorTracking>,
     error_skip_threshold: u64,
@@ -352,16 +409,18 @@ struct LiquidationState<'a> {
     error_reset_duration: std::time::Duration,
 }
 
-impl<'a> LiquidationState<'a> {
+impl LiquidationState {
     async fn maybe_liquidate_one_and_rebalance<'b>(
         &mut self,
         accounts_iter: impl Iterator<Item = &'b Pubkey>,
     ) -> anyhow::Result<()> {
         use rand::seq::SliceRandom;
-        let mut rng = rand::thread_rng();
 
         let mut accounts = accounts_iter.collect::<Vec<&Pubkey>>();
-        accounts.shuffle(&mut rng);
+        {
+            let mut rng = rand::thread_rng();
+            accounts.shuffle(&mut rng);
+        }
 
         let mut liquidated_one = false;
         for pubkey in accounts {
@@ -401,8 +460,8 @@ impl<'a> LiquidationState<'a> {
         }
 
         let result = liquidate::maybe_liquidate_account(
-            self.mango_client,
-            self.account_fetcher,
+            &self.mango_client,
+            &self.account_fetcher,
             pubkey,
             &self.liquidation_config,
         )
