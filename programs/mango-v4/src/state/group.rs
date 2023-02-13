@@ -45,11 +45,14 @@ pub struct Group {
     // 0 is chosen as enabled, becase we want to start out with all ixs enabled, 1 is disabled
     pub ix_gate: u128,
 
-    pub reserved: [u8; 1864],
+    // todo: change to a bit maipulated flag to accomodate more fields?
+    pub mngo_settleable_fees: u8,
+
+    pub reserved: [u8; 1856],
 }
 const_assert_eq!(
     size_of::<Group>(),
-    32 + 4 + 32 * 2 + 4 + 32 * 2 + 3 + 5 + 20 * 32 + 32 + 8 + 16 + 1864
+    32 + 4 + 32 * 2 + 4 + 32 * 2 + 3 + 5 + 20 * 32 + 32 + 8 + 16 + 8 + 1856
 );
 const_assert_eq!(size_of::<Group>(), 2736);
 const_assert_eq!(size_of::<Group>() % 8, 0);

@@ -249,12 +249,14 @@ pub struct PerpPosition {
     /// price and current price of the base position is the overall pnl.
     pub realized_pnl_for_position_native: I80F48,
 
+    pub mngo_settleable_fees: u64,
+
     #[derivative(Debug = "ignore")]
-    pub reserved: [u8; 88],
+    pub reserved: [u8; 80],
 }
 const_assert_eq!(
     size_of::<PerpPosition>(),
-    2 + 2 + 4 + 8 + 8 + 16 + 8 + 16 * 2 + 8 * 2 + 8 * 2 + 8 * 5 + 8 + 2 * 16 + 8 + 16 + 88
+    2 + 2 + 4 + 8 + 8 + 16 + 8 + 16 * 2 + 8 * 2 + 8 * 2 + 8 * 5 + 8 + 2 * 16 + 8 + 16 + 8 + 80
 );
 const_assert_eq!(size_of::<PerpPosition>(), 304);
 const_assert_eq!(size_of::<PerpPosition>() % 8, 0);
@@ -753,6 +755,7 @@ impl PerpPosition {
     /// Update perp position for a maker/taker fee payment
     pub fn record_trading_fee(&mut self, fee: I80F48) {
         self.change_quote_position(-fee);
+        self.mngo_settleable_fees += fee.round().to_num::<u64>();
         cm!(self.realized_other_pnl_native -= fee);
         cm!(self.realized_pnl_for_position_native -= fee);
     }

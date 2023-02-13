@@ -37,6 +37,7 @@ pub struct PerpSettleFees<'info> {
     pub settle_bank: AccountLoader<'info, Bank>,
 
     /// CHECK: Oracle can have different account types
+    /// TODO: unused
     #[account(address = settle_bank.load()?.oracle)]
     pub settle_oracle: UncheckedAccount<'info>,
 }
@@ -53,6 +54,7 @@ pub fn perp_settle_fees(ctx: Context<PerpSettleFees>, max_settle_amount: u64) ->
     let mut perp_market = ctx.accounts.perp_market.load_mut()?;
 
     // Verify that the bank is the quote currency bank (#2)
+    // TODO: or compare to mngo bank
     require_eq!(
         settle_bank.token_index,
         perp_market.settle_token_index,
@@ -78,7 +80,7 @@ pub fn perp_settle_fees(ctx: Context<PerpSettleFees>, max_settle_amount: u64) ->
     require!(pnl.is_negative(), MangoError::ProfitabilityMismatch);
     require!(
         perp_market.fees_accrued.is_positive(),
-        MangoError::ProfitabilityMismatch
+        MangoError::ProfitabilityMismatchch
     );
 
     let settleable_pnl = perp_position.apply_pnl_settle_limit(&perp_market, pnl);
