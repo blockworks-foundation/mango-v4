@@ -7,7 +7,7 @@ use crate::state::*;
 pub struct AccountToggleFreeze<'info> {
     #[account(
         constraint = group.load()?.is_ix_enabled(IxGate::AccountToggleFreeze) @ MangoError::IxIsDisabled,
-        constraint = group.load()?.admin == admin.key() || group.load()?.security_admin == admin.key(),
+        constraint = group.load()?.admin == admin.key()
     )]
     pub group: AccountLoader<'info, Group>,
 
