@@ -1481,7 +1481,7 @@ pub enum MangoClientError {
 pub struct TransactionBuilder<'a> {
     instructions: Vec<Instruction>,
     address_lookup_tables: Vec<AddressLookupTableAccount>,
-    signers: Vec<&'a dyn Signer>,
+    signers: Vec<&'a Keypair>,
     payer: Pubkey,
 }
 

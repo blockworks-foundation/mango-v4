@@ -17,7 +17,7 @@ use std::str::FromStr;
 use std::time::Duration;
 use tokio::time;
 
-use crate::chain_data;
+use crate::account_update_stream::{AccountUpdate, Message};
 use crate::AnyhowWrap;
 
 pub fn is_mango_account<'a>(
@@ -34,16 +34,9 @@ pub fn is_mango_account<'a>(
     MangoAccountLoadedRef::from_bytes(&data[8..]).ok()
 }
 
-#[derive(Clone)]
-pub struct AccountUpdate {
-    pub pubkey: Pubkey,
-    pub slot: u64,
-    pub account: AccountSharedData,
-}
-
-#[derive(Clone, Default)]
-pub struct AccountSnapshot {
-    pub accounts: Vec<AccountUpdate>,
+#[derive(Default)]
+struct AccountSnapshot {
+    accounts: Vec<AccountUpdate>,
 }
 
 impl AccountSnapshot {
@@ -98,7 +91,7 @@ pub struct Config {
 async fn feed_snapshots(
     config: &Config,
     mango_oracles: Vec<Pubkey>,
-    sender: &async_channel::Sender<AccountSnapshot>,
+    sender: &async_channel::Sender<Message>,
 ) -> anyhow::Result<()> {
     let rpc_client = http::connect_with_options::<AccountsDataClient>(&config.rpc_http_url, true)
         .await
@@ -210,15 +203,14 @@ async fn feed_snapshots(
         )?;
     }
 
-    sender.send(snapshot).await.expect("sending must succeed");
+    sender
+        .send(Message::Snapshot(snapshot.accounts))
+        .await
+        .expect("sending must succeed");
     Ok(())
 }
 
-pub fn start(
-    config: Config,
-    mango_oracles: Vec<Pubkey>,
-    sender: async_channel::Sender<AccountSnapshot>,
-) {
+pub fn start(config: Config, mango_oracles: Vec<Pubkey>, sender: async_channel::Sender<Message>) {
     let mut poll_wait_first_snapshot = time::interval(time::Duration::from_secs(2));
     let mut interval_between_snapshots = time::interval(config.snapshot_interval);
 
@@ -255,16 +247,4 @@ pub fn start(
             };
         }
     });
-}
-
-pub fn update_chain_data(chain: &mut chain_data::ChainData, snapshot: AccountSnapshot) {
-    for account_update in snapshot.accounts {
-        chain.update_account(
-            account_update.pubkey,
-            chain_data::AccountAndSlot {
-                account: account_update.account,
-                slot: account_update.slot,
-            },
-        );
-    }
 }

@@ -5,47 +5,18 @@ use solana_account_decoder::UiAccountEncoding;
 use solana_client::{
     rpc_config::{RpcAccountInfoConfig, RpcProgramAccountsConfig},
     rpc_filter::{Memcmp, RpcFilterType},
-    rpc_response::{Response, RpcKeyedAccount, RpcResponseContext},
+    rpc_response::{RpcKeyedAccount, RpcResponseContext},
 };
 use solana_rpc::rpc_pubsub::RpcSolPubSubClient;
-use solana_sdk::{account::AccountSharedData, commitment_config::CommitmentConfig, pubkey::Pubkey};
+use solana_sdk::{commitment_config::CommitmentConfig, pubkey::Pubkey};
 
 use anyhow::Context;
 use log::*;
-use std::{str::FromStr, sync::Arc, time::Duration};
+use std::time::Duration;
 use tokio_stream::StreamMap;
 
-use crate::chain_data;
+use crate::account_update_stream::{AccountUpdate, Message};
 use crate::AnyhowWrap;
-
-#[derive(Clone)]
-pub struct AccountUpdate {
-    pub pubkey: Pubkey,
-    pub slot: u64,
-    pub account: AccountSharedData,
-}
-
-impl AccountUpdate {
-    pub fn from_rpc(rpc: Response<RpcKeyedAccount>) -> anyhow::Result<Self> {
-        let pubkey = Pubkey::from_str(&rpc.value.pubkey)?;
-        let account = rpc
-            .value
-            .account
-            .decode()
-            .ok_or_else(|| anyhow::anyhow!("could not decode account"))?;
-        Ok(AccountUpdate {
-            pubkey,
-            slot: rpc.context.slot,
-            account,
-        })
-    }
-}
-
-#[derive(Clone)]
-pub enum Message {
-    Account(AccountUpdate),
-    Slot(Arc<solana_client::rpc_response::SlotUpdate>),
-}
 
 pub struct Config {
     pub rpc_ws_url: String,
@@ -179,53 +150,6 @@ pub fn start(config: Config, mango_oracles: Vec<Pubkey>, sender: async_channel::
             }
         }
     });
-}
-
-pub fn update_chain_data(chain: &mut chain_data::ChainData, message: Message) {
-    use chain_data::*;
-    match message {
-        Message::Account(account_write) => {
-            trace!("websocket account message");
-            chain.update_account(
-                account_write.pubkey,
-                AccountAndSlot {
-                    slot: account_write.slot,
-                    account: account_write.account,
-                },
-            );
-        }
-        Message::Slot(slot_update) => {
-            trace!("websocket slot message");
-            let slot_update = match *slot_update {
-                solana_client::rpc_response::SlotUpdate::CreatedBank { slot, parent, .. } => {
-                    Some(SlotData {
-                        slot,
-                        parent: Some(parent),
-                        status: SlotStatus::Processed,
-                        chain: 0,
-                    })
-                }
-                solana_client::rpc_response::SlotUpdate::OptimisticConfirmation {
-                    slot, ..
-                } => Some(SlotData {
-                    slot,
-                    parent: None,
-                    status: SlotStatus::Confirmed,
-                    chain: 0,
-                }),
-                solana_client::rpc_response::SlotUpdate::Root { slot, .. } => Some(SlotData {
-                    slot,
-                    parent: None,
-                    status: SlotStatus::Rooted,
-                    chain: 0,
-                }),
-                _ => None,
-            };
-            if let Some(update) = slot_update {
-                chain.update_slot(update);
-            }
-        }
-    }
 }
 
 pub async fn get_next_create_bank_slot(
