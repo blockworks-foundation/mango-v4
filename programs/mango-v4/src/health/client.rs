@@ -579,6 +579,8 @@ fn find_maximum(
 }
 
 fn ignore_net_borrow_limit_errors(maybe_cache: Result<HealthCache>) -> Result<Option<HealthCache>> {
+    // Special case net borrow errors: We want to be able to find a good
+    // swap amount even if the max swap is limited by the net borrow limit.
     if maybe_cache.is_anchor_error_with_code(MangoError::BankNetBorrowsLimitReached.error_code()) {
         return Ok(None);
     }
