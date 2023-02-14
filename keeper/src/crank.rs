@@ -1,4 +1,4 @@
-use std::{collections::HashSet, sync::Arc, time::Duration, time::Instant};
+use std::{collections::HashSet, str::FromStr, sync::Arc, time::Duration, time::Instant};
 
 use crate::MangoClient;
 use itertools::Itertools;
@@ -46,6 +46,9 @@ pub async fn runner(
         .context
         .perp_markets
         .values()
+        .filter(|perp|
+            // MNGO-PERP-OLD
+            perp.market.perp_market_index == 1)
         .map(|perp| {
             loop_consume_events(
                 mango_client.clone(),
@@ -60,6 +63,9 @@ pub async fn runner(
         .context
         .perp_markets
         .values()
+        .filter(|perp|
+            // MNGO-PERP-OLD
+            perp.market.perp_market_index == 1)
         .map(|perp| {
             loop_update_funding(
                 mango_client.clone(),
