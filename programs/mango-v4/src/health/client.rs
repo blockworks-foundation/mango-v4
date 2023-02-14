@@ -579,17 +579,12 @@ fn find_maximum(
 }
 
 fn ignore_net_borrow_limit_errors(maybe_cache: Result<HealthCache>) -> Result<Option<HealthCache>> {
-    match maybe_cache {
-        Ok(cache) => Ok(Some(cache)),
-        // Special case net borrow errors: We want to be able to find a good
-        // swap amount even if the max swap is limited by the net borrow limit.
-        Err(Error::AnchorError(err))
-            if err.error_code_number == MangoError::BankNetBorrowsLimitReached.error_code() =>
-        {
-            Ok(None)
-        }
-        Err(err) => Err(err),
+    // Special case net borrow errors: We want to be able to find a good
+    // swap amount even if the max swap is limited by the net borrow limit.
+    if maybe_cache.is_anchor_error_with_code(MangoError::BankNetBorrowsLimitReached.error_code()) {
+        return Ok(None);
     }
+    maybe_cache.map(|c| Some(c))
 }
 
 fn system_epoch_secs() -> u64 {

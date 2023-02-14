@@ -301,7 +301,19 @@ impl<'a> Orderbook<'a> {
 
             let order_id = oo.id;
 
-            self.cancel_order(mango_account, order_id, order_side_and_tree, None)?;
+            let cancel_result =
+                self.cancel_order(mango_account, order_id, order_side_and_tree, None);
+            if cancel_result.is_anchor_error_with_code(MangoError::PerpOrderIdNotFound.into()) {
+                // It's possible for the order to be filled or expired already.
+                // There will be an event on the queue, the perp order slot is freed once
+                // it is processed.
+                msg!(
+                    "order {} was not found on orderbook, expired or filled already",
+                    order_id
+                );
+            } else {
+                cancel_result?;
+            }
 
             limit -= 1;
             if limit == 0 {
@@ -324,8 +336,9 @@ impl<'a> Orderbook<'a> {
         let book_component = side_and_tree.order_tree();
         let leaf_node = self.bookside_mut(side).
         remove_by_key(book_component, order_id).ok_or_else(|| {
-                    error_msg!("invalid perp order id {order_id} for side {side:?} and component {book_component:?}")
-                })?;
+            // possibly already filled or expired?
+            error_msg_typed!(MangoError::PerpOrderIdNotFound, "no perp order with id {order_id}, side {side:?}, component {book_component:?} found on the orderbook")
+        })?;
         if let Some(owner) = expected_owner {
             require_keys_eq!(leaf_node.owner, owner);
         }

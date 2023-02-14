@@ -268,6 +268,18 @@ async fn test_perp_fixed() -> Result<(), TransportError> {
     .unwrap();
     check_prev_instruction_post_health(&solana, account_1).await;
 
+    // Trying to cancel-all after the order was already taken: has no effect but succeeds
+    send_tx(
+        solana,
+        PerpCancelAllOrdersInstruction {
+            account: account_0,
+            perp_market,
+            owner,
+        },
+    )
+    .await
+    .unwrap();
+
     send_tx(
         solana,
         PerpConsumeEventsInstruction {
