@@ -8335,6 +8335,11 @@ export type MangoV4 = {
       "code": 6043,
       "name": "NoLiquidatablePerpBasePosition",
       "msg": "no liquidatable perp base position"
+    },
+    {
+      "code": 6044,
+      "name": "PerpOrderIdNotFound",
+      "msg": "perp order id not found on the orderbook"
     }
   ]
 };
@@ -16676,6 +16681,11 @@ export const IDL: MangoV4 = {
       "code": 6043,
       "name": "NoLiquidatablePerpBasePosition",
       "msg": "no liquidatable perp base position"
+    },
+    {
+      "code": 6044,
+      "name": "PerpOrderIdNotFound",
+      "msg": "perp order id not found on the orderbook"
     }
   ]
 };
