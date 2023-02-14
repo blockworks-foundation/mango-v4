@@ -118,7 +118,7 @@
     <span class="kw">let </span>oo = account
         .perp_find_order_with_order_id(perp_market.perp_market_index, order_id)
         .ok_or_else(|| {
-            <span class="macro">error_msg!</span>(<span class="string">&quot;could not find perp order with id {order_id} in perp market orderbook&quot;</span>)
+            <span class="macro">error_msg!</span>(<span class="string">&quot;could not find perp order with id {order_id} in user account&quot;</span>)
         })<span class="question-mark">?</span>;
     <span class="kw">let </span>order_id = oo.id;
     <span class="kw">let </span>order_side_and_tree = oo.side_and_tree();

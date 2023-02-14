@@ -531,10 +531,6 @@
 <a href="#531" id="531">531</a>
 <a href="#532" id="532">532</a>
 <a href="#533" id="533">533</a>
-<a href="#534" id="534">534</a>
-<a href="#535" id="535">535</a>
-<a href="#536" id="536">536</a>
-<a href="#537" id="537">537</a>
 </pre><pre class="rust"><code><span class="kw">use </span>anchor_lang::prelude::<span class="kw-2">*</span>;
 <span class="kw">use </span>anchor_lang::ZeroCopy;
 
@@ -752,16 +748,12 @@
     (i, ai): (usize, <span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span>AccountInfo),
 ) -&gt; <span class="prelude-ty">Option</span>&lt;(usize, <span class="prelude-ty">Result</span>&lt;Ref&lt;<span class="lifetime">&#39;a</span>, T&gt;&gt;)&gt; {
     <span class="kw">let </span>load_result = ai.load::&lt;T&gt;();
-    <span class="kw">match </span>load_result {
-        <span class="prelude-val">Err</span>(Error::AnchorError(error))
-            <span class="kw">if </span>error.error_code_number == ErrorCode::AccountDiscriminatorMismatch <span class="kw">as </span>u32
-                || error.error_code_number == ErrorCode::AccountDiscriminatorNotFound <span class="kw">as </span>u32
-                || error.error_code_number == ErrorCode::AccountOwnedByWrongProgram <span class="kw">as </span>u32 =&gt;
-        {
-            <span class="kw">return </span><span class="prelude-val">None</span>;
-        }
-        <span class="kw">_ </span>=&gt; {}
-    };
+    <span class="kw">if </span>load_result.is_anchor_error_with_code(ErrorCode::AccountDiscriminatorMismatch.into())
+        || load_result.is_anchor_error_with_code(ErrorCode::AccountDiscriminatorNotFound.into())
+        || load_result.is_anchor_error_with_code(ErrorCode::AccountOwnedByWrongProgram.into())
+    {
+        <span class="kw">return </span><span class="prelude-val">None</span>;
+    }
     <span class="prelude-val">Some</span>((i, load_result))
 }
 

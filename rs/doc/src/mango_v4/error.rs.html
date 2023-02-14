@@ -209,6 +209,21 @@
 <a href="#209" id="209">209</a>
 <a href="#210" id="210">210</a>
 <a href="#211" id="211">211</a>
+<a href="#212" id="212">212</a>
+<a href="#213" id="213">213</a>
+<a href="#214" id="214">214</a>
+<a href="#215" id="215">215</a>
+<a href="#216" id="216">216</a>
+<a href="#217" id="217">217</a>
+<a href="#218" id="218">218</a>
+<a href="#219" id="219">219</a>
+<a href="#220" id="220">220</a>
+<a href="#221" id="221">221</a>
+<a href="#222" id="222">222</a>
+<a href="#223" id="223">223</a>
+<a href="#224" id="224">224</a>
+<a href="#225" id="225">225</a>
+<a href="#226" id="226">226</a>
 </pre><pre class="rust"><code><span class="kw">use </span>anchor_lang::prelude::<span class="kw-2">*</span>;
 <span class="kw">use </span>core::fmt::Display;
 
@@ -304,11 +319,26 @@
     </span>IxIsDisabled,
     <span class="attr">#[msg(<span class="string">&quot;no liquidatable perp base position&quot;</span>)]
     </span>NoLiquidatablePerpBasePosition,
+    <span class="attr">#[msg(<span class="string">&quot;perp order id not found on the orderbook&quot;</span>)]
+    </span>PerpOrderIdNotFound,
 }
 
 <span class="kw">impl </span>MangoError {
     <span class="kw">pub fn </span>error_code(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; u32 {
         (<span class="kw-2">*</span><span class="self">self</span>).into()
+    }
+}
+
+<span class="kw">pub trait </span>IsAnchorErrorWithCode {
+    <span class="kw">fn </span>is_anchor_error_with_code(<span class="kw-2">&amp;</span><span class="self">self</span>, code: u32) -&gt; bool;
+}
+
+<span class="kw">impl</span>&lt;T&gt; IsAnchorErrorWithCode <span class="kw">for </span>anchor_lang::Result&lt;T&gt; {
+    <span class="kw">fn </span>is_anchor_error_with_code(<span class="kw-2">&amp;</span><span class="self">self</span>, code: u32) -&gt; bool {
+        <span class="kw">match </span><span class="self">self </span>{
+            <span class="prelude-val">Err</span>(Error::AnchorError(error)) =&gt; error.error_code_number == code,
+            <span class="kw">_ </span>=&gt; <span class="bool-val">false</span>,
+        }
     }
 }
 
