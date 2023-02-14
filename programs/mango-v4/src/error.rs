@@ -93,11 +93,26 @@ pub enum MangoError {
     IxIsDisabled,
     #[msg("no liquidatable perp base position")]
     NoLiquidatablePerpBasePosition,
+    #[msg("perp order id not found on the orderbook")]
+    PerpOrderIdNotFound,
 }
 
 impl MangoError {
     pub fn error_code(&self) -> u32 {
         (*self).into()
+    }
+}
+
+pub trait IsAnchorErrorWithCode {
+    fn is_anchor_error_with_code(&self, code: u32) -> bool;
+}
+
+impl<T> IsAnchorErrorWithCode for anchor_lang::Result<T> {
+    fn is_anchor_error_with_code(&self, code: u32) -> bool {
+        match self {
+            Err(Error::AnchorError(error)) => error.error_code_number == code,
+            _ => false,
+        }
     }
 }
 

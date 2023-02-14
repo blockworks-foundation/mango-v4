@@ -215,16 +215,12 @@ fn can_load_as<'a, T: ZeroCopy + Owner>(
     (i, ai): (usize, &'a AccountInfo),
 ) -> Option<(usize, Result<Ref<'a, T>>)> {
     let load_result = ai.load::<T>();
-    match load_result {
-        Err(Error::AnchorError(error))
-            if error.error_code_number == ErrorCode::AccountDiscriminatorMismatch as u32
-                || error.error_code_number == ErrorCode::AccountDiscriminatorNotFound as u32
-                || error.error_code_number == ErrorCode::AccountOwnedByWrongProgram as u32 =>
-        {
-            return None;
-        }
-        _ => {}
-    };
+    if load_result.is_anchor_error_with_code(ErrorCode::AccountDiscriminatorMismatch.into())
+        || load_result.is_anchor_error_with_code(ErrorCode::AccountDiscriminatorNotFound.into())
+        || load_result.is_anchor_error_with_code(ErrorCode::AccountOwnedByWrongProgram.into())
+    {
+        return None;
+    }
     Some((i, load_result))
 }
 

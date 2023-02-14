@@ -52,7 +52,11 @@ pub fn perp_cancel_order_by_client_order_id(
 
     let oo = account
         .perp_find_order_with_client_order_id(perp_market.perp_market_index, client_order_id)
-        .ok_or_else(|| error_msg!("could not find perp order with client order id {client_order_id} in perp order books"))?;
+        .ok_or_else(|| {
+            error_msg!(
+                "could not find perp order with client order id {client_order_id} in user account"
+            )
+        })?;
     let order_id = oo.id;
     let order_side_and_tree = oo.side_and_tree();
 
