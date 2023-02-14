@@ -82,7 +82,7 @@ pub fn perp_settle_pnl(ctx: Context<PerpSettlePnl>) -> Result<()> {
         account_b.token_position(settle_token_index)?;
     }
 
-    let a_init_health;
+    let a_liq_end_health;
     let a_maint_health;
     let b_settle_health;
     {
@@ -91,7 +91,7 @@ pub fn perp_settle_pnl(ctx: Context<PerpSettlePnl>) -> Result<()> {
                 .context("create account retriever")?;
         b_settle_health = new_health_cache(&account_b.borrow(), &retriever)?.perp_settle_health();
         let a_cache = new_health_cache(&account_a.borrow(), &retriever)?;
-        a_init_health = a_cache.health(HealthType::Init);
+        a_liq_end_health = a_cache.health(HealthType::LiquidationEnd);
         a_maint_health = a_cache.health(HealthType::Maint);
     };
 
@@ -181,7 +181,7 @@ pub fn perp_settle_pnl(ctx: Context<PerpSettlePnl>) -> Result<()> {
         b_settle_health,
     );
 
-    let fee = compute_settle_fee(&perp_market, a_init_health, a_maint_health, settlement)?;
+    let fee = compute_settle_fee(&perp_market, a_liq_end_health, a_maint_health, settlement)?;
 
     a_perp_position.record_settle(settlement);
     b_perp_position.record_settle(-settlement);
@@ -285,21 +285,23 @@ pub fn perp_settle_pnl(ctx: Context<PerpSettlePnl>) -> Result<()> {
 
 pub fn compute_settle_fee(
     perp_market: &PerpMarket,
-    source_init_health: I80F48,
+    source_liq_end_health: I80F48,
     source_maint_health: I80F48,
     settlement: I80F48,
 ) -> Result<I80F48> {
+    assert!(source_maint_health >= source_liq_end_health);
+
     // A percentage fee is paid to the settler when the source account's health is low.
     // That's because the settlement could avoid it getting liquidated: settling will
     // increase its health by actualizing positive perp pnl.
-    let low_health_fee = if source_init_health < 0 {
+    let low_health_fee = if source_liq_end_health < 0 {
         let fee_fraction = I80F48::from_num(perp_market.settle_fee_fraction_low_health);
         if source_maint_health < 0 {
             cm!(settlement * fee_fraction)
         } else {
             cm!(settlement
                 * fee_fraction
-                * (-source_init_health / (source_maint_health - source_init_health)))
+                * (-source_liq_end_health / (source_maint_health - source_liq_end_health)))
         }
     } else {
         I80F48::ZERO

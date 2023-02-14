@@ -54,10 +54,9 @@ pub fn perp_liq_force_cancel_orders(
                 }
             } else {
                 // Frozen accounts can always have their orders cancelled
-                if let Err(Error::AnchorError(ref inner)) = result {
-                    if inner.error_code_number != MangoError::HealthMustBeNegative as u32 {
-                        result?;
-                    }
+                if !result.is_anchor_error_with_code(MangoError::HealthMustBeNegative.into()) {
+                    // Propagate unexpected errors
+                    result?;
                 }
             }
         }
@@ -84,7 +83,7 @@ pub fn perp_liq_force_cancel_orders(
     //
     // Health check at the end
     //
-    let init_health = health_cache.health(HealthType::Init);
+    let init_health = health_cache.health(HealthType::LiquidationEnd);
     account
         .fixed
         .maybe_recover_from_being_liquidated(init_health);

@@ -99,7 +99,7 @@ async function closeUserAccount(userKeypairFile: string) {
         continue;
       }
 
-      const withdrawIx = await client.tokenWithdrawNativeIx(
+      await client.tokenWithdrawNative(
         group,
         mangoAccount,
         group.getFirstBankByTokenIndex(token.tokenIndex)!.mint,
@@ -109,10 +109,6 @@ async function closeUserAccount(userKeypairFile: string) {
             .toNumber(),
         ),
         false,
-      );
-      await this.sendAndConfirmTransaction(
-        [...withdrawIx],
-        group.addressLookupTablesList,
       );
     }
   } catch (error) {

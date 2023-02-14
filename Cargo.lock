@@ -1110,7 +1110,7 @@ dependencies = [
  "log 0.4.17",
  "mango-v4",
  "pyth-sdk-solana",
- "serum_dex 0.5.6",
+ "serum_dex 0.5.10",
  "solana-client",
  "solana-sdk",
  "tokio",
@@ -1138,7 +1138,7 @@ dependencies = [
  "reqwest",
  "serde",
  "serde_json",
- "serum_dex 0.5.6",
+ "serum_dex 0.5.10",
  "shellexpand",
  "solana-account-decoder",
  "solana-address-lookup-table-program",
@@ -2863,7 +2863,7 @@ dependencies = [
  "log 0.4.17",
  "mango-v4",
  "pyth-sdk-solana",
- "serum_dex 0.5.6",
+ "serum_dex 0.5.10",
  "solana-client",
  "solana-sdk",
  "tokio",
@@ -3041,7 +3041,7 @@ dependencies = [
  "serde",
  "serde_derive",
  "serde_json",
- "serum_dex 0.5.6",
+ "serum_dex 0.5.10",
  "shellexpand",
  "solana-account-decoder",
  "solana-client",
@@ -3121,7 +3121,7 @@ dependencies = [
 
 [[package]]
 name = "mango-v4"
-version = "0.5.0"
+version = "0.6.0"
 dependencies = [
  "anchor-lang",
  "anchor-spl",
@@ -3145,7 +3145,7 @@ dependencies = [
  "pyth-sdk-solana",
  "rand 0.8.5",
  "serde",
- "serum_dex 0.5.6",
+ "serum_dex 0.5.10",
  "solana-address-lookup-table-program",
  "solana-logger",
  "solana-program",
@@ -4983,9 +4983,9 @@ dependencies = [
 
 [[package]]
 name = "serde"
-version = "1.0.149"
+version = "1.0.152"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "256b9932320c590e707b94576e3cc1f7c9024d0ee6612dfbcf1cb106cbe8e055"
+checksum = "bb7d1f0d3021d347a83e556fc4683dea2ea09d87bccdf88ff5c12545d89d5efb"
 dependencies = [
  "serde_derive",
 ]
@@ -5001,9 +5001,9 @@ dependencies = [
 
 [[package]]
 name = "serde_derive"
-version = "1.0.149"
+version = "1.0.152"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b4eae9b04cbffdfd550eb462ed33bc6a1b68c935127d008b27444d08380f94e4"
+checksum = "af487d118eecd09402d70a5d72551860e788df87b464af30e5ea6a38c75c541e"
 dependencies = [
  "proc-macro2 1.0.47",
  "quote 1.0.21",
@@ -5081,21 +5081,24 @@ dependencies = [
 
 [[package]]
 name = "serum_dex"
-version = "0.5.6"
-source = "git+https://github.com/blockworks-foundation/serum-dex.git?branch=ckamm/find_by_key#c0b9f559daa74ec5960cc371a8bed610029a656b"
+version = "0.5.10"
+source = "git+https://github.com/openbook-dex/program.git#c85e56deeaead43abbc33b7301058838b9c5136d"
 dependencies = [
+ "anchor-lang",
  "arrayref",
  "bincode",
  "bytemuck",
  "byteorder",
+ "default-env",
  "enumflags2",
  "field-offset",
- "itertools 0.9.0",
+ "itertools 0.10.5",
  "num-traits",
  "num_enum",
  "safe-transmute",
  "serde",
  "solana-program",
+ "solana-security-txt",
  "spl-token",
  "static_assertions",
  "thiserror",

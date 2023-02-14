@@ -59,6 +59,10 @@ struct Cli {
 
     #[clap(long, env, default_value_t = 10)]
     timeout: u64,
+
+    /// prioritize each transaction with this many microlamports/cu
+    #[clap(long, env, default_value = "0")]
+    prioritization_micro_lamports: u64,
 }
 
 #[derive(Subcommand, Debug, Clone)]
@@ -100,6 +104,7 @@ async fn main() -> Result<(), anyhow::Error> {
                 commitment,
                 &owner,
                 Some(Duration::from_secs(cli.timeout)),
+                cli.prioritization_micro_lamports,
             ),
             cli.mango_account,
             owner,

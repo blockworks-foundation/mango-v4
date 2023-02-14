@@ -51,7 +51,7 @@ pub fn perp_cancel_order(ctx: Context<PerpCancelOrder>, order_id: u128) -> Resul
     let oo = account
         .perp_find_order_with_order_id(perp_market.perp_market_index, order_id)
         .ok_or_else(|| {
-            error_msg!("could not find perp order with id {order_id} in perp market orderbook")
+            error_msg!("could not find perp order with id {order_id} in user account")
         })?;
     let order_id = oo.id;
     let order_side_and_tree = oo.side_and_tree();

@@ -29,6 +29,7 @@ async function main() {
     MANGO_V4_ID['mainnet-beta'],
     {
       idsSource: 'get-program-accounts',
+      prioritizationFee: 5,
     },
   );
 

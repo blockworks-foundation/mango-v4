@@ -6,8 +6,11 @@ liquidator:
 - 'liquidator/**'
 keeper:
 - 'keeper/**'
-ci:
-- '.github/workflows/**'
+devops:
+- '*.yml'
+- '*.yaml'
+- '*Dockerfile*'
+- 'fly.toml'
 dependency:
 - '*.lock'
 documentation:

@@ -111,7 +111,7 @@ pub fn perp_liq_negative_pnl_or_bankruptcy(
             .context("create account retriever")?;
         new_health_cache(&liqee.borrow(), &retriever)?
     };
-    let liqee_init_health = liqee_health_cache.health(HealthType::Init);
+    let liqee_liq_end_health = liqee_health_cache.health(HealthType::LiquidationEnd);
     let liqee_settle_health = liqee_health_cache.perp_settle_health();
     liqee_health_cache.require_after_phase2_liquidation()?;
 
@@ -218,7 +218,8 @@ pub fn perp_liq_negative_pnl_or_bankruptcy(
         let liqee_perp_position = liqee.perp_position_mut(perp_market_index)?;
         let liqee_pnl = liqee_perp_position.unsettled_pnl(&perp_market, oracle_price)?;
 
-        let max_liab_transfer_from_liqee = (-liqee_pnl).min(-liqee_init_health).max(I80F48::ZERO);
+        let max_liab_transfer_from_liqee =
+            (-liqee_pnl).min(-liqee_liq_end_health).max(I80F48::ZERO);
         let liab_transfer = max_liab_transfer_from_liqee
             .min(max_liab_transfer)
             .max(I80F48::ZERO);
@@ -343,10 +344,10 @@ pub fn perp_liq_negative_pnl_or_bankruptcy(
 
     // Check liqee health again: bankruptcy would improve health
     liqee_health_cache.recompute_perp_info(liqee_perp_position, &perp_market)?;
-    let liqee_init_health = liqee_health_cache.health(HealthType::Init);
+    let liqee_liq_end_health = liqee_health_cache.health(HealthType::LiquidationEnd);
     liqee
         .fixed
-        .maybe_recover_from_being_liquidated(liqee_init_health);
+        .maybe_recover_from_being_liquidated(liqee_liq_end_health);
 
     drop(perp_market);
     drop(settle_bank);

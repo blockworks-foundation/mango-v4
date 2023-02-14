@@ -28,7 +28,7 @@ async fn test_health_compute_tokens() -> Result<(), TransportError> {
     create_funded_account(&solana, group, owner, 0, &context.users[1], mints, 1000, 0).await;
 
     // TODO: actual explicit CU comparisons.
-    // On 2022-11-29 the final deposit costs 61568 CU and each new token increases it by roughly 3125 CU
+    // On 2023-2-5 the final deposit costs 57622 CU and each new token increases it by roughly 2400 CU
 
     Ok(())
 }
@@ -148,7 +148,7 @@ async fn test_health_compute_serum() -> Result<(), TransportError> {
     }
 
     // TODO: actual explicit CU comparisons.
-    // On 2022-11-29 the final deposit costs 76029 CU and each new market increases it by roughly 6191 CU
+    // On 2023-2-5 the final deposit costs 78587 CU and each new market increases it by roughly 5900 CU
 
     Ok(())
 }
@@ -156,7 +156,9 @@ async fn test_health_compute_serum() -> Result<(), TransportError> {
 // Try to reach compute limits in health checks by having many perp markets in an account
 #[tokio::test]
 async fn test_health_compute_perp() -> Result<(), TransportError> {
-    let context = TestContext::new().await;
+    let mut test_builder = TestContextBuilder::new();
+    test_builder.test().set_compute_max_units(90_000);
+    let context = test_builder.start_default().await;
     let solana = &context.solana.clone();
 
     let admin = TestKeypair::new();
@@ -266,7 +268,7 @@ async fn test_health_compute_perp() -> Result<(), TransportError> {
     }
 
     // TODO: actual explicit CU comparisons.
-    // On 2022-11-29 the final deposit costs 54954 CU and each new market increases it by roughly 3171 CU
+    // On 2023-2-5 the final deposit costs 60732 CU and each new market increases it by roughly 3400 CU
 
     Ok(())
 }

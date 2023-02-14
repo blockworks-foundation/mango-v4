@@ -1,5 +1,5 @@
 export type MangoV4 = {
-  "version": "0.5.0",
+  "version": "0.6.0",
   "name": "mango_v4",
   "instructions": [
     {
@@ -2880,32 +2880,6 @@ export type MangoV4 = {
       "args": []
     },
     {
-      "name": "perpZeroOutForMarket",
-      "accounts": [
-        {
-          "name": "group",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "account",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "perpMarket",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "admin",
-          "isMut": false,
-          "isSigner": true
-        }
-      ],
-      "args": []
-    },
-    {
       "name": "perpPlaceOrder",
       "accounts": [
         {
@@ -5001,6 +4975,12 @@ export type MangoV4 = {
             }
           },
           {
+            "name": "initScaledAssetWeight",
+            "type": {
+              "defined": "I80F48"
+            }
+          },
+          {
             "name": "maintLiabWeight",
             "type": {
               "defined": "I80F48"
@@ -5008,6 +4988,12 @@ export type MangoV4 = {
           },
           {
             "name": "initLiabWeight",
+            "type": {
+              "defined": "I80F48"
+            }
+          },
+          {
+            "name": "initScaledLiabWeight",
             "type": {
               "defined": "I80F48"
             }
@@ -6409,12 +6395,20 @@ export type MangoV4 = {
     {
       "name": "HealthType",
       "docs": [
-        "There are two types of health, initial health used for opening new positions and maintenance",
-        "health used for liquidations. They are both calculated as a weighted sum of the assets",
-        "minus the liabilities but the maint. health uses slightly larger weights for assets and",
-        "slightly smaller weights for the liabilities. Zero is used as the bright line for both",
-        "i.e. if your init health falls below zero, you cannot open new positions and if your maint. health",
-        "falls below zero you will be liquidated."
+        "There are three types of health:",
+        "- initial health (\"init\"): users can only open new positions if it's >= 0",
+        "- maintenance health (\"maint\"): users get liquidated if it's < 0",
+        "- liquidation end health: once liquidation started (see being_liquidated), it",
+        "only stops once this is >= 0",
+        "",
+        "The ordering is",
+        "init health <= liquidation end health <= maint health",
+        "",
+        "The different health types are realized by using different weights and prices:",
+        "- init health: init weights with scaling, stable-price adjusted prices",
+        "- liq end health: init weights without scaling, oracle prices",
+        "- maint health: maint weights, oracle prices",
+        ""
       ],
       "type": {
         "kind": "enum",
@@ -6424,6 +6418,9 @@ export type MangoV4 = {
           },
           {
             "name": "Maint"
+          },
+          {
+            "name": "LiquidationEnd"
           }
         ]
       }
@@ -8338,12 +8335,17 @@ export type MangoV4 = {
       "code": 6043,
       "name": "NoLiquidatablePerpBasePosition",
       "msg": "no liquidatable perp base position"
+    },
+    {
+      "code": 6044,
+      "name": "PerpOrderIdNotFound",
+      "msg": "perp order id not found on the orderbook"
     }
   ]
 };
 
 export const IDL: MangoV4 = {
-  "version": "0.5.0",
+  "version": "0.6.0",
   "name": "mango_v4",
   "instructions": [
     {
@@ -11224,32 +11226,6 @@ export const IDL: MangoV4 = {
       "args": []
     },
     {
-      "name": "perpZeroOutForMarket",
-      "accounts": [
-        {
-          "name": "group",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "account",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "perpMarket",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "admin",
-          "isMut": false,
-          "isSigner": true
-        }
-      ],
-      "args": []
-    },
-    {
       "name": "perpPlaceOrder",
       "accounts": [
         {
@@ -13345,6 +13321,12 @@ export const IDL: MangoV4 = {
             }
           },
           {
+            "name": "initScaledAssetWeight",
+            "type": {
+              "defined": "I80F48"
+            }
+          },
+          {
             "name": "maintLiabWeight",
             "type": {
               "defined": "I80F48"
@@ -13352,6 +13334,12 @@ export const IDL: MangoV4 = {
           },
           {
             "name": "initLiabWeight",
+            "type": {
+              "defined": "I80F48"
+            }
+          },
+          {
+            "name": "initScaledLiabWeight",
             "type": {
               "defined": "I80F48"
             }
@@ -14753,12 +14741,20 @@ export const IDL: MangoV4 = {
     {
       "name": "HealthType",
       "docs": [
-        "There are two types of health, initial health used for opening new positions and maintenance",
-        "health used for liquidations. They are both calculated as a weighted sum of the assets",
-        "minus the liabilities but the maint. health uses slightly larger weights for assets and",
-        "slightly smaller weights for the liabilities. Zero is used as the bright line for both",
-        "i.e. if your init health falls below zero, you cannot open new positions and if your maint. health",
-        "falls below zero you will be liquidated."
+        "There are three types of health:",
+        "- initial health (\"init\"): users can only open new positions if it's >= 0",
+        "- maintenance health (\"maint\"): users get liquidated if it's < 0",
+        "- liquidation end health: once liquidation started (see being_liquidated), it",
+        "only stops once this is >= 0",
+        "",
+        "The ordering is",
+        "init health <= liquidation end health <= maint health",
+        "",
+        "The different health types are realized by using different weights and prices:",
+        "- init health: init weights with scaling, stable-price adjusted prices",
+        "- liq end health: init weights without scaling, oracle prices",
+        "- maint health: maint weights, oracle prices",
+        ""
       ],
       "type": {
         "kind": "enum",
@@ -14768,6 +14764,9 @@ export const IDL: MangoV4 = {
           },
           {
             "name": "Maint"
+          },
+          {
+            "name": "LiquidationEnd"
           }
         ]
       }
@@ -16682,6 +16681,11 @@ export const IDL: MangoV4 = {
       "code": 6043,
       "name": "NoLiquidatablePerpBasePosition",
       "msg": "no liquidatable perp base position"
+    },
+    {
+      "code": 6044,
+      "name": "PerpOrderIdNotFound",
+      "msg": "perp order id not found on the orderbook"
     }
   ]
 };

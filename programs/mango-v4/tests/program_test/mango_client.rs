@@ -356,7 +356,7 @@ pub async fn check_prev_instruction_post_health(solana: &SolanaCookie, account: 
     let logs = solana.program_log();
     let post_health_str = logs
         .iter()
-        .find_map(|line| line.strip_prefix("post_health: "))
+        .find_map(|line| line.strip_prefix("post_init_health: "))
         .unwrap();
     let post_health = post_health_str.parse::<f64>().unwrap();
 

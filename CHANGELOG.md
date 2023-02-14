@@ -6,6 +6,19 @@ Update this for each program release and mainnet deployment.
 
 ## mainnet
 
+### v0.6.0, 2023-2-14
+
+Deployment: Feb 14, 2023 at 16:06:03 Central European Standard Time, https://explorer.solana.com/tx/4vpjuiESQZn5t6XErHeSX76dCng4P4KPrr5pMGuYv9LhA3EcLgTw1bYxg8aRmBt1rfJCTqqYLws1cr4EvnrrETue
+
+- Client: Increase search iteration limit
+- Update Serum dependency to most recent openbook version (#437)
+- Enable release-move overflow checks (#438)
+- Remove cleanup testing instruction PerpZeroOut (#430)
+- Liquidation: Fix amount limits by introducing a new "LiquidationEnd" health type (#440, #447)
+- Fix amount logging in token deposit (#446)
+- Restrict what the security admin can do (#452)
+- Fix bug in perp cancel all so it doesn't error on filled/expired orders (#453)
+
 ### v0.5.0, 2023-2-2
 
 Deployment: Feb 2, 2023 at 10:51:02 Central European Standard Time, https://explorer.solana.com/tx/eVGLcy3y8Vi9sMDKQbKdRKZa6dpjTjdP5HyDFXXQFqAaS1CXCg2QnFC1hgE8F8unWfgpmXC8PvmuRMhmQEE1YzK

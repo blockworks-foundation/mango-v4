@@ -39,8 +39,8 @@ export interface BankForHealth {
   price: I80F48;
   stablePriceModel: StablePriceModel;
 
-  scaledInitAssetWeight(): I80F48;
-  scaledInitLiabWeight(): I80F48;
+  scaledInitAssetWeight(price: I80F48): I80F48;
+  scaledInitLiabWeight(price: I80F48): I80F48;
 }
 
 export class Bank implements BankForHealth {
@@ -309,8 +309,8 @@ export class Bank implements BankForHealth {
     );
   }
 
-  scaledInitAssetWeight(): I80F48 {
-    const depositsQuote = this.nativeDeposits().mul(this.price);
+  scaledInitAssetWeight(price: I80F48): I80F48 {
+    const depositsQuote = this.nativeDeposits().mul(price);
     if (
       this.depositWeightScaleStartQuote >= Number.MAX_SAFE_INTEGER ||
       depositsQuote.lte(I80F48.fromNumber(this.depositWeightScaleStartQuote))
@@ -322,8 +322,8 @@ export class Bank implements BankForHealth {
     );
   }
 
-  scaledInitLiabWeight(): I80F48 {
-    const borrowsQuote = this.nativeBorrows().mul(this.price);
+  scaledInitLiabWeight(price: I80F48): I80F48 {
+    const borrowsQuote = this.nativeBorrows().mul(price);
     if (
       this.borrowWeightScaleStartQuote >= Number.MAX_SAFE_INTEGER ||
       borrowsQuote.lte(I80F48.fromNumber(this.borrowWeightScaleStartQuote))

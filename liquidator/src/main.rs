@@ -80,8 +80,12 @@ struct Cli {
     #[clap(long, env, default_value = "50")]
     min_health_ratio: f64,
 
-    #[clap(long, env, default_value = "1")]
-    rebalance_slippage: f64,
+    #[clap(long, env, default_value = "100")]
+    rebalance_slippage_bps: u64,
+
+    /// prioritize each transaction with this many microlamports/cu
+    #[clap(long, env, default_value = "0")]
+    prioritization_micro_lamports: u64,
 }
 
 pub fn encode_address(addr: &Pubkey) -> String {
@@ -107,7 +111,13 @@ async fn main() -> anyhow::Result<()> {
     let rpc_timeout = Duration::from_secs(10);
     let cluster = Cluster::Custom(rpc_url.clone(), ws_url.clone());
     let commitment = CommitmentConfig::processed();
-    let client = Client::new(cluster.clone(), commitment, &liqor_owner, Some(rpc_timeout));
+    let client = Client::new(
+        cluster.clone(),
+        commitment,
+        &liqor_owner,
+        Some(rpc_timeout),
+        cli.prioritization_micro_lamports,
+    );
 
     // The representation of current on-chain account data
     let chain_data = Arc::new(RwLock::new(chain_data::ChainData::new()));
@@ -222,7 +232,7 @@ async fn main() -> anyhow::Result<()> {
 
     let mut rebalance_interval = tokio::time::interval(Duration::from_secs(5));
     let rebalance_config = rebalance::Config {
-        slippage: cli.rebalance_slippage,
+        slippage_bps: cli.rebalance_slippage_bps,
         // TODO: config
         borrow_settle_excess: 1.05,
         refresh_timeout: Duration::from_secs(30),

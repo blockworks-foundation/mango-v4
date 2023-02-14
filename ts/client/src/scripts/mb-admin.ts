@@ -516,6 +516,118 @@ async function changeTokenOracle() {
   );
 }
 
+async function makeTokenReduceonly() {
+  const result = await buildAdminClient();
+  const client = result[0];
+  const admin = result[1];
+  const creator = result[2];
+
+  const group = await client.getGroupForCreator(creator.publicKey, GROUP_NUM);
+  const bank = group.getFirstBankByMint(
+    new PublicKey(MAINNET_MINTS.get('DAI')!),
+  );
+  await client.tokenEdit(
+    group,
+    bank.mint,
+    Builder(NullTokenEditParams).reduceOnly(true).build(),
+  );
+}
+
+async function changeMaxStalenessSlots() {
+  const result = await buildAdminClient();
+  const client = result[0];
+  const admin = result[1];
+  const creator = result[2];
+
+  const group = await client.getGroupForCreator(creator.publicKey, GROUP_NUM);
+
+  for (const bank of Array.from(group.banksMapByTokenIndex.values()).flat()) {
+    await client.tokenEdit(
+      group,
+      bank.mint,
+      Builder(NullTokenEditParams)
+        .oracleConfig({
+          confFilter: 0.1,
+          maxStalenessSlots: 120,
+        })
+        .build(),
+    );
+  }
+
+  for (const perpMarket of Array.from(
+    group.perpMarketsMapByMarketIndex.values(),
+  )) {
+    await client.perpEditMarket(
+      group,
+      perpMarket.perpMarketIndex,
+      Builder(NullPerpEditParams)
+        .oracleConfig({
+          confFilter: 0.1,
+          maxStalenessSlots: 120,
+        })
+        .build(),
+    );
+  }
+}
+
+async function changeStartQuote() {
+  const result = await buildAdminClient();
+  const client = result[0];
+  const admin = result[1];
+  const creator = result[2];
+
+  const group = await client.getGroupForCreator(creator.publicKey, GROUP_NUM);
+
+  await client.tokenEdit(
+    group,
+    group.getFirstBankByMint(new PublicKey(MAINNET_MINTS.get('USDT')!)).mint,
+    Builder(NullTokenEditParams)
+      .depositWeightScaleStartQuote(toNative(1000000, 6).toNumber())
+      .borrowWeightScaleStartQuote(toNative(1000000, 6).toNumber())
+      .build(),
+  );
+  await client.tokenEdit(
+    group,
+    group.getFirstBankByMint(new PublicKey(MAINNET_MINTS.get('ETH')!)).mint,
+    Builder(NullTokenEditParams)
+      .depositWeightScaleStartQuote(toNative(100000, 6).toNumber())
+      .borrowWeightScaleStartQuote(toNative(100000, 6).toNumber())
+      .build(),
+  );
+  await client.tokenEdit(
+    group,
+    group.getFirstBankByMint(new PublicKey(MAINNET_MINTS.get('SOL')!)).mint,
+    Builder(NullTokenEditParams)
+      .depositWeightScaleStartQuote(toNative(5000000, 6).toNumber())
+      .borrowWeightScaleStartQuote(toNative(5000000, 6).toNumber())
+      .build(),
+  );
+  await client.tokenEdit(
+    group,
+    group.getFirstBankByMint(new PublicKey(MAINNET_MINTS.get('MSOL')!)).mint,
+    Builder(NullTokenEditParams)
+      .depositWeightScaleStartQuote(toNative(1000000, 6).toNumber())
+      .borrowWeightScaleStartQuote(toNative(1000000, 6).toNumber())
+      .build(),
+  );
+  await client.tokenEdit(
+    group,
+    group.getFirstBankByMint(new PublicKey(MAINNET_MINTS.get('MNGO')!)).mint,
+    Builder(NullTokenEditParams)
+      .depositWeightScaleStartQuote(toNative(5000, 6).toNumber())
+      .borrowWeightScaleStartQuote(toNative(5000, 6).toNumber())
+      .build(),
+  );
+  await client.tokenEdit(
+    group,
+    group.getFirstBankByMint(new PublicKey(MAINNET_MINTS.get('BONK')!)).mint,
+    Builder(NullTokenEditParams)
+      .depositWeightScaleStartQuote(toNative(100000, 6).toNumber())
+      .borrowWeightScaleStartQuote(toNative(100000, 6).toNumber())
+      .build(),
+  );
+}
+
 async function makePerpMarketReduceOnly() {
   const result = await buildAdminClient();
   const client = result[0];
@@ -681,6 +793,9 @@ async function main() {
   try {
     // await registerTokens();
     // await changeTokenOracle();
+    // await makeTokenReduceonly();
+    // await changeMaxStalenessSlots();
+    // await changeStartQuote();
   } catch (error) {
     console.log(error);
   }

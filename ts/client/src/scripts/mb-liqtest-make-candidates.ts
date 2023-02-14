@@ -53,6 +53,8 @@ const TOKEN_SCENARIOS: [string, [string, number][], [string, number][]][] = [
 
 async function main() {
   const options = AnchorProvider.defaultOptions();
+  options.commitment = 'processed';
+  options.preflightCommitment = 'finalized';
   const connection = new Connection(process.env.CLUSTER_URL!, options);
 
   const admin = Keypair.fromSecretKey(
@@ -70,6 +72,8 @@ async function main() {
     MANGO_V4_ID['mainnet-beta'],
     {
       idsSource: 'get-program-accounts',
+      prioritizationFee: 100,
+      txConfirmationCommitment: 'confirmed',
     },
   );
   console.log(`User ${userWallet.publicKey.toBase58()}`);
@@ -119,7 +123,7 @@ async function main() {
     await client.perpEditMarket(
       group,
       perpMarket.perpMarketIndex,
-      Builder(NullPerpEditParams).oracle(perpMarket.oracle).build(),
+      Builder(NullPerpEditParams).resetStablePrice(true).build(),
     );
   }
 
@@ -152,16 +156,12 @@ async function main() {
       try {
         await setBankPrice(bank, PRICES[liabName] / 2);
 
-        const withdrawIx = await client.tokenWithdrawNativeIx(
+        await client.tokenWithdrawNative(
           group,
           mangoAccount,
           liabMint,
           new BN(liabAmount),
           true,
-        );
-        await this.sendAndConfirmTransaction(
-          [...withdrawIx],
-          group.addressLookupTablesList,
         );
       } finally {
         // restore the oracle
@@ -377,16 +377,12 @@ async function main() {
       await setBankPrice(collateralBank, PRICES['SOL'] * 10);
 
       // Spot-borrow more than the collateral is worth
-      const withdrawIx = await client.tokenWithdrawNativeIx(
+      await client.tokenWithdrawNative(
         group,
         mangoAccount,
         liabMint,
         new BN(-5000),
         true,
-      );
-      await this.sendAndConfirmTransaction(
-        [...withdrawIx],
-        group.addressLookupTablesList,
       );
       await mangoAccount.reload(client);
 
