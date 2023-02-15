@@ -20,7 +20,9 @@ pub struct Group {
     // TODO: unused, use case - listing shit tokens with conservative parameters (mostly defaults)
     pub fast_listing_admin: Pubkey,
 
-    pub padding: [u8; 4],
+    pub pay_fees_with_mngo: u8,
+
+    pub padding: [u8; 3],
 
     pub insurance_vault: Pubkey,
     pub insurance_mint: Pubkey,
@@ -49,12 +51,16 @@ pub struct Group {
 }
 const_assert_eq!(
     size_of::<Group>(),
-    32 + 4 + 32 * 2 + 4 + 32 * 2 + 3 + 5 + 20 * 32 + 32 + 8 + 16 + 1864
+    32 + 4 + 32 * 2 + 1 + 3 + 32 * 2 + 3 + 5 + 20 * 32 + 32 + 8 + 16 + 1864
 );
 const_assert_eq!(size_of::<Group>(), 2736);
 const_assert_eq!(size_of::<Group>() % 8, 0);
 
 impl Group {
+    pub fn pay_fees_with_mngo(&self) -> bool {
+        self.pay_fees_with_mngo == 1
+    }
+
     pub fn is_testing(&self) -> bool {
         self.testing == 1
     }

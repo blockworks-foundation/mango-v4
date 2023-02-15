@@ -12,6 +12,7 @@ pub fn group_edit(
     testing_opt: Option<u8>,
     version_opt: Option<u8>,
     deposit_limit_quote_opt: Option<u64>,
+    pay_fees_with_mngo_opt: Option<u8>,
 ) -> Result<()> {
     let mut group = ctx.accounts.group.load_mut()?;
 
@@ -56,6 +57,15 @@ pub fn group_edit(
             deposit_limit_quote
         );
         group.deposit_limit_quote = deposit_limit_quote;
+    }
+
+    if let Some(pay_fees_with_mngo) = pay_fees_with_mngo_opt {
+        msg!(
+            "Pay fees with mngo old {:?}, new {:?}",
+            group.pay_fees_with_mngo,
+            pay_fees_with_mngo
+        );
+        group.pay_fees_with_mngo = pay_fees_with_mngo;
     }
 
     Ok(())
