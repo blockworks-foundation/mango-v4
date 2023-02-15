@@ -1,24 +1,7 @@
 use anchor_lang::prelude::*;
 
-use crate::error::MangoError;
+use crate::accounts_ix::*;
 use crate::state::*;
-
-#[derive(Accounts)]
-pub struct AccountToggleFreeze<'info> {
-    #[account(
-        constraint = group.load()?.is_ix_enabled(IxGate::AccountToggleFreeze) @ MangoError::IxIsDisabled,
-        constraint = group.load()?.admin == admin.key()
-    )]
-    pub group: AccountLoader<'info, Group>,
-
-    #[account(
-        mut,
-        has_one = group,
-    )]
-    pub account: AccountLoader<'info, MangoAccountFixed>,
-
-    pub admin: Signer<'info>,
-}
 
 // Freezing an account, prevents all instructions involving account (also settling and liquidation), except
 // perp consume events and force cancellation of orders

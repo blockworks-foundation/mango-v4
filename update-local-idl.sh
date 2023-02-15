@@ -3,7 +3,7 @@
 set -e pipefail
 
 # build program, 
-cargo run -p anchor-cli -- build
+cargo run -p anchor-cli -- build -- --features enable-gpl
 
 # patch types, which we want in rust, but anchor client doesn't support
 ./idl-fixup.sh

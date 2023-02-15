@@ -1,6 +1,6 @@
 use super::*;
 
-use mango_v4::instructions::{Serum3OrderType, Serum3SelfTradeBehavior, Serum3Side};
+use mango_v4::accounts_ix::{Serum3OrderType, Serum3SelfTradeBehavior, Serum3Side};
 
 #[tokio::test]
 async fn test_liq_tokens_force_cancel() -> Result<(), TransportError> {

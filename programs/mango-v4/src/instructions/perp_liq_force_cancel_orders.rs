@@ -1,35 +1,9 @@
 use anchor_lang::prelude::*;
 
+use crate::accounts_ix::*;
 use crate::error::*;
 use crate::health::*;
 use crate::state::*;
-
-#[derive(Accounts)]
-pub struct PerpLiqForceCancelOrders<'info> {
-    #[account(
-        constraint = group.load()?.is_ix_enabled(IxGate::PerpLiqForceCancelOrders) @ MangoError::IxIsDisabled,
-    )]
-    pub group: AccountLoader<'info, Group>,
-
-    // Allow force cancel even if account is frozen
-    #[account(
-        mut,
-        has_one = group
-    )]
-    pub account: AccountLoader<'info, MangoAccountFixed>,
-
-    #[account(
-        mut,
-        has_one = group,
-        has_one = bids,
-        has_one = asks,
-    )]
-    pub perp_market: AccountLoader<'info, PerpMarket>,
-    #[account(mut)]
-    pub bids: AccountLoader<'info, BookSide>,
-    #[account(mut)]
-    pub asks: AccountLoader<'info, BookSide>,
-}
 
 pub fn perp_liq_force_cancel_orders(
     ctx: Context<PerpLiqForceCancelOrders>,

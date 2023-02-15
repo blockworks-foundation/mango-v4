@@ -1,30 +1,7 @@
-use crate::{error::MangoError, state::*};
+use crate::accounts_ix::*;
+use crate::state::*;
 use anchor_lang::prelude::*;
-use anchor_spl::token::{self, CloseAccount, Token, TokenAccount};
-
-#[derive(Accounts)]
-pub struct GroupClose<'info> {
-    #[account(
-        mut,
-        has_one = admin,
-        has_one = insurance_vault,
-        constraint = group.load()?.is_testing(),
-        constraint = group.load()?.is_ix_enabled(IxGate::GroupClose) @ MangoError::IxIsDisabled,
-        close = sol_destination
-    )]
-    pub group: AccountLoader<'info, Group>,
-
-    pub admin: Signer<'info>,
-
-    #[account(mut)]
-    pub insurance_vault: Account<'info, TokenAccount>,
-
-    #[account(mut)]
-    /// CHECK: target for account rent needs no checks
-    pub sol_destination: UncheckedAccount<'info>,
-
-    pub token_program: Program<'info, Token>,
-}
+use anchor_spl::token::{self, CloseAccount};
 
 pub fn group_close(ctx: Context<GroupClose>) -> Result<()> {
     // close insurance vault (must be empty)

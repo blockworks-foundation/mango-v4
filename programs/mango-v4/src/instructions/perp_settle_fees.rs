@@ -5,41 +5,10 @@ use fixed::types::I80F48;
 use crate::accounts_zerocopy::*;
 use crate::error::*;
 use crate::health::{compute_health, new_fixed_order_account_retriever, HealthType};
-use crate::state::Bank;
-use crate::state::IxGate;
-use crate::state::{Group, MangoAccountFixed, MangoAccountLoader, PerpMarket};
+use crate::state::*;
 
+use crate::accounts_ix::*;
 use crate::logs::{emit_perp_balances, PerpSettleFeesLog, TokenBalanceLog};
-
-#[derive(Accounts)]
-pub struct PerpSettleFees<'info> {
-    #[account(
-        constraint = group.load()?.is_ix_enabled(IxGate::PerpSettleFees) @ MangoError::IxIsDisabled,
-    )]
-    pub group: AccountLoader<'info, Group>,
-
-    #[account(mut, has_one = group, has_one = oracle)]
-    pub perp_market: AccountLoader<'info, PerpMarket>,
-
-    // This account MUST have a loss
-    #[account(
-        mut,
-        has_one = group,
-        constraint = account.load()?.is_operational() @ MangoError::AccountIsFrozen
-    )]
-    pub account: AccountLoader<'info, MangoAccountFixed>,
-
-    /// CHECK: Oracle can have different account types, constrained by address in perp_market
-    pub oracle: UncheckedAccount<'info>,
-
-    // bank correctness is checked at #2
-    #[account(mut, has_one = group)]
-    pub settle_bank: AccountLoader<'info, Bank>,
-
-    /// CHECK: Oracle can have different account types
-    #[account(address = settle_bank.load()?.oracle)]
-    pub settle_oracle: UncheckedAccount<'info>,
-}
 
 pub fn perp_settle_fees(ctx: Context<PerpSettleFees>, max_settle_amount: u64) -> Result<()> {
     // max_settle_amount must greater than zero

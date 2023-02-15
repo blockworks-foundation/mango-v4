@@ -15,7 +15,7 @@ use fixed::types::I80F48;
 use futures::{stream, StreamExt, TryStreamExt};
 use itertools::Itertools;
 
-use mango_v4::instructions::{Serum3OrderType, Serum3SelfTradeBehavior, Serum3Side};
+use mango_v4::accounts_ix::{Serum3OrderType, Serum3SelfTradeBehavior, Serum3Side};
 use mango_v4::state::{
     Bank, Group, MangoAccountValue, PerpMarketIndex, PlaceOrderType, Serum3MarketIndex, Side,
     TokenIndex,
@@ -1348,7 +1348,7 @@ impl MangoClient {
                 ams
             },
             data: anchor_lang::InstructionData::data(&mango_v4::instruction::FlashLoanEnd {
-                flash_loan_type: mango_v4::instructions::FlashLoanType::Swap,
+                flash_loan_type: mango_v4::accounts_ix::FlashLoanType::Swap,
             }),
         });
 

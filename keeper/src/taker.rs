@@ -6,7 +6,7 @@ use std::{
 
 use fixed::types::I80F48;
 use futures::Future;
-use mango_v4::instructions::{Serum3OrderType, Serum3SelfTradeBehavior, Serum3Side};
+use mango_v4::accounts_ix::{Serum3OrderType, Serum3SelfTradeBehavior, Serum3Side};
 
 use tokio::time;
 

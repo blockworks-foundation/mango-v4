@@ -1,16 +1,7 @@
 use anchor_lang::prelude::*;
 
+use crate::accounts_ix::*;
 use crate::{error::MangoError, state::*};
-
-#[derive(Accounts)]
-pub struct IxGateSet<'info> {
-    #[account(
-        mut,
-        // group <-> admin relation is checked at #1
-    )]
-    pub group: AccountLoader<'info, Group>,
-    pub admin: Signer<'info>,
-}
 
 pub fn ix_gate_set(ctx: Context<IxGateSet>, ix_gate: u128) -> Result<()> {
     let mut group = ctx.accounts.group.load_mut()?;
