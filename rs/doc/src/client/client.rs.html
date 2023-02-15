@@ -1606,7 +1606,6 @@
 <a href="#1606" id="1606">1606</a>
 <a href="#1607" id="1607">1607</a>
 <a href="#1608" id="1608">1608</a>
-<a href="#1609" id="1609">1609</a>
 </pre><pre class="rust"><code><span class="kw">use </span>std::str::FromStr;
 <span class="kw">use </span>std::sync::Arc;
 <span class="kw">use </span>std::time::Duration;
@@ -1640,7 +1639,6 @@
 <span class="kw">use </span><span class="kw">crate</span>::context::{MangoGroupContext, Serum3MarketContext, TokenContext};
 <span class="kw">use </span><span class="kw">crate</span>::gpa::{fetch_anchor_account, fetch_mango_accounts};
 <span class="kw">use </span><span class="kw">crate</span>::jupiter;
-<span class="kw">use </span><span class="kw">crate</span>::util::MyClone;
 
 <span class="kw">use </span>anyhow::Context;
 <span class="kw">use </span>solana_sdk::account::ReadableAccount;
@@ -1663,13 +1661,13 @@
     <span class="kw">pub fn </span>new(
         cluster: Cluster,
         commitment: CommitmentConfig,
-        fee_payer: <span class="kw-2">&amp;</span>Keypair,
+        fee_payer: Arc&lt;Keypair&gt;,
         timeout: <span class="prelude-ty">Option</span>&lt;Duration&gt;,
         prioritization_micro_lamports: u64,
     ) -&gt; <span class="self">Self </span>{
         <span class="self">Self </span>{
             cluster,
-            fee_payer: Arc::new(fee_payer.clone()),
+            fee_payer,
             commitment,
             timeout,
             prioritization_micro_lamports,
@@ -1702,7 +1700,7 @@
     // call to refresh banks etc -- if it&#39;s backed by websockets, these could just do nothing
     </span><span class="kw">pub </span>account_fetcher: Arc&lt;<span class="kw">dyn </span>AccountFetcher&gt;,
 
-    <span class="kw">pub </span>owner: Keypair,
+    <span class="kw">pub </span>owner: Arc&lt;Keypair&gt;,
     <span class="kw">pub </span>mango_account_address: Pubkey,
 
     <span class="kw">pub </span>context: MangoGroupContext,
@@ -1828,7 +1826,7 @@
     </span><span class="kw">pub async fn </span>new_for_existing_account(
         client: Client,
         account: Pubkey,
-        owner: Keypair,
+        owner: Arc&lt;Keypair&gt;,
     ) -&gt; anyhow::Result&lt;<span class="self">Self</span>&gt; {
         <span class="kw">let </span>rpc = client.rpc_async();
         <span class="kw">let </span>account_fetcher = Arc::new(CachedAccountFetcher::new(Arc::new(RpcAccountFetcher {
@@ -1855,7 +1853,7 @@
     </span><span class="kw">pub fn </span>new_detail(
         client: Client,
         account: Pubkey,
-        owner: Keypair,
+        owner: Arc&lt;Keypair&gt;,
         <span class="comment">// future: maybe pass Arc&lt;MangoGroupContext&gt;, so it can be extenally updated?
         </span>group_context: MangoGroupContext,
         account_fetcher: Arc&lt;<span class="kw">dyn </span>AccountFetcher&gt;,
@@ -2969,7 +2967,7 @@
             instructions,
             address_lookup_tables,
             payer,
-            signers: <span class="macro">vec!</span>[<span class="kw-2">&amp;</span><span class="self">self</span>.owner],
+            signers: <span class="macro">vec!</span>[<span class="kw-2">&amp;*</span><span class="self">self</span>.owner],
         }
         .send_and_confirm(<span class="kw-2">&amp;</span><span class="self">self</span>.client)
         .<span class="kw">await
@@ -3054,7 +3052,7 @@
             instructions,
             address_lookup_tables: <span class="macro">vec!</span>[],
             payer: <span class="self">self</span>.client.fee_payer.pubkey(),
-            signers: <span class="macro">vec!</span>[<span class="kw-2">&amp;</span><span class="self">self</span>.owner, <span class="kw-2">&amp;*</span><span class="self">self</span>.client.fee_payer],
+            signers: <span class="macro">vec!</span>[<span class="kw-2">&amp;*</span><span class="self">self</span>.owner, <span class="kw-2">&amp;*</span><span class="self">self</span>.client.fee_payer],
         }
         .send_and_confirm(<span class="kw-2">&amp;</span><span class="self">self</span>.client)
         .<span class="kw">await
@@ -3091,7 +3089,7 @@
 <span class="kw">pub struct </span>TransactionBuilder&lt;<span class="lifetime">&#39;a</span>&gt; {
     instructions: Vec&lt;Instruction&gt;,
     address_lookup_tables: Vec&lt;AddressLookupTableAccount&gt;,
-    signers: Vec&lt;<span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span><span class="kw">dyn </span>Signer&gt;,
+    signers: Vec&lt;<span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span>Keypair&gt;,
     payer: Pubkey,
 }
 
