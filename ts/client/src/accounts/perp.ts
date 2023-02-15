@@ -475,8 +475,8 @@ export class PerpMarket {
 
         const perpSettleHealth = acc.account.getPerpSettleHealth(group);
         acc.settleablePnl =
-          // need positive health to settle against +ve pnl
-          perpSettleHealth.gt(ZERO_I80F48()) && !acc.account.beingLiquidated
+          // need positive settle health to settle against +ve pnl
+          perpSettleHealth.gt(ZERO_I80F48())
             ? // can only settle min
               acc.settleablePnl.max(perpSettleHealth.neg())
             : ZERO_I80F48();
