@@ -1,5 +1,24 @@
 _work in progress_
 
+## License
+
+See the LICENSE file.
+
+The majority of this repo is MIT licensed, but some parts needed for compiling
+the solana program are under GPL.
+
+All GPL code is gated behind the `enable-gpl` feature. If you use the `mango-v4`
+crate as a dependency with the `client` or `cpi` features, you use only MIT
+parts of it.
+
+The intention is for you to be able to depend on the `mango-v4` crate for
+building closed-source tools and integrations, including other solana programs
+that call into the mango program.
+
+But deriving a solana program with similar functionality to the mango program
+from this codebase would require the changes and improvements to stay publicly
+available under GPL.
+
 ## Development
 
 See DEVELOPING.md
