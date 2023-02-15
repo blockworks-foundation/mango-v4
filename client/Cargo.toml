@@ -7,9 +7,9 @@ edition = "2021"
 doctest = false
 
 [dependencies]
-anchor-client = { path = "../anchor/client" }
-anchor-lang = { path = "../anchor/lang" }
-anchor-spl = { path = "../anchor/spl" }
+anchor-client = { path = "../3rdparty/anchor/client" }
+anchor-lang = { path = "../3rdparty/anchor/lang" }
+anchor-spl = { path = "../3rdparty/anchor/spl" }
 anyhow = "1.0"
 async-once-cell = { version = "0.4.2", features = ["unpin"] }
 async-trait = "0.1.52"

@@ -4,8 +4,8 @@ version = "0.0.1"
 edition = "2021"
 
 [dependencies]
-anchor-lang = { path = "../anchor/lang" }
-anchor-client = { path = "../anchor/client" }
+anchor-lang = { path = "../3rdparty/anchor/lang" }
+anchor-client = { path = "../3rdparty/anchor/client" }
 anyhow = "1.0"
 arrayref = "0.3.6"
 async-channel = "1.6"

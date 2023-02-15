@@ -1,7 +1,7 @@
 [submodule "anchor"]
-	path = anchor
+	path = 3rdparty/anchor
 	url = https://github.com/blockworks-foundation/anchor.git
 	branch = v0.25.0-mangov4
 [submodule "switchboard-v2"]
-	path = switchboard-v2
+	path = 3rdparty/switchboard-v2
 	url = https://github.com/blockworks-foundation/sbv2-solana.git

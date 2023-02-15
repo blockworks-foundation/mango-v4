@@ -4,6 +4,9 @@ All files in the programs/mango-v4/src/instructions directory and below
 are licensed under the GNU General Public License v3.0. See
 programs/mango-v4/src/instructions/LICENSE.
 
+The contents of the 3rdparty/ directory and below are covered by the
+licenses specified in the subfolders.
+
 All other files are licensed under the MIT License reproduced below.
 
 MIT License
