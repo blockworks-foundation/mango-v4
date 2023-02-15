@@ -1624,7 +1624,7 @@
 <span class="kw">use </span>futures::{stream, StreamExt, TryStreamExt};
 <span class="kw">use </span>itertools::Itertools;
 
-<span class="kw">use </span>mango_v4::instructions::{Serum3OrderType, Serum3SelfTradeBehavior, Serum3Side};
+<span class="kw">use </span>mango_v4::accounts_ix::{Serum3OrderType, Serum3SelfTradeBehavior, Serum3Side};
 <span class="kw">use </span>mango_v4::state::{
     Bank, Group, MangoAccountValue, PerpMarketIndex, PlaceOrderType, Serum3MarketIndex, Side,
     TokenIndex,
@@ -2957,7 +2957,7 @@
                 ams
             },
             data: anchor_lang::InstructionData::data(<span class="kw-2">&amp;</span>mango_v4::instruction::FlashLoanEnd {
-                flash_loan_type: mango_v4::instructions::FlashLoanType::Swap,
+                flash_loan_type: mango_v4::accounts_ix::FlashLoanType::Swap,
             }),
         });
 

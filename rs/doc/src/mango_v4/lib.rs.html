@@ -797,7 +797,141 @@
 <a href="#797" id="797">797</a>
 <a href="#798" id="798">798</a>
 <a href="#799" id="799">799</a>
-</pre><pre class="rust"><code><span class="kw">use </span>fixed::types::I80F48;
+<a href="#800" id="800">800</a>
+<a href="#801" id="801">801</a>
+<a href="#802" id="802">802</a>
+<a href="#803" id="803">803</a>
+<a href="#804" id="804">804</a>
+<a href="#805" id="805">805</a>
+<a href="#806" id="806">806</a>
+<a href="#807" id="807">807</a>
+<a href="#808" id="808">808</a>
+<a href="#809" id="809">809</a>
+<a href="#810" id="810">810</a>
+<a href="#811" id="811">811</a>
+<a href="#812" id="812">812</a>
+<a href="#813" id="813">813</a>
+<a href="#814" id="814">814</a>
+<a href="#815" id="815">815</a>
+<a href="#816" id="816">816</a>
+<a href="#817" id="817">817</a>
+<a href="#818" id="818">818</a>
+<a href="#819" id="819">819</a>
+<a href="#820" id="820">820</a>
+<a href="#821" id="821">821</a>
+<a href="#822" id="822">822</a>
+<a href="#823" id="823">823</a>
+<a href="#824" id="824">824</a>
+<a href="#825" id="825">825</a>
+<a href="#826" id="826">826</a>
+<a href="#827" id="827">827</a>
+<a href="#828" id="828">828</a>
+<a href="#829" id="829">829</a>
+<a href="#830" id="830">830</a>
+<a href="#831" id="831">831</a>
+<a href="#832" id="832">832</a>
+<a href="#833" id="833">833</a>
+<a href="#834" id="834">834</a>
+<a href="#835" id="835">835</a>
+<a href="#836" id="836">836</a>
+<a href="#837" id="837">837</a>
+<a href="#838" id="838">838</a>
+<a href="#839" id="839">839</a>
+<a href="#840" id="840">840</a>
+<a href="#841" id="841">841</a>
+<a href="#842" id="842">842</a>
+<a href="#843" id="843">843</a>
+<a href="#844" id="844">844</a>
+<a href="#845" id="845">845</a>
+<a href="#846" id="846">846</a>
+<a href="#847" id="847">847</a>
+<a href="#848" id="848">848</a>
+<a href="#849" id="849">849</a>
+<a href="#850" id="850">850</a>
+<a href="#851" id="851">851</a>
+<a href="#852" id="852">852</a>
+<a href="#853" id="853">853</a>
+<a href="#854" id="854">854</a>
+<a href="#855" id="855">855</a>
+<a href="#856" id="856">856</a>
+<a href="#857" id="857">857</a>
+<a href="#858" id="858">858</a>
+<a href="#859" id="859">859</a>
+<a href="#860" id="860">860</a>
+<a href="#861" id="861">861</a>
+<a href="#862" id="862">862</a>
+<a href="#863" id="863">863</a>
+<a href="#864" id="864">864</a>
+<a href="#865" id="865">865</a>
+<a href="#866" id="866">866</a>
+<a href="#867" id="867">867</a>
+<a href="#868" id="868">868</a>
+<a href="#869" id="869">869</a>
+<a href="#870" id="870">870</a>
+<a href="#871" id="871">871</a>
+<a href="#872" id="872">872</a>
+<a href="#873" id="873">873</a>
+<a href="#874" id="874">874</a>
+<a href="#875" id="875">875</a>
+<a href="#876" id="876">876</a>
+<a href="#877" id="877">877</a>
+<a href="#878" id="878">878</a>
+<a href="#879" id="879">879</a>
+<a href="#880" id="880">880</a>
+<a href="#881" id="881">881</a>
+<a href="#882" id="882">882</a>
+<a href="#883" id="883">883</a>
+<a href="#884" id="884">884</a>
+<a href="#885" id="885">885</a>
+<a href="#886" id="886">886</a>
+<a href="#887" id="887">887</a>
+<a href="#888" id="888">888</a>
+<a href="#889" id="889">889</a>
+<a href="#890" id="890">890</a>
+<a href="#891" id="891">891</a>
+<a href="#892" id="892">892</a>
+<a href="#893" id="893">893</a>
+<a href="#894" id="894">894</a>
+<a href="#895" id="895">895</a>
+<a href="#896" id="896">896</a>
+<a href="#897" id="897">897</a>
+<a href="#898" id="898">898</a>
+<a href="#899" id="899">899</a>
+<a href="#900" id="900">900</a>
+<a href="#901" id="901">901</a>
+<a href="#902" id="902">902</a>
+<a href="#903" id="903">903</a>
+<a href="#904" id="904">904</a>
+<a href="#905" id="905">905</a>
+<a href="#906" id="906">906</a>
+<a href="#907" id="907">907</a>
+<a href="#908" id="908">908</a>
+<a href="#909" id="909">909</a>
+<a href="#910" id="910">910</a>
+<a href="#911" id="911">911</a>
+<a href="#912" id="912">912</a>
+<a href="#913" id="913">913</a>
+<a href="#914" id="914">914</a>
+<a href="#915" id="915">915</a>
+<a href="#916" id="916">916</a>
+<a href="#917" id="917">917</a>
+<a href="#918" id="918">918</a>
+<a href="#919" id="919">919</a>
+<a href="#920" id="920">920</a>
+<a href="#921" id="921">921</a>
+<a href="#922" id="922">922</a>
+<a href="#923" id="923">923</a>
+<a href="#924" id="924">924</a>
+<a href="#925" id="925">925</a>
+<a href="#926" id="926">926</a>
+<a href="#927" id="927">927</a>
+<a href="#928" id="928">928</a>
+<a href="#929" id="929">929</a>
+<a href="#930" id="930">930</a>
+<a href="#931" id="931">931</a>
+</pre><pre class="rust"><code><span class="attr">#![allow(unused_variables)]
+
+</span><span class="kw">use </span>fixed::types::I80F48;
 
 <span class="attr">#[macro_use]
 </span><span class="kw">pub mod </span>util;
@@ -807,19 +941,25 @@
 
 <span class="kw">use </span>anchor_lang::prelude::<span class="kw-2">*</span>;
 
-<span class="kw">use </span>instructions::<span class="kw-2">*</span>;
+<span class="kw">use </span>accounts_ix::<span class="kw-2">*</span>;
 
+<span class="kw">pub mod </span>accounts_ix;
 <span class="kw">pub mod </span>accounts_zerocopy;
 <span class="kw">pub mod </span>address_lookup_table_program;
 <span class="kw">pub mod </span>error;
 <span class="kw">pub mod </span>events;
 <span class="kw">pub mod </span>health;
 <span class="kw">pub mod </span>i80f48;
-<span class="kw">pub mod </span>instructions;
 <span class="kw">pub mod </span>logs;
 <span class="kw">pub mod </span>serum3_cpi;
 <span class="kw">pub mod </span>state;
 <span class="kw">pub mod </span>types;
+
+<span class="attr">#[cfg(feature = <span class="string">&quot;enable-gpl&quot;</span>)]
+</span><span class="kw">pub mod </span>instructions;
+
+<span class="attr">#[cfg(all(not(feature = <span class="string">&quot;no-entrypoint&quot;</span>), not(feature = <span class="string">&quot;enable-gpl&quot;</span>)))]
+</span><span class="macro">compile_error!</span>(<span class="string">&quot;compiling the program entrypoint without &#39;enable-gpl&#39; makes no sense, enable it or use the &#39;cpi&#39; or &#39;client&#39; features&quot;</span>);
 
 <span class="kw">use </span>state::{
     OracleConfigParams, PerpMarketIndex, PlaceOrderType, Serum3MarketIndex, Side, TokenIndex,
@@ -837,7 +977,9 @@
         testing: u8,
         version: u8,
     ) -&gt; <span class="prelude-ty">Result</span>&lt;()&gt; {
-        instructions::group_create(ctx, group_num, testing, version)
+        <span class="attr">#[cfg(feature = <span class="string">&quot;enable-gpl&quot;</span>)]
+        </span>instructions::group_create(ctx, group_num, testing, version)<span class="question-mark">?</span>;
+        <span class="prelude-val">Ok</span>(())
     }
 
     <span class="kw">pub fn </span>group_edit(
@@ -849,7 +991,8 @@
         version_opt: <span class="prelude-ty">Option</span>&lt;u8&gt;,
         deposit_limit_quote_opt: <span class="prelude-ty">Option</span>&lt;u64&gt;,
     ) -&gt; <span class="prelude-ty">Result</span>&lt;()&gt; {
-        instructions::group_edit(
+        <span class="attr">#[cfg(feature = <span class="string">&quot;enable-gpl&quot;</span>)]
+        </span>instructions::group_edit(
             ctx,
             admin_opt,
             fast_listing_admin_opt,
@@ -857,15 +1000,20 @@
             testing_opt,
             version_opt,
             deposit_limit_quote_opt,
-        )
+        )<span class="question-mark">?</span>;
+        <span class="prelude-val">Ok</span>(())
     }
 
     <span class="kw">pub fn </span>ix_gate_set(ctx: Context&lt;IxGateSet&gt;, ix_gate: u128) -&gt; <span class="prelude-ty">Result</span>&lt;()&gt; {
-        instructions::ix_gate_set(ctx, ix_gate)
+        <span class="attr">#[cfg(feature = <span class="string">&quot;enable-gpl&quot;</span>)]
+        </span>instructions::ix_gate_set(ctx, ix_gate)<span class="question-mark">?</span>;
+        <span class="prelude-val">Ok</span>(())
     }
 
     <span class="kw">pub fn </span>group_close(ctx: Context&lt;GroupClose&gt;) -&gt; <span class="prelude-ty">Result</span>&lt;()&gt; {
-        instructions::group_close(ctx)
+        <span class="attr">#[cfg(feature = <span class="string">&quot;enable-gpl&quot;</span>)]
+        </span>instructions::group_close(ctx)<span class="question-mark">?</span>;
+        <span class="prelude-val">Ok</span>(())
     }
 
     <span class="attr">#[allow(clippy::too_many_arguments)]
@@ -886,7 +1034,8 @@
         net_borrow_limit_window_size_ts: u64,
         net_borrow_limit_per_window_quote: i64,
     ) -&gt; <span class="prelude-ty">Result</span>&lt;()&gt; {
-        instructions::token_register(
+        <span class="attr">#[cfg(feature = <span class="string">&quot;enable-gpl&quot;</span>)]
+        </span>instructions::token_register(
             ctx,
             token_index,
             name,
@@ -902,7 +1051,8 @@
             min_vault_to_deposits_ratio,
             net_borrow_limit_window_size_ts,
             net_borrow_limit_per_window_quote,
-        )
+        )<span class="question-mark">?</span>;
+        <span class="prelude-val">Ok</span>(())
     }
 
     <span class="kw">pub fn </span>token_register_trustless(
@@ -910,7 +1060,9 @@
         token_index: TokenIndex,
         name: String,
     ) -&gt; <span class="prelude-ty">Result</span>&lt;()&gt; {
-        instructions::token_register_trustless(ctx, token_index, name)
+        <span class="attr">#[cfg(feature = <span class="string">&quot;enable-gpl&quot;</span>)]
+        </span>instructions::token_register_trustless(ctx, token_index, name)<span class="question-mark">?</span>;
+        <span class="prelude-val">Ok</span>(())
     }
 
     <span class="attr">#[allow(clippy::too_many_arguments)]
@@ -939,7 +1091,8 @@
         reset_net_borrow_limit: bool,
         reduce_only_opt: <span class="prelude-ty">Option</span>&lt;bool&gt;,
     ) -&gt; <span class="prelude-ty">Result</span>&lt;()&gt; {
-        instructions::token_edit(
+        <span class="attr">#[cfg(feature = <span class="string">&quot;enable-gpl&quot;</span>)]
+        </span>instructions::token_edit(
             ctx,
             oracle_opt,
             oracle_config_opt,
@@ -963,7 +1116,8 @@
             reset_stable_price,
             reset_net_borrow_limit,
             reduce_only_opt,
-        )
+        )<span class="question-mark">?</span>;
+        <span class="prelude-val">Ok</span>(())
     }
 
     <span class="attr">#[allow(clippy::too_many_arguments)]
@@ -972,17 +1126,23 @@
         token_index: TokenIndex,
         bank_num: u32,
     ) -&gt; <span class="prelude-ty">Result</span>&lt;()&gt; {
-        instructions::token_add_bank(ctx, token_index, bank_num)
+        <span class="attr">#[cfg(feature = <span class="string">&quot;enable-gpl&quot;</span>)]
+        </span>instructions::token_add_bank(ctx, token_index, bank_num)<span class="question-mark">?</span>;
+        <span class="prelude-val">Ok</span>(())
     }
 
     <span class="kw">pub fn </span>token_deregister&lt;<span class="lifetime">&#39;key</span>, <span class="lifetime">&#39;accounts</span>, <span class="lifetime">&#39;remaining</span>, <span class="lifetime">&#39;info</span>&gt;(
         ctx: Context&lt;<span class="lifetime">&#39;key</span>, <span class="lifetime">&#39;accounts</span>, <span class="lifetime">&#39;remaining</span>, <span class="lifetime">&#39;info</span>, TokenDeregister&lt;<span class="lifetime">&#39;info</span>&gt;&gt;,
     ) -&gt; <span class="prelude-ty">Result</span>&lt;()&gt; {
-        instructions::token_deregister(ctx)
+        <span class="attr">#[cfg(feature = <span class="string">&quot;enable-gpl&quot;</span>)]
+        </span>instructions::token_deregister(ctx)<span class="question-mark">?</span>;
+        <span class="prelude-val">Ok</span>(())
     }
 
     <span class="kw">pub fn </span>token_update_index_and_rate(ctx: Context&lt;TokenUpdateIndexAndRate&gt;) -&gt; <span class="prelude-ty">Result</span>&lt;()&gt; {
-        instructions::token_update_index_and_rate(ctx)
+        <span class="attr">#[cfg(feature = <span class="string">&quot;enable-gpl&quot;</span>)]
+        </span>instructions::token_update_index_and_rate(ctx)<span class="question-mark">?</span>;
+        <span class="prelude-val">Ok</span>(())
     }
 
     <span class="kw">pub fn </span>account_create(
@@ -994,7 +1154,8 @@
         perp_oo_count: u8,
         name: String,
     ) -&gt; <span class="prelude-ty">Result</span>&lt;()&gt; {
-        instructions::account_create(
+        <span class="attr">#[cfg(feature = <span class="string">&quot;enable-gpl&quot;</span>)]
+        </span>instructions::account_create(
             ctx,
             account_num,
             token_count,
@@ -1002,7 +1163,8 @@
             perp_count,
             perp_oo_count,
             name,
-        )
+        )<span class="question-mark">?</span>;
+        <span class="prelude-val">Ok</span>(())
     }
 
     <span class="kw">pub fn </span>account_expand(
@@ -1012,7 +1174,9 @@
         perp_count: u8,
         perp_oo_count: u8,
     ) -&gt; <span class="prelude-ty">Result</span>&lt;()&gt; {
-        instructions::account_expand(ctx, token_count, serum3_count, perp_count, perp_oo_count)
+        <span class="attr">#[cfg(feature = <span class="string">&quot;enable-gpl&quot;</span>)]
+        </span>instructions::account_expand(ctx, token_count, serum3_count, perp_count, perp_oo_count)<span class="question-mark">?</span>;
+        <span class="prelude-val">Ok</span>(())
     }
 
     <span class="kw">pub fn </span>account_edit(
@@ -1020,15 +1184,21 @@
         name_opt: <span class="prelude-ty">Option</span>&lt;String&gt;,
         delegate_opt: <span class="prelude-ty">Option</span>&lt;Pubkey&gt;,
     ) -&gt; <span class="prelude-ty">Result</span>&lt;()&gt; {
-        instructions::account_edit(ctx, name_opt, delegate_opt)
+        <span class="attr">#[cfg(feature = <span class="string">&quot;enable-gpl&quot;</span>)]
+        </span>instructions::account_edit(ctx, name_opt, delegate_opt)<span class="question-mark">?</span>;
+        <span class="prelude-val">Ok</span>(())
     }
 
     <span class="kw">pub fn </span>account_toggle_freeze(ctx: Context&lt;AccountToggleFreeze&gt;, freeze: bool) -&gt; <span class="prelude-ty">Result</span>&lt;()&gt; {
-        instructions::account_toggle_freeze(ctx, freeze)
+        <span class="attr">#[cfg(feature = <span class="string">&quot;enable-gpl&quot;</span>)]
+        </span>instructions::account_toggle_freeze(ctx, freeze)<span class="question-mark">?</span>;
+        <span class="prelude-val">Ok</span>(())
     }
 
     <span class="kw">pub fn </span>account_close(ctx: Context&lt;AccountClose&gt;, force_close: bool) -&gt; <span class="prelude-ty">Result</span>&lt;()&gt; {
-        instructions::account_close(ctx, force_close)
+        <span class="attr">#[cfg(feature = <span class="string">&quot;enable-gpl&quot;</span>)]
+        </span>instructions::account_close(ctx, force_close)<span class="question-mark">?</span>;
+        <span class="prelude-val">Ok</span>(())
     }
 
     <span class="comment">// todo:
@@ -1037,19 +1207,27 @@
     // and it&#39;s tricky to use in typescript generally
     // lets do an interface pass later
     </span><span class="kw">pub fn </span>stub_oracle_create(ctx: Context&lt;StubOracleCreate&gt;, price: I80F48) -&gt; <span class="prelude-ty">Result</span>&lt;()&gt; {
-        instructions::stub_oracle_create(ctx, price)
+        <span class="attr">#[cfg(feature = <span class="string">&quot;enable-gpl&quot;</span>)]
+        </span>instructions::stub_oracle_create(ctx, price)<span class="question-mark">?</span>;
+        <span class="prelude-val">Ok</span>(())
     }
 
     <span class="kw">pub fn </span>stub_oracle_close(ctx: Context&lt;StubOracleClose&gt;) -&gt; <span class="prelude-ty">Result</span>&lt;()&gt; {
-        instructions::stub_oracle_close(ctx)
+        <span class="attr">#[cfg(feature = <span class="string">&quot;enable-gpl&quot;</span>)]
+        </span>instructions::stub_oracle_close(ctx)<span class="question-mark">?</span>;
+        <span class="prelude-val">Ok</span>(())
     }
 
     <span class="kw">pub fn </span>stub_oracle_set(ctx: Context&lt;StubOracleSet&gt;, price: I80F48) -&gt; <span class="prelude-ty">Result</span>&lt;()&gt; {
-        instructions::stub_oracle_set(ctx, price)
+        <span class="attr">#[cfg(feature = <span class="string">&quot;enable-gpl&quot;</span>)]
+        </span>instructions::stub_oracle_set(ctx, price)<span class="question-mark">?</span>;
+        <span class="prelude-val">Ok</span>(())
     }
 
     <span class="kw">pub fn </span>token_deposit(ctx: Context&lt;TokenDeposit&gt;, amount: u64, reduce_only: bool) -&gt; <span class="prelude-ty">Result</span>&lt;()&gt; {
-        instructions::token_deposit(ctx, amount, reduce_only)
+        <span class="attr">#[cfg(feature = <span class="string">&quot;enable-gpl&quot;</span>)]
+        </span>instructions::token_deposit(ctx, amount, reduce_only)<span class="question-mark">?</span>;
+        <span class="prelude-val">Ok</span>(())
     }
 
     <span class="kw">pub fn </span>token_deposit_into_existing(
@@ -1057,7 +1235,9 @@
         amount: u64,
         reduce_only: bool,
     ) -&gt; <span class="prelude-ty">Result</span>&lt;()&gt; {
-        instructions::token_deposit_into_existing(ctx, amount, reduce_only)
+        <span class="attr">#[cfg(feature = <span class="string">&quot;enable-gpl&quot;</span>)]
+        </span>instructions::token_deposit_into_existing(ctx, amount, reduce_only)<span class="question-mark">?</span>;
+        <span class="prelude-val">Ok</span>(())
     }
 
     <span class="kw">pub fn </span>token_withdraw(
@@ -1065,33 +1245,43 @@
         amount: u64,
         allow_borrow: bool,
     ) -&gt; <span class="prelude-ty">Result</span>&lt;()&gt; {
-        instructions::token_withdraw(ctx, amount, allow_borrow)
+        <span class="attr">#[cfg(feature = <span class="string">&quot;enable-gpl&quot;</span>)]
+        </span>instructions::token_withdraw(ctx, amount, allow_borrow)<span class="question-mark">?</span>;
+        <span class="prelude-val">Ok</span>(())
     }
 
     <span class="kw">pub fn </span>flash_loan_begin&lt;<span class="lifetime">&#39;key</span>, <span class="lifetime">&#39;accounts</span>, <span class="lifetime">&#39;remaining</span>, <span class="lifetime">&#39;info</span>&gt;(
         ctx: Context&lt;<span class="lifetime">&#39;key</span>, <span class="lifetime">&#39;accounts</span>, <span class="lifetime">&#39;remaining</span>, <span class="lifetime">&#39;info</span>, FlashLoanBegin&lt;<span class="lifetime">&#39;info</span>&gt;&gt;,
         loan_amounts: Vec&lt;u64&gt;,
     ) -&gt; <span class="prelude-ty">Result</span>&lt;()&gt; {
-        instructions::flash_loan_begin(ctx, loan_amounts)
+        <span class="attr">#[cfg(feature = <span class="string">&quot;enable-gpl&quot;</span>)]
+        </span>instructions::flash_loan_begin(ctx, loan_amounts)<span class="question-mark">?</span>;
+        <span class="prelude-val">Ok</span>(())
     }
 
     <span class="kw">pub fn </span>flash_loan_end&lt;<span class="lifetime">&#39;key</span>, <span class="lifetime">&#39;accounts</span>, <span class="lifetime">&#39;remaining</span>, <span class="lifetime">&#39;info</span>&gt;(
         ctx: Context&lt;<span class="lifetime">&#39;key</span>, <span class="lifetime">&#39;accounts</span>, <span class="lifetime">&#39;remaining</span>, <span class="lifetime">&#39;info</span>, FlashLoanEnd&lt;<span class="lifetime">&#39;info</span>&gt;&gt;,
         flash_loan_type: FlashLoanType,
     ) -&gt; <span class="prelude-ty">Result</span>&lt;()&gt; {
-        instructions::flash_loan_end(ctx, flash_loan_type)
+        <span class="attr">#[cfg(feature = <span class="string">&quot;enable-gpl&quot;</span>)]
+        </span>instructions::flash_loan_end(ctx, flash_loan_type)<span class="question-mark">?</span>;
+        <span class="prelude-val">Ok</span>(())
     }
 
     <span class="kw">pub fn </span>health_region_begin&lt;<span class="lifetime">&#39;key</span>, <span class="lifetime">&#39;accounts</span>, <span class="lifetime">&#39;remaining</span>, <span class="lifetime">&#39;info</span>&gt;(
         ctx: Context&lt;<span class="lifetime">&#39;key</span>, <span class="lifetime">&#39;accounts</span>, <span class="lifetime">&#39;remaining</span>, <span class="lifetime">&#39;info</span>, HealthRegionBegin&lt;<span class="lifetime">&#39;info</span>&gt;&gt;,
     ) -&gt; <span class="prelude-ty">Result</span>&lt;()&gt; {
-        instructions::health_region_begin(ctx)
+        <span class="attr">#[cfg(feature = <span class="string">&quot;enable-gpl&quot;</span>)]
+        </span>instructions::health_region_begin(ctx)<span class="question-mark">?</span>;
+        <span class="prelude-val">Ok</span>(())
     }
 
     <span class="kw">pub fn </span>health_region_end&lt;<span class="lifetime">&#39;key</span>, <span class="lifetime">&#39;accounts</span>, <span class="lifetime">&#39;remaining</span>, <span class="lifetime">&#39;info</span>&gt;(
         ctx: Context&lt;<span class="lifetime">&#39;key</span>, <span class="lifetime">&#39;accounts</span>, <span class="lifetime">&#39;remaining</span>, <span class="lifetime">&#39;info</span>, HealthRegionEnd&lt;<span class="lifetime">&#39;info</span>&gt;&gt;,
     ) -&gt; <span class="prelude-ty">Result</span>&lt;()&gt; {
-        instructions::health_region_end(ctx)
+        <span class="attr">#[cfg(feature = <span class="string">&quot;enable-gpl&quot;</span>)]
+        </span>instructions::health_region_end(ctx)<span class="question-mark">?</span>;
+        <span class="prelude-val">Ok</span>(())
     }
 
     <span class="doccomment">///
@@ -1103,14 +1293,18 @@
         market_index: Serum3MarketIndex,
         name: String,
     ) -&gt; <span class="prelude-ty">Result</span>&lt;()&gt; {
-        instructions::serum3_register_market(ctx, market_index, name)
+        <span class="attr">#[cfg(feature = <span class="string">&quot;enable-gpl&quot;</span>)]
+        </span>instructions::serum3_register_market(ctx, market_index, name)<span class="question-mark">?</span>;
+        <span class="prelude-val">Ok</span>(())
     }
 
     <span class="kw">pub fn </span>serum3_edit_market(
         ctx: Context&lt;Serum3EditMarket&gt;,
         reduce_only_opt: <span class="prelude-ty">Option</span>&lt;bool&gt;,
     ) -&gt; <span class="prelude-ty">Result</span>&lt;()&gt; {
-        instructions::serum3_edit_market(ctx, reduce_only_opt)
+        <span class="attr">#[cfg(feature = <span class="string">&quot;enable-gpl&quot;</span>)]
+        </span>instructions::serum3_edit_market(ctx, reduce_only_opt)<span class="question-mark">?</span>;
+        <span class="prelude-val">Ok</span>(())
     }
 
     <span class="comment">// note:
@@ -1119,15 +1313,21 @@
     // should be edited once set on creation
 
     </span><span class="kw">pub fn </span>serum3_deregister_market(ctx: Context&lt;Serum3DeregisterMarket&gt;) -&gt; <span class="prelude-ty">Result</span>&lt;()&gt; {
-        instructions::serum3_deregister_market(ctx)
+        <span class="attr">#[cfg(feature = <span class="string">&quot;enable-gpl&quot;</span>)]
+        </span>instructions::serum3_deregister_market(ctx)<span class="question-mark">?</span>;
+        <span class="prelude-val">Ok</span>(())
     }
 
     <span class="kw">pub fn </span>serum3_create_open_orders(ctx: Context&lt;Serum3CreateOpenOrders&gt;) -&gt; <span class="prelude-ty">Result</span>&lt;()&gt; {
-        instructions::serum3_create_open_orders(ctx)
+        <span class="attr">#[cfg(feature = <span class="string">&quot;enable-gpl&quot;</span>)]
+        </span>instructions::serum3_create_open_orders(ctx)<span class="question-mark">?</span>;
+        <span class="prelude-val">Ok</span>(())
     }
 
     <span class="kw">pub fn </span>serum3_close_open_orders(ctx: Context&lt;Serum3CloseOpenOrders&gt;) -&gt; <span class="prelude-ty">Result</span>&lt;()&gt; {
-        instructions::serum3_close_open_orders(ctx)
+        <span class="attr">#[cfg(feature = <span class="string">&quot;enable-gpl&quot;</span>)]
+        </span>instructions::serum3_close_open_orders(ctx)<span class="question-mark">?</span>;
+        <span class="prelude-val">Ok</span>(())
     }
 
     <span class="attr">#[allow(clippy::too_many_arguments)]
@@ -1142,7 +1342,8 @@
         client_order_id: u64,
         limit: u16,
     ) -&gt; <span class="prelude-ty">Result</span>&lt;()&gt; {
-        instructions::serum3_place_order(
+        <span class="attr">#[cfg(feature = <span class="string">&quot;enable-gpl&quot;</span>)]
+        </span>instructions::serum3_place_order(
             ctx,
             side,
             limit_price,
@@ -1152,7 +1353,8 @@
             order_type,
             client_order_id,
             limit,
-        )
+        )<span class="question-mark">?</span>;
+        <span class="prelude-val">Ok</span>(())
     }
 
     <span class="kw">pub fn </span>serum3_cancel_order(
@@ -1160,22 +1362,30 @@
         side: Serum3Side,
         order_id: u128,
     ) -&gt; <span class="prelude-ty">Result</span>&lt;()&gt; {
-        instructions::serum3_cancel_order(ctx, side, order_id)
+        <span class="attr">#[cfg(feature = <span class="string">&quot;enable-gpl&quot;</span>)]
+        </span>instructions::serum3_cancel_order(ctx, side, order_id)<span class="question-mark">?</span>;
+        <span class="prelude-val">Ok</span>(())
     }
 
     <span class="kw">pub fn </span>serum3_cancel_all_orders(ctx: Context&lt;Serum3CancelAllOrders&gt;, limit: u8) -&gt; <span class="prelude-ty">Result</span>&lt;()&gt; {
-        instructions::serum3_cancel_all_orders(ctx, limit)
+        <span class="attr">#[cfg(feature = <span class="string">&quot;enable-gpl&quot;</span>)]
+        </span>instructions::serum3_cancel_all_orders(ctx, limit)<span class="question-mark">?</span>;
+        <span class="prelude-val">Ok</span>(())
     }
 
     <span class="kw">pub fn </span>serum3_settle_funds(ctx: Context&lt;Serum3SettleFunds&gt;) -&gt; <span class="prelude-ty">Result</span>&lt;()&gt; {
-        instructions::serum3_settle_funds(ctx)
+        <span class="attr">#[cfg(feature = <span class="string">&quot;enable-gpl&quot;</span>)]
+        </span>instructions::serum3_settle_funds(ctx)<span class="question-mark">?</span>;
+        <span class="prelude-val">Ok</span>(())
     }
 
     <span class="kw">pub fn </span>serum3_liq_force_cancel_orders(
         ctx: Context&lt;Serum3LiqForceCancelOrders&gt;,
         limit: u8,
     ) -&gt; <span class="prelude-ty">Result</span>&lt;()&gt; {
-        instructions::serum3_liq_force_cancel_orders(ctx, limit)
+        <span class="attr">#[cfg(feature = <span class="string">&quot;enable-gpl&quot;</span>)]
+        </span>instructions::serum3_liq_force_cancel_orders(ctx, limit)<span class="question-mark">?</span>;
+        <span class="prelude-val">Ok</span>(())
     }
 
     <span class="comment">// DEPRECATED: use token_liq_with_token
@@ -1185,12 +1395,14 @@
         liab_token_index: TokenIndex,
         max_liab_transfer: I80F48,
     ) -&gt; <span class="prelude-ty">Result</span>&lt;()&gt; {
-        instructions::token_liq_with_token(
+        <span class="attr">#[cfg(feature = <span class="string">&quot;enable-gpl&quot;</span>)]
+        </span>instructions::token_liq_with_token(
             ctx,
             asset_token_index,
             liab_token_index,
             max_liab_transfer,
-        )
+        )<span class="question-mark">?</span>;
+        <span class="prelude-val">Ok</span>(())
     }
 
     <span class="comment">// DEPRECATED: use token_liq_bankruptcy
@@ -1198,7 +1410,9 @@
         ctx: Context&lt;TokenLiqBankruptcy&gt;,
         max_liab_transfer: I80F48,
     ) -&gt; <span class="prelude-ty">Result</span>&lt;()&gt; {
-        instructions::token_liq_bankruptcy(ctx, max_liab_transfer)
+        <span class="attr">#[cfg(feature = <span class="string">&quot;enable-gpl&quot;</span>)]
+        </span>instructions::token_liq_bankruptcy(ctx, max_liab_transfer)<span class="question-mark">?</span>;
+        <span class="prelude-val">Ok</span>(())
     }
 
     <span class="kw">pub fn </span>token_liq_with_token(
@@ -1207,19 +1421,23 @@
         liab_token_index: TokenIndex,
         max_liab_transfer: I80F48,
     ) -&gt; <span class="prelude-ty">Result</span>&lt;()&gt; {
-        instructions::token_liq_with_token(
+        <span class="attr">#[cfg(feature = <span class="string">&quot;enable-gpl&quot;</span>)]
+        </span>instructions::token_liq_with_token(
             ctx,
             asset_token_index,
             liab_token_index,
             max_liab_transfer,
-        )
+        )<span class="question-mark">?</span>;
+        <span class="prelude-val">Ok</span>(())
     }
 
     <span class="kw">pub fn </span>token_liq_bankruptcy(
         ctx: Context&lt;TokenLiqBankruptcy&gt;,
         max_liab_transfer: I80F48,
     ) -&gt; <span class="prelude-ty">Result</span>&lt;()&gt; {
-        instructions::token_liq_bankruptcy(ctx, max_liab_transfer)
+        <span class="attr">#[cfg(feature = <span class="string">&quot;enable-gpl&quot;</span>)]
+        </span>instructions::token_liq_bankruptcy(ctx, max_liab_transfer)<span class="question-mark">?</span>;
+        <span class="prelude-val">Ok</span>(())
     }
 
     <span class="doccomment">///
@@ -1257,7 +1475,8 @@
         settle_pnl_limit_window_size_ts: u64,
         positive_pnl_liquidation_fee: f32,
     ) -&gt; <span class="prelude-ty">Result</span>&lt;()&gt; {
-        instructions::perp_create_market(
+        <span class="attr">#[cfg(feature = <span class="string">&quot;enable-gpl&quot;</span>)]
+        </span>instructions::perp_create_market(
             ctx,
             perp_market_index,
             settle_token_index,
@@ -1286,7 +1505,8 @@
             settle_pnl_limit_factor,
             settle_pnl_limit_window_size_ts,
             positive_pnl_liquidation_fee,
-        )
+        )<span class="question-mark">?</span>;
+        <span class="prelude-val">Ok</span>(())
     }
 
     <span class="attr">#[allow(clippy::too_many_arguments)]
@@ -1321,7 +1541,8 @@
         reset_stable_price: bool,
         positive_pnl_liquidation_fee_opt: <span class="prelude-ty">Option</span>&lt;f32&gt;,
     ) -&gt; <span class="prelude-ty">Result</span>&lt;()&gt; {
-        instructions::perp_edit_market(
+        <span class="attr">#[cfg(feature = <span class="string">&quot;enable-gpl&quot;</span>)]
+        </span>instructions::perp_edit_market(
             ctx,
             oracle_opt,
             oracle_config_opt,
@@ -1351,15 +1572,20 @@
             reduce_only_opt,
             reset_stable_price,
             positive_pnl_liquidation_fee_opt,
-        )
+        )<span class="question-mark">?</span>;
+        <span class="prelude-val">Ok</span>(())
     }
 
     <span class="kw">pub fn </span>perp_close_market(ctx: Context&lt;PerpCloseMarket&gt;) -&gt; <span class="prelude-ty">Result</span>&lt;()&gt; {
-        instructions::perp_close_market(ctx)
+        <span class="attr">#[cfg(feature = <span class="string">&quot;enable-gpl&quot;</span>)]
+        </span>instructions::perp_close_market(ctx)<span class="question-mark">?</span>;
+        <span class="prelude-val">Ok</span>(())
     }
 
     <span class="kw">pub fn </span>perp_deactivate_position(ctx: Context&lt;PerpDeactivatePosition&gt;) -&gt; <span class="prelude-ty">Result</span>&lt;()&gt; {
-        instructions::perp_deactivate_position(ctx)
+        <span class="attr">#[cfg(feature = <span class="string">&quot;enable-gpl&quot;</span>)]
+        </span>instructions::perp_deactivate_position(ctx)<span class="question-mark">?</span>;
+        <span class="prelude-val">Ok</span>(())
     }
 
     <span class="attr">#[allow(clippy::too_many_arguments)]
@@ -1418,7 +1644,11 @@
                 },
             },
         };
-        instructions::perp_place_order(ctx, order, limit)
+        <span class="attr">#[cfg(feature = <span class="string">&quot;enable-gpl&quot;</span>)]
+        </span><span class="kw">return </span>instructions::perp_place_order(ctx, order, limit);
+
+        <span class="attr">#[cfg(not(feature = <span class="string">&quot;enable-gpl&quot;</span>))]
+        </span><span class="prelude-val">Ok</span>(<span class="prelude-val">None</span>)
     }
 
     <span class="attr">#[allow(clippy::too_many_arguments)]
@@ -1485,22 +1715,32 @@
                 max_oracle_staleness_slots,
             },
         };
-        instructions::perp_place_order(ctx, order, limit)
+        <span class="attr">#[cfg(feature = <span class="string">&quot;enable-gpl&quot;</span>)]
+        </span><span class="kw">return </span>instructions::perp_place_order(ctx, order, limit);
+
+        <span class="attr">#[cfg(not(feature = <span class="string">&quot;enable-gpl&quot;</span>))]
+        </span><span class="prelude-val">Ok</span>(<span class="prelude-val">None</span>)
     }
 
     <span class="kw">pub fn </span>perp_cancel_order(ctx: Context&lt;PerpCancelOrder&gt;, order_id: u128) -&gt; <span class="prelude-ty">Result</span>&lt;()&gt; {
-        instructions::perp_cancel_order(ctx, order_id)
+        <span class="attr">#[cfg(feature = <span class="string">&quot;enable-gpl&quot;</span>)]
+        </span>instructions::perp_cancel_order(ctx, order_id)<span class="question-mark">?</span>;
+        <span class="prelude-val">Ok</span>(())
     }
 
     <span class="kw">pub fn </span>perp_cancel_order_by_client_order_id(
         ctx: Context&lt;PerpCancelOrderByClientOrderId&gt;,
         client_order_id: u64,
     ) -&gt; <span class="prelude-ty">Result</span>&lt;()&gt; {
-        instructions::perp_cancel_order_by_client_order_id(ctx, client_order_id)
+        <span class="attr">#[cfg(feature = <span class="string">&quot;enable-gpl&quot;</span>)]
+        </span>instructions::perp_cancel_order_by_client_order_id(ctx, client_order_id)<span class="question-mark">?</span>;
+        <span class="prelude-val">Ok</span>(())
     }
 
     <span class="kw">pub fn </span>perp_cancel_all_orders(ctx: Context&lt;PerpCancelAllOrders&gt;, limit: u8) -&gt; <span class="prelude-ty">Result</span>&lt;()&gt; {
-        instructions::perp_cancel_all_orders(ctx, limit)
+        <span class="attr">#[cfg(feature = <span class="string">&quot;enable-gpl&quot;</span>)]
+        </span>instructions::perp_cancel_all_orders(ctx, limit)<span class="question-mark">?</span>;
+        <span class="prelude-val">Ok</span>(())
     }
 
     <span class="kw">pub fn </span>perp_cancel_all_orders_by_side(
@@ -1508,23 +1748,33 @@
         side_option: <span class="prelude-ty">Option</span>&lt;Side&gt;,
         limit: u8,
     ) -&gt; <span class="prelude-ty">Result</span>&lt;()&gt; {
-        instructions::perp_cancel_all_orders_by_side(ctx, side_option, limit)
+        <span class="attr">#[cfg(feature = <span class="string">&quot;enable-gpl&quot;</span>)]
+        </span>instructions::perp_cancel_all_orders_by_side(ctx, side_option, limit)<span class="question-mark">?</span>;
+        <span class="prelude-val">Ok</span>(())
     }
 
     <span class="kw">pub fn </span>perp_consume_events(ctx: Context&lt;PerpConsumeEvents&gt;, limit: usize) -&gt; <span class="prelude-ty">Result</span>&lt;()&gt; {
-        instructions::perp_consume_events(ctx, limit)
+        <span class="attr">#[cfg(feature = <span class="string">&quot;enable-gpl&quot;</span>)]
+        </span>instructions::perp_consume_events(ctx, limit)<span class="question-mark">?</span>;
+        <span class="prelude-val">Ok</span>(())
     }
 
     <span class="kw">pub fn </span>perp_update_funding(ctx: Context&lt;PerpUpdateFunding&gt;) -&gt; <span class="prelude-ty">Result</span>&lt;()&gt; {
-        instructions::perp_update_funding(ctx)
+        <span class="attr">#[cfg(feature = <span class="string">&quot;enable-gpl&quot;</span>)]
+        </span>instructions::perp_update_funding(ctx)<span class="question-mark">?</span>;
+        <span class="prelude-val">Ok</span>(())
     }
 
     <span class="kw">pub fn </span>perp_settle_pnl(ctx: Context&lt;PerpSettlePnl&gt;) -&gt; <span class="prelude-ty">Result</span>&lt;()&gt; {
-        instructions::perp_settle_pnl(ctx)
+        <span class="attr">#[cfg(feature = <span class="string">&quot;enable-gpl&quot;</span>)]
+        </span>instructions::perp_settle_pnl(ctx)<span class="question-mark">?</span>;
+        <span class="prelude-val">Ok</span>(())
     }
 
     <span class="kw">pub fn </span>perp_settle_fees(ctx: Context&lt;PerpSettleFees&gt;, max_settle_amount: u64) -&gt; <span class="prelude-ty">Result</span>&lt;()&gt; {
-        instructions::perp_settle_fees(ctx, max_settle_amount)
+        <span class="attr">#[cfg(feature = <span class="string">&quot;enable-gpl&quot;</span>)]
+        </span>instructions::perp_settle_fees(ctx, max_settle_amount)<span class="question-mark">?</span>;
+        <span class="prelude-val">Ok</span>(())
     }
 
     <span class="kw">pub fn </span>perp_liq_base_or_positive_pnl(
@@ -1532,25 +1782,33 @@
         max_base_transfer: i64,
         max_pnl_transfer: u64,
     ) -&gt; <span class="prelude-ty">Result</span>&lt;()&gt; {
-        instructions::perp_liq_base_or_positive_pnl(ctx, max_base_transfer, max_pnl_transfer)
+        <span class="attr">#[cfg(feature = <span class="string">&quot;enable-gpl&quot;</span>)]
+        </span>instructions::perp_liq_base_or_positive_pnl(ctx, max_base_transfer, max_pnl_transfer)<span class="question-mark">?</span>;
+        <span class="prelude-val">Ok</span>(())
     }
 
     <span class="kw">pub fn </span>perp_liq_force_cancel_orders(
         ctx: Context&lt;PerpLiqForceCancelOrders&gt;,
         limit: u8,
     ) -&gt; <span class="prelude-ty">Result</span>&lt;()&gt; {
-        instructions::perp_liq_force_cancel_orders(ctx, limit)
+        <span class="attr">#[cfg(feature = <span class="string">&quot;enable-gpl&quot;</span>)]
+        </span>instructions::perp_liq_force_cancel_orders(ctx, limit)<span class="question-mark">?</span>;
+        <span class="prelude-val">Ok</span>(())
     }
 
     <span class="kw">pub fn </span>perp_liq_negative_pnl_or_bankruptcy(
         ctx: Context&lt;PerpLiqNegativePnlOrBankruptcy&gt;,
         max_liab_transfer: u64,
     ) -&gt; <span class="prelude-ty">Result</span>&lt;()&gt; {
-        instructions::perp_liq_negative_pnl_or_bankruptcy(ctx, max_liab_transfer)
+        <span class="attr">#[cfg(feature = <span class="string">&quot;enable-gpl&quot;</span>)]
+        </span>instructions::perp_liq_negative_pnl_or_bankruptcy(ctx, max_liab_transfer)<span class="question-mark">?</span>;
+        <span class="prelude-val">Ok</span>(())
     }
 
     <span class="kw">pub fn </span>alt_set(ctx: Context&lt;AltSet&gt;, index: u8) -&gt; <span class="prelude-ty">Result</span>&lt;()&gt; {
-        instructions::alt_set(ctx, index)
+        <span class="attr">#[cfg(feature = <span class="string">&quot;enable-gpl&quot;</span>)]
+        </span>instructions::alt_set(ctx, index)<span class="question-mark">?</span>;
+        <span class="prelude-val">Ok</span>(())
     }
 
     <span class="kw">pub fn </span>alt_extend(
@@ -1558,11 +1816,15 @@
         index: u8,
         new_addresses: Vec&lt;Pubkey&gt;,
     ) -&gt; <span class="prelude-ty">Result</span>&lt;()&gt; {
-        instructions::alt_extend(ctx, index, new_addresses)
+        <span class="attr">#[cfg(feature = <span class="string">&quot;enable-gpl&quot;</span>)]
+        </span>instructions::alt_extend(ctx, index, new_addresses)<span class="question-mark">?</span>;
+        <span class="prelude-val">Ok</span>(())
     }
 
     <span class="kw">pub fn </span>compute_account_data(ctx: Context&lt;ComputeAccountData&gt;) -&gt; <span class="prelude-ty">Result</span>&lt;()&gt; {
-        instructions::compute_account_data(ctx)
+        <span class="attr">#[cfg(feature = <span class="string">&quot;enable-gpl&quot;</span>)]
+        </span>instructions::compute_account_data(ctx)<span class="question-mark">?</span>;
+        <span class="prelude-val">Ok</span>(())
     }
 
     <span class="doccomment">///
@@ -1570,7 +1832,9 @@
     ///
 
     </span><span class="kw">pub fn </span>benchmark(ctx: Context&lt;Benchmark&gt;) -&gt; <span class="prelude-ty">Result</span>&lt;()&gt; {
-        instructions::benchmark(ctx)
+        <span class="attr">#[cfg(feature = <span class="string">&quot;enable-gpl&quot;</span>)]
+        </span>instructions::benchmark(ctx)<span class="question-mark">?</span>;
+        <span class="prelude-val">Ok</span>(())
     }
 }
 
