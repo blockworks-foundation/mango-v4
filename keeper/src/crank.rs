@@ -48,7 +48,7 @@ pub async fn runner(
         .values()
         .filter(|perp|
             // MNGO-PERP-OLD
-            perp.market.perp_market_index == 1)
+            perp.market.perp_market_index != 1)
         .map(|perp| {
             loop_consume_events(
                 mango_client.clone(),
@@ -65,7 +65,7 @@ pub async fn runner(
         .values()
         .filter(|perp|
             // MNGO-PERP-OLD
-            perp.market.perp_market_index == 1)
+            perp.market.perp_market_index != 1)
         .map(|perp| {
             loop_update_funding(
                 mango_client.clone(),
