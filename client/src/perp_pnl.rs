@@ -98,7 +98,7 @@ pub async fn fetch_top(
             let perp_settle_health = crate::health_cache::new(context, account_fetcher, &acc)
                 .await?
                 .perp_settle_health();
-            let settleable_pnl = if perp_settle_health > 0 && !acc.being_liquidated() {
+            let settleable_pnl = if perp_settle_health > 0 {
                 (*pnl).max(-perp_settle_health)
             } else {
                 I80F48::ZERO
