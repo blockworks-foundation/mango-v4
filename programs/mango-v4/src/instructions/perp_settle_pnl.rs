@@ -135,7 +135,7 @@ pub fn perp_settle_pnl(ctx: Context<PerpSettlePnl>) -> Result<()> {
         b_settle_health,
     );
 
-    let fee = compute_settle_fee(&perp_market, a_liq_end_health, a_maint_health, settlement)?;
+    let fee = perp_market.compute_settle_fee(settlement, a_liq_end_health, a_maint_health)?;
 
     a_perp_position.record_settle(settlement);
     b_perp_position.record_settle(-settlement);
@@ -235,44 +235,4 @@ pub fn perp_settle_pnl(ctx: Context<PerpSettlePnl>) -> Result<()> {
 
     msg!("settled pnl = {}, fee = {}", settlement, fee);
     Ok(())
-}
-
-pub fn compute_settle_fee(
-    perp_market: &PerpMarket,
-    source_liq_end_health: I80F48,
-    source_maint_health: I80F48,
-    settlement: I80F48,
-) -> Result<I80F48> {
-    assert!(source_maint_health >= source_liq_end_health);
-
-    // A percentage fee is paid to the settler when the source account's health is low.
-    // That's because the settlement could avoid it getting liquidated: settling will
-    // increase its health by actualizing positive perp pnl.
-    let low_health_fee = if source_liq_end_health < 0 {
-        let fee_fraction = I80F48::from_num(perp_market.settle_fee_fraction_low_health);
-        if source_maint_health < 0 {
-            cm!(settlement * fee_fraction)
-        } else {
-            cm!(settlement
-                * fee_fraction
-                * (-source_liq_end_health / (source_maint_health - source_liq_end_health)))
-        }
-    } else {
-        I80F48::ZERO
-    };
-
-    // The settler receives a flat fee
-    let flat_fee = I80F48::from_num(perp_market.settle_fee_flat);
-
-    // Fees only apply when the settlement is large enough
-    let fee = if settlement >= perp_market.settle_fee_amount_threshold {
-        cm!(low_health_fee + flat_fee).min(settlement)
-    } else {
-        I80F48::ZERO
-    };
-
-    // Safety check to prevent any accidental negative transfer
-    require!(fee >= 0, MangoError::SettlementAmountMustBePositive);
-
-    Ok(fee)
 }
