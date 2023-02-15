@@ -133,7 +133,7 @@ pub struct PerpMarket {
     /// In native units of settlement token, given to each settle call above the
     /// settle_fee_amount_threshold.
     pub settle_fee_flat: f32,
-    /// Pnl settlement amount needed to be eligible for fees.
+    /// Pnl settlement amount needed to be eligible for the flat fee.
     pub settle_fee_amount_threshold: f32,
     /// Fraction of pnl to pay out as fee if +pnl account has low health.
     pub settle_fee_fraction_low_health: f32,
@@ -394,14 +394,14 @@ impl PerpMarket {
         };
 
         // The settler receives a flat fee
-        let flat_fee = I80F48::from_num(self.settle_fee_flat);
-
-        // Fees only apply when the settlement is large enough
-        let fee = if settlement >= self.settle_fee_amount_threshold {
-            cm!(low_health_fee + flat_fee).min(settlement)
+        let flat_fee = if settlement >= self.settle_fee_amount_threshold {
+            I80F48::from_num(self.settle_fee_flat)
         } else {
             I80F48::ZERO
         };
+
+        // Fees only apply when the settlement is large enough
+        let fee = cm!(low_health_fee + flat_fee).min(settlement);
 
         // Safety check to prevent any accidental negative transfer
         require!(fee >= 0, MangoError::SettlementAmountMustBePositive);
