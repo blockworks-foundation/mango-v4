@@ -233,7 +233,7 @@ async fn main() -> anyhow::Result<()> {
     info!("main loop");
 
     // Job to update chain_data and notify the liquidation job when a new check is needed.
-    tokio::spawn({
+    let data_job = tokio::spawn({
         use account_update_stream::Message;
 
         let shared_state = shared_state.clone();
@@ -324,8 +324,7 @@ async fn main() -> anyhow::Result<()> {
         }
     });
 
-    // Rebalancing job
-    tokio::spawn({
+    let rebalance_job = tokio::spawn({
         let shared_state = shared_state.clone();
         async move {
             loop {
@@ -345,8 +344,7 @@ async fn main() -> anyhow::Result<()> {
         }
     });
 
-    // Liquidation job
-    tokio::spawn({
+    let liquidation_job = tokio::spawn({
         async move {
             loop {
                 liquidation_trigger_receiver.recv().await.unwrap();
@@ -374,6 +372,14 @@ async fn main() -> anyhow::Result<()> {
         }
     });
 
+    use futures::StreamExt;
+    let mut jobs: futures::stream::FuturesUnordered<_> =
+        vec![data_job, rebalance_job, liquidation_job]
+            .into_iter()
+            .collect();
+    jobs.next().await;
+
+    log::error!("a critical job aborted, exiting");
     Ok(())
 }
 
