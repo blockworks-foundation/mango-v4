@@ -26,6 +26,7 @@ use solana_client::nonblocking::rpc_client::RpcClient as RpcClientAsync;
 use solana_sdk::address_lookup_table_account::AddressLookupTableAccount;
 use solana_sdk::hash::Hash;
 use solana_sdk::signer::keypair;
+use solana_sdk::transaction::TransactionError;
 
 use crate::account_fetcher::*;
 use crate::context::{MangoGroupContext, Serum3MarketContext, TokenContext};
@@ -1474,8 +1475,13 @@ struct Serum3Data<'a> {
 
 #[derive(Debug, thiserror::Error)]
 pub enum MangoClientError {
-    #[error("Transaction simulation error. Logs: {logs}")]
-    SendTransactionPreflightFailure { logs: String },
+    #[error("Transaction simulation error. Error: {err:?}, Logs: {}",
+        .logs.iter().join("; ")
+    )]
+    SendTransactionPreflightFailure {
+        err: Option<TransactionError>,
+        logs: Vec<String>,
+    },
 }
 
 pub struct TransactionBuilder<'a> {
@@ -1552,12 +1558,11 @@ pub fn prettify_solana_client_error(
     match err.kind() {
         ClientErrorKind::RpcError(RpcError::RpcResponseError { data, .. }) => match data {
             RpcResponseErrorData::SendTransactionPreflightFailure(s) => {
-                if let Some(logs) = s.logs.as_ref() {
-                    return MangoClientError::SendTransactionPreflightFailure {
-                        logs: logs.iter().join("; "),
-                    }
-                    .into();
+                return MangoClientError::SendTransactionPreflightFailure {
+                    err: s.err.clone(),
+                    logs: s.logs.clone().unwrap_or_default(),
                 }
+                .into();
             }
             _ => {}
         },
