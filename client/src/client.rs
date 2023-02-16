@@ -1554,7 +1554,10 @@ pub fn prettify_solana_client_error(
             RpcResponseErrorData::SendTransactionPreflightFailure(s) => {
                 if let Some(logs) = s.logs.as_ref() {
                     return MangoClientError::SendTransactionPreflightFailure {
-                        logs: logs.iter().join("; "),
+                        logs: logs.iter().join("; ")
+                            + &s.err
+                                .as_ref()
+                                .map_or_else(|| "".to_owned(), |e| e.to_string()),
                     }
                     .into();
                 }
