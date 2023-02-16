@@ -1016,12 +1016,12 @@ export interface FillEvent extends Event {
   seqNum: BN;
   maker: PublicKey;
   makerOrderId: BN;
-  makerFee: I80F48;
+  makerFee: number;
   makerTimestamp: BN;
   taker: PublicKey;
   takerOrderId: BN;
   takerClientOrderId: BN;
-  takerFee: I80F48;
+  takerFee: number;
   price: BN;
   quantity: BN;
 }
