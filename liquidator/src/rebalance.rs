@@ -1,6 +1,4 @@
-use crate::AnyhowWrap;
-
-use client::{chain_data, AccountFetcher, MangoClient, TokenContext};
+use client::{chain_data, AccountFetcher, AnyhowWrap, MangoClient, TokenContext};
 use mango_v4::accounts_zerocopy::KeyedAccountSharedData;
 use mango_v4::state::{
     Bank, BookSide, PlaceOrderType, Side, TokenIndex, TokenPosition, QUOTE_TOKEN_INDEX,
@@ -10,6 +8,7 @@ use {fixed::types::I80F48, solana_sdk::pubkey::Pubkey};
 
 use futures::{stream, StreamExt, TryStreamExt};
 use solana_sdk::signature::Signature;
+use std::sync::Arc;
 use std::{collections::HashMap, time::Duration};
 
 #[derive(Clone)]
@@ -65,14 +64,14 @@ impl TokenState {
     }
 }
 
-pub struct Rebalancer<'a> {
-    pub mango_client: &'a MangoClient,
-    pub account_fetcher: &'a chain_data::AccountFetcher,
+pub struct Rebalancer {
+    pub mango_client: Arc<MangoClient>,
+    pub account_fetcher: Arc<chain_data::AccountFetcher>,
     pub mango_account_address: Pubkey,
     pub config: Config,
 }
 
-impl<'a> Rebalancer<'a> {
+impl Rebalancer {
     pub async fn zero_all_non_quote(&self) -> anyhow::Result<()> {
         log::trace!("checking for rebalance: {}", self.mango_account_address);
 
@@ -116,7 +115,7 @@ impl<'a> Rebalancer<'a> {
                     let token = self.mango_client.context.token(token_position.token_index);
                     Ok((
                         token.token_index,
-                        TokenState::new_position(token, token_position, self.account_fetcher)
+                        TokenState::new_position(token, token_position, &self.account_fetcher)
                             .await?,
                     ))
                 })
@@ -174,7 +173,7 @@ impl<'a> Rebalancer<'a> {
                 if !self.refresh_mango_account_after_tx(txsig).await? {
                     return Ok(());
                 }
-                let bank = TokenState::bank(token, self.account_fetcher)?;
+                let bank = TokenState::bank(token, &self.account_fetcher)?;
                 amount = self
                     .mango_client
                     .mango_account()
@@ -206,7 +205,7 @@ impl<'a> Rebalancer<'a> {
                 if !self.refresh_mango_account_after_tx(txsig).await? {
                     return Ok(());
                 }
-                let bank = TokenState::bank(token, self.account_fetcher)?;
+                let bank = TokenState::bank(token, &self.account_fetcher)?;
                 amount = self
                     .mango_client
                     .mango_account()
@@ -353,7 +352,7 @@ impl<'a> Rebalancer<'a> {
                 };
                 let counters = client::perp_pnl::fetch_top(
                     &self.mango_client.context,
-                    self.account_fetcher,
+                    self.account_fetcher.as_ref(),
                     perp_position.market_index,
                     direction,
                     2,

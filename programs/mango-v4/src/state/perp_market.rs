@@ -6,6 +6,7 @@ use fixed::types::I80F48;
 use static_assertions::const_assert_eq;
 
 use crate::accounts_zerocopy::KeyedAccountReader;
+use crate::error::MangoError;
 use crate::logs::PerpUpdateFundingLog;
 use crate::state::orderbook::Side;
 use crate::state::{oracle, TokenIndex};
@@ -132,7 +133,7 @@ pub struct PerpMarket {
     /// In native units of settlement token, given to each settle call above the
     /// settle_fee_amount_threshold.
     pub settle_fee_flat: f32,
-    /// Pnl settlement amount needed to be eligible for fees.
+    /// Pnl settlement amount needed to be eligible for the flat fee.
     pub settle_fee_amount_threshold: f32,
     /// Fraction of pnl to pay out as fee if +pnl account has low health.
     pub settle_fee_fraction_low_health: f32,
@@ -364,6 +365,48 @@ impl PerpMarket {
         self.long_funding -= socialized_loss;
         self.short_funding += socialized_loss;
         Ok(socialized_loss)
+    }
+
+    /// Returns the fee for settling `settlement` when the negative-pnl side has the given
+    /// health values.
+    pub fn compute_settle_fee(
+        &self,
+        settlement: I80F48,
+        source_liq_end_health: I80F48,
+        source_maint_health: I80F48,
+    ) -> Result<I80F48> {
+        assert!(source_maint_health >= source_liq_end_health);
+
+        // A percentage fee is paid to the settler when the source account's health is low.
+        // That's because the settlement could avoid it getting liquidated: settling will
+        // increase its health by actualizing positive perp pnl.
+        let low_health_fee = if source_liq_end_health < 0 {
+            let fee_fraction = I80F48::from_num(self.settle_fee_fraction_low_health);
+            if source_maint_health < 0 {
+                cm!(settlement * fee_fraction)
+            } else {
+                cm!(settlement
+                    * fee_fraction
+                    * (-source_liq_end_health / (source_maint_health - source_liq_end_health)))
+            }
+        } else {
+            I80F48::ZERO
+        };
+
+        // The settler receives a flat fee
+        let flat_fee = if settlement >= self.settle_fee_amount_threshold {
+            I80F48::from_num(self.settle_fee_flat)
+        } else {
+            I80F48::ZERO
+        };
+
+        // Fees only apply when the settlement is large enough
+        let fee = cm!(low_health_fee + flat_fee).min(settlement);
+
+        // Safety check to prevent any accidental negative transfer
+        require!(fee >= 0, MangoError::SettlementAmountMustBePositive);
+
+        Ok(fee)
     }
 
     /// Creates default market for tests

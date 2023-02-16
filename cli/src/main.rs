@@ -160,7 +160,7 @@ async fn main() -> Result<(), anyhow::Error> {
         Command::Deposit(cmd) => {
             let client = cmd.rpc.client(Some(&cmd.owner))?;
             let account = client::pubkey_from_cli(&cmd.account);
-            let owner = client::keypair_from_cli(&cmd.owner);
+            let owner = Arc::new(client::keypair_from_cli(&cmd.owner));
             let mint = client::pubkey_from_cli(&cmd.mint);
             let client = MangoClient::new_for_existing_account(client, account, owner).await?;
             let txsig = client.token_deposit(mint, cmd.amount, false).await?;
@@ -169,7 +169,7 @@ async fn main() -> Result<(), anyhow::Error> {
         Command::JupiterSwap(cmd) => {
             let client = cmd.rpc.client(Some(&cmd.owner))?;
             let account = client::pubkey_from_cli(&cmd.account);
-            let owner = client::keypair_from_cli(&cmd.owner);
+            let owner = Arc::new(client::keypair_from_cli(&cmd.owner));
             let input_mint = client::pubkey_from_cli(&cmd.input_mint);
             let output_mint = client::pubkey_from_cli(&cmd.output_mint);
             let client = MangoClient::new_for_existing_account(client, account, owner).await?;

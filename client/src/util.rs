@@ -3,9 +3,7 @@ use solana_client::{
 };
 use solana_sdk::transaction::Transaction;
 use solana_sdk::{
-    clock::Slot,
-    commitment_config::CommitmentConfig,
-    signature::{Keypair, Signature},
+    clock::Slot, commitment_config::CommitmentConfig, signature::Signature,
     transaction::uses_durable_nonce,
 };
 
@@ -26,13 +24,33 @@ use std::{thread, time};
 //     Err(anyhow!("Retry failed"))
 // }
 
-pub trait MyClone {
-    fn clone(&self) -> Self;
+/// Some Result<> types don't convert to anyhow::Result nicely. Force them through stringification.
+pub trait AnyhowWrap {
+    type Value;
+    fn map_err_anyhow(self) -> anyhow::Result<Self::Value>;
 }
 
-impl MyClone for Keypair {
-    fn clone(&self) -> Keypair {
-        Self::from_bytes(&self.to_bytes()).unwrap()
+impl<T, E: std::fmt::Debug> AnyhowWrap for Result<T, E> {
+    type Value = T;
+    fn map_err_anyhow(self) -> anyhow::Result<Self::Value> {
+        self.map_err(|err| anyhow::anyhow!("{:?}", err))
+    }
+}
+
+/// Push to an async_channel::Sender and ignore if the channel is full
+pub trait AsyncChannelSendUnlessFull<T> {
+    /// Send a message if the channel isn't full
+    fn send_unless_full(&self, msg: T) -> Result<(), async_channel::SendError<T>>;
+}
+
+impl<T> AsyncChannelSendUnlessFull<T> for async_channel::Sender<T> {
+    fn send_unless_full(&self, msg: T) -> Result<(), async_channel::SendError<T>> {
+        use async_channel::*;
+        match self.try_send(msg) {
+            Ok(()) => Ok(()),
+            Err(TrySendError::Closed(msg)) => Err(async_channel::SendError(msg)),
+            Err(TrySendError::Full(_)) => Ok(()),
+        }
     }
 }
 

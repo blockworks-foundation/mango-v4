@@ -31,7 +31,6 @@ use crate::account_fetcher::*;
 use crate::context::{MangoGroupContext, Serum3MarketContext, TokenContext};
 use crate::gpa::{fetch_anchor_account, fetch_mango_accounts};
 use crate::jupiter;
-use crate::util::MyClone;
 
 use anyhow::Context;
 use solana_sdk::account::ReadableAccount;
@@ -54,13 +53,13 @@ impl Client {
     pub fn new(
         cluster: Cluster,
         commitment: CommitmentConfig,
-        fee_payer: &Keypair,
+        fee_payer: Arc<Keypair>,
         timeout: Option<Duration>,
         prioritization_micro_lamports: u64,
     ) -> Self {
         Self {
             cluster,
-            fee_payer: Arc::new(fee_payer.clone()),
+            fee_payer,
             commitment,
             timeout,
             prioritization_micro_lamports,
@@ -93,7 +92,7 @@ pub struct MangoClient {
     // call to refresh banks etc -- if it's backed by websockets, these could just do nothing
     pub account_fetcher: Arc<dyn AccountFetcher>,
 
-    pub owner: Keypair,
+    pub owner: Arc<Keypair>,
     pub mango_account_address: Pubkey,
 
     pub context: MangoGroupContext,
@@ -219,7 +218,7 @@ impl MangoClient {
     pub async fn new_for_existing_account(
         client: Client,
         account: Pubkey,
-        owner: Keypair,
+        owner: Arc<Keypair>,
     ) -> anyhow::Result<Self> {
         let rpc = client.rpc_async();
         let account_fetcher = Arc::new(CachedAccountFetcher::new(Arc::new(RpcAccountFetcher {
@@ -246,7 +245,7 @@ impl MangoClient {
     pub fn new_detail(
         client: Client,
         account: Pubkey,
-        owner: Keypair,
+        owner: Arc<Keypair>,
         // future: maybe pass Arc<MangoGroupContext>, so it can be extenally updated?
         group_context: MangoGroupContext,
         account_fetcher: Arc<dyn AccountFetcher>,
@@ -1360,7 +1359,7 @@ impl MangoClient {
             instructions,
             address_lookup_tables,
             payer,
-            signers: vec![&self.owner],
+            signers: vec![&*self.owner],
         }
         .send_and_confirm(&self.client)
         .await
@@ -1445,7 +1444,7 @@ impl MangoClient {
             instructions,
             address_lookup_tables: vec![],
             payer: self.client.fee_payer.pubkey(),
-            signers: vec![&self.owner, &*self.client.fee_payer],
+            signers: vec![&*self.owner, &*self.client.fee_payer],
         }
         .send_and_confirm(&self.client)
         .await
@@ -1482,7 +1481,7 @@ pub enum MangoClientError {
 pub struct TransactionBuilder<'a> {
     instructions: Vec<Instruction>,
     address_lookup_tables: Vec<AddressLookupTableAccount>,
-    signers: Vec<&'a dyn Signer>,
+    signers: Vec<&'a Keypair>,
     payer: Pubkey,
 }
 

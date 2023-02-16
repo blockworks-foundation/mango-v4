@@ -1,5 +1,7 @@
 use jsonrpc_core_client::transports::http;
 
+use mango_v4::accounts_zerocopy::*;
+use mango_v4::state::{MangoAccountFixed, MangoAccountLoadedRef};
 use solana_account_decoder::{UiAccount, UiAccountEncoding};
 use solana_client::{
     rpc_config::{RpcAccountInfoConfig, RpcContextConfig, RpcProgramAccountsConfig},
@@ -15,20 +17,26 @@ use std::str::FromStr;
 use std::time::Duration;
 use tokio::time;
 
-use client::chain_data;
+use crate::account_update_stream::{AccountUpdate, Message};
+use crate::AnyhowWrap;
 
-use crate::{util::is_mango_account, AnyhowWrap};
+pub fn is_mango_account<'a>(
+    account: &'a AccountSharedData,
+    group_id: &Pubkey,
+) -> Option<MangoAccountLoadedRef<'a>> {
+    // check owner, discriminator
+    let fixed = account.load::<MangoAccountFixed>().ok()?;
+    if fixed.group != *group_id {
+        return None;
+    }
 
-#[derive(Clone)]
-pub struct AccountUpdate {
-    pub pubkey: Pubkey,
-    pub slot: u64,
-    pub account: AccountSharedData,
+    let data = account.data();
+    MangoAccountLoadedRef::from_bytes(&data[8..]).ok()
 }
 
-#[derive(Clone, Default)]
-pub struct AccountSnapshot {
-    pub accounts: Vec<AccountUpdate>,
+#[derive(Default)]
+struct AccountSnapshot {
+    accounts: Vec<AccountUpdate>,
 }
 
 impl AccountSnapshot {
@@ -73,7 +81,6 @@ impl AccountSnapshot {
 
 pub struct Config {
     pub rpc_http_url: String,
-    pub mango_program: Pubkey,
     pub mango_group: Pubkey,
     pub get_multiple_accounts_count: usize,
     pub parallel_rpc_requests: usize,
@@ -84,7 +91,7 @@ pub struct Config {
 async fn feed_snapshots(
     config: &Config,
     mango_oracles: Vec<Pubkey>,
-    sender: &async_channel::Sender<AccountSnapshot>,
+    sender: &async_channel::Sender<Message>,
 ) -> anyhow::Result<()> {
     let rpc_client = http::connect_with_options::<AccountsDataClient>(&config.rpc_http_url, true)
         .await
@@ -109,7 +116,7 @@ async fn feed_snapshots(
     // Get all accounts of the mango program
     let response = rpc_client
         .get_program_accounts(
-            config.mango_program.to_string(),
+            mango_v4::id().to_string(),
             Some(all_accounts_config.clone()),
         )
         .await
@@ -156,9 +163,7 @@ async fn feed_snapshots(
     let oo_account_pubkeys = snapshot
         .accounts
         .iter()
-        .filter_map(|update| {
-            is_mango_account(&update.account, &config.mango_program, &config.mango_group)
-        })
+        .filter_map(|update| is_mango_account(&update.account, &config.mango_group))
         .flat_map(|mango_account| {
             mango_account
                 .active_serum3_orders()
@@ -198,15 +203,14 @@ async fn feed_snapshots(
         )?;
     }
 
-    sender.send(snapshot).await.expect("sending must succeed");
+    sender
+        .send(Message::Snapshot(snapshot.accounts))
+        .await
+        .expect("sending must succeed");
     Ok(())
 }
 
-pub fn start(
-    config: Config,
-    mango_oracles: Vec<Pubkey>,
-    sender: async_channel::Sender<AccountSnapshot>,
-) {
+pub fn start(config: Config, mango_oracles: Vec<Pubkey>, sender: async_channel::Sender<Message>) {
     let mut poll_wait_first_snapshot = time::interval(time::Duration::from_secs(2));
     let mut interval_between_snapshots = time::interval(config.snapshot_interval);
 
@@ -243,16 +247,4 @@ pub fn start(
             };
         }
     });
-}
-
-pub fn update_chain_data(chain: &mut chain_data::ChainData, snapshot: AccountSnapshot) {
-    for account_update in snapshot.accounts {
-        chain.update_account(
-            account_update.pubkey,
-            chain_data::AccountAndSlot {
-                account: account_update.account,
-                slot: account_update.slot,
-            },
-        );
-    }
 }

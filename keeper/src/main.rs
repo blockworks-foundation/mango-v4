@@ -86,7 +86,7 @@ async fn main() -> Result<(), anyhow::Error> {
     };
     let cli = Cli::parse_from(args);
 
-    let owner = keypair_from_cli(&cli.owner);
+    let owner = Arc::new(keypair_from_cli(&cli.owner));
 
     let rpc_url = cli.rpc_url;
     let ws_url = rpc_url.replace("https", "wss");
@@ -102,12 +102,12 @@ async fn main() -> Result<(), anyhow::Error> {
             Client::new(
                 cluster,
                 commitment,
-                &owner,
+                owner.clone(),
                 Some(Duration::from_secs(cli.timeout)),
                 cli.prioritization_micro_lamports,
             ),
             cli.mango_account,
-            owner,
+            owner.clone(),
         )
         .await?,
     );
