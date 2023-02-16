@@ -129,7 +129,7 @@ pub async fn loop_update_index_and_rate(
             .map(|token_index| client.context.token(*token_index).name.to_owned())
             .join(",");
 
-        let mut instructions = vec![ComputeBudgetInstruction::set_compute_unit_price(1)];
+        let mut instructions = vec![];
         for token_index in token_indices_clone.iter() {
             let token = client.context.token(*token_index);
             let banks_for_a_token = token.mint_info.banks();
