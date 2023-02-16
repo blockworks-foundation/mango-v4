@@ -488,8 +488,12 @@ impl LiquidationState {
             // Simulation errors due to liqee precondition failures on the liquidation instructions
             // will commonly happen if our liquidator is late or if there are chain forks.
             match err.downcast_ref::<client::MangoClientError>() {
-                Some(client::MangoClientError::SendTransactionPreflightFailure { logs }) => {
-                    if logs.contains("HealthMustBeNegative") || logs.contains("IsNotBankrupt") {
+                Some(client::MangoClientError::SendTransactionPreflightFailure {
+                    logs, ..
+                }) => {
+                    if logs.iter().any(|line| {
+                        line.contains("HealthMustBeNegative") || line.contains("IsNotBankrupt")
+                    }) {
                         log_level = log::Level::Trace;
                     }
                 }
