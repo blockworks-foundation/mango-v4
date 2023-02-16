@@ -1606,6 +1606,11 @@
 <a href="#1606" id="1606">1606</a>
 <a href="#1607" id="1607">1607</a>
 <a href="#1608" id="1608">1608</a>
+<a href="#1609" id="1609">1609</a>
+<a href="#1610" id="1610">1610</a>
+<a href="#1611" id="1611">1611</a>
+<a href="#1612" id="1612">1612</a>
+<a href="#1613" id="1613">1613</a>
 </pre><pre class="rust"><code><span class="kw">use </span>std::str::FromStr;
 <span class="kw">use </span>std::sync::Arc;
 <span class="kw">use </span>std::time::Duration;
@@ -1634,6 +1639,7 @@
 <span class="kw">use </span>solana_sdk::address_lookup_table_account::AddressLookupTableAccount;
 <span class="kw">use </span>solana_sdk::hash::Hash;
 <span class="kw">use </span>solana_sdk::signer::keypair;
+<span class="kw">use </span>solana_sdk::transaction::TransactionError;
 
 <span class="kw">use </span><span class="kw">crate</span>::account_fetcher::<span class="kw-2">*</span>;
 <span class="kw">use </span><span class="kw">crate</span>::context::{MangoGroupContext, Serum3MarketContext, TokenContext};
@@ -3082,8 +3088,13 @@
 
 <span class="attr">#[derive(Debug, thiserror::Error)]
 </span><span class="kw">pub enum </span>MangoClientError {
-    <span class="attr">#[error(<span class="string">&quot;Transaction simulation error. Logs: {logs}&quot;</span>)]
-    </span>SendTransactionPreflightFailure { logs: String },
+    <span class="attr">#[error(<span class="string">&quot;Transaction simulation error. Error: {err:?}, Logs: {}&quot;</span>,
+        .logs.iter().join(<span class="string">&quot;; &quot;</span>)
+    )]
+    </span>SendTransactionPreflightFailure {
+        err: <span class="prelude-ty">Option</span>&lt;TransactionError&gt;,
+        logs: Vec&lt;String&gt;,
+    },
 }
 
 <span class="kw">pub struct </span>TransactionBuilder&lt;<span class="lifetime">&#39;a</span>&gt; {
@@ -3160,12 +3171,11 @@
     <span class="kw">match </span>err.kind() {
         ClientErrorKind::RpcError(RpcError::RpcResponseError { data, .. }) =&gt; <span class="kw">match </span>data {
             RpcResponseErrorData::SendTransactionPreflightFailure(s) =&gt; {
-                <span class="kw">if let </span><span class="prelude-val">Some</span>(logs) = s.logs.as_ref() {
-                    <span class="kw">return </span>MangoClientError::SendTransactionPreflightFailure {
-                        logs: logs.iter().join(<span class="string">&quot;; &quot;</span>),
-                    }
-                    .into();
+                <span class="kw">return </span>MangoClientError::SendTransactionPreflightFailure {
+                    err: s.err.clone(),
+                    logs: s.logs.clone().unwrap_or_default(),
                 }
+                .into();
             }
             <span class="kw">_ </span>=&gt; {}
         },
