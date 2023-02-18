@@ -51,6 +51,7 @@ pub mod mango_v4 {
         Ok(())
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub fn group_edit(
         ctx: Context<GroupEdit>,
         admin_opt: Option<Pubkey>,
@@ -59,6 +60,9 @@ pub mod mango_v4 {
         testing_opt: Option<u8>,
         version_opt: Option<u8>,
         deposit_limit_quote_opt: Option<u64>,
+        pay_fees_with_mngo_opt: Option<bool>,
+        fees_mngo_discount_rate_opt: Option<f32>,
+        dao_mango_account_opt: Option<Pubkey>,
     ) -> Result<()> {
         #[cfg(feature = "enable-gpl")]
         instructions::group_edit(
@@ -69,6 +73,9 @@ pub mod mango_v4 {
             testing_opt,
             version_opt,
             deposit_limit_quote_opt,
+            pay_fees_with_mngo_opt,
+            fees_mngo_discount_rate_opt,
+            dao_mango_account_opt,
         )?;
         Ok(())
     }
@@ -267,6 +274,15 @@ pub mod mango_v4 {
     pub fn account_close(ctx: Context<AccountClose>, force_close: bool) -> Result<()> {
         #[cfg(feature = "enable-gpl")]
         instructions::account_close(ctx, force_close)?;
+        Ok(())
+    }
+
+    pub fn account_settle_fees_accrued_with_mngo(
+        ctx: Context<AccountSettleFeesAccruedWithMngo>,
+        max_settle: u64,
+    ) -> Result<()> {
+        #[cfg(feature = "enable-gpl")]
+        instructions::account_settle_fees_accrued_with_mngo(ctx, max_settle)?;
         Ok(())
     }
 

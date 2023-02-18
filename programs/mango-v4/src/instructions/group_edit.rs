@@ -4,6 +4,7 @@ use crate::accounts_ix::*;
 
 // use case - transfer group ownership to governance, where
 // admin and fast_listing_admin are PDAs
+#[allow(clippy::too_many_arguments)]
 pub fn group_edit(
     ctx: Context<GroupEdit>,
     admin_opt: Option<Pubkey>,
@@ -12,7 +13,9 @@ pub fn group_edit(
     testing_opt: Option<u8>,
     version_opt: Option<u8>,
     deposit_limit_quote_opt: Option<u64>,
-    pay_fees_with_mngo_opt: Option<u8>,
+    pay_fees_with_mngo_opt: Option<bool>,
+    fees_mngo_discount_rate_opt: Option<f32>,
+    dao_mango_account_opt: Option<Pubkey>,
 ) -> Result<()> {
     let mut group = ctx.accounts.group.load_mut()?;
 
@@ -65,7 +68,25 @@ pub fn group_edit(
             group.pay_fees_with_mngo,
             pay_fees_with_mngo
         );
-        group.pay_fees_with_mngo = pay_fees_with_mngo;
+        group.pay_fees_with_mngo = u8::from(pay_fees_with_mngo);
+    }
+
+    if let Some(fees_mngo_discount_rate) = fees_mngo_discount_rate_opt {
+        msg!(
+            "Fees mngo discount rate old {:?}, new {:?}",
+            group.fees_mngo_discount_rate,
+            fees_mngo_discount_rate
+        );
+        group.fees_mngo_discount_rate = fees_mngo_discount_rate;
+    }
+
+    if let Some(dao_mango_account) = dao_mango_account_opt {
+        msg!(
+            "Dao mango account old {:?}, new {:?}",
+            group.dao_mango_account,
+            dao_mango_account
+        );
+        group.dao_mango_account = dao_mango_account;
     }
 
     Ok(())

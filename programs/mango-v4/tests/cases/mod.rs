@@ -18,6 +18,7 @@ mod test_basic;
 mod test_benchmark;
 mod test_borrow_limits;
 mod test_delegate;
+mod test_fees_settle_with_mngo;
 mod test_health_compute;
 mod test_health_region;
 mod test_ix_gate_set;

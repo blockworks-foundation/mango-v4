@@ -36,7 +36,10 @@ export class Group {
       insuranceVault: PublicKey;
       testing: number;
       version: number;
+      payFeesWithMngo: number;
+      feesMngoDiscountRate: number;
       ixGate: BN;
+      daoMangoAccount: PublicKey;
       addressLookupTables: PublicKey[];
     },
   ): Group {
@@ -51,7 +54,10 @@ export class Group {
       obj.insuranceVault,
       obj.testing,
       obj.version,
+      obj.payFeesWithMngo == 1,
+      obj.feesMngoDiscountRate,
       obj.ixGate,
+      obj.daoMangoAccount,
       obj.addressLookupTables,
       [], // addressLookupTablesList
       new Map(), // banksMapByName
@@ -80,7 +86,10 @@ export class Group {
     public insuranceVault: PublicKey,
     public testing: number,
     public version: number,
+    public payFeesWithMngo: boolean,
+    public feesMngoDiscountRate: number,
     public ixGate: BN,
+    public daoMangoAccount: PublicKey,
     public addressLookupTables: PublicKey[],
     public addressLookupTablesList: AddressLookupTableAccount[],
     public banksMapByName: Map<string, Bank[]>,

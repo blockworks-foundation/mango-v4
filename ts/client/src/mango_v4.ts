@@ -1,5 +1,5 @@
 export type MangoV4 = {
-  "version": "0.6.0",
+  "version": "0.7.0",
   "name": "mango_v4",
   "instructions": [
     {
@@ -143,6 +143,24 @@ export type MangoV4 = {
           "name": "depositLimitQuoteOpt",
           "type": {
             "option": "u64"
+          }
+        },
+        {
+          "name": "payFeesWithMngoOpt",
+          "type": {
+            "option": "bool"
+          }
+        },
+        {
+          "name": "feesMngoDiscountRateOpt",
+          "type": {
+            "option": "f32"
+          }
+        },
+        {
+          "name": "daoMangoAccountOpt",
+          "type": {
+            "option": "publicKey"
           }
         }
       ]
@@ -1091,6 +1109,57 @@ export type MangoV4 = {
         {
           "name": "forceClose",
           "type": "bool"
+        }
+      ]
+    },
+    {
+      "name": "accountSettleFeesAccruedWithMngo",
+      "accounts": [
+        {
+          "name": "group",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "account",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "owner",
+          "isMut": false,
+          "isSigner": true
+        },
+        {
+          "name": "daoAccount",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "mngoBank",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "mngoOracle",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "settleBank",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "settleOracle",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "maxSettle",
+          "type": "u64"
         }
       ]
     },
@@ -3977,13 +4046,12 @@ export type MangoV4 = {
             "type": "u8"
           },
           {
-            "name": "padding2",
-            "type": {
-              "array": [
-                "u8",
-                5
-              ]
-            }
+            "name": "payFeesWithMngo",
+            "type": "u8"
+          },
+          {
+            "name": "feesMngoDiscountRate",
+            "type": "f32"
           },
           {
             "name": "addressLookupTables",
@@ -4007,11 +4075,15 @@ export type MangoV4 = {
             "type": "u128"
           },
           {
+            "name": "daoMangoAccount",
+            "type": "publicKey"
+          },
+          {
             "name": "reserved",
             "type": {
               "array": [
                 "u8",
-                1864
+                1832
               ]
             }
           }
@@ -4105,11 +4177,15 @@ export type MangoV4 = {
             "type": "u64"
           },
           {
+            "name": "feesAccrued",
+            "type": "u64"
+          },
+          {
             "name": "reserved",
             "type": {
               "array": [
                 "u8",
-                232
+                224
               ]
             }
           },
@@ -4663,7 +4739,7 @@ export type MangoV4 = {
           {
             "name": "settleFeeAmountThreshold",
             "docs": [
-              "Pnl settlement amount needed to be eligible for fees."
+              "Pnl settlement amount needed to be eligible for the flat fee."
             ],
             "type": "f32"
           },
@@ -5680,11 +5756,15 @@ export type MangoV4 = {
             "type": "u64"
           },
           {
+            "name": "feesAccrued",
+            "type": "u64"
+          },
+          {
             "name": "reserved",
             "type": {
               "array": [
                 "u8",
-                232
+                224
               ]
             }
           }
@@ -6682,6 +6762,9 @@ export type MangoV4 = {
           },
           {
             "name": "TokenWithdraw"
+          },
+          {
+            "name": "AccountSettleFeesAccruedWithMngo"
           }
         ]
       }
@@ -8345,7 +8428,7 @@ export type MangoV4 = {
 };
 
 export const IDL: MangoV4 = {
-  "version": "0.6.0",
+  "version": "0.7.0",
   "name": "mango_v4",
   "instructions": [
     {
@@ -8489,6 +8572,24 @@ export const IDL: MangoV4 = {
           "name": "depositLimitQuoteOpt",
           "type": {
             "option": "u64"
+          }
+        },
+        {
+          "name": "payFeesWithMngoOpt",
+          "type": {
+            "option": "bool"
+          }
+        },
+        {
+          "name": "feesMngoDiscountRateOpt",
+          "type": {
+            "option": "f32"
+          }
+        },
+        {
+          "name": "daoMangoAccountOpt",
+          "type": {
+            "option": "publicKey"
           }
         }
       ]
@@ -9437,6 +9538,57 @@ export const IDL: MangoV4 = {
         {
           "name": "forceClose",
           "type": "bool"
+        }
+      ]
+    },
+    {
+      "name": "accountSettleFeesAccruedWithMngo",
+      "accounts": [
+        {
+          "name": "group",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "account",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "owner",
+          "isMut": false,
+          "isSigner": true
+        },
+        {
+          "name": "daoAccount",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "mngoBank",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "mngoOracle",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "settleBank",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "settleOracle",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "maxSettle",
+          "type": "u64"
         }
       ]
     },
@@ -12323,13 +12475,12 @@ export const IDL: MangoV4 = {
             "type": "u8"
           },
           {
-            "name": "padding2",
-            "type": {
-              "array": [
-                "u8",
-                5
-              ]
-            }
+            "name": "payFeesWithMngo",
+            "type": "u8"
+          },
+          {
+            "name": "feesMngoDiscountRate",
+            "type": "f32"
           },
           {
             "name": "addressLookupTables",
@@ -12353,11 +12504,15 @@ export const IDL: MangoV4 = {
             "type": "u128"
           },
           {
+            "name": "daoMangoAccount",
+            "type": "publicKey"
+          },
+          {
             "name": "reserved",
             "type": {
               "array": [
                 "u8",
-                1864
+                1832
               ]
             }
           }
@@ -12451,11 +12606,15 @@ export const IDL: MangoV4 = {
             "type": "u64"
           },
           {
+            "name": "feesAccrued",
+            "type": "u64"
+          },
+          {
             "name": "reserved",
             "type": {
               "array": [
                 "u8",
-                232
+                224
               ]
             }
           },
@@ -13009,7 +13168,7 @@ export const IDL: MangoV4 = {
           {
             "name": "settleFeeAmountThreshold",
             "docs": [
-              "Pnl settlement amount needed to be eligible for fees."
+              "Pnl settlement amount needed to be eligible for the flat fee."
             ],
             "type": "f32"
           },
@@ -14026,11 +14185,15 @@ export const IDL: MangoV4 = {
             "type": "u64"
           },
           {
+            "name": "feesAccrued",
+            "type": "u64"
+          },
+          {
             "name": "reserved",
             "type": {
               "array": [
                 "u8",
-                232
+                224
               ]
             }
           }
@@ -15028,6 +15191,9 @@ export const IDL: MangoV4 = {
           },
           {
             "name": "TokenWithdraw"
+          },
+          {
+            "name": "AccountSettleFeesAccruedWithMngo"
           }
         ]
       }

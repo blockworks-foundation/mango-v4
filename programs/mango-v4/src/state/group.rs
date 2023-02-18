@@ -20,9 +20,7 @@ pub struct Group {
     // TODO: unused, use case - listing shit tokens with conservative parameters (mostly defaults)
     pub fast_listing_admin: Pubkey,
 
-    pub pay_fees_with_mngo: u8,
-
-    pub padding: [u8; 3],
+    pub padding: [u8; 4],
 
     pub insurance_vault: Pubkey,
     pub insurance_mint: Pubkey,
@@ -33,7 +31,8 @@ pub struct Group {
 
     pub version: u8,
 
-    pub padding2: [u8; 5],
+    pub pay_fees_with_mngo: u8,
+    pub fees_mngo_discount_rate: f32,
 
     pub address_lookup_tables: [Pubkey; 20],
 
@@ -47,11 +46,13 @@ pub struct Group {
     // 0 is chosen as enabled, becase we want to start out with all ixs enabled, 1 is disabled
     pub ix_gate: u128,
 
-    pub reserved: [u8; 1864],
+    pub dao_mango_account: Pubkey,
+
+    pub reserved: [u8; 1832],
 }
 const_assert_eq!(
     size_of::<Group>(),
-    32 + 4 + 32 * 2 + 1 + 3 + 32 * 2 + 3 + 5 + 20 * 32 + 32 + 8 + 16 + 1864
+    32 + 4 + 32 * 2 + 4 + 32 * 2 + 4 + 4 + 20 * 32 + 32 + 8 + 16 + 32 + 1832
 );
 const_assert_eq!(size_of::<Group>(), 2736);
 const_assert_eq!(size_of::<Group>() % 8, 0);
@@ -145,6 +146,7 @@ pub enum IxGate {
     TokenRegisterTrustless = 45,
     TokenUpdateIndexAndRate = 46,
     TokenWithdraw = 47,
+    AccountSettleFeesAccruedWithMngo = 48,
 }
 
 // note: using creator instead of admin, since admin can be changed

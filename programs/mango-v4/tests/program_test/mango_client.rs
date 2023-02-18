@@ -1503,6 +1503,47 @@ impl ClientInstruction for GroupCreateInstruction {
     }
 }
 
+pub struct GroupEditInstruction {
+    pub group: Pubkey,
+    pub admin: TestKeypair,
+    pub fees_mngo_discount_rate: f32,
+    pub dao_mango_account: Pubkey,
+}
+#[async_trait::async_trait(?Send)]
+impl ClientInstruction for GroupEditInstruction {
+    type Accounts = mango_v4::accounts::GroupEdit;
+    type Instruction = mango_v4::instruction::GroupEdit;
+    async fn to_instruction(
+        &self,
+        _account_loader: impl ClientAccountLoader + 'async_trait,
+    ) -> (Self::Accounts, instruction::Instruction) {
+        let program_id = mango_v4::id();
+        let instruction = Self::Instruction {
+            admin_opt: None,
+            fast_listing_admin_opt: None,
+            security_admin_opt: None,
+            testing_opt: None,
+            version_opt: None,
+            deposit_limit_quote_opt: None,
+            pay_fees_with_mngo_opt: Some(true),
+            fees_mngo_discount_rate_opt: Some(self.fees_mngo_discount_rate),
+            dao_mango_account_opt: Some(self.dao_mango_account),
+        };
+
+        let accounts = Self::Accounts {
+            group: self.group,
+            admin: self.admin.pubkey(),
+        };
+
+        let instruction = make_instruction(program_id, &accounts, instruction);
+        (accounts, instruction)
+    }
+
+    fn signers(&self) -> Vec<TestKeypair> {
+        vec![self.admin]
+    }
+}
+
 pub struct IxGateSetInstruction {
     pub group: Pubkey,
     pub admin: TestKeypair,
@@ -1754,6 +1795,49 @@ impl ClientInstruction for AccountCloseInstruction {
             account: self.account,
             sol_destination: self.sol_destination,
             token_program: Token::id(),
+        };
+
+        let instruction = make_instruction(program_id, &accounts, instruction);
+        (accounts, instruction)
+    }
+
+    fn signers(&self) -> Vec<TestKeypair> {
+        vec![self.owner]
+    }
+}
+
+pub struct AccountSettleFeesAccruedWithMngo {
+    pub group: Pubkey,
+    pub owner: TestKeypair,
+    pub account: Pubkey,
+    pub dao_account: Pubkey,
+    pub mngo_bank: Pubkey,
+    pub settle_bank: Pubkey,
+}
+#[async_trait::async_trait(?Send)]
+impl ClientInstruction for AccountSettleFeesAccruedWithMngo {
+    type Accounts = mango_v4::accounts::AccountSettleFeesAccruedWithMngo;
+    type Instruction = mango_v4::instruction::AccountSettleFeesAccruedWithMngo;
+    async fn to_instruction(
+        &self,
+        account_loader: impl ClientAccountLoader + 'async_trait,
+    ) -> (Self::Accounts, instruction::Instruction) {
+        let program_id = mango_v4::id();
+        let instruction = Self::Instruction {
+            max_settle: u64::MAX,
+        };
+
+        let mngo_bank: Bank = account_loader.load(&self.mngo_bank).await.unwrap();
+        let settle_bank: Bank = account_loader.load(&self.settle_bank).await.unwrap();
+        let accounts = Self::Accounts {
+            group: self.group,
+            owner: self.owner.pubkey(),
+            account: self.account,
+            dao_account: self.dao_account,
+            mngo_bank: self.mngo_bank,
+            mngo_oracle: mngo_bank.oracle,
+            settle_bank: self.settle_bank,
+            settle_oracle: settle_bank.oracle,
         };
 
         let instruction = make_instruction(program_id, &accounts, instruction);
