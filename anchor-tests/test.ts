@@ -1,6 +1,6 @@
-import * as anchor from '@project-serum/anchor';
-import { AnchorProvider, BN, Program } from '@project-serum/anchor';
-import NodeWallet from '@project-serum/anchor/dist/cjs/nodewallet';
+import * as anchor from '@coral-xyz/anchor';
+import { AnchorProvider, BN, Program } from '@coral-xyz/anchor';
+import NodeWallet from '@coral-xyz/anchor/dist/cjs/nodewallet';
 import * as spl from '@solana/spl-token';
 import {
   Connection,
@@ -743,37 +743,25 @@ describe('mango-v4', () => {
     const positionA = accountA.getPerpPosition(btcPerp.perpMarketIndex)!;
     const positionB = accountB.getPerpPosition(btcPerp.perpMarketIndex)!;
 
-    assert.equal(
-      positionA.getBasePositionUi(btcPerp),
-      1,
-      'Position is long'
+    assert.equal(positionA.getBasePositionUi(btcPerp), 1, 'Position is long');
+    assert.equal(positionB.getBasePositionUi(btcPerp), -1, 'Position is short');
+
+    assert.isTrue(
+      positionA.getEntryPrice(btcPerp).eq(new BN(99.0)),
+      'long entry price matches',
     );
-    assert.equal(
-      positionB.getBasePositionUi(btcPerp),
-      -1,
-      'Position is short'
+    assert.isTrue(
+      positionB.getEntryPrice(btcPerp).eq(new BN(99.0)),
+      'short entry price matches',
     );
 
     assert.isTrue(
-      positionA.getEntryPrice(btcPerp)
-                      .eq(new BN(99.0)),
-      'long entry price matches'
+      positionA.getBreakEvenPrice(btcPerp).eq(new BN(99.0)),
+      'long break even price matches',
     );
     assert.isTrue(
-      positionB.getEntryPrice(btcPerp)
-                      .eq(new BN(99.0)),
-      'short entry price matches'
-    );
-
-    assert.isTrue(
-      positionA.getBreakEvenPrice(btcPerp)
-                      .eq(new BN(99.0)),
-      'long break even price matches'
-    );
-    assert.isTrue(
-      positionB.getBreakEvenPrice(btcPerp)
-                      .eq(new BN(99.0)),
-      'short break even price matches'
+      positionB.getBreakEvenPrice(btcPerp).eq(new BN(99.0)),
+      'short break even price matches',
     );
   });
 });

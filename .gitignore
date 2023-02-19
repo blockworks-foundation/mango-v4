@@ -5,7 +5,7 @@ test-ledger
 target
 
 **/*.rs.bk
-
+types/
 dist
 node_modules
 yarn-error.log

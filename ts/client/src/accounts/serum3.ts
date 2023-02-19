@@ -1,5 +1,5 @@
-import { utf8 } from '@project-serum/anchor/dist/cjs/utils/bytes';
-import { Market, Orderbook } from '@project-serum/serum/lib/market';
+import { utf8 } from '@coral-xyz/anchor/dist/cjs/utils/bytes';
+import { Market, Orderbook } from '@project-serum/serum';
 import { Cluster, PublicKey } from '@solana/web3.js';
 import BN from 'bn.js';
 import { MangoClient } from '../client';

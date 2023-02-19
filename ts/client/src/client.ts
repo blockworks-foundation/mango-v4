@@ -1,10 +1,5 @@
-import { AnchorProvider, BN, Program, Provider } from '@project-serum/anchor';
-import {
-  WRAPPED_SOL_MINT,
-  closeAccount,
-  initializeAccount,
-} from '@project-serum/serum/lib/token-instructions';
-import { TOKEN_PROGRAM_ID } from '@solana/spl-token';
+import { AnchorProvider, BN, Program, Provider } from '@coral-xyz/anchor';
+import { TOKEN_PROGRAM_ID, NATIVE_MINT } from './utils/spl';
 import {
   AccountMeta,
   AddressLookupTableAccount,
@@ -65,6 +60,10 @@ import {
   toNative,
 } from './utils';
 import { sendTransaction } from './utils/rpc';
+import {
+  createCloseAccountInstruction,
+  createInitializeAccount3Instruction,
+} from '@solana/spl-token';
 
 export enum AccountRetriever {
   Scanning,
@@ -1020,7 +1019,7 @@ export class MangoClient {
     let preInstructions: TransactionInstruction[] = [];
     let postInstructions: TransactionInstruction[] = [];
     const additionalSigners: Signer[] = [];
-    if (mintPk.equals(WRAPPED_SOL_MINT)) {
+    if (mintPk.equals(NATIVE_MINT)) {
       wrappedSolAccount = new Keypair();
       const lamports = nativeAmount.add(new BN(1e7));
 
@@ -1032,18 +1031,18 @@ export class MangoClient {
           space: 165,
           programId: TOKEN_PROGRAM_ID,
         }),
-        initializeAccount({
-          account: wrappedSolAccount.publicKey,
-          mint: WRAPPED_SOL_MINT,
-          owner: mangoAccount.owner,
-        }),
+        createInitializeAccount3Instruction(
+          wrappedSolAccount.publicKey,
+          NATIVE_MINT,
+          mangoAccount.owner,
+        ),
       ];
       postInstructions = [
-        closeAccount({
-          source: wrappedSolAccount.publicKey,
-          destination: mangoAccount.owner,
-          owner: mangoAccount.owner,
-        }),
+        createCloseAccountInstruction(
+          wrappedSolAccount.publicKey,
+          mangoAccount.owner,
+          mangoAccount.owner,
+        ),
       ];
       additionalSigners.push(wrappedSolAccount);
     }
@@ -1128,13 +1127,13 @@ export class MangoClient {
     ];
 
     const postInstructions: TransactionInstruction[] = [];
-    if (mintPk.equals(WRAPPED_SOL_MINT)) {
+    if (mintPk.equals(NATIVE_MINT)) {
       postInstructions.push(
-        closeAccount({
-          source: tokenAccountPk,
-          destination: mangoAccount.owner,
-          owner: mangoAccount.owner,
-        }),
+        createCloseAccountInstruction(
+          tokenAccountPk,
+          mangoAccount.owner,
+          mangoAccount.owner,
+        ),
       );
     }
 

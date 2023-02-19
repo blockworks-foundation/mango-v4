@@ -1,4 +1,4 @@
-import { AnchorProvider, Wallet } from '@project-serum/anchor';
+import { AnchorProvider, Wallet } from '@coral-xyz/anchor';
 import {
   AddressLookupTableProgram,
   Connection,
@@ -6,9 +6,8 @@ import {
   PublicKey,
 } from '@solana/web3.js';
 import fs from 'fs';
-import { MangoClient } from '../client';
-import { MANGO_V4_ID } from '../constants';
-import { sendTransaction } from '../utils/rpc';
+import { MangoClient } from '../src/client';
+import { MANGO_V4_ID } from '../src/constants';
 
 //
 // Script which depoys a new mango group, and registers 3 tokens

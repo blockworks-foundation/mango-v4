@@ -1,9 +1,9 @@
-import { AnchorProvider, Wallet } from '@project-serum/anchor';
+import { AnchorProvider, Wallet } from '@coral-xyz/anchor';
 import { Connection, Keypair, PublicKey } from '@solana/web3.js';
 import fs from 'fs';
-import { Group } from '../accounts/group';
-import { MangoClient } from '../client';
-import { MANGO_V4_ID } from '../constants';
+import { Group } from '../src/accounts/group';
+import { MangoClient } from '../src/client';
+import { MANGO_V4_ID } from '../src/constants';
 
 const GROUP_NUM = Number(process.env.GROUP_NUM || 0);
 const MANGO_ACCOUNT_PK = process.env.MANGO_ACCOUNT_PK;

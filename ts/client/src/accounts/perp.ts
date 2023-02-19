@@ -1,16 +1,21 @@
-import { BN } from '@project-serum/anchor';
-import { utf8 } from '@project-serum/anchor/dist/cjs/utils/bytes';
+import { BN } from '@coral-xyz/anchor';
+import { utf8 } from '@coral-xyz/anchor/dist/cjs/utils/bytes';
 import { PublicKey } from '@solana/web3.js';
 import Big from 'big.js';
 import { MangoClient } from '../client';
 import { RUST_U64_MAX } from '../constants';
 import { I80F48, I80F48Dto, ZERO_I80F48 } from '../numbers/I80F48';
 import { Modify } from '../types';
-import { As, U64_MAX_BN, toNative, toUiDecimals } from '../utils';
+import {
+  As,
+  U64_MAX_BN,
+  toNative,
+  toUiDecimals,
+  QUOTE_DECIMALS,
+} from '../utils';
 import {
   OracleConfig,
   OracleConfigDto,
-  QUOTE_DECIMALS,
   StablePriceModel,
   TokenIndex,
 } from './bank';

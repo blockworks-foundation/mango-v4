@@ -1,12 +1,12 @@
-import { AnchorProvider, Wallet } from '@project-serum/anchor';
-import { coder } from '@project-serum/anchor/dist/cjs/spl/token';
+import { AnchorProvider, Wallet } from '@coral-xyz/anchor';
+import { coder } from '@coral-xyz/anchor/dist/cjs/spl/token';
 import { Cluster, Connection, Keypair } from '@solana/web3.js';
 import * as dotenv from 'dotenv';
 import fs from 'fs';
-import { MangoClient } from '../client';
-import { MANGO_V4_ID } from '../constants';
-import { I80F48, ZERO_I80F48 } from '../numbers/I80F48';
-import { toUiDecimals } from '../utils';
+import { MangoClient } from '../../src/client';
+import { MANGO_V4_ID } from '../../src/constants';
+import { I80F48, ZERO_I80F48 } from '../../src/numbers/I80F48';
+import { toUiDecimals } from '../../src/utils';
 dotenv.config();
 
 const CLUSTER_URL =

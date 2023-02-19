@@ -1,4 +1,4 @@
-import { AnchorProvider, BN, Wallet } from '@project-serum/anchor';
+import { AnchorProvider, BN, Wallet } from '@coral-xyz/anchor';
 import {
   Cluster,
   Connection,
@@ -10,19 +10,19 @@ import Binance from 'binance-api-node';
 import fs from 'fs';
 import { Kraken } from 'node-kraken-api';
 import path from 'path';
-import { Group } from '../../accounts/group';
-import { HealthType, MangoAccount } from '../../accounts/mangoAccount';
+import { Group } from '../../src/accounts/group';
+import { HealthType, MangoAccount } from '../../src/accounts/mangoAccount';
 import {
   BookSide,
   PerpMarket,
   PerpMarketIndex,
   PerpOrderSide,
   PerpOrderType,
-} from '../../accounts/perp';
-import { MangoClient } from '../../client';
-import { MANGO_V4_ID } from '../../constants';
-import { toUiDecimalsForQuote } from '../../utils';
-import { sendTransaction } from '../../utils/rpc';
+} from '../../src/accounts/perp';
+import { MangoClient } from '../../src/client';
+import { MANGO_V4_ID } from '../../src/constants';
+import { toUiDecimalsForQuote } from '../../src/utils';
+import { sendTransaction } from '../../src/utils/rpc';
 import * as defaultParams from './params/default.json';
 import {
   makeCheckAndSetSequenceNumberIx,
@@ -159,6 +159,8 @@ async function initSequenceEnforcerAccounts(
       CLUSTER,
     ),
   );
+
+  // eslint-disable-next-line
   while (true) {
     try {
       const sig = await sendTransaction(

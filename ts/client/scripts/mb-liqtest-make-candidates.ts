@@ -1,21 +1,21 @@
-import { AnchorProvider, BN, Wallet } from '@project-serum/anchor';
+import { AnchorProvider, BN, Wallet } from '@coral-xyz/anchor';
 import { Connection, Keypair, PublicKey } from '@solana/web3.js';
 import fs from 'fs';
-import { Bank } from '../accounts/bank';
-import { MangoAccount } from '../accounts/mangoAccount';
-import { PerpMarket, PerpOrderSide, PerpOrderType } from '../accounts/perp';
+import { Bank } from '../src/accounts/bank';
+import { MangoAccount } from '../src/accounts/mangoAccount';
+import { PerpMarket, PerpOrderSide, PerpOrderType } from '../src/accounts/perp';
 import {
   Serum3OrderType,
   Serum3SelfTradeBehavior,
   Serum3Side,
-} from '../accounts/serum3';
-import { Builder } from '../builder';
-import { MangoClient } from '../client';
+} from '../src/accounts/serum3';
+import { Builder } from '../src/builder';
+import { MangoClient } from '../src/client';
 import {
   NullPerpEditParams,
   NullTokenEditParams,
-} from '../clientIxParamBuilder';
-import { MANGO_V4_ID } from '../constants';
+} from '../src/clientIxParamBuilder';
+import { MANGO_V4_ID } from '../src/constants';
 
 //
 // This script creates liquidation candidates
