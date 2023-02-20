@@ -14,7 +14,7 @@ pub fn group_edit(
     version_opt: Option<u8>,
     deposit_limit_quote_opt: Option<u64>,
     fees_pay_with_mngo_opt: Option<bool>,
-    fees_mngo_bonus_rate_opt: Option<f32>,
+    fees_mngo_bonus_factor_opt: Option<f32>,
     fees_swap_mango_account_opt: Option<Pubkey>,
     fees_mngo_token_index_opt: Option<TokenIndex>,
 ) -> Result<()> {
@@ -71,13 +71,13 @@ pub fn group_edit(
         );
         group.fees_pay_with_mngo = u8::from(pay_fees_with_mngo);
     }
-    if let Some(fees_mngo_bonus_rate) = fees_mngo_bonus_rate_opt {
+    if let Some(fees_mngo_bonus_factor) = fees_mngo_bonus_factor_opt {
         msg!(
             "Fees mngo bonus rate old {:?}, new {:?}",
-            group.fees_mngo_bonus_rate,
-            fees_mngo_bonus_rate
+            group.fees_mngo_bonus_factor,
+            fees_mngo_bonus_factor
         );
-        group.fees_mngo_bonus_rate = fees_mngo_bonus_rate;
+        group.fees_mngo_bonus_factor = fees_mngo_bonus_factor;
     }
     if let Some(fees_swap_mango_account) = fees_swap_mango_account_opt {
         msg!(

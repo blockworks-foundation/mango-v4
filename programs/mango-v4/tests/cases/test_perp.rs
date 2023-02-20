@@ -23,7 +23,7 @@ async fn test_perp_fixed() -> Result<(), TransportError> {
     .create(solana)
     .await;
 
-    let deposit_amount = 1000_000;
+    let deposit_amount = 1000;
     let account_0 = create_funded_account(
         &solana,
         group,

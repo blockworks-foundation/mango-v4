@@ -32,7 +32,7 @@ export class MangoAccount {
       perpSpotTransfers: BN;
       healthRegionBeginInitHealth: BN;
       frozenUntil: BN;
-      feesAccrued: BN;
+      discountSettleableFeesAccrued: BN;
       headerVersion: number;
       tokens: unknown;
       serum3: unknown;
@@ -53,7 +53,7 @@ export class MangoAccount {
       obj.perpSpotTransfers,
       obj.healthRegionBeginInitHealth,
       obj.frozenUntil,
-      obj.feesAccrued,
+      obj.discountSettleableFeesAccrued,
       obj.headerVersion,
       obj.tokens as TokenPositionDto[],
       obj.serum3 as Serum3PositionDto[],
@@ -76,7 +76,7 @@ export class MangoAccount {
     public perpSpotTransfers: BN,
     public healthRegionBeginInitHealth: BN,
     public frozenUntil: BN,
-    public feesAccrued: BN,
+    public discountSettleableFeesAccrued: BN,
     public headerVersion: number,
     tokens: TokenPositionDto[],
     serum3: Serum3PositionDto[],

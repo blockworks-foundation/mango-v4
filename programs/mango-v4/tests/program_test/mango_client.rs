@@ -1503,15 +1503,30 @@ impl ClientInstruction for GroupCreateInstruction {
     }
 }
 
-pub struct GroupEditInstruction {
+fn group_edit_instruction_default() -> mango_v4::instruction::GroupEdit {
+    mango_v4::instruction::GroupEdit {
+        admin_opt: None,
+        fast_listing_admin_opt: None,
+        security_admin_opt: None,
+        testing_opt: None,
+        version_opt: None,
+        deposit_limit_quote_opt: None,
+        fees_pay_with_mngo_opt: None,
+        fees_mngo_bonus_factor_opt: None,
+        fees_swap_mango_account_opt: None,
+        fees_mngo_token_index_opt: None,
+    }
+}
+
+pub struct GroupEditFeeParameters {
     pub group: Pubkey,
     pub admin: TestKeypair,
-    pub fees_mngo_bonus_rate: f32,
+    pub fees_mngo_bonus_factor: f32,
     pub fees_mngo_token_index: TokenIndex,
     pub fees_swap_mango_account: Pubkey,
 }
 #[async_trait::async_trait(?Send)]
-impl ClientInstruction for GroupEditInstruction {
+impl ClientInstruction for GroupEditFeeParameters {
     type Accounts = mango_v4::accounts::GroupEdit;
     type Instruction = mango_v4::instruction::GroupEdit;
     async fn to_instruction(
@@ -1520,16 +1535,11 @@ impl ClientInstruction for GroupEditInstruction {
     ) -> (Self::Accounts, instruction::Instruction) {
         let program_id = mango_v4::id();
         let instruction = Self::Instruction {
-            admin_opt: None,
-            fast_listing_admin_opt: None,
-            security_admin_opt: None,
-            testing_opt: None,
-            version_opt: None,
-            deposit_limit_quote_opt: None,
             fees_pay_with_mngo_opt: Some(true),
-            fees_mngo_bonus_rate_opt: Some(self.fees_mngo_bonus_rate),
+            fees_mngo_bonus_factor_opt: Some(self.fees_mngo_bonus_factor),
             fees_swap_mango_account_opt: Some(self.fees_swap_mango_account),
             fees_mngo_token_index_opt: Some(self.fees_mngo_token_index),
+            ..group_edit_instruction_default()
         };
 
         let accounts = Self::Accounts {
@@ -1809,10 +1819,8 @@ impl ClientInstruction for AccountCloseInstruction {
 }
 
 pub struct AccountSettleFeesWithMngo {
-    pub group: Pubkey,
     pub owner: TestKeypair,
     pub account: Pubkey,
-    pub dao_account: Pubkey,
     pub mngo_bank: Pubkey,
     pub settle_bank: Pubkey,
 }
@@ -1829,13 +1837,21 @@ impl ClientInstruction for AccountSettleFeesWithMngo {
             max_settle: u64::MAX,
         };
 
+        let account = account_loader
+            .load_mango_account(&self.account)
+            .await
+            .unwrap();
+        let group = account_loader
+            .load::<Group>(&account.fixed.group)
+            .await
+            .unwrap();
         let mngo_bank: Bank = account_loader.load(&self.mngo_bank).await.unwrap();
         let settle_bank: Bank = account_loader.load(&self.settle_bank).await.unwrap();
         let accounts = Self::Accounts {
-            group: self.group,
+            group: account.fixed.group,
             owner: self.owner.pubkey(),
             account: self.account,
-            dao_account: self.dao_account,
+            dao_account: group.fees_swap_mango_account,
             mngo_bank: self.mngo_bank,
             mngo_oracle: mngo_bank.oracle,
             settle_bank: self.settle_bank,

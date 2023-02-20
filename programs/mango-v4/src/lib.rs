@@ -61,7 +61,7 @@ pub mod mango_v4 {
         version_opt: Option<u8>,
         deposit_limit_quote_opt: Option<u64>,
         fees_pay_with_mngo_opt: Option<bool>,
-        fees_mngo_bonus_rate_opt: Option<f32>,
+        fees_mngo_bonus_factor_opt: Option<f32>,
         fees_swap_mango_account_opt: Option<Pubkey>,
         fees_mngo_token_index_opt: Option<TokenIndex>,
     ) -> Result<()> {
@@ -75,7 +75,7 @@ pub mod mango_v4 {
             version_opt,
             deposit_limit_quote_opt,
             fees_pay_with_mngo_opt,
-            fees_mngo_bonus_rate_opt,
+            fees_mngo_bonus_factor_opt,
             fees_swap_mango_account_opt,
             fees_mngo_token_index_opt,
         )?;

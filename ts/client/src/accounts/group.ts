@@ -37,7 +37,7 @@ export class Group {
       testing: number;
       version: number;
       feesPayWithMngo: number;
-      feesMngoBonusRate: number;
+      feesMngoBonusFactor: number;
       addressLookupTables: PublicKey[];
       securityAdmin: PublicKey;
       depositLimitQuote: BN;
@@ -57,7 +57,7 @@ export class Group {
       obj.testing,
       obj.version,
       obj.feesPayWithMngo == 1,
-      obj.feesMngoBonusRate,
+      obj.feesMngoBonusFactor,
       obj.addressLookupTables,
       obj.securityAdmin,
       obj.depositLimitQuote,
@@ -91,7 +91,7 @@ export class Group {
     public testing: number,
     public version: number,
     public feesPayWithMngo: boolean,
-    public feesMngoBonusRate: number,
+    public feesMngoBonusFactor: number,
     public addressLookupTables: PublicKey[],
     public securityAdmin: PublicKey,
     public depositLimitQuote,

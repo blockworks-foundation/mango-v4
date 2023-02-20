@@ -131,12 +131,12 @@ async fn test_fees_settle_with_mngo() -> Result<(), TransportError> {
     //
     send_tx(
         solana,
-        GroupEditInstruction {
+        GroupEditFeeParameters {
             group,
             admin,
             fees_mngo_token_index: 1 as TokenIndex,
             fees_swap_mango_account: account_0,
-            fees_mngo_bonus_rate: 1.2,
+            fees_mngo_bonus_factor: 1.2,
         },
     )
     .await
@@ -151,10 +151,8 @@ async fn test_fees_settle_with_mngo() -> Result<(), TransportError> {
     send_tx(
         solana,
         AccountSettleFeesWithMngo {
-            group,
             owner,
             account: account_1,
-            dao_account: account_0,
             mngo_bank: tokens[1].bank,
             settle_bank: tokens[0].bank,
         },

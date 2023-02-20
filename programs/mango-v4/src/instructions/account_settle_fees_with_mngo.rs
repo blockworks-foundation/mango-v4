@@ -32,22 +32,21 @@ pub fn account_settle_fees_with_mngo(
     );
     let mut dao_account = ctx.accounts.dao_account.load_full_mut()?;
 
-    // check positions exist, for nicer error messages
-    {
-        account.ensure_token_position(mngo_bank.token_index)?;
-        account.ensure_token_position(settle_bank.token_index)?;
-        dao_account.ensure_token_position(mngo_bank.token_index)?;
-        dao_account.ensure_token_position(settle_bank.token_index)?;
-    }
-
-    let bonus_rate = I80F48::from_num(group.fees_mngo_bonus_rate);
+    let bonus_rate = I80F48::from_num(group.fees_mngo_bonus_factor);
     let now_ts = Clock::get()?.unix_timestamp.try_into().unwrap();
 
     let mut max_settle =
         I80F48::from_num::<u64>(max_settle.min(account.fixed.discount_settleable_fees_accrued));
+    if max_settle == I80F48::ZERO {
+        msg!(
+            "nothing to settle, (discount_settleable_fees_accrued {})",
+            account.fixed.discount_settleable_fees_accrued
+        );
+        return Ok(());
+    }
 
     // if mngo token position has borrows, skip settling
-    let account_mngo_token_position = account.token_position_mut(mngo_bank.token_index)?.0;
+    let account_mngo_token_position = account.ensure_token_position(mngo_bank.token_index)?.0;
     let account_mngo_native = account_mngo_token_position.native(&mngo_bank);
     if account_mngo_native.is_negative() {
         msg!(
@@ -58,7 +57,7 @@ pub fn account_settle_fees_with_mngo(
     }
     let mngo_oracle_price = mngo_bank.oracle_price(
         &AccountInfoRef::borrow(&ctx.accounts.mngo_oracle.as_ref())?,
-        None,
+        Some(Clock::get()?.slot),
     )?;
     let mngo_settle_price = cm!(mngo_oracle_price * bonus_rate);
     // mngo is exchanged at a discount
@@ -68,7 +67,7 @@ pub fn account_settle_fees_with_mngo(
     max_settle = cm!(max_settle_mngo * mngo_settle_price);
 
     // move mngo from user to dao
-    let dao_mngo_token_position = dao_account.token_position_mut(mngo_bank.token_index)?.0;
+    let dao_mngo_token_position = dao_account.ensure_token_position(mngo_bank.token_index)?.0;
     mngo_bank.withdraw_without_fee(
         account_mngo_token_position,
         max_settle_mngo,
@@ -78,8 +77,10 @@ pub fn account_settle_fees_with_mngo(
     mngo_bank.deposit(dao_mngo_token_position, max_settle_mngo, now_ts)?;
 
     // move settlement tokens from dao to user
-    let account_settle_token_position = account.token_position_mut(settle_bank.token_index)?.0;
-    let dao_settle_token_position = dao_account.token_position_mut(settle_bank.token_index)?.0;
+    let account_settle_token_position = account.ensure_token_position(settle_bank.token_index)?.0;
+    let dao_settle_token_position = dao_account
+        .ensure_token_position(settle_bank.token_index)?
+        .0;
     settle_bank.withdraw_without_fee(
         dao_settle_token_position,
         max_settle,
@@ -97,6 +98,8 @@ pub fn account_settle_fees_with_mngo(
         max_settle,
         max_settle_mngo
     );
+
+    // TODO health check
 
     Ok(())
 }
