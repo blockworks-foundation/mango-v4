@@ -20,7 +20,8 @@ pub struct Group {
     // TODO: unused, use case - listing shit tokens with conservative parameters (mostly defaults)
     pub fast_listing_admin: Pubkey,
 
-    pub padding: [u8; 4],
+    pub fees_mngo_token_index: TokenIndex,
+    pub padding: [u8; 2],
 
     pub insurance_vault: Pubkey,
     pub insurance_mint: Pubkey,
@@ -31,8 +32,8 @@ pub struct Group {
 
     pub version: u8,
 
-    pub pay_fees_with_mngo: u8,
-    pub fees_mngo_discount_rate: f32,
+    pub fees_pay_with_mngo: u8,
+    pub fees_mngo_bonus_rate: f32,
 
     pub address_lookup_tables: [Pubkey; 20],
 
@@ -46,7 +47,8 @@ pub struct Group {
     // 0 is chosen as enabled, becase we want to start out with all ixs enabled, 1 is disabled
     pub ix_gate: u128,
 
-    pub dao_mango_account: Pubkey,
+    // A mango account which would be counter party for settling fees with mngo
+    pub fees_swap_mango_account: Pubkey,
 
     pub reserved: [u8; 1832],
 }
@@ -58,8 +60,8 @@ const_assert_eq!(size_of::<Group>(), 2736);
 const_assert_eq!(size_of::<Group>() % 8, 0);
 
 impl Group {
-    pub fn pay_fees_with_mngo(&self) -> bool {
-        self.pay_fees_with_mngo == 1
+    pub fn fees_pay_with_mngo(&self) -> bool {
+        self.fees_pay_with_mngo == 1
     }
 
     pub fn is_testing(&self) -> bool {
@@ -146,7 +148,7 @@ pub enum IxGate {
     TokenRegisterTrustless = 45,
     TokenUpdateIndexAndRate = 46,
     TokenWithdraw = 47,
-    AccountSettleFeesAccruedWithMngo = 48,
+    AccountSettleFeesWithMngo = 48,
 }
 
 // note: using creator instead of admin, since admin can be changed

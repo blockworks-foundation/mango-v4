@@ -159,9 +159,10 @@ export class MangoClient {
     testing?: number,
     version?: number,
     depositLimitQuote?: BN,
-    payFeesWithMngo?: boolean,
-    feesMngoDiscountRate?: number,
-    daoMangoAccount?: PublicKey,
+    feesPayWithMngo?: boolean,
+    feesMngoBonusRate?: number,
+    feesSwapMangoAccount?: PublicKey,
+    feesMngoTokenIndex?: TokenIndex,
   ): Promise<TransactionSignature> {
     const ix = await this.program.methods
       .groupEdit(
@@ -171,9 +172,10 @@ export class MangoClient {
         testing ?? null,
         version ?? null,
         depositLimitQuote !== undefined ? depositLimitQuote : null,
-        payFeesWithMngo ?? null,
-        feesMngoDiscountRate ?? null,
-        daoMangoAccount ?? null,
+        feesPayWithMngo ?? null,
+        feesMngoBonusRate ?? null,
+        feesSwapMangoAccount ?? null,
+        feesMngoTokenIndex ?? null,
       )
       .accounts({
         group: group.publicKey,

@@ -60,9 +60,10 @@ pub mod mango_v4 {
         testing_opt: Option<u8>,
         version_opt: Option<u8>,
         deposit_limit_quote_opt: Option<u64>,
-        pay_fees_with_mngo_opt: Option<bool>,
-        fees_mngo_discount_rate_opt: Option<f32>,
-        dao_mango_account_opt: Option<Pubkey>,
+        fees_pay_with_mngo_opt: Option<bool>,
+        fees_mngo_bonus_rate_opt: Option<f32>,
+        fees_swap_mango_account_opt: Option<Pubkey>,
+        fees_mngo_token_index_opt: Option<TokenIndex>,
     ) -> Result<()> {
         #[cfg(feature = "enable-gpl")]
         instructions::group_edit(
@@ -73,9 +74,10 @@ pub mod mango_v4 {
             testing_opt,
             version_opt,
             deposit_limit_quote_opt,
-            pay_fees_with_mngo_opt,
-            fees_mngo_discount_rate_opt,
-            dao_mango_account_opt,
+            fees_pay_with_mngo_opt,
+            fees_mngo_bonus_rate_opt,
+            fees_swap_mango_account_opt,
+            fees_mngo_token_index_opt,
         )?;
         Ok(())
     }
@@ -277,12 +279,12 @@ pub mod mango_v4 {
         Ok(())
     }
 
-    pub fn account_settle_fees_accrued_with_mngo(
-        ctx: Context<AccountSettleFeesAccruedWithMngo>,
+    pub fn account_settle_fees_with_mngo(
+        ctx: Context<AccountSettleFeesWithMngo>,
         max_settle: u64,
     ) -> Result<()> {
         #[cfg(feature = "enable-gpl")]
-        instructions::account_settle_fees_accrued_with_mngo(ctx, max_settle)?;
+        instructions::account_settle_fees_with_mngo(ctx, max_settle)?;
         Ok(())
     }
 

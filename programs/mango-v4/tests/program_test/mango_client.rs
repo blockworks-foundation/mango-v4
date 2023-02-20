@@ -1506,8 +1506,9 @@ impl ClientInstruction for GroupCreateInstruction {
 pub struct GroupEditInstruction {
     pub group: Pubkey,
     pub admin: TestKeypair,
-    pub fees_mngo_discount_rate: f32,
-    pub dao_mango_account: Pubkey,
+    pub fees_mngo_bonus_rate: f32,
+    pub fees_mngo_token_index: TokenIndex,
+    pub fees_swap_mango_account: Pubkey,
 }
 #[async_trait::async_trait(?Send)]
 impl ClientInstruction for GroupEditInstruction {
@@ -1525,9 +1526,10 @@ impl ClientInstruction for GroupEditInstruction {
             testing_opt: None,
             version_opt: None,
             deposit_limit_quote_opt: None,
-            pay_fees_with_mngo_opt: Some(true),
-            fees_mngo_discount_rate_opt: Some(self.fees_mngo_discount_rate),
-            dao_mango_account_opt: Some(self.dao_mango_account),
+            fees_pay_with_mngo_opt: Some(true),
+            fees_mngo_bonus_rate_opt: Some(self.fees_mngo_bonus_rate),
+            fees_swap_mango_account_opt: Some(self.fees_swap_mango_account),
+            fees_mngo_token_index_opt: Some(self.fees_mngo_token_index),
         };
 
         let accounts = Self::Accounts {
@@ -1806,7 +1808,7 @@ impl ClientInstruction for AccountCloseInstruction {
     }
 }
 
-pub struct AccountSettleFeesAccruedWithMngo {
+pub struct AccountSettleFeesWithMngo {
     pub group: Pubkey,
     pub owner: TestKeypair,
     pub account: Pubkey,
@@ -1815,9 +1817,9 @@ pub struct AccountSettleFeesAccruedWithMngo {
     pub settle_bank: Pubkey,
 }
 #[async_trait::async_trait(?Send)]
-impl ClientInstruction for AccountSettleFeesAccruedWithMngo {
-    type Accounts = mango_v4::accounts::AccountSettleFeesAccruedWithMngo;
-    type Instruction = mango_v4::instruction::AccountSettleFeesAccruedWithMngo;
+impl ClientInstruction for AccountSettleFeesWithMngo {
+    type Accounts = mango_v4::accounts::AccountSettleFeesWithMngo;
+    type Instruction = mango_v4::instruction::AccountSettleFeesWithMngo;
     async fn to_instruction(
         &self,
         account_loader: impl ClientAccountLoader + 'async_trait,

@@ -1,6 +1,6 @@
 use anchor_lang::prelude::*;
 
-use crate::accounts_ix::*;
+use crate::{accounts_ix::*, state::TokenIndex};
 
 // use case - transfer group ownership to governance, where
 // admin and fast_listing_admin are PDAs
@@ -13,9 +13,10 @@ pub fn group_edit(
     testing_opt: Option<u8>,
     version_opt: Option<u8>,
     deposit_limit_quote_opt: Option<u64>,
-    pay_fees_with_mngo_opt: Option<bool>,
-    fees_mngo_discount_rate_opt: Option<f32>,
-    dao_mango_account_opt: Option<Pubkey>,
+    fees_pay_with_mngo_opt: Option<bool>,
+    fees_mngo_bonus_rate_opt: Option<f32>,
+    fees_swap_mango_account_opt: Option<Pubkey>,
+    fees_mngo_token_index_opt: Option<TokenIndex>,
 ) -> Result<()> {
     let mut group = ctx.accounts.group.load_mut()?;
 
@@ -62,31 +63,37 @@ pub fn group_edit(
         group.deposit_limit_quote = deposit_limit_quote;
     }
 
-    if let Some(pay_fees_with_mngo) = pay_fees_with_mngo_opt {
+    if let Some(pay_fees_with_mngo) = fees_pay_with_mngo_opt {
         msg!(
-            "Pay fees with mngo old {:?}, new {:?}",
-            group.pay_fees_with_mngo,
+            "Fees pay with mngo old {:?}, new {:?}",
+            group.fees_pay_with_mngo,
             pay_fees_with_mngo
         );
-        group.pay_fees_with_mngo = u8::from(pay_fees_with_mngo);
+        group.fees_pay_with_mngo = u8::from(pay_fees_with_mngo);
     }
-
-    if let Some(fees_mngo_discount_rate) = fees_mngo_discount_rate_opt {
+    if let Some(fees_mngo_bonus_rate) = fees_mngo_bonus_rate_opt {
         msg!(
-            "Fees mngo discount rate old {:?}, new {:?}",
-            group.fees_mngo_discount_rate,
-            fees_mngo_discount_rate
+            "Fees mngo bonus rate old {:?}, new {:?}",
+            group.fees_mngo_bonus_rate,
+            fees_mngo_bonus_rate
         );
-        group.fees_mngo_discount_rate = fees_mngo_discount_rate;
+        group.fees_mngo_bonus_rate = fees_mngo_bonus_rate;
     }
-
-    if let Some(dao_mango_account) = dao_mango_account_opt {
+    if let Some(fees_swap_mango_account) = fees_swap_mango_account_opt {
         msg!(
-            "Dao mango account old {:?}, new {:?}",
-            group.dao_mango_account,
-            dao_mango_account
+            "Fees swap mango account old {:?}, new {:?}",
+            group.fees_swap_mango_account,
+            fees_swap_mango_account
         );
-        group.dao_mango_account = dao_mango_account;
+        group.fees_swap_mango_account = fees_swap_mango_account;
+    }
+    if let Some(fees_mngo_token_index) = fees_mngo_token_index_opt {
+        msg!(
+            "Fees mngo token index old {:?}, new {:?}",
+            group.fees_mngo_token_index,
+            fees_mngo_token_index
+        );
+        group.fees_mngo_token_index = fees_mngo_token_index;
     }
 
     Ok(())

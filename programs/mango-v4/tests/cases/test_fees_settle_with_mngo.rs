@@ -134,22 +134,23 @@ async fn test_fees_settle_with_mngo() -> Result<(), TransportError> {
         GroupEditInstruction {
             group,
             admin,
-            fees_mngo_discount_rate: 0.8,
-            dao_mango_account: account_0, // we will settle fees for account_1, since it was taker, and has positive fees accrued
+            fees_mngo_token_index: 1 as TokenIndex,
+            fees_swap_mango_account: account_0,
+            fees_mngo_bonus_rate: 1.2,
         },
     )
     .await
     .unwrap();
 
     let mango_account_1 = solana.get_account::<MangoAccount>(account_1).await;
-    let before_fees_accrued = mango_account_1.fees_accrued;
+    let before_fees_accrued = mango_account_1.discount_settleable_fees_accrued;
     let settle_token_position_before =
         mango_account_1.tokens[0].native(&solana.get_account::<Bank>(tokens[0].bank).await);
     let mngo_token_position_before =
         mango_account_1.tokens[1].native(&solana.get_account::<Bank>(tokens[1].bank).await);
     send_tx(
         solana,
-        AccountSettleFeesAccruedWithMngo {
+        AccountSettleFeesWithMngo {
             group,
             owner,
             account: account_1,
@@ -164,7 +165,7 @@ async fn test_fees_settle_with_mngo() -> Result<(), TransportError> {
     let after_fees_accrued = solana
         .get_account::<MangoAccount>(account_1)
         .await
-        .fees_accrued;
+        .discount_settleable_fees_accrued;
     let settle_token_position_after =
         mango_account_1.tokens[0].native(&solana.get_account::<Bank>(tokens[0].bank).await);
     let mngo_token_position_after =
@@ -178,7 +179,7 @@ async fn test_fees_settle_with_mngo() -> Result<(), TransportError> {
             < I80F48::from_num(0.000001)
     );
     assert!(
-        (mngo_token_position_before - mngo_token_position_after) - I80F48::from_num(16)
+        (mngo_token_position_before - mngo_token_position_after) - I80F48::from_num(16.666666)
             < I80F48::from_num(0.000001)
     );
 

@@ -31,16 +31,18 @@ export class Group {
       groupNum: number;
       admin: PublicKey;
       fastListingAdmin: PublicKey;
-      securityAdmin: PublicKey;
+      feesMngoTokenIndex: number;
       insuranceMint: PublicKey;
       insuranceVault: PublicKey;
       testing: number;
       version: number;
-      payFeesWithMngo: number;
-      feesMngoDiscountRate: number;
-      ixGate: BN;
-      daoMangoAccount: PublicKey;
+      feesPayWithMngo: number;
+      feesMngoBonusRate: number;
       addressLookupTables: PublicKey[];
+      securityAdmin: PublicKey;
+      depositLimitQuote: BN;
+      ixGate: BN;
+      feesSwapMangoAccount: PublicKey;
     },
   ): Group {
     return new Group(
@@ -49,16 +51,18 @@ export class Group {
       obj.groupNum,
       obj.admin,
       obj.fastListingAdmin,
-      obj.securityAdmin,
+      obj.feesMngoTokenIndex as TokenIndex,
       obj.insuranceMint,
       obj.insuranceVault,
       obj.testing,
       obj.version,
-      obj.payFeesWithMngo == 1,
-      obj.feesMngoDiscountRate,
-      obj.ixGate,
-      obj.daoMangoAccount,
+      obj.feesPayWithMngo == 1,
+      obj.feesMngoBonusRate,
       obj.addressLookupTables,
+      obj.securityAdmin,
+      obj.depositLimitQuote,
+      obj.ixGate,
+      obj.feesSwapMangoAccount,
       [], // addressLookupTablesList
       new Map(), // banksMapByName
       new Map(), // banksMapByMint
@@ -81,16 +85,18 @@ export class Group {
     public groupNum: number,
     public admin: PublicKey,
     public fastListingAdmin: PublicKey,
-    public securityAdmin: PublicKey,
+    public feesMngoTokenIndex: TokenIndex,
     public insuranceMint: PublicKey,
     public insuranceVault: PublicKey,
     public testing: number,
     public version: number,
-    public payFeesWithMngo: boolean,
-    public feesMngoDiscountRate: number,
-    public ixGate: BN,
-    public daoMangoAccount: PublicKey,
+    public feesPayWithMngo: boolean,
+    public feesMngoBonusRate: number,
     public addressLookupTables: PublicKey[],
+    public securityAdmin: PublicKey,
+    public depositLimitQuote,
+    public ixGate: BN,
+    public feesSwapMangoAccount: PublicKey,
     public addressLookupTablesList: AddressLookupTableAccount[],
     public banksMapByName: Map<string, Bank[]>,
     public banksMapByMint: Map<string, Bank[]>,

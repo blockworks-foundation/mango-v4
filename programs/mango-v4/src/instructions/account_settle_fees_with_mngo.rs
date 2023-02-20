@@ -8,8 +8,8 @@ use crate::state::*;
 
 use crate::accounts_ix::*;
 
-pub fn account_settle_fees_accrued_with_mngo(
-    ctx: Context<AccountSettleFeesAccruedWithMngo>,
+pub fn account_settle_fees_with_mngo(
+    ctx: Context<AccountSettleFeesWithMngo>,
     max_settle: u64,
 ) -> Result<()> {
     // Cannot settle with yourself
@@ -34,16 +34,17 @@ pub fn account_settle_fees_accrued_with_mngo(
 
     // check positions exist, for nicer error messages
     {
-        account.token_position(mngo_bank.token_index)?;
-        account.token_position(settle_bank.token_index)?;
-        dao_account.token_position(mngo_bank.token_index)?;
-        dao_account.token_position(settle_bank.token_index)?;
+        account.ensure_token_position(mngo_bank.token_index)?;
+        account.ensure_token_position(settle_bank.token_index)?;
+        dao_account.ensure_token_position(mngo_bank.token_index)?;
+        dao_account.ensure_token_position(settle_bank.token_index)?;
     }
 
-    let discount_rate = I80F48::from_num::<f32>(group.fees_mngo_discount_rate);
+    let bonus_rate = I80F48::from_num(group.fees_mngo_bonus_rate);
     let now_ts = Clock::get()?.unix_timestamp.try_into().unwrap();
 
-    let mut max_settle = I80F48::from_num::<u64>(max_settle.min(account.fixed.fees_accrued));
+    let mut max_settle =
+        I80F48::from_num::<u64>(max_settle.min(account.fixed.discount_settleable_fees_accrued));
 
     // if mngo token position has borrows, skip settling
     let account_mngo_token_position = account.token_position_mut(mngo_bank.token_index)?.0;
@@ -59,11 +60,12 @@ pub fn account_settle_fees_accrued_with_mngo(
         &AccountInfoRef::borrow(&ctx.accounts.mngo_oracle.as_ref())?,
         None,
     )?;
+    let mngo_settle_price = cm!(mngo_oracle_price * bonus_rate);
     // mngo is exchanged at a discount
-    let mut max_settle_mngo = cm!(max_settle * discount_rate / mngo_oracle_price);
+    let mut max_settle_mngo = cm!(max_settle / mngo_settle_price);
     // settlement is restricted to accounts token position
     max_settle_mngo = max_settle_mngo.min(account_mngo_native);
-    max_settle = cm!(max_settle_mngo * mngo_oracle_price / discount_rate);
+    max_settle = cm!(max_settle_mngo * mngo_settle_price);
 
     // move mngo from user to dao
     let dao_mngo_token_position = dao_account.token_position_mut(mngo_bank.token_index)?.0;
@@ -86,8 +88,10 @@ pub fn account_settle_fees_accrued_with_mngo(
     )?;
     settle_bank.deposit(account_settle_token_position, max_settle, now_ts)?;
 
-    account.fixed.fees_accrued =
-        cm!(account.fixed.fees_accrued - max_settle.round().to_num::<u64>());
+    account.fixed.discount_settleable_fees_accrued = account
+        .fixed
+        .discount_settleable_fees_accrued
+        .saturating_sub(max_settle.ceil().to_num::<u64>());
     msg!(
         "settled {} native fees with {} native mngo",
         max_settle,

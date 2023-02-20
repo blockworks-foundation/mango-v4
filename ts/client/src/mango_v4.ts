@@ -146,21 +146,27 @@ export type MangoV4 = {
           }
         },
         {
-          "name": "payFeesWithMngoOpt",
+          "name": "feesPayWithMngoOpt",
           "type": {
             "option": "bool"
           }
         },
         {
-          "name": "feesMngoDiscountRateOpt",
+          "name": "feesMngoBonusRateOpt",
           "type": {
             "option": "f32"
           }
         },
         {
-          "name": "daoMangoAccountOpt",
+          "name": "feesSwapMangoAccountOpt",
           "type": {
             "option": "publicKey"
+          }
+        },
+        {
+          "name": "feesMngoTokenIndexOpt",
+          "type": {
+            "option": "u16"
           }
         }
       ]
@@ -1113,7 +1119,7 @@ export type MangoV4 = {
       ]
     },
     {
-      "name": "accountSettleFeesAccruedWithMngo",
+      "name": "accountSettleFeesWithMngo",
       "accounts": [
         {
           "name": "group",
@@ -4017,11 +4023,15 @@ export type MangoV4 = {
             "type": "publicKey"
           },
           {
+            "name": "feesMngoTokenIndex",
+            "type": "u16"
+          },
+          {
             "name": "padding",
             "type": {
               "array": [
                 "u8",
-                4
+                2
               ]
             }
           },
@@ -4046,11 +4056,11 @@ export type MangoV4 = {
             "type": "u8"
           },
           {
-            "name": "payFeesWithMngo",
+            "name": "feesPayWithMngo",
             "type": "u8"
           },
           {
-            "name": "feesMngoDiscountRate",
+            "name": "feesMngoBonusRate",
             "type": "f32"
           },
           {
@@ -4075,7 +4085,7 @@ export type MangoV4 = {
             "type": "u128"
           },
           {
-            "name": "daoMangoAccount",
+            "name": "feesSwapMangoAccount",
             "type": "publicKey"
           },
           {
@@ -4177,7 +4187,7 @@ export type MangoV4 = {
             "type": "u64"
           },
           {
-            "name": "feesAccrued",
+            "name": "discountSettleableFeesAccrued",
             "type": "u64"
           },
           {
@@ -5756,7 +5766,7 @@ export type MangoV4 = {
             "type": "u64"
           },
           {
-            "name": "feesAccrued",
+            "name": "discountSettleableFeesAccrued",
             "type": "u64"
           },
           {
@@ -6764,7 +6774,7 @@ export type MangoV4 = {
             "name": "TokenWithdraw"
           },
           {
-            "name": "AccountSettleFeesAccruedWithMngo"
+            "name": "AccountSettleFeesWithMngo"
           }
         ]
       }
@@ -8575,21 +8585,27 @@ export const IDL: MangoV4 = {
           }
         },
         {
-          "name": "payFeesWithMngoOpt",
+          "name": "feesPayWithMngoOpt",
           "type": {
             "option": "bool"
           }
         },
         {
-          "name": "feesMngoDiscountRateOpt",
+          "name": "feesMngoBonusRateOpt",
           "type": {
             "option": "f32"
           }
         },
         {
-          "name": "daoMangoAccountOpt",
+          "name": "feesSwapMangoAccountOpt",
           "type": {
             "option": "publicKey"
+          }
+        },
+        {
+          "name": "feesMngoTokenIndexOpt",
+          "type": {
+            "option": "u16"
           }
         }
       ]
@@ -9542,7 +9558,7 @@ export const IDL: MangoV4 = {
       ]
     },
     {
-      "name": "accountSettleFeesAccruedWithMngo",
+      "name": "accountSettleFeesWithMngo",
       "accounts": [
         {
           "name": "group",
@@ -12446,11 +12462,15 @@ export const IDL: MangoV4 = {
             "type": "publicKey"
           },
           {
+            "name": "feesMngoTokenIndex",
+            "type": "u16"
+          },
+          {
             "name": "padding",
             "type": {
               "array": [
                 "u8",
-                4
+                2
               ]
             }
           },
@@ -12475,11 +12495,11 @@ export const IDL: MangoV4 = {
             "type": "u8"
           },
           {
-            "name": "payFeesWithMngo",
+            "name": "feesPayWithMngo",
             "type": "u8"
           },
           {
-            "name": "feesMngoDiscountRate",
+            "name": "feesMngoBonusRate",
             "type": "f32"
           },
           {
@@ -12504,7 +12524,7 @@ export const IDL: MangoV4 = {
             "type": "u128"
           },
           {
-            "name": "daoMangoAccount",
+            "name": "feesSwapMangoAccount",
             "type": "publicKey"
           },
           {
@@ -12606,7 +12626,7 @@ export const IDL: MangoV4 = {
             "type": "u64"
           },
           {
-            "name": "feesAccrued",
+            "name": "discountSettleableFeesAccrued",
             "type": "u64"
           },
           {
@@ -14185,7 +14205,7 @@ export const IDL: MangoV4 = {
             "type": "u64"
           },
           {
-            "name": "feesAccrued",
+            "name": "discountSettleableFeesAccrued",
             "type": "u64"
           },
           {
@@ -15193,7 +15213,7 @@ export const IDL: MangoV4 = {
             "name": "TokenWithdraw"
           },
           {
-            "name": "AccountSettleFeesAccruedWithMngo"
+            "name": "AccountSettleFeesWithMngo"
           }
         ]
       }
