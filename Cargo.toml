@@ -6,6 +6,7 @@ members = [
     "keeper",
     "lib/*",
     "liquidator",
+    "settle-bot",
     "3rdparty/anchor/cli",
 ]
 

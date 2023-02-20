@@ -23,7 +23,9 @@ use mango_v4::state::{
 
 use solana_address_lookup_table_program::state::AddressLookupTable;
 use solana_client::nonblocking::rpc_client::RpcClient as RpcClientAsync;
+use solana_client::rpc_config::RpcSendTransactionConfig;
 use solana_sdk::address_lookup_table_account::AddressLookupTableAccount;
+use solana_sdk::commitment_config::CommitmentLevel;
 use solana_sdk::hash::Hash;
 use solana_sdk::signer::keypair;
 use solana_sdk::transaction::TransactionError;
@@ -47,7 +49,8 @@ pub struct Client {
     pub fee_payer: Arc<Keypair>,
     pub commitment: CommitmentConfig,
     pub timeout: Option<Duration>,
-    pub prioritization_micro_lamports: u64,
+    pub transaction_builder_config: TransactionBuilderConfig,
+    pub rpc_send_transaction_config: RpcSendTransactionConfig,
 }
 
 impl Client {
@@ -56,14 +59,18 @@ impl Client {
         commitment: CommitmentConfig,
         fee_payer: Arc<Keypair>,
         timeout: Option<Duration>,
-        prioritization_micro_lamports: u64,
+        transaction_builder_config: TransactionBuilderConfig,
     ) -> Self {
         Self {
             cluster,
             fee_payer,
             commitment,
             timeout,
-            prioritization_micro_lamports,
+            transaction_builder_config,
+            rpc_send_transaction_config: RpcSendTransactionConfig {
+                preflight_commitment: Some(CommitmentLevel::Processed),
+                ..Default::default()
+            },
         }
     }
 
@@ -208,6 +215,7 @@ impl MangoClient {
             address_lookup_tables: vec![],
             payer: payer.pubkey(),
             signers: vec![owner, payer],
+            config: client.transaction_builder_config,
         }
         .send_and_confirm(&client)
         .await?;
@@ -861,12 +869,12 @@ impl MangoClient {
         self.send_and_confirm_owner_tx(vec![ix]).await
     }
 
-    pub async fn perp_settle_pnl(
+    pub fn perp_settle_pnl_instruction(
         &self,
         market_index: PerpMarketIndex,
         account_a: (&Pubkey, &MangoAccountValue),
         account_b: (&Pubkey, &MangoAccountValue),
-    ) -> anyhow::Result<Signature> {
+    ) -> anyhow::Result<Instruction> {
         let perp = self.context.perp(market_index);
         let settlement_token = self.context.token(perp.market.settle_token_index);
 
@@ -875,7 +883,7 @@ impl MangoClient {
             .derive_health_check_remaining_account_metas_two_accounts(account_a.1, account_b.1, &[])
             .unwrap();
 
-        let ix = Instruction {
+        Ok(Instruction {
             program_id: mango_v4::id(),
             accounts: {
                 let mut ams = anchor_lang::ToAccountMetas::to_account_metas(
@@ -896,7 +904,16 @@ impl MangoClient {
                 ams
             },
             data: anchor_lang::InstructionData::data(&mango_v4::instruction::PerpSettlePnl {}),
-        };
+        })
+    }
+
+    pub async fn perp_settle_pnl(
+        &self,
+        market_index: PerpMarketIndex,
+        account_a: (&Pubkey, &MangoAccountValue),
+        account_b: (&Pubkey, &MangoAccountValue),
+    ) -> anyhow::Result<Signature> {
+        let ix = self.perp_settle_pnl_instruction(market_index, account_a, account_b)?;
         self.send_and_confirm_permissionless_tx(vec![ix]).await
     }
 
@@ -1361,6 +1378,7 @@ impl MangoClient {
             address_lookup_tables,
             payer,
             signers: vec![&*self.owner],
+            config: self.client.transaction_builder_config,
         }
         .send_and_confirm(&self.client)
         .await
@@ -1381,7 +1399,9 @@ impl MangoClient {
         })
     }
 
-    async fn mango_address_lookup_tables(&self) -> anyhow::Result<Vec<AddressLookupTableAccount>> {
+    pub async fn mango_address_lookup_tables(
+        &self,
+    ) -> anyhow::Result<Vec<AddressLookupTableAccount>> {
         stream::iter(self.context.address_lookup_tables.iter())
             .then(|&k| self.fetch_address_lookup_table(k))
             .try_collect::<Vec<_>>()
@@ -1446,6 +1466,7 @@ impl MangoClient {
             address_lookup_tables: vec![],
             payer: self.client.fee_payer.pubkey(),
             signers: vec![&*self.owner, &*self.client.fee_payer],
+            config: self.client.transaction_builder_config,
         }
         .send_and_confirm(&self.client)
         .await
@@ -1460,6 +1481,7 @@ impl MangoClient {
             address_lookup_tables: vec![],
             payer: self.client.fee_payer.pubkey(),
             signers: vec![&*self.client.fee_payer],
+            config: self.client.transaction_builder_config,
         }
         .send_and_confirm(&self.client)
         .await
@@ -1484,11 +1506,18 @@ pub enum MangoClientError {
     },
 }
 
+#[derive(Copy, Clone, Debug)]
+pub struct TransactionBuilderConfig {
+    // adds a SetComputeUnitPrice instruction in front
+    pub prioritization_micro_lamports: Option<u64>,
+}
+
 pub struct TransactionBuilder<'a> {
-    instructions: Vec<Instruction>,
-    address_lookup_tables: Vec<AddressLookupTableAccount>,
-    signers: Vec<&'a Keypair>,
-    payer: Pubkey,
+    pub instructions: Vec<Instruction>,
+    pub address_lookup_tables: Vec<AddressLookupTableAccount>,
+    pub signers: Vec<&'a Keypair>,
+    pub payer: Pubkey,
+    pub config: TransactionBuilderConfig,
 }
 
 impl<'a> TransactionBuilder<'a> {
@@ -1501,9 +1530,17 @@ impl<'a> TransactionBuilder<'a> {
     }
 
     pub fn transaction_with_blockhash(
-        self,
+        mut self,
         blockhash: Hash,
     ) -> anyhow::Result<solana_sdk::transaction::VersionedTransaction> {
+        if let Some(prio_price) = self.config.prioritization_micro_lamports {
+            self.instructions.insert(
+                0,
+                solana_sdk::compute_budget::ComputeBudgetInstruction::set_compute_unit_price(
+                    prio_price,
+                ),
+            )
+        }
         let v0_message = solana_sdk::message::v0::Message::try_compile(
             &self.payer,
             &self.instructions,
@@ -1521,17 +1558,20 @@ impl<'a> TransactionBuilder<'a> {
         Ok(tx)
     }
 
-    pub async fn send_and_confirm(mut self, client: &Client) -> anyhow::Result<Signature> {
+    // These two send() functions don't really belong into the transaction builder!
+
+    pub async fn send(self, client: &Client) -> anyhow::Result<Signature> {
         let rpc = client.rpc_async();
-        if client.prioritization_micro_lamports != 0 {
-            self.instructions.insert(
-                0,
-                solana_sdk::compute_budget::ComputeBudgetInstruction::set_compute_unit_price(
-                    client.prioritization_micro_lamports,
-                ),
-            )
-        }
         let tx = self.transaction(&rpc).await?;
+        rpc.send_transaction_with_config(&tx, client.rpc_send_transaction_config)
+            .await
+            .map_err(prettify_solana_client_error)
+    }
+
+    pub async fn send_and_confirm(self, client: &Client) -> anyhow::Result<Signature> {
+        let rpc = client.rpc_async();
+        let tx = self.transaction(&rpc).await?;
+        // TODO: Wish we could use client.rpc_send_transaction_config here too!
         rpc.send_and_confirm_transaction(&tx)
             .await
             .map_err(prettify_solana_client_error)

@@ -4003,6 +4003,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "priority-queue"
+version = "1.3.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5ca9c6be70d989d21a136eb86c2d83e4b328447fac4a88dace2143c179c86267"
+dependencies = [
+ "autocfg 1.1.0",
+ "indexmap",
+]
+
+[[package]]
 name = "proc-macro-crate"
 version = "0.1.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5108,6 +5118,54 @@ dependencies = [
  "static_assertions",
  "thiserror",
  "without-alloc",
+]
+
+[[package]]
+name = "settle-bot"
+version = "0.0.1"
+dependencies = [
+ "anchor-client",
+ "anchor-lang",
+ "anyhow",
+ "arrayref",
+ "async-channel",
+ "async-stream 0.2.1",
+ "async-trait",
+ "bincode",
+ "bs58 0.3.1",
+ "bytemuck",
+ "bytes 1.3.0",
+ "checked_math",
+ "clap 3.2.23",
+ "client",
+ "dotenv",
+ "fixed",
+ "futures 0.3.25",
+ "futures-core",
+ "futures-util",
+ "itertools 0.10.5",
+ "jemallocator",
+ "jsonrpc-core 18.0.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "jsonrpc-core-client",
+ "log 0.4.17",
+ "mango-v4",
+ "once_cell",
+ "priority-queue",
+ "pyth-sdk-solana",
+ "rand 0.7.3",
+ "serde",
+ "serde_derive",
+ "serde_json",
+ "serum_dex 0.5.10",
+ "shellexpand",
+ "solana-account-decoder",
+ "solana-client",
+ "solana-logger",
+ "solana-rpc",
+ "solana-sdk",
+ "tokio",
+ "tokio-stream",
+ "tokio-tungstenite 0.16.1",
 ]
 
 [[package]]
