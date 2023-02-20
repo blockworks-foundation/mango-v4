@@ -1611,6 +1611,46 @@
 <a href="#1611" id="1611">1611</a>
 <a href="#1612" id="1612">1612</a>
 <a href="#1613" id="1613">1613</a>
+<a href="#1614" id="1614">1614</a>
+<a href="#1615" id="1615">1615</a>
+<a href="#1616" id="1616">1616</a>
+<a href="#1617" id="1617">1617</a>
+<a href="#1618" id="1618">1618</a>
+<a href="#1619" id="1619">1619</a>
+<a href="#1620" id="1620">1620</a>
+<a href="#1621" id="1621">1621</a>
+<a href="#1622" id="1622">1622</a>
+<a href="#1623" id="1623">1623</a>
+<a href="#1624" id="1624">1624</a>
+<a href="#1625" id="1625">1625</a>
+<a href="#1626" id="1626">1626</a>
+<a href="#1627" id="1627">1627</a>
+<a href="#1628" id="1628">1628</a>
+<a href="#1629" id="1629">1629</a>
+<a href="#1630" id="1630">1630</a>
+<a href="#1631" id="1631">1631</a>
+<a href="#1632" id="1632">1632</a>
+<a href="#1633" id="1633">1633</a>
+<a href="#1634" id="1634">1634</a>
+<a href="#1635" id="1635">1635</a>
+<a href="#1636" id="1636">1636</a>
+<a href="#1637" id="1637">1637</a>
+<a href="#1638" id="1638">1638</a>
+<a href="#1639" id="1639">1639</a>
+<a href="#1640" id="1640">1640</a>
+<a href="#1641" id="1641">1641</a>
+<a href="#1642" id="1642">1642</a>
+<a href="#1643" id="1643">1643</a>
+<a href="#1644" id="1644">1644</a>
+<a href="#1645" id="1645">1645</a>
+<a href="#1646" id="1646">1646</a>
+<a href="#1647" id="1647">1647</a>
+<a href="#1648" id="1648">1648</a>
+<a href="#1649" id="1649">1649</a>
+<a href="#1650" id="1650">1650</a>
+<a href="#1651" id="1651">1651</a>
+<a href="#1652" id="1652">1652</a>
+<a href="#1653" id="1653">1653</a>
 </pre><pre class="rust"><code><span class="kw">use </span>std::str::FromStr;
 <span class="kw">use </span>std::sync::Arc;
 <span class="kw">use </span>std::time::Duration;
@@ -1636,7 +1676,9 @@
 
 <span class="kw">use </span>solana_address_lookup_table_program::state::AddressLookupTable;
 <span class="kw">use </span>solana_client::nonblocking::rpc_client::RpcClient <span class="kw">as </span>RpcClientAsync;
+<span class="kw">use </span>solana_client::rpc_config::RpcSendTransactionConfig;
 <span class="kw">use </span>solana_sdk::address_lookup_table_account::AddressLookupTableAccount;
+<span class="kw">use </span>solana_sdk::commitment_config::CommitmentLevel;
 <span class="kw">use </span>solana_sdk::hash::Hash;
 <span class="kw">use </span>solana_sdk::signer::keypair;
 <span class="kw">use </span>solana_sdk::transaction::TransactionError;
@@ -1660,7 +1702,8 @@
     <span class="kw">pub </span>fee_payer: Arc&lt;Keypair&gt;,
     <span class="kw">pub </span>commitment: CommitmentConfig,
     <span class="kw">pub </span>timeout: <span class="prelude-ty">Option</span>&lt;Duration&gt;,
-    <span class="kw">pub </span>prioritization_micro_lamports: u64,
+    <span class="kw">pub </span>transaction_builder_config: TransactionBuilderConfig,
+    <span class="kw">pub </span>rpc_send_transaction_config: RpcSendTransactionConfig,
 }
 
 <span class="kw">impl </span>Client {
@@ -1669,14 +1712,18 @@
         commitment: CommitmentConfig,
         fee_payer: Arc&lt;Keypair&gt;,
         timeout: <span class="prelude-ty">Option</span>&lt;Duration&gt;,
-        prioritization_micro_lamports: u64,
+        transaction_builder_config: TransactionBuilderConfig,
     ) -&gt; <span class="self">Self </span>{
         <span class="self">Self </span>{
             cluster,
             fee_payer,
             commitment,
             timeout,
-            prioritization_micro_lamports,
+            transaction_builder_config,
+            rpc_send_transaction_config: RpcSendTransactionConfig {
+                preflight_commitment: <span class="prelude-val">Some</span>(CommitmentLevel::Processed),
+                ..Default::default()
+            },
         }
     }
 
@@ -1821,6 +1868,7 @@
             address_lookup_tables: <span class="macro">vec!</span>[],
             payer: payer.pubkey(),
             signers: <span class="macro">vec!</span>[owner, payer],
+            config: client.transaction_builder_config,
         }
         .send_and_confirm(<span class="kw-2">&amp;</span>client)
         .<span class="kw">await</span><span class="question-mark">?</span>;
@@ -2474,12 +2522,12 @@
         <span class="self">self</span>.send_and_confirm_owner_tx(<span class="macro">vec!</span>[ix]).<span class="kw">await
     </span>}
 
-    <span class="kw">pub async fn </span>perp_settle_pnl(
+    <span class="kw">pub fn </span>perp_settle_pnl_instruction(
         <span class="kw-2">&amp;</span><span class="self">self</span>,
         market_index: PerpMarketIndex,
         account_a: (<span class="kw-2">&amp;</span>Pubkey, <span class="kw-2">&amp;</span>MangoAccountValue),
         account_b: (<span class="kw-2">&amp;</span>Pubkey, <span class="kw-2">&amp;</span>MangoAccountValue),
-    ) -&gt; anyhow::Result&lt;Signature&gt; {
+    ) -&gt; anyhow::Result&lt;Instruction&gt; {
         <span class="kw">let </span>perp = <span class="self">self</span>.context.perp(market_index);
         <span class="kw">let </span>settlement_token = <span class="self">self</span>.context.token(perp.market.settle_token_index);
 
@@ -2488,7 +2536,7 @@
             .derive_health_check_remaining_account_metas_two_accounts(account_a.<span class="number">1</span>, account_b.<span class="number">1</span>, <span class="kw-2">&amp;</span>[])
             .unwrap();
 
-        <span class="kw">let </span>ix = Instruction {
+        <span class="prelude-val">Ok</span>(Instruction {
             program_id: mango_v4::id(),
             accounts: {
                 <span class="kw">let </span><span class="kw-2">mut </span>ams = anchor_lang::ToAccountMetas::to_account_metas(
@@ -2509,7 +2557,16 @@
                 ams
             },
             data: anchor_lang::InstructionData::data(<span class="kw-2">&amp;</span>mango_v4::instruction::PerpSettlePnl {}),
-        };
+        })
+    }
+
+    <span class="kw">pub async fn </span>perp_settle_pnl(
+        <span class="kw-2">&amp;</span><span class="self">self</span>,
+        market_index: PerpMarketIndex,
+        account_a: (<span class="kw-2">&amp;</span>Pubkey, <span class="kw-2">&amp;</span>MangoAccountValue),
+        account_b: (<span class="kw-2">&amp;</span>Pubkey, <span class="kw-2">&amp;</span>MangoAccountValue),
+    ) -&gt; anyhow::Result&lt;Signature&gt; {
+        <span class="kw">let </span>ix = <span class="self">self</span>.perp_settle_pnl_instruction(market_index, account_a, account_b)<span class="question-mark">?</span>;
         <span class="self">self</span>.send_and_confirm_permissionless_tx(<span class="macro">vec!</span>[ix]).<span class="kw">await
     </span>}
 
@@ -2974,6 +3031,7 @@
             address_lookup_tables,
             payer,
             signers: <span class="macro">vec!</span>[<span class="kw-2">&amp;*</span><span class="self">self</span>.owner],
+            config: <span class="self">self</span>.client.transaction_builder_config,
         }
         .send_and_confirm(<span class="kw-2">&amp;</span><span class="self">self</span>.client)
         .<span class="kw">await
@@ -2994,7 +3052,9 @@
         })
     }
 
-    <span class="kw">async fn </span>mango_address_lookup_tables(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; anyhow::Result&lt;Vec&lt;AddressLookupTableAccount&gt;&gt; {
+    <span class="kw">pub async fn </span>mango_address_lookup_tables(
+        <span class="kw-2">&amp;</span><span class="self">self</span>,
+    ) -&gt; anyhow::Result&lt;Vec&lt;AddressLookupTableAccount&gt;&gt; {
         stream::iter(<span class="self">self</span>.context.address_lookup_tables.iter())
             .then(|<span class="kw-2">&amp;</span>k| <span class="self">self</span>.fetch_address_lookup_table(k))
             .try_collect::&lt;Vec&lt;<span class="kw">_</span>&gt;&gt;()
@@ -3059,6 +3119,7 @@
             address_lookup_tables: <span class="macro">vec!</span>[],
             payer: <span class="self">self</span>.client.fee_payer.pubkey(),
             signers: <span class="macro">vec!</span>[<span class="kw-2">&amp;*</span><span class="self">self</span>.owner, <span class="kw-2">&amp;*</span><span class="self">self</span>.client.fee_payer],
+            config: <span class="self">self</span>.client.transaction_builder_config,
         }
         .send_and_confirm(<span class="kw-2">&amp;</span><span class="self">self</span>.client)
         .<span class="kw">await
@@ -3073,6 +3134,7 @@
             address_lookup_tables: <span class="macro">vec!</span>[],
             payer: <span class="self">self</span>.client.fee_payer.pubkey(),
             signers: <span class="macro">vec!</span>[<span class="kw-2">&amp;*</span><span class="self">self</span>.client.fee_payer],
+            config: <span class="self">self</span>.client.transaction_builder_config,
         }
         .send_and_confirm(<span class="kw-2">&amp;</span><span class="self">self</span>.client)
         .<span class="kw">await
@@ -3097,11 +3159,18 @@
     },
 }
 
+<span class="attr">#[derive(Copy, Clone, Debug)]
+</span><span class="kw">pub struct </span>TransactionBuilderConfig {
+    <span class="comment">// adds a SetComputeUnitPrice instruction in front
+    </span><span class="kw">pub </span>prioritization_micro_lamports: <span class="prelude-ty">Option</span>&lt;u64&gt;,
+}
+
 <span class="kw">pub struct </span>TransactionBuilder&lt;<span class="lifetime">&#39;a</span>&gt; {
-    instructions: Vec&lt;Instruction&gt;,
-    address_lookup_tables: Vec&lt;AddressLookupTableAccount&gt;,
-    signers: Vec&lt;<span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span>Keypair&gt;,
-    payer: Pubkey,
+    <span class="kw">pub </span>instructions: Vec&lt;Instruction&gt;,
+    <span class="kw">pub </span>address_lookup_tables: Vec&lt;AddressLookupTableAccount&gt;,
+    <span class="kw">pub </span>signers: Vec&lt;<span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span>Keypair&gt;,
+    <span class="kw">pub </span>payer: Pubkey,
+    <span class="kw">pub </span>config: TransactionBuilderConfig,
 }
 
 <span class="kw">impl</span>&lt;<span class="lifetime">&#39;a</span>&gt; TransactionBuilder&lt;<span class="lifetime">&#39;a</span>&gt; {
@@ -3114,9 +3183,17 @@
     }
 
     <span class="kw">pub fn </span>transaction_with_blockhash(
-        <span class="self">self</span>,
+        <span class="kw-2">mut </span><span class="self">self</span>,
         blockhash: Hash,
     ) -&gt; anyhow::Result&lt;solana_sdk::transaction::VersionedTransaction&gt; {
+        <span class="kw">if let </span><span class="prelude-val">Some</span>(prio_price) = <span class="self">self</span>.config.prioritization_micro_lamports {
+            <span class="self">self</span>.instructions.insert(
+                <span class="number">0</span>,
+                solana_sdk::compute_budget::ComputeBudgetInstruction::set_compute_unit_price(
+                    prio_price,
+                ),
+            )
+        }
         <span class="kw">let </span>v0_message = solana_sdk::message::v0::Message::try_compile(
             <span class="kw-2">&amp;</span><span class="self">self</span>.payer,
             <span class="kw-2">&amp;</span><span class="self">self</span>.instructions,
@@ -3134,18 +3211,21 @@
         <span class="prelude-val">Ok</span>(tx)
     }
 
-    <span class="kw">pub async fn </span>send_and_confirm(<span class="kw-2">mut </span><span class="self">self</span>, client: <span class="kw-2">&amp;</span>Client) -&gt; anyhow::Result&lt;Signature&gt; {
+    <span class="comment">// These two send() functions don&#39;t really belong into the transaction builder!
+
+    </span><span class="kw">pub async fn </span>send(<span class="self">self</span>, client: <span class="kw-2">&amp;</span>Client) -&gt; anyhow::Result&lt;Signature&gt; {
         <span class="kw">let </span>rpc = client.rpc_async();
-        <span class="kw">if </span>client.prioritization_micro_lamports != <span class="number">0 </span>{
-            <span class="self">self</span>.instructions.insert(
-                <span class="number">0</span>,
-                solana_sdk::compute_budget::ComputeBudgetInstruction::set_compute_unit_price(
-                    client.prioritization_micro_lamports,
-                ),
-            )
-        }
         <span class="kw">let </span>tx = <span class="self">self</span>.transaction(<span class="kw-2">&amp;</span>rpc).<span class="kw">await</span><span class="question-mark">?</span>;
-        rpc.send_and_confirm_transaction(<span class="kw-2">&amp;</span>tx)
+        rpc.send_transaction_with_config(<span class="kw-2">&amp;</span>tx, client.rpc_send_transaction_config)
+            .<span class="kw">await
+            </span>.map_err(prettify_solana_client_error)
+    }
+
+    <span class="kw">pub async fn </span>send_and_confirm(<span class="self">self</span>, client: <span class="kw-2">&amp;</span>Client) -&gt; anyhow::Result&lt;Signature&gt; {
+        <span class="kw">let </span>rpc = client.rpc_async();
+        <span class="kw">let </span>tx = <span class="self">self</span>.transaction(<span class="kw-2">&amp;</span>rpc).<span class="kw">await</span><span class="question-mark">?</span>;
+        <span class="comment">// TODO: Wish we could use client.rpc_send_transaction_config here too!
+        </span>rpc.send_and_confirm_transaction(<span class="kw-2">&amp;</span>tx)
             .<span class="kw">await
             </span>.map_err(prettify_solana_client_error)
     }
@@ -3225,4 +3305,4 @@
     }
 }
 </code></pre></div>
-</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-static-root-path="../../static.files/" data-current-crate="client" data-themes="" data-resource-suffix="" data-rustdoc-version="1.67.0 (fc594f156 2023-01-24)" data-search-js="search-444266647c4dba98.js" data-settings-js="settings-bebeae96e00e4617.js" data-settings-css="settings-af96d9e2fc13e081.css" ></div></body></html>
+</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-static-root-path="../../static.files/" data-current-crate="client" data-themes="" data-resource-suffix="" data-rustdoc-version="1.67.1 (d5a82bbd2 2023-02-07)" data-search-js="search-444266647c4dba98.js" data-settings-js="settings-bebeae96e00e4617.js" data-settings-css="settings-af96d9e2fc13e081.css" ></div></body></html>
