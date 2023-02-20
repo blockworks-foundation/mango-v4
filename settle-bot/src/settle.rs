@@ -188,32 +188,47 @@ impl SettlementState {
                     .0,
                 address_lookup_tables: &address_lookup_tables,
             };
-            for (account_a, settleable_a, fee) in positive_settleable {
-                // find the best remaining counterparty
-                let (&account_b, &settleable_b) = match negative_settleable.peek() {
-                    None => break,
-                    Some(v) => v,
-                };
 
-                let settleable = settleable_a.min(settleable_b);
-                if settleable <= 0
-                    || (settleable < perp_market.settle_fee_amount_threshold
-                        && fee == perp_market.settle_fee_flat)
+            for (account_a, mut settleable_a, fee) in positive_settleable {
+                // Settle account_a as much as we can while still getting a fee for it:
+                // Could be that all counterparties are small and we can settle multiple times
+                // until account_a is exhausted.
+                let mut settled_a_once = false;
+                while settleable_a > perp_market.settle_fee_amount_threshold
+                    || (settleable_a > 0 && fee != perp_market.settle_fee_flat)
                 {
-                    // no more interesting pairs that would produce fees
+                    // find the best remaining counterparty
+                    let (&account_b, &settleable_b) = match negative_settleable.peek() {
+                        None => break,
+                        Some(v) => v,
+                    };
+
+                    let settleable = settleable_a.min(settleable_b);
+                    if settleable <= 0
+                        || (settleable < perp_market.settle_fee_amount_threshold
+                            && fee == perp_market.settle_fee_flat)
+                    {
+                        // no more interesting pairs that would produce fees
+                        break;
+                    }
+
+                    batch_processor
+                        .add_and_maybe_send(account_a, account_b)
+                        .await?;
+
+                    settled_a_once = true;
+                    settleable_a -= settleable;
+                    negative_settleable.change_priority(&account_b, settleable_b - settleable);
+                }
+                if settled_a_once {
+                    let now = Instant::now();
+                    self.recently_settled.insert(account_a, now);
+                } else {
                     break;
                 }
-
-                // add to batch and maybe send
-                batch_processor
-                    .add_and_maybe_send(account_a, account_b)
-                    .await?;
-                negative_settleable.change_priority(&account_b, settleable_b - settleable);
-                let now = Instant::now();
-                self.recently_settled.insert(account_a, now);
             }
 
-            // final batch, if any
+            // send final batch, if any
             batch_processor.send().await?;
         }
 

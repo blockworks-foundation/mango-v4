@@ -7,7 +7,8 @@ on:
             'programs/**',
             'client/**',
             'keeper/**',
-            'liquidator/**']
+            'liquidator/**',
+            'settle-bot/**']
   workflow_call:
     secrets:
       GCR_PROJECT:
@@ -76,6 +77,17 @@ jobs:
             us-docker.pkg.dev/${{ env.PROJECT_ID }}/gcr.io/${{ env.IMAGE }}-liquidator:${{ github.sha }}
             us-docker.pkg.dev/${{ env.PROJECT_ID }}/gcr.io/${{ env.IMAGE }}-liquidator:${{ github.ref_name }}
             us-docker.pkg.dev/${{ env.PROJECT_ID }}/gcr.io/${{ env.IMAGE }}-liquidator:latest
+      # Build and push the settle-bot runtime image
+      - name: Build and Push Settle Bot
+        uses: docker/build-push-action@v2
+        with:
+          file: settle-bot/Dockerfile.settle-bot
+          context: .
+          push: true
+          tags: |
+            us-docker.pkg.dev/${{ env.PROJECT_ID }}/gcr.io/${{ env.IMAGE }}-settle-bot:${{ github.sha }}
+            us-docker.pkg.dev/${{ env.PROJECT_ID }}/gcr.io/${{ env.IMAGE }}-settle-bot:${{ github.ref_name }}
+            us-docker.pkg.dev/${{ env.PROJECT_ID }}/gcr.io/${{ env.IMAGE }}-settle-bot:latest
       # Build and push the keeper runtime image
       - name: Build and Push Keeper
         uses: docker/build-push-action@v2
