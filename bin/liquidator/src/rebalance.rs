@@ -1,7 +1,9 @@
-use client::{chain_data, AccountFetcher, AnyhowWrap, MangoClient, TokenContext};
 use mango_v4::accounts_zerocopy::KeyedAccountSharedData;
 use mango_v4::state::{
     Bank, BookSide, PlaceOrderType, Side, TokenIndex, TokenPosition, QUOTE_TOKEN_INDEX,
+};
+use mango_v4_client::{
+    chain_data, perp_pnl, AccountFetcher, AnyhowWrap, JupiterSwapMode, MangoClient, TokenContext,
 };
 
 use {fixed::types::I80F48, solana_sdk::pubkey::Pubkey};
@@ -160,7 +162,7 @@ impl Rebalancer {
                         token_mint,
                         input_amount.to_num::<u64>(),
                         self.config.slippage_bps,
-                        client::JupiterSwapMode::ExactIn,
+                        JupiterSwapMode::ExactIn,
                     )
                     .await?;
                 log::info!(
@@ -192,7 +194,7 @@ impl Rebalancer {
                         quote_mint,
                         amount.to_num::<u64>(),
                         self.config.slippage_bps,
-                        client::JupiterSwapMode::ExactIn,
+                        JupiterSwapMode::ExactIn,
                     )
                     .await?;
                 log::info!(
@@ -346,11 +348,11 @@ impl Rebalancer {
             } else if base_lots == 0 && quote_native != 0 {
                 // settle pnl
                 let direction = if quote_native > 0 {
-                    client::perp_pnl::Direction::MaxNegative
+                    perp_pnl::Direction::MaxNegative
                 } else {
-                    client::perp_pnl::Direction::MaxPositive
+                    perp_pnl::Direction::MaxPositive
                 };
-                let counters = client::perp_pnl::fetch_top(
+                let counters = perp_pnl::fetch_top(
                     &self.mango_client.context,
                     self.account_fetcher.as_ref(),
                     perp_position.market_index,

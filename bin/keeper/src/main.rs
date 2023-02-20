@@ -7,7 +7,7 @@ use std::time::Duration;
 use anchor_client::Cluster;
 
 use clap::{Parser, Subcommand};
-use client::{keypair_from_cli, Client, MangoClient};
+use mango_v4_client::{keypair_from_cli, Client, MangoClient, TransactionBuilderConfig};
 use solana_sdk::commitment_config::CommitmentConfig;
 use solana_sdk::pubkey::Pubkey;
 use tokio::time;
@@ -104,7 +104,7 @@ async fn main() -> Result<(), anyhow::Error> {
                 commitment,
                 owner.clone(),
                 Some(Duration::from_secs(cli.timeout)),
-                client::TransactionBuilderConfig {
+                TransactionBuilderConfig {
                     prioritization_micro_lamports: (cli.prioritization_micro_lamports > 0)
                         .then_some(cli.prioritization_micro_lamports),
                 },

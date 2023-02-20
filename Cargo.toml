@@ -1,12 +1,8 @@
 [workspace]
 members = [
-    "cli",
-    "client",
+    "bin/*",
     "programs/mango-v4",
-    "keeper",
     "lib/*",
-    "liquidator",
-    "settle-bot",
     "3rdparty/anchor/cli",
 ]
 

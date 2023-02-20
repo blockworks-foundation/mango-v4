@@ -5,10 +5,10 @@ on:
     branches: [dev,main]
     paths: ['.github/ci-docker-publish.yml',
             'programs/**',
-            'client/**',
-            'keeper/**',
-            'liquidator/**',
-            'settle-bot/**']
+            'lib/client/**',
+            'bin/keeper/**',
+            'bin/liquidator/**',
+            'bin/settle-bot/**']
   workflow_call:
     secrets:
       GCR_PROJECT:
