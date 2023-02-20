@@ -1,5 +1,8 @@
 use clap::{Args, Parser, Subcommand};
-use client::{MangoClient, TransactionBuilderConfig};
+use mango_v4_client::{
+    keypair_from_cli, pubkey_from_cli, Client, JupiterSwapMode, MangoClient,
+    TransactionBuilderConfig,
+};
 use solana_sdk::pubkey::Pubkey;
 use std::str::FromStr;
 use std::sync::Arc;
@@ -108,9 +111,9 @@ enum Command {
 }
 
 impl Rpc {
-    fn client(&self, override_fee_payer: Option<&str>) -> anyhow::Result<client::Client> {
-        let fee_payer = client::keypair_from_cli(override_fee_payer.unwrap_or(&self.fee_payer));
-        Ok(client::Client::new(
+    fn client(&self, override_fee_payer: Option<&str>) -> anyhow::Result<Client> {
+        let fee_payer = keypair_from_cli(override_fee_payer.unwrap_or(&self.fee_payer));
+        Ok(Client::new(
             anchor_client::Cluster::from_str(&self.url)?,
             solana_sdk::commitment_config::CommitmentConfig::confirmed(),
             Arc::new(fee_payer),
@@ -134,8 +137,8 @@ async fn main() -> Result<(), anyhow::Error> {
     match cli.command {
         Command::CreateAccount(cmd) => {
             let client = cmd.rpc.client(Some(&cmd.owner))?;
-            let group = client::pubkey_from_cli(&cmd.group);
-            let owner = client::keypair_from_cli(&cmd.owner);
+            let group = pubkey_from_cli(&cmd.group);
+            let owner = keypair_from_cli(&cmd.owner);
 
             let account_num = if let Some(num) = cmd.account_num {
                 num
@@ -161,19 +164,19 @@ async fn main() -> Result<(), anyhow::Error> {
         }
         Command::Deposit(cmd) => {
             let client = cmd.rpc.client(Some(&cmd.owner))?;
-            let account = client::pubkey_from_cli(&cmd.account);
-            let owner = Arc::new(client::keypair_from_cli(&cmd.owner));
-            let mint = client::pubkey_from_cli(&cmd.mint);
+            let account = pubkey_from_cli(&cmd.account);
+            let owner = Arc::new(keypair_from_cli(&cmd.owner));
+            let mint = pubkey_from_cli(&cmd.mint);
             let client = MangoClient::new_for_existing_account(client, account, owner).await?;
             let txsig = client.token_deposit(mint, cmd.amount, false).await?;
             println!("{}", txsig);
         }
         Command::JupiterSwap(cmd) => {
             let client = cmd.rpc.client(Some(&cmd.owner))?;
-            let account = client::pubkey_from_cli(&cmd.account);
-            let owner = Arc::new(client::keypair_from_cli(&cmd.owner));
-            let input_mint = client::pubkey_from_cli(&cmd.input_mint);
-            let output_mint = client::pubkey_from_cli(&cmd.output_mint);
+            let account = pubkey_from_cli(&cmd.account);
+            let owner = Arc::new(keypair_from_cli(&cmd.owner));
+            let input_mint = pubkey_from_cli(&cmd.input_mint);
+            let output_mint = pubkey_from_cli(&cmd.output_mint);
             let client = MangoClient::new_for_existing_account(client, account, owner).await?;
             let txsig = client
                 .jupiter_swap(
@@ -181,18 +184,18 @@ async fn main() -> Result<(), anyhow::Error> {
                     output_mint,
                     cmd.amount,
                     cmd.slippage_bps,
-                    client::JupiterSwapMode::ExactIn,
+                    JupiterSwapMode::ExactIn,
                 )
                 .await?;
             println!("{}", txsig);
         }
         Command::GroupAddress { creator, num } => {
-            let creator = client::pubkey_from_cli(&creator);
+            let creator = pubkey_from_cli(&creator);
             println!("{}", MangoClient::group_for_admin(creator, num));
         }
         Command::MangoAccountAddress { group, owner, num } => {
-            let group = client::pubkey_from_cli(&group);
-            let owner = client::pubkey_from_cli(&owner);
+            let group = pubkey_from_cli(&group);
+            let owner = pubkey_from_cli(&owner);
             let address = Pubkey::find_program_address(
                 &[
                     group.as_ref(),

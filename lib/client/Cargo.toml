@@ -1,5 +1,5 @@
 [package]
-name = "client"
+name = "mango-v4-client"
 version = "0.3.0"
 edition = "2021"
 
@@ -7,9 +7,9 @@ edition = "2021"
 doctest = false
 
 [dependencies]
-anchor-client = { path = "../3rdparty/anchor/client" }
-anchor-lang = { path = "../3rdparty/anchor/lang" }
-anchor-spl = { path = "../3rdparty/anchor/spl" }
+anchor-client = { path = "../../3rdparty/anchor/client" }
+anchor-lang = { path = "../../3rdparty/anchor/lang" }
+anchor-spl = { path = "../../3rdparty/anchor/spl" }
 anyhow = "1.0"
 async-channel = "1.6"
 async-once-cell = { version = "0.4.2", features = ["unpin"] }
@@ -20,7 +20,7 @@ futures = "0.3.25"
 itertools = "0.10.3"
 jsonrpc-core = "18.0.0"
 jsonrpc-core-client = { version = "18.0.0", features = ["ws", "http", "tls"] }
-mango-v4 = { path = "../programs/mango-v4", features = ["client"] }
+mango-v4 = { path = "../../programs/mango-v4", features = ["client"] }
 pyth-sdk-solana = "0.1.0"
 serum_dex = { git = "https://github.com/openbook-dex/program.git", default-features=false,features = ["no-entrypoint", "program"] }
 shellexpand = "2.1.0"

@@ -4,7 +4,7 @@ use mango_v4::state::{Bank, MintInfo, PerpMarket};
 use solana_sdk::account::AccountSharedData;
 use solana_sdk::pubkey::Pubkey;
 
-pub use client::snapshot_source::is_mango_account;
+pub use mango_v4_client::snapshot_source::is_mango_account;
 
 pub fn is_mango_bank<'a>(account: &'a AccountSharedData, group_id: &Pubkey) -> Option<&'a Bank> {
     let bank = account.load::<Bank>().ok()?;

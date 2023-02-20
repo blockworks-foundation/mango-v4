@@ -1,12 +1,12 @@
 use std::collections::HashSet;
 use std::time::Duration;
 
-use client::{chain_data, health_cache, AccountFetcher, MangoClient};
 use mango_v4::accounts_zerocopy::KeyedAccountSharedData;
 use mango_v4::health::{HealthCache, HealthType};
 use mango_v4::state::{
     Bank, MangoAccountValue, PerpMarketIndex, Side, TokenIndex, QUOTE_TOKEN_INDEX,
 };
+use mango_v4_client::{chain_data, health_cache, AccountFetcher, JupiterSwapMode, MangoClient};
 use solana_sdk::signature::Signature;
 
 use futures::{stream, StreamExt, TryStreamExt};
@@ -40,7 +40,7 @@ pub async fn jupiter_market_can_buy(
             token_mint,
             quote_amount,
             slippage,
-            client::JupiterSwapMode::ExactIn,
+            JupiterSwapMode::ExactIn,
         )
         .await
         .is_ok()
@@ -68,7 +68,7 @@ pub async fn jupiter_market_can_sell(
             quote_token_mint,
             quote_amount,
             slippage,
-            client::JupiterSwapMode::ExactOut,
+            JupiterSwapMode::ExactOut,
         )
         .await
         .is_ok()

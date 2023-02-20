@@ -4,12 +4,13 @@ use std::time::Duration;
 
 use anchor_client::Cluster;
 use clap::Parser;
-use client::{
-    account_update_stream, chain_data, keypair_from_cli, snapshot_source, websocket_source,
-    AsyncChannelSendUnlessFull, Client, MangoClient, MangoGroupContext,
-};
 use log::*;
 use mango_v4::state::{PerpMarketIndex, TokenIndex};
+use mango_v4_client::{
+    account_update_stream, chain_data, keypair_from_cli, snapshot_source, websocket_source,
+    AsyncChannelSendUnlessFull, Client, MangoClient, MangoClientError, MangoGroupContext,
+    TransactionBuilderConfig,
+};
 
 use itertools::Itertools;
 use solana_sdk::commitment_config::CommitmentConfig;
@@ -105,7 +106,7 @@ async fn main() -> anyhow::Result<()> {
         commitment,
         liqor_owner.clone(),
         Some(rpc_timeout),
-        client::TransactionBuilderConfig {
+        TransactionBuilderConfig {
             prioritization_micro_lamports: (cli.prioritization_micro_lamports > 0)
                 .then_some(cli.prioritization_micro_lamports),
         },
@@ -496,10 +497,8 @@ impl LiquidationState {
 
             // Simulation errors due to liqee precondition failures on the liquidation instructions
             // will commonly happen if our liquidator is late or if there are chain forks.
-            match err.downcast_ref::<client::MangoClientError>() {
-                Some(client::MangoClientError::SendTransactionPreflightFailure {
-                    logs, ..
-                }) => {
+            match err.downcast_ref::<MangoClientError>() {
+                Some(MangoClientError::SendTransactionPreflightFailure { logs, .. }) => {
                     if logs.iter().any(|line| {
                         line.contains("HealthMustBeNegative") || line.contains("IsNotBankrupt")
                     }) {

@@ -4,12 +4,12 @@ use std::time::Duration;
 
 use anchor_client::Cluster;
 use clap::Parser;
-use client::{
-    account_update_stream, chain_data, keypair_from_cli, snapshot_source, websocket_source,
-    AsyncChannelSendUnlessFull, Client, MangoClient, MangoGroupContext,
-};
 use log::*;
 use mango_v4::state::{PerpMarketIndex, TokenIndex};
+use mango_v4_client::{
+    account_update_stream, chain_data, keypair_from_cli, snapshot_source, websocket_source,
+    AsyncChannelSendUnlessFull, Client, MangoClient, MangoGroupContext, TransactionBuilderConfig,
+};
 
 use itertools::Itertools;
 use solana_sdk::commitment_config::CommitmentConfig;
@@ -97,7 +97,7 @@ async fn main() -> anyhow::Result<()> {
         commitment,
         settler_owner.clone(),
         Some(rpc_timeout),
-        client::TransactionBuilderConfig {
+        TransactionBuilderConfig {
             prioritization_micro_lamports: (cli.prioritization_micro_lamports > 0)
                 .then_some(cli.prioritization_micro_lamports),
         },
