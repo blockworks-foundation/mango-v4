@@ -99,7 +99,15 @@ pub fn account_settle_fees_with_mngo(
         max_settle_mngo
     );
 
-    // TODO health check
+    // Ensure dao mango account has no liabilities after we do the token swap
+    for ele in dao_account.all_token_positions() {
+        require!(ele.indexed_position.is_positive(), MangoError::SomeError);
+    }
+    require_eq!(
+        dao_account.all_perp_positions().count(),
+        0,
+        MangoError::SomeError
+    );
 
     Ok(())
 }
