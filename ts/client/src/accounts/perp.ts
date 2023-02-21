@@ -683,7 +683,7 @@ export class BookSide {
           this.perpMarket,
           leafNode,
           this.type,
-          now.lt(expiryTimestamp),
+          now.gt(expiryTimestamp),
         );
       }
     }
@@ -713,7 +713,7 @@ export class BookSide {
           this.perpMarket,
           leafNode,
           this.type,
-          now.lt(expiryTimestamp),
+          now.gt(expiryTimestamp),
           true,
         );
       }
