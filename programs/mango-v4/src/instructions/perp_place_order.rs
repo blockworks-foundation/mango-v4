@@ -87,22 +87,27 @@ pub fn perp_place_order(
     let pp = account.perp_position(perp_market_index)?;
     let effective_pos = pp.effective_base_position_lots();
     let max_base_lots = if order.reduce_only || perp_market.is_reduce_only() {
-        if (order.side == Side::Bid && effective_pos >= 0)
-            || (order.side == Side::Ask && effective_pos <= 0)
-        {
-            0
-        } else if order.side == Side::Bid {
+        let allowed_base_lots = if order.side == Side::Bid {
             // ignores open asks
-            (effective_pos + pp.bids_base_lots)
-                .min(0)
-                .abs()
-                .min(order.max_base_lots)
+            msg!(
+                "reduce only: effective base position incl open bids is {} lots",
+                effective_pos + pp.bids_base_lots
+            );
+            (effective_pos + pp.bids_base_lots).min(0).abs()
         } else {
             // ignores open bids
-            (effective_pos - pp.asks_base_lots)
-                .max(0)
-                .min(order.max_base_lots)
-        }
+            msg!(
+                "reduce only: effective base position incl open asks is {} lots",
+                effective_pos - pp.asks_base_lots
+            );
+            (effective_pos - pp.asks_base_lots).max(0)
+        };
+        msg!(
+            "max allowed {:?}: {} base lots",
+            order.side,
+            allowed_base_lots
+        );
+        allowed_base_lots.min(order.max_base_lots)
     } else {
         order.max_base_lots
     };
