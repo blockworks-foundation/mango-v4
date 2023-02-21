@@ -1,24 +1,32 @@
 name: Code Review - Rust
 on:
   push:
-    paths: ['cli/**',
-            'client/**',
-            'programs/**',
-            'keeper/**',
-            'lib/**',
-            'liquidator/**',
-            'anchor/cli/**',
-            'Cargo.lock']
-  pull_request: 
+    paths:
+      [
+        'bin/cli/**',
+        'client/**',
+        'programs/**',
+        'bin/keeper/**',
+        'lib/**',
+        'bin/liquidator/**',
+        'bin/settle-bot/**',
+        'anchor/cli/**',
+        'Cargo.lock',
+      ]
+  pull_request:
     branches: ['main', 'dev']
-    paths: ['cli/**',
-            'client/**',
-            'programs/**',
-            'keeper/**',
-            'lib/**',
-            'liquidator/**',
-            'anchor/cli/**',
-            'Cargo.lock']
+    paths:
+      [
+        'bin/cli/**',
+        'client/**',
+        'programs/**',
+        'bin/keeper/**',
+        'lib/**',
+        'bin/liquidator/**',
+        'bin/settle-bot/**',
+        'anchor/cli/**',
+        'Cargo.lock',
+      ]
   workflow_dispatch: # Pick branch manually
 
 env:
@@ -103,7 +111,7 @@ jobs:
         with:
           name: raw-test-bpf
           path: raw-test-bpf.log
-  
+
   sca:
     name: Dependency Scan
     runs-on: ubuntu-latest
@@ -121,7 +129,7 @@ jobs:
           hide-progress: true
           format: 'sarif'
           output: 'trivy-results.sarif'
-          
+
       # Fail the job on critical vulnerabiliies with fix available
       - name: Fail on critical vulnerabilities
         uses: aquasecurity/trivy-action@master
@@ -139,7 +147,7 @@ jobs:
         if: always()
         with:
           sarif_file: 'trivy-results.sarif'
-  
+
   # Download logs and process them
   process-logs:
     name: Process logs
