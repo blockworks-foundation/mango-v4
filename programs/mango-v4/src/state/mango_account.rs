@@ -906,7 +906,7 @@ impl<
         let (base_change, quote_change) = fill.base_quote_change(side);
         let quote = cm!(I80F48::from(perp_market.quote_lot_size) * I80F48::from(quote_change));
         let fees = cm!(quote.abs() * I80F48::from_num(fill.maker_fee));
-        if fees.is_negative() {
+        if fees.is_positive() {
             self.fixed_mut().discount_settleable_fees_accrued += fees.round().to_num::<u64>();
         }
         let pa = self.perp_position_mut(perp_market_index)?;
