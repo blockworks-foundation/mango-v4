@@ -1,5 +1,7 @@
 use anchor_lang::prelude::*;
 
+use fixed::types::I80F48;
+
 use crate::accounts_ix::*;
 use crate::error::*;
 use crate::health::*;
@@ -10,6 +12,7 @@ use crate::instructions::{
 use crate::logs::Serum3OpenOrdersBalanceLogV2;
 use crate::serum3_cpi::load_open_orders_ref;
 use crate::state::*;
+use crate::util::checked_math as cm;
 
 pub fn serum3_liq_force_cancel_orders(
     ctx: Context<Serum3LiqForceCancelOrders>,
@@ -117,10 +120,11 @@ pub fn serum3_liq_force_cancel_orders(
     //
     // After-settle tracking
     //
+    let after_oo;
     {
         let oo_ai = &ctx.accounts.open_orders.as_ref();
         let open_orders = load_open_orders_ref(oo_ai)?;
-        let after_oo = OpenOrdersSlim::from_oo(&open_orders);
+        after_oo = OpenOrdersSlim::from_oo(&open_orders);
 
         emit!(Serum3OpenOrdersBalanceLogV2 {
             mango_group: ctx.accounts.group.key(),
@@ -139,10 +143,16 @@ pub fn serum3_liq_force_cancel_orders(
             .adjust_health_cache(&mut health_cache, &serum_market)?;
     };
 
+    let received_fees = before_oo
+        .native_rebates()
+        .saturating_sub(after_oo.native_rebates());
+
     ctx.accounts.base_vault.reload()?;
     ctx.accounts.quote_vault.reload()?;
     let after_base_vault = ctx.accounts.base_vault.amount;
-    let after_quote_vault = ctx.accounts.quote_vault.amount;
+    // Don't count the referrer rebate fees as part of the vault change that should be
+    // credited to the user.
+    let after_quote_vault = ctx.accounts.quote_vault.amount - received_fees;
 
     // Settle cannot decrease vault balances
     require_gte!(after_base_vault, before_base_vault);
@@ -172,6 +182,7 @@ pub fn serum3_liq_force_cancel_orders(
         None, // guaranteed to deposit into bank
     )?
     .adjust_health_cache(&mut health_cache, &quote_bank)?;
+    cm!(quote_bank.collected_fees_native += I80F48::from(received_fees));
 
     //
     // Health check at the end

@@ -38,10 +38,8 @@ pub trait OpenOrdersAmounts {
     fn native_quote_reserved(&self) -> u64;
     fn native_base_free(&self) -> u64;
     fn native_quote_free(&self) -> u64;
-    fn native_quote_free_plus_rebates(&self) -> u64;
     fn native_base_total(&self) -> u64;
     fn native_quote_total(&self) -> u64;
-    fn native_quote_total_plus_rebates(&self) -> u64;
     fn native_rebates(&self) -> u64;
 }
 
@@ -58,17 +56,11 @@ impl OpenOrdersAmounts for OpenOrdersSlim {
     fn native_quote_free(&self) -> u64 {
         self.native_pc_free
     }
-    fn native_quote_free_plus_rebates(&self) -> u64 {
-        cm!(self.native_pc_free + self.referrer_rebates_accrued)
-    }
     fn native_base_total(&self) -> u64 {
         self.native_coin_total
     }
     fn native_quote_total(&self) -> u64 {
         self.native_pc_total
-    }
-    fn native_quote_total_plus_rebates(&self) -> u64 {
-        cm!(self.native_pc_total + self.referrer_rebates_accrued)
     }
     fn native_rebates(&self) -> u64 {
         self.referrer_rebates_accrued
@@ -88,17 +80,11 @@ impl OpenOrdersAmounts for OpenOrders {
     fn native_quote_free(&self) -> u64 {
         self.native_pc_free
     }
-    fn native_quote_free_plus_rebates(&self) -> u64 {
-        cm!(self.native_pc_free + self.referrer_rebates_accrued)
-    }
     fn native_base_total(&self) -> u64 {
         self.native_coin_total
     }
     fn native_quote_total(&self) -> u64 {
         self.native_pc_total
-    }
-    fn native_quote_total_plus_rebates(&self) -> u64 {
-        cm!(self.native_pc_total + self.referrer_rebates_accrued)
     }
     fn native_rebates(&self) -> u64 {
         self.referrer_rebates_accrued
@@ -312,8 +298,8 @@ impl OODifference {
                 - I80F48::from(before_oo.native_quote_reserved())),
             free_base_change: cm!(I80F48::from(after_oo.native_base_free())
                 - I80F48::from(before_oo.native_base_free())),
-            free_quote_change: cm!(I80F48::from(after_oo.native_quote_free_plus_rebates())
-                - I80F48::from(before_oo.native_quote_free_plus_rebates())),
+            free_quote_change: cm!(I80F48::from(after_oo.native_quote_free())
+                - I80F48::from(before_oo.native_quote_free())),
         }
     }
 
