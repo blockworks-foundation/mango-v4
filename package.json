@@ -1,6 +1,6 @@
 {
   "name": "@blockworks-foundation/mango-v4",
-  "version": "0.5.19",
+  "version": "0.5.21",
   "description": "Typescript Client for mango-v4 program.",
   "repository": "https://github.com/blockworks-foundation/mango-v4",
   "author": {
@@ -9,7 +9,6 @@
     "url": "https://blockworks.foundation"
   },
   "sideEffects": false,
-  "type": "module",
   "main": "./dist/cjs/src/index.js",
   "module": "./dist/esm/src/index.js",
   "types": "./dist/types/src/index.d.ts",
@@ -17,7 +16,7 @@
     "dist"
   ],
   "scripts": {
-    "build": "tsc -p tsconfig.esm.json && tsc -p tsconfig.cjs.json",
+    "build": "tsc -p tsconfig.esm.json && tsc -p tsconfig.cjs.json && tsc -p tsconfig.types.json",
     "test": "ts-mocha ts/client/**/*.spec.ts --timeout 300000",
     "example1-user": "ts-node ts/client/src/scripts/example1-user.ts",
     "example1-admin": "ts-node ts/client/src/scripts/example1-admin.ts",
