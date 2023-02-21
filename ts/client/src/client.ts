@@ -612,7 +612,7 @@ export class MangoClient {
         tokenCount ?? 8,
         serum3Count ?? 8,
         perpCount ?? 8,
-        perpOoCount ?? 8,
+        perpOoCount ?? 32,
         name ?? '',
       )
       .accounts({
