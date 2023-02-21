@@ -20,11 +20,12 @@ COPY --from=plan /app/recipe-*.json .
 COPY . .
 # RUN cargo chef cook --release --recipe-path recipe-keeper.json --bin keeper
 # RUN cargo chef cook --release --recipe-path recipe-liquidator.json --bin liquidator
-RUN cargo build --release --bin keeper --bin liquidator
+RUN cargo build --release --bin keeper --bin liquidator --bin settler
 
 FROM debian:bullseye-slim as run
 RUN apt-get update && apt-get -y install ca-certificates libc6
 COPY --from=build /app/target/release/keeper /usr/local/bin/
 COPY --from=build /app/target/release/liquidator /usr/local/bin/
+COPY --from=build /app/target/release/settler /usr/local/bin/
 RUN adduser --system --group --no-create-home mangouser
 USER mangouser

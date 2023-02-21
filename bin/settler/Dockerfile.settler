@@ -4,4 +4,4 @@
 ARG BASE_TAG=latest
 FROM us-docker.pkg.dev/mango-markets/gcr.io/mango-v4:$BASE_TAG
 USER mangouser
-CMD ["liquidator"]
+CMD ["settler"]
