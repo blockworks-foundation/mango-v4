@@ -1,7 +1,7 @@
 use super::*;
 
 #[tokio::test]
-async fn test_fees_settle_with_mngo() -> Result<(), TransportError> {
+async fn test_fees_buyback_with_mngo() -> Result<(), TransportError> {
     let context = TestContext::new().await;
     let solana = &context.solana.clone();
 
@@ -23,7 +23,7 @@ async fn test_fees_settle_with_mngo() -> Result<(), TransportError> {
     .create(solana)
     .await;
 
-    let deposit_amount = 1_000_000;
+    let deposit_amount = 100_000_000;
     let account_0 = create_funded_account(
         solana,
         group,
@@ -40,6 +40,17 @@ async fn test_fees_settle_with_mngo() -> Result<(), TransportError> {
         group,
         owner,
         1,
+        &context.users[1],
+        mints,
+        deposit_amount,
+        0,
+    )
+    .await;
+    let account_2 = create_funded_account(
+        solana,
+        group,
+        owner,
+        2,
         &context.users[1],
         mints,
         deposit_amount,
@@ -127,7 +138,7 @@ async fn test_fees_settle_with_mngo() -> Result<(), TransportError> {
     .unwrap();
 
     //
-    // Test: Account settle fees accrued with mngo
+    // Test: Account buyback fees accrued with mngo
     //
     send_tx(
         solana,
@@ -135,7 +146,7 @@ async fn test_fees_settle_with_mngo() -> Result<(), TransportError> {
             group,
             admin,
             fees_mngo_token_index: 1 as TokenIndex,
-            fees_swap_mango_account: account_0,
+            fees_swap_mango_account: account_2,
             fees_mngo_bonus_factor: 1.2,
         },
     )
@@ -143,18 +154,18 @@ async fn test_fees_settle_with_mngo() -> Result<(), TransportError> {
     .unwrap();
 
     let mango_account_1 = solana.get_account::<MangoAccount>(account_1).await;
-    let before_fees_accrued = mango_account_1.discount_settleable_fees_accrued;
-    let settle_token_position_before =
+    let before_fees_accrued = mango_account_1.discount_buyback_fees_accrued;
+    let fees_token_position_before =
         mango_account_1.tokens[0].native(&solana.get_account::<Bank>(tokens[0].bank).await);
     let mngo_token_position_before =
         mango_account_1.tokens[1].native(&solana.get_account::<Bank>(tokens[1].bank).await);
     send_tx(
         solana,
-        AccountSettleFeesWithMngo {
+        AccountBuybackFeesWithMngo {
             owner,
             account: account_1,
             mngo_bank: tokens[1].bank,
-            settle_bank: tokens[0].bank,
+            fees_bank: tokens[0].bank,
         },
     )
     .await
@@ -163,8 +174,8 @@ async fn test_fees_settle_with_mngo() -> Result<(), TransportError> {
     let after_fees_accrued = solana
         .get_account::<MangoAccount>(account_1)
         .await
-        .discount_settleable_fees_accrued;
-    let settle_token_position_after =
+        .discount_buyback_fees_accrued;
+    let fees_token_position_after =
         mango_account_1.tokens[0].native(&solana.get_account::<Bank>(tokens[0].bank).await);
     let mngo_token_position_after =
         mango_account_1.tokens[1].native(&solana.get_account::<Bank>(tokens[1].bank).await);
@@ -173,7 +184,7 @@ async fn test_fees_settle_with_mngo() -> Result<(), TransportError> {
 
     // token[1] swapped at discount for token[0]
     assert!(
-        (settle_token_position_after - settle_token_position_before) - I80F48::from_num(20)
+        (fees_token_position_after - fees_token_position_before) - I80F48::from_num(20)
             < I80F48::from_num(0.000001)
     );
     assert!(

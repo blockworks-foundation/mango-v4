@@ -3,9 +3,9 @@ use crate::state::*;
 use anchor_lang::prelude::*;
 
 #[derive(Accounts)]
-pub struct AccountSettleFeesWithMngo<'info> {
+pub struct AccountBuybackFeesWithMngo<'info> {
     #[account(
-        constraint = group.load()?.is_ix_enabled(IxGate::AccountSettleFeesWithMngo) @ MangoError::IxIsDisabled,
+        constraint = group.load()?.is_ix_enabled(IxGate::AccountBuybackFeesWithMngo) @ MangoError::IxIsDisabled,
         constraint = group.load()?.fees_pay_with_mngo() @ MangoError::SomeError
     )]
     pub group: AccountLoader<'info, Group>,
@@ -42,11 +42,11 @@ pub struct AccountSettleFeesWithMngo<'info> {
     #[account(
         mut,
         has_one = group,
-        constraint = settle_bank.load()?.token_index == QUOTE_TOKEN_INDEX
+        constraint = fees_bank.load()?.token_index == QUOTE_TOKEN_INDEX
     )]
-    pub settle_bank: AccountLoader<'info, Bank>,
+    pub fees_bank: AccountLoader<'info, Bank>,
 
     /// CHECK: Oracle can have different account types
-    #[account(address = settle_bank.load()?.oracle)]
-    pub settle_oracle: UncheckedAccount<'info>,
+    #[account(address = fees_bank.load()?.oracle)]
+    pub fees_oracle: UncheckedAccount<'info>,
 }

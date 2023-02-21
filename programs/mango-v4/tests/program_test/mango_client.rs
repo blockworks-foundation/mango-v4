@@ -1818,23 +1818,23 @@ impl ClientInstruction for AccountCloseInstruction {
     }
 }
 
-pub struct AccountSettleFeesWithMngo {
+pub struct AccountBuybackFeesWithMngo {
     pub owner: TestKeypair,
     pub account: Pubkey,
     pub mngo_bank: Pubkey,
-    pub settle_bank: Pubkey,
+    pub fees_bank: Pubkey,
 }
 #[async_trait::async_trait(?Send)]
-impl ClientInstruction for AccountSettleFeesWithMngo {
-    type Accounts = mango_v4::accounts::AccountSettleFeesWithMngo;
-    type Instruction = mango_v4::instruction::AccountSettleFeesWithMngo;
+impl ClientInstruction for AccountBuybackFeesWithMngo {
+    type Accounts = mango_v4::accounts::AccountBuybackFeesWithMngo;
+    type Instruction = mango_v4::instruction::AccountBuybackFeesWithMngo;
     async fn to_instruction(
         &self,
         account_loader: impl ClientAccountLoader + 'async_trait,
     ) -> (Self::Accounts, instruction::Instruction) {
         let program_id = mango_v4::id();
         let instruction = Self::Instruction {
-            max_settle: u64::MAX,
+            max_buyback: u64::MAX,
         };
 
         let account = account_loader
@@ -1846,7 +1846,7 @@ impl ClientInstruction for AccountSettleFeesWithMngo {
             .await
             .unwrap();
         let mngo_bank: Bank = account_loader.load(&self.mngo_bank).await.unwrap();
-        let settle_bank: Bank = account_loader.load(&self.settle_bank).await.unwrap();
+        let fees_bank: Bank = account_loader.load(&self.fees_bank).await.unwrap();
         let accounts = Self::Accounts {
             group: account.fixed.group,
             owner: self.owner.pubkey(),
@@ -1854,8 +1854,8 @@ impl ClientInstruction for AccountSettleFeesWithMngo {
             dao_account: group.fees_swap_mango_account,
             mngo_bank: self.mngo_bank,
             mngo_oracle: mngo_bank.oracle,
-            settle_bank: self.settle_bank,
-            settle_oracle: settle_bank.oracle,
+            fees_bank: self.fees_bank,
+            fees_oracle: fees_bank.oracle,
         };
 
         let instruction = make_instruction(program_id, &accounts, instruction);

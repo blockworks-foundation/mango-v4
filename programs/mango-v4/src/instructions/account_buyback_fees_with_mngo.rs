@@ -8,21 +8,21 @@ use crate::state::*;
 
 use crate::accounts_ix::*;
 
-pub fn account_settle_fees_with_mngo(
-    ctx: Context<AccountSettleFeesWithMngo>,
-    max_settle: u64,
+pub fn account_buyback_fees_with_mngo(
+    ctx: Context<AccountBuybackFeesWithMngo>,
+    max_buyback: u64,
 ) -> Result<()> {
-    // Cannot settle with yourself
+    // Cannot buyback from yourself
     require_keys_neq!(
         ctx.accounts.account.key(),
         ctx.accounts.dao_account.key(),
-        MangoError::CannotSettleWithSelf
+        MangoError::SomeError
     );
 
     let group = ctx.accounts.group.load()?;
 
     let mut mngo_bank = ctx.accounts.mngo_bank.load_mut()?;
-    let mut settle_bank = ctx.accounts.settle_bank.load_mut()?;
+    let mut fees_bank = ctx.accounts.fees_bank.load_mut()?;
 
     let mut account = ctx.accounts.account.load_full_mut()?;
     // account constraint #1
@@ -35,12 +35,12 @@ pub fn account_settle_fees_with_mngo(
     let bonus_rate = I80F48::from_num(group.fees_mngo_bonus_factor);
     let now_ts = Clock::get()?.unix_timestamp.try_into().unwrap();
 
-    let mut max_settle =
-        I80F48::from_num::<u64>(max_settle.min(account.fixed.discount_settleable_fees_accrued));
-    if max_settle == I80F48::ZERO {
+    let mut max_buyback =
+        I80F48::from_num::<u64>(max_buyback.min(account.fixed.discount_buyback_fees_accrued));
+    if max_buyback == I80F48::ZERO {
         msg!(
-            "nothing to settle, (discount_settleable_fees_accrued {})",
-            account.fixed.discount_settleable_fees_accrued
+            "nothing to settle, (discount_buyback_fees_accrued {})",
+            account.fixed.discount_buyback_fees_accrued
         );
         return Ok(());
     }
@@ -59,52 +59,50 @@ pub fn account_settle_fees_with_mngo(
         &AccountInfoRef::borrow(&ctx.accounts.mngo_oracle.as_ref())?,
         Some(Clock::get()?.slot),
     )?;
-    let mngo_settle_price = cm!(mngo_oracle_price * bonus_rate);
+    let mngo_buyback_price = cm!(mngo_oracle_price * bonus_rate);
     // mngo is exchanged at a discount
-    let mut max_settle_mngo = cm!(max_settle / mngo_settle_price);
-    // settlement is restricted to accounts token position
-    max_settle_mngo = max_settle_mngo.min(account_mngo_native);
-    max_settle = cm!(max_settle_mngo * mngo_settle_price);
+    let mut max_buyback_mngo = cm!(max_buyback / mngo_buyback_price);
+    // buyback is restricted to accounts token position
+    max_buyback_mngo = max_buyback_mngo.min(account_mngo_native);
+    max_buyback = cm!(max_buyback_mngo * mngo_buyback_price);
 
     // move mngo from user to dao
     let dao_mngo_token_position = dao_account.ensure_token_position(mngo_bank.token_index)?.0;
     mngo_bank.withdraw_without_fee(
         account_mngo_token_position,
-        max_settle_mngo,
+        max_buyback_mngo,
         now_ts,
         mngo_oracle_price,
     )?;
-    mngo_bank.deposit(dao_mngo_token_position, max_settle_mngo, now_ts)?;
+    mngo_bank.deposit(dao_mngo_token_position, max_buyback_mngo, now_ts)?;
 
-    // move settlement tokens from dao to user
-    let account_settle_token_position = account.ensure_token_position(settle_bank.token_index)?.0;
-    let dao_settle_token_position = dao_account
-        .ensure_token_position(settle_bank.token_index)?
-        .0;
-    settle_bank.withdraw_without_fee(
-        dao_settle_token_position,
-        max_settle,
+    // move buyback tokens from dao to user
+    let account_fees_token_position = account.ensure_token_position(fees_bank.token_index)?.0;
+    let dao_fees_token_position = dao_account.ensure_token_position(fees_bank.token_index)?.0;
+    fees_bank.withdraw_without_fee(
+        dao_fees_token_position,
+        max_buyback,
         now_ts,
         mngo_oracle_price,
     )?;
-    settle_bank.deposit(account_settle_token_position, max_settle, now_ts)?;
+    fees_bank.deposit(account_fees_token_position, max_buyback, now_ts)?;
 
-    account.fixed.discount_settleable_fees_accrued = account
+    account.fixed.discount_buyback_fees_accrued = account
         .fixed
-        .discount_settleable_fees_accrued
-        .saturating_sub(max_settle.ceil().to_num::<u64>());
+        .discount_buyback_fees_accrued
+        .saturating_sub(max_buyback.ceil().to_num::<u64>());
     msg!(
-        "settled {} native fees with {} native mngo",
-        max_settle,
-        max_settle_mngo
+        "bought back {} native fees with {} native mngo",
+        max_buyback,
+        max_buyback_mngo
     );
 
     // Ensure dao mango account has no liabilities after we do the token swap
     for ele in dao_account.all_token_positions() {
-        require!(ele.indexed_position.is_positive(), MangoError::SomeError);
+        require!(!ele.indexed_position.is_negative(), MangoError::SomeError);
     }
     require_eq!(
-        dao_account.all_perp_positions().count(),
+        dao_account.active_perp_positions().count(),
         0,
         MangoError::SomeError
     );

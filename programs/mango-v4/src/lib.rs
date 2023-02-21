@@ -279,12 +279,12 @@ pub mod mango_v4 {
         Ok(())
     }
 
-    pub fn account_settle_fees_with_mngo(
-        ctx: Context<AccountSettleFeesWithMngo>,
-        max_settle: u64,
+    pub fn account_buyback_fees_with_mngo(
+        ctx: Context<AccountBuybackFeesWithMngo>,
+        max_buyback: u64,
     ) -> Result<()> {
         #[cfg(feature = "enable-gpl")]
-        instructions::account_settle_fees_with_mngo(ctx, max_settle)?;
+        instructions::account_buyback_fees_with_mngo(ctx, max_buyback)?;
         Ok(())
     }
 

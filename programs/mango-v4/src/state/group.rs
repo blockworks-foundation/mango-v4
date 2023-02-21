@@ -20,7 +20,7 @@ pub struct Group {
     // TODO: unused, use case - listing shit tokens with conservative parameters (mostly defaults)
     pub fast_listing_admin: Pubkey,
 
-    // Settle Fees with Mngo: usually in quote native can be exchanged at a bonus for mango,
+    // Buyback fees with Mngo: usually in quote native can be exchanged at a bonus for mango,
     // this is the token index of the mngo token listed on the group
     pub fees_mngo_token_index: TokenIndex,
     pub padding: [u8; 2],
@@ -34,9 +34,9 @@ pub struct Group {
 
     pub version: u8,
 
-    // Settle Fees with Mngo: allow exchanging fees with mngo at a bonus
+    // Buyback fees with Mngo: allow exchanging fees with mngo at a bonus
     pub fees_pay_with_mngo: u8,
-    // Settle Fees with Mngo: how much should the bonus be,
+    // Buyback fees with Mngo: how much should the bonus be,
     // e.g. a bonus factor of 1.2 means 120$ worth fees could be swapped for mngo worth 100$ at current market price
     pub fees_mngo_bonus_factor: f32,
 
@@ -52,7 +52,7 @@ pub struct Group {
     // 0 is chosen as enabled, becase we want to start out with all ixs enabled, 1 is disabled
     pub ix_gate: u128,
 
-    // Settle Fees with Mngo:
+    // Buyback fees with Mngo:
     // A mango account which would be counter party for settling fees with mngo
     // This ensures that the system doesn't have a net deficit of tokens
     // The workflow should be something like this
@@ -159,7 +159,7 @@ pub enum IxGate {
     TokenRegisterTrustless = 45,
     TokenUpdateIndexAndRate = 46,
     TokenWithdraw = 47,
-    AccountSettleFeesWithMngo = 48,
+    AccountBuybackFeesWithMngo = 48,
 }
 
 // note: using creator instead of admin, since admin can be changed
