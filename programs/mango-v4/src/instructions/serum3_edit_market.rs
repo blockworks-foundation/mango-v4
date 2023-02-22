@@ -8,7 +8,7 @@ pub fn serum3_edit_market(
     let mut serum3_market = ctx.accounts.market.load_mut()?;
 
     let group = ctx.accounts.group.load()?;
-    let require_group_admin = false;
+    let mut require_group_admin = false;
 
     if let Some(reduce_only) = reduce_only_opt {
         msg!(
@@ -17,6 +17,11 @@ pub fn serum3_edit_market(
             u8::from(reduce_only)
         );
         serum3_market.reduce_only = u8::from(reduce_only);
+
+        // security admin can only enable reduce_only
+        if !reduce_only {
+            require_group_admin = true;
+        }
     };
 
     if require_group_admin {
