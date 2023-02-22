@@ -9,13 +9,7 @@ import { toNativeI80F48, toUiDecimals, toUiDecimalsForQuote } from '../utils';
 import { Bank, TokenIndex } from './bank';
 import { Group } from './group';
 import { HealthCache } from './healthCache';
-import {
-  BookSide,
-  PerpMarket,
-  PerpMarketIndex,
-  PerpOrder,
-  PerpOrderSide,
-} from './perp';
+import { PerpMarket, PerpMarketIndex, PerpOrder, PerpOrderSide } from './perp';
 import { MarketIndex, Serum3Side } from './serum3';
 export class MangoAccount {
   public name: string;
@@ -1262,6 +1256,10 @@ export class PerpPosition {
 
   isActive(): boolean {
     return this.marketIndex !== PerpPosition.PerpMarketIndexUnset;
+  }
+
+  public getNotionalValueUi(perpMarket: PerpMarket): number {
+    return this.getBasePositionUi(perpMarket, true) * perpMarket.uiPrice;
   }
 
   public getBasePositionNative(perpMarket: PerpMarket): I80F48 {
