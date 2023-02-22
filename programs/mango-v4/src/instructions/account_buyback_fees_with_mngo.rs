@@ -46,11 +46,12 @@ pub fn account_buyback_fees_with_mngo(
     }
 
     // if mngo token position has borrows, skip settling
-    let account_mngo_token_position = account.ensure_token_position(mngo_bank.token_index)?.0;
+    let (account_mngo_token_position, account_mngo_raw_token_index, _) =
+        account.ensure_token_position(mngo_bank.token_index)?;
     let account_mngo_native = account_mngo_token_position.native(&mngo_bank);
     if account_mngo_native.is_negative() {
         msg!(
-            "mngo token position ({} native mngo) has borrows, nothing will be settled",
+            "account mngo token position ({} native mngo) has borrows, nothing will be settled",
             account_mngo_native
         );
         return Ok(());
@@ -68,23 +69,44 @@ pub fn account_buyback_fees_with_mngo(
 
     // move mngo from user to dao
     let dao_mngo_token_position = dao_account.ensure_token_position(mngo_bank.token_index)?.0;
-    mngo_bank.withdraw_without_fee(
+    let in_use = mngo_bank.withdraw_without_fee(
         account_mngo_token_position,
         max_buyback_mngo,
         now_ts,
         mngo_oracle_price,
     )?;
+    if !in_use {
+        account.deactivate_token_position_and_log(
+            account_mngo_raw_token_index,
+            ctx.accounts.account.key(),
+        );
+    }
     mngo_bank.deposit(dao_mngo_token_position, max_buyback_mngo, now_ts)?;
 
     // move buyback tokens from dao to user
     let account_fees_token_position = account.ensure_token_position(fees_bank.token_index)?.0;
-    let dao_fees_token_position = dao_account.ensure_token_position(fees_bank.token_index)?.0;
-    fees_bank.withdraw_without_fee(
+    let (dao_fees_token_position, dao_fees_raw_token_index, _) =
+        dao_account.ensure_token_position(fees_bank.token_index)?;
+    let dao_fees_native = dao_fees_token_position.native(&fees_bank);
+    if dao_fees_native.is_negative() || dao_fees_native < max_buyback {
+        msg!(
+            "dao fees token position ({} native fees) is lesser than max buyback {}, nothing will be settled",
+            dao_fees_native, max_buyback
+        );
+        return Ok(());
+    }
+    let in_use = fees_bank.withdraw_without_fee(
         dao_fees_token_position,
         max_buyback,
         now_ts,
         mngo_oracle_price,
     )?;
+    if !in_use {
+        dao_account.deactivate_token_position_and_log(
+            dao_fees_raw_token_index,
+            ctx.accounts.dao_account.key(),
+        );
+    }
     fees_bank.deposit(account_fees_token_position, max_buyback, now_ts)?;
 
     account.fixed.discount_buyback_fees_accrued = account
