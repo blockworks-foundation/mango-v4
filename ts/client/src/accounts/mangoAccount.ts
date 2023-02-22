@@ -9,7 +9,13 @@ import { toNativeI80F48, toUiDecimals, toUiDecimalsForQuote } from '../utils';
 import { Bank, TokenIndex } from './bank';
 import { Group } from './group';
 import { HealthCache } from './healthCache';
-import { PerpMarket, PerpMarketIndex, PerpOrder, PerpOrderSide } from './perp';
+import {
+  BookSide,
+  PerpMarket,
+  PerpMarketIndex,
+  PerpOrder,
+  PerpOrderSide,
+} from './perp';
 import { MarketIndex, Serum3Side } from './serum3';
 export class MangoAccount {
   public name: string;
@@ -940,15 +946,25 @@ export class MangoAccount {
     client: MangoClient,
     group: Group,
     perpMarketIndex: PerpMarketIndex,
+    orderbook?: {
+      bids: BookSide;
+      asks: BookSide;
+    },
   ): Promise<PerpOrder[]> {
     const perpMarket = group.getPerpMarketByMarketIndex(perpMarketIndex);
-    const [bids, asks] = await Promise.all([
-      perpMarket.loadBids(client),
-      perpMarket.loadAsks(client),
-    ]);
-
-    return [...Array.from(bids.items()), ...Array.from(asks.items())].filter(
-      (order) => order.owner.equals(this.publicKey),
+    let bids: BookSide;
+    let asks: BookSide;
+    if (orderbook) {
+      bids = orderbook.bids;
+      asks = orderbook.asks;
+    } else {
+      [bids, asks] = await Promise.all([
+        perpMarket.loadBids(client),
+        perpMarket.loadAsks(client),
+      ]);
+    }
+    return [...bids.items(), ...asks.items()].filter((order) =>
+      order.owner.equals(this.publicKey),
     );
   }
 
