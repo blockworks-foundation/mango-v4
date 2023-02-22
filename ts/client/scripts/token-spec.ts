@@ -68,7 +68,6 @@ async function main() {
   // get from jup api?
 
   // how does the oracle look like?
-  
 
   // how was the price volatility yday?
 }
