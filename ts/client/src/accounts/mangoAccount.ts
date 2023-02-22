@@ -594,9 +594,11 @@ export class MangoAccount {
   public async loadSerum3OpenOrdersAccounts(
     client: MangoClient,
   ): Promise<OpenOrders[]> {
+    const openOrderPks = this.serum3Active().map((s) => s.openOrders);
+    if (!openOrderPks.length) return [];
     const response =
       await client.program.provider.connection.getMultipleAccountsInfo(
-        this.serum3Active().map((s) => s.openOrders),
+        openOrderPks,
       );
     const accounts = response.filter((a): a is AccountInfo<Buffer> =>
       Boolean(a),
