@@ -1,5 +1,5 @@
 import { AnchorProvider, Wallet } from '@coral-xyz/anchor';
-import { coder } from '@coral-xyz/anchor/dist/cjs/spl/token';
+import { getAccount } from '@solana/spl-token';
 import { Cluster, Connection, Keypair } from '@solana/web3.js';
 import * as dotenv from 'dotenv';
 import fs from 'fs';
@@ -75,15 +75,11 @@ async function main(): Promise<void> {
   for (const bank of await Array.from(banksMapUsingTokenIndex.values()).sort(
     (a, b) => a.tokenIndex - b.tokenIndex,
   )) {
-    const vault = I80F48.fromNumber(
-      coder()
-        .accounts.decode(
-          'token',
-          (await client.program.provider.connection.getAccountInfo(bank.vault))!
-            .data,
-        )
-        .amount.toNumber(),
+    const account = await getAccount(
+      client.program.provider.connection,
+      bank.vault,
     );
+    const vault = I80F48.fromNumber(Number(account.amount));
 
     const error = vault.sub(
       (bank as any).indexedDepositsByMangoAccounts

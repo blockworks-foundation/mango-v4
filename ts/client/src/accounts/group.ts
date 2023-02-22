@@ -1,6 +1,7 @@
 import { BorshAccountsCoder } from '@coral-xyz/anchor';
 import { Market, Orderbook } from '@project-serum/serum';
 import { parsePriceData } from '@pythnetwork/client';
+import { TOKEN_PROGRAM_ID, unpackAccount } from '@solana/spl-token';
 import {
   AccountInfo,
   AddressLookupTableAccount,
@@ -414,8 +415,12 @@ export class Group {
         if (!vaultAi) {
           throw new Error(`Undefined vaultAi for ${vaultPks[i]}`!);
         }
-        const vaultAmount = coder.decode('token', vaultAi.data).amount;
-        return [vaultPks[i].toBase58(), vaultAmount];
+        const vaultAmount = unpackAccount(
+          vaultPks[i],
+          vaultAi,
+          TOKEN_PROGRAM_ID,
+        ).amount;
+        return [vaultPks[i].toBase58(), new BN(Number(vaultAmount))];
       }),
     );
   }
