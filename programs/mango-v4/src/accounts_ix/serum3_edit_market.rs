@@ -6,7 +6,7 @@ use crate::state::*;
 #[instruction(market_index: Serum3MarketIndex)]
 pub struct Serum3EditMarket<'info> {
     #[account(
-        has_one = admin,
+        // group <-> admin relation is checked at #1
         constraint = group.load()?.serum3_supported()
     )]
     pub group: AccountLoader<'info, Group>,
