@@ -946,23 +946,14 @@ export class MangoAccount {
     client: MangoClient,
     group: Group,
     perpMarketIndex: PerpMarketIndex,
-    orderbook?: {
-      bids: BookSide;
-      asks: BookSide;
-    },
+    forceReload?: boolean,
   ): Promise<PerpOrder[]> {
     const perpMarket = group.getPerpMarketByMarketIndex(perpMarketIndex);
-    let bids: BookSide;
-    let asks: BookSide;
-    if (orderbook) {
-      bids = orderbook.bids;
-      asks = orderbook.asks;
-    } else {
-      [bids, asks] = await Promise.all([
-        perpMarket.loadBids(client),
-        perpMarket.loadAsks(client),
-      ]);
-    }
+    const [bids, asks] = await Promise.all([
+      perpMarket.loadBids(client, forceReload),
+      perpMarket.loadAsks(client, forceReload),
+    ]);
+
     return [...bids.items(), ...asks.items()].filter((order) =>
       order.owner.equals(this.publicKey),
     );
