@@ -9,7 +9,13 @@ import { toNativeI80F48, toUiDecimals, toUiDecimalsForQuote } from '../utils';
 import { Bank, TokenIndex } from './bank';
 import { Group } from './group';
 import { HealthCache } from './healthCache';
-import { PerpMarket, PerpMarketIndex, PerpOrder, PerpOrderSide } from './perp';
+import {
+  BookSide,
+  PerpMarket,
+  PerpMarketIndex,
+  PerpOrder,
+  PerpOrderSide,
+} from './perp';
 import { MarketIndex, Serum3Side } from './serum3';
 export class MangoAccount {
   public name: string;
@@ -588,9 +594,11 @@ export class MangoAccount {
   public async loadSerum3OpenOrdersAccounts(
     client: MangoClient,
   ): Promise<OpenOrders[]> {
+    const openOrderPks = this.serum3Active().map((s) => s.openOrders);
+    if (!openOrderPks.length) return [];
     const response =
       await client.program.provider.connection.getMultipleAccountsInfo(
-        this.serum3Active().map((s) => s.openOrders),
+        openOrderPks,
       );
     const accounts = response.filter((a): a is AccountInfo<Buffer> =>
       Boolean(a),
@@ -940,15 +948,16 @@ export class MangoAccount {
     client: MangoClient,
     group: Group,
     perpMarketIndex: PerpMarketIndex,
+    forceReload?: boolean,
   ): Promise<PerpOrder[]> {
     const perpMarket = group.getPerpMarketByMarketIndex(perpMarketIndex);
     const [bids, asks] = await Promise.all([
-      perpMarket.loadBids(client),
-      perpMarket.loadAsks(client),
+      perpMarket.loadBids(client, forceReload),
+      perpMarket.loadAsks(client, forceReload),
     ]);
 
-    return [...Array.from(bids.items()), ...Array.from(asks.items())].filter(
-      (order) => order.owner.equals(this.publicKey),
+    return [...bids.items(), ...asks.items()].filter((order) =>
+      order.owner.equals(this.publicKey),
     );
   }
 
