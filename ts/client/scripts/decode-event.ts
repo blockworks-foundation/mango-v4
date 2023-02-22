@@ -1,5 +1,5 @@
-import { BN, BorshCoder } from '@project-serum/anchor';
-import { IDL } from '../mango_v4';
+import { BN, BorshCoder } from '@coral-xyz/anchor';
+import { IDL } from '../src/mango_v4';
 
 async function main() {
   const coder = new BorshCoder(IDL);

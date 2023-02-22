@@ -1,4 +1,4 @@
-import { AnchorProvider, Wallet } from '@project-serum/anchor';
+import { AnchorProvider, Wallet } from '@coral-xyz/anchor';
 import {
   AddressLookupTableProgram,
   Connection,
@@ -6,10 +6,10 @@ import {
   PublicKey,
 } from '@solana/web3.js';
 import fs from 'fs';
-import { PerpMarketIndex } from '../accounts/perp';
-import { MangoClient } from '../client';
-import { MANGO_V4_ID } from '../constants';
-import { buildVersionedTx } from '../utils';
+import { PerpMarketIndex } from '../src/accounts/perp';
+import { MangoClient } from '../src/client';
+import { MANGO_V4_ID } from '../src/constants';
+import { buildVersionedTx } from '../src/utils';
 
 //
 // An example for admins based on high level api i.e. the client
@@ -131,6 +131,7 @@ async function main() {
       `...registered token bank ${bank.publicKey}, https://explorer.solana.com/tx/${sig}?cluster=devnet`,
     );
     await group.reloadAll(client);
+    // eslint-disable-next-line
   } catch (error) {}
 
   // register token 1
@@ -318,11 +319,6 @@ async function main() {
     } catch (error) {
       console.log(error);
     }
-  }
-
-  try {
-  } catch (error) {
-    console.log(error);
   }
 
   process.exit();

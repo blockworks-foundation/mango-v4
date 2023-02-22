@@ -1,7 +1,7 @@
-import { BN } from '@project-serum/anchor';
+import { BN } from '@coral-xyz/anchor';
 import { OpenOrders } from '@project-serum/serum';
 import { PublicKey } from '@solana/web3.js';
-import { cloneDeep } from 'lodash';
+import cloneDeep from 'lodash/cloneDeep';
 import {
   HUNDRED_I80F48,
   I80F48,

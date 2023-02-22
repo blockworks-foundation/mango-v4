@@ -1,13 +1,17 @@
-import { AnchorProvider, Wallet } from '@project-serum/anchor';
+import { AnchorProvider, Wallet } from '@coral-xyz/anchor';
 import { Cluster, Connection, Keypair, PublicKey } from '@solana/web3.js';
 import fs from 'fs';
-import { Group } from '../../accounts/group';
-import { MangoAccount } from '../../accounts/mangoAccount';
-import { PerpMarket, PerpOrderSide, PerpOrderType } from '../../accounts/perp';
-import { MangoClient } from '../../client';
-import { MANGO_V4_ID } from '../../constants';
-import { ZERO_I80F48 } from '../../numbers/I80F48';
-import { toNativeI80F48, toUiDecimalsForQuote } from '../../utils';
+import { Group } from '../../src/accounts/group';
+import { MangoAccount } from '../../src/accounts/mangoAccount';
+import {
+  PerpMarket,
+  PerpOrderSide,
+  PerpOrderType,
+} from '../../src/accounts/perp';
+import { MangoClient } from '../../src/client';
+import { MANGO_V4_ID } from '../../src/constants';
+import { ZERO_I80F48 } from '../../src/numbers/I80F48';
+import { toNativeI80F48, toUiDecimalsForQuote } from '../../src/utils';
 
 // For easy switching between mainnet and devnet, default is mainnet
 const CLUSTER: Cluster =

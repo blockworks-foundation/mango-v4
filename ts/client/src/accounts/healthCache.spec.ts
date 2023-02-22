@@ -1,7 +1,8 @@
-import { BN } from '@project-serum/anchor';
+import { BN } from '@coral-xyz/anchor';
 import { OpenOrders } from '@project-serum/serum';
 import { expect } from 'chai';
-import { cloneDeep, range } from 'lodash';
+import cloneDeep from 'lodash/cloneDeep';
+import range from 'lodash/range';
 
 import { I80F48, ONE_I80F48, ZERO_I80F48 } from '../numbers/I80F48';
 import { BankForHealth, StablePriceModel, TokenIndex } from './bank';
