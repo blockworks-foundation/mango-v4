@@ -1258,10 +1258,6 @@ export class PerpPosition {
     return this.marketIndex !== PerpPosition.PerpMarketIndexUnset;
   }
 
-  public getNotionalValueUi(perpMarket: PerpMarket): number {
-    return this.getBasePositionUi(perpMarket, true) * perpMarket.uiPrice;
-  }
-
   public getBasePositionNative(perpMarket: PerpMarket): I80F48 {
     return I80F48.fromI64(this.basePositionLots.mul(perpMarket.baseLotSize));
   }
@@ -1279,6 +1275,25 @@ export class PerpPosition {
         ? this.basePositionLots.add(this.takerBaseLots)
         : this.basePositionLots,
     );
+  }
+
+  public getQuotePositionUi(
+    perpMarket: PerpMarket,
+    useEventQueue?: boolean,
+  ): number {
+    if (perpMarket.perpMarketIndex !== this.marketIndex) {
+      throw new Error("PerpPosition doesn't belong to the given market!");
+    }
+
+    const quotePositionUi = toUiDecimalsForQuote(this.quotePositionNative);
+
+    return useEventQueue
+      ? quotePositionUi + perpMarket.quoteLotsToUi(this.takerQuoteLots)
+      : quotePositionUi;
+  }
+
+  public getNotionalValueUi(perpMarket: PerpMarket): number {
+    return this.getBasePositionUi(perpMarket, true) * perpMarket.uiPrice;
   }
 
   public getUnsettledFunding(perpMarket: PerpMarket): I80F48 {
