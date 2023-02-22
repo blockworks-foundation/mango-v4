@@ -4,6 +4,16 @@ Update this for each program release and mainnet deployment.
 
 ## not on mainnet
 
+### v0.7.0, 2023-2-22
+
+Deployment:
+
+- Security admin can now set OpenBook markets to reduce-only (#472)
+- PlacePerpOrder: Improved logging when reduce-only is set (#468)
+- PerpSettlePnl: Grant the low-health settle fee even if the settled amount is
+  below the flat fee threshold (#458)
+- OpenBook: Take referrer rebate as Mango fee (#469)
+
 ## mainnet
 
 ### v0.6.0, 2023-2-14

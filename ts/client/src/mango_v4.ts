@@ -1,5 +1,5 @@
 export type MangoV4 = {
-  "version": "0.6.0",
+  "version": "0.7.0",
   "name": "mango_v4",
   "instructions": [
     {
@@ -4663,7 +4663,7 @@ export type MangoV4 = {
           {
             "name": "settleFeeAmountThreshold",
             "docs": [
-              "Pnl settlement amount needed to be eligible for fees."
+              "Pnl settlement amount needed to be eligible for the flat fee."
             ],
             "type": "f32"
           },
@@ -8345,7 +8345,7 @@ export type MangoV4 = {
 };
 
 export const IDL: MangoV4 = {
-  "version": "0.6.0",
+  "version": "0.7.0",
   "name": "mango_v4",
   "instructions": [
     {
@@ -13009,7 +13009,7 @@ export const IDL: MangoV4 = {
           {
             "name": "settleFeeAmountThreshold",
             "docs": [
-              "Pnl settlement amount needed to be eligible for fees."
+              "Pnl settlement amount needed to be eligible for the flat fee."
             ],
             "type": "f32"
           },
