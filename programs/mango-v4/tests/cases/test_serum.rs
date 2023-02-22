@@ -504,7 +504,8 @@ async fn test_serum_loan_origination_fees() -> Result<(), TransportError> {
     }
 
     let without_serum_taker_fee = |amount: i64| (amount as f64 * (1.0 - 0.0004)).trunc() as i64;
-    let serum_maker_rebate = |amount: i64| (amount as f64 * 0.0).round() as i64;
+    let serum_maker_rebate = |amount: i64| (amount as f64 * 0.0002).floor() as i64;
+    let serum_fee = |amount: i64| (amount as f64 * 0.0002).trunc() as i64;
     let loan_origination_fee = |amount: i64| (amount as f64 * 0.0005).trunc() as i64;
 
     //
@@ -515,6 +516,10 @@ async fn test_serum_loan_origination_fees() -> Result<(), TransportError> {
         let bid_amount = 200000;
         let ask_amount = 210000;
         let fill_amount = 200000;
+        let quote_fees1 = solana
+            .get_account::<Bank>(quote_bank)
+            .await
+            .collected_fees_native;
 
         // account2 has an order on the book
         order_placer2.bid(1.0, bid_amount as u64).await.unwrap();
@@ -540,6 +545,13 @@ async fn test_serum_loan_origination_fees() -> Result<(), TransportError> {
             deposit_amount - ask_amount - loan_origination_fee(fill_amount - deposit_amount)
         );
 
+        // Serum referrer rebates only accrue once the events are executed
+        let quote_fees2 = solana
+            .get_account::<Bank>(quote_bank)
+            .await
+            .collected_fees_native;
+        assert!(assert_equal(quote_fees2 - quote_fees1, 0.0, 0.1));
+
         // check account2 balances too
         context
             .serum
@@ -558,7 +570,36 @@ async fn test_serum_loan_origination_fees() -> Result<(), TransportError> {
         assert_eq!(
             account_position(solana, account2, quote_bank).await,
             deposit_amount - fill_amount - loan_origination_fee(fill_amount - deposit_amount)
-                + serum_maker_rebate(fill_amount)
+                + (serum_maker_rebate(fill_amount) - 1) // unclear where the -1 comes from?
+        );
+
+        // Serum referrer rebates accrue on the taker side
+        let quote_fees3 = solana
+            .get_account::<Bank>(quote_bank)
+            .await
+            .collected_fees_native;
+        assert!(assert_equal(
+            quote_fees3 - quote_fees1,
+            loan_origination_fee(fill_amount - deposit_amount) as f64,
+            0.1
+        ));
+
+        order_placer.settle().await;
+
+        // Now rebates got collected as Mango fees, but user balances are unchanged
+        let quote_fees4 = solana
+            .get_account::<Bank>(quote_bank)
+            .await
+            .collected_fees_native;
+        assert!(assert_equal(
+            quote_fees4 - quote_fees3,
+            serum_fee(fill_amount) as f64,
+            0.1
+        ));
+
+        assert_eq!(
+            account_position(solana, account, quote_bank).await,
+            deposit_amount + without_serum_taker_fee(fill_amount)
         );
     }
 

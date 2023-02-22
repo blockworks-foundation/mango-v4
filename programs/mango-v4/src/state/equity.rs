@@ -34,8 +34,7 @@ pub fn compute_equity(
         let accumulated_equity = token_equity_map
             .get(&serum_account.base_token_index)
             .unwrap_or(&I80F48::ZERO);
-        let native_coin_total_i80f48 =
-            I80F48::from_num(oo.native_coin_total + oo.referrer_rebates_accrued);
+        let native_coin_total_i80f48 = I80F48::from_num(oo.native_coin_total);
         let new_equity = cm!(accumulated_equity + native_coin_total_i80f48 * oracle_price);
         token_equity_map.insert(serum_account.base_token_index, new_equity);
 
