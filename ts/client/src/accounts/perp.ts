@@ -49,13 +49,12 @@ export class PerpMarket {
   public _price: I80F48;
   public _uiPrice: number;
   public _oracleLastUpdatedSlot: number;
+  public _bids: BookSide;
+  public _asks: BookSide;
 
   private priceLotsToUiConverter: number;
   private baseLotsToUiConverter: number;
   private quoteLotsToUiConverter: number;
-
-  private _bids: BookSide;
-  private _asks: BookSide;
 
   static from(
     publicKey: PublicKey,
