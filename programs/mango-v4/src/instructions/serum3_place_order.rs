@@ -272,8 +272,8 @@ pub fn serum3_place_order(
     // Health check
     //
     if let Some((mut health_cache, pre_init_health)) = pre_health_opt {
-        vault_difference.adjust_health_cache(&mut health_cache, &payer_bank)?;
-        oo_difference.adjust_health_cache(&mut health_cache, &serum_market)?;
+        vault_difference.adjust_health_cache_token_balance(&mut health_cache, &payer_bank)?;
+        oo_difference.adjust_health_cache_serum3_state(&mut health_cache, &serum_market)?;
         account.check_health_post(&health_cache, pre_init_health)?;
     }
 
@@ -303,7 +303,7 @@ impl OODifference {
         }
     }
 
-    pub fn adjust_health_cache(
+    pub fn adjust_health_cache_serum3_state(
         &self,
         health_cache: &mut HealthCache,
         market: &Serum3Market,
@@ -326,17 +326,21 @@ pub struct VaultDifference {
 }
 
 impl VaultDifference {
-    pub fn adjust_health_cache(&self, health_cache: &mut HealthCache, bank: &Bank) -> Result<()> {
+    pub fn adjust_health_cache_token_balance(
+        &self,
+        health_cache: &mut HealthCache,
+        bank: &Bank,
+    ) -> Result<()> {
         assert_eq!(bank.token_index, self.token_index);
         health_cache.adjust_token_balance(bank, self.native_change)?;
         Ok(())
     }
 }
 
-/// Called in settle_funds, place_order, liq_force_cancel to adjust token positions after
+/// Called in apply_settle_changes() and place_order to adjust token positions after
 /// changing the vault balances
 /// Also logs changes to token balances
-pub fn apply_vault_difference(
+fn apply_vault_difference(
     account_pk: Pubkey,
     account: &mut MangoAccountRefMut,
     serum_market_index: Serum3MarketIndex,
@@ -402,6 +406,67 @@ pub fn apply_vault_difference(
         token_index: bank.token_index,
         native_change,
     })
+}
+
+/// Uses the changes in OpenOrders and vaults to adjust the user token position,
+/// collect fees and optionally adjusts the HealthCache.
+pub fn apply_settle_changes(
+    account_pk: Pubkey,
+    account: &mut MangoAccountRefMut,
+    base_bank: &mut Bank,
+    quote_bank: &mut Bank,
+    serum_market: &Serum3Market,
+    before_base_vault: u64,
+    before_quote_vault: u64,
+    before_oo: &OpenOrdersSlim,
+    after_base_vault: u64,
+    after_quote_vault: u64,
+    after_oo: &OpenOrdersSlim,
+    health_cache: Option<&mut HealthCache>,
+) -> Result<()> {
+    // Example: rebates go from 100 -> 10. That means we credit 90 in fees.
+    let received_fees = before_oo
+        .native_rebates()
+        .saturating_sub(after_oo.native_rebates());
+    cm!(quote_bank.collected_fees_native += I80F48::from(received_fees));
+
+    // Don't count the referrer rebate fees as part of the vault change that should be
+    // credited to the user.
+    let after_quote_vault_adjusted = after_quote_vault - received_fees;
+
+    // Settle cannot decrease vault balances
+    require_gte!(after_base_vault, before_base_vault);
+    require_gte!(after_quote_vault_adjusted, before_quote_vault);
+
+    // Credit the difference in vault balances to the user's account
+    let base_difference = apply_vault_difference(
+        account_pk,
+        account,
+        serum_market.market_index,
+        base_bank,
+        after_base_vault,
+        before_base_vault,
+        None, // guaranteed to deposit into bank
+    )?;
+    let quote_difference = apply_vault_difference(
+        account_pk,
+        account,
+        serum_market.market_index,
+        quote_bank,
+        after_quote_vault_adjusted,
+        before_quote_vault,
+        None, // guaranteed to deposit into bank
+    )?;
+
+    if let Some(health_cache) = health_cache {
+        base_difference.adjust_health_cache_token_balance(health_cache, &base_bank)?;
+        quote_difference.adjust_health_cache_token_balance(health_cache, &quote_bank)?;
+
+        OODifference::new(&before_oo, &after_oo)
+            .adjust_health_cache_serum3_state(health_cache, serum_market)?;
+    }
+
+    Ok(())
 }
 
 fn cpi_place_order(ctx: &Serum3PlaceOrder, order: NewOrderInstructionV3) -> Result<()> {

@@ -1,18 +1,13 @@
 use anchor_lang::prelude::*;
 
-use fixed::types::I80F48;
-
 use crate::accounts_ix::*;
 use crate::error::*;
 use crate::health::*;
-use crate::instructions::{
-    apply_vault_difference, charge_loan_origination_fees, OODifference, OpenOrdersAmounts,
-    OpenOrdersSlim,
-};
+use crate::instructions::apply_settle_changes;
+use crate::instructions::{charge_loan_origination_fees, OpenOrdersAmounts, OpenOrdersSlim};
 use crate::logs::Serum3OpenOrdersBalanceLogV2;
 use crate::serum3_cpi::load_open_orders_ref;
 use crate::state::*;
-use crate::util::checked_math as cm;
 
 pub fn serum3_liq_force_cancel_orders(
     ctx: Context<Serum3LiqForceCancelOrders>,
@@ -138,51 +133,30 @@ pub fn serum3_liq_force_cancel_orders(
             quote_free: after_oo.native_quote_free(),
             referrer_rebates_accrued: after_oo.native_rebates(),
         });
-
-        OODifference::new(&before_oo, &after_oo)
-            .adjust_health_cache(&mut health_cache, &serum_market)?;
     };
-
-    let received_fees = before_oo
-        .native_rebates()
-        .saturating_sub(after_oo.native_rebates());
 
     ctx.accounts.base_vault.reload()?;
     ctx.accounts.quote_vault.reload()?;
     let after_base_vault = ctx.accounts.base_vault.amount;
-    // Don't count the referrer rebate fees as part of the vault change that should be
-    // credited to the user.
-    let after_quote_vault = ctx.accounts.quote_vault.amount - received_fees;
+    let after_quote_vault = ctx.accounts.quote_vault.amount;
 
-    // Settle cannot decrease vault balances
-    require_gte!(after_base_vault, before_base_vault);
-    require_gte!(after_quote_vault, before_quote_vault);
-
-    // Credit the difference in vault balances to the user's account
     let mut account = ctx.accounts.account.load_full_mut()?;
     let mut base_bank = ctx.accounts.base_bank.load_mut()?;
     let mut quote_bank = ctx.accounts.quote_bank.load_mut()?;
-    apply_vault_difference(
+    apply_settle_changes(
         ctx.accounts.account.key(),
         &mut account.borrow_mut(),
-        serum_market.market_index,
         &mut base_bank,
-        after_base_vault,
-        before_base_vault,
-        None, // guaranteed to deposit into bank
-    )?
-    .adjust_health_cache(&mut health_cache, &base_bank)?;
-    apply_vault_difference(
-        ctx.accounts.account.key(),
-        &mut account.borrow_mut(),
-        serum_market.market_index,
         &mut quote_bank,
-        after_quote_vault,
+        &serum_market,
+        before_base_vault,
         before_quote_vault,
-        None, // guaranteed to deposit into bank
-    )?
-    .adjust_health_cache(&mut health_cache, &quote_bank)?;
-    cm!(quote_bank.collected_fees_native += I80F48::from(received_fees));
+        &before_oo,
+        after_base_vault,
+        after_quote_vault,
+        &after_oo,
+        Some(&mut health_cache),
+    )?;
 
     //
     // Health check at the end
