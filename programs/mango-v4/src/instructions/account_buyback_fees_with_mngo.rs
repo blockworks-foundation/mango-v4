@@ -68,7 +68,8 @@ pub fn account_buyback_fees_with_mngo(
     max_buyback = cm!(max_buyback_mngo * mngo_buyback_price);
 
     // move mngo from user to dao
-    let dao_mngo_token_position = dao_account.ensure_token_position(mngo_bank.token_index)?.0;
+    let (dao_mngo_token_position, dao_mngo_raw_token_index, _) =
+        dao_account.ensure_token_position(mngo_bank.token_index)?;
     let in_use = mngo_bank.withdraw_without_fee(
         account_mngo_token_position,
         max_buyback_mngo,
@@ -81,10 +82,17 @@ pub fn account_buyback_fees_with_mngo(
             ctx.accounts.account.key(),
         );
     }
-    mngo_bank.deposit(dao_mngo_token_position, max_buyback_mngo, now_ts)?;
+    let in_use = mngo_bank.deposit(dao_mngo_token_position, max_buyback_mngo, now_ts)?;
+    if !in_use {
+        dao_account.deactivate_token_position_and_log(
+            dao_mngo_raw_token_index,
+            ctx.accounts.dao_account.key(),
+        );
+    }
 
     // move buyback tokens from dao to user
-    let account_fees_token_position = account.ensure_token_position(fees_bank.token_index)?.0;
+    let (account_fees_token_position, account_fees_raw_token_index, _) =
+        account.ensure_token_position(fees_bank.token_index)?;
     let (dao_fees_token_position, dao_fees_raw_token_index, _) =
         dao_account.ensure_token_position(fees_bank.token_index)?;
     let dao_fees_native = dao_fees_token_position.native(&fees_bank);
@@ -107,7 +115,13 @@ pub fn account_buyback_fees_with_mngo(
             ctx.accounts.dao_account.key(),
         );
     }
-    fees_bank.deposit(account_fees_token_position, max_buyback, now_ts)?;
+    let in_use = fees_bank.deposit(account_fees_token_position, max_buyback, now_ts)?;
+    if !in_use {
+        account.deactivate_token_position_and_log(
+            account_fees_raw_token_index,
+            ctx.accounts.account.key(),
+        );
+    }
 
     account.fixed.discount_buyback_fees_accrued = account
         .fixed
