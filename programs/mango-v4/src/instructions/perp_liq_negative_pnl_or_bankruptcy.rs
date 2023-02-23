@@ -112,7 +112,7 @@ pub fn perp_liq_negative_pnl_or_bankruptcy(
             liqee_perp_position.record_settle(-settlement);
 
             // Update the accounts' perp_spot_transfer statistics.
-            let settlement_i64 = settlement.round_to_zero().checked_to_num::<i64>().unwrap();
+            let settlement_i64 = settlement.round_to_zero().to_num::<i64>();
             (liqor_perp_position.perp_spot_transfers += settlement_i64);
             (liqee_perp_position.perp_spot_transfers -= settlement_i64);
             (liqor.fixed.perp_spot_transfers += settlement_i64);
@@ -171,10 +171,8 @@ pub fn perp_liq_negative_pnl_or_bankruptcy(
 
         // Amount given to the liqor from the insurance fund
         let insurance_transfer = (liab_transfer * liquidation_fee_factor)
-            .checked_ceil()
-            .unwrap()
-            .checked_to_num::<u64>()
-            .unwrap()
+            .ceil()
+            .to_num::<u64>()
             .min(insurance_vault_amount);
 
         let insurance_transfer_i80f48 = I80F48::from(insurance_transfer);

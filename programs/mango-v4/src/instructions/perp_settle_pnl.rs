@@ -157,8 +157,8 @@ pub fn perp_settle_pnl(ctx: Context<PerpSettlePnl>) -> Result<()> {
     // Applying the fee here means that it decreases the displayed perp pnl.
     // Think about it like this: a's pnl reduces by `settlement` and spot increases by `settlement - fee`.
     // That means that it managed to extract `settlement - fee` from perp interactions.
-    let settlement_i64 = settlement.round_to_zero().checked_to_num::<i64>().unwrap();
-    let fee_i64 = fee.round_to_zero().checked_to_num::<i64>().unwrap();
+    let settlement_i64 = settlement.round_to_zero().to_num::<i64>();
+    let fee_i64 = fee.round_to_zero().to_num::<i64>();
     (a_perp_position.perp_spot_transfers += settlement_i64 - fee_i64);
     (b_perp_position.perp_spot_transfers -= settlement_i64);
     (account_a.fixed.perp_spot_transfers += settlement_i64 - fee_i64);

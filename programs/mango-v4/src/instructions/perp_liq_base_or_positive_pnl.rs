@@ -310,10 +310,8 @@ pub(crate) fn liquidation_action(
             .max(I80F48::ZERO);
         // How many lots to transfer?
         let base_lots = (health_limit / health_per_lot)
-            .checked_ceil() // overshoot to aim for init_health >= 0
-            .unwrap()
-            .checked_to_num::<i64>()
-            .unwrap()
+            .ceil() // overshoot to aim for init_health >= 0
+            .to_num::<i64>()
             .min(liqee_base_lots.abs() - base_reduction)
             .min(max_base_transfer.abs() - base_reduction)
             .max(0);
@@ -407,9 +405,7 @@ pub(crate) fn liquidation_action(
         current_actual_health < 0 && current_unweighted_perp_health > 0 && max_pnl_transfer > 0;
     let (pnl_transfer, limit_transfer) = if pnl_transfer_possible {
         let health_per_transfer = spot_gain_per_settled - init_overall_asset_weight;
-        let transfer_for_zero = (-current_actual_health / health_per_transfer)
-            .checked_ceil()
-            .unwrap();
+        let transfer_for_zero = (-current_actual_health / health_per_transfer).ceil();
         let liqee_pnl = liqee_perp_position.unsettled_pnl(&perp_market, oracle_price)?;
 
         // Allow taking over *more* than the liqee_positive_settle_limit. In exchange, the liqor
@@ -427,8 +423,8 @@ pub(crate) fn liquidation_action(
         let limit_transfer = {
             // take care, liqee_limit may be i64::MAX
             let liqee_limit: i128 = liqee_positive_settle_limit.into();
-            let settle = pnl_transfer.checked_floor().unwrap().to_num::<i128>();
-            let total = liqee_pnl.checked_ceil().unwrap().to_num::<i128>();
+            let settle = pnl_transfer.floor().to_num::<i128>();
+            let total = liqee_pnl.ceil().to_num::<i128>();
             let liqor_limit: i64 = (liqee_limit * settle / total).try_into().unwrap();
             I80F48::from(liqor_limit).min(pnl_transfer).max(I80F48::ONE)
         };
@@ -441,10 +437,7 @@ pub(crate) fn liquidation_action(
             liqee_perp_position.record_settle(pnl_transfer);
 
             // Update the accounts' perp_spot_transfer statistics.
-            let transfer_i64 = token_transfer
-                .round_to_zero()
-                .checked_to_num::<i64>()
-                .unwrap();
+            let transfer_i64 = token_transfer.round_to_zero().to_num::<i64>();
             (liqor_perp_position.perp_spot_transfers -= transfer_i64);
             (liqee_perp_position.perp_spot_transfers += transfer_i64);
             (liqor.fixed.perp_spot_transfers -= transfer_i64);

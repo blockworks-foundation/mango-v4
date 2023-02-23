@@ -430,10 +430,7 @@ impl PerpPosition {
         } else {
             // The old and new position have the same sign
 
-            (self.quote_running_native += quote_change_native
-                .round_to_zero()
-                .checked_to_num::<i64>()
-                .unwrap());
+            self.quote_running_native += quote_change_native.round_to_zero().to_num::<i64>();
 
             let is_increasing = old_position.signum() == base_change.signum();
             if is_increasing {

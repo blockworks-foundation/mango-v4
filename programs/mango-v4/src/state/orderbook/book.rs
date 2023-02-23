@@ -353,7 +353,7 @@ fn apply_fees(
     perp_position: &mut PerpPosition,
     quote_lots: i64,
 ) -> Result<()> {
-    let quote_native = I80F48::from_num(market.quote_lot_size.checked_mul(quote_lots).unwrap());
+    let quote_native = I80F48::from_num(market.quote_lot_size * quote_lots);
 
     let maker_fees = quote_native * market.maker_fee;
     let taker_fees = quote_native * market.taker_fee;

@@ -252,7 +252,7 @@ impl Bank {
 
         let bank_native_deposits = self.native_deposits();
         if bank_native_deposits != I80F48::ZERO {
-            let bank_native_deposits: f64 = bank_native_deposits.checked_to_num().unwrap();
+            let bank_native_deposits: f64 = bank_native_deposits.to_num();
             if vault_amount < self.min_vault_to_deposits_ratio * bank_native_deposits {
                 return err!(MangoError::BankBorrowLimitReached).with_context(|| {
                 format!(
@@ -589,9 +589,9 @@ impl Bank {
             // reset to latest window
             self.last_net_borrows_window_start_ts = now_ts / self.net_borrow_limit_window_size_ts
                 * self.net_borrow_limit_window_size_ts;
-            native_amount.checked_to_num::<i64>().unwrap()
+            native_amount.to_num::<i64>()
         } else {
-            self.net_borrows_in_window + native_amount.checked_to_num::<i64>().unwrap()
+            self.net_borrows_in_window + native_amount.to_num::<i64>()
         };
     }
 

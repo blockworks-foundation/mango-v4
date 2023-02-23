@@ -76,10 +76,8 @@ pub fn token_liq_bankruptcy(
     };
 
     let insurance_transfer = (liab_transfer_unrounded * liab_price_adjusted)
-        .checked_ceil()
-        .unwrap()
-        .checked_to_num::<u64>()
-        .unwrap()
+        .ceil()
+        .to_num::<u64>()
         .min(insurance_vault_amount);
 
     let insurance_fund_exhausted = insurance_transfer == insurance_vault_amount;

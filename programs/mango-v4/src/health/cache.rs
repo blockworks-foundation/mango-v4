@@ -617,11 +617,9 @@ impl HealthCache {
 
             let base_max_reserved = &mut token_max_reserved[info.base_index];
             // note: () does not work with mutable references
-            *base_max_reserved = base_max_reserved.checked_add(all_reserved_as_base).unwrap();
+            *base_max_reserved += all_reserved_as_base;
             let quote_max_reserved = &mut token_max_reserved[info.quote_index];
-            *quote_max_reserved = quote_max_reserved
-                .checked_add(all_reserved_as_quote)
-                .unwrap();
+            *quote_max_reserved += all_reserved_as_quote;
 
             serum3_reserved.push(Serum3Reserved {
                 all_reserved_as_base,

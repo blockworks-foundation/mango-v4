@@ -74,7 +74,7 @@ pub fn perp_settle_fees(ctx: Context<PerpSettleFees>, max_settle_amount: u64) ->
     );
 
     // Update the account's perp_spot_transfers with the new PnL
-    let settlement_i64 = settlement.round().checked_to_num::<i64>().unwrap();
+    let settlement_i64 = settlement.round().to_num::<i64>();
 
     // Safety check to prevent any accidental negative transfer
     require!(

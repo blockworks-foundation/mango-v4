@@ -134,8 +134,7 @@ impl<'a, 'info> DepositCommon<'a, 'info> {
                 .health_assets_and_liabs(HealthType::Init)
                 .0
                 .round_to_zero()
-                .checked_to_num::<u64>()
-                .unwrap();
+                .to_num::<u64>();
             require_msg_typed!(
                 assets <= group.deposit_limit_quote,
                 MangoError::DepositLimit,

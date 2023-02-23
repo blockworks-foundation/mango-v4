@@ -278,7 +278,7 @@ impl PerpMarket {
         let diff_price = match (bid, ask) {
             (Some(bid), Some(ask)) => {
                 // calculate mid-market rate
-                let mid_price = bid.checked_add(ask).unwrap() / 2;
+                let mid_price = (bid + ask) / 2;
                 let book_price = self.lot_to_native_price(mid_price);
                 let diff = book_price / index_price - I80F48::ONE;
                 diff.clamp(self.min_funding, self.max_funding)
@@ -317,19 +317,12 @@ impl PerpMarket {
 
     /// Convert from the price stored on the book to the price used in value calculations
     pub fn lot_to_native_price(&self, price: i64) -> I80F48 {
-        I80F48::from_num(price)
-            .checked_mul(I80F48::from_num(self.quote_lot_size))
-            .unwrap()
-            .checked_div(I80F48::from_num(self.base_lot_size))
-            .unwrap()
+        I80F48::from_num(price) * I80F48::from_num(self.quote_lot_size)
+            / I80F48::from_num(self.base_lot_size)
     }
 
     pub fn native_price_to_lot(&self, price: I80F48) -> i64 {
-        price
-            .checked_mul(I80F48::from_num(self.base_lot_size))
-            .unwrap()
-            .checked_div(I80F48::from_num(self.quote_lot_size))
-            .unwrap()
+        (price * I80F48::from_num(self.base_lot_size) / I80F48::from_num(self.quote_lot_size))
             .to_num()
     }
 
