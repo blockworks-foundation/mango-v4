@@ -8,16 +8,15 @@ use anchor_lang::prelude::*;
 use anchor_spl::token::TokenAccount;
 use derivative::Derivative;
 use fixed::types::I80F48;
-use fixed_macro::types::I80F48;
 use static_assertions::const_assert_eq;
 
 use std::mem::size_of;
 
 pub const HOUR: i64 = 3600;
 pub const DAY: i64 = 86400;
-pub const DAY_I80F48: I80F48 = I80F48!(86400);
-pub const YEAR_I80F48: I80F48 = I80F48!(31536000);
-pub const MINIMUM_MAX_RATE: I80F48 = I80F48!(0.5);
+pub const DAY_I80F48: I80F48 = I80F48::lit("86_400");
+pub const YEAR_I80F48: I80F48 = I80F48::lit("31_536_000");
+pub const MINIMUM_MAX_RATE: I80F48 = I80F48::lit("0.5");
 
 #[derive(Derivative)]
 #[derivative(Debug)]

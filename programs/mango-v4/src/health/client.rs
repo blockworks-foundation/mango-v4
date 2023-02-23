@@ -3,7 +3,6 @@
 use anchor_lang::prelude::*;
 
 use fixed::types::I80F48;
-use fixed_macro::types::I80F48;
 
 use crate::error::*;
 use crate::state::Side as PerpOrderSide;
@@ -477,7 +476,7 @@ fn binary_search(
     fun: impl Fn(I80F48) -> Result<I80F48>,
 ) -> Result<I80F48> {
     let max_iterations = 50;
-    let target_error = I80F48!(0.1);
+    let target_error = I80F48::lit("0.1");
     let right_value = fun(right)?;
     require_msg!(
         (left_value <= target_value && right_value >= target_value)
