@@ -185,23 +185,23 @@ pub fn benchmark(_ctx: Context<Benchmark>) -> Result<()> {
     let max = I80F48::MAX;
     sol_log_compute_units(); // 92610
 
-    let _ = checked_math!(half + half); // 0
+    let _ = half + half; // 0
     sol_log_compute_units(); // 92509
 
-    let _ = checked_math!(max - max); // 0
+    let _ = max - max; // 0
     sol_log_compute_units(); // 92408
 
-    let _ = checked_math!(large_number * large_number); // 77
+    let _ = large_number * large_number; // 77
     sol_log_compute_units(); // 92230
 
     // /
-    let _ = checked_math!(I80F48::ZERO / max); // 839
+    let _ = I80F48::ZERO / max; // 839
     sol_log_compute_units(); // 91290
 
-    let _ = checked_math!(half / max); // 3438
+    let _ = half / max; // 3438
     sol_log_compute_units(); // 87751
 
-    let _ = checked_math!(max / max); // 3457
+    let _ = max / max; // 3457
     sol_log_compute_units(); // 84193
 
     Ok(())

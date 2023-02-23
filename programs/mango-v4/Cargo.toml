@@ -29,7 +29,6 @@ arrayref = "0.3.6"
 bincode = "1.3.3"
 borsh = { version = "0.9.3", features = ["const-generics"] }
 bytemuck = { version = "^1.7.2", features = ["min_const_generics"] }
-checked_math = { path = "../../lib/checked_math" }
 default-env = "0.1.1"
 derivative = "2.2.0"
 fixed = { path = "../../3rdparty/fixed", version = "=1.23.0", features = ["serde", "borsh", "disable-cache", "debug-assert-in-release"] }
