@@ -19,43 +19,47 @@ pub fn account_buyback_fees_with_mngo(
         MangoError::SomeError
     );
 
-    let group = ctx.accounts.group.load()?;
-
-    let mut mngo_bank = ctx.accounts.mngo_bank.load_mut()?;
-    let mut fees_bank = ctx.accounts.fees_bank.load_mut()?;
-
     let mut account = ctx.accounts.account.load_full_mut()?;
     // account constraint #1
     require!(
         account.fixed.is_owner_or_delegate(ctx.accounts.owner.key()),
         MangoError::SomeError
     );
+
     let mut dao_account = ctx.accounts.dao_account.load_full_mut()?;
+
+    let group = ctx.accounts.group.load()?;
+
+    let mut mngo_bank = ctx.accounts.mngo_bank.load_mut()?;
+    let mut fees_bank = ctx.accounts.fees_bank.load_mut()?;
 
     let bonus_rate = I80F48::from_num(group.fees_mngo_bonus_factor);
     let now_ts = Clock::get()?.unix_timestamp.try_into().unwrap();
 
+    // quick return if nothing to buyback
     let mut max_buyback =
         I80F48::from_num::<u64>(max_buyback.min(account.fixed.discount_buyback_fees_accrued));
     if max_buyback == I80F48::ZERO {
         msg!(
-            "nothing to settle, (discount_buyback_fees_accrued {})",
+            "nothing to buyback, (discount_buyback_fees_accrued {})",
             account.fixed.discount_buyback_fees_accrued
         );
         return Ok(());
     }
 
-    // if mngo token position has borrows, skip settling
+    // if mngo token position has borrows, skip buyback
     let (account_mngo_token_position, account_mngo_raw_token_index, _) =
         account.ensure_token_position(mngo_bank.token_index)?;
     let account_mngo_native = account_mngo_token_position.native(&mngo_bank);
     if account_mngo_native.is_negative() {
         msg!(
-            "account mngo token position ({} native mngo) has borrows, nothing will be settled",
+            "account mngo token position ({} native mngo) has borrows, nothing will be bought back",
             account_mngo_native
         );
         return Ok(());
     }
+
+    // compute max mngo to swap for fees
     let mngo_oracle_price = mngo_bank.oracle_price(
         &AccountInfoRef::borrow(&ctx.accounts.mngo_oracle.as_ref())?,
         Some(Clock::get()?.slot),
@@ -90,7 +94,7 @@ pub fn account_buyback_fees_with_mngo(
         );
     }
 
-    // move buyback tokens from dao to user
+    // move fees from dao to user
     let (account_fees_token_position, account_fees_raw_token_index, _) =
         account.ensure_token_position(fees_bank.token_index)?;
     let (dao_fees_token_position, dao_fees_raw_token_index, _) =
@@ -98,7 +102,7 @@ pub fn account_buyback_fees_with_mngo(
     let dao_fees_native = dao_fees_token_position.native(&fees_bank);
     if dao_fees_native.is_negative() || dao_fees_native < max_buyback {
         msg!(
-            "dao fees token position ({} native fees) is lesser than max buyback {}, nothing will be settled",
+            "dao fees token position ({} native fees) is lesser than max buyback {}, nothing will be bought back",
             dao_fees_native, max_buyback
         );
         return Ok(());
