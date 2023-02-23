@@ -133,7 +133,7 @@ pub fn account_buyback_fees_with_mngo(
         max_buyback_mngo
     );
 
-    // Ensure dao mango account has no liabilities after we do the token swap
+    // ensure dao mango account has no liabilities after we do the token swap
     for ele in dao_account.all_token_positions() {
         require!(!ele.indexed_position.is_negative(), MangoError::SomeError);
     }
