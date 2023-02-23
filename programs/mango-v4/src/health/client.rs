@@ -32,7 +32,7 @@ impl HealthCache {
         let hundred = I80F48::from(100);
         if liabs > 0 {
             // feel free to saturate to MAX for tiny liabs
-            cm!(hundred * (assets - liabs)).saturating_div(liabs)
+            (hundred * (assets - liabs)).saturating_div(liabs)
         } else {
             I80F48::MAX
         }
@@ -57,7 +57,7 @@ impl HealthCache {
         let mut source_position = account.token_position(source_bank.token_index)?.clone();
         let mut target_position = account.token_position(target_bank.token_index)?.clone();
 
-        let target_amount = cm!(amount * price);
+        let target_amount = (amount * price);
 
         let mut source_bank = source_bank.clone();
         source_bank.withdraw_with_fee(&mut source_position, amount, now_ts, source_oracle_price)?;

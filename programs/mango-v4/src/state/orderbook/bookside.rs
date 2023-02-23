@@ -174,7 +174,7 @@ impl BookSide {
     pub fn impact_price(&self, quantity: i64, now_ts: u64, oracle_price_lots: i64) -> Option<i64> {
         let mut sum: i64 = 0;
         for order in self.iter_valid(now_ts, oracle_price_lots) {
-            cm!(sum += order.node.quantity);
+            (sum += order.node.quantity);
             if sum >= quantity {
                 return Some(order.price_lots);
             }

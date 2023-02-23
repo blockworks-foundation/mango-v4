@@ -281,7 +281,7 @@ impl PerpMarket {
                 // calculate mid-market rate
                 let mid_price = bid.checked_add(ask).unwrap() / 2;
                 let book_price = self.lot_to_native_price(mid_price);
-                let diff = cm!(book_price / index_price - I80F48::ONE);
+                let diff = (book_price / index_price - I80F48::ONE);
                 diff.clamp(self.min_funding, self.max_funding)
             }
             (Some(_bid), None) => self.max_funding,
@@ -290,9 +290,9 @@ impl PerpMarket {
         };
 
         let diff_ts = I80F48::from_num(now_ts - self.funding_last_updated as u64);
-        let time_factor = cm!(diff_ts / DAY_I80F48);
+        let time_factor = (diff_ts / DAY_I80F48);
         let base_lot_size = I80F48::from_num(self.base_lot_size);
-        let funding_delta = cm!(index_price * diff_price * base_lot_size * time_factor);
+        let funding_delta = (index_price * diff_price * base_lot_size * time_factor);
 
         self.long_funding += funding_delta;
         self.short_funding += funding_delta;
@@ -342,8 +342,8 @@ impl PerpMarket {
         oracle_price: I80F48,
     ) -> bool {
         match side {
-            Side::Bid => native_price <= cm!(self.maint_base_liab_weight * oracle_price),
-            Side::Ask => native_price >= cm!(self.maint_base_asset_weight * oracle_price),
+            Side::Bid => native_price <= (self.maint_base_liab_weight * oracle_price),
+            Side::Ask => native_price >= (self.maint_base_asset_weight * oracle_price),
         }
     }
 
@@ -360,7 +360,7 @@ impl PerpMarket {
             // would be appreciated. Luckily, this will be an extremely rare situation.
             I80F48::ZERO
         } else {
-            cm!(loss / I80F48::from(self.open_interest))
+            (loss / I80F48::from(self.open_interest))
         };
         self.long_funding -= socialized_loss;
         self.short_funding += socialized_loss;
@@ -383,9 +383,9 @@ impl PerpMarket {
         let low_health_fee = if source_liq_end_health < 0 {
             let fee_fraction = I80F48::from_num(self.settle_fee_fraction_low_health);
             if source_maint_health < 0 {
-                cm!(settlement * fee_fraction)
+                (settlement * fee_fraction)
             } else {
-                cm!(settlement
+                (settlement
                     * fee_fraction
                     * (-source_liq_end_health / (source_maint_health - source_liq_end_health)))
             }
@@ -401,7 +401,7 @@ impl PerpMarket {
         };
 
         // Fees only apply when the settlement is large enough
-        let fee = cm!(low_health_fee + flat_fee).min(settlement);
+        let fee = (low_health_fee + flat_fee).min(settlement);
 
         // Safety check to prevent any accidental negative transfer
         require!(fee >= 0, MangoError::SettlementAmountMustBePositive);

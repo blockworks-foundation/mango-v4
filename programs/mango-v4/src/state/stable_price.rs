@@ -123,7 +123,7 @@ impl StablePriceModel {
         //
         // Update delay price
         //
-        cm!(self.delay_accumulator_time += dt as u32);
+        (self.delay_accumulator_time += dt as u32);
         self.delay_accumulator_price += oracle_price * dt_limited;
 
         let delay_interval_index = self.delay_interval_index(now_ts);

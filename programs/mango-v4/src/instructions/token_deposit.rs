@@ -94,8 +94,8 @@ impl<'a, 'info> DepositCommon<'a, 'info> {
         )?;
 
         // Update the net deposits - adjust by price so different tokens are on the same basis (in USD terms)
-        let amount_usd = cm!(amount_i80f48 * oracle_price).to_num::<i64>();
-        cm!(account.fixed.net_deposits += amount_usd);
+        let amount_usd = (amount_i80f48 * oracle_price).to_num::<i64>();
+        (account.fixed.net_deposits += amount_usd);
 
         emit!(TokenBalanceLog {
             mango_group: self.group.key(),
