@@ -13,15 +13,13 @@ export {
   Serum3Side,
 } from './accounts/serum3';
 export {
-  IxGateParams,
   NullPerpEditParams,
   NullTokenEditParams,
-  PerpEditParams,
-  TokenEditParams,
   TrueIxGateParams,
   buildIxGate,
 } from './clientIxParamBuilder';
 export * from './constants';
 export * from './numbers/I80F48';
 export * from './utils';
+export * from './types';
 export { Group, StubOracle, MangoClient, MANGO_V4_ID };

@@ -1,14 +1,15 @@
-import { BorshAccountsCoder } from '@project-serum/anchor';
-import { coder } from '@project-serum/anchor/dist/cjs/spl/token';
+import { BorshAccountsCoder } from '@coral-xyz/anchor';
 import { Market, Orderbook } from '@project-serum/serum';
 import { parsePriceData } from '@pythnetwork/client';
+import { TOKEN_PROGRAM_ID, unpackAccount } from '@solana/spl-token';
 import {
   AccountInfo,
   AddressLookupTableAccount,
   PublicKey,
 } from '@solana/web3.js';
 import BN from 'bn.js';
-import { cloneDeep, merge } from 'lodash';
+import cloneDeep from 'lodash/cloneDeep';
+import merge from 'lodash/merge';
 import { MangoClient } from '../client';
 import { OPENBOOK_PROGRAM_ID } from '../constants';
 import { Id } from '../ids';
@@ -423,17 +424,18 @@ export class Group {
       await client.program.provider.connection.getMultipleAccountsInfo(
         vaultPks,
       );
-
+    const coder = new BorshAccountsCoder(client.program.idl);
     this.vaultAmountsMap = new Map(
       vaultAccounts.map((vaultAi, i) => {
         if (!vaultAi) {
           throw new Error(`Undefined vaultAi for ${vaultPks[i]}`!);
         }
-        const vaultAmount = coder().accounts.decode(
-          'token',
-          vaultAi.data,
+        const vaultAmount = unpackAccount(
+          vaultPks[i],
+          vaultAi,
+          TOKEN_PROGRAM_ID,
         ).amount;
-        return [vaultPks[i].toBase58(), vaultAmount];
+        return [vaultPks[i].toBase58(), new BN(Number(vaultAmount))];
       }),
     );
   }

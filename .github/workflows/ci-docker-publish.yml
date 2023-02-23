@@ -2,12 +2,16 @@ name: Publish Docker Image to GCR
 
 on:
   push:
-    branches: [dev,main]
-    paths: ['.github/ci-docker-publish.yml',
-            'programs/**',
-            'client/**',
-            'keeper/**',
-            'liquidator/**']
+    branches: [dev, main]
+    paths:
+      [
+        '.github/ci-docker-publish.yml',
+        'programs/**',
+        'lib/client/**',
+        'bin/keeper/**',
+        'bin/liquidator/**',
+        'bin/settle-bot/**',
+      ]
   workflow_call:
     secrets:
       GCR_PROJECT:
@@ -69,18 +73,29 @@ jobs:
       - name: Build and Push Liquidator
         uses: docker/build-push-action@v2
         with:
-          file: liquidator/Dockerfile.liquidator
+          file: bin/liquidator/Dockerfile.liquidator
           context: .
           push: true
           tags: |
             us-docker.pkg.dev/${{ env.PROJECT_ID }}/gcr.io/${{ env.IMAGE }}-liquidator:${{ github.sha }}
             us-docker.pkg.dev/${{ env.PROJECT_ID }}/gcr.io/${{ env.IMAGE }}-liquidator:${{ github.ref_name }}
             us-docker.pkg.dev/${{ env.PROJECT_ID }}/gcr.io/${{ env.IMAGE }}-liquidator:latest
+      # Build and push the settle-bot runtime image
+      - name: Build and Push Settle Bot
+        uses: docker/build-push-action@v2
+        with:
+          file: bin/settle-bot/Dockerfile.settle-bot
+          context: .
+          push: true
+          tags: |
+            us-docker.pkg.dev/${{ env.PROJECT_ID }}/gcr.io/${{ env.IMAGE }}-settle-bot:${{ github.sha }}
+            us-docker.pkg.dev/${{ env.PROJECT_ID }}/gcr.io/${{ env.IMAGE }}-settle-bot:${{ github.ref_name }}
+            us-docker.pkg.dev/${{ env.PROJECT_ID }}/gcr.io/${{ env.IMAGE }}-settle-bot:latest
       # Build and push the keeper runtime image
       - name: Build and Push Keeper
         uses: docker/build-push-action@v2
         with:
-          file: keeper/Dockerfile.keeper
+          file: bin/keeper/Dockerfile.keeper
           context: .
           push: true
           tags: |

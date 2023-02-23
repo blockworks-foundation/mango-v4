@@ -1,5 +1,5 @@
-import { AnchorProvider, BN } from '@project-serum/anchor';
-import { utf8 } from '@project-serum/anchor/dist/cjs/utils/bytes';
+import { AnchorProvider, BN } from '@coral-xyz/anchor';
+import { utf8 } from '@coral-xyz/anchor/dist/cjs/utils/bytes';
 import { OpenOrders, Order, Orderbook } from '@project-serum/serum/lib/market';
 import { AccountInfo, PublicKey, TransactionSignature } from '@solana/web3.js';
 import { MangoClient } from '../client';
@@ -32,7 +32,7 @@ export class MangoAccount {
       perpSpotTransfers: BN;
       healthRegionBeginInitHealth: BN;
       frozenUntil: BN;
-      discountSettleableFeesAccrued: BN;
+      discountBuybackFeesAccrued: BN;
       headerVersion: number;
       tokens: unknown;
       serum3: unknown;
@@ -53,7 +53,7 @@ export class MangoAccount {
       obj.perpSpotTransfers,
       obj.healthRegionBeginInitHealth,
       obj.frozenUntil,
-      obj.discountSettleableFeesAccrued,
+      obj.discountBuybackFeesAccrued,
       obj.headerVersion,
       obj.tokens as TokenPositionDto[],
       obj.serum3 as Serum3PositionDto[],
@@ -76,7 +76,7 @@ export class MangoAccount {
     public perpSpotTransfers: BN,
     public healthRegionBeginInitHealth: BN,
     public frozenUntil: BN,
-    public discountSettleableFeesAccrued: BN,
+    public discountBuybackFeesAccrued: BN,
     public headerVersion: number,
     tokens: TokenPositionDto[],
     serum3: Serum3PositionDto[],
@@ -591,9 +591,11 @@ export class MangoAccount {
   public async loadSerum3OpenOrdersAccounts(
     client: MangoClient,
   ): Promise<OpenOrders[]> {
+    const openOrderPks = this.serum3Active().map((s) => s.openOrders);
+    if (!openOrderPks.length) return [];
     const response =
       await client.program.provider.connection.getMultipleAccountsInfo(
-        this.serum3Active().map((s) => s.openOrders),
+        openOrderPks,
       );
     const accounts = response.filter((a): a is AccountInfo<Buffer> =>
       Boolean(a),
@@ -943,15 +945,16 @@ export class MangoAccount {
     client: MangoClient,
     group: Group,
     perpMarketIndex: PerpMarketIndex,
+    forceReload?: boolean,
   ): Promise<PerpOrder[]> {
     const perpMarket = group.getPerpMarketByMarketIndex(perpMarketIndex);
     const [bids, asks] = await Promise.all([
-      perpMarket.loadBids(client),
-      perpMarket.loadAsks(client),
+      perpMarket.loadBids(client, forceReload),
+      perpMarket.loadAsks(client, forceReload),
     ]);
 
-    return [...Array.from(bids.items()), ...Array.from(asks.items())].filter(
-      (order) => order.owner.equals(this.publicKey),
+    return [...bids.items(), ...asks.items()].filter((order) =>
+      order.owner.equals(this.publicKey),
     );
   }
 

@@ -902,9 +902,9 @@ checksum = "dfb24e866b15a1af2a1b663f10c6b6b8f397a84aadb828f12e5b289ec23a3a3c"
 
 [[package]]
 name = "bzip2"
-version = "0.4.3"
+version = "0.4.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6afcd980b5f3a45017c57e57a2fcccbb351cc43a356ce117ef760ef8052b89b0"
+checksum = "bdb116a6ef3f6c3698828873ad02c3014b3c85cadb88496095628e3ef1e347f8"
 dependencies = [
  "bzip2-sys",
  "libc",
@@ -1090,68 +1090,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2850f2f5a82cbf437dd5af4d49848fbdfc27c157c3d010345776f952765261c5"
 dependencies = [
  "os_str_bytes",
-]
-
-[[package]]
-name = "cli"
-version = "0.3.0"
-dependencies = [
- "anchor-client",
- "anchor-lang",
- "anchor-spl",
- "anyhow",
- "clap 3.2.23",
- "client",
- "dotenv",
- "env_logger 0.8.4",
- "fixed",
- "fixed-macro",
- "futures 0.3.25",
- "log 0.4.17",
- "mango-v4",
- "pyth-sdk-solana",
- "serum_dex 0.5.10",
- "solana-client",
- "solana-sdk",
- "tokio",
-]
-
-[[package]]
-name = "client"
-version = "0.3.0"
-dependencies = [
- "anchor-client",
- "anchor-lang",
- "anchor-spl",
- "anyhow",
- "async-channel",
- "async-once-cell",
- "async-trait",
- "base64 0.13.1",
- "bincode",
- "fixed",
- "fixed-macro",
- "futures 0.3.25",
- "itertools 0.10.5",
- "jsonrpc-core 18.0.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "jsonrpc-core-client",
- "log 0.4.17",
- "mango-v4",
- "pyth-sdk-solana",
- "reqwest",
- "serde",
- "serde_json",
- "serum_dex 0.5.10",
- "shellexpand",
- "solana-account-decoder",
- "solana-address-lookup-table-program",
- "solana-client",
- "solana-rpc",
- "solana-sdk",
- "spl-associated-token-account",
- "thiserror",
- "tokio",
- "tokio-stream",
 ]
 
 [[package]]
@@ -2850,31 +2788,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "keeper"
-version = "0.3.0"
-dependencies = [
- "anchor-client",
- "anchor-lang",
- "anchor-spl",
- "anyhow",
- "clap 3.2.23",
- "client",
- "dotenv",
- "env_logger 0.8.4",
- "fixed",
- "fixed-macro",
- "futures 0.3.25",
- "itertools 0.10.5",
- "log 0.4.17",
- "mango-v4",
- "pyth-sdk-solana",
- "serum_dex 0.5.10",
- "solana-client",
- "solana-sdk",
- "tokio",
-]
-
-[[package]]
 name = "kernel32-sys"
 version = "0.2.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3013,52 +2926,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0717cef1bc8b636c6e1c1bbdefc09e6322da8a9321966e8928ef80d20f7f770f"
 
 [[package]]
-name = "liquidator"
-version = "0.0.1"
-dependencies = [
- "anchor-client",
- "anchor-lang",
- "anyhow",
- "arrayref",
- "async-channel",
- "async-stream 0.2.1",
- "async-trait",
- "bs58 0.3.1",
- "bytemuck",
- "bytes 1.3.0",
- "checked_math",
- "clap 3.2.23",
- "client",
- "dotenv",
- "fixed",
- "futures 0.3.25",
- "futures-core",
- "futures-util",
- "itertools 0.10.5",
- "jemallocator",
- "jsonrpc-core 18.0.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "jsonrpc-core-client",
- "log 0.4.17",
- "mango-v4",
- "once_cell",
- "pyth-sdk-solana",
- "rand 0.7.3",
- "serde",
- "serde_derive",
- "serde_json",
- "serum_dex 0.5.10",
- "shellexpand",
- "solana-account-decoder",
- "solana-client",
- "solana-logger",
- "solana-rpc",
- "solana-sdk",
- "tokio",
- "tokio-stream",
- "tokio-tungstenite 0.16.1",
-]
-
-[[package]]
 name = "lock_api"
 version = "0.3.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3126,7 +2993,7 @@ dependencies = [
 
 [[package]]
 name = "mango-v4"
-version = "0.7.0"
+version = "0.8.0"
 dependencies = [
  "anchor-lang",
  "anchor-spl",
@@ -3162,6 +3029,187 @@ dependencies = [
  "static_assertions",
  "switchboard-program",
  "switchboard-v2",
+]
+
+[[package]]
+name = "mango-v4-cli"
+version = "0.3.0"
+dependencies = [
+ "anchor-client",
+ "anchor-lang",
+ "anchor-spl",
+ "anyhow",
+ "clap 3.2.23",
+ "dotenv",
+ "env_logger 0.8.4",
+ "fixed",
+ "fixed-macro",
+ "futures 0.3.25",
+ "log 0.4.17",
+ "mango-v4",
+ "mango-v4-client",
+ "pyth-sdk-solana",
+ "serum_dex 0.5.10",
+ "solana-client",
+ "solana-sdk",
+ "tokio",
+]
+
+[[package]]
+name = "mango-v4-client"
+version = "0.3.0"
+dependencies = [
+ "anchor-client",
+ "anchor-lang",
+ "anchor-spl",
+ "anyhow",
+ "async-channel",
+ "async-once-cell",
+ "async-trait",
+ "base64 0.13.1",
+ "bincode",
+ "fixed",
+ "fixed-macro",
+ "futures 0.3.25",
+ "itertools 0.10.5",
+ "jsonrpc-core 18.0.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "jsonrpc-core-client",
+ "log 0.4.17",
+ "mango-v4",
+ "pyth-sdk-solana",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "serum_dex 0.5.10",
+ "shellexpand",
+ "solana-account-decoder",
+ "solana-address-lookup-table-program",
+ "solana-client",
+ "solana-rpc",
+ "solana-sdk",
+ "spl-associated-token-account",
+ "thiserror",
+ "tokio",
+ "tokio-stream",
+]
+
+[[package]]
+name = "mango-v4-keeper"
+version = "0.3.0"
+dependencies = [
+ "anchor-client",
+ "anchor-lang",
+ "anchor-spl",
+ "anyhow",
+ "clap 3.2.23",
+ "dotenv",
+ "env_logger 0.8.4",
+ "fixed",
+ "fixed-macro",
+ "futures 0.3.25",
+ "itertools 0.10.5",
+ "log 0.4.17",
+ "mango-v4",
+ "mango-v4-client",
+ "pyth-sdk-solana",
+ "serum_dex 0.5.10",
+ "solana-client",
+ "solana-sdk",
+ "tokio",
+]
+
+[[package]]
+name = "mango-v4-liquidator"
+version = "0.0.1"
+dependencies = [
+ "anchor-client",
+ "anchor-lang",
+ "anyhow",
+ "arrayref",
+ "async-channel",
+ "async-stream 0.2.1",
+ "async-trait",
+ "bs58 0.3.1",
+ "bytemuck",
+ "bytes 1.3.0",
+ "checked_math",
+ "clap 3.2.23",
+ "dotenv",
+ "fixed",
+ "futures 0.3.25",
+ "futures-core",
+ "futures-util",
+ "itertools 0.10.5",
+ "jemallocator",
+ "jsonrpc-core 18.0.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "jsonrpc-core-client",
+ "log 0.4.17",
+ "mango-v4",
+ "mango-v4-client",
+ "once_cell",
+ "pyth-sdk-solana",
+ "rand 0.7.3",
+ "serde",
+ "serde_derive",
+ "serde_json",
+ "serum_dex 0.5.10",
+ "shellexpand",
+ "solana-account-decoder",
+ "solana-client",
+ "solana-logger",
+ "solana-rpc",
+ "solana-sdk",
+ "tokio",
+ "tokio-stream",
+ "tokio-tungstenite 0.16.1",
+]
+
+[[package]]
+name = "mango-v4-settle-bot"
+version = "0.0.1"
+dependencies = [
+ "anchor-client",
+ "anchor-lang",
+ "anyhow",
+ "arrayref",
+ "async-channel",
+ "async-stream 0.2.1",
+ "async-trait",
+ "bincode",
+ "bs58 0.3.1",
+ "bytemuck",
+ "bytes 1.3.0",
+ "checked_math",
+ "clap 3.2.23",
+ "dotenv",
+ "fixed",
+ "futures 0.3.25",
+ "futures-core",
+ "futures-util",
+ "itertools 0.10.5",
+ "jemallocator",
+ "jsonrpc-core 18.0.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "jsonrpc-core-client",
+ "log 0.4.17",
+ "mango-v4",
+ "mango-v4-client",
+ "once_cell",
+ "priority-queue",
+ "pyth-sdk-solana",
+ "rand 0.7.3",
+ "serde",
+ "serde_derive",
+ "serde_json",
+ "serum_dex 0.5.10",
+ "shellexpand",
+ "solana-account-decoder",
+ "solana-client",
+ "solana-logger",
+ "solana-rpc",
+ "solana-sdk",
+ "tokio",
+ "tokio-stream",
+ "tokio-tungstenite 0.16.1",
 ]
 
 [[package]]
@@ -3681,9 +3729,9 @@ checksum = "ff011a302c396a5197692431fc1948019154afc178baf7d8e37367442a4601cf"
 
 [[package]]
 name = "openssl-src"
-version = "111.24.0+1.1.1s"
+version = "111.25.0+1.1.1t"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3498f259dab01178c6228c6b00dcef0ed2a2d5e20d648c017861227773ea4abd"
+checksum = "3173cd3626c43e3854b1b727422a276e568d9ec5fe8cec197822cf52cfb743d6"
 dependencies = [
  "cc",
 ]
@@ -4000,6 +4048,16 @@ checksum = "c142c0e46b57171fe0c528bee8c5b7569e80f0c17e377cd0e30ea57dbc11bb51"
 dependencies = [
  "proc-macro2 1.0.47",
  "syn 1.0.105",
+]
+
+[[package]]
+name = "priority-queue"
+version = "1.3.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5ca9c6be70d989d21a136eb86c2d83e4b328447fac4a88dace2143c179c86267"
+dependencies = [
+ "autocfg 1.1.0",
+ "indexmap",
 ]
 
 [[package]]

@@ -6,6 +6,16 @@ Update this for each program release and mainnet deployment.
 
 ## mainnet
 
+### v0.7.0, 2023-2-22
+
+Deployment: Feb 22, 2023 at 14:45:12 Central European Standard Time, https://explorer.solana.com/tx/2KjMd2GLggSTJGSBQ3T96KK8Pj8XEXSDad65b8AN9gtCo6XdWmaFtewUJbPFvXK8WnKgdTxUNJjftpbtRJNEVhDg
+
+- Security admin can now set OpenBook markets to reduce-only (#472)
+- PlacePerpOrder: Improved logging when reduce-only is set (#468)
+- PerpSettlePnl: Grant the low-health settle fee even if the settled amount is
+  below the flat fee threshold (#458)
+- OpenBook: Take referrer rebate as Mango fee (#469)
+
 ### v0.6.0, 2023-2-14
 
 Deployment: Feb 14, 2023 at 16:06:03 Central European Standard Time, https://explorer.solana.com/tx/4vpjuiESQZn5t6XErHeSX76dCng4P4KPrr5pMGuYv9LhA3EcLgTw1bYxg8aRmBt1rfJCTqqYLws1cr4EvnrrETue

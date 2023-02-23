@@ -1,5 +1,5 @@
 export type MangoV4 = {
-  "version": "0.7.0",
+  "version": "0.8.0",
   "name": "mango_v4",
   "instructions": [
     {
@@ -152,7 +152,7 @@ export type MangoV4 = {
           }
         },
         {
-          "name": "feesMngoBonusRateOpt",
+          "name": "feesMngoBonusFactorOpt",
           "type": {
             "option": "f32"
           }
@@ -1119,7 +1119,7 @@ export type MangoV4 = {
       ]
     },
     {
-      "name": "accountSettleFeesWithMngo",
+      "name": "accountBuybackFeesWithMngo",
       "accounts": [
         {
           "name": "group",
@@ -1152,19 +1152,19 @@ export type MangoV4 = {
           "isSigner": false
         },
         {
-          "name": "settleBank",
+          "name": "feesBank",
           "isMut": true,
           "isSigner": false
         },
         {
-          "name": "settleOracle",
+          "name": "feesOracle",
           "isMut": false,
           "isSigner": false
         }
       ],
       "args": [
         {
-          "name": "maxSettle",
+          "name": "maxBuyback",
           "type": "u64"
         }
       ]
@@ -4060,7 +4060,7 @@ export type MangoV4 = {
             "type": "u8"
           },
           {
-            "name": "feesMngoBonusRate",
+            "name": "feesMngoBonusFactor",
             "type": "f32"
           },
           {
@@ -4187,7 +4187,7 @@ export type MangoV4 = {
             "type": "u64"
           },
           {
-            "name": "discountSettleableFeesAccrued",
+            "name": "discountBuybackFeesAccrued",
             "type": "u64"
           },
           {
@@ -5766,7 +5766,7 @@ export type MangoV4 = {
             "type": "u64"
           },
           {
-            "name": "discountSettleableFeesAccrued",
+            "name": "discountBuybackFeesAccrued",
             "type": "u64"
           },
           {
@@ -6774,7 +6774,7 @@ export type MangoV4 = {
             "name": "TokenWithdraw"
           },
           {
-            "name": "AccountSettleFeesWithMngo"
+            "name": "AccountBuybackFeesWithMngo"
           }
         ]
       }
@@ -8438,7 +8438,7 @@ export type MangoV4 = {
 };
 
 export const IDL: MangoV4 = {
-  "version": "0.7.0",
+  "version": "0.8.0",
   "name": "mango_v4",
   "instructions": [
     {
@@ -8591,7 +8591,7 @@ export const IDL: MangoV4 = {
           }
         },
         {
-          "name": "feesMngoBonusRateOpt",
+          "name": "feesMngoBonusFactorOpt",
           "type": {
             "option": "f32"
           }
@@ -9558,7 +9558,7 @@ export const IDL: MangoV4 = {
       ]
     },
     {
-      "name": "accountSettleFeesWithMngo",
+      "name": "accountBuybackFeesWithMngo",
       "accounts": [
         {
           "name": "group",
@@ -9591,19 +9591,19 @@ export const IDL: MangoV4 = {
           "isSigner": false
         },
         {
-          "name": "settleBank",
+          "name": "feesBank",
           "isMut": true,
           "isSigner": false
         },
         {
-          "name": "settleOracle",
+          "name": "feesOracle",
           "isMut": false,
           "isSigner": false
         }
       ],
       "args": [
         {
-          "name": "maxSettle",
+          "name": "maxBuyback",
           "type": "u64"
         }
       ]
@@ -12499,7 +12499,7 @@ export const IDL: MangoV4 = {
             "type": "u8"
           },
           {
-            "name": "feesMngoBonusRate",
+            "name": "feesMngoBonusFactor",
             "type": "f32"
           },
           {
@@ -12626,7 +12626,7 @@ export const IDL: MangoV4 = {
             "type": "u64"
           },
           {
-            "name": "discountSettleableFeesAccrued",
+            "name": "discountBuybackFeesAccrued",
             "type": "u64"
           },
           {
@@ -14205,7 +14205,7 @@ export const IDL: MangoV4 = {
             "type": "u64"
           },
           {
-            "name": "discountSettleableFeesAccrued",
+            "name": "discountBuybackFeesAccrued",
             "type": "u64"
           },
           {
@@ -15213,7 +15213,7 @@ export const IDL: MangoV4 = {
             "name": "TokenWithdraw"
           },
           {
-            "name": "AccountSettleFeesWithMngo"
+            "name": "AccountBuybackFeesWithMngo"
           }
         ]
       }
