@@ -10,7 +10,6 @@ use crate::accounts_ix::*;
 use crate::logs::{
     LoanOriginationFeeInstruction, TokenBalanceLog, WithdrawLoanOriginationFeeLog, WithdrawLog,
 };
-use crate::util::checked_math as cm;
 
 pub fn token_withdraw(ctx: Context<TokenWithdraw>, amount: u64, allow_borrow: bool) -> Result<()> {
     require_msg!(amount > 0, "withdraw amount must be positive");
@@ -109,7 +108,7 @@ pub fn token_withdraw(ctx: Context<TokenWithdraw>, amount: u64, allow_borrow: bo
     // Health check
     //
     if let Some((mut health_cache, pre_init_health)) = pre_health_opt {
-        health_cache.adjust_token_balance(&bank, (native_position_after - native_position))?;
+        health_cache.adjust_token_balance(&bank, native_position_after - native_position)?;
         account.check_health_post(&health_cache, pre_init_health)?;
     }
 

@@ -18,7 +18,6 @@ macro_rules! checked_math {
         checked_math::checked_math_or_panic!($x)
     };
 }
-pub(crate) use checked_math;
 
 pub fn fill_from_str<const N: usize>(name: &str) -> Result<[u8; N]> {
     let name_bytes = name.as_bytes();

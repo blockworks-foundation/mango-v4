@@ -1,5 +1,5 @@
 use anchor_lang::prelude::*;
-use checked_math as cm;
+
 use fixed::types::I80F48;
 
 use crate::accounts_ix::*;
@@ -168,7 +168,7 @@ pub fn perp_settle_pnl(ctx: Context<PerpSettlePnl>) -> Result<()> {
     // The fee is paid by the account with positive unsettled pnl
     let a_token_position = account_a.token_position_mut(settle_token_index)?.0;
     let b_token_position = account_b.token_position_mut(settle_token_index)?.0;
-    settle_bank.deposit(a_token_position, (settlement - fee), now_ts)?;
+    settle_bank.deposit(a_token_position, settlement - fee, now_ts)?;
     // Don't charge loan origination fees on borrows created via settling:
     // Even small loan origination fees could accumulate if a perp position is
     // settled back and forth repeatedly.

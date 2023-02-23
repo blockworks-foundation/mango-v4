@@ -9,7 +9,7 @@ use switchboard_program::FastRoundResultAccountData;
 use switchboard_v2::AggregatorAccountData;
 
 use crate::accounts_zerocopy::*;
-use crate::checked_math as cm;
+
 use crate::error::*;
 
 const DECIMAL_CONSTANT_ZERO_INDEX: i8 = 12;
@@ -185,9 +185,9 @@ pub fn oracle_price(
                 return Err(MangoError::OracleStale.into());
             }
 
-            let decimals = ((price_account.expo as i8) + QUOTE_DECIMALS - (base_decimals as i8));
+            let decimals = (price_account.expo as i8) + QUOTE_DECIMALS - (base_decimals as i8);
             let decimal_adj = power_of_ten(decimals);
-            (price * decimal_adj)
+            price * decimal_adj
         }
         OracleType::SwitchboardV2 => {
             fn from_foreign_error(e: impl std::fmt::Display) -> Error {
@@ -231,9 +231,9 @@ pub fn oracle_price(
                 return Err(MangoError::OracleConfidence.into());
             }
 
-            let decimals = (QUOTE_DECIMALS - (base_decimals as i8));
+            let decimals = QUOTE_DECIMALS - (base_decimals as i8);
             let decimal_adj = power_of_ten(decimals);
-            (price * decimal_adj)
+            price * decimal_adj
         }
         OracleType::SwitchboardV1 => {
             let result = FastRoundResultAccountData::deserialize(data).unwrap();
@@ -267,9 +267,9 @@ pub fn oracle_price(
                 return Err(MangoError::OracleConfidence.into());
             }
 
-            let decimals = (QUOTE_DECIMALS - (base_decimals as i8));
+            let decimals = QUOTE_DECIMALS - (base_decimals as i8);
             let decimal_adj = power_of_ten(decimals);
-            (price * decimal_adj)
+            price * decimal_adj
         }
     })
 }

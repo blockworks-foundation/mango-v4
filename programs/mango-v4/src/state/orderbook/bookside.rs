@@ -3,7 +3,6 @@ use num_enum::{IntoPrimitive, TryFromPrimitive};
 use static_assertions::const_assert_eq;
 
 use super::*;
-use crate::util::checked_math as cm;
 
 #[derive(
     Eq,

@@ -1,5 +1,5 @@
 use anchor_lang::prelude::*;
-use checked_math as cm;
+
 use fixed::types::I80F48;
 
 use crate::accounts_zerocopy::*;
@@ -64,7 +64,7 @@ pub fn perp_settle_fees(ctx: Context<PerpSettleFees>, max_settle_amount: u64) ->
     require!(settlement >= 0, MangoError::SettlementAmountMustBePositive);
 
     perp_position.record_settle(-settlement); // settle the negative pnl on the user perp position
-    perp_market.fees_accrued = (perp_market.fees_accrued - settlement);
+    perp_market.fees_accrued = perp_market.fees_accrued - settlement;
 
     emit_perp_balances(
         ctx.accounts.group.key(),
@@ -96,7 +96,7 @@ pub fn perp_settle_fees(ctx: Context<PerpSettleFees>, max_settle_amount: u64) ->
         oracle_price,
     )?;
     // Update the settled balance on the market itself
-    perp_market.fees_settled = (perp_market.fees_settled + settlement);
+    perp_market.fees_settled = perp_market.fees_settled + settlement;
 
     emit!(TokenBalanceLog {
         mango_group: ctx.accounts.group.key(),

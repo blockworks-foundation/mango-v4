@@ -10,7 +10,7 @@ use crate::{
 };
 use anchor_lang::solana_program::sysvar::instructions as tx_instructions;
 use anchor_lang::Discriminator;
-use checked_math as cm;
+
 use fixed::types::I80F48;
 
 pub mod compute_budget {
@@ -71,7 +71,7 @@ pub fn token_update_index_and_rate(ctx: Context<TokenUpdateIndexAndRate>) -> Res
     {
         let mut some_bank = ctx.remaining_accounts[0].load_mut::<Bank>()?;
 
-        let diff_ts = I80F48::from_num((now_ts - some_bank.index_last_updated));
+        let diff_ts = I80F48::from_num(now_ts - some_bank.index_last_updated);
 
         let (deposit_index, borrow_index, borrow_fees, borrow_rate, deposit_rate) =
             some_bank.compute_index(indexed_total_deposits, indexed_total_borrows, diff_ts)?;

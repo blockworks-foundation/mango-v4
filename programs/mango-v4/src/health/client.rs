@@ -7,7 +7,6 @@ use fixed::types::I80F48;
 use crate::error::*;
 use crate::state::Side as PerpOrderSide;
 use crate::state::{Bank, MangoAccountValue, PerpMarketIndex};
-use crate::util::checked_math as cm;
 
 use super::*;
 
@@ -57,7 +56,7 @@ impl HealthCache {
         let mut source_position = account.token_position(source_bank.token_index)?.clone();
         let mut target_position = account.token_position(target_bank.token_index)?.clone();
 
-        let target_amount = (amount * price);
+        let target_amount = amount * price;
 
         let mut source_bank = source_bank.clone();
         source_bank.withdraw_with_fee(&mut source_position, amount, now_ts, source_oracle_price)?;

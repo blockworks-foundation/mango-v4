@@ -1,6 +1,6 @@
 use anchor_lang::prelude::*;
 use anchor_spl::token;
-use checked_math as cm;
+
 use fixed::types::I80F48;
 
 use crate::accounts_ix::*;
@@ -141,7 +141,7 @@ pub fn perp_liq_negative_pnl_or_bankruptcy(
             msg!("liquidated pnl = {}", settlement);
         }
     };
-    let max_liab_transfer = (I80F48::from(max_liab_transfer) - settlement);
+    let max_liab_transfer = I80F48::from(max_liab_transfer) - settlement;
 
     //
     // Step 2: bankruptcy
@@ -167,7 +167,7 @@ pub fn perp_liq_negative_pnl_or_bankruptcy(
             0
         };
 
-        let liquidation_fee_factor = (I80F48::ONE + perp_market.base_liquidation_fee);
+        let liquidation_fee_factor = I80F48::ONE + perp_market.base_liquidation_fee;
 
         // Amount given to the liqor from the insurance fund
         let insurance_transfer = (liab_transfer * liquidation_fee_factor)

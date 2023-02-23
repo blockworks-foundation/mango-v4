@@ -9,7 +9,6 @@ use fixed::types::I80F48;
 use std::cell::RefMut;
 
 use super::*;
-use crate::util::checked_math as cm;
 
 /// Drop at most this many expired orders from a BookSide when trying to match orders.
 /// This exists as a guard against excessive compute use.
@@ -123,12 +122,12 @@ impl<'a> Orderbook<'a> {
                 .min(best_opposing.node.quantity)
                 .min(max_match_by_quote);
 
-            let match_quote_lots = (match_base_lots * best_opposing_price);
+            let match_quote_lots = match_base_lots * best_opposing_price;
             (remaining_base_lots -= match_base_lots);
             (remaining_quote_lots -= match_quote_lots);
             assert!(remaining_quote_lots >= 0);
 
-            let new_best_opposing_quantity = (best_opposing.node.quantity - match_base_lots);
+            let new_best_opposing_quantity = best_opposing.node.quantity - match_base_lots;
             let maker_out = new_best_opposing_quantity == 0;
             if maker_out {
                 matched_order_deletes
@@ -156,8 +155,8 @@ impl<'a> Orderbook<'a> {
             event_queue.push_back(cast(fill)).unwrap();
             limit -= 1;
         }
-        let total_quote_lots_taken = (order.max_quote_lots - remaining_quote_lots);
-        let total_base_lots_taken = (order.max_base_lots - remaining_base_lots);
+        let total_quote_lots_taken = order.max_quote_lots - remaining_quote_lots;
+        let total_base_lots_taken = order.max_base_lots - remaining_base_lots;
         assert!(total_quote_lots_taken >= 0);
         assert!(total_base_lots_taken >= 0);
 
@@ -356,8 +355,8 @@ fn apply_fees(
 ) -> Result<()> {
     let quote_native = I80F48::from_num(market.quote_lot_size.checked_mul(quote_lots).unwrap());
 
-    let maker_fees = (quote_native * market.maker_fee);
-    let taker_fees = (quote_native * market.taker_fee);
+    let maker_fees = quote_native * market.maker_fee;
+    let taker_fees = quote_native * market.taker_fee;
 
     // taker fees should never be negative
     require_gte!(taker_fees, 0);

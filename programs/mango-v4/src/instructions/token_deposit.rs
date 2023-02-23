@@ -8,7 +8,6 @@ use crate::accounts_zerocopy::AccountInfoRef;
 use crate::error::*;
 use crate::health::*;
 use crate::state::*;
-use crate::util::checked_math as cm;
 
 use crate::accounts_ix::*;
 use crate::logs::{DepositLog, TokenBalanceLog};

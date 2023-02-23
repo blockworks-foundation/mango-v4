@@ -13,7 +13,6 @@ use static_assertions::const_assert_eq;
 use crate::error::*;
 use crate::health::{HealthCache, HealthType};
 use crate::logs::{DeactivatePerpPositionLog, DeactivateTokenPositionLog};
-use checked_math as cm;
 
 use super::dynamic_account::*;
 use super::BookSideOrderTree;
@@ -897,8 +896,8 @@ impl<
 
         let side = fill.taker_side().invert_side();
         let (base_change, quote_change) = fill.base_quote_change(side);
-        let quote = (I80F48::from(perp_market.quote_lot_size) * I80F48::from(quote_change));
-        let fees = (quote.abs() * I80F48::from_num(fill.maker_fee));
+        let quote = I80F48::from(perp_market.quote_lot_size) * I80F48::from(quote_change);
+        let fees = quote.abs() * I80F48::from_num(fill.maker_fee);
         pa.record_trading_fee(fees);
         pa.record_trade(perp_market, base_change, quote);
 
@@ -932,7 +931,7 @@ impl<
         pa.remove_taker_trade(base_change, quote_change);
         // fees are assessed at time of trade; no need to assess fees here
         let quote_change_native =
-            (I80F48::from(perp_market.quote_lot_size) * I80F48::from(quote_change));
+            I80F48::from(perp_market.quote_lot_size) * I80F48::from(quote_change);
         pa.record_trade(perp_market, base_change, quote_change_native);
 
         (pa.taker_volume += quote_change_native.abs().to_num::<u64>());

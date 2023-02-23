@@ -1,5 +1,5 @@
 use anchor_lang::prelude::*;
-use checked_math as cm;
+
 use derivative::Derivative;
 use fixed::types::I80F48;
 use static_assertions::const_assert_eq;
@@ -320,7 +320,7 @@ impl PerpPosition {
 
     // Return base position in native units for a perp market
     pub fn base_position_native(&self, market: &PerpMarket) -> I80F48 {
-        I80F48::from((self.base_position_lots * market.base_lot_size))
+        I80F48::from(self.base_position_lots * market.base_lot_size)
     }
 
     pub fn base_position_lots(&self) -> i64 {
@@ -347,12 +347,12 @@ impl PerpPosition {
     pub fn unsettled_funding(&self, perp_market: &PerpMarket) -> I80F48 {
         match self.base_position_lots.cmp(&0) {
             Ordering::Greater => {
-                ((perp_market.long_funding - self.long_settled_funding)
-                    * I80F48::from_num(self.base_position_lots))
+                (perp_market.long_funding - self.long_settled_funding)
+                    * I80F48::from_num(self.base_position_lots)
             }
             Ordering::Less => {
-                ((perp_market.short_funding - self.short_settled_funding)
-                    * I80F48::from_num(self.base_position_lots))
+                (perp_market.short_funding - self.short_settled_funding)
+                    * I80F48::from_num(self.base_position_lots)
             }
             Ordering::Equal => I80F48::ZERO,
         }
@@ -387,7 +387,7 @@ impl PerpPosition {
         }
 
         let old_position = self.base_position_lots;
-        let new_position = (old_position + base_change);
+        let new_position = old_position + base_change;
 
         // amount of lots that were reduced (so going from -5 to 10 lots is a reduction of 5)
         let reduced_lots;
@@ -404,9 +404,9 @@ impl PerpPosition {
 
             // There can't be unrealized pnl without a base position, so fix the
             // realized_trade_pnl to cover everything that isn't realized_other_pnl.
-            let total_realized_pnl = (self.quote_position_native + quote_change_native);
-            let new_realized_trade_pnl = (total_realized_pnl - self.realized_other_pnl_native);
-            newly_realized_pnl = (new_realized_trade_pnl - self.realized_trade_pnl_native);
+            let total_realized_pnl = self.quote_position_native + quote_change_native;
+            let new_realized_trade_pnl = total_realized_pnl - self.realized_other_pnl_native;
+            newly_realized_pnl = new_realized_trade_pnl - self.realized_trade_pnl_native;
             self.realized_trade_pnl_native = new_realized_trade_pnl;
         } else if old_position.signum() != new_position.signum() {
             // If the base position changes sign, we've crossed base_pos == 0 (or old_position == 0)
@@ -450,7 +450,7 @@ impl PerpPosition {
                 // Decreasing position: pnl is realized, avg entry price does not change
                 reduced_lots = base_change;
                 let avg_entry = I80F48::from_num(self.avg_entry_price_per_base_lot);
-                newly_realized_pnl = (quote_change_native + I80F48::from(base_change) * avg_entry);
+                newly_realized_pnl = quote_change_native + I80F48::from(base_change) * avg_entry;
                 (self.realized_trade_pnl_native += newly_realized_pnl);
                 (self.realized_pnl_for_position_native += newly_realized_pnl);
             }
@@ -467,10 +467,10 @@ impl PerpPosition {
         // magnitude.
         if newly_realized_pnl.signum() == self.realized_trade_pnl_native.signum() {
             let realized_stable_value =
-                (I80F48::from(reduced_lots.abs() * perp_market.base_lot_size)
-                    * perp_market.stable_price());
+                I80F48::from(reduced_lots.abs() * perp_market.base_lot_size)
+                    * perp_market.stable_price();
             let stable_value_fraction =
-                (I80F48::from_num(perp_market.settle_pnl_limit_factor) * realized_stable_value);
+                I80F48::from_num(perp_market.settle_pnl_limit_factor) * realized_stable_value;
 
             // The realized pnl settle limit change is restricted to actually realized pnl:
             // buying and then selling some base lots at the same price shouldn't affect
@@ -612,7 +612,7 @@ impl PerpPosition {
     pub fn unsettled_pnl(&self, perp_market: &PerpMarket, price: I80F48) -> Result<I80F48> {
         require_eq!(self.market_index, perp_market.perp_market_index);
         let base_native = self.base_position_native(perp_market);
-        let pnl = (self.quote_position_native() + base_native * price);
+        let pnl = self.quote_position_native() + base_native * price;
         Ok(pnl)
     }
 
@@ -621,8 +621,8 @@ impl PerpPosition {
     pub fn update_settle_limit(&mut self, market: &PerpMarket, now_ts: u64) {
         assert_eq!(self.market_index, market.perp_market_index);
         let window_size = market.settle_pnl_limit_window_size_ts;
-        let window_start = (self.settle_pnl_limit_window as u64 * window_size);
-        let window_end = (window_start + window_size);
+        let window_start = self.settle_pnl_limit_window as u64 * window_size;
+        let window_end = window_start + window_size;
         // now_ts < window_start can happen when window size is changed on the market
         let new_window = now_ts >= window_end || now_ts < window_start;
         if new_window {
@@ -723,7 +723,7 @@ impl PerpPosition {
                 .min(I80F48::ZERO)
         };
         (self.realized_other_pnl_native -= other_reduction);
-        let trade_and_unrealized_settlement = (settled_pnl - other_reduction);
+        let trade_and_unrealized_settlement = settled_pnl - other_reduction;
 
         // Then reduces realized_trade_pnl, similar to other_pnl above.
         let trade_reduction = if trade_and_unrealized_settlement > 0 {

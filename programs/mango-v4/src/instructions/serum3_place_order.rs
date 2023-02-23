@@ -7,7 +7,7 @@ use crate::accounts_ix::*;
 use crate::logs::{Serum3OpenOrdersBalanceLogV2, TokenBalanceLog};
 use crate::serum3_cpi::{load_market_state, load_open_orders_ref};
 use anchor_lang::prelude::*;
-use checked_math as cm;
+
 use fixed::types::I80F48;
 use serum_dex::instruction::NewOrderInstructionV3;
 use serum_dex::state::OpenOrders;
@@ -45,10 +45,10 @@ pub trait OpenOrdersAmounts {
 
 impl OpenOrdersAmounts for OpenOrdersSlim {
     fn native_base_reserved(&self) -> u64 {
-        (self.native_coin_total - self.native_coin_free)
+        self.native_coin_total - self.native_coin_free
     }
     fn native_quote_reserved(&self) -> u64 {
-        (self.native_pc_total - self.native_pc_free)
+        self.native_pc_total - self.native_pc_free
     }
     fn native_base_free(&self) -> u64 {
         self.native_coin_free
@@ -69,10 +69,10 @@ impl OpenOrdersAmounts for OpenOrdersSlim {
 
 impl OpenOrdersAmounts for OpenOrders {
     fn native_base_reserved(&self) -> u64 {
-        (self.native_coin_total - self.native_coin_free)
+        self.native_coin_total - self.native_coin_free
     }
     fn native_quote_reserved(&self) -> u64 {
-        (self.native_pc_total - self.native_pc_free)
+        self.native_pc_total - self.native_pc_free
     }
     fn native_base_free(&self) -> u64 {
         self.native_coin_free
@@ -244,7 +244,7 @@ pub fn serum3_place_order(
     let mut payer_bank = ctx.accounts.payer_bank.load_mut()?;
 
     // Enforce min vault to deposits ratio
-    let withdrawn_from_vault = I80F48::from((before_vault - after_vault));
+    let withdrawn_from_vault = I80F48::from(before_vault - after_vault);
     let position_native = account
         .token_position_mut(payer_bank.token_index)?
         .0
@@ -349,7 +349,7 @@ fn apply_vault_difference(
     vault_before: u64,
     oracle_price: Option<I80F48>,
 ) -> Result<VaultDifference> {
-    let needed_change = (I80F48::from(vault_after) - I80F48::from(vault_before));
+    let needed_change = I80F48::from(vault_after) - I80F48::from(vault_before);
 
     let (position, _) = account.token_position_mut(bank.token_index)?;
     let native_before = position.native(bank);
@@ -365,7 +365,7 @@ fn apply_vault_difference(
         )?;
     }
     let native_after = position.native(bank);
-    let native_change = (native_after - native_before);
+    let native_change = native_after - native_before;
     let new_borrows = native_change
         .max(native_after)
         .min(I80F48::ZERO)
@@ -386,7 +386,7 @@ fn apply_vault_difference(
 
     // Only for place: Add to potential borrow amount
     let old_value = *borrows_without_fee;
-    *borrows_without_fee = (old_value + new_borrows);
+    *borrows_without_fee = old_value + new_borrows;
 
     // Only for settle/liq_force_cancel: Reduce the potential borrow amounts
     if needed_change > 0 {

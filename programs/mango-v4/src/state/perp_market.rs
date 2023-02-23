@@ -10,7 +10,6 @@ use crate::error::MangoError;
 use crate::logs::PerpUpdateFundingLog;
 use crate::state::orderbook::Side;
 use crate::state::{oracle, TokenIndex};
-use crate::util::checked_math as cm;
 
 use super::{orderbook, OracleConfig, Orderbook, StablePriceModel, DAY_I80F48};
 
@@ -281,7 +280,7 @@ impl PerpMarket {
                 // calculate mid-market rate
                 let mid_price = bid.checked_add(ask).unwrap() / 2;
                 let book_price = self.lot_to_native_price(mid_price);
-                let diff = (book_price / index_price - I80F48::ONE);
+                let diff = book_price / index_price - I80F48::ONE;
                 diff.clamp(self.min_funding, self.max_funding)
             }
             (Some(_bid), None) => self.max_funding,
@@ -290,9 +289,9 @@ impl PerpMarket {
         };
 
         let diff_ts = I80F48::from_num(now_ts - self.funding_last_updated as u64);
-        let time_factor = (diff_ts / DAY_I80F48);
+        let time_factor = diff_ts / DAY_I80F48;
         let base_lot_size = I80F48::from_num(self.base_lot_size);
-        let funding_delta = (index_price * diff_price * base_lot_size * time_factor);
+        let funding_delta = index_price * diff_price * base_lot_size * time_factor;
 
         self.long_funding += funding_delta;
         self.short_funding += funding_delta;
@@ -360,7 +359,7 @@ impl PerpMarket {
             // would be appreciated. Luckily, this will be an extremely rare situation.
             I80F48::ZERO
         } else {
-            (loss / I80F48::from(self.open_interest))
+            loss / I80F48::from(self.open_interest)
         };
         self.long_funding -= socialized_loss;
         self.short_funding += socialized_loss;
@@ -383,11 +382,11 @@ impl PerpMarket {
         let low_health_fee = if source_liq_end_health < 0 {
             let fee_fraction = I80F48::from_num(self.settle_fee_fraction_low_health);
             if source_maint_health < 0 {
-                (settlement * fee_fraction)
+                settlement * fee_fraction
             } else {
-                (settlement
+                settlement
                     * fee_fraction
-                    * (-source_liq_end_health / (source_maint_health - source_liq_end_health)))
+                    * (-source_liq_end_health / (source_maint_health - source_liq_end_health))
             }
         } else {
             I80F48::ZERO
