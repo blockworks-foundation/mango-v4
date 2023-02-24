@@ -55,9 +55,9 @@ pub fn account_buyback_fees_with_mngo(
     let (account_mngo_token_position, account_mngo_raw_token_index, _) =
         account.ensure_token_position(mngo_bank.token_index)?;
     let account_mngo_native = account_mngo_token_position.native(&mngo_bank);
-    if account_mngo_native.is_negative() {
+    if account_mngo_native <= I80F48::ZERO {
         msg!(
-            "account mngo token position ({} native mngo) has borrows, nothing will be bought back",
+            "account mngo token position ({} native mngo) is <= 0, nothing will be bought back",
             account_mngo_native
         );
         return Ok(());
