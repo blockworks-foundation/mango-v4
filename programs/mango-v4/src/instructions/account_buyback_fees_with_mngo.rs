@@ -55,7 +55,7 @@ pub fn account_buyback_fees_with_mngo(
     let (account_mngo_token_position, account_mngo_raw_token_index, _) =
         account.ensure_token_position(mngo_bank.token_index)?;
     let account_mngo_native = account_mngo_token_position.native(&mngo_bank);
-    if account_mngo_native.is_negative() {
+    if  .is_negative() {
         msg!(
             "account mngo token position ({} native mngo) has borrows, nothing will be bought back",
             account_mngo_native
@@ -145,6 +145,11 @@ pub fn account_buyback_fees_with_mngo(
     }
     require_eq!(
         dao_account.active_perp_positions().count(),
+        0,
+        MangoError::SomeError
+    );
+    require_eq!(
+        dao_account.active_serum3_orders().count(),
         0,
         MangoError::SomeError
     );
