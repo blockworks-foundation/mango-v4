@@ -1511,10 +1511,10 @@ fn group_edit_instruction_default() -> mango_v4::instruction::GroupEdit {
         testing_opt: None,
         version_opt: None,
         deposit_limit_quote_opt: None,
-        fees_pay_with_mngo_opt: None,
-        fees_mngo_bonus_factor_opt: None,
-        fees_swap_mango_account_opt: None,
-        fees_mngo_token_index_opt: None,
+        buyback_fees_opt: None,
+        buyback_fees_bonus_factor_opt: None,
+        buyback_fees_swap_mango_account_opt: None,
+        mngo_token_index_opt: None,
     }
 }
 
@@ -1851,7 +1851,7 @@ impl ClientInstruction for AccountBuybackFeesWithMngo {
             group: account.fixed.group,
             owner: self.owner.pubkey(),
             account: self.account,
-            dao_account: group.fees_swap_mango_account,
+            dao_account: group.buyback_fees_swap_mango_account,
             mngo_bank: self.mngo_bank,
             mngo_oracle: mngo_bank.oracle,
             fees_bank: self.fees_bank,

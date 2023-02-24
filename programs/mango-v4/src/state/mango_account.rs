@@ -88,7 +88,7 @@ pub struct MangoAccount {
 
     pub frozen_until: u64,
 
-    pub discount_buyback_fees_accrued: u64,
+    pub buyback_fees_accrued: u64,
 
     pub reserved: [u8; 224],
 
@@ -125,7 +125,7 @@ impl MangoAccount {
             net_deposits: 0,
             health_region_begin_init_health: 0,
             frozen_until: 0,
-            discount_buyback_fees_accrued: 0,
+            buyback_fees_accrued: 0,
             reserved: [0; 224],
             header_version: DEFAULT_MANGO_ACCOUNT_VERSION,
             padding3: Default::default(),
@@ -208,7 +208,7 @@ pub struct MangoAccountFixed {
     pub perp_spot_transfers: i64,
     pub health_region_begin_init_health: i64,
     pub frozen_until: u64,
-    pub discount_buyback_fees_accrued: u64,
+    pub buyback_fees_accrued: u64,
     pub reserved: [u8; 224],
 }
 const_assert_eq!(
@@ -907,7 +907,7 @@ impl<
         let quote = cm!(I80F48::from(perp_market.quote_lot_size) * I80F48::from(quote_change));
         let fees = cm!(quote.abs() * I80F48::from_num(fill.maker_fee));
         if fees.is_positive() {
-            self.fixed_mut().discount_buyback_fees_accrued += fees.round().to_num::<u64>();
+            self.fixed_mut().buyback_fees_accrued += fees.floor().to_num::<u64>();
         }
         let pa = self.perp_position_mut(perp_market_index)?;
         pa.record_trading_fee(fees);

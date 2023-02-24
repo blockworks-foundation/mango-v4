@@ -6,7 +6,7 @@ use anchor_lang::prelude::*;
 pub struct AccountBuybackFeesWithMngo<'info> {
     #[account(
         constraint = group.load()?.is_ix_enabled(IxGate::AccountBuybackFeesWithMngo) @ MangoError::IxIsDisabled,
-        constraint = group.load()?.fees_pay_with_mngo() @ MangoError::SomeError
+        constraint = group.load()?.buback_fees() @ MangoError::SomeError
     )]
     pub group: AccountLoader<'info, Group>,
 
@@ -23,14 +23,14 @@ pub struct AccountBuybackFeesWithMngo<'info> {
         mut,
         has_one = group,
         constraint = account.load()?.is_operational() @ MangoError::AccountIsFrozen,
-        constraint = group.load()?.fees_swap_mango_account == dao_account.key()
+        address = group.load()?.buyback_fees_swap_mango_account
     )]
     pub dao_account: AccountLoader<'info, MangoAccountFixed>,
 
     #[account(
         mut,
         has_one = group,
-        constraint = mngo_bank.load()?.token_index == group.load()?.fees_mngo_token_index,
+        constraint = mngo_bank.load()?.token_index == group.load()?.mngo_token_index,
         constraint = mngo_bank.load()?.token_index != 0, // should not be unset
     )]
     pub mngo_bank: AccountLoader<'info, Bank>,

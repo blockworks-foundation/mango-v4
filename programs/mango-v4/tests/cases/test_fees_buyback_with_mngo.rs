@@ -154,7 +154,7 @@ async fn test_fees_buyback_with_mngo() -> Result<(), TransportError> {
     .unwrap();
 
     let mango_account_1 = solana.get_account::<MangoAccount>(account_1).await;
-    let before_fees_accrued = mango_account_1.discount_buyback_fees_accrued;
+    let before_fees_accrued = mango_account_1.buyback_fees_accrued;
     let fees_token_position_before =
         mango_account_1.tokens[0].native(&solana.get_account::<Bank>(tokens[0].bank).await);
     let mngo_token_position_before =
@@ -174,7 +174,7 @@ async fn test_fees_buyback_with_mngo() -> Result<(), TransportError> {
     let after_fees_accrued = solana
         .get_account::<MangoAccount>(account_1)
         .await
-        .discount_buyback_fees_accrued;
+        .buyback_fees_accrued;
     let fees_token_position_after =
         mango_account_1.tokens[0].native(&solana.get_account::<Bank>(tokens[0].bank).await);
     let mngo_token_position_after =

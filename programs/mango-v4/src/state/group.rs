@@ -20,9 +20,8 @@ pub struct Group {
     // TODO: unused, use case - listing shit tokens with conservative parameters (mostly defaults)
     pub fast_listing_admin: Pubkey,
 
-    // Buyback fees with Mngo: usually in quote native can be exchanged at a bonus for mango,
-    // this is the token index of the mngo token listed on the group
-    pub fees_mngo_token_index: TokenIndex,
+    // This is the token index of the mngo token listed on the group
+    pub mngo_token_index: TokenIndex,
     pub padding: [u8; 2],
 
     pub insurance_vault: Pubkey,
@@ -35,10 +34,10 @@ pub struct Group {
     pub version: u8,
 
     // Buyback fees with Mngo: allow exchanging fees with mngo at a bonus
-    pub fees_pay_with_mngo: u8,
+    pub buyback_fees: u8,
     // Buyback fees with Mngo: how much should the bonus be,
     // e.g. a bonus factor of 1.2 means 120$ worth fees could be swapped for mngo worth 100$ at current market price
-    pub fees_mngo_bonus_factor: f32,
+    pub buyback_fees_mngo_bonus_factor: f32,
 
     pub address_lookup_tables: [Pubkey; 20],
 
@@ -59,7 +58,7 @@ pub struct Group {
     // - the dao deposits quote tokens in its respective mango account
     // - the user deposits some mngo tokens in his mango account
     // - the user then claims quote for mngo at a bonus rate
-    pub fees_swap_mango_account: Pubkey,
+    pub buyback_fees_swap_mango_account: Pubkey,
 
     pub reserved: [u8; 1832],
 }
@@ -71,8 +70,8 @@ const_assert_eq!(size_of::<Group>(), 2736);
 const_assert_eq!(size_of::<Group>() % 8, 0);
 
 impl Group {
-    pub fn fees_pay_with_mngo(&self) -> bool {
-        self.fees_pay_with_mngo == 1
+    pub fn buyback_fees(&self) -> bool {
+        self.buyback_fees == 1
     }
 
     pub fn is_testing(&self) -> bool {

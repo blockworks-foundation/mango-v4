@@ -13,10 +13,10 @@ pub fn group_edit(
     testing_opt: Option<u8>,
     version_opt: Option<u8>,
     deposit_limit_quote_opt: Option<u64>,
-    fees_pay_with_mngo_opt: Option<bool>,
-    fees_mngo_bonus_factor_opt: Option<f32>,
-    fees_swap_mango_account_opt: Option<Pubkey>,
-    fees_mngo_token_index_opt: Option<TokenIndex>,
+    buyback_fees_opt: Option<bool>,
+    buyback_fees_bonus_factor_opt: Option<f32>,
+    buyback_fees_swap_mango_account_opt: Option<Pubkey>,
+    mngo_token_index_opt: Option<TokenIndex>,
 ) -> Result<()> {
     let mut group = ctx.accounts.group.load_mut()?;
 
@@ -63,37 +63,37 @@ pub fn group_edit(
         group.deposit_limit_quote = deposit_limit_quote;
     }
 
-    if let Some(pay_fees_with_mngo) = fees_pay_with_mngo_opt {
+    if let Some(buyback_fees) = buyback_fees_opt {
         msg!(
-            "Fees pay with mngo old {:?}, new {:?}",
-            group.fees_pay_with_mngo,
-            pay_fees_with_mngo
+            "Buyback fees old {:?}, new {:?}",
+            group.buyback_fees,
+            buyback_fees
         );
-        group.fees_pay_with_mngo = u8::from(pay_fees_with_mngo);
+        group.buyback_fees = u8::from(buyback_fees);
     }
-    if let Some(fees_mngo_bonus_factor) = fees_mngo_bonus_factor_opt {
+    if let Some(buyback_fees_mngo_bonus_factor) = buyback_fees_bonus_factor_opt {
         msg!(
-            "Fees mngo bonus rate old {:?}, new {:?}",
-            group.fees_mngo_bonus_factor,
-            fees_mngo_bonus_factor
+            "Buyback fees mngo bonus factor old {:?}, new {:?}",
+            group.buyback_fees_mngo_bonus_factor,
+            buyback_fees_mngo_bonus_factor
         );
-        group.fees_mngo_bonus_factor = fees_mngo_bonus_factor;
+        group.buyback_fees_mngo_bonus_factor = buyback_fees_mngo_bonus_factor;
     }
-    if let Some(fees_swap_mango_account) = fees_swap_mango_account_opt {
+    if let Some(buyback_fees_swap_mango_account) = buyback_fees_swap_mango_account_opt {
         msg!(
-            "Fees swap mango account old {:?}, new {:?}",
-            group.fees_swap_mango_account,
-            fees_swap_mango_account
+            "Buyback fees swap mango account old {:?}, new {:?}",
+            group.buyback_fees_swap_mango_account,
+            buyback_fees_swap_mango_account
         );
-        group.fees_swap_mango_account = fees_swap_mango_account;
+        group.buyback_fees_swap_mango_account = buyback_fees_swap_mango_account;
     }
-    if let Some(fees_mngo_token_index) = fees_mngo_token_index_opt {
+    if let Some(mngo_token_index) = mngo_token_index_opt {
         msg!(
-            "Fees mngo token index old {:?}, new {:?}",
-            group.fees_mngo_token_index,
-            fees_mngo_token_index
+            "Mngo token index old {:?}, new {:?}",
+            group.mngo_token_index,
+            mngo_token_index
         );
-        group.fees_mngo_token_index = fees_mngo_token_index;
+        group.mngo_token_index = mngo_token_index;
     }
 
     Ok(())

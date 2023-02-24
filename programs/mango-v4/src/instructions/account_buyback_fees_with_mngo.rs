@@ -33,16 +33,16 @@ pub fn account_buyback_fees_with_mngo(
     let mut mngo_bank = ctx.accounts.mngo_bank.load_mut()?;
     let mut fees_bank = ctx.accounts.fees_bank.load_mut()?;
 
-    let bonus_rate = I80F48::from_num(group.fees_mngo_bonus_factor);
+    let bonus_factor = I80F48::from_num(group.buyback_fees_mngo_bonus_factor);
     let now_ts = Clock::get()?.unix_timestamp.try_into().unwrap();
 
     // quick return if nothing to buyback
     let mut max_buyback =
-        I80F48::from_num::<u64>(max_buyback.min(account.fixed.discount_buyback_fees_accrued));
+        I80F48::from_num::<u64>(max_buyback.min(account.fixed.buyback_fees_accrued));
     if max_buyback == I80F48::ZERO {
         msg!(
-            "nothing to buyback, (discount_buyback_fees_accrued {})",
-            account.fixed.discount_buyback_fees_accrued
+            "nothing to buyback, (buyback_fees_accrued {})",
+            account.fixed.buyback_fees_accrued
         );
         return Ok(());
     }
@@ -64,10 +64,10 @@ pub fn account_buyback_fees_with_mngo(
         &AccountInfoRef::borrow(&ctx.accounts.mngo_oracle.as_ref())?,
         Some(Clock::get()?.slot),
     )?;
-    let mngo_buyback_price = cm!(mngo_oracle_price * bonus_rate);
+    let mngo_buyback_price = cm!(mngo_oracle_price * bonus_factor);
     // mngo is exchanged at a discount
     let mut max_buyback_mngo = cm!(max_buyback / mngo_buyback_price);
-    // buyback is restricted to accounts token position
+    // buyback is restricted to account's token position
     max_buyback_mngo = max_buyback_mngo.min(account_mngo_native);
     max_buyback = cm!(max_buyback_mngo * mngo_buyback_price);
 
@@ -127,9 +127,9 @@ pub fn account_buyback_fees_with_mngo(
         );
     }
 
-    account.fixed.discount_buyback_fees_accrued = account
+    account.fixed.buyback_fees_accrued = account
         .fixed
-        .discount_buyback_fees_accrued
+        .buyback_fees_accrued
         .saturating_sub(max_buyback.ceil().to_num::<u64>());
     msg!(
         "bought back {} native fees with {} native mngo",
