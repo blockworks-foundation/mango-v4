@@ -9,13 +9,7 @@ import { toNativeI80F48, toUiDecimals, toUiDecimalsForQuote } from '../utils';
 import { Bank, TokenIndex } from './bank';
 import { Group } from './group';
 import { HealthCache } from './healthCache';
-import {
-  BookSide,
-  PerpMarket,
-  PerpMarketIndex,
-  PerpOrder,
-  PerpOrderSide,
-} from './perp';
+import { PerpMarket, PerpMarketIndex, PerpOrder, PerpOrderSide } from './perp';
 import { MarketIndex, Serum3Side } from './serum3';
 export class MangoAccount {
   public name: string;
@@ -1280,6 +1274,30 @@ export class PerpPosition {
       useEventQueue
         ? this.basePositionLots.add(this.takerBaseLots)
         : this.basePositionLots,
+    );
+  }
+
+  public getQuotePositionUi(
+    perpMarket: PerpMarket,
+    useEventQueue?: boolean,
+  ): number {
+    if (perpMarket.perpMarketIndex !== this.marketIndex) {
+      throw new Error("PerpPosition doesn't belong to the given market!");
+    }
+
+    const quotePositionUi = toUiDecimalsForQuote(this.quotePositionNative);
+
+    return useEventQueue
+      ? quotePositionUi + perpMarket.quoteLotsToUi(this.takerQuoteLots)
+      : quotePositionUi;
+  }
+
+  public getNotionalValueUi(
+    perpMarket: PerpMarket,
+    useEventQueue?: boolean,
+  ): number {
+    return (
+      this.getBasePositionUi(perpMarket, useEventQueue) * perpMarket.uiPrice
     );
   }
 
