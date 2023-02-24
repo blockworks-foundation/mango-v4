@@ -51,9 +51,10 @@ pub fn account_buyback_fees_with_mngo(
     }
 
     // if mngo token position has borrows, skip buyback
-    let (account_mngo_token_position, account_mngo_raw_token_index, _) =
-        account.ensure_token_position(mngo_bank.token_index)?;
-    let account_mngo_native = account_mngo_token_position.native(&mngo_bank);
+    let account_mngo_native = account
+        .token_position(mngo_bank.token_index)
+        .map(|tp| tp.native(&mngo_bank))
+        .unwrap_or(I80F48::ZERO);
     if account_mngo_native <= I80F48::ZERO {
         msg!(
             "account mngo token position ({} native mngo) is <= 0, nothing will be bought back",
@@ -61,6 +62,8 @@ pub fn account_buyback_fees_with_mngo(
         );
         return Ok(());
     }
+    let (account_mngo_token_position, account_mngo_raw_token_index, _) =
+        account.ensure_token_position(mngo_bank.token_index)?;
 
     // compute max mngo to swap for fees
     let mngo_oracle_price = mngo_bank.oracle_price(
