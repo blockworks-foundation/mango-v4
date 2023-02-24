@@ -438,10 +438,10 @@ pub(crate) fn liquidation_action(
 
             // Update the accounts' perp_spot_transfer statistics.
             let transfer_i64 = token_transfer.round_to_zero().to_num::<i64>();
-            (liqor_perp_position.perp_spot_transfers -= transfer_i64);
-            (liqee_perp_position.perp_spot_transfers += transfer_i64);
-            (liqor.fixed.perp_spot_transfers -= transfer_i64);
-            (liqee.fixed.perp_spot_transfers += transfer_i64);
+            liqor_perp_position.perp_spot_transfers -= transfer_i64;
+            liqee_perp_position.perp_spot_transfers += transfer_i64;
+            liqor.fixed.perp_spot_transfers -= transfer_i64;
+            liqee.fixed.perp_spot_transfers += transfer_i64;
 
             // Transfer token balance
             let liqor_token_position = liqor.token_position_mut(settle_token_index)?.0;

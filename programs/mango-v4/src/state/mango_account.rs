@@ -779,7 +779,7 @@ impl<
                 perp_position.market_index = perp_market_index;
 
                 let mut settle_token_position = self.ensure_token_position(settle_token_index)?.0;
-                (settle_token_position.in_use_count += 1);
+                settle_token_position.in_use_count += 1;
             }
         }
         if let Some(raw_index) = raw_index_opt {
@@ -797,7 +797,7 @@ impl<
         self.perp_position_mut(perp_market_index)?.market_index = PerpMarketIndex::MAX;
 
         let mut settle_token_position = self.token_position_mut(settle_token_index)?.0;
-        (settle_token_position.in_use_count -= 1);
+        settle_token_position.in_use_count -= 1;
 
         Ok(())
     }
@@ -825,7 +825,7 @@ impl<
         perp_position.market_index = PerpMarketIndex::MAX;
 
         let mut settle_token_position = self.token_position_mut(settle_token_index)?.0;
-        (settle_token_position.in_use_count -= 1);
+        settle_token_position.in_use_count -= 1;
 
         Ok(())
     }
@@ -841,10 +841,10 @@ impl<
         let mut perp_account = self.perp_position_mut(perp_market_index)?;
         match side {
             Side::Bid => {
-                (perp_account.bids_base_lots += order.quantity);
+                perp_account.bids_base_lots += order.quantity;
             }
             Side::Ask => {
-                (perp_account.asks_base_lots += order.quantity);
+                perp_account.asks_base_lots += order.quantity;
             }
         };
         let slot = order.owner_slot as usize;
@@ -868,10 +868,10 @@ impl<
             // accounting
             match order_side {
                 Side::Bid => {
-                    (perp_account.bids_base_lots -= quantity);
+                    perp_account.bids_base_lots -= quantity;
                 }
                 Side::Ask => {
-                    (perp_account.asks_base_lots -= quantity);
+                    perp_account.asks_base_lots -= quantity;
                 }
             }
         }
@@ -901,17 +901,17 @@ impl<
         pa.record_trading_fee(fees);
         pa.record_trade(perp_market, base_change, quote);
 
-        (pa.maker_volume += quote.abs().to_num::<u64>());
+        pa.maker_volume += quote.abs().to_num::<u64>();
 
         if fill.maker_out() {
             self.remove_perp_order(fill.maker_slot as usize, base_change.abs())
         } else {
             match side {
                 Side::Bid => {
-                    (pa.bids_base_lots -= base_change.abs());
+                    pa.bids_base_lots -= base_change.abs();
                 }
                 Side::Ask => {
-                    (pa.asks_base_lots -= base_change.abs());
+                    pa.asks_base_lots -= base_change.abs();
                 }
             }
             Ok(())
@@ -934,7 +934,7 @@ impl<
             I80F48::from(perp_market.quote_lot_size) * I80F48::from(quote_change);
         pa.record_trade(perp_market, base_change, quote_change_native);
 
-        (pa.taker_volume += quote_change_native.abs().to_num::<u64>());
+        pa.taker_volume += quote_change_native.abs().to_num::<u64>();
 
         Ok(())
     }

@@ -295,19 +295,19 @@ impl PerpPosition {
     pub fn add_taker_trade(&mut self, side: Side, base_lots: i64, quote_lots: i64) {
         match side {
             Side::Bid => {
-                (self.taker_base_lots += base_lots);
-                (self.taker_quote_lots -= quote_lots);
+                self.taker_base_lots += base_lots;
+                self.taker_quote_lots -= quote_lots;
             }
             Side::Ask => {
-                (self.taker_base_lots -= base_lots);
-                (self.taker_quote_lots += quote_lots);
+                self.taker_base_lots -= base_lots;
+                self.taker_quote_lots += quote_lots;
             }
         }
     }
     /// Remove taker trade after it has been processed on EventQueue
     pub fn remove_taker_trade(&mut self, base_change: i64, quote_change: i64) {
-        (self.taker_base_lots -= base_change);
-        (self.taker_quote_lots -= quote_change);
+        self.taker_base_lots -= base_change;
+        self.taker_quote_lots -= quote_change;
     }
 
     pub fn is_active(&self) -> bool {
@@ -361,9 +361,9 @@ impl PerpPosition {
     /// Move unrealized funding payments into the quote_position
     pub fn settle_funding(&mut self, perp_market: &PerpMarket) {
         let funding = self.unsettled_funding(perp_market);
-        (self.quote_position_native -= funding);
-        (self.realized_other_pnl_native -= funding);
-        (self.realized_pnl_for_position_native -= funding);
+        self.quote_position_native -= funding;
+        self.realized_other_pnl_native -= funding;
+        self.realized_pnl_for_position_native -= funding;
 
         if self.base_position_lots.is_positive() {
             self.cumulative_long_funding += funding.to_num::<f64>();
@@ -419,7 +419,7 @@ impl PerpPosition {
 
             // Award realized pnl based on the old_position size
             newly_realized_pnl = I80F48::from_num(old_position * (new_avg_entry - old_avg_entry));
-            (self.realized_trade_pnl_native += newly_realized_pnl);
+            self.realized_trade_pnl_native += newly_realized_pnl;
 
             // Set entry and break-even based on the new_position entered
             self.avg_entry_price_per_base_lot = new_avg_entry;
@@ -448,8 +448,8 @@ impl PerpPosition {
                 reduced_lots = base_change;
                 let avg_entry = I80F48::from_num(self.avg_entry_price_per_base_lot);
                 newly_realized_pnl = quote_change_native + I80F48::from(base_change) * avg_entry;
-                (self.realized_trade_pnl_native += newly_realized_pnl);
-                (self.realized_pnl_for_position_native += newly_realized_pnl);
+                self.realized_trade_pnl_native += newly_realized_pnl;
+                self.realized_pnl_for_position_native += newly_realized_pnl;
             }
         }
 
@@ -483,7 +483,7 @@ impl PerpPosition {
                     .floor()
                     .clamp_to_i64()
             };
-            (self.settle_pnl_limit_realized_trade += limit_change);
+            self.settle_pnl_limit_realized_trade += limit_change;
         }
 
         // Ensure the realized limit doesn't exceed the realized pnl
@@ -551,7 +551,7 @@ impl PerpPosition {
             limit_change.max(realized_pnl_change).min(0)
         };
 
-        (self.settle_pnl_limit_settled_in_current_window_native += used_change);
+        self.settle_pnl_limit_settled_in_current_window_native += used_change;
     }
 
     /// Change the base and quote positions as the result of a trade
@@ -568,7 +568,7 @@ impl PerpPosition {
     }
 
     fn change_quote_position(&mut self, quote_change_native: I80F48) {
-        (self.quote_position_native += quote_change_native);
+        self.quote_position_native += quote_change_native;
     }
 
     /// Does the user have any orders on the book?
@@ -719,7 +719,7 @@ impl PerpPosition {
                 .max(self.realized_other_pnl_native)
                 .min(I80F48::ZERO)
         };
-        (self.realized_other_pnl_native -= other_reduction);
+        self.realized_other_pnl_native -= other_reduction;
         let trade_and_unrealized_settlement = settled_pnl - other_reduction;
 
         // Then reduces realized_trade_pnl, similar to other_pnl above.
@@ -732,14 +732,14 @@ impl PerpPosition {
                 .max(self.realized_trade_pnl_native)
                 .min(I80F48::ZERO)
         };
-        (self.realized_trade_pnl_native -= trade_reduction);
+        self.realized_trade_pnl_native -= trade_reduction;
 
         // Consume settle limit budget: We don't track consumption of realized_other_pnl
         // because settling it directly reduces its budget as well.
         let settled_pnl_i64 = trade_and_unrealized_settlement
             .round_to_zero()
             .clamp_to_i64();
-        (self.settle_pnl_limit_settled_in_current_window_native += settled_pnl_i64);
+        self.settle_pnl_limit_settled_in_current_window_native += settled_pnl_i64;
 
         self.apply_realized_trade_pnl_settle_limit_constraint(-trade_reduction)
     }
@@ -747,20 +747,20 @@ impl PerpPosition {
     /// Update perp position for a maker/taker fee payment
     pub fn record_trading_fee(&mut self, fee: I80F48) {
         self.change_quote_position(-fee);
-        (self.realized_other_pnl_native -= fee);
-        (self.realized_pnl_for_position_native -= fee);
+        self.realized_other_pnl_native -= fee;
+        self.realized_pnl_for_position_native -= fee;
     }
 
     /// Adds immediately-settleable realized pnl when a liqor takes over pnl during liquidation
     pub fn record_liquidation_quote_change(&mut self, change: I80F48) {
         self.change_quote_position(change);
-        (self.realized_other_pnl_native += change);
+        self.realized_other_pnl_native += change;
     }
 
     /// Adds to the quote position and adds a recurring ("realized trade") settle limit
     pub fn record_liquidation_pnl_takeover(&mut self, change: I80F48, recurring_limit: I80F48) {
         self.change_quote_position(change);
-        (self.realized_trade_pnl_native += recurring_limit);
+        self.realized_trade_pnl_native += recurring_limit;
     }
 }
 

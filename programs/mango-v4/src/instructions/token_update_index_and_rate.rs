@@ -62,8 +62,8 @@ pub fn token_update_index_and_rate(ctx: Context<TokenUpdateIndexAndRate>) -> Res
     let mut indexed_total_borrows = I80F48::ZERO;
     for ai in ctx.remaining_accounts.iter() {
         let bank = ai.load::<Bank>()?;
-        (indexed_total_deposits += bank.indexed_deposits);
-        (indexed_total_borrows += bank.indexed_borrows);
+        indexed_total_deposits += bank.indexed_deposits;
+        indexed_total_borrows += bank.indexed_borrows;
     }
 
     // compute and set latest index and average utilization on each bank
@@ -76,7 +76,7 @@ pub fn token_update_index_and_rate(ctx: Context<TokenUpdateIndexAndRate>) -> Res
         let (deposit_index, borrow_index, borrow_fees, borrow_rate, deposit_rate) =
             some_bank.compute_index(indexed_total_deposits, indexed_total_borrows, diff_ts)?;
 
-        (some_bank.collected_fees_native += borrow_fees);
+        some_bank.collected_fees_native += borrow_fees;
 
         let new_avg_utilization = some_bank.compute_new_avg_utilization(
             indexed_total_deposits,

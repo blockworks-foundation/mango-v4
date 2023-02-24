@@ -271,7 +271,7 @@ pub fn flash_loan_end<'key, 'accounts, 'remaining, 'info>(
             token::transfer(transfer_ctx, repay)?;
 
             let repay = I80F48::from(repay);
-            (change += repay);
+            change += repay;
         }
 
         changes.push(TokenVaultChange {
@@ -339,7 +339,7 @@ pub fn flash_loan_end<'key, 'accounts, 'remaining, 'info>(
         };
 
         let loan_origination_fee = loan * bank.loan_origination_fee_rate;
-        (bank.collected_fees_native += loan_origination_fee);
+        bank.collected_fees_native += loan_origination_fee;
 
         let change_amount = change.amount - loan_origination_fee;
         let native_after_change = native + change_amount;

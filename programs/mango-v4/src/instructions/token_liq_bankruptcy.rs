@@ -200,7 +200,7 @@ pub fn token_liq_bankruptcy(
         let mut indexed_total_deposits = I80F48::ZERO;
         for bank_ai in bank_ais.iter() {
             let bank = bank_ai.load::<Bank>()?;
-            (indexed_total_deposits += bank.indexed_deposits);
+            indexed_total_deposits += bank.indexed_deposits;
         }
 
         // This is the solution to:
@@ -223,7 +223,7 @@ pub fn token_liq_bankruptcy(
                 // could bring the total position slightly above zero otherwise
                 liqee_liab_active =
                     bank.deposit_with_dusting(liqee_liab, amount_for_bank, now_ts)?;
-                (amount_to_credit -= amount_for_bank);
+                amount_to_credit -= amount_for_bank;
                 if amount_to_credit <= 0 {
                     break;
                 }

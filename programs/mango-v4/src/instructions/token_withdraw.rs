@@ -102,7 +102,7 @@ pub fn token_withdraw(ctx: Context<TokenWithdraw>, amount: u64, allow_borrow: bo
 
     // Update the net deposits - adjust by price so different tokens are on the same basis (in USD terms)
     let amount_usd = (amount_i80f48 * oracle_price).to_num::<i64>();
-    (account.fixed.net_deposits -= amount_usd);
+    account.fixed.net_deposits -= amount_usd;
 
     //
     // Health check

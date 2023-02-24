@@ -184,7 +184,7 @@ impl Serum3Info {
                 } else if max_balance.is_negative() {
                     (I80F48::ZERO, market_reserved)
                 } else {
-                    (max_balance, (market_reserved - max_balance))
+                    (max_balance, market_reserved - max_balance)
                 };
 
                 let asset_weight = token_info.asset_weight(health_type);
@@ -353,7 +353,7 @@ impl HealthCache {
     pub fn health(&self, health_type: HealthType) -> I80F48 {
         let mut health = I80F48::ZERO;
         let sum = |contrib| {
-            (health += contrib);
+            health += contrib;
         };
         self.health_sum(health_type, sum);
         health
@@ -366,9 +366,9 @@ impl HealthCache {
         let mut liabs = I80F48::ZERO;
         let sum = |contrib| {
             if contrib > 0 {
-                (assets += contrib);
+                assets += contrib;
             } else {
-                (liabs -= contrib);
+                liabs -= contrib;
             }
         };
         self.health_sum(health_type, sum);
@@ -425,7 +425,7 @@ impl HealthCache {
         // We need to make sure that if balance is before * price, then change = -before
         // brings it to exactly zero.
         let removed_contribution = -change;
-        (entry.balance_native -= removed_contribution);
+        entry.balance_native -= removed_contribution;
         Ok(())
     }
 
@@ -450,11 +450,11 @@ impl HealthCache {
         // Apply it to the tokens
         {
             let base_entry = &mut self.token_infos[base_entry_index];
-            (base_entry.balance_native += free_base_change);
+            base_entry.balance_native += free_base_change;
         }
         {
             let quote_entry = &mut self.token_infos[quote_entry_index];
-            (quote_entry.balance_native += free_quote_change);
+            quote_entry.balance_native += free_quote_change;
         }
 
         // Apply it to the serum3 info
@@ -463,8 +463,8 @@ impl HealthCache {
             .iter_mut()
             .find(|m| m.market_index == market_index)
             .ok_or_else(|| error_msg!("serum3 market {} not found", market_index))?;
-        (market_entry.reserved_base += reserved_base_change);
-        (market_entry.reserved_quote += reserved_quote_change);
+        market_entry.reserved_base += reserved_base_change;
+        market_entry.reserved_quote += reserved_quote_change;
         Ok(())
     }
 
@@ -668,7 +668,7 @@ impl HealthCache {
         let mut health = I80F48::ZERO;
         for token_info in self.token_infos.iter() {
             let contrib = token_info.health_contribution(health_type);
-            (health += contrib);
+            health += contrib;
         }
 
         let (token_max_reserved, serum3_reserved) = self.compute_serum3_reservations(health_type);
@@ -679,12 +679,12 @@ impl HealthCache {
                 &token_max_reserved,
                 reserved,
             );
-            (health += contrib);
+            health += contrib;
         }
 
         for perp_info in self.perp_infos.iter() {
             let positive_contrib = perp_info.health_contribution(health_type).max(I80F48::ZERO);
-            (health += positive_contrib);
+            health += positive_contrib;
         }
         health
     }
@@ -749,9 +749,9 @@ pub fn new_health_cache(
         let base_free = I80F48::from(oo.native_coin_free);
         let quote_free = I80F48::from(oo.native_pc_free + oo.referrer_rebates_accrued);
         let base_info = &mut token_infos[base_index];
-        (base_info.balance_native += base_free);
+        base_info.balance_native += base_free;
         let quote_info = &mut token_infos[quote_index];
-        (quote_info.balance_native += quote_free);
+        quote_info.balance_native += quote_free;
 
         // track the reserved amounts
         let reserved_base = I80F48::from(oo.native_coin_total - oo.native_coin_free);
@@ -801,7 +801,6 @@ mod tests {
     use super::*;
     use crate::state::*;
     use serum_dex::state::OpenOrders;
-    use std::str::FromStr;
 
     #[test]
     fn test_precision() {

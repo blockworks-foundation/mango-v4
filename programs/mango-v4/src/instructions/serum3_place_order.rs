@@ -292,14 +292,14 @@ pub struct OODifference {
 impl OODifference {
     pub fn new(before_oo: &OpenOrdersSlim, after_oo: &OpenOrdersSlim) -> Self {
         Self {
-            reserved_base_change: (I80F48::from(after_oo.native_base_reserved())
-                - I80F48::from(before_oo.native_base_reserved())),
-            reserved_quote_change: (I80F48::from(after_oo.native_quote_reserved())
-                - I80F48::from(before_oo.native_quote_reserved())),
-            free_base_change: (I80F48::from(after_oo.native_base_free())
-                - I80F48::from(before_oo.native_base_free())),
-            free_quote_change: (I80F48::from(after_oo.native_quote_free())
-                - I80F48::from(before_oo.native_quote_free())),
+            reserved_base_change: I80F48::from(after_oo.native_base_reserved())
+                - I80F48::from(before_oo.native_base_reserved()),
+            reserved_quote_change: I80F48::from(after_oo.native_quote_reserved())
+                - I80F48::from(before_oo.native_quote_reserved()),
+            free_base_change: I80F48::from(after_oo.native_base_free())
+                - I80F48::from(before_oo.native_base_free()),
+            free_quote_change: I80F48::from(after_oo.native_quote_free())
+                - I80F48::from(before_oo.native_quote_free()),
         }
     }
 
@@ -428,7 +428,7 @@ pub fn apply_settle_changes(
     let received_fees = before_oo
         .native_rebates()
         .saturating_sub(after_oo.native_rebates());
-    (quote_bank.collected_fees_native += I80F48::from(received_fees));
+    quote_bank.collected_fees_native += I80F48::from(received_fees);
 
     // Don't count the referrer rebate fees as part of the vault change that should be
     // credited to the user.

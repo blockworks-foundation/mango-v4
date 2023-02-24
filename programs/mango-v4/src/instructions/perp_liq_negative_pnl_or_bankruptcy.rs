@@ -113,10 +113,10 @@ pub fn perp_liq_negative_pnl_or_bankruptcy(
 
             // Update the accounts' perp_spot_transfer statistics.
             let settlement_i64 = settlement.round_to_zero().to_num::<i64>();
-            (liqor_perp_position.perp_spot_transfers += settlement_i64);
-            (liqee_perp_position.perp_spot_transfers -= settlement_i64);
-            (liqor.fixed.perp_spot_transfers += settlement_i64);
-            (liqee.fixed.perp_spot_transfers -= settlement_i64);
+            liqor_perp_position.perp_spot_transfers += settlement_i64;
+            liqee_perp_position.perp_spot_transfers -= settlement_i64;
+            liqor.fixed.perp_spot_transfers += settlement_i64;
+            liqee.fixed.perp_spot_transfers -= settlement_i64;
 
             // Transfer token balance
             let liqor_token_position = liqor.token_position_mut(settle_token_index)?.0;

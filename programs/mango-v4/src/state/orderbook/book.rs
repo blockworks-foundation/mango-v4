@@ -123,8 +123,8 @@ impl<'a> Orderbook<'a> {
                 .min(max_match_by_quote);
 
             let match_quote_lots = match_base_lots * best_opposing_price;
-            (remaining_base_lots -= match_base_lots);
-            (remaining_quote_lots -= match_quote_lots);
+            remaining_base_lots -= match_base_lots;
+            remaining_quote_lots -= match_quote_lots;
             assert!(remaining_quote_lots >= 0);
 
             let new_best_opposing_quantity = best_opposing.node.quantity - match_base_lots;
@@ -363,12 +363,12 @@ fn apply_fees(
 
     // The maker fees apply to the maker's account only when the fill event is consumed.
     perp_position.record_trading_fee(taker_fees);
-    (perp_position.taker_volume += taker_fees.to_num::<u64>());
+    perp_position.taker_volume += taker_fees.to_num::<u64>();
 
     // Accrue maker fees immediately: they can be negative and applying them later
     // risks that fees_accrued is settled to 0 before they apply. It going negative
     // breaks assumptions.
-    (market.fees_accrued += taker_fees + maker_fees);
+    market.fees_accrued += taker_fees + maker_fees;
 
     Ok(())
 }
@@ -377,6 +377,6 @@ fn apply_fees(
 fn apply_penalty(market: &mut PerpMarket, perp_position: &mut PerpPosition) -> Result<()> {
     let fee_penalty = I80F48::from_num(market.fee_penalty);
     perp_position.record_trading_fee(fee_penalty);
-    (market.fees_accrued += fee_penalty);
+    market.fees_accrued += fee_penalty;
     Ok(())
 }

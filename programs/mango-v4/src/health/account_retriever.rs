@@ -72,8 +72,8 @@ pub fn new_fixed_order_account_retriever<'a, 'info>(
         ais: AccountInfoRef::borrow_slice(ais)?,
         n_banks: active_token_len,
         n_perps: active_perp_len,
-        begin_perp: (active_token_len * 2),
-        begin_serum3: (active_token_len * 2 + active_perp_len * 2),
+        begin_perp: active_token_len * 2,
+        begin_serum3: active_token_len * 2 + active_perp_len * 2,
         staleness_slot: Some(Clock::get()?.slot),
     })
 }

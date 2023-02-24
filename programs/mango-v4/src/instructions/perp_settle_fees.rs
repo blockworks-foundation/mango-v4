@@ -64,7 +64,7 @@ pub fn perp_settle_fees(ctx: Context<PerpSettleFees>, max_settle_amount: u64) ->
     require!(settlement >= 0, MangoError::SettlementAmountMustBePositive);
 
     perp_position.record_settle(-settlement); // settle the negative pnl on the user perp position
-    perp_market.fees_accrued = perp_market.fees_accrued - settlement;
+    perp_market.fees_accrued -= settlement;
 
     emit_perp_balances(
         ctx.accounts.group.key(),
@@ -82,8 +82,8 @@ pub fn perp_settle_fees(ctx: Context<PerpSettleFees>, max_settle_amount: u64) ->
         MangoError::SettlementAmountMustBePositive
     );
 
-    (perp_position.perp_spot_transfers -= settlement_i64);
-    (account.fixed.perp_spot_transfers -= settlement_i64);
+    perp_position.perp_spot_transfers -= settlement_i64;
+    account.fixed.perp_spot_transfers -= settlement_i64;
 
     // Transfer token balances
     let token_position = account
@@ -96,7 +96,7 @@ pub fn perp_settle_fees(ctx: Context<PerpSettleFees>, max_settle_amount: u64) ->
         oracle_price,
     )?;
     // Update the settled balance on the market itself
-    perp_market.fees_settled = perp_market.fees_settled + settlement;
+    perp_market.fees_settled += settlement;
 
     emit!(TokenBalanceLog {
         mango_group: ctx.accounts.group.key(),
