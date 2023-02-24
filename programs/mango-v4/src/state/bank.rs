@@ -3,21 +3,20 @@ use crate::accounts_zerocopy::KeyedAccountReader;
 use crate::error::*;
 use crate::state::{oracle, StablePriceModel};
 use crate::util;
-use crate::util::checked_math as cm;
+
 use anchor_lang::prelude::*;
 use anchor_spl::token::TokenAccount;
 use derivative::Derivative;
 use fixed::types::I80F48;
-use fixed_macro::types::I80F48;
 use static_assertions::const_assert_eq;
 
 use std::mem::size_of;
 
 pub const HOUR: i64 = 3600;
 pub const DAY: i64 = 86400;
-pub const DAY_I80F48: I80F48 = I80F48!(86400);
-pub const YEAR_I80F48: I80F48 = I80F48!(31536000);
-pub const MINIMUM_MAX_RATE: I80F48 = I80F48!(0.5);
+pub const DAY_I80F48: I80F48 = I80F48::lit("86_400");
+pub const YEAR_I80F48: I80F48 = I80F48::lit("31_536_000");
+pub const MINIMUM_MAX_RATE: I80F48 = I80F48::lit("0.5");
 
 #[derive(Derivative)]
 #[derivative(Debug)]
@@ -235,12 +234,12 @@ impl Bank {
 
     #[inline(always)]
     pub fn native_borrows(&self) -> I80F48 {
-        cm!(self.borrow_index * self.indexed_borrows)
+        self.borrow_index * self.indexed_borrows
     }
 
     #[inline(always)]
     pub fn native_deposits(&self) -> I80F48 {
-        cm!(self.deposit_index * self.indexed_deposits)
+        self.deposit_index * self.indexed_deposits
     }
 
     /// Prevent borrowing away the full bank vault.
@@ -253,7 +252,7 @@ impl Bank {
 
         let bank_native_deposits = self.native_deposits();
         if bank_native_deposits != I80F48::ZERO {
-            let bank_native_deposits: f64 = bank_native_deposits.checked_to_num().unwrap();
+            let bank_native_deposits: f64 = bank_native_deposits.to_num();
             if vault_amount < self.min_vault_to_deposits_ratio * bank_native_deposits {
                 return err!(MangoError::BankBorrowLimitReached).with_context(|| {
                 format!(
@@ -328,34 +327,34 @@ impl Bank {
         // (native / index) * index == native, because we sometimes call this function with
         // values that are products of index.
         let div_rounding_up = |native: I80F48, index: I80F48| {
-            let indexed = cm!(native / index);
-            if cm!(indexed * index) < native {
-                cm!(indexed + I80F48::DELTA)
+            let indexed = native / index;
+            if (indexed * index) < native {
+                indexed + I80F48::DELTA
             } else {
                 indexed
             }
         };
 
         if native_position.is_negative() {
-            let new_native_position = cm!(native_position + native_amount);
+            let new_native_position = native_position + native_amount;
             let indexed_change = div_rounding_up(native_amount, self.borrow_index);
             // this is only correct if it's not positive, because it scales the whole amount by borrow_index
-            let new_indexed_value = cm!(position.indexed_position + indexed_change);
+            let new_indexed_value = position.indexed_position + indexed_change;
             if new_indexed_value.is_negative() {
                 // pay back borrows only, leaving a negative position
-                cm!(self.indexed_borrows -= indexed_change);
+                self.indexed_borrows -= indexed_change;
                 position.indexed_position = new_indexed_value;
                 return Ok(true);
             } else if new_native_position < I80F48::ONE && allow_dusting {
                 // if there's less than one token deposited, zero the position
-                cm!(self.dust += new_native_position);
-                cm!(self.indexed_borrows += position.indexed_position);
+                self.dust += new_native_position;
+                self.indexed_borrows += position.indexed_position;
                 position.indexed_position = I80F48::ZERO;
                 return Ok(false);
             }
 
             // pay back all borrows
-            cm!(self.indexed_borrows += position.indexed_position); // position.value is negative
+            self.indexed_borrows += position.indexed_position; // position.value is negative
             position.indexed_position = I80F48::ZERO;
             // deposit the rest
             // note: .max(0) because there's a scenario where new_indexed_value == 0 and new_native_position < 0
@@ -364,8 +363,8 @@ impl Bank {
 
         // add to deposits
         let indexed_change = div_rounding_up(native_amount, self.deposit_index);
-        cm!(self.indexed_deposits += indexed_change);
-        cm!(position.indexed_position += indexed_change);
+        self.indexed_deposits += indexed_change;
+        position.indexed_position += indexed_change;
 
         Ok(true)
     }
@@ -480,26 +479,26 @@ impl Bank {
         let native_position = position.native(self);
 
         if native_position.is_positive() {
-            let new_native_position = cm!(native_position - native_amount);
+            let new_native_position = native_position - native_amount;
             if !new_native_position.is_negative() {
                 // withdraw deposits only
                 if new_native_position < I80F48::ONE && allow_dusting {
                     // zero the account collecting the leftovers in `dust`
-                    cm!(self.dust += new_native_position);
-                    cm!(self.indexed_deposits -= position.indexed_position);
+                    self.dust += new_native_position;
+                    self.indexed_deposits -= position.indexed_position;
                     position.indexed_position = I80F48::ZERO;
                     return Ok((false, I80F48::ZERO));
                 } else {
                     // withdraw some deposits leaving a positive balance
-                    let indexed_change = cm!(native_amount / self.deposit_index);
-                    cm!(self.indexed_deposits -= indexed_change);
-                    cm!(position.indexed_position -= indexed_change);
+                    let indexed_change = native_amount / self.deposit_index;
+                    self.indexed_deposits -= indexed_change;
+                    position.indexed_position -= indexed_change;
                     return Ok((true, I80F48::ZERO));
                 }
             }
 
             // withdraw all deposits
-            cm!(self.indexed_deposits -= position.indexed_position);
+            self.indexed_deposits -= position.indexed_position;
             position.indexed_position = I80F48::ZERO;
             // borrow the rest
             native_amount = -new_native_position;
@@ -507,15 +506,15 @@ impl Bank {
 
         let mut loan_origination_fee = I80F48::ZERO;
         if with_loan_origination_fee {
-            loan_origination_fee = cm!(self.loan_origination_fee_rate * native_amount);
-            cm!(self.collected_fees_native += loan_origination_fee);
-            cm!(native_amount += loan_origination_fee);
+            loan_origination_fee = self.loan_origination_fee_rate * native_amount;
+            self.collected_fees_native += loan_origination_fee;
+            native_amount += loan_origination_fee;
         }
 
         // add to borrows
-        let indexed_change = cm!(native_amount / self.borrow_index);
-        cm!(self.indexed_borrows += indexed_change);
-        cm!(position.indexed_position -= indexed_change);
+        let indexed_change = native_amount / self.borrow_index;
+        self.indexed_borrows += indexed_change;
+        position.indexed_position -= indexed_change;
 
         // net borrows requires updating in only this case, since other branches of the method deal with
         // withdraws and not borrows
@@ -534,9 +533,8 @@ impl Bank {
         already_borrowed_native_amount: I80F48,
         now_ts: u64,
     ) -> Result<(bool, I80F48)> {
-        let loan_origination_fee =
-            cm!(self.loan_origination_fee_rate * already_borrowed_native_amount);
-        cm!(self.collected_fees_native += loan_origination_fee);
+        let loan_origination_fee = self.loan_origination_fee_rate * already_borrowed_native_amount;
+        self.collected_fees_native += loan_origination_fee;
 
         let (position_is_active, _) = self.withdraw_internal_wrapper(
             position,
@@ -591,9 +589,9 @@ impl Bank {
             // reset to latest window
             self.last_net_borrows_window_start_ts = now_ts / self.net_borrow_limit_window_size_ts
                 * self.net_borrow_limit_window_size_ts;
-            native_amount.checked_to_num::<i64>().unwrap()
+            native_amount.to_num::<i64>()
         } else {
-            cm!(self.net_borrows_in_window + native_amount.checked_to_num().unwrap())
+            self.net_borrows_in_window + native_amount.to_num::<i64>()
         };
     }
 
@@ -623,14 +621,14 @@ impl Bank {
         opening_indexed_position: I80F48,
     ) {
         if opening_indexed_position.is_positive() {
-            let interest =
-                cm!((self.deposit_index - position.previous_index) * opening_indexed_position)
-                    .to_num::<f64>();
+            let interest = ((self.deposit_index - position.previous_index)
+                * opening_indexed_position)
+                .to_num::<f64>();
             position.cumulative_deposit_interest += interest;
         } else {
-            let interest =
-                cm!((self.borrow_index - position.previous_index) * opening_indexed_position)
-                    .to_num::<f64>();
+            let interest = ((self.borrow_index - position.previous_index)
+                * opening_indexed_position)
+                .to_num::<f64>();
             position.cumulative_borrow_interest -= interest;
         }
 
@@ -648,14 +646,14 @@ impl Bank {
         diff_ts: I80F48,
     ) -> Result<(I80F48, I80F48, I80F48, I80F48, I80F48)> {
         // compute index based on utilization
-        let native_total_deposits = cm!(self.deposit_index * indexed_total_deposits);
-        let native_total_borrows = cm!(self.borrow_index * indexed_total_borrows);
+        let native_total_deposits = self.deposit_index * indexed_total_deposits;
+        let native_total_borrows = self.borrow_index * indexed_total_borrows;
 
         // This will be >= 0, but can also be > 1
         let instantaneous_utilization = if native_total_deposits == I80F48::ZERO {
             I80F48::ZERO
         } else {
-            cm!(native_total_borrows / native_total_deposits)
+            native_total_borrows / native_total_deposits
         };
 
         let borrow_rate = self.compute_interest_rate(instantaneous_utilization);
@@ -670,17 +668,16 @@ impl Bank {
         // we have
         //   deposit_rate = borrow_rate * (old_borrow_index * indexed_borrows) / (old_deposit_index * indexed_deposits)
         // and the latter factor is exactly instantaneous_utilization.
-        let deposit_rate = cm!(borrow_rate * instantaneous_utilization);
+        let deposit_rate = borrow_rate * instantaneous_utilization;
 
         // The loan fee rate is not distributed to depositors.
-        let borrow_rate_with_fees = cm!(borrow_rate + self.loan_fee_rate);
-        let borrow_fees = cm!(native_total_borrows * self.loan_fee_rate * diff_ts / YEAR_I80F48);
+        let borrow_rate_with_fees = borrow_rate + self.loan_fee_rate;
+        let borrow_fees = native_total_borrows * self.loan_fee_rate * diff_ts / YEAR_I80F48;
 
-        let borrow_index = cm!(
-            (self.borrow_index * borrow_rate_with_fees * diff_ts) / YEAR_I80F48 + self.borrow_index
-        );
+        let borrow_index =
+            (self.borrow_index * borrow_rate_with_fees * diff_ts) / YEAR_I80F48 + self.borrow_index;
         let deposit_index =
-            cm!((self.deposit_index * deposit_rate * diff_ts) / YEAR_I80F48 + self.deposit_index);
+            (self.deposit_index * deposit_rate * diff_ts) / YEAR_I80F48 + self.deposit_index;
 
         Ok((
             deposit_index,
@@ -716,16 +713,16 @@ impl Bank {
         max_rate: I80F48,
     ) -> I80F48 {
         if utilization <= util0 {
-            let slope = cm!(rate0 / util0);
-            cm!(slope * utilization)
+            let slope = rate0 / util0;
+            slope * utilization
         } else if utilization <= util1 {
-            let extra_util = cm!(utilization - util0);
-            let slope = cm!((rate1 - rate0) / (util1 - util0));
-            cm!(rate0 + slope * extra_util)
+            let extra_util = utilization - util0;
+            let slope = (rate1 - rate0) / (util1 - util0);
+            rate0 + slope * extra_util
         } else {
-            let extra_util = cm!(utilization - util1);
-            let slope = cm!((max_rate - rate1) / (I80F48::ONE - util1));
-            cm!(rate1 + slope * extra_util)
+            let extra_util = utilization - util1;
+            let slope = (max_rate - rate1) / (I80F48::ONE - util1);
+            rate1 + slope * extra_util
         }
     }
 
@@ -740,26 +737,24 @@ impl Bank {
             return I80F48::ZERO;
         }
 
-        let native_total_deposits = cm!(self.deposit_index * indexed_total_deposits);
-        let native_total_borrows = cm!(self.borrow_index * indexed_total_borrows);
+        let native_total_deposits = self.deposit_index * indexed_total_deposits;
+        let native_total_borrows = self.borrow_index * indexed_total_borrows;
         let instantaneous_utilization = if native_total_deposits == I80F48::ZERO {
             I80F48::ZERO
         } else {
-            cm!(native_total_borrows / native_total_deposits)
+            native_total_borrows / native_total_deposits
         };
 
         // Compute a time-weighted average since bank_rate_last_updated.
         let previous_avg_time =
-            I80F48::from_num(cm!(self.index_last_updated - self.bank_rate_last_updated));
-        let diff_ts = I80F48::from_num(cm!(now_ts - self.index_last_updated));
-        let new_avg_time = I80F48::from_num(cm!(now_ts - self.bank_rate_last_updated));
+            I80F48::from_num(self.index_last_updated - self.bank_rate_last_updated);
+        let diff_ts = I80F48::from_num(now_ts - self.index_last_updated);
+        let new_avg_time = I80F48::from_num(now_ts - self.bank_rate_last_updated);
         if new_avg_time <= 0 {
             return instantaneous_utilization;
         }
-        cm!(
-            (self.avg_utilization * previous_avg_time + instantaneous_utilization * diff_ts)
-                / new_avg_time
-        )
+        (self.avg_utilization * previous_avg_time + instantaneous_utilization * diff_ts)
+            / new_avg_time
     }
 
     // computes new optimal rates and max rate
@@ -772,21 +767,21 @@ impl Bank {
         // move rates up when utilization is above optimal utilization, and vice versa
         // util factor is between -1 (avg util = 0) and +1 (avg util = 100%)
         let util_factor = if avg_util > optimal_util {
-            cm!((avg_util - optimal_util) / (I80F48::ONE - optimal_util))
+            (avg_util - optimal_util) / (I80F48::ONE - optimal_util)
         } else {
-            cm!((avg_util - optimal_util) / optimal_util)
+            (avg_util - optimal_util) / optimal_util
         };
-        let adjustment = cm!(I80F48::ONE + self.adjustment_factor * util_factor);
+        let adjustment = I80F48::ONE + self.adjustment_factor * util_factor;
 
         // 1. irrespective of which leg current utilization is in, update all rates
         // 2. only update rates as long as new adjusted rates are above MINIMUM_MAX_RATE,
         //  since we don't want to fall to such low rates that it would take a long time to
         //  recover to high rates if utilization suddently increases to a high value
-        if cm!(self.max_rate * adjustment) > MINIMUM_MAX_RATE {
+        if (self.max_rate * adjustment) > MINIMUM_MAX_RATE {
             (
-                cm!(self.rate0 * adjustment),
-                cm!(self.rate1 * adjustment),
-                cm!(self.max_rate * adjustment),
+                (self.rate0 * adjustment),
+                (self.rate1 * adjustment),
+                (self.max_rate * adjustment),
             )
         } else {
             (self.rate0, self.rate1, self.max_rate)
@@ -828,7 +823,7 @@ impl Bank {
         } else {
             // The next line is around 500 CU
             let scale = self.deposit_weight_scale_start_quote / deposits_quote;
-            cm!(self.init_asset_weight * I80F48::from_num(scale))
+            self.init_asset_weight * I80F48::from_num(scale)
         }
     }
 
@@ -848,7 +843,7 @@ impl Bank {
         } else {
             // The next line is around 500 CU
             let scale = borrows_quote / self.borrow_weight_scale_start_quote;
-            cm!(self.init_liab_weight * I80F48::from_num(scale))
+            self.init_liab_weight * I80F48::from_num(scale)
         }
     }
 }

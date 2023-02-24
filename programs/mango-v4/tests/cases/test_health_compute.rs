@@ -37,7 +37,7 @@ async fn test_health_compute_tokens() -> Result<(), TransportError> {
 #[tokio::test]
 async fn test_health_compute_serum() -> Result<(), TransportError> {
     let mut test_builder = TestContextBuilder::new();
-    test_builder.test().set_compute_max_units(80_000);
+    test_builder.test().set_compute_max_units(90_000);
     let context = test_builder.start_default().await;
     let solana = &context.solana.clone();
 
@@ -148,7 +148,7 @@ async fn test_health_compute_serum() -> Result<(), TransportError> {
     }
 
     // TODO: actual explicit CU comparisons.
-    // On 2023-2-5 the final deposit costs 78587 CU and each new market increases it by roughly 5900 CU
+    // On 2023-2-23 the final deposit costs 81141 CU and each new market increases it by roughly 6184 CU
 
     Ok(())
 }

@@ -1280,6 +1280,30 @@ export class PerpPosition {
     );
   }
 
+  public getQuotePositionUi(
+    perpMarket: PerpMarket,
+    useEventQueue?: boolean,
+  ): number {
+    if (perpMarket.perpMarketIndex !== this.marketIndex) {
+      throw new Error("PerpPosition doesn't belong to the given market!");
+    }
+
+    const quotePositionUi = toUiDecimalsForQuote(this.quotePositionNative);
+
+    return useEventQueue
+      ? quotePositionUi + perpMarket.quoteLotsToUi(this.takerQuoteLots)
+      : quotePositionUi;
+  }
+
+  public getNotionalValueUi(
+    perpMarket: PerpMarket,
+    useEventQueue?: boolean,
+  ): number {
+    return (
+      this.getBasePositionUi(perpMarket, useEventQueue) * perpMarket.uiPrice
+    );
+  }
+
   public getUnsettledFunding(perpMarket: PerpMarket): I80F48 {
     if (perpMarket.perpMarketIndex !== this.marketIndex) {
       throw new Error("PerpPosition doesn't belong to the given market!");

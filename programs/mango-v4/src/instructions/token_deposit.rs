@@ -8,7 +8,6 @@ use crate::accounts_zerocopy::AccountInfoRef;
 use crate::error::*;
 use crate::health::*;
 use crate::state::*;
-use crate::util::checked_math as cm;
 
 use crate::accounts_ix::*;
 use crate::logs::{DepositLog, TokenBalanceLog};
@@ -94,8 +93,8 @@ impl<'a, 'info> DepositCommon<'a, 'info> {
         )?;
 
         // Update the net deposits - adjust by price so different tokens are on the same basis (in USD terms)
-        let amount_usd = cm!(amount_i80f48 * oracle_price).to_num::<i64>();
-        cm!(account.fixed.net_deposits += amount_usd);
+        let amount_usd = (amount_i80f48 * oracle_price).to_num::<i64>();
+        account.fixed.net_deposits += amount_usd;
 
         emit!(TokenBalanceLog {
             mango_group: self.group.key(),
@@ -135,8 +134,7 @@ impl<'a, 'info> DepositCommon<'a, 'info> {
                 .health_assets_and_liabs(HealthType::Init)
                 .0
                 .round_to_zero()
-                .checked_to_num::<u64>()
-                .unwrap();
+                .to_num::<u64>();
             require_msg_typed!(
                 assets <= group.deposit_limit_quote,
                 MangoError::DepositLimit,
