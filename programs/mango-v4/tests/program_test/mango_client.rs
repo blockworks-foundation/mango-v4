@@ -1535,10 +1535,10 @@ impl ClientInstruction for GroupEditFeeParameters {
     ) -> (Self::Accounts, instruction::Instruction) {
         let program_id = mango_v4::id();
         let instruction = Self::Instruction {
-            fees_pay_with_mngo_opt: Some(true),
-            fees_mngo_bonus_factor_opt: Some(self.fees_mngo_bonus_factor),
-            fees_swap_mango_account_opt: Some(self.fees_swap_mango_account),
-            fees_mngo_token_index_opt: Some(self.fees_mngo_token_index),
+            buyback_fees_opt: Some(true),
+            buyback_fees_bonus_factor_opt: Some(self.fees_mngo_bonus_factor),
+            buyback_fees_swap_mango_account_opt: Some(self.fees_swap_mango_account),
+            mngo_token_index_opt: Some(self.fees_mngo_token_index),
             ..group_edit_instruction_default()
         };
 

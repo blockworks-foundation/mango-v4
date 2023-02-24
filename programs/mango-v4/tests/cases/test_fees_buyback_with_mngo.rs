@@ -180,7 +180,7 @@ async fn test_fees_buyback_with_mngo() -> Result<(), TransportError> {
     let mngo_token_position_after =
         mango_account_1.tokens[1].native(&solana.get_account::<Bank>(tokens[1].bank).await);
 
-    assert_eq!(before_fees_accrued - after_fees_accrued, 20);
+    assert_eq!(before_fees_accrued - after_fees_accrued, 19);
 
     // token[1] swapped at discount for token[0]
     assert!(
