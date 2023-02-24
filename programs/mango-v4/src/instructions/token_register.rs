@@ -1,6 +1,5 @@
 use anchor_lang::prelude::*;
 use fixed::types::I80F48;
-use fixed_macro::types::I80F48;
 
 use crate::accounts_zerocopy::AccountInfoRef;
 use crate::error::*;
@@ -9,7 +8,7 @@ use crate::util::fill_from_str;
 
 use crate::logs::TokenMetaDataLog;
 
-pub const INDEX_START: I80F48 = I80F48!(1_000_000);
+pub const INDEX_START: I80F48 = I80F48::lit("1_000_000");
 
 use crate::accounts_ix::*;
 

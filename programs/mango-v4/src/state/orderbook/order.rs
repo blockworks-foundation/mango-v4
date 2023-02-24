@@ -1,7 +1,6 @@
 use anchor_lang::prelude::*;
 
 use super::*;
-use crate::util::checked_math as cm;
 
 /// Perp order parameters
 pub struct Order {
@@ -138,7 +137,7 @@ impl Order {
                 order_type,
                 ..
             } => {
-                let price_lots = cm!(oracle_price_lots + price_offset_lots);
+                let price_lots = oracle_price_lots + price_offset_lots;
                 self.price_for_order_type(
                     now_ts,
                     oracle_price_lots,
@@ -150,7 +149,7 @@ impl Order {
         };
         let price_data = match self.params {
             OrderParams::OraclePegged { .. } => {
-                oracle_pegged_price_data(cm!(price_lots - oracle_price_lots))
+                oracle_pegged_price_data(price_lots - oracle_price_lots)
             }
             _ => fixed_price_data(price_lots)?,
         };
@@ -179,7 +178,7 @@ fn market_order_limit_for_side(side: Side) -> i64 {
 /// the best opposing order
 fn post_only_slide_limit(side: Side, best_other_side: i64, limit: i64) -> i64 {
     match side {
-        Side::Bid => limit.min(cm!(best_other_side - 1)),
-        Side::Ask => limit.max(cm!(best_other_side + 1)),
+        Side::Bid => limit.min(best_other_side - 1),
+        Side::Ask => limit.max(best_other_side + 1),
     }
 }

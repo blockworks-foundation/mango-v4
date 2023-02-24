@@ -11,7 +11,6 @@ use crate::accounts_zerocopy::*;
 use crate::error::*;
 use crate::serum3_cpi;
 use crate::state::{Bank, MangoAccountRef, PerpMarket, PerpMarketIndex, TokenIndex};
-use crate::util::checked_math as cm;
 
 /// This trait abstracts how to find accounts needed for the health computation.
 ///
@@ -64,17 +63,17 @@ pub fn new_fixed_order_account_retriever<'a, 'info>(
     let active_token_len = account.active_token_positions().count();
     let active_serum3_len = account.active_serum3_orders().count();
     let active_perp_len = account.active_perp_positions().count();
-    let expected_ais = cm!(active_token_len * 2 // banks + oracles
+    let expected_ais = active_token_len * 2 // banks + oracles
         + active_perp_len * 2 // PerpMarkets + Oracles
-        + active_serum3_len); // open_orders
+        + active_serum3_len; // open_orders
     require_eq!(ais.len(), expected_ais);
 
     Ok(FixedOrderAccountRetriever {
         ais: AccountInfoRef::borrow_slice(ais)?,
         n_banks: active_token_len,
         n_perps: active_perp_len,
-        begin_perp: cm!(active_token_len * 2),
-        begin_serum3: cm!(active_token_len * 2 + active_perp_len * 2),
+        begin_perp: active_token_len * 2,
+        begin_serum3: active_token_len * 2 + active_perp_len * 2,
         staleness_slot: Some(Clock::get()?.slot),
     })
 }
@@ -130,7 +129,7 @@ impl<T: KeyedAccountReader> AccountRetriever for FixedOrderAccountRetriever<T> {
                 )
             })?;
 
-        let oracle_index = cm!(self.n_banks + active_token_position_index);
+        let oracle_index = self.n_banks + active_token_position_index;
         let oracle_price = self.oracle_price_bank(oracle_index, bank).with_context(|| {
             format!(
                 "getting oracle for bank with health account index {} and token index {}, passed account {}",
@@ -149,7 +148,7 @@ impl<T: KeyedAccountReader> AccountRetriever for FixedOrderAccountRetriever<T> {
         active_perp_position_index: usize,
         perp_market_index: PerpMarketIndex,
     ) -> Result<(&PerpMarket, I80F48)> {
-        let perp_index = cm!(self.begin_perp + active_perp_position_index);
+        let perp_index = self.begin_perp + active_perp_position_index;
         let perp_market = self
             .perp_market(group, perp_index, perp_market_index)
             .with_context(|| {
@@ -161,7 +160,7 @@ impl<T: KeyedAccountReader> AccountRetriever for FixedOrderAccountRetriever<T> {
                 )
             })?;
 
-        let oracle_index = cm!(perp_index + self.n_perps);
+        let oracle_index = perp_index + self.n_perps;
         let oracle_price = self.oracle_price_perp(oracle_index, perp_market).with_context(|| {
             format!(
                 "getting oracle for perp market with health account index {} and perp market index {}, passed account {}",
@@ -174,7 +173,7 @@ impl<T: KeyedAccountReader> AccountRetriever for FixedOrderAccountRetriever<T> {
     }
 
     fn serum_oo(&self, active_serum_oo_index: usize, key: &Pubkey) -> Result<&OpenOrders> {
-        let serum_oo_index = cm!(self.begin_serum3 + active_serum_oo_index);
+        let serum_oo_index = self.begin_serum3 + active_serum_oo_index;
         let ai = &self.ais[serum_oo_index];
         (|| {
             require_keys_eq!(*key, *ai.key());

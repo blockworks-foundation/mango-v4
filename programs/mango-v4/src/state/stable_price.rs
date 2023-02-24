@@ -1,4 +1,3 @@
-use crate::util::checked_math as cm;
 use anchor_lang::prelude::*;
 use derivative::Derivative;
 use static_assertions::const_assert_eq;
@@ -123,7 +122,7 @@ impl StablePriceModel {
         //
         // Update delay price
         //
-        cm!(self.delay_accumulator_time += dt as u32);
+        self.delay_accumulator_time += dt as u32;
         self.delay_accumulator_price += oracle_price * dt_limited;
 
         let delay_interval_index = self.delay_interval_index(now_ts);

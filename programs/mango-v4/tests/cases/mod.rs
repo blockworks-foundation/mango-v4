@@ -1,6 +1,5 @@
 pub use anchor_lang::prelude::Pubkey;
 pub use fixed::types::I80F48;
-pub use fixed_macro::types::I80F48;
 pub use solana_program_test::*;
 pub use solana_sdk::transport::TransportError;
 

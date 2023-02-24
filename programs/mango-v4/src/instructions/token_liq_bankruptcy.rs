@@ -6,7 +6,6 @@ use crate::accounts_zerocopy::*;
 use crate::error::*;
 use crate::health::*;
 use crate::state::*;
-use crate::util::checked_math as cm;
 
 use crate::accounts_ix::*;
 use crate::logs::{
@@ -64,9 +63,9 @@ pub fn token_liq_bankruptcy(
     let liab_fee_factor = if liab_token_index == QUOTE_TOKEN_INDEX {
         I80F48::ONE
     } else {
-        cm!(I80F48::ONE + liab_bank.liquidation_fee)
+        I80F48::ONE + liab_bank.liquidation_fee
     };
-    let liab_price_adjusted = cm!(liab_oracle_price * liab_fee_factor);
+    let liab_price_adjusted = liab_oracle_price * liab_fee_factor;
 
     let liab_transfer_unrounded = remaining_liab_loss.min(max_liab_transfer);
 
@@ -76,11 +75,9 @@ pub fn token_liq_bankruptcy(
         0
     };
 
-    let insurance_transfer = cm!(liab_transfer_unrounded * liab_price_adjusted)
-        .checked_ceil()
-        .unwrap()
-        .checked_to_num::<u64>()
-        .unwrap()
+    let insurance_transfer = (liab_transfer_unrounded * liab_price_adjusted)
+        .ceil()
+        .to_num::<u64>()
         .min(insurance_vault_amount);
 
     let insurance_fund_exhausted = insurance_transfer == insurance_vault_amount;
@@ -90,7 +87,7 @@ pub fn token_liq_bankruptcy(
     // AUDIT: v3 does this, but it seems bad, because it can make liab_transfer
     // exceed max_liab_transfer due to the ceil() above! Otoh, not doing it would allow
     // liquidators to exploit the insurance fund for 1 native token each call.
-    let liab_transfer = cm!(insurance_transfer_i80f48 / liab_price_adjusted);
+    let liab_transfer = insurance_transfer_i80f48 / liab_price_adjusted;
 
     let now_ts: u64 = Clock::get()?.unix_timestamp.try_into().unwrap();
 
@@ -203,15 +200,14 @@ pub fn token_liq_bankruptcy(
         let mut indexed_total_deposits = I80F48::ZERO;
         for bank_ai in bank_ais.iter() {
             let bank = bank_ai.load::<Bank>()?;
-            cm!(indexed_total_deposits += bank.indexed_deposits);
+            indexed_total_deposits += bank.indexed_deposits;
         }
 
         // This is the solution to:
         //   total_indexed_deposits * (deposit_index - new_deposit_index) = remaining_liab_loss
         // AUDIT: Could it happen that remaining_liab_loss > total_indexed_deposits * deposit_index?
         //        Probably not.
-        let new_deposit_index =
-            cm!(liab_deposit_index - remaining_liab_loss / indexed_total_deposits);
+        let new_deposit_index = liab_deposit_index - remaining_liab_loss / indexed_total_deposits;
         liab_deposit_index = new_deposit_index;
         socialized_loss = remaining_liab_loss;
 
@@ -227,7 +223,7 @@ pub fn token_liq_bankruptcy(
                 // could bring the total position slightly above zero otherwise
                 liqee_liab_active =
                     bank.deposit_with_dusting(liqee_liab, amount_for_bank, now_ts)?;
-                cm!(amount_to_credit -= amount_for_bank);
+                amount_to_credit -= amount_for_bank;
                 if amount_to_credit <= 0 {
                     break;
                 }
@@ -250,8 +246,7 @@ pub fn token_liq_bankruptcy(
 
     let liab_bank = bank_ais[0].load::<Bank>()?;
     let end_liab_native = liqee_liab.native(&liab_bank);
-    liqee_health_cache
-        .adjust_token_balance(&liab_bank, cm!(end_liab_native - initial_liab_native))?;
+    liqee_health_cache.adjust_token_balance(&liab_bank, end_liab_native - initial_liab_native)?;
 
     // Check liqee health again
     let liqee_liq_end_health = liqee_health_cache.health(HealthType::LiquidationEnd);

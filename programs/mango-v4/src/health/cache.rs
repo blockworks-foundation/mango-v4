@@ -6,7 +6,6 @@ use crate::error::*;
 use crate::state::{
     Bank, MangoAccountRef, PerpMarket, PerpMarketIndex, PerpPosition, Serum3MarketIndex, TokenIndex,
 };
-use crate::util::checked_math as cm;
 
 use super::*;
 
@@ -132,7 +131,7 @@ impl TokenInfo {
                 self.prices.asset(health_type),
             )
         };
-        cm!(self.balance_native * price * weight)
+        self.balance_native * price * weight
     }
 }
 
@@ -175,7 +174,7 @@ impl Serum3Info {
             |token_info: &TokenInfo, token_max_reserved: I80F48, market_reserved: I80F48| {
                 // This balance includes all possible reserved funds from markets that relate to the
                 // token, including this market itself: `market_reserved` is already included in `token_max_reserved`.
-                let max_balance = cm!(token_info.balance_native + token_max_reserved);
+                let max_balance = token_info.balance_native + token_max_reserved;
 
                 // For simplicity, we assume that `market_reserved` was added to `max_balance` last
                 // (it underestimates health because that gives the smallest effects): how much did
@@ -185,14 +184,14 @@ impl Serum3Info {
                 } else if max_balance.is_negative() {
                     (I80F48::ZERO, market_reserved)
                 } else {
-                    (max_balance, cm!(market_reserved - max_balance))
+                    (max_balance, market_reserved - max_balance)
                 };
 
                 let asset_weight = token_info.asset_weight(health_type);
                 let liab_weight = token_info.liab_weight(health_type);
                 let asset_price = token_info.prices.asset(health_type);
                 let liab_price = token_info.prices.liab(health_type);
-                cm!(asset_part * asset_weight * asset_price + liab_part * liab_weight * liab_price)
+                asset_part * asset_weight * asset_price + liab_part * liab_weight * liab_price
             };
 
         let health_base = compute_health_effect(
@@ -239,14 +238,11 @@ pub struct PerpInfo {
 
 impl PerpInfo {
     fn new(perp_position: &PerpPosition, perp_market: &PerpMarket, prices: Prices) -> Result<Self> {
-        let base_lots = cm!(perp_position.base_position_lots() + perp_position.taker_base_lots);
+        let base_lots = perp_position.base_position_lots() + perp_position.taker_base_lots;
 
         let unsettled_funding = perp_position.unsettled_funding(perp_market);
-        let taker_quote = I80F48::from(cm!(
-            perp_position.taker_quote_lots * perp_market.quote_lot_size
-        ));
-        let quote_current =
-            cm!(perp_position.quote_position_native() - unsettled_funding + taker_quote);
+        let taker_quote = I80F48::from(perp_position.taker_quote_lots * perp_market.quote_lot_size);
+        let quote_current = perp_position.quote_position_native() - unsettled_funding + taker_quote;
 
         Ok(Self {
             perp_market_index: perp_market.perp_market_index,
@@ -299,7 +295,7 @@ impl PerpInfo {
                 HealthType::Maint => self.maint_overall_asset_weight,
             };
 
-            cm!(asset_weight * unweighted)
+            asset_weight * unweighted
         } else {
             unweighted
         }
@@ -309,7 +305,7 @@ impl PerpInfo {
     pub fn unweighted_health_contribution(&self, health_type: HealthType) -> I80F48 {
         let order_execution_case = |orders_base_lots: i64, order_price: I80F48| {
             let net_base_native =
-                I80F48::from(cm!((self.base_lots + orders_base_lots) * self.base_lot_size));
+                I80F48::from((self.base_lots + orders_base_lots) * self.base_lot_size);
             let weight = match (health_type, net_base_native.is_negative()) {
                 (HealthType::Init, true) | (HealthType::LiquidationEnd, true) => {
                     self.init_base_liab_weight
@@ -327,13 +323,13 @@ impl PerpInfo {
             };
 
             // Total value of the order-execution adjusted base position
-            let base_health = cm!(net_base_native * weight * base_price);
+            let base_health = net_base_native * weight * base_price;
 
-            let orders_base_native = I80F48::from(cm!(orders_base_lots * self.base_lot_size));
+            let orders_base_native = I80F48::from(orders_base_lots * self.base_lot_size);
             // The quote change from executing the bids/asks
-            let order_quote = cm!(-orders_base_native * order_price);
+            let order_quote = -orders_base_native * order_price;
 
-            cm!(base_health + order_quote)
+            base_health + order_quote
         };
 
         // What is worse: Executing all bids at oracle_price.liab, or executing all asks at oracle_price.asset?
@@ -341,7 +337,7 @@ impl PerpInfo {
         let asks_case = order_execution_case(-self.asks_base_lots, self.prices.asset(health_type));
         let worst_case = bids_case.min(asks_case);
 
-        cm!(self.quote + worst_case)
+        self.quote + worst_case
     }
 }
 
@@ -357,7 +353,7 @@ impl HealthCache {
     pub fn health(&self, health_type: HealthType) -> I80F48 {
         let mut health = I80F48::ZERO;
         let sum = |contrib| {
-            cm!(health += contrib);
+            health += contrib;
         };
         self.health_sum(health_type, sum);
         health
@@ -370,9 +366,9 @@ impl HealthCache {
         let mut liabs = I80F48::ZERO;
         let sum = |contrib| {
             if contrib > 0 {
-                cm!(assets += contrib);
+                assets += contrib;
             } else {
-                cm!(liabs -= contrib);
+                liabs -= contrib;
             }
         };
         self.health_sum(health_type, sum);
@@ -429,7 +425,7 @@ impl HealthCache {
         // We need to make sure that if balance is before * price, then change = -before
         // brings it to exactly zero.
         let removed_contribution = -change;
-        cm!(entry.balance_native -= removed_contribution);
+        entry.balance_native -= removed_contribution;
         Ok(())
     }
 
@@ -454,11 +450,11 @@ impl HealthCache {
         // Apply it to the tokens
         {
             let base_entry = &mut self.token_infos[base_entry_index];
-            cm!(base_entry.balance_native += free_base_change);
+            base_entry.balance_native += free_base_change;
         }
         {
             let quote_entry = &mut self.token_infos[quote_entry_index];
-            cm!(quote_entry.balance_native += free_quote_change);
+            quote_entry.balance_native += free_quote_change;
         }
 
         // Apply it to the serum3 info
@@ -467,8 +463,8 @@ impl HealthCache {
             .iter_mut()
             .find(|m| m.market_index == market_index)
             .ok_or_else(|| error_msg!("serum3 market {} not found", market_index))?;
-        cm!(market_entry.reserved_base += reserved_base_change);
-        cm!(market_entry.reserved_quote += reserved_quote_change);
+        market_entry.reserved_base += reserved_base_change;
+        market_entry.reserved_quote += reserved_quote_change;
         Ok(())
     }
 
@@ -613,21 +609,17 @@ impl HealthCache {
             let quote_asset = quote.prices.asset(health_type);
             let base_liab = base.prices.liab(health_type);
             // OPTIMIZATION: These divisions can be extremely expensive (up to 5k CU each)
-            let all_reserved_as_base =
-                cm!(reserved_base + reserved_quote * quote_asset / base_liab);
+            let all_reserved_as_base = reserved_base + reserved_quote * quote_asset / base_liab;
 
             let base_asset = base.prices.asset(health_type);
             let quote_liab = quote.prices.liab(health_type);
-            let all_reserved_as_quote =
-                cm!(reserved_quote + reserved_base * base_asset / quote_liab);
+            let all_reserved_as_quote = reserved_quote + reserved_base * base_asset / quote_liab;
 
             let base_max_reserved = &mut token_max_reserved[info.base_index];
-            // note: cm!() does not work with mutable references
-            *base_max_reserved = base_max_reserved.checked_add(all_reserved_as_base).unwrap();
+            // note: () does not work with mutable references
+            *base_max_reserved += all_reserved_as_base;
             let quote_max_reserved = &mut token_max_reserved[info.quote_index];
-            *quote_max_reserved = quote_max_reserved
-                .checked_add(all_reserved_as_quote)
-                .unwrap();
+            *quote_max_reserved += all_reserved_as_quote;
 
             serum3_reserved.push(Serum3Reserved {
                 all_reserved_as_base,
@@ -676,7 +668,7 @@ impl HealthCache {
         let mut health = I80F48::ZERO;
         for token_info in self.token_infos.iter() {
             let contrib = token_info.health_contribution(health_type);
-            cm!(health += contrib);
+            health += contrib;
         }
 
         let (token_max_reserved, serum3_reserved) = self.compute_serum3_reservations(health_type);
@@ -687,12 +679,12 @@ impl HealthCache {
                 &token_max_reserved,
                 reserved,
             );
-            cm!(health += contrib);
+            health += contrib;
         }
 
         for perp_info in self.perp_infos.iter() {
             let positive_contrib = perp_info.health_contribution(health_type).max(I80F48::ZERO);
-            cm!(health += positive_contrib);
+            health += positive_contrib;
         }
         health
     }
@@ -755,15 +747,15 @@ pub fn new_health_cache(
 
         // add the amounts that are freely settleable immediately to token balances
         let base_free = I80F48::from(oo.native_coin_free);
-        let quote_free = I80F48::from(cm!(oo.native_pc_free + oo.referrer_rebates_accrued));
+        let quote_free = I80F48::from(oo.native_pc_free + oo.referrer_rebates_accrued);
         let base_info = &mut token_infos[base_index];
-        cm!(base_info.balance_native += base_free);
+        base_info.balance_native += base_free;
         let quote_info = &mut token_infos[quote_index];
-        cm!(quote_info.balance_native += quote_free);
+        quote_info.balance_native += quote_free;
 
         // track the reserved amounts
-        let reserved_base = I80F48::from(cm!(oo.native_coin_total - oo.native_coin_free));
-        let reserved_quote = I80F48::from(cm!(oo.native_pc_total - oo.native_pc_free));
+        let reserved_base = I80F48::from(oo.native_coin_total - oo.native_coin_free);
+        let reserved_quote = I80F48::from(oo.native_pc_total - oo.native_pc_free);
 
         serum3_infos.push(Serum3Info {
             reserved_base,
@@ -809,7 +801,6 @@ mod tests {
     use super::*;
     use crate::state::*;
     use serum_dex::state::OpenOrders;
-    use std::str::FromStr;
 
     #[test]
     fn test_precision() {

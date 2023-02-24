@@ -10,7 +10,7 @@ use crate::{
 };
 use anchor_lang::solana_program::sysvar::instructions as tx_instructions;
 use anchor_lang::Discriminator;
-use checked_math as cm;
+
 use fixed::types::I80F48;
 
 pub mod compute_budget {
@@ -62,8 +62,8 @@ pub fn token_update_index_and_rate(ctx: Context<TokenUpdateIndexAndRate>) -> Res
     let mut indexed_total_borrows = I80F48::ZERO;
     for ai in ctx.remaining_accounts.iter() {
         let bank = ai.load::<Bank>()?;
-        cm!(indexed_total_deposits += bank.indexed_deposits);
-        cm!(indexed_total_borrows += bank.indexed_borrows);
+        indexed_total_deposits += bank.indexed_deposits;
+        indexed_total_borrows += bank.indexed_borrows;
     }
 
     // compute and set latest index and average utilization on each bank
@@ -71,12 +71,12 @@ pub fn token_update_index_and_rate(ctx: Context<TokenUpdateIndexAndRate>) -> Res
     {
         let mut some_bank = ctx.remaining_accounts[0].load_mut::<Bank>()?;
 
-        let diff_ts = I80F48::from_num(cm!(now_ts - some_bank.index_last_updated));
+        let diff_ts = I80F48::from_num(now_ts - some_bank.index_last_updated);
 
         let (deposit_index, borrow_index, borrow_fees, borrow_rate, deposit_rate) =
             some_bank.compute_index(indexed_total_deposits, indexed_total_borrows, diff_ts)?;
 
-        cm!(some_bank.collected_fees_native += borrow_fees);
+        some_bank.collected_fees_native += borrow_fees;
 
         let new_avg_utilization = some_bank.compute_new_avg_utilization(
             indexed_total_deposits,
@@ -104,8 +104,8 @@ pub fn token_update_index_and_rate(ctx: Context<TokenUpdateIndexAndRate>) -> Res
             stable_price: some_bank.stable_price().to_bits(),
             collected_fees: some_bank.collected_fees_native.to_bits(),
             loan_fee_rate: some_bank.loan_fee_rate.to_bits(),
-            total_deposits: cm!(deposit_index * indexed_total_deposits).to_bits(),
-            total_borrows: cm!(borrow_index * indexed_total_borrows).to_bits(),
+            total_deposits: (deposit_index * indexed_total_deposits).to_bits(),
+            total_borrows: (borrow_index * indexed_total_borrows).to_bits(),
             borrow_rate: borrow_rate.to_bits(),
             deposit_rate: deposit_rate.to_bits(),
         });
