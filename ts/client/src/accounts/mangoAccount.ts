@@ -1292,8 +1292,13 @@ export class PerpPosition {
       : quotePositionUi;
   }
 
-  public getNotionalValueUi(perpMarket: PerpMarket): number {
-    return this.getBasePositionUi(perpMarket, true) * perpMarket.uiPrice;
+  public getNotionalValueUi(
+    perpMarket: PerpMarket,
+    useEventQueue?: boolean,
+  ): number {
+    return (
+      this.getBasePositionUi(perpMarket, useEventQueue) * perpMarket.uiPrice
+    );
   }
 
   public getUnsettledFunding(perpMarket: PerpMarket): I80F48 {
