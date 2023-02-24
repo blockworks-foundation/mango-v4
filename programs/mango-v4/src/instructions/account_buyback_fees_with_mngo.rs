@@ -43,7 +43,7 @@ pub fn account_buyback_fees_with_mngo(
         I80F48::from_num::<u64>(max_buyback.min(account.fixed.buyback_fees_accrued))
             .min(dao_fees_native)
     };
-    if max_buyback == I80F48::ZERO {
+    if max_buyback <= I80F48::ZERO {
         msg!(
             "nothing to buyback, (buyback_fees_accrued {})",
             account.fixed.buyback_fees_accrued
@@ -102,13 +102,7 @@ pub fn account_buyback_fees_with_mngo(
     let (dao_fees_token_position, dao_fees_raw_token_index, _) =
         dao_account.ensure_token_position(fees_bank.token_index)?;
     let dao_fees_native = dao_fees_token_position.native(&fees_bank);
-    if dao_fees_native.is_negative() || dao_fees_native < max_buyback {
-        msg!(
-            "dao fees token position ({} native fees) is lesser than max buyback {}, nothing will be bought back",
-            dao_fees_native, max_buyback
-        );
-        return Ok(());
-    }
+    assert!(dao_fees_native >= max_buyback);
     let in_use = fees_bank.withdraw_without_fee(
         dao_fees_token_position,
         max_buyback,
@@ -149,7 +143,7 @@ pub fn account_buyback_fees_with_mngo(
         MangoError::SomeError
     );
     require_eq!(
-        dao_account.active_perp_positions().count(),
+        dao_account.active_serum3_orders().count(),
         0,
         MangoError::SomeError
     );
