@@ -6,7 +6,7 @@ use anchor_lang::prelude::*;
 pub struct AccountBuybackFeesWithMngo<'info> {
     #[account(
         constraint = group.load()?.is_ix_enabled(IxGate::AccountBuybackFeesWithMngo) @ MangoError::IxIsDisabled,
-        constraint = group.load()?.buback_fees() @ MangoError::SomeError
+        constraint = group.load()?.buyback_fees() @ MangoError::SomeError
     )]
     pub group: AccountLoader<'info, Group>,
 

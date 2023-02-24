@@ -899,9 +899,6 @@ impl<
         perp_market: &mut PerpMarket,
         fill: &FillEvent,
     ) -> Result<()> {
-        let pa = self.perp_position_mut(perp_market_index)?;
-        pa.settle_funding(perp_market);
-
         let side = fill.taker_side().invert_side();
         let (base_change, quote_change) = fill.base_quote_change(side);
         let quote = cm!(I80F48::from(perp_market.quote_lot_size) * I80F48::from(quote_change));
@@ -910,6 +907,7 @@ impl<
             self.fixed_mut().buyback_fees_accrued += fees.floor().to_num::<u64>();
         }
         let pa = self.perp_position_mut(perp_market_index)?;
+        pa.settle_funding(perp_market);
         pa.record_trading_fee(fees);
         pa.record_trade(perp_market, base_change, quote);
 

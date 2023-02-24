@@ -37,8 +37,12 @@ pub fn account_buyback_fees_with_mngo(
     let now_ts = Clock::get()?.unix_timestamp.try_into().unwrap();
 
     // quick return if nothing to buyback
-    let mut max_buyback =
-        I80F48::from_num::<u64>(max_buyback.min(account.fixed.buyback_fees_accrued));
+    let mut max_buyback = {
+        let dao_fees_token_position = dao_account.ensure_token_position(fees_bank.token_index)?.0;
+        let dao_fees_native = dao_fees_token_position.native(&fees_bank);
+        I80F48::from_num::<u64>(max_buyback.min(account.fixed.buyback_fees_accrued))
+            .min(dao_fees_native)
+    };
     if max_buyback == I80F48::ZERO {
         msg!(
             "nothing to buyback, (buyback_fees_accrued {})",
@@ -74,6 +78,10 @@ pub fn account_buyback_fees_with_mngo(
     // move mngo from user to dao
     let (dao_mngo_token_position, dao_mngo_raw_token_index, _) =
         dao_account.ensure_token_position(mngo_bank.token_index)?;
+    require!(
+        dao_mngo_token_position.indexed_position >= I80F48::ZERO,
+        MangoError::SomeError
+    );
     let in_use = mngo_bank.withdraw_without_fee(
         account_mngo_token_position,
         max_buyback_mngo,
@@ -86,13 +94,7 @@ pub fn account_buyback_fees_with_mngo(
             ctx.accounts.account.key(),
         );
     }
-    let in_use = mngo_bank.deposit(dao_mngo_token_position, max_buyback_mngo, now_ts)?;
-    if !in_use {
-        dao_account.deactivate_token_position_and_log(
-            dao_mngo_raw_token_index,
-            ctx.accounts.dao_account.key(),
-        );
-    }
+    mngo_bank.deposit(dao_mngo_token_position, max_buyback_mngo, now_ts)?;
 
     // move fees from dao to user
     let (account_fees_token_position, account_fees_raw_token_index, _) =
