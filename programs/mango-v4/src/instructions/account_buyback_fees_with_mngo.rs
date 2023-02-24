@@ -1,5 +1,4 @@
 use anchor_lang::prelude::*;
-use checked_math as cm;
 use fixed::types::I80F48;
 
 use crate::accounts_zerocopy::*;
@@ -68,12 +67,12 @@ pub fn account_buyback_fees_with_mngo(
         &AccountInfoRef::borrow(&ctx.accounts.mngo_oracle.as_ref())?,
         Some(Clock::get()?.slot),
     )?;
-    let mngo_buyback_price = cm!(mngo_oracle_price * bonus_factor);
+    let mngo_buyback_price = mngo_oracle_price * bonus_factor;
     // mngo is exchanged at a discount
-    let mut max_buyback_mngo = cm!(max_buyback / mngo_buyback_price);
+    let mut max_buyback_mngo = max_buyback / mngo_buyback_price;
     // buyback is restricted to account's token position
     max_buyback_mngo = max_buyback_mngo.min(account_mngo_native);
-    max_buyback = cm!(max_buyback_mngo * mngo_buyback_price);
+    max_buyback = max_buyback_mngo * mngo_buyback_price;
 
     // move mngo from user to dao
     let (dao_mngo_token_position, dao_mngo_raw_token_index, _) =

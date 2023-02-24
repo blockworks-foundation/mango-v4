@@ -87,7 +87,7 @@ async fn test_fees_buyback_with_mngo() -> Result<(), TransportError> {
 
     let price_lots = {
         let perp_market = solana.get_account::<PerpMarket>(perp_market).await;
-        perp_market.native_price_to_lot(I80F48!(1))
+        perp_market.native_price_to_lot(I80F48::from(1))
     };
 
     //
