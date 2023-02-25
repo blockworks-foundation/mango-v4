@@ -1,4 +1,4 @@
-use crate::state::{MangoAccountRefMut, PerpPosition};
+use crate::state::MangoAccountRefMut;
 use crate::{
     error::*,
     state::{orderbook::bookside::*, EventQueue, PerpMarket},
@@ -58,15 +58,16 @@ impl<'a> Orderbook<'a> {
         let post_only = order.is_post_only();
         let mut post_target = order.post_target();
         let (price_lots, price_data) = order.price(now_ts, oracle_price_lots, self)?;
-        let perp_position = mango_account.perp_position_mut(market.perp_market_index)?;
 
         // generate new order id
         let order_id = market.gen_order_id(side, price_data);
 
         // IOC orders have a fee penalty applied regardless of match
         if order.needs_penalty_fee() {
-            apply_penalty(market, perp_position)?;
+            apply_penalty(market, mango_account)?;
         }
+
+        let perp_position = mango_account.perp_position_mut(market.perp_market_index)?;
 
         // Iterate through book and match against this new order.
         //
@@ -164,7 +165,7 @@ impl<'a> Orderbook<'a> {
         // realized when the fill event gets executed
         if total_quote_lots_taken > 0 || total_base_lots_taken > 0 {
             perp_position.add_taker_trade(side, total_base_lots_taken, total_quote_lots_taken);
-            apply_fees(market, perp_position, total_quote_lots_taken)?;
+            apply_fees(market, mango_account, total_quote_lots_taken)?;
         }
 
         // Apply changes to matched asks (handles invalidate on delete!)
@@ -350,7 +351,7 @@ impl<'a> Orderbook<'a> {
 /// both the maker and taker fees.
 fn apply_fees(
     market: &mut PerpMarket,
-    perp_position: &mut PerpPosition,
+    account: &mut MangoAccountRefMut,
     quote_lots: i64,
 ) -> Result<()> {
     let quote_native = I80F48::from_num(market.quote_lot_size * quote_lots);
@@ -362,6 +363,8 @@ fn apply_fees(
     require_gte!(taker_fees, 0);
 
     // The maker fees apply to the maker's account only when the fill event is consumed.
+    account.fixed.buyback_fees_accrued += taker_fees.floor().to_num::<u64>();
+    let perp_position = account.perp_position_mut(market.perp_market_index)?;
     perp_position.record_trading_fee(taker_fees);
     perp_position.taker_volume += taker_fees.to_num::<u64>();
 
@@ -374,8 +377,11 @@ fn apply_fees(
 }
 
 /// Applies a fixed penalty fee to the account, and update the market's fees_accrued
-fn apply_penalty(market: &mut PerpMarket, perp_position: &mut PerpPosition) -> Result<()> {
+fn apply_penalty(market: &mut PerpMarket, account: &mut MangoAccountRefMut) -> Result<()> {
     let fee_penalty = I80F48::from_num(market.fee_penalty);
+    account.fixed.buyback_fees_accrued += fee_penalty.floor().to_num::<u64>();
+
+    let perp_position = account.perp_position_mut(market.perp_market_index)?;
     perp_position.record_trading_fee(fee_penalty);
     market.fees_accrued += fee_penalty;
     Ok(())

@@ -475,7 +475,7 @@ export class MintInfo {
       obj.vaults,
       obj.oracle,
       obj.registrationTime,
-      obj.groupInsuranceFund,
+      obj.groupInsuranceFund == 1,
     );
   }
 
@@ -488,7 +488,7 @@ export class MintInfo {
     public vaults: PublicKey[],
     public oracle: PublicKey,
     public registrationTime: BN,
-    public groupInsuranceFund: number,
+    public groupInsuranceFund: boolean,
   ) {}
 
   public firstBank(): PublicKey {

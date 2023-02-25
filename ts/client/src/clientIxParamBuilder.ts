@@ -287,6 +287,8 @@ export function buildIxGate(p: IxGateParams): BN {
   toggleIx(ixGate, p, 'TokenRegisterTrustless', 45);
   toggleIx(ixGate, p, 'TokenUpdateIndexAndRate', 46);
   toggleIx(ixGate, p, 'TokenWithdraw', 47);
+  toggleIx(ixGate, p, 'AccountSettleFeesWithMngo', 48);
 
   return ixGate;
 }
+

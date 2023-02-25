@@ -144,6 +144,30 @@ export type MangoV4 = {
           "type": {
             "option": "u64"
           }
+        },
+        {
+          "name": "feesPayWithMngoOpt",
+          "type": {
+            "option": "bool"
+          }
+        },
+        {
+          "name": "feesMngoBonusFactorOpt",
+          "type": {
+            "option": "f32"
+          }
+        },
+        {
+          "name": "feesSwapMangoAccountOpt",
+          "type": {
+            "option": "publicKey"
+          }
+        },
+        {
+          "name": "feesMngoTokenIndexOpt",
+          "type": {
+            "option": "u16"
+          }
         }
       ]
     },
@@ -1091,6 +1115,57 @@ export type MangoV4 = {
         {
           "name": "forceClose",
           "type": "bool"
+        }
+      ]
+    },
+    {
+      "name": "accountBuybackFeesWithMngo",
+      "accounts": [
+        {
+          "name": "group",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "account",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "owner",
+          "isMut": false,
+          "isSigner": true
+        },
+        {
+          "name": "daoAccount",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "mngoBank",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "mngoOracle",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "feesBank",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "feesOracle",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "maxBuyback",
+          "type": "u64"
         }
       ]
     },
@@ -3948,11 +4023,15 @@ export type MangoV4 = {
             "type": "publicKey"
           },
           {
+            "name": "feesMngoTokenIndex",
+            "type": "u16"
+          },
+          {
             "name": "padding",
             "type": {
               "array": [
                 "u8",
-                4
+                2
               ]
             }
           },
@@ -3977,13 +4056,12 @@ export type MangoV4 = {
             "type": "u8"
           },
           {
-            "name": "padding2",
-            "type": {
-              "array": [
-                "u8",
-                5
-              ]
-            }
+            "name": "feesPayWithMngo",
+            "type": "u8"
+          },
+          {
+            "name": "feesMngoBonusFactor",
+            "type": "f32"
           },
           {
             "name": "addressLookupTables",
@@ -4007,11 +4085,15 @@ export type MangoV4 = {
             "type": "u128"
           },
           {
+            "name": "feesSwapMangoAccount",
+            "type": "publicKey"
+          },
+          {
             "name": "reserved",
             "type": {
               "array": [
                 "u8",
-                1864
+                1832
               ]
             }
           }
@@ -4105,11 +4187,15 @@ export type MangoV4 = {
             "type": "u64"
           },
           {
+            "name": "discountBuybackFeesAccrued",
+            "type": "u64"
+          },
+          {
             "name": "reserved",
             "type": {
               "array": [
                 "u8",
-                232
+                224
               ]
             }
           },
@@ -5680,11 +5766,15 @@ export type MangoV4 = {
             "type": "u64"
           },
           {
+            "name": "discountBuybackFeesAccrued",
+            "type": "u64"
+          },
+          {
             "name": "reserved",
             "type": {
               "array": [
                 "u8",
-                232
+                224
               ]
             }
           }
@@ -6682,6 +6772,9 @@ export type MangoV4 = {
           },
           {
             "name": "TokenWithdraw"
+          },
+          {
+            "name": "AccountBuybackFeesWithMngo"
           }
         ]
       }
@@ -8490,6 +8583,30 @@ export const IDL: MangoV4 = {
           "type": {
             "option": "u64"
           }
+        },
+        {
+          "name": "feesPayWithMngoOpt",
+          "type": {
+            "option": "bool"
+          }
+        },
+        {
+          "name": "feesMngoBonusFactorOpt",
+          "type": {
+            "option": "f32"
+          }
+        },
+        {
+          "name": "feesSwapMangoAccountOpt",
+          "type": {
+            "option": "publicKey"
+          }
+        },
+        {
+          "name": "feesMngoTokenIndexOpt",
+          "type": {
+            "option": "u16"
+          }
         }
       ]
     },
@@ -9437,6 +9554,57 @@ export const IDL: MangoV4 = {
         {
           "name": "forceClose",
           "type": "bool"
+        }
+      ]
+    },
+    {
+      "name": "accountBuybackFeesWithMngo",
+      "accounts": [
+        {
+          "name": "group",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "account",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "owner",
+          "isMut": false,
+          "isSigner": true
+        },
+        {
+          "name": "daoAccount",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "mngoBank",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "mngoOracle",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "feesBank",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "feesOracle",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "maxBuyback",
+          "type": "u64"
         }
       ]
     },
@@ -12294,11 +12462,15 @@ export const IDL: MangoV4 = {
             "type": "publicKey"
           },
           {
+            "name": "feesMngoTokenIndex",
+            "type": "u16"
+          },
+          {
             "name": "padding",
             "type": {
               "array": [
                 "u8",
-                4
+                2
               ]
             }
           },
@@ -12323,13 +12495,12 @@ export const IDL: MangoV4 = {
             "type": "u8"
           },
           {
-            "name": "padding2",
-            "type": {
-              "array": [
-                "u8",
-                5
-              ]
-            }
+            "name": "feesPayWithMngo",
+            "type": "u8"
+          },
+          {
+            "name": "feesMngoBonusFactor",
+            "type": "f32"
           },
           {
             "name": "addressLookupTables",
@@ -12353,11 +12524,15 @@ export const IDL: MangoV4 = {
             "type": "u128"
           },
           {
+            "name": "feesSwapMangoAccount",
+            "type": "publicKey"
+          },
+          {
             "name": "reserved",
             "type": {
               "array": [
                 "u8",
-                1864
+                1832
               ]
             }
           }
@@ -12451,11 +12626,15 @@ export const IDL: MangoV4 = {
             "type": "u64"
           },
           {
+            "name": "discountBuybackFeesAccrued",
+            "type": "u64"
+          },
+          {
             "name": "reserved",
             "type": {
               "array": [
                 "u8",
-                232
+                224
               ]
             }
           },
@@ -14026,11 +14205,15 @@ export const IDL: MangoV4 = {
             "type": "u64"
           },
           {
+            "name": "discountBuybackFeesAccrued",
+            "type": "u64"
+          },
+          {
             "name": "reserved",
             "type": {
               "array": [
                 "u8",
-                232
+                224
               ]
             }
           }
@@ -15028,6 +15211,9 @@ export const IDL: MangoV4 = {
           },
           {
             "name": "TokenWithdraw"
+          },
+          {
+            "name": "AccountBuybackFeesWithMngo"
           }
         ]
       }
