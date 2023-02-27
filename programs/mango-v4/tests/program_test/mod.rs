@@ -142,8 +142,8 @@ impl TestContextBuilder {
                 index: i,
                 decimals: 6,
                 unit: 10u64.pow(6) as f64,
-                base_lot: 0 as f64,
-                quote_lot: 0 as f64,
+                base_lot: 100 as f64,
+                quote_lot: 10 as f64,
                 pubkey: Pubkey::default(),
                 authority: TestKeypair::new(),
             });

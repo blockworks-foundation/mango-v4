@@ -143,7 +143,9 @@ pub fn serum3_liq_force_cancel_orders(
     let mut account = ctx.accounts.account.load_full_mut()?;
     let mut base_bank = ctx.accounts.base_bank.load_mut()?;
     let mut quote_bank = ctx.accounts.quote_bank.load_mut()?;
+    let group = ctx.accounts.group.load()?;
     apply_settle_changes(
+        &group,
         ctx.accounts.account.key(),
         &mut account.borrow_mut(),
         &mut base_bank,
