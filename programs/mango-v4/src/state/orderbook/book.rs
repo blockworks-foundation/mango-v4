@@ -363,7 +363,9 @@ fn apply_fees(
     require_gte!(taker_fees, 0);
 
     // The maker fees apply to the maker's account only when the fill event is consumed.
-    account.fixed.buyback_fees_accrued += taker_fees.floor().to_num::<u64>();
+    account
+        .fixed
+        .accrue_buyback_fees(taker_fees.floor().to_num::<u64>());
     let perp_position = account.perp_position_mut(market.perp_market_index)?;
     perp_position.record_trading_fee(taker_fees);
     perp_position.taker_volume += taker_fees.to_num::<u64>();
@@ -379,7 +381,9 @@ fn apply_fees(
 /// Applies a fixed penalty fee to the account, and update the market's fees_accrued
 fn apply_penalty(market: &mut PerpMarket, account: &mut MangoAccountRefMut) -> Result<()> {
     let fee_penalty = I80F48::from_num(market.fee_penalty);
-    account.fixed.buyback_fees_accrued += fee_penalty.floor().to_num::<u64>();
+    account
+        .fixed
+        .accrue_buyback_fees(fee_penalty.floor().to_num::<u64>());
 
     let perp_position = account.perp_position_mut(market.perp_market_index)?;
     perp_position.record_trading_fee(fee_penalty);

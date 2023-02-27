@@ -168,6 +168,12 @@ export type MangoV4 = {
           "type": {
             "option": "u16"
           }
+        },
+        {
+          "name": "buybackFeesExpiryIntervalOpt",
+          "type": {
+            "option": "u64"
+          }
         }
       ]
     },
@@ -4089,11 +4095,23 @@ export type MangoV4 = {
             "type": "publicKey"
           },
           {
+            "name": "buybackFeesExpiryInterval",
+            "docs": [
+              "Number of seconds after which fees that could be used with the fees buyback feature expire.",
+              "",
+              "The actual expiry is staggered such that the fees users accumulate are always",
+              "available for at least this interval - but may be available for up to twice this time.",
+              "",
+              "When set to 0, there's no expiry of buyback fees."
+            ],
+            "type": "u64"
+          },
+          {
             "name": "reserved",
             "type": {
               "array": [
                 "u8",
-                1832
+                1824
               ]
             }
           }
@@ -4187,7 +4205,25 @@ export type MangoV4 = {
             "type": "u64"
           },
           {
-            "name": "buybackFeesAccrued",
+            "name": "buybackFeesAccruedCurrent",
+            "docs": [
+              "Fees usable with the \"fees buyback\" feature.",
+              "This tracks the ones that accrued in the current expiry interval."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "buybackFeesAccruedPrevious",
+            "docs": [
+              "Fees buyback amount from the previous expiry interval."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "buybackFeesExpiryTimestamp",
+            "docs": [
+              "End timestamp of the current expiry interval of the buyback fees amount."
+            ],
             "type": "u64"
           },
           {
@@ -4195,7 +4231,7 @@ export type MangoV4 = {
             "type": {
               "array": [
                 "u8",
-                224
+                208
               ]
             }
           },
@@ -5766,7 +5802,15 @@ export type MangoV4 = {
             "type": "u64"
           },
           {
-            "name": "buybackFeesAccrued",
+            "name": "buybackFeesAccruedCurrent",
+            "type": "u64"
+          },
+          {
+            "name": "buybackFeesAccruedPrevious",
+            "type": "u64"
+          },
+          {
+            "name": "buybackFeesExpiryTimestamp",
             "type": "u64"
           },
           {
@@ -5774,7 +5818,7 @@ export type MangoV4 = {
             "type": {
               "array": [
                 "u8",
-                224
+                208
               ]
             }
           }
@@ -8607,6 +8651,12 @@ export const IDL: MangoV4 = {
           "type": {
             "option": "u16"
           }
+        },
+        {
+          "name": "buybackFeesExpiryIntervalOpt",
+          "type": {
+            "option": "u64"
+          }
         }
       ]
     },
@@ -12528,11 +12578,23 @@ export const IDL: MangoV4 = {
             "type": "publicKey"
           },
           {
+            "name": "buybackFeesExpiryInterval",
+            "docs": [
+              "Number of seconds after which fees that could be used with the fees buyback feature expire.",
+              "",
+              "The actual expiry is staggered such that the fees users accumulate are always",
+              "available for at least this interval - but may be available for up to twice this time.",
+              "",
+              "When set to 0, there's no expiry of buyback fees."
+            ],
+            "type": "u64"
+          },
+          {
             "name": "reserved",
             "type": {
               "array": [
                 "u8",
-                1832
+                1824
               ]
             }
           }
@@ -12626,7 +12688,25 @@ export const IDL: MangoV4 = {
             "type": "u64"
           },
           {
-            "name": "buybackFeesAccrued",
+            "name": "buybackFeesAccruedCurrent",
+            "docs": [
+              "Fees usable with the \"fees buyback\" feature.",
+              "This tracks the ones that accrued in the current expiry interval."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "buybackFeesAccruedPrevious",
+            "docs": [
+              "Fees buyback amount from the previous expiry interval."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "buybackFeesExpiryTimestamp",
+            "docs": [
+              "End timestamp of the current expiry interval of the buyback fees amount."
+            ],
             "type": "u64"
           },
           {
@@ -12634,7 +12714,7 @@ export const IDL: MangoV4 = {
             "type": {
               "array": [
                 "u8",
-                224
+                208
               ]
             }
           },
@@ -14205,7 +14285,15 @@ export const IDL: MangoV4 = {
             "type": "u64"
           },
           {
-            "name": "buybackFeesAccrued",
+            "name": "buybackFeesAccruedCurrent",
+            "type": "u64"
+          },
+          {
+            "name": "buybackFeesAccruedPrevious",
+            "type": "u64"
+          },
+          {
+            "name": "buybackFeesExpiryTimestamp",
             "type": "u64"
           },
           {
@@ -14213,7 +14301,7 @@ export const IDL: MangoV4 = {
             "type": {
               "array": [
                 "u8",
-                224
+                208
               ]
             }
           }

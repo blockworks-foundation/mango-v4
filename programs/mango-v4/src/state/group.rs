@@ -60,11 +60,19 @@ pub struct Group {
     // - the user then claims quote for mngo at a bonus rate
     pub buyback_fees_swap_mango_account: Pubkey,
 
-    pub reserved: [u8; 1832],
+    /// Number of seconds after which fees that could be used with the fees buyback feature expire.
+    ///
+    /// The actual expiry is staggered such that the fees users accumulate are always
+    /// available for at least this interval - but may be available for up to twice this time.
+    ///
+    /// When set to 0, there's no expiry of buyback fees.
+    pub buyback_fees_expiry_interval: u64,
+
+    pub reserved: [u8; 1824],
 }
 const_assert_eq!(
     size_of::<Group>(),
-    32 + 4 + 32 * 2 + 4 + 32 * 2 + 4 + 4 + 20 * 32 + 32 + 8 + 16 + 32 + 1832
+    32 + 4 + 32 * 2 + 4 + 32 * 2 + 4 + 4 + 20 * 32 + 32 + 8 + 16 + 32 + 8 + 1824
 );
 const_assert_eq!(size_of::<Group>(), 2736);
 const_assert_eq!(size_of::<Group>() % 8, 0);

@@ -1515,6 +1515,7 @@ fn group_edit_instruction_default() -> mango_v4::instruction::GroupEdit {
         buyback_fees_bonus_factor_opt: None,
         buyback_fees_swap_mango_account_opt: None,
         mngo_token_index_opt: None,
+        buyback_fees_expiry_interval_opt: None,
     }
 }
 

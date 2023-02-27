@@ -17,6 +17,7 @@ pub fn group_edit(
     buyback_fees_bonus_factor_opt: Option<f32>,
     buyback_fees_swap_mango_account_opt: Option<Pubkey>,
     mngo_token_index_opt: Option<TokenIndex>,
+    buyback_fees_expiry_interval_opt: Option<u64>,
 ) -> Result<()> {
     let mut group = ctx.accounts.group.load_mut()?;
 
@@ -94,6 +95,15 @@ pub fn group_edit(
             mngo_token_index
         );
         group.mngo_token_index = mngo_token_index;
+    }
+
+    if let Some(buyback_fees_expiry_interval) = buyback_fees_expiry_interval_opt {
+        msg!(
+            "Buyback fees expiry interval old {:?}, new {:?}",
+            group.buyback_fees_expiry_interval,
+            buyback_fees_expiry_interval
+        );
+        group.buyback_fees_expiry_interval = buyback_fees_expiry_interval;
     }
 
     Ok(())

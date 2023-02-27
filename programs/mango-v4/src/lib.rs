@@ -64,6 +64,7 @@ pub mod mango_v4 {
         buyback_fees_bonus_factor_opt: Option<f32>,
         buyback_fees_swap_mango_account_opt: Option<Pubkey>,
         mngo_token_index_opt: Option<TokenIndex>,
+        buyback_fees_expiry_interval_opt: Option<u64>,
     ) -> Result<()> {
         #[cfg(feature = "enable-gpl")]
         instructions::group_edit(
@@ -78,6 +79,7 @@ pub mod mango_v4 {
             buyback_fees_bonus_factor_opt,
             buyback_fees_swap_mango_account_opt,
             mngo_token_index_opt,
+            buyback_fees_expiry_interval_opt,
         )?;
         Ok(())
     }
