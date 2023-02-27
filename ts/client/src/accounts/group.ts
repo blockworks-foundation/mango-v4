@@ -32,18 +32,18 @@ export class Group {
       groupNum: number;
       admin: PublicKey;
       fastListingAdmin: PublicKey;
-      feesMngoTokenIndex: number;
+      mngoTokenIndex: number;
       insuranceMint: PublicKey;
       insuranceVault: PublicKey;
       testing: number;
       version: number;
-      feesPayWithMngo: number;
-      feesMngoBonusFactor: number;
+      buybackFees: number;
+      buybackFeesMngoBonusFactor: number;
       addressLookupTables: PublicKey[];
       securityAdmin: PublicKey;
       depositLimitQuote: BN;
       ixGate: BN;
-      feesSwapMangoAccount: PublicKey;
+      buybackFeesSwapMangoAccount: PublicKey;
     },
   ): Group {
     return new Group(
@@ -52,18 +52,18 @@ export class Group {
       obj.groupNum,
       obj.admin,
       obj.fastListingAdmin,
-      obj.feesMngoTokenIndex as TokenIndex,
+      obj.mngoTokenIndex as TokenIndex,
       obj.insuranceMint,
       obj.insuranceVault,
       obj.testing,
       obj.version,
-      obj.feesPayWithMngo == 1,
-      obj.feesMngoBonusFactor,
+      obj.buybackFees == 1,
+      obj.buybackFeesMngoBonusFactor,
       obj.addressLookupTables,
       obj.securityAdmin,
       obj.depositLimitQuote,
       obj.ixGate,
-      obj.feesSwapMangoAccount,
+      obj.buybackFeesSwapMangoAccount,
       [], // addressLookupTablesList
       new Map(), // banksMapByName
       new Map(), // banksMapByMint
@@ -86,18 +86,18 @@ export class Group {
     public groupNum: number,
     public admin: PublicKey,
     public fastListingAdmin: PublicKey,
-    public feesMngoTokenIndex: TokenIndex,
+    public mngoTokenIndex: TokenIndex,
     public insuranceMint: PublicKey,
     public insuranceVault: PublicKey,
     public testing: number,
     public version: number,
-    public feesPayWithMngo: boolean,
-    public feesMngoBonusFactor: number,
+    public buybackFees: boolean,
+    public buybackFeesMngoBonusFactor: number,
     public addressLookupTables: PublicKey[],
     public securityAdmin: PublicKey,
     public depositLimitQuote,
     public ixGate: BN,
-    public feesSwapMangoAccount: PublicKey,
+    public buybackFeesSwapMangoAccount: PublicKey,
     public addressLookupTablesList: AddressLookupTableAccount[],
     public banksMapByName: Map<string, Bank[]>,
     public banksMapByMint: Map<string, Bank[]>,

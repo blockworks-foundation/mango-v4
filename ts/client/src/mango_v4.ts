@@ -146,25 +146,25 @@ export type MangoV4 = {
           }
         },
         {
-          "name": "feesPayWithMngoOpt",
+          "name": "buybackFeesOpt",
           "type": {
             "option": "bool"
           }
         },
         {
-          "name": "feesMngoBonusFactorOpt",
+          "name": "buybackFeesBonusFactorOpt",
           "type": {
             "option": "f32"
           }
         },
         {
-          "name": "feesSwapMangoAccountOpt",
+          "name": "buybackFeesSwapMangoAccountOpt",
           "type": {
             "option": "publicKey"
           }
         },
         {
-          "name": "feesMngoTokenIndexOpt",
+          "name": "mngoTokenIndexOpt",
           "type": {
             "option": "u16"
           }
@@ -4023,7 +4023,7 @@ export type MangoV4 = {
             "type": "publicKey"
           },
           {
-            "name": "feesMngoTokenIndex",
+            "name": "mngoTokenIndex",
             "type": "u16"
           },
           {
@@ -4056,11 +4056,11 @@ export type MangoV4 = {
             "type": "u8"
           },
           {
-            "name": "feesPayWithMngo",
+            "name": "buybackFees",
             "type": "u8"
           },
           {
-            "name": "feesMngoBonusFactor",
+            "name": "buybackFeesMngoBonusFactor",
             "type": "f32"
           },
           {
@@ -4085,7 +4085,7 @@ export type MangoV4 = {
             "type": "u128"
           },
           {
-            "name": "feesSwapMangoAccount",
+            "name": "buybackFeesSwapMangoAccount",
             "type": "publicKey"
           },
           {
@@ -4187,7 +4187,7 @@ export type MangoV4 = {
             "type": "u64"
           },
           {
-            "name": "discountBuybackFeesAccrued",
+            "name": "buybackFeesAccrued",
             "type": "u64"
           },
           {
@@ -5766,7 +5766,7 @@ export type MangoV4 = {
             "type": "u64"
           },
           {
-            "name": "discountBuybackFeesAccrued",
+            "name": "buybackFeesAccrued",
             "type": "u64"
           },
           {
@@ -8585,25 +8585,25 @@ export const IDL: MangoV4 = {
           }
         },
         {
-          "name": "feesPayWithMngoOpt",
+          "name": "buybackFeesOpt",
           "type": {
             "option": "bool"
           }
         },
         {
-          "name": "feesMngoBonusFactorOpt",
+          "name": "buybackFeesBonusFactorOpt",
           "type": {
             "option": "f32"
           }
         },
         {
-          "name": "feesSwapMangoAccountOpt",
+          "name": "buybackFeesSwapMangoAccountOpt",
           "type": {
             "option": "publicKey"
           }
         },
         {
-          "name": "feesMngoTokenIndexOpt",
+          "name": "mngoTokenIndexOpt",
           "type": {
             "option": "u16"
           }
@@ -12462,7 +12462,7 @@ export const IDL: MangoV4 = {
             "type": "publicKey"
           },
           {
-            "name": "feesMngoTokenIndex",
+            "name": "mngoTokenIndex",
             "type": "u16"
           },
           {
@@ -12495,11 +12495,11 @@ export const IDL: MangoV4 = {
             "type": "u8"
           },
           {
-            "name": "feesPayWithMngo",
+            "name": "buybackFees",
             "type": "u8"
           },
           {
-            "name": "feesMngoBonusFactor",
+            "name": "buybackFeesMngoBonusFactor",
             "type": "f32"
           },
           {
@@ -12524,7 +12524,7 @@ export const IDL: MangoV4 = {
             "type": "u128"
           },
           {
-            "name": "feesSwapMangoAccount",
+            "name": "buybackFeesSwapMangoAccount",
             "type": "publicKey"
           },
           {
@@ -12626,7 +12626,7 @@ export const IDL: MangoV4 = {
             "type": "u64"
           },
           {
-            "name": "discountBuybackFeesAccrued",
+            "name": "buybackFeesAccrued",
             "type": "u64"
           },
           {
@@ -14205,7 +14205,7 @@ export const IDL: MangoV4 = {
             "type": "u64"
           },
           {
-            "name": "discountBuybackFeesAccrued",
+            "name": "buybackFeesAccrued",
             "type": "u64"
           },
           {
