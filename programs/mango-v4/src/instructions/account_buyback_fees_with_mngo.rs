@@ -33,19 +33,23 @@ pub fn account_buyback_fees_with_mngo(
     let mut fees_bank = ctx.accounts.fees_bank.load_mut()?;
 
     let bonus_factor = I80F48::from_num(group.buyback_fees_mngo_bonus_factor);
+
     let now_ts = Clock::get()?.unix_timestamp.try_into().unwrap();
+    account
+        .fixed
+        .expire_buyback_fees(now_ts, group.buyback_fees_expiry_interval);
 
     // quick return if nothing to buyback
     let mut max_buyback = {
         let dao_fees_token_position = dao_account.ensure_token_position(fees_bank.token_index)?.0;
         let dao_fees_native = dao_fees_token_position.native(&fees_bank);
-        I80F48::from_num::<u64>(max_buyback.min(account.fixed.buyback_fees_accrued))
+        I80F48::from_num::<u64>(max_buyback.min(account.fixed.buyback_fees_accrued()))
             .min(dao_fees_native)
     };
     if max_buyback <= I80F48::ZERO {
         msg!(
             "nothing to buyback, (buyback_fees_accrued {})",
-            account.fixed.buyback_fees_accrued
+            account.fixed.buyback_fees_accrued()
         );
         return Ok(());
     }
@@ -125,10 +129,9 @@ pub fn account_buyback_fees_with_mngo(
         );
     }
 
-    account.fixed.buyback_fees_accrued = account
+    account
         .fixed
-        .buyback_fees_accrued
-        .saturating_sub(max_buyback.ceil().to_num::<u64>());
+        .reduce_buyback_fees_accrued(max_buyback.ceil().to_num::<u64>());
     msg!(
         "bought back {} native fees with {} native mngo",
         max_buyback,

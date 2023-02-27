@@ -291,4 +291,3 @@ export function buildIxGate(p: IxGateParams): BN {
 
   return ixGate;
 }
-

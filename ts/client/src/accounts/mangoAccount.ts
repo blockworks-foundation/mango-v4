@@ -32,7 +32,9 @@ export class MangoAccount {
       perpSpotTransfers: BN;
       healthRegionBeginInitHealth: BN;
       frozenUntil: BN;
-      buybackFeesAccrued: BN;
+      buybackFeesAccruedCurrent: BN;
+      buybackFeesAccruedPrevious: BN;
+      buybackFeesExpiryTimestamp: BN;
       headerVersion: number;
       tokens: unknown;
       serum3: unknown;
@@ -53,7 +55,9 @@ export class MangoAccount {
       obj.perpSpotTransfers,
       obj.healthRegionBeginInitHealth,
       obj.frozenUntil,
-      obj.buybackFeesAccrued,
+      obj.buybackFeesAccruedCurrent,
+      obj.buybackFeesAccruedPrevious,
+      obj.buybackFeesExpiryTimestamp,
       obj.headerVersion,
       obj.tokens as TokenPositionDto[],
       obj.serum3 as Serum3PositionDto[],
@@ -76,7 +80,9 @@ export class MangoAccount {
     public perpSpotTransfers: BN,
     public healthRegionBeginInitHealth: BN,
     public frozenUntil: BN,
-    public buybackFeesAccrued: BN,
+    public buybackFeesAccruedCurrent: BN,
+    public buybackFeesAccruedPrevious: BN,
+    public buybackFeesExpiryTimestamp: BN,
     public headerVersion: number,
     tokens: TokenPositionDto[],
     serum3: Serum3PositionDto[],
