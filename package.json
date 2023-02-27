@@ -24,7 +24,8 @@
     "lint": "eslint ./ts/client/src --ext ts --ext tsx --ext js --quiet",
     "typecheck": "tsc --noEmit --pretty",
     "prepublishOnly": "yarn validate && yarn build",
-    "validate": "yarn lint && yarn format"
+    "validate": "yarn lint && yarn format",
+    "sm": "yarn ts-node ts/client/scripts/sm.ts"
   },
   "devDependencies": {
     "@tsconfig/recommended": "^1.0.1",

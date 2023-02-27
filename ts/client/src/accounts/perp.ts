@@ -29,6 +29,7 @@ export type ParsedFillEvent = Modify<
   {
     price: number;
     quantity: number;
+    size: number;
   }
 >;
 
@@ -312,15 +313,15 @@ export class PerpMarket {
   public async loadFills(
     client: MangoClient,
     lastSeqNum: BN = new BN(0),
-  ): Promise<FillEvent[]> {
+  ): Promise<ParsedFillEvent[]> {
     const eventQueue = await this.loadEventQueue(client);
     return eventQueue
       .eventsSince(lastSeqNum)
       .filter((event) => event.eventType == PerpEventQueue.FILL_EVENT_TYPE)
-      .map(this.parseFillEvent.bind(this)) as ParsedFillEvent[];
+      .map(this.parseFillEvent);
   }
 
-  public parseFillEvent(event): ParsedFillEvent {
+  public parseFillEvent(event: FillEvent): ParsedFillEvent {
     const quantity = this.baseLotsToUi(event.quantity);
     const price = this.priceLotsToUi(event.price);
 
