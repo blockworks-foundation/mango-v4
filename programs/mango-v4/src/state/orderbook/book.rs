@@ -356,16 +356,20 @@ fn apply_fees(
 ) -> Result<()> {
     let quote_native = I80F48::from_num(market.quote_lot_size * quote_lots);
 
+    // The maker fees apply to the maker's account only when the fill event is consumed.
     let maker_fees = quote_native * market.maker_fee;
+
     let taker_fees = quote_native * market.taker_fee;
 
     // taker fees should never be negative
     require_gte!(taker_fees, 0);
 
-    // The maker fees apply to the maker's account only when the fill event is consumed.
+    // Part of the taker fees that go to the dao, instead of paying for maker rebates
+    let taker_dao_fees = (taker_fees + maker_fees.min(I80F48::ZERO)).max(I80F48::ZERO);
     account
         .fixed
-        .accrue_buyback_fees(taker_fees.floor().to_num::<u64>());
+        .accrue_buyback_fees(taker_dao_fees.floor().to_num::<u64>());
+
     let perp_position = account.perp_position_mut(market.perp_market_index)?;
     perp_position.record_trading_fee(taker_fees);
     perp_position.taker_volume += taker_fees.to_num::<u64>();
