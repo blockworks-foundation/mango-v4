@@ -1,5 +1,8 @@
 import { AnchorProvider, BN, Program, Provider } from '@coral-xyz/anchor';
-import { TOKEN_PROGRAM_ID, NATIVE_MINT } from './utils/spl';
+import {
+  createCloseAccountInstruction,
+  createInitializeAccount3Instruction,
+} from '@solana/spl-token';
 import {
   AccountMeta,
   AddressLookupTableAccount,
@@ -60,10 +63,7 @@ import {
   toNative,
 } from './utils';
 import { sendTransaction } from './utils/rpc';
-import {
-  createCloseAccountInstruction,
-  createInitializeAccount3Instruction,
-} from '@solana/spl-token';
+import { NATIVE_MINT, TOKEN_PROGRAM_ID } from './utils/spl';
 
 export enum AccountRetriever {
   Scanning,
@@ -991,6 +991,39 @@ export class MangoClient {
     instructions.push(closeIx);
 
     return await this.sendAndConfirmTransactionForGroup(group, instructions);
+  }
+
+  public async accountBuybackFeesWithMngoIx(
+    group: Group,
+    mangoAccount: MangoAccount,
+    maxBuyback?: number,
+  ): Promise<TransactionInstruction> {
+    maxBuyback = maxBuyback ?? mangoAccount.getMaxFeesBuybackUi(group);
+    return await this.program.methods
+      .accountBuybackFeesWithMngo(new BN(maxBuyback))
+      .accounts({
+        group: group.publicKey,
+        account: mangoAccount.publicKey,
+        daoAccount: group.buybackFeesSwapMangoAccount,
+        mngoBank: group.getFirstBankForMngo().publicKey,
+        mngoOracle: group.getFirstBankForMngo().oracle,
+        feesBank: group.getFirstBankForFees().publicKey,
+        feesOracle: group.getFirstBankForFees().oracle,
+      })
+      .instruction();
+  }
+
+  public async accountBuybackFeesWithMngo(
+    group: Group,
+    mangoAccount: MangoAccount,
+    maxBuyback?: number,
+  ): Promise<TransactionSignature> {
+    const ix = await this.accountBuybackFeesWithMngoIx(
+      group,
+      mangoAccount,
+      maxBuyback,
+    );
+    return await this.sendAndConfirmTransactionForGroup(group, [ix]);
   }
 
   public async tokenDeposit(
@@ -2035,7 +2068,7 @@ export class MangoClient {
         group,
         [mangoAccount],
         // Settlement token bank, because a position for it may be created
-        [group.getFirstBankByTokenIndex(0 as TokenIndex)],
+        [group.getFirstBankForSettlement()],
         [perpMarket],
       );
     return await this.program.methods
@@ -2127,7 +2160,7 @@ export class MangoClient {
         group,
         [mangoAccount],
         // Settlement token bank, because a position for it may be created
-        [group.getFirstBankByTokenIndex(0 as TokenIndex)],
+        [group.getFirstBankForSettlement()],
         [perpMarket],
       );
     return await this.program.methods
@@ -2250,7 +2283,7 @@ export class MangoClient {
         AccountRetriever.Scanning,
         group,
         [profitableAccount, unprofitableAccount],
-        [group.getFirstBankByTokenIndex(0 as TokenIndex)],
+        [group.getFirstBankForSettlement()],
         [perpMarket],
       );
     const bank = group.banksMapByTokenIndex.get(0 as TokenIndex)![0];
@@ -2291,7 +2324,7 @@ export class MangoClient {
         AccountRetriever.Fixed,
         group,
         [account], // Account must be unprofitable
-        [group.getFirstBankByTokenIndex(0 as TokenIndex)],
+        [group.getFirstBankForSettlement()],
         [perpMarket],
       );
     const bank = group.banksMapByTokenIndex.get(0 as TokenIndex)![0];
