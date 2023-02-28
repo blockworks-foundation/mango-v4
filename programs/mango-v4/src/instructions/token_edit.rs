@@ -151,7 +151,12 @@ pub fn token_edit(
             );
 
             bank.init_asset_weight = I80F48::from_num(init_asset_weight);
-            require_group_admin = true;
+
+            // The security admin is allowed to decrease the init collateral weight to zero,
+            // but all other changes need to go through the full group admin.
+            if init_asset_weight != 0.0 {
+                require_group_admin = true;
+            }
         }
         if let Some(maint_liab_weight) = maint_liab_weight_opt {
             msg!(

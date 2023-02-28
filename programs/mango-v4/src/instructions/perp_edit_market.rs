@@ -129,7 +129,12 @@ pub fn perp_edit_market(
             init_overall_asset_weight
         );
         perp_market.init_overall_asset_weight = I80F48::from_num(init_overall_asset_weight);
-        require_group_admin = true;
+
+        // The security admin is allowed to disable init collateral contributions,
+        // but all other changes need to go through the full group admin.
+        if init_overall_asset_weight != 0.0 {
+            require_group_admin = true;
+        }
     }
     if let Some(base_liquidation_fee) = base_liquidation_fee_opt {
         msg!(
