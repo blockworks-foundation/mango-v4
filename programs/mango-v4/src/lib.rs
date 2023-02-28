@@ -464,7 +464,17 @@ pub mod mango_v4 {
 
     pub fn serum3_settle_funds(ctx: Context<Serum3SettleFunds>) -> Result<()> {
         #[cfg(feature = "enable-gpl")]
-        instructions::serum3_settle_funds(ctx)?;
+        instructions::serum3_settle_funds(ctx.accounts, None, true)?;
+        Ok(())
+    }
+
+    pub fn serum3_settle_funds2(ctx: Context<Serum3SettleFunds2>, fees_to_dao: bool) -> Result<()> {
+        #[cfg(feature = "enable-gpl")]
+        instructions::serum3_settle_funds(
+            &mut ctx.accounts.v1,
+            Some(&mut ctx.accounts.v2),
+            fees_to_dao,
+        )?;
         Ok(())
     }
 
