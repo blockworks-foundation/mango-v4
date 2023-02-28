@@ -466,6 +466,14 @@ export class Group {
     return banks[0];
   }
 
+  public getFirstBankForMngo(): Bank {
+    return this.getFirstBankByTokenIndex(this.mngoTokenIndex);
+  }
+
+  public getFirstBankForPerpSettlement(): Bank {
+    return this.getFirstBankByTokenIndex(0 as TokenIndex);
+  }
+
   /**
    *
    * @param mintPk

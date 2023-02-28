@@ -964,6 +964,32 @@ export class MangoAccount {
     );
   }
 
+  public getBuybackFeesAccrued(): BN {
+    return this.buybackFeesAccruedCurrent.add(this.buybackFeesAccruedPrevious);
+  }
+
+  public getBuybackFeesAccruedUi(): number {
+    return toUiDecimalsForQuote(this.getBuybackFeesAccrued());
+  }
+
+  public getMaxFeesBuyback(group: Group): BN {
+    const mngoBalanceValueWithBonus = new BN(
+      this.getTokenBalance(group.getFirstBankForMngo())
+        .mul(group.getFirstBankForMngo().price)
+        .mul(I80F48.fromNumber(group.buybackFeesMngoBonusFactor))
+        .floor()
+        .toNumber(),
+    );
+    return BN.max(
+      BN.min(this.getBuybackFeesAccrued(), mngoBalanceValueWithBonus),
+      new BN(0),
+    );
+  }
+
+  public getMaxFeesBuybackUi(group: Group): number {
+    return toUiDecimalsForQuote(this.getMaxFeesBuyback(group));
+  }
+
   toString(group?: Group, onlyTokens = false): string {
     let res = 'MangoAccount';
     res = res + '\n pk: ' + this.publicKey.toString();
