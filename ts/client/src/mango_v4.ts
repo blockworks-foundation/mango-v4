@@ -428,7 +428,7 @@ export type MangoV4 = {
           "isSigner": false
         },
         {
-          "name": "fastListingAdmin",
+          "name": "admin",
           "isMut": false,
           "isSigner": true
         },
@@ -8911,7 +8911,7 @@ export const IDL: MangoV4 = {
           "isSigner": false
         },
         {
-          "name": "fastListingAdmin",
+          "name": "admin",
           "isMut": false,
           "isSigner": true
         },
