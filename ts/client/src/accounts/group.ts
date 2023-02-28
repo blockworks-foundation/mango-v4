@@ -470,12 +470,8 @@ export class Group {
     return this.getFirstBankByTokenIndex(this.mngoTokenIndex);
   }
 
-  public getFirstBankForFees(): Bank {
-    return this.getFirstBankByTokenIndex(0);
-  }
-
-  public getFirstBankForSettlement(): Bank {
-    return this.getFirstBankByTokenIndex(0);
+  public getFirstBankForPerpSettlement(): Bank {
+    return this.getFirstBankByTokenIndex(0 as TokenIndex);
   }
 
   /**

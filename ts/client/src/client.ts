@@ -1007,8 +1007,8 @@ export class MangoClient {
         daoAccount: group.buybackFeesSwapMangoAccount,
         mngoBank: group.getFirstBankForMngo().publicKey,
         mngoOracle: group.getFirstBankForMngo().oracle,
-        feesBank: group.getFirstBankForFees().publicKey,
-        feesOracle: group.getFirstBankForFees().oracle,
+        feesBank: group.getFirstBankByTokenIndex(0 as TokenIndex).publicKey,
+        feesOracle: group.getFirstBankByTokenIndex(0 as TokenIndex).oracle,
       })
       .instruction();
   }
@@ -2068,7 +2068,7 @@ export class MangoClient {
         group,
         [mangoAccount],
         // Settlement token bank, because a position for it may be created
-        [group.getFirstBankForSettlement()],
+        [group.getFirstBankForPerpSettlement()],
         [perpMarket],
       );
     return await this.program.methods
@@ -2160,7 +2160,7 @@ export class MangoClient {
         group,
         [mangoAccount],
         // Settlement token bank, because a position for it may be created
-        [group.getFirstBankForSettlement()],
+        [group.getFirstBankForPerpSettlement()],
         [perpMarket],
       );
     return await this.program.methods
@@ -2283,7 +2283,7 @@ export class MangoClient {
         AccountRetriever.Scanning,
         group,
         [profitableAccount, unprofitableAccount],
-        [group.getFirstBankForSettlement()],
+        [group.getFirstBankForPerpSettlement()],
         [perpMarket],
       );
     const bank = group.banksMapByTokenIndex.get(0 as TokenIndex)![0];
@@ -2324,7 +2324,7 @@ export class MangoClient {
         AccountRetriever.Fixed,
         group,
         [account], // Account must be unprofitable
-        [group.getFirstBankForSettlement()],
+        [group.getFirstBankForPerpSettlement()],
         [perpMarket],
       );
     const bank = group.banksMapByTokenIndex.get(0 as TokenIndex)![0];
