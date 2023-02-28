@@ -338,8 +338,7 @@ export class MangoClient {
       .tokenRegisterTrustless(tokenIndex, name)
       .accounts({
         group: group.publicKey,
-        fastListingAdmin: (this.program.provider as AnchorProvider).wallet
-          .publicKey,
+        admin: (this.program.provider as AnchorProvider).wallet.publicKey,
         mint: mintPk,
         oracle: oraclePk,
         payer: (this.program.provider as AnchorProvider).wallet.publicKey,

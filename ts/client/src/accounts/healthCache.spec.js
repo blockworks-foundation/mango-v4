@@ -1,0 +1,508 @@
+import { BN } from '@coral-xyz/anchor';
+import { expect } from 'chai';
+import cloneDeep from 'lodash/cloneDeep';
+import range from 'lodash/range';
+import { I80F48, ONE_I80F48, ZERO_I80F48 } from '../numbers/I80F48';
+import { HealthCache, PerpInfo, Serum3Info, TokenInfo } from './healthCache';
+import { HealthType, PerpPosition } from './mangoAccount';
+import { PerpOrderSide } from './perp';
+function mockBankAndOracle(tokenIndex, maintWeight, initWeight, price, stablePrice) {
+    return {
+        tokenIndex,
+        maintAssetWeight: I80F48.fromNumber(1 - maintWeight),
+        initAssetWeight: I80F48.fromNumber(1 - initWeight),
+        maintLiabWeight: I80F48.fromNumber(1 + maintWeight),
+        initLiabWeight: I80F48.fromNumber(1 + initWeight),
+        price: I80F48.fromNumber(price),
+        stablePriceModel: { stablePrice: stablePrice },
+        scaledInitAssetWeight: () => I80F48.fromNumber(1 - initWeight),
+        scaledInitLiabWeight: () => I80F48.fromNumber(1 + initWeight),
+    };
+}
+function mockPerpMarket(perpMarketIndex, maintBaseWeight, initBaseWeight, baseLotSize, price) {
+    return {
+        perpMarketIndex,
+        maintBaseAssetWeight: I80F48.fromNumber(1 - maintBaseWeight),
+        initBaseAssetWeight: I80F48.fromNumber(1 - initBaseWeight),
+        maintBaseLiabWeight: I80F48.fromNumber(1 + maintBaseWeight),
+        initBaseLiabWeight: I80F48.fromNumber(1 + initBaseWeight),
+        maintOverallAssetWeight: I80F48.fromNumber(1 - 0.02),
+        initOverallAssetWeight: I80F48.fromNumber(1 - 0.05),
+        price: I80F48.fromNumber(price),
+        stablePriceModel: { stablePrice: price },
+        quoteLotSize: new BN(100),
+        baseLotSize: new BN(baseLotSize),
+        longFunding: ZERO_I80F48(),
+        shortFunding: ZERO_I80F48(),
+    };
+}
+describe('Health Cache', () => {
+    it('test_health0', () => {
+        const sourceBank = mockBankAndOracle(1, 0.1, 0.2, 1, 1);
+        const targetBank = mockBankAndOracle(4, 0.3, 0.5, 5, 5);
+        const ti1 = TokenInfo.fromBank(sourceBank, I80F48.fromNumber(100));
+        const ti2 = TokenInfo.fromBank(targetBank, I80F48.fromNumber(-10));
+        const si1 = Serum3Info.fromOoModifyingTokenInfos(1, ti2, 0, ti1, 2, {
+            quoteTokenTotal: new BN(21),
+            baseTokenTotal: new BN(18),
+            quoteTokenFree: new BN(1),
+            baseTokenFree: new BN(3),
+            referrerRebatesAccrued: new BN(2),
+        });
+        const pM = mockPerpMarket(9, 0.1, 0.2, 10, targetBank.price.toNumber());
+        const pp = new PerpPosition(pM.perpMarketIndex, 0, new BN(0), new BN(3), I80F48.fromNumber(-310), new BN(0), ZERO_I80F48(), ZERO_I80F48(), new BN(7), new BN(11), new BN(1), new BN(2), 0, 0, new BN(0), new BN(0), new BN(0), 0, ZERO_I80F48(), ZERO_I80F48(), new BN(0), ZERO_I80F48());
+        const pi1 = PerpInfo.fromPerpPosition(pM, pp);
+        const hc = new HealthCache([ti1, ti2], [si1], [pi1]);
+        // for bank1/oracle1, including open orders (scenario: bids execute)
+        const health1 = (100.0 + 1.0 + 2.0 + (20.0 + 15.0 * 5.0)) * 0.8;
+        // for bank2/oracle2
+        const health2 = (-10.0 + 3.0) * 5.0 * 1.5;
+        // for perp (scenario: bids execute)
+        const health3 = (3.0 + 7.0 + 1.0) * 10.0 * 5.0 * 0.8 +
+            (-310.0 + 2.0 * 100.0 - 7.0 * 10.0 * 5.0);
+        const health = hc.health(HealthType.init).toNumber();
+        console.log(` - health ${health
+            .toFixed(3)
+            .padStart(10)}, case "test that includes all the side values (like referrer_rebates_accrued)"`);
+        expect(health - (health1 + health2 + health3)).lessThan(0.0000001);
+    });
+    it('test_health1', (done) => {
+        function testFixture(fixture) {
+            const bank1 = mockBankAndOracle(1, 0.1, 0.2, 1, 1);
+            const bank2 = mockBankAndOracle(4, 0.3, 0.5, 5, 5);
+            const bank3 = mockBankAndOracle(5, 0.3, 0.5, 10, 10);
+            const ti1 = TokenInfo.fromBank(bank1, I80F48.fromNumber(fixture.token1));
+            const ti2 = TokenInfo.fromBank(bank2, I80F48.fromNumber(fixture.token2));
+            const ti3 = TokenInfo.fromBank(bank3, I80F48.fromNumber(fixture.token3));
+            const si1 = Serum3Info.fromOoModifyingTokenInfos(1, ti2, 0, ti1, 2, {
+                quoteTokenTotal: new BN(fixture.oo12[0]),
+                baseTokenTotal: new BN(fixture.oo12[1]),
+                quoteTokenFree: new BN(0),
+                baseTokenFree: new BN(0),
+                referrerRebatesAccrued: new BN(0),
+            });
+            const si2 = Serum3Info.fromOoModifyingTokenInfos(2, ti3, 0, ti1, 2, {
+                quoteTokenTotal: new BN(fixture.oo13[0]),
+                baseTokenTotal: new BN(fixture.oo13[1]),
+                quoteTokenFree: new BN(0),
+                baseTokenFree: new BN(0),
+                referrerRebatesAccrued: new BN(0),
+            });
+            const pM = mockPerpMarket(9, 0.1, 0.2, 10, bank2.price.toNumber());
+            const pp = new PerpPosition(pM.perpMarketIndex, 0, new BN(0), new BN(fixture.perp1[0]), I80F48.fromNumber(fixture.perp1[1]), new BN(0), ZERO_I80F48(), ZERO_I80F48(), new BN(fixture.perp1[2]), new BN(fixture.perp1[3]), new BN(0), new BN(0), 0, 0, new BN(0), new BN(0), new BN(0), 0, ZERO_I80F48(), ZERO_I80F48(), new BN(0), ZERO_I80F48());
+            const pi1 = PerpInfo.fromPerpPosition(pM, pp);
+            const hc = new HealthCache([ti1, ti2, ti3], [si1, si2], [pi1]);
+            const health = hc.health(HealthType.init).toNumber();
+            console.log(` - case "${fixture.name}" health ${health
+                .toFixed(3)
+                .padStart(10)}, expected ${fixture.expectedHealth}`);
+            expect(health - fixture.expectedHealth).lessThan(0.0000001);
+        }
+        const basePrice = 5;
+        const baseLotsToQuote = 10.0 * basePrice;
+        testFixture({
+            name: '0',
+            token1: 100,
+            token2: -10,
+            token3: 0,
+            oo12: [20, 15],
+            oo13: [0, 0],
+            perp1: [3, -131, 7, 11],
+            expectedHealth: 
+            // for token1, including open orders (scenario: bids execute)
+            (100.0 + (20.0 + 15.0 * basePrice)) * 0.8 -
+                // for token2
+                10.0 * basePrice * 1.5 +
+                // for perp (scenario: bids execute)
+                (3.0 + 7.0) * baseLotsToQuote * 0.8 +
+                (-131.0 - 7.0 * baseLotsToQuote),
+        });
+        testFixture({
+            name: '1',
+            token1: -100,
+            token2: 10,
+            token3: 0,
+            oo12: [20, 15],
+            oo13: [0, 0],
+            perp1: [-10, -131, 7, 11],
+            expectedHealth: 
+            // for token1
+            -100.0 * 1.2 +
+                // for token2, including open orders (scenario: asks execute)
+                (10.0 * basePrice + (20.0 + 15.0 * basePrice)) * 0.5 +
+                // for perp (scenario: asks execute)
+                (-10.0 - 11.0) * baseLotsToQuote * 1.2 +
+                (-131.0 + 11.0 * baseLotsToQuote),
+        });
+        testFixture({
+            name: '2: weighted positive perp pnl',
+            token1: 0,
+            token2: 0,
+            token3: 0,
+            oo12: [0, 0],
+            oo13: [0, 0],
+            perp1: [-1, 100, 0, 0],
+            expectedHealth: 0.95 * (100.0 - 1.2 * 1.0 * baseLotsToQuote),
+        });
+        testFixture({
+            name: '3: negative perp pnl is not weighted',
+            token1: 0,
+            token2: 0,
+            token3: 0,
+            oo12: [0, 0],
+            oo13: [0, 0],
+            perp1: [1, -100, 0, 0],
+            expectedHealth: -100.0 + 0.8 * 1.0 * baseLotsToQuote,
+        });
+        testFixture({
+            name: '4: perp health',
+            token1: 0,
+            token2: 0,
+            token3: 0,
+            oo12: [0, 0],
+            oo13: [0, 0],
+            perp1: [10, 100, 0, 0],
+            expectedHealth: 0.95 * (100.0 + 0.8 * 10.0 * baseLotsToQuote),
+        });
+        testFixture({
+            name: '5: perp health',
+            token1: 0,
+            token2: 0,
+            token3: 0,
+            oo12: [0, 0],
+            oo13: [0, 0],
+            perp1: [30, -100, 0, 0],
+            expectedHealth: 0.95 * (-100.0 + 0.8 * 30.0 * baseLotsToQuote),
+        });
+        testFixture({
+            name: '6, reserved oo funds',
+            token1: -100,
+            token2: -10,
+            token3: -10,
+            oo12: [1, 1],
+            oo13: [1, 1],
+            perp1: [0, 0, 0, 0],
+            expectedHealth: 
+            // tokens
+            -100.0 * 1.2 -
+                10.0 * 5.0 * 1.5 -
+                10.0 * 10.0 * 1.5 +
+                // oo_1_2 (-> token1)
+                (1.0 + 5.0) * 1.2 +
+                // oo_1_3 (-> token1)
+                (1.0 + 10.0) * 1.2,
+        });
+        testFixture({
+            name: '7, reserved oo funds cross the zero balance level',
+            token1: -14,
+            token2: -10,
+            token3: -10,
+            oo12: [1, 1],
+            oo13: [1, 1],
+            perp1: [0, 0, 0, 0],
+            expectedHealth: -14.0 * 1.2 -
+                10.0 * 5.0 * 1.5 -
+                10.0 * 10.0 * 1.5 +
+                // oo_1_2 (-> token1)
+                3.0 * 1.2 +
+                3.0 * 0.8 +
+                // oo_1_3 (-> token1)
+                8.0 * 1.2 +
+                3.0 * 0.8,
+        });
+        testFixture({
+            name: '8, reserved oo funds in a non-quote currency',
+            token1: -100,
+            token2: -100,
+            token3: -1,
+            oo12: [0, 0],
+            oo13: [10, 1],
+            perp1: [0, 0, 0, 0],
+            expectedHealth: 
+            // tokens
+            -100.0 * 1.2 -
+                100.0 * 5.0 * 1.5 -
+                10.0 * 1.5 +
+                // oo_1_3 (-> token3)
+                10.0 * 1.5 +
+                10.0 * 0.5,
+        });
+        testFixture({
+            name: '9, like 8 but oo_1_2 flips the oo_1_3 target',
+            token1: -100,
+            token2: -100,
+            token3: -1,
+            oo12: [100, 0],
+            oo13: [10, 1],
+            perp1: [0, 0, 0, 0],
+            expectedHealth: 
+            // tokens
+            -100.0 * 1.2 -
+                100.0 * 5.0 * 1.5 -
+                10.0 * 1.5 +
+                // oo_1_2 (-> token1)
+                80.0 * 1.2 +
+                20.0 * 0.8 +
+                // oo_1_3 (-> token1)
+                20.0 * 0.8,
+        });
+        done();
+    });
+    it('test_max_swap', (done) => {
+        const b0 = mockBankAndOracle(0, 0.1, 0.1, 2, 2);
+        const b1 = mockBankAndOracle(1, 0.2, 0.2, 3, 3);
+        const b2 = mockBankAndOracle(2, 0.3, 0.3, 4, 4);
+        const banks = [b0, b1, b2];
+        const hc = new HealthCache([
+            TokenInfo.fromBank(b0, I80F48.fromNumber(0)),
+            TokenInfo.fromBank(b1, I80F48.fromNumber(0)),
+            TokenInfo.fromBank(b2, I80F48.fromNumber(0)),
+        ], [], []);
+        expect(hc
+            .getMaxSwapSourceForHealthRatio(b0, b1, I80F48.fromNumber(2 / 3), I80F48.fromNumber(50))
+            .toNumber()).lessThan(0.0000001);
+        function findMaxSwapActual(hc, source, target, minValue, priceFactor, maxSwapFn) {
+            const clonedHc = cloneDeep(hc);
+            const sourcePrice = clonedHc.tokenInfos[source].prices;
+            const targetPrice = clonedHc.tokenInfos[target].prices;
+            const swapPrice = I80F48.fromNumber(priceFactor)
+                .mul(sourcePrice.oracle)
+                .div(targetPrice.oracle);
+            const sourceAmount = clonedHc.getMaxSwapSourceForHealthFn(banks[source], banks[target], swapPrice, I80F48.fromNumber(minValue), maxSwapFn);
+            function valueForAmount(amount) {
+                // adjust token balance
+                const clonedHcClone = cloneDeep(clonedHc);
+                clonedHc.tokenInfos[source].balanceNative.isub(amount);
+                clonedHc.tokenInfos[target].balanceNative.iadd(amount.mul(swapPrice));
+                return maxSwapFn(clonedHcClone);
+            }
+            return [
+                sourceAmount.toNumber(),
+                valueForAmount(sourceAmount).toNumber(),
+                valueForAmount(sourceAmount.sub(ONE_I80F48())).toNumber(),
+                valueForAmount(sourceAmount.add(ONE_I80F48())).toNumber(),
+            ];
+        }
+        function checkMaxSwapResult(hc, source, target, minValue, priceFactor, maxSwapFn) {
+            const [sourceAmount, actualValue, minusValue, plusValue] = findMaxSwapActual(hc, source, target, minValue, priceFactor, maxSwapFn);
+            console.log(` -- checking ${source} to ${target} for priceFactor: ${priceFactor}, target: ${minValue} actual: ${minusValue}/${actualValue}/${plusValue}, amount: ${sourceAmount}`);
+            if (actualValue < minValue) {
+                // check that swapping more would decrease the ratio!
+                expect(plusValue < actualValue);
+            }
+            else {
+                expect(actualValue >= minValue);
+                // either we're within tolerance of the target, or swapping 1 more would
+                // bring us below the target
+                expect(actualValue < minValue + 1 || plusValue < minValue);
+            }
+        }
+        function maxSwapFnRatio(hc) {
+            return hc.healthRatio(HealthType.init);
+        }
+        function maxSwapFn(hc) {
+            return hc.health(HealthType.init);
+        }
+        for (const fn of [maxSwapFn, maxSwapFnRatio]) {
+            {
+                console.log(' - test 0');
+                // adjust by usdc
+                const clonedHc = cloneDeep(hc);
+                clonedHc.tokenInfos[1].balanceNative.iadd(I80F48.fromNumber(100).div(clonedHc.tokenInfos[1].prices.oracle));
+                for (const priceFactor of [0.1, 0.9, 1.1]) {
+                    for (const target of range(1, 100, 1)) {
+                        checkMaxSwapResult(clonedHc, 0, 1, target, priceFactor, fn);
+                        checkMaxSwapResult(clonedHc, 1, 0, target, priceFactor, fn);
+                        checkMaxSwapResult(clonedHc, 0, 2, target, priceFactor, fn);
+                    }
+                }
+                // At this unlikely price it's healthy to swap infinitely
+                expect(function () {
+                    findMaxSwapActual(clonedHc, 0, 1, 50.0, 1.5, fn);
+                }).to.throw('Number out of range');
+            }
+            {
+                console.log(' - test 1');
+                const clonedHc = cloneDeep(hc);
+                // adjust by usdc
+                clonedHc.tokenInfos[0].balanceNative.iadd(I80F48.fromNumber(-20).div(clonedHc.tokenInfos[0].prices.oracle));
+                clonedHc.tokenInfos[1].balanceNative.iadd(I80F48.fromNumber(100).div(clonedHc.tokenInfos[1].prices.oracle));
+                for (const priceFactor of [0.1, 0.9, 1.1]) {
+                    for (const target of range(1, 100, 1)) {
+                        checkMaxSwapResult(clonedHc, 0, 1, target, priceFactor, fn);
+                        checkMaxSwapResult(clonedHc, 1, 0, target, priceFactor, fn);
+                        checkMaxSwapResult(clonedHc, 0, 2, target, priceFactor, fn);
+                        checkMaxSwapResult(clonedHc, 2, 0, target, priceFactor, fn);
+                    }
+                }
+            }
+            {
+                console.log(' - test 2');
+                const clonedHc = cloneDeep(hc);
+                // adjust by usdc
+                clonedHc.tokenInfos[0].balanceNative.iadd(I80F48.fromNumber(-50).div(clonedHc.tokenInfos[0].prices.oracle));
+                clonedHc.tokenInfos[1].balanceNative.iadd(I80F48.fromNumber(100).div(clonedHc.tokenInfos[1].prices.oracle));
+                // possible even though the init ratio is <100
+                checkMaxSwapResult(clonedHc, 1, 0, 100, 1, maxSwapFn);
+            }
+            {
+                console.log(' - test 3');
+                const clonedHc = cloneDeep(hc);
+                // adjust by usdc
+                clonedHc.tokenInfos[0].balanceNative.iadd(I80F48.fromNumber(-30).div(clonedHc.tokenInfos[0].prices.oracle));
+                clonedHc.tokenInfos[1].balanceNative.iadd(I80F48.fromNumber(100).div(clonedHc.tokenInfos[1].prices.oracle));
+                clonedHc.tokenInfos[2].balanceNative.iadd(I80F48.fromNumber(-30).div(clonedHc.tokenInfos[2].prices.oracle));
+                // swapping with a high ratio advises paying back all liabs
+                // and then swapping even more because increasing assets in 0 has better asset weight
+                const initRatio = clonedHc.healthRatio(HealthType.init).toNumber();
+                const [amount, actualRatio] = findMaxSwapActual(clonedHc, 1, 0, 100, 1, maxSwapFn);
+                expect(actualRatio / 2.0 > initRatio);
+                expect(amount - 100 / 3).lessThan(1);
+            }
+            {
+                console.log(' - test 4');
+                const clonedHc = cloneDeep(hc);
+                // adjust by usdc
+                clonedHc.tokenInfos[0].balanceNative.iadd(I80F48.fromNumber(100).div(clonedHc.tokenInfos[0].prices.oracle));
+                clonedHc.tokenInfos[1].balanceNative.iadd(I80F48.fromNumber(-2).div(clonedHc.tokenInfos[1].prices.oracle));
+                clonedHc.tokenInfos[2].balanceNative.iadd(I80F48.fromNumber(-65).div(clonedHc.tokenInfos[2].prices.oracle));
+                const initRatio = clonedHc.healthRatio(HealthType.init);
+                expect(initRatio.toNumber()).greaterThan(3);
+                expect(initRatio.toNumber()).lessThan(4);
+                checkMaxSwapResult(clonedHc, 0, 1, 1, 1, maxSwapFn);
+                checkMaxSwapResult(clonedHc, 0, 1, 3, 1, maxSwapFn);
+                checkMaxSwapResult(clonedHc, 0, 1, 4, 1, maxSwapFn);
+            }
+            // TODO test 5
+            {
+                console.log(' - test 6');
+                const clonedHc = cloneDeep(hc);
+                clonedHc.serum3Infos = [
+                    new Serum3Info(I80F48.fromNumber(30 / 3), I80F48.fromNumber(30 / 2), 1, 0, 0),
+                ];
+                // adjust by usdc
+                clonedHc.tokenInfos[0].balanceNative.iadd(I80F48.fromNumber(-20).div(clonedHc.tokenInfos[0].prices.oracle));
+                clonedHc.tokenInfos[1].balanceNative.iadd(I80F48.fromNumber(-40).div(clonedHc.tokenInfos[1].prices.oracle));
+                clonedHc.tokenInfos[2].balanceNative.iadd(I80F48.fromNumber(120).div(clonedHc.tokenInfos[2].prices.oracle));
+                for (const priceFactor of [0.9, 1.1]) {
+                    for (const target of range(1, 100, 1)) {
+                        checkMaxSwapResult(clonedHc, 0, 1, target, priceFactor, fn);
+                        checkMaxSwapResult(clonedHc, 1, 0, target, priceFactor, fn);
+                        checkMaxSwapResult(clonedHc, 0, 2, target, priceFactor, fn);
+                        checkMaxSwapResult(clonedHc, 1, 2, target, priceFactor, fn);
+                        checkMaxSwapResult(clonedHc, 2, 0, target, priceFactor, fn);
+                        checkMaxSwapResult(clonedHc, 2, 1, target, priceFactor, fn);
+                    }
+                }
+            }
+            {
+                // check starting with negative health but swapping can make it positive
+                console.log(' - test 7');
+                const clonedHc = cloneDeep(hc);
+                // adjust by usdc
+                clonedHc.tokenInfos[0].balanceNative.iadd(I80F48.fromNumber(-20).div(clonedHc.tokenInfos[0].prices.oracle));
+                clonedHc.tokenInfos[1].balanceNative.iadd(I80F48.fromNumber(20).div(clonedHc.tokenInfos[1].prices.oracle));
+                expect(clonedHc.health(HealthType.init).toNumber() < 0);
+                for (const priceFactor of [0.9, 1.1]) {
+                    for (const target of range(1, 100, 1)) {
+                        checkMaxSwapResult(clonedHc, 1, 0, target, priceFactor, fn);
+                    }
+                }
+            }
+            {
+                // check starting with negative health but swapping can't make it positive
+                console.log(' - test 8');
+                const clonedHc = cloneDeep(hc);
+                // adjust by usdc
+                clonedHc.tokenInfos[0].balanceNative.iadd(I80F48.fromNumber(-20).div(clonedHc.tokenInfos[0].prices.oracle));
+                clonedHc.tokenInfos[1].balanceNative.iadd(I80F48.fromNumber(10).div(clonedHc.tokenInfos[1].prices.oracle));
+                expect(clonedHc.health(HealthType.init).toNumber() < 0);
+                for (const priceFactor of [0.9, 1.1]) {
+                    for (const target of range(1, 100, 1)) {
+                        checkMaxSwapResult(clonedHc, 1, 0, target, priceFactor, fn);
+                    }
+                }
+            }
+            {
+                // swap some assets into a zero-asset-weight token
+                console.log(' - test 9');
+                const clonedHc = cloneDeep(hc);
+                // adjust by usdc
+                clonedHc.tokenInfos[0].balanceNative.iadd(I80F48.fromNumber(10).div(clonedHc.tokenInfos[0].prices.oracle));
+                clonedHc.tokenInfos[1].initAssetWeight = ZERO_I80F48();
+                expect(findMaxSwapActual(clonedHc, 0, 1, 1, 1, maxSwapFn)[0] > 0);
+                for (const priceFactor of [0.9, 1.1]) {
+                    for (const target of range(1, 100, 1)) {
+                        checkMaxSwapResult(clonedHc, 0, 1, target, priceFactor, fn);
+                    }
+                }
+            }
+        }
+        done();
+    });
+    it('test_max_perp', (done) => {
+        const baseLotSize = 100;
+        const b0 = mockBankAndOracle(0, 0.0, 0.0, 1, 1);
+        const p0 = mockPerpMarket(0, 0.3, 0.3, baseLotSize, 2);
+        const hc = new HealthCache([TokenInfo.fromBank(b0, I80F48.fromNumber(0))], [], [PerpInfo.emptyFromPerpMarket(p0)]);
+        expect(hc.health(HealthType.init).toNumber()).equals(0);
+        expect(hc
+            .getMaxPerpForHealthRatio(p0, I80F48.fromNumber(2), PerpOrderSide.bid, I80F48.fromNumber(50))
+            .toNumber()).equals(0);
+        function findMaxTrade(hc, side, ratio, priceFactor) {
+            const prices = hc.perpInfos[0].prices;
+            const tradePrice = I80F48.fromNumber(priceFactor).mul(prices.oracle);
+            const baseLots0 = hc
+                .getMaxPerpForHealthRatio(p0, tradePrice, side, I80F48.fromNumber(ratio))
+                .toNumber();
+            const direction = side == PerpOrderSide.bid ? 1 : -1;
+            // compute the health ratio we'd get when executing the trade
+            const baseLots1 = direction * baseLots0;
+            let baseNative = I80F48.fromNumber(baseLots1).mul(I80F48.fromNumber(baseLotSize));
+            let hcClone = cloneDeep(hc);
+            hcClone.perpInfos[0].baseLots.iadd(new BN(baseLots1));
+            hcClone.perpInfos[0].quote.isub(baseNative.mul(tradePrice));
+            const actualRatio = hcClone.healthRatio(HealthType.init);
+            // the ratio for trading just one base lot extra
+            const baseLots2 = direction * (baseLots0 + 1);
+            baseNative = I80F48.fromNumber(baseLots2 * baseLotSize);
+            hcClone = cloneDeep(hc);
+            hcClone.perpInfos[0].baseLots.iadd(new BN(baseLots2));
+            hcClone.perpInfos[0].quote.isub(baseNative.mul(tradePrice));
+            const plusRatio = hcClone.healthRatio(HealthType.init);
+            return [baseLots0, actualRatio.toNumber(), plusRatio.toNumber()];
+        }
+        function checkMaxTrade(hc, side, ratio, priceFactor) {
+            const [baseLots, actualRatio, plusRatio] = findMaxTrade(hc, side, ratio, priceFactor);
+            console.log(`checking for price_factor: ${priceFactor}, target ratio ${ratio}: actual ratio: ${actualRatio}, plus ratio: ${plusRatio}, base_lots: ${baseLots}`);
+            expect(ratio).lessThan(actualRatio);
+            expect(plusRatio - 0.1).lessThanOrEqual(ratio);
+        }
+        // adjust token
+        hc.tokenInfos[0].balanceNative.iadd(I80F48.fromNumber(3000));
+        for (const existing of [-5, 0, 3]) {
+            const hcClone = cloneDeep(hc);
+            hcClone.perpInfos[0].baseLots.iadd(new BN(existing));
+            hcClone.perpInfos[0].quote.isub(I80F48.fromNumber(existing * baseLotSize * 2));
+            for (const side of [PerpOrderSide.bid, PerpOrderSide.ask]) {
+                console.log(`existing ${existing} ${side === PerpOrderSide.bid ? 'bid' : 'ask'}`);
+                for (const priceFactor of [0.8, 1.0, 1.1]) {
+                    for (const ratio of range(1, 101, 1)) {
+                        checkMaxTrade(hcClone, side, ratio, priceFactor);
+                    }
+                }
+            }
+        }
+        // check some extremely bad prices
+        checkMaxTrade(hc, PerpOrderSide.bid, 50, 2);
+        checkMaxTrade(hc, PerpOrderSide.ask, 50, 0.1);
+        // and extremely good prices
+        expect(function () {
+            findMaxTrade(hc, PerpOrderSide.bid, 50, 0.1);
+        }).to.throw();
+        expect(function () {
+            findMaxTrade(hc, PerpOrderSide.ask, 50, 1.5);
+        }).to.throw();
+        done();
+    });
+});
