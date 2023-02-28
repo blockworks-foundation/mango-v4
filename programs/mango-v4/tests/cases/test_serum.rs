@@ -334,9 +334,9 @@ async fn test_serum_loan_origination_fees() -> Result<(), TransportError> {
     }
     .create(solana)
     .await;
-    let base_token = &tokens[0];
+    let base_token = &tokens[1];
     let base_bank = base_token.bank;
-    let quote_token = &tokens[1];
+    let quote_token = &tokens[0];
     let quote_bank = quote_token.bank;
 
     //
@@ -596,6 +596,12 @@ async fn test_serum_loan_origination_fees() -> Result<(), TransportError> {
             serum_fee(fill_amount) as f64,
             0.1
         ));
+
+        let account_data = solana.get_account::<MangoAccount>(account).await;
+        assert_eq!(
+            account_data.buyback_fees_accrued_current,
+            serum_fee(fill_amount) as u64
+        );
 
         assert_eq!(
             account_position(solana, account, quote_bank).await,
