@@ -74,7 +74,7 @@ pub fn account_buyback_fees_with_mngo(
         &AccountInfoRef::borrow(&ctx.accounts.mngo_oracle.as_ref())?,
         Some(Clock::get()?.slot),
     )?;
-    let mngo_buyback_price = mngo_oracle_price * bonus_factor;
+    let mngo_buyback_price = mngo_oracle_price.min(mngo_bank.stable_price()) * bonus_factor;
     // mngo is exchanged at a discount
     let mut max_buyback_mngo = max_buyback / mngo_buyback_price;
     // buyback is restricted to account's token position
