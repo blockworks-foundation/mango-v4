@@ -8,10 +8,10 @@ import { I80F48, I80F48Dto, ZERO_I80F48 } from '../numbers/I80F48';
 import { Modify } from '../types';
 import {
   As,
+  QUOTE_DECIMALS,
   U64_MAX_BN,
   toNative,
   toUiDecimals,
-  QUOTE_DECIMALS,
 } from '../utils';
 import {
   OracleConfig,
@@ -198,7 +198,7 @@ export class PerpMarket {
     public reduceOnly: boolean,
     maintOverallAssetWeight: I80F48Dto,
     initOverallAssetWeight: I80F48Dto,
-    positivePnlLiquidationFee: I80F48Dto,
+    public positivePnlLiquidationFee: I80F48Dto,
   ) {
     this.name = utf8.decode(new Uint8Array(name)).split('\x00')[0];
     this.oracleConfig = {
