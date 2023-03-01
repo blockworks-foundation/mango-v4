@@ -50,6 +50,7 @@ export class PerpMarket {
   public feesSettled: I80F48;
   public maintOverallAssetWeight: I80F48;
   public initOverallAssetWeight: I80F48;
+  public positivePnlLiquidationFee: I80F48;
 
   public _price: I80F48;
   public _uiPrice: number;
@@ -198,7 +199,7 @@ export class PerpMarket {
     public reduceOnly: boolean,
     maintOverallAssetWeight: I80F48Dto,
     initOverallAssetWeight: I80F48Dto,
-    public positivePnlLiquidationFee: I80F48Dto,
+    positivePnlLiquidationFee: I80F48Dto,
   ) {
     this.name = utf8.decode(new Uint8Array(name)).split('\x00')[0];
     this.oracleConfig = {
@@ -220,6 +221,7 @@ export class PerpMarket {
     this.feesSettled = I80F48.from(feesSettled);
     this.maintOverallAssetWeight = I80F48.from(maintOverallAssetWeight);
     this.initOverallAssetWeight = I80F48.from(initOverallAssetWeight);
+    this.positivePnlLiquidationFee = I80F48.from(positivePnlLiquidationFee);
 
     this.priceLotsToUiConverter = new Big(10)
       .pow(baseDecimals - QUOTE_DECIMALS)
