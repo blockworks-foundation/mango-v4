@@ -13,7 +13,7 @@ import { TokenIndex } from '../accounts/bank';
 import { Builder } from '../builder';
 import { MangoClient } from '../client';
 import { NullTokenEditParams } from '../clientIxParamBuilder';
-import { MANGO_V4_ID } from '../constants';
+import { MANGO_V4_ID, OPENBOOK_PROGRAM_ID } from '../constants';
 import { bpsToDecimal, percentageToDecimal, toNative } from '../utils';
 
 const GROUP_NUM = Number(process.env.GROUP_NUM || 0);
@@ -163,6 +163,36 @@ async function tokenEdit() {
   console.log(serializeInstructionToBase64(ix));
 }
 
+async function serum3Register() {
+  const result = await buildAdminClient();
+  const client = result[0];
+
+  const group = await client.getGroup(
+    new PublicKey('78b8f4cGCwmZ9ysPFMWLaLTkkaYnUjwMJYStWe5RTSSX'),
+  );
+
+  const ix = await client.program.methods
+    .serum3RegisterMarket(3, 'ETH (Portal)/USDC')
+    .accounts({
+      group: group.publicKey,
+      admin: group.admin,
+      serumProgram: OPENBOOK_PROGRAM_ID['mainnet-beta'],
+      serumMarketExternal: new PublicKey(
+        'BbJgE7HZMaDp5NTYvRh5jZSkQPVDTU8ubPFtpogUkEj4',
+      ),
+      baseBank: group.getFirstBankByMint(
+        new PublicKey('7vfCXTUXx5WJV5JADk17DUJ4ksgau7utNKj4b963voxs'),
+      ).publicKey,
+      quoteBank: group.getFirstBankByMint(
+        new PublicKey('EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v'),
+      ).publicKey,
+      payer: (client.program.provider as AnchorProvider).wallet.publicKey,
+    })
+    .instruction();
+
+  console.log(serializeInstructionToBase64(ix));
+}
+
 async function perpCreate() {
   const result = await buildAdminClient();
   const client = result[0];
@@ -268,7 +298,8 @@ async function main() {
   try {
     // await tokenRegister();
     // await tokenEdit();
-    await perpCreate();
+    // await perpCreate();
+    await serum3Register();
   } catch (error) {
     console.log(error);
   }
