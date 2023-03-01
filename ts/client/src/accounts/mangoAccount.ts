@@ -630,9 +630,8 @@ export class MangoAccount {
       throw new Error(`No open orders account found for ${externalMarketPk}`);
     }
 
-    const serum3MarketExternal = group.serum3ExternalMarketsMap.get(
-      externalMarketPk.toBase58(),
-    )!;
+    const serum3MarketExternal =
+      group.getSerum3ExternalMarket(externalMarketPk);
     const [bidsInfo, asksInfo] =
       await client.program.provider.connection.getMultipleAccountsInfo([
         serum3MarketExternal.bidsAddress,

@@ -90,9 +90,9 @@ const binanceClient = Binance();
 const krakenClient = new Kraken();
 
 function getPerpMarketAssetsToTradeOn(group: Group) {
-  const allMangoGroupPerpMarketAssets = Array.from(
-    group.perpMarketsMapByName.keys(),
-  ).map((marketName) => marketName.replace('-PERP', ''));
+  const allMangoGroupPerpMarketAssets = group.perpMarkets.map((perpMarket) =>
+    perpMarket.name.replace('-PERP', ''),
+  );
   return Object.keys(params.assets).filter((asset) =>
     allMangoGroupPerpMarketAssets.includes(asset),
   );
@@ -267,9 +267,7 @@ async function fullMarketMaker() {
   await group.reloadAll(client);
 
   // Cancel all existing orders
-  for (const perpMarket of Array.from(
-    group.perpMarketsMapByMarketIndex.values(),
-  )) {
+  for (const perpMarket of group.perpMarkets) {
     await client.perpCancelAllOrders(
       group,
       mangoAccount,

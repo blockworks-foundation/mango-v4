@@ -8,7 +8,7 @@ import {
   PublicKey,
 } from '@solana/web3.js';
 import BN from 'bn.js';
-import cloneDeep from 'lodash/cloneDeep';
+import groupBy from 'lodash/groupBy';
 import merge from 'lodash/merge';
 import { MangoClient } from '../client';
 import { OPENBOOK_PROGRAM_ID } from '../constants';
@@ -65,18 +65,12 @@ export class Group {
       obj.ixGate,
       obj.buybackFeesSwapMangoAccount,
       [], // addressLookupTablesList
-      new Map(), // banksMapByName
-      new Map(), // banksMapByMint
-      new Map(), // banksMapByTokenIndex
-      new Map(), // serum3MarketsMapByExternal
-      new Map(), // serum3MarketsMapByMarketIndex
-      new Map(), // serum3MarketExternalsMap
-      new Map(), // perpMarketsMapByOracle
-      new Map(), // perpMarketsMapByMarketIndex
-      new Map(), // perpMarketsMapByName
-      new Map(), // mintInfosMapByTokenIndex
-      new Map(), // mintInfosMapByMint
-      new Map(), // vaultAmountsMap
+      [], // banks
+      [], // serum3MarketInfos
+      [], // serum3Markets
+      [], // perpMarkets
+      [], // mintInfos
+      new Map(),
     );
   }
 
@@ -99,19 +93,16 @@ export class Group {
     public ixGate: BN,
     public buybackFeesSwapMangoAccount: PublicKey,
     public addressLookupTablesList: AddressLookupTableAccount[],
-    public banksMapByName: Map<string, Bank[]>,
-    public banksMapByMint: Map<string, Bank[]>,
-    public banksMapByTokenIndex: Map<TokenIndex, Bank[]>,
-    public serum3MarketsMapByExternal: Map<string, Serum3Market>,
-    public serum3MarketsMapByMarketIndex: Map<MarketIndex, Serum3Market>,
-    public serum3ExternalMarketsMap: Map<string, Market>,
-    public perpMarketsMapByOracle: Map<string, PerpMarket>,
-    public perpMarketsMapByMarketIndex: Map<PerpMarketIndex, PerpMarket>,
-    public perpMarketsMapByName: Map<string, PerpMarket>,
-    public mintInfosMapByTokenIndex: Map<TokenIndex, MintInfo>,
-    public mintInfosMapByMint: Map<string, MintInfo>,
-    public vaultAmountsMap: Map<string, BN>,
-  ) {}
+    public banks: Bank[][],
+    public serum3MarketInfos: Serum3Market[],
+    public serum3Markets: Market[],
+    public perpMarkets: PerpMarket[],
+    public mintInfos: MintInfo[],
+    public vaultAmountsMap: Map<string, BN>, // public banksMapByName: Map<string, Bank[]>, // public banksMapByMint: Map<string, Bank[]>, // public banksMapByTokenIndex: Map<TokenIndex, Bank[]>, // public serum3MarketsMapByExternal: Map<string, Serum3Market>, // public serum3MarketsMapByMarketIndex: Map<MarketIndex, Serum3Market>, // public serum3ExternalMarketsMap: Map<string, Market>, // public perpMarketsMapByOracle: Map<string, PerpMarket>, // public perpMarketsMapByMarketIndex: Map<PerpMarketIndex, PerpMarket>, // public perpMarketsMapByName: Map<string, PerpMarket>,
+  ) // public mintInfosMapByTokenIndex: Map<TokenIndex, MintInfo>,
+  // public mintInfosMapByMint: Map<string, MintInfo>,
+  // public vaultAmountsMap: Map<string, BN>,
+  {}
 
   public async reloadAll(client: MangoClient): Promise<void> {
     const ids: Id | undefined = await client.getIds(this.publicKey);
@@ -165,28 +156,8 @@ export class Group {
       banks = await client.getBanksForGroup(this);
     }
 
-    const oldbanksMapByTokenIndex = cloneDeep(this.banksMapByTokenIndex);
-    this.banksMapByName = new Map();
-    this.banksMapByMint = new Map();
-    this.banksMapByTokenIndex = new Map();
-    for (const bank of banks) {
-      // ensure that freshly fetched banks have valid price until we fetch oracles again
-      const oldBanks = oldbanksMapByTokenIndex.get(bank.tokenIndex);
-      if (oldBanks && oldBanks.length > 0) {
-        merge(bank, oldBanks[0]);
-      }
-
-      const mintId = bank.mint.toString();
-      if (this.banksMapByMint.has(mintId)) {
-        this.banksMapByMint.get(mintId)?.push(bank);
-        this.banksMapByName.get(bank.name)?.push(bank);
-        this.banksMapByTokenIndex.get(bank.tokenIndex)?.push(bank);
-      } else {
-        this.banksMapByMint.set(mintId, [bank]);
-        this.banksMapByName.set(bank.name, [bank]);
-        this.banksMapByTokenIndex.set(bank.tokenIndex, [bank]);
-      }
-    }
+    const banksByMint = groupBy(banks, (b: Bank) => b.mint.toString());
+    this.banks = Array.from(Object.values(banksByMint));
   }
 
   public async reloadMintInfos(client: MangoClient, ids?: Id): Promise<void> {
@@ -200,18 +171,7 @@ export class Group {
     } else {
       mintInfos = await client.getMintInfosForGroup(this);
     }
-
-    this.mintInfosMapByTokenIndex = new Map(
-      mintInfos.map((mintInfo) => {
-        return [mintInfo.tokenIndex, mintInfo];
-      }),
-    );
-
-    this.mintInfosMapByMint = new Map(
-      mintInfos.map((mintInfo) => {
-        return [mintInfo.mint.toString(), mintInfo];
-      }),
-    );
+    this.mintInfos = mintInfos;
   }
 
   public async reloadSerum3Markets(
@@ -230,39 +190,18 @@ export class Group {
     } else {
       serum3Markets = await client.serum3GetMarkets(this);
     }
-
-    this.serum3MarketsMapByExternal = new Map(
-      serum3Markets.map((serum3Market) => [
-        serum3Market.serumMarketExternal.toBase58(),
-        serum3Market,
-      ]),
-    );
-    this.serum3MarketsMapByMarketIndex = new Map(
-      serum3Markets.map((serum3Market) => [
-        serum3Market.marketIndex,
-        serum3Market,
-      ]),
-    );
+    this.serum3MarketInfos = serum3Markets;
   }
 
   public async reloadSerum3ExternalMarkets(client: MangoClient): Promise<void> {
-    const externalMarkets = await Promise.all(
-      Array.from(this.serum3MarketsMapByExternal.values()).map((serum3Market) =>
+    this.serum3Markets = await Promise.all(
+      this.serum3MarketInfos.map((serum3Market) =>
         Market.load(
           client.program.provider.connection,
           serum3Market.serumMarketExternal,
           { commitment: client.program.provider.connection.commitment },
           OPENBOOK_PROGRAM_ID[client.cluster],
         ),
-      ),
-    );
-
-    this.serum3ExternalMarketsMap = new Map(
-      Array.from(this.serum3MarketsMapByExternal.values()).map(
-        (serum3Market, index) => [
-          serum3Market.serumMarketExternal.toBase58(),
-          externalMarkets[index],
-        ],
       ),
     );
   }
@@ -280,39 +219,17 @@ export class Group {
     } else {
       perpMarkets = await client.perpGetMarkets(this);
     }
-
     // ensure that freshly fetched perp markets have valid price until we fetch oracles again
-    const oldPerpMarketByMarketIndex = cloneDeep(
-      this.perpMarketsMapByMarketIndex,
-    );
-    for (const perpMarket of perpMarkets) {
-      const oldPerpMarket = oldPerpMarketByMarketIndex.get(
-        perpMarket.perpMarketIndex,
+    this.perpMarkets = perpMarkets.map((perpMarket) => {
+      const oldPerpMarket = this.perpMarkets.find(
+        (old) => old.perpMarketIndex === perpMarket.perpMarketIndex,
       );
-      if (oldPerpMarket) {
-        merge(perpMarket, oldPerpMarket);
-      }
-    }
-
-    this.perpMarketsMapByName = new Map(
-      perpMarkets.map((perpMarket) => [perpMarket.name, perpMarket]),
-    );
-    this.perpMarketsMapByOracle = new Map(
-      perpMarkets.map((perpMarket) => [
-        perpMarket.oracle.toBase58(),
-        perpMarket,
-      ]),
-    );
-    this.perpMarketsMapByMarketIndex = new Map(
-      perpMarkets.map((perpMarket) => [perpMarket.perpMarketIndex, perpMarket]),
-    );
+      return oldPerpMarket ? merge(perpMarket, oldPerpMarket) : perpMarket;
+    });
   }
 
   public async reloadBankOraclePrices(client: MangoClient): Promise<void> {
-    const banks: Bank[][] = Array.from(
-      this.banksMapByMint,
-      ([, value]) => value,
-    );
+    const banks: Bank[][] = this.banks;
     const oracles = banks.map((b) => b[0].oracle);
     const ais =
       await client.program.provider.connection.getMultipleAccountsInfo(oracles);
@@ -347,17 +264,14 @@ export class Group {
   public async reloadPerpMarketOraclePrices(
     client: MangoClient,
   ): Promise<void> {
-    const perpMarkets: PerpMarket[] = Array.from(
-      this.perpMarketsMapByName.values(),
-    );
-    const oracles = perpMarkets.map((b) => b.oracle);
+    const oracles = this.perpMarkets.map((b) => b.oracle);
     const ais =
       await client.program.provider.connection.getMultipleAccountsInfo(oracles);
 
     const coder = new BorshAccountsCoder(client.program.idl);
     await Promise.all(
       Array.from(ais.entries()).map(async ([i, ai]) => {
-        const perpMarket = perpMarkets[i];
+        const perpMarket = this.perpMarkets[i];
         if (!ai)
           throw new Error(
             `Undefined ai object in reloadPerpMarketOraclePrices for ${perpMarket.oracle}!`,
@@ -417,14 +331,11 @@ export class Group {
   }
 
   public async reloadVaults(client: MangoClient): Promise<void> {
-    const vaultPks = Array.from(this.banksMapByMint.values())
-      .flat()
-      .map((bank) => bank.vault);
+    const vaultPks = this.banks.flat().map((bank) => bank.vault);
     const vaultAccounts =
       await client.program.provider.connection.getMultipleAccountsInfo(
         vaultPks,
       );
-    const coder = new BorshAccountsCoder(client.program.idl);
     this.vaultAmountsMap = new Map(
       vaultAccounts.map((vaultAi, i) => {
         if (!vaultAi) {
@@ -455,13 +366,13 @@ export class Group {
   }
 
   public getFirstBankByMint(mintPk: PublicKey): Bank {
-    const banks = this.banksMapByMint.get(mintPk.toString());
-    if (!banks) throw new Error(`No bank found for mint ${mintPk}!`);
+    const banks = this.banks.find((bank) => bank[0]?.mint.equals(mintPk));
+    if (!banks?.[0]) throw new Error(`No bank found for mint ${mintPk}!`);
     return banks[0];
   }
 
   public getFirstBankByTokenIndex(tokenIndex: TokenIndex): Bank {
-    const banks = this.banksMapByTokenIndex.get(tokenIndex);
+    const banks = this.banks.find((bank) => bank[0]?.tokenIndex === tokenIndex);
     if (!banks) throw new Error(`No bank found for tokenIndex ${tokenIndex}!`);
     return banks[0];
   }
@@ -474,13 +385,31 @@ export class Group {
     return this.getFirstBankByTokenIndex(0 as TokenIndex);
   }
 
+  public getMintInfoByTokenIndex(tokenIndex: number): MintInfo {
+    const mintInfo = this.mintInfos.find(
+      (mintInfo) => mintInfo.tokenIndex === tokenIndex,
+    );
+    if (!mintInfo)
+      throw new Error(`No mint info found for token index ${tokenIndex}`);
+    return mintInfo;
+  }
+
+  public mintInfosMapByMint(mintPk: PublicKey): MintInfo {
+    const mintInfo = this.mintInfos.find(
+      (mintInfo) => mintInfo.mint === mintPk,
+    );
+    if (!mintInfo)
+      throw new Error(`No mint info found for mint ${mintPk.toString()}`);
+    return mintInfo;
+  }
+
   /**
    *
    * @param mintPk
    * @returns sum of ui balances of vaults for all banks for a token
    */
   public getTokenVaultBalanceByMintUi(mintPk: PublicKey): number {
-    const banks = this.banksMapByMint.get(mintPk.toBase58());
+    const banks = this.banks.find((bank) => bank[0]?.mint.equals(mintPk));
     if (!banks) {
       throw new Error(`No bank found for mint ${mintPk}!`);
     }
@@ -499,7 +428,9 @@ export class Group {
   }
 
   public getSerum3MarketByMarketIndex(marketIndex: MarketIndex): Serum3Market {
-    const serum3Market = this.serum3MarketsMapByMarketIndex.get(marketIndex);
+    const serum3Market = this.serum3MarketInfos.find(
+      (mkt) => mkt.marketIndex === marketIndex,
+    );
     if (!serum3Market) {
       throw new Error(`No serum3Market found for marketIndex ${marketIndex}!`);
     }
@@ -507,9 +438,9 @@ export class Group {
   }
 
   public getSerum3MarketByName(name: string): Serum3Market {
-    const serum3Market = Array.from(
-      this.serum3MarketsMapByExternal.values(),
-    ).find((serum3Market) => serum3Market.name === name);
+    const serum3Market = this.serum3MarketInfos.find(
+      (mkt) => mkt.name === name,
+    );
     if (!serum3Market) {
       throw new Error(`No serum3Market found by name ${name}!`);
     }
@@ -519,10 +450,8 @@ export class Group {
   public getSerum3MarketByExternalMarket(
     externalMarketPk: PublicKey,
   ): Serum3Market {
-    const serum3Market = Array.from(
-      this.serum3MarketsMapByExternal.values(),
-    ).find((serum3Market) =>
-      serum3Market.serumMarketExternal.equals(externalMarketPk),
+    const serum3Market = this.serum3MarketInfos.find((mkt) =>
+      mkt.serumMarketExternal.equals(externalMarketPk),
     );
     if (!serum3Market) {
       throw new Error(
@@ -533,8 +462,8 @@ export class Group {
   }
 
   public getSerum3ExternalMarket(externalMarketPk: PublicKey): Market {
-    const market = this.serum3ExternalMarketsMap.get(
-      externalMarketPk.toBase58(),
+    const market = this.serum3Markets.find((mkt) =>
+      mkt.publicKey.equals(externalMarketPk),
     );
     if (!market) {
       throw new Error(
@@ -561,7 +490,7 @@ export class Group {
   }
 
   public findPerpMarket(marketIndex: PerpMarketIndex): PerpMarket {
-    const perpMarket = Array.from(this.perpMarketsMapByName.values()).find(
+    const perpMarket = this.perpMarkets.find(
       (perpMarket) => perpMarket.perpMarketIndex === marketIndex,
     );
     if (!perpMarket) {
@@ -573,7 +502,9 @@ export class Group {
   }
 
   public getPerpMarketByOracle(oracle: PublicKey): PerpMarket {
-    const perpMarket = this.perpMarketsMapByOracle.get(oracle.toBase58());
+    const perpMarket = this.perpMarkets.find((perpMarket) =>
+      perpMarket.oracle.equals(oracle),
+    );
     if (!perpMarket) {
       throw new Error(`No PerpMarket found for oracle ${oracle}!`);
     }
@@ -581,19 +512,21 @@ export class Group {
   }
 
   public getPerpMarketByMarketIndex(marketIndex: PerpMarketIndex): PerpMarket {
-    const perpMarket = this.perpMarketsMapByMarketIndex.get(marketIndex);
+    const perpMarket = this.perpMarkets.find(
+      (perpMarket) => perpMarket.perpMarketIndex === marketIndex,
+    );
     if (!perpMarket) {
       throw new Error(`No PerpMarket found with marketIndex ${marketIndex}!`);
     }
     return perpMarket;
   }
 
-  public getPerpMarketByName(perpMarketName: string): PerpMarket {
-    const perpMarket = Array.from(
-      this.perpMarketsMapByMarketIndex.values(),
-    ).find((perpMarket) => perpMarket.name === perpMarketName);
+  public getPerpMarketByName(name: string): PerpMarket {
+    const perpMarket = this.perpMarkets.find(
+      (perpMarket) => perpMarket.name === name,
+    );
     if (!perpMarket) {
-      throw new Error(`No PerpMarket found by name ${perpMarketName}!`);
+      throw new Error(`No PerpMarket found by name ${name}!`);
     }
     return perpMarket;
   }
@@ -616,7 +549,7 @@ export class Group {
   }
 
   public consoleLogBanks(): void {
-    for (const mintBanks of this.banksMapByMint.values()) {
+    for (const mintBanks of this.banks) {
       for (const bank of mintBanks) {
         console.log(bank.toString());
       }
@@ -648,15 +581,15 @@ export class Group {
     res =
       res +
       '\n mintInfos:' +
-      Array.from(this.mintInfosMapByTokenIndex.entries())
+      this.mintInfos
         .map(
-          (mintInfoTuple) =>
-            '  \n' + mintInfoTuple[0] + ') ' + mintInfoTuple[1].toString(),
+          (mintInfo) =>
+            '  \n' + mintInfo.tokenIndex + ') ' + mintInfo.toString(),
         )
         .join(', ');
 
     const banks: Bank[] = [];
-    for (const tokenBanks of this.banksMapByMint.values()) {
+    for (const tokenBanks of this.banks) {
       for (const bank of tokenBanks) {
         banks.push(bank);
       }
@@ -665,7 +598,7 @@ export class Group {
     res =
       res +
       '\n banks:' +
-      Array.from(banks)
+      banks
         .map((bank) => '  \n' + bank.name + ') ' + bank.toString())
         .join(', ');
 

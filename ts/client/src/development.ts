@@ -26,22 +26,22 @@ export function debugHealthAccounts(
   publicKeys: PublicKey[],
 ): void {
   const banks = new Map(
-    Array.from(group.banksMapByName.values()).map((banks: Bank[]) => [
+    group.banks.map((banks: Bank[]) => [
       banks[0].publicKey.toBase58(),
       `${banks[0].name} bank`,
     ]),
   );
   const oracles = new Map(
-    Array.from(group.banksMapByName.values()).map((banks: Bank[]) => [
+    group.banks.map((banks: Bank[]) => [
       banks[0].oracle.toBase58(),
       `${banks[0].name} oracle`,
     ]),
   );
   const serum3 = new Map(
     mangoAccount.serum3Active().map((serum3: Serum3Orders) => {
-      const serum3Market = Array.from(
-        group.serum3MarketsMapByExternal.values(),
-      ).find((serum3Market) => serum3Market.marketIndex === serum3.marketIndex);
+      const serum3Market = group.serum3MarketInfos.find(
+        (serum3Market) => serum3Market.marketIndex === serum3.marketIndex,
+      );
       if (!serum3Market) {
         throw new Error(
           `Serum3Orders for non existent market with market index ${serum3.marketIndex}`,
@@ -51,12 +51,10 @@ export function debugHealthAccounts(
     }),
   );
   const perps = new Map(
-    Array.from(group.perpMarketsMapByName.values()).map(
-      (perpMarket: PerpMarket) => [
-        perpMarket.publicKey.toBase58(),
-        `${perpMarket.name} perp market`,
-      ],
-    ),
+    group.perpMarkets.map((perpMarket: PerpMarket) => [
+      perpMarket.publicKey.toBase58(),
+      `${perpMarket.name} perp market`,
+    ]),
   );
 
   publicKeys.map((pk) => {
