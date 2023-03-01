@@ -98,11 +98,8 @@ export class Group {
     public serum3Markets: Market[],
     public perpMarkets: PerpMarket[],
     public mintInfos: MintInfo[],
-    public vaultAmountsMap: Map<string, BN>, // public banksMapByName: Map<string, Bank[]>, // public banksMapByMint: Map<string, Bank[]>, // public banksMapByTokenIndex: Map<TokenIndex, Bank[]>, // public serum3MarketsMapByExternal: Map<string, Serum3Market>, // public serum3MarketsMapByMarketIndex: Map<MarketIndex, Serum3Market>, // public serum3ExternalMarketsMap: Map<string, Market>, // public perpMarketsMapByOracle: Map<string, PerpMarket>, // public perpMarketsMapByMarketIndex: Map<PerpMarketIndex, PerpMarket>, // public perpMarketsMapByName: Map<string, PerpMarket>,
-  ) // public mintInfosMapByTokenIndex: Map<TokenIndex, MintInfo>,
-  // public mintInfosMapByMint: Map<string, MintInfo>,
-  // public vaultAmountsMap: Map<string, BN>,
-  {}
+    public vaultAmountsMap: Map<string, BN>,
+  ) {}
 
   public async reloadAll(client: MangoClient): Promise<void> {
     const ids: Id | undefined = await client.getIds(this.publicKey);
