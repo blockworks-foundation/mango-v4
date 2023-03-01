@@ -1026,8 +1026,8 @@ export interface FillEvent extends Event {
   takerOrderId: BN;
   takerClientOrderId: BN;
   takerFee: number;
-  price: BN;
-  quantity: BN;
+  price: number;
+  quantity: number;
 }
 
 export interface LiquidateEvent extends Event {
