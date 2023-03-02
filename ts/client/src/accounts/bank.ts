@@ -58,6 +58,7 @@ export class Bank implements BankForHealth {
   public _price: I80F48 | undefined;
   public _uiPrice: number | undefined;
   public _oracleLastUpdatedSlot: number | undefined;
+  public _oracleProvider: string | undefined;
   public collectedFeesNative: I80F48;
   public loanFeeRate: I80F48;
   public loanOriginationFeeRate: I80F48;
@@ -235,6 +236,7 @@ export class Bank implements BankForHealth {
     this._price = undefined;
     this._uiPrice = undefined;
     this._oracleLastUpdatedSlot = undefined;
+    this._oracleProvider = undefined;
   }
 
   toString(): string {
@@ -358,6 +360,15 @@ export class Bank implements BankForHealth {
       );
     }
     return this._oracleLastUpdatedSlot;
+  }
+
+  get oracleProvider(): string {
+    if (!this._oracleProvider) {
+      throw new Error(
+        `Undefined oracleProvider for bank ${this.publicKey} with tokenIndex ${this.tokenIndex}!`,
+      );
+    }
+    return this._oracleProvider;
   }
 
   nativeDeposits(): I80F48 {
