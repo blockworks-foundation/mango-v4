@@ -7,6 +7,8 @@ use crate::state::*;
 
 use crate::accounts_ix::*;
 
+use crate::logs::{AccountBuybackFeesWithMngoLog, TokenBalanceLog};
+
 pub fn account_buyback_fees_with_mngo(
     ctx: Context<AccountBuybackFeesWithMngo>,
     max_buyback: u64,
@@ -94,6 +96,14 @@ pub fn account_buyback_fees_with_mngo(
         now_ts,
         mngo_oracle_price,
     )?;
+    emit!(TokenBalanceLog {
+        mango_group: ctx.accounts.group.key(),
+        mango_account: ctx.accounts.account.key(),
+        token_index: mngo_bank.token_index,
+        indexed_position: account_mngo_token_position.indexed_position.to_bits(),
+        deposit_index: mngo_bank.deposit_index.to_bits(),
+        borrow_index: mngo_bank.borrow_index.to_bits(),
+    });
     if !in_use {
         account.deactivate_token_position_and_log(
             account_mngo_raw_token_index,
@@ -137,6 +147,15 @@ pub fn account_buyback_fees_with_mngo(
         max_buyback,
         max_buyback_mngo
     );
+
+    emit!(AccountBuybackFeesWithMngoLog {
+        mango_group: ctx.accounts.group.key(),
+        mango_account: ctx.accounts.account.key(),
+        buyback_fees: max_buyback.to_bits(),
+        buyback_mngo: max_buyback_mngo.to_bits(),
+        mngo_buyback_price: mngo_buyback_price.to_bits(),
+        oracle_price: mngo_oracle_price.to_bits(),
+    });
 
     // ensure dao mango account has no liabilities after we do the token swap
     for ele in dao_account.all_token_positions() {

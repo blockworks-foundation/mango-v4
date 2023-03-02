@@ -8250,6 +8250,41 @@ export type MangoV4 = {
           "index": false
         }
       ]
+    },
+    {
+      "name": "AccountBuybackFeesWithMngoLog",
+      "fields": [
+        {
+          "name": "mangoGroup",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "mangoAccount",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "buybackFees",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "buybackMngo",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "mngoBuybackPrice",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "oraclePrice",
+          "type": "i128",
+          "index": false
+        }
+      ]
     }
   ],
   "errors": [
@@ -16729,6 +16764,41 @@ export const IDL: MangoV4 = {
         },
         {
           "name": "settlement",
+          "type": "i128",
+          "index": false
+        }
+      ]
+    },
+    {
+      "name": "AccountBuybackFeesWithMngoLog",
+      "fields": [
+        {
+          "name": "mangoGroup",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "mangoAccount",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "buybackFees",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "buybackMngo",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "mngoBuybackPrice",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "oraclePrice",
           "type": "i128",
           "index": false
         }
