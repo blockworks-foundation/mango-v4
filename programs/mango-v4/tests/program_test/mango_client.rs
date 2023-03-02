@@ -1071,6 +1071,7 @@ fn token_edit_instruction_default() -> mango_v4::instruction::TokenEdit {
         reset_stable_price: false,
         reset_net_borrow_limit: false,
         reduce_only_opt: None,
+        name_opt: None,
     }
 }
 
@@ -2820,6 +2821,7 @@ fn perp_edit_instruction_default() -> mango_v4::instruction::PerpEditMarket {
         reduce_only_opt: None,
         reset_stable_price: false,
         positive_pnl_liquidation_fee_opt: None,
+        name_opt: None,
     }
 }
 

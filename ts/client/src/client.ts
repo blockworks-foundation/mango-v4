@@ -384,6 +384,7 @@ export class MangoClient {
         params.resetStablePrice ?? false,
         params.resetNetBorrowLimit ?? false,
         params.reduceOnly,
+        params.name,
       )
       .accounts({
         group: group.publicKey,
@@ -1916,6 +1917,7 @@ export class MangoClient {
         params.reduceOnly,
         params.resetStablePrice ?? false,
         params.positivePnlLiquidationFee,
+        params.name,
       )
       .accounts({
         group: group.publicKey,
