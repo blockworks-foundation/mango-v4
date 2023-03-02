@@ -7,9 +7,7 @@ import {
 } from '@solana/web3.js';
 import fs from 'fs';
 import { PerpMarketIndex } from '../src/accounts/perp';
-import { Builder } from '../src/builder';
 import { MangoClient } from '../src/client';
-import { NullTokenEditParams } from '../src/clientIxParamBuilder';
 import { MANGO_V4_ID } from '../src/constants';
 import { buildVersionedTx } from '../src/utils';
 
@@ -132,44 +130,7 @@ async function main() {
     console.log(
       `...registered token bank ${bank.publicKey}, https://explorer.solana.com/tx/${sig}?cluster=devnet`,
     );
-
-    sig = await client.tokenEdit(
-      group,
-      usdcDevnetMint,
-      Builder(NullTokenEditParams).name('new-name').forTestingOnly(1).build(),
-    );
-    console.log(
-      `...edited token https://explorer.solana.com/tx/${sig}?cluster=devnet`,
-    );
-
-    sig = await client.tokenEdit(
-      group,
-      usdcDevnetMint,
-      Builder(NullTokenEditParams).forTestingOnly(1).build(),
-    );
-    console.log(
-      `...edited token https://explorer.solana.com/tx/${sig}?cluster=devnet`,
-    );
-
-    sig = await client.tokenEdit(
-      group,
-      usdcDevnetMint,
-      Builder(NullTokenEditParams).build(),
-    );
-    console.log(
-      `...edited token https://explorer.solana.com/tx/${sig}?cluster=devnet`,
-    );
-
-    sig = await client.tokenEdit(
-      group,
-      usdcDevnetMint,
-      Builder(NullTokenEditParams).reduceOnly(true).build(),
-    );
-    console.log(
-      `...edited token https://explorer.solana.com/tx/${sig}?cluster=devnet`,
-    );
-    process.exit();
-
+    await group.reloadAll(client);
     // eslint-disable-next-line
   } catch (error) {}
 
