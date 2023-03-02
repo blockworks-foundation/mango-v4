@@ -64,13 +64,6 @@ pub fn serum3_settle_funds<'info>(
         );
     }
 
-    if fees_to_dao && !v2.is_none() {
-        require_keys_eq!(
-            v2.as_ref().unwrap().fee_rebate_target.key(),
-            accounts.quote_vault.key()
-        );
-    }
-
     //
     // Charge any open loan origination fees
     //
@@ -98,7 +91,7 @@ pub fn serum3_settle_funds<'info>(
     let before_base_vault = accounts.base_vault.amount;
     let before_quote_vault = accounts.quote_vault.amount;
 
-    cpi_settle_funds(accounts, v2.as_deref())?;
+    cpi_settle_funds(accounts)?;
 
     //
     // After-settle tracking
@@ -223,10 +216,7 @@ pub fn charge_loan_origination_fees(
     Ok(())
 }
 
-fn cpi_settle_funds<'info>(
-    ctx: &Serum3SettleFunds<'info>,
-    v2: Option<&Serum3SettleFundsV2Extra<'info>>,
-) -> Result<()> {
+fn cpi_settle_funds<'info>(ctx: &Serum3SettleFunds<'info>) -> Result<()> {
     use crate::serum3_cpi;
     let group = ctx.group.load()?;
     serum3_cpi::SettleFunds {
@@ -240,9 +230,7 @@ fn cpi_settle_funds<'info>(
         user_quote_wallet: ctx.quote_vault.to_account_info(),
         vault_signer: ctx.market_vault_signer.to_account_info(),
         token_program: ctx.token_program.to_account_info(),
-        rebates_quote_wallet: v2
-            .map(|a| a.fee_rebate_target.to_account_info())
-            .unwrap_or(ctx.quote_vault.to_account_info()),
+        rebates_quote_wallet: ctx.quote_vault.to_account_info(),
     }
     .call(&group)
 }

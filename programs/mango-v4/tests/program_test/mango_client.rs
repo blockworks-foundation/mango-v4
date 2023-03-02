@@ -2422,7 +2422,6 @@ pub struct Serum3SettleFundsV2Instruction {
 
     pub serum_market: Pubkey,
     pub fees_to_dao: bool,
-    pub fee_target: Option<Pubkey>,
 }
 #[async_trait::async_trait(?Send)]
 impl ClientInstruction for Serum3SettleFundsV2Instruction {
@@ -2470,13 +2469,6 @@ impl ClientInstruction for Serum3SettleFundsV2Instruction {
         )
         .unwrap();
 
-        let fee_target = if self.fees_to_dao {
-            assert!(self.fee_target.is_none());
-            quote_info.first_vault()
-        } else {
-            self.fee_target.unwrap()
-        };
-
         let accounts = Self::Accounts {
             v1: mango_v4::accounts::Serum3SettleFunds {
                 group: account.fixed.group,
@@ -2498,7 +2490,6 @@ impl ClientInstruction for Serum3SettleFundsV2Instruction {
             v2: mango_v4::accounts::Serum3SettleFundsV2Extra {
                 quote_oracle: quote_info.oracle,
                 base_oracle: base_info.oracle,
-                fee_rebate_target: fee_target,
             },
         };
 

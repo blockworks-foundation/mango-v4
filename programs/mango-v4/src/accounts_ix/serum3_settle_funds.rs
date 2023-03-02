@@ -67,9 +67,6 @@ pub struct Serum3SettleFundsV2Extra<'info> {
     pub quote_oracle: UncheckedAccount<'info>,
     /// CHECK: The oracle can be one of several different account types and the pubkey is checked in the parent
     pub base_oracle: UncheckedAccount<'info>,
-    /// CHECK: Validated by the serum cpi call
-    #[account(mut)]
-    pub fee_rebate_target: UncheckedAccount<'info>,
 }
 
 #[derive(Accounts)]

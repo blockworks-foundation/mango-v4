@@ -120,15 +120,14 @@ impl SerumOrderPlacer {
         .unwrap();
     }
 
-    async fn settle_v2(&self, fee_target: Option<Pubkey>) {
+    async fn settle_v2(&self, fees_to_dao: bool) {
         send_tx(
             &self.solana,
             Serum3SettleFundsV2Instruction {
                 account: self.account,
                 owner: self.owner,
                 serum_market: self.serum_market,
-                fees_to_dao: fee_target.is_none(),
-                fee_target,
+                fees_to_dao,
             },
         )
         .await
@@ -657,8 +656,8 @@ async fn test_serum_settle_v2_to_dao() -> Result<(), TransportError> {
         )
         .await;
 
-    order_placer.settle_v2(None).await;
-    order_placer2.settle_v2(None).await;
+    order_placer.settle_v2(true).await;
+    order_placer2.settle_v2(true).await;
 
     let quote_end = account_position(solana, account, quote_bank).await;
     let quote2_end = account_position(solana, account2, quote_bank).await;
@@ -708,7 +707,6 @@ async fn test_serum_settle_v2_to_account() -> Result<(), TransportError> {
     } = common_setup(&context, deposit_amount).await;
     let account = order_placer.account;
     let account2 = order_placer2.account;
-    let quote_vault = solana.get_account::<Bank>(quote_bank).await.vault;
 
     let serum_taker_fee = |amount: i64| (amount as f64 * 0.0004).trunc() as i64;
     let serum_maker_rebate = |amount: i64| (amount as f64 * 0.0002).floor() as i64;
@@ -741,8 +739,8 @@ async fn test_serum_settle_v2_to_account() -> Result<(), TransportError> {
         )
         .await;
 
-    order_placer.settle_v2(Some(quote_vault)).await;
-    order_placer2.settle_v2(Some(quote_vault)).await;
+    order_placer.settle_v2(false).await;
+    order_placer2.settle_v2(false).await;
 
     let quote_end = account_position(solana, account, quote_bank).await;
     let quote2_end = account_position(solana, account2, quote_bank).await;
@@ -760,93 +758,6 @@ async fn test_serum_settle_v2_to_account() -> Result<(), TransportError> {
         quote2_start - amount + serum_maker_rebate(amount) - lof - 1,
         quote2_end
     );
-
-    let quote_fees_end = solana
-        .get_account::<Bank>(quote_bank)
-        .await
-        .collected_fees_native;
-    assert!(assert_equal(
-        quote_fees_end - quote_fees_start,
-        lof as f64,
-        0.1
-    ));
-
-    Ok(())
-}
-
-#[tokio::test]
-async fn test_serum_settle_v2_to_foreign() -> Result<(), TransportError> {
-    let mut test_builder = TestContextBuilder::new();
-    test_builder.test().set_compute_max_units(95_000); // Serum3PlaceOrder needs 92.8k
-    let context = test_builder.start_default().await;
-    let solana = &context.solana.clone();
-
-    //
-    // SETUP: Create a group, accounts, market etc
-    //
-    let deposit_amount = 160000;
-    let CommonSetup {
-        serum_market_cookie,
-        quote_bank,
-        base_bank,
-        mut order_placer,
-        mut order_placer2,
-        ..
-    } = common_setup(&context, deposit_amount).await;
-    let account = order_placer.account;
-    let account2 = order_placer2.account;
-    let payer_quote_account = context.users[0].token_accounts[0];
-
-    let serum_taker_fee = |amount: i64| (amount as f64 * 0.0004).trunc() as i64;
-    let serum_maker_rebate = |amount: i64| (amount as f64 * 0.0002).floor() as i64;
-    let serum_referrer_fee = |amount: i64| (amount as f64 * 0.0002).trunc() as i64;
-    let loan_origination_fee = |amount: i64| (amount as f64 * 0.0005).trunc() as i64;
-
-    //
-    // TEST: Use v1 serum3_settle_funds
-    //
-    let deposit_amount = deposit_amount as i64;
-    let amount = 200000;
-    let quote_fees_start = solana
-        .get_account::<Bank>(quote_bank)
-        .await
-        .collected_fees_native;
-    let quote_start = account_position(solana, account, quote_bank).await;
-    let quote2_start = account_position(solana, account2, quote_bank).await;
-    let base_start = account_position(solana, account, base_bank).await;
-    let base2_start = account_position(solana, account2, base_bank).await;
-    let payer_start = solana.token_account_balance(payer_quote_account).await as i64;
-
-    // account2 has an order on the book, account takes
-    order_placer2.bid(1.0, amount as u64).await.unwrap();
-    order_placer.ask(1.0, amount as u64).await.unwrap();
-
-    context
-        .serum
-        .consume_spot_events(
-            &serum_market_cookie,
-            &[order_placer.open_orders, order_placer2.open_orders],
-        )
-        .await;
-
-    order_placer.settle_v2(Some(payer_quote_account)).await;
-    order_placer2.settle_v2(Some(payer_quote_account)).await;
-
-    let quote_end = account_position(solana, account, quote_bank).await;
-    let quote2_end = account_position(solana, account2, quote_bank).await;
-    let base_end = account_position(solana, account, base_bank).await;
-    let base2_end = account_position(solana, account2, base_bank).await;
-    let payer_end = solana.token_account_balance(payer_quote_account).await as i64;
-
-    let lof = loan_origination_fee(amount - deposit_amount);
-    assert_eq!(base_start - amount - lof, base_end);
-    assert_eq!(base2_start + amount, base2_end);
-    assert_eq!(quote_start + amount - serum_taker_fee(amount), quote_end);
-    assert_eq!(
-        quote2_start - amount + serum_maker_rebate(amount) - lof - 1,
-        quote2_end
-    );
-    assert_eq!(payer_start + serum_referrer_fee(amount), payer_end);
 
     let quote_fees_end = solana
         .get_account::<Bank>(quote_bank)
