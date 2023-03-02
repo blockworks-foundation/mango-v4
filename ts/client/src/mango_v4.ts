@@ -2133,6 +2133,11 @@ export type MangoV4 = {
     },
     {
       "name": "serum3SettleFunds",
+      "docs": [
+        "Settles all free funds from the OpenOrders account into the MangoAccount.",
+        "",
+        "Any serum \"referrer rebates\" (ui fees) are considered Mango fees."
+      ],
       "accounts": [
         {
           "name": "group",
@@ -2216,7 +2221,11 @@ export type MangoV4 = {
       "args": []
     },
     {
-      "name": "serum3SettleFunds2",
+      "name": "serum3SettleFundsV2",
+      "docs": [
+        "Like Serum3SettleFunds, but `fees_to_dao` determines if referrer rebates are considered fees",
+        "or are credited to the MangoAccount."
+      ],
       "accounts": [
         {
           "name": "v1",
@@ -2311,11 +2320,6 @@ export type MangoV4 = {
             },
             {
               "name": "baseOracle",
-              "isMut": false,
-              "isSigner": false
-            },
-            {
-              "name": "feeRebateTarget",
               "isMut": false,
               "isSigner": false
             }
@@ -10730,6 +10734,11 @@ export const IDL: MangoV4 = {
     },
     {
       "name": "serum3SettleFunds",
+      "docs": [
+        "Settles all free funds from the OpenOrders account into the MangoAccount.",
+        "",
+        "Any serum \"referrer rebates\" (ui fees) are considered Mango fees."
+      ],
       "accounts": [
         {
           "name": "group",
@@ -10813,7 +10822,11 @@ export const IDL: MangoV4 = {
       "args": []
     },
     {
-      "name": "serum3SettleFunds2",
+      "name": "serum3SettleFundsV2",
+      "docs": [
+        "Like Serum3SettleFunds, but `fees_to_dao` determines if referrer rebates are considered fees",
+        "or are credited to the MangoAccount."
+      ],
       "accounts": [
         {
           "name": "v1",
@@ -10908,11 +10921,6 @@ export const IDL: MangoV4 = {
             },
             {
               "name": "baseOracle",
-              "isMut": false,
-              "isSigner": false
-            },
-            {
-              "name": "feeRebateTarget",
               "isMut": false,
               "isSigner": false
             }
