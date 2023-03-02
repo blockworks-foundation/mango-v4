@@ -116,7 +116,11 @@ pub fn load_open_orders_ref<'a>(
 }
 
 pub fn load_open_orders(acc: &impl AccountReader) -> Result<&serum_dex::state::OpenOrders> {
-    Ok(bytemuck::from_bytes(strip_dex_padding(acc.data())?))
+    load_open_orders_bytes(acc.data())
+}
+
+pub fn load_open_orders_bytes(bytes: &[u8]) -> Result<&serum_dex::state::OpenOrders> {
+    Ok(bytemuck::from_bytes(strip_dex_padding(bytes)?))
 }
 
 pub fn pubkey_from_u64_array(d: [u64; 4]) -> Pubkey {

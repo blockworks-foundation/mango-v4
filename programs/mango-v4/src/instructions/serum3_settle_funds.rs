@@ -18,7 +18,7 @@ use crate::logs::{LoanOriginationFeeInstruction, WithdrawLoanOriginationFeeLog};
 ///
 pub fn serum3_settle_funds<'info>(
     accounts: &mut Serum3SettleFunds<'info>,
-    v2: Option<&mut Serum3SettleFunds2Extra<'info>>,
+    v2: Option<&mut Serum3SettleFundsV2Extra<'info>>,
     fees_to_dao: bool,
 ) -> Result<()> {
     let serum_market = accounts.serum_market.load()?;
@@ -225,7 +225,7 @@ pub fn charge_loan_origination_fees(
 
 fn cpi_settle_funds<'info>(
     ctx: &Serum3SettleFunds<'info>,
-    v2: Option<&Serum3SettleFunds2Extra<'info>>,
+    v2: Option<&Serum3SettleFundsV2Extra<'info>>,
 ) -> Result<()> {
     use crate::serum3_cpi;
     let group = ctx.group.load()?;

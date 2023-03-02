@@ -2416,6 +2416,101 @@ impl ClientInstruction for Serum3SettleFundsInstruction {
     }
 }
 
+pub struct Serum3SettleFundsV2Instruction {
+    pub account: Pubkey,
+    pub owner: TestKeypair,
+
+    pub serum_market: Pubkey,
+    pub fees_to_dao: bool,
+    pub fee_target: Option<Pubkey>,
+}
+#[async_trait::async_trait(?Send)]
+impl ClientInstruction for Serum3SettleFundsV2Instruction {
+    type Accounts = mango_v4::accounts::Serum3SettleFundsV2;
+    type Instruction = mango_v4::instruction::Serum3SettleFundsV2;
+    async fn to_instruction(
+        &self,
+        account_loader: impl ClientAccountLoader + 'async_trait,
+    ) -> (Self::Accounts, instruction::Instruction) {
+        let program_id = mango_v4::id();
+        let instruction = Self::Instruction {
+            fees_to_dao: self.fees_to_dao,
+        };
+
+        let account = account_loader
+            .load_mango_account(&self.account)
+            .await
+            .unwrap();
+        let serum_market: Serum3Market = account_loader.load(&self.serum_market).await.unwrap();
+        let open_orders = account
+            .serum3_orders(serum_market.market_index)
+            .unwrap()
+            .open_orders;
+        let quote_info =
+            get_mint_info_by_token_index(&account_loader, &account, serum_market.quote_token_index)
+                .await;
+        let base_info =
+            get_mint_info_by_token_index(&account_loader, &account, serum_market.base_token_index)
+                .await;
+
+        let market_external_bytes = account_loader
+            .load_bytes(&serum_market.serum_market_external)
+            .await
+            .unwrap();
+        let market_external: &serum_dex::state::MarketState = bytemuck::from_bytes(
+            &market_external_bytes[5..5 + std::mem::size_of::<serum_dex::state::MarketState>()],
+        );
+        // unpack the data, to avoid unaligned references
+        let coin_vault = market_external.coin_vault;
+        let pc_vault = market_external.pc_vault;
+        let vault_signer = serum_dex::state::gen_vault_signer_key(
+            market_external.vault_signer_nonce,
+            &serum_market.serum_market_external,
+            &serum_market.serum_program,
+        )
+        .unwrap();
+
+        let fee_target = if self.fees_to_dao {
+            assert!(self.fee_target.is_none());
+            quote_info.first_vault()
+        } else {
+            self.fee_target.unwrap()
+        };
+
+        let accounts = Self::Accounts {
+            v1: mango_v4::accounts::Serum3SettleFunds {
+                group: account.fixed.group,
+                account: self.account,
+                open_orders,
+                quote_bank: quote_info.first_bank(),
+                quote_vault: quote_info.first_vault(),
+                base_bank: base_info.first_bank(),
+                base_vault: base_info.first_vault(),
+                serum_market: self.serum_market,
+                serum_program: serum_market.serum_program,
+                serum_market_external: serum_market.serum_market_external,
+                market_base_vault: from_serum_style_pubkey(&coin_vault),
+                market_quote_vault: from_serum_style_pubkey(&pc_vault),
+                market_vault_signer: vault_signer,
+                owner: self.owner.pubkey(),
+                token_program: Token::id(),
+            },
+            v2: mango_v4::accounts::Serum3SettleFundsV2Extra {
+                quote_oracle: quote_info.oracle,
+                base_oracle: base_info.oracle,
+                fee_rebate_target: fee_target,
+            },
+        };
+
+        let instruction = make_instruction(program_id, &accounts, instruction);
+        (accounts, instruction)
+    }
+
+    fn signers(&self) -> Vec<TestKeypair> {
+        vec![self.owner]
+    }
+}
+
 pub struct Serum3LiqForceCancelOrdersInstruction {
     pub account: Pubkey,
     pub serum_market: Pubkey,
