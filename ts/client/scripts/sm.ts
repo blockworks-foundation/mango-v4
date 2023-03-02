@@ -57,8 +57,8 @@ class TestGroupReload {
   }
 
   async getPositionPerp() {
-    await this.mangoAccount.reload(this.client);
     if (Date.now() - this.lastOraclePricesUpdateTs > 10_000) {
+      await this.mangoAccount.reload(this.client);
       console.time('reloading group');
       // await this.group.reloadPerpMarketOraclePrices(this.client);
       await this.group.reloadAll(this.client);
