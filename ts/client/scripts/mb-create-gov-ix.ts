@@ -1,4 +1,5 @@
-import { AnchorProvider, BN, Wallet } from '@project-serum/anchor';
+import { AnchorProvider } from '@coral-xyz/anchor';
+import { BN, Wallet } from '@project-serum/anchor';
 import { serializeInstructionToBase64 } from '@solana/spl-governance';
 import {
   AccountMeta,
@@ -9,14 +10,12 @@ import {
   SystemProgram,
 } from '@solana/web3.js';
 import fs from 'fs';
-import { TokenIndex } from '../accounts/bank';
-import { Builder } from '../builder';
-import { MangoClient } from '../client';
-import { NullTokenEditParams } from '../clientIxParamBuilder';
-import { MANGO_V4_ID, OPENBOOK_PROGRAM_ID } from '../constants';
-import { bpsToDecimal, percentageToDecimal, toNative } from '../utils';
-
-const GROUP_NUM = Number(process.env.GROUP_NUM || 0);
+import { TokenIndex } from '../src/accounts/bank';
+import { Builder } from '../src/builder';
+import { MangoClient } from '../src/client';
+import { NullTokenEditParams } from '../src/clientIxParamBuilder';
+import { MANGO_V4_ID, OPENBOOK_PROGRAM_ID } from '../src/constants';
+import { bpsToDecimal, percentageToDecimal, toNative } from '../src/utils';
 
 const { MB_CLUSTER_URL, MB_PAYER_KEYPAIR, MB_PAYER3_KEYPAIR } = process.env;
 
@@ -61,7 +60,7 @@ async function buildAdminClient(): Promise<[MangoClient, Keypair, Keypair]> {
   return [client, admin, creator];
 }
 
-async function tokenRegister() {
+async function tokenRegister(): Promise<void> {
   const result = await buildAdminClient();
   const client = result[0];
   const admin = result[1];
@@ -70,7 +69,7 @@ async function tokenRegister() {
     new PublicKey('78b8f4cGCwmZ9ysPFMWLaLTkkaYnUjwMJYStWe5RTSSX'),
   );
 
-  let ix = await client.program.methods
+  const ix = await client.program.methods
     .tokenRegister(
       8 as TokenIndex,
       'wBTC (Portal)',
@@ -103,7 +102,7 @@ async function tokenRegister() {
   console.log(await serializeInstructionToBase64(ix));
 }
 
-async function tokenEdit() {
+async function tokenEdit(): Promise<void> {
   const result = await buildAdminClient();
   const client = result[0];
   const admin = result[1];
@@ -163,7 +162,7 @@ async function tokenEdit() {
   console.log(serializeInstructionToBase64(ix));
 }
 
-async function serum3Register() {
+async function serum3Register(): Promise<void> {
   const result = await buildAdminClient();
   const client = result[0];
 
@@ -193,7 +192,7 @@ async function serum3Register() {
   console.log(serializeInstructionToBase64(ix));
 }
 
-async function perpCreate() {
+async function perpCreate(): Promise<void> {
   const result = await buildAdminClient();
   const client = result[0];
   const admin = result[1];
@@ -294,7 +293,7 @@ async function perpCreate() {
   console.log(serializeInstructionToBase64(ix));
 }
 
-async function main() {
+async function main(): Promise<void> {
   try {
     // await tokenRegister();
     // await tokenEdit();
