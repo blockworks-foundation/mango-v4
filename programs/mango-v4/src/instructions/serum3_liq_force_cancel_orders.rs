@@ -3,10 +3,8 @@ use anchor_lang::prelude::*;
 use crate::accounts_ix::*;
 use crate::error::*;
 use crate::health::*;
-use crate::instructions::{
-    apply_vault_difference, charge_loan_origination_fees, OODifference, OpenOrdersAmounts,
-    OpenOrdersSlim,
-};
+use crate::instructions::apply_settle_changes;
+use crate::instructions::{charge_loan_origination_fees, OpenOrdersAmounts, OpenOrdersSlim};
 use crate::logs::Serum3OpenOrdersBalanceLogV2;
 use crate::serum3_cpi::load_open_orders_ref;
 use crate::state::*;
@@ -117,10 +115,11 @@ pub fn serum3_liq_force_cancel_orders(
     //
     // After-settle tracking
     //
+    let after_oo;
     {
         let oo_ai = &ctx.accounts.open_orders.as_ref();
         let open_orders = load_open_orders_ref(oo_ai)?;
-        let after_oo = OpenOrdersSlim::from_oo(&open_orders);
+        after_oo = OpenOrdersSlim::from_oo(&open_orders);
 
         emit!(Serum3OpenOrdersBalanceLogV2 {
             mango_group: ctx.accounts.group.key(),
@@ -134,9 +133,6 @@ pub fn serum3_liq_force_cancel_orders(
             quote_free: after_oo.native_quote_free(),
             referrer_rebates_accrued: after_oo.native_rebates(),
         });
-
-        OODifference::new(&before_oo, &after_oo)
-            .adjust_health_cache(&mut health_cache, &serum_market)?;
     };
 
     ctx.accounts.base_vault.reload()?;
@@ -144,34 +140,25 @@ pub fn serum3_liq_force_cancel_orders(
     let after_base_vault = ctx.accounts.base_vault.amount;
     let after_quote_vault = ctx.accounts.quote_vault.amount;
 
-    // Settle cannot decrease vault balances
-    require_gte!(after_base_vault, before_base_vault);
-    require_gte!(after_quote_vault, before_quote_vault);
-
-    // Credit the difference in vault balances to the user's account
     let mut account = ctx.accounts.account.load_full_mut()?;
     let mut base_bank = ctx.accounts.base_bank.load_mut()?;
     let mut quote_bank = ctx.accounts.quote_bank.load_mut()?;
-    apply_vault_difference(
+    let group = ctx.accounts.group.load()?;
+    apply_settle_changes(
+        &group,
         ctx.accounts.account.key(),
         &mut account.borrow_mut(),
-        serum_market.market_index,
         &mut base_bank,
-        after_base_vault,
-        before_base_vault,
-        None, // guaranteed to deposit into bank
-    )?
-    .adjust_health_cache(&mut health_cache, &base_bank)?;
-    apply_vault_difference(
-        ctx.accounts.account.key(),
-        &mut account.borrow_mut(),
-        serum_market.market_index,
         &mut quote_bank,
-        after_quote_vault,
+        &serum_market,
+        before_base_vault,
         before_quote_vault,
-        None, // guaranteed to deposit into bank
-    )?
-    .adjust_health_cache(&mut health_cache, &quote_bank)?;
+        &before_oo,
+        after_base_vault,
+        after_quote_vault,
+        &after_oo,
+        Some(&mut health_cache),
+    )?;
 
     //
     // Health check at the end

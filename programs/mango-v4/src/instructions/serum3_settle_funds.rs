@@ -6,7 +6,7 @@ use crate::error::*;
 use crate::serum3_cpi::load_open_orders_ref;
 use crate::state::*;
 
-use super::{apply_vault_difference, OpenOrdersAmounts, OpenOrdersSlim};
+use super::{apply_settle_changes, OpenOrdersAmounts, OpenOrdersSlim};
 use crate::accounts_ix::*;
 use crate::logs::Serum3OpenOrdersBalanceLogV2;
 use crate::logs::{LoanOriginationFeeInstruction, WithdrawLoanOriginationFeeLog};
@@ -63,9 +63,10 @@ pub fn serum3_settle_funds(ctx: Context<Serum3SettleFunds>) -> Result<()> {
     //
     // Charge any open loan origination fees
     //
+    let before_oo;
     {
         let open_orders = load_open_orders_ref(ctx.accounts.open_orders.as_ref())?;
-        let before_oo = OpenOrdersSlim::from_oo(&open_orders);
+        before_oo = OpenOrdersSlim::from_oo(&open_orders);
         let mut account = ctx.accounts.account.load_full_mut()?;
         let mut base_bank = ctx.accounts.base_bank.load_mut()?;
         let mut quote_bank = ctx.accounts.quote_bank.load_mut()?;
@@ -91,46 +92,37 @@ pub fn serum3_settle_funds(ctx: Context<Serum3SettleFunds>) -> Result<()> {
     //
     // After-settle tracking
     //
-    {
-        ctx.accounts.base_vault.reload()?;
-        ctx.accounts.quote_vault.reload()?;
-        let after_base_vault = ctx.accounts.base_vault.amount;
-        let after_quote_vault = ctx.accounts.quote_vault.amount;
+    let after_oo = {
+        let oo_ai = &ctx.accounts.open_orders.as_ref();
+        let open_orders = load_open_orders_ref(oo_ai)?;
+        OpenOrdersSlim::from_oo(&open_orders)
+    };
 
-        // Settle cannot decrease vault balances
-        require_gte!(after_base_vault, before_base_vault);
-        require_gte!(after_quote_vault, before_quote_vault);
+    ctx.accounts.base_vault.reload()?;
+    ctx.accounts.quote_vault.reload()?;
+    let after_base_vault = ctx.accounts.base_vault.amount;
+    let after_quote_vault = ctx.accounts.quote_vault.amount;
 
-        // Credit the difference in vault balances to the user's account
-        let mut account = ctx.accounts.account.load_full_mut()?;
-        let mut base_bank = ctx.accounts.base_bank.load_mut()?;
-        let mut quote_bank = ctx.accounts.quote_bank.load_mut()?;
-        apply_vault_difference(
-            ctx.accounts.account.key(),
-            &mut account.borrow_mut(),
-            serum_market.market_index,
-            &mut base_bank,
-            after_base_vault,
-            before_base_vault,
-            // Since after >= before, we know this can be a deposit
-            // and no net borrow check will be necessary, meaning
-            // we don't need an oracle price.
-            None,
-        )?;
-        apply_vault_difference(
-            ctx.accounts.account.key(),
-            &mut account.borrow_mut(),
-            serum_market.market_index,
-            &mut quote_bank,
-            after_quote_vault,
-            before_quote_vault,
-            None,
-        )?;
-    }
+    let mut account = ctx.accounts.account.load_full_mut()?;
+    let mut base_bank = ctx.accounts.base_bank.load_mut()?;
+    let mut quote_bank = ctx.accounts.quote_bank.load_mut()?;
+    let group = ctx.accounts.group.load()?;
+    apply_settle_changes(
+        &group,
+        ctx.accounts.account.key(),
+        &mut account.borrow_mut(),
+        &mut base_bank,
+        &mut quote_bank,
+        &serum_market,
+        before_base_vault,
+        before_quote_vault,
+        &before_oo,
+        after_base_vault,
+        after_quote_vault,
+        &after_oo,
+        None,
+    )?;
 
-    let oo_ai = &ctx.accounts.open_orders.as_ref();
-    let open_orders = load_open_orders_ref(oo_ai)?;
-    let after_oo = OpenOrdersSlim::from_oo(&open_orders);
     emit!(Serum3OpenOrdersBalanceLogV2 {
         mango_group: ctx.accounts.group.key(),
         mango_account: ctx.accounts.account.key(),
@@ -189,7 +181,7 @@ pub fn charge_loan_origination_fees(
     }
 
     let serum3_account = account.serum3_orders_mut(market_index).unwrap();
-    let oo_quote_total = before_oo.native_quote_total_plus_rebates();
+    let oo_quote_total = before_oo.native_quote_total();
     let actualized_quote_loan = I80F48::from_num::<u64>(
         serum3_account
             .quote_borrows_without_fee

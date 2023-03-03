@@ -1,12 +1,12 @@
-import { AnchorProvider, Wallet } from '@project-serum/anchor';
-import { coder } from '@project-serum/anchor/dist/cjs/spl/token';
+import { AnchorProvider, Wallet } from '@coral-xyz/anchor';
+import { getAccount } from '@solana/spl-token';
 import { Cluster, Connection, Keypair } from '@solana/web3.js';
 import * as dotenv from 'dotenv';
 import fs from 'fs';
-import { MangoClient } from '../client';
-import { MANGO_V4_ID } from '../constants';
-import { I80F48, ZERO_I80F48 } from '../numbers/I80F48';
-import { toUiDecimals } from '../utils';
+import { MangoClient } from '../../src/client';
+import { MANGO_V4_ID } from '../../src/constants';
+import { I80F48, ZERO_I80F48 } from '../../src/numbers/I80F48';
+import { toUiDecimals } from '../../src/utils';
 dotenv.config();
 
 const CLUSTER_URL =
@@ -75,15 +75,11 @@ async function main(): Promise<void> {
   for (const bank of await Array.from(banksMapUsingTokenIndex.values()).sort(
     (a, b) => a.tokenIndex - b.tokenIndex,
   )) {
-    const vault = I80F48.fromNumber(
-      coder()
-        .accounts.decode(
-          'token',
-          (await client.program.provider.connection.getAccountInfo(bank.vault))!
-            .data,
-        )
-        .amount.toNumber(),
+    const account = await getAccount(
+      client.program.provider.connection,
+      bank.vault,
     );
+    const vault = I80F48.fromNumber(Number(account.amount));
 
     const error = vault.sub(
       (bank as any).indexedDepositsByMangoAccounts

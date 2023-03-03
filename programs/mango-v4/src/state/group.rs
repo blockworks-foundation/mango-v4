@@ -20,7 +20,9 @@ pub struct Group {
     // TODO: unused, use case - listing shit tokens with conservative parameters (mostly defaults)
     pub fast_listing_admin: Pubkey,
 
-    pub padding: [u8; 4],
+    // This is the token index of the mngo token listed on the group
+    pub mngo_token_index: TokenIndex,
+    pub padding: [u8; 2],
 
     pub insurance_vault: Pubkey,
     pub insurance_mint: Pubkey,
@@ -31,7 +33,11 @@ pub struct Group {
 
     pub version: u8,
 
-    pub padding2: [u8; 5],
+    // Buyback fees with Mngo: allow exchanging fees with mngo at a bonus
+    pub buyback_fees: u8,
+    // Buyback fees with Mngo: how much should the bonus be,
+    // e.g. a bonus factor of 1.2 means 120$ worth fees could be swapped for mngo worth 100$ at current market price
+    pub buyback_fees_mngo_bonus_factor: f32,
 
     pub address_lookup_tables: [Pubkey; 20],
 
@@ -45,16 +51,37 @@ pub struct Group {
     // 0 is chosen as enabled, becase we want to start out with all ixs enabled, 1 is disabled
     pub ix_gate: u128,
 
-    pub reserved: [u8; 1864],
+    // Buyback fees with Mngo:
+    // A mango account which would be counter party for settling fees with mngo
+    // This ensures that the system doesn't have a net deficit of tokens
+    // The workflow should be something like this
+    // - the dao deposits quote tokens in its respective mango account
+    // - the user deposits some mngo tokens in his mango account
+    // - the user then claims quote for mngo at a bonus rate
+    pub buyback_fees_swap_mango_account: Pubkey,
+
+    /// Number of seconds after which fees that could be used with the fees buyback feature expire.
+    ///
+    /// The actual expiry is staggered such that the fees users accumulate are always
+    /// available for at least this interval - but may be available for up to twice this time.
+    ///
+    /// When set to 0, there's no expiry of buyback fees.
+    pub buyback_fees_expiry_interval: u64,
+
+    pub reserved: [u8; 1824],
 }
 const_assert_eq!(
     size_of::<Group>(),
-    32 + 4 + 32 * 2 + 4 + 32 * 2 + 3 + 5 + 20 * 32 + 32 + 8 + 16 + 1864
+    32 + 4 + 32 * 2 + 4 + 32 * 2 + 4 + 4 + 20 * 32 + 32 + 8 + 16 + 32 + 8 + 1824
 );
 const_assert_eq!(size_of::<Group>(), 2736);
 const_assert_eq!(size_of::<Group>() % 8, 0);
 
 impl Group {
+    pub fn buyback_fees(&self) -> bool {
+        self.buyback_fees == 1
+    }
+
     pub fn is_testing(&self) -> bool {
         self.testing == 1
     }
@@ -139,6 +166,7 @@ pub enum IxGate {
     TokenRegisterTrustless = 45,
     TokenUpdateIndexAndRate = 46,
     TokenWithdraw = 47,
+    AccountBuybackFeesWithMngo = 48,
 }
 
 // note: using creator instead of admin, since admin can be changed

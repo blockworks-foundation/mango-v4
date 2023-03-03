@@ -3,12 +3,10 @@
 use anchor_lang::prelude::*;
 
 use fixed::types::I80F48;
-use fixed_macro::types::I80F48;
 
 use crate::error::*;
 use crate::state::Side as PerpOrderSide;
 use crate::state::{Bank, MangoAccountValue, PerpMarketIndex};
-use crate::util::checked_math as cm;
 
 use super::*;
 
@@ -33,7 +31,7 @@ impl HealthCache {
         let hundred = I80F48::from(100);
         if liabs > 0 {
             // feel free to saturate to MAX for tiny liabs
-            cm!(hundred * (assets - liabs)).saturating_div(liabs)
+            (hundred * (assets - liabs)).saturating_div(liabs)
         } else {
             I80F48::MAX
         }
@@ -58,7 +56,7 @@ impl HealthCache {
         let mut source_position = account.token_position(source_bank.token_index)?.clone();
         let mut target_position = account.token_position(target_bank.token_index)?.clone();
 
-        let target_amount = cm!(amount * price);
+        let target_amount = amount * price;
 
         let mut source_bank = source_bank.clone();
         source_bank.withdraw_with_fee(&mut source_position, amount, now_ts, source_oracle_price)?;
@@ -477,7 +475,7 @@ fn binary_search(
     fun: impl Fn(I80F48) -> Result<I80F48>,
 ) -> Result<I80F48> {
     let max_iterations = 50;
-    let target_error = I80F48!(0.1);
+    let target_error = I80F48::lit("0.1");
     let right_value = fun(right)?;
     require_msg!(
         (left_value <= target_value && right_value >= target_value)

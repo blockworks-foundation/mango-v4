@@ -1,5 +1,5 @@
 use anchor_lang::prelude::*;
-use checked_math as cm;
+
 use fixed::types::I80F48;
 
 use crate::accounts_ix::*;
@@ -157,18 +157,18 @@ pub fn perp_settle_pnl(ctx: Context<PerpSettlePnl>) -> Result<()> {
     // Applying the fee here means that it decreases the displayed perp pnl.
     // Think about it like this: a's pnl reduces by `settlement` and spot increases by `settlement - fee`.
     // That means that it managed to extract `settlement - fee` from perp interactions.
-    let settlement_i64 = settlement.round_to_zero().checked_to_num::<i64>().unwrap();
-    let fee_i64 = fee.round_to_zero().checked_to_num::<i64>().unwrap();
-    cm!(a_perp_position.perp_spot_transfers += settlement_i64 - fee_i64);
-    cm!(b_perp_position.perp_spot_transfers -= settlement_i64);
-    cm!(account_a.fixed.perp_spot_transfers += settlement_i64 - fee_i64);
-    cm!(account_b.fixed.perp_spot_transfers -= settlement_i64);
+    let settlement_i64 = settlement.round_to_zero().to_num::<i64>();
+    let fee_i64 = fee.round_to_zero().to_num::<i64>();
+    (a_perp_position.perp_spot_transfers += settlement_i64 - fee_i64);
+    (b_perp_position.perp_spot_transfers -= settlement_i64);
+    (account_a.fixed.perp_spot_transfers += settlement_i64 - fee_i64);
+    (account_b.fixed.perp_spot_transfers -= settlement_i64);
 
     // Transfer token balances
     // The fee is paid by the account with positive unsettled pnl
     let a_token_position = account_a.token_position_mut(settle_token_index)?.0;
     let b_token_position = account_b.token_position_mut(settle_token_index)?.0;
-    settle_bank.deposit(a_token_position, cm!(settlement - fee), now_ts)?;
+    settle_bank.deposit(a_token_position, settlement - fee, now_ts)?;
     // Don't charge loan origination fees on borrows created via settling:
     // Even small loan origination fees could accumulate if a perp position is
     // settled back and forth repeatedly.

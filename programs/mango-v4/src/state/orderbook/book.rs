@@ -1,4 +1,4 @@
-use crate::state::{MangoAccountRefMut, PerpPosition};
+use crate::state::MangoAccountRefMut;
 use crate::{
     error::*,
     state::{orderbook::bookside::*, EventQueue, PerpMarket},
@@ -9,7 +9,6 @@ use fixed::types::I80F48;
 use std::cell::RefMut;
 
 use super::*;
-use crate::util::checked_math as cm;
 
 /// Drop at most this many expired orders from a BookSide when trying to match orders.
 /// This exists as a guard against excessive compute use.
@@ -59,15 +58,16 @@ impl<'a> Orderbook<'a> {
         let post_only = order.is_post_only();
         let mut post_target = order.post_target();
         let (price_lots, price_data) = order.price(now_ts, oracle_price_lots, self)?;
-        let perp_position = mango_account.perp_position_mut(market.perp_market_index)?;
 
         // generate new order id
         let order_id = market.gen_order_id(side, price_data);
 
         // IOC orders have a fee penalty applied regardless of match
         if order.needs_penalty_fee() {
-            apply_penalty(market, perp_position)?;
+            apply_penalty(market, mango_account)?;
         }
+
+        let perp_position = mango_account.perp_position_mut(market.perp_market_index)?;
 
         // Iterate through book and match against this new order.
         //
@@ -123,12 +123,12 @@ impl<'a> Orderbook<'a> {
                 .min(best_opposing.node.quantity)
                 .min(max_match_by_quote);
 
-            let match_quote_lots = cm!(match_base_lots * best_opposing_price);
-            cm!(remaining_base_lots -= match_base_lots);
-            cm!(remaining_quote_lots -= match_quote_lots);
+            let match_quote_lots = match_base_lots * best_opposing_price;
+            remaining_base_lots -= match_base_lots;
+            remaining_quote_lots -= match_quote_lots;
             assert!(remaining_quote_lots >= 0);
 
-            let new_best_opposing_quantity = cm!(best_opposing.node.quantity - match_base_lots);
+            let new_best_opposing_quantity = best_opposing.node.quantity - match_base_lots;
             let maker_out = new_best_opposing_quantity == 0;
             if maker_out {
                 matched_order_deletes
@@ -156,8 +156,8 @@ impl<'a> Orderbook<'a> {
             event_queue.push_back(cast(fill)).unwrap();
             limit -= 1;
         }
-        let total_quote_lots_taken = cm!(order.max_quote_lots - remaining_quote_lots);
-        let total_base_lots_taken = cm!(order.max_base_lots - remaining_base_lots);
+        let total_quote_lots_taken = order.max_quote_lots - remaining_quote_lots;
+        let total_base_lots_taken = order.max_base_lots - remaining_base_lots;
         assert!(total_quote_lots_taken >= 0);
         assert!(total_base_lots_taken >= 0);
 
@@ -165,7 +165,7 @@ impl<'a> Orderbook<'a> {
         // realized when the fill event gets executed
         if total_quote_lots_taken > 0 || total_base_lots_taken > 0 {
             perp_position.add_taker_trade(side, total_base_lots_taken, total_quote_lots_taken);
-            apply_fees(market, perp_position, total_quote_lots_taken)?;
+            apply_fees(market, mango_account, total_quote_lots_taken)?;
         }
 
         // Apply changes to matched asks (handles invalidate on delete!)
@@ -351,33 +351,46 @@ impl<'a> Orderbook<'a> {
 /// both the maker and taker fees.
 fn apply_fees(
     market: &mut PerpMarket,
-    perp_position: &mut PerpPosition,
+    account: &mut MangoAccountRefMut,
     quote_lots: i64,
 ) -> Result<()> {
-    let quote_native = I80F48::from_num(market.quote_lot_size.checked_mul(quote_lots).unwrap());
+    let quote_native = I80F48::from_num(market.quote_lot_size * quote_lots);
 
-    let maker_fees = cm!(quote_native * market.maker_fee);
-    let taker_fees = cm!(quote_native * market.taker_fee);
+    // The maker fees apply to the maker's account only when the fill event is consumed.
+    let maker_fees = quote_native * market.maker_fee;
+
+    let taker_fees = quote_native * market.taker_fee;
 
     // taker fees should never be negative
     require_gte!(taker_fees, 0);
 
-    // The maker fees apply to the maker's account only when the fill event is consumed.
+    // Part of the taker fees that go to the dao, instead of paying for maker rebates
+    let taker_dao_fees = (taker_fees + maker_fees.min(I80F48::ZERO)).max(I80F48::ZERO);
+    account
+        .fixed
+        .accrue_buyback_fees(taker_dao_fees.floor().to_num::<u64>());
+
+    let perp_position = account.perp_position_mut(market.perp_market_index)?;
     perp_position.record_trading_fee(taker_fees);
-    cm!(perp_position.taker_volume += taker_fees.to_num::<u64>());
+    perp_position.taker_volume += taker_fees.to_num::<u64>();
 
     // Accrue maker fees immediately: they can be negative and applying them later
     // risks that fees_accrued is settled to 0 before they apply. It going negative
     // breaks assumptions.
-    cm!(market.fees_accrued += taker_fees + maker_fees);
+    market.fees_accrued += taker_fees + maker_fees;
 
     Ok(())
 }
 
 /// Applies a fixed penalty fee to the account, and update the market's fees_accrued
-fn apply_penalty(market: &mut PerpMarket, perp_position: &mut PerpPosition) -> Result<()> {
+fn apply_penalty(market: &mut PerpMarket, account: &mut MangoAccountRefMut) -> Result<()> {
     let fee_penalty = I80F48::from_num(market.fee_penalty);
+    account
+        .fixed
+        .accrue_buyback_fees(fee_penalty.floor().to_num::<u64>());
+
+    let perp_position = account.perp_position_mut(market.perp_market_index)?;
     perp_position.record_trading_fee(fee_penalty);
-    cm!(market.fees_accrued += fee_penalty);
+    market.fees_accrued += fee_penalty;
     Ok(())
 }

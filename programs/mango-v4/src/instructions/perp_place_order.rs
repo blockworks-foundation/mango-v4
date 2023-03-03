@@ -81,8 +81,12 @@ pub fn perp_place_order(
     };
 
     let mut event_queue = ctx.accounts.event_queue.load_mut()?;
+    let group = ctx.accounts.group.load()?;
 
     let now_ts: u64 = Clock::get()?.unix_timestamp.try_into().unwrap();
+    account
+        .fixed
+        .expire_buyback_fees(now_ts, group.buyback_fees_expiry_interval);
 
     let pp = account.perp_position(perp_market_index)?;
     let effective_pos = pp.effective_base_position_lots();

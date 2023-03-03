@@ -51,6 +51,7 @@ pub mod mango_v4 {
         Ok(())
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub fn group_edit(
         ctx: Context<GroupEdit>,
         admin_opt: Option<Pubkey>,
@@ -59,6 +60,11 @@ pub mod mango_v4 {
         testing_opt: Option<u8>,
         version_opt: Option<u8>,
         deposit_limit_quote_opt: Option<u64>,
+        buyback_fees_opt: Option<bool>,
+        buyback_fees_bonus_factor_opt: Option<f32>,
+        buyback_fees_swap_mango_account_opt: Option<Pubkey>,
+        mngo_token_index_opt: Option<TokenIndex>,
+        buyback_fees_expiry_interval_opt: Option<u64>,
     ) -> Result<()> {
         #[cfg(feature = "enable-gpl")]
         instructions::group_edit(
@@ -69,6 +75,11 @@ pub mod mango_v4 {
             testing_opt,
             version_opt,
             deposit_limit_quote_opt,
+            buyback_fees_opt,
+            buyback_fees_bonus_factor_opt,
+            buyback_fees_swap_mango_account_opt,
+            mngo_token_index_opt,
+            buyback_fees_expiry_interval_opt,
         )?;
         Ok(())
     }
@@ -267,6 +278,15 @@ pub mod mango_v4 {
     pub fn account_close(ctx: Context<AccountClose>, force_close: bool) -> Result<()> {
         #[cfg(feature = "enable-gpl")]
         instructions::account_close(ctx, force_close)?;
+        Ok(())
+    }
+
+    pub fn account_buyback_fees_with_mngo(
+        ctx: Context<AccountBuybackFeesWithMngo>,
+        max_buyback: u64,
+    ) -> Result<()> {
+        #[cfg(feature = "enable-gpl")]
+        instructions::account_buyback_fees_with_mngo(ctx, max_buyback)?;
         Ok(())
     }
 

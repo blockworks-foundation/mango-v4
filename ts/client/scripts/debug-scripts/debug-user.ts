@@ -1,14 +1,14 @@
-import { AnchorProvider, Wallet } from '@project-serum/anchor';
+import { AnchorProvider, Wallet } from '@coral-xyz/anchor';
 import { Cluster, Connection, Keypair, PublicKey } from '@solana/web3.js';
 import fs from 'fs';
-import { Group } from '../accounts/group';
-import { HealthCache } from '../accounts/healthCache';
-import { HealthType, MangoAccount } from '../accounts/mangoAccount';
-import { PerpMarket } from '../accounts/perp';
-import { Serum3Market } from '../accounts/serum3';
-import { MangoClient } from '../client';
-import { MANGO_V4_ID } from '../constants';
-import { toUiDecimalsForQuote } from '../utils';
+import { Group } from '../../src/accounts/group';
+import { HealthCache } from '../../src/accounts/healthCache';
+import { HealthType, MangoAccount } from '../../src/accounts/mangoAccount';
+import { PerpMarket } from '../../src/accounts/perp';
+import { Serum3Market } from '../../src/accounts/serum3';
+import { MangoClient } from '../../src/client';
+import { MANGO_V4_ID } from '../../src/constants';
+import { toUiDecimalsForQuote } from '../../src/utils';
 
 const CLUSTER_URL =
   process.env.CLUSTER_URL_OVERRIDE || process.env.MB_CLUSTER_URL;

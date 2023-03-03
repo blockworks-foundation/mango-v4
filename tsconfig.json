@@ -1,27 +1,22 @@
 {
   "compilerOptions": {
-    "esModuleInterop": true,
+    "target": "esnext",
+    "module": "esnext",
     "moduleResolution": "node",
-    "lib": [
-      "es2019",
-      "dom"
-    ],
-    "outDir": "./dist",
+    "esModuleInterop": true,
     "resolveJsonModule": true,
     "noImplicitAny": false,
-    "sourceMap": true,
     "skipLibCheck": true,
-    "target": "es2019",
     "strictNullChecks": true
   },
+  "ts-node": {
+    // these options are overrides used only by ts-node
+    // same as the --compilerOptions flag and the TS_NODE_COMPILER_OPTIONS environment variable
+    "compilerOptions": {
+      "module": "commonjs"
+    }
+  },
   "include": [
-    "ts/client/src",
-    "ts/client/src/scripts",
-    "ts/client/src/debug-scripts",
-    "ts/client/src/deployment-scripts"
-  ],
-  "exclude": [
-    "./ts/**/*.test.js",
-    "node_modules",
+    "ts/client/src"
   ]
 }

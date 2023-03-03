@@ -7,7 +7,7 @@ use crate::accounts_ix::*;
 use crate::logs::{Serum3OpenOrdersBalanceLogV2, TokenBalanceLog};
 use crate::serum3_cpi::{load_market_state, load_open_orders_ref};
 use anchor_lang::prelude::*;
-use checked_math as cm;
+
 use fixed::types::I80F48;
 use serum_dex::instruction::NewOrderInstructionV3;
 use serum_dex::state::OpenOrders;
@@ -38,19 +38,17 @@ pub trait OpenOrdersAmounts {
     fn native_quote_reserved(&self) -> u64;
     fn native_base_free(&self) -> u64;
     fn native_quote_free(&self) -> u64;
-    fn native_quote_free_plus_rebates(&self) -> u64;
     fn native_base_total(&self) -> u64;
     fn native_quote_total(&self) -> u64;
-    fn native_quote_total_plus_rebates(&self) -> u64;
     fn native_rebates(&self) -> u64;
 }
 
 impl OpenOrdersAmounts for OpenOrdersSlim {
     fn native_base_reserved(&self) -> u64 {
-        cm!(self.native_coin_total - self.native_coin_free)
+        self.native_coin_total - self.native_coin_free
     }
     fn native_quote_reserved(&self) -> u64 {
-        cm!(self.native_pc_total - self.native_pc_free)
+        self.native_pc_total - self.native_pc_free
     }
     fn native_base_free(&self) -> u64 {
         self.native_coin_free
@@ -58,17 +56,11 @@ impl OpenOrdersAmounts for OpenOrdersSlim {
     fn native_quote_free(&self) -> u64 {
         self.native_pc_free
     }
-    fn native_quote_free_plus_rebates(&self) -> u64 {
-        cm!(self.native_pc_free + self.referrer_rebates_accrued)
-    }
     fn native_base_total(&self) -> u64 {
         self.native_coin_total
     }
     fn native_quote_total(&self) -> u64 {
         self.native_pc_total
-    }
-    fn native_quote_total_plus_rebates(&self) -> u64 {
-        cm!(self.native_pc_total + self.referrer_rebates_accrued)
     }
     fn native_rebates(&self) -> u64 {
         self.referrer_rebates_accrued
@@ -77,10 +69,10 @@ impl OpenOrdersAmounts for OpenOrdersSlim {
 
 impl OpenOrdersAmounts for OpenOrders {
     fn native_base_reserved(&self) -> u64 {
-        cm!(self.native_coin_total - self.native_coin_free)
+        self.native_coin_total - self.native_coin_free
     }
     fn native_quote_reserved(&self) -> u64 {
-        cm!(self.native_pc_total - self.native_pc_free)
+        self.native_pc_total - self.native_pc_free
     }
     fn native_base_free(&self) -> u64 {
         self.native_coin_free
@@ -88,17 +80,11 @@ impl OpenOrdersAmounts for OpenOrders {
     fn native_quote_free(&self) -> u64 {
         self.native_pc_free
     }
-    fn native_quote_free_plus_rebates(&self) -> u64 {
-        cm!(self.native_pc_free + self.referrer_rebates_accrued)
-    }
     fn native_base_total(&self) -> u64 {
         self.native_coin_total
     }
     fn native_quote_total(&self) -> u64 {
         self.native_pc_total
-    }
-    fn native_quote_total_plus_rebates(&self) -> u64 {
-        cm!(self.native_pc_total + self.referrer_rebates_accrued)
     }
     fn native_rebates(&self) -> u64 {
         self.referrer_rebates_accrued
@@ -190,7 +176,7 @@ pub fn serum3_place_order(
 
         let needed_amount = match side {
             Serum3Side::Ask => {
-                cm!(max_base_qty * base_lot_size).saturating_sub(before_oo.native_base_free())
+                (max_base_qty * base_lot_size).saturating_sub(before_oo.native_base_free())
             }
             Serum3Side::Bid => {
                 max_native_quote_qty_including_fees.saturating_sub(before_oo.native_quote_free())
@@ -258,7 +244,7 @@ pub fn serum3_place_order(
     let mut payer_bank = ctx.accounts.payer_bank.load_mut()?;
 
     // Enforce min vault to deposits ratio
-    let withdrawn_from_vault = I80F48::from(cm!(before_vault - after_vault));
+    let withdrawn_from_vault = I80F48::from(before_vault - after_vault);
     let position_native = account
         .token_position_mut(payer_bank.token_index)?
         .0
@@ -286,8 +272,8 @@ pub fn serum3_place_order(
     // Health check
     //
     if let Some((mut health_cache, pre_init_health)) = pre_health_opt {
-        vault_difference.adjust_health_cache(&mut health_cache, &payer_bank)?;
-        oo_difference.adjust_health_cache(&mut health_cache, &serum_market)?;
+        vault_difference.adjust_health_cache_token_balance(&mut health_cache, &payer_bank)?;
+        oo_difference.adjust_health_cache_serum3_state(&mut health_cache, &serum_market)?;
         account.check_health_post(&health_cache, pre_init_health)?;
     }
 
@@ -306,18 +292,18 @@ pub struct OODifference {
 impl OODifference {
     pub fn new(before_oo: &OpenOrdersSlim, after_oo: &OpenOrdersSlim) -> Self {
         Self {
-            reserved_base_change: cm!(I80F48::from(after_oo.native_base_reserved())
-                - I80F48::from(before_oo.native_base_reserved())),
-            reserved_quote_change: cm!(I80F48::from(after_oo.native_quote_reserved())
-                - I80F48::from(before_oo.native_quote_reserved())),
-            free_base_change: cm!(I80F48::from(after_oo.native_base_free())
-                - I80F48::from(before_oo.native_base_free())),
-            free_quote_change: cm!(I80F48::from(after_oo.native_quote_free_plus_rebates())
-                - I80F48::from(before_oo.native_quote_free_plus_rebates())),
+            reserved_base_change: I80F48::from(after_oo.native_base_reserved())
+                - I80F48::from(before_oo.native_base_reserved()),
+            reserved_quote_change: I80F48::from(after_oo.native_quote_reserved())
+                - I80F48::from(before_oo.native_quote_reserved()),
+            free_base_change: I80F48::from(after_oo.native_base_free())
+                - I80F48::from(before_oo.native_base_free()),
+            free_quote_change: I80F48::from(after_oo.native_quote_free())
+                - I80F48::from(before_oo.native_quote_free()),
         }
     }
 
-    pub fn adjust_health_cache(
+    pub fn adjust_health_cache_serum3_state(
         &self,
         health_cache: &mut HealthCache,
         market: &Serum3Market,
@@ -340,17 +326,21 @@ pub struct VaultDifference {
 }
 
 impl VaultDifference {
-    pub fn adjust_health_cache(&self, health_cache: &mut HealthCache, bank: &Bank) -> Result<()> {
+    pub fn adjust_health_cache_token_balance(
+        &self,
+        health_cache: &mut HealthCache,
+        bank: &Bank,
+    ) -> Result<()> {
         assert_eq!(bank.token_index, self.token_index);
         health_cache.adjust_token_balance(bank, self.native_change)?;
         Ok(())
     }
 }
 
-/// Called in settle_funds, place_order, liq_force_cancel to adjust token positions after
+/// Called in apply_settle_changes() and place_order to adjust token positions after
 /// changing the vault balances
 /// Also logs changes to token balances
-pub fn apply_vault_difference(
+fn apply_vault_difference(
     account_pk: Pubkey,
     account: &mut MangoAccountRefMut,
     serum_market_index: Serum3MarketIndex,
@@ -359,7 +349,7 @@ pub fn apply_vault_difference(
     vault_before: u64,
     oracle_price: Option<I80F48>,
 ) -> Result<VaultDifference> {
-    let needed_change = cm!(I80F48::from(vault_after) - I80F48::from(vault_before));
+    let needed_change = I80F48::from(vault_after) - I80F48::from(vault_before);
 
     let (position, _) = account.token_position_mut(bank.token_index)?;
     let native_before = position.native(bank);
@@ -375,7 +365,7 @@ pub fn apply_vault_difference(
         )?;
     }
     let native_after = position.native(bank);
-    let native_change = cm!(native_after - native_before);
+    let native_change = native_after - native_before;
     let new_borrows = native_change
         .max(native_after)
         .min(I80F48::ZERO)
@@ -396,7 +386,7 @@ pub fn apply_vault_difference(
 
     // Only for place: Add to potential borrow amount
     let old_value = *borrows_without_fee;
-    *borrows_without_fee = cm!(old_value + new_borrows);
+    *borrows_without_fee = old_value + new_borrows;
 
     // Only for settle/liq_force_cancel: Reduce the potential borrow amounts
     if needed_change > 0 {
@@ -416,6 +406,79 @@ pub fn apply_vault_difference(
         token_index: bank.token_index,
         native_change,
     })
+}
+
+/// Uses the changes in OpenOrders and vaults to adjust the user token position,
+/// collect fees and optionally adjusts the HealthCache.
+pub fn apply_settle_changes(
+    group: &Group,
+    account_pk: Pubkey,
+    account: &mut MangoAccountRefMut,
+    base_bank: &mut Bank,
+    quote_bank: &mut Bank,
+    serum_market: &Serum3Market,
+    before_base_vault: u64,
+    before_quote_vault: u64,
+    before_oo: &OpenOrdersSlim,
+    after_base_vault: u64,
+    after_quote_vault: u64,
+    after_oo: &OpenOrdersSlim,
+    health_cache: Option<&mut HealthCache>,
+) -> Result<()> {
+    // Example: rebates go from 100 -> 10. That means we credit 90 in fees.
+    let received_fees = before_oo
+        .native_rebates()
+        .saturating_sub(after_oo.native_rebates());
+    quote_bank.collected_fees_native += I80F48::from(received_fees);
+
+    // Ideally we could credit buyback_fees at the current value of the received fees,
+    // but the settle_funds instruction currently doesn't receive the oracle account
+    // that would be needed for it.
+    if quote_bank.token_index == QUOTE_TOKEN_INDEX {
+        let now_ts = Clock::get()?.unix_timestamp.try_into().unwrap();
+        account
+            .fixed
+            .expire_buyback_fees(now_ts, group.buyback_fees_expiry_interval);
+        account.fixed.accrue_buyback_fees(received_fees);
+    }
+
+    // Don't count the referrer rebate fees as part of the vault change that should be
+    // credited to the user.
+    let after_quote_vault_adjusted = after_quote_vault - received_fees;
+
+    // Settle cannot decrease vault balances
+    require_gte!(after_base_vault, before_base_vault);
+    require_gte!(after_quote_vault_adjusted, before_quote_vault);
+
+    // Credit the difference in vault balances to the user's account
+    let base_difference = apply_vault_difference(
+        account_pk,
+        account,
+        serum_market.market_index,
+        base_bank,
+        after_base_vault,
+        before_base_vault,
+        None, // guaranteed to deposit into bank
+    )?;
+    let quote_difference = apply_vault_difference(
+        account_pk,
+        account,
+        serum_market.market_index,
+        quote_bank,
+        after_quote_vault_adjusted,
+        before_quote_vault,
+        None, // guaranteed to deposit into bank
+    )?;
+
+    if let Some(health_cache) = health_cache {
+        base_difference.adjust_health_cache_token_balance(health_cache, &base_bank)?;
+        quote_difference.adjust_health_cache_token_balance(health_cache, &quote_bank)?;
+
+        OODifference::new(&before_oo, &after_oo)
+            .adjust_health_cache_serum3_state(health_cache, serum_market)?;
+    }
+
+    Ok(())
 }
 
 fn cpi_place_order(ctx: &Serum3PlaceOrder, order: NewOrderInstructionV3) -> Result<()> {

@@ -5,7 +5,7 @@ use crate::group_seeds;
 use crate::health::{new_fixed_order_account_retriever, new_health_cache, AccountRetriever};
 use crate::logs::{FlashLoanLog, FlashLoanTokenDetail, TokenBalanceLog};
 use crate::state::*;
-use crate::util::checked_math as cm;
+
 use anchor_lang::prelude::*;
 use anchor_lang::solana_program::sysvar::instructions as tx_instructions;
 use anchor_lang::Discriminator;
@@ -271,7 +271,7 @@ pub fn flash_loan_end<'key, 'accounts, 'remaining, 'info>(
             token::transfer(transfer_ctx, repay)?;
 
             let repay = I80F48::from(repay);
-            cm!(change += repay);
+            change += repay;
         }
 
         changes.push(TokenVaultChange {
@@ -333,16 +333,16 @@ pub fn flash_loan_end<'key, 'accounts, 'remaining, 'info>(
         let approved_amount = I80F48::from(bank.flash_loan_approved_amount);
 
         let loan = if native.is_positive() {
-            cm!(approved_amount - native).max(I80F48::ZERO)
+            (approved_amount - native).max(I80F48::ZERO)
         } else {
             approved_amount
         };
 
-        let loan_origination_fee = cm!(loan * bank.loan_origination_fee_rate);
-        cm!(bank.collected_fees_native += loan_origination_fee);
+        let loan_origination_fee = loan * bank.loan_origination_fee_rate;
+        bank.collected_fees_native += loan_origination_fee;
 
-        let change_amount = cm!(change.amount - loan_origination_fee);
-        let native_after_change = cm!(native + change_amount);
+        let change_amount = change.amount - loan_origination_fee;
+        let native_after_change = native + change_amount;
         if bank.is_reduce_only() {
             require!(
                 (change_amount < 0 && native_after_change >= 0)
@@ -362,7 +362,7 @@ pub fn flash_loan_end<'key, 'accounts, 'remaining, 'info>(
 
         let is_active = bank.change_without_fee(
             position,
-            cm!(change.amount - loan_origination_fee),
+            change.amount - loan_origination_fee,
             Clock::get()?.unix_timestamp.try_into().unwrap(),
             *oracle_price,
         )?;

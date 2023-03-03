@@ -188,9 +188,12 @@ impl SerumCookie {
         spot_market_cookie: &SpotMarketCookie,
         open_orders: &[Pubkey],
     ) {
+        let mut sorted_oos = open_orders.to_vec();
+        sorted_oos.sort_by_key(|key| serum_dex::state::ToAlignedBytes::to_aligned_bytes(key));
+
         let instructions = [serum_dex::instruction::consume_events(
             &self.program_id,
-            open_orders.iter().collect(),
+            sorted_oos.iter().collect(),
             &spot_market_cookie.market,
             &spot_market_cookie.event_q,
             &spot_market_cookie.coin_fee_account,

@@ -1,6 +1,5 @@
 pub use anchor_lang::prelude::Pubkey;
 pub use fixed::types::I80F48;
-pub use fixed_macro::types::I80F48;
 pub use solana_program_test::*;
 pub use solana_sdk::transport::TransportError;
 
@@ -18,6 +17,7 @@ mod test_basic;
 mod test_benchmark;
 mod test_borrow_limits;
 mod test_delegate;
+mod test_fees_buyback_with_mngo;
 mod test_health_compute;
 mod test_health_region;
 mod test_ix_gate_set;

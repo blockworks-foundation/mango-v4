@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use anchor_lang::prelude::*;
-use checked_math as cm;
+
 use fixed::types::I80F48;
 
 use crate::events::{Equity, TokenEquity};
@@ -34,9 +34,8 @@ pub fn compute_equity(
         let accumulated_equity = token_equity_map
             .get(&serum_account.base_token_index)
             .unwrap_or(&I80F48::ZERO);
-        let native_coin_total_i80f48 =
-            I80F48::from_num(oo.native_coin_total + oo.referrer_rebates_accrued);
-        let new_equity = cm!(accumulated_equity + native_coin_total_i80f48 * oracle_price);
+        let native_coin_total_i80f48 = I80F48::from_num(oo.native_coin_total);
+        let new_equity = accumulated_equity + native_coin_total_i80f48 * oracle_price;
         token_equity_map.insert(serum_account.base_token_index, new_equity);
 
         // note quote token value
@@ -46,7 +45,7 @@ pub fn compute_equity(
             .get(&serum_account.quote_token_index)
             .unwrap_or(&I80F48::ZERO);
         let native_pc_total_i80f48 = I80F48::from_num(oo.native_pc_total);
-        let new_equity = cm!(accumulated_equity + native_pc_total_i80f48 * oracle_price);
+        let new_equity = accumulated_equity + native_pc_total_i80f48 * oracle_price;
         token_equity_map.insert(serum_account.quote_token_index, new_equity);
     }
 

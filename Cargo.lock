@@ -326,6 +326,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "216261ddc8289130e551ddcd5ce8a064710c0d064a4d2895c67151c92b5443f6"
 
 [[package]]
+name = "arbitrary"
+version = "1.2.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3e90af4de65aa7b293ef2d09daff88501eb254f58edde2e1ac02c82d873eadad"
+
+[[package]]
 name = "arc-swap"
 version = "1.5.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -902,9 +908,9 @@ checksum = "dfb24e866b15a1af2a1b663f10c6b6b8f397a84aadb828f12e5b289ec23a3a3c"
 
 [[package]]
 name = "bzip2"
-version = "0.4.3"
+version = "0.4.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6afcd980b5f3a45017c57e57a2fcccbb351cc43a356ce117ef760ef8052b89b0"
+checksum = "bdb116a6ef3f6c3698828873ad02c3014b3c85cadb88496095628e3ef1e347f8"
 dependencies = [
  "bzip2-sys",
  "libc",
@@ -1830,51 +1836,16 @@ dependencies = [
 
 [[package]]
 name = "fixed"
-version = "1.11.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "80a9a8cb2e34880a498f09367089339bda5e12d6f871640f947850f7113058c0"
+version = "1.23.0"
 dependencies = [
+ "arbitrary",
  "az",
  "borsh",
  "bytemuck",
  "half",
+ "num-traits",
  "serde",
  "typenum",
-]
-
-[[package]]
-name = "fixed-macro"
-version = "1.2.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1fd0c48af8cb14e02868f449f8a2187bd78af7a08da201fdc78d518ecb1675bc"
-dependencies = [
- "fixed",
- "fixed-macro-impl",
- "fixed-macro-types",
-]
-
-[[package]]
-name = "fixed-macro-impl"
-version = "1.2.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c93086f471c0a1b9c5e300ea92f5cd990ac6d3f8edf27616ef624b8fa6402d4b"
-dependencies = [
- "fixed",
- "paste",
- "proc-macro-error",
- "proc-macro2 1.0.47",
- "quote 1.0.21",
- "syn 1.0.105",
-]
-
-[[package]]
-name = "fixed-macro-types"
-version = "1.2.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "044a61b034a2264a7f65aa0c3cd112a01b4d4ee58baace51fead3f21b993c7e4"
-dependencies = [
- "fixed",
- "fixed-macro-impl",
 ]
 
 [[package]]
@@ -2193,9 +2164,12 @@ dependencies = [
 
 [[package]]
 name = "half"
-version = "1.8.2"
+version = "2.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "eabb4a44450da02c90444cf74558da904edde8fb4e9035a9a6a4e15445af0bd7"
+checksum = "02b4af3693f1b705df946e9fe5631932443781d0aabb423b62fcd4d73f6d2fd0"
+dependencies = [
+ "crunchy",
+]
 
 [[package]]
 name = "hash32"
@@ -2993,7 +2967,7 @@ dependencies = [
 
 [[package]]
 name = "mango-v4"
-version = "0.7.0"
+version = "0.8.0"
 dependencies = [
  "anchor-lang",
  "anchor-spl",
@@ -3003,12 +2977,10 @@ dependencies = [
  "bincode",
  "borsh",
  "bytemuck",
- "checked_math",
  "default-env",
  "derivative",
  "env_logger 0.9.3",
  "fixed",
- "fixed-macro",
  "itertools 0.10.5",
  "lazy_static",
  "log 0.4.17",
@@ -3043,7 +3015,6 @@ dependencies = [
  "dotenv",
  "env_logger 0.8.4",
  "fixed",
- "fixed-macro",
  "futures 0.3.25",
  "log 0.4.17",
  "mango-v4",
@@ -3069,7 +3040,6 @@ dependencies = [
  "base64 0.13.1",
  "bincode",
  "fixed",
- "fixed-macro",
  "futures 0.3.25",
  "itertools 0.10.5",
  "jsonrpc-core 18.0.0 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -3105,7 +3075,6 @@ dependencies = [
  "dotenv",
  "env_logger 0.8.4",
  "fixed",
- "fixed-macro",
  "futures 0.3.25",
  "itertools 0.10.5",
  "log 0.4.17",
@@ -3132,7 +3101,6 @@ dependencies = [
  "bs58 0.3.1",
  "bytemuck",
  "bytes 1.3.0",
- "checked_math",
  "clap 3.2.23",
  "dotenv",
  "fixed",
@@ -3179,7 +3147,6 @@ dependencies = [
  "bs58 0.3.1",
  "bytemuck",
  "bytes 1.3.0",
- "checked_math",
  "clap 3.2.23",
  "dotenv",
  "fixed",
@@ -3729,9 +3696,9 @@ checksum = "ff011a302c396a5197692431fc1948019154afc178baf7d8e37367442a4601cf"
 
 [[package]]
 name = "openssl-src"
-version = "111.24.0+1.1.1s"
+version = "111.25.0+1.1.1t"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3498f259dab01178c6228c6b00dcef0ed2a2d5e20d648c017861227773ea4abd"
+checksum = "3173cd3626c43e3854b1b727422a276e568d9ec5fe8cec197822cf52cfb743d6"
 dependencies = [
  "cc",
 ]
@@ -3871,12 +3838,6 @@ dependencies = [
  "smallvec 1.10.0",
  "windows-sys 0.42.0",
 ]
-
-[[package]]
-name = "paste"
-version = "1.0.9"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b1de2e551fb905ac83f73f7aedf2f0cb4a0da7e35efa24a202a936269f1f18e1"
 
 [[package]]
 name = "pathdiff"

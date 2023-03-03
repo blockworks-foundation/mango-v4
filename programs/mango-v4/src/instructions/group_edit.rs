@@ -1,9 +1,10 @@
 use anchor_lang::prelude::*;
 
-use crate::accounts_ix::*;
+use crate::{accounts_ix::*, state::TokenIndex};
 
 // use case - transfer group ownership to governance, where
 // admin and fast_listing_admin are PDAs
+#[allow(clippy::too_many_arguments)]
 pub fn group_edit(
     ctx: Context<GroupEdit>,
     admin_opt: Option<Pubkey>,
@@ -12,6 +13,11 @@ pub fn group_edit(
     testing_opt: Option<u8>,
     version_opt: Option<u8>,
     deposit_limit_quote_opt: Option<u64>,
+    buyback_fees_opt: Option<bool>,
+    buyback_fees_bonus_factor_opt: Option<f32>,
+    buyback_fees_swap_mango_account_opt: Option<Pubkey>,
+    mngo_token_index_opt: Option<TokenIndex>,
+    buyback_fees_expiry_interval_opt: Option<u64>,
 ) -> Result<()> {
     let mut group = ctx.accounts.group.load_mut()?;
 
@@ -56,6 +62,48 @@ pub fn group_edit(
             deposit_limit_quote
         );
         group.deposit_limit_quote = deposit_limit_quote;
+    }
+
+    if let Some(buyback_fees) = buyback_fees_opt {
+        msg!(
+            "Buyback fees old {:?}, new {:?}",
+            group.buyback_fees,
+            buyback_fees
+        );
+        group.buyback_fees = u8::from(buyback_fees);
+    }
+    if let Some(buyback_fees_mngo_bonus_factor) = buyback_fees_bonus_factor_opt {
+        msg!(
+            "Buyback fees mngo bonus factor old {:?}, new {:?}",
+            group.buyback_fees_mngo_bonus_factor,
+            buyback_fees_mngo_bonus_factor
+        );
+        group.buyback_fees_mngo_bonus_factor = buyback_fees_mngo_bonus_factor;
+    }
+    if let Some(buyback_fees_swap_mango_account) = buyback_fees_swap_mango_account_opt {
+        msg!(
+            "Buyback fees swap mango account old {:?}, new {:?}",
+            group.buyback_fees_swap_mango_account,
+            buyback_fees_swap_mango_account
+        );
+        group.buyback_fees_swap_mango_account = buyback_fees_swap_mango_account;
+    }
+    if let Some(mngo_token_index) = mngo_token_index_opt {
+        msg!(
+            "Mngo token index old {:?}, new {:?}",
+            group.mngo_token_index,
+            mngo_token_index
+        );
+        group.mngo_token_index = mngo_token_index;
+    }
+
+    if let Some(buyback_fees_expiry_interval) = buyback_fees_expiry_interval_opt {
+        msg!(
+            "Buyback fees expiry interval old {:?}, new {:?}",
+            group.buyback_fees_expiry_interval,
+            buyback_fees_expiry_interval
+        );
+        group.buyback_fees_expiry_interval = buyback_fees_expiry_interval;
     }
 
     Ok(())

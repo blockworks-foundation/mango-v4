@@ -1,1 +1,1 @@
-mm: node dist/cjs/src/scripts/mm/market-maker.js
+mm: node dist/cjs/scripts/mm/market-maker.js

@@ -1,5 +1,5 @@
 export type MangoV4 = {
-  "version": "0.6.0",
+  "version": "0.8.0",
   "name": "mango_v4",
   "instructions": [
     {
@@ -141,6 +141,36 @@ export type MangoV4 = {
         },
         {
           "name": "depositLimitQuoteOpt",
+          "type": {
+            "option": "u64"
+          }
+        },
+        {
+          "name": "buybackFeesOpt",
+          "type": {
+            "option": "bool"
+          }
+        },
+        {
+          "name": "buybackFeesBonusFactorOpt",
+          "type": {
+            "option": "f32"
+          }
+        },
+        {
+          "name": "buybackFeesSwapMangoAccountOpt",
+          "type": {
+            "option": "publicKey"
+          }
+        },
+        {
+          "name": "mngoTokenIndexOpt",
+          "type": {
+            "option": "u16"
+          }
+        },
+        {
+          "name": "buybackFeesExpiryIntervalOpt",
           "type": {
             "option": "u64"
           }
@@ -398,7 +428,7 @@ export type MangoV4 = {
           "isSigner": false
         },
         {
-          "name": "fastListingAdmin",
+          "name": "admin",
           "isMut": false,
           "isSigner": true
         },
@@ -1091,6 +1121,57 @@ export type MangoV4 = {
         {
           "name": "forceClose",
           "type": "bool"
+        }
+      ]
+    },
+    {
+      "name": "accountBuybackFeesWithMngo",
+      "accounts": [
+        {
+          "name": "group",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "account",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "owner",
+          "isMut": false,
+          "isSigner": true
+        },
+        {
+          "name": "daoAccount",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "mngoBank",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "mngoOracle",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "feesBank",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "feesOracle",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "maxBuyback",
+          "type": "u64"
         }
       ]
     },
@@ -3948,11 +4029,15 @@ export type MangoV4 = {
             "type": "publicKey"
           },
           {
+            "name": "mngoTokenIndex",
+            "type": "u16"
+          },
+          {
             "name": "padding",
             "type": {
               "array": [
                 "u8",
-                4
+                2
               ]
             }
           },
@@ -3977,13 +4062,12 @@ export type MangoV4 = {
             "type": "u8"
           },
           {
-            "name": "padding2",
-            "type": {
-              "array": [
-                "u8",
-                5
-              ]
-            }
+            "name": "buybackFees",
+            "type": "u8"
+          },
+          {
+            "name": "buybackFeesMngoBonusFactor",
+            "type": "f32"
           },
           {
             "name": "addressLookupTables",
@@ -4007,11 +4091,27 @@ export type MangoV4 = {
             "type": "u128"
           },
           {
+            "name": "buybackFeesSwapMangoAccount",
+            "type": "publicKey"
+          },
+          {
+            "name": "buybackFeesExpiryInterval",
+            "docs": [
+              "Number of seconds after which fees that could be used with the fees buyback feature expire.",
+              "",
+              "The actual expiry is staggered such that the fees users accumulate are always",
+              "available for at least this interval - but may be available for up to twice this time.",
+              "",
+              "When set to 0, there's no expiry of buyback fees."
+            ],
+            "type": "u64"
+          },
+          {
             "name": "reserved",
             "type": {
               "array": [
                 "u8",
-                1864
+                1824
               ]
             }
           }
@@ -4105,11 +4205,33 @@ export type MangoV4 = {
             "type": "u64"
           },
           {
+            "name": "buybackFeesAccruedCurrent",
+            "docs": [
+              "Fees usable with the \"fees buyback\" feature.",
+              "This tracks the ones that accrued in the current expiry interval."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "buybackFeesAccruedPrevious",
+            "docs": [
+              "Fees buyback amount from the previous expiry interval."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "buybackFeesExpiryTimestamp",
+            "docs": [
+              "End timestamp of the current expiry interval of the buyback fees amount."
+            ],
+            "type": "u64"
+          },
+          {
             "name": "reserved",
             "type": {
               "array": [
                 "u8",
-                232
+                208
               ]
             }
           },
@@ -4663,7 +4785,7 @@ export type MangoV4 = {
           {
             "name": "settleFeeAmountThreshold",
             "docs": [
-              "Pnl settlement amount needed to be eligible for fees."
+              "Pnl settlement amount needed to be eligible for the flat fee."
             ],
             "type": "f32"
           },
@@ -5680,11 +5802,23 @@ export type MangoV4 = {
             "type": "u64"
           },
           {
+            "name": "buybackFeesAccruedCurrent",
+            "type": "u64"
+          },
+          {
+            "name": "buybackFeesAccruedPrevious",
+            "type": "u64"
+          },
+          {
+            "name": "buybackFeesExpiryTimestamp",
+            "type": "u64"
+          },
+          {
             "name": "reserved",
             "type": {
               "array": [
                 "u8",
-                232
+                208
               ]
             }
           }
@@ -6682,6 +6816,9 @@ export type MangoV4 = {
           },
           {
             "name": "TokenWithdraw"
+          },
+          {
+            "name": "AccountBuybackFeesWithMngo"
           }
         ]
       }
@@ -8345,7 +8482,7 @@ export type MangoV4 = {
 };
 
 export const IDL: MangoV4 = {
-  "version": "0.6.0",
+  "version": "0.8.0",
   "name": "mango_v4",
   "instructions": [
     {
@@ -8487,6 +8624,36 @@ export const IDL: MangoV4 = {
         },
         {
           "name": "depositLimitQuoteOpt",
+          "type": {
+            "option": "u64"
+          }
+        },
+        {
+          "name": "buybackFeesOpt",
+          "type": {
+            "option": "bool"
+          }
+        },
+        {
+          "name": "buybackFeesBonusFactorOpt",
+          "type": {
+            "option": "f32"
+          }
+        },
+        {
+          "name": "buybackFeesSwapMangoAccountOpt",
+          "type": {
+            "option": "publicKey"
+          }
+        },
+        {
+          "name": "mngoTokenIndexOpt",
+          "type": {
+            "option": "u16"
+          }
+        },
+        {
+          "name": "buybackFeesExpiryIntervalOpt",
           "type": {
             "option": "u64"
           }
@@ -8744,7 +8911,7 @@ export const IDL: MangoV4 = {
           "isSigner": false
         },
         {
-          "name": "fastListingAdmin",
+          "name": "admin",
           "isMut": false,
           "isSigner": true
         },
@@ -9437,6 +9604,57 @@ export const IDL: MangoV4 = {
         {
           "name": "forceClose",
           "type": "bool"
+        }
+      ]
+    },
+    {
+      "name": "accountBuybackFeesWithMngo",
+      "accounts": [
+        {
+          "name": "group",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "account",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "owner",
+          "isMut": false,
+          "isSigner": true
+        },
+        {
+          "name": "daoAccount",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "mngoBank",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "mngoOracle",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "feesBank",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "feesOracle",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "maxBuyback",
+          "type": "u64"
         }
       ]
     },
@@ -12294,11 +12512,15 @@ export const IDL: MangoV4 = {
             "type": "publicKey"
           },
           {
+            "name": "mngoTokenIndex",
+            "type": "u16"
+          },
+          {
             "name": "padding",
             "type": {
               "array": [
                 "u8",
-                4
+                2
               ]
             }
           },
@@ -12323,13 +12545,12 @@ export const IDL: MangoV4 = {
             "type": "u8"
           },
           {
-            "name": "padding2",
-            "type": {
-              "array": [
-                "u8",
-                5
-              ]
-            }
+            "name": "buybackFees",
+            "type": "u8"
+          },
+          {
+            "name": "buybackFeesMngoBonusFactor",
+            "type": "f32"
           },
           {
             "name": "addressLookupTables",
@@ -12353,11 +12574,27 @@ export const IDL: MangoV4 = {
             "type": "u128"
           },
           {
+            "name": "buybackFeesSwapMangoAccount",
+            "type": "publicKey"
+          },
+          {
+            "name": "buybackFeesExpiryInterval",
+            "docs": [
+              "Number of seconds after which fees that could be used with the fees buyback feature expire.",
+              "",
+              "The actual expiry is staggered such that the fees users accumulate are always",
+              "available for at least this interval - but may be available for up to twice this time.",
+              "",
+              "When set to 0, there's no expiry of buyback fees."
+            ],
+            "type": "u64"
+          },
+          {
             "name": "reserved",
             "type": {
               "array": [
                 "u8",
-                1864
+                1824
               ]
             }
           }
@@ -12451,11 +12688,33 @@ export const IDL: MangoV4 = {
             "type": "u64"
           },
           {
+            "name": "buybackFeesAccruedCurrent",
+            "docs": [
+              "Fees usable with the \"fees buyback\" feature.",
+              "This tracks the ones that accrued in the current expiry interval."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "buybackFeesAccruedPrevious",
+            "docs": [
+              "Fees buyback amount from the previous expiry interval."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "buybackFeesExpiryTimestamp",
+            "docs": [
+              "End timestamp of the current expiry interval of the buyback fees amount."
+            ],
+            "type": "u64"
+          },
+          {
             "name": "reserved",
             "type": {
               "array": [
                 "u8",
-                232
+                208
               ]
             }
           },
@@ -13009,7 +13268,7 @@ export const IDL: MangoV4 = {
           {
             "name": "settleFeeAmountThreshold",
             "docs": [
-              "Pnl settlement amount needed to be eligible for fees."
+              "Pnl settlement amount needed to be eligible for the flat fee."
             ],
             "type": "f32"
           },
@@ -14026,11 +14285,23 @@ export const IDL: MangoV4 = {
             "type": "u64"
           },
           {
+            "name": "buybackFeesAccruedCurrent",
+            "type": "u64"
+          },
+          {
+            "name": "buybackFeesAccruedPrevious",
+            "type": "u64"
+          },
+          {
+            "name": "buybackFeesExpiryTimestamp",
+            "type": "u64"
+          },
+          {
             "name": "reserved",
             "type": {
               "array": [
                 "u8",
-                232
+                208
               ]
             }
           }
@@ -15028,6 +15299,9 @@ export const IDL: MangoV4 = {
           },
           {
             "name": "TokenWithdraw"
+          },
+          {
+            "name": "AccountBuybackFeesWithMngo"
           }
         ]
       }

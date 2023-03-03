@@ -1,16 +1,21 @@
-import { BN } from '@project-serum/anchor';
-import { utf8 } from '@project-serum/anchor/dist/cjs/utils/bytes';
+import { BN } from '@coral-xyz/anchor';
+import { utf8 } from '@coral-xyz/anchor/dist/cjs/utils/bytes';
 import { PublicKey } from '@solana/web3.js';
 import Big from 'big.js';
 import { MangoClient } from '../client';
 import { RUST_U64_MAX } from '../constants';
 import { I80F48, I80F48Dto, ZERO_I80F48 } from '../numbers/I80F48';
 import { Modify } from '../types';
-import { As, U64_MAX_BN, toNative, toUiDecimals } from '../utils';
+import {
+  As,
+  QUOTE_DECIMALS,
+  U64_MAX_BN,
+  toNative,
+  toUiDecimals,
+} from '../utils';
 import {
   OracleConfig,
   OracleConfigDto,
-  QUOTE_DECIMALS,
   StablePriceModel,
   TokenIndex,
 } from './bank';
@@ -49,13 +54,12 @@ export class PerpMarket {
   public _price: I80F48;
   public _uiPrice: number;
   public _oracleLastUpdatedSlot: number;
+  public _bids: BookSide;
+  public _asks: BookSide;
 
   private priceLotsToUiConverter: number;
   private baseLotsToUiConverter: number;
   private quoteLotsToUiConverter: number;
-
-  private _bids: BookSide;
-  private _asks: BookSide;
 
   static from(
     publicKey: PublicKey,
@@ -194,7 +198,7 @@ export class PerpMarket {
     public reduceOnly: boolean,
     maintOverallAssetWeight: I80F48Dto,
     initOverallAssetWeight: I80F48Dto,
-    positivePnlLiquidationFee: I80F48Dto,
+    public positivePnlLiquidationFee: I80F48Dto,
   ) {
     this.name = utf8.decode(new Uint8Array(name)).split('\x00')[0];
     this.oracleConfig = {
@@ -683,7 +687,7 @@ export class BookSide {
           this.perpMarket,
           leafNode,
           this.type,
-          now.lt(expiryTimestamp),
+          now.gt(expiryTimestamp),
         );
       }
     }
@@ -713,7 +717,7 @@ export class BookSide {
           this.perpMarket,
           leafNode,
           this.type,
-          now.lt(expiryTimestamp),
+          now.gt(expiryTimestamp),
           true,
         );
       }

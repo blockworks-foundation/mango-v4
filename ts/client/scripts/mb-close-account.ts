@@ -1,9 +1,9 @@
-import { AnchorProvider, BN, Wallet } from '@project-serum/anchor';
+import { AnchorProvider, BN, Wallet } from '@coral-xyz/anchor';
 import { Connection, Keypair } from '@solana/web3.js';
 import fs from 'fs';
-import { Serum3Side } from '../accounts/serum3';
-import { MangoClient } from '../client';
-import { MANGO_V4_ID } from '../constants';
+import { Serum3Side } from '../src/accounts/serum3';
+import { MangoClient } from '../src/client';
+import { MANGO_V4_ID } from '../src/constants';
 
 //
 // (untested?) script which closes a mango account cleanly, first closes all positions, withdraws all tokens and then closes it
