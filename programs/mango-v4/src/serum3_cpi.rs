@@ -116,7 +116,11 @@ pub fn load_open_orders_ref<'a>(
 }
 
 pub fn load_open_orders(acc: &impl AccountReader) -> Result<&serum_dex::state::OpenOrders> {
-    Ok(bytemuck::from_bytes(strip_dex_padding(acc.data())?))
+    load_open_orders_bytes(acc.data())
+}
+
+pub fn load_open_orders_bytes(bytes: &[u8]) -> Result<&serum_dex::state::OpenOrders> {
+    Ok(bytemuck::from_bytes(strip_dex_padding(bytes)?))
 }
 
 pub fn pubkey_from_u64_array(d: [u64; 4]) -> Pubkey {
@@ -226,6 +230,8 @@ pub struct SettleFunds<'info> {
     pub vault_signer: AccountInfo<'info>,
     /// CHECK: cpi
     pub token_program: AccountInfo<'info>,
+    /// CHECK: cpi
+    pub rebates_quote_wallet: AccountInfo<'info>,
 }
 
 impl<'a> SettleFunds<'a> {
@@ -244,7 +250,7 @@ impl<'a> SettleFunds<'a> {
                 AccountMeta::new(*self.user_quote_wallet.key, false),
                 AccountMeta::new_readonly(*self.vault_signer.key, false),
                 AccountMeta::new_readonly(*self.token_program.key, false),
-                AccountMeta::new(*self.user_quote_wallet.key, false),
+                AccountMeta::new(*self.rebates_quote_wallet.key, false),
             ],
         };
 
@@ -256,10 +262,10 @@ impl<'a> SettleFunds<'a> {
             self.base_vault,
             self.quote_vault,
             self.user_base_wallet,
-            self.user_quote_wallet.clone(),
+            self.user_quote_wallet,
             self.vault_signer,
             self.token_program,
-            self.user_quote_wallet,
+            self.rebates_quote_wallet,
         ];
 
         let seeds = group_seeds!(group);

@@ -2139,6 +2139,11 @@ export type MangoV4 = {
     },
     {
       "name": "serum3SettleFunds",
+      "docs": [
+        "Settles all free funds from the OpenOrders account into the MangoAccount.",
+        "",
+        "Any serum \"referrer rebates\" (ui fees) are considered Mango fees."
+      ],
       "accounts": [
         {
           "name": "group",
@@ -2220,6 +2225,119 @@ export type MangoV4 = {
         }
       ],
       "args": []
+    },
+    {
+      "name": "serum3SettleFundsV2",
+      "docs": [
+        "Like Serum3SettleFunds, but `fees_to_dao` determines if referrer rebates are considered fees",
+        "or are credited to the MangoAccount."
+      ],
+      "accounts": [
+        {
+          "name": "v1",
+          "accounts": [
+            {
+              "name": "group",
+              "isMut": false,
+              "isSigner": false
+            },
+            {
+              "name": "account",
+              "isMut": true,
+              "isSigner": false
+            },
+            {
+              "name": "owner",
+              "isMut": false,
+              "isSigner": true
+            },
+            {
+              "name": "openOrders",
+              "isMut": true,
+              "isSigner": false
+            },
+            {
+              "name": "serumMarket",
+              "isMut": false,
+              "isSigner": false
+            },
+            {
+              "name": "serumProgram",
+              "isMut": false,
+              "isSigner": false
+            },
+            {
+              "name": "serumMarketExternal",
+              "isMut": true,
+              "isSigner": false
+            },
+            {
+              "name": "marketBaseVault",
+              "isMut": true,
+              "isSigner": false
+            },
+            {
+              "name": "marketQuoteVault",
+              "isMut": true,
+              "isSigner": false
+            },
+            {
+              "name": "marketVaultSigner",
+              "isMut": false,
+              "isSigner": false,
+              "docs": [
+                "needed for the automatic settle_funds call"
+              ]
+            },
+            {
+              "name": "quoteBank",
+              "isMut": true,
+              "isSigner": false
+            },
+            {
+              "name": "quoteVault",
+              "isMut": true,
+              "isSigner": false
+            },
+            {
+              "name": "baseBank",
+              "isMut": true,
+              "isSigner": false
+            },
+            {
+              "name": "baseVault",
+              "isMut": true,
+              "isSigner": false
+            },
+            {
+              "name": "tokenProgram",
+              "isMut": false,
+              "isSigner": false
+            }
+          ]
+        },
+        {
+          "name": "v2",
+          "accounts": [
+            {
+              "name": "quoteOracle",
+              "isMut": false,
+              "isSigner": false
+            },
+            {
+              "name": "baseOracle",
+              "isMut": false,
+              "isSigner": false
+            }
+          ]
+        }
+      ],
+      "args": [
+        {
+          "name": "feesToDao",
+          "type": "bool"
+        }
+      ]
     },
     {
       "name": "serum3LiqForceCancelOrders",
@@ -10634,6 +10752,11 @@ export const IDL: MangoV4 = {
     },
     {
       "name": "serum3SettleFunds",
+      "docs": [
+        "Settles all free funds from the OpenOrders account into the MangoAccount.",
+        "",
+        "Any serum \"referrer rebates\" (ui fees) are considered Mango fees."
+      ],
       "accounts": [
         {
           "name": "group",
@@ -10715,6 +10838,119 @@ export const IDL: MangoV4 = {
         }
       ],
       "args": []
+    },
+    {
+      "name": "serum3SettleFundsV2",
+      "docs": [
+        "Like Serum3SettleFunds, but `fees_to_dao` determines if referrer rebates are considered fees",
+        "or are credited to the MangoAccount."
+      ],
+      "accounts": [
+        {
+          "name": "v1",
+          "accounts": [
+            {
+              "name": "group",
+              "isMut": false,
+              "isSigner": false
+            },
+            {
+              "name": "account",
+              "isMut": true,
+              "isSigner": false
+            },
+            {
+              "name": "owner",
+              "isMut": false,
+              "isSigner": true
+            },
+            {
+              "name": "openOrders",
+              "isMut": true,
+              "isSigner": false
+            },
+            {
+              "name": "serumMarket",
+              "isMut": false,
+              "isSigner": false
+            },
+            {
+              "name": "serumProgram",
+              "isMut": false,
+              "isSigner": false
+            },
+            {
+              "name": "serumMarketExternal",
+              "isMut": true,
+              "isSigner": false
+            },
+            {
+              "name": "marketBaseVault",
+              "isMut": true,
+              "isSigner": false
+            },
+            {
+              "name": "marketQuoteVault",
+              "isMut": true,
+              "isSigner": false
+            },
+            {
+              "name": "marketVaultSigner",
+              "isMut": false,
+              "isSigner": false,
+              "docs": [
+                "needed for the automatic settle_funds call"
+              ]
+            },
+            {
+              "name": "quoteBank",
+              "isMut": true,
+              "isSigner": false
+            },
+            {
+              "name": "quoteVault",
+              "isMut": true,
+              "isSigner": false
+            },
+            {
+              "name": "baseBank",
+              "isMut": true,
+              "isSigner": false
+            },
+            {
+              "name": "baseVault",
+              "isMut": true,
+              "isSigner": false
+            },
+            {
+              "name": "tokenProgram",
+              "isMut": false,
+              "isSigner": false
+            }
+          ]
+        },
+        {
+          "name": "v2",
+          "accounts": [
+            {
+              "name": "quoteOracle",
+              "isMut": false,
+              "isSigner": false
+            },
+            {
+              "name": "baseOracle",
+              "isMut": false,
+              "isSigner": false
+            }
+          ]
+        }
+      ],
+      "args": [
+        {
+          "name": "feesToDao",
+          "type": "bool"
+        }
+      ]
     },
     {
       "name": "serum3LiqForceCancelOrders",
