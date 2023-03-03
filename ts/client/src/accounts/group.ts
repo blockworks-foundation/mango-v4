@@ -386,7 +386,12 @@ export class Group {
     ai: AccountInfo<Buffer>,
     baseDecimals: number,
     client: MangoClient,
-  ): Promise<{ price: I80F48; uiPrice: number; lastUpdatedSlot: number; provider: string; }> {
+  ): Promise<{
+    price: I80F48;
+    uiPrice: number;
+    lastUpdatedSlot: number;
+    provider: string;
+  }> {
     let price, uiPrice, lastUpdatedSlot, provider;
     if (
       !BorshAccountsCoder.accountDiscriminator('stubOracle').compare(
