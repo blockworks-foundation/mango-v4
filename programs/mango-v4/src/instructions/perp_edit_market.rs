@@ -324,7 +324,7 @@ pub fn perp_edit_market(
         require_group_admin = true;
     }
 
-    if let Some(name) = name_opt.clone() {
+    if let Some(name) = name_opt.as_ref() {
         msg!("Name: old - {:?}, new - {:?}", perp_market.name, name);
         perp_market.name = fill_from_str(&name)?;
         require_group_admin = true;

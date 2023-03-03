@@ -284,7 +284,7 @@ pub fn token_edit(
             }
         };
 
-        if let Some(name) = name_opt.clone() {
+        if let Some(name) = name_opt.as_ref() {
             msg!("Name: old - {:?}, new - {:?}", bank.name, name);
             bank.name = fill_from_str(&name)?;
             require_group_admin = true;
