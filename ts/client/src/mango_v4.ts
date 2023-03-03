@@ -717,6 +717,12 @@ export type MangoV4 = {
           "type": {
             "option": "bool"
           }
+        },
+        {
+          "name": "nameOpt",
+          "type": {
+            "option": "string"
+          }
         }
       ]
     },
@@ -2884,6 +2890,12 @@ export type MangoV4 = {
           "name": "positivePnlLiquidationFeeOpt",
           "type": {
             "option": "f32"
+          }
+        },
+        {
+          "name": "nameOpt",
+          "type": {
+            "option": "string"
           }
         }
       ]
@@ -9200,6 +9212,12 @@ export const IDL: MangoV4 = {
           "type": {
             "option": "bool"
           }
+        },
+        {
+          "name": "nameOpt",
+          "type": {
+            "option": "string"
+          }
         }
       ]
     },
@@ -11367,6 +11385,12 @@ export const IDL: MangoV4 = {
           "name": "positivePnlLiquidationFeeOpt",
           "type": {
             "option": "f32"
+          }
+        },
+        {
+          "name": "nameOpt",
+          "type": {
+            "option": "string"
           }
         }
       ]

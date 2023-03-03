@@ -170,6 +170,7 @@ pub mod mango_v4 {
         reset_stable_price: bool,
         reset_net_borrow_limit: bool,
         reduce_only_opt: Option<bool>,
+        name_opt: Option<String>,
     ) -> Result<()> {
         #[cfg(feature = "enable-gpl")]
         instructions::token_edit(
@@ -196,6 +197,7 @@ pub mod mango_v4 {
             reset_stable_price,
             reset_net_borrow_limit,
             reduce_only_opt,
+            name_opt,
         )?;
         Ok(())
     }
@@ -629,6 +631,7 @@ pub mod mango_v4 {
         reduce_only_opt: Option<bool>,
         reset_stable_price: bool,
         positive_pnl_liquidation_fee_opt: Option<f32>,
+        name_opt: Option<String>,
     ) -> Result<()> {
         #[cfg(feature = "enable-gpl")]
         instructions::perp_edit_market(
@@ -661,6 +664,7 @@ pub mod mango_v4 {
             reduce_only_opt,
             reset_stable_price,
             positive_pnl_liquidation_fee_opt,
+            name_opt,
         )?;
         Ok(())
     }
