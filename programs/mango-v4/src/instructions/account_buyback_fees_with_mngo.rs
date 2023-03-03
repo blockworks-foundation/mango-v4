@@ -132,6 +132,14 @@ pub fn account_buyback_fees_with_mngo(
         );
     }
     let in_use = fees_bank.deposit(account_fees_token_position, max_buyback, now_ts)?;
+    emit!(TokenBalanceLog {
+        mango_group: ctx.accounts.group.key(),
+        mango_account: ctx.accounts.account.key(),
+        token_index: fees_bank.token_index,
+        indexed_position: account_fees_token_position.indexed_position.to_bits(),
+        deposit_index: fees_bank.deposit_index.to_bits(),
+        borrow_index: fees_bank.borrow_index.to_bits(),
+    });
     if !in_use {
         account.deactivate_token_position_and_log(
             account_fees_raw_token_index,
