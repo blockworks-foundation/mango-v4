@@ -1640,6 +1640,12 @@ export class MangoClient {
     mangoAccount: MangoAccount,
     externalMarketPk: PublicKey,
   ): Promise<TransactionInstruction> {
+    if (this.openbookFeesToDao == false) {
+      throw new Error(
+        `openbookFeesToDao is set to false, please use serum3SettleFundsV2Ix`,
+      );
+    }
+
     const serum3Market = group.serum3MarketsMapByExternal.get(
       externalMarketPk.toBase58(),
     )!;
@@ -1682,20 +1688,6 @@ export class MangoClient {
       .instruction();
 
     return ix;
-  }
-
-  public async serum3SettleFunds(
-    group: Group,
-    mangoAccount: MangoAccount,
-    externalMarketPk: PublicKey,
-  ): Promise<TransactionSignature> {
-    const ix = await this.serum3SettleFundsIx(
-      group,
-      mangoAccount,
-      externalMarketPk,
-    );
-
-    return await this.sendAndConfirmTransactionForGroup(group, [ix]);
   }
 
   public async serum3SettleFundsV2Ix(
@@ -1759,7 +1751,7 @@ export class MangoClient {
     return ix;
   }
 
-  public async serum3SettleFundsV2(
+  public async serum3SettleFunds(
     group: Group,
     mangoAccount: MangoAccount,
     externalMarketPk: PublicKey,
