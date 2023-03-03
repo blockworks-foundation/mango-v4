@@ -25,6 +25,7 @@ export interface TokenEditParams {
   resetStablePrice: boolean | null;
   resetNetBorrowLimit: boolean | null;
   reduceOnly: boolean | null;
+  name: string | null;
 }
 
 export const NullTokenEditParams: TokenEditParams = {
@@ -50,6 +51,7 @@ export const NullTokenEditParams: TokenEditParams = {
   resetStablePrice: null,
   resetNetBorrowLimit: null,
   reduceOnly: null,
+  name: null,
 };
 
 export interface PerpEditParams {
@@ -81,6 +83,7 @@ export interface PerpEditParams {
   reduceOnly: boolean | null;
   resetStablePrice: boolean | null;
   positivePnlLiquidationFee: number | null;
+  name: string | null;
 }
 
 export const NullPerpEditParams: PerpEditParams = {
@@ -112,6 +115,7 @@ export const NullPerpEditParams: PerpEditParams = {
   reduceOnly: null,
   resetStablePrice: null,
   positivePnlLiquidationFee: null,
+  name: null,
 };
 
 // Use with TrueIxGateParams and buildIxGate

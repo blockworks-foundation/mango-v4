@@ -170,6 +170,7 @@ pub mod mango_v4 {
         reset_stable_price: bool,
         reset_net_borrow_limit: bool,
         reduce_only_opt: Option<bool>,
+        name_opt: Option<String>,
     ) -> Result<()> {
         #[cfg(feature = "enable-gpl")]
         instructions::token_edit(
@@ -196,6 +197,7 @@ pub mod mango_v4 {
             reset_stable_price,
             reset_net_borrow_limit,
             reduce_only_opt,
+            name_opt,
         )?;
         Ok(())
     }
@@ -462,9 +464,27 @@ pub mod mango_v4 {
         Ok(())
     }
 
+    /// Settles all free funds from the OpenOrders account into the MangoAccount.
+    ///
+    /// Any serum "referrer rebates" (ui fees) are considered Mango fees.
     pub fn serum3_settle_funds(ctx: Context<Serum3SettleFunds>) -> Result<()> {
         #[cfg(feature = "enable-gpl")]
-        instructions::serum3_settle_funds(ctx)?;
+        instructions::serum3_settle_funds(ctx.accounts, None, true)?;
+        Ok(())
+    }
+
+    /// Like Serum3SettleFunds, but `fees_to_dao` determines if referrer rebates are considered fees
+    /// or are credited to the MangoAccount.
+    pub fn serum3_settle_funds_v2(
+        ctx: Context<Serum3SettleFundsV2>,
+        fees_to_dao: bool,
+    ) -> Result<()> {
+        #[cfg(feature = "enable-gpl")]
+        instructions::serum3_settle_funds(
+            &mut ctx.accounts.v1,
+            Some(&mut ctx.accounts.v2),
+            fees_to_dao,
+        )?;
         Ok(())
     }
 
@@ -629,6 +649,7 @@ pub mod mango_v4 {
         reduce_only_opt: Option<bool>,
         reset_stable_price: bool,
         positive_pnl_liquidation_fee_opt: Option<f32>,
+        name_opt: Option<String>,
     ) -> Result<()> {
         #[cfg(feature = "enable-gpl")]
         instructions::perp_edit_market(
@@ -661,6 +682,7 @@ pub mod mango_v4 {
             reduce_only_opt,
             reset_stable_price,
             positive_pnl_liquidation_fee_opt,
+            name_opt,
         )?;
         Ok(())
     }

@@ -9,6 +9,7 @@ use crate::state::*;
 
 use crate::accounts_ix::*;
 use crate::logs::TokenMetaDataLog;
+use crate::util::fill_from_str;
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
@@ -36,6 +37,7 @@ pub fn token_edit(
     reset_stable_price: bool,
     reset_net_borrow_limit: bool,
     reduce_only_opt: Option<bool>,
+    name_opt: Option<String>,
 ) -> Result<()> {
     let group = ctx.accounts.group.load()?;
 
@@ -280,6 +282,12 @@ pub fn token_edit(
             if !reduce_only {
                 require_group_admin = true;
             }
+        };
+
+        if let Some(name) = name_opt.as_ref() {
+            msg!("Name: old - {:?}, new - {:?}", bank.name, name);
+            bank.name = fill_from_str(&name)?;
+            require_group_admin = true;
         };
     }
 
