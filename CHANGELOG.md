@@ -8,7 +8,7 @@ Update this for each program release and mainnet deployment.
 
 Deployment:
 
-- Introduce a new "fee buyback" feature. (#464, #478, #479, #481, #485)
+- Introduce a new "fee buyback" feature. (#464, #478, #479, #481, #485, #489)
 
   If enabled, users who paid perp or openbook fees can optionally perform a MNGO
   to USDC swap at a favorable price to pay fees in MNGO instead.
@@ -23,7 +23,7 @@ Deployment:
   This allows the security council to disable new borrows against a token or
   perp market in emergency situations. The primary usecase is a scenario where
   an oracle no longer tracks the real value of an asset. (like when the soBTC
-  price depegged, but Mango used the baseline BTC oracle for it)
+  price depegged: Mango would have used the BTC oracle for it if it had been live)
 
 - Introduce a new `Serum3SettleFundsV2` instruction (#484)
 
