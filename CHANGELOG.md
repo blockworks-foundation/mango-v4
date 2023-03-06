@@ -4,6 +4,41 @@ Update this for each program release and mainnet deployment.
 
 ## not on mainnet
 
+### v0.8.0, 2023-3-
+
+Deployment:
+
+- Introduce a new "fee buyback" feature. (#464, #478, #479, #481, #485)
+
+  If enabled, users who paid perp or openbook fees can optionally perform a MNGO
+  to USDC swap at a favorable price to pay fees in MNGO instead.
+
+  For example, if a user had paid 100 USDC in fees, they could use the new
+  instruction to pay $90 worth of MNGO instead and get back their 100 USDC
+  (concrete numbers and enabling this feature are up to DAO vote).
+
+- The security admin is now allowed to reduce the init asset weight of tokens
+  and perp markets to zero. (#482)
+
+  This allows the security council to disable new borrows against a token or
+  perp market in emergency situations. The primary usecase is a scenario where
+  an oracle no longer tracks the real value of an asset. (like when the soBTC
+  price depegged, but Mango used the baseline BTC oracle for it)
+
+- Introduce a new `Serum3SettleFundsV2` instruction (#484)
+
+  OpenBook has a UI fee that bots don't have to pay. Previously, Mango claimed
+  this OpenBook fee component for itself. The new instruction allows bots to
+  skip paying the OpenBook UI fee when trading through Mango.
+
+  The idea is to avoid penalizing market maker bots for trading on OpenBook
+  through a Mango account.
+
+- Make reduce-only behavior more intuitive for PerpPlaceOrder instruction (#483)
+- Allow the group admin to edit the token and perp names stored on-chain (#488)
+- Allow the group admin to call the `TokenRegisterTrustless` instruction (#477)
+- Vendor `fixed` crate to enable general overflow checking in release mode (#476)
+
 ## mainnet
 
 ### v0.7.0, 2023-2-22
