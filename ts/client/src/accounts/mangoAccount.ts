@@ -9,13 +9,7 @@ import { toNativeI80F48, toUiDecimals, toUiDecimalsForQuote } from '../utils';
 import { Bank, TokenIndex } from './bank';
 import { Group } from './group';
 import { HealthCache } from './healthCache';
-import {
-  BookSide,
-  PerpMarket,
-  PerpMarketIndex,
-  PerpOrder,
-  PerpOrderSide,
-} from './perp';
+import { PerpMarket, PerpMarketIndex, PerpOrder, PerpOrderSide } from './perp';
 import { MarketIndex, Serum3Side } from './serum3';
 export class MangoAccount {
   public name: string;
@@ -866,7 +860,7 @@ export class MangoAccount {
     const hc = HealthCache.fromMangoAccount(group, this);
     const baseLots = hc.getMaxPerpForHealthRatio(
       perpMarket,
-      I80F48.fromNumber(perpMarket.uiPrice),
+      perpMarket.price,
       PerpOrderSide.bid,
       I80F48.fromNumber(2),
     );
@@ -893,7 +887,7 @@ export class MangoAccount {
     const hc = HealthCache.fromMangoAccount(group, this);
     const baseLots = hc.getMaxPerpForHealthRatio(
       perpMarket,
-      I80F48.fromNumber(perpMarket.uiPrice),
+      perpMarket.price,
       PerpOrderSide.ask,
       I80F48.fromNumber(2),
     );
