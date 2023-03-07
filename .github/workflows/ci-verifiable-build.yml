@@ -23,7 +23,7 @@ jobs:
 
       - name: Generate Checksum
         run: |
-          echo "CHECKSUM=$(sha256sum ./target/verifiable/${{ env.APP_NAME }}.so)" >> $GITHUB_ENV
+          echo "CHECKSUM=$(sha256sum ./target/verifiable/${{ env.APP_NAME }}.so | head -c 64)" >> $GITHUB_ENV
 
       - name: Generate SBOM
         uses: aquasecurity/trivy-action@master
@@ -37,7 +37,7 @@ jobs:
         uses: softprops/action-gh-release@v1
         with:
           tag_name: ${{ github.ref_name }}
-          name: Release ${{ github.ref_name }}
+          name: ${{ github.ref_name }}
           body: |
             sha256 checksum: ${{ env.CHECKSUM }}
             github commit: ${{ github.sha }}
