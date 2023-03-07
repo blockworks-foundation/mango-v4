@@ -199,7 +199,7 @@ export class PerpMarket {
     public reduceOnly: boolean,
     maintOverallAssetWeight: I80F48Dto,
     initOverallAssetWeight: I80F48Dto,
-    public positivePnlLiquidationFee: I80F48Dto,
+    positivePnlLiquidationFee: I80F48Dto,
   ) {
     this.name = utf8.decode(new Uint8Array(name)).split('\x00')[0];
     this.oracleConfig = {
