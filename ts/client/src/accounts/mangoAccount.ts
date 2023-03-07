@@ -1581,7 +1581,19 @@ export class PerpPosition {
           ', takerQuoteLots - ' +
           perpMarket.quoteLotsToUi(this.takerQuoteLots) +
           ', unsettled pnl - ' +
-          this.getUnsettledPnlUi(perpMarket!).toString()
+          this.getUnsettledPnlUi(perpMarket!).toString() +
+          ', average entry price ui - ' +
+          this.getAverageEntryPriceUi(perpMarket!).toString() +
+          ', notional value ui - ' +
+          this.getNotionalValueUi(perpMarket!).toString() +
+          ', cumulative pnl over position lifetime ui - ' +
+          this.cumulativePnlOverPositionLifetimeUi(perpMarket!).toString() +
+          ', realized other pnl native ui - ' +
+          toUiDecimalsForQuote(this.realizedOtherPnlNative) +
+          ', cumulative long funding ui - ' +
+          toUiDecimalsForQuote(this.cumulativeLongFunding) +
+          ', cumulative short funding ui - ' +
+          toUiDecimalsForQuote(this.cumulativeShortFunding)
       : '';
   }
 }
