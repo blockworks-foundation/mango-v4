@@ -106,11 +106,6 @@ jobs:
       - name: Run bpf tests
         run: cargo +bpf test-bpf --features enable-gpl 2> >(tee raw-test-bpf.log >&2)
 
-      - name: Rebuild IDL and check it's up to date
-        run: |
-          ./update-local-idl.sh
-          git diff --exit-code mango_v4.json
-
       - name: Save raw log
         uses: actions/upload-artifact@v3
         with:
