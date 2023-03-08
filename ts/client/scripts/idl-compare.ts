@@ -8,6 +8,8 @@ import {
 import fs from 'fs';
 
 function main(): void {
+  let hasError = false;
+
   const oldIdl = JSON.parse(fs.readFileSync(process.argv[2], 'utf-8')) as Idl;
   const newIdl = JSON.parse(fs.readFileSync(process.argv[3], 'utf-8')) as Idl;
 
@@ -15,6 +17,7 @@ function main(): void {
   for (const oldIx of oldIdl.instructions) {
     if (!newIdl.instructions.find((x) => x.name == oldIx.name)) {
       console.log(`Error: instruction '${oldIx.name}' was removed`);
+      hasError = true;
     }
   }
 
@@ -24,7 +27,15 @@ function main(): void {
     // Old accounts still exist
     if (!newAcc) {
       console.log(`Error: account '${oldAcc.name}' was removed`);
+      hasError = true;
       continue;
+    }
+
+    const oldSize = accountSize(oldIdl, oldAcc);
+    const newSize = accountSize(newIdl, newAcc);
+    if (oldSize != newSize) {
+      console.log(`Error: account '${oldAcc.name}' has changed size`);
+      hasError = true;
     }
 
     // Data offset matches for each account field with the same name
@@ -55,6 +66,7 @@ function main(): void {
         console.log(
           `Error: account field '${oldAcc.name}.${oldField.name}' has changed size`,
         );
+        hasError = true;
       }
 
       // Fields may not change offset
@@ -64,11 +76,12 @@ function main(): void {
         console.log(
           `Error: account field '${oldAcc.name}.${oldField.name}' has changed offset`,
         );
+        hasError = true;
       }
     }
   }
 
-  process.exit();
+  process.exit(hasError ? 1 : 0);
 }
 
 main();
