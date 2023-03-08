@@ -100,11 +100,11 @@ jobs:
       - name: Build all deps
         run: |
           cargo build --features enable-gpl
-          cargo build-bpf --features enable-gpl
+          cargo +bpf build-bpf --features enable-gpl
 
         # Run bpf tests and output to runner and log
       - name: Run bpf tests
-        run: cargo test-bpf --features enable-gpl 2> >(tee raw-test-bpf.log >&2)
+        run: cargo +bpf test-bpf --features enable-gpl 2> >(tee raw-test-bpf.log >&2)
 
       - name: Rebuild IDL and check it's up to date
         run: |
