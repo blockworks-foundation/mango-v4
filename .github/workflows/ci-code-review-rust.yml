@@ -99,7 +99,7 @@ jobs:
 
       - name: Build all deps
         run: |
-          cargo build --features enable-gpl
+          cargo build-bpf --features enable-gpl || true
           cargo +bpf build-bpf --features enable-gpl
 
         # Run bpf tests and output to runner and log
