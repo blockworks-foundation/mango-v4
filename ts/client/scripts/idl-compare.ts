@@ -13,7 +13,7 @@ function main(): void {
   const oldIdl = JSON.parse(fs.readFileSync(process.argv[2], 'utf-8')) as Idl;
   const newIdl = JSON.parse(fs.readFileSync(process.argv[3], 'utf-8')) as Idl;
 
-  // Old instructions stil exist
+  // Old instructions still exist
   for (const oldIx of oldIdl.instructions) {
     if (!newIdl.instructions.find((x) => x.name == oldIx.name)) {
       console.log(`Error: instruction '${oldIx.name}' was removed`);
