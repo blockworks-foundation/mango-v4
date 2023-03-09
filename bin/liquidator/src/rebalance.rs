@@ -223,7 +223,7 @@ impl Rebalancer {
                 let allow_borrow = false;
                 let txsig = self
                     .mango_client
-                    .token_withdraw(token_mint, amount.to_num::<u64>(), allow_borrow)
+                    .token_withdraw(token_mint, u64::MAX, allow_borrow)
                     .await?;
                 log::info!(
                     "withdrew {} {} to liqor wallet in {}",
