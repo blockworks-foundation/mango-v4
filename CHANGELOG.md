@@ -4,9 +4,23 @@ Update this for each program release and mainnet deployment.
 
 ## not on mainnet
 
-### v0.8.0, 2023-3-
+### v0.9.0, 2023-3-
 
 Deployment:
+
+- Downgrade the "fixed" dependency to v1.11.0 (#500)
+
+  The dependency had a regression. This downgrades to the previous version that
+  had been in use with Mango v3, while backporting the safety improvements done
+  for release v0.8.0.
+
+- Improvements to perp position docstrings (#497)
+
+## mainnet
+
+### v0.8.0, 2023-3-11
+
+Deployment: Mar 11, 2023 at 08:06:22 Central European Standard Time, https://explorer.solana.com/tx/61CbcyDaCV1DKHEGxkfNfx9nCUfsH3RgUU7mivTjtqbHJ3YVPX6vNAzn91CZYRsjohVc5LdcZCZtteDKrCiKjYEi
 
 - Introduce a new "fee buyback" feature. (#464, #478, #479, #481, #485, #489)
 
@@ -38,8 +52,6 @@ Deployment:
 - Allow the group admin to edit the token and perp names stored on-chain (#488)
 - Allow the group admin to call the `TokenRegisterTrustless` instruction (#477)
 - Vendor `fixed` crate to enable general overflow checking in release mode (#476)
-
-## mainnet
 
 ### v0.7.0, 2023-2-22
 
