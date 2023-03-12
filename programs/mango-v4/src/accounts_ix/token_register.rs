@@ -1,11 +1,8 @@
 use anchor_lang::prelude::*;
 use anchor_spl::token::{Mint, Token, TokenAccount};
-use fixed::types::I80F48;
 
 use crate::error::*;
 use crate::state::*;
-
-pub const INDEX_START: I80F48 = I80F48::lit("1_000_000");
 
 const FIRST_BANK_NUM: u32 = 0;
 

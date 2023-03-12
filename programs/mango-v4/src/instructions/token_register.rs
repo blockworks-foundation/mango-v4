@@ -8,7 +8,7 @@ use crate::util::fill_from_str;
 
 use crate::logs::TokenMetaDataLog;
 
-pub const INDEX_START: I80F48 = I80F48::lit("1_000_000");
+pub const INDEX_START: I80F48 = I80F48::from_bits(1_000_000 * I80F48::ONE.to_bits());
 
 use crate::accounts_ix::*;
 
