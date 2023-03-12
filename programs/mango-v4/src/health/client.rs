@@ -475,7 +475,7 @@ fn binary_search(
     fun: impl Fn(I80F48) -> Result<I80F48>,
 ) -> Result<I80F48> {
     let max_iterations = 50;
-    let target_error = I80F48::lit("0.1");
+    let target_error = I80F48::from_num(0.1);
     let right_value = fun(right)?;
     require_msg!(
         (left_value <= target_value && right_value >= target_value)
