@@ -1,5 +1,5 @@
 export type MangoV4 = {
-  "version": "0.8.0",
+  "version": "0.9.0",
   "name": "mango_v4",
   "instructions": [
     {
@@ -4826,7 +4826,7 @@ export type MangoV4 = {
             "name": "longFunding",
             "docs": [
               "Current long funding value. Increasing it means that every long base lot",
-              "needs to pay that amount in funding.",
+              "needs to pay that amount of quote native in funding.",
               "",
               "PerpPosition uses and tracks it settle funding. Updated by the perp",
               "keeper instruction."
@@ -5726,22 +5726,54 @@ export type MangoV4 = {
           },
           {
             "name": "cumulativeLongFunding",
+            "docs": [
+              "Cumulative long funding in quote native units.",
+              "If the user paid $1 in funding for a long position, this would be 1e6.",
+              "Beware of the sign!",
+              "",
+              "(Display only)"
+            ],
             "type": "f64"
           },
           {
             "name": "cumulativeShortFunding",
+            "docs": [
+              "Cumulative short funding in quote native units",
+              "If the user paid $1 in funding for a short position, this would be -1e6.",
+              "",
+              "(Display only)"
+            ],
             "type": "f64"
           },
           {
             "name": "makerVolume",
+            "docs": [
+              "Cumulative maker volume in quote native units",
+              "",
+              "(Display only)"
+            ],
             "type": "u64"
           },
           {
             "name": "takerVolume",
+            "docs": [
+              "Cumulative taker volume in quote native units",
+              "",
+              "(Display only)"
+            ],
             "type": "u64"
           },
           {
             "name": "perpSpotTransfers",
+            "docs": [
+              "Cumulative number of quote native units transfered from the perp position",
+              "to the settle token spot position.",
+              "",
+              "For example, if the user settled $1 of positive pnl into their USDC spot",
+              "position, this would be 1e6.",
+              "",
+              "(Display only)"
+            ],
             "type": "i64"
           },
           {
@@ -8647,7 +8679,7 @@ export type MangoV4 = {
 };
 
 export const IDL: MangoV4 = {
-  "version": "0.8.0",
+  "version": "0.9.0",
   "name": "mango_v4",
   "instructions": [
     {
@@ -13474,7 +13506,7 @@ export const IDL: MangoV4 = {
             "name": "longFunding",
             "docs": [
               "Current long funding value. Increasing it means that every long base lot",
-              "needs to pay that amount in funding.",
+              "needs to pay that amount of quote native in funding.",
               "",
               "PerpPosition uses and tracks it settle funding. Updated by the perp",
               "keeper instruction."
@@ -14374,22 +14406,54 @@ export const IDL: MangoV4 = {
           },
           {
             "name": "cumulativeLongFunding",
+            "docs": [
+              "Cumulative long funding in quote native units.",
+              "If the user paid $1 in funding for a long position, this would be 1e6.",
+              "Beware of the sign!",
+              "",
+              "(Display only)"
+            ],
             "type": "f64"
           },
           {
             "name": "cumulativeShortFunding",
+            "docs": [
+              "Cumulative short funding in quote native units",
+              "If the user paid $1 in funding for a short position, this would be -1e6.",
+              "",
+              "(Display only)"
+            ],
             "type": "f64"
           },
           {
             "name": "makerVolume",
+            "docs": [
+              "Cumulative maker volume in quote native units",
+              "",
+              "(Display only)"
+            ],
             "type": "u64"
           },
           {
             "name": "takerVolume",
+            "docs": [
+              "Cumulative taker volume in quote native units",
+              "",
+              "(Display only)"
+            ],
             "type": "u64"
           },
           {
             "name": "perpSpotTransfers",
+            "docs": [
+              "Cumulative number of quote native units transfered from the perp position",
+              "to the settle token spot position.",
+              "",
+              "For example, if the user settled $1 of positive pnl into their USDC spot",
+              "position, this would be 1e6.",
+              "",
+              "(Display only)"
+            ],
             "type": "i64"
           },
           {
