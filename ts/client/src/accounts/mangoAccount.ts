@@ -32,6 +32,9 @@ export class MangoAccount {
       perpSpotTransfers: BN;
       healthRegionBeginInitHealth: BN;
       frozenUntil: BN;
+      buybackFeesAccruedCurrent: BN;
+      buybackFeesAccruedPrevious: BN;
+      buybackFeesExpiryTimestamp: BN;
       headerVersion: number;
       tokens: unknown;
       serum3: unknown;
@@ -52,6 +55,9 @@ export class MangoAccount {
       obj.perpSpotTransfers,
       obj.healthRegionBeginInitHealth,
       obj.frozenUntil,
+      obj.buybackFeesAccruedCurrent,
+      obj.buybackFeesAccruedPrevious,
+      obj.buybackFeesExpiryTimestamp,
       obj.headerVersion,
       obj.tokens as TokenPositionDto[],
       obj.serum3 as Serum3PositionDto[],
@@ -74,6 +80,9 @@ export class MangoAccount {
     public perpSpotTransfers: BN,
     public healthRegionBeginInitHealth: BN,
     public frozenUntil: BN,
+    public buybackFeesAccruedCurrent: BN,
+    public buybackFeesAccruedPrevious: BN,
+    public buybackFeesExpiryTimestamp: BN,
     public headerVersion: number,
     tokens: TokenPositionDto[],
     serum3: Serum3PositionDto[],
@@ -955,6 +964,32 @@ export class MangoAccount {
     );
   }
 
+  public getBuybackFeesAccrued(): BN {
+    return this.buybackFeesAccruedCurrent.add(this.buybackFeesAccruedPrevious);
+  }
+
+  public getBuybackFeesAccruedUi(): number {
+    return toUiDecimalsForQuote(this.getBuybackFeesAccrued());
+  }
+
+  public getMaxFeesBuyback(group: Group): BN {
+    const mngoBalanceValueWithBonus = new BN(
+      this.getTokenBalance(group.getFirstBankForMngo())
+        .mul(group.getFirstBankForMngo().price)
+        .mul(I80F48.fromNumber(group.buybackFeesMngoBonusFactor))
+        .floor()
+        .toNumber(),
+    );
+    return BN.max(
+      BN.min(this.getBuybackFeesAccrued(), mngoBalanceValueWithBonus),
+      new BN(0),
+    );
+  }
+
+  public getMaxFeesBuybackUi(group: Group): number {
+    return toUiDecimalsForQuote(this.getMaxFeesBuyback(group));
+  }
+
   toString(group?: Group, onlyTokens = false): string {
     let res = 'MangoAccount';
     res = res + '\n pk: ' + this.publicKey.toString();
@@ -1277,6 +1312,30 @@ export class PerpPosition {
     );
   }
 
+  public getQuotePositionUi(
+    perpMarket: PerpMarket,
+    useEventQueue?: boolean,
+  ): number {
+    if (perpMarket.perpMarketIndex !== this.marketIndex) {
+      throw new Error("PerpPosition doesn't belong to the given market!");
+    }
+
+    const quotePositionUi = toUiDecimalsForQuote(this.quotePositionNative);
+
+    return useEventQueue
+      ? quotePositionUi + perpMarket.quoteLotsToUi(this.takerQuoteLots)
+      : quotePositionUi;
+  }
+
+  public getNotionalValueUi(
+    perpMarket: PerpMarket,
+    useEventQueue?: boolean,
+  ): number {
+    return (
+      this.getBasePositionUi(perpMarket, useEventQueue) * perpMarket.uiPrice
+    );
+  }
+
   public getUnsettledFunding(perpMarket: PerpMarket): I80F48 {
     if (perpMarket.perpMarketIndex !== this.marketIndex) {
       throw new Error("PerpPosition doesn't belong to the given market!");
@@ -1522,7 +1581,19 @@ export class PerpPosition {
           ', takerQuoteLots - ' +
           perpMarket.quoteLotsToUi(this.takerQuoteLots) +
           ', unsettled pnl - ' +
-          this.getUnsettledPnlUi(perpMarket!).toString()
+          this.getUnsettledPnlUi(perpMarket!).toString() +
+          ', average entry price ui - ' +
+          this.getAverageEntryPriceUi(perpMarket!).toString() +
+          ', notional value ui - ' +
+          this.getNotionalValueUi(perpMarket!).toString() +
+          ', cumulative pnl over position lifetime ui - ' +
+          this.cumulativePnlOverPositionLifetimeUi(perpMarket!).toString() +
+          ', realized other pnl native ui - ' +
+          toUiDecimalsForQuote(this.realizedOtherPnlNative) +
+          ', cumulative long funding ui - ' +
+          toUiDecimalsForQuote(this.cumulativeLongFunding) +
+          ', cumulative short funding ui - ' +
+          toUiDecimalsForQuote(this.cumulativeShortFunding)
       : '';
   }
 }

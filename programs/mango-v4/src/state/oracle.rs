@@ -9,7 +9,7 @@ use switchboard_program::FastRoundResultAccountData;
 use switchboard_v2::AggregatorAccountData;
 
 use crate::accounts_zerocopy::*;
-use crate::checked_math as cm;
+
 use crate::error::*;
 
 const DECIMAL_CONSTANT_ZERO_INDEX: i8 = 12;
@@ -153,7 +153,7 @@ pub fn oracle_price(
             let price = I80F48::from_num(price_data.price);
 
             // Filter out bad prices
-            if I80F48::from_num(price_data.conf) > cm!(config.conf_filter * price) {
+            if I80F48::from_num(price_data.conf) > (config.conf_filter * price) {
                 msg!(
                     "Pyth conf interval too high; pubkey {} price: {} price_data.conf: {}",
                     acc_info.key(),
@@ -185,9 +185,9 @@ pub fn oracle_price(
                 return Err(MangoError::OracleStale.into());
             }
 
-            let decimals = cm!((price_account.expo as i8) + QUOTE_DECIMALS - (base_decimals as i8));
+            let decimals = (price_account.expo as i8) + QUOTE_DECIMALS - (base_decimals as i8);
             let decimal_adj = power_of_ten(decimals);
-            cm!(price * decimal_adj)
+            price * decimal_adj
         }
         OracleType::SwitchboardV2 => {
             fn from_foreign_error(e: impl std::fmt::Display) -> Error {
@@ -205,7 +205,7 @@ pub fn oracle_price(
                 .std_deviation
                 .try_into()
                 .map_err(from_foreign_error)?;
-            if I80F48::from_num(std_deviation_decimal) > cm!(config.conf_filter * price) {
+            if I80F48::from_num(std_deviation_decimal) > (config.conf_filter * price) {
                 msg!(
                     "Switchboard v2 std deviation too high; pubkey {} price: {} latest_confirmed_round.std_deviation: {}",
                     acc_info.key(),
@@ -231,9 +231,9 @@ pub fn oracle_price(
                 return Err(MangoError::OracleConfidence.into());
             }
 
-            let decimals = cm!(QUOTE_DECIMALS - (base_decimals as i8));
+            let decimals = QUOTE_DECIMALS - (base_decimals as i8);
             let decimal_adj = power_of_ten(decimals);
-            cm!(price * decimal_adj)
+            price * decimal_adj
         }
         OracleType::SwitchboardV1 => {
             let result = FastRoundResultAccountData::deserialize(data).unwrap();
@@ -242,7 +242,7 @@ pub fn oracle_price(
             // Filter out bad prices
             let min_response = I80F48::from_num(result.result.min_response);
             let max_response = I80F48::from_num(result.result.max_response);
-            if cm!(max_response - min_response) > cm!(config.conf_filter * price) {
+            if (max_response - min_response) > (config.conf_filter * price) {
                 msg!(
                     "Switchboard v1 min-max response gap too wide; pubkey {} price: {} min_response: {} max_response {}",
                     acc_info.key(),
@@ -267,9 +267,9 @@ pub fn oracle_price(
                 return Err(MangoError::OracleConfidence.into());
             }
 
-            let decimals = cm!(QUOTE_DECIMALS - (base_decimals as i8));
+            let decimals = QUOTE_DECIMALS - (base_decimals as i8);
             let decimal_adj = power_of_ten(decimals);
-            cm!(price * decimal_adj)
+            price * decimal_adj
         }
     })
 }

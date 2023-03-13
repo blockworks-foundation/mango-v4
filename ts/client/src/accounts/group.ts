@@ -32,13 +32,18 @@ export class Group {
       groupNum: number;
       admin: PublicKey;
       fastListingAdmin: PublicKey;
-      securityAdmin: PublicKey;
+      mngoTokenIndex: number;
       insuranceMint: PublicKey;
       insuranceVault: PublicKey;
       testing: number;
       version: number;
-      ixGate: BN;
+      buybackFees: number;
+      buybackFeesMngoBonusFactor: number;
       addressLookupTables: PublicKey[];
+      securityAdmin: PublicKey;
+      depositLimitQuote: BN;
+      ixGate: BN;
+      buybackFeesSwapMangoAccount: PublicKey;
     },
   ): Group {
     return new Group(
@@ -47,13 +52,18 @@ export class Group {
       obj.groupNum,
       obj.admin,
       obj.fastListingAdmin,
-      obj.securityAdmin,
+      obj.mngoTokenIndex as TokenIndex,
       obj.insuranceMint,
       obj.insuranceVault,
       obj.testing,
       obj.version,
-      obj.ixGate,
+      obj.buybackFees == 1,
+      obj.buybackFeesMngoBonusFactor,
       obj.addressLookupTables,
+      obj.securityAdmin,
+      obj.depositLimitQuote,
+      obj.ixGate,
+      obj.buybackFeesSwapMangoAccount,
       [], // addressLookupTablesList
       new Map(), // banksMapByName
       new Map(), // banksMapByMint
@@ -76,13 +86,18 @@ export class Group {
     public groupNum: number,
     public admin: PublicKey,
     public fastListingAdmin: PublicKey,
-    public securityAdmin: PublicKey,
+    public mngoTokenIndex: TokenIndex,
     public insuranceMint: PublicKey,
     public insuranceVault: PublicKey,
     public testing: number,
     public version: number,
-    public ixGate: BN,
+    public buybackFees: boolean,
+    public buybackFeesMngoBonusFactor: number,
     public addressLookupTables: PublicKey[],
+    public securityAdmin: PublicKey,
+    public depositLimitQuote,
+    public ixGate: BN,
+    public buybackFeesSwapMangoAccount: PublicKey,
     public addressLookupTablesList: AddressLookupTableAccount[],
     public banksMapByName: Map<string, Bank[]>,
     public banksMapByMint: Map<string, Bank[]>,
@@ -449,6 +464,14 @@ export class Group {
     const banks = this.banksMapByTokenIndex.get(tokenIndex);
     if (!banks) throw new Error(`No bank found for tokenIndex ${tokenIndex}!`);
     return banks[0];
+  }
+
+  public getFirstBankForMngo(): Bank {
+    return this.getFirstBankByTokenIndex(this.mngoTokenIndex);
+  }
+
+  public getFirstBankForPerpSettlement(): Bank {
+    return this.getFirstBankByTokenIndex(0 as TokenIndex);
   }
 
   /**

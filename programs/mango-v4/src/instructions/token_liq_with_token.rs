@@ -10,7 +10,6 @@ use crate::logs::{
     WithdrawLoanOriginationFeeLog,
 };
 use crate::state::*;
-use crate::util::checked_math as cm;
 
 pub fn token_liq_with_token(
     ctx: Context<TokenLiqWithToken>,
@@ -125,8 +124,8 @@ pub(crate) fn liquidation_action(
     //   assets = liabs * liab_oracle_price / asset_oracle_price * fee_factor
     //   assets = liabs * liab_oracle_price_adjusted / asset_oracle_price
     //          = liabs * lopa / aop
-    let fee_factor = cm!(I80F48::ONE + asset_bank.liquidation_fee + liab_bank.liquidation_fee);
-    let liab_oracle_price_adjusted = cm!(liab_oracle_price * fee_factor);
+    let fee_factor = I80F48::ONE + asset_bank.liquidation_fee + liab_bank.liquidation_fee;
+    let liab_oracle_price_adjusted = liab_oracle_price * fee_factor;
 
     let init_asset_weight = asset_bank.init_asset_weight;
     let init_liab_weight = liab_bank.init_liab_weight;
@@ -163,14 +162,14 @@ pub(crate) fn liquidation_action(
     //   y = x * lopa / aop   (native asset tokens, see above)
     //
     // Result: x = -init_health / (ilw * llep - iaw * lopa * alep / aop)
-    let liab_needed = cm!(-liqee_liq_end_health
+    let liab_needed = -liqee_liq_end_health
         / (liab_liq_end_price * init_liab_weight
             - liab_oracle_price_adjusted
                 * init_asset_weight
-                * (asset_liq_end_price / asset_oracle_price)));
+                * (asset_liq_end_price / asset_oracle_price));
 
     // How much liab can we get at most for the asset balance?
-    let liab_possible = cm!(liqee_asset_native * asset_oracle_price / liab_oracle_price_adjusted);
+    let liab_possible = liqee_asset_native * asset_oracle_price / liab_oracle_price_adjusted;
 
     // The amount of liab native tokens we will transfer
     let liab_transfer = min(
@@ -179,7 +178,7 @@ pub(crate) fn liquidation_action(
     );
 
     // The amount of asset native tokens we will give up for them
-    let asset_transfer = cm!(liab_transfer * liab_oracle_price_adjusted / asset_oracle_price);
+    let asset_transfer = liab_transfer * liab_oracle_price_adjusted / asset_oracle_price;
 
     // During liquidation, we mustn't leave small positive balances in the liqee. Those
     // could break bankruptcy-detection. Thus we dust them even if the token position
@@ -219,11 +218,9 @@ pub(crate) fn liquidation_action(
 
     // Update the health cache
     liqee_health_cache
-        .adjust_token_balance(liab_bank, cm!(liqee_liab_native_after - liqee_liab_native))?;
-    liqee_health_cache.adjust_token_balance(
-        asset_bank,
-        cm!(liqee_assets_native_after - liqee_asset_native),
-    )?;
+        .adjust_token_balance(liab_bank, liqee_liab_native_after - liqee_liab_native)?;
+    liqee_health_cache
+        .adjust_token_balance(asset_bank, liqee_assets_native_after - liqee_asset_native)?;
 
     msg!(
         "liquidated {} liab for {} asset",

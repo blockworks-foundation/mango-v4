@@ -1,3 +1,4 @@
+use crate::util::fill_from_str;
 use crate::{accounts_zerocopy::AccountInfoRef, error::MangoError, state::*};
 use anchor_lang::prelude::*;
 use fixed::types::I80F48;
@@ -36,6 +37,7 @@ pub fn perp_edit_market(
     reduce_only_opt: Option<bool>,
     reset_stable_price: bool,
     positive_pnl_liquidation_fee_opt: Option<f32>,
+    name_opt: Option<String>,
 ) -> Result<()> {
     let group = ctx.accounts.group.load()?;
 
@@ -129,7 +131,12 @@ pub fn perp_edit_market(
             init_overall_asset_weight
         );
         perp_market.init_overall_asset_weight = I80F48::from_num(init_overall_asset_weight);
-        require_group_admin = true;
+
+        // The security admin is allowed to disable init collateral contributions,
+        // but all other changes need to go through the full group admin.
+        if init_overall_asset_weight != 0.0 {
+            require_group_admin = true;
+        }
     }
     if let Some(base_liquidation_fee) = base_liquidation_fee_opt {
         msg!(
@@ -316,6 +323,12 @@ pub fn perp_edit_market(
         perp_market.positive_pnl_liquidation_fee = I80F48::from_num(positive_pnl_liquidation_fee);
         require_group_admin = true;
     }
+
+    if let Some(name) = name_opt.as_ref() {
+        msg!("Name: old - {:?}, new - {:?}", perp_market.name, name);
+        perp_market.name = fill_from_str(&name)?;
+        require_group_admin = true;
+    };
 
     // account constraint #1
     if require_group_admin {

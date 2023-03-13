@@ -27,6 +27,7 @@
     "validate": "yarn lint && yarn format"
   },
   "devDependencies": {
+    "@solana/spl-governance": "^0.3.25",
     "@tsconfig/recommended": "^1.0.1",
     "@types/bn.js": "^5.1.1",
     "@types/bs58": "^4.0.1",

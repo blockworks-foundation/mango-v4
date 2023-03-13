@@ -81,7 +81,7 @@ async fn test_perp_fixed() -> Result<(), TransportError> {
 
     let price_lots = {
         let perp_market = solana.get_account::<PerpMarket>(perp_market).await;
-        perp_market.native_price_to_lot(I80F48!(1))
+        perp_market.native_price_to_lot(I80F48::ONE)
     };
 
     //
@@ -537,7 +537,7 @@ async fn test_perp_oracle_peg() -> Result<(), TransportError> {
 
     let price_lots = {
         let perp_market = solana.get_account::<PerpMarket>(perp_market).await;
-        perp_market.native_price_to_lot(I80F48!(1))
+        perp_market.native_price_to_lot(I80F48::ONE)
     };
     assert_eq!(price_lots, 1000);
 
@@ -918,7 +918,7 @@ async fn test_perp_realize_partially() -> Result<(), TransportError> {
     .unwrap();
 
     let perp_market_data = solana.get_account::<PerpMarket>(perp_market).await;
-    let price_lots = perp_market_data.native_price_to_lot(I80F48!(1000));
+    let price_lots = perp_market_data.native_price_to_lot(I80F48::from(1000));
     set_perp_stub_oracle_price(solana, group, perp_market, &tokens[1], admin, 1000.0).await;
 
     //

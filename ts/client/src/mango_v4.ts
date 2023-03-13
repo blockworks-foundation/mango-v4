@@ -1,5 +1,5 @@
 export type MangoV4 = {
-  "version": "0.7.0",
+  "version": "0.9.0",
   "name": "mango_v4",
   "instructions": [
     {
@@ -141,6 +141,36 @@ export type MangoV4 = {
         },
         {
           "name": "depositLimitQuoteOpt",
+          "type": {
+            "option": "u64"
+          }
+        },
+        {
+          "name": "buybackFeesOpt",
+          "type": {
+            "option": "bool"
+          }
+        },
+        {
+          "name": "buybackFeesBonusFactorOpt",
+          "type": {
+            "option": "f32"
+          }
+        },
+        {
+          "name": "buybackFeesSwapMangoAccountOpt",
+          "type": {
+            "option": "publicKey"
+          }
+        },
+        {
+          "name": "mngoTokenIndexOpt",
+          "type": {
+            "option": "u16"
+          }
+        },
+        {
+          "name": "buybackFeesExpiryIntervalOpt",
           "type": {
             "option": "u64"
           }
@@ -398,7 +428,7 @@ export type MangoV4 = {
           "isSigner": false
         },
         {
-          "name": "fastListingAdmin",
+          "name": "admin",
           "isMut": false,
           "isSigner": true
         },
@@ -686,6 +716,12 @@ export type MangoV4 = {
           "name": "reduceOnlyOpt",
           "type": {
             "option": "bool"
+          }
+        },
+        {
+          "name": "nameOpt",
+          "type": {
+            "option": "string"
           }
         }
       ]
@@ -1091,6 +1127,57 @@ export type MangoV4 = {
         {
           "name": "forceClose",
           "type": "bool"
+        }
+      ]
+    },
+    {
+      "name": "accountBuybackFeesWithMngo",
+      "accounts": [
+        {
+          "name": "group",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "account",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "owner",
+          "isMut": false,
+          "isSigner": true
+        },
+        {
+          "name": "daoAccount",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "mngoBank",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "mngoOracle",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "feesBank",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "feesOracle",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "maxBuyback",
+          "type": "u64"
         }
       ]
     },
@@ -2052,6 +2139,11 @@ export type MangoV4 = {
     },
     {
       "name": "serum3SettleFunds",
+      "docs": [
+        "Settles all free funds from the OpenOrders account into the MangoAccount.",
+        "",
+        "Any serum \"referrer rebates\" (ui fees) are considered Mango fees."
+      ],
       "accounts": [
         {
           "name": "group",
@@ -2133,6 +2225,119 @@ export type MangoV4 = {
         }
       ],
       "args": []
+    },
+    {
+      "name": "serum3SettleFundsV2",
+      "docs": [
+        "Like Serum3SettleFunds, but `fees_to_dao` determines if referrer rebates are considered fees",
+        "or are credited to the MangoAccount."
+      ],
+      "accounts": [
+        {
+          "name": "v1",
+          "accounts": [
+            {
+              "name": "group",
+              "isMut": false,
+              "isSigner": false
+            },
+            {
+              "name": "account",
+              "isMut": true,
+              "isSigner": false
+            },
+            {
+              "name": "owner",
+              "isMut": false,
+              "isSigner": true
+            },
+            {
+              "name": "openOrders",
+              "isMut": true,
+              "isSigner": false
+            },
+            {
+              "name": "serumMarket",
+              "isMut": false,
+              "isSigner": false
+            },
+            {
+              "name": "serumProgram",
+              "isMut": false,
+              "isSigner": false
+            },
+            {
+              "name": "serumMarketExternal",
+              "isMut": true,
+              "isSigner": false
+            },
+            {
+              "name": "marketBaseVault",
+              "isMut": true,
+              "isSigner": false
+            },
+            {
+              "name": "marketQuoteVault",
+              "isMut": true,
+              "isSigner": false
+            },
+            {
+              "name": "marketVaultSigner",
+              "isMut": false,
+              "isSigner": false,
+              "docs": [
+                "needed for the automatic settle_funds call"
+              ]
+            },
+            {
+              "name": "quoteBank",
+              "isMut": true,
+              "isSigner": false
+            },
+            {
+              "name": "quoteVault",
+              "isMut": true,
+              "isSigner": false
+            },
+            {
+              "name": "baseBank",
+              "isMut": true,
+              "isSigner": false
+            },
+            {
+              "name": "baseVault",
+              "isMut": true,
+              "isSigner": false
+            },
+            {
+              "name": "tokenProgram",
+              "isMut": false,
+              "isSigner": false
+            }
+          ]
+        },
+        {
+          "name": "v2",
+          "accounts": [
+            {
+              "name": "quoteOracle",
+              "isMut": false,
+              "isSigner": false
+            },
+            {
+              "name": "baseOracle",
+              "isMut": false,
+              "isSigner": false
+            }
+          ]
+        }
+      ],
+      "args": [
+        {
+          "name": "feesToDao",
+          "type": "bool"
+        }
+      ]
     },
     {
       "name": "serum3LiqForceCancelOrders",
@@ -2803,6 +3008,12 @@ export type MangoV4 = {
           "name": "positivePnlLiquidationFeeOpt",
           "type": {
             "option": "f32"
+          }
+        },
+        {
+          "name": "nameOpt",
+          "type": {
+            "option": "string"
           }
         }
       ]
@@ -3948,11 +4159,15 @@ export type MangoV4 = {
             "type": "publicKey"
           },
           {
+            "name": "mngoTokenIndex",
+            "type": "u16"
+          },
+          {
             "name": "padding",
             "type": {
               "array": [
                 "u8",
-                4
+                2
               ]
             }
           },
@@ -3977,13 +4192,12 @@ export type MangoV4 = {
             "type": "u8"
           },
           {
-            "name": "padding2",
-            "type": {
-              "array": [
-                "u8",
-                5
-              ]
-            }
+            "name": "buybackFees",
+            "type": "u8"
+          },
+          {
+            "name": "buybackFeesMngoBonusFactor",
+            "type": "f32"
           },
           {
             "name": "addressLookupTables",
@@ -4007,11 +4221,27 @@ export type MangoV4 = {
             "type": "u128"
           },
           {
+            "name": "buybackFeesSwapMangoAccount",
+            "type": "publicKey"
+          },
+          {
+            "name": "buybackFeesExpiryInterval",
+            "docs": [
+              "Number of seconds after which fees that could be used with the fees buyback feature expire.",
+              "",
+              "The actual expiry is staggered such that the fees users accumulate are always",
+              "available for at least this interval - but may be available for up to twice this time.",
+              "",
+              "When set to 0, there's no expiry of buyback fees."
+            ],
+            "type": "u64"
+          },
+          {
             "name": "reserved",
             "type": {
               "array": [
                 "u8",
-                1864
+                1824
               ]
             }
           }
@@ -4105,11 +4335,33 @@ export type MangoV4 = {
             "type": "u64"
           },
           {
+            "name": "buybackFeesAccruedCurrent",
+            "docs": [
+              "Fees usable with the \"fees buyback\" feature.",
+              "This tracks the ones that accrued in the current expiry interval."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "buybackFeesAccruedPrevious",
+            "docs": [
+              "Fees buyback amount from the previous expiry interval."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "buybackFeesExpiryTimestamp",
+            "docs": [
+              "End timestamp of the current expiry interval of the buyback fees amount."
+            ],
+            "type": "u64"
+          },
+          {
             "name": "reserved",
             "type": {
               "array": [
                 "u8",
-                232
+                208
               ]
             }
           },
@@ -4574,7 +4826,7 @@ export type MangoV4 = {
             "name": "longFunding",
             "docs": [
               "Current long funding value. Increasing it means that every long base lot",
-              "needs to pay that amount in funding.",
+              "needs to pay that amount of quote native in funding.",
               "",
               "PerpPosition uses and tracks it settle funding. Updated by the perp",
               "keeper instruction."
@@ -5474,22 +5726,54 @@ export type MangoV4 = {
           },
           {
             "name": "cumulativeLongFunding",
+            "docs": [
+              "Cumulative long funding in quote native units.",
+              "If the user paid $1 in funding for a long position, this would be 1e6.",
+              "Beware of the sign!",
+              "",
+              "(Display only)"
+            ],
             "type": "f64"
           },
           {
             "name": "cumulativeShortFunding",
+            "docs": [
+              "Cumulative short funding in quote native units",
+              "If the user paid $1 in funding for a short position, this would be -1e6.",
+              "",
+              "(Display only)"
+            ],
             "type": "f64"
           },
           {
             "name": "makerVolume",
+            "docs": [
+              "Cumulative maker volume in quote native units",
+              "",
+              "(Display only)"
+            ],
             "type": "u64"
           },
           {
             "name": "takerVolume",
+            "docs": [
+              "Cumulative taker volume in quote native units",
+              "",
+              "(Display only)"
+            ],
             "type": "u64"
           },
           {
             "name": "perpSpotTransfers",
+            "docs": [
+              "Cumulative number of quote native units transfered from the perp position",
+              "to the settle token spot position.",
+              "",
+              "For example, if the user settled $1 of positive pnl into their USDC spot",
+              "position, this would be 1e6.",
+              "",
+              "(Display only)"
+            ],
             "type": "i64"
           },
           {
@@ -5680,11 +5964,23 @@ export type MangoV4 = {
             "type": "u64"
           },
           {
+            "name": "buybackFeesAccruedCurrent",
+            "type": "u64"
+          },
+          {
+            "name": "buybackFeesAccruedPrevious",
+            "type": "u64"
+          },
+          {
+            "name": "buybackFeesExpiryTimestamp",
+            "type": "u64"
+          },
+          {
             "name": "reserved",
             "type": {
               "array": [
                 "u8",
-                232
+                208
               ]
             }
           }
@@ -6682,6 +6978,9 @@ export type MangoV4 = {
           },
           {
             "name": "TokenWithdraw"
+          },
+          {
+            "name": "AccountBuybackFeesWithMngo"
           }
         ]
       }
@@ -8109,6 +8408,41 @@ export type MangoV4 = {
         },
         {
           "name": "settlement",
+          "type": "i128",
+          "index": false
+        }
+      ]
+    },
+    {
+      "name": "AccountBuybackFeesWithMngoLog",
+      "fields": [
+        {
+          "name": "mangoGroup",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "mangoAccount",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "buybackFees",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "buybackMngo",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "mngoBuybackPrice",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "oraclePrice",
           "type": "i128",
           "index": false
         }
@@ -8345,7 +8679,7 @@ export type MangoV4 = {
 };
 
 export const IDL: MangoV4 = {
-  "version": "0.7.0",
+  "version": "0.9.0",
   "name": "mango_v4",
   "instructions": [
     {
@@ -8487,6 +8821,36 @@ export const IDL: MangoV4 = {
         },
         {
           "name": "depositLimitQuoteOpt",
+          "type": {
+            "option": "u64"
+          }
+        },
+        {
+          "name": "buybackFeesOpt",
+          "type": {
+            "option": "bool"
+          }
+        },
+        {
+          "name": "buybackFeesBonusFactorOpt",
+          "type": {
+            "option": "f32"
+          }
+        },
+        {
+          "name": "buybackFeesSwapMangoAccountOpt",
+          "type": {
+            "option": "publicKey"
+          }
+        },
+        {
+          "name": "mngoTokenIndexOpt",
+          "type": {
+            "option": "u16"
+          }
+        },
+        {
+          "name": "buybackFeesExpiryIntervalOpt",
           "type": {
             "option": "u64"
           }
@@ -8744,7 +9108,7 @@ export const IDL: MangoV4 = {
           "isSigner": false
         },
         {
-          "name": "fastListingAdmin",
+          "name": "admin",
           "isMut": false,
           "isSigner": true
         },
@@ -9032,6 +9396,12 @@ export const IDL: MangoV4 = {
           "name": "reduceOnlyOpt",
           "type": {
             "option": "bool"
+          }
+        },
+        {
+          "name": "nameOpt",
+          "type": {
+            "option": "string"
           }
         }
       ]
@@ -9437,6 +9807,57 @@ export const IDL: MangoV4 = {
         {
           "name": "forceClose",
           "type": "bool"
+        }
+      ]
+    },
+    {
+      "name": "accountBuybackFeesWithMngo",
+      "accounts": [
+        {
+          "name": "group",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "account",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "owner",
+          "isMut": false,
+          "isSigner": true
+        },
+        {
+          "name": "daoAccount",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "mngoBank",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "mngoOracle",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "feesBank",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "feesOracle",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "maxBuyback",
+          "type": "u64"
         }
       ]
     },
@@ -10398,6 +10819,11 @@ export const IDL: MangoV4 = {
     },
     {
       "name": "serum3SettleFunds",
+      "docs": [
+        "Settles all free funds from the OpenOrders account into the MangoAccount.",
+        "",
+        "Any serum \"referrer rebates\" (ui fees) are considered Mango fees."
+      ],
       "accounts": [
         {
           "name": "group",
@@ -10479,6 +10905,119 @@ export const IDL: MangoV4 = {
         }
       ],
       "args": []
+    },
+    {
+      "name": "serum3SettleFundsV2",
+      "docs": [
+        "Like Serum3SettleFunds, but `fees_to_dao` determines if referrer rebates are considered fees",
+        "or are credited to the MangoAccount."
+      ],
+      "accounts": [
+        {
+          "name": "v1",
+          "accounts": [
+            {
+              "name": "group",
+              "isMut": false,
+              "isSigner": false
+            },
+            {
+              "name": "account",
+              "isMut": true,
+              "isSigner": false
+            },
+            {
+              "name": "owner",
+              "isMut": false,
+              "isSigner": true
+            },
+            {
+              "name": "openOrders",
+              "isMut": true,
+              "isSigner": false
+            },
+            {
+              "name": "serumMarket",
+              "isMut": false,
+              "isSigner": false
+            },
+            {
+              "name": "serumProgram",
+              "isMut": false,
+              "isSigner": false
+            },
+            {
+              "name": "serumMarketExternal",
+              "isMut": true,
+              "isSigner": false
+            },
+            {
+              "name": "marketBaseVault",
+              "isMut": true,
+              "isSigner": false
+            },
+            {
+              "name": "marketQuoteVault",
+              "isMut": true,
+              "isSigner": false
+            },
+            {
+              "name": "marketVaultSigner",
+              "isMut": false,
+              "isSigner": false,
+              "docs": [
+                "needed for the automatic settle_funds call"
+              ]
+            },
+            {
+              "name": "quoteBank",
+              "isMut": true,
+              "isSigner": false
+            },
+            {
+              "name": "quoteVault",
+              "isMut": true,
+              "isSigner": false
+            },
+            {
+              "name": "baseBank",
+              "isMut": true,
+              "isSigner": false
+            },
+            {
+              "name": "baseVault",
+              "isMut": true,
+              "isSigner": false
+            },
+            {
+              "name": "tokenProgram",
+              "isMut": false,
+              "isSigner": false
+            }
+          ]
+        },
+        {
+          "name": "v2",
+          "accounts": [
+            {
+              "name": "quoteOracle",
+              "isMut": false,
+              "isSigner": false
+            },
+            {
+              "name": "baseOracle",
+              "isMut": false,
+              "isSigner": false
+            }
+          ]
+        }
+      ],
+      "args": [
+        {
+          "name": "feesToDao",
+          "type": "bool"
+        }
+      ]
     },
     {
       "name": "serum3LiqForceCancelOrders",
@@ -11149,6 +11688,12 @@ export const IDL: MangoV4 = {
           "name": "positivePnlLiquidationFeeOpt",
           "type": {
             "option": "f32"
+          }
+        },
+        {
+          "name": "nameOpt",
+          "type": {
+            "option": "string"
           }
         }
       ]
@@ -12294,11 +12839,15 @@ export const IDL: MangoV4 = {
             "type": "publicKey"
           },
           {
+            "name": "mngoTokenIndex",
+            "type": "u16"
+          },
+          {
             "name": "padding",
             "type": {
               "array": [
                 "u8",
-                4
+                2
               ]
             }
           },
@@ -12323,13 +12872,12 @@ export const IDL: MangoV4 = {
             "type": "u8"
           },
           {
-            "name": "padding2",
-            "type": {
-              "array": [
-                "u8",
-                5
-              ]
-            }
+            "name": "buybackFees",
+            "type": "u8"
+          },
+          {
+            "name": "buybackFeesMngoBonusFactor",
+            "type": "f32"
           },
           {
             "name": "addressLookupTables",
@@ -12353,11 +12901,27 @@ export const IDL: MangoV4 = {
             "type": "u128"
           },
           {
+            "name": "buybackFeesSwapMangoAccount",
+            "type": "publicKey"
+          },
+          {
+            "name": "buybackFeesExpiryInterval",
+            "docs": [
+              "Number of seconds after which fees that could be used with the fees buyback feature expire.",
+              "",
+              "The actual expiry is staggered such that the fees users accumulate are always",
+              "available for at least this interval - but may be available for up to twice this time.",
+              "",
+              "When set to 0, there's no expiry of buyback fees."
+            ],
+            "type": "u64"
+          },
+          {
             "name": "reserved",
             "type": {
               "array": [
                 "u8",
-                1864
+                1824
               ]
             }
           }
@@ -12451,11 +13015,33 @@ export const IDL: MangoV4 = {
             "type": "u64"
           },
           {
+            "name": "buybackFeesAccruedCurrent",
+            "docs": [
+              "Fees usable with the \"fees buyback\" feature.",
+              "This tracks the ones that accrued in the current expiry interval."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "buybackFeesAccruedPrevious",
+            "docs": [
+              "Fees buyback amount from the previous expiry interval."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "buybackFeesExpiryTimestamp",
+            "docs": [
+              "End timestamp of the current expiry interval of the buyback fees amount."
+            ],
+            "type": "u64"
+          },
+          {
             "name": "reserved",
             "type": {
               "array": [
                 "u8",
-                232
+                208
               ]
             }
           },
@@ -12920,7 +13506,7 @@ export const IDL: MangoV4 = {
             "name": "longFunding",
             "docs": [
               "Current long funding value. Increasing it means that every long base lot",
-              "needs to pay that amount in funding.",
+              "needs to pay that amount of quote native in funding.",
               "",
               "PerpPosition uses and tracks it settle funding. Updated by the perp",
               "keeper instruction."
@@ -13820,22 +14406,54 @@ export const IDL: MangoV4 = {
           },
           {
             "name": "cumulativeLongFunding",
+            "docs": [
+              "Cumulative long funding in quote native units.",
+              "If the user paid $1 in funding for a long position, this would be 1e6.",
+              "Beware of the sign!",
+              "",
+              "(Display only)"
+            ],
             "type": "f64"
           },
           {
             "name": "cumulativeShortFunding",
+            "docs": [
+              "Cumulative short funding in quote native units",
+              "If the user paid $1 in funding for a short position, this would be -1e6.",
+              "",
+              "(Display only)"
+            ],
             "type": "f64"
           },
           {
             "name": "makerVolume",
+            "docs": [
+              "Cumulative maker volume in quote native units",
+              "",
+              "(Display only)"
+            ],
             "type": "u64"
           },
           {
             "name": "takerVolume",
+            "docs": [
+              "Cumulative taker volume in quote native units",
+              "",
+              "(Display only)"
+            ],
             "type": "u64"
           },
           {
             "name": "perpSpotTransfers",
+            "docs": [
+              "Cumulative number of quote native units transfered from the perp position",
+              "to the settle token spot position.",
+              "",
+              "For example, if the user settled $1 of positive pnl into their USDC spot",
+              "position, this would be 1e6.",
+              "",
+              "(Display only)"
+            ],
             "type": "i64"
           },
           {
@@ -14026,11 +14644,23 @@ export const IDL: MangoV4 = {
             "type": "u64"
           },
           {
+            "name": "buybackFeesAccruedCurrent",
+            "type": "u64"
+          },
+          {
+            "name": "buybackFeesAccruedPrevious",
+            "type": "u64"
+          },
+          {
+            "name": "buybackFeesExpiryTimestamp",
+            "type": "u64"
+          },
+          {
             "name": "reserved",
             "type": {
               "array": [
                 "u8",
-                232
+                208
               ]
             }
           }
@@ -15028,6 +15658,9 @@ export const IDL: MangoV4 = {
           },
           {
             "name": "TokenWithdraw"
+          },
+          {
+            "name": "AccountBuybackFeesWithMngo"
           }
         ]
       }
@@ -16455,6 +17088,41 @@ export const IDL: MangoV4 = {
         },
         {
           "name": "settlement",
+          "type": "i128",
+          "index": false
+        }
+      ]
+    },
+    {
+      "name": "AccountBuybackFeesWithMngoLog",
+      "fields": [
+        {
+          "name": "mangoGroup",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "mangoAccount",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "buybackFees",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "buybackMngo",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "mngoBuybackPrice",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "oraclePrice",
           "type": "i128",
           "index": false
         }

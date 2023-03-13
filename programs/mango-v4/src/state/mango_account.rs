@@ -13,7 +13,6 @@ use static_assertions::const_assert_eq;
 use crate::error::*;
 use crate::health::{HealthCache, HealthType};
 use crate::logs::{DeactivatePerpPositionLog, DeactivateTokenPositionLog};
-use checked_math as cm;
 
 use super::dynamic_account::*;
 use super::BookSideOrderTree;
@@ -88,7 +87,15 @@ pub struct MangoAccount {
 
     pub frozen_until: u64,
 
-    pub reserved: [u8; 232],
+    /// Fees usable with the "fees buyback" feature.
+    /// This tracks the ones that accrued in the current expiry interval.
+    pub buyback_fees_accrued_current: u64,
+    /// Fees buyback amount from the previous expiry interval.
+    pub buyback_fees_accrued_previous: u64,
+    /// End timestamp of the current expiry interval of the buyback fees amount.
+    pub buyback_fees_expiry_timestamp: u64,
+
+    pub reserved: [u8; 208],
 
     // dynamic
     pub header_version: u8,
@@ -123,7 +130,10 @@ impl MangoAccount {
             net_deposits: 0,
             health_region_begin_init_health: 0,
             frozen_until: 0,
-            reserved: [0; 232],
+            buyback_fees_accrued_current: 0,
+            buyback_fees_accrued_previous: 0,
+            buyback_fees_expiry_timestamp: 0,
+            reserved: [0; 208],
             header_version: DEFAULT_MANGO_ACCOUNT_VERSION,
             padding3: Default::default(),
             padding4: Default::default(),
@@ -205,9 +215,12 @@ pub struct MangoAccountFixed {
     pub perp_spot_transfers: i64,
     pub health_region_begin_init_health: i64,
     pub frozen_until: u64,
-    pub reserved: [u8; 232],
+    pub buyback_fees_accrued_current: u64,
+    pub buyback_fees_accrued_previous: u64,
+    pub buyback_fees_expiry_timestamp: u64,
+    pub reserved: [u8; 208],
 }
-const_assert_eq!(size_of::<MangoAccountFixed>(), 32 * 4 + 8 + 3 * 8 + 8 + 232);
+const_assert_eq!(size_of::<MangoAccountFixed>(), 32 * 4 + 8 + 7 * 8 + 208);
 const_assert_eq!(size_of::<MangoAccountFixed>(), 400);
 const_assert_eq!(size_of::<MangoAccountFixed>() % 8, 0);
 
@@ -255,6 +268,43 @@ impl MangoAccountFixed {
             true
         } else {
             false
+        }
+    }
+
+    /// Updates the buyback_fees_* fields for staggered expiry of available amounts.
+    pub fn expire_buyback_fees(&mut self, now_ts: u64, interval: u64) {
+        if interval == 0 || now_ts < self.buyback_fees_expiry_timestamp {
+            return;
+        } else if now_ts < self.buyback_fees_expiry_timestamp + interval {
+            self.buyback_fees_accrued_previous = self.buyback_fees_accrued_current;
+        } else {
+            self.buyback_fees_accrued_previous = 0;
+        }
+        self.buyback_fees_accrued_current = 0;
+        self.buyback_fees_expiry_timestamp = (now_ts / interval + 1) * interval;
+    }
+
+    /// The total buyback fees amount that the account can make use of.
+    pub fn buyback_fees_accrued(&self) -> u64 {
+        self.buyback_fees_accrued_current
+            .saturating_add(self.buyback_fees_accrued_previous)
+    }
+
+    /// Add new fees that are usable with the buyback fees feature.
+    pub fn accrue_buyback_fees(&mut self, amount: u64) {
+        self.buyback_fees_accrued_current =
+            self.buyback_fees_accrued_current.saturating_add(amount);
+    }
+
+    /// Reduce the available buyback fees amount because it was used up.
+    pub fn reduce_buyback_fees_accrued(&mut self, amount: u64) {
+        if amount > self.buyback_fees_accrued_previous {
+            self.buyback_fees_accrued_current = self
+                .buyback_fees_accrued_current
+                .saturating_sub(amount - self.buyback_fees_accrued_previous);
+            self.buyback_fees_accrued_previous = 0;
+        } else {
+            self.buyback_fees_accrued_previous -= amount;
         }
     }
 }
@@ -780,7 +830,7 @@ impl<
                 perp_position.market_index = perp_market_index;
 
                 let mut settle_token_position = self.ensure_token_position(settle_token_index)?.0;
-                cm!(settle_token_position.in_use_count += 1);
+                settle_token_position.in_use_count += 1;
             }
         }
         if let Some(raw_index) = raw_index_opt {
@@ -798,7 +848,7 @@ impl<
         self.perp_position_mut(perp_market_index)?.market_index = PerpMarketIndex::MAX;
 
         let mut settle_token_position = self.token_position_mut(settle_token_index)?.0;
-        cm!(settle_token_position.in_use_count -= 1);
+        settle_token_position.in_use_count -= 1;
 
         Ok(())
     }
@@ -826,7 +876,7 @@ impl<
         perp_position.market_index = PerpMarketIndex::MAX;
 
         let mut settle_token_position = self.token_position_mut(settle_token_index)?.0;
-        cm!(settle_token_position.in_use_count -= 1);
+        settle_token_position.in_use_count -= 1;
 
         Ok(())
     }
@@ -842,10 +892,10 @@ impl<
         let mut perp_account = self.perp_position_mut(perp_market_index)?;
         match side {
             Side::Bid => {
-                cm!(perp_account.bids_base_lots += order.quantity);
+                perp_account.bids_base_lots += order.quantity;
             }
             Side::Ask => {
-                cm!(perp_account.asks_base_lots += order.quantity);
+                perp_account.asks_base_lots += order.quantity;
             }
         };
         let slot = order.owner_slot as usize;
@@ -869,10 +919,10 @@ impl<
             // accounting
             match order_side {
                 Side::Bid => {
-                    cm!(perp_account.bids_base_lots -= quantity);
+                    perp_account.bids_base_lots -= quantity;
                 }
                 Side::Ask => {
-                    cm!(perp_account.asks_base_lots -= quantity);
+                    perp_account.asks_base_lots -= quantity;
                 }
             }
         }
@@ -892,27 +942,30 @@ impl<
         perp_market: &mut PerpMarket,
         fill: &FillEvent,
     ) -> Result<()> {
-        let pa = self.perp_position_mut(perp_market_index)?;
-        pa.settle_funding(perp_market);
-
         let side = fill.taker_side().invert_side();
         let (base_change, quote_change) = fill.base_quote_change(side);
-        let quote = cm!(I80F48::from(perp_market.quote_lot_size) * I80F48::from(quote_change));
-        let fees = cm!(quote.abs() * I80F48::from_num(fill.maker_fee));
+        let quote = I80F48::from(perp_market.quote_lot_size) * I80F48::from(quote_change);
+        let fees = quote.abs() * I80F48::from_num(fill.maker_fee);
+        if fees.is_positive() {
+            self.fixed_mut()
+                .accrue_buyback_fees(fees.floor().to_num::<u64>());
+        }
+        let pa = self.perp_position_mut(perp_market_index)?;
+        pa.settle_funding(perp_market);
         pa.record_trading_fee(fees);
         pa.record_trade(perp_market, base_change, quote);
 
-        cm!(pa.maker_volume += quote.abs().to_num::<u64>());
+        pa.maker_volume += quote.abs().to_num::<u64>();
 
         if fill.maker_out() {
             self.remove_perp_order(fill.maker_slot as usize, base_change.abs())
         } else {
             match side {
                 Side::Bid => {
-                    cm!(pa.bids_base_lots -= base_change.abs());
+                    pa.bids_base_lots -= base_change.abs();
                 }
                 Side::Ask => {
-                    cm!(pa.asks_base_lots -= base_change.abs());
+                    pa.asks_base_lots -= base_change.abs();
                 }
             }
             Ok(())
@@ -932,10 +985,10 @@ impl<
         pa.remove_taker_trade(base_change, quote_change);
         // fees are assessed at time of trade; no need to assess fees here
         let quote_change_native =
-            cm!(I80F48::from(perp_market.quote_lot_size) * I80F48::from(quote_change));
+            I80F48::from(perp_market.quote_lot_size) * I80F48::from(quote_change);
         pa.record_trade(perp_market, base_change, quote_change_native);
 
-        cm!(pa.taker_volume += quote_change_native.abs().to_num::<u64>());
+        pa.taker_volume += quote_change_native.abs().to_num::<u64>();
 
         Ok(())
     }
@@ -1224,6 +1277,9 @@ mod tests {
         account.bump = 4;
         account.net_deposits = 5;
         account.health_region_begin_init_health = 7;
+        account.buyback_fees_accrued_current = 10;
+        account.buyback_fees_accrued_previous = 11;
+        account.buyback_fees_expiry_timestamp = 12;
         account.tokens.resize(8, TokenPosition::default());
         account.tokens[0].token_index = 8;
         account.serum3.resize(8, Serum3Orders::default());
@@ -1254,6 +1310,18 @@ mod tests {
         assert_eq!(
             account.health_region_begin_init_health,
             account2.fixed.health_region_begin_init_health
+        );
+        assert_eq!(
+            account.buyback_fees_accrued_current,
+            account2.fixed.buyback_fees_accrued_current
+        );
+        assert_eq!(
+            account.buyback_fees_accrued_previous,
+            account2.fixed.buyback_fees_accrued_previous
+        );
+        assert_eq!(
+            account.buyback_fees_expiry_timestamp,
+            account2.fixed.buyback_fees_expiry_timestamp
         );
         assert_eq!(
             account.tokens[0].token_index,
@@ -1440,5 +1508,60 @@ mod tests {
         assert!(account.perp_position(8).is_ok());
         assert!(account.perp_position(42).is_ok());
         assert_eq!(account.active_perp_positions().count(), 2);
+    }
+
+    #[test]
+    fn test_buyback_fees() {
+        let mut account = make_test_account();
+        let fixed = account.fixed_mut();
+        assert_eq!(fixed.buyback_fees_accrued(), 0);
+        fixed.expire_buyback_fees(1000, 10);
+        assert_eq!(fixed.buyback_fees_accrued(), 0);
+        assert_eq!(fixed.buyback_fees_expiry_timestamp, 1010);
+
+        fixed.accrue_buyback_fees(10);
+        fixed.accrue_buyback_fees(5);
+        assert_eq!(fixed.buyback_fees_accrued(), 15);
+        fixed.reduce_buyback_fees_accrued(2);
+        assert_eq!(fixed.buyback_fees_accrued(), 13);
+
+        fixed.expire_buyback_fees(1009, 10);
+        assert_eq!(fixed.buyback_fees_expiry_timestamp, 1010);
+        assert_eq!(fixed.buyback_fees_accrued(), 13);
+        assert_eq!(fixed.buyback_fees_accrued_current, 13);
+
+        fixed.expire_buyback_fees(1010, 10);
+        assert_eq!(fixed.buyback_fees_expiry_timestamp, 1020);
+        assert_eq!(fixed.buyback_fees_accrued(), 13);
+        assert_eq!(fixed.buyback_fees_accrued_previous, 13);
+        assert_eq!(fixed.buyback_fees_accrued_current, 0);
+
+        fixed.accrue_buyback_fees(5);
+        assert_eq!(fixed.buyback_fees_accrued(), 18);
+
+        fixed.reduce_buyback_fees_accrued(15);
+        assert_eq!(fixed.buyback_fees_accrued(), 3);
+        assert_eq!(fixed.buyback_fees_accrued_previous, 0);
+        assert_eq!(fixed.buyback_fees_accrued_current, 3);
+
+        fixed.expire_buyback_fees(1021, 10);
+        fixed.accrue_buyback_fees(1);
+        assert_eq!(fixed.buyback_fees_expiry_timestamp, 1030);
+        assert_eq!(fixed.buyback_fees_accrued_previous, 3);
+        assert_eq!(fixed.buyback_fees_accrued_current, 1);
+
+        fixed.expire_buyback_fees(1051, 10);
+        assert_eq!(fixed.buyback_fees_expiry_timestamp, 1060);
+        assert_eq!(fixed.buyback_fees_accrued_previous, 0);
+        assert_eq!(fixed.buyback_fees_accrued_current, 0);
+
+        fixed.accrue_buyback_fees(7);
+        fixed.expire_buyback_fees(1060, 10);
+        fixed.accrue_buyback_fees(5);
+        assert_eq!(fixed.buyback_fees_expiry_timestamp, 1070);
+        assert_eq!(fixed.buyback_fees_accrued(), 12);
+
+        fixed.reduce_buyback_fees_accrued(100);
+        assert_eq!(fixed.buyback_fees_accrued(), 0);
     }
 }

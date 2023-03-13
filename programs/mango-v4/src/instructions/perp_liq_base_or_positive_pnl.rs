@@ -1,5 +1,5 @@
 use anchor_lang::prelude::*;
-use checked_math as cm;
+
 use fixed::types::I80F48;
 
 use crate::accounts_zerocopy::*;
@@ -217,7 +217,7 @@ pub(crate) fn liquidation_action(
     let perp_info = liqee_health_cache.perp_info(perp_market_index)?;
     let oracle_price = perp_info.prices.oracle;
     let base_lot_size = I80F48::from(perp_market.base_lot_size);
-    let oracle_price_per_lot = cm!(base_lot_size * oracle_price);
+    let oracle_price_per_lot = base_lot_size * oracle_price;
 
     let liqee_positive_settle_limit = liqee_perp_position.settle_limit(&perp_market).1;
 
@@ -245,12 +245,11 @@ pub(crate) fn liquidation_action(
         // and increased by `base * price * (1 - liq_fee) * quote_init_asset_weight`
         let quote_init_asset_weight = I80F48::ONE;
         direction = -1;
-        fee_factor = cm!(I80F48::ONE - perp_market.base_liquidation_fee);
+        fee_factor = I80F48::ONE - perp_market.base_liquidation_fee;
         let asset_price = perp_info.prices.asset(HealthType::LiquidationEnd);
-        unweighted_health_per_lot = cm!(-asset_price
-            * base_lot_size
-            * perp_market.init_base_asset_weight
-            + oracle_price_per_lot * quote_init_asset_weight * fee_factor);
+        unweighted_health_per_lot =
+            -asset_price * base_lot_size * perp_market.init_base_asset_weight
+                + oracle_price_per_lot * quote_init_asset_weight * fee_factor;
     } else {
         // liqee_base_lots <= 0
         require_msg!(
@@ -262,17 +261,15 @@ pub(crate) fn liquidation_action(
         // and reduced by `base * price * (1 + liq_fee) * quote_init_liab_weight`
         let quote_init_liab_weight = I80F48::ONE;
         direction = 1;
-        fee_factor = cm!(I80F48::ONE + perp_market.base_liquidation_fee);
+        fee_factor = I80F48::ONE + perp_market.base_liquidation_fee;
         let liab_price = perp_info.prices.liab(HealthType::LiquidationEnd);
-        unweighted_health_per_lot = cm!(liab_price
-            * base_lot_size
-            * perp_market.init_base_liab_weight
-            - oracle_price_per_lot * quote_init_liab_weight * fee_factor);
+        unweighted_health_per_lot = liab_price * base_lot_size * perp_market.init_base_liab_weight
+            - oracle_price_per_lot * quote_init_liab_weight * fee_factor;
     };
     assert!(unweighted_health_per_lot > 0);
 
     // Amount of settle token received for each token that is settled
-    let spot_gain_per_settled = cm!(I80F48::ONE - perp_market.positive_pnl_liquidation_fee);
+    let spot_gain_per_settled = I80F48::ONE - perp_market.positive_pnl_liquidation_fee;
 
     let init_overall_asset_weight = perp_market.init_overall_asset_weight;
 
@@ -283,10 +280,10 @@ pub(crate) fn liquidation_action(
         if unweighted < 0 {
             unweighted
         } else if unweighted < max_pnl_transfer {
-            cm!(unweighted * spot_gain_per_settled)
+            unweighted * spot_gain_per_settled
         } else {
-            let unsettled = cm!(unweighted - max_pnl_transfer);
-            cm!(max_pnl_transfer * spot_gain_per_settled + unsettled * init_overall_asset_weight)
+            let unsettled = unweighted - max_pnl_transfer;
+            max_pnl_transfer * spot_gain_per_settled + unsettled * init_overall_asset_weight
         }
     };
 
@@ -301,7 +298,7 @@ pub(crate) fn liquidation_action(
         .weigh_health_contribution(current_unweighted_perp_health, HealthType::LiquidationEnd);
     let mut current_expected_perp_health = expected_perp_health(current_unweighted_perp_health);
     let mut current_expected_health =
-        cm!(liqee_liq_end_health + current_expected_perp_health - initial_weighted_perp_health);
+        liqee_liq_end_health + current_expected_perp_health - initial_weighted_perp_health;
 
     let mut reduce_base = |step: &str,
                            health_amount: I80F48,
@@ -312,20 +309,18 @@ pub(crate) fn liquidation_action(
             .min(-current_expected_health)
             .max(I80F48::ZERO);
         // How many lots to transfer?
-        let base_lots = cm!(health_limit / health_per_lot)
-            .checked_ceil() // overshoot to aim for init_health >= 0
-            .unwrap()
-            .checked_to_num::<i64>()
-            .unwrap()
+        let base_lots = (health_limit / health_per_lot)
+            .ceil() // overshoot to aim for init_health >= 0
+            .to_num::<i64>()
             .min(liqee_base_lots.abs() - base_reduction)
             .min(max_base_transfer.abs() - base_reduction)
             .max(0);
-        let unweighted_change = cm!(I80F48::from(base_lots) * unweighted_health_per_lot);
+        let unweighted_change = I80F48::from(base_lots) * unweighted_health_per_lot;
         let current_unweighted = *current_unweighted_perp_health;
-        let new_unweighted_perp = cm!(current_unweighted + unweighted_change);
+        let new_unweighted_perp = current_unweighted + unweighted_change;
         let new_expected_perp = expected_perp_health(new_unweighted_perp);
         let new_expected_health =
-            cm!(current_expected_health + (new_expected_perp - current_expected_perp_health));
+            current_expected_health + (new_expected_perp - current_expected_perp_health);
         msg!(
             "{}: {} lots, health {} -> {}, unweighted perp {} -> {}",
             step,
@@ -360,10 +355,10 @@ pub(crate) fn liquidation_action(
     // benefit account health slightly less because of the settlement liquidation fee.
     //
     if current_unweighted_perp_health >= 0 && current_unweighted_perp_health < max_pnl_transfer {
-        let settled_health_per_lot = cm!(unweighted_health_per_lot * spot_gain_per_settled);
+        let settled_health_per_lot = unweighted_health_per_lot * spot_gain_per_settled;
         reduce_base(
             "settleable",
-            cm!(max_pnl_transfer - current_unweighted_perp_health),
+            max_pnl_transfer - current_unweighted_perp_health,
             settled_health_per_lot,
             &mut current_unweighted_perp_health,
         );
@@ -373,7 +368,7 @@ pub(crate) fn liquidation_action(
     // Step 3: Above that, perp base positions only benefit account health if the pnl asset weight is positive
     //
     if current_unweighted_perp_health >= max_pnl_transfer && init_overall_asset_weight > 0 {
-        let weighted_health_per_lot = cm!(unweighted_health_per_lot * init_overall_asset_weight);
+        let weighted_health_per_lot = unweighted_health_per_lot * init_overall_asset_weight;
         reduce_base(
             "positive",
             I80F48::MAX,
@@ -386,8 +381,8 @@ pub(crate) fn liquidation_action(
     // Execute the base reduction. This is essentially a forced trade and updates the
     // liqee and liqors entry and break even prices.
     //
-    let base_transfer = cm!(direction * base_reduction);
-    let quote_transfer = cm!(-I80F48::from(base_transfer) * oracle_price_per_lot * fee_factor);
+    let base_transfer = direction * base_reduction;
+    let quote_transfer = -I80F48::from(base_transfer) * oracle_price_per_lot * fee_factor;
     if base_transfer != 0 {
         msg!(
             "transfering: {} base lots and {} quote",
@@ -405,14 +400,12 @@ pub(crate) fn liquidation_action(
     let final_weighted_perp_health = perp_info
         .weigh_health_contribution(current_unweighted_perp_health, HealthType::LiquidationEnd);
     let current_actual_health =
-        cm!(liqee_liq_end_health - initial_weighted_perp_health + final_weighted_perp_health);
+        liqee_liq_end_health - initial_weighted_perp_health + final_weighted_perp_health;
     let pnl_transfer_possible =
         current_actual_health < 0 && current_unweighted_perp_health > 0 && max_pnl_transfer > 0;
     let (pnl_transfer, limit_transfer) = if pnl_transfer_possible {
-        let health_per_transfer = cm!(spot_gain_per_settled - init_overall_asset_weight);
-        let transfer_for_zero = cm!(-current_actual_health / health_per_transfer)
-            .checked_ceil()
-            .unwrap();
+        let health_per_transfer = spot_gain_per_settled - init_overall_asset_weight;
+        let transfer_for_zero = (-current_actual_health / health_per_transfer).ceil();
         let liqee_pnl = liqee_perp_position.unsettled_pnl(&perp_market, oracle_price)?;
 
         // Allow taking over *more* than the liqee_positive_settle_limit. In exchange, the liqor
@@ -430,28 +423,25 @@ pub(crate) fn liquidation_action(
         let limit_transfer = {
             // take care, liqee_limit may be i64::MAX
             let liqee_limit: i128 = liqee_positive_settle_limit.into();
-            let settle = pnl_transfer.checked_floor().unwrap().to_num::<i128>();
-            let total = liqee_pnl.checked_ceil().unwrap().to_num::<i128>();
-            let liqor_limit: i64 = cm!(liqee_limit * settle / total).try_into().unwrap();
+            let settle = pnl_transfer.floor().to_num::<i128>();
+            let total = liqee_pnl.ceil().to_num::<i128>();
+            let liqor_limit: i64 = (liqee_limit * settle / total).try_into().unwrap();
             I80F48::from(liqor_limit).min(pnl_transfer).max(I80F48::ONE)
         };
 
         // The liqor pays less than the full amount to receive the positive pnl
-        let token_transfer = cm!(pnl_transfer * spot_gain_per_settled);
+        let token_transfer = pnl_transfer * spot_gain_per_settled;
 
         if pnl_transfer > 0 {
             liqor_perp_position.record_liquidation_pnl_takeover(pnl_transfer, limit_transfer);
             liqee_perp_position.record_settle(pnl_transfer);
 
             // Update the accounts' perp_spot_transfer statistics.
-            let transfer_i64 = token_transfer
-                .round_to_zero()
-                .checked_to_num::<i64>()
-                .unwrap();
-            cm!(liqor_perp_position.perp_spot_transfers -= transfer_i64);
-            cm!(liqee_perp_position.perp_spot_transfers += transfer_i64);
-            cm!(liqor.fixed.perp_spot_transfers -= transfer_i64);
-            cm!(liqee.fixed.perp_spot_transfers += transfer_i64);
+            let transfer_i64 = token_transfer.round_to_zero().to_num::<i64>();
+            liqor_perp_position.perp_spot_transfers -= transfer_i64;
+            liqee_perp_position.perp_spot_transfers += transfer_i64;
+            liqor.fixed.perp_spot_transfers -= transfer_i64;
+            liqee.fixed.perp_spot_transfers += transfer_i64;
 
             // Transfer token balance
             let liqor_token_position = liqor.token_position_mut(settle_token_index)?.0;

@@ -2,7 +2,6 @@ use anchor_lang::prelude::*;
 
 use crate::accounts_ix::*;
 use crate::state::*;
-use crate::util::checked_math as cm;
 
 pub fn account_expand(
     ctx: Context<AccountExpand>,
@@ -29,7 +28,7 @@ pub fn account_expand(
                 to: realloc_account.clone(),
             },
         ),
-        cm!(new_rent_minimum - old_lamports),
+        new_rent_minimum - old_lamports,
     )?;
 
     // realloc: it's safe to not re-zero-init since we never shrink accounts

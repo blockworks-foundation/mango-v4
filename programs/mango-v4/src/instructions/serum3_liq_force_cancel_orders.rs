@@ -143,7 +143,9 @@ pub fn serum3_liq_force_cancel_orders(
     let mut account = ctx.accounts.account.load_full_mut()?;
     let mut base_bank = ctx.accounts.base_bank.load_mut()?;
     let mut quote_bank = ctx.accounts.quote_bank.load_mut()?;
+    let group = ctx.accounts.group.load()?;
     apply_settle_changes(
+        &group,
         ctx.accounts.account.key(),
         &mut account.borrow_mut(),
         &mut base_bank,
@@ -156,6 +158,7 @@ pub fn serum3_liq_force_cancel_orders(
         after_quote_vault,
         &after_oo,
         Some(&mut health_cache),
+        true,
     )?;
 
     //
@@ -199,6 +202,7 @@ fn cpi_settle_funds(ctx: &Serum3LiqForceCancelOrders) -> Result<()> {
         user_quote_wallet: ctx.quote_vault.to_account_info(),
         vault_signer: ctx.market_vault_signer.to_account_info(),
         token_program: ctx.token_program.to_account_info(),
+        rebates_quote_wallet: ctx.quote_vault.to_account_info(),
     }
     .call(&group)
 }
