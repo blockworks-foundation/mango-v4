@@ -1,14 +1,14 @@
 {
   "compilerOptions": {
-    "target": "esnext",
+    "esModuleInterop": true,
     "module": "esnext",
     "moduleResolution": "node",
-    "esModuleInterop": true,
-    "resolveJsonModule": true,
+    "noEmit": true,
     "noImplicitAny": false,
+    "resolveJsonModule": true,
     "skipLibCheck": true,
     "strictNullChecks": true,
-    "noEmit": true
+    "target": "esnext",
   },
   "ts-node": {
     // these options are overrides used only by ts-node
@@ -17,5 +17,7 @@
       "module": "commonjs"
     }
   },
-  "include": ["ts/client/src"]
+  "include": [
+    "ts/client/src"
+  ]
 }

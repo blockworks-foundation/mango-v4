@@ -3,8 +3,8 @@
   "compilerOptions": {
     "declaration": false,
     "declarationMap": false,
-    "sourceMap": false,
     "module": "esnext",
-    "outDir": "./dist/esm"
+    "outDir": "dist/esm",
+    "sourceMap": false,
   }
 }
