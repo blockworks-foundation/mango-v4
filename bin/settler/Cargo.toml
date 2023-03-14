@@ -1,10 +1,10 @@
 [package]
-name = "mango-v4-settle-bot"
+name = "mango-v4-settler"
 version = "0.0.1"
 edition = "2021"
 
 [[bin]]
-name = "settle-bot"
+name = "settler"
 path = "src/main.rs"
 
 [dependencies]
