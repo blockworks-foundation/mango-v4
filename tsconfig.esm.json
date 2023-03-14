@@ -3,12 +3,8 @@
   "compilerOptions": {
     "declaration": false,
     "declarationMap": false,
-    "module": "esnext",
-    "outDir": "./dist/esm",
     "sourceMap": false,
-  },
-  "include": [
-    "ts/client/src",
-    "ts/client/scripts"
-  ]
+    "module": "esnext",
+    "outDir": "./dist/esm"
+  }
 }
