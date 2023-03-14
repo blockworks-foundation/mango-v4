@@ -869,7 +869,7 @@ export class MangoAccount {
     const hc = HealthCache.fromMangoAccount(group, this);
     const baseLots = hc.getMaxPerpForHealthRatio(
       perpMarket,
-      I80F48.fromNumber(perpMarket.uiPrice),
+      perpMarket.price,
       PerpOrderSide.bid,
       I80F48.fromNumber(2),
     );
@@ -896,7 +896,7 @@ export class MangoAccount {
     const hc = HealthCache.fromMangoAccount(group, this);
     const baseLots = hc.getMaxPerpForHealthRatio(
       perpMarket,
-      I80F48.fromNumber(perpMarket.uiPrice),
+      perpMarket.price,
       PerpOrderSide.ask,
       I80F48.fromNumber(2),
     );
@@ -919,7 +919,7 @@ export class MangoAccount {
           : PerpPosition.emptyFromPerpMarketIndex(perpMarket.perpMarketIndex),
         PerpOrderSide.bid,
         perpMarket.uiBaseToLots(size),
-        I80F48.fromNumber(perpMarket.uiPrice),
+        perpMarket.price,
         HealthType.init,
       )
       .toNumber();
@@ -941,7 +941,7 @@ export class MangoAccount {
           : PerpPosition.emptyFromPerpMarketIndex(perpMarket.perpMarketIndex),
         PerpOrderSide.ask,
         perpMarket.uiBaseToLots(size),
-        I80F48.fromNumber(perpMarket.uiPrice),
+        perpMarket.price,
         HealthType.init,
       )
       .toNumber();
