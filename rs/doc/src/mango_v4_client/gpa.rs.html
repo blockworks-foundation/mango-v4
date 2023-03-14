@@ -147,12 +147,12 @@
 ) -&gt; anyhow::Result&lt;Vec&lt;(Pubkey, MangoAccountValue)&gt;&gt; {
     <span class="kw">let </span>config = RpcProgramAccountsConfig {
         filters: <span class="prelude-val">Some</span>(<span class="macro">vec!</span>[
-            RpcFilterType::Memcmp(Memcmp::new_base58_encoded(
+            RpcFilterType::Memcmp(Memcmp::new_raw_bytes(
                 <span class="number">0</span>,
-                <span class="kw-2">&amp;</span>MangoAccount::discriminator(),
+                MangoAccount::discriminator().to_vec(),
             )),
-            RpcFilterType::Memcmp(Memcmp::new_base58_encoded(<span class="number">8</span>, <span class="kw-2">&amp;</span>group.to_bytes())),
-            RpcFilterType::Memcmp(Memcmp::new_base58_encoded(<span class="number">40</span>, <span class="kw-2">&amp;</span>owner.to_bytes())),
+            RpcFilterType::Memcmp(Memcmp::new_raw_bytes(<span class="number">8</span>, group.to_bytes().to_vec())),
+            RpcFilterType::Memcmp(Memcmp::new_raw_bytes(<span class="number">40</span>, owner.to_bytes().to_vec())),
         ]),
         account_config: RpcAccountInfoConfig {
             encoding: <span class="prelude-val">Some</span>(UiAccountEncoding::Base64),
@@ -181,7 +181,7 @@
     filters: Vec&lt;RpcFilterType&gt;,
 ) -&gt; anyhow::Result&lt;Vec&lt;(Pubkey, T)&gt;&gt; {
     <span class="kw">let </span>account_type_filter =
-        RpcFilterType::Memcmp(Memcmp::new_base58_encoded(<span class="number">0</span>, <span class="kw-2">&amp;</span>T::discriminator()));
+        RpcFilterType::Memcmp(Memcmp::new_raw_bytes(<span class="number">0</span>, T::discriminator().to_vec()));
     <span class="kw">let </span>config = RpcProgramAccountsConfig {
         filters: <span class="prelude-val">Some</span>([<span class="macro">vec!</span>[account_type_filter], filters].concat()),
         account_config: RpcAccountInfoConfig {
@@ -205,9 +205,9 @@
     fetch_anchor_accounts::&lt;Bank&gt;(
         rpc,
         program,
-        <span class="macro">vec!</span>[RpcFilterType::Memcmp(Memcmp::new_base58_encoded(
+        <span class="macro">vec!</span>[RpcFilterType::Memcmp(Memcmp::new_raw_bytes(
             <span class="number">8</span>,
-            <span class="kw-2">&amp;</span>group.to_bytes(),
+            group.to_bytes().to_vec(),
         ))],
     )
     .<span class="kw">await
@@ -221,9 +221,9 @@
     fetch_anchor_accounts::&lt;MintInfo&gt;(
         rpc,
         program,
-        <span class="macro">vec!</span>[RpcFilterType::Memcmp(Memcmp::new_base58_encoded(
+        <span class="macro">vec!</span>[RpcFilterType::Memcmp(Memcmp::new_raw_bytes(
             <span class="number">8</span>,
-            <span class="kw-2">&amp;</span>group.to_bytes(),
+            group.to_bytes().to_vec(),
         ))],
     )
     .<span class="kw">await
@@ -237,9 +237,9 @@
     fetch_anchor_accounts::&lt;Serum3Market&gt;(
         rpc,
         program,
-        <span class="macro">vec!</span>[RpcFilterType::Memcmp(Memcmp::new_base58_encoded(
+        <span class="macro">vec!</span>[RpcFilterType::Memcmp(Memcmp::new_raw_bytes(
             <span class="number">8</span>,
-            <span class="kw-2">&amp;</span>group.to_bytes(),
+            group.to_bytes().to_vec(),
         ))],
     )
     .<span class="kw">await
@@ -253,9 +253,9 @@
     fetch_anchor_accounts::&lt;PerpMarket&gt;(
         rpc,
         program,
-        <span class="macro">vec!</span>[RpcFilterType::Memcmp(Memcmp::new_base58_encoded(
+        <span class="macro">vec!</span>[RpcFilterType::Memcmp(Memcmp::new_raw_bytes(
             <span class="number">8</span>,
-            <span class="kw-2">&amp;</span>group.to_bytes(),
+            group.to_bytes().to_vec(),
         ))],
     )
     .<span class="kw">await
