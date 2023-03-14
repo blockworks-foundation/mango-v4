@@ -460,12 +460,6 @@
 <a href="#460" id="460">460</a>
 <a href="#461" id="461">461</a>
 <a href="#462" id="462">462</a>
-<a href="#463" id="463">463</a>
-<a href="#464" id="464">464</a>
-<a href="#465" id="465">465</a>
-<a href="#466" id="466">466</a>
-<a href="#467" id="467">467</a>
-<a href="#468" id="468">468</a>
 </pre><pre class="rust"><code><span class="kw">use </span>std::mem::size_of;
 
 <span class="kw">use </span>anchor_lang::prelude::<span class="kw-2">*</span>;
@@ -478,7 +472,6 @@
 <span class="kw">use </span><span class="kw">crate</span>::logs::PerpUpdateFundingLog;
 <span class="kw">use </span><span class="kw">crate</span>::state::orderbook::Side;
 <span class="kw">use </span><span class="kw">crate</span>::state::{oracle, TokenIndex};
-<span class="kw">use </span><span class="kw">crate</span>::util::checked_math <span class="kw">as </span>cm;
 
 <span class="kw">use super</span>::{orderbook, OracleConfig, Orderbook, StablePriceModel, DAY_I80F48};
 
@@ -570,7 +563,7 @@
     </span><span class="kw">pub </span>impact_quantity: i64,
 
     <span class="doccomment">/// Current long funding value. Increasing it means that every long base lot
-    /// needs to pay that amount in funding.
+    /// needs to pay that amount of quote native in funding.
     ///
     /// PerpPosition uses and tracks it settle funding. Updated by the perp
     /// keeper instruction.
@@ -744,12 +737,12 @@
             book.bookside(Side::Ask)
                 .impact_price(<span class="self">self</span>.impact_quantity, now_ts, oracle_price_lots);
 
-        <span class="kw">let </span>diff_price = <span class="kw">match </span>(bid, ask) {
+        <span class="kw">let </span>funding_rate = <span class="kw">match </span>(bid, ask) {
             (<span class="prelude-val">Some</span>(bid), <span class="prelude-val">Some</span>(ask)) =&gt; {
                 <span class="comment">// calculate mid-market rate
-                </span><span class="kw">let </span>mid_price = bid.checked_add(ask).unwrap() / <span class="number">2</span>;
+                </span><span class="kw">let </span>mid_price = (bid + ask) / <span class="number">2</span>;
                 <span class="kw">let </span>book_price = <span class="self">self</span>.lot_to_native_price(mid_price);
-                <span class="kw">let </span>diff = <span class="macro">cm!</span>(book_price / index_price - I80F48::ONE);
+                <span class="kw">let </span>diff = book_price / index_price - I80F48::ONE;
                 diff.clamp(<span class="self">self</span>.min_funding, <span class="self">self</span>.max_funding)
             }
             (<span class="prelude-val">Some</span>(_bid), <span class="prelude-val">None</span>) =&gt; <span class="self">self</span>.max_funding,
@@ -758,9 +751,11 @@
         };
 
         <span class="kw">let </span>diff_ts = I80F48::from_num(now_ts - <span class="self">self</span>.funding_last_updated <span class="kw">as </span>u64);
-        <span class="kw">let </span>time_factor = <span class="macro">cm!</span>(diff_ts / DAY_I80F48);
+        <span class="kw">let </span>time_factor = diff_ts / DAY_I80F48;
         <span class="kw">let </span>base_lot_size = I80F48::from_num(<span class="self">self</span>.base_lot_size);
-        <span class="kw">let </span>funding_delta = <span class="macro">cm!</span>(index_price * diff_price * base_lot_size * time_factor);
+
+        <span class="comment">// The number of native quote that one base lot should pay in funding
+        </span><span class="kw">let </span>funding_delta = index_price * base_lot_size * funding_rate * time_factor;
 
         <span class="self">self</span>.long_funding += funding_delta;
         <span class="self">self</span>.short_funding += funding_delta;
@@ -778,7 +773,7 @@
             stable_price: <span class="self">self</span>.stable_price().to_bits(),
             fees_accrued: <span class="self">self</span>.fees_accrued.to_bits(),
             open_interest: <span class="self">self</span>.open_interest,
-            instantaneous_funding_rate: diff_price.to_bits(),
+            instantaneous_funding_rate: funding_rate.to_bits(),
         });
 
         <span class="prelude-val">Ok</span>(())
@@ -786,19 +781,12 @@
 
     <span class="doccomment">/// Convert from the price stored on the book to the price used in value calculations
     </span><span class="kw">pub fn </span>lot_to_native_price(<span class="kw-2">&amp;</span><span class="self">self</span>, price: i64) -&gt; I80F48 {
-        I80F48::from_num(price)
-            .checked_mul(I80F48::from_num(<span class="self">self</span>.quote_lot_size))
-            .unwrap()
-            .checked_div(I80F48::from_num(<span class="self">self</span>.base_lot_size))
-            .unwrap()
+        I80F48::from_num(price) * I80F48::from_num(<span class="self">self</span>.quote_lot_size)
+            / I80F48::from_num(<span class="self">self</span>.base_lot_size)
     }
 
     <span class="kw">pub fn </span>native_price_to_lot(<span class="kw-2">&amp;</span><span class="self">self</span>, price: I80F48) -&gt; i64 {
-        price
-            .checked_mul(I80F48::from_num(<span class="self">self</span>.base_lot_size))
-            .unwrap()
-            .checked_div(I80F48::from_num(<span class="self">self</span>.quote_lot_size))
-            .unwrap()
+        (price * I80F48::from_num(<span class="self">self</span>.base_lot_size) / I80F48::from_num(<span class="self">self</span>.quote_lot_size))
             .to_num()
     }
 
@@ -810,8 +798,8 @@
         oracle_price: I80F48,
     ) -&gt; bool {
         <span class="kw">match </span>side {
-            Side::Bid =&gt; native_price &lt;= <span class="macro">cm!</span>(<span class="self">self</span>.maint_base_liab_weight * oracle_price),
-            Side::Ask =&gt; native_price &gt;= <span class="macro">cm!</span>(<span class="self">self</span>.maint_base_asset_weight * oracle_price),
+            Side::Bid =&gt; native_price &lt;= (<span class="self">self</span>.maint_base_liab_weight * oracle_price),
+            Side::Ask =&gt; native_price &gt;= (<span class="self">self</span>.maint_base_asset_weight * oracle_price),
         }
     }
 
@@ -828,7 +816,7 @@
             // would be appreciated. Luckily, this will be an extremely rare situation.
             </span>I80F48::ZERO
         } <span class="kw">else </span>{
-            <span class="macro">cm!</span>(loss / I80F48::from(<span class="self">self</span>.open_interest))
+            loss / I80F48::from(<span class="self">self</span>.open_interest)
         };
         <span class="self">self</span>.long_funding -= socialized_loss;
         <span class="self">self</span>.short_funding += socialized_loss;
@@ -851,11 +839,11 @@
         </span><span class="kw">let </span>low_health_fee = <span class="kw">if </span>source_liq_end_health &lt; <span class="number">0 </span>{
             <span class="kw">let </span>fee_fraction = I80F48::from_num(<span class="self">self</span>.settle_fee_fraction_low_health);
             <span class="kw">if </span>source_maint_health &lt; <span class="number">0 </span>{
-                <span class="macro">cm!</span>(settlement * fee_fraction)
+                settlement * fee_fraction
             } <span class="kw">else </span>{
-                <span class="macro">cm!</span>(settlement
+                settlement
                     * fee_fraction
-                    * (-source_liq_end_health / (source_maint_health - source_liq_end_health)))
+                    * (-source_liq_end_health / (source_maint_health - source_liq_end_health))
             }
         } <span class="kw">else </span>{
             I80F48::ZERO
@@ -869,7 +857,7 @@
         };
 
         <span class="comment">// Fees only apply when the settlement is large enough
-        </span><span class="kw">let </span>fee = <span class="macro">cm!</span>(low_health_fee + flat_fee).min(settlement);
+        </span><span class="kw">let </span>fee = (low_health_fee + flat_fee).min(settlement);
 
         <span class="comment">// Safety check to prevent any accidental negative transfer
         </span><span class="macro">require!</span>(fee &gt;= <span class="number">0</span>, MangoError::SettlementAmountMustBePositive);

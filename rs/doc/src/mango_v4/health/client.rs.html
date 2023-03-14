@@ -1368,19 +1368,15 @@
 <a href="#1368" id="1368">1368</a>
 <a href="#1369" id="1369">1369</a>
 <a href="#1370" id="1370">1370</a>
-<a href="#1371" id="1371">1371</a>
-<a href="#1372" id="1372">1372</a>
 </pre><pre class="rust"><code><span class="attr">#![cfg(feature = <span class="string">&quot;client&quot;</span>)]
 
 </span><span class="kw">use </span>anchor_lang::prelude::<span class="kw-2">*</span>;
 
 <span class="kw">use </span>fixed::types::I80F48;
-<span class="kw">use </span>fixed_macro::types::I80F48;
 
 <span class="kw">use </span><span class="kw">crate</span>::error::<span class="kw-2">*</span>;
 <span class="kw">use </span><span class="kw">crate</span>::state::Side <span class="kw">as </span>PerpOrderSide;
 <span class="kw">use </span><span class="kw">crate</span>::state::{Bank, MangoAccountValue, PerpMarketIndex};
-<span class="kw">use </span><span class="kw">crate</span>::util::checked_math <span class="kw">as </span>cm;
 
 <span class="kw">use super</span>::<span class="kw-2">*</span>;
 
@@ -1405,7 +1401,7 @@
         <span class="kw">let </span>hundred = I80F48::from(<span class="number">100</span>);
         <span class="kw">if </span>liabs &gt; <span class="number">0 </span>{
             <span class="comment">// feel free to saturate to MAX for tiny liabs
-            </span><span class="macro">cm!</span>(hundred * (assets - liabs)).saturating_div(liabs)
+            </span>(hundred * (assets - liabs)).saturating_div(liabs)
         } <span class="kw">else </span>{
             I80F48::MAX
         }
@@ -1430,7 +1426,7 @@
         <span class="kw">let </span><span class="kw-2">mut </span>source_position = account.token_position(source_bank.token_index)<span class="question-mark">?</span>.clone();
         <span class="kw">let </span><span class="kw-2">mut </span>target_position = account.token_position(target_bank.token_index)<span class="question-mark">?</span>.clone();
 
-        <span class="kw">let </span>target_amount = <span class="macro">cm!</span>(amount * price);
+        <span class="kw">let </span>target_amount = amount * price;
 
         <span class="kw">let </span><span class="kw-2">mut </span>source_bank = source_bank.clone();
         source_bank.withdraw_with_fee(<span class="kw-2">&amp;mut </span>source_position, amount, now_ts, source_oracle_price)<span class="question-mark">?</span>;
@@ -1849,7 +1845,7 @@
     fun: <span class="kw">impl </span>Fn(I80F48) -&gt; <span class="prelude-ty">Result</span>&lt;I80F48&gt;,
 ) -&gt; <span class="prelude-ty">Result</span>&lt;I80F48&gt; {
     <span class="kw">let </span>max_iterations = <span class="number">50</span>;
-    <span class="kw">let </span>target_error = <span class="macro">I80F48!</span>(<span class="number">0.1</span>);
+    <span class="kw">let </span>target_error = I80F48::from_num(<span class="number">0.1</span>);
     <span class="kw">let </span>right_value = fun(right)<span class="question-mark">?</span>;
     <span class="macro">require_msg!</span>(
         (left_value &lt;= target_value &amp;&amp; right_value &gt;= target_value)

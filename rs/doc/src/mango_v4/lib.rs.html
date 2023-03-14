@@ -929,6 +929,48 @@
 <a href="#929" id="929">929</a>
 <a href="#930" id="930">930</a>
 <a href="#931" id="931">931</a>
+<a href="#932" id="932">932</a>
+<a href="#933" id="933">933</a>
+<a href="#934" id="934">934</a>
+<a href="#935" id="935">935</a>
+<a href="#936" id="936">936</a>
+<a href="#937" id="937">937</a>
+<a href="#938" id="938">938</a>
+<a href="#939" id="939">939</a>
+<a href="#940" id="940">940</a>
+<a href="#941" id="941">941</a>
+<a href="#942" id="942">942</a>
+<a href="#943" id="943">943</a>
+<a href="#944" id="944">944</a>
+<a href="#945" id="945">945</a>
+<a href="#946" id="946">946</a>
+<a href="#947" id="947">947</a>
+<a href="#948" id="948">948</a>
+<a href="#949" id="949">949</a>
+<a href="#950" id="950">950</a>
+<a href="#951" id="951">951</a>
+<a href="#952" id="952">952</a>
+<a href="#953" id="953">953</a>
+<a href="#954" id="954">954</a>
+<a href="#955" id="955">955</a>
+<a href="#956" id="956">956</a>
+<a href="#957" id="957">957</a>
+<a href="#958" id="958">958</a>
+<a href="#959" id="959">959</a>
+<a href="#960" id="960">960</a>
+<a href="#961" id="961">961</a>
+<a href="#962" id="962">962</a>
+<a href="#963" id="963">963</a>
+<a href="#964" id="964">964</a>
+<a href="#965" id="965">965</a>
+<a href="#966" id="966">966</a>
+<a href="#967" id="967">967</a>
+<a href="#968" id="968">968</a>
+<a href="#969" id="969">969</a>
+<a href="#970" id="970">970</a>
+<a href="#971" id="971">971</a>
+<a href="#972" id="972">972</a>
+<a href="#973" id="973">973</a>
 </pre><pre class="rust"><code><span class="attr">#![allow(unused_variables)]
 
 </span><span class="kw">use </span>fixed::types::I80F48;
@@ -982,7 +1024,8 @@
         <span class="prelude-val">Ok</span>(())
     }
 
-    <span class="kw">pub fn </span>group_edit(
+    <span class="attr">#[allow(clippy::too_many_arguments)]
+    </span><span class="kw">pub fn </span>group_edit(
         ctx: Context&lt;GroupEdit&gt;,
         admin_opt: <span class="prelude-ty">Option</span>&lt;Pubkey&gt;,
         fast_listing_admin_opt: <span class="prelude-ty">Option</span>&lt;Pubkey&gt;,
@@ -990,6 +1033,11 @@
         testing_opt: <span class="prelude-ty">Option</span>&lt;u8&gt;,
         version_opt: <span class="prelude-ty">Option</span>&lt;u8&gt;,
         deposit_limit_quote_opt: <span class="prelude-ty">Option</span>&lt;u64&gt;,
+        buyback_fees_opt: <span class="prelude-ty">Option</span>&lt;bool&gt;,
+        buyback_fees_bonus_factor_opt: <span class="prelude-ty">Option</span>&lt;f32&gt;,
+        buyback_fees_swap_mango_account_opt: <span class="prelude-ty">Option</span>&lt;Pubkey&gt;,
+        mngo_token_index_opt: <span class="prelude-ty">Option</span>&lt;TokenIndex&gt;,
+        buyback_fees_expiry_interval_opt: <span class="prelude-ty">Option</span>&lt;u64&gt;,
     ) -&gt; <span class="prelude-ty">Result</span>&lt;()&gt; {
         <span class="attr">#[cfg(feature = <span class="string">&quot;enable-gpl&quot;</span>)]
         </span>instructions::group_edit(
@@ -1000,6 +1048,11 @@
             testing_opt,
             version_opt,
             deposit_limit_quote_opt,
+            buyback_fees_opt,
+            buyback_fees_bonus_factor_opt,
+            buyback_fees_swap_mango_account_opt,
+            mngo_token_index_opt,
+            buyback_fees_expiry_interval_opt,
         )<span class="question-mark">?</span>;
         <span class="prelude-val">Ok</span>(())
     }
@@ -1090,6 +1143,7 @@
         reset_stable_price: bool,
         reset_net_borrow_limit: bool,
         reduce_only_opt: <span class="prelude-ty">Option</span>&lt;bool&gt;,
+        name_opt: <span class="prelude-ty">Option</span>&lt;String&gt;,
     ) -&gt; <span class="prelude-ty">Result</span>&lt;()&gt; {
         <span class="attr">#[cfg(feature = <span class="string">&quot;enable-gpl&quot;</span>)]
         </span>instructions::token_edit(
@@ -1116,6 +1170,7 @@
             reset_stable_price,
             reset_net_borrow_limit,
             reduce_only_opt,
+            name_opt,
         )<span class="question-mark">?</span>;
         <span class="prelude-val">Ok</span>(())
     }
@@ -1198,6 +1253,15 @@
     <span class="kw">pub fn </span>account_close(ctx: Context&lt;AccountClose&gt;, force_close: bool) -&gt; <span class="prelude-ty">Result</span>&lt;()&gt; {
         <span class="attr">#[cfg(feature = <span class="string">&quot;enable-gpl&quot;</span>)]
         </span>instructions::account_close(ctx, force_close)<span class="question-mark">?</span>;
+        <span class="prelude-val">Ok</span>(())
+    }
+
+    <span class="kw">pub fn </span>account_buyback_fees_with_mngo(
+        ctx: Context&lt;AccountBuybackFeesWithMngo&gt;,
+        max_buyback: u64,
+    ) -&gt; <span class="prelude-ty">Result</span>&lt;()&gt; {
+        <span class="attr">#[cfg(feature = <span class="string">&quot;enable-gpl&quot;</span>)]
+        </span>instructions::account_buyback_fees_with_mngo(ctx, max_buyback)<span class="question-mark">?</span>;
         <span class="prelude-val">Ok</span>(())
     }
 
@@ -1373,9 +1437,27 @@
         <span class="prelude-val">Ok</span>(())
     }
 
-    <span class="kw">pub fn </span>serum3_settle_funds(ctx: Context&lt;Serum3SettleFunds&gt;) -&gt; <span class="prelude-ty">Result</span>&lt;()&gt; {
+    <span class="doccomment">/// Settles all free funds from the OpenOrders account into the MangoAccount.
+    ///
+    /// Any serum &quot;referrer rebates&quot; (ui fees) are considered Mango fees.
+    </span><span class="kw">pub fn </span>serum3_settle_funds(ctx: Context&lt;Serum3SettleFunds&gt;) -&gt; <span class="prelude-ty">Result</span>&lt;()&gt; {
         <span class="attr">#[cfg(feature = <span class="string">&quot;enable-gpl&quot;</span>)]
-        </span>instructions::serum3_settle_funds(ctx)<span class="question-mark">?</span>;
+        </span>instructions::serum3_settle_funds(ctx.accounts, <span class="prelude-val">None</span>, <span class="bool-val">true</span>)<span class="question-mark">?</span>;
+        <span class="prelude-val">Ok</span>(())
+    }
+
+    <span class="doccomment">/// Like Serum3SettleFunds, but `fees_to_dao` determines if referrer rebates are considered fees
+    /// or are credited to the MangoAccount.
+    </span><span class="kw">pub fn </span>serum3_settle_funds_v2(
+        ctx: Context&lt;Serum3SettleFundsV2&gt;,
+        fees_to_dao: bool,
+    ) -&gt; <span class="prelude-ty">Result</span>&lt;()&gt; {
+        <span class="attr">#[cfg(feature = <span class="string">&quot;enable-gpl&quot;</span>)]
+        </span>instructions::serum3_settle_funds(
+            <span class="kw-2">&amp;mut </span>ctx.accounts.v1,
+            <span class="prelude-val">Some</span>(<span class="kw-2">&amp;mut </span>ctx.accounts.v2),
+            fees_to_dao,
+        )<span class="question-mark">?</span>;
         <span class="prelude-val">Ok</span>(())
     }
 
@@ -1540,6 +1622,7 @@
         reduce_only_opt: <span class="prelude-ty">Option</span>&lt;bool&gt;,
         reset_stable_price: bool,
         positive_pnl_liquidation_fee_opt: <span class="prelude-ty">Option</span>&lt;f32&gt;,
+        name_opt: <span class="prelude-ty">Option</span>&lt;String&gt;,
     ) -&gt; <span class="prelude-ty">Result</span>&lt;()&gt; {
         <span class="attr">#[cfg(feature = <span class="string">&quot;enable-gpl&quot;</span>)]
         </span>instructions::perp_edit_market(
@@ -1572,6 +1655,7 @@
             reduce_only_opt,
             reset_stable_price,
             positive_pnl_liquidation_fee_opt,
+            name_opt,
         )<span class="question-mark">?</span>;
         <span class="prelude-val">Ok</span>(())
     }

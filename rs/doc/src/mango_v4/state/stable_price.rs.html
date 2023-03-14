@@ -289,9 +289,7 @@
 <a href="#289" id="289">289</a>
 <a href="#290" id="290">290</a>
 <a href="#291" id="291">291</a>
-<a href="#292" id="292">292</a>
-</pre><pre class="rust"><code><span class="kw">use </span><span class="kw">crate</span>::util::checked_math <span class="kw">as </span>cm;
-<span class="kw">use </span>anchor_lang::prelude::<span class="kw-2">*</span>;
+</pre><pre class="rust"><code><span class="kw">use </span>anchor_lang::prelude::<span class="kw-2">*</span>;
 <span class="kw">use </span>derivative::Derivative;
 <span class="kw">use </span>static_assertions::const_assert_eq;
 <span class="kw">use </span>std::mem::size_of;
@@ -415,7 +413,7 @@
         <span class="comment">//
         // Update delay price
         //
-        </span><span class="macro">cm!</span>(<span class="self">self</span>.delay_accumulator_time += dt <span class="kw">as </span>u32);
+        </span><span class="self">self</span>.delay_accumulator_time += dt <span class="kw">as </span>u32;
         <span class="self">self</span>.delay_accumulator_price += oracle_price * dt_limited;
 
         <span class="kw">let </span>delay_interval_index = <span class="self">self</span>.delay_interval_index(now_ts);

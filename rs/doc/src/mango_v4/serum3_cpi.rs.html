@@ -482,6 +482,12 @@
 <a href="#482" id="482">482</a>
 <a href="#483" id="483">483</a>
 <a href="#484" id="484">484</a>
+<a href="#485" id="485">485</a>
+<a href="#486" id="486">486</a>
+<a href="#487" id="487">487</a>
+<a href="#488" id="488">488</a>
+<a href="#489" id="489">489</a>
+<a href="#490" id="490">490</a>
 </pre><pre class="rust"><code><span class="kw">use </span>anchor_lang::prelude::<span class="kw-2">*</span>;
 <span class="kw">use </span>serum_dex::state::ToAlignedBytes;
 
@@ -600,7 +606,11 @@
 }
 
 <span class="kw">pub fn </span>load_open_orders(acc: <span class="kw-2">&amp;</span><span class="kw">impl </span>AccountReader) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="kw-2">&amp;</span>serum_dex::state::OpenOrders&gt; {
-    <span class="prelude-val">Ok</span>(bytemuck::from_bytes(strip_dex_padding(acc.data())<span class="question-mark">?</span>))
+    load_open_orders_bytes(acc.data())
+}
+
+<span class="kw">pub fn </span>load_open_orders_bytes(bytes: <span class="kw-2">&amp;</span>[u8]) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="kw-2">&amp;</span>serum_dex::state::OpenOrders&gt; {
+    <span class="prelude-val">Ok</span>(bytemuck::from_bytes(strip_dex_padding(bytes)<span class="question-mark">?</span>))
 }
 
 <span class="kw">pub fn </span>pubkey_from_u64_array(d: [u64; <span class="number">4</span>]) -&gt; Pubkey {
@@ -710,6 +720,8 @@
     </span><span class="kw">pub </span>vault_signer: AccountInfo&lt;<span class="lifetime">&#39;info</span>&gt;,
     <span class="doccomment">/// CHECK: cpi
     </span><span class="kw">pub </span>token_program: AccountInfo&lt;<span class="lifetime">&#39;info</span>&gt;,
+    <span class="doccomment">/// CHECK: cpi
+    </span><span class="kw">pub </span>rebates_quote_wallet: AccountInfo&lt;<span class="lifetime">&#39;info</span>&gt;,
 }
 
 <span class="kw">impl</span>&lt;<span class="lifetime">&#39;a</span>&gt; SettleFunds&lt;<span class="lifetime">&#39;a</span>&gt; {
@@ -728,7 +740,7 @@
                 AccountMeta::new(<span class="kw-2">*</span><span class="self">self</span>.user_quote_wallet.key, <span class="bool-val">false</span>),
                 AccountMeta::new_readonly(<span class="kw-2">*</span><span class="self">self</span>.vault_signer.key, <span class="bool-val">false</span>),
                 AccountMeta::new_readonly(<span class="kw-2">*</span><span class="self">self</span>.token_program.key, <span class="bool-val">false</span>),
-                AccountMeta::new(<span class="kw-2">*</span><span class="self">self</span>.user_quote_wallet.key, <span class="bool-val">false</span>),
+                AccountMeta::new(<span class="kw-2">*</span><span class="self">self</span>.rebates_quote_wallet.key, <span class="bool-val">false</span>),
             ],
         };
 
@@ -740,10 +752,10 @@
             <span class="self">self</span>.base_vault,
             <span class="self">self</span>.quote_vault,
             <span class="self">self</span>.user_base_wallet,
-            <span class="self">self</span>.user_quote_wallet.clone(),
+            <span class="self">self</span>.user_quote_wallet,
             <span class="self">self</span>.vault_signer,
             <span class="self">self</span>.token_program,
-            <span class="self">self</span>.user_quote_wallet,
+            <span class="self">self</span>.rebates_quote_wallet,
         ];
 
         <span class="kw">let </span>seeds = <span class="macro">group_seeds!</span>(group);

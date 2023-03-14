@@ -1214,14 +1214,6 @@
 <a href="#1214" id="1214">1214</a>
 <a href="#1215" id="1215">1215</a>
 <a href="#1216" id="1216">1216</a>
-<a href="#1217" id="1217">1217</a>
-<a href="#1218" id="1218">1218</a>
-<a href="#1219" id="1219">1219</a>
-<a href="#1220" id="1220">1220</a>
-<a href="#1221" id="1221">1221</a>
-<a href="#1222" id="1222">1222</a>
-<a href="#1223" id="1223">1223</a>
-<a href="#1224" id="1224">1224</a>
 </pre><pre class="rust"><code><span class="kw">use </span>anchor_lang::prelude::<span class="kw-2">*</span>;
 
 <span class="kw">use </span>fixed::types::I80F48;
@@ -1230,7 +1222,6 @@
 <span class="kw">use </span><span class="kw">crate</span>::state::{
     Bank, MangoAccountRef, PerpMarket, PerpMarketIndex, PerpPosition, Serum3MarketIndex, TokenIndex,
 };
-<span class="kw">use </span><span class="kw">crate</span>::util::checked_math <span class="kw">as </span>cm;
 
 <span class="kw">use super</span>::<span class="kw-2">*</span>;
 
@@ -1356,7 +1347,7 @@
                 <span class="self">self</span>.prices.asset(health_type),
             )
         };
-        <span class="macro">cm!</span>(<span class="self">self</span>.balance_native * price * weight)
+        <span class="self">self</span>.balance_native * price * weight
     }
 }
 
@@ -1399,7 +1390,7 @@
             |token_info: <span class="kw-2">&amp;</span>TokenInfo, token_max_reserved: I80F48, market_reserved: I80F48| {
                 <span class="comment">// This balance includes all possible reserved funds from markets that relate to the
                 // token, including this market itself: `market_reserved` is already included in `token_max_reserved`.
-                </span><span class="kw">let </span>max_balance = <span class="macro">cm!</span>(token_info.balance_native + token_max_reserved);
+                </span><span class="kw">let </span>max_balance = token_info.balance_native + token_max_reserved;
 
                 <span class="comment">// For simplicity, we assume that `market_reserved` was added to `max_balance` last
                 // (it underestimates health because that gives the smallest effects): how much did
@@ -1409,14 +1400,14 @@
                 } <span class="kw">else if </span>max_balance.is_negative() {
                     (I80F48::ZERO, market_reserved)
                 } <span class="kw">else </span>{
-                    (max_balance, <span class="macro">cm!</span>(market_reserved - max_balance))
+                    (max_balance, market_reserved - max_balance)
                 };
 
                 <span class="kw">let </span>asset_weight = token_info.asset_weight(health_type);
                 <span class="kw">let </span>liab_weight = token_info.liab_weight(health_type);
                 <span class="kw">let </span>asset_price = token_info.prices.asset(health_type);
                 <span class="kw">let </span>liab_price = token_info.prices.liab(health_type);
-                <span class="macro">cm!</span>(asset_part * asset_weight * asset_price + liab_part * liab_weight * liab_price)
+                asset_part * asset_weight * asset_price + liab_part * liab_weight * liab_price
             };
 
         <span class="kw">let </span>health_base = compute_health_effect(
@@ -1463,14 +1454,11 @@
 
 <span class="kw">impl </span>PerpInfo {
     <span class="kw">fn </span>new(perp_position: <span class="kw-2">&amp;</span>PerpPosition, perp_market: <span class="kw-2">&amp;</span>PerpMarket, prices: Prices) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="self">Self</span>&gt; {
-        <span class="kw">let </span>base_lots = <span class="macro">cm!</span>(perp_position.base_position_lots() + perp_position.taker_base_lots);
+        <span class="kw">let </span>base_lots = perp_position.base_position_lots() + perp_position.taker_base_lots;
 
         <span class="kw">let </span>unsettled_funding = perp_position.unsettled_funding(perp_market);
-        <span class="kw">let </span>taker_quote = I80F48::from(<span class="macro">cm!</span>(
-            perp_position.taker_quote_lots * perp_market.quote_lot_size
-        ));
-        <span class="kw">let </span>quote_current =
-            <span class="macro">cm!</span>(perp_position.quote_position_native() - unsettled_funding + taker_quote);
+        <span class="kw">let </span>taker_quote = I80F48::from(perp_position.taker_quote_lots * perp_market.quote_lot_size);
+        <span class="kw">let </span>quote_current = perp_position.quote_position_native() - unsettled_funding + taker_quote;
 
         <span class="prelude-val">Ok</span>(<span class="self">Self </span>{
             perp_market_index: perp_market.perp_market_index,
@@ -1523,7 +1511,7 @@
                 HealthType::Maint =&gt; <span class="self">self</span>.maint_overall_asset_weight,
             };
 
-            <span class="macro">cm!</span>(asset_weight * unweighted)
+            asset_weight * unweighted
         } <span class="kw">else </span>{
             unweighted
         }
@@ -1533,7 +1521,7 @@
     </span><span class="kw">pub fn </span>unweighted_health_contribution(<span class="kw-2">&amp;</span><span class="self">self</span>, health_type: HealthType) -&gt; I80F48 {
         <span class="kw">let </span>order_execution_case = |orders_base_lots: i64, order_price: I80F48| {
             <span class="kw">let </span>net_base_native =
-                I80F48::from(<span class="macro">cm!</span>((<span class="self">self</span>.base_lots + orders_base_lots) * <span class="self">self</span>.base_lot_size));
+                I80F48::from((<span class="self">self</span>.base_lots + orders_base_lots) * <span class="self">self</span>.base_lot_size);
             <span class="kw">let </span>weight = <span class="kw">match </span>(health_type, net_base_native.is_negative()) {
                 (HealthType::Init, <span class="bool-val">true</span>) | (HealthType::LiquidationEnd, <span class="bool-val">true</span>) =&gt; {
                     <span class="self">self</span>.init_base_liab_weight
@@ -1551,13 +1539,13 @@
             };
 
             <span class="comment">// Total value of the order-execution adjusted base position
-            </span><span class="kw">let </span>base_health = <span class="macro">cm!</span>(net_base_native * weight * base_price);
+            </span><span class="kw">let </span>base_health = net_base_native * weight * base_price;
 
-            <span class="kw">let </span>orders_base_native = I80F48::from(<span class="macro">cm!</span>(orders_base_lots * <span class="self">self</span>.base_lot_size));
+            <span class="kw">let </span>orders_base_native = I80F48::from(orders_base_lots * <span class="self">self</span>.base_lot_size);
             <span class="comment">// The quote change from executing the bids/asks
-            </span><span class="kw">let </span>order_quote = <span class="macro">cm!</span>(-orders_base_native * order_price);
+            </span><span class="kw">let </span>order_quote = -orders_base_native * order_price;
 
-            <span class="macro">cm!</span>(base_health + order_quote)
+            base_health + order_quote
         };
 
         <span class="comment">// What is worse: Executing all bids at oracle_price.liab, or executing all asks at oracle_price.asset?
@@ -1565,7 +1553,7 @@
         <span class="kw">let </span>asks_case = order_execution_case(-<span class="self">self</span>.asks_base_lots, <span class="self">self</span>.prices.asset(health_type));
         <span class="kw">let </span>worst_case = bids_case.min(asks_case);
 
-        <span class="macro">cm!</span>(<span class="self">self</span>.quote + worst_case)
+        <span class="self">self</span>.quote + worst_case
     }
 }
 
@@ -1581,7 +1569,7 @@
     <span class="kw">pub fn </span>health(<span class="kw-2">&amp;</span><span class="self">self</span>, health_type: HealthType) -&gt; I80F48 {
         <span class="kw">let </span><span class="kw-2">mut </span>health = I80F48::ZERO;
         <span class="kw">let </span>sum = |contrib| {
-            <span class="macro">cm!</span>(health += contrib);
+            health += contrib;
         };
         <span class="self">self</span>.health_sum(health_type, sum);
         health
@@ -1594,9 +1582,9 @@
         <span class="kw">let </span><span class="kw-2">mut </span>liabs = I80F48::ZERO;
         <span class="kw">let </span>sum = |contrib| {
             <span class="kw">if </span>contrib &gt; <span class="number">0 </span>{
-                <span class="macro">cm!</span>(assets += contrib);
+                assets += contrib;
             } <span class="kw">else </span>{
-                <span class="macro">cm!</span>(liabs -= contrib);
+                liabs -= contrib;
             }
         };
         <span class="self">self</span>.health_sum(health_type, sum);
@@ -1653,7 +1641,7 @@
         // We need to make sure that if balance is before * price, then change = -before
         // brings it to exactly zero.
         </span><span class="kw">let </span>removed_contribution = -change;
-        <span class="macro">cm!</span>(entry.balance_native -= removed_contribution);
+        entry.balance_native -= removed_contribution;
         <span class="prelude-val">Ok</span>(())
     }
 
@@ -1678,11 +1666,11 @@
         <span class="comment">// Apply it to the tokens
         </span>{
             <span class="kw">let </span>base_entry = <span class="kw-2">&amp;mut </span><span class="self">self</span>.token_infos[base_entry_index];
-            <span class="macro">cm!</span>(base_entry.balance_native += free_base_change);
+            base_entry.balance_native += free_base_change;
         }
         {
             <span class="kw">let </span>quote_entry = <span class="kw-2">&amp;mut </span><span class="self">self</span>.token_infos[quote_entry_index];
-            <span class="macro">cm!</span>(quote_entry.balance_native += free_quote_change);
+            quote_entry.balance_native += free_quote_change;
         }
 
         <span class="comment">// Apply it to the serum3 info
@@ -1691,8 +1679,8 @@
             .iter_mut()
             .find(|m| m.market_index == market_index)
             .ok_or_else(|| <span class="macro">error_msg!</span>(<span class="string">&quot;serum3 market {} not found&quot;</span>, market_index))<span class="question-mark">?</span>;
-        <span class="macro">cm!</span>(market_entry.reserved_base += reserved_base_change);
-        <span class="macro">cm!</span>(market_entry.reserved_quote += reserved_quote_change);
+        market_entry.reserved_base += reserved_base_change;
+        market_entry.reserved_quote += reserved_quote_change;
         <span class="prelude-val">Ok</span>(())
     }
 
@@ -1837,21 +1825,17 @@
             <span class="kw">let </span>quote_asset = quote.prices.asset(health_type);
             <span class="kw">let </span>base_liab = base.prices.liab(health_type);
             <span class="comment">// OPTIMIZATION: These divisions can be extremely expensive (up to 5k CU each)
-            </span><span class="kw">let </span>all_reserved_as_base =
-                <span class="macro">cm!</span>(reserved_base + reserved_quote * quote_asset / base_liab);
+            </span><span class="kw">let </span>all_reserved_as_base = reserved_base + reserved_quote * quote_asset / base_liab;
 
             <span class="kw">let </span>base_asset = base.prices.asset(health_type);
             <span class="kw">let </span>quote_liab = quote.prices.liab(health_type);
-            <span class="kw">let </span>all_reserved_as_quote =
-                <span class="macro">cm!</span>(reserved_quote + reserved_base * base_asset / quote_liab);
+            <span class="kw">let </span>all_reserved_as_quote = reserved_quote + reserved_base * base_asset / quote_liab;
 
             <span class="kw">let </span>base_max_reserved = <span class="kw-2">&amp;mut </span>token_max_reserved[info.base_index];
-            <span class="comment">// note: cm!() does not work with mutable references
-            </span><span class="kw-2">*</span>base_max_reserved = base_max_reserved.checked_add(all_reserved_as_base).unwrap();
+            <span class="comment">// note: () does not work with mutable references
+            </span><span class="kw-2">*</span>base_max_reserved += all_reserved_as_base;
             <span class="kw">let </span>quote_max_reserved = <span class="kw-2">&amp;mut </span>token_max_reserved[info.quote_index];
-            <span class="kw-2">*</span>quote_max_reserved = quote_max_reserved
-                .checked_add(all_reserved_as_quote)
-                .unwrap();
+            <span class="kw-2">*</span>quote_max_reserved += all_reserved_as_quote;
 
             serum3_reserved.push(Serum3Reserved {
                 all_reserved_as_base,
@@ -1900,7 +1884,7 @@
         <span class="kw">let </span><span class="kw-2">mut </span>health = I80F48::ZERO;
         <span class="kw">for </span>token_info <span class="kw">in </span><span class="self">self</span>.token_infos.iter() {
             <span class="kw">let </span>contrib = token_info.health_contribution(health_type);
-            <span class="macro">cm!</span>(health += contrib);
+            health += contrib;
         }
 
         <span class="kw">let </span>(token_max_reserved, serum3_reserved) = <span class="self">self</span>.compute_serum3_reservations(health_type);
@@ -1911,12 +1895,12 @@
                 <span class="kw-2">&amp;</span>token_max_reserved,
                 reserved,
             );
-            <span class="macro">cm!</span>(health += contrib);
+            health += contrib;
         }
 
         <span class="kw">for </span>perp_info <span class="kw">in </span><span class="self">self</span>.perp_infos.iter() {
             <span class="kw">let </span>positive_contrib = perp_info.health_contribution(health_type).max(I80F48::ZERO);
-            <span class="macro">cm!</span>(health += positive_contrib);
+            health += positive_contrib;
         }
         health
     }
@@ -1979,15 +1963,15 @@
 
         <span class="comment">// add the amounts that are freely settleable immediately to token balances
         </span><span class="kw">let </span>base_free = I80F48::from(oo.native_coin_free);
-        <span class="kw">let </span>quote_free = I80F48::from(<span class="macro">cm!</span>(oo.native_pc_free + oo.referrer_rebates_accrued));
+        <span class="kw">let </span>quote_free = I80F48::from(oo.native_pc_free + oo.referrer_rebates_accrued);
         <span class="kw">let </span>base_info = <span class="kw-2">&amp;mut </span>token_infos[base_index];
-        <span class="macro">cm!</span>(base_info.balance_native += base_free);
+        base_info.balance_native += base_free;
         <span class="kw">let </span>quote_info = <span class="kw-2">&amp;mut </span>token_infos[quote_index];
-        <span class="macro">cm!</span>(quote_info.balance_native += quote_free);
+        quote_info.balance_native += quote_free;
 
         <span class="comment">// track the reserved amounts
-        </span><span class="kw">let </span>reserved_base = I80F48::from(<span class="macro">cm!</span>(oo.native_coin_total - oo.native_coin_free));
-        <span class="kw">let </span>reserved_quote = I80F48::from(<span class="macro">cm!</span>(oo.native_pc_total - oo.native_pc_free));
+        </span><span class="kw">let </span>reserved_base = I80F48::from(oo.native_coin_total - oo.native_coin_free);
+        <span class="kw">let </span>reserved_quote = I80F48::from(oo.native_pc_total - oo.native_pc_free);
 
         serum3_infos.push(Serum3Info {
             reserved_base,

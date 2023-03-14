@@ -1403,8 +1403,16 @@
 <a href="#1403" id="1403">1403</a>
 <a href="#1404" id="1404">1404</a>
 <a href="#1405" id="1405">1405</a>
+<a href="#1406" id="1406">1406</a>
+<a href="#1407" id="1407">1407</a>
+<a href="#1408" id="1408">1408</a>
+<a href="#1409" id="1409">1409</a>
+<a href="#1410" id="1410">1410</a>
+<a href="#1411" id="1411">1411</a>
+<a href="#1412" id="1412">1412</a>
+<a href="#1413" id="1413">1413</a>
 </pre><pre class="rust"><code><span class="kw">use </span>anchor_lang::prelude::<span class="kw-2">*</span>;
-<span class="kw">use </span>checked_math <span class="kw">as </span>cm;
+
 <span class="kw">use </span>derivative::Derivative;
 <span class="kw">use </span>fixed::types::I80F48;
 <span class="kw">use </span>static_assertions::const_assert_eq;
@@ -1584,10 +1592,10 @@
     </span><span class="kw">pub </span>settle_pnl_limit_settled_in_current_window_native: i64,
 
     <span class="doccomment">/// Active position size, measured in base lots
-    </span>base_position_lots: i64,
+    </span><span class="kw">pub </span>base_position_lots: i64,
     <span class="doccomment">/// Active position in quote (conversation rate is that of the time the order was settled)
     /// measured in native quote
-    </span>quote_position_native: I80F48,
+    </span><span class="kw">pub </span>quote_position_native: I80F48,
 
     <span class="doccomment">/// Tracks what the position is to calculate average entry &amp; break even price
     </span><span class="kw">pub </span>quote_running_native: i64,
@@ -1607,20 +1615,34 @@
     <span class="doccomment">/// Amount of quote lots on the EventQueue waiting to be processed
     </span><span class="kw">pub </span>taker_quote_lots: i64,
 
-    <span class="comment">// (Display only)
-    // Cumulative long funding in base native units
+    <span class="doccomment">/// Cumulative long funding in quote native units.
+    /// If the user paid $1 in funding for a long position, this would be 1e6.
+    /// Beware of the sign!
+    ///
+    /// (Display only)
     </span><span class="kw">pub </span>cumulative_long_funding: f64,
-    <span class="comment">// (Display only)
-    // Cumulative short funding in base native units
+    <span class="doccomment">/// Cumulative short funding in quote native units
+    /// If the user paid $1 in funding for a short position, this would be -1e6.
+    ///
+    /// (Display only)
     </span><span class="kw">pub </span>cumulative_short_funding: f64,
-    <span class="comment">// (Display only)
-    // Cumulative maker volume in quote native units
+
+    <span class="doccomment">/// Cumulative maker volume in quote native units
+    ///
+    /// (Display only)
     </span><span class="kw">pub </span>maker_volume: u64,
-    <span class="comment">// (Display only)
-    // Cumulative taker volume in quote native units
+    <span class="doccomment">/// Cumulative taker volume in quote native units
+    ///
+    /// (Display only)
     </span><span class="kw">pub </span>taker_volume: u64,
-    <span class="comment">// (Display only)
-    // Cumulative realized pnl in quote native units
+
+    <span class="doccomment">/// Cumulative number of quote native units transfered from the perp position
+    /// to the settle token spot position.
+    ///
+    /// For example, if the user settled $1 of positive pnl into their USDC spot
+    /// position, this would be 1e6.
+    ///
+    /// (Display only)
     </span><span class="kw">pub </span>perp_spot_transfers: i64,
 
     <span class="doccomment">/// The native average entry price for the base lots of the current position.
@@ -1700,19 +1722,19 @@
     </span><span class="kw">pub fn </span>add_taker_trade(<span class="kw-2">&amp;mut </span><span class="self">self</span>, side: Side, base_lots: i64, quote_lots: i64) {
         <span class="kw">match </span>side {
             Side::Bid =&gt; {
-                <span class="macro">cm!</span>(<span class="self">self</span>.taker_base_lots += base_lots);
-                <span class="macro">cm!</span>(<span class="self">self</span>.taker_quote_lots -= quote_lots);
+                <span class="self">self</span>.taker_base_lots += base_lots;
+                <span class="self">self</span>.taker_quote_lots -= quote_lots;
             }
             Side::Ask =&gt; {
-                <span class="macro">cm!</span>(<span class="self">self</span>.taker_base_lots -= base_lots);
-                <span class="macro">cm!</span>(<span class="self">self</span>.taker_quote_lots += quote_lots);
+                <span class="self">self</span>.taker_base_lots -= base_lots;
+                <span class="self">self</span>.taker_quote_lots += quote_lots;
             }
         }
     }
     <span class="doccomment">/// Remove taker trade after it has been processed on EventQueue
     </span><span class="kw">pub fn </span>remove_taker_trade(<span class="kw-2">&amp;mut </span><span class="self">self</span>, base_change: i64, quote_change: i64) {
-        <span class="macro">cm!</span>(<span class="self">self</span>.taker_base_lots -= base_change);
-        <span class="macro">cm!</span>(<span class="self">self</span>.taker_quote_lots -= quote_change);
+        <span class="self">self</span>.taker_base_lots -= base_change;
+        <span class="self">self</span>.taker_quote_lots -= quote_change;
     }
 
     <span class="kw">pub fn </span>is_active(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool {
@@ -1725,7 +1747,7 @@
 
     <span class="comment">// Return base position in native units for a perp market
     </span><span class="kw">pub fn </span>base_position_native(<span class="kw-2">&amp;</span><span class="self">self</span>, market: <span class="kw-2">&amp;</span>PerpMarket) -&gt; I80F48 {
-        I80F48::from(<span class="macro">cm!</span>(<span class="self">self</span>.base_position_lots * market.base_lot_size))
+        I80F48::from(<span class="self">self</span>.base_position_lots * market.base_lot_size)
     }
 
     <span class="kw">pub fn </span>base_position_lots(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; i64 {
@@ -1752,12 +1774,12 @@
     </span><span class="kw">pub fn </span>unsettled_funding(<span class="kw-2">&amp;</span><span class="self">self</span>, perp_market: <span class="kw-2">&amp;</span>PerpMarket) -&gt; I80F48 {
         <span class="kw">match </span><span class="self">self</span>.base_position_lots.cmp(<span class="kw-2">&amp;</span><span class="number">0</span>) {
             Ordering::Greater =&gt; {
-                <span class="macro">cm!</span>((perp_market.long_funding - <span class="self">self</span>.long_settled_funding)
-                    * I80F48::from_num(<span class="self">self</span>.base_position_lots))
+                (perp_market.long_funding - <span class="self">self</span>.long_settled_funding)
+                    * I80F48::from_num(<span class="self">self</span>.base_position_lots)
             }
             Ordering::Less =&gt; {
-                <span class="macro">cm!</span>((perp_market.short_funding - <span class="self">self</span>.short_settled_funding)
-                    * I80F48::from_num(<span class="self">self</span>.base_position_lots))
+                (perp_market.short_funding - <span class="self">self</span>.short_settled_funding)
+                    * I80F48::from_num(<span class="self">self</span>.base_position_lots)
             }
             Ordering::Equal =&gt; I80F48::ZERO,
         }
@@ -1766,9 +1788,9 @@
     <span class="doccomment">/// Move unrealized funding payments into the quote_position
     </span><span class="kw">pub fn </span>settle_funding(<span class="kw-2">&amp;mut </span><span class="self">self</span>, perp_market: <span class="kw-2">&amp;</span>PerpMarket) {
         <span class="kw">let </span>funding = <span class="self">self</span>.unsettled_funding(perp_market);
-        <span class="macro">cm!</span>(<span class="self">self</span>.quote_position_native -= funding);
-        <span class="macro">cm!</span>(<span class="self">self</span>.realized_other_pnl_native -= funding);
-        <span class="macro">cm!</span>(<span class="self">self</span>.realized_pnl_for_position_native -= funding);
+        <span class="self">self</span>.quote_position_native -= funding;
+        <span class="self">self</span>.realized_other_pnl_native -= funding;
+        <span class="self">self</span>.realized_pnl_for_position_native -= funding;
 
         <span class="kw">if </span><span class="self">self</span>.base_position_lots.is_positive() {
             <span class="self">self</span>.cumulative_long_funding += funding.to_num::&lt;f64&gt;();
@@ -1792,7 +1814,7 @@
         }
 
         <span class="kw">let </span>old_position = <span class="self">self</span>.base_position_lots;
-        <span class="kw">let </span>new_position = <span class="macro">cm!</span>(old_position + base_change);
+        <span class="kw">let </span>new_position = old_position + base_change;
 
         <span class="comment">// amount of lots that were reduced (so going from -5 to 10 lots is a reduction of 5)
         </span><span class="kw">let </span>reduced_lots;
@@ -1809,9 +1831,9 @@
 
             <span class="comment">// There can&#39;t be unrealized pnl without a base position, so fix the
             // realized_trade_pnl to cover everything that isn&#39;t realized_other_pnl.
-            </span><span class="kw">let </span>total_realized_pnl = <span class="macro">cm!</span>(<span class="self">self</span>.quote_position_native + quote_change_native);
-            <span class="kw">let </span>new_realized_trade_pnl = <span class="macro">cm!</span>(total_realized_pnl - <span class="self">self</span>.realized_other_pnl_native);
-            newly_realized_pnl = <span class="macro">cm!</span>(new_realized_trade_pnl - <span class="self">self</span>.realized_trade_pnl_native);
+            </span><span class="kw">let </span>total_realized_pnl = <span class="self">self</span>.quote_position_native + quote_change_native;
+            <span class="kw">let </span>new_realized_trade_pnl = total_realized_pnl - <span class="self">self</span>.realized_other_pnl_native;
+            newly_realized_pnl = new_realized_trade_pnl - <span class="self">self</span>.realized_trade_pnl_native;
             <span class="self">self</span>.realized_trade_pnl_native = new_realized_trade_pnl;
         } <span class="kw">else if </span>old_position.signum() != new_position.signum() {
             <span class="comment">// If the base position changes sign, we&#39;ve crossed base_pos == 0 (or old_position == 0)
@@ -1824,7 +1846,7 @@
 
             <span class="comment">// Award realized pnl based on the old_position size
             </span>newly_realized_pnl = I80F48::from_num(old_position * (new_avg_entry - old_avg_entry));
-            <span class="macro">cm!</span>(<span class="self">self</span>.realized_trade_pnl_native += newly_realized_pnl);
+            <span class="self">self</span>.realized_trade_pnl_native += newly_realized_pnl;
 
             <span class="comment">// Set entry and break-even based on the new_position entered
             </span><span class="self">self</span>.avg_entry_price_per_base_lot = new_avg_entry;
@@ -1835,10 +1857,7 @@
         } <span class="kw">else </span>{
             <span class="comment">// The old and new position have the same sign
 
-            </span><span class="macro">cm!</span>(<span class="self">self</span>.quote_running_native += quote_change_native
-                .round_to_zero()
-                .checked_to_num::&lt;i64&gt;()
-                .unwrap());
+            </span><span class="self">self</span>.quote_running_native += quote_change_native.round_to_zero().to_num::&lt;i64&gt;();
 
             <span class="kw">let </span>is_increasing = old_position.signum() == base_change.signum();
             <span class="kw">if </span>is_increasing {
@@ -1855,10 +1874,9 @@
                 <span class="comment">// Decreasing position: pnl is realized, avg entry price does not change
                 </span>reduced_lots = base_change;
                 <span class="kw">let </span>avg_entry = I80F48::from_num(<span class="self">self</span>.avg_entry_price_per_base_lot);
-                newly_realized_pnl =
-                    <span class="macro">cm!</span>(quote_change_native + I80F48::from(base_change) * avg_entry);
-                <span class="macro">cm!</span>(<span class="self">self</span>.realized_trade_pnl_native += newly_realized_pnl);
-                <span class="macro">cm!</span>(<span class="self">self</span>.realized_pnl_for_position_native += newly_realized_pnl);
+                newly_realized_pnl = quote_change_native + I80F48::from(base_change) * avg_entry;
+                <span class="self">self</span>.realized_trade_pnl_native += newly_realized_pnl;
+                <span class="self">self</span>.realized_pnl_for_position_native += newly_realized_pnl;
             }
         }
 
@@ -1873,10 +1891,10 @@
         // magnitude.
         </span><span class="kw">if </span>newly_realized_pnl.signum() == <span class="self">self</span>.realized_trade_pnl_native.signum() {
             <span class="kw">let </span>realized_stable_value =
-                <span class="macro">cm!</span>(I80F48::from(reduced_lots.abs() * perp_market.base_lot_size)
-                    * perp_market.stable_price());
+                I80F48::from(reduced_lots.abs() * perp_market.base_lot_size)
+                    * perp_market.stable_price();
             <span class="kw">let </span>stable_value_fraction =
-                <span class="macro">cm!</span>(I80F48::from_num(perp_market.settle_pnl_limit_factor) * realized_stable_value);
+                I80F48::from_num(perp_market.settle_pnl_limit_factor) * realized_stable_value;
 
             <span class="comment">// The realized pnl settle limit change is restricted to actually realized pnl:
             // buying and then selling some base lots at the same price shouldn&#39;t affect
@@ -1892,7 +1910,7 @@
                     .floor()
                     .clamp_to_i64()
             };
-            <span class="macro">cm!</span>(<span class="self">self</span>.settle_pnl_limit_realized_trade += limit_change);
+            <span class="self">self</span>.settle_pnl_limit_realized_trade += limit_change;
         }
 
         <span class="comment">// Ensure the realized limit doesn&#39;t exceed the realized pnl
@@ -1960,7 +1978,7 @@
             limit_change.max(realized_pnl_change).min(<span class="number">0</span>)
         };
 
-        <span class="macro">cm!</span>(<span class="self">self</span>.settle_pnl_limit_settled_in_current_window_native += used_change);
+        <span class="self">self</span>.settle_pnl_limit_settled_in_current_window_native += used_change;
     }
 
     <span class="doccomment">/// Change the base and quote positions as the result of a trade
@@ -1977,7 +1995,7 @@
     }
 
     <span class="kw">fn </span>change_quote_position(<span class="kw-2">&amp;mut </span><span class="self">self</span>, quote_change_native: I80F48) {
-        <span class="macro">cm!</span>(<span class="self">self</span>.quote_position_native += quote_change_native);
+        <span class="self">self</span>.quote_position_native += quote_change_native;
     }
 
     <span class="doccomment">/// Does the user have any orders on the book?
@@ -2011,14 +2029,14 @@
         }
         <span class="macro">assert_eq!</span>(<span class="self">self</span>.market_index, market.perp_market_index);
         -(<span class="self">self</span>.quote_running_native <span class="kw">as </span>f64)
-            / (<span class="macro">cm!</span>(<span class="self">self</span>.base_position_lots * market.base_lot_size) <span class="kw">as </span>f64)
+            / ((<span class="self">self</span>.base_position_lots * market.base_lot_size) <span class="kw">as </span>f64)
     }
 
     <span class="doccomment">/// Calculate the PnL of the position for a given price
     </span><span class="kw">pub fn </span>unsettled_pnl(<span class="kw-2">&amp;</span><span class="self">self</span>, perp_market: <span class="kw-2">&amp;</span>PerpMarket, price: I80F48) -&gt; <span class="prelude-ty">Result</span>&lt;I80F48&gt; {
         <span class="macro">require_eq!</span>(<span class="self">self</span>.market_index, perp_market.perp_market_index);
         <span class="kw">let </span>base_native = <span class="self">self</span>.base_position_native(perp_market);
-        <span class="kw">let </span>pnl = <span class="macro">cm!</span>(<span class="self">self</span>.quote_position_native() + base_native * price);
+        <span class="kw">let </span>pnl = <span class="self">self</span>.quote_position_native() + base_native * price;
         <span class="prelude-val">Ok</span>(pnl)
     }
 
@@ -2027,12 +2045,12 @@
     </span><span class="kw">pub fn </span>update_settle_limit(<span class="kw-2">&amp;mut </span><span class="self">self</span>, market: <span class="kw-2">&amp;</span>PerpMarket, now_ts: u64) {
         <span class="macro">assert_eq!</span>(<span class="self">self</span>.market_index, market.perp_market_index);
         <span class="kw">let </span>window_size = market.settle_pnl_limit_window_size_ts;
-        <span class="kw">let </span>window_start = <span class="macro">cm!</span>(<span class="self">self</span>.settle_pnl_limit_window <span class="kw">as </span>u64 * window_size);
-        <span class="kw">let </span>window_end = <span class="macro">cm!</span>(window_start + window_size);
+        <span class="kw">let </span>window_start = <span class="self">self</span>.settle_pnl_limit_window <span class="kw">as </span>u64 * window_size;
+        <span class="kw">let </span>window_end = window_start + window_size;
         <span class="comment">// now_ts &lt; window_start can happen when window size is changed on the market
         </span><span class="kw">let </span>new_window = now_ts &gt;= window_end || now_ts &lt; window_start;
         <span class="kw">if </span>new_window {
-            <span class="self">self</span>.settle_pnl_limit_window = <span class="macro">cm!</span>(now_ts / window_size).try_into().unwrap();
+            <span class="self">self</span>.settle_pnl_limit_window = (now_ts / window_size).try_into().unwrap();
             <span class="self">self</span>.settle_pnl_limit_settled_in_current_window_native = <span class="number">0</span>;
         }
     }
@@ -2053,9 +2071,7 @@
         }
 
         <span class="kw">let </span>base_native = <span class="self">self</span>.base_position_native(market);
-        <span class="kw">let </span>position_value = <span class="macro">cm!</span>(market.stable_price() * base_native)
-            .abs()
-            .to_num::&lt;f64&gt;();
+        <span class="kw">let </span>position_value = (market.stable_price() * base_native).abs().to_num::&lt;f64&gt;();
         <span class="kw">let </span>unrealized = (market.settle_pnl_limit_factor <span class="kw">as </span>f64 * position_value).clamp_to_i64();
 
         <span class="kw">let </span><span class="kw-2">mut </span>min_pnl = -unrealized;
@@ -2130,8 +2146,8 @@
                 .max(<span class="self">self</span>.realized_other_pnl_native)
                 .min(I80F48::ZERO)
         };
-        <span class="macro">cm!</span>(<span class="self">self</span>.realized_other_pnl_native -= other_reduction);
-        <span class="kw">let </span>trade_and_unrealized_settlement = <span class="macro">cm!</span>(settled_pnl - other_reduction);
+        <span class="self">self</span>.realized_other_pnl_native -= other_reduction;
+        <span class="kw">let </span>trade_and_unrealized_settlement = settled_pnl - other_reduction;
 
         <span class="comment">// Then reduces realized_trade_pnl, similar to other_pnl above.
         </span><span class="kw">let </span>trade_reduction = <span class="kw">if </span>trade_and_unrealized_settlement &gt; <span class="number">0 </span>{
@@ -2143,14 +2159,14 @@
                 .max(<span class="self">self</span>.realized_trade_pnl_native)
                 .min(I80F48::ZERO)
         };
-        <span class="macro">cm!</span>(<span class="self">self</span>.realized_trade_pnl_native -= trade_reduction);
+        <span class="self">self</span>.realized_trade_pnl_native -= trade_reduction;
 
         <span class="comment">// Consume settle limit budget: We don&#39;t track consumption of realized_other_pnl
         // because settling it directly reduces its budget as well.
         </span><span class="kw">let </span>settled_pnl_i64 = trade_and_unrealized_settlement
             .round_to_zero()
             .clamp_to_i64();
-        <span class="macro">cm!</span>(<span class="self">self</span>.settle_pnl_limit_settled_in_current_window_native += settled_pnl_i64);
+        <span class="self">self</span>.settle_pnl_limit_settled_in_current_window_native += settled_pnl_i64;
 
         <span class="self">self</span>.apply_realized_trade_pnl_settle_limit_constraint(-trade_reduction)
     }
@@ -2158,20 +2174,20 @@
     <span class="doccomment">/// Update perp position for a maker/taker fee payment
     </span><span class="kw">pub fn </span>record_trading_fee(<span class="kw-2">&amp;mut </span><span class="self">self</span>, fee: I80F48) {
         <span class="self">self</span>.change_quote_position(-fee);
-        <span class="macro">cm!</span>(<span class="self">self</span>.realized_other_pnl_native -= fee);
-        <span class="macro">cm!</span>(<span class="self">self</span>.realized_pnl_for_position_native -= fee);
+        <span class="self">self</span>.realized_other_pnl_native -= fee;
+        <span class="self">self</span>.realized_pnl_for_position_native -= fee;
     }
 
     <span class="doccomment">/// Adds immediately-settleable realized pnl when a liqor takes over pnl during liquidation
     </span><span class="kw">pub fn </span>record_liquidation_quote_change(<span class="kw-2">&amp;mut </span><span class="self">self</span>, change: I80F48) {
         <span class="self">self</span>.change_quote_position(change);
-        <span class="macro">cm!</span>(<span class="self">self</span>.realized_other_pnl_native += change);
+        <span class="self">self</span>.realized_other_pnl_native += change;
     }
 
     <span class="doccomment">/// Adds to the quote position and adds a recurring (&quot;realized trade&quot;) settle limit
     </span><span class="kw">pub fn </span>record_liquidation_pnl_takeover(<span class="kw-2">&amp;mut </span><span class="self">self</span>, change: I80F48, recurring_limit: I80F48) {
         <span class="self">self</span>.change_quote_position(change);
-        <span class="macro">cm!</span>(<span class="self">self</span>.realized_trade_pnl_native += recurring_limit);
+        <span class="self">self</span>.realized_trade_pnl_native += recurring_limit;
     }
 }
 

@@ -26,8 +26,8 @@
 #[instruction(market_index: Serum3MarketIndex)]
 </span><span class="kw">pub struct </span>Serum3EditMarket&lt;<span class="lifetime">&#39;info</span>&gt; {
     <span class="attr">#[account(
-        has_one = admin,
-        constraint = group.load()<span class="question-mark">?</span>.serum3_supported()
+        <span class="comment">// group &lt;-&gt; admin relation is checked at #1
+        </span>constraint = group.load()<span class="question-mark">?</span>.serum3_supported()
     )]
     </span><span class="kw">pub </span>group: AccountLoader&lt;<span class="lifetime">&#39;info</span>, Group&gt;,
     <span class="kw">pub </span>admin: Signer&lt;<span class="lifetime">&#39;info</span>&gt;,

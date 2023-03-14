@@ -362,6 +362,14 @@
 <a href="#362" id="362">362</a>
 <a href="#363" id="363">363</a>
 <a href="#364" id="364">364</a>
+<a href="#365" id="365">365</a>
+<a href="#366" id="366">366</a>
+<a href="#367" id="367">367</a>
+<a href="#368" id="368">368</a>
+<a href="#369" id="369">369</a>
+<a href="#370" id="370">370</a>
+<a href="#371" id="371">371</a>
+<a href="#372" id="372">372</a>
 </pre><pre class="rust"><code><span class="kw">use crate</span>::{
     accounts_ix::FlashLoanType,
     state::{PerpMarket, PerpPosition},
@@ -562,8 +570,7 @@
     <span class="kw">pub </span>quote_token_index: u16,
     <span class="kw">pub </span>base_total: u64,
     <span class="kw">pub </span>base_free: u64,
-    <span class="doccomment">/// this field does not include the referrer_rebates; need to add that in to get true total
-    </span><span class="kw">pub </span>quote_total: u64,
+    <span class="kw">pub </span>quote_total: u64,
     <span class="kw">pub </span>quote_free: u64,
     <span class="kw">pub </span>referrer_rebates_accrued: u64,
 }
@@ -577,8 +584,7 @@
     <span class="kw">pub </span>quote_token_index: u16,
     <span class="kw">pub </span>base_total: u64,
     <span class="kw">pub </span>base_free: u64,
-    <span class="doccomment">/// this field does not include the referrer_rebates; need to add that in to get true total
-    </span><span class="kw">pub </span>quote_total: u64,
+    <span class="kw">pub </span>quote_total: u64,
     <span class="kw">pub </span>quote_free: u64,
     <span class="kw">pub </span>referrer_rebates_accrued: u64,
 }
@@ -725,6 +731,16 @@
     <span class="kw">pub </span>mango_account: Pubkey,
     <span class="kw">pub </span>perp_market_index: u16,
     <span class="kw">pub </span>settlement: i128,
+}
+
+<span class="attr">#[event]
+</span><span class="kw">pub struct </span>AccountBuybackFeesWithMngoLog {
+    <span class="kw">pub </span>mango_group: Pubkey,
+    <span class="kw">pub </span>mango_account: Pubkey,
+    <span class="kw">pub </span>buyback_fees: i128,
+    <span class="kw">pub </span>buyback_mngo: i128,
+    <span class="kw">pub </span>mngo_buyback_price: i128,
+    <span class="kw">pub </span>oracle_price: i128,
 }
 </code></pre></div>
 </section></div></main><div id="rustdoc-vars" data-root-path="../../" data-static-root-path="../../static.files/" data-current-crate="mango_v4" data-themes="" data-resource-suffix="" data-rustdoc-version="1.67.1 (d5a82bbd2 2023-02-07)" data-search-js="search-444266647c4dba98.js" data-settings-js="settings-bebeae96e00e4617.js" data-settings-css="settings-af96d9e2fc13e081.css" ></div></body></html>

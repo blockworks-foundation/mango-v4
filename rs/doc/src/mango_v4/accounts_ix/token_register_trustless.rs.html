@@ -68,11 +68,11 @@
 #[instruction(token_index: TokenIndex)]
 </span><span class="kw">pub struct </span>TokenRegisterTrustless&lt;<span class="lifetime">&#39;info</span>&gt; {
     <span class="attr">#[account(
-        has_one = fast_listing_admin,
+        constraint = group.load()<span class="question-mark">?</span>.admin == admin.key() || group.load()<span class="question-mark">?</span>.fast_listing_admin == admin.key() ,
         constraint = group.load()<span class="question-mark">?</span>.is_ix_enabled(IxGate::TokenRegisterTrustless) @ MangoError::IxIsDisabled,
     )]
     </span><span class="kw">pub </span>group: AccountLoader&lt;<span class="lifetime">&#39;info</span>, Group&gt;,
-    <span class="kw">pub </span>fast_listing_admin: Signer&lt;<span class="lifetime">&#39;info</span>&gt;,
+    <span class="kw">pub </span>admin: Signer&lt;<span class="lifetime">&#39;info</span>&gt;,
 
     <span class="kw">pub </span>mint: Account&lt;<span class="lifetime">&#39;info</span>, Mint&gt;,
 

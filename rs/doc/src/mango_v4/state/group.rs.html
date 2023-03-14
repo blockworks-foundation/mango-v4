@@ -155,6 +155,34 @@
 <a href="#155" id="155">155</a>
 <a href="#156" id="156">156</a>
 <a href="#157" id="157">157</a>
+<a href="#158" id="158">158</a>
+<a href="#159" id="159">159</a>
+<a href="#160" id="160">160</a>
+<a href="#161" id="161">161</a>
+<a href="#162" id="162">162</a>
+<a href="#163" id="163">163</a>
+<a href="#164" id="164">164</a>
+<a href="#165" id="165">165</a>
+<a href="#166" id="166">166</a>
+<a href="#167" id="167">167</a>
+<a href="#168" id="168">168</a>
+<a href="#169" id="169">169</a>
+<a href="#170" id="170">170</a>
+<a href="#171" id="171">171</a>
+<a href="#172" id="172">172</a>
+<a href="#173" id="173">173</a>
+<a href="#174" id="174">174</a>
+<a href="#175" id="175">175</a>
+<a href="#176" id="176">176</a>
+<a href="#177" id="177">177</a>
+<a href="#178" id="178">178</a>
+<a href="#179" id="179">179</a>
+<a href="#180" id="180">180</a>
+<a href="#181" id="181">181</a>
+<a href="#182" id="182">182</a>
+<a href="#183" id="183">183</a>
+<a href="#184" id="184">184</a>
+<a href="#185" id="185">185</a>
 </pre><pre class="rust"><code><span class="kw">use </span>anchor_lang::prelude::<span class="kw-2">*</span>;
 <span class="kw">use </span>static_assertions::const_assert_eq;
 <span class="kw">use </span>std::mem::size_of;
@@ -177,7 +205,9 @@
     <span class="comment">// TODO: unused, use case - listing shit tokens with conservative parameters (mostly defaults)
     </span><span class="kw">pub </span>fast_listing_admin: Pubkey,
 
-    <span class="kw">pub </span>padding: [u8; <span class="number">4</span>],
+    <span class="comment">// This is the token index of the mngo token listed on the group
+    </span><span class="kw">pub </span>mngo_token_index: TokenIndex,
+    <span class="kw">pub </span>padding: [u8; <span class="number">2</span>],
 
     <span class="kw">pub </span>insurance_vault: Pubkey,
     <span class="kw">pub </span>insurance_mint: Pubkey,
@@ -188,7 +218,11 @@
 
     <span class="kw">pub </span>version: u8,
 
-    <span class="kw">pub </span>padding2: [u8; <span class="number">5</span>],
+    <span class="comment">// Buyback fees with Mngo: allow exchanging fees with mngo at a bonus
+    </span><span class="kw">pub </span>buyback_fees: u8,
+    <span class="comment">// Buyback fees with Mngo: how much should the bonus be,
+    // e.g. a bonus factor of 1.2 means 120$ worth fees could be swapped for mngo worth 100$ at current market price
+    </span><span class="kw">pub </span>buyback_fees_mngo_bonus_factor: f32,
 
     <span class="kw">pub </span>address_lookup_tables: [Pubkey; <span class="number">20</span>],
 
@@ -202,16 +236,37 @@
     // 0 is chosen as enabled, becase we want to start out with all ixs enabled, 1 is disabled
     </span><span class="kw">pub </span>ix_gate: u128,
 
-    <span class="kw">pub </span>reserved: [u8; <span class="number">1864</span>],
+    <span class="comment">// Buyback fees with Mngo:
+    // A mango account which would be counter party for settling fees with mngo
+    // This ensures that the system doesn&#39;t have a net deficit of tokens
+    // The workflow should be something like this
+    // - the dao deposits quote tokens in its respective mango account
+    // - the user deposits some mngo tokens in his mango account
+    // - the user then claims quote for mngo at a bonus rate
+    </span><span class="kw">pub </span>buyback_fees_swap_mango_account: Pubkey,
+
+    <span class="doccomment">/// Number of seconds after which fees that could be used with the fees buyback feature expire.
+    ///
+    /// The actual expiry is staggered such that the fees users accumulate are always
+    /// available for at least this interval - but may be available for up to twice this time.
+    ///
+    /// When set to 0, there&#39;s no expiry of buyback fees.
+    </span><span class="kw">pub </span>buyback_fees_expiry_interval: u64,
+
+    <span class="kw">pub </span>reserved: [u8; <span class="number">1824</span>],
 }
 <span class="macro">const_assert_eq!</span>(
     size_of::&lt;Group&gt;(),
-    <span class="number">32 </span>+ <span class="number">4 </span>+ <span class="number">32 </span>* <span class="number">2 </span>+ <span class="number">4 </span>+ <span class="number">32 </span>* <span class="number">2 </span>+ <span class="number">3 </span>+ <span class="number">5 </span>+ <span class="number">20 </span>* <span class="number">32 </span>+ <span class="number">32 </span>+ <span class="number">8 </span>+ <span class="number">16 </span>+ <span class="number">1864
+    <span class="number">32 </span>+ <span class="number">4 </span>+ <span class="number">32 </span>* <span class="number">2 </span>+ <span class="number">4 </span>+ <span class="number">32 </span>* <span class="number">2 </span>+ <span class="number">4 </span>+ <span class="number">4 </span>+ <span class="number">20 </span>* <span class="number">32 </span>+ <span class="number">32 </span>+ <span class="number">8 </span>+ <span class="number">16 </span>+ <span class="number">32 </span>+ <span class="number">8 </span>+ <span class="number">1824
 </span>);
 <span class="macro">const_assert_eq!</span>(size_of::&lt;Group&gt;(), <span class="number">2736</span>);
 <span class="macro">const_assert_eq!</span>(size_of::&lt;Group&gt;() % <span class="number">8</span>, <span class="number">0</span>);
 
 <span class="kw">impl </span>Group {
+    <span class="kw">pub fn </span>buyback_fees(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool {
+        <span class="self">self</span>.buyback_fees == <span class="number">1
+    </span>}
+
     <span class="kw">pub fn </span>is_testing(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool {
         <span class="self">self</span>.testing == <span class="number">1
     </span>}
@@ -296,6 +351,7 @@
     TokenRegisterTrustless = <span class="number">45</span>,
     TokenUpdateIndexAndRate = <span class="number">46</span>,
     TokenWithdraw = <span class="number">47</span>,
+    AccountBuybackFeesWithMngo = <span class="number">48</span>,
 }
 
 <span class="comment">// note: using creator instead of admin, since admin can be changed

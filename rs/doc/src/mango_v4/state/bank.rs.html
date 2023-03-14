@@ -1016,31 +1016,25 @@
 <a href="#1016" id="1016">1016</a>
 <a href="#1017" id="1017">1017</a>
 <a href="#1018" id="1018">1018</a>
-<a href="#1019" id="1019">1019</a>
-<a href="#1020" id="1020">1020</a>
-<a href="#1021" id="1021">1021</a>
-<a href="#1022" id="1022">1022</a>
-<a href="#1023" id="1023">1023</a>
 </pre><pre class="rust"><code><span class="kw">use super</span>::{OracleConfig, TokenIndex, TokenPosition};
 <span class="kw">use </span><span class="kw">crate</span>::accounts_zerocopy::KeyedAccountReader;
 <span class="kw">use </span><span class="kw">crate</span>::error::<span class="kw-2">*</span>;
 <span class="kw">use </span><span class="kw">crate</span>::state::{oracle, StablePriceModel};
 <span class="kw">use </span><span class="kw">crate</span>::util;
-<span class="kw">use </span><span class="kw">crate</span>::util::checked_math <span class="kw">as </span>cm;
+
 <span class="kw">use </span>anchor_lang::prelude::<span class="kw-2">*</span>;
 <span class="kw">use </span>anchor_spl::token::TokenAccount;
 <span class="kw">use </span>derivative::Derivative;
 <span class="kw">use </span>fixed::types::I80F48;
-<span class="kw">use </span>fixed_macro::types::I80F48;
 <span class="kw">use </span>static_assertions::const_assert_eq;
 
 <span class="kw">use </span>std::mem::size_of;
 
 <span class="kw">pub const </span>HOUR: i64 = <span class="number">3600</span>;
 <span class="kw">pub const </span>DAY: i64 = <span class="number">86400</span>;
-<span class="kw">pub const </span>DAY_I80F48: I80F48 = <span class="macro">I80F48!</span>(<span class="number">86400</span>);
-<span class="kw">pub const </span>YEAR_I80F48: I80F48 = <span class="macro">I80F48!</span>(<span class="number">31536000</span>);
-<span class="kw">pub const </span>MINIMUM_MAX_RATE: I80F48 = <span class="macro">I80F48!</span>(<span class="number">0.5</span>);
+<span class="kw">pub const </span>DAY_I80F48: I80F48 = I80F48::from_bits(<span class="number">86_400 </span>* I80F48::ONE.to_bits());
+<span class="kw">pub const </span>YEAR_I80F48: I80F48 = I80F48::from_bits(<span class="number">31_536_000 </span>* I80F48::ONE.to_bits());
+<span class="kw">pub const </span>MINIMUM_MAX_RATE: I80F48 = I80F48::from_bits(I80F48::ONE.to_bits() / <span class="number">2</span>);
 
 <span class="attr">#[derive(Derivative)]
 #[derivative(Debug)]
@@ -1258,12 +1252,12 @@
 
     <span class="attr">#[inline(always)]
     </span><span class="kw">pub fn </span>native_borrows(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; I80F48 {
-        <span class="macro">cm!</span>(<span class="self">self</span>.borrow_index * <span class="self">self</span>.indexed_borrows)
+        <span class="self">self</span>.borrow_index * <span class="self">self</span>.indexed_borrows
     }
 
     <span class="attr">#[inline(always)]
     </span><span class="kw">pub fn </span>native_deposits(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; I80F48 {
-        <span class="macro">cm!</span>(<span class="self">self</span>.deposit_index * <span class="self">self</span>.indexed_deposits)
+        <span class="self">self</span>.deposit_index * <span class="self">self</span>.indexed_deposits
     }
 
     <span class="doccomment">/// Prevent borrowing away the full bank vault.
@@ -1276,7 +1270,7 @@
 
         <span class="kw">let </span>bank_native_deposits = <span class="self">self</span>.native_deposits();
         <span class="kw">if </span>bank_native_deposits != I80F48::ZERO {
-            <span class="kw">let </span>bank_native_deposits: f64 = bank_native_deposits.checked_to_num().unwrap();
+            <span class="kw">let </span>bank_native_deposits: f64 = bank_native_deposits.to_num();
             <span class="kw">if </span>vault_amount &lt; <span class="self">self</span>.min_vault_to_deposits_ratio * bank_native_deposits {
                 <span class="kw">return </span><span class="macro">err!</span>(MangoError::BankBorrowLimitReached).with_context(|| {
                 <span class="macro">format!</span>(
@@ -1351,34 +1345,34 @@
         // (native / index) * index == native, because we sometimes call this function with
         // values that are products of index.
         </span><span class="kw">let </span>div_rounding_up = |native: I80F48, index: I80F48| {
-            <span class="kw">let </span>indexed = <span class="macro">cm!</span>(native / index);
-            <span class="kw">if </span><span class="macro">cm!</span>(indexed * index) &lt; native {
-                <span class="macro">cm!</span>(indexed + I80F48::DELTA)
+            <span class="kw">let </span>indexed = native / index;
+            <span class="kw">if </span>(indexed * index) &lt; native {
+                indexed + I80F48::DELTA
             } <span class="kw">else </span>{
                 indexed
             }
         };
 
         <span class="kw">if </span>native_position.is_negative() {
-            <span class="kw">let </span>new_native_position = <span class="macro">cm!</span>(native_position + native_amount);
+            <span class="kw">let </span>new_native_position = native_position + native_amount;
             <span class="kw">let </span>indexed_change = div_rounding_up(native_amount, <span class="self">self</span>.borrow_index);
             <span class="comment">// this is only correct if it&#39;s not positive, because it scales the whole amount by borrow_index
-            </span><span class="kw">let </span>new_indexed_value = <span class="macro">cm!</span>(position.indexed_position + indexed_change);
+            </span><span class="kw">let </span>new_indexed_value = position.indexed_position + indexed_change;
             <span class="kw">if </span>new_indexed_value.is_negative() {
                 <span class="comment">// pay back borrows only, leaving a negative position
-                </span><span class="macro">cm!</span>(<span class="self">self</span>.indexed_borrows -= indexed_change);
+                </span><span class="self">self</span>.indexed_borrows -= indexed_change;
                 position.indexed_position = new_indexed_value;
                 <span class="kw">return </span><span class="prelude-val">Ok</span>(<span class="bool-val">true</span>);
             } <span class="kw">else if </span>new_native_position &lt; I80F48::ONE &amp;&amp; allow_dusting {
                 <span class="comment">// if there&#39;s less than one token deposited, zero the position
-                </span><span class="macro">cm!</span>(<span class="self">self</span>.dust += new_native_position);
-                <span class="macro">cm!</span>(<span class="self">self</span>.indexed_borrows += position.indexed_position);
+                </span><span class="self">self</span>.dust += new_native_position;
+                <span class="self">self</span>.indexed_borrows += position.indexed_position;
                 position.indexed_position = I80F48::ZERO;
                 <span class="kw">return </span><span class="prelude-val">Ok</span>(<span class="bool-val">false</span>);
             }
 
             <span class="comment">// pay back all borrows
-            </span><span class="macro">cm!</span>(<span class="self">self</span>.indexed_borrows += position.indexed_position); <span class="comment">// position.value is negative
+            </span><span class="self">self</span>.indexed_borrows += position.indexed_position; <span class="comment">// position.value is negative
             </span>position.indexed_position = I80F48::ZERO;
             <span class="comment">// deposit the rest
             // note: .max(0) because there&#39;s a scenario where new_indexed_value == 0 and new_native_position &lt; 0
@@ -1387,8 +1381,8 @@
 
         <span class="comment">// add to deposits
         </span><span class="kw">let </span>indexed_change = div_rounding_up(native_amount, <span class="self">self</span>.deposit_index);
-        <span class="macro">cm!</span>(<span class="self">self</span>.indexed_deposits += indexed_change);
-        <span class="macro">cm!</span>(position.indexed_position += indexed_change);
+        <span class="self">self</span>.indexed_deposits += indexed_change;
+        position.indexed_position += indexed_change;
 
         <span class="prelude-val">Ok</span>(<span class="bool-val">true</span>)
     }
@@ -1503,26 +1497,26 @@
         <span class="kw">let </span>native_position = position.native(<span class="self">self</span>);
 
         <span class="kw">if </span>native_position.is_positive() {
-            <span class="kw">let </span>new_native_position = <span class="macro">cm!</span>(native_position - native_amount);
+            <span class="kw">let </span>new_native_position = native_position - native_amount;
             <span class="kw">if </span>!new_native_position.is_negative() {
                 <span class="comment">// withdraw deposits only
                 </span><span class="kw">if </span>new_native_position &lt; I80F48::ONE &amp;&amp; allow_dusting {
                     <span class="comment">// zero the account collecting the leftovers in `dust`
-                    </span><span class="macro">cm!</span>(<span class="self">self</span>.dust += new_native_position);
-                    <span class="macro">cm!</span>(<span class="self">self</span>.indexed_deposits -= position.indexed_position);
+                    </span><span class="self">self</span>.dust += new_native_position;
+                    <span class="self">self</span>.indexed_deposits -= position.indexed_position;
                     position.indexed_position = I80F48::ZERO;
                     <span class="kw">return </span><span class="prelude-val">Ok</span>((<span class="bool-val">false</span>, I80F48::ZERO));
                 } <span class="kw">else </span>{
                     <span class="comment">// withdraw some deposits leaving a positive balance
-                    </span><span class="kw">let </span>indexed_change = <span class="macro">cm!</span>(native_amount / <span class="self">self</span>.deposit_index);
-                    <span class="macro">cm!</span>(<span class="self">self</span>.indexed_deposits -= indexed_change);
-                    <span class="macro">cm!</span>(position.indexed_position -= indexed_change);
+                    </span><span class="kw">let </span>indexed_change = native_amount / <span class="self">self</span>.deposit_index;
+                    <span class="self">self</span>.indexed_deposits -= indexed_change;
+                    position.indexed_position -= indexed_change;
                     <span class="kw">return </span><span class="prelude-val">Ok</span>((<span class="bool-val">true</span>, I80F48::ZERO));
                 }
             }
 
             <span class="comment">// withdraw all deposits
-            </span><span class="macro">cm!</span>(<span class="self">self</span>.indexed_deposits -= position.indexed_position);
+            </span><span class="self">self</span>.indexed_deposits -= position.indexed_position;
             position.indexed_position = I80F48::ZERO;
             <span class="comment">// borrow the rest
             </span>native_amount = -new_native_position;
@@ -1530,15 +1524,15 @@
 
         <span class="kw">let </span><span class="kw-2">mut </span>loan_origination_fee = I80F48::ZERO;
         <span class="kw">if </span>with_loan_origination_fee {
-            loan_origination_fee = <span class="macro">cm!</span>(<span class="self">self</span>.loan_origination_fee_rate * native_amount);
-            <span class="macro">cm!</span>(<span class="self">self</span>.collected_fees_native += loan_origination_fee);
-            <span class="macro">cm!</span>(native_amount += loan_origination_fee);
+            loan_origination_fee = <span class="self">self</span>.loan_origination_fee_rate * native_amount;
+            <span class="self">self</span>.collected_fees_native += loan_origination_fee;
+            native_amount += loan_origination_fee;
         }
 
         <span class="comment">// add to borrows
-        </span><span class="kw">let </span>indexed_change = <span class="macro">cm!</span>(native_amount / <span class="self">self</span>.borrow_index);
-        <span class="macro">cm!</span>(<span class="self">self</span>.indexed_borrows += indexed_change);
-        <span class="macro">cm!</span>(position.indexed_position -= indexed_change);
+        </span><span class="kw">let </span>indexed_change = native_amount / <span class="self">self</span>.borrow_index;
+        <span class="self">self</span>.indexed_borrows += indexed_change;
+        position.indexed_position -= indexed_change;
 
         <span class="comment">// net borrows requires updating in only this case, since other branches of the method deal with
         // withdraws and not borrows
@@ -1557,9 +1551,8 @@
         already_borrowed_native_amount: I80F48,
         now_ts: u64,
     ) -&gt; <span class="prelude-ty">Result</span>&lt;(bool, I80F48)&gt; {
-        <span class="kw">let </span>loan_origination_fee =
-            <span class="macro">cm!</span>(<span class="self">self</span>.loan_origination_fee_rate * already_borrowed_native_amount);
-        <span class="macro">cm!</span>(<span class="self">self</span>.collected_fees_native += loan_origination_fee);
+        <span class="kw">let </span>loan_origination_fee = <span class="self">self</span>.loan_origination_fee_rate * already_borrowed_native_amount;
+        <span class="self">self</span>.collected_fees_native += loan_origination_fee;
 
         <span class="kw">let </span>(position_is_active, <span class="kw">_</span>) = <span class="self">self</span>.withdraw_internal_wrapper(
             position,
@@ -1614,9 +1607,9 @@
             <span class="comment">// reset to latest window
             </span><span class="self">self</span>.last_net_borrows_window_start_ts = now_ts / <span class="self">self</span>.net_borrow_limit_window_size_ts
                 * <span class="self">self</span>.net_borrow_limit_window_size_ts;
-            native_amount.checked_to_num::&lt;i64&gt;().unwrap()
+            native_amount.to_num::&lt;i64&gt;()
         } <span class="kw">else </span>{
-            <span class="macro">cm!</span>(<span class="self">self</span>.net_borrows_in_window + native_amount.checked_to_num().unwrap())
+            <span class="self">self</span>.net_borrows_in_window + native_amount.to_num::&lt;i64&gt;()
         };
     }
 
@@ -1646,14 +1639,14 @@
         opening_indexed_position: I80F48,
     ) {
         <span class="kw">if </span>opening_indexed_position.is_positive() {
-            <span class="kw">let </span>interest =
-                <span class="macro">cm!</span>((<span class="self">self</span>.deposit_index - position.previous_index) * opening_indexed_position)
-                    .to_num::&lt;f64&gt;();
+            <span class="kw">let </span>interest = ((<span class="self">self</span>.deposit_index - position.previous_index)
+                * opening_indexed_position)
+                .to_num::&lt;f64&gt;();
             position.cumulative_deposit_interest += interest;
         } <span class="kw">else </span>{
-            <span class="kw">let </span>interest =
-                <span class="macro">cm!</span>((<span class="self">self</span>.borrow_index - position.previous_index) * opening_indexed_position)
-                    .to_num::&lt;f64&gt;();
+            <span class="kw">let </span>interest = ((<span class="self">self</span>.borrow_index - position.previous_index)
+                * opening_indexed_position)
+                .to_num::&lt;f64&gt;();
             position.cumulative_borrow_interest -= interest;
         }
 
@@ -1671,14 +1664,14 @@
         diff_ts: I80F48,
     ) -&gt; <span class="prelude-ty">Result</span>&lt;(I80F48, I80F48, I80F48, I80F48, I80F48)&gt; {
         <span class="comment">// compute index based on utilization
-        </span><span class="kw">let </span>native_total_deposits = <span class="macro">cm!</span>(<span class="self">self</span>.deposit_index * indexed_total_deposits);
-        <span class="kw">let </span>native_total_borrows = <span class="macro">cm!</span>(<span class="self">self</span>.borrow_index * indexed_total_borrows);
+        </span><span class="kw">let </span>native_total_deposits = <span class="self">self</span>.deposit_index * indexed_total_deposits;
+        <span class="kw">let </span>native_total_borrows = <span class="self">self</span>.borrow_index * indexed_total_borrows;
 
         <span class="comment">// This will be &gt;= 0, but can also be &gt; 1
         </span><span class="kw">let </span>instantaneous_utilization = <span class="kw">if </span>native_total_deposits == I80F48::ZERO {
             I80F48::ZERO
         } <span class="kw">else </span>{
-            <span class="macro">cm!</span>(native_total_borrows / native_total_deposits)
+            native_total_borrows / native_total_deposits
         };
 
         <span class="kw">let </span>borrow_rate = <span class="self">self</span>.compute_interest_rate(instantaneous_utilization);
@@ -1693,17 +1686,16 @@
         // we have
         //   deposit_rate = borrow_rate * (old_borrow_index * indexed_borrows) / (old_deposit_index * indexed_deposits)
         // and the latter factor is exactly instantaneous_utilization.
-        </span><span class="kw">let </span>deposit_rate = <span class="macro">cm!</span>(borrow_rate * instantaneous_utilization);
+        </span><span class="kw">let </span>deposit_rate = borrow_rate * instantaneous_utilization;
 
         <span class="comment">// The loan fee rate is not distributed to depositors.
-        </span><span class="kw">let </span>borrow_rate_with_fees = <span class="macro">cm!</span>(borrow_rate + <span class="self">self</span>.loan_fee_rate);
-        <span class="kw">let </span>borrow_fees = <span class="macro">cm!</span>(native_total_borrows * <span class="self">self</span>.loan_fee_rate * diff_ts / YEAR_I80F48);
+        </span><span class="kw">let </span>borrow_rate_with_fees = borrow_rate + <span class="self">self</span>.loan_fee_rate;
+        <span class="kw">let </span>borrow_fees = native_total_borrows * <span class="self">self</span>.loan_fee_rate * diff_ts / YEAR_I80F48;
 
-        <span class="kw">let </span>borrow_index = <span class="macro">cm!</span>(
-            (<span class="self">self</span>.borrow_index * borrow_rate_with_fees * diff_ts) / YEAR_I80F48 + <span class="self">self</span>.borrow_index
-        );
+        <span class="kw">let </span>borrow_index =
+            (<span class="self">self</span>.borrow_index * borrow_rate_with_fees * diff_ts) / YEAR_I80F48 + <span class="self">self</span>.borrow_index;
         <span class="kw">let </span>deposit_index =
-            <span class="macro">cm!</span>((<span class="self">self</span>.deposit_index * deposit_rate * diff_ts) / YEAR_I80F48 + <span class="self">self</span>.deposit_index);
+            (<span class="self">self</span>.deposit_index * deposit_rate * diff_ts) / YEAR_I80F48 + <span class="self">self</span>.deposit_index;
 
         <span class="prelude-val">Ok</span>((
             deposit_index,
@@ -1739,16 +1731,16 @@
         max_rate: I80F48,
     ) -&gt; I80F48 {
         <span class="kw">if </span>utilization &lt;= util0 {
-            <span class="kw">let </span>slope = <span class="macro">cm!</span>(rate0 / util0);
-            <span class="macro">cm!</span>(slope * utilization)
+            <span class="kw">let </span>slope = rate0 / util0;
+            slope * utilization
         } <span class="kw">else if </span>utilization &lt;= util1 {
-            <span class="kw">let </span>extra_util = <span class="macro">cm!</span>(utilization - util0);
-            <span class="kw">let </span>slope = <span class="macro">cm!</span>((rate1 - rate0) / (util1 - util0));
-            <span class="macro">cm!</span>(rate0 + slope * extra_util)
+            <span class="kw">let </span>extra_util = utilization - util0;
+            <span class="kw">let </span>slope = (rate1 - rate0) / (util1 - util0);
+            rate0 + slope * extra_util
         } <span class="kw">else </span>{
-            <span class="kw">let </span>extra_util = <span class="macro">cm!</span>(utilization - util1);
-            <span class="kw">let </span>slope = <span class="macro">cm!</span>((max_rate - rate1) / (I80F48::ONE - util1));
-            <span class="macro">cm!</span>(rate1 + slope * extra_util)
+            <span class="kw">let </span>extra_util = utilization - util1;
+            <span class="kw">let </span>slope = (max_rate - rate1) / (I80F48::ONE - util1);
+            rate1 + slope * extra_util
         }
     }
 
@@ -1763,26 +1755,24 @@
             <span class="kw">return </span>I80F48::ZERO;
         }
 
-        <span class="kw">let </span>native_total_deposits = <span class="macro">cm!</span>(<span class="self">self</span>.deposit_index * indexed_total_deposits);
-        <span class="kw">let </span>native_total_borrows = <span class="macro">cm!</span>(<span class="self">self</span>.borrow_index * indexed_total_borrows);
+        <span class="kw">let </span>native_total_deposits = <span class="self">self</span>.deposit_index * indexed_total_deposits;
+        <span class="kw">let </span>native_total_borrows = <span class="self">self</span>.borrow_index * indexed_total_borrows;
         <span class="kw">let </span>instantaneous_utilization = <span class="kw">if </span>native_total_deposits == I80F48::ZERO {
             I80F48::ZERO
         } <span class="kw">else </span>{
-            <span class="macro">cm!</span>(native_total_borrows / native_total_deposits)
+            native_total_borrows / native_total_deposits
         };
 
         <span class="comment">// Compute a time-weighted average since bank_rate_last_updated.
         </span><span class="kw">let </span>previous_avg_time =
-            I80F48::from_num(<span class="macro">cm!</span>(<span class="self">self</span>.index_last_updated - <span class="self">self</span>.bank_rate_last_updated));
-        <span class="kw">let </span>diff_ts = I80F48::from_num(<span class="macro">cm!</span>(now_ts - <span class="self">self</span>.index_last_updated));
-        <span class="kw">let </span>new_avg_time = I80F48::from_num(<span class="macro">cm!</span>(now_ts - <span class="self">self</span>.bank_rate_last_updated));
+            I80F48::from_num(<span class="self">self</span>.index_last_updated - <span class="self">self</span>.bank_rate_last_updated);
+        <span class="kw">let </span>diff_ts = I80F48::from_num(now_ts - <span class="self">self</span>.index_last_updated);
+        <span class="kw">let </span>new_avg_time = I80F48::from_num(now_ts - <span class="self">self</span>.bank_rate_last_updated);
         <span class="kw">if </span>new_avg_time &lt;= <span class="number">0 </span>{
             <span class="kw">return </span>instantaneous_utilization;
         }
-        <span class="macro">cm!</span>(
-            (<span class="self">self</span>.avg_utilization * previous_avg_time + instantaneous_utilization * diff_ts)
-                / new_avg_time
-        )
+        (<span class="self">self</span>.avg_utilization * previous_avg_time + instantaneous_utilization * diff_ts)
+            / new_avg_time
     }
 
     <span class="comment">// computes new optimal rates and max rate
@@ -1795,21 +1785,21 @@
         <span class="comment">// move rates up when utilization is above optimal utilization, and vice versa
         // util factor is between -1 (avg util = 0) and +1 (avg util = 100%)
         </span><span class="kw">let </span>util_factor = <span class="kw">if </span>avg_util &gt; optimal_util {
-            <span class="macro">cm!</span>((avg_util - optimal_util) / (I80F48::ONE - optimal_util))
+            (avg_util - optimal_util) / (I80F48::ONE - optimal_util)
         } <span class="kw">else </span>{
-            <span class="macro">cm!</span>((avg_util - optimal_util) / optimal_util)
+            (avg_util - optimal_util) / optimal_util
         };
-        <span class="kw">let </span>adjustment = <span class="macro">cm!</span>(I80F48::ONE + <span class="self">self</span>.adjustment_factor * util_factor);
+        <span class="kw">let </span>adjustment = I80F48::ONE + <span class="self">self</span>.adjustment_factor * util_factor;
 
         <span class="comment">// 1. irrespective of which leg current utilization is in, update all rates
         // 2. only update rates as long as new adjusted rates are above MINIMUM_MAX_RATE,
         //  since we don&#39;t want to fall to such low rates that it would take a long time to
         //  recover to high rates if utilization suddently increases to a high value
-        </span><span class="kw">if </span><span class="macro">cm!</span>(<span class="self">self</span>.max_rate * adjustment) &gt; MINIMUM_MAX_RATE {
+        </span><span class="kw">if </span>(<span class="self">self</span>.max_rate * adjustment) &gt; MINIMUM_MAX_RATE {
             (
-                <span class="macro">cm!</span>(<span class="self">self</span>.rate0 * adjustment),
-                <span class="macro">cm!</span>(<span class="self">self</span>.rate1 * adjustment),
-                <span class="macro">cm!</span>(<span class="self">self</span>.max_rate * adjustment),
+                (<span class="self">self</span>.rate0 * adjustment),
+                (<span class="self">self</span>.rate1 * adjustment),
+                (<span class="self">self</span>.max_rate * adjustment),
             )
         } <span class="kw">else </span>{
             (<span class="self">self</span>.rate0, <span class="self">self</span>.rate1, <span class="self">self</span>.max_rate)
@@ -1851,7 +1841,7 @@
         } <span class="kw">else </span>{
             <span class="comment">// The next line is around 500 CU
             </span><span class="kw">let </span>scale = <span class="self">self</span>.deposit_weight_scale_start_quote / deposits_quote;
-            <span class="macro">cm!</span>(<span class="self">self</span>.init_asset_weight * I80F48::from_num(scale))
+            <span class="self">self</span>.init_asset_weight * I80F48::from_num(scale)
         }
     }
 
@@ -1871,7 +1861,7 @@
         } <span class="kw">else </span>{
             <span class="comment">// The next line is around 500 CU
             </span><span class="kw">let </span>scale = borrows_quote / <span class="self">self</span>.borrow_weight_scale_start_quote;
-            <span class="macro">cm!</span>(<span class="self">self</span>.init_liab_weight * I80F48::from_num(scale))
+            <span class="self">self</span>.init_liab_weight * I80F48::from_num(scale)
         }
     }
 }

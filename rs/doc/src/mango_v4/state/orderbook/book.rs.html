@@ -381,7 +381,20 @@
 <a href="#381" id="381">381</a>
 <a href="#382" id="382">382</a>
 <a href="#383" id="383">383</a>
-</pre><pre class="rust"><code><span class="kw">use </span><span class="kw">crate</span>::state::{MangoAccountRefMut, PerpPosition};
+<a href="#384" id="384">384</a>
+<a href="#385" id="385">385</a>
+<a href="#386" id="386">386</a>
+<a href="#387" id="387">387</a>
+<a href="#388" id="388">388</a>
+<a href="#389" id="389">389</a>
+<a href="#390" id="390">390</a>
+<a href="#391" id="391">391</a>
+<a href="#392" id="392">392</a>
+<a href="#393" id="393">393</a>
+<a href="#394" id="394">394</a>
+<a href="#395" id="395">395</a>
+<a href="#396" id="396">396</a>
+</pre><pre class="rust"><code><span class="kw">use </span><span class="kw">crate</span>::state::MangoAccountRefMut;
 <span class="kw">use crate</span>::{
     error::<span class="kw-2">*</span>,
     state::{orderbook::bookside::<span class="kw-2">*</span>, EventQueue, PerpMarket},
@@ -392,7 +405,6 @@
 <span class="kw">use </span>std::cell::RefMut;
 
 <span class="kw">use super</span>::<span class="kw-2">*</span>;
-<span class="kw">use </span><span class="kw">crate</span>::util::checked_math <span class="kw">as </span>cm;
 
 <span class="doccomment">/// Drop at most this many expired orders from a BookSide when trying to match orders.
 /// This exists as a guard against excessive compute use.
@@ -442,15 +454,16 @@
         <span class="kw">let </span>post_only = order.is_post_only();
         <span class="kw">let </span><span class="kw-2">mut </span>post_target = order.post_target();
         <span class="kw">let </span>(price_lots, price_data) = order.price(now_ts, oracle_price_lots, <span class="self">self</span>)<span class="question-mark">?</span>;
-        <span class="kw">let </span>perp_position = mango_account.perp_position_mut(market.perp_market_index)<span class="question-mark">?</span>;
 
         <span class="comment">// generate new order id
         </span><span class="kw">let </span>order_id = market.gen_order_id(side, price_data);
 
         <span class="comment">// IOC orders have a fee penalty applied regardless of match
         </span><span class="kw">if </span>order.needs_penalty_fee() {
-            apply_penalty(market, perp_position)<span class="question-mark">?</span>;
+            apply_penalty(market, mango_account)<span class="question-mark">?</span>;
         }
+
+        <span class="kw">let </span>perp_position = mango_account.perp_position_mut(market.perp_market_index)<span class="question-mark">?</span>;
 
         <span class="comment">// Iterate through book and match against this new order.
         //
@@ -506,12 +519,12 @@
                 .min(best_opposing.node.quantity)
                 .min(max_match_by_quote);
 
-            <span class="kw">let </span>match_quote_lots = <span class="macro">cm!</span>(match_base_lots * best_opposing_price);
-            <span class="macro">cm!</span>(remaining_base_lots -= match_base_lots);
-            <span class="macro">cm!</span>(remaining_quote_lots -= match_quote_lots);
+            <span class="kw">let </span>match_quote_lots = match_base_lots * best_opposing_price;
+            remaining_base_lots -= match_base_lots;
+            remaining_quote_lots -= match_quote_lots;
             <span class="macro">assert!</span>(remaining_quote_lots &gt;= <span class="number">0</span>);
 
-            <span class="kw">let </span>new_best_opposing_quantity = <span class="macro">cm!</span>(best_opposing.node.quantity - match_base_lots);
+            <span class="kw">let </span>new_best_opposing_quantity = best_opposing.node.quantity - match_base_lots;
             <span class="kw">let </span>maker_out = new_best_opposing_quantity == <span class="number">0</span>;
             <span class="kw">if </span>maker_out {
                 matched_order_deletes
@@ -539,8 +552,8 @@
             event_queue.push_back(cast(fill)).unwrap();
             limit -= <span class="number">1</span>;
         }
-        <span class="kw">let </span>total_quote_lots_taken = <span class="macro">cm!</span>(order.max_quote_lots - remaining_quote_lots);
-        <span class="kw">let </span>total_base_lots_taken = <span class="macro">cm!</span>(order.max_base_lots - remaining_base_lots);
+        <span class="kw">let </span>total_quote_lots_taken = order.max_quote_lots - remaining_quote_lots;
+        <span class="kw">let </span>total_base_lots_taken = order.max_base_lots - remaining_base_lots;
         <span class="macro">assert!</span>(total_quote_lots_taken &gt;= <span class="number">0</span>);
         <span class="macro">assert!</span>(total_base_lots_taken &gt;= <span class="number">0</span>);
 
@@ -548,7 +561,7 @@
         // realized when the fill event gets executed
         </span><span class="kw">if </span>total_quote_lots_taken &gt; <span class="number">0 </span>|| total_base_lots_taken &gt; <span class="number">0 </span>{
             perp_position.add_taker_trade(side, total_base_lots_taken, total_quote_lots_taken);
-            apply_fees(market, perp_position, total_quote_lots_taken)<span class="question-mark">?</span>;
+            apply_fees(market, mango_account, total_quote_lots_taken)<span class="question-mark">?</span>;
         }
 
         <span class="comment">// Apply changes to matched asks (handles invalidate on delete!)
@@ -734,34 +747,47 @@
 /// both the maker and taker fees.
 </span><span class="kw">fn </span>apply_fees(
     market: <span class="kw-2">&amp;mut </span>PerpMarket,
-    perp_position: <span class="kw-2">&amp;mut </span>PerpPosition,
+    account: <span class="kw-2">&amp;mut </span>MangoAccountRefMut,
     quote_lots: i64,
 ) -&gt; <span class="prelude-ty">Result</span>&lt;()&gt; {
-    <span class="kw">let </span>quote_native = I80F48::from_num(market.quote_lot_size.checked_mul(quote_lots).unwrap());
+    <span class="kw">let </span>quote_native = I80F48::from_num(market.quote_lot_size * quote_lots);
 
-    <span class="kw">let </span>maker_fees = <span class="macro">cm!</span>(quote_native * market.maker_fee);
-    <span class="kw">let </span>taker_fees = <span class="macro">cm!</span>(quote_native * market.taker_fee);
+    <span class="comment">// The maker fees apply to the maker&#39;s account only when the fill event is consumed.
+    </span><span class="kw">let </span>maker_fees = quote_native * market.maker_fee;
+
+    <span class="kw">let </span>taker_fees = quote_native * market.taker_fee;
 
     <span class="comment">// taker fees should never be negative
     </span><span class="macro">require_gte!</span>(taker_fees, <span class="number">0</span>);
 
-    <span class="comment">// The maker fees apply to the maker&#39;s account only when the fill event is consumed.
-    </span>perp_position.record_trading_fee(taker_fees);
-    <span class="macro">cm!</span>(perp_position.taker_volume += taker_fees.to_num::&lt;u64&gt;());
+    <span class="comment">// Part of the taker fees that go to the dao, instead of paying for maker rebates
+    </span><span class="kw">let </span>taker_dao_fees = (taker_fees + maker_fees.min(I80F48::ZERO)).max(I80F48::ZERO);
+    account
+        .fixed
+        .accrue_buyback_fees(taker_dao_fees.floor().to_num::&lt;u64&gt;());
+
+    <span class="kw">let </span>perp_position = account.perp_position_mut(market.perp_market_index)<span class="question-mark">?</span>;
+    perp_position.record_trading_fee(taker_fees);
+    perp_position.taker_volume += taker_fees.to_num::&lt;u64&gt;();
 
     <span class="comment">// Accrue maker fees immediately: they can be negative and applying them later
     // risks that fees_accrued is settled to 0 before they apply. It going negative
     // breaks assumptions.
-    </span><span class="macro">cm!</span>(market.fees_accrued += taker_fees + maker_fees);
+    </span>market.fees_accrued += taker_fees + maker_fees;
 
     <span class="prelude-val">Ok</span>(())
 }
 
 <span class="doccomment">/// Applies a fixed penalty fee to the account, and update the market&#39;s fees_accrued
-</span><span class="kw">fn </span>apply_penalty(market: <span class="kw-2">&amp;mut </span>PerpMarket, perp_position: <span class="kw-2">&amp;mut </span>PerpPosition) -&gt; <span class="prelude-ty">Result</span>&lt;()&gt; {
+</span><span class="kw">fn </span>apply_penalty(market: <span class="kw-2">&amp;mut </span>PerpMarket, account: <span class="kw-2">&amp;mut </span>MangoAccountRefMut) -&gt; <span class="prelude-ty">Result</span>&lt;()&gt; {
     <span class="kw">let </span>fee_penalty = I80F48::from_num(market.fee_penalty);
+    account
+        .fixed
+        .accrue_buyback_fees(fee_penalty.floor().to_num::&lt;u64&gt;());
+
+    <span class="kw">let </span>perp_position = account.perp_position_mut(market.perp_market_index)<span class="question-mark">?</span>;
     perp_position.record_trading_fee(fee_penalty);
-    <span class="macro">cm!</span>(market.fees_accrued += fee_penalty);
+    market.fees_accrued += fee_penalty;
     <span class="prelude-val">Ok</span>(())
 }
 </code></pre></div>

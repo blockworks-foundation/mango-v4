@@ -1,1 +1,1 @@
-window.ALL_CRATES = ["client","mango_v4"];
+window.ALL_CRATES = ["mango_v4","mango_v4_client"];

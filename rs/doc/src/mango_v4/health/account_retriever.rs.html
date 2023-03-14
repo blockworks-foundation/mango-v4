@@ -530,7 +530,6 @@
 <a href="#530" id="530">530</a>
 <a href="#531" id="531">531</a>
 <a href="#532" id="532">532</a>
-<a href="#533" id="533">533</a>
 </pre><pre class="rust"><code><span class="kw">use </span>anchor_lang::prelude::<span class="kw-2">*</span>;
 <span class="kw">use </span>anchor_lang::ZeroCopy;
 
@@ -544,7 +543,6 @@
 <span class="kw">use </span><span class="kw">crate</span>::error::<span class="kw-2">*</span>;
 <span class="kw">use </span><span class="kw">crate</span>::serum3_cpi;
 <span class="kw">use </span><span class="kw">crate</span>::state::{Bank, MangoAccountRef, PerpMarket, PerpMarketIndex, TokenIndex};
-<span class="kw">use </span><span class="kw">crate</span>::util::checked_math <span class="kw">as </span>cm;
 
 <span class="doccomment">/// This trait abstracts how to find accounts needed for the health computation.
 ///
@@ -597,17 +595,17 @@
     <span class="kw">let </span>active_token_len = account.active_token_positions().count();
     <span class="kw">let </span>active_serum3_len = account.active_serum3_orders().count();
     <span class="kw">let </span>active_perp_len = account.active_perp_positions().count();
-    <span class="kw">let </span>expected_ais = <span class="macro">cm!</span>(active_token_len * <span class="number">2 </span><span class="comment">// banks + oracles
+    <span class="kw">let </span>expected_ais = active_token_len * <span class="number">2 </span><span class="comment">// banks + oracles
         </span>+ active_perp_len * <span class="number">2 </span><span class="comment">// PerpMarkets + Oracles
-        </span>+ active_serum3_len); <span class="comment">// open_orders
+        </span>+ active_serum3_len; <span class="comment">// open_orders
     </span><span class="macro">require_eq!</span>(ais.len(), expected_ais);
 
     <span class="prelude-val">Ok</span>(FixedOrderAccountRetriever {
         ais: AccountInfoRef::borrow_slice(ais)<span class="question-mark">?</span>,
         n_banks: active_token_len,
         n_perps: active_perp_len,
-        begin_perp: <span class="macro">cm!</span>(active_token_len * <span class="number">2</span>),
-        begin_serum3: <span class="macro">cm!</span>(active_token_len * <span class="number">2 </span>+ active_perp_len * <span class="number">2</span>),
+        begin_perp: active_token_len * <span class="number">2</span>,
+        begin_serum3: active_token_len * <span class="number">2 </span>+ active_perp_len * <span class="number">2</span>,
         staleness_slot: <span class="prelude-val">Some</span>(Clock::get()<span class="question-mark">?</span>.slot),
     })
 }
@@ -663,7 +661,7 @@
                 )
             })<span class="question-mark">?</span>;
 
-        <span class="kw">let </span>oracle_index = <span class="macro">cm!</span>(<span class="self">self</span>.n_banks + active_token_position_index);
+        <span class="kw">let </span>oracle_index = <span class="self">self</span>.n_banks + active_token_position_index;
         <span class="kw">let </span>oracle_price = <span class="self">self</span>.oracle_price_bank(oracle_index, bank).with_context(|| {
             <span class="macro">format!</span>(
                 <span class="string">&quot;getting oracle for bank with health account index {} and token index {}, passed account {}&quot;</span>,
@@ -682,7 +680,7 @@
         active_perp_position_index: usize,
         perp_market_index: PerpMarketIndex,
     ) -&gt; <span class="prelude-ty">Result</span>&lt;(<span class="kw-2">&amp;</span>PerpMarket, I80F48)&gt; {
-        <span class="kw">let </span>perp_index = <span class="macro">cm!</span>(<span class="self">self</span>.begin_perp + active_perp_position_index);
+        <span class="kw">let </span>perp_index = <span class="self">self</span>.begin_perp + active_perp_position_index;
         <span class="kw">let </span>perp_market = <span class="self">self
             </span>.perp_market(group, perp_index, perp_market_index)
             .with_context(|| {
@@ -694,7 +692,7 @@
                 )
             })<span class="question-mark">?</span>;
 
-        <span class="kw">let </span>oracle_index = <span class="macro">cm!</span>(perp_index + <span class="self">self</span>.n_perps);
+        <span class="kw">let </span>oracle_index = perp_index + <span class="self">self</span>.n_perps;
         <span class="kw">let </span>oracle_price = <span class="self">self</span>.oracle_price_perp(oracle_index, perp_market).with_context(|| {
             <span class="macro">format!</span>(
                 <span class="string">&quot;getting oracle for perp market with health account index {} and perp market index {}, passed account {}&quot;</span>,
@@ -707,7 +705,7 @@
     }
 
     <span class="kw">fn </span>serum_oo(<span class="kw-2">&amp;</span><span class="self">self</span>, active_serum_oo_index: usize, key: <span class="kw-2">&amp;</span>Pubkey) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="kw-2">&amp;</span>OpenOrders&gt; {
-        <span class="kw">let </span>serum_oo_index = <span class="macro">cm!</span>(<span class="self">self</span>.begin_serum3 + active_serum_oo_index);
+        <span class="kw">let </span>serum_oo_index = <span class="self">self</span>.begin_serum3 + active_serum_oo_index;
         <span class="kw">let </span>ai = <span class="kw-2">&amp;</span><span class="self">self</span>.ais[serum_oo_index];
         (|| {
             <span class="macro">require_keys_eq!</span>(<span class="kw-2">*</span>key, <span class="kw-2">*</span>ai.key());

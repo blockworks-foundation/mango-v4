@@ -62,11 +62,10 @@
 <a href="#62" id="62">62</a>
 <a href="#63" id="63">63</a>
 <a href="#64" id="64">64</a>
-<a href="#65" id="65">65</a>
 </pre><pre class="rust"><code><span class="kw">use </span>std::collections::HashMap;
 
 <span class="kw">use </span>anchor_lang::prelude::<span class="kw-2">*</span>;
-<span class="kw">use </span>checked_math <span class="kw">as </span>cm;
+
 <span class="kw">use </span>fixed::types::I80F48;
 
 <span class="kw">use </span><span class="kw">crate</span>::events::{Equity, TokenEquity};
@@ -99,9 +98,8 @@
         <span class="kw">let </span>accumulated_equity = token_equity_map
             .get(<span class="kw-2">&amp;</span>serum_account.base_token_index)
             .unwrap_or(<span class="kw-2">&amp;</span>I80F48::ZERO);
-        <span class="kw">let </span>native_coin_total_i80f48 =
-            I80F48::from_num(oo.native_coin_total + oo.referrer_rebates_accrued);
-        <span class="kw">let </span>new_equity = <span class="macro">cm!</span>(accumulated_equity + native_coin_total_i80f48 * oracle_price);
+        <span class="kw">let </span>native_coin_total_i80f48 = I80F48::from_num(oo.native_coin_total);
+        <span class="kw">let </span>new_equity = accumulated_equity + native_coin_total_i80f48 * oracle_price;
         token_equity_map.insert(serum_account.base_token_index, new_equity);
 
         <span class="comment">// note quote token value
@@ -111,7 +109,7 @@
             .get(<span class="kw-2">&amp;</span>serum_account.quote_token_index)
             .unwrap_or(<span class="kw-2">&amp;</span>I80F48::ZERO);
         <span class="kw">let </span>native_pc_total_i80f48 = I80F48::from_num(oo.native_pc_total);
-        <span class="kw">let </span>new_equity = <span class="macro">cm!</span>(accumulated_equity + native_pc_total_i80f48 * oracle_price);
+        <span class="kw">let </span>new_equity = accumulated_equity + native_pc_total_i80f48 * oracle_price;
         token_equity_map.insert(serum_account.quote_token_index, new_equity);
     }
 
