@@ -19,6 +19,7 @@ import { Bank, MintInfo, TokenIndex } from './bank';
 import {
   isPythOracle,
   isSwitchboardOracle,
+  OracleProvider,
   parseSwitchboardOracle,
 } from './oracle';
 import { BookSide, PerpMarket, PerpMarketIndex } from './perp';
@@ -390,7 +391,7 @@ export class Group {
     price: I80F48;
     uiPrice: number;
     lastUpdatedSlot: number;
-    provider: string;
+    provider: OracleProvider;
   }> {
     let price, uiPrice, lastUpdatedSlot, provider;
     if (
@@ -402,13 +403,13 @@ export class Group {
       price = new I80F48(stubOracle.price.val);
       uiPrice = this.toUiPrice(price, baseDecimals);
       lastUpdatedSlot = stubOracle.lastUpdated.val;
-      provider = 'stub';
+      provider = OracleProvider.Stub;
     } else if (isPythOracle(ai)) {
       const priceData = parsePriceData(ai.data);
       uiPrice = priceData.previousPrice;
       price = this.toNativePrice(uiPrice, baseDecimals);
       lastUpdatedSlot = parseInt(priceData.lastSlot.toString());
-      provider = 'pyth';
+      provider = OracleProvider.Pyth;
     } else if (isSwitchboardOracle(ai)) {
       const priceData = await parseSwitchboardOracle(
         ai,
@@ -417,7 +418,7 @@ export class Group {
       uiPrice = priceData.price;
       price = this.toNativePrice(uiPrice, baseDecimals);
       lastUpdatedSlot = priceData.lastUpdatedSlot;
-      provider = 'switchboard';
+      provider = OracleProvider.Switchboard;
     } else {
       throw new Error(
         `Unknown oracle provider (parsing not implemented) for oracle ${oracle}, with owner ${ai.owner}!`,
