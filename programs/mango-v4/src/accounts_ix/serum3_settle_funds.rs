@@ -60,3 +60,21 @@ pub struct Serum3SettleFunds<'info> {
 
     pub token_program: Program<'info, Token>,
 }
+
+#[derive(Accounts)]
+pub struct Serum3SettleFundsV2Extra<'info> {
+    /// CHECK: The oracle can be one of several different account types and the pubkey is checked in the parent
+    pub quote_oracle: UncheckedAccount<'info>,
+    /// CHECK: The oracle can be one of several different account types and the pubkey is checked in the parent
+    pub base_oracle: UncheckedAccount<'info>,
+}
+
+#[derive(Accounts)]
+pub struct Serum3SettleFundsV2<'info> {
+    pub v1: Serum3SettleFunds<'info>,
+    #[account(
+        constraint = v2.quote_oracle.key() == v1.quote_bank.load()?.oracle,
+        constraint = v2.base_oracle.key() == v1.base_bank.load()?.oracle,
+    )]
+    pub v2: Serum3SettleFundsV2Extra<'info>,
+}

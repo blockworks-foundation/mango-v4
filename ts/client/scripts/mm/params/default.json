@@ -13,6 +13,17 @@
         "spammerCharge": 2,
         "krakenCode": "XXBTZUSD"
       }
+    },
+    "SOL": {
+      "perp": {
+        "sizePerc": 0.75,
+        "leanCoeff": 0.00025,
+        "bias": 0.0,
+        "requoteThresh": 0.0002,
+        "takeSpammers": true,
+        "spammerCharge": 2,
+        "krakenCode": "SOLUSD"
+      }
     }
   }
 }

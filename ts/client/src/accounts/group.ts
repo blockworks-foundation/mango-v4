@@ -45,6 +45,7 @@ export class Group {
       depositLimitQuote: BN;
       ixGate: BN;
       buybackFeesSwapMangoAccount: PublicKey;
+      buybackFeesExpiryInterval: BN;
     },
   ): Group {
     return new Group(
@@ -65,6 +66,7 @@ export class Group {
       obj.depositLimitQuote,
       obj.ixGate,
       obj.buybackFeesSwapMangoAccount,
+      obj.buybackFeesExpiryInterval,
       [], // addressLookupTablesList
       new Map(), // banksMapByName
       new Map(), // banksMapByMint
@@ -99,6 +101,7 @@ export class Group {
     public depositLimitQuote,
     public ixGate: BN,
     public buybackFeesSwapMangoAccount: PublicKey,
+    public buybackFeesExpiryInterval: BN,
     public addressLookupTablesList: AddressLookupTableAccount[],
     public banksMapByName: Map<string, Bank[]>,
     public banksMapByMint: Map<string, Bank[]>,

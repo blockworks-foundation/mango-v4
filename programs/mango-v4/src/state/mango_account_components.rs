@@ -179,10 +179,10 @@ pub struct PerpPosition {
     pub settle_pnl_limit_settled_in_current_window_native: i64,
 
     /// Active position size, measured in base lots
-    base_position_lots: i64,
+    pub base_position_lots: i64,
     /// Active position in quote (conversation rate is that of the time the order was settled)
     /// measured in native quote
-    quote_position_native: I80F48,
+    pub quote_position_native: I80F48,
 
     /// Tracks what the position is to calculate average entry & break even price
     pub quote_running_native: i64,
@@ -202,20 +202,34 @@ pub struct PerpPosition {
     /// Amount of quote lots on the EventQueue waiting to be processed
     pub taker_quote_lots: i64,
 
-    // (Display only)
-    // Cumulative long funding in base native units
+    /// Cumulative long funding in quote native units.
+    /// If the user paid $1 in funding for a long position, this would be 1e6.
+    /// Beware of the sign!
+    ///
+    /// (Display only)
     pub cumulative_long_funding: f64,
-    // (Display only)
-    // Cumulative short funding in base native units
+    /// Cumulative short funding in quote native units
+    /// If the user paid $1 in funding for a short position, this would be -1e6.
+    ///
+    /// (Display only)
     pub cumulative_short_funding: f64,
-    // (Display only)
-    // Cumulative maker volume in quote native units
+
+    /// Cumulative maker volume in quote native units
+    ///
+    /// (Display only)
     pub maker_volume: u64,
-    // (Display only)
-    // Cumulative taker volume in quote native units
+    /// Cumulative taker volume in quote native units
+    ///
+    /// (Display only)
     pub taker_volume: u64,
-    // (Display only)
-    // Cumulative realized pnl in quote native units
+
+    /// Cumulative number of quote native units transfered from the perp position
+    /// to the settle token spot position.
+    ///
+    /// For example, if the user settled $1 of positive pnl into their USDC spot
+    /// position, this would be 1e6.
+    ///
+    /// (Display only)
     pub perp_spot_transfers: i64,
 
     /// The native average entry price for the base lots of the current position.

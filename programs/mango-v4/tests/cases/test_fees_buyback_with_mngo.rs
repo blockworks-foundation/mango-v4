@@ -183,6 +183,7 @@ async fn test_fees_buyback_with_mngo() -> Result<(), TransportError> {
     assert_eq!(before_fees_accrued - after_fees_accrued, 19);
 
     // token[1] swapped at discount for token[0]
+    // TODO: https://github.com/blockworks-foundation/mango-v4/pull/464#discussion_r1111779730
     assert!(
         (fees_token_position_after - fees_token_position_before) - I80F48::from_num(20)
             < I80F48::from_num(0.000001)

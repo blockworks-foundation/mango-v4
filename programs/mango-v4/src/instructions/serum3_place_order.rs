@@ -424,22 +424,26 @@ pub fn apply_settle_changes(
     after_quote_vault: u64,
     after_oo: &OpenOrdersSlim,
     health_cache: Option<&mut HealthCache>,
+    fees_to_dao: bool,
 ) -> Result<()> {
-    // Example: rebates go from 100 -> 10. That means we credit 90 in fees.
-    let received_fees = before_oo
-        .native_rebates()
-        .saturating_sub(after_oo.native_rebates());
-    quote_bank.collected_fees_native += I80F48::from(received_fees);
+    let mut received_fees = 0;
+    if fees_to_dao {
+        // Example: rebates go from 100 -> 10. That means we credit 90 in fees.
+        received_fees = before_oo
+            .native_rebates()
+            .saturating_sub(after_oo.native_rebates());
+        quote_bank.collected_fees_native += I80F48::from(received_fees);
 
-    // Ideally we could credit buyback_fees at the current value of the received fees,
-    // but the settle_funds instruction currently doesn't receive the oracle account
-    // that would be needed for it.
-    if quote_bank.token_index == QUOTE_TOKEN_INDEX {
-        let now_ts = Clock::get()?.unix_timestamp.try_into().unwrap();
-        account
-            .fixed
-            .expire_buyback_fees(now_ts, group.buyback_fees_expiry_interval);
-        account.fixed.accrue_buyback_fees(received_fees);
+        // Ideally we could credit buyback_fees at the current value of the received fees,
+        // but the settle_funds instruction currently doesn't receive the oracle account
+        // that would be needed for it.
+        if quote_bank.token_index == QUOTE_TOKEN_INDEX {
+            let now_ts = Clock::get()?.unix_timestamp.try_into().unwrap();
+            account
+                .fixed
+                .expire_buyback_fees(now_ts, group.buyback_fees_expiry_interval);
+            account.fixed.accrue_buyback_fees(received_fees);
+        }
     }
 
     // Don't count the referrer rebate fees as part of the vault change that should be

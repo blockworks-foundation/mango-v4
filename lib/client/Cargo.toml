@@ -14,7 +14,7 @@ anyhow = "1.0"
 async-channel = "1.6"
 async-once-cell = { version = "0.4.2", features = ["unpin"] }
 async-trait = "0.1.52"
-fixed = { path = "../../3rdparty/fixed", version = "=1.23.0", features = ["serde", "borsh"] }
+fixed = { path = "../../3rdparty/fixed", version = "1.11.0", features = ["serde", "borsh"] }
 futures = "0.3.25"
 itertools = "0.10.3"
 jsonrpc-core = "18.0.0"

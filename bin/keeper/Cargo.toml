@@ -15,7 +15,7 @@ anyhow = "1.0"
 clap = { version = "3.1.8", features = ["derive", "env"] }
 dotenv = "0.15.0"
 env_logger = "0.8.4"
-fixed = { path = "../../3rdparty/fixed", version = "=1.23.0", features = ["serde", "borsh"] }
+fixed = { path = "../../3rdparty/fixed", version = "1.11.0", features = ["serde", "borsh"] }
 futures = "0.3.21"
 itertools = "0.10.3"
 log = "0.4.0"

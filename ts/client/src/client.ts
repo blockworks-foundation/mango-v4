@@ -77,6 +77,7 @@ export type MangoClientOptions = {
   postSendTxCallback?: ({ txid }: { txid: string }) => void;
   prioritizationFee?: number;
   txConfirmationCommitment?: Commitment;
+  openbookFeesToDao?: boolean;
 };
 
 export class MangoClient {
@@ -84,6 +85,7 @@ export class MangoClient {
   private postSendTxCallback?: ({ txid }) => void;
   private prioritizationFee: number;
   private txConfirmationCommitment: Commitment;
+  private openbookFeesToDao: boolean;
 
   constructor(
     public program: Program<MangoV4>,
@@ -94,6 +96,7 @@ export class MangoClient {
     this.idsSource = opts?.idsSource || 'get-program-accounts';
     this.prioritizationFee = opts?.prioritizationFee || 0;
     this.postSendTxCallback = opts?.postSendTxCallback;
+    this.openbookFeesToDao = opts?.openbookFeesToDao ?? true;
     this.txConfirmationCommitment =
       opts?.txConfirmationCommitment ??
       (program.provider as AnchorProvider).opts.commitment ??
@@ -384,6 +387,7 @@ export class MangoClient {
         params.resetStablePrice ?? false,
         params.resetNetBorrowLimit ?? false,
         params.reduceOnly,
+        params.name,
       )
       .accounts({
         group: group.publicKey,
@@ -1637,6 +1641,12 @@ export class MangoClient {
     mangoAccount: MangoAccount,
     externalMarketPk: PublicKey,
   ): Promise<TransactionInstruction> {
+    if (this.openbookFeesToDao == false) {
+      throw new Error(
+        `openbookFeesToDao is set to false, please use serum3SettleFundsV2Ix`,
+      );
+    }
+
     const serum3Market = group.serum3MarketsMapByExternal.get(
       externalMarketPk.toBase58(),
     )!;
@@ -1681,12 +1691,73 @@ export class MangoClient {
     return ix;
   }
 
+  public async serum3SettleFundsV2Ix(
+    group: Group,
+    mangoAccount: MangoAccount,
+    externalMarketPk: PublicKey,
+  ): Promise<TransactionInstruction> {
+    const serum3Market = group.serum3MarketsMapByExternal.get(
+      externalMarketPk.toBase58(),
+    )!;
+    const serum3MarketExternal = group.serum3ExternalMarketsMap.get(
+      externalMarketPk.toBase58(),
+    )!;
+
+    const [serum3MarketExternalVaultSigner, openOrderPublicKey] =
+      await Promise.all([
+        generateSerum3MarketExternalVaultSignerAddress(
+          this.cluster,
+          serum3Market,
+          serum3MarketExternal,
+        ),
+        serum3Market.findOoPda(this.program.programId, mangoAccount.publicKey),
+      ]);
+
+    const ix = await this.program.methods
+      .serum3SettleFundsV2(this.openbookFeesToDao)
+      .accounts({
+        v1: {
+          group: group.publicKey,
+          account: mangoAccount.publicKey,
+          owner: (this.program.provider as AnchorProvider).wallet.publicKey,
+          openOrders: openOrderPublicKey,
+          serumMarket: serum3Market.publicKey,
+          serumProgram: OPENBOOK_PROGRAM_ID[this.cluster],
+          serumMarketExternal: serum3Market.serumMarketExternal,
+          marketBaseVault: serum3MarketExternal.decoded.baseVault,
+          marketQuoteVault: serum3MarketExternal.decoded.quoteVault,
+          marketVaultSigner: serum3MarketExternalVaultSigner,
+          quoteBank: group.getFirstBankByTokenIndex(
+            serum3Market.quoteTokenIndex,
+          ).publicKey,
+          quoteVault: group.getFirstBankByTokenIndex(
+            serum3Market.quoteTokenIndex,
+          ).vault,
+          baseBank: group.getFirstBankByTokenIndex(serum3Market.baseTokenIndex)
+            .publicKey,
+          baseVault: group.getFirstBankByTokenIndex(serum3Market.baseTokenIndex)
+            .vault,
+        },
+        v2: {
+          quoteOracle: group.getFirstBankByTokenIndex(
+            serum3Market.quoteTokenIndex,
+          ).oracle,
+          baseOracle: group.getFirstBankByTokenIndex(
+            serum3Market.baseTokenIndex,
+          ).oracle,
+        },
+      })
+      .instruction();
+
+    return ix;
+  }
+
   public async serum3SettleFunds(
     group: Group,
     mangoAccount: MangoAccount,
     externalMarketPk: PublicKey,
   ): Promise<TransactionSignature> {
-    const ix = await this.serum3SettleFundsIx(
+    const ix = await this.serum3SettleFundsV2Ix(
       group,
       mangoAccount,
       externalMarketPk,
@@ -1744,7 +1815,7 @@ export class MangoClient {
         side,
         orderId,
       ),
-      this.serum3SettleFundsIx(group, mangoAccount, externalMarketPk),
+      this.serum3SettleFundsV2Ix(group, mangoAccount, externalMarketPk),
     ]);
 
     return await this.sendAndConfirmTransactionForGroup(group, ixes);
@@ -1916,6 +1987,7 @@ export class MangoClient {
         params.reduceOnly,
         params.resetStablePrice ?? false,
         params.positivePnlLiquidationFee,
+        params.name,
       )
       .accounts({
         group: group.publicKey,
@@ -3034,7 +3106,7 @@ export class MangoClient {
         side,
         orderId,
       ),
-      this.serum3SettleFundsIx(group, mangoAccount, externalMarketPk),
+      this.serum3SettleFundsV2Ix(group, mangoAccount, externalMarketPk),
       this.serum3PlaceOrderIx(
         group,
         mangoAccount,

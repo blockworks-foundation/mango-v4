@@ -158,6 +158,7 @@ pub fn serum3_liq_force_cancel_orders(
         after_quote_vault,
         &after_oo,
         Some(&mut health_cache),
+        true,
     )?;
 
     //
@@ -201,6 +202,7 @@ fn cpi_settle_funds(ctx: &Serum3LiqForceCancelOrders) -> Result<()> {
         user_quote_wallet: ctx.quote_vault.to_account_info(),
         vault_signer: ctx.market_vault_signer.to_account_info(),
         token_program: ctx.token_program.to_account_info(),
+        rebates_quote_wallet: ctx.quote_vault.to_account_info(),
     }
     .call(&group)
 }

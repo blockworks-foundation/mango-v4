@@ -801,6 +801,7 @@ mod tests {
     use super::*;
     use crate::state::*;
     use serum_dex::state::OpenOrders;
+    use std::str::FromStr;
 
     #[test]
     fn test_precision() {
