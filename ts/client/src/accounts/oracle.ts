@@ -17,7 +17,7 @@ export enum OracleProvider {
   Pyth,
   Switchboard,
   Stub,
-};
+}
 
 export class StubOracle {
   public price: I80F48;
