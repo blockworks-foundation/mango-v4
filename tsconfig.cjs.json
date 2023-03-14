@@ -7,5 +7,8 @@
     "declarationMap": false,
     "sourceMap": false
   },
-  "include": ["ts/client/src", "ts/client/scripts"]
+  "include": [
+    "ts/client/src",
+    "ts/client/scripts"
+  ]
 }
