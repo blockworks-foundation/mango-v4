@@ -1836,7 +1836,7 @@ dependencies = [
 
 [[package]]
 name = "fixed"
-version = "1.23.0"
+version = "1.11.0"
 dependencies = [
  "arbitrary",
  "az",
@@ -2164,12 +2164,9 @@ dependencies = [
 
 [[package]]
 name = "half"
-version = "2.2.1"
+version = "1.8.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "02b4af3693f1b705df946e9fe5631932443781d0aabb423b62fcd4d73f6d2fd0"
-dependencies = [
- "crunchy",
-]
+checksum = "eabb4a44450da02c90444cf74558da904edde8fb4e9035a9a6a4e15445af0bd7"
 
 [[package]]
 name = "hash32"
@@ -2967,7 +2964,7 @@ dependencies = [
 
 [[package]]
 name = "mango-v4"
-version = "0.8.0"
+version = "0.9.0"
 dependencies = [
  "anchor-lang",
  "anchor-spl",

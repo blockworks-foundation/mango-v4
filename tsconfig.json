@@ -7,7 +7,8 @@
     "resolveJsonModule": true,
     "noImplicitAny": false,
     "skipLibCheck": true,
-    "strictNullChecks": true
+    "strictNullChecks": true,
+    "noEmit": true
   },
   "ts-node": {
     // these options are overrides used only by ts-node
@@ -16,7 +17,5 @@
       "module": "commonjs"
     }
   },
-  "include": [
-    "ts/client/src"
-  ]
+  "include": ["ts/client/src"]
 }

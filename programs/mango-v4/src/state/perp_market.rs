@@ -101,7 +101,7 @@ pub struct PerpMarket {
     pub impact_quantity: i64,
 
     /// Current long funding value. Increasing it means that every long base lot
-    /// needs to pay that amount in funding.
+    /// needs to pay that amount of quote native in funding.
     ///
     /// PerpPosition uses and tracks it settle funding. Updated by the perp
     /// keeper instruction.
@@ -275,7 +275,7 @@ impl PerpMarket {
             book.bookside(Side::Ask)
                 .impact_price(self.impact_quantity, now_ts, oracle_price_lots);
 
-        let diff_price = match (bid, ask) {
+        let funding_rate = match (bid, ask) {
             (Some(bid), Some(ask)) => {
                 // calculate mid-market rate
                 let mid_price = (bid + ask) / 2;
@@ -291,7 +291,9 @@ impl PerpMarket {
         let diff_ts = I80F48::from_num(now_ts - self.funding_last_updated as u64);
         let time_factor = diff_ts / DAY_I80F48;
         let base_lot_size = I80F48::from_num(self.base_lot_size);
-        let funding_delta = index_price * diff_price * base_lot_size * time_factor;
+
+        // The number of native quote that one base lot should pay in funding
+        let funding_delta = index_price * base_lot_size * funding_rate * time_factor;
 
         self.long_funding += funding_delta;
         self.short_funding += funding_delta;
@@ -309,7 +311,7 @@ impl PerpMarket {
             stable_price: self.stable_price().to_bits(),
             fees_accrued: self.fees_accrued.to_bits(),
             open_interest: self.open_interest,
-            instantaneous_funding_rate: diff_price.to_bits(),
+            instantaneous_funding_rate: funding_rate.to_bits(),
         });
 
         Ok(())
