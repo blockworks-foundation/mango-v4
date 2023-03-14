@@ -30,7 +30,7 @@ jobs:
         run: yarn typedoc ts/client/src/index.ts --readme none --out ./docs/ts/client/
 
       - name: Build Rust Docs
-        run: cargo doc --no-deps --package client --package mango-v4 --target-dir ./docs/rs/ && rm -rf ./docs/rs/debug
+        run: cargo doc --no-deps --package mango-v4-client --package mango-v4 --target-dir ./docs/rs/ && rm -rf ./docs/rs/debug
 
       - name: Deploy 🚀
         uses: JamesIves/github-pages-deploy-action@4.1.5
