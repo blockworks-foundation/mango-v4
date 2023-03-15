@@ -21,6 +21,7 @@ import {
 } from './bank';
 import { Group } from './group';
 import { MangoAccount } from './mangoAccount';
+import { OracleProvider } from './oracle';
 
 export type PerpMarketIndex = number & As<'perp-market-index'>;
 
@@ -55,6 +56,8 @@ export class PerpMarket {
   public _price: I80F48;
   public _uiPrice: number;
   public _oracleLastUpdatedSlot: number;
+  public _oracleProvider: OracleProvider;
+
   public _bids: BookSide;
   public _asks: BookSide;
 
@@ -263,6 +266,15 @@ export class PerpMarket {
       );
     }
     return this._oracleLastUpdatedSlot;
+  }
+
+  get oracleProvider(): OracleProvider {
+    if (!this._oracleProvider) {
+      throw new Error(
+        `Undefined oracleProvider for perpMarket ${this.publicKey} with marketIndex ${this.perpMarketIndex}!`,
+      );
+    }
+    return this._oracleProvider;
   }
 
   get minOrderSize(): number {
