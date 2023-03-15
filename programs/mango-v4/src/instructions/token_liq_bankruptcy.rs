@@ -50,9 +50,9 @@ pub fn token_liq_bankruptcy(
     liqee_health_cache.require_after_phase2_liquidation()?;
     liqee.fixed.set_being_liquidated(true);
 
-    let liab_is_insurance_token = liab_token_index == QUOTE_TOKEN_INDEX;
+    let liab_is_insurance_token = liab_token_index == INSURANCE_TOKEN_INDEX;
     let (liab_bank, liab_oracle_price, opt_quote_bank_and_price) =
-        account_retriever.banks_mut_and_oracles(liab_token_index, QUOTE_TOKEN_INDEX)?;
+        account_retriever.banks_mut_and_oracles(liab_token_index, INSURANCE_TOKEN_INDEX)?;
     assert!(liab_is_insurance_token == opt_quote_bank_and_price.is_none());
 
     let mut liab_deposit_index = liab_bank.deposit_index;
@@ -120,7 +120,7 @@ pub fn token_liq_bankruptcy(
 
             // credit the liqor
             let (liqor_quote, liqor_quote_raw_token_index, _) =
-                liqor.ensure_token_position(QUOTE_TOKEN_INDEX)?;
+                liqor.ensure_token_position(INSURANCE_TOKEN_INDEX)?;
             let liqor_quote_active =
                 quote_bank.deposit(liqor_quote, insurance_transfer_i80f48, now_ts)?;
 
@@ -128,7 +128,7 @@ pub fn token_liq_bankruptcy(
             emit!(TokenBalanceLog {
                 mango_group: ctx.accounts.group.key(),
                 mango_account: ctx.accounts.liqor.key(),
-                token_index: QUOTE_TOKEN_INDEX,
+                token_index: INSURANCE_TOKEN_INDEX,
                 indexed_position: liqor_quote.indexed_position.to_bits(),
                 deposit_index: quote_deposit_index.to_bits(),
                 borrow_index: quote_borrow_index.to_bits(),
@@ -184,11 +184,11 @@ pub fn token_liq_bankruptcy(
                 );
             }
         } else {
-            // For liab_token_index == QUOTE_TOKEN_INDEX: the insurance fund deposits directly into liqee,
+            // For liab_token_index == INSURANCE_TOKEN_INDEX: the insurance fund deposits directly into liqee,
             // without a fee or the liqor being involved
             // account constraint #2 b)
             require_keys_eq!(liab_bank.vault, ctx.accounts.quote_vault.key());
-            require_eq!(liab_token_index, QUOTE_TOKEN_INDEX);
+            require_eq!(liab_token_index, INSURANCE_TOKEN_INDEX);
             require_eq!(liab_to_quote_with_fee, I80F48::ONE);
             require_eq!(insurance_transfer_i80f48, liab_transfer);
         }
@@ -269,7 +269,7 @@ pub fn token_liq_bankruptcy(
         liab_token_index,
         initial_liab_native: initial_liab_native.to_bits(),
         liab_price: liab_oracle_price.to_bits(),
-        insurance_token_index: QUOTE_TOKEN_INDEX,
+        insurance_token_index: INSURANCE_TOKEN_INDEX,
         insurance_transfer: insurance_transfer_i80f48.to_bits(),
         socialized_loss: socialized_loss.to_bits(),
         starting_liab_deposit_index: starting_deposit_index.to_bits(),
