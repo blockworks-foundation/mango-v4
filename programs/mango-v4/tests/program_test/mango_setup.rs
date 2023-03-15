@@ -27,6 +27,7 @@ pub struct Token {
 
 pub struct GroupWithTokens {
     pub group: Pubkey,
+    pub admin: TestKeypair,
     pub insurance_vault: Pubkey,
     pub tokens: Vec<Token>,
 }
@@ -141,6 +142,7 @@ impl<'a> GroupWithTokensConfig {
 
         GroupWithTokens {
             group,
+            admin,
             insurance_vault,
             tokens,
         }

@@ -126,6 +126,7 @@ pub fn serum3_settle_funds<'info>(
         &after_oo,
         None,
         fees_to_dao,
+        v2.map(|d| d.quote_oracle.as_ref()),
     )?;
 
     emit!(Serum3OpenOrdersBalanceLogV2 {
