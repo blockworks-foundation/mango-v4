@@ -1,4 +1,6 @@
 import { AnchorProvider, BN, Program, Provider } from '@coral-xyz/anchor';
+import { IdlCoder } from '@coral-xyz/anchor/dist/cjs/coder/borsh/idl';
+import { decode } from '@coral-xyz/anchor/dist/cjs/utils/bytes/base64';
 import {
   createCloseAccountInstruction,
   createInitializeAccount3Instruction,
@@ -2081,6 +2083,38 @@ export class MangoClient {
       perpMarketIndex,
     );
     return await this.sendAndConfirmTransactionForGroup(group, [ix]);
+  }
+
+  public async perpPlaceOrderReturnValue(signature: string): Promise<BN> {
+    async function extractReturnValueForIx(ixName: string): Promise<any> {
+      const tx = await this.program.provider.connection.getTransaction(
+        signature,
+        {
+          maxSupportedTransactionVersion: 1,
+        },
+      );
+
+      const returnPrefix = `Program return: ${this.programId} `;
+      const returnLog = tx?.meta?.logMessages?.find((l) =>
+        l.startsWith(returnPrefix),
+      );
+      if (!returnLog) {
+        throw new Error('Expected return log');
+      }
+      const returnData = decode(returnLog.slice(returnPrefix.length));
+      const returnType = (
+        IDL.instructions.find((ix) => ix.name === ixName) as any
+      ).returns;
+      if (!returnType) {
+        throw new Error('Expected return type');
+      }
+      const coder = IdlCoder.fieldLayout(
+        { type: returnType },
+        Array.from([...(IDL.accounts ?? []), ...(IDL.types ?? [])]),
+      );
+      return coder.decode(returnData);
+    }
+    return await extractReturnValueForIx('perpPlaceOrder');
   }
 
   // perpPlaceOrder ix returns an optional, custom order id,
