@@ -2088,7 +2088,7 @@ export class MangoClient {
 
   /**
    * @param signature of the 'CONFIRMED' tx where perpPlaceOrder was called
-   * @returns list of orderId, if null, then no order was placed on the book
+   * @returns list of orderIds, when null, then no order was placed on the book for that ix
    */
   public async perpPlaceOrderGetOrderIdsForTx(
     signature: string,
