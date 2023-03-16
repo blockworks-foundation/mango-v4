@@ -10,6 +10,7 @@ import {
   AddressLookupTableAccount,
   Cluster,
   Commitment,
+  Connection,
   Keypair,
   MemcmpFilter,
   PublicKey,
@@ -2086,23 +2087,27 @@ export class MangoClient {
   }
 
   /**
-   *
-   * @param signature of the confirmed tx where perpPlaceOrderWasCalled
-   * @returns orderId as BN, or
+   * @param signature of the 'CONFIRMED' tx where perpPlaceOrder was called
+   * @returns list of orderId, if null, then no order was placed on the book
    */
-  public async perpPlaceOrderExractOrderId(
+  public async perpPlaceOrderGetOrderIdsForTx(
     signature: string,
   ): Promise<(BN | null)[]> {
-    async function extractReturnValueForIx(ixName: string): Promise<any[]> {
-      const tx = await this.program.provider.connection.getTransaction(
-        signature,
-        {
-          maxSupportedTransactionVersion: 1,
-        },
+    async function extractReturnValueForIx(
+      client: MangoClient,
+      ixName: string,
+    ): Promise<any[]> {
+      // we need a 'confirmed' level connection
+      const conn = new Connection(
+        client.program.provider.connection.rpcEndpoint,
+        'confirmed',
       );
+      const tx = await conn.getTransaction(signature, {
+        maxSupportedTransactionVersion: 1,
+      });
 
-      const returnPrefix = `Program return: ${this.programId} `;
-      const returnLogs = tx?.meta?.logMessages?.find((l) =>
+      const returnPrefix = `Program return: ${client.programId} `;
+      const returnLogs = tx?.meta?.logMessages?.filter((l) =>
         l.startsWith(returnPrefix),
       );
       if (!returnLogs) {
@@ -2124,7 +2129,7 @@ export class MangoClient {
         return coder.decode(returnData);
       });
     }
-    return await extractReturnValueForIx('perpPlaceOrder');
+    return await extractReturnValueForIx(this, 'perpPlaceOrder');
   }
 
   // perpPlaceOrder ix returns an optional, custom order id,
