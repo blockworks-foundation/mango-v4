@@ -242,7 +242,7 @@ export class PerpMarket {
   }
 
   get price(): I80F48 {
-    if (!this._price) {
+    if (this._price === undefined) {
       throw new Error(
         `Undefined price for perpMarket ${this.publicKey} with marketIndex ${this.perpMarketIndex}!`,
       );
@@ -251,7 +251,7 @@ export class PerpMarket {
   }
 
   get uiPrice(): number {
-    if (!this._uiPrice) {
+    if (this._uiPrice === undefined) {
       throw new Error(
         `Undefined price for perpMarket ${this.publicKey} with marketIndex ${this.perpMarketIndex}!`,
       );
@@ -260,7 +260,7 @@ export class PerpMarket {
   }
 
   get oracleLastUpdatedSlot(): number {
-    if (!this._oracleLastUpdatedSlot) {
+    if (this._oracleLastUpdatedSlot === undefined) {
       throw new Error(
         `Undefined oracleLastUpdatedSlot for perpMarket ${this.publicKey} with marketIndex ${this.perpMarketIndex}!`,
       );
@@ -269,7 +269,7 @@ export class PerpMarket {
   }
 
   get oracleProvider(): OracleProvider {
-    if (!this._oracleProvider) {
+    if (this._oracleProvider === undefined) {
       throw new Error(
         `Undefined oracleProvider for perpMarket ${this.publicKey} with marketIndex ${this.perpMarketIndex}!`,
       );

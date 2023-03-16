@@ -1,5 +1,5 @@
 import { Group } from './accounts/group';
-import { StubOracle } from './accounts/oracle';
+import { OracleProvider, StubOracle } from './accounts/oracle';
 import { MangoClient } from './client';
 import { MANGO_V4_ID } from './constants';
 
@@ -22,4 +22,4 @@ export * from './constants';
 export * from './numbers/I80F48';
 export * from './utils';
 export * from './types';
-export { Group, StubOracle, MangoClient, MANGO_V4_ID };
+export { Group, OracleProvider, StubOracle, MangoClient, MANGO_V4_ID };

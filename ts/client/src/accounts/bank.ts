@@ -337,7 +337,7 @@ export class Bank implements BankForHealth {
   }
 
   get price(): I80F48 {
-    if (!this._price) {
+    if (this._price === undefined) {
       throw new Error(
         `Undefined price for bank ${this.publicKey} with tokenIndex ${this.tokenIndex}!`,
       );
@@ -346,7 +346,7 @@ export class Bank implements BankForHealth {
   }
 
   get uiPrice(): number {
-    if (!this._uiPrice) {
+    if (this._uiPrice === undefined) {
       throw new Error(
         `Undefined uiPrice for bank ${this.publicKey} with tokenIndex ${this.tokenIndex}!`,
       );
@@ -355,7 +355,7 @@ export class Bank implements BankForHealth {
   }
 
   get oracleLastUpdatedSlot(): number {
-    if (!this._oracleLastUpdatedSlot) {
+    if (this._oracleLastUpdatedSlot === undefined) {
       throw new Error(
         `Undefined oracleLastUpdatedSlot for bank ${this.publicKey} with tokenIndex ${this.tokenIndex}!`,
       );
@@ -364,7 +364,7 @@ export class Bank implements BankForHealth {
   }
 
   get oracleProvider(): OracleProvider {
-    if (!this._oracleProvider) {
+    if (this._oracleProvider === undefined) {
       throw new Error(
         `Undefined oracleProvider for bank ${this.publicKey} with tokenIndex ${this.tokenIndex}!`,
       );
