@@ -4,7 +4,24 @@ use std::mem::size_of;
 
 // TODO: Assuming we allow up to 65536 different tokens
 pub type TokenIndex = u16;
+
+/// This token index is supposed to be the token that oracles quote in.
+///
+/// In practice this is set to the USDC token index, and that is wrong: actually
+/// oracles quote in USD. Any use of this constant points to a potentially
+/// incorrect assumption.
 pub const QUOTE_TOKEN_INDEX: TokenIndex = 0;
+
+/// The token index used for the insurance fund.
+///
+/// We should eventually generalize insurance funds.
+pub const INSURANCE_TOKEN_INDEX: TokenIndex = 0;
+
+/// The token index used for settling perp markets.
+///
+/// We should eventually generalize to make the whole perp quote (and settle) token
+/// configurable.
+pub const PERP_SETTLE_TOKEN_INDEX: TokenIndex = 0;
 
 #[account(zero_copy(safe_bytemuck_derives))]
 #[derive(Debug)]

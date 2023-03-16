@@ -31,7 +31,7 @@ pub fn token_register(
     net_borrow_limit_per_window_quote: i64,
 ) -> Result<()> {
     // Require token 0 to be in the insurance token
-    if token_index == QUOTE_TOKEN_INDEX {
+    if token_index == INSURANCE_TOKEN_INDEX {
         require_keys_eq!(
             ctx.accounts.group.load()?.insurance_mint,
             ctx.accounts.mint.key()

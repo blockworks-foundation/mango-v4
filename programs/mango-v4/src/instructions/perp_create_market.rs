@@ -47,7 +47,7 @@ pub fn perp_create_market(
     // - In perp bankruptcy: fix the assumption that the insurance fund has the same mint as
     //   the settlement token.
     require_msg!(
-        settle_token_index == QUOTE_TOKEN_INDEX,
+        settle_token_index == PERP_SETTLE_TOKEN_INDEX,
         "settlement tokens != USDC are not fully implemented"
     );
 
