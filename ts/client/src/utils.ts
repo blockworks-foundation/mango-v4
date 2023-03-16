@@ -159,6 +159,10 @@ export declare abstract class As<Tag extends keyof never> {
   private [As.$as$]: Record<Tag, true>;
 }
 
+///
+/// Anchor / Solana
+///
+
 export function groupTxLogsByIx(txLogs: string[]): string[][] {
   const logsGroupedByIx: string[][] = [];
   let currentIx: string[] = [];
@@ -173,10 +177,6 @@ export function groupTxLogsByIx(txLogs: string[]): string[][] {
 
   return logsGroupedByIx;
 }
-
-///
-/// Anchor / Solana
-///
 
 export function extractReturnValuesForSolanaTxLogs<T>(
   programId: PublicKey,
