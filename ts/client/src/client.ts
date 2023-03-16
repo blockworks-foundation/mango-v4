@@ -1,4 +1,4 @@
-import { AnchorProvider, BN, Program, Provider } from '@coral-xyz/anchor';
+import { AnchorProvider, BN, Program } from '@coral-xyz/anchor';
 import { IdlCoder } from '@coral-xyz/anchor/dist/cjs/coder/borsh/idl';
 import { decode } from '@coral-xyz/anchor/dist/cjs/utils/bytes/base64';
 import {
@@ -2085,8 +2085,15 @@ export class MangoClient {
     return await this.sendAndConfirmTransactionForGroup(group, [ix]);
   }
 
-  public async perpPlaceOrderReturnValue(signature: string): Promise<BN> {
-    async function extractReturnValueForIx(ixName: string): Promise<any> {
+  /**
+   *
+   * @param signature of the confirmed tx where perpPlaceOrderWasCalled
+   * @returns orderId as BN, or
+   */
+  public async perpPlaceOrderExractOrderId(
+    signature: string,
+  ): Promise<(BN | null)[]> {
+    async function extractReturnValueForIx(ixName: string): Promise<any[]> {
       const tx = await this.program.provider.connection.getTransaction(
         signature,
         {
@@ -2095,24 +2102,27 @@ export class MangoClient {
       );
 
       const returnPrefix = `Program return: ${this.programId} `;
-      const returnLog = tx?.meta?.logMessages?.find((l) =>
+      const returnLogs = tx?.meta?.logMessages?.find((l) =>
         l.startsWith(returnPrefix),
       );
-      if (!returnLog) {
+      if (!returnLogs) {
         throw new Error('Expected return log');
       }
-      const returnData = decode(returnLog.slice(returnPrefix.length));
-      const returnType = (
-        IDL.instructions.find((ix) => ix.name === ixName) as any
-      ).returns;
-      if (!returnType) {
-        throw new Error('Expected return type');
-      }
-      const coder = IdlCoder.fieldLayout(
-        { type: returnType },
-        Array.from([...(IDL.accounts ?? []), ...(IDL.types ?? [])]),
-      );
-      return coder.decode(returnData);
+
+      return returnLogs.map((returnLog) => {
+        const returnData = decode(returnLog.slice(returnPrefix.length));
+        const returnType = (
+          IDL.instructions.find((ix) => ix.name === ixName) as any
+        ).returns;
+        if (!returnType) {
+          throw new Error('Expected return type');
+        }
+        const coder = IdlCoder.fieldLayout(
+          { type: returnType },
+          Array.from([...(IDL.accounts ?? []), ...(IDL.types ?? [])]),
+        );
+        return coder.decode(returnData);
+      });
     }
     return await extractReturnValueForIx('perpPlaceOrder');
   }
