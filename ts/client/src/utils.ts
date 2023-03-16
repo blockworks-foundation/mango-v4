@@ -1,7 +1,8 @@
 import { AnchorProvider } from '@coral-xyz/anchor';
-import { ASSOCIATED_TOKEN_PROGRAM_ID, TOKEN_PROGRAM_ID } from './utils/spl';
+import { IdlCoder } from '@coral-xyz/anchor/dist/cjs/coder/borsh/idl';
 import {
   AddressLookupTableAccount,
+  Connection,
   MessageV0,
   PublicKey,
   Signer,
@@ -10,7 +11,12 @@ import {
   VersionedTransaction,
 } from '@solana/web3.js';
 import BN from 'bn.js';
+
+import { decode } from '@coral-xyz/anchor/dist/cjs/utils/bytes/base64';
+import { MangoClient } from './client';
+import { IDL } from './mango_v4';
 import { I80F48 } from './numbers/I80F48';
+import { ASSOCIATED_TOKEN_PROGRAM_ID, TOKEN_PROGRAM_ID } from './utils/spl';
 
 ///
 /// numeric helpers
@@ -151,4 +157,85 @@ export async function buildVersionedTx(
 export declare abstract class As<Tag extends keyof never> {
   private static readonly $as$: unique symbol;
   private [As.$as$]: Record<Tag, true>;
+}
+
+export function groupTxLogsByIx(txLogs: string[]): string[][] {
+  const logsGroupedByIx: string[][] = [];
+  let currentIx: string[] = [];
+  for (const log of txLogs) {
+    if (log.indexOf('invoke') > -1) {
+      currentIx.length !== 0 ? logsGroupedByIx.push(currentIx) : false;
+      currentIx = [];
+    }
+    currentIx.push(log);
+  }
+  currentIx.length !== 0 ? logsGroupedByIx.push(currentIx) : false;
+
+  return logsGroupedByIx;
+}
+
+///
+/// Anchor / Solana
+///
+
+export function extractReturnValuesForSolanaTxLogs<T>(
+  programId: PublicKey,
+  ixName: string,
+  txLogs: string[],
+): T[] {
+  const logsGroupedByIx = groupTxLogsByIx(txLogs);
+  const ixNamePrefix = `Program log: Instruction: ${
+    ixName.charAt(0).toUpperCase() + ixName.slice(1)
+  }`;
+
+  const filteredlogsGroupedByIx = logsGroupedByIx.filter(
+    (ixLogs) => ixLogs[1].indexOf(ixNamePrefix) > -1,
+  );
+  const logMessages = filteredlogsGroupedByIx.flat();
+
+  const returnPrefix = `Program return: ${programId} `;
+  const returnLogs = logMessages.filter((l) => l.startsWith(returnPrefix));
+  if (!returnLogs) {
+    throw new Error('Expected return log');
+  }
+
+  return returnLogs.map((returnLog) => {
+    const returnData = decode(returnLog.slice(returnPrefix.length));
+    const returnType = (
+      IDL.instructions.find((ix) => ix.name === ixName) as any
+    ).returns;
+    if (!returnType) {
+      throw new Error('Expected return type');
+    }
+    const coder = IdlCoder.fieldLayout(
+      { type: returnType },
+      Array.from([...(IDL.accounts ?? []), ...(IDL.types ?? [])]),
+    );
+    return coder.decode(returnData);
+  });
+}
+
+export async function extractReturnValuesForSolanaTx<T>(
+  client: MangoClient,
+  ixName: string,
+  signature: string,
+): Promise<T[]> {
+  // we need a 'confirmed' level connection
+  const conn = new Connection(
+    client.program.provider.connection.rpcEndpoint,
+    'confirmed',
+  );
+  const tx = await conn.getTransaction(signature, {
+    maxSupportedTransactionVersion: 1,
+  });
+
+  if (!tx?.meta?.logMessages) {
+    throw new Error('Tx meta logMessages is null or undefined');
+  }
+
+  return extractReturnValuesForSolanaTxLogs(
+    client.programId,
+    ixName,
+    tx.meta.logMessages,
+  );
 }
