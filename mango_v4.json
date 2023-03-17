@@ -1176,7 +1176,7 @@
       ],
       "args": [
         {
-          "name": "maxBuybackUsdNative",
+          "name": "maxBuybackUsd",
           "type": "u64"
         }
       ]

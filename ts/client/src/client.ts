@@ -999,11 +999,11 @@ export class MangoClient {
   public async accountBuybackFeesWithMngoIx(
     group: Group,
     mangoAccount: MangoAccount,
-    maxBuyback?: number,
+    maxBuybackUsd?: number,
   ): Promise<TransactionInstruction> {
-    maxBuyback = maxBuyback ?? mangoAccount.getMaxFeesBuybackUi(group);
+    maxBuybackUsd = maxBuybackUsd ?? mangoAccount.getMaxFeesBuybackUi(group);
     return await this.program.methods
-      .accountBuybackFeesWithMngo(new BN(maxBuyback))
+      .accountBuybackFeesWithMngo(toNative(maxBuybackUsd, 6))
       .accounts({
         group: group.publicKey,
         account: mangoAccount.publicKey,
