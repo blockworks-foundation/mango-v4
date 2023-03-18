@@ -13,7 +13,11 @@ import fs from 'fs';
 import { TokenIndex } from '../src/accounts/bank';
 import { Builder } from '../src/builder';
 import { MangoClient } from '../src/client';
-import { NullTokenEditParams } from '../src/clientIxParamBuilder';
+import {
+  buildIxGate,
+  NullTokenEditParams,
+  TrueIxGateParams,
+} from '../src/clientIxParamBuilder';
 import { MANGO_V4_ID, OPENBOOK_PROGRAM_ID } from '../src/constants';
 import { bpsToDecimal, percentageToDecimal, toNative } from '../src/utils';
 
@@ -294,12 +298,35 @@ async function perpCreate(): Promise<void> {
   console.log(serializeInstructionToBase64(ix));
 }
 
+async function ixDisable(): Promise<void> {
+  const result = await buildAdminClient();
+  const client = result[0];
+  const admin = result[1];
+
+  const group = await client.getGroup(
+    new PublicKey('78b8f4cGCwmZ9ysPFMWLaLTkkaYnUjwMJYStWe5RTSSX'),
+  );
+
+  const ixGateParams = TrueIxGateParams;
+  ixGateParams.HealthRegion = false;
+  const ix = await client.program.methods
+    .ixGateSet(buildIxGate(ixGateParams))
+    .accounts({
+      group: group.publicKey,
+      admin: group.securityAdmin,
+    })
+    .instruction();
+
+  console.log(await serializeInstructionToBase64(ix));
+}
+
 async function main(): Promise<void> {
   try {
     // await tokenRegister();
     // await tokenEdit();
     // await perpCreate();
-    await serum3Register();
+    // await serum3Register();
+    await ixDisable();
   } catch (error) {
     console.log(error);
   }
