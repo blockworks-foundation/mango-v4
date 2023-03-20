@@ -468,9 +468,10 @@ async function makeMarketUpdateInstructions(
     ),
   ];
 
-  instructions.push(
-    await client.healthRegionBeginIx(group, mangoAccount, [], [perpMarket]),
-  );
+  // Temporary: Health regions are currently disabled on mainnet for security reasons
+  //instructions.push(
+  //  await client.healthRegionBeginIx(group, mangoAccount, [], [perpMarket]),
+  //);
 
   const expiryTimestamp =
     params.tif !== undefined ? Date.now() / 1000 + params.tif : 0;
@@ -698,9 +699,10 @@ async function makeMarketUpdateInstructions(
     }
   }
 
-  instructions.push(
-    await client.healthRegionEndIx(group, mangoAccount, [], [perpMarket]),
-  );
+  // Temporary: Health regions are currently disabled on mainnet for security reasons
+  //instructions.push(
+  //  await client.healthRegionEndIx(group, mangoAccount, [], [perpMarket]),
+  //);
 
   // If instruction is only the sequence enforcement and health region ixs, then just send empty
   if (instructions.length === 3) {
