@@ -10,10 +10,32 @@ use fixed::types::I80F48;
 pub fn health_region_begin<'key, 'accounts, 'remaining, 'info>(
     ctx: Context<'key, 'accounts, 'remaining, 'info, HealthRegionBegin<'info>>,
 ) -> Result<()> {
-    // Check if the other instructions in the transactions are compatible
+    // The instructions that may be called inside a HealthRegion
+    let allowed_inner_ix = [
+        crate::instruction::PerpCancelAllOrders::discriminator(),
+        crate::instruction::PerpCancelAllOrdersBySide::discriminator(),
+        crate::instruction::PerpCancelOrder::discriminator(),
+        crate::instruction::PerpCancelOrderByClientOrderId::discriminator(),
+        crate::instruction::PerpPlaceOrder::discriminator(),
+        crate::instruction::PerpPlaceOrderPegged::discriminator(),
+        crate::instruction::Serum3CancelAllOrders::discriminator(),
+        crate::instruction::Serum3CancelOrder::discriminator(),
+        crate::instruction::Serum3PlaceOrder::discriminator(),
+        crate::instruction::Serum3SettleFunds::discriminator(),
+        crate::instruction::Serum3SettleFundsV2::discriminator(),
+    ];
+
+    // Check if the other instructions in the transaction are compatible
     {
         let ixs = ctx.accounts.instructions.as_ref();
         let current_index = tx_instructions::load_current_index_checked(ixs)? as usize;
+
+        // Forbid HealthRegionBegin to be called from CPI (it does not have to be the first instruction)
+        let current_ix = tx_instructions::load_instruction_at_checked(current_index, ixs)?;
+        require_msg!(
+            current_ix.program_id == *ctx.program_id,
+            "HealthRegionBegin must be a top-level instruction"
+        );
 
         // There must be a matching HealthRegionEnd instruction
         let mut index = current_index + 1;
@@ -26,18 +48,24 @@ pub fn health_region_begin<'key, 'accounts, 'remaining, 'info>(
             };
             index += 1;
 
-            if ix.program_id != crate::id() {
-                continue;
-            }
-            if ix.data[0..8] != crate::instruction::HealthRegionEnd::discriminator() {
-                continue;
-            }
+            require_keys_eq!(
+                ix.program_id,
+                crate::id(),
+                MangoError::HealthRegionBadInnerInstruction
+            );
 
-            // check that it's for the same account
-            require_keys_eq!(ix.accounts[0].pubkey, ctx.accounts.account.key());
-
-            found_end = true;
-            index += 1;
+            let discriminator: [u8; 8] = ix.data[0..8].try_into().unwrap();
+            if discriminator == crate::instruction::HealthRegionEnd::discriminator() {
+                // check that it's for the same account
+                require_keys_eq!(ix.accounts[0].pubkey, ctx.accounts.account.key());
+                found_end = true;
+                break;
+            } else {
+                require!(
+                    allowed_inner_ix.contains(&discriminator),
+                    MangoError::HealthRegionBadInnerInstruction
+                );
+            }
         }
         require_msg!(
             found_end,
