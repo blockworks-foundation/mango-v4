@@ -1,19 +1,20 @@
 import { AnchorProvider, BN, Wallet } from '@coral-xyz/anchor';
 import {
+  BlockhashWithExpiryBlockHeight,
   Cluster,
   Connection,
   Keypair,
   PublicKey,
   TransactionInstruction,
 } from '@solana/web3.js';
-import Binance from 'binance-api-node';
 import fs from 'fs';
-import { Kraken } from 'node-kraken-api';
 import path from 'path';
+import { Bank } from '../../src/accounts/bank';
 import { Group } from '../../src/accounts/group';
 import { HealthType, MangoAccount } from '../../src/accounts/mangoAccount';
 import {
   BookSide,
+  FillEvent,
   PerpMarket,
   PerpMarketIndex,
   PerpOrderSide,
@@ -21,13 +22,14 @@ import {
 } from '../../src/accounts/perp';
 import { MangoClient } from '../../src/client';
 import { MANGO_V4_ID } from '../../src/constants';
+import { I80F48 } from '../../src/numbers/I80F48';
 import { toUiDecimalsForQuote } from '../../src/utils';
 import { sendTransaction } from '../../src/utils/rpc';
 import * as defaultParams from './params/default.json';
 import {
+  findOwnSeqEnforcerAddress,
   makeCheckAndSetSequenceNumberIx,
   makeInitSequenceEnforcerAccountIx,
-  seqEnforcerProgramIds,
 } from './sequence-enforcer-util';
 
 console.log(defaultParams);
@@ -57,39 +59,165 @@ const params = JSON.parse(
   ),
 );
 
-const control = { isRunning: true, interval: params.interval };
+const control = { isRunning: true };
 
-// State which is passed around
-type State = {
-  mangoAccount: MangoAccount;
-  lastMangoAccountUpdate: number;
-  marketContexts: Map<PerpMarketIndex, MarketContext>;
-};
+// Global state which is passed around
+class BotContext {
+  latestBlockhash: BlockhashWithExpiryBlockHeight;
+  latestBlockhashLastUpdatedTs: number;
+  groupLastUpdatedTs: number;
+  mangoAccountLastUpdatedSlot: number;
+  mangoAccountLastUpdatedTs: number;
+
+  constructor(
+    public client: MangoClient,
+    public group: Group,
+    public mangoAccount: MangoAccount,
+    public perpMarkets: Map<PerpMarketIndex, MarketContext>,
+  ) {}
+
+  async refreshAll(): Promise<any> {
+    return Promise.all([
+      this.refreshBlockhash(),
+      this.refreshGroup(),
+      this.refreshMangoAccount(),
+    ]);
+  }
+
+  async refreshBlockhash(): Promise<void> {
+    if (!control.isRunning) return;
+    try {
+      const response = await this.client.connection.getLatestBlockhash(
+        'finalized',
+      );
+      this.latestBlockhash = response;
+      this.latestBlockhashLastUpdatedTs = Date.now();
+    } catch (e) {
+      console.error('could not refresh blockhash', e);
+    }
+  }
+
+  async refreshGroup(): Promise<void> {
+    if (!control.isRunning) return;
+    try {
+      await this.group.reloadAll(this.client);
+      // sync the context for every perp market
+      Array.from(this.perpMarkets.values()).map(async (mc, i) => {
+        const perpMarket = mc.perpMarket;
+        mc.perpMarket = this.group.getPerpMarketByMarketIndex(
+          perpMarket.perpMarketIndex,
+        );
+      });
+      this.groupLastUpdatedTs = Date.now();
+    } catch (e) {
+      console.error('could not refresh blockhash', e);
+    }
+  }
+
+  async refreshMangoAccount(): Promise<void> {
+    if (!control.isRunning) return;
+    try {
+      const response = await this.client.getMangoAccountWithSlot(
+        this.mangoAccount.publicKey,
+        false,
+      );
+      if (response) {
+        this.mangoAccount = response.value;
+        this.mangoAccountLastUpdatedSlot = response.slot;
+        this.mangoAccountLastUpdatedTs = Date.now();
+      } else {
+        console.warn('could not fetch mangoAccount');
+      }
+    } catch (e) {
+      console.error('could not refresh mangoAccount', e);
+    }
+  }
+
+  async updateOrders(PerpMarketIndex: i): Promise<void> {
+    await Promise.all(
+      Array.from(this.perpMarkets.entries()).map(async ([_, p]) => {
+        const 
+        // TODO calculate current delta (spot + perp) & equity
+        const currentDelta = 0;
+        const currentEquityInUnderlying =
+          this.mangoAccount.getEquity(this.group).toNumber() /
+          p.perpMarket.uiPrice;
+        const maxSize = currentEquityInUnderlying * p.params.sizePerc;
+        const bidSize = Math.min(maxSize, p.params.deltaMax - currentDelta);
+        const askSize = Math.min(maxSize, currentDelta - p.params.deltaMin);
+        const bidPrice = p.perpMarket.uiPrice * -p.params.charge;
+        const askPrice = p.perpMarket.uiPrice * +p.params.charge;
+
+        const beginIx = await this.client.healthRegionBeginIx(
+          this.group,
+          this.mangoAccount,
+          [],
+          [p.perpMarket],
+        );
+        const cancelAllIx = await this.client.perpCancelAllOrdersIx(
+          this.group,
+          this.mangoAccount,
+          p.perpMarket.perpMarketIndex,
+          4,
+        );
+        const bidIx = await this.client.perpPlaceOrderPeggedIx(
+          this.group,
+          this.mangoAccount,
+          p.perpMarket.perpMarketIndex,
+          PerpOrderSide.bid,
+          bidPrice,
+          bidSize,
+          undefined,
+          undefined,
+          Date.now(),
+        );
+        const askIx = await this.client.perpPlaceOrderPeggedIx(
+          this.group,
+          this.mangoAccount,
+          p.perpMarket.perpMarketIndex,
+          PerpOrderSide.ask,
+          askPrice,
+          askSize,
+          undefined,
+          undefined,
+          Date.now(),
+        );
+
+        const endIx = await this.client.healthRegionEndIx(
+          this.group,
+          this.mangoAccount,
+          [],
+          [p.perpMarket],
+        );
+
+        await this.client.sendAndConfirmTransaction([
+          beginIx,
+          cancelAllIx,
+          bidIx,
+          askIx,
+          endIx,
+        ]);
+      }),
+    );
+  }
+}
+
+/// BTC 50,000 dec=9 lots=0.0001 BTC lSize = 10,000
+/// USDC dec=6 lots=1 USDC lSize = 1,000,000
+/// 1% spread
+/// one
+/// one increment in price = 0.0001 BTC
+
 type MarketContext = {
   params: any;
   perpMarket: PerpMarket;
-  bids: BookSide;
-  asks: BookSide;
-  lastBookUpdate: number;
-
-  krakenBid: number | undefined;
-  krakenAsk: number | undefined;
-
-  // binanceBid: number | undefined;
-  // binanceAsk: number | undefined;
-
   sequenceAccount: PublicKey;
   sequenceAccountBump: number;
-
-  sentBidPrice: number;
-  sentAskPrice: number;
-  lastOrderUpdate: number;
+  collateralBank: Bank;
+  unprocessedPerpFills: { fills: FillEvent; slot: number }[];
 };
 
-const binanceClient = Binance();
-const krakenClient = new Kraken();
-
-function getPerpMarketAssetsToTradeOn(group: Group) {
+function getPerpMarketAssetsToTradeOn(group: Group): string[] {
   const allMangoGroupPerpMarketAssets = Array.from(
     group.perpMarketsMapByName.keys(),
   ).map((marketName) => marketName.replace('-PERP', ''));
@@ -98,58 +226,11 @@ function getPerpMarketAssetsToTradeOn(group: Group) {
   );
 }
 
-// Refresh group, mango account and perp markets
-async function refreshState(
-  client: MangoClient,
-  group: Group,
-  mangoAccount: MangoAccount,
-  marketContexts: Map<PerpMarketIndex, MarketContext>,
-): Promise<State> {
-  const ts = Date.now() / 1000;
-
-  const result = await Promise.all([
-    group.reloadAll(client),
-    mangoAccount.reload(client),
-    ...Array.from(marketContexts.values()).map(
-      (mc) =>
-        krakenClient.depth({
-          pair: mc.params.krakenCode,
-        }),
-      // binanceClient.book({
-      //   symbol: mc.perpMarket.name.replace('-PERP', 'USDT'),
-      // }),
-    ),
-  ]);
-
-  Array.from(marketContexts.values()).map(async (mc, i) => {
-    const perpMarket = mc.perpMarket;
-    mc.perpMarket = group.getPerpMarketByMarketIndex(
-      perpMarket.perpMarketIndex,
-    );
-    mc.bids = await perpMarket.loadBids(client, true);
-    mc.asks = await perpMarket.loadAsks(client, true);
-    mc.lastBookUpdate = ts;
-
-    mc.krakenAsk = parseFloat(
-      (result[i + 2] as any)[mc.params.krakenCode].asks[0][0],
-    );
-    mc.krakenBid = parseFloat(
-      (result[i + 2] as any)[mc.params.krakenCode].bids[0][0],
-    );
-  });
-
-  return {
-    mangoAccount,
-    lastMangoAccountUpdate: ts,
-    marketContexts,
-  };
-}
-
 // Initialiaze sequence enforcer accounts
 async function initSequenceEnforcerAccounts(
   client: MangoClient,
   marketContexts: MarketContext[],
-) {
+): Promise<void> {
   const seqAccIxs = marketContexts.map((mc) =>
     makeInitSequenceEnforcerAccountIx(
       mc.sequenceAccount,
@@ -187,7 +268,7 @@ async function cancelAllOrdersForAMarket(
   group: Group,
   mangoAccount: MangoAccount,
   perpMarket: PerpMarket,
-) {
+): Promise<void> {
   for (const i of Array(100).keys()) {
     await sendTransaction(
       client.program.provider as AnchorProvider,
@@ -201,6 +282,8 @@ async function cancelAllOrdersForAMarket(
       ],
       [],
     );
+    // TODO: reloading the same account multiple times inside a loop
+    //       over all perp markets seems very wasteful
     await mangoAccount.reload(client);
     if (
       (
@@ -216,6 +299,77 @@ async function cancelAllOrdersForAMarket(
   }
 }
 
+async function refreshOrders(
+  client: MangoClient,
+  group: Group,
+  mangoAccount: MangoAccount,
+  pc: MarketContext,
+): Promise<string> {
+  // TODO calculate current delta (spot + perp) & equity
+
+  const spotDelta = mangoAccount.getTokenBalanceUi(pc.collateralBank);
+  const perpDelta = mangoAccount.getPerpPositionUi(group, pc.perpMarket.perpMarketIndex, false);
+  const unconfirmedDelta = pc.unprocessedPerpFills.filter(f => f.slot > )
+  const currentDelta = 0;
+  const currentEquityInUnderlying =
+    mangoAccount.getEquity(group).toNumber() / pc.perpMarket.uiPrice;
+  const maxSize = currentEquityInUnderlying * pc.params.sizePerc;
+  const bidSize = Math.min(maxSize, pc.params.deltaMax - currentDelta);
+  const askSize = Math.min(maxSize, currentDelta - pc.params.deltaMin);
+  const bidPrice = pc.perpMarket.uiPrice * -pc.params.charge;
+  const askPrice = pc.perpMarket.uiPrice * +pc.params.charge;
+
+  const beginIx = await this.client.healthRegionBeginIx(
+    group,
+    mangoAccount,
+    [],
+    [pc.perpMarket],
+  );
+  const cancelAllIx = await this.client.perpCancelAllOrdersIx(
+    group,
+    mangoAccount,
+    pc.perpMarket.perpMarketIndex,
+    4,
+  );
+  const bidIx = await this.client.perpPlaceOrderPeggedIx(
+    group,
+    mangoAccount,
+    pc.perpMarket.perpMarketIndex,
+    PerpOrderSide.bid,
+    bidPrice,
+    bidSize,
+    undefined,
+    undefined,
+    Date.now(),
+  );
+  const askIx = await this.client.perpPlaceOrderPeggedIx(
+    group,
+    mangoAccount,
+    pc.perpMarket.perpMarketIndex,
+    PerpOrderSide.ask,
+    askPrice,
+    askSize,
+    undefined,
+    undefined,
+    Date.now(),
+  );
+
+  const endIx = await this.client.healthRegionEndIx(
+    group,
+    mangoAccount,
+    [],
+    [pc.perpMarket],
+  );
+
+  return await this.client.sendAndConfirmTransaction([
+    beginIx,
+    cancelAllIx,
+    bidIx,
+    askIx,
+    endIx,
+  ]);
+}
+
 // Cancel all orders on exit
 async function onExit(
   client: MangoClient,
@@ -224,501 +378,164 @@ async function onExit(
   marketContexts: MarketContext[],
 ) {
   for (const mc of marketContexts) {
+    // TODO: this doesn't actually enforce execution as promise is never awaited for
     cancelAllOrdersForAMarket(client, group, mangoAccount, mc.perpMarket);
   }
 }
 
 // Main driver for the market maker
 async function fullMarketMaker() {
-  // Load client
-  const options = AnchorProvider.defaultOptions();
-  const connection = new Connection(CLUSTER_URL!, options);
-  const user = Keypair.fromSecretKey(
-    Buffer.from(
-      JSON.parse(
-        process.env.KEYPAIR || fs.readFileSync(USER_KEYPAIR!, 'utf-8'),
+  let intervals: NodeJS.Timer[] = [];
+  try {
+    // Load client
+    const options = AnchorProvider.defaultOptions();
+    const connection = new Connection(CLUSTER_URL!, options);
+    const user = Keypair.fromSecretKey(
+      Buffer.from(
+        JSON.parse(
+          process.env.KEYPAIR || fs.readFileSync(USER_KEYPAIR!, 'utf-8'),
+        ),
       ),
-    ),
-  );
-  const userWallet = new Wallet(user);
-  const userProvider = new AnchorProvider(connection, userWallet, options);
-  const client = await MangoClient.connect(
-    userProvider,
-    CLUSTER,
-    MANGO_V4_ID[CLUSTER],
-    {
-      idsSource: 'get-program-accounts',
-    },
-  );
-
-  // Load mango account
-  let mangoAccount = await client.getMangoAccount(
-    new PublicKey(MANGO_ACCOUNT_PK),
-  );
-  console.log(
-    `MangoAccount ${mangoAccount.publicKey} for user ${user.publicKey} ${
-      mangoAccount.isDelegate(client) ? 'via delegate ' + user.publicKey : ''
-    }`,
-  );
-  await mangoAccount.reload(client);
-
-  // Load group
-  const group = await client.getGroup(mangoAccount.group);
-  await group.reloadAll(client);
-
-  // Cancel all existing orders
-  for (const perpMarket of Array.from(
-    group.perpMarketsMapByMarketIndex.values(),
-  )) {
-    await client.perpCancelAllOrders(
-      group,
-      mangoAccount,
-      perpMarket.perpMarketIndex,
-      10,
     );
-  }
-
-  // Build and maintain an aggregate context object per market
-  const marketContexts: Map<PerpMarketIndex, MarketContext> = new Map();
-  for (const perpMarketAsset of getPerpMarketAssetsToTradeOn(group)) {
-    const perpMarket = group.getPerpMarketByName(perpMarketAsset + '-PERP');
-    const [sequenceAccount, sequenceAccountBump] =
-      await PublicKey.findProgramAddress(
-        [
-          Buffer.from(perpMarket.name, 'utf-8'),
-          (
-            client.program.provider as AnchorProvider
-          ).wallet.publicKey.toBytes(),
-        ],
-        seqEnforcerProgramIds[CLUSTER],
-      );
-    marketContexts.set(perpMarket.perpMarketIndex, {
-      params: params.assets[perpMarketAsset].perp,
-      perpMarket: perpMarket,
-      bids: await perpMarket.loadBids(client),
-      asks: await perpMarket.loadAsks(client),
-      lastBookUpdate: 0,
-
-      sequenceAccount,
-      sequenceAccountBump,
-
-      sentBidPrice: 0,
-      sentAskPrice: 0,
-      lastOrderUpdate: 0,
-
-      krakenBid: undefined,
-      krakenAsk: undefined,
-    });
-  }
-
-  // Init sequence enforcer accounts
-  await initSequenceEnforcerAccounts(
-    client,
-    Array.from(marketContexts.values()),
-  );
-
-  // Load state first time
-  console.log(`Loading state first time`);
-  let state = await refreshState(client, group, mangoAccount, marketContexts);
-
-  // Add handler for e.g. CTRL+C
-  process.on('SIGINT', function () {
-    console.log('Caught keyboard interrupt. Canceling orders');
-    control.isRunning = false;
-    onExit(client, group, mangoAccount, Array.from(marketContexts.values()));
-  });
-
-  // Loop indefinitely
-  while (control.isRunning) {
-    try {
-      console.log(`\nRefreshing state`);
-      refreshState(client, group, mangoAccount, marketContexts).then(
-        (result) => (state = result),
-      );
-
-      mangoAccount = state.mangoAccount;
-
-      // Calculate pf level values
-      let pfQuoteValue: number | undefined = 0;
-      for (const mc of Array.from(marketContexts.values())) {
-        const pos = mangoAccount.perpPositionExistsForMarket(mc.perpMarket)
-          ? mangoAccount.getPerpPositionUi(group, mc.perpMarket.perpMarketIndex)
-          : 0;
-        const mid = (mc.krakenBid! + mc.krakenAsk!) / 2;
-        if (mid) {
-          pfQuoteValue += pos * mid;
-        } else {
-          pfQuoteValue = undefined;
-          console.log(
-            `Breaking pfQuoteValue computation, since mid is undefined for ${mc.perpMarket.name}!`,
-          );
-          break;
-        }
-      }
-
-      // Don't proceed if we don't have pfQuoteValue yet
-      if (pfQuoteValue === undefined) {
-        console.log(
-          `Continuing control loop, since pfQuoteValue is undefined!`,
-        );
-        continue;
-      }
-
-      // Update all orders on all markets
-      for (const mc of Array.from(marketContexts.values())) {
-        const ixs = await makeMarketUpdateInstructions(
-          client,
-          group,
-          mangoAccount,
-          mc,
-          pfQuoteValue,
-        );
-        if (ixs.length === 0) {
-          continue;
-        }
-
-        const sig = await sendTransaction(
-          client.program.provider as AnchorProvider,
-          ixs,
-          group.addressLookupTablesList,
-        );
-        console.log(
-          `Orders for market updated, sig https://explorer.solana.com/tx/${sig}?cluster=${
-            CLUSTER == 'devnet' ? 'devnet' : ''
-          }`,
-        );
-      }
-    } catch (e) {
-      console.log(e);
-    } finally {
-      console.log(
-        `${new Date().toUTCString()} sleeping for ${control.interval / 1000}s`,
-      );
-      await new Promise((r) => setTimeout(r, control.interval));
-    }
-  }
-}
-
-async function makeMarketUpdateInstructions(
-  client: MangoClient,
-  group: Group,
-  mangoAccount: MangoAccount,
-  mc: MarketContext,
-  pfQuoteValue: number,
-): Promise<TransactionInstruction[]> {
-  const perpMarketIndex = mc.perpMarket.perpMarketIndex;
-  const perpMarket = mc.perpMarket;
-
-  const aggBid = mc.krakenBid;
-  const aggAsk = mc.krakenAsk;
-  if (aggBid === undefined || aggAsk === undefined) {
-    console.log(`No Aggregate Book for ${mc.perpMarket.name}!`);
-    return [];
-  }
-
-  const leanCoeff = mc.params.leanCoeff;
-
-  const fairValue = (aggBid + aggAsk) / 2;
-  const aggSpread = (aggAsk - aggBid) / fairValue;
-
-  const requoteThresh = mc.params.requoteThresh;
-  const equity = toUiDecimalsForQuote(mangoAccount.getEquity(group));
-  const sizePerc = mc.params.sizePerc;
-  const quoteSize = equity * sizePerc;
-  const size = quoteSize / fairValue;
-
-  // console.log(`equity ${equity}`);
-  // console.log(`sizePerc ${sizePerc}`);
-  // console.log(`fairValue ${fairValue}`);
-  // console.log(`size ${size}`);
-
-  const basePos = mangoAccount.perpPositionExistsForMarket(mc.perpMarket)
-    ? mangoAccount.getPerpPositionUi(group, perpMarketIndex, true)
-    : 0;
-  const unsettledPnl = mangoAccount.perpPositionExistsForMarket(mc.perpMarket)
-    ? mangoAccount
-        .getPerpPosition(perpMarketIndex)!
-        .getUnsettledPnlUi(perpMarket)
-    : 0;
-  const lean = (-leanCoeff * basePos) / size;
-  const pfQuoteLeanCoeff = params.pfQuoteLeanCoeff || 0.001; // How much to move if pf pos is equal to equity
-  const pfQuoteLean = (pfQuoteValue / equity) * -pfQuoteLeanCoeff;
-  const charge = (mc.params.charge || 0.0012) + aggSpread / 2;
-  const bias = mc.params.bias;
-
-  const fairValueInLots = perpMarket.uiPriceToLots(fairValue);
-
-  const nativeBidSize = perpMarket.uiBaseToLots(size);
-  const nativeAskSize = perpMarket.uiBaseToLots(size);
-
-  const bids = mc.bids;
-  const asks = mc.asks;
-  const bestBid = bids.best();
-  const bestAsk = asks.best();
-
-  let moveOrders = false;
-
-  // Start building the transaction
-  const instructions: TransactionInstruction[] = [
-    makeCheckAndSetSequenceNumberIx(
-      mc.sequenceAccount,
-      (client.program.provider as AnchorProvider).wallet.publicKey,
-      Date.now(),
+    const userWallet = new Wallet(user);
+    const userProvider = new AnchorProvider(connection, userWallet, options);
+    const client = await MangoClient.connect(
+      userProvider,
       CLUSTER,
-    ),
-  ];
-
-  instructions.push(
-    await client.healthRegionBeginIx(group, mangoAccount, [], [perpMarket]),
-  );
-
-  const expiryTimestamp =
-    params.tif !== undefined ? Date.now() / 1000 + params.tif : 0;
-
-  // TODO: oracle pegged runs out of free perp open order slots on mango account
-  if (params.oraclePegged) {
-    const uiOPegBidOffset = fairValue * (-charge + lean + bias + pfQuoteLean);
-    const uiOPegAskOffset = fairValue * (charge + lean + bias + pfQuoteLean);
-
-    const modelBidOPegOffset = perpMarket.uiPriceToLots(uiOPegBidOffset);
-    const modelAskOPegOffset = perpMarket.uiPriceToLots(uiOPegAskOffset);
-
-    const bookAdjBidOPegOffset = bestAsk?.priceLots
-      .sub(new BN(1))
-      .lt(fairValueInLots.add(modelBidOPegOffset))
-      ? fairValueInLots.sub(bestAsk.priceLots.sub(new BN(1)))
-      : modelBidOPegOffset;
-    const bookAdjAskOPegOffset = bestBid?.priceLots
-      .add(new BN(1))
-      .gt(fairValueInLots.add(modelAskOPegOffset))
-      ? bestBid.priceLots.sub(new BN(1)).sub(fairValueInLots)
-      : modelAskOPegOffset;
-
-    const openOrders = await mangoAccount.loadPerpOpenOrdersForMarket(
-      client,
-      group,
-      perpMarketIndex,
+      MANGO_V4_ID[CLUSTER],
+      {
+        idsSource: 'get-program-accounts',
+      },
     );
 
-    moveOrders = openOrders.length < 2;
-
-    const placeBidOPegIx = await client.perpPlaceOrderPeggedIx(
-      group,
-      mangoAccount,
-      perpMarketIndex,
-      PerpOrderSide.bid,
-      perpMarket.priceLotsToUi(bookAdjBidOPegOffset),
-      perpMarket.priceLotsToUi(
-        fairValueInLots.mul(new BN(101)).div(new BN(100)),
-      ),
-      perpMarket.baseLotsToUi(nativeBidSize),
-      undefined,
-      Date.now(),
-      PerpOrderType.limit,
-      false,
-      expiryTimestamp,
-      20,
+    // Load mango account
+    const mangoAccount = await client.getMangoAccount(
+      new PublicKey(MANGO_ACCOUNT_PK),
     );
-
-    const placeAskOPegIx = await client.perpPlaceOrderPeggedIx(
-      group,
-      mangoAccount,
-      perpMarketIndex,
-      PerpOrderSide.ask,
-      perpMarket.priceLotsToUi(bookAdjAskOPegOffset),
-      perpMarket.priceLotsToUi(
-        fairValueInLots.mul(new BN(98)).div(new BN(100)),
-      ),
-      perpMarket.baseLotsToUi(nativeAskSize),
-      undefined,
-      Date.now(),
-      PerpOrderType.limit,
-      false,
-      expiryTimestamp,
-      20,
+    console.log(
+      `MangoAccount ${mangoAccount.publicKey} for user ${user.publicKey} ${
+        mangoAccount.isDelegate(client) ? 'via delegate ' + user.publicKey : ''
+      }`,
     );
+    await mangoAccount.reload(client);
 
-    const posAsTradeSizes = basePos / size;
+    // Load group
+    const group = await client.getGroup(mangoAccount.group);
+    await group.reloadAll(client);
 
-    // console.log(
-    //   `basePos ${basePos}, posAsTradeSizes ${posAsTradeSizes}, size ${size}`,
-    // );
-
-    if (posAsTradeSizes < 15) {
-      instructions.push(placeBidOPegIx);
-    }
-    if (posAsTradeSizes > -15) {
-      instructions.push(placeAskOPegIx);
-    }
-
-    const approxOPegBidPrice = perpMarket.priceLotsToUi(
-      fairValueInLots.add(bookAdjBidOPegOffset),
-    );
-    const approxOPegAskPrice = perpMarket.priceLotsToUi(
-      fairValueInLots.add(bookAdjAskOPegOffset),
-    );
-
-    if (posAsTradeSizes < 15 || posAsTradeSizes > -15) {
-      console.log(
-        `Requoting for market ${mc.perpMarket.name} sentBid: ${
-          mc.sentBidPrice
-        } newBid: ${approxOPegBidPrice} sentAsk: ${
-          mc.sentAskPrice
-        } newAsk: ${approxOPegAskPrice} pfLean: ${(pfQuoteLean * 10000).toFixed(
-          1,
-        )} aggBid: ${aggBid} addAsk: ${aggAsk}`,
-      );
-      mc.sentBidPrice = approxOPegAskPrice;
-      mc.sentAskPrice = approxOPegAskPrice;
-      mc.lastOrderUpdate = Date.now() / 1000;
-    }
-  } else {
-    const uiBidPrice = fairValue * (1 - charge + lean + bias + pfQuoteLean);
-    const uiAskPrice = fairValue * (1 + charge + lean + bias + pfQuoteLean);
-
-    const modelBidPrice = perpMarket.uiPriceToLots(uiBidPrice);
-    const modelAskPrice = perpMarket.uiPriceToLots(uiAskPrice);
-
-    const bookAdjBid =
-      bestAsk !== undefined
-        ? BN.min(bestAsk.priceLots.sub(new BN(1)), modelBidPrice)
-        : modelBidPrice;
-    const bookAdjAsk =
-      bestBid !== undefined
-        ? BN.max(bestBid.priceLots.add(new BN(1)), modelAskPrice)
-        : modelAskPrice;
-
-    if (mc.lastBookUpdate >= mc.lastOrderUpdate + 2) {
-      // If mango book was updated recently, then MangoAccount was also updated
-      const openOrders = await mangoAccount.loadPerpOpenOrdersForMarket(
-        client,
-        group,
-        perpMarketIndex,
-      );
-      moveOrders = openOrders.length < 2 || openOrders.length > 2;
-      for (const o of openOrders) {
-        const refPrice = o.side === 'buy' ? bookAdjBid : bookAdjAsk;
-        moveOrders =
-          moveOrders ||
-          Math.abs(o.priceLots.toNumber() / refPrice.toNumber() - 1) >
-            requoteThresh;
-      }
-    } else {
-      // If order was updated before MangoAccount, then assume that sent order already executed
-      moveOrders =
-        moveOrders ||
-        Math.abs(mc.sentBidPrice / bookAdjBid.toNumber() - 1) > requoteThresh ||
-        Math.abs(mc.sentAskPrice / bookAdjAsk.toNumber() - 1) > requoteThresh;
-    }
-
-    if (moveOrders) {
-      // Cancel all, requote
-      const cancelAllIx = await client.perpCancelAllOrdersIx(
+    // Cancel all existing orders
+    // TODO: refactor so it can be called inside onExit
+    for (const perpMarket of Array.from(
+      group.perpMarketsMapByMarketIndex.values(),
+    )) {
+      await client.perpCancelAllOrders(
         group,
         mangoAccount,
-        perpMarketIndex,
+        perpMarket.perpMarketIndex,
         10,
       );
-
-      const placeBidIx = await client.perpPlaceOrderIx(
-        group,
-        mangoAccount,
-        perpMarketIndex,
-        PerpOrderSide.bid,
-        perpMarket.priceLotsToUi(bookAdjBid),
-        perpMarket.baseLotsToUi(nativeBidSize),
-        undefined,
-        Date.now(),
-        PerpOrderType.postOnlySlide,
-        false,
-        expiryTimestamp,
-        20,
-      );
-
-      const placeAskIx = await client.perpPlaceOrderIx(
-        group,
-        mangoAccount,
-        perpMarketIndex,
-        PerpOrderSide.ask,
-        perpMarket.priceLotsToUi(bookAdjAsk),
-        perpMarket.baseLotsToUi(nativeAskSize),
-        undefined,
-        Date.now(),
-        PerpOrderType.postOnlySlide,
-        false,
-        expiryTimestamp,
-        20,
-      );
-
-      // console.log(
-      //   `basePos ${basePos}, posAsTradeSizes ${posAsTradeSizes}, size ${size}`,
-      // );
-
-      const posAsTradeSizes = basePos / size;
-
-      instructions.push(cancelAllIx);
-      if (posAsTradeSizes < 15) {
-        instructions.push(placeBidIx);
-      }
-      if (posAsTradeSizes > -15) {
-        instructions.push(placeAskIx);
-      }
-
-      console.log(
-        `\nRequoting for market ${mc.perpMarket.name} sentBid: ${
-          mc.sentBidPrice
-        } newBid: ${bookAdjBid} sentAsk: ${
-          mc.sentAskPrice
-        } newAsk: ${bookAdjAsk} pfLean: ${(pfQuoteLean * 10000).toFixed(
-          1,
-        )} aggBid: ${aggBid} addAsk: ${aggAsk}`,
-      );
-
-      console.log(
-        `Health ratio ${mangoAccount
-          .getHealthRatio(group, HealthType.maint)
-          .toFixed(3)}, maint health ${toUiDecimalsForQuote(
-          mangoAccount.getHealth(group, HealthType.maint),
-        ).toFixed(3)}, account equity ${equity.toFixed(
-          3,
-        )}, base position ${Math.abs(basePos).toFixed(3)} ${
-          basePos >= 0 ? 'LONG' : 'SHORT'
-        }, notional ${Math.abs(basePos * perpMarket.uiPrice).toFixed(
-          3,
-        )}, unsettled Pnl ${unsettledPnl.toFixed(3)}`,
-      );
-
-      mc.sentBidPrice = bookAdjBid.toNumber();
-      mc.sentAskPrice = bookAdjAsk.toNumber();
-      mc.lastOrderUpdate = Date.now() / 1000;
-    } else {
-      console.log(
-        `Not requoting for market ${mc.perpMarket.name}. No need to move orders`,
-      );
     }
-  }
 
-  instructions.push(
-    await client.healthRegionEndIx(group, mangoAccount, [], [perpMarket]),
-  );
+    // Initialize bot state
+    const perpMarkets: Map<PerpMarketIndex, MarketContext> = new Map();
+    for (const perpMarketAsset of getPerpMarketAssetsToTradeOn(group)) {
+      const perpMarket = group.getPerpMarketByName(perpMarketAsset + '-PERP');
+      const collateralBank = group.getFirstBankByMint(
+        new PublicKey(params.assets[perpMarketAsset].perp.collateralMint),
+      );
+      const [sequenceAccount, sequenceAccountBump] =
+        await findOwnSeqEnforcerAddress(perpMarket.name, client);
+      perpMarkets.set(perpMarket.perpMarketIndex, {
+        params: params.assets[perpMarketAsset].perp,
+        perpMarket,
+        collateralBank,
+        sequenceAccount,
+        sequenceAccountBump,
+        unprocessedPerpFills: [],
+      });
+    }
 
-  // If instruction is only the sequence enforcement and health region ixs, then just send empty
-  if (instructions.length === 3) {
-    return [];
-  } else {
-    return instructions;
+    const bot = new BotContext(client, group, mangoAccount, perpMarkets);
+
+    // Init sequence enforcer accounts if needed
+    await initSequenceEnforcerAccounts(
+      client,
+      Array.from(perpMarkets.values()),
+    );
+
+    // TODO: subscribe to position change events:
+    //     const fillsWs = new WebSocket('https://api.mngo.cloud/fills/v1');
+    //     store events in unprocessedPerpFills together with the relevant slot
+    //     prune unprocessed fill events < response.slot here as well to avoid race conditions
+
+    // Add handler for e.g. CTRL+C
+    // TODO, this keep registering more and more handlers, maybe not ideal
+    process.on('SIGINT', function () {
+      console.log('Caught keyboard interrupt. Canceling orders');
+      control.isRunning = false;
+      // TODO: to execute promise until end, add .then() call
+      onExit(client, group, mangoAccount, Array.from(perpMarkets.values()));
+    });
+
+    console.log(`Refreshing state first time`);
+    await bot.refreshAll();
+
+    // setup continuous refresh
+    intervals.push(
+      setInterval(() =>
+        this.refreshBlockhash.then(() => console.debug('updated blockhash')),
+      ),
+      params.intervals.blockhash,
+    );
+    intervals.push(
+      setInterval(() =>
+        this.refreshGroup.then(() => console.debug('updated group')),
+      ),
+      params.intervals.group,
+    );
+    intervals.push(
+      setInterval(() =>
+        this.refreshMangoAccount.then(() =>
+          console.debug('updated mangoAccount'),
+        ),
+      ),
+      params.intervals.mangoAccount,
+    );
+
+    // TODO: place initial oracle peg orders on book
+    await bot.updateOrders();
+
+    // TODO: launch hedgers per market
+    // Loop indefinitely
+    while (control.isRunning) {
+      // calculate delta
+      //       hedge to bring delta in line with config goal
+      //       if perp position would be reduced by hedge:
+      //          hedge on perp with kill or fill
+      //          spot hedge in parallel with same sequence id but a second tx
+      //          if perp hedge fails, sequence id won't be advanced and spot hedge will succeed
+      //          spot hedge should use known liquid routes without network requests (mango-router run in parallel)
+      //       if perp position would increase:
+      //          spot hedge
+      //       wait for hedge txs to confirm:
+      //          update oracle peg orders
+    }
+  } finally {
+    intervals.forEach((i) => clearInterval(i));
+    intervals = [];
   }
 }
 
-function startMarketMaker() {
+function startMarketMaker(): void {
   try {
     if (control.isRunning) {
+      console.warn('start MM');
       fullMarketMaker()
-        .catch((error) => console.log(error))
+        .catch((e) => console.error('Critical Error', e))
         .finally(startMarketMaker);
     }
-  } catch (error) {
-    console.log(error);
+  } catch (e) {
+    console.error('this should never happen', e);
   }
 }
 

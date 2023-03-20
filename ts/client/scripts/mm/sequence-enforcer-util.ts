@@ -1,16 +1,39 @@
-import { BN } from '@coral-xyz/anchor';
+import { AnchorProvider, BN } from '@coral-xyz/anchor';
 import {
   PublicKey,
   SystemProgram,
   TransactionInstruction,
 } from '@solana/web3.js';
 import { createHash } from 'crypto';
+import { MangoClient } from '../../src/client';
 
 export const seqEnforcerProgramIds = {
   devnet: new PublicKey('FBngRHN4s5cmHagqy3Zd6xcK3zPJBeX5DixtHFbBhyCn'),
   testnet: new PublicKey('FThcgpaJM8WiEbK5rw3i31Ptb8Hm4rQ27TrhfzeR1uUy'),
   'mainnet-beta': new PublicKey('GDDMwNyyx8uB6zrqwBFHjLLG3TBYk2F8Az4yrQC5RzMp'),
 };
+
+export async function findSeqEnforcerAddress(
+  id: string,
+  owner: PublicKey,
+  programId: PublicKey,
+): Promise<[PublicKey, number]> {
+  return PublicKey.findProgramAddress(
+    [Buffer.from(id, 'utf-8'), owner.toBytes()],
+    programId,
+  );
+}
+
+export async function findOwnSeqEnforcerAddress(
+  id: string,
+  client: MangoClient,
+): Promise<[PublicKey, number]> {
+  return findSeqEnforcerAddress(
+    id,
+    (client.program.provider as AnchorProvider).wallet.publicKey,
+    seqEnforcerProgramIds[client.cluster],
+  );
+}
 
 export function makeInitSequenceEnforcerAccountIx(
   account: PublicKey,
