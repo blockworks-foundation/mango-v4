@@ -17,7 +17,8 @@ pub fn token_register_trustless(
     token_index: TokenIndex,
     name: String,
 ) -> Result<()> {
-    require_neq!(token_index, 0);
+    require_neq!(token_index, QUOTE_TOKEN_INDEX);
+    require_neq!(token_index, TokenIndex::MAX);
 
     let net_borrow_limit_window_size_ts = 24 * 60 * 60u64;
     let now_ts: u64 = Clock::get()?.unix_timestamp.try_into().unwrap();
