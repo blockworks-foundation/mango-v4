@@ -64,6 +64,7 @@ pub fn ix_gate_set(ctx: Context<IxGateSet>, ix_gate: u128) -> Result<()> {
     log_if_changed(&group, ix_gate, IxGate::TokenRegisterTrustless);
     log_if_changed(&group, ix_gate, IxGate::TokenUpdateIndexAndRate);
     log_if_changed(&group, ix_gate, IxGate::TokenWithdraw);
+    log_if_changed(&group, ix_gate, IxGate::AccountBuybackFeesWithMngo);
 
     group.ix_gate = ix_gate;
 

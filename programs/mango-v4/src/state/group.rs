@@ -187,6 +187,7 @@ pub enum IxGate {
     TokenUpdateIndexAndRate = 46,
     TokenWithdraw = 47,
     AccountBuybackFeesWithMngo = 48,
+    // NOTE: Adding new variants requires matching changes in ts and the ix_gate_set instruction.
 }
 
 // note: using creator instead of admin, since admin can be changed
