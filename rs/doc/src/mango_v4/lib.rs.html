@@ -1258,10 +1258,10 @@
 
     <span class="kw">pub fn </span>account_buyback_fees_with_mngo(
         ctx: Context&lt;AccountBuybackFeesWithMngo&gt;,
-        max_buyback: u64,
+        max_buyback_usd: u64,
     ) -&gt; <span class="prelude-ty">Result</span>&lt;()&gt; {
         <span class="attr">#[cfg(feature = <span class="string">&quot;enable-gpl&quot;</span>)]
-        </span>instructions::account_buyback_fees_with_mngo(ctx, max_buyback)<span class="question-mark">?</span>;
+        </span>instructions::account_buyback_fees_with_mngo(ctx, max_buyback_usd)<span class="question-mark">?</span>;
         <span class="prelude-val">Ok</span>(())
     }
 

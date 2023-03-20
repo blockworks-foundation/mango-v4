@@ -200,6 +200,9 @@
 <a href="#200" id="200">200</a>
 <a href="#201" id="201">201</a>
 <a href="#202" id="202">202</a>
+<a href="#203" id="203">203</a>
+<a href="#204" id="204">204</a>
+<a href="#205" id="205">205</a>
 </pre><pre class="rust"><code><span class="kw">use </span>anchor_lang::prelude::<span class="kw-2">*</span>;
 <span class="kw">use </span>static_assertions::const_assert_eq;
 <span class="kw">use </span>std::mem::size_of;
@@ -224,6 +227,9 @@
 /// We should eventually generalize to make the whole perp quote (and settle) token
 /// configurable.
 </span><span class="kw">pub const </span>PERP_SETTLE_TOKEN_INDEX: TokenIndex = <span class="number">0</span>;
+
+<span class="doccomment">/// The token index used in AccountBuybackFeesWithMngo to exchange for MNGO
+</span><span class="kw">pub const </span>FEE_BUYBACK_QUOTE_TOKEN_INDEX: TokenIndex = <span class="number">0</span>;
 
 <span class="attr">#[account(zero_copy(safe_bytemuck_derives))]
 #[derive(Debug)]
