@@ -1176,7 +1176,7 @@ export type MangoV4 = {
       ],
       "args": [
         {
-          "name": "maxBuyback",
+          "name": "maxBuybackUsd",
           "type": "u64"
         }
       ]
@@ -9856,7 +9856,7 @@ export const IDL: MangoV4 = {
       ],
       "args": [
         {
-          "name": "maxBuyback",
+          "name": "maxBuybackUsd",
           "type": "u64"
         }
       ]

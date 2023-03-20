@@ -288,6 +288,7 @@ async fn test_bankrupt_tokens_insurance_fund() -> Result<(), TransportError> {
         group,
         tokens,
         insurance_vault,
+        ..
     } = mango_setup::GroupWithTokensConfig {
         admin,
         payer,

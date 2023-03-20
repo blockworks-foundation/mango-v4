@@ -3130,7 +3130,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "mango-v4-settle-bot"
+name = "mango-v4-settler"
 version = "0.0.1"
 dependencies = [
  "anchor-client",
