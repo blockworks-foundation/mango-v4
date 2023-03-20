@@ -171,6 +171,7 @@ export interface IxGateParams {
   TokenRegisterTrustless: boolean;
   TokenUpdateIndexAndRate: boolean;
   TokenWithdraw: boolean;
+  AccountSettleFeesWithMngo: boolean;
 }
 
 // Default with all ixs enabled, use with buildIxGate
@@ -226,6 +227,7 @@ export const TrueIxGateParams: IxGateParams = {
   TokenRegisterTrustless: true,
   TokenUpdateIndexAndRate: true,
   TokenWithdraw: true,
+  AccountSettleFeesWithMngo: true,
 };
 
 // build ix gate e.g. buildIxGate(Builder(TrueIxGateParams).TokenDeposit(false).build()).toNumber(),
