@@ -14,7 +14,7 @@ pub(crate) use zip;
 
 pub fn fill_from_str<const N: usize>(name: &str) -> Result<[u8; N]> {
     let name_bytes = name.as_bytes();
-    require!(name_bytes.len() < N, MangoError::SomeError);
+    require!(name_bytes.len() <= N, MangoError::SomeError);
     let mut name_ = [0u8; N];
     name_[..name_bytes.len()].copy_from_slice(name_bytes);
     Ok(name_)
@@ -29,4 +29,23 @@ pub fn format_zero_terminated_utf8_bytes(
             .unwrap()
             .trim_matches(char::from(0)),
     )
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_fill_from_str() {
+        assert_eq!(fill_from_str::<4>(""), Ok([0, 0, 0, 0]));
+        assert_eq!(
+            fill_from_str::<4>("abc"),
+            Ok(['a' as u8, 'b' as u8, 'c' as u8, 0])
+        );
+        assert_eq!(
+            fill_from_str::<4>("abcd"),
+            Ok(['a' as u8, 'b' as u8, 'c' as u8, 'd' as u8])
+        );
+        assert!(fill_from_str::<4>("abcde").is_err());
+    }
 }
