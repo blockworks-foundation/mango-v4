@@ -9,6 +9,7 @@ use crate::state::*;
 
 use crate::accounts_ix::*;
 use crate::logs::TokenMetaDataLog;
+use crate::util::fill_from_str;
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
@@ -36,6 +37,7 @@ pub fn token_edit(
     reset_stable_price: bool,
     reset_net_borrow_limit: bool,
     reduce_only_opt: Option<bool>,
+    name_opt: Option<String>,
 ) -> Result<()> {
     let group = ctx.accounts.group.load()?;
 
@@ -151,7 +153,12 @@ pub fn token_edit(
             );
 
             bank.init_asset_weight = I80F48::from_num(init_asset_weight);
-            require_group_admin = true;
+
+            // The security admin is allowed to decrease the init collateral weight to zero,
+            // but all other changes need to go through the full group admin.
+            if init_asset_weight != 0.0 {
+                require_group_admin = true;
+            }
         }
         if let Some(maint_liab_weight) = maint_liab_weight_opt {
             msg!(
@@ -275,6 +282,12 @@ pub fn token_edit(
             if !reduce_only {
                 require_group_admin = true;
             }
+        };
+
+        if let Some(name) = name_opt.as_ref() {
+            msg!("Name: old - {:?}, new - {:?}", bank.name, name);
+            bank.name = fill_from_str(&name)?;
+            require_group_admin = true;
         };
     }
 

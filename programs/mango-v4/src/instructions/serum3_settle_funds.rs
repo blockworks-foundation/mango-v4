@@ -16,17 +16,21 @@ use crate::logs::{LoanOriginationFeeInstruction, WithdrawLoanOriginationFeeLog};
 ///
 /// There will be free funds on open_orders when an order was triggered.
 ///
-pub fn serum3_settle_funds(ctx: Context<Serum3SettleFunds>) -> Result<()> {
-    let serum_market = ctx.accounts.serum_market.load()?;
+pub fn serum3_settle_funds<'info>(
+    accounts: &mut Serum3SettleFunds<'info>,
+    v2: Option<&mut Serum3SettleFundsV2Extra<'info>>,
+    fees_to_dao: bool,
+) -> Result<()> {
+    let serum_market = accounts.serum_market.load()?;
 
     //
     // Validation
     //
     {
-        let account = ctx.accounts.account.load_full()?;
+        let account = accounts.account.load_full()?;
         // account constraint #1
         require!(
-            account.fixed.is_owner_or_delegate(ctx.accounts.owner.key()),
+            account.fixed.is_owner_or_delegate(accounts.owner.key()),
             MangoError::SomeError
         );
 
@@ -35,23 +39,23 @@ pub fn serum3_settle_funds(ctx: Context<Serum3SettleFunds>) -> Result<()> {
             account
                 .serum3_orders(serum_market.market_index)?
                 .open_orders
-                == ctx.accounts.open_orders.key(),
+                == accounts.open_orders.key(),
             MangoError::SomeError
         );
 
         // Validate banks and vaults #3
-        let quote_bank = ctx.accounts.quote_bank.load()?;
+        let quote_bank = accounts.quote_bank.load()?;
         require!(
-            quote_bank.vault == ctx.accounts.quote_vault.key(),
+            quote_bank.vault == accounts.quote_vault.key(),
             MangoError::SomeError
         );
         require!(
             quote_bank.token_index == serum_market.quote_token_index,
             MangoError::SomeError
         );
-        let base_bank = ctx.accounts.base_bank.load()?;
+        let base_bank = accounts.base_bank.load()?;
         require!(
-            base_bank.vault == ctx.accounts.base_vault.key(),
+            base_bank.vault == accounts.base_vault.key(),
             MangoError::SomeError
         );
         require!(
@@ -65,14 +69,14 @@ pub fn serum3_settle_funds(ctx: Context<Serum3SettleFunds>) -> Result<()> {
     //
     let before_oo;
     {
-        let open_orders = load_open_orders_ref(ctx.accounts.open_orders.as_ref())?;
+        let open_orders = load_open_orders_ref(accounts.open_orders.as_ref())?;
         before_oo = OpenOrdersSlim::from_oo(&open_orders);
-        let mut account = ctx.accounts.account.load_full_mut()?;
-        let mut base_bank = ctx.accounts.base_bank.load_mut()?;
-        let mut quote_bank = ctx.accounts.quote_bank.load_mut()?;
+        let mut account = accounts.account.load_full_mut()?;
+        let mut base_bank = accounts.base_bank.load_mut()?;
+        let mut quote_bank = accounts.quote_bank.load_mut()?;
         charge_loan_origination_fees(
-            &ctx.accounts.group.key(),
-            &ctx.accounts.account.key(),
+            &accounts.group.key(),
+            &accounts.account.key(),
             serum_market.market_index,
             &mut base_bank,
             &mut quote_bank,
@@ -84,30 +88,32 @@ pub fn serum3_settle_funds(ctx: Context<Serum3SettleFunds>) -> Result<()> {
     //
     // Settle
     //
-    let before_base_vault = ctx.accounts.base_vault.amount;
-    let before_quote_vault = ctx.accounts.quote_vault.amount;
+    let before_base_vault = accounts.base_vault.amount;
+    let before_quote_vault = accounts.quote_vault.amount;
 
-    cpi_settle_funds(ctx.accounts)?;
+    cpi_settle_funds(accounts)?;
 
     //
     // After-settle tracking
     //
     let after_oo = {
-        let oo_ai = &ctx.accounts.open_orders.as_ref();
+        let oo_ai = &accounts.open_orders.as_ref();
         let open_orders = load_open_orders_ref(oo_ai)?;
         OpenOrdersSlim::from_oo(&open_orders)
     };
 
-    ctx.accounts.base_vault.reload()?;
-    ctx.accounts.quote_vault.reload()?;
-    let after_base_vault = ctx.accounts.base_vault.amount;
-    let after_quote_vault = ctx.accounts.quote_vault.amount;
+    accounts.base_vault.reload()?;
+    accounts.quote_vault.reload()?;
+    let after_base_vault = accounts.base_vault.amount;
+    let after_quote_vault = accounts.quote_vault.amount;
 
-    let mut account = ctx.accounts.account.load_full_mut()?;
-    let mut base_bank = ctx.accounts.base_bank.load_mut()?;
-    let mut quote_bank = ctx.accounts.quote_bank.load_mut()?;
+    let mut account = accounts.account.load_full_mut()?;
+    let mut base_bank = accounts.base_bank.load_mut()?;
+    let mut quote_bank = accounts.quote_bank.load_mut()?;
+    let group = accounts.group.load()?;
     apply_settle_changes(
-        ctx.accounts.account.key(),
+        &group,
+        accounts.account.key(),
         &mut account.borrow_mut(),
         &mut base_bank,
         &mut quote_bank,
@@ -119,11 +125,12 @@ pub fn serum3_settle_funds(ctx: Context<Serum3SettleFunds>) -> Result<()> {
         after_quote_vault,
         &after_oo,
         None,
+        fees_to_dao,
     )?;
 
     emit!(Serum3OpenOrdersBalanceLogV2 {
-        mango_group: ctx.accounts.group.key(),
-        mango_account: ctx.accounts.account.key(),
+        mango_group: accounts.group.key(),
+        mango_account: accounts.account.key(),
         market_index: serum_market.market_index,
         base_token_index: serum_market.base_token_index,
         quote_token_index: serum_market.quote_token_index,
@@ -209,7 +216,7 @@ pub fn charge_loan_origination_fees(
     Ok(())
 }
 
-fn cpi_settle_funds(ctx: &Serum3SettleFunds) -> Result<()> {
+fn cpi_settle_funds<'info>(ctx: &Serum3SettleFunds<'info>) -> Result<()> {
     use crate::serum3_cpi;
     let group = ctx.group.load()?;
     serum3_cpi::SettleFunds {
@@ -223,6 +230,7 @@ fn cpi_settle_funds(ctx: &Serum3SettleFunds) -> Result<()> {
         user_quote_wallet: ctx.quote_vault.to_account_info(),
         vault_signer: ctx.market_vault_signer.to_account_info(),
         token_program: ctx.token_program.to_account_info(),
+        rebates_quote_wallet: ctx.quote_vault.to_account_info(),
     }
     .call(&group)
 }

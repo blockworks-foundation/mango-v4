@@ -59,8 +59,7 @@ pub fn health_region_begin<'key, 'accounts, 'remaining, 'info>(
     // Compute pre-health and store it on the account
     let health_cache = new_health_cache(&account.borrow(), &account_retriever)?;
     let pre_init_health = account.check_health_pre(&health_cache)?;
-    account.fixed.health_region_begin_init_health =
-        pre_init_health.ceil().checked_to_num().unwrap();
+    account.fixed.health_region_begin_init_health = pre_init_health.ceil().to_num();
 
     Ok(())
 }

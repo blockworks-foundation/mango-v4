@@ -9,13 +9,7 @@ import { toNativeI80F48, toUiDecimals, toUiDecimalsForQuote } from '../utils';
 import { Bank, TokenIndex } from './bank';
 import { Group } from './group';
 import { HealthCache } from './healthCache';
-import {
-  BookSide,
-  PerpMarket,
-  PerpMarketIndex,
-  PerpOrder,
-  PerpOrderSide,
-} from './perp';
+import { PerpMarket, PerpMarketIndex, PerpOrder, PerpOrderSide } from './perp';
 import { MarketIndex, Serum3Side } from './serum3';
 export class MangoAccount {
   public name: string;
@@ -38,6 +32,9 @@ export class MangoAccount {
       perpSpotTransfers: BN;
       healthRegionBeginInitHealth: BN;
       frozenUntil: BN;
+      buybackFeesAccruedCurrent: BN;
+      buybackFeesAccruedPrevious: BN;
+      buybackFeesExpiryTimestamp: BN;
       headerVersion: number;
       tokens: unknown;
       serum3: unknown;
@@ -58,6 +55,9 @@ export class MangoAccount {
       obj.perpSpotTransfers,
       obj.healthRegionBeginInitHealth,
       obj.frozenUntil,
+      obj.buybackFeesAccruedCurrent,
+      obj.buybackFeesAccruedPrevious,
+      obj.buybackFeesExpiryTimestamp,
       obj.headerVersion,
       obj.tokens as TokenPositionDto[],
       obj.serum3 as Serum3PositionDto[],
@@ -80,6 +80,9 @@ export class MangoAccount {
     public perpSpotTransfers: BN,
     public healthRegionBeginInitHealth: BN,
     public frozenUntil: BN,
+    public buybackFeesAccruedCurrent: BN,
+    public buybackFeesAccruedPrevious: BN,
+    public buybackFeesExpiryTimestamp: BN,
     public headerVersion: number,
     tokens: TokenPositionDto[],
     serum3: Serum3PositionDto[],
@@ -866,7 +869,7 @@ export class MangoAccount {
     const hc = HealthCache.fromMangoAccount(group, this);
     const baseLots = hc.getMaxPerpForHealthRatio(
       perpMarket,
-      I80F48.fromNumber(perpMarket.uiPrice),
+      perpMarket.price,
       PerpOrderSide.bid,
       I80F48.fromNumber(2),
     );
@@ -893,7 +896,7 @@ export class MangoAccount {
     const hc = HealthCache.fromMangoAccount(group, this);
     const baseLots = hc.getMaxPerpForHealthRatio(
       perpMarket,
-      I80F48.fromNumber(perpMarket.uiPrice),
+      perpMarket.price,
       PerpOrderSide.ask,
       I80F48.fromNumber(2),
     );
@@ -916,7 +919,7 @@ export class MangoAccount {
           : PerpPosition.emptyFromPerpMarketIndex(perpMarket.perpMarketIndex),
         PerpOrderSide.bid,
         perpMarket.uiBaseToLots(size),
-        I80F48.fromNumber(perpMarket.uiPrice),
+        perpMarket.price,
         HealthType.init,
       )
       .toNumber();
@@ -938,7 +941,7 @@ export class MangoAccount {
           : PerpPosition.emptyFromPerpMarketIndex(perpMarket.perpMarketIndex),
         PerpOrderSide.ask,
         perpMarket.uiBaseToLots(size),
-        I80F48.fromNumber(perpMarket.uiPrice),
+        perpMarket.price,
         HealthType.init,
       )
       .toNumber();
@@ -959,6 +962,32 @@ export class MangoAccount {
     return [...bids.items(), ...asks.items()].filter((order) =>
       order.owner.equals(this.publicKey),
     );
+  }
+
+  public getBuybackFeesAccrued(): BN {
+    return this.buybackFeesAccruedCurrent.add(this.buybackFeesAccruedPrevious);
+  }
+
+  public getBuybackFeesAccruedUi(): number {
+    return toUiDecimalsForQuote(this.getBuybackFeesAccrued());
+  }
+
+  public getMaxFeesBuyback(group: Group): BN {
+    const mngoBalanceValueWithBonus = new BN(
+      this.getTokenBalance(group.getFirstBankForMngo())
+        .mul(group.getFirstBankForMngo().price)
+        .mul(I80F48.fromNumber(group.buybackFeesMngoBonusFactor))
+        .floor()
+        .toNumber(),
+    );
+    return BN.max(
+      BN.min(this.getBuybackFeesAccrued(), mngoBalanceValueWithBonus),
+      new BN(0),
+    );
+  }
+
+  public getMaxFeesBuybackUi(group: Group): number {
+    return toUiDecimalsForQuote(this.getMaxFeesBuyback(group));
   }
 
   toString(group?: Group, onlyTokens = false): string {
@@ -1283,6 +1312,30 @@ export class PerpPosition {
     );
   }
 
+  public getQuotePositionUi(
+    perpMarket: PerpMarket,
+    useEventQueue?: boolean,
+  ): number {
+    if (perpMarket.perpMarketIndex !== this.marketIndex) {
+      throw new Error("PerpPosition doesn't belong to the given market!");
+    }
+
+    const quotePositionUi = toUiDecimalsForQuote(this.quotePositionNative);
+
+    return useEventQueue
+      ? quotePositionUi + perpMarket.quoteLotsToUi(this.takerQuoteLots)
+      : quotePositionUi;
+  }
+
+  public getNotionalValueUi(
+    perpMarket: PerpMarket,
+    useEventQueue?: boolean,
+  ): number {
+    return (
+      this.getBasePositionUi(perpMarket, useEventQueue) * perpMarket.uiPrice
+    );
+  }
+
   public getUnsettledFunding(perpMarket: PerpMarket): I80F48 {
     if (perpMarket.perpMarketIndex !== this.marketIndex) {
       throw new Error("PerpPosition doesn't belong to the given market!");
@@ -1528,7 +1581,19 @@ export class PerpPosition {
           ', takerQuoteLots - ' +
           perpMarket.quoteLotsToUi(this.takerQuoteLots) +
           ', unsettled pnl - ' +
-          this.getUnsettledPnlUi(perpMarket!).toString()
+          this.getUnsettledPnlUi(perpMarket!).toString() +
+          ', average entry price ui - ' +
+          this.getAverageEntryPriceUi(perpMarket!).toString() +
+          ', notional value ui - ' +
+          this.getNotionalValueUi(perpMarket!).toString() +
+          ', cumulative pnl over position lifetime ui - ' +
+          this.cumulativePnlOverPositionLifetimeUi(perpMarket!).toString() +
+          ', realized other pnl native ui - ' +
+          toUiDecimalsForQuote(this.realizedOtherPnlNative) +
+          ', cumulative long funding ui - ' +
+          toUiDecimalsForQuote(this.cumulativeLongFunding) +
+          ', cumulative short funding ui - ' +
+          toUiDecimalsForQuote(this.cumulativeShortFunding)
       : '';
   }
 }

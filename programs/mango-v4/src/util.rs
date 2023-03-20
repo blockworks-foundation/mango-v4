@@ -12,14 +12,6 @@ macro_rules! zip {
 #[allow(unused_imports)]
 pub(crate) use zip;
 
-#[macro_export]
-macro_rules! checked_math {
-    ($x: expr) => {
-        checked_math::checked_math_or_panic!($x)
-    };
-}
-pub(crate) use checked_math;
-
 pub fn fill_from_str<const N: usize>(name: &str) -> Result<[u8; N]> {
     let name_bytes = name.as_bytes();
     require!(name_bytes.len() < N, MangoError::SomeError);

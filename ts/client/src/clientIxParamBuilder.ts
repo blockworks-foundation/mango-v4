@@ -25,6 +25,7 @@ export interface TokenEditParams {
   resetStablePrice: boolean | null;
   resetNetBorrowLimit: boolean | null;
   reduceOnly: boolean | null;
+  name: string | null;
 }
 
 export const NullTokenEditParams: TokenEditParams = {
@@ -50,6 +51,7 @@ export const NullTokenEditParams: TokenEditParams = {
   resetStablePrice: null,
   resetNetBorrowLimit: null,
   reduceOnly: null,
+  name: null,
 };
 
 export interface PerpEditParams {
@@ -81,6 +83,7 @@ export interface PerpEditParams {
   reduceOnly: boolean | null;
   resetStablePrice: boolean | null;
   positivePnlLiquidationFee: number | null;
+  name: string | null;
 }
 
 export const NullPerpEditParams: PerpEditParams = {
@@ -112,6 +115,7 @@ export const NullPerpEditParams: PerpEditParams = {
   reduceOnly: null,
   resetStablePrice: null,
   positivePnlLiquidationFee: null,
+  name: null,
 };
 
 // Use with TrueIxGateParams and buildIxGate
@@ -167,6 +171,7 @@ export interface IxGateParams {
   TokenRegisterTrustless: boolean;
   TokenUpdateIndexAndRate: boolean;
   TokenWithdraw: boolean;
+  AccountSettleFeesWithMngo: boolean;
 }
 
 // Default with all ixs enabled, use with buildIxGate
@@ -222,6 +227,7 @@ export const TrueIxGateParams: IxGateParams = {
   TokenRegisterTrustless: true,
   TokenUpdateIndexAndRate: true,
   TokenWithdraw: true,
+  AccountSettleFeesWithMngo: true,
 };
 
 // build ix gate e.g. buildIxGate(Builder(TrueIxGateParams).TokenDeposit(false).build()).toNumber(),
@@ -287,6 +293,7 @@ export function buildIxGate(p: IxGateParams): BN {
   toggleIx(ixGate, p, 'TokenRegisterTrustless', 45);
   toggleIx(ixGate, p, 'TokenUpdateIndexAndRate', 46);
   toggleIx(ixGate, p, 'TokenWithdraw', 47);
+  toggleIx(ixGate, p, 'AccountSettleFeesWithMngo', 48);
 
   return ixGate;
 }

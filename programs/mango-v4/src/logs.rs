@@ -360,3 +360,13 @@ pub struct PerpSettleFeesLog {
     pub perp_market_index: u16,
     pub settlement: i128,
 }
+
+#[event]
+pub struct AccountBuybackFeesWithMngoLog {
+    pub mango_group: Pubkey,
+    pub mango_account: Pubkey,
+    pub buyback_fees: i128,
+    pub buyback_mngo: i128,
+    pub mngo_buyback_price: i128,
+    pub oracle_price: i128,
+}

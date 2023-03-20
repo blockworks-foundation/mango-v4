@@ -51,6 +51,7 @@ pub mod mango_v4 {
         Ok(())
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub fn group_edit(
         ctx: Context<GroupEdit>,
         admin_opt: Option<Pubkey>,
@@ -59,6 +60,11 @@ pub mod mango_v4 {
         testing_opt: Option<u8>,
         version_opt: Option<u8>,
         deposit_limit_quote_opt: Option<u64>,
+        buyback_fees_opt: Option<bool>,
+        buyback_fees_bonus_factor_opt: Option<f32>,
+        buyback_fees_swap_mango_account_opt: Option<Pubkey>,
+        mngo_token_index_opt: Option<TokenIndex>,
+        buyback_fees_expiry_interval_opt: Option<u64>,
     ) -> Result<()> {
         #[cfg(feature = "enable-gpl")]
         instructions::group_edit(
@@ -69,6 +75,11 @@ pub mod mango_v4 {
             testing_opt,
             version_opt,
             deposit_limit_quote_opt,
+            buyback_fees_opt,
+            buyback_fees_bonus_factor_opt,
+            buyback_fees_swap_mango_account_opt,
+            mngo_token_index_opt,
+            buyback_fees_expiry_interval_opt,
         )?;
         Ok(())
     }
@@ -159,6 +170,7 @@ pub mod mango_v4 {
         reset_stable_price: bool,
         reset_net_borrow_limit: bool,
         reduce_only_opt: Option<bool>,
+        name_opt: Option<String>,
     ) -> Result<()> {
         #[cfg(feature = "enable-gpl")]
         instructions::token_edit(
@@ -185,6 +197,7 @@ pub mod mango_v4 {
             reset_stable_price,
             reset_net_borrow_limit,
             reduce_only_opt,
+            name_opt,
         )?;
         Ok(())
     }
@@ -267,6 +280,15 @@ pub mod mango_v4 {
     pub fn account_close(ctx: Context<AccountClose>, force_close: bool) -> Result<()> {
         #[cfg(feature = "enable-gpl")]
         instructions::account_close(ctx, force_close)?;
+        Ok(())
+    }
+
+    pub fn account_buyback_fees_with_mngo(
+        ctx: Context<AccountBuybackFeesWithMngo>,
+        max_buyback: u64,
+    ) -> Result<()> {
+        #[cfg(feature = "enable-gpl")]
+        instructions::account_buyback_fees_with_mngo(ctx, max_buyback)?;
         Ok(())
     }
 
@@ -442,9 +464,27 @@ pub mod mango_v4 {
         Ok(())
     }
 
+    /// Settles all free funds from the OpenOrders account into the MangoAccount.
+    ///
+    /// Any serum "referrer rebates" (ui fees) are considered Mango fees.
     pub fn serum3_settle_funds(ctx: Context<Serum3SettleFunds>) -> Result<()> {
         #[cfg(feature = "enable-gpl")]
-        instructions::serum3_settle_funds(ctx)?;
+        instructions::serum3_settle_funds(ctx.accounts, None, true)?;
+        Ok(())
+    }
+
+    /// Like Serum3SettleFunds, but `fees_to_dao` determines if referrer rebates are considered fees
+    /// or are credited to the MangoAccount.
+    pub fn serum3_settle_funds_v2(
+        ctx: Context<Serum3SettleFundsV2>,
+        fees_to_dao: bool,
+    ) -> Result<()> {
+        #[cfg(feature = "enable-gpl")]
+        instructions::serum3_settle_funds(
+            &mut ctx.accounts.v1,
+            Some(&mut ctx.accounts.v2),
+            fees_to_dao,
+        )?;
         Ok(())
     }
 
@@ -609,6 +649,7 @@ pub mod mango_v4 {
         reduce_only_opt: Option<bool>,
         reset_stable_price: bool,
         positive_pnl_liquidation_fee_opt: Option<f32>,
+        name_opt: Option<String>,
     ) -> Result<()> {
         #[cfg(feature = "enable-gpl")]
         instructions::perp_edit_market(
@@ -641,6 +682,7 @@ pub mod mango_v4 {
             reduce_only_opt,
             reset_stable_price,
             positive_pnl_liquidation_fee_opt,
+            name_opt,
         )?;
         Ok(())
     }

@@ -1,6 +1,6 @@
 use anchor_lang::prelude::*;
 use anchor_spl::token;
-use checked_math as cm;
+
 use fixed::types::I80F48;
 
 use crate::accounts_ix::*;
@@ -112,11 +112,11 @@ pub fn perp_liq_negative_pnl_or_bankruptcy(
             liqee_perp_position.record_settle(-settlement);
 
             // Update the accounts' perp_spot_transfer statistics.
-            let settlement_i64 = settlement.round_to_zero().checked_to_num::<i64>().unwrap();
-            cm!(liqor_perp_position.perp_spot_transfers += settlement_i64);
-            cm!(liqee_perp_position.perp_spot_transfers -= settlement_i64);
-            cm!(liqor.fixed.perp_spot_transfers += settlement_i64);
-            cm!(liqee.fixed.perp_spot_transfers -= settlement_i64);
+            let settlement_i64 = settlement.round_to_zero().to_num::<i64>();
+            liqor_perp_position.perp_spot_transfers += settlement_i64;
+            liqee_perp_position.perp_spot_transfers -= settlement_i64;
+            liqor.fixed.perp_spot_transfers += settlement_i64;
+            liqee.fixed.perp_spot_transfers -= settlement_i64;
 
             // Transfer token balance
             let liqor_token_position = liqor.token_position_mut(settle_token_index)?.0;
@@ -141,7 +141,7 @@ pub fn perp_liq_negative_pnl_or_bankruptcy(
             msg!("liquidated pnl = {}", settlement);
         }
     };
-    let max_liab_transfer = cm!(I80F48::from(max_liab_transfer) - settlement);
+    let max_liab_transfer = I80F48::from(max_liab_transfer) - settlement;
 
     //
     // Step 2: bankruptcy
@@ -167,14 +167,12 @@ pub fn perp_liq_negative_pnl_or_bankruptcy(
             0
         };
 
-        let liquidation_fee_factor = cm!(I80F48::ONE + perp_market.base_liquidation_fee);
+        let liquidation_fee_factor = I80F48::ONE + perp_market.base_liquidation_fee;
 
         // Amount given to the liqor from the insurance fund
-        let insurance_transfer = cm!(liab_transfer * liquidation_fee_factor)
-            .checked_ceil()
-            .unwrap()
-            .checked_to_num::<u64>()
-            .unwrap()
+        let insurance_transfer = (liab_transfer * liquidation_fee_factor)
+            .ceil()
+            .to_num::<u64>()
             .min(insurance_vault_amount);
 
         let insurance_transfer_i80f48 = I80F48::from(insurance_transfer);
@@ -182,7 +180,7 @@ pub fn perp_liq_negative_pnl_or_bankruptcy(
 
         // Amount of negative perp pnl transfered to the liqor
         let insurance_liab_transfer =
-            cm!(insurance_transfer_i80f48 / liquidation_fee_factor).min(liab_transfer);
+            (insurance_transfer_i80f48 / liquidation_fee_factor).min(liab_transfer);
 
         // Try using the insurance fund if possible
         if insurance_transfer > 0 {
