@@ -37,6 +37,7 @@ pub fn token_register(
             ctx.accounts.mint.key()
         );
     }
+    require_neq!(token_index, TokenIndex::MAX);
 
     let now_ts: u64 = Clock::get()?.unix_timestamp.try_into().unwrap();
 
