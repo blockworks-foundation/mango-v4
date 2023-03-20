@@ -14,14 +14,17 @@ import { TokenIndex } from '../src/accounts/bank';
 import { Builder } from '../src/builder';
 import { MangoClient } from '../src/client';
 import {
-  buildIxGate,
   NullTokenEditParams,
   TrueIxGateParams,
+  buildIxGate,
 } from '../src/clientIxParamBuilder';
 import { MANGO_V4_ID, OPENBOOK_PROGRAM_ID } from '../src/constants';
 import { bpsToDecimal, percentageToDecimal, toNative } from '../src/utils';
 
-const { MB_CLUSTER_URL, MB_PAYER_KEYPAIR, MB_PAYER3_KEYPAIR } = process.env;
+const { MB_CLUSTER_URL, MB_PAYER_KEYPAIR } = process.env;
+
+const CLIENT_USER = MB_PAYER_KEYPAIR;
+const GROUP_PK = '78b8f4cGCwmZ9ysPFMWLaLTkkaYnUjwMJYStWe5RTSSX';
 
 const defaultOracleConfig = {
   confFilter: 0.1,
@@ -37,41 +40,31 @@ const defaultInterestRate = {
   maxRate: 2.0,
 };
 
-async function buildAdminClient(): Promise<[MangoClient, Keypair, Keypair]> {
-  const admin = Keypair.fromSecretKey(
-    Buffer.from(JSON.parse(fs.readFileSync(MB_PAYER3_KEYPAIR!, 'utf-8'))),
+async function buildClient(): Promise<MangoClient> {
+  const clientKeypair = Keypair.fromSecretKey(
+    Buffer.from(JSON.parse(fs.readFileSync(CLIENT_USER!, 'utf-8'))),
   );
 
   const options = AnchorProvider.defaultOptions();
   const connection = new Connection(MB_CLUSTER_URL!, options);
 
-  const adminWallet = new Wallet(admin);
-  const adminProvider = new AnchorProvider(connection, adminWallet, options);
+  const clientWallet = new Wallet(clientKeypair);
+  const clientProvider = new AnchorProvider(connection, clientWallet, options);
 
-  const client = await MangoClient.connect(
-    adminProvider,
+  return await MangoClient.connect(
+    clientProvider,
     'mainnet-beta',
     MANGO_V4_ID['mainnet-beta'],
     {
       idsSource: 'get-program-accounts',
     },
   );
-
-  const creator = Keypair.fromSecretKey(
-    Buffer.from(JSON.parse(fs.readFileSync(MB_PAYER_KEYPAIR!, 'utf-8'))),
-  );
-
-  return [client, admin, creator];
 }
 
 async function tokenRegister(): Promise<void> {
-  const result = await buildAdminClient();
-  const client = result[0];
-  const admin = result[1];
+  const client = await buildClient();
 
-  const group = await client.getGroup(
-    new PublicKey('78b8f4cGCwmZ9ysPFMWLaLTkkaYnUjwMJYStWe5RTSSX'),
-  );
+  const group = await client.getGroup(new PublicKey(GROUP_PK));
 
   const ix = await client.program.methods
     .tokenRegister(
@@ -107,16 +100,11 @@ async function tokenRegister(): Promise<void> {
 }
 
 async function tokenEdit(): Promise<void> {
-  const result = await buildAdminClient();
-  const client = result[0];
-  const admin = result[1];
+  const client = await buildClient();
 
-  const group = await client.getGroup(
-    new PublicKey('78b8f4cGCwmZ9ysPFMWLaLTkkaYnUjwMJYStWe5RTSSX'),
-  );
+  const group = await client.getGroup(new PublicKey(GROUP_PK));
 
   const params = Builder(NullTokenEditParams)
-    .oracle(new PublicKey('GVXRSBjFk6e6J3NbVPXohDJetcTjaeeuykUpbQF8UoMU'))
     .borrowWeightScaleStartQuote(new BN(toNative(100000, 6)).toNumber())
     .depositWeightScaleStartQuote(new BN(toNative(100000, 6)).toNumber())
     .build();
@@ -168,12 +156,9 @@ async function tokenEdit(): Promise<void> {
 }
 
 async function serum3Register(): Promise<void> {
-  const result = await buildAdminClient();
-  const client = result[0];
+  const client = await buildClient();
 
-  const group = await client.getGroup(
-    new PublicKey('78b8f4cGCwmZ9ysPFMWLaLTkkaYnUjwMJYStWe5RTSSX'),
-  );
+  const group = await client.getGroup(new PublicKey(GROUP_PK));
 
   const ix = await client.program.methods
     .serum3RegisterMarket(3, 'ETH (Portal)/USDC')
@@ -198,9 +183,7 @@ async function serum3Register(): Promise<void> {
 }
 
 async function perpCreate(): Promise<void> {
-  const result = await buildAdminClient();
-  const client = result[0];
-  const admin = result[1];
+  const client = await buildClient();
 
   const bids = new Keypair();
   const asks = new Keypair();
@@ -213,9 +196,7 @@ async function perpCreate(): Promise<void> {
     (client.program.account.eventQueue as any)._idlAccount,
   );
 
-  const group = await client.getGroup(
-    new PublicKey('78b8f4cGCwmZ9ysPFMWLaLTkkaYnUjwMJYStWe5RTSSX'),
-  );
+  const group = await client.getGroup(new PublicKey(GROUP_PK));
 
   const ix = await client.program.methods
     .perpCreateMarket(
@@ -299,13 +280,9 @@ async function perpCreate(): Promise<void> {
 }
 
 async function ixDisable(): Promise<void> {
-  const result = await buildAdminClient();
-  const client = result[0];
-  const admin = result[1];
+  const client = await buildClient();
 
-  const group = await client.getGroup(
-    new PublicKey('78b8f4cGCwmZ9ysPFMWLaLTkkaYnUjwMJYStWe5RTSSX'),
-  );
+  const group = await client.getGroup(new PublicKey(GROUP_PK));
 
   const ixGateParams = TrueIxGateParams;
   ixGateParams.HealthRegion = false;
@@ -326,7 +303,7 @@ async function main(): Promise<void> {
     // await tokenEdit();
     // await perpCreate();
     // await serum3Register();
-    await ixDisable();
+    // await ixDisable();
   } catch (error) {
     console.log(error);
   }
