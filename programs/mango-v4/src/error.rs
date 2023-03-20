@@ -95,6 +95,8 @@ pub enum MangoError {
     NoLiquidatablePerpBasePosition,
     #[msg("perp order id not found on the orderbook")]
     PerpOrderIdNotFound,
+    #[msg("HealthRegions allow only specific instructions between Begin and End")]
+    HealthRegionBadInnerInstruction,
 }
 
 impl MangoError {
