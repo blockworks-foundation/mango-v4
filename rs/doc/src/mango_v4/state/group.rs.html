@@ -203,6 +203,7 @@
 <a href="#203" id="203">203</a>
 <a href="#204" id="204">204</a>
 <a href="#205" id="205">205</a>
+<a href="#206" id="206">206</a>
 </pre><pre class="rust"><code><span class="kw">use </span>anchor_lang::prelude::<span class="kw-2">*</span>;
 <span class="kw">use </span>static_assertions::const_assert_eq;
 <span class="kw">use </span>std::mem::size_of;
@@ -392,7 +393,8 @@
     TokenUpdateIndexAndRate = <span class="number">46</span>,
     TokenWithdraw = <span class="number">47</span>,
     AccountBuybackFeesWithMngo = <span class="number">48</span>,
-}
+    <span class="comment">// NOTE: Adding new variants requires matching changes in ts and the ix_gate_set instruction.
+</span>}
 
 <span class="comment">// note: using creator instead of admin, since admin can be changed
 </span><span class="attr">#[macro_export]
