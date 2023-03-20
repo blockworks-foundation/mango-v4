@@ -16,11 +16,13 @@ export async function sendTransaction(
   opts: any = {},
 ): Promise<string> {
   const connection = provider.connection;
-  const latestBlockhash = await connection.getLatestBlockhash(
-    opts.preflightCommitment ??
-      provider.opts.preflightCommitment ??
-      'finalized',
-  );
+  const latestBlockhash =
+    opts.latestBlockhash ??
+    (await connection.getLatestBlockhash(
+      opts.preflightCommitment ??
+        provider.opts.preflightCommitment ??
+        'finalized',
+    ));
 
   const payer = (provider as AnchorProvider).wallet;
 

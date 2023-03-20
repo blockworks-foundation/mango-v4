@@ -877,7 +877,7 @@ export class PerpOrder {
       priceLots = perpMarket.uiPriceToLots(perpMarket.uiPrice).add(priceOffset);
       const isInvalid =
         type === BookSideType.bids
-          ? priceLots.gt(leafNode.pegLimit)
+          ? priceLots.gt(leafNode.pegLimit) && !leafNode.pegLimit.eqn(-1)
           : leafNode.pegLimit.gt(priceLots);
       oraclePeggedProperties = {
         isInvalid,
