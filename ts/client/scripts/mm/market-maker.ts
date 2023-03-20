@@ -61,7 +61,7 @@ const params = JSON.parse(
 
 const control = { isRunning: true };
 
-// Global state which is passed around
+// Global bot state shared between all markets
 class BotContext {
   latestBlockhash: BlockhashWithExpiryBlockHeight;
   latestBlockhashLastUpdatedTs: number;
@@ -133,81 +133,88 @@ class BotContext {
     }
   }
 
-  async updateOrders(PerpMarketIndex: i): Promise<void> {
-    await Promise.all(
-      Array.from(this.perpMarkets.entries()).map(async ([_, p]) => {
-        const 
-        // TODO calculate current delta (spot + perp) & equity
-        const currentDelta = 0;
-        const currentEquityInUnderlying =
-          this.mangoAccount.getEquity(this.group).toNumber() /
-          p.perpMarket.uiPrice;
-        const maxSize = currentEquityInUnderlying * p.params.sizePerc;
-        const bidSize = Math.min(maxSize, p.params.deltaMax - currentDelta);
-        const askSize = Math.min(maxSize, currentDelta - p.params.deltaMin);
-        const bidPrice = p.perpMarket.uiPrice * -p.params.charge;
-        const askPrice = p.perpMarket.uiPrice * +p.params.charge;
+  async updateOrders(i: PerpMarketIndex): Promise<string> {
+    const { params, perpMarket } = this.perpMarkets.get(i)!;
+    // TODO calculate current delta (spot + perp) & equity
+    const currentDelta = 0;
+    const currentEquityInUnderlying =
+      this.mangoAccount.getEquity(this.group).toNumber() / p.perpMarket.uiPrice;
+    const maxSize = currentEquityInUnderlying * params.sizePerc;
+    const bidSize = Math.min(maxSize, params.deltaMax - currentDelta);
+    const askSize = Math.min(maxSize, currentDelta - params.deltaMin);
+    const bidPrice = perpMarket.uiPrice * -params.charge;
+    const askPrice = perpMarket.uiPrice * +params.charge;
 
-        const beginIx = await this.client.healthRegionBeginIx(
-          this.group,
-          this.mangoAccount,
-          [],
-          [p.perpMarket],
-        );
-        const cancelAllIx = await this.client.perpCancelAllOrdersIx(
-          this.group,
-          this.mangoAccount,
-          p.perpMarket.perpMarketIndex,
-          4,
-        );
-        const bidIx = await this.client.perpPlaceOrderPeggedIx(
-          this.group,
-          this.mangoAccount,
-          p.perpMarket.perpMarketIndex,
-          PerpOrderSide.bid,
-          bidPrice,
-          bidSize,
-          undefined,
-          undefined,
-          Date.now(),
-        );
-        const askIx = await this.client.perpPlaceOrderPeggedIx(
-          this.group,
-          this.mangoAccount,
-          p.perpMarket.perpMarketIndex,
-          PerpOrderSide.ask,
-          askPrice,
-          askSize,
-          undefined,
-          undefined,
-          Date.now(),
-        );
-
-        const endIx = await this.client.healthRegionEndIx(
-          this.group,
-          this.mangoAccount,
-          [],
-          [p.perpMarket],
-        );
-
-        await this.client.sendAndConfirmTransaction([
-          beginIx,
-          cancelAllIx,
-          bidIx,
-          askIx,
-          endIx,
-        ]);
-      }),
+    const beginIx = await this.client.healthRegionBeginIx(
+      this.group,
+      this.mangoAccount,
+      [],
+      [perpMarket],
     );
+    const cancelAllIx = await this.client.perpCancelAllOrdersIx(
+      this.group,
+      this.mangoAccount,
+      perpMarket.perpMarketIndex,
+      4,
+    );
+    const bidIx = await this.client.perpPlaceOrderPeggedIx(
+      this.group,
+      this.mangoAccount,
+      perpMarket.perpMarketIndex,
+      PerpOrderSide.bid,
+      bidPrice,
+      bidSize,
+      undefined,
+      undefined,
+      Date.now(),
+    );
+    const askIx = await this.client.perpPlaceOrderPeggedIx(
+      this.group,
+      this.mangoAccount,
+      perpMarket.perpMarketIndex,
+      PerpOrderSide.ask,
+      askPrice,
+      askSize,
+      undefined,
+      undefined,
+      Date.now(),
+    );
+
+    const endIx = await this.client.healthRegionEndIx(
+      this.group,
+      this.mangoAccount,
+      [],
+      [perpMarket],
+    );
+
+    return this.client.sendAndConfirmTransaction([
+      beginIx,
+      cancelAllIx,
+      bidIx,
+      askIx,
+      endIx,
+    ]);
+  }
+
+  async hedgeFills(i: PerpMarketIndex): Promise<void> {
+    console.log('start hedger', i);
+    while (control.isRunning) {
+      // calculate delta
+      //       hedge to bring delta in line with config goal
+      //       if perp position would be reduced by hedge:
+      //          hedge on perp with kill or fill
+      //          spot hedge in parallel with same sequence id but a second tx
+      //          if perp hedge fails, sequence id won't be advanced and spot hedge will succeed
+      //          spot hedge should use known liquid routes without network requests (mango-router run in parallel)
+      //       if perp position would increase:
+      //          spot hedge
+      //       wait for hedge txs to confirm:
+      //          update oracle peg orders
+    }
   }
 }
 
-/// BTC 50,000 dec=9 lots=0.0001 BTC lSize = 10,000
-/// USDC dec=6 lots=1 USDC lSize = 1,000,000
-/// 1% spread
-/// one
-/// one increment in price = 0.0001 BTC
-
+// market specific state
 type MarketContext = {
   params: any;
   perpMarket: PerpMarket;
@@ -297,77 +304,6 @@ async function cancelAllOrdersForAMarket(
       break;
     }
   }
-}
-
-async function refreshOrders(
-  client: MangoClient,
-  group: Group,
-  mangoAccount: MangoAccount,
-  pc: MarketContext,
-): Promise<string> {
-  // TODO calculate current delta (spot + perp) & equity
-
-  const spotDelta = mangoAccount.getTokenBalanceUi(pc.collateralBank);
-  const perpDelta = mangoAccount.getPerpPositionUi(group, pc.perpMarket.perpMarketIndex, false);
-  const unconfirmedDelta = pc.unprocessedPerpFills.filter(f => f.slot > )
-  const currentDelta = 0;
-  const currentEquityInUnderlying =
-    mangoAccount.getEquity(group).toNumber() / pc.perpMarket.uiPrice;
-  const maxSize = currentEquityInUnderlying * pc.params.sizePerc;
-  const bidSize = Math.min(maxSize, pc.params.deltaMax - currentDelta);
-  const askSize = Math.min(maxSize, currentDelta - pc.params.deltaMin);
-  const bidPrice = pc.perpMarket.uiPrice * -pc.params.charge;
-  const askPrice = pc.perpMarket.uiPrice * +pc.params.charge;
-
-  const beginIx = await this.client.healthRegionBeginIx(
-    group,
-    mangoAccount,
-    [],
-    [pc.perpMarket],
-  );
-  const cancelAllIx = await this.client.perpCancelAllOrdersIx(
-    group,
-    mangoAccount,
-    pc.perpMarket.perpMarketIndex,
-    4,
-  );
-  const bidIx = await this.client.perpPlaceOrderPeggedIx(
-    group,
-    mangoAccount,
-    pc.perpMarket.perpMarketIndex,
-    PerpOrderSide.bid,
-    bidPrice,
-    bidSize,
-    undefined,
-    undefined,
-    Date.now(),
-  );
-  const askIx = await this.client.perpPlaceOrderPeggedIx(
-    group,
-    mangoAccount,
-    pc.perpMarket.perpMarketIndex,
-    PerpOrderSide.ask,
-    askPrice,
-    askSize,
-    undefined,
-    undefined,
-    Date.now(),
-  );
-
-  const endIx = await this.client.healthRegionEndIx(
-    group,
-    mangoAccount,
-    [],
-    [pc.perpMarket],
-  );
-
-  return await this.client.sendAndConfirmTransaction([
-    beginIx,
-    cancelAllIx,
-    bidIx,
-    askIx,
-    endIx,
-  ]);
 }
 
 // Cancel all orders on exit
@@ -502,24 +438,15 @@ async function fullMarketMaker() {
       params.intervals.mangoAccount,
     );
 
-    // TODO: place initial oracle peg orders on book
-    await bot.updateOrders();
+    // place initial oracle peg orders on book
+    await Promise.all(
+      Array.from(perpMarkets.keys()).map(async (i) => this.updateOrders(i)),
+    );
 
-    // TODO: launch hedgers per market
-    // Loop indefinitely
-    while (control.isRunning) {
-      // calculate delta
-      //       hedge to bring delta in line with config goal
-      //       if perp position would be reduced by hedge:
-      //          hedge on perp with kill or fill
-      //          spot hedge in parallel with same sequence id but a second tx
-      //          if perp hedge fails, sequence id won't be advanced and spot hedge will succeed
-      //          spot hedge should use known liquid routes without network requests (mango-router run in parallel)
-      //       if perp position would increase:
-      //          spot hedge
-      //       wait for hedge txs to confirm:
-      //          update oracle peg orders
-    }
+    // launch hedgers per market until control isRunning = false
+    await Promise.all(
+      Array.from(perpMarkets.keys()).map(async (i) => this.hedgeFills(i)),
+    );
   } finally {
     intervals.forEach((i) => clearInterval(i));
     intervals = [];
