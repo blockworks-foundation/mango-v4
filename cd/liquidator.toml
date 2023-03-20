@@ -1,0 +1,6 @@
+app = "mango-liquidator"
+kill_signal = "SIGTERM"
+kill_timeout = 30
+
+[build]
+  dockerfile = "../bin/liquidator/Dockerfile.liquidator"

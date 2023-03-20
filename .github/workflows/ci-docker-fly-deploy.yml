@@ -1,0 +1,35 @@
+name: Deploy to Fly
+
+on:
+  workflow_dispatch:
+    inputs:
+      appName:
+        description: 'Fly App Name'
+        required: true
+        type: string
+      imageName:
+        description: 'Image Name'
+        description: 'liquidator, keeper, mm, settler'
+        required: true
+        type: string
+      imageTag:
+        description: 'Docker Image Tag'
+        required: true
+        type: string
+        default: 'latest'
+
+env:
+  FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout 
+        uses: actions/checkout@v2
+
+      - name: Setup Fly
+        uses: superfly/flyctl-actions/setup-flyctl@master
+      
+      - name: Deploy
+        run: flyctl deploy -c cd/${{ inputs.imageName }}.toml -a ${{ inputs.appName }}
