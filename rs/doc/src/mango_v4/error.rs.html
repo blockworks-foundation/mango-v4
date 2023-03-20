@@ -224,6 +224,8 @@
 <a href="#224" id="224">224</a>
 <a href="#225" id="225">225</a>
 <a href="#226" id="226">226</a>
+<a href="#227" id="227">227</a>
+<a href="#228" id="228">228</a>
 </pre><pre class="rust"><code><span class="kw">use </span>anchor_lang::prelude::<span class="kw-2">*</span>;
 <span class="kw">use </span>core::fmt::Display;
 
@@ -321,6 +323,8 @@
     </span>NoLiquidatablePerpBasePosition,
     <span class="attr">#[msg(<span class="string">&quot;perp order id not found on the orderbook&quot;</span>)]
     </span>PerpOrderIdNotFound,
+    <span class="attr">#[msg(<span class="string">&quot;HealthRegions allow only specific instructions between Begin and End&quot;</span>)]
+    </span>HealthRegionBadInnerInstruction,
 }
 
 <span class="kw">impl </span>MangoError {
