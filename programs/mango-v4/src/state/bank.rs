@@ -303,7 +303,7 @@ impl Bank {
         now_ts: u64,
     ) -> Result<bool> {
         let opening_indexed_position = position.indexed_position;
-        let result = self.deposit_internal(position, native_amount, allow_dusting)?;
+        let result = self.deposit_internal(position, native_amount, allow_dusting, now_ts)?;
         self.update_cumulative_interest(position, opening_indexed_position);
         Ok(result)
     }
@@ -314,6 +314,7 @@ impl Bank {
         position: &mut TokenPosition,
         mut native_amount: I80F48,
         allow_dusting: bool,
+        now_ts: u64,
     ) -> Result<bool> {
         require_gte!(native_amount, 0);
 
@@ -336,7 +337,7 @@ impl Bank {
 
         if native_position.is_negative() {
             // Only account for the borrows we are repaying
-            self.update_net_borrows((native_position.max(-native_amount)), now_ts);
+            self.update_net_borrows(native_position.max(-native_amount), now_ts);
 
             let new_native_position = native_position + native_amount;
             let indexed_change = div_rounding_up(native_amount, self.borrow_index);
