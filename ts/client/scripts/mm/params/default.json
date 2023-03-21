@@ -11,6 +11,7 @@
         "requoteThresh": 0.0002,
         "takeSpammers": true,
         "spammerCharge": 2,
+        "charge": 0.0017,
         "krakenCode": "XXBTZUSD"
       }
     },
@@ -22,6 +23,7 @@
         "requoteThresh": 0.0002,
         "takeSpammers": true,
         "spammerCharge": 2,
+        "charge": 0.0017,
         "krakenCode": "SOLUSD"
       }
     }
