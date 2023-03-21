@@ -302,7 +302,6 @@ impl Bank {
         allow_dusting: bool,
         now_ts: u64,
     ) -> Result<bool> {
-        self.update_net_borrows(-native_amount, now_ts);
         let opening_indexed_position = position.indexed_position;
         let result = self.deposit_internal(position, native_amount, allow_dusting)?;
         self.update_cumulative_interest(position, opening_indexed_position);
@@ -336,6 +335,9 @@ impl Bank {
         };
 
         if native_position.is_negative() {
+            // Only account for the borrows we are repaying
+            self.update_net_borrows((native_position.max(-native_amount)), now_ts);
+
             let new_native_position = native_position + native_amount;
             let indexed_change = div_rounding_up(native_amount, self.borrow_index);
             // this is only correct if it's not positive, because it scales the whole amount by borrow_index
