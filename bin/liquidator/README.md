@@ -14,7 +14,7 @@ The environment variables required are
 - `LIQOR_MANGO_ACCOUNT` - public key of the mango account
 - `LIQOR_OWNER` - private key of the owner of the mango account
 - `RPC_URL` - RPC cluster url
-- `SERUM_PROGRAM` - the Openbook program Id the mango group is configured with e.g. primary mango group 78b8f4cGCwmZ9ysPFMWLaLTkkaYnUjwMJYStWe5RTSSX is configured to work with "srmqPvymJeFKQ4zGQed1GFppgkRHL9kaELCbyksJtPX"
+- `SERUM_PROGRAM` - the Openbook program Id the mango group is configured with e.g. primary mango group `78b8f4cGCwmZ9ysPFMWLaLTkkaYnUjwMJYStWe5RTSSX` is configured to work with `srmqPvymJeFKQ4zGQed1GFppgkRHL9kaELCbyksJtPX`
 
 more advanced parameters
 
