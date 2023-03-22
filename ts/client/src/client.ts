@@ -8,6 +8,7 @@ import {
   AddressLookupTableAccount,
   Cluster,
   Commitment,
+  Connection,
   Keypair,
   MemcmpFilter,
   PublicKey,
@@ -17,7 +18,6 @@ import {
   SystemProgram,
   TransactionInstruction,
   TransactionSignature,
-  Connection,
 } from '@solana/web3.js';
 import bs58 from 'bs58';
 import { Bank, MintInfo, TokenIndex } from './accounts/bank';
@@ -193,7 +193,7 @@ export class MangoClient {
       )
       .accounts({
         group: group.publicKey,
-        admin: (this.program.provider as AnchorProvider).wallet.publicKey,
+        admin: group.admin,
       })
       .instruction();
     return await this.sendAndConfirmTransactionForGroup(group, [ix]);
@@ -207,7 +207,7 @@ export class MangoClient {
       .ixGateSet(buildIxGate(ixGateParams))
       .accounts({
         group: group.publicKey,
-        admin: (this.program.provider as AnchorProvider).wallet.publicKey,
+        admin: group.admin,
       })
       .instruction();
     return await this.sendAndConfirmTransactionForGroup(group, [ix]);
@@ -330,7 +330,7 @@ export class MangoClient {
       )
       .accounts({
         group: group.publicKey,
-        admin: (this.program.provider as AnchorProvider).wallet.publicKey,
+        admin: group.admin,
         mint: mintPk,
         oracle: oraclePk,
         payer: (this.program.provider as AnchorProvider).wallet.publicKey,
@@ -351,7 +351,7 @@ export class MangoClient {
       .tokenRegisterTrustless(tokenIndex, name)
       .accounts({
         group: group.publicKey,
-        admin: (this.program.provider as AnchorProvider).wallet.publicKey,
+        admin: group.admin,
         mint: mintPk,
         oracle: oraclePk,
         payer: (this.program.provider as AnchorProvider).wallet.publicKey,
@@ -402,7 +402,7 @@ export class MangoClient {
       .accounts({
         group: group.publicKey,
         oracle: params.oracle ?? bank.oracle,
-        admin: (this.program.provider as AnchorProvider).wallet.publicKey,
+        admin: group.admin,
         mintInfo: mintInfo.publicKey,
       })
       .remainingAccounts([
@@ -528,7 +528,7 @@ export class MangoClient {
       .stubOracleCreate({ val: I80F48.fromNumber(price).getData() })
       .accounts({
         group: group.publicKey,
-        admin: (this.program.provider as AnchorProvider).wallet.publicKey,
+        admin: group.admin,
         mint: mintPk,
         payer: (this.program.provider as AnchorProvider).wallet.publicKey,
       })
@@ -561,7 +561,7 @@ export class MangoClient {
       .stubOracleSet({ val: I80F48.fromNumber(price).getData() })
       .accounts({
         group: group.publicKey,
-        admin: (this.program.provider as AnchorProvider).wallet.publicKey,
+        admin: group.admin,
         oracle: oraclePk,
       })
       .instruction();
@@ -753,7 +753,7 @@ export class MangoClient {
       .accounts({
         group: group.publicKey,
         account: mangoAccount.publicKey,
-        admin: (this.program.provider as AnchorProvider).wallet.publicKey,
+        admin: group.admin,
       })
       .instruction();
     return await this.sendAndConfirmTransactionForGroup(group, [ix]);
@@ -1268,7 +1268,7 @@ export class MangoClient {
       .serum3RegisterMarket(marketIndex, name)
       .accounts({
         group: group.publicKey,
-        admin: (this.program.provider as AnchorProvider).wallet.publicKey,
+        admin: group.admin,
         serumProgram: OPENBOOK_PROGRAM_ID[this.cluster],
         serumMarketExternal: serum3MarketExternalPk,
         baseBank: baseBank.publicKey,
@@ -1907,7 +1907,7 @@ export class MangoClient {
       )
       .accounts({
         group: group.publicKey,
-        admin: (this.program.provider as AnchorProvider).wallet.publicKey,
+        admin: group.admin,
         oracle: oraclePk,
         bids: bids.publicKey,
         asks: asks.publicKey,
@@ -2002,7 +2002,7 @@ export class MangoClient {
       .accounts({
         group: group.publicKey,
         oracle: params.oracle ?? perpMarket.oracle,
-        admin: (this.program.provider as AnchorProvider).wallet.publicKey,
+        admin: group.admin,
         perpMarket: perpMarket.publicKey,
       })
       .instruction();
@@ -2019,7 +2019,7 @@ export class MangoClient {
       .perpCloseMarket()
       .accounts({
         group: group.publicKey,
-        admin: (this.program.provider as AnchorProvider).wallet.publicKey,
+        admin: group.admin,
         perpMarket: perpMarket.publicKey,
         bids: perpMarket.bids,
         asks: perpMarket.asks,
@@ -2743,7 +2743,7 @@ export class MangoClient {
       .altSet(index)
       .accounts({
         group: group.publicKey,
-        admin: (this.program.provider as AnchorProvider).wallet.publicKey,
+        admin: group.admin,
         addressLookupTable,
       })
       .instruction();
@@ -2761,7 +2761,7 @@ export class MangoClient {
       .altExtend(index, pks)
       .accounts({
         group: group.publicKey,
-        admin: (this.program.provider as AnchorProvider).wallet.publicKey,
+        admin: group.admin,
         payer: (this.program.provider as AnchorProvider).wallet.publicKey,
         addressLookupTable,
       })
