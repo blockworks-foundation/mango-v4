@@ -278,7 +278,7 @@ impl HealthCache {
 
         let perp_info_index = self.perp_info_index(perp_market_index)?;
         let perp_info = &self.perp_infos[perp_info_index];
-        let prices = &perp_info.prices;
+        let prices = &perp_info.base_prices;
         let base_lot_size = I80F48::from(perp_info.base_lot_size);
 
         // If the price is sufficiently good then health will just increase from trading.
@@ -997,7 +997,7 @@ mod tests {
             bids_base_lots: 0,
             asks_base_lots: 0,
             quote: I80F48::ZERO,
-            prices: Prices::new_single_price(I80F48::from_num(2.0)),
+            base_prices: Prices::new_single_price(I80F48::from_num(2.0)),
             has_open_orders: false,
             has_open_fills: false,
         };
@@ -1036,7 +1036,7 @@ mod tests {
         };
         let find_max_trade =
             |c: &HealthCache, side: PerpOrderSide, ratio: f64, price_factor: f64| {
-                let prices = &c.perp_infos[0].prices;
+                let prices = &c.perp_infos[0].base_prices;
                 let trade_price = I80F48::from_num(price_factor) * prices.oracle;
                 let base_lots = c
                     .max_perp_for_health_ratio(0, trade_price, side, I80F48::from_num(ratio))

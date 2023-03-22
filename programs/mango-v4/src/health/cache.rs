@@ -231,13 +231,17 @@ pub struct PerpInfo {
     pub asks_base_lots: i64,
     // in health-reference-token native units, no asset/liab factor needed
     pub quote: I80F48,
-    pub prices: Prices,
+    pub base_prices: Prices,
     pub has_open_orders: bool,
     pub has_open_fills: bool,
 }
 
 impl PerpInfo {
-    fn new(perp_position: &PerpPosition, perp_market: &PerpMarket, prices: Prices) -> Result<Self> {
+    fn new(
+        perp_position: &PerpPosition,
+        perp_market: &PerpMarket,
+        base_prices: Prices,
+    ) -> Result<Self> {
         let base_lots = perp_position.base_position_lots() + perp_position.taker_base_lots;
 
         let unsettled_funding = perp_position.unsettled_funding(perp_market);
@@ -257,7 +261,7 @@ impl PerpInfo {
             bids_base_lots: perp_position.bids_base_lots,
             asks_base_lots: perp_position.asks_base_lots,
             quote: quote_current,
-            prices,
+            base_prices,
             has_open_orders: perp_position.has_open_orders(),
             has_open_fills: perp_position.has_open_taker_fills(),
         })
@@ -282,25 +286,45 @@ impl PerpInfo {
     /// users to borrow against unsettled positive pnl to some extend. In these cases,
     /// the pnl asset weights would be >0.
     #[inline(always)]
-    pub fn health_contribution(&self, health_type: HealthType) -> I80F48 {
+    pub fn health_contribution(&self, health_type: HealthType, settle_token: &TokenInfo) -> I80F48 {
         let contribution = self.unweighted_health_contribution(health_type);
-        self.weigh_health_contribution(contribution, health_type)
+        self.weigh_health_contribution(contribution, health_type, settle_token)
     }
 
+    /// Convert an unweighted_health_contribution to an actual one in health quote token units.
     #[inline(always)]
-    pub fn weigh_health_contribution(&self, unweighted: I80F48, health_type: HealthType) -> I80F48 {
+    pub fn weigh_health_contribution(
+        &self,
+        unweighted: I80F48,
+        health_type: HealthType,
+        settle_token: &TokenInfo,
+    ) -> I80F48 {
         if unweighted > 0 {
-            let asset_weight = match health_type {
+            let pnl_weight = match health_type {
                 HealthType::Init | HealthType::LiquidationEnd => self.init_overall_asset_weight,
                 HealthType::Maint => self.maint_overall_asset_weight,
             };
-
-            asset_weight * unweighted
+            let settle_weight = match health_type {
+                HealthType::Init | HealthType::LiquidationEnd => {
+                    settle_token.init_scaled_asset_weight
+                }
+                HealthType::Maint => settle_token.maint_asset_weight,
+            };
+            let settle_price = settle_token.prices.asset(health_type);
+            pnl_weight * settle_weight * unweighted * settle_price
         } else {
-            unweighted
+            let settle_weight = match health_type {
+                HealthType::Init | HealthType::LiquidationEnd => {
+                    settle_token.init_scaled_liab_weight
+                }
+                HealthType::Maint => settle_token.maint_liab_weight,
+            };
+            let settle_price = settle_token.prices.liab(health_type);
+            settle_weight * unweighted * settle_price
         }
     }
 
+    /// Health in terms of settle token, without the overall asset weight or the settle token weight or price.
     #[inline(always)]
     pub fn unweighted_health_contribution(&self, health_type: HealthType) -> I80F48 {
         let order_execution_case = |orders_base_lots: i64, order_price: I80F48| {
@@ -317,9 +341,9 @@ impl PerpInfo {
                 (HealthType::Maint, false) => self.maint_base_asset_weight,
             };
             let base_price = if net_base_native.is_negative() {
-                self.prices.liab(health_type)
+                self.base_prices.liab(health_type)
             } else {
-                self.prices.asset(health_type)
+                self.base_prices.asset(health_type)
             };
 
             // Total value of the order-execution adjusted base position
@@ -333,8 +357,10 @@ impl PerpInfo {
         };
 
         // What is worse: Executing all bids at oracle_price.liab, or executing all asks at oracle_price.asset?
-        let bids_case = order_execution_case(self.bids_base_lots, self.prices.liab(health_type));
-        let asks_case = order_execution_case(-self.asks_base_lots, self.prices.asset(health_type));
+        let bids_case =
+            order_execution_case(self.bids_base_lots, self.base_prices.liab(health_type));
+        let asks_case =
+            order_execution_case(-self.asks_base_lots, self.base_prices.asset(health_type));
         let worst_case = bids_case.min(asks_case);
 
         self.quote + worst_case
@@ -478,7 +504,7 @@ impl HealthCache {
             .iter_mut()
             .find(|m| m.perp_market_index == perp_market.perp_market_index)
             .ok_or_else(|| error_msg!("perp market {} not found", perp_market.perp_market_index))?;
-        *perp_entry = PerpInfo::new(perp_position, perp_market, perp_entry.prices.clone())?;
+        *perp_entry = PerpInfo::new(perp_position, perp_market, perp_entry.base_prices.clone())?;
         Ok(())
     }
 

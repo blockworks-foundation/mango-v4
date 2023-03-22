@@ -215,7 +215,7 @@ pub(crate) fn liquidation_action(
     let liqor_perp_position = liqor.perp_position_mut(perp_market_index)?;
 
     let perp_info = liqee_health_cache.perp_info(perp_market_index)?;
-    let oracle_price = perp_info.prices.oracle;
+    let oracle_price = perp_info.base_prices.oracle;
     let base_lot_size = I80F48::from(perp_market.base_lot_size);
     let oracle_price_per_lot = base_lot_size * oracle_price;
 
@@ -246,7 +246,7 @@ pub(crate) fn liquidation_action(
         let quote_init_asset_weight = I80F48::ONE;
         direction = -1;
         fee_factor = I80F48::ONE - perp_market.base_liquidation_fee;
-        let asset_price = perp_info.prices.asset(HealthType::LiquidationEnd);
+        let asset_price = perp_info.base_prices.asset(HealthType::LiquidationEnd);
         unweighted_health_per_lot =
             -asset_price * base_lot_size * perp_market.init_base_asset_weight
                 + oracle_price_per_lot * quote_init_asset_weight * fee_factor;
@@ -262,7 +262,7 @@ pub(crate) fn liquidation_action(
         let quote_init_liab_weight = I80F48::ONE;
         direction = 1;
         fee_factor = I80F48::ONE + perp_market.base_liquidation_fee;
-        let liab_price = perp_info.prices.liab(HealthType::LiquidationEnd);
+        let liab_price = perp_info.base_prices.liab(HealthType::LiquidationEnd);
         unweighted_health_per_lot = liab_price * base_lot_size * perp_market.init_base_liab_weight
             - oracle_price_per_lot * quote_init_liab_weight * fee_factor;
     };
