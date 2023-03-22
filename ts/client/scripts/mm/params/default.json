@@ -1,37 +1,22 @@
 {
   "intervals": {
-    "blockhash": 5000,
-    "group": 30000,
-    "mangoAccount": 1000
+    "blockhash": 30000,
+    "group": 60000,
+    "mangoAccount": 10000
   },
   "oraclePegged": true,
   "batch": 1,
   "assets": {
-    "BTC": {
-      "perp": {
-        "deltaMin": -1,
-        "deltaMax": 2,
-        "sizePerc": 0.25,
-        "leanCoeff": 0.00025,
-        "bias": 0.0,
-        "requoteThresh": 0.0002,
-        "takeSpammers": true,
-        "spammerCharge": 2,
-        "krakenCode": "XXBTZUSD",
-        "charge": 0.02,
-        "collateralMint": ""
-      }
-    },
     "SOL": {
       "perp": {
-        "sizePerc": 0.25,
-        "leanCoeff": 0.00025,
-        "bias": 0.0,
-        "requoteThresh": 0.0002,
-        "takeSpammers": true,
-        "spammerCharge": 2,
-        "krakenCode": "SOLUSD",
-        "charge": 0.02
+        "deltaBias": -1,
+        "deltaMin": -1,
+        "deltaMax": 2,
+        "hedgeMax": 1,
+        "hedgeDiscount": 0.005,
+        "orderSizeLimit": 0.25,
+        "spreadCharge": 0.001,
+        "tokenMint": "So11111111111111111111111111111111111111112"
       }
     }
   }

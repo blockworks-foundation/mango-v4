@@ -23,7 +23,7 @@ import {
 import { MangoClient } from '../../src/client';
 import { MANGO_V4_ID } from '../../src/constants';
 import { I80F48 } from '../../src/numbers/I80F48';
-import { toUiDecimalsForQuote } from '../../src/utils';
+import { QUOTE_DECIMALS, toUiDecimalsForQuote } from '../../src/utils';
 import { sendTransaction } from '../../src/utils/rpc';
 import * as defaultParams from './params/default.json';
 import {
@@ -42,13 +42,12 @@ console.log(defaultParams);
 // * only refresh part of the group which market maker is interested in
 
 // Env vars
-const CLUSTER: Cluster =
-  (process.env.CLUSTER_OVERRIDE as Cluster) || 'mainnet-beta';
-const CLUSTER_URL =
-  process.env.CLUSTER_URL_OVERRIDE || process.env.MB_CLUSTER_URL;
-const USER_KEYPAIR =
-  process.env.USER_KEYPAIR_OVERRIDE || process.env.MB_PAYER_KEYPAIR;
-const MANGO_ACCOUNT_PK = process.env.MANGO_ACCOUNT_PK || '';
+
+const CLUSTER: Cluster = (process.env.CLUSTER as Cluster) || 'mainnet-beta';
+const RPC_URL = process.env.RPC_URL;
+const KEYPAIR =
+  process.env.KEYPAIR || fs.readFileSync(process.env.KEYPAIR_PATH!, 'utf-8');
+const MANGO_ACCOUNT = new PublicKey(process.env.MANGO_ACCOUNT!);
 
 // Load configuration
 const paramsFileName = process.env.PARAMS || 'default.json';
@@ -133,17 +132,35 @@ class BotContext {
     }
   }
 
+  calculateDelta(i: PerpMarketIndex) {
+    const { params, perpMarket } = this.perpMarkets.get(i)!;
+
+    const tokenMint = new PublicKey(params.tokenMint);
+    const tokenBank = this.group.getFirstBankByMint(tokenMint);
+    const tokenPosition = this.mangoAccount.getTokenBalanceUi(tokenBank);
+    const perpPosition = this.mangoAccount.getPerpPositionUi(
+      this.group,
+      perpMarket.perpMarketIndex,
+    );
+    // TODO: add fill delta into perpPosition
+    return { delta: tokenPosition + perpPosition, tokenPosition, perpPosition };
+  }
+
   async updateOrders(i: PerpMarketIndex): Promise<string> {
     const { params, perpMarket } = this.perpMarkets.get(i)!;
-    // TODO calculate current delta (spot + perp) & equity
-    const currentDelta = 0;
+    const { delta } = this.calculateDelta(i);
     const currentEquityInUnderlying =
-      this.mangoAccount.getEquity(this.group).toNumber() / p.perpMarket.uiPrice;
-    const maxSize = currentEquityInUnderlying * params.sizePerc;
-    const bidSize = Math.min(maxSize, params.deltaMax - currentDelta);
-    const askSize = Math.min(maxSize, currentDelta - params.deltaMin);
-    const bidPrice = perpMarket.uiPrice * -params.charge;
-    const askPrice = perpMarket.uiPrice * +params.charge;
+      toUiDecimalsForQuote(this.mangoAccount.getEquity(this.group).toNumber()) /
+      perpMarket.uiPrice;
+    const maxSize = currentEquityInUnderlying * params.orderSizeLimit;
+    const bidSize = Math.min(maxSize, params.deltaMax - delta);
+    const askSize = Math.min(maxSize, delta - params.deltaMin);
+    const bidPrice = perpMarket.uiPrice * -params.spreadCharge;
+    const askPrice = perpMarket.uiPrice * +params.spreadCharge;
+
+    console.log(
+      `update orders delta=${delta} equity=${currentEquityInUnderlying} mark=${perpMarket.uiPrice} bid=${bidSize}@${bidPrice} ask=${askSize}@${askPrice}`,
+    );
 
     const beginIx = await this.client.healthRegionBeginIx(
       this.group,
@@ -188,21 +205,78 @@ class BotContext {
     );
 
     return this.client.sendAndConfirmTransaction([
-      beginIx,
+      // beginIx,
       cancelAllIx,
       bidIx,
       askIx,
-      endIx,
+      // endIx,
     ]);
   }
 
   async hedgeFills(i: PerpMarketIndex): Promise<void> {
+    const { params, perpMarket } = this.perpMarkets.get(i)!;
+
     console.log('start hedger', i);
     while (control.isRunning) {
-      // calculate delta
+      const { delta, perpPosition } = this.calculateDelta(i);
+      const biasedDelta = delta + params.deltaBias;
+
+      console.log(
+        `hedge delta=${delta} perp=${perpPosition} biased=${biasedDelta}`,
+      );
+
+      if (Math.abs(biasedDelta) > perpMarket.minOrderSize) {
+        // prefer perp hedge if perp position has same sign as account delta
+        if (Math.sign(biasedDelta) * Math.sign(perpPosition) > 0) {
+          // hedge size is limited to split hedges into reasonable order sizes
+          const hedgeSize = Math.min(Math.abs(biasedDelta), params.hedgeMax);
+          // hedge price needs to cross the spread and offer a discount
+          const hedgePrice =
+            perpMarket.uiPrice *
+            (1 - Math.sign(biasedDelta) * params.hedgeDiscount);
+
+          const side =
+            Math.sign(biasedDelta) > 0 ? PerpOrderSide.ask : PerpOrderSide.bid;
+
+          console.log(
+            `hedge perp delta=${biasedDelta} side=${
+              side == PerpOrderSide.ask ? 'ask' : 'bid'
+            } size=${hedgeSize} limit=${hedgePrice} index=${
+              perpMarket.uiPrice
+            }`,
+          );
+
+          const ix = await this.client.perpPlaceOrderIx(
+            this.group,
+            this.mangoAccount,
+            i,
+            side,
+            hedgePrice,
+            hedgeSize,
+            undefined,
+            Date.now(),
+            PerpOrderType.immediateOrCancel,
+            true,
+          );
+
+          const confirmBegin = Date.now();
+          const sig = await this.client.sendAndConfirmTransaction([ix], {
+            alts: this.group.addressLookupTablesList,
+            latestBlockhash: this.latestBlockhash,
+          });
+          const confirmEnd = Date.now();
+
+          const newDelta = this.calculateDelta(i).delta;
+
+          console.log(
+            `hedge ${i} confirmed delta time=${
+              (confirmEnd - confirmBegin) / 1000
+            } prev=${delta} new=${newDelta} https://explorer.solana.com/tx/${sig}`,
+          );
+        }
+      }
+
       //       hedge to bring delta in line with config goal
-      //       if perp position would be reduced by hedge:
-      //          hedge on perp with kill or fill
       //          spot hedge in parallel with same sequence id but a second tx
       //          if perp hedge fails, sequence id won't be advanced and spot hedge will succeed
       //          spot hedge should use known liquid routes without network requests (mango-router run in parallel)
@@ -210,6 +284,8 @@ class BotContext {
       //          spot hedge
       //       wait for hedge txs to confirm:
       //          update oracle peg orders
+
+      await sleep(30); // sleep a few ms
     }
   }
 }
@@ -276,6 +352,7 @@ async function cancelAllOrdersForAMarket(
   mangoAccount: MangoAccount,
   perpMarket: PerpMarket,
 ): Promise<void> {
+  console.log('cancel', perpMarket.name);
   for (const i of Array(100).keys()) {
     await sendTransaction(
       client.program.provider as AnchorProvider,
@@ -313,26 +390,25 @@ async function onExit(
   mangoAccount: MangoAccount,
   marketContexts: MarketContext[],
 ) {
+  console.log('cancel all');
   for (const mc of marketContexts) {
     // TODO: this doesn't actually enforce execution as promise is never awaited for
     cancelAllOrdersForAMarket(client, group, mangoAccount, mc.perpMarket);
   }
 }
 
+function sleep(ms): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 // Main driver for the market maker
-async function fullMarketMaker() {
+async function fullMarketMaker(): Promise<void> {
   let intervals: NodeJS.Timer[] = [];
   try {
     // Load client
     const options = AnchorProvider.defaultOptions();
-    const connection = new Connection(CLUSTER_URL!, options);
-    const user = Keypair.fromSecretKey(
-      Buffer.from(
-        JSON.parse(
-          process.env.KEYPAIR || fs.readFileSync(USER_KEYPAIR!, 'utf-8'),
-        ),
-      ),
-    );
+    const connection = new Connection(RPC_URL!, options);
+    const user = Keypair.fromSecretKey(Buffer.from(JSON.parse(KEYPAIR)));
     const userWallet = new Wallet(user);
     const userProvider = new AnchorProvider(connection, userWallet, options);
     const client = await MangoClient.connect(
@@ -345,9 +421,7 @@ async function fullMarketMaker() {
     );
 
     // Load mango account
-    const mangoAccount = await client.getMangoAccount(
-      new PublicKey(MANGO_ACCOUNT_PK),
-    );
+    const mangoAccount = await client.getMangoAccount(MANGO_ACCOUNT);
     console.log(
       `MangoAccount ${mangoAccount.publicKey} for user ${user.publicKey} ${
         mangoAccount.isDelegate(client) ? 'via delegate ' + user.publicKey : ''
@@ -377,7 +451,7 @@ async function fullMarketMaker() {
     for (const perpMarketAsset of getPerpMarketAssetsToTradeOn(group)) {
       const perpMarket = group.getPerpMarketByName(perpMarketAsset + '-PERP');
       const collateralBank = group.getFirstBankByMint(
-        new PublicKey(params.assets[perpMarketAsset].perp.collateralMint),
+        new PublicKey(params.assets[perpMarketAsset].perp.tokenMint),
       );
       const [sequenceAccount, sequenceAccountBump] =
         await findOwnSeqEnforcerAddress(perpMarket.name, client);
@@ -413,39 +487,40 @@ async function fullMarketMaker() {
       onExit(client, group, mangoAccount, Array.from(perpMarkets.values()));
     });
 
-    console.log(`Refreshing state first time`);
+    console.log('Fetch state for the first time');
     await bot.refreshAll();
 
     // setup continuous refresh
-    intervals.push(
-      setInterval(() =>
-        this.refreshBlockhash.then(() => console.debug('updated blockhash')),
-      ),
-      params.intervals.blockhash,
-    );
-    intervals.push(
-      setInterval(() =>
-        this.refreshGroup.then(() => console.debug('updated group')),
-      ),
-      params.intervals.group,
-    );
-    intervals.push(
-      setInterval(() =>
-        this.refreshMangoAccount.then(() =>
-          console.debug('updated mangoAccount'),
-        ),
-      ),
-      params.intervals.mangoAccount,
-    );
+    console.log('Refresh state', params.intervals);
+    // intervals.push(
+    //   setInterval(() =>
+    //     bot.refreshBlockhash().then(() => console.debug('updated blockhash')),
+    //   ),
+    //   params.intervals.blockhash,
+    // );
+    // intervals.push(
+    //   setInterval(() =>
+    //     bot.refreshGroup().then(() => console.debug('updated group')),
+    //   ),
+    //   params.intervals.group,
+    // );
+    // intervals.push(
+    //   setInterval(() =>
+    //     bot
+    //       .refreshMangoAccount()
+    //       .then(() => console.debug('updated mangoAccount')),
+    //   ),
+    //   params.intervals.mangoAccount,
+    // );
 
     // place initial oracle peg orders on book
     await Promise.all(
-      Array.from(perpMarkets.keys()).map(async (i) => this.updateOrders(i)),
+      Array.from(perpMarkets.keys()).map(async (i) => bot.updateOrders(i)),
     );
 
     // launch hedgers per market until control isRunning = false
     await Promise.all(
-      Array.from(perpMarkets.keys()).map(async (i) => this.hedgeFills(i)),
+      Array.from(perpMarkets.keys()).map(async (i) => bot.hedgeFills(i)),
     );
   } finally {
     intervals.forEach((i) => clearInterval(i));
