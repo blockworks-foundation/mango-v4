@@ -219,6 +219,7 @@ pub(crate) struct Serum3Reserved {
 #[derive(Clone, AnchorDeserialize, AnchorSerialize, Debug)]
 pub struct PerpInfo {
     pub perp_market_index: PerpMarketIndex,
+    pub settle_token_index: TokenIndex,
     pub maint_base_asset_weight: I80F48,
     pub init_base_asset_weight: I80F48,
     pub maint_base_liab_weight: I80F48,
@@ -250,6 +251,7 @@ impl PerpInfo {
 
         Ok(Self {
             perp_market_index: perp_market.perp_market_index,
+            settle_token_index: perp_market.settle_token_index,
             init_base_asset_weight: perp_market.init_base_asset_weight,
             init_base_liab_weight: perp_market.init_base_liab_weight,
             maint_base_asset_weight: perp_market.maint_base_asset_weight,
@@ -288,22 +290,23 @@ impl PerpInfo {
     #[inline(always)]
     pub fn health_contribution(&self, health_type: HealthType, settle_token: &TokenInfo) -> I80F48 {
         let contribution = self.unweighted_health_contribution(health_type);
-        self.weigh_health_contribution(contribution, health_type, settle_token)
+        self.weigh_health_contribution_settle(
+            self.weigh_health_contribution_overall(contribution, health_type),
+            health_type,
+            settle_token,
+        )
     }
 
     /// Convert an unweighted_health_contribution to an actual one in health quote token units.
     #[inline(always)]
-    pub fn weigh_health_contribution(
+    pub fn weigh_health_contribution_settle(
         &self,
         unweighted: I80F48,
         health_type: HealthType,
         settle_token: &TokenInfo,
     ) -> I80F48 {
+        assert_eq!(self.settle_token_index, settle_token.token_index);
         if unweighted > 0 {
-            let pnl_weight = match health_type {
-                HealthType::Init | HealthType::LiquidationEnd => self.init_overall_asset_weight,
-                HealthType::Maint => self.maint_overall_asset_weight,
-            };
             let settle_weight = match health_type {
                 HealthType::Init | HealthType::LiquidationEnd => {
                     settle_token.init_scaled_asset_weight
@@ -311,7 +314,7 @@ impl PerpInfo {
                 HealthType::Maint => settle_token.maint_asset_weight,
             };
             let settle_price = settle_token.prices.asset(health_type);
-            pnl_weight * settle_weight * unweighted * settle_price
+            settle_weight * unweighted * settle_price
         } else {
             let settle_weight = match health_type {
                 HealthType::Init | HealthType::LiquidationEnd => {
@@ -321,6 +324,24 @@ impl PerpInfo {
             };
             let settle_price = settle_token.prices.liab(health_type);
             settle_weight * unweighted * settle_price
+        }
+    }
+
+    /// Convert an unweighted_health_contribution to an actual one in health quote token units.
+    #[inline(always)]
+    pub fn weigh_health_contribution_overall(
+        &self,
+        unweighted: I80F48,
+        health_type: HealthType,
+    ) -> I80F48 {
+        if unweighted > 0 {
+            let overall_weight = match health_type {
+                HealthType::Init | HealthType::LiquidationEnd => self.init_overall_asset_weight,
+                HealthType::Maint => self.maint_overall_asset_weight,
+            };
+            overall_weight * unweighted
+        } else {
+            unweighted
         }
     }
 
@@ -674,7 +695,8 @@ impl HealthCache {
         }
 
         for perp_info in self.perp_infos.iter() {
-            let contrib = perp_info.health_contribution(health_type);
+            let settle_token = self.token_info(perp_info.settle_token_index).unwrap();
+            let contrib = perp_info.health_contribution(health_type, settle_token);
             action(contrib);
         }
     }
@@ -709,7 +731,10 @@ impl HealthCache {
         }
 
         for perp_info in self.perp_infos.iter() {
-            let positive_contrib = perp_info.health_contribution(health_type).max(I80F48::ZERO);
+            let settle_token = self.token_info(perp_info.settle_token_index).unwrap();
+            let positive_contrib = perp_info
+                .health_contribution(health_type, settle_token)
+                .max(I80F48::ZERO);
             health += positive_contrib;
         }
         health

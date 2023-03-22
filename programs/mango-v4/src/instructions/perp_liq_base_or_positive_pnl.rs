@@ -277,6 +277,7 @@ pub(crate) fn liquidation_action(
     // This is needed in order to reduce the base position the right amount when taking into
     // account the settlement that will happen afterwards.
     let expected_perp_health = |unweighted: I80F48| {
+        // TODO: this needs fixing...
         if unweighted < 0 {
             unweighted
         } else if unweighted < max_pnl_transfer {

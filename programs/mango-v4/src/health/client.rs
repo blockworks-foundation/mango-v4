@@ -343,10 +343,19 @@ impl HealthCache {
 
             // The perp market's contribution to the health above may be capped. But we need to trade
             // enough to fully reduce any positive-pnl buffer. Thus get the uncapped health:
+            // TODO: is this still correct?!
             let perp_info = &start_cache.perp_infos[perp_info_index];
+            let settle_token = start_cache
+                .token_info(perp_info.settle_token_index)
+                .unwrap();
+            let uncapped_health_contrib = perp_info.weigh_health_contribution_settle(
+                perp_info.unweighted_health_contribution(HealthType::Init),
+                HealthType::Init,
+                settle_token,
+            );
             let start_health_uncapped = start_health
-                - perp_info.health_contribution(HealthType::Init)
-                + perp_info.unweighted_health_contribution(HealthType::Init);
+                - perp_info.health_contribution(HealthType::Init, settle_token)
+                + uncapped_health_contrib;
             // We add 1 here because health is computed for truncated base_lots and we want to guarantee
             // zero_health_ratio <= 0.
             let zero_health_amount = case1_start_i80f48
