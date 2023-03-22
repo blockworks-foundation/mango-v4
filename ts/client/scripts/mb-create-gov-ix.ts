@@ -11,9 +11,11 @@ import {
 } from '@solana/web3.js';
 import fs from 'fs';
 import { TokenIndex } from '../src/accounts/bank';
+import { PerpMarketIndex } from '../src/accounts/perp';
 import { Builder } from '../src/builder';
 import { MangoClient } from '../src/client';
 import {
+  NullPerpEditParams,
   NullTokenEditParams,
   TrueIxGateParams,
   buildIxGate,
@@ -279,6 +281,57 @@ async function perpCreate(): Promise<void> {
   console.log(serializeInstructionToBase64(ix));
 }
 
+async function perpEdit(): Promise<void> {
+  const client = await buildClient();
+  const group = await client.getGroup(new PublicKey(GROUP_PK));
+  const perpMarket = group.getPerpMarketByMarketIndex(0 as PerpMarketIndex);
+  const params = Builder(NullPerpEditParams)
+    .positivePnlLiquidationFee(bpsToDecimal(250))
+    .build();
+  const ix = await client.program.methods
+    .perpEditMarket(
+      params.oracle,
+      params.oracleConfig,
+      params.baseDecimals,
+      params.maintBaseAssetWeight,
+      params.initBaseAssetWeight,
+      params.maintBaseLiabWeight,
+      params.initBaseLiabWeight,
+      params.maintOverallAssetWeight,
+      params.initOverallAssetWeight,
+      params.baseLiquidationFee,
+      params.makerFee,
+      params.takerFee,
+      params.minFunding,
+      params.maxFunding,
+      params.impactQuantity !== null ? new BN(params.impactQuantity) : null,
+      params.groupInsuranceFund,
+      params.feePenalty,
+      params.settleFeeFlat,
+      params.settleFeeAmountThreshold,
+      params.settleFeeFractionLowHealth,
+      params.stablePriceDelayIntervalSeconds,
+      params.stablePriceDelayGrowthLimit,
+      params.stablePriceGrowthLimit,
+      params.settlePnlLimitFactor,
+      params.settlePnlLimitWindowSize !== null
+        ? new BN(params.settlePnlLimitWindowSize)
+        : null,
+      params.reduceOnly,
+      params.resetStablePrice ?? false,
+      params.positivePnlLiquidationFee,
+      params.name,
+    )
+    .accounts({
+      group: group.publicKey,
+      oracle: params.oracle ?? perpMarket.oracle,
+      admin: group.admin,
+      perpMarket: perpMarket.publicKey,
+    })
+    .instruction();
+  console.log(serializeInstructionToBase64(ix));
+}
+
 async function ixDisable(): Promise<void> {
   const client = await buildClient();
 
@@ -297,13 +350,32 @@ async function ixDisable(): Promise<void> {
   console.log(await serializeInstructionToBase64(ix));
 }
 
+async function createMangoAccount(): Promise<void> {
+  const client = await buildClient();
+
+  const group = await client.getGroup(new PublicKey(GROUP_PK));
+
+  const ix = await client.program.methods
+    .accountCreate(0, 8, 8, 8, 32, 'Mango DAO 0')
+    .accounts({
+      group: group.publicKey,
+      owner: new PublicKey('5tgfd6XgwiXB9otEnzFpXK11m7Q7yZUaAJzWK4oT5UGF'),
+      payer: new PublicKey('5tgfd6XgwiXB9otEnzFpXK11m7Q7yZUaAJzWK4oT5UGF'),
+    })
+    .instruction();
+
+  console.log(await serializeInstructionToBase64(ix));
+}
+
 async function main(): Promise<void> {
   try {
     // await tokenRegister();
     // await tokenEdit();
     // await perpCreate();
+    await perpEdit();
     // await serum3Register();
     // await ixDisable();
+    // await createMangoAccount();
   } catch (error) {
     console.log(error);
   }
