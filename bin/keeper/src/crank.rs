@@ -22,8 +22,17 @@ lazy_static::lazy_static! {
         IntCounter::new("update_tokens_success", "Successful update token transactions").unwrap();
     pub static ref METRIC_UPDATE_TOKENS_FAILURE: IntCounter =
         IntCounter::new("update_tokens_failure", "Failed update token transactions").unwrap();
+    pub static ref METRIC_CONSUME_EVENTS_SUCCESS: IntCounter =
+        IntCounter::new("consume_events_success", "Successful consume events transactions").unwrap();
+    pub static ref METRIC_CONSUME_EVENTS_FAILURE: IntCounter =
+        IntCounter::new("consume_events_failure", "Failed consume events transactions").unwrap();
+    pub static ref METRIC_UPDATE_FUNDING_SUCCESS: IntCounter =
+        IntCounter::new("update_funding_success", "Successful update funding transactions").unwrap();
+    pub static ref METRIC_UPDATE_FUNDING_FAILURE: IntCounter =
+        IntCounter::new("update_funding_failure", "Failed update funding transactions").unwrap();
     pub static ref METRIC_CONFIRMATION_TIMES: Histogram = register_histogram!(
-        "confirmation_times", "Transaction confirmation times"
+        "confirmation_times", "Transaction confirmation times",
+        vec![1000.0, 3000.0, 5000.0, 7000.0, 10000.0, 15000.0, 20000.0, 30000.0, 40000.0, 50000.0, 60000.0]
     ).unwrap();
 }
 
@@ -34,6 +43,14 @@ async fn serve_metrics() {
         .register(Box::new(METRIC_UPDATE_TOKENS_SUCCESS.clone())).unwrap();
     METRICS_REGISTRY
         .register(Box::new(METRIC_UPDATE_TOKENS_FAILURE.clone())).unwrap();
+    METRICS_REGISTRY
+        .register(Box::new(METRIC_CONSUME_EVENTS_SUCCESS.clone())).unwrap();
+    METRICS_REGISTRY
+        .register(Box::new(METRIC_CONSUME_EVENTS_FAILURE.clone())).unwrap();
+    METRICS_REGISTRY
+        .register(Box::new(METRIC_UPDATE_FUNDING_SUCCESS.clone())).unwrap();
+    METRICS_REGISTRY
+        .register(Box::new(METRIC_UPDATE_FUNDING_FAILURE.clone())).unwrap();
     METRICS_REGISTRY
         .register(Box::new(METRIC_CONFIRMATION_TIMES.clone())).unwrap();
 
@@ -324,20 +341,26 @@ pub async fn loop_consume_events(
 
         let sig_result = client.send_and_confirm_permissionless_tx(vec![ix]).await;
 
+        let confirmation_time = pre.elapsed().as_millis();
+        METRIC_CONFIRMATION_TIMES
+            .observe(confirmation_time as f64);
+
         if let Err(e) = sig_result {
+            METRIC_CONSUME_EVENTS_FAILURE.inc();
             log::info!(
                 "metricName=ConsumeEventsV4Failure market={} durationMs={} consumed={} error={}",
                 perp_market.name(),
-                pre.elapsed().as_millis(),
+                confirmation_time,
                 num_of_events,
                 e.to_string()
             );
             log::error!("{:?}", e)
         } else {
+            METRIC_CONSUME_EVENTS_SUCCESS.inc();
             log::info!(
                 "metricName=ConsumeEventsV4Success market={} durationMs={} consumed={}",
                 perp_market.name(),
-                pre.elapsed().as_millis(),
+                confirmation_time,
                 num_of_events,
             );
             log::info!("{:?}", sig_result);
@@ -374,19 +397,25 @@ pub async fn loop_update_funding(
         };
         let sig_result = client.send_and_confirm_permissionless_tx(vec![ix]).await;
 
+        let confirmation_time = pre.elapsed().as_millis();
+        METRIC_CONFIRMATION_TIMES
+            .observe(confirmation_time as f64);
+
         if let Err(e) = sig_result {
+            METRIC_UPDATE_FUNDING_FAILURE.inc();
             log::error!(
                 "metricName=UpdateFundingV4Error market={} durationMs={} error={}",
                 perp_market.name(),
-                pre.elapsed().as_millis(),
+                confirmation_time,
                 e.to_string()
             );
             log::error!("{:?}", e)
         } else {
+            METRIC_UPDATE_FUNDING_SUCCESS.inc();
             log::info!(
                 "metricName=UpdateFundingV4Success market={} durationMs={}",
                 perp_market.name(),
-                pre.elapsed().as_millis(),
+                confirmation_time,
             );
             log::info!("{:?}", sig_result);
         }
