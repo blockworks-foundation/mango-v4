@@ -11,8 +11,47 @@ use solana_sdk::{
     pubkey::Pubkey,
 };
 use tokio::time;
+use prometheus::{
+    Histogram, IntCounter, Registry, Encoder, register_histogram,
+};
+use warp::Filter;
+
+lazy_static::lazy_static! {
+    pub static ref METRICS_REGISTRY: Registry = Registry::new_custom(Some("keeper".to_string()), None).unwrap();
+    pub static ref METRIC_UPDATE_TOKENS_SUCCESS: IntCounter =
+        IntCounter::new("update_tokens_success", "Successful update token transactions").unwrap();
+    pub static ref METRIC_UPDATE_TOKENS_FAILURE: IntCounter =
+        IntCounter::new("update_tokens_failure", "Failed update token transactions").unwrap();
+    pub static ref METRIC_CONFIRMATION_TIMES: Histogram = register_histogram!(
+        "confirmation_times", "Transaction confirmation times"
+    ).unwrap();
+}
 
 // TODO: move instructions into the client proper
+
+async fn serve_metrics() {
+    METRICS_REGISTRY
+        .register(Box::new(METRIC_UPDATE_TOKENS_SUCCESS.clone())).unwrap();
+    METRICS_REGISTRY
+        .register(Box::new(METRIC_UPDATE_TOKENS_FAILURE.clone())).unwrap();
+    METRICS_REGISTRY
+        .register(Box::new(METRIC_CONFIRMATION_TIMES.clone())).unwrap();
+
+
+    let metrics_route = warp::path!("metrics").map(|| {
+        let mut buffer = Vec::<u8>::new();
+        let encoder = prometheus::TextEncoder::new();
+        encoder
+            .encode(&METRICS_REGISTRY.gather(), &mut buffer)
+            .unwrap();
+
+        String::from_utf8(buffer.clone()).unwrap()
+    });
+    println!("Metrics server starting on port 9091");
+    warp::serve(metrics_route)
+        .run(([0, 0, 0, 0], 9091))
+        .await;
+}
 
 pub async fn runner(
     mango_client: Arc<MangoClient>,
@@ -83,7 +122,8 @@ pub async fn runner(
             mango_client.clone(),
             interval_check_new_listings_and_abort
         ),
-        debugging_handle
+        serve_metrics(),
+        debugging_handle,
     );
 
     Ok(())
@@ -165,19 +205,25 @@ pub async fn loop_update_index_and_rate(
             .send_and_confirm_permissionless_tx(instructions)
             .await;
 
+        let confirmation_time = pre.elapsed().as_millis();
+        METRIC_CONFIRMATION_TIMES
+            .observe(confirmation_time as f64);
+
         if let Err(e) = sig_result {
+            METRIC_UPDATE_TOKENS_FAILURE.inc();
             log::info!(
                 "metricName=UpdateTokensV4Failure tokens={} durationMs={} error={}",
                 token_names,
-                pre.elapsed().as_millis(),
+                confirmation_time,
                 e
             );
             log::error!("{:?}", e)
         } else {
+            METRIC_UPDATE_TOKENS_SUCCESS.inc();
             log::info!(
                 "metricName=UpdateTokensV4Success tokens={} durationMs={}",
                 token_names,
-                pre.elapsed().as_millis(),
+                confirmation_time,
             );
             log::info!("{:?}", sig_result);
         }
