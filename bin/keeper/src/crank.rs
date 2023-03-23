@@ -6,14 +6,12 @@ use itertools::Itertools;
 use anchor_lang::{__private::bytemuck::cast_ref, solana_program};
 use futures::Future;
 use mango_v4::state::{EventQueue, EventType, FillEvent, OutEvent, PerpMarket, TokenIndex};
+use prometheus::{register_histogram, Encoder, Histogram, IntCounter, Registry};
 use solana_sdk::{
     instruction::{AccountMeta, Instruction},
     pubkey::Pubkey,
 };
 use tokio::time;
-use prometheus::{
-    Histogram, IntCounter, Registry, Encoder, register_histogram,
-};
 use warp::Filter;
 
 lazy_static::lazy_static! {
@@ -40,20 +38,26 @@ lazy_static::lazy_static! {
 
 async fn serve_metrics() {
     METRICS_REGISTRY
-        .register(Box::new(METRIC_UPDATE_TOKENS_SUCCESS.clone())).unwrap();
+        .register(Box::new(METRIC_UPDATE_TOKENS_SUCCESS.clone()))
+        .unwrap();
     METRICS_REGISTRY
-        .register(Box::new(METRIC_UPDATE_TOKENS_FAILURE.clone())).unwrap();
+        .register(Box::new(METRIC_UPDATE_TOKENS_FAILURE.clone()))
+        .unwrap();
     METRICS_REGISTRY
-        .register(Box::new(METRIC_CONSUME_EVENTS_SUCCESS.clone())).unwrap();
+        .register(Box::new(METRIC_CONSUME_EVENTS_SUCCESS.clone()))
+        .unwrap();
     METRICS_REGISTRY
-        .register(Box::new(METRIC_CONSUME_EVENTS_FAILURE.clone())).unwrap();
+        .register(Box::new(METRIC_CONSUME_EVENTS_FAILURE.clone()))
+        .unwrap();
     METRICS_REGISTRY
-        .register(Box::new(METRIC_UPDATE_FUNDING_SUCCESS.clone())).unwrap();
+        .register(Box::new(METRIC_UPDATE_FUNDING_SUCCESS.clone()))
+        .unwrap();
     METRICS_REGISTRY
-        .register(Box::new(METRIC_UPDATE_FUNDING_FAILURE.clone())).unwrap();
+        .register(Box::new(METRIC_UPDATE_FUNDING_FAILURE.clone()))
+        .unwrap();
     METRICS_REGISTRY
-        .register(Box::new(METRIC_CONFIRMATION_TIMES.clone())).unwrap();
-
+        .register(Box::new(METRIC_CONFIRMATION_TIMES.clone()))
+        .unwrap();
 
     let metrics_route = warp::path!("metrics").map(|| {
         let mut buffer = Vec::<u8>::new();
@@ -65,9 +69,7 @@ async fn serve_metrics() {
         String::from_utf8(buffer.clone()).unwrap()
     });
     println!("Metrics server starting on port 9091");
-    warp::serve(metrics_route)
-        .run(([0, 0, 0, 0], 9091))
-        .await;
+    warp::serve(metrics_route).run(([0, 0, 0, 0], 9091)).await;
 }
 
 pub async fn runner(
@@ -223,8 +225,7 @@ pub async fn loop_update_index_and_rate(
             .await;
 
         let confirmation_time = pre.elapsed().as_millis();
-        METRIC_CONFIRMATION_TIMES
-            .observe(confirmation_time as f64);
+        METRIC_CONFIRMATION_TIMES.observe(confirmation_time as f64);
 
         if let Err(e) = sig_result {
             METRIC_UPDATE_TOKENS_FAILURE.inc();
@@ -342,8 +343,7 @@ pub async fn loop_consume_events(
         let sig_result = client.send_and_confirm_permissionless_tx(vec![ix]).await;
 
         let confirmation_time = pre.elapsed().as_millis();
-        METRIC_CONFIRMATION_TIMES
-            .observe(confirmation_time as f64);
+        METRIC_CONFIRMATION_TIMES.observe(confirmation_time as f64);
 
         if let Err(e) = sig_result {
             METRIC_CONSUME_EVENTS_FAILURE.inc();
@@ -398,8 +398,7 @@ pub async fn loop_update_funding(
         let sig_result = client.send_and_confirm_permissionless_tx(vec![ix]).await;
 
         let confirmation_time = pre.elapsed().as_millis();
-        METRIC_CONFIRMATION_TIMES
-            .observe(confirmation_time as f64);
+        METRIC_CONFIRMATION_TIMES.observe(confirmation_time as f64);
 
         if let Err(e) = sig_result {
             METRIC_UPDATE_FUNDING_FAILURE.inc();
