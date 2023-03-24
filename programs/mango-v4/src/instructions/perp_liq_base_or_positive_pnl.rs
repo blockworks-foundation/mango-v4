@@ -208,13 +208,16 @@ pub(crate) fn liquidation_action(
     max_base_transfer: i64,
     max_pnl_transfer: u64,
 ) -> Result<(i64, I80F48, I80F48, I80F48)> {
+    let liq_end_type = HealthType::LiquidationEnd;
     let perp_market_index = perp_market.perp_market_index;
     let settle_token_index = perp_market.settle_token_index;
 
     let liqee_perp_position = liqee.perp_position_mut(perp_market_index)?;
     let liqor_perp_position = liqor.perp_position_mut(perp_market_index)?;
 
-    let perp_info = liqee_health_cache.perp_info(perp_market_index)?;
+    let mut settle_token_info = liqee_health_cache.token_info(settle_token_index)?.clone();
+    let mut perp_info = liqee_health_cache.perp_info(perp_market_index)?.clone();
+
     let oracle_price = perp_info.base_prices.oracle;
     let base_lot_size = I80F48::from(perp_market.base_lot_size);
     let oracle_price_per_lot = base_lot_size * oracle_price;
@@ -231,6 +234,7 @@ pub(crate) fn liquidation_action(
     // Each lot the base position gets closer to 0, the unweighted perp health contribution
     // increases by this amount.
     let unweighted_health_per_lot;
+    let quote_per_lot;
     // -1 (liqee base lots decrease) or +1 (liqee base lots increase)
     let direction: i64;
     // Either 1+fee or 1-fee, depending on direction.
@@ -243,13 +247,12 @@ pub(crate) fn liquidation_action(
 
         // the unweighted perp health contribution gets reduced by `base * price * perp_init_asset_weight`
         // and increased by `base * price * (1 - liq_fee) * quote_init_asset_weight`
-        let quote_init_asset_weight = I80F48::ONE;
         direction = -1;
         fee_factor = I80F48::ONE - perp_market.base_liquidation_fee;
-        let asset_price = perp_info.base_prices.asset(HealthType::LiquidationEnd);
+        let asset_price = perp_info.base_prices.asset(liq_end_type);
+        quote_per_lot = oracle_price_per_lot * fee_factor;
         unweighted_health_per_lot =
-            -asset_price * base_lot_size * perp_market.init_base_asset_weight
-                + oracle_price_per_lot * quote_init_asset_weight * fee_factor;
+            -asset_price * base_lot_size * perp_market.init_base_asset_weight + quote_per_lot;
     } else {
         // liqee_base_lots <= 0
         require_msg!(
@@ -259,12 +262,12 @@ pub(crate) fn liquidation_action(
 
         // health gets increased by `base * price * perp_init_liab_weight`
         // and reduced by `base * price * (1 + liq_fee) * quote_init_liab_weight`
-        let quote_init_liab_weight = I80F48::ONE;
         direction = 1;
         fee_factor = I80F48::ONE + perp_market.base_liquidation_fee;
-        let liab_price = perp_info.base_prices.liab(HealthType::LiquidationEnd);
-        unweighted_health_per_lot = liab_price * base_lot_size * perp_market.init_base_liab_weight
-            - oracle_price_per_lot * quote_init_liab_weight * fee_factor;
+        let liab_price = perp_info.base_prices.liab(liq_end_type);
+        quote_per_lot = oracle_price_per_lot * fee_factor;
+        unweighted_health_per_lot =
+            liab_price * base_lot_size * perp_market.init_base_liab_weight - quote_per_lot;
     };
     assert!(unweighted_health_per_lot > 0);
 
@@ -277,10 +280,18 @@ pub(crate) fn liquidation_action(
     // This is needed in order to reduce the base position the right amount when taking into
     // account the settlement that will happen afterwards.
     let expected_perp_health = |unweighted: I80F48| {
-        // TODO: this needs fixing...
+        // TODO: this needs fixing... in the defailts
+        // but also conceptually, because unsettled pnl != unweighted health
+        // What we should be doing is to clone a PerpInfo and then update that:
+        // - base reduction means reducing base field, and compensating on quote field
+        // - then compute settleable pnl based on that
+        // - the health of settle depends on the settle token position
+        // should overall look a bit easier?! methinks
         if unweighted < 0 {
+            // liab price and liab init weight
             unweighted
         } else if unweighted < max_pnl_transfer {
+            // fuck, settlement health increase depends on current settle token balance!
             unweighted * spot_gain_per_settled
         } else {
             let unsettled = unweighted - max_pnl_transfer;
@@ -288,25 +299,52 @@ pub(crate) fn liquidation_action(
         }
     };
 
+    let unsettled_pnl = |perp_info: &PerpInfo| -> I80F48 {
+        perp_info.quote
+            + I80F48::from(perp_info.base_lots * perp_info.base_lot_size)
+                * perp_info.base_prices.oracle
+    };
+
+    let initial_perp_health = perp_info.health_contribution(liq_end_type, &settle_token_info);
+    let initial_settle_token_health = settle_token_info.health_contribution(liq_end_type);
+    let initial_health_without_perp_and_settle_token =
+        liqee_liq_end_health - initial_perp_health - initial_settle_token_health;
+
+    // Settles as much pnl as possible
+    //
+    // Needs fixing
+    //
+    // It's never worthwhile to settle pnl when perp health < 0: Settling would decrease perp health by x
+    // and only increase token health by x * (1-settle_fee). So don't touch that part of the unsettled pnl.
+    let mut remaining_allowed_settle = max_pnl_transfer;
+    let settle_pnl = |perp_info: &mut PerpInfo, settle_token_info: &mut TokenInfo| {
+        let upnl = unsettled_pnl(perp_info);
+        let settle = upnl.min(remaining_allowed_settle).max(I80F48::ZERO);
+
+        perp_info.quote -= settle;
+        settle_token_info.balance_native += settle * spot_gain_per_settled;
+        remaining_allowed_settle -= settle;
+    };
+
+    // Increase health by settling first, if possible
+    settle_pnl(&mut perp_info, &mut settle_token_info);
+
     //
     // Several steps of perp base position reduction will follow, and they'll update
     // these variables
     //
     let mut base_reduction = 0;
-    let mut current_unweighted_perp_health =
-        perp_info.unweighted_health_contribution(HealthType::LiquidationEnd);
-    let initial_weighted_perp_health = perp_info
-        .weigh_health_contribution(current_unweighted_perp_health, HealthType::LiquidationEnd);
-    let mut current_expected_perp_health = expected_perp_health(current_unweighted_perp_health);
-    let mut current_expected_health =
-        liqee_liq_end_health + current_expected_perp_health - initial_weighted_perp_health;
 
     let mut reduce_base = |step: &str,
-                           health_amount: I80F48,
-                           health_per_lot: I80F48,
-                           current_unweighted_perp_health: &mut I80F48| {
+                           perp_info: &mut PerpInfo,
+                           settle_token_info: &TokenInfo,
+                           health_quote_amount: I80F48,
+                           health_per_lot: I80F48| {
+        let current_expected_health = initial_health_without_perp_and_settle_token
+            + perp_info.health_contribution(liq_end_type, settle_token_info)
+            + settle_token_info.health_contribution(liq_end_type);
         // How much are we willing to increase the unweighted perp health?
-        let health_limit = health_amount
+        let health_limit = health_quote_amount
             .min(-current_expected_health)
             .max(I80F48::ZERO);
         // How many lots to transfer?
@@ -316,66 +354,57 @@ pub(crate) fn liquidation_action(
             .min(liqee_base_lots.abs() - base_reduction)
             .min(max_base_transfer.abs() - base_reduction)
             .max(0);
-        let unweighted_change = I80F48::from(base_lots) * unweighted_health_per_lot;
-        let current_unweighted = *current_unweighted_perp_health;
-        let new_unweighted_perp = current_unweighted + unweighted_change;
-        let new_expected_perp = expected_perp_health(new_unweighted_perp);
-        let new_expected_health =
-            current_expected_health + (new_expected_perp - current_expected_perp_health);
         msg!(
-            "{}: {} lots, health {} -> {}, unweighted perp {} -> {}",
+            "{}: reduce by {} lots, health before: {}, health quote amount: {}, health_per_lot: {}",
             step,
             base_lots,
             current_expected_health,
-            new_expected_health,
-            current_unweighted,
-            new_unweighted_perp
+            health_quote_amount,
+            health_per_lot,
         );
 
         base_reduction += base_lots;
-        current_expected_health = new_expected_health;
-        *current_unweighted_perp_health = new_unweighted_perp;
-        current_expected_perp_health = new_expected_perp;
+        perp_info.base_lots += direction * base_lots;
+        perp_info.quote -= I80F48::from(direction * base_lots) * quote_per_lot;
     };
 
     //
-    // Step 1: While the perp unsettled health is negative, any perp base position reduction
-    // directly increases it for the full amount.
+    // Step 1: While the perp health is negative, any perp base position reduction directly increases it.
     //
-    if current_unweighted_perp_health < 0 {
-        reduce_base(
-            "negative",
-            -current_unweighted_perp_health,
-            unweighted_health_per_lot,
-            &mut current_unweighted_perp_health,
-        );
-    }
-
-    //
-    // Step 2: If perp unsettled health is positive but below max_settle, perp base position reductions
-    // benefit account health slightly less because of the settlement liquidation fee.
-    //
-    if current_unweighted_perp_health >= 0 && current_unweighted_perp_health < max_pnl_transfer {
-        let settled_health_per_lot = unweighted_health_per_lot * spot_gain_per_settled;
-        reduce_base(
-            "settleable",
-            max_pnl_transfer - current_unweighted_perp_health,
-            settled_health_per_lot,
-            &mut current_unweighted_perp_health,
-        );
+    {
+        let current_perp_health = perp_info.health_contribution(liq_end_type, &settle_token_info);
+        if current_perp_health < 0 {
+            let health_per_lot = unweighted_health_per_lot
+                * settle_token_info.init_liab_weight
+                * settle_token_info.prices.liab(liq_end_type);
+            reduce_base(
+                "negative",
+                &mut perp_info,
+                &settle_token_info,
+                -current_perp_health,
+                health_per_lot,
+            );
+        }
     }
 
     //
     // Step 3: Above that, perp base positions only benefit account health if the pnl asset weight is positive
     //
-    if current_unweighted_perp_health >= max_pnl_transfer && init_overall_asset_weight > 0 {
-        let weighted_health_per_lot = unweighted_health_per_lot * init_overall_asset_weight;
-        reduce_base(
-            "positive",
-            I80F48::MAX,
-            weighted_health_per_lot,
-            &mut current_unweighted_perp_health,
-        );
+    {
+        let current_perp_health = perp_info.health_contribution(liq_end_type, &settle_token_info);
+        if current_perp_health >= 0 && init_overall_asset_weight > 0 {
+            let health_per_lot = unweighted_health_per_lot
+                * settle_token_info.init_asset_weight
+                * settle_token_info.prices.asset(liq_end_type)
+                * init_overall_asset_weight;
+            reduce_base(
+                "positive",
+                &mut perp_info,
+                &settle_token_info,
+                I80F48::MAX,
+                health_per_lot,
+            );
+        }
     }
 
     //

@@ -122,7 +122,7 @@ impl TokenInfo {
     }
 
     #[inline(always)]
-    fn health_contribution(&self, health_type: HealthType) -> I80F48 {
+    pub fn health_contribution(&self, health_type: HealthType) -> I80F48 {
         let (weight, price) = if self.balance_native.is_negative() {
             (self.liab_weight(health_type), self.prices.liab(health_type))
         } else {
@@ -308,18 +308,16 @@ impl PerpInfo {
         assert_eq!(self.settle_token_index, settle_token.token_index);
         if unweighted > 0 {
             let settle_weight = match health_type {
-                HealthType::Init | HealthType::LiquidationEnd => {
-                    settle_token.init_scaled_asset_weight
-                }
+                HealthType::Init => settle_token.init_scaled_asset_weight,
+                HealthType::LiquidationEnd => settle_token.init_asset_weight,
                 HealthType::Maint => settle_token.maint_asset_weight,
             };
             let settle_price = settle_token.prices.asset(health_type);
             settle_weight * unweighted * settle_price
         } else {
             let settle_weight = match health_type {
-                HealthType::Init | HealthType::LiquidationEnd => {
-                    settle_token.init_scaled_liab_weight
-                }
+                HealthType::Init => settle_token.init_scaled_liab_weight,
+                HealthType::LiquidationEnd => settle_token.init_liab_weight,
                 HealthType::Maint => settle_token.maint_liab_weight,
             };
             let settle_price = settle_token.prices.liab(health_type);
