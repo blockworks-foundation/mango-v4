@@ -1836,7 +1836,7 @@ impl ClientInstruction for AccountBuybackFeesWithMngo {
     ) -> (Self::Accounts, instruction::Instruction) {
         let program_id = mango_v4::id();
         let instruction = Self::Instruction {
-            max_buyback: u64::MAX,
+            max_buyback_usd: u64::MAX,
         };
 
         let account = account_loader
