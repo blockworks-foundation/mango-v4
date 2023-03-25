@@ -381,7 +381,7 @@ export class Group {
     );
   }
 
-  private async decodePriceFromOracleAi(
+  public async decodePriceFromOracleAi(
     coder: BorshAccountsCoder<string>,
     oracle: PublicKey,
     ai: AccountInfo<Buffer>,
