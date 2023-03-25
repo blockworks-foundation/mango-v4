@@ -1,21 +1,22 @@
 {
   "intervals": {
-    "blockhash": 30000,
-    "group": 60000,
-    "mangoAccount": 10000
+    "blockhash": 5000,
+    "group": 30000,
+    "mangoAccount": 1000
   },
   "oraclePegged": true,
   "batch": 1,
   "assets": {
     "SOL": {
       "perp": {
-        "deltaBias": -1,
-        "deltaMin": -1,
+        "deltaBias": 0,
+        "deltaMin": -2,
         "deltaMax": 2,
+        "positionMax": 8,
         "hedgeMax": 1,
-        "hedgeDiscount": 0.005,
+        "hedgeDiscount": 0.0001,
         "orderSizeLimit": 0.25,
-        "spreadCharge": 0.001,
+        "spreadCharge": 0.0008,
         "tokenMint": "So11111111111111111111111111111111111111112"
       }
     }
