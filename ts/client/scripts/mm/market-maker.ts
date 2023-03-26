@@ -78,6 +78,8 @@ const params = JSON.parse(
 
 const control = { isRunning: true };
 
+const prec = (n: number): string => n.toFixed(params.logPrecision);
+
 // Global bot state shared between all markets
 class BotContext {
   latestBlockhash: BlockhashWithExpiryBlockHeight;
@@ -158,10 +160,14 @@ class BotContext {
     const tokenMint = new PublicKey(params.tokenMint);
     const tokenBank = this.group.getFirstBankByMint(tokenMint);
     const tokenPosition = this.mangoAccount.getTokenBalanceUi(tokenBank);
-    const perpPosition = this.mangoAccount.getPerpPositionUi(
-      this.group,
-      perpMarket.perpMarketIndex,
-    );
+    let perpPosition = 0;
+    try {
+      perpPosition = this.mangoAccount.getPerpPositionUi(
+        this.group,
+        perpMarket.perpMarketIndex,
+      );
+      // eslint-disable-next-line no-empty
+    } catch (_) {}
 
     const fillsSinceLastUpdate = unprocessedPerpFills.filter(
       (f) => f.slot >= this.mangoAccountLastUpdatedSlot,
@@ -198,19 +204,21 @@ class BotContext {
     const maxSize = currentEquityInUnderlying * params.orderSizeLimit;
     const bidSize = Math.min(
       maxSize,
-      params.deltaMax - delta,
       params.positionMax - perpPosition, // dont buy if position > positionMax
     );
     const askSize = Math.min(
       maxSize,
-      delta - params.deltaMin,
       perpPosition + params.positionMax, // don't sell if position < - positionMax
     );
     const bidPrice = perpMarket.uiPrice * -params.spreadCharge;
     const askPrice = perpMarket.uiPrice * +params.spreadCharge;
 
     console.log(
-      `update orders delta=${delta} equity=${currentEquityInUnderlying} mark=${perpMarket.uiPrice} bid=${bidSize}@${bidPrice} ask=${askSize}@${askPrice}`,
+      `update orders ${perpMarket.name} delta=${prec(delta)} equity=${prec(
+        currentEquityInUnderlying,
+      )} mark=${prec(perpMarket.uiPrice)} bid=${prec(bidSize)}@${prec(
+        bidPrice,
+      )} ask=${prec(askSize)}@${prec(askPrice)}`,
     );
 
     const beginIx = await this.client.healthRegionBeginIx(
@@ -271,15 +279,19 @@ class BotContext {
 
     const tokenMint = new PublicKey(params.tokenMint);
 
-    console.log('start hedger', i);
+    console.log('start hedger', i, perpMarket.name);
     while (control.isRunning) {
       const { delta, perpPosition, tokenPosition, fillsDelta } =
         this.calculateDelta(i);
       const biasedDelta = delta + params.deltaBias;
 
-      console.log(
-        `hedge check d=${delta} t=${tokenPosition} p=${perpPosition} f=${fillsDelta}`,
-      );
+      // console.log(
+      //   `hedge check ${perpMarket.name} d=${delta.toFixed(
+      //     3,
+      //   )} t=${tokenPosition.toFixed(3)} p=${perpPosition.toFixed(
+      //     3,
+      //   )} f=${fillsDelta.toFixed(3)}`,
+      // );
 
       if (Math.abs(biasedDelta) > perpMarket.minOrderSize) {
         // prefer perp hedge if perp position has same sign as account delta
@@ -355,9 +367,11 @@ class BotContext {
           );
 
           console.log(
-            `hedge spot delta=${biasedDelta}/${perpPosition} inputMint=${inputMint.toString()} outputMint=${outputMint.toString()} size=${hedgeSize} limit=${hedgePrice} index=${
-              perpMarket.uiPrice
-            }`,
+            `hedge ${perpMarket.name} on spot delta=${prec(biasedDelta)}/${prec(
+              perpPosition,
+            )} inputMint=${inputMint.toString()} outputMint=${outputMint.toString()} size=${prec(
+              hedgeSize,
+            )} limit=${prec(hedgePrice)} index=${prec(perpMarket.uiPrice)}`,
           );
 
           const { bestRoute } = await fetchRoutes(
@@ -371,13 +385,10 @@ class BotContext {
           );
 
           if (!bestRoute) {
-            console.error('spot hedge could not find a route');
-          } else {
-            console.log(
-              // best route
-              `hedge spot bestRoute=${JSON.stringify(bestRoute)}`,
+            console.error(
+              `${perpMarket.name} spot hedge could not find a route`,
             );
-
+          } else {
             const [ixs, alts] =
               bestRoute.routerName === 'Mango'
                 ? await prepareMangoRouterInstructions(
@@ -419,19 +430,21 @@ class BotContext {
               const newDelta = this.calculateDelta(i).delta;
 
               console.log(
-                `hedge ${i} confirmed delta time=${
+                `hedge ${i} ${perpMarket.name} confirmed delta time=${
                   (confirmEnd - confirmBegin) / 1000
-                } prev=${delta} new=${newDelta} https://explorer.solana.com/tx/${sig}`,
+                } prev=${prec(delta)} new=${prec(
+                  newDelta,
+                )} https://explorer.solana.com/tx/${sig}`,
               );
 
               await this.updateOrders(i);
             } catch (e) {
-              console.error('spot hedge failed', e);
+              console.error(perpMarket.name, 'spot hedge failed', e);
             }
           }
         }
       }
-      await sleep(300); // sleep a few ms
+      await sleep(30); // sleep a few ms
     }
   }
 }

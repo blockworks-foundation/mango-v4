@@ -23,18 +23,25 @@ import { buildVersionedTx } from '../src/utils';
 
 // https://github.com/blockworks-foundation/mango-client-v3/blob/main/src/serum.json#L70
 const DEVNET_SERUM3_MARKETS = new Map([
-  ['SOL/USDC', '82iPEvGiTceyxYpeLK3DhSwga3R5m4Yfyoydd13CukQ9'],
+  ['AUD/USD', '8eQfJPRmpRX99QPVhNRN8UKLgzT2ZC8qBbzzxHH2Q7Y6'],
+  ['EUR/USD', '3wPLXhLzKxogSpX5UgoX7tkkFfvkmibJRBFiHthcdW7G'],
+  ['GBP/USD', '63f8gZbC4ReSeEWFGP61sXFiNoupbMtd9VcQky92c53W'],
 ]);
 const DEVNET_MINTS = new Map([
-  ['USDC', '8FRFC6MoGGkMFQwngccyu69VnYbzykGeez7ignHVAFSN'], // use devnet usdc
+  ['USD', 'H4TsydJhJThVREgzb77UmBwzx3Jfzq3eMhsgWUThXwKX'],
   ['SOL', 'So11111111111111111111111111111111111111112'],
-  ['MNGO', 'Bb9bsTQa1bGEtQ5KagGkvSHyuLqDWumFUcRqFusFNJWC'],
+  ['MNGO', '9f2JcpRo85mxuGzWRXUNafUmviCQN8ch2CpCw9TD7EQG'],
+  ['AUD', '7ptXJXcfPmF95D4PNvsdoch24t56GCHPg44jRvPwDps8'],
+  ['EUR', 'BXaDQHevzc6zKFsfVqVEwrc7Lz1yJGRrfa1UmTd87NwE'],
+  ['GBP', 'Gj8M9FWaVxPbZZ4YgwcZQenyVEouAuzrpJtwXT8HfPa8'],
 ]);
 const DEVNET_ORACLES = new Map([
-  ['SOL', 'J83w4HKfqxwcq3BEMMkPFSppX3gqekLyLJBexebFVkix'],
-  ['MNGO', '8k7F9Xb36oFJsjpCKpsXvg4cgBRoZtwNTc3EzG5Ttd2o'],
-  ['BTC', 'HovQMDrbAgAYPCmHVSrezcSmkMtXSSUsLDFANExrZh2J'],
-  ['ETH', 'EdVCmQ9FSPcVe5YySXDPCRmc8aDQLKJ9xvYBMZPie1Vw'],
+  ['AUD', '3aR6kTksEFb2GsCHGBNtpvUpUJ1XzeA41RTnS4APD8oG'],
+  ['EUR', 'E36MyBbavhYKHVLWR79GiReNNnBDiHj6nWA7htbkNZbh'],
+  ['GBP', 'DhmUMEyq1hmEAGpifaH8HzfG1NqipvrVhBZgBog7NCb6'],
+  ['XAU', '4GqTjGm686yihQ1m1YdTsSvfm4mNfadv6xskzgCYWNC5'],
+  ['XAG', '4NbqLAy4LjhZ7imWbyTuHo4EMSAVWTVDFS6Kpwz15Kyc'],
+  ['MNGO', '79wm3jjcPr6RaNQ4DGvP5KxG1mNd3gEBsg6FsNVFezK4'],
 ]);
 
 // TODO: should these constants be baked right into client.ts or even program?

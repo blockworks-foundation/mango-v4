@@ -6,18 +6,28 @@
   },
   "oraclePegged": true,
   "batch": 1,
+  "logPrecision": 4,
   "assets": {
     "SOL": {
       "perp": {
         "deltaBias": 0,
-        "deltaMin": -2,
-        "deltaMax": 2,
         "positionMax": 8,
         "hedgeMax": 1,
-        "hedgeDiscount": 0.0001,
-        "orderSizeLimit": 0.25,
-        "spreadCharge": 0.0008,
+        "hedgeDiscount": 0.0002,
+        "orderSizeLimit": 0.5,
+        "spreadCharge": 0.001,
         "tokenMint": "So11111111111111111111111111111111111111112"
+      }
+    },
+    "ETH": {
+      "perp": {
+        "deltaBias": 0,
+        "positionMax": 0.2,
+        "hedgeMax": 0.2,
+        "hedgeDiscount": 0.003,
+        "orderSizeLimit": 0.5,
+        "spreadCharge": 0.005,
+        "tokenMint": "7vfCXTUXx5WJV5JADk17DUJ4ksgau7utNKj4b963voxs"
       }
     }
   }
