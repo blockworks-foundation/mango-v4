@@ -391,6 +391,18 @@ export class MangoAccount {
   }
 
   /**
+   * The leverage is the ratio of Liabilities / Equity
+   */
+  public getLeverage(group: Group): I80F48 {
+    const liabs = this.getAssetsValue(group);
+    const assets = this.getLiabsValue(group);
+    if (assets.isZero()) {
+      return ZERO_I80F48();
+    }
+    return liabs.div(assets.sub(liabs));
+  }
+
+  /**
    * @returns Overall PNL, in native quote
    * PNL is defined here as spot value + serum3 open orders value + perp value - net deposits value (evaluated at native quote price at the time of the deposit/withdraw)
    * spot value + serum3 open orders value + perp value is returned by getEquity (open orders values are added to spot token values implicitly)
