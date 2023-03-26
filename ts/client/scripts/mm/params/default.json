@@ -25,6 +25,17 @@
         "spammerCharge": 2,
         "charge": 0.0017,
         "krakenCode": "SOLUSD"
+      },
+    "ETH": {
+      "perp": {
+        "sizePerc": 0.25,
+        "leanCoeff": 0.00025,
+        "bias": 0.0,
+        "requoteThresh": 0.0002,
+        "takeSpammers": true,
+        "spammerCharge": 2,
+        "charge": 0.0017,
+        "krakenCode": "ETHUSD"
       }
     }
   }
