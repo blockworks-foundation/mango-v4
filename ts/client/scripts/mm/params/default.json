@@ -25,7 +25,8 @@
         "spammerCharge": 2,
         "charge": 0.0017,
         "krakenCode": "SOLUSD"
-      },
+      }
+    },
     "ETH": {
       "perp": {
         "sizePerc": 0.25,
