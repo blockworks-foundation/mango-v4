@@ -391,7 +391,7 @@ export class MangoAccount {
   }
 
   /**
-   * The leverage is the ratio of Liabilities / Equity
+   * Ratio of liabilities / equity
    */
   public getLeverage(group: Group): I80F48 {
     const liabs = this.getAssetsValue(group);
