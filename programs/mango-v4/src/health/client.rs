@@ -151,8 +151,8 @@ impl HealthCache {
         let target = &self.token_infos[target_index];
 
         let (tokens_max_reserved, _) = self.compute_serum3_reservations(health_type);
-        let source_reserved = tokens_max_reserved[source_index];
-        let target_reserved = tokens_max_reserved[target_index];
+        let source_reserved = tokens_max_reserved[source_index].max_serum_reserved;
+        let target_reserved = tokens_max_reserved[target_index].max_serum_reserved;
 
         // If the price is sufficiently good, then health will just increase from swapping:
         // once we've swapped enough, swapping x reduces health by x * source_liab_weight and
@@ -193,8 +193,8 @@ impl HealthCache {
         // The first thing we do is to find this maximum.
         let (amount_for_max_value, max_value) = {
             // The largest amount that the maximum could be at
-            let rightmost = (source.balance_native.abs() + source_reserved)
-                .max((target.balance_native.abs() + target_reserved) / price);
+            let rightmost = (source.balance_spot.abs() + source_reserved)
+                .max((target.balance_spot.abs() + target_reserved) / price);
             find_maximum(
                 I80F48::ZERO,
                 rightmost,
@@ -428,7 +428,7 @@ impl HealthCache {
 
         // At most withdraw all deposits plus enough borrows to bring health to zero
         // (ensure this works with zero asset weight)
-        let limit = token.balance_native.max(I80F48::ZERO)
+        let limit = token.balance_spot.max(I80F48::ZERO)
             + self.health(health_type).max(I80F48::ZERO) / token.init_scaled_liab_weight;
         if limit <= 0 {
             return Ok(I80F48::ZERO);
@@ -628,7 +628,7 @@ mod tests {
             init_liab_weight: I80F48::from_num(1.0 + x),
             init_scaled_liab_weight: I80F48::from_num(1.0 + x),
             prices: Prices::new_single_price(I80F48::from_num(price)),
-            balance_native: I80F48::ZERO,
+            balance_spot: I80F48::ZERO,
         }
     }
 
@@ -690,7 +690,7 @@ mod tests {
 
         let adjust_by_usdc = |c: &mut HealthCache, ti: TokenIndex, usdc: f64| {
             let ti = &mut c.token_infos[ti as usize];
-            ti.balance_native += I80F48::from_num(usdc) / ti.prices.oracle;
+            ti.balance_spot += I80F48::from_num(usdc) / ti.prices.oracle;
         };
         let find_max_swap_actual = |c: &HealthCache,
                                     source: TokenIndex,
@@ -995,6 +995,7 @@ mod tests {
         let base_lot_size = 100;
         let default_perp_info = |x| PerpInfo {
             perp_market_index: 0,
+            settle_token_index: 0,
             maint_base_asset_weight: I80F48::from_num(1.0 - x),
             init_base_asset_weight: I80F48::from_num(1.0 - x),
             maint_base_liab_weight: I80F48::from_num(1.0 + x),
@@ -1014,7 +1015,7 @@ mod tests {
         let health_cache = HealthCache {
             token_infos: vec![TokenInfo {
                 token_index: 0,
-                balance_native: I80F48::ZERO,
+                balance_spot: I80F48::ZERO,
                 ..default_token_info(0.0, 1.0)
             }],
             serum3_infos: vec![],
@@ -1041,7 +1042,7 @@ mod tests {
 
         let adjust_token = |c: &mut HealthCache, value: f64| {
             let ti = &mut c.token_infos[0];
-            ti.balance_native += I80F48::from_num(value);
+            ti.balance_spot += I80F48::from_num(value);
         };
         let find_max_trade =
             |c: &HealthCache, side: PerpOrderSide, ratio: f64, price_factor: f64| {
@@ -1322,13 +1323,13 @@ mod tests {
             // compute the health ratio we'd get when executing the trade
             let actual_ratio = {
                 let mut c = c.clone();
-                c.token_infos[0].balance_native -= max_borrow;
+                c.token_infos[0].balance_spot -= max_borrow;
                 c.health_ratio(HealthType::Init).to_num::<f64>()
             };
             // the ratio for borrowing one native token extra
             let plus_ratio = {
                 let mut c = c.clone();
-                c.token_infos[0].balance_native -= max_borrow + I80F48::ONE;
+                c.token_infos[0].balance_spot -= max_borrow + I80F48::ONE;
                 c.health_ratio(HealthType::Init).to_num::<f64>()
             };
             (max_borrow, actual_ratio, plus_ratio)
@@ -1349,28 +1350,28 @@ mod tests {
 
         {
             let mut health_cache = health_cache.clone();
-            health_cache.token_infos[0].balance_native = I80F48::from_num(100.0);
+            health_cache.token_infos[0].balance_spot = I80F48::from_num(100.0);
             assert_eq!(check_max_borrow(&health_cache, 50.0), 100.0);
         }
         {
             let mut health_cache = health_cache.clone();
-            health_cache.token_infos[1].balance_native = I80F48::from_num(50.0); // price 2, so 2*50*0.8 = 80 health
+            health_cache.token_infos[1].balance_spot = I80F48::from_num(50.0); // price 2, so 2*50*0.8 = 80 health
             check_max_borrow(&health_cache, 100.0);
             check_max_borrow(&health_cache, 50.0);
             check_max_borrow(&health_cache, 0.0);
         }
         {
             let mut health_cache = health_cache.clone();
-            health_cache.token_infos[0].balance_native = I80F48::from_num(50.0);
-            health_cache.token_infos[1].balance_native = I80F48::from_num(50.0);
+            health_cache.token_infos[0].balance_spot = I80F48::from_num(50.0);
+            health_cache.token_infos[1].balance_spot = I80F48::from_num(50.0);
             check_max_borrow(&health_cache, 100.0);
             check_max_borrow(&health_cache, 50.0);
             check_max_borrow(&health_cache, 0.0);
         }
         {
             let mut health_cache = health_cache.clone();
-            health_cache.token_infos[0].balance_native = I80F48::from_num(-50.0);
-            health_cache.token_infos[1].balance_native = I80F48::from_num(50.0);
+            health_cache.token_infos[0].balance_spot = I80F48::from_num(-50.0);
+            health_cache.token_infos[1].balance_spot = I80F48::from_num(50.0);
             check_max_borrow(&health_cache, 100.0);
             check_max_borrow(&health_cache, 50.0);
             check_max_borrow(&health_cache, 0.0);

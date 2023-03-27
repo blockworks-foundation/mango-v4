@@ -322,7 +322,7 @@ pub(crate) fn liquidation_action(
         let settle = upnl.min(remaining_allowed_settle).max(I80F48::ZERO);
 
         perp_info.quote -= settle;
-        settle_token_info.balance_native += settle * spot_gain_per_settled;
+        settle_token_info.balance_spot += settle * spot_gain_per_settled;
         remaining_allowed_settle -= settle;
     };
 
