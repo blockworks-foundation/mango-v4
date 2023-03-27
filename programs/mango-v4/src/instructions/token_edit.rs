@@ -38,6 +38,7 @@ pub fn token_edit(
     reset_net_borrow_limit: bool,
     reduce_only_opt: Option<bool>,
     name_opt: Option<String>,
+    force_close_opt: Option<bool>,
 ) -> Result<()> {
     let group = ctx.accounts.group.load()?;
 
@@ -287,6 +288,16 @@ pub fn token_edit(
         if let Some(name) = name_opt.as_ref() {
             msg!("Name: old - {:?}, new - {:?}", bank.name, name);
             bank.name = fill_from_str(&name)?;
+            require_group_admin = true;
+        };
+
+        if let Some(force_close) = force_close_opt {
+            msg!(
+                "Force close: old - {:?}, new - {:?}",
+                bank.force_close,
+                u8::from(force_close)
+            );
+            bank.force_close = u8::from(force_close);
             require_group_admin = true;
         };
     }

@@ -1,5 +1,5 @@
 export type MangoV4 = {
-  "version": "0.9.0",
+  "version": "0.10.0",
   "name": "mango_v4",
   "instructions": [
     {
@@ -722,6 +722,12 @@ export type MangoV4 = {
           "name": "nameOpt",
           "type": {
             "option": "string"
+          }
+        },
+        {
+          "name": "forceCloseOpt",
+          "type": {
+            "option": "bool"
           }
         }
       ]
@@ -4126,11 +4132,15 @@ export type MangoV4 = {
             "type": "u8"
           },
           {
+            "name": "forceClose",
+            "type": "u8"
+          },
+          {
             "name": "reserved",
             "type": {
               "array": [
                 "u8",
-                2119
+                2118
               ]
             }
           }
@@ -8674,12 +8684,17 @@ export type MangoV4 = {
       "code": 6044,
       "name": "PerpOrderIdNotFound",
       "msg": "perp order id not found on the orderbook"
+    },
+    {
+      "code": 6045,
+      "name": "HealthRegionBadInnerInstruction",
+      "msg": "HealthRegions allow only specific instructions between Begin and End"
     }
   ]
 };
 
 export const IDL: MangoV4 = {
-  "version": "0.9.0",
+  "version": "0.10.0",
   "name": "mango_v4",
   "instructions": [
     {
@@ -9402,6 +9417,12 @@ export const IDL: MangoV4 = {
           "name": "nameOpt",
           "type": {
             "option": "string"
+          }
+        },
+        {
+          "name": "forceCloseOpt",
+          "type": {
+            "option": "bool"
           }
         }
       ]
@@ -12806,11 +12827,15 @@ export const IDL: MangoV4 = {
             "type": "u8"
           },
           {
+            "name": "forceClose",
+            "type": "u8"
+          },
+          {
             "name": "reserved",
             "type": {
               "array": [
                 "u8",
-                2119
+                2118
               ]
             }
           }
@@ -17354,6 +17379,11 @@ export const IDL: MangoV4 = {
       "code": 6044,
       "name": "PerpOrderIdNotFound",
       "msg": "perp order id not found on the orderbook"
+    },
+    {
+      "code": 6045,
+      "name": "HealthRegionBadInnerInstruction",
+      "msg": "HealthRegions allow only specific instructions between Begin and End"
     }
   ]
 };

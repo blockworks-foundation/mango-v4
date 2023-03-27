@@ -1072,6 +1072,7 @@ fn token_edit_instruction_default() -> mango_v4::instruction::TokenEdit {
         reset_net_borrow_limit: false,
         reduce_only_opt: None,
         name_opt: None,
+        force_close_opt: None,
     }
 }
 

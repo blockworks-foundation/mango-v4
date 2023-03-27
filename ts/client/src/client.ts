@@ -8,6 +8,7 @@ import {
   AddressLookupTableAccount,
   Cluster,
   Commitment,
+  Connection,
   Keypair,
   MemcmpFilter,
   PublicKey,
@@ -17,7 +18,6 @@ import {
   SystemProgram,
   TransactionInstruction,
   TransactionSignature,
-  Connection,
 } from '@solana/web3.js';
 import bs58 from 'bs58';
 import { Bank, MintInfo, TokenIndex } from './accounts/bank';
@@ -398,6 +398,7 @@ export class MangoClient {
         params.resetNetBorrowLimit ?? false,
         params.reduceOnly,
         params.name,
+        params.forceClose,
       )
       .accounts({
         group: group.publicKey,

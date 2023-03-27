@@ -171,6 +171,7 @@ pub mod mango_v4 {
         reset_net_borrow_limit: bool,
         reduce_only_opt: Option<bool>,
         name_opt: Option<String>,
+        force_close_opt: Option<bool>,
     ) -> Result<()> {
         #[cfg(feature = "enable-gpl")]
         instructions::token_edit(
@@ -198,6 +199,7 @@ pub mod mango_v4 {
             reset_net_borrow_limit,
             reduce_only_opt,
             name_opt,
+            force_close_opt,
         )?;
         Ok(())
     }
@@ -532,6 +534,22 @@ pub mod mango_v4 {
     ) -> Result<()> {
         #[cfg(feature = "enable-gpl")]
         instructions::token_liq_with_token(
+            ctx,
+            asset_token_index,
+            liab_token_index,
+            max_liab_transfer,
+        )?;
+        Ok(())
+    }
+
+    pub fn token_force_close_borrows_with_token(
+        ctx: Context<TokenForceCloseBorrowsWithToken>,
+        asset_token_index: TokenIndex,
+        liab_token_index: TokenIndex,
+        max_liab_transfer: I80F48,
+    ) -> Result<()> {
+        #[cfg(feature = "enable-gpl")]
+        instructions::token_force_close_borrows_with_token(
             ctx,
             asset_token_index,
             liab_token_index,
