@@ -410,21 +410,19 @@ export class Bank implements BankForHealth {
     }
 
     const utilization = totalBorrows.div(totalDeposits);
-    if (utilization.gt(this.util1)) {
+    if (utilization.lte(this.util0)) {
+      const slope = this.rate0.div(this.util0);
+      return slope.mul(utilization);
+    } else if (utilization.lt(this.util1)) {
+      const extraUtil = utilization.sub(this.util0);
+      const slope = this.rate1.sub(this.rate0).div(this.util1.sub(this.util0));
+      return this.rate0.add(slope.mul(extraUtil));
+    } else {
       const extraUtil = utilization.sub(this.util1);
       const slope = this.maxRate
         .sub(this.rate1)
         .div(I80F48.fromNumber(1).sub(this.util1));
       return this.rate1.add(slope.mul(extraUtil));
-    } else if (utilization.gt(this.util0)) {
-      const extraUtil = utilization.sub(this.util0);
-      const slope = this.maxRate
-        .sub(this.rate0)
-        .div(I80F48.fromNumber(1).sub(this.util0));
-      return this.rate0.add(slope.mul(extraUtil));
-    } else {
-      const slope = this.rate0.div(this.util0);
-      return slope.mul(utilization);
     }
   }
 
