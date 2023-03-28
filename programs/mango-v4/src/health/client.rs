@@ -349,7 +349,7 @@ impl HealthCache {
                 .token_info(perp_info.settle_token_index)
                 .unwrap();
             let uncapped_health_contrib = perp_info.weigh_health_contribution_settle(
-                perp_info.unweighted_health_contribution(HealthType::Init),
+                perp_info.unweighted_health_unsettled_pnl(HealthType::Init),
                 HealthType::Init,
                 settle_token,
             );

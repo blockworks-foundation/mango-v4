@@ -127,6 +127,11 @@ impl TokenInfo {
     }
 
     #[inline(always)]
+    pub fn asset_weighted_price(&self, health_type: HealthType) -> I80F48 {
+        self.asset_weight(health_type) * self.prices.asset(health_type)
+    }
+
+    #[inline(always)]
     fn liab_weight(&self, health_type: HealthType) -> I80F48 {
         match health_type {
             HealthType::Init => self.init_scaled_liab_weight,
@@ -136,11 +141,16 @@ impl TokenInfo {
     }
 
     #[inline(always)]
+    pub fn liab_weighted_price(&self, health_type: HealthType) -> I80F48 {
+        self.liab_weight(health_type) * self.prices.liab(health_type)
+    }
+
+    #[inline(always)]
     pub fn health_contribution(&self, health_type: HealthType, balance: I80F48) -> I80F48 {
         let weighted_price = if balance.is_negative() {
-            self.liab_weight(health_type) * self.prices.liab(health_type)
+            self.liab_weighted_price(health_type)
         } else {
-            self.asset_weight(health_type) * self.prices.asset(health_type)
+            self.asset_weighted_price(health_type)
         };
         balance * weighted_price
     }
@@ -305,7 +315,7 @@ impl PerpInfo {
     /// the pnl asset weights would be >0.
     #[inline(always)]
     pub fn health_contribution(&self, health_type: HealthType, settle_token: &TokenInfo) -> I80F48 {
-        let contribution = self.unweighted_health_contribution(health_type);
+        let contribution = self.unweighted_health_unsettled_pnl(health_type);
         self.weigh_health_contribution_settle(
             self.weigh_health_contribution_overall(contribution, health_type),
             health_type,
@@ -313,10 +323,11 @@ impl PerpInfo {
         )
     }
 
-    // like unsettled pnl, but applying the base weight and overall weight
+    // like unsettled pnl, but applying the base weight and overall weight. Always <= unsettled_pnl
+    // also called "hupnl"
     #[inline(always)]
     pub fn health_unsettled_pnl(&self, health_type: HealthType) -> I80F48 {
-        let contribution = self.unweighted_health_contribution(health_type);
+        let contribution = self.unweighted_health_unsettled_pnl(health_type);
         self.weigh_health_contribution_overall(contribution, health_type)
     }
 
@@ -367,8 +378,9 @@ impl PerpInfo {
     }
 
     /// Health in terms of settle token, without the overall asset weight or the settle token weight or price.
+    /// also called "uhupnl"
     #[inline(always)]
-    pub fn unweighted_health_contribution(&self, health_type: HealthType) -> I80F48 {
+    pub fn unweighted_health_unsettled_pnl(&self, health_type: HealthType) -> I80F48 {
         let order_execution_case = |orders_base_lots: i64, order_price: I80F48| {
             let net_base_native =
                 I80F48::from((self.base_lots + orders_base_lots) * self.base_lot_size);
@@ -694,12 +706,11 @@ impl HealthCache {
         (token_max_reserved, serum3_reserved)
     }
 
-    pub(crate) fn health_sum(
+    pub fn effective_token_balances(
         &self,
         health_type: HealthType,
-        mut action: impl FnMut(I80F48),
         perp_settle_health: bool,
-    ) {
+    ) -> Vec<TokenBalance> {
         let mut token_balances = vec![TokenBalance::default(); self.token_infos.len()];
 
         for perp_info in self.perp_infos.iter() {
@@ -713,8 +724,19 @@ impl HealthCache {
 
         for (token_info, token_balance) in self.token_infos.iter().zip(token_balances.iter_mut()) {
             token_balance.spot_and_perp += token_info.balance_spot;
+        }
 
-            // Add the completed spot+perp balances to the total
+        token_balances
+    }
+
+    pub(crate) fn health_sum(
+        &self,
+        health_type: HealthType,
+        mut action: impl FnMut(I80F48),
+        perp_settle_health: bool,
+    ) {
+        let token_balances = self.effective_token_balances(health_type, perp_settle_health);
+        for (token_info, token_balance) in self.token_infos.iter().zip(token_balances.iter()) {
             let contrib = token_info.health_contribution(health_type, token_balance.spot_and_perp);
             action(contrib);
         }
