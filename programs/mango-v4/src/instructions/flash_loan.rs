@@ -343,10 +343,15 @@ pub fn flash_loan_end<'key, 'accounts, 'remaining, 'info>(
 
         let change_amount = change.amount - loan_origination_fee;
         let native_after_change = native + change_amount;
-        if bank.is_reduce_only() {
+        if bank.are_deposits_reduce_only() {
             require!(
-                (change_amount < 0 && native_after_change >= 0)
-                    || (change_amount > 0 && native_after_change < 1),
+                (change_amount > 0 && native_after_change < 1),
+                MangoError::TokenInReduceOnlyMode
+            );
+        }
+        if bank.are_borrows_reduce_only() {
+            require!(
+                (change_amount < 0 && native_after_change >= 0),
                 MangoError::TokenInReduceOnlyMode
             );
         }

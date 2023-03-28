@@ -127,6 +127,11 @@ pub struct Bank {
     /// See scaled_init_asset_weight().
     pub deposit_weight_scale_start_quote: f64,
 
+    // We have 3 modes
+    // 0 - Off,
+    // 1 - NoDepositsNoBorrows - standard
+    // 2 - NoBorrows - borrows can only be reduced, but deposits have no restriction, special case for
+    //                 force close mode, where liqor should first acquire deposits before closing liqee's borrows
     pub reduce_only: u8,
     pub force_close: u8,
 
@@ -232,8 +237,12 @@ impl Bank {
             .trim_matches(char::from(0))
     }
 
-    pub fn is_reduce_only(&self) -> bool {
+    pub fn are_deposits_reduce_only(&self) -> bool {
         self.reduce_only == 1
+    }
+
+    pub fn are_borrows_reduce_only(&self) -> bool {
+        self.reduce_only == 1 || self.reduce_only == 2
     }
 
     pub fn is_force_close(&self) -> bool {

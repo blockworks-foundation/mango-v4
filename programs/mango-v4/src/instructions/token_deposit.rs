@@ -51,7 +51,7 @@ impl<'a, 'info> DepositCommon<'a, 'info> {
             let account = self.account.load_full()?;
             let position = account.token_position(token_index)?;
 
-            let amount_i80f48 = if reduce_only || bank.is_reduce_only() {
+            let amount_i80f48 = if reduce_only || bank.are_deposits_reduce_only() {
                 position
                     .native(&bank)
                     .min(I80F48::ZERO)
@@ -61,7 +61,7 @@ impl<'a, 'info> DepositCommon<'a, 'info> {
             } else {
                 I80F48::from(amount)
             };
-            if bank.is_reduce_only() {
+            if bank.are_deposits_reduce_only() {
                 require!(
                     reduce_only || amount_i80f48 == I80F48::from(amount),
                     MangoError::TokenInReduceOnlyMode
