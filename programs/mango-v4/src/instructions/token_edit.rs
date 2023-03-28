@@ -36,7 +36,7 @@ pub fn token_edit(
     deposit_weight_scale_start_quote_opt: Option<f64>,
     reset_stable_price: bool,
     reset_net_borrow_limit: bool,
-    reduce_only_opt: Option<bool>,
+    reduce_only_opt: Option<u8>,
     name_opt: Option<String>,
     force_close_opt: Option<bool>,
 ) -> Result<()> {
@@ -280,7 +280,7 @@ pub fn token_edit(
             bank.reduce_only = u8::from(reduce_only);
 
             // security admin can only enable reduce_only
-            if reduce_only == 0 {
+            if u8::from(reduce_only) == 0 {
                 require_group_admin = true;
             }
         };
@@ -292,6 +292,9 @@ pub fn token_edit(
         };
 
         if let Some(force_close) = force_close_opt {
+            if force_close {
+                require!(bank.reduce_only > 0, MangoError::SomeError);
+            }
             msg!(
                 "Force close: old - {:?}, new - {:?}",
                 bank.force_close,

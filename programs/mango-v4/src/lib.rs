@@ -169,7 +169,7 @@ pub mod mango_v4 {
         deposit_weight_scale_start_quote_opt: Option<f64>,
         reset_stable_price: bool,
         reset_net_borrow_limit: bool,
-        reduce_only_opt: Option<bool>,
+        reduce_only_opt: Option<u8>,
         name_opt: Option<String>,
         force_close_opt: Option<bool>,
     ) -> Result<()> {
