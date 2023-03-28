@@ -275,9 +275,9 @@ pub fn token_edit(
             msg!(
                 "Reduce only: old - {:?}, new - {:?}",
                 bank.reduce_only,
-                u8::from(reduce_only)
+                reduce_only
             );
-            bank.reduce_only = u8::from(reduce_only);
+            bank.reduce_only = reduce_only;
 
             // security admin can only enable reduce_only
             if u8::from(reduce_only) == 0 {

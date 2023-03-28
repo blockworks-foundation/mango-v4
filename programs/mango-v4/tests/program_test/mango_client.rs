@@ -1284,7 +1284,64 @@ impl ClientInstruction for TokenMakeReduceOnly {
         let mint_info: MintInfo = account_loader.load(&mint_info_key).await.unwrap();
 
         let instruction = Self::Instruction {
-            reduce_only_opt: Some(true),
+            reduce_only_opt: Some(1),
+            ..token_edit_instruction_default()
+        };
+
+        let accounts = Self::Accounts {
+            group: self.group,
+            admin: self.admin.pubkey(),
+            mint_info: mint_info_key,
+            oracle: mint_info.oracle,
+        };
+
+        let mut instruction = make_instruction(program_id, &accounts, instruction);
+        instruction
+            .accounts
+            .extend(mint_info.banks().iter().map(|&k| AccountMeta {
+                pubkey: k,
+                is_signer: false,
+                is_writable: true,
+            }));
+        (accounts, instruction)
+    }
+
+    fn signers(&self) -> Vec<TestKeypair> {
+        vec![self.admin]
+    }
+}
+
+pub struct TokenMakeForceClose {
+    pub group: Pubkey,
+    pub admin: TestKeypair,
+    pub mint: Pubkey,
+    pub reduce_only: u8,
+}
+
+#[async_trait::async_trait(?Send)]
+impl ClientInstruction for TokenMakeForceClose {
+    type Accounts = mango_v4::accounts::TokenEdit;
+    type Instruction = mango_v4::instruction::TokenEdit;
+    async fn to_instruction(
+        &self,
+        account_loader: impl ClientAccountLoader + 'async_trait,
+    ) -> (Self::Accounts, instruction::Instruction) {
+        let program_id = mango_v4::id();
+
+        let mint_info_key = Pubkey::find_program_address(
+            &[
+                b"MintInfo".as_ref(),
+                self.group.as_ref(),
+                self.mint.as_ref(),
+            ],
+            &program_id,
+        )
+        .0;
+        let mint_info: MintInfo = account_loader.load(&mint_info_key).await.unwrap();
+
+        let instruction = Self::Instruction {
+            reduce_only_opt: Some(self.reduce_only),
+            force_close_opt: Some(true),
             ..token_edit_instruction_default()
         };
 
@@ -2593,6 +2650,69 @@ impl ClientInstruction for Serum3LiqForceCancelOrdersInstruction {
 
     fn signers(&self) -> Vec<TestKeypair> {
         vec![]
+    }
+}
+
+pub struct TokenForceCloseBorrowsWithTokenInstruction {
+    pub liqee: Pubkey,
+    pub liqor: Pubkey,
+    pub liqor_owner: TestKeypair,
+
+    pub asset_token_index: TokenIndex,
+    pub asset_bank_index: usize,
+    pub liab_token_index: TokenIndex,
+    pub liab_bank_index: usize,
+    pub max_liab_transfer: I80F48,
+}
+#[async_trait::async_trait(?Send)]
+impl ClientInstruction for TokenForceCloseBorrowsWithTokenInstruction {
+    type Accounts = mango_v4::accounts::TokenForceCloseBorrowsWithToken;
+    type Instruction = mango_v4::instruction::TokenForceCloseBorrowsWithToken;
+    async fn to_instruction(
+        &self,
+        account_loader: impl ClientAccountLoader + 'async_trait,
+    ) -> (Self::Accounts, instruction::Instruction) {
+        let program_id = mango_v4::id();
+        let instruction = Self::Instruction {
+            asset_token_index: self.asset_token_index,
+            liab_token_index: self.liab_token_index,
+            max_liab_transfer: self.max_liab_transfer,
+        };
+
+        let liqee = account_loader
+            .load_mango_account(&self.liqee)
+            .await
+            .unwrap();
+        let liqor = account_loader
+            .load_mango_account(&self.liqor)
+            .await
+            .unwrap();
+        let health_check_metas = derive_liquidation_remaining_account_metas(
+            &account_loader,
+            &liqee,
+            &liqor,
+            self.asset_token_index,
+            self.asset_bank_index,
+            self.liab_token_index,
+            self.liab_bank_index,
+        )
+        .await;
+
+        let accounts = Self::Accounts {
+            group: liqee.fixed.group,
+            liqee: self.liqee,
+            liqor: self.liqor,
+            liqor_owner: self.liqor_owner.pubkey(),
+        };
+
+        let mut instruction = make_instruction(program_id, &accounts, instruction);
+        instruction.accounts.extend(health_check_metas.into_iter());
+
+        (accounts, instruction)
+    }
+
+    fn signers(&self) -> Vec<TestKeypair> {
+        vec![self.liqor_owner]
     }
 }
 

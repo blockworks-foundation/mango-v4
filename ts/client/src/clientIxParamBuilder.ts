@@ -24,7 +24,7 @@ export interface TokenEditParams {
   depositWeightScaleStartQuote: number | null;
   resetStablePrice: boolean | null;
   resetNetBorrowLimit: boolean | null;
-  reduceOnly: boolean | null;
+  reduceOnly: number | null;
   name: string | null;
   forceClose: boolean | null;
 }

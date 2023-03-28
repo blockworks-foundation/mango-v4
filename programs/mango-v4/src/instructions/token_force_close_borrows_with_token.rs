@@ -93,8 +93,10 @@ pub fn token_force_close_borrows_with_token(
         let liqor_liab_native = liqor_liab_position.native(liab_bank);
         // Require that liqor obtain deposits before he tries to liquidate liqee's borrows, to prevent
         // moving other liquidator from earning further liquidation fee from these borrows by trying to liquidate the current liqor
-        require!(
-            liqor_liab_native.is_positive() && liqor_liab_native.abs() >= liqee_liab_native.abs(),
+        require!(liqor_liab_native.is_positive(), MangoError::SomeError);
+        require_gte!(
+            liqor_liab_native.abs(),
+            liqee_liab_native.abs(),
             MangoError::SomeError
         );
         let (liqor_liab_active, loan_origination_fee) = liab_bank.withdraw_with_fee(

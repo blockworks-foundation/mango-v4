@@ -49,6 +49,7 @@ pub use token_deregister::*;
 pub use token_edit::*;
 pub use token_force_close_borrows_with_token::*;
 pub use token_liq_bankruptcy::*;
+pub use token_liq_with_token::*;
 pub use token_register::*;
 pub use token_register_trustless::*;
 pub use token_update_index_and_rate::*;

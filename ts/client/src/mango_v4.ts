@@ -715,7 +715,7 @@ export type MangoV4 = {
         {
           "name": "reduceOnlyOpt",
           "type": {
-            "option": "bool"
+            "option": "u8"
           }
         },
         {
@@ -2537,6 +2537,47 @@ export type MangoV4 = {
     },
     {
       "name": "tokenLiqWithToken",
+      "accounts": [
+        {
+          "name": "group",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "liqor",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "liqorOwner",
+          "isMut": false,
+          "isSigner": true
+        },
+        {
+          "name": "liqee",
+          "isMut": true,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "assetTokenIndex",
+          "type": "u16"
+        },
+        {
+          "name": "liabTokenIndex",
+          "type": "u16"
+        },
+        {
+          "name": "maxLiabTransfer",
+          "type": {
+            "defined": "I80F48"
+          }
+        }
+      ]
+    },
+    {
+      "name": "tokenForceCloseBorrowsWithToken",
       "accounts": [
         {
           "name": "group",
@@ -6991,6 +7032,9 @@ export type MangoV4 = {
           },
           {
             "name": "AccountBuybackFeesWithMngo"
+          },
+          {
+            "name": "TokenForceCloseBorrowsWithToken"
           }
         ]
       }
@@ -9410,7 +9454,7 @@ export const IDL: MangoV4 = {
         {
           "name": "reduceOnlyOpt",
           "type": {
-            "option": "bool"
+            "option": "u8"
           }
         },
         {
@@ -11232,6 +11276,47 @@ export const IDL: MangoV4 = {
     },
     {
       "name": "tokenLiqWithToken",
+      "accounts": [
+        {
+          "name": "group",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "liqor",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "liqorOwner",
+          "isMut": false,
+          "isSigner": true
+        },
+        {
+          "name": "liqee",
+          "isMut": true,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "assetTokenIndex",
+          "type": "u16"
+        },
+        {
+          "name": "liabTokenIndex",
+          "type": "u16"
+        },
+        {
+          "name": "maxLiabTransfer",
+          "type": {
+            "defined": "I80F48"
+          }
+        }
+      ]
+    },
+    {
+      "name": "tokenForceCloseBorrowsWithToken",
       "accounts": [
         {
           "name": "group",
@@ -15686,6 +15771,9 @@ export const IDL: MangoV4 = {
           },
           {
             "name": "AccountBuybackFeesWithMngo"
+          },
+          {
+            "name": "TokenForceCloseBorrowsWithToken"
           }
         ]
       }
