@@ -124,7 +124,7 @@ pub(crate) fn liquidation_action(
     //   assets = liabs * liab_oracle_price / asset_oracle_price * fee_factor
     //   assets = liabs * liab_oracle_price_adjusted / asset_oracle_price
     //          = liabs * lopa / aop
-    let fee_factor = I80F48::ONE + asset_bank.liquidation_fee + liab_bank.liquidation_fee;
+    let fee_factor = I80F48::ONE + liab_bank.liquidation_fee;
     let liab_oracle_price_adjusted = liab_oracle_price * fee_factor;
 
     let init_asset_weight = asset_bank.init_asset_weight;
