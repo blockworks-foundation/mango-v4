@@ -1136,11 +1136,11 @@ mod tests {
 
         let group = Pubkey::new_unique();
 
-        let (mut bank1, mut oracle1) = mock_bank_and_oracle(group, 1, 1.0, 0.2, 0.1);
+        let (mut bank1, mut oracle1) = mock_bank_and_oracle(group, 0, 1.0, 0.2, 0.1);
         bank1
             .data()
             .change_without_fee(
-                account.ensure_token_position(1).unwrap().0,
+                account.ensure_token_position(0).unwrap().0,
                 I80F48::from(100),
                 DUMMY_NOW_TS,
                 DUMMY_PRICE,
@@ -1149,7 +1149,7 @@ mod tests {
 
         let mut perp1 = mock_perp_market(group, oracle1.pubkey, 1.0, 9, (0.2, 0.1), (0.05, 0.02));
         perp1.data().long_funding = I80F48::from_num(10.1);
-        let perpaccount = account.ensure_perp_position(9, 1).unwrap().0;
+        let perpaccount = account.ensure_perp_position(9, 0).unwrap().0;
         perpaccount.record_trade(perp1.data(), 10, I80F48::from(-110));
         perpaccount.long_settled_funding = I80F48::from_num(10.0);
 
@@ -1166,13 +1166,13 @@ mod tests {
         assert!(health_eq(
             compute_health(&account.borrow(), HealthType::Init, &retriever).unwrap(),
             // token
-            0.8 * 100.0
+            0.8 * (100.0
             // perp base
             + 0.8 * 100.0
             // perp quote
             - 110.0
             // perp funding (10 * (10.1 - 10.0))
-            - 1.0
+            - 1.0)
         ));
     }
 
@@ -1218,12 +1218,12 @@ mod tests {
 
         let group = Pubkey::new_unique();
 
-        let (mut bank1, mut oracle1) = mock_bank_and_oracle(group, 1, 1.0, 0.2, 0.1);
+        let (mut bank1, mut oracle1) = mock_bank_and_oracle(group, 0, 1.0, 0.2, 0.1);
         bank1.data().stable_price_model.stable_price = 0.5;
         bank1
             .data()
             .change_without_fee(
-                account.ensure_token_position(1).unwrap().0,
+                account.ensure_token_position(0).unwrap().0,
                 I80F48::from(100),
                 DUMMY_NOW_TS,
                 DUMMY_PRICE,
@@ -1232,7 +1232,7 @@ mod tests {
         bank1
             .data()
             .change_without_fee(
-                account2.ensure_token_position(1).unwrap().0,
+                account2.ensure_token_position(0).unwrap().0,
                 I80F48::from(-100),
                 DUMMY_NOW_TS,
                 DUMMY_PRICE,
@@ -1241,7 +1241,7 @@ mod tests {
 
         let mut perp1 = mock_perp_market(group, oracle1.pubkey, 1.0, 9, (0.2, 0.1), (0.05, 0.02));
         perp1.data().stable_price_model.stable_price = 0.5;
-        let perpaccount = account3.ensure_perp_position(9, 1).unwrap().0;
+        let perpaccount = account3.ensure_perp_position(9, 0).unwrap().0;
         perpaccount.record_trade(perp1.data(), 10, I80F48::from(-100));
 
         let oracle1_ai = oracle1.as_account_info();
@@ -1272,11 +1272,11 @@ mod tests {
         ));
         assert!(health_eq(
             compute_health(&account3.borrow(), HealthType::Init, &retriever).unwrap(),
-            0.8 * 0.5 * 10.0 * 10.0 - 100.0
+            1.2 * (0.8 * 0.5 * 10.0 * 10.0 - 100.0)
         ));
         assert!(health_eq(
             compute_health(&account3.borrow(), HealthType::Maint, &retriever).unwrap(),
-            0.9 * 1.0 * 10.0 * 10.0 - 100.0
+            1.1 * (0.9 * 1.0 * 10.0 * 10.0 - 100.0)
         ));
     }
 

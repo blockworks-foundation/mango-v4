@@ -809,7 +809,7 @@ pub fn new_health_cache(
 
         // add the amounts that are freely settleable immediately to token balances
         let base_free = I80F48::from(oo.native_coin_free);
-        let quote_free = I80F48::from(oo.native_pc_free + oo.referrer_rebates_accrued);
+        let quote_free = I80F48::from(oo.native_pc_free);
         let base_info = &mut token_infos[base_index];
         base_info.balance_spot += base_free;
         let quote_info = &mut token_infos[quote_index];
@@ -905,12 +905,12 @@ mod tests {
 
         let group = Pubkey::new_unique();
 
-        let (mut bank1, mut oracle1) = mock_bank_and_oracle(group, 1, 1.0, 0.2, 0.1);
+        let (mut bank1, mut oracle1) = mock_bank_and_oracle(group, 0, 1.0, 0.2, 0.1);
         let (mut bank2, mut oracle2) = mock_bank_and_oracle(group, 4, 5.0, 0.5, 0.3);
         bank1
             .data()
             .deposit(
-                account.ensure_token_position(1).unwrap().0,
+                account.ensure_token_position(0).unwrap().0,
                 I80F48::from(100),
                 DUMMY_NOW_TS,
             )
@@ -929,7 +929,7 @@ mod tests {
         let serum3account = account.create_serum3_orders(2).unwrap();
         serum3account.open_orders = oo1.pubkey;
         serum3account.base_token_index = 4;
-        serum3account.quote_token_index = 1;
+        serum3account.quote_token_index = 0;
         oo1.data().native_pc_total = 21;
         oo1.data().native_coin_total = 18;
         oo1.data().native_pc_free = 1;
@@ -937,7 +937,7 @@ mod tests {
         oo1.data().referrer_rebates_accrued = 2;
 
         let mut perp1 = mock_perp_market(group, oracle2.pubkey, 5.0, 9, (0.2, 0.1), (0.05, 0.02));
-        let perpaccount = account.ensure_perp_position(9, 1).unwrap().0;
+        let perpaccount = account.ensure_perp_position(9, 0).unwrap().0;
         perpaccount.record_trade(perp1.data(), 3, -I80F48::from(310u16));
         perpaccount.bids_base_lots = 7;
         perpaccount.asks_base_lots = 11;
@@ -958,16 +958,18 @@ mod tests {
 
         let retriever = ScanningAccountRetriever::new_with_staleness(&ais, &group, None).unwrap();
 
-        // for bank1/oracle1, including open orders (scenario: bids execute)
-        let health1 = (100.0 + 1.0 + 2.0 + (20.0 + 15.0 * 5.0)) * 0.8;
+        // for bank1/oracle1
+        // including open orders (scenario: bids execute)
+        let serum1 = 1.0 + (20.0 + 15.0 * 5.0);
+        // and perp (scenario: bids execute)
+        let perp1 =
+            (3.0 + 7.0 + 1.0) * 10.0 * 5.0 * 0.8 + (-310.0 + 2.0 * 100.0 - 7.0 * 10.0 * 5.0);
+        let health1 = (100.0 + serum1 + perp1) * 0.8;
         // for bank2/oracle2
         let health2 = (-10.0 + 3.0) * 5.0 * 1.5;
-        // for perp (scenario: bids execute)
-        let health3 =
-            (3.0 + 7.0 + 1.0) * 10.0 * 5.0 * 0.8 + (-310.0 + 2.0 * 100.0 - 7.0 * 10.0 * 5.0);
         assert!(health_eq(
             compute_health(&account.borrow(), HealthType::Init, &retriever).unwrap(),
-            health1 + health2 + health3
+            health1 + health2
         ));
     }
 
@@ -996,13 +998,13 @@ mod tests {
 
         let group = Pubkey::new_unique();
 
-        let (mut bank1, mut oracle1) = mock_bank_and_oracle(group, 1, 1.0, 0.2, 0.1);
+        let (mut bank1, mut oracle1) = mock_bank_and_oracle(group, 0, 1.0, 0.2, 0.1);
         let (mut bank2, mut oracle2) = mock_bank_and_oracle(group, 4, 5.0, 0.5, 0.3);
         let (mut bank3, mut oracle3) = mock_bank_and_oracle(group, 5, 10.0, 0.5, 0.3);
         bank1
             .data()
             .change_without_fee(
-                account.ensure_token_position(1).unwrap().0,
+                account.ensure_token_position(0).unwrap().0,
                 I80F48::from(testcase.token1),
                 DUMMY_NOW_TS,
                 DUMMY_PRICE,
@@ -1048,7 +1050,7 @@ mod tests {
         let serum3account1 = account.create_serum3_orders(2).unwrap();
         serum3account1.open_orders = oo1.pubkey;
         serum3account1.base_token_index = 4;
-        serum3account1.quote_token_index = 1;
+        serum3account1.quote_token_index = 0;
         oo1.data().native_pc_total = testcase.oo_1_2.0;
         oo1.data().native_coin_total = testcase.oo_1_2.1;
 
@@ -1056,12 +1058,12 @@ mod tests {
         let serum3account2 = account.create_serum3_orders(3).unwrap();
         serum3account2.open_orders = oo2.pubkey;
         serum3account2.base_token_index = 5;
-        serum3account2.quote_token_index = 1;
+        serum3account2.quote_token_index = 0;
         oo2.data().native_pc_total = testcase.oo_1_3.0;
         oo2.data().native_coin_total = testcase.oo_1_3.1;
 
         let mut perp1 = mock_perp_market(group, oracle2.pubkey, 5.0, 9, (0.2, 0.1), (0.05, 0.02));
-        let perpaccount = account.ensure_perp_position(9, 1).unwrap().0;
+        let perpaccount = account.ensure_perp_position(9, 0).unwrap().0;
         perpaccount.record_trade(
             perp1.data(),
             testcase.perp1.0,
@@ -1104,12 +1106,14 @@ mod tests {
                 oo_1_2: (20, 15),
                 perp1: (3, -131, 7, 11),
                 expected_health:
-                    // for token1, including open orders (scenario: bids execute)
-                    (100.0 + (20.0 + 15.0 * base_price)) * 0.8
+                    // for token1
+                    0.8 * (100.0
+                    // including open orders (scenario: bids execute)
+                    + (20.0 + 15.0 * base_price)
+                    // including perp (scenario: bids execute)
+                    + (3.0 + 7.0) * base_lots_to_quote * 0.8 + (-131.0 - 7.0 * base_lots_to_quote))
                     // for token2
-                    - 10.0 * base_price * 1.5
-                    // for perp (scenario: bids execute)
-                    + (3.0 + 7.0) * base_lots_to_quote * 0.8 + (-131.0 - 7.0 * base_lots_to_quote),
+                    - 10.0 * base_price * 1.5,
                 ..Default::default()
             },
             TestHealth1Case { // 1
@@ -1119,35 +1123,35 @@ mod tests {
                 perp1: (-10, -131, 7, 11),
                 expected_health:
                     // for token1
-                    -100.0 * 1.2
-                    // for token2, including open orders (scenario: asks execute)
-                    + (10.0 * base_price + (20.0 + 15.0 * base_price)) * 0.5
+                    1.2 * (-100.0
                     // for perp (scenario: asks execute)
-                    + (-10.0 - 11.0) * base_lots_to_quote * 1.2 + (-131.0 + 11.0 * base_lots_to_quote),
+                    + (-10.0 - 11.0) * base_lots_to_quote * 1.2 + (-131.0 + 11.0 * base_lots_to_quote))
+                    // for token2, including open orders (scenario: asks execute)
+                    + (10.0 * base_price + (20.0 + 15.0 * base_price)) * 0.5,
                 ..Default::default()
             },
             TestHealth1Case {
                 // 2: weighted positive perp pnl
                 perp1: (-1, 100, 0, 0),
-                expected_health: 0.95 * (100.0 - 1.2 * 1.0 * base_lots_to_quote),
+                expected_health: 0.8 * 0.95 * (100.0 - 1.2 * 1.0 * base_lots_to_quote),
                 ..Default::default()
             },
             TestHealth1Case {
-                // 3: negative perp pnl is not weighted
+                // 3: negative perp pnl is not weighted (only the settle token weight)
                 perp1: (1, -100, 0, 0),
-                expected_health: -100.0 + 0.8 * 1.0 * base_lots_to_quote,
+                expected_health: 1.2 * (-100.0 + 0.8 * 1.0 * base_lots_to_quote),
                 ..Default::default()
             },
             TestHealth1Case {
                 // 4: perp health
                 perp1: (10, 100, 0, 0),
-                expected_health: 0.95 * (100.0 + 0.8 * 10.0 * base_lots_to_quote),
+                expected_health: 0.8 * 0.95 * (100.0 + 0.8 * 10.0 * base_lots_to_quote),
                 ..Default::default()
             },
             TestHealth1Case {
                 // 5: perp health
                 perp1: (30, -100, 0, 0),
-                expected_health: 0.95 * (-100.0 + 0.8 * 30.0 * base_lots_to_quote),
+                expected_health: 0.8 * 0.95 * (-100.0 + 0.8 * 30.0 * base_lots_to_quote),
                 ..Default::default()
             },
             TestHealth1Case { // 6, reserved oo funds
@@ -1266,6 +1270,20 @@ mod tests {
                     - 1.5 * 100.0 * 5.0 * (1500.0 * 5.0 / 5000.0)
                     // token3
                     - 1.5 * 100.0 * 10.0 * (10000.0 * 10.0 / 10000.0),
+                ..Default::default()
+            },
+            TestHealth1Case {
+                // 12: positive perp health offsets token borrow
+                token1: -100,
+                perp1: (1, 100, 0, 0),
+                expected_health: 0.8 * (-100.0 + 0.95 * (100.0 + 0.8 * 1.0 * base_lots_to_quote)),
+                ..Default::default()
+            },
+            TestHealth1Case {
+                // 13: negative perp health offsets token deposit
+                token1: 100,
+                perp1: (-1, -100, 0, 0),
+                expected_health: 1.2 * (100.0 - 100.0 - 1.2 * 1.0 * base_lots_to_quote),
                 ..Default::default()
             },
         ];
