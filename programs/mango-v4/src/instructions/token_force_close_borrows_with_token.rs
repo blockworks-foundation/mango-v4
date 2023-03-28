@@ -18,7 +18,7 @@ pub fn token_force_close_borrows_with_token(
 ) -> Result<()> {
     let group_pk = &ctx.accounts.group.key();
 
-    require!(asset_token_index != liab_token_index, MangoError::SomeError);
+    require_neq!(asset_token_index, liab_token_index, MangoError::SomeError);
     // TODO: should we enforce that asset token index is always USDC?
 
     let mut account_retriever = ScanningAccountRetriever::new(ctx.remaining_accounts, group_pk)
@@ -42,7 +42,7 @@ pub fn token_force_close_borrows_with_token(
     let mut liqee = ctx.accounts.liqee.load_full_mut()?;
     let mut liqee_health_cache = new_health_cache(&liqee.borrow(), &account_retriever)
         .context("create liqee health cache")?;
-    let liqee_liq_end_health = liqee_health_cache.health(HealthType::Maint);
+    let liqee_liq_end_health = liqee_health_cache.health(HealthType::LiquidationEnd);
 
     //
     // Transfer liab_token from liqor to liqee to close the borrows.
@@ -78,7 +78,7 @@ pub fn token_force_close_borrows_with_token(
         let liab_transfer = min(-liqee_liab_native, max_liab_transfer);
 
         // The amount of asset native tokens we will give up for them
-        let fee_factor = I80F48::ONE + asset_bank.liquidation_fee + liab_bank.liquidation_fee;
+        let fee_factor = I80F48::ONE + liab_bank.liquidation_fee;
         let liab_oracle_price_adjusted = liab_oracle_price * fee_factor;
         let asset_transfer = liab_transfer * liab_oracle_price_adjusted / asset_oracle_price;
 
@@ -90,6 +90,13 @@ pub fn token_force_close_borrows_with_token(
 
         let (liqor_liab_position, liqor_liab_raw_index, _) =
             liqor.ensure_token_position(liab_token_index)?;
+        let liqor_liab_native = liqor_liab_position.native(liab_bank);
+        // Require that liqor obtain deposits before he tries to liquidate liqee's borrows, to prevent
+        // moving other liquidator from earning further liquidation fee from these borrows by trying to liquidate the current liqor
+        require!(
+            liqor_liab_native.is_positive() && liqor_liab_native.abs() >= liqee_liab_native.abs(),
+            MangoError::SomeError
+        );
         let (liqor_liab_active, loan_origination_fee) = liab_bank.withdraw_with_fee(
             liqor_liab_position,
             liab_transfer,
@@ -187,11 +194,9 @@ pub fn token_force_close_borrows_with_token(
     };
 
     // Check liqor's health
-    if !liqor.fixed.is_in_health_region() {
-        let liqor_health = compute_health(&liqor.borrow(), HealthType::Init, &account_retriever)
-            .context("compute liqor health")?;
-        require!(liqor_health >= 0, MangoError::HealthMustBePositive);
-    }
+    let liqor_health = compute_health(&liqor.borrow(), HealthType::Init, &account_retriever)
+        .context("compute liqor health")?;
+    require!(liqor_health >= 0, MangoError::HealthMustBePositive);
 
     // TODO log
     // emit!(TokenForceCloseBorrowWithToken
