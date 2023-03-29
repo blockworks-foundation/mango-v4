@@ -328,9 +328,6 @@ async function fullMarketMaker() {
     onExit(client, group, mangoAccount, Array.from(marketContexts.values()));
   });
 
-  // Random delay to startup
-  await new Promise((r) => setTimeout(r, control.interval / Math.random()));
-
   // Loop indefinitely
   while (control.isRunning) {
     try {
