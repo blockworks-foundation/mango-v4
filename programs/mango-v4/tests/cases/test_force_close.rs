@@ -200,7 +200,7 @@ async fn test_force_close() -> Result<(), TransportError> {
     // test deposit with reduce only set to 1
     //
     let deposit1_amount = 11;
-    send_tx(
+    assert!(send_tx(
         solana,
         TokenDepositInstruction {
             amount: deposit1_amount,
@@ -213,7 +213,7 @@ async fn test_force_close() -> Result<(), TransportError> {
         },
     )
     .await
-    .unwrap();
+    .is_err());
 
     // set force close, and reduce only to 2
     send_tx(
@@ -264,6 +264,12 @@ async fn test_force_close() -> Result<(), TransportError> {
     )
     .await
     .unwrap();
+
+    assert!(account_position_closed(solana, liqee, borrow_token.bank).await);
+    assert_eq!(
+        account_position(solana, liqee, collateral_token.bank).await,
+        100 - 10
+    );
 
     Ok(())
 }
