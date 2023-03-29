@@ -280,11 +280,21 @@ impl MangoGroupContext {
         &self,
         account1: &MangoAccountValue,
         account2: &MangoAccountValue,
+        affected_tokens: Vec<TokenIndex>,
         writable_banks: &[TokenIndex],
     ) -> anyhow::Result<Vec<AccountMeta>> {
         // figure out all the banks/oracles that need to be passed for the health check
         let mut banks = vec![];
         let mut oracles = vec![];
+
+        let mut account = account1.clone();
+        for affected_token_index in &affected_tokens {
+            account.ensure_token_position(affected_token_index)?;
+        }
+        let mut account = account2.clone();
+        for affected_token_index in &affected_tokens {
+            account.ensure_token_position(*affected_token_index)?;
+        }
 
         let token_indexes = account2
             .active_token_positions()
