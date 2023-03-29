@@ -75,8 +75,8 @@ impl AccountFetcher {
         let chain_data = self.chain_data.read().unwrap();
         Ok(chain_data
             .account(address)
-            .with_context(|| format!("fetch account {} via chain_data", address))?
-            .clone())
+            .map(|d| d.account.clone())
+            .with_context(|| format!("fetch account {} via chain_data", address))?)
     }
 
     pub async fn refresh_account_via_rpc(&self, address: &Pubkey) -> anyhow::Result<Slot> {
@@ -92,11 +92,25 @@ impl AccountFetcher {
             .with_context(|| format!("refresh account {} via rpc", address))?;
 
         let mut chain_data = self.chain_data.write().unwrap();
-        chain_data.update_from_rpc(
-            address,
-            AccountAndSlot {
-                slot: response.context.slot,
+        let best_chain_slot = chain_data.best_chain_slot();
+
+        // The RPC can get information for slots that haven't been seen yet on chaindata. That means
+        // that the rpc thinks that slot is valid. Make it so by telling chain data about it.
+        if best_chain_slot < slot {
+            chain_data.update_slot(SlotData {
+                slot,
+                parent: Some(best_chain_slot),
+                status: SlotStatus::Processed,
+                chain: 0,
+            });
+        }
+
+        chain_data.update_account(
+            *address,
+            AccountData {
+                slot,
                 account: account.into(),
+                write_version: 1,
             },
         );
 
