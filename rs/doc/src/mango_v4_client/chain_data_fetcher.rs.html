@@ -184,6 +184,20 @@
 <a href="#184" id="184">184</a>
 <a href="#185" id="185">185</a>
 <a href="#186" id="186">186</a>
+<a href="#187" id="187">187</a>
+<a href="#188" id="188">188</a>
+<a href="#189" id="189">189</a>
+<a href="#190" id="190">190</a>
+<a href="#191" id="191">191</a>
+<a href="#192" id="192">192</a>
+<a href="#193" id="193">193</a>
+<a href="#194" id="194">194</a>
+<a href="#195" id="195">195</a>
+<a href="#196" id="196">196</a>
+<a href="#197" id="197">197</a>
+<a href="#198" id="198">198</a>
+<a href="#199" id="199">199</a>
+<a href="#200" id="200">200</a>
 </pre><pre class="rust"><code><span class="kw">use </span>std::sync::{Arc, RwLock};
 <span class="kw">use </span>std::thread;
 <span class="kw">use </span>std::time::{Duration, Instant};
@@ -261,8 +275,8 @@
         <span class="kw">let </span>chain_data = <span class="self">self</span>.chain_data.read().unwrap();
         <span class="prelude-val">Ok</span>(chain_data
             .account(address)
-            .with_context(|| <span class="macro">format!</span>(<span class="string">&quot;fetch account {} via chain_data&quot;</span>, address))<span class="question-mark">?
-            </span>.clone())
+            .map(|d| d.account.clone())
+            .with_context(|| <span class="macro">format!</span>(<span class="string">&quot;fetch account {} via chain_data&quot;</span>, address))<span class="question-mark">?</span>)
     }
 
     <span class="kw">pub async fn </span>refresh_account_via_rpc(<span class="kw-2">&amp;</span><span class="self">self</span>, address: <span class="kw-2">&amp;</span>Pubkey) -&gt; anyhow::Result&lt;Slot&gt; {
@@ -278,11 +292,25 @@
             .with_context(|| <span class="macro">format!</span>(<span class="string">&quot;refresh account {} via rpc&quot;</span>, address))<span class="question-mark">?</span>;
 
         <span class="kw">let </span><span class="kw-2">mut </span>chain_data = <span class="self">self</span>.chain_data.write().unwrap();
-        chain_data.update_from_rpc(
-            address,
-            AccountAndSlot {
-                slot: response.context.slot,
+        <span class="kw">let </span>best_chain_slot = chain_data.best_chain_slot();
+
+        <span class="comment">// The RPC can get information for slots that haven&#39;t been seen yet on chaindata. That means
+        // that the rpc thinks that slot is valid. Make it so by telling chain data about it.
+        </span><span class="kw">if </span>best_chain_slot &lt; slot {
+            chain_data.update_slot(SlotData {
+                slot,
+                parent: <span class="prelude-val">Some</span>(best_chain_slot),
+                status: SlotStatus::Processed,
+                chain: <span class="number">0</span>,
+            });
+        }
+
+        chain_data.update_account(
+            <span class="kw-2">*</span>address,
+            AccountData {
+                slot,
                 account: account.into(),
+                write_version: <span class="number">1</span>,
             },
         );
 

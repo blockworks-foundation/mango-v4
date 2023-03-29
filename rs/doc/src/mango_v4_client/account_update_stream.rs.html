@@ -96,6 +96,8 @@
 <a href="#96" id="96">96</a>
 <a href="#97" id="97">97</a>
 <a href="#98" id="98">98</a>
+<a href="#99" id="99">99</a>
+<a href="#100" id="100">100</a>
 </pre><pre class="rust"><code><span class="kw">use </span>solana_client::rpc_response::{Response, RpcKeyedAccount};
 <span class="kw">use </span>solana_sdk::{account::AccountSharedData, pubkey::Pubkey};
 
@@ -142,9 +144,10 @@
                 <span class="macro">trace!</span>(<span class="string">&quot;websocket account message&quot;</span>);
                 chain.update_account(
                     account_write.pubkey,
-                    AccountAndSlot {
+                    AccountData {
                         slot: account_write.slot,
                         account: account_write.account.clone(),
+                        write_version: <span class="number">1</span>,
                     },
                 );
             }
@@ -152,9 +155,10 @@
                 <span class="kw">for </span>account_update <span class="kw">in </span>snapshot {
                     chain.update_account(
                         account_update.pubkey,
-                        chain_data::AccountAndSlot {
+                        chain_data::AccountData {
                             slot: account_update.slot,
                             account: account_update.account.clone(),
+                            write_version: <span class="number">0</span>,
                         },
                     );
                 }
