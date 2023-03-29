@@ -329,9 +329,7 @@ async function fullMarketMaker() {
   });
 
   // Random delay to startup
-  if (Math.random() >= 0.5) {
-    await new Promise((r) => setTimeout(r, control.interval / 2));
-  }
+  await new Promise((r) => setTimeout(r, control.interval / Math.random()));
 
   // Loop indefinitely
   while (control.isRunning) {
