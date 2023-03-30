@@ -42,8 +42,8 @@ pub fn perp_force_close_position(ctx: Context<PerpForceClosePosition>) -> Result
         .unwrap();
     let quote_transfer = I80F48::from(base_transfer * perp_market.base_lot_size) * oracle_price;
 
-    account_a_perp_position.record_trade(&mut perp_market, base_transfer, quote_transfer);
-    account_b_perp_position.record_trade(&mut perp_market, -base_transfer, -quote_transfer);
+    account_a_perp_position.record_trade(&mut perp_market, base_transfer, -quote_transfer);
+    account_b_perp_position.record_trade(&mut perp_market, -base_transfer, quote_transfer);
 
     Ok(())
 }
