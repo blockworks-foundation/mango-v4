@@ -43,18 +43,20 @@ pub fn perp_settle_fees(ctx: Context<PerpSettleFees>, max_settle_amount: u64) ->
     // Calculate PnL
     let pnl = perp_position.unsettled_pnl(&perp_market, oracle_price)?;
 
-    // Account perp position must have a loss to be able to settle against the fee account
-    require!(pnl.is_negative(), MangoError::ProfitabilityMismatch);
-    require!(
-        perp_market.fees_accrued.is_positive(),
-        MangoError::ProfitabilityMismatch
-    );
-
     let settleable_pnl = perp_position.apply_pnl_settle_limit(&perp_market, pnl);
-    require!(
-        settleable_pnl.is_negative(),
-        MangoError::ProfitabilityMismatch
-    );
+
+    if !pnl.is_negative() // Account perp position must have a loss to be able to settle against the fee account
+        || !perp_market.fees_accrued.is_positive()
+        || !settleable_pnl.is_negative()
+    {
+        msg!(
+            "Not settling: pnl {},  perp_market.fees_accrued {}, settleable_pnl {}",
+            !pnl,
+            perp_market.fees_accrued,
+            settleable_pnl
+        );
+        return Ok(());
+    }
 
     // Settle for the maximum possible capped to max_settle_amount
     let settlement = settleable_pnl
