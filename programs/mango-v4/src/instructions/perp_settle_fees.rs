@@ -45,13 +45,10 @@ pub fn perp_settle_fees(ctx: Context<PerpSettleFees>, max_settle_amount: u64) ->
 
     let settleable_pnl = perp_position.apply_pnl_settle_limit(&perp_market, pnl);
 
-    if !pnl.is_negative() // Account perp position must have a loss to be able to settle against the fee account
-        || !perp_market.fees_accrued.is_positive()
-        || !settleable_pnl.is_negative()
-    {
+    if !settleable_pnl.is_negative() || !perp_market.fees_accrued.is_positive() {
         msg!(
-            "Not settling: pnl {},  perp_market.fees_accrued {}, settleable_pnl {}",
-            !pnl,
+            "Not settling: pnl {}, perp_market.fees_accrued {}, settleable_pnl {}",
+            pnl,
             perp_market.fees_accrued,
             settleable_pnl
         );
