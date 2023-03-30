@@ -1352,6 +1352,9 @@ export class PerpPosition {
     }
     return ZERO_I80F48();
   }
+  public getUnsettledFundingUi(perpMarket: PerpMarket): number {
+    return toUiDecimalsForQuote(this.getUnsettledFunding(perpMarket));
+  }
 
   public getEquityUi(perpMarket: PerpMarket): number {
     if (perpMarket.perpMarketIndex !== this.marketIndex) {
