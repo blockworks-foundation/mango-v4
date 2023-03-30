@@ -1478,7 +1478,7 @@ export class PerpPosition {
 
     const baseNative = I80F48.fromI64(
       this.basePositionLots.mul(perpMarket.baseLotSize),
-    );
+    ).abs();
     const positionValue = I80F48.fromNumber(
       perpMarket.stablePriceModel.stablePrice,
     )
