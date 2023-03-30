@@ -473,7 +473,7 @@ async function makeMarketUpdateInstructions(
   //  await client.healthRegionBeginIx(group, mangoAccount, [], [perpMarket]),
   //);
 
-  // Update funding
+  // Trigger update funding before cancelling existing orders
   instructions.push(await client.perpUpdateFundingIx(group, perpMarket));
 
   const expiryTimestamp =
