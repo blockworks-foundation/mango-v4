@@ -4,9 +4,35 @@ Update this for each program release and mainnet deployment.
 
 ## not on mainnet
 
-### v0.9.0, 2023-3-
+### v0.10.0, 2023-4-
 
 Deployment:
+
+- HealthRegion: Explicitly whitelist allowed instructions (#508)
+
+  The security council had disabled the HealthRegion instructions after the audit
+  found a vulnerability. The issue has been resolved by restricting which other
+  instructions may be called in a health region. That way it's still usable to
+  save compute units, but its attack surface is significantly reduced.
+
+- Use insurance fund token oracle for bankruptcies (#503)
+
+  This is in preparation for using an oracle for the USDC price instead of fixing
+  its value to $1. The insurance fund is in USDC, so the oracle price needs to
+  be taken into account once a real oracle is provided.
+
+- Fee buyback: Use the USDC oracle (#504)
+- Perp settle fees: Return early instead of error on failure (#526)
+- Net borrow limits: Fixed accounting of deposits (#513)
+- Better logging in IxGateSet instruction
+- Sanity check token_index in TokenRegister instruction
+- Allow using all available bytes for bank and market names
+
+## mainnet
+
+### v0.9.0, 2023-3-16
+
+Deployment: Mar 16, 2023 at 11:07:30 Central European Standard Time, https://explorer.solana.com/tx/2hVqFQhxC9BGzDvH7y9bWChrMRvzsBGMPcMepHLBamK4vKJMJG48Fv8ZB54b46qErH1aGRy9YVhFnVnpaKgnoP3c
 
 - Downgrade the "fixed" dependency to v1.11.0 (#500)
 
@@ -15,8 +41,6 @@ Deployment:
   for release v0.8.0.
 
 - Improvements to perp position docstrings (#497)
-
-## mainnet
 
 ### v0.8.0, 2023-3-11
 
