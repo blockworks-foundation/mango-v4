@@ -3,6 +3,7 @@ import { Cluster, Connection, Keypair, PublicKey } from '@solana/web3.js';
 import * as dotenv from 'dotenv';
 import { MangoClient } from '../../src/client';
 import { MANGO_V4_ID } from '../../src/constants';
+import { toUiDecimalsForQuote } from '../../src/utils';
 dotenv.config();
 
 const CLUSTER_URL =
@@ -115,6 +116,12 @@ async function main(): Promise<void> {
           .padStart(10)}`,
       );
       console.log(
+        `- perp.feesAccrued ${toUiDecimalsForQuote(perpMarket.feesAccrued)}`,
+      );
+      console.log(
+        `- perp.feesSettled ${toUiDecimalsForQuote(perpMarket.feesSettled)}`,
+      );
+      console.log(
         `- unsettled pnl aggr - base position aggr * price ${(
           getUnsettledPnlUiAgg -
           getBasePositionUiAgg * perpMarket.uiPrice
@@ -122,7 +129,13 @@ async function main(): Promise<void> {
           .toFixed(4)
           .padStart(10)}`,
       );
-      console.log();
+      console.log(
+        `- perp.feesAccrued - perp.feesSettled - unsettled pnl aggr ${
+          toUiDecimalsForQuote(
+            perpMarket.feesAccrued.sub(perpMarket.feesSettled),
+          ) - getUnsettledPnlUiAgg
+        }`,
+      );
     });
 
   process.exit();
