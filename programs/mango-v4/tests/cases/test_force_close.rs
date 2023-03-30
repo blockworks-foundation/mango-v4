@@ -27,6 +27,21 @@ async fn test_force_close() -> Result<(), TransportError> {
     let collateral_token = &tokens[0];
     let borrow_token = &tokens[1];
 
+    send_tx(
+        solana,
+        TokenEditWeights {
+            group,
+            admin,
+            mint: mints[1].pubkey,
+            init_asset_weight: 0.6,
+            maint_asset_weight: 0.8,
+            maint_liab_weight: 1.2,
+            init_liab_weight: 1.5, // changed from 1.4
+        },
+    )
+    .await
+    .unwrap();
+
     // deposit some funds, to the vaults aren't empty
     create_funded_account(
         &solana,

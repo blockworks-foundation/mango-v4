@@ -1,12 +1,10 @@
-use anchor_lang::prelude::*;
-use fixed::types::I80F48;
-use std::cmp::min;
-
 use crate::accounts_ix::*;
 use crate::error::*;
 use crate::health::*;
 use crate::logs::TokenBalanceLog;
 use crate::state::*;
+use anchor_lang::prelude::*;
+use fixed::types::I80F48;
 
 pub fn token_force_close_borrows_with_token(
     ctx: Context<TokenForceCloseBorrowsWithToken>,
@@ -40,8 +38,6 @@ pub fn token_force_close_borrows_with_token(
 
     let mut liqee = ctx.accounts.liqee.load_full_mut()?;
 
-    let account_retriever: &mut ScanningAccountRetriever = &mut account_retriever;
-
     //
     // Transfer liab_token from liqor to liqee to close the borrows.
     // Transfer corresponding amount of asset_token from liqee to liqor.
@@ -63,9 +59,9 @@ pub fn token_force_close_borrows_with_token(
         // account constraint #3
         // only allow combination of asset and liab token,
         // where liqee's health would be guaranteed to not decrease
-        require!(
-            asset_bank.scaled_init_liab_weight(asset_oracle_price)
-                <= liab_bank.scaled_init_liab_weight(liab_oracle_price) + liab_bank.liquidation_fee,
+        require_gte!(
+            liab_bank.init_liab_weight,
+            asset_bank.init_liab_weight * (I80F48::ONE + liab_bank.liquidation_fee),
             MangoError::SomeError
         );
 
@@ -87,11 +83,10 @@ pub fn token_force_close_borrows_with_token(
 
         // The amount of liab native tokens we will transfer
         let max_liab_transfer = I80F48::from(max_liab_transfer);
-        let liab_transfer = min(
-            min(-liqee_liab_native, liqor_liab_native),
-            max_liab_transfer,
-        )
-        .max(I80F48::ZERO);
+        let liab_transfer = max_liab_transfer
+            .min(-liqee_liab_native)
+            .min(liqor_liab_native)
+            .max(I80F48::ZERO);
 
         // The amount of asset native tokens we will give up for them
         let fee_factor = I80F48::ONE + liab_bank.liquidation_fee;
@@ -171,7 +166,7 @@ pub fn token_force_close_borrows_with_token(
             borrow_index: liab_bank.borrow_index.to_bits(),
         });
 
-        let liqee_health_cache = new_health_cache(&liqee.borrow(), account_retriever)
+        let liqee_health_cache = new_health_cache(&liqee.borrow(), &mut account_retriever)
             .context("create liqee health cache")?;
         let liqee_liq_end_health = liqee_health_cache.health(HealthType::LiquidationEnd);
         liqee
@@ -196,7 +191,7 @@ pub fn token_force_close_borrows_with_token(
     // Check liqor's health
     // This should always improve liqor health, since we decrease the zero-asset-weight
     // liab token and gain some asset token, this check is just for denfensive measure
-    let liqor_health = compute_health(&liqor.borrow(), HealthType::Init, account_retriever)
+    let liqor_health = compute_health(&liqor.borrow(), HealthType::Init, &mut account_retriever)
         .context("compute liqor health")?;
     require!(liqor_health >= 0, MangoError::HealthMustBePositive);
 

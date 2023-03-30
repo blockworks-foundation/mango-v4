@@ -351,7 +351,7 @@ pub fn flash_loan_end<'key, 'accounts, 'remaining, 'info>(
         }
         if bank.are_borrows_reduce_only() {
             require!(
-                native_after_change > native || native_after_change >= 0,
+                native_after_change >= native || native_after_change >= 0,
                 MangoError::TokenInReduceOnlyMode
             );
         }
