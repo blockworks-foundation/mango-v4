@@ -26,7 +26,7 @@ async function main(): Promise<void> {
   });
 
   const group = await client.getGroup(new PublicKey(GROUP_PK));
-  const mangoAccounts = await client.getAllMangoAccounts(group);
+  const mangoAccounts = await client.getAllMangoAccounts(group, true);
 
   Array.from(group.perpMarketsMapByMarketIndex.values())
     .filter((perpMarket) => perpMarket.name != 'SOMETHING-PERP')
@@ -34,6 +34,7 @@ async function main(): Promise<void> {
       console.log(`name ${perpMarket.name}`);
       let getUnsettledPnlUiAgg = 0;
       let getBasePositionUiAgg = 0;
+      let getQuotePositionUiAgg = 0;
       let longSettledFundingAgg = 0;
       let shortSettledFundingAgg = 0;
       mangoAccounts.map((mangoAccount) => {
@@ -43,70 +44,29 @@ async function main(): Promise<void> {
         if (pp) {
           getUnsettledPnlUiAgg += pp.getUnsettledPnlUi(perpMarket);
           getBasePositionUiAgg += pp.getBasePositionUi(perpMarket);
+          getQuotePositionUiAgg += pp.getQuotePositionUi(perpMarket);
           longSettledFundingAgg += pp.longSettledFunding.toNumber();
           shortSettledFundingAgg += pp.shortSettledFunding.toNumber();
-          // console.log(` - ${mangoAccount.publicKey.toBase58().padStart(45)}`);
-          // console.log(
-          //   `    - unsettled pnl ${pp
-          //     .getUnsettledPnlUi(group, perpMarket)
-          //     .toFixed(4)
-          //     .padStart(10)}`,
-          // );
-          // console.log(
-          //   `    - base position ${pp
-          //     .getBasePositionUi(perpMarket)
-          //     .toFixed(4)
-          //     .padStart(10)}`,
-          // );
-          // console.log(
-          //   `    - avgEntryPricePerBaseLot ${pp.avgEntryPricePerBaseLot}`,
-          // );
-          // console.log(
-          //   `    - realizedTradePnl ${toUiDecimalsForQuote(
-          //     pp.realizedTradePnlNative,
-          //   )}`,
-          // );
-          // console.log(
-          //   `    - realizedOtherPnl ${toUiDecimalsForQuote(
-          //     pp.realizedOtherPnlNative,
-          //   )}`,
-          // );
-          // console.log(
-          //   `    - settlePnlLimitRealizedTrade ${pp.settlePnlLimitRealizedTrade.toNumber()}`,
-          // );
-          // console.log(
-          //   `    - realizedPnlForPosition ${toUiDecimalsForQuote(
-          //     pp.realizedPnlForPositionNative,
-          //   )}`,
-          // );
-          // console.log(
-          //   `    - settlePnlLimitSettledInCurrentWindow ${toUiDecimalsForQuote(
-          //     pp.settlePnlLimitSettledInCurrentWindowNative,
-          //   )}`,
-          // );
         }
       });
-      // console.log(
-      //   `- feesAccrued ${toUiDecimalsForQuote(perpMarket.feesAccrued)}`,
-      // );
-      // console.log(
-      //   `- feesSettled ${toUiDecimalsForQuote(perpMarket.feesSettled)}`,
-      // );
-      // console.log(
-      //   `- longSettledFundingAgg ${longSettledFundingAgg
-      //     .toFixed(4)
-      //     .padStart(10)}`,
-      // );
-      // console.log(
-      //   `- shortSettledFunding ${shortSettledFundingAgg
-      //     .toFixed(4)
-      //     .padStart(10)}`,
-      // );
+
+      console.log(
+        `- longSettledFundingAgg - shortSettledFunding ${(
+          longSettledFundingAgg - shortSettledFundingAgg
+        )
+          .toFixed(4)
+          .padStart(10)}`,
+      );
       console.log(
         `- unsettled pnl aggr ${getUnsettledPnlUiAgg.toFixed(4).padStart(10)}`,
       );
       console.log(
         `- base position aggr ${getBasePositionUiAgg.toFixed(4).padStart(10)}`,
+      );
+      console.log(
+        `- quote position aggr ${getQuotePositionUiAgg
+          .toFixed(4)
+          .padStart(10)}`,
       );
       console.log(
         `- base position aggr * price ${(
@@ -119,9 +79,6 @@ async function main(): Promise<void> {
         `- perp.feesAccrued ${toUiDecimalsForQuote(perpMarket.feesAccrued)}`,
       );
       console.log(
-        `- perp.feesSettled ${toUiDecimalsForQuote(perpMarket.feesSettled)}`,
-      );
-      console.log(
         `- unsettled pnl aggr - base position aggr * price ${(
           getUnsettledPnlUiAgg -
           getBasePositionUiAgg * perpMarket.uiPrice
@@ -130,10 +87,8 @@ async function main(): Promise<void> {
           .padStart(10)}`,
       );
       console.log(
-        `- perp.feesAccrued - perp.feesSettled + unsettled pnl aggr ${
-          toUiDecimalsForQuote(
-            perpMarket.feesAccrued.sub(perpMarket.feesSettled),
-          ) + getUnsettledPnlUiAgg
+        `- perp.feesAccrued  + unsettled pnl aggr ${
+          toUiDecimalsForQuote(perpMarket.feesAccrued) + getUnsettledPnlUiAgg
         }`,
       );
     });
