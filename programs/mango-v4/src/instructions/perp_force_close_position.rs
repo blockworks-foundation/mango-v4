@@ -26,7 +26,8 @@ pub fn perp_force_close_position(ctx: Context<PerpForceClosePosition>) -> Result
     let base_transfer = account_a_perp_position
         .base_position_lots()
         .abs()
-        .min(account_b_perp_position.base_position_lots().abs());
+        .min(account_b_perp_position.base_position_lots().abs())
+        .max(0);
 
     let staleness_slot = perp_market
         .oracle_config
