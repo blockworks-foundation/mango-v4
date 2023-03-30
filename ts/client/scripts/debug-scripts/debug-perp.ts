@@ -130,10 +130,10 @@ async function main(): Promise<void> {
           .padStart(10)}`,
       );
       console.log(
-        `- perp.feesAccrued - perp.feesSettled - unsettled pnl aggr ${
+        `- perp.feesAccrued - perp.feesSettled + unsettled pnl aggr ${
           toUiDecimalsForQuote(
             perpMarket.feesAccrued.sub(perpMarket.feesSettled),
-          ) - getUnsettledPnlUiAgg
+          ) + getUnsettledPnlUiAgg
         }`,
       );
     });
