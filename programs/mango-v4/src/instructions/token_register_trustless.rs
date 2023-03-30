@@ -69,10 +69,10 @@ pub fn token_register_trustless(
         net_borrow_limit_window_size_ts,
         last_net_borrows_window_start_ts: now_ts / net_borrow_limit_window_size_ts
             * net_borrow_limit_window_size_ts,
-        net_borrow_limit_per_window_quote: 1_000_000_000_000, // 1M USD
+        net_borrow_limit_per_window_quote: 250_000_000_000, // $250k
         net_borrows_in_window: 0,
-        borrow_weight_scale_start_quote: f64::MAX,
-        deposit_weight_scale_start_quote: f64::MAX,
+        borrow_weight_scale_start_quote: 100_000_000_000.0, // $100k
+        deposit_weight_scale_start_quote: 100_000_000_000.0, // $100k
         reduce_only: 0,
         reserved: [0; 2119],
     };
