@@ -546,7 +546,7 @@ pub mod mango_v4 {
         ctx: Context<TokenForceCloseBorrowsWithToken>,
         asset_token_index: TokenIndex,
         liab_token_index: TokenIndex,
-        max_liab_transfer: I80F48,
+        max_liab_transfer: u64,
     ) -> Result<()> {
         #[cfg(feature = "enable-gpl")]
         instructions::token_force_close_borrows_with_token(

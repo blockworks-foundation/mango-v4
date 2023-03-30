@@ -129,8 +129,8 @@ pub struct Bank {
 
     // We have 3 modes
     // 0 - Off,
-    // 1 - NoDepositsNoBorrows - standard
-    // 2 - NoBorrows - borrows can only be reduced, but deposits have no restriction, special case for
+    // 1 - ReduceDepositsReduceBorrows - standard
+    // 2 - ReduceBorrows - borrows can only be reduced, but deposits have no restriction, special case for
     //                 force close mode, where liqor should first acquire deposits before closing liqee's borrows
     pub reduce_only: u8,
     pub force_close: u8,

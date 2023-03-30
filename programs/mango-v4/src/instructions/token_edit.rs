@@ -277,12 +277,11 @@ pub fn token_edit(
                 bank.reduce_only,
                 reduce_only
             );
-            bank.reduce_only = reduce_only;
-
-            // security admin can only enable reduce_only
-            if u8::from(reduce_only) == 0 {
+            // security admin can only make it stricter
+            if reduce_only < bank.reduce_only {
                 require_group_admin = true;
             }
+            bank.reduce_only = reduce_only;
         };
 
         if let Some(name) = name_opt.as_ref() {

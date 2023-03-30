@@ -2662,7 +2662,7 @@ pub struct TokenForceCloseBorrowsWithTokenInstruction {
     pub asset_bank_index: usize,
     pub liab_token_index: TokenIndex,
     pub liab_bank_index: usize,
-    pub max_liab_transfer: I80F48,
+    pub max_liab_transfer: u64,
 }
 #[async_trait::async_trait(?Send)]
 impl ClientInstruction for TokenForceCloseBorrowsWithTokenInstruction {

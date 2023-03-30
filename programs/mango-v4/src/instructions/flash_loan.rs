@@ -345,13 +345,13 @@ pub fn flash_loan_end<'key, 'accounts, 'remaining, 'info>(
         let native_after_change = native + change_amount;
         if bank.are_deposits_reduce_only() {
             require!(
-                (change_amount > 0 && native_after_change < 1),
+                native_after_change < 1 || native_after_change <= native,
                 MangoError::TokenInReduceOnlyMode
             );
         }
         if bank.are_borrows_reduce_only() {
             require!(
-                (change_amount < 0 && native_after_change >= 0),
+                native_after_change > native || native_after_change >= 0,
                 MangoError::TokenInReduceOnlyMode
             );
         }
