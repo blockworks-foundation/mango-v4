@@ -1260,6 +1260,8 @@ pub struct TokenMakeReduceOnly {
     pub group: Pubkey,
     pub admin: TestKeypair,
     pub mint: Pubkey,
+    pub reduce_only: u8,
+    pub force_close: bool,
 }
 
 #[async_trait::async_trait(?Send)]
@@ -1284,64 +1286,8 @@ impl ClientInstruction for TokenMakeReduceOnly {
         let mint_info: MintInfo = account_loader.load(&mint_info_key).await.unwrap();
 
         let instruction = Self::Instruction {
-            reduce_only_opt: Some(1),
-            ..token_edit_instruction_default()
-        };
-
-        let accounts = Self::Accounts {
-            group: self.group,
-            admin: self.admin.pubkey(),
-            mint_info: mint_info_key,
-            oracle: mint_info.oracle,
-        };
-
-        let mut instruction = make_instruction(program_id, &accounts, instruction);
-        instruction
-            .accounts
-            .extend(mint_info.banks().iter().map(|&k| AccountMeta {
-                pubkey: k,
-                is_signer: false,
-                is_writable: true,
-            }));
-        (accounts, instruction)
-    }
-
-    fn signers(&self) -> Vec<TestKeypair> {
-        vec![self.admin]
-    }
-}
-
-pub struct TokenMakeForceClose {
-    pub group: Pubkey,
-    pub admin: TestKeypair,
-    pub mint: Pubkey,
-    pub reduce_only: u8,
-}
-
-#[async_trait::async_trait(?Send)]
-impl ClientInstruction for TokenMakeForceClose {
-    type Accounts = mango_v4::accounts::TokenEdit;
-    type Instruction = mango_v4::instruction::TokenEdit;
-    async fn to_instruction(
-        &self,
-        account_loader: impl ClientAccountLoader + 'async_trait,
-    ) -> (Self::Accounts, instruction::Instruction) {
-        let program_id = mango_v4::id();
-
-        let mint_info_key = Pubkey::find_program_address(
-            &[
-                b"MintInfo".as_ref(),
-                self.group.as_ref(),
-                self.mint.as_ref(),
-            ],
-            &program_id,
-        )
-        .0;
-        let mint_info: MintInfo = account_loader.load(&mint_info_key).await.unwrap();
-
-        let instruction = Self::Instruction {
             reduce_only_opt: Some(self.reduce_only),
-            force_close_opt: Some(true),
+            force_close_opt: Some(self.force_close),
             ..token_edit_instruction_default()
         };
 

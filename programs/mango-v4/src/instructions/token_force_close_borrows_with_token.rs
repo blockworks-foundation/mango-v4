@@ -73,8 +73,8 @@ pub fn token_force_close_borrows_with_token(
             liqee.token_position_and_raw_index(asset_token_index)?;
         let liqee_asset_native = liqee_asset_position.native(asset_bank);
 
-        let (liqee_liab_position, liqee_liab_raw_index) =
-            liqee.token_position_and_raw_index(liab_token_index)?;
+        let (liqee_liab_position, liqee_liab_raw_index, _) =
+            liqee.ensure_token_position(liab_token_index)?;
         let liqee_liab_native = liqee_liab_position.native(liab_bank);
         require!(liqee_liab_native.is_negative(), MangoError::SomeError);
 
@@ -99,7 +99,6 @@ pub fn token_force_close_borrows_with_token(
         let asset_transfer = liab_transfer * liab_oracle_price_adjusted / asset_oracle_price;
 
         // Apply the balance changes to the liqor and liqee accounts
-        let liqee_liab_position = liqee.token_position_mut_by_raw_index(liqee_liab_raw_index);
         let liqee_liab_active =
             liab_bank.deposit_with_dusting(liqee_liab_position, liab_transfer, now_ts)?;
         let liqee_liab_indexed_position = liqee_liab_position.indexed_position;

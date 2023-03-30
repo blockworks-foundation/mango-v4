@@ -28,38 +28,17 @@ async fn test_force_close() -> Result<(), TransportError> {
     let borrow_token = &tokens[1];
 
     // deposit some funds, to the vaults aren't empty
-    let vault_account = send_tx(
-        solana,
-        AccountCreateInstruction {
-            account_num: 99,
-            token_count: 16,
-            serum3_count: 8,
-            perp_count: 8,
-            perp_oo_count: 8,
-            group,
-            owner,
-            payer,
-        },
+    create_funded_account(
+        &solana,
+        group,
+        owner,
+        99,
+        &context.users[1],
+        mints,
+        100000,
+        0,
     )
-    .await
-    .unwrap()
-    .account;
-    for &token_account in payer_mint_accounts {
-        send_tx(
-            solana,
-            TokenDepositInstruction {
-                amount: 100000,
-                reduce_only: false,
-                account: vault_account,
-                owner,
-                token_account,
-                token_authority: payer.clone(),
-                bank_index: 0,
-            },
-        )
-        .await
-        .unwrap();
-    }
+    .await;
 
     let liqor = send_tx(
         solana,
@@ -167,11 +146,12 @@ async fn test_force_close() -> Result<(), TransportError> {
     // set force close, and reduce only to 1
     send_tx(
         solana,
-        TokenMakeForceClose {
+        TokenMakeReduceOnly {
             admin,
             group,
             mint: mints[1].pubkey,
             reduce_only: 1,
+            force_close: false,
         },
     )
     .await
@@ -218,11 +198,12 @@ async fn test_force_close() -> Result<(), TransportError> {
     // set force close, and reduce only to 2
     send_tx(
         solana,
-        TokenMakeForceClose {
+        TokenMakeReduceOnly {
             admin,
             group,
             mint: mints[1].pubkey,
             reduce_only: 2,
+            force_close: true,
         },
     )
     .await
