@@ -28,9 +28,13 @@ pub fn perp_settle_fees(ctx: Context<PerpSettleFees>, max_settle_amount: u64) ->
         MangoError::InvalidBank
     );
 
-    // Get oracle price for market. Price is validated inside
+    // Get oracle prices
     let oracle_price = perp_market.oracle_price(
         &AccountInfoRef::borrow(ctx.accounts.oracle.as_ref())?,
+        None, // staleness checked in health
+    )?;
+    let settle_token_oracle_price = settle_bank.oracle_price(
+        &AccountInfoRef::borrow(ctx.accounts.settle_oracle.as_ref())?,
         None, // staleness checked in health
     )?;
 
@@ -93,7 +97,7 @@ pub fn perp_settle_fees(ctx: Context<PerpSettleFees>, max_settle_amount: u64) ->
         token_position,
         settlement,
         Clock::get()?.unix_timestamp.try_into().unwrap(),
-        oracle_price,
+        settle_token_oracle_price,
     )?;
     // Update the settled balance on the market itself
     perp_market.fees_settled += settlement;

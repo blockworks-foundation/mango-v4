@@ -215,6 +215,10 @@ pub(crate) fn liquidation_action(
     let liqor_perp_position = liqor.perp_position_mut(perp_market_index)?;
 
     let perp_info = liqee_health_cache.perp_info(perp_market_index)?;
+    let settle_token_oracle_price = liqee_health_cache
+        .token_info(settle_token_index)?
+        .prices
+        .oracle;
     let oracle_price = perp_info.prices.oracle;
     let base_lot_size = I80F48::from(perp_market.base_lot_size);
     let oracle_price_per_lot = base_lot_size * oracle_price;
@@ -451,7 +455,7 @@ pub(crate) fn liquidation_action(
                 liqor_token_position,
                 token_transfer,
                 now_ts,
-                oracle_price,
+                settle_token_oracle_price,
             )?;
             liqee_health_cache.adjust_token_balance(&settle_bank, token_transfer)?;
         }
