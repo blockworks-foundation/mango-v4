@@ -136,7 +136,7 @@ pub fn account_buyback_fees_with_mngo(
         dao_fees_token_position,
         max_buyback_fees,
         now_ts,
-        mngo_oracle_price,
+        fees_oracle_price,
     )?;
     if !in_use {
         dao_account.deactivate_token_position_and_log(
