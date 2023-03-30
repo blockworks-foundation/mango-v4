@@ -3060,6 +3060,12 @@
           "type": {
             "option": "string"
           }
+        },
+        {
+          "name": "forceCloseOpt",
+          "type": {
+            "option": "bool"
+          }
         }
       ]
     },
@@ -5017,11 +5023,15 @@
             "type": "u8"
           },
           {
+            "name": "forceClose",
+            "type": "u8"
+          },
+          {
             "name": "padding4",
             "type": {
               "array": [
                 "u8",
-                7
+                6
               ]
             }
           },
@@ -7033,6 +7043,9 @@
           },
           {
             "name": "TokenForceCloseBorrowsWithToken"
+          },
+          {
+            "name": "PerpForceClosePosition"
           }
         ]
       }

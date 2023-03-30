@@ -157,8 +157,9 @@ pub struct PerpMarket {
     /// If true, users may no longer increase their market exposure. Only actions
     /// that reduce their position are still allowed.
     pub reduce_only: u8,
+    pub force_close: u8,
 
-    pub padding4: [u8; 7],
+    pub padding4: [u8; 6],
 
     /// Weights for full perp market health, if positive
     pub maint_overall_asset_weight: I80F48,
@@ -216,6 +217,10 @@ impl PerpMarket {
 
     pub fn is_reduce_only(&self) -> bool {
         self.reduce_only == 1
+    }
+
+    pub fn is_force_close(&self) -> bool {
+        self.force_close == 1
     }
 
     pub fn elligible_for_group_insurance_fund(&self) -> bool {
@@ -460,6 +465,7 @@ impl PerpMarket {
             padding3: Default::default(),
             settle_pnl_limit_window_size_ts: 24 * 60 * 60,
             reduce_only: 0,
+            force_close: 0,
             padding4: Default::default(),
             maint_overall_asset_weight: I80F48::ONE,
             init_overall_asset_weight: I80F48::ONE,

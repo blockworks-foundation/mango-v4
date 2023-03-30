@@ -2975,6 +2975,7 @@ fn perp_edit_instruction_default() -> mango_v4::instruction::PerpEditMarket {
         reset_stable_price: false,
         positive_pnl_liquidation_fee_opt: None,
         name_opt: None,
+        force_close_opt: None,
     }
 }
 
