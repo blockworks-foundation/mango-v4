@@ -2341,6 +2341,32 @@ export class MangoClient {
       .instruction();
   }
 
+  async perpSettlePnlAndFees(
+    group: Group,
+    profitableAccount: MangoAccount,
+    unprofitableAccount: MangoAccount,
+    accountToSettleFeesFor: MangoAccount,
+    settler: MangoAccount,
+    perpMarketIndex: PerpMarketIndex,
+    maxSettleAmount?: number,
+  ): Promise<TransactionSignature> {
+    return await this.sendAndConfirmTransactionForGroup(group, [
+      await this.perpSettlePnlIx(
+        group,
+        profitableAccount,
+        unprofitableAccount,
+        settler,
+        perpMarketIndex,
+      ),
+      await this.perpSettleFeesIx(
+        group,
+        accountToSettleFeesFor,
+        perpMarketIndex,
+        maxSettleAmount,
+      ),
+    ]);
+  }
+
   async perpSettlePnl(
     group: Group,
     profitableAccount: MangoAccount,
