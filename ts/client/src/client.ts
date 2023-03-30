@@ -2477,6 +2477,22 @@ export class MangoClient {
     }
   }
 
+  public async perpUpdateFundingIx(
+    group: Group,
+    perpMarket: PerpMarket,
+  ): Promise<TransactionInstruction> {
+    return await this.program.methods
+      .perpUpdateFunding()
+      .accounts({
+        group: group.publicKey,
+        perpMarket: perpMarket.publicKey,
+        bids: perpMarket.bids,
+        asks: perpMarket.asks,
+        oracle: perpMarket.oracle,
+      })
+      .instruction();
+  }
+
   public async marginTrade({
     group,
     mangoAccount,
