@@ -4,6 +4,27 @@ Update this for each program release and mainnet deployment.
 
 ## not on mainnet
 
+### v0.11.0, 2023-4-
+
+Deployment:
+
+- Limit funding and interest accrual during downtimes (#529)
+
+  Previously, if the funding or interest updating instruction wassn't
+  called for a long time (like for a solana downtime or the security
+  council halting the program), the next update would apply funding or
+  interest for the whole time interval since the last update.
+
+  This could lead to a bad downtime situation becoming worse. Instead,
+  limit the maximum funding and interest time interval to one hour.
+
+- Update default interest parameters in token_register_trustless (#523)
+
+  This brings them in line with the recent interest rate changes for >50%
+  utilization.
+
+- Perp: Fix logging of funding rate in update funding and deactivate pos (#528)
+
 ### v0.10.0, 2023-4-
 
 Deployment:
