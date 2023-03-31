@@ -46,9 +46,9 @@ pub fn token_register_trustless(
         // 10% daily adjustment at 0% or 100% utilization
         adjustment_factor: I80F48::from_num(0.004),
         util0: I80F48::from_num(0.5),
-        rate0: I80F48::from_num(0.018),
+        rate0: I80F48::from_num(0.072),
         util1: I80F48::from_num(0.8),
-        rate1: I80F48::from_num(0.05),
+        rate1: I80F48::from_num(0.2),
         max_rate: I80F48::from_num(2.0),
         collected_fees_native: I80F48::ZERO,
         loan_origination_fee_rate: I80F48::from_num(0.0005),
