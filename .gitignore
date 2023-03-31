@@ -22,4 +22,4 @@ keeper/.env
 ts/client/src/scripts/archive/ts.ts
 
 logs
-grab-logs.sh
+check.sh
