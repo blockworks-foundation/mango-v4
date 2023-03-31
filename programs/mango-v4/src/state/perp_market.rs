@@ -288,7 +288,14 @@ impl PerpMarket {
             (None, None) => I80F48::ZERO,
         };
 
-        let diff_ts = I80F48::from_num(now_ts - self.funding_last_updated as u64);
+        // Limit the maximal time interval that funding is applied for. This means we won't use
+        // the funding rate computed from a single orderbook snapshot for a very long time period
+        // in exceptional circumstances, like a solana downtime or the security council disabling
+        // funding updates.
+        let max_funding_timestep = 3600; // one hour
+        let diff_ts =
+            I80F48::from_num((now_ts - self.funding_last_updated as u64).min(max_funding_timestep));
+
         let time_factor = diff_ts / DAY_I80F48;
         let base_lot_size = I80F48::from_num(self.base_lot_size);
 
