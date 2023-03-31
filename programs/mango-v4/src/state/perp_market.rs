@@ -306,7 +306,7 @@ impl PerpMarket {
             mango_group: self.group,
             market_index: self.perp_market_index,
             long_funding: self.long_funding.to_bits(),
-            short_funding: self.long_funding.to_bits(),
+            short_funding: self.short_funding.to_bits(),
             price: oracle_price.to_bits(),
             stable_price: self.stable_price().to_bits(),
             fees_accrued: self.fees_accrued.to_bits(),

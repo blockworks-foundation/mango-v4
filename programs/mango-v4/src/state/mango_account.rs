@@ -867,7 +867,7 @@ impl<
             mango_account: mango_account_pubkey,
             market_index: perp_market_index,
             cumulative_long_funding: perp_position.cumulative_long_funding,
-            cumulative_short_funding: perp_position.cumulative_long_funding,
+            cumulative_short_funding: perp_position.cumulative_short_funding,
             maker_volume: perp_position.maker_volume,
             taker_volume: perp_position.taker_volume,
             perp_spot_transfers: perp_position.perp_spot_transfers,
