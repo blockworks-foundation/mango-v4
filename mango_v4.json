@@ -7660,6 +7660,11 @@
           "index": false
         },
         {
+          "name": "feesSettled",
+          "type": "i128",
+          "index": false
+        },
+        {
           "name": "openInterest",
           "type": "i64",
           "index": false

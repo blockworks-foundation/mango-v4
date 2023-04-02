@@ -317,6 +317,7 @@ impl PerpMarket {
             price: oracle_price.to_bits(),
             stable_price: self.stable_price().to_bits(),
             fees_accrued: self.fees_accrued.to_bits(),
+            fees_settled: self.fees_settled.to_bits(),
             open_interest: self.open_interest,
             instantaneous_funding_rate: funding_rate.to_bits(),
         });
