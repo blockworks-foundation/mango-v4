@@ -545,7 +545,9 @@ pub(crate) fn liquidation_action(
     //
     // Step 3: Above that, perp base positions only benefit account health if the pnl asset weight is positive
     //
-    if current_uhupnl >= max_pnl_transfer && init_overall_asset_weight > 0 {
+    // TODO: magic number to avoid extra liquidation when health is already good enough and it's just
+    // rounding issues making it <0
+    if current_health < I80F48::from_num(-0.5) && init_overall_asset_weight > 0 {
         let weighted_health_per_lot = quote_per_lot * init_overall_asset_weight;
         reduce_base(
             "positive",
@@ -808,7 +810,7 @@ mod tests {
                 "base liq, pos perp health 1: until health positive",
                 (0.5, 0.8),
                 (-20.0, 20, 5.0),
-                (-20.0, 10, 15.0),
+                (0.0, 10, -5.0), // alternate: (-20, 0, 25). would it be better to reduce base more instead?
                 (100, 100),
             ),
             (
@@ -822,7 +824,7 @@ mod tests {
                 "base liq, pos perp health 2-2: base+settle until health positive",
                 (0.5, 0.5),
                 (-25.0, 20, 10.0),
-                (0.0, 10, -5.0),
+                (0.0, 10, -5.0), // alternate: (-5, 0, 10) better?
                 (100, 100),
             ),
             (
