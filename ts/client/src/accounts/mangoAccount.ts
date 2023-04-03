@@ -115,6 +115,7 @@ export class MangoAccount {
 
   async reloadSerum3OpenOrders(client: MangoClient): Promise<MangoAccount> {
     const serum3Active = this.serum3Active();
+    if (!serum3Active.length) return this;
     const ais =
       await client.program.provider.connection.getMultipleAccountsInfo(
         serum3Active.map((serum3) => serum3.openOrders),
