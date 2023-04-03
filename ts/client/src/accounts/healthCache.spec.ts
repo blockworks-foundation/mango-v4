@@ -5,55 +5,12 @@ import cloneDeep from 'lodash/cloneDeep';
 import range from 'lodash/range';
 
 import { I80F48, ONE_I80F48, ZERO_I80F48 } from '../numbers/I80F48';
-import { BankForHealth, StablePriceModel, TokenIndex } from './bank';
+import { BankForHealth, TokenIndex } from './bank';
 import { HealthCache, PerpInfo, Serum3Info, TokenInfo } from './healthCache';
 import { HealthType, PerpPosition } from './mangoAccount';
-import { PerpMarket, PerpOrderSide } from './perp';
+import { PerpOrderSide } from './perp';
 import { MarketIndex } from './serum3';
-
-function mockBankAndOracle(
-  tokenIndex: TokenIndex,
-  maintWeight: number,
-  initWeight: number,
-  price: number,
-  stablePrice: number,
-): BankForHealth {
-  return {
-    tokenIndex,
-    maintAssetWeight: I80F48.fromNumber(1 - maintWeight),
-    initAssetWeight: I80F48.fromNumber(1 - initWeight),
-    maintLiabWeight: I80F48.fromNumber(1 + maintWeight),
-    initLiabWeight: I80F48.fromNumber(1 + initWeight),
-    price: I80F48.fromNumber(price),
-    stablePriceModel: { stablePrice: stablePrice } as StablePriceModel,
-    scaledInitAssetWeight: () => I80F48.fromNumber(1 - initWeight),
-    scaledInitLiabWeight: () => I80F48.fromNumber(1 + initWeight),
-  };
-}
-
-function mockPerpMarket(
-  perpMarketIndex: number,
-  maintBaseWeight: number,
-  initBaseWeight: number,
-  baseLotSize: number,
-  price: number,
-): PerpMarket {
-  return {
-    perpMarketIndex,
-    maintBaseAssetWeight: I80F48.fromNumber(1 - maintBaseWeight),
-    initBaseAssetWeight: I80F48.fromNumber(1 - initBaseWeight),
-    maintBaseLiabWeight: I80F48.fromNumber(1 + maintBaseWeight),
-    initBaseLiabWeight: I80F48.fromNumber(1 + initBaseWeight),
-    maintOverallAssetWeight: I80F48.fromNumber(1 - 0.02),
-    initOverallAssetWeight: I80F48.fromNumber(1 - 0.05),
-    price: I80F48.fromNumber(price),
-    stablePriceModel: { stablePrice: price } as StablePriceModel,
-    quoteLotSize: new BN(100),
-    baseLotSize: new BN(baseLotSize),
-    longFunding: ZERO_I80F48(),
-    shortFunding: ZERO_I80F48(),
-  } as unknown as PerpMarket;
-}
+import { mockBankAndOracle, mockPerpMarket } from '../utils/mock';
 
 describe('Health Cache', () => {
   it('test_health0', () => {
@@ -90,7 +47,14 @@ describe('Health Cache', () => {
       } as any as OpenOrders,
     );
 
-    const pM = mockPerpMarket(9, 0.1, 0.2, 10, targetBank.price.toNumber());
+    const pM = mockPerpMarket(
+      9,
+      0.1,
+      0.2,
+      10,
+      100,
+      targetBank.price.toNumber(),
+    );
     const pp = new PerpPosition(
       pM.perpMarketIndex,
       0,
@@ -137,7 +101,9 @@ describe('Health Cache', () => {
         )}, case "test that includes all the side values (like referrer_rebates_accrued)"`,
     );
 
-    expect(health - (health1 + health2 + health3)).lessThan(0.0000001);
+    expect(Math.abs(health - (health1 + health2 + health3))).lessThan(
+      0.0000001,
+    );
   });
 
   it('test_health1', (done) => {
@@ -207,7 +173,7 @@ describe('Health Cache', () => {
         } as any as OpenOrders,
       );
 
-      const pM = mockPerpMarket(9, 0.1, 0.2, 10, bank2.price.toNumber());
+      const pM = mockPerpMarket(9, 0.1, 0.2, 10, 100, bank2.price.toNumber());
       const pp = new PerpPosition(
         pM.perpMarketIndex,
         0,
@@ -241,7 +207,7 @@ describe('Health Cache', () => {
           .toFixed(3)
           .padStart(10)}, expected ${fixture.expectedHealth}`,
       );
-      expect(health - fixture.expectedHealth).lessThan(0.0000001);
+      expect(Math.abs(health - fixture.expectedHealth)).lessThan(0.0000001);
     }
 
     const basePrice = 5;
@@ -402,6 +368,126 @@ describe('Health Cache', () => {
         20.0 * 0.8 +
         // oo_1_3 (-> token1)
         20.0 * 0.8,
+    });
+
+    done();
+  });
+
+  it('test_leverage', (done) => {
+    const b0 = mockBankAndOracle(0 as TokenIndex, 0.1, 0.1, 1, 1);
+    const b1 = mockBankAndOracle(1 as TokenIndex, 0.1, 0.2, 0.95, 1);
+    const b2 = mockBankAndOracle(2 as TokenIndex, 0.2, 0.4, 2, 2);
+    const banks = [b0, b1, b2];
+    const p2 = mockPerpMarket(9, 0.1, 0.2, 1, 1, b2.price.toNumber());
+    const perpMarkts = [p2];
+
+    function testFixture(fixture: {
+      name: string;
+      tokenBalances: number[];
+      perpPositions: number[][]; // [[basePositionLots, quotePositionNative]]
+      expectedLeverage: number;
+    }): void {
+      const hc = new HealthCache(
+        fixture.tokenBalances.map((b, i) =>
+          TokenInfo.fromBank(banks[i], I80F48.fromNumber(b)),
+        ),
+        [],
+        fixture.perpPositions.map((p, i) =>
+          PerpInfo.fromPerpPosition(
+            perpMarkts[i],
+            new PerpPosition(
+              perpMarkts[i].perpMarketIndex,
+              0,
+              new BN(0),
+              new BN(p[0]),
+              I80F48.fromNumber(p[1]),
+              new BN(0),
+              ZERO_I80F48(),
+              ZERO_I80F48(),
+              new BN(0),
+              new BN(0),
+              new BN(0),
+              new BN(0),
+              0,
+              0,
+              new BN(0),
+              new BN(0),
+              new BN(0),
+              0,
+              ZERO_I80F48(),
+              ZERO_I80F48(),
+              new BN(0),
+              ZERO_I80F48(),
+            ),
+          ),
+        ),
+      );
+
+      const leverage = hc.leverage().toNumber();
+      console.log(
+        ` - case "${fixture.name}" assets ${hc.assets().toFixed(3)} liabs ${hc
+          .liabs()
+          .toFixed(3)} leverage ${leverage.toFixed(3)}, expected ${
+          fixture.expectedLeverage
+        }`,
+      );
+
+      expect(Math.abs(leverage - fixture.expectedLeverage)).lessThan(0.0000001);
+    }
+
+    testFixture({
+      name: '0, empty account',
+      tokenBalances: [0, 0, 0],
+      perpPositions: [],
+      expectedLeverage: 1,
+    });
+
+    // equity: +1 +1.9 +6 = +8.9
+    testFixture({
+      name: '1, only deposits',
+      tokenBalances: [1, 2, 3],
+      perpPositions: [],
+      expectedLeverage: 1,
+    });
+
+    // equity: -1 +.95 = -.05
+    testFixture({
+      name: '2, token bankrupcy',
+      tokenBalances: [-1, 1, 0],
+      perpPositions: [],
+      expectedLeverage: 1,
+    });
+
+    // equity: +1 -2 = -1
+    testFixture({
+      name: '3, perp bankrupcy',
+      tokenBalances: [1, 0, 0],
+      perpPositions: [[-1, 0]],
+      expectedLeverage: 1,
+    });
+
+    // equity: -10 +0 +20 = 10
+    testFixture({
+      name: '4, simple spot margin long',
+      tokenBalances: [-10, 0, 10],
+      perpPositions: [],
+      expectedLeverage: 2,
+    });
+
+    // equity: -5 -190 +200 = 10
+    testFixture({
+      name: '5, complex spot margin long using oracle not stable',
+      tokenBalances: [-5, -200, 100],
+      perpPositions: [],
+      expectedLeverage: 40,
+    });
+
+    // equity: +2 +4 -4 = 2
+    testFixture({
+      name: '6, perp long',
+      tokenBalances: [2, 0, 0],
+      perpPositions: [[2, -4]],
+      expectedLeverage: 2,
     });
 
     done();
@@ -876,7 +962,7 @@ describe('Health Cache', () => {
   it('test_max_perp', (done) => {
     const baseLotSize = 100;
     const b0 = mockBankAndOracle(0 as TokenIndex, 0.0, 0.0, 1, 1);
-    const p0 = mockPerpMarket(0, 0.3, 0.3, baseLotSize, 2);
+    const p0 = mockPerpMarket(0, 0.3, 0.3, baseLotSize, 100, 2);
     const hc = new HealthCache(
       [TokenInfo.fromBank(b0, I80F48.fromNumber(0))],
       [],

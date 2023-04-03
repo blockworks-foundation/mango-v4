@@ -394,12 +394,8 @@ export class MangoAccount {
    * Ratio of liabilities / equity
    */
   public getLeverage(group: Group): I80F48 {
-    const liabs = this.getAssetsValue(group);
-    const assets = this.getLiabsValue(group);
-    if (assets.isZero()) {
-      return ZERO_I80F48();
-    }
-    return liabs.div(assets.sub(liabs));
+    const hc = HealthCache.fromMangoAccount(group, this);
+    return hc.leverage();
   }
 
   /**

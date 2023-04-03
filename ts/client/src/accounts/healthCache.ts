@@ -275,6 +275,16 @@ export class HealthCache {
     return liabs;
   }
 
+  public leverage(): I80F48 {
+    const liabs = this.liabs();
+    const assets = this.assets();
+    const equity = assets.sub(liabs);
+    if (!equity.isPos()) {
+      return ONE_I80F48();
+    }
+    return assets.div(assets.sub(liabs));
+  }
+
   public healthRatio(healthType: HealthType): I80F48 {
     const assets = ZERO_I80F48();
     const liabs = ZERO_I80F48();
@@ -1164,7 +1174,7 @@ export class HealthCache {
 export class Prices {
   constructor(public oracle: I80F48, public stable: I80F48) {}
 
-  public liab(healthType: HealthType | undefined): I80F48 {
+  public liab(healthType?: HealthType): I80F48 {
     if (
       healthType === HealthType.maint ||
       healthType === HealthType.liquidationEnd ||
@@ -1175,7 +1185,7 @@ export class Prices {
     return this.oracle.max(this.stable);
   }
 
-  public asset(healthType: HealthType | undefined): I80F48 {
+  public asset(healthType?: HealthType): I80F48 {
     if (
       healthType === HealthType.maint ||
       healthType === HealthType.liquidationEnd ||
