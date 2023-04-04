@@ -6,8 +6,8 @@ import {
   PublicKey,
 } from '@solana/web3.js';
 import fs from 'fs';
-import { MangoClient } from '../src/client';
-import { MANGO_V4_ID } from '../src/constants';
+import { MangoClient } from '../../src/client';
+import { MANGO_V4_ID } from '../../src/constants';
 
 //
 // Script which depoys a new mango group, and registers 3 tokens
