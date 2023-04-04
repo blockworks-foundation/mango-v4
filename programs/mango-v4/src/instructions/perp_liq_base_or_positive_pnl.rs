@@ -417,12 +417,12 @@ pub(crate) fn liquidation_action(
         base_reduction += total_base_reduction;
     };
 
-    let mut settle_pnl = |step: &str,
-                          quote_per_settle: I80F48,
-                          pnl_transfer: &mut I80F48,
-                          current_uhupnl: &mut I80F48,
-                          current_settle_token: &mut I80F48,
-                          current_health: &mut I80F48| {
+    let settle_pnl = |step: &str,
+                      quote_per_settle: I80F48,
+                      pnl_transfer: &mut I80F48,
+                      current_uhupnl: &mut I80F48,
+                      current_settle_token: &mut I80F48,
+                      current_health: &mut I80F48| {
         for i in [-1, 1] {
             // weighted asset or liab price for the settle token
             let weighted_price;
@@ -655,6 +655,8 @@ mod tests {
         group: Pubkey,
         settle_bank: TestAccount<Bank>,
         settle_oracle: TestAccount<StubOracle>,
+        other_bank: TestAccount<Bank>,
+        other_oracle: TestAccount<StubOracle>,
         perp_market: TestAccount<PerpMarket>,
         perp_oracle: TestAccount<StubOracle>,
         liqee: MangoAccountValue,
@@ -665,6 +667,7 @@ mod tests {
         fn new() -> Self {
             let group = Pubkey::new_unique();
             let (settle_bank, settle_oracle) = mock_bank_and_oracle(group, 0, 1.0, 0.0, 0.0);
+            let (other_bank, other_oracle) = mock_bank_and_oracle(group, 1, 1.0, 0.0, 0.0);
             let (_bank2, perp_oracle) = mock_bank_and_oracle(group, 4, 1.0, 0.5, 0.3);
             let mut perp_market =
                 mock_perp_market(group, perp_oracle.pubkey, 1.0, 9, (0.2, 0.1), (0.05, 0.02));
@@ -674,6 +677,7 @@ mod tests {
             let mut liqee = MangoAccountValue::from_bytes(&liqee_buffer).unwrap();
             {
                 liqee.ensure_token_position(0).unwrap();
+                liqee.ensure_token_position(1).unwrap();
                 liqee.ensure_perp_position(9, 0).unwrap();
             }
 
@@ -681,6 +685,7 @@ mod tests {
             let mut liqor = MangoAccountValue::from_bytes(&liqor_buffer).unwrap();
             {
                 liqor.ensure_token_position(0).unwrap();
+                liqor.ensure_token_position(1).unwrap();
                 liqor.ensure_perp_position(9, 0).unwrap();
             }
 
@@ -688,6 +693,8 @@ mod tests {
                 group,
                 settle_bank,
                 settle_oracle,
+                other_bank,
+                other_oracle,
                 perp_market,
                 perp_oracle,
                 liqee,
@@ -700,7 +707,9 @@ mod tests {
 
             let ais = vec![
                 setup.settle_bank.as_account_info(),
+                setup.other_bank.as_account_info(),
                 setup.settle_oracle.as_account_info(),
+                setup.other_oracle.as_account_info(),
                 setup.perp_market.as_account_info(),
                 setup.perp_oracle.as_account_info(),
             ];
@@ -735,6 +744,9 @@ mod tests {
     fn token_p(account: &mut MangoAccountValue) -> &mut TokenPosition {
         account.token_position_mut(0).unwrap().0
     }
+    fn other_p(account: &mut MangoAccountValue) -> &mut TokenPosition {
+        account.token_position_mut(1).unwrap().0
+    }
     fn perp_p(account: &mut MangoAccountValue) -> &mut PerpPosition {
         account.perp_position_mut(9).unwrap()
     }
@@ -754,7 +766,7 @@ mod tests {
             (
                 "nothing",
                 (0.9, 0.9),
-                (0.0, 0, 0.0),
+                (0.0, 0, 0.0, 0.0),
                 (0.0, 0, 0.0),
                 (0, 100),
             ),
@@ -764,42 +776,42 @@ mod tests {
             (
                 "neg base liq 1: limited",
                 (0.5, 0.5),
-                (5.0, -10, 0.0),
+                (5.0, -10, 0.0, 0.0),
                 (5.0, -9, -1.0),
                 (-1, 100),
             ),
             (
                 "neg base liq 2: base to zero",
                 (0.5, 0.5),
-                (5.0, -10, 0.0),
+                (5.0, -10, 0.0, 0.0),
                 (5.0, 0, -10.0),
                 (-20, 100),
             ),
             (
                 "neg base liq 3: health positive",
                 (0.5, 0.5),
-                (5.0, -4, 0.0),
+                (5.0, -4, 0.0, 0.0),
                 (5.0, -2, -2.0),
                 (-20, 100),
             ),
             (
                 "pos base liq 1: limited",
                 (0.5, 0.5),
-                (5.0, 20, -20.0),
+                (5.0, 20, -20.0, 0.0),
                 (5.0, 19, -19.0),
                 (1, 100),
             ),
             (
                 "pos base liq 2: base to zero",
                 (0.5, 0.5),
-                (0.0, 20, -30.0),
+                (0.0, 20, -30.0, 0.0),
                 (0.0, 0, -10.0),
                 (100, 100),
             ),
             (
                 "pos base liq 3: health positive",
                 (0.5, 0.5),
-                (5.0, 20, -20.0),
+                (5.0, 20, -20.0, 0.0),
                 (5.0, 10, -10.0),
                 (100, 100),
             ),
@@ -809,56 +821,56 @@ mod tests {
             (
                 "base liq, pos perp health 1: until health positive",
                 (0.5, 0.8),
-                (-20.0, 20, 5.0),
+                (-20.0, 20, 5.0, 0.0),
                 (0.0, 10, -5.0), // alternate: (-20, 0, 25). would it be better to reduce base more instead?
                 (100, 100),
             ),
             (
                 "base liq, pos perp health 2-1: settle until health positive",
                 (0.5, 0.5),
-                (-19.0, 20, 10.0),
+                (-19.0, 20, 10.0, 0.0),
                 (-1.0, 20, -8.0),
                 (100, 100),
             ),
             (
                 "base liq, pos perp health 2-2: base+settle until health positive",
                 (0.5, 0.5),
-                (-25.0, 20, 10.0),
+                (-25.0, 20, 10.0, 0.0),
                 (0.0, 10, -5.0), // alternate: (-5, 0, 10) better?
                 (100, 100),
             ),
             (
                 "base liq, pos perp health 2-3: base+settle until pnl limit",
                 (0.5, 0.5),
-                (-23.0, 20, 10.0),
+                (-23.0, 20, 10.0, 0.0),
                 (-2.0, 10, -1.0),
                 (100, 21),
             ),
             (
                 "base liq, pos perp health 2-4: base+settle until base limit",
                 (0.5, 0.5),
-                (-25.0, 20, 10.0),
+                (-25.0, 20, 10.0, 0.0),
                 (-4.0, 18, -9.0),
                 (2, 100),
             ),
             (
                 "base liq, pos perp health 2-5: base+settle until both limits",
                 (0.5, 0.5),
-                (-25.0, 20, 10.0),
+                (-25.0, 20, 10.0, 0.0),
                 (-4.0, 16, -7.0),
                 (4, 21),
             ),
             (
                 "base liq, pos perp health 4: liq some base, then settle some",
                 (0.5, 0.5),
-                (-20.0, 20, 10.0),
+                (-20.0, 20, 10.0, 0.0),
                 (-15.0, 10, 15.0),
                 (10, 5),
             ),
             (
                 "base liq, pos perp health 5: base to zero even without settlement",
                 (0.5, 0.5),
-                (-20.0, 20, 10.0),
+                (-20.0, 20, 10.0, 0.0),
                 (-20.0, 0, 30.0),
                 (100, 0),
             ),
@@ -868,38 +880,96 @@ mod tests {
             (
                 "base liq, pos perp health 6: don't touch base without settlement",
                 (0.5, 0.0),
-                (-20.0, 20, 10.0),
+                (-20.0, 20, 10.0, 0.0),
                 (-20.0, 20, 10.0),
                 (10, 0),
             ),
             (
                 "base liq, pos perp health 7: settlement without base",
                 (0.5, 0.0),
-                (-20.0, 20, 10.0),
+                (-20.0, 20, 10.0, 0.0),
                 (-15.0, 20, 5.0),
                 (10, 5),
             ),
             (
                 "base liq, pos perp health 8: settlement enables base",
                 (0.5, 0.0),
-                (-30.0, 20, 10.0),
+                (-30.0, 20, 10.0, 0.0),
                 (-7.5, 15, -7.5),
                 (5, 30),
             ),
             (
                 "base liq, pos perp health 9: until health positive",
                 (0.5, 0.0),
-                (-25.0, 20, 10.0),
+                (-25.0, 20, 10.0, 0.0),
                 (0.0, 10, -5.0),
                 (200, 200),
+            ),
+            //
+            // Liquidation in cases where another token contributes to health too
+            //
+            (
+                "base liq of negative perp health: where total token pos goes from negative to positive",
+                (0.5, 0.0),
+                (2.0, 60, -35.0, -2.0), // settle token: 2 + (60/2 - 35) = -3
+                (2.0, 50, -25.0), // settle token: 2 + (50/2 - 25) = 2
+                (200, 200),
+            ),
+            (
+                "pre-settle: where total token pos goes from negative to positive",
+                (0.5, 0.0),
+                (-7.0, 60, -20.0, -3.0), // settle token: -7 + 0.0 * (60/2 - 20) = -7
+                (3.0, 60, -30.0), // settle token: 3 + 0.0 * (60/2 - 30) = 3
+                (200, 200),
+            ),
+            (
+                "base liq and post-settle: where total token pos goes from negative to positive",
+                (0.5, 0.0),
+                (-7.0, 60, -30.0, -3.0), // settle token: -7 + 0.0 * (60/2 - 30) = -7
+                (3.0, 40, -20.0), // settle token: 3 + 0.0 * (40/2 - 20) = 3
+                (200, 200),
+            ),
+            (
+                "base liq of positive perp health: where total token pos goes from negative to positive",
+                (0.5, 0.5),
+                (-7.0, 60, -20.0, -3.0), // settle token: -7 + 0.5 * (60/2 - 20) = -2
+                (-7.0, 40, 0.0), // settle token: -7 + 0.5 * (40/2 - 0) = 3
+                (200, 0),
+            ),
+            (
+                "use all liquidation phases 1",
+                (0.5, 0.5),
+                (-7.0, 70, -40.0, -100.0),
+                // reduce 10
+                // no pre-settle
+                // reduce 20 + post-settle 10
+                // reduce 40
+                (3.0, 0, 20.0),
+                (200, 10),
+            ),
+            (
+                "use all liquidation phases 2",
+                (0.5, 0.5),
+                (-7.0, 70, -30.0, -100.0),
+                // no "reduce while health negative"
+                // pre-settle 5
+                // reduce 20 + post-settle 10
+                // reduce 40
+                (8.0, 10, 15.0),
+                (60, 15),
             ),
         ];
 
         for (
             name,
+            // the perp base asset weight (liab is symmetric) and the perp overall asset weight to use
             (base_weight, overall_weight),
-            (init_liqee_spot, init_liqee_base, init_liqee_quote),
+            // the liqee's starting point: (-5, 10, -5, 1) would mean:
+            // USDC: -5, perp base: 10, perp quote -5, other token: 1 (which also has weight/price 1)
+            (init_liqee_spot, init_liqee_base, init_liqee_quote, init_other_spot),
+            // the expected liqee end position
             (exp_liqee_spot, exp_liqee_base, exp_liqee_quote),
+            // maximum liquidation the liqor requests
             (max_base, max_pnl),
         ) in test_cases
         {
@@ -931,6 +1001,16 @@ mod tests {
                     .change_without_fee(
                         token_p(&mut setup.liqor),
                         I80F48::from_num(1000.0),
+                        0,
+                        I80F48::from(1),
+                    )
+                    .unwrap();
+
+                let other_bank = setup.other_bank.data();
+                other_bank
+                    .change_without_fee(
+                        other_p(&mut setup.liqee),
+                        I80F48::from_num(init_other_spot),
                         0,
                         I80F48::from(1),
                     )
