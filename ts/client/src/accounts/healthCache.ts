@@ -1141,7 +1141,7 @@ export class HealthCache {
         case1Start,
         case1StartRatio,
         zeroHealthAmount,
-        minRatio,
+        zeroHealthRatio.max(minRatio), // workaround, originally minRatio
         ONE_I80F48(),
         healthRatioAfterTradeTrunc,
       );
