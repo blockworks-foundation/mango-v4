@@ -17,15 +17,19 @@ pub fn perp_force_close_position(ctx: Context<PerpForceClosePosition>) -> Result
     let account_a_perp_position = account_a.perp_position_mut(perp_market_index)?;
     let account_b_perp_position = account_b.perp_position_mut(perp_market_index)?;
 
-    require!(
-        account_a_perp_position.base_position_lots().signum()
-            != account_b_perp_position.base_position_lots().signum(),
+    require_gt!(
+        account_a_perp_position.base_position_lots(),
+        0,
+        MangoError::SomeError
+    );
+    require_gt!(
+        0,
+        account_b_perp_position.base_position_lots(),
         MangoError::SomeError
     );
 
     let base_transfer = account_a_perp_position
         .base_position_lots()
-        .abs()
         .min(account_b_perp_position.base_position_lots().abs())
         .max(0);
 
@@ -42,8 +46,8 @@ pub fn perp_force_close_position(ctx: Context<PerpForceClosePosition>) -> Result
         .unwrap();
     let quote_transfer = I80F48::from(base_transfer * perp_market.base_lot_size) * oracle_price;
 
-    account_a_perp_position.record_trade(&mut perp_market, base_transfer, -quote_transfer);
-    account_b_perp_position.record_trade(&mut perp_market, -base_transfer, quote_transfer);
+    account_a_perp_position.record_trade(&mut perp_market, -base_transfer, quote_transfer);
+    account_b_perp_position.record_trade(&mut perp_market, base_transfer, -quote_transfer);
 
     Ok(())
 }
