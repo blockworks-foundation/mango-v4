@@ -8,9 +8,9 @@ use fixed::types::I80F48;
 
 pub fn token_force_close_borrows_with_token(
     ctx: Context<TokenForceCloseBorrowsWithToken>,
-    // which asset tokens are allowed, is checked at # 3
+    // which asset tokens are allowed, is checked at #3
     asset_token_index: TokenIndex,
-    // token's force_close flag is checked at # 2
+    // token's force_close flag is checked at #2
     liab_token_index: TokenIndex,
     max_liab_transfer: u64,
 ) -> Result<()> {

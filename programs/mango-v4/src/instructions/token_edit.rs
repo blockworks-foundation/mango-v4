@@ -280,9 +280,7 @@ pub fn token_edit(
 
             // security admin can only make it stricter
             // anything that makes it less strict, should require admin
-            if (bank.reduce_only == 1 && reduce_only == 2)
-                || (bank.reduce_only == 2 && reduce_only == 0)
-            {
+            if reduce_only == 0 || (reduce_only == 2 && bank.reduce_only == 1) {
                 require_group_admin = true;
             }
             bank.reduce_only = reduce_only;

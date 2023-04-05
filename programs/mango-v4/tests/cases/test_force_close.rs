@@ -55,74 +55,33 @@ async fn test_force_close() -> Result<(), TransportError> {
     )
     .await;
 
-    let liqor = send_tx(
-        solana,
-        AccountCreateInstruction {
-            account_num: 1,
-            token_count: 16,
-            serum3_count: 8,
-            perp_count: 8,
-            perp_oo_count: 8,
-            group,
-            owner,
-            payer,
-        },
-    )
-    .await
-    .unwrap()
-    .account;
-
     let deposit1_amount = 100;
-    send_tx(
-        solana,
-        TokenDepositInstruction {
-            amount: deposit1_amount,
-            reduce_only: false,
-            account: liqor,
-            owner,
-            token_account: payer_mint_accounts[0],
-            token_authority: payer.clone(),
-            bank_index: 0,
-        },
+    let liqor = create_funded_account(
+        &solana,
+        group,
+        owner,
+        1,
+        &context.users[0],
+        &[mints[0]],
+        deposit1_amount,
+        0,
     )
-    .await
-    .unwrap();
+    .await;
 
     //
     // SETUP: Make an account with some collateral and some borrows
     //
-    let liqee = send_tx(
-        solana,
-        AccountCreateInstruction {
-            account_num: 0,
-            token_count: 16,
-            serum3_count: 8,
-            perp_count: 8,
-            perp_oo_count: 8,
-            group,
-            owner,
-            payer,
-        },
+    let liqee = create_funded_account(
+        &solana,
+        group,
+        owner,
+        0,
+        &context.users[0],
+        &[mints[0]],
+        deposit1_amount,
+        0,
     )
-    .await
-    .unwrap()
-    .account;
-
-    let deposit1_amount = 100;
-    send_tx(
-        solana,
-        TokenDepositInstruction {
-            amount: deposit1_amount,
-            reduce_only: false,
-            account: liqee,
-            owner,
-            token_account: payer_mint_accounts[0],
-            token_authority: payer.clone(),
-            bank_index: 0,
-        },
-    )
-    .await
-    .unwrap();
+    .await;
 
     let borrow1_amount = 10;
     send_tx(
