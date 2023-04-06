@@ -4,6 +4,7 @@ members = [
     "programs/mango-v4",
     "lib/*",
     "3rdparty/anchor/cli",
+    "3rdparty/fixed"
 ]
 
 [profile.release]
