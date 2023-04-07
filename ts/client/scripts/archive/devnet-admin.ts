@@ -6,10 +6,10 @@ import {
   PublicKey,
 } from '@solana/web3.js';
 import fs from 'fs';
-import { PerpMarketIndex } from '../src/accounts/perp';
-import { MangoClient } from '../src/client';
-import { MANGO_V4_ID } from '../src/constants';
-import { buildVersionedTx } from '../src/utils';
+import { PerpMarketIndex } from '../../src/accounts/perp';
+import { MangoClient } from '../../src/client';
+import { MANGO_V4_ID } from '../../src/constants';
+import { buildVersionedTx } from '../../src/utils';
 
 //
 // An example for admins based on high level api i.e. the client
