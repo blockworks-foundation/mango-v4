@@ -438,7 +438,7 @@ export class Group {
           vaultAi,
           TOKEN_PROGRAM_ID,
         ).amount;
-        return [vaultPks[i].toBase58(), new BN(Number(vaultAmount))];
+        return [vaultPks[i].toBase58(), new BN(vaultAmount.toString())];
       }),
     );
   }
