@@ -583,6 +583,26 @@ interface FillEventUpdate {
   };
 }
 
+function isFillEventUpdate(obj: any): obj is FillEventUpdate {
+  return obj.event !== undefined;
+}
+
+interface HeadUpdate {
+  head: number;
+  previousHead: number;
+  headSeqNum: number;
+  previousHeadSeqNum: number;
+  status: 'new' | 'revoke';
+  marketKey: 'string';
+  marketName: 'string';
+  slot: number;
+  writeVersion: number;
+}
+
+function isHeadUpdate(obj: any): obj is HeadUpdate {
+  return obj.head !== undefined;
+}
+
 // Main driver for the market maker
 async function fullMarketMaker(): Promise<void> {
   let intervals: NodeJS.Timer[] = [];
@@ -663,52 +683,67 @@ async function fullMarketMaker(): Promise<void> {
     fillsWs = new WebSocket('wss://api.mngo.cloud/fills/v1/');
     fillsWs.addEventListener('open', (_) => {
       for (const [i, pc] of perpMarkets.entries()) {
-        // fillsWs!.send(
-        //   JSON.stringify({
-        //     command: 'subscribe',
-        //     marketId: pc.perpMarket.publicKey.toBase58(),
-        //   }),
-        //   // eslint-disable-next-line @typescript-eslint/no-empty-function
-        //   (_) => {
-        //     console.log(
-        //       `fills websocket subscribed ${pc.perpMarket.name} ${_}`,
-        //     );
-        //   },
-        // );
+        fillsWs!.send(
+          JSON.stringify({
+            command: 'subscribe',
+            marketId: pc.perpMarket.publicKey.toBase58(),
+            headUpdates: true,
+          }),
+          // eslint-disable-next-line @typescript-eslint/no-empty-function
+          (_) => {
+            console.log(
+              `fills websocket subscribed ${pc.perpMarket.name} ${_}`,
+            );
+          },
+        );
       }
       console.log('fills websocket open');
     });
     // Listen for messages
     fillsWs.addEventListener('message', (msg) => {
-      const data: FillEventUpdate = JSON.parse(msg.data);
+      const data = JSON.parse(msg.data);
 
-      if (!data.event)
-        return console.warn('no event on fillsWs received instead', data);
+      // fill added to queue
+      if (isFillEventUpdate(data)) {
+        const eventMarket = new PublicKey(data.marketKey);
+        for (const pc of perpMarkets.values()) {
+          if (!pc.perpMarket.publicKey.equals(eventMarket)) continue;
+          // check if maker xor taker equals to mango account to filter out irrelevant or self-trades
+          if (
+            (data.event.maker == MANGO_ACCOUNT.toString()) !==
+            (data.event.taker == MANGO_ACCOUNT.toString())
+          ) {
+            console.log(
+              'fill',
+              data.slot,
+              data.status,
+              data.event.quantity,
+              data.event.seqNum,
+              data.event.taker.slice(0, 4),
+              data.event.maker.slice(0, 4),
+            );
 
-      const eventMarket = new PublicKey(data.marketKey);
-      for (const pc of perpMarkets.values()) {
-        if (!pc.perpMarket.publicKey.equals(eventMarket)) continue;
-        // check if maker xor taker equals to mango account to filter out irrelevant or self-trades
-        if (
-          (data.event.maker == MANGO_ACCOUNT.toString()) !==
-          (data.event.taker == MANGO_ACCOUNT.toString())
-        ) {
-          console.log(
-            'fill',
-            data.slot,
-            data.status,
-            data.event.quantity,
-            data.event.seqNum,
-            data.event.taker.slice(0, 4),
-            data.event.maker.slice(0, 4),
-          );
+            // prune unprocessed fill events before last mango account update here to avoid race conditions
+            pc.unprocessedPerpFills = pc.unprocessedPerpFills.filter(
+              (f) => f.slot >= bot.mangoAccountLastUpdatedSlot,
+            );
+            pc.unprocessedPerpFills.push(data);
+            break;
+          }
+        }
+      }
 
-          // prune unprocessed fill events before last mango account update here to avoid race conditions
-          pc.unprocessedPerpFills = pc.unprocessedPerpFills.filter(
-            (f) => f.slot >= bot.mangoAccountLastUpdatedSlot,
-          );
-          pc.unprocessedPerpFills.push(data);
-          break;
+      // events consumed
+      if (isHeadUpdate(data)) {
+        for (const pc of perpMarkets.values()) {
+          if (!pc.perpMarket.publicKey.equals(new PublicKey(data.marketKey))) continue;
+          let processedFills = pc.unprocessedPerpFills.filter((f) => {
+            f.event.seqNum >= data.previousHeadSeqNum && f.event.seqNum < data.headSeqNum
+          });
+
+          if (!processedFills.length) continue;
+          console.log('received HeadUpdate');
+          bot.refreshMangoAccount();
         }
       }
     });
@@ -724,6 +759,7 @@ async function fullMarketMaker(): Promise<void> {
 
     console.log('Fetch state for the first time');
     await bot.refreshAll();
+    await mangoAccount.reloadSerum3OpenOrders(client);
 
     // setup continuous refresh
     console.log('Refresh state', params.intervals);
