@@ -7660,6 +7660,11 @@ export type MangoV4 = {
           "index": false
         },
         {
+          "name": "feesSettled",
+          "type": "i128",
+          "index": false
+        },
+        {
           "name": "openInterest",
           "type": "i64",
           "index": false
@@ -16341,6 +16346,11 @@ export const IDL: MangoV4 = {
         },
         {
           "name": "feesAccrued",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "feesSettled",
           "type": "i128",
           "index": false
         },
