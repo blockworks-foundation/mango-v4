@@ -2,7 +2,11 @@ import { AnchorProvider, Wallet } from '@coral-xyz/anchor';
 import { Connection, Keypair } from '@solana/web3.js';
 import fs from 'fs';
 import { HealthType } from '../../src/accounts/mangoAccount';
-import { MangoClient, MANGO_V4_ID, toUiDecimalsForQuote } from '../../src/index';
+import {
+  MangoClient,
+  MANGO_V4_ID,
+  toUiDecimalsForQuote,
+} from '../../src/index';
 
 async function main() {
   const options = AnchorProvider.defaultOptions();

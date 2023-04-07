@@ -3,7 +3,11 @@ import { Connection, Keypair, PublicKey } from '@solana/web3.js';
 import fs from 'fs';
 import { Bank } from '../../src/accounts/bank';
 import { MangoAccount } from '../../src/accounts/mangoAccount';
-import { PerpMarket, PerpOrderSide, PerpOrderType } from '../../src/accounts/perp';
+import {
+  PerpMarket,
+  PerpOrderSide,
+  PerpOrderType,
+} from '../../src/accounts/perp';
 import {
   Serum3OrderType,
   Serum3SelfTradeBehavior,
