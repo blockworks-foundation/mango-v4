@@ -347,12 +347,14 @@ async fn test_serum_loan_origination_fees() -> Result<(), TransportError> {
     let deposit_amount = 180000;
     let CommonSetup {
         serum_market_cookie,
-        quote_bank,
-        base_bank,
+        quote_token,
+        base_token,
         mut order_placer,
         mut order_placer2,
         ..
     } = common_setup(&context, deposit_amount).await;
+    let quote_bank = quote_token.bank;
+    let base_bank = base_token.bank;
     let account = order_placer.account;
     let account2 = order_placer2.account;
 
@@ -508,7 +510,7 @@ async fn test_serum_loan_origination_fees() -> Result<(), TransportError> {
         let account_data = solana.get_account::<MangoAccount>(account).await;
         assert_eq!(
             account_data.buyback_fees_accrued_current,
-            serum_fee(fill_amount) as u64
+            0 // the v1 function doesn't accumulate buyback fees
         );
 
         assert_eq!(
@@ -533,12 +535,14 @@ async fn test_serum_settle_v1() -> Result<(), TransportError> {
     let deposit_amount = 160000;
     let CommonSetup {
         serum_market_cookie,
-        quote_bank,
-        base_bank,
+        quote_token,
+        base_token,
         mut order_placer,
         mut order_placer2,
         ..
     } = common_setup(&context, deposit_amount).await;
+    let quote_bank = quote_token.bank;
+    let base_bank = base_token.bank;
     let account = order_placer.account;
     let account2 = order_placer2.account;
 
@@ -615,15 +619,29 @@ async fn test_serum_settle_v2_to_dao() -> Result<(), TransportError> {
     //
     let deposit_amount = 160000;
     let CommonSetup {
+        group_with_tokens,
         serum_market_cookie,
-        quote_bank,
-        base_bank,
+        quote_token,
+        base_token,
         mut order_placer,
         mut order_placer2,
         ..
     } = common_setup(&context, deposit_amount).await;
+    let quote_bank = quote_token.bank;
+    let base_bank = base_token.bank;
     let account = order_placer.account;
     let account2 = order_placer2.account;
+
+    // Change the quote price to verify that the current value of the serum quote token
+    // is added to the buyback fees amount
+    set_bank_stub_oracle_price(
+        solana,
+        group_with_tokens.group,
+        &quote_token,
+        group_with_tokens.admin,
+        2.0,
+    )
+    .await;
 
     let serum_taker_fee = |amount: i64| (amount as f64 * 0.0004).trunc() as i64;
     let serum_maker_rebate = |amount: i64| (amount as f64 * 0.0002).floor() as i64;
@@ -631,7 +649,7 @@ async fn test_serum_settle_v2_to_dao() -> Result<(), TransportError> {
     let loan_origination_fee = |amount: i64| (amount as f64 * 0.0005).trunc() as i64;
 
     //
-    // TEST: Use v1 serum3_settle_funds
+    // TEST: Use v2 serum3_settle_funds
     //
     let deposit_amount = deposit_amount as i64;
     let amount = 200000;
@@ -683,6 +701,14 @@ async fn test_serum_settle_v2_to_dao() -> Result<(), TransportError> {
         0.1
     ));
 
+    let account_data = solana.get_account::<MangoAccount>(account).await;
+    assert_eq!(
+        account_data.buyback_fees_accrued_current,
+        (serum_maker_rebate(amount) * 2) as u64 // *2 because that's the quote price and this number is in $
+    );
+    let account2_data = solana.get_account::<MangoAccount>(account2).await;
+    assert_eq!(account2_data.buyback_fees_accrued_current, 0);
+
     Ok(())
 }
 
@@ -699,12 +725,14 @@ async fn test_serum_settle_v2_to_account() -> Result<(), TransportError> {
     let deposit_amount = 160000;
     let CommonSetup {
         serum_market_cookie,
-        quote_bank,
-        base_bank,
+        quote_token,
+        base_token,
         mut order_placer,
         mut order_placer2,
         ..
     } = common_setup(&context, deposit_amount).await;
+    let quote_bank = quote_token.bank;
+    let base_bank = base_token.bank;
     let account = order_placer.account;
     let account2 = order_placer2.account;
 
@@ -769,14 +797,19 @@ async fn test_serum_settle_v2_to_account() -> Result<(), TransportError> {
         0.1
     ));
 
+    let account_data = solana.get_account::<MangoAccount>(account).await;
+    assert_eq!(account_data.buyback_fees_accrued_current, 0);
+    let account2_data = solana.get_account::<MangoAccount>(account2).await;
+    assert_eq!(account2_data.buyback_fees_accrued_current, 0);
+
     Ok(())
 }
 
 struct CommonSetup {
-    _group_with_tokens: GroupWithTokens,
+    group_with_tokens: GroupWithTokens,
     serum_market_cookie: SpotMarketCookie,
-    quote_bank: Pubkey,
-    base_bank: Pubkey,
+    quote_token: crate::program_test::mango_setup::Token,
+    base_token: crate::program_test::mango_setup::Token,
     order_placer: SerumOrderPlacer,
     order_placer2: SerumOrderPlacer,
 }
@@ -800,9 +833,7 @@ async fn common_setup(context: &TestContext, deposit_amount: u64) -> CommonSetup
     let group = group_with_tokens.group;
     let tokens = group_with_tokens.tokens.clone();
     let base_token = &tokens[1];
-    let base_bank = base_token.bank;
     let quote_token = &tokens[0];
-    let quote_bank = quote_token.bank;
 
     //
     // SETUP: Create serum market
@@ -916,10 +947,10 @@ async fn common_setup(context: &TestContext, deposit_amount: u64) -> CommonSetup
     };
 
     CommonSetup {
-        _group_with_tokens: group_with_tokens,
+        group_with_tokens,
         serum_market_cookie,
-        quote_bank,
-        base_bank,
+        quote_token: quote_token.clone(),
+        base_token: base_token.clone(),
         order_placer,
         order_placer2,
     }

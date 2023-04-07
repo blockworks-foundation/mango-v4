@@ -19,6 +19,7 @@ import { Bank, MintInfo, TokenIndex } from './bank';
 import {
   isPythOracle,
   isSwitchboardOracle,
+  OracleProvider,
   parseSwitchboardOracle,
 } from './oracle';
 import { BookSide, PerpMarket, PerpMarketIndex } from './perp';
@@ -331,7 +332,7 @@ export class Group {
             throw new Error(
               `Undefined accountInfo object in reloadBankOraclePrices for ${bank.oracle}!`,
             );
-          const { price, uiPrice, lastUpdatedSlot } =
+          const { price, uiPrice, lastUpdatedSlot, provider } =
             await this.decodePriceFromOracleAi(
               coder,
               bank.oracle,
@@ -342,6 +343,7 @@ export class Group {
           bank._price = price;
           bank._uiPrice = uiPrice;
           bank._oracleLastUpdatedSlot = lastUpdatedSlot;
+          bank._oracleProvider = provider;
         }
       }
     }
@@ -366,7 +368,7 @@ export class Group {
             `Undefined ai object in reloadPerpMarketOraclePrices for ${perpMarket.oracle}!`,
           );
 
-        const { price, uiPrice, lastUpdatedSlot } =
+        const { price, uiPrice, lastUpdatedSlot, provider } =
           await this.decodePriceFromOracleAi(
             coder,
             perpMarket.oracle,
@@ -377,6 +379,7 @@ export class Group {
         perpMarket._price = price;
         perpMarket._uiPrice = uiPrice;
         perpMarket._oracleLastUpdatedSlot = lastUpdatedSlot;
+        perpMarket._oracleProvider = provider;
       }),
     );
   }
@@ -387,8 +390,13 @@ export class Group {
     ai: AccountInfo<Buffer>,
     baseDecimals: number,
     client: MangoClient,
-  ): Promise<{ price: I80F48; uiPrice: number; lastUpdatedSlot: number }> {
-    let price, uiPrice, lastUpdatedSlot;
+  ): Promise<{
+    price: I80F48;
+    uiPrice: number;
+    lastUpdatedSlot: number;
+    provider: OracleProvider;
+  }> {
+    let price, uiPrice, lastUpdatedSlot, provider;
     if (
       !BorshAccountsCoder.accountDiscriminator('stubOracle').compare(
         ai.data.slice(0, 8),
@@ -398,11 +406,13 @@ export class Group {
       price = new I80F48(stubOracle.price.val);
       uiPrice = this.toUiPrice(price, baseDecimals);
       lastUpdatedSlot = stubOracle.lastUpdated.val;
+      provider = OracleProvider.Stub;
     } else if (isPythOracle(ai)) {
       const priceData = parsePriceData(ai.data);
       uiPrice = priceData.previousPrice;
       price = this.toNativePrice(uiPrice, baseDecimals);
       lastUpdatedSlot = parseInt(priceData.lastSlot.toString());
+      provider = OracleProvider.Pyth;
     } else if (isSwitchboardOracle(ai)) {
       const priceData = await parseSwitchboardOracle(
         ai,
@@ -411,12 +421,13 @@ export class Group {
       uiPrice = priceData.price;
       price = this.toNativePrice(uiPrice, baseDecimals);
       lastUpdatedSlot = priceData.lastUpdatedSlot;
+      provider = OracleProvider.Switchboard;
     } else {
       throw new Error(
         `Unknown oracle provider (parsing not implemented) for oracle ${oracle}, with owner ${ai.owner}!`,
       );
     }
-    return { price, uiPrice, lastUpdatedSlot };
+    return { price, uiPrice, lastUpdatedSlot, provider };
   }
 
   public async reloadVaults(client: MangoClient): Promise<void> {

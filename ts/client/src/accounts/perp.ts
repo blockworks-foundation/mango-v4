@@ -21,6 +21,7 @@ import {
 } from './bank';
 import { Group } from './group';
 import { MangoAccount } from './mangoAccount';
+import { OracleProvider } from './oracle';
 
 export type PerpMarketIndex = number & As<'perp-market-index'>;
 
@@ -55,6 +56,8 @@ export class PerpMarket {
   public _price: I80F48;
   public _uiPrice: number;
   public _oracleLastUpdatedSlot: number;
+  public _oracleProvider: OracleProvider;
+
   public _bids: BookSide;
   public _asks: BookSide;
 
@@ -239,7 +242,7 @@ export class PerpMarket {
   }
 
   get price(): I80F48 {
-    if (!this._price) {
+    if (this._price === undefined) {
       throw new Error(
         `Undefined price for perpMarket ${this.publicKey} with marketIndex ${this.perpMarketIndex}!`,
       );
@@ -248,7 +251,7 @@ export class PerpMarket {
   }
 
   get uiPrice(): number {
-    if (!this._uiPrice) {
+    if (this._uiPrice === undefined) {
       throw new Error(
         `Undefined price for perpMarket ${this.publicKey} with marketIndex ${this.perpMarketIndex}!`,
       );
@@ -257,12 +260,21 @@ export class PerpMarket {
   }
 
   get oracleLastUpdatedSlot(): number {
-    if (!this._oracleLastUpdatedSlot) {
+    if (this._oracleLastUpdatedSlot === undefined) {
       throw new Error(
         `Undefined oracleLastUpdatedSlot for perpMarket ${this.publicKey} with marketIndex ${this.perpMarketIndex}!`,
       );
     }
     return this._oracleLastUpdatedSlot;
+  }
+
+  get oracleProvider(): OracleProvider {
+    if (this._oracleProvider === undefined) {
+      throw new Error(
+        `Undefined oracleProvider for perpMarket ${this.publicKey} with marketIndex ${this.perpMarketIndex}!`,
+      );
+    }
+    return this._oracleProvider;
   }
 
   get minOrderSize(): number {
@@ -865,7 +877,7 @@ export class PerpOrder {
       priceLots = perpMarket.uiPriceToLots(perpMarket.uiPrice).add(priceOffset);
       const isInvalid =
         type === BookSideType.bids
-          ? priceLots.gt(leafNode.pegLimit)
+          ? priceLots.gt(leafNode.pegLimit) && !leafNode.pegLimit.eqn(-1)
           : leafNode.pegLimit.gt(priceLots);
       oraclePeggedProperties = {
         isInvalid,

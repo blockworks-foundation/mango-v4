@@ -1,6 +1,7 @@
 use crate::accounts_zerocopy::AccountInfoRef;
 use crate::error::*;
 use crate::health::*;
+use crate::i80f48::ClampToInt;
 use crate::state::*;
 
 use crate::accounts_ix::*;
@@ -425,6 +426,7 @@ pub fn apply_settle_changes(
     after_oo: &OpenOrdersSlim,
     health_cache: Option<&mut HealthCache>,
     fees_to_dao: bool,
+    quote_oracle: Option<&AccountInfo>,
 ) -> Result<()> {
     let mut received_fees = 0;
     if fees_to_dao {
@@ -434,15 +436,21 @@ pub fn apply_settle_changes(
             .saturating_sub(after_oo.native_rebates());
         quote_bank.collected_fees_native += I80F48::from(received_fees);
 
-        // Ideally we could credit buyback_fees at the current value of the received fees,
-        // but the settle_funds instruction currently doesn't receive the oracle account
-        // that would be needed for it.
-        if quote_bank.token_index == QUOTE_TOKEN_INDEX {
-            let now_ts = Clock::get()?.unix_timestamp.try_into().unwrap();
+        // Credit the buyback_fees at the current value of the quote token.
+        if let Some(quote_oracle_ai) = quote_oracle {
+            let clock = Clock::get()?;
+            let now_ts = clock.unix_timestamp.try_into().unwrap();
+
+            let quote_oracle_price = quote_bank
+                .oracle_price(&AccountInfoRef::borrow(quote_oracle_ai)?, Some(clock.slot))?;
+            let quote_asset_price = quote_oracle_price.min(quote_bank.stable_price());
             account
                 .fixed
                 .expire_buyback_fees(now_ts, group.buyback_fees_expiry_interval);
-            account.fixed.accrue_buyback_fees(received_fees);
+            let fees_in_usd = I80F48::from(received_fees) * quote_asset_price;
+            account
+                .fixed
+                .accrue_buyback_fees(fees_in_usd.clamp_to_u64());
         }
     }
 

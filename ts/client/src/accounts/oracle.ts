@@ -13,6 +13,12 @@ const SBV1_MAINNET_PID = new PublicKey(
 let sbv2DevnetProgram;
 let sbv2MainnetProgram;
 
+export enum OracleProvider {
+  Pyth,
+  Switchboard,
+  Stub,
+}
+
 export class StubOracle {
   public price: I80F48;
   public lastUpdated: BN;

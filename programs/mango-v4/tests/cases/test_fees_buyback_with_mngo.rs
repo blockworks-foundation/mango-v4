@@ -137,6 +137,10 @@ async fn test_fees_buyback_with_mngo() -> Result<(), TransportError> {
     .await
     .unwrap();
 
+    // Change the mngo and quote price to verify that they are taken into account
+    set_bank_stub_oracle_price(solana, group, &tokens[0], admin, 2.0).await;
+    set_bank_stub_oracle_price(solana, group, &tokens[1], admin, 3.0).await;
+
     //
     // Test: Account buyback fees accrued with mngo
     //
@@ -183,15 +187,16 @@ async fn test_fees_buyback_with_mngo() -> Result<(), TransportError> {
     assert_eq!(before_fees_accrued - after_fees_accrued, 19);
 
     // token[1] swapped at discount for token[0]
-    // TODO: https://github.com/blockworks-foundation/mango-v4/pull/464#discussion_r1111779730
-    assert!(
-        (fees_token_position_after - fees_token_position_before) - I80F48::from_num(20)
-            < I80F48::from_num(0.000001)
-    );
-    assert!(
-        (mngo_token_position_before - mngo_token_position_after) - I80F48::from_num(16.666666)
-            < I80F48::from_num(0.000001)
-    );
+    assert!(assert_equal(
+        fees_token_position_after - fees_token_position_before,
+        19.0 / 2.0,
+        0.1
+    ));
+    assert!(assert_equal(
+        mngo_token_position_after - mngo_token_position_before,
+        -19.0 / 3.0 / 1.2,
+        0.1
+    ));
 
     Ok(())
 }

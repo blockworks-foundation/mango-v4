@@ -16,12 +16,12 @@ pub async fn fetch_mango_accounts(
 ) -> anyhow::Result<Vec<(Pubkey, MangoAccountValue)>> {
     let config = RpcProgramAccountsConfig {
         filters: Some(vec![
-            RpcFilterType::Memcmp(Memcmp::new_base58_encoded(
+            RpcFilterType::Memcmp(Memcmp::new_raw_bytes(
                 0,
-                &MangoAccount::discriminator(),
+                MangoAccount::discriminator().to_vec(),
             )),
-            RpcFilterType::Memcmp(Memcmp::new_base58_encoded(8, &group.to_bytes())),
-            RpcFilterType::Memcmp(Memcmp::new_base58_encoded(40, &owner.to_bytes())),
+            RpcFilterType::Memcmp(Memcmp::new_raw_bytes(8, group.to_bytes().to_vec())),
+            RpcFilterType::Memcmp(Memcmp::new_raw_bytes(40, owner.to_bytes().to_vec())),
         ]),
         account_config: RpcAccountInfoConfig {
             encoding: Some(UiAccountEncoding::Base64),
@@ -50,7 +50,7 @@ async fn fetch_anchor_accounts<T: AccountDeserialize + Discriminator>(
     filters: Vec<RpcFilterType>,
 ) -> anyhow::Result<Vec<(Pubkey, T)>> {
     let account_type_filter =
-        RpcFilterType::Memcmp(Memcmp::new_base58_encoded(0, &T::discriminator()));
+        RpcFilterType::Memcmp(Memcmp::new_raw_bytes(0, T::discriminator().to_vec()));
     let config = RpcProgramAccountsConfig {
         filters: Some([vec![account_type_filter], filters].concat()),
         account_config: RpcAccountInfoConfig {
@@ -74,9 +74,9 @@ pub async fn fetch_banks(
     fetch_anchor_accounts::<Bank>(
         rpc,
         program,
-        vec![RpcFilterType::Memcmp(Memcmp::new_base58_encoded(
+        vec![RpcFilterType::Memcmp(Memcmp::new_raw_bytes(
             8,
-            &group.to_bytes(),
+            group.to_bytes().to_vec(),
         ))],
     )
     .await
@@ -90,9 +90,9 @@ pub async fn fetch_mint_infos(
     fetch_anchor_accounts::<MintInfo>(
         rpc,
         program,
-        vec![RpcFilterType::Memcmp(Memcmp::new_base58_encoded(
+        vec![RpcFilterType::Memcmp(Memcmp::new_raw_bytes(
             8,
-            &group.to_bytes(),
+            group.to_bytes().to_vec(),
         ))],
     )
     .await
@@ -106,9 +106,9 @@ pub async fn fetch_serum3_markets(
     fetch_anchor_accounts::<Serum3Market>(
         rpc,
         program,
-        vec![RpcFilterType::Memcmp(Memcmp::new_base58_encoded(
+        vec![RpcFilterType::Memcmp(Memcmp::new_raw_bytes(
             8,
-            &group.to_bytes(),
+            group.to_bytes().to_vec(),
         ))],
     )
     .await
@@ -122,9 +122,9 @@ pub async fn fetch_perp_markets(
     fetch_anchor_accounts::<PerpMarket>(
         rpc,
         program,
-        vec![RpcFilterType::Memcmp(Memcmp::new_base58_encoded(
+        vec![RpcFilterType::Memcmp(Memcmp::new_raw_bytes(
             8,
-            &group.to_bytes(),
+            group.to_bytes().to_vec(),
         ))],
     )
     .await

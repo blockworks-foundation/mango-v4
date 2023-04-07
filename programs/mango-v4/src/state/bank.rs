@@ -1,6 +1,7 @@
 use super::{OracleConfig, TokenIndex, TokenPosition};
 use crate::accounts_zerocopy::KeyedAccountReader;
 use crate::error::*;
+use crate::i80f48::ClampToInt;
 use crate::state::{oracle, StablePriceModel};
 use crate::util;
 
@@ -302,9 +303,8 @@ impl Bank {
         allow_dusting: bool,
         now_ts: u64,
     ) -> Result<bool> {
-        self.update_net_borrows(-native_amount, now_ts);
         let opening_indexed_position = position.indexed_position;
-        let result = self.deposit_internal(position, native_amount, allow_dusting)?;
+        let result = self.deposit_internal(position, native_amount, allow_dusting, now_ts)?;
         self.update_cumulative_interest(position, opening_indexed_position);
         Ok(result)
     }
@@ -315,6 +315,7 @@ impl Bank {
         position: &mut TokenPosition,
         mut native_amount: I80F48,
         allow_dusting: bool,
+        now_ts: u64,
     ) -> Result<bool> {
         require_gte!(native_amount, 0);
 
@@ -336,6 +337,9 @@ impl Bank {
         };
 
         if native_position.is_negative() {
+            // Only account for the borrows we are repaying
+            self.update_net_borrows(native_position.max(-native_amount), now_ts);
+
             let new_native_position = native_position + native_amount;
             let indexed_change = div_rounding_up(native_amount, self.borrow_index);
             // this is only correct if it's not positive, because it scales the whole amount by borrow_index
@@ -585,13 +589,15 @@ impl Bank {
         let in_new_window =
             now_ts >= self.last_net_borrows_window_start_ts + self.net_borrow_limit_window_size_ts;
 
+        let amount = native_amount.ceil().clamp_to_i64();
+
         self.net_borrows_in_window = if in_new_window {
             // reset to latest window
             self.last_net_borrows_window_start_ts = now_ts / self.net_borrow_limit_window_size_ts
                 * self.net_borrow_limit_window_size_ts;
-            native_amount.to_num::<i64>()
+            amount
         } else {
-            self.net_borrows_in_window + native_amount.to_num::<i64>()
+            self.net_borrows_in_window + amount
         };
     }
 
@@ -606,8 +612,8 @@ impl Bank {
             .unwrap();
         if net_borrows_quote > self.net_borrow_limit_per_window_quote {
             return Err(error_msg_typed!(MangoError::BankNetBorrowsLimitReached,
-                    "net_borrows_in_window ({:?}) exceeds net_borrow_limit_per_window_quote ({:?}) for last_net_borrows_window_start_ts ({:?}) ",
-                    self.net_borrows_in_window, self.net_borrow_limit_per_window_quote, self.last_net_borrows_window_start_ts
+                    "net_borrows_in_window ({:?}) valued at ({:?} exceed net_borrow_limit_per_window_quote ({:?}) for last_net_borrows_window_start_ts ({:?}) ",
+                    self.net_borrows_in_window, net_borrows_quote, self.net_borrow_limit_per_window_quote, self.last_net_borrows_window_start_ts
 
             ));
         }
@@ -1014,5 +1020,56 @@ mod tests {
         bank.bank_rate_last_updated = 1020;
         compute_new_avg_utilization_runner(&mut bank, I80F48::ONE, 1040);
         assert_eq!(bank.avg_utilization, I80F48::ONE);
+    }
+
+    #[test]
+    pub fn test_net_borrows() -> Result<()> {
+        let mut bank = Bank::zeroed();
+        bank.net_borrow_limit_window_size_ts = 100;
+        bank.net_borrow_limit_per_window_quote = 1000;
+        bank.deposit_index = I80F48::from_num(100.0);
+        bank.borrow_index = I80F48::from_num(100.0);
+
+        let price = I80F48::from(2);
+
+        let mut account = TokenPosition::default();
+
+        bank.change_without_fee(&mut account, I80F48::from(100), 0, price)
+            .unwrap();
+        assert_eq!(bank.net_borrows_in_window, 0);
+        bank.change_without_fee(&mut account, I80F48::from(-100), 0, price)
+            .unwrap();
+        assert_eq!(bank.net_borrows_in_window, 0);
+
+        account = TokenPosition::default();
+        bank.change_without_fee(&mut account, I80F48::from(10), 0, price)
+            .unwrap();
+        bank.change_without_fee(&mut account, I80F48::from(-110), 0, price)
+            .unwrap();
+        assert_eq!(bank.net_borrows_in_window, 100);
+        bank.change_without_fee(&mut account, I80F48::from(50), 0, price)
+            .unwrap();
+        assert_eq!(bank.net_borrows_in_window, 50);
+        bank.change_without_fee(&mut account, I80F48::from(100), 0, price)
+            .unwrap();
+        assert_eq!(bank.net_borrows_in_window, 1); // rounding
+
+        account = TokenPosition::default();
+        bank.net_borrows_in_window = 0;
+        bank.change_without_fee(&mut account, I80F48::from(-450), 0, price)
+            .unwrap();
+        bank.change_without_fee(&mut account, I80F48::from(-51), 0, price)
+            .unwrap_err();
+
+        account = TokenPosition::default();
+        bank.net_borrows_in_window = 0;
+        bank.change_without_fee(&mut account, I80F48::from(-450), 0, price)
+            .unwrap();
+        bank.change_without_fee(&mut account, I80F48::from(-50), 0, price)
+            .unwrap();
+        bank.change_without_fee(&mut account, I80F48::from(-50), 101, price)
+            .unwrap();
+
+        Ok(())
     }
 }

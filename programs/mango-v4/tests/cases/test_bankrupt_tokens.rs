@@ -288,6 +288,7 @@ async fn test_bankrupt_tokens_insurance_fund() -> Result<(), TransportError> {
         group,
         tokens,
         insurance_vault,
+        ..
     } = mango_setup::GroupWithTokensConfig {
         admin,
         payer,
@@ -519,6 +520,10 @@ async fn test_bankrupt_tokens_insurance_fund() -> Result<(), TransportError> {
     // TEST: use the insurance fund to liquidate borrow1 and borrow2
     //
 
+    // Change value of token that the insurance fund is in, to check that bankruptcy amounts
+    // are correct if it depegs
+    set_bank_stub_oracle_price(solana, group, borrow_token1, admin, 2.0).await;
+
     // bankruptcy of an USDC liability: just transfers funds from insurance vault to liqee,
     // the liqor is uninvolved
     let insurance_vault_before = solana.token_account_balance(insurance_vault).await;
@@ -553,7 +558,8 @@ async fn test_bankrupt_tokens_insurance_fund() -> Result<(), TransportError> {
     let liab_before = account_position_f64(solana, account, borrow_token2.bank).await;
     let insurance_vault_before = solana.token_account_balance(insurance_vault).await;
     let liqor_before = account_position(solana, vault_account, borrow_token1.bank).await;
-    let liab_transfer: f64 = 500.0 / 20.0;
+    let usdc_to_liab = 2.0 / 20.0;
+    let liab_transfer: f64 = 500.0 * usdc_to_liab;
     send_tx(
         solana,
         TokenLiqBankruptcyInstruction {
@@ -573,7 +579,7 @@ async fn test_bankrupt_tokens_insurance_fund() -> Result<(), TransportError> {
         account_position(solana, account, borrow_token2.bank).await,
         (liab_before + liab_transfer) as i64
     );
-    let usdc_amount = (liab_transfer * 20.0 * 1.02).ceil() as u64;
+    let usdc_amount = (liab_transfer / usdc_to_liab * 1.02).ceil() as u64;
     assert_eq!(
         solana.token_account_balance(insurance_vault).await,
         insurance_vault_before - usdc_amount

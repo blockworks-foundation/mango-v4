@@ -17,6 +17,7 @@ import {
   SystemProgram,
   TransactionInstruction,
   TransactionSignature,
+  Connection,
 } from '@solana/web3.js';
 import bs58 from 'bs58';
 import { Bank, MintInfo, TokenIndex } from './accounts/bank';
@@ -103,6 +104,15 @@ export class MangoClient {
       'processed';
     // TODO: evil side effect, but limited backtraces are a nightmare
     Error.stackTraceLimit = 1000;
+  }
+
+  /// Convenience accessors
+  public get connection(): Connection {
+    return this.program.provider.connection;
+  }
+
+  public get walletPk(): PublicKey {
+    return (this.program.provider as AnchorProvider).wallet.publicKey;
   }
 
   /// Transactions
@@ -999,11 +1009,11 @@ export class MangoClient {
   public async accountBuybackFeesWithMngoIx(
     group: Group,
     mangoAccount: MangoAccount,
-    maxBuyback?: number,
+    maxBuybackUsd?: number,
   ): Promise<TransactionInstruction> {
-    maxBuyback = maxBuyback ?? mangoAccount.getMaxFeesBuybackUi(group);
+    maxBuybackUsd = maxBuybackUsd ?? mangoAccount.getMaxFeesBuybackUi(group);
     return await this.program.methods
-      .accountBuybackFeesWithMngo(new BN(maxBuyback))
+      .accountBuybackFeesWithMngo(toNative(maxBuybackUsd, 6))
       .accounts({
         group: group.publicKey,
         account: mangoAccount.publicKey,
@@ -2181,8 +2191,8 @@ export class MangoClient {
     perpMarketIndex: PerpMarketIndex,
     side: PerpOrderSide,
     priceOffset: number,
-    pegLimit: number,
     quantity: number,
+    pegLimit?: number,
     maxQuoteQuantity?: number,
     clientOrderId?: number,
     orderType?: PerpOrderType,
@@ -2196,8 +2206,8 @@ export class MangoClient {
       perpMarketIndex,
       side,
       priceOffset,
-      pegLimit,
       quantity,
+      pegLimit,
       maxQuoteQuantity,
       clientOrderId,
       orderType,
@@ -2215,8 +2225,8 @@ export class MangoClient {
     perpMarketIndex: PerpMarketIndex,
     side: PerpOrderSide,
     priceOffset: number,
-    pegLimit: number,
     quantity: number,
+    pegLimit?: number,
     maxQuoteQuantity?: number,
     clientOrderId?: number,
     orderType?: PerpOrderType,
@@ -2238,7 +2248,7 @@ export class MangoClient {
       .perpPlaceOrderPegged(
         side,
         perpMarket.uiPriceToLots(priceOffset),
-        perpMarket.uiPriceToLots(pegLimit),
+        pegLimit ? perpMarket.uiPriceToLots(pegLimit) : new BN(-1),
         perpMarket.uiBaseToLots(quantity),
         maxQuoteQuantity
           ? perpMarket.uiQuoteToLots(maxQuoteQuantity)

@@ -285,10 +285,10 @@ pub mod mango_v4 {
 
     pub fn account_buyback_fees_with_mngo(
         ctx: Context<AccountBuybackFeesWithMngo>,
-        max_buyback: u64,
+        max_buyback_usd: u64,
     ) -> Result<()> {
         #[cfg(feature = "enable-gpl")]
-        instructions::account_buyback_fees_with_mngo(ctx, max_buyback)?;
+        instructions::account_buyback_fees_with_mngo(ctx, max_buyback_usd)?;
         Ok(())
     }
 

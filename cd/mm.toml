@@ -1,0 +1,6 @@
+app = "mango-mm"
+kill_signal = "SIGTERM"
+kill_timeout = 30
+
+[build]
+  dockerfile = "../ts/client/scripts/mm/Dockerfile.mm"

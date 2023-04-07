@@ -684,7 +684,7 @@ async function createAndPopulateAlt() {
 
   // Extend using mango v4 relevant pub keys
   try {
-    let bankAddresses = Array.from(group.banksMapByMint.values())
+    const bankAddresses = Array.from(group.banksMapByMint.values())
       .flat()
       .map((bank) => [bank.publicKey, bank.oracle, bank.vault])
       .flat()
@@ -694,13 +694,13 @@ async function createAndPopulateAlt() {
           .map((mintInfo) => mintInfo.publicKey),
       );
 
-    let serum3MarketAddresses = Array.from(
+    const serum3MarketAddresses = Array.from(
       group.serum3MarketsMapByExternal.values(),
     )
       .flat()
       .map((serum3Market) => serum3Market.publicKey);
 
-    let serum3ExternalMarketAddresses = Array.from(
+    const serum3ExternalMarketAddresses = Array.from(
       group.serum3ExternalMarketsMap.values(),
     )
       .flat()
@@ -711,7 +711,7 @@ async function createAndPopulateAlt() {
       ])
       .flat();
 
-    let perpMarketAddresses = Array.from(
+    const perpMarketAddresses = Array.from(
       group.perpMarketsMapByMarketIndex.values(),
     )
       .flat()
@@ -724,7 +724,8 @@ async function createAndPopulateAlt() {
       ])
       .flat();
 
-    async function extendTable(addresses: PublicKey[]) {
+    // eslint-disable-next-line no-inner-declarations
+    async function extendTable(addresses: PublicKey[]): Promise<void> {
       await group.reloadAll(client);
       const alt =
         await client.program.provider.connection.getAddressLookupTable(
@@ -751,7 +752,7 @@ async function createAndPopulateAlt() {
         client.program.provider as AnchorProvider,
         [extendIx],
       );
-      let sig = await client.program.provider.connection.sendTransaction(
+      const sig = await client.program.provider.connection.sendTransaction(
         extendTx,
       );
       console.log(`https://explorer.solana.com/tx/${sig}`);
@@ -765,7 +766,7 @@ async function createAndPopulateAlt() {
     await extendTable(serum3ExternalMarketAddresses);
 
     // TODO: dont extend for perps atm
-    // await extendTable(perpMarketAddresses);
+    await extendTable(perpMarketAddresses);
 
     // Well known addressess
     await extendTable([
@@ -819,8 +820,10 @@ async function main() {
   }
 
   try {
-    // createAndPopulateAlt();
-  } catch (error) {}
+    createAndPopulateAlt();
+  } catch (error) {
+    console.log(error);
+  }
 }
 
 try {
@@ -920,8 +923,8 @@ async function deregisterSerum3Markets() {
   const group = await client.getGroupForCreator(admin.publicKey, GROUP_NUM);
 
   // change xxx/xxx to market of choice
-  let serum3Market = group.getSerum3MarketByName('XXX/XXX');
-  let sig = await client.serum3deregisterMarket(
+  const serum3Market = group.getSerum3MarketByName('XXX/XXX');
+  const sig = await client.serum3deregisterMarket(
     group,
     serum3Market.serumMarketExternal,
   );
@@ -938,8 +941,8 @@ async function deregisterTokens() {
   const group = await client.getGroupForCreator(admin.publicKey, GROUP_NUM);
 
   // change -1 to tokenIndex of choice
-  let bank = group.getFirstBankByTokenIndex(-1 as TokenIndex);
-  let sig = await client.tokenDeregister(group, bank.mint);
+  const bank = group.getFirstBankByTokenIndex(-1 as TokenIndex);
+  const sig = await client.tokenDeregister(group, bank.mint);
   console.log(
     `...removed token ${bank.name}, sig https://explorer.solana.com/tx/${sig}`,
   );
