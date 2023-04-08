@@ -467,7 +467,6 @@
 <a href="#467" id="467">467</a>
 <a href="#468" id="468">468</a>
 <a href="#469" id="469">469</a>
-<a href="#470" id="470">470</a>
 </pre><pre class="rust"><code><span class="kw">use </span>std::mem::size_of;
 
 <span class="kw">use </span>anchor_lang::prelude::<span class="kw-2">*</span>;
@@ -787,7 +786,6 @@
             price: oracle_price.to_bits(),
             stable_price: <span class="self">self</span>.stable_price().to_bits(),
             fees_accrued: <span class="self">self</span>.fees_accrued.to_bits(),
-            fees_settled: <span class="self">self</span>.fees_settled.to_bits(),
             open_interest: <span class="self">self</span>.open_interest,
             instantaneous_funding_rate: funding_rate.to_bits(),
         });
