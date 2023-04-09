@@ -246,7 +246,7 @@ async fn test_health_compute_perp() -> Result<(), TransportError> {
                 max_quote_lots: i64::MAX,
                 reduce_only: false,
                 client_order_id: 0,
-self_trade_behavior: SelfTradeBehavior::DecrementTake
+                self_trade_behavior: SelfTradeBehavior::DecrementTake,
             },
         )
         .await

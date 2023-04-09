@@ -213,7 +213,11 @@ impl<'a> Orderbook<'a> {
         if total_quote_lots_taken > 0 || total_base_lots_taken > 0 {
             perp_position.add_taker_trade(side, total_base_lots_taken, total_quote_lots_taken);
             // reduce fees to apply by decrement take volume
-            apply_fees(market, mango_account, total_quote_lots_taken - decremented_quote_lots)?;
+            apply_fees(
+                market,
+                mango_account,
+                total_quote_lots_taken - decremented_quote_lots,
+            )?;
         }
 
         // Apply changes to matched asks (handles invalidate on delete!)

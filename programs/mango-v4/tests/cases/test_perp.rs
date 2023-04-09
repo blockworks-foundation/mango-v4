@@ -99,7 +99,7 @@ async fn test_perp_fixed() -> Result<(), TransportError> {
             max_quote_lots: i64::MAX,
             reduce_only: false,
             client_order_id: 0,
-self_trade_behavior: SelfTradeBehavior::DecrementTake
+            self_trade_behavior: SelfTradeBehavior::DecrementTake,
         },
     )
     .await

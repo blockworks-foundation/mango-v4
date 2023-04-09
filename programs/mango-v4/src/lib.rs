@@ -31,7 +31,8 @@ pub mod instructions;
 compile_error!("compiling the program entrypoint without 'enable-gpl' makes no sense, enable it or use the 'cpi' or 'client' features");
 
 use state::{
-    OracleConfigParams, PerpMarketIndex, PlaceOrderType, Serum3MarketIndex, Side, TokenIndex, SelfTradeBehavior
+    OracleConfigParams, PerpMarketIndex, PlaceOrderType, SelfTradeBehavior, Serum3MarketIndex,
+    Side, TokenIndex,
 };
 
 declare_id!("4MangoMjqJ2firMokCjjGgoK8d4MXcrgL7XJaL3w6fVg");
@@ -751,8 +752,13 @@ pub mod mango_v4 {
             reduce_only,
             time_in_force,
             params: match order_type {
-                PlaceOrderType::Market => OrderParams::Market { self_trade_behavior },
-                PlaceOrderType::ImmediateOrCancel => OrderParams::ImmediateOrCancel { price_lots, self_trade_behavior },
+                PlaceOrderType::Market => OrderParams::Market {
+                    self_trade_behavior,
+                },
+                PlaceOrderType::ImmediateOrCancel => OrderParams::ImmediateOrCancel {
+                    price_lots,
+                    self_trade_behavior,
+                },
                 _ => OrderParams::Fixed {
                     price_lots,
                     order_type: order_type.to_post_order_type()?,

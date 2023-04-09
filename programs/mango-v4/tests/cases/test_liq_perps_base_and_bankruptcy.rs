@@ -141,7 +141,7 @@ async fn test_liq_perps_base_and_bankruptcy() -> Result<(), TransportError> {
             max_quote_lots: i64::MAX,
             reduce_only: false,
             client_order_id: 0,
-self_trade_behavior: SelfTradeBehavior::DecrementTake
+            self_trade_behavior: SelfTradeBehavior::DecrementTake,
         },
     )
     .await
@@ -158,7 +158,7 @@ self_trade_behavior: SelfTradeBehavior::DecrementTake
             max_quote_lots: i64::MAX,
             reduce_only: false,
             client_order_id: 0,
-self_trade_behavior: SelfTradeBehavior::DecrementTake
+            self_trade_behavior: SelfTradeBehavior::DecrementTake,
         },
     )
     .await

@@ -17,8 +17,8 @@ use itertools::Itertools;
 
 use mango_v4::accounts_ix::{Serum3OrderType, Serum3SelfTradeBehavior, Serum3Side};
 use mango_v4::state::{
-    Bank, Group, MangoAccountValue, PerpMarketIndex, PlaceOrderType, Serum3MarketIndex, Side,
-    TokenIndex, SelfTradeBehavior,
+    Bank, Group, MangoAccountValue, PerpMarketIndex, PlaceOrderType, SelfTradeBehavior,
+    Serum3MarketIndex, Side, TokenIndex,
 };
 
 use solana_address_lookup_table_program::state::AddressLookupTable;
@@ -792,7 +792,7 @@ impl MangoClient {
         reduce_only: bool,
         expiry_timestamp: u64,
         limit: u8,
-        self_trade_behavior: SelfTradeBehavior
+        self_trade_behavior: SelfTradeBehavior,
     ) -> anyhow::Result<Signature> {
         let perp = self.context.perp(market_index);
 
@@ -833,7 +833,7 @@ impl MangoClient {
                 reduce_only,
                 expiry_timestamp,
                 limit,
-                self_trade_behavior
+                self_trade_behavior,
             }),
         };
         self.send_and_confirm_owner_tx(vec![ix]).await
