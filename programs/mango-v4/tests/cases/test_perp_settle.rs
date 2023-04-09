@@ -132,6 +132,7 @@ async fn test_perp_settle_pnl() -> Result<(), TransportError> {
             max_quote_lots: i64::MAX,
             reduce_only: false,
             client_order_id: 0,
+            self_trade_behavior: SelfTradeBehavior::DecrementTake,
         },
     )
     .await
@@ -149,6 +150,7 @@ async fn test_perp_settle_pnl() -> Result<(), TransportError> {
             max_quote_lots: i64::MAX,
             reduce_only: false,
             client_order_id: 0,
+            self_trade_behavior: SelfTradeBehavior::DecrementTake,
         },
     )
     .await
@@ -618,6 +620,7 @@ async fn test_perp_settle_pnl_fees() -> Result<(), TransportError> {
             max_quote_lots: i64::MAX,
             reduce_only: false,
             client_order_id: 0,
+            self_trade_behavior: SelfTradeBehavior::DecrementTake,
         },
     )
     .await
@@ -635,6 +638,7 @@ async fn test_perp_settle_pnl_fees() -> Result<(), TransportError> {
             max_quote_lots: i64::MAX,
             reduce_only: false,
             client_order_id: 0,
+            self_trade_behavior: SelfTradeBehavior::DecrementTake,
         },
     )
     .await
@@ -887,6 +891,7 @@ async fn test_perp_pnl_settle_limit() -> Result<(), TransportError> {
             max_quote_lots: i64::MAX,
             reduce_only: false,
             client_order_id: 0,
+            self_trade_behavior: SelfTradeBehavior::DecrementTake,
         },
     )
     .await
@@ -904,6 +909,7 @@ async fn test_perp_pnl_settle_limit() -> Result<(), TransportError> {
             max_quote_lots: i64::MAX,
             reduce_only: false,
             client_order_id: 0,
+            self_trade_behavior: SelfTradeBehavior::DecrementTake,
         },
     )
     .await
@@ -1019,6 +1025,7 @@ async fn test_perp_pnl_settle_limit() -> Result<(), TransportError> {
             max_base_lots: 1,
             max_quote_lots: i64::MAX,
             client_order_id: 0,
+            self_trade_behavior: SelfTradeBehavior::DecrementTake,
             reduce_only: false,
         },
     )
@@ -1036,6 +1043,7 @@ async fn test_perp_pnl_settle_limit() -> Result<(), TransportError> {
             max_base_lots: 1,
             max_quote_lots: i64::MAX,
             client_order_id: 0,
+            self_trade_behavior: SelfTradeBehavior::DecrementTake,
             reduce_only: false,
         },
     )

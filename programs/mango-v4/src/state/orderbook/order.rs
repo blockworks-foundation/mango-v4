@@ -26,9 +26,12 @@ pub struct Order {
 }
 
 pub enum OrderParams {
-    Market,
+    Market {
+        self_trade_behavior: SelfTradeBehavior,
+    },
     ImmediateOrCancel {
         price_lots: i64,
+        self_trade_behavior: SelfTradeBehavior,
     },
     Fixed {
         price_lots: i64,
@@ -120,8 +123,8 @@ impl Order {
         order_book: &Orderbook,
     ) -> Result<(i64, u64)> {
         let price_lots = match self.params {
-            OrderParams::Market => market_order_limit_for_side(self.side),
-            OrderParams::ImmediateOrCancel { price_lots } => price_lots,
+            OrderParams::Market { .. } => market_order_limit_for_side(self.side),
+            OrderParams::ImmediateOrCancel { price_lots, .. } => price_lots,
             OrderParams::Fixed {
                 price_lots,
                 order_type,

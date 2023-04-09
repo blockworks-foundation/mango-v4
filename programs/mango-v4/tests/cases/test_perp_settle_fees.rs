@@ -211,6 +211,7 @@ async fn test_perp_settle_fees() -> Result<(), TransportError> {
             max_quote_lots: i64::MAX,
             reduce_only: false,
             client_order_id: 0,
+self_trade_behavior: SelfTradeBehavior::DecrementTake
         },
     )
     .await
@@ -228,6 +229,7 @@ async fn test_perp_settle_fees() -> Result<(), TransportError> {
             max_quote_lots: i64::MAX,
             reduce_only: false,
             client_order_id: 0,
+self_trade_behavior: SelfTradeBehavior::DecrementTake
         },
     )
     .await

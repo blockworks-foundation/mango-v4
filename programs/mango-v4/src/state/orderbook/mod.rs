@@ -516,7 +516,7 @@ mod tests {
                 client_order_id: 43,
                 time_in_force: 0,
                 reduce_only: false,
-                params: OrderParams::ImmediateOrCancel { price_lots: 1000 },
+                params: OrderParams::ImmediateOrCancel { price_lots: 1000, self_trade_behavior: SelfTradeBehavior::AbortTransaction },
             },
             &mut market,
             &mut event_queue,

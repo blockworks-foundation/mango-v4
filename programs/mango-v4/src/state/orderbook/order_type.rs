@@ -91,6 +91,33 @@ pub enum PostOrderType {
     AnchorDeserialize,
 )]
 #[repr(u8)]
+pub enum SelfTradeBehavior {
+    /// Both the maker and taker sides of the matched orders are decremented.
+    /// This is equivalent to a normal order match, except for the fact that no fees are applied.
+    DecrementTake = 0,
+
+    /// Cancels the maker side of the trade, the taker side gets match with other makers and trades.
+    CancelProvide = 1,
+
+    /// Cancels the whole transaction as soon as a self-matching scenario is encountered.
+    AbortTransaction = 2,
+
+    /// All maker orders by the same user are ignored during the trade but remain on the book.
+    IgnoreProvide = 3,
+}
+
+#[derive(
+    Eq,
+    PartialEq,
+    Copy,
+    Clone,
+    TryFromPrimitive,
+    IntoPrimitive,
+    Debug,
+    AnchorSerialize,
+    AnchorDeserialize,
+)]
+#[repr(u8)]
 pub enum Side {
     Bid = 0,
     Ask = 1,

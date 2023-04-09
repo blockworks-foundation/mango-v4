@@ -164,6 +164,7 @@ async fn test_liq_perps_bankruptcy() -> Result<(), TransportError> {
             max_base_lots: 1,
             max_quote_lots: i64::MAX,
             client_order_id: 0,
+            self_trade_behavior: SelfTradeBehavior::DecrementTake,
             reduce_only: false,
         })
         .await;
@@ -176,6 +177,7 @@ async fn test_liq_perps_bankruptcy() -> Result<(), TransportError> {
             max_base_lots: 1,
             max_quote_lots: i64::MAX,
             client_order_id: 0,
+            self_trade_behavior: SelfTradeBehavior::DecrementTake,
             reduce_only: false,
         })
         .await;
@@ -197,6 +199,7 @@ async fn test_liq_perps_bankruptcy() -> Result<(), TransportError> {
             max_base_lots: 1,
             max_quote_lots: i64::MAX,
             client_order_id: 0,
+            self_trade_behavior: SelfTradeBehavior::DecrementTake,
             reduce_only: false,
         })
         .await;
@@ -209,6 +212,7 @@ async fn test_liq_perps_bankruptcy() -> Result<(), TransportError> {
             max_base_lots: 1,
             max_quote_lots: i64::MAX,
             client_order_id: 0,
+            self_trade_behavior: SelfTradeBehavior::DecrementTake,
             reduce_only: false,
         })
         .await;

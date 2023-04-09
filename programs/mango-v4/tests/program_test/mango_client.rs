@@ -3151,6 +3151,7 @@ pub struct PerpPlaceOrderInstruction {
     pub max_quote_lots: i64,
     pub reduce_only: bool,
     pub client_order_id: u64,
+    pub self_trade_behavior: SelfTradeBehavior,
 }
 #[async_trait::async_trait(?Send)]
 impl ClientInstruction for PerpPlaceOrderInstruction {
@@ -3168,6 +3169,7 @@ impl ClientInstruction for PerpPlaceOrderInstruction {
             max_quote_lots: self.max_quote_lots,
             client_order_id: self.client_order_id,
             order_type: PlaceOrderType::Limit,
+            self_trade_behavior: self.self_trade_behavior,
             reduce_only: self.reduce_only,
             expiry_timestamp: 0,
             limit: 10,

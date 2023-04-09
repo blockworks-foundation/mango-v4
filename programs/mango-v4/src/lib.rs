@@ -31,13 +31,14 @@ pub mod instructions;
 compile_error!("compiling the program entrypoint without 'enable-gpl' makes no sense, enable it or use the 'cpi' or 'client' features");
 
 use state::{
-    OracleConfigParams, PerpMarketIndex, PlaceOrderType, Serum3MarketIndex, Side, TokenIndex,
+    OracleConfigParams, PerpMarketIndex, PlaceOrderType, Serum3MarketIndex, Side, TokenIndex, SelfTradeBehavior
 };
 
 declare_id!("4MangoMjqJ2firMokCjjGgoK8d4MXcrgL7XJaL3w6fVg");
 
 #[program]
 pub mod mango_v4 {
+
     use super::*;
 
     pub fn group_create(
@@ -728,6 +729,9 @@ pub mod mango_v4 {
         // Use this to limit compute used during order matching.
         // When the limit is reached, processing stops and the instruction succeeds.
         limit: u8,
+
+        // Define how to handle self-trades
+        self_trade_behavior: SelfTradeBehavior,
     ) -> Result<Option<u128>> {
         require_gte!(price_lots, 0);
 
@@ -747,8 +751,8 @@ pub mod mango_v4 {
             reduce_only,
             time_in_force,
             params: match order_type {
-                PlaceOrderType::Market => OrderParams::Market,
-                PlaceOrderType::ImmediateOrCancel => OrderParams::ImmediateOrCancel { price_lots },
+                PlaceOrderType::Market => OrderParams::Market { self_trade_behavior },
+                PlaceOrderType::ImmediateOrCancel => OrderParams::ImmediateOrCancel { price_lots, self_trade_behavior },
                 _ => OrderParams::Fixed {
                     price_lots,
                     order_type: order_type.to_post_order_type()?,
