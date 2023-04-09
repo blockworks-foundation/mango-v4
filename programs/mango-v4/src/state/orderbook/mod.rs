@@ -516,7 +516,7 @@ mod tests {
                 client_order_id: 43,
                 time_in_force: 0,
                 reduce_only: false,
-                params: OrderParams::ImmediateOrCancel { price_lots: 1000, self_trade_behavior: SelfTradeBehavior::AbortTransaction },
+                params: OrderParams::ImmediateOrCancel { price_lots: 1000, self_trade_behavior: SelfTradeBehavior::DecrementTake },
             },
             &mut market,
             &mut event_queue,
@@ -532,13 +532,13 @@ mod tests {
 
         assert_eq!(
             pos.quote_position_native().round(),
-            I80F48::from_num(-25), // -10 - 5
-            "Regular fees + fixed penalty applied on IOC order"
+            I80F48::from_num(-15), // -10 - 5
+            "No fees, but fixed penalty applied on IOC order"
         );
 
         assert_eq!(
             market.fees_accrued.round(),
-            I80F48::from_num(25), // 10 + 5
+            I80F48::from_num(15), // 10 + 5
             "Fees moved to market"
         );
 

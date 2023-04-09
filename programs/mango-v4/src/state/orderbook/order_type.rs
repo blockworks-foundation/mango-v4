@@ -101,9 +101,6 @@ pub enum SelfTradeBehavior {
 
     /// Cancels the whole transaction as soon as a self-matching scenario is encountered.
     AbortTransaction = 2,
-
-    /// All maker orders by the same user are ignored during the trade but remain on the book.
-    IgnoreProvide = 3,
 }
 
 #[derive(

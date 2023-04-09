@@ -75,6 +75,7 @@ impl<'a> Orderbook<'a> {
         // matched_changes/matched_deletes and then applied after this loop.
         let mut remaining_base_lots = order.max_base_lots;
         let mut remaining_quote_lots = order.max_quote_lots;
+        let mut decremented_quote_lots = 0i64;
         let mut matched_order_changes: Vec<(BookSideOrderHandle, i64)> = vec![];
         let mut matched_order_deletes: Vec<(BookSideOrderTree, u128)> = vec![];
         let mut number_of_dropped_expired_orders = 0;
@@ -128,6 +129,52 @@ impl<'a> Orderbook<'a> {
             remaining_quote_lots -= match_quote_lots;
             assert!(remaining_quote_lots >= 0);
 
+            let self_trade_behavior = match order.params {
+                OrderParams::Market {
+                    self_trade_behavior,
+                } => Some(self_trade_behavior),
+                OrderParams::ImmediateOrCancel {
+                    self_trade_behavior,
+                    ..
+                } => Some(self_trade_behavior),
+                _ => None,
+            };
+
+            let mut maker_fee = market.maker_fee;
+            let mut taker_fee = market.taker_fee;
+            let order_would_self_trade = mango_account_pk.eq(&best_opposing.node.owner);
+            if order_would_self_trade {
+                if let Some(self_trade_behavior) = self_trade_behavior {
+                    require!(
+                        self_trade_behavior != SelfTradeBehavior::AbortTransaction,
+                        MangoError::WouldSelfTrade
+                    );
+
+                    if self_trade_behavior == SelfTradeBehavior::CancelProvide {
+                        let event = OutEvent::new(
+                            other_side,
+                            best_opposing.node.owner_slot,
+                            now_ts,
+                            event_queue.header.seq_num,
+                            best_opposing.node.owner,
+                            best_opposing.node.quantity,
+                        );
+                        event_queue.push_back(cast(event)).unwrap();
+                        // TODO track cancelled order deletes differently
+                        matched_order_deletes
+                            .push((best_opposing.handle.order_tree, best_opposing.node.key));
+
+                        continue;
+                    }
+
+                    if self_trade_behavior == SelfTradeBehavior::DecrementTake {
+                        maker_fee = I80F48::ZERO;
+                        taker_fee = I80F48::ZERO;
+                        decremented_quote_lots += match_quote_lots;
+                    }
+                }
+            }
+
             let new_best_opposing_quantity = best_opposing.node.quantity - match_base_lots;
             let maker_out = new_best_opposing_quantity == 0;
             if maker_out {
@@ -145,11 +192,11 @@ impl<'a> Orderbook<'a> {
                 event_queue.header.seq_num,
                 best_opposing.node.owner,
                 best_opposing.node.client_order_id,
-                market.maker_fee,
+                maker_fee,
                 best_opposing.node.timestamp,
                 *mango_account_pk,
                 order.client_order_id,
-                market.taker_fee,
+                taker_fee,
                 best_opposing_price,
                 match_base_lots,
             );
@@ -165,7 +212,8 @@ impl<'a> Orderbook<'a> {
         // realized when the fill event gets executed
         if total_quote_lots_taken > 0 || total_base_lots_taken > 0 {
             perp_position.add_taker_trade(side, total_base_lots_taken, total_quote_lots_taken);
-            apply_fees(market, mango_account, total_quote_lots_taken)?;
+            // reduce fees to apply by decrement take volume
+            apply_fees(market, mango_account, total_quote_lots_taken - decremented_quote_lots)?;
         }
 
         // Apply changes to matched asks (handles invalidate on delete!)
