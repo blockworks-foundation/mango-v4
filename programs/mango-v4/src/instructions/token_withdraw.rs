@@ -69,8 +69,8 @@ pub fn token_withdraw(ctx: Context<TokenWithdraw>, amount: u64, allow_borrow: bo
         position,
         amount_i80f48,
         Clock::get()?.unix_timestamp.try_into().unwrap(),
-        oracle_price,
     )?;
+    bank.check_net_borrows(oracle_price)?;
 
     // Provide a readable error message in case the vault doesn't have enough tokens
     if ctx.accounts.vault.amount < amount {

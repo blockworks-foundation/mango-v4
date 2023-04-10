@@ -96,7 +96,6 @@ pub fn perp_settle_fees(ctx: Context<PerpSettleFees>, max_settle_amount: u64) ->
         token_position,
         settlement,
         Clock::get()?.unix_timestamp.try_into().unwrap(),
-        settle_token_oracle_price,
     )?;
     // Update the settled balance on the market itself
     perp_market.fees_settled += settlement;
