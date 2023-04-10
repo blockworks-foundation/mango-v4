@@ -49,6 +49,8 @@ pub fn perp_liq_negative_pnl_or_bankruptcy(
     };
     let liqee_liq_end_health = liqee_health_cache.health(HealthType::LiquidationEnd);
     let liqee_settle_health = liqee_health_cache.perp_settle_health();
+
+    // TODO: re-think about this. Now that token balances and perp upnl are really close, this may need changes.
     liqee_health_cache.require_after_phase2_liquidation()?;
 
     if !liqee.check_liquidatable(&liqee_health_cache)? {
@@ -143,6 +145,7 @@ pub fn perp_liq_negative_pnl_or_bankruptcy(
     };
     let max_liab_transfer = I80F48::from(max_liab_transfer) - settlement;
 
+    // TODO: Read this with settle_token != insurance_token in mind
     //
     // Step 2: bankruptcy
     //

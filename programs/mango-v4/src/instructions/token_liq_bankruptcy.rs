@@ -50,6 +50,9 @@ pub fn token_liq_bankruptcy(
     liqee_health_cache.require_after_phase2_liquidation()?;
     liqee.fixed.set_being_liquidated(true);
 
+    // TODO: Can you be bankrupt while a negative spot balance is compensated by positive perp hpnl?
+    // TODO: Do we need to use the effective token position here, adjusted for perp?
+
     let liab_is_insurance_token = liab_token_index == INSURANCE_TOKEN_INDEX;
     let (liab_bank, liab_oracle_price, opt_quote_bank_and_price) =
         account_retriever.banks_mut_and_oracles(liab_token_index, INSURANCE_TOKEN_INDEX)?;

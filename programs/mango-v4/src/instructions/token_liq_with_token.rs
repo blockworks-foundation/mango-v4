@@ -143,6 +143,14 @@ pub(crate) fn liquidation_action(
         .prices
         .asset(HealthType::LiquidationEnd);
 
+    // TODO: This computation should be broken now, because perp hpnl could affect the
+    // effective token balance!
+    // TODO: Look at this from first principles as a phase2 liq action:
+    // - perp_liq_base_or_positive_pnl always increases the health token position
+    // - this instruction should only allow increasing health token position until it's >=0
+    // - but it probably shouldn't compensate for negative hpnl effects? an account with huge
+    //   negative hpnl shouldn't cause a large token liquidation after all
+
     // How much asset would need to be exchanged to liab in order to bring health to 0?
     //
     // That means: what is x (unit: native liab tokens) such that
