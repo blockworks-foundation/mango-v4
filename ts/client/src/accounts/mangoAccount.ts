@@ -115,6 +115,7 @@ export class MangoAccount {
 
   async reloadSerum3OpenOrders(client: MangoClient): Promise<MangoAccount> {
     const serum3Active = this.serum3Active();
+    if (!serum3Active.length) return this;
     const ais =
       await client.program.provider.connection.getMultipleAccountsInfo(
         serum3Active.map((serum3) => serum3.openOrders),
@@ -1352,6 +1353,9 @@ export class PerpPosition {
     }
     return ZERO_I80F48();
   }
+  public getUnsettledFundingUi(perpMarket: PerpMarket): number {
+    return toUiDecimalsForQuote(this.getUnsettledFunding(perpMarket));
+  }
 
   public getEquityUi(perpMarket: PerpMarket): number {
     if (perpMarket.perpMarketIndex !== this.marketIndex) {
@@ -1478,7 +1482,7 @@ export class PerpPosition {
 
     const baseNative = I80F48.fromI64(
       this.basePositionLots.mul(perpMarket.baseLotSize),
-    );
+    ).abs();
     const positionValue = I80F48.fromNumber(
       perpMarket.stablePriceModel.stablePrice,
     )

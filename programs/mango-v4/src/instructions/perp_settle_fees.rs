@@ -28,9 +28,13 @@ pub fn perp_settle_fees(ctx: Context<PerpSettleFees>, max_settle_amount: u64) ->
         MangoError::InvalidBank
     );
 
-    // Get oracle price for market. Price is validated inside
+    // Get oracle prices
     let oracle_price = perp_market.oracle_price(
         &AccountInfoRef::borrow(ctx.accounts.oracle.as_ref())?,
+        None, // staleness checked in health
+    )?;
+    let settle_token_oracle_price = settle_bank.oracle_price(
+        &AccountInfoRef::borrow(ctx.accounts.settle_oracle.as_ref())?,
         None, // staleness checked in health
     )?;
 
@@ -43,18 +47,17 @@ pub fn perp_settle_fees(ctx: Context<PerpSettleFees>, max_settle_amount: u64) ->
     // Calculate PnL
     let pnl = perp_position.unsettled_pnl(&perp_market, oracle_price)?;
 
-    // Account perp position must have a loss to be able to settle against the fee account
-    require!(pnl.is_negative(), MangoError::ProfitabilityMismatch);
-    require!(
-        perp_market.fees_accrued.is_positive(),
-        MangoError::ProfitabilityMismatch
-    );
-
     let settleable_pnl = perp_position.apply_pnl_settle_limit(&perp_market, pnl);
-    require!(
-        settleable_pnl.is_negative(),
-        MangoError::ProfitabilityMismatch
-    );
+
+    if !settleable_pnl.is_negative() || !perp_market.fees_accrued.is_positive() {
+        msg!(
+            "Not settling: pnl {}, perp_market.fees_accrued {}, settleable_pnl {}",
+            pnl,
+            perp_market.fees_accrued,
+            settleable_pnl
+        );
+        return Ok(());
+    }
 
     // Settle for the maximum possible capped to max_settle_amount
     let settlement = settleable_pnl
@@ -93,7 +96,7 @@ pub fn perp_settle_fees(ctx: Context<PerpSettleFees>, max_settle_amount: u64) ->
         token_position,
         settlement,
         Clock::get()?.unix_timestamp.try_into().unwrap(),
-        oracle_price,
+        settle_token_oracle_price,
     )?;
     // Update the settled balance on the market itself
     perp_market.fees_settled += settlement;

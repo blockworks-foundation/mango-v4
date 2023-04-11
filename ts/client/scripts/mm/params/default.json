@@ -5,24 +5,38 @@
   "assets": {
     "BTC": {
       "perp": {
-        "sizePerc": 1,
+        "sizePerc": 0.25,
         "leanCoeff": 0.00025,
         "bias": 0.0,
         "requoteThresh": 0.0002,
         "takeSpammers": true,
         "spammerCharge": 2,
+        "charge": 0.002,
         "krakenCode": "XXBTZUSD"
       }
     },
     "SOL": {
       "perp": {
-        "sizePerc": 1,
+        "sizePerc": 0.25,
         "leanCoeff": 0.00025,
         "bias": 0.0,
         "requoteThresh": 0.0002,
         "takeSpammers": true,
         "spammerCharge": 2,
+        "charge": 0.002,
         "krakenCode": "SOLUSD"
+      }
+    },
+    "ETH": {
+      "perp": {
+        "sizePerc": 0.25,
+        "leanCoeff": 0.00025,
+        "bias": 0.0,
+        "requoteThresh": 0.0002,
+        "takeSpammers": true,
+        "spammerCharge": 2,
+        "charge": 0.002,
+        "krakenCode": "XETHZUSD"
       }
     }
   }

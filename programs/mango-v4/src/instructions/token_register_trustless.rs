@@ -45,9 +45,9 @@ pub fn token_register_trustless(
         avg_utilization: I80F48::ZERO,
         // 10% daily adjustment at 0% or 100% utilization
         adjustment_factor: I80F48::from_num(0.004),
-        util0: I80F48::from_num(0.7),
-        rate0: I80F48::from_num(0.1),
-        util1: I80F48::from_num(0.85),
+        util0: I80F48::from_num(0.5),
+        rate0: I80F48::from_num(0.072),
+        util1: I80F48::from_num(0.8),
         rate1: I80F48::from_num(0.2),
         max_rate: I80F48::from_num(2.0),
         collected_fees_native: I80F48::ZERO,
@@ -69,10 +69,10 @@ pub fn token_register_trustless(
         net_borrow_limit_window_size_ts,
         last_net_borrows_window_start_ts: now_ts / net_borrow_limit_window_size_ts
             * net_borrow_limit_window_size_ts,
-        net_borrow_limit_per_window_quote: 1_000_000_000_000, // 1M USD
+        net_borrow_limit_per_window_quote: 250_000_000_000, // $250k
         net_borrows_in_window: 0,
-        borrow_weight_scale_start_quote: f64::MAX,
-        deposit_weight_scale_start_quote: f64::MAX,
+        borrow_weight_scale_start_quote: 100_000_000_000.0, // $100k
+        deposit_weight_scale_start_quote: 100_000_000_000.0, // $100k
         reduce_only: 0,
         reserved: [0; 2119],
     };
