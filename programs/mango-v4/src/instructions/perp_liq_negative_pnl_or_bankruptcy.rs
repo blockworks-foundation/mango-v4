@@ -98,8 +98,7 @@ pub fn perp_liq_negative_pnl_or_bankruptcy(
         liqor_perp_position.settle_funding(&perp_market);
 
         let liqee_pnl = liqee_perp_position.unsettled_pnl(&perp_market, oracle_price)?;
-        // TODO: deal with positive liqee pnl! Maybe another instruction?
-        require!(liqee_pnl < 0, MangoError::ProfitabilityMismatch);
+        require_gt!(0, liqee_pnl, MangoError::ProfitabilityMismatch);
 
         // Get settleable pnl on the liqee
         liqee_perp_position.update_settle_limit(&perp_market, now_ts);
@@ -148,8 +147,6 @@ pub fn perp_liq_negative_pnl_or_bankruptcy(
     };
     let max_liab_transfer = I80F48::from(max_liab_transfer) - settlement;
 
-    // TODO: Read this with settle_token != insurance_token in mind
-    //
     // Step 2: bankruptcy
     //
     // Remaining pnl that brings the account into negative init health is either:
@@ -165,6 +162,11 @@ pub fn perp_liq_negative_pnl_or_bankruptcy(
         let liab_transfer = max_liab_transfer_from_liqee
             .min(max_liab_transfer)
             .max(I80F48::ZERO);
+
+        // TODO: Read this with settle_token != insurance_token in mind
+
+        // TODO: Need to get the insurance bank and insurance oracle, because that doesn't need to have
+        // anything to do with the settle token!
 
         // Available insurance fund coverage
         let insurance_vault_amount = if perp_market.elligible_for_group_insurance_fund() {
@@ -241,7 +243,7 @@ pub fn perp_liq_negative_pnl_or_bankruptcy(
     };
 
     //
-    // Log positions aftewards
+    // Log positions afterwards
     //
     if settlement > 0 || insurance_transfer > 0 {
         let liqor_token_position = liqor.token_position(settle_token_index)?;
