@@ -40,17 +40,6 @@ pub fn perp_create_market(
     settle_pnl_limit_window_size_ts: u64,
     positive_pnl_liquidation_fee: f32,
 ) -> Result<()> {
-    // Settlement tokens that aren't USDC aren't fully implemented, the main missing steps are:
-    // - In health: the perp health needs to be adjusted by the settlement token weights.
-    //   Otherwise settling perp pnl could decrease health.
-    // - In settle pnl and settle fees: use the settle oracle to convert the pnl from USD to token.
-    // - In perp bankruptcy: fix the assumption that the insurance fund has the same mint as
-    //   the settlement token.
-    require_msg!(
-        settle_token_index == PERP_SETTLE_TOKEN_INDEX,
-        "settlement tokens != USDC are not fully implemented"
-    );
-
     let now_ts: u64 = Clock::get()?.unix_timestamp.try_into().unwrap();
 
     let mut perp_market = ctx.accounts.perp_market.load_init()?;

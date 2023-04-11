@@ -189,8 +189,15 @@ async fn derive_health_check_remaining_account_metas(
             .unwrap();
     }
     if let Some(affected_perp_market_index) = affected_perp_market_index {
+        let pm: PerpMarket = account_loader
+            .load(&get_perp_market_address_by_index(
+                account.fixed.group,
+                affected_perp_market_index,
+            ))
+            .await
+            .unwrap();
         adjusted_account
-            .ensure_perp_position(affected_perp_market_index, QUOTE_TOKEN_INDEX)
+            .ensure_perp_position(affected_perp_market_index, pm.settle_token_index)
             .unwrap();
     }
 
@@ -3476,7 +3483,6 @@ impl ClientInstruction for PerpSettlePnlInstruction {
         let instruction = Self::Instruction {};
 
         let perp_market: PerpMarket = account_loader.load(&self.perp_market).await.unwrap();
-        let settle_bank: Bank = account_loader.load(&self.settle_bank).await.unwrap();
         let account_a = account_loader
             .load_mango_account(&self.account_a)
             .await
@@ -3495,6 +3501,12 @@ impl ClientInstruction for PerpSettlePnlInstruction {
             0,
         )
         .await;
+        let settle_mint_info = get_mint_info_by_token_index(
+            &account_loader,
+            &account_a,
+            perp_market.settle_token_index,
+        )
+        .await;
 
         let accounts = Self::Accounts {
             group: perp_market.group,
@@ -3504,8 +3516,8 @@ impl ClientInstruction for PerpSettlePnlInstruction {
             account_a: self.account_a,
             account_b: self.account_b,
             oracle: perp_market.oracle,
-            settle_bank: self.settle_bank,
-            settle_oracle: settle_bank.oracle,
+            settle_bank: settle_mint_info.first_bank(),
+            settle_oracle: settle_mint_info.oracle,
         };
 
         let mut instruction = make_instruction(program_id, &accounts, instruction);
@@ -3662,17 +3674,9 @@ impl ClientInstruction for PerpLiqBaseOrPositivePnlInstruction {
         )
         .await;
 
-        let group = account_loader.load::<Group>(&group_key).await.unwrap();
-        let quote_mint_info = Pubkey::find_program_address(
-            &[
-                b"MintInfo".as_ref(),
-                group_key.as_ref(),
-                group.insurance_mint.as_ref(),
-            ],
-            &program_id,
-        )
-        .0;
-        let quote_mint_info: MintInfo = account_loader.load(&quote_mint_info).await.unwrap();
+        let settle_mint_info =
+            get_mint_info_by_token_index(&account_loader, &liqee, perp_market.settle_token_index)
+                .await;
 
         let accounts = Self::Accounts {
             group: group_key,
@@ -3681,9 +3685,9 @@ impl ClientInstruction for PerpLiqBaseOrPositivePnlInstruction {
             liqor: self.liqor,
             liqor_owner: self.liqor_owner.pubkey(),
             liqee: self.liqee,
-            settle_bank: quote_mint_info.first_bank(),
-            settle_vault: quote_mint_info.first_vault(),
-            settle_oracle: quote_mint_info.oracle,
+            settle_bank: settle_mint_info.first_bank(),
+            settle_vault: settle_mint_info.first_vault(),
+            settle_oracle: settle_mint_info.oracle,
         };
         let mut instruction = make_instruction(program_id, &accounts, instruction);
         instruction.accounts.extend(health_check_metas);
@@ -3738,16 +3742,9 @@ impl ClientInstruction for PerpLiqNegativePnlOrBankruptcyInstruction {
         .await;
 
         let group = account_loader.load::<Group>(&group_key).await.unwrap();
-        let quote_mint_info = Pubkey::find_program_address(
-            &[
-                b"MintInfo".as_ref(),
-                group_key.as_ref(),
-                group.insurance_mint.as_ref(),
-            ],
-            &program_id,
-        )
-        .0;
-        let quote_mint_info: MintInfo = account_loader.load(&quote_mint_info).await.unwrap();
+        let settle_mint_info =
+            get_mint_info_by_token_index(&account_loader, &liqee, perp_market.settle_token_index)
+                .await;
 
         let accounts = Self::Accounts {
             group: group_key,
@@ -3756,9 +3753,9 @@ impl ClientInstruction for PerpLiqNegativePnlOrBankruptcyInstruction {
             liqee: self.liqee,
             perp_market: self.perp_market,
             oracle: perp_market.oracle,
-            settle_bank: quote_mint_info.first_bank(),
-            settle_vault: quote_mint_info.first_vault(),
-            settle_oracle: quote_mint_info.oracle,
+            settle_bank: settle_mint_info.first_bank(),
+            settle_vault: settle_mint_info.first_vault(),
+            settle_oracle: settle_mint_info.oracle,
             insurance_vault: group.insurance_vault,
             token_program: Token::id(),
         };
