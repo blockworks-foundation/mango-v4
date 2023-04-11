@@ -472,7 +472,7 @@ impl<'a> LiquidateHelper<'a> {
     }
 
     async fn token_liq(&self) -> anyhow::Result<Option<Signature>> {
-        if !self.health_cache.has_spot_assets() || !self.health_cache.has_spot_borrows() {
+        if !self.health_cache.has_possible_spot_liquidations() {
             return Ok(None);
         }
 
@@ -541,7 +541,7 @@ impl<'a> LiquidateHelper<'a> {
     }
 
     async fn token_liq_bankruptcy(&self) -> anyhow::Result<Option<Signature>> {
-        if !self.health_cache.in_phase3_liquidation() || !self.health_cache.has_spot_borrows() {
+        if !self.health_cache.in_phase3_liquidation() || !self.health_cache.has_liq_spot_borrows() {
             return Ok(None);
         }
 

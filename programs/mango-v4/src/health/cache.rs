@@ -562,11 +562,26 @@ impl HealthCache {
         Ok(())
     }
 
-    pub fn has_spot_assets(&self) -> bool {
-        self.token_infos.iter().any(|ti| {
+    pub fn has_liq_spot_assets(&self) -> bool {
+        let health_token_balances =
+            self.effective_token_balances(HealthType::LiquidationEnd, false);
+        health_token_balances.iter().any(|it| {
             // can use token_liq_with_token
-            ti.balance_spot >= 1
+            it.spot_and_perp >= 1
         })
+    }
+
+    pub fn has_liq_spot_borrows(&self) -> bool {
+        let health_token_balances =
+            self.effective_token_balances(HealthType::LiquidationEnd, false);
+        health_token_balances.iter().any(|it| it.spot_and_perp < 0)
+    }
+
+    pub fn has_possible_spot_liquidations(&self) -> bool {
+        let health_token_balances =
+            self.effective_token_balances(HealthType::LiquidationEnd, false);
+        health_token_balances.iter().any(|it| it.spot_and_perp < 0)
+            && health_token_balances.iter().any(|it| it.spot_and_perp >= 1)
     }
 
     pub fn has_serum3_open_orders_funds(&self) -> bool {
@@ -591,8 +606,10 @@ impl HealthCache {
             .any(|p| p.base_lots == 0 && p.quote > 0)
     }
 
-    pub fn has_perp_negative_pnl(&self) -> bool {
-        self.perp_infos.iter().any(|p| p.quote < 0)
+    pub fn has_perp_negative_pnl_no_base(&self) -> bool {
+        self.perp_infos
+            .iter()
+            .any(|p| p.base_lots == 0 && p.quote < 0)
     }
 
     /// Phase1 is spot/perp order cancellation and spot settlement since
@@ -620,7 +637,7 @@ impl HealthCache {
     ///   it changes the base position, so need to wait for it to be processed...)
     /// - bringing positive trusted perp pnl into the spot realm
     pub fn has_phase2_liquidatable(&self) -> bool {
-        self.has_spot_assets() && self.has_spot_borrows()
+        self.has_possible_spot_liquidations()
             || self.has_perp_base_positions()
             || self.has_perp_open_fills()
             || self.has_perp_positive_pnl_no_base()
@@ -629,7 +646,7 @@ impl HealthCache {
     pub fn require_after_phase2_liquidation(&self) -> Result<()> {
         self.require_after_phase1_liquidation()?;
         require!(
-            !self.has_spot_assets() || !self.has_spot_borrows(),
+            !self.has_possible_spot_liquidations(),
             MangoError::HasLiquidatableTokenPosition
         );
         require!(
@@ -655,17 +672,13 @@ impl HealthCache {
     /// - token bankruptcy
     /// - perp bankruptcy
     pub fn has_phase3_liquidatable(&self) -> bool {
-        self.has_spot_borrows() || self.has_perp_negative_pnl()
+        self.has_liq_spot_borrows() || self.has_perp_negative_pnl_no_base()
     }
 
     pub fn in_phase3_liquidation(&self) -> bool {
         !self.has_phase1_liquidatable()
             && !self.has_phase2_liquidatable()
             && self.has_phase3_liquidatable()
-    }
-
-    pub fn has_spot_borrows(&self) -> bool {
-        self.token_infos.iter().any(|ti| ti.balance_spot < 0)
     }
 
     pub(crate) fn compute_serum3_reservations(
