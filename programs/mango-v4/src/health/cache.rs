@@ -565,23 +565,31 @@ impl HealthCache {
     pub fn has_liq_spot_assets(&self) -> bool {
         let health_token_balances =
             self.effective_token_balances(HealthType::LiquidationEnd, false);
-        health_token_balances.iter().any(|it| {
-            // can use token_liq_with_token
-            it.spot_and_perp >= 1
-        })
+        self.token_infos
+            .iter()
+            .zip(health_token_balances.iter())
+            .any(|(ti, b)| {
+                // need 1 native token to use token_liq_with_token
+                ti.balance_spot >= 1 && b.spot_and_perp >= 1
+            })
     }
 
     pub fn has_liq_spot_borrows(&self) -> bool {
         let health_token_balances =
             self.effective_token_balances(HealthType::LiquidationEnd, false);
-        health_token_balances.iter().any(|it| it.spot_and_perp < 0)
+        self.token_infos
+            .iter()
+            .zip(health_token_balances.iter())
+            .any(|(ti, b)| ti.balance_spot < 0 && b.spot_and_perp < 0)
     }
 
+    // This function exists separately from has_liq_spot_assets and has_liq_spot_borrows for performance reasons
     pub fn has_possible_spot_liquidations(&self) -> bool {
         let health_token_balances =
             self.effective_token_balances(HealthType::LiquidationEnd, false);
-        health_token_balances.iter().any(|it| it.spot_and_perp < 0)
-            && health_token_balances.iter().any(|it| it.spot_and_perp >= 1)
+        let all_iter = || self.token_infos.iter().zip(health_token_balances.iter());
+        all_iter().any(|(ti, b)| ti.balance_spot < 0 && b.spot_and_perp < 0)
+            && all_iter().any(|(ti, b)| ti.balance_spot >= 1 && b.spot_and_perp >= 1)
     }
 
     pub fn has_serum3_open_orders_funds(&self) -> bool {
