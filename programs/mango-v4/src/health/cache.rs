@@ -459,7 +459,7 @@ impl HealthCache {
         Ok(&self.token_infos[self.token_info_index(token_index)?])
     }
 
-    fn token_info_index(&self, token_index: TokenIndex) -> Result<usize> {
+    pub fn token_info_index(&self, token_index: TokenIndex) -> Result<usize> {
         self.token_infos
             .iter()
             .position(|t| t.token_index == token_index)

@@ -1,6 +1,5 @@
 use anchor_lang::prelude::*;
 use fixed::types::I80F48;
-use std::cmp::min;
 
 use crate::accounts_ix::*;
 use crate::error::*;
@@ -92,6 +91,8 @@ pub(crate) fn liquidation_action(
     now_ts: u64,
     max_liab_transfer: I80F48,
 ) -> Result<()> {
+    let liq_end_type = HealthType::LiquidationEnd;
+
     // Get the mut banks and oracle prices
     //
     // This must happen _after_ the health computation, since immutable borrows of
@@ -105,12 +106,12 @@ pub(crate) fn liquidation_action(
     let (liqee_asset_position, liqee_asset_raw_index) =
         liqee.token_position_and_raw_index(asset_token_index)?;
     let liqee_asset_native = liqee_asset_position.native(asset_bank);
-    require!(liqee_asset_native.is_positive(), MangoError::SomeError);
+    require_gt!(liqee_asset_native, 0);
 
     let (liqee_liab_position, liqee_liab_raw_index) =
         liqee.token_position_and_raw_index(liab_token_index)?;
     let liqee_liab_native = liqee_liab_position.native(liab_bank);
-    require!(liqee_liab_native.is_negative(), MangoError::SomeError);
+    require_gt!(0, liqee_liab_native);
 
     // Liquidation fees work by giving the liqor more assets than the oracle price would
     // indicate. Specifically we choose
@@ -135,21 +136,45 @@ pub(crate) fn liquidation_action(
         .token_info(liab_token_index)
         .unwrap()
         .prices
-        .liab(HealthType::LiquidationEnd);
+        .liab(liq_end_type);
     // Health price for an asset of one native asset token
     let asset_liq_end_price = liqee_health_cache
         .token_info(asset_token_index)
         .unwrap()
         .prices
-        .asset(HealthType::LiquidationEnd);
+        .asset(liq_end_type);
 
-    // TODO: This computation should be broken now, because perp hpnl could affect the
-    // effective token balance!
-    // TODO: Look at this from first principles as a phase2 liq action:
-    // - perp_liq_base_or_positive_pnl always increases the health token position
-    // - this instruction should only allow increasing health token position until it's >=0
-    // - but it probably shouldn't compensate for negative hpnl effects? an account with huge
-    //   negative hpnl shouldn't cause a large token liquidation after all
+    let liqee_health_token_balances =
+        liqee_health_cache.effective_token_balances(liq_end_type, false);
+
+    // At this point we've established that the liqee has a negative liab token position.
+    // However, the hupnl from perp markets can bring the health contribution for the token
+    // to a positive value.
+    // We'll only liquidate while the health token position is negative and rely on perp
+    // liquidation to offset the remainder by converting the upnl to a real spot position.
+    // At the same time an account with a very negative hupnl should not cause a large
+    // token liquidation: it'd be a way for perp losses to escape into the spot world. Only
+    // liquidate while the actual spot position is negative.
+    let liqee_liab_health_balance = liqee_health_token_balances
+        [liqee_health_cache.token_info_index(liab_token_index)?]
+    .spot_and_perp;
+    let max_liab_liquidation = max_liab_transfer
+        .min(-liqee_liab_native)
+        .min(-liqee_liab_health_balance)
+        .max(I80F48::ZERO);
+
+    // Similarly to the above, we should only reduce the asset token position while the
+    // health token balance and the actual token balance stay positive. Otherwise we'd be
+    // creating a new liability once perp upnl is settled.
+    let liqee_asset_health_balance = liqee_health_token_balances
+        [liqee_health_cache.token_info_index(asset_token_index)?]
+    .spot_and_perp;
+    let max_asset_transfer = liqee_asset_native
+        .min(liqee_asset_health_balance)
+        .max(I80F48::ZERO);
+
+    require_gt!(max_liab_liquidation, 0);
+    require_gt!(max_asset_transfer, 0);
 
     // How much asset would need to be exchanged to liab in order to bring health to 0?
     //
@@ -170,6 +195,7 @@ pub(crate) fn liquidation_action(
     //   y = x * lopa / aop   (native asset tokens, see above)
     //
     // Result: x = -init_health / (ilw * llep - iaw * lopa * alep / aop)
+    // TODO: the liq_end_price is the same as the oracle price again! Simplify here.
     let liab_needed = -liqee_liq_end_health
         / (liab_liq_end_price * init_liab_weight
             - liab_oracle_price_adjusted
@@ -177,13 +203,13 @@ pub(crate) fn liquidation_action(
                 * (asset_liq_end_price / asset_oracle_price));
 
     // How much liab can we get at most for the asset balance?
-    let liab_possible = liqee_asset_native * asset_oracle_price / liab_oracle_price_adjusted;
+    let liab_possible = max_asset_transfer * asset_oracle_price / liab_oracle_price_adjusted;
 
     // The amount of liab native tokens we will transfer
-    let liab_transfer = min(
-        min(min(liab_needed, -liqee_liab_native), liab_possible),
-        max_liab_transfer,
-    );
+    let liab_transfer = liab_needed
+        .min(liab_possible)
+        .min(max_liab_liquidation)
+        .max(I80F48::ZERO);
 
     // The amount of asset native tokens we will give up for them
     let asset_transfer = liab_transfer * liab_oracle_price_adjusted / asset_oracle_price;
