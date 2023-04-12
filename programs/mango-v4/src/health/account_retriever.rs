@@ -189,6 +189,72 @@ impl<T: KeyedAccountReader> AccountRetriever for FixedOrderAccountRetriever<T> {
     }
 }
 
+pub struct ScannedBanksAndOracles<'a, 'info> {
+    banks: Vec<AccountInfoRefMut<'a, 'info>>,
+    oracles: Vec<AccountInfoRef<'a, 'info>>,
+    index_map: HashMap<TokenIndex, usize>,
+    staleness_slot: Option<u64>,
+}
+
+impl<'a, 'info> ScannedBanksAndOracles<'a, 'info> {
+    #[inline]
+    fn bank_index(&self, token_index: TokenIndex) -> Result<usize> {
+        Ok(*self.index_map.get(&token_index).ok_or_else(|| {
+            error_msg_typed!(
+                MangoError::TokenPositionDoesNotExist,
+                "token index {} not found",
+                token_index
+            )
+        })?)
+    }
+
+    #[allow(clippy::type_complexity)]
+    pub fn banks_mut_and_oracles(
+        &mut self,
+        token_index1: TokenIndex,
+        token_index2: TokenIndex,
+    ) -> Result<(&mut Bank, I80F48, Option<(&mut Bank, I80F48)>)> {
+        if token_index1 == token_index2 {
+            let index = self.bank_index(token_index1)?;
+            let bank = self.banks[index].load_mut_fully_unchecked::<Bank>()?;
+            let oracle = &self.oracles[index];
+            let price = bank.oracle_price(oracle, self.staleness_slot)?;
+            return Ok((bank, price, None));
+        }
+        let index1 = self.bank_index(token_index1)?;
+        let index2 = self.bank_index(token_index2)?;
+        let (first, second, swap) = if index1 < index2 {
+            (index1, index2, false)
+        } else {
+            (index2, index1, true)
+        };
+
+        // split_at_mut after the first bank and after the second bank
+        let (first_bank_part, second_bank_part) = self.banks.split_at_mut(first + 1);
+
+        let bank1 = first_bank_part[first].load_mut_fully_unchecked::<Bank>()?;
+        let bank2 = second_bank_part[second - (first + 1)].load_mut_fully_unchecked::<Bank>()?;
+        let oracle1 = &self.oracles[first];
+        let oracle2 = &self.oracles[second];
+        let price1 = bank1.oracle_price(oracle1, self.staleness_slot)?;
+        let price2 = bank2.oracle_price(oracle2, self.staleness_slot)?;
+        if swap {
+            Ok((bank2, price2, Some((bank1, price1))))
+        } else {
+            Ok((bank1, price1, Some((bank2, price2))))
+        }
+    }
+
+    pub fn scanned_bank_and_oracle(&self, token_index: TokenIndex) -> Result<(&Bank, I80F48)> {
+        let index = self.bank_index(token_index)?;
+        // The account was already loaded successfully during construction
+        let bank = self.banks[index].load_fully_unchecked::<Bank>()?;
+        let oracle = &self.oracles[index];
+        let price = bank.oracle_price(oracle, self.staleness_slot)?;
+        Ok((bank, price))
+    }
+}
+
 /// Takes a list of account infos containing
 /// - an unknown number of Banks in any order, followed by
 /// - the same number of oracles in the same order as the banks, followed by
@@ -198,14 +264,11 @@ impl<T: KeyedAccountReader> AccountRetriever for FixedOrderAccountRetriever<T> {
 /// and retrieves accounts needed for the health computation by doing a linear
 /// scan for each request.
 pub struct ScanningAccountRetriever<'a, 'info> {
-    banks: Vec<AccountInfoRefMut<'a, 'info>>,
-    oracles: Vec<AccountInfoRef<'a, 'info>>,
+    banks_and_oracles: ScannedBanksAndOracles<'a, 'info>,
     perp_markets: Vec<AccountInfoRef<'a, 'info>>,
     perp_oracles: Vec<AccountInfoRef<'a, 'info>>,
     serum3_oos: Vec<AccountInfoRef<'a, 'info>>,
-    token_index_map: HashMap<TokenIndex, usize>,
     perp_index_map: HashMap<PerpMarketIndex, usize>,
-    staleness_slot: Option<u64>,
 }
 
 /// Returns None if `ai` doesn't have the owner or discriminator for T.
@@ -285,26 +348,17 @@ impl<'a, 'info> ScanningAccountRetriever<'a, 'info> {
         let serum3_start = perp_oracles_start + n_perps;
 
         Ok(Self {
-            banks: AccountInfoRefMut::borrow_slice(&ais[..n_banks])?,
-            oracles: AccountInfoRef::borrow_slice(&ais[n_banks..perps_start])?,
+            banks_and_oracles: ScannedBanksAndOracles {
+                banks: AccountInfoRefMut::borrow_slice(&ais[..n_banks])?,
+                oracles: AccountInfoRef::borrow_slice(&ais[n_banks..perps_start])?,
+                index_map: token_index_map,
+                staleness_slot,
+            },
             perp_markets: AccountInfoRef::borrow_slice(&ais[perps_start..perp_oracles_start])?,
             perp_oracles: AccountInfoRef::borrow_slice(&ais[perp_oracles_start..serum3_start])?,
             serum3_oos: AccountInfoRef::borrow_slice(&ais[serum3_start..])?,
-            token_index_map,
             perp_index_map,
-            staleness_slot,
         })
-    }
-
-    #[inline]
-    fn bank_index(&self, token_index: TokenIndex) -> Result<usize> {
-        Ok(*self.token_index_map.get(&token_index).ok_or_else(|| {
-            error_msg_typed!(
-                MangoError::TokenPositionDoesNotExist,
-                "token index {} not found",
-                token_index
-            )
-        })?)
     }
 
     #[inline]
@@ -321,44 +375,12 @@ impl<'a, 'info> ScanningAccountRetriever<'a, 'info> {
         token_index1: TokenIndex,
         token_index2: TokenIndex,
     ) -> Result<(&mut Bank, I80F48, Option<(&mut Bank, I80F48)>)> {
-        if token_index1 == token_index2 {
-            let index = self.bank_index(token_index1)?;
-            let bank = self.banks[index].load_mut_fully_unchecked::<Bank>()?;
-            let oracle = &self.oracles[index];
-            let price = bank.oracle_price(oracle, self.staleness_slot)?;
-            return Ok((bank, price, None));
-        }
-        let index1 = self.bank_index(token_index1)?;
-        let index2 = self.bank_index(token_index2)?;
-        let (first, second, swap) = if index1 < index2 {
-            (index1, index2, false)
-        } else {
-            (index2, index1, true)
-        };
-
-        // split_at_mut after the first bank and after the second bank
-        let (first_bank_part, second_bank_part) = self.banks.split_at_mut(first + 1);
-
-        let bank1 = first_bank_part[first].load_mut_fully_unchecked::<Bank>()?;
-        let bank2 = second_bank_part[second - (first + 1)].load_mut_fully_unchecked::<Bank>()?;
-        let oracle1 = &self.oracles[first];
-        let oracle2 = &self.oracles[second];
-        let price1 = bank1.oracle_price(oracle1, self.staleness_slot)?;
-        let price2 = bank2.oracle_price(oracle2, self.staleness_slot)?;
-        if swap {
-            Ok((bank2, price2, Some((bank1, price1))))
-        } else {
-            Ok((bank1, price1, Some((bank2, price2))))
-        }
+        self.banks_and_oracles
+            .banks_mut_and_oracles(token_index1, token_index2)
     }
 
     pub fn scanned_bank_and_oracle(&self, token_index: TokenIndex) -> Result<(&Bank, I80F48)> {
-        let index = self.bank_index(token_index)?;
-        // The account was already loaded successfully during construction
-        let bank = self.banks[index].load_fully_unchecked::<Bank>()?;
-        let oracle = &self.oracles[index];
-        let price = bank.oracle_price(oracle, self.staleness_slot)?;
-        Ok((bank, price))
+        self.banks_and_oracles.scanned_bank_and_oracle(token_index)
     }
 
     pub fn scanned_perp_market_and_oracle(
@@ -369,7 +391,7 @@ impl<'a, 'info> ScanningAccountRetriever<'a, 'info> {
         // The account was already loaded successfully during construction
         let perp_market = self.perp_markets[index].load_fully_unchecked::<PerpMarket>()?;
         let oracle_acc = &self.perp_oracles[index];
-        let price = perp_market.oracle_price(oracle_acc, self.staleness_slot)?;
+        let price = perp_market.oracle_price(oracle_acc, self.banks_and_oracles.staleness_slot)?;
         Ok((perp_market, price))
     }
 
@@ -380,6 +402,10 @@ impl<'a, 'info> ScanningAccountRetriever<'a, 'info> {
             .find(|ai| ai.key == key)
             .ok_or_else(|| error_msg!("no serum3 open orders for key {}", key))?;
         serum3_cpi::load_open_orders(oo)
+    }
+
+    pub fn into_banks_and_oracles(self) -> ScannedBanksAndOracles<'a, 'info> {
+        self.banks_and_oracles
     }
 }
 
@@ -467,9 +493,9 @@ mod tests {
         let mut retriever =
             ScanningAccountRetriever::new_with_staleness(&ais, &group, None).unwrap();
 
-        assert_eq!(retriever.banks.len(), 3);
-        assert_eq!(retriever.token_index_map.len(), 3);
-        assert_eq!(retriever.oracles.len(), 3);
+        assert_eq!(retriever.banks_and_oracles.banks.len(), 3);
+        assert_eq!(retriever.banks_and_oracles.index_map.len(), 3);
+        assert_eq!(retriever.banks_and_oracles.oracles.len(), 3);
         assert_eq!(retriever.perp_markets.len(), 2);
         assert_eq!(retriever.perp_oracles.len(), 2);
         assert_eq!(retriever.perp_index_map.len(), 2);
