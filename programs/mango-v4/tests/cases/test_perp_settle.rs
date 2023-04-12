@@ -1,7 +1,7 @@
 use super::*;
 
 #[tokio::test]
-async fn test_perp_settle_pnl() -> Result<(), TransportError> {
+async fn test_perp_settle_pnl_basic() -> Result<(), TransportError> {
     let context = TestContext::new().await;
     let solana = &context.solana.clone();
 
@@ -177,26 +177,6 @@ async fn test_perp_settle_pnl() -> Result<(), TransportError> {
         assert_eq!(mango_account_1.perps[0].quote_position_native(), 100_000);
     }
 
-    // Bank must be valid for quote currency
-    let result = send_tx(
-        solana,
-        PerpSettlePnlInstruction {
-            settler,
-            settler_owner,
-            account_a: account_1,
-            account_b: account_0,
-            perp_market,
-            settle_bank: tokens[1].bank,
-        },
-    )
-    .await;
-
-    assert_mango_error(
-        &result,
-        MangoError::InvalidBank.into(),
-        "Bank must be valid for quote currency".to_string(),
-    );
-
     // Cannot settle with yourself
     let result = send_tx(
         solana,
@@ -206,7 +186,6 @@ async fn test_perp_settle_pnl() -> Result<(), TransportError> {
             account_a: account_0,
             account_b: account_0,
             perp_market,
-            settle_bank: tokens[0].bank,
         },
     )
     .await;
@@ -226,7 +205,6 @@ async fn test_perp_settle_pnl() -> Result<(), TransportError> {
             account_a: account_0,
             account_b: account_1,
             perp_market: perp_market_2,
-            settle_bank: tokens[0].bank,
         },
     )
     .await;
@@ -267,7 +245,6 @@ async fn test_perp_settle_pnl() -> Result<(), TransportError> {
             account_a: account_1,
             account_b: account_0,
             perp_market,
-            settle_bank: tokens[0].bank,
         },
     )
     .await;
@@ -329,7 +306,6 @@ async fn test_perp_settle_pnl() -> Result<(), TransportError> {
             account_a: account_0,
             account_b: account_1,
             perp_market,
-            settle_bank: tokens[0].bank,
         },
     )
     .await
@@ -421,7 +397,6 @@ async fn test_perp_settle_pnl() -> Result<(), TransportError> {
             account_a: account_1,
             account_b: account_0,
             perp_market,
-            settle_bank: tokens[0].bank,
         },
     )
     .await
@@ -678,7 +653,6 @@ async fn test_perp_settle_pnl_fees() -> Result<(), TransportError> {
             account_a: account_0,
             account_b: account_1,
             perp_market,
-            settle_bank,
         },
     )
     .await
@@ -746,7 +720,6 @@ async fn test_perp_settle_pnl_fees() -> Result<(), TransportError> {
             account_a: account_0,
             account_b: account_1,
             perp_market,
-            settle_bank,
         },
     )
     .await
@@ -962,7 +935,6 @@ async fn test_perp_pnl_settle_limit() -> Result<(), TransportError> {
             account_a: account_0,
             account_b: account_1,
             perp_market,
-            settle_bank: tokens[0].bank,
         },
     )
     .await
@@ -995,7 +967,6 @@ async fn test_perp_pnl_settle_limit() -> Result<(), TransportError> {
             account_a: account_0,
             account_b: account_1,
             perp_market,
-            settle_bank: tokens[0].bank,
         },
     )
     .await;
@@ -1087,7 +1058,6 @@ async fn test_perp_pnl_settle_limit() -> Result<(), TransportError> {
             account_a: account_0,
             account_b: account_1,
             perp_market,
-            settle_bank: tokens[0].bank,
         },
     )
     .await
@@ -1129,7 +1099,6 @@ async fn test_perp_pnl_settle_limit() -> Result<(), TransportError> {
             account_a: account_0,
             account_b: account_1,
             perp_market,
-            settle_bank: tokens[0].bank,
         },
     )
     .await
@@ -1159,7 +1128,6 @@ async fn test_perp_pnl_settle_limit() -> Result<(), TransportError> {
             account_a: account_0,
             account_b: account_1,
             perp_market,
-            settle_bank: tokens[0].bank,
         },
     )
     .await
@@ -1192,7 +1160,6 @@ async fn test_perp_pnl_settle_limit() -> Result<(), TransportError> {
             account_a: account_0,
             account_b: account_1,
             perp_market,
-            settle_bank: tokens[0].bank,
         },
     )
     .await

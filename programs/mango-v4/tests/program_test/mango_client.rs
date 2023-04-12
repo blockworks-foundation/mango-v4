@@ -3469,7 +3469,6 @@ pub struct PerpSettlePnlInstruction {
     pub account_a: Pubkey,
     pub account_b: Pubkey,
     pub perp_market: Pubkey,
-    pub settle_bank: Pubkey,
 }
 #[async_trait::async_trait(?Send)]
 impl ClientInstruction for PerpSettlePnlInstruction {

@@ -442,7 +442,6 @@ async fn test_liq_perps_base_and_bankruptcy() -> Result<(), TransportError> {
             account_a: liqor,
             account_b: account_1,
             perp_market,
-            settle_bank: tokens[0].bank,
         },
     )
     .await
