@@ -3533,7 +3533,6 @@ impl ClientInstruction for PerpSettlePnlInstruction {
 pub struct PerpSettleFeesInstruction {
     pub account: Pubkey,
     pub perp_market: Pubkey,
-    pub settle_bank: Pubkey,
     pub max_settle_amount: u64,
 }
 #[async_trait::async_trait(?Send)]
@@ -3550,7 +3549,6 @@ impl ClientInstruction for PerpSettleFeesInstruction {
         };
 
         let perp_market: PerpMarket = account_loader.load(&self.perp_market).await.unwrap();
-        let settle_bank: Bank = account_loader.load(&self.settle_bank).await.unwrap();
         let account = account_loader
             .load_mango_account(&self.account)
             .await
@@ -3563,14 +3561,17 @@ impl ClientInstruction for PerpSettleFeesInstruction {
             Some(perp_market.perp_market_index),
         )
         .await;
+        let settle_mint_info =
+            get_mint_info_by_token_index(&account_loader, &account, perp_market.settle_token_index)
+                .await;
 
         let accounts = Self::Accounts {
             group: perp_market.group,
             perp_market: self.perp_market,
             account: self.account,
             oracle: perp_market.oracle,
-            settle_bank: self.settle_bank,
-            settle_oracle: settle_bank.oracle,
+            settle_bank: settle_mint_info.first_bank(),
+            settle_oracle: settle_mint_info.oracle,
         };
         let mut instruction = make_instruction(program_id, &accounts, instruction);
         instruction.accounts.extend(health_check_metas);

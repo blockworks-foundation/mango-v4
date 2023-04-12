@@ -81,17 +81,6 @@ impl Into<Keypair> for &TestKeypair {
     }
 }
 
-pub fn get_pnl_native(
-    perp_position: &PerpPosition,
-    perp_market: &PerpMarket,
-    oracle_price: I80F48,
-) -> I80F48 {
-    let contract_size = perp_market.base_lot_size;
-    let new_quote_pos =
-        I80F48::from_num(-perp_position.base_position_lots() * contract_size) * oracle_price;
-    perp_position.quote_position_native() - new_quote_pos
-}
-
 pub fn assert_mango_error<T>(
     result: &Result<T, TransportError>,
     expected_error: u32,

@@ -266,11 +266,16 @@ async fn test_perp_settle_pnl_basic() -> Result<(), TransportError> {
         let mango_account_1 = solana.get_account::<MangoAccount>(account_1).await;
         let perp_market = solana.get_account::<PerpMarket>(perp_market).await;
         assert_eq!(
-            get_pnl_native(&mango_account_0.perps[0], &perp_market, I80F48::from(1005)).round(),
+            mango_account_0.perps[0]
+                .unsettled_pnl(&perp_market, I80F48::from(1005))
+                .unwrap()
+                .round(),
             expected_pnl_0
         );
         assert_eq!(
-            get_pnl_native(&mango_account_1.perps[0], &perp_market, I80F48::from(1005)),
+            mango_account_1.perps[0]
+                .unsettled_pnl(&perp_market, I80F48::from(1005))
+                .unwrap(),
             expected_pnl_1
         );
     }
@@ -286,11 +291,16 @@ async fn test_perp_settle_pnl_basic() -> Result<(), TransportError> {
         let mango_account_1 = solana.get_account::<MangoAccount>(account_1).await;
         let perp_market = solana.get_account::<PerpMarket>(perp_market).await;
         assert_eq!(
-            get_pnl_native(&mango_account_0.perps[0], &perp_market, I80F48::from(1500)).round(),
+            mango_account_0.perps[0]
+                .unsettled_pnl(&perp_market, I80F48::from(1500))
+                .unwrap()
+                .round(),
             expected_pnl_0
         );
         assert_eq!(
-            get_pnl_native(&mango_account_1.perps[0], &perp_market, I80F48::from(1500)),
+            mango_account_1.perps[0]
+                .unsettled_pnl(&perp_market, I80F48::from(1500))
+                .unwrap(),
             expected_pnl_1
         );
     }
@@ -378,11 +388,17 @@ async fn test_perp_settle_pnl_basic() -> Result<(), TransportError> {
         let mango_account_1 = solana.get_account::<MangoAccount>(account_1).await;
         let perp_market = solana.get_account::<PerpMarket>(perp_market).await;
         assert_eq!(
-            get_pnl_native(&mango_account_0.perps[0], &perp_market, I80F48::from(995)).round(),
+            mango_account_0.perps[0]
+                .unsettled_pnl(&perp_market, I80F48::from(995))
+                .unwrap()
+                .round(),
             expected_pnl_0
         );
         assert_eq!(
-            get_pnl_native(&mango_account_1.perps[0], &perp_market, I80F48::from(995)).round(),
+            mango_account_1.perps[0]
+                .unsettled_pnl(&perp_market, I80F48::from(995))
+                .unwrap()
+                .round(),
             expected_pnl_1
         );
     }
@@ -457,11 +473,17 @@ async fn test_perp_settle_pnl_basic() -> Result<(), TransportError> {
         let mango_account_1 = solana.get_account::<MangoAccount>(account_1).await;
         let perp_market = solana.get_account::<PerpMarket>(perp_market).await;
         assert_eq!(
-            get_pnl_native(&mango_account_0.perps[0], &perp_market, I80F48::from(995)).round(),
+            mango_account_0.perps[0]
+                .unsettled_pnl(&perp_market, I80F48::from(995))
+                .unwrap()
+                .round(),
             -20 // fees
         );
         assert_eq!(
-            get_pnl_native(&mango_account_1.perps[0], &perp_market, I80F48::from(995)).round(),
+            mango_account_1.perps[0]
+                .unsettled_pnl(&perp_market, I80F48::from(995))
+                .unwrap()
+                .round(),
             0
         );
     }
