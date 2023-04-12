@@ -432,7 +432,6 @@ async fn test_liq_perps_base_and_bankruptcy() -> Result<(), TransportError> {
     let liqor_max_settle = liqor_data.perps[0]
         .available_settle_limit(&perp_market_data)
         .1;
-    let account_1_quote_before = account_position(solana, account_1, quote_token.bank).await;
 
     send_tx(
         solana,

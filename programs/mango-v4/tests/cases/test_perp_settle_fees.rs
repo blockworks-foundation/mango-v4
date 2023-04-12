@@ -9,7 +9,6 @@ async fn test_perp_settle_fees() -> Result<(), TransportError> {
     let owner = context.users[0].key;
     let payer = context.users[1].key;
     let mints = &context.mints[0..4];
-    let payer_mint_accounts = &context.users[1].token_accounts[0..4];
 
     let initial_token_deposit = 1_000_000;
 
@@ -26,10 +25,10 @@ async fn test_perp_settle_fees() -> Result<(), TransportError> {
     .create(solana)
     .await;
 
-    let quote_token = &tokens[0];
+    let _quote_token = &tokens[0];
     let base_token0 = &tokens[1];
     let base_token1 = &tokens[2];
-    let settle_token = &tokens[3];
+    let _settle_token = &tokens[3];
 
     let account_0 = create_funded_account(
         &solana,
@@ -247,7 +246,8 @@ async fn test_perp_settle_fees() -> Result<(), TransportError> {
             max_settle_amount: u64::MAX,
         },
     )
-    .await;
+    .await
+    .unwrap();
     // No change
     {
         let perp_market = solana.get_account::<PerpMarket>(perp_market).await;

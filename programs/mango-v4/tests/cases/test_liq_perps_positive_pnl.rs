@@ -52,7 +52,7 @@ async fn test_liq_perps_positive_pnl() -> Result<(), TransportError> {
         tx.send().await.unwrap();
     }
 
-    let quote_token = &tokens[0];
+    let _quote_token = &tokens[0];
     let base_token = &tokens[1];
     let borrow_token = &tokens[2];
     let settle_token = &tokens[3];

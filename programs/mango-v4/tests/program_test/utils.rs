@@ -2,7 +2,6 @@
 
 use bytemuck::{bytes_of, Contiguous};
 use fixed::types::I80F48;
-use mango_v4::state::{PerpMarket, PerpPosition};
 use solana_program::instruction::InstructionError;
 use solana_program::program_error::ProgramError;
 use solana_sdk::pubkey::Pubkey;
