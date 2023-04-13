@@ -291,7 +291,7 @@ impl MangoGroupContext {
             .active_token_positions()
             .chain(account1.active_token_positions())
             .map(|ta| ta.token_index)
-            .chain(affected_tokens.iter())
+            .chain(affected_tokens.iter().copied())
             .unique();
 
         for token_index in token_indexes {
