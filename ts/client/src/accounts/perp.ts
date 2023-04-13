@@ -911,6 +911,7 @@ export class PerpOrder {
       perpMarket.perpMarketIndex,
       isExpired,
       isOraclePegged,
+      leafNode.orderType,
       oraclePeggedProperties,
     );
   }
@@ -931,6 +932,7 @@ export class PerpOrder {
     public perpMarketIndex: number,
     public isExpired = false,
     public isOraclePegged = false,
+    public orderType: PerpOrderType,
     public oraclePeggedProperties?: OraclePeggedProperties,
   ) {}
 
