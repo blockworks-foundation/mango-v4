@@ -10,13 +10,15 @@ pub struct PerpForceClosePosition<'info> {
     pub group: AccountLoader<'info, Group>,
 
     #[account(
+        mut,
         has_one = group, 
         has_one = oracle,
         constraint = perp_market.load()?.is_force_close()
     )]
     pub perp_market: AccountLoader<'info, PerpMarket>,
 
-    #[account(mut,
+    #[account(
+        mut,
         has_one = group,
         constraint = account_a.load()?.is_operational() @ MangoError::AccountIsFrozen,
         constraint = account_a.key() != account_b.key()

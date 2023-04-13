@@ -902,6 +902,12 @@ pub mod mango_v4 {
         Ok(())
     }
 
+    pub fn perp_force_close_position(ctx: Context<PerpForceClosePosition>) -> Result<()> {
+        #[cfg(feature = "enable-gpl")]
+        instructions::perp_force_close_position(ctx)?;
+        Ok(())
+    }
+
     pub fn perp_settle_fees(ctx: Context<PerpSettleFees>, max_settle_amount: u64) -> Result<()> {
         #[cfg(feature = "enable-gpl")]
         instructions::perp_settle_fees(ctx, max_settle_amount)?;

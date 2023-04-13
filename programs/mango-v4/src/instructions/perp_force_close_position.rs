@@ -33,16 +33,8 @@ pub fn perp_force_close_position(ctx: Context<PerpForceClosePosition>) -> Result
         .min(account_b_perp_position.base_position_lots().abs())
         .max(0);
 
-    let staleness_slot = perp_market
-        .oracle_config
-        .max_staleness_slots
-        .try_into()
-        .unwrap();
     let oracle_price = perp_market
-        .oracle_price(
-            &AccountInfoRef::borrow(ctx.accounts.oracle.as_ref())?,
-            Some(staleness_slot),
-        )
+        .oracle_price(&AccountInfoRef::borrow(ctx.accounts.oracle.as_ref())?, None)
         .unwrap();
     let quote_transfer = I80F48::from(base_transfer * perp_market.base_lot_size) * oracle_price;
 
