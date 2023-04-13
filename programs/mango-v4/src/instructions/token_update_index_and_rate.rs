@@ -71,7 +71,12 @@ pub fn token_update_index_and_rate(ctx: Context<TokenUpdateIndexAndRate>) -> Res
     {
         let mut some_bank = ctx.remaining_accounts[0].load_mut::<Bank>()?;
 
-        let diff_ts = I80F48::from_num(now_ts - some_bank.index_last_updated);
+        // Limit the maximal time interval that interest is applied for. This means we won't use
+        // a fixed interest rate for a very long time period in exceptional circumstances, like
+        // when there is a solana downtime or the security council disables this instruction.
+        let max_interest_timestep = 3600; // hour
+        let diff_ts =
+            I80F48::from_num((now_ts - some_bank.index_last_updated).min(max_interest_timestep));
 
         let (deposit_index, borrow_index, borrow_fees, borrow_rate, deposit_rate) =
             some_bank.compute_index(indexed_total_deposits, indexed_total_borrows, diff_ts)?;

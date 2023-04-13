@@ -1,8 +1,8 @@
 import { AnchorProvider, Wallet } from '@coral-xyz/anchor';
 import { Connection, Keypair, PublicKey } from '@solana/web3.js';
 import fs from 'fs';
-import { MangoClient } from '../src/client';
-import { MANGO_V4_ID } from '../src/constants';
+import { MangoClient } from '../../src/client';
+import { MANGO_V4_ID } from '../../src/constants';
 
 //
 // An example for users based on high level api i.e. the client

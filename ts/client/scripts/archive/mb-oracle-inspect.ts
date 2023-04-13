@@ -4,8 +4,8 @@ import {
   isPythOracle,
   isSwitchboardOracle,
   parseSwitchboardOracle,
-} from '../src/accounts/oracle';
-import { toNativeI80F48 } from '../src/utils';
+} from '../../src/accounts/oracle';
+import { toNativeI80F48 } from '../../src/utils';
 const { MB_CLUSTER_URL } = process.env;
 
 async function decodePrice(conn, ai): Promise<void> {

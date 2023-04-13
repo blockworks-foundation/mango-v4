@@ -44,9 +44,10 @@ impl Message {
                 trace!("websocket account message");
                 chain.update_account(
                     account_write.pubkey,
-                    AccountAndSlot {
+                    AccountData {
                         slot: account_write.slot,
                         account: account_write.account.clone(),
+                        write_version: 1,
                     },
                 );
             }
@@ -54,9 +55,10 @@ impl Message {
                 for account_update in snapshot {
                     chain.update_account(
                         account_update.pubkey,
-                        chain_data::AccountAndSlot {
+                        chain_data::AccountData {
                             slot: account_update.slot,
                             account: account_update.account.clone(),
+                            write_version: 0,
                         },
                     );
                 }

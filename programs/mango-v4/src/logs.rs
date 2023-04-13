@@ -146,6 +146,7 @@ pub struct PerpUpdateFundingLog {
     pub price: i128,
     pub stable_price: i128,
     pub fees_accrued: i128,
+    pub fees_settled: i128,
     pub open_interest: i64,
     pub instantaneous_funding_rate: i128,
 }

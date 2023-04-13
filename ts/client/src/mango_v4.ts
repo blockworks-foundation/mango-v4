@@ -1,5 +1,5 @@
 export type MangoV4 = {
-  "version": "0.10.0",
+  "version": "0.11.0",
   "name": "mango_v4",
   "instructions": [
     {
@@ -2611,9 +2611,7 @@ export type MangoV4 = {
         },
         {
           "name": "maxLiabTransfer",
-          "type": {
-            "defined": "I80F48"
-          }
+          "type": "u64"
         }
       ]
     },
@@ -7714,6 +7712,11 @@ export type MangoV4 = {
           "index": false
         },
         {
+          "name": "feesSettled",
+          "type": "i128",
+          "index": false
+        },
+        {
           "name": "openInterest",
           "type": "i64",
           "index": false
@@ -8733,12 +8736,17 @@ export type MangoV4 = {
       "code": 6045,
       "name": "HealthRegionBadInnerInstruction",
       "msg": "HealthRegions allow only specific instructions between Begin and End"
+    },
+    {
+      "code": 6046,
+      "name": "TokenInForceClose",
+      "msg": "token is in force close"
     }
   ]
 };
 
 export const IDL: MangoV4 = {
-  "version": "0.10.0",
+  "version": "0.11.0",
   "name": "mango_v4",
   "instructions": [
     {
@@ -11350,9 +11358,7 @@ export const IDL: MangoV4 = {
         },
         {
           "name": "maxLiabTransfer",
-          "type": {
-            "defined": "I80F48"
-          }
+          "type": "u64"
         }
       ]
     },
@@ -16453,6 +16459,11 @@ export const IDL: MangoV4 = {
           "index": false
         },
         {
+          "name": "feesSettled",
+          "type": "i128",
+          "index": false
+        },
+        {
           "name": "openInterest",
           "type": "i64",
           "index": false
@@ -17472,6 +17483,11 @@ export const IDL: MangoV4 = {
       "code": 6045,
       "name": "HealthRegionBadInnerInstruction",
       "msg": "HealthRegions allow only specific instructions between Begin and End"
+    },
+    {
+      "code": 6046,
+      "name": "TokenInForceClose",
+      "msg": "token is in force close"
     }
   ]
 };

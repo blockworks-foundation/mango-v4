@@ -288,7 +288,14 @@ impl PerpMarket {
             (None, None) => I80F48::ZERO,
         };
 
-        let diff_ts = I80F48::from_num(now_ts - self.funding_last_updated as u64);
+        // Limit the maximal time interval that funding is applied for. This means we won't use
+        // the funding rate computed from a single orderbook snapshot for a very long time period
+        // in exceptional circumstances, like a solana downtime or the security council disabling
+        // funding updates.
+        let max_funding_timestep = 3600; // one hour
+        let diff_ts =
+            I80F48::from_num((now_ts - self.funding_last_updated as u64).min(max_funding_timestep));
+
         let time_factor = diff_ts / DAY_I80F48;
         let base_lot_size = I80F48::from_num(self.base_lot_size);
 
@@ -306,10 +313,11 @@ impl PerpMarket {
             mango_group: self.group,
             market_index: self.perp_market_index,
             long_funding: self.long_funding.to_bits(),
-            short_funding: self.long_funding.to_bits(),
+            short_funding: self.short_funding.to_bits(),
             price: oracle_price.to_bits(),
             stable_price: self.stable_price().to_bits(),
             fees_accrued: self.fees_accrued.to_bits(),
+            fees_settled: self.fees_settled.to_bits(),
             open_interest: self.open_interest,
             instantaneous_funding_rate: funding_rate.to_bits(),
         });

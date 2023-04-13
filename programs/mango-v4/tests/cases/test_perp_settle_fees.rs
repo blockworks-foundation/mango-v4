@@ -327,8 +327,8 @@ async fn test_perp_settle_fees() -> Result<(), TransportError> {
     // Try and settle with high price
     set_bank_stub_oracle_price(solana, group, &tokens[0], admin, 1200.0).await;
 
-    // Account must have a loss
-    let result = send_tx(
+    // Account must have a loss, should not settle anything and instead return early
+    send_tx(
         solana,
         PerpSettleFeesInstruction {
             account: account_0,
@@ -338,12 +338,18 @@ async fn test_perp_settle_fees() -> Result<(), TransportError> {
         },
     )
     .await;
-
-    assert_mango_error(
-        &result,
-        MangoError::ProfitabilityMismatch.into(),
-        "Account must be unprofitable".to_string(),
-    );
+    // No change
+    {
+        let perp_market = solana.get_account::<PerpMarket>(perp_market).await;
+        assert_eq!(
+            get_pnl_native(&mango_account_0.perps[0], &perp_market, I80F48::from(1200)).round(),
+            19980
+        );
+        assert_eq!(
+            get_pnl_native(&mango_account_1.perps[0], &perp_market, I80F48::from(1200)),
+            -20000
+        );
+    }
 
     // TODO: Difficult to test health due to fees being so small. Need alternative
     // let result = send_tx(

@@ -628,8 +628,8 @@ impl Bank {
             .unwrap();
         if net_borrows_quote > self.net_borrow_limit_per_window_quote {
             return Err(error_msg_typed!(MangoError::BankNetBorrowsLimitReached,
-                    "net_borrows_in_window ({:?}) exceeds net_borrow_limit_per_window_quote ({:?}) for last_net_borrows_window_start_ts ({:?}) ",
-                    self.net_borrows_in_window, self.net_borrow_limit_per_window_quote, self.last_net_borrows_window_start_ts
+                    "net_borrows_in_window ({:?}) valued at ({:?} exceed net_borrow_limit_per_window_quote ({:?}) for last_net_borrows_window_start_ts ({:?}) ",
+                    self.net_borrows_in_window, net_borrows_quote, self.net_borrow_limit_per_window_quote, self.last_net_borrows_window_start_ts
 
             ));
         }

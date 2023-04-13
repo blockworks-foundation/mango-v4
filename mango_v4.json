@@ -1,5 +1,5 @@
 {
-  "version": "0.10.0",
+  "version": "0.11.0",
   "name": "mango_v4",
   "instructions": [
     {
@@ -2611,9 +2611,7 @@
         },
         {
           "name": "maxLiabTransfer",
-          "type": {
-            "defined": "I80F48"
-          }
+          "type": "u64"
         }
       ]
     },
@@ -7714,6 +7712,11 @@
           "index": false
         },
         {
+          "name": "feesSettled",
+          "type": "i128",
+          "index": false
+        },
+        {
           "name": "openInterest",
           "type": "i64",
           "index": false
@@ -8733,6 +8736,11 @@
       "code": 6045,
       "name": "HealthRegionBadInnerInstruction",
       "msg": "HealthRegions allow only specific instructions between Begin and End"
+    },
+    {
+      "code": 6046,
+      "name": "TokenInForceClose",
+      "msg": "token is in force close"
     }
   ]
 }
