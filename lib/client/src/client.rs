@@ -313,7 +313,7 @@ impl MangoClient {
             .derive_health_check_remaining_account_metas_two_accounts(
                 &account,
                 liqee,
-                affected_tokens,
+                &affected_tokens,
                 writable_banks,
             )
     }
@@ -885,7 +885,7 @@ impl MangoClient {
             .derive_health_check_remaining_account_metas_two_accounts(
                 account_a.1,
                 account_b.1,
-                vec![],
+                &vec![],
                 &[],
             )
             .unwrap();
@@ -1020,7 +1020,11 @@ impl MangoClient {
         let settle_token_info = self.context.token(perp.market.settle_token_index);
 
         let health_remaining_ams = self
-            .derive_liquidation_health_check_remaining_account_metas(liqee.1, vec![], &[])
+            .derive_liquidation_health_check_remaining_account_metas(
+                liqee.1,
+                vec![INSURANCE_TOKEN_INDEX],
+                &[],
+            )
             .await
             .unwrap();
 
