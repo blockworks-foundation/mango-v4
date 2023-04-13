@@ -1210,10 +1210,6 @@
 <a href="#1210" id="1210">1210</a>
 <a href="#1211" id="1211">1211</a>
 <a href="#1212" id="1212">1212</a>
-<a href="#1213" id="1213">1213</a>
-<a href="#1214" id="1214">1214</a>
-<a href="#1215" id="1215">1215</a>
-<a href="#1216" id="1216">1216</a>
 </pre><pre class="rust"><code><span class="kw">use </span>anchor_lang::prelude::<span class="kw-2">*</span>;
 
 <span class="kw">use </span>fixed::types::I80F48;
@@ -2075,7 +2071,6 @@
                 account.ensure_token_position(<span class="number">4</span>).unwrap().<span class="number">0</span>,
                 I80F48::from(<span class="number">10</span>),
                 DUMMY_NOW_TS,
-                DUMMY_PRICE,
             )
             .unwrap();
 
@@ -2159,7 +2154,6 @@
                 account.ensure_token_position(<span class="number">1</span>).unwrap().<span class="number">0</span>,
                 I80F48::from(testcase.token1),
                 DUMMY_NOW_TS,
-                DUMMY_PRICE,
             )
             .unwrap();
         bank2
@@ -2168,7 +2162,6 @@
                 account.ensure_token_position(<span class="number">4</span>).unwrap().<span class="number">0</span>,
                 I80F48::from(testcase.token2),
                 DUMMY_NOW_TS,
-                DUMMY_PRICE,
             )
             .unwrap();
         bank3
@@ -2177,7 +2170,6 @@
                 account.ensure_token_position(<span class="number">5</span>).unwrap().<span class="number">0</span>,
                 I80F48::from(testcase.token3),
                 DUMMY_NOW_TS,
-                DUMMY_PRICE,
             )
             .unwrap();
         <span class="kw">for </span>(settings, bank) <span class="kw">in </span>testcase

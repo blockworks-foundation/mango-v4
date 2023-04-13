@@ -1046,33 +1046,6 @@
 <a href="#1046" id="1046">1046</a>
 <a href="#1047" id="1047">1047</a>
 <a href="#1048" id="1048">1048</a>
-<a href="#1049" id="1049">1049</a>
-<a href="#1050" id="1050">1050</a>
-<a href="#1051" id="1051">1051</a>
-<a href="#1052" id="1052">1052</a>
-<a href="#1053" id="1053">1053</a>
-<a href="#1054" id="1054">1054</a>
-<a href="#1055" id="1055">1055</a>
-<a href="#1056" id="1056">1056</a>
-<a href="#1057" id="1057">1057</a>
-<a href="#1058" id="1058">1058</a>
-<a href="#1059" id="1059">1059</a>
-<a href="#1060" id="1060">1060</a>
-<a href="#1061" id="1061">1061</a>
-<a href="#1062" id="1062">1062</a>
-<a href="#1063" id="1063">1063</a>
-<a href="#1064" id="1064">1064</a>
-<a href="#1065" id="1065">1065</a>
-<a href="#1066" id="1066">1066</a>
-<a href="#1067" id="1067">1067</a>
-<a href="#1068" id="1068">1068</a>
-<a href="#1069" id="1069">1069</a>
-<a href="#1070" id="1070">1070</a>
-<a href="#1071" id="1071">1071</a>
-<a href="#1072" id="1072">1072</a>
-<a href="#1073" id="1073">1073</a>
-<a href="#1074" id="1074">1074</a>
-<a href="#1075" id="1075">1075</a>
 </pre><pre class="rust"><code><span class="kw">use super</span>::{OracleConfig, TokenIndex, TokenPosition};
 <span class="kw">use </span><span class="kw">crate</span>::accounts_zerocopy::KeyedAccountReader;
 <span class="kw">use </span><span class="kw">crate</span>::error::<span class="kw-2">*</span>;
@@ -1461,7 +1434,6 @@
         position: <span class="kw-2">&amp;mut </span>TokenPosition,
         native_amount: I80F48,
         now_ts: u64,
-        oracle_price: I80F48,
     ) -&gt; <span class="prelude-ty">Result</span>&lt;bool&gt; {
         <span class="kw">let </span>(position_is_active, <span class="kw">_</span>) = <span class="self">self</span>.withdraw_internal_wrapper(
             position,
@@ -1469,7 +1441,6 @@
             <span class="bool-val">false</span>,
             !position.is_in_use(),
             now_ts,
-            <span class="prelude-val">Some</span>(oracle_price),
         )<span class="question-mark">?</span>;
 
         <span class="prelude-val">Ok</span>(position_is_active)
@@ -1483,17 +1454,9 @@
         position: <span class="kw-2">&amp;mut </span>TokenPosition,
         native_amount: I80F48,
         now_ts: u64,
-        oracle_price: I80F48,
     ) -&gt; <span class="prelude-ty">Result</span>&lt;bool&gt; {
-        <span class="self">self</span>.withdraw_internal_wrapper(
-            position,
-            native_amount,
-            <span class="bool-val">false</span>,
-            <span class="bool-val">true</span>,
-            now_ts,
-            <span class="prelude-val">Some</span>(oracle_price),
-        )
-        .map(|(not_dusted, <span class="kw">_</span>)| not_dusted || position.is_in_use())
+        <span class="self">self</span>.withdraw_internal_wrapper(position, native_amount, <span class="bool-val">false</span>, <span class="bool-val">true</span>, now_ts)
+            .map(|(not_dusted, <span class="kw">_</span>)| not_dusted || position.is_in_use())
     }
 
     <span class="doccomment">/// Withdraws `native_amount` while applying the loan origination fee if a borrow is created.
@@ -1509,16 +1472,8 @@
         position: <span class="kw-2">&amp;mut </span>TokenPosition,
         native_amount: I80F48,
         now_ts: u64,
-        oracle_price: I80F48,
     ) -&gt; <span class="prelude-ty">Result</span>&lt;(bool, I80F48)&gt; {
-        <span class="self">self</span>.withdraw_internal_wrapper(
-            position,
-            native_amount,
-            <span class="bool-val">true</span>,
-            !position.is_in_use(),
-            now_ts,
-            <span class="prelude-val">Some</span>(oracle_price),
-        )
+        <span class="self">self</span>.withdraw_internal_wrapper(position, native_amount, <span class="bool-val">true</span>, !position.is_in_use(), now_ts)
     }
 
     <span class="doccomment">/// Internal function to withdraw funds
@@ -1529,7 +1484,6 @@
         with_loan_origination_fee: bool,
         allow_dusting: bool,
         now_ts: u64,
-        oracle_price: <span class="prelude-ty">Option</span>&lt;I80F48&gt;,
     ) -&gt; <span class="prelude-ty">Result</span>&lt;(bool, I80F48)&gt; {
         <span class="kw">let </span>opening_indexed_position = position.indexed_position;
         <span class="kw">let </span>res = <span class="self">self</span>.withdraw_internal(
@@ -1538,7 +1492,6 @@
             with_loan_origination_fee,
             allow_dusting,
             now_ts,
-            oracle_price,
         );
         <span class="self">self</span>.update_cumulative_interest(position, opening_indexed_position);
         res
@@ -1552,7 +1505,6 @@
         with_loan_origination_fee: bool,
         allow_dusting: bool,
         now_ts: u64,
-        oracle_price: <span class="prelude-ty">Option</span>&lt;I80F48&gt;,
     ) -&gt; <span class="prelude-ty">Result</span>&lt;(bool, I80F48)&gt; {
         <span class="macro">require_gte!</span>(native_amount, <span class="number">0</span>);
         <span class="kw">let </span>native_position = position.native(<span class="self">self</span>);
@@ -1598,9 +1550,6 @@
         <span class="comment">// net borrows requires updating in only this case, since other branches of the method deal with
         // withdraws and not borrows
         </span><span class="self">self</span>.update_net_borrows(native_amount, now_ts);
-        <span class="kw">if let </span><span class="prelude-val">Some</span>(oracle_price) = oracle_price {
-            <span class="self">self</span>.check_net_borrows(oracle_price)<span class="question-mark">?</span>;
-        }
 
         <span class="prelude-val">Ok</span>((<span class="bool-val">true</span>, loan_origination_fee))
     }
@@ -1621,7 +1570,6 @@
             <span class="bool-val">false</span>,
             !position.is_in_use(),
             now_ts,
-            <span class="prelude-val">None</span>,
         )<span class="question-mark">?</span>;
 
         <span class="prelude-val">Ok</span>((position_is_active, loan_origination_fee))
@@ -1633,12 +1581,11 @@
         position: <span class="kw-2">&amp;mut </span>TokenPosition,
         native_amount: I80F48,
         now_ts: u64,
-        oracle_price: I80F48,
     ) -&gt; <span class="prelude-ty">Result</span>&lt;bool&gt; {
         <span class="kw">if </span>native_amount &gt;= <span class="number">0 </span>{
             <span class="self">self</span>.deposit(position, native_amount, now_ts)
         } <span class="kw">else </span>{
-            <span class="self">self</span>.withdraw_without_fee(position, -native_amount, now_ts, oracle_price)
+            <span class="self">self</span>.withdraw_without_fee(position, -native_amount, now_ts)
         }
     }
 
@@ -1648,12 +1595,11 @@
         position: <span class="kw-2">&amp;mut </span>TokenPosition,
         native_amount: I80F48,
         now_ts: u64,
-        oracle_price: I80F48,
     ) -&gt; <span class="prelude-ty">Result</span>&lt;(bool, I80F48)&gt; {
         <span class="kw">if </span>native_amount &gt;= <span class="number">0 </span>{
             <span class="prelude-val">Ok</span>((<span class="self">self</span>.deposit(position, native_amount, now_ts)<span class="question-mark">?</span>, I80F48::ZERO))
         } <span class="kw">else </span>{
-            <span class="self">self</span>.withdraw_with_fee(position, -native_amount, now_ts, oracle_price)
+            <span class="self">self</span>.withdraw_with_fee(position, -native_amount, now_ts)
         }
     }
 
@@ -2032,8 +1978,7 @@
                 </span><span class="kw">let </span>change = I80F48::from(change);
                 <span class="kw">let </span>dummy_now_ts = <span class="number">1 </span><span class="kw">as </span>u64;
                 <span class="kw">let </span>dummy_price = I80F48::ZERO;
-                <span class="kw">let </span>(is_active, <span class="kw">_</span>) =
-                    bank.change_with_fee(<span class="kw-2">&amp;mut </span>account, change, dummy_now_ts, dummy_price)<span class="question-mark">?</span>;
+                <span class="kw">let </span>(is_active, <span class="kw">_</span>) = bank.change_with_fee(<span class="kw-2">&amp;mut </span>account, change, dummy_now_ts)<span class="question-mark">?</span>;
 
                 <span class="kw">let </span><span class="kw-2">mut </span>expected_native = start_native + change;
                 <span class="kw">if </span>expected_native &gt;= <span class="number">0.0 </span>&amp;&amp; expected_native &lt; <span class="number">1.0 </span>&amp;&amp; !is_in_use {
@@ -2109,40 +2054,41 @@
 
         <span class="kw">let </span><span class="kw-2">mut </span>account = TokenPosition::default();
 
-        bank.change_without_fee(<span class="kw-2">&amp;mut </span>account, I80F48::from(<span class="number">100</span>), <span class="number">0</span>, price)
+        bank.change_without_fee(<span class="kw-2">&amp;mut </span>account, I80F48::from(<span class="number">100</span>), <span class="number">0</span>)
             .unwrap();
         <span class="macro">assert_eq!</span>(bank.net_borrows_in_window, <span class="number">0</span>);
-        bank.change_without_fee(<span class="kw-2">&amp;mut </span>account, I80F48::from(-<span class="number">100</span>), <span class="number">0</span>, price)
+        bank.change_without_fee(<span class="kw-2">&amp;mut </span>account, I80F48::from(-<span class="number">100</span>), <span class="number">0</span>)
             .unwrap();
         <span class="macro">assert_eq!</span>(bank.net_borrows_in_window, <span class="number">0</span>);
 
         account = TokenPosition::default();
-        bank.change_without_fee(<span class="kw-2">&amp;mut </span>account, I80F48::from(<span class="number">10</span>), <span class="number">0</span>, price)
+        bank.change_without_fee(<span class="kw-2">&amp;mut </span>account, I80F48::from(<span class="number">10</span>), <span class="number">0</span>)
             .unwrap();
-        bank.change_without_fee(<span class="kw-2">&amp;mut </span>account, I80F48::from(-<span class="number">110</span>), <span class="number">0</span>, price)
+        bank.change_without_fee(<span class="kw-2">&amp;mut </span>account, I80F48::from(-<span class="number">110</span>), <span class="number">0</span>)
             .unwrap();
         <span class="macro">assert_eq!</span>(bank.net_borrows_in_window, <span class="number">100</span>);
-        bank.change_without_fee(<span class="kw-2">&amp;mut </span>account, I80F48::from(<span class="number">50</span>), <span class="number">0</span>, price)
+        bank.change_without_fee(<span class="kw-2">&amp;mut </span>account, I80F48::from(<span class="number">50</span>), <span class="number">0</span>)
             .unwrap();
         <span class="macro">assert_eq!</span>(bank.net_borrows_in_window, <span class="number">50</span>);
-        bank.change_without_fee(<span class="kw-2">&amp;mut </span>account, I80F48::from(<span class="number">100</span>), <span class="number">0</span>, price)
+        bank.change_without_fee(<span class="kw-2">&amp;mut </span>account, I80F48::from(<span class="number">100</span>), <span class="number">0</span>)
             .unwrap();
         <span class="macro">assert_eq!</span>(bank.net_borrows_in_window, <span class="number">1</span>); <span class="comment">// rounding
 
         </span>account = TokenPosition::default();
         bank.net_borrows_in_window = <span class="number">0</span>;
-        bank.change_without_fee(<span class="kw-2">&amp;mut </span>account, I80F48::from(-<span class="number">450</span>), <span class="number">0</span>, price)
+        bank.change_without_fee(<span class="kw-2">&amp;mut </span>account, I80F48::from(-<span class="number">450</span>), <span class="number">0</span>)
             .unwrap();
-        bank.change_without_fee(<span class="kw-2">&amp;mut </span>account, I80F48::from(-<span class="number">51</span>), <span class="number">0</span>, price)
-            .unwrap_err();
+        bank.change_without_fee(<span class="kw-2">&amp;mut </span>account, I80F48::from(-<span class="number">51</span>), <span class="number">0</span>)
+            .unwrap();
+        bank.check_net_borrows(price).unwrap_err();
 
         account = TokenPosition::default();
         bank.net_borrows_in_window = <span class="number">0</span>;
-        bank.change_without_fee(<span class="kw-2">&amp;mut </span>account, I80F48::from(-<span class="number">450</span>), <span class="number">0</span>, price)
+        bank.change_without_fee(<span class="kw-2">&amp;mut </span>account, I80F48::from(-<span class="number">450</span>), <span class="number">0</span>)
             .unwrap();
-        bank.change_without_fee(<span class="kw-2">&amp;mut </span>account, I80F48::from(-<span class="number">50</span>), <span class="number">0</span>, price)
+        bank.change_without_fee(<span class="kw-2">&amp;mut </span>account, I80F48::from(-<span class="number">50</span>), <span class="number">0</span>)
             .unwrap();
-        bank.change_without_fee(<span class="kw-2">&amp;mut </span>account, I80F48::from(-<span class="number">50</span>), <span class="number">101</span>, price)
+        bank.change_without_fee(<span class="kw-2">&amp;mut </span>account, I80F48::from(-<span class="number">50</span>), <span class="number">101</span>)
             .unwrap();
 
         <span class="prelude-val">Ok</span>(())

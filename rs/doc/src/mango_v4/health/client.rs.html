@@ -1367,7 +1367,6 @@
 <a href="#1367" id="1367">1367</a>
 <a href="#1368" id="1368">1368</a>
 <a href="#1369" id="1369">1369</a>
-<a href="#1370" id="1370">1370</a>
 </pre><pre class="rust"><code><span class="attr">#![cfg(feature = <span class="string">&quot;client&quot;</span>)]
 
 </span><span class="kw">use </span>anchor_lang::prelude::<span class="kw-2">*</span>;
@@ -1429,7 +1428,8 @@
         <span class="kw">let </span>target_amount = amount * price;
 
         <span class="kw">let </span><span class="kw-2">mut </span>source_bank = source_bank.clone();
-        source_bank.withdraw_with_fee(<span class="kw-2">&amp;mut </span>source_position, amount, now_ts, source_oracle_price)<span class="question-mark">?</span>;
+        source_bank.withdraw_with_fee(<span class="kw-2">&amp;mut </span>source_position, amount, now_ts)<span class="question-mark">?</span>;
+        source_bank.check_net_borrows(source_oracle_price)<span class="question-mark">?</span>;
         <span class="kw">let </span><span class="kw-2">mut </span>target_bank = target_bank.clone();
         target_bank.deposit(<span class="kw-2">&amp;mut </span>target_position, target_amount, now_ts)<span class="question-mark">?</span>;
 
@@ -1773,7 +1773,8 @@
             <span class="kw">let </span><span class="kw-2">mut </span>position = account.token_position(bank.token_index)<span class="question-mark">?</span>.clone();
 
             <span class="kw">let </span><span class="kw-2">mut </span>bank = bank.clone();
-            bank.withdraw_with_fee(<span class="kw-2">&amp;mut </span>position, amount, now_ts, token.prices.oracle)<span class="question-mark">?</span>;
+            bank.withdraw_with_fee(<span class="kw-2">&amp;mut </span>position, amount, now_ts)<span class="question-mark">?</span>;
+            bank.check_net_borrows(token.prices.oracle)<span class="question-mark">?</span>;
 
             <span class="kw">let </span><span class="kw-2">mut </span>resulting_cache = <span class="self">self</span>.clone();
             resulting_cache.adjust_token_balance(<span class="kw-2">&amp;</span>bank, -amount)<span class="question-mark">?</span>;
@@ -2503,7 +2504,6 @@
                 account.ensure_token_position(<span class="number">1</span>).unwrap().<span class="number">0</span>,
                 I80F48::from(<span class="number">100</span>),
                 DUMMY_NOW_TS,
-                DUMMY_PRICE,
             )
             .unwrap();
 
@@ -2586,7 +2586,6 @@
                 account.ensure_token_position(<span class="number">1</span>).unwrap().<span class="number">0</span>,
                 I80F48::from(<span class="number">100</span>),
                 DUMMY_NOW_TS,
-                DUMMY_PRICE,
             )
             .unwrap();
         bank1
@@ -2595,7 +2594,6 @@
                 account2.ensure_token_position(<span class="number">1</span>).unwrap().<span class="number">0</span>,
                 I80F48::from(-<span class="number">100</span>),
                 DUMMY_NOW_TS,
-                DUMMY_PRICE,
             )
             .unwrap();
 
