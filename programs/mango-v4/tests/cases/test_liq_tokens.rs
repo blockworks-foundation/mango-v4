@@ -421,7 +421,7 @@ async fn test_liq_tokens_with_token() -> Result<(), TransportError> {
 
     // health after borrow2 liquidation was (1000-32) * 0.6 - 350 * 2 * 1.4 = -399.2
     // borrow1 needed 399.2 / (1.4*2 - 0.6*2*1.02) = 253.29
-    // asset cost = 257.2 * 2 * 1.02 = 524.68
+    // asset cost = 253.29 * 2 * 1.02 = 516.7
     // loan orignation fee = 1
     assert_eq!(
         account_position(solana, account, borrow_token1.bank).await,
@@ -429,7 +429,7 @@ async fn test_liq_tokens_with_token() -> Result<(), TransportError> {
     );
     assert_eq!(
         account_position(solana, account, collateral_token1.bank).await,
-        1000 - 22 - 525 - 1
+        1000 - 31 - 516 - 1
     );
     let liqee = get_mango_account(solana, account).await;
     assert!(!liqee.being_liquidated());
@@ -476,7 +476,6 @@ async fn test_liq_tokens_with_token() -> Result<(), TransportError> {
 
     let liqee = get_mango_account(solana, account).await;
     assert_eq!(liqee.active_token_positions().count(), 1);
-    dbg!(account_position_f64(solana, account, borrow_token1.bank).await);
     assert!(account_position_f64(solana, account, borrow_token1.bank).await > -2.74);
     assert!(liqee.being_liquidated());
 
