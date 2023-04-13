@@ -385,7 +385,7 @@ async fn test_force_close_perp() -> Result<(), TransportError> {
     .is_err());
 
     //
-    // Set force close and force close position
+    // Set force close and force close position and verify that base position is 0
     //
     send_tx(
         solana,
