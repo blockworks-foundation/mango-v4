@@ -1046,6 +1046,22 @@
 <a href="#1046" id="1046">1046</a>
 <a href="#1047" id="1047">1047</a>
 <a href="#1048" id="1048">1048</a>
+<a href="#1049" id="1049">1049</a>
+<a href="#1050" id="1050">1050</a>
+<a href="#1051" id="1051">1051</a>
+<a href="#1052" id="1052">1052</a>
+<a href="#1053" id="1053">1053</a>
+<a href="#1054" id="1054">1054</a>
+<a href="#1055" id="1055">1055</a>
+<a href="#1056" id="1056">1056</a>
+<a href="#1057" id="1057">1057</a>
+<a href="#1058" id="1058">1058</a>
+<a href="#1059" id="1059">1059</a>
+<a href="#1060" id="1060">1060</a>
+<a href="#1061" id="1061">1061</a>
+<a href="#1062" id="1062">1062</a>
+<a href="#1063" id="1063">1063</a>
+<a href="#1064" id="1064">1064</a>
 </pre><pre class="rust"><code><span class="kw">use super</span>::{OracleConfig, TokenIndex, TokenPosition};
 <span class="kw">use </span><span class="kw">crate</span>::accounts_zerocopy::KeyedAccountReader;
 <span class="kw">use </span><span class="kw">crate</span>::error::<span class="kw-2">*</span>;
@@ -1175,10 +1191,16 @@
     /// See scaled_init_asset_weight().
     </span><span class="kw">pub </span>deposit_weight_scale_start_quote: f64,
 
-    <span class="kw">pub </span>reduce_only: u8,
+    <span class="comment">// We have 3 modes
+    // 0 - Off,
+    // 1 - ReduceDepositsReduceBorrows - standard
+    // 2 - ReduceBorrows - borrows can only be reduced, but deposits have no restriction, special case for
+    //                 force close mode, where liqor should first acquire deposits before closing liqee&#39;s borrows
+    </span><span class="kw">pub </span>reduce_only: u8,
+    <span class="kw">pub </span>force_close: u8,
 
     <span class="attr">#[derivative(Debug = <span class="string">&quot;ignore&quot;</span>)]
-    </span><span class="kw">pub </span>reserved: [u8; <span class="number">2119</span>],
+    </span><span class="kw">pub </span>reserved: [u8; <span class="number">2118</span>],
 }
 <span class="macro">const_assert_eq!</span>(
     size_of::&lt;Bank&gt;(),
@@ -1206,7 +1228,8 @@
         </span>+ <span class="number">8
         </span>+ <span class="number">8
         </span>+ <span class="number">1
-        </span>+ <span class="number">2119
+        </span>+ <span class="number">1
+        </span>+ <span class="number">2118
 </span>);
 <span class="macro">const_assert_eq!</span>(size_of::&lt;Bank&gt;(), <span class="number">3064</span>);
 <span class="macro">const_assert_eq!</span>(size_of::&lt;Bank&gt;() % <span class="number">8</span>, <span class="number">0</span>);
@@ -1267,7 +1290,8 @@
             borrow_weight_scale_start_quote: f64::MAX,
             deposit_weight_scale_start_quote: f64::MAX,
             reduce_only: <span class="number">0</span>,
-            reserved: [<span class="number">0</span>; <span class="number">2119</span>],
+            force_close: <span class="number">0</span>,
+            reserved: [<span class="number">0</span>; <span class="number">2118</span>],
         }
     }
 
@@ -1277,8 +1301,16 @@
             .trim_matches(char::from(<span class="number">0</span>))
     }
 
-    <span class="kw">pub fn </span>is_reduce_only(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool {
+    <span class="kw">pub fn </span>are_deposits_reduce_only(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool {
         <span class="self">self</span>.reduce_only == <span class="number">1
+    </span>}
+
+    <span class="kw">pub fn </span>are_borrows_reduce_only(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool {
+        <span class="self">self</span>.reduce_only == <span class="number">1 </span>|| <span class="self">self</span>.reduce_only == <span class="number">2
+    </span>}
+
+    <span class="kw">pub fn </span>is_force_close(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool {
+        <span class="self">self</span>.force_close == <span class="number">1
     </span>}
 
     <span class="attr">#[inline(always)]
