@@ -372,3 +372,10 @@ pub struct AccountBuybackFeesWithMngoLog {
     pub mngo_buyback_price: i128,
     pub oracle_price: i128,
 }
+
+#[event]
+pub struct FilledPerpOrderLog {
+    pub mango_group: Pubkey,
+    pub perp_market_index: u16,
+    pub seq_num: u64,
+}
