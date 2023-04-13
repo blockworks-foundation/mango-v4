@@ -356,23 +356,22 @@ pub fn flash_loan_end<'key, 'accounts, 'remaining, 'info>(
             );
         }
 
-        // Enforce min vault to deposits ratio
-        if native_after_change < 0 {
+        let is_active = bank.change_without_fee(
+            position,
+            change_amount,
+            Clock::get()?.unix_timestamp.try_into().unwrap(),
+        )?;
+        if !is_active {
+            deactivated_token_positions.push(change.raw_token_index);
+        }
+
+        if change_amount < 0 && native_after_change < 0 {
             let vault_ai = vaults
                 .iter()
                 .find(|vault_ai| vault_ai.key == &bank.vault)
                 .unwrap();
             bank.enforce_min_vault_to_deposits_ratio(vault_ai)?;
-        }
-
-        let is_active = bank.change_without_fee(
-            position,
-            change.amount - loan_origination_fee,
-            Clock::get()?.unix_timestamp.try_into().unwrap(),
-            *oracle_price,
-        )?;
-        if !is_active {
-            deactivated_token_positions.push(change.raw_token_index);
+            bank.check_net_borrows(*oracle_price)?;
         }
 
         bank.flash_loan_approved_amount = 0;

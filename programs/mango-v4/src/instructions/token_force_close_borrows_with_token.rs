@@ -98,12 +98,8 @@ pub fn token_force_close_borrows_with_token(
             liab_bank.deposit_with_dusting(liqee_liab_position, liab_transfer, now_ts)?;
         let liqee_liab_indexed_position = liqee_liab_position.indexed_position;
 
-        let (liqor_liab_active, loan_origination_fee) = liab_bank.withdraw_with_fee(
-            liqor_liab_position,
-            liab_transfer,
-            now_ts,
-            liab_oracle_price,
-        )?;
+        let (liqor_liab_active, loan_origination_fee) =
+            liab_bank.withdraw_with_fee(liqor_liab_position, liab_transfer, now_ts)?;
         let liqor_liab_indexed_position = liqor_liab_position.indexed_position;
         let liqee_liab_native_after = liqee_liab_position.native(liab_bank);
 
@@ -118,7 +114,6 @@ pub fn token_force_close_borrows_with_token(
             liqee_asset_position,
             asset_transfer,
             now_ts,
-            asset_oracle_price,
         )?;
         let liqee_asset_indexed_position = liqee_asset_position.indexed_position;
         let liqee_assets_native_after = liqee_asset_position.native(asset_bank);
