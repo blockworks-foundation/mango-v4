@@ -59,7 +59,8 @@ impl HealthCache {
         let target_amount = amount * price;
 
         let mut source_bank = source_bank.clone();
-        source_bank.withdraw_with_fee(&mut source_position, amount, now_ts, source_oracle_price)?;
+        source_bank.withdraw_with_fee(&mut source_position, amount, now_ts)?;
+        source_bank.check_net_borrows(source_oracle_price)?;
         let mut target_bank = target_bank.clone();
         target_bank.deposit(&mut target_position, target_amount, now_ts)?;
 
@@ -403,7 +404,8 @@ impl HealthCache {
             let mut position = account.token_position(bank.token_index)?.clone();
 
             let mut bank = bank.clone();
-            bank.withdraw_with_fee(&mut position, amount, now_ts, token.prices.oracle)?;
+            bank.withdraw_with_fee(&mut position, amount, now_ts)?;
+            bank.check_net_borrows(token.prices.oracle)?;
 
             let mut resulting_cache = self.clone();
             resulting_cache.adjust_token_balance(&bank, -amount)?;
@@ -1133,7 +1135,6 @@ mod tests {
                 account.ensure_token_position(1).unwrap().0,
                 I80F48::from(100),
                 DUMMY_NOW_TS,
-                DUMMY_PRICE,
             )
             .unwrap();
 
@@ -1216,7 +1217,6 @@ mod tests {
                 account.ensure_token_position(1).unwrap().0,
                 I80F48::from(100),
                 DUMMY_NOW_TS,
-                DUMMY_PRICE,
             )
             .unwrap();
         bank1
@@ -1225,7 +1225,6 @@ mod tests {
                 account2.ensure_token_position(1).unwrap().0,
                 I80F48::from(-100),
                 DUMMY_NOW_TS,
-                DUMMY_PRICE,
             )
             .unwrap();
 
