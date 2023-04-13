@@ -219,7 +219,11 @@ async fn test_bank_net_borrows_based_borrow_limit() -> Result<(), TransportError
             },
         )
         .await;
-        assert!(res.is_err());
+        assert_mango_error(
+            &res,
+            MangoError::BankNetBorrowsLimitReached.into(),
+            "".into(),
+        );
 
         // succeeds because is not a borrow
         send_tx(
@@ -308,7 +312,26 @@ async fn test_bank_net_borrows_based_borrow_limit() -> Result<(), TransportError
             },
         )
         .await;
-        assert!(res.is_err());
+        assert_mango_error(
+            &res,
+            MangoError::BankNetBorrowsLimitReached.into(),
+            "".into(),
+        );
+
+        // can still withdraw
+        send_tx(
+            solana,
+            TokenWithdrawInstruction {
+                amount: 4000,
+                allow_borrow: false,
+                account: account_0,
+                owner,
+                token_account: payer_mint_accounts[0],
+                bank_index: 0,
+            },
+        )
+        .await
+        .unwrap();
 
         set_bank_stub_oracle_price(solana, group, &tokens[0], admin, 5.0).await;
 
@@ -325,7 +348,11 @@ async fn test_bank_net_borrows_based_borrow_limit() -> Result<(), TransportError
             },
         )
         .await;
-        assert!(res.is_err());
+        assert_mango_error(
+            &res,
+            MangoError::BankNetBorrowsLimitReached.into(),
+            "".into(),
+        );
 
         // can borrow smaller amounts: (net borrowed 1000 + new borrow 199) * price 5.0 < limit 6000
         send_tx(

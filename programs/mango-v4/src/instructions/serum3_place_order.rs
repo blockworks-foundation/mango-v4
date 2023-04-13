@@ -250,14 +250,9 @@ pub fn serum3_place_order(
         .token_position_mut(payer_bank.token_index)?
         .0
         .native(&payer_bank);
-    if withdrawn_from_vault > position_native {
-        payer_bank.enforce_min_vault_to_deposits_ratio((*ctx.accounts.payer_vault).as_ref())?;
-    }
 
     // Charge the difference in vault balance to the user's account
     let vault_difference = {
-        let oracle_price =
-            payer_bank.oracle_price(&AccountInfoRef::borrow(&ctx.accounts.payer_oracle)?, None)?;
         apply_vault_difference(
             ctx.accounts.account.key(),
             &mut account.borrow_mut(),
@@ -265,9 +260,15 @@ pub fn serum3_place_order(
             &mut payer_bank,
             after_vault,
             before_vault,
-            Some(oracle_price),
         )?
     };
+
+    if withdrawn_from_vault > position_native {
+        let oracle_price =
+            payer_bank.oracle_price(&AccountInfoRef::borrow(&ctx.accounts.payer_oracle)?, None)?;
+        payer_bank.enforce_min_vault_to_deposits_ratio((*ctx.accounts.payer_vault).as_ref())?;
+        payer_bank.check_net_borrows(oracle_price)?;
+    }
 
     //
     // Health check
@@ -348,7 +349,6 @@ fn apply_vault_difference(
     bank: &mut Bank,
     vault_after: u64,
     vault_before: u64,
-    oracle_price: Option<I80F48>,
 ) -> Result<VaultDifference> {
     let needed_change = I80F48::from(vault_after) - I80F48::from(vault_before);
 
@@ -358,12 +358,7 @@ fn apply_vault_difference(
     if needed_change >= 0 {
         bank.deposit(position, needed_change, now_ts)?;
     } else {
-        bank.withdraw_without_fee(
-            position,
-            -needed_change,
-            now_ts,
-            oracle_price.unwrap(), // required for withdraws
-        )?;
+        bank.withdraw_without_fee(position, -needed_change, now_ts)?;
     }
     let native_after = position.native(bank);
     let native_change = native_after - native_before;
@@ -470,7 +465,6 @@ pub fn apply_settle_changes(
         base_bank,
         after_base_vault,
         before_base_vault,
-        None, // guaranteed to deposit into bank
     )?;
     let quote_difference = apply_vault_difference(
         account_pk,
@@ -479,7 +473,6 @@ pub fn apply_settle_changes(
         quote_bank,
         after_quote_vault_adjusted,
         before_quote_vault,
-        None, // guaranteed to deposit into bank
     )?;
 
     if let Some(health_cache) = health_cache {

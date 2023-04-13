@@ -339,7 +339,10 @@ async fn test_perp_settle_fees() -> Result<(), TransportError> {
     )
     .await
     .unwrap();
+<<<<<<< HEAD
 
+=======
+>>>>>>> dev
     // No change
     {
         let perp_market = solana.get_account::<PerpMarket>(perp_market).await;

@@ -189,12 +189,8 @@ pub(crate) fn liquidation_action(
 
     let (liqor_liab_position, liqor_liab_raw_index, _) =
         liqor.ensure_token_position(liab_token_index)?;
-    let (liqor_liab_active, loan_origination_fee) = liab_bank.withdraw_with_fee(
-        liqor_liab_position,
-        liab_transfer,
-        now_ts,
-        liab_oracle_price,
-    )?;
+    let (liqor_liab_active, loan_origination_fee) =
+        liab_bank.withdraw_with_fee(liqor_liab_position, liab_transfer, now_ts)?;
     let liqor_liab_indexed_position = liqor_liab_position.indexed_position;
     let liqee_liab_native_after = liqee_liab_position.native(liab_bank);
 
@@ -208,7 +204,6 @@ pub(crate) fn liquidation_action(
         liqee_asset_position,
         asset_transfer,
         now_ts,
-        asset_oracle_price,
     )?;
     let liqee_asset_indexed_position = liqee_asset_position.indexed_position;
     let liqee_assets_native_after = liqee_asset_position.native(asset_bank);
@@ -441,38 +436,18 @@ mod tests {
         {
             let asset_bank = setup.asset_bank.data();
             asset_bank
-                .change_without_fee(
-                    asset_p(&mut setup.liqee),
-                    I80F48::from_num(10.0),
-                    0,
-                    I80F48::from(1),
-                )
+                .change_without_fee(asset_p(&mut setup.liqee), I80F48::from_num(10.0), 0)
                 .unwrap();
             asset_bank
-                .change_without_fee(
-                    asset_p(&mut setup.liqor),
-                    I80F48::from_num(1000.0),
-                    0,
-                    I80F48::from(1),
-                )
+                .change_without_fee(asset_p(&mut setup.liqor), I80F48::from_num(1000.0), 0)
                 .unwrap();
 
             let liab_bank = setup.liab_bank.data();
             liab_bank
-                .change_without_fee(
-                    liab_p(&mut setup.liqor),
-                    I80F48::from_num(1000.0),
-                    0,
-                    I80F48::from(1),
-                )
+                .change_without_fee(liab_p(&mut setup.liqor), I80F48::from_num(1000.0), 0)
                 .unwrap();
             liab_bank
-                .change_without_fee(
-                    liab_p(&mut setup.liqee),
-                    I80F48::from_num(-9.0),
-                    0,
-                    I80F48::from(1),
-                )
+                .change_without_fee(liab_p(&mut setup.liqee), I80F48::from_num(-9.0), 0)
                 .unwrap();
         }
 
