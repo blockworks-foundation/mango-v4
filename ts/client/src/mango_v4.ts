@@ -715,13 +715,19 @@ export type MangoV4 = {
         {
           "name": "reduceOnlyOpt",
           "type": {
-            "option": "bool"
+            "option": "u8"
           }
         },
         {
           "name": "nameOpt",
           "type": {
             "option": "string"
+          }
+        },
+        {
+          "name": "forceCloseOpt",
+          "type": {
+            "option": "bool"
           }
         }
       ]
@@ -2571,6 +2577,45 @@ export type MangoV4 = {
       ]
     },
     {
+      "name": "tokenForceCloseBorrowsWithToken",
+      "accounts": [
+        {
+          "name": "group",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "liqor",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "liqorOwner",
+          "isMut": false,
+          "isSigner": true
+        },
+        {
+          "name": "liqee",
+          "isMut": true,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "assetTokenIndex",
+          "type": "u16"
+        },
+        {
+          "name": "liabTokenIndex",
+          "type": "u16"
+        },
+        {
+          "name": "maxLiabTransfer",
+          "type": "u64"
+        }
+      ]
+    },
+    {
       "name": "tokenLiqBankruptcy",
       "accounts": [
         {
@@ -4126,11 +4171,15 @@ export type MangoV4 = {
             "type": "u8"
           },
           {
+            "name": "forceClose",
+            "type": "u8"
+          },
+          {
             "name": "reserved",
             "type": {
               "array": [
                 "u8",
-                2119
+                2118
               ]
             }
           }
@@ -6981,6 +7030,9 @@ export type MangoV4 = {
           },
           {
             "name": "AccountBuybackFeesWithMngo"
+          },
+          {
+            "name": "TokenForceCloseBorrowsWithToken"
           }
         ]
       }
@@ -8684,6 +8736,11 @@ export type MangoV4 = {
       "code": 6045,
       "name": "HealthRegionBadInnerInstruction",
       "msg": "HealthRegions allow only specific instructions between Begin and End"
+    },
+    {
+      "code": 6046,
+      "name": "TokenInForceClose",
+      "msg": "token is in force close"
     }
   ]
 };
@@ -9405,13 +9462,19 @@ export const IDL: MangoV4 = {
         {
           "name": "reduceOnlyOpt",
           "type": {
-            "option": "bool"
+            "option": "u8"
           }
         },
         {
           "name": "nameOpt",
           "type": {
             "option": "string"
+          }
+        },
+        {
+          "name": "forceCloseOpt",
+          "type": {
+            "option": "bool"
           }
         }
       ]
@@ -11261,6 +11324,45 @@ export const IDL: MangoV4 = {
       ]
     },
     {
+      "name": "tokenForceCloseBorrowsWithToken",
+      "accounts": [
+        {
+          "name": "group",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "liqor",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "liqorOwner",
+          "isMut": false,
+          "isSigner": true
+        },
+        {
+          "name": "liqee",
+          "isMut": true,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "assetTokenIndex",
+          "type": "u16"
+        },
+        {
+          "name": "liabTokenIndex",
+          "type": "u16"
+        },
+        {
+          "name": "maxLiabTransfer",
+          "type": "u64"
+        }
+      ]
+    },
+    {
       "name": "tokenLiqBankruptcy",
       "accounts": [
         {
@@ -12816,11 +12918,15 @@ export const IDL: MangoV4 = {
             "type": "u8"
           },
           {
+            "name": "forceClose",
+            "type": "u8"
+          },
+          {
             "name": "reserved",
             "type": {
               "array": [
                 "u8",
-                2119
+                2118
               ]
             }
           }
@@ -15671,6 +15777,9 @@ export const IDL: MangoV4 = {
           },
           {
             "name": "AccountBuybackFeesWithMngo"
+          },
+          {
+            "name": "TokenForceCloseBorrowsWithToken"
           }
         ]
       }
@@ -17374,6 +17483,11 @@ export const IDL: MangoV4 = {
       "code": 6045,
       "name": "HealthRegionBadInnerInstruction",
       "msg": "HealthRegions allow only specific instructions between Begin and End"
+    },
+    {
+      "code": 6046,
+      "name": "TokenInForceClose",
+      "msg": "token is in force close"
     }
   ]
 };
