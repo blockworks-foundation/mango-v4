@@ -1,7 +1,7 @@
 use super::*;
 
 #[tokio::test]
-async fn test_force_close() -> Result<(), TransportError> {
+async fn test_force_close_token() -> Result<(), TransportError> {
     let test_builder = TestContextBuilder::new();
     let context = test_builder.start_default().await;
     let solana = &context.solana.clone();
