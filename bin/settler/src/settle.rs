@@ -115,13 +115,14 @@ impl SettlementState {
                 .await
                 .context("creating health cache")?;
             let liq_end_health = health_cache.health(HealthType::LiquidationEnd);
-            let perp_settle_health = health_cache.perp_settle_health();
 
             for perp_market_index in perp_indexes {
                 let (perp_market, price) = match perp_market_info.get(&perp_market_index) {
                     Some(v) => v,
                     None => continue, // skip accounts with perp positions where we couldn't get the price and market
                 };
+                let perp_max_settle =
+                    health_cache.perp_max_settle(perp_market.settle_token_index)?;
 
                 let perp_position = account.perp_position_mut(perp_market_index).unwrap();
                 perp_position.settle_funding(perp_market);
@@ -132,7 +133,7 @@ impl SettlementState {
                 let settleable = if limited >= 0 {
                     limited
                 } else {
-                    limited.max(-perp_settle_health).min(I80F48::ZERO)
+                    limited.max(-perp_max_settle).min(I80F48::ZERO)
                 };
 
                 if settleable > 0 {

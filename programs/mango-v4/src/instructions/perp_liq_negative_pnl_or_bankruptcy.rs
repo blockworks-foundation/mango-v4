@@ -47,7 +47,7 @@ pub fn perp_liq_negative_pnl_or_bankruptcy(
         new_health_cache(&liqee.borrow(), &retriever)?
     };
     let liqee_liq_end_health = liqee_health_cache.health(HealthType::LiquidationEnd);
-    let liqee_settle_health = liqee_health_cache.perp_settle_health();
+    let liqee_max_settle = liqee_health_cache.perp_max_settle(settle_token_index)?;
 
     // TODO: re-think about this. Now that token balances and perp upnl are really close, this may need changes.
     liqee_health_cache.require_after_phase2_liquidation()?;
@@ -87,7 +87,7 @@ pub fn perp_liq_negative_pnl_or_bankruptcy(
     //
     // Step 1: Allow the liqor to take over ("settle") negative liqee pnl.
     //
-    // The only limitation is the liqee's perp_settle_health and its perp pnl settle limit.
+    // The only limitation is the liqee's perp_max_settle and its perp pnl settle limit.
     //
     let settlement;
     let max_settlement_liqee;
@@ -105,7 +105,7 @@ pub fn perp_liq_negative_pnl_or_bankruptcy(
         let liqee_settleable_pnl =
             liqee_perp_position.apply_pnl_settle_limit(&perp_market, liqee_pnl);
 
-        max_settlement_liqee = liqee_settle_health
+        max_settlement_liqee = liqee_max_settle
             .min(-liqee_settleable_pnl)
             .max(I80F48::ZERO);
         settlement = max_settlement_liqee
@@ -157,6 +157,8 @@ pub fn perp_liq_negative_pnl_or_bankruptcy(
         let liqee_perp_position = liqee.perp_position_mut(perp_market_index)?;
         let liqee_pnl = liqee_perp_position.unsettled_pnl(&perp_market, oracle_price)?;
 
+        // TODO: This is wrong. health token pos is negative, but reducing negative pnl can make it positive.
+        // So need to two-step this.
         let max_liab_transfer_from_liqee =
             (-liqee_pnl).min(-liqee_liq_end_health).max(I80F48::ZERO);
         let liab_transfer = max_liab_transfer_from_liqee

@@ -83,7 +83,7 @@ pub async fn fetch_top(
         }
     }
 
-    // Negative pnl needs to be limited by perp_settle_health.
+    // Negative pnl needs to be limited by perp_max_settle.
     // We're doing it in a second step, because it's pretty expensive and we don't
     // want to run this for all accounts.
     if direction == Direction::MaxNegative {
@@ -95,11 +95,11 @@ pub async fn fetch_top(
             } else {
                 I80F48::ZERO
             };
-            let perp_settle_health = crate::health_cache::new(context, account_fetcher, &acc)
+            let perp_max_settle = crate::health_cache::new(context, account_fetcher, &acc)
                 .await?
-                .perp_settle_health();
-            let settleable_pnl = if perp_settle_health > 0 {
-                (*pnl).max(-perp_settle_health)
+                .perp_max_settle(perp_market.settle_token_index)?;
+            let settleable_pnl = if perp_max_settle > 0 {
+                (*pnl).max(-perp_max_settle)
             } else {
                 I80F48::ZERO
             };

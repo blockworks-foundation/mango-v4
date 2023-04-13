@@ -785,13 +785,47 @@ impl HealthCache {
     ///   (+100 USDC health, -150 perp1 health, -150 perp2 health -> allow settling 100 health worth)
     /// - Positive trusted perp pnl can enable settling.
     ///   (+100 trusted perp1 health, -100 perp2 health -> allow settling of 100 health worth)
-    pub fn perp_settle_health(&self) -> I80F48 {
+    fn perp_settle_health(&self) -> I80F48 {
         let mut health = I80F48::ZERO;
         let sum = |contrib| {
             health += contrib;
         };
         self.health_sum(HealthType::Maint, sum, true);
         health
+    }
+
+    /// Returns how much pnl is settleable for a given settle token index.
+    ///
+    /// For example, if perp_settle_health is 50 USD, then the settleable amount in SOL
+    /// would depend on the SOL price, the user's current spot balance and the SOL weights:
+    /// We need to compute how much the users spot SOL balance may decrease before the
+    /// perp_settle_health becomes zero.
+    ///
+    /// Note that the account's actual health would not change during settling negative upnl:
+    /// the spot balance goes down but the perp hupnl goes up accordingly.
+    pub fn perp_max_settle(&self, settle_token_index: TokenIndex) -> Result<I80F48> {
+        let mut remaining_health = self.perp_settle_health();
+        if remaining_health <= 0 {
+            return Ok(I80F48::ZERO);
+        }
+
+        let token = self.token_info(settle_token_index)?;
+
+        // How much can token_index spot position decrease before perp_settle_health goes to 0?
+        let mut max_settle = I80F48::ZERO;
+        if token.balance_spot > 0 {
+            let asset_weighted_price = token.prices.oracle * token.maint_asset_weight;
+            // TODO: expensive divisions
+            let asset_max = remaining_health / asset_weighted_price;
+            max_settle = asset_max.min(token.balance_spot);
+            remaining_health -= max_settle * asset_weighted_price;
+        }
+        if remaining_health > 0 {
+            let liab_weighted_price = token.prices.oracle * token.maint_liab_weight;
+            let liab_max = remaining_health / liab_weighted_price;
+            max_settle += liab_max;
+        }
+        Ok(max_settle)
     }
 }
 
