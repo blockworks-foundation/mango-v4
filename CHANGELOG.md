@@ -4,9 +4,23 @@ Update this for each program release and mainnet deployment.
 
 ## not on mainnet
 
-### v0.11.0, 2023-4-
+### v0.12.0, 2023-4-
 
 Deployment:
+
+- Emit perp fees settled on update_funding (#530)
+
+  Required to have a full picture of total perp market fees.
+
+- Net borrow limit: Separate out tracking from checking (#534)
+
+  That way it's easier to be specific about where the limit should be checked.
+
+## mainnet
+
+### v0.11.0, 2023-4-4
+
+Deployment: Apr 4, 2023 at 21:43:18 Central European Summer Time, https://explorer.solana.com/tx/5Z36iV6VhAfmxwZubQduV1hNyUyyB9AyjovAwNrWLb5cdAqGm4F3NGmz6V8VpHT6yUwCEDxm2hWMrdJXNkZ8RSPR
 
 - Limit funding and interest accrual during downtimes (#529)
 
@@ -25,9 +39,9 @@ Deployment:
 
 - Perp: Fix logging of funding rate in update funding and deactivate pos (#528)
 
-### v0.10.0, 2023-4-
+### v0.10.0, 2023-4-3
 
-Deployment:
+Deployment: Apr 3, 2023 at 20:10:26 Central European Summer Time, https://explorer.solana.com/tx/3Rvv7hxqYQ7mPXE7jopzq1RAAoEwPi1pRPY7EubzEiZih8zMVhTMe1AsuYNJq3gwpM8BVVC3CXkAWcsFdd7SE6zC
 
 - HealthRegion: Explicitly whitelist allowed instructions (#508)
 
@@ -48,8 +62,6 @@ Deployment:
 - Better logging in IxGateSet instruction
 - Sanity check token_index in TokenRegister instruction
 - Allow using all available bytes for bank and market names
-
-## mainnet
 
 ### v0.9.0, 2023-3-16
 
