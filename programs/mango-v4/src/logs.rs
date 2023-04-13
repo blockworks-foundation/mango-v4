@@ -144,6 +144,7 @@ pub struct PerpUpdateFundingLog {
     pub long_funding: i128,
     pub short_funding: i128,
     pub price: i128,
+    pub oracle_slot: u64,
     pub stable_price: i128,
     pub fees_accrued: i128,
     pub fees_settled: i128,
