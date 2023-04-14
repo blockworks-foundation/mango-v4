@@ -39,6 +39,7 @@ declare_id!("4MangoMjqJ2firMokCjjGgoK8d4MXcrgL7XJaL3w6fVg");
 #[program]
 pub mod mango_v4 {
     use super::*;
+    use error::*;
 
     pub fn group_create(
         ctx: Context<GroupCreate>,
@@ -350,6 +351,13 @@ pub mod mango_v4 {
         #[cfg(feature = "enable-gpl")]
         instructions::flash_loan_begin(ctx, loan_amounts)?;
         Ok(())
+    }
+
+    pub fn flash_loan_end<'key, 'accounts, 'remaining, 'info>(
+        ctx: Context<'key, 'accounts, 'remaining, 'info, FlashLoanEnd<'info>>,
+        flash_loan_type: FlashLoanType,
+    ) -> Result<()> {
+        Err(error_msg!("FlashLoanEnd was replaced by FlashLoanEndV2"))
     }
 
     pub fn flash_loan_end_v2<'key, 'accounts, 'remaining, 'info>(

@@ -1516,6 +1516,34 @@ export type MangoV4 = {
       ]
     },
     {
+      "name": "flashLoanEnd",
+      "accounts": [
+        {
+          "name": "account",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "owner",
+          "isMut": false,
+          "isSigner": true
+        },
+        {
+          "name": "tokenProgram",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "flashLoanType",
+          "type": {
+            "defined": "FlashLoanType"
+          }
+        }
+      ]
+    },
+    {
       "name": "flashLoanEndV2",
       "accounts": [
         {
@@ -10287,6 +10315,34 @@ export const IDL: MangoV4 = {
           "name": "loanAmounts",
           "type": {
             "vec": "u64"
+          }
+        }
+      ]
+    },
+    {
+      "name": "flashLoanEnd",
+      "accounts": [
+        {
+          "name": "account",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "owner",
+          "isMut": false,
+          "isSigner": true
+        },
+        {
+          "name": "tokenProgram",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "flashLoanType",
+          "type": {
+            "defined": "FlashLoanType"
           }
         }
       ]
