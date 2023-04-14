@@ -2680,7 +2680,7 @@ export class MangoClient {
     };
 
     const flashLoanEndIx = await this.program.methods
-      .flashLoanEnd(flashLoanType)
+      .flashLoanEndV2(2, flashLoanType)
       .accounts({
         account: mangoAccount.publicKey,
       })

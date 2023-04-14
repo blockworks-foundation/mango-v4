@@ -499,13 +499,14 @@ pub struct FlashLoanEndInstruction {
 #[async_trait::async_trait(?Send)]
 impl ClientInstruction for FlashLoanEndInstruction {
     type Accounts = mango_v4::accounts::FlashLoanEnd;
-    type Instruction = mango_v4::instruction::FlashLoanEnd;
+    type Instruction = mango_v4::instruction::FlashLoanEndV2;
     async fn to_instruction(
         &self,
         account_loader: impl ClientAccountLoader + 'async_trait,
     ) -> (Self::Accounts, instruction::Instruction) {
         let program_id = mango_v4::id();
         let instruction = Self::Instruction {
+            num_loans: 1,
             flash_loan_type: self.flash_loan_type,
         };
 

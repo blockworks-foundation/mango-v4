@@ -1293,6 +1293,7 @@ impl MangoClient {
             },
             0u64,
         ];
+        let num_loans: u8 = loan_amounts.len().try_into().unwrap();
 
         // This relies on the fact that health account banks will be identical to the first_bank above!
         let health_ams = self
@@ -1364,7 +1365,8 @@ impl MangoClient {
                 ams.push(to_readonly_account_meta(self.group()));
                 ams
             },
-            data: anchor_lang::InstructionData::data(&mango_v4::instruction::FlashLoanEnd {
+            data: anchor_lang::InstructionData::data(&mango_v4::instruction::FlashLoanEndV2 {
+                num_loans,
                 flash_loan_type: mango_v4::accounts_ix::FlashLoanType::Swap,
             }),
         });
