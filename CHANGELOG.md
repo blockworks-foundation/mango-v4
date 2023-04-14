@@ -45,6 +45,11 @@ Deployment:
   relating the transaction with the order matching to the transaction that processed
   the fill event for the trade.
 
+- IxGate: Fix check for re-enabling instructions (#540)
+
+  The security admin was not supposed to be able to enable instructions, but a bug
+  allowed it. With this fix, only the group admin (DAO) can enable instructions.
+
 ### v0.12.0, 2023-4-
 
 Deployment:
