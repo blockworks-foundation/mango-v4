@@ -1,10 +1,5 @@
 import { AnchorProvider, Wallet } from '@coral-xyz/anchor';
 import {
-  ASSOCIATED_TOKEN_PROGRAM_ID,
-  NATIVE_MINT,
-  TOKEN_PROGRAM_ID,
-} from '../../src/utils/spl';
-import {
   AddressLookupTableProgram,
   ComputeBudgetProgram,
   Connection,
@@ -30,6 +25,11 @@ import {
 } from '../../src/clientIxParamBuilder';
 import { MANGO_V4_ID, OPENBOOK_PROGRAM_ID } from '../../src/constants';
 import { buildVersionedTx, toNative } from '../../src/utils';
+import {
+  ASSOCIATED_TOKEN_PROGRAM_ID,
+  NATIVE_MINT,
+  TOKEN_PROGRAM_ID,
+} from '../../src/utils/spl';
 
 const GROUP_NUM = Number(process.env.GROUP_NUM || 0);
 
@@ -529,7 +529,7 @@ async function makeTokenReduceonly() {
   await client.tokenEdit(
     group,
     bank.mint,
-    Builder(NullTokenEditParams).reduceOnly(true).build(),
+    Builder(NullTokenEditParams).reduceOnly(1).build(),
   );
 }
 
