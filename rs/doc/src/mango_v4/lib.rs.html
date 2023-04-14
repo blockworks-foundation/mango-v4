@@ -989,6 +989,15 @@
 <a href="#989" id="989">989</a>
 <a href="#990" id="990">990</a>
 <a href="#991" id="991">991</a>
+<a href="#992" id="992">992</a>
+<a href="#993" id="993">993</a>
+<a href="#994" id="994">994</a>
+<a href="#995" id="995">995</a>
+<a href="#996" id="996">996</a>
+<a href="#997" id="997">997</a>
+<a href="#998" id="998">998</a>
+<a href="#999" id="999">999</a>
+<a href="#1000" id="1000">1000</a>
 </pre><pre class="rust"><code><span class="attr">#![allow(unused_variables)]
 
 </span><span class="kw">use </span>fixed::types::I80F48;
@@ -1030,6 +1039,7 @@
 <span class="attr">#[program]
 </span><span class="kw">pub mod </span>mango_v4 {
     <span class="kw">use super</span>::<span class="kw-2">*</span>;
+    <span class="kw">use </span>error::<span class="kw-2">*</span>;
 
     <span class="kw">pub fn </span>group_create(
         ctx: Context&lt;GroupCreate&gt;,
@@ -1347,8 +1357,16 @@
         ctx: Context&lt;<span class="lifetime">&#39;key</span>, <span class="lifetime">&#39;accounts</span>, <span class="lifetime">&#39;remaining</span>, <span class="lifetime">&#39;info</span>, FlashLoanEnd&lt;<span class="lifetime">&#39;info</span>&gt;&gt;,
         flash_loan_type: FlashLoanType,
     ) -&gt; <span class="prelude-ty">Result</span>&lt;()&gt; {
+        <span class="prelude-val">Err</span>(<span class="macro">error_msg!</span>(<span class="string">&quot;FlashLoanEnd was replaced by FlashLoanEndV2&quot;</span>))
+    }
+
+    <span class="kw">pub fn </span>flash_loan_end_v2&lt;<span class="lifetime">&#39;key</span>, <span class="lifetime">&#39;accounts</span>, <span class="lifetime">&#39;remaining</span>, <span class="lifetime">&#39;info</span>&gt;(
+        ctx: Context&lt;<span class="lifetime">&#39;key</span>, <span class="lifetime">&#39;accounts</span>, <span class="lifetime">&#39;remaining</span>, <span class="lifetime">&#39;info</span>, FlashLoanEnd&lt;<span class="lifetime">&#39;info</span>&gt;&gt;,
+        num_loans: u8,
+        flash_loan_type: FlashLoanType,
+    ) -&gt; <span class="prelude-ty">Result</span>&lt;()&gt; {
         <span class="attr">#[cfg(feature = <span class="string">&quot;enable-gpl&quot;</span>)]
-        </span>instructions::flash_loan_end(ctx, flash_loan_type)<span class="question-mark">?</span>;
+        </span>instructions::flash_loan_end(ctx, num_loans, flash_loan_type)<span class="question-mark">?</span>;
         <span class="prelude-val">Ok</span>(())
     }
 
