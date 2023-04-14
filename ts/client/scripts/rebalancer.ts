@@ -107,32 +107,48 @@ async function rebalancer(): Promise<void> {
       );
       // Skip if quantity is too small
       if (maxBaseQuantity.eq(new BN(0))) {
-        console.log(
-          ` - Not rebalancing ${tokenBalance} $${baseBank.name}, quantity too small`,
-        );
+        // console.log(
+        //   ` - Not rebalancing ${tokenBalance} $${baseBank.name}, quantity too small`,
+        // );
         continue;
       }
       console.log(`- Rebalancing ${tokenBalance} $${baseBank.name}`);
 
-      const price = await serum3Market.computePriceForMarketOrderOfSize(
-        client,
-        group,
-        Math.abs(tokenBalance),
-        tokenBalance > 0 ? 'sell' : 'buy',
-      );
+      // if balance is negative we want to bid at a higher price
+      // if balance is positive we want to ask at a lower price
+      const price =
+        baseBank.uiPrice *
+        (1 + (tokenBalance > 0 ? -1 : 1) * baseBank.liquidationFee.toNumber());
       try {
-        const sig = await client.serum3PlaceOrder(
-          group,
-          mangoAccount,
-          serum3Market.serumMarketExternal,
-          tokenBalance > 0 ? Serum3Side.ask : Serum3Side.bid,
-          price,
-          Math.abs(tokenBalance),
-          Serum3SelfTradeBehavior.decrementTake,
-          Serum3OrderType.immediateOrCancel,
-          new Date().valueOf(),
-          10,
+        const sig = await sendTransaction(
+          client.program.provider as AnchorProvider,
+          [
+            ...(await client.serum3PlaceOrderIx(
+              group,
+              mangoAccount,
+              serum3Market.serumMarketExternal,
+              tokenBalance > 0 ? Serum3Side.ask : Serum3Side.bid,
+              price,
+              Math.abs(tokenBalance),
+              Serum3SelfTradeBehavior.decrementTake,
+              Serum3OrderType.limit,
+              new Date().valueOf(),
+              10,
+            )),
+            await client.serum3CancelAllOrdersIx(
+              group,
+              mangoAccount,
+              serum3Market.serumMarketExternal,
+            ),
+            await client.serum3SettleFundsV2Ix(
+              group,
+              mangoAccount,
+              serum3Market.serumMarketExternal,
+            ),
+          ],
+          group.addressLookupTablesList,
         );
+
         console.log(` -- sig https://explorer.solana.com/tx/${sig}`);
       } catch (e) {
         console.log(e);
@@ -157,17 +173,21 @@ async function rebalancer(): Promise<void> {
       );
     }
     if (ixs.length) {
-      const sig = await sendTransaction(
-        client.program.provider as AnchorProvider,
-        ixs,
-        group.addressLookupTablesList,
-      );
-      console.log(
-        ` - closed all serum3 oo accounts, sig https://explorer.solana.com/tx/${sig}`,
-      );
+      try {
+        const sig = await sendTransaction(
+          client.program.provider as AnchorProvider,
+          ixs,
+          group.addressLookupTablesList,
+        );
+        console.log(
+          ` - closed all serum3 oo accounts, sig https://explorer.solana.com/tx/${sig}`,
+        );
+      } catch (e) {
+        console.log(e);
+      }
     }
 
-    console.log(`${new Date().toUTCString()} sleeping for 1s`);
+    // console.log(`${new Date().toUTCString()} sleeping for 1s`);
     await new Promise((r) => setTimeout(r, 1000));
   }
 }

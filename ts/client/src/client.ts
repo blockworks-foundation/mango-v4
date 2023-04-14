@@ -1587,6 +1587,7 @@ export class MangoClient {
     orderType: Serum3OrderType,
     clientOrderId: number,
     limit: number,
+    closeOpenOrdersAccount = false,
   ): Promise<TransactionSignature> {
     const placeOrderIxes = await this.serum3PlaceOrderIx(
       group,
@@ -1609,15 +1610,33 @@ export class MangoClient {
 
     const ixs = [...placeOrderIxes, settleIx];
 
+    if (closeOpenOrdersAccount) {
+      ixs.push(
+        await this.serum3CancelAllOrdersIx(
+          group,
+          mangoAccount,
+          externalMarketPk,
+        ),
+      );
+      ixs.push(settleIx);
+      ixs.push(
+        await this.serum3CloseOpenOrdersIx(
+          group,
+          mangoAccount,
+          externalMarketPk,
+        ),
+      );
+    }
+
     return await this.sendAndConfirmTransactionForGroup(group, ixs);
   }
 
-  public async serum3CancelAllOrders(
+  public async serum3CancelAllOrdersIx(
     group: Group,
     mangoAccount: MangoAccount,
     externalMarketPk: PublicKey,
     limit?: number,
-  ): Promise<TransactionSignature> {
+  ): Promise<TransactionInstruction> {
     const serum3Market = group.serum3MarketsMapByExternal.get(
       externalMarketPk.toBase58(),
     )!;
@@ -1626,14 +1645,16 @@ export class MangoClient {
       externalMarketPk.toBase58(),
     )!;
 
-    const ix = await this.program.methods
+    return await this.program.methods
       .serum3CancelAllOrders(limit ? limit : 10)
       .accounts({
         group: group.publicKey,
         account: mangoAccount.publicKey,
         owner: (this.program.provider as AnchorProvider).wallet.publicKey,
-        openOrders: mangoAccount.getSerum3Account(serum3Market.marketIndex)
-          ?.openOrders,
+        openOrders: await serum3Market.findOoPda(
+          this.programId,
+          mangoAccount.publicKey,
+        ),
         serumMarket: serum3Market.publicKey,
         serumProgram: OPENBOOK_PROGRAM_ID[this.cluster],
         serumMarketExternal: serum3Market.serumMarketExternal,
@@ -1642,8 +1663,22 @@ export class MangoClient {
         marketEventQueue: serum3MarketExternal.decoded.eventQueue,
       })
       .instruction();
+  }
 
-    return await this.sendAndConfirmTransactionForGroup(group, [ix]);
+  public async serum3CancelAllOrders(
+    group: Group,
+    mangoAccount: MangoAccount,
+    externalMarketPk: PublicKey,
+    limit?: number,
+  ): Promise<TransactionSignature> {
+    return await this.sendAndConfirmTransactionForGroup(group, [
+      await this.serum3CancelAllOrdersIx(
+        group,
+        mangoAccount,
+        externalMarketPk,
+        limit,
+      ),
+    ]);
   }
 
   public async serum3SettleFundsIx(
