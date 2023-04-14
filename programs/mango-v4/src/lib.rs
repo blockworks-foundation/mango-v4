@@ -352,12 +352,13 @@ pub mod mango_v4 {
         Ok(())
     }
 
-    pub fn flash_loan_end<'key, 'accounts, 'remaining, 'info>(
+    pub fn flash_loan_end_v2<'key, 'accounts, 'remaining, 'info>(
         ctx: Context<'key, 'accounts, 'remaining, 'info, FlashLoanEnd<'info>>,
+        num_loans: u8,
         flash_loan_type: FlashLoanType,
     ) -> Result<()> {
         #[cfg(feature = "enable-gpl")]
-        instructions::flash_loan_end(ctx, flash_loan_type)?;
+        instructions::flash_loan_end(ctx, num_loans, flash_loan_type)?;
         Ok(())
     }
 

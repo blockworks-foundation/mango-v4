@@ -1516,7 +1516,7 @@
       ]
     },
     {
-      "name": "flashLoanEnd",
+      "name": "flashLoanEndV2",
       "accounts": [
         {
           "name": "account",
@@ -1535,6 +1535,10 @@
         }
       ],
       "args": [
+        {
+          "name": "numLoans",
+          "type": "u8"
+        },
         {
           "name": "flashLoanType",
           "type": {
@@ -7702,6 +7706,11 @@
           "index": false
         },
         {
+          "name": "oracleSlot",
+          "type": "u64",
+          "index": false
+        },
+        {
           "name": "stablePrice",
           "type": "i128",
           "index": false
@@ -8501,6 +8510,26 @@
         {
           "name": "oraclePrice",
           "type": "i128",
+          "index": false
+        }
+      ]
+    },
+    {
+      "name": "FilledPerpOrderLog",
+      "fields": [
+        {
+          "name": "mangoGroup",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "perpMarketIndex",
+          "type": "u16",
+          "index": false
+        },
+        {
+          "name": "seqNum",
+          "type": "u64",
           "index": false
         }
       ]

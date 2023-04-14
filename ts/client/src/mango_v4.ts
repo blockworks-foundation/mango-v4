@@ -1516,7 +1516,7 @@ export type MangoV4 = {
       ]
     },
     {
-      "name": "flashLoanEnd",
+      "name": "flashLoanEndV2",
       "accounts": [
         {
           "name": "account",
@@ -1535,6 +1535,10 @@ export type MangoV4 = {
         }
       ],
       "args": [
+        {
+          "name": "numLoans",
+          "type": "u8"
+        },
         {
           "name": "flashLoanType",
           "type": {
@@ -7702,6 +7706,11 @@ export type MangoV4 = {
           "index": false
         },
         {
+          "name": "oracleSlot",
+          "type": "u64",
+          "index": false
+        },
+        {
           "name": "stablePrice",
           "type": "i128",
           "index": false
@@ -8501,6 +8510,26 @@ export type MangoV4 = {
         {
           "name": "oraclePrice",
           "type": "i128",
+          "index": false
+        }
+      ]
+    },
+    {
+      "name": "FilledPerpOrderLog",
+      "fields": [
+        {
+          "name": "mangoGroup",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "perpMarketIndex",
+          "type": "u16",
+          "index": false
+        },
+        {
+          "name": "seqNum",
+          "type": "u64",
           "index": false
         }
       ]
@@ -10263,7 +10292,7 @@ export const IDL: MangoV4 = {
       ]
     },
     {
-      "name": "flashLoanEnd",
+      "name": "flashLoanEndV2",
       "accounts": [
         {
           "name": "account",
@@ -10282,6 +10311,10 @@ export const IDL: MangoV4 = {
         }
       ],
       "args": [
+        {
+          "name": "numLoans",
+          "type": "u8"
+        },
         {
           "name": "flashLoanType",
           "type": {
@@ -16449,6 +16482,11 @@ export const IDL: MangoV4 = {
           "index": false
         },
         {
+          "name": "oracleSlot",
+          "type": "u64",
+          "index": false
+        },
+        {
           "name": "stablePrice",
           "type": "i128",
           "index": false
@@ -17248,6 +17286,26 @@ export const IDL: MangoV4 = {
         {
           "name": "oraclePrice",
           "type": "i128",
+          "index": false
+        }
+      ]
+    },
+    {
+      "name": "FilledPerpOrderLog",
+      "fields": [
+        {
+          "name": "mangoGroup",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "perpMarketIndex",
+          "type": "u16",
+          "index": false
+        },
+        {
+          "name": "seqNum",
+          "type": "u64",
           "index": false
         }
       ]
