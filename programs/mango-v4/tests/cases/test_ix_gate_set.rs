@@ -24,6 +24,20 @@ async fn test_ix_gate_set() -> Result<(), TransportError> {
     .create(solana)
     .await;
 
+    send_tx(
+        solana,
+        GroupEdit {
+            group,
+            admin,
+            options: mango_v4::instruction::GroupEdit {
+                security_admin_opt: Some(payer.pubkey()),
+                ..group_edit_instruction_default()
+            },
+        },
+    )
+    .await
+    .unwrap();
+
     let account = create_funded_account(
         &solana,
         group,
@@ -88,6 +102,61 @@ async fn test_ix_gate_set() -> Result<(), TransportError> {
     )
     .await
     .unwrap();
+
+    //
+    // TEST: re-enabling is not allowed for security admin
+    //
+    let result = send_tx(
+        solana,
+        IxGateSetInstruction {
+            group,
+            admin: payer,
+            ix_gate: 0,
+        },
+    )
+    .await;
+    assert!(result.is_err());
+    let group_data: Group = solana.get_account(group).await;
+    assert!(!group_data.is_ix_enabled(IxGate::TokenDeposit));
+
+    //
+    // TEST: security admin can disable
+    //
+    send_tx(
+        solana,
+        IxGateSetInstruction {
+            group,
+            admin: payer,
+            ix_gate: {
+                let mut ix_gate = 0u128;
+                ix_gate |= 1 << IxGate::TokenDeposit as u128;
+                ix_gate |= 1 << IxGate::TokenWithdraw as u128;
+                ix_gate
+            },
+        },
+    )
+    .await
+    .unwrap();
+    let group_data: Group = solana.get_account(group).await;
+    assert!(!group_data.is_ix_enabled(IxGate::TokenDeposit));
+    assert!(!group_data.is_ix_enabled(IxGate::TokenWithdraw));
+
+    //
+    // TEST: admin can re-enable
+    //
+    send_tx(
+        solana,
+        IxGateSetInstruction {
+            group,
+            admin,
+            ix_gate: 0,
+        },
+    )
+    .await
+    .unwrap();
+    let group_data: Group = solana.get_account(group).await;
+    assert!(group_data.is_ix_enabled(IxGate::TokenDeposit));
+    assert!(group_data.is_ix_enabled(IxGate::TokenWithdraw));
 
     //
     // test cu budget, ix has a lot of logging
