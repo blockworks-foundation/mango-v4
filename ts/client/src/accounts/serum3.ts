@@ -140,6 +140,40 @@ export class Serum3Market {
     );
   }
 
+  public async computePriceForMarketOrderOfSize(
+    client: MangoClient,
+    group: Group,
+    size: number,
+    side: 'buy' | 'sell',
+  ): Promise<number> {
+    const ob =
+      side == 'buy'
+        ? await this.loadBids(client, group)
+        : await this.loadAsks(client, group);
+    let acc = 0;
+    let selectedOrder;
+    const orderSize = size;
+    for (const order of ob.getL2(size * 2)) {
+      acc += order[1];
+      if (acc >= orderSize) {
+        selectedOrder = order;
+        break;
+      }
+    }
+
+    if (!selectedOrder) {
+      throw new Error(
+        'Unable to place market order for this order size. Please retry.',
+      );
+    }
+
+    if (side === 'buy') {
+      return selectedOrder[0] * 1.05;
+    } else {
+      return selectedOrder[0] * 0.95;
+    }
+  }
+
   public async logOb(client: MangoClient, group: Group): Promise<string> {
     let res = ``;
     res += `  ${this.name} OrderBook`;

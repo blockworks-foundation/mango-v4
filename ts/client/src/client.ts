@@ -1410,10 +1410,6 @@ export class MangoClient {
       externalMarketPk.toBase58(),
     )!;
 
-    const openOrders = mangoAccount.serum3.find(
-      (account) => account.marketIndex === serum3Market.marketIndex,
-    )?.openOrders;
-
     return await this.program.methods
       .serum3CloseOpenOrders()
       .accounts({
@@ -1422,7 +1418,10 @@ export class MangoClient {
         serumMarket: serum3Market.publicKey,
         serumProgram: serum3Market.serumProgram,
         serumMarketExternal: serum3Market.serumMarketExternal,
-        openOrders,
+        openOrders: await serum3Market.findOoPda(
+          this.programId,
+          mangoAccount.publicKey,
+        ),
         solDestination: (this.program.provider as AnchorProvider).wallet
           .publicKey,
       })
@@ -1601,16 +1600,16 @@ export class MangoClient {
       clientOrderId,
       limit,
     );
+
     const settleIx = await this.serum3SettleFundsIx(
       group,
       mangoAccount,
       externalMarketPk,
     );
 
-    return await this.sendAndConfirmTransactionForGroup(group, [
-      ...placeOrderIxes,
-      settleIx,
-    ]);
+    const ixs = [...placeOrderIxes, settleIx];
+
+    return await this.sendAndConfirmTransactionForGroup(group, ixs);
   }
 
   public async serum3CancelAllOrders(
