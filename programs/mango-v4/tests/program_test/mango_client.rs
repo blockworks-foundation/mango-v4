@@ -108,12 +108,12 @@ pub trait ClientInstruction {
 fn make_instruction(
     program_id: Pubkey,
     accounts: &impl anchor_lang::ToAccountMetas,
-    data: impl anchor_lang::InstructionData,
+    data: &impl anchor_lang::InstructionData,
 ) -> instruction::Instruction {
     instruction::Instruction {
         program_id,
         accounts: anchor_lang::ToAccountMetas::to_account_metas(accounts, None),
-        data: anchor_lang::InstructionData::data(&data),
+        data: anchor_lang::InstructionData::data(data),
     }
 }
 
@@ -458,7 +458,7 @@ impl ClientInstruction for FlashLoanBeginInstruction {
             loan_amounts: vec![self.withdraw_amount],
         };
 
-        let mut instruction = make_instruction(program_id, &accounts, instruction);
+        let mut instruction = make_instruction(program_id, &accounts, &instruction);
         instruction.accounts.push(AccountMeta {
             pubkey: self.mango_token_bank,
             is_writable: true,
@@ -529,7 +529,7 @@ impl ClientInstruction for FlashLoanEndInstruction {
             token_program: Token::id(),
         };
 
-        let mut instruction = make_instruction(program_id, &accounts, instruction);
+        let mut instruction = make_instruction(program_id, &accounts, &instruction);
         instruction.accounts.extend(health_check_metas.into_iter());
         instruction.accounts.push(AccountMeta {
             pubkey: self.mango_token_vault,
@@ -615,7 +615,7 @@ impl ClientInstruction for TokenWithdrawInstruction {
             token_program: Token::id(),
         };
 
-        let mut instruction = make_instruction(program_id, &accounts, instruction);
+        let mut instruction = make_instruction(program_id, &accounts, &instruction);
         instruction.accounts.extend(health_check_metas.into_iter());
 
         (accounts, instruction)
@@ -687,7 +687,7 @@ impl ClientInstruction for TokenDepositInstruction {
             token_program: Token::id(),
         };
 
-        let mut instruction = make_instruction(program_id, &accounts, instruction);
+        let mut instruction = make_instruction(program_id, &accounts, &instruction);
         instruction.accounts.extend(health_check_metas.into_iter());
 
         (accounts, instruction)
@@ -757,7 +757,7 @@ impl ClientInstruction for TokenDepositIntoExistingInstruction {
             token_program: Token::id(),
         };
 
-        let mut instruction = make_instruction(program_id, &accounts, instruction);
+        let mut instruction = make_instruction(program_id, &accounts, &instruction);
         instruction.accounts.extend(health_check_metas.into_iter());
 
         (accounts, instruction)
@@ -888,7 +888,7 @@ impl ClientInstruction for TokenRegisterInstruction {
             rent: sysvar::rent::Rent::id(),
         };
 
-        let instruction = make_instruction(program_id, &accounts, instruction);
+        let instruction = make_instruction(program_id, &accounts, &instruction);
         (accounts, instruction)
     }
 
@@ -973,7 +973,7 @@ impl ClientInstruction for TokenAddBankInstruction {
             rent: sysvar::rent::Rent::id(),
         };
 
-        let instruction = make_instruction(program_id, &accounts, instruction);
+        let instruction = make_instruction(program_id, &accounts, &instruction);
         (accounts, instruction)
     }
 
@@ -1014,7 +1014,7 @@ impl ClientInstruction for TokenDeregisterInstruction {
             token_program: Token::id(),
         };
 
-        let mut instruction = make_instruction(program_id, &accounts, instruction);
+        let mut instruction = make_instruction(program_id, &accounts, &instruction);
 
         let mut ams = self
             .banks
@@ -1123,7 +1123,7 @@ impl ClientInstruction for TokenEditWeights {
             oracle: mint_info.oracle,
         };
 
-        let mut instruction = make_instruction(program_id, &accounts, instruction);
+        let mut instruction = make_instruction(program_id, &accounts, &instruction);
         instruction
             .accounts
             .extend(mint_info.banks().iter().map(|&k| AccountMeta {
@@ -1179,7 +1179,7 @@ impl ClientInstruction for TokenResetStablePriceModel {
             oracle: mint_info.oracle,
         };
 
-        let mut instruction = make_instruction(program_id, &accounts, instruction);
+        let mut instruction = make_instruction(program_id, &accounts, &instruction);
         instruction
             .accounts
             .extend(mint_info.banks().iter().map(|&k| AccountMeta {
@@ -1240,7 +1240,7 @@ impl ClientInstruction for TokenResetNetBorrows {
             oracle: mint_info.oracle,
         };
 
-        let mut instruction = make_instruction(program_id, &accounts, instruction);
+        let mut instruction = make_instruction(program_id, &accounts, &instruction);
         instruction
             .accounts
             .extend(mint_info.banks().iter().map(|&k| AccountMeta {
@@ -1298,7 +1298,7 @@ impl ClientInstruction for TokenMakeReduceOnly {
             oracle: mint_info.oracle,
         };
 
-        let mut instruction = make_instruction(program_id, &accounts, instruction);
+        let mut instruction = make_instruction(program_id, &accounts, &instruction);
         instruction
             .accounts
             .extend(mint_info.banks().iter().map(|&k| AccountMeta {
@@ -1350,7 +1350,7 @@ impl ClientInstruction for StubOracleSetInstruction {
             admin: self.admin.pubkey(),
         };
 
-        let instruction = make_instruction(program_id, &accounts, instruction);
+        let instruction = make_instruction(program_id, &accounts, &instruction);
         (accounts, instruction)
     }
 
@@ -1398,7 +1398,7 @@ impl ClientInstruction for StubOracleCreate {
             system_program: System::id(),
         };
 
-        let instruction = make_instruction(program_id, &accounts, instruction);
+        let instruction = make_instruction(program_id, &accounts, &instruction);
         (accounts, instruction)
     }
 
@@ -1443,7 +1443,7 @@ impl ClientInstruction for StubOracleCloseInstruction {
             token_program: Token::id(),
         };
 
-        let instruction = make_instruction(program_id, &accounts, instruction);
+        let instruction = make_instruction(program_id, &accounts, &instruction);
         (accounts, instruction)
     }
 
@@ -1499,7 +1499,7 @@ impl ClientInstruction for GroupCreateInstruction {
             rent: sysvar::rent::Rent::id(),
         };
 
-        let instruction = make_instruction(program_id, &accounts, instruction);
+        let instruction = make_instruction(program_id, &accounts, &instruction);
         (accounts, instruction)
     }
 
@@ -1508,7 +1508,7 @@ impl ClientInstruction for GroupCreateInstruction {
     }
 }
 
-fn group_edit_instruction_default() -> mango_v4::instruction::GroupEdit {
+pub fn group_edit_instruction_default() -> mango_v4::instruction::GroupEdit {
     mango_v4::instruction::GroupEdit {
         admin_opt: None,
         fast_listing_admin_opt: None,
@@ -1553,6 +1553,36 @@ impl ClientInstruction for GroupEditFeeParameters {
             admin: self.admin.pubkey(),
         };
 
+        let instruction = make_instruction(program_id, &accounts, &instruction);
+        (accounts, instruction)
+    }
+
+    fn signers(&self) -> Vec<TestKeypair> {
+        vec![self.admin]
+    }
+}
+
+pub struct GroupEdit {
+    pub group: Pubkey,
+    pub admin: TestKeypair,
+    pub options: mango_v4::instruction::GroupEdit,
+}
+#[async_trait::async_trait(?Send)]
+impl ClientInstruction for GroupEdit {
+    type Accounts = mango_v4::accounts::GroupEdit;
+    type Instruction = mango_v4::instruction::GroupEdit;
+    async fn to_instruction(
+        &self,
+        _account_loader: impl ClientAccountLoader + 'async_trait,
+    ) -> (Self::Accounts, instruction::Instruction) {
+        let program_id = mango_v4::id();
+        let instruction = &self.options;
+
+        let accounts = Self::Accounts {
+            group: self.group,
+            admin: self.admin.pubkey(),
+        };
+
         let instruction = make_instruction(program_id, &accounts, instruction);
         (accounts, instruction)
     }
@@ -1585,7 +1615,7 @@ impl ClientInstruction for IxGateSetInstruction {
             admin: self.admin.pubkey(),
         };
 
-        let instruction = make_instruction(program_id, &accounts, instruction);
+        let instruction = make_instruction(program_id, &accounts, &instruction);
         (accounts, instruction)
     }
 
@@ -1624,7 +1654,7 @@ impl ClientInstruction for GroupCloseInstruction {
             token_program: Token::id(),
         };
 
-        let instruction = make_instruction(program_id, &accounts, instruction);
+        let instruction = make_instruction(program_id, &accounts, &instruction);
         (accounts, instruction)
     }
 
@@ -1680,7 +1710,7 @@ impl ClientInstruction for AccountCreateInstruction {
             system_program: System::id(),
         };
 
-        let instruction = make_instruction(program_id, &accounts, instruction);
+        let instruction = make_instruction(program_id, &accounts, &instruction);
         (accounts, instruction)
     }
 
@@ -1734,7 +1764,7 @@ impl ClientInstruction for AccountExpandInstruction {
             system_program: System::id(),
         };
 
-        let instruction = make_instruction(program_id, &accounts, instruction);
+        let instruction = make_instruction(program_id, &accounts, &instruction);
         (accounts, instruction)
     }
 
@@ -1781,7 +1811,7 @@ impl ClientInstruction for AccountEditInstruction {
             owner: self.owner.pubkey(),
         };
 
-        let instruction = make_instruction(program_id, &accounts, instruction);
+        let instruction = make_instruction(program_id, &accounts, &instruction);
         (accounts, instruction)
     }
 
@@ -1815,7 +1845,7 @@ impl ClientInstruction for AccountCloseInstruction {
             token_program: Token::id(),
         };
 
-        let instruction = make_instruction(program_id, &accounts, instruction);
+        let instruction = make_instruction(program_id, &accounts, &instruction);
         (accounts, instruction)
     }
 
@@ -1864,7 +1894,7 @@ impl ClientInstruction for AccountBuybackFeesWithMngo {
             fees_oracle: fees_bank.oracle,
         };
 
-        let instruction = make_instruction(program_id, &accounts, instruction);
+        let instruction = make_instruction(program_id, &accounts, &instruction);
         (accounts, instruction)
     }
 
@@ -1933,7 +1963,7 @@ impl ClientInstruction for Serum3RegisterMarketInstruction {
             system_program: System::id(),
         };
 
-        let instruction = make_instruction(program_id, &accounts, instruction);
+        let instruction = make_instruction(program_id, &accounts, &instruction);
         (accounts, instruction)
     }
 
@@ -1989,7 +2019,7 @@ impl ClientInstruction for Serum3DeregisterMarketInstruction {
             token_program: Token::id(),
         };
 
-        let instruction = make_instruction(program_id, &accounts, instruction);
+        let instruction = make_instruction(program_id, &accounts, &instruction);
         (accounts, instruction)
     }
 
@@ -2040,7 +2070,7 @@ impl ClientInstruction for Serum3CreateOpenOrdersInstruction {
             rent: sysvar::rent::Rent::id(),
         };
 
-        let instruction = make_instruction(program_id, &accounts, instruction);
+        let instruction = make_instruction(program_id, &accounts, &instruction);
         (accounts, instruction)
     }
 
@@ -2089,7 +2119,7 @@ impl ClientInstruction for Serum3CloseOpenOrdersInstruction {
             sol_destination: self.sol_destination,
         };
 
-        let instruction = make_instruction(program_id, &accounts, instruction);
+        let instruction = make_instruction(program_id, &accounts, &instruction);
         (accounts, instruction)
     }
 
@@ -2205,7 +2235,7 @@ impl ClientInstruction for Serum3PlaceOrderInstruction {
             token_program: Token::id(),
         };
 
-        let mut instruction = make_instruction(program_id, &accounts, instruction);
+        let mut instruction = make_instruction(program_id, &accounts, &instruction);
         instruction.accounts.extend(health_check_metas.into_iter());
 
         (accounts, instruction)
@@ -2274,7 +2304,7 @@ impl ClientInstruction for Serum3CancelOrderInstruction {
             owner: self.owner.pubkey(),
         };
 
-        let instruction = make_instruction(program_id, &accounts, instruction);
+        let instruction = make_instruction(program_id, &accounts, &instruction);
         (accounts, instruction)
     }
 
@@ -2335,7 +2365,7 @@ impl ClientInstruction for Serum3CancelAllOrdersInstruction {
             owner: self.owner.pubkey(),
         };
 
-        let instruction = make_instruction(program_id, &accounts, instruction);
+        let instruction = make_instruction(program_id, &accounts, &instruction);
         (accounts, instruction)
     }
 
@@ -2412,7 +2442,7 @@ impl ClientInstruction for Serum3SettleFundsInstruction {
             token_program: Token::id(),
         };
 
-        let instruction = make_instruction(program_id, &accounts, instruction);
+        let instruction = make_instruction(program_id, &accounts, &instruction);
         (accounts, instruction)
     }
 
@@ -2498,7 +2528,7 @@ impl ClientInstruction for Serum3SettleFundsV2Instruction {
             },
         };
 
-        let instruction = make_instruction(program_id, &accounts, instruction);
+        let instruction = make_instruction(program_id, &accounts, &instruction);
         (accounts, instruction)
     }
 
@@ -2588,7 +2618,7 @@ impl ClientInstruction for Serum3LiqForceCancelOrdersInstruction {
             token_program: Token::id(),
         };
 
-        let mut instruction = make_instruction(program_id, &accounts, instruction);
+        let mut instruction = make_instruction(program_id, &accounts, &instruction);
         instruction.accounts.extend(health_check_metas.into_iter());
 
         (accounts, instruction)
@@ -2651,7 +2681,7 @@ impl ClientInstruction for TokenForceCloseBorrowsWithTokenInstruction {
             liqor_owner: self.liqor_owner.pubkey(),
         };
 
-        let mut instruction = make_instruction(program_id, &accounts, instruction);
+        let mut instruction = make_instruction(program_id, &accounts, &instruction);
         instruction.accounts.extend(health_check_metas.into_iter());
 
         (accounts, instruction)
@@ -2714,7 +2744,7 @@ impl ClientInstruction for TokenLiqWithTokenInstruction {
             liqor_owner: self.liqor_owner.pubkey(),
         };
 
-        let mut instruction = make_instruction(program_id, &accounts, instruction);
+        let mut instruction = make_instruction(program_id, &accounts, &instruction);
         instruction.accounts.extend(health_check_metas.into_iter());
 
         (accounts, instruction)
@@ -2797,7 +2827,7 @@ impl ClientInstruction for TokenLiqBankruptcyInstruction {
             token_program: Token::id(),
         };
 
-        let mut instruction = make_instruction(program_id, &accounts, instruction);
+        let mut instruction = make_instruction(program_id, &accounts, &instruction);
         let mut bank_ams = liab_mint_info
             .banks()
             .iter()
@@ -2935,7 +2965,7 @@ impl ClientInstruction for PerpCreateMarketInstruction {
             system_program: System::id(),
         };
 
-        let instruction = make_instruction(program_id, &accounts, instruction);
+        let instruction = make_instruction(program_id, &accounts, &instruction);
         (accounts, instruction)
     }
 
@@ -3008,7 +3038,7 @@ impl ClientInstruction for PerpResetStablePriceModel {
             oracle: perp_market.oracle,
         };
 
-        let instruction = make_instruction(program_id, &accounts, instruction);
+        let instruction = make_instruction(program_id, &accounts, &instruction);
         (accounts, instruction)
     }
 
@@ -3048,7 +3078,7 @@ impl ClientInstruction for PerpSetSettleLimitWindow {
             oracle: perp_market.oracle,
         };
 
-        let instruction = make_instruction(program_id, &accounts, instruction);
+        let instruction = make_instruction(program_id, &accounts, &instruction);
         (accounts, instruction)
     }
 
@@ -3087,7 +3117,7 @@ impl ClientInstruction for PerpMakeReduceOnly {
             oracle: perp_market.oracle,
         };
 
-        let instruction = make_instruction(program_id, &accounts, instruction);
+        let instruction = make_instruction(program_id, &accounts, &instruction);
         (accounts, instruction)
     }
 
@@ -3129,7 +3159,7 @@ impl ClientInstruction for PerpChangeWeights {
             oracle: perp_market.oracle,
         };
 
-        let instruction = make_instruction(program_id, &accounts, instruction);
+        let instruction = make_instruction(program_id, &accounts, &instruction);
         (accounts, instruction)
     }
 
@@ -3166,7 +3196,7 @@ impl ClientInstruction for PerpCloseMarketInstruction {
             sol_destination: self.sol_destination,
         };
 
-        let instruction = make_instruction(program_id, &accounts, instruction);
+        let instruction = make_instruction(program_id, &accounts, &instruction);
         (accounts, instruction)
     }
 
@@ -3199,7 +3229,7 @@ impl ClientInstruction for PerpDeactivatePositionInstruction {
             owner: self.owner.pubkey(),
         };
 
-        let instruction = make_instruction(program_id, &accounts, instruction);
+        let instruction = make_instruction(program_id, &accounts, &instruction);
         (accounts, instruction)
     }
 
@@ -3264,7 +3294,7 @@ impl ClientInstruction for PerpPlaceOrderInstruction {
             oracle: perp_market.oracle,
             owner: self.owner.pubkey(),
         };
-        let mut instruction = make_instruction(program_id, &accounts, instruction);
+        let mut instruction = make_instruction(program_id, &accounts, &instruction);
         instruction.accounts.extend(health_check_metas);
 
         (accounts, instruction)
@@ -3333,7 +3363,7 @@ impl ClientInstruction for PerpPlaceOrderPeggedInstruction {
             oracle: perp_market.oracle,
             owner: self.owner.pubkey(),
         };
-        let mut instruction = make_instruction(program_id, &accounts, instruction);
+        let mut instruction = make_instruction(program_id, &accounts, &instruction);
         instruction.accounts.extend(health_check_metas);
 
         (accounts, instruction)
@@ -3372,7 +3402,7 @@ impl ClientInstruction for PerpCancelOrderInstruction {
             owner: self.owner.pubkey(),
         };
 
-        let instruction = make_instruction(program_id, &accounts, instruction);
+        let instruction = make_instruction(program_id, &accounts, &instruction);
         (accounts, instruction)
     }
 
@@ -3409,7 +3439,7 @@ impl ClientInstruction for PerpCancelOrderByClientOrderIdInstruction {
             owner: self.owner.pubkey(),
         };
 
-        let instruction = make_instruction(program_id, &accounts, instruction);
+        let instruction = make_instruction(program_id, &accounts, &instruction);
         (accounts, instruction)
     }
 
@@ -3443,7 +3473,7 @@ impl ClientInstruction for PerpCancelAllOrdersInstruction {
             owner: self.owner.pubkey(),
         };
 
-        let instruction = make_instruction(program_id, &accounts, instruction);
+        let instruction = make_instruction(program_id, &accounts, &instruction);
         (accounts, instruction)
     }
 
@@ -3474,7 +3504,7 @@ impl ClientInstruction for PerpConsumeEventsInstruction {
             event_queue: perp_market.event_queue,
         };
 
-        let mut instruction = make_instruction(program_id, &accounts, instruction);
+        let mut instruction = make_instruction(program_id, &accounts, &instruction);
         instruction
             .accounts
             .extend(self.mango_accounts.iter().map(|ma| AccountMeta {
@@ -3514,7 +3544,7 @@ impl ClientInstruction for PerpUpdateFundingInstruction {
             oracle: self.oracle,
         };
 
-        let instruction = make_instruction(program_id, &accounts, instruction);
+        let instruction = make_instruction(program_id, &accounts, &instruction);
         (accounts, instruction)
     }
 
@@ -3575,7 +3605,7 @@ impl ClientInstruction for PerpSettlePnlInstruction {
             settle_oracle: settle_bank.oracle,
         };
 
-        let mut instruction = make_instruction(program_id, &accounts, instruction);
+        let mut instruction = make_instruction(program_id, &accounts, &instruction);
         instruction.accounts.extend(health_check_metas);
 
         (accounts, instruction)
@@ -3628,7 +3658,7 @@ impl ClientInstruction for PerpSettleFeesInstruction {
             settle_bank: self.settle_bank,
             settle_oracle: settle_bank.oracle,
         };
-        let mut instruction = make_instruction(program_id, &accounts, instruction);
+        let mut instruction = make_instruction(program_id, &accounts, &instruction);
         instruction.accounts.extend(health_check_metas);
 
         (accounts, instruction)
@@ -3675,7 +3705,7 @@ impl ClientInstruction for PerpLiqForceCancelOrdersInstruction {
             bids: perp_market.bids,
             asks: perp_market.asks,
         };
-        let mut instruction = make_instruction(program_id, &accounts, instruction);
+        let mut instruction = make_instruction(program_id, &accounts, &instruction);
         instruction.accounts.extend(health_check_metas);
 
         (accounts, instruction)
@@ -3752,7 +3782,7 @@ impl ClientInstruction for PerpLiqBaseOrPositivePnlInstruction {
             settle_vault: quote_mint_info.first_vault(),
             settle_oracle: quote_mint_info.oracle,
         };
-        let mut instruction = make_instruction(program_id, &accounts, instruction);
+        let mut instruction = make_instruction(program_id, &accounts, &instruction);
         instruction.accounts.extend(health_check_metas);
 
         (accounts, instruction)
@@ -3829,7 +3859,7 @@ impl ClientInstruction for PerpLiqNegativePnlOrBankruptcyInstruction {
             insurance_vault: group.insurance_vault,
             token_program: Token::id(),
         };
-        let mut instruction = make_instruction(program_id, &accounts, instruction);
+        let mut instruction = make_instruction(program_id, &accounts, &instruction);
         instruction.accounts.extend(health_check_metas);
 
         (accounts, instruction)
@@ -3853,7 +3883,7 @@ impl ClientInstruction for BenchmarkInstruction {
         let instruction = Self::Instruction {};
         let accounts = Self::Accounts {};
 
-        let instruction = make_instruction(program_id, &accounts, instruction);
+        let instruction = make_instruction(program_id, &accounts, &instruction);
         (accounts, instruction)
     }
 
@@ -3884,7 +3914,7 @@ impl ClientInstruction for TokenUpdateIndexAndRateInstruction {
             instructions: solana_program::sysvar::instructions::id(),
         };
 
-        let mut instruction = make_instruction(program_id, &accounts, instruction);
+        let mut instruction = make_instruction(program_id, &accounts, &instruction);
         let mut bank_ams = mint_info
             .banks()
             .iter()
@@ -3937,7 +3967,7 @@ impl ClientInstruction for ComputeAccountDataInstruction {
             account: self.account,
         };
 
-        let mut instruction = make_instruction(program_id, &accounts, instruction);
+        let mut instruction = make_instruction(program_id, &accounts, &instruction);
         instruction.accounts.extend(health_check_metas.into_iter());
 
         (accounts, instruction)
@@ -3982,7 +4012,7 @@ impl ClientInstruction for HealthRegionBeginInstruction {
             account: self.account,
         };
 
-        let mut instruction = make_instruction(program_id, &accounts, instruction);
+        let mut instruction = make_instruction(program_id, &accounts, &instruction);
         instruction.accounts.extend(health_check_metas.into_iter());
 
         (accounts, instruction)
@@ -4026,7 +4056,7 @@ impl ClientInstruction for HealthRegionEndInstruction {
             account: self.account,
         };
 
-        let mut instruction = make_instruction(program_id, &accounts, instruction);
+        let mut instruction = make_instruction(program_id, &accounts, &instruction);
         instruction.accounts.extend(health_check_metas.into_iter());
 
         (accounts, instruction)
@@ -4060,7 +4090,7 @@ impl ClientInstruction for AltSetInstruction {
             address_lookup_table: self.address_lookup_table,
         };
 
-        let instruction = make_instruction(program_id, &accounts, instruction);
+        let instruction = make_instruction(program_id, &accounts, &instruction);
         (accounts, instruction)
     }
 
@@ -4098,7 +4128,7 @@ impl ClientInstruction for AltExtendInstruction {
             address_lookup_table: self.address_lookup_table,
         };
 
-        let instruction = make_instruction(program_id, &accounts, instruction);
+        let instruction = make_instruction(program_id, &accounts, &instruction);
         (accounts, instruction)
     }
 

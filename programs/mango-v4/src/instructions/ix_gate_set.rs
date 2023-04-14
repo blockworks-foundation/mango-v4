@@ -11,7 +11,7 @@ pub fn ix_gate_set(ctx: Context<IxGateSet>, ix_gate: u128) -> Result<()> {
     let mut require_group_admin = false;
     for i in 0..128 {
         // only admin can re-enable
-        if group.ix_gate & (1 << i) == 1 && ix_gate & (1 << i) == 0 {
+        if group.ix_gate & (1 << i) != 0 && ix_gate & (1 << i) == 0 {
             require_group_admin = true;
         }
     }
