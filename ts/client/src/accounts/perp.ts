@@ -377,9 +377,9 @@ export class PerpMarket {
    *
    * @param bids
    * @param asks
-   * @returns returns funding rate per hour
+   * @returns returns instantaneous funding rate
    */
-  public getCurrentFundingRate(bids: BookSide, asks: BookSide): number {
+  public getInstantaneousFundingRate(bids: BookSide, asks: BookSide): number {
     const MIN_FUNDING = this.minFunding.toNumber();
     const MAX_FUNDING = this.maxFunding.toNumber();
 
@@ -401,7 +401,22 @@ export class PerpMarket {
     } else {
       funding = 0;
     }
-    return funding / 24 / Math.pow(10, QUOTE_DECIMALS);
+
+    return funding;
+  }
+
+  /**
+   *
+   * Returns instantaneous funding rate for the day. How is it actually applied - funding is
+   * continously applied on every interaction to a perp position. The rate is further multiplied
+   * by the time elapsed since it was last applied (capped to max. 1hr).
+   *
+   * @param bids
+   * @param asks
+   * @returns returns instantaneous funding rate in % form
+   */
+  public getInstantaneousFundingRateUi(bids: BookSide, asks: BookSide): number {
+    return this.getInstantaneousFundingRate(bids, asks) * 100;
   }
 
   public uiPriceToLots(price: number): BN {
