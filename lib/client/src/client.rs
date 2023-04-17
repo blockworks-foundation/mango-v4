@@ -18,7 +18,7 @@ use itertools::Itertools;
 use mango_v4::accounts_ix::{Serum3OrderType, Serum3SelfTradeBehavior, Serum3Side};
 use mango_v4::state::{
     Bank, Group, MangoAccountValue, PerpMarketIndex, PlaceOrderType, Serum3MarketIndex, Side,
-    TokenIndex,
+    TokenIndex, INSURANCE_TOKEN_INDEX,
 };
 
 use solana_address_lookup_table_program::state::AddressLookupTable;
@@ -1011,6 +1011,7 @@ impl MangoClient {
 
         let perp = self.context.perp(market_index);
         let settle_token_info = self.context.token(perp.market.settle_token_index);
+        let insurance_token_info = self.context.token(INSURANCE_TOKEN_INDEX);
 
         let health_remaining_ams = self
             .derive_liquidation_health_check_remaining_account_metas(liqee.1, &[])
@@ -1021,7 +1022,7 @@ impl MangoClient {
             program_id: mango_v4::id(),
             accounts: {
                 let mut ams = anchor_lang::ToAccountMetas::to_account_metas(
-                    &mango_v4::accounts::PerpLiqNegativePnlOrBankruptcy {
+                    &mango_v4::accounts::PerpLiqNegativePnlOrBankruptcyV2 {
                         group: self.group(),
                         perp_market: perp.address,
                         oracle: perp.market.oracle,
@@ -1032,6 +1033,9 @@ impl MangoClient {
                         settle_vault: settle_token_info.mint_info.first_vault(),
                         settle_oracle: settle_token_info.mint_info.oracle,
                         insurance_vault: group.insurance_vault,
+                        insurance_bank: insurance_token_info.mint_info.first_bank(),
+                        insurance_bank_vault: insurance_token_info.mint_info.first_vault(),
+                        insurance_oracle: insurance_token_info.mint_info.oracle,
                         token_program: Token::id(),
                     },
                     None,
@@ -1040,7 +1044,7 @@ impl MangoClient {
                 ams
             },
             data: anchor_lang::InstructionData::data(
-                &mango_v4::instruction::PerpLiqNegativePnlOrBankruptcy { max_liab_transfer },
+                &mango_v4::instruction::PerpLiqNegativePnlOrBankruptcyV2 { max_liab_transfer },
             ),
         };
         self.send_and_confirm_owner_tx(vec![ix]).await
