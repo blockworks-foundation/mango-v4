@@ -1,22 +1,9 @@
 name: Publish Docker Image to GCR
 
-on:
+on: 
   push:
-    branches: [dev, main]
-    paths:
-      [
-        '.github/ci-docker-publish.yml',
-        'programs/**',
-        'lib/client/**',
-        'bin/keeper/**',
-        'bin/liquidator/**',
-        'bin/settler/**',
-      ]
-  workflow_call:
-    secrets:
-      GITHUB_TOKEN:
-        required: true
-  workflow_dispatch:
+    branches:
+      - 'dev'
 
 env:
   IMAGE: mango-v4
@@ -54,7 +41,7 @@ jobs:
           context: .
           push: true
           tags: |
-            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
-            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
+            ${{ env.REGISTRY }}/${{ env.IMAGE }}:${{ github.sha }}
+            ${{ env.REGISTRY }}/${{ env.IMAGE }}:latest
           cache-from: type=gha
           cache-to: type=gha,mode=max
