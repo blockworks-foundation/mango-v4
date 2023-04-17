@@ -12,7 +12,10 @@
         "takeSpammers": true,
         "spammerCharge": 2,
         "charge": 0.002,
-        "krakenCode": "XXBTZUSD"
+        "krakenCode": "XXBTZUSD",
+        "binanceCode": "BTCUSDT",
+        "perpMarketIndex": 0,
+        "spotMarketIndex": 5
       }
     },
     "SOL": {
@@ -24,7 +27,10 @@
         "takeSpammers": true,
         "spammerCharge": 2,
         "charge": 0.002,
-        "krakenCode": "SOLUSD"
+        "krakenCode": "SOLUSD",
+        "binanceCode": "SOLUSDT",
+        "perpMarketIndex": 2,
+        "spotMarketIndex": 0
       }
     },
     "ETH": {
@@ -36,7 +42,10 @@
         "takeSpammers": true,
         "spammerCharge": 2,
         "charge": 0.002,
-        "krakenCode": "XETHZUSD"
+        "krakenCode": "XETHZUSD",
+        "binanceCode": "ETHUSDT",
+        "perpMarketIndex": 3,
+        "spotMarketIndex": 3
       }
     }
   }

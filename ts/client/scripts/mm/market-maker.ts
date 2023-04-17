@@ -90,12 +90,7 @@ const binanceClient = Binance();
 const krakenClient = new Kraken();
 
 function getPerpMarketAssetsToTradeOn(group: Group): string[] {
-  const allMangoGroupPerpMarketAssets = Array.from(
-    group.perpMarketsMapByName.keys(),
-  ).map((marketName) => marketName.replace('-PERP', ''));
-  return Object.keys(params.assets).filter((asset) =>
-    allMangoGroupPerpMarketAssets.includes(asset),
-  );
+  return Object.keys(params.assets);
 }
 
 // Refresh group, mango account and perp markets
@@ -115,7 +110,7 @@ async function refreshState(
       //   pair: mc.params.krakenCode,
       // }),
       binanceClient.book({
-        symbol: mc.perpMarket.name.replace('-PERP', 'USDT'),
+        symbol: mc.params.binanceCode,
       }),
     ),
   ]);
@@ -282,7 +277,9 @@ async function fullMarketMaker(): Promise<void> {
   // Build and maintain an aggregate context object per market
   const marketContexts: Map<PerpMarketIndex, MarketContext> = new Map();
   for (const perpMarketAsset of getPerpMarketAssetsToTradeOn(group)) {
-    const perpMarket = group.getPerpMarketByName(perpMarketAsset + '-PERP');
+    const perpMarket = group.getPerpMarketByMarketIndex(
+      params.assets[perpMarketAsset].perp.perpMarketIndex,
+    );
     const [sequenceAccount, sequenceAccountBump] =
       await PublicKey.findProgramAddress(
         [
