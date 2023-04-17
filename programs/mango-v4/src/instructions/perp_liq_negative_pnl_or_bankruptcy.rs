@@ -125,12 +125,7 @@ pub fn perp_liq_negative_pnl_or_bankruptcy(
             let liqor_token_position = liqor.token_position_mut(settle_token_index)?.0;
             let liqee_token_position = liqee.token_position_mut(settle_token_index)?.0;
             settle_bank.deposit(liqor_token_position, settlement, now_ts)?;
-            settle_bank.withdraw_without_fee(
-                liqee_token_position,
-                settlement,
-                now_ts,
-                settle_token_oracle_price,
-            )?;
+            settle_bank.withdraw_without_fee(liqee_token_position, settlement, now_ts)?;
             liqee_health_cache.adjust_token_balance(&settle_bank, -settlement)?;
 
             emit!(PerpLiqNegativePnlOrBankruptcyLog {

@@ -386,7 +386,6 @@ impl Bank {
         position: &mut TokenPosition,
         native_amount: I80F48,
         now_ts: u64,
-        oracle_price: I80F48,
     ) -> Result<bool> {
         let (position_is_active, _) = self.withdraw_internal_wrapper(
             position,
@@ -394,7 +393,6 @@ impl Bank {
             false,
             !position.is_in_use(),
             now_ts,
-            Some(oracle_price),
         )?;
 
         Ok(position_is_active)
@@ -408,17 +406,9 @@ impl Bank {
         position: &mut TokenPosition,
         native_amount: I80F48,
         now_ts: u64,
-        oracle_price: I80F48,
     ) -> Result<bool> {
-        self.withdraw_internal_wrapper(
-            position,
-            native_amount,
-            false,
-            true,
-            now_ts,
-            Some(oracle_price),
-        )
-        .map(|(not_dusted, _)| not_dusted || position.is_in_use())
+        self.withdraw_internal_wrapper(position, native_amount, false, true, now_ts)
+            .map(|(not_dusted, _)| not_dusted || position.is_in_use())
     }
 
     /// Withdraws `native_amount` while applying the loan origination fee if a borrow is created.
@@ -434,16 +424,8 @@ impl Bank {
         position: &mut TokenPosition,
         native_amount: I80F48,
         now_ts: u64,
-        oracle_price: I80F48,
     ) -> Result<(bool, I80F48)> {
-        self.withdraw_internal_wrapper(
-            position,
-            native_amount,
-            true,
-            !position.is_in_use(),
-            now_ts,
-            Some(oracle_price),
-        )
+        self.withdraw_internal_wrapper(position, native_amount, true, !position.is_in_use(), now_ts)
     }
 
     /// Internal function to withdraw funds
@@ -454,7 +436,6 @@ impl Bank {
         with_loan_origination_fee: bool,
         allow_dusting: bool,
         now_ts: u64,
-        oracle_price: Option<I80F48>,
     ) -> Result<(bool, I80F48)> {
         let opening_indexed_position = position.indexed_position;
         let res = self.withdraw_internal(
@@ -463,7 +444,6 @@ impl Bank {
             with_loan_origination_fee,
             allow_dusting,
             now_ts,
-            oracle_price,
         );
         self.update_cumulative_interest(position, opening_indexed_position);
         res
@@ -477,7 +457,6 @@ impl Bank {
         with_loan_origination_fee: bool,
         allow_dusting: bool,
         now_ts: u64,
-        oracle_price: Option<I80F48>,
     ) -> Result<(bool, I80F48)> {
         require_gte!(native_amount, 0);
         let native_position = position.native(self);
@@ -523,9 +502,6 @@ impl Bank {
         // net borrows requires updating in only this case, since other branches of the method deal with
         // withdraws and not borrows
         self.update_net_borrows(native_amount, now_ts);
-        if let Some(oracle_price) = oracle_price {
-            self.check_net_borrows(oracle_price)?;
-        }
 
         Ok((true, loan_origination_fee))
     }
@@ -546,7 +522,6 @@ impl Bank {
             false,
             !position.is_in_use(),
             now_ts,
-            None,
         )?;
 
         Ok((position_is_active, loan_origination_fee))
@@ -558,12 +533,11 @@ impl Bank {
         position: &mut TokenPosition,
         native_amount: I80F48,
         now_ts: u64,
-        oracle_price: I80F48,
     ) -> Result<bool> {
         if native_amount >= 0 {
             self.deposit(position, native_amount, now_ts)
         } else {
-            self.withdraw_without_fee(position, -native_amount, now_ts, oracle_price)
+            self.withdraw_without_fee(position, -native_amount, now_ts)
         }
     }
 
@@ -573,12 +547,11 @@ impl Bank {
         position: &mut TokenPosition,
         native_amount: I80F48,
         now_ts: u64,
-        oracle_price: I80F48,
     ) -> Result<(bool, I80F48)> {
         if native_amount >= 0 {
             Ok((self.deposit(position, native_amount, now_ts)?, I80F48::ZERO))
         } else {
-            self.withdraw_with_fee(position, -native_amount, now_ts, oracle_price)
+            self.withdraw_with_fee(position, -native_amount, now_ts)
         }
     }
 
@@ -957,8 +930,7 @@ mod tests {
                 let change = I80F48::from(change);
                 let dummy_now_ts = 1 as u64;
                 let dummy_price = I80F48::ZERO;
-                let (is_active, _) =
-                    bank.change_with_fee(&mut account, change, dummy_now_ts, dummy_price)?;
+                let (is_active, _) = bank.change_with_fee(&mut account, change, dummy_now_ts)?;
 
                 let mut expected_native = start_native + change;
                 if expected_native >= 0.0 && expected_native < 1.0 && !is_in_use {
@@ -1034,40 +1006,41 @@ mod tests {
 
         let mut account = TokenPosition::default();
 
-        bank.change_without_fee(&mut account, I80F48::from(100), 0, price)
+        bank.change_without_fee(&mut account, I80F48::from(100), 0)
             .unwrap();
         assert_eq!(bank.net_borrows_in_window, 0);
-        bank.change_without_fee(&mut account, I80F48::from(-100), 0, price)
+        bank.change_without_fee(&mut account, I80F48::from(-100), 0)
             .unwrap();
         assert_eq!(bank.net_borrows_in_window, 0);
 
         account = TokenPosition::default();
-        bank.change_without_fee(&mut account, I80F48::from(10), 0, price)
+        bank.change_without_fee(&mut account, I80F48::from(10), 0)
             .unwrap();
-        bank.change_without_fee(&mut account, I80F48::from(-110), 0, price)
+        bank.change_without_fee(&mut account, I80F48::from(-110), 0)
             .unwrap();
         assert_eq!(bank.net_borrows_in_window, 100);
-        bank.change_without_fee(&mut account, I80F48::from(50), 0, price)
+        bank.change_without_fee(&mut account, I80F48::from(50), 0)
             .unwrap();
         assert_eq!(bank.net_borrows_in_window, 50);
-        bank.change_without_fee(&mut account, I80F48::from(100), 0, price)
+        bank.change_without_fee(&mut account, I80F48::from(100), 0)
             .unwrap();
         assert_eq!(bank.net_borrows_in_window, 1); // rounding
 
         account = TokenPosition::default();
         bank.net_borrows_in_window = 0;
-        bank.change_without_fee(&mut account, I80F48::from(-450), 0, price)
+        bank.change_without_fee(&mut account, I80F48::from(-450), 0)
             .unwrap();
-        bank.change_without_fee(&mut account, I80F48::from(-51), 0, price)
-            .unwrap_err();
+        bank.change_without_fee(&mut account, I80F48::from(-51), 0)
+            .unwrap();
+        bank.check_net_borrows(price).unwrap_err();
 
         account = TokenPosition::default();
         bank.net_borrows_in_window = 0;
-        bank.change_without_fee(&mut account, I80F48::from(-450), 0, price)
+        bank.change_without_fee(&mut account, I80F48::from(-450), 0)
             .unwrap();
-        bank.change_without_fee(&mut account, I80F48::from(-50), 0, price)
+        bank.change_without_fee(&mut account, I80F48::from(-50), 0)
             .unwrap();
-        bank.change_without_fee(&mut account, I80F48::from(-50), 101, price)
+        bank.change_without_fee(&mut account, I80F48::from(-50), 101)
             .unwrap();
 
         Ok(())
