@@ -17,6 +17,16 @@ const CLUSTER_URL =
 const USER_KEYPAIR =
   process.env.USER_KEYPAIR_OVERRIDE || process.env.MB_PAYER_KEYPAIR;
 const MANGO_ACCOUNT_PK = process.env.MANGO_ACCOUNT_PK || '';
+const INTERVAL_UPDATE_BANKS = Number(process.env.INTERVAL_UPDATE_BANKS || 60);
+const INTERVAL_CONSUME_EVENTS = Number(
+  process.env.INTERVAL_CONSUME_EVENTS || 60,
+);
+const INTERVAL_UPDATE_FUNDING = Number(
+  process.env.INTERVAL_UPDATE_FUNDING || 60,
+);
+const INTERVAL_CHECK_NEW_LISTINGS_AND_ABORT = Number(
+  process.env.INTERVAL_CHECK_NEW_LISTINGS_AND_ABORT || 60,
+);
 
 async function updateBanks(client: MangoClient, group: Group): Promise<void> {
   console.log('Starting updateBanks loop');
@@ -50,7 +60,7 @@ async function updateBanks(client: MangoClient, group: Group): Promise<void> {
         );
       }
     });
-    await new Promise((r) => setTimeout(r, 60 * 1000));
+    await new Promise((r) => setTimeout(r, INTERVAL_UPDATE_BANKS * 1000));
   }
 }
 
@@ -103,7 +113,7 @@ async function consumeEvents(client: MangoClient, group: Group): Promise<void> {
         }
       }
     }
-    await new Promise((r) => setTimeout(r, 5 * 1000));
+    await new Promise((r) => setTimeout(r, INTERVAL_CONSUME_EVENTS * 1000));
   }
 }
 
@@ -138,7 +148,7 @@ async function updateFunding(client: MangoClient, group: Group): Promise<void> {
       }
     }
 
-    await new Promise((r) => setTimeout(r, 5 * 1000));
+    await new Promise((r) => setTimeout(r, INTERVAL_UPDATE_FUNDING * 1000));
   }
 }
 
@@ -158,7 +168,9 @@ async function checkNewListingsAndAbort(
     ) {
       process.exit();
     }
-    await new Promise((r) => setTimeout(r, 120 * 1000));
+    await new Promise((r) =>
+      setTimeout(r, INTERVAL_CHECK_NEW_LISTINGS_AND_ABORT * 1000),
+    );
   }
 }
 
@@ -194,8 +206,6 @@ async function keeper(): Promise<void> {
   consumeEvents(client, group);
   updateFunding(client, group);
   checkNewListingsAndAbort(client, group);
-
-  //   setInterval(() => {}, 120);
 }
 
 keeper();
