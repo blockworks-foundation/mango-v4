@@ -911,6 +911,16 @@ pub mod mango_v4 {
         ctx: Context<PerpLiqNegativePnlOrBankruptcy>,
         max_liab_transfer: u64,
     ) -> Result<()> {
+        // TODO: same as other disabled ix
+        use crate::error::*;
+        require_msg!(false, "disabled ix");
+        Ok(())
+    }
+
+    pub fn perp_liq_negative_pnl_or_bankruptcy_v2(
+        ctx: Context<PerpLiqNegativePnlOrBankruptcyV2>,
+        max_liab_transfer: u64,
+    ) -> Result<()> {
         #[cfg(feature = "enable-gpl")]
         instructions::perp_liq_negative_pnl_or_bankruptcy(ctx, max_liab_transfer)?;
         Ok(())

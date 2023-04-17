@@ -4,6 +4,7 @@ use anchor_spl::token;
 use fixed::types::I80F48;
 
 use crate::accounts_ix::*;
+use crate::accounts_zerocopy::AccountInfoRef;
 use crate::error::*;
 use crate::health::{compute_health, new_health_cache, HealthType, ScanningAccountRetriever};
 use crate::logs::{
@@ -12,27 +13,46 @@ use crate::logs::{
 use crate::state::*;
 
 pub fn perp_liq_negative_pnl_or_bankruptcy(
-    ctx: Context<PerpLiqNegativePnlOrBankruptcy>,
+    ctx: Context<PerpLiqNegativePnlOrBankruptcyV2>,
     max_liab_transfer: u64,
 ) -> Result<()> {
     let mango_group = ctx.accounts.group.key();
 
+    let now_slot = Clock::get()?.slot;
+    let now_ts = Clock::get()?.unix_timestamp.try_into().unwrap();
+
     let perp_market_index;
     let settle_token_index;
-    let settle_bank_num;
+    let perp_oracle_price;
+    let settle_token_oracle_price;
+    let insurance_token_oracle_price;
     {
         let perp_market = ctx.accounts.perp_market.load()?;
         perp_market_index = perp_market.perp_market_index;
         settle_token_index = perp_market.settle_token_index;
+        perp_oracle_price = perp_market.oracle_price(
+            &AccountInfoRef::borrow(&ctx.accounts.oracle)?,
+            Some(now_slot),
+        )?;
 
-        let settle_bank_explicit = ctx.accounts.settle_bank.load()?;
+        let settle_bank = ctx.accounts.settle_bank.load()?;
         // account constraint #2
         require_eq!(
-            settle_bank_explicit.token_index,
+            settle_bank.token_index,
             settle_token_index,
             MangoError::InvalidBank
         );
-        settle_bank_num = settle_bank_explicit.bank_num;
+        settle_token_oracle_price = settle_bank.oracle_price(
+            &AccountInfoRef::borrow(&ctx.accounts.settle_oracle)?,
+            Some(now_slot),
+        )?;
+        drop(settle_bank); // could be the same as insurance_bank
+
+        let insurance_bank = ctx.accounts.insurance_bank.load()?;
+        insurance_token_oracle_price = insurance_bank.oracle_price(
+            &AccountInfoRef::borrow(&ctx.accounts.insurance_oracle)?,
+            Some(now_slot),
+        )?;
     }
 
     require_keys_neq!(ctx.accounts.liqor.key(), ctx.accounts.liqee.key());
@@ -54,6 +74,7 @@ pub fn perp_liq_negative_pnl_or_bankruptcy(
     let retriever = ScanningAccountRetriever::new(ctx.remaining_accounts, &mango_group)
         .context("create account retriever")?;
     let mut liqee_health_cache = new_health_cache(&liqee.borrow(), &retriever)?;
+    drop(retriever);
     let liqee_liq_end_health = liqee_health_cache.health(HealthType::LiquidationEnd);
     let liqee_max_settle = liqee_health_cache.perp_max_settle(settle_token_index)?;
 
@@ -72,33 +93,7 @@ pub fn perp_liq_negative_pnl_or_bankruptcy(
         liqor.ensure_token_position(settle_token_index)?;
     }
 
-    // Get the settle and insurance bank. We pass the settle bank/oracle explicitly
-    // but the insurance bank/oracle may be passed implicitly as a health account (if
-    // it isn't the same as the settle bank). For lifetime reasons, we just get both
-    // from the health accounts.
-    // This requires dropping the Ref<>s on the perp market, since we need it mutable later.
-    let mut retriever_banks_and_oracles = retriever.into_banks_and_oracles();
-    let (settle_bank, settle_token_oracle_price, insurance_bank_and_oracle) =
-        retriever_banks_and_oracles
-            .banks_mut_and_oracles(settle_token_index, INSURANCE_TOKEN_INDEX)
-            .unwrap();
-    require_eq!(
-        settle_bank.bank_num,
-        settle_bank_num,
-        MangoError::InvalidBank
-    );
-
     let mut perp_market = ctx.accounts.perp_market.load_mut()?;
-    let oracle_price = liqee_health_cache
-        .perp_info(perp_market_index)?
-        .base_prices
-        .oracle;
-    let insurance_token_oracle_price = insurance_bank_and_oracle
-        .as_ref()
-        .map(|(_, p)| *p)
-        .unwrap_or(settle_token_oracle_price);
-
-    let now_ts: u64 = Clock::get()?.unix_timestamp.try_into().unwrap();
 
     //
     // Step 1: Allow the liqor to take over ("settle") negative liqee pnl.
@@ -110,12 +105,14 @@ pub fn perp_liq_negative_pnl_or_bankruptcy(
     let max_settlement_liqee;
     let mut liqee_pnl;
     {
+        let mut settle_bank = ctx.accounts.settle_bank.load_mut()?;
+
         let liqee_perp_position = liqee.perp_position_mut(perp_market_index)?;
         let liqor_perp_position = liqor.perp_position_mut(perp_market_index)?;
         liqee_perp_position.settle_funding(&perp_market);
         liqor_perp_position.settle_funding(&perp_market);
 
-        liqee_pnl = liqee_perp_position.unsettled_pnl(&perp_market, oracle_price)?;
+        liqee_pnl = liqee_perp_position.unsettled_pnl(&perp_market, perp_oracle_price)?;
         require_gt!(0, liqee_pnl, MangoError::ProfitabilityMismatch);
 
         // Get settleable pnl on the liqee
@@ -179,13 +176,14 @@ pub fn perp_liq_negative_pnl_or_bankruptcy(
     if settlement == max_settlement_liqee && liqee_pnl < 0 {
         // Preparation that's needed for both, insurance fund based pnl takeover and socialized loss
 
+        let settle_bank = ctx.accounts.settle_bank.load()?;
         let liqee_settle_token_position = liqee
             .token_position(settle_token_index)?
-            .native(settle_bank);
+            .native(&settle_bank);
         let liqee_perp_position = liqee.perp_position_mut(perp_market_index)?;
 
         // recompute for safety
-        liqee_pnl = liqee_perp_position.unsettled_pnl(&perp_market, oracle_price)?;
+        liqee_pnl = liqee_perp_position.unsettled_pnl(&perp_market, perp_oracle_price)?;
 
         // Each unit of pnl increase (towards 0) increases health, but the amount depends on whether
         // the health token position is negative or positive.
@@ -210,6 +208,8 @@ pub fn perp_liq_negative_pnl_or_bankruptcy(
             result
         };
 
+        drop(settle_bank); // insurance_bank could be the same, make sure to avoid double-borrow
+
         let max_liab_transfer_from_liqee = (-liqee_pnl).min(max_for_health).max(I80F48::ZERO);
 
         let max_liab_transfer_to_liqor = max_liab_transfer_from_liqee
@@ -228,9 +228,6 @@ pub fn perp_liq_negative_pnl_or_bankruptcy(
         let liquidation_fee_factor = I80F48::ONE + perp_market.base_liquidation_fee;
         let settle_token_price_with_fee = settle_token_oracle_price * liquidation_fee_factor;
 
-        let (insurance_bank, insurance_token_oracle_price) =
-            insurance_bank_and_oracle.unwrap_or((settle_bank, settle_token_oracle_price));
-
         // Amount given to the liqor from the insurance fund
         insurance_transfer = (max_liab_transfer_to_liqor * settle_token_price_with_fee
             / insurance_token_oracle_price)
@@ -248,6 +245,7 @@ pub fn perp_liq_negative_pnl_or_bankruptcy(
 
         // Try using the insurance fund if possible
         if insurance_transfer > 0 {
+            let mut insurance_bank = ctx.accounts.insurance_bank.load_mut()?;
             require_keys_eq!(insurance_bank.mint, ctx.accounts.insurance_vault.mint);
 
             // move insurance assets into quote bank
@@ -266,6 +264,12 @@ pub fn perp_liq_negative_pnl_or_bankruptcy(
             let liqor_perp_position = liqor.perp_position_mut(perp_market_index)?;
             liqee_perp_position.record_settle(-insurance_liab_transfer);
             liqor_perp_position.record_liquidation_quote_change(-insurance_liab_transfer);
+
+            msg!(
+                "bankruptcy: {} pnl for {} insurance",
+                insurance_liab_transfer,
+                insurance_transfer
+            );
         }
 
         // Socialize loss if the insurance fund is exhausted
@@ -279,6 +283,7 @@ pub fn perp_liq_negative_pnl_or_bankruptcy(
             perp_market.socialize_loss(-remaining_liab)?;
             liqee_perp_position.record_settle(-remaining_liab);
             socialized_loss = remaining_liab;
+            msg!("socialized loss: {}", socialized_loss);
         }
 
         emit!(PerpLiqBankruptcyLog {
@@ -297,14 +302,11 @@ pub fn perp_liq_negative_pnl_or_bankruptcy(
         insurance_transfer = 0;
     };
 
-    // reload the settle_bank, because it might have been dropped earlier
-    drop(retriever_banks_and_oracles);
-    let settle_bank = ctx.accounts.settle_bank.load()?;
-
     //
     // Log positions afterwards
     //
-    if settlement > 0 || insurance_transfer > 0 {
+    if settlement > 0 {
+        let settle_bank = ctx.accounts.settle_bank.load()?;
         let liqor_token_position = liqor.token_position(settle_token_index)?;
         emit!(TokenBalanceLog {
             mango_group,
@@ -314,9 +316,7 @@ pub fn perp_liq_negative_pnl_or_bankruptcy(
             deposit_index: settle_bank.deposit_index.to_bits(),
             borrow_index: settle_bank.borrow_index.to_bits(),
         });
-    }
 
-    if settlement > 0 {
         let liqee_token_position = liqee.token_position(settle_token_index)?;
         emit!(TokenBalanceLog {
             mango_group,
@@ -325,6 +325,19 @@ pub fn perp_liq_negative_pnl_or_bankruptcy(
             indexed_position: liqee_token_position.indexed_position.to_bits(),
             deposit_index: settle_bank.deposit_index.to_bits(),
             borrow_index: settle_bank.borrow_index.to_bits(),
+        });
+    }
+
+    if insurance_transfer > 0 {
+        let insurance_bank = ctx.accounts.insurance_bank.load()?;
+        let liqor_token_position = liqor.token_position(insurance_bank.token_index)?;
+        emit!(TokenBalanceLog {
+            mango_group,
+            mango_account: ctx.accounts.liqor.key(),
+            token_index: insurance_bank.token_index,
+            indexed_position: liqor_token_position.indexed_position.to_bits(),
+            deposit_index: insurance_bank.deposit_index.to_bits(),
+            borrow_index: insurance_bank.borrow_index.to_bits(),
         });
     }
 
@@ -351,7 +364,6 @@ pub fn perp_liq_negative_pnl_or_bankruptcy(
         .maybe_recover_from_being_liquidated(liqee_liq_end_health);
 
     drop(perp_market);
-    drop(settle_bank);
 
     // Check liqor's health
     if !liqor.fixed.is_in_health_region() {

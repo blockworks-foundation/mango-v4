@@ -40,6 +40,7 @@ pub struct TokenLiqBankruptcy<'info> {
 
     #[account(mut)]
     // address is checked at #2 a) and b)
+    // better name would be "insurance_bank_vault"
     pub quote_vault: Account<'info, TokenAccount>,
 
     // future: this would be an insurance fund vault specific to a

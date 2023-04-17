@@ -3709,8 +3709,8 @@ pub struct PerpLiqNegativePnlOrBankruptcyInstruction {
 }
 #[async_trait::async_trait(?Send)]
 impl ClientInstruction for PerpLiqNegativePnlOrBankruptcyInstruction {
-    type Accounts = mango_v4::accounts::PerpLiqNegativePnlOrBankruptcy;
-    type Instruction = mango_v4::instruction::PerpLiqNegativePnlOrBankruptcy;
+    type Accounts = mango_v4::accounts::PerpLiqNegativePnlOrBankruptcyV2;
+    type Instruction = mango_v4::instruction::PerpLiqNegativePnlOrBankruptcyV2;
     async fn to_instruction(
         &self,
         account_loader: impl ClientAccountLoader + 'async_trait,
@@ -3745,6 +3745,8 @@ impl ClientInstruction for PerpLiqNegativePnlOrBankruptcyInstruction {
         let settle_mint_info =
             get_mint_info_by_token_index(&account_loader, &liqee, perp_market.settle_token_index)
                 .await;
+        let insurance_mint_info =
+            get_mint_info_by_token_index(&account_loader, &liqee, QUOTE_TOKEN_INDEX).await;
 
         let accounts = Self::Accounts {
             group: group_key,
@@ -3757,6 +3759,9 @@ impl ClientInstruction for PerpLiqNegativePnlOrBankruptcyInstruction {
             settle_vault: settle_mint_info.first_vault(),
             settle_oracle: settle_mint_info.oracle,
             insurance_vault: group.insurance_vault,
+            insurance_bank: insurance_mint_info.first_bank(),
+            insurance_bank_vault: insurance_mint_info.first_vault(),
+            insurance_oracle: insurance_mint_info.oracle,
             token_program: Token::id(),
         };
         let mut instruction = make_instruction(program_id, &accounts, instruction);
