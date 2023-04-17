@@ -12,12 +12,12 @@ COPY . .
 RUN sed -i 's|lib/\*|lib/checked_math|' Cargo.toml
 # Hack to prevent local serum_dex manifests conflicting with cargo dependency
 RUN rm -rf anchor/tests
-RUN cargo chef prepare --recipe-path recipe.json
+# RUN cargo chef prepare --recipe-path recipe.json
 
 FROM base as build
-COPY --from=plan /app/recipe.json .
+# COPY --from=plan /app/recipe.json .
 COPY . .
-RUN cargo chef cook --release --recipe-path recipe.json
+# RUN cargo chef cook --release --recipe-path recipe.json
 RUN cargo build --release --bins
 
 FROM debian:bullseye-slim as run
