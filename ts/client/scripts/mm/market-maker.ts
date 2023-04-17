@@ -72,11 +72,11 @@ type MarketContext = {
   asks: BookSide;
   lastBookUpdate: number;
 
-  krakenBid: number | undefined;
-  krakenAsk: number | undefined;
+  // krakenBid: number | undefined;
+  // krakenAsk: number | undefined;
 
-  // binanceBid: number | undefined;
-  // binanceAsk: number | undefined;
+  binanceBid: number | undefined;
+  binanceAsk: number | undefined;
 
   sequenceAccount: PublicKey;
   sequenceAccountBump: number;
@@ -89,7 +89,7 @@ type MarketContext = {
 const binanceClient = Binance();
 const krakenClient = new Kraken();
 
-function getPerpMarketAssetsToTradeOn(group: Group) {
+function getPerpMarketAssetsToTradeOn(group: Group): string[] {
   const allMangoGroupPerpMarketAssets = Array.from(
     group.perpMarketsMapByName.keys(),
   ).map((marketName) => marketName.replace('-PERP', ''));
@@ -110,14 +110,13 @@ async function refreshState(
   const result = await Promise.all([
     group.reloadAll(client),
     mangoAccount.reload(client),
-    ...Array.from(marketContexts.values()).map(
-      (mc) =>
-        krakenClient.depth({
-          pair: mc.params.krakenCode,
-        }),
-      // binanceClient.book({
-      //   symbol: mc.perpMarket.name.replace('-PERP', 'USDT'),
+    ...Array.from(marketContexts.values()).map((mc) =>
+      // krakenClient.depth({
+      //   pair: mc.params.krakenCode,
       // }),
+      binanceClient.book({
+        symbol: mc.perpMarket.name.replace('-PERP', 'USDT'),
+      }),
     ),
   ]);
 
@@ -130,12 +129,14 @@ async function refreshState(
     mc.asks = await perpMarket.loadAsks(client, true);
     mc.lastBookUpdate = ts;
 
-    mc.krakenAsk = parseFloat(
-      (result[i + 2] as any)[mc.params.krakenCode].asks[0][0],
-    );
-    mc.krakenBid = parseFloat(
-      (result[i + 2] as any)[mc.params.krakenCode].bids[0][0],
-    );
+    // mc.krakenAsk = parseFloat(
+    //   (result[i + 2] as any)[mc.params.krakenCode].asks[0][0],
+    // );
+    // mc.krakenBid = parseFloat(
+    //   (result[i + 2] as any)[mc.params.krakenCode].bids[0][0],
+    // );
+    mc.binanceAsk = parseFloat((result[i + 2] as any).asks[0].price);
+    mc.binanceBid = parseFloat((result[i + 2] as any).bids[0].price);
   });
 
   return {
@@ -149,7 +150,7 @@ async function refreshState(
 async function initSequenceEnforcerAccounts(
   client: MangoClient,
   marketContexts: MarketContext[],
-) {
+): Promise<void> {
   const seqAccIxs = marketContexts.map((mc) =>
     makeInitSequenceEnforcerAccountIx(
       mc.sequenceAccount,
@@ -187,7 +188,7 @@ async function cancelAllOrdersForAMarket(
   group: Group,
   mangoAccount: MangoAccount,
   perpMarket: PerpMarket,
-) {
+): Promise<void> {
   for (const i of Array(100).keys()) {
     await sendTransaction(
       client.program.provider as AnchorProvider,
@@ -222,14 +223,14 @@ async function onExit(
   group: Group,
   mangoAccount: MangoAccount,
   marketContexts: MarketContext[],
-) {
+): Promise<void> {
   for (const mc of marketContexts) {
     cancelAllOrdersForAMarket(client, group, mangoAccount, mc.perpMarket);
   }
 }
 
 // Main driver for the market maker
-async function fullMarketMaker() {
+async function fullMarketMaker(): Promise<void> {
   // Load client
   const options = AnchorProvider.defaultOptions();
   const connection = new Connection(CLUSTER_URL!, options);
@@ -306,8 +307,11 @@ async function fullMarketMaker() {
       sentAskPrice: 0,
       lastOrderUpdate: 0,
 
-      krakenBid: undefined,
-      krakenAsk: undefined,
+      // krakenBid: undefined,
+      // krakenBid: undefined,
+
+      binanceBid: undefined,
+      binanceAsk: undefined,
     });
   }
 
@@ -344,7 +348,7 @@ async function fullMarketMaker() {
         const pos = mangoAccount.perpPositionExistsForMarket(mc.perpMarket)
           ? mangoAccount.getPerpPositionUi(group, mc.perpMarket.perpMarketIndex)
           : 0;
-        const mid = (mc.krakenBid! + mc.krakenAsk!) / 2;
+        const mid = (mc.binanceBid! + mc.binanceAsk!) / 2;
         if (mid) {
           pfQuoteValue += pos * mid;
         } else {
@@ -409,8 +413,8 @@ async function makeMarketUpdateInstructions(
   const perpMarketIndex = mc.perpMarket.perpMarketIndex;
   const perpMarket = mc.perpMarket;
 
-  const aggBid = mc.krakenBid;
-  const aggAsk = mc.krakenAsk;
+  const aggBid = mc.binanceBid;
+  const aggAsk = mc.binanceAsk;
   if (aggBid === undefined || aggAsk === undefined) {
     console.log(`No Aggregate Book for ${mc.perpMarket.name}!`);
     return [];
