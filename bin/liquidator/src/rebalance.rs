@@ -77,9 +77,8 @@ impl Rebalancer {
     pub async fn zero_all_non_quote(&self) -> anyhow::Result<()> {
         log::trace!("checking for rebalance: {}", self.mango_account_address);
 
-        // FIXME: re-enable when flash loans are back
-        // self.rebalance_tokens().await?;
         self.rebalance_perps().await?;
+        self.rebalance_tokens().await?;
 
         Ok(())
     }
