@@ -8,6 +8,7 @@ import {
   AddressLookupTableAccount,
   Cluster,
   Commitment,
+  Connection,
   Keypair,
   MemcmpFilter,
   PublicKey,
@@ -17,7 +18,6 @@ import {
   SystemProgram,
   TransactionInstruction,
   TransactionSignature,
-  Connection,
 } from '@solana/web3.js';
 import bs58 from 'bs58';
 import { Bank, MintInfo, TokenIndex } from './accounts/bank';
@@ -51,7 +51,7 @@ import {
   TokenEditParams,
   buildIxGate,
 } from './clientIxParamBuilder';
-import { OPENBOOK_PROGRAM_ID } from './constants';
+import { OPENBOOK_PROGRAM_ID, RUST_U64_MAX } from './constants';
 import { Id } from './ids';
 import { IDL, MangoV4 } from './mango_v4';
 import { I80F48 } from './numbers/I80F48';
@@ -398,6 +398,7 @@ export class MangoClient {
         params.resetNetBorrowLimit ?? false,
         params.reduceOnly,
         params.name,
+        params.forceClose,
       )
       .accounts({
         group: group.publicKey,
@@ -2351,6 +2352,32 @@ export class MangoClient {
       .instruction();
   }
 
+  async perpSettlePnlAndFees(
+    group: Group,
+    profitableAccount: MangoAccount,
+    unprofitableAccount: MangoAccount,
+    accountToSettleFeesFor: MangoAccount,
+    settler: MangoAccount,
+    perpMarketIndex: PerpMarketIndex,
+    maxSettleAmount?: number,
+  ): Promise<TransactionSignature> {
+    return await this.sendAndConfirmTransactionForGroup(group, [
+      await this.perpSettlePnlIx(
+        group,
+        profitableAccount,
+        unprofitableAccount,
+        settler,
+        perpMarketIndex,
+      ),
+      await this.perpSettleFeesIx(
+        group,
+        accountToSettleFeesFor,
+        perpMarketIndex,
+        maxSettleAmount,
+      ),
+    ]);
+  }
+
   async perpSettlePnl(
     group: Group,
     profitableAccount: MangoAccount,
@@ -2358,6 +2385,24 @@ export class MangoClient {
     settler: MangoAccount,
     perpMarketIndex: PerpMarketIndex,
   ): Promise<TransactionSignature> {
+    return await this.sendAndConfirmTransactionForGroup(group, [
+      await this.perpSettlePnlIx(
+        group,
+        profitableAccount,
+        unprofitableAccount,
+        settler,
+        perpMarketIndex,
+      ),
+    ]);
+  }
+
+  async perpSettlePnlIx(
+    group: Group,
+    profitableAccount: MangoAccount,
+    unprofitableAccount: MangoAccount,
+    settler: MangoAccount,
+    perpMarketIndex: PerpMarketIndex,
+  ): Promise<TransactionInstruction> {
     const perpMarket = group.getPerpMarketByMarketIndex(perpMarketIndex);
     const healthRemainingAccounts: PublicKey[] =
       this.buildHealthRemainingAccounts(
@@ -2368,7 +2413,7 @@ export class MangoClient {
         [perpMarket],
       );
     const bank = group.banksMapByTokenIndex.get(0 as TokenIndex)![0];
-    const ix = await this.program.methods
+    return await this.program.methods
       .perpSettlePnl()
       .accounts({
         group: group.publicKey,
@@ -2389,16 +2434,30 @@ export class MangoClient {
         ),
       )
       .instruction();
-
-    return await this.sendAndConfirmTransactionForGroup(group, [ix]);
   }
 
   async perpSettleFees(
     group: Group,
     account: MangoAccount,
     perpMarketIndex: PerpMarketIndex,
-    maxSettleAmount: BN,
+    maxSettleAmount?: number,
   ): Promise<TransactionSignature> {
+    return await this.sendAndConfirmTransactionForGroup(group, [
+      await this.perpSettleFeesIx(
+        group,
+        account,
+        perpMarketIndex,
+        maxSettleAmount,
+      ),
+    ]);
+  }
+
+  async perpSettleFeesIx(
+    group: Group,
+    account: MangoAccount,
+    perpMarketIndex: PerpMarketIndex,
+    maxSettleAmount?: number,
+  ): Promise<TransactionInstruction> {
     const perpMarket = group.getPerpMarketByMarketIndex(perpMarketIndex);
     const healthRemainingAccounts: PublicKey[] =
       this.buildHealthRemainingAccounts(
@@ -2409,8 +2468,10 @@ export class MangoClient {
         [perpMarket],
       );
     const bank = group.banksMapByTokenIndex.get(0 as TokenIndex)![0];
-    const ix = await this.program.methods
-      .perpSettleFees(maxSettleAmount)
+    return await this.program.methods
+      .perpSettleFees(
+        maxSettleAmount ? toNative(maxSettleAmount, 6) : RUST_U64_MAX(),
+      )
       .accounts({
         group: group.publicKey,
         account: account.publicKey,
@@ -2426,8 +2487,6 @@ export class MangoClient {
         ),
       )
       .instruction();
-
-    return await this.sendAndConfirmTransactionForGroup(group, [ix]);
   }
 
   public async perpConsumeEvents(
@@ -2485,6 +2544,22 @@ export class MangoClient {
 
       await this.perpConsumeEvents(group, perpMarketIndex, accounts, limit);
     }
+  }
+
+  public async perpUpdateFundingIx(
+    group: Group,
+    perpMarket: PerpMarket,
+  ): Promise<TransactionInstruction> {
+    return await this.program.methods
+      .perpUpdateFunding()
+      .accounts({
+        group: group.publicKey,
+        perpMarket: perpMarket.publicKey,
+        bids: perpMarket.bids,
+        asks: perpMarket.asks,
+        oracle: perpMarket.oracle,
+      })
+      .instruction();
   }
 
   public async marginTrade({
@@ -2605,7 +2680,7 @@ export class MangoClient {
     };
 
     const flashLoanEndIx = await this.program.methods
-      .flashLoanEnd(flashLoanType)
+      .flashLoanEndV2(2, flashLoanType)
       .accounts({
         account: mangoAccount.publicKey,
       })

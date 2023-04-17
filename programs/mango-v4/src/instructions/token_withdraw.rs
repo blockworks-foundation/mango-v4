@@ -52,7 +52,7 @@ pub fn token_withdraw(ctx: Context<TokenWithdraw>, amount: u64, allow_borrow: bo
 
     let is_borrow = amount > native_position;
     require!(allow_borrow || !is_borrow, MangoError::SomeError);
-    if bank.is_reduce_only() {
+    if bank.are_borrows_reduce_only() {
         require!(!is_borrow, MangoError::TokenInReduceOnlyMode);
     }
 
@@ -69,7 +69,6 @@ pub fn token_withdraw(ctx: Context<TokenWithdraw>, amount: u64, allow_borrow: bo
         position,
         amount_i80f48,
         Clock::get()?.unix_timestamp.try_into().unwrap(),
-        oracle_price,
     )?;
 
     // Provide a readable error message in case the vault doesn't have enough tokens
@@ -140,10 +139,11 @@ pub fn token_withdraw(ctx: Context<TokenWithdraw>, amount: u64, allow_borrow: bo
         });
     }
 
-    // Enforce min vault to deposits ratio
+    // Enforce min vault to deposits ratio and net borrow limits
     if is_borrow {
         ctx.accounts.vault.reload()?;
         bank.enforce_min_vault_to_deposits_ratio(ctx.accounts.vault.as_ref())?;
+        bank.check_net_borrows(oracle_price)?;
     }
 
     Ok(())

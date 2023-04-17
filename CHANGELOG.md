@@ -4,9 +4,114 @@ Update this for each program release and mainnet deployment.
 
 ## not on mainnet
 
-### v0.9.0, 2023-3-
+### v0.13.0, 2023-4-
 
 Deployment:
+
+- Add explicit token account checks to FlashLoan (#542)
+
+  It looks like the reported security issue was not exploitable, but the guards
+  that prevented it were too incidental. This change adds explicit checks,
+  improving safety and readability.
+
+  It adds the FlashLoanEndV2 instruction, replacing FlashLoanEnd.
+
+- Don't incentivize using asset tokens with high liquidation fee during liquidation (#536)
+
+  Previously liqors received the sum of the liquidation fee of the asset and liab token,
+  which meant liqors would preferably liquidate with high-liq-fee tokens.
+
+  After this change only the liab token's liq fee is used. That's sensible because
+  the fee is about giving liqors some margin to work with when settling the
+  liability they took on.
+
+- Force-closing of tokens (#518)
+
+  Mango already has the concept of switching tokens into a "reduce-only" mode where
+  deposits and borrows are only allowed to decrease.
+
+  The new "force-close" mode is even stricter: When it's enabled, liqors can reduce
+  an account's borrows of the force-closed token even if the account is healthy.
+
+  The goal is to have a way of winding down the platform's and users' exposure to
+  a token if necessary. Only a DAO vote can change a token's state to force-close.
+
+- Improve perp trade logging (#535)
+
+  PerpUpdateFunding now logs the oracle update slot to allow traders to better
+  evaluate oracle peg orders.
+
+  Perp fills now create a fill log that contains the fill event seqnum. That allows
+  relating the transaction with the order matching to the transaction that processed
+  the fill event for the trade.
+
+- IxGate: Fix check for re-enabling instructions (#540)
+
+  The security admin was not supposed to be able to enable instructions, but a bug
+  allowed it. With this fix, only the group admin (DAO) can enable instructions.
+
+### v0.12.0, 2023-4-
+
+Deployment:
+
+- Emit perp fees settled on update_funding (#530)
+
+  Required to have a full picture of total perp market fees.
+
+- Net borrow limit: Separate out tracking from checking (#534)
+
+  That way it's easier to be specific about where the limit should be checked.
+
+## mainnet
+
+### v0.11.0, 2023-4-4
+
+Deployment: Apr 4, 2023 at 21:43:18 Central European Summer Time, https://explorer.solana.com/tx/5Z36iV6VhAfmxwZubQduV1hNyUyyB9AyjovAwNrWLb5cdAqGm4F3NGmz6V8VpHT6yUwCEDxm2hWMrdJXNkZ8RSPR
+
+- Limit funding and interest accrual during downtimes (#529)
+
+  Previously, if the funding or interest updating instruction wassn't
+  called for a long time (like for a solana downtime or the security
+  council halting the program), the next update would apply funding or
+  interest for the whole time interval since the last update.
+
+  This could lead to a bad downtime situation becoming worse. Instead,
+  limit the maximum funding and interest time interval to one hour.
+
+- Update default interest parameters in token_register_trustless (#523)
+
+  This brings them in line with the recent interest rate changes for >50%
+  utilization.
+
+- Perp: Fix logging of funding rate in update funding and deactivate pos (#528)
+
+### v0.10.0, 2023-4-3
+
+Deployment: Apr 3, 2023 at 20:10:26 Central European Summer Time, https://explorer.solana.com/tx/3Rvv7hxqYQ7mPXE7jopzq1RAAoEwPi1pRPY7EubzEiZih8zMVhTMe1AsuYNJq3gwpM8BVVC3CXkAWcsFdd7SE6zC
+
+- HealthRegion: Explicitly whitelist allowed instructions (#508)
+
+  The security council had disabled the HealthRegion instructions after the audit
+  found a vulnerability. The issue has been resolved by restricting which other
+  instructions may be called in a health region. That way it's still usable to
+  save compute units, but its attack surface is significantly reduced.
+
+- Use insurance fund token oracle for bankruptcies (#503)
+
+  This is in preparation for using an oracle for the USDC price instead of fixing
+  its value to $1. The insurance fund is in USDC, so the oracle price needs to
+  be taken into account once a real oracle is provided.
+
+- Fee buyback: Use the USDC oracle (#504)
+- Perp settle fees: Return early instead of error on failure (#526)
+- Net borrow limits: Fixed accounting of deposits (#513)
+- Better logging in IxGateSet instruction
+- Sanity check token_index in TokenRegister instruction
+- Allow using all available bytes for bank and market names
+
+### v0.9.0, 2023-3-16
+
+Deployment: Mar 16, 2023 at 11:07:30 Central European Standard Time, https://explorer.solana.com/tx/2hVqFQhxC9BGzDvH7y9bWChrMRvzsBGMPcMepHLBamK4vKJMJG48Fv8ZB54b46qErH1aGRy9YVhFnVnpaKgnoP3c
 
 - Downgrade the "fixed" dependency to v1.11.0 (#500)
 
@@ -15,8 +120,6 @@ Deployment:
   for release v0.8.0.
 
 - Improvements to perp position docstrings (#497)
-
-## mainnet
 
 ### v0.8.0, 2023-3-11
 

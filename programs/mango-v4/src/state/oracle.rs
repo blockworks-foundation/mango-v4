@@ -135,18 +135,18 @@ pub fn determine_oracle_type(acc_info: &impl KeyedAccountReader) -> Result<Oracl
 /// This currently assumes that quote decimals is 6, like for USDC.
 ///
 /// Pass `staleness_slot` = None to skip the staleness check
-pub fn oracle_price(
+pub fn oracle_price_and_slot(
     acc_info: &impl KeyedAccountReader,
     config: &OracleConfig,
     base_decimals: u8,
     staleness_slot: Option<u64>,
-) -> Result<I80F48> {
+) -> Result<(I80F48, u64)> {
     let data = &acc_info.data();
     let oracle_type = determine_oracle_type(acc_info)?;
     let staleness_slot = staleness_slot.unwrap_or(0);
 
     Ok(match oracle_type {
-        OracleType::Stub => acc_info.load::<StubOracle>()?.price,
+        OracleType::Stub => (acc_info.load::<StubOracle>()?.price, 0),
         OracleType::Pyth => {
             let price_account = pyth_sdk_solana::state::load_price_account(data).unwrap();
             let price_data = price_account.to_price();
@@ -187,7 +187,7 @@ pub fn oracle_price(
 
             let decimals = (price_account.expo as i8) + QUOTE_DECIMALS - (base_decimals as i8);
             let decimal_adj = power_of_ten(decimals);
-            price * decimal_adj
+            (price * decimal_adj, last_slot)
         }
         OracleType::SwitchboardV2 => {
             fn from_foreign_error(e: impl std::fmt::Display) -> Error {
@@ -233,7 +233,7 @@ pub fn oracle_price(
 
             let decimals = QUOTE_DECIMALS - (base_decimals as i8);
             let decimal_adj = power_of_ten(decimals);
-            price * decimal_adj
+            (price * decimal_adj, round_open_slot)
         }
         OracleType::SwitchboardV1 => {
             let result = FastRoundResultAccountData::deserialize(data).unwrap();
@@ -269,7 +269,7 @@ pub fn oracle_price(
 
             let decimals = QUOTE_DECIMALS - (base_decimals as i8);
             let decimal_adj = power_of_ten(decimals);
-            price * decimal_adj
+            (price * decimal_adj, round_open_slot)
         }
     })
 }

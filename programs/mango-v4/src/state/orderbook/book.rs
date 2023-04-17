@@ -1,3 +1,4 @@
+use crate::logs::FilledPerpOrderLog;
 use crate::state::MangoAccountRefMut;
 use crate::{
     error::*,
@@ -155,6 +156,12 @@ impl<'a> Orderbook<'a> {
             );
             event_queue.push_back(cast(fill)).unwrap();
             limit -= 1;
+
+            emit!(FilledPerpOrderLog {
+                mango_group: market.group.key(),
+                perp_market_index: market.perp_market_index,
+                seq_num: event_queue.header.seq_num,
+            });
         }
         let total_quote_lots_taken = order.max_quote_lots - remaining_quote_lots;
         let total_base_lots_taken = order.max_base_lots - remaining_base_lots;

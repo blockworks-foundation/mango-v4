@@ -58,9 +58,13 @@ pub fn perp_settle_pnl(ctx: Context<PerpSettlePnl>) -> Result<()> {
         MangoError::InvalidBank
     );
 
-    // Get oracle price for market. Price is validated inside
+    // Get oracle prices
     let oracle_price = perp_market.oracle_price(
         &AccountInfoRef::borrow(ctx.accounts.oracle.as_ref())?,
+        None, // staleness checked in health
+    )?;
+    let settle_token_oracle_price = settle_bank.oracle_price(
+        &AccountInfoRef::borrow(ctx.accounts.settle_oracle.as_ref())?,
         None, // staleness checked in health
     )?;
 
@@ -172,7 +176,7 @@ pub fn perp_settle_pnl(ctx: Context<PerpSettlePnl>) -> Result<()> {
     // Don't charge loan origination fees on borrows created via settling:
     // Even small loan origination fees could accumulate if a perp position is
     // settled back and forth repeatedly.
-    settle_bank.withdraw_without_fee(b_token_position, settlement, now_ts, oracle_price)?;
+    settle_bank.withdraw_without_fee(b_token_position, settlement, now_ts)?;
 
     emit!(TokenBalanceLog {
         mango_group: ctx.accounts.group.key(),

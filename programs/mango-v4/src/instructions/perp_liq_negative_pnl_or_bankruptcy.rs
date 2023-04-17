@@ -4,7 +4,6 @@ use anchor_spl::token;
 use fixed::types::I80F48;
 
 use crate::accounts_ix::*;
-use crate::accounts_zerocopy::*;
 use crate::error::*;
 use crate::health::{compute_health, new_health_cache, HealthType, ScanningAccountRetriever};
 use crate::logs::{
@@ -72,10 +71,14 @@ pub fn perp_liq_negative_pnl_or_bankruptcy(
 
     // Get oracle price for market. Price is validated inside
     let mut perp_market = ctx.accounts.perp_market.load_mut()?;
-    let oracle_price = perp_market.oracle_price(
-        &AccountInfoRef::borrow(ctx.accounts.oracle.as_ref())?,
-        None, // staleness checked in health
-    )?;
+    let oracle_price = liqee_health_cache
+        .perp_info(perp_market_index)?
+        .prices
+        .oracle;
+    let settle_token_oracle_price = liqee_health_cache
+        .token_info(settle_token_index)?
+        .prices
+        .oracle;
 
     let now_ts: u64 = Clock::get()?.unix_timestamp.try_into().unwrap();
 
@@ -122,12 +125,7 @@ pub fn perp_liq_negative_pnl_or_bankruptcy(
             let liqor_token_position = liqor.token_position_mut(settle_token_index)?.0;
             let liqee_token_position = liqee.token_position_mut(settle_token_index)?.0;
             settle_bank.deposit(liqor_token_position, settlement, now_ts)?;
-            settle_bank.withdraw_without_fee(
-                liqee_token_position,
-                settlement,
-                now_ts,
-                oracle_price,
-            )?;
+            settle_bank.withdraw_without_fee(liqee_token_position, settlement, now_ts)?;
             liqee_health_cache.adjust_token_balance(&settle_bank, -settlement)?;
 
             emit!(PerpLiqNegativePnlOrBankruptcyLog {

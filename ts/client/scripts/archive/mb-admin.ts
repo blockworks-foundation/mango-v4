@@ -3,7 +3,7 @@ import {
   ASSOCIATED_TOKEN_PROGRAM_ID,
   NATIVE_MINT,
   TOKEN_PROGRAM_ID,
-} from '../src/utils/spl';
+} from '../../src/utils/spl';
 import {
   AddressLookupTableProgram,
   ComputeBudgetProgram,
@@ -15,21 +15,21 @@ import {
   SystemProgram,
 } from '@solana/web3.js';
 import fs from 'fs';
-import { TokenIndex } from '../src/accounts/bank';
-import { Group } from '../src/accounts/group';
+import { TokenIndex } from '../../src/accounts/bank';
+import { Group } from '../../src/accounts/group';
 import {
   Serum3OrderType,
   Serum3SelfTradeBehavior,
   Serum3Side,
-} from '../src/accounts/serum3';
-import { Builder } from '../src/builder';
-import { MangoClient } from '../src/client';
+} from '../../src/accounts/serum3';
+import { Builder } from '../../src/builder';
+import { MangoClient } from '../../src/client';
 import {
   NullPerpEditParams,
   NullTokenEditParams,
-} from '../src/clientIxParamBuilder';
-import { MANGO_V4_ID, OPENBOOK_PROGRAM_ID } from '../src/constants';
-import { buildVersionedTx, toNative } from '../src/utils';
+} from '../../src/clientIxParamBuilder';
+import { MANGO_V4_ID, OPENBOOK_PROGRAM_ID } from '../../src/constants';
+import { buildVersionedTx, toNative } from '../../src/utils';
 
 const GROUP_NUM = Number(process.env.GROUP_NUM || 0);
 

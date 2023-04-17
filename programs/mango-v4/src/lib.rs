@@ -39,6 +39,7 @@ declare_id!("4MangoMjqJ2firMokCjjGgoK8d4MXcrgL7XJaL3w6fVg");
 #[program]
 pub mod mango_v4 {
     use super::*;
+    use error::*;
 
     pub fn group_create(
         ctx: Context<GroupCreate>,
@@ -169,8 +170,9 @@ pub mod mango_v4 {
         deposit_weight_scale_start_quote_opt: Option<f64>,
         reset_stable_price: bool,
         reset_net_borrow_limit: bool,
-        reduce_only_opt: Option<bool>,
+        reduce_only_opt: Option<u8>,
         name_opt: Option<String>,
+        force_close_opt: Option<bool>,
     ) -> Result<()> {
         #[cfg(feature = "enable-gpl")]
         instructions::token_edit(
@@ -198,6 +200,7 @@ pub mod mango_v4 {
             reset_net_borrow_limit,
             reduce_only_opt,
             name_opt,
+            force_close_opt,
         )?;
         Ok(())
     }
@@ -354,8 +357,16 @@ pub mod mango_v4 {
         ctx: Context<'key, 'accounts, 'remaining, 'info, FlashLoanEnd<'info>>,
         flash_loan_type: FlashLoanType,
     ) -> Result<()> {
+        Err(error_msg!("FlashLoanEnd was replaced by FlashLoanEndV2"))
+    }
+
+    pub fn flash_loan_end_v2<'key, 'accounts, 'remaining, 'info>(
+        ctx: Context<'key, 'accounts, 'remaining, 'info, FlashLoanEnd<'info>>,
+        num_loans: u8,
+        flash_loan_type: FlashLoanType,
+    ) -> Result<()> {
         #[cfg(feature = "enable-gpl")]
-        instructions::flash_loan_end(ctx, flash_loan_type)?;
+        instructions::flash_loan_end(ctx, num_loans, flash_loan_type)?;
         Ok(())
     }
 
@@ -532,6 +543,22 @@ pub mod mango_v4 {
     ) -> Result<()> {
         #[cfg(feature = "enable-gpl")]
         instructions::token_liq_with_token(
+            ctx,
+            asset_token_index,
+            liab_token_index,
+            max_liab_transfer,
+        )?;
+        Ok(())
+    }
+
+    pub fn token_force_close_borrows_with_token(
+        ctx: Context<TokenForceCloseBorrowsWithToken>,
+        asset_token_index: TokenIndex,
+        liab_token_index: TokenIndex,
+        max_liab_transfer: u64,
+    ) -> Result<()> {
+        #[cfg(feature = "enable-gpl")]
+        instructions::token_force_close_borrows_with_token(
             ctx,
             asset_token_index,
             liab_token_index,

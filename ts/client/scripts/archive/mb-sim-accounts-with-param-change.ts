@@ -1,12 +1,12 @@
 import { AnchorProvider, Wallet } from '@coral-xyz/anchor';
 import { Cluster, Connection, Keypair, PublicKey } from '@solana/web3.js';
 import fs from 'fs';
-import { HealthType } from '../src/accounts/mangoAccount';
-import { PerpMarketIndex } from '../src/accounts/perp';
-import { MangoClient } from '../src/client';
-import { MANGO_V4_ID } from '../src/constants';
-import { I80F48 } from '../src/numbers/I80F48';
-import { toUiDecimalsForQuote } from '../src/utils';
+import { HealthType } from '../../src/accounts/mangoAccount';
+import { PerpMarketIndex } from '../../src/accounts/perp';
+import { MangoClient } from '../../src/client';
+import { MANGO_V4_ID } from '../../src/constants';
+import { I80F48 } from '../../src/numbers/I80F48';
+import { toUiDecimalsForQuote } from '../../src/utils';
 
 const CLUSTER_URL =
   process.env.CLUSTER_URL_OVERRIDE || process.env.MB_CLUSTER_URL;
