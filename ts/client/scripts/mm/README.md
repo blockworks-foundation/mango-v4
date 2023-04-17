@@ -7,10 +7,12 @@ The environment variables required are
 - `MB_CLUSTER_URL` - RPC cluster url
 
 Notes:
+
 - Quoting is based off of kraken
 - see default.json for quoting rules
 
 Future:
+
 - Hedging perp positions on mango-v4 spot
 - Observing fills and reacting earlier
 - Quoting off of binance
