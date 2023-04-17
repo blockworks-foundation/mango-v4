@@ -479,18 +479,18 @@
 /// This currently assumes that quote decimals is 6, like for USDC.
 ///
 /// Pass `staleness_slot` = None to skip the staleness check
-</span><span class="kw">pub fn </span>oracle_price_and_slot(
+</span><span class="kw">pub fn </span>oracle_price(
     acc_info: <span class="kw-2">&amp;</span><span class="kw">impl </span>KeyedAccountReader,
     config: <span class="kw-2">&amp;</span>OracleConfig,
     base_decimals: u8,
     staleness_slot: <span class="prelude-ty">Option</span>&lt;u64&gt;,
-) -&gt; <span class="prelude-ty">Result</span>&lt;(I80F48, u64)&gt; {
+) -&gt; <span class="prelude-ty">Result</span>&lt;I80F48&gt; {
     <span class="kw">let </span>data = <span class="kw-2">&amp;</span>acc_info.data();
     <span class="kw">let </span>oracle_type = determine_oracle_type(acc_info)<span class="question-mark">?</span>;
     <span class="kw">let </span>staleness_slot = staleness_slot.unwrap_or(<span class="number">0</span>);
 
     <span class="prelude-val">Ok</span>(<span class="kw">match </span>oracle_type {
-        OracleType::Stub =&gt; (acc_info.load::&lt;StubOracle&gt;()<span class="question-mark">?</span>.price, <span class="number">0</span>),
+        OracleType::Stub =&gt; acc_info.load::&lt;StubOracle&gt;()<span class="question-mark">?</span>.price,
         OracleType::Pyth =&gt; {
             <span class="kw">let </span>price_account = pyth_sdk_solana::state::load_price_account(data).unwrap();
             <span class="kw">let </span>price_data = price_account.to_price();
@@ -531,7 +531,7 @@
 
             <span class="kw">let </span>decimals = (price_account.expo <span class="kw">as </span>i8) + QUOTE_DECIMALS - (base_decimals <span class="kw">as </span>i8);
             <span class="kw">let </span>decimal_adj = power_of_ten(decimals);
-            (price * decimal_adj, last_slot)
+            price * decimal_adj
         }
         OracleType::SwitchboardV2 =&gt; {
             <span class="kw">fn </span>from_foreign_error(e: <span class="kw">impl </span>std::fmt::Display) -&gt; Error {
@@ -577,7 +577,7 @@
 
             <span class="kw">let </span>decimals = QUOTE_DECIMALS - (base_decimals <span class="kw">as </span>i8);
             <span class="kw">let </span>decimal_adj = power_of_ten(decimals);
-            (price * decimal_adj, round_open_slot)
+            price * decimal_adj
         }
         OracleType::SwitchboardV1 =&gt; {
             <span class="kw">let </span>result = FastRoundResultAccountData::deserialize(data).unwrap();
@@ -613,7 +613,7 @@
 
             <span class="kw">let </span>decimals = QUOTE_DECIMALS - (base_decimals <span class="kw">as </span>i8);
             <span class="kw">let </span>decimal_adj = power_of_ten(decimals);
-            (price * decimal_adj, round_open_slot)
+            price * decimal_adj
         }
     })
 }

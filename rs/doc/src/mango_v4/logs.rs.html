@@ -371,14 +371,6 @@
 <a href="#371" id="371">371</a>
 <a href="#372" id="372">372</a>
 <a href="#373" id="373">373</a>
-<a href="#374" id="374">374</a>
-<a href="#375" id="375">375</a>
-<a href="#376" id="376">376</a>
-<a href="#377" id="377">377</a>
-<a href="#378" id="378">378</a>
-<a href="#379" id="379">379</a>
-<a href="#380" id="380">380</a>
-<a href="#381" id="381">381</a>
 </pre><pre class="rust"><code><span class="kw">use crate</span>::{
     accounts_ix::FlashLoanType,
     state::{PerpMarket, PerpPosition},
@@ -525,7 +517,6 @@
     <span class="kw">pub </span>long_funding: i128,
     <span class="kw">pub </span>short_funding: i128,
     <span class="kw">pub </span>price: i128,
-    <span class="kw">pub </span>oracle_slot: u64,
     <span class="kw">pub </span>stable_price: i128,
     <span class="kw">pub </span>fees_accrued: i128,
     <span class="kw">pub </span>fees_settled: i128,
@@ -752,13 +743,6 @@
     <span class="kw">pub </span>buyback_mngo: i128,
     <span class="kw">pub </span>mngo_buyback_price: i128,
     <span class="kw">pub </span>oracle_price: i128,
-}
-
-<span class="attr">#[event]
-</span><span class="kw">pub struct </span>FilledPerpOrderLog {
-    <span class="kw">pub </span>mango_group: Pubkey,
-    <span class="kw">pub </span>perp_market_index: u16,
-    <span class="kw">pub </span>seq_num: u64,
 }
 </code></pre></div>
 </section></main><div id="rustdoc-vars" data-root-path="../../" data-static-root-path="../../static.files/" data-current-crate="mango_v4" data-themes="" data-resource-suffix="" data-rustdoc-version="1.68.2 (9eb3afe9e 2023-03-27)" data-search-js="search-98d53477a794af0b.js" data-settings-js="settings-c3c521c753752a1a.js" data-settings-css="settings-08ddfdda51b8ee2e.css" ></div></body></html>
