@@ -5,6 +5,21 @@ members = [
     "lib/*",
 ]
 
+
+[workspace.dependencies]
+anchor-spl = { git = "https://github.com/mschneider/anchor", branch = "max/solana-16" }
+anchor-lang = { git = "https://github.com/mschneider/anchor", branch = "max/solana-16" }
+anchor-client = { git = "https://github.com/mschneider/anchor", branch = "max/solana-16" }
+mango-v4 = { git = "https://github.com/blockworks-foundation/mango-v4", branch = "max/solana-16" }
+mango-v4-client = { git = "https://github.com/blockworks-foundation/mango-v4", branch = "max/solana-16" }
+mango-feeds-connector = { git = "https://github.com/blockworks-foundation/mango-feeds", branch = "max/solana-versions4"}
+solana-rpc = { git = "https://github.com/solana-labs/solana.git", branch="master" }
+solana-client = { git = "https://github.com/solana-labs/solana.git", branch="master" }
+solana-account-decoder = { git = "https://github.com/solana-labs/solana.git", branch="master" }
+solana-sdk = { git = "https://github.com/solana-labs/solana.git", branch="master" }
+solana-address-lookup-table-program = { git = "https://github.com/solana-labs/solana.git", branch="master" }
+solana-program-test = { git = "https://github.com/solana-labs/solana.git", branch="master" }
+
 [profile.release]
 overflow-checks = true
 
