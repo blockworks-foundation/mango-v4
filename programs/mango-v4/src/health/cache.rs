@@ -815,7 +815,7 @@ impl HealthCache {
         let mut max_settle = I80F48::ZERO;
         if token.balance_spot > 0 {
             let asset_weighted_price = token.prices.oracle * token.maint_asset_weight;
-            // TODO: expensive divisions
+            // TODO: expensive divisions, asset weight != 0
             let asset_max = remaining_health / asset_weighted_price;
             max_settle = asset_max.min(token.balance_spot);
             remaining_health -= max_settle * asset_weighted_price;
