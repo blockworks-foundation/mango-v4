@@ -350,11 +350,13 @@ impl PerpMarket {
     }
 
     /// Socialize the loss in this account across all longs and shorts
+    ///
+    /// `loss` is in settle token native units
     pub fn socialize_loss(&mut self, loss: I80F48) -> Result<I80F48> {
         require_gte!(0, loss);
 
         // TODO convert into only socializing on one side
-        // native USDC per contract open interest
+        // native settle token per contract open interest
         let socialized_loss = if self.open_interest == 0 {
             // AUDIT: think about the following:
             // This is kind of an unfortunate situation. This means socialized loss occurs on the
