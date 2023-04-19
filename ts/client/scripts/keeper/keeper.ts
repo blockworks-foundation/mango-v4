@@ -19,13 +19,13 @@ const USER_KEYPAIR =
 const MANGO_ACCOUNT_PK = process.env.MANGO_ACCOUNT_PK || '';
 const INTERVAL_UPDATE_BANKS = Number(process.env.INTERVAL_UPDATE_BANKS || 60);
 const INTERVAL_CONSUME_EVENTS = Number(
-  process.env.INTERVAL_CONSUME_EVENTS || 60,
+  process.env.INTERVAL_CONSUME_EVENTS || 5,
 );
 const INTERVAL_UPDATE_FUNDING = Number(
-  process.env.INTERVAL_UPDATE_FUNDING || 60,
+  process.env.INTERVAL_UPDATE_FUNDING || 5,
 );
 const INTERVAL_CHECK_NEW_LISTINGS_AND_ABORT = Number(
-  process.env.INTERVAL_CHECK_NEW_LISTINGS_AND_ABORT || 60,
+  process.env.INTERVAL_CHECK_NEW_LISTINGS_AND_ABORT || 120,
 );
 
 async function updateBanks(client: MangoClient, group: Group): Promise<void> {
