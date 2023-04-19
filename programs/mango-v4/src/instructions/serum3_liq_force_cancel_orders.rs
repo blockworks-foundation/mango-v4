@@ -63,7 +63,7 @@ pub fn serum3_liq_force_cancel_orders(
         {
             let result = account.check_liquidatable(&health_cache);
             if account.fixed.is_operational() {
-                if !result? {
+                if !result? && !serum_market.is_force_close() {
                     return Ok(());
                 }
             } else {
