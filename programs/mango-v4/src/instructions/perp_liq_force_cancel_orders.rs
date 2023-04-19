@@ -21,17 +21,11 @@ pub fn perp_liq_force_cancel_orders(
             new_health_cache(&account.borrow(), &retriever).context("create health cache")?;
 
         {
-            let result = account.check_liquidatable(&health_cache);
-            if account.fixed.is_operational() {
-                if !result? {
-                    return Ok(());
-                }
-            } else {
-                // Frozen accounts can always have their orders cancelled
-                if !result.is_anchor_error_with_code(MangoError::HealthMustBeNegative.into()) {
-                    // Propagate unexpected errors
-                    result?;
-                }
+            let check_liquidatable_result = account.check_liquidatable(&health_cache)?;
+            if account.fixed.is_operational() // Alternatively, frozen accounts can always have their orders cancelled
+                && check_liquidatable_result == CheckLiquidatable::NotLiquidatable
+            {
+                return Ok(());
             }
         }
 
