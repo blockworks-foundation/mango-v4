@@ -24,8 +24,9 @@ export interface TokenEditParams {
   depositWeightScaleStartQuote: number | null;
   resetStablePrice: boolean | null;
   resetNetBorrowLimit: boolean | null;
-  reduceOnly: boolean | null;
+  reduceOnly: number | null;
   name: string | null;
+  forceClose: boolean | null;
 }
 
 export const NullTokenEditParams: TokenEditParams = {
@@ -52,6 +53,7 @@ export const NullTokenEditParams: TokenEditParams = {
   resetNetBorrowLimit: null,
   reduceOnly: null,
   name: null,
+  forceClose: null,
 };
 
 export interface PerpEditParams {
@@ -172,6 +174,7 @@ export interface IxGateParams {
   TokenUpdateIndexAndRate: boolean;
   TokenWithdraw: boolean;
   AccountBuybackFeesWithMngo: boolean;
+  TokenForceCloseBorrowsWithToken: boolean;
 }
 
 // Default with all ixs enabled, use with buildIxGate
@@ -228,6 +231,7 @@ export const TrueIxGateParams: IxGateParams = {
   TokenUpdateIndexAndRate: true,
   TokenWithdraw: true,
   AccountBuybackFeesWithMngo: true,
+  TokenForceCloseBorrowsWithToken: true,
 };
 
 // build ix gate e.g. buildIxGate(Builder(TrueIxGateParams).TokenDeposit(false).build()).toNumber(),
@@ -294,6 +298,7 @@ export function buildIxGate(p: IxGateParams): BN {
   toggleIx(ixGate, p, 'TokenUpdateIndexAndRate', 46);
   toggleIx(ixGate, p, 'TokenWithdraw', 47);
   toggleIx(ixGate, p, 'AccountBuybackFeesWithMngo', 48);
+  toggleIx(ixGate, p, 'TokenForceCloseBorrowsWithToken', 49);
 
   return ixGate;
 }

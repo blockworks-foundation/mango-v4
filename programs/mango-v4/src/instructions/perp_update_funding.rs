@@ -14,12 +14,12 @@ pub fn perp_update_funding(ctx: Context<PerpUpdateFunding>) -> Result<()> {
     };
 
     let now_slot = Clock::get()?.slot;
-    let oracle_price = perp_market.oracle_price(
+    let (oracle_price, oracle_slot) = perp_market.oracle_price_and_slot(
         &AccountInfoRef::borrow(ctx.accounts.oracle.as_ref())?,
         Some(now_slot),
     )?;
 
-    perp_market.update_funding_and_stable_price(&book, oracle_price, now_ts)?;
+    perp_market.update_funding_and_stable_price(&book, oracle_price, oracle_slot, now_ts)?;
 
     Ok(())
 }

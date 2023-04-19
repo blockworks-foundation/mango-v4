@@ -19,6 +19,12 @@ pub fn flash_loan_begin<'key, 'accounts, 'remaining, 'info>(
     ctx: Context<'key, 'accounts, 'remaining, 'info, FlashLoanBegin<'info>>,
     loan_amounts: Vec<u64>,
 ) -> Result<()> {
+    let num_loans = loan_amounts.len();
+    require_gt!(num_loans, 0);
+
+    // Loans of 0 are acceptable and common: Users often want to loan some of token A,
+    // nothing of token B, swap A to B and then deposit the gains.
+
     let account = ctx.accounts.account.load_full_mut()?;
 
     // account constraint #1
@@ -27,7 +33,6 @@ pub fn flash_loan_begin<'key, 'accounts, 'remaining, 'info>(
         MangoError::SomeError
     );
 
-    let num_loans = loan_amounts.len();
     require_eq!(ctx.remaining_accounts.len(), 3 * num_loans + 1);
     let banks = &ctx.remaining_accounts[..num_loans];
     let vaults = &ctx.remaining_accounts[num_loans..2 * num_loans];
@@ -70,8 +75,13 @@ pub fn flash_loan_begin<'key, 'accounts, 'remaining, 'info>(
         let vault = Account::<TokenAccount>::try_from(vault_ai)?;
         let token_account = Account::<TokenAccount>::try_from(token_account_ai)?;
 
+        require_keys_eq!(token_account.mint, bank.mint);
+
+        // This check is likely unnecessary
         require_keys_neq!(token_account.owner, group_ai.key());
 
+        require_eq!(bank.flash_loan_approved_amount, 0);
+        require_eq!(bank.flash_loan_token_account_initial, u64::MAX);
         bank.flash_loan_approved_amount = *amount;
         bank.flash_loan_token_account_initial = token_account.amount;
 
@@ -144,9 +154,11 @@ pub fn flash_loan_begin<'key, 'accounts, 'remaining, 'info>(
 
                 // must be the FlashLoanEnd instruction
                 require!(
-                    ix.data[0..8] == crate::instruction::FlashLoanEnd::discriminator(),
+                    ix.data[0..8] == crate::instruction::FlashLoanEndV2::discriminator(),
                     MangoError::SomeError
                 );
+                // the correct number of loans is passed to the End instruction
+                require_eq!(ix.data[8] as usize, num_loans);
 
                 require_msg!(
                     ctx.accounts.account.key() == ix.accounts[0].pubkey,
@@ -186,8 +198,16 @@ struct TokenVaultChange {
 
 pub fn flash_loan_end<'key, 'accounts, 'remaining, 'info>(
     ctx: Context<'key, 'accounts, 'remaining, 'info, FlashLoanEnd<'info>>,
+    num_loans: u8,
     flash_loan_type: FlashLoanType,
 ) -> Result<()> {
+    require_gt!(num_loans, 0);
+
+    // FlashLoanEnd can only be called in the same tx as a FlashLoanBegin because:
+    // - FlashLoanBegin checks for a matching FlashLoanEnd in the same tx
+    // - FlashLoanBegin sets flash_loan_token_account_initial on a bank, which is
+    //   validated below. (and there must be at least one bank-vault-token account triple)
+
     let mut account = ctx.accounts.account.load_full_mut()?;
 
     // account constraint #1
@@ -203,14 +223,7 @@ pub fn flash_loan_end<'key, 'accounts, 'remaining, 'info>(
     require_keys_eq!(group, group_ai.key());
 
     // Find index at which vaults start
-    let vaults_len = ctx.remaining_accounts[..remaining_len - 1]
-        .iter()
-        .rev()
-        .map_while(|ai| Account::<TokenAccount>::try_from(ai).ok())
-        .position(|token_account| token_account.owner == group)
-        .ok_or_else(|| {
-            error_msg!("expected at least one group-owned vault token account to be passed")
-        })?;
+    let vaults_len: usize = num_loans.into();
     let vaults_index = remaining_len - 2 * vaults_len - 1;
 
     let health_ais = &ctx.remaining_accounts[..vaults_index];
@@ -246,10 +259,14 @@ pub fn flash_loan_end<'key, 'accounts, 'remaining, 'info>(
         let token_account_ai = &token_accounts[vault_index];
         let token_account = Account::<TokenAccount>::try_from(token_account_ai)?;
 
+        // The token account could have been re-initialized for a different mint
+        require_keys_eq!(token_account.mint, bank.mint);
+
         // Ensure this bank/vault combination was mentioned in the Begin instruction:
         // The Begin instruction only checks that End ends with the same vault accounts -
         // but there could be an extra vault account in End, or a different bank could be
         // used for the same vault.
+        // This check guarantees that FlashLoanBegin was called on this bank.
         require_neq!(bank.flash_loan_token_account_initial, u64::MAX);
 
         // Create the token position now, so we can compute the pre-health with fixed order health accounts
@@ -343,10 +360,15 @@ pub fn flash_loan_end<'key, 'accounts, 'remaining, 'info>(
 
         let change_amount = change.amount - loan_origination_fee;
         let native_after_change = native + change_amount;
-        if bank.is_reduce_only() {
+        if bank.are_deposits_reduce_only() {
             require!(
-                (change_amount < 0 && native_after_change >= 0)
-                    || (change_amount > 0 && native_after_change < 1),
+                native_after_change < 1 || native_after_change <= native,
+                MangoError::TokenInReduceOnlyMode
+            );
+        }
+        if bank.are_borrows_reduce_only() {
+            require!(
+                native_after_change >= native || native_after_change >= 0,
                 MangoError::TokenInReduceOnlyMode
             );
         }

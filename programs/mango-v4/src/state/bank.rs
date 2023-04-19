@@ -127,10 +127,16 @@ pub struct Bank {
     /// See scaled_init_asset_weight().
     pub deposit_weight_scale_start_quote: f64,
 
+    // We have 3 modes
+    // 0 - Off,
+    // 1 - ReduceDepositsReduceBorrows - standard
+    // 2 - ReduceBorrows - borrows can only be reduced, but deposits have no restriction, special case for
+    //                 force close mode, where liqor should first acquire deposits before closing liqee's borrows
     pub reduce_only: u8,
+    pub force_close: u8,
 
     #[derivative(Debug = "ignore")]
-    pub reserved: [u8; 2119],
+    pub reserved: [u8; 2118],
 }
 const_assert_eq!(
     size_of::<Bank>(),
@@ -158,7 +164,8 @@ const_assert_eq!(
         + 8
         + 8
         + 1
-        + 2119
+        + 1
+        + 2118
 );
 const_assert_eq!(size_of::<Bank>(), 3064);
 const_assert_eq!(size_of::<Bank>() % 8, 0);
@@ -219,7 +226,8 @@ impl Bank {
             borrow_weight_scale_start_quote: f64::MAX,
             deposit_weight_scale_start_quote: f64::MAX,
             reduce_only: 0,
-            reserved: [0; 2119],
+            force_close: 0,
+            reserved: [0; 2118],
         }
     }
 
@@ -229,8 +237,16 @@ impl Bank {
             .trim_matches(char::from(0))
     }
 
-    pub fn is_reduce_only(&self) -> bool {
+    pub fn are_deposits_reduce_only(&self) -> bool {
         self.reduce_only == 1
+    }
+
+    pub fn are_borrows_reduce_only(&self) -> bool {
+        self.reduce_only == 1 || self.reduce_only == 2
+    }
+
+    pub fn is_force_close(&self) -> bool {
+        self.force_close == 1
     }
 
     #[inline(always)]
@@ -773,12 +789,14 @@ impl Bank {
         staleness_slot: Option<u64>,
     ) -> Result<I80F48> {
         require_keys_eq!(self.oracle, *oracle_acc.key());
-        oracle::oracle_price(
+        let (price, _) = oracle::oracle_price_and_slot(
             oracle_acc,
             &self.oracle_config,
             self.mint_decimals,
             staleness_slot,
-        )
+        )?;
+
+        Ok(price)
     }
 
     pub fn stable_price(&self) -> I80F48 {

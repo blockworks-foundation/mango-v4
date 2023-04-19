@@ -74,7 +74,8 @@ pub fn token_register_trustless(
         borrow_weight_scale_start_quote: 100_000_000_000.0, // $100k
         deposit_weight_scale_start_quote: 100_000_000_000.0, // $100k
         reduce_only: 0,
-        reserved: [0; 2119],
+        force_close: 0,
+        reserved: [0; 2118],
     };
     require_gt!(bank.max_rate, MINIMUM_MAX_RATE);
 
