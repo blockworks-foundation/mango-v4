@@ -885,7 +885,7 @@ impl MangoClient {
             .derive_health_check_remaining_account_metas_two_accounts(
                 account_a.1,
                 account_b.1,
-                &vec![],
+                &[],
                 &[],
             )
             .unwrap();
