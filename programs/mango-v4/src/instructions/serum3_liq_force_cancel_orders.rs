@@ -63,7 +63,7 @@ pub fn serum3_liq_force_cancel_orders(
         {
             let check_liquidatable_result = account.check_liquidatable(&health_cache)?;
             if account.fixed.is_operational() // Alternatively, frozen accounts can always have their orders cancelled
-                && check_liquidatable_result == CheckLiquidatable::NotLiquidatable
+                && check_liquidatable_result != CheckLiquidatable::Liquidatable
                 && !serum_market.is_force_close()
             {
                 return Ok(());
