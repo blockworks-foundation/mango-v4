@@ -51,7 +51,7 @@ pub fn serum3_liq_force_cancel_orders(
     }
 
     //
-    // Check liqee health if liquidation is allowed
+    // Early return if if liquidation is not allowed or if market is not in force close
     //
     let mut health_cache = {
         let mut account = ctx.accounts.account.load_full_mut()?;
