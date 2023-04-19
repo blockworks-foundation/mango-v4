@@ -1999,6 +1999,7 @@ export class MangoClient {
         params.resetStablePrice ?? false,
         params.positivePnlLiquidationFee,
         params.name,
+        params.forceClose,
       )
       .accounts({
         group: group.publicKey,

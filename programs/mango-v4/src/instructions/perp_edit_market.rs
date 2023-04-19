@@ -38,6 +38,7 @@ pub fn perp_edit_market(
     reset_stable_price: bool,
     positive_pnl_liquidation_fee_opt: Option<f32>,
     name_opt: Option<String>,
+    force_close_opt: Option<bool>,
 ) -> Result<()> {
     let group = ctx.accounts.group.load()?;
 
@@ -327,6 +328,19 @@ pub fn perp_edit_market(
     if let Some(name) = name_opt.as_ref() {
         msg!("Name: old - {:?}, new - {:?}", perp_market.name, name);
         perp_market.name = fill_from_str(&name)?;
+        require_group_admin = true;
+    };
+
+    if let Some(force_close) = force_close_opt {
+        if force_close {
+            require!(perp_market.reduce_only > 0, MangoError::SomeError);
+        }
+        msg!(
+            "Force close: old - {:?}, new - {:?}",
+            perp_market.force_close,
+            u8::from(force_close)
+        );
+        perp_market.force_close = u8::from(force_close);
         require_group_admin = true;
     };
 
