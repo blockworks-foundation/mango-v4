@@ -1005,7 +1005,6 @@ mod tests {
                         other_p(&mut setup.liqee),
                         I80F48::from_num(init_other_spot),
                         0,
-                        I80F48::from(1),
                     )
                     .unwrap();
             }

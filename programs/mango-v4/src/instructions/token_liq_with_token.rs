@@ -727,16 +727,10 @@ mod tests {
                         liab_p(&mut setup.liqee),
                         I80F48::from_num(init_liab_token),
                         0,
-                        I80F48::from(1),
                     )
                     .unwrap();
                 liab_bank
-                    .change_without_fee(
-                        liab_p(&mut setup.liqor),
-                        I80F48::from_num(1000.0),
-                        0,
-                        I80F48::from(1),
-                    )
+                    .change_without_fee(liab_p(&mut setup.liqor), I80F48::from_num(1000.0), 0)
                     .unwrap();
 
                 let asset_bank = setup.asset_bank.data();
@@ -745,18 +739,12 @@ mod tests {
                         asset_p(&mut setup.liqee),
                         I80F48::from_num(init_asset_token),
                         0,
-                        I80F48::from(1),
                     )
                     .unwrap();
 
                 let other_bank = setup.other_bank.data();
                 other_bank
-                    .change_without_fee(
-                        other_p(&mut setup.liqee),
-                        I80F48::from_num(init_other),
-                        0,
-                        I80F48::from(1),
-                    )
+                    .change_without_fee(other_p(&mut setup.liqee), I80F48::from_num(init_other), 0)
                     .unwrap();
             }
 

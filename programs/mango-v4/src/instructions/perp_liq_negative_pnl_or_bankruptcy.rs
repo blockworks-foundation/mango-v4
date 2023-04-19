@@ -769,18 +769,12 @@ mod tests {
                         settle_p(&mut setup.liqee),
                         I80F48::from_num(init_settle_token),
                         0,
-                        settle_bank.stable_price(),
                     )
                     .unwrap();
 
                 let other_bank = setup.other_bank.data();
                 other_bank
-                    .change_without_fee(
-                        other_p(&mut setup.liqee),
-                        I80F48::from_num(init_other),
-                        0,
-                        I80F48::from(1),
-                    )
+                    .change_without_fee(other_p(&mut setup.liqee), I80F48::from_num(init_other), 0)
                     .unwrap();
             }
 
