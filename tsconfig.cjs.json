@@ -9,6 +9,8 @@
   },
   "include": [
     "ts/client/src",
-    "ts/client/scripts"
+    "ts/client/scripts",
+    "ts/client/scripts/mm",
+    "ts/client/scripts/keeper"
   ]
 }
