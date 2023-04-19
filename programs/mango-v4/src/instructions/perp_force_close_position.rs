@@ -4,6 +4,7 @@ use crate::accounts_ix::*;
 
 use crate::accounts_zerocopy::AccountInfoRef;
 use crate::error::MangoError;
+use crate::logs::emit_perp_balances;
 use crate::state::*;
 use fixed::types::I80F48;
 
@@ -41,6 +42,21 @@ pub fn perp_force_close_position(ctx: Context<PerpForceClosePosition>) -> Result
 
     account_a_perp_position.record_trade(&mut perp_market, -base_transfer, quote_transfer);
     account_b_perp_position.record_trade(&mut perp_market, base_transfer, -quote_transfer);
+
+    emit_perp_balances(
+        ctx.accounts.group.key(),
+        ctx.accounts.account_a.key(),
+        account_a_perp_position,
+        &perp_market,
+    );
+    emit_perp_balances(
+        ctx.accounts.group.key(),
+        ctx.accounts.account_b.key(),
+        &account_b_perp_position,
+        &perp_market,
+    );
+
+    // TODO force-close trade log
 
     Ok(())
 }
