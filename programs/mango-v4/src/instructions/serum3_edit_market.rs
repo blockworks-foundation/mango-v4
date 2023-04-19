@@ -32,9 +32,7 @@ pub fn serum3_edit_market(
             u8::from(force_close)
         );
         serum3_market.force_close = u8::from(force_close);
-        if !force_close {
-            require_group_admin = true;
-        }
+        require_group_admin = true;
     };
 
     if require_group_admin {
