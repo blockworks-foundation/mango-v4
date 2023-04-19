@@ -678,6 +678,7 @@ pub mod mango_v4 {
         reset_stable_price: bool,
         positive_pnl_liquidation_fee_opt: Option<f32>,
         name_opt: Option<String>,
+        force_close_opt: Option<bool>,
     ) -> Result<()> {
         #[cfg(feature = "enable-gpl")]
         instructions::perp_edit_market(
@@ -711,6 +712,7 @@ pub mod mango_v4 {
             reset_stable_price,
             positive_pnl_liquidation_fee_opt,
             name_opt,
+            force_close_opt,
         )?;
         Ok(())
     }
@@ -907,6 +909,12 @@ pub mod mango_v4 {
     pub fn perp_settle_pnl(ctx: Context<PerpSettlePnl>) -> Result<()> {
         #[cfg(feature = "enable-gpl")]
         instructions::perp_settle_pnl(ctx)?;
+        Ok(())
+    }
+
+    pub fn perp_force_close_position(ctx: Context<PerpForceClosePosition>) -> Result<()> {
+        #[cfg(feature = "enable-gpl")]
+        instructions::perp_force_close_position(ctx)?;
         Ok(())
     }
 

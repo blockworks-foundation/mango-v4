@@ -3092,6 +3092,12 @@
           "type": {
             "option": "string"
           }
+        },
+        {
+          "name": "forceCloseOpt",
+          "type": {
+            "option": "bool"
+          }
         }
       ]
     },
@@ -3629,6 +3635,37 @@
         },
         {
           "name": "settleOracle",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "perpForceClosePosition",
+      "accounts": [
+        {
+          "name": "group",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "perpMarket",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "accountA",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "accountB",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "oracle",
           "isMut": false,
           "isSigner": false
         }
@@ -5049,11 +5086,15 @@
             "type": "u8"
           },
           {
+            "name": "forceClose",
+            "type": "u8"
+          },
+          {
             "name": "padding4",
             "type": {
               "array": [
                 "u8",
-                7
+                6
               ]
             }
           },
@@ -7065,6 +7106,9 @@
           },
           {
             "name": "TokenForceCloseBorrowsWithToken"
+          },
+          {
+            "name": "PerpForceClosePosition"
           }
         ]
       }

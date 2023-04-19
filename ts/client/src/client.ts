@@ -1999,6 +1999,7 @@ export class MangoClient {
         params.resetStablePrice ?? false,
         params.positivePnlLiquidationFee,
         params.name,
+        params.forceClose,
       )
       .accounts({
         group: group.publicKey,
@@ -2495,8 +2496,19 @@ export class MangoClient {
     accounts: PublicKey[],
     limit: number,
   ): Promise<TransactionSignature> {
+    return await this.sendAndConfirmTransactionForGroup(group, [
+      await this.perpConsumeEventsIx(group, perpMarketIndex, accounts, limit),
+    ]);
+  }
+
+  public async perpConsumeEventsIx(
+    group: Group,
+    perpMarketIndex: PerpMarketIndex,
+    accounts: PublicKey[],
+    limit: number,
+  ): Promise<TransactionInstruction> {
     const perpMarket = group.getPerpMarketByMarketIndex(perpMarketIndex);
-    const ix = await this.program.methods
+    return await this.program.methods
       .perpConsumeEvents(new BN(limit))
       .accounts({
         group: group.publicKey,
@@ -2510,7 +2522,6 @@ export class MangoClient {
         ),
       )
       .instruction();
-    return await this.sendAndConfirmTransactionForGroup(group, [ix]);
   }
 
   public async perpConsumeAllEvents(
@@ -2733,14 +2744,23 @@ export class MangoClient {
     );
   }
 
-  public async updateIndexAndRate(
+  public async tokenUpdateIndexAndRate(
     group: Group,
     mintPk: PublicKey,
   ): Promise<TransactionSignature> {
+    return await this.sendAndConfirmTransactionForGroup(group, [
+      await this.tokenUpdateIndexAndRateIx(group, mintPk),
+    ]);
+  }
+
+  public async tokenUpdateIndexAndRateIx(
+    group: Group,
+    mintPk: PublicKey,
+  ): Promise<TransactionInstruction> {
     const bank = group.getFirstBankByMint(mintPk);
     const mintInfo = group.mintInfosMapByMint.get(mintPk.toString())!;
 
-    const ix = await this.program.methods
+    return await this.program.methods
       .tokenUpdateIndexAndRate()
       .accounts({
         group: group.publicKey,
@@ -2756,7 +2776,6 @@ export class MangoClient {
         } as AccountMeta,
       ])
       .instruction();
-    return await this.sendAndConfirmTransactionForGroup(group, [ix]);
   }
 
   /// liquidations
