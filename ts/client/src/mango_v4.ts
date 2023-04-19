@@ -1544,6 +1544,38 @@ export type MangoV4 = {
       ]
     },
     {
+      "name": "flashLoanEndV2",
+      "accounts": [
+        {
+          "name": "account",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "owner",
+          "isMut": false,
+          "isSigner": true
+        },
+        {
+          "name": "tokenProgram",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "numLoans",
+          "type": "u8"
+        },
+        {
+          "name": "flashLoanType",
+          "type": {
+            "defined": "FlashLoanType"
+          }
+        }
+      ]
+    },
+    {
       "name": "healthRegionBegin",
       "accounts": [
         {
@@ -3060,6 +3092,12 @@ export type MangoV4 = {
           "type": {
             "option": "string"
           }
+        },
+        {
+          "name": "forceCloseOpt",
+          "type": {
+            "option": "bool"
+          }
         }
       ]
     },
@@ -3597,6 +3635,37 @@ export type MangoV4 = {
         },
         {
           "name": "settleOracle",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "perpForceClosePosition",
+      "accounts": [
+        {
+          "name": "group",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "perpMarket",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "accountA",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "accountB",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "oracle",
           "isMut": false,
           "isSigner": false
         }
@@ -5017,11 +5086,15 @@ export type MangoV4 = {
             "type": "u8"
           },
           {
+            "name": "forceClose",
+            "type": "u8"
+          },
+          {
             "name": "padding4",
             "type": {
               "array": [
                 "u8",
-                7
+                6
               ]
             }
           },
@@ -7033,6 +7106,9 @@ export type MangoV4 = {
           },
           {
             "name": "TokenForceCloseBorrowsWithToken"
+          },
+          {
+            "name": "PerpForceClosePosition"
           }
         ]
       }
@@ -7699,6 +7775,11 @@ export type MangoV4 = {
         {
           "name": "price",
           "type": "i128",
+          "index": false
+        },
+        {
+          "name": "oracleSlot",
+          "type": "u64",
           "index": false
         },
         {
@@ -8501,6 +8582,26 @@ export type MangoV4 = {
         {
           "name": "oraclePrice",
           "type": "i128",
+          "index": false
+        }
+      ]
+    },
+    {
+      "name": "FilledPerpOrderLog",
+      "fields": [
+        {
+          "name": "mangoGroup",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "perpMarketIndex",
+          "type": "u16",
+          "index": false
+        },
+        {
+          "name": "seqNum",
+          "type": "u64",
           "index": false
         }
       ]
@@ -10291,6 +10392,38 @@ export const IDL: MangoV4 = {
       ]
     },
     {
+      "name": "flashLoanEndV2",
+      "accounts": [
+        {
+          "name": "account",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "owner",
+          "isMut": false,
+          "isSigner": true
+        },
+        {
+          "name": "tokenProgram",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "numLoans",
+          "type": "u8"
+        },
+        {
+          "name": "flashLoanType",
+          "type": {
+            "defined": "FlashLoanType"
+          }
+        }
+      ]
+    },
+    {
       "name": "healthRegionBegin",
       "accounts": [
         {
@@ -11807,6 +11940,12 @@ export const IDL: MangoV4 = {
           "type": {
             "option": "string"
           }
+        },
+        {
+          "name": "forceCloseOpt",
+          "type": {
+            "option": "bool"
+          }
         }
       ]
     },
@@ -12344,6 +12483,37 @@ export const IDL: MangoV4 = {
         },
         {
           "name": "settleOracle",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "perpForceClosePosition",
+      "accounts": [
+        {
+          "name": "group",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "perpMarket",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "accountA",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "accountB",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "oracle",
           "isMut": false,
           "isSigner": false
         }
@@ -13764,11 +13934,15 @@ export const IDL: MangoV4 = {
             "type": "u8"
           },
           {
+            "name": "forceClose",
+            "type": "u8"
+          },
+          {
             "name": "padding4",
             "type": {
               "array": [
                 "u8",
-                7
+                6
               ]
             }
           },
@@ -15780,6 +15954,9 @@ export const IDL: MangoV4 = {
           },
           {
             "name": "TokenForceCloseBorrowsWithToken"
+          },
+          {
+            "name": "PerpForceClosePosition"
           }
         ]
       }
@@ -16446,6 +16623,11 @@ export const IDL: MangoV4 = {
         {
           "name": "price",
           "type": "i128",
+          "index": false
+        },
+        {
+          "name": "oracleSlot",
+          "type": "u64",
           "index": false
         },
         {
@@ -17248,6 +17430,26 @@ export const IDL: MangoV4 = {
         {
           "name": "oraclePrice",
           "type": "i128",
+          "index": false
+        }
+      ]
+    },
+    {
+      "name": "FilledPerpOrderLog",
+      "fields": [
+        {
+          "name": "mangoGroup",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "perpMarketIndex",
+          "type": "u16",
+          "index": false
+        },
+        {
+          "name": "seqNum",
+          "type": "u64",
           "index": false
         }
       ]

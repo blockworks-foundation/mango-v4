@@ -39,6 +39,7 @@ declare_id!("4MangoMjqJ2firMokCjjGgoK8d4MXcrgL7XJaL3w6fVg");
 #[program]
 pub mod mango_v4 {
     use super::*;
+    use error::*;
 
     pub fn group_create(
         ctx: Context<GroupCreate>,
@@ -356,8 +357,16 @@ pub mod mango_v4 {
         ctx: Context<'key, 'accounts, 'remaining, 'info, FlashLoanEnd<'info>>,
         flash_loan_type: FlashLoanType,
     ) -> Result<()> {
+        Err(error_msg!("FlashLoanEnd was replaced by FlashLoanEndV2"))
+    }
+
+    pub fn flash_loan_end_v2<'key, 'accounts, 'remaining, 'info>(
+        ctx: Context<'key, 'accounts, 'remaining, 'info, FlashLoanEnd<'info>>,
+        num_loans: u8,
+        flash_loan_type: FlashLoanType,
+    ) -> Result<()> {
         #[cfg(feature = "enable-gpl")]
-        instructions::flash_loan_end(ctx, flash_loan_type)?;
+        instructions::flash_loan_end(ctx, num_loans, flash_loan_type)?;
         Ok(())
     }
 
@@ -668,6 +677,7 @@ pub mod mango_v4 {
         reset_stable_price: bool,
         positive_pnl_liquidation_fee_opt: Option<f32>,
         name_opt: Option<String>,
+        force_close_opt: Option<bool>,
     ) -> Result<()> {
         #[cfg(feature = "enable-gpl")]
         instructions::perp_edit_market(
@@ -701,6 +711,7 @@ pub mod mango_v4 {
             reset_stable_price,
             positive_pnl_liquidation_fee_opt,
             name_opt,
+            force_close_opt,
         )?;
         Ok(())
     }
@@ -897,6 +908,12 @@ pub mod mango_v4 {
     pub fn perp_settle_pnl(ctx: Context<PerpSettlePnl>) -> Result<()> {
         #[cfg(feature = "enable-gpl")]
         instructions::perp_settle_pnl(ctx)?;
+        Ok(())
+    }
+
+    pub fn perp_force_close_position(ctx: Context<PerpForceClosePosition>) -> Result<()> {
+        #[cfg(feature = "enable-gpl")]
+        instructions::perp_force_close_position(ctx)?;
         Ok(())
     }
 

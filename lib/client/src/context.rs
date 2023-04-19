@@ -280,6 +280,7 @@ impl MangoGroupContext {
         &self,
         account1: &MangoAccountValue,
         account2: &MangoAccountValue,
+        affected_tokens: &[TokenIndex],
         writable_banks: &[TokenIndex],
     ) -> anyhow::Result<Vec<AccountMeta>> {
         // figure out all the banks/oracles that need to be passed for the health check
@@ -290,6 +291,7 @@ impl MangoGroupContext {
             .active_token_positions()
             .chain(account1.active_token_positions())
             .map(|ta| ta.token_index)
+            .chain(affected_tokens.iter().copied())
             .unique();
 
         for token_index in token_indexes {
