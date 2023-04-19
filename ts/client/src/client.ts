@@ -1587,7 +1587,6 @@ export class MangoClient {
     orderType: Serum3OrderType,
     clientOrderId: number,
     limit: number,
-    closeOpenOrdersAccount = false,
   ): Promise<TransactionSignature> {
     const placeOrderIxes = await this.serum3PlaceOrderIx(
       group,
@@ -1609,24 +1608,6 @@ export class MangoClient {
     );
 
     const ixs = [...placeOrderIxes, settleIx];
-
-    if (closeOpenOrdersAccount) {
-      ixs.push(
-        await this.serum3CancelAllOrdersIx(
-          group,
-          mangoAccount,
-          externalMarketPk,
-        ),
-      );
-      ixs.push(settleIx);
-      ixs.push(
-        await this.serum3CloseOpenOrdersIx(
-          group,
-          mangoAccount,
-          externalMarketPk,
-        ),
-      );
-    }
 
     return await this.sendAndConfirmTransactionForGroup(group, ixs);
   }
