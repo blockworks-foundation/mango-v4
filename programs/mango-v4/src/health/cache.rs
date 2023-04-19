@@ -998,7 +998,6 @@ mod tests {
                 account.ensure_token_position(4).unwrap().0,
                 I80F48::from(10),
                 DUMMY_NOW_TS,
-                DUMMY_PRICE,
             )
             .unwrap();
 
@@ -1084,7 +1083,6 @@ mod tests {
                 account.ensure_token_position(0).unwrap().0,
                 I80F48::from(testcase.token1),
                 DUMMY_NOW_TS,
-                DUMMY_PRICE,
             )
             .unwrap();
         bank2
@@ -1093,7 +1091,6 @@ mod tests {
                 account.ensure_token_position(4).unwrap().0,
                 I80F48::from(testcase.token2),
                 DUMMY_NOW_TS,
-                DUMMY_PRICE,
             )
             .unwrap();
         bank3
@@ -1102,7 +1099,6 @@ mod tests {
                 account.ensure_token_position(5).unwrap().0,
                 I80F48::from(testcase.token3),
                 DUMMY_NOW_TS,
-                DUMMY_PRICE,
             )
             .unwrap();
         for (settings, bank) in testcase

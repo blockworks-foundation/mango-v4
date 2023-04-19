@@ -12,17 +12,11 @@ on:
         'bin/liquidator/**',
         'bin/settler/**',
       ]
-  workflow_call:
-    secrets:
-      GCR_PROJECT:
-        required: true
-      GCR_SA_KEY:
-        required: true
   workflow_dispatch:
 
 env:
-  PROJECT_ID: ${{ secrets.GCR_PROJECT }}
   IMAGE: mango-v4
+  REGISTRY: ghcr.io
 
 jobs:
   build:
@@ -41,21 +35,13 @@ jobs:
           install: true
           buildkitd-flags: --debug
 
-      # Login to Google Cloud
-      - name: 'Login to Google Cloud'
-        uses: 'google-github-actions/auth@v0'
-        id: auth
-        with:
-          token_format: 'access_token'
-          credentials_json: '${{ secrets.GCR_SA_KEY }}'
-
-      # Login to GCR
-      - name: Login to GCR
+      # Login to Registry
+      - name: Login to Registry
         uses: docker/login-action@v2
         with:
-          registry: us-docker.pkg.dev
-          username: oauth2accesstoken
-          password: ${{ steps.auth.outputs.access_token }}
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
       # Build and push the base image, leveraging layer caching
       - name: Build and Push Base Image
@@ -64,37 +50,7 @@ jobs:
           context: .
           push: true
           tags: |
-            us-docker.pkg.dev/${{ env.PROJECT_ID }}/gcr.io/${{ env.IMAGE }}:${{ github.sha }}
-            us-docker.pkg.dev/${{ env.PROJECT_ID }}/gcr.io/${{ env.IMAGE }}:latest
+            ${{ env.REGISTRY }}/blockworks-foundation/${{ env.IMAGE }}:${{ github.sha }}
+            ${{ env.REGISTRY }}/blockworks-foundation/${{ env.IMAGE }}:latest
           cache-from: type=gha
           cache-to: type=gha,mode=max
-      # Build and push the liquidator runtime image
-      - name: Build and Push Liquidator
-        uses: docker/build-push-action@v2
-        with:
-          file: bin/liquidator/Dockerfile.liquidator
-          context: .
-          push: true
-          tags: |
-            us-docker.pkg.dev/${{ env.PROJECT_ID }}/gcr.io/${{ env.IMAGE }}-liquidator:${{ github.sha }}
-            us-docker.pkg.dev/${{ env.PROJECT_ID }}/gcr.io/${{ env.IMAGE }}-liquidator:latest
-      # Build and push the settler runtime image
-      - name: Build and Push Settle Bot
-        uses: docker/build-push-action@v2
-        with:
-          file: bin/settler/Dockerfile.settler
-          context: .
-          push: true
-          tags: |
-            us-docker.pkg.dev/${{ env.PROJECT_ID }}/gcr.io/${{ env.IMAGE }}-settler:${{ github.sha }}
-            us-docker.pkg.dev/${{ env.PROJECT_ID }}/gcr.io/${{ env.IMAGE }}-settler:latest
-      # Build and push the keeper runtime image
-      - name: Build and Push Keeper
-        uses: docker/build-push-action@v2
-        with:
-          file: bin/keeper/Dockerfile.keeper
-          context: .
-          push: true
-          tags: |
-            us-docker.pkg.dev/${{ env.PROJECT_ID }}/gcr.io/${{ env.IMAGE }}-keeper:${{ github.sha }}
-            us-docker.pkg.dev/${{ env.PROJECT_ID }}/gcr.io/${{ env.IMAGE }}-keeper:latest

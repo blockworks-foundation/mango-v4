@@ -139,6 +139,7 @@ async function tokenEdit(): Promise<void> {
       params.resetNetBorrowLimit ?? false,
       params.reduceOnly,
       params.name,
+      params.forceClose,
     )
     .accounts({
       group: group.publicKey,

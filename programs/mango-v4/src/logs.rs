@@ -144,6 +144,7 @@ pub struct PerpUpdateFundingLog {
     pub long_funding: i128,
     pub short_funding: i128,
     pub price: i128,
+    pub oracle_slot: u64,
     pub stable_price: i128,
     pub fees_accrued: i128,
     pub fees_settled: i128,
@@ -370,4 +371,11 @@ pub struct AccountBuybackFeesWithMngoLog {
     pub buyback_mngo: i128,
     pub mngo_buyback_price: i128,
     pub oracle_price: i128,
+}
+
+#[event]
+pub struct FilledPerpOrderLog {
+    pub mango_group: Pubkey,
+    pub perp_market_index: u16,
+    pub seq_num: u64,
 }

@@ -710,7 +710,7 @@ async function main() {
     // console.log(`sig https://explorer.solana.com/tx/${sig}?cluster=devnet`);
 
     await perpMarket?.loadEventQueue(client)!;
-    const fr = perpMarket?.getCurrentFundingRate(
+    const fr = perpMarket?.getInstantaneousFundingRateUi(
       await perpMarket.loadBids(client),
       await perpMarket.loadAsks(client),
     );

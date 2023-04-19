@@ -116,16 +116,13 @@ pub(crate) fn liquidation_action(
     // Liquidation fees work by giving the liqor more assets than the oracle price would
     // indicate. Specifically we choose
     //   assets =
-    //     liabs * liab_oracle_price/asset_oracle_price * (1 + liab_liq_fee + asset_liq_fee)
-    // Which means that we use a increased liab oracle price and reduced asset oracle price for
-    // the conversion.
-    // It would be more fully correct to use (1+liab_liq_fee)*(1+asset_liq_fee), but for small
-    // fee amounts that is nearly identical.
+    //     liabs * liab_oracle_price/asset_oracle_price * (1 + liab_liq_fee)
+    // Which means that we use a increased liab oracle price for the conversion.
     // For simplicity we write
     //   assets = liabs * liab_oracle_price / asset_oracle_price * fee_factor
     //   assets = liabs * liab_oracle_price_adjusted / asset_oracle_price
     //          = liabs * lopa / aop
-    let fee_factor = I80F48::ONE + asset_bank.liquidation_fee + liab_bank.liquidation_fee;
+    let fee_factor = I80F48::ONE + liab_bank.liquidation_fee;
     let liab_oracle_price_adjusted = liab_oracle_price * fee_factor;
 
     let init_asset_weight = asset_bank.init_asset_weight;
@@ -226,12 +223,8 @@ pub(crate) fn liquidation_action(
 
     let (liqor_liab_position, liqor_liab_raw_index, _) =
         liqor.ensure_token_position(liab_token_index)?;
-    let (liqor_liab_active, loan_origination_fee) = liab_bank.withdraw_with_fee(
-        liqor_liab_position,
-        liab_transfer,
-        now_ts,
-        liab_oracle_price,
-    )?;
+    let (liqor_liab_active, loan_origination_fee) =
+        liab_bank.withdraw_with_fee(liqor_liab_position, liab_transfer, now_ts)?;
     let liqor_liab_indexed_position = liqor_liab_position.indexed_position;
     let liqee_liab_native_after = liqee_liab_position.native(liab_bank);
 
@@ -245,7 +238,6 @@ pub(crate) fn liquidation_action(
         liqee_asset_position,
         asset_transfer,
         now_ts,
-        asset_oracle_price,
     )?;
     let liqee_asset_indexed_position = liqee_asset_position.indexed_position;
     let liqee_assets_native_after = liqee_asset_position.native(asset_bank);
@@ -541,38 +533,18 @@ mod tests {
         {
             let asset_bank = setup.asset_bank.data();
             asset_bank
-                .change_without_fee(
-                    asset_p(&mut setup.liqee),
-                    I80F48::from_num(10.0),
-                    0,
-                    I80F48::from(1),
-                )
+                .change_without_fee(asset_p(&mut setup.liqee), I80F48::from_num(10.0), 0)
                 .unwrap();
             asset_bank
-                .change_without_fee(
-                    asset_p(&mut setup.liqor),
-                    I80F48::from_num(1000.0),
-                    0,
-                    I80F48::from(1),
-                )
+                .change_without_fee(asset_p(&mut setup.liqor), I80F48::from_num(1000.0), 0)
                 .unwrap();
 
             let liab_bank = setup.liab_bank.data();
             liab_bank
-                .change_without_fee(
-                    liab_p(&mut setup.liqor),
-                    I80F48::from_num(1000.0),
-                    0,
-                    I80F48::from(1),
-                )
+                .change_without_fee(liab_p(&mut setup.liqor), I80F48::from_num(1000.0), 0)
                 .unwrap();
             liab_bank
-                .change_without_fee(
-                    liab_p(&mut setup.liqee),
-                    I80F48::from_num(-9.0),
-                    0,
-                    I80F48::from(1),
-                )
+                .change_without_fee(liab_p(&mut setup.liqee), I80F48::from_num(-9.0), 0)
                 .unwrap();
         }
 

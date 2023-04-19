@@ -103,12 +103,8 @@ pub fn account_buyback_fees_with_mngo(
         dao_mngo_token_position.indexed_position >= I80F48::ZERO,
         MangoError::SomeError
     );
-    let in_use = mngo_bank.withdraw_without_fee(
-        account_mngo_token_position,
-        max_buyback_mngo,
-        now_ts,
-        mngo_oracle_price,
-    )?;
+    let in_use =
+        mngo_bank.withdraw_without_fee(account_mngo_token_position, max_buyback_mngo, now_ts)?;
     emit!(TokenBalanceLog {
         mango_group: ctx.accounts.group.key(),
         mango_account: ctx.accounts.account.key(),
@@ -132,12 +128,8 @@ pub fn account_buyback_fees_with_mngo(
         dao_account.ensure_token_position(fees_bank.token_index)?;
     let dao_fees = dao_fees_token_position.native(&fees_bank);
     assert!(dao_fees >= max_buyback_fees);
-    let in_use = fees_bank.withdraw_without_fee(
-        dao_fees_token_position,
-        max_buyback_fees,
-        now_ts,
-        fees_oracle_price,
-    )?;
+    let in_use =
+        fees_bank.withdraw_without_fee(dao_fees_token_position, max_buyback_fees, now_ts)?;
     if !in_use {
         dao_account.deactivate_token_position_and_log(
             dao_fees_raw_token_index,

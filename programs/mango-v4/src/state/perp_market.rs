@@ -241,7 +241,23 @@ impl PerpMarket {
         staleness_slot: Option<u64>,
     ) -> Result<I80F48> {
         require_keys_eq!(self.oracle, *oracle_acc.key());
-        oracle::oracle_price(
+        let (price, _) = oracle::oracle_price_and_slot(
+            oracle_acc,
+            &self.oracle_config,
+            self.base_decimals,
+            staleness_slot,
+        )?;
+
+        Ok(price)
+    }
+
+    pub fn oracle_price_and_slot(
+        &self,
+        oracle_acc: &impl KeyedAccountReader,
+        staleness_slot: Option<u64>,
+    ) -> Result<(I80F48, u64)> {
+        require_keys_eq!(self.oracle, *oracle_acc.key());
+        oracle::oracle_price_and_slot(
             oracle_acc,
             &self.oracle_config,
             self.base_decimals,
@@ -258,6 +274,7 @@ impl PerpMarket {
         &mut self,
         book: &Orderbook,
         oracle_price: I80F48,
+        oracle_slot: u64,
         now_ts: u64,
     ) -> Result<()> {
         if now_ts <= self.funding_last_updated {
@@ -315,6 +332,7 @@ impl PerpMarket {
             long_funding: self.long_funding.to_bits(),
             short_funding: self.short_funding.to_bits(),
             price: oracle_price.to_bits(),
+            oracle_slot: oracle_slot,
             stable_price: self.stable_price().to_bits(),
             fees_accrued: self.fees_accrued.to_bits(),
             fees_settled: self.fees_settled.to_bits(),

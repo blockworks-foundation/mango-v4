@@ -1,5 +1,5 @@
 # syntax = docker/dockerfile:1.2
-# Base image containing all binaries, deployed to gcr.io/mango-markets/mango-v4:latest
+# Base image containing all binaries, deployed to ghcr.io/blockworks-foundation/mango-v4:latest
 FROM rust:1.65 as base
 # RUN cargo install cargo-chef --locked
 RUN rustup component add rustfmt
@@ -12,15 +12,13 @@ COPY . .
 RUN sed -i 's|lib/\*|lib/checked_math|' Cargo.toml
 # Hack to prevent local serum_dex manifests conflicting with cargo dependency
 RUN rm -rf anchor/tests
-# RUN cargo chef prepare --bin keeper --recipe-path recipe-keeper.json
-# RUN cargo chef prepare --bin liquidator --recipe-path recipe-liquidator.json
+# RUN cargo chef prepare --recipe-path recipe.json
 
 FROM base as build
-COPY --from=plan /app/recipe-*.json .
+# COPY --from=plan /app/recipe.json .
 COPY . .
-# RUN cargo chef cook --release --recipe-path recipe-keeper.json --bin keeper
-# RUN cargo chef cook --release --recipe-path recipe-liquidator.json --bin liquidator
-RUN cargo build --release --bin keeper --bin liquidator --bin settler
+# RUN cargo chef cook --release --recipe-path recipe.json
+RUN cargo build --release --bins
 
 FROM debian:bullseye-slim as run
 RUN apt-get update && apt-get -y install ca-certificates libc6

@@ -177,12 +177,7 @@ pub fn perp_settle_pnl(ctx: Context<PerpSettlePnl>) -> Result<()> {
     // Don't charge loan origination fees on borrows created via settling:
     // Even small loan origination fees could accumulate if a perp position is
     // settled back and forth repeatedly.
-    settle_bank.withdraw_without_fee(
-        b_token_position,
-        settlement,
-        now_ts,
-        settle_token_oracle_price,
-    )?;
+    settle_bank.withdraw_without_fee(b_token_position, settlement, now_ts)?;
 
     emit!(TokenBalanceLog {
         mango_group: ctx.accounts.group.key(),
