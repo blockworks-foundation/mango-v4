@@ -131,7 +131,7 @@ async function rebalancer(): Promise<void> {
               price,
               Math.abs(tokenBalance),
               Serum3SelfTradeBehavior.decrementTake,
-              Serum3OrderType.limit,
+              Serum3OrderType.immediateOrCancel,
               new Date().valueOf(),
               10,
             )),

@@ -1,9 +1,8 @@
 import { utf8 } from '@coral-xyz/anchor/dist/cjs/utils/bytes';
-import { Market, Orderbook } from '@project-serum/serum';
-import { Cluster, PublicKey } from '@solana/web3.js';
+import { Orderbook } from '@project-serum/serum';
+import { PublicKey } from '@solana/web3.js';
 import BN from 'bn.js';
 import { MangoClient } from '../client';
-import { OPENBOOK_PROGRAM_ID } from '../constants';
 import { MAX_I80F48, ONE_I80F48, ZERO_I80F48 } from '../numbers/I80F48';
 import { As } from '../utils';
 import { TokenIndex } from './bank';
@@ -153,7 +152,7 @@ export class Serum3Market {
     let acc = 0;
     let selectedOrder;
     const orderSize = size;
-    for (const order of ob.getL2(size * 2)) {
+    for (const order of ob.getL2(size * 2 /* TODO Fix random constant */)) {
       acc += order[1];
       if (acc >= orderSize) {
         selectedOrder = order;
@@ -168,9 +167,9 @@ export class Serum3Market {
     }
 
     if (side === 'buy') {
-      return selectedOrder[0] * 1.05;
+      return selectedOrder[0] * 1.05 /* TODO Fix random constant */;
     } else {
-      return selectedOrder[0] * 0.95;
+      return selectedOrder[0] * 0.95 /* TODO Fix random constant */;
     }
   }
 
