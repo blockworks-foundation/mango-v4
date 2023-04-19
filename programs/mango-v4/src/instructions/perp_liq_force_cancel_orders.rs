@@ -10,6 +10,7 @@ pub fn perp_liq_force_cancel_orders(
     limit: u8,
 ) -> Result<()> {
     let mut account = ctx.accounts.account.load_full_mut()?;
+    let mut perp_market = ctx.accounts.perp_market.load_mut()?;
 
     //
     // Check liqee health if liquidation is allowed
@@ -24,6 +25,7 @@ pub fn perp_liq_force_cancel_orders(
             let check_liquidatable_result = account.check_liquidatable(&health_cache)?;
             if account.fixed.is_operational() // Alternatively, frozen accounts can always have their orders cancelled
                 && (check_liquidatable_result != CheckLiquidatable::Liquidatable)
+                && !perp_market.is_force_close()
             {
                 return Ok(());
             }
@@ -36,7 +38,6 @@ pub fn perp_liq_force_cancel_orders(
     // Cancel orders
     //
     {
-        let mut perp_market = ctx.accounts.perp_market.load_mut()?;
         let mut book = Orderbook {
             bids: ctx.accounts.bids.load_mut()?,
             asks: ctx.accounts.asks.load_mut()?,
