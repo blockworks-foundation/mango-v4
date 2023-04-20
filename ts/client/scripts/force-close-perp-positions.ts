@@ -74,15 +74,29 @@ async function forceClosePerpPositions(): Promise<void> {
     a = mangoAccounts[i];
     b = mangoAccounts[j];
     // PerpForceClosePosition ix expects a to be long, and b to short
-    await client.perpForceClosePosition(group, PERP_MARKET_INDEX, a, b);
+    const sig = await client.perpForceClosePosition(
+      group,
+      PERP_MARKET_INDEX,
+      a,
+      b,
+    );
+    console.log(
+      `PerpForceClosePosition ${a.publicKey} and ${
+        b.publicKey
+      } , sig https://explorer.solana.com/tx/${sig}?cluster=${
+        CLUSTER == 'devnet' ? 'devnet' : ''
+      }`,
+    );
     a = await a.reload(client);
     b = await b.reload(client);
     // Move to previous account once b's position is completely reduced
     if (b.getPerpPositionUi(group, PERP_MARKET_INDEX) === 0) {
+      console.log(`Fully reduced position for ${b.publicKey}`);
       j--;
     }
     // Move to next account once a's position is completely reduced
     if (a.getPerpPositionUi(group, PERP_MARKET_INDEX) === 0) {
+      console.log(`Fully reduced position for ${a.publicKey}`);
       i++;
     }
   }

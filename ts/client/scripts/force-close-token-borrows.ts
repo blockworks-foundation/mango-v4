@@ -4,6 +4,7 @@ import fs from 'fs';
 import { TokenIndex } from '../src/accounts/bank';
 import { MangoClient } from '../src/client';
 import { MANGO_V4_ID } from '../src/constants';
+import { toNative, toUiDecimals } from '../src/utils';
 import {
   fetchJupiterTransaction,
   fetchRoutes,
@@ -44,22 +45,24 @@ async function forceCloseTokenBorrows(): Promise<void> {
   let liqor = await client.getMangoAccount(new PublicKey(MANGO_ACCOUNT_PK!));
   const group = await client.getGroup(liqor.group);
   const forceCloseTokenBank = group.getFirstBankByTokenIndex(TOKEN_INDEX);
-  if (forceCloseTokenBank.reduceOnly != 2) {
-    throw new Error(
-      `Unexpected reduce only state ${forceCloseTokenBank.reduceOnly}`,
-    );
-  }
-  if (!forceCloseTokenBank.forceClose) {
-    throw new Error(
-      `Unexpected force close state ${forceCloseTokenBank.forceClose}`,
-    );
-  }
+  // if (forceCloseTokenBank.reduceOnly != 2) {
+  //   throw new Error(
+  //     `Unexpected reduce only state ${forceCloseTokenBank.reduceOnly}`,
+  //   );
+  // }
+  // if (!forceCloseTokenBank.forceClose) {
+  //   throw new Error(
+  //     `Unexpected force close state ${forceCloseTokenBank.forceClose}`,
+  //   );
+  // }
 
   const usdcBank = group.getFirstBankByTokenIndex(0 as TokenIndex);
   // Get all mango accounts with borrows for given token
   const mangoAccountsWithBorrows = (
     await client.getAllMangoAccounts(group)
   ).filter((a) => a.getTokenBalanceUi(forceCloseTokenBank) < 0);
+
+  console.log(`${liqor.toString(group, true)}`);
 
   for (const liqee of mangoAccountsWithBorrows) {
     liqor = await liqor.reload(client);
@@ -75,13 +78,32 @@ async function forceCloseTokenBorrows(): Promise<void> {
       forceCloseTokenBank.uiPrice *
       (1 + forceCloseTokenBank.liquidationFee.toNumber());
 
+    console.log(
+      `liqor balance ${liqor.getTokenBalanceUi(
+        forceCloseTokenBank,
+      )}, liqee balance ${liqee.getTokenBalanceUi(
+        forceCloseTokenBank,
+      )}, liqor will swap further amount of $${toUiDecimals(
+        amount,
+        usdcBank.mintDecimals,
+      )} to ${forceCloseTokenBank.name}`,
+    );
+
+    const amountBn = toNative(
+      Math.min(amount, 99999999999), // Jupiter API can't handle amounts larger than 99999999999
+      usdcBank.mintDecimals,
+    );
     const { bestRoute } = await fetchRoutes(
       usdcBank.mint,
       forceCloseTokenBank.mint,
-      amount.toString(),
+      amountBn.toString(),
+      forceCloseTokenBank.liquidationFee.toNumber() * 100,
+      'ExactIn',
+      '0',
+      liqor.owner,
     );
     if (!bestRoute) {
-      // Try again
+      await new Promise((r) => setTimeout(r, 500));
       continue;
     }
     const [ixs, alts] =
@@ -93,23 +115,28 @@ async function forceCloseTokenBorrows(): Promise<void> {
             user.publicKey,
           )
         : await fetchJupiterTransaction(
-            this.client.connection,
+            client.connection,
             bestRoute,
             user.publicKey,
             0,
             usdcBank.mint,
             forceCloseTokenBank.mint,
           );
-    await this.client.marginTrade({
-      group: this.group,
-      mangoAccount: this.mangoAccount,
+    const sig = await client.marginTrade({
+      group: group,
+      mangoAccount: liqor,
       inputMintPk: usdcBank.mint,
       amountIn: amount,
-      outputMintPk: usdcBank.mint,
+      outputMintPk: forceCloseTokenBank.mint,
       userDefinedInstructions: ixs,
       userDefinedAlts: alts,
       flashLoanType: { swap: {} },
     });
+    console.log(
+      ` - marginTrade, sig https://explorer.solana.com/tx/${sig}?cluster=${
+        CLUSTER == 'devnet' ? 'devnet' : ''
+      }`,
+    );
 
     await client.tokenForceCloseBorrowsWithToken(
       group,

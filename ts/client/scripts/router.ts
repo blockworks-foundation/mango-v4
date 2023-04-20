@@ -7,6 +7,7 @@ import {
   TransactionMessage,
   VersionedTransaction,
 } from '@solana/web3.js';
+import fetch from 'node-fetch';
 import { createAssociatedTokenAccountIdempotentInstruction } from '../src/utils';
 
 export const MANGO_ROUTER_API_URL = 'https://api.mngo.cloud/router/v1';
@@ -269,6 +270,7 @@ export const fetchRoutes = async (
         feeBps,
       ),
     ]);
+
     const routes: RouteInfo[] = responses
       .filter((x) => x.status === 'fulfilled' && x.value.bestRoute !== null)
       .map((x) => (x as any).value.routes)
