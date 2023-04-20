@@ -529,7 +529,7 @@ async function makeTokenReduceonly() {
   await client.tokenEdit(
     group,
     bank.mint,
-    Builder(NullTokenEditParams).reduceOnly(0).build(),
+    Builder(NullTokenEditParams).reduceOnly(1).build(),
   );
 }
 
