@@ -16,11 +16,10 @@ use crate::logs::{emit_perp_balances, PerpLiqBaseOrPositivePnlLog, TokenBalanceL
 ///
 /// It's a combined instruction because reducing the base position is not necessarily
 /// a health-increasing action when perp overall asset weight = 0. There, the pnl
-/// takeover can allow further base position to be reduced.
+/// takeover is necessary to allow the base position to be reduced to zero.
 ///
-/// Taking over negative pnl - or positive pnl when the unweighted perp health contributin
-/// is negative - never increases liqee health. That's why it's relegated to the
-/// separate liq_negative_pnl_or_bankruptcy instruction instead.
+/// Taking over pnl while health_unsettled_pnl() is negative never increases liqee health.
+/// That's why it's relegated to the separate liq_negative_pnl_or_bankruptcy instruction instead.
 pub fn perp_liq_base_or_positive_pnl(
     ctx: Context<PerpLiqBaseOrPositivePnl>,
     mut max_base_transfer: i64,
@@ -113,7 +112,7 @@ pub fn perp_liq_base_or_positive_pnl(
         )?;
 
     //
-    // Wrap up
+    // Log changes
     //
 
     let liqee_perp_position = liqee.perp_position_mut(perp_market_index)?;
@@ -248,7 +247,7 @@ pub(crate) fn liquidation_action(
     //    The amount of overall health gained depends on the effective token balance (spot and
     //    other perp market contributions) and the overall perp asset weight.
     // pnl settlement:
-    //    Increase health by settling positive health_unsettled_pnl()
+    //    Increase health by settling positive health_unsettled_pnl().
     //    Settling pnl when health_unsettled_pnl<0 has a negative effect on health, since it
     //    replaces unsettled pnl with (1-positive_pnl_liq_fee) spot tokens. But since the
     //    overall perp weight is less than (1-fee), settling positive health_unsettled_pnl will
@@ -321,14 +320,10 @@ pub(crate) fn liquidation_action(
     let mut base_reduction = 0;
     let mut pnl_transfer = I80F48::ZERO;
     let mut current_uhupnl = perp_info.unweighted_health_unsettled_pnl(liq_end_type);
-    // let initial_weighted_perp_health = perp_info
-    //     .weigh_health_contribution(current_uhu_pnl, liq_end_type);
-    //let mut current_expected_perp_health = expected_perp_health(current_uhu_pnl);
     let mut current_health = liqee_liq_end_health;
     let mut current_settle_token = settle_token_balance.spot_and_perp;
 
-    // example: health_amount = (-current_uhupnl).max(0)
-    //
+    // Helper function to reduce base position in exchange for effective settle token balance changes
     let mut reduce_base = |step: &str,
                            mut hupnl_limit: I80F48,
                            expected_quote_per_lot: I80F48,
@@ -337,77 +332,55 @@ pub(crate) fn liquidation_action(
                            current_uhupnl: &mut I80F48,
                            current_settle_token: &mut I80F48,
                            current_health: &mut I80F48| {
-        let mut expected_settle_token = *current_settle_token;
-        let mut expected_health = *current_health;
-        let mut total_base_reduction = 0;
+        let expected_settle_token = *current_settle_token;
+        let expected_health = *current_health;
 
-        for i in [-1, 1] {
-            // weighted asset or liab price for the settle token
-            let weighted_price;
-            // amount of settle token balance change that would change the weighted_price
-            let max_quote_weight_switch;
-            if i == -1 {
-                if expected_settle_token >= 0 {
-                    continue;
-                }
-                weighted_price = settle_token_info.liab_weighted_price(liq_end_type);
-                max_quote_weight_switch = -expected_settle_token;
-            } else {
-                if expected_settle_token < 0 {
-                    continue;
-                }
-                weighted_price = settle_token_info.asset_weighted_price(liq_end_type);
-                max_quote_weight_switch = I80F48::MAX;
-            }
-
-            // Settle token position we'd need to gain to bring health to zero.
-            let max_quote_for_health = (-expected_health).max(I80F48::ZERO) / weighted_price;
-
-            // Apply other limits on the hupnl units
-            let max_quote = max_quote_for_health
-                .min(max_quote_weight_switch)
-                .min(hupnl_limit);
-
-            // How many lots to transfer?
-            let base_lots = (max_quote / expected_quote_per_lot)
-                .ceil() // overshoot to aim for init_health >= 0
-                .to_num::<i64>()
-                .min(liqee_base_lots.abs() - base_reduction)
-                .min(max_base_transfer.abs() - base_reduction)
-                .max(0);
-
-            let expected_quote_gain = expected_quote_per_lot * I80F48::from(base_lots);
-            let new_expected_settle_token = expected_settle_token + expected_quote_gain;
-            let new_expected_health = expected_health
-                - settle_token_info.health_contribution(liq_end_type, expected_settle_token)
-                + settle_token_info.health_contribution(liq_end_type, new_expected_settle_token);
-
-            msg!(
-                "{}: {} lots, exp health {} -> {}",
-                step,
-                base_lots,
-                expected_health,
-                new_expected_health,
-            );
-
-            expected_settle_token = new_expected_settle_token;
-            expected_health = new_expected_health;
-
-            hupnl_limit -= expected_quote_gain;
-            total_base_reduction += base_lots;
+        // TODO: shared code 3x now
+        let mut max_quote_for_health = I80F48::ZERO;
+        let mut remaining_health = (-expected_health).max(I80F48::ZERO);
+        if expected_settle_token < 0 {
+            let liab_weighted_price = settle_token_info.liab_weighted_price(liq_end_type);
+            let liab_max = remaining_health / liab_weighted_price;
+            max_quote_for_health = liab_max.min(-expected_settle_token);
+            remaining_health -= max_quote_for_health * liab_weighted_price;
+        }
+        if remaining_health > 0 {
+            let asset_weighted_price = settle_token_info.asset_weighted_price(liq_end_type);
+            let asset_max = remaining_health / asset_weighted_price;
+            max_quote_for_health += asset_max;
         }
 
-        let new_uhupnl = *current_uhupnl + uhupnl_per_lot * I80F48::from(total_base_reduction);
+        let max_quote = max_quote_for_health.min(hupnl_limit);
+
+        // How many lots to transfer?
+        let base_lots = (max_quote / expected_quote_per_lot)
+            .ceil() // overshoot to aim for init_health >= 0
+            .to_num::<i64>()
+            .min(liqee_base_lots.abs() - base_reduction)
+            .min(max_base_transfer.abs() - base_reduction)
+            .max(0);
+
+        let expected_quote_gain = expected_quote_per_lot * I80F48::from(base_lots);
+        let new_expected_settle_token = expected_settle_token + expected_quote_gain;
+        let new_expected_health = expected_health
+            - settle_token_info.health_contribution(liq_end_type, expected_settle_token)
+            + settle_token_info.health_contribution(liq_end_type, new_expected_settle_token);
+
+        hupnl_limit -= expected_quote_gain;
+
+        let new_uhupnl = *current_uhupnl + uhupnl_per_lot * I80F48::from(base_lots);
         let new_settle_token =
-            *current_settle_token + actual_quote_per_lot * I80F48::from(total_base_reduction);
+            *current_settle_token + actual_quote_per_lot * I80F48::from(base_lots);
         let new_health = *current_health
             - settle_token_info.health_contribution(liq_end_type, *current_settle_token)
             + settle_token_info.health_contribution(liq_end_type, new_settle_token);
 
         msg!(
-            "{} total: {} lots, health {} -> {}, uhupnl: {} -> {}",
+            "{} total: {} lots, exhealth {} -> {}, health {} -> {}, uhupnl: {} -> {}",
             step,
-            total_base_reduction,
+            base_lots,
+            expected_health,
+            new_expected_health,
             *current_health,
             new_health,
             *current_uhupnl,
@@ -418,7 +391,7 @@ pub(crate) fn liquidation_action(
         *current_health = new_health;
         *current_uhupnl = new_uhupnl;
 
-        base_reduction += total_base_reduction;
+        base_reduction += base_lots;
     };
 
     let settle_pnl = |step: &str,
@@ -427,60 +400,49 @@ pub(crate) fn liquidation_action(
                       current_uhupnl: &mut I80F48,
                       current_settle_token: &mut I80F48,
                       current_health: &mut I80F48| {
-        for i in [-1, 1] {
-            // weighted asset or liab price for the settle token
-            let weighted_price;
-            // amount of settle token balance change that would change the weighted_price
-            let max_quote_weight_switch;
-            if i == -1 {
-                if *current_settle_token >= 0 {
-                    continue;
-                }
-                weighted_price = settle_token_info.liab_weighted_price(liq_end_type);
-                max_quote_weight_switch = -(*current_settle_token);
-            } else {
-                if *current_settle_token < 0 {
-                    continue;
-                }
-                weighted_price = settle_token_info.asset_weighted_price(liq_end_type);
-                max_quote_weight_switch = I80F48::MAX;
-            }
-
-            // Settle token position we'd need to gain to bring health to zero.
-            let max_quote_for_health = (-(*current_health)).max(I80F48::ZERO) / weighted_price;
-
-            // Apply other limits on the hupnl units
-            let max_quote = max_quote_for_health.min(max_quote_weight_switch);
-
-            // How many units to settle?
-            let settle = (max_quote / quote_per_settle)
-                .min(max_pnl_transfer - *pnl_transfer)
-                .min(*current_uhupnl)
-                .max(I80F48::ZERO);
-
-            let quote_gain = settle * quote_per_settle;
-            let new_settle_token = *current_settle_token + quote_gain;
-            let new_uhupnl = *current_uhupnl - settle;
-            let new_expected_health = *current_health
-                - settle_token_info.health_contribution(liq_end_type, *current_settle_token)
-                + settle_token_info.health_contribution(liq_end_type, new_settle_token);
-
-            msg!(
-                "{}: {} settled, health {} -> {}, uhupnl: {} -> {}",
-                step,
-                settle,
-                *current_health,
-                new_expected_health,
-                *current_uhupnl,
-                new_uhupnl,
-            );
-
-            *current_settle_token = new_settle_token;
-            *current_health = new_expected_health;
-            *current_uhupnl = new_uhupnl;
-
-            *pnl_transfer += settle;
+        // TODO: shared code 4x now
+        let mut max_quote_for_health = I80F48::ZERO;
+        let mut remaining_health = (-(*current_health)).max(I80F48::ZERO);
+        if *current_settle_token < 0 {
+            let liab_weighted_price = settle_token_info.liab_weighted_price(liq_end_type);
+            let liab_max = remaining_health / liab_weighted_price;
+            max_quote_for_health = liab_max.min(-(*current_settle_token));
+            remaining_health -= max_quote_for_health * liab_weighted_price;
         }
+        if remaining_health > 0 {
+            let asset_weighted_price = settle_token_info.asset_weighted_price(liq_end_type);
+            let asset_max = remaining_health / asset_weighted_price;
+            max_quote_for_health += asset_max;
+        }
+
+        // How many units to settle?
+        let settle = (max_quote_for_health / quote_per_settle)
+            .min(max_pnl_transfer - *pnl_transfer)
+            .min(*current_uhupnl)
+            .max(I80F48::ZERO);
+
+        let quote_gain = settle * quote_per_settle;
+        let new_settle_token = *current_settle_token + quote_gain;
+        let new_uhupnl = *current_uhupnl - settle;
+        let new_expected_health = *current_health
+            - settle_token_info.health_contribution(liq_end_type, *current_settle_token)
+            + settle_token_info.health_contribution(liq_end_type, new_settle_token);
+
+        msg!(
+            "{}: {} settled, health {} -> {}, uhupnl: {} -> {}",
+            step,
+            settle,
+            *current_health,
+            new_expected_health,
+            *current_uhupnl,
+            new_uhupnl,
+        );
+
+        *current_settle_token = new_settle_token;
+        *current_health = new_expected_health;
+        *current_uhupnl = new_uhupnl;
+
+        *pnl_transfer += settle;
     };
 
     //
