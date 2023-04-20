@@ -593,12 +593,12 @@ pub(crate) fn liquidation_action(
         // base position to zero and would need to deal with that in bankruptcy. Also, the settle
         // limit changes with the base position price, so it'd be hard to say when this liquidation
         // step is done.
-
-        let liqee_pnl = pnl_transfer; // TODO?!
-
         let limit_transfer = {
             // take care, liqee_limit may be i64::MAX
             let liqee_limit: i128 = liqee_positive_settle_limit.into();
+            let liqee_pnl = liqee_perp_position
+                .unsettled_pnl(perp_market, oracle_price)?
+                .max(I80F48::ONE);
             let settle = pnl_transfer.floor().to_num::<i128>();
             let total = liqee_pnl.ceil().to_num::<i128>();
             let liqor_limit: i64 = (liqee_limit * settle / total).try_into().unwrap();
@@ -608,24 +608,23 @@ pub(crate) fn liquidation_action(
         // The liqor pays less than the full amount to receive the positive pnl
         let token_transfer = pnl_transfer * spot_gain_per_settled;
 
-        if pnl_transfer > 0 {
-            liqor_perp_position.record_liquidation_pnl_takeover(pnl_transfer, limit_transfer);
-            liqee_perp_position.record_settle(pnl_transfer);
+        liqor_perp_position.record_liquidation_pnl_takeover(pnl_transfer, limit_transfer);
+        liqee_perp_position.record_settle(pnl_transfer);
 
-            // Update the accounts' perp_spot_transfer statistics.
-            let transfer_i64 = token_transfer.round_to_zero().to_num::<i64>();
-            liqor_perp_position.perp_spot_transfers -= transfer_i64;
-            liqee_perp_position.perp_spot_transfers += transfer_i64;
-            liqor.fixed.perp_spot_transfers -= transfer_i64;
-            liqee.fixed.perp_spot_transfers += transfer_i64;
+        // Update the accounts' perp_spot_transfer statistics.
+        let transfer_i64 = token_transfer.round_to_zero().to_num::<i64>();
+        liqor_perp_position.perp_spot_transfers -= transfer_i64;
+        liqee_perp_position.perp_spot_transfers += transfer_i64;
+        liqor.fixed.perp_spot_transfers -= transfer_i64;
+        liqee.fixed.perp_spot_transfers += transfer_i64;
 
-            // Transfer token balance
-            let liqor_token_position = liqor.token_position_mut(settle_token_index)?.0;
-            let liqee_token_position = liqee.token_position_mut(settle_token_index)?.0;
-            settle_bank.deposit(liqee_token_position, token_transfer, now_ts)?;
-            settle_bank.withdraw_without_fee(liqor_token_position, token_transfer, now_ts)?;
-            liqee_health_cache.adjust_token_balance(&settle_bank, token_transfer)?;
-        }
+        // Transfer token balance
+        let liqor_token_position = liqor.token_position_mut(settle_token_index)?.0;
+        let liqee_token_position = liqee.token_position_mut(settle_token_index)?.0;
+        settle_bank.deposit(liqee_token_position, token_transfer, now_ts)?;
+        settle_bank.withdraw_without_fee(liqor_token_position, token_transfer, now_ts)?;
+        liqee_health_cache.adjust_token_balance(&settle_bank, token_transfer)?;
+
         msg!(
             "pnl {} was transferred to liqor for quote {} with settle limit {}",
             pnl_transfer,
@@ -981,11 +980,15 @@ mod tests {
                 pm.init_overall_asset_weight = I80F48::from_num(overall_weight);
             }
             {
-                perp_p(&mut setup.liqee).record_trade(
+                let p = perp_p(&mut setup.liqee);
+                p.record_trade(
                     setup.perp_market.data(),
                     init_liqee_base,
                     I80F48::from_num(init_liqee_quote),
                 );
+                p.realized_other_pnl_native = p
+                    .unsettled_pnl(setup.perp_market.data(), I80F48::ONE)
+                    .unwrap();
 
                 let settle_bank = setup.settle_bank.data();
                 settle_bank
@@ -1034,6 +1037,13 @@ mod tests {
                 token_p(&mut result.liqor).native(settle_bank),
                 1000.0 - (exp_liqee_spot - init_liqee_spot),
                 0.01
+            );
+
+            let settled = exp_liqee_spot - init_liqee_spot;
+            assert_eq_f!(
+                I80F48::from(perp_p(&mut result.liqor).settle_pnl_limit_realized_trade),
+                settled,
+                1.1
             );
         }
     }

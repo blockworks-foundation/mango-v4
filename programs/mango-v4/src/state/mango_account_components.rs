@@ -469,6 +469,20 @@ impl PerpPosition {
             }
         }
 
+        // Bump the realized trade pnl settle limit for a fraction of the stable price value,
+        // allowing gradual settlement of very high-pnl trades.
+        let realized_stable_value = I80F48::from(reduced_lots.abs() * perp_market.base_lot_size)
+            * perp_market.stable_price();
+        let stable_value_fraction =
+            I80F48::from_num(perp_market.settle_pnl_limit_factor) * realized_stable_value;
+        self.increase_realized_trade_pnl_settle_limit(newly_realized_pnl, stable_value_fraction);
+    }
+
+    fn increase_realized_trade_pnl_settle_limit(
+        &mut self,
+        newly_realized_pnl: I80F48,
+        limit: I80F48,
+    ) {
         // When realized limit has a different sign from realized pnl, reset it completely
         if (self.settle_pnl_limit_realized_trade > 0 && self.realized_trade_pnl_native <= 0)
             || (self.settle_pnl_limit_realized_trade < 0 && self.realized_trade_pnl_native >= 0)
@@ -479,25 +493,13 @@ impl PerpPosition {
         // Whenever realized pnl increases in magnitude, also increase realized pnl settle limit
         // magnitude.
         if newly_realized_pnl.signum() == self.realized_trade_pnl_native.signum() {
-            let realized_stable_value =
-                I80F48::from(reduced_lots.abs() * perp_market.base_lot_size)
-                    * perp_market.stable_price();
-            let stable_value_fraction =
-                I80F48::from_num(perp_market.settle_pnl_limit_factor) * realized_stable_value;
-
             // The realized pnl settle limit change is restricted to actually realized pnl:
             // buying and then selling some base lots at the same price shouldn't affect
             // the settle limit.
             let limit_change = if newly_realized_pnl > 0 {
-                newly_realized_pnl
-                    .min(stable_value_fraction)
-                    .ceil()
-                    .clamp_to_i64()
+                newly_realized_pnl.min(limit).ceil().clamp_to_i64()
             } else {
-                newly_realized_pnl
-                    .max(-stable_value_fraction)
-                    .floor()
-                    .clamp_to_i64()
+                newly_realized_pnl.max(-limit).floor().clamp_to_i64()
             };
             self.settle_pnl_limit_realized_trade += limit_change;
         }
@@ -776,7 +778,8 @@ impl PerpPosition {
     /// Adds to the quote position and adds a recurring ("realized trade") settle limit
     pub fn record_liquidation_pnl_takeover(&mut self, change: I80F48, recurring_limit: I80F48) {
         self.change_quote_position(change);
-        self.realized_trade_pnl_native += recurring_limit;
+        self.realized_trade_pnl_native += change;
+        self.increase_realized_trade_pnl_settle_limit(change, recurring_limit);
     }
 }
 
