@@ -4,6 +4,7 @@ use anchor_lang::prelude::*;
 pub fn serum3_edit_market(
     ctx: Context<Serum3EditMarket>,
     reduce_only_opt: Option<bool>,
+    force_close_opt: Option<bool>,
 ) -> Result<()> {
     let mut serum3_market = ctx.accounts.market.load_mut()?;
 
@@ -22,6 +23,16 @@ pub fn serum3_edit_market(
         if !reduce_only {
             require_group_admin = true;
         }
+    };
+
+    if let Some(force_close) = force_close_opt {
+        msg!(
+            "Force close: old - {:?}, new - {:?}",
+            serum3_market.force_close,
+            u8::from(force_close)
+        );
+        serum3_market.force_close = u8::from(force_close);
+        require_group_admin = true;
     };
 
     if require_group_admin {

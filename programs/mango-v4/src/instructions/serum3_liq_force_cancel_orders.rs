@@ -51,7 +51,7 @@ pub fn serum3_liq_force_cancel_orders(
     }
 
     //
-    // Check liqee health if liquidation is allowed
+    // Early return if if liquidation is not allowed or if market is not in force close
     //
     let mut health_cache = {
         let mut account = ctx.accounts.account.load_full_mut()?;
@@ -61,17 +61,12 @@ pub fn serum3_liq_force_cancel_orders(
             new_health_cache(&account.borrow(), &retriever).context("create health cache")?;
 
         {
-            let result = account.check_liquidatable(&health_cache);
-            if account.fixed.is_operational() {
-                if !result? {
-                    return Ok(());
-                }
-            } else {
-                // Frozen accounts can always have their orders cancelled
-                if !result.is_anchor_error_with_code(MangoError::HealthMustBeNegative.into()) {
-                    // Propagate unexpected errors
-                    result?;
-                }
+            let liquidatable = account.check_liquidatable(&health_cache)?;
+            if account.fixed.is_operational()
+                && liquidatable != CheckLiquidatable::Liquidatable
+                && !serum_market.is_force_close()
+            {
+                return Ok(());
             }
         }
 

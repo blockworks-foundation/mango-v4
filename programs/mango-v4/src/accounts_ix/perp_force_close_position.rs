@@ -11,7 +11,7 @@ pub struct PerpForceClosePosition<'info> {
 
     #[account(
         mut,
-        has_one = group, 
+        has_one = group,
         has_one = oracle,
         constraint = perp_market.load()?.is_force_close()
     )]

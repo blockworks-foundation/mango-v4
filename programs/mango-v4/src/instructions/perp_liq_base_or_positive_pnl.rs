@@ -58,7 +58,7 @@ pub fn perp_liq_base_or_positive_pnl(
     let liqee_liq_end_health = liqee_health_cache.health(HealthType::LiquidationEnd);
     liqee_health_cache.require_after_phase1_liquidation()?;
 
-    if !liqee.check_liquidatable(&liqee_health_cache)? {
+    if liqee.check_liquidatable(&liqee_health_cache)? != CheckLiquidatable::Liquidatable {
         return Ok(());
     }
 
