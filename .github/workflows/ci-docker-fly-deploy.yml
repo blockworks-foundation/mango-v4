@@ -8,8 +8,7 @@ on:
         required: true
         type: string
       imageName:
-        description: 'Image Name'
-        description: 'liquidator, keeper, mm, settler'
+        description: 'Docker Image Name'
         required: true
         type: string
       imageTag:
