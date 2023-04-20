@@ -78,7 +78,6 @@ async function forceCloseTokenBorrows(): Promise<void> {
             usdcBank.mint,
             forceCloseTokenBank.mint,
           );
-
     await this.client.marginTrade({
       group: this.group,
       mangoAccount: this.mangoAccount,
