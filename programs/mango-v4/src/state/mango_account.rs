@@ -1053,6 +1053,7 @@ impl<
         } else {
             let maint_health = health_cache.health(HealthType::Maint);
             if maint_health >= I80F48::ZERO {
+                msg!("Liqee is not liquidatable");
                 return Ok(CheckLiquidatable::NotLiquidatable);
             }
             self.fixed_mut().set_being_liquidated(true);

@@ -50,7 +50,7 @@ pub fn perp_liq_negative_pnl_or_bankruptcy(
     let liqee_settle_health = liqee_health_cache.perp_settle_health();
     liqee_health_cache.require_after_phase2_liquidation()?;
 
-    if !liqee.check_liquidatable(&liqee_health_cache)? {
+    if liqee.check_liquidatable(&liqee_health_cache)? != CheckLiquidatable::Liquidatable {
         return Ok(());
     }
 

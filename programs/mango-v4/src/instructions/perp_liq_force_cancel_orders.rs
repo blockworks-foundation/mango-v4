@@ -22,9 +22,9 @@ pub fn perp_liq_force_cancel_orders(
             new_health_cache(&account.borrow(), &retriever).context("create health cache")?;
 
         {
-            let check_liquidatable_result = account.check_liquidatable(&health_cache)?;
+            let liquidatable = account.check_liquidatable(&health_cache)?;
             if account.fixed.is_operational()
-                && (check_liquidatable_result != CheckLiquidatable::Liquidatable)
+                && (liquidatable != CheckLiquidatable::Liquidatable)
                 && !perp_market.is_force_close()
             {
                 return Ok(());
