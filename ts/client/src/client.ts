@@ -417,6 +417,54 @@ export class MangoClient {
     return await this.sendAndConfirmTransactionForGroup(group, [ix]);
   }
 
+  public async tokenForceCloseBorrowsWithToken(
+    group: Group,
+    liqor: MangoAccount,
+    liqee: MangoAccount,
+    assetTokenIndex: TokenIndex,
+    liabTokenIndex: TokenIndex,
+    maxLiabTransfer?: number,
+  ): Promise<string> {
+    const assetBank = group.getFirstBankByTokenIndex(assetTokenIndex);
+    const liabBank = group.getFirstBankByTokenIndex(liabTokenIndex);
+    const healthRemainingAccounts: PublicKey[] =
+      this.buildHealthRemainingAccounts(
+        AccountRetriever.Scanning,
+        group,
+        [liqor, liqee],
+        [assetBank, liabBank],
+        [],
+      );
+    const parsedHealthAccounts = healthRemainingAccounts.map(
+      (pk) =>
+        ({
+          pubkey: pk,
+          isWritable:
+            pk.equals(assetBank.publicKey) || pk.equals(liabBank.publicKey)
+              ? true
+              : false,
+          isSigner: false,
+        } as AccountMeta),
+    );
+    const ix = await this.program.methods
+      .tokenForceCloseBorrowsWithToken(
+        assetTokenIndex,
+        liabTokenIndex,
+        maxLiabTransfer
+          ? toNative(maxLiabTransfer, liabBank.mintDecimals)
+          : U64_MAX_BN,
+      )
+      .accounts({
+        group: group.publicKey,
+        liqor: liqor.publicKey,
+        liqorOwner: (this.program.provider as AnchorProvider).wallet.publicKey,
+        liqee: liqee.publicKey,
+      })
+      .remainingAccounts(parsedHealthAccounts)
+      .instruction();
+    return await this.sendAndConfirmTransactionForGroup(group, [ix]);
+  }
+
   public async tokenDeregister(
     group: Group,
     mintPk: PublicKey,
