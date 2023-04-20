@@ -1449,6 +1449,40 @@ export class MangoClient {
     );
   }
 
+  public async serum3LiqForceCancelOrders(
+    group: Group,
+    mangoAccount: MangoAccount,
+    externalMarketPk: PublicKey,
+    limit?: number,
+  ): Promise<string> {
+    const serum3Market = group.serum3MarketsMapByExternal.get(
+      externalMarketPk.toBase58(),
+    )!;
+
+    const serum3MarketExternal = group.serum3ExternalMarketsMap.get(
+      externalMarketPk.toBase58(),
+    )!;
+    const ix = await this.program.methods
+      .serum3LiqForceCancelOrders(limit ? limit : 10)
+      .accounts({
+        group: group.publicKey,
+        account: mangoAccount.publicKey,
+        openOrders: await serum3Market.findOoPda(
+          this.programId,
+          mangoAccount.publicKey,
+        ),
+        serumMarket: serum3Market.publicKey,
+        serumProgram: OPENBOOK_PROGRAM_ID[this.cluster],
+        serumMarketExternal: serum3Market.serumMarketExternal,
+        marketBids: serum3MarketExternal.bidsAddress,
+        marketAsks: serum3MarketExternal.asksAddress,
+        marketEventQueue: serum3MarketExternal.decoded.eventQueue,
+      })
+      .instruction();
+
+    return await this.sendAndConfirmTransactionForGroup(group, [ix]);
+  }
+
   public async serum3PlaceOrderIx(
     group: Group,
     mangoAccount: MangoAccount,
