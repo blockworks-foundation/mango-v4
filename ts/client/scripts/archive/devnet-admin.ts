@@ -23,16 +23,14 @@ import { buildVersionedTx } from '../../src/utils';
 
 // https://github.com/blockworks-foundation/mango-client-v3/blob/main/src/serum.json#L70
 const DEVNET_SERUM3_MARKETS = new Map([
-  ['SOL/USDC', '82iPEvGiTceyxYpeLK3DhSwga3R5m4Yfyoydd13CukQ9'],
+  ['SOL/USDC', '6xYbSQyhajUqyatJDdkonpj7v41bKeEBWpf7kwRh5X7A'],
 ]);
 const DEVNET_MINTS = new Map([
   ['USDC', '8FRFC6MoGGkMFQwngccyu69VnYbzykGeez7ignHVAFSN'], // use devnet usdc
   ['SOL', 'So11111111111111111111111111111111111111112'],
-  ['MNGO', 'Bb9bsTQa1bGEtQ5KagGkvSHyuLqDWumFUcRqFusFNJWC'],
 ]);
 const DEVNET_ORACLES = new Map([
   ['SOL', 'J83w4HKfqxwcq3BEMMkPFSppX3gqekLyLJBexebFVkix'],
-  ['MNGO', '8k7F9Xb36oFJsjpCKpsXvg4cgBRoZtwNTc3EzG5Ttd2o'],
   ['BTC', 'HovQMDrbAgAYPCmHVSrezcSmkMtXSSUsLDFANExrZh2J'],
   ['ETH', 'EdVCmQ9FSPcVe5YySXDPCRmc8aDQLKJ9xvYBMZPie1Vw'],
 ]);
@@ -180,53 +178,31 @@ async function main() {
   console.log(
     `...edited group, https://explorer.solana.com/tx/${sig}?cluster=devnet`,
   );
-  console.log(`Registering MNGO...`);
-  const mngoDevnetMint = new PublicKey(DEVNET_MINTS.get('MNGO')!);
-  const mngoDevnetOracle = new PublicKey(DEVNET_ORACLES.get('MNGO')!);
+
+  // register serum market
+  console.log(`Registering serum3 market...`);
+  const serumMarketExternalPk = new PublicKey(
+    DEVNET_SERUM3_MARKETS.get('SOL/USDC')!,
+  );
   try {
-    sig = await client.tokenRegisterTrustless(
+    sig = await client.serum3RegisterMarket(
       group,
-      mngoDevnetMint,
-      mngoDevnetOracle,
-      2,
-      'MNGO',
+      serumMarketExternalPk,
+      group.getFirstBankByMint(solDevnetMint),
+      group.getFirstBankByMint(usdcDevnetMint),
+      0,
+      'SOL/USDC',
     );
     await group.reloadAll(client);
-    const bank = group.getFirstBankByMint(mngoDevnetMint);
+    const serum3Market = group.getSerum3MarketByExternalMarket(
+      serumMarketExternalPk,
+    );
     console.log(
-      `...registered token bank ${bank.publicKey}, https://explorer.solana.com/tx/${sig}?cluster=devnet`,
+      `...registered serum market ${serum3Market.publicKey}, https://explorer.solana.com/tx/${sig}?cluster=devnet`,
     );
   } catch (error) {
     console.log(error);
   }
-
-  // DEBUGGING
-  // log tokens/banks
-  // group.consoleLogBanks();
-
-  // // register serum market
-  // const serumMarketExternalPk = new PublicKey(
-  //   DEVNET_SERUM3_MARKETS.get('SOL/USDC')!,
-  // );
-  // try {
-  //   sig = await client.serum3RegisterMarket(
-  //     group,
-  //     serumMarketExternalPk,
-  //     group.getFirstBankByMint(solDevnetMint),
-  //     group.getFirstBankByMint(usdcDevnetMint),
-  //     0,
-  //     'SOL/USDC',
-  //   );
-  //   await group.reloadAll(client);
-  //   const serum3Market = group.getSerum3MarketByExternalMarket(
-  //     serumMarketExternalPk,
-  //   );
-  //   console.log(
-  //     `...registered serum market ${serum3Market.publicKey}, https://explorer.solana.com/tx/${sig}?cluster=devnet`,
-  //   );
-  // } catch (error) {
-  //   console.log(error);
-  // }
 
   // register perp market
   console.log(`Registering perp market...`);
@@ -320,6 +296,15 @@ async function main() {
       console.log(error);
     }
   }
+
+  // await client.serum3EditMarket(group, 0 as MarketIndex, false, false);
+
+  // const perpMarket = group.getPerpMarketByMarketIndex(0 as PerpMarketIndex);
+  // const params = Builder(NullPerpEditParams)
+  //   .reduceOnly(true)
+  //   .forceClose(true)
+  //   .build();
+  // await client.perpEditMarket(group, 0 as PerpMarketIndex, params);
 
   process.exit();
 }

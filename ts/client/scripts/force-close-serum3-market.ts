@@ -1,6 +1,5 @@
 import { AnchorProvider, Wallet } from '@coral-xyz/anchor';
 import { Cluster, Connection, Keypair, PublicKey } from '@solana/web3.js';
-import { BN } from 'bn.js';
 import fs from 'fs';
 import range from 'lodash/range';
 import { MarketIndex } from '../src/accounts/serum3';
@@ -55,15 +54,22 @@ async function forceCloseSerum3Market(): Promise<void> {
   for (let a of mangoAccounts) {
     // Cancel all orders and confirm that all have been cancelled
     for (const _ of range(0, 10)) {
-      await client.serum3LiqForceCancelOrders(
+      console.log(a.getSerum3OoAccount(MARKET_INDEX).freeSlotBits.zeroBits());
+      const sig = await client.serum3LiqForceCancelOrders(
         group,
         a,
         serum3Market.serumMarketExternal,
+        10,
+      );
+      console.log(
+        ` serum3LiqForceCancelOrders for ${
+          a.publicKey
+        }, sig https://explorer.solana.com/tx/${sig}?cluster=${
+          CLUSTER == 'devnet' ? 'devnet' : ''
+        }`,
       );
       a = await a.reload(client);
-      if (
-        !a.getSerum3OoAccount(MARKET_INDEX).orders.some((o) => !o.eq(new BN(0)))
-      ) {
+      if (a.getSerum3OoAccount(MARKET_INDEX).freeSlotBits.zeroBits() === 0) {
         break;
       }
     }

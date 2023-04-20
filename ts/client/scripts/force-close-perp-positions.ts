@@ -50,7 +50,9 @@ async function forceClosePerpPositions(): Promise<void> {
 
   // Get all mango accounts who have a position in the given market
   const mangoAccounts = (await client.getAllMangoAccounts(group)).filter(
-    (a) => a.getPerpPosition(PERP_MARKET_INDEX) !== undefined,
+    (a) =>
+      a.getPerpPosition(PERP_MARKET_INDEX) !== undefined &&
+      a.getPerpPositionUi(group, PERP_MARKET_INDEX) !== 0,
   );
   // Sort descending
   mangoAccounts.sort(
@@ -66,6 +68,9 @@ async function forceClosePerpPositions(): Promise<void> {
 
   // i iterates forward to 2nd last account, and b iterates backward till 2nd account
   while (i < mangoAccounts.length - 1 && j > 0) {
+    if (i === j) {
+      break;
+    }
     a = mangoAccounts[i];
     b = mangoAccounts[j];
     // PerpForceClosePosition ix expects a to be long, and b to short

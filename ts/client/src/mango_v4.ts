@@ -1,5 +1,5 @@
 export type MangoV4 = {
-  "version": "0.13.0",
+  "version": "0.14.0",
   "name": "mango_v4",
   "instructions": [
     {
@@ -1740,6 +1740,12 @@ export type MangoV4 = {
       "args": [
         {
           "name": "reduceOnlyOpt",
+          "type": {
+            "option": "bool"
+          }
+        },
+        {
+          "name": "forceCloseOpt",
           "type": {
             "option": "bool"
           }
@@ -5153,11 +5159,15 @@ export type MangoV4 = {
             "type": "u8"
           },
           {
+            "name": "forceClose",
+            "type": "u8"
+          },
+          {
             "name": "padding1",
             "type": {
               "array": [
                 "u8",
-                3
+                2
               ]
             }
           },
@@ -7109,6 +7119,23 @@ export type MangoV4 = {
           },
           {
             "name": "PerpForceClosePosition"
+          }
+        ]
+      }
+    },
+    {
+      "name": "CheckLiquidatable",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "NotLiquidatable"
+          },
+          {
+            "name": "Liquidatable"
+          },
+          {
+            "name": "BecameNotLiquidatable"
           }
         ]
       }
@@ -8847,7 +8874,7 @@ export type MangoV4 = {
 };
 
 export const IDL: MangoV4 = {
-  "version": "0.13.0",
+  "version": "0.14.0",
   "name": "mango_v4",
   "instructions": [
     {
@@ -10588,6 +10615,12 @@ export const IDL: MangoV4 = {
       "args": [
         {
           "name": "reduceOnlyOpt",
+          "type": {
+            "option": "bool"
+          }
+        },
+        {
+          "name": "forceCloseOpt",
           "type": {
             "option": "bool"
           }
@@ -14001,11 +14034,15 @@ export const IDL: MangoV4 = {
             "type": "u8"
           },
           {
+            "name": "forceClose",
+            "type": "u8"
+          },
+          {
             "name": "padding1",
             "type": {
               "array": [
                 "u8",
-                3
+                2
               ]
             }
           },
@@ -15957,6 +15994,23 @@ export const IDL: MangoV4 = {
           },
           {
             "name": "PerpForceClosePosition"
+          }
+        ]
+      }
+    },
+    {
+      "name": "CheckLiquidatable",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "NotLiquidatable"
+          },
+          {
+            "name": "Liquidatable"
+          },
+          {
+            "name": "BecameNotLiquidatable"
           }
         ]
       }
