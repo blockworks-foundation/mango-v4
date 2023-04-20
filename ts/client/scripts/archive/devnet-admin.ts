@@ -306,6 +306,16 @@ async function main() {
   //   .build();
   // await client.perpEditMarket(group, 0 as PerpMarketIndex, params);
 
+  // const params = Builder(NullTokenEditParams)
+  //   .reduceOnly(2)
+  //   .forceClose(true)
+  //   .build();
+  // await client.tokenEdit(
+  //   group,
+  //   group.banksMapByName.get('SOL')![0].mint,
+  //   params,
+  // );
+
   process.exit();
 }
 

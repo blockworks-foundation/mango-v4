@@ -45,16 +45,16 @@ async function forceCloseTokenBorrows(): Promise<void> {
   let liqor = await client.getMangoAccount(new PublicKey(MANGO_ACCOUNT_PK!));
   const group = await client.getGroup(liqor.group);
   const forceCloseTokenBank = group.getFirstBankByTokenIndex(TOKEN_INDEX);
-  // if (forceCloseTokenBank.reduceOnly != 2) {
-  //   throw new Error(
-  //     `Unexpected reduce only state ${forceCloseTokenBank.reduceOnly}`,
-  //   );
-  // }
-  // if (!forceCloseTokenBank.forceClose) {
-  //   throw new Error(
-  //     `Unexpected force close state ${forceCloseTokenBank.forceClose}`,
-  //   );
-  // }
+  if (forceCloseTokenBank.reduceOnly != 2) {
+    throw new Error(
+      `Unexpected reduce only state ${forceCloseTokenBank.reduceOnly}`,
+    );
+  }
+  if (!forceCloseTokenBank.forceClose) {
+    throw new Error(
+      `Unexpected force close state ${forceCloseTokenBank.forceClose}`,
+    );
+  }
 
   const usdcBank = group.getFirstBankByTokenIndex(0 as TokenIndex);
   // Get all mango accounts with borrows for given token
