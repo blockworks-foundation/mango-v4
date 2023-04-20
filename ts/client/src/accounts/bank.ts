@@ -115,6 +115,7 @@ export class Bank implements BankForHealth {
       borrowWeightScaleStartQuote: number;
       depositWeightScaleStartQuote: number;
       reduceOnly: number;
+      forceClose: number;
     },
   ): Bank {
     return new Bank(
@@ -161,6 +162,8 @@ export class Bank implements BankForHealth {
       obj.borrowWeightScaleStartQuote,
       obj.depositWeightScaleStartQuote,
       obj.reduceOnly == 1,
+      obj.reduceOnly == 1 || obj.reduceOnly == 2,
+      obj.forceClose == 1,
     );
   }
 
@@ -207,7 +210,9 @@ export class Bank implements BankForHealth {
     public netBorrowsInWindow: BN,
     public borrowWeightScaleStartQuote: number,
     public depositWeightScaleStartQuote: number,
-    public reduceOnly: boolean,
+    public depositsReduceOnly: boolean,
+    public borrowsReduceOnly: boolean,
+    public forceClose: boolean,
   ) {
     this.name = utf8.decode(new Uint8Array(name)).split('\x00')[0];
     this.oracleConfig = {
