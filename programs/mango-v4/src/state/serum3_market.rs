@@ -16,7 +16,8 @@ pub struct Serum3Market {
     // ABI: Clients rely on this being at offset 42
     pub quote_token_index: TokenIndex,
     pub reduce_only: u8,
-    pub padding1: [u8; 3],
+    pub force_close: u8,
+    pub padding1: [u8; 2],
     pub name: [u8; 16],
     pub serum_program: Pubkey,
     pub serum_market_external: Pubkey,
@@ -47,6 +48,10 @@ impl Serum3Market {
 
     pub fn is_reduce_only(&self) -> bool {
         self.reduce_only == 1
+    }
+
+    pub fn is_force_close(&self) -> bool {
+        self.force_close == 1
     }
 }
 

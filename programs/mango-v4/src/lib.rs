@@ -403,9 +403,10 @@ pub mod mango_v4 {
     pub fn serum3_edit_market(
         ctx: Context<Serum3EditMarket>,
         reduce_only_opt: Option<bool>,
+        force_close_opt: Option<bool>,
     ) -> Result<()> {
         #[cfg(feature = "enable-gpl")]
-        instructions::serum3_edit_market(ctx, reduce_only_opt)?;
+        instructions::serum3_edit_market(ctx, reduce_only_opt, force_close_opt)?;
         Ok(())
     }
 

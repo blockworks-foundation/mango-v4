@@ -10,9 +10,10 @@ pub fn perp_liq_force_cancel_orders(
     limit: u8,
 ) -> Result<()> {
     let mut account = ctx.accounts.account.load_full_mut()?;
+    let mut perp_market = ctx.accounts.perp_market.load_mut()?;
 
     //
-    // Check liqee health if liquidation is allowed
+    // Early return if if liquidation is not allowed or if market is not in force close
     //
     let mut health_cache = {
         let retriever =
@@ -21,17 +22,12 @@ pub fn perp_liq_force_cancel_orders(
             new_health_cache(&account.borrow(), &retriever).context("create health cache")?;
 
         {
-            let result = account.check_liquidatable(&health_cache);
-            if account.fixed.is_operational() {
-                if !result? {
-                    return Ok(());
-                }
-            } else {
-                // Frozen accounts can always have their orders cancelled
-                if !result.is_anchor_error_with_code(MangoError::HealthMustBeNegative.into()) {
-                    // Propagate unexpected errors
-                    result?;
-                }
+            let liquidatable = account.check_liquidatable(&health_cache)?;
+            if account.fixed.is_operational()
+                && liquidatable != CheckLiquidatable::Liquidatable
+                && !perp_market.is_force_close()
+            {
+                return Ok(());
             }
         }
 
@@ -42,7 +38,6 @@ pub fn perp_liq_force_cancel_orders(
     // Cancel orders
     //
     {
-        let mut perp_market = ctx.accounts.perp_market.load_mut()?;
         let mut book = Orderbook {
             bids: ctx.accounts.bids.load_mut()?,
             asks: ctx.accounts.asks.load_mut()?,

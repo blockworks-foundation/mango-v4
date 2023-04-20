@@ -25,6 +25,7 @@ export class Serum3Market {
       marketIndex: number;
       registrationTime: BN;
       reduceOnly: number;
+      forceClose: number;
     },
   ): Serum3Market {
     return new Serum3Market(
@@ -38,6 +39,7 @@ export class Serum3Market {
       obj.marketIndex as MarketIndex,
       obj.registrationTime,
       obj.reduceOnly == 1,
+      obj.forceClose == 1,
     );
   }
 
@@ -52,6 +54,7 @@ export class Serum3Market {
     public marketIndex: MarketIndex,
     public registrationTime: BN,
     public reduceOnly: boolean,
+    public forceClose: boolean,
   ) {
     this.name = utf8.decode(new Uint8Array(name)).split('\x00')[0];
   }
