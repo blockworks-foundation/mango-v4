@@ -2026,6 +2026,27 @@ export class MangoClient {
     return await this.sendAndConfirmTransactionForGroup(group, [ix]);
   }
 
+  public async perpForceClosePosition(
+    group: Group,
+    perpMarketIndex: PerpMarketIndex,
+    accountA: MangoAccount,
+    accountB: MangoAccount,
+  ): Promise<string> {
+    const perpMarket = group.getPerpMarketByMarketIndex(perpMarketIndex);
+
+    const ix = await this.program.methods
+      .perpForceClosePosition()
+      .accounts({
+        group: group.publicKey,
+        perpMarket: perpMarket.publicKey,
+        accountA: accountA.publicKey,
+        accountB: accountB.publicKey,
+        oracle: perpMarket.oracle,
+      })
+      .instruction();
+    return await this.sendAndConfirmTransactionForGroup(group, [ix]);
+  }
+
   public async perpCloseMarket(
     group: Group,
     perpMarketIndex: PerpMarketIndex,
