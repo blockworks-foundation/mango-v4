@@ -1565,6 +1565,15 @@
 <a href="#1565" id="1565">1565</a>
 <a href="#1566" id="1566">1566</a>
 <a href="#1567" id="1567">1567</a>
+<a href="#1568" id="1568">1568</a>
+<a href="#1569" id="1569">1569</a>
+<a href="#1570" id="1570">1570</a>
+<a href="#1571" id="1571">1571</a>
+<a href="#1572" id="1572">1572</a>
+<a href="#1573" id="1573">1573</a>
+<a href="#1574" id="1574">1574</a>
+<a href="#1575" id="1575">1575</a>
+<a href="#1576" id="1576">1576</a>
 </pre><pre class="rust"><code><span class="kw">use </span>std::cell::{Ref, RefMut};
 <span class="kw">use </span>std::mem::size_of;
 
@@ -1598,6 +1607,15 @@
 <span class="kw">const </span>BORSH_VEC_PADDING_BYTES: usize = <span class="number">4</span>;
 <span class="kw">const </span>BORSH_VEC_SIZE_BYTES: usize = <span class="number">4</span>;
 <span class="kw">const </span>DEFAULT_MANGO_ACCOUNT_VERSION: u8 = <span class="number">1</span>;
+
+<span class="comment">// Return variants for check_liquidatable method, should be wrapped in a Result
+// for a future possiblity of returning any error
+</span><span class="attr">#[derive(PartialEq)]
+</span><span class="kw">pub enum </span>CheckLiquidatable {
+    NotLiquidatable,
+    Liquidatable,
+    BecameNotLiquidatable,
+}
 
 <span class="comment">// Mango Account
 // This struct definition is only for clients e.g. typescript, so that they can easily use out of the box
@@ -2595,7 +2613,7 @@
         <span class="prelude-val">Ok</span>(())
     }
 
-    <span class="kw">pub fn </span>check_liquidatable(<span class="kw-2">&amp;mut </span><span class="self">self</span>, health_cache: <span class="kw-2">&amp;</span>HealthCache) -&gt; <span class="prelude-ty">Result</span>&lt;bool&gt; {
+    <span class="kw">pub fn </span>check_liquidatable(<span class="kw-2">&amp;mut </span><span class="self">self</span>, health_cache: <span class="kw-2">&amp;</span>HealthCache) -&gt; <span class="prelude-ty">Result</span>&lt;CheckLiquidatable&gt; {
         <span class="comment">// Once maint_health falls below 0, we want to start liquidating,
         // we want to allow liquidation to continue until init_health is positive,
         // to prevent constant oscillation between the two states
@@ -2606,17 +2624,17 @@
                 .maybe_recover_from_being_liquidated(liq_end_health)
             {
                 <span class="macro">msg!</span>(<span class="string">&quot;Liqee init_health above zero&quot;</span>);
-                <span class="kw">return </span><span class="prelude-val">Ok</span>(<span class="bool-val">false</span>);
+                <span class="kw">return </span><span class="prelude-val">Ok</span>(CheckLiquidatable::BecameNotLiquidatable);
             }
         } <span class="kw">else </span>{
             <span class="kw">let </span>maint_health = health_cache.health(HealthType::Maint);
-            <span class="macro">require!</span>(
-                maint_health &lt; I80F48::ZERO,
-                MangoError::HealthMustBeNegative
-            );
+            <span class="kw">if </span>maint_health &gt;= I80F48::ZERO {
+                <span class="macro">msg!</span>(<span class="string">&quot;Liqee is not liquidatable&quot;</span>);
+                <span class="kw">return </span><span class="prelude-val">Ok</span>(CheckLiquidatable::NotLiquidatable);
+            }
             <span class="self">self</span>.fixed_mut().set_being_liquidated(<span class="bool-val">true</span>);
         }
-        <span class="prelude-val">Ok</span>(<span class="bool-val">true</span>)
+        <span class="kw">return </span><span class="prelude-val">Ok</span>(CheckLiquidatable::Liquidatable);
     }
 
     <span class="comment">// writes length of tokens vec at appropriate offset so that borsh can infer the vector length

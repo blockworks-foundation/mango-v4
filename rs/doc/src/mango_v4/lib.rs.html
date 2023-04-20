@@ -1006,6 +1006,7 @@
 <a href="#1006" id="1006">1006</a>
 <a href="#1007" id="1007">1007</a>
 <a href="#1008" id="1008">1008</a>
+<a href="#1009" id="1009">1009</a>
 </pre><pre class="rust"><code><span class="attr">#![allow(unused_variables)]
 
 </span><span class="kw">use </span>fixed::types::I80F48;
@@ -1411,9 +1412,10 @@
     <span class="kw">pub fn </span>serum3_edit_market(
         ctx: Context&lt;Serum3EditMarket&gt;,
         reduce_only_opt: <span class="prelude-ty">Option</span>&lt;bool&gt;,
+        force_close_opt: <span class="prelude-ty">Option</span>&lt;bool&gt;,
     ) -&gt; <span class="prelude-ty">Result</span>&lt;()&gt; {
         <span class="attr">#[cfg(feature = <span class="string">&quot;enable-gpl&quot;</span>)]
-        </span>instructions::serum3_edit_market(ctx, reduce_only_opt)<span class="question-mark">?</span>;
+        </span>instructions::serum3_edit_market(ctx, reduce_only_opt, force_close_opt)<span class="question-mark">?</span>;
         <span class="prelude-val">Ok</span>(())
     }
 

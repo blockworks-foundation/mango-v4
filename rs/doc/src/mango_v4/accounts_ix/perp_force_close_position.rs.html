@@ -48,7 +48,7 @@
 
     <span class="attr">#[account(
         <span class="kw-2">mut</span>,
-        has_one = group, 
+        has_one = group,
         has_one = oracle,
         constraint = perp_market.load()<span class="question-mark">?</span>.is_force_close()
     )]
