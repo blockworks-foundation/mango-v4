@@ -40,9 +40,19 @@ async function forceClosePerpPositions(): Promise<void> {
   );
 
   const group = await client.getGroup(new PublicKey(GROUP_PK));
+  const pm = group.getPerpMarketByMarketIndex(PERP_MARKET_INDEX);
+  if (!pm.reduceOnly) {
+    throw new Error(`Unexpected reduce only state ${pm.reduceOnly}`);
+  }
+  if (!pm.forceClose) {
+    throw new Error(`Unexpected force close state ${pm.forceClose}`);
+  }
+
+  // Get all mango accounts who have a position in the given market
   const mangoAccounts = (await client.getAllMangoAccounts(group)).filter(
     (a) => a.getPerpPosition(PERP_MARKET_INDEX) !== undefined,
   );
+  // Sort descending
   mangoAccounts.sort(
     (a, b) =>
       b.getPerpPositionUi(group, PERP_MARKET_INDEX) -
@@ -54,15 +64,19 @@ async function forceClosePerpPositions(): Promise<void> {
   let i = 0,
     j = mangoAccounts.length - 1;
 
+  // i iterates forward to 2nd last account, and b iterates backward till 2nd account
   while (i < mangoAccounts.length - 1 && j > 0) {
     a = mangoAccounts[i];
     b = mangoAccounts[j];
+    // PerpForceClosePosition ix expects a to be long, and b to short
     await client.perpForceClosePosition(group, PERP_MARKET_INDEX, a, b);
     a = await a.reload(client);
     b = await b.reload(client);
+    // Move to previous account once b's position is completely reduced
     if (b.getPerpPositionUi(group, PERP_MARKET_INDEX) === 0) {
       j--;
     }
+    // Move to next account once a's position is completely reduced
     if (a.getPerpPositionUi(group, PERP_MARKET_INDEX) === 0) {
       i++;
     }

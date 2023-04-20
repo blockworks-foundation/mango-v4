@@ -40,11 +40,20 @@ async function forceCloseSerum3Market(): Promise<void> {
 
   const group = await client.getGroup(new PublicKey(GROUP_PK));
   const serum3Market = group.serum3MarketsMapByMarketIndex.get(MARKET_INDEX)!;
+  if (!serum3Market.reduceOnly) {
+    throw new Error(`Unexpected reduce only state ${serum3Market.reduceOnly}`);
+  }
+  if (!serum3Market.forceClose) {
+    throw new Error(`Unexpected force close state ${serum3Market.forceClose}`);
+  }
+
+  // Get all mango accounts who have a serum oo account for the given market
   const mangoAccounts = (await client.getAllMangoAccounts(group, true)).filter(
     (a) => a.serum3OosMapByMarketIndex.get(MARKET_INDEX) !== undefined,
   );
 
   for (let a of mangoAccounts) {
+    // Cancel all orders and confirm that all have been cancelled
     for (const _ of range(0, 10)) {
       await client.serum3LiqForceCancelOrders(
         group,

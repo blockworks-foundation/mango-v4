@@ -18,6 +18,7 @@ const USER_KEYPAIR =
   process.env.USER_KEYPAIR_OVERRIDE || process.env.MB_PAYER_KEYPAIR;
 const MANGO_ACCOUNT_PK = process.env.MANGO_ACCOUNT_PK;
 const TOKEN_INDEX = Number(process.env.TOKEN_INDEX) as TokenIndex;
+const MAX_LIAB_TRANSFER = Number(process.env.MAX_LIAB_TRANSFER);
 
 async function forceCloseTokenBorrows(): Promise<void> {
   const options = AnchorProvider.defaultOptions();
@@ -40,17 +41,37 @@ async function forceCloseTokenBorrows(): Promise<void> {
     },
   );
 
-  const liqor = await client.getMangoAccount(new PublicKey(MANGO_ACCOUNT_PK!));
+  let liqor = await client.getMangoAccount(new PublicKey(MANGO_ACCOUNT_PK!));
   const group = await client.getGroup(liqor.group);
   const forceCloseTokenBank = group.getFirstBankByTokenIndex(TOKEN_INDEX);
+  if (forceCloseTokenBank.reduceOnly != 2) {
+    throw new Error(
+      `Unexpected reduce only state ${forceCloseTokenBank.reduceOnly}`,
+    );
+  }
+  if (!forceCloseTokenBank.forceClose) {
+    throw new Error(
+      `Unexpected force close state ${forceCloseTokenBank.forceClose}`,
+    );
+  }
+
   const usdcBank = group.getFirstBankByTokenIndex(0 as TokenIndex);
+  // Get all mango accounts with borrows for given token
   const mangoAccountsWithBorrows = (
     await client.getAllMangoAccounts(group)
   ).filter((a) => a.getTokenBalanceUi(forceCloseTokenBank) < 0);
 
   for (const liqee of mangoAccountsWithBorrows) {
+    liqor = await liqor.reload(client);
+    // Liqor can only liquidate borrow using deposits, since borrows are in reduce only
+    // Swap usdc worth token borrow (sub existing position), account for slippage using liquidation fee
+    // MAX_LIAB_TRANSFER guards against trying to swap to a very large amount
     const amount =
-      liqee.getTokenBorrowsUi(forceCloseTokenBank) *
+      Math.min(
+        liqee.getTokenBorrowsUi(forceCloseTokenBank) -
+          liqor.getTokenBalanceUi(forceCloseTokenBank),
+        MAX_LIAB_TRANSFER,
+      ) *
       forceCloseTokenBank.uiPrice *
       (1 + forceCloseTokenBank.liquidationFee.toNumber());
 
@@ -60,6 +81,7 @@ async function forceCloseTokenBorrows(): Promise<void> {
       amount.toString(),
     );
     if (!bestRoute) {
+      // Try again
       continue;
     }
     const [ixs, alts] =
