@@ -24,7 +24,7 @@ pub fn perp_liq_force_cancel_orders(
         {
             let liquidatable = account.check_liquidatable(&health_cache)?;
             if account.fixed.is_operational()
-                && (liquidatable != CheckLiquidatable::Liquidatable)
+                && liquidatable != CheckLiquidatable::Liquidatable
                 && !perp_market.is_force_close()
             {
                 return Ok(());
