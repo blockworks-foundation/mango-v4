@@ -4,12 +4,12 @@ import fs from 'fs';
 import { TokenIndex } from '../src/accounts/bank';
 import { MangoClient } from '../src/client';
 import { MANGO_V4_ID } from '../src/constants';
-import { toNative, toUiDecimals } from '../src/utils';
 import {
   fetchJupiterTransaction,
   fetchRoutes,
   prepareMangoRouterInstructions,
-} from './router';
+} from '../src/router';
+import { toNative, toUiDecimals } from '../src/utils';
 
 const CLUSTER: Cluster =
   (process.env.CLUSTER_OVERRIDE as Cluster) || 'mainnet-beta';

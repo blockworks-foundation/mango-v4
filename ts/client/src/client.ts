@@ -1338,10 +1338,7 @@ export class MangoClient {
     const serum3Market =
       group.serum3MarketsMapByMarketIndex.get(serum3MarketIndex);
     const ix = await this.program.methods
-      .serum3EditMarket(
-        reduceOnly != null ? reduceOnly : null,
-        forceClose != null ? forceClose : null,
-      )
+      .serum3EditMarket(reduceOnly ?? reduceOnly, forceClose ?? forceClose)
       .accounts({
         group: group.publicKey,
         admin: (this.program.provider as AnchorProvider).wallet.publicKey,
@@ -1532,41 +1529,27 @@ export class MangoClient {
     const serum3MarketExternal = group.serum3ExternalMarketsMap.get(
       externalMarketPk.toBase58(),
     )!;
+    const openOrders = await serum3Market.findOoPda(
+      this.programId,
+      mangoAccount.publicKey,
+    );
 
     const healthRemainingAccounts: PublicKey[] =
       this.buildHealthRemainingAccounts(
         AccountRetriever.Fixed,
         group,
         [mangoAccount],
-        [
-          group.getFirstBankByTokenIndex(serum3Market.baseTokenIndex),
-          group.getFirstBankByTokenIndex(serum3Market.quoteTokenIndex),
-        ],
         [],
-        [
-          [
-            serum3Market,
-            await serum3Market.findOoPda(
-              this.program.programId,
-              mangoAccount.publicKey,
-            ),
-          ],
-        ],
+        [],
+        [[serum3Market, openOrders]],
       );
 
-    console.log(
-      `${await serum3Market.findOoPda(this.programId, mangoAccount.publicKey)}`,
-    );
-
     const ix = await this.program.methods
-      .serum3LiqForceCancelOrders(limit ? limit : 10)
+      .serum3LiqForceCancelOrders(limit ?? 10)
       .accounts({
         group: group.publicKey,
         account: mangoAccount.publicKey,
-        openOrders: await serum3Market.findOoPda(
-          this.programId,
-          mangoAccount.publicKey,
-        ),
+        openOrders,
         serumMarket: serum3Market.publicKey,
         serumProgram: OPENBOOK_PROGRAM_ID[this.cluster],
         serumMarketExternal: serum3Market.serumMarketExternal,
@@ -1664,8 +1647,6 @@ export class MangoClient {
       );
 
     const limitPrice = serum3MarketExternal.priceNumberToLots(price);
-    console.log(size);
-    console.log(serum3MarketExternal['_decoded'].baseLotSize.toNumber());
     const maxBaseQuantity = serum3MarketExternal.baseSizeNumberToLots(size);
     const isTaker = orderType !== Serum3OrderType.postOnly;
     const maxQuoteQuantity = new BN(

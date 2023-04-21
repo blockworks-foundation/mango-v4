@@ -8,7 +8,7 @@ import {
   VersionedTransaction,
 } from '@solana/web3.js';
 import fetch from 'node-fetch';
-import { createAssociatedTokenAccountIdempotentInstruction } from '../src/utils';
+import { createAssociatedTokenAccountIdempotentInstruction } from './utils';
 
 export const MANGO_ROUTER_API_URL = 'https://api.mngo.cloud/router/v1';
 
