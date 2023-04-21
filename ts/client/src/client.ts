@@ -1332,8 +1332,8 @@ export class MangoClient {
   public async serum3EditMarket(
     group: Group,
     serum3MarketIndex: MarketIndex,
-    reduceOnly: boolean,
-    forceClose: boolean,
+    reduceOnly: boolean | null,
+    forceClose: boolean | null,
   ): Promise<TransactionSignature> {
     const serum3Market =
       group.serum3MarketsMapByMarketIndex.get(serum3MarketIndex);
