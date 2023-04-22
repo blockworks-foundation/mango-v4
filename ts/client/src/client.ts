@@ -1338,7 +1338,7 @@ export class MangoClient {
     const serum3Market =
       group.serum3MarketsMapByMarketIndex.get(serum3MarketIndex);
     const ix = await this.program.methods
-      .serum3EditMarket(reduceOnly ?? null, forceClose ?? null)
+      .serum3EditMarket(reduceOnly, forceClose)
       .accounts({
         group: group.publicKey,
         admin: (this.program.provider as AnchorProvider).wallet.publicKey,
