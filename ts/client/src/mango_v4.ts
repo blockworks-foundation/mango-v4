@@ -1,5 +1,5 @@
 export type MangoV4 = {
-  "version": "0.13.0",
+  "version": "0.14.0",
   "name": "mango_v4",
   "instructions": [
     {
@@ -1740,6 +1740,12 @@ export type MangoV4 = {
       "args": [
         {
           "name": "reduceOnlyOpt",
+          "type": {
+            "option": "bool"
+          }
+        },
+        {
+          "name": "forceCloseOpt",
           "type": {
             "option": "bool"
           }
@@ -5153,11 +5159,15 @@ export type MangoV4 = {
             "type": "u8"
           },
           {
+            "name": "forceClose",
+            "type": "u8"
+          },
+          {
             "name": "padding1",
             "type": {
               "array": [
                 "u8",
-                3
+                2
               ]
             }
           },
@@ -7114,6 +7124,23 @@ export type MangoV4 = {
       }
     },
     {
+      "name": "CheckLiquidatable",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "NotLiquidatable"
+          },
+          {
+            "name": "Liquidatable"
+          },
+          {
+            "name": "BecameNotLiquidatable"
+          }
+        ]
+      }
+    },
+    {
       "name": "OracleType",
       "type": {
         "kind": "enum",
@@ -8602,6 +8629,101 @@ export type MangoV4 = {
         {
           "name": "seqNum",
           "type": "u64",
+          "index": false
+        }
+      ]
+    },
+    {
+      "name": "PerpForceClosePositionLog",
+      "fields": [
+        {
+          "name": "mangoGroup",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "perpMarketIndex",
+          "type": "u16",
+          "index": false
+        },
+        {
+          "name": "accountA",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "accountB",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "baseTransfer",
+          "type": "i64",
+          "index": false
+        },
+        {
+          "name": "quoteTransfer",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "price",
+          "type": "i128",
+          "index": false
+        }
+      ]
+    },
+    {
+      "name": "TokenForceCloseBorrowsWithTokenLog",
+      "fields": [
+        {
+          "name": "mangoGroup",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "liqor",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "liqee",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "assetTokenIndex",
+          "type": "u16",
+          "index": false
+        },
+        {
+          "name": "liabTokenIndex",
+          "type": "u16",
+          "index": false
+        },
+        {
+          "name": "assetTransfer",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "liabTransfer",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "assetPrice",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "liabPrice",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "feeFactor",
+          "type": "i128",
           "index": false
         }
       ]
@@ -8847,7 +8969,7 @@ export type MangoV4 = {
 };
 
 export const IDL: MangoV4 = {
-  "version": "0.13.0",
+  "version": "0.14.0",
   "name": "mango_v4",
   "instructions": [
     {
@@ -10588,6 +10710,12 @@ export const IDL: MangoV4 = {
       "args": [
         {
           "name": "reduceOnlyOpt",
+          "type": {
+            "option": "bool"
+          }
+        },
+        {
+          "name": "forceCloseOpt",
           "type": {
             "option": "bool"
           }
@@ -14001,11 +14129,15 @@ export const IDL: MangoV4 = {
             "type": "u8"
           },
           {
+            "name": "forceClose",
+            "type": "u8"
+          },
+          {
             "name": "padding1",
             "type": {
               "array": [
                 "u8",
-                3
+                2
               ]
             }
           },
@@ -15962,6 +16094,23 @@ export const IDL: MangoV4 = {
       }
     },
     {
+      "name": "CheckLiquidatable",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "NotLiquidatable"
+          },
+          {
+            "name": "Liquidatable"
+          },
+          {
+            "name": "BecameNotLiquidatable"
+          }
+        ]
+      }
+    },
+    {
       "name": "OracleType",
       "type": {
         "kind": "enum",
@@ -17450,6 +17599,101 @@ export const IDL: MangoV4 = {
         {
           "name": "seqNum",
           "type": "u64",
+          "index": false
+        }
+      ]
+    },
+    {
+      "name": "PerpForceClosePositionLog",
+      "fields": [
+        {
+          "name": "mangoGroup",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "perpMarketIndex",
+          "type": "u16",
+          "index": false
+        },
+        {
+          "name": "accountA",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "accountB",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "baseTransfer",
+          "type": "i64",
+          "index": false
+        },
+        {
+          "name": "quoteTransfer",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "price",
+          "type": "i128",
+          "index": false
+        }
+      ]
+    },
+    {
+      "name": "TokenForceCloseBorrowsWithTokenLog",
+      "fields": [
+        {
+          "name": "mangoGroup",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "liqor",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "liqee",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "assetTokenIndex",
+          "type": "u16",
+          "index": false
+        },
+        {
+          "name": "liabTokenIndex",
+          "type": "u16",
+          "index": false
+        },
+        {
+          "name": "assetTransfer",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "liabTransfer",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "assetPrice",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "liabPrice",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "feeFactor",
+          "type": "i128",
           "index": false
         }
       ]
