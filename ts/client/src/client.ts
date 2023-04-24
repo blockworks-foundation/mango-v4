@@ -20,6 +20,7 @@ import {
   TransactionSignature,
 } from '@solana/web3.js';
 import bs58 from 'bs58';
+import cloneDeep from 'lodash/cloneDeep';
 import { Bank, MintInfo, TokenIndex } from './accounts/bank';
 import { Group } from './accounts/group';
 import {
@@ -934,16 +935,20 @@ export class MangoClient {
     group: Group,
     mangoAccount: MangoAccount,
   ): Promise<TransactionSignature> {
+    // Work on a deep cloned mango account, since we would deactivating positions
+    // before deactivation reaches on-chain state in order to simplify building a fresh list
+    // of healthRemainingAccounts to each subsequent ix
+    const clonedMangoAccount = cloneDeep(mangoAccount);
     const instructions: TransactionInstruction[] = [];
 
-    for (const serum3Account of mangoAccount.serum3Active()) {
+    for (const serum3Account of clonedMangoAccount.serum3Active()) {
       const serum3Market = group.serum3MarketsMapByMarketIndex.get(
         serum3Account.marketIndex,
       )!;
 
       const closeOOIx = await this.serum3CloseOpenOrdersIx(
         group,
-        mangoAccount,
+        clonedMangoAccount,
         serum3Market.serumMarketExternal,
       );
       instructions.push(closeOOIx);
@@ -951,23 +956,23 @@ export class MangoClient {
         Serum3Orders.Serum3MarketIndexUnset as MarketIndex;
     }
 
-    for (const pp of mangoAccount.perpActive()) {
+    for (const pp of clonedMangoAccount.perpActive()) {
       const perpMarketIndex = pp.marketIndex;
       const perpMarket = group.getPerpMarketByMarketIndex(perpMarketIndex);
       const deactivatingPositionIx = await this.perpDeactivatePositionIx(
         group,
-        mangoAccount,
+        clonedMangoAccount,
         perpMarketIndex,
       );
       instructions.push(deactivatingPositionIx);
       pp.marketIndex = PerpPosition.PerpMarketIndexUnset as PerpMarketIndex;
     }
 
-    for (const tp of mangoAccount.tokensActive()) {
+    for (const tp of clonedMangoAccount.tokensActive()) {
       const bank = group.getFirstBankByTokenIndex(tp.tokenIndex);
       const withdrawIx = await this.tokenWithdrawNativeIx(
         group,
-        mangoAccount,
+        clonedMangoAccount,
         bank.mint,
         U64_MAX_BN,
         false,
@@ -980,9 +985,9 @@ export class MangoClient {
       .accountClose(false)
       .accounts({
         group: group.publicKey,
-        account: mangoAccount.publicKey,
+        account: clonedMangoAccount.publicKey,
         owner: (this.program.provider as AnchorProvider).wallet.publicKey,
-        solDestination: mangoAccount.owner,
+        solDestination: clonedMangoAccount.owner,
       })
       .instruction();
     instructions.push(closeIx);
