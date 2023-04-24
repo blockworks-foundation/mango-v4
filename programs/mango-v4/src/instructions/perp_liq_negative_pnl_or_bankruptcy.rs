@@ -8,9 +8,7 @@ use fixed::types::I80F48;
 use crate::accounts_ix::*;
 use crate::accounts_zerocopy::AccountInfoRef;
 use crate::error::*;
-use crate::health::{
-    compute_health, new_health_cache, HealthCache, HealthType, ScanningAccountRetriever,
-};
+use crate::health::*;
 use crate::logs::{
     emit_perp_balances, PerpLiqBankruptcyLog, PerpLiqNegativePnlOrBankruptcyLog, TokenBalanceLog,
 };
@@ -324,22 +322,14 @@ pub(crate) fn liquidation_action(
         // Compute how much pnl would need to be increased to reach liq end health 0 (while ignoring
         // liqee_pnl and other constraints for now)
         let max_for_health = {
-            let mut result = I80F48::ZERO;
-            let mut remaining_health = -liqee_liq_end_health;
-            if liqee_settle_health_balance < 0 {
-                let liab_weighted_price = settle_token_oracle_price * settle_bank.init_liab_weight;
-                // TODO: expensive divisions, asset weight != 0, shares code with perp_max_settle
-                let liab_max = remaining_health / liab_weighted_price;
-                result = liab_max.min(-liqee_settle_health_balance);
-                remaining_health -= result * liab_weighted_price;
-            }
-            if remaining_health > 0 {
-                let asset_weighted_price =
-                    settle_token_oracle_price * settle_bank.init_asset_weight;
-                let asset_max = remaining_health / asset_weighted_price;
-                result += asset_max;
-            }
-            result
+            let liab_weighted_price = settle_token_oracle_price * settle_bank.init_liab_weight;
+            let asset_weighted_price = settle_token_oracle_price * settle_bank.init_asset_weight;
+            spot_amount_given_for_health_zero(
+                liqee_liq_end_health,
+                liqee_settle_health_balance,
+                asset_weighted_price,
+                liab_weighted_price,
+            )?
         };
 
         let max_liab_transfer_from_liqee = (-liqee_pnl).min(max_for_health).max(I80F48::ZERO);

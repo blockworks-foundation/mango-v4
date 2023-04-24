@@ -89,6 +89,51 @@ pub fn compute_health(
     Ok(new_health_cache(account, retriever)?.health(health_type))
 }
 
+/// How much of a token can be taken away before health decreases to zero?
+pub fn spot_amount_taken_for_health_zero(
+    mut health: I80F48,
+    starting_spot: I80F48,
+    asset_weighted_price: I80F48,
+    liab_weighted_price: I80F48,
+) -> Result<I80F48> {
+    if health <= 0 {
+        return Ok(I80F48::ZERO);
+    }
+
+    let mut taken_spot = I80F48::ZERO;
+    if starting_spot > 0 {
+        if asset_weighted_price > 0 {
+            let asset_max = health / asset_weighted_price;
+            if asset_max <= starting_spot {
+                return Ok(asset_max);
+            }
+        }
+        taken_spot = starting_spot;
+        health -= starting_spot * asset_weighted_price;
+    }
+    if health > 0 {
+        require_gt!(liab_weighted_price, 0);
+        taken_spot += health / liab_weighted_price;
+    }
+    Ok(taken_spot)
+}
+
+/// How much of a token can be gained before health increases to zero?
+pub fn spot_amount_given_for_health_zero(
+    health: I80F48,
+    starting_spot: I80F48,
+    asset_weighted_price: I80F48,
+    liab_weighted_price: I80F48,
+) -> Result<I80F48> {
+    // asset/liab prices are reversed intentionally
+    spot_amount_taken_for_health_zero(
+        -health,
+        -starting_spot,
+        liab_weighted_price,
+        asset_weighted_price,
+    )
+}
+
 #[derive(Clone, AnchorDeserialize, AnchorSerialize, Debug)]
 pub struct TokenInfo {
     pub token_index: TokenIndex,
@@ -804,28 +849,17 @@ impl HealthCache {
     /// Note that the account's actual health would not change during settling negative upnl:
     /// the spot balance goes down but the perp hupnl goes up accordingly.
     pub fn perp_max_settle(&self, settle_token_index: TokenIndex) -> Result<I80F48> {
-        let mut remaining_health = self.perp_settle_health();
-        if remaining_health <= 0 {
-            return Ok(I80F48::ZERO);
-        }
-
+        let remaining_health = self.perp_settle_health();
         let token = self.token_info(settle_token_index)?;
-
-        // How much can token_index spot position decrease before perp_settle_health goes to 0?
-        let mut max_settle = I80F48::ZERO;
-        if token.balance_spot > 0 {
-            let asset_weighted_price = token.prices.oracle * token.maint_asset_weight;
-            // TODO: expensive divisions, asset weight != 0
-            let asset_max = remaining_health / asset_weighted_price;
-            max_settle = asset_max.min(token.balance_spot);
-            remaining_health -= max_settle * asset_weighted_price;
-        }
-        if remaining_health > 0 {
-            let liab_weighted_price = token.prices.oracle * token.maint_liab_weight;
-            let liab_max = remaining_health / liab_weighted_price;
-            max_settle += liab_max;
-        }
-        Ok(max_settle)
+        let asset_weighted_price = token.prices.oracle * token.maint_asset_weight;
+        let liab_weighted_price = token.prices.oracle * token.maint_liab_weight;
+        // TODO: is it correct to not take positive perp contributions into account? probably not!
+        spot_amount_taken_for_health_zero(
+            remaining_health,
+            token.balance_spot,
+            asset_weighted_price,
+            liab_weighted_price,
+        )
     }
 }
 

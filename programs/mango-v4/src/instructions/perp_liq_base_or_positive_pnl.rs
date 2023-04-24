@@ -335,20 +335,13 @@ pub(crate) fn liquidation_action(
         let expected_settle_token = *current_settle_token;
         let expected_health = *current_health;
 
-        // TODO: shared code 3x now
-        let mut max_quote_for_health = I80F48::ZERO;
-        let mut remaining_health = (-expected_health).max(I80F48::ZERO);
-        if expected_settle_token < 0 {
-            let liab_weighted_price = settle_token_info.liab_weighted_price(liq_end_type);
-            let liab_max = remaining_health / liab_weighted_price;
-            max_quote_for_health = liab_max.min(-expected_settle_token);
-            remaining_health -= max_quote_for_health * liab_weighted_price;
-        }
-        if remaining_health > 0 {
-            let asset_weighted_price = settle_token_info.asset_weighted_price(liq_end_type);
-            let asset_max = remaining_health / asset_weighted_price;
-            max_quote_for_health += asset_max;
-        }
+        let max_quote_for_health = spot_amount_given_for_health_zero(
+            expected_health,
+            expected_settle_token,
+            settle_token_info.asset_weighted_price(liq_end_type),
+            settle_token_info.liab_weighted_price(liq_end_type),
+        )
+        .unwrap();
 
         let max_quote = max_quote_for_health.min(hupnl_limit);
 
@@ -400,20 +393,13 @@ pub(crate) fn liquidation_action(
                       current_uhupnl: &mut I80F48,
                       current_settle_token: &mut I80F48,
                       current_health: &mut I80F48| {
-        // TODO: shared code 4x now
-        let mut max_quote_for_health = I80F48::ZERO;
-        let mut remaining_health = (-(*current_health)).max(I80F48::ZERO);
-        if *current_settle_token < 0 {
-            let liab_weighted_price = settle_token_info.liab_weighted_price(liq_end_type);
-            let liab_max = remaining_health / liab_weighted_price;
-            max_quote_for_health = liab_max.min(-(*current_settle_token));
-            remaining_health -= max_quote_for_health * liab_weighted_price;
-        }
-        if remaining_health > 0 {
-            let asset_weighted_price = settle_token_info.asset_weighted_price(liq_end_type);
-            let asset_max = remaining_health / asset_weighted_price;
-            max_quote_for_health += asset_max;
-        }
+        let max_quote_for_health = spot_amount_given_for_health_zero(
+            *current_health,
+            *current_settle_token,
+            settle_token_info.asset_weighted_price(liq_end_type),
+            settle_token_info.liab_weighted_price(liq_end_type),
+        )
+        .unwrap();
 
         // How many units to settle?
         let settle = (max_quote_for_health / quote_per_settle)
