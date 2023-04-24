@@ -20,6 +20,8 @@ import {
   TransactionSignature,
 } from '@solana/web3.js';
 import bs58 from 'bs58';
+import cloneDeep from 'lodash/cloneDeep';
+import uniq from 'lodash/uniq';
 import { Bank, MintInfo, TokenIndex } from './accounts/bank';
 import { Group } from './accounts/group';
 import {
@@ -39,6 +41,7 @@ import {
   PerpOrderType,
 } from './accounts/perp';
 import {
+  MarketIndex,
   Serum3Market,
   Serum3OrderType,
   Serum3SelfTradeBehavior,
@@ -719,13 +722,7 @@ export class MangoClient {
     mangoAccount: MangoAccount,
   ): Promise<TransactionSignature> {
     const healthRemainingAccounts: PublicKey[] =
-      this.buildHealthRemainingAccounts(
-        AccountRetriever.Fixed,
-        group,
-        [mangoAccount],
-        [],
-        [],
-      );
+      this.buildHealthRemainingAccounts(group, [mangoAccount], [], []);
 
     const ix = await this.program.methods
       .computeAccountData()
@@ -939,67 +936,59 @@ export class MangoClient {
     group: Group,
     mangoAccount: MangoAccount,
   ): Promise<TransactionSignature> {
+    // Work on a deep cloned mango account, since we would deactivating positions
+    // before deactivation reaches on-chain state in order to simplify building a fresh list
+    // of healthRemainingAccounts to each subsequent ix
+    const clonedMangoAccount = cloneDeep(mangoAccount);
     const instructions: TransactionInstruction[] = [];
-    const healthAccountsToExclude: PublicKey[] = [];
 
-    for (const serum3Account of mangoAccount.serum3Active()) {
+    for (const serum3Account of clonedMangoAccount.serum3Active()) {
       const serum3Market = group.serum3MarketsMapByMarketIndex.get(
         serum3Account.marketIndex,
       )!;
 
       const closeOOIx = await this.serum3CloseOpenOrdersIx(
         group,
-        mangoAccount,
+        clonedMangoAccount,
         serum3Market.serumMarketExternal,
       );
-      healthAccountsToExclude.push(serum3Account.openOrders);
       instructions.push(closeOOIx);
+      serum3Account.marketIndex =
+        Serum3Orders.Serum3MarketIndexUnset as MarketIndex;
     }
 
-    for (const perp of mangoAccount.perpActive()) {
-      const perpMarketIndex = perp.marketIndex;
+    for (const pp of clonedMangoAccount.perpActive()) {
+      const perpMarketIndex = pp.marketIndex;
       const perpMarket = group.getPerpMarketByMarketIndex(perpMarketIndex);
       const deactivatingPositionIx = await this.perpDeactivatePositionIx(
         group,
-        mangoAccount,
+        clonedMangoAccount,
         perpMarketIndex,
       );
-      healthAccountsToExclude.push(perpMarket.publicKey, perpMarket.oracle);
       instructions.push(deactivatingPositionIx);
+      pp.marketIndex = PerpPosition.PerpMarketIndexUnset as PerpMarketIndex;
     }
 
-    for (const index in mangoAccount.tokensActive()) {
-      const indexNum = Number(index);
-      const accountsToExclude = [...healthAccountsToExclude];
-      const token = mangoAccount.tokensActive()[indexNum];
-      const bank = group.getFirstBankByTokenIndex(token.tokenIndex);
-      //to withdraw from all token accounts we need to exclude previous tokens pubkeys
-      //used to build health remaining accounts
-      if (indexNum !== 0) {
-        for (let i = indexNum; i--; i >= 0) {
-          const prevToken = mangoAccount.tokensActive()[i];
-          const prevBank = group.getFirstBankByTokenIndex(prevToken.tokenIndex);
-          accountsToExclude.push(prevBank.publicKey, prevBank.oracle);
-        }
-      }
+    for (const tp of clonedMangoAccount.tokensActive()) {
+      const bank = group.getFirstBankByTokenIndex(tp.tokenIndex);
       const withdrawIx = await this.tokenWithdrawNativeIx(
         group,
-        mangoAccount,
+        clonedMangoAccount,
         bank.mint,
         U64_MAX_BN,
         false,
-        [...accountsToExclude],
       );
       instructions.push(...withdrawIx);
+      tp.tokenIndex = TokenPosition.TokenIndexUnset as TokenIndex;
     }
 
     const closeIx = await this.program.methods
       .accountClose(false)
       .accounts({
         group: group.publicKey,
-        account: mangoAccount.publicKey,
+        account: clonedMangoAccount.publicKey,
         owner: (this.program.provider as AnchorProvider).wallet.publicKey,
-        solDestination: mangoAccount.owner,
+        solDestination: clonedMangoAccount.owner,
       })
       .instruction();
     instructions.push(closeIx);
@@ -1105,13 +1094,7 @@ export class MangoClient {
     }
 
     const healthRemainingAccounts: PublicKey[] =
-      this.buildHealthRemainingAccounts(
-        AccountRetriever.Fixed,
-        group,
-        [mangoAccount],
-        [bank],
-        [],
-      );
+      this.buildHealthRemainingAccounts(group, [mangoAccount], [bank], []);
 
     const ix = await this.program.methods
       .tokenDeposit(new BN(nativeAmount), reduceOnly)
@@ -1165,7 +1148,6 @@ export class MangoClient {
     mintPk: PublicKey,
     nativeAmount: BN,
     allowBorrow: boolean,
-    healthAccountsToExclude: PublicKey[] = [],
   ): Promise<TransactionInstruction[]> {
     const bank = group.getFirstBankByMint(mintPk);
 
@@ -1195,13 +1177,7 @@ export class MangoClient {
     }
 
     const healthRemainingAccounts: PublicKey[] =
-      this.buildHealthRemainingAccounts(
-        AccountRetriever.Fixed,
-        group,
-        [mangoAccount],
-        [bank],
-        [],
-      );
+      this.buildHealthRemainingAccounts(group, [mangoAccount], [bank], [], []);
 
     const ix = await this.program.methods
       .tokenWithdraw(new BN(nativeAmount), allowBorrow)
@@ -1215,21 +1191,14 @@ export class MangoClient {
         tokenAccount: tokenAccountPk,
       })
       .remainingAccounts(
-        healthRemainingAccounts
-          .filter(
-            (accounts) =>
-              !healthAccountsToExclude.find((accountsToExclude) =>
-                accounts.equals(accountsToExclude),
-              ),
-          )
-          .map(
-            (pk) =>
-              ({
-                pubkey: pk,
-                isWritable: false,
-                isSigner: false,
-              } as AccountMeta),
-          ),
+        healthRemainingAccounts.map(
+          (pk) =>
+            ({
+              pubkey: pk,
+              isWritable: false,
+              isSigner: false,
+            } as AccountMeta),
+        ),
       )
       .instruction();
 
@@ -1242,7 +1211,6 @@ export class MangoClient {
     mintPk: PublicKey,
     nativeAmount: BN,
     allowBorrow: boolean,
-    healthAccountsToExclude: PublicKey[] = [],
   ): Promise<TransactionSignature> {
     const ixs = await this.tokenWithdrawNativeIx(
       group,
@@ -1250,7 +1218,6 @@ export class MangoClient {
       mintPk,
       nativeAmount,
       allowBorrow,
-      healthAccountsToExclude,
     );
     return await this.sendAndConfirmTransactionForGroup(group, ixs);
   }
@@ -1494,7 +1461,6 @@ export class MangoClient {
 
     const healthRemainingAccounts: PublicKey[] =
       this.buildHealthRemainingAccounts(
-        AccountRetriever.Fixed,
         group,
         [mangoAccount],
         banks,
@@ -2073,13 +2039,7 @@ export class MangoClient {
   ): Promise<TransactionInstruction> {
     const perpMarket = group.getPerpMarketByMarketIndex(perpMarketIndex);
     const healthRemainingAccounts: PublicKey[] =
-      this.buildHealthRemainingAccounts(
-        AccountRetriever.Fixed,
-        group,
-        [mangoAccount],
-        [],
-        [],
-      );
+      this.buildHealthRemainingAccounts(group, [mangoAccount], [], []);
     return await this.program.methods
       .perpDeactivatePosition()
       .accounts({
@@ -2162,7 +2122,6 @@ export class MangoClient {
     const perpMarket = group.getPerpMarketByMarketIndex(perpMarketIndex);
     const healthRemainingAccounts: PublicKey[] =
       this.buildHealthRemainingAccounts(
-        AccountRetriever.Fixed,
         group,
         [mangoAccount],
         // Settlement token bank, because a position for it may be created
@@ -2254,7 +2213,6 @@ export class MangoClient {
     const perpMarket = group.getPerpMarketByMarketIndex(perpMarketIndex);
     const healthRemainingAccounts: PublicKey[] =
       this.buildHealthRemainingAccounts(
-        AccountRetriever.Fixed,
         group,
         [mangoAccount],
         // Settlement token bank, because a position for it may be created
@@ -2422,7 +2380,6 @@ export class MangoClient {
     const perpMarket = group.getPerpMarketByMarketIndex(perpMarketIndex);
     const healthRemainingAccounts: PublicKey[] =
       this.buildHealthRemainingAccounts(
-        AccountRetriever.Scanning,
         group,
         [profitableAccount, unprofitableAccount],
         [group.getFirstBankForPerpSettlement()],
@@ -2477,7 +2434,6 @@ export class MangoClient {
     const perpMarket = group.getPerpMarketByMarketIndex(perpMarketIndex);
     const healthRemainingAccounts: PublicKey[] =
       this.buildHealthRemainingAccounts(
-        AccountRetriever.Fixed,
         group,
         [account], // Account must be unprofitable
         [group.getFirstBankForPerpSettlement()],
@@ -2614,7 +2570,6 @@ export class MangoClient {
 
     const healthRemainingAccounts: PublicKey[] =
       this.buildHealthRemainingAccounts(
-        AccountRetriever.Fixed,
         group,
         [mangoAccount],
         [inputBank, outputBank],
@@ -2808,7 +2763,6 @@ export class MangoClient {
 
     const healthRemainingAccounts: PublicKey[] =
       this.buildHealthRemainingAccounts(
-        AccountRetriever.Scanning,
         group,
         [liqor, liqee],
         [assetBank, liabBank],
@@ -2886,7 +2840,6 @@ export class MangoClient {
   ): Promise<TransactionInstruction> {
     const healthRemainingAccounts: PublicKey[] =
       this.buildHealthRemainingAccounts(
-        AccountRetriever.Fixed,
         group,
         [account],
         [...banks],
@@ -2920,7 +2873,6 @@ export class MangoClient {
   ): Promise<TransactionInstruction> {
     const healthRemainingAccounts: PublicKey[] =
       this.buildHealthRemainingAccounts(
-        AccountRetriever.Fixed,
         group,
         [account],
         [...banks],
@@ -2979,44 +2931,39 @@ export class MangoClient {
     );
   }
 
-  public buildHealthRemainingAccounts(
-    retriever: AccountRetriever,
+  /**
+   * Builds health remaining accounts.
+   *
+   * For single mango account it builds a list of PublicKeys
+   * which is compatbile with Fixed account retriever.
+   *
+   * For multiple mango accounts it uses same logic as for fixed
+   * but packing all banks, then perp markets, and then serum oo accounts, which
+   * should always be compatible with Scanning account retriever.
+   *
+   * @param group
+   * @param mangoAccounts
+   * @param banks - banks in which new positions might be opened
+   * @param perpMarkets - markets in which new positions might be opened
+   * @param openOrdersForMarket - markets in which new positions might be opened
+   * @returns
+   */
+  buildHealthRemainingAccounts(
     group: Group,
     mangoAccounts: MangoAccount[],
+    // Banks and markets for whom positions don't exist on mango account,
+    // but user would potentially open new positions.
     banks: Bank[] = [],
     perpMarkets: PerpMarket[] = [],
     openOrdersForMarket: [Serum3Market, PublicKey][] = [],
   ): PublicKey[] {
-    if (retriever === AccountRetriever.Fixed) {
-      return this.buildFixedAccountRetrieverHealthAccounts(
-        group,
-        mangoAccounts[0],
-        banks,
-        perpMarkets,
-        openOrdersForMarket,
-      );
-    } else {
-      return this.buildScanningAccountRetrieverHealthAccounts(
-        group,
-        mangoAccounts,
-        banks,
-        perpMarkets,
-      );
-    }
-  }
-
-  private buildFixedAccountRetrieverHealthAccounts(
-    group: Group,
-    mangoAccount: MangoAccount,
-    // Banks and perpMarkets for whom positions don't exist on mango account,
-    // but user would potentially open new positions.
-    banks: Bank[],
-    perpMarkets: PerpMarket[],
-    openOrdersForMarket: [Serum3Market, PublicKey][],
-  ): PublicKey[] {
     const healthRemainingAccounts: PublicKey[] = [];
 
-    const tokenPositionIndices = mangoAccount.tokens.map((t) => t.tokenIndex);
+    const tokenPositionIndices = uniq(
+      mangoAccounts
+        .map((mangoAccount) => mangoAccount.tokens.map((t) => t.tokenIndex))
+        .flat(),
+    );
     for (const bank of banks) {
       const tokenPositionExists =
         tokenPositionIndices.indexOf(bank.tokenIndex) > -1;
@@ -3039,126 +2986,72 @@ export class MangoClient {
       ...mintInfos.map((mintInfo) => mintInfo.oracle),
     );
 
-    // insert any extra perp markets in the free perp position slots
-    const perpPositionIndices = mangoAccount.perps.map((p) => p.marketIndex);
+    // Insert any extra perp markets in the free perp position slots
+    const perpPositionsMarketIndices = uniq(
+      mangoAccounts
+        .map((mangoAccount) => mangoAccount.perps.map((p) => p.marketIndex))
+        .flat(),
+    );
     for (const perpMarket of perpMarkets) {
       const perpPositionExists =
-        perpPositionIndices.indexOf(perpMarket.perpMarketIndex) > -1;
+        perpPositionsMarketIndices.indexOf(perpMarket.perpMarketIndex) > -1;
       if (!perpPositionExists) {
-        const inactivePerpPosition = perpPositionIndices.findIndex(
+        const inactivePerpPosition = perpPositionsMarketIndices.findIndex(
           (perpIdx) => perpIdx === PerpPosition.PerpMarketIndexUnset,
         );
         if (inactivePerpPosition != -1) {
-          perpPositionIndices[inactivePerpPosition] =
+          perpPositionsMarketIndices[inactivePerpPosition] =
             perpMarket.perpMarketIndex;
         }
       }
     }
-
-    const allPerpMarkets = perpPositionIndices
-      .filter((perpIdx) => perpIdx !== PerpPosition.PerpMarketIndexUnset)
+    const allPerpMarkets = perpPositionsMarketIndices
+      .filter(
+        (perpMarktIndex) =>
+          perpMarktIndex !== PerpPosition.PerpMarketIndexUnset,
+      )
       .map((perpIdx) => group.getPerpMarketByMarketIndex(perpIdx)!);
     healthRemainingAccounts.push(
       ...allPerpMarkets.map((perp) => perp.publicKey),
     );
     healthRemainingAccounts.push(...allPerpMarkets.map((perp) => perp.oracle));
 
-    // insert any extra open orders accounts in the cooresponding free serum market slot
-    const serumPositionIndices = mangoAccount.serum3.map((s) => ({
-      marketIndex: s.marketIndex,
-      openOrders: s.openOrders,
-    }));
+    // Insert any extra open orders accounts in the cooresponding free serum market slot
+    const serumPositionMarketIndices = mangoAccounts
+      .map((mangoAccount) =>
+        mangoAccount.serum3.map((s) => ({
+          marketIndex: s.marketIndex,
+          openOrders: s.openOrders,
+        })),
+      )
+      .flat();
     for (const [serum3Market, openOrderPk] of openOrdersForMarket) {
       const ooPositionExists =
-        serumPositionIndices.findIndex(
+        serumPositionMarketIndices.findIndex(
           (i) => i.marketIndex === serum3Market.marketIndex,
         ) > -1;
       if (!ooPositionExists) {
-        const inactiveSerumPosition = serumPositionIndices.findIndex(
+        const inactiveSerumPosition = serumPositionMarketIndices.findIndex(
           (serumPos) =>
             serumPos.marketIndex === Serum3Orders.Serum3MarketIndexUnset,
         );
         if (inactiveSerumPosition != -1) {
-          serumPositionIndices[inactiveSerumPosition].marketIndex =
+          serumPositionMarketIndices[inactiveSerumPosition].marketIndex =
             serum3Market.marketIndex;
-          serumPositionIndices[inactiveSerumPosition].openOrders = openOrderPk;
+          serumPositionMarketIndices[inactiveSerumPosition].openOrders =
+            openOrderPk;
         }
       }
     }
 
     healthRemainingAccounts.push(
-      ...serumPositionIndices
+      ...serumPositionMarketIndices
         .filter(
           (serumPosition) =>
             serumPosition.marketIndex !== Serum3Orders.Serum3MarketIndexUnset,
         )
         .map((serumPosition) => serumPosition.openOrders),
     );
-
-    // debugHealthAccounts(group, mangoAccount, healthRemainingAccounts);
-
-    return healthRemainingAccounts;
-  }
-
-  private buildScanningAccountRetrieverHealthAccounts(
-    group: Group,
-    mangoAccounts: MangoAccount[],
-    banks: Bank[],
-    perpMarkets: PerpMarket[],
-  ): PublicKey[] {
-    const healthRemainingAccounts: PublicKey[] = [];
-
-    let tokenIndices: TokenIndex[] = [];
-    for (const mangoAccount of mangoAccounts) {
-      tokenIndices.push(
-        ...mangoAccount.tokens
-          .filter((token) => token.tokenIndex !== 65535)
-          .map((token) => token.tokenIndex),
-      );
-    }
-    tokenIndices = [...new Set(tokenIndices)];
-
-    if (banks?.length) {
-      for (const bank of banks) {
-        tokenIndices.push(bank.tokenIndex);
-      }
-    }
-    const mintInfos = [...new Set(tokenIndices)].map(
-      (tokenIndex) => group.mintInfosMapByTokenIndex.get(tokenIndex)!,
-    );
-    healthRemainingAccounts.push(
-      ...mintInfos.map((mintInfo) => mintInfo.firstBank()),
-    );
-    healthRemainingAccounts.push(
-      ...mintInfos.map((mintInfo) => mintInfo.oracle),
-    );
-
-    const perpIndices: PerpMarketIndex[] = [];
-    for (const mangoAccount of mangoAccounts) {
-      perpIndices.push(
-        ...mangoAccount.perps
-          .filter((perp) => perp.marketIndex !== 65535)
-          .map((perp) => perp.marketIndex),
-      );
-    }
-    perpIndices.push(...perpMarkets.map((perp) => perp.perpMarketIndex));
-
-    const allPerpMarkets = [...new Set(perpIndices)].map(
-      (marketIndex) => group.findPerpMarket(marketIndex)!,
-    );
-
-    // Add perp accounts
-    healthRemainingAccounts.push(...allPerpMarkets.map((p) => p.publicKey));
-    // Add oracle for each perp
-    healthRemainingAccounts.push(...allPerpMarkets.map((p) => p.oracle));
-
-    for (const mangoAccount of mangoAccounts) {
-      healthRemainingAccounts.push(
-        ...mangoAccount.serum3
-          .filter((serum3Account) => serum3Account.marketIndex !== 65535)
-          .map((serum3Account) => serum3Account.openOrders),
-      );
-    }
 
     return healthRemainingAccounts;
   }
