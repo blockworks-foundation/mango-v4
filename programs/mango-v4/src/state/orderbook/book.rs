@@ -138,12 +138,13 @@ impl<'a> Orderbook<'a> {
                 matched_order_changes.push((best_opposing.handle, new_best_opposing_quantity));
             }
 
+            let seq_num = event_queue.header.seq_num;
             let fill = FillEvent::new(
                 side,
                 maker_out,
                 best_opposing.node.owner_slot,
                 now_ts,
-                event_queue.header.seq_num,
+                seq_num,
                 best_opposing.node.owner,
                 best_opposing.node.client_order_id,
                 market.maker_fee,
@@ -160,7 +161,7 @@ impl<'a> Orderbook<'a> {
             emit!(FilledPerpOrderLog {
                 mango_group: market.group.key(),
                 perp_market_index: market.perp_market_index,
-                seq_num: event_queue.header.seq_num,
+                seq_num: seq_num,
             });
         }
         let total_quote_lots_taken = order.max_quote_lots - remaining_quote_lots;
