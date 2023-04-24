@@ -3647,7 +3647,7 @@ impl ClientInstruction for PerpForceClosePositionInstruction {
             oracle: perp_market.oracle,
         };
 
-        let instruction = make_instruction(program_id, &accounts, instruction);
+        let instruction = make_instruction(program_id, &accounts, &instruction);
 
         (accounts, instruction)
     }
