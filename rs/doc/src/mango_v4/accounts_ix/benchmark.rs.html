@@ -2,9 +2,15 @@
 <a href="#2" id="2">2</a>
 <a href="#3" id="3">3</a>
 <a href="#4" id="4">4</a>
+<a href="#5" id="5">5</a>
+<a href="#6" id="6">6</a>
+<a href="#7" id="7">7</a>
 </pre><pre class="rust"><code><span class="kw">use </span>anchor_lang::prelude::<span class="kw-2">*</span>;
 
 <span class="attr">#[derive(Accounts)]
-</span><span class="kw">pub struct </span>Benchmark {}
+</span><span class="kw">pub struct </span>Benchmark&lt;<span class="lifetime">&#39;info</span>&gt; {
+    <span class="doccomment">/// CHECK: unused, exists only because anchor is unhappy in no-entrypoint mode otherwise
+    </span><span class="kw">pub </span>dummy: UncheckedAccount&lt;<span class="lifetime">&#39;info</span>&gt;,
+}
 </code></pre></div>
 </section></main><div id="rustdoc-vars" data-root-path="../../../" data-static-root-path="../../../static.files/" data-current-crate="mango_v4" data-themes="" data-resource-suffix="" data-rustdoc-version="1.68.2 (9eb3afe9e 2023-03-27)" data-search-js="search-98d53477a794af0b.js" data-settings-js="settings-c3c521c753752a1a.js" data-settings-css="settings-08ddfdda51b8ee2e.css" ></div></body></html>
