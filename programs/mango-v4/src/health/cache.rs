@@ -476,17 +476,19 @@ pub struct HealthCache {
 
 impl HealthCache {
     pub fn health(&self, health_type: HealthType) -> I80F48 {
+        let token_balances = self.effective_token_balances(health_type, false);
         let mut health = I80F48::ZERO;
         let sum = |contrib| {
             health += contrib;
         };
-        self.health_sum(health_type, sum, false);
+        self.health_sum(health_type, sum, &token_balances);
         health
     }
 
     /// Sum of only the positive health components (assets) and
     /// sum of absolute values of all negative health components (liabs, always >= 0)
     pub fn health_assets_and_liabs(&self, health_type: HealthType) -> (I80F48, I80F48) {
+        let token_balances = self.effective_token_balances(health_type, false);
         let mut assets = I80F48::ZERO;
         let mut liabs = I80F48::ZERO;
         let sum = |contrib| {
@@ -496,7 +498,7 @@ impl HealthCache {
                 liabs -= contrib;
             }
         };
-        self.health_sum(health_type, sum, false);
+        self.health_sum(health_type, sum, &token_balances);
         (assets, liabs)
     }
 
@@ -799,9 +801,8 @@ impl HealthCache {
         &self,
         health_type: HealthType,
         mut action: impl FnMut(I80F48),
-        perp_settle_health: bool,
+        token_balances: &[TokenBalance],
     ) {
-        let token_balances = self.effective_token_balances(health_type, perp_settle_health);
         for (token_info, token_balance) in self.token_infos.iter().zip(token_balances.iter()) {
             let contrib = token_info.health_contribution(health_type, token_balance.spot_and_perp);
             action(contrib);
@@ -820,25 +821,6 @@ impl HealthCache {
         }
     }
 
-    /// Compute the health when it comes to settling perp pnl
-    ///
-    /// Examples:
-    /// - An account may have maint_health < 0, but settling perp pnl could still be allowed.
-    ///   (+100 USDC health, -50 USDT health, -50 perp health -> allow settling 50 health worth)
-    /// - Positive health from trusted pnl markets counts
-    /// - If overall health is 0 with two trusted perp pnl < 0, settling may still be possible.
-    ///   (+100 USDC health, -150 perp1 health, -150 perp2 health -> allow settling 100 health worth)
-    /// - Positive trusted perp pnl can enable settling.
-    ///   (+100 trusted perp1 health, -100 perp2 health -> allow settling of 100 health worth)
-    fn perp_settle_health(&self) -> I80F48 {
-        let mut health = I80F48::ZERO;
-        let sum = |contrib| {
-            health += contrib;
-        };
-        self.health_sum(HealthType::Maint, sum, true);
-        health
-    }
-
     /// Returns how much pnl is settleable for a given settle token index.
     ///
     /// For example, if perp_settle_health is 50 USD, then the settleable amount in SOL
@@ -848,15 +830,30 @@ impl HealthCache {
     ///
     /// Note that the account's actual health would not change during settling negative upnl:
     /// the spot balance goes down but the perp hupnl goes up accordingly.
+    ///
+    /// Examples:
+    /// - An account may have maint_health < 0, but settling perp pnl could still be allowed.
+    ///   (+100 USDC health, -50 USDT health, -50 perp health -> allow settling 50 health worth)
+    /// - Positive health from trusted pnl markets counts
+    /// - If overall health is 0 with two trusted perp pnl < 0, settling may still be possible.
+    ///   (+100 USDC health, -150 perp1 health, -150 perp2 health -> allow settling 100 health worth)
+    /// - Positive trusted perp pnl can enable settling.
+    ///   (+100 trusted perp1 health, -100 perp2 health -> allow settling of 100 health worth)
     pub fn perp_max_settle(&self, settle_token_index: TokenIndex) -> Result<I80F48> {
-        let remaining_health = self.perp_settle_health();
-        let token = self.token_info(settle_token_index)?;
+        let token_balances = self.effective_token_balances(HealthType::Maint, true);
+        let mut perp_settle_health = I80F48::ZERO;
+        let sum = |contrib| {
+            perp_settle_health += contrib;
+        };
+        self.health_sum(HealthType::Maint, sum, &token_balances);
+
+        let token_info_index = self.token_info_index(settle_token_index)?;
+        let token = &self.token_infos[token_info_index];
         let asset_weighted_price = token.prices.oracle * token.maint_asset_weight;
         let liab_weighted_price = token.prices.oracle * token.maint_liab_weight;
-        // TODO: is it correct to not take positive perp contributions into account? probably not!
         spot_amount_taken_for_health_zero(
-            remaining_health,
-            token.balance_spot,
+            perp_settle_health,
+            token_balances[token_info_index].spot_and_perp,
             asset_weighted_price,
             liab_weighted_price,
         )
