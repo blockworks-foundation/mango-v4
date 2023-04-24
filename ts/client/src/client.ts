@@ -1231,7 +1231,6 @@ export class MangoClient {
     mintPk: PublicKey,
     nativeAmount: BN,
     allowBorrow: boolean,
-    healthAccountsToExclude: PublicKey[] = [],
   ): Promise<TransactionSignature> {
     const ixs = await this.tokenWithdrawNativeIx(
       group,
@@ -1239,7 +1238,6 @@ export class MangoClient {
       mintPk,
       nativeAmount,
       allowBorrow,
-      healthAccountsToExclude,
     );
     return await this.sendAndConfirmTransactionForGroup(group, ixs);
   }
@@ -2402,7 +2400,6 @@ export class MangoClient {
     const perpMarket = group.getPerpMarketByMarketIndex(perpMarketIndex);
     const healthRemainingAccounts: PublicKey[] =
       this.buildHealthRemainingAccounts(
-        AccountRetriever.Scanning,
         group,
         [profitableAccount, unprofitableAccount],
         [group.getFirstBankForPerpSettlement()],
@@ -2786,7 +2783,6 @@ export class MangoClient {
 
     const healthRemainingAccounts: PublicKey[] =
       this.buildHealthRemainingAccounts(
-        AccountRetriever.Scanning,
         group,
         [liqor, liqee],
         [assetBank, liabBank],
