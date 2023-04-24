@@ -39,6 +39,7 @@ import {
   PerpOrderType,
 } from './accounts/perp';
 import {
+  MarketIndex,
   Serum3Market,
   Serum3OrderType,
   Serum3SelfTradeBehavior,
@@ -934,9 +935,6 @@ export class MangoClient {
     mangoAccount: MangoAccount,
   ): Promise<TransactionSignature> {
     const instructions: TransactionInstruction[] = [];
-    const banksToExclude: Bank[] = [];
-    const perpMarketsToExclude: PerpMarket[] = [];
-    const serum3MarketsToExclude: Serum3Market[] = [];
 
     for (const serum3Account of mangoAccount.serum3Active()) {
       const serum3Market = group.serum3MarketsMapByMarketIndex.get(
@@ -948,46 +946,34 @@ export class MangoClient {
         mangoAccount,
         serum3Market.serumMarketExternal,
       );
-      serum3MarketsToExclude.push(serum3Market);
       instructions.push(closeOOIx);
+      serum3Account.marketIndex =
+        Serum3Orders.Serum3MarketIndexUnset as MarketIndex;
     }
 
-    for (const perp of mangoAccount.perpActive()) {
-      const perpMarketIndex = perp.marketIndex;
+    for (const pp of mangoAccount.perpActive()) {
+      const perpMarketIndex = pp.marketIndex;
       const perpMarket = group.getPerpMarketByMarketIndex(perpMarketIndex);
       const deactivatingPositionIx = await this.perpDeactivatePositionIx(
         group,
         mangoAccount,
         perpMarketIndex,
       );
-      perpMarketsToExclude.push(perpMarket);
       instructions.push(deactivatingPositionIx);
+      pp.marketIndex = PerpPosition.PerpMarketIndexUnset as PerpMarketIndex;
     }
 
-    for (const index in mangoAccount.tokensActive()) {
-      const indexNum = Number(index);
-      const token = mangoAccount.tokensActive()[indexNum];
-      const bank = group.getFirstBankByTokenIndex(token.tokenIndex);
-      // To withdraw from a particular token account we need to exclude previously
-      // withdrawn tokens
-      if (indexNum !== 0) {
-        for (let i = indexNum; i--; i >= 0) {
-          const prevToken = mangoAccount.tokensActive()[i];
-          const prevBank = group.getFirstBankByTokenIndex(prevToken.tokenIndex);
-          banksToExclude.push(prevBank);
-        }
-      }
+    for (const tp of mangoAccount.tokensActive()) {
+      const bank = group.getFirstBankByTokenIndex(tp.tokenIndex);
       const withdrawIx = await this.tokenWithdrawNativeIx(
         group,
         mangoAccount,
         bank.mint,
         U64_MAX_BN,
         false,
-        banksToExclude,
-        perpMarketsToExclude,
-        serum3MarketsToExclude,
       );
       instructions.push(...withdrawIx);
+      tp.tokenIndex = TokenPosition.TokenIndexUnset as TokenIndex;
     }
 
     const closeIx = await this.program.methods
@@ -1156,9 +1142,6 @@ export class MangoClient {
     mintPk: PublicKey,
     nativeAmount: BN,
     allowBorrow: boolean,
-    banksToExclude: Bank[] = [],
-    perpMarketsToExclude: PerpMarket[] = [],
-    serum3MarketsToExclude: Serum3Market[] = [],
   ): Promise<TransactionInstruction[]> {
     const bank = group.getFirstBankByMint(mintPk);
 
@@ -1188,16 +1171,7 @@ export class MangoClient {
     }
 
     const healthRemainingAccounts: PublicKey[] =
-      this.buildHealthRemainingAccounts(
-        group,
-        [mangoAccount],
-        [bank],
-        [],
-        [],
-        banksToExclude,
-        perpMarketsToExclude,
-        serum3MarketsToExclude,
-      );
+      this.buildHealthRemainingAccounts(group, [mangoAccount], [bank], [], []);
 
     const ix = await this.program.methods
       .tokenWithdraw(new BN(nativeAmount), allowBorrow)
@@ -2957,11 +2931,6 @@ export class MangoClient {
     banks: Bank[] = [],
     perpMarkets: PerpMarket[] = [],
     openOrdersForMarket: [Serum3Market, PublicKey][] = [],
-    // Banks and markets for whom positions have been closed in a previous ix
-    // in same tx
-    banksToExclude: Bank[] = [],
-    perpMarketsToExclude: PerpMarket[] = [],
-    serum3MarketsToExclude: Serum3Market[] = [],
   ): PublicKey[] {
     return this.buildFixedAccountRetrieverHealthAccounts(
       group,
@@ -2969,9 +2938,6 @@ export class MangoClient {
       banks,
       perpMarkets,
       openOrdersForMarket,
-      banksToExclude,
-      perpMarketsToExclude,
-      serum3MarketsToExclude,
     );
   }
 
@@ -2983,11 +2949,6 @@ export class MangoClient {
     banks: Bank[],
     perpMarkets: PerpMarket[],
     openOrdersForMarket: [Serum3Market, PublicKey][],
-    // Banks and markets for whom positions have been closed in a previous ix
-    // in same tx
-    banksToExclude: Bank[],
-    perpMarketsToExclude: PerpMarket[],
-    serum3MarketsToExclude: Serum3Market[],
   ): PublicKey[] {
     const healthRemainingAccounts: PublicKey[] = [];
 
@@ -3004,15 +2965,8 @@ export class MangoClient {
         }
       }
     }
-    // Collect mint info
     const mintInfos = tokenPositionIndices
-      .filter(
-        (tokenIndex) =>
-          // if token position is not closed
-          tokenIndex !== TokenPosition.TokenIndexUnset &&
-          // AND bank is not part of exclusion set
-          !banksToExclude.map((bank) => bank.tokenIndex).includes(tokenIndex),
-      )
+      .filter((tokenIndex) => tokenIndex !== TokenPosition.TokenIndexUnset)
       .map((tokenIndex) => group.mintInfosMapByTokenIndex.get(tokenIndex)!);
     healthRemainingAccounts.push(
       ...mintInfos.map((mintInfo) => mintInfo.firstBank()),
@@ -3038,16 +2992,10 @@ export class MangoClient {
         }
       }
     }
-    // Collect perp markets
     const allPerpMarkets = perpPositionsMarketIndices
       .filter(
         (perpMarktIndex) =>
-          // if perp market position is deactivated
-          perpMarktIndex !== PerpPosition.PerpMarketIndexUnset &&
-          // AND perp market is not part of exclusion set
-          !perpMarketsToExclude
-            .map((pm) => pm.perpMarketIndex)
-            .includes(perpMarktIndex),
+          perpMarktIndex !== PerpPosition.PerpMarketIndexUnset,
       )
       .map((perpIdx) => group.getPerpMarketByMarketIndex(perpIdx)!);
     healthRemainingAccounts.push(
@@ -3080,21 +3028,13 @@ export class MangoClient {
     }
 
     healthRemainingAccounts.push(
-      // Collect serum3 market oo accounts
       ...serumPositionMarketIndices
         .filter(
           (serumPosition) =>
-            // if serum3 market oo is closed
-            serumPosition.marketIndex !== Serum3Orders.Serum3MarketIndexUnset &&
-            // AND serum3 market is not part of exclusion set
-            !serum3MarketsToExclude
-              .map((sm) => sm.marketIndex)
-              .includes(serumPosition.marketIndex),
+            serumPosition.marketIndex !== Serum3Orders.Serum3MarketIndexUnset,
         )
         .map((serumPosition) => serumPosition.openOrders),
     );
-
-    // debugHealthAccounts(group, mangoAccount, healthRemainingAccounts);
 
     return healthRemainingAccounts;
   }
