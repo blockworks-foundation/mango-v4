@@ -81,7 +81,7 @@ pub fn perp_liq_negative_pnl_or_bankruptcy(
     drop(retriever);
     let liqee_liq_end_health = liqee_health_cache.health(HealthType::LiquidationEnd);
 
-    // TODO: re-think about this. Now that token balances and perp upnl are really close, this may need changes.
+    // Guarantees that perp base position is 0 and perp quote position is <= 0.
     liqee_health_cache.require_after_phase2_liquidation()?;
 
     if !liqee.check_liquidatable(&liqee_health_cache)? {

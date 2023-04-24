@@ -325,8 +325,11 @@ pub(crate) fn liquidation_action(
 
     // Helper function to reduce base position in exchange for effective settle token balance changes
     let mut reduce_base = |step: &str,
-                           mut hupnl_limit: I80F48,
+                           mut uhupnl_limit: I80F48,
+                           // How much effective settle token will be gained when taking future
+                           // upnl settlement into account.
                            expected_quote_per_lot: I80F48,
+                           // Effective settle token gained directly from the operation (before settlement)
                            actual_quote_per_lot: I80F48,
                            uhupnl_per_lot: I80F48,
                            current_uhupnl: &mut I80F48,
@@ -343,7 +346,7 @@ pub(crate) fn liquidation_action(
         )
         .unwrap();
 
-        let max_quote = max_quote_for_health.min(hupnl_limit);
+        let max_quote = max_quote_for_health.min(uhupnl_limit);
 
         // How many lots to transfer?
         let base_lots = (max_quote / expected_quote_per_lot)
@@ -359,9 +362,10 @@ pub(crate) fn liquidation_action(
             - settle_token_info.health_contribution(liq_end_type, expected_settle_token)
             + settle_token_info.health_contribution(liq_end_type, new_expected_settle_token);
 
-        hupnl_limit -= expected_quote_gain;
+        let uhupnl_gain = uhupnl_per_lot * I80F48::from(base_lots);
+        let new_uhupnl = *current_uhupnl + uhupnl_gain;
+        uhupnl_limit -= uhupnl_gain;
 
-        let new_uhupnl = *current_uhupnl + uhupnl_per_lot * I80F48::from(base_lots);
         let new_settle_token =
             *current_settle_token + actual_quote_per_lot * I80F48::from(base_lots);
         let new_health = *current_health
@@ -439,6 +443,8 @@ pub(crate) fn liquidation_action(
         reduce_base(
             "negative",
             -current_uhupnl,
+            // for negative values uhupnl and hupnl are the same and increases
+            // directly improve health
             quote_per_lot,
             quote_per_lot,
             quote_per_lot,
@@ -447,9 +453,6 @@ pub(crate) fn liquidation_action(
             &mut current_health,
         );
     }
-
-    // check if it's better to liq base or to settle for the user
-    // given the weights
 
     if current_uhupnl >= 0 && spot_gain_per_settled > init_overall_asset_weight {
         // Settlement produces direct spot (after fees) and loses perp-positive-uhupnl weighted settle token pos
@@ -471,7 +474,7 @@ pub(crate) fn liquidation_action(
     if current_uhupnl >= 0 && pnl_transfer < max_pnl_transfer {
         reduce_base(
             "settleable",
-            max_pnl_transfer - pnl_transfer, // TODO: sounds like an uhupnl limit!?
+            max_pnl_transfer - pnl_transfer,
             quote_per_lot * spot_gain_per_settled,
             quote_per_lot * init_overall_asset_weight,
             quote_per_lot,
@@ -711,7 +714,7 @@ mod tests {
         let test_cases = vec![
             (
                 "nothing",
-                (0.9, 0.9),
+                (0.9, 0.9, 0.0),
                 (0.0, 0, 0.0, 0.0),
                 (0.0, 0, 0.0),
                 (0, 100),
@@ -721,42 +724,42 @@ mod tests {
             //
             (
                 "neg base liq 1: limited",
-                (0.5, 0.5),
+                (0.5, 0.5, 0.0),
                 (5.0, -10, 0.0, 0.0),
                 (5.0, -9, -1.0),
                 (-1, 100),
             ),
             (
                 "neg base liq 2: base to zero",
-                (0.5, 0.5),
+                (0.5, 0.5, 0.0),
                 (5.0, -10, 0.0, 0.0),
                 (5.0, 0, -10.0),
                 (-20, 100),
             ),
             (
                 "neg base liq 3: health positive",
-                (0.5, 0.5),
+                (0.5, 0.5, 0.0),
                 (5.0, -4, 0.0, 0.0),
                 (5.0, -2, -2.0),
                 (-20, 100),
             ),
             (
                 "pos base liq 1: limited",
-                (0.5, 0.5),
+                (0.5, 0.5, 0.0),
                 (5.0, 20, -20.0, 0.0),
                 (5.0, 19, -19.0),
                 (1, 100),
             ),
             (
                 "pos base liq 2: base to zero",
-                (0.5, 0.5),
+                (0.5, 0.5, 0.0),
                 (0.0, 20, -30.0, 0.0),
                 (0.0, 0, -10.0),
                 (100, 100),
             ),
             (
                 "pos base liq 3: health positive",
-                (0.5, 0.5),
+                (0.5, 0.5, 0.0),
                 (5.0, 20, -20.0, 0.0),
                 (5.0, 10, -10.0),
                 (100, 100),
@@ -766,56 +769,56 @@ mod tests {
             //
             (
                 "base liq, pos perp health 1: until health positive",
-                (0.5, 0.8),
+                (0.5, 0.8, 0.0),
                 (-20.0, 20, 5.0, 0.0),
                 (0.0, 10, -5.0), // alternate: (-20, 0, 25). would it be better to reduce base more instead?
                 (100, 100),
             ),
             (
                 "base liq, pos perp health 2-1: settle until health positive",
-                (0.5, 0.5),
+                (0.5, 0.5, 0.0),
                 (-19.0, 20, 10.0, 0.0),
                 (-1.0, 20, -8.0),
                 (100, 100),
             ),
             (
                 "base liq, pos perp health 2-2: base+settle until health positive",
-                (0.5, 0.5),
+                (0.5, 0.5, 0.0),
                 (-25.0, 20, 10.0, 0.0),
                 (0.0, 10, -5.0), // alternate: (-5, 0, 10) better?
                 (100, 100),
             ),
             (
                 "base liq, pos perp health 2-3: base+settle until pnl limit",
-                (0.5, 0.5),
+                (0.5, 0.5, 0.0),
                 (-23.0, 20, 10.0, 0.0),
                 (-2.0, 10, -1.0),
                 (100, 21),
             ),
             (
                 "base liq, pos perp health 2-4: base+settle until base limit",
-                (0.5, 0.5),
+                (0.5, 0.5, 0.0),
                 (-25.0, 20, 10.0, 0.0),
                 (-4.0, 18, -9.0),
                 (2, 100),
             ),
             (
                 "base liq, pos perp health 2-5: base+settle until both limits",
-                (0.5, 0.5),
+                (0.5, 0.5, 0.0),
                 (-25.0, 20, 10.0, 0.0),
                 (-4.0, 16, -7.0),
                 (4, 21),
             ),
             (
                 "base liq, pos perp health 4: liq some base, then settle some",
-                (0.5, 0.5),
+                (0.5, 0.5, 0.0),
                 (-20.0, 20, 10.0, 0.0),
                 (-15.0, 10, 15.0),
                 (10, 5),
             ),
             (
                 "base liq, pos perp health 5: base to zero even without settlement",
-                (0.5, 0.5),
+                (0.5, 0.5, 0.0),
                 (-20.0, 20, 10.0, 0.0),
                 (-20.0, 0, 30.0),
                 (100, 0),
@@ -825,28 +828,28 @@ mod tests {
             //
             (
                 "base liq, pos perp health 6: don't touch base without settlement",
-                (0.5, 0.0),
+                (0.5, 0.0, 0.0),
                 (-20.0, 20, 10.0, 0.0),
                 (-20.0, 20, 10.0),
                 (10, 0),
             ),
             (
                 "base liq, pos perp health 7: settlement without base",
-                (0.5, 0.0),
+                (0.5, 0.0, 0.0),
                 (-20.0, 20, 10.0, 0.0),
                 (-15.0, 20, 5.0),
                 (10, 5),
             ),
             (
                 "base liq, pos perp health 8: settlement enables base",
-                (0.5, 0.0),
+                (0.5, 0.0, 0.0),
                 (-30.0, 20, 10.0, 0.0),
                 (-7.5, 15, -7.5),
                 (5, 30),
             ),
             (
                 "base liq, pos perp health 9: until health positive",
-                (0.5, 0.0),
+                (0.5, 0.0, 0.0),
                 (-25.0, 20, 10.0, 0.0),
                 (0.0, 10, -5.0),
                 (200, 200),
@@ -856,35 +859,35 @@ mod tests {
             //
             (
                 "base liq of negative perp health: where total token pos goes from negative to positive",
-                (0.5, 0.0),
+                (0.5, 0.0, 0.0),
                 (2.0, 60, -35.0, -2.0), // settle token: 2 + (60/2 - 35) = -3
                 (2.0, 50, -25.0), // settle token: 2 + (50/2 - 25) = 2
                 (200, 200),
             ),
             (
                 "pre-settle: where total token pos goes from negative to positive",
-                (0.5, 0.0),
+                (0.5, 0.0, 0.0),
                 (-7.0, 60, -20.0, -3.0), // settle token: -7 + 0.0 * (60/2 - 20) = -7
                 (3.0, 60, -30.0), // settle token: 3 + 0.0 * (60/2 - 30) = 3
                 (200, 200),
             ),
             (
                 "base liq and post-settle: where total token pos goes from negative to positive",
-                (0.5, 0.0),
+                (0.5, 0.0, 0.0),
                 (-7.0, 60, -30.0, -3.0), // settle token: -7 + 0.0 * (60/2 - 30) = -7
                 (3.0, 40, -20.0), // settle token: 3 + 0.0 * (40/2 - 20) = 3
                 (200, 200),
             ),
             (
                 "base liq of positive perp health: where total token pos goes from negative to positive",
-                (0.5, 0.5),
+                (0.5, 0.5, 0.0),
                 (-7.0, 60, -20.0, -3.0), // settle token: -7 + 0.5 * (60/2 - 20) = -2
                 (-7.0, 40, 0.0), // settle token: -7 + 0.5 * (40/2 - 0) = 3
                 (200, 0),
             ),
             (
                 "use all liquidation phases 1",
-                (0.5, 0.5),
+                (0.5, 0.5, 0.0),
                 (-7.0, 70, -40.0, -100.0),
                 // reduce 10
                 // no pre-settle
@@ -895,7 +898,7 @@ mod tests {
             ),
             (
                 "use all liquidation phases 2",
-                (0.5, 0.5),
+                (0.5, 0.5, 0.0),
                 (-7.0, 70, -30.0, -100.0),
                 // no "reduce while health negative"
                 // pre-settle 5
@@ -904,12 +907,56 @@ mod tests {
                 (8.0, 10, 15.0),
                 (60, 15),
             ),
+            //
+            // Involving a settle fee
+            //
+            (
+                "settle fee 1",
+                (0.5, 0.5, 0.25),
+                (-7.0, 70, -30.0, -100.0),
+                // no "reduce while health negative"
+                // pre-settle 5
+                // reduce 40 + post-settle 15
+                // reduce 20
+                (8.0, 10, 10.0), // spot increased only by 20 * (1-0.25)
+                (60, 20),
+            ),
+            (
+                "settle fee 2",
+                (0.5, 0.5, 0.25),
+                (-7.0, 70, -30.0, -12.0),
+                // no "reduce while health negative"
+                // pre-settle 5
+                // reduce 40 + post-settle 15
+                // reduce 6
+                (8.0, 24, -4.0), // 8 + (24*0.5 - 4)*0.5 = 12
+                (60, 20),
+            ),
+            (
+                "settle fee 3",
+                (0.5, 0.5, 0.25),
+                (-7.0, 70, -30.0, -6.0),
+                // no "reduce while health negative"
+                // pre-settle 5
+                // reduce 25 + post-settle 12
+                (-7.0 + 12.75, 45, -22.0), // 5.75 + (45*0.5 - 22)*0.5 = 6
+                (60, 20),
+            ),
+            (
+                "settle fee 4",
+                (0.5, 0.5, 0.25),
+                (-7.0, 70, -30.0, 4.0),
+                // no "reduce while health negative"
+                // pre-settle 2
+                (-7.0 + 1.5, 70, -32.0), // -5.5 + (70*0.5 - 32)*0.5 = -4
+                (60, 20),
+            ),
         ];
 
         for (
             name,
             // the perp base asset weight (liab is symmetric) and the perp overall asset weight to use
-            (base_weight, overall_weight),
+            (base_weight, overall_weight, pos_pnl_liq_fee),
             // the liqee's starting point: (-5, 10, -5, 1) would mean:
             // USDC: -5, perp base: 10, perp quote -5, other token: 1 (which also has weight/price 1)
             (init_liqee_spot, init_liqee_base, init_liqee_quote, init_other_spot),
@@ -926,6 +973,7 @@ mod tests {
                 pm.init_base_asset_weight = I80F48::from_num(base_weight);
                 pm.init_base_liab_weight = I80F48::from_num(2.0 - base_weight);
                 pm.init_overall_asset_weight = I80F48::from_num(overall_weight);
+                pm.positive_pnl_liquidation_fee = I80F48::from_num(pos_pnl_liq_fee);
             }
             {
                 let p = perp_p(&mut setup.liqee);
@@ -965,6 +1013,7 @@ mod tests {
             let liqee_perp = perp_p(&mut result.liqee);
             assert_eq!(liqee_perp.base_position_lots(), exp_liqee_base);
             assert_eq_f!(liqee_perp.quote_position_native(), exp_liqee_quote, 0.01);
+
             let liqor_perp = perp_p(&mut result.liqor);
             assert_eq!(
                 liqor_perp.base_position_lots(),
@@ -975,6 +1024,14 @@ mod tests {
                 -(exp_liqee_quote - init_liqee_quote),
                 0.01
             );
+            // everything that was not a trade gain produced settleable pnl
+            assert_eq_f!(
+                I80F48::from_num(liqor_perp.settle_pnl_limit_realized_trade),
+                liqor_perp.quote_position_native.to_num::<f64>()
+                    + liqor_perp.base_position_lots as f64,
+                1.1
+            );
+
             let settle_bank = result.settle_bank.data();
             assert_eq_f!(
                 token_p(&mut result.liqee).native(settle_bank),
@@ -985,13 +1042,6 @@ mod tests {
                 token_p(&mut result.liqor).native(settle_bank),
                 1000.0 - (exp_liqee_spot - init_liqee_spot),
                 0.01
-            );
-
-            let settled = exp_liqee_spot - init_liqee_spot;
-            assert_eq_f!(
-                I80F48::from(perp_p(&mut result.liqor).settle_pnl_limit_realized_trade),
-                settled,
-                1.1
             );
         }
     }
