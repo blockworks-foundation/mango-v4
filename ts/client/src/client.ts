@@ -2931,6 +2931,23 @@ export class MangoClient {
     );
   }
 
+  /**
+   * Builds health remaining accounts.
+   *
+   * For single mango account it builds a list of PublicKeys
+   * which is compatbile with Fixed account retriever.
+   *
+   * For multiple mango accounts it uses same logic as for fixed
+   * but packing all banks, then perp markets, and then serum oo accounts, which
+   * should always be compatible with Scanning account retriever.
+   *
+   * @param group
+   * @param mangoAccounts
+   * @param banks - banks in which new positions might be opened
+   * @param perpMarkets - markets in which new positions might be opened
+   * @param openOrdersForMarket - markets in which new positions might be opened
+   * @returns
+   */
   buildHealthRemainingAccounts(
     group: Group,
     mangoAccounts: MangoAccount[],
