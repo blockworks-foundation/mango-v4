@@ -21,6 +21,7 @@ import {
 } from '@solana/web3.js';
 import bs58 from 'bs58';
 import cloneDeep from 'lodash/cloneDeep';
+import uniq from 'lodash/uniq';
 import { Bank, MintInfo, TokenIndex } from './accounts/bank';
 import { Group } from './accounts/group';
 import {
@@ -2933,31 +2934,19 @@ export class MangoClient {
   buildHealthRemainingAccounts(
     group: Group,
     mangoAccounts: MangoAccount[],
+    // Banks and markets for whom positions don't exist on mango account,
+    // but user would potentially open new positions.
     banks: Bank[] = [],
     perpMarkets: PerpMarket[] = [],
     openOrdersForMarket: [Serum3Market, PublicKey][] = [],
   ): PublicKey[] {
-    return this.buildFixedAccountRetrieverHealthAccounts(
-      group,
-      mangoAccounts[0],
-      banks,
-      perpMarkets,
-      openOrdersForMarket,
-    );
-  }
-
-  private buildFixedAccountRetrieverHealthAccounts(
-    group: Group,
-    mangoAccount: MangoAccount,
-    // Banks and markets for whom positions don't exist on mango account,
-    // but user would potentially open new positions.
-    banks: Bank[],
-    perpMarkets: PerpMarket[],
-    openOrdersForMarket: [Serum3Market, PublicKey][],
-  ): PublicKey[] {
     const healthRemainingAccounts: PublicKey[] = [];
 
-    const tokenPositionIndices = mangoAccount.tokens.map((t) => t.tokenIndex);
+    const tokenPositionIndices = uniq(
+      mangoAccounts
+        .map((mangoAccount) => mangoAccount.tokens.map((t) => t.tokenIndex))
+        .flat(),
+    );
     for (const bank of banks) {
       const tokenPositionExists =
         tokenPositionIndices.indexOf(bank.tokenIndex) > -1;
@@ -2981,8 +2970,10 @@ export class MangoClient {
     );
 
     // Insert any extra perp markets in the free perp position slots
-    const perpPositionsMarketIndices = mangoAccount.perps.map(
-      (p) => p.marketIndex,
+    const perpPositionsMarketIndices = uniq(
+      mangoAccounts
+        .map((mangoAccount) => mangoAccount.perps.map((p) => p.marketIndex))
+        .flat(),
     );
     for (const perpMarket of perpMarkets) {
       const perpPositionExists =
@@ -3009,10 +3000,14 @@ export class MangoClient {
     healthRemainingAccounts.push(...allPerpMarkets.map((perp) => perp.oracle));
 
     // Insert any extra open orders accounts in the cooresponding free serum market slot
-    const serumPositionMarketIndices = mangoAccount.serum3.map((s) => ({
-      marketIndex: s.marketIndex,
-      openOrders: s.openOrders,
-    }));
+    const serumPositionMarketIndices = mangoAccounts
+      .map((mangoAccount) =>
+        mangoAccount.serum3.map((s) => ({
+          marketIndex: s.marketIndex,
+          openOrders: s.openOrders,
+        })),
+      )
+      .flat();
     for (const [serum3Market, openOrderPk] of openOrdersForMarket) {
       const ooPositionExists =
         serumPositionMarketIndices.findIndex(
