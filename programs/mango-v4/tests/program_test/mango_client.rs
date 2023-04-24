@@ -3922,7 +3922,9 @@ impl ClientInstruction for BenchmarkInstruction {
     ) -> (Self::Accounts, instruction::Instruction) {
         let program_id = mango_v4::id();
         let instruction = Self::Instruction {};
-        let accounts = Self::Accounts {};
+        let accounts = Self::Accounts {
+            dummy: Pubkey::new_unique(),
+        };
 
         let instruction = make_instruction(program_id, &accounts, &instruction);
         (accounts, instruction)
