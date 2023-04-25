@@ -236,6 +236,7 @@ export const TrueIxGateParams: IxGateParams = {
   AccountBuybackFeesWithMngo: true,
   TokenForceCloseBorrowsWithToken: true,
   PerpForceClosePosition: true,
+  GroupWithdrawInsuranceFund: true,
 };
 
 // build ix gate e.g. buildIxGate(Builder(TrueIxGateParams).TokenDeposit(false).build()).toNumber(),
@@ -303,8 +304,8 @@ export function buildIxGate(p: IxGateParams): BN {
   toggleIx(ixGate, p, 'TokenWithdraw', 47);
   toggleIx(ixGate, p, 'AccountBuybackFeesWithMngo', 48);
   toggleIx(ixGate, p, 'TokenForceCloseBorrowsWithToken', 49);
-  toggleIx(ixGate, p, 'TokenForceCloseBorrowsWithToken', 49);
-  toggleIx(ixGate, p, 'PerpForceClosePosition', 49);
+  toggleIx(ixGate, p, 'PerpForceClosePosition', 50);
+  toggleIx(ixGate, p, 'GroupWithdrawInsuranceFund', 51);
 
   return ixGate;
 }
