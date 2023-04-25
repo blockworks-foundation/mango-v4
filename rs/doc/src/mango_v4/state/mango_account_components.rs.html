@@ -1411,6 +1411,9 @@
 <a href="#1411" id="1411">1411</a>
 <a href="#1412" id="1412">1412</a>
 <a href="#1413" id="1413">1413</a>
+<a href="#1414" id="1414">1414</a>
+<a href="#1415" id="1415">1415</a>
+<a href="#1416" id="1416">1416</a>
 </pre><pre class="rust"><code><span class="kw">use </span>anchor_lang::prelude::<span class="kw-2">*</span>;
 
 <span class="kw">use </span>derivative::Derivative;
@@ -1880,6 +1883,20 @@
             }
         }
 
+        <span class="comment">// Bump the realized trade pnl settle limit for a fraction of the stable price value,
+        // allowing gradual settlement of very high-pnl trades.
+        </span><span class="kw">let </span>realized_stable_value = I80F48::from(reduced_lots.abs() * perp_market.base_lot_size)
+            * perp_market.stable_price();
+        <span class="kw">let </span>stable_value_fraction =
+            I80F48::from_num(perp_market.settle_pnl_limit_factor) * realized_stable_value;
+        <span class="self">self</span>.increase_realized_trade_pnl_settle_limit(newly_realized_pnl, stable_value_fraction);
+    }
+
+    <span class="kw">fn </span>increase_realized_trade_pnl_settle_limit(
+        <span class="kw-2">&amp;mut </span><span class="self">self</span>,
+        newly_realized_pnl: I80F48,
+        limit: I80F48,
+    ) {
         <span class="comment">// When realized limit has a different sign from realized pnl, reset it completely
         </span><span class="kw">if </span>(<span class="self">self</span>.settle_pnl_limit_realized_trade &gt; <span class="number">0 </span>&amp;&amp; <span class="self">self</span>.realized_trade_pnl_native &lt;= <span class="number">0</span>)
             || (<span class="self">self</span>.settle_pnl_limit_realized_trade &lt; <span class="number">0 </span>&amp;&amp; <span class="self">self</span>.realized_trade_pnl_native &gt;= <span class="number">0</span>)
@@ -1890,25 +1907,13 @@
         <span class="comment">// Whenever realized pnl increases in magnitude, also increase realized pnl settle limit
         // magnitude.
         </span><span class="kw">if </span>newly_realized_pnl.signum() == <span class="self">self</span>.realized_trade_pnl_native.signum() {
-            <span class="kw">let </span>realized_stable_value =
-                I80F48::from(reduced_lots.abs() * perp_market.base_lot_size)
-                    * perp_market.stable_price();
-            <span class="kw">let </span>stable_value_fraction =
-                I80F48::from_num(perp_market.settle_pnl_limit_factor) * realized_stable_value;
-
             <span class="comment">// The realized pnl settle limit change is restricted to actually realized pnl:
             // buying and then selling some base lots at the same price shouldn&#39;t affect
             // the settle limit.
             </span><span class="kw">let </span>limit_change = <span class="kw">if </span>newly_realized_pnl &gt; <span class="number">0 </span>{
-                newly_realized_pnl
-                    .min(stable_value_fraction)
-                    .ceil()
-                    .clamp_to_i64()
+                newly_realized_pnl.min(limit).ceil().clamp_to_i64()
             } <span class="kw">else </span>{
-                newly_realized_pnl
-                    .max(-stable_value_fraction)
-                    .floor()
-                    .clamp_to_i64()
+                newly_realized_pnl.max(-limit).floor().clamp_to_i64()
             };
             <span class="self">self</span>.settle_pnl_limit_realized_trade += limit_change;
         }
@@ -2187,7 +2192,8 @@
     <span class="doccomment">/// Adds to the quote position and adds a recurring (&quot;realized trade&quot;) settle limit
     </span><span class="kw">pub fn </span>record_liquidation_pnl_takeover(<span class="kw-2">&amp;mut </span><span class="self">self</span>, change: I80F48, recurring_limit: I80F48) {
         <span class="self">self</span>.change_quote_position(change);
-        <span class="self">self</span>.realized_trade_pnl_native += recurring_limit;
+        <span class="self">self</span>.realized_trade_pnl_native += change;
+        <span class="self">self</span>.increase_realized_trade_pnl_settle_limit(change, recurring_limit);
     }
 }
 

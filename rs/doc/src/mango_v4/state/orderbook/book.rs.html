@@ -401,6 +401,7 @@
 <a href="#401" id="401">401</a>
 <a href="#402" id="402">402</a>
 <a href="#403" id="403">403</a>
+<a href="#404" id="404">404</a>
 </pre><pre class="rust"><code><span class="kw">use </span><span class="kw">crate</span>::logs::FilledPerpOrderLog;
 <span class="kw">use </span><span class="kw">crate</span>::state::MangoAccountRefMut;
 <span class="kw">use crate</span>::{
@@ -541,12 +542,13 @@
                 matched_order_changes.push((best_opposing.handle, new_best_opposing_quantity));
             }
 
+            <span class="kw">let </span>seq_num = event_queue.header.seq_num;
             <span class="kw">let </span>fill = FillEvent::new(
                 side,
                 maker_out,
                 best_opposing.node.owner_slot,
                 now_ts,
-                event_queue.header.seq_num,
+                seq_num,
                 best_opposing.node.owner,
                 best_opposing.node.client_order_id,
                 market.maker_fee,
@@ -563,7 +565,7 @@
             <span class="macro">emit!</span>(FilledPerpOrderLog {
                 mango_group: market.group.key(),
                 perp_market_index: market.perp_market_index,
-                seq_num: event_queue.header.seq_num,
+                seq_num: seq_num,
             });
         }
         <span class="kw">let </span>total_quote_lots_taken = order.max_quote_lots - remaining_quote_lots;
