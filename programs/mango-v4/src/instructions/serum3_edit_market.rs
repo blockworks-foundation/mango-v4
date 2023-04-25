@@ -26,6 +26,9 @@ pub fn serum3_edit_market(
     };
 
     if let Some(force_close) = force_close_opt {
+        if force_close {
+            require!(serum3_market.reduce_only, MangoError::SomeError);
+        }
         msg!(
             "Force close: old - {:?}, new - {:?}",
             serum3_market.force_close,

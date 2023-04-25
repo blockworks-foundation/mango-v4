@@ -5,7 +5,6 @@ use anchor_spl::token::{self, Token, TokenAccount};
 #[derive(Accounts)]
 pub struct GroupWithdrawInsuranceFund<'info> {
     #[account(
-        mut,
         has_one = insurance_vault,
         has_one = admin,
         constraint = group.load()?.is_ix_enabled(IxGate::GroupWithdrawInsuranceFund) @ MangoError::IxIsDisabled,
