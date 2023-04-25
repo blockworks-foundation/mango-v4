@@ -1,7 +1,7 @@
 use crate::accounts_ix::*;
 use crate::error::*;
 use crate::health::*;
-use crate::logs::TokenBalanceLog;
+use crate::logs::{TokenBalanceLog, TokenForceCloseBorrowsWithTokenLog};
 use crate::state::*;
 use anchor_lang::prelude::*;
 use fixed::types::I80F48;
@@ -159,6 +159,19 @@ pub fn token_force_close_borrows_with_token(
             indexed_position: liqor_liab_indexed_position.to_bits(),
             deposit_index: liab_bank.deposit_index.to_bits(),
             borrow_index: liab_bank.borrow_index.to_bits(),
+        });
+
+        emit!(TokenForceCloseBorrowsWithTokenLog {
+            mango_group: liqee.fixed.group,
+            liqee: liqee_key,
+            liqor: liqor_key,
+            asset_token_index: asset_token_index,
+            liab_token_index: liab_token_index,
+            asset_transfer: asset_transfer.to_bits(),
+            liab_transfer: liab_transfer.to_bits(),
+            asset_price: asset_oracle_price.to_bits(),
+            liab_price: liab_oracle_price.to_bits(),
+            fee_factor: fee_factor.to_bits(),
         });
 
         let liqee_health_cache = new_health_cache(&liqee.borrow(), &mut account_retriever)

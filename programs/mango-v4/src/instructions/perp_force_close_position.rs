@@ -4,7 +4,7 @@ use crate::accounts_ix::*;
 
 use crate::accounts_zerocopy::AccountInfoRef;
 use crate::error::MangoError;
-use crate::logs::emit_perp_balances;
+use crate::logs::{emit_perp_balances, PerpForceClosePositionLog};
 use crate::state::*;
 use fixed::types::I80F48;
 
@@ -56,7 +56,15 @@ pub fn perp_force_close_position(ctx: Context<PerpForceClosePosition>) -> Result
         &perp_market,
     );
 
-    // TODO force-close trade log
+    emit!(PerpForceClosePositionLog {
+        mango_group: ctx.accounts.group.key(),
+        perp_market_index: perp_market.perp_market_index,
+        account_a: ctx.accounts.account_a.key(),
+        account_b: ctx.accounts.account_b.key(),
+        base_transfer: base_transfer,
+        quote_transfer: quote_transfer.to_bits(),
+        price: oracle_price.to_bits(),
+    });
 
     Ok(())
 }
