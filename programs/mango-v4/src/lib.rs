@@ -938,10 +938,9 @@ pub mod mango_v4 {
         ctx: Context<PerpLiqNegativePnlOrBankruptcy>,
         max_liab_transfer: u64,
     ) -> Result<()> {
-        // TODO: same as other disabled ix
-        use crate::error::*;
-        require_msg!(false, "disabled ix");
-        Ok(())
+        Err(error_msg!(
+            "PerpLiqNegativePnlOrBankruptcy was replaced by PerpLiqNegativePnlOrBankruptcyV2"
+        ))
     }
 
     pub fn perp_liq_negative_pnl_or_bankruptcy_v2(

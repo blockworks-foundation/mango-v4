@@ -500,9 +500,10 @@ pub(crate) fn liquidation_action(
     //
     // Step 3: Above that, perp base positions only benefit account health if the pnl asset weight is positive
     //
-    // TODO: magic number to avoid extra liquidation when health is already good enough and it's just
-    // rounding issues making it <0
-    if current_health < I80F48::from_num(-0.5) && init_overall_asset_weight > 0 {
+    // Using -0.5 as a health target prevents rounding related issues. Any health >-1 will be enough
+    // to get the account out of being-liquidated state.
+    let health_target = I80F48::from_num(-0.5);
+    if current_health < health_target && init_overall_asset_weight > 0 {
         let weighted_health_per_lot = quote_per_lot * init_overall_asset_weight;
         reduce_base(
             "positive",

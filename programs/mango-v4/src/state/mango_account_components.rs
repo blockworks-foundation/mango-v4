@@ -181,9 +181,14 @@ pub struct PerpPosition {
     /// Active position size, measured in base lots
     pub base_position_lots: i64,
 
-    /// Active position in oracle quote native, this is 1:1 a settle_token native amount
+    /// Active position in oracle quote native. At the same time this is 1:1 a settle_token native amount.
     ///
-    /// TODO: rename?!
+    /// Example: Say there's a perp market on the BTC/USD price using SOL for settlement. The user buys
+    /// one long contract for $20k, then base = 1, quote = -20k. The price goes to $21k. Now their
+    /// unsettled pnl is (1 * 21k - 20k) __SOL__ = 1000 SOL. This is because the perp contract arbitrarily
+    /// decides that each unit of price difference creates 1 SOL worth of settlement.
+    /// (yes, causing 1 SOL of settlement for each $1 price change implies a lot of extra leverage; likely
+    /// there should be an extra configurable scaling factor before we use this for cases like that)
     pub quote_position_native: I80F48,
 
     /// Tracks what the position is to calculate average entry & break even price

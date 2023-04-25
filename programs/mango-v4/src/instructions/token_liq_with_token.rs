@@ -192,12 +192,11 @@ pub(crate) fn liquidation_action(
     //   y = x * lopa / aop   (native asset tokens, see above)
     //
     // Result: x = -init_health / (ilw * llep - iaw * lopa * alep / aop)
-    // TODO: the liq_end_price is the same as the oracle price again! Simplify here.
+    //
+    // Simplified for alep == aop:
+    assert!(asset_liq_end_price == asset_oracle_price);
     let liab_needed = -liqee_liq_end_health
-        / (liab_liq_end_price * init_liab_weight
-            - liab_oracle_price_adjusted
-                * init_asset_weight
-                * (asset_liq_end_price / asset_oracle_price));
+        / (liab_liq_end_price * init_liab_weight - liab_oracle_price_adjusted * init_asset_weight);
 
     // How much liab can we get at most for the asset balance?
     let liab_possible = max_asset_transfer * asset_oracle_price / liab_oracle_price_adjusted;
