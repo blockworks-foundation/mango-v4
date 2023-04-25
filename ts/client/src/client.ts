@@ -420,6 +420,54 @@ export class MangoClient {
     return await this.sendAndConfirmTransactionForGroup(group, [ix]);
   }
 
+  public async tokenForceCloseBorrowsWithToken(
+    group: Group,
+    liqor: MangoAccount,
+    liqee: MangoAccount,
+    assetTokenIndex: TokenIndex,
+    liabTokenIndex: TokenIndex,
+    maxLiabTransfer?: number,
+  ): Promise<string> {
+    const assetBank = group.getFirstBankByTokenIndex(assetTokenIndex);
+    const liabBank = group.getFirstBankByTokenIndex(liabTokenIndex);
+    const healthRemainingAccounts: PublicKey[] =
+      this.buildHealthRemainingAccounts(
+        AccountRetriever.Scanning,
+        group,
+        [liqor, liqee],
+        [assetBank, liabBank],
+        [],
+      );
+    const parsedHealthAccounts = healthRemainingAccounts.map(
+      (pk) =>
+        ({
+          pubkey: pk,
+          isWritable:
+            pk.equals(assetBank.publicKey) || pk.equals(liabBank.publicKey)
+              ? true
+              : false,
+          isSigner: false,
+        } as AccountMeta),
+    );
+    const ix = await this.program.methods
+      .tokenForceCloseBorrowsWithToken(
+        assetTokenIndex,
+        liabTokenIndex,
+        maxLiabTransfer
+          ? toNative(maxLiabTransfer, liabBank.mintDecimals)
+          : U64_MAX_BN,
+      )
+      .accounts({
+        group: group.publicKey,
+        liqor: liqor.publicKey,
+        liqorOwner: (this.program.provider as AnchorProvider).wallet.publicKey,
+        liqee: liqee.publicKey,
+      })
+      .remainingAccounts(parsedHealthAccounts)
+      .instruction();
+    return await this.sendAndConfirmTransactionForGroup(group, [ix]);
+  }
+
   public async tokenDeregister(
     group: Group,
     mintPk: PublicKey,
@@ -1247,6 +1295,25 @@ export class MangoClient {
     return await this.sendAndConfirmTransactionForGroup(group, [ix]);
   }
 
+  public async serum3EditMarket(
+    group: Group,
+    serum3MarketIndex: MarketIndex,
+    reduceOnly: boolean | null,
+    forceClose: boolean | null,
+  ): Promise<TransactionSignature> {
+    const serum3Market =
+      group.serum3MarketsMapByMarketIndex.get(serum3MarketIndex);
+    const ix = await this.program.methods
+      .serum3EditMarket(reduceOnly, forceClose)
+      .accounts({
+        group: group.publicKey,
+        admin: (this.program.provider as AnchorProvider).wallet.publicKey,
+        market: serum3Market?.publicKey,
+      })
+      .instruction();
+    return await this.sendAndConfirmTransactionForGroup(group, [ix]);
+  }
+
   public async serum3deregisterMarket(
     group: Group,
     externalMarketPk: PublicKey,
@@ -1414,6 +1481,72 @@ export class MangoClient {
         postSendTxCallback: this.postSendTxCallback,
       },
     );
+  }
+
+  public async serum3LiqForceCancelOrders(
+    group: Group,
+    mangoAccount: MangoAccount,
+    externalMarketPk: PublicKey,
+    limit?: number,
+  ): Promise<string> {
+    const serum3Market = group.serum3MarketsMapByExternal.get(
+      externalMarketPk.toBase58(),
+    )!;
+    const serum3MarketExternal = group.serum3ExternalMarketsMap.get(
+      externalMarketPk.toBase58(),
+    )!;
+    const openOrders = await serum3Market.findOoPda(
+      this.programId,
+      mangoAccount.publicKey,
+    );
+
+    const healthRemainingAccounts: PublicKey[] =
+      this.buildHealthRemainingAccounts(
+        AccountRetriever.Fixed,
+        group,
+        [mangoAccount],
+        [],
+        [],
+        [[serum3Market, openOrders]],
+      );
+
+    const ix = await this.program.methods
+      .serum3LiqForceCancelOrders(limit ?? 10)
+      .accounts({
+        group: group.publicKey,
+        account: mangoAccount.publicKey,
+        openOrders,
+        serumMarket: serum3Market.publicKey,
+        serumProgram: OPENBOOK_PROGRAM_ID[this.cluster],
+        serumMarketExternal: serum3Market.serumMarketExternal,
+        marketBids: serum3MarketExternal.bidsAddress,
+        marketAsks: serum3MarketExternal.asksAddress,
+        marketEventQueue: serum3MarketExternal.decoded.eventQueue,
+        marketBaseVault: serum3MarketExternal.decoded.baseVault,
+        marketQuoteVault: serum3MarketExternal.decoded.quoteVault,
+        marketVaultSigner: await generateSerum3MarketExternalVaultSignerAddress(
+          this.cluster,
+          serum3Market,
+          serum3MarketExternal,
+        ),
+        quoteBank: group.getFirstBankByTokenIndex(serum3Market.quoteTokenIndex)
+          .publicKey,
+        quoteVault: group.getFirstBankByTokenIndex(serum3Market.quoteTokenIndex)
+          .vault,
+        baseBank: group.getFirstBankByTokenIndex(serum3Market.baseTokenIndex)
+          .publicKey,
+        baseVault: group.getFirstBankByTokenIndex(serum3Market.baseTokenIndex)
+          .vault,
+      })
+      .remainingAccounts(
+        healthRemainingAccounts.map(
+          (pk) =>
+            ({ pubkey: pk, isWritable: false, isSigner: false } as AccountMeta),
+        ),
+      )
+      .instruction();
+
+    return await this.sendAndConfirmTransactionForGroup(group, [ix]);
   }
 
   public async serum3PlaceOrderIx(
@@ -1987,6 +2120,27 @@ export class MangoClient {
         oracle: params.oracle ?? perpMarket.oracle,
         admin: (this.program.provider as AnchorProvider).wallet.publicKey,
         perpMarket: perpMarket.publicKey,
+      })
+      .instruction();
+    return await this.sendAndConfirmTransactionForGroup(group, [ix]);
+  }
+
+  public async perpForceClosePosition(
+    group: Group,
+    perpMarketIndex: PerpMarketIndex,
+    accountA: MangoAccount,
+    accountB: MangoAccount,
+  ): Promise<string> {
+    const perpMarket = group.getPerpMarketByMarketIndex(perpMarketIndex);
+
+    const ix = await this.program.methods
+      .perpForceClosePosition()
+      .accounts({
+        group: group.publicKey,
+        perpMarket: perpMarket.publicKey,
+        accountA: accountA.publicKey,
+        accountB: accountB.publicKey,
+        oracle: perpMarket.oracle,
       })
       .instruction();
     return await this.sendAndConfirmTransactionForGroup(group, [ix]);

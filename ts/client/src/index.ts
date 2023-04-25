@@ -20,6 +20,7 @@ export {
 } from './clientIxParamBuilder';
 export * from './constants';
 export * from './numbers/I80F48';
-export * from './utils';
+export * from './router';
 export * from './types';
-export { Group, OracleProvider, StubOracle, MangoClient, MANGO_V4_ID };
+export * from './utils';
+export { Group, MANGO_V4_ID, MangoClient, OracleProvider, StubOracle };
