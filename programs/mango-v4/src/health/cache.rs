@@ -340,14 +340,19 @@ impl PerpInfo {
         })
     }
 
-    /// Total health contribution from perp balances
+    /// The perp-risk (but not token-risk) adjusted upnl. Also called "hupnl".
+    ///
+    /// In settle token native units.
+    ///
+    /// This is what gets added to effective_token_balances() and then contributes
+    /// to account health.
     ///
     /// For fully isolated perp markets, users may never borrow against unsettled
-    /// positive perp pnl, there pnl_asset_weight == 0 and there can't be positive
+    /// positive perp pnl, there overall_asset_weight == 0 and there can't be positive
     /// health contributions from these perp market. We sometimes call these markets
     /// "untrusted markets".
     ///
-    /// Users need to settle their perp pnl with other perp market participants
+    /// In these, users need to settle their perp pnl with other perp market participants
     /// in order to realize their gains if they want to use them as collateral.
     ///
     /// This is because we don't trust the perp's base price to not suddenly jump to
@@ -357,60 +362,16 @@ impl PerpInfo {
     ///
     /// Other markets may be liquid enough that we have enough confidence to allow
     /// users to borrow against unsettled positive pnl to some extend. In these cases,
-    /// the pnl asset weights would be >0.
-    #[inline(always)]
-    pub fn health_contribution(&self, health_type: HealthType, settle_token: &TokenInfo) -> I80F48 {
-        let contribution = self.unweighted_health_unsettled_pnl(health_type);
-        self.weigh_health_contribution_settle(
-            self.weigh_health_contribution_overall(contribution, health_type),
-            health_type,
-            settle_token,
-        )
-    }
-
-    // like unsettled pnl, but applying the base weight and overall weight. Always <= unsettled_pnl
-    // also called "hupnl"
+    /// the overall asset weights would be >0.
     #[inline(always)]
     pub fn health_unsettled_pnl(&self, health_type: HealthType) -> I80F48 {
         let contribution = self.unweighted_health_unsettled_pnl(health_type);
-        self.weigh_health_contribution_overall(contribution, health_type)
+        self.weigh_uhupnl_overall(contribution, health_type)
     }
 
-    /// Convert an unweighted_health_contribution to an actual one in health quote token units.
+    /// Convert uhupnl to hupnl by applying the overall weight.
     #[inline(always)]
-    pub fn weigh_health_contribution_settle(
-        &self,
-        unweighted: I80F48,
-        health_type: HealthType,
-        settle_token: &TokenInfo,
-    ) -> I80F48 {
-        assert_eq!(self.settle_token_index, settle_token.token_index);
-        if unweighted > 0 {
-            let settle_weight = match health_type {
-                HealthType::Init => settle_token.init_scaled_asset_weight,
-                HealthType::LiquidationEnd => settle_token.init_asset_weight,
-                HealthType::Maint => settle_token.maint_asset_weight,
-            };
-            let settle_price = settle_token.prices.asset(health_type);
-            settle_weight * unweighted * settle_price
-        } else {
-            let settle_weight = match health_type {
-                HealthType::Init => settle_token.init_scaled_liab_weight,
-                HealthType::LiquidationEnd => settle_token.init_liab_weight,
-                HealthType::Maint => settle_token.maint_liab_weight,
-            };
-            let settle_price = settle_token.prices.liab(health_type);
-            settle_weight * unweighted * settle_price
-        }
-    }
-
-    /// Convert an unweighted_health_contribution to an actual one in health quote token units.
-    #[inline(always)]
-    pub fn weigh_health_contribution_overall(
-        &self,
-        unweighted: I80F48,
-        health_type: HealthType,
-    ) -> I80F48 {
+    fn weigh_uhupnl_overall(&self, unweighted: I80F48, health_type: HealthType) -> I80F48 {
         if unweighted > 0 {
             let overall_weight = match health_type {
                 HealthType::Init | HealthType::LiquidationEnd => self.init_overall_asset_weight,
@@ -774,6 +735,17 @@ impl HealthCache {
         (token_max_reserved, serum3_reserved)
     }
 
+    /// Returns token balances that account for spot and perp contributions
+    ///
+    /// Spot contributions are just the regular deposits or borrows.
+    ///
+    /// Perp contributions come from perp positions in markets that use the token as a settle token:
+    /// For these the hupnl is added to the total because that's the risk-adjusted expected to be
+    /// gained or lost from settlement.
+    ///
+    /// The perp_settle_health flag exists for perp_max_settle(). When it is enabled, all negative
+    /// token contributions from perp markets are ignored. That's useful for knowing how much token
+    /// collateral is available when limiting negative upnl settlement.
     pub fn effective_token_balances(
         &self,
         health_type: HealthType,

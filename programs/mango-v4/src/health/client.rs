@@ -155,6 +155,10 @@ impl HealthCache {
         let source_reserved = tokens_max_reserved[source_index].max_serum_reserved;
         let target_reserved = tokens_max_reserved[target_index].max_serum_reserved;
 
+        let token_balances = self.effective_token_balances(health_type, false);
+        let source_balance = token_balances[source_index].spot_and_perp;
+        let target_balance = token_balances[target_index].spot_and_perp;
+
         // If the price is sufficiently good, then health will just increase from swapping:
         // once we've swapped enough, swapping x reduces health by x * source_liab_weight and
         // increases it by x * target_asset_weight * price_factor.
@@ -194,8 +198,8 @@ impl HealthCache {
         // The first thing we do is to find this maximum.
         let (amount_for_max_value, max_value) = {
             // The largest amount that the maximum could be at
-            let rightmost = (source.balance_spot.abs() + source_reserved)
-                .max((target.balance_spot.abs() + target_reserved) / price);
+            let rightmost = (source_balance.abs() + source_reserved)
+                .max((target_balance.abs() + target_reserved) / price);
             find_maximum(
                 I80F48::ZERO,
                 rightmost,
@@ -282,10 +286,13 @@ impl HealthCache {
         let prices = &perp_info.base_prices;
         let base_lot_size = I80F48::from(perp_info.base_lot_size);
 
+        let settle_info_index = self.token_info_index(perp_info.settle_token_index)?;
+        let settle_info = &self.token_infos[settle_info_index];
+
         // If the price is sufficiently good then health will just increase from trading.
-        // It's ok to ignore the pnl_asset_weight here because we'll jump out early if this
-        // slope is >=0, and the extra asset weight would just decrease it.
-        let final_health_slope = if direction == 1 {
+        // It's ok to ignore the overall_asset_weight and token asset weight here because
+        // we'll jump out early if this slope is >=0, and those weights would just decrease it.
+        let mut final_health_slope = if direction == 1 {
             perp_info.init_base_asset_weight * prices.asset(health_type) - price
         } else {
             price - perp_info.init_base_liab_weight * prices.liab(health_type)
@@ -293,6 +300,7 @@ impl HealthCache {
         if final_health_slope >= 0 {
             return Ok(i64::MAX);
         }
+        final_health_slope *= settle_info.init_liab_weight;
 
         let cache_after_trade = |base_lots: i64| -> Result<HealthCache> {
             let mut adjusted_cache = self.clone();
@@ -336,31 +344,20 @@ impl HealthCache {
             // Need to figure out how many lots to trade to reach zero health (zero_health_amount).
             // We do this by looking at the starting health and the health slope per
             // traded base lot (final_health_slope).
-            let start_cache = cache_after_trade(case1_start)?;
-            let start_health = start_cache.health(HealthType::Init);
+            let mut start_cache = cache_after_trade(case1_start)?;
+            // The perp market's contribution to the health above may be capped. But we need to trade
+            // enough to fully reduce any positive-pnl buffer. Thus get the uncapped health by fixing
+            // the overall weight.
+            start_cache.perp_infos[perp_info_index].init_overall_asset_weight = I80F48::ONE;
+            let start_health = start_cache.health(health_type);
             if start_health <= 0 {
                 return Ok(0);
             }
 
-            // The perp market's contribution to the health above may be capped. But we need to trade
-            // enough to fully reduce any positive-pnl buffer. Thus get the uncapped health:
-            // TODO: is this still correct?!
-            let perp_info = &start_cache.perp_infos[perp_info_index];
-            let settle_token = start_cache
-                .token_info(perp_info.settle_token_index)
-                .unwrap();
-            let uncapped_health_contrib = perp_info.weigh_health_contribution_settle(
-                perp_info.unweighted_health_unsettled_pnl(HealthType::Init),
-                HealthType::Init,
-                settle_token,
-            );
-            let start_health_uncapped = start_health
-                - perp_info.health_contribution(HealthType::Init, settle_token)
-                + uncapped_health_contrib;
             // We add 1 here because health is computed for truncated base_lots and we want to guarantee
             // zero_health_ratio <= 0.
             let zero_health_amount = case1_start_i80f48
-                - start_health_uncapped / final_health_slope / base_lot_size
+                - start_health / final_health_slope / base_lot_size
                 + I80F48::ONE;
             let zero_health_ratio = health_ratio_after_trade_trunc(zero_health_amount)?;
             assert!(zero_health_ratio <= 0);
@@ -406,6 +403,8 @@ impl HealthCache {
         // positions for the source and target token index.
         let token_info_index = find_token_info_index(&self.token_infos, bank.token_index)?;
         let token = &self.token_infos[token_info_index];
+        let token_balance =
+            self.effective_token_balances(health_type, false)[token_info_index].spot_and_perp;
 
         let cache_after_borrow = |amount: I80F48| -> Result<HealthCache> {
             let now_ts = system_epoch_secs();
@@ -430,7 +429,7 @@ impl HealthCache {
 
         // At most withdraw all deposits plus enough borrows to bring health to zero
         // (ensure this works with zero asset weight)
-        let limit = token.balance_spot.max(I80F48::ZERO)
+        let limit = token_balance.max(I80F48::ZERO)
             + self.health(health_type).max(I80F48::ZERO) / token.init_scaled_liab_weight;
         if limit <= 0 {
             return Ok(I80F48::ZERO);
