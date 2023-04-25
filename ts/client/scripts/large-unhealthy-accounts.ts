@@ -50,13 +50,17 @@ async function main(): Promise<void> {
     .sort((a, b) => a.healthRatio - b.healthRatio);
 
   console.log(
-    `${'Account'.padStart(45)}, ${'Health Ratio'.padStart(
+    `${'Owner'.padStart(45)}, ${'Health Ratio'.padStart(
+      10,
+    )} ${'Account'.padStart(45)}, ${'Health Ratio'.padStart(
       10,
     )}, ${'Equity'.padStart(10)}`,
   );
   for (const obj of mangoAccountsWithHealth) {
     console.log(
-      `${obj.account.publicKey.toBase58().padStart(45)}: ${obj.healthRatio
+      `${obj.account.owner.toBase58().padStart(45)} ${obj.account.publicKey
+        .toBase58()
+        .padStart(45)}: ${obj.healthRatio
         .toFixed(2)
         .padStart(8)} %, ${obj.equity.toLocaleString().padStart(10)} $`,
     );
