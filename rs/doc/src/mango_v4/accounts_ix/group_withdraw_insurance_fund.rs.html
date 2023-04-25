@@ -32,7 +32,6 @@
 <a href="#32" id="32">32</a>
 <a href="#33" id="33">33</a>
 <a href="#34" id="34">34</a>
-<a href="#35" id="35">35</a>
 </pre><pre class="rust"><code><span class="kw">use crate</span>::{error::MangoError, state::<span class="kw-2">*</span>};
 <span class="kw">use </span>anchor_lang::prelude::<span class="kw-2">*</span>;
 <span class="kw">use </span>anchor_spl::token::{<span class="self">self</span>, Token, TokenAccount};
@@ -40,7 +39,6 @@
 <span class="attr">#[derive(Accounts)]
 </span><span class="kw">pub struct </span>GroupWithdrawInsuranceFund&lt;<span class="lifetime">&#39;info</span>&gt; {
     <span class="attr">#[account(
-        <span class="kw-2">mut</span>,
         has_one = insurance_vault,
         has_one = admin,
         constraint = group.load()<span class="question-mark">?</span>.is_ix_enabled(IxGate::GroupWithdrawInsuranceFund) @ MangoError::IxIsDisabled,
