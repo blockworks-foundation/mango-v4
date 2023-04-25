@@ -178,6 +178,7 @@ export interface IxGateParams {
   AccountBuybackFeesWithMngo: boolean;
   TokenForceCloseBorrowsWithToken: boolean;
   PerpForceClosePosition: boolean;
+  GroupWithdrawInsuranceFund: boolean;
 }
 
 // Default with all ixs enabled, use with buildIxGate

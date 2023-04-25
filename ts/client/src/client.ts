@@ -432,7 +432,6 @@ export class MangoClient {
     const liabBank = group.getFirstBankByTokenIndex(liabTokenIndex);
     const healthRemainingAccounts: PublicKey[] =
       this.buildHealthRemainingAccounts(
-        AccountRetriever.Scanning,
         group,
         [liqor, liqee],
         [assetBank, liabBank],
@@ -1502,7 +1501,6 @@ export class MangoClient {
 
     const healthRemainingAccounts: PublicKey[] =
       this.buildHealthRemainingAccounts(
-        AccountRetriever.Fixed,
         group,
         [mangoAccount],
         [],

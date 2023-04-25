@@ -178,6 +178,42 @@ export type MangoV4 = {
       ]
     },
     {
+      "name": "groupWithdrawInsuranceFund",
+      "accounts": [
+        {
+          "name": "group",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "admin",
+          "isMut": false,
+          "isSigner": true
+        },
+        {
+          "name": "insuranceVault",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "destination",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "tokenProgram",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "amount",
+          "type": "u64"
+        }
+      ]
+    },
+    {
       "name": "ixGateSet",
       "accounts": [
         {
@@ -3967,7 +4003,13 @@ export type MangoV4 = {
         "benchmark",
         ""
       ],
-      "accounts": [],
+      "accounts": [
+        {
+          "name": "dummy",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
       "args": []
     }
   ],
@@ -7119,6 +7161,9 @@ export type MangoV4 = {
           },
           {
             "name": "PerpForceClosePosition"
+          },
+          {
+            "name": "GroupWithdrawInsuranceFund"
           }
         ]
       }
@@ -9053,6 +9098,42 @@ export const IDL: MangoV4 = {
       ]
     },
     {
+      "name": "groupWithdrawInsuranceFund",
+      "accounts": [
+        {
+          "name": "group",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "admin",
+          "isMut": false,
+          "isSigner": true
+        },
+        {
+          "name": "insuranceVault",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "destination",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "tokenProgram",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "amount",
+          "type": "u64"
+        }
+      ]
+    },
+    {
       "name": "ixGateSet",
       "accounts": [
         {
@@ -12842,7 +12923,13 @@ export const IDL: MangoV4 = {
         "benchmark",
         ""
       ],
-      "accounts": [],
+      "accounts": [
+        {
+          "name": "dummy",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
       "args": []
     }
   ],
@@ -15994,6 +16081,9 @@ export const IDL: MangoV4 = {
           },
           {
             "name": "PerpForceClosePosition"
+          },
+          {
+            "name": "GroupWithdrawInsuranceFund"
           }
         ]
       }
