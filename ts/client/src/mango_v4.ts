@@ -7203,6 +7203,23 @@ export type MangoV4 = {
       }
     },
     {
+      "name": "CheckLiquidatable",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "NotLiquidatable"
+          },
+          {
+            "name": "Liquidatable"
+          },
+          {
+            "name": "BecameNotLiquidatable"
+          }
+        ]
+      }
+    },
+    {
       "name": "OracleType",
       "type": {
         "kind": "enum",
@@ -16196,6 +16213,23 @@ export const IDL: MangoV4 = {
           },
           {
             "name": "GroupWithdrawInsuranceFund"
+          }
+        ]
+      }
+    },
+    {
+      "name": "CheckLiquidatable",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "NotLiquidatable"
+          },
+          {
+            "name": "Liquidatable"
+          },
+          {
+            "name": "BecameNotLiquidatable"
           }
         ]
       }
