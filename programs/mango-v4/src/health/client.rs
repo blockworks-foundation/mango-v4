@@ -300,7 +300,7 @@ impl HealthCache {
         if final_health_slope >= 0 {
             return Ok(i64::MAX);
         }
-        final_health_slope *= settle_info.init_liab_weight;
+        final_health_slope *= settle_info.liab_weighted_price(health_type);
 
         let cache_after_trade = |base_lots: i64| -> Result<HealthCache> {
             let mut adjusted_cache = self.clone();
