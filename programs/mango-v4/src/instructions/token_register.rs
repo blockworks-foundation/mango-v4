@@ -88,7 +88,8 @@ pub fn token_register(
         borrow_weight_scale_start_quote: f64::MAX,
         deposit_weight_scale_start_quote: f64::MAX,
         reduce_only: 0,
-        reserved: [0; 2119],
+        force_close: 0,
+        reserved: [0; 2118],
     };
     require_gt!(bank.max_rate, MINIMUM_MAX_RATE);
 

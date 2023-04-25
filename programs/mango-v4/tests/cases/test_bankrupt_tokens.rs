@@ -184,7 +184,7 @@ async fn test_bankrupt_tokens_socialize_loss() -> Result<(), TransportError> {
     assert!(account_position_closed(solana, account, collateral_token1.bank).await);
     assert_eq!(
         account_position(solana, account, borrow_token1.bank).await,
-        (-350.0f64 + (1000.0 / 20.0 / 1.04)).round() as i64
+        (-350.0f64 + (1000.0 / 20.0 / 1.02)).round() as i64
     );
     let liqee = get_mango_account(solana, account).await;
     assert!(liqee.being_liquidated());
@@ -206,7 +206,7 @@ async fn test_bankrupt_tokens_socialize_loss() -> Result<(), TransportError> {
     .await
     .unwrap();
     assert!(account_position_closed(solana, account, collateral_token2.bank).await);
-    let borrow1_after_liq = -350.0f64 + (1000.0 / 20.0 / 1.04) + (20.0 / 20.0 / 1.04);
+    let borrow1_after_liq = -350.0f64 + (1000.0 / 20.0 / 1.02) + (20.0 / 20.0 / 1.02);
     assert_eq!(
         account_position(solana, account, borrow_token1.bank).await,
         borrow1_after_liq.round() as i64
