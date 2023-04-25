@@ -90,7 +90,8 @@ pub mod mango_v4 {
         amount: u64,
     ) -> Result<()> {
         #[cfg(feature = "enable-gpl")]
-        instructions::group_withdraw_insurance_fund(ctx, amount)
+        instructions::group_withdraw_insurance_fund(ctx, amount)?;
+        Ok(())
     }
 
     pub fn ix_gate_set(ctx: Context<IxGateSet>, ix_gate: u128) -> Result<()> {
