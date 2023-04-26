@@ -182,7 +182,7 @@ export type MangoV4 = {
       "accounts": [
         {
           "name": "group",
-          "isMut": true,
+          "isMut": false,
           "isSigner": false
         },
         {
@@ -7164,40 +7164,6 @@ export type MangoV4 = {
           },
           {
             "name": "GroupWithdrawInsuranceFund"
-          }
-        ]
-      }
-    },
-    {
-      "name": "CheckLiquidatable",
-      "type": {
-        "kind": "enum",
-        "variants": [
-          {
-            "name": "NotLiquidatable"
-          },
-          {
-            "name": "Liquidatable"
-          },
-          {
-            "name": "BecameNotLiquidatable"
-          }
-        ]
-      }
-    },
-    {
-      "name": "CheckLiquidatable",
-      "type": {
-        "kind": "enum",
-        "variants": [
-          {
-            "name": "NotLiquidatable"
-          },
-          {
-            "name": "Liquidatable"
-          },
-          {
-            "name": "BecameNotLiquidatable"
           }
         ]
       }
@@ -9231,7 +9197,7 @@ export const IDL: MangoV4 = {
       "accounts": [
         {
           "name": "group",
-          "isMut": true,
+          "isMut": false,
           "isSigner": false
         },
         {
@@ -16213,40 +16179,6 @@ export const IDL: MangoV4 = {
           },
           {
             "name": "GroupWithdrawInsuranceFund"
-          }
-        ]
-      }
-    },
-    {
-      "name": "CheckLiquidatable",
-      "type": {
-        "kind": "enum",
-        "variants": [
-          {
-            "name": "NotLiquidatable"
-          },
-          {
-            "name": "Liquidatable"
-          },
-          {
-            "name": "BecameNotLiquidatable"
-          }
-        ]
-      }
-    },
-    {
-      "name": "CheckLiquidatable",
-      "type": {
-        "kind": "enum",
-        "variants": [
-          {
-            "name": "NotLiquidatable"
-          },
-          {
-            "name": "Liquidatable"
-          },
-          {
-            "name": "BecameNotLiquidatable"
           }
         ]
       }

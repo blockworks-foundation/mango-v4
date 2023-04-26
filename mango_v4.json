@@ -182,7 +182,7 @@
       "accounts": [
         {
           "name": "group",
-          "isMut": true,
+          "isMut": false,
           "isSigner": false
         },
         {
@@ -7164,40 +7164,6 @@
           },
           {
             "name": "GroupWithdrawInsuranceFund"
-          }
-        ]
-      }
-    },
-    {
-      "name": "CheckLiquidatable",
-      "type": {
-        "kind": "enum",
-        "variants": [
-          {
-            "name": "NotLiquidatable"
-          },
-          {
-            "name": "Liquidatable"
-          },
-          {
-            "name": "BecameNotLiquidatable"
-          }
-        ]
-      }
-    },
-    {
-      "name": "CheckLiquidatable",
-      "type": {
-        "kind": "enum",
-        "variants": [
-          {
-            "name": "NotLiquidatable"
-          },
-          {
-            "name": "Liquidatable"
-          },
-          {
-            "name": "BecameNotLiquidatable"
           }
         ]
       }
