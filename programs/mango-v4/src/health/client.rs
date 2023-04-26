@@ -27,7 +27,7 @@ impl HealthCache {
     ///
     /// Maybe talking about the collateralization ratio assets/liabs is more intuitive?
     pub fn health_ratio(&self, health_type: HealthType) -> I80F48 {
-        let (assets, liabs) = self.health_assets_and_liabs(health_type);
+        let (assets, liabs) = self.health_assets_and_liabs_stable_liabs(health_type);
         let hundred = I80F48::from(100);
         if liabs > 0 {
             // feel free to saturate to MAX for tiny liabs
@@ -642,6 +642,27 @@ mod tests {
         }
     }
 
+    fn default_perp_info(x: f64) -> PerpInfo {
+        PerpInfo {
+            perp_market_index: 0,
+            settle_token_index: 0,
+            maint_base_asset_weight: I80F48::from_num(1.0 - x),
+            init_base_asset_weight: I80F48::from_num(1.0 - x),
+            maint_base_liab_weight: I80F48::from_num(1.0 + x),
+            init_base_liab_weight: I80F48::from_num(1.0 + x),
+            maint_overall_asset_weight: I80F48::from_num(0.6),
+            init_overall_asset_weight: I80F48::from_num(0.6),
+            base_lot_size: 1,
+            base_lots: 0,
+            bids_base_lots: 0,
+            asks_base_lots: 0,
+            quote: I80F48::ZERO,
+            base_prices: Prices::new_single_price(I80F48::from_num(2.0)),
+            has_open_orders: false,
+            has_open_fills: false,
+        }
+    }
+
     #[test]
     fn test_max_swap() {
         let buffer = MangoAccount::default_for_tests().try_to_vec().unwrap();
@@ -997,30 +1018,35 @@ mod tests {
                     }
                 }
             }
+
+            {
+                // swap while influenced by a perp market
+                println!("test 10 {test_name}");
+                let mut health_cache = health_cache.clone();
+                health_cache.perp_infos.push(PerpInfo {
+                    perp_market_index: 0,
+                    settle_token_index: 1,
+                    ..default_perp_info(0.3)
+                });
+                adjust_by_usdc(&mut health_cache, 0, 60.0);
+
+                for perp_quote in [-10, 10] {
+                    health_cache.perp_infos[0].quote = I80F48::from_num(perp_quote);
+                    for price_factor in [0.9, 1.1] {
+                        for target in 1..100 {
+                            let target = target as f64;
+                            check(&health_cache, 0, 1, target, price_factor, banks);
+                            check(&health_cache, 1, 0, target, price_factor, banks);
+                        }
+                    }
+                }
+            }
         }
     }
 
     #[test]
     fn test_max_perp() {
         let base_lot_size = 100;
-        let default_perp_info = |x| PerpInfo {
-            perp_market_index: 0,
-            settle_token_index: 1,
-            maint_base_asset_weight: I80F48::from_num(1.0 - x),
-            init_base_asset_weight: I80F48::from_num(1.0 - x),
-            maint_base_liab_weight: I80F48::from_num(1.0 + x),
-            init_base_liab_weight: I80F48::from_num(1.0 + x),
-            maint_overall_asset_weight: I80F48::from_num(0.6),
-            init_overall_asset_weight: I80F48::from_num(0.6),
-            base_lot_size,
-            base_lots: 0,
-            bids_base_lots: 0,
-            asks_base_lots: 0,
-            quote: I80F48::ZERO,
-            base_prices: Prices::new_single_price(I80F48::from_num(2.0)),
-            has_open_orders: false,
-            has_open_fills: false,
-        };
 
         let health_cache = HealthCache {
             token_infos: vec![
@@ -1038,6 +1064,8 @@ mod tests {
             serum3_infos: vec![],
             perp_infos: vec![PerpInfo {
                 perp_market_index: 0,
+                settle_token_index: 1,
+                base_lot_size,
                 ..default_perp_info(0.3)
             }],
             being_liquidated: false,
@@ -1395,6 +1423,57 @@ mod tests {
             check_max_borrow(&health_cache, 100.0);
             check_max_borrow(&health_cache, 50.0);
             check_max_borrow(&health_cache, 0.0);
+        }
+    }
+
+    #[test]
+    fn test_assets_and_borrows() {
+        let health_cache = HealthCache {
+            token_infos: vec![
+                TokenInfo {
+                    token_index: 0,
+                    ..default_token_info(0.0, 1.0)
+                },
+                TokenInfo {
+                    token_index: 1,
+                    ..default_token_info(0.2, 2.0)
+                },
+            ],
+            serum3_infos: vec![],
+            perp_infos: vec![PerpInfo {
+                perp_market_index: 0,
+                settle_token_index: 0,
+                ..default_perp_info(0.3)
+            }],
+            being_liquidated: false,
+        };
+
+        {
+            let mut hc = health_cache.clone();
+            hc.token_infos[1].balance_spot = I80F48::from(10);
+            hc.perp_infos[0].quote = I80F48::from(-12);
+
+            let (assets, liabs) = hc.health_assets_and_liabs_stable_assets(HealthType::Init);
+            assert!((assets.to_num::<f64>() - 2.0 * 10.0 * 0.8) < 0.01);
+            assert!((liabs.to_num::<f64>() - 2.0 * (10.0 * 0.8 + 2.0 * 1.2)) < 0.01);
+
+            let (assets, liabs) = hc.health_assets_and_liabs_stable_liabs(HealthType::Init);
+            assert!((liabs.to_num::<f64>() - 2.0 * 12.0 * 1.2) < 0.01);
+            assert!((assets.to_num::<f64>() - 2.0 * 10.0 * 1.2) < 0.01);
+        }
+
+        {
+            let mut hc = health_cache.clone();
+            hc.token_infos[1].balance_spot = I80F48::from(12);
+            hc.perp_infos[0].quote = I80F48::from(-10);
+
+            let (assets, liabs) = hc.health_assets_and_liabs_stable_assets(HealthType::Init);
+            assert!((assets.to_num::<f64>() - 2.0 * 12.0 * 0.8) < 0.01);
+            assert!((liabs.to_num::<f64>() - 2.0 * 10.0 * 0.8) < 0.01);
+
+            let (assets, liabs) = hc.health_assets_and_liabs_stable_liabs(HealthType::Init);
+            assert!((liabs.to_num::<f64>() - 2.0 * 10.0 * 1.2) < 0.01);
+            assert!((assets.to_num::<f64>() - 2.0 * (10.0 * 1.2 + 2.0 * 0.8)) < 0.01);
         }
     }
 }

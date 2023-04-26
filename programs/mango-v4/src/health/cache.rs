@@ -446,21 +446,119 @@ impl HealthCache {
         health
     }
 
-    /// Sum of only the positive health components (assets) and
-    /// sum of absolute values of all negative health components (liabs, always >= 0)
-    pub fn health_assets_and_liabs(&self, health_type: HealthType) -> (I80F48, I80F48) {
-        let token_balances = self.effective_token_balances(health_type, false);
-        let mut assets = I80F48::ZERO;
-        let mut liabs = I80F48::ZERO;
-        let sum = |contrib| {
-            if contrib > 0 {
-                assets += contrib;
+    pub fn health_assets_and_liabs_stable_assets(
+        &self,
+        health_type: HealthType,
+    ) -> (I80F48, I80F48) {
+        self.health_assets_and_liabs(health_type, true)
+    }
+    pub fn health_assets_and_liabs_stable_liabs(
+        &self,
+        health_type: HealthType,
+    ) -> (I80F48, I80F48) {
+        self.health_assets_and_liabs(health_type, false)
+    }
+
+    /// Loop over the token, perp, serum contributions and add up all positive values into `assets`
+    /// and (the abs) of negative values separately into `liabs`. Return (assets, liabs).
+    ///
+    /// Due to the way token and perp positions sum before being weighted, there's some flexibility
+    /// in how the sum is split up. It can either be split up such that the amount of liabs stays
+    /// constant when assets change, or the other way around.
+    ///
+    /// For example, if assets are held stable: An account with $10 in SOL and -$12 hupnl in a
+    /// SOL-settled perp market would have:
+    /// - assets: $10 * SOL_asset_weight
+    /// - liabs: $10 * SOL_asset_weight + $2 * SOL_liab_weight
+    /// because some of the liabs are weighted lower as they are just compensating the assets.
+    ///
+    /// Same example if liabs are held stable:
+    /// - liabs: $12 * SOL_liab_weight
+    /// - assets: $10 * SOL_liab_weight
+    ///
+    /// The value `assets - liabs` is the health and the same in both cases.
+    fn health_assets_and_liabs(
+        &self,
+        health_type: HealthType,
+        stable_assets: bool,
+    ) -> (I80F48, I80F48) {
+        let mut total_assets = I80F48::ZERO;
+        let mut total_liabs = I80F48::ZERO;
+        let add = |assets: &mut I80F48, liabs: &mut I80F48, value: I80F48| {
+            if value > 0 {
+                *assets += value;
             } else {
-                liabs -= contrib;
+                *liabs += -value;
             }
         };
-        self.health_sum(health_type, sum, &token_balances);
-        (assets, liabs)
+
+        for token_info in self.token_infos.iter() {
+            // For each token, health only considers the effective token position. But for
+            // this function we want to distinguish the contribution from token deposits from
+            // contributions by perp markets.
+            // However, the overall weight is determined by the sum, so first collect all
+            // assets parts and all liab parts and then determine the actual values.
+            let mut asset_balance = I80F48::ZERO;
+            let mut liab_balance = I80F48::ZERO;
+
+            add(
+                &mut asset_balance,
+                &mut liab_balance,
+                token_info.balance_spot,
+            );
+
+            for perp_info in self.perp_infos.iter() {
+                if perp_info.settle_token_index != token_info.token_index {
+                    continue;
+                }
+                let health_unsettled = perp_info.health_unsettled_pnl(health_type);
+                add(&mut asset_balance, &mut liab_balance, health_unsettled);
+            }
+
+            // The assignment to total_assets and total_liabs is a bit arbitrary.
+            // As long as the (added_assets - added_liabs) = weighted(asset_balance - liab_balance),
+            // the result will be consistent.
+            if stable_assets {
+                let asset_weighted_price = token_info.asset_weighted_price(health_type);
+                let assets = asset_balance * asset_weighted_price;
+                total_assets += assets;
+                if asset_balance >= liab_balance {
+                    // liabs partially compensate
+                    total_liabs += liab_balance * asset_weighted_price;
+                } else {
+                    let liab_weighted_price = token_info.liab_weighted_price(health_type);
+                    // the liabs fully compensate the assets and even add something extra
+                    total_liabs += assets + (liab_balance - asset_balance) * liab_weighted_price;
+                }
+            } else {
+                let liab_weighted_price = token_info.liab_weighted_price(health_type);
+                let liabs = liab_balance * liab_weighted_price;
+                total_liabs += liabs;
+                if asset_balance >= liab_balance {
+                    let asset_weighted_price = token_info.asset_weighted_price(health_type);
+                    // the assets fully compensate the liabs and even add something extra
+                    total_assets += liabs + (asset_balance - liab_balance) * asset_weighted_price;
+                } else {
+                    // assets partially compensate
+                    total_assets += asset_balance * liab_weighted_price;
+                }
+            }
+        }
+
+        let token_balances = self.effective_token_balances(health_type, false);
+        let (token_max_reserved, serum3_reserved) = self.compute_serum3_reservations(health_type);
+        for (serum3_info, reserved) in self.serum3_infos.iter().zip(serum3_reserved.iter()) {
+            let contrib = serum3_info.health_contribution(
+                health_type,
+                &self.token_infos,
+                &token_balances,
+                &token_max_reserved,
+                reserved,
+            );
+            add(&mut total_assets, &mut total_liabs, contrib);
+        }
+
+        (total_assets, total_liabs)
     }
 
     pub fn token_info(&self, token_index: TokenIndex) -> Result<&TokenInfo> {

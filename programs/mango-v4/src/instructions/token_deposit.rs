@@ -131,7 +131,7 @@ impl<'a, 'info> DepositCommon<'a, 'info> {
         let group = self.group.load()?;
         if group.deposit_limit_quote > 0 {
             let assets = cache
-                .health_assets_and_liabs(HealthType::Init)
+                .health_assets_and_liabs_stable_assets(HealthType::Init)
                 .0
                 .round_to_zero()
                 .to_num::<u64>();
