@@ -57,7 +57,7 @@ pub fn perp_liq_base_or_positive_pnl(
     let liqee_liq_end_health = liqee_health_cache.health(HealthType::LiquidationEnd);
     liqee_health_cache.require_after_phase1_liquidation()?;
 
-    if !liqee.check_liquidatable(&liqee_health_cache)? {
+    if liqee.check_liquidatable(&liqee_health_cache)? != CheckLiquidatable::Liquidatable {
         return Ok(());
     }
 
@@ -1025,7 +1025,8 @@ mod tests {
                 -(exp_liqee_quote - init_liqee_quote),
                 0.01
             );
-            // everything that was not a trade gain produced settleable pnl
+            // The settle limit taken over matches the quote pos when removing the
+            // quote gains from giving away base lots
             assert_eq_f!(
                 I80F48::from_num(liqor_perp.settle_pnl_limit_realized_trade),
                 liqor_perp.quote_position_native.to_num::<f64>()

@@ -364,6 +364,8 @@ async fn test_perp_reduce_only() -> Result<(), TransportError> {
             group,
             admin,
             perp_market,
+            reduce_only: true,
+            force_close: false,
         },
     )
     .await

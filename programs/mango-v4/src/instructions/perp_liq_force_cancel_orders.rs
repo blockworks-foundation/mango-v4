@@ -11,38 +11,29 @@ pub fn perp_liq_force_cancel_orders(
 ) -> Result<()> {
     let mut account = ctx.accounts.account.load_full_mut()?;
 
-    //
-    // Check liqee health if liquidation is allowed
-    //
     let mut health_cache = {
         let retriever =
             new_fixed_order_account_retriever(ctx.remaining_accounts, &account.borrow())?;
-        let health_cache =
-            new_health_cache(&account.borrow(), &retriever).context("create health cache")?;
-
-        {
-            let result = account.check_liquidatable(&health_cache);
-            if account.fixed.is_operational() {
-                if !result? {
-                    return Ok(());
-                }
-            } else {
-                // Frozen accounts can always have their orders cancelled
-                if !result.is_anchor_error_with_code(MangoError::HealthMustBeNegative.into()) {
-                    // Propagate unexpected errors
-                    result?;
-                }
-            }
-        }
-
-        health_cache
+        new_health_cache(&account.borrow(), &retriever).context("create health cache")?
     };
+
+    let mut perp_market = ctx.accounts.perp_market.load_mut()?;
+
+    //
+    // Early return if if liquidation is not allowed or if market is not in force close
+    //
+    let liquidatable = account.check_liquidatable(&health_cache)?;
+    if account.fixed.is_operational()
+        && liquidatable != CheckLiquidatable::Liquidatable
+        && !perp_market.is_force_close()
+    {
+        return Ok(());
+    }
 
     //
     // Cancel orders
     //
     {
-        let mut perp_market = ctx.accounts.perp_market.load_mut()?;
         let mut book = Orderbook {
             bids: ctx.accounts.bids.load_mut()?,
             asks: ctx.accounts.asks.load_mut()?,

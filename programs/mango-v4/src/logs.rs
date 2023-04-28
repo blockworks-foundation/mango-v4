@@ -379,3 +379,28 @@ pub struct FilledPerpOrderLog {
     pub perp_market_index: u16,
     pub seq_num: u64,
 }
+
+#[event]
+pub struct PerpForceClosePositionLog {
+    pub mango_group: Pubkey,
+    pub perp_market_index: u16,
+    pub account_a: Pubkey,
+    pub account_b: Pubkey,
+    pub base_transfer: i64,
+    pub quote_transfer: i128,
+    pub price: i128,
+}
+
+#[event]
+pub struct TokenForceCloseBorrowsWithTokenLog {
+    pub mango_group: Pubkey,
+    pub liqor: Pubkey,
+    pub liqee: Pubkey,
+    pub asset_token_index: u16,
+    pub liab_token_index: u16,
+    pub asset_transfer: i128,
+    pub liab_transfer: i128,
+    pub asset_price: i128,
+    pub liab_price: i128,
+    pub fee_factor: i128,
+}

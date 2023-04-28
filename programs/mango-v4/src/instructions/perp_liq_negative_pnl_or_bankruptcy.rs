@@ -84,7 +84,7 @@ pub fn perp_liq_negative_pnl_or_bankruptcy(
     // Guarantees that perp base position is 0 and perp quote position is <= 0.
     liqee_health_cache.require_after_phase2_liquidation()?;
 
-    if !liqee.check_liquidatable(&liqee_health_cache)? {
+    if liqee.check_liquidatable(&liqee_health_cache)? != CheckLiquidatable::Liquidatable {
         return Ok(());
     }
 

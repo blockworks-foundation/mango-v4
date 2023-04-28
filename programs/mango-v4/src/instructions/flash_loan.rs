@@ -137,7 +137,8 @@ pub fn flash_loan_begin<'key, 'accounts, 'remaining, 'info>(
                 require_msg!(
                     ix.program_id == AssociatedToken::id()
                         || ix.program_id == jupiter_mainnet_3::ID
-                        || ix.program_id == jupiter_mainnet_4::ID,
+                        || ix.program_id == jupiter_mainnet_4::ID
+                        || ix.program_id == crate::id(),
                     "delegate is only allowed to pass in ixs to ATA or Jupiter v3 or v4 programs"
                 );
             }

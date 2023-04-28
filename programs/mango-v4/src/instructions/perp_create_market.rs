@@ -86,6 +86,7 @@ pub fn perp_create_market(
         padding3: Default::default(),
         settle_pnl_limit_window_size_ts,
         reduce_only: 0,
+        force_close: 0,
         padding4: Default::default(),
         maint_overall_asset_weight: I80F48::from_num(maint_overall_asset_weight),
         init_overall_asset_weight: I80F48::from_num(init_overall_asset_weight),

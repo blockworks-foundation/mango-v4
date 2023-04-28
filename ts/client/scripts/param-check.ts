@@ -45,7 +45,7 @@ async function computePriceImpact(
   };
 }
 
-async function main() {
+async function main(): Promise<void> {
   const client = await buildClient();
   const group = await client.getGroup(new PublicKey(GROUP_PK));
   await group.reloadAll(client);
@@ -57,9 +57,6 @@ async function main() {
   );
 
   for (const bank of Array.from(group.banksMapByMint.values())) {
-    if (bank[0].name === 'USDC' || bank[0].reduceOnly === true) {
-      continue;
-    }
     const usdcMint = 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v';
 
     const pi1 = await computePriceImpact(
