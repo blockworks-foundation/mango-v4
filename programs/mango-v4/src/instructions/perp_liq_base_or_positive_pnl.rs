@@ -376,12 +376,13 @@ pub(crate) fn liquidation_action(
             "{} total: {} lots, exhealth {} -> {}, health {} -> {}, uhupnl: {} -> {}",
             step,
             base_lots,
-            expected_health,
-            new_expected_health,
-            *current_health,
-            new_health,
-            *current_uhupnl,
-            new_uhupnl,
+            // logging i64 is significantly cheaper
+            expected_health.to_num::<i64>(),
+            new_expected_health.to_num::<i64>(),
+            current_health.to_num::<i64>(),
+            new_health.to_num::<i64>(),
+            current_uhupnl.to_num::<i64>(),
+            new_uhupnl.to_num::<i64>(),
         );
 
         *current_settle_token = new_settle_token;
@@ -421,11 +422,11 @@ pub(crate) fn liquidation_action(
         msg!(
             "{}: {} settled, health {} -> {}, uhupnl: {} -> {}",
             step,
-            settle,
-            *current_health,
-            new_expected_health,
-            *current_uhupnl,
-            new_uhupnl,
+            settle.to_num::<i64>(),
+            current_health.to_num::<i64>(),
+            new_expected_health.to_num::<i64>(),
+            current_uhupnl.to_num::<i64>(),
+            new_uhupnl.to_num::<i64>(),
         );
 
         *current_settle_token = new_settle_token;

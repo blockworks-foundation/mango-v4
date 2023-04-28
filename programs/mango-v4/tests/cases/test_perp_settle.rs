@@ -3,7 +3,7 @@ use super::*;
 #[tokio::test]
 async fn test_perp_settle_pnl_basic() -> Result<(), TransportError> {
     let mut test_builder = TestContextBuilder::new();
-    test_builder.test().set_compute_max_units(90_000); // TODO: the divisions in perp_max_settle are costly!
+    test_builder.test().set_compute_max_units(90_000); // the divisions in perp_max_settle are costly!
     let context = test_builder.start_default().await;
     let solana = &context.solana.clone();
 

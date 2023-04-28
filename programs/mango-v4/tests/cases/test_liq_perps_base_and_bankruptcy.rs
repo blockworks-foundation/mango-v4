@@ -3,8 +3,7 @@ use super::*;
 #[tokio::test]
 async fn test_liq_perps_base_and_bankruptcy() -> Result<(), TransportError> {
     let mut test_builder = TestContextBuilder::new();
-    // TODO: lots of costly divisions now in liq ix
-    test_builder.test().set_compute_max_units(200_000); // PerpLiqBaseOrPositivePnl takes a lot of CU
+    test_builder.test().set_compute_max_units(150_000); // PerpLiqBaseOrPositivePnl takes a lot of CU
     let context = test_builder.start_default().await;
     let solana = &context.solana.clone();
 

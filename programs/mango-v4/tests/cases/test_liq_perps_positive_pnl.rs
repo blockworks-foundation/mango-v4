@@ -3,8 +3,7 @@ use super::*;
 #[tokio::test]
 async fn test_liq_perps_positive_pnl() -> Result<(), TransportError> {
     let mut test_builder = TestContextBuilder::new();
-    // TODO: Need to drop a bunch of logging? CU too high!
-    test_builder.test().set_compute_max_units(250_000); // PerpLiqBaseOrPositivePnlInstruction takes a lot of CU
+    test_builder.test().set_compute_max_units(170_000); // PerpLiqBaseOrPositivePnlInstruction takes a lot of CU
     let context = test_builder.start_default().await;
     let solana = &context.solana.clone();
 
