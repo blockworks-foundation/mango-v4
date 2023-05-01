@@ -309,7 +309,7 @@ pub(crate) fn liquidation_action(
     if settlement == max_settlement_liqee && liqee_pnl < 0 {
         // Preparation that's needed for both, insurance fund based pnl takeover and socialized loss
 
-        let liqee_settle_health_balance = liqee_health_token_balances
+        let liqee_settle_token_balance = liqee_health_token_balances
             [liqee_health_cache.token_info_index(settle_token_index)?]
         .spot_and_perp;
         let liqee_perp_position = liqee.perp_position_mut(perp_market_index)?;
@@ -326,7 +326,7 @@ pub(crate) fn liquidation_action(
             let asset_weighted_price = settle_token_oracle_price * settle_bank.init_asset_weight;
             spot_amount_given_for_health_zero(
                 liqee_liq_end_health,
-                liqee_settle_health_balance,
+                liqee_settle_token_balance,
                 asset_weighted_price,
                 liab_weighted_price,
             )?

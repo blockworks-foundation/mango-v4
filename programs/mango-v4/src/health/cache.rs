@@ -841,13 +841,13 @@ impl HealthCache {
     /// For these the hupnl is added to the total because that's the risk-adjusted expected to be
     /// gained or lost from settlement.
     ///
-    /// The perp_settle_health flag exists for perp_max_settle(). When it is enabled, all negative
+    /// The ignore_negative_perp flag exists for perp_max_settle(). When it is enabled, all negative
     /// token contributions from perp markets are ignored. That's useful for knowing how much token
     /// collateral is available when limiting negative upnl settlement.
     pub fn effective_token_balances(
         &self,
         health_type: HealthType,
-        perp_settle_health: bool,
+        ignore_negative_perp: bool,
     ) -> Vec<TokenBalance> {
         let mut token_balances = vec![TokenBalance::default(); self.token_infos.len()];
 
@@ -855,7 +855,7 @@ impl HealthCache {
             let settle_token_index = self.token_info_index(perp_info.settle_token_index).unwrap();
             let perp_settle_token = &mut token_balances[settle_token_index];
             let health_unsettled = perp_info.health_unsettled_pnl(health_type);
-            if !perp_settle_health || health_unsettled > 0 {
+            if !ignore_negative_perp || health_unsettled > 0 {
                 perp_settle_token.spot_and_perp += health_unsettled;
             }
         }
@@ -891,11 +891,20 @@ impl HealthCache {
         }
     }
 
-    /// Returns how much pnl is settleable for a given settle token index.
+    /// Returns how much pnl is settleable for a given settle token.
+    ///
+    /// The idea of this limit is that settlement is only permissible as long as there are
+    /// non-perp assets that back it. If an account with 1 USD deposited somehow gets
+    /// a large negative perp upnl, it should not be allowed to settle that perp loss into
+    /// the spot world fully. Only 1 USD worth would be allowed.
+    ///
+    /// Effectively, there's a health variant "perp settle health" that ignores negative
+    /// token contributions from perp markets. Settlement is allowed as long as perp settle
+    /// health remains >= 0.
     ///
     /// For example, if perp_settle_health is 50 USD, then the settleable amount in SOL
     /// would depend on the SOL price, the user's current spot balance and the SOL weights:
-    /// We need to compute how much the users spot SOL balance may decrease before the
+    /// We need to compute how much the user's spot SOL balance may decrease before the
     /// perp_settle_health becomes zero.
     ///
     /// Note that the account's actual health would not change during settling negative upnl:

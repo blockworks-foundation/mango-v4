@@ -447,9 +447,9 @@ async fn test_liq_perps_base_and_bankruptcy() -> Result<(), TransportError> {
     .await
     .unwrap();
 
-    let liqee_settle_health_before: f64 = 1329.0;
+    let liqee_quote_deposits_before: f64 = 1329.0;
     // the liqor's settle limit means we can't settle everything
-    let settle_amount = liqee_settle_health_before.min(liqor_max_settle as f64);
+    let settle_amount = liqee_quote_deposits_before.min(liqor_max_settle as f64);
     let remaining_pnl = 20.0 * 100.0 - liq_amount_3 - liq_amount_4 - liq_amount_5 + settle_amount;
     assert!(remaining_pnl < 0.0);
     let liqee_data = solana.get_account::<MangoAccount>(account_1).await;
@@ -461,7 +461,7 @@ async fn test_liq_perps_base_and_bankruptcy() -> Result<(), TransportError> {
     ));
     assert_eq!(
         account_position(solana, account_1, quote_token.bank).await,
-        liqee_settle_health_before as i64
+        liqee_quote_deposits_before as i64
     );
     assert_eq!(
         account_position(solana, account_1, settle_token.bank).await,
@@ -494,7 +494,7 @@ async fn test_liq_perps_base_and_bankruptcy() -> Result<(), TransportError> {
     send_tx(
         solana,
         TokenWithdrawInstruction {
-            amount: liqee_settle_health_before as u64 - 100,
+            amount: liqee_quote_deposits_before as u64 - 100,
             allow_borrow: false,
             account: account_1,
             owner,
