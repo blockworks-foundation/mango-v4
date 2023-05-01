@@ -4,9 +4,39 @@ Update this for each program release and mainnet deployment.
 
 ## not on mainnet
 
-### v0.13.0, 2023-4-
+### v0.14.0, 2023-4-
 
 Deployment:
+
+- Force-closing of perp positions (#525)
+
+  When a perp markets is set to "force-close" by the DAO, anyone can close open
+  perp orders and positions on the market. This allows the DAO to wind down perp
+  markets if needed.
+
+- Force-closing of OpenBook market use via Mango (#551)
+
+  When an OpenBook market's Mango integration is set to "force-close" by the DAO,
+  anyone can close open orders on that market that were placed via Mango.
+  This allows the DAO to wind down interactions with an OpenBook market.
+
+- Fix exception for the Jupiter program in flash loan (#552)
+
+  Account delegates cannot execute generic flash loans, but were supposed to be
+  able to use whitelisted Jupiter programs during a flash loan. The bug that
+  prevented the exception from working was fixed.
+
+- Allow the DAO to withdraw from the insurance fund token account (#561)
+- Fix a bug with settle limit accounting when liqors take over positive pnl (#562)
+- Improve logging on force-close instructions (#555)
+- Fix perp order seqnum logging (#556)
+- Fix build when using mango-v4 code with the "no-entrypoint" feature (#558)
+
+## mainnet
+
+### v0.13.0, 2023-4-18
+
+Deployment: Apr 18, 2023 at 17:33:15 Central European Summer Time, https://explorer.solana.com/tx/4WWVHCAheTRBhzyXUjsV1Kqfn8LdnkupiVbK4qaPNqby8P5vv7hY6HS3rHHL9bMu1RGdCZvqsd2MHjdawLYQ6Pxi
 
 - Add explicit token account checks to FlashLoan (#542)
 
@@ -50,9 +80,9 @@ Deployment:
   The security admin was not supposed to be able to enable instructions, but a bug
   allowed it. With this fix, only the group admin (DAO) can enable instructions.
 
-### v0.12.0, 2023-4-
+### v0.12.0, 2023-4-17
 
-Deployment:
+Deployment: Apr 17, 2023 at 15:49:33 Central European Summer Time, https://explorer.solana.com/tx/2PbaCRMGgpGiysxk5y8x3TdFRZbGEAKZdyAzEQhAMXfCxS4bPN96YZ4Pp6hHfp17fd7RYUd13t4vtjpaFb4ccYRm
 
 - Emit perp fees settled on update_funding (#530)
 
@@ -61,8 +91,6 @@ Deployment:
 - Net borrow limit: Separate out tracking from checking (#534)
 
   That way it's easier to be specific about where the limit should be checked.
-
-## mainnet
 
 ### v0.11.0, 2023-4-4
 

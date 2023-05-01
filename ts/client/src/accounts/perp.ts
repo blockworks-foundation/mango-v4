@@ -107,6 +107,7 @@ export class PerpMarket {
       settlePnlLimitFactor: number;
       settlePnlLimitWindowSizeTs: BN;
       reduceOnly: number;
+      forceClose: number;
       maintOverallAssetWeight: I80F48Dto;
       initOverallAssetWeight: I80F48Dto;
       positivePnlLiquidationFee: I80F48Dto;
@@ -153,6 +154,7 @@ export class PerpMarket {
       obj.settlePnlLimitFactor,
       obj.settlePnlLimitWindowSizeTs,
       obj.reduceOnly == 1,
+      obj.forceClose == 1,
       obj.maintOverallAssetWeight,
       obj.initOverallAssetWeight,
       obj.positivePnlLiquidationFee,
@@ -200,6 +202,7 @@ export class PerpMarket {
     public settlePnlLimitFactor: number,
     public settlePnlLimitWindowSizeTs: BN,
     public reduceOnly: boolean,
+    public forceClose: boolean,
     maintOverallAssetWeight: I80F48Dto,
     initOverallAssetWeight: I80F48Dto,
     positivePnlLiquidationFee: I80F48Dto,

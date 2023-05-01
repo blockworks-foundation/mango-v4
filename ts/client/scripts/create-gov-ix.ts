@@ -322,6 +322,7 @@ async function perpEdit(): Promise<void> {
       params.resetStablePrice ?? false,
       params.positivePnlLiquidationFee,
       params.name,
+      params.forceClose,
     )
     .accounts({
       group: group.publicKey,

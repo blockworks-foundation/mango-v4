@@ -3006,6 +3006,7 @@ fn perp_edit_instruction_default() -> mango_v4::instruction::PerpEditMarket {
         reset_stable_price: false,
         positive_pnl_liquidation_fee_opt: None,
         name_opt: None,
+        force_close_opt: None,
     }
 }
 
@@ -3092,6 +3093,8 @@ pub struct PerpMakeReduceOnly {
     pub group: Pubkey,
     pub admin: TestKeypair,
     pub perp_market: Pubkey,
+    pub reduce_only: bool,
+    pub force_close: bool,
 }
 
 #[async_trait::async_trait(?Send)]
@@ -3107,7 +3110,8 @@ impl ClientInstruction for PerpMakeReduceOnly {
         let perp_market: PerpMarket = account_loader.load(&self.perp_market).await.unwrap();
 
         let instruction = Self::Instruction {
-            reduce_only_opt: Some(true),
+            reduce_only_opt: Some(self.reduce_only),
+            force_close_opt: Some(self.force_close),
             ..perp_edit_instruction_default()
         };
 
@@ -3617,6 +3621,42 @@ impl ClientInstruction for PerpSettlePnlInstruction {
     }
 }
 
+pub struct PerpForceClosePositionInstruction {
+    pub account_a: Pubkey,
+    pub account_b: Pubkey,
+    pub perp_market: Pubkey,
+}
+#[async_trait::async_trait(?Send)]
+impl ClientInstruction for PerpForceClosePositionInstruction {
+    type Accounts = mango_v4::accounts::PerpForceClosePosition;
+    type Instruction = mango_v4::instruction::PerpForceClosePosition;
+    async fn to_instruction(
+        &self,
+        account_loader: impl ClientAccountLoader + 'async_trait,
+    ) -> (Self::Accounts, instruction::Instruction) {
+        let program_id = mango_v4::id();
+        let instruction = Self::Instruction {};
+
+        let perp_market: PerpMarket = account_loader.load(&self.perp_market).await.unwrap();
+
+        let accounts = Self::Accounts {
+            group: perp_market.group,
+            perp_market: self.perp_market,
+            account_a: self.account_a,
+            account_b: self.account_b,
+            oracle: perp_market.oracle,
+        };
+
+        let instruction = make_instruction(program_id, &accounts, &instruction);
+
+        (accounts, instruction)
+    }
+
+    fn signers(&self) -> Vec<TestKeypair> {
+        vec![]
+    }
+}
+
 pub struct PerpSettleFeesInstruction {
     pub account: Pubkey,
     pub perp_market: Pubkey,
@@ -3882,7 +3922,9 @@ impl ClientInstruction for BenchmarkInstruction {
     ) -> (Self::Accounts, instruction::Instruction) {
         let program_id = mango_v4::id();
         let instruction = Self::Instruction {};
-        let accounts = Self::Accounts {};
+        let accounts = Self::Accounts {
+            dummy: Pubkey::new_unique(),
+        };
 
         let instruction = make_instruction(program_id, &accounts, &instruction);
         (accounts, instruction)
