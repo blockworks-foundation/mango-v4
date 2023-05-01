@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"enum":[["SlotStatus",""]],"struct":[["AccountData",""],["AccountFetcher",""],["ChainData","Track slots and account writes"],["ChainDataMetrics",""],["SlotData",""]]};
+window.SIDEBAR_ITEMS = {"enum":["SlotStatus"],"struct":["AccountData","AccountFetcher","ChainData","ChainDataMetrics","SlotData"]};

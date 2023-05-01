@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"fn":[["addresses",""],["contains",""],["cpi_extend",""]]};
+window.SIDEBAR_ITEMS = {"fn":["addresses","contains","cpi_extend"]};
