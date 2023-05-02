@@ -136,12 +136,13 @@ class BotContext {
   async refreshMangoAccount(): Promise<number | undefined> {
     if (!control.isRunning) return;
     try {
+      const preserveOOs = this.mangoAccount.serum3OosMapByMarketIndex;
       const response = await this.client.getMangoAccountWithSlot(
         this.mangoAccount.publicKey,
-        false,
       );
       if (response) {
         this.mangoAccount = response.value;
+        this.mangoAccount.serum3OosMapByMarketIndex = preserveOOs;
         this.mangoAccountLastUpdatedSlot = response.slot;
         this.mangoAccountLastUpdatedTs = Date.now();
         return response.slot;
@@ -154,7 +155,7 @@ class BotContext {
   }
 
   calculateDelta(i: PerpMarketIndex) {
-    const { params, perpMarket, unprocessedPerpFills } =
+    const { params, perpMarket, unprocessedPerpFills, eventQueueHeadBySlot } =
       this.perpMarkets.get(i)!;
 
     const tokenMint = new PublicKey(params.tokenMint);
@@ -169,9 +170,17 @@ class BotContext {
       // eslint-disable-next-line no-empty
     } catch (_) {}
 
-    const fillsSinceLastUpdate = unprocessedPerpFills.filter(
-      (f) => f.slot >= this.mangoAccountLastUpdatedSlot,
-    );
+
+    let fillsSinceLastUpdate: FillEventUpdate[] = []
+    let eventQueueHeadUpdatesBeforeLastMangoAccountUpdate = eventQueueHeadBySlot.filter(e => e.slot <= this.mangoAccountLastUpdatedSlot);
+    if (eventQueueHeadUpdatesBeforeLastMangoAccountUpdate.length > 0)
+    {
+      let eventQueueHeadAtMangoAccountUpdate = eventQueueHeadUpdatesBeforeLastMangoAccountUpdate[eventQueueHeadUpdatesBeforeLastMangoAccountUpdate.length-1];
+      fillsSinceLastUpdate = unprocessedPerpFills.filter(
+        (f) => f.event.seqNum >= eventQueueHeadAtMangoAccountUpdate.head
+      );
+    }
+
     const fillsDelta = fillsSinceLastUpdate.reduce((d, u) => {
       const isMaker = u.event.maker == MANGO_ACCOUNT.toString();
       const isNew = u.status == 'new';
@@ -186,6 +195,8 @@ class BotContext {
 
       return d + deltaSign * u.event.quantity;
     }, 0);
+
+
     // TODO: add fill delta into perpPosition
     return {
       delta: tokenPosition + perpPosition + fillsDelta,
@@ -197,7 +208,7 @@ class BotContext {
 
   async updateOrders(i: PerpMarketIndex): Promise<string> {
     const { params, perpMarket } = this.perpMarkets.get(i)!;
-    const { delta, perpPosition } = this.calculateDelta(i);
+    const { delta, perpPosition, fillsDelta } = this.calculateDelta(i);
     const currentEquityInUnderlying =
       toUiDecimalsForQuote(this.mangoAccount.getEquity(this.group).toNumber()) /
       perpMarket.uiPrice;
@@ -214,7 +225,7 @@ class BotContext {
     const askPrice = perpMarket.uiPrice * +params.spreadCharge;
 
     console.log(
-      `update orders ${perpMarket.name} delta=${prec(delta)} equity=${prec(
+      `update orders ${perpMarket.name} delta=${prec(delta)} fills=${prec(fillsDelta)} equity=${prec(
         currentEquityInUnderlying,
       )} mark=${prec(perpMarket.uiPrice)} bid=${prec(bidSize)}@${prec(
         bidPrice,
@@ -367,8 +378,8 @@ class BotContext {
           );
 
           console.log(
-            `hedge ${perpMarket.name} on spot delta=${prec(biasedDelta)}/${prec(
-              perpPosition,
+            `hedge ${perpMarket.name} on spot delta=${prec(biasedDelta)} fills=${prec(
+              fillsDelta,
             )} inputMint=${inputMint.toString()} outputMint=${outputMint.toString()} size=${prec(
               hedgeSize,
             )} limit=${prec(hedgePrice)} index=${prec(perpMarket.uiPrice)}`,
@@ -427,6 +438,8 @@ class BotContext {
               });
               const confirmEnd = Date.now();
 
+              await this.refreshMangoAccount();
+
               const newDelta = this.calculateDelta(i).delta;
 
               console.log(
@@ -444,7 +457,7 @@ class BotContext {
           }
         }
       }
-      await sleep(30); // sleep a few ms
+      await sleep(10); // sleep a few ms
     }
   }
 }
@@ -457,6 +470,7 @@ type MarketContext = {
   sequenceAccountBump: number;
   collateralBank: Bank;
   unprocessedPerpFills: FillEventUpdate[];
+  eventQueueHeadBySlot: {slot: number, head: number}[];
 };
 
 function getPerpMarketAssetsToTradeOn(group: Group): string[] {
@@ -610,6 +624,7 @@ async function fullMarketMaker(): Promise<void> {
   try {
     // Load client
     const options = AnchorProvider.defaultOptions();
+    options.commitment = 'processed';
     const connection = new Connection(RPC_URL!, options);
     const userWallet = new Wallet(KEYPAIR);
     const userProvider = new AnchorProvider(connection, userWallet, options);
@@ -633,6 +648,7 @@ async function fullMarketMaker(): Promise<void> {
           : ''
       }`,
     );
+    // reload mango account to load the serum3 oos
     await mangoAccount.reload(client);
 
     // Load group
@@ -668,6 +684,7 @@ async function fullMarketMaker(): Promise<void> {
         sequenceAccount,
         sequenceAccountBump,
         unprocessedPerpFills: [],
+        eventQueueHeadBySlot: [],
       });
     }
 
@@ -714,19 +731,18 @@ async function fullMarketMaker(): Promise<void> {
             (data.event.taker == MANGO_ACCOUNT.toString())
           ) {
             console.log(
-              'fill',
-              data.slot,
-              data.status,
-              data.event.quantity,
-              data.event.seqNum,
-              data.event.taker.slice(0, 4),
-              data.event.maker.slice(0, 4),
+              `fill id=${data.event.seqNum} status=${data.status} slot=${data.slot} size=${data.event.quantity} price=${data.event.price} taker=${data.event.taker.slice(0, 4)} maker=${data.event.maker.slice(0, 4)} takerSide=${data.event.takerSide}`
             );
 
-            // prune unprocessed fill events before last mango account update here to avoid race conditions
-            pc.unprocessedPerpFills = pc.unprocessedPerpFills.filter(
-              (f) => f.slot >= bot.mangoAccountLastUpdatedSlot,
-            );
+            // prune unprocessed fill events before last head update here to avoid race conditions
+            let eventQueueHeadUpdatesBeforeLastMangoAccountUpdate = pc.eventQueueHeadBySlot.filter(e => e.slot <= bot.mangoAccountLastUpdatedSlot);
+            if (eventQueueHeadUpdatesBeforeLastMangoAccountUpdate.length > 0)
+            {
+              let eventQueueHeadAtMangoAccountUpdate = eventQueueHeadUpdatesBeforeLastMangoAccountUpdate[eventQueueHeadUpdatesBeforeLastMangoAccountUpdate.length-1];
+              // truncate list to a reasonable limit
+              let deleteCount = Math.max(0, pc.unprocessedPerpFills.length - 500);
+              pc.unprocessedPerpFills.splice(0, deleteCount);
+            }
             pc.unprocessedPerpFills.push(data);
             break;
           }
@@ -737,13 +753,11 @@ async function fullMarketMaker(): Promise<void> {
       if (isHeadUpdate(data)) {
         for (const pc of perpMarkets.values()) {
           if (!pc.perpMarket.publicKey.equals(new PublicKey(data.marketKey))) continue;
-          let processedFills = pc.unprocessedPerpFills.filter((f) => {
-            f.event.seqNum >= data.previousHeadSeqNum && f.event.seqNum < data.headSeqNum
-          });
-
-          if (!processedFills.length) continue;
-          console.log('received HeadUpdate');
-          bot.refreshMangoAccount();
+          console.log('received HeadUpdate', data);
+          // truncate list to a reasonable limit
+          let deleteCount = Math.max(0, pc.eventQueueHeadBySlot.length - 500);
+          pc.eventQueueHeadBySlot.splice(0, deleteCount);
+          pc.eventQueueHeadBySlot.push({slot: data.slot, head: data.headSeqNum});
         }
       }
     });
