@@ -1,5 +1,4 @@
 import { AnchorProvider } from '@coral-xyz/anchor';
-import { ASSOCIATED_TOKEN_PROGRAM_ID, TOKEN_PROGRAM_ID } from './utils/spl';
 import {
   AddressLookupTableAccount,
   MessageV0,
@@ -11,6 +10,7 @@ import {
 } from '@solana/web3.js';
 import BN from 'bn.js';
 import { I80F48 } from './numbers/I80F48';
+import { ASSOCIATED_TOKEN_PROGRAM_ID, TOKEN_PROGRAM_ID } from './utils/spl';
 
 ///
 /// numeric helpers
@@ -19,7 +19,7 @@ export const U64_MAX_BN = new BN('18446744073709551615');
 export const I64_MAX_BN = new BN('9223372036854775807').toTwos(64);
 
 export function bpsToDecimal(bps: number): number {
-  return bps / 1000;
+  return bps / 10000;
 }
 
 export function percentageToDecimal(percentage: number): number {

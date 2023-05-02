@@ -1,0 +1,23 @@
+{
+  "intervals": {
+    "blockhash": 5000,
+    "group": 30000,
+    "mangoAccount": 1000
+  },
+  "oraclePegged": true,
+  "batch": 1,
+  "logPrecision": 4,
+  "assets": {
+    "SOL": {
+      "perp": {
+        "deltaBias": 0,
+        "positionMax": 4,
+        "hedgeMax": 4,
+        "hedgeDiscount": 0.0001,
+        "orderSizeLimit": 0.5,
+        "spreadCharge": 0.0005,
+        "tokenMint": "So11111111111111111111111111111111111111112"
+      }
+    }
+  }
+}

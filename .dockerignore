@@ -17,3 +17,6 @@ programs/margin-trade/src/lib-expanded.rs
 programs/mango-v4/src/lib-expanded.rs
 
 keeper/.env
+.env
+
+ts/client/src/scripts/archive/ts.ts

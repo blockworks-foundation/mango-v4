@@ -1,0 +1,10 @@
+app = "mango-keeper"
+kill_signal = "SIGTERM"
+kill_timeout = 30
+
+[build]
+  dockerfile = "../bin/keeper/Dockerfile.keeper"
+
+[metrics]
+  port = 9091
+  path = "/metrics"

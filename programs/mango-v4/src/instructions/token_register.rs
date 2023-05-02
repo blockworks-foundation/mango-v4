@@ -37,6 +37,7 @@ pub fn token_register(
             ctx.accounts.mint.key()
         );
     }
+    require_neq!(token_index, TokenIndex::MAX);
 
     let now_ts: u64 = Clock::get()?.unix_timestamp.try_into().unwrap();
 
@@ -87,7 +88,8 @@ pub fn token_register(
         borrow_weight_scale_start_quote: f64::MAX,
         deposit_weight_scale_start_quote: f64::MAX,
         reduce_only: 0,
-        reserved: [0; 2119],
+        force_close: 0,
+        reserved: [0; 2118],
     };
     require_gt!(bank.max_rate, MINIMUM_MAX_RATE);
 

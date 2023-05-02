@@ -25,6 +25,7 @@ export class Serum3Market {
       marketIndex: number;
       registrationTime: BN;
       reduceOnly: number;
+      forceClose: number;
     },
   ): Serum3Market {
     return new Serum3Market(
@@ -38,6 +39,7 @@ export class Serum3Market {
       obj.marketIndex as MarketIndex,
       obj.registrationTime,
       obj.reduceOnly == 1,
+      obj.forceClose == 1,
     );
   }
 
@@ -52,6 +54,7 @@ export class Serum3Market {
     public marketIndex: MarketIndex,
     public registrationTime: BN,
     public reduceOnly: boolean,
+    public forceClose: boolean,
   ) {
     this.name = utf8.decode(new Uint8Array(name)).split('\x00')[0];
   }
@@ -138,6 +141,40 @@ export class Serum3Market {
     return await serum3MarketExternal.loadAsks(
       client.program.provider.connection,
     );
+  }
+
+  public async computePriceForMarketOrderOfSize(
+    client: MangoClient,
+    group: Group,
+    size: number,
+    side: 'buy' | 'sell',
+  ): Promise<number> {
+    const ob =
+      side == 'buy'
+        ? await this.loadBids(client, group)
+        : await this.loadAsks(client, group);
+    let acc = 0;
+    let selectedOrder;
+    const orderSize = size;
+    for (const order of ob.getL2(size * 2 /* TODO Fix random constant */)) {
+      acc += order[1];
+      if (acc >= orderSize) {
+        selectedOrder = order;
+        break;
+      }
+    }
+
+    if (!selectedOrder) {
+      throw new Error(
+        'Unable to place market order for this order size. Please retry.',
+      );
+    }
+
+    if (side === 'buy') {
+      return selectedOrder[0] * 1.05 /* TODO Fix random constant */;
+    } else {
+      return selectedOrder[0] * 0.95 /* TODO Fix random constant */;
+    }
   }
 
   public async logOb(client: MangoClient, group: Group): Promise<string> {

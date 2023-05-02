@@ -32,6 +32,15 @@ const BORSH_VEC_PADDING_BYTES: usize = 4;
 const BORSH_VEC_SIZE_BYTES: usize = 4;
 const DEFAULT_MANGO_ACCOUNT_VERSION: u8 = 1;
 
+// Return variants for check_liquidatable method, should be wrapped in a Result
+// for a future possiblity of returning any error
+#[derive(PartialEq)]
+pub enum CheckLiquidatable {
+    NotLiquidatable,
+    Liquidatable,
+    BecameNotLiquidatable,
+}
+
 // Mango Account
 // This struct definition is only for clients e.g. typescript, so that they can easily use out of the box
 // deserialization and not have to do custom deserialization
@@ -867,7 +876,7 @@ impl<
             mango_account: mango_account_pubkey,
             market_index: perp_market_index,
             cumulative_long_funding: perp_position.cumulative_long_funding,
-            cumulative_short_funding: perp_position.cumulative_long_funding,
+            cumulative_short_funding: perp_position.cumulative_short_funding,
             maker_volume: perp_position.maker_volume,
             taker_volume: perp_position.taker_volume,
             perp_spot_transfers: perp_position.perp_spot_transfers,
@@ -1028,7 +1037,7 @@ impl<
         Ok(())
     }
 
-    pub fn check_liquidatable(&mut self, health_cache: &HealthCache) -> Result<bool> {
+    pub fn check_liquidatable(&mut self, health_cache: &HealthCache) -> Result<CheckLiquidatable> {
         // Once maint_health falls below 0, we want to start liquidating,
         // we want to allow liquidation to continue until init_health is positive,
         // to prevent constant oscillation between the two states
@@ -1039,17 +1048,17 @@ impl<
                 .maybe_recover_from_being_liquidated(liq_end_health)
             {
                 msg!("Liqee init_health above zero");
-                return Ok(false);
+                return Ok(CheckLiquidatable::BecameNotLiquidatable);
             }
         } else {
             let maint_health = health_cache.health(HealthType::Maint);
-            require!(
-                maint_health < I80F48::ZERO,
-                MangoError::HealthMustBeNegative
-            );
+            if maint_health >= I80F48::ZERO {
+                msg!("Liqee is not liquidatable");
+                return Ok(CheckLiquidatable::NotLiquidatable);
+            }
             self.fixed_mut().set_being_liquidated(true);
         }
-        Ok(true)
+        return Ok(CheckLiquidatable::Liquidatable);
     }
 
     // writes length of tokens vec at appropriate offset so that borsh can infer the vector length

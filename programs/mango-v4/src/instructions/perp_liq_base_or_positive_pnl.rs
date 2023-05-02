@@ -58,7 +58,7 @@ pub fn perp_liq_base_or_positive_pnl(
     let liqee_liq_end_health = liqee_health_cache.health(HealthType::LiquidationEnd);
     liqee_health_cache.require_after_phase1_liquidation()?;
 
-    if !liqee.check_liquidatable(&liqee_health_cache)? {
+    if liqee.check_liquidatable(&liqee_health_cache)? != CheckLiquidatable::Liquidatable {
         return Ok(());
     }
 
@@ -215,6 +215,10 @@ pub(crate) fn liquidation_action(
     let liqor_perp_position = liqor.perp_position_mut(perp_market_index)?;
 
     let perp_info = liqee_health_cache.perp_info(perp_market_index)?;
+    let settle_token_oracle_price = liqee_health_cache
+        .token_info(settle_token_index)?
+        .prices
+        .oracle;
     let oracle_price = perp_info.prices.oracle;
     let base_lot_size = I80F48::from(perp_market.base_lot_size);
     let oracle_price_per_lot = base_lot_size * oracle_price;
@@ -447,12 +451,7 @@ pub(crate) fn liquidation_action(
             let liqor_token_position = liqor.token_position_mut(settle_token_index)?.0;
             let liqee_token_position = liqee.token_position_mut(settle_token_index)?.0;
             settle_bank.deposit(liqee_token_position, token_transfer, now_ts)?;
-            settle_bank.withdraw_without_fee(
-                liqor_token_position,
-                token_transfer,
-                now_ts,
-                oracle_price,
-            )?;
+            settle_bank.withdraw_without_fee(liqor_token_position, token_transfer, now_ts)?;
             liqee_health_cache.adjust_token_balance(&settle_bank, token_transfer)?;
         }
         msg!(
@@ -740,11 +739,15 @@ mod tests {
                 pm.init_overall_asset_weight = I80F48::from_num(overall_weight);
             }
             {
-                perp_p(&mut setup.liqee).record_trade(
+                let p = perp_p(&mut setup.liqee);
+                p.record_trade(
                     setup.perp_market.data(),
                     init_liqee_base,
                     I80F48::from_num(init_liqee_quote),
                 );
+                p.realized_other_pnl_native = p
+                    .unsettled_pnl(setup.perp_market.data(), I80F48::ONE)
+                    .unwrap();
 
                 let settle_bank = setup.settle_bank.data();
                 settle_bank
@@ -752,16 +755,10 @@ mod tests {
                         token_p(&mut setup.liqee),
                         I80F48::from_num(init_liqee_spot),
                         0,
-                        I80F48::from(1),
                     )
                     .unwrap();
                 settle_bank
-                    .change_without_fee(
-                        token_p(&mut setup.liqor),
-                        I80F48::from_num(1000.0),
-                        0,
-                        I80F48::from(1),
-                    )
+                    .change_without_fee(token_p(&mut setup.liqor), I80F48::from_num(1000.0), 0)
                     .unwrap();
             }
 
@@ -780,6 +777,15 @@ mod tests {
                 -(exp_liqee_quote - init_liqee_quote),
                 0.01
             );
+            // The settle limit taken over matches the quote pos when removing the
+            // quote gains from giving away base lots
+            assert_eq_f!(
+                I80F48::from_num(liqor_perp.settle_pnl_limit_realized_trade),
+                liqor_perp.quote_position_native.to_num::<f64>()
+                    + liqor_perp.base_position_lots as f64,
+                1.1
+            );
+
             let settle_bank = result.settle_bank.data();
             assert_eq_f!(
                 token_p(&mut result.liqee).native(settle_bank),
@@ -813,20 +819,10 @@ mod tests {
 
             let settle_bank = setup.settle_bank.data();
             settle_bank
-                .change_without_fee(
-                    token_p(&mut setup.liqee),
-                    I80F48::from_num(5.0),
-                    0,
-                    I80F48::from(1),
-                )
+                .change_without_fee(token_p(&mut setup.liqee), I80F48::from_num(5.0), 0)
                 .unwrap();
             settle_bank
-                .change_without_fee(
-                    token_p(&mut setup.liqor),
-                    I80F48::from_num(1000.0),
-                    0,
-                    I80F48::from(1),
-                )
+                .change_without_fee(token_p(&mut setup.liqor), I80F48::from_num(1000.0), 0)
                 .unwrap();
         }
 

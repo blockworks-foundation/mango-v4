@@ -11,13 +11,22 @@ import {
 } from '@solana/web3.js';
 import fs from 'fs';
 import { TokenIndex } from '../src/accounts/bank';
+import { PerpMarketIndex } from '../src/accounts/perp';
 import { Builder } from '../src/builder';
 import { MangoClient } from '../src/client';
-import { NullTokenEditParams } from '../src/clientIxParamBuilder';
+import {
+  NullPerpEditParams,
+  NullTokenEditParams,
+  TrueIxGateParams,
+  buildIxGate,
+} from '../src/clientIxParamBuilder';
 import { MANGO_V4_ID, OPENBOOK_PROGRAM_ID } from '../src/constants';
 import { bpsToDecimal, percentageToDecimal, toNative } from '../src/utils';
 
-const { MB_CLUSTER_URL, MB_PAYER_KEYPAIR, MB_PAYER3_KEYPAIR } = process.env;
+const { MB_CLUSTER_URL, MB_PAYER_KEYPAIR } = process.env;
+
+const CLIENT_USER = MB_PAYER_KEYPAIR;
+const GROUP_PK = '78b8f4cGCwmZ9ysPFMWLaLTkkaYnUjwMJYStWe5RTSSX';
 
 const defaultOracleConfig = {
   confFilter: 0.1,
@@ -33,41 +42,31 @@ const defaultInterestRate = {
   maxRate: 2.0,
 };
 
-async function buildAdminClient(): Promise<[MangoClient, Keypair, Keypair]> {
-  const admin = Keypair.fromSecretKey(
-    Buffer.from(JSON.parse(fs.readFileSync(MB_PAYER3_KEYPAIR!, 'utf-8'))),
+async function buildClient(): Promise<MangoClient> {
+  const clientKeypair = Keypair.fromSecretKey(
+    Buffer.from(JSON.parse(fs.readFileSync(CLIENT_USER!, 'utf-8'))),
   );
 
   const options = AnchorProvider.defaultOptions();
   const connection = new Connection(MB_CLUSTER_URL!, options);
 
-  const adminWallet = new Wallet(admin);
-  const adminProvider = new AnchorProvider(connection, adminWallet, options);
+  const clientWallet = new Wallet(clientKeypair);
+  const clientProvider = new AnchorProvider(connection, clientWallet, options);
 
-  const client = await MangoClient.connect(
-    adminProvider,
+  return await MangoClient.connect(
+    clientProvider,
     'mainnet-beta',
     MANGO_V4_ID['mainnet-beta'],
     {
       idsSource: 'get-program-accounts',
     },
   );
-
-  const creator = Keypair.fromSecretKey(
-    Buffer.from(JSON.parse(fs.readFileSync(MB_PAYER_KEYPAIR!, 'utf-8'))),
-  );
-
-  return [client, admin, creator];
 }
 
 async function tokenRegister(): Promise<void> {
-  const result = await buildAdminClient();
-  const client = result[0];
-  const admin = result[1];
+  const client = await buildClient();
 
-  const group = await client.getGroup(
-    new PublicKey('78b8f4cGCwmZ9ysPFMWLaLTkkaYnUjwMJYStWe5RTSSX'),
-  );
+  const group = await client.getGroup(new PublicKey(GROUP_PK));
 
   const ix = await client.program.methods
     .tokenRegister(
@@ -103,16 +102,11 @@ async function tokenRegister(): Promise<void> {
 }
 
 async function tokenEdit(): Promise<void> {
-  const result = await buildAdminClient();
-  const client = result[0];
-  const admin = result[1];
+  const client = await buildClient();
 
-  const group = await client.getGroup(
-    new PublicKey('78b8f4cGCwmZ9ysPFMWLaLTkkaYnUjwMJYStWe5RTSSX'),
-  );
+  const group = await client.getGroup(new PublicKey(GROUP_PK));
 
   const params = Builder(NullTokenEditParams)
-    .oracle(new PublicKey('GVXRSBjFk6e6J3NbVPXohDJetcTjaeeuykUpbQF8UoMU'))
     .borrowWeightScaleStartQuote(new BN(toNative(100000, 6)).toNumber())
     .depositWeightScaleStartQuote(new BN(toNative(100000, 6)).toNumber())
     .build();
@@ -145,6 +139,7 @@ async function tokenEdit(): Promise<void> {
       params.resetNetBorrowLimit ?? false,
       params.reduceOnly,
       params.name,
+      params.forceClose,
     )
     .accounts({
       group: group.publicKey,
@@ -164,12 +159,9 @@ async function tokenEdit(): Promise<void> {
 }
 
 async function serum3Register(): Promise<void> {
-  const result = await buildAdminClient();
-  const client = result[0];
+  const client = await buildClient();
 
-  const group = await client.getGroup(
-    new PublicKey('78b8f4cGCwmZ9ysPFMWLaLTkkaYnUjwMJYStWe5RTSSX'),
-  );
+  const group = await client.getGroup(new PublicKey(GROUP_PK));
 
   const ix = await client.program.methods
     .serum3RegisterMarket(3, 'ETH (Portal)/USDC')
@@ -194,9 +186,7 @@ async function serum3Register(): Promise<void> {
 }
 
 async function perpCreate(): Promise<void> {
-  const result = await buildAdminClient();
-  const client = result[0];
-  const admin = result[1];
+  const client = await buildClient();
 
   const bids = new Keypair();
   const asks = new Keypair();
@@ -209,9 +199,7 @@ async function perpCreate(): Promise<void> {
     (client.program.account.eventQueue as any)._idlAccount,
   );
 
-  const group = await client.getGroup(
-    new PublicKey('78b8f4cGCwmZ9ysPFMWLaLTkkaYnUjwMJYStWe5RTSSX'),
-  );
+  const group = await client.getGroup(new PublicKey(GROUP_PK));
 
   const ix = await client.program.methods
     .perpCreateMarket(
@@ -294,12 +282,102 @@ async function perpCreate(): Promise<void> {
   console.log(serializeInstructionToBase64(ix));
 }
 
+async function perpEdit(): Promise<void> {
+  const client = await buildClient();
+  const group = await client.getGroup(new PublicKey(GROUP_PK));
+  const perpMarket = group.getPerpMarketByMarketIndex(0 as PerpMarketIndex);
+  const params = Builder(NullPerpEditParams)
+    .positivePnlLiquidationFee(bpsToDecimal(250))
+    .build();
+  const ix = await client.program.methods
+    .perpEditMarket(
+      params.oracle,
+      params.oracleConfig,
+      params.baseDecimals,
+      params.maintBaseAssetWeight,
+      params.initBaseAssetWeight,
+      params.maintBaseLiabWeight,
+      params.initBaseLiabWeight,
+      params.maintOverallAssetWeight,
+      params.initOverallAssetWeight,
+      params.baseLiquidationFee,
+      params.makerFee,
+      params.takerFee,
+      params.minFunding,
+      params.maxFunding,
+      params.impactQuantity !== null ? new BN(params.impactQuantity) : null,
+      params.groupInsuranceFund,
+      params.feePenalty,
+      params.settleFeeFlat,
+      params.settleFeeAmountThreshold,
+      params.settleFeeFractionLowHealth,
+      params.stablePriceDelayIntervalSeconds,
+      params.stablePriceDelayGrowthLimit,
+      params.stablePriceGrowthLimit,
+      params.settlePnlLimitFactor,
+      params.settlePnlLimitWindowSize !== null
+        ? new BN(params.settlePnlLimitWindowSize)
+        : null,
+      params.reduceOnly,
+      params.resetStablePrice ?? false,
+      params.positivePnlLiquidationFee,
+      params.name,
+      params.forceClose,
+    )
+    .accounts({
+      group: group.publicKey,
+      oracle: params.oracle ?? perpMarket.oracle,
+      admin: group.admin,
+      perpMarket: perpMarket.publicKey,
+    })
+    .instruction();
+  console.log(serializeInstructionToBase64(ix));
+}
+
+async function ixDisable(): Promise<void> {
+  const client = await buildClient();
+
+  const group = await client.getGroup(new PublicKey(GROUP_PK));
+
+  const ixGateParams = TrueIxGateParams;
+  ixGateParams.HealthRegion = false;
+  const ix = await client.program.methods
+    .ixGateSet(buildIxGate(ixGateParams))
+    .accounts({
+      group: group.publicKey,
+      admin: group.securityAdmin,
+    })
+    .instruction();
+
+  console.log(await serializeInstructionToBase64(ix));
+}
+
+async function createMangoAccount(): Promise<void> {
+  const client = await buildClient();
+
+  const group = await client.getGroup(new PublicKey(GROUP_PK));
+
+  const ix = await client.program.methods
+    .accountCreate(0, 8, 8, 8, 32, 'Mango DAO 0')
+    .accounts({
+      group: group.publicKey,
+      owner: new PublicKey('5tgfd6XgwiXB9otEnzFpXK11m7Q7yZUaAJzWK4oT5UGF'),
+      payer: new PublicKey('5tgfd6XgwiXB9otEnzFpXK11m7Q7yZUaAJzWK4oT5UGF'),
+    })
+    .instruction();
+
+  console.log(await serializeInstructionToBase64(ix));
+}
+
 async function main(): Promise<void> {
   try {
     // await tokenRegister();
     // await tokenEdit();
     // await perpCreate();
-    await serum3Register();
+    await perpEdit();
+    // await serum3Register();
+    // await ixDisable();
+    // await createMangoAccount();
   } catch (error) {
     console.log(error);
   }

@@ -1,6 +1,7 @@
 use super::{OracleConfig, TokenIndex, TokenPosition};
 use crate::accounts_zerocopy::KeyedAccountReader;
 use crate::error::*;
+use crate::i80f48::ClampToInt;
 use crate::state::{oracle, StablePriceModel};
 use crate::util;
 
@@ -126,10 +127,16 @@ pub struct Bank {
     /// See scaled_init_asset_weight().
     pub deposit_weight_scale_start_quote: f64,
 
+    // We have 3 modes
+    // 0 - Off,
+    // 1 - ReduceDepositsReduceBorrows - standard
+    // 2 - ReduceBorrows - borrows can only be reduced, but deposits have no restriction, special case for
+    //                 force close mode, where liqor should first acquire deposits before closing liqee's borrows
     pub reduce_only: u8,
+    pub force_close: u8,
 
     #[derivative(Debug = "ignore")]
-    pub reserved: [u8; 2119],
+    pub reserved: [u8; 2118],
 }
 const_assert_eq!(
     size_of::<Bank>(),
@@ -157,7 +164,8 @@ const_assert_eq!(
         + 8
         + 8
         + 1
-        + 2119
+        + 1
+        + 2118
 );
 const_assert_eq!(size_of::<Bank>(), 3064);
 const_assert_eq!(size_of::<Bank>() % 8, 0);
@@ -218,7 +226,8 @@ impl Bank {
             borrow_weight_scale_start_quote: f64::MAX,
             deposit_weight_scale_start_quote: f64::MAX,
             reduce_only: 0,
-            reserved: [0; 2119],
+            force_close: 0,
+            reserved: [0; 2118],
         }
     }
 
@@ -228,8 +237,16 @@ impl Bank {
             .trim_matches(char::from(0))
     }
 
-    pub fn is_reduce_only(&self) -> bool {
+    pub fn are_deposits_reduce_only(&self) -> bool {
         self.reduce_only == 1
+    }
+
+    pub fn are_borrows_reduce_only(&self) -> bool {
+        self.reduce_only == 1 || self.reduce_only == 2
+    }
+
+    pub fn is_force_close(&self) -> bool {
+        self.force_close == 1
     }
 
     #[inline(always)]
@@ -302,9 +319,8 @@ impl Bank {
         allow_dusting: bool,
         now_ts: u64,
     ) -> Result<bool> {
-        self.update_net_borrows(-native_amount, now_ts);
         let opening_indexed_position = position.indexed_position;
-        let result = self.deposit_internal(position, native_amount, allow_dusting)?;
+        let result = self.deposit_internal(position, native_amount, allow_dusting, now_ts)?;
         self.update_cumulative_interest(position, opening_indexed_position);
         Ok(result)
     }
@@ -315,6 +331,7 @@ impl Bank {
         position: &mut TokenPosition,
         mut native_amount: I80F48,
         allow_dusting: bool,
+        now_ts: u64,
     ) -> Result<bool> {
         require_gte!(native_amount, 0);
 
@@ -336,6 +353,9 @@ impl Bank {
         };
 
         if native_position.is_negative() {
+            // Only account for the borrows we are repaying
+            self.update_net_borrows(native_position.max(-native_amount), now_ts);
+
             let new_native_position = native_position + native_amount;
             let indexed_change = div_rounding_up(native_amount, self.borrow_index);
             // this is only correct if it's not positive, because it scales the whole amount by borrow_index
@@ -382,7 +402,6 @@ impl Bank {
         position: &mut TokenPosition,
         native_amount: I80F48,
         now_ts: u64,
-        oracle_price: I80F48,
     ) -> Result<bool> {
         let (position_is_active, _) = self.withdraw_internal_wrapper(
             position,
@@ -390,7 +409,6 @@ impl Bank {
             false,
             !position.is_in_use(),
             now_ts,
-            Some(oracle_price),
         )?;
 
         Ok(position_is_active)
@@ -404,17 +422,9 @@ impl Bank {
         position: &mut TokenPosition,
         native_amount: I80F48,
         now_ts: u64,
-        oracle_price: I80F48,
     ) -> Result<bool> {
-        self.withdraw_internal_wrapper(
-            position,
-            native_amount,
-            false,
-            true,
-            now_ts,
-            Some(oracle_price),
-        )
-        .map(|(not_dusted, _)| not_dusted || position.is_in_use())
+        self.withdraw_internal_wrapper(position, native_amount, false, true, now_ts)
+            .map(|(not_dusted, _)| not_dusted || position.is_in_use())
     }
 
     /// Withdraws `native_amount` while applying the loan origination fee if a borrow is created.
@@ -430,16 +440,8 @@ impl Bank {
         position: &mut TokenPosition,
         native_amount: I80F48,
         now_ts: u64,
-        oracle_price: I80F48,
     ) -> Result<(bool, I80F48)> {
-        self.withdraw_internal_wrapper(
-            position,
-            native_amount,
-            true,
-            !position.is_in_use(),
-            now_ts,
-            Some(oracle_price),
-        )
+        self.withdraw_internal_wrapper(position, native_amount, true, !position.is_in_use(), now_ts)
     }
 
     /// Internal function to withdraw funds
@@ -450,7 +452,6 @@ impl Bank {
         with_loan_origination_fee: bool,
         allow_dusting: bool,
         now_ts: u64,
-        oracle_price: Option<I80F48>,
     ) -> Result<(bool, I80F48)> {
         let opening_indexed_position = position.indexed_position;
         let res = self.withdraw_internal(
@@ -459,7 +460,6 @@ impl Bank {
             with_loan_origination_fee,
             allow_dusting,
             now_ts,
-            oracle_price,
         );
         self.update_cumulative_interest(position, opening_indexed_position);
         res
@@ -473,7 +473,6 @@ impl Bank {
         with_loan_origination_fee: bool,
         allow_dusting: bool,
         now_ts: u64,
-        oracle_price: Option<I80F48>,
     ) -> Result<(bool, I80F48)> {
         require_gte!(native_amount, 0);
         let native_position = position.native(self);
@@ -519,9 +518,6 @@ impl Bank {
         // net borrows requires updating in only this case, since other branches of the method deal with
         // withdraws and not borrows
         self.update_net_borrows(native_amount, now_ts);
-        if let Some(oracle_price) = oracle_price {
-            self.check_net_borrows(oracle_price)?;
-        }
 
         Ok((true, loan_origination_fee))
     }
@@ -542,7 +538,6 @@ impl Bank {
             false,
             !position.is_in_use(),
             now_ts,
-            None,
         )?;
 
         Ok((position_is_active, loan_origination_fee))
@@ -554,12 +549,11 @@ impl Bank {
         position: &mut TokenPosition,
         native_amount: I80F48,
         now_ts: u64,
-        oracle_price: I80F48,
     ) -> Result<bool> {
         if native_amount >= 0 {
             self.deposit(position, native_amount, now_ts)
         } else {
-            self.withdraw_without_fee(position, -native_amount, now_ts, oracle_price)
+            self.withdraw_without_fee(position, -native_amount, now_ts)
         }
     }
 
@@ -569,12 +563,11 @@ impl Bank {
         position: &mut TokenPosition,
         native_amount: I80F48,
         now_ts: u64,
-        oracle_price: I80F48,
     ) -> Result<(bool, I80F48)> {
         if native_amount >= 0 {
             Ok((self.deposit(position, native_amount, now_ts)?, I80F48::ZERO))
         } else {
-            self.withdraw_with_fee(position, -native_amount, now_ts, oracle_price)
+            self.withdraw_with_fee(position, -native_amount, now_ts)
         }
     }
 
@@ -585,13 +578,15 @@ impl Bank {
         let in_new_window =
             now_ts >= self.last_net_borrows_window_start_ts + self.net_borrow_limit_window_size_ts;
 
+        let amount = native_amount.ceil().clamp_to_i64();
+
         self.net_borrows_in_window = if in_new_window {
             // reset to latest window
             self.last_net_borrows_window_start_ts = now_ts / self.net_borrow_limit_window_size_ts
                 * self.net_borrow_limit_window_size_ts;
-            native_amount.to_num::<i64>()
+            amount
         } else {
-            self.net_borrows_in_window + native_amount.to_num::<i64>()
+            self.net_borrows_in_window + amount
         };
     }
 
@@ -606,8 +601,8 @@ impl Bank {
             .unwrap();
         if net_borrows_quote > self.net_borrow_limit_per_window_quote {
             return Err(error_msg_typed!(MangoError::BankNetBorrowsLimitReached,
-                    "net_borrows_in_window ({:?}) exceeds net_borrow_limit_per_window_quote ({:?}) for last_net_borrows_window_start_ts ({:?}) ",
-                    self.net_borrows_in_window, self.net_borrow_limit_per_window_quote, self.last_net_borrows_window_start_ts
+                    "net_borrows_in_window ({:?}) valued at ({:?} exceed net_borrow_limit_per_window_quote ({:?}) for last_net_borrows_window_start_ts ({:?}) ",
+                    self.net_borrows_in_window, net_borrows_quote, self.net_borrow_limit_per_window_quote, self.last_net_borrows_window_start_ts
 
             ));
         }
@@ -794,12 +789,14 @@ impl Bank {
         staleness_slot: Option<u64>,
     ) -> Result<I80F48> {
         require_keys_eq!(self.oracle, *oracle_acc.key());
-        oracle::oracle_price(
+        let (price, _) = oracle::oracle_price_and_slot(
             oracle_acc,
             &self.oracle_config,
             self.mint_decimals,
             staleness_slot,
-        )
+        )?;
+
+        Ok(price)
     }
 
     pub fn stable_price(&self) -> I80F48 {
@@ -951,8 +948,7 @@ mod tests {
                 let change = I80F48::from(change);
                 let dummy_now_ts = 1 as u64;
                 let dummy_price = I80F48::ZERO;
-                let (is_active, _) =
-                    bank.change_with_fee(&mut account, change, dummy_now_ts, dummy_price)?;
+                let (is_active, _) = bank.change_with_fee(&mut account, change, dummy_now_ts)?;
 
                 let mut expected_native = start_native + change;
                 if expected_native >= 0.0 && expected_native < 1.0 && !is_in_use {
@@ -1014,5 +1010,57 @@ mod tests {
         bank.bank_rate_last_updated = 1020;
         compute_new_avg_utilization_runner(&mut bank, I80F48::ONE, 1040);
         assert_eq!(bank.avg_utilization, I80F48::ONE);
+    }
+
+    #[test]
+    pub fn test_net_borrows() -> Result<()> {
+        let mut bank = Bank::zeroed();
+        bank.net_borrow_limit_window_size_ts = 100;
+        bank.net_borrow_limit_per_window_quote = 1000;
+        bank.deposit_index = I80F48::from_num(100.0);
+        bank.borrow_index = I80F48::from_num(100.0);
+
+        let price = I80F48::from(2);
+
+        let mut account = TokenPosition::default();
+
+        bank.change_without_fee(&mut account, I80F48::from(100), 0)
+            .unwrap();
+        assert_eq!(bank.net_borrows_in_window, 0);
+        bank.change_without_fee(&mut account, I80F48::from(-100), 0)
+            .unwrap();
+        assert_eq!(bank.net_borrows_in_window, 0);
+
+        account = TokenPosition::default();
+        bank.change_without_fee(&mut account, I80F48::from(10), 0)
+            .unwrap();
+        bank.change_without_fee(&mut account, I80F48::from(-110), 0)
+            .unwrap();
+        assert_eq!(bank.net_borrows_in_window, 100);
+        bank.change_without_fee(&mut account, I80F48::from(50), 0)
+            .unwrap();
+        assert_eq!(bank.net_borrows_in_window, 50);
+        bank.change_without_fee(&mut account, I80F48::from(100), 0)
+            .unwrap();
+        assert_eq!(bank.net_borrows_in_window, 1); // rounding
+
+        account = TokenPosition::default();
+        bank.net_borrows_in_window = 0;
+        bank.change_without_fee(&mut account, I80F48::from(-450), 0)
+            .unwrap();
+        bank.change_without_fee(&mut account, I80F48::from(-51), 0)
+            .unwrap();
+        bank.check_net_borrows(price).unwrap_err();
+
+        account = TokenPosition::default();
+        bank.net_borrows_in_window = 0;
+        bank.change_without_fee(&mut account, I80F48::from(-450), 0)
+            .unwrap();
+        bank.change_without_fee(&mut account, I80F48::from(-50), 0)
+            .unwrap();
+        bank.change_without_fee(&mut account, I80F48::from(-50), 101)
+            .unwrap();
+
+        Ok(())
     }
 }

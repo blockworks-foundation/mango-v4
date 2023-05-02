@@ -115,6 +115,7 @@ export class Bank implements BankForHealth {
       borrowWeightScaleStartQuote: number;
       depositWeightScaleStartQuote: number;
       reduceOnly: number;
+      forceClose: number;
     },
   ): Bank {
     return new Bank(
@@ -160,7 +161,8 @@ export class Bank implements BankForHealth {
       obj.netBorrowsInWindow,
       obj.borrowWeightScaleStartQuote,
       obj.depositWeightScaleStartQuote,
-      obj.reduceOnly == 1,
+      obj.reduceOnly,
+      obj.forceClose == 1,
     );
   }
 
@@ -207,7 +209,8 @@ export class Bank implements BankForHealth {
     public netBorrowsInWindow: BN,
     public borrowWeightScaleStartQuote: number,
     public depositWeightScaleStartQuote: number,
-    public reduceOnly: boolean,
+    public reduceOnly: number,
+    public forceClose: boolean,
   ) {
     this.name = utf8.decode(new Uint8Array(name)).split('\x00')[0];
     this.oracleConfig = {
@@ -310,6 +313,14 @@ export class Bank implements BankForHealth {
     );
   }
 
+  areDepositsReduceOnly(): boolean {
+    return this.reduceOnly == 1;
+  }
+
+  areBorrowsReduceOnly(): boolean {
+    return this.reduceOnly == 1 || this.reduceOnly == 2;
+  }
+
   scaledInitAssetWeight(price: I80F48): I80F48 {
     const depositsQuote = this.nativeDeposits().mul(price);
     if (
@@ -410,21 +421,19 @@ export class Bank implements BankForHealth {
     }
 
     const utilization = totalBorrows.div(totalDeposits);
-    if (utilization.gt(this.util1)) {
+    if (utilization.lte(this.util0)) {
+      const slope = this.rate0.div(this.util0);
+      return slope.mul(utilization);
+    } else if (utilization.lt(this.util1)) {
+      const extraUtil = utilization.sub(this.util0);
+      const slope = this.rate1.sub(this.rate0).div(this.util1.sub(this.util0));
+      return this.rate0.add(slope.mul(extraUtil));
+    } else {
       const extraUtil = utilization.sub(this.util1);
       const slope = this.maxRate
         .sub(this.rate1)
         .div(I80F48.fromNumber(1).sub(this.util1));
       return this.rate1.add(slope.mul(extraUtil));
-    } else if (utilization.gt(this.util0)) {
-      const extraUtil = utilization.sub(this.util0);
-      const slope = this.maxRate
-        .sub(this.rate0)
-        .div(I80F48.fromNumber(1).sub(this.util0));
-      return this.rate0.add(slope.mul(extraUtil));
-    } else {
-      const slope = this.rate0.div(this.util0);
-      return slope.mul(utilization);
     }
   }
 
