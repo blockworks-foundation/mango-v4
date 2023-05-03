@@ -61,7 +61,7 @@ pub fn token_liq_bankruptcy(
     let initial_liab_native = liqee_liab.native(liab_bank);
 
     let liqee_health_token_balances =
-        liqee_health_cache.effective_token_balances(HealthType::LiquidationEnd, false);
+        liqee_health_cache.effective_token_balances(HealthType::LiquidationEnd);
     let liqee_liab_health_balance = liqee_health_token_balances
         [liqee_health_cache.token_info_index(liab_token_index)?]
     .spot_and_perp;

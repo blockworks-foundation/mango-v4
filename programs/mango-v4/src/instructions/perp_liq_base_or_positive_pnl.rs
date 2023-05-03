@@ -215,7 +215,7 @@ pub(crate) fn liquidation_action(
     let liqee_perp_position = liqee.perp_position_mut(perp_market_index)?;
     let liqor_perp_position = liqor.perp_position_mut(perp_market_index)?;
 
-    let token_balances = liqee_health_cache.effective_token_balances(liq_end_type, false);
+    let token_balances = liqee_health_cache.effective_token_balances(liq_end_type);
     let settle_token_balance = &token_balances[liqee_health_cache
         .token_infos
         .iter()

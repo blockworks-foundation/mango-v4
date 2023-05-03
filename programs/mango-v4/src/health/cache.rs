@@ -437,7 +437,7 @@ pub struct HealthCache {
 
 impl HealthCache {
     pub fn health(&self, health_type: HealthType) -> I80F48 {
-        let token_balances = self.effective_token_balances(health_type, false);
+        let token_balances = self.effective_token_balances(health_type);
         let mut health = I80F48::ZERO;
         let sum = |contrib| {
             health += contrib;
@@ -545,7 +545,7 @@ impl HealthCache {
             }
         }
 
-        let token_balances = self.effective_token_balances(health_type, false);
+        let token_balances = self.effective_token_balances(health_type);
         let (token_max_reserved, serum3_reserved) = self.compute_serum3_reservations(health_type);
         for (serum3_info, reserved) in self.serum3_infos.iter().zip(serum3_reserved.iter()) {
             let contrib = serum3_info.health_contribution(
@@ -669,8 +669,7 @@ impl HealthCache {
     }
 
     pub fn has_liq_spot_assets(&self) -> bool {
-        let health_token_balances =
-            self.effective_token_balances(HealthType::LiquidationEnd, false);
+        let health_token_balances = self.effective_token_balances(HealthType::LiquidationEnd);
         self.token_infos
             .iter()
             .zip(health_token_balances.iter())
@@ -681,8 +680,7 @@ impl HealthCache {
     }
 
     pub fn has_liq_spot_borrows(&self) -> bool {
-        let health_token_balances =
-            self.effective_token_balances(HealthType::LiquidationEnd, false);
+        let health_token_balances = self.effective_token_balances(HealthType::LiquidationEnd);
         self.token_infos
             .iter()
             .zip(health_token_balances.iter())
@@ -691,8 +689,7 @@ impl HealthCache {
 
     // This function exists separately from has_liq_spot_assets and has_liq_spot_borrows for performance reasons
     pub fn has_possible_spot_liquidations(&self) -> bool {
-        let health_token_balances =
-            self.effective_token_balances(HealthType::LiquidationEnd, false);
+        let health_token_balances = self.effective_token_balances(HealthType::LiquidationEnd);
         let all_iter = || self.token_infos.iter().zip(health_token_balances.iter());
         all_iter().any(|(ti, b)| ti.balance_spot < 0 && b.spot_and_perp < 0)
             && all_iter().any(|(ti, b)| ti.balance_spot >= 1 && b.spot_and_perp >= 1)
@@ -835,16 +832,22 @@ impl HealthCache {
 
     /// Returns token balances that account for spot and perp contributions
     ///
-    /// Spot contributions are just the regular deposits or borrows.
+    /// Spot contributions are just the regular deposits or borrows, as well as from free
+    /// funds on serum3 open orders accounts.
     ///
     /// Perp contributions come from perp positions in markets that use the token as a settle token:
     /// For these the hupnl is added to the total because that's the risk-adjusted expected to be
     /// gained or lost from settlement.
+    pub fn effective_token_balances(&self, health_type: HealthType) -> Vec<TokenBalance> {
+        self.effective_token_balances_internal(health_type, false)
+    }
+
+    /// Implementation of effective_token_balances()
     ///
     /// The ignore_negative_perp flag exists for perp_max_settle(). When it is enabled, all negative
     /// token contributions from perp markets are ignored. That's useful for knowing how much token
     /// collateral is available when limiting negative upnl settlement.
-    pub fn effective_token_balances(
+    fn effective_token_balances_internal(
         &self,
         health_type: HealthType,
         ignore_negative_perp: bool,
@@ -919,7 +922,7 @@ impl HealthCache {
     /// - Positive trusted perp pnl can enable settling.
     ///   (+100 trusted perp1 health, -100 perp2 health -> allow settling of 100 health worth)
     pub fn perp_max_settle(&self, settle_token_index: TokenIndex) -> Result<I80F48> {
-        let token_balances = self.effective_token_balances(HealthType::Maint, true);
+        let token_balances = self.effective_token_balances_internal(HealthType::Maint, true);
         let mut perp_settle_health = I80F48::ZERO;
         let sum = |contrib| {
             perp_settle_health += contrib;

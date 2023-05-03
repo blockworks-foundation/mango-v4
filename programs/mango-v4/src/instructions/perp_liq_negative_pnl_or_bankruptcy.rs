@@ -233,7 +233,7 @@ pub(crate) fn liquidation_action(
     let settle_token_index = perp_market.settle_token_index;
     let liqee_max_settle = liqee_health_cache.perp_max_settle(settle_token_index)?;
     let liqee_health_token_balances =
-        liqee_health_cache.effective_token_balances(HealthType::LiquidationEnd, false);
+        liqee_health_cache.effective_token_balances(HealthType::LiquidationEnd);
 
     //
     // Step 1: Allow the liqor to take over ("settle") negative liqee pnl.

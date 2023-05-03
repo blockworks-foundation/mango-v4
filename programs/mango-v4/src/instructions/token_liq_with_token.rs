@@ -141,8 +141,7 @@ pub(crate) fn liquidation_action(
         .prices
         .asset(liq_end_type);
 
-    let liqee_health_token_balances =
-        liqee_health_cache.effective_token_balances(liq_end_type, false);
+    let liqee_health_token_balances = liqee_health_cache.effective_token_balances(liq_end_type);
 
     // At this point we've established that the liqee has a negative liab token position.
     // However, the hupnl from perp markets can bring the health contribution for the token

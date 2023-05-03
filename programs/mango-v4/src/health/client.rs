@@ -155,7 +155,7 @@ impl HealthCache {
         let source_reserved = tokens_max_reserved[source_index].max_serum_reserved;
         let target_reserved = tokens_max_reserved[target_index].max_serum_reserved;
 
-        let token_balances = self.effective_token_balances(health_type, false);
+        let token_balances = self.effective_token_balances(health_type);
         let source_balance = token_balances[source_index].spot_and_perp;
         let target_balance = token_balances[target_index].spot_and_perp;
 
@@ -413,7 +413,7 @@ impl HealthCache {
         let token_info_index = find_token_info_index(&self.token_infos, bank.token_index)?;
         let token = &self.token_infos[token_info_index];
         let token_balance =
-            self.effective_token_balances(health_type, false)[token_info_index].spot_and_perp;
+            self.effective_token_balances(health_type)[token_info_index].spot_and_perp;
 
         let cache_after_borrow = |amount: I80F48| -> Result<HealthCache> {
             let now_ts = system_epoch_secs();
