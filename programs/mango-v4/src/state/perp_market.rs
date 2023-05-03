@@ -7,7 +7,7 @@ use static_assertions::const_assert_eq;
 
 use crate::accounts_zerocopy::KeyedAccountReader;
 use crate::error::MangoError;
-use crate::logs::PerpUpdateFundingLog;
+use crate::logs::PerpUpdateFundingLogV2;
 use crate::state::orderbook::Side;
 use crate::state::{oracle, TokenIndex};
 
@@ -246,7 +246,7 @@ impl PerpMarket {
         staleness_slot: Option<u64>,
     ) -> Result<I80F48> {
         require_keys_eq!(self.oracle, *oracle_acc.key());
-        let (price, _) = oracle::oracle_price_and_slot(
+        let (price, _, _, _) = oracle::oracle_price_and_meta(
             oracle_acc,
             &self.oracle_config,
             self.base_decimals,
@@ -256,13 +256,13 @@ impl PerpMarket {
         Ok(price)
     }
 
-    pub fn oracle_price_and_slot(
+    pub fn oracle_price_and_meta(
         &self,
         oracle_acc: &impl KeyedAccountReader,
         staleness_slot: Option<u64>,
-    ) -> Result<(I80F48, u64)> {
+    ) -> Result<(I80F48, u64, I80F48, oracle::OracleType)> {
         require_keys_eq!(self.oracle, *oracle_acc.key());
-        oracle::oracle_price_and_slot(
+        oracle::oracle_price_and_meta(
             oracle_acc,
             &self.oracle_config,
             self.base_decimals,
@@ -280,6 +280,8 @@ impl PerpMarket {
         book: &Orderbook,
         oracle_price: I80F48,
         oracle_slot: u64,
+        oracle_confidence: I80F48,
+        oracle_type: oracle::OracleType,
         now_ts: u64,
     ) -> Result<()> {
         if now_ts <= self.funding_last_updated {
@@ -331,13 +333,15 @@ impl PerpMarket {
         self.stable_price_model
             .update(now_ts, oracle_price.to_num());
 
-        emit!(PerpUpdateFundingLog {
+        emit!(PerpUpdateFundingLogV2 {
             mango_group: self.group,
             market_index: self.perp_market_index,
             long_funding: self.long_funding.to_bits(),
             short_funding: self.short_funding.to_bits(),
             price: oracle_price.to_bits(),
             oracle_slot: oracle_slot,
+            oracle_confidence: oracle_confidence.to_bits(),
+            oracle_type: oracle_type,
             stable_price: self.stable_price().to_bits(),
             fees_accrued: self.fees_accrued.to_bits(),
             fees_settled: self.fees_settled.to_bits(),

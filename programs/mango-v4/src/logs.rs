@@ -1,6 +1,6 @@
 use crate::{
     accounts_ix::FlashLoanType,
-    state::{PerpMarket, PerpPosition},
+    state::{OracleType, PerpMarket, PerpPosition},
 };
 use anchor_lang::prelude::*;
 use borsh::BorshSerialize;
@@ -145,6 +145,23 @@ pub struct PerpUpdateFundingLog {
     pub short_funding: i128,
     pub price: i128,
     pub oracle_slot: u64,
+    pub stable_price: i128,
+    pub fees_accrued: i128,
+    pub fees_settled: i128,
+    pub open_interest: i64,
+    pub instantaneous_funding_rate: i128,
+}
+
+#[event]
+pub struct PerpUpdateFundingLogV2 {
+    pub mango_group: Pubkey,
+    pub market_index: u16,
+    pub long_funding: i128,
+    pub short_funding: i128,
+    pub price: i128,
+    pub oracle_slot: u64,
+    pub oracle_confidence: i128,
+    pub oracle_type: OracleType,
     pub stable_price: i128,
     pub fees_accrued: i128,
     pub fees_settled: i128,
