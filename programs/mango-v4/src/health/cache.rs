@@ -144,7 +144,11 @@ pub struct TokenInfo {
     pub init_liab_weight: I80F48,
     pub init_scaled_liab_weight: I80F48,
     pub prices: Prices,
-    // Does explicitly not include unsettled pnl from perp markets or spot on serum open orders
+
+    /// Freely available spot balance for the token.
+    ///
+    /// Includes TokenPosition and free Serum3OpenOrders balances.
+    /// Does not include perp upnl or Serum3 reserved amounts.
     pub balance_spot: I80F48,
 }
 
@@ -922,22 +926,22 @@ impl HealthCache {
     /// - Positive trusted perp pnl can enable settling.
     ///   (+100 trusted perp1 health, -100 perp2 health -> allow settling of 100 health worth)
     pub fn perp_max_settle(&self, settle_token_index: TokenIndex) -> Result<I80F48> {
-        let token_balances = self.effective_token_balances_internal(HealthType::Maint, true);
+        let maint_type = HealthType::Maint;
+
+        let token_balances = self.effective_token_balances_internal(maint_type, true);
         let mut perp_settle_health = I80F48::ZERO;
         let sum = |contrib| {
             perp_settle_health += contrib;
         };
-        self.health_sum(HealthType::Maint, sum, &token_balances);
+        self.health_sum(maint_type, sum, &token_balances);
 
         let token_info_index = self.token_info_index(settle_token_index)?;
         let token = &self.token_infos[token_info_index];
-        let asset_weighted_price = token.prices.oracle * token.maint_asset_weight;
-        let liab_weighted_price = token.prices.oracle * token.maint_liab_weight;
         spot_amount_taken_for_health_zero(
             perp_settle_health,
             token_balances[token_info_index].spot_and_perp,
-            asset_weighted_price,
-            liab_weighted_price,
+            token.asset_weighted_price(maint_type),
+            token.liab_weighted_price(maint_type),
         )
     }
 }
