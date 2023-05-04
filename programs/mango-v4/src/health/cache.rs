@@ -150,6 +150,32 @@ pub struct Serum3Info {
 
 impl Serum3Info {
     #[inline(always)]
+    fn all_reserved_as_base(
+        &self,
+        health_type: HealthType,
+        quote_info: &TokenInfo,
+        base_info: &TokenInfo,
+    ) -> I80F48 {
+        let quote_asset = quote_info.prices.asset(health_type);
+        let base_liab = base_info.prices.liab(health_type);
+        // OPTIMIZATION: These divisions can be extremely expensive (up to 5k CU each)
+        self.reserved_base + self.reserved_quote * quote_asset / base_liab
+    }
+
+    #[inline(always)]
+    fn all_reserved_as_quote(
+        &self,
+        health_type: HealthType,
+        quote_info: &TokenInfo,
+        base_info: &TokenInfo,
+    ) -> I80F48 {
+        let base_asset = base_info.prices.asset(health_type);
+        let quote_liab = quote_info.prices.liab(health_type);
+        // OPTIMIZATION: These divisions can be extremely expensive (up to 5k CU each)
+        self.reserved_quote + self.reserved_base * base_asset / quote_liab
+    }
+
+    #[inline(always)]
     fn health_contribution(
         &self,
         health_type: HealthType,
@@ -600,23 +626,15 @@ impl HealthCache {
         let mut serum3_reserved = Vec::with_capacity(self.serum3_infos.len());
 
         for info in self.serum3_infos.iter() {
-            let quote = &self.token_infos[info.quote_index];
-            let base = &self.token_infos[info.base_index];
+            let quote_info = &self.token_infos[info.quote_index];
+            let base_info = &self.token_infos[info.base_index];
 
-            let reserved_base = info.reserved_base;
-            let reserved_quote = info.reserved_quote;
-
-            let quote_asset = quote.prices.asset(health_type);
-            let base_liab = base.prices.liab(health_type);
-            // OPTIMIZATION: These divisions can be extremely expensive (up to 5k CU each)
-            let all_reserved_as_base = reserved_base + reserved_quote * quote_asset / base_liab;
-
-            let base_asset = base.prices.asset(health_type);
-            let quote_liab = quote.prices.liab(health_type);
-            let all_reserved_as_quote = reserved_quote + reserved_base * base_asset / quote_liab;
+            let all_reserved_as_base =
+                info.all_reserved_as_base(health_type, quote_info, base_info);
+            let all_reserved_as_quote =
+                info.all_reserved_as_quote(health_type, quote_info, base_info);
 
             let base_max_reserved = &mut token_max_reserved[info.base_index];
-            // note: () does not work with mutable references
             *base_max_reserved += all_reserved_as_base;
             let quote_max_reserved = &mut token_max_reserved[info.quote_index];
             *quote_max_reserved += all_reserved_as_quote;
@@ -687,6 +705,36 @@ impl HealthCache {
             health += positive_contrib;
         }
         health
+    }
+
+    pub fn total_serum3_potential(
+        &self,
+        health_type: HealthType,
+        token_index: TokenIndex,
+    ) -> Result<I80F48> {
+        let target_token_info_index = self.token_info_index(token_index)?;
+        let total_reserved = self
+            .serum3_infos
+            .iter()
+            .filter_map(|info| {
+                if info.quote_index == target_token_info_index {
+                    Some(info.all_reserved_as_quote(
+                        health_type,
+                        &self.token_infos[info.quote_index],
+                        &self.token_infos[info.base_index],
+                    ))
+                } else if info.base_index == target_token_info_index {
+                    Some(info.all_reserved_as_base(
+                        health_type,
+                        &self.token_infos[info.quote_index],
+                        &self.token_infos[info.base_index],
+                    ))
+                } else {
+                    None
+                }
+            })
+            .sum();
+        Ok(total_reserved)
     }
 }
 

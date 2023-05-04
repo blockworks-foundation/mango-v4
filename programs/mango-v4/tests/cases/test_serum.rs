@@ -1,3 +1,4 @@
+#![allow(dead_code)]
 use super::*;
 
 use mango_v4::accounts_ix::{Serum3OrderType, Serum3SelfTradeBehavior, Serum3Side};
@@ -34,15 +35,25 @@ impl SerumOrderPlacer {
         None
     }
 
-    async fn bid(&mut self, limit_price: f64, max_base: u64) -> Option<(u128, u64)> {
+    async fn try_bid(
+        &mut self,
+        limit_price: f64,
+        max_base: u64,
+        taker: bool,
+    ) -> Result<mango_v4::accounts::Serum3PlaceOrder, TransportError> {
         let client_order_id = self.inc_client_order_id();
+        let fees = if taker { 0.0004 } else { 0.0 };
         send_tx(
             &self.solana,
             Serum3PlaceOrderInstruction {
                 side: Serum3Side::Bid,
                 limit_price: (limit_price * 100.0 / 10.0) as u64, // in quote_lot (10) per base lot (100)
                 max_base_qty: max_base / 100,                     // in base lot (100)
-                max_native_quote_qty_including_fees: (limit_price * (max_base as f64)) as u64,
+                // 4 bps taker fees added in
+                max_native_quote_qty_including_fees: (limit_price
+                    * (max_base as f64)
+                    * (1.0 + fees))
+                    .ceil() as u64,
                 self_trade_behavior: Serum3SelfTradeBehavior::AbortTransaction,
                 order_type: Serum3OrderType::Limit,
                 client_order_id,
@@ -53,12 +64,25 @@ impl SerumOrderPlacer {
             },
         )
         .await
-        .unwrap();
-        self.find_order_id_for_client_order_id(client_order_id)
+    }
+
+    async fn bid_maker(&mut self, limit_price: f64, max_base: u64) -> Option<(u128, u64)> {
+        self.try_bid(limit_price, max_base, false).await.unwrap();
+        self.find_order_id_for_client_order_id(self.next_client_order_id - 1)
             .await
     }
 
-    async fn ask(&mut self, limit_price: f64, max_base: u64) -> Option<(u128, u64)> {
+    async fn bid_taker(&mut self, limit_price: f64, max_base: u64) -> Option<(u128, u64)> {
+        self.try_bid(limit_price, max_base, true).await.unwrap();
+        self.find_order_id_for_client_order_id(self.next_client_order_id - 1)
+            .await
+    }
+
+    async fn try_ask(
+        &mut self,
+        limit_price: f64,
+        max_base: u64,
+    ) -> Result<mango_v4::accounts::Serum3PlaceOrder, TransportError> {
         let client_order_id = self.inc_client_order_id();
         send_tx(
             &self.solana,
@@ -77,8 +101,11 @@ impl SerumOrderPlacer {
             },
         )
         .await
-        .unwrap();
-        self.find_order_id_for_client_order_id(client_order_id)
+    }
+
+    async fn ask(&mut self, limit_price: f64, max_base: u64) -> Option<(u128, u64)> {
+        self.try_ask(limit_price, max_base).await.unwrap();
+        self.find_order_id_for_client_order_id(self.next_client_order_id - 1)
             .await
     }
 
@@ -262,7 +289,7 @@ async fn test_serum_basics() -> Result<(), TransportError> {
     //
     // TEST: Place an order
     //
-    let (order_id, _) = order_placer.bid(1.0, 100).await.unwrap();
+    let (order_id, _) = order_placer.bid_maker(1.0, 100).await.unwrap();
     check_prev_instruction_post_health(&solana, account).await;
 
     let native0 = account_position(solana, account, base_token.bank).await;
@@ -362,7 +389,7 @@ async fn test_serum_loan_origination_fees() -> Result<(), TransportError> {
     // TEST: Placing and canceling an order does not take loan origination fees even if borrows are needed
     //
     {
-        let (bid_order_id, _) = order_placer.bid(1.0, 200000).await.unwrap();
+        let (bid_order_id, _) = order_placer.bid_maker(1.0, 200000).await.unwrap();
         let (ask_order_id, _) = order_placer.ask(2.0, 200000).await.unwrap();
 
         let o = order_placer.mango_serum_orders().await;
@@ -377,7 +404,7 @@ async fn test_serum_loan_origination_fees() -> Result<(), TransportError> {
         assert_eq!(o.quote_borrows_without_fee, 19999);
 
         // placing new, slightly larger orders increases the borrow_without_fee amount only by a small amount
-        let (bid_order_id, _) = order_placer.bid(1.0, 210000).await.unwrap();
+        let (bid_order_id, _) = order_placer.bid_maker(1.0, 210000).await.unwrap();
         let (ask_order_id, _) = order_placer.ask(2.0, 300000).await.unwrap();
 
         let o = order_placer.mango_serum_orders().await;
@@ -429,7 +456,10 @@ async fn test_serum_loan_origination_fees() -> Result<(), TransportError> {
             .collected_fees_native;
 
         // account2 has an order on the book
-        order_placer2.bid(1.0, bid_amount as u64).await.unwrap();
+        order_placer2
+            .bid_maker(1.0, bid_amount as u64)
+            .await
+            .unwrap();
 
         // account takes
         order_placer.ask(1.0, ask_amount as u64).await.unwrap();
@@ -566,7 +596,7 @@ async fn test_serum_settle_v1() -> Result<(), TransportError> {
     let base2_start = account_position(solana, account2, base_bank).await;
 
     // account2 has an order on the book, account takes
-    order_placer2.bid(1.0, amount as u64).await.unwrap();
+    order_placer2.bid_maker(1.0, amount as u64).await.unwrap();
     order_placer.ask(1.0, amount as u64).await.unwrap();
 
     context
@@ -663,7 +693,7 @@ async fn test_serum_settle_v2_to_dao() -> Result<(), TransportError> {
     let base2_start = account_position(solana, account2, base_bank).await;
 
     // account2 has an order on the book, account takes
-    order_placer2.bid(1.0, amount as u64).await.unwrap();
+    order_placer2.bid_maker(1.0, amount as u64).await.unwrap();
     order_placer.ask(1.0, amount as u64).await.unwrap();
 
     context
@@ -756,7 +786,7 @@ async fn test_serum_settle_v2_to_account() -> Result<(), TransportError> {
     let base2_start = account_position(solana, account2, base_bank).await;
 
     // account2 has an order on the book, account takes
-    order_placer2.bid(1.0, amount as u64).await.unwrap();
+    order_placer2.bid_maker(1.0, amount as u64).await.unwrap();
     order_placer.ask(1.0, amount as u64).await.unwrap();
 
     context
@@ -801,6 +831,173 @@ async fn test_serum_settle_v2_to_account() -> Result<(), TransportError> {
     assert_eq!(account_data.buyback_fees_accrued_current, 0);
     let account2_data = solana.get_account::<MangoAccount>(account2).await;
     assert_eq!(account2_data.buyback_fees_accrued_current, 0);
+
+    Ok(())
+}
+
+#[tokio::test]
+async fn test_serum_reduce_only_borrows() -> Result<(), TransportError> {
+    let mut test_builder = TestContextBuilder::new();
+    test_builder.test().set_compute_max_units(95_000); // Serum3PlaceOrder needs 92.8k
+    let context = test_builder.start_default().await;
+    let solana = &context.solana.clone();
+
+    //
+    // SETUP: Create a group, accounts, market etc
+    //
+    let deposit_amount = 1000;
+    let CommonSetup {
+        group_with_tokens,
+        base_token,
+        mut order_placer,
+        ..
+    } = common_setup(&context, deposit_amount).await;
+
+    send_tx(
+        solana,
+        TokenMakeReduceOnly {
+            group: group_with_tokens.group,
+            admin: group_with_tokens.admin,
+            mint: base_token.mint.pubkey,
+            reduce_only: 2,
+            force_close: false,
+        },
+    )
+    .await
+    .unwrap();
+
+    //
+    // TEST: Cannot borrow tokens when bank is reduce only
+    //
+
+    let err = order_placer.try_ask(1.0, 1100).await;
+    assert_mango_error(&err, MangoError::TokenInReduceOnlyMode.into(), "".into());
+
+    order_placer.try_ask(0.5, 500).await.unwrap();
+
+    let err = order_placer.try_ask(1.0, 600).await;
+    assert_mango_error(&err, MangoError::TokenInReduceOnlyMode.into(), "".into());
+
+    order_placer.try_ask(2.0, 500).await.unwrap();
+
+    let err = order_placer.try_ask(1.0, 100).await;
+    assert_mango_error(&err, MangoError::TokenInReduceOnlyMode.into(), "".into());
+
+    Ok(())
+}
+
+#[tokio::test]
+async fn test_serum_reduce_only_deposits1() -> Result<(), TransportError> {
+    let mut test_builder = TestContextBuilder::new();
+    test_builder.test().set_compute_max_units(95_000); // Serum3PlaceOrder needs 92.8k
+    let context = test_builder.start_default().await;
+    let solana = &context.solana.clone();
+
+    //
+    // SETUP: Create a group, accounts, market etc
+    //
+    let deposit_amount = 1000;
+    let CommonSetup {
+        group_with_tokens,
+        base_token,
+        mut order_placer,
+        mut order_placer2,
+        ..
+    } = common_setup(&context, deposit_amount).await;
+
+    send_tx(
+        solana,
+        TokenMakeReduceOnly {
+            group: group_with_tokens.group,
+            admin: group_with_tokens.admin,
+            mint: base_token.mint.pubkey,
+            reduce_only: 1,
+            force_close: false,
+        },
+    )
+    .await
+    .unwrap();
+
+    //
+    // TEST: Cannot buy tokens when deposits are already >0
+    //
+
+    // fails to place on the book
+    let err = order_placer.try_bid(1.0, 1000, false).await;
+    assert_mango_error(&err, MangoError::TokenInReduceOnlyMode.into(), "".into());
+
+    // also fails as a taker order
+    order_placer2.ask(1.0, 500).await.unwrap();
+    let err = order_placer.try_bid(1.0, 100, true).await;
+    assert_mango_error(&err, MangoError::TokenInReduceOnlyMode.into(), "".into());
+
+    Ok(())
+}
+
+#[tokio::test]
+async fn test_serum_reduce_only_deposits2() -> Result<(), TransportError> {
+    let mut test_builder = TestContextBuilder::new();
+    test_builder.test().set_compute_max_units(95_000); // Serum3PlaceOrder needs 92.8k
+    let context = test_builder.start_default().await;
+    let solana = &context.solana.clone();
+
+    //
+    // SETUP: Create a group, accounts, market etc
+    //
+    let deposit_amount = 1000;
+    let CommonSetup {
+        group_with_tokens,
+        base_token,
+        mut order_placer,
+        mut order_placer2,
+        ..
+    } = common_setup(&context, deposit_amount).await;
+
+    // Give account some base token borrows (-500)
+    send_tx(
+        solana,
+        TokenWithdrawInstruction {
+            amount: 1500,
+            allow_borrow: true,
+            account: order_placer.account,
+            owner: order_placer.owner,
+            token_account: context.users[0].token_accounts[1],
+            bank_index: 0,
+        },
+    )
+    .await
+    .unwrap();
+
+    //
+    // TEST: Cannot buy tokens when deposits are already >0
+    //
+    send_tx(
+        solana,
+        TokenMakeReduceOnly {
+            group: group_with_tokens.group,
+            admin: group_with_tokens.admin,
+            mint: base_token.mint.pubkey,
+            reduce_only: 1,
+            force_close: false,
+        },
+    )
+    .await
+    .unwrap();
+
+    // cannot place a large order on the book that would deposit too much
+    let err = order_placer.try_bid(1.0, 600, false).await;
+    assert_mango_error(&err, MangoError::TokenInReduceOnlyMode.into(), "".into());
+
+    // a small order is fine
+    order_placer.try_bid(1.0, 100, false).await.unwrap();
+
+    // taking some is fine too
+    order_placer2.ask(1.0, 800).await.unwrap();
+    order_placer.try_bid(1.0, 100, true).await.unwrap();
+
+    // the limit for orders is reduced now, 100 received, 100 on the book
+    let err = order_placer.try_bid(1.0, 400, true).await;
+    assert_mango_error(&err, MangoError::TokenInReduceOnlyMode.into(), "".into());
 
     Ok(())
 }
