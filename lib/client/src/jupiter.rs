@@ -65,6 +65,7 @@ pub struct SwapRequest {
     pub user_public_key: String,
     #[serde(rename = "wrapUnwrapSOL")]
     pub wrap_unwrap_sol: bool,
+    pub compute_unit_price_micro_lamports: Option<u64>,
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
