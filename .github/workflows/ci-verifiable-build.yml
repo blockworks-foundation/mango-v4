@@ -2,7 +2,7 @@ name: Verifiable Build
 on:
   push:
     tags:
-      - "program-v*"
+      - 'program-v*'
 
 env:
   APP_NAME: mango_v4
