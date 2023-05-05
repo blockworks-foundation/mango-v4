@@ -257,16 +257,19 @@ async function main(): Promise<void> {
     const userWallet = new Wallet(user);
     console.log(`User ${userWallet.publicKey.toBase58()}`);
 
-    const mangoAccounts = await client.getAllMangoAccounts(group);
+    const mangoAccounts = await client.getAllMangoAccounts(group, true);
 
     for (const mangoAccount of mangoAccounts) {
       if (
         !MANGO_ACCOUNT_PK ||
         mangoAccount.publicKey.equals(new PublicKey(MANGO_ACCOUNT_PK))
       ) {
-        console.log();
-        console.log(`MangoAccount ${mangoAccount.publicKey}`);
-        await debugUser(client, group, mangoAccount);
+        console.log(
+          `MangoAccount ${mangoAccount.publicKey} ${toUiDecimalsForQuote(
+            mangoAccount.getHealth(group, HealthType.init),
+          )}`,
+        );
+        // await debugUser(client, group, mangoAccount);
       }
     }
   }

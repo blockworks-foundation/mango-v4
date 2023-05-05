@@ -509,12 +509,15 @@ export class PerpMarket {
             ? accountsWithSettleablePnl[i + 1].settleablePnl
             : ZERO_I80F48();
 
-        const perpSettleHealth = acc.account.getPerpSettleHealth(group);
+        const perpMaxSettle = acc.account.perpMaxSettle(
+          group,
+          this.settleTokenIndex,
+        );
         acc.settleablePnl =
           // need positive settle health to settle against +ve pnl
-          perpSettleHealth.gt(ZERO_I80F48())
+          perpMaxSettle.gt(ZERO_I80F48())
             ? // can only settle min
-              acc.settleablePnl.max(perpSettleHealth.neg())
+              acc.settleablePnl.max(perpMaxSettle.neg())
             : ZERO_I80F48();
 
         // If the ordering was unchanged `count` times we know we have the top `count` accounts

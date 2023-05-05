@@ -296,9 +296,12 @@ export class MangoAccount {
     return hc.health(healthType);
   }
 
-  public getPerpSettleHealth(group: Group): I80F48 {
+  public perpMaxSettle(
+    group: Group,
+    perpMarketSettleTokenIndex: TokenIndex,
+  ): I80F48 {
     const hc = HealthCache.fromMangoAccount(group, this);
-    return hc.perpSettleHealth();
+    return hc.perpMaxSettle(perpMarketSettleTokenIndex);
   }
 
   /**
@@ -375,20 +378,22 @@ export class MangoAccount {
 
   /**
    * Sum of all positive assets.
+   * TODO: healthType = HealthType.maint breaks UI assumption
    * @returns assets, in native quote
    */
-  public getAssetsValue(group: Group, healthType?: HealthType): I80F48 {
+  public getAssetsValue(group: Group, healthType = HealthType.maint): I80F48 {
     const hc = HealthCache.fromMangoAccount(group, this);
-    return hc.assets(healthType);
+    return hc.assetsAndLiabs(healthType, true).assets;
   }
 
   /**
    * Sum of all negative assets.
+   * TODO: healthType = HealthType.maint breaks UI assumption
    * @returns liabs, in native quote
    */
-  public getLiabsValue(group: Group, healthType?: HealthType): I80F48 {
+  public getLiabsValue(group: Group, healthType = HealthType.maint): I80F48 {
     const hc = HealthCache.fromMangoAccount(group, this);
-    return hc.liabs(healthType);
+    return hc.assetsAndLiabs(healthType, false).liabs;
   }
 
   /**
@@ -445,6 +450,7 @@ export class MangoAccount {
    * @returns amount of given native token you can borrow, considering all existing assets as collateral, in native token
    *
    * TODO: take into account net_borrow_limit and min_vault_to_deposits_ratio
+   * TODO: see max_borrow_for_health_fn
    */
   public getMaxWithdrawWithBorrowForToken(
     group: Group,
@@ -1539,7 +1545,10 @@ export class PerpPosition {
       throw new Error("PerpPosition doesn't belong to the given market!");
     }
     this.updateSettleLimit(perpMarket);
-    const perpSettleHealth = account.getPerpSettleHealth(group);
+    const perpSettleHealth = account.perpMaxSettle(
+      group,
+      perpMarket.settleTokenIndex,
+    );
     const limitedUnsettled = this.applyPnlSettleLimit(
       this.getUnsettledPnl(perpMarket),
       perpMarket,
