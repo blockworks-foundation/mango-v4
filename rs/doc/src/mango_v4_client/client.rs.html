@@ -1666,6 +1666,19 @@
 <a href="#1666" id="1666">1666</a>
 <a href="#1667" id="1667">1667</a>
 <a href="#1668" id="1668">1668</a>
+<a href="#1669" id="1669">1669</a>
+<a href="#1670" id="1670">1670</a>
+<a href="#1671" id="1671">1671</a>
+<a href="#1672" id="1672">1672</a>
+<a href="#1673" id="1673">1673</a>
+<a href="#1674" id="1674">1674</a>
+<a href="#1675" id="1675">1675</a>
+<a href="#1676" id="1676">1676</a>
+<a href="#1677" id="1677">1677</a>
+<a href="#1678" id="1678">1678</a>
+<a href="#1679" id="1679">1679</a>
+<a href="#1680" id="1680">1680</a>
+<a href="#1681" id="1681">1681</a>
 </pre><pre class="rust"><code><span class="kw">use </span>std::str::FromStr;
 <span class="kw">use </span>std::sync::Arc;
 <span class="kw">use </span>std::time::Duration;
@@ -2905,7 +2918,8 @@
                 route: route.clone(),
                 user_public_key: <span class="self">self</span>.owner.pubkey().to_string(),
                 wrap_unwrap_sol: <span class="bool-val">false</span>,
-            })
+                compute_unit_price_micro_lamports: <span class="prelude-val">None</span>, <span class="comment">// we already prioritize
+            </span>})
             .send()
             .<span class="kw">await
             </span>.context(<span class="string">&quot;swap transaction request to jupiter&quot;</span>)<span class="question-mark">?
@@ -2929,11 +2943,20 @@
             .context(<span class="string">&quot;parsing jupiter transaction&quot;</span>)<span class="question-mark">?</span>;
         <span class="kw">let </span>ata_program = anchor_spl::associated_token::ID;
         <span class="kw">let </span>token_program = anchor_spl::token::ID;
-        <span class="kw">let </span>is_setup_ix = |k: Pubkey| -&gt; bool { k == ata_program || k == token_program };
+        <span class="kw">let </span>compute_budget_program = solana_sdk::compute_budget::ID;
+        <span class="comment">// these setup instructions are unnecessary since FlashLoan already takes care of it
+        </span><span class="kw">let </span>is_setup_ix = |k: Pubkey| -&gt; bool {
+            k == ata_program || k == token_program || k == compute_budget_program
+        };
         <span class="kw">let </span>(jup_ixs, jup_alts) = <span class="self">self
             </span>.deserialize_instructions_and_alts(<span class="kw-2">&amp;</span>jup_tx.message)
             .<span class="kw">await</span><span class="question-mark">?</span>;
-        <span class="kw">let </span>filtered_jup_ix = jup_ixs
+        <span class="kw">let </span>jup_cu_ix = jup_ixs
+            .iter()
+            .filter(|ix| ix.program_id == compute_budget_program)
+            .cloned()
+            .collect::&lt;Vec&lt;<span class="kw">_</span>&gt;&gt;();
+        <span class="kw">let </span>jup_action_ix = jup_ixs
             .into_iter()
             .filter(|ix| !is_setup_ix(ix.program_id))
             .collect::&lt;Vec&lt;<span class="kw">_</span>&gt;&gt;();
@@ -2988,6 +3011,9 @@
 
         <span class="kw">let </span><span class="kw-2">mut </span>instructions = Vec::new();
 
+        <span class="kw">for </span>ix <span class="kw">in </span>jup_cu_ix {
+            instructions.push(ix.clone());
+        }
         instructions.push(
             spl_associated_token_account::instruction::create_associated_token_account_idempotent(
                 <span class="kw-2">&amp;</span><span class="self">self</span>.owner.pubkey(),
@@ -3026,7 +3052,7 @@
                 loan_amounts,
             }),
         });
-        <span class="kw">for </span>ix <span class="kw">in </span>filtered_jup_ix {
+        <span class="kw">for </span>ix <span class="kw">in </span>jup_action_ix {
             instructions.push(ix.clone());
         }
         instructions.push(Instruction {

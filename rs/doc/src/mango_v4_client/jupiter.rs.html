@@ -74,6 +74,7 @@
 <a href="#74" id="74">74</a>
 <a href="#75" id="75">75</a>
 <a href="#76" id="76">76</a>
+<a href="#77" id="77">77</a>
 </pre><pre class="rust"><code><span class="kw">use </span>serde::{Deserialize, Serialize};
 
 <span class="attr">#[derive(Deserialize, Serialize, Debug, Clone)]
@@ -141,6 +142,7 @@
     <span class="kw">pub </span>user_public_key: String,
     <span class="attr">#[serde(rename = <span class="string">&quot;wrapUnwrapSOL&quot;</span>)]
     </span><span class="kw">pub </span>wrap_unwrap_sol: bool,
+    <span class="kw">pub </span>compute_unit_price_micro_lamports: <span class="prelude-ty">Option</span>&lt;u64&gt;,
 }
 
 <span class="attr">#[derive(Deserialize, Serialize, Debug, Clone)]
