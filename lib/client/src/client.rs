@@ -1237,6 +1237,7 @@ impl MangoClient {
                 route: route.clone(),
                 user_public_key: self.owner.pubkey().to_string(),
                 wrap_unwrap_sol: false,
+                compute_unit_price_micro_lamports: None, // we already prioritize
             })
             .send()
             .await
@@ -1261,11 +1262,20 @@ impl MangoClient {
             .context("parsing jupiter transaction")?;
         let ata_program = anchor_spl::associated_token::ID;
         let token_program = anchor_spl::token::ID;
-        let is_setup_ix = |k: Pubkey| -> bool { k == ata_program || k == token_program };
+        let compute_budget_program = solana_sdk::compute_budget::ID;
+        // these setup instructions are unnecessary since FlashLoan already takes care of it
+        let is_setup_ix = |k: Pubkey| -> bool {
+            k == ata_program || k == token_program || k == compute_budget_program
+        };
         let (jup_ixs, jup_alts) = self
             .deserialize_instructions_and_alts(&jup_tx.message)
             .await?;
-        let filtered_jup_ix = jup_ixs
+        let jup_cu_ix = jup_ixs
+            .iter()
+            .filter(|ix| ix.program_id == compute_budget_program)
+            .cloned()
+            .collect::<Vec<_>>();
+        let jup_action_ix = jup_ixs
             .into_iter()
             .filter(|ix| !is_setup_ix(ix.program_id))
             .collect::<Vec<_>>();
@@ -1320,6 +1330,9 @@ impl MangoClient {
 
         let mut instructions = Vec::new();
 
+        for ix in jup_cu_ix {
+            instructions.push(ix.clone());
+        }
         instructions.push(
             spl_associated_token_account::instruction::create_associated_token_account_idempotent(
                 &self.owner.pubkey(),
@@ -1358,7 +1371,7 @@ impl MangoClient {
                 loan_amounts,
             }),
         });
-        for ix in filtered_jup_ix {
+        for ix in jup_action_ix {
             instructions.push(ix.clone());
         }
         instructions.push(Instruction {
