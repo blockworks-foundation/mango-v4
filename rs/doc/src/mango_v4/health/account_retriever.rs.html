@@ -530,10 +530,6 @@
 <a href="#530" id="530">530</a>
 <a href="#531" id="531">531</a>
 <a href="#532" id="532">532</a>
-<a href="#533" id="533">533</a>
-<a href="#534" id="534">534</a>
-<a href="#535" id="535">535</a>
-<a href="#536" id="536">536</a>
 </pre><pre class="rust"><code><span class="kw">use </span>anchor_lang::prelude::<span class="kw-2">*</span>;
 <span class="kw">use </span>anchor_lang::ZeroCopy;
 
@@ -602,11 +598,7 @@
     <span class="kw">let </span>expected_ais = active_token_len * <span class="number">2 </span><span class="comment">// banks + oracles
         </span>+ active_perp_len * <span class="number">2 </span><span class="comment">// PerpMarkets + Oracles
         </span>+ active_serum3_len; <span class="comment">// open_orders
-    </span><span class="macro">require_msg_typed!</span>(ais.len() == expected_ais, MangoError::InvalidHealthAccountCount,
-        <span class="string">&quot;received {} accounts but expected {} ({} banks, {} bank oracles, {} perp markets, {} perp oracles, {} serum3 oos)&quot;</span>,
-        ais.len(), expected_ais,
-        active_token_len, active_token_len, active_perp_len, active_perp_len, active_serum3_len
-    );
+    </span><span class="macro">require_eq!</span>(ais.len(), expected_ais);
 
     <span class="prelude-val">Ok</span>(FixedOrderAccountRetriever {
         ais: AccountInfoRef::borrow_slice(ais)<span class="question-mark">?</span>,
