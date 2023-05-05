@@ -66,7 +66,11 @@ pub fn new_fixed_order_account_retriever<'a, 'info>(
     let expected_ais = active_token_len * 2 // banks + oracles
         + active_perp_len * 2 // PerpMarkets + Oracles
         + active_serum3_len; // open_orders
-    require_eq!(ais.len(), expected_ais);
+    require_msg_typed!(ais.len() == expected_ais, MangoError::InvalidHealthAccountCount,
+        "received {} accounts but expected {} ({} banks, {} bank oracles, {} perp markets, {} perp oracles, {} serum3 oos)",
+        ais.len(), expected_ais,
+        active_token_len, active_token_len, active_perp_len, active_perp_len, active_serum3_len
+    );
 
     Ok(FixedOrderAccountRetriever {
         ais: AccountInfoRef::borrow_slice(ais)?,

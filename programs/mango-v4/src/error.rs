@@ -99,6 +99,8 @@ pub enum MangoError {
     HealthRegionBadInnerInstruction,
     #[msg("token is in force close")]
     TokenInForceClose,
+    #[msg("incorrect number of health accounts")]
+    InvalidHealthAccountCount,
 }
 
 impl MangoError {
