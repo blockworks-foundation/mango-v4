@@ -3918,6 +3918,87 @@ export type MangoV4 = {
       ]
     },
     {
+      "name": "perpLiqNegativePnlOrBankruptcyV2",
+      "accounts": [
+        {
+          "name": "group",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "liqor",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "liqorOwner",
+          "isMut": false,
+          "isSigner": true
+        },
+        {
+          "name": "liqee",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "perpMarket",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "oracle",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "settleBank",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "settleVault",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "settleOracle",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "insuranceVault",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "insuranceBank",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "insuranceBankVault",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "insuranceOracle",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "tokenProgram",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "maxLiabTransfer",
+          "type": "u64"
+        }
+      ]
+    },
+    {
       "name": "altSet",
       "accounts": [
         {
@@ -5463,7 +5544,13 @@ export type MangoV4 = {
             }
           },
           {
-            "name": "balanceNative",
+            "name": "balanceSpot",
+            "docs": [
+              "Freely available spot balance for the token.",
+              "",
+              "Includes TokenPosition and free Serum3OpenOrders balances.",
+              "Does not include perp upnl or Serum3 reserved amounts."
+            ],
             "type": {
               "defined": "I80F48"
             }
@@ -5517,6 +5604,10 @@ export type MangoV4 = {
         "fields": [
           {
             "name": "perpMarketIndex",
+            "type": "u16"
+          },
+          {
+            "name": "settleTokenIndex",
             "type": "u16"
           },
           {
@@ -5578,7 +5669,7 @@ export type MangoV4 = {
             }
           },
           {
-            "name": "prices",
+            "name": "basePrices",
             "type": {
               "defined": "Prices"
             }
@@ -5838,8 +5929,14 @@ export type MangoV4 = {
           {
             "name": "quotePositionNative",
             "docs": [
-              "Active position in quote (conversation rate is that of the time the order was settled)",
-              "measured in native quote"
+              "Active position in oracle quote native. At the same time this is 1:1 a settle_token native amount.",
+              "",
+              "Example: Say there's a perp market on the BTC/USD price using SOL for settlement. The user buys",
+              "one long contract for $20k, then base = 1, quote = -20k. The price goes to $21k. Now their",
+              "unsettled pnl is (1 * 21k - 20k) __SOL__ = 1000 SOL. This is because the perp contract arbitrarily",
+              "decides that each unit of price difference creates 1 SOL worth of settlement.",
+              "(yes, causing 1 SOL of settlement for each $1 price change implies a lot of extra leverage; likely",
+              "there should be an extra configurable scaling factor before we use this for cases like that)"
             ],
             "type": {
               "defined": "I80F48"
@@ -12933,6 +13030,87 @@ export const IDL: MangoV4 = {
       ]
     },
     {
+      "name": "perpLiqNegativePnlOrBankruptcyV2",
+      "accounts": [
+        {
+          "name": "group",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "liqor",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "liqorOwner",
+          "isMut": false,
+          "isSigner": true
+        },
+        {
+          "name": "liqee",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "perpMarket",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "oracle",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "settleBank",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "settleVault",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "settleOracle",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "insuranceVault",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "insuranceBank",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "insuranceBankVault",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "insuranceOracle",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "tokenProgram",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "maxLiabTransfer",
+          "type": "u64"
+        }
+      ]
+    },
+    {
       "name": "altSet",
       "accounts": [
         {
@@ -14478,7 +14656,13 @@ export const IDL: MangoV4 = {
             }
           },
           {
-            "name": "balanceNative",
+            "name": "balanceSpot",
+            "docs": [
+              "Freely available spot balance for the token.",
+              "",
+              "Includes TokenPosition and free Serum3OpenOrders balances.",
+              "Does not include perp upnl or Serum3 reserved amounts."
+            ],
             "type": {
               "defined": "I80F48"
             }
@@ -14532,6 +14716,10 @@ export const IDL: MangoV4 = {
         "fields": [
           {
             "name": "perpMarketIndex",
+            "type": "u16"
+          },
+          {
+            "name": "settleTokenIndex",
             "type": "u16"
           },
           {
@@ -14593,7 +14781,7 @@ export const IDL: MangoV4 = {
             }
           },
           {
-            "name": "prices",
+            "name": "basePrices",
             "type": {
               "defined": "Prices"
             }
@@ -14853,8 +15041,14 @@ export const IDL: MangoV4 = {
           {
             "name": "quotePositionNative",
             "docs": [
-              "Active position in quote (conversation rate is that of the time the order was settled)",
-              "measured in native quote"
+              "Active position in oracle quote native. At the same time this is 1:1 a settle_token native amount.",
+              "",
+              "Example: Say there's a perp market on the BTC/USD price using SOL for settlement. The user buys",
+              "one long contract for $20k, then base = 1, quote = -20k. The price goes to $21k. Now their",
+              "unsettled pnl is (1 * 21k - 20k) __SOL__ = 1000 SOL. This is because the perp contract arbitrarily",
+              "decides that each unit of price difference creates 1 SOL worth of settlement.",
+              "(yes, causing 1 SOL of settlement for each $1 price change implies a lot of extra leverage; likely",
+              "there should be an extra configurable scaling factor before we use this for cases like that)"
             ],
             "type": {
               "defined": "I80F48"
