@@ -18,8 +18,6 @@ pub fn perp_place_order(
 
     let now_ts: u64 = Clock::get()?.unix_timestamp.try_into().unwrap();
     let oracle_price;
-    let oracle_confidence;
-    let oracle_type;
 
     // Update funding if possible.
     //
@@ -32,21 +30,13 @@ pub fn perp_place_order(
             asks: ctx.accounts.asks.load_mut()?,
         };
 
-        let oracle_slot;
-        (oracle_price, oracle_slot, oracle_confidence, oracle_type) = perp_market
-            .oracle_price_and_meta(
-                &AccountInfoRef::borrow(ctx.accounts.oracle.as_ref())?,
-                None, // staleness checked in health
-            )?;
-
-        perp_market.update_funding_and_stable_price(
-            &book,
-            oracle_price,
-            oracle_slot,
-            oracle_confidence,
-            oracle_type,
-            now_ts,
+        let oracle_state;
+        (oracle_price, oracle_state) = perp_market.oracle_price_and_state(
+            &AccountInfoRef::borrow(ctx.accounts.oracle.as_ref())?,
+            None, // staleness checked in health
         )?;
+
+        perp_market.update_funding_and_stable_price(&book, oracle_price, oracle_state, now_ts)?;
     }
 
     let mut account = ctx.accounts.account.load_full_mut()?;
