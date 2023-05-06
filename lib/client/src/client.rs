@@ -18,7 +18,7 @@ use itertools::Itertools;
 use mango_v4::accounts_ix::{Serum3OrderType, Serum3SelfTradeBehavior, Serum3Side};
 use mango_v4::state::{
     Bank, Group, MangoAccountValue, PerpMarketIndex, PlaceOrderType, Serum3MarketIndex, Side,
-    TokenIndex, INSURANCE_TOKEN_INDEX,
+    TokenIndex, INSURANCE_TOKEN_INDEX
 };
 
 use solana_address_lookup_table_program::state::AddressLookupTable;
@@ -782,8 +782,9 @@ impl MangoClient {
     //
     // Perps
     //
-    pub async fn perp_place_order(
+    pub fn perp_place_order_instruction(
         &self,
+        account: &MangoAccountValue,
         market_index: PerpMarketIndex,
         side: Side,
         price_lots: i64,
@@ -794,16 +795,14 @@ impl MangoClient {
         reduce_only: bool,
         expiry_timestamp: u64,
         limit: u8,
-    ) -> anyhow::Result<Signature> {
+    ) -> anyhow::Result<Instruction> {
         let perp = self.context.perp(market_index);
-
-        let health_check_metas = self
-            .derive_health_check_remaining_account_metas(
-                vec![],
-                vec![],
-                vec![perp.market.perp_market_index],
-            )
-            .await?;
+        let health_remaining_metas = self.context.derive_health_check_remaining_account_metas(
+            account,
+            vec![],
+            vec![],
+            vec![market_index],
+        )?;
 
         let ix = Instruction {
             program_id: mango_v4::id(),
@@ -821,7 +820,7 @@ impl MangoClient {
                     },
                     None,
                 );
-                ams.extend(health_check_metas.into_iter());
+                ams.extend(health_remaining_metas.into_iter());
                 ams
             },
             data: anchor_lang::InstructionData::data(&mango_v4::instruction::PerpPlaceOrder {
@@ -836,7 +835,67 @@ impl MangoClient {
                 limit,
             }),
         };
+
+        Ok(ix)
+    }
+
+    pub async fn perp_place_order(
+        &self,
+        market_index: PerpMarketIndex,
+        side: Side,
+        price_lots: i64,
+        max_base_lots: i64,
+        max_quote_lots: i64,
+        client_order_id: u64,
+        order_type: PlaceOrderType,
+        reduce_only: bool,
+        expiry_timestamp: u64,
+        limit: u8,
+    ) -> anyhow::Result<Signature> {
+        let account = self.mango_account().await?;
+        let ix = self.perp_place_order_instruction(
+            &account,
+            market_index,
+            side,
+            price_lots,
+            max_base_lots,
+            max_quote_lots,
+            client_order_id,
+            order_type,
+            reduce_only,
+            expiry_timestamp,
+            limit,
+        )?;
         self.send_and_confirm_owner_tx(vec![ix]).await
+    }
+
+    pub fn perp_cancel_all_orders_instruction(
+        &self,
+        market_index: PerpMarketIndex,
+        limit: u8,
+    ) -> anyhow::Result<Instruction> {
+        let perp = self.context.perp(market_index);
+
+        let ix = Instruction {
+            program_id: mango_v4::id(),
+            accounts: {
+                anchor_lang::ToAccountMetas::to_account_metas(
+                    &mango_v4::accounts::PerpCancelAllOrders {
+                        group: self.group(),
+                        account: self.mango_account_address,
+                        owner: self.owner(),
+                        perp_market: perp.address,
+                        bids: perp.market.bids,
+                        asks: perp.market.asks,
+                    },
+                    None,
+                )
+            },
+            data: anchor_lang::InstructionData::data(&mango_v4::instruction::PerpCancelAllOrders {
+                limit,
+            }),
+        };
+        Ok(ix)
     }
 
     pub async fn perp_deactivate_position(
@@ -1160,6 +1219,76 @@ impl MangoClient {
         };
         self.send_and_confirm_owner_tx(vec![ix]).await
     }
+
+    // health region
+
+    pub fn health_region_begin_instruction(
+        &self,
+        account: &MangoAccountValue,
+        affected_tokens: Vec<TokenIndex>,
+        writable_banks: Vec<TokenIndex>,
+        affected_perp_markets: Vec<PerpMarketIndex>,
+    ) -> anyhow::Result<Instruction> {
+        let health_remaining_metas = self.context.derive_health_check_remaining_account_metas(
+            account,
+            affected_tokens,
+            writable_banks,
+            affected_perp_markets,
+        )?;
+
+        let ix = Instruction {
+            program_id: mango_v4::id(),
+            accounts: {
+                let mut ams = anchor_lang::ToAccountMetas::to_account_metas(
+                    &mango_v4::accounts::HealthRegionBegin {
+                        group: self.group(),
+                        account: self.mango_account_address,
+                        instructions: solana_sdk::sysvar::instructions::id(),
+                    },
+                    None,
+                );
+                ams.extend(health_remaining_metas.into_iter());
+                ams
+            },
+            data: anchor_lang::InstructionData::data(&mango_v4::instruction::HealthRegionBegin {}),
+        };
+
+        Ok(ix)
+    }
+
+    pub fn health_region_end_instruction(
+        &self,
+        account: &MangoAccountValue,
+        affected_tokens: Vec<TokenIndex>,
+        writable_banks: Vec<TokenIndex>,
+        affected_perp_markets: Vec<PerpMarketIndex>,
+    ) -> anyhow::Result<Instruction> {
+        let health_remaining_metas = self.context.derive_health_check_remaining_account_metas(
+            account,
+            affected_tokens,
+            writable_banks,
+            affected_perp_markets,
+        )?;
+
+        let ix = Instruction {
+            program_id: mango_v4::id(),
+            accounts: {
+                let mut ams = anchor_lang::ToAccountMetas::to_account_metas(
+                    &mango_v4::accounts::HealthRegionEnd {
+                        account: self.mango_account_address,
+                    },
+                    None,
+                );
+                ams.extend(health_remaining_metas.into_iter());
+                ams
+            },
+            data: anchor_lang::InstructionData::data(&mango_v4::instruction::HealthRegionEnd {}),
+        };
+
+        Ok(ix)
+    }
+
+    // jupiter
 
     pub async fn jupiter_route(
         &self,
