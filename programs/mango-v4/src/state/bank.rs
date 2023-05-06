@@ -789,7 +789,7 @@ impl Bank {
         staleness_slot: Option<u64>,
     ) -> Result<I80F48> {
         require_keys_eq!(self.oracle, *oracle_acc.key());
-        let (price, _) = oracle::oracle_price_and_slot(
+        let (price, _) = oracle::oracle_price_and_state(
             oracle_acc,
             &self.oracle_config,
             self.mint_decimals,
