@@ -18,7 +18,7 @@ use itertools::Itertools;
 use mango_v4::accounts_ix::{Serum3OrderType, Serum3SelfTradeBehavior, Serum3Side};
 use mango_v4::state::{
     Bank, Group, MangoAccountValue, PerpMarketIndex, PlaceOrderType, Serum3MarketIndex, Side,
-    TokenIndex, INSURANCE_TOKEN_INDEX
+    TokenIndex, INSURANCE_TOKEN_INDEX,
 };
 
 use solana_address_lookup_table_program::state::AddressLookupTable;
