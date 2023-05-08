@@ -54,7 +54,7 @@ async function main(): Promise<void> {
   console.log(`Admin ${admin.publicKey.toBase58()}`);
 
   // Make mints
-  const mints = await Promise.all(Array(3).fill(null).map(() => splToken.createMint(connection, admin, admin.publicKey, null, 6)));
+  const mints = await Promise.all(Array(4).fill(null).map(() => splToken.createMint(connection, admin, admin.publicKey, null, 6)));
 
   // Mint some tokens to the admin
   for (const mint of mints) {

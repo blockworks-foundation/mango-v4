@@ -25,12 +25,14 @@ const MAINNET_MINTS = new Map([
   ['USDC', MINTS[0]],
   ['ETH', MINTS[1]],
   ['SOL', MINTS[2]],
+  ['MNGO', MINTS[3]],
 ]);
 
 const STUB_PRICES = new Map([
   ['USDC', 1.0],
   ['ETH', 1200.0], // eth and usdc both have 6 decimals
   ['SOL', 0.015], // sol has 9 decimals, equivalent to $15 per SOL
+  ['MNGO', 0.02],
 ]);
 
 // External markets are matched with those in https://github.com/blockworks-foundation/mango-client-v3/blob/main/src/ids.json
@@ -113,13 +115,13 @@ async function main(): Promise<void> {
 
   // register token 0
   console.log(`Registering USDC...`);
-  const usdcMainnetMint = new PublicKey(MAINNET_MINTS.get('USDC')!);
-  const usdcMainnetOracle = oracles.get('USDC');
+  const usdcMint = new PublicKey(MAINNET_MINTS.get('USDC')!);
+  const usdcOracle = oracles.get('USDC');
   try {
     await client.tokenRegister(
       group,
-      usdcMainnetMint,
-      usdcMainnetOracle,
+      usdcMint,
+      usdcOracle,
       defaultOracleConfig,
       0,
       'USDC',
@@ -142,13 +144,13 @@ async function main(): Promise<void> {
 
   // register token 1
   console.log(`Registering ETH...`);
-  const ethMainnetMint = new PublicKey(MAINNET_MINTS.get('ETH')!);
-  const ethMainnetOracle = oracles.get('ETH');
+  const ethMint = new PublicKey(MAINNET_MINTS.get('ETH')!);
+  const ethOracle = oracles.get('ETH');
   try {
     await client.tokenRegister(
       group,
-      ethMainnetMint,
-      ethMainnetOracle,
+      ethMint,
+      ethOracle,
       defaultOracleConfig,
       1,
       'ETH',
@@ -171,13 +173,13 @@ async function main(): Promise<void> {
 
   // register token 2
   console.log(`Registering SOL...`);
-  const solMainnetMint = new PublicKey(MAINNET_MINTS.get('SOL')!);
-  const solMainnetOracle = oracles.get('SOL');
+  const solMint = new PublicKey(MAINNET_MINTS.get('SOL')!);
+  const solOracle = oracles.get('SOL');
   try {
     await client.tokenRegister(
       group,
-      solMainnetMint,
-      solMainnetOracle,
+      solMint,
+      solOracle,
       defaultOracleConfig,
       2, // tokenIndex
       'SOL',
@@ -217,13 +219,14 @@ async function main(): Promise<void> {
     console.log(error);
   }
 
-  console.log('Registering SOL-PERP market...');
+  console.log('Registering MNGO-PERP market...');
+  const mngoOracle = oracles.get('MNGO');
   try {
     await client.perpCreateMarket(
       group,
-      solMainnetOracle,
+      mngoOracle,
       0,
-      'SOL-PERP',
+      'MNGO-PERP',
       defaultOracleConfig,
       6,
       10,
