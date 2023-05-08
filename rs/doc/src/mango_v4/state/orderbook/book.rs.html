@@ -402,6 +402,10 @@
 <a href="#402" id="402">402</a>
 <a href="#403" id="403">403</a>
 <a href="#404" id="404">404</a>
+<a href="#405" id="405">405</a>
+<a href="#406" id="406">406</a>
+<a href="#407" id="407">407</a>
+<a href="#408" id="408">408</a>
 </pre><pre class="rust"><code><span class="kw">use </span><span class="kw">crate</span>::logs::FilledPerpOrderLog;
 <span class="kw">use </span><span class="kw">crate</span>::state::MangoAccountRefMut;
 <span class="kw">use crate</span>::{
@@ -524,6 +528,10 @@
             }
 
             <span class="kw">let </span>max_match_by_quote = remaining_quote_lots / best_opposing_price;
+            <span class="kw">if </span>max_match_by_quote == <span class="number">0 </span>{
+                <span class="kw">break</span>;
+            }
+
             <span class="kw">let </span>match_base_lots = remaining_base_lots
                 .min(best_opposing.node.quantity)
                 .min(max_match_by_quote);
