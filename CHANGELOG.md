@@ -4,9 +4,41 @@ Update this for each program release and mainnet deployment.
 
 ## not on mainnet
 
-### v0.14.0, 2023-4-
+### v0.15.0, 2023-5-
 
 Deployment:
+
+- Change TokenRegisterTrustless instruction to disable borrows by default (#567)
+
+  The instruction is intended to use very conservative defaults for listing
+  tokens. It now lists new tokens with zero asset weights and without allowing
+  borrowing, which should leave oracle staleness and potential bugs as the main
+  risks of listing new tokens.
+
+- OpenBook place order instruction: Respect reduce-only flags on the base and
+  quote bank (#569)
+
+  This way the DAO can potentially leave related OpenBook markets open when it
+  marks a token as reduce-only.
+
+- FlashLoan: Whitelist the ComputeBudget program when called by delegates (#572)
+
+  For convenience. When constructing a flash loan instruction for a delegated
+  account, users no longer need to take care to remove compute budget
+  instructions from the flash loan scope.
+
+- Perp Order Matching: Exit when no lots can be filled due to the quote limit (#576)
+
+  Previously it would keep looping unnecessarily.
+
+- Improve error message for incorrect number of accounts in FixedAccountRetriever (#566)
+- Add oracle confidence and type information to perp update funding logs (#568)
+
+## mainnet
+
+### v0.14.0, 2023-4-29
+
+Deployment: Apr 29, 2023 at 11:58:43 Central European Summer Time, https://explorer.solana.com/tx/2iaLQTT6PqFjFQr94j5g2iUhDT9v6CJk5rNC9mY7cY7BfRjn6pWixnUF5Wv2qAAUq4hmEvM7WyajDxQjq6QbufSk
 
 - Force-closing of perp positions (#525)
 
@@ -31,8 +63,6 @@ Deployment:
 - Improve logging on force-close instructions (#555)
 - Fix perp order seqnum logging (#556)
 - Fix build when using mango-v4 code with the "no-entrypoint" feature (#558)
-
-## mainnet
 
 ### v0.13.0, 2023-4-18
 

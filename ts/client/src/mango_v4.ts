@@ -1,5 +1,5 @@
 export type MangoV4 = {
-  "version": "0.14.0",
+  "version": "0.15.0",
   "name": "mango_v4",
   "instructions": [
     {
@@ -9081,12 +9081,17 @@ export type MangoV4 = {
       "code": 6046,
       "name": "TokenInForceClose",
       "msg": "token is in force close"
+    },
+    {
+      "code": 6047,
+      "name": "InvalidHealthAccountCount",
+      "msg": "incorrect number of health accounts"
     }
   ]
 };
 
 export const IDL: MangoV4 = {
-  "version": "0.14.0",
+  "version": "0.15.0",
   "name": "mango_v4",
   "instructions": [
     {
@@ -18168,6 +18173,11 @@ export const IDL: MangoV4 = {
       "code": 6046,
       "name": "TokenInForceClose",
       "msg": "token is in force close"
+    },
+    {
+      "code": 6047,
+      "name": "InvalidHealthAccountCount",
+      "msg": "incorrect number of health accounts"
     }
   ]
 };
