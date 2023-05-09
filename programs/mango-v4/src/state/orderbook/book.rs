@@ -1,4 +1,4 @@
-use crate::logs::FilledPerpOrderLog;
+use crate::logs::{FilledPerpOrderLog, PerpTakerTradeLog};
 use crate::state::MangoAccountRefMut;
 use crate::{
     error::*,
@@ -177,7 +177,14 @@ impl<'a> Orderbook<'a> {
         // realized when the fill event gets executed
         if total_quote_lots_taken > 0 || total_base_lots_taken > 0 {
             perp_position.add_taker_trade(side, total_base_lots_taken, total_quote_lots_taken);
-            apply_fees(market, mango_account, total_quote_lots_taken)?;
+            let taker_fees_paid = apply_fees(market, mango_account, total_quote_lots_taken)?;
+            emit!(PerpTakerTradeLog {
+                mango_group: market.group.key(),
+                perp_market_index: market.perp_market_index,
+                total_base_lots_taken,
+                total_quote_lots_taken,
+                taker_fees_paid: taker_fees_paid.to_bits()
+            });
         }
 
         // Apply changes to matched asks (handles invalidate on delete!)
@@ -365,7 +372,7 @@ fn apply_fees(
     market: &mut PerpMarket,
     account: &mut MangoAccountRefMut,
     quote_lots: i64,
-) -> Result<()> {
+) -> Result<I80F48> {
     let quote_native = I80F48::from_num(market.quote_lot_size * quote_lots);
 
     // The maker fees apply to the maker's account only when the fill event is consumed.
@@ -391,7 +398,7 @@ fn apply_fees(
     // breaks assumptions.
     market.fees_accrued += taker_fees + maker_fees;
 
-    Ok(())
+    Ok(taker_fees)
 }
 
 /// Applies a fixed penalty fee to the account, and update the market's fees_accrued
