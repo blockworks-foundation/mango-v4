@@ -181,6 +181,7 @@ impl<'a> Orderbook<'a> {
             emit!(PerpTakerTradeLog {
                 mango_group: market.group.key(),
                 perp_market_index: market.perp_market_index,
+                taker_side: side as u8,
                 total_base_lots_taken,
                 total_quote_lots_taken,
                 taker_fees_paid: taker_fees_paid.to_bits()
