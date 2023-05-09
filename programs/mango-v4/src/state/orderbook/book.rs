@@ -165,7 +165,7 @@ impl<'a> Orderbook<'a> {
             emit!(FilledPerpOrderLog {
                 mango_group: market.group.key(),
                 perp_market_index: market.perp_market_index,
-                seq_num: seq_num,
+                seq_num,
             });
         }
         let total_quote_lots_taken = order.max_quote_lots - remaining_quote_lots;
