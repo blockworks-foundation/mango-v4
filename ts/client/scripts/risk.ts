@@ -198,11 +198,7 @@ async function computePriceImpactForLiqor(
     const assets = mangoAccountsWithHealth.reduce((sum, a) => {
       // How much would health increase for every unit liab moved to liqor
       // assetprice * (liabweight/(1+liabliqfee) - assetweight)
-      const tokenAssetHealthContrib = ONE_I80F48()
-        .sub(bank.liquidationFee)
-        .mul(bank.price)
-        .mul(bank.initAssetWeight);
-      bank.price.mul(
+      const tokenAssetHealthContrib = bank.price.mul(
         Array.from(group.banksMapByTokenIndex.values())
           .flat()
           .map((bank) => bank.initLiabWeight)
@@ -214,9 +210,6 @@ async function computePriceImpactForLiqor(
       const maxTokenHealthAsset = a.account
         .getTokenBalance(bank)
         .max(ZERO_I80F48());
-      if (bank.initAssetWeight.eq(ZERO_I80F48())) {
-        return sum.add(maxTokenHealthAsset);
-      }
       const maxAsset = a.health
         .min(ZERO_I80F48())
         .abs()
