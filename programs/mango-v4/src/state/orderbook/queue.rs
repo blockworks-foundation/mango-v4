@@ -1,4 +1,4 @@
-use crate::{error::MangoError, error_msg, error::Contextable};
+use crate::{error::Contextable, error::MangoError, error_msg};
 use anchor_lang::prelude::*;
 use bytemuck::cast_ref;
 use fixed::types::I80F48;
@@ -293,8 +293,6 @@ impl<'a> TryFrom<&'a AnyEvent> for &'a FillEvent {
         }
     }
 }
-
-
 
 #[derive(
     Copy, Clone, Debug, bytemuck::Pod, bytemuck::Zeroable, AnchorSerialize, AnchorDeserialize,

@@ -713,7 +713,6 @@ mod tests {
             "Fees moved to market"
         );
 
-
         let fill_event: FillEvent = event_queue.pop_front()?.try_into()?;
         assert_eq!(fill_event.quantity, 1);
         assert_eq!(fill_event.maker, taker_pk);
@@ -730,7 +729,6 @@ mod tests {
 
         Ok(())
     }
-
 
     #[test]
     fn test_self_trade_cancel_provide() -> Result<()> {
@@ -814,7 +812,10 @@ mod tests {
                 time_in_force: 0,
                 reduce_only: false,
                 self_trade_behavior: SelfTradeBehavior::CancelProvide,
-                params: OrderParams::Fixed { price_lots: 1000, order_type: PostOrderType::Limit },
+                params: OrderParams::Fixed {
+                    price_lots: 1000,
+                    order_type: PostOrderType::Limit,
+                },
             },
             &mut market,
             &mut event_queue,
@@ -916,7 +917,8 @@ mod tests {
             &taker_pk,
             now_ts,
             u8::MAX,
-        ).expect_err("should fail");
+        )
+        .expect_err("should fail");
 
         Ok(())
     }
