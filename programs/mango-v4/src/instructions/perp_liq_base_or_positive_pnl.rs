@@ -353,6 +353,7 @@ pub(crate) fn liquidation_action(
             .min(max_base_transfer.abs() - base_reduction)
             .max(0);
 
+        // Note, the expected health and settle token change is just for logging
         let expected_settle_token_gain = expected_settle_token_per_lot * I80F48::from(base_lots);
         let new_expected_settle_token = *current_settle_token + expected_settle_token_gain;
         let new_expected_health = *current_health

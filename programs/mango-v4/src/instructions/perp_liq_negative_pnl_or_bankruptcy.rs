@@ -320,7 +320,7 @@ pub(crate) fn liquidation_action(
         // Each unit of pnl increase (towards 0) increases health, but the amount depends on whether
         // the health token position is negative or positive.
         // Compute how much pnl would need to be increased to reach liq end health 0 (while ignoring
-        // liqee_pnl and other constraints for now)
+        // liqee_pnl and other constraints initially, those are applied below)
         let max_for_health = {
             let liab_weighted_price = settle_token_oracle_price * settle_bank.init_liab_weight;
             let asset_weighted_price = settle_token_oracle_price * settle_bank.init_asset_weight;

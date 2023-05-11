@@ -90,6 +90,8 @@ pub fn compute_health(
 }
 
 /// How much of a token can be taken away before health decreases to zero?
+///
+/// If health is negative, returns 0.
 pub fn spot_amount_taken_for_health_zero(
     mut health: I80F48,
     starting_spot: I80F48,
@@ -119,6 +121,8 @@ pub fn spot_amount_taken_for_health_zero(
 }
 
 /// How much of a token can be gained before health increases to zero?
+///
+/// Returns 0 if health is positive.
 pub fn spot_amount_given_for_health_zero(
     health: I80F48,
     starting_spot: I80F48,
@@ -672,6 +676,7 @@ impl HealthCache {
         Ok(())
     }
 
+    /// Liquidatable spot assets mean: actual token deposits and also a positive effective token balance
     pub fn has_liq_spot_assets(&self) -> bool {
         let health_token_balances = self.effective_token_balances(HealthType::LiquidationEnd);
         self.token_infos
@@ -683,6 +688,7 @@ impl HealthCache {
             })
     }
 
+    /// Liquidatable spot borrows mean: actual toen borrows plus a negative effective token balance
     pub fn has_liq_spot_borrows(&self) -> bool {
         let health_token_balances = self.effective_token_balances(HealthType::LiquidationEnd);
         self.token_infos
@@ -903,7 +909,8 @@ impl HealthCache {
     /// The idea of this limit is that settlement is only permissible as long as there are
     /// non-perp assets that back it. If an account with 1 USD deposited somehow gets
     /// a large negative perp upnl, it should not be allowed to settle that perp loss into
-    /// the spot world fully. Only 1 USD worth would be allowed.
+    /// the spot world fully (because of perp/spot isolation, translating perp losses and
+    /// gains into tokens is restricted). Only 1 USD worth would be allowed.
     ///
     /// Effectively, there's a health variant "perp settle health" that ignores negative
     /// token contributions from perp markets. Settlement is allowed as long as perp settle
