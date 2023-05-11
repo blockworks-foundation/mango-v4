@@ -3156,7 +3156,7 @@ pub struct PerpPlaceOrderInstruction {
 #[async_trait::async_trait(?Send)]
 impl ClientInstruction for PerpPlaceOrderInstruction {
     type Accounts = mango_v4::accounts::PerpPlaceOrder;
-    type Instruction = mango_v4::instruction::PerpPlaceOrder;
+    type Instruction = mango_v4::instruction::PerpPlaceOrderV2;
     async fn to_instruction(
         &self,
         account_loader: impl ClientAccountLoader + 'async_trait,
