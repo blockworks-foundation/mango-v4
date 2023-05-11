@@ -1,5 +1,6 @@
-use crate::error::MangoError;
+use crate::{error::MangoError, error_msg, error::Contextable};
 use anchor_lang::prelude::*;
+use bytemuck::cast_ref;
 use fixed::types::I80F48;
 use num_enum::{IntoPrimitive, TryFromPrimitive};
 use static_assertions::const_assert_eq;
@@ -263,6 +264,38 @@ impl FillEvent {
     }
 }
 
+impl TryFrom<AnyEvent> for FillEvent {
+    type Error = error::Error;
+
+    fn try_from(e: AnyEvent) -> Result<Self> {
+        if e.event_type != EventType::Fill as u8 {
+            Err(error_msg!(
+                "could not convert event with type={} to FillEvent",
+                e.event_type
+            ))
+        } else {
+            Ok(*cast_ref(&e))
+        }
+    }
+}
+
+impl<'a> TryFrom<&'a AnyEvent> for &'a FillEvent {
+    type Error = error::Error;
+
+    fn try_from(e: &'a AnyEvent) -> Result<Self> {
+        if e.event_type != EventType::Fill as u8 {
+            Err(error_msg!(
+                "could not convert event with type={} to FillEvent",
+                e.event_type
+            ))
+        } else {
+            Ok(cast_ref(e))
+        }
+    }
+}
+
+
+
 #[derive(
     Copy, Clone, Debug, bytemuck::Pod, bytemuck::Zeroable, AnchorSerialize, AnchorDeserialize,
 )]
@@ -305,5 +338,35 @@ impl OutEvent {
 
     pub fn side(&self) -> Side {
         self.side.try_into().unwrap()
+    }
+}
+
+impl TryFrom<AnyEvent> for OutEvent {
+    type Error = error::Error;
+
+    fn try_from(e: AnyEvent) -> Result<Self> {
+        if e.event_type != EventType::Out as u8 {
+            Err(error_msg!(
+                "could not convert event with type={} to OutEvent",
+                e.event_type
+            ))
+        } else {
+            Ok(*cast_ref(&e))
+        }
+    }
+}
+
+impl<'a> TryFrom<&'a AnyEvent> for &'a OutEvent {
+    type Error = error::Error;
+
+    fn try_from(e: &'a AnyEvent) -> Result<Self> {
+        if e.event_type != EventType::Out as u8 {
+            Err(error_msg!(
+                "could not convert event with type={} to OutEvent",
+                e.event_type
+            ))
+        } else {
+            Ok(cast_ref(e))
+        }
     }
 }
