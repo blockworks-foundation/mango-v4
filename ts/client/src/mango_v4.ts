@@ -1,5 +1,5 @@
 export type MangoV4 = {
-  "version": "0.14.0",
+  "version": "0.15.0",
   "name": "mango_v4",
   "instructions": [
     {
@@ -7882,6 +7882,78 @@ export type MangoV4 = {
       ]
     },
     {
+      "name": "PerpUpdateFundingLogV2",
+      "fields": [
+        {
+          "name": "mangoGroup",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "marketIndex",
+          "type": "u16",
+          "index": false
+        },
+        {
+          "name": "longFunding",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "shortFunding",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "price",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "oracleSlot",
+          "type": "u64",
+          "index": false
+        },
+        {
+          "name": "oracleConfidence",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "oracleType",
+          "type": {
+            "defined": "OracleType"
+          },
+          "index": false
+        },
+        {
+          "name": "stablePrice",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "feesAccrued",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "feesSettled",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "openInterest",
+          "type": "i64",
+          "index": false
+        },
+        {
+          "name": "instantaneousFundingRate",
+          "type": "i128",
+          "index": false
+        }
+      ]
+    },
+    {
       "name": "UpdateIndexLog",
       "fields": [
         {
@@ -9009,12 +9081,17 @@ export type MangoV4 = {
       "code": 6046,
       "name": "TokenInForceClose",
       "msg": "token is in force close"
+    },
+    {
+      "code": 6047,
+      "name": "InvalidHealthAccountCount",
+      "msg": "incorrect number of health accounts"
     }
   ]
 };
 
 export const IDL: MangoV4 = {
-  "version": "0.14.0",
+  "version": "0.15.0",
   "name": "mango_v4",
   "instructions": [
     {
@@ -16897,6 +16974,78 @@ export const IDL: MangoV4 = {
       ]
     },
     {
+      "name": "PerpUpdateFundingLogV2",
+      "fields": [
+        {
+          "name": "mangoGroup",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "marketIndex",
+          "type": "u16",
+          "index": false
+        },
+        {
+          "name": "longFunding",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "shortFunding",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "price",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "oracleSlot",
+          "type": "u64",
+          "index": false
+        },
+        {
+          "name": "oracleConfidence",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "oracleType",
+          "type": {
+            "defined": "OracleType"
+          },
+          "index": false
+        },
+        {
+          "name": "stablePrice",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "feesAccrued",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "feesSettled",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "openInterest",
+          "type": "i64",
+          "index": false
+        },
+        {
+          "name": "instantaneousFundingRate",
+          "type": "i128",
+          "index": false
+        }
+      ]
+    },
+    {
       "name": "UpdateIndexLog",
       "fields": [
         {
@@ -18024,6 +18173,11 @@ export const IDL: MangoV4 = {
       "code": 6046,
       "name": "TokenInForceClose",
       "msg": "token is in force close"
+    },
+    {
+      "code": 6047,
+      "name": "InvalidHealthAccountCount",
+      "msg": "incorrect number of health accounts"
     }
   ]
 };
