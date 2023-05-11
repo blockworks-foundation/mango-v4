@@ -126,6 +126,7 @@ mod tests {
                     client_order_id: 0,
                     time_in_force,
                     reduce_only: false,
+                    self_trade_behavior: SelfTradeBehavior::DecrementTake,
                     params: OrderParams::Fixed {
                         price_lots,
                         order_type: PostOrderType::Limit,
@@ -274,6 +275,7 @@ mod tests {
                 client_order_id: 42,
                 time_in_force: 0,
                 reduce_only: false,
+                self_trade_behavior: SelfTradeBehavior::DecrementTake,
                 params: OrderParams::Fixed {
                     price_lots,
                     order_type: PostOrderType::Limit,
@@ -335,6 +337,7 @@ mod tests {
                 client_order_id: 43,
                 time_in_force: 0,
                 reduce_only: false,
+                self_trade_behavior: SelfTradeBehavior::DecrementTake,
                 params: OrderParams::Fixed {
                     price_lots,
                     order_type: PostOrderType::Limit,
@@ -433,27 +436,36 @@ mod tests {
 
     #[test]
     fn test_fee_penalty_applied_only_on_limit_order() -> Result<()> {
+        // setup market
         let (mut market, oracle_price, mut event_queue, book_accs) = test_setup(1000.0);
         let mut book = book_accs.orderbook();
-
-        let buffer = MangoAccount::default_for_tests().try_to_vec().unwrap();
-        let mut account = MangoAccountValue::from_bytes(&buffer).unwrap();
-        let taker_pk = Pubkey::new_unique();
         let now_ts = 1000000;
-
         market.taker_fee = I80F48::from_num(0.01);
+        market.maker_fee = I80F48::from_num(0.0);
         market.fee_penalty = 5.0;
-        account.ensure_perp_position(market.perp_market_index, 0)?;
 
-        // Passive order
+        // setup maker account
+        let maker_buffer = MangoAccount::default_for_tests().try_to_vec().unwrap();
+        let mut maker_account = MangoAccountValue::from_bytes(&maker_buffer).unwrap();
+        let maker_pk = Pubkey::new_unique();
+        maker_account.ensure_perp_position(market.perp_market_index, 0)?;
+
+        // setup taker account
+        let taker_buffer = MangoAccount::default_for_tests().try_to_vec().unwrap();
+        let mut taker_account = MangoAccountValue::from_bytes(&taker_buffer).unwrap();
+        let taker_pk = Pubkey::new_unique();
+        taker_account.ensure_perp_position(market.perp_market_index, 0)?;
+
+        // Maker order
         book.new_order(
             Order {
                 side: Side::Ask,
                 max_base_lots: 2,
                 max_quote_lots: i64::MAX,
-                client_order_id: 43,
+                client_order_id: 42,
                 time_in_force: 0,
                 reduce_only: false,
+                self_trade_behavior: SelfTradeBehavior::default(),
                 params: OrderParams::Fixed {
                     price_lots: 1000,
                     order_type: PostOrderType::Limit,
@@ -462,8 +474,8 @@ mod tests {
             &mut market,
             &mut event_queue,
             oracle_price,
-            &mut account.borrow_mut(),
-            &taker_pk,
+            &mut maker_account.borrow_mut(),
+            &maker_pk,
             now_ts,
             u8::MAX,
         )
@@ -478,6 +490,7 @@ mod tests {
                 client_order_id: 43,
                 time_in_force: 0,
                 reduce_only: false,
+                self_trade_behavior: SelfTradeBehavior::DecrementTake,
                 params: OrderParams::Fixed {
                     price_lots: 1000,
                     order_type: PostOrderType::Limit,
@@ -486,14 +499,14 @@ mod tests {
             &mut market,
             &mut event_queue,
             oracle_price,
-            &mut account.borrow_mut(),
+            &mut taker_account.borrow_mut(),
             &taker_pk,
             now_ts,
             u8::MAX,
         )
         .unwrap();
 
-        let pos = account.perp_position(market.perp_market_index)?;
+        let pos = taker_account.perp_position(market.perp_market_index)?;
 
         assert_eq!(
             pos.quote_position_native().round(),
@@ -513,35 +526,35 @@ mod tests {
                 side: Side::Bid,
                 max_base_lots: 1,
                 max_quote_lots: i64::MAX,
-                client_order_id: 43,
+                client_order_id: 44,
                 time_in_force: 0,
                 reduce_only: false,
+                self_trade_behavior: SelfTradeBehavior::DecrementTake,
                 params: OrderParams::ImmediateOrCancel {
                     price_lots: 1000,
-                    self_trade_behavior: SelfTradeBehavior::DecrementTake,
                 },
             },
             &mut market,
             &mut event_queue,
             oracle_price,
-            &mut account.borrow_mut(),
+            &mut taker_account.borrow_mut(),
             &taker_pk,
             now_ts,
             u8::MAX,
         )
         .unwrap();
 
-        let pos = account.perp_position(market.perp_market_index)?;
+        let pos = taker_account.perp_position(market.perp_market_index)?;
 
         assert_eq!(
             pos.quote_position_native().round(),
-            I80F48::from_num(-15), // -10 - 5
+            I80F48::from_num(-25), // -10 - 5
             "No fees, but fixed penalty applied on IOC order"
         );
 
         assert_eq!(
             market.fees_accrued.round(),
-            I80F48::from_num(15), // 10 + 5
+            I80F48::from_num(25), // 10 + 5
             "Fees moved to market"
         );
 

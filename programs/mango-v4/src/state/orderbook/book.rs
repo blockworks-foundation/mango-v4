@@ -129,28 +129,18 @@ impl<'a> Orderbook<'a> {
             remaining_quote_lots -= match_quote_lots;
             assert!(remaining_quote_lots >= 0);
 
-            let self_trade_behavior = match order.params {
-                OrderParams::Market {
-                    self_trade_behavior,
-                } => Some(self_trade_behavior),
-                OrderParams::ImmediateOrCancel {
-                    self_trade_behavior,
-                    ..
-                } => Some(self_trade_behavior),
-                _ => None,
-            };
 
             let mut maker_fee = market.maker_fee;
             let mut taker_fee = market.taker_fee;
-            let order_would_self_trade = mango_account_pk.eq(&best_opposing.node.owner);
+            let order_would_self_trade = *mango_account_pk == best_opposing.node.owner;
             if order_would_self_trade {
-                if let Some(self_trade_behavior) = self_trade_behavior {
-                    require!(
-                        self_trade_behavior != SelfTradeBehavior::AbortTransaction,
-                        MangoError::WouldSelfTrade
-                    );
-
-                    if self_trade_behavior == SelfTradeBehavior::CancelProvide {
+                match order.self_trade_behavior {
+                    SelfTradeBehavior::DecrementTake => {
+                        maker_fee = I80F48::ZERO;
+                        taker_fee = I80F48::ZERO;
+                        decremented_quote_lots += match_quote_lots;
+                    },
+                    SelfTradeBehavior::CancelProvide => {
                         let event = OutEvent::new(
                             other_side,
                             best_opposing.node.owner_slot,
@@ -165,13 +155,8 @@ impl<'a> Orderbook<'a> {
                             .push((best_opposing.handle.order_tree, best_opposing.node.key));
 
                         continue;
-                    }
-
-                    if self_trade_behavior == SelfTradeBehavior::DecrementTake {
-                        maker_fee = I80F48::ZERO;
-                        taker_fee = I80F48::ZERO;
-                        decremented_quote_lots += match_quote_lots;
-                    }
+                    },
+                    SelfTradeBehavior::AbortTransaction => Err(MangoError::WouldSelfTrade)?
                 }
             }
 

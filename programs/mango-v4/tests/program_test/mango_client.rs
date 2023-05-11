@@ -3240,6 +3240,7 @@ impl ClientInstruction for PerpPlaceOrderPeggedInstruction {
             order_type: PlaceOrderType::Limit,
             reduce_only: false,
             expiry_timestamp: 0,
+            self_trade_behavior: SelfTradeBehavior::DecrementTake,
             limit: 10,
             max_oracle_staleness_slots: -1,
         };

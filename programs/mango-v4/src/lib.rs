@@ -751,13 +751,12 @@ pub mod mango_v4 {
             client_order_id,
             reduce_only,
             time_in_force,
+            self_trade_behavior,
             params: match order_type {
                 PlaceOrderType::Market => OrderParams::Market {
-                    self_trade_behavior,
                 },
                 PlaceOrderType::ImmediateOrCancel => OrderParams::ImmediateOrCancel {
                     price_lots,
-                    self_trade_behavior,
                 },
                 _ => OrderParams::Fixed {
                     price_lots,
@@ -810,6 +809,9 @@ pub mod mango_v4 {
         //
         // WARNING: Not currently implemented.
         max_oracle_staleness_slots: i32,
+
+        // Define how to handle self-trades
+        self_trade_behavior: SelfTradeBehavior,
     ) -> Result<Option<u128>> {
         require_gte!(peg_limit, -1);
         require_eq!(max_oracle_staleness_slots, -1); // unimplemented
@@ -829,6 +831,7 @@ pub mod mango_v4 {
             client_order_id,
             reduce_only,
             time_in_force,
+            self_trade_behavior,
             params: OrderParams::OraclePegged {
                 price_offset_lots,
                 order_type: order_type.to_post_order_type()?,

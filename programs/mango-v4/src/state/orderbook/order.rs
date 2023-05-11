@@ -21,17 +21,18 @@ pub struct Order {
     /// Number of seconds the order shall live, 0 meaning forever
     pub time_in_force: u16,
 
+    /// Configure how matches with order of the same owner are handled
+    pub self_trade_behavior: SelfTradeBehavior,
+
     /// Order type specific params
     pub params: OrderParams,
 }
 
 pub enum OrderParams {
     Market {
-        self_trade_behavior: SelfTradeBehavior,
     },
     ImmediateOrCancel {
         price_lots: i64,
-        self_trade_behavior: SelfTradeBehavior,
     },
     Fixed {
         price_lots: i64,

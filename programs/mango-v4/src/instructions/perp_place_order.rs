@@ -209,9 +209,8 @@ mod tests {
                 client_order_id: 0,
                 reduce_only: true,
                 time_in_force: 0,
-                params: OrderParams::Market {
-                    self_trade_behavior: SelfTradeBehavior::DecrementTake,
-                },
+                self_trade_behavior: SelfTradeBehavior::DecrementTake,
+                params: OrderParams::Market {},
             };
 
             let result = reduce_only_max_base_lots(&pp, &order, market_reduce_only);
