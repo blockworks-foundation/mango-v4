@@ -76,8 +76,8 @@ impl<'a> Orderbook<'a> {
         let mut remaining_base_lots = order.max_base_lots;
         let mut remaining_quote_lots = order.max_quote_lots;
         let mut decremented_quote_lots = 0i64;
-        let mut matched_order_changes: Vec<(BookSideOrderHandle, i64)> = vec![];
-        let mut matched_order_deletes: Vec<(BookSideOrderTree, u128)> = vec![];
+        let mut orders_to_change: Vec<(BookSideOrderHandle, i64)> = vec![];
+        let mut orders_to_delete: Vec<(BookSideOrderTree, u128)> = vec![];
         let mut number_of_dropped_expired_orders = 0;
         let opposing_bookside = self.bookside_mut(other_side);
         for best_opposing in opposing_bookside.iter_all_including_invalid(now_ts, oracle_price_lots)
@@ -99,7 +99,7 @@ impl<'a> Orderbook<'a> {
                         best_opposing.node.quantity,
                     );
                     event_queue.push_back(cast(event)).unwrap();
-                    matched_order_deletes
+                    orders_to_delete
                         .push((best_opposing.handle.order_tree, best_opposing.node.key));
                 }
                 continue;
@@ -150,8 +150,7 @@ impl<'a> Orderbook<'a> {
                             best_opposing.node.quantity,
                         );
                         event_queue.push_back(cast(event)).unwrap();
-                        // TODO track cancelled order deletes differently
-                        matched_order_deletes
+                        orders_to_delete
                             .push((best_opposing.handle.order_tree, best_opposing.node.key));
 
                         continue;
@@ -163,10 +162,10 @@ impl<'a> Orderbook<'a> {
             let new_best_opposing_quantity = best_opposing.node.quantity - match_base_lots;
             let maker_out = new_best_opposing_quantity == 0;
             if maker_out {
-                matched_order_deletes
+                orders_to_delete
                     .push((best_opposing.handle.order_tree, best_opposing.node.key));
             } else {
-                matched_order_changes.push((best_opposing.handle, new_best_opposing_quantity));
+                orders_to_change.push((best_opposing.handle, new_best_opposing_quantity));
             }
 
             let fill = FillEvent::new(
@@ -206,7 +205,7 @@ impl<'a> Orderbook<'a> {
         }
 
         // Apply changes to matched asks (handles invalidate on delete!)
-        for (handle, new_quantity) in matched_order_changes {
+        for (handle, new_quantity) in orders_to_change {
             opposing_bookside
                 .node_mut(handle.node)
                 .unwrap()
@@ -214,7 +213,7 @@ impl<'a> Orderbook<'a> {
                 .unwrap()
                 .quantity = new_quantity;
         }
-        for (component, key) in matched_order_deletes {
+        for (component, key) in orders_to_delete {
             let _removed_leaf = opposing_bookside.remove_by_key(component, key).unwrap();
         }
 
