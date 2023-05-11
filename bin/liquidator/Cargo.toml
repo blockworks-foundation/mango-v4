@@ -8,8 +8,8 @@ name = "liquidator"
 path = "src/main.rs"
 
 [dependencies]
-anchor-lang = { path = "../../3rdparty/anchor/lang" }
-anchor-client = { path = "../../3rdparty/anchor/client" }
+anchor-lang = "0.27.0"
+anchor-client = "0.27.0"
 anyhow = "1.0"
 arrayref = "0.3.6"
 async-channel = "1.6"

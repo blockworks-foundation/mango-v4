@@ -26,7 +26,7 @@ pub const PERP_SETTLE_TOKEN_INDEX: TokenIndex = 0;
 /// The token index used in AccountBuybackFeesWithMngo to exchange for MNGO
 pub const FEE_BUYBACK_QUOTE_TOKEN_INDEX: TokenIndex = 0;
 
-#[account(zero_copy(safe_bytemuck_derives))]
+#[account(zero_copy)]
 #[derive(Debug)]
 pub struct Group {
     // ABI: Clients rely on this being at offset 8

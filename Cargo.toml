@@ -3,7 +3,6 @@ members = [
     "bin/*",
     "programs/mango-v4",
     "lib/*",
-    "3rdparty/anchor/cli",
 ]
 
 [profile.release]
@@ -12,8 +11,3 @@ overflow-checks = true
 [patch.crates-io]
 # for gzip encoded responses
 jsonrpc-core-client = { git = "https://github.com/ckamm/jsonrpc.git", branch = "ckamm/http-with-gzip" }
-# these patch anchor to use solana 1.14.9 in order to fix dependency conflicts in switchboard-v2
-# downstream applications may need to copy these patches to their own workspace
-anchor-spl = { path = "./3rdparty/anchor/spl/" }
-anchor-lang = { path = "./3rdparty/anchor/lang/" }
-switchboard-v2 = { path = "./3rdparty/switchboard-v2/rust/switchboard-v2/" }
