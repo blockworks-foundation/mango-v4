@@ -753,11 +753,8 @@ pub mod mango_v4 {
             time_in_force,
             self_trade_behavior,
             params: match order_type {
-                PlaceOrderType::Market => OrderParams::Market {
-                },
-                PlaceOrderType::ImmediateOrCancel => OrderParams::ImmediateOrCancel {
-                    price_lots,
-                },
+                PlaceOrderType::Market => OrderParams::Market {},
+                PlaceOrderType::ImmediateOrCancel => OrderParams::ImmediateOrCancel { price_lots },
                 _ => OrderParams::Fixed {
                     price_lots,
                     order_type: order_type.to_post_order_type()?,

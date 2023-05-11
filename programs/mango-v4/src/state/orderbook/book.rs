@@ -64,6 +64,7 @@ impl<'a> Orderbook<'a> {
 
         // IOC orders have a fee penalty applied regardless of match
         if order.needs_penalty_fee() {
+            // TODO: this penalty is not logged
             apply_penalty(market, mango_account)?;
         }
 
@@ -123,23 +124,15 @@ impl<'a> Orderbook<'a> {
             let match_base_lots = remaining_base_lots
                 .min(best_opposing.node.quantity)
                 .min(max_match_by_quote);
-
             let match_quote_lots = match_base_lots * best_opposing_price;
-            remaining_base_lots -= match_base_lots;
-            remaining_quote_lots -= match_quote_lots;
-            assert!(remaining_quote_lots >= 0);
 
-
-            let mut maker_fee = market.maker_fee;
-            let mut taker_fee = market.taker_fee;
             let order_would_self_trade = *mango_account_pk == best_opposing.node.owner;
             if order_would_self_trade {
                 match order.self_trade_behavior {
                     SelfTradeBehavior::DecrementTake => {
-                        maker_fee = I80F48::ZERO;
-                        taker_fee = I80F48::ZERO;
+                        // remember all decremented quote lots to only charge fees on not-self-trades
                         decremented_quote_lots += match_quote_lots;
-                    },
+                    }
                     SelfTradeBehavior::CancelProvide => {
                         let event = OutEvent::new(
                             other_side,
@@ -153,21 +146,27 @@ impl<'a> Orderbook<'a> {
                         orders_to_delete
                             .push((best_opposing.handle.order_tree, best_opposing.node.key));
 
+                        // skip actual matching
                         continue;
-                    },
-                    SelfTradeBehavior::AbortTransaction => Err(MangoError::WouldSelfTrade)?
+                    }
+                    SelfTradeBehavior::AbortTransaction => Err(MangoError::WouldSelfTrade)?,
                 }
+                assert!(order.self_trade_behavior == SelfTradeBehavior::DecrementTake);
             }
+
+            remaining_base_lots -= match_base_lots;
+            remaining_quote_lots -= match_quote_lots;
+            assert!(remaining_quote_lots >= 0);
 
             let new_best_opposing_quantity = best_opposing.node.quantity - match_base_lots;
             let maker_out = new_best_opposing_quantity == 0;
             if maker_out {
-                orders_to_delete
-                    .push((best_opposing.handle.order_tree, best_opposing.node.key));
+                orders_to_delete.push((best_opposing.handle.order_tree, best_opposing.node.key));
             } else {
                 orders_to_change.push((best_opposing.handle, new_best_opposing_quantity));
             }
 
+            // order_would_self_trade is only true in the DecrementTake case, in which we don't charge fees
             let fill = FillEvent::new(
                 side,
                 maker_out,
@@ -176,11 +175,20 @@ impl<'a> Orderbook<'a> {
                 event_queue.header.seq_num,
                 best_opposing.node.owner,
                 best_opposing.node.client_order_id,
-                maker_fee,
+                if order_would_self_trade {
+                    I80F48::ZERO
+                } else {
+                    market.maker_fee
+                },
                 best_opposing.node.timestamp,
                 *mango_account_pk,
                 order.client_order_id,
-                taker_fee,
+                if order_would_self_trade {
+                    I80F48::ZERO
+                } else {
+                    // NOTE: this does not include the IOC penalty, but this value is not used to calculate fees
+                    market.taker_fee
+                },
                 best_opposing_price,
                 match_base_lots,
             );
@@ -408,6 +416,8 @@ fn apply_fees(
 
     let perp_position = account.perp_position_mut(market.perp_market_index)?;
     perp_position.record_trading_fee(taker_fees);
+
+    // taker fees are applied to volume during matching, quote volume only during consume
     perp_position.taker_volume += taker_fees.to_num::<u64>();
 
     // Accrue maker fees immediately: they can be negative and applying them later

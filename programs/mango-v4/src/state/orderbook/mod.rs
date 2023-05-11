@@ -530,9 +530,7 @@ mod tests {
                 time_in_force: 0,
                 reduce_only: false,
                 self_trade_behavior: SelfTradeBehavior::DecrementTake,
-                params: OrderParams::ImmediateOrCancel {
-                    price_lots: 1000,
-                },
+                params: OrderParams::ImmediateOrCancel { price_lots: 1000 },
             },
             &mut market,
             &mut event_queue,
