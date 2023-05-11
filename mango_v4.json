@@ -3181,6 +3181,102 @@
       }
     },
     {
+      "name": "perpPlaceOrderV2",
+      "accounts": [
+        {
+          "name": "group",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "account",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "owner",
+          "isMut": false,
+          "isSigner": true
+        },
+        {
+          "name": "perpMarket",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "bids",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "asks",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "eventQueue",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "oracle",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "side",
+          "type": {
+            "defined": "Side"
+          }
+        },
+        {
+          "name": "priceLots",
+          "type": "i64"
+        },
+        {
+          "name": "maxBaseLots",
+          "type": "i64"
+        },
+        {
+          "name": "maxQuoteLots",
+          "type": "i64"
+        },
+        {
+          "name": "clientOrderId",
+          "type": "u64"
+        },
+        {
+          "name": "orderType",
+          "type": {
+            "defined": "PlaceOrderType"
+          }
+        },
+        {
+          "name": "selfTradeBehavior",
+          "type": {
+            "defined": "SelfTradeBehavior"
+          }
+        },
+        {
+          "name": "reduceOnly",
+          "type": "bool"
+        },
+        {
+          "name": "expiryTimestamp",
+          "type": "u64"
+        },
+        {
+          "name": "limit",
+          "type": "u8"
+        }
+      ],
+      "returns": {
+        "option": "u128"
+      }
+    },
+    {
       "name": "perpPlaceOrderPegged",
       "accounts": [
         {
@@ -3272,6 +3368,12 @@
         {
           "name": "maxOracleStalenessSlots",
           "type": "i32"
+        },
+        {
+          "name": "selfTradeBehavior",
+          "type": {
+            "defined": "SelfTradeBehavior"
+          }
         }
       ],
       "returns": {
@@ -7100,6 +7202,28 @@
       }
     },
     {
+      "name": "SelfTradeBehavior",
+      "docs": [
+        "Self trade behavior controls how taker orders interact with resting limit orders of the same account.",
+        "This setting has no influecne on placing a resting or oracle pegged limit order that does not match",
+        "immediately, instead it's the responsibility of the user to correctly configure his taker orders."
+      ],
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "DecrementTake"
+          },
+          {
+            "name": "CancelProvide"
+          },
+          {
+            "name": "AbortTransaction"
+          }
+        ]
+      }
+    },
+    {
       "name": "Side",
       "type": {
         "kind": "enum",
@@ -7142,7 +7266,8 @@
         "kind": "enum",
         "variants": [
           {
-            "name": "Market"
+            "name": "Market",
+            "fields": []
           },
           {
             "name": "ImmediateOrCancel",
@@ -8684,6 +8809,11 @@
       "code": 6045,
       "name": "HealthRegionBadInnerInstruction",
       "msg": "HealthRegions allow only specific instructions between Begin and End"
+    },
+    {
+      "code": 6046,
+      "name": "WouldSelfTrade",
+      "msg": "would self trade"
     }
   ]
 }
