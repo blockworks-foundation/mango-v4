@@ -23,7 +23,7 @@
 
 - Do a verifiable build
 
-  cargo run -p anchor-cli -- build --verifiable --solana-version 1.14.13 -- --features enable-gpl
+  anchor build --verifiable --solana-version 1.14.13 -- --features enable-gpl
 
   (or wait for github to finish and create the release)
 
@@ -45,13 +45,13 @@
 
 - Create IDL buffer
 
-  cargo run -p anchor-cli -- idl write-buffer --provider.cluster $RPC_URL --provider.wallet $KEY --filepath target/idl/mango_v4_no_docs.json 4MangoMjqJ2firMokCjjGgoK8d4MXcrgL7XJaL3w6fVg
+  anchor idl write-buffer --provider.cluster $RPC_URL --provider.wallet $KEY --filepath target/idl/mango_v4_no_docs.json 4MangoMjqJ2firMokCjjGgoK8d4MXcrgL7XJaL3w6fVg
 
   Save the returned address as $IDL_BUFFER
 
 - Set IDL buffer authority
 
-  cargo run -p anchor-cli -- idl set-authority --provider.cluster $RPC_URL --provider.wallet $KEY --program-id 4MangoMjqJ2firMokCjjGgoK8d4MXcrgL7XJaL3w6fVg --new-authority FP4PxqHTVzeG2c6eZd7974F9WvKUSdBeduUK3rjYyvBw $IDL_BUFFER
+  anchor idl set-authority --provider.cluster $RPC_URL --provider.wallet $KEY --program-id 4MangoMjqJ2firMokCjjGgoK8d4MXcrgL7XJaL3w6fVg --new-authority FP4PxqHTVzeG2c6eZd7974F9WvKUSdBeduUK3rjYyvBw $IDL_BUFFER
 
 - Make a gist for the proposal description, ideally based on previous upgrade proposals
 
