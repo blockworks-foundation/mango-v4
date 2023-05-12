@@ -180,6 +180,7 @@ impl<'a> Orderbook<'a> {
             let taker_fees_paid = apply_fees(market, mango_account, total_quote_lots_taken)?;
             emit!(PerpTakerTradeLog {
                 mango_group: market.group.key(),
+                mango_account: *mango_account_pk,
                 perp_market_index: market.perp_market_index,
                 taker_side: side as u8,
                 total_base_lots_taken,
