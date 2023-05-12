@@ -1,3 +1,4 @@
+use crate::logs::FilledPerpOrderLog;
 use crate::state::MangoAccountRefMut;
 use crate::{
     error::*,
@@ -121,6 +122,10 @@ impl<'a> Orderbook<'a> {
             }
 
             let max_match_by_quote = remaining_quote_lots / best_opposing_price;
+            if max_match_by_quote == 0 {
+                break;
+            }
+
             let match_base_lots = remaining_base_lots
                 .min(best_opposing.node.quantity)
                 .min(max_match_by_quote);
@@ -167,12 +172,13 @@ impl<'a> Orderbook<'a> {
             }
 
             // order_would_self_trade is only true in the DecrementTake case, in which we don't charge fees
+            let seq_num = event_queue.header.seq_num;
             let fill = FillEvent::new(
                 side,
                 maker_out,
                 best_opposing.node.owner_slot,
                 now_ts,
-                event_queue.header.seq_num,
+                seq_num,
                 best_opposing.node.owner,
                 best_opposing.node.client_order_id,
                 if order_would_self_trade {
@@ -194,6 +200,12 @@ impl<'a> Orderbook<'a> {
             );
             event_queue.push_back(cast(fill)).unwrap();
             limit -= 1;
+
+            emit!(FilledPerpOrderLog {
+                mango_group: market.group.key(),
+                perp_market_index: market.perp_market_index,
+                seq_num: seq_num,
+            });
         }
         let total_quote_lots_taken = order.max_quote_lots - remaining_quote_lots;
         let total_base_lots_taken = order.max_base_lots - remaining_base_lots;

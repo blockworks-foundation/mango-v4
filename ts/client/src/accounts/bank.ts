@@ -115,6 +115,7 @@ export class Bank implements BankForHealth {
       borrowWeightScaleStartQuote: number;
       depositWeightScaleStartQuote: number;
       reduceOnly: number;
+      forceClose: number;
     },
   ): Bank {
     return new Bank(
@@ -160,7 +161,8 @@ export class Bank implements BankForHealth {
       obj.netBorrowsInWindow,
       obj.borrowWeightScaleStartQuote,
       obj.depositWeightScaleStartQuote,
-      obj.reduceOnly == 1,
+      obj.reduceOnly,
+      obj.forceClose == 1,
     );
   }
 
@@ -207,7 +209,8 @@ export class Bank implements BankForHealth {
     public netBorrowsInWindow: BN,
     public borrowWeightScaleStartQuote: number,
     public depositWeightScaleStartQuote: number,
-    public reduceOnly: boolean,
+    public reduceOnly: number,
+    public forceClose: boolean,
   ) {
     this.name = utf8.decode(new Uint8Array(name)).split('\x00')[0];
     this.oracleConfig = {
@@ -308,6 +311,14 @@ export class Bank implements BankForHealth {
       '\n getBorrowRate() - ' +
       this.getBorrowRate().toString()
     );
+  }
+
+  areDepositsReduceOnly(): boolean {
+    return this.reduceOnly == 1;
+  }
+
+  areBorrowsReduceOnly(): boolean {
+    return this.reduceOnly == 1 || this.reduceOnly == 2;
   }
 
   scaledInitAssetWeight(price: I80F48): I80F48 {

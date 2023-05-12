@@ -113,6 +113,7 @@ pub fn serum3_place_order(
     //
     // Validation
     //
+    let receiver_token_index;
     {
         let account = ctx.accounts.account.load_full()?;
         // account constraint #1
@@ -138,22 +139,39 @@ pub fn serum3_place_order(
             Serum3Side::Ask => serum_market.base_token_index,
         };
         require_eq!(payer_bank.token_index, payer_token_index);
+
+        receiver_token_index = match side {
+            Serum3Side::Bid => serum_market.base_token_index,
+            Serum3Side::Ask => serum_market.quote_token_index,
+        };
     }
 
     //
     // Pre-health computation
     //
     let mut account = ctx.accounts.account.load_full_mut()?;
+    let retriever = new_fixed_order_account_retriever(ctx.remaining_accounts, &account.borrow())?;
+    let mut health_cache =
+        new_health_cache(&account.borrow(), &retriever).context("pre-withdraw init health")?;
     let pre_health_opt = if !account.fixed.is_in_health_region() {
-        let retriever =
-            new_fixed_order_account_retriever(ctx.remaining_accounts, &account.borrow())?;
-        let health_cache =
-            new_health_cache(&account.borrow(), &retriever).context("pre-withdraw init health")?;
         let pre_init_health = account.check_health_pre(&health_cache)?;
-        Some((health_cache, pre_init_health))
+        Some(pre_init_health)
     } else {
         None
     };
+
+    // Check if the bank for the token whose balance is increased is in reduce-only mode
+    let receiver_bank_reduce_only = {
+        // The token position already exists, but we need the active_index.
+        let (_, _, active_index) = account.ensure_token_position(receiver_token_index)?;
+        let group_key = ctx.accounts.group.key();
+        let receiver_bank = retriever
+            .bank_and_oracle(&group_key, active_index, receiver_token_index)?
+            .0;
+        receiver_bank.are_deposits_reduce_only()
+    };
+
+    drop(retriever);
 
     //
     // Before-order tracking
@@ -212,30 +230,29 @@ pub fn serum3_place_order(
     };
     cpi_place_order(ctx.accounts, order)?;
 
-    let oo_difference = {
-        let oo_ai = &ctx.accounts.open_orders.as_ref();
-        let open_orders = load_open_orders_ref(oo_ai)?;
-        let after_oo = OpenOrdersSlim::from_oo(&open_orders);
-
-        emit!(Serum3OpenOrdersBalanceLogV2 {
-            mango_group: ctx.accounts.group.key(),
-            mango_account: ctx.accounts.account.key(),
-            market_index: serum_market.market_index,
-            base_token_index: serum_market.base_token_index,
-            quote_token_index: serum_market.quote_token_index,
-            base_total: after_oo.native_coin_total,
-            base_free: after_oo.native_coin_free,
-            quote_total: after_oo.native_pc_total,
-            quote_free: after_oo.native_pc_free,
-            referrer_rebates_accrued: after_oo.referrer_rebates_accrued,
-        });
-
-        OODifference::new(&before_oo, &after_oo)
-    };
-
     //
     // After-order tracking
     //
+    let after_oo = {
+        let oo_ai = &ctx.accounts.open_orders.as_ref();
+        let open_orders = load_open_orders_ref(oo_ai)?;
+        OpenOrdersSlim::from_oo(&open_orders)
+    };
+    let oo_difference = OODifference::new(&before_oo, &after_oo);
+
+    emit!(Serum3OpenOrdersBalanceLogV2 {
+        mango_group: ctx.accounts.group.key(),
+        mango_account: ctx.accounts.account.key(),
+        market_index: serum_market.market_index,
+        base_token_index: serum_market.base_token_index,
+        quote_token_index: serum_market.quote_token_index,
+        base_total: after_oo.native_coin_total,
+        base_free: after_oo.native_coin_free,
+        quote_total: after_oo.native_pc_total,
+        quote_free: after_oo.native_pc_free,
+        referrer_rebates_accrued: after_oo.referrer_rebates_accrued,
+    });
+
     ctx.accounts.payer_vault.reload()?;
     let after_vault = ctx.accounts.payer_vault.amount;
 
@@ -250,14 +267,9 @@ pub fn serum3_place_order(
         .token_position_mut(payer_bank.token_index)?
         .0
         .native(&payer_bank);
-    if withdrawn_from_vault > position_native {
-        payer_bank.enforce_min_vault_to_deposits_ratio((*ctx.accounts.payer_vault).as_ref())?;
-    }
 
     // Charge the difference in vault balance to the user's account
     let vault_difference = {
-        let oracle_price =
-            payer_bank.oracle_price(&AccountInfoRef::borrow(&ctx.accounts.payer_oracle)?, None)?;
         apply_vault_difference(
             ctx.accounts.account.key(),
             &mut account.borrow_mut(),
@@ -265,20 +277,48 @@ pub fn serum3_place_order(
             &mut payer_bank,
             after_vault,
             before_vault,
-            Some(oracle_price),
         )?
     };
+
+    if withdrawn_from_vault > position_native {
+        require_msg_typed!(
+            !payer_bank.are_borrows_reduce_only(),
+            MangoError::TokenInReduceOnlyMode,
+            "the payer tokens cannot be borrowed"
+        );
+        let oracle_price =
+            payer_bank.oracle_price(&AccountInfoRef::borrow(&ctx.accounts.payer_oracle)?, None)?;
+        payer_bank.enforce_min_vault_to_deposits_ratio((*ctx.accounts.payer_vault).as_ref())?;
+        payer_bank.check_net_borrows(oracle_price)?;
+    }
+
+    vault_difference.adjust_health_cache_token_balance(&mut health_cache, &payer_bank)?;
+    oo_difference.adjust_health_cache_serum3_state(&mut health_cache, &serum_market)?;
+
+    // Check the receiver's reduce only flag.
+    //
+    // Note that all orders on the book executing can still cause a net deposit. That's because
+    // the total serum3 potential amount assumes all reserved amounts convert at the current
+    // oracle price.
+    if receiver_bank_reduce_only {
+        let balance = health_cache
+            .token_info(receiver_token_index)?
+            .balance_native;
+        let potential =
+            health_cache.total_serum3_potential(HealthType::Maint, receiver_token_index)?;
+        require_msg_typed!(
+            balance + potential < 1,
+            MangoError::TokenInReduceOnlyMode,
+            "receiver bank does not accept deposits"
+        );
+    }
 
     //
     // Health check
     //
-    if let Some((mut health_cache, pre_init_health)) = pre_health_opt {
-        vault_difference.adjust_health_cache_token_balance(&mut health_cache, &payer_bank)?;
-        oo_difference.adjust_health_cache_serum3_state(&mut health_cache, &serum_market)?;
+    if let Some(pre_init_health) = pre_health_opt {
         account.check_health_post(&health_cache, pre_init_health)?;
     }
-
-    // TODO: enforce min_vault_to_deposits_ratio
 
     Ok(())
 }
@@ -348,7 +388,6 @@ fn apply_vault_difference(
     bank: &mut Bank,
     vault_after: u64,
     vault_before: u64,
-    oracle_price: Option<I80F48>,
 ) -> Result<VaultDifference> {
     let needed_change = I80F48::from(vault_after) - I80F48::from(vault_before);
 
@@ -358,12 +397,7 @@ fn apply_vault_difference(
     if needed_change >= 0 {
         bank.deposit(position, needed_change, now_ts)?;
     } else {
-        bank.withdraw_without_fee(
-            position,
-            -needed_change,
-            now_ts,
-            oracle_price.unwrap(), // required for withdraws
-        )?;
+        bank.withdraw_without_fee(position, -needed_change, now_ts)?;
     }
     let native_after = position.native(bank);
     let native_change = native_after - native_before;
@@ -470,7 +504,6 @@ pub fn apply_settle_changes(
         base_bank,
         after_base_vault,
         before_base_vault,
-        None, // guaranteed to deposit into bank
     )?;
     let quote_difference = apply_vault_difference(
         account_pk,
@@ -479,7 +512,6 @@ pub fn apply_settle_changes(
         quote_bank,
         after_quote_vault_adjusted,
         before_quote_vault,
-        None, // guaranteed to deposit into bank
     )?;
 
     if let Some(health_cache) = health_cache {

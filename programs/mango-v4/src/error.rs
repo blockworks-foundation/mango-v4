@@ -97,6 +97,10 @@ pub enum MangoError {
     PerpOrderIdNotFound,
     #[msg("HealthRegions allow only specific instructions between Begin and End")]
     HealthRegionBadInnerInstruction,
+    #[msg("token is in force close")]
+    TokenInForceClose,
+    #[msg("incorrect number of health accounts")]
+    InvalidHealthAccountCount,
     #[msg("would self trade")]
     WouldSelfTrade,
 }

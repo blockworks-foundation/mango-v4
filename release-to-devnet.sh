@@ -23,7 +23,3 @@ solana --url https://mango.devnet.rpcpool.com program deploy --program-id $PROGR
 # publish idl
 cargo run -p anchor-cli -- idl upgrade --provider.cluster https://mango.devnet.rpcpool.com --provider.wallet $WALLET_WITH_FUNDS \
     --filepath target/idl/mango_v4_no_docs.json $PROGRAM_ID
-
-
-# build npm package
-(cd ./ts/client && tsc)

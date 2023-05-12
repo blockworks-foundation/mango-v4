@@ -1,5 +1,5 @@
 export type MangoV4 = {
-  "version": "0.11.0",
+  "version": "0.15.0",
   "name": "mango_v4",
   "instructions": [
     {
@@ -174,6 +174,42 @@ export type MangoV4 = {
           "type": {
             "option": "u64"
           }
+        }
+      ]
+    },
+    {
+      "name": "groupWithdrawInsuranceFund",
+      "accounts": [
+        {
+          "name": "group",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "admin",
+          "isMut": false,
+          "isSigner": true
+        },
+        {
+          "name": "insuranceVault",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "destination",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "tokenProgram",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "amount",
+          "type": "u64"
         }
       ]
     },
@@ -715,13 +751,19 @@ export type MangoV4 = {
         {
           "name": "reduceOnlyOpt",
           "type": {
-            "option": "bool"
+            "option": "u8"
           }
         },
         {
           "name": "nameOpt",
           "type": {
             "option": "string"
+          }
+        },
+        {
+          "name": "forceCloseOpt",
+          "type": {
+            "option": "bool"
           }
         }
       ]
@@ -1538,6 +1580,38 @@ export type MangoV4 = {
       ]
     },
     {
+      "name": "flashLoanEndV2",
+      "accounts": [
+        {
+          "name": "account",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "owner",
+          "isMut": false,
+          "isSigner": true
+        },
+        {
+          "name": "tokenProgram",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "numLoans",
+          "type": "u8"
+        },
+        {
+          "name": "flashLoanType",
+          "type": {
+            "defined": "FlashLoanType"
+          }
+        }
+      ]
+    },
+    {
       "name": "healthRegionBegin",
       "accounts": [
         {
@@ -1702,6 +1776,12 @@ export type MangoV4 = {
       "args": [
         {
           "name": "reduceOnlyOpt",
+          "type": {
+            "option": "bool"
+          }
+        },
+        {
+          "name": "forceCloseOpt",
           "type": {
             "option": "bool"
           }
@@ -2571,6 +2651,45 @@ export type MangoV4 = {
       ]
     },
     {
+      "name": "tokenForceCloseBorrowsWithToken",
+      "accounts": [
+        {
+          "name": "group",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "liqor",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "liqorOwner",
+          "isMut": false,
+          "isSigner": true
+        },
+        {
+          "name": "liqee",
+          "isMut": true,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "assetTokenIndex",
+          "type": "u16"
+        },
+        {
+          "name": "liabTokenIndex",
+          "type": "u16"
+        },
+        {
+          "name": "maxLiabTransfer",
+          "type": "u64"
+        }
+      ]
+    },
+    {
       "name": "tokenLiqBankruptcy",
       "accounts": [
         {
@@ -3014,6 +3133,12 @@ export type MangoV4 = {
           "name": "nameOpt",
           "type": {
             "option": "string"
+          }
+        },
+        {
+          "name": "forceCloseOpt",
+          "type": {
+            "option": "bool"
           }
         }
       ]
@@ -3559,6 +3684,37 @@ export type MangoV4 = {
       "args": []
     },
     {
+      "name": "perpForceClosePosition",
+      "accounts": [
+        {
+          "name": "group",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "perpMarket",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "accountA",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "accountB",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "oracle",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": []
+    },
+    {
       "name": "perpSettleFees",
       "accounts": [
         {
@@ -3847,7 +4003,13 @@ export type MangoV4 = {
         "benchmark",
         ""
       ],
-      "accounts": [],
+      "accounts": [
+        {
+          "name": "dummy",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
       "args": []
     }
   ],
@@ -4126,11 +4288,15 @@ export type MangoV4 = {
             "type": "u8"
           },
           {
+            "name": "forceClose",
+            "type": "u8"
+          },
+          {
             "name": "reserved",
             "type": {
               "array": [
                 "u8",
-                2119
+                2118
               ]
             }
           }
@@ -4968,11 +5134,15 @@ export type MangoV4 = {
             "type": "u8"
           },
           {
+            "name": "forceClose",
+            "type": "u8"
+          },
+          {
             "name": "padding4",
             "type": {
               "array": [
                 "u8",
-                7
+                6
               ]
             }
           },
@@ -5031,11 +5201,15 @@ export type MangoV4 = {
             "type": "u8"
           },
           {
+            "name": "forceClose",
+            "type": "u8"
+          },
+          {
             "name": "padding1",
             "type": {
               "array": [
                 "u8",
-                3
+                2
               ]
             }
           },
@@ -6981,6 +7155,32 @@ export type MangoV4 = {
           },
           {
             "name": "AccountBuybackFeesWithMngo"
+          },
+          {
+            "name": "TokenForceCloseBorrowsWithToken"
+          },
+          {
+            "name": "PerpForceClosePosition"
+          },
+          {
+            "name": "GroupWithdrawInsuranceFund"
+          }
+        ]
+      }
+    },
+    {
+      "name": "CheckLiquidatable",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "NotLiquidatable"
+          },
+          {
+            "name": "Liquidatable"
+          },
+          {
+            "name": "BecameNotLiquidatable"
           }
         ]
       }
@@ -7647,6 +7847,83 @@ export type MangoV4 = {
         {
           "name": "price",
           "type": "i128",
+          "index": false
+        },
+        {
+          "name": "oracleSlot",
+          "type": "u64",
+          "index": false
+        },
+        {
+          "name": "stablePrice",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "feesAccrued",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "feesSettled",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "openInterest",
+          "type": "i64",
+          "index": false
+        },
+        {
+          "name": "instantaneousFundingRate",
+          "type": "i128",
+          "index": false
+        }
+      ]
+    },
+    {
+      "name": "PerpUpdateFundingLogV2",
+      "fields": [
+        {
+          "name": "mangoGroup",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "marketIndex",
+          "type": "u16",
+          "index": false
+        },
+        {
+          "name": "longFunding",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "shortFunding",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "price",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "oracleSlot",
+          "type": "u64",
+          "index": false
+        },
+        {
+          "name": "oracleConfidence",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "oracleType",
+          "type": {
+            "defined": "OracleType"
+          },
           "index": false
         },
         {
@@ -8452,6 +8729,121 @@ export type MangoV4 = {
           "index": false
         }
       ]
+    },
+    {
+      "name": "FilledPerpOrderLog",
+      "fields": [
+        {
+          "name": "mangoGroup",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "perpMarketIndex",
+          "type": "u16",
+          "index": false
+        },
+        {
+          "name": "seqNum",
+          "type": "u64",
+          "index": false
+        }
+      ]
+    },
+    {
+      "name": "PerpForceClosePositionLog",
+      "fields": [
+        {
+          "name": "mangoGroup",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "perpMarketIndex",
+          "type": "u16",
+          "index": false
+        },
+        {
+          "name": "accountA",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "accountB",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "baseTransfer",
+          "type": "i64",
+          "index": false
+        },
+        {
+          "name": "quoteTransfer",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "price",
+          "type": "i128",
+          "index": false
+        }
+      ]
+    },
+    {
+      "name": "TokenForceCloseBorrowsWithTokenLog",
+      "fields": [
+        {
+          "name": "mangoGroup",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "liqor",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "liqee",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "assetTokenIndex",
+          "type": "u16",
+          "index": false
+        },
+        {
+          "name": "liabTokenIndex",
+          "type": "u16",
+          "index": false
+        },
+        {
+          "name": "assetTransfer",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "liabTransfer",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "assetPrice",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "liabPrice",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "feeFactor",
+          "type": "i128",
+          "index": false
+        }
+      ]
     }
   ],
   "errors": [
@@ -8684,12 +9076,22 @@ export type MangoV4 = {
       "code": 6045,
       "name": "HealthRegionBadInnerInstruction",
       "msg": "HealthRegions allow only specific instructions between Begin and End"
+    },
+    {
+      "code": 6046,
+      "name": "TokenInForceClose",
+      "msg": "token is in force close"
+    },
+    {
+      "code": 6047,
+      "name": "InvalidHealthAccountCount",
+      "msg": "incorrect number of health accounts"
     }
   ]
 };
 
 export const IDL: MangoV4 = {
-  "version": "0.11.0",
+  "version": "0.15.0",
   "name": "mango_v4",
   "instructions": [
     {
@@ -8864,6 +9266,42 @@ export const IDL: MangoV4 = {
           "type": {
             "option": "u64"
           }
+        }
+      ]
+    },
+    {
+      "name": "groupWithdrawInsuranceFund",
+      "accounts": [
+        {
+          "name": "group",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "admin",
+          "isMut": false,
+          "isSigner": true
+        },
+        {
+          "name": "insuranceVault",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "destination",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "tokenProgram",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "amount",
+          "type": "u64"
         }
       ]
     },
@@ -9405,13 +9843,19 @@ export const IDL: MangoV4 = {
         {
           "name": "reduceOnlyOpt",
           "type": {
-            "option": "bool"
+            "option": "u8"
           }
         },
         {
           "name": "nameOpt",
           "type": {
             "option": "string"
+          }
+        },
+        {
+          "name": "forceCloseOpt",
+          "type": {
+            "option": "bool"
           }
         }
       ]
@@ -10228,6 +10672,38 @@ export const IDL: MangoV4 = {
       ]
     },
     {
+      "name": "flashLoanEndV2",
+      "accounts": [
+        {
+          "name": "account",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "owner",
+          "isMut": false,
+          "isSigner": true
+        },
+        {
+          "name": "tokenProgram",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "numLoans",
+          "type": "u8"
+        },
+        {
+          "name": "flashLoanType",
+          "type": {
+            "defined": "FlashLoanType"
+          }
+        }
+      ]
+    },
+    {
       "name": "healthRegionBegin",
       "accounts": [
         {
@@ -10392,6 +10868,12 @@ export const IDL: MangoV4 = {
       "args": [
         {
           "name": "reduceOnlyOpt",
+          "type": {
+            "option": "bool"
+          }
+        },
+        {
+          "name": "forceCloseOpt",
           "type": {
             "option": "bool"
           }
@@ -11261,6 +11743,45 @@ export const IDL: MangoV4 = {
       ]
     },
     {
+      "name": "tokenForceCloseBorrowsWithToken",
+      "accounts": [
+        {
+          "name": "group",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "liqor",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "liqorOwner",
+          "isMut": false,
+          "isSigner": true
+        },
+        {
+          "name": "liqee",
+          "isMut": true,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "assetTokenIndex",
+          "type": "u16"
+        },
+        {
+          "name": "liabTokenIndex",
+          "type": "u16"
+        },
+        {
+          "name": "maxLiabTransfer",
+          "type": "u64"
+        }
+      ]
+    },
+    {
       "name": "tokenLiqBankruptcy",
       "accounts": [
         {
@@ -11704,6 +12225,12 @@ export const IDL: MangoV4 = {
           "name": "nameOpt",
           "type": {
             "option": "string"
+          }
+        },
+        {
+          "name": "forceCloseOpt",
+          "type": {
+            "option": "bool"
           }
         }
       ]
@@ -12249,6 +12776,37 @@ export const IDL: MangoV4 = {
       "args": []
     },
     {
+      "name": "perpForceClosePosition",
+      "accounts": [
+        {
+          "name": "group",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "perpMarket",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "accountA",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "accountB",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "oracle",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": []
+    },
+    {
       "name": "perpSettleFees",
       "accounts": [
         {
@@ -12537,7 +13095,13 @@ export const IDL: MangoV4 = {
         "benchmark",
         ""
       ],
-      "accounts": [],
+      "accounts": [
+        {
+          "name": "dummy",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
       "args": []
     }
   ],
@@ -12816,11 +13380,15 @@ export const IDL: MangoV4 = {
             "type": "u8"
           },
           {
+            "name": "forceClose",
+            "type": "u8"
+          },
+          {
             "name": "reserved",
             "type": {
               "array": [
                 "u8",
-                2119
+                2118
               ]
             }
           }
@@ -13658,11 +14226,15 @@ export const IDL: MangoV4 = {
             "type": "u8"
           },
           {
+            "name": "forceClose",
+            "type": "u8"
+          },
+          {
             "name": "padding4",
             "type": {
               "array": [
                 "u8",
-                7
+                6
               ]
             }
           },
@@ -13721,11 +14293,15 @@ export const IDL: MangoV4 = {
             "type": "u8"
           },
           {
+            "name": "forceClose",
+            "type": "u8"
+          },
+          {
             "name": "padding1",
             "type": {
               "array": [
                 "u8",
-                3
+                2
               ]
             }
           },
@@ -15671,6 +16247,32 @@ export const IDL: MangoV4 = {
           },
           {
             "name": "AccountBuybackFeesWithMngo"
+          },
+          {
+            "name": "TokenForceCloseBorrowsWithToken"
+          },
+          {
+            "name": "PerpForceClosePosition"
+          },
+          {
+            "name": "GroupWithdrawInsuranceFund"
+          }
+        ]
+      }
+    },
+    {
+      "name": "CheckLiquidatable",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "NotLiquidatable"
+          },
+          {
+            "name": "Liquidatable"
+          },
+          {
+            "name": "BecameNotLiquidatable"
           }
         ]
       }
@@ -16337,6 +16939,83 @@ export const IDL: MangoV4 = {
         {
           "name": "price",
           "type": "i128",
+          "index": false
+        },
+        {
+          "name": "oracleSlot",
+          "type": "u64",
+          "index": false
+        },
+        {
+          "name": "stablePrice",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "feesAccrued",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "feesSettled",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "openInterest",
+          "type": "i64",
+          "index": false
+        },
+        {
+          "name": "instantaneousFundingRate",
+          "type": "i128",
+          "index": false
+        }
+      ]
+    },
+    {
+      "name": "PerpUpdateFundingLogV2",
+      "fields": [
+        {
+          "name": "mangoGroup",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "marketIndex",
+          "type": "u16",
+          "index": false
+        },
+        {
+          "name": "longFunding",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "shortFunding",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "price",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "oracleSlot",
+          "type": "u64",
+          "index": false
+        },
+        {
+          "name": "oracleConfidence",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "oracleType",
+          "type": {
+            "defined": "OracleType"
+          },
           "index": false
         },
         {
@@ -17142,6 +17821,121 @@ export const IDL: MangoV4 = {
           "index": false
         }
       ]
+    },
+    {
+      "name": "FilledPerpOrderLog",
+      "fields": [
+        {
+          "name": "mangoGroup",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "perpMarketIndex",
+          "type": "u16",
+          "index": false
+        },
+        {
+          "name": "seqNum",
+          "type": "u64",
+          "index": false
+        }
+      ]
+    },
+    {
+      "name": "PerpForceClosePositionLog",
+      "fields": [
+        {
+          "name": "mangoGroup",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "perpMarketIndex",
+          "type": "u16",
+          "index": false
+        },
+        {
+          "name": "accountA",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "accountB",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "baseTransfer",
+          "type": "i64",
+          "index": false
+        },
+        {
+          "name": "quoteTransfer",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "price",
+          "type": "i128",
+          "index": false
+        }
+      ]
+    },
+    {
+      "name": "TokenForceCloseBorrowsWithTokenLog",
+      "fields": [
+        {
+          "name": "mangoGroup",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "liqor",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "liqee",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "assetTokenIndex",
+          "type": "u16",
+          "index": false
+        },
+        {
+          "name": "liabTokenIndex",
+          "type": "u16",
+          "index": false
+        },
+        {
+          "name": "assetTransfer",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "liabTransfer",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "assetPrice",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "liabPrice",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "feeFactor",
+          "type": "i128",
+          "index": false
+        }
+      ]
     }
   ],
   "errors": [
@@ -17374,6 +18168,16 @@ export const IDL: MangoV4 = {
       "code": 6045,
       "name": "HealthRegionBadInnerInstruction",
       "msg": "HealthRegions allow only specific instructions between Begin and End"
+    },
+    {
+      "code": 6046,
+      "name": "TokenInForceClose",
+      "msg": "token is in force close"
+    },
+    {
+      "code": 6047,
+      "name": "InvalidHealthAccountCount",
+      "msg": "incorrect number of health accounts"
     }
   ]
 };

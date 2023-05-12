@@ -4,7 +4,16 @@ import { expect } from 'chai';
 import fs from 'fs';
 import { Group } from '../../src/accounts/group';
 import { HealthType } from '../../src/accounts/mangoAccount';
-import { PerpOrderSide, PerpOrderType } from '../../src/accounts/perp';
+import {
+  PerpMarketIndex,
+  PerpOrderSide,
+  PerpOrderType,
+} from '../../src/accounts/perp';
+import {
+  Serum3OrderType,
+  Serum3SelfTradeBehavior,
+  Serum3Side,
+} from '../../src/accounts/serum3';
 import { MangoClient } from '../../src/client';
 import { MANGO_V4_ID } from '../../src/constants';
 import { toUiDecimalsForQuote } from '../../src/utils';
@@ -22,17 +31,14 @@ const DEVNET_MINTS = new Map([
   ['USDC', '8FRFC6MoGGkMFQwngccyu69VnYbzykGeez7ignHVAFSN'], // use devnet usdc
   ['BTC', '3UNBZ6o52WTWwjac2kPUb4FyodhU1vFkRJheu1Sh2TvU'],
   ['SOL', 'So11111111111111111111111111111111111111112'],
-  ['ORCA', 'orcarKHSqC5CDDsGbho8GKvwExejWHxTqGzXgcewB9L'],
-  ['MNGO', 'Bb9bsTQa1bGEtQ5KagGkvSHyuLqDWumFUcRqFusFNJWC'],
 ]);
 export const DEVNET_SERUM3_MARKETS = new Map([
-  ['BTC/USDC', new PublicKey('DW83EpHFywBxCHmyARxwj3nzxJd7MUdSeznmrdzZKNZB')],
-  ['SOL/USDC', new PublicKey('5xWpt56U1NCuHoAEtpLeUrQcxDkEpNfScjfLFaRzLPgR')],
+  ['SOL/USDC', new PublicKey('6xYbSQyhajUqyatJDdkonpj7v41bKeEBWpf7kwRh5X7A')],
 ]);
 
 const GROUP_NUM = Number(process.env.GROUP_NUM || 0);
 
-async function main() {
+async function main(): Promise<void> {
   const options = AnchorProvider.defaultOptions();
   const connection = new Connection(
     'https://mango.devnet.rpcpool.com',
@@ -710,7 +716,7 @@ async function main() {
     // console.log(`sig https://explorer.solana.com/tx/${sig}?cluster=devnet`);
 
     await perpMarket?.loadEventQueue(client)!;
-    const fr = perpMarket?.getCurrentFundingRate(
+    const fr = perpMarket?.getInstantaneousFundingRateUi(
       await perpMarket.loadBids(client),
       await perpMarket.loadAsks(client),
     );

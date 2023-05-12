@@ -559,7 +559,7 @@ export class HealthCache {
     target: I80F48,
     fun: (amount: I80F48) => I80F48,
   ): I80F48 {
-    const maxIterations = 20;
+    const maxIterations = 50;
     let current = start;
     // console.log(`scanRightUntilLessThan, start ${start.toLocaleString()}`);
     for (const key of Array(maxIterations).fill(0).keys()) {
@@ -1141,7 +1141,7 @@ export class HealthCache {
         case1Start,
         case1StartRatio,
         zeroHealthAmount,
-        minRatio,
+        zeroHealthRatio.max(minRatio), // workaround, originally minRatio
         ONE_I80F48(),
         healthRatioAfterTradeTrunc,
       );

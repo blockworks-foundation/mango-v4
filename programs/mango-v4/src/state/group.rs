@@ -187,6 +187,9 @@ pub enum IxGate {
     TokenUpdateIndexAndRate = 46,
     TokenWithdraw = 47,
     AccountBuybackFeesWithMngo = 48,
+    TokenForceCloseBorrowsWithToken = 49,
+    PerpForceClosePosition = 50,
+    GroupWithdrawInsuranceFund = 51,
     // NOTE: Adding new variants requires matching changes in ts and the ix_gate_set instruction.
 }
 

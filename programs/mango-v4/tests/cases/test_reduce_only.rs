@@ -60,6 +60,8 @@ async fn test_reduce_only_token() -> Result<(), TransportError> {
             admin,
             group,
             mint: mints[0].pubkey,
+            reduce_only: 1,
+            force_close: false,
         },
     )
     .await
@@ -159,6 +161,8 @@ async fn test_reduce_only_token() -> Result<(), TransportError> {
             admin,
             group,
             mint: mints[2].pubkey,
+            reduce_only: 1,
+            force_close: false,
         },
     )
     .await
@@ -364,6 +368,8 @@ async fn test_perp_reduce_only() -> Result<(), TransportError> {
             group,
             admin,
             perp_market,
+            reduce_only: true,
+            force_close: false,
         },
     )
     .await

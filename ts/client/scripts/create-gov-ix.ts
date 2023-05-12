@@ -139,6 +139,7 @@ async function tokenEdit(): Promise<void> {
       params.resetNetBorrowLimit ?? false,
       params.reduceOnly,
       params.name,
+      params.forceClose,
     )
     .accounts({
       group: group.publicKey,
@@ -321,6 +322,7 @@ async function perpEdit(): Promise<void> {
       params.resetStablePrice ?? false,
       params.positivePnlLiquidationFee,
       params.name,
+      params.forceClose,
     )
     .accounts({
       group: group.publicKey,

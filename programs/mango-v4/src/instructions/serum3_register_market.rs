@@ -36,6 +36,7 @@ pub fn serum3_register_market(
         base_token_index: base_bank.token_index,
         quote_token_index: quote_bank.token_index,
         reduce_only: 0,
+        force_close: 0,
         padding1: Default::default(),
         name: fill_from_str(&name)?,
         serum_program: ctx.accounts.serum_program.key(),

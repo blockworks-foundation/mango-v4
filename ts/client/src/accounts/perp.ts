@@ -107,6 +107,7 @@ export class PerpMarket {
       settlePnlLimitFactor: number;
       settlePnlLimitWindowSizeTs: BN;
       reduceOnly: number;
+      forceClose: number;
       maintOverallAssetWeight: I80F48Dto;
       initOverallAssetWeight: I80F48Dto;
       positivePnlLiquidationFee: I80F48Dto;
@@ -153,6 +154,7 @@ export class PerpMarket {
       obj.settlePnlLimitFactor,
       obj.settlePnlLimitWindowSizeTs,
       obj.reduceOnly == 1,
+      obj.forceClose == 1,
       obj.maintOverallAssetWeight,
       obj.initOverallAssetWeight,
       obj.positivePnlLiquidationFee,
@@ -200,6 +202,7 @@ export class PerpMarket {
     public settlePnlLimitFactor: number,
     public settlePnlLimitWindowSizeTs: BN,
     public reduceOnly: boolean,
+    public forceClose: boolean,
     maintOverallAssetWeight: I80F48Dto,
     initOverallAssetWeight: I80F48Dto,
     positivePnlLiquidationFee: I80F48Dto,
@@ -377,9 +380,9 @@ export class PerpMarket {
    *
    * @param bids
    * @param asks
-   * @returns returns funding rate per hour
+   * @returns returns instantaneous funding rate
    */
-  public getCurrentFundingRate(bids: BookSide, asks: BookSide): number {
+  public getInstantaneousFundingRate(bids: BookSide, asks: BookSide): number {
     const MIN_FUNDING = this.minFunding.toNumber();
     const MAX_FUNDING = this.maxFunding.toNumber();
 
@@ -401,7 +404,22 @@ export class PerpMarket {
     } else {
       funding = 0;
     }
-    return funding / 24 / Math.pow(10, QUOTE_DECIMALS);
+
+    return funding;
+  }
+
+  /**
+   *
+   * Returns instantaneous funding rate for the day. How is it actually applied - funding is
+   * continously applied on every interaction to a perp position. The rate is further multiplied
+   * by the time elapsed since it was last applied (capped to max. 1hr).
+   *
+   * @param bids
+   * @param asks
+   * @returns returns instantaneous funding rate in % form
+   */
+  public getInstantaneousFundingRateUi(bids: BookSide, asks: BookSide): number {
+    return this.getInstantaneousFundingRate(bids, asks) * 100;
   }
 
   public uiPriceToLots(price: number): BN {
@@ -911,6 +929,7 @@ export class PerpOrder {
       perpMarket.perpMarketIndex,
       isExpired,
       isOraclePegged,
+      leafNode.orderType,
       oraclePeggedProperties,
     );
   }
@@ -931,6 +950,7 @@ export class PerpOrder {
     public perpMarketIndex: number,
     public isExpired = false,
     public isOraclePegged = false,
+    public orderType: PerpOrderType,
     public oraclePeggedProperties?: OraclePeggedProperties,
   ) {}
 

@@ -36,8 +36,9 @@ pub fn token_edit(
     deposit_weight_scale_start_quote_opt: Option<f64>,
     reset_stable_price: bool,
     reset_net_borrow_limit: bool,
-    reduce_only_opt: Option<bool>,
+    reduce_only_opt: Option<u8>,
     name_opt: Option<String>,
+    force_close_opt: Option<bool>,
 ) -> Result<()> {
     let group = ctx.accounts.group.load()?;
 
@@ -274,19 +275,33 @@ pub fn token_edit(
             msg!(
                 "Reduce only: old - {:?}, new - {:?}",
                 bank.reduce_only,
-                u8::from(reduce_only)
+                reduce_only
             );
-            bank.reduce_only = u8::from(reduce_only);
 
-            // security admin can only enable reduce_only
-            if !reduce_only {
+            // security admin can only make it stricter
+            // anything that makes it less strict, should require admin
+            if reduce_only == 0 || (reduce_only == 2 && bank.reduce_only == 1) {
                 require_group_admin = true;
             }
+            bank.reduce_only = reduce_only;
         };
 
         if let Some(name) = name_opt.as_ref() {
             msg!("Name: old - {:?}, new - {:?}", bank.name, name);
             bank.name = fill_from_str(&name)?;
+            require_group_admin = true;
+        };
+
+        if let Some(force_close) = force_close_opt {
+            if force_close {
+                require!(bank.reduce_only > 0, MangoError::SomeError);
+            }
+            msg!(
+                "Force close: old - {:?}, new - {:?}",
+                bank.force_close,
+                u8::from(force_close)
+            );
+            bank.force_close = u8::from(force_close);
             require_group_admin = true;
         };
     }

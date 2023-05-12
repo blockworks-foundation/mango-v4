@@ -4,9 +4,127 @@ Update this for each program release and mainnet deployment.
 
 ## not on mainnet
 
-### v0.11.0, 2023-4-
+## mainnet
 
-Deployment:
+### v0.15.0, 2023-5-11
+
+Deployment: May 11, 2023 at 09:29:12 Central European Summer Time, https://explorer.solana.com/tx/3h6KFxLEAvifNGDBNcQrWdc6cRkpHTzFzL8VradfAXBYNfScrLJzDxm52N4RNmS9dmE84zDuwbErQ75RcxDcihY3
+
+- Change TokenRegisterTrustless instruction to disable borrows by default (#567)
+
+  The instruction is intended to use very conservative defaults for listing
+  tokens. It now lists new tokens with zero asset weights and without allowing
+  borrowing, which should leave oracle staleness and potential bugs as the main
+  risks of listing new tokens.
+
+- OpenBook place order instruction: Respect reduce-only flags on the base and
+  quote bank (#569)
+
+  This way the DAO can potentially leave related OpenBook markets open when it
+  marks a token as reduce-only.
+
+- FlashLoan: Whitelist the ComputeBudget program when called by delegates (#572)
+
+  For convenience. When constructing a flash loan instruction for a delegated
+  account, users no longer need to take care to remove compute budget
+  instructions from the flash loan scope.
+
+- Perp Order Matching: Exit when no lots can be filled due to the quote limit (#576)
+
+  Previously it would keep looping unnecessarily.
+
+- Improve error message for incorrect number of accounts in FixedAccountRetriever (#566)
+- Add oracle confidence and type information to perp update funding logs (#568)
+
+### v0.14.0, 2023-4-29
+
+Deployment: Apr 29, 2023 at 11:58:43 Central European Summer Time, https://explorer.solana.com/tx/2iaLQTT6PqFjFQr94j5g2iUhDT9v6CJk5rNC9mY7cY7BfRjn6pWixnUF5Wv2qAAUq4hmEvM7WyajDxQjq6QbufSk
+
+- Force-closing of perp positions (#525)
+
+  When a perp markets is set to "force-close" by the DAO, anyone can close open
+  perp orders and positions on the market. This allows the DAO to wind down perp
+  markets if needed.
+
+- Force-closing of OpenBook market use via Mango (#551)
+
+  When an OpenBook market's Mango integration is set to "force-close" by the DAO,
+  anyone can close open orders on that market that were placed via Mango.
+  This allows the DAO to wind down interactions with an OpenBook market.
+
+- Fix exception for the Jupiter program in flash loan (#552)
+
+  Account delegates cannot execute generic flash loans, but were supposed to be
+  able to use whitelisted Jupiter programs during a flash loan. The bug that
+  prevented the exception from working was fixed.
+
+- Allow the DAO to withdraw from the insurance fund token account (#561)
+- Fix a bug with settle limit accounting when liqors take over positive pnl (#562)
+- Improve logging on force-close instructions (#555)
+- Fix perp order seqnum logging (#556)
+- Fix build when using mango-v4 code with the "no-entrypoint" feature (#558)
+
+### v0.13.0, 2023-4-18
+
+Deployment: Apr 18, 2023 at 17:33:15 Central European Summer Time, https://explorer.solana.com/tx/4WWVHCAheTRBhzyXUjsV1Kqfn8LdnkupiVbK4qaPNqby8P5vv7hY6HS3rHHL9bMu1RGdCZvqsd2MHjdawLYQ6Pxi
+
+- Add explicit token account checks to FlashLoan (#542)
+
+  It looks like the reported security issue was not exploitable, but the guards
+  that prevented it were too incidental. This change adds explicit checks,
+  improving safety and readability.
+
+  It adds the FlashLoanEndV2 instruction, replacing FlashLoanEnd.
+
+- Don't incentivize using asset tokens with high liquidation fee during liquidation (#536)
+
+  Previously liqors received the sum of the liquidation fee of the asset and liab token,
+  which meant liqors would preferably liquidate with high-liq-fee tokens.
+
+  After this change only the liab token's liq fee is used. That's sensible because
+  the fee is about giving liqors some margin to work with when settling the
+  liability they took on.
+
+- Force-closing of tokens (#518)
+
+  Mango already has the concept of switching tokens into a "reduce-only" mode where
+  deposits and borrows are only allowed to decrease.
+
+  The new "force-close" mode is even stricter: When it's enabled, liqors can reduce
+  an account's borrows of the force-closed token even if the account is healthy.
+
+  The goal is to have a way of winding down the platform's and users' exposure to
+  a token if necessary. Only a DAO vote can change a token's state to force-close.
+
+- Improve perp trade logging (#535)
+
+  PerpUpdateFunding now logs the oracle update slot to allow traders to better
+  evaluate oracle peg orders.
+
+  Perp fills now create a fill log that contains the fill event seqnum. That allows
+  relating the transaction with the order matching to the transaction that processed
+  the fill event for the trade.
+
+- IxGate: Fix check for re-enabling instructions (#540)
+
+  The security admin was not supposed to be able to enable instructions, but a bug
+  allowed it. With this fix, only the group admin (DAO) can enable instructions.
+
+### v0.12.0, 2023-4-17
+
+Deployment: Apr 17, 2023 at 15:49:33 Central European Summer Time, https://explorer.solana.com/tx/2PbaCRMGgpGiysxk5y8x3TdFRZbGEAKZdyAzEQhAMXfCxS4bPN96YZ4Pp6hHfp17fd7RYUd13t4vtjpaFb4ccYRm
+
+- Emit perp fees settled on update_funding (#530)
+
+  Required to have a full picture of total perp market fees.
+
+- Net borrow limit: Separate out tracking from checking (#534)
+
+  That way it's easier to be specific about where the limit should be checked.
+
+### v0.11.0, 2023-4-4
+
+Deployment: Apr 4, 2023 at 21:43:18 Central European Summer Time, https://explorer.solana.com/tx/5Z36iV6VhAfmxwZubQduV1hNyUyyB9AyjovAwNrWLb5cdAqGm4F3NGmz6V8VpHT6yUwCEDxm2hWMrdJXNkZ8RSPR
 
 - Limit funding and interest accrual during downtimes (#529)
 
@@ -25,9 +143,9 @@ Deployment:
 
 - Perp: Fix logging of funding rate in update funding and deactivate pos (#528)
 
-### v0.10.0, 2023-4-
+### v0.10.0, 2023-4-3
 
-Deployment:
+Deployment: Apr 3, 2023 at 20:10:26 Central European Summer Time, https://explorer.solana.com/tx/3Rvv7hxqYQ7mPXE7jopzq1RAAoEwPi1pRPY7EubzEiZih8zMVhTMe1AsuYNJq3gwpM8BVVC3CXkAWcsFdd7SE6zC
 
 - HealthRegion: Explicitly whitelist allowed instructions (#508)
 
@@ -48,8 +166,6 @@ Deployment:
 - Better logging in IxGateSet instruction
 - Sanity check token_index in TokenRegister instruction
 - Allow using all available bytes for bank and market names
-
-## mainnet
 
 ### v0.9.0, 2023-3-16
 

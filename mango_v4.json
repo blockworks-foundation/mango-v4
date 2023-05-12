@@ -1,5 +1,5 @@
 {
-  "version": "0.11.0",
+  "version": "0.15.0",
   "name": "mango_v4",
   "instructions": [
     {
@@ -174,6 +174,42 @@
           "type": {
             "option": "u64"
           }
+        }
+      ]
+    },
+    {
+      "name": "groupWithdrawInsuranceFund",
+      "accounts": [
+        {
+          "name": "group",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "admin",
+          "isMut": false,
+          "isSigner": true
+        },
+        {
+          "name": "insuranceVault",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "destination",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "tokenProgram",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "amount",
+          "type": "u64"
         }
       ]
     },
@@ -715,13 +751,19 @@
         {
           "name": "reduceOnlyOpt",
           "type": {
-            "option": "bool"
+            "option": "u8"
           }
         },
         {
           "name": "nameOpt",
           "type": {
             "option": "string"
+          }
+        },
+        {
+          "name": "forceCloseOpt",
+          "type": {
+            "option": "bool"
           }
         }
       ]
@@ -1538,6 +1580,38 @@
       ]
     },
     {
+      "name": "flashLoanEndV2",
+      "accounts": [
+        {
+          "name": "account",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "owner",
+          "isMut": false,
+          "isSigner": true
+        },
+        {
+          "name": "tokenProgram",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "numLoans",
+          "type": "u8"
+        },
+        {
+          "name": "flashLoanType",
+          "type": {
+            "defined": "FlashLoanType"
+          }
+        }
+      ]
+    },
+    {
       "name": "healthRegionBegin",
       "accounts": [
         {
@@ -1702,6 +1776,12 @@
       "args": [
         {
           "name": "reduceOnlyOpt",
+          "type": {
+            "option": "bool"
+          }
+        },
+        {
+          "name": "forceCloseOpt",
           "type": {
             "option": "bool"
           }
@@ -2571,6 +2651,45 @@
       ]
     },
     {
+      "name": "tokenForceCloseBorrowsWithToken",
+      "accounts": [
+        {
+          "name": "group",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "liqor",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "liqorOwner",
+          "isMut": false,
+          "isSigner": true
+        },
+        {
+          "name": "liqee",
+          "isMut": true,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "assetTokenIndex",
+          "type": "u16"
+        },
+        {
+          "name": "liabTokenIndex",
+          "type": "u16"
+        },
+        {
+          "name": "maxLiabTransfer",
+          "type": "u64"
+        }
+      ]
+    },
+    {
       "name": "tokenLiqBankruptcy",
       "accounts": [
         {
@@ -3015,6 +3134,12 @@
           "type": {
             "option": "string"
           }
+        },
+        {
+          "name": "forceCloseOpt",
+          "type": {
+            "option": "bool"
+          }
         }
       ]
     },
@@ -3181,102 +3306,6 @@
       }
     },
     {
-      "name": "perpPlaceOrderV2",
-      "accounts": [
-        {
-          "name": "group",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "account",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "owner",
-          "isMut": false,
-          "isSigner": true
-        },
-        {
-          "name": "perpMarket",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "bids",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "asks",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "eventQueue",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "oracle",
-          "isMut": false,
-          "isSigner": false
-        }
-      ],
-      "args": [
-        {
-          "name": "side",
-          "type": {
-            "defined": "Side"
-          }
-        },
-        {
-          "name": "priceLots",
-          "type": "i64"
-        },
-        {
-          "name": "maxBaseLots",
-          "type": "i64"
-        },
-        {
-          "name": "maxQuoteLots",
-          "type": "i64"
-        },
-        {
-          "name": "clientOrderId",
-          "type": "u64"
-        },
-        {
-          "name": "orderType",
-          "type": {
-            "defined": "PlaceOrderType"
-          }
-        },
-        {
-          "name": "selfTradeBehavior",
-          "type": {
-            "defined": "SelfTradeBehavior"
-          }
-        },
-        {
-          "name": "reduceOnly",
-          "type": "bool"
-        },
-        {
-          "name": "expiryTimestamp",
-          "type": "u64"
-        },
-        {
-          "name": "limit",
-          "type": "u8"
-        }
-      ],
-      "returns": {
-        "option": "u128"
-      }
-    },
-    {
       "name": "perpPlaceOrderPegged",
       "accounts": [
         {
@@ -3368,12 +3397,6 @@
         {
           "name": "maxOracleStalenessSlots",
           "type": "i32"
-        },
-        {
-          "name": "selfTradeBehavior",
-          "type": {
-            "defined": "SelfTradeBehavior"
-          }
         }
       ],
       "returns": {
@@ -3654,6 +3677,37 @@
         },
         {
           "name": "settleOracle",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "perpForceClosePosition",
+      "accounts": [
+        {
+          "name": "group",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "perpMarket",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "accountA",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "accountB",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "oracle",
           "isMut": false,
           "isSigner": false
         }
@@ -3949,7 +4003,13 @@
         "benchmark",
         ""
       ],
-      "accounts": [],
+      "accounts": [
+        {
+          "name": "dummy",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
       "args": []
     }
   ],
@@ -4228,11 +4288,15 @@
             "type": "u8"
           },
           {
+            "name": "forceClose",
+            "type": "u8"
+          },
+          {
             "name": "reserved",
             "type": {
               "array": [
                 "u8",
-                2119
+                2118
               ]
             }
           }
@@ -5070,11 +5134,15 @@
             "type": "u8"
           },
           {
+            "name": "forceClose",
+            "type": "u8"
+          },
+          {
             "name": "padding4",
             "type": {
               "array": [
                 "u8",
-                7
+                6
               ]
             }
           },
@@ -5133,11 +5201,15 @@
             "type": "u8"
           },
           {
+            "name": "forceClose",
+            "type": "u8"
+          },
+          {
             "name": "padding1",
             "type": {
               "array": [
                 "u8",
-                3
+                2
               ]
             }
           },
@@ -7083,6 +7155,32 @@
           },
           {
             "name": "AccountBuybackFeesWithMngo"
+          },
+          {
+            "name": "TokenForceCloseBorrowsWithToken"
+          },
+          {
+            "name": "PerpForceClosePosition"
+          },
+          {
+            "name": "GroupWithdrawInsuranceFund"
+          }
+        ]
+      }
+    },
+    {
+      "name": "CheckLiquidatable",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "NotLiquidatable"
+          },
+          {
+            "name": "Liquidatable"
+          },
+          {
+            "name": "BecameNotLiquidatable"
           }
         ]
       }
@@ -7202,28 +7300,6 @@
       }
     },
     {
-      "name": "SelfTradeBehavior",
-      "docs": [
-        "Self trade behavior controls how taker orders interact with resting limit orders of the same account.",
-        "This setting has no influecne on placing a resting or oracle pegged limit order that does not match",
-        "immediately, instead it's the responsibility of the user to correctly configure his taker orders."
-      ],
-      "type": {
-        "kind": "enum",
-        "variants": [
-          {
-            "name": "DecrementTake"
-          },
-          {
-            "name": "CancelProvide"
-          },
-          {
-            "name": "AbortTransaction"
-          }
-        ]
-      }
-    },
-    {
       "name": "Side",
       "type": {
         "kind": "enum",
@@ -7266,8 +7342,7 @@
         "kind": "enum",
         "variants": [
           {
-            "name": "Market",
-            "fields": []
+            "name": "Market"
           },
           {
             "name": "ImmediateOrCancel",
@@ -7772,6 +7847,83 @@
         {
           "name": "price",
           "type": "i128",
+          "index": false
+        },
+        {
+          "name": "oracleSlot",
+          "type": "u64",
+          "index": false
+        },
+        {
+          "name": "stablePrice",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "feesAccrued",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "feesSettled",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "openInterest",
+          "type": "i64",
+          "index": false
+        },
+        {
+          "name": "instantaneousFundingRate",
+          "type": "i128",
+          "index": false
+        }
+      ]
+    },
+    {
+      "name": "PerpUpdateFundingLogV2",
+      "fields": [
+        {
+          "name": "mangoGroup",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "marketIndex",
+          "type": "u16",
+          "index": false
+        },
+        {
+          "name": "longFunding",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "shortFunding",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "price",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "oracleSlot",
+          "type": "u64",
+          "index": false
+        },
+        {
+          "name": "oracleConfidence",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "oracleType",
+          "type": {
+            "defined": "OracleType"
+          },
           "index": false
         },
         {
@@ -8577,6 +8729,121 @@
           "index": false
         }
       ]
+    },
+    {
+      "name": "FilledPerpOrderLog",
+      "fields": [
+        {
+          "name": "mangoGroup",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "perpMarketIndex",
+          "type": "u16",
+          "index": false
+        },
+        {
+          "name": "seqNum",
+          "type": "u64",
+          "index": false
+        }
+      ]
+    },
+    {
+      "name": "PerpForceClosePositionLog",
+      "fields": [
+        {
+          "name": "mangoGroup",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "perpMarketIndex",
+          "type": "u16",
+          "index": false
+        },
+        {
+          "name": "accountA",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "accountB",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "baseTransfer",
+          "type": "i64",
+          "index": false
+        },
+        {
+          "name": "quoteTransfer",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "price",
+          "type": "i128",
+          "index": false
+        }
+      ]
+    },
+    {
+      "name": "TokenForceCloseBorrowsWithTokenLog",
+      "fields": [
+        {
+          "name": "mangoGroup",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "liqor",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "liqee",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "assetTokenIndex",
+          "type": "u16",
+          "index": false
+        },
+        {
+          "name": "liabTokenIndex",
+          "type": "u16",
+          "index": false
+        },
+        {
+          "name": "assetTransfer",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "liabTransfer",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "assetPrice",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "liabPrice",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "feeFactor",
+          "type": "i128",
+          "index": false
+        }
+      ]
     }
   ],
   "errors": [
@@ -8812,8 +9079,13 @@
     },
     {
       "code": 6046,
-      "name": "WouldSelfTrade",
-      "msg": "would self trade"
+      "name": "TokenInForceClose",
+      "msg": "token is in force close"
+    },
+    {
+      "code": 6047,
+      "name": "InvalidHealthAccountCount",
+      "msg": "incorrect number of health accounts"
     }
   ]
 }

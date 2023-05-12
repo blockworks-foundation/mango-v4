@@ -339,8 +339,8 @@ async fn test_perp_settle_fees() -> Result<(), TransportError> {
             max_settle_amount: u64::MAX,
         },
     )
-    .await?;
-
+    .await
+    .unwrap();
     // No change
     {
         let perp_market = solana.get_account::<PerpMarket>(perp_market).await;
