@@ -235,7 +235,7 @@
 <span class="doccomment">/// The token index used in AccountBuybackFeesWithMngo to exchange for MNGO
 </span><span class="kw">pub const </span>FEE_BUYBACK_QUOTE_TOKEN_INDEX: TokenIndex = <span class="number">0</span>;
 
-<span class="attribute">#[account(zero_copy(safe_bytemuck_derives))]
+<span class="attribute">#[account(zero_copy)]
 #[derive(Debug)]
 </span><span class="kw">pub struct </span>Group {
     <span class="comment">// ABI: Clients rely on this being at offset 8

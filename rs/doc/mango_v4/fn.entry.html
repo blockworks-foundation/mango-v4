@@ -3,14 +3,8 @@ a set of methods inside of a <code>#[program]</code> module in a way similar
 to writing RPC request handlers. The macro then generates a bunch of
 code wrapping these user defined methods into something that can be
 executed on Solana.</p>
-<p>These methods fall into one of three categories, each of which
-can be considered a different “namespace” of the program.</p>
-<ol>
-<li>Global methods - regular methods inside of the <code>#[program]</code>.</li>
-<li>State methods - associated methods inside a <code>#[state]</code> struct.</li>
-<li>Interface methods - methods inside a strait struct’s
-implementation of an <code>#[interface]</code> trait.</li>
-</ol>
+<p>These methods fall into one categorie for now.</p>
+<p>Global methods - regular methods inside of the <code>#[program]</code>.</p>
 <p>Care must be taken by the codegen to prevent collisions between
 methods in these different namespaces. For this reason, Anchor uses
 a variant of sighash to perform method dispatch, rather than

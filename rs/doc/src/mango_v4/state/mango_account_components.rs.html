@@ -1428,7 +1428,7 @@
 <span class="kw">pub const </span>FREE_ORDER_SLOT: PerpMarketIndex = PerpMarketIndex::MAX;
 
 <span class="attribute">#[zero_copy]
-#[derive(AnchorDeserialize, AnchorSerialize, Derivative, bytemuck::Pod, bytemuck::Zeroable)]
+#[derive(AnchorDeserialize, AnchorSerialize, Derivative, bytemuck::Pod)]
 #[derivative(Debug)]
 </span><span class="kw">pub struct </span>TokenPosition {
     <span class="comment">// TODO: Why did we have deposits and borrows as two different values
@@ -1518,7 +1518,7 @@
 }
 
 <span class="attribute">#[zero_copy]
-#[derive(AnchorSerialize, AnchorDeserialize, Derivative, bytemuck::Pod, bytemuck::Zeroable)]
+#[derive(AnchorSerialize, AnchorDeserialize, Derivative, bytemuck::Pod)]
 #[derivative(Debug)]
 </span><span class="kw">pub struct </span>Serum3Orders {
     <span class="kw">pub </span>open_orders: Pubkey,
@@ -1574,7 +1574,7 @@
 }
 
 <span class="attribute">#[zero_copy]
-#[derive(AnchorSerialize, AnchorDeserialize, Derivative, bytemuck::Pod, bytemuck::Zeroable)]
+#[derive(AnchorSerialize, AnchorDeserialize, Derivative, bytemuck::Pod)]
 #[derivative(Debug)]
 </span><span class="kw">pub struct </span>PerpPosition {
     <span class="kw">pub </span>market_index: PerpMarketIndex,
@@ -2198,7 +2198,7 @@
 }
 
 <span class="attribute">#[zero_copy]
-#[derive(AnchorSerialize, AnchorDeserialize, Debug, bytemuck::Pod, bytemuck::Zeroable)]
+#[derive(AnchorSerialize, AnchorDeserialize, Debug, bytemuck::Pod)]
 </span><span class="kw">pub struct </span>PerpOpenOrder {
     <span class="kw">pub </span>side_and_tree: u8, <span class="comment">// SideAndOrderTree -- enums aren&#39;t POD
     </span><span class="kw">pub </span>padding1: [u8; <span class="number">1</span>],

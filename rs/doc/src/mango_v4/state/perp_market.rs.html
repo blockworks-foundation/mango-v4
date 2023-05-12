@@ -511,7 +511,7 @@
 
 <span class="kw">pub type </span>PerpMarketIndex = u16;
 
-<span class="attribute">#[account(zero_copy(safe_bytemuck_derives))]
+<span class="attribute">#[account(zero_copy)]
 #[derive(Debug)]
 </span><span class="kw">pub struct </span>PerpMarket {
     <span class="comment">// ABI: Clients rely on this being at offset 8

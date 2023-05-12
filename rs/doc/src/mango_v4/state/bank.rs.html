@@ -1087,7 +1087,7 @@
 
 <span class="attribute">#[derive(Derivative)]
 #[derivative(Debug)]
-#[account(zero_copy(safe_bytemuck_derives))]
+#[account(zero_copy)]
 </span><span class="kw">pub struct </span>Bank {
     <span class="comment">// ABI: Clients rely on this being at offset 8
     </span><span class="kw">pub </span>group: Pubkey,

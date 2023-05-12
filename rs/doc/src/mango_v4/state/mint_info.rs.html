@@ -88,7 +88,7 @@
 // the accounts that are relevant for this mint. The idea is that clients
 // can load this account to figure out which address maps to use when calling
 // instructions that need banks/oracles for all active positions.
-</span><span class="attribute">#[account(zero_copy(safe_bytemuck_derives))]
+</span><span class="attribute">#[account(zero_copy)]
 #[derive(Debug)]
 </span><span class="kw">pub struct </span>MintInfo {
     <span class="comment">// ABI: Clients rely on this being at offset 8

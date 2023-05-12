@@ -435,7 +435,7 @@
 }
 
 <span class="attribute">#[zero_copy]
-#[derive(AnchorDeserialize, AnchorSerialize, Debug, bytemuck::Pod, bytemuck::Zeroable)]
+#[derive(AnchorDeserialize, AnchorSerialize, Debug, bytemuck::Pod)]
 </span><span class="kw">pub struct </span>OracleConfig {
     <span class="kw">pub </span>conf_filter: I80F48,
     <span class="kw">pub </span>max_staleness_slots: i64,
@@ -475,7 +475,7 @@
     <span class="kw">pub </span>oracle_type: OracleType,
 }
 
-<span class="attribute">#[account(zero_copy(safe_bytemuck_derives))]
+<span class="attribute">#[account(zero_copy)]
 </span><span class="kw">pub struct </span>StubOracle {
     <span class="comment">// ABI: Clients rely on this being at offset 8
     </span><span class="kw">pub </span>group: Pubkey,

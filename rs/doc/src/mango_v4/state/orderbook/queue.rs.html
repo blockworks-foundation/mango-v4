@@ -330,7 +330,7 @@
     <span class="kw">fn </span>decr_event_id(<span class="kw-2">&amp;mut </span><span class="self">self</span>, n: u64);
 }
 
-<span class="attribute">#[account(zero_copy(safe_bytemuck_derives))]
+<span class="attribute">#[account(zero_copy)]
 </span><span class="kw">pub struct </span>EventQueue {
     <span class="kw">pub </span>header: EventQueueHeader,
     <span class="kw">pub </span>buf: [AnyEvent; MAX_NUM_EVENTS <span class="kw">as </span>usize],

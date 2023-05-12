@@ -1572,8 +1572,6 @@
 <span id="1572">1572</span>
 <span id="1573">1573</span>
 <span id="1574">1574</span>
-<span id="1575">1575</span>
-<span id="1576">1576</span>
 </pre><pre class="rust"><code><span class="kw">use </span>std::cell::{Ref, RefMut};
 <span class="kw">use </span>std::mem::size_of;
 
@@ -1901,9 +1899,7 @@
 }
 
 <span class="kw">impl </span>Discriminator <span class="kw">for </span>MangoAccountFixed {
-    <span class="kw">fn </span>discriminator() -&gt; [u8; <span class="number">8</span>] {
-        MangoAccount::discriminator()
-    }
+    <span class="kw">const </span>DISCRIMINATOR: [u8; <span class="number">8</span>] = MangoAccount::DISCRIMINATOR;
 }
 
 <span class="kw">impl </span>anchor_lang::ZeroCopy <span class="kw">for </span>MangoAccountFixed {}

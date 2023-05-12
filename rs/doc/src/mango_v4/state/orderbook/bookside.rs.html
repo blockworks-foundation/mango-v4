@@ -436,7 +436,7 @@
     <span class="kw">pub </span>order_tree: BookSideOrderTree,
 }
 
-<span class="attribute">#[account(zero_copy(safe_bytemuck_derives))]
+<span class="attribute">#[account(zero_copy)]
 </span><span class="kw">pub struct </span>BookSide {
     <span class="kw">pub </span>roots: [OrderTreeRoot; <span class="number">2</span>],
     <span class="kw">pub </span>reserved_roots: [OrderTreeRoot; <span class="number">4</span>],
