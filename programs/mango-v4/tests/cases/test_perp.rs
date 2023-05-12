@@ -96,10 +96,7 @@ async fn test_perp_fixed() -> Result<(), TransportError> {
             side: Side::Bid,
             price_lots,
             max_base_lots: 1,
-            max_quote_lots: i64::MAX,
-            reduce_only: false,
-            client_order_id: 0,
-            self_trade_behavior: SelfTradeBehavior::DecrementTake,
+            ..PerpPlaceOrderInstruction::default()
         },
     )
     .await
@@ -139,10 +136,8 @@ async fn test_perp_fixed() -> Result<(), TransportError> {
             side: Side::Bid,
             price_lots,
             max_base_lots: 1,
-            max_quote_lots: i64::MAX,
-            self_trade_behavior: SelfTradeBehavior::DecrementTake,
-            reduce_only: false,
             client_order_id: 1,
+            ..PerpPlaceOrderInstruction::default()
         },
     )
     .await
@@ -175,10 +170,8 @@ async fn test_perp_fixed() -> Result<(), TransportError> {
             side: Side::Bid,
             price_lots,
             max_base_lots: 1,
-            max_quote_lots: i64::MAX,
-            self_trade_behavior: SelfTradeBehavior::DecrementTake,
-            reduce_only: false,
             client_order_id: 2,
+            ..PerpPlaceOrderInstruction::default()
         },
     )
     .await
@@ -210,10 +203,8 @@ async fn test_perp_fixed() -> Result<(), TransportError> {
             side: Side::Bid,
             price_lots,
             max_base_lots: 1,
-            max_quote_lots: i64::MAX,
-            self_trade_behavior: SelfTradeBehavior::DecrementTake,
-            reduce_only: false,
             client_order_id: 4,
+            ..PerpPlaceOrderInstruction::default()
         },
     )
     .await
@@ -245,10 +236,8 @@ async fn test_perp_fixed() -> Result<(), TransportError> {
             side: Side::Bid,
             price_lots,
             max_base_lots: 1,
-            max_quote_lots: i64::MAX,
-            self_trade_behavior: SelfTradeBehavior::DecrementTake,
-            reduce_only: false,
             client_order_id: 5,
+            ..PerpPlaceOrderInstruction::default()
         },
     )
     .await
@@ -264,10 +253,8 @@ async fn test_perp_fixed() -> Result<(), TransportError> {
             side: Side::Ask,
             price_lots,
             max_base_lots: 1,
-            max_quote_lots: i64::MAX,
-            self_trade_behavior: SelfTradeBehavior::DecrementTake,
-            reduce_only: false,
             client_order_id: 6,
+            ..PerpPlaceOrderInstruction::default()
         },
     )
     .await
@@ -339,10 +326,8 @@ async fn test_perp_fixed() -> Result<(), TransportError> {
             side: Side::Ask,
             price_lots,
             max_base_lots: 1,
-            max_quote_lots: i64::MAX,
-            self_trade_behavior: SelfTradeBehavior::DecrementTake,
-            reduce_only: false,
             client_order_id: 7,
+            ..PerpPlaceOrderInstruction::default()
         },
     )
     .await
@@ -358,10 +343,8 @@ async fn test_perp_fixed() -> Result<(), TransportError> {
             side: Side::Bid,
             price_lots,
             max_base_lots: 1,
-            max_quote_lots: i64::MAX,
-            self_trade_behavior: SelfTradeBehavior::DecrementTake,
-            reduce_only: false,
             client_order_id: 8,
+            ..PerpPlaceOrderInstruction::default()
         },
     )
     .await
@@ -624,10 +607,8 @@ async fn test_perp_oracle_peg() -> Result<(), TransportError> {
             side: Side::Ask,
             price_lots,
             max_base_lots: 1,
-            max_quote_lots: i64::MAX,
-            self_trade_behavior: SelfTradeBehavior::DecrementTake,
-            reduce_only: false,
             client_order_id: 6,
+            ..PerpPlaceOrderInstruction::default()
         },
     )
     .await
@@ -708,10 +689,8 @@ async fn test_perp_oracle_peg() -> Result<(), TransportError> {
             side: Side::Ask,
             price_lots,
             max_base_lots: 1,
-            max_quote_lots: i64::MAX,
-            self_trade_behavior: SelfTradeBehavior::DecrementTake,
-            reduce_only: false,
             client_order_id: 60,
+            ..PerpPlaceOrderInstruction::default()
         },
     )
     .await
@@ -739,10 +718,8 @@ async fn test_perp_oracle_peg() -> Result<(), TransportError> {
             side: Side::Ask,
             price_lots,
             max_base_lots: 2,
-            max_quote_lots: i64::MAX,
-            self_trade_behavior: SelfTradeBehavior::DecrementTake,
-            reduce_only: false,
             client_order_id: 61,
+            ..PerpPlaceOrderInstruction::default()
         },
     )
     .await
@@ -792,10 +769,8 @@ async fn test_perp_oracle_peg() -> Result<(), TransportError> {
             side: Side::Ask,
             price_lots: price_lots + 2,
             max_base_lots: 1,
-            max_quote_lots: i64::MAX,
-            self_trade_behavior: SelfTradeBehavior::DecrementTake,
-            reduce_only: false,
             client_order_id: 62,
+            ..PerpPlaceOrderInstruction::default()
         },
     )
     .await
@@ -823,10 +798,8 @@ async fn test_perp_oracle_peg() -> Result<(), TransportError> {
             side: Side::Ask,
             price_lots: price_lots + 3,
             max_base_lots: 1,
-            max_quote_lots: i64::MAX,
-            self_trade_behavior: SelfTradeBehavior::DecrementTake,
-            reduce_only: false,
             client_order_id: 63,
+            ..PerpPlaceOrderInstruction::default()
         },
     )
     .await
@@ -946,10 +919,8 @@ async fn test_perp_realize_partially() -> Result<(), TransportError> {
             side: Side::Bid,
             price_lots,
             max_base_lots: 2,
-            max_quote_lots: i64::MAX,
-            self_trade_behavior: SelfTradeBehavior::DecrementTake,
-            reduce_only: false,
             client_order_id: 5,
+            ..PerpPlaceOrderInstruction::default()
         },
     )
     .await
@@ -964,10 +935,8 @@ async fn test_perp_realize_partially() -> Result<(), TransportError> {
             side: Side::Ask,
             price_lots,
             max_base_lots: 2,
-            max_quote_lots: i64::MAX,
-            self_trade_behavior: SelfTradeBehavior::DecrementTake,
-            reduce_only: false,
             client_order_id: 6,
+            ..PerpPlaceOrderInstruction::default()
         },
     )
     .await
@@ -1004,10 +973,8 @@ async fn test_perp_realize_partially() -> Result<(), TransportError> {
             side: Side::Ask,
             price_lots: perp_market_data.native_price_to_lot(I80F48::from_num(1500)),
             max_base_lots: 1,
-            max_quote_lots: i64::MAX,
-            self_trade_behavior: SelfTradeBehavior::DecrementTake,
-            reduce_only: false,
             client_order_id: 5,
+            ..PerpPlaceOrderInstruction::default()
         },
     )
     .await
@@ -1022,10 +989,8 @@ async fn test_perp_realize_partially() -> Result<(), TransportError> {
             side: Side::Bid,
             price_lots: perp_market_data.native_price_to_lot(I80F48::from_num(1500)),
             max_base_lots: 1,
-            max_quote_lots: i64::MAX,
-            self_trade_behavior: SelfTradeBehavior::DecrementTake,
-            reduce_only: false,
             client_order_id: 6,
+            ..PerpPlaceOrderInstruction::default()
         },
     )
     .await

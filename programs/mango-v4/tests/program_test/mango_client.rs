@@ -3255,6 +3255,22 @@ pub struct PerpPlaceOrderInstruction {
     pub client_order_id: u64,
     pub self_trade_behavior: SelfTradeBehavior,
 }
+impl Default for PerpPlaceOrderInstruction {
+    fn default() -> Self {
+        Self {
+            account: Pubkey::default(),
+            perp_market: Pubkey::default(),
+            owner: TestKeypair::default(),
+            side: Side::Bid,
+            price_lots: 0,
+            max_base_lots: i64::MAX,
+            max_quote_lots: i64::MAX,
+            reduce_only: false,
+            client_order_id: 0,
+            self_trade_behavior: SelfTradeBehavior::DecrementTake,
+        }
+    }
+}
 #[async_trait::async_trait(?Send)]
 impl ClientInstruction for PerpPlaceOrderInstruction {
     type Accounts = mango_v4::accounts::PerpPlaceOrder;

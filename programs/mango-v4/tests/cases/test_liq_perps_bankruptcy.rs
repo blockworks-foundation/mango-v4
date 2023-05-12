@@ -162,10 +162,7 @@ async fn test_liq_perps_bankruptcy() -> Result<(), TransportError> {
             side: Side::Bid,
             price_lots,
             max_base_lots: 1,
-            max_quote_lots: i64::MAX,
-            client_order_id: 0,
-            self_trade_behavior: SelfTradeBehavior::DecrementTake,
-            reduce_only: false,
+            ..PerpPlaceOrderInstruction::default()
         })
         .await;
         tx.add_instruction(PerpPlaceOrderInstruction {
@@ -175,10 +172,7 @@ async fn test_liq_perps_bankruptcy() -> Result<(), TransportError> {
             side: Side::Ask,
             price_lots,
             max_base_lots: 1,
-            max_quote_lots: i64::MAX,
-            client_order_id: 0,
-            self_trade_behavior: SelfTradeBehavior::DecrementTake,
-            reduce_only: false,
+            ..PerpPlaceOrderInstruction::default()
         })
         .await;
         tx.add_instruction(PerpConsumeEventsInstruction {
@@ -197,10 +191,7 @@ async fn test_liq_perps_bankruptcy() -> Result<(), TransportError> {
             side: Side::Ask,
             price_lots: adj_price_lots,
             max_base_lots: 1,
-            max_quote_lots: i64::MAX,
-            client_order_id: 0,
-            self_trade_behavior: SelfTradeBehavior::DecrementTake,
-            reduce_only: false,
+            ..PerpPlaceOrderInstruction::default()
         })
         .await;
         tx.add_instruction(PerpPlaceOrderInstruction {
@@ -210,10 +201,7 @@ async fn test_liq_perps_bankruptcy() -> Result<(), TransportError> {
             side: Side::Bid,
             price_lots: adj_price_lots,
             max_base_lots: 1,
-            max_quote_lots: i64::MAX,
-            client_order_id: 0,
-            self_trade_behavior: SelfTradeBehavior::DecrementTake,
-            reduce_only: false,
+            ..PerpPlaceOrderInstruction::default()
         })
         .await;
         tx.add_instruction(PerpConsumeEventsInstruction {
