@@ -124,7 +124,8 @@ pub fn load_open_orders_bytes(bytes: &[u8]) -> Result<&serum_dex::state::OpenOrd
 }
 
 pub fn pubkey_from_u64_array(d: [u64; 4]) -> Pubkey {
-    Pubkey::new(bytemuck::cast_slice(&d as &[_]))
+    let b: [u8; 32] = bytemuck::cast(d);
+    Pubkey::from(b)
 }
 
 pub struct InitOpenOrders<'info> {
