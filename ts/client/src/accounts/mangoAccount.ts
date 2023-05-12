@@ -383,7 +383,7 @@ export class MangoAccount {
    */
   public getAssetsValue(group: Group, healthType = HealthType.maint): I80F48 {
     const hc = HealthCache.fromMangoAccount(group, this);
-    return hc.assetsAndLiabs(healthType, true).assets;
+    return hc.healthAssetsAndLiabs(healthType, true).assets;
   }
 
   /**
@@ -393,7 +393,7 @@ export class MangoAccount {
    */
   public getLiabsValue(group: Group, healthType = HealthType.maint): I80F48 {
     const hc = HealthCache.fromMangoAccount(group, this);
-    return hc.assetsAndLiabs(healthType, false).liabs;
+    return hc.healthAssetsAndLiabs(healthType, false).liabs;
   }
 
   /**
@@ -1545,7 +1545,7 @@ export class PerpPosition {
       throw new Error("PerpPosition doesn't belong to the given market!");
     }
     this.updateSettleLimit(perpMarket);
-    const perpSettleHealth = account.perpMaxSettle(
+    const perpMaxSettle = account.perpMaxSettle(
       group,
       perpMarket.settleTokenIndex,
     );
@@ -1554,7 +1554,7 @@ export class PerpPosition {
       perpMarket,
     );
     if (limitedUnsettled.lt(ZERO_I80F48())) {
-      return limitedUnsettled.max(perpSettleHealth.max(ZERO_I80F48()).neg());
+      return limitedUnsettled.max(perpMaxSettle.max(ZERO_I80F48()).neg());
     }
     return limitedUnsettled;
   }

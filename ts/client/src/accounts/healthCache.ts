@@ -288,17 +288,17 @@ export class HealthCache {
     assets: I80F48;
     liabs: I80F48;
   } {
-    return this.assetsAndLiabs(healthType, true);
+    return this.healthAssetsAndLiabs(healthType, true);
   }
 
   healthAssetsAndLiabsStableLiabs(healthType: HealthType): {
     assets: I80F48;
     liabs: I80F48;
   } {
-    return this.assetsAndLiabs(healthType, false);
+    return this.healthAssetsAndLiabs(healthType, false);
   }
 
-  public assetsAndLiabs(
+  public healthAssetsAndLiabs(
     healthType: HealthType,
     stableAssets: boolean,
   ): { assets: I80F48; liabs: I80F48 } {
@@ -584,11 +584,6 @@ export class HealthCache {
       clonedHealthCache.getOrCreatePerpInfoIndex(perpMarket);
     clonedHealthCache.adjustPerpInfo(perpInfoIndex, price, side, baseLots);
     return clonedHealthCache.healthRatio(healthType);
-  }
-
-  public logHealthCache(debug?: string): void {
-    if (debug) console.log(debug);
-    // TODO
   }
 
   private static scanRightUntilLessThan(
