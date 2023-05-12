@@ -70,15 +70,11 @@ async function debugUser(
   );
   console.log(
     'mangoAccount.getAssetsValue() ' +
-      toUiDecimalsForQuote(
-        mangoAccount.getAssetsValue(group, HealthType.init)!.toNumber(),
-      ),
+      toUiDecimalsForQuote(mangoAccount.getAssetsValue(group)!.toNumber()),
   );
   console.log(
     'mangoAccount.getLiabsValue() ' +
-      toUiDecimalsForQuote(
-        mangoAccount.getLiabsValue(group, HealthType.init)!.toNumber(),
-      ),
+      toUiDecimalsForQuote(mangoAccount.getLiabsValue(group)!.toNumber()),
   );
 
   async function getMaxWithdrawWithBorrowForTokenUiWrapper(

@@ -378,22 +378,20 @@ export class MangoAccount {
 
   /**
    * Sum of all positive assets.
-   * TODO: healthType = HealthType.maint breaks UI assumption
    * @returns assets, in native quote
    */
-  public getAssetsValue(group: Group, healthType = HealthType.maint): I80F48 {
+  public getAssetsValue(group: Group): I80F48 {
     const hc = HealthCache.fromMangoAccount(group, this);
-    return hc.healthAssetsAndLiabs(healthType, true).assets;
+    return hc.healthAssetsAndLiabs(undefined, true).assets;
   }
 
   /**
    * Sum of all negative assets.
-   * TODO: healthType = HealthType.maint breaks UI assumption
    * @returns liabs, in native quote
    */
-  public getLiabsValue(group: Group, healthType = HealthType.maint): I80F48 {
+  public getLiabsValue(group: Group): I80F48 {
     const hc = HealthCache.fromMangoAccount(group, this);
-    return hc.healthAssetsAndLiabs(healthType, false).liabs;
+    return hc.healthAssetsAndLiabs(undefined, false).liabs;
   }
 
   /**

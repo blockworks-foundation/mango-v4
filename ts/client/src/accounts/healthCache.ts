@@ -156,7 +156,7 @@ export class HealthCache {
     );
   }
 
-  computeSerum3Reservations(healthType: HealthType): {
+  computeSerum3Reservations(healthType: HealthType | undefined): {
     tokenMaxReserved: TokenMaxReserved[];
     serum3Reserved: Serum3Reserved[];
   } {
@@ -203,12 +203,12 @@ export class HealthCache {
     };
   }
 
-  effectiveTokenBalances(healthType: HealthType): TokenBalance[] {
+  effectiveTokenBalances(healthType: HealthType | undefined): TokenBalance[] {
     return this.effectiveTokenBalancesInternal(healthType, false);
   }
 
   effectiveTokenBalancesInternal(
-    healthType: HealthType,
+    healthType: HealthType | undefined,
     perpSettleHealth: boolean,
   ): TokenBalance[] {
     const tokenBalances = new Array(this.tokenInfos.length)
@@ -299,7 +299,7 @@ export class HealthCache {
   }
 
   public healthAssetsAndLiabs(
-    healthType: HealthType,
+    healthType: HealthType | undefined,
     stableAssets: boolean,
   ): { assets: I80F48; liabs: I80F48 } {
     const totalAssets = ZERO_I80F48();
@@ -1283,31 +1283,35 @@ export class TokenInfo {
     );
   }
 
-  assetWeight(healthType: HealthType): I80F48 {
+  assetWeight(healthType: HealthType | undefined): I80F48 {
     if (healthType == HealthType.init) {
       return this.initScaledAssetWeight;
     } else if (healthType == HealthType.liquidationEnd) {
       return this.initAssetWeight;
     }
-    // healthType == HealthType.maint
-    return this.maintAssetWeight;
+    if (healthType == HealthType.maint) {
+      return this.maintAssetWeight;
+    }
+    return I80F48.fromNumber(1);
   }
 
-  assetWeightedPrice(healthType: HealthType): I80F48 {
+  assetWeightedPrice(healthType: HealthType | undefined): I80F48 {
     return this.assetWeight(healthType).mul(this.prices.asset(healthType));
   }
 
-  liabWeight(healthType: HealthType): I80F48 {
+  liabWeight(healthType: HealthType | undefined): I80F48 {
     if (healthType == HealthType.init) {
       return this.initScaledLiabWeight;
     } else if (healthType == HealthType.liquidationEnd) {
       return this.initLiabWeight;
     }
-    // healthType == HealthType.maint
-    return this.maintLiabWeight;
+    if (healthType == HealthType.maint) {
+      return this.maintLiabWeight;
+    }
+    return I80F48.fromNumber(1);
   }
 
-  liabWeightedPrice(healthType: HealthType): I80F48 {
+  liabWeightedPrice(healthType: HealthType | undefined): I80F48 {
     return this.liabWeight(healthType).mul(this.prices.liab(healthType));
   }
 
@@ -1605,7 +1609,7 @@ export class PerpInfo {
     );
   }
 
-  healthUnsettledPnl(healthType: HealthType): I80F48 {
+  healthUnsettledPnl(healthType: HealthType | undefined): I80F48 {
     const contrib = this.unweightedHealthUnsettledPnl(healthType);
     return this.weighHealthContributionOverall(contrib, healthType);
   }
@@ -1642,7 +1646,7 @@ export class PerpInfo {
 
   weighHealthContributionOverall(
     unweighted: I80F48,
-    healthType: HealthType,
+    healthType: HealthType | undefined,
   ): I80F48 {
     if (unweighted.gt(ZERO_I80F48())) {
       return (
