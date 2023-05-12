@@ -124,7 +124,6 @@ async function computePriceImpactForLiqor(
 
   // For each token
   for (const banks of Array.from(group.banksMapByMint.values())) {
-    // TODO USDC
     const bank = banks[0];
 
     const onChainPrice = (
@@ -133,7 +132,7 @@ async function computePriceImpactForLiqor(
       ).json()
     )['data'][bank.mint.toBase58()]['price'];
 
-    if (bank.reduceOnly > 0 || bank.tokenIndex === usdcBank.tokenIndex) {
+    if (bank.tokenIndex === usdcBank.tokenIndex) {
       continue;
     }
 
@@ -152,7 +151,7 @@ async function computePriceImpactForLiqor(
         );
         // Abs liab/borrow
         const maxTokenLiab = a.account
-          .getTokenBalance(bank)
+          .getTokenBalance(group, bank)
           .min(ZERO_I80F48())
           .abs();
         // Health under 0
@@ -198,17 +197,19 @@ async function computePriceImpactForLiqor(
     const assets = mangoAccountsWithHealth.reduce((sum, a) => {
       // How much would health increase for every unit liab moved to liqor
       // assetprice * (liabweight/(1+liabliqfee) - assetweight)
+      const liabBank = Array.from(group.banksMapByTokenIndex.values())
+        .flat()
+        .reduce((prev, curr) =>
+          prev.initLiabWeight.lt(curr.initLiabWeight) ? prev : curr,
+        );
       const tokenAssetHealthContrib = bank.price.mul(
-        Array.from(group.banksMapByTokenIndex.values())
-          .flat()
-          .map((bank) => bank.initLiabWeight)
-          .reduce((prev, curr) => (prev.lt(curr) ? prev : curr))
-          .div(ONE_I80F48().add(bank.liquidationFee))
+        liabBank.initLiabWeight
+          .div(ONE_I80F48().add(liabBank.liquidationFee))
           .sub(bank.initAssetWeight),
       );
       // Abs collateral/asset
       const maxTokenHealthAsset = a.account
-        .getTokenBalance(bank)
+        .getTokenBalance(group, bank)
         .max(ZERO_I80F48());
       const maxAsset = a.health
         .min(ZERO_I80F48())

@@ -231,9 +231,24 @@ export class MangoAccount {
    * @param bank
    * @returns native balance for a token, is signed
    */
-  public getTokenBalance(bank: Bank): I80F48 {
+  public getTokenBalance(group: Group, bank: Bank): I80F48 {
     const tp = this.getToken(bank.tokenIndex);
-    return tp ? tp.balance(bank) : ZERO_I80F48();
+    if (tp) {
+      const bal = tp.balance(bank);
+      for (const serum3Market of Array.from(
+        group.serum3MarketsMapByMarketIndex.values(),
+      )) {
+        const oo = this.serum3OosMapByMarketIndex.get(serum3Market.marketIndex);
+        if (serum3Market.baseTokenIndex == bank.tokenIndex && oo) {
+          bal.add(I80F48.fromI64(oo.baseTokenFree));
+        }
+        if (serum3Market.quoteTokenIndex == bank.tokenIndex && oo) {
+          bal.add(I80F48.fromI64(oo.quoteTokenFree));
+        }
+      }
+      return bal;
+    }
+    return ZERO_I80F48();
   }
 
   /**
@@ -550,7 +565,7 @@ export class MangoAccount {
             Math.pow(10, targetBank.mintDecimals - sourceBank.mintDecimals)),
       ),
     );
-    const sourceBalance = this.getTokenBalance(sourceBank);
+    const sourceBalance = this.getTokenBalance(group, sourceBank);
     if (maxSource.gt(sourceBalance)) {
       const sourceBorrow = maxSource.sub(sourceBalance);
       maxSource = sourceBalance.add(
@@ -686,7 +701,7 @@ export class MangoAccount {
     let quoteAmount = nativeAmount.div(quoteBank.price);
     // If its a bid then the reserved fund and potential loan is in base
     // also keep some buffer for fees, use taker fees for worst case simulation.
-    const quoteBalance = this.getTokenBalance(quoteBank);
+    const quoteBalance = this.getTokenBalance(group, quoteBank);
     if (quoteAmount.gt(quoteBalance)) {
       const quoteBorrow = quoteAmount.sub(quoteBalance);
       quoteAmount = quoteBalance.add(
@@ -728,7 +743,7 @@ export class MangoAccount {
     let baseAmount = nativeAmount.div(baseBank.price);
     // If its a ask then the reserved fund and potential loan is in base
     // also keep some buffer for fees, use taker fees for worst case simulation.
-    const baseBalance = this.getTokenBalance(baseBank);
+    const baseBalance = this.getTokenBalance(group, baseBank);
     if (baseAmount.gt(baseBalance)) {
       const baseBorrow = baseAmount.sub(baseBalance);
       baseAmount = baseBalance.add(
@@ -975,7 +990,7 @@ export class MangoAccount {
 
   public getMaxFeesBuyback(group: Group): BN {
     const mngoBalanceValueWithBonus = new BN(
-      this.getTokenBalance(group.getFirstBankForMngo())
+      this.getTokenBalance(group, group.getFirstBankForMngo())
         .mul(group.getFirstBankForMngo().price)
         .mul(I80F48.fromNumber(group.buybackFeesMngoBonusFactor))
         .floor()
