@@ -169,7 +169,7 @@ pub enum IxGate {
     Serum3CloseOpenOrders = 28,
     Serum3CreateOpenOrders = 29,
     Serum3DeregisterMarket = 30,
-    Serum3EditMarket = 31,
+    Serum3EditMarket = 31, // Note: Unused, and should never be used, added mistakenly.
     Serum3LiqForceCancelOrders = 32,
     Serum3PlaceOrder = 33,
     Serum3RegisterMarket = 34,
