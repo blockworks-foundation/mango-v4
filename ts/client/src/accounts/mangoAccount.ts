@@ -382,7 +382,7 @@ export class MangoAccount {
    */
   public getAssetsValue(group: Group): I80F48 {
     const hc = HealthCache.fromMangoAccount(group, this);
-    return hc.healthAssetsAndLiabs(undefined, true).assets;
+    return hc.healthAssetsAndLiabs(undefined, false).assets;
   }
 
   /**
