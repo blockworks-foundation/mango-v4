@@ -4,6 +4,8 @@ Update this for each program release and mainnet deployment.
 
 ## not on mainnet
 
+- New event: PerpTakerTradeLog immdediatly logs your last trade execution (#579)
+
 ## mainnet
 
 ### v0.15.0, 2023-5-11

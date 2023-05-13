@@ -9209,6 +9209,11 @@
           "name": "takerFeesPaid",
           "type": "i128",
           "index": false
+        },
+        {
+          "name": "feePenalty",
+          "type": "f32",
+          "index": false
         }
       ]
     },

@@ -9209,6 +9209,11 @@ export type MangoV4 = {
           "name": "takerFeesPaid",
           "type": "i128",
           "index": false
+        },
+        {
+          "name": "feePenalty",
+          "type": "f32",
+          "index": false
         }
       ]
     },
@@ -18762,6 +18767,11 @@ export const IDL: MangoV4 = {
         {
           "name": "takerFeesPaid",
           "type": "i128",
+          "index": false
+        },
+        {
+          "name": "feePenalty",
+          "type": "f32",
           "index": false
         }
       ]
