@@ -406,7 +406,19 @@
 <span id="406">406</span>
 <span id="407">407</span>
 <span id="408">408</span>
-</pre><pre class="rust"><code><span class="kw">use </span><span class="kw">crate</span>::logs::FilledPerpOrderLog;
+<span id="409">409</span>
+<span id="410">410</span>
+<span id="411">411</span>
+<span id="412">412</span>
+<span id="413">413</span>
+<span id="414">414</span>
+<span id="415">415</span>
+<span id="416">416</span>
+<span id="417">417</span>
+<span id="418">418</span>
+<span id="419">419</span>
+<span id="420">420</span>
+</pre><pre class="rust"><code><span class="kw">use </span><span class="kw">crate</span>::logs::{FilledPerpOrderLog, PerpTakerTradeLog};
 <span class="kw">use </span><span class="kw">crate</span>::state::MangoAccountRefMut;
 <span class="kw">use crate</span>::{
     error::<span class="kw-2">*</span>,
@@ -472,9 +484,11 @@
         </span><span class="kw">let </span>order_id = market.gen_order_id(side, price_data);
 
         <span class="comment">// IOC orders have a fee penalty applied regardless of match
-        </span><span class="kw">if </span>order.needs_penalty_fee() {
-            apply_penalty(market, mango_account)<span class="question-mark">?</span>;
-        }
+        </span><span class="kw">let </span>fee_penalty = <span class="kw">if </span>order.needs_penalty_fee() {
+            apply_penalty(market, mango_account)<span class="question-mark">?
+        </span>} <span class="kw">else </span>{
+            I80F48::ZERO
+        };
 
         <span class="kw">let </span>perp_position = mango_account.perp_position_mut(market.perp_market_index)<span class="question-mark">?</span>;
 
@@ -573,7 +587,7 @@
             <span class="macro">emit!</span>(FilledPerpOrderLog {
                 mango_group: market.group.key(),
                 perp_market_index: market.perp_market_index,
-                seq_num: seq_num,
+                seq_num,
             });
         }
         <span class="kw">let </span>total_quote_lots_taken = order.max_quote_lots - remaining_quote_lots;
@@ -585,7 +599,17 @@
         // realized when the fill event gets executed
         </span><span class="kw">if </span>total_quote_lots_taken &gt; <span class="number">0 </span>|| total_base_lots_taken &gt; <span class="number">0 </span>{
             perp_position.add_taker_trade(side, total_base_lots_taken, total_quote_lots_taken);
-            apply_fees(market, mango_account, total_quote_lots_taken)<span class="question-mark">?</span>;
+            <span class="kw">let </span>taker_fees_paid = apply_fees(market, mango_account, total_quote_lots_taken)<span class="question-mark">?</span>;
+            <span class="macro">emit!</span>(PerpTakerTradeLog {
+                mango_group: market.group.key(),
+                mango_account: <span class="kw-2">*</span>mango_account_pk,
+                perp_market_index: market.perp_market_index,
+                taker_side: side <span class="kw">as </span>u8,
+                total_base_lots_taken,
+                total_quote_lots_taken,
+                taker_fees_paid: taker_fees_paid.to_bits(),
+                fee_penalty: fee_penalty.to_bits(),
+            });
         }
 
         <span class="comment">// Apply changes to matched asks (handles invalidate on delete!)
@@ -773,7 +797,7 @@
     market: <span class="kw-2">&amp;mut </span>PerpMarket,
     account: <span class="kw-2">&amp;mut </span>MangoAccountRefMut,
     quote_lots: i64,
-) -&gt; <span class="prelude-ty">Result</span>&lt;()&gt; {
+) -&gt; <span class="prelude-ty">Result</span>&lt;I80F48&gt; {
     <span class="kw">let </span>quote_native = I80F48::from_num(market.quote_lot_size * quote_lots);
 
     <span class="comment">// The maker fees apply to the maker&#39;s account only when the fill event is consumed.
@@ -799,11 +823,11 @@
     // breaks assumptions.
     </span>market.fees_accrued += taker_fees + maker_fees;
 
-    <span class="prelude-val">Ok</span>(())
+    <span class="prelude-val">Ok</span>(taker_fees)
 }
 
 <span class="doccomment">/// Applies a fixed penalty fee to the account, and update the market&#39;s fees_accrued
-</span><span class="kw">fn </span>apply_penalty(market: <span class="kw-2">&amp;mut </span>PerpMarket, account: <span class="kw-2">&amp;mut </span>MangoAccountRefMut) -&gt; <span class="prelude-ty">Result</span>&lt;()&gt; {
+</span><span class="kw">fn </span>apply_penalty(market: <span class="kw-2">&amp;mut </span>PerpMarket, account: <span class="kw-2">&amp;mut </span>MangoAccountRefMut) -&gt; <span class="prelude-ty">Result</span>&lt;I80F48&gt; {
     <span class="kw">let </span>fee_penalty = I80F48::from_num(market.fee_penalty);
     account
         .fixed
@@ -812,7 +836,7 @@
     <span class="kw">let </span>perp_position = account.perp_position_mut(market.perp_market_index)<span class="question-mark">?</span>;
     perp_position.record_trading_fee(fee_penalty);
     market.fees_accrued += fee_penalty;
-    <span class="prelude-val">Ok</span>(())
+    <span class="prelude-val">Ok</span>(fee_penalty)
 }
 </code></pre></div>
 </section></div></main><div id="rustdoc-vars" data-root-path="../../../../" data-current-crate="mango_v4" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.65.0 (897e37553 2022-11-02)" ></div></body></html>

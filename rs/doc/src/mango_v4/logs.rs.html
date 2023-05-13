@@ -421,6 +421,18 @@
 <span id="421">421</span>
 <span id="422">422</span>
 <span id="423">423</span>
+<span id="424">424</span>
+<span id="425">425</span>
+<span id="426">426</span>
+<span id="427">427</span>
+<span id="428">428</span>
+<span id="429">429</span>
+<span id="430">430</span>
+<span id="431">431</span>
+<span id="432">432</span>
+<span id="433">433</span>
+<span id="434">434</span>
+<span id="435">435</span>
 </pre><pre class="rust"><code><span class="kw">use crate</span>::{
     accounts_ix::FlashLoanType,
     state::{OracleType, PerpMarket, PerpPosition},
@@ -819,6 +831,18 @@
     <span class="kw">pub </span>perp_market_index: u16,
     <span class="kw">pub </span>seq_num: u64,
 }
+
+<span class="attribute">#[event]
+</span><span class="kw">pub struct </span>PerpTakerTradeLog {
+    <span class="kw">pub </span>mango_group: Pubkey,
+    <span class="kw">pub </span>mango_account: Pubkey,
+    <span class="kw">pub </span>perp_market_index: u16,
+    <span class="kw">pub </span>taker_side: u8,
+    <span class="kw">pub </span>total_base_lots_taken: i64,
+    <span class="kw">pub </span>total_quote_lots_taken: i64, <span class="comment">// exclusive fees paid
+    </span><span class="kw">pub </span>taker_fees_paid: i128,       <span class="comment">// in native quote units
+    </span><span class="kw">pub </span>fee_penalty: i128,           <span class="comment">// in native quote units
+</span>}
 
 <span class="attribute">#[event]
 </span><span class="kw">pub struct </span>PerpForceClosePositionLog {
