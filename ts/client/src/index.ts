@@ -20,6 +20,7 @@ export {
 } from './clientIxParamBuilder';
 export * from './constants';
 export * from './numbers/I80F48';
+export * from './risk';
 export * from './router';
 export * from './types';
 export * from './utils';
