@@ -187,9 +187,6 @@ pub fn benchmark(_ctx: Context<Benchmark>) -> Result<()> {
     let _ = half + half; // 0
     sol_log_compute_units(); // 92509
 
-    let _ = max - max; // 0
-    sol_log_compute_units(); // 92408
-
     let _ = large_number * large_number; // 77
     sol_log_compute_units(); // 92230
 
@@ -199,9 +196,6 @@ pub fn benchmark(_ctx: Context<Benchmark>) -> Result<()> {
 
     let _ = half / max; // 3438
     sol_log_compute_units(); // 87751
-
-    let _ = max / max; // 3457
-    sol_log_compute_units(); // 84193
 
     Ok(())
 }

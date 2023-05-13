@@ -4,9 +4,11 @@ Update this for each program release and mainnet deployment.
 
 ## not on mainnet
 
-### v0.15.0, 2023-5-
+## mainnet
 
-Deployment:
+### v0.15.0, 2023-5-11
+
+Deployment: May 11, 2023 at 09:29:12 Central European Summer Time, https://explorer.solana.com/tx/3h6KFxLEAvifNGDBNcQrWdc6cRkpHTzFzL8VradfAXBYNfScrLJzDxm52N4RNmS9dmE84zDuwbErQ75RcxDcihY3
 
 - Change TokenRegisterTrustless instruction to disable borrows by default (#567)
 
@@ -33,8 +35,6 @@ Deployment:
 
 - Improve error message for incorrect number of accounts in FixedAccountRetriever (#566)
 - Add oracle confidence and type information to perp update funding logs (#568)
-
-## mainnet
 
 ### v0.14.0, 2023-4-29
 

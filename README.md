@@ -27,6 +27,7 @@ See DEVELOPING.md
 
 - rust version 1.65.0
 - solana-cli 1.14.9
+- anchor-cli 0.27.0
 - npm 8.1.2
 - node v16.13.1
 
@@ -43,16 +44,7 @@ Consider setting the git option `submodule.recurse=true`.
 
 ### Release
 
-Here are steps followed while performing a program deployment to mainnet-beta
-
-- review diff of last deployed tag to mainnet-beta, e.g. https://github.com/blockworks-foundation/mango-v4/compare/program-v0.4.0..dev, pay special attention to account layout changes, backward compatibility of newly introduced account fields, etc.
-- deploy to mainnet-beta
-- update changelog with deploy timestamp and tx
-- add a git tag e.g. `program-v0.0.1`, should match the version the program has
-- reset `main` to currently deployed tag
-- notify other contributors for bringing in changes from new release by merging `main` into their branch, e.g. `ts-client` and `deploy-mm`
-- notify other contributors for appropriately handling offchain services e.g. scrapers, market makers, etc.
-- bump program version in `Cargo.toml` on dev branch for next release
+For program deployment, see RELEASING.md.
 
 Here are steps followed while performing a npm package release
 note: the UI currently uses code directly from github, pointing to the ts-client branch
