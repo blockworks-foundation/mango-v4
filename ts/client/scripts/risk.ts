@@ -1,9 +1,6 @@
 import { AnchorProvider, BN, Wallet } from '@coral-xyz/anchor';
 import { Connection, Keypair, PublicKey } from '@solana/web3.js';
-import axios from 'axios';
 import { Table } from 'console-table-printer';
-import { format } from 'fast-csv';
-import fs from 'fs';
 import cloneDeep from 'lodash/cloneDeep';
 import fetch from 'node-fetch';
 import { Group } from '../src/accounts/group';
@@ -63,7 +60,6 @@ async function computePriceImpactForLiqor(
   mangoAccounts: MangoAccount[],
   healthThresh: number,
   title: string,
-  csvSuffix: string,
 ): Promise<void> {
   // Filter mango accounts below a certain health ration threshold
   const mangoAccountsWithHealth = mangoAccounts
@@ -85,39 +81,13 @@ async function computePriceImpactForLiqor(
       { name: 'Oracle Price', alignment: 'right' },
       { name: 'On-Chain Price', alignment: 'right' },
       { name: 'Future Price', alignment: 'right' },
-      // { name: 'V4 Soft Limit', alignment: 'right' },
       { name: 'V4 Liq Fee', alignment: 'right' },
       { name: 'Liabs', alignment: 'right' },
       { name: 'Liabs slippage', alignment: 'right' },
       { name: 'Assets Sum', alignment: 'right' },
       { name: 'Assets Slippage', alignment: 'right' },
-      // { name: 'Jup Day Volume', alignment: 'right' },
     ],
   });
-
-  const fileName = `/tmp/${
-    new Date().toISOString().split('T')[0]
-  }-${csvSuffix}-price_impact.csv`;
-  const csvFile = fs.createWriteStream(fileName);
-  const stream = format({ headers: true });
-  stream.pipe(csvFile);
-  stream.write([
-    'Coin',
-    'Oracle Price',
-    'On-Chain Price',
-    'Future Price',
-    // 'V4 Soft Limit',
-    'V4 Liq Fee',
-    'Liabs',
-    'Liabs slippage',
-    'Assets Sum',
-    'Assets Slippage',
-    // 'Jup Day Volume',
-  ]);
-
-  // High level solana defi stats
-  const response = await fetch('https://cache.jup.ag/stats/day');
-  const res = await response.json();
 
   const USDC_MINT = 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v';
   const usdcBank = group.getFirstBankByMint(new PublicKey(USDC_MINT));
@@ -160,19 +130,6 @@ async function computePriceImpactForLiqor(
           .abs()
           .div(tokenLiabHealthContrib)
           .min(maxTokenLiab);
-
-        // DEBUG
-        // if (
-        //   a.health.toNumber() < -10000000 ||
-        //   maxLiab.gt(I80F48.fromNumber(10000))
-        // )
-        //   console.log(
-        //     `https://app.mango.markets/?address=${
-        //       a.account.publicKey
-        //     }, health ${a.health.toNumber().toLocaleString()}, bank ${
-        //       bank.name
-        //     }, maxLiab ${maxLiab.toNumber().toLocaleString()}`,
-        //   );
 
         return sum.add(maxLiab);
       }, ZERO_I80F48());
@@ -217,19 +174,6 @@ async function computePriceImpactForLiqor(
         .div(tokenAssetHealthContrib)
         .min(maxTokenHealthAsset);
 
-      // DEBUG
-      // if (
-      //   a.health.toNumber() < -10000000 ||
-      //   maxAsset.gt(I80F48.fromNumber(10000))
-      // )
-      //   console.log(
-      //     `https://app.mango.markets/?address=${
-      //       a.account.publicKey
-      //     }, health ${a.health.toNumber().toLocaleString()}, bank ${
-      //       bank.name
-      //     }, maxAsset ${maxAsset.toNumber().toLocaleString()}`,
-      //   );
-
       return sum.add(maxAsset);
     }, ZERO_I80F48());
 
@@ -251,10 +195,7 @@ async function computePriceImpactForLiqor(
         onChainPrice < 0.1 ? onChainPrice : onChainPrice.toFixed(2),
       'Future Price':
         bank._uiPrice! < 0.1 ? bank._uiPrice! : bank._uiPrice!.toFixed(2),
-      // 'V4 Soft Limit':
-      //   toUiDecimalsForQuote(
-      //     bank.depositWeightScaleStartQuote,
-      //   ).toLocaleString() + '$',
+
       'V4 Liq Fee': (bank.liquidationFee.toNumber() * 100).toFixed(2) + '%',
       Liabs: toUiDecimalsForQuote(liabsInUsdc).toLocaleString() + '$',
       'Liabs slippage': (pi1.priceImpactPct * 100).toFixed(2) + '%',
@@ -263,41 +204,11 @@ async function computePriceImpactForLiqor(
           toUiDecimals(assets, bank.mintDecimals) * bank.uiPrice
         ).toLocaleString() + '$',
       'Assets Slippage': (pi2.priceImpactPct * 100).toFixed(2) + '%',
-      // 'Jup Day Volume':
-      //   '$' +
-      //   parseFloat(
-      //     res['lastXTopTokens'].filter(
-      //       (entry) => entry.mint === bank.mint.toBase58(),
-      //     )[0].amount,
-      //   ).toLocaleString(),
     });
-
-    stream.write([
-      bank.name,
-      bank['oldUiPrice'],
-      onChainPrice,
-      bank._uiPrice,
-      // toUiDecimalsForQuote(bank.depositWeightScaleStartQuote),
-      (bank.liquidationFee.toNumber() * 100).toFixed(2),
-      toUiDecimalsForQuote(liabsInUsdc).toFixed(2),
-      (pi1.priceImpactPct * 100).toFixed(2),
-      (toUiDecimals(assets, bank.mintDecimals) * bank.uiPrice).toFixed(2),
-      (pi2.priceImpactPct * 100).toFixed(2),
-      // parseFloat(
-      //   res['lastXTopTokens'].filter(
-      //     (entry) => entry.mint === bank.mint.toBase58(),
-      //   )[0].amount,
-      // ).toFixed(2),
-    ]);
   }
-  stream.end();
+
   const msg = title + '\n```\n' + table.render() + '\n```';
   console.log(msg);
-  if (process.env.WEBHOOK_URL) {
-    axios
-      .post(process.env.WEBHOOK_URL, { content: msg })
-      .catch((e) => console.log(e.response.data));
-  }
   console.log();
 }
 
@@ -306,7 +217,6 @@ async function computePerpPositionsToBeLiquidated(
   mangoAccounts: MangoAccount[],
   healthThresh: number,
   title: string,
-  csvSuffix: string,
 ): Promise<void> {
   const mangoAccountsWithHealth = mangoAccounts
     .map((a: MangoAccount) => {
@@ -329,13 +239,6 @@ async function computePerpPositionsToBeLiquidated(
       { name: 'Notional Position', alignment: 'right' },
     ],
   });
-  const fileName = `/tmp/${
-    new Date().toISOString().split('T')[0]
-  }-${csvSuffix}-perp_market.csv`;
-  const csvFile = fs.createWriteStream(fileName);
-  const stream = format({ headers: true });
-  stream.pipe(csvFile);
-  stream.write(['Market', 'Price', 'Future Price', 'Notional Position']);
 
   for (const pm of Array.from(
     group.perpMarketsMapByMarketIndex.values(),
@@ -375,23 +278,6 @@ async function computePerpPositionsToBeLiquidated(
           .div(unweightedHealthPerLot.abs())
           .min(I80F48.fromU64(baseLots).abs());
 
-        // DEBUG
-        // if (
-        //   a.health.toNumber() < -10000000 ||
-        //   toUiDecimalsForQuote(
-        //     maxBaseLots.mul(I80F48.fromU64(pm.baseLotSize).mul(pm.price)),
-        //   ) > 100
-        // )
-        //   console.log(
-        //     `https://app.mango.markets/?address=${
-        //       a.account.publicKey
-        //     }, perp market ${pm.name}, health ${a.health
-        //       .toNumber()
-        //       .toLocaleString()}, unweightedHealthPerLot ${unweightedHealthPerLot}, maxBaseLots ${toUiDecimalsForQuote(
-        //       maxBaseLots.mul(I80F48.fromU64(pm.baseLotSize).mul(pm.price)),
-        //     )}`,
-        //   );
-
         return sum.add(maxBaseLots);
       }, ONE_I80F48());
 
@@ -407,21 +293,9 @@ async function computePerpPositionsToBeLiquidated(
         pm._uiPrice! < 0.1 ? pm._uiPrice! : pm._uiPrice!.toFixed(2),
       'Notional Position': notionalPositionUi.toLocaleString() + '$',
     });
-    stream.write([
-      pm.name,
-      pm['oldUiPrice'],
-      pm['_uiPrice'],
-      notionalPositionUi,
-    ]);
   }
-  stream.end();
   const msg = title + '\n```\n' + table.render() + '\n```';
   console.log(msg);
-  if (process.env.WEBHOOK_URL) {
-    axios
-      .post(process.env.WEBHOOK_URL, { content: msg })
-      .catch((e) => console.log(e.response.data));
-  }
   console.log();
 }
 
@@ -458,11 +332,6 @@ async function logLiqorEquity(
   });
   const msg = title + '\n```\n' + table.render() + '\n```';
   console.log(msg);
-  // if (process.env.WEBHOOK_URL) {
-  //   axios
-  //     .post(process.env.WEBHOOK_URL, { content: msg })
-  //     .catch((e) => console.log(e));
-  // }
   console.log();
 }
 
@@ -513,14 +382,12 @@ async function main(): Promise<void> {
     mangoAccounts,
     healthThresh,
     `Table 1a: ${tableName} 20% drop`,
-    'drop-by-20-pct',
   );
   await computePriceImpactForLiqor(
     groupBull,
     mangoAccounts,
     healthThresh,
     `Table 1b: ${tableName} 20% rally`,
-    'rally-by-20-pct',
   );
 
   tableName = 'Perp notional that liqor need to liquidate after a ';
@@ -529,14 +396,12 @@ async function main(): Promise<void> {
     mangoAccounts,
     healthThresh,
     `Table 2a: ${tableName} 20% drop`,
-    'rally-by-20-pct',
   );
   await computePerpPositionsToBeLiquidated(
     groupBull,
     mangoAccounts,
     healthThresh,
     `Table 2b: ${tableName} 20% rally`,
-    'rally-by-20-pct',
   );
 
   await logLiqorEquity(
