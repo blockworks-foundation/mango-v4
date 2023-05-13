@@ -123,7 +123,7 @@ async function computePriceImpactForLiqor(
   const usdcBank = group.getFirstBankByMint(new PublicKey(USDC_MINT));
 
   // For each token
-  for (const banks of Array.from(group.banksMapByMint.values())) {
+  for (const banks of group.banksMapByMint.values()) {
     const bank = banks[0];
 
     const onChainPrice = (
@@ -151,7 +151,7 @@ async function computePriceImpactForLiqor(
         );
         // Abs liab/borrow
         const maxTokenLiab = a.account
-          .getTokenBalance(group, bank)
+          .getEffectiveTokenBalance(group, bank)
           .min(ZERO_I80F48())
           .abs();
         // Health under 0
@@ -209,7 +209,7 @@ async function computePriceImpactForLiqor(
       );
       // Abs collateral/asset
       const maxTokenHealthAsset = a.account
-        .getTokenBalance(group, bank)
+        .getEffectiveTokenBalance(group, bank)
         .max(ZERO_I80F48());
       const maxAsset = a.health
         .min(ZERO_I80F48())
