@@ -93,7 +93,7 @@ pub enum PostOrderType {
 )]
 #[repr(u8)]
 /// Self trade behavior controls how taker orders interact with resting limit orders of the same account.
-/// This setting has no influecne on placing a resting or oracle pegged limit order that does not match
+/// This setting has no influence on placing a resting or oracle pegged limit order that does not match
 /// immediately, instead it's the responsibility of the user to correctly configure his taker orders.
 pub enum SelfTradeBehavior {
     /// Both the maker and taker sides of the matched orders are decremented.

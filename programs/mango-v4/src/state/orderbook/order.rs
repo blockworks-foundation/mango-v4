@@ -29,7 +29,7 @@ pub struct Order {
 }
 
 pub enum OrderParams {
-    Market {},
+    Market,
     ImmediateOrCancel {
         price_lots: i64,
     },

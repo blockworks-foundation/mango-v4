@@ -154,7 +154,7 @@ impl<'a> Orderbook<'a> {
                         // skip actual matching
                         continue;
                     }
-                    SelfTradeBehavior::AbortTransaction => Err(MangoError::WouldSelfTrade)?,
+                    SelfTradeBehavior::AbortTransaction => return err!(MangoError::WouldSelfTrade),
                 }
                 assert!(order.self_trade_behavior == SelfTradeBehavior::DecrementTake);
             }
