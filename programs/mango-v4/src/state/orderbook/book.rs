@@ -185,7 +185,8 @@ impl<'a> Orderbook<'a> {
                 taker_side: side as u8,
                 total_base_lots_taken,
                 total_quote_lots_taken,
-                taker_fees_paid: taker_fees_paid.to_bits()
+                taker_fees_paid: taker_fees_paid.to_bits(),
+                fee_penalty: if order.needs_penalty_fee() { market.fee_penalty } else { 0.0 },
             });
         }
 
