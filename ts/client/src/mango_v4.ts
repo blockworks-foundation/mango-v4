@@ -9212,7 +9212,7 @@ export type MangoV4 = {
         },
         {
           "name": "feePenalty",
-          "type": "f32",
+          "type": "i128",
           "index": false
         }
       ]
@@ -18771,7 +18771,7 @@ export const IDL: MangoV4 = {
         },
         {
           "name": "feePenalty",
-          "type": "f32",
+          "type": "i128",
           "index": false
         }
       ]

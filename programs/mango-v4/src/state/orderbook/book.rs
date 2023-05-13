@@ -64,9 +64,11 @@ impl<'a> Orderbook<'a> {
         let order_id = market.gen_order_id(side, price_data);
 
         // IOC orders have a fee penalty applied regardless of match
-        if order.needs_penalty_fee() {
-            apply_penalty(market, mango_account)?;
-        }
+        let fee_penalty = if order.needs_penalty_fee() {
+            apply_penalty(market, mango_account)?
+        } else {
+            I80F48::ZERO
+        };
 
         let perp_position = mango_account.perp_position_mut(market.perp_market_index)?;
 
@@ -186,7 +188,7 @@ impl<'a> Orderbook<'a> {
                 total_base_lots_taken,
                 total_quote_lots_taken,
                 taker_fees_paid: taker_fees_paid.to_bits(),
-                fee_penalty: if order.needs_penalty_fee() { market.fee_penalty } else { 0.0 },
+                fee_penalty: fee_penalty.to_bits(),
             });
         }
 
@@ -405,7 +407,7 @@ fn apply_fees(
 }
 
 /// Applies a fixed penalty fee to the account, and update the market's fees_accrued
-fn apply_penalty(market: &mut PerpMarket, account: &mut MangoAccountRefMut) -> Result<()> {
+fn apply_penalty(market: &mut PerpMarket, account: &mut MangoAccountRefMut) -> Result<(I80F48)> {
     let fee_penalty = I80F48::from_num(market.fee_penalty);
     account
         .fixed
@@ -414,5 +416,5 @@ fn apply_penalty(market: &mut PerpMarket, account: &mut MangoAccountRefMut) -> R
     let perp_position = account.perp_position_mut(market.perp_market_index)?;
     perp_position.record_trading_fee(fee_penalty);
     market.fees_accrued += fee_penalty;
-    Ok(())
+    Ok(fee_penalty)
 }

@@ -406,7 +406,7 @@ pub struct PerpTakerTradeLog {
     pub total_base_lots_taken: i64,
     pub total_quote_lots_taken: i64, // exclusive fees paid
     pub taker_fees_paid: i128,       // in native quote units
-    pub fee_penalty: f32             // floor to native quote units
+    pub fee_penalty: i128,           // in native quote units
 }
 
 #[event]
