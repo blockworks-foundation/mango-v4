@@ -407,7 +407,7 @@ fn apply_fees(
 }
 
 /// Applies a fixed penalty fee to the account, and update the market's fees_accrued
-fn apply_penalty(market: &mut PerpMarket, account: &mut MangoAccountRefMut) -> Result<(I80F48)> {
+fn apply_penalty(market: &mut PerpMarket, account: &mut MangoAccountRefMut) -> Result<I80F48> {
     let fee_penalty = I80F48::from_num(market.fee_penalty);
     account
         .fixed
