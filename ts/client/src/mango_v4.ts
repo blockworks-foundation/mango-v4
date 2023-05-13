@@ -9173,6 +9173,51 @@ export type MangoV4 = {
       ]
     },
     {
+      "name": "PerpTakerTradeLog",
+      "fields": [
+        {
+          "name": "mangoGroup",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "mangoAccount",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "perpMarketIndex",
+          "type": "u16",
+          "index": false
+        },
+        {
+          "name": "takerSide",
+          "type": "u8",
+          "index": false
+        },
+        {
+          "name": "totalBaseLotsTaken",
+          "type": "i64",
+          "index": false
+        },
+        {
+          "name": "totalQuoteLotsTaken",
+          "type": "i64",
+          "index": false
+        },
+        {
+          "name": "takerFeesPaid",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "feePenalty",
+          "type": "i128",
+          "index": false
+        }
+      ]
+    },
+    {
       "name": "PerpForceClosePositionLog",
       "fields": [
         {
@@ -18682,6 +18727,51 @@ export const IDL: MangoV4 = {
         {
           "name": "seqNum",
           "type": "u64",
+          "index": false
+        }
+      ]
+    },
+    {
+      "name": "PerpTakerTradeLog",
+      "fields": [
+        {
+          "name": "mangoGroup",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "mangoAccount",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "perpMarketIndex",
+          "type": "u16",
+          "index": false
+        },
+        {
+          "name": "takerSide",
+          "type": "u8",
+          "index": false
+        },
+        {
+          "name": "totalBaseLotsTaken",
+          "type": "i64",
+          "index": false
+        },
+        {
+          "name": "totalQuoteLotsTaken",
+          "type": "i64",
+          "index": false
+        },
+        {
+          "name": "takerFeesPaid",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "feePenalty",
+          "type": "i128",
           "index": false
         }
       ]
