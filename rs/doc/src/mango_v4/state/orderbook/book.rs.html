@@ -418,6 +418,52 @@
 <span id="418">418</span>
 <span id="419">419</span>
 <span id="420">420</span>
+<span id="421">421</span>
+<span id="422">422</span>
+<span id="423">423</span>
+<span id="424">424</span>
+<span id="425">425</span>
+<span id="426">426</span>
+<span id="427">427</span>
+<span id="428">428</span>
+<span id="429">429</span>
+<span id="430">430</span>
+<span id="431">431</span>
+<span id="432">432</span>
+<span id="433">433</span>
+<span id="434">434</span>
+<span id="435">435</span>
+<span id="436">436</span>
+<span id="437">437</span>
+<span id="438">438</span>
+<span id="439">439</span>
+<span id="440">440</span>
+<span id="441">441</span>
+<span id="442">442</span>
+<span id="443">443</span>
+<span id="444">444</span>
+<span id="445">445</span>
+<span id="446">446</span>
+<span id="447">447</span>
+<span id="448">448</span>
+<span id="449">449</span>
+<span id="450">450</span>
+<span id="451">451</span>
+<span id="452">452</span>
+<span id="453">453</span>
+<span id="454">454</span>
+<span id="455">455</span>
+<span id="456">456</span>
+<span id="457">457</span>
+<span id="458">458</span>
+<span id="459">459</span>
+<span id="460">460</span>
+<span id="461">461</span>
+<span id="462">462</span>
+<span id="463">463</span>
+<span id="464">464</span>
+<span id="465">465</span>
+<span id="466">466</span>
 </pre><pre class="rust"><code><span class="kw">use </span><span class="kw">crate</span>::logs::{FilledPerpOrderLog, PerpTakerTradeLog};
 <span class="kw">use </span><span class="kw">crate</span>::state::MangoAccountRefMut;
 <span class="kw">use crate</span>::{
@@ -498,8 +544,9 @@
         // matched_changes/matched_deletes and then applied after this loop.
         </span><span class="kw">let </span><span class="kw-2">mut </span>remaining_base_lots = order.max_base_lots;
         <span class="kw">let </span><span class="kw-2">mut </span>remaining_quote_lots = order.max_quote_lots;
-        <span class="kw">let </span><span class="kw-2">mut </span>matched_order_changes: Vec&lt;(BookSideOrderHandle, i64)&gt; = <span class="macro">vec!</span>[];
-        <span class="kw">let </span><span class="kw-2">mut </span>matched_order_deletes: Vec&lt;(BookSideOrderTree, u128)&gt; = <span class="macro">vec!</span>[];
+        <span class="kw">let </span><span class="kw-2">mut </span>decremented_quote_lots = <span class="number">0i64</span>;
+        <span class="kw">let </span><span class="kw-2">mut </span>orders_to_change: Vec&lt;(BookSideOrderHandle, i64)&gt; = <span class="macro">vec!</span>[];
+        <span class="kw">let </span><span class="kw-2">mut </span>orders_to_delete: Vec&lt;(BookSideOrderTree, u128)&gt; = <span class="macro">vec!</span>[];
         <span class="kw">let </span><span class="kw-2">mut </span>number_of_dropped_expired_orders = <span class="number">0</span>;
         <span class="kw">let </span>opposing_bookside = <span class="self">self</span>.bookside_mut(other_side);
         <span class="kw">for </span>best_opposing <span class="kw">in </span>opposing_bookside.iter_all_including_invalid(now_ts, oracle_price_lots)
@@ -521,7 +568,7 @@
                         best_opposing.node.quantity,
                     );
                     event_queue.push_back(cast(event)).unwrap();
-                    matched_order_deletes
+                    orders_to_delete
                         .push((best_opposing.handle.order_tree, best_opposing.node.key));
                 }
                 <span class="kw">continue</span>;
@@ -549,8 +596,36 @@
             <span class="kw">let </span>match_base_lots = remaining_base_lots
                 .min(best_opposing.node.quantity)
                 .min(max_match_by_quote);
-
             <span class="kw">let </span>match_quote_lots = match_base_lots * best_opposing_price;
+
+            <span class="kw">let </span>order_would_self_trade = <span class="kw-2">*</span>mango_account_pk == best_opposing.node.owner;
+            <span class="kw">if </span>order_would_self_trade {
+                <span class="kw">match </span>order.self_trade_behavior {
+                    SelfTradeBehavior::DecrementTake =&gt; {
+                        <span class="comment">// remember all decremented quote lots to only charge fees on not-self-trades
+                        </span>decremented_quote_lots += match_quote_lots;
+                    }
+                    SelfTradeBehavior::CancelProvide =&gt; {
+                        <span class="kw">let </span>event = OutEvent::new(
+                            other_side,
+                            best_opposing.node.owner_slot,
+                            now_ts,
+                            event_queue.header.seq_num,
+                            best_opposing.node.owner,
+                            best_opposing.node.quantity,
+                        );
+                        event_queue.push_back(cast(event)).unwrap();
+                        orders_to_delete
+                            .push((best_opposing.handle.order_tree, best_opposing.node.key));
+
+                        <span class="comment">// skip actual matching
+                        </span><span class="kw">continue</span>;
+                    }
+                    SelfTradeBehavior::AbortTransaction =&gt; <span class="kw">return </span><span class="macro">err!</span>(MangoError::WouldSelfTrade),
+                }
+                <span class="macro">assert!</span>(order.self_trade_behavior == SelfTradeBehavior::DecrementTake);
+            }
+
             remaining_base_lots -= match_base_lots;
             remaining_quote_lots -= match_quote_lots;
             <span class="macro">assert!</span>(remaining_quote_lots &gt;= <span class="number">0</span>);
@@ -558,13 +633,13 @@
             <span class="kw">let </span>new_best_opposing_quantity = best_opposing.node.quantity - match_base_lots;
             <span class="kw">let </span>maker_out = new_best_opposing_quantity == <span class="number">0</span>;
             <span class="kw">if </span>maker_out {
-                matched_order_deletes
-                    .push((best_opposing.handle.order_tree, best_opposing.node.key));
+                orders_to_delete.push((best_opposing.handle.order_tree, best_opposing.node.key));
             } <span class="kw">else </span>{
-                matched_order_changes.push((best_opposing.handle, new_best_opposing_quantity));
+                orders_to_change.push((best_opposing.handle, new_best_opposing_quantity));
             }
 
-            <span class="kw">let </span>seq_num = event_queue.header.seq_num;
+            <span class="comment">// order_would_self_trade is only true in the DecrementTake case, in which we don&#39;t charge fees
+            </span><span class="kw">let </span>seq_num = event_queue.header.seq_num;
             <span class="kw">let </span>fill = FillEvent::new(
                 side,
                 maker_out,
@@ -573,11 +648,20 @@
                 seq_num,
                 best_opposing.node.owner,
                 best_opposing.node.client_order_id,
-                market.maker_fee,
+                <span class="kw">if </span>order_would_self_trade {
+                    I80F48::ZERO
+                } <span class="kw">else </span>{
+                    market.maker_fee
+                },
                 best_opposing.node.timestamp,
                 <span class="kw-2">*</span>mango_account_pk,
                 order.client_order_id,
-                market.taker_fee,
+                <span class="kw">if </span>order_would_self_trade {
+                    I80F48::ZERO
+                } <span class="kw">else </span>{
+                    <span class="comment">// NOTE: this does not include the IOC penalty, but this value is not used to calculate fees
+                    </span>market.taker_fee
+                },
                 best_opposing_price,
                 match_base_lots,
             );
@@ -599,7 +683,12 @@
         // realized when the fill event gets executed
         </span><span class="kw">if </span>total_quote_lots_taken &gt; <span class="number">0 </span>|| total_base_lots_taken &gt; <span class="number">0 </span>{
             perp_position.add_taker_trade(side, total_base_lots_taken, total_quote_lots_taken);
-            <span class="kw">let </span>taker_fees_paid = apply_fees(market, mango_account, total_quote_lots_taken)<span class="question-mark">?</span>;
+            <span class="comment">// reduce fees to apply by decrement take volume
+            </span><span class="kw">let </span>taker_fees_paid = apply_fees(
+                market,
+                mango_account,
+                total_quote_lots_taken - decremented_quote_lots,
+            )<span class="question-mark">?</span>;
             <span class="macro">emit!</span>(PerpTakerTradeLog {
                 mango_group: market.group.key(),
                 mango_account: <span class="kw-2">*</span>mango_account_pk,
@@ -607,13 +696,14 @@
                 taker_side: side <span class="kw">as </span>u8,
                 total_base_lots_taken,
                 total_quote_lots_taken,
+                total_quote_lots_decremented: decremented_quote_lots,
                 taker_fees_paid: taker_fees_paid.to_bits(),
                 fee_penalty: fee_penalty.to_bits(),
             });
         }
 
         <span class="comment">// Apply changes to matched asks (handles invalidate on delete!)
-        </span><span class="kw">for </span>(handle, new_quantity) <span class="kw">in </span>matched_order_changes {
+        </span><span class="kw">for </span>(handle, new_quantity) <span class="kw">in </span>orders_to_change {
             opposing_bookside
                 .node_mut(handle.node)
                 .unwrap()
@@ -621,7 +711,7 @@
                 .unwrap()
                 .quantity = new_quantity;
         }
-        <span class="kw">for </span>(component, key) <span class="kw">in </span>matched_order_deletes {
+        <span class="kw">for </span>(component, key) <span class="kw">in </span>orders_to_delete {
             <span class="kw">let </span>_removed_leaf = opposing_bookside.remove_by_key(component, key).unwrap();
         }
 
@@ -816,7 +906,9 @@
 
     <span class="kw">let </span>perp_position = account.perp_position_mut(market.perp_market_index)<span class="question-mark">?</span>;
     perp_position.record_trading_fee(taker_fees);
-    perp_position.taker_volume += taker_fees.to_num::&lt;u64&gt;();
+
+    <span class="comment">// taker fees are applied to volume during matching, quote volume only during consume
+    </span>perp_position.taker_volume += taker_fees.to_num::&lt;u64&gt;();
 
     <span class="comment">// Accrue maker fees immediately: they can be negative and applying them later
     // risks that fees_accrued is settled to 0 before they apply. It going negative

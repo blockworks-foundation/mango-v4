@@ -182,6 +182,9 @@
 <span id="182">182</span>
 <span id="183">183</span>
 <span id="184">184</span>
+<span id="185">185</span>
+<span id="186">186</span>
+<span id="187">187</span>
 </pre><pre class="rust"><code><span class="kw">use </span>anchor_lang::prelude::<span class="kw-2">*</span>;
 
 <span class="kw">use super</span>::<span class="kw-2">*</span>;
@@ -204,6 +207,9 @@
 
     <span class="doccomment">/// Number of seconds the order shall live, 0 meaning forever
     </span><span class="kw">pub </span>time_in_force: u16,
+
+    <span class="doccomment">/// Configure how matches with order of the same owner are handled
+    </span><span class="kw">pub </span>self_trade_behavior: SelfTradeBehavior,
 
     <span class="doccomment">/// Order type specific params
     </span><span class="kw">pub </span>params: OrderParams,
@@ -304,8 +310,8 @@
         order_book: <span class="kw-2">&amp;</span>Orderbook,
     ) -&gt; <span class="prelude-ty">Result</span>&lt;(i64, u64)&gt; {
         <span class="kw">let </span>price_lots = <span class="kw">match </span><span class="self">self</span>.params {
-            OrderParams::Market =&gt; market_order_limit_for_side(<span class="self">self</span>.side),
-            OrderParams::ImmediateOrCancel { price_lots } =&gt; price_lots,
+            OrderParams::Market { .. } =&gt; market_order_limit_for_side(<span class="self">self</span>.side),
+            OrderParams::ImmediateOrCancel { price_lots, .. } =&gt; price_lots,
             OrderParams::Fixed {
                 price_lots,
                 order_type,

@@ -307,8 +307,70 @@
 <span id="307">307</span>
 <span id="308">308</span>
 <span id="309">309</span>
-</pre><pre class="rust"><code><span class="kw">use </span><span class="kw">crate</span>::error::MangoError;
+<span id="310">310</span>
+<span id="311">311</span>
+<span id="312">312</span>
+<span id="313">313</span>
+<span id="314">314</span>
+<span id="315">315</span>
+<span id="316">316</span>
+<span id="317">317</span>
+<span id="318">318</span>
+<span id="319">319</span>
+<span id="320">320</span>
+<span id="321">321</span>
+<span id="322">322</span>
+<span id="323">323</span>
+<span id="324">324</span>
+<span id="325">325</span>
+<span id="326">326</span>
+<span id="327">327</span>
+<span id="328">328</span>
+<span id="329">329</span>
+<span id="330">330</span>
+<span id="331">331</span>
+<span id="332">332</span>
+<span id="333">333</span>
+<span id="334">334</span>
+<span id="335">335</span>
+<span id="336">336</span>
+<span id="337">337</span>
+<span id="338">338</span>
+<span id="339">339</span>
+<span id="340">340</span>
+<span id="341">341</span>
+<span id="342">342</span>
+<span id="343">343</span>
+<span id="344">344</span>
+<span id="345">345</span>
+<span id="346">346</span>
+<span id="347">347</span>
+<span id="348">348</span>
+<span id="349">349</span>
+<span id="350">350</span>
+<span id="351">351</span>
+<span id="352">352</span>
+<span id="353">353</span>
+<span id="354">354</span>
+<span id="355">355</span>
+<span id="356">356</span>
+<span id="357">357</span>
+<span id="358">358</span>
+<span id="359">359</span>
+<span id="360">360</span>
+<span id="361">361</span>
+<span id="362">362</span>
+<span id="363">363</span>
+<span id="364">364</span>
+<span id="365">365</span>
+<span id="366">366</span>
+<span id="367">367</span>
+<span id="368">368</span>
+<span id="369">369</span>
+<span id="370">370</span>
+</pre><pre class="rust"><code><span class="kw">use crate</span>::{error::Contextable, error::MangoError, error_msg};
 <span class="kw">use </span>anchor_lang::prelude::<span class="kw-2">*</span>;
+<span class="kw">use </span>bytemuck::cast_ref;
 <span class="kw">use </span>fixed::types::I80F48;
 <span class="kw">use </span>num_enum::{IntoPrimitive, TryFromPrimitive};
 <span class="kw">use </span>static_assertions::const_assert_eq;
@@ -572,6 +634,36 @@
     </span>}
 }
 
+<span class="kw">impl </span>TryFrom&lt;AnyEvent&gt; <span class="kw">for </span>FillEvent {
+    <span class="kw">type </span>Error = error::Error;
+
+    <span class="kw">fn </span>try_from(e: AnyEvent) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="self">Self</span>&gt; {
+        <span class="kw">if </span>e.event_type != EventType::Fill <span class="kw">as </span>u8 {
+            <span class="prelude-val">Err</span>(<span class="macro">error_msg!</span>(
+                <span class="string">&quot;could not convert event with type={} to FillEvent&quot;</span>,
+                e.event_type
+            ))
+        } <span class="kw">else </span>{
+            <span class="prelude-val">Ok</span>(<span class="kw-2">*</span>cast_ref(<span class="kw-2">&amp;</span>e))
+        }
+    }
+}
+
+<span class="kw">impl</span>&lt;<span class="lifetime">&#39;a</span>&gt; TryFrom&lt;<span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span>AnyEvent&gt; <span class="kw">for </span><span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span>FillEvent {
+    <span class="kw">type </span>Error = error::Error;
+
+    <span class="kw">fn </span>try_from(e: <span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span>AnyEvent) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="self">Self</span>&gt; {
+        <span class="kw">if </span>e.event_type != EventType::Fill <span class="kw">as </span>u8 {
+            <span class="prelude-val">Err</span>(<span class="macro">error_msg!</span>(
+                <span class="string">&quot;could not convert event with type={} to FillEvent&quot;</span>,
+                e.event_type
+            ))
+        } <span class="kw">else </span>{
+            <span class="prelude-val">Ok</span>(cast_ref(e))
+        }
+    }
+}
+
 <span class="attribute">#[derive(
     Copy, Clone, Debug, bytemuck::Pod, bytemuck::Zeroable, AnchorSerialize, AnchorDeserialize,
 )]
@@ -614,6 +706,36 @@
 
     <span class="kw">pub fn </span>side(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; Side {
         <span class="self">self</span>.side.try_into().unwrap()
+    }
+}
+
+<span class="kw">impl </span>TryFrom&lt;AnyEvent&gt; <span class="kw">for </span>OutEvent {
+    <span class="kw">type </span>Error = error::Error;
+
+    <span class="kw">fn </span>try_from(e: AnyEvent) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="self">Self</span>&gt; {
+        <span class="kw">if </span>e.event_type != EventType::Out <span class="kw">as </span>u8 {
+            <span class="prelude-val">Err</span>(<span class="macro">error_msg!</span>(
+                <span class="string">&quot;could not convert event with type={} to OutEvent&quot;</span>,
+                e.event_type
+            ))
+        } <span class="kw">else </span>{
+            <span class="prelude-val">Ok</span>(<span class="kw-2">*</span>cast_ref(<span class="kw-2">&amp;</span>e))
+        }
+    }
+}
+
+<span class="kw">impl</span>&lt;<span class="lifetime">&#39;a</span>&gt; TryFrom&lt;<span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span>AnyEvent&gt; <span class="kw">for </span><span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span>OutEvent {
+    <span class="kw">type </span>Error = error::Error;
+
+    <span class="kw">fn </span>try_from(e: <span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span>AnyEvent) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="self">Self</span>&gt; {
+        <span class="kw">if </span>e.event_type != EventType::Out <span class="kw">as </span>u8 {
+            <span class="prelude-val">Err</span>(<span class="macro">error_msg!</span>(
+                <span class="string">&quot;could not convert event with type={} to OutEvent&quot;</span>,
+                e.event_type
+            ))
+        } <span class="kw">else </span>{
+            <span class="prelude-val">Ok</span>(cast_ref(e))
+        }
     }
 }
 </code></pre></div>

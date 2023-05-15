@@ -230,6 +230,8 @@
 <span id="230">230</span>
 <span id="231">231</span>
 <span id="232">232</span>
+<span id="233">233</span>
+<span id="234">234</span>
 </pre><pre class="rust"><code><span class="kw">use </span>anchor_lang::prelude::<span class="kw-2">*</span>;
 <span class="kw">use </span>core::fmt::Display;
 
@@ -333,6 +335,8 @@
     </span>TokenInForceClose,
     <span class="attribute">#[msg(<span class="string">&quot;incorrect number of health accounts&quot;</span>)]
     </span>InvalidHealthAccountCount,
+    <span class="attribute">#[msg(<span class="string">&quot;would self trade&quot;</span>)]
+    </span>WouldSelfTrade,
 }
 
 <span class="kw">impl </span>MangoError {

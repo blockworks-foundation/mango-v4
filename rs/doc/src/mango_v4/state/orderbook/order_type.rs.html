@@ -173,6 +173,35 @@
 <span id="173">173</span>
 <span id="174">174</span>
 <span id="175">175</span>
+<span id="176">176</span>
+<span id="177">177</span>
+<span id="178">178</span>
+<span id="179">179</span>
+<span id="180">180</span>
+<span id="181">181</span>
+<span id="182">182</span>
+<span id="183">183</span>
+<span id="184">184</span>
+<span id="185">185</span>
+<span id="186">186</span>
+<span id="187">187</span>
+<span id="188">188</span>
+<span id="189">189</span>
+<span id="190">190</span>
+<span id="191">191</span>
+<span id="192">192</span>
+<span id="193">193</span>
+<span id="194">194</span>
+<span id="195">195</span>
+<span id="196">196</span>
+<span id="197">197</span>
+<span id="198">198</span>
+<span id="199">199</span>
+<span id="200">200</span>
+<span id="201">201</span>
+<span id="202">202</span>
+<span id="203">203</span>
+<span id="204">204</span>
 </pre><pre class="rust"><code><span class="kw">use </span>anchor_lang::prelude::<span class="kw-2">*</span>;
 <span class="kw">use </span>num_enum::{IntoPrimitive, TryFromPrimitive};
 
@@ -252,6 +281,35 @@
     <span class="doccomment">/// If existing orders match with this order, adjust the price to just barely
     /// not match. Always places an order on the book.
     </span>PostOnlySlide = <span class="number">4</span>,
+}
+
+<span class="attribute">#[derive(
+    Eq,
+    PartialEq,
+    Copy,
+    Clone,
+    Default,
+    TryFromPrimitive,
+    IntoPrimitive,
+    Debug,
+    AnchorSerialize,
+    AnchorDeserialize,
+)]
+#[repr(u8)]
+</span><span class="doccomment">/// Self trade behavior controls how taker orders interact with resting limit orders of the same account.
+/// This setting has no influence on placing a resting or oracle pegged limit order that does not match
+/// immediately, instead it&#39;s the responsibility of the user to correctly configure his taker orders.
+</span><span class="kw">pub enum </span>SelfTradeBehavior {
+    <span class="doccomment">/// Both the maker and taker sides of the matched orders are decremented.
+    /// This is equivalent to a normal order match, except for the fact that no fees are applied.
+    </span><span class="attribute">#[default]
+    </span>DecrementTake = <span class="number">0</span>,
+
+    <span class="doccomment">/// Cancels the maker side of the trade, the taker side gets matched with other maker&#39;s orders.
+    </span>CancelProvide = <span class="number">1</span>,
+
+    <span class="doccomment">/// Cancels the whole transaction as soon as a self-matching scenario is encountered.
+    </span>AbortTransaction = <span class="number">2</span>,
 }
 
 <span class="attribute">#[derive(

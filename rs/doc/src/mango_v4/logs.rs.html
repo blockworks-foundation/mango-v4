@@ -433,6 +433,7 @@
 <span id="433">433</span>
 <span id="434">434</span>
 <span id="435">435</span>
+<span id="436">436</span>
 </pre><pre class="rust"><code><span class="kw">use crate</span>::{
     accounts_ix::FlashLoanType,
     state::{OracleType, PerpMarket, PerpPosition},
@@ -839,9 +840,10 @@
     <span class="kw">pub </span>perp_market_index: u16,
     <span class="kw">pub </span>taker_side: u8,
     <span class="kw">pub </span>total_base_lots_taken: i64,
-    <span class="kw">pub </span>total_quote_lots_taken: i64, <span class="comment">// exclusive fees paid
-    </span><span class="kw">pub </span>taker_fees_paid: i128,       <span class="comment">// in native quote units
-    </span><span class="kw">pub </span>fee_penalty: i128,           <span class="comment">// in native quote units
+    <span class="kw">pub </span>total_quote_lots_taken: i64,       <span class="comment">// exclusive fees paid
+    </span><span class="kw">pub </span>total_quote_lots_decremented: i64, <span class="comment">// from DecrementTake self-trades
+    </span><span class="kw">pub </span>taker_fees_paid: i128,             <span class="comment">// in native quote units
+    </span><span class="kw">pub </span>fee_penalty: i128,                 <span class="comment">// in native quote units
 </span>}
 
 <span class="attribute">#[event]

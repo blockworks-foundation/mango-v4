@@ -1808,6 +1808,10 @@
 <span id="1808">1808</span>
 <span id="1809">1809</span>
 <span id="1810">1810</span>
+<span id="1811">1811</span>
+<span id="1812">1812</span>
+<span id="1813">1813</span>
+<span id="1814">1814</span>
 </pre><pre class="rust"><code><span class="kw">use </span>std::str::FromStr;
 <span class="kw">use </span>std::sync::Arc;
 <span class="kw">use </span>std::time::Duration;
@@ -1827,8 +1831,8 @@
 
 <span class="kw">use </span>mango_v4::accounts_ix::{Serum3OrderType, Serum3SelfTradeBehavior, Serum3Side};
 <span class="kw">use </span>mango_v4::state::{
-    Bank, Group, MangoAccountValue, PerpMarketIndex, PlaceOrderType, Serum3MarketIndex, Side,
-    TokenIndex, INSURANCE_TOKEN_INDEX,
+    Bank, Group, MangoAccountValue, PerpMarketIndex, PlaceOrderType, SelfTradeBehavior,
+    Serum3MarketIndex, Side, TokenIndex, INSURANCE_TOKEN_INDEX,
 };
 
 <span class="kw">use </span>solana_address_lookup_table_program::state::AddressLookupTable;
@@ -2605,6 +2609,7 @@
         reduce_only: bool,
         expiry_timestamp: u64,
         limit: u8,
+        self_trade_behavior: SelfTradeBehavior,
     ) -&gt; anyhow::Result&lt;Instruction&gt; {
         <span class="kw">let </span>perp = <span class="self">self</span>.context.perp(market_index);
         <span class="kw">let </span>health_remaining_metas = <span class="self">self</span>.context.derive_health_check_remaining_account_metas(
@@ -2633,7 +2638,7 @@
                 ams.extend(health_remaining_metas.into_iter());
                 ams
             },
-            data: anchor_lang::InstructionData::data(<span class="kw-2">&amp;</span>mango_v4::instruction::PerpPlaceOrder {
+            data: anchor_lang::InstructionData::data(<span class="kw-2">&amp;</span>mango_v4::instruction::PerpPlaceOrderV2 {
                 side,
                 price_lots,
                 max_base_lots,
@@ -2643,6 +2648,7 @@
                 reduce_only,
                 expiry_timestamp,
                 limit,
+                self_trade_behavior,
             }),
         };
 
@@ -2661,6 +2667,7 @@
         reduce_only: bool,
         expiry_timestamp: u64,
         limit: u8,
+        self_trade_behavior: SelfTradeBehavior,
     ) -&gt; anyhow::Result&lt;Signature&gt; {
         <span class="kw">let </span>account = <span class="self">self</span>.mango_account().<span class="kw">await</span><span class="question-mark">?</span>;
         <span class="kw">let </span>ix = <span class="self">self</span>.perp_place_order_instruction(
@@ -2675,6 +2682,7 @@
             reduce_only,
             expiry_timestamp,
             limit,
+            self_trade_behavior,
         )<span class="question-mark">?</span>;
         <span class="self">self</span>.send_and_confirm_owner_tx(<span class="macro">vec!</span>[ix]).<span class="kw">await
     </span>}
