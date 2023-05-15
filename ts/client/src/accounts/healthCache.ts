@@ -824,7 +824,9 @@ export class HealthCache {
     const sourceReserved = res.tokenMaxReserved[sourceIndex].maxSerumReserved;
     const targetReserved = res.tokenMaxReserved[targetIndex].maxSerumReserved;
 
-    const tokenBalances = this.effectiveTokenBalances(HealthType.init);
+    const tokenBalances = healthCacheClone.effectiveTokenBalances(
+      HealthType.init,
+    );
     const sourceBalance = tokenBalances[sourceIndex].spotAndPerp;
     const targetBalance = tokenBalances[targetIndex].spotAndPerp;
 
