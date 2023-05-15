@@ -95,6 +95,7 @@ export async function getPriceImpactForLiqor(
 
   return await Promise.all(
     Array.from(group.banksMapByMint.values())
+      .sort((a, b) => a[0].name.localeCompare(b[0].name))
       .filter((banks) => banks[0].tokenIndex !== usdcBank.tokenIndex)
       .map(async (banks) => {
         const bank = banks[0];
@@ -197,11 +198,11 @@ export async function getPriceImpactForLiqor(
           'Oracle Price': bank['oldUiPrice'],
           'On-Chain Price': onChainPrice,
           'Future Price': bank._uiPrice!,
-          'V4 Liq Fee': bank.liquidationFee.toNumber() * 100,
+          'V4 Liq Fee': bank.liquidationFee.toNumber() * 10000,
           Liabs: toUiDecimalsForQuote(liabsInUsdc),
-          'Liabs slippage': pi1.priceImpactPct * 100,
+          'Liabs slippage': pi1.priceImpactPct * 10000,
           Assets: toUiDecimals(assets, bank.mintDecimals) * bank.uiPrice,
-          'Assets Slippage': pi2.priceImpactPct * 100,
+          'Assets Slippage': pi2.priceImpactPct * 10000,
         };
       }),
   );
@@ -295,12 +296,14 @@ export async function getEquityForMangoAccounts(
     liqors.map((liqor) => client.getMangoAccount(liqor, true)),
   );
 
-  return liqorMangoAccounts.map((a: MangoAccount) => {
+  const accountsWithEquity = liqorMangoAccounts.map((a: MangoAccount) => {
     return {
       Account: a.publicKey,
       Equity: toUiDecimalsForQuote(a.getEquity(group)),
     };
   });
+  accountsWithEquity.sort((a, b) => b.Equity - a.Equity);
+  return accountsWithEquity;
 }
 
 export async function getRiskStats(
@@ -387,21 +390,21 @@ export async function getRiskStats(
     assetDrop: {
       title: `Table 1a: Liqors acquire liabs and assets. The assets and liabs are sum of max assets and max
     liabs for any token which would be liquidated to fix the health of a mango account.
-    This would be the slippage they would face on buying-liabs/offloading-assets tokens acquired from unhealth accounts after a 20% drop`,
+    This would be the slippage they would face on buying-liabs/offloading-assets tokens acquired from unhealth accounts after a 40% drop`,
       data: assetDrop,
     },
     assetRally: {
       title: `Table 1b: Liqors acquire liabs and assets. The assets and liabs are sum of max assets and max
     liabs for any token which would be liquidated to fix the health of a mango account.
-    This would be the slippage they would face on buying-liabs/offloading-assets tokens acquired from unhealth accounts after a 20% rally`,
+    This would be the slippage they would face on buying-liabs/offloading-assets tokens acquired from unhealth accounts after a 40% rally`,
       data: assetRally,
     },
     perpDrop: {
-      title: `Table 2a: Perp notional that liqor need to liquidate after a  20% drop`,
+      title: `Table 2a: Perp notional that liqor need to liquidate after a  40% drop`,
       data: perpDrop,
     },
     perpRally: {
-      title: `Table 2b: Perp notional that liqor need to liquidate after a  20% rally`,
+      title: `Table 2b: Perp notional that liqor need to liquidate after a  40% rally`,
       data: perpRally,
     },
     liqorEquity: {
