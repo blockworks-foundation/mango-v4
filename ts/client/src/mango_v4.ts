@@ -3594,6 +3594,112 @@ export type MangoV4 = {
       }
     },
     {
+      "name": "perpPlaceOrderV2",
+      "accounts": [
+        {
+          "name": "group",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "account",
+          "isMut": true,
+          "isSigner": false,
+          "relations": [
+            "group"
+          ]
+        },
+        {
+          "name": "owner",
+          "isMut": false,
+          "isSigner": true
+        },
+        {
+          "name": "perpMarket",
+          "isMut": true,
+          "isSigner": false,
+          "relations": [
+            "group",
+            "bids",
+            "asks",
+            "event_queue",
+            "oracle"
+          ]
+        },
+        {
+          "name": "bids",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "asks",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "eventQueue",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "oracle",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "side",
+          "type": {
+            "defined": "Side"
+          }
+        },
+        {
+          "name": "priceLots",
+          "type": "i64"
+        },
+        {
+          "name": "maxBaseLots",
+          "type": "i64"
+        },
+        {
+          "name": "maxQuoteLots",
+          "type": "i64"
+        },
+        {
+          "name": "clientOrderId",
+          "type": "u64"
+        },
+        {
+          "name": "orderType",
+          "type": {
+            "defined": "PlaceOrderType"
+          }
+        },
+        {
+          "name": "selfTradeBehavior",
+          "type": {
+            "defined": "SelfTradeBehavior"
+          }
+        },
+        {
+          "name": "reduceOnly",
+          "type": "bool"
+        },
+        {
+          "name": "expiryTimestamp",
+          "type": "u64"
+        },
+        {
+          "name": "limit",
+          "type": "u8"
+        }
+      ],
+      "returns": {
+        "option": "u128"
+      }
+    },
+    {
       "name": "perpPlaceOrderPegged",
       "accounts": [
         {
@@ -3678,6 +3784,120 @@ export type MangoV4 = {
           "name": "orderType",
           "type": {
             "defined": "PlaceOrderType"
+          }
+        },
+        {
+          "name": "reduceOnly",
+          "type": "bool"
+        },
+        {
+          "name": "expiryTimestamp",
+          "type": "u64"
+        },
+        {
+          "name": "limit",
+          "type": "u8"
+        },
+        {
+          "name": "maxOracleStalenessSlots",
+          "type": "i32"
+        }
+      ],
+      "returns": {
+        "option": "u128"
+      }
+    },
+    {
+      "name": "perpPlaceOrderPeggedV2",
+      "accounts": [
+        {
+          "name": "group",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "account",
+          "isMut": true,
+          "isSigner": false,
+          "relations": [
+            "group"
+          ]
+        },
+        {
+          "name": "owner",
+          "isMut": false,
+          "isSigner": true
+        },
+        {
+          "name": "perpMarket",
+          "isMut": true,
+          "isSigner": false,
+          "relations": [
+            "group",
+            "bids",
+            "asks",
+            "event_queue",
+            "oracle"
+          ]
+        },
+        {
+          "name": "bids",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "asks",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "eventQueue",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "oracle",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "side",
+          "type": {
+            "defined": "Side"
+          }
+        },
+        {
+          "name": "priceOffsetLots",
+          "type": "i64"
+        },
+        {
+          "name": "pegLimit",
+          "type": "i64"
+        },
+        {
+          "name": "maxBaseLots",
+          "type": "i64"
+        },
+        {
+          "name": "maxQuoteLots",
+          "type": "i64"
+        },
+        {
+          "name": "clientOrderId",
+          "type": "u64"
+        },
+        {
+          "name": "orderType",
+          "type": {
+            "defined": "PlaceOrderType"
+          }
+        },
+        {
+          "name": "selfTradeBehavior",
+          "type": {
+            "defined": "SelfTradeBehavior"
           }
         },
         {
@@ -7722,6 +7942,28 @@ export type MangoV4 = {
       }
     },
     {
+      "name": "SelfTradeBehavior",
+      "docs": [
+        "Self trade behavior controls how taker orders interact with resting limit orders of the same account.",
+        "This setting has no influence on placing a resting or oracle pegged limit order that does not match",
+        "immediately, instead it's the responsibility of the user to correctly configure his taker orders."
+      ],
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "DecrementTake"
+          },
+          {
+            "name": "CancelProvide"
+          },
+          {
+            "name": "AbortTransaction"
+          }
+        ]
+      }
+    },
+    {
       "name": "Side",
       "type": {
         "kind": "enum",
@@ -9206,6 +9448,11 @@ export type MangoV4 = {
           "index": false
         },
         {
+          "name": "totalQuoteLotsDecremented",
+          "type": "i64",
+          "index": false
+        },
+        {
           "name": "takerFeesPaid",
           "type": "i128",
           "index": false
@@ -9553,6 +9800,11 @@ export type MangoV4 = {
       "code": 6047,
       "name": "InvalidHealthAccountCount",
       "msg": "incorrect number of health accounts"
+    },
+    {
+      "code": 6048,
+      "name": "WouldSelfTrade",
+      "msg": "would self trade"
     }
   ]
 };
@@ -13153,6 +13405,112 @@ export const IDL: MangoV4 = {
       }
     },
     {
+      "name": "perpPlaceOrderV2",
+      "accounts": [
+        {
+          "name": "group",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "account",
+          "isMut": true,
+          "isSigner": false,
+          "relations": [
+            "group"
+          ]
+        },
+        {
+          "name": "owner",
+          "isMut": false,
+          "isSigner": true
+        },
+        {
+          "name": "perpMarket",
+          "isMut": true,
+          "isSigner": false,
+          "relations": [
+            "group",
+            "bids",
+            "asks",
+            "event_queue",
+            "oracle"
+          ]
+        },
+        {
+          "name": "bids",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "asks",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "eventQueue",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "oracle",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "side",
+          "type": {
+            "defined": "Side"
+          }
+        },
+        {
+          "name": "priceLots",
+          "type": "i64"
+        },
+        {
+          "name": "maxBaseLots",
+          "type": "i64"
+        },
+        {
+          "name": "maxQuoteLots",
+          "type": "i64"
+        },
+        {
+          "name": "clientOrderId",
+          "type": "u64"
+        },
+        {
+          "name": "orderType",
+          "type": {
+            "defined": "PlaceOrderType"
+          }
+        },
+        {
+          "name": "selfTradeBehavior",
+          "type": {
+            "defined": "SelfTradeBehavior"
+          }
+        },
+        {
+          "name": "reduceOnly",
+          "type": "bool"
+        },
+        {
+          "name": "expiryTimestamp",
+          "type": "u64"
+        },
+        {
+          "name": "limit",
+          "type": "u8"
+        }
+      ],
+      "returns": {
+        "option": "u128"
+      }
+    },
+    {
       "name": "perpPlaceOrderPegged",
       "accounts": [
         {
@@ -13237,6 +13595,120 @@ export const IDL: MangoV4 = {
           "name": "orderType",
           "type": {
             "defined": "PlaceOrderType"
+          }
+        },
+        {
+          "name": "reduceOnly",
+          "type": "bool"
+        },
+        {
+          "name": "expiryTimestamp",
+          "type": "u64"
+        },
+        {
+          "name": "limit",
+          "type": "u8"
+        },
+        {
+          "name": "maxOracleStalenessSlots",
+          "type": "i32"
+        }
+      ],
+      "returns": {
+        "option": "u128"
+      }
+    },
+    {
+      "name": "perpPlaceOrderPeggedV2",
+      "accounts": [
+        {
+          "name": "group",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "account",
+          "isMut": true,
+          "isSigner": false,
+          "relations": [
+            "group"
+          ]
+        },
+        {
+          "name": "owner",
+          "isMut": false,
+          "isSigner": true
+        },
+        {
+          "name": "perpMarket",
+          "isMut": true,
+          "isSigner": false,
+          "relations": [
+            "group",
+            "bids",
+            "asks",
+            "event_queue",
+            "oracle"
+          ]
+        },
+        {
+          "name": "bids",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "asks",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "eventQueue",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "oracle",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "side",
+          "type": {
+            "defined": "Side"
+          }
+        },
+        {
+          "name": "priceOffsetLots",
+          "type": "i64"
+        },
+        {
+          "name": "pegLimit",
+          "type": "i64"
+        },
+        {
+          "name": "maxBaseLots",
+          "type": "i64"
+        },
+        {
+          "name": "maxQuoteLots",
+          "type": "i64"
+        },
+        {
+          "name": "clientOrderId",
+          "type": "u64"
+        },
+        {
+          "name": "orderType",
+          "type": {
+            "defined": "PlaceOrderType"
+          }
+        },
+        {
+          "name": "selfTradeBehavior",
+          "type": {
+            "defined": "SelfTradeBehavior"
           }
         },
         {
@@ -17281,6 +17753,28 @@ export const IDL: MangoV4 = {
       }
     },
     {
+      "name": "SelfTradeBehavior",
+      "docs": [
+        "Self trade behavior controls how taker orders interact with resting limit orders of the same account.",
+        "This setting has no influence on placing a resting or oracle pegged limit order that does not match",
+        "immediately, instead it's the responsibility of the user to correctly configure his taker orders."
+      ],
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "DecrementTake"
+          },
+          {
+            "name": "CancelProvide"
+          },
+          {
+            "name": "AbortTransaction"
+          }
+        ]
+      }
+    },
+    {
       "name": "Side",
       "type": {
         "kind": "enum",
@@ -18765,6 +19259,11 @@ export const IDL: MangoV4 = {
           "index": false
         },
         {
+          "name": "totalQuoteLotsDecremented",
+          "type": "i64",
+          "index": false
+        },
+        {
           "name": "takerFeesPaid",
           "type": "i128",
           "index": false
@@ -19112,6 +19611,11 @@ export const IDL: MangoV4 = {
       "code": 6047,
       "name": "InvalidHealthAccountCount",
       "msg": "incorrect number of health accounts"
+    },
+    {
+      "code": 6048,
+      "name": "WouldSelfTrade",
+      "msg": "would self trade"
     }
   ]
 };

@@ -138,9 +138,7 @@ async fn test_liq_perps_base_and_bankruptcy() -> Result<(), TransportError> {
             side: Side::Bid,
             price_lots,
             max_base_lots: 20,
-            max_quote_lots: i64::MAX,
-            reduce_only: false,
-            client_order_id: 0,
+            ..PerpPlaceOrderInstruction::default()
         },
     )
     .await
@@ -154,9 +152,7 @@ async fn test_liq_perps_base_and_bankruptcy() -> Result<(), TransportError> {
             side: Side::Ask,
             price_lots,
             max_base_lots: 20,
-            max_quote_lots: i64::MAX,
-            reduce_only: false,
-            client_order_id: 0,
+            ..PerpPlaceOrderInstruction::default()
         },
     )
     .await

@@ -101,6 +101,8 @@ pub enum MangoError {
     TokenInForceClose,
     #[msg("incorrect number of health accounts")]
     InvalidHealthAccountCount,
+    #[msg("would self trade")]
+    WouldSelfTrade,
 }
 
 impl MangoError {

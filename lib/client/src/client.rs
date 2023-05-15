@@ -17,8 +17,8 @@ use itertools::Itertools;
 
 use mango_v4::accounts_ix::{Serum3OrderType, Serum3SelfTradeBehavior, Serum3Side};
 use mango_v4::state::{
-    Bank, Group, MangoAccountValue, PerpMarketIndex, PlaceOrderType, Serum3MarketIndex, Side,
-    TokenIndex, INSURANCE_TOKEN_INDEX,
+    Bank, Group, MangoAccountValue, PerpMarketIndex, PlaceOrderType, SelfTradeBehavior,
+    Serum3MarketIndex, Side, TokenIndex, INSURANCE_TOKEN_INDEX,
 };
 
 use solana_address_lookup_table_program::state::AddressLookupTable;
@@ -795,6 +795,7 @@ impl MangoClient {
         reduce_only: bool,
         expiry_timestamp: u64,
         limit: u8,
+        self_trade_behavior: SelfTradeBehavior,
     ) -> anyhow::Result<Instruction> {
         let perp = self.context.perp(market_index);
         let health_remaining_metas = self.context.derive_health_check_remaining_account_metas(
@@ -823,7 +824,7 @@ impl MangoClient {
                 ams.extend(health_remaining_metas.into_iter());
                 ams
             },
-            data: anchor_lang::InstructionData::data(&mango_v4::instruction::PerpPlaceOrder {
+            data: anchor_lang::InstructionData::data(&mango_v4::instruction::PerpPlaceOrderV2 {
                 side,
                 price_lots,
                 max_base_lots,
@@ -833,6 +834,7 @@ impl MangoClient {
                 reduce_only,
                 expiry_timestamp,
                 limit,
+                self_trade_behavior,
             }),
         };
 
@@ -851,6 +853,7 @@ impl MangoClient {
         reduce_only: bool,
         expiry_timestamp: u64,
         limit: u8,
+        self_trade_behavior: SelfTradeBehavior,
     ) -> anyhow::Result<Signature> {
         let account = self.mango_account().await?;
         let ix = self.perp_place_order_instruction(
@@ -865,6 +868,7 @@ impl MangoClient {
             reduce_only,
             expiry_timestamp,
             limit,
+            self_trade_behavior,
         )?;
         self.send_and_confirm_owner_tx(vec![ix]).await
     }
