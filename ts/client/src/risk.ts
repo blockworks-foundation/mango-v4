@@ -376,7 +376,7 @@ export async function getRiskStats(
     marketMakerEquity,
   ] = await Promise.all([
     getPriceImpactForLiqor(groupDrop, mangoAccounts),
-    getPriceImpactForLiqor(groupDrop, mangoAccounts),
+    getPriceImpactForLiqor(groupRally, mangoAccounts),
     getPerpPositionsToBeLiquidated(groupDrop, mangoAccounts),
     getPerpPositionsToBeLiquidated(groupRally, mangoAccounts),
     getEquityForMangoAccounts(client, group, liqors),
