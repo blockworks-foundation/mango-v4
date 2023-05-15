@@ -96,29 +96,27 @@ impl EventQueue {
     }
 
     pub fn iter(&self) -> impl Iterator<Item = &AnyEvent> {
-        EventQueueIterator {
-            queue: self,
-            index: 0,
-        }
-    }
-}
-
-struct EventQueueIterator<'a> {
-    queue: &'a EventQueue,
-    index: usize,
-}
-
-impl<'a> Iterator for EventQueueIterator<'a> {
-    type Item = &'a AnyEvent;
-    fn next(&mut self) -> Option<Self::Item> {
-        if self.index == self.queue.len() {
-            None
+        let len = self.len();
+        let (left, right) = self.buf.split_at(self.header.head());
+        let (left_len, right_len) = if len <= right.len() {
+            (0, len)
         } else {
-            let item =
-                &self.queue.buf[(self.queue.header.head() + self.index) % self.queue.buf.len()];
-            self.index += 1;
-            Some(item)
-        }
+            (len - right.len(), right.len())
+        };
+        right[0..right_len].iter().chain(left[0..left_len].iter())
+    }
+
+    pub fn iter_mut(&mut self) -> impl Iterator<Item = &mut AnyEvent> {
+        let len = self.len();
+        let (left, right) = self.buf.split_at_mut(self.header.head());
+        let (left_len, right_len) = if len <= right.len() {
+            (0, len)
+        } else {
+            (len - right.len(), right.len())
+        };
+        right[0..right_len]
+            .iter_mut()
+            .chain(left[0..left_len].iter_mut())
     }
 }
 
@@ -171,6 +169,7 @@ pub enum EventType {
     Fill,
     Out,
     Liquidate,
+    AlreadyProcessed,
 }
 
 #[derive(

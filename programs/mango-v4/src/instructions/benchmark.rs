@@ -146,11 +146,39 @@ pub fn benchmark(_ctx: Context<Benchmark>) -> Result<()> {
             let outev: &OutEvent = bytemuck::cast_ref(ev);
             let r: &[u8] = outev.owner.as_ref();
             if r[0..8] == t[0..8] {
+                // cheap 8-byte comparison first
                 if r == t {
                     founds += 1;
                 }
             }
+            // if sol_memcmp(r, t, 32) == 0 {
+            //     founds += 1;
+            // }
         }
+    }
+
+    sol_log_compute_units(); // 100422
+
+    let mut processed = 0;
+    let limit = 10;
+    sol_log_compute_units(); // 100422
+    for event in event_queue.iter_mut() {
+        if processed >= limit {
+            break;
+        }
+        if event.event_type != EventType::Out as u8 {
+            continue;
+        }
+        let out_event: &mut OutEvent = bytemuck::cast_mut(event);
+        let owner_bytes: &[u8] = out_event.owner.as_ref();
+
+        // Two-stage comparison is for performance
+        if owner_bytes[0..8] != t[0..8] || owner_bytes != t {
+            continue;
+        }
+
+        out_event.event_type = EventType::AlreadyProcessed as u8;
+        processed += 1;
     }
 
     sol_log_compute_units(); // 100422
