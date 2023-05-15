@@ -84,9 +84,6 @@ export async function getPriceImpactForLiqor(
       account: a,
       health: a.getHealth(group, HealthType.liquidationEnd),
       healthRatio: a.getHealthRatioUi(group, HealthType.liquidationEnd),
-      liabs: toUiDecimalsForQuote(
-        a.getLiabsValue(group, HealthType.liquidationEnd),
-      ),
     };
   });
 
@@ -216,9 +213,6 @@ export async function getPerpPositionsToBeLiquidated(
       account: a,
       health: a.getHealth(group, HealthType.liquidationEnd),
       healthRatio: a.getHealthRatioUi(group, HealthType.liquidationEnd),
-      liabs: toUiDecimalsForQuote(
-        a.getLiabsValue(group, HealthType.liquidationEnd),
-      ),
     };
   });
 
