@@ -398,6 +398,19 @@ pub struct FilledPerpOrderLog {
 }
 
 #[event]
+pub struct PerpTakerTradeLog {
+    pub mango_group: Pubkey,
+    pub mango_account: Pubkey,
+    pub perp_market_index: u16,
+    pub taker_side: u8,
+    pub total_base_lots_taken: i64,
+    pub total_quote_lots_taken: i64,       // exclusive fees paid
+    pub total_quote_lots_decremented: i64, // from DecrementTake self-trades
+    pub taker_fees_paid: i128,             // in native quote units
+    pub fee_penalty: i128,                 // in native quote units
+}
+
+#[event]
 pub struct PerpForceClosePositionLog {
     pub mango_group: Pubkey,
     pub perp_market_index: u16,
