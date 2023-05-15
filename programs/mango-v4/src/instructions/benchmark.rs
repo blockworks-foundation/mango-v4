@@ -117,85 +117,45 @@ pub fn benchmark(_ctx: Context<Benchmark>) -> Result<()> {
     sol_log_compute_units(); // 100422
     sol_log_compute_units(); // 100321 -> 101
 
-    let clock = Clock::get().unwrap();
+    use crate::state::*;
+    use bytemuck::Zeroable;
 
-    {
-        let s = clock.slot as i128;
-        let t = clock.unix_timestamp as i128;
-        let a = I80F48::from_bits((s << 64) + s);
-        let b = I80F48::from_bits((t << 64) + t);
-        division_i80f48(a, b); // 1000 - 5000 CU
-        division_i128(a.to_bits(), b.to_bits()); // 100 - 2000 CU
-        division_i80f48_30bit(a, b); // 300 CU
-        division_i80f48_f64(a, b); // 500 CU
-        mul_i80f48(a >> 64, b >> 64); // 100 CU
-        i80f48_to_f64(a); // 50 CU
+    // some example event queue
+    let mut event_queue = _ctx.accounts.dummy.load_init()?;
+    for i in 0..488 {
+        let event = OutEvent::new(
+            Side::Bid,
+            0,
+            0,
+            event_queue.header.seq_num,
+            Pubkey::from([i as u8; 32]),
+            i,
+        );
+        event_queue.push_back(bytemuck::cast(event)).unwrap();
+    }
+    let target = Pubkey::from([1u8; 32]);
+    let t: &[u8] = target.as_ref();
+
+    sol_log_compute_units(); // 100422
+
+    // find all events for a key
+    let mut founds = 0;
+    for i in 0..488 {
+        let ev = &event_queue.buf[i];
+        if ev.event_type == EventType::Out as u8 {
+            let outev: &OutEvent = bytemuck::cast_ref(ev);
+            let r: &[u8] = outev.owner.as_ref();
+            if r[0..8] == t[0..8] {
+                if r == t {
+                    founds += 1;
+                }
+            }
+        }
     }
 
-    {
-        let s = clock.slot as u128;
-        let t = clock.unix_timestamp as u128;
-        let a = U80F48::from_bits((s << 64) + s);
-        let b = U80F48::from_bits((t << 64) + t);
-        division_u80f48(a, b); // 1000 - 5000 CU
-    }
+    sol_log_compute_units(); // 100422
 
-    {
-        let a = clock.slot as i64;
-        let b = clock.unix_timestamp as i64;
-        division_i64(a, b); // 50 CU
-    }
-
-    {
-        let a = clock.slot as i32;
-        let b = clock.unix_timestamp as i32;
-        division_i32(a, b); // 50 CU
-    }
-
-    {
-        let a = clock.slot as u32;
-        let b = clock.unix_timestamp as u32;
-        division_u32(a, b); // 20 CU
-    }
-
-    {
-        let a = clock.slot as f64;
-        let b = clock.unix_timestamp as f64;
-        mul_f64(a, b); // 0 CU??
-    }
-
-    sol_log_compute_units(); // 100321 -> 101
-    msg!("msg!"); // 100079+101 -> 203
-    sol_log_compute_units(); // 100117
-
-    let pk1 = Pubkey::default(); // 10
-    sol_log_compute_units(); // 100006
-    let pk2 = Pubkey::default(); // 10
-    sol_log_compute_units(); // 99895
-
-    let _ = pk1 == pk2; // 56
-    sol_log_compute_units(); // 99739
-
-    let _ = sol_memcmp(&pk1.to_bytes(), &pk2.to_bytes(), 32); // 64
-    sol_log_compute_units(); // 99574
-
-    let large_number = I80F48::from_str("777472127991.999999999999996").unwrap();
-    let half = I80F48::MAX / 2;
-    let max = I80F48::MAX;
-    sol_log_compute_units(); // 92610
-
-    let _ = half + half; // 0
-    sol_log_compute_units(); // 92509
-
-    let _ = large_number * large_number; // 77
-    sol_log_compute_units(); // 92230
-
-    // /
-    let _ = I80F48::ZERO / max; // 839
-    sol_log_compute_units(); // 91290
-
-    let _ = half / max; // 3438
-    sol_log_compute_units(); // 87751
+    msg!("{}", founds);
 
     Ok(())
 }

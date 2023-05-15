@@ -3930,7 +3930,9 @@ impl ClientInstruction for PerpLiqNegativePnlOrBankruptcyInstruction {
     }
 }
 
-pub struct BenchmarkInstruction {}
+pub struct BenchmarkInstruction {
+    pub event_queue: Pubkey,
+}
 #[async_trait::async_trait(?Send)]
 impl ClientInstruction for BenchmarkInstruction {
     type Accounts = mango_v4::accounts::Benchmark;
@@ -3942,7 +3944,7 @@ impl ClientInstruction for BenchmarkInstruction {
         let program_id = mango_v4::id();
         let instruction = Self::Instruction {};
         let accounts = Self::Accounts {
-            dummy: Pubkey::new_unique(),
+            dummy: self.event_queue,
         };
 
         let instruction = make_instruction(program_id, &accounts, &instruction);
