@@ -57,7 +57,7 @@ pub mod switchboard_v2_mainnet_oracle {
 }
 
 #[zero_copy]
-#[derive(AnchorDeserialize, AnchorSerialize, Debug, bytemuck::Pod, bytemuck::Zeroable)]
+#[derive(AnchorDeserialize, AnchorSerialize, Debug, bytemuck::Pod)]
 pub struct OracleConfig {
     pub conf_filter: I80F48,
     pub max_staleness_slots: i64,
@@ -83,7 +83,7 @@ impl OracleConfigParams {
     }
 }
 
-#[derive(PartialEq)]
+#[derive(PartialEq, AnchorSerialize, AnchorDeserialize)]
 pub enum OracleType {
     Pyth,
     Stub,
@@ -91,7 +91,13 @@ pub enum OracleType {
     SwitchboardV2,
 }
 
-#[account(zero_copy(safe_bytemuck_derives))]
+pub struct OracleState {
+    pub last_update_slot: u64,
+    pub confidence: I80F48,
+    pub oracle_type: OracleType,
+}
+
+#[account(zero_copy)]
 pub struct StubOracle {
     // ABI: Clients rely on this being at offset 8
     pub group: Pubkey,
@@ -135,18 +141,25 @@ pub fn determine_oracle_type(acc_info: &impl KeyedAccountReader) -> Result<Oracl
 /// This currently assumes that quote decimals is 6, like for USDC.
 ///
 /// Pass `staleness_slot` = None to skip the staleness check
-pub fn oracle_price_and_slot(
+pub fn oracle_price_and_state(
     acc_info: &impl KeyedAccountReader,
     config: &OracleConfig,
     base_decimals: u8,
     staleness_slot: Option<u64>,
-) -> Result<(I80F48, u64)> {
+) -> Result<(I80F48, OracleState)> {
     let data = &acc_info.data();
     let oracle_type = determine_oracle_type(acc_info)?;
     let staleness_slot = staleness_slot.unwrap_or(0);
 
     Ok(match oracle_type {
-        OracleType::Stub => (acc_info.load::<StubOracle>()?.price, 0),
+        OracleType::Stub => (
+            acc_info.load::<StubOracle>()?.price,
+            OracleState {
+                last_update_slot: 0,
+                confidence: I80F48::ZERO,
+                oracle_type: OracleType::Stub,
+            },
+        ),
         OracleType::Pyth => {
             let price_account = pyth_sdk_solana::state::load_price_account(data).unwrap();
             let price_data = price_account.to_price();
@@ -187,7 +200,14 @@ pub fn oracle_price_and_slot(
 
             let decimals = (price_account.expo as i8) + QUOTE_DECIMALS - (base_decimals as i8);
             let decimal_adj = power_of_ten(decimals);
-            (price * decimal_adj, last_slot)
+            (
+                price * decimal_adj,
+                OracleState {
+                    last_update_slot: last_slot,
+                    confidence: I80F48::from_num(price_data.conf),
+                    oracle_type: OracleType::Pyth,
+                },
+            )
         }
         OracleType::SwitchboardV2 => {
             fn from_foreign_error(e: impl std::fmt::Display) -> Error {
@@ -233,7 +253,14 @@ pub fn oracle_price_and_slot(
 
             let decimals = QUOTE_DECIMALS - (base_decimals as i8);
             let decimal_adj = power_of_ten(decimals);
-            (price * decimal_adj, round_open_slot)
+            (
+                price * decimal_adj,
+                OracleState {
+                    last_update_slot: round_open_slot,
+                    confidence: I80F48::from_num(std_deviation_decimal),
+                    oracle_type: OracleType::SwitchboardV2,
+                },
+            )
         }
         OracleType::SwitchboardV1 => {
             let result = FastRoundResultAccountData::deserialize(data).unwrap();
@@ -269,7 +296,14 @@ pub fn oracle_price_and_slot(
 
             let decimals = QUOTE_DECIMALS - (base_decimals as i8);
             let decimal_adj = power_of_ten(decimals);
-            (price * decimal_adj, round_open_slot)
+            (
+                price * decimal_adj,
+                OracleState {
+                    last_update_slot: round_open_slot,
+                    confidence: max_response - min_response,
+                    oracle_type: OracleType::SwitchboardV1,
+                },
+            )
         }
     })
 }

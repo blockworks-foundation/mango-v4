@@ -30,13 +30,13 @@ pub fn perp_place_order(
             asks: ctx.accounts.asks.load_mut()?,
         };
 
-        let oracle_slot;
-        (oracle_price, oracle_slot) = perp_market.oracle_price_and_slot(
+        let oracle_state;
+        (oracle_price, oracle_state) = perp_market.oracle_price_and_state(
             &AccountInfoRef::borrow(ctx.accounts.oracle.as_ref())?,
             None, // staleness checked in health
         )?;
 
-        perp_market.update_funding_and_stable_price(&book, oracle_price, oracle_slot, now_ts)?;
+        perp_market.update_funding_and_stable_price(&book, oracle_price, oracle_state, now_ts)?;
     }
 
     let mut account = ctx.accounts.account.load_full_mut()?;
@@ -210,7 +210,8 @@ mod tests {
                 client_order_id: 0,
                 reduce_only: true,
                 time_in_force: 0,
-                params: OrderParams::Market,
+                self_trade_behavior: SelfTradeBehavior::DecrementTake,
+                params: OrderParams::Market {},
             };
 
             let result = reduce_only_max_base_lots(&pp, &order, market_reduce_only);

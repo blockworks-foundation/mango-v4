@@ -28,6 +28,7 @@ pub struct Config {
 struct TokenState {
     price: I80F48,
     native_position: I80F48,
+    in_use: bool,
 }
 
 impl TokenState {
@@ -40,6 +41,7 @@ impl TokenState {
         Ok(Self {
             price: Self::fetch_price(token, &bank, account_fetcher).await?,
             native_position: position.native(&bank),
+            in_use: position.is_in_use(),
         })
     }
 
@@ -219,7 +221,7 @@ impl Rebalancer {
 
             // Any remainder that could not be sold just gets withdrawn to ensure the
             // TokenPosition is freed up
-            if amount > 0 && amount <= dust_threshold {
+            if amount > 0 && amount <= dust_threshold && !token_state.in_use {
                 let allow_borrow = false;
                 let txsig = self
                     .mango_client
@@ -333,6 +335,7 @@ impl Rebalancer {
                         true, // reduce only
                         0,
                         10,
+                        mango_v4::state::SelfTradeBehavior::DecrementTake,
                     )
                     .await?;
                 log::info!(

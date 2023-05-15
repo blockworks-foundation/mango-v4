@@ -21,7 +21,7 @@ pub const MINIMUM_MAX_RATE: I80F48 = I80F48::from_bits(I80F48::ONE.to_bits() / 2
 
 #[derive(Derivative)]
 #[derivative(Debug)]
-#[account(zero_copy(safe_bytemuck_derives))]
+#[account(zero_copy)]
 pub struct Bank {
     // ABI: Clients rely on this being at offset 8
     pub group: Pubkey,
@@ -789,7 +789,7 @@ impl Bank {
         staleness_slot: Option<u64>,
     ) -> Result<I80F48> {
         require_keys_eq!(self.oracle, *oracle_acc.key());
-        let (price, _) = oracle::oracle_price_and_slot(
+        let (price, _) = oracle::oracle_price_and_state(
             oracle_acc,
             &self.oracle_config,
             self.mint_decimals,

@@ -355,7 +355,8 @@ impl MangoGroupContext {
 }
 
 fn from_serum_style_pubkey(d: [u64; 4]) -> Pubkey {
-    Pubkey::new(bytemuck::cast_slice(&d as &[_]))
+    let b: [u8; 32] = bytemuck::cast(d);
+    Pubkey::from(b)
 }
 
 async fn fetch_raw_account(rpc: &RpcClientAsync, address: Pubkey) -> Result<Account, ClientError> {

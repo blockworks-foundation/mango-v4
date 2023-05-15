@@ -1613,10 +1613,12 @@ export class MangoClient {
     const maxBaseQuantity = serum3MarketExternal.baseSizeNumberToLots(size);
     const isTaker = orderType !== Serum3OrderType.postOnly;
     const maxQuoteQuantity = new BN(
-      serum3MarketExternal.decoded.quoteLotSize.toNumber() *
-        (1 + Math.max(serum3Market.getFeeRates(isTaker), 0)) *
-        serum3MarketExternal.baseSizeNumberToLots(size).toNumber() *
-        serum3MarketExternal.priceNumberToLots(price).toNumber(),
+      Math.ceil(
+        serum3MarketExternal.decoded.quoteLotSize.toNumber() *
+          (1 + Math.max(serum3Market.getFeeRates(isTaker), 0)) *
+          serum3MarketExternal.baseSizeNumberToLots(size).toNumber() *
+          serum3MarketExternal.priceNumberToLots(price).toNumber(),
+      ),
     );
 
     const payerTokenIndex = ((): TokenIndex => {

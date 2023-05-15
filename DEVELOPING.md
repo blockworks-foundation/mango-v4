@@ -10,3 +10,9 @@ _work in progress_
 ### Code style
 
 ### Testing
+
+In order to run the tests the `enable_gpl` feature needs to be enabled to not skip essential tests.
+
+```
+cargo test-sbf --features enable-gpl
+```

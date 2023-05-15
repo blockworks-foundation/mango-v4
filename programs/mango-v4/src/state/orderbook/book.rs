@@ -1,4 +1,4 @@
-use crate::logs::FilledPerpOrderLog;
+use crate::logs::{FilledPerpOrderLog, PerpTakerTradeLog};
 use crate::state::MangoAccountRefMut;
 use crate::{
     error::*,
@@ -64,9 +64,11 @@ impl<'a> Orderbook<'a> {
         let order_id = market.gen_order_id(side, price_data);
 
         // IOC orders have a fee penalty applied regardless of match
-        if order.needs_penalty_fee() {
-            apply_penalty(market, mango_account)?;
-        }
+        let fee_penalty = if order.needs_penalty_fee() {
+            apply_penalty(market, mango_account)?
+        } else {
+            I80F48::ZERO
+        };
 
         let perp_position = mango_account.perp_position_mut(market.perp_market_index)?;
 
@@ -76,8 +78,9 @@ impl<'a> Orderbook<'a> {
         // matched_changes/matched_deletes and then applied after this loop.
         let mut remaining_base_lots = order.max_base_lots;
         let mut remaining_quote_lots = order.max_quote_lots;
-        let mut matched_order_changes: Vec<(BookSideOrderHandle, i64)> = vec![];
-        let mut matched_order_deletes: Vec<(BookSideOrderTree, u128)> = vec![];
+        let mut decremented_quote_lots = 0i64;
+        let mut orders_to_change: Vec<(BookSideOrderHandle, i64)> = vec![];
+        let mut orders_to_delete: Vec<(BookSideOrderTree, u128)> = vec![];
         let mut number_of_dropped_expired_orders = 0;
         let opposing_bookside = self.bookside_mut(other_side);
         for best_opposing in opposing_bookside.iter_all_including_invalid(now_ts, oracle_price_lots)
@@ -99,7 +102,7 @@ impl<'a> Orderbook<'a> {
                         best_opposing.node.quantity,
                     );
                     event_queue.push_back(cast(event)).unwrap();
-                    matched_order_deletes
+                    orders_to_delete
                         .push((best_opposing.handle.order_tree, best_opposing.node.key));
                 }
                 continue;
@@ -120,11 +123,43 @@ impl<'a> Orderbook<'a> {
             }
 
             let max_match_by_quote = remaining_quote_lots / best_opposing_price;
+            if max_match_by_quote == 0 {
+                break;
+            }
+
             let match_base_lots = remaining_base_lots
                 .min(best_opposing.node.quantity)
                 .min(max_match_by_quote);
-
             let match_quote_lots = match_base_lots * best_opposing_price;
+
+            let order_would_self_trade = *mango_account_pk == best_opposing.node.owner;
+            if order_would_self_trade {
+                match order.self_trade_behavior {
+                    SelfTradeBehavior::DecrementTake => {
+                        // remember all decremented quote lots to only charge fees on not-self-trades
+                        decremented_quote_lots += match_quote_lots;
+                    }
+                    SelfTradeBehavior::CancelProvide => {
+                        let event = OutEvent::new(
+                            other_side,
+                            best_opposing.node.owner_slot,
+                            now_ts,
+                            event_queue.header.seq_num,
+                            best_opposing.node.owner,
+                            best_opposing.node.quantity,
+                        );
+                        event_queue.push_back(cast(event)).unwrap();
+                        orders_to_delete
+                            .push((best_opposing.handle.order_tree, best_opposing.node.key));
+
+                        // skip actual matching
+                        continue;
+                    }
+                    SelfTradeBehavior::AbortTransaction => return err!(MangoError::WouldSelfTrade),
+                }
+                assert!(order.self_trade_behavior == SelfTradeBehavior::DecrementTake);
+            }
+
             remaining_base_lots -= match_base_lots;
             remaining_quote_lots -= match_quote_lots;
             assert!(remaining_quote_lots >= 0);
@@ -132,12 +167,12 @@ impl<'a> Orderbook<'a> {
             let new_best_opposing_quantity = best_opposing.node.quantity - match_base_lots;
             let maker_out = new_best_opposing_quantity == 0;
             if maker_out {
-                matched_order_deletes
-                    .push((best_opposing.handle.order_tree, best_opposing.node.key));
+                orders_to_delete.push((best_opposing.handle.order_tree, best_opposing.node.key));
             } else {
-                matched_order_changes.push((best_opposing.handle, new_best_opposing_quantity));
+                orders_to_change.push((best_opposing.handle, new_best_opposing_quantity));
             }
 
+            // order_would_self_trade is only true in the DecrementTake case, in which we don't charge fees
             let seq_num = event_queue.header.seq_num;
             let fill = FillEvent::new(
                 side,
@@ -147,11 +182,20 @@ impl<'a> Orderbook<'a> {
                 seq_num,
                 best_opposing.node.owner,
                 best_opposing.node.client_order_id,
-                market.maker_fee,
+                if order_would_self_trade {
+                    I80F48::ZERO
+                } else {
+                    market.maker_fee
+                },
                 best_opposing.node.timestamp,
                 *mango_account_pk,
                 order.client_order_id,
-                market.taker_fee,
+                if order_would_self_trade {
+                    I80F48::ZERO
+                } else {
+                    // NOTE: this does not include the IOC penalty, but this value is not used to calculate fees
+                    market.taker_fee
+                },
                 best_opposing_price,
                 match_base_lots,
             );
@@ -161,7 +205,7 @@ impl<'a> Orderbook<'a> {
             emit!(FilledPerpOrderLog {
                 mango_group: market.group.key(),
                 perp_market_index: market.perp_market_index,
-                seq_num: seq_num,
+                seq_num,
             });
         }
         let total_quote_lots_taken = order.max_quote_lots - remaining_quote_lots;
@@ -173,11 +217,27 @@ impl<'a> Orderbook<'a> {
         // realized when the fill event gets executed
         if total_quote_lots_taken > 0 || total_base_lots_taken > 0 {
             perp_position.add_taker_trade(side, total_base_lots_taken, total_quote_lots_taken);
-            apply_fees(market, mango_account, total_quote_lots_taken)?;
+            // reduce fees to apply by decrement take volume
+            let taker_fees_paid = apply_fees(
+                market,
+                mango_account,
+                total_quote_lots_taken - decremented_quote_lots,
+            )?;
+            emit!(PerpTakerTradeLog {
+                mango_group: market.group.key(),
+                mango_account: *mango_account_pk,
+                perp_market_index: market.perp_market_index,
+                taker_side: side as u8,
+                total_base_lots_taken,
+                total_quote_lots_taken,
+                total_quote_lots_decremented: decremented_quote_lots,
+                taker_fees_paid: taker_fees_paid.to_bits(),
+                fee_penalty: fee_penalty.to_bits(),
+            });
         }
 
         // Apply changes to matched asks (handles invalidate on delete!)
-        for (handle, new_quantity) in matched_order_changes {
+        for (handle, new_quantity) in orders_to_change {
             opposing_bookside
                 .node_mut(handle.node)
                 .unwrap()
@@ -185,7 +245,7 @@ impl<'a> Orderbook<'a> {
                 .unwrap()
                 .quantity = new_quantity;
         }
-        for (component, key) in matched_order_deletes {
+        for (component, key) in orders_to_delete {
             let _removed_leaf = opposing_bookside.remove_by_key(component, key).unwrap();
         }
 
@@ -361,7 +421,7 @@ fn apply_fees(
     market: &mut PerpMarket,
     account: &mut MangoAccountRefMut,
     quote_lots: i64,
-) -> Result<()> {
+) -> Result<I80F48> {
     let quote_native = I80F48::from_num(market.quote_lot_size * quote_lots);
 
     // The maker fees apply to the maker's account only when the fill event is consumed.
@@ -380,6 +440,8 @@ fn apply_fees(
 
     let perp_position = account.perp_position_mut(market.perp_market_index)?;
     perp_position.record_trading_fee(taker_fees);
+
+    // taker fees are applied to volume during matching, quote volume only during consume
     perp_position.taker_volume += taker_fees.to_num::<u64>();
 
     // Accrue maker fees immediately: they can be negative and applying them later
@@ -387,11 +449,11 @@ fn apply_fees(
     // breaks assumptions.
     market.fees_accrued += taker_fees + maker_fees;
 
-    Ok(())
+    Ok(taker_fees)
 }
 
 /// Applies a fixed penalty fee to the account, and update the market's fees_accrued
-fn apply_penalty(market: &mut PerpMarket, account: &mut MangoAccountRefMut) -> Result<()> {
+fn apply_penalty(market: &mut PerpMarket, account: &mut MangoAccountRefMut) -> Result<I80F48> {
     let fee_penalty = I80F48::from_num(market.fee_penalty);
     account
         .fixed
@@ -400,5 +462,5 @@ fn apply_penalty(market: &mut PerpMarket, account: &mut MangoAccountRefMut) -> R
     let perp_position = account.perp_position_mut(market.perp_market_index)?;
     perp_position.record_trading_fee(fee_penalty);
     market.fees_accrued += fee_penalty;
-    Ok(())
+    Ok(fee_penalty)
 }

@@ -3260,11 +3260,28 @@ pub struct PerpPlaceOrderInstruction {
     pub max_quote_lots: i64,
     pub reduce_only: bool,
     pub client_order_id: u64,
+    pub self_trade_behavior: SelfTradeBehavior,
+}
+impl Default for PerpPlaceOrderInstruction {
+    fn default() -> Self {
+        Self {
+            account: Pubkey::default(),
+            perp_market: Pubkey::default(),
+            owner: TestKeypair::default(),
+            side: Side::Bid,
+            price_lots: 0,
+            max_base_lots: i64::MAX,
+            max_quote_lots: i64::MAX,
+            reduce_only: false,
+            client_order_id: 0,
+            self_trade_behavior: SelfTradeBehavior::DecrementTake,
+        }
+    }
 }
 #[async_trait::async_trait(?Send)]
 impl ClientInstruction for PerpPlaceOrderInstruction {
     type Accounts = mango_v4::accounts::PerpPlaceOrder;
-    type Instruction = mango_v4::instruction::PerpPlaceOrder;
+    type Instruction = mango_v4::instruction::PerpPlaceOrderV2;
     async fn to_instruction(
         &self,
         account_loader: impl ClientAccountLoader + 'async_trait,
@@ -3277,6 +3294,7 @@ impl ClientInstruction for PerpPlaceOrderInstruction {
             max_quote_lots: self.max_quote_lots,
             client_order_id: self.client_order_id,
             order_type: PlaceOrderType::Limit,
+            self_trade_behavior: self.self_trade_behavior,
             reduce_only: self.reduce_only,
             expiry_timestamp: 0,
             limit: 10,
@@ -3331,7 +3349,7 @@ pub struct PerpPlaceOrderPeggedInstruction {
 #[async_trait::async_trait(?Send)]
 impl ClientInstruction for PerpPlaceOrderPeggedInstruction {
     type Accounts = mango_v4::accounts::PerpPlaceOrder;
-    type Instruction = mango_v4::instruction::PerpPlaceOrderPegged;
+    type Instruction = mango_v4::instruction::PerpPlaceOrderPeggedV2;
     async fn to_instruction(
         &self,
         account_loader: impl ClientAccountLoader + 'async_trait,
@@ -3347,6 +3365,7 @@ impl ClientInstruction for PerpPlaceOrderPeggedInstruction {
             order_type: PlaceOrderType::Limit,
             reduce_only: false,
             expiry_timestamp: 0,
+            self_trade_behavior: SelfTradeBehavior::DecrementTake,
             limit: 10,
             max_oracle_staleness_slots: -1,
         };

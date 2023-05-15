@@ -1,6 +1,6 @@
 use crate::{
     accounts_ix::FlashLoanType,
-    state::{PerpMarket, PerpPosition},
+    state::{OracleType, PerpMarket, PerpPosition},
 };
 use anchor_lang::prelude::*;
 use borsh::BorshSerialize;
@@ -145,6 +145,23 @@ pub struct PerpUpdateFundingLog {
     pub short_funding: i128,
     pub price: i128,
     pub oracle_slot: u64,
+    pub stable_price: i128,
+    pub fees_accrued: i128,
+    pub fees_settled: i128,
+    pub open_interest: i64,
+    pub instantaneous_funding_rate: i128,
+}
+
+#[event]
+pub struct PerpUpdateFundingLogV2 {
+    pub mango_group: Pubkey,
+    pub market_index: u16,
+    pub long_funding: i128,
+    pub short_funding: i128,
+    pub price: i128,
+    pub oracle_slot: u64,
+    pub oracle_confidence: i128,
+    pub oracle_type: OracleType,
     pub stable_price: i128,
     pub fees_accrued: i128,
     pub fees_settled: i128,
@@ -378,6 +395,19 @@ pub struct FilledPerpOrderLog {
     pub mango_group: Pubkey,
     pub perp_market_index: u16,
     pub seq_num: u64,
+}
+
+#[event]
+pub struct PerpTakerTradeLog {
+    pub mango_group: Pubkey,
+    pub mango_account: Pubkey,
+    pub perp_market_index: u16,
+    pub taker_side: u8,
+    pub total_base_lots_taken: i64,
+    pub total_quote_lots_taken: i64,       // exclusive fees paid
+    pub total_quote_lots_decremented: i64, // from DecrementTake self-trades
+    pub taker_fees_paid: i128,             // in native quote units
+    pub fee_penalty: i128,                 // in native quote units
 }
 
 #[event]

@@ -243,9 +243,7 @@ async fn test_health_compute_perp() -> Result<(), TransportError> {
                 side: Side::Bid,
                 price_lots,
                 max_base_lots: 1,
-                max_quote_lots: i64::MAX,
-                reduce_only: false,
-                client_order_id: 0,
+                ..PerpPlaceOrderInstruction::default()
             },
         )
         .await

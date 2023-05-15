@@ -18,6 +18,6 @@ default = []
 test-bpf = []
 
 [dependencies]
-anchor-lang = { path = "../../3rdparty/anchor/lang" }
-anchor-spl = { path = "../../3rdparty/anchor/spl" }
+anchor-lang = "0.27.0"
+anchor-spl = "0.27.0"
 solana-program = "~1.14.9"

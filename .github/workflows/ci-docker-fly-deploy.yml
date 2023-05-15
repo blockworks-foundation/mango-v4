@@ -24,11 +24,11 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout 
+      - name: Checkout
         uses: actions/checkout@v2
 
       - name: Setup Fly
         uses: superfly/flyctl-actions/setup-flyctl@master
-      
+
       - name: Deploy
         run: flyctl deploy -c cd/${{ inputs.imageName }}.toml -a ${{ inputs.appName }}
