@@ -6,7 +6,7 @@ use crate::state::*;
 
 pub type Serum3MarketIndex = u16;
 
-#[account(zero_copy(safe_bytemuck_derives))]
+#[account(zero_copy)]
 #[derive(Debug)]
 pub struct Serum3Market {
     // ABI: Clients rely on this being at offset 8

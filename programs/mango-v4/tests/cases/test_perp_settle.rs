@@ -129,9 +129,7 @@ async fn test_perp_settle_pnl() -> Result<(), TransportError> {
             side: Side::Bid,
             price_lots,
             max_base_lots: 1,
-            max_quote_lots: i64::MAX,
-            reduce_only: false,
-            client_order_id: 0,
+            ..PerpPlaceOrderInstruction::default()
         },
     )
     .await
@@ -146,9 +144,7 @@ async fn test_perp_settle_pnl() -> Result<(), TransportError> {
             side: Side::Ask,
             price_lots,
             max_base_lots: 1,
-            max_quote_lots: i64::MAX,
-            reduce_only: false,
-            client_order_id: 0,
+            ..PerpPlaceOrderInstruction::default()
         },
     )
     .await
@@ -615,9 +611,7 @@ async fn test_perp_settle_pnl_fees() -> Result<(), TransportError> {
             side: Side::Bid,
             price_lots,
             max_base_lots: 1,
-            max_quote_lots: i64::MAX,
-            reduce_only: false,
-            client_order_id: 0,
+            ..PerpPlaceOrderInstruction::default()
         },
     )
     .await
@@ -632,9 +626,7 @@ async fn test_perp_settle_pnl_fees() -> Result<(), TransportError> {
             side: Side::Ask,
             price_lots,
             max_base_lots: 1,
-            max_quote_lots: i64::MAX,
-            reduce_only: false,
-            client_order_id: 0,
+            ..PerpPlaceOrderInstruction::default()
         },
     )
     .await
@@ -884,9 +876,7 @@ async fn test_perp_pnl_settle_limit() -> Result<(), TransportError> {
             side: Side::Bid,
             price_lots,
             max_base_lots: 1,
-            max_quote_lots: i64::MAX,
-            reduce_only: false,
-            client_order_id: 0,
+            ..PerpPlaceOrderInstruction::default()
         },
     )
     .await
@@ -901,9 +891,7 @@ async fn test_perp_pnl_settle_limit() -> Result<(), TransportError> {
             side: Side::Ask,
             price_lots,
             max_base_lots: 1,
-            max_quote_lots: i64::MAX,
-            reduce_only: false,
-            client_order_id: 0,
+            ..PerpPlaceOrderInstruction::default()
         },
     )
     .await
@@ -1017,9 +1005,7 @@ async fn test_perp_pnl_settle_limit() -> Result<(), TransportError> {
             side: Side::Bid,
             price_lots: 3 * price_lots,
             max_base_lots: 1,
-            max_quote_lots: i64::MAX,
-            client_order_id: 0,
-            reduce_only: false,
+            ..PerpPlaceOrderInstruction::default()
         },
     )
     .await
@@ -1034,9 +1020,7 @@ async fn test_perp_pnl_settle_limit() -> Result<(), TransportError> {
             side: Side::Ask,
             price_lots: 3 * price_lots,
             max_base_lots: 1,
-            max_quote_lots: i64::MAX,
-            client_order_id: 0,
-            reduce_only: false,
+            ..PerpPlaceOrderInstruction::default()
         },
     )
     .await

@@ -21,6 +21,9 @@ pub struct Order {
     /// Number of seconds the order shall live, 0 meaning forever
     pub time_in_force: u16,
 
+    /// Configure how matches with order of the same owner are handled
+    pub self_trade_behavior: SelfTradeBehavior,
+
     /// Order type specific params
     pub params: OrderParams,
 }
@@ -120,8 +123,8 @@ impl Order {
         order_book: &Orderbook,
     ) -> Result<(i64, u64)> {
         let price_lots = match self.params {
-            OrderParams::Market => market_order_limit_for_side(self.side),
-            OrderParams::ImmediateOrCancel { price_lots } => price_lots,
+            OrderParams::Market { .. } => market_order_limit_for_side(self.side),
+            OrderParams::ImmediateOrCancel { price_lots, .. } => price_lots,
             OrderParams::Fixed {
                 price_lots,
                 order_type,

@@ -121,6 +121,7 @@ async function main(): Promise<void> {
 
     // deposit USDC
     let oldBalance = mangoAccount.getTokenBalance(
+      group,
       group.getFirstBankByMint(new PublicKey(DEVNET_MINTS.get('USDC')!)),
     );
     await client.tokenDeposit(
@@ -131,6 +132,7 @@ async function main(): Promise<void> {
     );
     await mangoAccount.reload(client);
     let newBalance = mangoAccount.getTokenBalance(
+      group,
       group.getFirstBankByMint(new PublicKey(DEVNET_MINTS.get('USDC')!)),
     );
     expect(toUiDecimalsForQuote(newBalance.sub(oldBalance)).toString()).equals(
@@ -158,6 +160,7 @@ async function main(): Promise<void> {
     // withdraw USDC
     console.log(`...withdrawing 1 USDC`);
     oldBalance = mangoAccount.getTokenBalance(
+      group,
       group.getFirstBankByMint(new PublicKey(DEVNET_MINTS.get('USDC')!)),
     );
     await client.tokenWithdraw(
@@ -169,6 +172,7 @@ async function main(): Promise<void> {
     );
     await mangoAccount.reload(client);
     newBalance = mangoAccount.getTokenBalance(
+      group,
       group.getFirstBankByMint(new PublicKey(DEVNET_MINTS.get('USDC')!)),
     );
     expect(toUiDecimalsForQuote(oldBalance.sub(newBalance)).toString()).equals(

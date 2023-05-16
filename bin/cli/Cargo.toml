@@ -8,9 +8,9 @@ name = "cli"
 path = "src/main.rs"
 
 [dependencies]
-anchor-client = { path = "../../3rdparty/anchor/client" }
-anchor-lang = { path = "../../3rdparty/anchor/lang" }
-anchor-spl = { path = "../../3rdparty/anchor/spl" }
+anchor-client = "0.27.0"
+anchor-lang = "0.27.0"
+anchor-spl = "0.27.0"
 anyhow = "1.0"
 clap = { version = "3.1.8", features = ["derive", "env"] }
 dotenv = "0.15.0"

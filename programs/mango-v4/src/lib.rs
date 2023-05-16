@@ -31,13 +31,15 @@ pub mod instructions;
 compile_error!("compiling the program entrypoint without 'enable-gpl' makes no sense, enable it or use the 'cpi' or 'client' features");
 
 use state::{
-    OracleConfigParams, PerpMarketIndex, PlaceOrderType, Serum3MarketIndex, Side, TokenIndex,
+    OracleConfigParams, PerpMarketIndex, PlaceOrderType, SelfTradeBehavior, Serum3MarketIndex,
+    Side, TokenIndex,
 };
 
 declare_id!("4MangoMjqJ2firMokCjjGgoK8d4MXcrgL7XJaL3w6fVg");
 
 #[program]
 pub mod mango_v4 {
+
     use super::*;
     use error::*;
 
@@ -785,8 +787,74 @@ pub mod mango_v4 {
             client_order_id,
             reduce_only,
             time_in_force,
+            self_trade_behavior: SelfTradeBehavior::default(),
             params: match order_type {
-                PlaceOrderType::Market => OrderParams::Market,
+                PlaceOrderType::Market => OrderParams::Market {},
+                PlaceOrderType::ImmediateOrCancel => OrderParams::ImmediateOrCancel { price_lots },
+                _ => OrderParams::Fixed {
+                    price_lots,
+                    order_type: order_type.to_post_order_type()?,
+                },
+            },
+        };
+        #[cfg(feature = "enable-gpl")]
+        return instructions::perp_place_order(ctx, order, limit);
+
+        #[cfg(not(feature = "enable-gpl"))]
+        Ok(None)
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    pub fn perp_place_order_v2(
+        ctx: Context<PerpPlaceOrder>,
+        side: Side,
+
+        // The price in lots (quote lots per base lots)
+        // - fill orders on the book up to this price or
+        // - place an order on the book at this price.
+        // - ignored for Market orders and potentially adjusted for PostOnlySlide orders.
+        price_lots: i64,
+
+        max_base_lots: i64,
+        max_quote_lots: i64,
+        client_order_id: u64,
+        order_type: PlaceOrderType,
+        self_trade_behavior: SelfTradeBehavior,
+        reduce_only: bool,
+
+        // Timestamp of when order expires
+        //
+        // Send 0 if you want the order to never expire.
+        // Timestamps in the past mean the instruction is skipped.
+        // Timestamps in the future are reduced to now + 65535s.
+        expiry_timestamp: u64,
+
+        // Maximum number of orders from the book to fill.
+        //
+        // Use this to limit compute used during order matching.
+        // When the limit is reached, processing stops and the instruction succeeds.
+        limit: u8,
+    ) -> Result<Option<u128>> {
+        require_gte!(price_lots, 0);
+
+        use crate::state::{Order, OrderParams};
+        let time_in_force = match Order::tif_from_expiry(expiry_timestamp) {
+            Some(t) => t,
+            None => {
+                msg!("Order is already expired");
+                return Ok(None);
+            }
+        };
+        let order = Order {
+            side,
+            max_base_lots,
+            max_quote_lots,
+            client_order_id,
+            reduce_only,
+            time_in_force,
+            self_trade_behavior,
+            params: match order_type {
+                PlaceOrderType::Market => OrderParams::Market {},
                 PlaceOrderType::ImmediateOrCancel => OrderParams::ImmediateOrCancel { price_lots },
                 _ => OrderParams::Fixed {
                     price_lots,
@@ -858,6 +926,80 @@ pub mod mango_v4 {
             client_order_id,
             reduce_only,
             time_in_force,
+            self_trade_behavior: SelfTradeBehavior::DecrementTake,
+            params: OrderParams::OraclePegged {
+                price_offset_lots,
+                order_type: order_type.to_post_order_type()?,
+                peg_limit,
+                max_oracle_staleness_slots,
+            },
+        };
+        #[cfg(feature = "enable-gpl")]
+        return instructions::perp_place_order(ctx, order, limit);
+
+        #[cfg(not(feature = "enable-gpl"))]
+        Ok(None)
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    pub fn perp_place_order_pegged_v2(
+        ctx: Context<PerpPlaceOrder>,
+        side: Side,
+
+        // The adjustment from the oracle price, in lots (quote lots per base lots).
+        // Orders on the book may be filled at oracle + adjustment (depends on order type).
+        price_offset_lots: i64,
+
+        // The limit at which the pegged order shall expire.
+        // May be -1 to denote no peg limit.
+        //
+        // Example: An bid pegged to -20 with peg_limit 100 would expire if the oracle hits 121.
+        peg_limit: i64,
+
+        max_base_lots: i64,
+        max_quote_lots: i64,
+        client_order_id: u64,
+        order_type: PlaceOrderType,
+        self_trade_behavior: SelfTradeBehavior,
+        reduce_only: bool,
+
+        // Timestamp of when order expires
+        //
+        // Send 0 if you want the order to never expire.
+        // Timestamps in the past mean the instruction is skipped.
+        // Timestamps in the future are reduced to now + 65535s.
+        expiry_timestamp: u64,
+
+        // Maximum number of orders from the book to fill.
+        //
+        // Use this to limit compute used during order matching.
+        // When the limit is reached, processing stops and the instruction succeeds.
+        limit: u8,
+
+        // Oracle staleness limit, in slots. Set to -1 to disable.
+        //
+        // WARNING: Not currently implemented.
+        max_oracle_staleness_slots: i32,
+    ) -> Result<Option<u128>> {
+        require_gte!(peg_limit, -1);
+        require_eq!(max_oracle_staleness_slots, -1); // unimplemented
+
+        use crate::state::{Order, OrderParams};
+        let time_in_force = match Order::tif_from_expiry(expiry_timestamp) {
+            Some(t) => t,
+            None => {
+                msg!("Order is already expired");
+                return Ok(None);
+            }
+        };
+        let order = Order {
+            side,
+            max_base_lots,
+            max_quote_lots,
+            client_order_id,
+            reduce_only,
+            time_in_force,
+            self_trade_behavior,
             params: OrderParams::OraclePegged {
                 price_offset_lots,
                 order_type: order_type.to_post_order_type()?,

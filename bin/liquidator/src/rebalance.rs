@@ -335,6 +335,7 @@ impl Rebalancer {
                         true, // reduce only
                         0,
                         10,
+                        mango_v4::state::SelfTradeBehavior::DecrementTake,
                     )
                     .await?;
                 log::info!(
