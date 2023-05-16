@@ -63,17 +63,18 @@ export async function computePriceImpactOnJup(
   const response = await (await buildFetch())(url);
 
   try {
-    let res = await response.json();
-    res = res.data[0];
-
-    if (parseFloat(res.priceImpactPct) < 0) {
-      console.log(url);
+    const res = await response.json();
+    if (res['data'] && res.data.length > 0 && res.data[0].outAmount) {
+      return {
+        outAmount: parseFloat(res.data[0].outAmount),
+        priceImpactPct: parseFloat(res.data[0].priceImpactPct),
+      };
+    } else {
+      return {
+        outAmount: -1,
+        priceImpactPct: -1,
+      };
     }
-
-    return {
-      outAmount: parseFloat(res.outAmount),
-      priceImpactPct: parseFloat(res.priceImpactPct),
-    };
   } catch (e) {
     console.log(e);
     throw e;
@@ -350,6 +351,7 @@ export async function getRiskStats(
   const groupDrop: Group = cloneDeep(group);
   Array.from(groupDrop.banksMapByTokenIndex.values())
     .flat()
+    .filter((b) => !b.name.includes('USD'))
     .forEach((b) => {
       b['oldUiPrice'] = b._uiPrice;
       b._uiPrice = b._uiPrice! * drop;
@@ -366,6 +368,7 @@ export async function getRiskStats(
   const groupRally: Group = cloneDeep(group);
   Array.from(groupRally.banksMapByTokenIndex.values())
     .flat()
+    .filter((b) => !b.name.includes('USD'))
     .forEach((b) => {
       b['oldUiPrice'] = b._uiPrice;
       b._uiPrice = b._uiPrice! * rally;
@@ -397,13 +400,13 @@ export async function getRiskStats(
     assetDrop: {
       title: `Table 1a: Liqors acquire liabs and assets. The assets and liabs are sum of max assets and max
     liabs for any token which would be liquidated to fix the health of a mango account.
-    This would be the slippage they would face on buying-liabs/offloading-assets tokens acquired from unhealth accounts after a 40% drop`,
+    This would be the slippage they would face on buying-liabs/offloading-assets tokens acquired from unhealth accounts after a 40% drop to all non-stable assets`,
       data: assetDrop,
     },
     assetRally: {
       title: `Table 1b: Liqors acquire liabs and assets. The assets and liabs are sum of max assets and max
     liabs for any token which would be liquidated to fix the health of a mango account.
-    This would be the slippage they would face on buying-liabs/offloading-assets tokens acquired from unhealth accounts after a 40% rally`,
+    This would be the slippage they would face on buying-liabs/offloading-assets tokens acquired from unhealth accounts after a 40% rally to all non-stable assets`,
       data: assetRally,
     },
     perpDrop: {

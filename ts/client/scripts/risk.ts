@@ -30,7 +30,11 @@ async function buildClient(): Promise<MangoClient> {
 async function main(): Promise<void> {
   const client = await buildClient();
   const group = await client.getGroup(new PublicKey(GROUP_PK));
-  console.log(JSON.stringify(await getRiskStats(client, group), null, 2));
+  try {
+    console.log(JSON.stringify(await getRiskStats(client, group), null, 2));
+  } catch (error) {
+    console.log(error);
+  }
 }
 
 main();
