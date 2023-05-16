@@ -48,6 +48,8 @@ export interface AccountEquity {
 export interface Risk {
   assetRally: { title: string; data: LiqorPriceImpact[] };
   assetDrop: { title: string; data: LiqorPriceImpact[] };
+  usdcDepeg: { title: string; data: LiqorPriceImpact[] };
+  usdtDepeg: { title: string; data: LiqorPriceImpact[] };
   perpRally: { title: string; data: PerpPositionsToBeLiquidated[] };
   perpDrop: { title: string; data: PerpPositionsToBeLiquidated[] };
   marketMakerEquity: { title: string; data: AccountEquity[] };
@@ -71,8 +73,8 @@ export async function computePriceImpactOnJup(
       };
     } else {
       return {
-        outAmount: -1,
-        priceImpactPct: -1,
+        outAmount: -1 / 10000,
+        priceImpactPct: -1 / 10000,
       };
     }
   } catch (e) {
@@ -211,7 +213,9 @@ export async function getPriceImpactForLiqor(
 
         return {
           Coin: { val: bank.name },
-          'Oracle Price': { val: bank['oldUiPrice'] },
+          'Oracle Price': {
+            val: bank['oldUiPrice'] ? bank['oldUiPrice'] : bank._uiPrice!,
+          },
           'On-Chain Price': { val: onChainPrice },
           'Future Price': { val: bank._uiPrice! },
           'V4 Liq Fee': {
@@ -360,7 +364,7 @@ export async function getRiskStats(
   // Get all mango accounts
   const mangoAccounts = await client.getAllMangoAccounts(group, true);
 
-  // Clone group, and simulate change % price drop for all assets
+  // Clone group, and simulate change % price drop for all assets except stables
   const drop = 1 - change;
   const groupDrop: Group = cloneDeep(group);
   Array.from(groupDrop.banksMapByTokenIndex.values())
@@ -377,7 +381,29 @@ export async function getRiskStats(
     p._price = p._price?.mul(I80F48.fromNumber(drop));
   });
 
-  // Clone group, and simulate change % price rally for all assets
+  // Clone group, and simulate change % price drop for usdc
+  const groupUsdcDepeg: Group = cloneDeep(group);
+  Array.from(groupDrop.banksMapByTokenIndex.values())
+    .flat()
+    .filter((b) => b.name.includes('USDC'))
+    .forEach((b) => {
+      b['oldUiPrice'] = b._uiPrice;
+      b._uiPrice = b._uiPrice! * drop;
+      b._price = b._price?.mul(I80F48.fromNumber(drop));
+    });
+
+  // Clone group, and simulate change % price drop for usdt
+  const groupUsdtDepeg: Group = cloneDeep(group);
+  Array.from(groupDrop.banksMapByTokenIndex.values())
+    .flat()
+    .filter((b) => b.name.includes('USDT'))
+    .forEach((b) => {
+      b['oldUiPrice'] = b._uiPrice;
+      b._uiPrice = b._uiPrice! * drop;
+      b._price = b._price?.mul(I80F48.fromNumber(drop));
+    });
+
+  // Clone group, and simulate change % price rally for all assets except stables
   const rally = 1 + change;
   const groupRally: Group = cloneDeep(group);
   Array.from(groupRally.banksMapByTokenIndex.values())
@@ -397,6 +423,8 @@ export async function getRiskStats(
   const [
     assetDrop,
     assetRally,
+    usdcDepeg,
+    usdtDepeg,
     perpDrop,
     perpRally,
     liqorEquity,
@@ -404,6 +432,8 @@ export async function getRiskStats(
   ] = await Promise.all([
     getPriceImpactForLiqor(groupDrop, mangoAccounts),
     getPriceImpactForLiqor(groupRally, mangoAccounts),
+    getPriceImpactForLiqor(groupUsdcDepeg, mangoAccounts),
+    getPriceImpactForLiqor(groupUsdtDepeg, mangoAccounts),
     getPerpPositionsToBeLiquidated(groupDrop, mangoAccounts),
     getPerpPositionsToBeLiquidated(groupRally, mangoAccounts),
     getEquityForMangoAccounts(client, group, liqors),
@@ -418,10 +448,16 @@ export async function getRiskStats(
       data: assetDrop,
     },
     assetRally: {
-      title: `Table 1b: Liqors acquire liabs and assets. The assets and liabs are sum of max assets and max
-    liabs for any token which would be liquidated to fix the health of a mango account.
-    This would be the slippage they would face on buying-liabs/offloading-assets tokens acquired from unhealth accounts after a 40% rally to all non-stable oracles`,
+      title: `Table 1b: ... same as above with a 40% rally to all non-stable oracles instead of drop`,
       data: assetRally,
+    },
+    usdcDepeg: {
+      title: `Table 1c: ... same as above with a 40% drop to only usdc oracle`,
+      data: usdcDepeg,
+    },
+    usdtDepeg: {
+      title: `Table 1d: ... same as above with a 40% drop to only usdt oracle`,
+      data: usdtDepeg,
     },
     perpDrop: {
       title: `Table 2a: Perp notional that liqor need to liquidate after a  40% drop`,
