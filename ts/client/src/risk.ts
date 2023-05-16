@@ -79,7 +79,10 @@ export async function computePriceImpactOnJup(
     }
   } catch (e) {
     console.log(e);
-    throw e;
+    return {
+      outAmount: -1 / 10000,
+      priceImpactPct: -1 / 10000,
+    };
   }
 }
 
