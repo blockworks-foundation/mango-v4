@@ -22,7 +22,7 @@ async function buildFetch(): Promise<
 }
 
 export interface LiqorPriceImpact {
-  Coin: string;
+  Coin: { val: string };
   'Oracle Price': { val: number };
   'On-Chain Price': { val: number };
   'Future Price': { val: number };
@@ -210,7 +210,7 @@ export async function getPriceImpactForLiqor(
         ]);
 
         return {
-          Coin: bank.name,
+          Coin: { val: bank.name },
           'Oracle Price': { val: bank['oldUiPrice'] },
           'On-Chain Price': { val: onChainPrice },
           'Future Price': { val: bank._uiPrice! },
