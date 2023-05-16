@@ -23,11 +23,11 @@ mango-v4 = { path = "../../programs/mango-v4", features = ["client"] }
 pyth-sdk-solana = "0.1.0"
 serum_dex = { git = "https://github.com/openbook-dex/program.git", default-features=false,features = ["no-entrypoint", "program"] }
 shellexpand = "2.1.0"
-solana-account-decoder = "~1.14.9"
-solana-client = "~1.14.9"
-solana-rpc = "~1.14.9"
-solana-sdk = "~1.14.9"
-solana-address-lookup-table-program = "~1.14.9"
+solana-account-decoder = { workspace = true }
+solana-client = { workspace = true }
+solana-rpc = { workspace = true }
+solana-sdk = { workspace = true }
+solana-address-lookup-table-program = { workspace = true }
 mango-feeds-connector = "0.1.1"
 spl-associated-token-account = "1.0.3"
 thiserror = "1.0.31"

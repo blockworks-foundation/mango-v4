@@ -5,6 +5,16 @@ members = [
     "lib/*",
 ]
 
+[workspace.dependencies]
+solana-address-lookup-table-program =  "~1.14.9"
+solana-account-decoder =  "~1.14.9"
+solana-client =  "~1.14.9"
+solana-logger =  "~1.14.9"
+solana-program =  "~1.14.9"
+solana-program-test =  "~1.14.9"
+solana-rpc =  "~1.14.9"
+solana-sdk =  "~1.14.9"
+
 [profile.release]
 overflow-checks = true
 
