@@ -22,27 +22,27 @@ async function buildFetch(): Promise<
 }
 
 export interface LiqorPriceImpact {
-  Coin: { val: string };
-  'Oracle Price': { val: number };
-  'On-Chain Price': { val: number };
-  'Future Price': { val: number };
-  'V4 Liq Fee': { val: number };
-  Liabs: { val: number };
-  'Liabs Slippage': { val: number };
-  Assets: { val: number };
-  'Assets Slippage': { val: number };
+  Coin: { val: string; highlight: boolean };
+  'Oracle Price': { val: number; highlight: boolean };
+  'On-Chain Price': { val: number; highlight: boolean };
+  'Future Price': { val: number; highlight: boolean };
+  'V4 Liq Fee': { val: number; highlight: boolean };
+  Liabs: { val: number; highlight: boolean };
+  'Liabs Slippage': { val: number; highlight: boolean };
+  Assets: { val: number; highlight: boolean };
+  'Assets Slippage': { val: number; highlight: boolean };
 }
 
 export interface PerpPositionsToBeLiquidated {
-  Market: { val: string };
-  Price: { val: number };
-  'Future Price': { val: number };
-  'Notional Position': { val: number };
+  Market: { val: string; highlight: boolean };
+  Price: { val: number; highlight: boolean };
+  'Future Price': { val: number; highlight: boolean };
+  'Notional Position': { val: number; highlight: boolean };
 }
 
 export interface AccountEquity {
-  Account: { val: PublicKey };
-  Equity: { val: number };
+  Account: { val: PublicKey; highlight: boolean };
+  Equity: { val: number; highlight: boolean };
 }
 
 export interface Risk {
@@ -218,23 +218,45 @@ export async function getPriceImpactForLiqor(
         ]);
 
         return {
-          Coin: { val: bank.name },
+          Coin: { val: bank.name, highlight: false },
           'Oracle Price': {
             val: bank['oldUiPrice'] ? bank['oldUiPrice'] : bank._uiPrice!,
+            highlight: false,
           },
-          'On-Chain Price': { val: bank['onChainPrice'] },
-          'Future Price': { val: bank._uiPrice! },
+          'On-Chain Price': {
+            val: bank['onChainPrice'],
+            highlight:
+              Math.abs(
+                (bank['onChainPrice'] - bank._uiPrice!) / bank._uiPrice!,
+              ) > 0.05,
+          },
+          'Future Price': { val: bank._uiPrice!, highlight: false },
           'V4 Liq Fee': {
             val: Math.round(bank.liquidationFee.toNumber() * 10000),
+            highlight: false,
           },
-          Liabs: { val: Math.round(toUiDecimalsForQuote(liabsInUsdc)) },
-          'Liabs Slippage': { val: Math.round(pi1.priceImpactPct * 10000) },
+          Liabs: {
+            val: Math.round(toUiDecimalsForQuote(liabsInUsdc)),
+            highlight: Math.round(toUiDecimalsForQuote(liabsInUsdc)) > 5000,
+          },
+          'Liabs Slippage': {
+            val: Math.round(pi1.priceImpactPct * 10000),
+            highlight:
+              Math.round(pi1.priceImpactPct * 10000) >
+              Math.round(bank.liquidationFee.toNumber() * 10000),
+          },
           Assets: {
             val: Math.round(
               toUiDecimals(assets, bank.mintDecimals) * bank.uiPrice,
             ),
+            highlight: Math.round(toUiDecimalsForQuote(liabsInUsdc)) > 5000,
           },
-          'Assets Slippage': { val: Math.round(pi2.priceImpactPct * 10000) },
+          'Assets Slippage': {
+            val: Math.round(pi2.priceImpactPct * 10000),
+            highlight:
+              Math.round(pi2.priceImpactPct * 10000) >
+              Math.round(bank.liquidationFee.toNumber() * 10000),
+          },
         };
       }),
   );
@@ -301,10 +323,13 @@ export async function getPerpPositionsToBeLiquidated(
       );
 
       return {
-        Market: { val: pm.name },
-        Price: { val: pm['oldUiPrice'] },
-        'Future Price': { val: pm._uiPrice },
-        'Notional Position': { val: Math.round(notionalPositionUi) },
+        Market: { val: pm.name, highlight: false },
+        Price: { val: pm['oldUiPrice'], highlight: false },
+        'Future Price': { val: pm._uiPrice, highlight: false },
+        'Notional Position': {
+          val: Math.round(notionalPositionUi),
+          highlight: Math.round(notionalPositionUi) > 5000,
+        },
       };
     });
 }
@@ -330,8 +355,11 @@ export async function getEquityForMangoAccounts(
 
   const accountsWithEquity = liqorMangoAccounts.map((a: MangoAccount) => {
     return {
-      Account: { val: a.publicKey },
-      Equity: { val: Math.round(toUiDecimalsForQuote(a.getEquity(group))) },
+      Account: { val: a.publicKey, highlight: false },
+      Equity: {
+        val: Math.round(toUiDecimalsForQuote(a.getEquity(group))),
+        highlight: false,
+      },
     };
   });
   accountsWithEquity.sort((a, b) => b.Equity.val - a.Equity.val);
