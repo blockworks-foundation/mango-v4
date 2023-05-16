@@ -6,18 +6,32 @@ members = [
 ]
 
 [workspace.dependencies]
-solana-address-lookup-table-program =  "~1.14.9"
-solana-account-decoder =  "~1.14.9"
-solana-client =  "~1.14.9"
-solana-logger =  "~1.14.9"
-solana-program =  "~1.14.9"
-solana-program-test =  "~1.14.9"
-solana-rpc =  "~1.14.9"
-solana-sdk =  "~1.14.9"
+solana-address-lookup-table-program = { git = "https://github.com/solana-labs/solana", branch = "mergify/bp/v1.14/pr-31637" }
+solana-account-decoder = { git = "https://github.com/solana-labs/solana", branch = "mergify/bp/v1.14/pr-31637" }
+solana-client = { git = "https://github.com/solana-labs/solana", branch = "mergify/bp/v1.14/pr-31637" }
+solana-logger = { git = "https://github.com/solana-labs/solana", branch = "mergify/bp/v1.14/pr-31637" }
+solana-program = { git = "https://github.com/solana-labs/solana", branch = "mergify/bp/v1.14/pr-31637" }
+solana-program-test = { git = "https://github.com/solana-labs/solana", branch = "mergify/bp/v1.14/pr-31637" }
+solana-rpc = { git = "https://github.com/solana-labs/solana", branch = "mergify/bp/v1.14/pr-31637" }
+solana-sdk = { git = "https://github.com/solana-labs/solana", branch = "mergify/bp/v1.14/pr-31637" }
 
 [profile.release]
 overflow-checks = true
 
 [patch.crates-io]
 # for gzip encoded responses
-jsonrpc-core-client = { git = "https://github.com/ckamm/jsonrpc.git", branch = "ckamm/http-with-gzip" }
+jsonrpc-core-client = { git = "https://github.com/ckamm/jsonrpc", branch = "ckamm/http-with-gzip" }
+# for improving CI reliability
+solana-address-lookup-table-program = { git = "https://github.com/solana-labs/solana", branch = "mergify/bp/v1.14/pr-31637" }
+solana-account-decoder = { git = "https://github.com/solana-labs/solana", branch = "mergify/bp/v1.14/pr-31637" }
+solana-client = { git = "https://github.com/solana-labs/solana", branch = "mergify/bp/v1.14/pr-31637" }
+solana-logger = { git = "https://github.com/solana-labs/solana", branch = "mergify/bp/v1.14/pr-31637" }
+solana-program = { git = "https://github.com/solana-labs/solana", branch = "mergify/bp/v1.14/pr-31637" }
+solana-program-test = { git = "https://github.com/solana-labs/solana", branch = "mergify/bp/v1.14/pr-31637" }
+solana-rpc = { git = "https://github.com/solana-labs/solana", branch = "mergify/bp/v1.14/pr-31637" }
+solana-sdk = { git = "https://github.com/solana-labs/solana", branch = "mergify/bp/v1.14/pr-31637" }
+solana-zk-token-sdk = { git = "https://github.com/solana-labs/solana", branch = "mergify/bp/v1.14/pr-31637" }
+spl-token = { git = "https://github.com/solana-labs/solana-program-library", branch="master" }
+spl-token-2022 = { git = "https://github.com/solana-labs/solana-program-library", tag="token-2022-v0.6.0" }
+anchor-lang = { git = "https://github.com/blockworks-foundation/anchor", branch = "v0.27.0-solana-v1.14.19" }
+anchor-spl = { git = "https://github.com/blockworks-foundation/anchor", branch = "v0.27.0-solana-v1.14.19" }

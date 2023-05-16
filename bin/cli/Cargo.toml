@@ -1,3 +1,5 @@
+cargo-features = ["workspace-inheritance"]
+
 [package]
 name = "mango-v4-cli"
 version = "0.3.0"
