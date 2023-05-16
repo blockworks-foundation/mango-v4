@@ -24,7 +24,7 @@ async function buildFetch(): Promise<
 export interface LiqorPriceImpact {
   Coin: { val: string; highlight: boolean };
   'Oracle Price': { val: number; highlight: boolean };
-  'On-Chain Price': { val: number; highlight: boolean };
+  'Jup Price': { val: number; highlight: boolean };
   'Future Price': { val: number; highlight: boolean };
   'V4 Liq Fee': { val: number; highlight: boolean };
   Liabs: { val: number; highlight: boolean };
@@ -223,11 +223,13 @@ export async function getPriceImpactForLiqor(
             val: bank['oldUiPrice'] ? bank['oldUiPrice'] : bank._uiPrice!,
             highlight: false,
           },
-          'On-Chain Price': {
+          'Jup Price': {
             val: bank['onChainPrice'],
             highlight:
               Math.abs(
-                (bank['onChainPrice'] - bank._uiPrice!) / bank._uiPrice!,
+                (bank['onChainPrice'] -
+                  (bank['oldUiPrice'] ? bank['oldUiPrice'] : bank._uiPrice!)) /
+                  (bank['oldUiPrice'] ? bank['oldUiPrice'] : bank._uiPrice!),
               ) > 0.05,
           },
           'Future Price': { val: bank._uiPrice!, highlight: false },
@@ -249,7 +251,10 @@ export async function getPriceImpactForLiqor(
             val: Math.round(
               toUiDecimals(assets, bank.mintDecimals) * bank.uiPrice,
             ),
-            highlight: Math.round(toUiDecimalsForQuote(liabsInUsdc)) > 5000,
+            highlight:
+              Math.round(
+                toUiDecimals(assets, bank.mintDecimals) * bank.uiPrice,
+              ) > 5000,
           },
           'Assets Slippage': {
             val: Math.round(pi2.priceImpactPct * 10000),
