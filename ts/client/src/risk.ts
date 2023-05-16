@@ -23,26 +23,26 @@ async function buildFetch(): Promise<
 
 export interface LiqorPriceImpact {
   Coin: string;
-  'Oracle Price': number;
-  'On-Chain Price': number;
-  'Future Price': number;
-  'V4 Liq Fee': number;
-  Liabs: number;
-  'Liabs slippage': number;
-  Assets: number;
-  'Assets Slippage': number;
+  'Oracle Price': { val: number };
+  'On-Chain Price': { val: number };
+  'Future Price': { val: number };
+  'V4 Liq Fee': { val: number };
+  Liabs: { val: number };
+  'Liabs Slippage': { val: number };
+  Assets: { val: number };
+  'Assets Slippage': { val: number };
 }
 
 export interface PerpPositionsToBeLiquidated {
-  Market: string;
-  Price: number;
-  'Future Price': number;
-  'Notional Position': number;
+  Market: { val: string };
+  Price: { val: number };
+  'Future Price': { val: number };
+  'Notional Position': { val: number };
 }
 
 export interface AccountEquity {
-  Account: PublicKey;
-  Equity: number;
+  Account: { val: PublicKey };
+  Equity: { val: number };
 }
 
 export interface Risk {
@@ -211,16 +211,20 @@ export async function getPriceImpactForLiqor(
 
         return {
           Coin: bank.name,
-          'Oracle Price': bank['oldUiPrice'],
-          'On-Chain Price': onChainPrice,
-          'Future Price': bank._uiPrice!,
-          'V4 Liq Fee': Math.round(bank.liquidationFee.toNumber() * 10000),
-          Liabs: Math.round(toUiDecimalsForQuote(liabsInUsdc)),
-          'Liabs slippage': Math.round(pi1.priceImpactPct * 10000),
-          Assets: Math.round(
-            toUiDecimals(assets, bank.mintDecimals) * bank.uiPrice,
-          ),
-          'Assets Slippage': Math.round(pi2.priceImpactPct * 10000),
+          'Oracle Price': { val: bank['oldUiPrice'] },
+          'On-Chain Price': { val: onChainPrice },
+          'Future Price': { val: bank._uiPrice! },
+          'V4 Liq Fee': {
+            val: Math.round(bank.liquidationFee.toNumber() * 10000),
+          },
+          Liabs: { val: Math.round(toUiDecimalsForQuote(liabsInUsdc)) },
+          'Liabs Slippage': { val: Math.round(pi1.priceImpactPct * 10000) },
+          Assets: {
+            val: Math.round(
+              toUiDecimals(assets, bank.mintDecimals) * bank.uiPrice,
+            ),
+          },
+          'Assets Slippage': { val: Math.round(pi2.priceImpactPct * 10000) },
         };
       }),
   );
@@ -287,10 +291,10 @@ export async function getPerpPositionsToBeLiquidated(
       );
 
       return {
-        Market: pm.name,
-        Price: pm['oldUiPrice'],
-        'Future Price': pm._uiPrice,
-        'Notional Position': Math.round(notionalPositionUi),
+        Market: { val: pm.name },
+        Price: { val: pm['oldUiPrice'] },
+        'Future Price': { val: pm._uiPrice },
+        'Notional Position': { val: Math.round(notionalPositionUi) },
       };
     });
 }
@@ -316,11 +320,11 @@ export async function getEquityForMangoAccounts(
 
   const accountsWithEquity = liqorMangoAccounts.map((a: MangoAccount) => {
     return {
-      Account: a.publicKey,
-      Equity: Math.round(toUiDecimalsForQuote(a.getEquity(group))),
+      Account: { val: a.publicKey },
+      Equity: { val: Math.round(toUiDecimalsForQuote(a.getEquity(group))) },
     };
   });
-  accountsWithEquity.sort((a, b) => b.Equity - a.Equity);
+  accountsWithEquity.sort((a, b) => b.Equity.val - a.Equity.val);
   return accountsWithEquity;
 }
 
@@ -410,13 +414,13 @@ export async function getRiskStats(
     assetDrop: {
       title: `Table 1a: Liqors acquire liabs and assets. The assets and liabs are sum of max assets and max
     liabs for any token which would be liquidated to fix the health of a mango account.
-    This would be the slippage they would face on buying-liabs/offloading-assets tokens acquired from unhealth accounts after a 40% drop to all non-stable assets`,
+    This would be the slippage they would face on buying-liabs/offloading-assets tokens acquired from unhealth accounts after a 40% drop to all non-stable oracles`,
       data: assetDrop,
     },
     assetRally: {
       title: `Table 1b: Liqors acquire liabs and assets. The assets and liabs are sum of max assets and max
     liabs for any token which would be liquidated to fix the health of a mango account.
-    This would be the slippage they would face on buying-liabs/offloading-assets tokens acquired from unhealth accounts after a 40% rally to all non-stable assets`,
+    This would be the slippage they would face on buying-liabs/offloading-assets tokens acquired from unhealth accounts after a 40% rally to all non-stable oracles`,
       data: assetRally,
     },
     perpDrop: {
