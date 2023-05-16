@@ -17,9 +17,13 @@ jobs:
         with:
           submodules: 'recursive'
 
+      - name: Setup Anchor
+        run: |
+          cargo install --git https://github.com/coral-xyz/anchor --tag v0.27.0 anchor-cli --locked --force
+
       - name: Verifiable Build
         run: |
-          cargo run -p anchor-cli -- build --verifiable --solana-version 1.14.13 -- --features enable-gpl
+          anchor build --verifiable --solana-version 1.14.13 -- --features enable-gpl
 
       - name: Generate Checksum
         run: |
