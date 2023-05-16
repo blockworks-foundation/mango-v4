@@ -102,7 +102,6 @@ export async function getPriceImpactForLiqor(
   return await Promise.all(
     Array.from(group.banksMapByMint.values())
       .sort((a, b) => a[0].name.localeCompare(b[0].name))
-      .filter((banks) => banks[0].tokenIndex !== usdcBank.tokenIndex)
       .map(async (banks) => {
         const bank = banks[0];
 
@@ -126,6 +125,11 @@ export async function getPriceImpactForLiqor(
               .getEffectiveTokenBalance(group, bank)
               .min(ZERO_I80F48())
               .abs();
+
+            if (tokenLiabHealthContrib.eq(ZERO_I80F48())) {
+              return sum.add(maxTokenLiab);
+            }
+
             // Health under 0
             const maxLiab = a.health
               .min(ZERO_I80F48())
@@ -159,10 +163,16 @@ export async function getPriceImpactForLiqor(
               .div(ONE_I80F48().add(liabBank.liquidationFee))
               .sub(bank.initAssetWeight),
           );
+
           // Abs collateral/asset
           const maxTokenHealthAsset = a.account
             .getEffectiveTokenBalance(group, bank)
             .max(ZERO_I80F48());
+
+          if (tokenAssetHealthContrib.eq(ZERO_I80F48())) {
+            return sum.add(maxTokenHealthAsset);
+          }
+
           const maxAsset = a.health
             .min(ZERO_I80F48())
             .abs()
