@@ -65,6 +65,11 @@ export async function computePriceImpactOnJup(
   try {
     let res = await response.json();
     res = res.data[0];
+
+    if (parseFloat(res.priceImpactPct) < 0) {
+      console.log(url);
+    }
+
     return {
       outAmount: parseFloat(res.outAmount),
       priceImpactPct: parseFloat(res.priceImpactPct),
@@ -198,11 +203,13 @@ export async function getPriceImpactForLiqor(
           'Oracle Price': bank['oldUiPrice'],
           'On-Chain Price': onChainPrice,
           'Future Price': bank._uiPrice!,
-          'V4 Liq Fee': bank.liquidationFee.toNumber() * 10000,
-          Liabs: toUiDecimalsForQuote(liabsInUsdc),
-          'Liabs slippage': pi1.priceImpactPct * 10000,
-          Assets: toUiDecimals(assets, bank.mintDecimals) * bank.uiPrice,
-          'Assets Slippage': pi2.priceImpactPct * 10000,
+          'V4 Liq Fee': Math.round(bank.liquidationFee.toNumber() * 10000),
+          Liabs: Math.round(toUiDecimalsForQuote(liabsInUsdc)),
+          'Liabs slippage': Math.round(pi1.priceImpactPct * 10000),
+          Assets: Math.round(
+            toUiDecimals(assets, bank.mintDecimals) * bank.uiPrice,
+          ),
+          'Assets Slippage': Math.round(pi2.priceImpactPct * 10000),
         };
       }),
   );
@@ -272,7 +279,7 @@ export async function getPerpPositionsToBeLiquidated(
         Market: pm.name,
         Price: pm['oldUiPrice'],
         'Future Price': pm._uiPrice,
-        'Notional Position': notionalPositionUi,
+        'Notional Position': Math.round(notionalPositionUi),
       };
     });
 }
@@ -299,7 +306,7 @@ export async function getEquityForMangoAccounts(
   const accountsWithEquity = liqorMangoAccounts.map((a: MangoAccount) => {
     return {
       Account: a.publicKey,
-      Equity: toUiDecimalsForQuote(a.getEquity(group)),
+      Equity: Math.round(toUiDecimalsForQuote(a.getEquity(group))),
     };
   });
   accountsWithEquity.sort((a, b) => b.Equity - a.Equity);
