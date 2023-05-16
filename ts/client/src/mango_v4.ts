@@ -9443,6 +9443,11 @@ export type MangoV4 = {
           "index": false
         },
         {
+          "name": "totalBaseLotsDecremented",
+          "type": "i64",
+          "index": false
+        },
+        {
           "name": "totalQuoteLotsTaken",
           "type": "i64",
           "index": false
@@ -19250,6 +19255,11 @@ export const IDL: MangoV4 = {
         },
         {
           "name": "totalBaseLotsTaken",
+          "type": "i64",
+          "index": false
+        },
+        {
+          "name": "totalBaseLotsDecremented",
           "type": "i64",
           "index": false
         },
