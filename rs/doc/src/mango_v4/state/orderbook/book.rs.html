@@ -464,6 +464,11 @@
 <span id="464">464</span>
 <span id="465">465</span>
 <span id="466">466</span>
+<span id="467">467</span>
+<span id="468">468</span>
+<span id="469">469</span>
+<span id="470">470</span>
+<span id="471">471</span>
 </pre><pre class="rust"><code><span class="kw">use </span><span class="kw">crate</span>::logs::{FilledPerpOrderLog, PerpTakerTradeLog};
 <span class="kw">use </span><span class="kw">crate</span>::state::MangoAccountRefMut;
 <span class="kw">use crate</span>::{
@@ -544,6 +549,7 @@
         // matched_changes/matched_deletes and then applied after this loop.
         </span><span class="kw">let </span><span class="kw-2">mut </span>remaining_base_lots = order.max_base_lots;
         <span class="kw">let </span><span class="kw-2">mut </span>remaining_quote_lots = order.max_quote_lots;
+        <span class="kw">let </span><span class="kw-2">mut </span>decremented_base_lots = <span class="number">0i64</span>;
         <span class="kw">let </span><span class="kw-2">mut </span>decremented_quote_lots = <span class="number">0i64</span>;
         <span class="kw">let </span><span class="kw-2">mut </span>orders_to_change: Vec&lt;(BookSideOrderHandle, i64)&gt; = <span class="macro">vec!</span>[];
         <span class="kw">let </span><span class="kw-2">mut </span>orders_to_delete: Vec&lt;(BookSideOrderTree, u128)&gt; = <span class="macro">vec!</span>[];
@@ -604,6 +610,8 @@
                     SelfTradeBehavior::DecrementTake =&gt; {
                         <span class="comment">// remember all decremented quote lots to only charge fees on not-self-trades
                         </span>decremented_quote_lots += match_quote_lots;
+                        <span class="comment">// decremented base lots are only tracked for logging
+                        </span>decremented_base_lots += match_base_lots;
                     }
                     SelfTradeBehavior::CancelProvide =&gt; {
                         <span class="kw">let </span>event = OutEvent::new(
@@ -695,6 +703,7 @@
                 perp_market_index: market.perp_market_index,
                 taker_side: side <span class="kw">as </span>u8,
                 total_base_lots_taken,
+                total_base_lots_decremented: decremented_base_lots,
                 total_quote_lots_taken,
                 total_quote_lots_decremented: decremented_quote_lots,
                 taker_fees_paid: taker_fees_paid.to_bits(),
@@ -888,6 +897,7 @@
     account: <span class="kw-2">&amp;mut </span>MangoAccountRefMut,
     quote_lots: i64,
 ) -&gt; <span class="prelude-ty">Result</span>&lt;I80F48&gt; {
+    <span class="macro">assert!</span>(quote_lots &gt;= <span class="number">0</span>);
     <span class="kw">let </span>quote_native = I80F48::from_num(market.quote_lot_size * quote_lots);
 
     <span class="comment">// The maker fees apply to the maker&#39;s account only when the fill event is consumed.
