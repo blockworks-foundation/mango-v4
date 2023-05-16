@@ -133,11 +133,28 @@ export async function getPriceImpactForLiqor(
           mangoAccountsWithHealth.reduce((sum, a) => {
             // How much would health increase for every unit liab moved to liqor
             // liabprice * (liabweight - (1+fee)*assetweight)
+            // Choose the most valuable asset the user has
+            const assetBank = Array.from(group.banksMapByTokenIndex.values())
+              .flat()
+              .reduce((prev, curr) =>
+                prev.initAssetWeight
+                  .mul(a.account.getEffectiveTokenBalance(group, prev))
+                  .mul(prev._price!)
+                  .gt(
+                    curr.initAssetWeight.mul(
+                      a.account
+                        .getEffectiveTokenBalance(group, curr)
+                        .mul(curr._price!),
+                    ),
+                  )
+                  ? prev
+                  : curr,
+              );
             const tokenLiabHealthContrib = bank.price.mul(
               bank.initLiabWeight.sub(
                 ONE_I80F48()
                   .add(bank.liquidationFee)
-                  .mul(usdcBank.initAssetWeight),
+                  .mul(assetBank.initAssetWeight),
               ),
             );
             // Abs liab/borrow
@@ -173,10 +190,22 @@ export async function getPriceImpactForLiqor(
         const assets = mangoAccountsWithHealth.reduce((sum, a) => {
           // How much would health increase for every unit liab moved to liqor
           // assetprice * (liabweight/(1+liabliqfee) - assetweight)
+          // Choose the smallest liability the user has
           const liabBank = Array.from(group.banksMapByTokenIndex.values())
             .flat()
             .reduce((prev, curr) =>
-              prev.initLiabWeight.lt(curr.initLiabWeight) ? prev : curr,
+              prev.initLiabWeight
+                .mul(a.account.getEffectiveTokenBalance(group, prev))
+                .mul(prev._price!)
+                .lt(
+                  curr.initLiabWeight.mul(
+                    a.account
+                      .getEffectiveTokenBalance(group, curr)
+                      .mul(curr._price!),
+                  ),
+                )
+                ? prev
+                : curr,
             );
           const tokenAssetHealthContrib = bank.price.mul(
             liabBank.initLiabWeight
@@ -405,6 +434,12 @@ export async function getRiskStats(
 
   // Get all mango accounts
   const mangoAccounts = await client.getAllMangoAccounts(group, true);
+  // const mangoAccounts = [
+  //   await client.getMangoAccount(
+  //     new PublicKey('5G9XriaoqQy1V4s9RmnbczWAozzbv6h2RuEeAHk4R6Lb'), // https://app.mango.markets/stats?token=SOL
+  //     true,
+  //   ),
+  // ];
 
   // Get on chain prices
   const mints = [
