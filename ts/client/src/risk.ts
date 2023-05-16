@@ -83,6 +83,21 @@ export async function computePriceImpactOnJup(
   }
 }
 
+export async function getOnChainPriceForMints(
+  mints: string[],
+): Promise<number[]> {
+  return await Promise.all(
+    mints.map(async (mint) => {
+      let data = await (
+        await buildFetch()
+      )(`https://price.jup.ag/v4/price?ids=${mint}`);
+      data = await data.json();
+      data = data['data'];
+      return data[mint]['price'];
+    }),
+  );
+}
+
 export async function getPriceImpactForLiqor(
   group: Group,
   mangoAccounts: MangoAccount[],
@@ -184,16 +199,7 @@ export async function getPriceImpactForLiqor(
           return sum.add(maxAsset);
         }, ZERO_I80F48());
 
-        let data;
-        data = await (
-          await buildFetch()
-        )(`https://price.jup.ag/v4/price?ids=${bank.mint}`);
-        data = await data.json();
-        data = data['data'];
-
-        const [onChainPrice, pi1, pi2] = await Promise.all([
-          data[bank.mint.toBase58()]['price'],
-
+        const [pi1, pi2] = await Promise.all([
           !liabsInUsdc.eq(ZERO_I80F48())
             ? computePriceImpactOnJup(
                 liabsInUsdc.toString(),
@@ -216,7 +222,7 @@ export async function getPriceImpactForLiqor(
           'Oracle Price': {
             val: bank['oldUiPrice'] ? bank['oldUiPrice'] : bank._uiPrice!,
           },
-          'On-Chain Price': { val: onChainPrice },
+          'On-Chain Price': { val: bank['onChainPrice'] },
           'Future Price': { val: bank._uiPrice! },
           'V4 Liq Fee': {
             val: Math.round(bank.liquidationFee.toNumber() * 10000),
@@ -364,6 +370,30 @@ export async function getRiskStats(
   // Get all mango accounts
   const mangoAccounts = await client.getAllMangoAccounts(group, true);
 
+  // Get on chain prices
+  const mints = [
+    ...new Set(
+      Array.from(group.banksMapByTokenIndex.values())
+        .flat()
+        .map((bank) => bank.mint.toString()),
+    ),
+  ];
+  const prices = await getOnChainPriceForMints([
+    ...new Set(
+      Array.from(group.banksMapByTokenIndex.values())
+        .flat()
+        .map((bank) => bank.mint.toString()),
+    ),
+  ]);
+  const onChainPrices = Object.fromEntries(
+    prices.map((price, i) => [mints[i], price]),
+  );
+  Array.from(group.banksMapByTokenIndex.values())
+    .flat()
+    .forEach((b) => {
+      b['onChainPrice'] = onChainPrices[b.mint.toBase58()];
+    });
+
   // Clone group, and simulate change % price drop for all assets except stables
   const drop = 1 - change;
   const groupDrop: Group = cloneDeep(group);
@@ -448,15 +478,15 @@ export async function getRiskStats(
       data: assetDrop,
     },
     assetRally: {
-      title: `Table 1b: ... same as above with a 40% rally to all non-stable oracles instead of drop`,
+      title: `Table 1b: ... same as above but with a 40% rally to all non-stable oracles instead of drop`,
       data: assetRally,
     },
     usdcDepeg: {
-      title: `Table 1c: ... same as above with a 40% drop to only usdc oracle`,
+      title: `Table 1c: ... same as above but with a 40% drop to only usdc oracle`,
       data: usdcDepeg,
     },
     usdtDepeg: {
-      title: `Table 1d: ... same as above with a 40% drop to only usdt oracle`,
+      title: `Table 1d: ... same as above but with a 40% drop to only usdt oracle`,
       data: usdtDepeg,
     },
     perpDrop: {
