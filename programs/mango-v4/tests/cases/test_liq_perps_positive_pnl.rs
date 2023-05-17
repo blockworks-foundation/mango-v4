@@ -3,15 +3,15 @@ use super::*;
 #[tokio::test]
 async fn test_liq_perps_positive_pnl() -> Result<(), TransportError> {
     let mut test_builder = TestContextBuilder::new();
-    test_builder.test().set_compute_max_units(140_000); // PerpLiqNegativePnlOrBankruptcy takes a lot of CU
+    test_builder.test().set_compute_max_units(170_000); // PerpLiqBaseOrPositivePnlInstruction takes a lot of CU
     let context = test_builder.start_default().await;
     let solana = &context.solana.clone();
 
     let admin = TestKeypair::new();
     let owner = context.users[0].key;
     let payer = context.users[1].key;
-    let mints = &context.mints[0..3];
-    let payer_mint_accounts = &context.users[1].token_accounts[0..3];
+    let mints = &context.mints[0..4];
+    let payer_mint_accounts = &context.users[1].token_accounts[0..4];
 
     //
     // SETUP: Create a group and an account to fill the vaults
@@ -51,9 +51,10 @@ async fn test_liq_perps_positive_pnl() -> Result<(), TransportError> {
         tx.send().await.unwrap();
     }
 
-    let quote_token = &tokens[0];
+    let _quote_token = &tokens[0];
     let base_token = &tokens[1];
     let borrow_token = &tokens[2];
+    let settle_token = &tokens[3];
 
     // deposit some funds, to the vaults aren't empty
     let liqor = create_funded_account(
@@ -78,6 +79,7 @@ async fn test_liq_perps_positive_pnl() -> Result<(), TransportError> {
             admin,
             payer,
             perp_market_index: 0,
+            settle_token_index: 3,
             quote_lot_size: 10,
             base_lot_size: 100,
             maint_base_asset_weight: 0.8,
@@ -188,22 +190,22 @@ async fn test_liq_perps_positive_pnl() -> Result<(), TransportError> {
     .unwrap();
 
     // after this order exchange it is changed by
-    //   10*10*100*(0.5-1) = -5000 for the long account0
-    //   10*10*100*(1-1.5) = -5000 for the short account1
+    //   10*10*100*(0.5-1)*1.4 = -7000 for the long account0
+    //   10*10*100*(1-1.5)*1.4 = -7000 for the short account1
     // (100 is base lot size)
     assert_eq!(
         account_init_health(solana, account_0).await.round(),
-        (10000.0f64 - 1000.5 * 1.4 - 5000.0).round()
+        (10000.0f64 - 1000.5 * 1.4 - 7000.0).round()
     );
     assert_eq!(
         account_init_health(solana, account_1).await.round(),
-        10000.0 - 5000.0
+        10000.0 - 7000.0
     );
 
     //
     // SETUP: Change the perp oracle to make perp-based health go positive for account_0
     // perp base value goes to 10*21*100*0.5, exceeding the negative quote
-    // unweighted perp health is 10*1*100*0.5 = 500
+    // perp uhupnl is 10*21*100*0.5 - 10*10*100 = 500
     // but health doesn't exceed 10k because of the 0 overall weight
     //
     set_perp_stub_oracle_price(solana, group, perp_market, &base_token, admin, 21.0).await;
@@ -265,15 +267,15 @@ async fn test_liq_perps_positive_pnl() -> Result<(), TransportError> {
     assert_eq!(liqor_data.perps[0].base_position_lots(), 0);
     assert_eq!(liqor_data.perps[0].quote_position_native(), 100);
     assert_eq!(
-        account_position(solana, liqor, quote_token.bank).await,
+        account_position(solana, liqor, settle_token.bank).await,
         10000 - 95
     );
     let liqee_data = solana.get_account::<MangoAccount>(account_0).await;
     assert_eq!(liqee_data.perps[0].base_position_lots(), 10);
     assert_eq!(liqee_data.perps[0].quote_position_native(), -10100);
     assert_eq!(
-        account_position(solana, account_0, quote_token.bank).await,
-        10000 + 95
+        account_position(solana, account_0, settle_token.bank).await,
+        95
     );
 
     //
@@ -301,7 +303,7 @@ async fn test_liq_perps_positive_pnl() -> Result<(), TransportError> {
         0.1
     ));
     assert_eq!(
-        account_position(solana, liqor, quote_token.bank).await,
+        account_position(solana, liqor, settle_token.bank).await,
         10000 - 95 - 570
     );
     let liqee_data = solana.get_account::<MangoAccount>(account_0).await;
@@ -312,8 +314,8 @@ async fn test_liq_perps_positive_pnl() -> Result<(), TransportError> {
         0.1
     ));
     assert_eq!(
-        account_position(solana, account_0, quote_token.bank).await,
-        10000 + 95 + 570
+        account_position(solana, account_0, settle_token.bank).await,
+        95 + 570
     );
 
     //
@@ -348,9 +350,6 @@ async fn test_liq_perps_positive_pnl() -> Result<(), TransportError> {
     //
     // TEST: if overall perp health weight is >0, we can liquidate the base position further
     //
-
-    // reduce the price some more, so the liq instruction can do some of step1 and step2
-    set_perp_stub_oracle_price(solana, group, perp_market, &base_token, admin, 17.0).await;
 
     send_tx(
         solana,
@@ -403,7 +402,7 @@ async fn test_liq_perps_positive_pnl() -> Result<(), TransportError> {
     .unwrap();
 
     let liqee_data = solana.get_account::<MangoAccount>(account_0).await;
-    assert_eq!(liqee_data.perps[0].base_position_lots(), 3);
+    assert_eq!(liqee_data.perps[0].base_position_lots(), 1);
     let health = account_init_health(solana, account_0).await;
     assert!(health > 0.0);
     assert!(health < 1.0);

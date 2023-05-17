@@ -283,83 +283,6 @@ impl<'a> LiquidateHelper<'a> {
         Ok(Some(sig))
     }
 
-    /*
-    async fn perp_settle_pnl(&self) -> anyhow::Result<Option<Signature>> {
-        let perp_settle_health = self.health_cache.perp_settle_health();
-        let mut perp_settleable_pnl = self
-            .liqee
-            .active_perp_positions()
-            .filter_map(|pp| {
-                if pp.base_position_lots() != 0 {
-                    return None;
-                }
-                let pnl = pp.quote_position_native();
-                // TODO: outdated: must account for perp settle limit
-                let settleable_pnl = if pnl > 0 {
-                    pnl
-                } else if pnl < 0 && perp_settle_health > 0 {
-                    pnl.max(-perp_settle_health)
-                } else {
-                    return None;
-                };
-                if settleable_pnl.abs() < 1 {
-                    return None;
-                }
-                Some((pp.market_index, settleable_pnl))
-            })
-            .collect::<Vec<(PerpMarketIndex, I80F48)>>();
-        // sort by pnl, descending
-        perp_settleable_pnl.sort_by(|a, b| b.1.cmp(&a.1));
-
-        if perp_settleable_pnl.is_empty() {
-            return Ok(None);
-        }
-
-        for (perp_index, pnl) in perp_settleable_pnl {
-            let direction = if pnl > 0 {
-                client::perp_pnl::Direction::MaxNegative
-            } else {
-                client::perp_pnl::Direction::MaxPositive
-            };
-            let counters = client::perp_pnl::fetch_top(
-                &self.client.context,
-                self.account_fetcher,
-                perp_index,
-                direction,
-                2,
-            )
-            .await?;
-            if counters.is_empty() {
-                // If we can't settle some positive PNL because we're lacking a suitable counterparty,
-                // then liquidation should continue, even though this step produced no transaction
-                log::info!("Could not settle perp pnl {pnl} for account {}, perp market {perp_index}: no counterparty",
-            self.pubkey);
-                continue;
-            }
-            let (counter_key, counter_acc, counter_pnl) = counters.first().unwrap();
-
-            log::info!("Trying to settle perp pnl account: {} market_index: {perp_index} amount: {pnl} against {counter_key} with pnl: {counter_pnl}", self.pubkey);
-
-            let (account_a, account_b) = if pnl > 0 {
-                ((self.pubkey, self.liqee), (counter_key, counter_acc))
-            } else {
-                ((counter_key, counter_acc), (self.pubkey, self.liqee))
-            };
-            let sig = self
-                .client
-                .perp_settle_pnl(perp_index, account_a, account_b)
-                .await?;
-            log::info!(
-                "Settled perp pnl for perp market on account {}, market index {perp_index}, maint_health was {}, tx sig {sig:?}",
-                self.pubkey,
-                self.maint_health,
-            );
-            return Ok(Some(sig));
-        }
-        return Ok(None);
-    }
-    */
-
     async fn perp_liq_negative_pnl_or_bankruptcy(&self) -> anyhow::Result<Option<Signature>> {
         if !self.health_cache.in_phase3_liquidation() {
             return Ok(None);
@@ -472,7 +395,7 @@ impl<'a> LiquidateHelper<'a> {
     }
 
     async fn token_liq(&self) -> anyhow::Result<Option<Signature>> {
-        if !self.health_cache.has_spot_assets() || !self.health_cache.has_spot_borrows() {
+        if !self.health_cache.has_possible_spot_liquidations() {
             return Ok(None);
         }
 
@@ -541,7 +464,7 @@ impl<'a> LiquidateHelper<'a> {
     }
 
     async fn token_liq_bankruptcy(&self) -> anyhow::Result<Option<Signature>> {
-        if !self.health_cache.in_phase3_liquidation() || !self.health_cache.has_spot_borrows() {
+        if !self.health_cache.in_phase3_liquidation() || !self.health_cache.has_liq_spot_borrows() {
             return Ok(None);
         }
 

@@ -3,8 +3,8 @@ import { Connection, Keypair } from '@solana/web3.js';
 import fs from 'fs';
 import { HealthType } from '../../src/accounts/mangoAccount';
 import {
-  MangoClient,
   MANGO_V4_ID,
+  MangoClient,
   toUiDecimalsForQuote,
 } from '../../src/index';
 
@@ -83,15 +83,11 @@ async function main() {
   );
   console.log(
     'mangoAccount.getAssetsVal() ' +
-      toUiDecimalsForQuote(
-        mangoAccount.getAssetsValue(group, HealthType.init).toNumber(),
-      ),
+      toUiDecimalsForQuote(mangoAccount.getAssetsValue(group).toNumber()),
   );
   console.log(
     'mangoAccount.getLiabsVal() ' +
-      toUiDecimalsForQuote(
-        mangoAccount.getLiabsValue(group, HealthType.init).toNumber(),
-      ),
+      toUiDecimalsForQuote(mangoAccount.getLiabsValue(group).toNumber()),
   );
 
   console.log(
