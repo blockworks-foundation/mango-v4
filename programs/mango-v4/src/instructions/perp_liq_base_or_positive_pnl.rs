@@ -319,6 +319,16 @@ pub(crate) fn liquidation_action(
     let mut current_settle_token = settle_token_balance.spot_and_perp;
 
     // Helper function to reduce base position in exchange for effective settle token balance changes
+    //
+    // This function does only deal with reducing the base position and getting settle token balance
+    // in exchange. This exchange does not always lead to health improvements (like when the overall
+    // weight is 0 and the uhupnl is already positive). That's why we pass an "expected" gain per lot
+    // as well, which incorporates the fact that the increase in uhupnl can get settled later and
+    // becomes health then.
+    //
+    // This means that the amount of base_lots reduced by this function is determined in anticipation
+    // of future pnl settlement. It only changes the current_* args according to the actual reduction
+    // that happened. The settlement happens later, separately, in settle_pnl() below.
     let mut reduce_base = |step: &str,
                            uhupnl_limit: I80F48,
                            // How much effective settle token will be gained when taking future
