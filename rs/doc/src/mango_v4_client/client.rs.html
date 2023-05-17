@@ -1812,6 +1812,10 @@
 <span id="1812">1812</span>
 <span id="1813">1813</span>
 <span id="1814">1814</span>
+<span id="1815">1815</span>
+<span id="1816">1816</span>
+<span id="1817">1817</span>
+<span id="1818">1818</span>
 </pre><pre class="rust"><code><span class="kw">use </span>std::str::FromStr;
 <span class="kw">use </span>std::sync::Arc;
 <span class="kw">use </span>std::time::Duration;
@@ -2895,6 +2899,7 @@
 
         <span class="kw">let </span>perp = <span class="self">self</span>.context.perp(market_index);
         <span class="kw">let </span>settle_token_info = <span class="self">self</span>.context.token(perp.market.settle_token_index);
+        <span class="kw">let </span>insurance_token_info = <span class="self">self</span>.context.token(INSURANCE_TOKEN_INDEX);
 
         <span class="kw">let </span>health_remaining_ams = <span class="self">self
             </span>.derive_liquidation_health_check_remaining_account_metas(
@@ -2909,7 +2914,7 @@
             program_id: mango_v4::id(),
             accounts: {
                 <span class="kw">let </span><span class="kw-2">mut </span>ams = anchor_lang::ToAccountMetas::to_account_metas(
-                    <span class="kw-2">&amp;</span>mango_v4::accounts::PerpLiqNegativePnlOrBankruptcy {
+                    <span class="kw-2">&amp;</span>mango_v4::accounts::PerpLiqNegativePnlOrBankruptcyV2 {
                         group: <span class="self">self</span>.group(),
                         perp_market: perp.address,
                         oracle: perp.market.oracle,
@@ -2920,6 +2925,9 @@
                         settle_vault: settle_token_info.mint_info.first_vault(),
                         settle_oracle: settle_token_info.mint_info.oracle,
                         insurance_vault: group.insurance_vault,
+                        insurance_bank: insurance_token_info.mint_info.first_bank(),
+                        insurance_bank_vault: insurance_token_info.mint_info.first_vault(),
+                        insurance_oracle: insurance_token_info.mint_info.oracle,
                         token_program: Token::id(),
                     },
                     <span class="prelude-val">None</span>,
@@ -2928,7 +2936,7 @@
                 ams
             },
             data: anchor_lang::InstructionData::data(
-                <span class="kw-2">&amp;</span>mango_v4::instruction::PerpLiqNegativePnlOrBankruptcy { max_liab_transfer },
+                <span class="kw-2">&amp;</span>mango_v4::instruction::PerpLiqNegativePnlOrBankruptcyV2 { max_liab_transfer },
             ),
         };
         <span class="self">self</span>.send_and_confirm_owner_tx(<span class="macro">vec!</span>[ix]).<span class="kw">await

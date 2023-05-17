@@ -534,6 +534,32 @@
 <span id="534">534</span>
 <span id="535">535</span>
 <span id="536">536</span>
+<span id="537">537</span>
+<span id="538">538</span>
+<span id="539">539</span>
+<span id="540">540</span>
+<span id="541">541</span>
+<span id="542">542</span>
+<span id="543">543</span>
+<span id="544">544</span>
+<span id="545">545</span>
+<span id="546">546</span>
+<span id="547">547</span>
+<span id="548">548</span>
+<span id="549">549</span>
+<span id="550">550</span>
+<span id="551">551</span>
+<span id="552">552</span>
+<span id="553">553</span>
+<span id="554">554</span>
+<span id="555">555</span>
+<span id="556">556</span>
+<span id="557">557</span>
+<span id="558">558</span>
+<span id="559">559</span>
+<span id="560">560</span>
+<span id="561">561</span>
+<span id="562">562</span>
 </pre><pre class="rust"><code><span class="kw">use </span>anchor_lang::prelude::<span class="kw-2">*</span>;
 <span class="kw">use </span>anchor_lang::ZeroCopy;
 
@@ -729,6 +755,72 @@
     }
 }
 
+<span class="kw">pub struct </span>ScannedBanksAndOracles&lt;<span class="lifetime">&#39;a</span>, <span class="lifetime">&#39;info</span>&gt; {
+    banks: Vec&lt;AccountInfoRefMut&lt;<span class="lifetime">&#39;a</span>, <span class="lifetime">&#39;info</span>&gt;&gt;,
+    oracles: Vec&lt;AccountInfoRef&lt;<span class="lifetime">&#39;a</span>, <span class="lifetime">&#39;info</span>&gt;&gt;,
+    index_map: HashMap&lt;TokenIndex, usize&gt;,
+    staleness_slot: <span class="prelude-ty">Option</span>&lt;u64&gt;,
+}
+
+<span class="kw">impl</span>&lt;<span class="lifetime">&#39;a</span>, <span class="lifetime">&#39;info</span>&gt; ScannedBanksAndOracles&lt;<span class="lifetime">&#39;a</span>, <span class="lifetime">&#39;info</span>&gt; {
+    <span class="attribute">#[inline]
+    </span><span class="kw">fn </span>bank_index(<span class="kw-2">&amp;</span><span class="self">self</span>, token_index: TokenIndex) -&gt; <span class="prelude-ty">Result</span>&lt;usize&gt; {
+        <span class="prelude-val">Ok</span>(<span class="kw-2">*</span><span class="self">self</span>.index_map.get(<span class="kw-2">&amp;</span>token_index).ok_or_else(|| {
+            <span class="macro">error_msg_typed!</span>(
+                MangoError::TokenPositionDoesNotExist,
+                <span class="string">&quot;token index {} not found&quot;</span>,
+                token_index
+            )
+        })<span class="question-mark">?</span>)
+    }
+
+    <span class="attribute">#[allow(clippy::type_complexity)]
+    </span><span class="kw">pub fn </span>banks_mut_and_oracles(
+        <span class="kw-2">&amp;mut </span><span class="self">self</span>,
+        token_index1: TokenIndex,
+        token_index2: TokenIndex,
+    ) -&gt; <span class="prelude-ty">Result</span>&lt;(<span class="kw-2">&amp;mut </span>Bank, I80F48, <span class="prelude-ty">Option</span>&lt;(<span class="kw-2">&amp;mut </span>Bank, I80F48)&gt;)&gt; {
+        <span class="kw">if </span>token_index1 == token_index2 {
+            <span class="kw">let </span>index = <span class="self">self</span>.bank_index(token_index1)<span class="question-mark">?</span>;
+            <span class="kw">let </span>bank = <span class="self">self</span>.banks[index].load_mut_fully_unchecked::&lt;Bank&gt;()<span class="question-mark">?</span>;
+            <span class="kw">let </span>oracle = <span class="kw-2">&amp;</span><span class="self">self</span>.oracles[index];
+            <span class="kw">let </span>price = bank.oracle_price(oracle, <span class="self">self</span>.staleness_slot)<span class="question-mark">?</span>;
+            <span class="kw">return </span><span class="prelude-val">Ok</span>((bank, price, <span class="prelude-val">None</span>));
+        }
+        <span class="kw">let </span>index1 = <span class="self">self</span>.bank_index(token_index1)<span class="question-mark">?</span>;
+        <span class="kw">let </span>index2 = <span class="self">self</span>.bank_index(token_index2)<span class="question-mark">?</span>;
+        <span class="kw">let </span>(first, second, swap) = <span class="kw">if </span>index1 &lt; index2 {
+            (index1, index2, <span class="bool-val">false</span>)
+        } <span class="kw">else </span>{
+            (index2, index1, <span class="bool-val">true</span>)
+        };
+
+        <span class="comment">// split_at_mut after the first bank and after the second bank
+        </span><span class="kw">let </span>(first_bank_part, second_bank_part) = <span class="self">self</span>.banks.split_at_mut(first + <span class="number">1</span>);
+
+        <span class="kw">let </span>bank1 = first_bank_part[first].load_mut_fully_unchecked::&lt;Bank&gt;()<span class="question-mark">?</span>;
+        <span class="kw">let </span>bank2 = second_bank_part[second - (first + <span class="number">1</span>)].load_mut_fully_unchecked::&lt;Bank&gt;()<span class="question-mark">?</span>;
+        <span class="kw">let </span>oracle1 = <span class="kw-2">&amp;</span><span class="self">self</span>.oracles[first];
+        <span class="kw">let </span>oracle2 = <span class="kw-2">&amp;</span><span class="self">self</span>.oracles[second];
+        <span class="kw">let </span>price1 = bank1.oracle_price(oracle1, <span class="self">self</span>.staleness_slot)<span class="question-mark">?</span>;
+        <span class="kw">let </span>price2 = bank2.oracle_price(oracle2, <span class="self">self</span>.staleness_slot)<span class="question-mark">?</span>;
+        <span class="kw">if </span>swap {
+            <span class="prelude-val">Ok</span>((bank2, price2, <span class="prelude-val">Some</span>((bank1, price1))))
+        } <span class="kw">else </span>{
+            <span class="prelude-val">Ok</span>((bank1, price1, <span class="prelude-val">Some</span>((bank2, price2))))
+        }
+    }
+
+    <span class="kw">pub fn </span>scanned_bank_and_oracle(<span class="kw-2">&amp;</span><span class="self">self</span>, token_index: TokenIndex) -&gt; <span class="prelude-ty">Result</span>&lt;(<span class="kw-2">&amp;</span>Bank, I80F48)&gt; {
+        <span class="kw">let </span>index = <span class="self">self</span>.bank_index(token_index)<span class="question-mark">?</span>;
+        <span class="comment">// The account was already loaded successfully during construction
+        </span><span class="kw">let </span>bank = <span class="self">self</span>.banks[index].load_fully_unchecked::&lt;Bank&gt;()<span class="question-mark">?</span>;
+        <span class="kw">let </span>oracle = <span class="kw-2">&amp;</span><span class="self">self</span>.oracles[index];
+        <span class="kw">let </span>price = bank.oracle_price(oracle, <span class="self">self</span>.staleness_slot)<span class="question-mark">?</span>;
+        <span class="prelude-val">Ok</span>((bank, price))
+    }
+}
+
 <span class="doccomment">/// Takes a list of account infos containing
 /// - an unknown number of Banks in any order, followed by
 /// - the same number of oracles in the same order as the banks, followed by
@@ -738,14 +830,11 @@
 /// and retrieves accounts needed for the health computation by doing a linear
 /// scan for each request.
 </span><span class="kw">pub struct </span>ScanningAccountRetriever&lt;<span class="lifetime">&#39;a</span>, <span class="lifetime">&#39;info</span>&gt; {
-    banks: Vec&lt;AccountInfoRefMut&lt;<span class="lifetime">&#39;a</span>, <span class="lifetime">&#39;info</span>&gt;&gt;,
-    oracles: Vec&lt;AccountInfoRef&lt;<span class="lifetime">&#39;a</span>, <span class="lifetime">&#39;info</span>&gt;&gt;,
+    banks_and_oracles: ScannedBanksAndOracles&lt;<span class="lifetime">&#39;a</span>, <span class="lifetime">&#39;info</span>&gt;,
     perp_markets: Vec&lt;AccountInfoRef&lt;<span class="lifetime">&#39;a</span>, <span class="lifetime">&#39;info</span>&gt;&gt;,
     perp_oracles: Vec&lt;AccountInfoRef&lt;<span class="lifetime">&#39;a</span>, <span class="lifetime">&#39;info</span>&gt;&gt;,
     serum3_oos: Vec&lt;AccountInfoRef&lt;<span class="lifetime">&#39;a</span>, <span class="lifetime">&#39;info</span>&gt;&gt;,
-    token_index_map: HashMap&lt;TokenIndex, usize&gt;,
     perp_index_map: HashMap&lt;PerpMarketIndex, usize&gt;,
-    staleness_slot: <span class="prelude-ty">Option</span>&lt;u64&gt;,
 }
 
 <span class="doccomment">/// Returns None if `ai` doesn&#39;t have the owner or discriminator for T.
@@ -825,26 +914,17 @@
         <span class="kw">let </span>serum3_start = perp_oracles_start + n_perps;
 
         <span class="prelude-val">Ok</span>(<span class="self">Self </span>{
-            banks: AccountInfoRefMut::borrow_slice(<span class="kw-2">&amp;</span>ais[..n_banks])<span class="question-mark">?</span>,
-            oracles: AccountInfoRef::borrow_slice(<span class="kw-2">&amp;</span>ais[n_banks..perps_start])<span class="question-mark">?</span>,
+            banks_and_oracles: ScannedBanksAndOracles {
+                banks: AccountInfoRefMut::borrow_slice(<span class="kw-2">&amp;</span>ais[..n_banks])<span class="question-mark">?</span>,
+                oracles: AccountInfoRef::borrow_slice(<span class="kw-2">&amp;</span>ais[n_banks..perps_start])<span class="question-mark">?</span>,
+                index_map: token_index_map,
+                staleness_slot,
+            },
             perp_markets: AccountInfoRef::borrow_slice(<span class="kw-2">&amp;</span>ais[perps_start..perp_oracles_start])<span class="question-mark">?</span>,
             perp_oracles: AccountInfoRef::borrow_slice(<span class="kw-2">&amp;</span>ais[perp_oracles_start..serum3_start])<span class="question-mark">?</span>,
             serum3_oos: AccountInfoRef::borrow_slice(<span class="kw-2">&amp;</span>ais[serum3_start..])<span class="question-mark">?</span>,
-            token_index_map,
             perp_index_map,
-            staleness_slot,
         })
-    }
-
-    <span class="attribute">#[inline]
-    </span><span class="kw">fn </span>bank_index(<span class="kw-2">&amp;</span><span class="self">self</span>, token_index: TokenIndex) -&gt; <span class="prelude-ty">Result</span>&lt;usize&gt; {
-        <span class="prelude-val">Ok</span>(<span class="kw-2">*</span><span class="self">self</span>.token_index_map.get(<span class="kw-2">&amp;</span>token_index).ok_or_else(|| {
-            <span class="macro">error_msg_typed!</span>(
-                MangoError::TokenPositionDoesNotExist,
-                <span class="string">&quot;token index {} not found&quot;</span>,
-                token_index
-            )
-        })<span class="question-mark">?</span>)
     }
 
     <span class="attribute">#[inline]
@@ -861,44 +941,12 @@
         token_index1: TokenIndex,
         token_index2: TokenIndex,
     ) -&gt; <span class="prelude-ty">Result</span>&lt;(<span class="kw-2">&amp;mut </span>Bank, I80F48, <span class="prelude-ty">Option</span>&lt;(<span class="kw-2">&amp;mut </span>Bank, I80F48)&gt;)&gt; {
-        <span class="kw">if </span>token_index1 == token_index2 {
-            <span class="kw">let </span>index = <span class="self">self</span>.bank_index(token_index1)<span class="question-mark">?</span>;
-            <span class="kw">let </span>bank = <span class="self">self</span>.banks[index].load_mut_fully_unchecked::&lt;Bank&gt;()<span class="question-mark">?</span>;
-            <span class="kw">let </span>oracle = <span class="kw-2">&amp;</span><span class="self">self</span>.oracles[index];
-            <span class="kw">let </span>price = bank.oracle_price(oracle, <span class="self">self</span>.staleness_slot)<span class="question-mark">?</span>;
-            <span class="kw">return </span><span class="prelude-val">Ok</span>((bank, price, <span class="prelude-val">None</span>));
-        }
-        <span class="kw">let </span>index1 = <span class="self">self</span>.bank_index(token_index1)<span class="question-mark">?</span>;
-        <span class="kw">let </span>index2 = <span class="self">self</span>.bank_index(token_index2)<span class="question-mark">?</span>;
-        <span class="kw">let </span>(first, second, swap) = <span class="kw">if </span>index1 &lt; index2 {
-            (index1, index2, <span class="bool-val">false</span>)
-        } <span class="kw">else </span>{
-            (index2, index1, <span class="bool-val">true</span>)
-        };
-
-        <span class="comment">// split_at_mut after the first bank and after the second bank
-        </span><span class="kw">let </span>(first_bank_part, second_bank_part) = <span class="self">self</span>.banks.split_at_mut(first + <span class="number">1</span>);
-
-        <span class="kw">let </span>bank1 = first_bank_part[first].load_mut_fully_unchecked::&lt;Bank&gt;()<span class="question-mark">?</span>;
-        <span class="kw">let </span>bank2 = second_bank_part[second - (first + <span class="number">1</span>)].load_mut_fully_unchecked::&lt;Bank&gt;()<span class="question-mark">?</span>;
-        <span class="kw">let </span>oracle1 = <span class="kw-2">&amp;</span><span class="self">self</span>.oracles[first];
-        <span class="kw">let </span>oracle2 = <span class="kw-2">&amp;</span><span class="self">self</span>.oracles[second];
-        <span class="kw">let </span>price1 = bank1.oracle_price(oracle1, <span class="self">self</span>.staleness_slot)<span class="question-mark">?</span>;
-        <span class="kw">let </span>price2 = bank2.oracle_price(oracle2, <span class="self">self</span>.staleness_slot)<span class="question-mark">?</span>;
-        <span class="kw">if </span>swap {
-            <span class="prelude-val">Ok</span>((bank2, price2, <span class="prelude-val">Some</span>((bank1, price1))))
-        } <span class="kw">else </span>{
-            <span class="prelude-val">Ok</span>((bank1, price1, <span class="prelude-val">Some</span>((bank2, price2))))
-        }
+        <span class="self">self</span>.banks_and_oracles
+            .banks_mut_and_oracles(token_index1, token_index2)
     }
 
     <span class="kw">pub fn </span>scanned_bank_and_oracle(<span class="kw-2">&amp;</span><span class="self">self</span>, token_index: TokenIndex) -&gt; <span class="prelude-ty">Result</span>&lt;(<span class="kw-2">&amp;</span>Bank, I80F48)&gt; {
-        <span class="kw">let </span>index = <span class="self">self</span>.bank_index(token_index)<span class="question-mark">?</span>;
-        <span class="comment">// The account was already loaded successfully during construction
-        </span><span class="kw">let </span>bank = <span class="self">self</span>.banks[index].load_fully_unchecked::&lt;Bank&gt;()<span class="question-mark">?</span>;
-        <span class="kw">let </span>oracle = <span class="kw-2">&amp;</span><span class="self">self</span>.oracles[index];
-        <span class="kw">let </span>price = bank.oracle_price(oracle, <span class="self">self</span>.staleness_slot)<span class="question-mark">?</span>;
-        <span class="prelude-val">Ok</span>((bank, price))
+        <span class="self">self</span>.banks_and_oracles.scanned_bank_and_oracle(token_index)
     }
 
     <span class="kw">pub fn </span>scanned_perp_market_and_oracle(
@@ -909,7 +957,7 @@
         <span class="comment">// The account was already loaded successfully during construction
         </span><span class="kw">let </span>perp_market = <span class="self">self</span>.perp_markets[index].load_fully_unchecked::&lt;PerpMarket&gt;()<span class="question-mark">?</span>;
         <span class="kw">let </span>oracle_acc = <span class="kw-2">&amp;</span><span class="self">self</span>.perp_oracles[index];
-        <span class="kw">let </span>price = perp_market.oracle_price(oracle_acc, <span class="self">self</span>.staleness_slot)<span class="question-mark">?</span>;
+        <span class="kw">let </span>price = perp_market.oracle_price(oracle_acc, <span class="self">self</span>.banks_and_oracles.staleness_slot)<span class="question-mark">?</span>;
         <span class="prelude-val">Ok</span>((perp_market, price))
     }
 
@@ -920,6 +968,10 @@
             .find(|ai| ai.key == key)
             .ok_or_else(|| <span class="macro">error_msg!</span>(<span class="string">&quot;no serum3 open orders for key {}&quot;</span>, key))<span class="question-mark">?</span>;
         serum3_cpi::load_open_orders(oo)
+    }
+
+    <span class="kw">pub fn </span>into_banks_and_oracles(<span class="self">self</span>) -&gt; ScannedBanksAndOracles&lt;<span class="lifetime">&#39;a</span>, <span class="lifetime">&#39;info</span>&gt; {
+        <span class="self">self</span>.banks_and_oracles
     }
 }
 
@@ -1007,9 +1059,9 @@
         <span class="kw">let </span><span class="kw-2">mut </span>retriever =
             ScanningAccountRetriever::new_with_staleness(<span class="kw-2">&amp;</span>ais, <span class="kw-2">&amp;</span>group, <span class="prelude-val">None</span>).unwrap();
 
-        <span class="macro">assert_eq!</span>(retriever.banks.len(), <span class="number">3</span>);
-        <span class="macro">assert_eq!</span>(retriever.token_index_map.len(), <span class="number">3</span>);
-        <span class="macro">assert_eq!</span>(retriever.oracles.len(), <span class="number">3</span>);
+        <span class="macro">assert_eq!</span>(retriever.banks_and_oracles.banks.len(), <span class="number">3</span>);
+        <span class="macro">assert_eq!</span>(retriever.banks_and_oracles.index_map.len(), <span class="number">3</span>);
+        <span class="macro">assert_eq!</span>(retriever.banks_and_oracles.oracles.len(), <span class="number">3</span>);
         <span class="macro">assert_eq!</span>(retriever.perp_markets.len(), <span class="number">2</span>);
         <span class="macro">assert_eq!</span>(retriever.perp_oracles.len(), <span class="number">2</span>);
         <span class="macro">assert_eq!</span>(retriever.perp_index_map.len(), <span class="number">2</span>);

@@ -1414,6 +1414,13 @@
 <span id="1414">1414</span>
 <span id="1415">1415</span>
 <span id="1416">1416</span>
+<span id="1417">1417</span>
+<span id="1418">1418</span>
+<span id="1419">1419</span>
+<span id="1420">1420</span>
+<span id="1421">1421</span>
+<span id="1422">1422</span>
+<span id="1423">1423</span>
 </pre><pre class="rust"><code><span class="kw">use </span>anchor_lang::prelude::<span class="kw-2">*</span>;
 
 <span class="kw">use </span>derivative::Derivative;
@@ -1596,8 +1603,15 @@
 
     <span class="doccomment">/// Active position size, measured in base lots
     </span><span class="kw">pub </span>base_position_lots: i64,
-    <span class="doccomment">/// Active position in quote (conversation rate is that of the time the order was settled)
-    /// measured in native quote
+
+    <span class="doccomment">/// Active position in oracle quote native. At the same time this is 1:1 a settle_token native amount.
+    ///
+    /// Example: Say there&#39;s a perp market on the BTC/USD price using SOL for settlement. The user buys
+    /// one long contract for $20k, then base = 1, quote = -20k. The price goes to $21k. Now their
+    /// unsettled pnl is (1 * 21k - 20k) __SOL__ = 1000 SOL. This is because the perp contract arbitrarily
+    /// decides that each unit of price difference creates 1 SOL worth of settlement.
+    /// (yes, causing 1 SOL of settlement for each $1 price change implies a lot of extra leverage; likely
+    /// there should be an extra configurable scaling factor before we use this for cases like that)
     </span><span class="kw">pub </span>quote_position_native: I80F48,
 
     <span class="doccomment">/// Tracks what the position is to calculate average entry &amp; break even price
