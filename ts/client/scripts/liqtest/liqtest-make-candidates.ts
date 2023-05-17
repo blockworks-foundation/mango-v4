@@ -65,9 +65,7 @@ async function main() {
 
   const admin = Keypair.fromSecretKey(
     Buffer.from(
-      JSON.parse(
-        fs.readFileSync(process.env.PAYER_KEYPAIR!, 'utf-8'),
-      ),
+      JSON.parse(fs.readFileSync(process.env.PAYER_KEYPAIR!, 'utf-8')),
     ),
   );
   const userWallet = new Wallet(admin);
@@ -276,7 +274,9 @@ async function main() {
       await client.perpPlaceOrder(
         group,
         mangoAccount,
-        assertNotUndefined(group.perpMarketsMapByName.get('MNGO-PERP')?.perpMarketIndex),
+        assertNotUndefined(
+          group.perpMarketsMapByName.get('MNGO-PERP')?.perpMarketIndex,
+        ),
         PerpOrderSide.bid,
         0.001, // ui price that won't get hit
         3.0, // ui base quantity, 30 base lots, 3.0 MNGO, $0.06
@@ -319,7 +319,9 @@ async function main() {
       await client.perpPlaceOrder(
         group,
         fundingAccount,
-        assertNotUndefined(group.perpMarketsMapByName.get('MNGO-PERP')?.perpMarketIndex),
+        assertNotUndefined(
+          group.perpMarketsMapByName.get('MNGO-PERP')?.perpMarketIndex,
+        ),
         PerpOrderSide.ask,
         0.03,
         1.1, // ui base quantity, 11 base lots, $0.022 value, gain $0.033
@@ -334,7 +336,9 @@ async function main() {
       await client.perpPlaceOrder(
         group,
         mangoAccount,
-        assertNotUndefined(group.perpMarketsMapByName.get('MNGO-PERP')?.perpMarketIndex),
+        assertNotUndefined(
+          group.perpMarketsMapByName.get('MNGO-PERP')?.perpMarketIndex,
+        ),
         PerpOrderSide.bid,
         0.03,
         1.1, // ui base quantity, 11 base lots, $0.022 value, cost $0.033
@@ -348,7 +352,9 @@ async function main() {
 
       await client.perpConsumeAllEvents(
         group,
-        assertNotUndefined(group.perpMarketsMapByName.get('MNGO-PERP')?.perpMarketIndex),
+        assertNotUndefined(
+          group.perpMarketsMapByName.get('MNGO-PERP')?.perpMarketIndex,
+        ),
       );
     } finally {
       await setBankPrice(collateralBank, PRICES['SOL']);

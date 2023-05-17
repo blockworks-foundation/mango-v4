@@ -19,7 +19,9 @@ import { MANGO_V4_ID } from '../../src/constants';
 const GROUP_NUM = Number(process.env.GROUP_NUM || 200);
 const CLUSTER = process.env.CLUSTER || 'mainnet-beta';
 const MINTS = JSON.parse(process.env.MINTS || '').map((s) => new PublicKey(s));
-const SERUM_MARKETS = JSON.parse(process.env.SERUM_MARKETS || '').map((s) => new PublicKey(s));
+const SERUM_MARKETS = JSON.parse(process.env.SERUM_MARKETS || '').map(
+  (s) => new PublicKey(s),
+);
 
 const MAINNET_MINTS = new Map([
   ['USDC', MINTS[0]],
@@ -54,9 +56,7 @@ async function main(): Promise<void> {
 
   const admin = Keypair.fromSecretKey(
     Buffer.from(
-      JSON.parse(
-        fs.readFileSync(process.env.PAYER_KEYPAIR!, 'utf-8'),
-      ),
+      JSON.parse(fs.readFileSync(process.env.PAYER_KEYPAIR!, 'utf-8')),
     ),
   );
   const adminWallet = new Wallet(admin);
@@ -264,7 +264,10 @@ async function main(): Promise<void> {
 
 main();
 
-async function createAndPopulateAlt(client: MangoClient, admin: Keypair): Promise<void> {
+async function createAndPopulateAlt(
+  client: MangoClient,
+  admin: Keypair,
+): Promise<void> {
   let group = await client.getGroupForCreator(admin.publicKey, GROUP_NUM);
 
   const connection = client.program.provider.connection;
@@ -295,10 +298,9 @@ async function createAndPopulateAlt(client: MangoClient, admin: Keypair): Promis
 
   async function extendTable(addresses: PublicKey[]): Promise<void> {
     await group.reloadAll(client);
-    const alt =
-      await client.program.provider.connection.getAddressLookupTable(
-        group.addressLookupTables[0],
-      );
+    const alt = await client.program.provider.connection.getAddressLookupTable(
+      group.addressLookupTables[0],
+    );
 
     addresses = addresses.filter(
       (newAddress) =>

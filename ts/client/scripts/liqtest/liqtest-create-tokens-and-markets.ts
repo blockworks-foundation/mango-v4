@@ -20,7 +20,10 @@ import { generateSerum3MarketExternalVaultSignerAddress } from '../../src/accoun
 // Script which creates three mints and two serum3 markets relating them
 //
 
-function getVaultOwnerAndNonce(market: PublicKey, programId: PublicKey): [PublicKey, BN] {
+function getVaultOwnerAndNonce(
+  market: PublicKey,
+  programId: PublicKey,
+): [PublicKey, BN] {
   const nonce = new BN(0);
   // eslint-disable-next-line no-constant-condition
   while (true) {
@@ -46,20 +49,36 @@ async function main(): Promise<void> {
 
   const admin = Keypair.fromSecretKey(
     Buffer.from(
-      JSON.parse(
-        fs.readFileSync(process.env.PAYER_KEYPAIR!, 'utf-8'),
-      ),
+      JSON.parse(fs.readFileSync(process.env.PAYER_KEYPAIR!, 'utf-8')),
     ),
   );
   console.log(`Admin ${admin.publicKey.toBase58()}`);
 
   // Make mints
-  const mints = await Promise.all(Array(4).fill(null).map(() => splToken.createMint(connection, admin, admin.publicKey, null, 6)));
+  const mints = await Promise.all(
+    Array(4)
+      .fill(null)
+      .map(() =>
+        splToken.createMint(connection, admin, admin.publicKey, null, 6),
+      ),
+  );
 
   // Mint some tokens to the admin
   for (const mint of mints) {
-    const tokenAccount = await splToken.createAssociatedTokenAccountIdempotent(connection, admin, mint, admin.publicKey);
-    await splToken.mintTo(connection, admin, mint, tokenAccount, admin, 1000 * 1e6);
+    const tokenAccount = await splToken.createAssociatedTokenAccountIdempotent(
+      connection,
+      admin,
+      mint,
+      admin.publicKey,
+    );
+    await splToken.mintTo(
+      connection,
+      admin,
+      mint,
+      tokenAccount,
+      admin,
+      1000 * 1e6,
+    );
   }
   //const mints = [new PublicKey('5aMD1uEcWnXnptwmyfxmTWHzx3KeMsZ7jmiJAZ3eiAdH'), new PublicKey('FijXcDUkgTiMsghQVpjRDBdUPtkrJfQdfRZkr6zLkdkW'), new PublicKey('3tVDfiFQAAT3rqLNMXUaH2p5X5R4fjz8LYEvFEQ9fDYB')]
 
@@ -81,10 +100,25 @@ async function main(): Promise<void> {
     const baseVault = Keypair.generate();
     const quoteVault = Keypair.generate();
 
-    const [vaultOwner, vaultSignerNonce] = getVaultOwnerAndNonce(market.publicKey, openbookProgramId);
+    const [vaultOwner, vaultSignerNonce] = getVaultOwnerAndNonce(
+      market.publicKey,
+      openbookProgramId,
+    );
 
-    await splToken.createAccount(connection, admin, baseMint, vaultOwner, baseVault);
-    await splToken.createAccount(connection, admin, quoteMint, vaultOwner, quoteVault);
+    await splToken.createAccount(
+      connection,
+      admin,
+      baseMint,
+      vaultOwner,
+      baseVault,
+    );
+    await splToken.createAccount(
+      connection,
+      admin,
+      quoteMint,
+      vaultOwner,
+      quoteVault,
+    );
 
     const tx = new Transaction();
     tx.add(
@@ -107,21 +141,27 @@ async function main(): Promise<void> {
       SystemProgram.createAccount({
         fromPubkey: admin.publicKey,
         newAccountPubkey: eventQueue.publicKey,
-        lamports: await connection.getMinimumBalanceForRentExemption(262144 + 12),
+        lamports: await connection.getMinimumBalanceForRentExemption(
+          262144 + 12,
+        ),
         space: 262144 + 12,
         programId: openbookProgramId,
       }),
       SystemProgram.createAccount({
         fromPubkey: admin.publicKey,
         newAccountPubkey: bids.publicKey,
-        lamports: await connection.getMinimumBalanceForRentExemption(65536 + 12),
+        lamports: await connection.getMinimumBalanceForRentExemption(
+          65536 + 12,
+        ),
         space: 65536 + 12,
         programId: openbookProgramId,
       }),
       SystemProgram.createAccount({
         fromPubkey: admin.publicKey,
         newAccountPubkey: asks.publicKey,
-        lamports: await connection.getMinimumBalanceForRentExemption(65536 + 12),
+        lamports: await connection.getMinimumBalanceForRentExemption(
+          65536 + 12,
+        ),
         space: 65536 + 12,
         programId: openbookProgramId,
       }),
@@ -145,17 +185,26 @@ async function main(): Promise<void> {
       }),
     );
 
-    await sendAndConfirmTransaction(
-      connection,
-      tx,
-      [admin, market, requestQueue, eventQueue, bids, asks],
-    );
+    await sendAndConfirmTransaction(connection, tx, [
+      admin,
+      market,
+      requestQueue,
+      eventQueue,
+      bids,
+      asks,
+    ]);
 
     serumMarkets.push(market.publicKey);
   }
 
-  console.log('MINTS=\'[' + mints.map((pk) => '"' + pk.toBase58() + '"').join(',') + ']\'');
-  console.log('SERUM_MARKETS=\'[' + serumMarkets.map((pk) => '"' + pk.toBase58() + '"').join(',') + ']\'');
+  console.log(
+    "MINTS='[" + mints.map((pk) => '"' + pk.toBase58() + '"').join(',') + "]'",
+  );
+  console.log(
+    "SERUM_MARKETS='[" +
+      serumMarkets.map((pk) => '"' + pk.toBase58() + '"').join(',') +
+      "]'",
+  );
 
   process.exit();
 }

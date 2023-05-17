@@ -12,8 +12,7 @@ import { MANGO_V4_ID } from '../../src/constants';
 const GROUP_NUM = Number(process.env.GROUP_NUM || 200);
 const CLUSTER = process.env.CLUSTER || 'mainnet-beta';
 const CLUSTER_URL = process.env.CLUSTER_URL;
-const PAYER_KEYPAIR =
-  process.env.PAYER_KEYPAIR || '';
+const PAYER_KEYPAIR = process.env.PAYER_KEYPAIR || '';
 
 async function main() {
   const options = AnchorProvider.defaultOptions();
@@ -22,9 +21,7 @@ async function main() {
   const connection = new Connection(CLUSTER_URL!, options);
 
   const admin = Keypair.fromSecretKey(
-    Buffer.from(
-      JSON.parse(fs.readFileSync(PAYER_KEYPAIR, 'utf-8')),
-    ),
+    Buffer.from(JSON.parse(fs.readFileSync(PAYER_KEYPAIR, 'utf-8'))),
   );
   const userWallet = new Wallet(admin);
   const userProvider = new AnchorProvider(connection, userWallet, options);
