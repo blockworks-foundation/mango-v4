@@ -34,8 +34,11 @@ pub struct PerpLiqNegativePnlOrBankruptcy<'info> {
     /// CHECK: Oracle can have different account types, constrained by address in perp_market
     pub oracle: UncheckedAccount<'info>,
 
-    // bank correctness is checked at #2
-    #[account(mut, has_one = group)]
+    #[account(
+        mut,
+        has_one = group,
+        constraint = settle_bank.load()?.token_index == perp_market.load()?.settle_token_index @ MangoError::InvalidBank
+    )]
     pub settle_bank: AccountLoader<'info, Bank>,
 
     #[account(
