@@ -46,6 +46,12 @@ static_assertions = "1.1"
 switchboard-program = ">=0.2.0"
 switchboard-v2 = "0.1.17"
 
+# we need to pin winnow until the sbf compiler upgrades to rust 1.64
+winnow = "<=0.4.1"
+# we need to pin time until the sbf compiler upgrades to rust 1.65
+time = "=0.3.19"
+
+
 [dev-dependencies]
 solana-sdk = { workspace = true, default-features = false }
 solana-program-test = { workspace = true }
