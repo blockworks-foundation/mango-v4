@@ -38,12 +38,6 @@ pub fn perp_liq_negative_pnl_or_bankruptcy(
         )?;
 
         let settle_bank = ctx.accounts.settle_bank.load()?;
-        // account constraint #2
-        require_eq!(
-            settle_bank.token_index,
-            settle_token_index,
-            MangoError::InvalidBank
-        );
         settle_token_oracle_price = settle_bank.oracle_price(
             &AccountInfoRef::borrow(&ctx.accounts.settle_oracle)?,
             Some(now_slot),

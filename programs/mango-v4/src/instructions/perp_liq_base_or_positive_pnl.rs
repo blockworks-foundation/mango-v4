@@ -66,11 +66,6 @@ pub fn perp_liq_base_or_positive_pnl(
     let settle_token_index = perp_market.settle_token_index;
 
     let mut settle_bank = ctx.accounts.settle_bank.load_mut()?;
-    // account constraint #2
-    require!(
-        settle_bank.token_index == settle_token_index,
-        MangoError::InvalidBank
-    );
 
     // Get oracle price for market. Price is validated inside
     let oracle_price = perp_market.oracle_price(
