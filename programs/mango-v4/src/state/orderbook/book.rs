@@ -78,6 +78,7 @@ impl<'a> Orderbook<'a> {
         // matched_changes/matched_deletes and then applied after this loop.
         let mut remaining_base_lots = order.max_base_lots;
         let mut remaining_quote_lots = order.max_quote_lots;
+        let mut decremented_base_lots = 0i64;
         let mut decremented_quote_lots = 0i64;
         let mut orders_to_change: Vec<(BookSideOrderHandle, i64)> = vec![];
         let mut orders_to_delete: Vec<(BookSideOrderTree, u128)> = vec![];
@@ -138,6 +139,8 @@ impl<'a> Orderbook<'a> {
                     SelfTradeBehavior::DecrementTake => {
                         // remember all decremented quote lots to only charge fees on not-self-trades
                         decremented_quote_lots += match_quote_lots;
+                        // decremented base lots are only tracked for logging
+                        decremented_base_lots += match_base_lots;
                     }
                     SelfTradeBehavior::CancelProvide => {
                         let event = OutEvent::new(
@@ -229,6 +232,7 @@ impl<'a> Orderbook<'a> {
                 perp_market_index: market.perp_market_index,
                 taker_side: side as u8,
                 total_base_lots_taken,
+                total_base_lots_decremented: decremented_base_lots,
                 total_quote_lots_taken,
                 total_quote_lots_decremented: decremented_quote_lots,
                 taker_fees_paid: taker_fees_paid.to_bits(),
@@ -422,6 +426,7 @@ fn apply_fees(
     account: &mut MangoAccountRefMut,
     quote_lots: i64,
 ) -> Result<I80F48> {
+    assert!(quote_lots >= 0);
     let quote_native = I80F48::from_num(market.quote_lot_size * quote_lots);
 
     // The maker fees apply to the maker's account only when the fill event is consumed.

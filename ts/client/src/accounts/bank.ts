@@ -412,17 +412,14 @@ export class Bank implements BankForHealth {
 
   /**
    *
-   * @returns borrow rate, 0 is 0% where 1 is 100%
+   * @returns borrow rate, 0 is 0% where 1 is 100%; not including loan upkeep rate
    */
-  getBorrowRate(): I80F48 {
+  getBorrowRateWithoutUpkeepRate(): I80F48 {
     const totalBorrows = this.nativeBorrows();
     const totalDeposits = this.nativeDeposits();
 
     if (totalDeposits.isZero() && totalBorrows.isZero()) {
       return ZERO_I80F48();
-    }
-    if (totalDeposits.lte(totalBorrows)) {
-      return this.maxRate;
     }
 
     const utilization = totalBorrows.div(totalDeposits);
@@ -444,7 +441,15 @@ export class Bank implements BankForHealth {
 
   /**
    *
-   * @returns borrow rate percentage
+   * @returns total borrow rate, 0 is 0% where 1 is 100% (including loan upkeep rate)
+   */
+  getBorrowRate(): I80F48 {
+    return this.getBorrowRateWithoutUpkeepRate().add(this.loanFeeRate);
+  }
+
+  /**
+   *
+   * @returns total borrow rate percentage (including loan upkeep rate)
    */
   getBorrowRateUi(): number {
     return this.getBorrowRate().toNumber() * 100;

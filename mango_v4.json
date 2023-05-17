@@ -9540,6 +9540,11 @@
           "index": false
         },
         {
+          "name": "totalBaseLotsDecremented",
+          "type": "i64",
+          "index": false
+        },
+        {
           "name": "totalQuoteLotsTaken",
           "type": "i64",
           "index": false

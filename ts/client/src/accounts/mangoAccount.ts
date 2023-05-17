@@ -721,7 +721,7 @@ export class MangoAccount {
     quoteAmount = quoteAmount.div(
       ONE_I80F48().add(I80F48.fromNumber(serum3Market.getFeeRates(true))),
     );
-    return toUiDecimals(nativeAmount, quoteBank.mintDecimals);
+    return toUiDecimals(quoteAmount, quoteBank.mintDecimals);
   }
 
   /**

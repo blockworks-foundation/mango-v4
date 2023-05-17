@@ -4,7 +4,27 @@ Update this for each program release and mainnet deployment.
 
 ## not on mainnet
 
-- New event: PerpTakerTradeLog immdediatly logs your last trade execution (#579)
+### v0.16.0, 2023-5-
+
+- New event: PerpTakerTradeLog immediately logs your trade execution (#579, #584)
+
+  Previously you had to look at the logs from FillEvent processing to determine
+  how much was taken and what the fees were. The new PerpTakerTradeLog event
+  is emitted during PerpPlaceOrder and simplifies that.
+
+- Perp self-trade options (#533)
+
+  There are new PerpPlaceOrderV2 and PerpPlaceOrderPeggedV2 instructions that take
+  an argument that controls self-trade behavior, similar to OpenBook.
+
+  The old instructions still exist with nearly unchanged behavior: They default
+  to DecrementTake, which means being allowed to match against your own orders.
+  But now you don't pay fees if you do so.
+
+- Update anchor to v0.27.0 (#582)
+
+  Mango used to depend on a fork of anchor. Now all patches are upstreamed and
+  we have upgraded to the unmodified upstream version of v0.27.0.
 
 ## mainnet
 
