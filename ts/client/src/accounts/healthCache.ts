@@ -209,7 +209,7 @@ export class HealthCache {
 
   effectiveTokenBalancesInternal(
     healthType: HealthType | undefined,
-    perpSettleHealth: boolean,
+    ignoreNegativePerp: boolean,
   ): TokenBalance[] {
     const tokenBalances = new Array(this.tokenInfos.length)
       .fill(null)
@@ -221,7 +221,7 @@ export class HealthCache {
       );
       const perpSettleToken = tokenBalances[settleTokenIndex];
       const healthUnsettled = perpInfo.healthUnsettledPnl(healthType);
-      if (!perpSettleHealth || healthUnsettled.gt(ZERO_I80F48())) {
+      if (!ignoreNegativePerp || healthUnsettled.gt(ZERO_I80F48())) {
         perpSettleToken.spotAndPerp.iadd(healthUnsettled);
       }
     }
