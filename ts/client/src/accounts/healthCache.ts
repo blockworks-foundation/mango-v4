@@ -108,19 +108,19 @@ export class HealthCache {
       const oo = mangoAccount.getSerum3OoAccount(serum3.marketIndex);
 
       // find the TokenInfos for the market's base and quote tokens
-      const baseIndex = tokenInfos.findIndex(
+      const baseInfoIndex = tokenInfos.findIndex(
         (tokenInfo) => tokenInfo.tokenIndex === serum3.baseTokenIndex,
       );
-      const baseInfo = tokenInfos[baseIndex];
+      const baseInfo = tokenInfos[baseInfoIndex];
       if (!baseInfo) {
         throw new Error(
           `BaseInfo not found for market with marketIndex ${serum3.marketIndex}!`,
         );
       }
-      const quoteIndex = tokenInfos.findIndex(
+      const quoteInfoIndex = tokenInfos.findIndex(
         (tokenInfo) => tokenInfo.tokenIndex === serum3.quoteTokenIndex,
       );
-      const quoteInfo = tokenInfos[quoteIndex];
+      const quoteInfo = tokenInfos[quoteInfoIndex];
       if (!quoteInfo) {
         throw new Error(
           `QuoteInfo not found for market with marketIndex ${serum3.marketIndex}!`,
@@ -128,9 +128,9 @@ export class HealthCache {
       }
 
       return Serum3Info.fromOoModifyingTokenInfos(
-        baseIndex,
+        baseInfoIndex,
         baseInfo,
-        quoteIndex,
+        quoteInfoIndex,
         quoteInfo,
         serum3.marketIndex,
         oo,
@@ -170,8 +170,8 @@ export class HealthCache {
     const serum3Reserved: Serum3Reserved[] = [];
 
     for (const info of this.serum3Infos) {
-      const quote = this.tokenInfos[info.quoteIndex];
-      const base = this.tokenInfos[info.baseIndex];
+      const quote = this.tokenInfos[info.quoteInfoIndex];
+      const base = this.tokenInfos[info.baseInfoIndex];
 
       const reservedBase = info.reservedBase;
       const reservedQuote = info.reservedQuote;
@@ -187,9 +187,9 @@ export class HealthCache {
         reservedBase.mul(baseAsset).div(quoteLiab),
       );
 
-      const baseMaxReserved = tokenMaxReserved[info.baseIndex];
+      const baseMaxReserved = tokenMaxReserved[info.baseInfoIndex];
       baseMaxReserved.maxSerumReserved.iadd(allReservedAsBase);
-      const quoteMaxReserved = tokenMaxReserved[info.quoteIndex];
+      const quoteMaxReserved = tokenMaxReserved[info.quoteInfoIndex];
       quoteMaxReserved.maxSerumReserved.iadd(allReservedAsQuote);
 
       serum3Reserved.push(
@@ -1356,8 +1356,8 @@ export class Serum3Info {
   constructor(
     public reservedBase: I80F48,
     public reservedQuote: I80F48,
-    public baseIndex: number,
-    public quoteIndex: number,
+    public baseInfoIndex: number,
+    public quoteInfoIndex: number,
     public marketIndex: MarketIndex,
   ) {}
 
@@ -1365,8 +1365,8 @@ export class Serum3Info {
     return new Serum3Info(
       I80F48.from(dto.reservedBase),
       I80F48.from(dto.reservedQuote),
-      dto.baseIndex,
-      dto.quoteIndex,
+      dto.baseInfoIndex,
+      dto.quoteInfoIndex,
       dto.marketIndex as MarketIndex,
     );
   }
@@ -1386,9 +1386,9 @@ export class Serum3Info {
   }
 
   static fromOoModifyingTokenInfos(
-    baseIndex: number,
+    baseInfoIndex: number,
     baseInfo: TokenInfo,
-    quoteIndex: number,
+    quoteInfoIndex: number,
     quoteInfo: TokenInfo,
     marketIndex: MarketIndex,
     oo: OpenOrders,
@@ -1412,8 +1412,8 @@ export class Serum3Info {
     return new Serum3Info(
       reservedBase,
       reservedQuote,
-      baseIndex,
-      quoteIndex,
+      baseInfoIndex,
+      quoteInfoIndex,
       marketIndex,
     );
   }
@@ -1433,10 +1433,10 @@ export class Serum3Info {
       return ZERO_I80F48();
     }
 
-    const baseInfo = tokenInfos[this.baseIndex];
-    const quoteInfo = tokenInfos[this.quoteIndex];
-    const baseMaxReserved = tokenMaxReserved[this.baseIndex];
-    const quoteMaxReserved = tokenMaxReserved[this.quoteIndex];
+    const baseInfo = tokenInfos[this.baseInfoIndex];
+    const quoteInfo = tokenInfos[this.quoteInfoIndex];
+    const baseMaxReserved = tokenMaxReserved[this.baseInfoIndex];
+    const quoteMaxReserved = tokenMaxReserved[this.quoteInfoIndex];
 
     // How much the health would increase if the reserved balance were applied to the passed
     // token info?
@@ -1483,14 +1483,14 @@ export class Serum3Info {
 
     const healthBase = computeHealthEffect(
       baseInfo,
-      tokenBalances[this.baseIndex],
-      tokenMaxReserved[this.baseIndex],
+      tokenBalances[this.baseInfoIndex],
+      tokenMaxReserved[this.baseInfoIndex],
       marketReserved.allReservedAsBase,
     );
     const healthQuote = computeHealthEffect(
       quoteInfo,
-      tokenBalances[this.quoteIndex],
-      tokenMaxReserved[this.quoteIndex],
+      tokenBalances[this.quoteInfoIndex],
+      tokenMaxReserved[this.quoteInfoIndex],
       marketReserved.allReservedAsQuote,
     );
 
@@ -1506,9 +1506,9 @@ export class Serum3Info {
     tokenMaxReserved: TokenMaxReserved[],
     marketReserved: Serum3Reserved,
   ): string {
-    return `  marketIndex: ${this.marketIndex}, baseIndex: ${
-      this.baseIndex
-    }, quoteIndex: ${this.quoteIndex}, reservedBase: ${
+    return `  marketIndex: ${this.marketIndex}, baseInfoIndex: ${
+      this.baseInfoIndex
+    }, quoteInfoIndex: ${this.quoteInfoIndex}, reservedBase: ${
       this.reservedBase
     }, reservedQuote: ${
       this.reservedQuote
@@ -1800,20 +1800,20 @@ export class TokenInfoDto {
 export class Serum3InfoDto {
   reservedBase: I80F48Dto;
   reservedQuote: I80F48Dto;
-  baseIndex: number;
-  quoteIndex: number;
+  baseInfoIndex: number;
+  quoteInfoIndex: number;
   marketIndex: number;
 
   constructor(
     reservedBase: I80F48Dto,
     reservedQuote: I80F48Dto,
-    baseIndex: number,
-    quoteIndex: number,
+    baseInfoIndex: number,
+    quoteInfoIndex: number,
   ) {
     this.reservedBase = reservedBase;
     this.reservedQuote = reservedQuote;
-    this.baseIndex = baseIndex;
-    this.quoteIndex = quoteIndex;
+    this.baseInfoIndex = baseInfoIndex;
+    this.quoteInfoIndex = quoteInfoIndex;
   }
 }
 

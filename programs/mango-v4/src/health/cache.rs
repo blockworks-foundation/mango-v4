@@ -1127,15 +1127,16 @@ pub fn new_health_cache(
         let oo = retriever.serum_oo(i, &serum_account.open_orders)?;
 
         // find the TokenInfos for the market's base and quote tokens
-        let base_index = find_token_info_index(&token_infos, serum_account.base_token_index)?;
-        let quote_index = find_token_info_index(&token_infos, serum_account.quote_token_index)?;
+        let base_info_index = find_token_info_index(&token_infos, serum_account.base_token_index)?;
+        let quote_info_index =
+            find_token_info_index(&token_infos, serum_account.quote_token_index)?;
 
         // add the amounts that are freely settleable immediately to token balances
         let base_free = I80F48::from(oo.native_coin_free);
         let quote_free = I80F48::from(oo.native_pc_free);
-        let base_info = &mut token_infos[base_index];
+        let base_info = &mut token_infos[base_info_index];
         base_info.balance_spot += base_free;
-        let quote_info = &mut token_infos[quote_index];
+        let quote_info = &mut token_infos[quote_info_index];
         quote_info.balance_spot += quote_free;
 
         // track the reserved amounts
@@ -1145,8 +1146,8 @@ pub fn new_health_cache(
         serum3_infos.push(Serum3Info {
             reserved_base,
             reserved_quote,
-            base_info_index: base_index,
-            quote_info_index: quote_index,
+            base_info_index,
+            quote_info_index,
             market_index: serum_account.market_index,
             has_zero_funds: oo.native_coin_total == 0
                 && oo.native_pc_total == 0
