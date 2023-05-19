@@ -1,3 +1,19 @@
+/*!
+ * This module deals with computing different types of health for a mango account.
+ *
+ * Health is a number in USD and represents a risk-engine assessment of the account's
+ * positions and open orders. The larger the health the better. Negative health
+ * often means some action is necessary or a limitation is placed on the user.
+ *
+ * The different types of health are described in the HealthType enum.
+ *
+ * The key struct in this module is HealthCache, typically constructed by the
+ * new_health_cache() function. With it, the different health types can be
+ * computed.
+ *
+ * The HealthCache holds the data it needs in TokenInfo, Serum3Info and PerpInfo.
+ */
+
 use anchor_lang::prelude::*;
 
 use fixed::types::I80F48;
@@ -209,6 +225,12 @@ impl TokenInfo {
     }
 }
 
+/// Information about reserved funds on Serum3 open orders accounts.
+///
+/// Note that all "free" funds on open orders accounts are added directly
+/// to the token info. This is only about dealing with the reserved funds
+/// that might end up as base OR quote tokens, depending on whether the
+/// open orders execute on not.
 #[derive(Clone, AnchorDeserialize, AnchorSerialize, Debug)]
 pub struct Serum3Info {
     // reserved amounts as stored on the open orders
@@ -216,10 +238,11 @@ pub struct Serum3Info {
     pub reserved_quote: I80F48,
 
     // Index into TokenInfos _not_ a TokenIndex
-    pub base_index: usize,
-    pub quote_index: usize,
+    pub base_info_index: usize,
+    pub quote_info_index: usize,
 
     pub market_index: Serum3MarketIndex,
+
     /// The open orders account has no free or reserved funds
     pub has_zero_funds: bool,
 }
@@ -251,6 +274,30 @@ impl Serum3Info {
         self.reserved_quote + self.reserved_base * base_asset / quote_liab
     }
 
+    /// Compute the health contribution from active open orders.
+    ///
+    /// For open orders, health is about the worst-case outcome: Consider the scenarios:
+    /// - all reserved base tokens convert to quote tokens
+    /// - all reserved quote tokens convert to base tokens
+    /// Which would lead to the smaller token health?
+    ///
+    /// Answering this question isn't straightforward for two reasons:
+    /// 1. We don't have information about the actual open orders here. Just about the amount
+    ///    of reserved tokens. Hence we assume base/quote conversion would happen at current
+    ///    asset/liab prices.
+    /// 2. Technically, there are interaction effects between multiple spot markets. If the
+    ///    account has open orders on SOL/USDC, BTC/USDC and SOL/BTC, then the worst case for
+    ///    SOL/USDC might be dependent on what happens with the open orders on the other two
+    ///    markets.
+    ///
+    /// To simplify 2, we give up on computing the actual worst-case and instead compute something
+    /// that's guaranteed to be less: Get the worst case for each market independently while
+    /// assuming all other market open orders resolved maximally unfavorably.
+    ///
+    /// To be able to do that, we compute `token_max_reserved` for each token, which is the maximum
+    /// token amount that would be generated if open orders in all markets that deal with the token
+    /// turn its way. (in the example above: the open orders in the SOL/USDC and SOL/BTC market
+    /// both produce SOL) See `compute_serum3_reservations()` below.
     #[inline(always)]
     fn health_contribution(
         &self,
@@ -266,8 +313,8 @@ impl Serum3Info {
             return I80F48::ZERO;
         }
 
-        let base_info = &token_infos[self.base_index];
-        let quote_info = &token_infos[self.quote_index];
+        let base_info = &token_infos[self.base_info_index];
+        let quote_info = &token_infos[self.quote_info_index];
 
         // How much would health increase if the reserved balance were applied to the passed
         // token info?
@@ -299,14 +346,14 @@ impl Serum3Info {
 
         let health_base = compute_health_effect(
             base_info,
-            &token_balances[self.base_index],
-            &token_max_reserved[self.base_index],
+            &token_balances[self.base_info_index],
+            &token_max_reserved[self.base_info_index],
             market_reserved.all_reserved_as_base,
         );
         let health_quote = compute_health_effect(
             quote_info,
-            &token_balances[self.quote_index],
-            &token_max_reserved[self.quote_index],
+            &token_balances[self.quote_info_index],
+            &token_max_reserved[self.quote_info_index],
             market_reserved.all_reserved_as_quote,
         );
         health_base.min(health_quote)
@@ -321,6 +368,10 @@ pub(crate) struct Serum3Reserved {
     all_reserved_as_quote: I80F48,
 }
 
+/// Stores information about perp market positions and their open orders.
+///
+/// Perp markets affect account health indirectly, though the token balance in the
+/// perp market's settle token. See `effective_token_balances()`.
 #[derive(Clone, AnchorDeserialize, AnchorSerialize, Debug)]
 pub struct PerpInfo {
     pub perp_market_index: PerpMarketIndex,
@@ -403,7 +454,7 @@ impl PerpInfo {
         self.weigh_uhupnl_overall(contribution, health_type)
     }
 
-    /// Convert uhupnl to hupnl by applying the overall weight.
+    /// Convert uhupnl to hupnl by applying the overall weight. In settle token native units.
     #[inline(always)]
     fn weigh_uhupnl_overall(&self, unweighted: I80F48, health_type: HealthType) -> I80F48 {
         if unweighted > 0 {
@@ -417,8 +468,17 @@ impl PerpInfo {
         }
     }
 
-    /// Health in terms of settle token, without the overall asset weight or the settle token weight or price.
-    /// also called "uhupnl"
+    /// Settle token native provided by perp position and open orders, without the overall asset weight.
+    ///
+    /// Also called "uhupnl".
+    ///
+    /// For open orders, this computes the worst-case amount by considering the scenario where all
+    /// bids execute and the one where all asks execute.
+    ///
+    /// It's always less than the PerpPosition's `unsettled_pnl()` for two reasons: The open orders
+    /// are taken into account and the base weight is applied to the base position.
+    ///
+    /// Generally: hupnl <= uhupnl <= upnl
     #[inline(always)]
     pub fn unweighted_health_unsettled_pnl(&self, health_type: HealthType) -> I80F48 {
         let order_execution_case = |orders_base_lots: i64, order_price: I80F48| {
@@ -461,6 +521,19 @@ impl PerpInfo {
     }
 }
 
+/// Store information needed to compute account health
+///
+/// This is called a cache, because it extracts information from a MangoAccount and
+/// the Bank, Perp, oracle accounts once and then allows computing different types
+/// of health.
+///
+/// For compute-saving reasons, it also allows applying adjustments to the extracted
+/// positions. That's often helpful for instructions that want to re-compute health
+/// after having made small, well-known changes to an account. Recomputing the
+/// HealthCache from scratch would be significantly more expensive.
+///
+/// However, there's a real risk of getting the adjustments wrong and computing an
+/// inconsistent result, so particular care needs to be taken when this is done.
 #[derive(Clone, AnchorDeserialize, AnchorSerialize, Debug)]
 pub struct HealthCache {
     pub(crate) token_infos: Vec<TokenInfo>,
@@ -839,16 +912,16 @@ impl HealthCache {
         let mut serum3_reserved = Vec::with_capacity(self.serum3_infos.len());
 
         for info in self.serum3_infos.iter() {
-            let quote_info = &self.token_infos[info.quote_index];
-            let base_info = &self.token_infos[info.base_index];
+            let quote_info = &self.token_infos[info.quote_info_index];
+            let base_info = &self.token_infos[info.base_info_index];
 
             let all_reserved_as_base =
                 info.all_reserved_as_base(health_type, quote_info, base_info);
             let all_reserved_as_quote =
                 info.all_reserved_as_quote(health_type, quote_info, base_info);
 
-            token_max_reserved[info.base_index].max_serum_reserved += all_reserved_as_base;
-            token_max_reserved[info.quote_index].max_serum_reserved += all_reserved_as_quote;
+            token_max_reserved[info.base_info_index].max_serum_reserved += all_reserved_as_base;
+            token_max_reserved[info.quote_info_index].max_serum_reserved += all_reserved_as_quote;
 
             serum3_reserved.push(Serum3Reserved {
                 all_reserved_as_base,
@@ -981,17 +1054,17 @@ impl HealthCache {
             .serum3_infos
             .iter()
             .filter_map(|info| {
-                if info.quote_index == target_token_info_index {
+                if info.quote_info_index == target_token_info_index {
                     Some(info.all_reserved_as_quote(
                         health_type,
-                        &self.token_infos[info.quote_index],
-                        &self.token_infos[info.base_index],
+                        &self.token_infos[info.quote_info_index],
+                        &self.token_infos[info.base_info_index],
                     ))
-                } else if info.base_index == target_token_info_index {
+                } else if info.base_info_index == target_token_info_index {
                     Some(info.all_reserved_as_base(
                         health_type,
-                        &self.token_infos[info.quote_index],
-                        &self.token_infos[info.base_index],
+                        &self.token_infos[info.quote_info_index],
+                        &self.token_infos[info.base_info_index],
                     ))
                 } else {
                     None
@@ -1054,15 +1127,16 @@ pub fn new_health_cache(
         let oo = retriever.serum_oo(i, &serum_account.open_orders)?;
 
         // find the TokenInfos for the market's base and quote tokens
-        let base_index = find_token_info_index(&token_infos, serum_account.base_token_index)?;
-        let quote_index = find_token_info_index(&token_infos, serum_account.quote_token_index)?;
+        let base_info_index = find_token_info_index(&token_infos, serum_account.base_token_index)?;
+        let quote_info_index =
+            find_token_info_index(&token_infos, serum_account.quote_token_index)?;
 
         // add the amounts that are freely settleable immediately to token balances
         let base_free = I80F48::from(oo.native_coin_free);
         let quote_free = I80F48::from(oo.native_pc_free);
-        let base_info = &mut token_infos[base_index];
+        let base_info = &mut token_infos[base_info_index];
         base_info.balance_spot += base_free;
-        let quote_info = &mut token_infos[quote_index];
+        let quote_info = &mut token_infos[quote_info_index];
         quote_info.balance_spot += quote_free;
 
         // track the reserved amounts
@@ -1072,8 +1146,8 @@ pub fn new_health_cache(
         serum3_infos.push(Serum3Info {
             reserved_base,
             reserved_quote,
-            base_index,
-            quote_index,
+            base_info_index,
+            quote_info_index,
             market_index: serum_account.market_index,
             has_zero_funds: oo.native_coin_total == 0
                 && oo.native_pc_total == 0
