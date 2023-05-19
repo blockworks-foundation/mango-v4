@@ -30,7 +30,12 @@ async function buildClient(): Promise<MangoClient> {
 function doBin(
   bs: BookSide,
   direction: 'bids' | 'asks',
-  range: { start: number; end: number; scoreMultiplier: number },
+  range: {
+    start: number;
+    end: number;
+    scoreMultiplier: number;
+    queueMultiplier: number;
+  },
 ): Map<string, { size: number; score: number }> {
   const bin = new Map<string, number>();
   const binWithScore = new Map();
@@ -47,7 +52,16 @@ function doBin(
     bestPrice +
     (((direction == 'bids' ? -1 : 1) * range.end) / 10000) * bestPrice;
 
+  let lastSeenPrice = best.price;
+  let queuePosition = 0; // TODO unused
   for (const item of bs.items()) {
+    if (lastSeenPrice != item.price) {
+      lastSeenPrice = item.price;
+      queuePosition = 0;
+    } else {
+      queuePosition = queuePosition + 1;
+    }
+
     if (direction == 'bids' ? item.price <= binEnd : item.price >= binEnd) {
       break;
     }
@@ -78,12 +92,12 @@ function doSide(bs: BookSide, direction: 'bids' | 'asks'): Map<string, number> {
   const bins: Map<string, { size: number; score: number }>[] = [];
   for (const range of [
     // Range end is exclusive, and start in inclusive
-    { start: 0, end: 1, scoreMultiplier: 100 },
-    { start: 1, end: 5, scoreMultiplier: 50 },
-    { start: 5, end: 10, scoreMultiplier: 20 },
-    { start: 10, end: 20, scoreMultiplier: 7.5 },
-    { start: 20, end: 50, scoreMultiplier: 5 },
-    { start: 50, end: 100, scoreMultiplier: 2.5 },
+    { start: 0, end: 1, scoreMultiplier: 100, queueMultiplier: 1.25 },
+    { start: 1, end: 5, scoreMultiplier: 50, queueMultiplier: 1.25 },
+    { start: 5, end: 10, scoreMultiplier: 20, queueMultiplier: 1.25 },
+    { start: 10, end: 20, scoreMultiplier: 7.5, queueMultiplier: 1.25 },
+    { start: 20, end: 50, scoreMultiplier: 5, queueMultiplier: 1.25 },
+    { start: 50, end: 100, scoreMultiplier: 2.5, queueMultiplier: 1.25 },
   ]) {
     bins.push(doBin(bs, direction, range));
   }
