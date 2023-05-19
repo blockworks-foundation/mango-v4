@@ -938,8 +938,8 @@ mod tests {
                 println!("test 6 {test_name}");
                 let mut health_cache = health_cache.clone();
                 health_cache.serum3_infos = vec![Serum3Info {
-                    base_index: 1,
-                    quote_index: 0,
+                    base_info_index: 1,
+                    quote_info_index: 0,
                     market_index: 0,
                     reserved_base: I80F48::from(30 / 3),
                     reserved_quote: I80F48::from(30 / 2),
