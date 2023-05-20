@@ -787,7 +787,7 @@ async function fullMarketMaker(): Promise<void> {
     intervals.push(
       setInterval(
         () =>
-          bot.refreshBlockhash().then(() => console.log('updated blockhash')),
+          bot.refreshBlockhash().then(() => console.log('updated blockhash', bot.latestBlockhash.blockhash.toString())),
         params.intervals.blockhash,
       ),
     );
