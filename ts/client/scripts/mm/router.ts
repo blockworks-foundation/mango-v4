@@ -248,27 +248,34 @@ export const fetchRoutes = async (
   swapMode = 'ExactIn',
   feeBps = '0',
   wallet = PublicKey.default,
+  providers = ['Jupiter', 'Mango'],
 ): Promise<Routes> => {
   try {
-    const responses = await Promise.allSettled([
-      fetchMangoRoutes(
-        inputMint,
-        outputMint,
-        amount,
-        slippage,
-        swapMode,
-        feeBps,
-        wallet,
-      ),
-      fetchJupiterRoutes(
-        inputMint,
-        outputMint,
-        amount,
-        slippage,
-        swapMode,
-        feeBps,
-      ),
-    ]);
+    const responses = await Promise.allSettled(
+      providers.map((p) => {
+        switch (p) {
+          case 'Mango':
+            return fetchMangoRoutes(
+              inputMint,
+              outputMint,
+              amount,
+              slippage,
+              swapMode,
+              feeBps,
+              wallet,
+            );
+          case 'Jupiter':
+            return fetchJupiterRoutes(
+              inputMint,
+              outputMint,
+              amount,
+              slippage,
+              swapMode,
+              feeBps,
+            );
+        }
+      }),
+    );
     const routes: RouteInfo[] = responses
       .filter((x) => x.status === 'fulfilled' && x.value.bestRoute !== null)
       .map((x) => (x as any).value.routes)

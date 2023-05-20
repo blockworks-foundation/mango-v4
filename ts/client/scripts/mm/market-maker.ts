@@ -2,6 +2,7 @@ import { AnchorProvider, BN, Wallet } from '@coral-xyz/anchor';
 import {
   BlockhashWithExpiryBlockHeight,
   Cluster,
+  ComputeBudgetProgram,
   Connection,
   Keypair,
   PublicKey,
@@ -13,36 +14,31 @@ import path from 'path';
 import WebSocket from 'ws';
 import { Bank } from '../../src/accounts/bank';
 import { Group } from '../../src/accounts/group';
-import { HealthType, MangoAccount } from '../../src/accounts/mangoAccount';
+import { MangoAccount } from '../../src/accounts/mangoAccount';
 import {
-  BookSide,
-  FillEvent,
   PerpMarket,
   PerpMarketIndex,
   PerpOrderSide,
-  PerpOrderType,
 } from '../../src/accounts/perp';
 import { MangoClient } from '../../src/client';
 import { MANGO_V4_ID } from '../../src/constants';
-import { I80F48 } from '../../src/numbers/I80F48';
-import {
-  QUOTE_DECIMALS,
-  toNative,
-  toUiDecimalsForQuote,
-} from '../../src/utils';
+import { toNative, toUiDecimalsForQuote } from '../../src/utils';
 import { sendTransaction } from '../../src/utils/rpc';
 import * as defaultParams from './params/default.json';
 import {
   fetchJupiterTransaction,
   fetchRoutes,
   prepareMangoRouterInstructions,
-  RouteInfo,
 } from './router';
 import {
   findOwnSeqEnforcerAddress,
-  makeCheckAndSetSequenceNumberIx,
   makeInitSequenceEnforcerAccountIx,
 } from './sequence-enforcer-util';
+
+const log = console.log;
+console.log = function (...args): void {
+  log.apply(console, [Date.now()].concat(args));
+};
 
 console.log(defaultParams);
 
@@ -355,6 +351,7 @@ class BotContext {
 
           await this.updateOrders(i);
         } else */ {
+          const hedgeStart = Date.now();
           // hedge on spot
           // hedge size is limited to split hedges into reasonable order sizes
           const hedgeSize = Math.min(Math.abs(biasedDelta), params.hedgeMax);
@@ -393,6 +390,7 @@ class BotContext {
             swapMode,
             '0',
             KEYPAIR.publicKey,
+            ['Jupiter'],
           );
 
           if (!bestRoute) {
@@ -400,6 +398,7 @@ class BotContext {
               `${perpMarket.name} spot hedge could not find a route`,
             );
           } else {
+            console.log('hedging via route', bestRoute);
             const [ixs, alts] =
               bestRoute.routerName === 'Mango'
                 ? await prepareMangoRouterInstructions(
@@ -417,8 +416,16 @@ class BotContext {
                     outputMint,
                   );
 
+            ixs.push(
+              ComputeBudgetProgram.setComputeUnitLimit({ units: 300000 }),
+            );
+            ixs.push(
+              ComputeBudgetProgram.setComputeUnitPrice({ microLamports: 1 }),
+            );
             try {
               const confirmBegin = Date.now();
+              console.log('finalized hedge instructions', ixs);
+
               const sig = await this.client.marginTrade({
                 group: this.group,
                 mangoAccount: this.mangoAccount,
@@ -443,11 +450,11 @@ class BotContext {
               const newDelta = this.calculateDelta(i).delta;
 
               console.log(
-                `hedge ${i} ${perpMarket.name} confirmed delta time=${
-                  (confirmEnd - confirmBegin) / 1000
-                } prev=${prec(delta)} new=${prec(
-                  newDelta,
-                )} https://explorer.solana.com/tx/${sig}`,
+                `hedge ${i} ${perpMarket.name} confirmed delta t(all)=${
+                  confirmEnd - hedgeStart
+                } t(confirm)=${(confirmEnd - confirmBegin) / 1000} prev=${prec(
+                  delta,
+                )} new=${prec(newDelta)} https://explorer.solana.com/tx/${sig}`,
               );
 
               await this.updateOrders(i);
