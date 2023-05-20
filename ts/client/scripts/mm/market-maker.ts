@@ -35,9 +35,22 @@ import {
   makeInitSequenceEnforcerAccountIx,
 } from './sequence-enforcer-util';
 
+// some log controls
+const debug = console.debug;
+console.debug = function (...args): void {
+  // debug.apply(console, ["DEBUG", new Date().toISOString()].concat(args));
+}
 const log = console.log;
 console.log = function (...args): void {
-  log.apply(console, [Date.now()].concat(args));
+  log.apply(console, ["  LOG", new Date().toISOString()].concat(args));
+};
+const warn = console.warn;
+console.warn = function (...args): void {
+  warn.apply(console, [" WARN", new Date().toISOString()].concat(args));
+};
+const error = console.error;
+console.error = function (...args): void {
+  error.apply(console, ["ERROR", new Date().toISOString()].concat(args));
 };
 
 console.log(defaultParams);
@@ -398,7 +411,7 @@ class BotContext {
               `${perpMarket.name} spot hedge could not find a route`,
             );
           } else {
-            console.log('hedging via route', bestRoute);
+            console.log(`hedging via route ${bestRoute.marketInfos.map(m => m.label)} in=${bestRoute.inAmount} out=${bestRoute.outAmount}`);
             const [ixs, alts] =
               bestRoute.routerName === 'Mango'
                 ? await prepareMangoRouterInstructions(
@@ -424,7 +437,7 @@ class BotContext {
             );
             try {
               const confirmBegin = Date.now();
-              console.log('finalized hedge instructions', ixs);
+              console.log(`prepared hedge ixs=${ixs.length}`);
 
               const sig = await this.client.marginTrade({
                 group: this.group,
@@ -451,7 +464,7 @@ class BotContext {
 
               console.log(
                 `hedge ${i} ${perpMarket.name} confirmed delta t(all)=${
-                  confirmEnd - hedgeStart
+                  (confirmEnd - hedgeStart) / 1000
                 } t(confirm)=${(confirmEnd - confirmBegin) / 1000} prev=${prec(
                   delta,
                 )} new=${prec(newDelta)} https://explorer.solana.com/tx/${sig}`,

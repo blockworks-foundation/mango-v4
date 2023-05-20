@@ -277,7 +277,7 @@ export const fetchRoutes = async (
       }),
     );
     const routes: RouteInfo[] = responses
-      .filter((x) => x.status === 'fulfilled' && x.value.bestRoute !== null)
+      .filter((x) => x.status === 'fulfilled' && x.value?.bestRoute)
       .map((x) => (x as any).value.routes)
       .flat();
 
