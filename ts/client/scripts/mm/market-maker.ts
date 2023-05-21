@@ -37,9 +37,22 @@ import {
 
 import { Router, SwapMode, SwapResult } from './mango-router';
 
+// some log controls
+const debug = console.debug;
+console.debug = function (...args): void {
+  // debug.apply(console, ["DEBUG", new Date().toISOString()].concat(args));
+};
 const log = console.log;
 console.log = function (...args): void {
-  log.apply(console, [Date.now()].concat(args));
+  log.apply(console, ['  LOG', new Date().toISOString()].concat(args));
+};
+const warn = console.warn;
+console.warn = function (...args): void {
+  warn.apply(console, [' WARN', new Date().toISOString()].concat(args));
+};
+const error = console.error;
+console.error = function (...args): void {
+  error.apply(console, ['ERROR', new Date().toISOString()].concat(args));
 };
 
 console.log(defaultParams);
@@ -467,6 +480,7 @@ class BotContext {
             );
             try {
               const confirmBegin = Date.now();
+              console.log(`prepared hedge ixs=${ixs.length}`);
 
               const sig = await this.client.marginTrade({
                 group: this.group,
@@ -878,7 +892,14 @@ async function fullMarketMaker(): Promise<void> {
     intervals.push(
       setInterval(
         () =>
-          bot.refreshBlockhash().then(() => console.log('updated blockhash')),
+          bot
+            .refreshBlockhash()
+            .then(() =>
+              console.log(
+                'updated blockhash',
+                bot.latestBlockhash.blockhash.toString(),
+              ),
+            ),
         params.intervals.blockhash,
       ),
     );
