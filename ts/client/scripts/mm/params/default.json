@@ -13,9 +13,9 @@
         "deltaBias": 0,
         "positionMax": 8,
         "hedgeMax": 8,
-        "hedgeDiscount": 0.0010,
+        "hedgeDiscount": 0.001,
         "orderSizeLimit": 0.5,
-        "spreadCharge": 0.0030,
+        "spreadCharge": 0.002,
         "tokenMint": "So11111111111111111111111111111111111111112"
       }
     },
@@ -24,9 +24,9 @@
         "deltaBias": 0,
         "positionMax": 0.2,
         "hedgeMax": 0.1,
-        "hedgeDiscount": 0.003,
+        "hedgeDiscount": 0.001,
         "orderSizeLimit": 0.5,
-        "spreadCharge": 0.005,
+        "spreadCharge": 0.002,
         "tokenMint": "7vfCXTUXx5WJV5JADk17DUJ4ksgau7utNKj4b963voxs"
       }
     }

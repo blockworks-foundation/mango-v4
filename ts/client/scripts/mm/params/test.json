@@ -13,7 +13,7 @@
         "deltaBias": 0,
         "positionMax": 4,
         "hedgeMax": 4,
-        "hedgeDiscount": 0.0001,
+        "hedgeDiscount": 0.0003,
         "orderSizeLimit": 0.5,
         "spreadCharge": 0.0005,
         "tokenMint": "So11111111111111111111111111111111111111112"

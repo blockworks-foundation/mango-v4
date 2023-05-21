@@ -1,8 +1,143 @@
 import { AnchorProvider, BN, Program, Provider } from '@coral-xyz/anchor';
-import {
-  createCloseAccountInstruction,
-  createInitializeAccount3Instruction,
-} from '@solana/spl-token';
+
+import { struct, u8 } from '@solana/buffer-layout';
+import { publicKey } from '@solana/buffer-layout-utils';
+
+/** Instructions defined by the program */
+export enum TokenInstruction {
+  InitializeMint = 0,
+  InitializeAccount = 1,
+  InitializeMultisig = 2,
+  Transfer = 3,
+  Approve = 4,
+  Revoke = 5,
+  SetAuthority = 6,
+  MintTo = 7,
+  Burn = 8,
+  CloseAccount = 9,
+  FreezeAccount = 10,
+  ThawAccount = 11,
+  TransferChecked = 12,
+  ApproveChecked = 13,
+  MintToChecked = 14,
+  BurnChecked = 15,
+  InitializeAccount2 = 16,
+  SyncNative = 17,
+  InitializeAccount3 = 18,
+  InitializeMultisig2 = 19,
+  InitializeMint2 = 20,
+  GetAccountDataSize = 21,
+  InitializeImmutableOwner = 22,
+  AmountToUiAmount = 23,
+  UiAmountToAmount = 24,
+  InitializeMintCloseAuthority = 25,
+  TransferFeeExtension = 26,
+  ConfidentialTransferExtension = 27,
+  DefaultAccountStateExtension = 28,
+  Reallocate = 29,
+  MemoTransferExtension = 30,
+  CreateNativeMint = 31,
+  InitializeNonTransferableMint = 32,
+  InterestBearingMintExtension = 33,
+  CpiGuardExtension = 34,
+  InitializePermanentDelegate = 35,
+}
+
+/** @internal */
+export function addSigners(
+  keys: AccountMeta[],
+  ownerOrAuthority: PublicKey,
+  multiSigners: (Signer | PublicKey)[],
+): AccountMeta[] {
+  if (multiSigners.length) {
+    keys.push({ pubkey: ownerOrAuthority, isSigner: false, isWritable: false });
+    for (const signer of multiSigners) {
+      keys.push({
+        pubkey: signer instanceof PublicKey ? signer : signer.publicKey,
+        isSigner: true,
+        isWritable: false,
+      });
+    }
+  } else {
+    keys.push({ pubkey: ownerOrAuthority, isSigner: true, isWritable: false });
+  }
+  return keys;
+}
+
+/** TODO: docs */
+export interface CloseAccountInstructionData {
+  instruction: TokenInstruction.CloseAccount;
+}
+
+/** TODO: docs */
+export const closeAccountInstructionData = struct<CloseAccountInstructionData>([
+  u8('instruction'),
+]);
+
+export function createCloseAccountInstruction(
+  account: PublicKey,
+  destination: PublicKey,
+  authority: PublicKey,
+  multiSigners: (Signer | PublicKey)[] = [],
+  programId = TOKEN_PROGRAM_ID,
+): TransactionInstruction {
+  const keys = addSigners(
+    [
+      { pubkey: account, isSigner: false, isWritable: true },
+      { pubkey: destination, isSigner: false, isWritable: true },
+    ],
+    authority,
+    multiSigners,
+  );
+
+  const data = Buffer.alloc(closeAccountInstructionData.span);
+  closeAccountInstructionData.encode(
+    { instruction: TokenInstruction.CloseAccount },
+    data,
+  );
+
+  return new TransactionInstruction({ keys, programId, data });
+}
+
+export interface InitializeAccount3InstructionData {
+  instruction: TokenInstruction.InitializeAccount3;
+  owner: PublicKey;
+}
+
+export const initializeAccount3InstructionData =
+  struct<InitializeAccount3InstructionData>([
+    u8('instruction'),
+    publicKey('owner'),
+  ]);
+
+/**
+ * Construct an InitializeAccount3 instruction
+ *
+ * @param account   New token account
+ * @param mint      Mint account
+ * @param owner     New account's owner/multisignature
+ * @param programId SPL Token program account
+ *
+ * @return Instruction to add to a transaction
+ */
+export function createInitializeAccount3Instruction(
+  account: PublicKey,
+  mint: PublicKey,
+  owner: PublicKey,
+  programId = TOKEN_PROGRAM_ID,
+): TransactionInstruction {
+  const keys = [
+    { pubkey: account, isSigner: false, isWritable: true },
+    { pubkey: mint, isSigner: false, isWritable: false },
+  ];
+  const data = Buffer.alloc(initializeAccount3InstructionData.span);
+  initializeAccount3InstructionData.encode(
+    { instruction: TokenInstruction.InitializeAccount3, owner },
+    data,
+  );
+  return new TransactionInstruction({ keys, programId, data });
+}
+
 import {
   AccountMeta,
   AddressLookupTableAccount,

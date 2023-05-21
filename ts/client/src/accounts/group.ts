@@ -1,7 +1,121 @@
 import { BorshAccountsCoder } from '@coral-xyz/anchor';
 import { Market, Orderbook } from '@project-serum/serum';
 import { parsePriceData } from '@pythnetwork/client';
-import { TOKEN_PROGRAM_ID, unpackAccount } from '@solana/spl-token';
+import { TOKEN_PROGRAM_ID } from '@solana/spl-token';
+
+import { struct, u8, u32 } from '@solana/buffer-layout';
+import { publicKey, u64 } from '@solana/buffer-layout-utils';
+
+/** Information about a token account */
+export interface Account {
+  /** Address of the account */
+  address: PublicKey;
+  /** Mint associated with the account */
+  mint: PublicKey;
+  /** Owner of the account */
+  owner: PublicKey;
+  /** Number of tokens the account holds */
+  amount: bigint;
+  /** Authority that can transfer tokens from the account */
+  delegate: PublicKey | null;
+  /** Number of tokens the delegate is authorized to transfer */
+  delegatedAmount: bigint;
+  /** True if the account is initialized */
+  isInitialized: boolean;
+  /** True if the account is frozen */
+  isFrozen: boolean;
+  /** True if the account is a native token account */
+  isNative: boolean;
+  /**
+   * If the account is a native token account, it must be rent-exempt. The rent-exempt reserve is the amount that must
+   * remain in the balance until the account is closed.
+   */
+  rentExemptReserve: bigint | null;
+  /** Optional authority to close the account */
+  closeAuthority: PublicKey | null;
+  tlvData: Buffer;
+}
+
+/** Token account state as stored by the program */
+export enum AccountState {
+  Uninitialized = 0,
+  Initialized = 1,
+  Frozen = 2,
+}
+
+/** Token account as stored by the program */
+export interface RawAccount {
+  mint: PublicKey;
+  owner: PublicKey;
+  amount: bigint;
+  delegateOption: 1 | 0;
+  delegate: PublicKey;
+  state: AccountState;
+  isNativeOption: 1 | 0;
+  isNative: bigint;
+  delegatedAmount: bigint;
+  closeAuthorityOption: 1 | 0;
+  closeAuthority: PublicKey;
+}
+
+/** Buffer layout for de/serializing a token account */
+export const AccountLayout = struct<RawAccount>([
+  publicKey('mint'),
+  publicKey('owner'),
+  u64('amount'),
+  u32('delegateOption'),
+  publicKey('delegate'),
+  u8('state'),
+  u32('isNativeOption'),
+  u64('isNative'),
+  u64('delegatedAmount'),
+  u32('closeAuthorityOption'),
+  publicKey('closeAuthority'),
+]);
+
+/** Byte length of a token account */
+export const ACCOUNT_SIZE = AccountLayout.span;
+
+/**
+ * Unpack a token account
+ *
+ * @param address   Token account
+ * @param info      Token account data
+ * @param programId SPL Token program account
+ *
+ * @return Unpacked token account
+ */
+export function unpackAccount(
+  address: PublicKey,
+  info: AccountInfo<Buffer> | null,
+  programId = TOKEN_PROGRAM_ID,
+): Account {
+  if (!info) throw 'TokenAccountNotFoundError';
+  if (!info.owner.equals(programId)) throw 'TokenInvalidAccountOwnerError';
+  if (info.data.length < ACCOUNT_SIZE) throw 'TokenInvalidAccountSizeError';
+
+  const rawAccount = AccountLayout.decode(info.data.slice(0, ACCOUNT_SIZE));
+  const tlvData = Buffer.alloc(0);
+
+  return {
+    address,
+    mint: rawAccount.mint,
+    owner: rawAccount.owner,
+    amount: rawAccount.amount,
+    delegate: rawAccount.delegateOption ? rawAccount.delegate : null,
+    delegatedAmount: rawAccount.delegatedAmount,
+    isInitialized: rawAccount.state !== AccountState.Uninitialized,
+    isFrozen: rawAccount.state === AccountState.Frozen,
+    isNative: !!rawAccount.isNativeOption,
+    rentExemptReserve: rawAccount.isNativeOption ? rawAccount.isNative : null,
+    closeAuthority: rawAccount.closeAuthorityOption
+      ? rawAccount.closeAuthority
+      : null,
+    tlvData,
+  };
+}
+
+
 import {
   AccountInfo,
   AddressLookupTableAccount,

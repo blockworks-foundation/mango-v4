@@ -22,7 +22,7 @@ import {
 } from '../../src/accounts/perp';
 import { MangoClient } from '../../src/client';
 import { MANGO_V4_ID } from '../../src/constants';
-import { toNative, toUiDecimalsForQuote } from '../../src/utils';
+import { U64_MAX_BN, toNative, toUiDecimalsForQuote } from '../../src/utils';
 import { sendTransaction } from '../../src/utils/rpc';
 import * as defaultParams from './params/default.json';
 import {
@@ -34,6 +34,8 @@ import {
   findOwnSeqEnforcerAddress,
   makeInitSequenceEnforcerAccountIx,
 } from './sequence-enforcer-util';
+
+import { Router, SwapMode, SwapResult } from './mango-router';
 
 const log = console.log;
 console.log = function (...args): void {
@@ -89,6 +91,7 @@ class BotContext {
     public group: Group,
     public mangoAccount: MangoAccount,
     public perpMarkets: Map<PerpMarketIndex, MarketContext>,
+    public router: Router,
   ) {}
 
   async refreshAll(): Promise<any> {
@@ -166,14 +169,18 @@ class BotContext {
       // eslint-disable-next-line no-empty
     } catch (_) {}
 
-
-    let fillsSinceLastUpdate: FillEventUpdate[] = []
-    let eventQueueHeadUpdatesBeforeLastMangoAccountUpdate = eventQueueHeadBySlot.filter(e => e.slot <= this.mangoAccountLastUpdatedSlot);
-    if (eventQueueHeadUpdatesBeforeLastMangoAccountUpdate.length > 0)
-    {
-      let eventQueueHeadAtMangoAccountUpdate = eventQueueHeadUpdatesBeforeLastMangoAccountUpdate[eventQueueHeadUpdatesBeforeLastMangoAccountUpdate.length-1];
+    let fillsSinceLastUpdate: FillEventUpdate[] = [];
+    const eventQueueHeadUpdatesBeforeLastMangoAccountUpdate =
+      eventQueueHeadBySlot.filter(
+        (e) => e.slot <= this.mangoAccountLastUpdatedSlot,
+      );
+    if (eventQueueHeadUpdatesBeforeLastMangoAccountUpdate.length > 0) {
+      const eventQueueHeadAtMangoAccountUpdate =
+        eventQueueHeadUpdatesBeforeLastMangoAccountUpdate[
+          eventQueueHeadUpdatesBeforeLastMangoAccountUpdate.length - 1
+        ];
       fillsSinceLastUpdate = unprocessedPerpFills.filter(
-        (f) => f.event.seqNum >= eventQueueHeadAtMangoAccountUpdate.head
+        (f) => f.event.seqNum >= eventQueueHeadAtMangoAccountUpdate.head,
       );
     }
 
@@ -192,7 +199,6 @@ class BotContext {
       return d + deltaSign * u.event.quantity;
     }, 0);
 
-
     // TODO: add fill delta into perpPosition
     return {
       delta: tokenPosition + perpPosition + fillsDelta,
@@ -210,10 +216,12 @@ class BotContext {
       perpMarket.uiPrice;
     const maxSize = currentEquityInUnderlying * params.orderSizeLimit;
     const bidSize = Math.min(
+      params.hedgeMax,
       maxSize,
       params.positionMax - perpPosition, // dont buy if position > positionMax
     );
     const askSize = Math.min(
+      params.hedgeMax,
       maxSize,
       perpPosition + params.positionMax, // don't sell if position < - positionMax
     );
@@ -221,11 +229,13 @@ class BotContext {
     const askPrice = perpMarket.uiPrice * +params.spreadCharge;
 
     console.log(
-      `update orders ${perpMarket.name} delta=${prec(delta)} fills=${prec(fillsDelta)} equity=${prec(
-        currentEquityInUnderlying,
-      )} mark=${prec(perpMarket.uiPrice)} bid=${prec(bidSize)}@${prec(
-        bidPrice,
-      )} ask=${prec(askSize)}@${prec(askPrice)}`,
+      `update orders ${perpMarket.name} delta=${prec(delta)} fills=${prec(
+        fillsDelta,
+      )} equity=${prec(currentEquityInUnderlying)} mark=${prec(
+        perpMarket.uiPrice,
+      )} bid=${prec(bidSize)}@${prec(bidPrice)} ask=${prec(askSize)}@${prec(
+        askPrice,
+      )}`,
     );
 
     const beginIx = await this.client.healthRegionBeginIx(
@@ -373,15 +383,45 @@ class BotContext {
             hedgeSize,
             this.group.getFirstBankByMint(tokenMint).mintDecimals,
           );
+          const otherAmount = toNative(
+            hedgeSize * hedgePrice,
+            this.group.getFirstBankForPerpSettlement().mintDecimals,
+          );
 
           console.log(
-            `hedge ${perpMarket.name} on spot delta=${prec(biasedDelta)} fills=${prec(
+            `hedge ${perpMarket.name} on spot delta=${prec(
+              biasedDelta,
+            )} fills=${prec(
               fillsDelta,
             )} inputMint=${inputMint.toString()} outputMint=${outputMint.toString()} size=${prec(
               hedgeSize,
-            )} limit=${prec(hedgePrice)} index=${prec(perpMarket.uiPrice)}`,
+            )} limit=${prec(hedgePrice)} mode=${swapMode} index=${prec(
+              perpMarket.uiPrice,
+            )} amount=${amount.toString()} other=${otherAmount.toString()}`,
           );
 
+          const results = await this.router.swap(
+            inputMint,
+            outputMint,
+            amount,
+            otherAmount,
+            swapMode as SwapMode,
+            params.hedgeDiscount,
+          );
+          const filtered = results.filter((r) => r.ok);
+          let ranked: SwapResult[] = [];
+          if (swapMode === SwapMode.ExactIn) {
+            ranked = filtered.sort((a, b) =>
+              Number(b.minAmtOut.sub(a.minAmtOut).toString()),
+            );
+          } else if (swapMode === SwapMode.ExactOut) {
+            ranked = filtered.sort((a, b) =>
+              Number(a.maxAmtIn.sub(b.maxAmtIn).toString()),
+            );
+          }
+          const bestRoute = ranked[0];
+
+          /*
           const { bestRoute } = await fetchRoutes(
             inputMint,
             outputMint,
@@ -391,30 +431,33 @@ class BotContext {
             '0',
             KEYPAIR.publicKey,
             ['Jupiter'],
-          );
+          );*/
 
           if (!bestRoute) {
+            params.deltaBias -= biasedDelta;
             console.error(
-              `${perpMarket.name} spot hedge could not find a route`,
+              `${perpMarket.name} spot hedge could not find a route adjusted delta bias to ${params.deltaBias}`,
             );
           } else {
-            console.log('hedging via route', bestRoute);
-            const [ixs, alts] =
-              bestRoute.routerName === 'Mango'
-                ? await prepareMangoRouterInstructions(
-                    bestRoute,
-                    inputMint,
-                    outputMint,
-                    KEYPAIR.publicKey,
-                  )
-                : await fetchJupiterTransaction(
-                    this.client.connection,
-                    bestRoute,
-                    KEYPAIR.publicKey,
-                    params.hedgeDiscount,
-                    inputMint,
-                    outputMint,
-                  );
+            const ixs = await bestRoute.instructions(this.client.walletPk);
+
+            // console.log('hedging via route', bestRoute);
+            // const [ixs, alts] =
+            //   bestRoute.routerName === 'Mango'
+            //     ? await prepareMangoRouterInstructions(
+            //         bestRoute,
+            //         inputMint,
+            //         outputMint,
+            //         KEYPAIR.publicKey,
+            //       )
+            //     : await fetchJupiterTransaction(
+            //         this.client.connection,
+            //         bestRoute,
+            //         KEYPAIR.publicKey,
+            //         params.hedgeDiscount,
+            //         inputMint,
+            //         outputMint,
+            //       );
 
             ixs.push(
               ComputeBudgetProgram.setComputeUnitLimit({ units: 300000 }),
@@ -424,7 +467,6 @@ class BotContext {
             );
             try {
               const confirmBegin = Date.now();
-              console.log('finalized hedge instructions', ixs);
 
               const sig = await this.client.marginTrade({
                 group: this.group,
@@ -433,14 +475,14 @@ class BotContext {
                 amountIn:
                   Math.sign(biasedDelta) > 0
                     ? hedgeSize
-                    : bestRoute.inAmount /
+                    : (bestRoute.maxAmtIn.toString() as any) /
                       Math.pow(
                         10,
                         this.group.getFirstBankForPerpSettlement().mintDecimals,
                       ),
                 outputMintPk: outputMint,
                 userDefinedInstructions: ixs,
-                userDefinedAlts: alts,
+                userDefinedAlts: [],
                 flashLoanType: { swap: {} },
               });
               const confirmEnd = Date.now();
@@ -451,7 +493,7 @@ class BotContext {
 
               console.log(
                 `hedge ${i} ${perpMarket.name} confirmed delta t(all)=${
-                  confirmEnd - hedgeStart
+                  (confirmEnd - hedgeStart) / 1000
                 } t(confirm)=${(confirmEnd - confirmBegin) / 1000} prev=${prec(
                   delta,
                 )} new=${prec(newDelta)} https://explorer.solana.com/tx/${sig}`,
@@ -459,7 +501,15 @@ class BotContext {
 
               await this.updateOrders(i);
             } catch (e) {
-              console.error(perpMarket.name, 'spot hedge failed', e);
+              params.deltaBias -= biasedDelta;
+
+              console.error(
+                perpMarket.name,
+                'spot hedge failed',
+                e,
+                'adjusted delta bias to',
+                params.deltaBias,
+              );
             }
           }
         }
@@ -477,7 +527,7 @@ type MarketContext = {
   sequenceAccountBump: number;
   collateralBank: Bank;
   unprocessedPerpFills: FillEventUpdate[];
-  eventQueueHeadBySlot: {slot: number, head: number}[];
+  eventQueueHeadBySlot: { slot: number; head: number }[];
 };
 
 function getPerpMarketAssetsToTradeOn(group: Group): string[] {
@@ -628,6 +678,7 @@ function isHeadUpdate(obj: any): obj is HeadUpdate {
 async function fullMarketMaker(): Promise<void> {
   let intervals: NodeJS.Timer[] = [];
   let fillsWs: WebSocket | undefined;
+  let router: Router | undefined;
   try {
     // Load client
     const options = AnchorProvider.defaultOptions();
@@ -635,6 +686,7 @@ async function fullMarketMaker(): Promise<void> {
     const connection = new Connection(RPC_URL!, options);
     const userWallet = new Wallet(KEYPAIR);
     const userProvider = new AnchorProvider(connection, userWallet, options);
+
     const client = await MangoClient.connect(
       userProvider,
       CLUSTER,
@@ -675,7 +727,23 @@ async function fullMarketMaker(): Promise<void> {
       );
     }
 
+    // Initialize router
+    console.log('initialize router');
+    router = new Router(userProvider, 500);
+    await router.start();
+
+    // test swap to trigger jit compiler
+    await router.swap(
+      new PublicKey('So11111111111111111111111111111111111111112'),
+      new PublicKey('EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v'),
+      new BN(10000000),
+      new BN(0),
+      SwapMode.ExactIn,
+      0,
+    );
+
     // Initialize bot state
+    console.log('initialize bot');
     const perpMarkets: Map<PerpMarketIndex, MarketContext> = new Map();
     for (const perpMarketAsset of getPerpMarketAssetsToTradeOn(group)) {
       const perpMarket = group.getPerpMarketByName(perpMarketAsset + '-PERP');
@@ -695,7 +763,13 @@ async function fullMarketMaker(): Promise<void> {
       });
     }
 
-    const bot = new BotContext(client, group, mangoAccount, perpMarkets);
+    const bot = new BotContext(
+      client,
+      group,
+      mangoAccount,
+      perpMarkets,
+      router,
+    );
 
     // Init sequence enforcer accounts if needed
     await initSequenceEnforcerAccounts(
@@ -738,16 +812,29 @@ async function fullMarketMaker(): Promise<void> {
             (data.event.taker == MANGO_ACCOUNT.toString())
           ) {
             console.log(
-              `fill id=${data.event.seqNum} status=${data.status} slot=${data.slot} size=${data.event.quantity} price=${data.event.price} taker=${data.event.taker.slice(0, 4)} maker=${data.event.maker.slice(0, 4)} takerSide=${data.event.takerSide}`
+              `fill id=${data.event.seqNum} status=${data.status} slot=${
+                data.slot
+              } size=${data.event.quantity} price=${
+                data.event.price
+              } taker=${data.event.taker.slice(
+                0,
+                4,
+              )} maker=${data.event.maker.slice(0, 4)} takerSide=${
+                data.event.takerSide
+              }`,
             );
 
             // prune unprocessed fill events before last head update here to avoid race conditions
-            let eventQueueHeadUpdatesBeforeLastMangoAccountUpdate = pc.eventQueueHeadBySlot.filter(e => e.slot <= bot.mangoAccountLastUpdatedSlot);
-            if (eventQueueHeadUpdatesBeforeLastMangoAccountUpdate.length > 0)
-            {
-              let eventQueueHeadAtMangoAccountUpdate = eventQueueHeadUpdatesBeforeLastMangoAccountUpdate[eventQueueHeadUpdatesBeforeLastMangoAccountUpdate.length-1];
+            const eventQueueHeadUpdatesBeforeLastMangoAccountUpdate =
+              pc.eventQueueHeadBySlot.filter(
+                (e) => e.slot <= bot.mangoAccountLastUpdatedSlot,
+              );
+            if (eventQueueHeadUpdatesBeforeLastMangoAccountUpdate.length > 0) {
               // truncate list to a reasonable limit
-              let deleteCount = Math.max(0, pc.unprocessedPerpFills.length - 500);
+              const deleteCount = Math.max(
+                0,
+                pc.unprocessedPerpFills.length - 500,
+              );
               pc.unprocessedPerpFills.splice(0, deleteCount);
             }
             pc.unprocessedPerpFills.push(data);
@@ -759,12 +846,16 @@ async function fullMarketMaker(): Promise<void> {
       // events consumed
       if (isHeadUpdate(data)) {
         for (const pc of perpMarkets.values()) {
-          if (!pc.perpMarket.publicKey.equals(new PublicKey(data.marketKey))) continue;
+          if (!pc.perpMarket.publicKey.equals(new PublicKey(data.marketKey)))
+            continue;
           console.log('received HeadUpdate', data);
           // truncate list to a reasonable limit
-          let deleteCount = Math.max(0, pc.eventQueueHeadBySlot.length - 500);
+          const deleteCount = Math.max(0, pc.eventQueueHeadBySlot.length - 500);
           pc.eventQueueHeadBySlot.splice(0, deleteCount);
-          pc.eventQueueHeadBySlot.push({slot: data.slot, head: data.headSeqNum});
+          pc.eventQueueHeadBySlot.push({
+            slot: data.slot,
+            head: data.headSeqNum,
+          });
         }
       }
     });
@@ -820,6 +911,7 @@ async function fullMarketMaker(): Promise<void> {
     intervals.forEach((i) => clearInterval(i));
     intervals = [];
     if (fillsWs) fillsWs.close();
+    if (router) await router.stop();
   }
 }
 
@@ -859,4 +951,3 @@ function fetchJupiterRoutes(
 ): any {
   throw new Error('Function not implemented.');
 }
-
