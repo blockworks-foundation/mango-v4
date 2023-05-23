@@ -1028,8 +1028,11 @@ impl<
     ) -> Result<()> {
         let post_init_health = health_cache.health(HealthType::Init);
         msg!("post_init_health: {}", post_init_health);
+
+        // Accounts that have negative init health may only take actions that don't further
+        // decrease their health.
         require!(
-            post_init_health >= 0 || post_init_health > pre_init_health,
+            post_init_health >= 0 || post_init_health >= pre_init_health,
             MangoError::HealthMustBePositiveOrIncrease
         );
         Ok(())
