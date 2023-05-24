@@ -1134,6 +1134,23 @@ pub mod mango_v4 {
         Ok(())
     }
 
+    pub fn trigger_action_create(
+        ctx: Context<TriggerActionCreate>,
+        trigger_num: u64,
+        condition: Vec<u8>,
+        action: Vec<u8>,
+    ) -> Result<()> {
+        #[cfg(feature = "enable-gpl")]
+        instructions::trigger_action_create(ctx, trigger_num, condition, action)?;
+        Ok(())
+    }
+
+    pub fn trigger_action_execute(ctx: Context<TriggerActionExecute>) -> Result<()> {
+        #[cfg(feature = "enable-gpl")]
+        instructions::trigger_action_execute(ctx)?;
+        Ok(())
+    }
+
     ///
     /// benchmark
     ///

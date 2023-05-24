@@ -56,6 +56,8 @@ pub use token_register::*;
 pub use token_register_trustless::*;
 pub use token_update_index_and_rate::*;
 pub use token_withdraw::*;
+pub use trigger_action_create::*;
+pub use trigger_action_execute::*;
 
 mod account_buyback_fees_with_mngo;
 mod account_close;
@@ -115,3 +117,5 @@ mod token_register;
 mod token_register_trustless;
 mod token_update_index_and_rate;
 mod token_withdraw;
+mod trigger_action_create;
+mod trigger_action_execute;
