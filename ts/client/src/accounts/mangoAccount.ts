@@ -2,12 +2,20 @@ import { AnchorProvider, BN } from '@coral-xyz/anchor';
 import { utf8 } from '@coral-xyz/anchor/dist/cjs/utils/bytes';
 import { OpenOrders, Order, Orderbook } from '@project-serum/serum/lib/market';
 import { AccountInfo, PublicKey, TransactionSignature } from '@solana/web3.js';
+import cloneDeep from 'lodash/cloneDeep';
 import { MangoClient } from '../client';
 import { OPENBOOK_PROGRAM_ID, RUST_I64_MAX, RUST_I64_MIN } from '../constants';
-import { I80F48, I80F48Dto, ONE_I80F48, ZERO_I80F48 } from '../numbers/I80F48';
+import {
+  I80F48,
+  I80F48Dto,
+  MINUS_ONE_I80F48,
+  ONE_I80F48,
+  ZERO_I80F48,
+} from '../numbers/I80F48';
 import { toNativeI80F48, toUiDecimals, toUiDecimalsForQuote } from '../utils';
 import { Bank, TokenIndex } from './bank';
 import { Group } from './group';
+
 import { HealthCache } from './healthCache';
 import { PerpMarket, PerpMarketIndex, PerpOrder, PerpOrderSide } from './perp';
 import { MarketIndex, Serum3Side } from './serum3';
@@ -236,23 +244,27 @@ export class MangoAccount {
     return tp ? tp.balance(bank) : ZERO_I80F48();
   }
 
+  public getSerum3TokenFreeBalance(group: Group, bank: Bank): I80F48 {
+    const freeBalance = ZERO_I80F48();
+    for (const serum3Market of Array.from(
+      group.serum3MarketsMapByMarketIndex.values(),
+    )) {
+      const oo = this.serum3OosMapByMarketIndex.get(serum3Market.marketIndex);
+      if (serum3Market.baseTokenIndex == bank.tokenIndex && oo) {
+        freeBalance.add(I80F48.fromI64(oo.baseTokenFree));
+      }
+      if (serum3Market.quoteTokenIndex == bank.tokenIndex && oo) {
+        freeBalance.add(I80F48.fromI64(oo.quoteTokenFree));
+      }
+    }
+    return freeBalance;
+  }
+
   // TODO: once perp quote is merged, also add in the settle token balance if relevant
   public getEffectiveTokenBalance(group: Group, bank: Bank): I80F48 {
     const tp = this.getToken(bank.tokenIndex);
     if (tp) {
-      const bal = tp.balance(bank);
-      for (const serum3Market of Array.from(
-        group.serum3MarketsMapByMarketIndex.values(),
-      )) {
-        const oo = this.serum3OosMapByMarketIndex.get(serum3Market.marketIndex);
-        if (serum3Market.baseTokenIndex == bank.tokenIndex && oo) {
-          bal.add(I80F48.fromI64(oo.baseTokenFree));
-        }
-        if (serum3Market.quoteTokenIndex == bank.tokenIndex && oo) {
-          bal.add(I80F48.fromI64(oo.quoteTokenFree));
-        }
-      }
-      return bal;
+      return tp.balance(bank).add(this.getSerum3TokenFreeBalance(group, bank));
     }
     return ZERO_I80F48();
   }
@@ -990,6 +1002,42 @@ export class MangoAccount {
     );
   }
 
+  public async getSortedAsksForMarket(
+    client: MangoClient,
+    group: Group,
+    perpMarketIndex: PerpMarketIndex,
+    forceReload?: boolean,
+  ): Promise<PerpOrder[]> {
+    return (
+      await this.loadPerpOpenOrdersForMarket(
+        client,
+        group,
+        perpMarketIndex,
+        forceReload,
+      )
+    )
+      .filter((oo) => oo.side === PerpOrderSide.ask)
+      .sort((a, b) => a.price - b.price);
+  }
+
+  public async getSortedBidsForMarket(
+    client: MangoClient,
+    group: Group,
+    perpMarketIndex: PerpMarketIndex,
+    forceReload?: boolean,
+  ): Promise<PerpOrder[]> {
+    return (
+      await this.loadPerpOpenOrdersForMarket(
+        client,
+        group,
+        perpMarketIndex,
+        forceReload,
+      )
+    )
+      .filter((oo) => oo.side === PerpOrderSide.bid)
+      .sort((a, b) => b.price - a.price);
+  }
+
   public getBuybackFeesAccrued(): BN {
     return this.buybackFeesAccruedCurrent.add(this.buybackFeesAccruedPrevious);
   }
@@ -1627,6 +1675,239 @@ export class PerpPosition {
           ', cumulative short funding ui - ' +
           toUiDecimalsForQuote(this.cumulativeShortFunding)
       : '';
+  }
+
+  public async getLiquidationPriceForPerpPosition(
+    client: MangoClient,
+    group: Group,
+    perpMarket: PerpMarket,
+    mangoAccount: MangoAccount,
+    forceReload = false,
+  ): Promise<I80F48> {
+    const pp = mangoAccount.getPerpPosition(perpMarket.perpMarketIndex);
+    if (!pp) {
+      throw new Error(
+        `Cannot compute liquidation price for a position which doesn't, perpMarketIndex - ${perpMarket.perpMarketIndex}`,
+      );
+    }
+
+    // Orders in direction of our current position, would be considered for execution as long as their price
+    // is between liquidtion price and current market price
+    const sortedOo = await (pp.getBasePositionNative(perpMarket).isPos()
+      ? mangoAccount.getSortedBidsForMarket(
+          client,
+          group,
+          perpMarket.perpMarketIndex,
+          forceReload,
+        )
+      : mangoAccount.getSortedAsksForMarket(
+          client,
+          group,
+          perpMarket.perpMarketIndex,
+          forceReload,
+        ));
+
+    let prevLp;
+    for (let i = 0; i < 1000; i++) {
+      // Iteratively make liquidation price worse by simulating execution of
+      // bids for longs (asks for shorts) as long as they are within mark price
+      // and previously computed liquidation price
+      const nextLp = this.getLiquidationPriceInternal(
+        group,
+        perpMarket,
+        mangoAccount,
+        sortedOo,
+        prevLp ?? perpMarket.price,
+      );
+
+      if (prevLp && pp.getBasePositionNative(perpMarket).isPos()) {
+        if (!nextLp.gt(prevLp)) {
+          break;
+        }
+      } else if (prevLp && !nextLp.lt(prevLp)) {
+        break;
+      }
+      prevLp = nextLp;
+    }
+    return prevLp;
+  }
+
+  public static getAggregatePerpOrderSizeAndQuoteNative(
+    perpMarket: PerpMarket,
+    orders: PerpOrder[],
+    side: PerpOrderSide,
+    tillPriceExclusive: I80F48,
+  ): { sizeLots: BN; quoteNative: I80F48 } {
+    const filtered = orders.filter((oo) =>
+      side == PerpOrderSide.bid
+        ? perpMarket.priceLotsToNative(oo.priceLots).gte(tillPriceExclusive)
+        : perpMarket.priceLotsToNative(oo.priceLots).lte(tillPriceExclusive),
+    );
+    return {
+      sizeLots: filtered.reduce((sum, a) => sum.add(a.sizeLots), new BN(0)),
+      quoteNative: filtered.reduce(
+        (sum, a) =>
+          sum.add(
+            I80F48.fromI64(a.sizeLots)
+              .mul(I80F48.fromI64(perpMarket.baseLotSize))
+              .mul(perpMarket.priceLotsToNative(a.priceLots)),
+          ),
+        ZERO_I80F48(),
+      ),
+    };
+  }
+
+  public getLiquidationPriceInternal(
+    group: Group,
+    perpMarket: PerpMarket,
+    mangoAccount: MangoAccount,
+    sortedOo: PerpOrder[],
+    tillPriceExclusive: I80F48,
+  ): I80F48 {
+    const settleTokenBank = group.getFirstBankByTokenIndex(
+      perpMarket.settleTokenIndex,
+    );
+    const settleTokenPrice = settleTokenBank.price;
+
+    // Set base and quote
+    // Take into account bids or asks if they'd execute
+    // before we hit tillPriceExclusive i.e. previously computed liquidation price
+    let wbpn; // B
+    let qpn = this.quotePositionNative.sub(
+      this.getUnsettledFunding(perpMarket),
+    );
+    {
+      const baseNative = this.getBasePositionNative(perpMarket);
+      if (baseNative.isZero()) {
+        return MINUS_ONE_I80F48();
+      }
+
+      if (baseNative.isNeg()) {
+        const ret = PerpPosition.getAggregatePerpOrderSizeAndQuoteNative(
+          perpMarket,
+          sortedOo,
+          PerpOrderSide.ask,
+          tillPriceExclusive,
+        );
+        wbpn = perpMarket.maintBaseLiabWeight.mul(
+          baseNative.sub(
+            I80F48.fromI64(ret.sizeLots).mul(
+              I80F48.fromI64(perpMarket.baseLotSize),
+            ),
+          ),
+        );
+        qpn = qpn.add(ret.quoteNative);
+      } else {
+        const ret = PerpPosition.getAggregatePerpOrderSizeAndQuoteNative(
+          perpMarket,
+          sortedOo,
+          PerpOrderSide.ask,
+          tillPriceExclusive,
+        );
+        wbpn = perpMarket.maintBaseAssetWeight.mul(
+          baseNative.add(
+            I80F48.fromI64(ret.sizeLots).mul(
+              I80F48.fromI64(perpMarket.baseLotSize),
+            ),
+          ),
+        );
+        qpn = qpn.sub(ret.quoteNative);
+      }
+    }
+
+    if (wbpn.isZero()) {
+      return MINUS_ONE_I80F48();
+    }
+
+    // Health contribution of perp position in question would be considered separately
+    const mAClone: MangoAccount = cloneDeep(mangoAccount);
+    const ppToBeErased: PerpPosition = mAClone.getPerpPosition(
+      perpMarket.perpMarketIndex,
+    )!;
+    ppToBeErased.marketIndex =
+      PerpPosition.PerpMarketIndexUnset as PerpMarketIndex;
+    const healthCacheWoPerpPosition = HealthCache.fromMangoAccount(
+      group,
+      mAClone,
+    );
+
+    // Unused, TODO what to do with this?
+    // const basePrice = qpn.neg().div(wbpn);
+
+    const healthContributionWithoutSettleToken =
+      healthCacheWoPerpPosition.healthExcludingToken(
+        HealthType.maint,
+        perpMarket.settleTokenIndex,
+      ); // C
+
+    const settleTokenWeight = healthContributionWithoutSettleToken.lt(
+      ZERO_I80F48(),
+    )
+      ? settleTokenBank.maintAssetWeight
+      : settleTokenBank.maintLiabWeight;
+    const settleTokenSpot =
+      healthCacheWoPerpPosition.tokenInfos[
+        healthCacheWoPerpPosition.getOrCreateTokenInfoIndex(settleTokenBank)
+      ].balanceSpot;
+    const otherPerpsSettledInSettleTokenUhuPnl =
+      healthCacheWoPerpPosition.perpInfos
+        .filter((pi) => pi.settleTokenIndex == perpMarket.settleTokenIndex)
+        .reduce(
+          (sum, pi) => sum.add(pi.healthUnsettledPnl(HealthType.maint)),
+          ZERO_I80F48(),
+        );
+    const openBookFree = mangoAccount.getSerum3TokenFreeBalance(
+      group,
+      settleTokenBank,
+    );
+    const settleTokenContribution = settleTokenSpot
+      .add(otherPerpsSettledInSettleTokenUhuPnl)
+      .add(openBookFree)
+      .add(qpn); // T
+
+    const liqPrice = healthContributionWithoutSettleToken
+      .neg()
+      .div(settleTokenPrice.mul(settleTokenWeight))
+      .sub(settleTokenContribution)
+      .div(wbpn);
+
+    // Debugging
+    // console.log(
+    //   ` - wbpn ${wbpn}, C ${toUiDecimalsForQuote(
+    //     healthContributionWithoutSettleToken,
+    //   ).toLocaleString()}, settleTokenSpot ${toUiDecimalsForQuote(
+    //     settleTokenSpot,
+    //   ).toLocaleString()}, otherPerps ${toUiDecimalsForQuote(
+    //     otherPerpsSettledInSettleTokenUhuPnl,
+    //   ).toLocaleString()}, qpn ${toUiDecimalsForQuote(
+    //     qpn,
+    //   ).toLocaleString()}, openbookFree ${openBookFree}, T ${toUiDecimalsForQuote(
+    //     settleTokenContribution,
+    //   ).toLocaleString()}, -C-T ${toUiDecimalsForQuote(
+    //     healthContributionWithoutSettleToken.neg().sub(settleTokenContribution),
+    //   ).toLocaleString()}`,
+    // );
+
+    return liqPrice;
+  }
+
+  public async getLiquidationPriceForPerpPositionUi(
+    client: MangoClient,
+    group: Group,
+    perpMarket: PerpMarket,
+    mangoAccount: MangoAccount,
+  ): Promise<number> {
+    const lpUi = perpMarket.priceNativeToUi(
+      (
+        await this.getLiquidationPriceForPerpPosition(
+          client,
+          group,
+          perpMarket,
+          mangoAccount,
+        )
+      ).toNumber(),
+    );
+    return lpUi;
   }
 }
 

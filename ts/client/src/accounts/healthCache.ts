@@ -210,24 +210,43 @@ export class HealthCache {
   effectiveTokenBalancesInternal(
     healthType: HealthType | undefined,
     ignoreNegativePerp: boolean,
+    skipTokenIndex = -1 as TokenIndex,
   ): TokenBalance[] {
     const tokenBalances = new Array(this.tokenInfos.length)
       .fill(null)
       .map((ignored) => new TokenBalance(ZERO_I80F48()));
 
     for (const perpInfo of this.perpInfos) {
+      if (skipTokenIndex === perpInfo.settleTokenIndex) {
+        continue;
+      }
+
       const settleTokenIndex = this.findTokenInfoIndex(
         perpInfo.settleTokenIndex,
       );
       const perpSettleToken = tokenBalances[settleTokenIndex];
       const healthUnsettled = perpInfo.healthUnsettledPnl(healthType);
       if (!ignoreNegativePerp || healthUnsettled.gt(ZERO_I80F48())) {
+        // console.log(
+        //   ` - healthUnsettled ${
+        //     perpInfo.perpMarketIndex
+        //   } ${toUiDecimalsForQuote(healthUnsettled).toLocaleString(0)}`,
+        // );
         perpSettleToken.spotAndPerp.iadd(healthUnsettled);
       }
     }
 
     for (const index of this.tokenInfos.keys()) {
       const tokenInfo = this.tokenInfos[index];
+      if (skipTokenIndex === tokenInfo.tokenIndex) {
+        continue;
+      }
+
+      // console.log(
+      //   ` - tokenInfo.balanceSpot ${
+      //     tokenInfo.tokenIndex
+      //   } ${toUiDecimalsForQuote(tokenInfo.balanceSpot).toLocaleString()}`,
+      // );
       const tokenBalance = tokenBalances[index];
       tokenBalance.spotAndPerp.iadd(tokenInfo.balanceSpot);
     }
@@ -244,7 +263,11 @@ export class HealthCache {
         healthType,
         tokenBalance.spotAndPerp,
       );
-      // console.log(` - ti ${contrib}`);
+      // console.log(
+      //   ` - ti tokenIndex ${tokenInfo.tokenIndex} ${toUiDecimalsForQuote(
+      //     contrib,
+      //   ).toLocaleString()}`,
+      // );
       health.iadd(contrib);
     }
     const res = this.computeSerum3Reservations(healthType);
@@ -256,7 +279,11 @@ export class HealthCache {
         res.tokenMaxReserved,
         res.serum3Reserved[index],
       );
-      // console.log(` - si ${contrib}`);
+      // console.log(
+      //   ` - si marketIndex ${serum3Info.marketIndex} ${toUiDecimalsForQuote(
+      //     contrib,
+      //   ).toLocaleString(0)}`,
+      // );
       health.iadd(contrib);
     }
     return health;
@@ -266,6 +293,18 @@ export class HealthCache {
     const tokenBalances = this.effectiveTokenBalancesInternal(
       healthType,
       false,
+    );
+    return this.healthSum(healthType, tokenBalances);
+  }
+
+  public healthExcludingToken(
+    healthType: HealthType,
+    skipTokenIndex: TokenIndex,
+  ): I80F48 {
+    const tokenBalances = this.effectiveTokenBalancesInternal(
+      healthType,
+      false,
+      skipTokenIndex,
     );
     return this.healthSum(healthType, tokenBalances);
   }
@@ -1696,6 +1735,8 @@ export class PerpInfo {
         basePrice = pi.basePrices.asset(healthType);
       }
 
+      // console.log(` - basePrice ${basePrice}`);
+
       // Total value of the order-execution adjusted base position
       const baseHealth = netBaseNative.mul(weight).mul(basePrice);
 
@@ -1720,6 +1761,15 @@ export class PerpInfo {
       this.basePrices.asset(healthType),
     );
     const worstCase = bidsCase.min(asksCase);
+    // console.log(
+    //   ` - bidsCase ${toUiDecimalsForQuote(bidsCase).toLocaleString()}`,
+    // );
+    // console.log(
+    //   ` - asksCase ${toUiDecimalsForQuote(asksCase).toLocaleString()}`,
+    // );
+    // console.log(
+    //   ` - this.quote ${toUiDecimalsForQuote(this.quote).toLocaleString()}`,
+    // );
 
     return this.quote.add(worstCase);
   }
