@@ -312,7 +312,8 @@ async fn derive_liquidation_remaining_account_metas(
 }
 
 fn from_serum_style_pubkey(d: &[u64; 4]) -> Pubkey {
-    Pubkey::new(bytemuck::cast_slice(d as &[_]))
+    let b: &[u8; 32] = bytemuck::cast_ref(d);
+    Pubkey::from(*b)
 }
 
 pub async fn get_mango_account(solana: &SolanaCookie, account: Pubkey) -> MangoAccountValue {
