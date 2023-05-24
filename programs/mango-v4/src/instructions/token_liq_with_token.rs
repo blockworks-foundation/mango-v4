@@ -151,7 +151,7 @@ pub(crate) fn liquidation_action(
     //   ilw = init_liab_weight,
     //   llep = liab_liq_end_price,
     //   lopa = liab_oracle_price_adjusted, (see above)
-    //   iap = init_asset_weight,
+    //   iaw = init_asset_weight,
     //   alep = asset_liq_end_price,
     //   aop = asset_oracle_price
     //   ff = fee_factor
