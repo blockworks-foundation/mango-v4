@@ -23,6 +23,9 @@ pub fn trigger_action_create(
         trigger_action.action_bytes = action.len().try_into().unwrap();
     }
 
+    // TODO: It's better API if setting up the condition and the action are separate instructions,
+    // instead of passing opaque blobs of condition and action information here.
+
     {
         let mut bytes = ctx.accounts.trigger_action.as_ref().try_borrow_mut_data()?;
         let fixed_struct_end = 8 + std::mem::size_of::<TriggerAction>();

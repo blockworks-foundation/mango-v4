@@ -4,21 +4,23 @@ use crate::accounts_ix::*;
 use crate::error::*;
 use crate::state::*;
 
-pub fn trigger_action_execute(ctx: Context<TriggerActionExecute>) -> Result<()> {
+pub fn trigger_action_execute(
+    ctx: Context<TriggerActionExecute>,
+    num_condition_accounts: u8,
+) -> Result<()> {
+    let num_condition_accounts: usize = num_condition_accounts.into();
+
     let trigger_action_bytes = ctx.accounts.trigger_action.as_ref().try_borrow_data()?;
     let (trigger, condition, action) = TriggerAction::from_account_bytes(&trigger_action_bytes)?;
 
-    match condition {
-        ConditionRef::OraclePrice(c) => {
-            // TODO: check condition
-        }
-    };
+    let condition_accounts = &ctx.remaining_accounts[..num_condition_accounts];
+    condition.check(condition_accounts)?;
 
-    match action {
-        ActionRef::PerpPlaceOrder(a) => {
-            // TODO: actual execution
-        }
-    }
+    let action_accounts = &ctx.remaining_accounts[num_condition_accounts..];
+    action.execute(action_accounts)?;
+
+    // TODO: incentivize triggerer
+    // TODO: close trigger action account
 
     Ok(())
 }

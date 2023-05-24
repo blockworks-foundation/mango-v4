@@ -93,6 +93,12 @@ impl<'a> ConditionRef<'a> {
             }
         }
     }
+
+    pub fn check(&self, accounts: &[AccountInfo]) -> Result<()> {
+        match self {
+            ConditionRef::OraclePrice(c) => c.check(accounts),
+        }
+    }
 }
 
 #[zero_copy]
@@ -108,6 +114,18 @@ pub struct OraclePriceCondition {
     // TODO: also oracle staleness and confidence
     #[derivative(Debug = "ignore")]
     pub padding: [u8; 7],
+}
+
+impl OraclePriceCondition {
+    pub fn check(&self, accounts: &[AccountInfo]) -> Result<()> {
+        require_eq!(accounts.len(), 1);
+        let oracle_ai = &accounts[0];
+        require_keys_eq!(*oracle_ai.key, self.oracle);
+
+        // TODO: grab the price and compare it
+
+        Ok(())
+    }
 }
 
 #[repr(u32)]
@@ -134,6 +152,12 @@ impl<'a> ActionRef<'a> {
             }
         }
     }
+
+    pub fn execute(&self, accounts: &[AccountInfo]) -> Result<()> {
+        match self {
+            ActionRef::PerpPlaceOrder(p) => p.execute(accounts),
+        }
+    }
 }
 
 #[zero_copy]
@@ -145,4 +169,52 @@ pub struct PerpPlaceOrderAction {
     // TODO: basically the Order struct, though that one is internal; and this struct is a public interface
     #[derivative(Debug = "ignore")]
     pub padding: u16,
+}
+
+impl PerpPlaceOrderAction {
+    pub fn execute(accounts: &[AccountInfo]) -> Result<()> {
+        // TODO: Grab all the accounts needed for calling perp_place_order()
+        // and either make a context object or something intermediate that can be shared.
+        let mut mut_accounts = accounts;
+        // TODO: owner doesn't need to be a signer, doesn't even need to be passed...
+        // TODO: need to validate the inner and outer group accounts match
+        // TODO: need to validate the inner account is owned/delegated by the external owner
+        // TODO: We're in a tricky situation here:
+        //       - Anchor constructs the idl from the accounts struct, that's good, but means we can't
+        //         make `owner` not a signer without making bad changes to the idl.
+        //       - We _do_ want to reuse most of the validation logic from perp_place_order.
+        //       - Some of this validation logic is currently in the accounts struct constraints.
+        //         And some of it also ends up affecting the idl (has_one constraints...).
+        //       - Also, some validation might be in lib.rs, double check this.
+        // One solution might be to duplicate the validation in the actual program code that we reuse here.
+        // And also keep it in the accounts struct to generate a nice idl.
+        // Then calling the actual instruction code should no longer use the ctx object and instead use something
+        // sharable.
+        let mut place_order_accts = crate::accounts_ix::PerpPlaceOrder::try_accounts(
+            &crate::id(),
+            &mut mut_accounts,
+            &[],
+            bumps,
+            reallocs,
+        )?;
+        let ctx = Context {
+            program_id: &crate::id(),
+            accounts: &mut place_order_accts,
+            remaining_accounts: &mut mut_accounts,
+            bumps: (),
+        };
+
+        // TODO: Make an "Order" struct from self
+        let order = crate::state::Order {};
+
+        // TODO: ?
+        let limit = 10;
+
+        // TODO: probably move this whole set of functions into GPL?
+        #[cfg(feature = "enable-gpl")]
+        return crate::instructions::perp_place_order(ctx, order, limit).map(|_| ());
+
+        #[cfg(not(feature = "enable-gpl"))]
+        error_msg!("not gpl")
+    }
 }
