@@ -1710,8 +1710,9 @@ export class PerpPosition {
     let prevLp;
     for (let i = 0; i < 1000; i++) {
       // Iteratively make liquidation price worse by simulating execution of
-      // bids for longs (asks for shorts) as long as they are within mark price
+      // bids for LONGs (asks for SHORTs) as long as they are within mark price
       // and previously computed liquidation price
+      // Asks for LONGs (bids for SHORTs) are ignored
       const nextLp = this.getLiquidationPriceInternal(
         group,
         perpMarket,
@@ -1768,6 +1769,9 @@ export class PerpPosition {
       perpMarket.settleTokenIndex,
     );
     const settleTokenPrice = settleTokenBank.price;
+
+    // For constants B, T, C and final liqudation price equation, refer to
+    // https://www.notion.so/mango-markets/Mango-v4-Perp-Liq-Price-b7dde5e70c724d07934a21dc0aa79518?pvs=4
 
     // Set base and quote
     // Take into account bids or asks if they'd execute
