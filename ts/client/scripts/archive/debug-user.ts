@@ -29,198 +29,198 @@ async function debugUser(
   group: Group,
   mangoAccount: MangoAccount,
 ): Promise<void> {
-  // console.log(mangoAccount.toString(group));
+  console.log(mangoAccount.toString(group));
 
-  // await mangoAccount.reload(client);
+  await mangoAccount.reload(client);
 
-  // console.log(
-  //   'mangoAccount.getEquity() ' +
-  //     toUiDecimalsForQuote(mangoAccount.getEquity(group)!.toNumber()),
-  // );
-  // console.log(
-  //   'mangoAccount.getHealth(HealthType.init) ' +
-  //     toUiDecimalsForQuote(
-  //       mangoAccount.getHealth(group, HealthType.init)!.toNumber(),
-  //     ),
-  // );
-  // console.log(
-  //   'HealthCache.fromMangoAccount(group,mangoAccount).health(HealthType.init) ' +
-  //     toUiDecimalsForQuote(
-  //       HealthCache.fromMangoAccount(group, mangoAccount)
-  //         .health(HealthType.init)
-  //         .toNumber(),
-  //     ),
-  // );
-  // console.log(
-  //   'mangoAccount.getHealthRatio(HealthType.init) ' +
-  //     mangoAccount.getHealthRatio(group, HealthType.init)!.toNumber(),
-  // );
-  // console.log(
-  //   'mangoAccount.getHealthRatioUi(HealthType.init) ' +
-  //     mangoAccount.getHealthRatioUi(group, HealthType.init),
-  // );
-  // console.log(
-  //   'mangoAccount.getHealthRatio(HealthType.maint) ' +
-  //     mangoAccount.getHealthRatio(group, HealthType.maint)!.toNumber(),
-  // );
-  // console.log(
-  //   'mangoAccount.getHealthRatioUi(HealthType.maint) ' +
-  //     mangoAccount.getHealthRatioUi(group, HealthType.maint),
-  // );
-  // console.log(
-  //   'mangoAccount.getCollateralValue() ' +
-  //     toUiDecimalsForQuote(mangoAccount.getCollateralValue(group)!.toNumber()),
-  // );
-  // console.log(
-  //   'mangoAccount.getAssetsValue() ' +
-  //     toUiDecimalsForQuote(mangoAccount.getAssetsValue(group)!.toNumber()),
-  // );
-  // console.log(
-  //   'mangoAccount.getLiabsValue() ' +
-  //     toUiDecimalsForQuote(mangoAccount.getLiabsValue(group)!.toNumber()),
-  // );
+  console.log(
+    'mangoAccount.getEquity() ' +
+      toUiDecimalsForQuote(mangoAccount.getEquity(group)!.toNumber()),
+  );
+  console.log(
+    'mangoAccount.getHealth(HealthType.init) ' +
+      toUiDecimalsForQuote(
+        mangoAccount.getHealth(group, HealthType.init)!.toNumber(),
+      ),
+  );
+  console.log(
+    'HealthCache.fromMangoAccount(group,mangoAccount).health(HealthType.init) ' +
+      toUiDecimalsForQuote(
+        HealthCache.fromMangoAccount(group, mangoAccount)
+          .health(HealthType.init)
+          .toNumber(),
+      ),
+  );
+  console.log(
+    'mangoAccount.getHealthRatio(HealthType.init) ' +
+      mangoAccount.getHealthRatio(group, HealthType.init)!.toNumber(),
+  );
+  console.log(
+    'mangoAccount.getHealthRatioUi(HealthType.init) ' +
+      mangoAccount.getHealthRatioUi(group, HealthType.init),
+  );
+  console.log(
+    'mangoAccount.getHealthRatio(HealthType.maint) ' +
+      mangoAccount.getHealthRatio(group, HealthType.maint)!.toNumber(),
+  );
+  console.log(
+    'mangoAccount.getHealthRatioUi(HealthType.maint) ' +
+      mangoAccount.getHealthRatioUi(group, HealthType.maint),
+  );
+  console.log(
+    'mangoAccount.getCollateralValue() ' +
+      toUiDecimalsForQuote(mangoAccount.getCollateralValue(group)!.toNumber()),
+  );
+  console.log(
+    'mangoAccount.getAssetsValue() ' +
+      toUiDecimalsForQuote(mangoAccount.getAssetsValue(group)!.toNumber()),
+  );
+  console.log(
+    'mangoAccount.getLiabsValue() ' +
+      toUiDecimalsForQuote(mangoAccount.getLiabsValue(group)!.toNumber()),
+  );
 
-  // async function getMaxWithdrawWithBorrowForTokenUiWrapper(
-  //   token,
-  // ): Promise<void> {
-  //   console.log(
-  //     `mangoAccount.getMaxWithdrawWithBorrowForTokenUi(group, ${token}) ` +
-  //       mangoAccount.getMaxWithdrawWithBorrowForTokenUi(
-  //         group,
-  //         group.banksMapByName.get(token)![0].mint,
-  //       ),
-  //   );
-  // }
-  // for (const srcToken of Array.from(group.banksMapByName.keys())) {
-  //   await getMaxWithdrawWithBorrowForTokenUiWrapper(srcToken);
-  // }
+  async function getMaxWithdrawWithBorrowForTokenUiWrapper(
+    token,
+  ): Promise<void> {
+    console.log(
+      `mangoAccount.getMaxWithdrawWithBorrowForTokenUi(group, ${token}) ` +
+        mangoAccount.getMaxWithdrawWithBorrowForTokenUi(
+          group,
+          group.banksMapByName.get(token)![0].mint,
+        ),
+    );
+  }
+  for (const srcToken of Array.from(group.banksMapByName.keys())) {
+    await getMaxWithdrawWithBorrowForTokenUiWrapper(srcToken);
+  }
 
-  // function getMaxSourceForTokenSwapWrapper(src, tgt): void {
-  //   // Turn on for debugging specific pairs
-  //   // if (src != 'USDC' || tgt != 'MNGO') return;
+  function getMaxSourceForTokenSwapWrapper(src, tgt): void {
+    // Turn on for debugging specific pairs
+    // if (src != 'USDC' || tgt != 'MNGO') return;
 
-  //   let maxSourceUi;
-  //   try {
-  //     maxSourceUi = mangoAccount.getMaxSourceUiForTokenSwap(
-  //       group,
-  //       group.banksMapByName.get(src)![0].mint,
-  //       group.banksMapByName.get(tgt)![0].mint,
-  //     );
-  //   } catch (error) {
-  //     console.log(`Error for ${src}->${tgt}, ` + error.toString());
-  //   }
+    let maxSourceUi;
+    try {
+      maxSourceUi = mangoAccount.getMaxSourceUiForTokenSwap(
+        group,
+        group.banksMapByName.get(src)![0].mint,
+        group.banksMapByName.get(tgt)![0].mint,
+      );
+    } catch (error) {
+      console.log(`Error for ${src}->${tgt}, ` + error.toString());
+    }
 
-  //   const maxTargetUi =
-  //     maxSourceUi *
-  //     (group.banksMapByName.get(src)![0].uiPrice /
-  //       group.banksMapByName.get(tgt)![0].uiPrice);
+    const maxTargetUi =
+      maxSourceUi *
+      (group.banksMapByName.get(src)![0].uiPrice /
+        group.banksMapByName.get(tgt)![0].uiPrice);
 
-  //   const sim = mangoAccount.simHealthRatioWithTokenPositionUiChanges(group, [
-  //     {
-  //       mintPk: group.banksMapByName.get(src)![0].mint,
-  //       uiTokenAmount: -maxSourceUi,
-  //     },
-  //     {
-  //       mintPk: group.banksMapByName.get(tgt)![0].mint,
-  //       uiTokenAmount: maxTargetUi,
-  //     },
-  //   ]);
-  //   console.log(
-  //     `getMaxSourceForTokenSwap ${src.padEnd(4)} ${tgt.padEnd(4)} ` +
-  //       maxSourceUi.toFixed(3).padStart(10) +
-  //       `, health ratio after (${sim.toFixed(3).padStart(10)})`,
-  //   );
-  // }
-  // for (const srcToken of Array.from(group.banksMapByName.keys()).sort()) {
-  //   for (const tgtToken of Array.from(group.banksMapByName.keys()).sort()) {
-  //     getMaxSourceForTokenSwapWrapper(srcToken, tgtToken);
-  //   }
-  // }
+    const sim = mangoAccount.simHealthRatioWithTokenPositionUiChanges(group, [
+      {
+        mintPk: group.banksMapByName.get(src)![0].mint,
+        uiTokenAmount: -maxSourceUi,
+      },
+      {
+        mintPk: group.banksMapByName.get(tgt)![0].mint,
+        uiTokenAmount: maxTargetUi,
+      },
+    ]);
+    console.log(
+      `getMaxSourceForTokenSwap ${src.padEnd(4)} ${tgt.padEnd(4)} ` +
+        maxSourceUi.toFixed(3).padStart(10) +
+        `, health ratio after (${sim.toFixed(3).padStart(10)})`,
+    );
+  }
+  for (const srcToken of Array.from(group.banksMapByName.keys()).sort()) {
+    for (const tgtToken of Array.from(group.banksMapByName.keys()).sort()) {
+      getMaxSourceForTokenSwapWrapper(srcToken, tgtToken);
+    }
+  }
 
-  // function getMaxForPerpWrapper(perpMarket: PerpMarket): void {
-  //   const maxQuoteUi = mangoAccount.getMaxQuoteForPerpBidUi(
-  //     group,
-  //     perpMarket.perpMarketIndex,
-  //   );
-  //   const simMaxQuote = mangoAccount.simHealthRatioWithPerpBidUiChanges(
-  //     group,
-  //     perpMarket.perpMarketIndex,
-  //     maxQuoteUi / perpMarket.uiPrice,
-  //   );
-  //   const maxBaseUi = mangoAccount.getMaxBaseForPerpAskUi(
-  //     group,
-  //     perpMarket.perpMarketIndex,
-  //   );
-  //   const simMaxBase = mangoAccount.simHealthRatioWithPerpAskUiChanges(
-  //     group,
-  //     perpMarket.perpMarketIndex,
-  //     maxBaseUi,
-  //   );
-  //   console.log(
-  //     `getMaxPerp ${perpMarket.name.padStart(
-  //       10,
-  //     )} getMaxQuoteForPerpBidUi ${maxQuoteUi
-  //       .toFixed(3)
-  //       .padStart(10)} health ratio after (${simMaxQuote
-  //       .toFixed(3)
-  //       .padStart(10)}), getMaxBaseForPerpAskUi ${maxBaseUi
-  //       .toFixed(3)
-  //       .padStart(10)} health ratio after (${simMaxBase
-  //       .toFixed(3)
-  //       .padStart(10)})`,
-  //   );
-  // }
-  // for (const perpMarket of Array.from(
-  //   group.perpMarketsMapByMarketIndex.values(),
-  // )) {
-  //   getMaxForPerpWrapper(perpMarket);
-  // }
+  function getMaxForPerpWrapper(perpMarket: PerpMarket): void {
+    const maxQuoteUi = mangoAccount.getMaxQuoteForPerpBidUi(
+      group,
+      perpMarket.perpMarketIndex,
+    );
+    const simMaxQuote = mangoAccount.simHealthRatioWithPerpBidUiChanges(
+      group,
+      perpMarket.perpMarketIndex,
+      maxQuoteUi / perpMarket.uiPrice,
+    );
+    const maxBaseUi = mangoAccount.getMaxBaseForPerpAskUi(
+      group,
+      perpMarket.perpMarketIndex,
+    );
+    const simMaxBase = mangoAccount.simHealthRatioWithPerpAskUiChanges(
+      group,
+      perpMarket.perpMarketIndex,
+      maxBaseUi,
+    );
+    console.log(
+      `getMaxPerp ${perpMarket.name.padStart(
+        10,
+      )} getMaxQuoteForPerpBidUi ${maxQuoteUi
+        .toFixed(3)
+        .padStart(10)} health ratio after (${simMaxQuote
+        .toFixed(3)
+        .padStart(10)}), getMaxBaseForPerpAskUi ${maxBaseUi
+        .toFixed(3)
+        .padStart(10)} health ratio after (${simMaxBase
+        .toFixed(3)
+        .padStart(10)})`,
+    );
+  }
+  for (const perpMarket of Array.from(
+    group.perpMarketsMapByMarketIndex.values(),
+  )) {
+    getMaxForPerpWrapper(perpMarket);
+  }
 
-  // function getMaxForSerum3Wrapper(serum3Market: Serum3Market): void {
-  //   console.log(
-  //     `getMaxQuoteForSerum3BidUi ${serum3Market.name} ` +
-  //       mangoAccount.getMaxQuoteForSerum3BidUi(
-  //         group,
-  //         serum3Market.serumMarketExternal,
-  //       ),
-  //   );
-  //   console.log(
-  //     `- simHealthRatioWithSerum3BidUiChanges  ${serum3Market.name} ` +
-  //       mangoAccount.simHealthRatioWithSerum3BidUiChanges(
-  //         group,
-  //         mangoAccount.getMaxQuoteForSerum3BidUi(
-  //           group,
-  //           serum3Market.serumMarketExternal,
-  //         ),
-  //         serum3Market.serumMarketExternal,
-  //         HealthType.init,
-  //       ),
-  //   );
-  //   console.log(
-  //     `getMaxBaseForSerum3AskUi ${serum3Market.name} ` +
-  //       mangoAccount.getMaxBaseForSerum3AskUi(
-  //         group,
-  //         serum3Market.serumMarketExternal,
-  //       ),
-  //   );
-  //   console.log(
-  //     `- simHealthRatioWithSerum3BidUiChanges  ${serum3Market.name} ` +
-  //       mangoAccount.simHealthRatioWithSerum3AskUiChanges(
-  //         group,
-  //         mangoAccount.getMaxBaseForSerum3AskUi(
-  //           group,
-  //           serum3Market.serumMarketExternal,
-  //         ),
-  //         serum3Market.serumMarketExternal,
-  //         HealthType.init,
-  //       ),
-  //   );
-  // }
-  // for (const serum3Market of Array.from(
-  //   group.serum3MarketsMapByExternal.values(),
-  // )) {
-  //   getMaxForSerum3Wrapper(serum3Market);
-  // }
+  function getMaxForSerum3Wrapper(serum3Market: Serum3Market): void {
+    console.log(
+      `getMaxQuoteForSerum3BidUi ${serum3Market.name} ` +
+        mangoAccount.getMaxQuoteForSerum3BidUi(
+          group,
+          serum3Market.serumMarketExternal,
+        ),
+    );
+    console.log(
+      `- simHealthRatioWithSerum3BidUiChanges  ${serum3Market.name} ` +
+        mangoAccount.simHealthRatioWithSerum3BidUiChanges(
+          group,
+          mangoAccount.getMaxQuoteForSerum3BidUi(
+            group,
+            serum3Market.serumMarketExternal,
+          ),
+          serum3Market.serumMarketExternal,
+          HealthType.init,
+        ),
+    );
+    console.log(
+      `getMaxBaseForSerum3AskUi ${serum3Market.name} ` +
+        mangoAccount.getMaxBaseForSerum3AskUi(
+          group,
+          serum3Market.serumMarketExternal,
+        ),
+    );
+    console.log(
+      `- simHealthRatioWithSerum3BidUiChanges  ${serum3Market.name} ` +
+        mangoAccount.simHealthRatioWithSerum3AskUiChanges(
+          group,
+          mangoAccount.getMaxBaseForSerum3AskUi(
+            group,
+            serum3Market.serumMarketExternal,
+          ),
+          serum3Market.serumMarketExternal,
+          HealthType.init,
+        ),
+    );
+  }
+  for (const serum3Market of Array.from(
+    group.serum3MarketsMapByExternal.values(),
+  )) {
+    getMaxForSerum3Wrapper(serum3Market);
+  }
 
   // Liquidation price for perp positions
   for (const pp of mangoAccount.perpActive()) {
@@ -248,6 +248,9 @@ async function debugUser(
     const ppFromClone: PerpPosition = mClone.getPerpPosition(
       pm.perpMarketIndex,
     )!;
+
+    // Erase asks and bids
+    // Fold relevant bids for LONGs and asks for SHORTs into existing position
     if (ppFromClone.getBasePositionNative(pm).isPos()) {
       const sortedOo = await mangoAccount.getSortedBidsForMarket(
         client,
@@ -261,7 +264,6 @@ async function debugUser(
         PerpOrderSide.bid,
         lp,
       );
-      // console.log(ret);
       ppFromClone.basePositionLots = ppFromClone.basePositionLots.add(
         ret.sizeLots,
       );
@@ -281,7 +283,6 @@ async function debugUser(
         PerpOrderSide.ask,
         lp,
       );
-      // console.log(ret);
       ppFromClone.basePositionLots = ppFromClone.basePositionLots.sub(
         ret.sizeLots,
       );
@@ -296,19 +297,16 @@ async function debugUser(
       mClone.getHealth(gClone, HealthType.maint),
     );
 
-    if (Math.abs(simHealth) > 2 && lpUi != -1) {
-      console.log(
-        `account https://app.mango.markets/?address=${mangoAccount.publicKey}`,
-      );
-      console.log(
-        `${pm.name}, health: ${health.toLocaleString()}, side: ${
-          pp.getBasePositionNative(pm).isPos() ? 'LONG' : 'SHORT'
-        }, notional: ${pp.getNotionalValueUi(
-          pm,
-        )}, liq price ui: ${lpUi.toLocaleString()}, sim health: ${simHealth.toLocaleString()}`,
-      );
-      console.log(``);
-    }
+    console.log(
+      `account https://app.mango.markets/?address=${mangoAccount.publicKey}`,
+    );
+    console.log(
+      `${pm.name}, health: ${health.toLocaleString()}, side: ${
+        pp.getBasePositionNative(pm).isPos() ? 'LONG' : 'SHORT'
+      }, notional: ${pp.getNotionalValueUi(
+        pm,
+      )}, liq price ui: ${lpUi.toLocaleString()}, sim health: ${simHealth.toLocaleString()}`,
+    );
   }
 }
 
@@ -350,11 +348,11 @@ async function main(): Promise<void> {
             .gt(ZERO_I80F48()),
         ).length > 0
     ) {
-      // console.log(
-      //   `account https://app.mango.markets/?address=${mangoAccount.publicKey}`,
-      // );
+      console.log(
+        `account https://app.mango.markets/?address=${mangoAccount.publicKey}`,
+      );
       await debugUser(client, group, mangoAccount);
-      // console.log(``);
+      console.log(``);
     }
   }
 
