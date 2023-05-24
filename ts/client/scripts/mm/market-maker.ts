@@ -295,11 +295,11 @@ class BotContext {
 
     return this.client.sendAndConfirmTransaction(
       [
-        // beginIx,
+        beginIx,
         cancelAllIx,
         bidSize > 0 ? bidIx : null,
         askSize > 0 ? askIx : null,
-        // endIx,
+        endIx,
       ].filter((i) => !!i) as TransactionInstruction[],
     );
   }
@@ -524,6 +524,16 @@ class BotContext {
                 'adjusted delta bias to',
                 params.deltaBias,
               );
+
+              for (let r = 0; r < 9; r++) {
+                try {
+                  await this.updateOrders(i);
+                } catch (e) {
+                  const delay = Math.pow(2, r);
+                  console.error(`could not update orders retry=${r} delay=${delay} e=${e}`);
+                  await sleep(1000 * delay);
+                }
+              }
             }
           }
         }
