@@ -741,8 +741,8 @@ pub mod mango_v4 {
     }
 
     #[allow(clippy::too_many_arguments)]
-    pub fn perp_place_order(
-        ctx: Context<PerpPlaceOrder>,
+    pub fn perp_place_order<'key, 'accounts, 'remaining, 'info>(
+        ctx: Context<'key, 'accounts, 'remaining, 'info, PerpPlaceOrder<'info>>,
         side: Side,
 
         // The price in lots (quote lots per base lots)
@@ -797,16 +797,29 @@ pub mod mango_v4 {
                 },
             },
         };
+
+        let accounts = PerpPlaceOrderAccounts {
+            group: ctx.accounts.group,
+            account: ctx.accounts.account,
+            perp_market: ctx.accounts.perp_market,
+            bids: ctx.accounts.bids,
+            asks: ctx.accounts.asks,
+            event_queue: ctx.accounts.event_queue,
+            oracle: ctx.accounts.oracle,
+            remaining: ctx.remaining_accounts,
+        };
+        accounts.validate(&ctx.accounts.owner.key())?;
+
         #[cfg(feature = "enable-gpl")]
-        return instructions::perp_place_order(ctx, order, limit);
+        return instructions::perp_place_order(accounts, order, limit);
 
         #[cfg(not(feature = "enable-gpl"))]
         Ok(None)
     }
 
     #[allow(clippy::too_many_arguments)]
-    pub fn perp_place_order_v2(
-        ctx: Context<PerpPlaceOrder>,
+    pub fn perp_place_order_v2<'key, 'accounts, 'remaining, 'info>(
+        ctx: Context<'key, 'accounts, 'remaining, 'info, PerpPlaceOrder<'info>>,
         side: Side,
 
         // The price in lots (quote lots per base lots)
@@ -862,16 +875,29 @@ pub mod mango_v4 {
                 },
             },
         };
+
+        let accounts = PerpPlaceOrderAccounts {
+            group: ctx.accounts.group,
+            account: ctx.accounts.account,
+            perp_market: ctx.accounts.perp_market,
+            bids: ctx.accounts.bids,
+            asks: ctx.accounts.asks,
+            event_queue: ctx.accounts.event_queue,
+            oracle: ctx.accounts.oracle,
+            remaining: ctx.remaining_accounts,
+        };
+        accounts.validate(&ctx.accounts.owner.key())?;
+
         #[cfg(feature = "enable-gpl")]
-        return instructions::perp_place_order(ctx, order, limit);
+        return instructions::perp_place_order(accounts, order, limit);
 
         #[cfg(not(feature = "enable-gpl"))]
         Ok(None)
     }
 
     #[allow(clippy::too_many_arguments)]
-    pub fn perp_place_order_pegged(
-        ctx: Context<PerpPlaceOrder>,
+    pub fn perp_place_order_pegged<'key, 'accounts, 'remaining, 'info>(
+        ctx: Context<'key, 'accounts, 'remaining, 'info, PerpPlaceOrder<'info>>,
         side: Side,
 
         // The adjustment from the oracle price, in lots (quote lots per base lots).
@@ -934,16 +960,29 @@ pub mod mango_v4 {
                 max_oracle_staleness_slots,
             },
         };
+
+        let accounts = PerpPlaceOrderAccounts {
+            group: ctx.accounts.group,
+            account: ctx.accounts.account,
+            perp_market: ctx.accounts.perp_market,
+            bids: ctx.accounts.bids,
+            asks: ctx.accounts.asks,
+            event_queue: ctx.accounts.event_queue,
+            oracle: ctx.accounts.oracle,
+            remaining: ctx.remaining_accounts,
+        };
+        accounts.validate(&ctx.accounts.owner.key())?;
+
         #[cfg(feature = "enable-gpl")]
-        return instructions::perp_place_order(ctx, order, limit);
+        return instructions::perp_place_order(accounts, order, limit);
 
         #[cfg(not(feature = "enable-gpl"))]
         Ok(None)
     }
 
     #[allow(clippy::too_many_arguments)]
-    pub fn perp_place_order_pegged_v2(
-        ctx: Context<PerpPlaceOrder>,
+    pub fn perp_place_order_pegged_v2<'key, 'accounts, 'remaining, 'info>(
+        ctx: Context<'key, 'accounts, 'remaining, 'info, PerpPlaceOrder<'info>>,
         side: Side,
 
         // The adjustment from the oracle price, in lots (quote lots per base lots).
@@ -1007,8 +1046,21 @@ pub mod mango_v4 {
                 max_oracle_staleness_slots,
             },
         };
+
+        let accounts = PerpPlaceOrderAccounts {
+            group: ctx.accounts.group,
+            account: ctx.accounts.account,
+            perp_market: ctx.accounts.perp_market,
+            bids: ctx.accounts.bids,
+            asks: ctx.accounts.asks,
+            event_queue: ctx.accounts.event_queue,
+            oracle: ctx.accounts.oracle,
+            remaining: ctx.remaining_accounts,
+        };
+        accounts.validate(&ctx.accounts.owner.key())?;
+
         #[cfg(feature = "enable-gpl")]
-        return instructions::perp_place_order(ctx, order, limit);
+        return instructions::perp_place_order(accounts, order, limit);
 
         #[cfg(not(feature = "enable-gpl"))]
         Ok(None)
@@ -1145,9 +1197,12 @@ pub mod mango_v4 {
         Ok(())
     }
 
-    pub fn trigger_action_execute(ctx: Context<TriggerActionExecute>) -> Result<()> {
+    pub fn trigger_action_execute(
+        ctx: Context<TriggerActionExecute>,
+        num_condition_accounts: u8,
+    ) -> Result<()> {
         #[cfg(feature = "enable-gpl")]
-        instructions::trigger_action_execute(ctx)?;
+        instructions::trigger_action_execute(ctx, num_condition_accounts)?;
         Ok(())
     }
 

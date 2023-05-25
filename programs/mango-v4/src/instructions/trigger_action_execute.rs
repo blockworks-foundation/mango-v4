@@ -17,7 +17,7 @@ pub fn trigger_action_execute(
     condition.check(condition_accounts)?;
 
     let action_accounts = &ctx.remaining_accounts[num_condition_accounts..];
-    action.execute(action_accounts)?;
+    action.execute(trigger, ctx.accounts, action_accounts)?;
 
     // TODO: incentivize triggerer
     // TODO: close trigger action account

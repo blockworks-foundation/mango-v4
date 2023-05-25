@@ -6,6 +6,9 @@ use num_enum::{IntoPrimitive, TryFromPrimitive};
 use static_assertions::const_assert_eq;
 use std::mem::size_of;
 
+use crate::accounts_ix::PerpPlaceOrderAccountInfos;
+use crate::accounts_ix::PerpPlaceOrderAccounts;
+use crate::accounts_ix::TriggerActionExecute;
 use crate::error::*;
 use crate::PerpMarketIndex;
 
@@ -88,9 +91,7 @@ impl<'a> ConditionRef<'a> {
             ConditionType::OraclePrice => {
                 Ok(ConditionRef::OraclePrice(bytemuck::from_bytes(bytes)))
             }
-            _ => {
-                error_msg!("bad condition type")
-            }
+            _ => Err(error_msg!("bad condition type")),
         }
     }
 
@@ -147,15 +148,18 @@ impl<'a> ActionRef<'a> {
             ActionType::PerpPlaceOrder => {
                 Ok(ActionRef::PerpPlaceOrder(bytemuck::from_bytes(bytes)))
             }
-            _ => {
-                error_msg!("bad action type")
-            }
+            _ => Err(error_msg!("bad action type")),
         }
     }
 
-    pub fn execute(&self, accounts: &[AccountInfo]) -> Result<()> {
+    pub fn execute(
+        &self,
+        trigger_action: &TriggerAction,
+        execute_ix: &TriggerActionExecute,
+        accounts: &[AccountInfo],
+    ) -> Result<()> {
         match self {
-            ActionRef::PerpPlaceOrder(p) => p.execute(accounts),
+            ActionRef::PerpPlaceOrder(p) => p.execute(trigger_action, execute_ix, accounts),
         }
     }
 }
@@ -172,12 +176,12 @@ pub struct PerpPlaceOrderAction {
 }
 
 impl PerpPlaceOrderAction {
-    pub fn execute(accounts: &[AccountInfo]) -> Result<()> {
-        // TODO: Grab all the accounts needed for calling perp_place_order()
-        // and either make a context object or something intermediate that can be shared.
-        let mut mut_accounts = accounts;
-        // TODO: owner doesn't need to be a signer, doesn't even need to be passed...
-        // TODO: need to validate the inner and outer group accounts match
+    pub fn execute(
+        &self,
+        trigger_action: &TriggerAction,
+        execute_ix: &TriggerActionExecute,
+        accounts: &[AccountInfo],
+    ) -> Result<()> {
         // TODO: need to validate the inner account is owned/delegated by the external owner
         // TODO: We're in a tricky situation here:
         //       - Anchor constructs the idl from the accounts struct, that's good, but means we can't
@@ -190,19 +194,19 @@ impl PerpPlaceOrderAction {
         // And also keep it in the accounts struct to generate a nice idl.
         // Then calling the actual instruction code should no longer use the ctx object and instead use something
         // sharable.
-        let mut place_order_accts = crate::accounts_ix::PerpPlaceOrder::try_accounts(
-            &crate::id(),
-            &mut mut_accounts,
-            &[],
-            bumps,
-            reallocs,
-        )?;
-        let ctx = Context {
-            program_id: &crate::id(),
-            accounts: &mut place_order_accts,
-            remaining_accounts: &mut mut_accounts,
-            bumps: (),
+        let perp_place_order_ais = PerpPlaceOrderAccountInfos {
+            group: execute_ix.group.as_ref(),
+            account: &accounts[0],
+            perp_market: &accounts[1],
+            bids: &accounts[2],
+            asks: &accounts[3],
+            event_queue: &accounts[4],
+            oracle: &accounts[5],
+            remaining: &accounts[6..],
         };
+        let perp_place_order_accounts =
+            PerpPlaceOrderAccounts::from_account_infos(perp_place_order_ais)?;
+        perp_place_order_accounts.validate(&trigger_action.owner)?;
 
         // TODO: Make an "Order" struct from self
         let order = crate::state::Order {};
@@ -212,9 +216,10 @@ impl PerpPlaceOrderAction {
 
         // TODO: probably move this whole set of functions into GPL?
         #[cfg(feature = "enable-gpl")]
-        return crate::instructions::perp_place_order(ctx, order, limit).map(|_| ());
+        return crate::instructions::perp_place_order(perp_place_order_accounts, order, limit)
+            .map(|_| ());
 
         #[cfg(not(feature = "enable-gpl"))]
-        error_msg!("not gpl")
+        Err(error_msg!("not gpl"))
     }
 }

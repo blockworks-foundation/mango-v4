@@ -9,7 +9,7 @@ use crate::state::*;
 // TODO
 #[allow(clippy::too_many_arguments)]
 pub fn perp_place_order(
-    ctx: Context<PerpPlaceOrder>,
+    accounts: PerpPlaceOrderAccounts,
     mut order: Order,
     limit: u8,
 ) -> Result<Option<u128>> {
@@ -24,32 +24,26 @@ pub fn perp_place_order(
     // Doing this automatically here makes it impossible for attackers to add orders to the orderbook
     // before triggering the funding computation.
     {
-        let mut perp_market = ctx.accounts.perp_market.load_mut()?;
+        let mut perp_market = accounts.perp_market.load_mut()?;
         let book = Orderbook {
-            bids: ctx.accounts.bids.load_mut()?,
-            asks: ctx.accounts.asks.load_mut()?,
+            bids: accounts.bids.load_mut()?,
+            asks: accounts.asks.load_mut()?,
         };
 
         let oracle_state;
         (oracle_price, oracle_state) = perp_market.oracle_price_and_state(
-            &AccountInfoRef::borrow(ctx.accounts.oracle.as_ref())?,
+            &AccountInfoRef::borrow(accounts.oracle.as_ref())?,
             None, // staleness checked in health
         )?;
 
         perp_market.update_funding_and_stable_price(&book, oracle_price, oracle_state, now_ts)?;
     }
 
-    let mut account = ctx.accounts.account.load_full_mut()?;
-    // account constraint #1
-    require!(
-        account.fixed.is_owner_or_delegate(ctx.accounts.owner.key()),
-        MangoError::SomeError
-    );
-
-    let account_pk = ctx.accounts.account.key();
+    let mut account = accounts.account.load_full_mut()?;
+    let account_pk = accounts.account.key();
 
     let (perp_market_index, settle_token_index) = {
-        let perp_market = ctx.accounts.perp_market.load()?;
+        let perp_market = accounts.perp_market.load()?;
         (
             perp_market.perp_market_index,
             perp_market.settle_token_index,
@@ -65,8 +59,7 @@ pub fn perp_place_order(
     // Pre-health computation, _after_ perp position is created
     //
     let pre_health_opt = if !account.fixed.is_in_health_region() {
-        let retriever =
-            new_fixed_order_account_retriever(ctx.remaining_accounts, &account.borrow())?;
+        let retriever = new_fixed_order_account_retriever(accounts.remaining, &account.borrow())?;
         let health_cache =
             new_health_cache(&account.borrow(), &retriever).context("pre-withdraw init health")?;
         let pre_init_health = account.check_health_pre(&health_cache)?;
@@ -75,14 +68,14 @@ pub fn perp_place_order(
         None
     };
 
-    let mut perp_market = ctx.accounts.perp_market.load_mut()?;
+    let mut perp_market = accounts.perp_market.load_mut()?;
     let mut book = Orderbook {
-        bids: ctx.accounts.bids.load_mut()?,
-        asks: ctx.accounts.asks.load_mut()?,
+        bids: accounts.bids.load_mut()?,
+        asks: accounts.asks.load_mut()?,
     };
 
-    let mut event_queue = ctx.accounts.event_queue.load_mut()?;
-    let group = ctx.accounts.group.load()?;
+    let mut event_queue = accounts.event_queue.load_mut()?;
+    let group = accounts.group.load()?;
 
     let now_ts: u64 = Clock::get()?.unix_timestamp.try_into().unwrap();
     account
