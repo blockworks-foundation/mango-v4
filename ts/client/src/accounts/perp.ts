@@ -348,7 +348,6 @@ export class PerpMarket {
       price,
     };
   }
-  
 
   public async logOb(client: MangoClient): Promise<string> {
     let res = ``;
@@ -442,9 +441,7 @@ export class PerpMarket {
   }
 
   public priceLotsToNative(price: BN): I80F48 {
-    return I80F48.fromI64(price)
-      .mul(I80F48.fromI64(this.quoteLotSize))
-      .div(I80F48.fromI64(this.baseLotSize));
+    return I80F48.fromI64(price.mul(this.quoteLotSize).div(this.baseLotSize));
   }
 
   public priceNativeToUi(price: number): number {
