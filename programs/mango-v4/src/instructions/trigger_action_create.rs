@@ -23,6 +23,21 @@ pub fn trigger_action_create(
         trigger_action.action_bytes = action.len().try_into().unwrap();
     }
 
+    // Transfer extra lamports into the trigger_action account as incentive
+    // TODO: configurable?
+    **ctx
+        .accounts
+        .trigger_action
+        .as_ref()
+        .try_borrow_mut_lamports()
+        .unwrap() += 500_000;
+    **ctx
+        .accounts
+        .payer
+        .as_ref()
+        .try_borrow_mut_lamports()
+        .unwrap() -= 500_000;
+
     // TODO: It's better API if setting up the condition and the action are separate instructions,
     // instead of passing opaque blobs of condition and action information here.
 

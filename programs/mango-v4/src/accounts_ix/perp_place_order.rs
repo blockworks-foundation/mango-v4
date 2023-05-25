@@ -83,6 +83,9 @@ impl<'info, 'remaining> PerpPlaceOrderAccounts<'info, 'remaining> {
         })
     }
 
+    // This duplicates the anchor account constraints, but is necessary since indirect
+    // calls from trigger order execution won't go through the normal accounts struct.
+    // (they can't, because the normal struct requires a signing owner)
     pub fn validate(&self, owner: &Pubkey) -> Result<()> {
         // group
         {
@@ -96,7 +99,7 @@ impl<'info, 'remaining> PerpPlaceOrderAccounts<'info, 'remaining> {
         {
             require!(self.account.as_ref().is_writable, ErrorCode::ConstraintMut);
             let account = self.account.load()?;
-            require_keys_eq!(account.owner, self.group.key());
+            require_keys_eq!(account.group, self.group.key());
             require!(account.is_operational(), MangoError::AccountIsFrozen);
 
             // account constraint #1

@@ -91,7 +91,6 @@ impl<'a> ConditionRef<'a> {
             ConditionType::OraclePrice => {
                 Ok(ConditionRef::OraclePrice(bytemuck::from_bytes(bytes)))
             }
-            _ => Err(error_msg!("bad condition type")),
         }
     }
 
@@ -148,15 +147,14 @@ impl<'a> ActionRef<'a> {
             ActionType::PerpPlaceOrder => {
                 Ok(ActionRef::PerpPlaceOrder(bytemuck::from_bytes(bytes)))
             }
-            _ => Err(error_msg!("bad action type")),
         }
     }
 
-    pub fn execute(
+    pub fn execute<'info>(
         &self,
         trigger_action: &TriggerAction,
-        execute_ix: &TriggerActionExecute,
-        accounts: &[AccountInfo],
+        execute_ix: &TriggerActionExecute<'info>,
+        accounts: &[AccountInfo<'info>],
     ) -> Result<()> {
         match self {
             ActionRef::PerpPlaceOrder(p) => p.execute(trigger_action, execute_ix, accounts),
@@ -169,31 +167,81 @@ impl<'a> ActionRef<'a> {
 #[derivative(Debug)]
 pub struct PerpPlaceOrderAction {
     pub action_type: u32, // always ActionType::PerpPlaceOrder
+    // TODO: all these fields are just slapdash
+    pub max_oracle_staleness_slots: i32,
+    pub max_base_lots: i64,
+    pub max_quote_lots: i64,
+    pub client_order_id: u64,
+    pub price_lots_or_offset: i64,
+    pub peg_limit: i64,
     pub perp_market_index: PerpMarketIndex,
-    // TODO: basically the Order struct, though that one is internal; and this struct is a public interface
+    pub side: u8,
+    pub reduce_only: u8,
+    pub self_trade_behavior: u8,
+    pub place_order_type: u8,
+    pub is_pegged: u8,
+    pub limit: u8,
     #[derivative(Debug = "ignore")]
-    pub padding: u16,
+    pub reserved: [u8; 64],
 }
+const_assert_eq!(
+    size_of::<PerpPlaceOrderAction>(),
+    4 * 2 + 8 * 5 + 2 + 1 * 5 + 1 + 64
+);
+const_assert_eq!(size_of::<PerpPlaceOrderAction>(), 120);
+const_assert_eq!(size_of::<PerpPlaceOrderAction>() % 8, 0);
 
 impl PerpPlaceOrderAction {
-    pub fn execute(
+    fn to_order(&self) -> Result<crate::state::Order> {
+        use crate::state::*;
+        let place_order_type = PlaceOrderType::try_from(self.place_order_type).unwrap();
+        let params = match place_order_type {
+            PlaceOrderType::Market => {
+                require_eq!(self.is_pegged, 0);
+                OrderParams::Market
+            }
+            PlaceOrderType::ImmediateOrCancel => {
+                require_eq!(self.is_pegged, 0);
+                OrderParams::ImmediateOrCancel {
+                    price_lots: self.price_lots_or_offset,
+                }
+            }
+            _ => {
+                let order_type = place_order_type.to_post_order_type()?;
+                if self.is_pegged == 0 {
+                    OrderParams::Fixed {
+                        price_lots: self.price_lots_or_offset,
+                        order_type,
+                    }
+                } else {
+                    OrderParams::OraclePegged {
+                        price_offset_lots: self.price_lots_or_offset,
+                        order_type,
+                        peg_limit: self.peg_limit,
+                        max_oracle_staleness_slots: self.max_oracle_staleness_slots,
+                    }
+                }
+            }
+        };
+        Ok(Order {
+            side: Side::try_from(self.side).unwrap(),
+            max_base_lots: self.max_base_lots,
+            max_quote_lots: self.max_quote_lots,
+            client_order_id: self.client_order_id,
+            reduce_only: self.reduce_only != 0,
+            time_in_force: 0,
+            self_trade_behavior: SelfTradeBehavior::try_from(self.self_trade_behavior).unwrap(),
+            params,
+        })
+    }
+
+    pub fn execute<'info>(
         &self,
         trigger_action: &TriggerAction,
-        execute_ix: &TriggerActionExecute,
-        accounts: &[AccountInfo],
+        execute_ix: &TriggerActionExecute<'info>,
+        accounts: &[AccountInfo<'info>],
     ) -> Result<()> {
-        // TODO: need to validate the inner account is owned/delegated by the external owner
-        // TODO: We're in a tricky situation here:
-        //       - Anchor constructs the idl from the accounts struct, that's good, but means we can't
-        //         make `owner` not a signer without making bad changes to the idl.
-        //       - We _do_ want to reuse most of the validation logic from perp_place_order.
-        //       - Some of this validation logic is currently in the accounts struct constraints.
-        //         And some of it also ends up affecting the idl (has_one constraints...).
-        //       - Also, some validation might be in lib.rs, double check this.
-        // One solution might be to duplicate the validation in the actual program code that we reuse here.
-        // And also keep it in the accounts struct to generate a nice idl.
-        // Then calling the actual instruction code should no longer use the ctx object and instead use something
-        // sharable.
+        // Use the accounts and validate them
         let perp_place_order_ais = PerpPlaceOrderAccountInfos {
             group: execute_ix.group.as_ref(),
             account: &accounts[0],
@@ -208,15 +256,19 @@ impl PerpPlaceOrderAction {
             PerpPlaceOrderAccounts::from_account_infos(perp_place_order_ais)?;
         perp_place_order_accounts.validate(&trigger_action.owner)?;
 
-        // TODO: Make an "Order" struct from self
-        let order = crate::state::Order {};
+        require_eq!(
+            perp_place_order_accounts
+                .perp_market
+                .load()?
+                .perp_market_index,
+            self.perp_market_index
+        );
 
-        // TODO: ?
-        let limit = 10;
+        let order = self.to_order()?;
 
         // TODO: probably move this whole set of functions into GPL?
         #[cfg(feature = "enable-gpl")]
-        return crate::instructions::perp_place_order(perp_place_order_accounts, order, limit)
+        return crate::instructions::perp_place_order(perp_place_order_accounts, order, self.limit)
             .map(|_| ());
 
         #[cfg(not(feature = "enable-gpl"))]

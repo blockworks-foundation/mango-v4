@@ -799,13 +799,13 @@ pub mod mango_v4 {
         };
 
         let accounts = PerpPlaceOrderAccounts {
-            group: ctx.accounts.group,
-            account: ctx.accounts.account,
-            perp_market: ctx.accounts.perp_market,
-            bids: ctx.accounts.bids,
-            asks: ctx.accounts.asks,
-            event_queue: ctx.accounts.event_queue,
-            oracle: ctx.accounts.oracle,
+            group: ctx.accounts.group.clone(),
+            account: ctx.accounts.account.clone(),
+            perp_market: ctx.accounts.perp_market.clone(),
+            bids: ctx.accounts.bids.clone(),
+            asks: ctx.accounts.asks.clone(),
+            event_queue: ctx.accounts.event_queue.clone(),
+            oracle: ctx.accounts.oracle.clone(),
             remaining: ctx.remaining_accounts,
         };
         accounts.validate(&ctx.accounts.owner.key())?;
@@ -877,13 +877,13 @@ pub mod mango_v4 {
         };
 
         let accounts = PerpPlaceOrderAccounts {
-            group: ctx.accounts.group,
-            account: ctx.accounts.account,
-            perp_market: ctx.accounts.perp_market,
-            bids: ctx.accounts.bids,
-            asks: ctx.accounts.asks,
-            event_queue: ctx.accounts.event_queue,
-            oracle: ctx.accounts.oracle,
+            group: ctx.accounts.group.clone(),
+            account: ctx.accounts.account.clone(),
+            perp_market: ctx.accounts.perp_market.clone(),
+            bids: ctx.accounts.bids.clone(),
+            asks: ctx.accounts.asks.clone(),
+            event_queue: ctx.accounts.event_queue.clone(),
+            oracle: ctx.accounts.oracle.clone(),
             remaining: ctx.remaining_accounts,
         };
         accounts.validate(&ctx.accounts.owner.key())?;
@@ -962,13 +962,13 @@ pub mod mango_v4 {
         };
 
         let accounts = PerpPlaceOrderAccounts {
-            group: ctx.accounts.group,
-            account: ctx.accounts.account,
-            perp_market: ctx.accounts.perp_market,
-            bids: ctx.accounts.bids,
-            asks: ctx.accounts.asks,
-            event_queue: ctx.accounts.event_queue,
-            oracle: ctx.accounts.oracle,
+            group: ctx.accounts.group.clone(),
+            account: ctx.accounts.account.clone(),
+            perp_market: ctx.accounts.perp_market.clone(),
+            bids: ctx.accounts.bids.clone(),
+            asks: ctx.accounts.asks.clone(),
+            event_queue: ctx.accounts.event_queue.clone(),
+            oracle: ctx.accounts.oracle.clone(),
             remaining: ctx.remaining_accounts,
         };
         accounts.validate(&ctx.accounts.owner.key())?;
@@ -1048,13 +1048,13 @@ pub mod mango_v4 {
         };
 
         let accounts = PerpPlaceOrderAccounts {
-            group: ctx.accounts.group,
-            account: ctx.accounts.account,
-            perp_market: ctx.accounts.perp_market,
-            bids: ctx.accounts.bids,
-            asks: ctx.accounts.asks,
-            event_queue: ctx.accounts.event_queue,
-            oracle: ctx.accounts.oracle,
+            group: ctx.accounts.group.clone(),
+            account: ctx.accounts.account.clone(),
+            perp_market: ctx.accounts.perp_market.clone(),
+            bids: ctx.accounts.bids.clone(),
+            asks: ctx.accounts.asks.clone(),
+            event_queue: ctx.accounts.event_queue.clone(),
+            oracle: ctx.accounts.oracle.clone(),
             remaining: ctx.remaining_accounts,
         };
         accounts.validate(&ctx.accounts.owner.key())?;
@@ -1197,8 +1197,8 @@ pub mod mango_v4 {
         Ok(())
     }
 
-    pub fn trigger_action_execute(
-        ctx: Context<TriggerActionExecute>,
+    pub fn trigger_action_execute<'key, 'accounts, 'remaining, 'info>(
+        ctx: Context<'key, 'accounts, 'remaining, 'info, TriggerActionExecute<'info>>,
         num_condition_accounts: u8,
     ) -> Result<()> {
         #[cfg(feature = "enable-gpl")]
