@@ -62,7 +62,7 @@ export async function computePriceImpactOnJup(
   outputMint: string,
 ): Promise<{ outAmount: number; priceImpactPct: number }> {
   const url = `https://quote-api.jup.ag/v4/quote?inputMint=${inputMint}&outputMint=${outputMint}&amount=${amount}&swapMode=ExactIn&slippageBps=10000&onlyDirectRoutes=false&asLegacyTransaction=false`;
-  const response = await (await buildFetch())(url);
+  const response = await (await buildFetch())(url, { mode: 'no-cors' });
 
   try {
     const res = await response.json();
@@ -93,7 +93,7 @@ export async function getOnChainPriceForMints(
     mints.map(async (mint) => {
       let data = await (
         await buildFetch()
-      )(`https://price.jup.ag/v4/price?ids=${mint}`);
+      )(`https://price.jup.ag/v4/price?ids=${mint}`, { mode: 'no-cors' });
       data = await data.json();
       data = data['data'];
       return data[mint]['price'];
@@ -411,6 +411,7 @@ export async function getRiskStats(
           await buildFetch()
         )(
           `https://api.mngo.cloud/data/v4/stats/liqors-over_period?over_period=1MONTH`,
+          { mode: 'no-cors' },
         )
       ).json()
     ).map((data) => new PublicKey(data['liqor']));
