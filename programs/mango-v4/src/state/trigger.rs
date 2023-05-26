@@ -8,13 +8,13 @@ use std::mem::size_of;
 
 use crate::accounts_ix::PerpPlaceOrderAccountInfos;
 use crate::accounts_ix::PerpPlaceOrderAccounts;
-use crate::accounts_ix::TriggerActionExecute;
+use crate::accounts_ix::TriggerCheck;
 use crate::error::*;
 use crate::PerpMarketIndex;
 
 #[account(zero_copy)]
 #[derive(Debug)]
-pub struct TriggerAction {
+pub struct Trigger {
     // ABI: Clients rely on this being at offset 8
     pub group: Pubkey,
 
@@ -24,7 +24,12 @@ pub struct TriggerAction {
     pub owner: Pubkey,
 
     // For recreating the seed
+    // TODO: needed?
     pub trigger_num: u64,
+
+    pub expiry_slot: u64,
+
+    pub incentive_lamports: u64,
 
     // TODO: expiry?
     // TODO: incentive (just SOL on this account maybe?)
@@ -33,28 +38,30 @@ pub struct TriggerAction {
     pub action_type: u32,
     pub action_bytes: u32,
 
-    pub reserved: [u8; 1000],
+    pub condition_was_met: u8,
+
+    pub reserved: [u8; 999],
     // Condition and Action bytes trail this struct in the account!
 }
-const_assert_eq!(size_of::<TriggerAction>(), 32 * 3 + 8 + 4 * 4 + 1000);
-const_assert_eq!(size_of::<TriggerAction>(), 1120);
-const_assert_eq!(size_of::<TriggerAction>() % 8, 0);
+const_assert_eq!(size_of::<Trigger>(), 32 * 3 + 8 * 3 + 4 * 4 + 1 + 999);
+const_assert_eq!(size_of::<Trigger>(), 1136);
+const_assert_eq!(size_of::<Trigger>() % 8, 0);
 
-impl TriggerAction {
+impl Trigger {
     // TODO: check owner, doesn't work with Ref<>
     pub fn from_account_bytes<'a>(
         bytes: &'a [u8],
-    ) -> Result<(&TriggerAction, ConditionRef<'a>, ActionRef<'a>)> {
+    ) -> Result<(&Trigger, ConditionRef<'a>, ActionRef<'a>)> {
         if bytes.len() < 8 {
             return Err(ErrorCode::AccountDiscriminatorNotFound.into());
         }
         let disc_bytes = &bytes[0..8];
-        if disc_bytes != &TriggerAction::DISCRIMINATOR {
+        if disc_bytes != &Trigger::DISCRIMINATOR {
             return Err(ErrorCode::AccountDiscriminatorMismatch.into());
         }
 
-        let (fixed_bytes, tail_bytes) = bytes.split_at(8 + std::mem::size_of::<TriggerAction>());
-        let fixed: &TriggerAction = bytemuck::from_bytes(&fixed_bytes[8..]);
+        let (fixed_bytes, tail_bytes) = bytes.split_at(8 + std::mem::size_of::<Trigger>());
+        let fixed: &Trigger = bytemuck::from_bytes(&fixed_bytes[8..]);
 
         let (condition_bytes, action_bytes) =
             tail_bytes.split_at(fixed.condition_bytes.try_into().unwrap());
@@ -152,12 +159,12 @@ impl<'a> ActionRef<'a> {
 
     pub fn execute<'info>(
         &self,
-        trigger_action: &TriggerAction,
-        execute_ix: &TriggerActionExecute<'info>,
+        trigger: &Trigger,
+        execute_ix: &TriggerCheck<'info>,
         accounts: &[AccountInfo<'info>],
     ) -> Result<()> {
         match self {
-            ActionRef::PerpPlaceOrder(p) => p.execute(trigger_action, execute_ix, accounts),
+            ActionRef::PerpPlaceOrder(p) => p.execute(trigger, execute_ix, accounts),
         }
     }
 }
@@ -237,8 +244,8 @@ impl PerpPlaceOrderAction {
 
     pub fn execute<'info>(
         &self,
-        trigger_action: &TriggerAction,
-        execute_ix: &TriggerActionExecute<'info>,
+        trigger: &Trigger,
+        execute_ix: &TriggerCheck<'info>,
         accounts: &[AccountInfo<'info>],
     ) -> Result<()> {
         // Use the accounts and validate them
@@ -254,7 +261,7 @@ impl PerpPlaceOrderAction {
         };
         let perp_place_order_accounts =
             PerpPlaceOrderAccounts::from_account_infos(perp_place_order_ais)?;
-        perp_place_order_accounts.validate(&trigger_action.owner)?;
+        perp_place_order_accounts.validate(&trigger.owner)?;
 
         require_eq!(
             perp_place_order_accounts

@@ -10,7 +10,7 @@ pub use orderbook::*;
 pub use perp_market::*;
 pub use serum3_market::*;
 pub use stable_price::*;
-pub use trigger_action::*;
+pub use trigger::*;
 
 mod bank;
 mod dynamic_account;
@@ -24,4 +24,4 @@ mod orderbook;
 mod perp_market;
 mod serum3_market;
 mod stable_price;
-mod trigger_action;
+mod trigger;

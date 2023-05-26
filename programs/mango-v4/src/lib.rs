@@ -1186,23 +1186,31 @@ pub mod mango_v4 {
         Ok(())
     }
 
-    pub fn trigger_action_create(
-        ctx: Context<TriggerActionCreate>,
+    pub fn trigger_create(
+        ctx: Context<TriggerCreate>,
         trigger_num: u64,
         condition: Vec<u8>,
         action: Vec<u8>,
     ) -> Result<()> {
         #[cfg(feature = "enable-gpl")]
-        instructions::trigger_action_create(ctx, trigger_num, condition, action)?;
+        instructions::trigger_create(ctx, trigger_num, condition, action)?;
         Ok(())
     }
 
-    pub fn trigger_action_execute<'key, 'accounts, 'remaining, 'info>(
-        ctx: Context<'key, 'accounts, 'remaining, 'info, TriggerActionExecute<'info>>,
+    pub fn trigger_check<'key, 'accounts, 'remaining, 'info>(
+        ctx: Context<'key, 'accounts, 'remaining, 'info, TriggerCheck<'info>>,
+    ) -> Result<()> {
+        #[cfg(feature = "enable-gpl")]
+        instructions::trigger_check(ctx)?;
+        Ok(())
+    }
+
+    pub fn trigger_check_and_execute<'key, 'accounts, 'remaining, 'info>(
+        ctx: Context<'key, 'accounts, 'remaining, 'info, TriggerCheck<'info>>,
         num_condition_accounts: u8,
     ) -> Result<()> {
         #[cfg(feature = "enable-gpl")]
-        instructions::trigger_action_execute(ctx, num_condition_accounts)?;
+        instructions::trigger_check_and_execute(ctx, num_condition_accounts)?;
         Ok(())
     }
 

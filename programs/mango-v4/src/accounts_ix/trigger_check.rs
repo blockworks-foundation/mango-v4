@@ -3,17 +3,18 @@ use crate::state::*;
 use anchor_lang::prelude::*;
 
 #[derive(Accounts)]
-pub struct TriggerActionExecute<'info> {
+pub struct TriggerCheck<'info> {
     #[account(
         // TODO: constraint = group.load()?.is_ix_enabled(IxGate::AccountCreate) @ MangoError::IxIsDisabled,
     )]
     pub group: AccountLoader<'info, Group>,
 
     #[account(
+        mut,
         has_one = group,
         // TODO: does this account always close on success?
     )]
-    pub trigger_action: AccountLoader<'info, TriggerAction>,
+    pub trigger: AccountLoader<'info, Trigger>,
 
     #[account(mut)]
     pub triggerer: Signer<'info>,
