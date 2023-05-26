@@ -315,225 +315,130 @@ class BotContext {
         this.calculateDelta(i);
       const biasedDelta = delta + params.deltaBias;
 
-      // console.log(
-      //   `hedge check ${perpMarket.name} d=${delta.toFixed(
-      //     3,
-      //   )} t=${tokenPosition.toFixed(3)} p=${perpPosition.toFixed(
-      //     3,
-      //   )} f=${fillsDelta.toFixed(3)}`,
-      // );
-
       if (Math.abs(biasedDelta) > perpMarket.minOrderSize) {
-        // prefer perp hedge if perp position has same sign as account delta
-        /* if (Math.sign(biasedDelta) * Math.sign(perpPosition) > 0) {
-          // hedge size is limited to split hedges into reasonable order sizes
-          const hedgeSize = Math.min(Math.abs(biasedDelta), params.hedgeMax);
-          // hedge price needs to cross the spread and offer a discount
-          const hedgePrice =
-            perpMarket.uiPrice *
-            (1 - Math.sign(biasedDelta) * params.hedgeDiscount);
+        const hedgeStart = Date.now();
+        // hedge on spot
+        // hedge size is limited to split hedges into reasonable order sizes
+        const hedgeSize = Math.min(Math.abs(biasedDelta), params.hedgeMax);
+        // hedge price needs to cross the spread and offer a discount
+        const hedgePrice =
+          perpMarket.uiPrice *
+          (1 - Math.sign(biasedDelta) * params.hedgeDiscount);
 
-          const side =
-            Math.sign(biasedDelta) > 0 ? PerpOrderSide.ask : PerpOrderSide.bid;
+        const inputMint =
+          Math.sign(biasedDelta) > 0
+            ? tokenMint
+            : this.group.getFirstBankForPerpSettlement().mint;
+        const outputMint =
+          Math.sign(biasedDelta) > 0
+            ? this.group.getFirstBankForPerpSettlement().mint
+            : tokenMint;
+        const swapMode = Math.sign(biasedDelta) > 0 ? 'ExactIn' : 'ExactOut';
+        const amount = toNative(
+          hedgeSize,
+          this.group.getFirstBankByMint(tokenMint).mintDecimals,
+        );
+        const otherAmount = toNative(
+          hedgeSize * hedgePrice,
+          this.group.getFirstBankForPerpSettlement().mintDecimals,
+        );
 
-          console.log(
-            `hedge perp delta=${biasedDelta}/${perpPosition} side=${
-              side == PerpOrderSide.ask ? 'ask' : 'bid'
-            } size=${hedgeSize} limit=${hedgePrice} index=${
-              perpMarket.uiPrice
-            }`,
-          );
-
-          const ix = await this.client.perpPlaceOrderIx(
-            this.group,
-            this.mangoAccount,
-            i,
-            side,
-            hedgePrice,
+        console.log(
+          `hedge ${perpMarket.name} on spot delta=${prec(
+            biasedDelta,
+          )} fills=${prec(
+            fillsDelta,
+          )} inputMint=${inputMint.toString()} outputMint=${outputMint.toString()} size=${prec(
             hedgeSize,
-            undefined,
-            Date.now(),
-            PerpOrderType.immediateOrCancel,
-            true,
-          );
+          )} limit=${prec(hedgePrice)} mode=${swapMode} index=${prec(
+            perpMarket.uiPrice,
+          )} amount=${amount.toString()} other=${otherAmount.toString()}`,
+        );
 
+        const results = await this.router.swap(
+          inputMint,
+          outputMint,
+          amount,
+          otherAmount,
+          swapMode as SwapMode,
+          params.hedgeDiscount,
+        );
+        const filtered = results.filter((r) => r.ok);
+        let ranked: SwapResult[] = [];
+        if (swapMode === SwapMode.ExactIn) {
+          ranked = filtered.sort((a, b) =>
+            Number(b.minAmtOut.sub(a.minAmtOut).toString()),
+          );
+        } else if (swapMode === SwapMode.ExactOut) {
+          ranked = filtered.sort((a, b) =>
+            Number(a.maxAmtIn.sub(b.maxAmtIn).toString()),
+          );
+        }
+        const bestRoute = ranked[0];
+
+        try {
+          if (!bestRoute) throw 'no route found';
+
+          const ixs = await bestRoute.instructions(this.client.walletPk);
+
+          ixs.push(ComputeBudgetProgram.setComputeUnitLimit({ units: 300000 }));
+          ixs.push(
+            ComputeBudgetProgram.setComputeUnitPrice({ microLamports: 1 }),
+          );
           const confirmBegin = Date.now();
-          const sig = await this.client.sendAndConfirmTransaction([ix], {
-            alts: this.group.addressLookupTablesList,
-            latestBlockhash: this.latestBlockhash,
+          console.log(`prepared hedge ixs=${ixs.length}`);
+
+          const sig = await this.client.marginTrade({
+            group: this.group,
+            mangoAccount: this.mangoAccount,
+            inputMintPk: inputMint,
+            amountIn:
+              Math.sign(biasedDelta) > 0
+                ? hedgeSize
+                : (bestRoute.maxAmtIn.toString() as any) /
+                  Math.pow(
+                    10,
+                    this.group.getFirstBankForPerpSettlement().mintDecimals,
+                  ),
+            outputMintPk: outputMint,
+            userDefinedInstructions: ixs,
+            userDefinedAlts: [],
+            flashLoanType: { swap: {} },
           });
           const confirmEnd = Date.now();
+
+          await this.refreshMangoAccount();
 
           const newDelta = this.calculateDelta(i).delta;
 
           console.log(
-            `hedge ${i} confirmed delta time=${
-              (confirmEnd - confirmBegin) / 1000
-            } prev=${delta} new=${newDelta} https://explorer.solana.com/tx/${sig}`,
+            `hedge ${i} ${perpMarket.name} confirmed delta t(all)=${
+              (confirmEnd - hedgeStart) / 1000
+            } t(confirm)=${(confirmEnd - confirmBegin) / 1000} prev=${prec(
+              delta,
+            )} new=${prec(newDelta)} https://explorer.solana.com/tx/${sig}`,
           );
+        } catch (e) {
+          params.deltaBias -= biasedDelta;
 
-          await this.updateOrders(i);
-        } else */ {
-          const hedgeStart = Date.now();
-          // hedge on spot
-          // hedge size is limited to split hedges into reasonable order sizes
-          const hedgeSize = Math.min(Math.abs(biasedDelta), params.hedgeMax);
-          // hedge price needs to cross the spread and offer a discount
-          const hedgePrice =
-            perpMarket.uiPrice *
-            (1 - Math.sign(biasedDelta) * params.hedgeDiscount);
-
-          const inputMint =
-            Math.sign(biasedDelta) > 0
-              ? tokenMint
-              : this.group.getFirstBankForPerpSettlement().mint;
-          const outputMint =
-            Math.sign(biasedDelta) > 0
-              ? this.group.getFirstBankForPerpSettlement().mint
-              : tokenMint;
-          const swapMode = Math.sign(biasedDelta) > 0 ? 'ExactIn' : 'ExactOut';
-          const amount = toNative(
-            hedgeSize,
-            this.group.getFirstBankByMint(tokenMint).mintDecimals,
+          console.error(
+            perpMarket.name,
+            'spot hedge failed',
+            e,
+            'adjusted delta bias to',
+            prec(params.deltaBias),
           );
-          const otherAmount = toNative(
-            hedgeSize * hedgePrice,
-            this.group.getFirstBankForPerpSettlement().mintDecimals,
-          );
-
-          console.log(
-            `hedge ${perpMarket.name} on spot delta=${prec(
-              biasedDelta,
-            )} fills=${prec(
-              fillsDelta,
-            )} inputMint=${inputMint.toString()} outputMint=${outputMint.toString()} size=${prec(
-              hedgeSize,
-            )} limit=${prec(hedgePrice)} mode=${swapMode} index=${prec(
-              perpMarket.uiPrice,
-            )} amount=${amount.toString()} other=${otherAmount.toString()}`,
-          );
-
-          const results = await this.router.swap(
-            inputMint,
-            outputMint,
-            amount,
-            otherAmount,
-            swapMode as SwapMode,
-            params.hedgeDiscount,
-          );
-          const filtered = results.filter((r) => r.ok);
-          let ranked: SwapResult[] = [];
-          if (swapMode === SwapMode.ExactIn) {
-            ranked = filtered.sort((a, b) =>
-              Number(b.minAmtOut.sub(a.minAmtOut).toString()),
-            );
-          } else if (swapMode === SwapMode.ExactOut) {
-            ranked = filtered.sort((a, b) =>
-              Number(a.maxAmtIn.sub(b.maxAmtIn).toString()),
-            );
-          }
-          const bestRoute = ranked[0];
-
-          /*
-          const { bestRoute } = await fetchRoutes(
-            inputMint,
-            outputMint,
-            amount.toString(),
-            params.hedgeDiscount,
-            swapMode,
-            '0',
-            KEYPAIR.publicKey,
-            ['Jupiter'],
-          );*/
-
-          if (!bestRoute) {
-            params.deltaBias -= biasedDelta;
-            console.error(
-              `${perpMarket.name} spot hedge could not find a route adjusted delta bias to ${params.deltaBias}`,
-            );
-          } else {
-            const ixs = await bestRoute.instructions(this.client.walletPk);
-
-            // console.log('hedging via route', bestRoute);
-            // const [ixs, alts] =
-            //   bestRoute.routerName === 'Mango'
-            //     ? await prepareMangoRouterInstructions(
-            //         bestRoute,
-            //         inputMint,
-            //         outputMint,
-            //         KEYPAIR.publicKey,
-            //       )
-            //     : await fetchJupiterTransaction(
-            //         this.client.connection,
-            //         bestRoute,
-            //         KEYPAIR.publicKey,
-            //         params.hedgeDiscount,
-            //         inputMint,
-            //         outputMint,
-            //       );
-
-            ixs.push(
-              ComputeBudgetProgram.setComputeUnitLimit({ units: 300000 }),
-            );
-            ixs.push(
-              ComputeBudgetProgram.setComputeUnitPrice({ microLamports: 1 }),
-            );
+        } finally {
+          for (let r = 0; r < 9; r++) {
             try {
-              const confirmBegin = Date.now();
-              console.log(`prepared hedge ixs=${ixs.length}`);
-
-              const sig = await this.client.marginTrade({
-                group: this.group,
-                mangoAccount: this.mangoAccount,
-                inputMintPk: inputMint,
-                amountIn:
-                  Math.sign(biasedDelta) > 0
-                    ? hedgeSize
-                    : (bestRoute.maxAmtIn.toString() as any) /
-                      Math.pow(
-                        10,
-                        this.group.getFirstBankForPerpSettlement().mintDecimals,
-                      ),
-                outputMintPk: outputMint,
-                userDefinedInstructions: ixs,
-                userDefinedAlts: [],
-                flashLoanType: { swap: {} },
-              });
-              const confirmEnd = Date.now();
-
-              await this.refreshMangoAccount();
-
-              const newDelta = this.calculateDelta(i).delta;
-
-              console.log(
-                `hedge ${i} ${perpMarket.name} confirmed delta t(all)=${
-                  (confirmEnd - hedgeStart) / 1000
-                } t(confirm)=${(confirmEnd - confirmBegin) / 1000} prev=${prec(
-                  delta,
-                )} new=${prec(newDelta)} https://explorer.solana.com/tx/${sig}`,
-              );
-
               await this.updateOrders(i);
+              break;
             } catch (e) {
-              params.deltaBias -= biasedDelta;
-
+              const delay = Math.pow(2, r);
               console.error(
-                perpMarket.name,
-                'spot hedge failed',
-                e,
-                'adjusted delta bias to',
-                params.deltaBias,
+                `could not update orders retry=${r} delay=${delay} e=${e}`,
               );
-
-              for (let r = 0; r < 9; r++) {
-                try {
-                  await this.updateOrders(i);
-                } catch (e) {
-                  const delay = Math.pow(2, r);
-                  console.error(`could not update orders retry=${r} delay=${delay} e=${e}`);
-                  await sleep(1000 * delay);
-                }
-              }
+              await sleep(1000 * delay);
             }
           }
         }
