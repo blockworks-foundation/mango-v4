@@ -3,6 +3,7 @@ use anchor_lang::Discriminator;
 use derivative::Derivative;
 use fixed::types::I80F48;
 use num_enum::{IntoPrimitive, TryFromPrimitive};
+use solana_program::program::invoke_signed;
 use static_assertions::const_assert_eq;
 use std::mem::size_of;
 
@@ -10,6 +11,7 @@ use crate::accounts_ix::PerpPlaceOrderAccountInfos;
 use crate::accounts_ix::PerpPlaceOrderAccounts;
 use crate::accounts_ix::TriggerCheck;
 use crate::error::*;
+use crate::state::*;
 use crate::PerpMarketIndex;
 
 #[account(zero_copy)]
@@ -139,11 +141,13 @@ impl OraclePriceCondition {
 #[derive(Clone, Copy, TryFromPrimitive, IntoPrimitive)]
 pub enum ActionType {
     PerpPlaceOrder,
+    MangoCpi,
 }
 
 #[derive(Debug)]
 pub enum ActionRef<'a> {
     PerpPlaceOrder(&'a PerpPlaceOrderAction),
+    MangoCpi(&'a [u8]),
 }
 
 impl<'a> ActionRef<'a> {
@@ -154,6 +158,7 @@ impl<'a> ActionRef<'a> {
             ActionType::PerpPlaceOrder => {
                 Ok(ActionRef::PerpPlaceOrder(bytemuck::from_bytes(bytes)))
             }
+            ActionType::MangoCpi => Ok(ActionRef::MangoCpi(bytes)),
         }
     }
 
@@ -165,6 +170,7 @@ impl<'a> ActionRef<'a> {
     ) -> Result<()> {
         match self {
             ActionRef::PerpPlaceOrder(p) => p.execute(trigger, execute_ix, accounts),
+            ActionRef::MangoCpi(p) => execute_mango_cpi(trigger, execute_ix, accounts, p),
         }
     }
 }
@@ -199,8 +205,7 @@ const_assert_eq!(size_of::<PerpPlaceOrderAction>(), 120);
 const_assert_eq!(size_of::<PerpPlaceOrderAction>() % 8, 0);
 
 impl PerpPlaceOrderAction {
-    fn to_order(&self) -> Result<crate::state::Order> {
-        use crate::state::*;
+    fn to_order(&self) -> Result<Order> {
         let place_order_type = PlaceOrderType::try_from(self.place_order_type).unwrap();
         let params = match place_order_type {
             PlaceOrderType::Market => {
@@ -281,4 +286,74 @@ impl PerpPlaceOrderAction {
         #[cfg(not(feature = "enable-gpl"))]
         Err(error_msg!("not gpl"))
     }
+}
+
+fn execute_mango_cpi<'info>(
+    trigger: &Trigger,
+    outer_accounts: &TriggerCheck<'info>,
+    account_infos: &[AccountInfo<'info>],
+    ix_data: &[u8],
+) -> Result<()> {
+    use solana_program::instruction::Instruction;
+    let mango_program = crate::id();
+
+    // Whitelist of acceptable instructions
+    let allowed_inner_ix = [
+        crate::instruction::PerpCancelAllOrders::discriminator(),
+        crate::instruction::PerpCancelAllOrdersBySide::discriminator(),
+        crate::instruction::PerpPlaceOrder::discriminator(),
+        crate::instruction::PerpPlaceOrderV2::discriminator(),
+        crate::instruction::PerpPlaceOrderPegged::discriminator(),
+        crate::instruction::PerpPlaceOrderPeggedV2::discriminator(),
+        crate::instruction::Serum3CancelAllOrders::discriminator(),
+        crate::instruction::Serum3PlaceOrder::discriminator(),
+    ];
+    let ix_discriminator: [u8; 8] = ix_data[..8].try_into().unwrap();
+    require!(
+        allowed_inner_ix.contains(&ix_discriminator),
+        MangoError::SomeError
+    );
+
+    let mut account_metas = Vec::with_capacity(account_infos.len());
+    for ai in account_infos {
+        let pubkey = ai.key();
+        let mut is_signer = ai.is_signer;
+
+        if ai.owner == &mango_program {
+            let discriminator: [u8; 8] = ai.try_borrow_data()?[..8].try_into().unwrap();
+            if discriminator == Group::DISCRIMINATOR {
+                // Allowing execution for foreign groups could be a security issue.
+                require_keys_eq!(pubkey, outer_accounts.group.key());
+                // We call instructions without being able to provide the true `owner`.
+                // Instead we pass the group as owner and sign for it, which is something
+                // no user is able to do.
+                is_signer = true;
+            }
+            if discriminator == MangoAccount::DISCRIMINATOR {
+                // Since we provide a generic `owner` for the cpi call, it's essential that
+                // we only allow interaction with the account that the trigger order should be for.
+                // TODO: do we need to check if the trigger.owner has the rights for trigger.account?
+                // do delegates add trigger orders to the delegated account's Trigger account? probably.
+                require_keys_eq!(pubkey, trigger.account);
+            }
+        }
+
+        account_metas.push(AccountMeta {
+            pubkey,
+            is_writable: ai.is_writable,
+            is_signer,
+        });
+    }
+
+    let instruction = Instruction {
+        program_id: crate::id(),
+        accounts: account_metas,
+        data: ix_data.to_vec(),
+    };
+
+    let group = outer_accounts.group.load()?;
+    let group_seeds = group_seeds!(group);
+    invoke_signed(&instruction, account_infos, &[group_seeds])?;
+
+    Ok(())
 }
