@@ -364,15 +364,9 @@ export class MangoAccount {
         .get(baseBank.tokenIndex)!
         .iadd(I80F48.fromI64(oo.baseTokenTotal).mul(baseBank.price));
       const quoteBank = group.getFirstBankByTokenIndex(sp.quoteTokenIndex);
-      // NOTE: referrerRebatesAccrued is not declared on oo class, but the layout
-      // is aware of it
       tokensMap
         .get(baseBank.tokenIndex)!
-        .iadd(
-          I80F48.fromI64(
-            oo.quoteTokenTotal.add((oo as any).referrerRebatesAccrued),
-          ).mul(quoteBank.price),
-        );
+        .iadd(I80F48.fromI64(oo.quoteTokenTotal).mul(quoteBank.price));
     }
 
     const tokenEquity = Array.from(tokensMap.values()).reduce(

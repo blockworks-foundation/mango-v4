@@ -1395,8 +1395,6 @@ export class Serum3Info {
   ): Serum3Info {
     // add the amounts that are freely settleable immediately to token balances
     const baseFree = I80F48.fromI64(oo.baseTokenFree);
-    // NOTE: referrerRebatesAccrued is not declared on oo class, but the layout
-    // is aware of it
     const quoteFree = I80F48.fromI64(oo.quoteTokenFree);
     baseInfo.balanceSpot.iadd(baseFree);
     quoteInfo.balanceSpot.iadd(quoteFree);
