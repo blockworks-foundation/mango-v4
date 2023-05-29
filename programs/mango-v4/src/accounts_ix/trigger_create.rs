@@ -12,20 +12,20 @@ pub struct TriggerCreate<'info> {
 
     #[account(
         has_one = group,
-        has_one = owner,
+        // authority is checked at #1
     )]
     pub account: AccountLoader<'info, MangoAccountFixed>,
 
     #[account(
         init,
-        seeds = [b"Trigger".as_ref(), group.key().as_ref(), account.key().as_ref(), &trigger_num.to_le_bytes()],
+        seeds = [b"Trigger".as_ref(), account.key().as_ref(), &trigger_num.to_le_bytes()],
         bump,
         payer = payer,
         space = 8 + std::mem::size_of::<Trigger>() + condition.len() + action.len(),
     )]
     pub trigger: AccountLoader<'info, Trigger>,
 
-    pub owner: Signer<'info>,
+    pub authority: Signer<'info>,
 
     #[account(mut)]
     pub payer: Signer<'info>,

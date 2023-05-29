@@ -12,7 +12,9 @@ pub fn perp_cancel_all_orders_by_side(
     let mut account = ctx.accounts.account.load_full_mut()?;
     // account constraint #1
     require!(
-        account.fixed.is_owner_or_delegate(ctx.accounts.owner.key()),
+        account
+            .fixed
+            .is_owner_or_delegate_or_self(&ctx.accounts.owner.key(), &ctx.accounts.account.key()),
         MangoError::SomeError
     );
 

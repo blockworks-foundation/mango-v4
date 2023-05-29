@@ -249,6 +249,12 @@ impl MangoAccountFixed {
         self.owner == ix_signer || self.delegate == ix_signer
     }
 
+    /// Instructions that are usable from triggers accept a signature for the MangoAccount
+    /// itself as proof of authority for actions.
+    pub fn is_owner_or_delegate_or_self(&self, ix_signer: &Pubkey, mango_account: &Pubkey) -> bool {
+        &self.owner == ix_signer || &self.delegate == ix_signer || mango_account == ix_signer
+    }
+
     pub fn is_delegate(&self, ix_signer: Pubkey) -> bool {
         self.delegate == ix_signer
     }

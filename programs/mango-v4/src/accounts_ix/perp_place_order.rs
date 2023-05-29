@@ -103,7 +103,10 @@ impl<'info, 'remaining> PerpPlaceOrderAccounts<'info, 'remaining> {
             require!(account.is_operational(), MangoError::AccountIsFrozen);
 
             // account constraint #1
-            require!(account.is_owner_or_delegate(*owner), MangoError::SomeError);
+            require!(
+                account.is_owner_or_delegate_or_self(owner, &self.account.key()),
+                MangoError::SomeError
+            );
         }
 
         // perp market

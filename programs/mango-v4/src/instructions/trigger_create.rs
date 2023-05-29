@@ -15,17 +15,27 @@ pub fn trigger_create(
     let incentive_lamports = 100_000;
 
     {
+        let account = ctx.accounts.account.load()?;
+        // account constraint #1
+        require!(
+            account.is_owner_or_delegate(ctx.accounts.authority.key()),
+            MangoError::SomeError
+        );
+    }
+
+    {
         let mut trigger = ctx.accounts.trigger.load_init()?;
         trigger.group = ctx.accounts.group.key();
         trigger.account = ctx.accounts.account.key();
-        trigger.owner = ctx.accounts.owner.key();
         trigger.trigger_num = trigger_num;
         trigger.expiry_slot = u64::MAX; // TODO: pass in expiry info
         trigger.condition_was_met = 0;
 
-        // TODO: copy out condition and action type for fixed-offset access
         trigger.condition_bytes = condition.len().try_into().unwrap();
         trigger.action_bytes = action.len().try_into().unwrap();
+
+        trigger.condition_type = *bytemuck::from_bytes(&condition[..4]);
+        trigger.action_type = *bytemuck::from_bytes(&action[..4]);
 
         trigger.incentive_lamports = incentive_lamports;
     }
@@ -63,6 +73,7 @@ pub fn trigger_create(
     // Verify the condition and action are valid
     let trigger_bytes = ctx.accounts.trigger.as_ref().try_borrow_data()?;
     let (fixed, condition, action) = Trigger::from_account_bytes(&trigger_bytes)?;
+    action.check()?;
 
     // TODO: remove logging?
     msg!("cond {:#?}", condition);
