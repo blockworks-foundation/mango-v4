@@ -94,6 +94,7 @@ impl<'a> ConditionRef<'a> {
         let condition_type: ConditionType = raw_type.try_into().unwrap();
         match condition_type {
             ConditionType::OraclePrice => {
+                require_eq!(bytes.len(), size_of::<OraclePriceCondition>());
                 Ok(ConditionRef::OraclePrice(bytemuck::from_bytes(bytes)))
             }
         }
@@ -150,6 +151,7 @@ impl<'a> ActionRef<'a> {
         let action_type: ActionType = raw_type.try_into().unwrap();
         match action_type {
             ActionType::PerpCpi => {
+                require_gte!(bytes.len(), size_of::<PerpCpiAction>());
                 let (action_data, ix_data) = bytes.split_at(size_of::<PerpCpiAction>());
                 let action: &PerpCpiAction = bytemuck::from_bytes(action_data);
                 Ok(ActionRef::PerpCpi((action, ix_data)))
@@ -159,7 +161,7 @@ impl<'a> ActionRef<'a> {
 
     pub fn check(&self) -> Result<()> {
         match self {
-            ActionRef::PerpCpi((_, ix_data)) => action.check(ix_data),
+            ActionRef::PerpCpi((action, ix_data)) => action.check(ix_data),
         }
     }
 
@@ -192,6 +194,8 @@ const_assert_eq!(size_of::<PerpCpiAction>() % 8, 0);
 
 impl PerpCpiAction {
     pub fn check(&self, ix_data: &[u8]) -> Result<()> {
+        require_gte!(ix_data.len(), 8);
+
         // Whitelist of acceptable instructions
         use crate::instruction as ixs;
         let allowed_inner_ix = [

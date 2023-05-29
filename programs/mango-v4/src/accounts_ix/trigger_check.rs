@@ -12,7 +12,6 @@ pub struct TriggerCheck<'info> {
     #[account(
         mut,
         has_one = group,
-        // TODO: does this account always close on success?
     )]
     pub trigger: AccountLoader<'info, Trigger>,
 

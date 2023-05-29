@@ -4200,3 +4200,95 @@ impl ClientInstruction for AltExtendInstruction {
         vec![self.admin, self.payer]
     }
 }
+
+pub struct TriggerCreateInstruction {
+    pub account: Pubkey,
+    pub authority: TestKeypair,
+    pub payer: TestKeypair,
+    pub num: u64,
+    pub condition: Vec<u8>,
+    pub action: Vec<u8>,
+}
+#[async_trait::async_trait(?Send)]
+impl ClientInstruction for TriggerCreateInstruction {
+    type Accounts = mango_v4::accounts::TriggerCreate;
+    type Instruction = mango_v4::instruction::TriggerCreate;
+    async fn to_instruction(
+        &self,
+        account_loader: impl ClientAccountLoader + 'async_trait,
+    ) -> (Self::Accounts, instruction::Instruction) {
+        let program_id = mango_v4::id();
+
+        let account = account_loader
+            .load_mango_account(&self.account)
+            .await
+            .unwrap();
+
+        let instruction = Self::Instruction {
+            trigger_num: self.num,
+            condition: self.condition.clone(),
+            action: self.action.clone(),
+        };
+
+        let trigger = Pubkey::find_program_address(
+            &[
+                b"Trigger".as_ref(),
+                self.account.as_ref(),
+                &self.num.to_le_bytes(),
+            ],
+            &program_id,
+        )
+        .0;
+
+        let accounts = Self::Accounts {
+            group: account.fixed.group,
+            account: self.account,
+            trigger,
+            authority: self.authority.pubkey(),
+            payer: self.payer.pubkey(),
+            system_program: System::id(),
+        };
+
+        let instruction = make_instruction(program_id, &accounts, &instruction);
+        (accounts, instruction)
+    }
+
+    fn signers(&self) -> Vec<TestKeypair> {
+        vec![self.authority, self.payer]
+    }
+}
+
+pub struct TriggerCheckInstruction {
+    pub trigger: Pubkey,
+    pub triggerer: TestKeypair,
+}
+#[async_trait::async_trait(?Send)]
+impl ClientInstruction for TriggerCheckInstruction {
+    type Accounts = mango_v4::accounts::TriggerCheck;
+    type Instruction = mango_v4::instruction::TriggerCheck;
+    async fn to_instruction(
+        &self,
+        account_loader: impl ClientAccountLoader + 'async_trait,
+    ) -> (Self::Accounts, instruction::Instruction) {
+        let program_id = mango_v4::id();
+
+        let trigger: Trigger = account_loader.load(&self.trigger).await.unwrap();
+
+        let instruction = Self::Instruction {};
+
+        let accounts = Self::Accounts {
+            group: trigger.group,
+            trigger: self.trigger,
+            triggerer: self.triggerer.pubkey(),
+        };
+
+        // TODO: all the trigger-action dependent accounts need to be added here
+
+        let instruction = make_instruction(program_id, &accounts, &instruction);
+        (accounts, instruction)
+    }
+
+    fn signers(&self) -> Vec<TestKeypair> {
+        vec![self.triggerer]
+    }
+}
