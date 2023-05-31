@@ -26,6 +26,10 @@ pub trait ClientAccountLoader {
         let bytes = self.load_bytes(pubkey).await?;
         AccountDeserialize::try_deserialize(&mut &bytes[..]).ok()
     }
+    async fn load_bytemuck<T: AccountDeserialize>(&self, pubkey: &Pubkey) -> Option<T> {
+        let bytes = self.load_bytes(pubkey).await?;
+        AccountDeserialize::try_deserialize(&mut &bytes[..(8 + std::mem::size_of::<T>())]).ok()
+    }
     async fn load_mango_account(&self, pubkey: &Pubkey) -> Option<MangoAccountValue> {
         self.load_bytes(pubkey)
             .await
@@ -4272,7 +4276,8 @@ impl ClientInstruction for TriggerCheckInstruction {
     ) -> (Self::Accounts, instruction::Instruction) {
         let program_id = mango_v4::id();
 
-        let trigger: Trigger = account_loader.load(&self.trigger).await.unwrap();
+        let trigger_bytes = account_loader.load_bytes(&self.trigger).await.unwrap();
+        let (trigger, condition, _action) = Trigger::from_account_bytes(&trigger_bytes).unwrap();
 
         let instruction = Self::Instruction {};
 
@@ -4280,11 +4285,99 @@ impl ClientInstruction for TriggerCheckInstruction {
             group: trigger.group,
             trigger: self.trigger,
             triggerer: self.triggerer.pubkey(),
+            system_program: System::id(),
         };
 
-        // TODO: all the trigger-action dependent accounts need to be added here
+        let mut instruction = make_instruction(program_id, &accounts, &instruction);
+        instruction
+            .accounts
+            .extend(condition.accounts().into_iter());
+        (accounts, instruction)
+    }
 
-        let instruction = make_instruction(program_id, &accounts, &instruction);
+    fn signers(&self) -> Vec<TestKeypair> {
+        vec![self.triggerer]
+    }
+}
+
+pub struct TriggerCheckAndExecuteInstruction {
+    pub trigger: Pubkey,
+    pub triggerer: TestKeypair,
+}
+#[async_trait::async_trait(?Send)]
+impl ClientInstruction for TriggerCheckAndExecuteInstruction {
+    type Accounts = mango_v4::accounts::TriggerCheck;
+    type Instruction = mango_v4::instruction::TriggerCheckAndExecute;
+    async fn to_instruction(
+        &self,
+        account_loader: impl ClientAccountLoader + 'async_trait,
+    ) -> (Self::Accounts, instruction::Instruction) {
+        let program_id = mango_v4::id();
+
+        let trigger_bytes = account_loader.load_bytes(&self.trigger).await.unwrap();
+        let (trigger, condition, action) = Trigger::from_account_bytes(&trigger_bytes).unwrap();
+
+        let condition_accounts = condition.accounts();
+
+        let instruction = Self::Instruction {
+            num_condition_accounts: condition_accounts.len().try_into().unwrap(),
+        };
+
+        let accounts = Self::Accounts {
+            group: trigger.group,
+            trigger: self.trigger,
+            triggerer: self.triggerer.pubkey(),
+            system_program: System::id(),
+        };
+
+        let mut instruction = make_instruction(program_id, &accounts, &instruction);
+        instruction.accounts.extend(condition_accounts.into_iter());
+
+        // also add all the action-specific accounts
+        let action_accounts = match action {
+            ActionRef::PerpCpi((perp_cpi, ix_data)) => {
+                let perp_market_address = Pubkey::find_program_address(
+                    &[
+                        b"PerpMarket".as_ref(),
+                        trigger.group.as_ref(),
+                        perp_cpi.perp_market_index.to_le_bytes().as_ref(),
+                    ],
+                    &program_id,
+                )
+                .0;
+                let perp_market: PerpMarket =
+                    account_loader.load(&perp_market_address).await.unwrap();
+                let mut ams = perp_cpi
+                    .accounts(
+                        trigger,
+                        ix_data,
+                        perp_market_address,
+                        perp_market.bids,
+                        perp_market.asks,
+                        perp_market.event_queue,
+                        perp_market.oracle,
+                    )
+                    .unwrap();
+
+                let account = account_loader
+                    .load_mango_account(&trigger.account)
+                    .await
+                    .unwrap();
+                let health_check_metas = derive_health_check_remaining_account_metas(
+                    &account_loader,
+                    &account,
+                    None,
+                    false,
+                    Some(perp_cpi.perp_market_index),
+                )
+                .await;
+                ams.extend(health_check_metas.into_iter());
+
+                ams
+            }
+        };
+        instruction.accounts.extend(action_accounts.into_iter());
+
         (accounts, instruction)
     }
 

@@ -105,6 +105,18 @@ impl<'a> ConditionRef<'a> {
             ConditionRef::OraclePrice(c) => c.check(accounts),
         }
     }
+
+    // TODO: This function must move to a place closer to the client; a similar function for
+    // actions needs too much context knowledge...
+    pub fn accounts(&self) -> Vec<AccountMeta> {
+        match self {
+            ConditionRef::OraclePrice(op) => vec![AccountMeta {
+                pubkey: op.oracle,
+                is_writable: false,
+                is_signer: false,
+            }],
+        }
+    }
 }
 
 #[zero_copy]
@@ -193,6 +205,86 @@ const_assert_eq!(size_of::<PerpCpiAction>(), 64);
 const_assert_eq!(size_of::<PerpCpiAction>() % 8, 0);
 
 impl PerpCpiAction {
+    pub fn accounts(
+        &self,
+        trigger: &Trigger,
+        ix_data: &[u8],
+        perp_market: Pubkey,
+        bids: Pubkey,
+        asks: Pubkey,
+        event_queue: Pubkey,
+        oracle: Pubkey,
+    ) -> Result<Vec<AccountMeta>> {
+        require_gte!(ix_data.len(), 8);
+        let discr: [u8; 8] = ix_data[..8].try_into().unwrap();
+
+        use crate::instruction as ixs;
+        let mut ams = vec![
+            // To be able to call into ourselves, the program needs to be passed explicitly
+            AccountMeta {
+                pubkey: crate::id(),
+                is_writable: false,
+                is_signer: false,
+            },
+        ];
+
+        if discr == ixs::PerpPlaceOrder::DISCRIMINATOR
+            || discr == ixs::PerpPlaceOrderV2::DISCRIMINATOR
+            || discr == ixs::PerpPlaceOrderPegged::DISCRIMINATOR
+            || discr == ixs::PerpPlaceOrderPeggedV2::DISCRIMINATOR
+        {
+            ams.extend(
+                crate::accounts::PerpPlaceOrder {
+                    group: trigger.group,
+                    account: trigger.account,
+                    owner: trigger.account,
+                    perp_market,
+                    bids,
+                    asks,
+                    event_queue,
+                    oracle,
+                }
+                .to_account_metas(None)
+                .into_iter(),
+            );
+        } else if discr == ixs::PerpCancelAllOrders::DISCRIMINATOR {
+            ams.extend(
+                crate::accounts::PerpCancelAllOrders {
+                    group: trigger.group,
+                    account: trigger.account,
+                    owner: trigger.account,
+                    perp_market,
+                    bids,
+                    asks,
+                }
+                .to_account_metas(None)
+                .into_iter(),
+            );
+        } else if discr == ixs::PerpCancelAllOrdersBySide::DISCRIMINATOR {
+            ams.extend(
+                crate::accounts::PerpCancelAllOrdersBySide {
+                    group: trigger.group,
+                    account: trigger.account,
+                    owner: trigger.account,
+                    perp_market,
+                    bids,
+                    asks,
+                }
+                .to_account_metas(None)
+                .into_iter(),
+            );
+        } else {
+            return Err(error_msg!("bad perp cpi action discriminator"));
+        }
+
+        // The signer flag for the owner must not be set: it'll be toggled by the trigger execution ix
+        ams[3].is_signer = false;
+
+        // TODO: Add health accounts too!
+
+        Ok(ams)
+    }
+
     pub fn check(&self, ix_data: &[u8]) -> Result<()> {
         require_gte!(ix_data.len(), 8);
 
@@ -225,6 +317,9 @@ impl PerpCpiAction {
 
         let mango_program = crate::id();
 
+        // Skip the accountinfo for our program, which is passed first
+        let passed_accounts = &account_infos[1..];
+
         // Verify that the accounts passed to the inner instruction are safe:
         // - same group as the trigger
         // - same account as the trigger
@@ -245,25 +340,29 @@ impl PerpCpiAction {
             perp_market: 3,
         };
 
-        require_keys_eq!(account_infos[account_indexes.group].key(), trigger.group);
+        require_keys_eq!(passed_accounts[account_indexes.group].key(), trigger.group);
         require_keys_eq!(
-            account_infos[account_indexes.account].key(),
+            passed_accounts[account_indexes.account].key(),
             trigger.account
         );
         // To let the inner instruction know it's authorized, we pass the account itself
         // as the owner and sign for it.
-        require_keys_eq!(account_infos[account_indexes.owner].key(), trigger.account);
+        require_keys_eq!(
+            passed_accounts[account_indexes.owner].key(),
+            trigger.account
+        );
 
         {
-            let perp_market_loader =
-                AccountLoader::<PerpMarket>::try_from(&account_infos[account_indexes.perp_market])?;
+            let perp_market_loader = AccountLoader::<PerpMarket>::try_from(
+                &passed_accounts[account_indexes.perp_market],
+            )?;
             let perp_market = perp_market_loader.load()?;
             require_eq!(perp_market.perp_market_index, self.perp_market_index);
         }
 
         // Prepare and execute the cpi call, forwarding the accounts
 
-        let account_metas = account_infos
+        let account_metas = passed_accounts
             .iter()
             .enumerate()
             .map(|(i, ai)| {
@@ -287,7 +386,7 @@ impl PerpCpiAction {
         // Prepare the MangoAccount seeds, so we can sign for it
         let (owner, account_num, bump) = {
             let loader = AccountLoader::<MangoAccountFixed>::try_from(
-                &account_infos[account_indexes.account],
+                &passed_accounts[account_indexes.account],
             )?;
             let account = loader.load()?;
             (account.owner, account.account_num, account.bump)
