@@ -1,5 +1,5 @@
 export type MangoV4 = {
-  "version": "0.16.0",
+  "version": "0.17.0",
   "name": "mango_v4",
   "instructions": [
     {
@@ -4556,12 +4556,18 @@ export type MangoV4 = {
         {
           "name": "group",
           "isMut": false,
-          "isSigner": false
+          "isSigner": false,
+          "relations": [
+            "insurance_vault"
+          ]
         },
         {
           "name": "liqor",
           "isMut": true,
-          "isSigner": false
+          "isSigner": false,
+          "relations": [
+            "group"
+          ]
         },
         {
           "name": "liqorOwner",
@@ -4571,12 +4577,19 @@ export type MangoV4 = {
         {
           "name": "liqee",
           "isMut": true,
-          "isSigner": false
+          "isSigner": false,
+          "relations": [
+            "group"
+          ]
         },
         {
           "name": "perpMarket",
           "isMut": true,
-          "isSigner": false
+          "isSigner": false,
+          "relations": [
+            "group",
+            "oracle"
+          ]
         },
         {
           "name": "oracle",
@@ -4586,7 +4599,10 @@ export type MangoV4 = {
         {
           "name": "settleBank",
           "isMut": true,
-          "isSigner": false
+          "isSigner": false,
+          "relations": [
+            "group"
+          ]
         },
         {
           "name": "settleVault",
@@ -4606,7 +4622,10 @@ export type MangoV4 = {
         {
           "name": "insuranceBank",
           "isMut": true,
-          "isSigner": false
+          "isSigner": false,
+          "relations": [
+            "group"
+          ]
         },
         {
           "name": "insuranceBankVault",
@@ -6202,6 +6221,14 @@ export type MangoV4 = {
     },
     {
       "name": "Serum3Info",
+      "docs": [
+        "Information about reserved funds on Serum3 open orders accounts.",
+        "",
+        "Note that all \"free\" funds on open orders accounts are added directly",
+        "to the token info. This is only about dealing with the reserved funds",
+        "that might end up as base OR quote tokens, depending on whether the",
+        "open orders execute on not."
+      ],
       "type": {
         "kind": "struct",
         "fields": [
@@ -6218,11 +6245,11 @@ export type MangoV4 = {
             }
           },
           {
-            "name": "baseIndex",
+            "name": "baseInfoIndex",
             "type": "u64"
           },
           {
-            "name": "quoteIndex",
+            "name": "quoteInfoIndex",
             "type": "u64"
           },
           {
@@ -6241,6 +6268,12 @@ export type MangoV4 = {
     },
     {
       "name": "PerpInfo",
+      "docs": [
+        "Stores information about perp market positions and their open orders.",
+        "",
+        "Perp markets affect account health indirectly, though the token balance in the",
+        "perp market's settle token. See `effective_token_balances()`."
+      ],
       "type": {
         "kind": "struct",
         "fields": [
@@ -6329,6 +6362,21 @@ export type MangoV4 = {
     },
     {
       "name": "HealthCache",
+      "docs": [
+        "Store information needed to compute account health",
+        "",
+        "This is called a cache, because it extracts information from a MangoAccount and",
+        "the Bank, Perp, oracle accounts once and then allows computing different types",
+        "of health.",
+        "",
+        "For compute-saving reasons, it also allows applying adjustments to the extracted",
+        "positions. That's often helpful for instructions that want to re-compute health",
+        "after having made small, well-known changes to an account. Recomputing the",
+        "HealthCache from scratch would be significantly more expensive.",
+        "",
+        "However, there's a real risk of getting the adjustments wrong and computing an",
+        "inconsistent result, so particular care needs to be taken when this is done."
+      ],
       "type": {
         "kind": "struct",
         "fields": [
@@ -9912,7 +9960,7 @@ export type MangoV4 = {
 };
 
 export const IDL: MangoV4 = {
-  "version": "0.16.0",
+  "version": "0.17.0",
   "name": "mango_v4",
   "instructions": [
     {
@@ -14469,12 +14517,18 @@ export const IDL: MangoV4 = {
         {
           "name": "group",
           "isMut": false,
-          "isSigner": false
+          "isSigner": false,
+          "relations": [
+            "insurance_vault"
+          ]
         },
         {
           "name": "liqor",
           "isMut": true,
-          "isSigner": false
+          "isSigner": false,
+          "relations": [
+            "group"
+          ]
         },
         {
           "name": "liqorOwner",
@@ -14484,12 +14538,19 @@ export const IDL: MangoV4 = {
         {
           "name": "liqee",
           "isMut": true,
-          "isSigner": false
+          "isSigner": false,
+          "relations": [
+            "group"
+          ]
         },
         {
           "name": "perpMarket",
           "isMut": true,
-          "isSigner": false
+          "isSigner": false,
+          "relations": [
+            "group",
+            "oracle"
+          ]
         },
         {
           "name": "oracle",
@@ -14499,7 +14560,10 @@ export const IDL: MangoV4 = {
         {
           "name": "settleBank",
           "isMut": true,
-          "isSigner": false
+          "isSigner": false,
+          "relations": [
+            "group"
+          ]
         },
         {
           "name": "settleVault",
@@ -14519,7 +14583,10 @@ export const IDL: MangoV4 = {
         {
           "name": "insuranceBank",
           "isMut": true,
-          "isSigner": false
+          "isSigner": false,
+          "relations": [
+            "group"
+          ]
         },
         {
           "name": "insuranceBankVault",
@@ -16115,6 +16182,14 @@ export const IDL: MangoV4 = {
     },
     {
       "name": "Serum3Info",
+      "docs": [
+        "Information about reserved funds on Serum3 open orders accounts.",
+        "",
+        "Note that all \"free\" funds on open orders accounts are added directly",
+        "to the token info. This is only about dealing with the reserved funds",
+        "that might end up as base OR quote tokens, depending on whether the",
+        "open orders execute on not."
+      ],
       "type": {
         "kind": "struct",
         "fields": [
@@ -16131,11 +16206,11 @@ export const IDL: MangoV4 = {
             }
           },
           {
-            "name": "baseIndex",
+            "name": "baseInfoIndex",
             "type": "u64"
           },
           {
-            "name": "quoteIndex",
+            "name": "quoteInfoIndex",
             "type": "u64"
           },
           {
@@ -16154,6 +16229,12 @@ export const IDL: MangoV4 = {
     },
     {
       "name": "PerpInfo",
+      "docs": [
+        "Stores information about perp market positions and their open orders.",
+        "",
+        "Perp markets affect account health indirectly, though the token balance in the",
+        "perp market's settle token. See `effective_token_balances()`."
+      ],
       "type": {
         "kind": "struct",
         "fields": [
@@ -16242,6 +16323,21 @@ export const IDL: MangoV4 = {
     },
     {
       "name": "HealthCache",
+      "docs": [
+        "Store information needed to compute account health",
+        "",
+        "This is called a cache, because it extracts information from a MangoAccount and",
+        "the Bank, Perp, oracle accounts once and then allows computing different types",
+        "of health.",
+        "",
+        "For compute-saving reasons, it also allows applying adjustments to the extracted",
+        "positions. That's often helpful for instructions that want to re-compute health",
+        "after having made small, well-known changes to an account. Recomputing the",
+        "HealthCache from scratch would be significantly more expensive.",
+        "",
+        "However, there's a real risk of getting the adjustments wrong and computing an",
+        "inconsistent result, so particular care needs to be taken when this is done."
+      ],
       "type": {
         "kind": "struct",
         "fields": [

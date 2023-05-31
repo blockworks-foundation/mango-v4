@@ -4,7 +4,35 @@ Update this for each program release and mainnet deployment.
 
 ## not on mainnet
 
-### v0.16.0, 2023-5-
+### v0.17.0, 2023-6-
+
+- Configurable perp market settle token (#550)
+
+  This changes perp market margining to no longer assume all pnl is in USD
+  while settlement is in USDC. Instead, a configurable settle token is used for
+  pnl and settlement, defaulting to USDC.
+
+  There is no difference while the USDC price is forced to $1 and its init and liab
+  weights are 1. But with this patch, it becomes possible to change that.
+
+  For now it is not recommended to use a token other than USDC or USDT (or
+  another USD targeting stable token) for perp settlement.
+
+  The patch also updates all instructions dealing with the insurance vault
+  to be aware that the insurance fund is not in USD but in USDC and apply the
+  USDC price before payouts. To do this, the previous
+  PerpLiqNegativePnlOrBankruptcy was replaced by a new
+  PerpLiqNegativePnlOrBankruptcyV2 instruction.
+
+- Whitelist PerpPlaceOrderV2 and PerpPlaceOrderPeggedV2 for HealthRegions (#597)
+- Improve docs (#590, #594)
+- Use workspace dependencies (#588)
+
+## mainnet
+
+### v0.16.0, 2023-5-19
+
+Deployment: May 19, 2023 at 15:35:12 Central European Summer Time, https://explorer.solana.com/tx/22fEcghPGgAnYCZkfjTxTeKQwX5rzWSx3c5CV9TikJmaAKWCpubCZYBx5ZJJPeNG1xWUPWMw3ooDhFBRYCR3tKYU
 
 - New event: PerpTakerTradeLog immediately logs your trade execution (#579, #584)
 
@@ -25,8 +53,6 @@ Update this for each program release and mainnet deployment.
 
   Mango used to depend on a fork of anchor. Now all patches are upstreamed and
   we have upgraded to the unmodified upstream version of v0.27.0.
-
-## mainnet
 
 ### v0.15.0, 2023-5-11
 
