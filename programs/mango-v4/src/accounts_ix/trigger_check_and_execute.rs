@@ -13,7 +13,7 @@ pub struct TriggerCheckAndExecute<'info> {
         has_one = group,
         // TODO: does this account always close on success?
     )]
-    pub trigger: AccountLoader<'info, Trigger>,
+    pub triggers: AccountLoader<'info, Triggers>,
 
     #[account(mut)]
     pub triggerer: Signer<'info>,

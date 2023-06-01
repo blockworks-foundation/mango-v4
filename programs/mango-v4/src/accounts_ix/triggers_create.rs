@@ -3,9 +3,10 @@ use crate::state::*;
 use anchor_lang::prelude::*;
 
 #[derive(Accounts)]
-pub struct TriggerCreate<'info> {
+#[instruction()]
+pub struct TriggersCreate<'info> {
     #[account(
-        // TODO: constraint = group.load()?.is_ix_enabled(IxGate::TriggerCreate) @ MangoError::IxIsDisabled,
+        // TODO: constraint = group.load()?.is_ix_enabled(IxGate::TriggersCreate) @ MangoError::IxIsDisabled,
     )]
     pub group: AccountLoader<'info, Group>,
 
@@ -16,9 +17,11 @@ pub struct TriggerCreate<'info> {
     pub account: AccountLoader<'info, MangoAccountFixed>,
 
     #[account(
-        mut,
-        has_one = group,
-        has_one = account,
+        init,
+        seeds = [b"Triggers".as_ref(), account.key().as_ref()],
+        bump,
+        payer = payer,
+        space = 8 + std::mem::size_of::<Triggers>(),
     )]
     pub triggers: AccountLoader<'info, Triggers>,
 

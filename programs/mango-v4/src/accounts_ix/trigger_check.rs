@@ -13,7 +13,7 @@ pub struct TriggerCheck<'info> {
         mut,
         has_one = group,
     )]
-    pub trigger: AccountLoader<'info, Trigger>,
+    pub triggers: AccountLoader<'info, Triggers>,
 
     #[account(mut)]
     pub triggerer: Signer<'info>,

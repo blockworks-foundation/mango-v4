@@ -59,6 +59,7 @@ pub use token_withdraw::*;
 pub use trigger_check::*;
 pub use trigger_check_and_execute::*;
 pub use trigger_create::*;
+pub use triggers_create::*;
 
 mod account_buyback_fees_with_mngo;
 mod account_close;
@@ -121,3 +122,4 @@ mod token_withdraw;
 mod trigger_check;
 mod trigger_check_and_execute;
 mod trigger_create;
+mod triggers_create;

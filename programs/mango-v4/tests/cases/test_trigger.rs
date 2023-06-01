@@ -119,25 +119,35 @@ async fn test_trigger() -> Result<(), TransportError> {
     let mut action = bytemuck::bytes_of(&perp_cpi).to_vec();
     action.extend(anchor_lang::InstructionData::data(&perp_place_order));
 
-    let trigger = send_tx(
+    send_tx(
+        solana,
+        TriggersCreateInstruction {
+            account: account_0,
+            authority: owner,
+            payer,
+        },
+    )
+    .await
+    .unwrap();
+
+    send_tx(
         solana,
         TriggerCreateInstruction {
             account: account_0,
             authority: owner,
             payer,
-            num: 1,
             condition: bytemuck::bytes_of(&oracle_condition).to_vec(),
-            action,
+            action: action.clone(),
         },
     )
     .await
-    .unwrap()
-    .trigger;
+    .unwrap();
 
     send_tx(
         solana,
         TriggerCheckInstruction {
-            trigger,
+            account: account_0,
+            id: 1,
             triggerer: payer,
         },
     )
@@ -147,7 +157,8 @@ async fn test_trigger() -> Result<(), TransportError> {
     send_tx(
         solana,
         TriggerCheckAndExecuteInstruction {
-            trigger,
+            account: account_0,
+            id: 1,
             triggerer: payer,
         },
     )

@@ -15,66 +15,116 @@ use crate::PerpMarketIndex;
 
 #[account(zero_copy)]
 #[derive(Debug)]
-pub struct Trigger {
+pub struct Triggers {
     // ABI: Clients rely on this being at offset 8
     pub group: Pubkey,
 
     // ABI: Clients rely on this being at offset 40
     pub account: Pubkey,
 
-    pub removed: Pubkey,
+    pub next_trigger_id: u64,
 
-    // For recreating the seed, just in case
-    pub trigger_num: u64,
-    // TODO: bump too then?
-    pub expiry_slot: u64,
+    // TODO: do we care about fast lookup? how much CU does traversing the linked list cost?
+    // pub orders: [(u64, u64); 255],
+    pub reserved: [u8; 960],
+}
+const_assert_eq!(size_of::<Triggers>(), 32 * 2 + 8 + 960);
+const_assert_eq!(size_of::<Triggers>(), 1032);
+const_assert_eq!(size_of::<Triggers>() % 8, 0);
 
-    // Paid on check and on execute
-    pub incentive_lamports: u64,
+impl Triggers {
+    // TODO: distinguish error from not-found?
+    // NOTE: Currently iterating over 100 non-matching triggers costs around 3000 CU,
+    // so around 30 CU per trigger.
+    pub fn find_trigger_offset_by_id(bytes: &[u8], trigger_id: u64) -> Result<usize> {
+        let mut offset = 8 + std::mem::size_of::<Triggers>();
+        loop {
+            // TODO: if empty, return not found?!
+            let trigger = Trigger::from_bytes(&bytes[offset..])?;
+            if trigger.id == trigger_id {
+                return Ok(offset);
+            }
+            offset += trigger.total_bytes as usize;
+        }
+    }
+}
 
-    pub condition_type: u32,
+#[account(zero_copy)]
+#[derive(Debug)]
+pub struct Trigger {
+    pub total_bytes: u32,
+    pub version: u32, // for future use, currently always 0
+
+    // so ix have a stable reference to a trigger even if its bytes are moved
+    pub id: u64,
+
+    // Note that condition_bytes + action_bytes <= total_bytes, because there
+    // may be trailing bytes after the action for alignment.
+    // TODO: probably should also allow alignment bytes on the condition? maybe just align_of(condition_bytes)?
     pub condition_bytes: u32,
-    pub action_type: u32,
     pub action_bytes: u32,
 
+    pub expiry_slot: u64,
+
+    // Paid both on check and on execute. Stored in triggers account lamport balance.
+    pub incentive_lamports: u64,
+
+    // Did TriggerCheck ever succeed? (means the check incentive was already paid out)
     pub condition_was_met: u8,
 
-    pub reserved: [u8; 999],
+    pub reserved: [u8; 127],
     // Condition and Action bytes trail this struct in the account!
 }
-const_assert_eq!(size_of::<Trigger>(), 32 * 3 + 8 * 3 + 4 * 4 + 1 + 999);
-const_assert_eq!(size_of::<Trigger>(), 1136);
+const_assert_eq!(size_of::<Trigger>(), 4 * 2 + 8 + 4 * 2 + 8 * 2 + 1 + 127);
+const_assert_eq!(size_of::<Trigger>(), 168);
 const_assert_eq!(size_of::<Trigger>() % 8, 0);
 
 impl Trigger {
-    // TODO: check owner, doesn't work with Ref<>
-    pub fn from_account_bytes<'a>(
+    /// Reads a single trigger, condition and action
+    // TODO: rename? move?
+    // ignores trailing bytes
+    pub fn all_from_bytes<'a>(
         bytes: &'a [u8],
-    ) -> Result<(&Trigger, ConditionRef<'a>, ActionRef<'a>)> {
-        if bytes.len() < 8 {
-            return Err(ErrorCode::AccountDiscriminatorNotFound.into());
-        }
-        let disc_bytes = &bytes[0..8];
-        if disc_bytes != &Trigger::DISCRIMINATOR {
-            return Err(ErrorCode::AccountDiscriminatorMismatch.into());
-        }
+        trigger_offset: usize,
+    ) -> Result<(&Triggers, &Trigger, ConditionRef<'a>, ActionRef<'a>)> {
+        let triggers_size = std::mem::size_of::<Triggers>();
+        let trigger_start = 8 + triggers_size;
+        let trigger_size = std::mem::size_of::<Trigger>();
+        require_gte!(bytes.len(), trigger_offset + trigger_size);
 
-        let (fixed_bytes, tail_bytes) = bytes.split_at(8 + std::mem::size_of::<Trigger>());
-        let fixed: &Trigger = bytemuck::from_bytes(&fixed_bytes[8..]);
+        let (triggers_bytes, tail_bytes) = (&bytes[8..]).split_at(triggers_size);
+        let triggers: &Triggers = bytemuck::from_bytes(&triggers_bytes);
 
-        let (condition_bytes, action_bytes) =
-            tail_bytes.split_at(fixed.condition_bytes.try_into().unwrap());
-        require_eq!(action_bytes.len(), fixed.action_bytes as usize);
+        let (trigger_bytes, tail_bytes) =
+            (&tail_bytes[trigger_offset - trigger_start..]).split_at(trigger_size);
+        let trigger: &Trigger = bytemuck::from_bytes(&trigger_bytes);
 
-        let condition_type: u32 = *bytemuck::from_bytes(&condition_bytes[0..4]);
-        require_eq!(condition_type, fixed.condition_type);
+        require_gte!(
+            tail_bytes.len(),
+            trigger.total_bytes as usize - trigger_size
+        );
+
+        let (condition_bytes, tail_bytes) =
+            tail_bytes.split_at(trigger.condition_bytes.try_into().unwrap());
+
         let condition = ConditionRef::from_bytes(condition_bytes)?;
+        let action = ActionRef::from_bytes(&tail_bytes[..trigger.action_bytes as usize])?;
 
-        let action_type: u32 = *bytemuck::from_bytes(&action_bytes[0..4]);
-        require_eq!(action_type, fixed.action_type);
-        let action = ActionRef::from_bytes(action_bytes)?;
+        Ok((triggers, trigger, condition, action))
+    }
 
-        Ok((fixed, condition, action))
+    // ignores trailing bytes
+    pub fn from_bytes(bytes: &[u8]) -> Result<&Trigger> {
+        let trigger_size = std::mem::size_of::<Trigger>();
+        require_gte!(bytes.len(), trigger_size);
+        Ok(bytemuck::from_bytes(&bytes[..trigger_size]))
+    }
+
+    // ignores trailing bytes
+    pub fn from_bytes_mut(bytes: &mut [u8]) -> Result<&mut Trigger> {
+        let trigger_size = std::mem::size_of::<Trigger>();
+        require_gte!(bytes.len(), trigger_size);
+        Ok(bytemuck::from_bytes_mut(&mut bytes[..trigger_size]))
     }
 }
 
@@ -209,13 +259,13 @@ impl<'a> ActionRef<'a> {
 
     pub fn execute<'info>(
         &self,
-        trigger: &Trigger,
+        triggers: &Triggers,
         execute_ix: &TriggerCheck<'info>,
         accounts: &[AccountInfo<'info>],
     ) -> Result<()> {
         match self {
             ActionRef::PerpCpi((action, ix_data)) => {
-                action.execute(trigger, execute_ix, accounts, ix_data)
+                action.execute(triggers, execute_ix, accounts, ix_data)
             }
         }
     }
@@ -237,7 +287,8 @@ const_assert_eq!(size_of::<PerpCpiAction>() % 8, 0);
 impl PerpCpiAction {
     pub fn accounts(
         &self,
-        trigger: &Trigger,
+        group: Pubkey,
+        account: Pubkey,
         ix_data: &[u8],
         perp_market: Pubkey,
         bids: Pubkey,
@@ -265,9 +316,9 @@ impl PerpCpiAction {
         {
             ams.extend(
                 crate::accounts::PerpPlaceOrder {
-                    group: trigger.group,
-                    account: trigger.account,
-                    owner: trigger.account,
+                    group,
+                    account,
+                    owner: account,
                     perp_market,
                     bids,
                     asks,
@@ -280,9 +331,9 @@ impl PerpCpiAction {
         } else if discr == ixs::PerpCancelAllOrders::DISCRIMINATOR {
             ams.extend(
                 crate::accounts::PerpCancelAllOrders {
-                    group: trigger.group,
-                    account: trigger.account,
-                    owner: trigger.account,
+                    group,
+                    account,
+                    owner: account,
                     perp_market,
                     bids,
                     asks,
@@ -293,9 +344,9 @@ impl PerpCpiAction {
         } else if discr == ixs::PerpCancelAllOrdersBySide::DISCRIMINATOR {
             ams.extend(
                 crate::accounts::PerpCancelAllOrdersBySide {
-                    group: trigger.group,
-                    account: trigger.account,
-                    owner: trigger.account,
+                    group,
+                    account,
+                    owner: account,
                     perp_market,
                     bids,
                     asks,
@@ -338,7 +389,7 @@ impl PerpCpiAction {
 
     pub fn execute<'info>(
         &self,
-        trigger: &Trigger,
+        triggers: &Triggers,
         outer_accounts: &TriggerCheck<'info>,
         account_infos: &[AccountInfo<'info>],
         ix_data: &[u8],
@@ -370,16 +421,16 @@ impl PerpCpiAction {
             perp_market: 3,
         };
 
-        require_keys_eq!(passed_accounts[account_indexes.group].key(), trigger.group);
+        require_keys_eq!(passed_accounts[account_indexes.group].key(), triggers.group);
         require_keys_eq!(
             passed_accounts[account_indexes.account].key(),
-            trigger.account
+            triggers.account
         );
         // To let the inner instruction know it's authorized, we pass the account itself
         // as the owner and sign for it.
         require_keys_eq!(
             passed_accounts[account_indexes.owner].key(),
-            trigger.account
+            triggers.account
         );
 
         {
@@ -423,7 +474,7 @@ impl PerpCpiAction {
         };
         let account_seeds = &[
             b"MangoAccount".as_ref(),
-            trigger.group.as_ref(),
+            triggers.group.as_ref(),
             owner.as_ref(),
             &account_num.to_le_bytes(),
             &[bump],
