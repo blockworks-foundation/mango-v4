@@ -8,6 +8,7 @@ use static_assertions::const_assert_eq;
 use std::mem::size_of;
 
 use crate::accounts_ix::TriggerCheck;
+use crate::accounts_zerocopy::AccountInfoRef;
 use crate::error::*;
 use crate::state::*;
 use crate::PerpMarketIndex;
@@ -127,20 +128,49 @@ pub struct OraclePriceCondition {
     #[derivative(Debug = "ignore")]
     pub padding0: u32,
     pub oracle: Pubkey,
-    pub threshold: I80F48,
+    pub threshold_ui: I80F48,
+    pub max_staleness_slots: i64, // negative means: don't check
+    pub conf_filter: f32,
     pub trigger_when_above: u8, // TODO: don't use a bool
-    // TODO: also oracle staleness and confidence
     #[derivative(Debug = "ignore")]
-    pub padding: [u8; 7],
+    pub padding: [u8; 3],
 }
+const_assert_eq!(
+    size_of::<OraclePriceCondition>(),
+    4 + 4 + 32 + 16 + 8 + 4 + 1 + 3
+);
+const_assert_eq!(size_of::<OraclePriceCondition>(), 72);
+const_assert_eq!(size_of::<OraclePriceCondition>() % 8, 0);
 
 impl OraclePriceCondition {
+    // TODO: should this distinguish a (possibly permanent) error from a temporary failure (due to staleness, price being wrong, etc)?
     pub fn check(&self, accounts: &[AccountInfo]) -> Result<()> {
         require_eq!(accounts.len(), 1);
         let oracle_ai = &accounts[0];
         require_keys_eq!(*oracle_ai.key, self.oracle);
 
-        // TODO: grab the price and compare it
+        let config = OracleConfig {
+            conf_filter: I80F48::from_num(self.conf_filter),
+            max_staleness_slots: self.max_staleness_slots,
+            ..Default::default()
+        };
+        let slot = Clock::get()?.slot;
+        // Using this as decimals produces the ui price
+        let decimals = QUOTE_DECIMALS.try_into().unwrap();
+
+        let (price_ui, _) = oracle_price_and_state(
+            &AccountInfoRef::borrow(oracle_ai)?,
+            &config,
+            decimals,
+            Some(slot),
+        )?;
+        let price_good = if self.trigger_when_above != 0 {
+            price_ui >= self.threshold_ui
+        } else {
+            price_ui <= self.threshold_ui
+        };
+
+        require_msg!(price_good, "price not yet over/under threshold"); // TODO: bad error
 
         Ok(())
     }

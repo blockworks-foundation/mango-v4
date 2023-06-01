@@ -3,7 +3,7 @@ use super::*;
 #[tokio::test]
 async fn test_trigger() -> Result<(), TransportError> {
     let mut test_builder = TestContextBuilder::new();
-    test_builder.test().set_compute_max_units(95_000); // logging..
+    test_builder.test().set_compute_max_units(120_000); // logging..
     let context = test_builder.start_default().await;
     let solana = &context.solana.clone();
 
@@ -75,7 +75,7 @@ async fn test_trigger() -> Result<(), TransportError> {
             taker_fee: 0.0002,
             settle_pnl_limit_factor: -1.0,
             settle_pnl_limit_window_size_ts: 24 * 60 * 60,
-            ..PerpCreateMarketInstruction::with_new_book_and_queue(&solana, &tokens[0]).await
+            ..PerpCreateMarketInstruction::with_new_book_and_queue(&solana, &tokens[1]).await
         },
     )
     .await
@@ -89,9 +89,11 @@ async fn test_trigger() -> Result<(), TransportError> {
     let oracle_condition = OraclePriceCondition {
         condition_type: ConditionType::OraclePrice.into(),
         padding0: 0,
-        oracle: Pubkey::default(),
-        threshold: I80F48::ZERO,
-        trigger_when_above: 0,
+        oracle: tokens[1].oracle,
+        threshold_ui: I80F48::from_num(0.5),
+        trigger_when_above: 1,
+        conf_filter: 0.1,
+        max_staleness_slots: -1,
         padding: Default::default(),
     };
 
