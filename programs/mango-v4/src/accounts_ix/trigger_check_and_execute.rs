@@ -2,6 +2,7 @@ use crate::error::*;
 use crate::state::*;
 use anchor_lang::prelude::*;
 
+// TODO: unused
 #[derive(Accounts)]
 pub struct TriggerCheckAndExecute<'info> {
     #[account(

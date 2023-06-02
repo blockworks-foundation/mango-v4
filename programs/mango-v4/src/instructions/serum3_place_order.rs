@@ -118,7 +118,10 @@ pub fn serum3_place_order(
         let account = ctx.accounts.account.load_full()?;
         // account constraint #1
         require!(
-            account.fixed.is_owner_or_delegate(ctx.accounts.owner.key()),
+            account.fixed.is_owner_or_delegate_or_self(
+                &ctx.accounts.owner.key(),
+                &ctx.accounts.account.key()
+            ),
             MangoError::SomeError
         );
 

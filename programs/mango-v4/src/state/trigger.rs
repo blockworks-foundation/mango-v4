@@ -7,6 +7,7 @@ use solana_program::program::invoke_signed;
 use static_assertions::const_assert_eq;
 use std::mem::size_of;
 
+use crate::accounts_ix::Serum3Side;
 use crate::accounts_ix::TriggerCheck;
 use crate::accounts_zerocopy::AccountInfoRef;
 use crate::error::*;
@@ -230,11 +231,13 @@ impl OraclePriceCondition {
 #[derive(Clone, Copy, TryFromPrimitive, IntoPrimitive)]
 pub enum ActionType {
     PerpCpi,
+    Serum3Cpi,
 }
 
 #[derive(Debug)]
 pub enum ActionRef<'a> {
     PerpCpi((&'a PerpCpiAction, &'a [u8])),
+    Serum3Cpi((&'a Serum3CpiAction, &'a [u8])),
 }
 
 impl<'a> ActionRef<'a> {
@@ -248,12 +251,19 @@ impl<'a> ActionRef<'a> {
                 let action: &PerpCpiAction = bytemuck::from_bytes(action_data);
                 Ok(ActionRef::PerpCpi((action, ix_data)))
             }
+            ActionType::Serum3Cpi => {
+                require_gte!(bytes.len(), size_of::<Serum3CpiAction>());
+                let (action_data, ix_data) = bytes.split_at(size_of::<Serum3CpiAction>());
+                let action: &Serum3CpiAction = bytemuck::from_bytes(action_data);
+                Ok(ActionRef::Serum3Cpi((action, ix_data)))
+            }
         }
     }
 
     pub fn check(&self) -> Result<()> {
         match self {
             ActionRef::PerpCpi((action, ix_data)) => action.check(ix_data),
+            ActionRef::Serum3Cpi((action, ix_data)) => action.check(ix_data),
         }
     }
 
@@ -265,6 +275,9 @@ impl<'a> ActionRef<'a> {
     ) -> Result<()> {
         match self {
             ActionRef::PerpCpi((action, ix_data)) => {
+                action.execute(triggers, execute_ix, accounts, ix_data)
+            }
+            ActionRef::Serum3Cpi((action, ix_data)) => {
                 action.execute(triggers, execute_ix, accounts, ix_data)
             }
         }
@@ -440,6 +453,213 @@ impl PerpCpiAction {
             let perp_market = perp_market_loader.load()?;
             require_eq!(perp_market.perp_market_index, self.perp_market_index);
         }
+
+        // Prepare and execute the cpi call, forwarding the accounts
+
+        let account_metas = passed_accounts
+            .iter()
+            .enumerate()
+            .map(|(i, ai)| {
+                AccountMeta {
+                    pubkey: ai.key(),
+                    is_writable: ai.is_writable,
+                    // We call the inner instruction without being able to provide the true `owner`.
+                    // Instead the account is passed as owner and this ix signs for the PDA, which is something
+                    // no user is able to do.
+                    is_signer: ai.is_signer || i == account_indexes.owner,
+                }
+            })
+            .collect();
+
+        let instruction = solana_program::instruction::Instruction {
+            program_id: crate::id(),
+            accounts: account_metas,
+            data: ix_data.to_vec(),
+        };
+
+        // Prepare the MangoAccount seeds, so we can sign for it
+        let (owner, account_num, bump) = {
+            let loader = AccountLoader::<MangoAccountFixed>::try_from(
+                &passed_accounts[account_indexes.account],
+            )?;
+            let account = loader.load()?;
+            (account.owner, account.account_num, account.bump)
+        };
+        let account_seeds = &[
+            b"MangoAccount".as_ref(),
+            triggers.group.as_ref(),
+            owner.as_ref(),
+            &account_num.to_le_bytes(),
+            &[bump],
+        ];
+
+        invoke_signed(&instruction, account_infos, &[account_seeds])?;
+
+        Ok(())
+    }
+}
+
+#[zero_copy]
+#[derive(Derivative)]
+#[derivative(Debug)]
+pub struct Serum3CpiAction {
+    pub action_type: u32, // always ActionType::Serum3CpiAction
+    pub serum3_market: Pubkey,
+    #[derivative(Debug = "ignore")]
+    pub reserved: [u8; 60],
+}
+const_assert_eq!(size_of::<Serum3CpiAction>(), 4 + 32 + 60);
+const_assert_eq!(size_of::<Serum3CpiAction>(), 96);
+const_assert_eq!(size_of::<Serum3CpiAction>() % 8, 0);
+
+impl Serum3CpiAction {
+    // TODO: the number of pubkeys passed here is incredibly ugly, at least make a struct
+    pub fn accounts(
+        &self,
+        group: Pubkey,
+        account: Pubkey,
+        ix_data: &[u8],
+        open_orders: Pubkey,
+        serum_market: Pubkey,
+        serum_program: Pubkey,
+        serum_market_external: Pubkey,
+        market_bids: Pubkey,
+        market_asks: Pubkey,
+        market_event_queue: Pubkey,
+        market_request_queue: Pubkey,
+        market_base_vault: Pubkey,
+        market_quote_vault: Pubkey,
+        market_vault_signer: Pubkey,
+        quote_bank: Pubkey,
+        quote_vault: Pubkey,
+        quote_oracle: Pubkey,
+        base_bank: Pubkey,
+        base_vault: Pubkey,
+        base_oracle: Pubkey,
+    ) -> Result<Vec<AccountMeta>> {
+        require_gte!(ix_data.len(), 8);
+        let discr: [u8; 8] = ix_data[..8].try_into().unwrap();
+
+        use crate::instruction as ixs;
+        let mut ams = vec![
+            // To be able to call into ourselves, the program needs to be passed explicitly
+            AccountMeta {
+                pubkey: crate::id(),
+                is_writable: false,
+                is_signer: false,
+            },
+        ];
+
+        // TODO: support more instructions, like cancel all etc
+        if discr == ixs::Serum3PlaceOrder::DISCRIMINATOR {
+            let ix = ixs::Serum3PlaceOrder::deserialize(&mut &ix_data[8..])?;
+            let (payer_bank, payer_vault, payer_oracle) = match ix.side {
+                Serum3Side::Bid => (quote_bank, quote_vault, quote_oracle),
+                Serum3Side::Ask => (base_bank, base_vault, base_oracle),
+            };
+            ams.extend(
+                crate::accounts::Serum3PlaceOrder {
+                    group,
+                    account,
+                    owner: account,
+                    open_orders,
+                    serum_market,
+                    serum_program,
+                    serum_market_external,
+                    market_bids,
+                    market_asks,
+                    market_request_queue,
+                    market_event_queue,
+                    market_base_vault,
+                    market_quote_vault,
+                    market_vault_signer,
+                    payer_bank,
+                    payer_vault,
+                    payer_oracle,
+                    token_program: anchor_spl::token::ID,
+                }
+                .to_account_metas(None)
+                .into_iter(),
+            );
+        } else {
+            return Err(error_msg!("bad serum3 cpi action discriminator"));
+        }
+
+        // The signer flag for the owner must not be set: it'll be toggled by the trigger execution ix
+        ams[3].is_signer = false;
+
+        // TODO: Add health accounts too!
+
+        Ok(ams)
+    }
+
+    pub fn check(&self, ix_data: &[u8]) -> Result<()> {
+        require_gte!(ix_data.len(), 8);
+
+        // Whitelist of acceptable instructions
+        use crate::instruction as ixs;
+        let allowed_inner_ix = [
+            // TODO: support more
+            ixs::Serum3PlaceOrder::discriminator(),
+        ];
+        let ix_discriminator: [u8; 8] = ix_data[..8].try_into().unwrap();
+        require!(
+            allowed_inner_ix.contains(&ix_discriminator),
+            MangoError::SomeError
+        );
+        Ok(())
+    }
+
+    pub fn execute<'info>(
+        &self,
+        triggers: &Triggers,
+        outer_accounts: &TriggerCheck<'info>,
+        account_infos: &[AccountInfo<'info>],
+        ix_data: &[u8],
+    ) -> Result<()> {
+        self.check(ix_data)?;
+
+        let mango_program = crate::id();
+
+        // Skip the accountinfo for our program, which is passed first
+        let passed_accounts = &account_infos[1..];
+
+        // Verify that the accounts passed to the inner instruction are safe:
+        // - same group as the trigger
+        // - same account as the trigger
+        // - the right owner account
+        // - the desired serum market
+        // All other accounts are essentially derived from these.
+        struct AccountIndexes {
+            group: usize,
+            account: usize,
+            owner: usize,
+            serum_market: usize,
+        }
+        // Currently all instructions have the accounts in the same order, so this
+        // can be a constant instead of depending on the instruction discriminator.
+        let account_indexes = AccountIndexes {
+            group: 0,
+            account: 1,
+            owner: 2,
+            serum_market: 4,
+        };
+
+        require_keys_eq!(passed_accounts[account_indexes.group].key(), triggers.group);
+        require_keys_eq!(
+            passed_accounts[account_indexes.account].key(),
+            triggers.account
+        );
+        // To let the inner instruction know it's authorized, we pass the account itself
+        // as the owner and sign for it.
+        require_keys_eq!(
+            passed_accounts[account_indexes.owner].key(),
+            triggers.account
+        );
+        require_keys_eq!(
+            passed_accounts[account_indexes.serum_market].key(),
+            self.serum3_market
+        );
 
         // Prepare and execute the cpi call, forwarding the accounts
 
