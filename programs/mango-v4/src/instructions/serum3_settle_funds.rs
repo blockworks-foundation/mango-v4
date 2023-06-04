@@ -9,7 +9,7 @@ use crate::state::*;
 use super::{apply_settle_changes, OpenOrdersAmounts, OpenOrdersSlim};
 use crate::accounts_ix::*;
 use crate::logs::Serum3OpenOrdersBalanceLogV2;
-use crate::logs::{LoanOriginationFeeInstruction, WithdrawLoanOriginationFeeLog};
+use crate::logs::{LoanOriginationFeeInstructionV2, WithdrawLoanLog};
 
 /// Settling means moving free funds from the serum3 open orders account
 /// back into the mango account wallet.
@@ -171,18 +171,19 @@ pub fn charge_loan_origination_fees(
         // now that the loan is actually materialized, charge the loan origination fee
         // note: the withdraw has already happened while placing the order
         let base_token_account = account.token_position_mut(base_bank.token_index)?.0;
-        let (_, fee) = base_bank.withdraw_loan_origination_fee(
+        let withdraw_result = base_bank.withdraw_loan_origination_fee(
             base_token_account,
             actualized_base_loan,
             now_ts,
         )?;
 
-        emit!(WithdrawLoanOriginationFeeLog {
+        emit!(WithdrawLoanLog {
             mango_group: *group_pubkey,
             mango_account: *account_pubkey,
             token_index: base_bank.token_index,
-            loan_origination_fee: fee.to_bits(),
-            instruction: LoanOriginationFeeInstruction::Serum3SettleFunds,
+            loan_amount: withdraw_result.loan_amount.to_bits(),
+            loan_origination_fee: withdraw_result.loan_origination_fee.to_bits(),
+            instruction: LoanOriginationFeeInstructionV2::Serum3SettleFunds,
         });
     }
 
@@ -199,18 +200,19 @@ pub fn charge_loan_origination_fees(
         // now that the loan is actually materialized, charge the loan origination fee
         // note: the withdraw has already happened while placing the order
         let quote_token_account = account.token_position_mut(quote_bank.token_index)?.0;
-        let (_, fee) = quote_bank.withdraw_loan_origination_fee(
+        let withdraw_result = quote_bank.withdraw_loan_origination_fee(
             quote_token_account,
             actualized_quote_loan,
             now_ts,
         )?;
 
-        emit!(WithdrawLoanOriginationFeeLog {
+        emit!(WithdrawLoanLog {
             mango_group: *group_pubkey,
             mango_account: *account_pubkey,
             token_index: quote_bank.token_index,
-            loan_origination_fee: fee.to_bits(),
-            instruction: LoanOriginationFeeInstruction::Serum3SettleFunds,
+            loan_amount: withdraw_result.loan_amount.to_bits(),
+            loan_origination_fee: withdraw_result.loan_origination_fee.to_bits(),
+            instruction: LoanOriginationFeeInstructionV2::Serum3SettleFunds,
         });
     }
 
