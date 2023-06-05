@@ -18,7 +18,7 @@ use itertools::Itertools;
 use mango_v4::accounts_ix::{Serum3OrderType, Serum3SelfTradeBehavior, Serum3Side};
 use mango_v4::state::{
     Bank, Group, MangoAccountValue, PerpMarketIndex, PlaceOrderType, SelfTradeBehavior,
-    Serum3MarketIndex, Side, TokenIndex, INSURANCE_TOKEN_INDEX,
+    Serum3Market, Serum3MarketIndex, Side, TokenIndex, INSURANCE_TOKEN_INDEX,
 };
 
 use solana_address_lookup_table_program::state::AddressLookupTable;
@@ -429,52 +429,15 @@ impl MangoClient {
     // Serum3
     //
 
-    pub async fn serum3_create_open_orders(&self, name: &str) -> anyhow::Result<Signature> {
-        let account_pubkey = self.mango_account_address;
-
-        let market_index = *self
+    fn serum3_market_index_by_market_name(&self, name: &str) -> Serum3MarketIndex {
+        *self
             .context
             .serum3_market_indexes_by_name
             .get(name)
-            .unwrap();
-        let serum3_info = self.context.serum3_markets.get(&market_index).unwrap();
-
-        let open_orders = Pubkey::find_program_address(
-            &[
-                account_pubkey.as_ref(),
-                b"Serum3OO".as_ref(),
-                serum3_info.address.as_ref(),
-            ],
-            &mango_v4::ID,
-        )
-        .0;
-
-        let ix = Instruction {
-            program_id: mango_v4::id(),
-            accounts: anchor_lang::ToAccountMetas::to_account_metas(
-                &mango_v4::accounts::Serum3CreateOpenOrders {
-                    group: self.group(),
-                    account: account_pubkey,
-
-                    serum_market: serum3_info.address,
-                    serum_program: serum3_info.market.serum_program,
-                    serum_market_external: serum3_info.market.serum_market_external,
-                    open_orders,
-                    owner: self.owner(),
-                    payer: self.owner(),
-                    system_program: System::id(),
-                    rent: sysvar::rent::id(),
-                },
-                None,
-            ),
-            data: anchor_lang::InstructionData::data(
-                &mango_v4::instruction::Serum3CreateOpenOrders {},
-            ),
-        };
-        self.send_and_confirm_owner_tx(vec![ix]).await
+            .unwrap()
     }
 
-    fn serum3_data_by_market_name<'a>(&'a self, name: &str) -> Result<Serum3Data<'a>, ClientError> {
+    fn serum3_data_by_market_name<'a>(&'a self, name: &str) -> Serum3Data<'a> {
         let market_index = *self
             .context
             .serum3_market_indexes_by_name
@@ -486,24 +449,70 @@ impl MangoClient {
     fn serum3_data_by_market_index<'a>(
         &'a self,
         market_index: Serum3MarketIndex,
-    ) -> Result<Serum3Data<'a>, ClientError> {
+    ) -> Serum3Data<'a> {
         let serum3_info = self.context.serum3_markets.get(&market_index).unwrap();
 
         let quote_info = self.context.token(serum3_info.market.quote_token_index);
         let base_info = self.context.token(serum3_info.market.base_token_index);
 
-        Ok(Serum3Data {
+        Serum3Data {
             market_index,
             market: serum3_info,
             quote: quote_info,
             base: base_info,
-        })
+        }
     }
 
-    #[allow(clippy::too_many_arguments)]
-    pub async fn serum3_place_order(
+    pub fn serum3_create_open_orders_instruction(
         &self,
-        name: &str,
+        market_index: Serum3MarketIndex,
+    ) -> Instruction {
+        let account_pubkey = self.mango_account_address;
+        let s3 = self.serum3_data_by_market_index(market_index);
+
+        let open_orders = Pubkey::find_program_address(
+            &[
+                account_pubkey.as_ref(),
+                b"Serum3OO".as_ref(),
+                s3.market.address.as_ref(),
+            ],
+            &mango_v4::ID,
+        )
+        .0;
+
+        Instruction {
+            program_id: mango_v4::id(),
+            accounts: anchor_lang::ToAccountMetas::to_account_metas(
+                &mango_v4::accounts::Serum3CreateOpenOrders {
+                    group: self.group(),
+                    account: account_pubkey,
+                    serum_market: s3.market.address,
+                    serum_program: s3.market.market.serum_program,
+                    serum_market_external: s3.market.market.serum_market_external,
+                    open_orders,
+                    owner: self.owner(),
+                    payer: self.owner(),
+                    system_program: System::id(),
+                    rent: sysvar::rent::id(),
+                },
+                None,
+            ),
+            data: anchor_lang::InstructionData::data(
+                &mango_v4::instruction::Serum3CreateOpenOrders {},
+            ),
+        }
+    }
+
+    pub async fn serum3_create_open_orders(&self, name: &str) -> anyhow::Result<Signature> {
+        let market_index = self.serum3_market_index_by_market_name(name);
+        let ix = self.serum3_create_open_orders_instruction(market_index);
+        self.send_and_confirm_owner_tx(vec![ix]).await
+    }
+
+    pub fn serum3_place_order_instruction(
+        &self,
+        account: &MangoAccountValue,
+        market_index: Serum3MarketIndex,
         side: Serum3Side,
         price: f64,
         size: f64,
@@ -511,15 +520,16 @@ impl MangoClient {
         order_type: Serum3OrderType,
         client_order_id: u64,
         limit: u16,
-    ) -> anyhow::Result<Signature> {
-        let s3 = self.serum3_data_by_market_name(name)?;
-
-        let account = self.mango_account().await?;
+    ) -> anyhow::Result<Instruction> {
+        let s3 = self.serum3_data_by_market_index(market_index);
         let open_orders = account.serum3_orders(s3.market_index).unwrap().open_orders;
 
-        let health_check_metas = self
-            .derive_health_check_remaining_account_metas(vec![], vec![], vec![])
-            .await?;
+        let health_check_metas = self.context.derive_health_check_remaining_account_metas(
+            account,
+            vec![],
+            vec![],
+            vec![],
+        )?;
 
         // https://github.com/project-serum/serum-ts/blob/master/packages/serum/src/market.ts#L1306
         let limit_price = {
@@ -622,11 +632,40 @@ impl MangoClient {
                 limit,
             }),
         };
+
+        Ok(ix)
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    pub async fn serum3_place_order(
+        &self,
+        name: &str,
+        side: Serum3Side,
+        price: f64,
+        size: f64,
+        self_trade_behavior: Serum3SelfTradeBehavior,
+        order_type: Serum3OrderType,
+        client_order_id: u64,
+        limit: u16,
+    ) -> anyhow::Result<Signature> {
+        let account = self.mango_account().await?;
+        let market_index = self.serum3_market_index_by_market_name(name);
+        let ix = self.serum3_place_order_instruction(
+            &account,
+            market_index,
+            side,
+            price,
+            size,
+            self_trade_behavior,
+            order_type,
+            client_order_id,
+            limit,
+        )?;
         self.send_and_confirm_owner_tx(vec![ix]).await
     }
 
     pub async fn serum3_settle_funds(&self, name: &str) -> anyhow::Result<Signature> {
-        let s3 = self.serum3_data_by_market_name(name)?;
+        let s3 = self.serum3_data_by_market_name(name);
 
         let account = self.mango_account().await?;
         let open_orders = account.serum3_orders(s3.market_index).unwrap().open_orders;
@@ -658,15 +697,42 @@ impl MangoClient {
         self.send_and_confirm_owner_tx(vec![ix]).await
     }
 
+    pub fn serum3_cancel_all_orders_instruction(
+        &self,
+        account: &MangoAccountValue,
+        market_index: Serum3MarketIndex,
+    ) -> anyhow::Result<Instruction> {
+        let s3 = self.serum3_data_by_market_index(market_index);
+        let open_orders = account.serum3_orders(s3.market_index)?.open_orders;
+
+        let ix = Instruction {
+            program_id: mango_v4::id(),
+            accounts: anchor_lang::ToAccountMetas::to_account_metas(
+                &mango_v4::accounts::Serum3CancelAllOrders {
+                    group: self.group(),
+                    account: self.mango_account_address,
+                    open_orders,
+                    market_bids: s3.market.bids,
+                    market_asks: s3.market.asks,
+                    market_event_queue: s3.market.event_q,
+                    serum_market: s3.market.address,
+                    serum_program: s3.market.market.serum_program,
+                    serum_market_external: s3.market.market.serum_market_external,
+                    owner: self.owner(),
+                },
+                None,
+            ),
+            data: anchor_lang::InstructionData::data(&mango_v4::instruction::Serum3SettleFunds {}),
+        };
+
+        Ok(ix)
+    }
+
     pub async fn serum3_cancel_all_orders(
         &self,
         market_name: &str,
     ) -> Result<Vec<u128>, anyhow::Error> {
-        let market_index = *self
-            .context
-            .serum3_market_indexes_by_name
-            .get(market_name)
-            .unwrap();
+        let market_index = self.serum3_market_index_by_market_name(market_name);
         let account = self.mango_account().await?;
         let open_orders = account.serum3_orders(market_index).unwrap().open_orders;
         let open_orders_acc = self.account_fetcher.fetch_raw_account(&open_orders).await?;
@@ -699,7 +765,7 @@ impl MangoClient {
         market_index: Serum3MarketIndex,
         open_orders: &Pubkey,
     ) -> anyhow::Result<Signature> {
-        let s3 = self.serum3_data_by_market_index(market_index)?;
+        let s3 = self.serum3_data_by_market_index(market_index);
 
         let health_remaining_ams = self
             .context
@@ -747,7 +813,7 @@ impl MangoClient {
         side: Serum3Side,
         order_id: u128,
     ) -> anyhow::Result<Signature> {
-        let s3 = self.serum3_data_by_market_name(market_name)?;
+        let s3 = self.serum3_data_by_market_name(market_name);
 
         let account = self.mango_account().await?;
         let open_orders = account.serum3_orders(s3.market_index).unwrap().open_orders;
