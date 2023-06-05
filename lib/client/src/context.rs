@@ -47,6 +47,8 @@ pub struct Serum3MarketContext {
     pub vault_signer: Pubkey,
     pub coin_lot_size: u64,
     pub pc_lot_size: u64,
+    pub coin_token_index: TokenIndex,
+    pub pc_token_index: TokenIndex,
 }
 
 pub struct PerpMarketContext {
@@ -149,6 +151,19 @@ impl MangoGroupContext {
                     &s.serum_program,
                 )
                 .unwrap();
+                let coin_token_index = mint_info_tuples
+                            .iter()
+                            .find(|(pk, _)| {
+                                *pk == from_serum_style_pubkey(market_external.coin_mint)
+                            })
+                            .map(|(_, mi)| mi.token_index)
+                            .unwrap();
+                let pc_token_index =
+                        mint_info_tuples
+                            .iter()
+                            .find(|(pk, _)| *pk == from_serum_style_pubkey(market_external.pc_mint))
+                            .map(|(_, mi)| mi.token_index)
+                            .unwrap();
                 (
                     s.market_index,
                     Serum3MarketContext {
@@ -163,6 +178,8 @@ impl MangoGroupContext {
                         vault_signer,
                         coin_lot_size: market_external.coin_lot_size,
                         pc_lot_size: market_external.pc_lot_size,
+                        coin_token_index,
+                        pc_token_index,
                     },
                 )
             })
