@@ -2,7 +2,7 @@ use std::str::FromStr;
 use std::sync::Arc;
 use std::time::Duration;
 
-use anchor_client::{ClientError, Cluster};
+use anchor_client::Cluster;
 
 use anchor_lang::__private::bytemuck;
 use anchor_lang::prelude::System;
@@ -18,7 +18,7 @@ use itertools::Itertools;
 use mango_v4::accounts_ix::{Serum3OrderType, Serum3SelfTradeBehavior, Serum3Side};
 use mango_v4::state::{
     Bank, Group, MangoAccountValue, PerpMarketIndex, PlaceOrderType, SelfTradeBehavior,
-    Serum3Market, Serum3MarketIndex, Side, TokenIndex, INSURANCE_TOKEN_INDEX,
+    Serum3MarketIndex, Side, TokenIndex, INSURANCE_TOKEN_INDEX,
 };
 
 use solana_address_lookup_table_program::state::AddressLookupTable;
@@ -509,6 +509,7 @@ impl MangoClient {
         self.send_and_confirm_owner_tx(vec![ix]).await
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub fn serum3_place_order_instruction(
         &self,
         account: &MangoAccountValue,
@@ -848,6 +849,8 @@ impl MangoClient {
     //
     // Perps
     //
+
+    #[allow(clippy::too_many_arguments)]
     pub fn perp_place_order_instruction(
         &self,
         account: &MangoAccountValue,
@@ -907,6 +910,7 @@ impl MangoClient {
         Ok(ix)
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub async fn perp_place_order(
         &self,
         market_index: PerpMarketIndex,
