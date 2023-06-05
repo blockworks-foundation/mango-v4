@@ -9,7 +9,7 @@ use crate::state::*;
 
 use crate::accounts_ix::*;
 use crate::logs::{
-    LoanOriginationFeeInstructionV2, TokenBalanceLog, TokenLiqBankruptcyLog, WithdrawLoanLog,
+    LoanOriginationFeeInstruction, TokenBalanceLog, TokenLiqBankruptcyLog, WithdrawLoanLog,
 };
 
 pub fn token_liq_bankruptcy(
@@ -178,7 +178,7 @@ pub fn token_liq_bankruptcy(
                     token_index: liab_token_index,
                     loan_amount: liqor_liab_withdraw_result.loan_amount.to_bits(),
                     loan_origination_fee: liqor_liab_withdraw_result.loan_origination_fee.to_bits(),
-                    instruction: LoanOriginationFeeInstructionV2::LiqTokenBankruptcy
+                    instruction: LoanOriginationFeeInstruction::LiqTokenBankruptcy
                 });
             }
 

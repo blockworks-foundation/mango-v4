@@ -9,7 +9,7 @@ use crate::state::*;
 use super::{apply_settle_changes, OpenOrdersAmounts, OpenOrdersSlim};
 use crate::accounts_ix::*;
 use crate::logs::Serum3OpenOrdersBalanceLogV2;
-use crate::logs::{LoanOriginationFeeInstructionV2, WithdrawLoanLog};
+use crate::logs::{LoanOriginationFeeInstruction, WithdrawLoanLog};
 
 /// Settling means moving free funds from the serum3 open orders account
 /// back into the mango account wallet.
@@ -183,7 +183,7 @@ pub fn charge_loan_origination_fees(
             token_index: base_bank.token_index,
             loan_amount: withdraw_result.loan_amount.to_bits(),
             loan_origination_fee: withdraw_result.loan_origination_fee.to_bits(),
-            instruction: LoanOriginationFeeInstructionV2::Serum3SettleFunds,
+            instruction: LoanOriginationFeeInstruction::Serum3SettleFunds,
         });
     }
 
@@ -212,7 +212,7 @@ pub fn charge_loan_origination_fees(
             token_index: quote_bank.token_index,
             loan_amount: withdraw_result.loan_amount.to_bits(),
             loan_origination_fee: withdraw_result.loan_origination_fee.to_bits(),
-            instruction: LoanOriginationFeeInstructionV2::Serum3SettleFunds,
+            instruction: LoanOriginationFeeInstruction::Serum3SettleFunds,
         });
     }
 

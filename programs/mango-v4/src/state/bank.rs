@@ -495,7 +495,7 @@ impl Bank {
                     self.indexed_deposits -= position.indexed_position;
                     position.indexed_position = I80F48::ZERO;
                     return Ok(WithdrawResult {
-                        position_is_active: true,
+                        position_is_active: false,
                         loan_origination_fee: I80F48::ZERO,
                         loan_amount: I80F48::ZERO,
                     });
@@ -565,7 +565,8 @@ impl Bank {
         Ok(WithdrawResult {
             position_is_active,
             loan_origination_fee,
-            loan_amount: already_borrowed_native_amount,
+            // To avoid double counting of loans return loan_amount of 0 here (as the loan_amount has already been returned earlier with loan_origination_fee == 0)
+            loan_amount: I80F48::ZERO,
         })
     }
 

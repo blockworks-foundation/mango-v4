@@ -7,7 +7,7 @@ use anchor_spl::token;
 use fixed::types::I80F48;
 
 use crate::accounts_ix::*;
-use crate::logs::{LoanOriginationFeeInstructionV2, TokenBalanceLog, WithdrawLoanLog, WithdrawLog};
+use crate::logs::{LoanOriginationFeeInstruction, TokenBalanceLog, WithdrawLoanLog, WithdrawLog};
 
 pub fn token_withdraw(ctx: Context<TokenWithdraw>, amount: u64, allow_borrow: bool) -> Result<()> {
     require_msg!(amount > 0, "withdraw amount must be positive");
@@ -134,7 +134,7 @@ pub fn token_withdraw(ctx: Context<TokenWithdraw>, amount: u64, allow_borrow: bo
             token_index,
             loan_amount: withdraw_result.loan_amount.to_bits(),
             loan_origination_fee: withdraw_result.loan_origination_fee.to_bits(),
-            instruction: LoanOriginationFeeInstructionV2::TokenWithdraw,
+            instruction: LoanOriginationFeeInstruction::TokenWithdraw,
         });
     }
 

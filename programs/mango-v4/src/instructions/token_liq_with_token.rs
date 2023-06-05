@@ -5,7 +5,7 @@ use crate::accounts_ix::*;
 use crate::error::*;
 use crate::health::*;
 use crate::logs::{
-    LoanOriginationFeeInstructionV2, TokenBalanceLog, TokenLiqWithTokenLog, WithdrawLoanLog,
+    LoanOriginationFeeInstruction, TokenBalanceLog, TokenLiqWithTokenLog, WithdrawLoanLog,
 };
 use crate::state::*;
 
@@ -298,7 +298,7 @@ pub(crate) fn liquidation_action(
             token_index: liab_token_index,
             loan_amount: liqor_liab_withdraw_result.loan_amount.to_bits(),
             loan_origination_fee: liqor_liab_withdraw_result.loan_origination_fee.to_bits(),
-            instruction: LoanOriginationFeeInstructionV2::LiqTokenWithToken
+            instruction: LoanOriginationFeeInstruction::LiqTokenWithToken
         });
     }
 

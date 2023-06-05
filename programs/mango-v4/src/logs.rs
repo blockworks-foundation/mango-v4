@@ -248,19 +248,6 @@ pub enum LoanOriginationFeeInstruction {
     TokenWithdraw,
 }
 
-#[derive(PartialEq, Copy, Clone, Debug, AnchorSerialize, AnchorDeserialize)]
-#[repr(u8)]
-pub enum LoanOriginationFeeInstructionV2 {
-    Unknown,
-    LiqTokenBankruptcy,
-    LiqTokenWithToken,
-    Serum3LiqForceCancelOrders,
-    Serum3PlaceOrder,
-    Serum3SettleFunds,
-    TokenWithdraw,
-    TokenForceCloseBorrowsWithToken,
-}
-
 #[event]
 pub struct WithdrawLoanOriginationFeeLog {
     pub mango_group: Pubkey,
@@ -277,7 +264,7 @@ pub struct WithdrawLoanLog {
     pub token_index: u16,
     pub loan_amount: i128,
     pub loan_origination_fee: i128,
-    pub instruction: LoanOriginationFeeInstructionV2,
+    pub instruction: LoanOriginationFeeInstruction,
 }
 
 #[event]

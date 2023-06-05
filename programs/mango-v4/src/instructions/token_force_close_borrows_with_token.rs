@@ -1,10 +1,7 @@
 use crate::accounts_ix::*;
 use crate::error::*;
 use crate::health::*;
-use crate::logs::{
-    LoanOriginationFeeInstructionV2, TokenBalanceLog, TokenForceCloseBorrowsWithTokenLog,
-    WithdrawLoanLog,
-};
+use crate::logs::{TokenBalanceLog, TokenForceCloseBorrowsWithTokenLog};
 use crate::state::*;
 use anchor_lang::prelude::*;
 use fixed::types::I80F48;
@@ -177,19 +174,11 @@ pub fn token_force_close_borrows_with_token(
             fee_factor: fee_factor.to_bits(),
         });
 
-        if liqor_liab_withdraw_result
-            .loan_origination_fee
-            .is_positive()
-        {
-            emit!(WithdrawLoanLog {
-                mango_group: ctx.accounts.group.key(),
-                mango_account: ctx.accounts.liqor.key(),
-                token_index: liab_token_index,
-                loan_amount: liqor_liab_withdraw_result.loan_amount.to_bits(),
-                loan_origination_fee: liqor_liab_withdraw_result.loan_origination_fee.to_bits(),
-                instruction: LoanOriginationFeeInstructionV2::TokenForceCloseBorrowsWithToken
-            });
-        }
+        // liqor should never have a borrow
+        require!(
+            liqor_liab_withdraw_result.loan_amount.is_zero(),
+            MangoError::SomeError
+        );
 
         let liqee_health_cache = new_health_cache(&liqee.borrow(), &mut account_retriever)
             .context("create liqee health cache")?;
