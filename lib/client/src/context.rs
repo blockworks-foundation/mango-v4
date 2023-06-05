@@ -35,6 +35,7 @@ impl TokenContext {
     }
 }
 
+#[derive(Clone)]
 pub struct Serum3MarketContext {
     pub address: Pubkey,
     pub market: Serum3Market,
