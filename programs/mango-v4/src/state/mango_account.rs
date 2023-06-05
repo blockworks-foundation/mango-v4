@@ -23,6 +23,7 @@ use super::PerpMarketIndex;
 use super::PerpOpenOrder;
 use super::Serum3MarketIndex;
 use super::TokenIndex;
+use super::TokenStopLoss;
 use super::FREE_ORDER_SLOT;
 use super::{PerpPosition, Serum3Orders, TokenPosition};
 use super::{Side, SideAndOrderTree};
@@ -157,20 +158,35 @@ impl MangoAccount {
         }
     }
 
+    pub fn to_bytes(&self) -> Vec<u8> {
+        let mut b = AnchorSerialize::try_to_vec(&self).unwrap();
+        // TODO: maybe don't do this, the program happily reads accounts without a token_stop_loss size
+        b.extend(&[0u8; 8]);
+        b
+    }
+
     /// Number of bytes needed for the MangoAccount, including the discriminator
     pub fn space(
         token_count: u8,
         serum3_count: u8,
         perp_count: u8,
         perp_oo_count: u8,
+        token_stop_loss_count: u8,
     ) -> Result<usize> {
         require_gte!(16, token_count);
         require_gte!(8, serum3_count);
         require_gte!(8, perp_count);
         require_gte!(64, perp_oo_count);
+        require_gte!(64, token_stop_loss_count);
 
         Ok(8 + size_of::<MangoAccountFixed>()
-            + Self::dynamic_size(token_count, serum3_count, perp_count, perp_oo_count))
+            + Self::dynamic_size(
+                token_count,
+                serum3_count,
+                perp_count,
+                perp_oo_count,
+                token_stop_loss_count,
+            ))
     }
 
     pub fn dynamic_token_vec_offset() -> usize {
@@ -196,7 +212,7 @@ impl MangoAccount {
             + BORSH_VEC_PADDING_BYTES
     }
 
-    pub fn dynamic_size(
+    pub fn dynamic_token_stop_loss_vec_offset(
         token_count: u8,
         serum3_count: u8,
         perp_count: u8,
@@ -204,6 +220,22 @@ impl MangoAccount {
     ) -> usize {
         Self::dynamic_perp_oo_vec_offset(token_count, serum3_count, perp_count)
             + (BORSH_VEC_SIZE_BYTES + size_of::<PerpOpenOrder>() * usize::from(perp_oo_count))
+            + BORSH_VEC_PADDING_BYTES
+    }
+
+    pub fn dynamic_size(
+        token_count: u8,
+        serum3_count: u8,
+        perp_count: u8,
+        perp_oo_count: u8,
+        token_stop_loss_count: u8,
+    ) -> usize {
+        Self::dynamic_token_stop_loss_vec_offset(
+            token_count,
+            serum3_count,
+            perp_count,
+            perp_oo_count,
+        ) + (BORSH_VEC_SIZE_BYTES + size_of::<TokenStopLoss>() * usize::from(token_stop_loss_count))
     }
 }
 
@@ -336,6 +368,7 @@ pub struct MangoAccountDynamicHeader {
     pub serum3_count: u8,
     pub perp_count: u8,
     pub perp_oo_count: u8,
+    pub token_stop_loss_count: u8,
 }
 
 impl DynamicHeader for MangoAccountDynamicHeader {
@@ -372,11 +405,31 @@ impl DynamicHeader for MangoAccountDynamicHeader {
                 ]))
                 .unwrap();
 
+                // TODO: Should we make this header version 2 instead? That breaks backwards compat though!
+                let token_stop_loss_vec_offset = MangoAccount::dynamic_token_stop_loss_vec_offset(
+                    token_count,
+                    serum3_count,
+                    perp_count,
+                    perp_oo_count,
+                );
+                let token_stop_loss_count =
+                    if dynamic_data.len() > token_stop_loss_vec_offset + BORSH_VEC_SIZE_BYTES {
+                        u8::try_from(BorshVecLength::from_le_bytes(*array_ref![
+                            dynamic_data,
+                            token_stop_loss_vec_offset,
+                            BORSH_VEC_SIZE_BYTES
+                        ]))
+                        .unwrap()
+                    } else {
+                        0
+                    };
+
                 Ok(Self {
                     token_count,
                     serum3_count,
                     perp_count,
                     perp_oo_count,
+                    token_stop_loss_count,
                 })
             }
             _ => err!(MangoError::NotImplementedError).context("unexpected header version number"),
@@ -431,6 +484,16 @@ impl MangoAccountDynamicHeader {
             + raw_index * size_of::<PerpOpenOrder>()
     }
 
+    fn token_stop_loss_offset(&self, raw_index: usize) -> usize {
+        MangoAccount::dynamic_token_stop_loss_vec_offset(
+            self.token_count,
+            self.serum3_count,
+            self.perp_count,
+            self.perp_oo_count,
+        ) + BORSH_VEC_SIZE_BYTES
+            + raw_index * size_of::<TokenStopLoss>()
+    }
+
     pub fn token_count(&self) -> usize {
         self.token_count.into()
     }
@@ -442,6 +505,9 @@ impl MangoAccountDynamicHeader {
     }
     pub fn perp_oo_count(&self) -> usize {
         self.perp_oo_count.into()
+    }
+    pub fn token_stop_loss_count(&self) -> usize {
+        self.token_stop_loss_count.into()
     }
 }
 
@@ -1059,54 +1125,41 @@ impl<
         return Ok(CheckLiquidatable::Liquidatable);
     }
 
+    fn write_borsh_vec_length(&mut self, offset: usize, count: u8) {
+        let dst: &mut [u8] = &mut self.dynamic_mut()[offset - BORSH_VEC_SIZE_BYTES..offset];
+        dst.copy_from_slice(&BorshVecLength::from(count).to_le_bytes());
+    }
+
     // writes length of tokens vec at appropriate offset so that borsh can infer the vector length
     // length used is that present in the header
     fn write_token_length(&mut self) {
-        let tokens_offset = self.header().token_offset(0);
-        // msg!(
-        //     "writing tokens length at {}",
-        //     tokens_offset - size_of::<BorshVecLength>()
-        // );
+        let offset = self.header().token_offset(0);
         let count = self.header().token_count;
-        let dst: &mut [u8] =
-            &mut self.dynamic_mut()[tokens_offset - BORSH_VEC_SIZE_BYTES..tokens_offset];
-        dst.copy_from_slice(&BorshVecLength::from(count).to_le_bytes());
+        self.write_borsh_vec_length(offset, count)
     }
 
     fn write_serum3_length(&mut self) {
-        let serum3_offset = self.header().serum3_offset(0);
-        // msg!(
-        //     "writing serum3 length at {}",
-        //     serum3_offset - size_of::<BorshVecLength>()
-        // );
+        let offset = self.header().serum3_offset(0);
         let count = self.header().serum3_count;
-        let dst: &mut [u8] =
-            &mut self.dynamic_mut()[serum3_offset - BORSH_VEC_SIZE_BYTES..serum3_offset];
-        dst.copy_from_slice(&BorshVecLength::from(count).to_le_bytes());
+        self.write_borsh_vec_length(offset, count)
     }
 
     fn write_perp_length(&mut self) {
-        let perp_offset = self.header().perp_offset(0);
-        // msg!(
-        //     "writing perp length at {}",
-        //     perp_offset - size_of::<BorshVecLength>()
-        // );
+        let offset = self.header().perp_offset(0);
         let count = self.header().perp_count;
-        let dst: &mut [u8] =
-            &mut self.dynamic_mut()[perp_offset - BORSH_VEC_SIZE_BYTES..perp_offset];
-        dst.copy_from_slice(&BorshVecLength::from(count).to_le_bytes());
+        self.write_borsh_vec_length(offset, count)
     }
 
     fn write_perp_oo_length(&mut self) {
-        let perp_oo_offset = self.header().perp_oo_offset(0);
-        // msg!(
-        //     "writing perp length at {}",
-        //     perp_offset - size_of::<BorshVecLength>()
-        // );
+        let offset = self.header().perp_oo_offset(0);
         let count = self.header().perp_oo_count;
-        let dst: &mut [u8] =
-            &mut self.dynamic_mut()[perp_oo_offset - BORSH_VEC_SIZE_BYTES..perp_oo_offset];
-        dst.copy_from_slice(&BorshVecLength::from(count).to_le_bytes());
+        self.write_borsh_vec_length(offset, count)
+    }
+
+    fn write_token_stop_loss_length(&mut self) {
+        let offset = self.header().token_stop_loss_offset(0);
+        let count = self.header().token_stop_loss_count;
+        self.write_borsh_vec_length(offset, count)
     }
 
     pub fn expand_dynamic_content(
@@ -1115,11 +1168,16 @@ impl<
         new_serum3_count: u8,
         new_perp_count: u8,
         new_perp_oo_count: u8,
+        new_token_stop_loss_count: u8,
     ) -> Result<()> {
         require_gte!(new_token_count, self.header().token_count);
         require_gte!(new_serum3_count, self.header().serum3_count);
         require_gte!(new_perp_count, self.header().perp_count);
         require_gte!(new_perp_oo_count, self.header().perp_oo_count);
+        require_gte!(
+            new_token_stop_loss_count,
+            self.header().token_stop_loss_count
+        );
 
         // create a temp copy to compute new starting offsets
         let new_header = MangoAccountDynamicHeader {
@@ -1127,11 +1185,27 @@ impl<
             serum3_count: new_serum3_count,
             perp_count: new_perp_count,
             perp_oo_count: new_perp_oo_count,
+            token_stop_loss_count: new_token_stop_loss_count,
         };
         let old_header = self.header().clone();
         let dynamic = self.dynamic_mut();
 
         // expand dynamic components by first moving existing positions, and then setting new ones to defaults
+
+        // token stop loss
+        if old_header.token_stop_loss_count() > 0 {
+            unsafe {
+                sol_memmove(
+                    &mut dynamic[new_header.token_stop_loss_offset(0)],
+                    &mut dynamic[old_header.token_stop_loss_offset(0)],
+                    size_of::<TokenStopLoss>() * old_header.token_stop_loss_count(),
+                );
+            }
+        }
+        for i in old_header.token_stop_loss_count..new_token_stop_loss_count {
+            *get_helper_mut(dynamic, new_header.token_stop_loss_offset(i.into())) =
+                TokenStopLoss::default();
+        }
 
         // perp oo
         if old_header.perp_oo_count() > 0 {
@@ -1198,6 +1272,7 @@ impl<
         self.write_serum3_length();
         self.write_perp_length();
         self.write_perp_oo_length();
+        self.write_token_stop_loss_length();
 
         Ok(())
     }
@@ -1267,7 +1342,7 @@ mod tests {
     use super::*;
 
     fn make_test_account() -> MangoAccountValue {
-        let bytes = AnchorSerialize::try_to_vec(&MangoAccount::default_for_tests()).unwrap();
+        let bytes = MangoAccount::default_for_tests().to_bytes();
         MangoAccountValue::from_bytes(&bytes).unwrap()
     }
 
@@ -1294,10 +1369,10 @@ mod tests {
         account.perps[0].market_index = 9;
         account.perp_open_orders.resize(8, PerpOpenOrder::default());
 
-        let account_bytes = AnchorSerialize::try_to_vec(&account).unwrap();
+        let account_bytes = account.to_bytes();
         assert_eq!(
             8 + account_bytes.len(),
-            MangoAccount::space(8, 8, 8, 8).unwrap()
+            MangoAccount::space(8, 8, 8, 8, 0).unwrap()
         );
 
         let account2 = MangoAccountValue::from_bytes(&account_bytes).unwrap();

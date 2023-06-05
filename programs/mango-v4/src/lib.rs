@@ -271,7 +271,27 @@ pub mod mango_v4 {
         perp_oo_count: u8,
     ) -> Result<()> {
         #[cfg(feature = "enable-gpl")]
-        instructions::account_expand(ctx, token_count, serum3_count, perp_count, perp_oo_count)?;
+        instructions::account_expand(ctx, token_count, serum3_count, perp_count, perp_oo_count, 0)?;
+        Ok(())
+    }
+
+    pub fn account_expand_v2(
+        ctx: Context<AccountExpand>,
+        token_count: u8,
+        serum3_count: u8,
+        perp_count: u8,
+        perp_oo_count: u8,
+        token_stop_loss_count: u8,
+    ) -> Result<()> {
+        #[cfg(feature = "enable-gpl")]
+        instructions::account_expand(
+            ctx,
+            token_count,
+            serum3_count,
+            perp_count,
+            perp_oo_count,
+            token_stop_loss_count,
+        )?;
         Ok(())
     }
 

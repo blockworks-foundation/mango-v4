@@ -5333,6 +5333,10 @@ export type MangoV4 = {
                 "defined": "PerpOpenOrder"
               }
             }
+          },
+          {
+            "name": "padding8",
+            "type": "u32"
           }
         ]
       }
@@ -15294,6 +15298,10 @@ export const IDL: MangoV4 = {
                 "defined": "PerpOpenOrder"
               }
             }
+          },
+          {
+            "name": "padding8",
+            "type": "u32"
           }
         ]
       }
