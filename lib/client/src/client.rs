@@ -702,6 +702,7 @@ impl MangoClient {
         &self,
         account: &MangoAccountValue,
         market_index: Serum3MarketIndex,
+        limit: u8,
     ) -> anyhow::Result<Instruction> {
         let s3 = self.serum3_data_by_market_index(market_index);
         let open_orders = account.serum3_orders(s3.market_index)?.open_orders;
@@ -723,7 +724,9 @@ impl MangoClient {
                 },
                 None,
             ),
-            data: anchor_lang::InstructionData::data(&mango_v4::instruction::Serum3SettleFunds {}),
+            data: anchor_lang::InstructionData::data(
+                &mango_v4::instruction::Serum3CancelAllOrders { limit },
+            ),
         };
 
         Ok(ix)
