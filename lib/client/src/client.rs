@@ -472,8 +472,8 @@ impl MangoClient {
 
         let open_orders = Pubkey::find_program_address(
             &[
-                account_pubkey.as_ref(),
                 b"Serum3OO".as_ref(),
+                account_pubkey.as_ref(),
                 s3.market.address.as_ref(),
             ],
             &mango_v4::ID,
