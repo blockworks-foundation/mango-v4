@@ -28,20 +28,22 @@ pub struct TokenStopLossTrigger<'info> {
     #[account(
         mut,
         has_one = group,
+        // banks are matched to the TokenStopLoss entry at #2
     )]
-    pub a_bank: AccountLoader<'info, Bank>,
+    pub buy_bank: AccountLoader<'info, Bank>,
 
     /// CHECK: The oracle can be one of several different account types and the pubkey is checked above
-    #[account(address = a_bank.load()?.oracle)]
-    pub a_oracle: UncheckedAccount<'info>,
+    #[account(address = buy_bank.load()?.oracle)]
+    pub buy_oracle: UncheckedAccount<'info>,
 
     #[account(
         mut,
         has_one = group,
+        // banks are matched to the TokenStopLoss entry at #2
     )]
-    pub b_bank: AccountLoader<'info, Bank>,
+    pub sell_bank: AccountLoader<'info, Bank>,
 
     /// CHECK: The oracle can be one of several different account types and the pubkey is checked above
-    #[account(address = b_bank.load()?.oracle)]
-    pub b_oracle: UncheckedAccount<'info>,
+    #[account(address = sell_bank.load()?.oracle)]
+    pub sell_oracle: UncheckedAccount<'info>,
 }

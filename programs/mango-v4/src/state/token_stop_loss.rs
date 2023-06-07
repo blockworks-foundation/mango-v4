@@ -78,4 +78,12 @@ impl TokenStopLoss {
     pub fn set_active(&mut self, active: bool) {
         self.is_active = u8::from(active);
     }
+
+    pub fn allow_creating_deposits(&self) -> bool {
+        self.allow_creating_deposits == 1
+    }
+
+    pub fn allow_creating_borrows(&self) -> bool {
+        self.allow_creating_borrows == 1
+    }
 }
