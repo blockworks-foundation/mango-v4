@@ -690,6 +690,24 @@ impl<
         self.fixed().being_liquidated()
     }
 
+    pub fn token_stop_loss_by_index(&self, index: usize) -> &TokenStopLoss {
+        get_helper(self.dynamic(), self.header().token_stop_loss_offset(index))
+    }
+
+    pub fn all_token_stop_loss(&self) -> impl Iterator<Item = &TokenStopLoss> {
+        (0..self.header().token_stop_loss_count()).map(|i| self.token_stop_loss_by_index(i))
+    }
+
+    pub fn active_token_stop_loss(&self) -> impl Iterator<Item = &TokenStopLoss> {
+        self.all_token_stop_loss().filter(|p| p.is_active())
+    }
+
+    pub fn token_stop_loss_free_index(&self) -> Result<usize> {
+        self.all_token_stop_loss()
+            .position(|&v| !v.is_active())
+            .ok_or_else(|| error_msg!("no free token stop loss index"))
+    }
+
     pub fn borrow(&self) -> MangoAccountRef {
         MangoAccountRef {
             header: self.header(),
@@ -1063,6 +1081,18 @@ impl<
 
         pa.taker_volume += quote_change_native.abs().to_num::<u64>();
 
+        Ok(())
+    }
+
+    pub fn token_stop_loss_mut_by_index(&mut self, index: usize) -> &mut TokenStopLoss {
+        let offset = self.header().token_stop_loss_offset(index);
+        get_helper_mut(self.dynamic_mut(), offset)
+    }
+
+    pub fn add_token_stop_loss(&mut self) -> Result<()> {
+        let index = self.token_stop_loss_free_index()?;
+        let tsl = self.token_stop_loss_mut_by_index(index);
+        tsl.set_active(true);
         Ok(())
     }
 
