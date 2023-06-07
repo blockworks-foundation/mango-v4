@@ -492,7 +492,7 @@ impl MangoClient {
         let s3 = self.context.serum3(market_index);
         let base = self.context.serum3_base_token(market_index);
         let quote = self.context.serum3_quote_token(market_index);
-        let open_orders = account.serum3_orders(market_index).unwrap().open_orders;
+        let open_orders = account.serum3_orders(market_index).expect("oo is created").open_orders;
 
         let health_check_metas = self.context.derive_health_check_remaining_account_metas(
             account,
