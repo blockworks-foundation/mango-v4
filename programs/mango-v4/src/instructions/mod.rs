@@ -54,6 +54,8 @@ pub use token_liq_bankruptcy::*;
 pub use token_liq_with_token::*;
 pub use token_register::*;
 pub use token_register_trustless::*;
+pub use token_stop_loss_create::*;
+pub use token_stop_loss_trigger::*;
 pub use token_update_index_and_rate::*;
 pub use token_withdraw::*;
 
@@ -113,5 +115,7 @@ mod token_liq_bankruptcy;
 mod token_liq_with_token;
 mod token_register;
 mod token_register_trustless;
+mod token_stop_loss_create;
+mod token_stop_loss_trigger;
 mod token_update_index_and_rate;
 mod token_withdraw;
