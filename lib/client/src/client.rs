@@ -515,8 +515,9 @@ impl MangoClient {
         account: &MangoAccountValue,
         market_index: Serum3MarketIndex,
         side: Serum3Side,
-        price: f64,
-        size: f64,
+        limit_price: u64,
+        max_base_qty: u64,
+        max_native_quote_qty_including_fees: u64,
         self_trade_behavior: Serum3SelfTradeBehavior,
         order_type: Serum3OrderType,
         client_order_id: u64,
@@ -532,62 +533,6 @@ impl MangoClient {
             vec![],
         )?;
 
-        // https://github.com/project-serum/serum-ts/blob/master/packages/serum/src/market.ts#L1306
-        let limit_price = {
-            (price * ((10u64.pow(s3.quote.decimals as u32) * s3.market.coin_lot_size) as f64))
-                as u64
-                / (10u64.pow(s3.base.decimals as u32) * s3.market.pc_lot_size)
-        };
-        // https://github.com/project-serum/serum-ts/blob/master/packages/serum/src/market.ts#L1333
-        let max_base_qty =
-            { (size * 10u64.pow(s3.base.decimals as u32) as f64) as u64 / s3.market.coin_lot_size };
-        let max_native_quote_qty_including_fees = {
-            fn get_fee_tier(msrm_balance: u64, srm_balance: u64) -> u64 {
-                if msrm_balance >= 1 {
-                    6
-                } else if srm_balance >= 1_000_000 {
-                    5
-                } else if srm_balance >= 100_000 {
-                    4
-                } else if srm_balance >= 10_000 {
-                    3
-                } else if srm_balance >= 1_000 {
-                    2
-                } else if srm_balance >= 100 {
-                    1
-                } else {
-                    0
-                }
-            }
-
-            fn get_fee_rates(fee_tier: u64) -> (f64, f64) {
-                if fee_tier == 1 {
-                    // SRM2
-                    return (0.002, -0.0003);
-                } else if fee_tier == 2 {
-                    // SRM3
-                    return (0.0018, -0.0003);
-                } else if fee_tier == 3 {
-                    // SRM4
-                    return (0.0016, -0.0003);
-                } else if fee_tier == 4 {
-                    // SRM5
-                    return (0.0014, -0.0003);
-                } else if fee_tier == 5 {
-                    // SRM6
-                    return (0.0012, -0.0003);
-                } else if fee_tier == 6 {
-                    // MSRM
-                    return (0.001, -0.0005);
-                }
-                // Base
-                (0.0022, -0.0003)
-            }
-
-            let fee_tier = get_fee_tier(0, 0);
-            let rates = get_fee_rates(fee_tier);
-            (s3.market.pc_lot_size as f64 * (1f64 + rates.0)) as u64 * (limit_price * max_base_qty)
-        };
         let payer_mint_info = match side {
             Serum3Side::Bid => s3.quote.mint_info,
             Serum3Side::Ask => s3.base.mint_info,
@@ -642,8 +587,9 @@ impl MangoClient {
         &self,
         name: &str,
         side: Serum3Side,
-        price: f64,
-        size: f64,
+        limit_price: u64,
+        max_base_qty: u64,
+        max_native_quote_qty_including_fees: u64,
         self_trade_behavior: Serum3SelfTradeBehavior,
         order_type: Serum3OrderType,
         client_order_id: u64,
@@ -655,8 +601,9 @@ impl MangoClient {
             &account,
             market_index,
             side,
-            price,
-            size,
+            limit_price,
+            max_base_qty,
+            max_native_quote_qty_including_fees,
             self_trade_behavior,
             order_type,
             client_order_id,
