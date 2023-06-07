@@ -157,19 +157,8 @@ pub async fn loop_blocking_orders(
         .unwrap();
     log::info!("Cancelled orders - {:?} for {}", orders, market_name);
 
-    let market_index = mango_client
-        .context
-        .serum3_market_indexes_by_name
-        .get(&market_name)
-        .unwrap()
-        .clone();
-
-    let s3 = mango_client
-        .context
-        .serum3_markets
-        .get(&market_index)
-        .unwrap()
-        .clone();
+    let market_index = mango_client.context.serum3_market_index(&market_name);
+    let s3 = mango_client.context.serum3(market_index);
 
     let base_decimals = mango_client
         .context
@@ -220,7 +209,6 @@ pub async fn loop_blocking_orders(
             let ask_price_lots =
                 ask_price * 10f64.powi(quote_decimals - base_decimals) * s3.coin_lot_size as f64
                     / s3.pc_lot_size as f64;
-            // let ask_quote_qty_including_fees =
 
             let res = client
                 .serum3_place_order(
