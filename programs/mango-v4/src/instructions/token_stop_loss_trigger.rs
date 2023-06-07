@@ -4,7 +4,7 @@ use fixed::types::I80F48;
 use crate::accounts_ix::*;
 use crate::accounts_zerocopy::*;
 use crate::error::*;
-use crate::health::{new_fixed_order_account_retriever, new_health_cache};
+use crate::health::*;
 use crate::state::*;
 
 #[allow(clippy::too_many_arguments)]
@@ -17,17 +17,31 @@ pub fn token_stop_loss_trigger(
 ) -> Result<()> {
     let token_stop_loss_index: usize = token_stop_loss_index.into();
 
+    let group_pk = &ctx.accounts.group.key();
+    let liqee_key = ctx.accounts.liqee.key();
+    let liqor_key = ctx.accounts.liqor.key();
+    require_keys_neq!(liqee_key, liqor_key);
+
     let mut liqor = ctx.accounts.liqor.load_full_mut()?;
     // account constraint #1
     require!(
         liqor.fixed.is_owner_or_delegate(ctx.accounts.owner.key()),
         MangoError::SomeError
     );
+    require_msg_typed!(
+        !liqor.fixed.being_liquidated(),
+        MangoError::BeingLiquidated,
+        "liqor account"
+    );
 
-    let mut buy_bank = ctx.accounts.buy_bank.load_mut()?;
-    let mut sell_bank = ctx.accounts.sell_bank.load_mut()?;
+    let mut account_retriever = ScanningAccountRetriever::new(ctx.remaining_accounts, group_pk)
+        .context("create account retriever")?;
 
     let mut liqee = ctx.accounts.liqee.load_full_mut()?;
+    let mut liqee_health_cache = new_health_cache(&liqee.borrow(), &account_retriever)
+        .context("create liqee health cache")?;
+    let liqee_pre_init_health = liqee.check_health_pre(&liqee_health_cache)?;
+
     let tsl = liqee
         .token_stop_loss_by_index(token_stop_loss_index)
         .clone();
@@ -39,20 +53,10 @@ pub fn token_stop_loss_trigger(
         return Ok(());
     }
 
-    // account constraint #2
-    require_eq!(tsl.buy_token_index, buy_bank.token_index);
-    require_eq!(tsl.sell_token_index, sell_bank.token_index);
+    let (buy_bank, buy_token_price, sell_bank_and_oracle_opt) =
+        account_retriever.banks_mut_and_oracles(tsl.buy_token_index, tsl.sell_token_index)?;
+    let (sell_bank, sell_token_price) = sell_bank_and_oracle_opt.unwrap();
 
-    let now_ts: u64 = Clock::get().unwrap().unix_timestamp.try_into().unwrap();
-    let now_slot = Clock::get().unwrap().slot;
-    let buy_token_price = buy_bank.oracle_price(
-        &AccountInfoRef::borrow(&ctx.accounts.buy_oracle)?,
-        Some(now_slot),
-    )?;
-    let sell_token_price = sell_bank.oracle_price(
-        &AccountInfoRef::borrow(&ctx.accounts.sell_oracle)?,
-        Some(now_slot),
-    )?;
     // amount of sell token native per buy token native
     let price = buy_token_price / sell_token_price;
 
@@ -111,6 +115,8 @@ pub fn token_stop_loss_trigger(
     }
 
     // do the token transfer between liqee and liqor
+    let now_ts: u64 = Clock::get().unwrap().unix_timestamp.try_into().unwrap();
+
     let (liqee_buy_token, liqee_buy_raw_index) = liqee.token_position_mut(tsl.buy_token_index)?;
     let (liqor_buy_token, liqor_buy_raw_index, _) =
         liqor.ensure_token_position(tsl.buy_token_index)?;
@@ -129,8 +135,6 @@ pub fn token_stop_loss_trigger(
         sell_bank.withdraw_with_fee(liqee_sell_token, I80F48::from(sell_token_amount), now_ts)?;
 
     // With a scanning account retriever, it's safe to deactivate inactive token positions immediately
-    let liqee_key = ctx.accounts.liqee.key();
-    let liqor_key = ctx.accounts.liqor.key();
     if !liqee_buy_active {
         liqee.deactivate_token_position_and_log(liqee_buy_raw_index, liqee_key);
     }
@@ -144,8 +148,12 @@ pub fn token_stop_loss_trigger(
         liqor.deactivate_token_position_and_log(liqor_sell_raw_index, liqor_key)
     }
 
-    // TODO: check liqee health (also need to compute pre-health, so we can allow improving)
-    // TODO: check liqor health (let's just be strict and only check init >= 0)
+    // TODO: adjust token balances
+    liqee.check_health_post(&liqee_health_cache, liqee_pre_init_health)?;
+
+    let liqor_health = compute_health(&liqor.borrow(), HealthType::Init, &account_retriever)
+        .context("compute liqor health")?;
+    require!(liqor_health >= 0, MangoError::HealthMustBePositive);
 
     // record amount
     let tsl = liqee.token_stop_loss_mut_by_index(token_stop_loss_index);
