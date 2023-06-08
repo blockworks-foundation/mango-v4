@@ -1,7 +1,6 @@
 use anchor_lang::prelude::*;
 
 use derivative::Derivative;
-use fixed::types::I80F48;
 use num_enum::{IntoPrimitive, TryFromPrimitive};
 use static_assertions::const_assert_eq;
 use std::mem::size_of;
@@ -57,6 +56,8 @@ pub struct TokenStopLoss {
     /// may token selling create borrows? (often users just want to get out of a long)
     pub allow_creating_borrows: u8,
 
+    // TODO: these should probably have some kind of id, so it's easy to refer to them
+    //       and clearer when one got cancelled and replaced
     #[derivative(Debug = "ignore")]
     pub reserved: [u8; 136],
 }

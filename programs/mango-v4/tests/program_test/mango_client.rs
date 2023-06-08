@@ -1728,6 +1728,7 @@ impl ClientInstruction for AccountCreateInstruction {
     }
 }
 
+#[derive(Default)]
 pub struct AccountExpandInstruction {
     pub account_num: u32,
     pub group: Pubkey,
@@ -1737,21 +1738,23 @@ pub struct AccountExpandInstruction {
     pub serum3_count: u8,
     pub perp_count: u8,
     pub perp_oo_count: u8,
+    pub token_stop_loss_count: u8,
 }
 #[async_trait::async_trait(?Send)]
 impl ClientInstruction for AccountExpandInstruction {
     type Accounts = mango_v4::accounts::AccountExpand;
-    type Instruction = mango_v4::instruction::AccountExpand;
+    type Instruction = mango_v4::instruction::AccountExpandV2;
     async fn to_instruction(
         &self,
         _account_loader: impl ClientAccountLoader + 'async_trait,
     ) -> (Self::Accounts, instruction::Instruction) {
         let program_id = mango_v4::id();
-        let instruction = mango_v4::instruction::AccountExpand {
+        let instruction = Self::Instruction {
             token_count: self.token_count,
             serum3_count: self.serum3_count,
             perp_count: self.perp_count,
             perp_oo_count: self.perp_oo_count,
+            token_stop_loss_count: self.token_stop_loss_count,
         };
 
         let account = Pubkey::find_program_address(
@@ -4199,5 +4202,99 @@ impl ClientInstruction for AltExtendInstruction {
 
     fn signers(&self) -> Vec<TestKeypair> {
         vec![self.admin, self.payer]
+    }
+}
+
+#[derive(Clone)]
+pub struct TokenStopLossCreateInstruction {
+    pub account: Pubkey,
+    pub owner: TestKeypair,
+    pub buy_token_index: TokenIndex,
+    pub sell_token_index: TokenIndex,
+    pub max_buy: u64,
+    pub max_sell: u64,
+    pub price_threshold: f32,
+    pub price_threshold_type: TokenStopLossPriceThresholdType,
+    pub price_premium_bps: u32,
+    pub allow_creating_deposits: bool,
+    pub allow_creating_borrows: bool,
+}
+#[async_trait::async_trait(?Send)]
+impl ClientInstruction for TokenStopLossCreateInstruction {
+    type Accounts = mango_v4::accounts::AccountAndAuthority;
+    type Instruction = mango_v4::instruction::TokenStopLossCreate;
+    async fn to_instruction(
+        &self,
+        account_loader: impl ClientAccountLoader + 'async_trait,
+    ) -> (Self::Accounts, instruction::Instruction) {
+        let program_id = mango_v4::id();
+        let instruction = Self::Instruction {
+            buy_token_index: self.buy_token_index,
+            sell_token_index: self.sell_token_index,
+            max_buy: self.max_buy,
+            max_sell: self.max_sell,
+            price_threshold: self.price_threshold,
+            price_threshold_type: self.price_threshold_type,
+            price_premium_bps: self.price_premium_bps,
+            allow_creating_deposits: self.allow_creating_deposits,
+            allow_creating_borrows: self.allow_creating_borrows,
+        };
+
+        let account = account_loader
+            .load_mango_account(&self.account)
+            .await
+            .unwrap();
+
+        let accounts = Self::Accounts {
+            group: account.fixed.group,
+            account: self.account,
+            authority: self.owner.pubkey(),
+        };
+
+        let instruction = make_instruction(program_id, &accounts, &instruction);
+        (accounts, instruction)
+    }
+
+    fn signers(&self) -> Vec<TestKeypair> {
+        vec![self.owner]
+    }
+}
+
+#[derive(Clone)]
+pub struct TokenStopLossCancelInstruction {
+    pub account: Pubkey,
+    pub owner: TestKeypair,
+    pub index: u8,
+}
+#[async_trait::async_trait(?Send)]
+impl ClientInstruction for TokenStopLossCancelInstruction {
+    type Accounts = mango_v4::accounts::AccountAndAuthority;
+    type Instruction = mango_v4::instruction::TokenStopLossCancel;
+    async fn to_instruction(
+        &self,
+        account_loader: impl ClientAccountLoader + 'async_trait,
+    ) -> (Self::Accounts, instruction::Instruction) {
+        let program_id = mango_v4::id();
+        let instruction = Self::Instruction {
+            token_stop_loss_index: self.index,
+        };
+
+        let account = account_loader
+            .load_mango_account(&self.account)
+            .await
+            .unwrap();
+
+        let accounts = Self::Accounts {
+            group: account.fixed.group,
+            account: self.account,
+            authority: self.owner.pubkey(),
+        };
+
+        let instruction = make_instruction(program_id, &accounts, &instruction);
+        (accounts, instruction)
+    }
+
+    fn signers(&self) -> Vec<TestKeypair> {
+        vec![self.owner]
     }
 }

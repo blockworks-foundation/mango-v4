@@ -2,7 +2,6 @@ use anchor_lang::prelude::*;
 use fixed::types::I80F48;
 
 use crate::accounts_ix::*;
-use crate::accounts_zerocopy::*;
 use crate::error::*;
 use crate::health::*;
 use crate::state::*;
