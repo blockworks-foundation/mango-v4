@@ -55,7 +55,7 @@ pub fn token_stop_loss_trigger(
     let (sell_bank, sell_token_price) = sell_bank_and_oracle_opt.unwrap();
 
     // amount of sell token native per buy token native
-    let price = buy_token_price / sell_token_price;
+    let price: f32 = (buy_token_price.to_num::<f64>() / sell_token_price.to_num::<f64>()) as f32;
     match tsl.price_threshold_type() {
         TokenStopLossPriceThresholdType::PriceUnderThreshold => {
             require_gt!(tsl.price_threshold, price);
@@ -78,7 +78,8 @@ pub fn token_stop_loss_trigger(
         .native(&sell_bank);
 
     // derive trade amount based on limits in the tsl and by the liqor
-    let premium_price = price * (I80F48::from(tsl.price_premium) * I80F48::from_num(0.0001));
+    let premium_price = price * (1.0 + (tsl.price_premium as f32) * 0.0001);
+    let premium_price_i80f48 = I80F48::from_num(premium_price);
     // TODO: is it ok for these to be in u64? Otherwise a bunch of fields on the tsl would need to be I80F48 too...
     let buy_token_amount;
     let sell_token_amount;
@@ -93,7 +94,7 @@ pub fn token_stop_loss_trigger(
                     .to_num::<u64>(),
             );
         }
-        let sell_for_buy = (I80F48::from(initial_buy) * premium_price)
+        let sell_for_buy = (I80F48::from(initial_buy) * premium_price_i80f48)
             .ceil() // in doubt, increase the liqee's cost slightly
             .to_num::<u64>();
 
@@ -108,7 +109,7 @@ pub fn token_stop_loss_trigger(
                     .to_num::<u64>(),
             );
         }
-        let buy_for_sell = (I80F48::from(initial_sell) / premium_price)
+        let buy_for_sell = (I80F48::from(initial_sell) / premium_price_i80f48)
             .floor() // decreases the amount the liqee would get
             .to_num::<u64>();
 

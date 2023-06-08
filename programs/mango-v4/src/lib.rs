@@ -1132,7 +1132,13 @@ pub mod mango_v4 {
         Ok(())
     }
 
-    pub fn token_stop_loss_create(ctx: Context<AccountAndAuthority>) -> Result<()> {
+    pub fn token_stop_loss_create(
+        ctx: Context<AccountAndAuthority>,
+        buy_token_index: TokenIndex,
+        sell_token_index: TokenIndex,
+        max_buy: u64,
+        max_sell: u64,
+    ) -> Result<()> {
         #[cfg(feature = "enable-gpl")]
         instructions::token_stop_loss_create(ctx)?;
         Ok(())

@@ -38,7 +38,7 @@ pub struct TokenStopLoss {
     pub sold: u64,
 
     /// the threshold at which to allow execution
-    pub price_threshold: I80F48,
+    pub price_threshold: f32,
 
     /// the premium to pay over oracle price, in bps
     pub price_premium: u32,
@@ -58,12 +58,12 @@ pub struct TokenStopLoss {
     pub allow_creating_borrows: u8,
 
     #[derivative(Debug = "ignore")]
-    pub reserved: [u8; 124],
+    pub reserved: [u8; 136],
 }
 
 const_assert_eq!(
     size_of::<TokenStopLoss>(),
-    8 * 4 + 16 + 4 + 2 * 2 + 1 * 4 + 124
+    8 * 4 + 4 + 4 + 2 * 2 + 1 * 4 + 136
 );
 const_assert_eq!(size_of::<TokenStopLoss>(), 184);
 const_assert_eq!(size_of::<TokenStopLoss>() % 8, 0);
@@ -75,7 +75,7 @@ impl Default for TokenStopLoss {
             max_sell: 0,
             bought: 0,
             sold: 0,
-            price_threshold: I80F48::ZERO,
+            price_threshold: 0.0,
             price_premium: 0,
             buy_token_index: TokenIndex::MAX,
             sell_token_index: TokenIndex::MAX,
@@ -83,7 +83,7 @@ impl Default for TokenStopLoss {
             is_active: 0,
             allow_creating_borrows: 0,
             allow_creating_deposits: 0,
-            reserved: [0; 124],
+            reserved: [0; 136],
         }
     }
 }
