@@ -2,10 +2,28 @@ use anchor_lang::prelude::*;
 
 use derivative::Derivative;
 use fixed::types::I80F48;
+use num_enum::{IntoPrimitive, TryFromPrimitive};
 use static_assertions::const_assert_eq;
 use std::mem::size_of;
 
 use crate::state::*;
+
+#[derive(
+    Eq,
+    PartialEq,
+    Copy,
+    Clone,
+    TryFromPrimitive,
+    IntoPrimitive,
+    Debug,
+    AnchorSerialize,
+    AnchorDeserialize,
+)]
+#[repr(u8)]
+pub enum TokenStopLossPriceThresholdType {
+    PriceOverThreshold,
+    PriceUnderThreshold,
+}
 
 #[zero_copy]
 #[derive(AnchorDeserialize, AnchorSerialize, Derivative, bytemuck::Pod)]
@@ -29,8 +47,8 @@ pub struct TokenStopLoss {
     pub buy_token_index: TokenIndex,
     pub sell_token_index: TokenIndex,
 
-    /// whether the price threshold is >= or <=
-    pub price_threshold_side: u8,
+    /// holds a TokenStopLossPriceThresholdType, so whether the threshold is > or <
+    pub price_threshold_type: u8,
 
     pub is_active: u8,
 
@@ -61,7 +79,7 @@ impl Default for TokenStopLoss {
             price_premium: 0,
             buy_token_index: TokenIndex::MAX,
             sell_token_index: TokenIndex::MAX,
-            price_threshold_side: 0,
+            price_threshold_type: TokenStopLossPriceThresholdType::PriceOverThreshold.into(),
             is_active: 0,
             allow_creating_borrows: 0,
             allow_creating_deposits: 0,
@@ -85,5 +103,9 @@ impl TokenStopLoss {
 
     pub fn allow_creating_borrows(&self) -> bool {
         self.allow_creating_borrows == 1
+    }
+
+    pub fn price_threshold_type(&self) -> TokenStopLossPriceThresholdType {
+        TokenStopLossPriceThresholdType::try_from(self.price_threshold_type).unwrap()
     }
 }

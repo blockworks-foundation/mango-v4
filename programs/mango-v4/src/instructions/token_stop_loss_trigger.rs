@@ -13,7 +13,6 @@ pub fn token_stop_loss_trigger(
     token_stop_loss_index: usize,
     liqor_max_buy_token_to_give: u64,
     liqor_max_sell_token_to_receive: u64,
-    // TODO: somehow pass max, maybe on both sides?
 ) -> Result<()> {
     let group_pk = &ctx.accounts.group.key();
     let liqee_key = ctx.accounts.liqee.key();
@@ -57,9 +56,14 @@ pub fn token_stop_loss_trigger(
 
     // amount of sell token native per buy token native
     let price = buy_token_price / sell_token_price;
-
-    // TODO: more work on conditions, use price_threshold_side etc
-    require_gte!(price, tsl.price_threshold);
+    match tsl.price_threshold_type() {
+        TokenStopLossPriceThresholdType::PriceUnderThreshold => {
+            require_gt!(tsl.price_threshold, price);
+        }
+        TokenStopLossPriceThresholdType::PriceOverThreshold => {
+            require_gt!(price, tsl.price_threshold);
+        }
+    }
 
     // NOTE: can we just leave computing the max-swap amount to the caller? we just do health checks in the end?
     // that would make this simple and obviously safe
