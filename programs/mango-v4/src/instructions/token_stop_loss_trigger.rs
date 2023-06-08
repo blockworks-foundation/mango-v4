@@ -68,11 +68,11 @@ pub fn token_stop_loss_trigger(
     // NOTE: can we just leave computing the max-swap amount to the caller? we just do health checks in the end?
     // that would make this simple and obviously safe
 
-    let initial_liqee_buy_token = liqee
+    let pre_liqee_buy_token = liqee
         .ensure_token_position(tsl.buy_token_index)?
         .0
         .native(&buy_bank);
-    let initial_liqee_sell_token = liqee
+    let pre_liqee_sell_token = liqee
         .ensure_token_position(tsl.sell_token_index)?
         .0
         .native(&sell_bank);
@@ -87,7 +87,7 @@ pub fn token_stop_loss_trigger(
         if !tsl.allow_creating_deposits() {
             // ceil, because we want to end in the 0..1 native token range, so the position can be closed
             initial_buy = initial_buy.min(
-                (-initial_liqee_buy_token)
+                (-pre_liqee_buy_token)
                     .max(I80F48::ZERO)
                     .ceil()
                     .to_num::<u64>(),
@@ -102,7 +102,7 @@ pub fn token_stop_loss_trigger(
             .min(sell_for_buy);
         if !tsl.allow_creating_borrows() {
             initial_sell = initial_sell.min(
-                initial_liqee_sell_token
+                pre_liqee_sell_token
                     .max(I80F48::ZERO)
                     .floor()
                     .to_num::<u64>(),
@@ -118,23 +118,26 @@ pub fn token_stop_loss_trigger(
 
     // do the token transfer between liqee and liqor
     let now_ts: u64 = Clock::get().unwrap().unix_timestamp.try_into().unwrap();
+    let buy_token_amount_i80f48 = I80F48::from(buy_token_amount);
+    let sell_token_amount_i80f48 = I80F48::from(sell_token_amount);
 
     let (liqee_buy_token, liqee_buy_raw_index) = liqee.token_position_mut(tsl.buy_token_index)?;
     let (liqor_buy_token, liqor_buy_raw_index, _) =
         liqor.ensure_token_position(tsl.buy_token_index)?;
-    let liqee_buy_active =
-        buy_bank.deposit(liqee_buy_token, I80F48::from(buy_token_amount), now_ts)?;
+    let liqee_buy_active = buy_bank.deposit(liqee_buy_token, buy_token_amount_i80f48, now_ts)?;
     let (liqor_buy_active, liqor_buy_loan_origination) =
-        buy_bank.withdraw_with_fee(liqor_buy_token, I80F48::from(buy_token_amount), now_ts)?;
+        buy_bank.withdraw_with_fee(liqor_buy_token, buy_token_amount_i80f48, now_ts)?;
 
     let (liqee_sell_token, liqee_sell_raw_index) =
         liqee.token_position_mut(tsl.sell_token_index)?;
     let (liqor_sell_token, liqor_sell_raw_index, _) =
         liqor.ensure_token_position(tsl.sell_token_index)?;
     let liqor_sell_active =
-        sell_bank.deposit(liqor_sell_token, I80F48::from(sell_token_amount), now_ts)?;
+        sell_bank.deposit(liqor_sell_token, sell_token_amount_i80f48, now_ts)?;
     let (liqee_sell_active, liqee_sell_loan_origination) =
-        sell_bank.withdraw_with_fee(liqee_sell_token, I80F48::from(sell_token_amount), now_ts)?;
+        sell_bank.withdraw_with_fee(liqee_sell_token, sell_token_amount_i80f48, now_ts)?;
+
+    let post_liqee_sell_token = liqee_sell_token.native(&sell_bank);
 
     // With a scanning account retriever, it's safe to deactivate inactive token positions immediately
     if !liqee_buy_active {
@@ -150,7 +153,11 @@ pub fn token_stop_loss_trigger(
         liqor.deactivate_token_position_and_log(liqor_sell_raw_index, liqor_key)
     }
 
-    // TODO: adjust token balances
+    // Check liqee and liqor health after the transaction
+    liqee_health_cache.adjust_token_balance(&buy_bank, buy_token_amount_i80f48)?;
+    // using sell_token_amount_i80f48 here would not account for loan origination fees!
+    liqee_health_cache
+        .adjust_token_balance(&sell_bank, post_liqee_sell_token - pre_liqee_sell_token)?;
     liqee.check_health_post(&liqee_health_cache, liqee_pre_init_health)?;
 
     let liqor_health = compute_health(&liqor.borrow(), HealthType::Init, &account_retriever)
