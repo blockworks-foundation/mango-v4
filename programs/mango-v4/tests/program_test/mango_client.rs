@@ -4298,3 +4298,69 @@ impl ClientInstruction for TokenStopLossCancelInstruction {
         vec![self.owner]
     }
 }
+
+#[derive(Clone)]
+pub struct TokenStopLossTriggerInstruction {
+    pub liqee: Pubkey,
+    pub liqor: Pubkey,
+    pub liqor_owner: TestKeypair,
+    pub token_stop_loss_index: u8,
+    pub max_buy_token_to_give: u64,
+    pub max_sell_token_to_receive: u64,
+}
+#[async_trait::async_trait(?Send)]
+impl ClientInstruction for TokenStopLossTriggerInstruction {
+    type Accounts = mango_v4::accounts::TokenStopLossTrigger;
+    type Instruction = mango_v4::instruction::TokenStopLossTrigger;
+    async fn to_instruction(
+        &self,
+        account_loader: impl ClientAccountLoader + 'async_trait,
+    ) -> (Self::Accounts, instruction::Instruction) {
+        let program_id = mango_v4::id();
+        let instruction = Self::Instruction {
+            token_stop_loss_index: self.token_stop_loss_index,
+            liqor_max_buy_token_to_give: self.max_buy_token_to_give,
+            liqor_max_sell_token_to_receive: self.max_sell_token_to_receive,
+        };
+
+        let liqee = account_loader
+            .load_mango_account(&self.liqee)
+            .await
+            .unwrap();
+        let liqor = account_loader
+            .load_mango_account(&self.liqor)
+            .await
+            .unwrap();
+
+        let tsl = liqee
+            .token_stop_loss_by_index(self.token_stop_loss_index.into())
+            .unwrap()
+            .clone();
+
+        let health_check_metas = derive_liquidation_remaining_account_metas(
+            &account_loader,
+            &liqee,
+            &liqor,
+            tsl.buy_token_index,
+            0,
+            tsl.sell_token_index,
+            0,
+        )
+        .await;
+
+        let accounts = Self::Accounts {
+            group: liqee.fixed.group,
+            liqee: self.liqee,
+            liqor: self.liqor,
+            liqor_authority: self.liqor_owner.pubkey(),
+        };
+
+        let mut instruction = make_instruction(program_id, &accounts, &instruction);
+        instruction.accounts.extend(health_check_metas.into_iter());
+        (accounts, instruction)
+    }
+
+    fn signers(&self) -> Vec<TestKeypair> {
+        vec![self.liqor_owner]
+    }
+}

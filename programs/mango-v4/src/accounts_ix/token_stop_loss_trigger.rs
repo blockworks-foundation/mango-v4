@@ -19,9 +19,9 @@ pub struct TokenStopLossTrigger<'info> {
     #[account(
         mut,
         has_one = group,
-        constraint = liqor.load()?.is_operational() @ MangoError::AccountIsFrozen
-        // owner is checked at #1
+        constraint = liqor.load()?.is_operational() @ MangoError::AccountIsFrozen,
+        constraint = liqor.load()?.is_owner_or_delegate(liqor_authority.key()),
     )]
     pub liqor: AccountLoader<'info, MangoAccountFixed>,
-    pub owner: Signer<'info>,
+    pub liqor_authority: Signer<'info>,
 }

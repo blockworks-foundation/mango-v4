@@ -19,11 +19,6 @@ pub fn token_stop_loss_trigger(
     require_keys_neq!(liqee_key, liqor_key);
 
     let mut liqor = ctx.accounts.liqor.load_full_mut()?;
-    // account constraint #1
-    require!(
-        liqor.fixed.is_owner_or_delegate(ctx.accounts.owner.key()),
-        MangoError::SomeError
-    );
     require_msg_typed!(
         !liqor.fixed.being_liquidated(),
         MangoError::BeingLiquidated,
