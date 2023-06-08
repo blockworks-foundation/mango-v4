@@ -40,8 +40,8 @@ pub struct TokenStopLoss {
     /// the threshold at which to allow execution
     pub price_threshold: f32,
 
-    /// the premium to pay over oracle price, in bps
-    pub price_premium: u32,
+    /// the premium to pay over oracle price
+    pub price_premium_bps: u32,
 
     /// indexes of tokens for the swap
     pub buy_token_index: TokenIndex,
@@ -76,7 +76,7 @@ impl Default for TokenStopLoss {
             bought: 0,
             sold: 0,
             price_threshold: 0.0,
-            price_premium: 0,
+            price_premium_bps: 0,
             buy_token_index: TokenIndex::MAX,
             sell_token_index: TokenIndex::MAX,
             price_threshold_type: TokenStopLossPriceThresholdType::PriceOverThreshold.into(),

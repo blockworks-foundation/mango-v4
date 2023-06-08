@@ -78,7 +78,7 @@ pub fn token_stop_loss_trigger(
         .native(&sell_bank);
 
     // derive trade amount based on limits in the tsl and by the liqor
-    let premium_price = price * (1.0 + (tsl.price_premium as f32) * 0.0001);
+    let premium_price = price * (1.0 + (tsl.price_premium_bps as f32) * 0.0001);
     let premium_price_i80f48 = I80F48::from_num(premium_price);
     // TODO: is it ok for these to be in u64? Otherwise a bunch of fields on the tsl would need to be I80F48 too...
     let buy_token_amount;

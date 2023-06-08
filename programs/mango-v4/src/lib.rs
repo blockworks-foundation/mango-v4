@@ -32,7 +32,7 @@ compile_error!("compiling the program entrypoint without 'enable-gpl' makes no s
 
 use state::{
     OracleConfigParams, PerpMarketIndex, PlaceOrderType, SelfTradeBehavior, Serum3MarketIndex,
-    Side, TokenIndex,
+    Side, TokenIndex, TokenStopLoss, TokenStopLossPriceThresholdType,
 };
 
 declare_id!("4MangoMjqJ2firMokCjjGgoK8d4MXcrgL7XJaL3w6fVg");
@@ -1138,9 +1138,30 @@ pub mod mango_v4 {
         sell_token_index: TokenIndex,
         max_buy: u64,
         max_sell: u64,
+        price_threshold: f32,
+        price_threshold_type: TokenStopLossPriceThresholdType,
+        price_premium_bps: u32,
+        allow_creating_deposits: bool,
+        allow_creating_borrows: bool,
     ) -> Result<()> {
+        let tsl = TokenStopLoss {
+            max_buy,
+            max_sell,
+            bought: 0,
+            sold: 0,
+            price_threshold,
+            price_premium_bps,
+            buy_token_index,
+            sell_token_index,
+            price_threshold_type: price_threshold_type.into(),
+            is_active: 1,
+            allow_creating_deposits: u8::from(allow_creating_deposits),
+            allow_creating_borrows: u8::from(allow_creating_borrows),
+            reserved: [0; 136],
+        };
+
         #[cfg(feature = "enable-gpl")]
-        instructions::token_stop_loss_create(ctx)?;
+        instructions::token_stop_loss_create(ctx, tsl)?;
         Ok(())
     }
 

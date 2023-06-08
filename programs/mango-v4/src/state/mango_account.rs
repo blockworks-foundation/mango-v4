@@ -1099,11 +1099,11 @@ impl<
         Ok(get_helper_mut(self.dynamic_mut(), offset))
     }
 
-    pub fn add_token_stop_loss(&mut self) -> Result<()> {
+    pub fn add_token_stop_loss(&mut self) -> Result<&mut TokenStopLoss> {
         let index = self.token_stop_loss_free_index()?;
         let tsl = self.token_stop_loss_mut_by_index(index)?;
         tsl.set_active(true);
-        Ok(())
+        Ok(tsl)
     }
 
     pub fn check_health_pre(&mut self, health_cache: &HealthCache) -> Result<I80F48> {
