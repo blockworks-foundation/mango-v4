@@ -10,13 +10,11 @@ use crate::state::*;
 #[allow(clippy::too_many_arguments)]
 pub fn token_stop_loss_trigger(
     ctx: Context<TokenStopLossTrigger>,
-    token_stop_loss_index: u8,
+    token_stop_loss_index: usize,
     liqor_max_buy_token_to_give: u64,
     liqor_max_sell_token_to_receive: u64,
     // TODO: somehow pass max, maybe on both sides?
 ) -> Result<()> {
-    let token_stop_loss_index: usize = token_stop_loss_index.into();
-
     let group_pk = &ctx.accounts.group.key();
     let liqee_key = ctx.accounts.liqee.key();
     let liqor_key = ctx.accounts.liqor.key();
@@ -43,12 +41,12 @@ pub fn token_stop_loss_trigger(
     let liqee_pre_init_health = liqee.check_health_pre(&liqee_health_cache)?;
 
     let tsl = liqee
-        .token_stop_loss_by_index(token_stop_loss_index)
+        .token_stop_loss_by_index(token_stop_loss_index)?
         .clone();
     require!(tsl.is_active(), MangoError::SomeError);
     // TODO: this check is purely defensive -- keep?
     if tsl.bought >= tsl.max_buy || tsl.sold >= tsl.max_sell {
-        let tsl = liqee.token_stop_loss_mut_by_index(token_stop_loss_index);
+        let tsl = liqee.token_stop_loss_mut_by_index(token_stop_loss_index)?;
         *tsl = TokenStopLoss::default();
         return Ok(());
     }
@@ -156,7 +154,7 @@ pub fn token_stop_loss_trigger(
     require!(liqor_health >= 0, MangoError::HealthMustBePositive);
 
     // record amount
-    let tsl = liqee.token_stop_loss_mut_by_index(token_stop_loss_index);
+    let tsl = liqee.token_stop_loss_mut_by_index(token_stop_loss_index)?;
     tsl.bought += buy_token_amount;
     tsl.sold += sell_token_amount;
     assert!(tsl.bought <= tsl.max_buy);

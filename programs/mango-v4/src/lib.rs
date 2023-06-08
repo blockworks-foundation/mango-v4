@@ -1132,6 +1132,37 @@ pub mod mango_v4 {
         Ok(())
     }
 
+    pub fn token_stop_loss_create(ctx: Context<AccountAndAuthority>) -> Result<()> {
+        #[cfg(feature = "enable-gpl")]
+        instructions::token_stop_loss_create(ctx)?;
+        Ok(())
+    }
+
+    pub fn token_stop_loss_cancel(
+        ctx: Context<AccountAndAuthority>,
+        token_stop_loss_index: u8,
+    ) -> Result<()> {
+        #[cfg(feature = "enable-gpl")]
+        instructions::token_stop_loss_cancel(ctx, token_stop_loss_index.into())?;
+        Ok(())
+    }
+
+    pub fn token_stop_loss_trigger(
+        ctx: Context<TokenStopLossTrigger>,
+        token_stop_loss_index: u8,
+        liqor_max_buy_token_to_give: u64,
+        liqor_max_sell_token_to_receive: u64,
+    ) -> Result<()> {
+        #[cfg(feature = "enable-gpl")]
+        instructions::token_stop_loss_trigger(
+            ctx,
+            token_stop_loss_index.into(),
+            liqor_max_buy_token_to_give,
+            liqor_max_sell_token_to_receive,
+        )?;
+        Ok(())
+    }
+
     pub fn alt_set(ctx: Context<AltSet>, index: u8) -> Result<()> {
         #[cfg(feature = "enable-gpl")]
         instructions::alt_set(ctx, index)?;

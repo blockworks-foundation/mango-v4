@@ -690,12 +690,20 @@ impl<
         self.fixed().being_liquidated()
     }
 
-    pub fn token_stop_loss_by_index(&self, index: usize) -> &TokenStopLoss {
+    // TODO: for safety, let's do the same for the other raw_index functions
+    fn token_stop_loss_by_index_unchecked(&self, index: usize) -> &TokenStopLoss {
         get_helper(self.dynamic(), self.header().token_stop_loss_offset(index))
     }
 
+    pub fn token_stop_loss_by_index(&self, index: usize) -> Result<&TokenStopLoss> {
+        let count: usize = self.header().token_stop_loss_count.into();
+        require_gt!(count, index);
+        Ok(self.token_stop_loss_by_index_unchecked(index))
+    }
+
     pub fn all_token_stop_loss(&self) -> impl Iterator<Item = &TokenStopLoss> {
-        (0..self.header().token_stop_loss_count()).map(|i| self.token_stop_loss_by_index(i))
+        (0..self.header().token_stop_loss_count())
+            .map(|i| self.token_stop_loss_by_index_unchecked(i))
     }
 
     pub fn active_token_stop_loss(&self) -> impl Iterator<Item = &TokenStopLoss> {
@@ -1084,14 +1092,16 @@ impl<
         Ok(())
     }
 
-    pub fn token_stop_loss_mut_by_index(&mut self, index: usize) -> &mut TokenStopLoss {
+    pub fn token_stop_loss_mut_by_index(&mut self, index: usize) -> Result<&mut TokenStopLoss> {
+        let count: usize = self.header().token_stop_loss_count.into();
+        require_gt!(count, index);
         let offset = self.header().token_stop_loss_offset(index);
-        get_helper_mut(self.dynamic_mut(), offset)
+        Ok(get_helper_mut(self.dynamic_mut(), offset))
     }
 
     pub fn add_token_stop_loss(&mut self) -> Result<()> {
         let index = self.token_stop_loss_free_index()?;
-        let tsl = self.token_stop_loss_mut_by_index(index);
+        let tsl = self.token_stop_loss_mut_by_index(index)?;
         tsl.set_active(true);
         Ok(())
     }
