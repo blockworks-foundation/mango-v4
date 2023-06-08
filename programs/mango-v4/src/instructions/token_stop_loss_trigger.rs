@@ -47,9 +47,53 @@ pub fn token_stop_loss_trigger(
     let (buy_bank, buy_token_price, sell_bank_and_oracle_opt) =
         account_retriever.banks_mut_and_oracles(tsl.buy_token_index, tsl.sell_token_index)?;
     let (sell_bank, sell_token_price) = sell_bank_and_oracle_opt.unwrap();
-
-    // amount of sell token native per buy token native
     let price: f32 = (buy_token_price.to_num::<f64>() / sell_token_price.to_num::<f64>()) as f32;
+
+    let now_ts: u64 = Clock::get().unwrap().unix_timestamp.try_into().unwrap();
+    let (liqee_buy_change, liqee_sell_change) = action(
+        &mut liqor.borrow_mut(),
+        liqor_key,
+        &mut liqee.borrow_mut(),
+        liqee_key,
+        &tsl,
+        token_stop_loss_index,
+        buy_bank,
+        liqor_max_buy_token_to_give,
+        sell_bank,
+        liqor_max_sell_token_to_receive,
+        price,
+        now_ts,
+    )?;
+
+    // TODO: log token positions, loan and origination fee amounts, and the ix
+
+    // Check liqee and liqor health after the transaction
+    liqee_health_cache.adjust_token_balance(&buy_bank, liqee_buy_change)?;
+    liqee_health_cache.adjust_token_balance(&sell_bank, liqee_sell_change)?;
+    liqee.check_health_post(&liqee_health_cache, liqee_pre_init_health)?;
+
+    let liqor_health = compute_health(&liqor.borrow(), HealthType::Init, &account_retriever)
+        .context("compute liqor health")?;
+    require!(liqor_health >= 0, MangoError::HealthMustBePositive);
+
+    Ok(())
+}
+
+fn action(
+    liqor: &mut MangoAccountRefMut,
+    liqor_key: Pubkey,
+    liqee: &mut MangoAccountRefMut,
+    liqee_key: Pubkey,
+    tsl: &TokenStopLoss,
+    token_stop_loss_index: usize,
+    buy_bank: &mut Bank,
+    liqor_max_buy_token_to_give: u64,
+    sell_bank: &mut Bank,
+    liqor_max_sell_token_to_receive: u64,
+    price: f32,
+    now_ts: u64,
+) -> Result<(I80F48, I80F48)> {
+    // amount of sell token native per buy token native
     match tsl.price_threshold_type() {
         TokenStopLossPriceThresholdType::PriceUnderThreshold => {
             require_gt!(tsl.price_threshold, price);
@@ -112,7 +156,6 @@ pub fn token_stop_loss_trigger(
     }
 
     // do the token transfer between liqee and liqor
-    let now_ts: u64 = Clock::get().unwrap().unix_timestamp.try_into().unwrap();
     let buy_token_amount_i80f48 = I80F48::from(buy_token_amount);
     let sell_token_amount_i80f48 = I80F48::from(sell_token_amount);
 
@@ -148,31 +191,31 @@ pub fn token_stop_loss_trigger(
         liqor.deactivate_token_position_and_log(liqor_sell_raw_index, liqor_key)
     }
 
-    // Check liqee and liqor health after the transaction
-    liqee_health_cache.adjust_token_balance(&buy_bank, buy_token_amount_i80f48)?;
-    // using sell_token_amount_i80f48 here would not account for loan origination fees!
-    liqee_health_cache
-        .adjust_token_balance(&sell_bank, post_liqee_sell_token - pre_liqee_sell_token)?;
-    liqee.check_health_post(&liqee_health_cache, liqee_pre_init_health)?;
+    // update tsl information on the account
+    {
+        // record amount
+        let tsl = liqee.token_stop_loss_mut_by_index(token_stop_loss_index)?;
+        tsl.bought += buy_token_amount;
+        tsl.sold += sell_token_amount;
+        assert!(tsl.bought <= tsl.max_buy);
+        assert!(tsl.sold <= tsl.max_sell);
 
-    let liqor_health = compute_health(&liqor.borrow(), HealthType::Init, &account_retriever)
-        .context("compute liqor health")?;
-    require!(liqor_health >= 0, MangoError::HealthMustBePositive);
-
-    // record amount
-    let tsl = liqee.token_stop_loss_mut_by_index(token_stop_loss_index)?;
-    tsl.bought += buy_token_amount;
-    tsl.sold += sell_token_amount;
-    assert!(tsl.bought <= tsl.max_buy);
-    assert!(tsl.sold <= tsl.max_sell);
-
-    // maybe remove tsl
-    // TODO: a tsl should maybe also end if the don't-create-deposits/borrows limit is hit?!
-    if tsl.bought >= tsl.max_buy || tsl.sold >= tsl.max_sell {
-        *tsl = TokenStopLoss::default();
+        // maybe remove tsl
+        // TODO: a tsl should maybe also end if the don't-create-deposits/borrows limit is hit?!
+        if tsl.bought >= tsl.max_buy || tsl.sold >= tsl.max_sell {
+            *tsl = TokenStopLoss::default();
+        }
     }
 
-    // TODO: log token positions, loan and origination fee amounts, and the ix
+    // using sell_token_amount_i80f48 here would not account for loan origination fees!
+    Ok((
+        buy_token_amount_i80f48,
+        post_liqee_sell_token - pre_liqee_sell_token,
+    ))
+}
 
-    Ok(())
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::health::{self, test::*};
 }
