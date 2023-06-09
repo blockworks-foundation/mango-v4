@@ -33,16 +33,8 @@ pub fn token_stop_loss_trigger(
         .context("create liqee health cache")?;
     let liqee_pre_init_health = liqee.check_health_pre(&liqee_health_cache)?;
 
-    let tsl = liqee
-        .token_stop_loss_by_index(token_stop_loss_index)?
-        .clone();
+    let tsl = liqee.token_stop_loss_by_index(token_stop_loss_index)?;
     require!(tsl.is_active(), MangoError::SomeError);
-    // TODO: this check is purely defensive -- keep?
-    if tsl.bought >= tsl.max_buy || tsl.sold >= tsl.max_sell {
-        let tsl = liqee.token_stop_loss_mut_by_index(token_stop_loss_index)?;
-        *tsl = TokenStopLoss::default();
-        return Ok(());
-    }
 
     let (buy_bank, buy_token_price, sell_bank_and_oracle_opt) =
         account_retriever.banks_mut_and_oracles(tsl.buy_token_index, tsl.sell_token_index)?;
@@ -55,7 +47,6 @@ pub fn token_stop_loss_trigger(
         liqor_key,
         &mut liqee.borrow_mut(),
         liqee_key,
-        &tsl,
         token_stop_loss_index,
         buy_bank,
         liqor_max_buy_token_to_give,
@@ -133,7 +124,6 @@ fn action(
     liqor_key: Pubkey,
     liqee: &mut MangoAccountRefMut,
     liqee_key: Pubkey,
-    tsl: &TokenStopLoss,
     token_stop_loss_index: usize,
     buy_bank: &mut Bank,
     liqor_max_buy_token_to_give: u64,
@@ -142,6 +132,11 @@ fn action(
     price: f32,
     now_ts: u64,
 ) -> Result<(I80F48, I80F48)> {
+    let tsl = liqee
+        .token_stop_loss_by_index(token_stop_loss_index)?
+        .clone();
+    require!(tsl.is_active(), MangoError::SomeError);
+
     // amount of sell token native per buy token native
     match tsl.price_threshold_type() {
         TokenStopLossPriceThresholdType::PriceUnderThreshold => {
@@ -176,6 +171,7 @@ fn action(
         pre_liqee_buy_token,
         pre_liqee_sell_token,
     );
+    // TODO: do something special for an execution where buy_token_amount or sell_token_amount are zero?
 
     // do the token transfer between liqee and liqor
     let buy_token_amount_i80f48 = I80F48::from(buy_token_amount);
@@ -377,5 +373,147 @@ mod tests {
             assert_eq!(actual_sell, (actual_buy as f64 * price).floor() as u64); // invariant
             assert_eq!(actual_sell, sell_amount);
         }
+    }
+
+    #[derive(Clone)]
+    struct TestSetup {
+        group: Pubkey,
+        asset_bank: TestAccount<Bank>,
+        liab_bank: TestAccount<Bank>,
+        asset_oracle: TestAccount<StubOracle>,
+        liab_oracle: TestAccount<StubOracle>,
+        liqee: MangoAccountValue,
+        liqor: MangoAccountValue,
+    }
+
+    impl TestSetup {
+        fn new() -> Self {
+            let group = Pubkey::new_unique();
+            let (asset_bank, asset_oracle) = mock_bank_and_oracle(group, 0, 1.0, 0.0, 0.0);
+            let (liab_bank, liab_oracle) = mock_bank_and_oracle(group, 1, 1.0, 0.0, 0.0);
+
+            let mut liqee_buffer = MangoAccount::default_for_tests().try_to_vec().unwrap();
+            liqee_buffer.extend_from_slice(&[0u8; 256]);
+            let mut liqee = MangoAccountValue::from_bytes(&liqee_buffer).unwrap();
+            {
+                liqee.expand_dynamic_content(3, 5, 4, 6, 1).unwrap();
+                liqee.ensure_token_position(0).unwrap();
+                liqee.ensure_token_position(1).unwrap();
+            }
+
+            let liqor_buffer = MangoAccount::default_for_tests().try_to_vec().unwrap();
+            let mut liqor = MangoAccountValue::from_bytes(&liqor_buffer).unwrap();
+            {
+                liqor.ensure_token_position(0).unwrap();
+                liqor.ensure_token_position(1).unwrap();
+            }
+
+            Self {
+                group,
+                asset_bank,
+                liab_bank,
+                asset_oracle,
+                liab_oracle,
+                liqee,
+                liqor,
+            }
+        }
+
+        fn liqee_asset_pos(&mut self) -> I80F48 {
+            self.liqee
+                .token_position(0)
+                .unwrap()
+                .native(self.asset_bank.data())
+        }
+        fn liqee_liab_pos(&mut self) -> I80F48 {
+            self.liqee
+                .token_position(1)
+                .unwrap()
+                .native(self.liab_bank.data())
+        }
+        fn liqor_asset_pos(&mut self) -> I80F48 {
+            self.liqor
+                .token_position(0)
+                .unwrap()
+                .native(self.asset_bank.data())
+        }
+        fn liqor_liab_pos(&mut self) -> I80F48 {
+            self.liqor
+                .token_position(1)
+                .unwrap()
+                .native(self.liab_bank.data())
+        }
+    }
+
+    #[test]
+    fn test_token_stop_loss_trigger() {
+        let mut setup = TestSetup::new();
+
+        let tsl = TokenStopLoss {
+            max_buy: 100,
+            max_sell: 100,
+            price_threshold: 1.0,
+            price_threshold_type: TokenStopLossPriceThresholdType::PriceOverThreshold.into(),
+            price_premium_bps: 1000,
+            buy_token_index: 1,
+            sell_token_index: 0,
+            is_active: 1,
+            allow_creating_borrows: 1,
+            allow_creating_deposits: 1,
+            ..Default::default()
+        };
+        *setup.liqee.add_token_stop_loss().unwrap() = tsl.clone();
+        assert_eq!(setup.liqee.active_token_stop_loss().count(), 1);
+
+        let (buy_change, sell_change) = action(
+            &mut setup.liqor.borrow_mut(),
+            Pubkey::default(),
+            &mut setup.liqee.borrow_mut(),
+            Pubkey::default(),
+            0,
+            setup.liab_bank.data(),
+            40,
+            setup.asset_bank.data(),
+            100,
+            2.0,
+            0,
+        )
+        .unwrap();
+        assert_eq!(buy_change.round(), 40);
+        assert_eq!(sell_change.round(), -88);
+
+        assert_eq!(setup.liqee.active_token_stop_loss().count(), 1);
+        let tsl = setup.liqee.token_stop_loss_by_index(0).unwrap().clone();
+        assert_eq!(tsl.bought, 40);
+        assert_eq!(tsl.sold, 88);
+
+        assert_eq!(setup.liqee_liab_pos().round(), 40);
+        assert_eq!(setup.liqee_asset_pos().round(), -88);
+        assert_eq!(setup.liqor_liab_pos().round(), -40);
+        assert_eq!(setup.liqor_asset_pos().round(), 88);
+
+        let (buy_change, sell_change) = action(
+            &mut setup.liqor.borrow_mut(),
+            Pubkey::default(),
+            &mut setup.liqee.borrow_mut(),
+            Pubkey::default(),
+            0,
+            setup.liab_bank.data(),
+            40,
+            setup.asset_bank.data(),
+            100,
+            2.0,
+            0,
+        )
+        .unwrap();
+        assert_eq!(buy_change.round(), 5);
+        assert_eq!(sell_change.round(), -11);
+
+        assert_eq!(setup.liqee.active_token_stop_loss().count(), 0);
+
+        assert_eq!(setup.liqee_liab_pos().round(), 45);
+        assert_eq!(setup.liqee_asset_pos().round(), -99);
+        assert_eq!(setup.liqor_liab_pos().round(), -45);
+        assert_eq!(setup.liqor_asset_pos().round(), 99);
     }
 }
