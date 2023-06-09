@@ -98,12 +98,12 @@ fn trade_amount(
 }
 
 fn trade_amount_inner(max_buy: u64, max_sell: u64, sell_per_buy_price: I80F48) -> (u64, u64) {
+    // This logic looks confusing, but please check the test_trade_amount_inner
     let buy_for_sell: u64 = if sell_per_buy_price > I80F48::ONE {
-        (I80F48::from(max_sell) / sell_per_buy_price)
+        ((I80F48::from(max_sell) + I80F48::ONE - I80F48::DELTA) / sell_per_buy_price)
             .floor()
             .to_num()
     } else {
-        // This logic looks confusing, but please check the test_trade_amount_inner
         ((I80F48::from(max_buy) * sell_per_buy_price)
             .floor()
             .min(I80F48::from(max_sell))
@@ -136,11 +136,13 @@ fn action(
         .token_stop_loss_by_index(token_stop_loss_index)?
         .clone();
     require!(tsl.is_active(), MangoError::SomeError);
+    require_eq!(buy_bank.token_index, tsl.buy_token_index);
+    require_eq!(sell_bank.token_index, tsl.sell_token_index);
 
     // amount of sell token native per buy token native
     match tsl.price_threshold_type() {
         TokenStopLossPriceThresholdType::PriceUnderThreshold => {
-            require_gt!(tsl.price_threshold, price);
+            require_gt!(tsl.price_threshold, price); // TODO: clearer error, "threshold not reached"
         }
         TokenStopLossPriceThresholdType::PriceOverThreshold => {
             require_gt!(price, tsl.price_threshold);
@@ -172,6 +174,7 @@ fn action(
         pre_liqee_sell_token,
     );
     // TODO: do something special for an execution where buy_token_amount or sell_token_amount are zero?
+    // (note that some mutation has already happened!)
 
     // do the token transfer between liqee and liqor
     let buy_token_amount_i80f48 = I80F48::from(buy_token_amount);
@@ -247,7 +250,7 @@ fn action(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::health::{self, test::*};
+    use crate::health::test::*;
 
     #[test]
     fn test_trade_amount_inner() {
@@ -259,6 +262,8 @@ mod tests {
             ("buy limit 2", (10, 50, 0.75), (10, 7)),
             ("sell limit 1", (10, 15, 2.1), (7, 14)),
             ("sell limit 2", (10, 5, 0.75), (7, 5)),
+            ("sell limit 3", (50, 50, 1.1), (46, 50)),
+            ("sell limit 4", (60, 50, 0.9), (56, 50)),
             ("less than one 1", (10, 10, 100.0), (0, 0)),
             ("less than one 2", (10, 10, 0.001), (0, 0)),
             ("round 1", (10, 110, 100.0), (1, 100)),
@@ -377,11 +382,8 @@ mod tests {
 
     #[derive(Clone)]
     struct TestSetup {
-        group: Pubkey,
         asset_bank: TestAccount<Bank>,
         liab_bank: TestAccount<Bank>,
-        asset_oracle: TestAccount<StubOracle>,
-        liab_oracle: TestAccount<StubOracle>,
         liqee: MangoAccountValue,
         liqor: MangoAccountValue,
     }
@@ -409,11 +411,8 @@ mod tests {
             }
 
             Self {
-                group,
                 asset_bank,
                 liab_bank,
-                asset_oracle,
-                liab_oracle,
                 liqee,
                 liqor,
             }

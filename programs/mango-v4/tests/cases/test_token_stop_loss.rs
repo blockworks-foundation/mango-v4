@@ -217,18 +217,14 @@ async fn test_token_stop_loss() -> Result<(), TransportError> {
     let liqee_base = account_position_f64(solana, account, base_token.bank).await;
     assert!(assert_equal_f_f(
         liqee_quote,
-        1000.0 + (50.0f64 / 1.1).floor(),
+        1000.0 + 46.0, // roughly 50 / 1.1
         0.01
     ));
     assert!(assert_equal_f_f(liqee_base, 1000.0 - 50.0, 0.01));
 
     let liqor_quote = account_position_f64(solana, liqor, quote_token.bank).await;
     let liqor_base = account_position_f64(solana, liqor, base_token.bank).await;
-    assert!(assert_equal_f_f(
-        liqor_quote,
-        1000.0 - (50.0f64 / 1.1).floor(),
-        0.01
-    ));
+    assert!(assert_equal_f_f(liqor_quote, 1000.0 - 46.0, 0.01));
     assert!(assert_equal_f_f(liqor_base, 1000.0 + 50.0, 0.01));
 
     //
@@ -250,20 +246,12 @@ async fn test_token_stop_loss() -> Result<(), TransportError> {
 
     let liqee_quote = account_position_f64(solana, account, quote_token.bank).await;
     let liqee_base = account_position_f64(solana, account, base_token.bank).await;
-    assert!(assert_equal_f_f(
-        liqee_quote,
-        1000.0 + (100.0f64 / 1.1).floor(),
-        0.01
-    ));
+    assert!(assert_equal_f_f(liqee_quote, 1000.0 + 92.0, 0.01));
     assert!(assert_equal_f_f(liqee_base, 1000.0 - 100.0, 0.01));
 
     let liqor_quote = account_position_f64(solana, liqor, quote_token.bank).await;
     let liqor_base = account_position_f64(solana, liqor, base_token.bank).await;
-    assert!(assert_equal_f_f(
-        liqor_quote,
-        1000.0 - (100.0f64 / 1.1).floor(),
-        0.01
-    ));
+    assert!(assert_equal_f_f(liqor_quote, 1000.0 - 92.0, 0.01));
     assert!(assert_equal_f_f(liqor_base, 1000.0 + 100.0, 0.01));
 
     let account_data = get_mango_account(solana, account).await;
