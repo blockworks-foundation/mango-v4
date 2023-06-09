@@ -188,6 +188,8 @@ fn action(
     let (liqor_buy_active, liqor_buy_loan_origination) =
         buy_bank.withdraw_with_fee(liqor_buy_token, buy_token_amount_i80f48, now_ts)?;
 
+    let post_liqee_buy_token = liqee_buy_token.native(&buy_bank);
+
     let (liqee_sell_token, liqee_sell_raw_index) =
         liqee.token_position_mut(tsl.sell_token_index)?;
     let (liqor_sell_token, liqor_sell_raw_index, _) =
@@ -223,8 +225,18 @@ fn action(
         assert!(tsl.sold <= tsl.max_sell);
 
         // maybe remove tsl
-        // TODO: a tsl should maybe also end if the don't-create-deposits/borrows limit is hit?!
-        if tsl.bought >= tsl.max_buy || tsl.sold >= tsl.max_sell {
+        // TODO: this also drops the TSL if no more swapping is possible at the current price
+        // - like if the "don't create deposits/borrows" constraint is reached
+        // - or if the price is such that swapping 1 native token would already exceed the limit
+        let (future_buy, future_sell) = trade_amount(
+            tsl,
+            premium_price_i80f48,
+            u64::MAX,
+            u64::MAX,
+            post_liqee_buy_token,
+            post_liqee_sell_token,
+        );
+        if future_buy == 0 || future_sell == 0 {
             *tsl = TokenStopLoss::default();
         }
     }

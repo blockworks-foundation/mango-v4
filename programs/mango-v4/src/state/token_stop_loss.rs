@@ -58,6 +58,7 @@ pub struct TokenStopLoss {
 
     // TODO: these should probably have some kind of id, so it's easy to refer to them
     //       and clearer when one got cancelled and replaced
+    // TODO: Add some kind of expiry timestamp
     #[derivative(Debug = "ignore")]
     pub reserved: [u8; 136],
 }
