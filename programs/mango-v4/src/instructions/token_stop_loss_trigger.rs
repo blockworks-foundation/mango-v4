@@ -79,6 +79,55 @@ pub fn token_stop_loss_trigger(
     Ok(())
 }
 
+fn trade_amount(
+    tsl: &TokenStopLoss,
+    sell_per_buy_price: I80F48,
+    liqor_max_buy_token_to_give: u64,
+    liqor_max_sell_token_to_receive: u64,
+    buy_balance: I80F48,
+    sell_balance: I80F48,
+) -> (u64, u64) {
+    let max_buy = liqor_max_buy_token_to_give.min(tsl.remaining_buy()).min(
+        if tsl.allow_creating_deposits() {
+            u64::MAX
+        } else {
+            // ceil() because we're ok reaching 0..1 deposited native tokens
+            (-buy_balance).max(I80F48::ZERO).ceil().to_num::<u64>()
+        },
+    );
+    let max_sell = liqor_max_sell_token_to_receive
+        .min(tsl.remaining_sell())
+        .min(if tsl.allow_creating_borrows() {
+            u64::MAX
+        } else {
+            // floor() so we never go below 0
+            sell_balance.max(I80F48::ZERO).floor().to_num::<u64>()
+        });
+    trade_amount_inner(max_buy, max_sell, sell_per_buy_price)
+}
+
+fn trade_amount_inner(max_buy: u64, max_sell: u64, sell_per_buy_price: I80F48) -> (u64, u64) {
+    let buy_for_sell: u64 = if sell_per_buy_price > I80F48::ONE {
+        (I80F48::from(max_sell) / sell_per_buy_price)
+            .floor()
+            .to_num()
+    } else {
+        // This logic looks confusing, but please check the test_trade_amount_inner
+        ((I80F48::from(max_buy) * sell_per_buy_price)
+            .floor()
+            .min(I80F48::from(max_sell))
+            / sell_per_buy_price)
+            .ceil()
+            .to_num()
+    };
+    let buy_amount = max_buy.min(buy_for_sell);
+    let sell_for_buy = (I80F48::from(buy_amount) * sell_per_buy_price)
+        .floor()
+        .to_num::<u64>();
+
+    (buy_amount, max_sell.min(sell_for_buy))
+}
+
 fn action(
     liqor: &mut MangoAccountRefMut,
     liqor_key: Pubkey,
@@ -119,41 +168,14 @@ fn action(
     let premium_price = price * (1.0 + (tsl.price_premium_bps as f32) * 0.0001);
     let premium_price_i80f48 = I80F48::from_num(premium_price);
     // TODO: is it ok for these to be in u64? Otherwise a bunch of fields on the tsl would need to be I80F48 too...
-    let buy_token_amount;
-    let sell_token_amount;
-    {
-        let mut initial_buy = (tsl.max_buy - tsl.bought).min(liqor_max_buy_token_to_give);
-        if !tsl.allow_creating_deposits() {
-            // ceil, because we want to end in the 0..1 native token range, so the position can be closed
-            initial_buy = initial_buy.min(
-                (-pre_liqee_buy_token)
-                    .max(I80F48::ZERO)
-                    .ceil()
-                    .to_num::<u64>(),
-            );
-        }
-        let sell_for_buy = (I80F48::from(initial_buy) * premium_price_i80f48)
-            .ceil() // in doubt, increase the liqee's cost slightly
-            .to_num::<u64>();
-
-        let mut initial_sell = (tsl.max_sell - tsl.sold)
-            .min(liqor_max_sell_token_to_receive)
-            .min(sell_for_buy);
-        if !tsl.allow_creating_borrows() {
-            initial_sell = initial_sell.min(
-                pre_liqee_sell_token
-                    .max(I80F48::ZERO)
-                    .floor()
-                    .to_num::<u64>(),
-            );
-        }
-        let buy_for_sell = (I80F48::from(initial_sell) / premium_price_i80f48)
-            .floor() // decreases the amount the liqee would get
-            .to_num::<u64>();
-
-        buy_token_amount = initial_buy.min(buy_for_sell);
-        sell_token_amount = initial_sell;
-    }
+    let (buy_token_amount, sell_token_amount) = trade_amount(
+        &tsl,
+        premium_price_i80f48,
+        liqor_max_buy_token_to_give,
+        liqor_max_sell_token_to_receive,
+        pre_liqee_buy_token,
+        pre_liqee_sell_token,
+    );
 
     // do the token transfer between liqee and liqor
     let buy_token_amount_i80f48 = I80F48::from(buy_token_amount);
@@ -218,4 +240,130 @@ fn action(
 mod tests {
     use super::*;
     use crate::health::{self, test::*};
+
+    #[test]
+    fn test_trade_amount_inner() {
+        let cases = vec![
+            ("null 1", (0, 0, 1.0), (0, 0)),
+            ("null 2", (0, 10, 1.0), (0, 0)),
+            ("null 3", (10, 0, 1.0), (0, 0)),
+            ("buy limit 1", (10, 30, 2.11), (10, 21)),
+            ("buy limit 2", (10, 50, 0.75), (10, 7)),
+            ("sell limit 1", (10, 15, 2.1), (7, 14)),
+            ("sell limit 2", (10, 5, 0.75), (7, 5)),
+            ("less than one 1", (10, 10, 100.0), (0, 0)),
+            ("less than one 2", (10, 10, 0.001), (0, 0)),
+            ("round 1", (10, 110, 100.0), (1, 100)),
+            ("round 2", (199, 10, 0.01), (100, 1)),
+        ];
+
+        for (name, (max_buy, max_sell, price), (buy_amount, sell_amount)) in cases {
+            println!("{name}");
+
+            let (actual_buy, actual_sell) =
+                trade_amount_inner(max_buy, max_sell, I80F48::from_num(price));
+            println!("actual: {actual_buy} {actual_sell}, expected: {buy_amount}, {sell_amount}");
+            assert_eq!(actual_buy, buy_amount);
+            assert_eq!(actual_sell, (actual_buy as f64 * price).floor() as u64); // invariant
+            assert_eq!(actual_sell, sell_amount);
+        }
+    }
+
+    #[test]
+    fn test_trade_amount_outer() {
+        let cases = vec![
+            (
+                "limit 1",
+                (1, 100, 100, 100, 0.0, 0.0, true, true, 1.0),
+                (1, 1),
+            ),
+            (
+                "limit 2",
+                (100, 1, 100, 100, 0.0, 0.0, true, true, 1.0),
+                (1, 1),
+            ),
+            (
+                "limit 3",
+                (100, 100, 1, 100, 0.0, 0.0, true, true, 1.0),
+                (1, 1),
+            ),
+            (
+                "limit 4",
+                (100, 100, 100, 1, 0.0, 0.0, true, true, 1.0),
+                (1, 1),
+            ),
+            (
+                "limit 5",
+                (100, 100, 100, 100, -0.3, 0.0, false, true, 1.0),
+                (1, 1),
+            ),
+            (
+                "limit 6",
+                (100, 100, 100, 100, 0.0, 1.8, true, false, 1.0),
+                (1, 1),
+            ),
+            (
+                "full 1",
+                (100, 100, 100, 100, -100.0, 100.0, false, false, 1.0),
+                (100, 100),
+            ),
+            (
+                "full 2",
+                (100, 100, 100, 100, 0.0, 0.0, true, true, 1.0),
+                (100, 100),
+            ),
+            (
+                "price 1",
+                (100, 100, 100, 100, 0.0, 0.0, true, true, 1.23456),
+                (81, 99),
+            ),
+            (
+                "price 2",
+                (100, 100, 100, 100, 0.0, 0.0, true, true, 0.76543),
+                (100, 76),
+            ),
+        ];
+
+        for (
+            name,
+            (
+                tsl_buy,
+                tsl_sell,
+                liqor_buy,
+                liqor_sell,
+                buy_balance,
+                sell_balance,
+                allow_deposit,
+                allow_borrow,
+                price,
+            ),
+            (buy_amount, sell_amount),
+        ) in cases
+        {
+            println!("{name}");
+
+            let tsl = TokenStopLoss {
+                max_buy: 42 + tsl_buy,
+                max_sell: 100 + tsl_sell,
+                bought: 42,
+                sold: 100,
+                allow_creating_borrows: u8::from(allow_borrow),
+                allow_creating_deposits: u8::from(allow_deposit),
+                ..Default::default()
+            };
+
+            let (actual_buy, actual_sell) = trade_amount(
+                &tsl,
+                I80F48::from_num(price),
+                liqor_buy,
+                liqor_sell,
+                I80F48::from_num(buy_balance),
+                I80F48::from_num(sell_balance),
+            );
+            println!("actual: {actual_buy} {actual_sell}, expected: {buy_amount}, {sell_amount}");
+            assert_eq!(actual_buy, buy_amount);
+            assert_eq!(actual_sell, (actual_buy as f64 * price).floor() as u64); // invariant
+            assert_eq!(actual_sell, sell_amount);
+        }
+    }
 }

@@ -109,4 +109,12 @@ impl TokenStopLoss {
     pub fn price_threshold_type(&self) -> TokenStopLossPriceThresholdType {
         TokenStopLossPriceThresholdType::try_from(self.price_threshold_type).unwrap()
     }
+
+    pub fn remaining_buy(&self) -> u64 {
+        self.max_buy - self.bought
+    }
+
+    pub fn remaining_sell(&self) -> u64 {
+        self.max_sell - self.sold
+    }
 }
