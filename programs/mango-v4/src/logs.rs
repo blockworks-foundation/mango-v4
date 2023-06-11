@@ -258,6 +258,16 @@ pub struct WithdrawLoanOriginationFeeLog {
 }
 
 #[event]
+pub struct WithdrawLoanLog {
+    pub mango_group: Pubkey,
+    pub mango_account: Pubkey,
+    pub token_index: u16,
+    pub loan_amount: i128,
+    pub loan_origination_fee: i128,
+    pub instruction: LoanOriginationFeeInstruction,
+}
+
+#[event]
 pub struct TokenLiqBankruptcyLog {
     pub mango_group: Pubkey,
     pub liqee: Pubkey,
