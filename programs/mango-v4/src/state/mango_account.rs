@@ -603,13 +603,18 @@ impl<
             .map(|(p, _)| p)
     }
 
-    pub fn token_position_by_raw_index(&self, raw_index: usize) -> &TokenPosition {
+    pub(crate) fn token_position_by_raw_index_unchecked(&self, raw_index: usize) -> &TokenPosition {
         get_helper(self.dynamic(), self.header().token_offset(raw_index))
+    }
+
+    pub fn token_position_by_raw_index(&self, raw_index: usize) -> Result<&TokenPosition> {
+        require_gt!(self.header().token_count(), raw_index);
+        Ok(self.token_position_by_raw_index_unchecked(raw_index))
     }
 
     // get iter over all TokenPositions (including inactive)
     pub fn all_token_positions(&self) -> impl Iterator<Item = &TokenPosition> + '_ {
-        (0..self.header().token_count()).map(|i| self.token_position_by_raw_index(i))
+        (0..self.header().token_count()).map(|i| self.token_position_by_raw_index_unchecked(i))
     }
 
     // get iter over all active TokenPositions
@@ -623,12 +628,17 @@ impl<
             .ok_or_else(|| error_msg!("serum3 orders for market index {} not found", market_index))
     }
 
-    pub fn serum3_orders_by_raw_index(&self, raw_index: usize) -> &Serum3Orders {
+    pub(crate) fn serum3_orders_by_raw_index_unchecked(&self, raw_index: usize) -> &Serum3Orders {
         get_helper(self.dynamic(), self.header().serum3_offset(raw_index))
     }
 
+    pub fn serum3_orders_by_raw_index(&self, raw_index: usize) -> Result<&Serum3Orders> {
+        require_gt!(self.header().serum3_count(), raw_index);
+        Ok(self.serum3_orders_by_raw_index_unchecked(raw_index))
+    }
+
     pub fn all_serum3_orders(&self) -> impl Iterator<Item = &Serum3Orders> + '_ {
-        (0..self.header().serum3_count()).map(|i| self.serum3_orders_by_raw_index(i))
+        (0..self.header().serum3_count()).map(|i| self.serum3_orders_by_raw_index_unchecked(i))
     }
 
     pub fn active_serum3_orders(&self) -> impl Iterator<Item = &Serum3Orders> + '_ {
@@ -642,24 +652,34 @@ impl<
             .ok_or_else(|| error!(MangoError::PerpPositionDoesNotExist))
     }
 
-    pub fn perp_position_by_raw_index(&self, raw_index: usize) -> &PerpPosition {
+    pub(crate) fn perp_position_by_raw_index_unchecked(&self, raw_index: usize) -> &PerpPosition {
         get_helper(self.dynamic(), self.header().perp_offset(raw_index))
     }
 
+    pub fn perp_position_by_raw_index(&self, raw_index: usize) -> Result<&PerpPosition> {
+        require_gt!(self.header().perp_count(), raw_index);
+        Ok(self.perp_position_by_raw_index_unchecked(raw_index))
+    }
+
     pub fn all_perp_positions(&self) -> impl Iterator<Item = &PerpPosition> {
-        (0..self.header().perp_count()).map(|i| self.perp_position_by_raw_index(i))
+        (0..self.header().perp_count()).map(|i| self.perp_position_by_raw_index_unchecked(i))
     }
 
     pub fn active_perp_positions(&self) -> impl Iterator<Item = &PerpPosition> {
         self.all_perp_positions().filter(|p| p.is_active())
     }
 
-    pub fn perp_order_by_raw_index(&self, raw_index: usize) -> &PerpOpenOrder {
+    pub(crate) fn perp_order_by_raw_index_unchecked(&self, raw_index: usize) -> &PerpOpenOrder {
         get_helper(self.dynamic(), self.header().perp_oo_offset(raw_index))
     }
 
+    pub fn perp_order_by_raw_index(&self, raw_index: usize) -> Result<&PerpOpenOrder> {
+        require_gt!(self.header().perp_oo_count(), raw_index);
+        Ok(self.perp_order_by_raw_index_unchecked(raw_index))
+    }
+
     pub fn all_perp_orders(&self) -> impl Iterator<Item = &PerpOpenOrder> {
-        (0..self.header().perp_oo_count()).map(|i| self.perp_order_by_raw_index(i))
+        (0..self.header().perp_oo_count()).map(|i| self.perp_order_by_raw_index_unchecked(i))
     }
 
     pub fn perp_next_order_slot(&self) -> Result<usize> {
@@ -690,14 +710,12 @@ impl<
         self.fixed().being_liquidated()
     }
 
-    // TODO: for safety, let's do the same for the other raw_index functions
     fn token_stop_loss_by_index_unchecked(&self, index: usize) -> &TokenStopLoss {
         get_helper(self.dynamic(), self.header().token_stop_loss_offset(index))
     }
 
     pub fn token_stop_loss_by_index(&self, index: usize) -> Result<&TokenStopLoss> {
-        let count: usize = self.header().token_stop_loss_count.into();
-        require_gt!(count, index);
+        require_gt!(self.header().token_stop_loss_count(), index);
         Ok(self.token_stop_loss_by_index_unchecked(index))
     }
 
@@ -1449,15 +1467,19 @@ mod tests {
         );
         assert_eq!(
             account.tokens[0].token_index,
-            account2.token_position_by_raw_index(0).token_index
+            account2
+                .token_position_by_raw_index_unchecked(0)
+                .token_index
         );
         assert_eq!(
             account.serum3[0].open_orders,
-            account2.serum3_orders_by_raw_index(0).open_orders
+            account2.serum3_orders_by_raw_index_unchecked(0).open_orders
         );
         assert_eq!(
             account.perps[0].market_index,
-            account2.perp_position_by_raw_index(0).market_index
+            account2
+                .perp_position_by_raw_index_unchecked(0)
+                .market_index
         );
     }
 
@@ -1468,7 +1490,7 @@ mod tests {
         assert!(account.token_position_and_raw_index(2).is_err());
         assert!(account.token_position_mut(3).is_err());
         assert_eq!(
-            account.token_position_by_raw_index(0).token_index,
+            account.token_position_by_raw_index_unchecked(0).token_index,
             TokenIndex::MAX
         );
 
@@ -1508,7 +1530,7 @@ mod tests {
         assert_eq!(account.active_token_positions().count(), 3);
         account.deactivate_token_position(0);
         assert_eq!(
-            account.token_position_by_raw_index(0).token_index,
+            account.token_position_by_raw_index_unchecked(0).token_index,
             TokenIndex::MAX
         );
         assert!(account.token_position(1).is_err());
@@ -1536,7 +1558,7 @@ mod tests {
         assert!(account.serum3_orders(1).is_err());
         assert!(account.serum3_orders_mut(3).is_err());
         assert_eq!(
-            account.serum3_orders_by_raw_index(0).market_index,
+            account.serum3_orders_by_raw_index_unchecked(0).market_index,
             Serum3MarketIndex::MAX
         );
 
@@ -1548,11 +1570,14 @@ mod tests {
 
         assert!(account.deactivate_serum3_orders(7).is_ok());
         assert_eq!(
-            account.serum3_orders_by_raw_index(1).market_index,
+            account.serum3_orders_by_raw_index_unchecked(1).market_index,
             Serum3MarketIndex::MAX
         );
         assert!(account.create_serum3_orders(8).is_ok());
-        assert_eq!(account.serum3_orders_by_raw_index(1).market_index, 8);
+        assert_eq!(
+            account.serum3_orders_by_raw_index_unchecked(1).market_index,
+            8
+        );
 
         assert_eq!(account.active_serum3_orders().count(), 3);
         assert!(account.deactivate_serum3_orders(1).is_ok());
@@ -1573,7 +1598,7 @@ mod tests {
         assert!(account.perp_position(1).is_err());
         assert!(account.perp_position_mut(3).is_err());
         assert_eq!(
-            account.perp_position_by_raw_index(0).market_index,
+            account.perp_position_by_raw_index_unchecked(0).market_index,
             PerpMarketIndex::MAX
         );
 
@@ -1624,7 +1649,7 @@ mod tests {
         assert_eq!(account.active_perp_positions().count(), 3);
         assert!(account.deactivate_perp_position(1, 0).is_ok());
         assert_eq!(
-            account.perp_position_by_raw_index(0).market_index,
+            account.perp_position_by_raw_index_unchecked(0).market_index,
             PerpMarketIndex::MAX
         );
         assert!(account.perp_position(1).is_err());

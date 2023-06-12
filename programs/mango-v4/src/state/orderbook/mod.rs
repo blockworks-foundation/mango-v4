@@ -141,7 +141,7 @@ mod tests {
                 u8::MAX,
             )
             .unwrap();
-            account.perp_order_by_raw_index(0).id
+            account.perp_order_by_raw_index_unchecked(0).id
         };
 
         // insert bids until book side is full
@@ -291,7 +291,8 @@ mod tests {
         )
         .unwrap();
         let order =
-            order_tree_leaf_by_key(&book.bids, maker.perp_order_by_raw_index(0).id).unwrap();
+            order_tree_leaf_by_key(&book.bids, maker.perp_order_by_raw_index_unchecked(0).id)
+                .unwrap();
         assert_eq!(order.client_order_id, 42);
         assert_eq!(order.quantity, bid_quantity);
         assert_eq!(
@@ -311,16 +312,34 @@ mod tests {
         ));
         assert!(order_tree_contains_price(&book.bids, price_lots as u64));
         assert_eq!(
-            maker.perp_position_by_raw_index(0).bids_base_lots,
+            maker.perp_position_by_raw_index_unchecked(0).bids_base_lots,
             bid_quantity
         );
-        assert_eq!(maker.perp_position_by_raw_index(0).asks_base_lots, 0);
-        assert_eq!(maker.perp_position_by_raw_index(0).taker_base_lots, 0);
-        assert_eq!(maker.perp_position_by_raw_index(0).taker_quote_lots, 0);
-        assert_eq!(maker.perp_position_by_raw_index(0).base_position_lots(), 0);
+        assert_eq!(
+            maker.perp_position_by_raw_index_unchecked(0).asks_base_lots,
+            0
+        );
         assert_eq!(
             maker
-                .perp_position_by_raw_index(0)
+                .perp_position_by_raw_index_unchecked(0)
+                .taker_base_lots,
+            0
+        );
+        assert_eq!(
+            maker
+                .perp_position_by_raw_index_unchecked(0)
+                .taker_quote_lots,
+            0
+        );
+        assert_eq!(
+            maker
+                .perp_position_by_raw_index_unchecked(0)
+                .base_position_lots(),
+            0
+        );
+        assert_eq!(
+            maker
+                .perp_position_by_raw_index_unchecked(0)
                 .quote_position_native()
                 .to_num::<u32>(),
             0
@@ -355,7 +374,8 @@ mod tests {
         // the remainder of the maker order is still on the book
         // (the maker account is unchanged: it was not even passed in)
         let order =
-            order_tree_leaf_by_key(&book.bids, maker.perp_order_by_raw_index(0).id).unwrap();
+            order_tree_leaf_by_key(&book.bids, maker.perp_order_by_raw_index_unchecked(0).id)
+                .unwrap();
         assert_eq!(fixed_price_lots(order.price_data()), price_lots);
         assert_eq!(order.quantity, bid_quantity - match_quantity);
 
@@ -364,20 +384,40 @@ mod tests {
         assert_eq!(market.fees_accrued, match_quote * (maker_fee + taker_fee));
 
         // the taker account is updated
-        assert_eq!(taker.perp_order_by_raw_index(0).market, FREE_ORDER_SLOT);
-        assert_eq!(taker.perp_position_by_raw_index(0).bids_base_lots, 0);
-        assert_eq!(taker.perp_position_by_raw_index(0).asks_base_lots, 0);
         assert_eq!(
-            taker.perp_position_by_raw_index(0).taker_base_lots,
+            taker.perp_order_by_raw_index_unchecked(0).market,
+            FREE_ORDER_SLOT
+        );
+        assert_eq!(
+            taker.perp_position_by_raw_index_unchecked(0).bids_base_lots,
+            0
+        );
+        assert_eq!(
+            taker.perp_position_by_raw_index_unchecked(0).asks_base_lots,
+            0
+        );
+        assert_eq!(
+            taker
+                .perp_position_by_raw_index_unchecked(0)
+                .taker_base_lots,
             -match_quantity
         );
         assert_eq!(
-            taker.perp_position_by_raw_index(0).taker_quote_lots,
+            taker
+                .perp_position_by_raw_index_unchecked(0)
+                .taker_quote_lots,
             match_quantity * price_lots
         );
-        assert_eq!(taker.perp_position_by_raw_index(0).base_position_lots(), 0);
         assert_eq!(
-            taker.perp_position_by_raw_index(0).quote_position_native(),
+            taker
+                .perp_position_by_raw_index_unchecked(0)
+                .base_position_lots(),
+            0
+        );
+        assert_eq!(
+            taker
+                .perp_position_by_raw_index_unchecked(0)
+                .quote_position_native(),
             -match_quote * taker_fee
         );
 
@@ -403,33 +443,70 @@ mod tests {
             .unwrap();
         assert_eq!(market.open_interest, 2 * match_quantity);
 
-        assert_eq!(maker.perp_order_by_raw_index(0).market, 0);
+        assert_eq!(maker.perp_order_by_raw_index_unchecked(0).market, 0);
         assert_eq!(
-            maker.perp_position_by_raw_index(0).bids_base_lots,
+            maker.perp_position_by_raw_index_unchecked(0).bids_base_lots,
             bid_quantity - match_quantity
         );
-        assert_eq!(maker.perp_position_by_raw_index(0).asks_base_lots, 0);
-        assert_eq!(maker.perp_position_by_raw_index(0).taker_base_lots, 0);
-        assert_eq!(maker.perp_position_by_raw_index(0).taker_quote_lots, 0);
         assert_eq!(
-            maker.perp_position_by_raw_index(0).base_position_lots(),
+            maker.perp_position_by_raw_index_unchecked(0).asks_base_lots,
+            0
+        );
+        assert_eq!(
+            maker
+                .perp_position_by_raw_index_unchecked(0)
+                .taker_base_lots,
+            0
+        );
+        assert_eq!(
+            maker
+                .perp_position_by_raw_index_unchecked(0)
+                .taker_quote_lots,
+            0
+        );
+        assert_eq!(
+            maker
+                .perp_position_by_raw_index_unchecked(0)
+                .base_position_lots(),
             match_quantity
         );
         assert_eq!(
-            maker.perp_position_by_raw_index(0).quote_position_native(),
+            maker
+                .perp_position_by_raw_index_unchecked(0)
+                .quote_position_native(),
             -match_quote - match_quote * maker_fee
         );
 
-        assert_eq!(taker.perp_position_by_raw_index(0).bids_base_lots, 0);
-        assert_eq!(taker.perp_position_by_raw_index(0).asks_base_lots, 0);
-        assert_eq!(taker.perp_position_by_raw_index(0).taker_base_lots, 0);
-        assert_eq!(taker.perp_position_by_raw_index(0).taker_quote_lots, 0);
         assert_eq!(
-            taker.perp_position_by_raw_index(0).base_position_lots(),
+            taker.perp_position_by_raw_index_unchecked(0).bids_base_lots,
+            0
+        );
+        assert_eq!(
+            taker.perp_position_by_raw_index_unchecked(0).asks_base_lots,
+            0
+        );
+        assert_eq!(
+            taker
+                .perp_position_by_raw_index_unchecked(0)
+                .taker_base_lots,
+            0
+        );
+        assert_eq!(
+            taker
+                .perp_position_by_raw_index_unchecked(0)
+                .taker_quote_lots,
+            0
+        );
+        assert_eq!(
+            taker
+                .perp_position_by_raw_index_unchecked(0)
+                .base_position_lots(),
             -match_quantity
         );
         assert_eq!(
-            taker.perp_position_by_raw_index(0).quote_position_native(),
+            taker
+                .perp_position_by_raw_index_unchecked(0)
+                .quote_position_native(),
             match_quote - match_quote * taker_fee
         );
     }
@@ -603,7 +680,7 @@ mod tests {
                 u8::MAX,
             )
             .unwrap();
-            account.perp_order_by_raw_index(0).id
+            account.perp_order_by_raw_index_unchecked(0).id
         };
 
         // Setup
