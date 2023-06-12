@@ -1119,6 +1119,62 @@ export type MangoV4 = {
       ]
     },
     {
+      "name": "accountExpandV2",
+      "accounts": [
+        {
+          "name": "group",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "account",
+          "isMut": true,
+          "isSigner": false,
+          "relations": [
+            "group",
+            "owner"
+          ]
+        },
+        {
+          "name": "owner",
+          "isMut": false,
+          "isSigner": true
+        },
+        {
+          "name": "payer",
+          "isMut": true,
+          "isSigner": true
+        },
+        {
+          "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "tokenCount",
+          "type": "u8"
+        },
+        {
+          "name": "serum3Count",
+          "type": "u8"
+        },
+        {
+          "name": "perpCount",
+          "type": "u8"
+        },
+        {
+          "name": "perpOoCount",
+          "type": "u8"
+        },
+        {
+          "name": "tokenStopLossCount",
+          "type": "u8"
+        }
+      ]
+    },
+    {
       "name": "accountEdit",
       "accounts": [
         {
@@ -4651,6 +4707,151 @@ export type MangoV4 = {
       ]
     },
     {
+      "name": "tokenStopLossCreate",
+      "accounts": [
+        {
+          "name": "group",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "account",
+          "isMut": true,
+          "isSigner": false,
+          "relations": [
+            "group"
+          ]
+        },
+        {
+          "name": "authority",
+          "isMut": false,
+          "isSigner": true
+        }
+      ],
+      "args": [
+        {
+          "name": "buyTokenIndex",
+          "type": "u16"
+        },
+        {
+          "name": "sellTokenIndex",
+          "type": "u16"
+        },
+        {
+          "name": "maxBuy",
+          "type": "u64"
+        },
+        {
+          "name": "maxSell",
+          "type": "u64"
+        },
+        {
+          "name": "priceThreshold",
+          "type": "f32"
+        },
+        {
+          "name": "priceThresholdType",
+          "type": {
+            "defined": "TokenStopLossPriceThresholdType"
+          }
+        },
+        {
+          "name": "pricePremiumBps",
+          "type": "u32"
+        },
+        {
+          "name": "allowCreatingDeposits",
+          "type": "bool"
+        },
+        {
+          "name": "allowCreatingBorrows",
+          "type": "bool"
+        }
+      ]
+    },
+    {
+      "name": "tokenStopLossCancel",
+      "accounts": [
+        {
+          "name": "group",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "account",
+          "isMut": true,
+          "isSigner": false,
+          "relations": [
+            "group"
+          ]
+        },
+        {
+          "name": "authority",
+          "isMut": false,
+          "isSigner": true
+        }
+      ],
+      "args": [
+        {
+          "name": "tokenStopLossIndex",
+          "type": "u8"
+        },
+        {
+          "name": "tokenStopLossId",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "tokenStopLossTrigger",
+      "accounts": [
+        {
+          "name": "group",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "liqee",
+          "isMut": true,
+          "isSigner": false,
+          "relations": [
+            "group"
+          ]
+        },
+        {
+          "name": "liqor",
+          "isMut": true,
+          "isSigner": false,
+          "relations": [
+            "group"
+          ]
+        },
+        {
+          "name": "liqorAuthority",
+          "isMut": false,
+          "isSigner": true
+        }
+      ],
+      "args": [
+        {
+          "name": "tokenStopLossIndex",
+          "type": "u8"
+        },
+        {
+          "name": "tokenStopLossId",
+          "type": "u64"
+        },
+        {
+          "name": "liqorMaxBuyTokenToGive",
+          "type": "u64"
+        },
+        {
+          "name": "liqorMaxSellTokenToReceive",
+          "type": "u64"
+        }
+      ]
+    },
+    {
       "name": "altSet",
       "accounts": [
         {
@@ -5265,11 +5466,15 @@ export type MangoV4 = {
             "type": "u64"
           },
           {
+            "name": "nextStopLossId",
+            "type": "u64"
+          },
+          {
             "name": "reserved",
             "type": {
               "array": [
                 "u8",
-                208
+                200
               ]
             }
           },
@@ -5333,10 +5538,6 @@ export type MangoV4 = {
                 "defined": "PerpOpenOrder"
               }
             }
-          },
-          {
-            "name": "padding8",
-            "type": "u32"
           }
         ]
       }
@@ -6941,11 +7142,15 @@ export type MangoV4 = {
             "type": "u64"
           },
           {
+            "name": "nextStopLossId",
+            "type": "u64"
+          },
+          {
             "name": "reserved",
             "type": {
               "array": [
                 "u8",
-                208
+                200
               ]
             }
           }
@@ -7602,6 +7807,99 @@ export type MangoV4 = {
       }
     },
     {
+      "name": "TokenStopLoss",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "id",
+            "type": "u64"
+          },
+          {
+            "name": "maxBuy",
+            "docs": [
+              "maximum amount of native tokens to buy or sell"
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "maxSell",
+            "type": "u64"
+          },
+          {
+            "name": "bought",
+            "docs": [
+              "how many native tokens were already bought/sold"
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "sold",
+            "type": "u64"
+          },
+          {
+            "name": "priceThreshold",
+            "docs": [
+              "the threshold at which to allow execution"
+            ],
+            "type": "f32"
+          },
+          {
+            "name": "pricePremiumBps",
+            "docs": [
+              "the premium to pay over oracle price"
+            ],
+            "type": "u32"
+          },
+          {
+            "name": "buyTokenIndex",
+            "docs": [
+              "indexes of tokens for the swap"
+            ],
+            "type": "u16"
+          },
+          {
+            "name": "sellTokenIndex",
+            "type": "u16"
+          },
+          {
+            "name": "priceThresholdType",
+            "docs": [
+              "holds a TokenStopLossPriceThresholdType, so whether the threshold is > or <"
+            ],
+            "type": "u8"
+          },
+          {
+            "name": "isActive",
+            "type": "u8"
+          },
+          {
+            "name": "allowCreatingDeposits",
+            "docs": [
+              "may token purchases create deposits? (often users just want to get out of a borrow)"
+            ],
+            "type": "u8"
+          },
+          {
+            "name": "allowCreatingBorrows",
+            "docs": [
+              "may token selling create borrows? (often users just want to get out of a long)"
+            ],
+            "type": "u8"
+          },
+          {
+            "name": "reserved",
+            "type": {
+              "array": [
+                "u8",
+                128
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
       "name": "TokenIndex",
       "docs": [
         "Nothing in Rust shall use these types. They only exist so that the Anchor IDL",
@@ -7776,6 +8074,9 @@ export type MangoV4 = {
           },
           {
             "name": "TokenWithdraw"
+          },
+          {
+            "name": "TokenStopLossTrigger"
           }
         ]
       }
@@ -7955,6 +8256,15 @@ export type MangoV4 = {
           },
           {
             "name": "GroupWithdrawInsuranceFund"
+          },
+          {
+            "name": "TokenStopLossCreate"
+          },
+          {
+            "name": "TokenStopLossTrigger"
+          },
+          {
+            "name": "TokenStopLossCancel"
           }
         ]
       }
@@ -8234,6 +8544,20 @@ export type MangoV4 = {
           },
           {
             "name": "Liquidate"
+          }
+        ]
+      }
+    },
+    {
+      "name": "TokenStopLossPriceThresholdType",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "PriceOverThreshold"
+          },
+          {
+            "name": "PriceUnderThreshold"
           }
         ]
       }
@@ -9712,6 +10036,66 @@ export type MangoV4 = {
           "index": false
         }
       ]
+    },
+    {
+      "name": "TokenStopLossTriggerLog",
+      "fields": [
+        {
+          "name": "mangoGroup",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "liqee",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "liqor",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "tokenStopLossId",
+          "type": "u64",
+          "index": false
+        },
+        {
+          "name": "buyTokenIndex",
+          "type": "u16",
+          "index": false
+        },
+        {
+          "name": "sellTokenIndex",
+          "type": "u16",
+          "index": false
+        },
+        {
+          "name": "buyAmount",
+          "type": "u64",
+          "index": false
+        },
+        {
+          "name": "sellAmount",
+          "type": "u64",
+          "index": false
+        },
+        {
+          "name": "buyTokenPrice",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "sellTokenPrice",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "closed",
+          "type": "bool",
+          "index": false
+        }
+      ]
     }
   ],
   "errors": [
@@ -9959,6 +10343,11 @@ export type MangoV4 = {
       "code": 6048,
       "name": "WouldSelfTrade",
       "msg": "would self trade"
+    },
+    {
+      "code": 6049,
+      "name": "StopLossPriceThresholdNotReached",
+      "msg": "stop loss price threshold not reached"
     }
   ]
 };
@@ -11084,6 +11473,62 @@ export const IDL: MangoV4 = {
       ]
     },
     {
+      "name": "accountExpandV2",
+      "accounts": [
+        {
+          "name": "group",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "account",
+          "isMut": true,
+          "isSigner": false,
+          "relations": [
+            "group",
+            "owner"
+          ]
+        },
+        {
+          "name": "owner",
+          "isMut": false,
+          "isSigner": true
+        },
+        {
+          "name": "payer",
+          "isMut": true,
+          "isSigner": true
+        },
+        {
+          "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "tokenCount",
+          "type": "u8"
+        },
+        {
+          "name": "serum3Count",
+          "type": "u8"
+        },
+        {
+          "name": "perpCount",
+          "type": "u8"
+        },
+        {
+          "name": "perpOoCount",
+          "type": "u8"
+        },
+        {
+          "name": "tokenStopLossCount",
+          "type": "u8"
+        }
+      ]
+    },
+    {
       "name": "accountEdit",
       "accounts": [
         {
@@ -14616,6 +15061,151 @@ export const IDL: MangoV4 = {
       ]
     },
     {
+      "name": "tokenStopLossCreate",
+      "accounts": [
+        {
+          "name": "group",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "account",
+          "isMut": true,
+          "isSigner": false,
+          "relations": [
+            "group"
+          ]
+        },
+        {
+          "name": "authority",
+          "isMut": false,
+          "isSigner": true
+        }
+      ],
+      "args": [
+        {
+          "name": "buyTokenIndex",
+          "type": "u16"
+        },
+        {
+          "name": "sellTokenIndex",
+          "type": "u16"
+        },
+        {
+          "name": "maxBuy",
+          "type": "u64"
+        },
+        {
+          "name": "maxSell",
+          "type": "u64"
+        },
+        {
+          "name": "priceThreshold",
+          "type": "f32"
+        },
+        {
+          "name": "priceThresholdType",
+          "type": {
+            "defined": "TokenStopLossPriceThresholdType"
+          }
+        },
+        {
+          "name": "pricePremiumBps",
+          "type": "u32"
+        },
+        {
+          "name": "allowCreatingDeposits",
+          "type": "bool"
+        },
+        {
+          "name": "allowCreatingBorrows",
+          "type": "bool"
+        }
+      ]
+    },
+    {
+      "name": "tokenStopLossCancel",
+      "accounts": [
+        {
+          "name": "group",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "account",
+          "isMut": true,
+          "isSigner": false,
+          "relations": [
+            "group"
+          ]
+        },
+        {
+          "name": "authority",
+          "isMut": false,
+          "isSigner": true
+        }
+      ],
+      "args": [
+        {
+          "name": "tokenStopLossIndex",
+          "type": "u8"
+        },
+        {
+          "name": "tokenStopLossId",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "tokenStopLossTrigger",
+      "accounts": [
+        {
+          "name": "group",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "liqee",
+          "isMut": true,
+          "isSigner": false,
+          "relations": [
+            "group"
+          ]
+        },
+        {
+          "name": "liqor",
+          "isMut": true,
+          "isSigner": false,
+          "relations": [
+            "group"
+          ]
+        },
+        {
+          "name": "liqorAuthority",
+          "isMut": false,
+          "isSigner": true
+        }
+      ],
+      "args": [
+        {
+          "name": "tokenStopLossIndex",
+          "type": "u8"
+        },
+        {
+          "name": "tokenStopLossId",
+          "type": "u64"
+        },
+        {
+          "name": "liqorMaxBuyTokenToGive",
+          "type": "u64"
+        },
+        {
+          "name": "liqorMaxSellTokenToReceive",
+          "type": "u64"
+        }
+      ]
+    },
+    {
       "name": "altSet",
       "accounts": [
         {
@@ -15230,11 +15820,15 @@ export const IDL: MangoV4 = {
             "type": "u64"
           },
           {
+            "name": "nextStopLossId",
+            "type": "u64"
+          },
+          {
             "name": "reserved",
             "type": {
               "array": [
                 "u8",
-                208
+                200
               ]
             }
           },
@@ -15298,10 +15892,6 @@ export const IDL: MangoV4 = {
                 "defined": "PerpOpenOrder"
               }
             }
-          },
-          {
-            "name": "padding8",
-            "type": "u32"
           }
         ]
       }
@@ -16906,11 +17496,15 @@ export const IDL: MangoV4 = {
             "type": "u64"
           },
           {
+            "name": "nextStopLossId",
+            "type": "u64"
+          },
+          {
             "name": "reserved",
             "type": {
               "array": [
                 "u8",
-                208
+                200
               ]
             }
           }
@@ -17567,6 +18161,99 @@ export const IDL: MangoV4 = {
       }
     },
     {
+      "name": "TokenStopLoss",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "id",
+            "type": "u64"
+          },
+          {
+            "name": "maxBuy",
+            "docs": [
+              "maximum amount of native tokens to buy or sell"
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "maxSell",
+            "type": "u64"
+          },
+          {
+            "name": "bought",
+            "docs": [
+              "how many native tokens were already bought/sold"
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "sold",
+            "type": "u64"
+          },
+          {
+            "name": "priceThreshold",
+            "docs": [
+              "the threshold at which to allow execution"
+            ],
+            "type": "f32"
+          },
+          {
+            "name": "pricePremiumBps",
+            "docs": [
+              "the premium to pay over oracle price"
+            ],
+            "type": "u32"
+          },
+          {
+            "name": "buyTokenIndex",
+            "docs": [
+              "indexes of tokens for the swap"
+            ],
+            "type": "u16"
+          },
+          {
+            "name": "sellTokenIndex",
+            "type": "u16"
+          },
+          {
+            "name": "priceThresholdType",
+            "docs": [
+              "holds a TokenStopLossPriceThresholdType, so whether the threshold is > or <"
+            ],
+            "type": "u8"
+          },
+          {
+            "name": "isActive",
+            "type": "u8"
+          },
+          {
+            "name": "allowCreatingDeposits",
+            "docs": [
+              "may token purchases create deposits? (often users just want to get out of a borrow)"
+            ],
+            "type": "u8"
+          },
+          {
+            "name": "allowCreatingBorrows",
+            "docs": [
+              "may token selling create borrows? (often users just want to get out of a long)"
+            ],
+            "type": "u8"
+          },
+          {
+            "name": "reserved",
+            "type": {
+              "array": [
+                "u8",
+                128
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
       "name": "TokenIndex",
       "docs": [
         "Nothing in Rust shall use these types. They only exist so that the Anchor IDL",
@@ -17741,6 +18428,9 @@ export const IDL: MangoV4 = {
           },
           {
             "name": "TokenWithdraw"
+          },
+          {
+            "name": "TokenStopLossTrigger"
           }
         ]
       }
@@ -17920,6 +18610,15 @@ export const IDL: MangoV4 = {
           },
           {
             "name": "GroupWithdrawInsuranceFund"
+          },
+          {
+            "name": "TokenStopLossCreate"
+          },
+          {
+            "name": "TokenStopLossTrigger"
+          },
+          {
+            "name": "TokenStopLossCancel"
           }
         ]
       }
@@ -18199,6 +18898,20 @@ export const IDL: MangoV4 = {
           },
           {
             "name": "Liquidate"
+          }
+        ]
+      }
+    },
+    {
+      "name": "TokenStopLossPriceThresholdType",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "PriceOverThreshold"
+          },
+          {
+            "name": "PriceUnderThreshold"
           }
         ]
       }
@@ -19677,6 +20390,66 @@ export const IDL: MangoV4 = {
           "index": false
         }
       ]
+    },
+    {
+      "name": "TokenStopLossTriggerLog",
+      "fields": [
+        {
+          "name": "mangoGroup",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "liqee",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "liqor",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "tokenStopLossId",
+          "type": "u64",
+          "index": false
+        },
+        {
+          "name": "buyTokenIndex",
+          "type": "u16",
+          "index": false
+        },
+        {
+          "name": "sellTokenIndex",
+          "type": "u16",
+          "index": false
+        },
+        {
+          "name": "buyAmount",
+          "type": "u64",
+          "index": false
+        },
+        {
+          "name": "sellAmount",
+          "type": "u64",
+          "index": false
+        },
+        {
+          "name": "buyTokenPrice",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "sellTokenPrice",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "closed",
+          "type": "bool",
+          "index": false
+        }
+      ]
     }
   ],
   "errors": [
@@ -19924,6 +20697,11 @@ export const IDL: MangoV4 = {
       "code": 6048,
       "name": "WouldSelfTrade",
       "msg": "would self trade"
+    },
+    {
+      "code": 6049,
+      "name": "StopLossPriceThresholdNotReached",
+      "msg": "stop loss price threshold not reached"
     }
   ]
 };
