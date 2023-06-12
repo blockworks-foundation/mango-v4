@@ -98,12 +98,16 @@ fn trade_amount(
 }
 
 fn trade_amount_inner(max_buy: u64, max_sell: u64, sell_per_buy_price: I80F48) -> (u64, u64) {
-    // This logic looks confusing, but please check the test_trade_amount_inner
+    // This logic looks confusing, but also check the test_trade_amount_inner
     let buy_for_sell: u64 = if sell_per_buy_price > I80F48::ONE {
+        // Example: max_sell=1 and price=1.9. Result should be buy=1, sell=1
+        // since we're ok flooring the sell amount.
         ((I80F48::from(max_sell) + I80F48::ONE - I80F48::DELTA) / sell_per_buy_price)
             .floor()
             .to_num()
     } else {
+        // Example: max_buy=7, max_sell=4, price=0.6. Result should be buy=7, sell=4
+        // Example: max_buy=1, max_sell=1, price=0.01. Result should be 0, 0
         ((I80F48::from(max_buy) * sell_per_buy_price)
             .floor()
             .min(I80F48::from(max_sell))
@@ -115,8 +119,13 @@ fn trade_amount_inner(max_buy: u64, max_sell: u64, sell_per_buy_price: I80F48) -
     let sell_for_buy = (I80F48::from(buy_amount) * sell_per_buy_price)
         .floor()
         .to_num::<u64>();
+    let sell_amount = max_sell.min(sell_for_buy);
 
-    (buy_amount, max_sell.min(sell_for_buy))
+    // Invariant: never exchange something for nothing.
+    // the proof for buy==0 => sell==0 is trivial, other directly is less clear but should hold
+    assert!(!((buy_amount > 0) ^ (sell_amount > 0)));
+
+    (buy_amount, sell_amount)
 }
 
 fn action(
@@ -142,15 +151,20 @@ fn action(
     // amount of sell token native per buy token native
     match tsl.price_threshold_type() {
         TokenStopLossPriceThresholdType::PriceUnderThreshold => {
-            require_gt!(tsl.price_threshold, price); // TODO: clearer error, "threshold not reached"
+            require_gt!(
+                tsl.price_threshold,
+                price,
+                MangoError::StopLossPriceThresholdNotReached
+            );
         }
         TokenStopLossPriceThresholdType::PriceOverThreshold => {
-            require_gt!(price, tsl.price_threshold);
+            require_gt!(
+                price,
+                tsl.price_threshold,
+                MangoError::StopLossPriceThresholdNotReached
+            );
         }
     }
-
-    // NOTE: can we just leave computing the max-swap amount to the caller? we just do health checks in the end?
-    // that would make this simple and obviously safe
 
     let pre_liqee_buy_token = liqee
         .ensure_token_position(tsl.buy_token_index)?
@@ -164,7 +178,6 @@ fn action(
     // derive trade amount based on limits in the tsl and by the liqor
     let premium_price = price * (1.0 + (tsl.price_premium_bps as f32) * 0.0001);
     let premium_price_i80f48 = I80F48::from_num(premium_price);
-    // TODO: is it ok for these to be in u64? Otherwise a bunch of fields on the tsl would need to be I80F48 too...
     let (buy_token_amount, sell_token_amount) = trade_amount(
         &tsl,
         premium_price_i80f48,
@@ -173,8 +186,9 @@ fn action(
         pre_liqee_buy_token,
         pre_liqee_sell_token,
     );
-    // TODO: do something special for an execution where buy_token_amount or sell_token_amount are zero?
-    // (note that some mutation has already happened!)
+    // NOTE: It's possible that buy_token_amount == sell_token_amount == 0!
+    // Proceed with it anyway because we already mutated the account anyway and might want
+    // to drop the token stop loss entry later.
 
     // do the token transfer between liqee and liqor
     let buy_token_amount_i80f48 = I80F48::from(buy_token_amount);
@@ -223,10 +237,12 @@ fn action(
         assert!(tsl.bought <= tsl.max_buy);
         assert!(tsl.sold <= tsl.max_sell);
 
-        // maybe remove tsl
-        // TODO: this also drops the TSL if no more swapping is possible at the current price
-        // - like if the "don't create deposits/borrows" constraint is reached
-        // - or if the price is such that swapping 1 native token would already exceed the limit
+        // Maybe remove token stop loss entry
+        //
+        // This drops the tsl if no more swapping is possible at the current price:
+        // - if bought/sold reached the max
+        // - if the "don't create deposits/borrows" constraint is reached
+        // - if the price is such that swapping 1 native token would already exceed the limit
         let (future_buy, future_sell) = trade_amount(
             tsl,
             premium_price_i80f48,
@@ -240,9 +256,10 @@ fn action(
         }
     }
 
-    // using sell_token_amount_i80f48 here would not account for loan origination fees!
+    // Return the change in liqee token account balances
     Ok((
         buy_token_amount_i80f48,
+        // using sell_token_amount_i80f48 here would not account for loan origination fees!
         post_liqee_sell_token - pre_liqee_sell_token,
     ))
 }

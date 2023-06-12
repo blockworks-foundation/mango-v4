@@ -159,9 +159,10 @@ impl MangoAccount {
     }
 
     pub fn to_bytes(&self) -> Vec<u8> {
-        let mut b = AnchorSerialize::try_to_vec(&self).unwrap();
-        // TODO: maybe don't do this, the program happily reads accounts without a token_stop_loss size
-        b.extend(&[0u8; 8]);
+        let b = AnchorSerialize::try_to_vec(&self).unwrap();
+        // We could extend for u32 padding and u32 size of TokenStopLoss entries here,
+        // but the from_bytes() code must support reading older account data, so it's fine.
+        // b.extend(&[0u8; 8]);
         b
     }
 
@@ -405,7 +406,6 @@ impl DynamicHeader for MangoAccountDynamicHeader {
                 ]))
                 .unwrap();
 
-                // TODO: Should we make this header version 2 instead? That breaks backwards compat though!
                 let token_stop_loss_vec_offset = MangoAccount::dynamic_token_stop_loss_vec_offset(
                     token_count,
                     serum3_count,
@@ -1412,7 +1412,9 @@ mod tests {
         let account_bytes = account.to_bytes();
         assert_eq!(
             8 + account_bytes.len(),
-            MangoAccount::space(8, 8, 8, 8, 0).unwrap()
+            // MangoAccount.to_bytes() creates an account without token stop loss, so
+            // subtract 8 bytes for TokenStopLoss padding and size
+            MangoAccount::space(8, 8, 8, 8, 0).unwrap() - 8
         );
 
         let account2 = MangoAccountValue::from_bytes(&account_bytes).unwrap();

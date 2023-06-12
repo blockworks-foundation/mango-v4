@@ -103,6 +103,8 @@ pub enum MangoError {
     InvalidHealthAccountCount,
     #[msg("would self trade")]
     WouldSelfTrade,
+    #[msg("stop loss price threshold not reached")]
+    StopLossPriceThresholdNotReached,
 }
 
 impl MangoError {

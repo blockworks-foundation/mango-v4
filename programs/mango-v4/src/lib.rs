@@ -1174,6 +1174,7 @@ pub mod mango_v4 {
         Ok(())
     }
 
+    // NOTE: It's the triggerer's job to compute liqor_max_* numbers that work with the liqee's health.
     pub fn token_stop_loss_trigger(
         ctx: Context<TokenStopLossTrigger>,
         token_stop_loss_index: u8,
