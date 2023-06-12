@@ -5,7 +5,7 @@ use anchor_lang::prelude::*;
 #[derive(Accounts)]
 pub struct TokenStopLossTrigger<'info> {
     #[account(
-        // TODO: constraint = group.load()?.is_ix_enabled(IxGate::PerpPlaceOrder) @ MangoError::IxIsDisabled,
+        constraint = group.load()?.is_ix_enabled(IxGate::TokenStopLossTrigger) @ MangoError::IxIsDisabled,
     )]
     pub group: AccountLoader<'info, Group>,
 

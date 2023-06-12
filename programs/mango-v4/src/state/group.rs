@@ -190,6 +190,9 @@ pub enum IxGate {
     TokenForceCloseBorrowsWithToken = 49,
     PerpForceClosePosition = 50,
     GroupWithdrawInsuranceFund = 51,
+    TokenStopLossCreate = 52,
+    TokenStopLossTrigger = 53,
+    TokenStopLossCancel = 54,
     // NOTE: Adding new variants requires matching changes in ts and the ix_gate_set instruction.
 }
 
