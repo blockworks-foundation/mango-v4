@@ -246,6 +246,7 @@ pub enum LoanOriginationFeeInstruction {
     Serum3PlaceOrder,
     Serum3SettleFunds,
     TokenWithdraw,
+    TokenStopLossTrigger,
 }
 
 #[event]
@@ -434,4 +435,19 @@ pub struct TokenForceCloseBorrowsWithTokenLog {
     pub asset_price: i128,
     pub liab_price: i128,
     pub fee_factor: i128,
+}
+
+#[event]
+pub struct TokenStopLossTriggerLog {
+    pub mango_group: Pubkey,
+    pub liqee: Pubkey,
+    pub liqor: Pubkey,
+    pub token_stop_loss_id: u64,
+    pub buy_token_index: u16,
+    pub sell_token_index: u16,
+    pub buy_amount: u64,
+    pub sell_amount: u64,
+    pub buy_token_price: i128,  // I80F48
+    pub sell_token_price: i128, // I80F48
+    pub closed: bool,
 }

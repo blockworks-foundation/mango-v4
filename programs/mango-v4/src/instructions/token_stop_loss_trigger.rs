@@ -4,6 +4,10 @@ use fixed::types::I80F48;
 use crate::accounts_ix::*;
 use crate::error::*;
 use crate::health::*;
+use crate::logs::{
+    LoanOriginationFeeInstruction, TokenBalanceLog, TokenStopLossTriggerLog,
+    WithdrawLoanOriginationFeeLog,
+};
 use crate::state::*;
 
 #[allow(clippy::too_many_arguments)]
@@ -41,7 +45,6 @@ pub fn token_stop_loss_trigger(
     let (buy_bank, buy_token_price, sell_bank_and_oracle_opt) =
         account_retriever.banks_mut_and_oracles(tsl.buy_token_index, tsl.sell_token_index)?;
     let (sell_bank, sell_token_price) = sell_bank_and_oracle_opt.unwrap();
-    let price: f32 = (buy_token_price.to_num::<f64>() / sell_token_price.to_num::<f64>()) as f32;
 
     let now_ts: u64 = Clock::get().unwrap().unix_timestamp.try_into().unwrap();
     let (liqee_buy_change, liqee_sell_change) = action(
@@ -51,14 +54,13 @@ pub fn token_stop_loss_trigger(
         liqee_key,
         token_stop_loss_index,
         buy_bank,
+        buy_token_price,
         liqor_max_buy_token_to_give,
         sell_bank,
+        sell_token_price,
         liqor_max_sell_token_to_receive,
-        price,
         now_ts,
     )?;
-
-    // TODO: log token positions, loan and origination fee amounts, and the ix
 
     // Check liqee and liqor health after the transaction
     liqee_health_cache.adjust_token_balance(&buy_bank, liqee_buy_change)?;
@@ -137,10 +139,11 @@ fn action(
     liqee_key: Pubkey,
     token_stop_loss_index: usize,
     buy_bank: &mut Bank,
+    buy_token_price: I80F48,
     liqor_max_buy_token_to_give: u64,
     sell_bank: &mut Bank,
+    sell_token_price: I80F48,
     liqor_max_sell_token_to_receive: u64,
-    price: f32,
     now_ts: u64,
 ) -> Result<(I80F48, I80F48)> {
     let tsl = liqee
@@ -151,6 +154,7 @@ fn action(
     require_eq!(sell_bank.token_index, tsl.sell_token_index);
 
     // amount of sell token native per buy token native
+    let price: f32 = (buy_token_price.to_num::<f64>() / sell_token_price.to_num::<f64>()) as f32;
     match tsl.price_threshold_type() {
         TokenStopLossPriceThresholdType::PriceUnderThreshold => {
             require_gt!(
@@ -204,6 +208,7 @@ fn action(
         buy_bank.withdraw_with_fee(liqor_buy_token, buy_token_amount_i80f48, now_ts)?;
 
     let post_liqee_buy_token = liqee_buy_token.native(&buy_bank);
+    let post_liqor_buy_token = liqor_buy_token.native(&buy_bank);
 
     let (liqee_sell_token, liqee_sell_raw_index) =
         liqee.token_position_mut(tsl.sell_token_index)?;
@@ -215,6 +220,7 @@ fn action(
         sell_bank.withdraw_with_fee(liqee_sell_token, sell_token_amount_i80f48, now_ts)?;
 
     let post_liqee_sell_token = liqee_sell_token.native(&sell_bank);
+    let post_liqor_sell_token = liqor_sell_token.native(&sell_bank);
 
     // With a scanning account retriever, it's safe to deactivate inactive token positions immediately
     if !liqee_buy_active {
@@ -230,8 +236,66 @@ fn action(
         liqor.deactivate_token_position_and_log(liqor_sell_raw_index, liqor_key)
     }
 
+    // Log info
+
+    // liqee buy token
+    emit!(TokenBalanceLog {
+        mango_group: liqee.fixed.group,
+        mango_account: liqee_key,
+        token_index: tsl.buy_token_index,
+        indexed_position: post_liqee_buy_token.to_bits(),
+        deposit_index: buy_bank.deposit_index.to_bits(),
+        borrow_index: buy_bank.borrow_index.to_bits(),
+    });
+    // liqee sell token
+    emit!(TokenBalanceLog {
+        mango_group: liqee.fixed.group,
+        mango_account: liqee_key,
+        token_index: tsl.sell_token_index,
+        indexed_position: post_liqee_sell_token.to_bits(),
+        deposit_index: sell_bank.deposit_index.to_bits(),
+        borrow_index: sell_bank.borrow_index.to_bits(),
+    });
+    // liqor buy token
+    emit!(TokenBalanceLog {
+        mango_group: liqee.fixed.group,
+        mango_account: liqor_key,
+        token_index: tsl.buy_token_index,
+        indexed_position: post_liqor_buy_token.to_bits(),
+        deposit_index: buy_bank.deposit_index.to_bits(),
+        borrow_index: buy_bank.borrow_index.to_bits(),
+    });
+    // liqor sell token
+    emit!(TokenBalanceLog {
+        mango_group: liqee.fixed.group,
+        mango_account: liqor_key,
+        token_index: tsl.sell_token_index,
+        indexed_position: post_liqor_sell_token.to_bits(),
+        deposit_index: sell_bank.deposit_index.to_bits(),
+        borrow_index: sell_bank.borrow_index.to_bits(),
+    });
+
+    if liqor_buy_loan_origination.is_positive() {
+        emit!(WithdrawLoanOriginationFeeLog {
+            mango_group: liqee.fixed.group,
+            mango_account: liqor_key,
+            token_index: tsl.buy_token_index,
+            loan_origination_fee: liqor_buy_loan_origination.to_bits(),
+            instruction: LoanOriginationFeeInstruction::TokenStopLossTrigger
+        });
+    }
+    if liqee_sell_loan_origination.is_positive() {
+        emit!(WithdrawLoanOriginationFeeLog {
+            mango_group: liqee.fixed.group,
+            mango_account: liqee_key,
+            token_index: tsl.sell_token_index,
+            loan_origination_fee: liqee_sell_loan_origination.to_bits(),
+            instruction: LoanOriginationFeeInstruction::TokenStopLossTrigger
+        });
+    }
+
     // update tsl information on the account
-    {
+    let closed = {
         // record amount
         let tsl = liqee.token_stop_loss_mut_by_index(token_stop_loss_index)?;
         tsl.bought += buy_token_amount;
@@ -255,8 +319,25 @@ fn action(
         );
         if future_buy == 0 || future_sell == 0 {
             *tsl = TokenStopLoss::default();
+            true
+        } else {
+            false
         }
-    }
+    };
+
+    emit!(TokenStopLossTriggerLog {
+        mango_group: liqee.fixed.group,
+        liqee: liqee_key,
+        liqor: liqor_key,
+        token_stop_loss_id: tsl.id,
+        buy_token_index: tsl.buy_token_index,
+        sell_token_index: tsl.sell_token_index,
+        buy_amount: buy_token_amount,
+        sell_amount: sell_token_amount,
+        buy_token_price: buy_token_price.to_bits(),
+        sell_token_price: sell_token_price.to_bits(),
+        closed,
+    });
 
     // Return the change in liqee token account balances
     Ok((
@@ -490,10 +571,11 @@ mod tests {
             Pubkey::default(),
             0,
             setup.liab_bank.data(),
+            I80F48::from(2),
             40,
             setup.asset_bank.data(),
+            I80F48::from(1),
             100,
-            2.0,
             0,
         )
         .unwrap();
@@ -517,10 +599,11 @@ mod tests {
             Pubkey::default(),
             0,
             setup.liab_bank.data(),
+            I80F48::from(2),
             40,
             setup.asset_bank.data(),
+            I80F48::from(1),
             100,
-            2.0,
             0,
         )
         .unwrap();
