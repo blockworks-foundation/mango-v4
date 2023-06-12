@@ -105,7 +105,9 @@ pub struct MangoAccount {
     /// End timestamp of the current expiry interval of the buyback fees amount.
     pub buyback_fees_expiry_timestamp: u64,
 
-    pub reserved: [u8; 208],
+    pub next_stop_loss_id: u64,
+
+    pub reserved: [u8; 200],
 
     // dynamic
     pub header_version: u8,
@@ -143,7 +145,8 @@ impl MangoAccount {
             buyback_fees_accrued_current: 0,
             buyback_fees_accrued_previous: 0,
             buyback_fees_expiry_timestamp: 0,
-            reserved: [0; 208],
+            next_stop_loss_id: 0,
+            reserved: [0; 200],
             header_version: DEFAULT_MANGO_ACCOUNT_VERSION,
             padding3: Default::default(),
             padding4: Default::default(),
@@ -260,9 +263,10 @@ pub struct MangoAccountFixed {
     pub buyback_fees_accrued_current: u64,
     pub buyback_fees_accrued_previous: u64,
     pub buyback_fees_expiry_timestamp: u64,
-    pub reserved: [u8; 208],
+    pub next_stop_loss_id: u64,
+    pub reserved: [u8; 200],
 }
-const_assert_eq!(size_of::<MangoAccountFixed>(), 32 * 4 + 8 + 7 * 8 + 208);
+const_assert_eq!(size_of::<MangoAccountFixed>(), 32 * 4 + 8 + 8 * 8 + 200);
 const_assert_eq!(size_of::<MangoAccountFixed>(), 400);
 const_assert_eq!(size_of::<MangoAccountFixed>() % 8, 0);
 
@@ -1426,6 +1430,7 @@ mod tests {
         account.perps.resize(8, PerpPosition::default());
         account.perps[0].market_index = 9;
         account.perp_open_orders.resize(8, PerpOpenOrder::default());
+        account.next_stop_loss_id = 13;
 
         let account_bytes = account.to_bytes();
         assert_eq!(
@@ -1465,6 +1470,7 @@ mod tests {
             account.buyback_fees_expiry_timestamp,
             account2.fixed.buyback_fees_expiry_timestamp
         );
+        assert_eq!(account.next_stop_loss_id, account2.fixed.next_stop_loss_id);
         assert_eq!(
             account.tokens[0].token_index,
             account2

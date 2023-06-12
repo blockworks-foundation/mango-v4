@@ -10,6 +10,7 @@ use crate::state::*;
 pub fn token_stop_loss_trigger(
     ctx: Context<TokenStopLossTrigger>,
     token_stop_loss_index: usize,
+    token_stop_loss_id: u64,
     liqor_max_buy_token_to_give: u64,
     liqor_max_sell_token_to_receive: u64,
 ) -> Result<()> {
@@ -35,6 +36,7 @@ pub fn token_stop_loss_trigger(
 
     let tsl = liqee.token_stop_loss_by_index(token_stop_loss_index)?;
     require!(tsl.is_active(), MangoError::SomeError);
+    require_eq!(tsl.id, token_stop_loss_id);
 
     let (buy_bank, buy_token_price, sell_bank_and_oracle_opt) =
         account_retriever.banks_mut_and_oracles(tsl.buy_token_index, tsl.sell_token_index)?;

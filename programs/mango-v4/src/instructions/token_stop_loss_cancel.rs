@@ -8,6 +8,7 @@ use crate::state::*;
 pub fn token_stop_loss_cancel(
     ctx: Context<AccountAndAuthority>,
     token_stop_loss_index: usize,
+    token_stop_loss_id: u64,
 ) -> Result<()> {
     require!(
         ctx.accounts
@@ -19,7 +20,13 @@ pub fn token_stop_loss_cancel(
 
     let mut account = ctx.accounts.account.load_full_mut()?;
     let tsl = account.token_stop_loss_mut_by_index(token_stop_loss_index)?;
+
     // If the tsl is already inactive, this just is a noop
+    if !tsl.is_active() {
+        return Ok(());
+    }
+
+    require_eq!(tsl.id, token_stop_loss_id);
     *tsl = TokenStopLoss::default();
 
     Ok(())

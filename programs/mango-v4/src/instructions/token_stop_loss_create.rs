@@ -18,8 +18,13 @@ pub fn token_stop_loss_create(
     );
 
     let mut account = ctx.accounts.account.load_full_mut()?;
+
+    let id = account.fixed.next_stop_loss_id;
+    account.fixed.next_stop_loss_id = account.fixed.next_stop_loss_id.wrapping_add(1);
+
     let tsl = account.add_token_stop_loss()?;
     *tsl = token_stop_loss;
+    tsl.id = id;
 
     Ok(())
 }

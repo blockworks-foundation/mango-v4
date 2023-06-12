@@ -28,6 +28,8 @@ pub enum TokenStopLossPriceThresholdType {
 #[derive(AnchorDeserialize, AnchorSerialize, Derivative, bytemuck::Pod)]
 #[derivative(Debug)]
 pub struct TokenStopLoss {
+    pub id: u64,
+
     /// maximum amount of native tokens to buy or sell
     pub max_buy: u64,
     pub max_sell: u64,
@@ -56,16 +58,14 @@ pub struct TokenStopLoss {
     /// may token selling create borrows? (often users just want to get out of a long)
     pub allow_creating_borrows: u8,
 
-    // TODO: these should probably have some kind of id, so it's easy to refer to them
-    //       and clearer when one got cancelled and replaced
     // TODO: Add some kind of expiry timestamp
     #[derivative(Debug = "ignore")]
-    pub reserved: [u8; 136],
+    pub reserved: [u8; 128],
 }
 
 const_assert_eq!(
     size_of::<TokenStopLoss>(),
-    8 * 4 + 4 + 4 + 2 * 2 + 1 * 4 + 136
+    8 * 5 + 4 + 4 + 2 * 2 + 1 * 4 + 128
 );
 const_assert_eq!(size_of::<TokenStopLoss>(), 184);
 const_assert_eq!(size_of::<TokenStopLoss>() % 8, 0);
@@ -73,6 +73,7 @@ const_assert_eq!(size_of::<TokenStopLoss>() % 8, 0);
 impl Default for TokenStopLoss {
     fn default() -> Self {
         Self {
+            id: 0,
             max_buy: 0,
             max_sell: 0,
             bought: 0,
@@ -85,7 +86,7 @@ impl Default for TokenStopLoss {
             is_active: 0,
             allow_creating_borrows: 0,
             allow_creating_deposits: 0,
-            reserved: [0; 136],
+            reserved: [0; 128],
         }
     }
 }

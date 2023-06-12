@@ -4265,6 +4265,7 @@ pub struct TokenStopLossCancelInstruction {
     pub account: Pubkey,
     pub owner: TestKeypair,
     pub index: u8,
+    pub id: u64,
 }
 #[async_trait::async_trait(?Send)]
 impl ClientInstruction for TokenStopLossCancelInstruction {
@@ -4277,6 +4278,7 @@ impl ClientInstruction for TokenStopLossCancelInstruction {
         let program_id = mango_v4::id();
         let instruction = Self::Instruction {
             token_stop_loss_index: self.index,
+            token_stop_loss_id: self.id,
         };
 
         let account = account_loader
@@ -4304,7 +4306,7 @@ pub struct TokenStopLossTriggerInstruction {
     pub liqee: Pubkey,
     pub liqor: Pubkey,
     pub liqor_owner: TestKeypair,
-    pub token_stop_loss_index: u8,
+    pub index: u8,
     pub max_buy_token_to_give: u64,
     pub max_sell_token_to_receive: u64,
 }
@@ -4317,11 +4319,6 @@ impl ClientInstruction for TokenStopLossTriggerInstruction {
         account_loader: impl ClientAccountLoader + 'async_trait,
     ) -> (Self::Accounts, instruction::Instruction) {
         let program_id = mango_v4::id();
-        let instruction = Self::Instruction {
-            token_stop_loss_index: self.token_stop_loss_index,
-            liqor_max_buy_token_to_give: self.max_buy_token_to_give,
-            liqor_max_sell_token_to_receive: self.max_sell_token_to_receive,
-        };
 
         let liqee = account_loader
             .load_mango_account(&self.liqee)
@@ -4333,9 +4330,16 @@ impl ClientInstruction for TokenStopLossTriggerInstruction {
             .unwrap();
 
         let tsl = liqee
-            .token_stop_loss_by_index(self.token_stop_loss_index.into())
+            .token_stop_loss_by_index(self.index.into())
             .unwrap()
             .clone();
+
+        let instruction = Self::Instruction {
+            token_stop_loss_index: self.index,
+            token_stop_loss_id: tsl.id,
+            liqor_max_buy_token_to_give: self.max_buy_token_to_give,
+            liqor_max_sell_token_to_receive: self.max_sell_token_to_receive,
+        };
 
         let health_check_metas = derive_liquidation_remaining_account_metas(
             &account_loader,

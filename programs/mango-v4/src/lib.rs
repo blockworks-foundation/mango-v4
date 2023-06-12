@@ -1145,6 +1145,7 @@ pub mod mango_v4 {
         allow_creating_borrows: bool,
     ) -> Result<()> {
         let tsl = TokenStopLoss {
+            id: 0,
             max_buy,
             max_sell,
             bought: 0,
@@ -1157,7 +1158,7 @@ pub mod mango_v4 {
             is_active: 1,
             allow_creating_deposits: u8::from(allow_creating_deposits),
             allow_creating_borrows: u8::from(allow_creating_borrows),
-            reserved: [0; 136],
+            reserved: [0; 128],
         };
 
         #[cfg(feature = "enable-gpl")]
@@ -1168,9 +1169,14 @@ pub mod mango_v4 {
     pub fn token_stop_loss_cancel(
         ctx: Context<AccountAndAuthority>,
         token_stop_loss_index: u8,
+        token_stop_loss_id: u64,
     ) -> Result<()> {
         #[cfg(feature = "enable-gpl")]
-        instructions::token_stop_loss_cancel(ctx, token_stop_loss_index.into())?;
+        instructions::token_stop_loss_cancel(
+            ctx,
+            token_stop_loss_index.into(),
+            token_stop_loss_id,
+        )?;
         Ok(())
     }
 
@@ -1178,6 +1184,7 @@ pub mod mango_v4 {
     pub fn token_stop_loss_trigger(
         ctx: Context<TokenStopLossTrigger>,
         token_stop_loss_index: u8,
+        token_stop_loss_id: u64,
         liqor_max_buy_token_to_give: u64,
         liqor_max_sell_token_to_receive: u64,
     ) -> Result<()> {
@@ -1185,6 +1192,7 @@ pub mod mango_v4 {
         instructions::token_stop_loss_trigger(
             ctx,
             token_stop_loss_index.into(),
+            token_stop_loss_id,
             liqor_max_buy_token_to_give,
             liqor_max_sell_token_to_receive,
         )?;
