@@ -1,28 +1,10 @@
 use anchor_lang::prelude::*;
 
 use derivative::Derivative;
-use num_enum::{IntoPrimitive, TryFromPrimitive};
 use static_assertions::const_assert_eq;
 use std::mem::size_of;
 
 use crate::state::*;
-
-#[derive(
-    Eq,
-    PartialEq,
-    Copy,
-    Clone,
-    TryFromPrimitive,
-    IntoPrimitive,
-    Debug,
-    AnchorSerialize,
-    AnchorDeserialize,
-)]
-#[repr(u8)]
-pub enum TokenStopLossPriceThresholdType {
-    PriceOverThreshold,
-    PriceUnderThreshold,
-}
 
 #[zero_copy]
 #[derive(AnchorDeserialize, AnchorSerialize, Derivative, bytemuck::Pod)]
@@ -41,15 +23,15 @@ pub struct TokenStopLoss {
     /// the threshold at which to allow execution
     pub price_threshold: f32,
 
+    /// the maximum price at which execution is allowed
+    pub price_limit: f32,
+
     /// the premium to pay over oracle price
     pub price_premium_bps: u32,
 
     /// indexes of tokens for the swap
     pub buy_token_index: TokenIndex,
     pub sell_token_index: TokenIndex,
-
-    /// holds a TokenStopLossPriceThresholdType, so whether the threshold is > or <
-    pub price_threshold_type: u8,
 
     pub is_active: u8,
 
@@ -60,12 +42,12 @@ pub struct TokenStopLoss {
 
     // TODO: Add some kind of expiry timestamp
     #[derivative(Debug = "ignore")]
-    pub reserved: [u8; 128],
+    pub reserved: [u8; 125],
 }
 
 const_assert_eq!(
     size_of::<TokenStopLoss>(),
-    8 * 5 + 4 + 4 + 2 * 2 + 1 * 4 + 128
+    8 * 5 + 2 * 4 + 4 + 2 * 2 + 1 * 3 + 125
 );
 const_assert_eq!(size_of::<TokenStopLoss>(), 184);
 const_assert_eq!(size_of::<TokenStopLoss>() % 8, 0);
@@ -79,14 +61,14 @@ impl Default for TokenStopLoss {
             bought: 0,
             sold: 0,
             price_threshold: 0.0,
+            price_limit: 0.0,
             price_premium_bps: 0,
             buy_token_index: TokenIndex::MAX,
             sell_token_index: TokenIndex::MAX,
-            price_threshold_type: TokenStopLossPriceThresholdType::PriceOverThreshold.into(),
             is_active: 0,
             allow_creating_borrows: 0,
             allow_creating_deposits: 0,
-            reserved: [0; 128],
+            reserved: [0; 125],
         }
     }
 }
@@ -106,10 +88,6 @@ impl TokenStopLoss {
 
     pub fn allow_creating_borrows(&self) -> bool {
         self.allow_creating_borrows == 1
-    }
-
-    pub fn price_threshold_type(&self) -> TokenStopLossPriceThresholdType {
-        TokenStopLossPriceThresholdType::try_from(self.price_threshold_type).unwrap()
     }
 
     pub fn remaining_buy(&self) -> u64 {

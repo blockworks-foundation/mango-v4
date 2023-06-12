@@ -155,22 +155,11 @@ fn action(
 
     // amount of sell token native per buy token native
     let price: f32 = (buy_token_price.to_num::<f64>() / sell_token_price.to_num::<f64>()) as f32;
-    match tsl.price_threshold_type() {
-        TokenStopLossPriceThresholdType::PriceUnderThreshold => {
-            require_gt!(
-                tsl.price_threshold,
-                price,
-                MangoError::StopLossPriceThresholdNotReached
-            );
-        }
-        TokenStopLossPriceThresholdType::PriceOverThreshold => {
-            require_gt!(
-                price,
-                tsl.price_threshold,
-                MangoError::StopLossPriceThresholdNotReached
-            );
-        }
-    }
+    require_gte!(
+        price,
+        tsl.price_threshold,
+        MangoError::StopLossPriceThresholdNotReached
+    );
 
     let pre_liqee_buy_token = liqee
         .ensure_token_position(tsl.buy_token_index)?
@@ -183,6 +172,8 @@ fn action(
 
     // derive trade amount based on limits in the tsl and by the liqor
     let premium_price = price * (1.0 + (tsl.price_premium_bps as f32) * 0.0001);
+    require_gte!(tsl.price_limit, premium_price);
+
     let premium_price_i80f48 = I80F48::from_num(premium_price);
     let (buy_token_amount, sell_token_amount) = trade_amount(
         &tsl,
@@ -552,7 +543,7 @@ mod tests {
             max_buy: 100,
             max_sell: 100,
             price_threshold: 1.0,
-            price_threshold_type: TokenStopLossPriceThresholdType::PriceOverThreshold.into(),
+            price_limit: 3.0,
             price_premium_bps: 1000,
             buy_token_index: 1,
             sell_token_index: 0,
@@ -564,21 +555,27 @@ mod tests {
         *setup.liqee.add_token_stop_loss().unwrap() = tsl.clone();
         assert_eq!(setup.liqee.active_token_stop_loss().count(), 1);
 
-        let (buy_change, sell_change) = action(
-            &mut setup.liqor.borrow_mut(),
-            Pubkey::default(),
-            &mut setup.liqee.borrow_mut(),
-            Pubkey::default(),
-            0,
-            setup.liab_bank.data(),
-            I80F48::from(2),
-            40,
-            setup.asset_bank.data(),
-            I80F48::from(1),
-            100,
-            0,
-        )
-        .unwrap();
+        let trigger = |setup: &mut TestSetup, buy_price, buy_max, sell_price, sell_max| {
+            action(
+                &mut setup.liqor.borrow_mut(),
+                Pubkey::default(),
+                &mut setup.liqee.borrow_mut(),
+                Pubkey::default(),
+                0,
+                setup.liab_bank.data(),
+                I80F48::from_num(buy_price),
+                buy_max,
+                setup.asset_bank.data(),
+                I80F48::from_num(sell_price),
+                sell_max,
+                0,
+            )
+        };
+
+        assert!(trigger(&mut setup, 0.99, 40, 1.0, 100,).is_err());
+        assert!(trigger(&mut setup, 1.0, 40, 0.33, 100,).is_err());
+
+        let (buy_change, sell_change) = trigger(&mut setup, 2.0, 40, 1.0, 100).unwrap();
         assert_eq!(buy_change.round(), 40);
         assert_eq!(sell_change.round(), -88);
 
@@ -592,21 +589,7 @@ mod tests {
         assert_eq!(setup.liqor_liab_pos().round(), -40);
         assert_eq!(setup.liqor_asset_pos().round(), 88);
 
-        let (buy_change, sell_change) = action(
-            &mut setup.liqor.borrow_mut(),
-            Pubkey::default(),
-            &mut setup.liqee.borrow_mut(),
-            Pubkey::default(),
-            0,
-            setup.liab_bank.data(),
-            I80F48::from(2),
-            40,
-            setup.asset_bank.data(),
-            I80F48::from(1),
-            100,
-            0,
-        )
-        .unwrap();
+        let (buy_change, sell_change) = trigger(&mut setup, 2.0, 40, 1.0, 100).unwrap();
         assert_eq!(buy_change.round(), 5);
         assert_eq!(sell_change.round(), -11);
 
