@@ -165,6 +165,17 @@ pub fn oracle_price_and_state(
             let price_data = price_account.to_price();
             let price = I80F48::from_num(price_data.price);
 
+            // Don't use price_data.status, because that has its own built-in staleness detection,
+            // check PriceAccount::to_price() impl.
+            if price_account.agg.status != pyth_sdk_solana::PriceStatus::Trading {
+                msg!(
+                    "Pyth price status isn't 'Trading': status: {}",
+                    price_data.status as u64
+                );
+
+                return Err(MangoError::OracleStale.into());
+            }
+
             // Filter out bad prices
             if I80F48::from_num(price_data.conf) > (config.conf_filter * price) {
                 msg!(
