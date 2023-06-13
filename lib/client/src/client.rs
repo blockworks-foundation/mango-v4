@@ -634,26 +634,34 @@ impl MangoClient {
         let ix = Instruction {
             program_id: mango_v4::id(),
             accounts: anchor_lang::ToAccountMetas::to_account_metas(
-                &mango_v4::accounts::Serum3SettleFunds {
-                    group: self.group(),
-                    account: self.mango_account_address,
-                    open_orders,
-                    quote_bank: s3.quote.mint_info.first_bank(),
-                    quote_vault: s3.quote.mint_info.first_vault(),
-                    base_bank: s3.base.mint_info.first_bank(),
-                    base_vault: s3.base.mint_info.first_vault(),
-                    serum_market: s3.market.address,
-                    serum_program: s3.market.market.serum_program,
-                    serum_market_external: s3.market.market.serum_market_external,
-                    market_base_vault: s3.market.coin_vault,
-                    market_quote_vault: s3.market.pc_vault,
-                    market_vault_signer: s3.market.vault_signer,
-                    owner: self.owner(),
-                    token_program: Token::id(),
+                &mango_v4::accounts::Serum3SettleFundsV2 {
+                    v1: mango_v4::accounts::Serum3SettleFunds {
+                        group: self.group(),
+                        account: self.mango_account_address,
+                        open_orders,
+                        quote_bank: s3.quote.mint_info.first_bank(),
+                        quote_vault: s3.quote.mint_info.first_vault(),
+                        base_bank: s3.base.mint_info.first_bank(),
+                        base_vault: s3.base.mint_info.first_vault(),
+                        serum_market: s3.market.address,
+                        serum_program: s3.market.market.serum_program,
+                        serum_market_external: s3.market.market.serum_market_external,
+                        market_base_vault: s3.market.coin_vault,
+                        market_quote_vault: s3.market.pc_vault,
+                        market_vault_signer: s3.market.vault_signer,
+                        owner: self.owner(),
+                        token_program: Token::id(),
+                    },
+                    v2: mango_v4::accounts::Serum3SettleFundsV2Extra {
+                        quote_oracle: s3.quote.mint_info.oracle,
+                        base_oracle: s3.base.mint_info.oracle,
+                    },
                 },
                 None,
             ),
-            data: anchor_lang::InstructionData::data(&mango_v4::instruction::Serum3SettleFunds {}),
+            data: anchor_lang::InstructionData::data(&mango_v4::instruction::Serum3SettleFundsV2 {
+                fees_to_dao: true,
+            }),
         };
         self.send_and_confirm_owner_tx(vec![ix]).await
     }
