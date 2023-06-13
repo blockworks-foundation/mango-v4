@@ -675,3 +675,71 @@ pub async fn maybe_liquidate_account(
 
     Ok(true)
 }
+
+#[allow(clippy::too_many_arguments)]
+pub async fn maybe_execute_token_stop_loss(
+    mango_client: &MangoClient,
+    account_fetcher: &chain_data::AccountFetcher,
+    pubkey: &Pubkey,
+    config: &Config,
+) -> anyhow::Result<bool> {
+    // TODO: exit early if there's no tsl active
+    // TODO: we should try finding the best stop loss over all accounts, imo!
+
+    let liqor_min_health_ratio = I80F48::from_num(config.min_health_ratio);
+
+    let account = account_fetcher.fetch_mango_account(pubkey)?;
+    let health_cache = health_cache::new(&mango_client.context, account_fetcher, &account)
+        .await
+        .context("creating health cache 1")?;
+    if health_cache.is_liquidatable() {
+        return Ok(false);
+    }
+
+    // Check for triggerable stop loss
+    for tsl in account.active_token_stop_loss() { // TODO: randomize order
+         // TODO: compute price and premium_price
+         // TODO: compare to threshold and limit
+    }
+
+    // TODO: exit if we didn't find one
+    // TODO: update the accounts for the top ones and recheck
+    // TODO: this time also check the health
+
+    // TODO: ok, we have a pubkey + tsl id. Compute the max viable swap (for liqor and liqee)
+    let tsl_id = 0;
+    let max_buy_token_to_liqee = 0;
+    let max_sell_token_to_liqor = 0;
+
+    // TODO: send the instruction
+
+    log::trace!(
+        "executing token stop loss for: {}, with owner: {}, TODO DETAILS",
+        pubkey,
+        account.fixed.owner,
+    );
+
+    let txsig = mango_client
+        .token_stop_loss_trigger(
+            (pubkey, &account),
+            tsl_id,
+            max_buy_token_to_liqee,
+            max_sell_token_to_liqor,
+        )
+        .await?;
+    // TODO: log txsig, see liquidation
+
+    let slot = account_fetcher.transaction_max_slot(&[txsig]).await?;
+    if let Err(e) = account_fetcher
+        .refresh_accounts_via_rpc_until_slot(
+            &[*pubkey, mango_client.mango_account_address],
+            slot,
+            config.refresh_timeout,
+        )
+        .await
+    {
+        log::info!("could not refresh after stop loss: {}", e);
+    }
+
+    Ok(true)
+}

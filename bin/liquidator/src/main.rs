@@ -368,10 +368,17 @@ async fn main() -> anyhow::Result<()> {
                     state.health_check_accounts = vec![];
                 }
 
-                liquidation
+                let liquidated = liquidation
                     .maybe_liquidate_one_and_rebalance(account_addresses.iter())
                     .await
                     .unwrap();
+
+                if !liquidated {
+                    liquidation
+                        .maybe_take_token_stop_loss(account_addresses.iter())
+                        .await
+                        .unwrap();
+                }
             }
         }
     });
@@ -423,7 +430,7 @@ impl LiquidationState {
     async fn maybe_liquidate_one_and_rebalance<'b>(
         &mut self,
         accounts_iter: impl Iterator<Item = &'b Pubkey>,
-    ) -> anyhow::Result<()> {
+    ) -> anyhow::Result<bool> {
         use rand::seq::SliceRandom;
 
         let mut accounts = accounts_iter.collect::<Vec<&Pubkey>>();
@@ -444,13 +451,13 @@ impl LiquidationState {
             }
         }
         if !liquidated_one {
-            return Ok(());
+            return Ok(false);
         }
 
         if let Err(err) = self.rebalancer.zero_all_non_quote().await {
             log::error!("failed to rebalance liqor: {:?}", err);
         }
-        Ok(())
+        Ok(true)
     }
 
     async fn maybe_liquidate_and_log_error(&mut self, pubkey: &Pubkey) -> anyhow::Result<bool> {
@@ -470,6 +477,106 @@ impl LiquidationState {
         }
 
         let result = liquidate::maybe_liquidate_account(
+            &self.mango_client,
+            &self.account_fetcher,
+            pubkey,
+            &self.liquidation_config,
+        )
+        .await;
+
+        if let Err(err) = result.as_ref() {
+            // Keep track of pubkeys that had errors
+            let error_entry = self
+                .accounts_with_errors
+                .entry(*pubkey)
+                .or_insert(ErrorTracking {
+                    count: 0,
+                    last_at: now,
+                });
+            if now.duration_since(error_entry.last_at) > self.error_reset_duration {
+                error_entry.count = 0;
+            }
+            error_entry.count += 1;
+            error_entry.last_at = now;
+
+            // Not all errors need to be raised to the user's attention.
+            let mut log_level = log::Level::Error;
+
+            // Simulation errors due to liqee precondition failures on the liquidation instructions
+            // will commonly happen if our liquidator is late or if there are chain forks.
+            match err.downcast_ref::<MangoClientError>() {
+                Some(MangoClientError::SendTransactionPreflightFailure { logs, .. }) => {
+                    if logs.iter().any(|line| {
+                        line.contains("HealthMustBeNegative") || line.contains("IsNotBankrupt")
+                    }) {
+                        log_level = log::Level::Trace;
+                    }
+                }
+                _ => {}
+            };
+            log::log!(log_level, "liquidating account {}: {:?}", pubkey, err);
+        } else {
+            self.accounts_with_errors.remove(pubkey);
+        }
+
+        result
+    }
+
+    async fn maybe_take_token_stop_loss<'b>(
+        &mut self,
+        accounts_iter: impl Iterator<Item = &'b Pubkey>,
+    ) -> anyhow::Result<()> {
+        use rand::seq::SliceRandom;
+
+        let mut accounts = accounts_iter.collect::<Vec<&Pubkey>>();
+        {
+            let mut rng = rand::thread_rng();
+            accounts.shuffle(&mut rng);
+        }
+
+        let mut took_one = false;
+        for pubkey in accounts {
+            if self
+                .maybe_take_stop_loss_and_log_error(pubkey)
+                .await
+                .unwrap_or(false)
+            {
+                took_one = true;
+                break;
+            }
+        }
+        if !took_one {
+            return Ok(());
+        }
+
+        if let Err(err) = self.rebalancer.zero_all_non_quote().await {
+            log::error!("failed to rebalance liqor: {:?}", err);
+        }
+        Ok(())
+    }
+
+    async fn maybe_take_stop_loss_and_log_error(
+        &mut self,
+        pubkey: &Pubkey,
+    ) -> anyhow::Result<bool> {
+        let now = std::time::Instant::now();
+
+        // Skip a pubkey if there've been too many errors recently
+        // TODO: separate stop loss errors from liq errors
+        // TODO: this whole thing could use some work
+        if let Some(error_entry) = self.accounts_with_errors.get(pubkey) {
+            if error_entry.count >= self.error_skip_threshold
+                && now.duration_since(error_entry.last_at) < self.error_skip_duration
+            {
+                log::trace!(
+                    "skip checking account {pubkey}, had {} errors recently",
+                    error_entry.count
+                );
+                return Ok(false);
+            }
+        }
+
+        let result = liquidate::maybe_execute_token_stop_loss(
             &self.mango_client,
             &self.account_fetcher,
             pubkey,
