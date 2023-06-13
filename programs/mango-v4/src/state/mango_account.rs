@@ -306,11 +306,13 @@ impl MangoAccountFixed {
     }
 
     /// Reduce the available buyback fees amount because it was used up.
+    ///
+    /// Panics if `amount` exceeds the available accrued amount
     pub fn reduce_buyback_fees_accrued(&mut self, amount: u64) {
         if amount > self.buyback_fees_accrued_previous {
-            self.buyback_fees_accrued_current = self
-                .buyback_fees_accrued_current
-                .saturating_sub(amount - self.buyback_fees_accrued_previous);
+            let remaining_amount = amount - self.buyback_fees_accrued_previous;
+            assert!(remaining_amount <= self.buyback_fees_accrued_current);
+            self.buyback_fees_accrued_current -= remaining_amount;
             self.buyback_fees_accrued_previous = 0;
         } else {
             self.buyback_fees_accrued_previous -= amount;
@@ -1568,7 +1570,7 @@ mod tests {
         assert_eq!(fixed.buyback_fees_expiry_timestamp, 1070);
         assert_eq!(fixed.buyback_fees_accrued(), 12);
 
-        fixed.reduce_buyback_fees_accrued(100);
+        fixed.reduce_buyback_fees_accrued(12);
         assert_eq!(fixed.buyback_fees_accrued(), 0);
     }
 }
