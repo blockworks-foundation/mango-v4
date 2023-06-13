@@ -21,7 +21,7 @@ mod queue;
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::state::{MangoAccount, MangoAccountValue, PerpMarket, FREE_ORDER_SLOT};
+    use crate::state::{Group, MangoAccount, MangoAccountValue, PerpMarket, FREE_ORDER_SLOT};
     use anchor_lang::prelude::*;
     use bytemuck::Zeroable;
     use fixed::types::I80F48;
@@ -238,6 +238,7 @@ mod tests {
 
     #[test]
     fn book_new_order() {
+        let group = Group::zeroed();
         let (mut market, oracle_price, mut event_queue, book_accs) = test_setup(1000.0);
         let mut book = book_accs.orderbook();
         let settle_token_index = 0;
@@ -396,7 +397,7 @@ mod tests {
 
         // simulate event queue processing
         maker
-            .execute_perp_maker(market.perp_market_index, &mut market, fill)
+            .execute_perp_maker(market.perp_market_index, &mut market, fill, &group)
             .unwrap();
         taker
             .execute_perp_taker(market.perp_market_index, &mut market, fill)
