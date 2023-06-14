@@ -163,6 +163,10 @@ fn action(
         MangoError::StopLossPriceThresholdNotReached
     );
 
+    let premium_price = tsl.execution_price(price);
+    require_gte!(tsl.price_limit, premium_price);
+    let premium_price_i80f48 = I80F48::from_num(premium_price);
+
     let pre_liqee_buy_token = liqee
         .ensure_token_position(tsl.buy_token_index)?
         .0
@@ -173,10 +177,6 @@ fn action(
         .native(&sell_bank);
 
     // derive trade amount based on limits in the tsl and by the liqor
-    let premium_price = price * (1.0 + (tsl.price_premium_bps as f32) * 0.0001);
-    require_gte!(tsl.price_limit, premium_price);
-
-    let premium_price_i80f48 = I80F48::from_num(premium_price);
     let (buy_token_amount, sell_token_amount) = trade_amount(
         &tsl,
         premium_price_i80f48,

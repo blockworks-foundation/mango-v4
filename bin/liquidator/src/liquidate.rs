@@ -1,11 +1,8 @@
 use std::collections::HashSet;
 use std::time::Duration;
 
-use mango_v4::accounts_zerocopy::KeyedAccountSharedData;
 use mango_v4::health::{HealthCache, HealthType};
-use mango_v4::state::{
-    Bank, MangoAccountValue, PerpMarketIndex, Side, TokenIndex, QUOTE_TOKEN_INDEX,
-};
+use mango_v4::state::{MangoAccountValue, PerpMarketIndex, Side, TokenIndex, QUOTE_TOKEN_INDEX};
 use mango_v4_client::{chain_data, health_cache, AccountFetcher, JupiterSwapMode, MangoClient};
 use solana_sdk::signature::Signature;
 
@@ -341,37 +338,63 @@ impl<'a> LiquidateHelper<'a> {
         source: TokenIndex,
         target: TokenIndex,
     ) -> anyhow::Result<I80F48> {
-        let mut liqor = self
+        let liqor = self
             .account_fetcher
             .fetch_fresh_mango_account(&self.client.mango_account_address)
             .await
             .context("getting liquidator account")?;
 
+        let source_price = self.client.bank_oracle_price(source).await?;
+        let target_price = self.client.bank_oracle_price(target).await?;
+
+        // TODO: This is where we could multiply in the liquidation fee factors
+        let price = source_price / target_price;
+
+        Self::max_swap_source(
+            self.client,
+            self.account_fetcher,
+            &liqor,
+            source,
+            target,
+            price,
+            self.liqor_min_health_ratio,
+        )
+        .await
+    }
+
+    async fn max_swap_source(
+        client: &MangoClient,
+        account_fetcher: &chain_data::AccountFetcher,
+        account: &MangoAccountValue,
+        source: TokenIndex,
+        target: TokenIndex,
+        price: I80F48,
+        min_health_ratio: I80F48,
+    ) -> anyhow::Result<I80F48> {
+        let mut account = account.clone();
+
         // Ensure the tokens are activated, so they appear in the health cache and
         // max_swap_source() will work.
-        liqor.ensure_token_position(source)?;
-        liqor.ensure_token_position(target)?;
+        account.ensure_token_position(source)?;
+        account.ensure_token_position(target)?;
 
-        let health_cache = health_cache::new(&self.client.context, self.account_fetcher, &liqor)
+        let health_cache = health_cache::new(&client.context, account_fetcher, &account)
             .await
             .expect("always ok");
 
-        let source_bank = self.client.first_bank(source).await?;
-        let target_bank = self.client.first_bank(target).await?;
+        let source_bank = client.first_bank(source).await?;
+        let target_bank = client.first_bank(target).await?;
 
         let source_price = health_cache.token_info(source).unwrap().prices.oracle;
-        let target_price = health_cache.token_info(target).unwrap().prices.oracle;
-        // TODO: This is where we could multiply in the liquidation fee factors
-        let oracle_swap_price = source_price / target_price;
 
         let amount = health_cache
             .max_swap_source_for_health_ratio(
-                &liqor,
+                &account,
                 &source_bank,
                 source_price,
                 &target_bank,
-                oracle_swap_price,
-                self.liqor_min_health_ratio,
+                price,
+                min_health_ratio,
             )
             .context("getting max_swap_source")?;
         Ok(amount)
@@ -666,47 +689,91 @@ pub async fn maybe_execute_token_stop_loss(
     pubkey: &Pubkey,
     config: &Config,
 ) -> anyhow::Result<bool> {
-    // TODO: exit early if there's no tsl active
-    // TODO: we should try finding the best stop loss over all accounts, imo!
+    // TODO: we should try finding the best stop loss over all accounts?
 
-    let liqor_min_health_ratio = I80F48::from_num(config.min_health_ratio);
+    let liqee = account_fetcher.fetch_mango_account(pubkey)?;
 
-    let account = account_fetcher.fetch_mango_account(pubkey)?;
-    let health_cache = health_cache::new(&mango_client.context, account_fetcher, &account)
+    // Check for triggerable stop loss
+    let mut tsl_id = None;
+    for tsl in liqee.active_token_stop_loss() {
+        // TODO: randomize order
+        let buy_token_price = mango_client.bank_oracle_price(tsl.buy_token_index).await?;
+        let sell_token_price = mango_client.bank_oracle_price(tsl.sell_token_index).await?;
+        let base_price = (buy_token_price / sell_token_price).to_num();
+        let execution_price = tsl.execution_price(base_price);
+
+        if base_price >= tsl.price_threshold && execution_price <= tsl.price_limit {
+            tsl_id = Some(tsl.id);
+            break;
+        }
+    }
+    if tsl_id.is_none() {
+        return Ok(false);
+    }
+    let tsl_id = tsl_id.unwrap();
+
+    // TODO: get a fresh account and re-check
+    // TODO: this time also check the health
+
+    let health_cache = health_cache::new(&mango_client.context, account_fetcher, &liqee)
         .await
         .context("creating health cache 1")?;
     if health_cache.is_liquidatable() {
         return Ok(false);
     }
 
-    // Check for triggerable stop loss
-    for tsl in account.active_token_stop_loss() { // TODO: randomize order
-         // TODO: compute price and premium_price
-         // TODO: compare to threshold and limit
+    // TODO: separate min-health for stop loss!?
+    let liqor_min_health_ratio = I80F48::from_num(config.min_health_ratio);
+
+    // Compute the max viable swap (for liqor and liqee) and min it
+    let (_, tsl) = liqee.token_stop_loss_by_id(tsl_id)?;
+
+    let buy_token_price = mango_client.bank_oracle_price(tsl.buy_token_index).await?;
+    let sell_token_price = mango_client.bank_oracle_price(tsl.sell_token_index).await?;
+
+    let base_price = buy_token_price / sell_token_price;
+    let execution_price = I80F48::from_num(tsl.execution_price(base_price.to_num()));
+
+    let max_sell_token_to_liqor = LiquidateHelper::max_swap_source(
+        mango_client,
+        account_fetcher,
+        &liqee,
+        tsl.sell_token_index,
+        tsl.buy_token_index,
+        execution_price,
+        I80F48::from_num(0.01), // TODO: what target?
+    )
+    .await?
+    .floor()
+    .to_num();
+
+    let max_buy_token_to_liqee = LiquidateHelper::max_swap_source(
+        mango_client,
+        account_fetcher,
+        &mango_client.mango_account().await?, // TODO: get a fresh one!
+        tsl.buy_token_index,
+        tsl.sell_token_index,
+        execution_price,
+        liqor_min_health_ratio,
+    )
+    .await?
+    .floor()
+    .to_num();
+
+    if max_sell_token_to_liqor == 0 || max_buy_token_to_liqee == 0 {
+        return Ok(false);
     }
 
-    // TODO: exit if we didn't find one
-    // TODO: update the accounts for the top ones and recheck
-    // TODO: this time also check the health
-
-    // TODO: ok, we have a pubkey + tsl id.
-    // Compute the max viable swap (for liqor and liqee) and min it
-    let tsl_id = 0;
-    let max_buy_token_to_liqee = 0;
-    let max_sell_token_to_liqor = 0;
-
-    // TODO: send the instruction
-
     log::trace!(
-        "executing token stop loss for: {}, with owner: {}, TODO DETAILS",
+        "executing token stop loss for: {}, with owner: {}, TODO", // TODO: details
         pubkey,
-        account.fixed.owner,
+        liqee.fixed.owner,
     );
 
     let txsig = mango_client
         .token_stop_loss_trigger(
-            (pubkey, &account),
-            tsl_id,
+            (pubkey, &liqee),
+            tsl.id,
             max_buy_token_to_liqee,
             max_sell_token_to_liqor,
         )

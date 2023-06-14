@@ -97,4 +97,8 @@ impl TokenStopLoss {
     pub fn remaining_sell(&self) -> u64 {
         self.max_sell - self.sold
     }
+
+    pub fn execution_price(&self, base_price: f32) -> f32 {
+        base_price * (1.0 + (self.price_premium_bps as f32) * 0.0001)
+    }
 }
