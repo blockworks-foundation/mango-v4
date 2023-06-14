@@ -190,8 +190,8 @@ async fn test_token_stop_loss() -> Result<(), TransportError> {
             liqor,
             liqor_owner: owner,
             index: 1,
-            max_buy_token_to_give: 50,
-            max_sell_token_to_receive: 50,
+            max_buy_token_to_liqee: 50,
+            max_sell_token_to_liqor: 50,
         },
     )
     .await;
@@ -207,8 +207,8 @@ async fn test_token_stop_loss() -> Result<(), TransportError> {
             liqor,
             liqor_owner: owner,
             index: 0,
-            max_buy_token_to_give: 50,
-            max_sell_token_to_receive: 50,
+            max_buy_token_to_liqee: 50,
+            max_sell_token_to_liqor: 50,
         },
     )
     .await
@@ -238,8 +238,8 @@ async fn test_token_stop_loss() -> Result<(), TransportError> {
             liqor,
             liqor_owner: owner,
             index: 0,
-            max_buy_token_to_give: 5000,
-            max_sell_token_to_receive: 5000,
+            max_buy_token_to_liqee: 5000,
+            max_sell_token_to_liqor: 5000,
         },
     )
     .await

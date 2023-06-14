@@ -15,8 +15,8 @@ pub fn token_stop_loss_trigger(
     ctx: Context<TokenStopLossTrigger>,
     token_stop_loss_index: usize,
     token_stop_loss_id: u64,
-    liqor_max_buy_token_to_give: u64,
-    liqor_max_sell_token_to_receive: u64,
+    max_buy_token_to_liqee: u64,
+    max_sell_token_to_liqor: u64,
 ) -> Result<()> {
     let group_pk = &ctx.accounts.group.key();
     let liqee_key = ctx.accounts.liqee.key();
@@ -55,10 +55,10 @@ pub fn token_stop_loss_trigger(
         token_stop_loss_index,
         buy_bank,
         buy_token_price,
-        liqor_max_buy_token_to_give,
+        max_buy_token_to_liqee,
         sell_bank,
         sell_token_price,
-        liqor_max_sell_token_to_receive,
+        max_sell_token_to_liqor,
         now_ts,
     )?;
 
@@ -77,27 +77,29 @@ pub fn token_stop_loss_trigger(
 fn trade_amount(
     tsl: &TokenStopLoss,
     sell_per_buy_price: I80F48,
-    liqor_max_buy_token_to_give: u64,
-    liqor_max_sell_token_to_receive: u64,
+    max_buy_token_to_liqee: u64,
+    max_sell_token_to_liqor: u64,
     buy_balance: I80F48,
     sell_balance: I80F48,
 ) -> (u64, u64) {
-    let max_buy = liqor_max_buy_token_to_give.min(tsl.remaining_buy()).min(
-        if tsl.allow_creating_deposits() {
-            u64::MAX
-        } else {
-            // ceil() because we're ok reaching 0..1 deposited native tokens
-            (-buy_balance).max(I80F48::ZERO).ceil().to_num::<u64>()
-        },
-    );
-    let max_sell = liqor_max_sell_token_to_receive
-        .min(tsl.remaining_sell())
-        .min(if tsl.allow_creating_borrows() {
-            u64::MAX
-        } else {
-            // floor() so we never go below 0
-            sell_balance.max(I80F48::ZERO).floor().to_num::<u64>()
-        });
+    let max_buy =
+        max_buy_token_to_liqee
+            .min(tsl.remaining_buy())
+            .min(if tsl.allow_creating_deposits() {
+                u64::MAX
+            } else {
+                // ceil() because we're ok reaching 0..1 deposited native tokens
+                (-buy_balance).max(I80F48::ZERO).ceil().to_num::<u64>()
+            });
+    let max_sell =
+        max_sell_token_to_liqor
+            .min(tsl.remaining_sell())
+            .min(if tsl.allow_creating_borrows() {
+                u64::MAX
+            } else {
+                // floor() so we never go below 0
+                sell_balance.max(I80F48::ZERO).floor().to_num::<u64>()
+            });
     trade_amount_inner(max_buy, max_sell, sell_per_buy_price)
 }
 
@@ -140,10 +142,10 @@ fn action(
     token_stop_loss_index: usize,
     buy_bank: &mut Bank,
     buy_token_price: I80F48,
-    liqor_max_buy_token_to_give: u64,
+    max_buy_token_to_liqee: u64,
     sell_bank: &mut Bank,
     sell_token_price: I80F48,
-    liqor_max_sell_token_to_receive: u64,
+    max_sell_token_to_liqor: u64,
     now_ts: u64,
 ) -> Result<(I80F48, I80F48)> {
     let tsl = liqee
@@ -178,8 +180,8 @@ fn action(
     let (buy_token_amount, sell_token_amount) = trade_amount(
         &tsl,
         premium_price_i80f48,
-        liqor_max_buy_token_to_give,
-        liqor_max_sell_token_to_receive,
+        max_buy_token_to_liqee,
+        max_sell_token_to_liqor,
         pre_liqee_buy_token,
         pre_liqee_sell_token,
     );

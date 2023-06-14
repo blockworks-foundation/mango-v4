@@ -1185,16 +1185,16 @@ pub mod mango_v4 {
         ctx: Context<TokenStopLossTrigger>,
         token_stop_loss_index: u8,
         token_stop_loss_id: u64,
-        liqor_max_buy_token_to_give: u64,
-        liqor_max_sell_token_to_receive: u64,
+        max_buy_token_to_liqee: u64,
+        max_sell_token_to_liqor: u64,
     ) -> Result<()> {
         #[cfg(feature = "enable-gpl")]
         instructions::token_stop_loss_trigger(
             ctx,
             token_stop_loss_index.into(),
             token_stop_loss_id,
-            liqor_max_buy_token_to_give,
-            liqor_max_sell_token_to_receive,
+            max_buy_token_to_liqee,
+            max_sell_token_to_liqor,
         )?;
         Ok(())
     }

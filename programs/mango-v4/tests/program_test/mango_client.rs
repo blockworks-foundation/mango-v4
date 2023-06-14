@@ -4307,8 +4307,8 @@ pub struct TokenStopLossTriggerInstruction {
     pub liqor: Pubkey,
     pub liqor_owner: TestKeypair,
     pub index: u8,
-    pub max_buy_token_to_give: u64,
-    pub max_sell_token_to_receive: u64,
+    pub max_buy_token_to_liqee: u64,
+    pub max_sell_token_to_liqor: u64,
 }
 #[async_trait::async_trait(?Send)]
 impl ClientInstruction for TokenStopLossTriggerInstruction {
@@ -4337,8 +4337,8 @@ impl ClientInstruction for TokenStopLossTriggerInstruction {
         let instruction = Self::Instruction {
             token_stop_loss_index: self.index,
             token_stop_loss_id: tsl.id,
-            liqor_max_buy_token_to_give: self.max_buy_token_to_give,
-            liqor_max_sell_token_to_receive: self.max_sell_token_to_receive,
+            max_buy_token_to_liqee: self.max_buy_token_to_liqee,
+            max_sell_token_to_liqor: self.max_sell_token_to_liqor,
         };
 
         let health_check_metas = derive_liquidation_remaining_account_metas(
