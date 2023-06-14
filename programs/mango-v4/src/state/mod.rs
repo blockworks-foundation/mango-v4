@@ -10,7 +10,7 @@ pub use orderbook::*;
 pub use perp_market::*;
 pub use serum3_market::*;
 pub use stable_price::*;
-pub use token_stop_loss::*;
+pub use token_conditional_swap::*;
 
 mod bank;
 mod dynamic_account;
@@ -24,4 +24,4 @@ mod orderbook;
 mod perp_market;
 mod serum3_market;
 mod stable_price;
-mod token_stop_loss;
+mod token_conditional_swap;
