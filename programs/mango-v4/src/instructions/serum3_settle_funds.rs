@@ -1,5 +1,4 @@
 use anchor_lang::prelude::*;
-
 use fixed::types::I80F48;
 
 use crate::error::*;
@@ -10,6 +9,8 @@ use super::{apply_settle_changes, OpenOrdersAmounts, OpenOrdersSlim};
 use crate::accounts_ix::*;
 use crate::logs::Serum3OpenOrdersBalanceLogV2;
 use crate::logs::{LoanOriginationFeeInstruction, WithdrawLoanLog};
+
+use crate::accounts_zerocopy::AccountInfoRef;
 
 /// Settling means moving free funds from the serum3 open orders account
 /// back into the mango account wallet.
@@ -82,6 +83,8 @@ pub fn serum3_settle_funds<'info>(
             &mut quote_bank,
             &mut account.borrow_mut(),
             &before_oo,
+            v2.as_ref().map(|d| d.base_oracle.as_ref()),
+            v2.as_ref().map(|d| d.quote_oracle.as_ref()),
         )?;
     }
 
@@ -154,6 +157,8 @@ pub fn charge_loan_origination_fees(
     quote_bank: &mut Bank,
     account: &mut MangoAccountRefMut,
     before_oo: &OpenOrdersSlim,
+    base_oracle: Option<&AccountInfo>,
+    quote_oracle: Option<&AccountInfo>,
 ) -> Result<()> {
     let serum3_account = account.serum3_orders_mut(market_index).unwrap();
 
@@ -177,6 +182,12 @@ pub fn charge_loan_origination_fees(
             now_ts,
         )?;
 
+        let base_oracle_price = base_oracle
+            .map(|ai| {
+                base_bank.oracle_price(&AccountInfoRef::borrow(ai)?, Some(Clock::get()?.slot))
+            })
+            .transpose()?;
+
         emit!(WithdrawLoanLog {
             mango_group: *group_pubkey,
             mango_account: *account_pubkey,
@@ -184,6 +195,7 @@ pub fn charge_loan_origination_fees(
             loan_amount: withdraw_result.loan_amount.to_bits(),
             loan_origination_fee: withdraw_result.loan_origination_fee.to_bits(),
             instruction: LoanOriginationFeeInstruction::Serum3SettleFunds,
+            price: base_oracle_price.map(|p| p.to_bits())
         });
     }
 
@@ -206,6 +218,12 @@ pub fn charge_loan_origination_fees(
             now_ts,
         )?;
 
+        let quote_oracle_price = quote_oracle
+            .map(|ai| {
+                quote_bank.oracle_price(&AccountInfoRef::borrow(ai)?, Some(Clock::get()?.slot))
+            })
+            .transpose()?;
+
         emit!(WithdrawLoanLog {
             mango_group: *group_pubkey,
             mango_account: *account_pubkey,
@@ -213,6 +231,7 @@ pub fn charge_loan_origination_fees(
             loan_amount: withdraw_result.loan_amount.to_bits(),
             loan_origination_fee: withdraw_result.loan_origination_fee.to_bits(),
             instruction: LoanOriginationFeeInstruction::Serum3SettleFunds,
+            price: quote_oracle_price.map(|p| p.to_bits())
         });
     }
 

@@ -298,7 +298,8 @@ pub(crate) fn liquidation_action(
             token_index: liab_token_index,
             loan_amount: liqor_liab_withdraw_result.loan_amount.to_bits(),
             loan_origination_fee: liqor_liab_withdraw_result.loan_origination_fee.to_bits(),
-            instruction: LoanOriginationFeeInstruction::LiqTokenWithToken
+            instruction: LoanOriginationFeeInstruction::LiqTokenWithToken,
+            price: Some(liab_oracle_price.to_bits())
         });
     }
 

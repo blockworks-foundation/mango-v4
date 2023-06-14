@@ -265,6 +265,7 @@ pub struct WithdrawLoanLog {
     pub loan_amount: i128,
     pub loan_origination_fee: i128,
     pub instruction: LoanOriginationFeeInstruction,
+    pub price: Option<i128>, // Ideally would log price everywhere but in serum3_settle_funds oracle is not a passed in account
 }
 
 #[event]

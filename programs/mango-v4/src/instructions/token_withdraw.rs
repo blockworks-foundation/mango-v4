@@ -135,6 +135,7 @@ pub fn token_withdraw(ctx: Context<TokenWithdraw>, amount: u64, allow_borrow: bo
             loan_amount: withdraw_result.loan_amount.to_bits(),
             loan_origination_fee: withdraw_result.loan_origination_fee.to_bits(),
             instruction: LoanOriginationFeeInstruction::TokenWithdraw,
+            price: Some(oracle_price.to_bits()),
         });
     }
 
