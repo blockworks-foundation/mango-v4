@@ -537,7 +537,7 @@ impl LiquidationState {
         let mut took_one = false;
         for pubkey in accounts {
             if self
-                .maybe_take_stop_loss_and_log_error(pubkey)
+                .maybe_take_conditional_swap_and_log_error(pubkey)
                 .await
                 .unwrap_or(false)
             {
@@ -555,7 +555,7 @@ impl LiquidationState {
         Ok(())
     }
 
-    async fn maybe_take_stop_loss_and_log_error(
+    async fn maybe_take_conditional_swap_and_log_error(
         &mut self,
         pubkey: &Pubkey,
     ) -> anyhow::Result<bool> {

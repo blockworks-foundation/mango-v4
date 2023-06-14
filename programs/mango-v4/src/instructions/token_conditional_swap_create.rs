@@ -19,8 +19,8 @@ pub fn token_conditional_swap_create(
 
     let mut account = ctx.accounts.account.load_full_mut()?;
 
-    let id = account.fixed.next_stop_loss_id;
-    account.fixed.next_stop_loss_id = account.fixed.next_stop_loss_id.wrapping_add(1);
+    let id = account.fixed.next_conditional_swap_id;
+    account.fixed.next_conditional_swap_id = account.fixed.next_conditional_swap_id.wrapping_add(1);
 
     let tcs = account.add_token_conditional_swap()?;
     *tcs = token_conditional_swap;
