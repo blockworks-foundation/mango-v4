@@ -182,14 +182,11 @@ pub fn charge_loan_origination_fees(
             now_ts,
         )?;
 
-        let base_oracle_price = if let Some(base_oracle_ai) = base_oracle {
-            Some(base_bank.oracle_price(
-                &AccountInfoRef::borrow(base_oracle_ai)?,
-                Some(Clock::get()?.slot),
-            )?)
-        } else {
-            None
-        };
+        let base_oracle_price = base_oracle
+            .map(|ai| {
+                base_bank.oracle_price(&AccountInfoRef::borrow(ai)?, Some(Clock::get()?.slot))
+            })
+            .transpose()?;
 
         emit!(WithdrawLoanLog {
             mango_group: *group_pubkey,
@@ -221,14 +218,11 @@ pub fn charge_loan_origination_fees(
             now_ts,
         )?;
 
-        let quote_oracle_price = if let Some(quote_oracle_ai) = quote_oracle {
-            Some(quote_bank.oracle_price(
-                &AccountInfoRef::borrow(quote_oracle_ai)?,
-                Some(Clock::get()?.slot),
-            )?)
-        } else {
-            None
-        };
+        let quote_oracle_price = quote_oracle
+            .map(|ai| {
+                quote_bank.oracle_price(&AccountInfoRef::borrow(ai)?, Some(Clock::get()?.slot))
+            })
+            .transpose()?;
 
         emit!(WithdrawLoanLog {
             mango_group: *group_pubkey,
