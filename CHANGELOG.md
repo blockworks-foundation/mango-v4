@@ -25,6 +25,7 @@ Update this for each program release and mainnet deployment.
   PerpLiqNegativePnlOrBankruptcyV2 instruction.
 
 - Whitelist PerpPlaceOrderV2 and PerpPlaceOrderPeggedV2 for HealthRegions (#597)
+- Improve logging of loans (#599, #603)
 - Improve docs (#590, #594)
 - Use workspace dependencies (#588)
 
