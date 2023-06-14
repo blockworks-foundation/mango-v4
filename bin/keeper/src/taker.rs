@@ -22,7 +22,7 @@ pub async fn runner(
     let mut price_arcs = HashMap::new();
     for market_name in mango_client.context.serum3_market_indexes_by_name.keys() {
         let price = mango_client
-            .get_oracle_price(
+            .get_oracle_price_deprecated(
                 market_name
                     .split('/')
                     .collect::<Vec<&str>>()
@@ -134,7 +134,10 @@ pub async fn loop_blocking_price_update(
     loop {
         interval.tick().await;
 
-        let fresh_price = mango_client.get_oracle_price(token_name).await.unwrap();
+        let fresh_price = mango_client
+            .get_oracle_price_deprecated(token_name)
+            .await
+            .unwrap();
         log::info!("{} Updated price is {:?}", token_name, fresh_price.price);
         if let Ok(mut price) = price.write() {
             *price = I80F48::from_num(fresh_price.price)

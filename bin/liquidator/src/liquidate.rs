@@ -172,15 +172,7 @@ impl<'a> LiquidateHelper<'a> {
                 {
                     return Ok(None);
                 }
-                let perp = self.client.context.perp(pp.market_index);
-                let oracle = self
-                    .account_fetcher
-                    .fetch_raw_account(&perp.market.oracle)
-                    .await?;
-                let price = perp.market.oracle_price(
-                    &KeyedAccountSharedData::new(perp.market.oracle, oracle.into()),
-                    None,
-                )?;
+                let price = self.client.perp_oracle_price(pp.market_index).await?;
                 Ok(Some((
                     pp.market_index,
                     base_lots,
@@ -328,18 +320,9 @@ impl<'a> LiquidateHelper<'a> {
         let tokens_maybe: anyhow::Result<Vec<(TokenIndex, I80F48, I80F48)>> =
             stream::iter(self.liqee.active_token_positions())
                 .then(|token_position| async {
-                    let token = self.client.context.token(token_position.token_index);
-                    let bank = self
-                        .account_fetcher
-                        .fetch::<Bank>(&token.mint_info.first_bank())?;
-                    let oracle = self
-                        .account_fetcher
-                        .fetch_raw_account(&token.mint_info.oracle)
-                        .await?;
-                    let price = bank.oracle_price(
-                        &KeyedAccountSharedData::new(token.mint_info.oracle, oracle.into()),
-                        None,
-                    )?;
+                    let token_index = token_position.token_index;
+                    let price = self.client.bank_oracle_price(token_index).await?;
+                    let bank = self.client.first_bank(token_index).await?;
                     Ok((
                         token_position.token_index,
                         price,
@@ -706,7 +689,8 @@ pub async fn maybe_execute_token_stop_loss(
     // TODO: update the accounts for the top ones and recheck
     // TODO: this time also check the health
 
-    // TODO: ok, we have a pubkey + tsl id. Compute the max viable swap (for liqor and liqee)
+    // TODO: ok, we have a pubkey + tsl id.
+    // Compute the max viable swap (for liqor and liqee) and min it
     let tsl_id = 0;
     let max_buy_token_to_liqee = 0;
     let max_sell_token_to_liqor = 0;
