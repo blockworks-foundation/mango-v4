@@ -83,8 +83,8 @@ pub fn serum3_settle_funds<'info>(
             &mut quote_bank,
             &mut account.borrow_mut(),
             &before_oo,
-            v2.map(|d| d.base_oracle.as_ref()),
-            v2.map(|d| d.quote_oracle.as_ref()),
+            v2.as_ref().map(|d| d.base_oracle.as_ref()),
+            v2.as_ref().map(|d| d.quote_oracle.as_ref()),
         )?;
     }
 
@@ -182,15 +182,11 @@ pub fn charge_loan_origination_fees(
             now_ts,
         )?;
 
-        let base_oracle_price_bits = if let Some(base_oracle_ai) = base_oracle {
-            Some(
-                base_bank
-                    .oracle_price(
-                        &AccountInfoRef::borrow(base_oracle_ai)?,
-                        Some(Clock::get()?.slot),
-                    )?
-                    .to_bits(),
-            )
+        let base_oracle_price = if let Some(base_oracle_ai) = base_oracle {
+            Some(base_bank.oracle_price(
+                &AccountInfoRef::borrow(base_oracle_ai)?,
+                Some(Clock::get()?.slot),
+            )?)
         } else {
             None
         };
@@ -202,7 +198,7 @@ pub fn charge_loan_origination_fees(
             loan_amount: withdraw_result.loan_amount.to_bits(),
             loan_origination_fee: withdraw_result.loan_origination_fee.to_bits(),
             instruction: LoanOriginationFeeInstruction::Serum3SettleFunds,
-            price: base_oracle_price_bits
+            price: base_oracle_price.map(|p| p.to_bits())
         });
     }
 
@@ -225,15 +221,11 @@ pub fn charge_loan_origination_fees(
             now_ts,
         )?;
 
-        let quote_oracle_price_bits = if let Some(quote_oracle_ai) = quote_oracle {
-            Some(
-                quote_bank
-                    .oracle_price(
-                        &AccountInfoRef::borrow(quote_oracle_ai)?,
-                        Some(Clock::get()?.slot),
-                    )?
-                    .to_bits(),
-            )
+        let quote_oracle_price = if let Some(quote_oracle_ai) = quote_oracle {
+            Some(quote_bank.oracle_price(
+                &AccountInfoRef::borrow(quote_oracle_ai)?,
+                Some(Clock::get()?.slot),
+            )?)
         } else {
             None
         };
@@ -245,7 +237,7 @@ pub fn charge_loan_origination_fees(
             loan_amount: withdraw_result.loan_amount.to_bits(),
             loan_origination_fee: withdraw_result.loan_origination_fee.to_bits(),
             instruction: LoanOriginationFeeInstruction::Serum3SettleFunds,
-            price: quote_oracle_price_bits
+            price: quote_oracle_price.map(|p| p.to_bits())
         });
     }
 
