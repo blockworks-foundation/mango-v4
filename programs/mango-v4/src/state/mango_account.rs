@@ -723,6 +723,14 @@ impl<
         Ok(self.token_stop_loss_by_index_unchecked(index))
     }
 
+    pub fn token_stop_loss_by_id(&self, id: u64) -> Result<(usize, &TokenStopLoss)> {
+        let index = self
+            .all_token_stop_loss()
+            .position(|tsl| tsl.is_active() && tsl.id == id)
+            .ok_or_else(|| error_msg!("token stop loss with id {} not found", id))?;
+        Ok((index, self.token_stop_loss_by_index_unchecked(index)))
+    }
+
     pub fn all_token_stop_loss(&self) -> impl Iterator<Item = &TokenStopLoss> {
         (0..self.header().token_stop_loss_count())
             .map(|i| self.token_stop_loss_by_index_unchecked(i))

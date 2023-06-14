@@ -1228,6 +1228,51 @@ impl MangoClient {
         self.send_and_confirm_owner_tx(vec![ix]).await
     }
 
+    pub async fn token_stop_loss_trigger(
+        &self,
+        liqee: (&Pubkey, &MangoAccountValue),
+        token_stop_loss_id: u64,
+        max_buy_token_to_liqee: u64,
+        max_sell_token_to_liqor: u64,
+    ) -> anyhow::Result<Signature> {
+        let (tsl_index, tsl) = liqee.1.token_stop_loss_by_id(token_stop_loss_id)?;
+
+        let health_remaining_ams = self
+            .derive_liquidation_health_check_remaining_account_metas(
+                liqee.1,
+                vec![tsl.buy_token_index, tsl.sell_token_index],
+                &[tsl.buy_token_index, tsl.sell_token_index],
+            )
+            .await
+            .unwrap();
+
+        let ix = Instruction {
+            program_id: mango_v4::id(),
+            accounts: {
+                let mut ams = anchor_lang::ToAccountMetas::to_account_metas(
+                    &mango_v4::accounts::TokenStopLossTrigger {
+                        group: self.group(),
+                        liqee: *liqee.0,
+                        liqor: self.mango_account_address,
+                        liqor_authority: self.owner(),
+                    },
+                    None,
+                );
+                ams.extend(health_remaining_ams);
+                ams
+            },
+            data: anchor_lang::InstructionData::data(
+                &mango_v4::instruction::TokenStopLossTrigger {
+                    token_stop_loss_id,
+                    token_stop_loss_index: tsl_index.try_into().unwrap(),
+                    max_buy_token_to_liqee,
+                    max_sell_token_to_liqor,
+                },
+            ),
+        };
+        self.send_and_confirm_owner_tx(vec![ix]).await
+    }
+
     // health region
 
     pub fn health_region_begin_instruction(
