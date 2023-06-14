@@ -3,9 +3,9 @@ use crate::state::*;
 use anchor_lang::prelude::*;
 
 #[derive(Accounts)]
-pub struct TokenStopLossTrigger<'info> {
+pub struct TokenConditionalSwapTrigger<'info> {
     #[account(
-        constraint = group.load()?.is_ix_enabled(IxGate::TokenStopLossTrigger) @ MangoError::IxIsDisabled,
+        constraint = group.load()?.is_ix_enabled(IxGate::TokenConditionalSwapTrigger) @ MangoError::IxIsDisabled,
     )]
     pub group: AccountLoader<'info, Group>,
 

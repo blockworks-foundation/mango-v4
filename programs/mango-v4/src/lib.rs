@@ -32,7 +32,7 @@ compile_error!("compiling the program entrypoint without 'enable-gpl' makes no s
 
 use state::{
     OracleConfigParams, PerpMarketIndex, PlaceOrderType, SelfTradeBehavior, Serum3MarketIndex,
-    Side, TokenIndex, TokenStopLoss,
+    Side, TokenConditionalSwap, TokenIndex,
 };
 
 declare_id!("4MangoMjqJ2firMokCjjGgoK8d4MXcrgL7XJaL3w6fVg");
@@ -281,7 +281,7 @@ pub mod mango_v4 {
         serum3_count: u8,
         perp_count: u8,
         perp_oo_count: u8,
-        token_stop_loss_count: u8,
+        token_conditional_swap_count: u8,
     ) -> Result<()> {
         #[cfg(feature = "enable-gpl")]
         instructions::account_expand(
@@ -290,7 +290,7 @@ pub mod mango_v4 {
             serum3_count,
             perp_count,
             perp_oo_count,
-            token_stop_loss_count,
+            token_conditional_swap_count,
         )?;
         Ok(())
     }
@@ -1132,7 +1132,7 @@ pub mod mango_v4 {
         Ok(())
     }
 
-    pub fn token_stop_loss_create(
+    pub fn token_conditional_swap_create(
         ctx: Context<AccountAndAuthority>,
         buy_token_index: TokenIndex,
         sell_token_index: TokenIndex,
@@ -1144,7 +1144,7 @@ pub mod mango_v4 {
         allow_creating_deposits: bool,
         allow_creating_borrows: bool,
     ) -> Result<()> {
-        let tsl = TokenStopLoss {
+        let tcs = TokenConditionalSwap {
             id: 0,
             max_buy,
             max_sell,
@@ -1162,37 +1162,37 @@ pub mod mango_v4 {
         };
 
         #[cfg(feature = "enable-gpl")]
-        instructions::token_stop_loss_create(ctx, tsl)?;
+        instructions::token_conditional_swap_create(ctx, tcs)?;
         Ok(())
     }
 
-    pub fn token_stop_loss_cancel(
+    pub fn token_conditional_swap_cancel(
         ctx: Context<AccountAndAuthority>,
-        token_stop_loss_index: u8,
-        token_stop_loss_id: u64,
+        token_conditional_swap_index: u8,
+        token_conditional_swap_id: u64,
     ) -> Result<()> {
         #[cfg(feature = "enable-gpl")]
-        instructions::token_stop_loss_cancel(
+        instructions::token_conditional_swap_cancel(
             ctx,
-            token_stop_loss_index.into(),
-            token_stop_loss_id,
+            token_conditional_swap_index.into(),
+            token_conditional_swap_id,
         )?;
         Ok(())
     }
 
     // NOTE: It's the triggerer's job to compute liqor_max_* numbers that work with the liqee's health.
-    pub fn token_stop_loss_trigger(
-        ctx: Context<TokenStopLossTrigger>,
-        token_stop_loss_index: u8,
-        token_stop_loss_id: u64,
+    pub fn token_conditional_swap_trigger(
+        ctx: Context<TokenConditionalSwapTrigger>,
+        token_conditional_swap_index: u8,
+        token_conditional_swap_id: u64,
         max_buy_token_to_liqee: u64,
         max_sell_token_to_liqor: u64,
     ) -> Result<()> {
         #[cfg(feature = "enable-gpl")]
-        instructions::token_stop_loss_trigger(
+        instructions::token_conditional_swap_trigger(
             ctx,
-            token_stop_loss_index.into(),
-            token_stop_loss_id,
+            token_conditional_swap_index.into(),
+            token_conditional_swap_id,
             max_buy_token_to_liqee,
             max_sell_token_to_liqor,
         )?;

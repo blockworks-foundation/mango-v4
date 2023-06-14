@@ -683,7 +683,7 @@ pub async fn maybe_liquidate_account(
 }
 
 #[allow(clippy::too_many_arguments)]
-pub async fn maybe_execute_token_stop_loss(
+pub async fn maybe_execute_token_conditional_swap(
     mango_client: &MangoClient,
     account_fetcher: &chain_data::AccountFetcher,
     pubkey: &Pubkey,
@@ -694,23 +694,23 @@ pub async fn maybe_execute_token_stop_loss(
     let liqee = account_fetcher.fetch_mango_account(pubkey)?;
 
     // Check for triggerable stop loss
-    let mut tsl_id = None;
-    for tsl in liqee.active_token_stop_loss() {
+    let mut tcs_id = None;
+    for tcs in liqee.active_token_conditional_swap() {
         // TODO: randomize order
-        let buy_token_price = mango_client.bank_oracle_price(tsl.buy_token_index).await?;
-        let sell_token_price = mango_client.bank_oracle_price(tsl.sell_token_index).await?;
+        let buy_token_price = mango_client.bank_oracle_price(tcs.buy_token_index).await?;
+        let sell_token_price = mango_client.bank_oracle_price(tcs.sell_token_index).await?;
         let base_price = (buy_token_price / sell_token_price).to_num();
-        let execution_price = tsl.execution_price(base_price);
+        let execution_price = tcs.execution_price(base_price);
 
-        if base_price >= tsl.price_threshold && execution_price <= tsl.price_limit {
-            tsl_id = Some(tsl.id);
+        if base_price >= tcs.price_threshold && execution_price <= tcs.price_limit {
+            tcs_id = Some(tcs.id);
             break;
         }
     }
-    if tsl_id.is_none() {
+    if tcs_id.is_none() {
         return Ok(false);
     }
-    let tsl_id = tsl_id.unwrap();
+    let tcs_id = tcs_id.unwrap();
 
     // TODO: get a fresh account and re-check
     // TODO: this time also check the health
@@ -726,20 +726,20 @@ pub async fn maybe_execute_token_stop_loss(
     let liqor_min_health_ratio = I80F48::from_num(config.min_health_ratio);
 
     // Compute the max viable swap (for liqor and liqee) and min it
-    let (_, tsl) = liqee.token_stop_loss_by_id(tsl_id)?;
+    let (_, tcs) = liqee.token_conditional_swap_by_id(tcs_id)?;
 
-    let buy_token_price = mango_client.bank_oracle_price(tsl.buy_token_index).await?;
-    let sell_token_price = mango_client.bank_oracle_price(tsl.sell_token_index).await?;
+    let buy_token_price = mango_client.bank_oracle_price(tcs.buy_token_index).await?;
+    let sell_token_price = mango_client.bank_oracle_price(tcs.sell_token_index).await?;
 
     let base_price = buy_token_price / sell_token_price;
-    let execution_price = I80F48::from_num(tsl.execution_price(base_price.to_num()));
+    let execution_price = I80F48::from_num(tcs.execution_price(base_price.to_num()));
 
     let max_sell_token_to_liqor = LiquidateHelper::max_swap_source(
         mango_client,
         account_fetcher,
         &liqee,
-        tsl.sell_token_index,
-        tsl.buy_token_index,
+        tcs.sell_token_index,
+        tcs.buy_token_index,
         execution_price,
         I80F48::from_num(0.01), // TODO: what target?
     )
@@ -751,8 +751,8 @@ pub async fn maybe_execute_token_stop_loss(
         mango_client,
         account_fetcher,
         &mango_client.mango_account().await?, // TODO: get a fresh one!
-        tsl.buy_token_index,
-        tsl.sell_token_index,
+        tcs.buy_token_index,
+        tcs.sell_token_index,
         execution_price,
         liqor_min_health_ratio,
     )
@@ -771,9 +771,9 @@ pub async fn maybe_execute_token_stop_loss(
     );
 
     let txsig = mango_client
-        .token_stop_loss_trigger(
+        .token_conditional_swap_trigger(
             (pubkey, &liqee),
-            tsl.id,
+            tcs.id,
             max_buy_token_to_liqee,
             max_sell_token_to_liqor,
         )

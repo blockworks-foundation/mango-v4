@@ -1738,7 +1738,7 @@ pub struct AccountExpandInstruction {
     pub serum3_count: u8,
     pub perp_count: u8,
     pub perp_oo_count: u8,
-    pub token_stop_loss_count: u8,
+    pub token_conditional_swap_count: u8,
 }
 #[async_trait::async_trait(?Send)]
 impl ClientInstruction for AccountExpandInstruction {
@@ -1754,7 +1754,7 @@ impl ClientInstruction for AccountExpandInstruction {
             serum3_count: self.serum3_count,
             perp_count: self.perp_count,
             perp_oo_count: self.perp_oo_count,
-            token_stop_loss_count: self.token_stop_loss_count,
+            token_conditional_swap_count: self.token_conditional_swap_count,
         };
 
         let account = Pubkey::find_program_address(
@@ -4206,7 +4206,7 @@ impl ClientInstruction for AltExtendInstruction {
 }
 
 #[derive(Clone)]
-pub struct TokenStopLossCreateInstruction {
+pub struct TokenConditionalSwapCreateInstruction {
     pub account: Pubkey,
     pub owner: TestKeypair,
     pub buy_token_index: TokenIndex,
@@ -4220,9 +4220,9 @@ pub struct TokenStopLossCreateInstruction {
     pub allow_creating_borrows: bool,
 }
 #[async_trait::async_trait(?Send)]
-impl ClientInstruction for TokenStopLossCreateInstruction {
+impl ClientInstruction for TokenConditionalSwapCreateInstruction {
     type Accounts = mango_v4::accounts::AccountAndAuthority;
-    type Instruction = mango_v4::instruction::TokenStopLossCreate;
+    type Instruction = mango_v4::instruction::TokenConditionalSwapCreate;
     async fn to_instruction(
         &self,
         account_loader: impl ClientAccountLoader + 'async_trait,
@@ -4261,24 +4261,24 @@ impl ClientInstruction for TokenStopLossCreateInstruction {
 }
 
 #[derive(Clone)]
-pub struct TokenStopLossCancelInstruction {
+pub struct TokenConditionalSwapCancelInstruction {
     pub account: Pubkey,
     pub owner: TestKeypair,
     pub index: u8,
     pub id: u64,
 }
 #[async_trait::async_trait(?Send)]
-impl ClientInstruction for TokenStopLossCancelInstruction {
+impl ClientInstruction for TokenConditionalSwapCancelInstruction {
     type Accounts = mango_v4::accounts::AccountAndAuthority;
-    type Instruction = mango_v4::instruction::TokenStopLossCancel;
+    type Instruction = mango_v4::instruction::TokenConditionalSwapCancel;
     async fn to_instruction(
         &self,
         account_loader: impl ClientAccountLoader + 'async_trait,
     ) -> (Self::Accounts, instruction::Instruction) {
         let program_id = mango_v4::id();
         let instruction = Self::Instruction {
-            token_stop_loss_index: self.index,
-            token_stop_loss_id: self.id,
+            token_conditional_swap_index: self.index,
+            token_conditional_swap_id: self.id,
         };
 
         let account = account_loader
@@ -4302,7 +4302,7 @@ impl ClientInstruction for TokenStopLossCancelInstruction {
 }
 
 #[derive(Clone)]
-pub struct TokenStopLossTriggerInstruction {
+pub struct TokenConditionalSwapTriggerInstruction {
     pub liqee: Pubkey,
     pub liqor: Pubkey,
     pub liqor_owner: TestKeypair,
@@ -4311,9 +4311,9 @@ pub struct TokenStopLossTriggerInstruction {
     pub max_sell_token_to_liqor: u64,
 }
 #[async_trait::async_trait(?Send)]
-impl ClientInstruction for TokenStopLossTriggerInstruction {
-    type Accounts = mango_v4::accounts::TokenStopLossTrigger;
-    type Instruction = mango_v4::instruction::TokenStopLossTrigger;
+impl ClientInstruction for TokenConditionalSwapTriggerInstruction {
+    type Accounts = mango_v4::accounts::TokenConditionalSwapTrigger;
+    type Instruction = mango_v4::instruction::TokenConditionalSwapTrigger;
     async fn to_instruction(
         &self,
         account_loader: impl ClientAccountLoader + 'async_trait,
@@ -4329,14 +4329,14 @@ impl ClientInstruction for TokenStopLossTriggerInstruction {
             .await
             .unwrap();
 
-        let tsl = liqee
-            .token_stop_loss_by_index(self.index.into())
+        let tcs = liqee
+            .token_conditional_swap_by_index(self.index.into())
             .unwrap()
             .clone();
 
         let instruction = Self::Instruction {
-            token_stop_loss_index: self.index,
-            token_stop_loss_id: tsl.id,
+            token_conditional_swap_index: self.index,
+            token_conditional_swap_id: tcs.id,
             max_buy_token_to_liqee: self.max_buy_token_to_liqee,
             max_sell_token_to_liqor: self.max_sell_token_to_liqor,
         };
@@ -4345,9 +4345,9 @@ impl ClientInstruction for TokenStopLossTriggerInstruction {
             &account_loader,
             &liqee,
             &liqor,
-            tsl.buy_token_index,
+            tcs.buy_token_index,
             0,
-            tsl.sell_token_index,
+            tcs.sell_token_index,
             0,
         )
         .await;

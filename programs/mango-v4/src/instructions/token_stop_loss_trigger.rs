@@ -5,16 +5,16 @@ use crate::accounts_ix::*;
 use crate::error::*;
 use crate::health::*;
 use crate::logs::{
-    LoanOriginationFeeInstruction, TokenBalanceLog, TokenStopLossTriggerLog,
+    LoanOriginationFeeInstruction, TokenBalanceLog, TokenConditionalSwapTriggerLog,
     WithdrawLoanOriginationFeeLog,
 };
 use crate::state::*;
 
 #[allow(clippy::too_many_arguments)]
-pub fn token_stop_loss_trigger(
-    ctx: Context<TokenStopLossTrigger>,
-    token_stop_loss_index: usize,
-    token_stop_loss_id: u64,
+pub fn token_conditional_swap_trigger(
+    ctx: Context<TokenConditionalSwapTrigger>,
+    token_conditional_swap_index: usize,
+    token_conditional_swap_id: u64,
     max_buy_token_to_liqee: u64,
     max_sell_token_to_liqor: u64,
 ) -> Result<()> {
@@ -38,12 +38,12 @@ pub fn token_stop_loss_trigger(
         .context("create liqee health cache")?;
     let liqee_pre_init_health = liqee.check_health_pre(&liqee_health_cache)?;
 
-    let tsl = liqee.token_stop_loss_by_index(token_stop_loss_index)?;
-    require!(tsl.is_active(), MangoError::SomeError);
-    require_eq!(tsl.id, token_stop_loss_id);
+    let tcs = liqee.token_conditional_swap_by_index(token_conditional_swap_index)?;
+    require!(tcs.is_active(), MangoError::SomeError);
+    require_eq!(tcs.id, token_conditional_swap_id);
 
     let (buy_bank, buy_token_price, sell_bank_and_oracle_opt) =
-        account_retriever.banks_mut_and_oracles(tsl.buy_token_index, tsl.sell_token_index)?;
+        account_retriever.banks_mut_and_oracles(tcs.buy_token_index, tcs.sell_token_index)?;
     let (sell_bank, sell_token_price) = sell_bank_and_oracle_opt.unwrap();
 
     let now_ts: u64 = Clock::get().unwrap().unix_timestamp.try_into().unwrap();
@@ -52,7 +52,7 @@ pub fn token_stop_loss_trigger(
         liqor_key,
         &mut liqee.borrow_mut(),
         liqee_key,
-        token_stop_loss_index,
+        token_conditional_swap_index,
         buy_bank,
         buy_token_price,
         max_buy_token_to_liqee,
@@ -75,7 +75,7 @@ pub fn token_stop_loss_trigger(
 }
 
 fn trade_amount(
-    tsl: &TokenStopLoss,
+    tcs: &TokenConditionalSwap,
     sell_per_buy_price: I80F48,
     max_buy_token_to_liqee: u64,
     max_sell_token_to_liqor: u64,
@@ -84,8 +84,8 @@ fn trade_amount(
 ) -> (u64, u64) {
     let max_buy =
         max_buy_token_to_liqee
-            .min(tsl.remaining_buy())
-            .min(if tsl.allow_creating_deposits() {
+            .min(tcs.remaining_buy())
+            .min(if tcs.allow_creating_deposits() {
                 u64::MAX
             } else {
                 // ceil() because we're ok reaching 0..1 deposited native tokens
@@ -93,8 +93,8 @@ fn trade_amount(
             });
     let max_sell =
         max_sell_token_to_liqor
-            .min(tsl.remaining_sell())
-            .min(if tsl.allow_creating_borrows() {
+            .min(tcs.remaining_sell())
+            .min(if tcs.allow_creating_borrows() {
                 u64::MAX
             } else {
                 // floor() so we never go below 0
@@ -139,7 +139,7 @@ fn action(
     liqor_key: Pubkey,
     liqee: &mut MangoAccountRefMut,
     liqee_key: Pubkey,
-    token_stop_loss_index: usize,
+    token_conditional_swap_index: usize,
     buy_bank: &mut Bank,
     buy_token_price: I80F48,
     max_buy_token_to_liqee: u64,
@@ -148,37 +148,37 @@ fn action(
     max_sell_token_to_liqor: u64,
     now_ts: u64,
 ) -> Result<(I80F48, I80F48)> {
-    let tsl = liqee
-        .token_stop_loss_by_index(token_stop_loss_index)?
+    let tcs = liqee
+        .token_conditional_swap_by_index(token_conditional_swap_index)?
         .clone();
-    require!(tsl.is_active(), MangoError::SomeError);
-    require_eq!(buy_bank.token_index, tsl.buy_token_index);
-    require_eq!(sell_bank.token_index, tsl.sell_token_index);
+    require!(tcs.is_active(), MangoError::SomeError);
+    require_eq!(buy_bank.token_index, tcs.buy_token_index);
+    require_eq!(sell_bank.token_index, tcs.sell_token_index);
 
     // amount of sell token native per buy token native
     let price: f32 = (buy_token_price.to_num::<f64>() / sell_token_price.to_num::<f64>()) as f32;
     require_gte!(
         price,
-        tsl.price_threshold,
+        tcs.price_threshold,
         MangoError::StopLossPriceThresholdNotReached
     );
 
-    let premium_price = tsl.execution_price(price);
-    require_gte!(tsl.price_limit, premium_price);
+    let premium_price = tcs.execution_price(price);
+    require_gte!(tcs.price_limit, premium_price);
     let premium_price_i80f48 = I80F48::from_num(premium_price);
 
     let pre_liqee_buy_token = liqee
-        .ensure_token_position(tsl.buy_token_index)?
+        .ensure_token_position(tcs.buy_token_index)?
         .0
         .native(&buy_bank);
     let pre_liqee_sell_token = liqee
-        .ensure_token_position(tsl.sell_token_index)?
+        .ensure_token_position(tcs.sell_token_index)?
         .0
         .native(&sell_bank);
 
-    // derive trade amount based on limits in the tsl and by the liqor
+    // derive trade amount based on limits in the tcs and by the liqor
     let (buy_token_amount, sell_token_amount) = trade_amount(
-        &tsl,
+        &tcs,
         premium_price_i80f48,
         max_buy_token_to_liqee,
         max_sell_token_to_liqor,
@@ -193,9 +193,9 @@ fn action(
     let buy_token_amount_i80f48 = I80F48::from(buy_token_amount);
     let sell_token_amount_i80f48 = I80F48::from(sell_token_amount);
 
-    let (liqee_buy_token, liqee_buy_raw_index) = liqee.token_position_mut(tsl.buy_token_index)?;
+    let (liqee_buy_token, liqee_buy_raw_index) = liqee.token_position_mut(tcs.buy_token_index)?;
     let (liqor_buy_token, liqor_buy_raw_index, _) =
-        liqor.ensure_token_position(tsl.buy_token_index)?;
+        liqor.ensure_token_position(tcs.buy_token_index)?;
     let liqee_buy_active = buy_bank.deposit(liqee_buy_token, buy_token_amount_i80f48, now_ts)?;
     let (liqor_buy_active, liqor_buy_loan_origination) =
         buy_bank.withdraw_with_fee(liqor_buy_token, buy_token_amount_i80f48, now_ts)?;
@@ -204,9 +204,9 @@ fn action(
     let post_liqor_buy_token = liqor_buy_token.native(&buy_bank);
 
     let (liqee_sell_token, liqee_sell_raw_index) =
-        liqee.token_position_mut(tsl.sell_token_index)?;
+        liqee.token_position_mut(tcs.sell_token_index)?;
     let (liqor_sell_token, liqor_sell_raw_index, _) =
-        liqor.ensure_token_position(tsl.sell_token_index)?;
+        liqor.ensure_token_position(tcs.sell_token_index)?;
     let liqor_sell_active =
         sell_bank.deposit(liqor_sell_token, sell_token_amount_i80f48, now_ts)?;
     let (liqee_sell_active, liqee_sell_loan_origination) =
@@ -235,7 +235,7 @@ fn action(
     emit!(TokenBalanceLog {
         mango_group: liqee.fixed.group,
         mango_account: liqee_key,
-        token_index: tsl.buy_token_index,
+        token_index: tcs.buy_token_index,
         indexed_position: post_liqee_buy_token.to_bits(),
         deposit_index: buy_bank.deposit_index.to_bits(),
         borrow_index: buy_bank.borrow_index.to_bits(),
@@ -244,7 +244,7 @@ fn action(
     emit!(TokenBalanceLog {
         mango_group: liqee.fixed.group,
         mango_account: liqee_key,
-        token_index: tsl.sell_token_index,
+        token_index: tcs.sell_token_index,
         indexed_position: post_liqee_sell_token.to_bits(),
         deposit_index: sell_bank.deposit_index.to_bits(),
         borrow_index: sell_bank.borrow_index.to_bits(),
@@ -253,7 +253,7 @@ fn action(
     emit!(TokenBalanceLog {
         mango_group: liqee.fixed.group,
         mango_account: liqor_key,
-        token_index: tsl.buy_token_index,
+        token_index: tcs.buy_token_index,
         indexed_position: post_liqor_buy_token.to_bits(),
         deposit_index: buy_bank.deposit_index.to_bits(),
         borrow_index: buy_bank.borrow_index.to_bits(),
@@ -262,7 +262,7 @@ fn action(
     emit!(TokenBalanceLog {
         mango_group: liqee.fixed.group,
         mango_account: liqor_key,
-        token_index: tsl.sell_token_index,
+        token_index: tcs.sell_token_index,
         indexed_position: post_liqor_sell_token.to_bits(),
         deposit_index: sell_bank.deposit_index.to_bits(),
         borrow_index: sell_bank.borrow_index.to_bits(),
@@ -272,38 +272,38 @@ fn action(
         emit!(WithdrawLoanOriginationFeeLog {
             mango_group: liqee.fixed.group,
             mango_account: liqor_key,
-            token_index: tsl.buy_token_index,
+            token_index: tcs.buy_token_index,
             loan_origination_fee: liqor_buy_loan_origination.to_bits(),
-            instruction: LoanOriginationFeeInstruction::TokenStopLossTrigger
+            instruction: LoanOriginationFeeInstruction::TokenConditionalSwapTrigger
         });
     }
     if liqee_sell_loan_origination.is_positive() {
         emit!(WithdrawLoanOriginationFeeLog {
             mango_group: liqee.fixed.group,
             mango_account: liqee_key,
-            token_index: tsl.sell_token_index,
+            token_index: tcs.sell_token_index,
             loan_origination_fee: liqee_sell_loan_origination.to_bits(),
-            instruction: LoanOriginationFeeInstruction::TokenStopLossTrigger
+            instruction: LoanOriginationFeeInstruction::TokenConditionalSwapTrigger
         });
     }
 
-    // update tsl information on the account
+    // update tcs information on the account
     let closed = {
         // record amount
-        let tsl = liqee.token_stop_loss_mut_by_index(token_stop_loss_index)?;
-        tsl.bought += buy_token_amount;
-        tsl.sold += sell_token_amount;
-        assert!(tsl.bought <= tsl.max_buy);
-        assert!(tsl.sold <= tsl.max_sell);
+        let tcs = liqee.token_conditional_swap_mut_by_index(token_conditional_swap_index)?;
+        tcs.bought += buy_token_amount;
+        tcs.sold += sell_token_amount;
+        assert!(tcs.bought <= tcs.max_buy);
+        assert!(tcs.sold <= tcs.max_sell);
 
         // Maybe remove token stop loss entry
         //
-        // This drops the tsl if no more swapping is possible at the current price:
+        // This drops the tcs if no more swapping is possible at the current price:
         // - if bought/sold reached the max
         // - if the "don't create deposits/borrows" constraint is reached
         // - if the price is such that swapping 1 native token would already exceed the limit
         let (future_buy, future_sell) = trade_amount(
-            tsl,
+            tcs,
             premium_price_i80f48,
             u64::MAX,
             u64::MAX,
@@ -311,20 +311,20 @@ fn action(
             post_liqee_sell_token,
         );
         if future_buy == 0 || future_sell == 0 {
-            *tsl = TokenStopLoss::default();
+            *tcs = TokenConditionalSwap::default();
             true
         } else {
             false
         }
     };
 
-    emit!(TokenStopLossTriggerLog {
+    emit!(TokenConditionalSwapTriggerLog {
         mango_group: liqee.fixed.group,
         liqee: liqee_key,
         liqor: liqor_key,
-        token_stop_loss_id: tsl.id,
-        buy_token_index: tsl.buy_token_index,
-        sell_token_index: tsl.sell_token_index,
+        token_conditional_swap_id: tcs.id,
+        buy_token_index: tcs.buy_token_index,
+        sell_token_index: tcs.sell_token_index,
         buy_amount: buy_token_amount,
         sell_amount: sell_token_amount,
         buy_token_price: buy_token_price.to_bits(),
@@ -433,8 +433,8 @@ mod tests {
         for (
             name,
             (
-                tsl_buy,
-                tsl_sell,
+                tcs_buy,
+                tcs_sell,
                 liqor_buy,
                 liqor_sell,
                 buy_balance,
@@ -448,9 +448,9 @@ mod tests {
         {
             println!("{name}");
 
-            let tsl = TokenStopLoss {
-                max_buy: 42 + tsl_buy,
-                max_sell: 100 + tsl_sell,
+            let tcs = TokenConditionalSwap {
+                max_buy: 42 + tcs_buy,
+                max_sell: 100 + tcs_sell,
                 bought: 42,
                 sold: 100,
                 allow_creating_borrows: u8::from(allow_borrow),
@@ -459,7 +459,7 @@ mod tests {
             };
 
             let (actual_buy, actual_sell) = trade_amount(
-                &tsl,
+                &tcs,
                 I80F48::from_num(price),
                 liqor_buy,
                 liqor_sell,
@@ -538,10 +538,10 @@ mod tests {
     }
 
     #[test]
-    fn test_token_stop_loss_trigger() {
+    fn test_token_conditional_swap_trigger() {
         let mut setup = TestSetup::new();
 
-        let tsl = TokenStopLoss {
+        let tcs = TokenConditionalSwap {
             max_buy: 100,
             max_sell: 100,
             price_threshold: 1.0,
@@ -554,8 +554,8 @@ mod tests {
             allow_creating_deposits: 1,
             ..Default::default()
         };
-        *setup.liqee.add_token_stop_loss().unwrap() = tsl.clone();
-        assert_eq!(setup.liqee.active_token_stop_loss().count(), 1);
+        *setup.liqee.add_token_conditional_swap().unwrap() = tcs.clone();
+        assert_eq!(setup.liqee.active_token_conditional_swap().count(), 1);
 
         let trigger = |setup: &mut TestSetup, buy_price, buy_max, sell_price, sell_max| {
             action(
@@ -581,10 +581,14 @@ mod tests {
         assert_eq!(buy_change.round(), 40);
         assert_eq!(sell_change.round(), -88);
 
-        assert_eq!(setup.liqee.active_token_stop_loss().count(), 1);
-        let tsl = setup.liqee.token_stop_loss_by_index(0).unwrap().clone();
-        assert_eq!(tsl.bought, 40);
-        assert_eq!(tsl.sold, 88);
+        assert_eq!(setup.liqee.active_token_conditional_swap().count(), 1);
+        let tcs = setup
+            .liqee
+            .token_conditional_swap_by_index(0)
+            .unwrap()
+            .clone();
+        assert_eq!(tcs.bought, 40);
+        assert_eq!(tcs.sold, 88);
 
         assert_eq!(setup.liqee_liab_pos().round(), 40);
         assert_eq!(setup.liqee_asset_pos().round(), -88);
@@ -595,7 +599,7 @@ mod tests {
         assert_eq!(buy_change.round(), 5);
         assert_eq!(sell_change.round(), -11);
 
-        assert_eq!(setup.liqee.active_token_stop_loss().count(), 0);
+        assert_eq!(setup.liqee.active_token_conditional_swap().count(), 0);
 
         assert_eq!(setup.liqee_liab_pos().round(), 45);
         assert_eq!(setup.liqee_asset_pos().round(), -99);

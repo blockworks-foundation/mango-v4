@@ -5,29 +5,29 @@ use crate::error::*;
 use crate::state::*;
 
 #[allow(clippy::too_many_arguments)]
-pub fn token_stop_loss_cancel(
+pub fn token_conditional_swap_cancel(
     ctx: Context<AccountAndAuthority>,
-    token_stop_loss_index: usize,
-    token_stop_loss_id: u64,
+    token_conditional_swap_index: usize,
+    token_conditional_swap_id: u64,
 ) -> Result<()> {
     require!(
         ctx.accounts
             .group
             .load()?
-            .is_ix_enabled(IxGate::TokenStopLossCancel),
+            .is_ix_enabled(IxGate::TokenConditionalSwapCancel),
         MangoError::IxIsDisabled
     );
 
     let mut account = ctx.accounts.account.load_full_mut()?;
-    let tsl = account.token_stop_loss_mut_by_index(token_stop_loss_index)?;
+    let tcs = account.token_conditional_swap_mut_by_index(token_conditional_swap_index)?;
 
-    // If the tsl is already inactive, this just is a noop
-    if !tsl.is_active() {
+    // If the tcs is already inactive, this just is a noop
+    if !tcs.is_active() {
         return Ok(());
     }
 
-    require_eq!(tsl.id, token_stop_loss_id);
-    *tsl = TokenStopLoss::default();
+    require_eq!(tcs.id, token_conditional_swap_id);
+    *tcs = TokenConditionalSwap::default();
 
     Ok(())
 }

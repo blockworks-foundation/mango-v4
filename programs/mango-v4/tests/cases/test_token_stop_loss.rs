@@ -1,7 +1,7 @@
 use super::*;
 
 #[tokio::test]
-async fn test_token_stop_loss() -> Result<(), TransportError> {
+async fn test_token_conditional_swap() -> Result<(), TransportError> {
     pub use utils::assert_equal_f64_f64 as assert_equal_f_f;
 
     let context = TestContext::new().await;
@@ -52,11 +52,11 @@ async fn test_token_stop_loss() -> Result<(), TransportError> {
     .await;
 
     //
-    // TEST: Trying to add a tsl on an account without space will fail
+    // TEST: Trying to add a tcs on an account without space will fail
     //
     let tx_result = send_tx(
         solana,
-        TokenStopLossCreateInstruction {
+        TokenConditionalSwapCreateInstruction {
             account,
             owner,
             buy_token_index: quote_token.index,
@@ -74,7 +74,7 @@ async fn test_token_stop_loss() -> Result<(), TransportError> {
     assert!(tx_result.is_err());
 
     //
-    // TEST: Extending an account to have space for tsl works
+    // TEST: Extending an account to have space for tcs works
     //
     send_tx(
         solana,
@@ -84,7 +84,7 @@ async fn test_token_stop_loss() -> Result<(), TransportError> {
             serum3_count: 8,
             perp_count: 8,
             perp_oo_count: 8,
-            token_stop_loss_count: 2,
+            token_conditional_swap_count: 2,
             group,
             owner,
             payer,
@@ -94,12 +94,12 @@ async fn test_token_stop_loss() -> Result<(), TransportError> {
     .unwrap()
     .account;
     let account_data = get_mango_account(solana, account).await;
-    assert_eq!(account_data.header.token_stop_loss_count, 2);
+    assert_eq!(account_data.header.token_conditional_swap_count, 2);
 
     //
     // TEST: Can create tsls until all slots are filled
     //
-    let tsl_ix = TokenStopLossCreateInstruction {
+    let tcs_ix = TokenConditionalSwapCreateInstruction {
         account,
         owner,
         buy_token_index: quote_token.index,
@@ -114,33 +114,39 @@ async fn test_token_stop_loss() -> Result<(), TransportError> {
     };
     send_tx(
         solana,
-        TokenStopLossCreateInstruction {
+        TokenConditionalSwapCreateInstruction {
             max_buy: 101,
-            ..tsl_ix
+            ..tcs_ix
         },
     )
     .await
     .unwrap();
     send_tx(
         solana,
-        TokenStopLossCreateInstruction {
+        TokenConditionalSwapCreateInstruction {
             max_buy: 102,
             price_threshold: 1.1,
-            ..tsl_ix
+            ..tcs_ix
         },
     )
     .await
     .unwrap();
-    let tx_result = send_tx(solana, tsl_ix.clone()).await;
+    let tx_result = send_tx(solana, tcs_ix.clone()).await;
     assert!(tx_result.is_err());
 
     let account_data = get_mango_account(solana, account).await;
     assert_eq!(
-        account_data.token_stop_loss_by_index(0).unwrap().max_buy,
+        account_data
+            .token_conditional_swap_by_index(0)
+            .unwrap()
+            .max_buy,
         101
     );
     assert_eq!(
-        account_data.token_stop_loss_by_index(1).unwrap().max_buy,
+        account_data
+            .token_conditional_swap_by_index(1)
+            .unwrap()
+            .max_buy,
         102
     );
 
@@ -149,7 +155,7 @@ async fn test_token_stop_loss() -> Result<(), TransportError> {
     //
     send_tx(
         solana,
-        TokenStopLossCancelInstruction {
+        TokenConditionalSwapCancelInstruction {
             account,
             owner,
             index: 0,
@@ -160,23 +166,29 @@ async fn test_token_stop_loss() -> Result<(), TransportError> {
     .unwrap();
     send_tx(
         solana,
-        TokenStopLossCreateInstruction {
+        TokenConditionalSwapCreateInstruction {
             max_buy: 103,
-            ..tsl_ix
+            ..tcs_ix
         },
     )
     .await
     .unwrap();
-    let tx_result = send_tx(solana, tsl_ix.clone()).await;
+    let tx_result = send_tx(solana, tcs_ix.clone()).await;
     assert!(tx_result.is_err());
 
     let account_data = get_mango_account(solana, account).await;
     assert_eq!(
-        account_data.token_stop_loss_by_index(0).unwrap().max_buy,
+        account_data
+            .token_conditional_swap_by_index(0)
+            .unwrap()
+            .max_buy,
         103
     );
     assert_eq!(
-        account_data.token_stop_loss_by_index(1).unwrap().max_buy,
+        account_data
+            .token_conditional_swap_by_index(1)
+            .unwrap()
+            .max_buy,
         102
     );
 
@@ -185,7 +197,7 @@ async fn test_token_stop_loss() -> Result<(), TransportError> {
     //
     let tx_result = send_tx(
         solana,
-        TokenStopLossTriggerInstruction {
+        TokenConditionalSwapTriggerInstruction {
             liqee: account,
             liqor,
             liqor_owner: owner,
@@ -202,7 +214,7 @@ async fn test_token_stop_loss() -> Result<(), TransportError> {
     //
     send_tx(
         solana,
-        TokenStopLossTriggerInstruction {
+        TokenConditionalSwapTriggerInstruction {
             liqee: account,
             liqor,
             liqor_owner: owner,
@@ -233,7 +245,7 @@ async fn test_token_stop_loss() -> Result<(), TransportError> {
     //
     send_tx(
         solana,
-        TokenStopLossTriggerInstruction {
+        TokenConditionalSwapTriggerInstruction {
             liqee: account,
             liqor,
             liqor_owner: owner,
@@ -257,7 +269,7 @@ async fn test_token_stop_loss() -> Result<(), TransportError> {
 
     let account_data = get_mango_account(solana, account).await;
     assert!(!account_data
-        .token_stop_loss_by_index(0)
+        .token_conditional_swap_by_index(0)
         .unwrap()
         .is_active());
 

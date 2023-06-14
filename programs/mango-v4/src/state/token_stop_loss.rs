@@ -9,7 +9,7 @@ use crate::state::*;
 #[zero_copy]
 #[derive(AnchorDeserialize, AnchorSerialize, Derivative, bytemuck::Pod)]
 #[derivative(Debug)]
-pub struct TokenStopLoss {
+pub struct TokenConditionalSwap {
     pub id: u64,
 
     /// maximum amount of native tokens to buy or sell
@@ -46,13 +46,13 @@ pub struct TokenStopLoss {
 }
 
 const_assert_eq!(
-    size_of::<TokenStopLoss>(),
+    size_of::<TokenConditionalSwap>(),
     8 * 5 + 2 * 4 + 4 + 2 * 2 + 1 * 3 + 125
 );
-const_assert_eq!(size_of::<TokenStopLoss>(), 184);
-const_assert_eq!(size_of::<TokenStopLoss>() % 8, 0);
+const_assert_eq!(size_of::<TokenConditionalSwap>(), 184);
+const_assert_eq!(size_of::<TokenConditionalSwap>() % 8, 0);
 
-impl Default for TokenStopLoss {
+impl Default for TokenConditionalSwap {
     fn default() -> Self {
         Self {
             id: 0,
@@ -73,7 +73,7 @@ impl Default for TokenStopLoss {
     }
 }
 
-impl TokenStopLoss {
+impl TokenConditionalSwap {
     pub fn is_active(&self) -> bool {
         self.is_active == 1
     }

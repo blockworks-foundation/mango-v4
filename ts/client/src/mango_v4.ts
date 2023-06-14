@@ -4752,7 +4752,7 @@ export type MangoV4 = {
         {
           "name": "priceThresholdType",
           "type": {
-            "defined": "TokenStopLossPriceThresholdType"
+            "defined": "TokenConditionalSwapPriceThresholdType"
           }
         },
         {
@@ -7807,7 +7807,7 @@ export type MangoV4 = {
       }
     },
     {
-      "name": "TokenStopLoss",
+      "name": "TokenConditionalSwap",
       "type": {
         "kind": "struct",
         "fields": [
@@ -7865,7 +7865,7 @@ export type MangoV4 = {
           {
             "name": "priceThresholdType",
             "docs": [
-              "holds a TokenStopLossPriceThresholdType, so whether the threshold is > or <"
+              "holds a TokenConditionalSwapPriceThresholdType, so whether the threshold is > or <"
             ],
             "type": "u8"
           },
@@ -8076,7 +8076,7 @@ export type MangoV4 = {
             "name": "TokenWithdraw"
           },
           {
-            "name": "TokenStopLossTrigger"
+            "name": "TokenConditionalSwapTrigger"
           }
         ]
       }
@@ -8258,13 +8258,13 @@ export type MangoV4 = {
             "name": "GroupWithdrawInsuranceFund"
           },
           {
-            "name": "TokenStopLossCreate"
+            "name": "TokenConditionalSwapCreate"
           },
           {
-            "name": "TokenStopLossTrigger"
+            "name": "TokenConditionalSwapTrigger"
           },
           {
-            "name": "TokenStopLossCancel"
+            "name": "TokenConditionalSwapCancel"
           }
         ]
       }
@@ -8549,7 +8549,7 @@ export type MangoV4 = {
       }
     },
     {
-      "name": "TokenStopLossPriceThresholdType",
+      "name": "TokenConditionalSwapPriceThresholdType",
       "type": {
         "kind": "enum",
         "variants": [
@@ -10038,7 +10038,7 @@ export type MangoV4 = {
       ]
     },
     {
-      "name": "TokenStopLossTriggerLog",
+      "name": "TokenConditionalSwapTriggerLog",
       "fields": [
         {
           "name": "mangoGroup",
@@ -15106,7 +15106,7 @@ export const IDL: MangoV4 = {
         {
           "name": "priceThresholdType",
           "type": {
-            "defined": "TokenStopLossPriceThresholdType"
+            "defined": "TokenConditionalSwapPriceThresholdType"
           }
         },
         {
@@ -18161,7 +18161,7 @@ export const IDL: MangoV4 = {
       }
     },
     {
-      "name": "TokenStopLoss",
+      "name": "TokenConditionalSwap",
       "type": {
         "kind": "struct",
         "fields": [
@@ -18219,7 +18219,7 @@ export const IDL: MangoV4 = {
           {
             "name": "priceThresholdType",
             "docs": [
-              "holds a TokenStopLossPriceThresholdType, so whether the threshold is > or <"
+              "holds a TokenConditionalSwapPriceThresholdType, so whether the threshold is > or <"
             ],
             "type": "u8"
           },
@@ -18430,7 +18430,7 @@ export const IDL: MangoV4 = {
             "name": "TokenWithdraw"
           },
           {
-            "name": "TokenStopLossTrigger"
+            "name": "TokenConditionalSwapTrigger"
           }
         ]
       }
@@ -18612,13 +18612,13 @@ export const IDL: MangoV4 = {
             "name": "GroupWithdrawInsuranceFund"
           },
           {
-            "name": "TokenStopLossCreate"
+            "name": "TokenConditionalSwapCreate"
           },
           {
-            "name": "TokenStopLossTrigger"
+            "name": "TokenConditionalSwapTrigger"
           },
           {
-            "name": "TokenStopLossCancel"
+            "name": "TokenConditionalSwapCancel"
           }
         ]
       }
@@ -18903,7 +18903,7 @@ export const IDL: MangoV4 = {
       }
     },
     {
-      "name": "TokenStopLossPriceThresholdType",
+      "name": "TokenConditionalSwapPriceThresholdType",
       "type": {
         "kind": "enum",
         "variants": [
@@ -20392,7 +20392,7 @@ export const IDL: MangoV4 = {
       ]
     },
     {
-      "name": "TokenStopLossTriggerLog",
+      "name": "TokenConditionalSwapTriggerLog",
       "fields": [
         {
           "name": "mangoGroup",

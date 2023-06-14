@@ -22,8 +22,8 @@ use super::PerpMarket;
 use super::PerpMarketIndex;
 use super::PerpOpenOrder;
 use super::Serum3MarketIndex;
+use super::TokenConditionalSwap;
 use super::TokenIndex;
-use super::TokenStopLoss;
 use super::FREE_ORDER_SLOT;
 use super::{PerpPosition, Serum3Orders, TokenPosition};
 use super::{Side, SideAndOrderTree};
@@ -163,7 +163,7 @@ impl MangoAccount {
 
     pub fn to_bytes(&self) -> Vec<u8> {
         let b = AnchorSerialize::try_to_vec(&self).unwrap();
-        // We could extend for u32 padding and u32 size of TokenStopLoss entries here,
+        // We could extend for u32 padding and u32 size of TokenConditionalSwap entries here,
         // but the from_bytes() code must support reading older account data, so it's fine.
         // b.extend(&[0u8; 8]);
         b
@@ -175,13 +175,13 @@ impl MangoAccount {
         serum3_count: u8,
         perp_count: u8,
         perp_oo_count: u8,
-        token_stop_loss_count: u8,
+        token_conditional_swap_count: u8,
     ) -> Result<usize> {
         require_gte!(16, token_count);
         require_gte!(8, serum3_count);
         require_gte!(8, perp_count);
         require_gte!(64, perp_oo_count);
-        require_gte!(64, token_stop_loss_count);
+        require_gte!(64, token_conditional_swap_count);
 
         Ok(8 + size_of::<MangoAccountFixed>()
             + Self::dynamic_size(
@@ -189,7 +189,7 @@ impl MangoAccount {
                 serum3_count,
                 perp_count,
                 perp_oo_count,
-                token_stop_loss_count,
+                token_conditional_swap_count,
             ))
     }
 
@@ -216,7 +216,7 @@ impl MangoAccount {
             + BORSH_VEC_PADDING_BYTES
     }
 
-    pub fn dynamic_token_stop_loss_vec_offset(
+    pub fn dynamic_token_conditional_swap_vec_offset(
         token_count: u8,
         serum3_count: u8,
         perp_count: u8,
@@ -232,14 +232,15 @@ impl MangoAccount {
         serum3_count: u8,
         perp_count: u8,
         perp_oo_count: u8,
-        token_stop_loss_count: u8,
+        token_conditional_swap_count: u8,
     ) -> usize {
-        Self::dynamic_token_stop_loss_vec_offset(
+        Self::dynamic_token_conditional_swap_vec_offset(
             token_count,
             serum3_count,
             perp_count,
             perp_oo_count,
-        ) + (BORSH_VEC_SIZE_BYTES + size_of::<TokenStopLoss>() * usize::from(token_stop_loss_count))
+        ) + (BORSH_VEC_SIZE_BYTES
+            + size_of::<TokenConditionalSwap>() * usize::from(token_conditional_swap_count))
     }
 }
 
@@ -373,7 +374,7 @@ pub struct MangoAccountDynamicHeader {
     pub serum3_count: u8,
     pub perp_count: u8,
     pub perp_oo_count: u8,
-    pub token_stop_loss_count: u8,
+    pub token_conditional_swap_count: u8,
 }
 
 impl DynamicHeader for MangoAccountDynamicHeader {
@@ -410,30 +411,32 @@ impl DynamicHeader for MangoAccountDynamicHeader {
                 ]))
                 .unwrap();
 
-                let token_stop_loss_vec_offset = MangoAccount::dynamic_token_stop_loss_vec_offset(
-                    token_count,
-                    serum3_count,
-                    perp_count,
-                    perp_oo_count,
-                );
-                let token_stop_loss_count =
-                    if dynamic_data.len() > token_stop_loss_vec_offset + BORSH_VEC_SIZE_BYTES {
-                        u8::try_from(BorshVecLength::from_le_bytes(*array_ref![
-                            dynamic_data,
-                            token_stop_loss_vec_offset,
-                            BORSH_VEC_SIZE_BYTES
-                        ]))
-                        .unwrap()
-                    } else {
-                        0
-                    };
+                let token_conditional_swap_vec_offset =
+                    MangoAccount::dynamic_token_conditional_swap_vec_offset(
+                        token_count,
+                        serum3_count,
+                        perp_count,
+                        perp_oo_count,
+                    );
+                let token_conditional_swap_count = if dynamic_data.len()
+                    > token_conditional_swap_vec_offset + BORSH_VEC_SIZE_BYTES
+                {
+                    u8::try_from(BorshVecLength::from_le_bytes(*array_ref![
+                        dynamic_data,
+                        token_conditional_swap_vec_offset,
+                        BORSH_VEC_SIZE_BYTES
+                    ]))
+                    .unwrap()
+                } else {
+                    0
+                };
 
                 Ok(Self {
                     token_count,
                     serum3_count,
                     perp_count,
                     perp_oo_count,
-                    token_stop_loss_count,
+                    token_conditional_swap_count,
                 })
             }
             _ => err!(MangoError::NotImplementedError).context("unexpected header version number"),
@@ -488,14 +491,14 @@ impl MangoAccountDynamicHeader {
             + raw_index * size_of::<PerpOpenOrder>()
     }
 
-    fn token_stop_loss_offset(&self, raw_index: usize) -> usize {
-        MangoAccount::dynamic_token_stop_loss_vec_offset(
+    fn token_conditional_swap_offset(&self, raw_index: usize) -> usize {
+        MangoAccount::dynamic_token_conditional_swap_vec_offset(
             self.token_count,
             self.serum3_count,
             self.perp_count,
             self.perp_oo_count,
         ) + BORSH_VEC_SIZE_BYTES
-            + raw_index * size_of::<TokenStopLoss>()
+            + raw_index * size_of::<TokenConditionalSwap>()
     }
 
     pub fn token_count(&self) -> usize {
@@ -510,8 +513,8 @@ impl MangoAccountDynamicHeader {
     pub fn perp_oo_count(&self) -> usize {
         self.perp_oo_count.into()
     }
-    pub fn token_stop_loss_count(&self) -> usize {
-        self.token_stop_loss_count.into()
+    pub fn token_conditional_swap_count(&self) -> usize {
+        self.token_conditional_swap_count.into()
     }
 }
 
@@ -714,34 +717,37 @@ impl<
         self.fixed().being_liquidated()
     }
 
-    fn token_stop_loss_by_index_unchecked(&self, index: usize) -> &TokenStopLoss {
-        get_helper(self.dynamic(), self.header().token_stop_loss_offset(index))
+    fn token_conditional_swap_by_index_unchecked(&self, index: usize) -> &TokenConditionalSwap {
+        get_helper(
+            self.dynamic(),
+            self.header().token_conditional_swap_offset(index),
+        )
     }
 
-    pub fn token_stop_loss_by_index(&self, index: usize) -> Result<&TokenStopLoss> {
-        require_gt!(self.header().token_stop_loss_count(), index);
-        Ok(self.token_stop_loss_by_index_unchecked(index))
+    pub fn token_conditional_swap_by_index(&self, index: usize) -> Result<&TokenConditionalSwap> {
+        require_gt!(self.header().token_conditional_swap_count(), index);
+        Ok(self.token_conditional_swap_by_index_unchecked(index))
     }
 
-    pub fn token_stop_loss_by_id(&self, id: u64) -> Result<(usize, &TokenStopLoss)> {
+    pub fn token_conditional_swap_by_id(&self, id: u64) -> Result<(usize, &TokenConditionalSwap)> {
         let index = self
-            .all_token_stop_loss()
-            .position(|tsl| tsl.is_active() && tsl.id == id)
+            .all_token_conditional_swap()
+            .position(|tcs| tcs.is_active() && tcs.id == id)
             .ok_or_else(|| error_msg!("token stop loss with id {} not found", id))?;
-        Ok((index, self.token_stop_loss_by_index_unchecked(index)))
+        Ok((index, self.token_conditional_swap_by_index_unchecked(index)))
     }
 
-    pub fn all_token_stop_loss(&self) -> impl Iterator<Item = &TokenStopLoss> {
-        (0..self.header().token_stop_loss_count())
-            .map(|i| self.token_stop_loss_by_index_unchecked(i))
+    pub fn all_token_conditional_swap(&self) -> impl Iterator<Item = &TokenConditionalSwap> {
+        (0..self.header().token_conditional_swap_count())
+            .map(|i| self.token_conditional_swap_by_index_unchecked(i))
     }
 
-    pub fn active_token_stop_loss(&self) -> impl Iterator<Item = &TokenStopLoss> {
-        self.all_token_stop_loss().filter(|p| p.is_active())
+    pub fn active_token_conditional_swap(&self) -> impl Iterator<Item = &TokenConditionalSwap> {
+        self.all_token_conditional_swap().filter(|p| p.is_active())
     }
 
-    pub fn token_stop_loss_free_index(&self) -> Result<usize> {
-        self.all_token_stop_loss()
+    pub fn token_conditional_swap_free_index(&self) -> Result<usize> {
+        self.all_token_conditional_swap()
             .position(|&v| !v.is_active())
             .ok_or_else(|| error_msg!("no free token stop loss index"))
     }
@@ -1122,18 +1128,21 @@ impl<
         Ok(())
     }
 
-    pub fn token_stop_loss_mut_by_index(&mut self, index: usize) -> Result<&mut TokenStopLoss> {
-        let count: usize = self.header().token_stop_loss_count.into();
+    pub fn token_conditional_swap_mut_by_index(
+        &mut self,
+        index: usize,
+    ) -> Result<&mut TokenConditionalSwap> {
+        let count: usize = self.header().token_conditional_swap_count.into();
         require_gt!(count, index);
-        let offset = self.header().token_stop_loss_offset(index);
+        let offset = self.header().token_conditional_swap_offset(index);
         Ok(get_helper_mut(self.dynamic_mut(), offset))
     }
 
-    pub fn add_token_stop_loss(&mut self) -> Result<&mut TokenStopLoss> {
-        let index = self.token_stop_loss_free_index()?;
-        let tsl = self.token_stop_loss_mut_by_index(index)?;
-        tsl.set_active(true);
-        Ok(tsl)
+    pub fn add_token_conditional_swap(&mut self) -> Result<&mut TokenConditionalSwap> {
+        let index = self.token_conditional_swap_free_index()?;
+        let tcs = self.token_conditional_swap_mut_by_index(index)?;
+        tcs.set_active(true);
+        Ok(tcs)
     }
 
     pub fn check_health_pre(&mut self, health_cache: &HealthCache) -> Result<I80F48> {
@@ -1226,9 +1235,9 @@ impl<
         self.write_borsh_vec_length(offset, count)
     }
 
-    fn write_token_stop_loss_length(&mut self) {
-        let offset = self.header().token_stop_loss_offset(0);
-        let count = self.header().token_stop_loss_count;
+    fn write_token_conditional_swap_length(&mut self) {
+        let offset = self.header().token_conditional_swap_offset(0);
+        let count = self.header().token_conditional_swap_count;
         self.write_borsh_vec_length(offset, count)
     }
 
@@ -1238,15 +1247,15 @@ impl<
         new_serum3_count: u8,
         new_perp_count: u8,
         new_perp_oo_count: u8,
-        new_token_stop_loss_count: u8,
+        new_token_conditional_swap_count: u8,
     ) -> Result<()> {
         require_gte!(new_token_count, self.header().token_count);
         require_gte!(new_serum3_count, self.header().serum3_count);
         require_gte!(new_perp_count, self.header().perp_count);
         require_gte!(new_perp_oo_count, self.header().perp_oo_count);
         require_gte!(
-            new_token_stop_loss_count,
-            self.header().token_stop_loss_count
+            new_token_conditional_swap_count,
+            self.header().token_conditional_swap_count
         );
 
         // create a temp copy to compute new starting offsets
@@ -1255,7 +1264,7 @@ impl<
             serum3_count: new_serum3_count,
             perp_count: new_perp_count,
             perp_oo_count: new_perp_oo_count,
-            token_stop_loss_count: new_token_stop_loss_count,
+            token_conditional_swap_count: new_token_conditional_swap_count,
         };
         let old_header = self.header().clone();
         let dynamic = self.dynamic_mut();
@@ -1263,18 +1272,18 @@ impl<
         // expand dynamic components by first moving existing positions, and then setting new ones to defaults
 
         // token stop loss
-        if old_header.token_stop_loss_count() > 0 {
+        if old_header.token_conditional_swap_count() > 0 {
             unsafe {
                 sol_memmove(
-                    &mut dynamic[new_header.token_stop_loss_offset(0)],
-                    &mut dynamic[old_header.token_stop_loss_offset(0)],
-                    size_of::<TokenStopLoss>() * old_header.token_stop_loss_count(),
+                    &mut dynamic[new_header.token_conditional_swap_offset(0)],
+                    &mut dynamic[old_header.token_conditional_swap_offset(0)],
+                    size_of::<TokenConditionalSwap>() * old_header.token_conditional_swap_count(),
                 );
             }
         }
-        for i in old_header.token_stop_loss_count..new_token_stop_loss_count {
-            *get_helper_mut(dynamic, new_header.token_stop_loss_offset(i.into())) =
-                TokenStopLoss::default();
+        for i in old_header.token_conditional_swap_count..new_token_conditional_swap_count {
+            *get_helper_mut(dynamic, new_header.token_conditional_swap_offset(i.into())) =
+                TokenConditionalSwap::default();
         }
 
         // perp oo
@@ -1342,7 +1351,7 @@ impl<
         self.write_serum3_length();
         self.write_perp_length();
         self.write_perp_oo_length();
-        self.write_token_stop_loss_length();
+        self.write_token_conditional_swap_length();
 
         Ok(())
     }
@@ -1444,7 +1453,7 @@ mod tests {
         assert_eq!(
             8 + account_bytes.len(),
             // MangoAccount.to_bytes() creates an account without token stop loss, so
-            // subtract 8 bytes for TokenStopLoss padding and size
+            // subtract 8 bytes for TokenConditionalSwap padding and size
             MangoAccount::space(8, 8, 8, 8, 0).unwrap() - 8
         );
 

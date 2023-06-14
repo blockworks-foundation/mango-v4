@@ -375,7 +375,7 @@ async fn main() -> anyhow::Result<()> {
 
                 if !liquidated {
                     liquidation
-                        .maybe_take_token_stop_loss(account_addresses.iter())
+                        .maybe_take_token_conditional_swap(account_addresses.iter())
                         .await
                         .unwrap();
                 }
@@ -522,7 +522,7 @@ impl LiquidationState {
         result
     }
 
-    async fn maybe_take_token_stop_loss<'b>(
+    async fn maybe_take_token_conditional_swap<'b>(
         &mut self,
         accounts_iter: impl Iterator<Item = &'b Pubkey>,
     ) -> anyhow::Result<()> {
@@ -576,7 +576,7 @@ impl LiquidationState {
             }
         }
 
-        let result = liquidate::maybe_execute_token_stop_loss(
+        let result = liquidate::maybe_execute_token_conditional_swap(
             &self.mango_client,
             &self.account_fetcher,
             pubkey,

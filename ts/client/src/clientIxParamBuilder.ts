@@ -179,9 +179,9 @@ export interface IxGateParams {
   TokenForceCloseBorrowsWithToken: boolean;
   PerpForceClosePosition: boolean;
   GroupWithdrawInsuranceFund: boolean;
-  TokenStopLossCreate: boolean;
-  TokenStopLossTrigger: boolean;
-  TokenStopLossCancel: boolean;
+  TokenConditionalSwapCreate: boolean;
+  TokenConditionalSwapTrigger: boolean;
+  TokenConditionalSwapCancel: boolean;
 }
 
 // Default with all ixs enabled, use with buildIxGate
@@ -241,9 +241,9 @@ export const TrueIxGateParams: IxGateParams = {
   TokenForceCloseBorrowsWithToken: true,
   PerpForceClosePosition: true,
   GroupWithdrawInsuranceFund: true,
-  TokenStopLossCreate: true,
-  TokenStopLossTrigger: true,
-  TokenStopLossCancel: true,
+  TokenConditionalSwapCreate: true,
+  TokenConditionalSwapTrigger: true,
+  TokenConditionalSwapCancel: true,
 };
 
 // build ix gate e.g. buildIxGate(Builder(TrueIxGateParams).TokenDeposit(false).build()).toNumber(),
@@ -313,9 +313,9 @@ export function buildIxGate(p: IxGateParams): BN {
   toggleIx(ixGate, p, 'TokenForceCloseBorrowsWithToken', 49);
   toggleIx(ixGate, p, 'PerpForceClosePosition', 50);
   toggleIx(ixGate, p, 'GroupWithdrawInsuranceFund', 51);
-  toggleIx(ixGate, p, 'TokenStopLossCreate', 52);
-  toggleIx(ixGate, p, 'TokenStopLossTrigger', 53);
-  toggleIx(ixGate, p, 'TokenStopLossCancel', 54);
+  toggleIx(ixGate, p, 'TokenConditionalSwapCreate', 52);
+  toggleIx(ixGate, p, 'TokenConditionalSwapTrigger', 53);
+  toggleIx(ixGate, p, 'TokenConditionalSwapCancel', 54);
 
   return ixGate;
 }

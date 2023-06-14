@@ -1260,20 +1260,22 @@ impl MangoClient {
         self.send_and_confirm_owner_tx(vec![ix]).await
     }
 
-    pub async fn token_stop_loss_trigger(
+    pub async fn token_conditional_swap_trigger(
         &self,
         liqee: (&Pubkey, &MangoAccountValue),
-        token_stop_loss_id: u64,
+        token_conditional_swap_id: u64,
         max_buy_token_to_liqee: u64,
         max_sell_token_to_liqor: u64,
     ) -> anyhow::Result<Signature> {
-        let (tsl_index, tsl) = liqee.1.token_stop_loss_by_id(token_stop_loss_id)?;
+        let (tcs_index, tcs) = liqee
+            .1
+            .token_conditional_swap_by_id(token_conditional_swap_id)?;
 
         let health_remaining_ams = self
             .derive_liquidation_health_check_remaining_account_metas(
                 liqee.1,
-                vec![tsl.buy_token_index, tsl.sell_token_index],
-                &[tsl.buy_token_index, tsl.sell_token_index],
+                vec![tcs.buy_token_index, tcs.sell_token_index],
+                &[tcs.buy_token_index, tcs.sell_token_index],
             )
             .await
             .unwrap();
@@ -1282,7 +1284,7 @@ impl MangoClient {
             program_id: mango_v4::id(),
             accounts: {
                 let mut ams = anchor_lang::ToAccountMetas::to_account_metas(
-                    &mango_v4::accounts::TokenStopLossTrigger {
+                    &mango_v4::accounts::TokenConditionalSwapTrigger {
                         group: self.group(),
                         liqee: *liqee.0,
                         liqor: self.mango_account_address,
@@ -1294,9 +1296,9 @@ impl MangoClient {
                 ams
             },
             data: anchor_lang::InstructionData::data(
-                &mango_v4::instruction::TokenStopLossTrigger {
-                    token_stop_loss_id,
-                    token_stop_loss_index: tsl_index.try_into().unwrap(),
+                &mango_v4::instruction::TokenConditionalSwapTrigger {
+                    token_conditional_swap_id,
+                    token_conditional_swap_index: tcs_index.try_into().unwrap(),
                     max_buy_token_to_liqee,
                     max_sell_token_to_liqor,
                 },

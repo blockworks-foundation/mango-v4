@@ -4752,7 +4752,7 @@
         {
           "name": "priceThresholdType",
           "type": {
-            "defined": "TokenStopLossPriceThresholdType"
+            "defined": "TokenConditionalSwapPriceThresholdType"
           }
         },
         {
@@ -7807,7 +7807,7 @@
       }
     },
     {
-      "name": "TokenStopLoss",
+      "name": "TokenConditionalSwap",
       "type": {
         "kind": "struct",
         "fields": [
@@ -7865,7 +7865,7 @@
           {
             "name": "priceThresholdType",
             "docs": [
-              "holds a TokenStopLossPriceThresholdType, so whether the threshold is > or <"
+              "holds a TokenConditionalSwapPriceThresholdType, so whether the threshold is > or <"
             ],
             "type": "u8"
           },
@@ -8076,7 +8076,7 @@
             "name": "TokenWithdraw"
           },
           {
-            "name": "TokenStopLossTrigger"
+            "name": "TokenConditionalSwapTrigger"
           }
         ]
       }
@@ -8258,13 +8258,13 @@
             "name": "GroupWithdrawInsuranceFund"
           },
           {
-            "name": "TokenStopLossCreate"
+            "name": "TokenConditionalSwapCreate"
           },
           {
-            "name": "TokenStopLossTrigger"
+            "name": "TokenConditionalSwapTrigger"
           },
           {
-            "name": "TokenStopLossCancel"
+            "name": "TokenConditionalSwapCancel"
           }
         ]
       }
@@ -8549,7 +8549,7 @@
       }
     },
     {
-      "name": "TokenStopLossPriceThresholdType",
+      "name": "TokenConditionalSwapPriceThresholdType",
       "type": {
         "kind": "enum",
         "variants": [
@@ -10038,7 +10038,7 @@
       ]
     },
     {
-      "name": "TokenStopLossTriggerLog",
+      "name": "TokenConditionalSwapTriggerLog",
       "fields": [
         {
           "name": "mangoGroup",
