@@ -1140,7 +1140,7 @@ pub mod mango_v4 {
         max_sell: u64,
         price_threshold: f32,
         price_threshold_type: TokenConditionalSwapPriceThresholdType,
-        price_premium_bps: u32,
+        price_premium_bps: u16,
         price_limit: f32,
         allow_creating_deposits: bool,
         allow_creating_borrows: bool,
@@ -1154,13 +1154,15 @@ pub mod mango_v4 {
             price_threshold,
             price_limit,
             price_premium_bps,
+            taker_fee_bps: 1, // TODO: read from group?!
+            maker_fee_bps: 1,
             buy_token_index,
             sell_token_index,
             is_active: 1,
             price_threshold_type: price_threshold_type.into(),
             allow_creating_deposits: u8::from(allow_creating_deposits),
             allow_creating_borrows: u8::from(allow_creating_borrows),
-            reserved: [0; 124],
+            reserved: [0; 122],
         };
 
         #[cfg(feature = "enable-gpl")]

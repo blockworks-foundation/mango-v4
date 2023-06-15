@@ -700,9 +700,10 @@ pub async fn maybe_execute_token_conditional_swap(
         let buy_token_price = mango_client.bank_oracle_price(tcs.buy_token_index).await?;
         let sell_token_price = mango_client.bank_oracle_price(tcs.sell_token_index).await?;
         let base_price = (buy_token_price / sell_token_price).to_num();
-        let execution_price = tcs.execution_price(base_price);
+        let premium_price = tcs.premium_price(base_price);
+        let maker_price = tcs.maker_price(premium_price);
 
-        if !tcs.price_threshold_reached(base_price) || execution_price > tcs.price_limit {
+        if !tcs.price_threshold_reached(base_price) || maker_price > tcs.price_limit {
             continue;
         }
 
@@ -739,7 +740,9 @@ pub async fn maybe_execute_token_conditional_swap(
     let sell_token_price = mango_client.bank_oracle_price(tcs.sell_token_index).await?;
 
     let base_price = buy_token_price / sell_token_price;
-    let execution_price = I80F48::from_num(tcs.execution_price(base_price.to_num()));
+    let premium_price = tcs.premium_price(base_price.to_num());
+    let maker_price = I80F48::from_num(tcs.maker_price(premium_price));
+    let taker_price = I80F48::from_num(tcs.taker_price(premium_price));
 
     let max_sell_token_to_liqor = LiquidateHelper::max_swap_source(
         mango_client,
@@ -747,7 +750,7 @@ pub async fn maybe_execute_token_conditional_swap(
         &liqee,
         tcs.sell_token_index,
         tcs.buy_token_index,
-        execution_price,
+        maker_price,
         I80F48::from_num(0.01), // TODO: what target?
     )
     .await?
@@ -760,7 +763,7 @@ pub async fn maybe_execute_token_conditional_swap(
         &mango_client.mango_account().await?, // TODO: get a fresh one!
         tcs.buy_token_index,
         tcs.sell_token_index,
-        execution_price,
+        I80F48::ONE / taker_price,
         liqor_min_health_ratio,
     )
     .await?

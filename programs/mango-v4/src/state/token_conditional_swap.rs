@@ -1,6 +1,7 @@
 use anchor_lang::prelude::*;
 
 use derivative::Derivative;
+use fixed::types::I80F48;
 use num_enum::{IntoPrimitive, TryFromPrimitive};
 use static_assertions::const_assert_eq;
 use std::mem::size_of;
@@ -38,14 +39,24 @@ pub struct TokenConditionalSwap {
     pub bought: u64,
     pub sold: u64,
 
-    /// the threshold at which to allow execution
+    /// The price threshold at which to allow execution
+    ///
+    /// Uses the sell_token oracle per buy_token oracle price, without accounting for fees.
     pub price_threshold: f32,
 
-    /// the maximum price at which execution is allowed
+    /// The maximum sell_token per buy_token price at which execution is allowed
+    ///
+    /// this includes the premium and fees.
     pub price_limit: f32,
 
-    /// the premium to pay over oracle price
-    pub price_premium_bps: u32,
+    /// The premium to pay over oracle price to incentivize execution.
+    pub price_premium_bps: u16,
+
+    /// The taker receives only premium_price * (1 - taker_fee_bps/10000)
+    pub taker_fee_bps: u16,
+
+    /// The maker has to pay premium_price * (1 + maker_fee_bps/10000)
+    pub maker_fee_bps: u16,
 
     /// indexes of tokens for the swap
     pub buy_token_index: TokenIndex,
@@ -63,12 +74,12 @@ pub struct TokenConditionalSwap {
 
     // TODO: Add some kind of expiry timestamp
     #[derivative(Debug = "ignore")]
-    pub reserved: [u8; 124],
+    pub reserved: [u8; 122],
 }
 
 const_assert_eq!(
     size_of::<TokenConditionalSwap>(),
-    8 * 5 + 2 * 4 + 4 + 2 * 2 + 1 * 4 + 124
+    8 * 5 + 2 * 4 + 2 * 5 + 1 * 4 + 122
 );
 const_assert_eq!(size_of::<TokenConditionalSwap>(), 184);
 const_assert_eq!(size_of::<TokenConditionalSwap>() % 8, 0);
@@ -84,13 +95,15 @@ impl Default for TokenConditionalSwap {
             price_threshold: 0.0,
             price_limit: 0.0,
             price_premium_bps: 0,
+            taker_fee_bps: 0,
+            maker_fee_bps: 0,
             buy_token_index: TokenIndex::MAX,
             sell_token_index: TokenIndex::MAX,
             is_active: 0,
             price_threshold_type: TokenConditionalSwapPriceThresholdType::PriceOverThreshold.into(),
             allow_creating_borrows: 0,
             allow_creating_deposits: 0,
-            reserved: [0; 124],
+            reserved: [0; 122],
         }
     }
 }
@@ -124,8 +137,33 @@ impl TokenConditionalSwap {
         TokenConditionalSwapPriceThresholdType::try_from(self.price_threshold_type).unwrap()
     }
 
-    pub fn execution_price(&self, base_price: f32) -> f32 {
-        base_price * (1.0 + (self.price_premium_bps as f32) * 0.0001)
+    /// Base price adjusted for the premium
+    ///
+    /// Base price is the amount of sell_token to pay for one buy_token.
+    pub fn premium_price(&self, base_price: f32) -> f32 {
+        base_price * (1.0 + self.price_premium_bps as f32 * 0.0001)
+    }
+
+    /// Premium price adjusted for the maker fee
+    pub fn maker_price(&self, premium_price: f32) -> f32 {
+        premium_price * (1.0 + self.maker_fee_bps as f32 * 0.0001)
+    }
+
+    /// Premium price adjusted for the taker fee
+    pub fn taker_price(&self, premium_price: f32) -> f32 {
+        premium_price * (1.0 - self.taker_fee_bps as f32 * 0.0001)
+    }
+
+    pub fn maker_fee(&self, base_sell_amount: I80F48) -> u64 {
+        (base_sell_amount * I80F48::from(self.maker_fee_bps) * ONE_BPS)
+            .floor()
+            .to_num()
+    }
+
+    pub fn taker_fee(&self, base_sell_amount: I80F48) -> u64 {
+        (base_sell_amount * I80F48::from(self.taker_fee_bps) * ONE_BPS)
+            .floor()
+            .to_num()
     }
 
     pub fn price_threshold_reached(&self, price: f32) -> bool {

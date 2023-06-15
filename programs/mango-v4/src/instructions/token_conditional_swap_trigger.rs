@@ -162,9 +162,11 @@ fn action(
         MangoError::TokenConditionalSwapPriceThresholdNotReached
     );
 
-    let premium_price = tcs.execution_price(price);
-    require_gte!(tcs.price_limit, premium_price);
-    let premium_price_i80f48 = I80F48::from_num(premium_price);
+    let premium_price = tcs.premium_price(price);
+    let maker_price = tcs.maker_price(premium_price);
+
+    require_gte!(tcs.price_limit, maker_price);
+    let maker_price_i80f48 = I80F48::from_num(maker_price);
 
     let pre_liqee_buy_token = liqee
         .ensure_token_position(tcs.buy_token_index)?
@@ -176,9 +178,11 @@ fn action(
         .native(&sell_bank);
 
     // derive trade amount based on limits in the tcs and by the liqor
-    let (buy_token_amount, sell_token_amount) = trade_amount(
+    // the sell_token_amount_from_liqee is the amount to deduct from the liqee, it's adjusted upwards
+    // for the taker fee (since this is included in the maker_price)
+    let (buy_token_amount, sell_token_amount_from_liqee) = trade_amount(
         &tcs,
-        premium_price_i80f48,
+        maker_price_i80f48,
         max_buy_token_to_liqee,
         max_sell_token_to_liqor,
         pre_liqee_buy_token,
@@ -188,9 +192,14 @@ fn action(
     // Proceed with it anyway because we already mutated the account anyway and might want
     // to drop the token stop loss entry later.
 
+    let sell_token_amount =
+        (I80F48::from(buy_token_amount) * I80F48::from_num(premium_price)).floor();
+    let maker_fee = tcs.maker_fee(sell_token_amount);
+    let taker_fee = tcs.taker_fee(sell_token_amount);
+    let sell_token_amount_to_liqor = sell_token_amount_from_liqee - maker_fee - taker_fee;
+
     // do the token transfer between liqee and liqor
     let buy_token_amount_i80f48 = I80F48::from(buy_token_amount);
-    let sell_token_amount_i80f48 = I80F48::from(sell_token_amount);
 
     let (liqee_buy_token, liqee_buy_raw_index) = liqee.token_position_mut(tcs.buy_token_index)?;
     let (liqor_buy_token, liqor_buy_raw_index, _) =
@@ -206,10 +215,20 @@ fn action(
         liqee.token_position_mut(tcs.sell_token_index)?;
     let (liqor_sell_token, liqor_sell_raw_index, _) =
         liqor.ensure_token_position(tcs.sell_token_index)?;
-    let liqor_sell_active =
-        sell_bank.deposit(liqor_sell_token, sell_token_amount_i80f48, now_ts)?;
-    let (liqee_sell_active, liqee_sell_loan_origination) =
-        sell_bank.withdraw_with_fee(liqee_sell_token, sell_token_amount_i80f48, now_ts)?;
+    let liqor_sell_active = sell_bank.deposit(
+        liqor_sell_token,
+        I80F48::from(sell_token_amount_to_liqor),
+        now_ts,
+    )?;
+    let (liqee_sell_active, liqee_sell_loan_origination) = sell_bank.withdraw_with_fee(
+        liqee_sell_token,
+        I80F48::from(sell_token_amount_from_liqee),
+        now_ts,
+    )?;
+
+    sell_bank.collected_fees_native += I80F48::from(maker_fee + taker_fee);
+
+    // TODO: safety features on net borrows
 
     let post_liqee_sell_token = liqee_sell_token.native(&sell_bank);
     let post_liqor_sell_token = liqor_sell_token.native(&sell_bank);
@@ -291,7 +310,7 @@ fn action(
         // record amount
         let tcs = liqee.token_conditional_swap_mut_by_index(token_conditional_swap_index)?;
         tcs.bought += buy_token_amount;
-        tcs.sold += sell_token_amount;
+        tcs.sold += sell_token_amount_from_liqee;
         assert!(tcs.bought <= tcs.max_buy);
         assert!(tcs.sold <= tcs.max_sell);
 
@@ -303,7 +322,7 @@ fn action(
         // - if the price is such that swapping 1 native token would already exceed the limit
         let (future_buy, future_sell) = trade_amount(
             tcs,
-            premium_price_i80f48,
+            maker_price_i80f48,
             u64::MAX,
             u64::MAX,
             post_liqee_buy_token,
@@ -325,7 +344,9 @@ fn action(
         buy_token_index: tcs.buy_token_index,
         sell_token_index: tcs.sell_token_index,
         buy_amount: buy_token_amount,
-        sell_amount: sell_token_amount,
+        sell_amount: sell_token_amount_from_liqee,
+        maker_fee,
+        taker_fee,
         buy_token_price: buy_token_price.to_bits(),
         sell_token_price: sell_token_price.to_bits(),
         closed,
@@ -534,6 +555,29 @@ mod tests {
                 .unwrap()
                 .native(self.liab_bank.data())
         }
+
+        fn trigger(
+            &mut self,
+            buy_price: f64,
+            buy_max: u64,
+            sell_price: f64,
+            sell_max: u64,
+        ) -> Result<(I80F48, I80F48)> {
+            action(
+                &mut self.liqor.borrow_mut(),
+                Pubkey::default(),
+                &mut self.liqee.borrow_mut(),
+                Pubkey::default(),
+                0,
+                self.liab_bank.data(),
+                I80F48::from_num(buy_price),
+                buy_max,
+                self.asset_bank.data(),
+                I80F48::from_num(sell_price),
+                sell_max,
+                0,
+            )
+        }
     }
 
     #[test]
@@ -556,27 +600,10 @@ mod tests {
         *setup.liqee.add_token_conditional_swap().unwrap() = tcs.clone();
         assert_eq!(setup.liqee.active_token_conditional_swap().count(), 1);
 
-        let trigger = |setup: &mut TestSetup, buy_price, buy_max, sell_price, sell_max| {
-            action(
-                &mut setup.liqor.borrow_mut(),
-                Pubkey::default(),
-                &mut setup.liqee.borrow_mut(),
-                Pubkey::default(),
-                0,
-                setup.liab_bank.data(),
-                I80F48::from_num(buy_price),
-                buy_max,
-                setup.asset_bank.data(),
-                I80F48::from_num(sell_price),
-                sell_max,
-                0,
-            )
-        };
+        assert!(setup.trigger(0.99, 40, 1.0, 100,).is_err());
+        assert!(setup.trigger(1.0, 40, 0.33, 100,).is_err());
 
-        assert!(trigger(&mut setup, 0.99, 40, 1.0, 100,).is_err());
-        assert!(trigger(&mut setup, 1.0, 40, 0.33, 100,).is_err());
-
-        let (buy_change, sell_change) = trigger(&mut setup, 2.0, 40, 1.0, 100).unwrap();
+        let (buy_change, sell_change) = setup.trigger(2.0, 40, 1.0, 100).unwrap();
         assert_eq!(buy_change.round(), 40);
         assert_eq!(sell_change.round(), -88);
 
@@ -594,7 +621,7 @@ mod tests {
         assert_eq!(setup.liqor_liab_pos().round(), -40);
         assert_eq!(setup.liqor_asset_pos().round(), 88);
 
-        let (buy_change, sell_change) = trigger(&mut setup, 2.0, 40, 1.0, 100).unwrap();
+        let (buy_change, sell_change) = setup.trigger(2.0, 40, 1.0, 100).unwrap();
         assert_eq!(buy_change.round(), 5);
         assert_eq!(sell_change.round(), -11);
 
@@ -604,5 +631,39 @@ mod tests {
         assert_eq!(setup.liqee_asset_pos().round(), -99);
         assert_eq!(setup.liqor_liab_pos().round(), -45);
         assert_eq!(setup.liqor_asset_pos().round(), 99);
+    }
+
+    #[test]
+    fn test_token_conditional_swap_trigger_fees() {
+        let mut setup = TestSetup::new();
+
+        let tcs = TokenConditionalSwap {
+            max_buy: 1000,
+            max_sell: 1000,
+            price_threshold: 1.0,
+            price_limit: 3.0,
+            price_premium_bps: 200,
+            maker_fee_bps: 300,
+            taker_fee_bps: 500,
+            buy_token_index: 1,
+            sell_token_index: 0,
+            is_active: 1,
+            allow_creating_borrows: 1,
+            allow_creating_deposits: 1,
+            ..Default::default()
+        };
+        *setup.liqee.add_token_conditional_swap().unwrap() = tcs.clone();
+        assert_eq!(setup.liqee.active_token_conditional_swap().count(), 1);
+
+        let (buy_change, sell_change) = setup.trigger(1.0, 1000, 1.0, 1000).unwrap();
+        assert_eq!(buy_change.round(), 952);
+        assert_eq!(sell_change.round(), -1000);
+
+        assert_eq!(setup.liqee_liab_pos().round(), 952);
+        assert_eq!(setup.liqee_asset_pos().round(), -1000);
+        assert_eq!(setup.liqor_liab_pos().round(), -952);
+        assert_eq!(setup.liqor_asset_pos().round(), 923); // floor(952*1.02*0.95)
+
+        assert_eq!(setup.asset_bank.data().collected_fees_native, 77);
     }
 }

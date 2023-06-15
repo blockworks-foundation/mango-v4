@@ -445,9 +445,11 @@ pub struct TokenConditionalSwapTriggerLog {
     pub token_conditional_swap_id: u64,
     pub buy_token_index: u16,
     pub sell_token_index: u16,
-    pub buy_amount: u64,
-    pub sell_amount: u64,
-    pub buy_token_price: i128,  // I80F48
+    pub buy_amount: u64,        // amount the liqee got
+    pub sell_amount: u64,       // amount the liqee paid (including fees)
+    pub maker_fee: u64,         // in native units of sell token (included in sell amount)
+    pub taker_fee: u64, // in native units of sell token (deducted from the sell amount the liqor received)
+    pub buy_token_price: i128, // I80F48
     pub sell_token_price: i128, // I80F48
     pub closed: bool,
 }

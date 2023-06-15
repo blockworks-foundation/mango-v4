@@ -16,6 +16,7 @@ use std::mem::size_of;
 pub const HOUR: i64 = 3600;
 pub const DAY: i64 = 86400;
 pub const DAY_I80F48: I80F48 = I80F48::from_bits(86_400 * I80F48::ONE.to_bits());
+pub const ONE_BPS: I80F48 = I80F48::from_bits(28147497671);
 pub const YEAR_I80F48: I80F48 = I80F48::from_bits(31_536_000 * I80F48::ONE.to_bits());
 pub const MINIMUM_MAX_RATE: I80F48 = I80F48::from_bits(I80F48::ONE.to_bits() / 2);
 

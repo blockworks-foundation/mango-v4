@@ -4216,7 +4216,7 @@ pub struct TokenConditionalSwapCreateInstruction {
     pub price_threshold: f32,
     pub price_threshold_type: TokenConditionalSwapPriceThresholdType,
     pub price_limit: f32,
-    pub price_premium_bps: u32,
+    pub price_premium_bps: u16,
     pub allow_creating_deposits: bool,
     pub allow_creating_borrows: bool,
 }
