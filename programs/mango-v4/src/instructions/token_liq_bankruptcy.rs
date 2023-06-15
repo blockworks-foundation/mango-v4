@@ -178,7 +178,8 @@ pub fn token_liq_bankruptcy(
                     token_index: liab_token_index,
                     loan_amount: liqor_liab_withdraw_result.loan_amount.to_bits(),
                     loan_origination_fee: liqor_liab_withdraw_result.loan_origination_fee.to_bits(),
-                    instruction: LoanOriginationFeeInstruction::LiqTokenBankruptcy
+                    instruction: LoanOriginationFeeInstruction::LiqTokenBankruptcy,
+                    price: Some(liab_oracle_price.to_bits())
                 });
             }
 

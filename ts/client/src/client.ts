@@ -1768,7 +1768,11 @@ export class MangoClient {
       );
     }
 
-    return await this.serum3SettleFundsV2Ix(group, mangoAccount, externalMarketPk);
+    return await this.serum3SettleFundsV2Ix(
+      group,
+      mangoAccount,
+      externalMarketPk,
+    );
   }
 
   public async serum3SettleFundsV2Ix(
