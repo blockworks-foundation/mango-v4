@@ -1687,7 +1687,7 @@ export class PerpPosition {
     const pp = mangoAccount.getPerpPosition(perpMarket.perpMarketIndex);
     if (!pp) {
       throw new Error(
-        `Cannot compute liquidation price for a position which doesn't, perpMarketIndex - ${perpMarket.perpMarketIndex}`,
+        `Cannot compute liquidation price for a position which doesn't exist, perpMarketIndex - ${perpMarket.perpMarketIndex}`,
       );
     }
 
@@ -1718,7 +1718,7 @@ export class PerpPosition {
         perpMarket,
         mangoAccount,
         sortedOo,
-        prevLp ?? perpMarket.price,
+        prevLp && prevLp.gt(ZERO_I80F48) ? prevLp : perpMarket.price,
       );
 
       if (prevLp && pp.getBasePositionNative(perpMarket).isPos()) {
