@@ -1,4 +1,4 @@
-Disclaimer:
+## Disclaimer:
 
 The following open source code contains an automated bot designed to market make. Please note that the use of this code is at your own risk and responsibility.
 
@@ -16,7 +16,7 @@ The following open source code contains an automated bot designed to market make
 
 By using this open source code, you acknowledge and agree to the above disclaimer. If you do not agree with any part of the disclaimer, refrain from using the code.
 
---
+---
 
 This directory contains a sample market maker (`market-maker.ts`) in typescript, which can be run using ts-node.
 
