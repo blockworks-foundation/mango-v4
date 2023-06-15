@@ -14,7 +14,6 @@ use crate::error::*;
 use crate::health::{HealthCache, HealthType};
 use crate::logs::{DeactivatePerpPositionLog, DeactivateTokenPositionLog};
 
-use super::dynamic_account::*;
 use super::BookSideOrderTree;
 use super::FillEvent;
 use super::LeafNode;
@@ -24,6 +23,7 @@ use super::PerpOpenOrder;
 use super::Serum3MarketIndex;
 use super::TokenIndex;
 use super::FREE_ORDER_SLOT;
+use super::{dynamic_account::*, Group};
 use super::{PerpPosition, Serum3Orders, TokenPosition};
 use super::{Side, SideAndOrderTree};
 
@@ -300,17 +300,22 @@ impl MangoAccountFixed {
     }
 
     /// Add new fees that are usable with the buyback fees feature.
+    ///
+    /// Any call to this should be preceeded by a call to expire_buyback_fees earlier
+    /// in the same instruction.
     pub fn accrue_buyback_fees(&mut self, amount: u64) {
         self.buyback_fees_accrued_current =
             self.buyback_fees_accrued_current.saturating_add(amount);
     }
 
     /// Reduce the available buyback fees amount because it was used up.
+    ///
+    /// Panics if `amount` exceeds the available accrued amount
     pub fn reduce_buyback_fees_accrued(&mut self, amount: u64) {
         if amount > self.buyback_fees_accrued_previous {
-            self.buyback_fees_accrued_current = self
-                .buyback_fees_accrued_current
-                .saturating_sub(amount - self.buyback_fees_accrued_previous);
+            let remaining_amount = amount - self.buyback_fees_accrued_previous;
+            assert!(remaining_amount <= self.buyback_fees_accrued_current);
+            self.buyback_fees_accrued_current -= remaining_amount;
             self.buyback_fees_accrued_previous = 0;
         } else {
             self.buyback_fees_accrued_previous -= amount;
@@ -948,14 +953,17 @@ impl<
         perp_market_index: PerpMarketIndex,
         perp_market: &mut PerpMarket,
         fill: &FillEvent,
+        group: &Group,
     ) -> Result<()> {
         let side = fill.taker_side().invert_side();
         let (base_change, quote_change) = fill.base_quote_change(side);
         let quote = I80F48::from(perp_market.quote_lot_size) * I80F48::from(quote_change);
         let fees = quote.abs() * I80F48::from_num(fill.maker_fee);
         if fees.is_positive() {
-            self.fixed_mut()
-                .accrue_buyback_fees(fees.floor().to_num::<u64>());
+            let f = self.fixed_mut();
+            let now_ts = Clock::get().unwrap().unix_timestamp.try_into().unwrap();
+            f.expire_buyback_fees(now_ts, group.buyback_fees_expiry_interval);
+            f.accrue_buyback_fees(fees.floor().to_num::<u64>());
         }
         let pa = self.perp_position_mut(perp_market_index)?;
         pa.settle_funding(perp_market);
@@ -1568,7 +1576,7 @@ mod tests {
         assert_eq!(fixed.buyback_fees_expiry_timestamp, 1070);
         assert_eq!(fixed.buyback_fees_accrued(), 12);
 
-        fixed.reduce_buyback_fees_accrued(100);
+        fixed.reduce_buyback_fees_accrued(12);
         assert_eq!(fixed.buyback_fees_accrued(), 0);
     }
 }

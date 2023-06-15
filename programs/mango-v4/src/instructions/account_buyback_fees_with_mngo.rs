@@ -93,7 +93,7 @@ pub fn account_buyback_fees_with_mngo(
     let mut max_buyback_mngo = max_buyback_usd / mngo_buyback_price;
     // buyback is restricted to account's token position
     max_buyback_mngo = max_buyback_mngo.min(account_mngo);
-    max_buyback_usd = max_buyback_mngo * mngo_buyback_price;
+    max_buyback_usd = max_buyback_usd.min(max_buyback_mngo * mngo_buyback_price);
     let max_buyback_fees = max_buyback_usd / fees_liab_price;
 
     // move mngo from user to dao
