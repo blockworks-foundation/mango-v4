@@ -78,12 +78,32 @@ impl MangoGroupContext {
         self.token(token_index).mint_info
     }
 
-    pub fn token(&self, token_index: TokenIndex) -> &TokenContext {
-        self.tokens.get(&token_index).unwrap()
-    }
-
     pub fn perp(&self, perp_market_index: PerpMarketIndex) -> &PerpMarketContext {
         self.perp_markets.get(&perp_market_index).unwrap()
+    }
+
+    pub fn perp_market_address(&self, perp_market_index: PerpMarketIndex) -> Pubkey {
+        self.perp(perp_market_index).address
+    }
+
+    pub fn serum3_market_index(&self, name: &str) -> Serum3MarketIndex {
+        *self.serum3_market_indexes_by_name.get(name).unwrap()
+    }
+
+    pub fn serum3(&self, market_index: Serum3MarketIndex) -> &Serum3MarketContext {
+        self.serum3_markets.get(&market_index).unwrap()
+    }
+
+    pub fn serum3_base_token(&self, market_index: Serum3MarketIndex) -> &TokenContext {
+        self.token(self.serum3(market_index).market.base_token_index)
+    }
+
+    pub fn serum3_quote_token(&self, market_index: Serum3MarketIndex) -> &TokenContext {
+        self.token(self.serum3(market_index).market.quote_token_index)
+    }
+
+    pub fn token(&self, token_index: TokenIndex) -> &TokenContext {
+        self.tokens.get(&token_index).unwrap()
     }
 
     pub fn token_by_mint(&self, mint: &Pubkey) -> anyhow::Result<&TokenContext> {
@@ -91,10 +111,6 @@ impl MangoGroupContext {
             .iter()
             .find_map(|(_, tc)| (tc.mint_info.mint == *mint).then(|| tc))
             .ok_or_else(|| anyhow::anyhow!("no token for mint {}", mint))
-    }
-
-    pub fn perp_market_address(&self, perp_market_index: PerpMarketIndex) -> Pubkey {
-        self.perp(perp_market_index).address
     }
 
     pub async fn new_from_rpc(rpc: &RpcClientAsync, group: Pubkey) -> anyhow::Result<Self> {

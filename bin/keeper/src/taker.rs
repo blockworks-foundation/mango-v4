@@ -138,7 +138,7 @@ pub async fn loop_blocking_price_update(
         log::info!("{} Updated price is {:?}", token_name, fresh_price.price);
         if let Ok(mut price) = price.write() {
             *price = I80F48::from_num(fresh_price.price)
-                / I80F48::from_num(10u64.pow(-fresh_price.expo as u32));
+                / I80F48::from_num(10f64.powi(-fresh_price.expo));
         }
     }
 }
@@ -157,6 +157,18 @@ pub async fn loop_blocking_orders(
         .unwrap();
     log::info!("Cancelled orders - {:?} for {}", orders, market_name);
 
+    let market_index = mango_client.context.serum3_market_index(&market_name);
+    let s3 = mango_client.context.serum3(market_index);
+
+    let base_decimals = mango_client
+        .context
+        .token(s3.market.base_token_index)
+        .decimals as i32;
+    let quote_decimals = mango_client
+        .context
+        .token(s3.market.quote_token_index)
+        .decimals as i32;
+
     loop {
         interval.tick().await;
 
@@ -164,25 +176,23 @@ pub async fn loop_blocking_orders(
         let market_name = market_name.clone();
         let price = price.clone();
 
-        let res = (|| async move {
+        let res: anyhow::Result<()> = (|| async move {
             client.serum3_settle_funds(&market_name).await?;
 
-            let fresh_price = match price.read() {
-                Ok(price) => *price,
-                Err(_) => {
-                    anyhow::bail!("Price RwLock PoisonError!");
-                }
-            };
+            let fresh_price = price.read().unwrap().to_num::<f64>();
+            let bid_price = fresh_price * 1.1;
 
-            let fresh_price = fresh_price.to_num::<f64>();
+            let bid_price_lots =
+                bid_price * 10f64.powi(quote_decimals - base_decimals) * s3.coin_lot_size as f64
+                    / s3.pc_lot_size as f64;
 
-            let bid_price = fresh_price + fresh_price * 0.1;
             let res = client
                 .serum3_place_order(
                     &market_name,
                     Serum3Side::Bid,
-                    bid_price,
-                    0.0001,
+                    bid_price_lots.round() as u64,
+                    1,
+                    u64::MAX,
                     Serum3SelfTradeBehavior::DecrementTake,
                     Serum3OrderType::ImmediateOrCancel,
                     SystemTime::now().duration_since(UNIX_EPOCH)?.as_millis() as u64,
@@ -195,13 +205,18 @@ pub async fn loop_blocking_orders(
                 log::info!("Placed bid at {} for {}", bid_price, market_name)
             }
 
-            let ask_price = fresh_price - fresh_price * 0.1;
+            let ask_price = fresh_price * 0.9;
+            let ask_price_lots =
+                ask_price * 10f64.powi(quote_decimals - base_decimals) * s3.coin_lot_size as f64
+                    / s3.pc_lot_size as f64;
+
             let res = client
                 .serum3_place_order(
                     &market_name,
                     Serum3Side::Ask,
-                    ask_price,
-                    0.0001,
+                    ask_price_lots.round() as u64,
+                    1,
+                    u64::MAX,
                     Serum3SelfTradeBehavior::DecrementTake,
                     Serum3OrderType::ImmediateOrCancel,
                     SystemTime::now().duration_since(UNIX_EPOCH)?.as_millis() as u64,
