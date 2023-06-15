@@ -3068,6 +3068,15 @@ export class MangoClient {
     );
   }
 
+  /**
+   * Connect with defaults,
+   *  - random ephemeral keypair,
+   *  - fetch ids using gPa
+   *  - connects to mainnet-beta
+   *  - uses well known program Id
+   * @param clusterUrl
+   * @returns
+   */
   static connectDefault(clusterUrl: string): MangoClient {
     const idl = IDL;
 
