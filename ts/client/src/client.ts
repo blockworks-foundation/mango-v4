@@ -2238,7 +2238,7 @@ export class MangoClient {
     expiryTimestamp?: number,
     limit?: number,
   ): Promise<TransactionSignature> {
-    const ix = await this.perpPlaceOrderIx(
+    const ix = await this.perpPlaceOrderV2Ix(
       group,
       mangoAccount,
       perpMarketIndex,
@@ -2248,6 +2248,7 @@ export class MangoClient {
       maxQuoteQuantity,
       clientOrderId,
       orderType,
+      PerpSelfTradeBehavior.decrementTake,
       reduceOnly,
       expiryTimestamp,
       limit,
@@ -2385,7 +2386,7 @@ export class MangoClient {
     expiryTimestamp?: number,
     limit?: number,
   ): Promise<TransactionSignature> {
-    const ix = await this.perpPlaceOrderPeggedIx(
+    const ix = await this.perpPlaceOrderPegged2Ix(
       group,
       mangoAccount,
       perpMarketIndex,
@@ -2396,6 +2397,7 @@ export class MangoClient {
       maxQuoteQuantity,
       clientOrderId,
       orderType,
+      PerpSelfTradeBehavior.decrementTake,
       reduceOnly,
       expiryTimestamp,
       limit,
