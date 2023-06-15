@@ -1169,7 +1169,7 @@ export type MangoV4 = {
           "type": "u8"
         },
         {
-          "name": "tokenStopLossCount",
+          "name": "tokenConditionalSwapCount",
           "type": "u8"
         }
       ]
@@ -4707,7 +4707,7 @@ export type MangoV4 = {
       ]
     },
     {
-      "name": "tokenStopLossCreate",
+      "name": "tokenConditionalSwapCreate",
       "accounts": [
         {
           "name": "group",
@@ -4760,6 +4760,10 @@ export type MangoV4 = {
           "type": "u32"
         },
         {
+          "name": "priceLimit",
+          "type": "f32"
+        },
+        {
           "name": "allowCreatingDeposits",
           "type": "bool"
         },
@@ -4770,7 +4774,7 @@ export type MangoV4 = {
       ]
     },
     {
-      "name": "tokenStopLossCancel",
+      "name": "tokenConditionalSwapCancel",
       "accounts": [
         {
           "name": "group",
@@ -4793,17 +4797,17 @@ export type MangoV4 = {
       ],
       "args": [
         {
-          "name": "tokenStopLossIndex",
+          "name": "tokenConditionalSwapIndex",
           "type": "u8"
         },
         {
-          "name": "tokenStopLossId",
+          "name": "tokenConditionalSwapId",
           "type": "u64"
         }
       ]
     },
     {
-      "name": "tokenStopLossTrigger",
+      "name": "tokenConditionalSwapTrigger",
       "accounts": [
         {
           "name": "group",
@@ -4834,19 +4838,19 @@ export type MangoV4 = {
       ],
       "args": [
         {
-          "name": "tokenStopLossIndex",
+          "name": "tokenConditionalSwapIndex",
           "type": "u8"
         },
         {
-          "name": "tokenStopLossId",
+          "name": "tokenConditionalSwapId",
           "type": "u64"
         },
         {
-          "name": "liqorMaxBuyTokenToGive",
+          "name": "maxBuyTokenToLiqee",
           "type": "u64"
         },
         {
-          "name": "liqorMaxSellTokenToReceive",
+          "name": "maxSellTokenToLiqor",
           "type": "u64"
         }
       ]
@@ -5466,7 +5470,7 @@ export type MangoV4 = {
             "type": "u64"
           },
           {
-            "name": "nextStopLossId",
+            "name": "nextConditionalSwapId",
             "type": "u64"
           },
           {
@@ -7142,7 +7146,7 @@ export type MangoV4 = {
             "type": "u64"
           },
           {
-            "name": "nextStopLossId",
+            "name": "nextConditionalSwapId",
             "type": "u64"
           },
           {
@@ -7845,6 +7849,13 @@ export type MangoV4 = {
             "type": "f32"
           },
           {
+            "name": "priceLimit",
+            "docs": [
+              "the maximum price at which execution is allowed"
+            ],
+            "type": "f32"
+          },
+          {
             "name": "pricePremiumBps",
             "docs": [
               "the premium to pay over oracle price"
@@ -7863,14 +7874,14 @@ export type MangoV4 = {
             "type": "u16"
           },
           {
-            "name": "priceThresholdType",
-            "docs": [
-              "holds a TokenConditionalSwapPriceThresholdType, so whether the threshold is > or <"
-            ],
+            "name": "isActive",
             "type": "u8"
           },
           {
-            "name": "isActive",
+            "name": "priceThresholdType",
+            "docs": [
+              "holds a TokenConditionalSwapPriceThresholdType"
+            ],
             "type": "u8"
           },
           {
@@ -7892,7 +7903,7 @@ export type MangoV4 = {
             "type": {
               "array": [
                 "u8",
-                128
+                124
               ]
             }
           }
@@ -10056,7 +10067,7 @@ export type MangoV4 = {
           "index": false
         },
         {
-          "name": "tokenStopLossId",
+          "name": "tokenConditionalSwapId",
           "type": "u64",
           "index": false
         },
@@ -10346,8 +10357,8 @@ export type MangoV4 = {
     },
     {
       "code": 6049,
-      "name": "StopLossPriceThresholdNotReached",
-      "msg": "stop loss price threshold not reached"
+      "name": "TokenConditionalSwapPriceThresholdNotReached",
+      "msg": "conditional token swap price threshold not reached"
     }
   ]
 };
@@ -11523,7 +11534,7 @@ export const IDL: MangoV4 = {
           "type": "u8"
         },
         {
-          "name": "tokenStopLossCount",
+          "name": "tokenConditionalSwapCount",
           "type": "u8"
         }
       ]
@@ -15061,7 +15072,7 @@ export const IDL: MangoV4 = {
       ]
     },
     {
-      "name": "tokenStopLossCreate",
+      "name": "tokenConditionalSwapCreate",
       "accounts": [
         {
           "name": "group",
@@ -15114,6 +15125,10 @@ export const IDL: MangoV4 = {
           "type": "u32"
         },
         {
+          "name": "priceLimit",
+          "type": "f32"
+        },
+        {
           "name": "allowCreatingDeposits",
           "type": "bool"
         },
@@ -15124,7 +15139,7 @@ export const IDL: MangoV4 = {
       ]
     },
     {
-      "name": "tokenStopLossCancel",
+      "name": "tokenConditionalSwapCancel",
       "accounts": [
         {
           "name": "group",
@@ -15147,17 +15162,17 @@ export const IDL: MangoV4 = {
       ],
       "args": [
         {
-          "name": "tokenStopLossIndex",
+          "name": "tokenConditionalSwapIndex",
           "type": "u8"
         },
         {
-          "name": "tokenStopLossId",
+          "name": "tokenConditionalSwapId",
           "type": "u64"
         }
       ]
     },
     {
-      "name": "tokenStopLossTrigger",
+      "name": "tokenConditionalSwapTrigger",
       "accounts": [
         {
           "name": "group",
@@ -15188,19 +15203,19 @@ export const IDL: MangoV4 = {
       ],
       "args": [
         {
-          "name": "tokenStopLossIndex",
+          "name": "tokenConditionalSwapIndex",
           "type": "u8"
         },
         {
-          "name": "tokenStopLossId",
+          "name": "tokenConditionalSwapId",
           "type": "u64"
         },
         {
-          "name": "liqorMaxBuyTokenToGive",
+          "name": "maxBuyTokenToLiqee",
           "type": "u64"
         },
         {
-          "name": "liqorMaxSellTokenToReceive",
+          "name": "maxSellTokenToLiqor",
           "type": "u64"
         }
       ]
@@ -15820,7 +15835,7 @@ export const IDL: MangoV4 = {
             "type": "u64"
           },
           {
-            "name": "nextStopLossId",
+            "name": "nextConditionalSwapId",
             "type": "u64"
           },
           {
@@ -17496,7 +17511,7 @@ export const IDL: MangoV4 = {
             "type": "u64"
           },
           {
-            "name": "nextStopLossId",
+            "name": "nextConditionalSwapId",
             "type": "u64"
           },
           {
@@ -18199,6 +18214,13 @@ export const IDL: MangoV4 = {
             "type": "f32"
           },
           {
+            "name": "priceLimit",
+            "docs": [
+              "the maximum price at which execution is allowed"
+            ],
+            "type": "f32"
+          },
+          {
             "name": "pricePremiumBps",
             "docs": [
               "the premium to pay over oracle price"
@@ -18217,14 +18239,14 @@ export const IDL: MangoV4 = {
             "type": "u16"
           },
           {
-            "name": "priceThresholdType",
-            "docs": [
-              "holds a TokenConditionalSwapPriceThresholdType, so whether the threshold is > or <"
-            ],
+            "name": "isActive",
             "type": "u8"
           },
           {
-            "name": "isActive",
+            "name": "priceThresholdType",
+            "docs": [
+              "holds a TokenConditionalSwapPriceThresholdType"
+            ],
             "type": "u8"
           },
           {
@@ -18246,7 +18268,7 @@ export const IDL: MangoV4 = {
             "type": {
               "array": [
                 "u8",
-                128
+                124
               ]
             }
           }
@@ -20410,7 +20432,7 @@ export const IDL: MangoV4 = {
           "index": false
         },
         {
-          "name": "tokenStopLossId",
+          "name": "tokenConditionalSwapId",
           "type": "u64",
           "index": false
         },
@@ -20700,8 +20722,8 @@ export const IDL: MangoV4 = {
     },
     {
       "code": 6049,
-      "name": "StopLossPriceThresholdNotReached",
-      "msg": "stop loss price threshold not reached"
+      "name": "TokenConditionalSwapPriceThresholdNotReached",
+      "msg": "conditional token swap price threshold not reached"
     }
   ]
 };

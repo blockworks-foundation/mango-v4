@@ -702,10 +702,17 @@ pub async fn maybe_execute_token_conditional_swap(
         let base_price = (buy_token_price / sell_token_price).to_num();
         let execution_price = tcs.execution_price(base_price);
 
-        if base_price >= tcs.price_threshold && execution_price <= tcs.price_limit {
-            tcs_id = Some(tcs.id);
-            break;
+        if !tcs.price_threshold_reached(base_price) || execution_price > tcs.price_limit {
+            continue;
         }
+
+        // TODO: requirements on premium
+        if tcs.price_premium_bps < 1000 {
+            continue;
+        }
+
+        tcs_id = Some(tcs.id);
+        break;
     }
     if tcs_id.is_none() {
         return Ok(false);

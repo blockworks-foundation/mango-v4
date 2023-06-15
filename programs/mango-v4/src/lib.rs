@@ -32,7 +32,7 @@ compile_error!("compiling the program entrypoint without 'enable-gpl' makes no s
 
 use state::{
     OracleConfigParams, PerpMarketIndex, PlaceOrderType, SelfTradeBehavior, Serum3MarketIndex,
-    Side, TokenConditionalSwap, TokenIndex,
+    Side, TokenConditionalSwap, TokenConditionalSwapPriceThresholdType, TokenIndex,
 };
 
 declare_id!("4MangoMjqJ2firMokCjjGgoK8d4MXcrgL7XJaL3w6fVg");
@@ -1139,6 +1139,7 @@ pub mod mango_v4 {
         max_buy: u64,
         max_sell: u64,
         price_threshold: f32,
+        price_threshold_type: TokenConditionalSwapPriceThresholdType,
         price_premium_bps: u32,
         price_limit: f32,
         allow_creating_deposits: bool,
@@ -1156,9 +1157,10 @@ pub mod mango_v4 {
             buy_token_index,
             sell_token_index,
             is_active: 1,
+            price_threshold_type: price_threshold_type.into(),
             allow_creating_deposits: u8::from(allow_creating_deposits),
             allow_creating_borrows: u8::from(allow_creating_borrows),
-            reserved: [0; 125],
+            reserved: [0; 124],
         };
 
         #[cfg(feature = "enable-gpl")]

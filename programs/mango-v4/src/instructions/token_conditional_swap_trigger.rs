@@ -157,10 +157,9 @@ fn action(
 
     // amount of sell token native per buy token native
     let price: f32 = (buy_token_price.to_num::<f64>() / sell_token_price.to_num::<f64>()) as f32;
-    require_gte!(
-        price,
-        tcs.price_threshold,
-        MangoError::StopLossPriceThresholdNotReached
+    require!(
+        tcs.price_threshold_reached(price),
+        MangoError::TokenConditionalSwapPriceThresholdNotReached
     );
 
     let premium_price = tcs.execution_price(price);
