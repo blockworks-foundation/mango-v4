@@ -281,9 +281,7 @@ async fn test_perp_reduce_only() -> Result<(), TransportError> {
             side: Side::Bid,
             price_lots,
             max_base_lots: 2,
-            max_quote_lots: i64::MAX,
-            reduce_only: false,
-            client_order_id: 0,
+            ..PerpPlaceOrderInstruction::default()
         },
     )
     .await
@@ -298,9 +296,7 @@ async fn test_perp_reduce_only() -> Result<(), TransportError> {
             side: Side::Ask,
             price_lots,
             max_base_lots: 2,
-            max_quote_lots: i64::MAX,
-            reduce_only: false,
-            client_order_id: 0,
+            ..PerpPlaceOrderInstruction::default()
         },
     )
     .await
@@ -328,9 +324,7 @@ async fn test_perp_reduce_only() -> Result<(), TransportError> {
             side: Side::Bid,
             price_lots: price_lots / 2,
             max_base_lots: 1,
-            max_quote_lots: i64::MAX,
-            reduce_only: false,
-            client_order_id: 0,
+            ..PerpPlaceOrderInstruction::default()
         },
     )
     .await
@@ -347,9 +341,7 @@ async fn test_perp_reduce_only() -> Result<(), TransportError> {
             side: Side::Ask,
             price_lots,
             max_base_lots: 1,
-            max_quote_lots: i64::MAX,
-            reduce_only: false,
-            client_order_id: 0,
+            ..PerpPlaceOrderInstruction::default()
         },
     )
     .await
@@ -381,9 +373,7 @@ async fn test_perp_reduce_only() -> Result<(), TransportError> {
             side: Side::Bid,
             price_lots,
             max_base_lots: 1,
-            max_quote_lots: i64::MAX,
-            reduce_only: false,
-            client_order_id: 0,
+            ..PerpPlaceOrderInstruction::default()
         },
     )
     .await;
@@ -399,9 +389,8 @@ async fn test_perp_reduce_only() -> Result<(), TransportError> {
             side: Side::Bid,
             price_lots,
             max_base_lots: 1,
-            max_quote_lots: i64::MAX,
             reduce_only: true,
-            client_order_id: 0,
+            ..PerpPlaceOrderInstruction::default()
         },
     )
     .await
@@ -419,9 +408,7 @@ async fn test_perp_reduce_only() -> Result<(), TransportError> {
             side: Side::Ask,
             price_lots,
             max_base_lots: 1,
-            max_quote_lots: i64::MAX,
-            reduce_only: false,
-            client_order_id: 0,
+            ..PerpPlaceOrderInstruction::default()
         },
     )
     .await
@@ -439,9 +426,8 @@ async fn test_perp_reduce_only() -> Result<(), TransportError> {
             side: Side::Ask,
             price_lots,
             max_base_lots: 1,
-            max_quote_lots: i64::MAX,
             reduce_only: true,
-            client_order_id: 0,
+            ..PerpPlaceOrderInstruction::default()
         },
     )
     .await
@@ -459,9 +445,7 @@ async fn test_perp_reduce_only() -> Result<(), TransportError> {
             side: Side::Ask,
             price_lots,
             max_base_lots: 1,
-            max_quote_lots: i64::MAX,
-            reduce_only: false,
-            client_order_id: 0,
+            ..PerpPlaceOrderInstruction::default()
         },
     )
     .await;
@@ -477,9 +461,8 @@ async fn test_perp_reduce_only() -> Result<(), TransportError> {
             side: Side::Ask,
             price_lots,
             max_base_lots: 1,
-            max_quote_lots: i64::MAX,
             reduce_only: true,
-            client_order_id: 0,
+            ..PerpPlaceOrderInstruction::default()
         },
     )
     .await
@@ -497,9 +480,7 @@ async fn test_perp_reduce_only() -> Result<(), TransportError> {
             side: Side::Ask,
             price_lots,
             max_base_lots: 1,
-            max_quote_lots: i64::MAX,
-            reduce_only: false,
-            client_order_id: 0,
+            ..PerpPlaceOrderInstruction::default()
         },
     )
     .await;
@@ -515,9 +496,8 @@ async fn test_perp_reduce_only() -> Result<(), TransportError> {
             side: Side::Ask,
             price_lots,
             max_base_lots: 1,
-            max_quote_lots: i64::MAX,
             reduce_only: true,
-            client_order_id: 0,
+            ..PerpPlaceOrderInstruction::default()
         },
     )
     .await
@@ -535,9 +515,7 @@ async fn test_perp_reduce_only() -> Result<(), TransportError> {
             side: Side::Bid,
             price_lots: price_lots / 2,
             max_base_lots: 1,
-            max_quote_lots: i64::MAX,
-            reduce_only: false,
-            client_order_id: 0,
+            ..PerpPlaceOrderInstruction::default()
         },
     )
     .await
@@ -555,9 +533,7 @@ async fn test_perp_reduce_only() -> Result<(), TransportError> {
             side: Side::Bid,
             price_lots: price_lots / 2,
             max_base_lots: 1,
-            max_quote_lots: i64::MAX,
-            reduce_only: false,
-            client_order_id: 0,
+            ..PerpPlaceOrderInstruction::default()
         },
     )
     .await
@@ -575,9 +551,7 @@ async fn test_perp_reduce_only() -> Result<(), TransportError> {
             side: Side::Bid,
             price_lots: price_lots / 2,
             max_base_lots: 1,
-            max_quote_lots: i64::MAX,
-            reduce_only: false,
-            client_order_id: 0,
+            ..PerpPlaceOrderInstruction::default()
         },
     )
     .await;
@@ -593,9 +567,8 @@ async fn test_perp_reduce_only() -> Result<(), TransportError> {
             side: Side::Bid,
             price_lots: price_lots / 2,
             max_base_lots: 1,
-            max_quote_lots: i64::MAX,
             reduce_only: true,
-            client_order_id: 0,
+            ..PerpPlaceOrderInstruction::default()
         },
     )
     .await

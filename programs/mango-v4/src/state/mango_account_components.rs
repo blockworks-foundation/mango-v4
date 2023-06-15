@@ -12,7 +12,7 @@ use crate::state::*;
 pub const FREE_ORDER_SLOT: PerpMarketIndex = PerpMarketIndex::MAX;
 
 #[zero_copy]
-#[derive(AnchorDeserialize, AnchorSerialize, Derivative, bytemuck::Pod, bytemuck::Zeroable)]
+#[derive(AnchorDeserialize, AnchorSerialize, Derivative, bytemuck::Pod)]
 #[derivative(Debug)]
 pub struct TokenPosition {
     // TODO: Why did we have deposits and borrows as two different values
@@ -102,7 +102,7 @@ impl TokenPosition {
 }
 
 #[zero_copy]
-#[derive(AnchorSerialize, AnchorDeserialize, Derivative, bytemuck::Pod, bytemuck::Zeroable)]
+#[derive(AnchorSerialize, AnchorDeserialize, Derivative, bytemuck::Pod)]
 #[derivative(Debug)]
 pub struct Serum3Orders {
     pub open_orders: Pubkey,
@@ -158,7 +158,7 @@ impl Default for Serum3Orders {
 }
 
 #[zero_copy]
-#[derive(AnchorSerialize, AnchorDeserialize, Derivative, bytemuck::Pod, bytemuck::Zeroable)]
+#[derive(AnchorSerialize, AnchorDeserialize, Derivative, bytemuck::Pod)]
 #[derivative(Debug)]
 pub struct PerpPosition {
     pub market_index: PerpMarketIndex,
@@ -782,7 +782,7 @@ impl PerpPosition {
 }
 
 #[zero_copy]
-#[derive(AnchorSerialize, AnchorDeserialize, Debug, bytemuck::Pod, bytemuck::Zeroable)]
+#[derive(AnchorSerialize, AnchorDeserialize, Debug, bytemuck::Pod)]
 pub struct PerpOpenOrder {
     pub side_and_tree: u8, // SideAndOrderTree -- enums aren't POD
     pub padding1: [u8; 1],

@@ -325,9 +325,7 @@ impl Owner for MangoAccountFixed {
 }
 
 impl Discriminator for MangoAccountFixed {
-    fn discriminator() -> [u8; 8] {
-        MangoAccount::discriminator()
-    }
+    const DISCRIMINATOR: [u8; 8] = MangoAccount::DISCRIMINATOR;
 }
 
 impl anchor_lang::ZeroCopy for MangoAccountFixed {}

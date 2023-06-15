@@ -1,6 +1,6 @@
 [package]
 name = "mango-v4"
-version = "0.15.0"
+version = "0.16.0"
 description = "Created with Anchor"
 edition = "2021"
 
@@ -23,8 +23,8 @@ enable-gpl = []
 [dependencies]
 # todo: when to fix, when to use caret? need a regular chore to bump dependencies
 # note: possibly need init-if-needed feature
-anchor-lang = { path = "../../3rdparty/anchor/lang" }
-anchor-spl = { path = "../../3rdparty/anchor/spl" }
+anchor-lang = "0.27.0"
+anchor-spl = "0.27.0"
 arrayref = "0.3.6"
 bincode = "1.3.3"
 borsh = { version = "0.9.3", features = ["const-generics"] }

@@ -70,7 +70,7 @@ jobs:
 
       - name: Run clippy
         # The --allow args are due to clippy scanning anchor
-        run: cargo clippy --no-deps -- --deny=warnings --allow=clippy::style --allow=clippy::complexity --allow=clippy::manual-retain --allow=clippy::crate-in-macro-def --allow=clippy::result-large-err --allow=clippy::derive_partial_eq_without_eq
+        run: cargo clippy --workspace --exclude anchor-\* --exclude fixed --exclude checked_math --features enable-gpl -- --no-deps --deny=warnings --allow=clippy::style --allow=clippy::complexity --allow=clippy::manual-retain --allow=clippy::crate-in-macro-def --allow=clippy::result-large-err --allow=clippy::derive_partial_eq_without_eq
 
   test:
     name: Test

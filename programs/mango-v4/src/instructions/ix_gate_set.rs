@@ -47,7 +47,6 @@ pub fn ix_gate_set(ctx: Context<IxGateSet>, ix_gate: u128) -> Result<()> {
     log_if_changed(&group, ix_gate, IxGate::Serum3CloseOpenOrders);
     log_if_changed(&group, ix_gate, IxGate::Serum3CreateOpenOrders);
     log_if_changed(&group, ix_gate, IxGate::Serum3DeregisterMarket);
-    log_if_changed(&group, ix_gate, IxGate::Serum3EditMarket);
     log_if_changed(&group, ix_gate, IxGate::Serum3LiqForceCancelOrders);
     log_if_changed(&group, ix_gate, IxGate::Serum3PlaceOrder);
     log_if_changed(&group, ix_gate, IxGate::Serum3RegisterMarket);
