@@ -595,26 +595,34 @@ impl MangoClient {
         let ix = Instruction {
             program_id: mango_v4::id(),
             accounts: anchor_lang::ToAccountMetas::to_account_metas(
-                &mango_v4::accounts::Serum3SettleFunds {
-                    group: self.group(),
-                    account: self.mango_account_address,
-                    open_orders,
-                    quote_bank: quote.mint_info.first_bank(),
-                    quote_vault: quote.mint_info.first_vault(),
-                    base_bank: base.mint_info.first_bank(),
-                    base_vault: base.mint_info.first_vault(),
-                    serum_market: s3.address,
-                    serum_program: s3.market.serum_program,
-                    serum_market_external: s3.market.serum_market_external,
-                    market_base_vault: s3.coin_vault,
-                    market_quote_vault: s3.pc_vault,
-                    market_vault_signer: s3.vault_signer,
-                    owner: self.owner(),
-                    token_program: Token::id(),
+                &mango_v4::accounts::Serum3SettleFundsV2 {
+                    v1: mango_v4::accounts::Serum3SettleFunds {
+                        group: self.group(),
+                        account: self.mango_account_address,
+                        open_orders,
+                        quote_bank: quote.mint_info.first_bank(),
+                        quote_vault: quote.mint_info.first_vault(),
+                        base_bank: base.mint_info.first_bank(),
+                        base_vault: base.mint_info.first_vault(),
+                        serum_market: s3.address,
+                        serum_program: s3.market.serum_program,
+                        serum_market_external: s3.market.serum_market_external,
+                        market_base_vault: s3.coin_vault,
+                        market_quote_vault: s3.pc_vault,
+                        market_vault_signer: s3.vault_signer,
+                        owner: self.owner(),
+                        token_program: Token::id(),
+                    },
+                    v2: mango_v4::accounts::Serum3SettleFundsV2Extra {
+                        quote_oracle: quote.mint_info.oracle,
+                        base_oracle: base.mint_info.oracle,
+                    },
                 },
                 None,
             ),
-            data: anchor_lang::InstructionData::data(&mango_v4::instruction::Serum3SettleFunds {}),
+            data: anchor_lang::InstructionData::data(&mango_v4::instruction::Serum3SettleFundsV2 {
+                fees_to_dao: true,
+            }),
         };
         self.send_and_confirm_owner_tx(vec![ix]).await
     }

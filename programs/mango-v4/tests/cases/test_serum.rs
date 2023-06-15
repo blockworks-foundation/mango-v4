@@ -135,16 +135,7 @@ impl SerumOrderPlacer {
     }
 
     async fn settle(&self) {
-        send_tx(
-            &self.solana,
-            Serum3SettleFundsInstruction {
-                account: self.account,
-                owner: self.owner,
-                serum_market: self.serum_market,
-            },
-        )
-        .await
-        .unwrap();
+        self.settle_v2(true).await
     }
 
     async fn settle_v2(&self, fees_to_dao: bool) {

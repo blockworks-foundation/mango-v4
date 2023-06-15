@@ -1768,48 +1768,11 @@ export class MangoClient {
       );
     }
 
-    const serum3Market = group.serum3MarketsMapByExternal.get(
-      externalMarketPk.toBase58(),
-    )!;
-    const serum3MarketExternal = group.serum3ExternalMarketsMap.get(
-      externalMarketPk.toBase58(),
-    )!;
-
-    const [serum3MarketExternalVaultSigner, openOrderPublicKey] =
-      await Promise.all([
-        generateSerum3MarketExternalVaultSignerAddress(
-          this.cluster,
-          serum3Market,
-          serum3MarketExternal,
-        ),
-        serum3Market.findOoPda(this.program.programId, mangoAccount.publicKey),
-      ]);
-
-    const ix = await this.program.methods
-      .serum3SettleFunds()
-      .accounts({
-        group: group.publicKey,
-        account: mangoAccount.publicKey,
-        owner: (this.program.provider as AnchorProvider).wallet.publicKey,
-        openOrders: openOrderPublicKey,
-        serumMarket: serum3Market.publicKey,
-        serumProgram: OPENBOOK_PROGRAM_ID[this.cluster],
-        serumMarketExternal: serum3Market.serumMarketExternal,
-        marketBaseVault: serum3MarketExternal.decoded.baseVault,
-        marketQuoteVault: serum3MarketExternal.decoded.quoteVault,
-        marketVaultSigner: serum3MarketExternalVaultSigner,
-        quoteBank: group.getFirstBankByTokenIndex(serum3Market.quoteTokenIndex)
-          .publicKey,
-        quoteVault: group.getFirstBankByTokenIndex(serum3Market.quoteTokenIndex)
-          .vault,
-        baseBank: group.getFirstBankByTokenIndex(serum3Market.baseTokenIndex)
-          .publicKey,
-        baseVault: group.getFirstBankByTokenIndex(serum3Market.baseTokenIndex)
-          .vault,
-      })
-      .instruction();
-
-    return ix;
+    return await this.serum3SettleFundsV2Ix(
+      group,
+      mangoAccount,
+      externalMarketPk,
+    );
   }
 
   public async serum3SettleFundsV2Ix(
