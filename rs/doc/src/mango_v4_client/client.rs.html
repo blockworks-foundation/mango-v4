@@ -1806,17 +1806,11 @@
 <span id="1806">1806</span>
 <span id="1807">1807</span>
 <span id="1808">1808</span>
-<span id="1809">1809</span>
-<span id="1810">1810</span>
-<span id="1811">1811</span>
-<span id="1812">1812</span>
-<span id="1813">1813</span>
-<span id="1814">1814</span>
 </pre><pre class="rust"><code><span class="kw">use </span>std::str::FromStr;
 <span class="kw">use </span>std::sync::Arc;
 <span class="kw">use </span>std::time::Duration;
 
-<span class="kw">use </span>anchor_client::{ClientError, Cluster};
+<span class="kw">use </span>anchor_client::Cluster;
 
 <span class="kw">use </span>anchor_lang::__private::bytemuck;
 <span class="kw">use </span>anchor_lang::prelude::System;
@@ -1845,7 +1839,7 @@
 <span class="kw">use </span>solana_sdk::transaction::TransactionError;
 
 <span class="kw">use </span><span class="kw">crate</span>::account_fetcher::<span class="kw-2">*</span>;
-<span class="kw">use </span><span class="kw">crate</span>::context::{MangoGroupContext, Serum3MarketContext, TokenContext};
+<span class="kw">use </span><span class="kw">crate</span>::context::MangoGroupContext;
 <span class="kw">use </span><span class="kw">crate</span>::gpa::{fetch_anchor_account, fetch_mango_accounts};
 <span class="kw">use </span><span class="kw">crate</span>::jupiter;
 
@@ -2243,36 +2237,32 @@
     // Serum3
     //
 
-    </span><span class="kw">pub async fn </span>serum3_create_open_orders(<span class="kw-2">&amp;</span><span class="self">self</span>, name: <span class="kw-2">&amp;</span>str) -&gt; anyhow::Result&lt;Signature&gt; {
+    </span><span class="kw">pub fn </span>serum3_create_open_orders_instruction(
+        <span class="kw-2">&amp;</span><span class="self">self</span>,
+        market_index: Serum3MarketIndex,
+    ) -&gt; Instruction {
         <span class="kw">let </span>account_pubkey = <span class="self">self</span>.mango_account_address;
-
-        <span class="kw">let </span>market_index = <span class="kw-2">*</span><span class="self">self
-            </span>.context
-            .serum3_market_indexes_by_name
-            .get(name)
-            .unwrap();
-        <span class="kw">let </span>serum3_info = <span class="self">self</span>.context.serum3_markets.get(<span class="kw-2">&amp;</span>market_index).unwrap();
+        <span class="kw">let </span>s3 = <span class="self">self</span>.context.serum3(market_index);
 
         <span class="kw">let </span>open_orders = Pubkey::find_program_address(
             <span class="kw-2">&amp;</span>[
-                account_pubkey.as_ref(),
                 <span class="string">b&quot;Serum3OO&quot;</span>.as_ref(),
-                serum3_info.address.as_ref(),
+                account_pubkey.as_ref(),
+                s3.address.as_ref(),
             ],
             <span class="kw-2">&amp;</span>mango_v4::ID,
         )
         .<span class="number">0</span>;
 
-        <span class="kw">let </span>ix = Instruction {
+        Instruction {
             program_id: mango_v4::id(),
             accounts: anchor_lang::ToAccountMetas::to_account_metas(
                 <span class="kw-2">&amp;</span>mango_v4::accounts::Serum3CreateOpenOrders {
                     group: <span class="self">self</span>.group(),
                     account: account_pubkey,
-
-                    serum_market: serum3_info.address,
-                    serum_program: serum3_info.market.serum_program,
-                    serum_market_external: serum3_info.market.serum_market_external,
+                    serum_market: s3.address,
+                    serum_program: s3.market.serum_program,
+                    serum_market_external: s3.market.serum_market_external,
                     open_orders,
                     owner: <span class="self">self</span>.owner(),
                     payer: <span class="self">self</span>.owner(),
@@ -2284,116 +2274,47 @@
             data: anchor_lang::InstructionData::data(
                 <span class="kw-2">&amp;</span>mango_v4::instruction::Serum3CreateOpenOrders {},
             ),
-        };
+        }
+    }
+
+    <span class="kw">pub async fn </span>serum3_create_open_orders(<span class="kw-2">&amp;</span><span class="self">self</span>, name: <span class="kw-2">&amp;</span>str) -&gt; anyhow::Result&lt;Signature&gt; {
+        <span class="kw">let </span>market_index = <span class="self">self</span>.context.serum3_market_index(name);
+        <span class="kw">let </span>ix = <span class="self">self</span>.serum3_create_open_orders_instruction(market_index);
         <span class="self">self</span>.send_and_confirm_owner_tx(<span class="macro">vec!</span>[ix]).<span class="kw">await
     </span>}
 
-    <span class="kw">fn </span>serum3_data_by_market_name&lt;<span class="lifetime">&#39;a</span>&gt;(<span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span><span class="self">self</span>, name: <span class="kw-2">&amp;</span>str) -&gt; <span class="prelude-ty">Result</span>&lt;Serum3Data&lt;<span class="lifetime">&#39;a</span>&gt;, ClientError&gt; {
-        <span class="kw">let </span>market_index = <span class="kw-2">*</span><span class="self">self
-            </span>.context
-            .serum3_market_indexes_by_name
-            .get(name)
-            .unwrap();
-        <span class="self">self</span>.serum3_data_by_market_index(market_index)
-    }
-
-    <span class="kw">fn </span>serum3_data_by_market_index&lt;<span class="lifetime">&#39;a</span>&gt;(
-        <span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span><span class="self">self</span>,
-        market_index: Serum3MarketIndex,
-    ) -&gt; <span class="prelude-ty">Result</span>&lt;Serum3Data&lt;<span class="lifetime">&#39;a</span>&gt;, ClientError&gt; {
-        <span class="kw">let </span>serum3_info = <span class="self">self</span>.context.serum3_markets.get(<span class="kw-2">&amp;</span>market_index).unwrap();
-
-        <span class="kw">let </span>quote_info = <span class="self">self</span>.context.token(serum3_info.market.quote_token_index);
-        <span class="kw">let </span>base_info = <span class="self">self</span>.context.token(serum3_info.market.base_token_index);
-
-        <span class="prelude-val">Ok</span>(Serum3Data {
-            market_index,
-            market: serum3_info,
-            quote: quote_info,
-            base: base_info,
-        })
-    }
-
     <span class="attribute">#[allow(clippy::too_many_arguments)]
-    </span><span class="kw">pub async fn </span>serum3_place_order(
+    </span><span class="kw">pub fn </span>serum3_place_order_instruction(
         <span class="kw-2">&amp;</span><span class="self">self</span>,
-        name: <span class="kw-2">&amp;</span>str,
+        account: <span class="kw-2">&amp;</span>MangoAccountValue,
+        market_index: Serum3MarketIndex,
         side: Serum3Side,
-        price: f64,
-        size: f64,
+        limit_price: u64,
+        max_base_qty: u64,
+        max_native_quote_qty_including_fees: u64,
         self_trade_behavior: Serum3SelfTradeBehavior,
         order_type: Serum3OrderType,
         client_order_id: u64,
         limit: u16,
-    ) -&gt; anyhow::Result&lt;Signature&gt; {
-        <span class="kw">let </span>s3 = <span class="self">self</span>.serum3_data_by_market_name(name)<span class="question-mark">?</span>;
+    ) -&gt; anyhow::Result&lt;Instruction&gt; {
+        <span class="kw">let </span>s3 = <span class="self">self</span>.context.serum3(market_index);
+        <span class="kw">let </span>base = <span class="self">self</span>.context.serum3_base_token(market_index);
+        <span class="kw">let </span>quote = <span class="self">self</span>.context.serum3_quote_token(market_index);
+        <span class="kw">let </span>open_orders = account
+            .serum3_orders(market_index)
+            .expect(<span class="string">&quot;oo is created&quot;</span>)
+            .open_orders;
 
-        <span class="kw">let </span>account = <span class="self">self</span>.mango_account().<span class="kw">await</span><span class="question-mark">?</span>;
-        <span class="kw">let </span>open_orders = account.serum3_orders(s3.market_index).unwrap().open_orders;
+        <span class="kw">let </span>health_check_metas = <span class="self">self</span>.context.derive_health_check_remaining_account_metas(
+            account,
+            <span class="macro">vec!</span>[],
+            <span class="macro">vec!</span>[],
+            <span class="macro">vec!</span>[],
+        )<span class="question-mark">?</span>;
 
-        <span class="kw">let </span>health_check_metas = <span class="self">self
-            </span>.derive_health_check_remaining_account_metas(<span class="macro">vec!</span>[], <span class="macro">vec!</span>[], <span class="macro">vec!</span>[])
-            .<span class="kw">await</span><span class="question-mark">?</span>;
-
-        <span class="comment">// https://github.com/project-serum/serum-ts/blob/master/packages/serum/src/market.ts#L1306
-        </span><span class="kw">let </span>limit_price = {
-            (price * ((<span class="number">10u64</span>.pow(s3.quote.decimals <span class="kw">as </span>u32) * s3.market.coin_lot_size) <span class="kw">as </span>f64))
-                <span class="kw">as </span>u64
-                / (<span class="number">10u64</span>.pow(s3.base.decimals <span class="kw">as </span>u32) * s3.market.pc_lot_size)
-        };
-        <span class="comment">// https://github.com/project-serum/serum-ts/blob/master/packages/serum/src/market.ts#L1333
-        </span><span class="kw">let </span>max_base_qty =
-            { (size * <span class="number">10u64</span>.pow(s3.base.decimals <span class="kw">as </span>u32) <span class="kw">as </span>f64) <span class="kw">as </span>u64 / s3.market.coin_lot_size };
-        <span class="kw">let </span>max_native_quote_qty_including_fees = {
-            <span class="kw">fn </span>get_fee_tier(msrm_balance: u64, srm_balance: u64) -&gt; u64 {
-                <span class="kw">if </span>msrm_balance &gt;= <span class="number">1 </span>{
-                    <span class="number">6
-                </span>} <span class="kw">else if </span>srm_balance &gt;= <span class="number">1_000_000 </span>{
-                    <span class="number">5
-                </span>} <span class="kw">else if </span>srm_balance &gt;= <span class="number">100_000 </span>{
-                    <span class="number">4
-                </span>} <span class="kw">else if </span>srm_balance &gt;= <span class="number">10_000 </span>{
-                    <span class="number">3
-                </span>} <span class="kw">else if </span>srm_balance &gt;= <span class="number">1_000 </span>{
-                    <span class="number">2
-                </span>} <span class="kw">else if </span>srm_balance &gt;= <span class="number">100 </span>{
-                    <span class="number">1
-                </span>} <span class="kw">else </span>{
-                    <span class="number">0
-                </span>}
-            }
-
-            <span class="kw">fn </span>get_fee_rates(fee_tier: u64) -&gt; (f64, f64) {
-                <span class="kw">if </span>fee_tier == <span class="number">1 </span>{
-                    <span class="comment">// SRM2
-                    </span><span class="kw">return </span>(<span class="number">0.002</span>, -<span class="number">0.0003</span>);
-                } <span class="kw">else if </span>fee_tier == <span class="number">2 </span>{
-                    <span class="comment">// SRM3
-                    </span><span class="kw">return </span>(<span class="number">0.0018</span>, -<span class="number">0.0003</span>);
-                } <span class="kw">else if </span>fee_tier == <span class="number">3 </span>{
-                    <span class="comment">// SRM4
-                    </span><span class="kw">return </span>(<span class="number">0.0016</span>, -<span class="number">0.0003</span>);
-                } <span class="kw">else if </span>fee_tier == <span class="number">4 </span>{
-                    <span class="comment">// SRM5
-                    </span><span class="kw">return </span>(<span class="number">0.0014</span>, -<span class="number">0.0003</span>);
-                } <span class="kw">else if </span>fee_tier == <span class="number">5 </span>{
-                    <span class="comment">// SRM6
-                    </span><span class="kw">return </span>(<span class="number">0.0012</span>, -<span class="number">0.0003</span>);
-                } <span class="kw">else if </span>fee_tier == <span class="number">6 </span>{
-                    <span class="comment">// MSRM
-                    </span><span class="kw">return </span>(<span class="number">0.001</span>, -<span class="number">0.0005</span>);
-                }
-                <span class="comment">// Base
-                </span>(<span class="number">0.0022</span>, -<span class="number">0.0003</span>)
-            }
-
-            <span class="kw">let </span>fee_tier = get_fee_tier(<span class="number">0</span>, <span class="number">0</span>);
-            <span class="kw">let </span>rates = get_fee_rates(fee_tier);
-            (s3.market.pc_lot_size <span class="kw">as </span>f64 * (<span class="number">1f64 </span>+ rates.<span class="number">0</span>)) <span class="kw">as </span>u64 * (limit_price * max_base_qty)
-        };
         <span class="kw">let </span>payer_mint_info = <span class="kw">match </span>side {
-            Serum3Side::Bid =&gt; s3.quote.mint_info,
-            Serum3Side::Ask =&gt; s3.base.mint_info,
+            Serum3Side::Bid =&gt; quote.mint_info,
+            Serum3Side::Ask =&gt; base.mint_info,
         };
 
         <span class="kw">let </span>ix = Instruction {
@@ -2407,16 +2328,16 @@
                         payer_bank: payer_mint_info.first_bank(),
                         payer_vault: payer_mint_info.first_vault(),
                         payer_oracle: payer_mint_info.oracle,
-                        serum_market: s3.market.address,
-                        serum_program: s3.market.market.serum_program,
-                        serum_market_external: s3.market.market.serum_market_external,
-                        market_bids: s3.market.bids,
-                        market_asks: s3.market.asks,
-                        market_event_queue: s3.market.event_q,
-                        market_request_queue: s3.market.req_q,
-                        market_base_vault: s3.market.coin_vault,
-                        market_quote_vault: s3.market.pc_vault,
-                        market_vault_signer: s3.market.vault_signer,
+                        serum_market: s3.address,
+                        serum_program: s3.market.serum_program,
+                        serum_market_external: s3.market.serum_market_external,
+                        market_bids: s3.bids,
+                        market_asks: s3.asks,
+                        market_event_queue: s3.event_q,
+                        market_request_queue: s3.req_q,
+                        market_base_vault: s3.coin_vault,
+                        market_quote_vault: s3.pc_vault,
+                        market_vault_signer: s3.vault_signer,
                         owner: <span class="self">self</span>.owner(),
                         token_program: Token::id(),
                     },
@@ -2436,14 +2357,48 @@
                 limit,
             }),
         };
+
+        <span class="prelude-val">Ok</span>(ix)
+    }
+
+    <span class="attribute">#[allow(clippy::too_many_arguments)]
+    </span><span class="kw">pub async fn </span>serum3_place_order(
+        <span class="kw-2">&amp;</span><span class="self">self</span>,
+        name: <span class="kw-2">&amp;</span>str,
+        side: Serum3Side,
+        limit_price: u64,
+        max_base_qty: u64,
+        max_native_quote_qty_including_fees: u64,
+        self_trade_behavior: Serum3SelfTradeBehavior,
+        order_type: Serum3OrderType,
+        client_order_id: u64,
+        limit: u16,
+    ) -&gt; anyhow::Result&lt;Signature&gt; {
+        <span class="kw">let </span>account = <span class="self">self</span>.mango_account().<span class="kw">await</span><span class="question-mark">?</span>;
+        <span class="kw">let </span>market_index = <span class="self">self</span>.context.serum3_market_index(name);
+        <span class="kw">let </span>ix = <span class="self">self</span>.serum3_place_order_instruction(
+            <span class="kw-2">&amp;</span>account,
+            market_index,
+            side,
+            limit_price,
+            max_base_qty,
+            max_native_quote_qty_including_fees,
+            self_trade_behavior,
+            order_type,
+            client_order_id,
+            limit,
+        )<span class="question-mark">?</span>;
         <span class="self">self</span>.send_and_confirm_owner_tx(<span class="macro">vec!</span>[ix]).<span class="kw">await
     </span>}
 
     <span class="kw">pub async fn </span>serum3_settle_funds(<span class="kw-2">&amp;</span><span class="self">self</span>, name: <span class="kw-2">&amp;</span>str) -&gt; anyhow::Result&lt;Signature&gt; {
-        <span class="kw">let </span>s3 = <span class="self">self</span>.serum3_data_by_market_name(name)<span class="question-mark">?</span>;
+        <span class="kw">let </span>market_index = <span class="self">self</span>.context.serum3_market_index(name);
+        <span class="kw">let </span>s3 = <span class="self">self</span>.context.serum3(market_index);
+        <span class="kw">let </span>base = <span class="self">self</span>.context.serum3_base_token(market_index);
+        <span class="kw">let </span>quote = <span class="self">self</span>.context.serum3_quote_token(market_index);
 
         <span class="kw">let </span>account = <span class="self">self</span>.mango_account().<span class="kw">await</span><span class="question-mark">?</span>;
-        <span class="kw">let </span>open_orders = account.serum3_orders(s3.market_index).unwrap().open_orders;
+        <span class="kw">let </span>open_orders = account.serum3_orders(market_index).unwrap().open_orders;
 
         <span class="kw">let </span>ix = Instruction {
             program_id: mango_v4::id(),
@@ -2452,16 +2407,16 @@
                     group: <span class="self">self</span>.group(),
                     account: <span class="self">self</span>.mango_account_address,
                     open_orders,
-                    quote_bank: s3.quote.mint_info.first_bank(),
-                    quote_vault: s3.quote.mint_info.first_vault(),
-                    base_bank: s3.base.mint_info.first_bank(),
-                    base_vault: s3.base.mint_info.first_vault(),
-                    serum_market: s3.market.address,
-                    serum_program: s3.market.market.serum_program,
-                    serum_market_external: s3.market.market.serum_market_external,
-                    market_base_vault: s3.market.coin_vault,
-                    market_quote_vault: s3.market.pc_vault,
-                    market_vault_signer: s3.market.vault_signer,
+                    quote_bank: quote.mint_info.first_bank(),
+                    quote_vault: quote.mint_info.first_vault(),
+                    base_bank: base.mint_info.first_bank(),
+                    base_vault: base.mint_info.first_vault(),
+                    serum_market: s3.address,
+                    serum_program: s3.market.serum_program,
+                    serum_market_external: s3.market.serum_market_external,
+                    market_base_vault: s3.coin_vault,
+                    market_quote_vault: s3.pc_vault,
+                    market_vault_signer: s3.vault_signer,
                     owner: <span class="self">self</span>.owner(),
                     token_program: Token::id(),
                 },
@@ -2472,15 +2427,45 @@
         <span class="self">self</span>.send_and_confirm_owner_tx(<span class="macro">vec!</span>[ix]).<span class="kw">await
     </span>}
 
+    <span class="kw">pub fn </span>serum3_cancel_all_orders_instruction(
+        <span class="kw-2">&amp;</span><span class="self">self</span>,
+        account: <span class="kw-2">&amp;</span>MangoAccountValue,
+        market_index: Serum3MarketIndex,
+        limit: u8,
+    ) -&gt; anyhow::Result&lt;Instruction&gt; {
+        <span class="kw">let </span>s3 = <span class="self">self</span>.context.serum3(market_index);
+        <span class="kw">let </span>open_orders = account.serum3_orders(market_index)<span class="question-mark">?</span>.open_orders;
+
+        <span class="kw">let </span>ix = Instruction {
+            program_id: mango_v4::id(),
+            accounts: anchor_lang::ToAccountMetas::to_account_metas(
+                <span class="kw-2">&amp;</span>mango_v4::accounts::Serum3CancelAllOrders {
+                    group: <span class="self">self</span>.group(),
+                    account: <span class="self">self</span>.mango_account_address,
+                    open_orders,
+                    market_bids: s3.bids,
+                    market_asks: s3.asks,
+                    market_event_queue: s3.event_q,
+                    serum_market: s3.address,
+                    serum_program: s3.market.serum_program,
+                    serum_market_external: s3.market.serum_market_external,
+                    owner: <span class="self">self</span>.owner(),
+                },
+                <span class="prelude-val">None</span>,
+            ),
+            data: anchor_lang::InstructionData::data(
+                <span class="kw-2">&amp;</span>mango_v4::instruction::Serum3CancelAllOrders { limit },
+            ),
+        };
+
+        <span class="prelude-val">Ok</span>(ix)
+    }
+
     <span class="kw">pub async fn </span>serum3_cancel_all_orders(
         <span class="kw-2">&amp;</span><span class="self">self</span>,
         market_name: <span class="kw-2">&amp;</span>str,
     ) -&gt; <span class="prelude-ty">Result</span>&lt;Vec&lt;u128&gt;, anyhow::Error&gt; {
-        <span class="kw">let </span>market_index = <span class="kw-2">*</span><span class="self">self
-            </span>.context
-            .serum3_market_indexes_by_name
-            .get(market_name)
-            .unwrap();
+        <span class="kw">let </span>market_index = <span class="self">self</span>.context.serum3_market_index(market_name);
         <span class="kw">let </span>account = <span class="self">self</span>.mango_account().<span class="kw">await</span><span class="question-mark">?</span>;
         <span class="kw">let </span>open_orders = account.serum3_orders(market_index).unwrap().open_orders;
         <span class="kw">let </span>open_orders_acc = <span class="self">self</span>.account_fetcher.fetch_raw_account(<span class="kw-2">&amp;</span>open_orders).<span class="kw">await</span><span class="question-mark">?</span>;
@@ -2513,7 +2498,9 @@
         market_index: Serum3MarketIndex,
         open_orders: <span class="kw-2">&amp;</span>Pubkey,
     ) -&gt; anyhow::Result&lt;Signature&gt; {
-        <span class="kw">let </span>s3 = <span class="self">self</span>.serum3_data_by_market_index(market_index)<span class="question-mark">?</span>;
+        <span class="kw">let </span>s3 = <span class="self">self</span>.context.serum3(market_index);
+        <span class="kw">let </span>base = <span class="self">self</span>.context.serum3_base_token(market_index);
+        <span class="kw">let </span>quote = <span class="self">self</span>.context.serum3_quote_token(market_index);
 
         <span class="kw">let </span>health_remaining_ams = <span class="self">self
             </span>.context
@@ -2528,19 +2515,19 @@
                         group: <span class="self">self</span>.group(),
                         account: <span class="kw-2">*</span>liqee.<span class="number">0</span>,
                         open_orders: <span class="kw-2">*</span>open_orders,
-                        serum_market: s3.market.address,
-                        serum_program: s3.market.market.serum_program,
-                        serum_market_external: s3.market.market.serum_market_external,
-                        market_bids: s3.market.bids,
-                        market_asks: s3.market.asks,
-                        market_event_queue: s3.market.event_q,
-                        market_base_vault: s3.market.coin_vault,
-                        market_quote_vault: s3.market.pc_vault,
-                        market_vault_signer: s3.market.vault_signer,
-                        quote_bank: s3.quote.mint_info.first_bank(),
-                        quote_vault: s3.quote.mint_info.first_vault(),
-                        base_bank: s3.base.mint_info.first_bank(),
-                        base_vault: s3.base.mint_info.first_vault(),
+                        serum_market: s3.address,
+                        serum_program: s3.market.serum_program,
+                        serum_market_external: s3.market.serum_market_external,
+                        market_bids: s3.bids,
+                        market_asks: s3.asks,
+                        market_event_queue: s3.event_q,
+                        market_base_vault: s3.coin_vault,
+                        market_quote_vault: s3.pc_vault,
+                        market_vault_signer: s3.vault_signer,
+                        quote_bank: quote.mint_info.first_bank(),
+                        quote_vault: quote.mint_info.first_vault(),
+                        base_bank: base.mint_info.first_bank(),
+                        base_vault: base.mint_info.first_vault(),
                         token_program: Token::id(),
                     },
                     <span class="prelude-val">None</span>,
@@ -2561,10 +2548,11 @@
         side: Serum3Side,
         order_id: u128,
     ) -&gt; anyhow::Result&lt;Signature&gt; {
-        <span class="kw">let </span>s3 = <span class="self">self</span>.serum3_data_by_market_name(market_name)<span class="question-mark">?</span>;
+        <span class="kw">let </span>market_index = <span class="self">self</span>.context.serum3_market_index(market_name);
+        <span class="kw">let </span>s3 = <span class="self">self</span>.context.serum3(market_index);
 
         <span class="kw">let </span>account = <span class="self">self</span>.mango_account().<span class="kw">await</span><span class="question-mark">?</span>;
-        <span class="kw">let </span>open_orders = account.serum3_orders(s3.market_index).unwrap().open_orders;
+        <span class="kw">let </span>open_orders = account.serum3_orders(market_index).unwrap().open_orders;
 
         <span class="kw">let </span>ix = Instruction {
             program_id: mango_v4::id(),
@@ -2573,13 +2561,13 @@
                     <span class="kw-2">&amp;</span>mango_v4::accounts::Serum3CancelOrder {
                         group: <span class="self">self</span>.group(),
                         account: <span class="self">self</span>.mango_account_address,
-                        serum_market: s3.market.address,
-                        serum_program: s3.market.market.serum_program,
-                        serum_market_external: s3.market.market.serum_market_external,
+                        serum_market: s3.address,
+                        serum_program: s3.market.serum_program,
+                        serum_market_external: s3.market.serum_market_external,
                         open_orders,
-                        market_bids: s3.market.bids,
-                        market_asks: s3.market.asks,
-                        market_event_queue: s3.market.event_q,
+                        market_bids: s3.bids,
+                        market_asks: s3.asks,
+                        market_event_queue: s3.event_q,
                         owner: <span class="self">self</span>.owner(),
                     },
                     <span class="prelude-val">None</span>,
@@ -2596,6 +2584,8 @@
     <span class="comment">//
     // Perps
     //
+
+    </span><span class="attribute">#[allow(clippy::too_many_arguments)]
     </span><span class="kw">pub fn </span>perp_place_order_instruction(
         <span class="kw-2">&amp;</span><span class="self">self</span>,
         account: <span class="kw-2">&amp;</span>MangoAccountValue,
@@ -2655,7 +2645,8 @@
         <span class="prelude-val">Ok</span>(ix)
     }
 
-    <span class="kw">pub async fn </span>perp_place_order(
+    <span class="attribute">#[allow(clippy::too_many_arguments)]
+    </span><span class="kw">pub async fn </span>perp_place_order(
         <span class="kw-2">&amp;</span><span class="self">self</span>,
         market_index: PerpMarketIndex,
         side: Side,
@@ -2895,6 +2886,7 @@
 
         <span class="kw">let </span>perp = <span class="self">self</span>.context.perp(market_index);
         <span class="kw">let </span>settle_token_info = <span class="self">self</span>.context.token(perp.market.settle_token_index);
+        <span class="kw">let </span>insurance_token_info = <span class="self">self</span>.context.token(INSURANCE_TOKEN_INDEX);
 
         <span class="kw">let </span>health_remaining_ams = <span class="self">self
             </span>.derive_liquidation_health_check_remaining_account_metas(
@@ -2909,7 +2901,7 @@
             program_id: mango_v4::id(),
             accounts: {
                 <span class="kw">let </span><span class="kw-2">mut </span>ams = anchor_lang::ToAccountMetas::to_account_metas(
-                    <span class="kw-2">&amp;</span>mango_v4::accounts::PerpLiqNegativePnlOrBankruptcy {
+                    <span class="kw-2">&amp;</span>mango_v4::accounts::PerpLiqNegativePnlOrBankruptcyV2 {
                         group: <span class="self">self</span>.group(),
                         perp_market: perp.address,
                         oracle: perp.market.oracle,
@@ -2920,6 +2912,9 @@
                         settle_vault: settle_token_info.mint_info.first_vault(),
                         settle_oracle: settle_token_info.mint_info.oracle,
                         insurance_vault: group.insurance_vault,
+                        insurance_bank: insurance_token_info.mint_info.first_bank(),
+                        insurance_bank_vault: insurance_token_info.mint_info.first_vault(),
+                        insurance_oracle: insurance_token_info.mint_info.oracle,
                         token_program: Token::id(),
                     },
                     <span class="prelude-val">None</span>,
@@ -2928,7 +2923,7 @@
                 ams
             },
             data: anchor_lang::InstructionData::data(
-                <span class="kw-2">&amp;</span>mango_v4::instruction::PerpLiqNegativePnlOrBankruptcy { max_liab_transfer },
+                <span class="kw-2">&amp;</span>mango_v4::instruction::PerpLiqNegativePnlOrBankruptcyV2 { max_liab_transfer },
             ),
         };
         <span class="self">self</span>.send_and_confirm_owner_tx(<span class="macro">vec!</span>[ix]).<span class="kw">await
@@ -3461,13 +3456,6 @@
         .send_and_confirm(<span class="kw-2">&amp;</span><span class="self">self</span>.client)
         .<span class="kw">await
     </span>}
-}
-
-<span class="kw">struct </span>Serum3Data&lt;<span class="lifetime">&#39;a</span>&gt; {
-    market_index: Serum3MarketIndex,
-    market: <span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span>Serum3MarketContext,
-    quote: <span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span>TokenContext,
-    base: <span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span>TokenContext,
 }
 
 <span class="attribute">#[derive(Debug, thiserror::Error)]

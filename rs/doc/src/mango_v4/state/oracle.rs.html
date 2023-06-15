@@ -376,6 +376,17 @@
 <span id="376">376</span>
 <span id="377">377</span>
 <span id="378">378</span>
+<span id="379">379</span>
+<span id="380">380</span>
+<span id="381">381</span>
+<span id="382">382</span>
+<span id="383">383</span>
+<span id="384">384</span>
+<span id="385">385</span>
+<span id="386">386</span>
+<span id="387">387</span>
+<span id="388">388</span>
+<span id="389">389</span>
 </pre><pre class="rust"><code><span class="kw">use </span>std::mem::size_of;
 
 <span class="kw">use </span>anchor_lang::prelude::<span class="kw-2">*</span>;
@@ -542,6 +553,17 @@
             <span class="kw">let </span>price_account = pyth_sdk_solana::state::load_price_account(data).unwrap();
             <span class="kw">let </span>price_data = price_account.to_price();
             <span class="kw">let </span>price = I80F48::from_num(price_data.price);
+
+            <span class="comment">// Don&#39;t use price_data.status, because that has its own built-in staleness detection,
+            // check PriceAccount::to_price() impl.
+            </span><span class="kw">if </span>price_account.agg.status != pyth_sdk_solana::PriceStatus::Trading {
+                <span class="macro">msg!</span>(
+                    <span class="string">&quot;Pyth price status isn&#39;t &#39;Trading&#39;: status: {}&quot;</span>,
+                    price_data.status <span class="kw">as </span>u64
+                );
+
+                <span class="kw">return </span><span class="prelude-val">Err</span>(MangoError::OracleStale.into());
+            }
 
             <span class="comment">// Filter out bad prices
             </span><span class="kw">if </span>I80F48::from_num(price_data.conf) &gt; (config.conf_filter * price) {

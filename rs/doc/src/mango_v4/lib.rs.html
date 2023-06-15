@@ -1158,6 +1158,15 @@
 <span id="1158">1158</span>
 <span id="1159">1159</span>
 <span id="1160">1160</span>
+<span id="1161">1161</span>
+<span id="1162">1162</span>
+<span id="1163">1163</span>
+<span id="1164">1164</span>
+<span id="1165">1165</span>
+<span id="1166">1166</span>
+<span id="1167">1167</span>
+<span id="1168">1168</span>
+<span id="1169">1169</span>
 </pre><pre class="rust"><code><span class="attribute">#![allow(unused_variables)]
 
 </span><span class="kw">use </span>fixed::types::I80F48;
@@ -2256,6 +2265,15 @@
 
     <span class="kw">pub fn </span>perp_liq_negative_pnl_or_bankruptcy(
         ctx: Context&lt;PerpLiqNegativePnlOrBankruptcy&gt;,
+        max_liab_transfer: u64,
+    ) -&gt; <span class="prelude-ty">Result</span>&lt;()&gt; {
+        <span class="prelude-val">Err</span>(<span class="macro">error_msg!</span>(
+            <span class="string">&quot;PerpLiqNegativePnlOrBankruptcy was replaced by PerpLiqNegativePnlOrBankruptcyV2&quot;
+        </span>))
+    }
+
+    <span class="kw">pub fn </span>perp_liq_negative_pnl_or_bankruptcy_v2(
+        ctx: Context&lt;PerpLiqNegativePnlOrBankruptcyV2&gt;,
         max_liab_transfer: u64,
     ) -&gt; <span class="prelude-ty">Result</span>&lt;()&gt; {
         <span class="attribute">#[cfg(feature = <span class="string">&quot;enable-gpl&quot;</span>)]

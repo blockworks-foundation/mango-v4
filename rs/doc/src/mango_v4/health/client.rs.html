@@ -1367,6 +1367,116 @@
 <span id="1367">1367</span>
 <span id="1368">1368</span>
 <span id="1369">1369</span>
+<span id="1370">1370</span>
+<span id="1371">1371</span>
+<span id="1372">1372</span>
+<span id="1373">1373</span>
+<span id="1374">1374</span>
+<span id="1375">1375</span>
+<span id="1376">1376</span>
+<span id="1377">1377</span>
+<span id="1378">1378</span>
+<span id="1379">1379</span>
+<span id="1380">1380</span>
+<span id="1381">1381</span>
+<span id="1382">1382</span>
+<span id="1383">1383</span>
+<span id="1384">1384</span>
+<span id="1385">1385</span>
+<span id="1386">1386</span>
+<span id="1387">1387</span>
+<span id="1388">1388</span>
+<span id="1389">1389</span>
+<span id="1390">1390</span>
+<span id="1391">1391</span>
+<span id="1392">1392</span>
+<span id="1393">1393</span>
+<span id="1394">1394</span>
+<span id="1395">1395</span>
+<span id="1396">1396</span>
+<span id="1397">1397</span>
+<span id="1398">1398</span>
+<span id="1399">1399</span>
+<span id="1400">1400</span>
+<span id="1401">1401</span>
+<span id="1402">1402</span>
+<span id="1403">1403</span>
+<span id="1404">1404</span>
+<span id="1405">1405</span>
+<span id="1406">1406</span>
+<span id="1407">1407</span>
+<span id="1408">1408</span>
+<span id="1409">1409</span>
+<span id="1410">1410</span>
+<span id="1411">1411</span>
+<span id="1412">1412</span>
+<span id="1413">1413</span>
+<span id="1414">1414</span>
+<span id="1415">1415</span>
+<span id="1416">1416</span>
+<span id="1417">1417</span>
+<span id="1418">1418</span>
+<span id="1419">1419</span>
+<span id="1420">1420</span>
+<span id="1421">1421</span>
+<span id="1422">1422</span>
+<span id="1423">1423</span>
+<span id="1424">1424</span>
+<span id="1425">1425</span>
+<span id="1426">1426</span>
+<span id="1427">1427</span>
+<span id="1428">1428</span>
+<span id="1429">1429</span>
+<span id="1430">1430</span>
+<span id="1431">1431</span>
+<span id="1432">1432</span>
+<span id="1433">1433</span>
+<span id="1434">1434</span>
+<span id="1435">1435</span>
+<span id="1436">1436</span>
+<span id="1437">1437</span>
+<span id="1438">1438</span>
+<span id="1439">1439</span>
+<span id="1440">1440</span>
+<span id="1441">1441</span>
+<span id="1442">1442</span>
+<span id="1443">1443</span>
+<span id="1444">1444</span>
+<span id="1445">1445</span>
+<span id="1446">1446</span>
+<span id="1447">1447</span>
+<span id="1448">1448</span>
+<span id="1449">1449</span>
+<span id="1450">1450</span>
+<span id="1451">1451</span>
+<span id="1452">1452</span>
+<span id="1453">1453</span>
+<span id="1454">1454</span>
+<span id="1455">1455</span>
+<span id="1456">1456</span>
+<span id="1457">1457</span>
+<span id="1458">1458</span>
+<span id="1459">1459</span>
+<span id="1460">1460</span>
+<span id="1461">1461</span>
+<span id="1462">1462</span>
+<span id="1463">1463</span>
+<span id="1464">1464</span>
+<span id="1465">1465</span>
+<span id="1466">1466</span>
+<span id="1467">1467</span>
+<span id="1468">1468</span>
+<span id="1469">1469</span>
+<span id="1470">1470</span>
+<span id="1471">1471</span>
+<span id="1472">1472</span>
+<span id="1473">1473</span>
+<span id="1474">1474</span>
+<span id="1475">1475</span>
+<span id="1476">1476</span>
+<span id="1477">1477</span>
+<span id="1478">1478</span>
+<span id="1479">1479</span>
 </pre><pre class="rust"><code><span class="attribute">#![cfg(feature = <span class="string">&quot;client&quot;</span>)]
 
 </span><span class="kw">use </span>anchor_lang::prelude::<span class="kw-2">*</span>;
@@ -1396,7 +1506,7 @@
     ///
     /// Maybe talking about the collateralization ratio assets/liabs is more intuitive?
     </span><span class="kw">pub fn </span>health_ratio(<span class="kw-2">&amp;</span><span class="self">self</span>, health_type: HealthType) -&gt; I80F48 {
-        <span class="kw">let </span>(assets, liabs) = <span class="self">self</span>.health_assets_and_liabs(health_type);
+        <span class="kw">let </span>(assets, liabs) = <span class="self">self</span>.health_assets_and_liabs_stable_liabs(health_type);
         <span class="kw">let </span>hundred = I80F48::from(<span class="number">100</span>);
         <span class="kw">if </span>liabs &gt; <span class="number">0 </span>{
             <span class="comment">// feel free to saturate to MAX for tiny liabs
@@ -1521,8 +1631,12 @@
         <span class="kw">let </span>target = <span class="kw-2">&amp;</span><span class="self">self</span>.token_infos[target_index];
 
         <span class="kw">let </span>(tokens_max_reserved, <span class="kw">_</span>) = <span class="self">self</span>.compute_serum3_reservations(health_type);
-        <span class="kw">let </span>source_reserved = tokens_max_reserved[source_index];
-        <span class="kw">let </span>target_reserved = tokens_max_reserved[target_index];
+        <span class="kw">let </span>source_reserved = tokens_max_reserved[source_index].max_serum_reserved;
+        <span class="kw">let </span>target_reserved = tokens_max_reserved[target_index].max_serum_reserved;
+
+        <span class="kw">let </span>token_balances = <span class="self">self</span>.effective_token_balances(health_type);
+        <span class="kw">let </span>source_balance = token_balances[source_index].spot_and_perp;
+        <span class="kw">let </span>target_balance = token_balances[target_index].spot_and_perp;
 
         <span class="comment">// If the price is sufficiently good, then health will just increase from swapping:
         // once we&#39;ve swapped enough, swapping x reduces health by x * source_liab_weight and
@@ -1563,8 +1677,8 @@
         // The first thing we do is to find this maximum.
         </span><span class="kw">let </span>(amount_for_max_value, max_value) = {
             <span class="comment">// The largest amount that the maximum could be at
-            </span><span class="kw">let </span>rightmost = (source.balance_native.abs() + source_reserved)
-                .max((target.balance_native.abs() + target_reserved) / price);
+            </span><span class="kw">let </span>rightmost = (source_balance.abs() + source_reserved)
+                .max((target_balance.abs() + target_reserved) / price);
             find_maximum(
                 I80F48::ZERO,
                 rightmost,
@@ -1648,20 +1762,24 @@
 
         <span class="kw">let </span>perp_info_index = <span class="self">self</span>.perp_info_index(perp_market_index)<span class="question-mark">?</span>;
         <span class="kw">let </span>perp_info = <span class="kw-2">&amp;</span><span class="self">self</span>.perp_infos[perp_info_index];
-        <span class="kw">let </span>prices = <span class="kw-2">&amp;</span>perp_info.prices;
+        <span class="kw">let </span>prices = <span class="kw-2">&amp;</span>perp_info.base_prices;
         <span class="kw">let </span>base_lot_size = I80F48::from(perp_info.base_lot_size);
 
+        <span class="kw">let </span>settle_info_index = <span class="self">self</span>.token_info_index(perp_info.settle_token_index)<span class="question-mark">?</span>;
+        <span class="kw">let </span>settle_info = <span class="kw-2">&amp;</span><span class="self">self</span>.token_infos[settle_info_index];
+
         <span class="comment">// If the price is sufficiently good then health will just increase from trading.
-        // It&#39;s ok to ignore the pnl_asset_weight here because we&#39;ll jump out early if this
-        // slope is &gt;=0, and the extra asset weight would just decrease it.
-        </span><span class="kw">let </span>final_health_slope = <span class="kw">if </span>direction == <span class="number">1 </span>{
+        // It&#39;s ok to ignore the overall_asset_weight and token asset weight here because
+        // we&#39;ll jump out early if this slope is &gt;=0, and those weights would just decrease it.
+        </span><span class="kw">let </span><span class="kw-2">mut </span>final_health_slope = <span class="kw">if </span>direction == <span class="number">1 </span>{
             perp_info.init_base_asset_weight * prices.asset(health_type) - price
         } <span class="kw">else </span>{
-            price - perp_info.init_base_liab_weight * prices.liab(health_type)
+            -perp_info.init_base_liab_weight * prices.liab(health_type) + price
         };
         <span class="kw">if </span>final_health_slope &gt;= <span class="number">0 </span>{
             <span class="kw">return </span><span class="prelude-val">Ok</span>(i64::MAX);
         }
+        final_health_slope <span class="kw-2">*</span>= settle_info.liab_weighted_price(health_type);
 
         <span class="kw">let </span>cache_after_trade = |base_lots: i64| -&gt; <span class="prelude-ty">Result</span>&lt;HealthCache&gt; {
             <span class="kw">let </span><span class="kw-2">mut </span>adjusted_cache = <span class="self">self</span>.clone();
@@ -1671,7 +1789,7 @@
             <span class="prelude-val">Ok</span>(adjusted_cache)
         };
         <span class="kw">let </span>health_ratio_after_trade =
-            |base_lots: i64| <span class="prelude-val">Ok</span>(cache_after_trade(base_lots)<span class="question-mark">?</span>.health_ratio(HealthType::Init));
+            |base_lots: i64| <span class="prelude-val">Ok</span>(cache_after_trade(base_lots)<span class="question-mark">?</span>.health_ratio(health_type));
         <span class="kw">let </span>health_ratio_after_trade_trunc =
             |base_lots: I80F48| health_ratio_after_trade(base_lots.round_to_zero().to_num());
 
@@ -1705,22 +1823,29 @@
             // Need to figure out how many lots to trade to reach zero health (zero_health_amount).
             // We do this by looking at the starting health and the health slope per
             // traded base lot (final_health_slope).
-            </span><span class="kw">let </span>start_cache = cache_after_trade(case1_start)<span class="question-mark">?</span>;
-            <span class="kw">let </span>start_health = start_cache.health(HealthType::Init);
+            </span><span class="kw">let </span><span class="kw-2">mut </span>start_cache = cache_after_trade(case1_start)<span class="question-mark">?</span>;
+            <span class="comment">// The perp market&#39;s contribution to the health above may be capped. But we need to trade
+            // enough to fully reduce any positive-pnl buffer. Thus get the uncapped health by fixing
+            // the overall weight.
+            </span>start_cache.perp_infos[perp_info_index].init_overall_asset_weight = I80F48::ONE;
+            <span class="comment">// We don&#39;t want to deal with slope changes due to settle token assets being
+            // reduced first, so modify the weights to use settle token liab scaling everywhere.
+            // That way the final_health_slope is applicable from the start.
+            </span>{
+                <span class="kw">let </span>settle_info = <span class="kw-2">&amp;mut </span>start_cache.token_infos[settle_info_index];
+                settle_info.init_asset_weight = settle_info.init_liab_weight;
+                settle_info.init_scaled_asset_weight = settle_info.init_scaled_liab_weight;
+            }
+            <span class="kw">let </span>start_health = start_cache.health(health_type);
             <span class="kw">if </span>start_health &lt;= <span class="number">0 </span>{
                 <span class="kw">return </span><span class="prelude-val">Ok</span>(<span class="number">0</span>);
             }
 
-            <span class="comment">// The perp market&#39;s contribution to the health above may be capped. But we need to trade
-            // enough to fully reduce any positive-pnl buffer. Thus get the uncapped health:
-            </span><span class="kw">let </span>perp_info = <span class="kw-2">&amp;</span>start_cache.perp_infos[perp_info_index];
-            <span class="kw">let </span>start_health_uncapped = start_health
-                - perp_info.health_contribution(HealthType::Init)
-                + perp_info.unweighted_health_contribution(HealthType::Init);
             <span class="comment">// We add 1 here because health is computed for truncated base_lots and we want to guarantee
-            // zero_health_ratio &lt;= 0.
+            // zero_health_ratio &lt;= 0. Similarly, scale down the per-lot slope slightly for a benign
+            // overestimation that guards against rounding issues.
             </span><span class="kw">let </span>zero_health_amount = case1_start_i80f48
-                - start_health_uncapped / final_health_slope / base_lot_size
+                - start_health / (final_health_slope * base_lot_size * I80F48::from_num(<span class="number">0.99</span>))
                 + I80F48::ONE;
             <span class="kw">let </span>zero_health_ratio = health_ratio_after_trade_trunc(zero_health_amount)<span class="question-mark">?</span>;
             <span class="macro">assert!</span>(zero_health_ratio &lt;= <span class="number">0</span>);
@@ -1766,6 +1891,8 @@
         // positions for the source and target token index.
         </span><span class="kw">let </span>token_info_index = find_token_info_index(<span class="kw-2">&amp;</span><span class="self">self</span>.token_infos, bank.token_index)<span class="question-mark">?</span>;
         <span class="kw">let </span>token = <span class="kw-2">&amp;</span><span class="self">self</span>.token_infos[token_info_index];
+        <span class="kw">let </span>token_balance =
+            <span class="self">self</span>.effective_token_balances(health_type)[token_info_index].spot_and_perp;
 
         <span class="kw">let </span>cache_after_borrow = |amount: I80F48| -&gt; <span class="prelude-ty">Result</span>&lt;HealthCache&gt; {
             <span class="kw">let </span>now_ts = system_epoch_secs();
@@ -1790,7 +1917,7 @@
 
         <span class="comment">// At most withdraw all deposits plus enough borrows to bring health to zero
         // (ensure this works with zero asset weight)
-        </span><span class="kw">let </span>limit = token.balance_native.max(I80F48::ZERO)
+        </span><span class="kw">let </span>limit = token_balance.max(I80F48::ZERO)
             + <span class="self">self</span>.health(health_type).max(I80F48::ZERO) / token.init_scaled_liab_weight;
         <span class="kw">if </span>limit &lt;= <span class="number">0 </span>{
             <span class="kw">return </span><span class="prelude-val">Ok</span>(I80F48::ZERO);
@@ -1990,7 +2117,28 @@
             init_liab_weight: I80F48::from_num(<span class="number">1.0 </span>+ x),
             init_scaled_liab_weight: I80F48::from_num(<span class="number">1.0 </span>+ x),
             prices: Prices::new_single_price(I80F48::from_num(price)),
-            balance_native: I80F48::ZERO,
+            balance_spot: I80F48::ZERO,
+        }
+    }
+
+    <span class="kw">fn </span>default_perp_info(x: f64) -&gt; PerpInfo {
+        PerpInfo {
+            perp_market_index: <span class="number">0</span>,
+            settle_token_index: <span class="number">0</span>,
+            maint_base_asset_weight: I80F48::from_num(<span class="number">1.0 </span>- x),
+            init_base_asset_weight: I80F48::from_num(<span class="number">1.0 </span>- x),
+            maint_base_liab_weight: I80F48::from_num(<span class="number">1.0 </span>+ x),
+            init_base_liab_weight: I80F48::from_num(<span class="number">1.0 </span>+ x),
+            maint_overall_asset_weight: I80F48::from_num(<span class="number">0.6</span>),
+            init_overall_asset_weight: I80F48::from_num(<span class="number">0.6</span>),
+            base_lot_size: <span class="number">1</span>,
+            base_lots: <span class="number">0</span>,
+            bids_base_lots: <span class="number">0</span>,
+            asks_base_lots: <span class="number">0</span>,
+            quote: I80F48::ZERO,
+            base_prices: Prices::new_single_price(I80F48::from_num(<span class="number">2.0</span>)),
+            has_open_orders: <span class="bool-val">false</span>,
+            has_open_fills: <span class="bool-val">false</span>,
         }
     }
 
@@ -2052,7 +2200,7 @@
 
         <span class="kw">let </span>adjust_by_usdc = |c: <span class="kw-2">&amp;mut </span>HealthCache, ti: TokenIndex, usdc: f64| {
             <span class="kw">let </span>ti = <span class="kw-2">&amp;mut </span>c.token_infos[ti <span class="kw">as </span>usize];
-            ti.balance_native += I80F48::from_num(usdc) / ti.prices.oracle;
+            ti.balance_spot += I80F48::from_num(usdc) / ti.prices.oracle;
         };
         <span class="kw">let </span>find_max_swap_actual = |c: <span class="kw-2">&amp;</span>HealthCache,
                                     source: TokenIndex,
@@ -2269,8 +2417,8 @@
                 </span><span class="macro">println!</span>(<span class="string">&quot;test 6 {test_name}&quot;</span>);
                 <span class="kw">let </span><span class="kw-2">mut </span>health_cache = health_cache.clone();
                 health_cache.serum3_infos = <span class="macro">vec!</span>[Serum3Info {
-                    base_index: <span class="number">1</span>,
-                    quote_index: <span class="number">0</span>,
+                    base_info_index: <span class="number">1</span>,
+                    quote_info_index: <span class="number">0</span>,
                     market_index: <span class="number">0</span>,
                     reserved_base: I80F48::from(<span class="number">30 </span>/ <span class="number">3</span>),
                     reserved_quote: I80F48::from(<span class="number">30 </span>/ <span class="number">2</span>),
@@ -2349,39 +2497,54 @@
                     }
                 }
             }
+
+            {
+                <span class="comment">// swap while influenced by a perp market
+                </span><span class="macro">println!</span>(<span class="string">&quot;test 10 {test_name}&quot;</span>);
+                <span class="kw">let </span><span class="kw-2">mut </span>health_cache = health_cache.clone();
+                health_cache.perp_infos.push(PerpInfo {
+                    perp_market_index: <span class="number">0</span>,
+                    settle_token_index: <span class="number">1</span>,
+                    ..default_perp_info(<span class="number">0.3</span>)
+                });
+                adjust_by_usdc(<span class="kw-2">&amp;mut </span>health_cache, <span class="number">0</span>, <span class="number">60.0</span>);
+
+                <span class="kw">for </span>perp_quote <span class="kw">in </span>[-<span class="number">10</span>, <span class="number">10</span>] {
+                    health_cache.perp_infos[<span class="number">0</span>].quote = I80F48::from_num(perp_quote);
+                    <span class="kw">for </span>price_factor <span class="kw">in </span>[<span class="number">0.9</span>, <span class="number">1.1</span>] {
+                        <span class="kw">for </span>target <span class="kw">in </span><span class="number">1</span>..<span class="number">100 </span>{
+                            <span class="kw">let </span>target = target <span class="kw">as </span>f64;
+                            check(<span class="kw-2">&amp;</span>health_cache, <span class="number">0</span>, <span class="number">1</span>, target, price_factor, banks);
+                            check(<span class="kw-2">&amp;</span>health_cache, <span class="number">1</span>, <span class="number">0</span>, target, price_factor, banks);
+                        }
+                    }
+                }
+            }
         }
     }
 
     <span class="attribute">#[test]
     </span><span class="kw">fn </span>test_max_perp() {
         <span class="kw">let </span>base_lot_size = <span class="number">100</span>;
-        <span class="kw">let </span>default_perp_info = |x| PerpInfo {
-            perp_market_index: <span class="number">0</span>,
-            maint_base_asset_weight: I80F48::from_num(<span class="number">1.0 </span>- x),
-            init_base_asset_weight: I80F48::from_num(<span class="number">1.0 </span>- x),
-            maint_base_liab_weight: I80F48::from_num(<span class="number">1.0 </span>+ x),
-            init_base_liab_weight: I80F48::from_num(<span class="number">1.0 </span>+ x),
-            maint_overall_asset_weight: I80F48::from_num(<span class="number">0.6</span>),
-            init_overall_asset_weight: I80F48::from_num(<span class="number">0.6</span>),
-            base_lot_size,
-            base_lots: <span class="number">0</span>,
-            bids_base_lots: <span class="number">0</span>,
-            asks_base_lots: <span class="number">0</span>,
-            quote: I80F48::ZERO,
-            prices: Prices::new_single_price(I80F48::from_num(<span class="number">2.0</span>)),
-            has_open_orders: <span class="bool-val">false</span>,
-            has_open_fills: <span class="bool-val">false</span>,
-        };
 
         <span class="kw">let </span>health_cache = HealthCache {
-            token_infos: <span class="macro">vec!</span>[TokenInfo {
-                token_index: <span class="number">0</span>,
-                balance_native: I80F48::ZERO,
-                ..default_token_info(<span class="number">0.0</span>, <span class="number">1.0</span>)
-            }],
+            token_infos: <span class="macro">vec!</span>[
+                TokenInfo {
+                    token_index: <span class="number">0</span>,
+                    balance_spot: I80F48::ZERO,
+                    ..default_token_info(<span class="number">0.0</span>, <span class="number">1.0</span>)
+                },
+                TokenInfo {
+                    token_index: <span class="number">1</span>,
+                    balance_spot: I80F48::ZERO,
+                    ..default_token_info(<span class="number">0.2</span>, <span class="number">1.5</span>)
+                },
+            ],
             serum3_infos: <span class="macro">vec!</span>[],
             perp_infos: <span class="macro">vec!</span>[PerpInfo {
                 perp_market_index: <span class="number">0</span>,
+                settle_token_index: <span class="number">1</span>,
+                base_lot_size,
                 ..default_perp_info(<span class="number">0.3</span>)
             }],
             being_liquidated: <span class="bool-val">false</span>,
@@ -2401,13 +2564,13 @@
             I80F48::ZERO
         );
 
-        <span class="kw">let </span>adjust_token = |c: <span class="kw-2">&amp;mut </span>HealthCache, value: f64| {
-            <span class="kw">let </span>ti = <span class="kw-2">&amp;mut </span>c.token_infos[<span class="number">0</span>];
-            ti.balance_native += I80F48::from_num(value);
+        <span class="kw">let </span>adjust_token = |c: <span class="kw-2">&amp;mut </span>HealthCache, info_index: usize, value: f64| {
+            <span class="kw">let </span>ti = <span class="kw-2">&amp;mut </span>c.token_infos[info_index];
+            ti.balance_spot += I80F48::from_num(value);
         };
         <span class="kw">let </span>find_max_trade =
             |c: <span class="kw-2">&amp;</span>HealthCache, side: PerpOrderSide, ratio: f64, price_factor: f64| {
-                <span class="kw">let </span>prices = <span class="kw-2">&amp;</span>c.perp_infos[<span class="number">0</span>].prices;
+                <span class="kw">let </span>prices = <span class="kw-2">&amp;</span>c.perp_infos[<span class="number">0</span>].base_prices;
                 <span class="kw">let </span>trade_price = I80F48::from_num(price_factor) * prices.oracle;
                 <span class="kw">let </span>base_lots = c
                     .max_perp_for_health_ratio(<span class="number">0</span>, trade_price, side, I80F48::from_num(ratio))
@@ -2457,18 +2620,24 @@
 
         {
             <span class="kw">let </span><span class="kw-2">mut </span>health_cache = health_cache.clone();
-            adjust_token(<span class="kw-2">&amp;mut </span>health_cache, <span class="number">3000.0</span>);
+            adjust_token(<span class="kw-2">&amp;mut </span>health_cache, <span class="number">0</span>, <span class="number">3000.0</span>);
 
-            <span class="kw">for </span>existing <span class="kw">in </span>[-<span class="number">5</span>, <span class="number">0</span>, <span class="number">3</span>] {
+            <span class="kw">for </span>existing_settle <span class="kw">in </span>[-<span class="number">500.0</span>, <span class="number">0.0</span>, <span class="number">300.0</span>] {
                 <span class="kw">let </span><span class="kw-2">mut </span>c = health_cache.clone();
-                c.perp_infos[<span class="number">0</span>].base_lots += existing;
-                c.perp_infos[<span class="number">0</span>].quote -= I80F48::from(existing * base_lot_size * <span class="number">2</span>);
+                adjust_token(<span class="kw-2">&amp;mut </span>c, <span class="number">1</span>, existing_settle);
+                <span class="kw">for </span>existing_lots <span class="kw">in </span>[-<span class="number">5</span>, <span class="number">0</span>, <span class="number">3</span>] {
+                    <span class="kw">let </span><span class="kw-2">mut </span>c = c.clone();
+                    c.perp_infos[<span class="number">0</span>].base_lots += existing_lots;
+                    c.perp_infos[<span class="number">0</span>].quote -= I80F48::from(existing_lots * base_lot_size * <span class="number">2</span>);
 
-                <span class="kw">for </span>side <span class="kw">in </span>[PerpOrderSide::Bid, PerpOrderSide::Ask] {
-                    <span class="macro">println!</span>(<span class="string">&quot;test 0: existing {existing}, side {side:?}&quot;</span>);
-                    <span class="kw">for </span>price_factor <span class="kw">in </span>[<span class="number">0.8</span>, <span class="number">1.0</span>, <span class="number">1.1</span>] {
-                        <span class="kw">for </span>ratio <span class="kw">in </span><span class="number">1</span>..=<span class="number">100 </span>{
-                            check_max_trade(<span class="kw-2">&amp;</span>c, side, ratio <span class="kw">as </span>f64, price_factor);
+                    <span class="kw">for </span>side <span class="kw">in </span>[PerpOrderSide::Bid, PerpOrderSide::Ask] {
+                        <span class="macro">println!</span>(
+                            <span class="string">&quot;test 0: lots {existing_lots}, settle {existing_settle}, side {side:?}&quot;
+                        </span>);
+                        <span class="kw">for </span>price_factor <span class="kw">in </span>[<span class="number">0.8</span>, <span class="number">1.0</span>, <span class="number">1.1</span>] {
+                            <span class="kw">for </span>ratio <span class="kw">in </span><span class="number">1</span>..=<span class="number">100 </span>{
+                                check_max_trade(<span class="kw-2">&amp;</span>c, side, ratio <span class="kw">as </span>f64, price_factor);
+                            }
                         }
                     }
                 }
@@ -2497,11 +2666,11 @@
 
         <span class="kw">let </span>group = Pubkey::new_unique();
 
-        <span class="kw">let </span>(<span class="kw-2">mut </span>bank1, <span class="kw-2">mut </span>oracle1) = mock_bank_and_oracle(group, <span class="number">1</span>, <span class="number">1.0</span>, <span class="number">0.2</span>, <span class="number">0.1</span>);
+        <span class="kw">let </span>(<span class="kw-2">mut </span>bank1, <span class="kw-2">mut </span>oracle1) = mock_bank_and_oracle(group, <span class="number">0</span>, <span class="number">1.0</span>, <span class="number">0.2</span>, <span class="number">0.1</span>);
         bank1
             .data()
             .change_without_fee(
-                account.ensure_token_position(<span class="number">1</span>).unwrap().<span class="number">0</span>,
+                account.ensure_token_position(<span class="number">0</span>).unwrap().<span class="number">0</span>,
                 I80F48::from(<span class="number">100</span>),
                 DUMMY_NOW_TS,
             )
@@ -2509,7 +2678,7 @@
 
         <span class="kw">let </span><span class="kw-2">mut </span>perp1 = mock_perp_market(group, oracle1.pubkey, <span class="number">1.0</span>, <span class="number">9</span>, (<span class="number">0.2</span>, <span class="number">0.1</span>), (<span class="number">0.05</span>, <span class="number">0.02</span>));
         perp1.data().long_funding = I80F48::from_num(<span class="number">10.1</span>);
-        <span class="kw">let </span>perpaccount = account.ensure_perp_position(<span class="number">9</span>, <span class="number">1</span>).unwrap().<span class="number">0</span>;
+        <span class="kw">let </span>perpaccount = account.ensure_perp_position(<span class="number">9</span>, <span class="number">0</span>).unwrap().<span class="number">0</span>;
         perpaccount.record_trade(perp1.data(), <span class="number">10</span>, I80F48::from(-<span class="number">110</span>));
         perpaccount.long_settled_funding = I80F48::from_num(<span class="number">10.0</span>);
 
@@ -2526,14 +2695,14 @@
         <span class="macro">assert!</span>(health_eq(
             compute_health(<span class="kw-2">&amp;</span>account.borrow(), HealthType::Init, <span class="kw-2">&amp;</span>retriever).unwrap(),
             <span class="comment">// token
-            </span><span class="number">0.8 </span>* <span class="number">100.0
+            </span><span class="number">0.8 </span>* (<span class="number">100.0
             </span><span class="comment">// perp base
             </span>+ <span class="number">0.8 </span>* <span class="number">100.0
             </span><span class="comment">// perp quote
             </span>- <span class="number">110.0
             </span><span class="comment">// perp funding (10 * (10.1 - 10.0))
-            </span>- <span class="number">1.0
-        </span>));
+            </span>- <span class="number">1.0</span>)
+        ));
     }
 
     <span class="attribute">#[test]
@@ -2578,12 +2747,12 @@
 
         <span class="kw">let </span>group = Pubkey::new_unique();
 
-        <span class="kw">let </span>(<span class="kw-2">mut </span>bank1, <span class="kw-2">mut </span>oracle1) = mock_bank_and_oracle(group, <span class="number">1</span>, <span class="number">1.0</span>, <span class="number">0.2</span>, <span class="number">0.1</span>);
+        <span class="kw">let </span>(<span class="kw-2">mut </span>bank1, <span class="kw-2">mut </span>oracle1) = mock_bank_and_oracle(group, <span class="number">0</span>, <span class="number">1.0</span>, <span class="number">0.2</span>, <span class="number">0.1</span>);
         bank1.data().stable_price_model.stable_price = <span class="number">0.5</span>;
         bank1
             .data()
             .change_without_fee(
-                account.ensure_token_position(<span class="number">1</span>).unwrap().<span class="number">0</span>,
+                account.ensure_token_position(<span class="number">0</span>).unwrap().<span class="number">0</span>,
                 I80F48::from(<span class="number">100</span>),
                 DUMMY_NOW_TS,
             )
@@ -2591,7 +2760,7 @@
         bank1
             .data()
             .change_without_fee(
-                account2.ensure_token_position(<span class="number">1</span>).unwrap().<span class="number">0</span>,
+                account2.ensure_token_position(<span class="number">0</span>).unwrap().<span class="number">0</span>,
                 I80F48::from(-<span class="number">100</span>),
                 DUMMY_NOW_TS,
             )
@@ -2599,7 +2768,7 @@
 
         <span class="kw">let </span><span class="kw-2">mut </span>perp1 = mock_perp_market(group, oracle1.pubkey, <span class="number">1.0</span>, <span class="number">9</span>, (<span class="number">0.2</span>, <span class="number">0.1</span>), (<span class="number">0.05</span>, <span class="number">0.02</span>));
         perp1.data().stable_price_model.stable_price = <span class="number">0.5</span>;
-        <span class="kw">let </span>perpaccount = account3.ensure_perp_position(<span class="number">9</span>, <span class="number">1</span>).unwrap().<span class="number">0</span>;
+        <span class="kw">let </span>perpaccount = account3.ensure_perp_position(<span class="number">9</span>, <span class="number">0</span>).unwrap().<span class="number">0</span>;
         perpaccount.record_trade(perp1.data(), <span class="number">10</span>, I80F48::from(-<span class="number">100</span>));
 
         <span class="kw">let </span>oracle1_ai = oracle1.as_account_info();
@@ -2630,12 +2799,12 @@
         </span>));
         <span class="macro">assert!</span>(health_eq(
             compute_health(<span class="kw-2">&amp;</span>account3.borrow(), HealthType::Init, <span class="kw-2">&amp;</span>retriever).unwrap(),
-            <span class="number">0.8 </span>* <span class="number">0.5 </span>* <span class="number">10.0 </span>* <span class="number">10.0 </span>- <span class="number">100.0
-        </span>));
+            <span class="number">1.2 </span>* (<span class="number">0.8 </span>* <span class="number">0.5 </span>* <span class="number">10.0 </span>* <span class="number">10.0 </span>- <span class="number">100.0</span>)
+        ));
         <span class="macro">assert!</span>(health_eq(
             compute_health(<span class="kw-2">&amp;</span>account3.borrow(), HealthType::Maint, <span class="kw-2">&amp;</span>retriever).unwrap(),
-            <span class="number">0.9 </span>* <span class="number">1.0 </span>* <span class="number">10.0 </span>* <span class="number">10.0 </span>- <span class="number">100.0
-        </span>));
+            <span class="number">1.1 </span>* (<span class="number">0.9 </span>* <span class="number">1.0 </span>* <span class="number">10.0 </span>* <span class="number">10.0 </span>- <span class="number">100.0</span>)
+        ));
     }
 
     <span class="attribute">#[test]
@@ -2681,13 +2850,13 @@
             <span class="comment">// compute the health ratio we&#39;d get when executing the trade
             </span><span class="kw">let </span>actual_ratio = {
                 <span class="kw">let </span><span class="kw-2">mut </span>c = c.clone();
-                c.token_infos[<span class="number">0</span>].balance_native -= max_borrow;
+                c.token_infos[<span class="number">0</span>].balance_spot -= max_borrow;
                 c.health_ratio(HealthType::Init).to_num::&lt;f64&gt;()
             };
             <span class="comment">// the ratio for borrowing one native token extra
             </span><span class="kw">let </span>plus_ratio = {
                 <span class="kw">let </span><span class="kw-2">mut </span>c = c.clone();
-                c.token_infos[<span class="number">0</span>].balance_native -= max_borrow + I80F48::ONE;
+                c.token_infos[<span class="number">0</span>].balance_spot -= max_borrow + I80F48::ONE;
                 c.health_ratio(HealthType::Init).to_num::&lt;f64&gt;()
             };
             (max_borrow, actual_ratio, plus_ratio)
@@ -2708,31 +2877,82 @@
 
         {
             <span class="kw">let </span><span class="kw-2">mut </span>health_cache = health_cache.clone();
-            health_cache.token_infos[<span class="number">0</span>].balance_native = I80F48::from_num(<span class="number">100.0</span>);
+            health_cache.token_infos[<span class="number">0</span>].balance_spot = I80F48::from_num(<span class="number">100.0</span>);
             <span class="macro">assert_eq!</span>(check_max_borrow(<span class="kw-2">&amp;</span>health_cache, <span class="number">50.0</span>), <span class="number">100.0</span>);
         }
         {
             <span class="kw">let </span><span class="kw-2">mut </span>health_cache = health_cache.clone();
-            health_cache.token_infos[<span class="number">1</span>].balance_native = I80F48::from_num(<span class="number">50.0</span>); <span class="comment">// price 2, so 2*50*0.8 = 80 health
+            health_cache.token_infos[<span class="number">1</span>].balance_spot = I80F48::from_num(<span class="number">50.0</span>); <span class="comment">// price 2, so 2*50*0.8 = 80 health
             </span>check_max_borrow(<span class="kw-2">&amp;</span>health_cache, <span class="number">100.0</span>);
             check_max_borrow(<span class="kw-2">&amp;</span>health_cache, <span class="number">50.0</span>);
             check_max_borrow(<span class="kw-2">&amp;</span>health_cache, <span class="number">0.0</span>);
         }
         {
             <span class="kw">let </span><span class="kw-2">mut </span>health_cache = health_cache.clone();
-            health_cache.token_infos[<span class="number">0</span>].balance_native = I80F48::from_num(<span class="number">50.0</span>);
-            health_cache.token_infos[<span class="number">1</span>].balance_native = I80F48::from_num(<span class="number">50.0</span>);
+            health_cache.token_infos[<span class="number">0</span>].balance_spot = I80F48::from_num(<span class="number">50.0</span>);
+            health_cache.token_infos[<span class="number">1</span>].balance_spot = I80F48::from_num(<span class="number">50.0</span>);
             check_max_borrow(<span class="kw-2">&amp;</span>health_cache, <span class="number">100.0</span>);
             check_max_borrow(<span class="kw-2">&amp;</span>health_cache, <span class="number">50.0</span>);
             check_max_borrow(<span class="kw-2">&amp;</span>health_cache, <span class="number">0.0</span>);
         }
         {
             <span class="kw">let </span><span class="kw-2">mut </span>health_cache = health_cache.clone();
-            health_cache.token_infos[<span class="number">0</span>].balance_native = I80F48::from_num(-<span class="number">50.0</span>);
-            health_cache.token_infos[<span class="number">1</span>].balance_native = I80F48::from_num(<span class="number">50.0</span>);
+            health_cache.token_infos[<span class="number">0</span>].balance_spot = I80F48::from_num(-<span class="number">50.0</span>);
+            health_cache.token_infos[<span class="number">1</span>].balance_spot = I80F48::from_num(<span class="number">50.0</span>);
             check_max_borrow(<span class="kw-2">&amp;</span>health_cache, <span class="number">100.0</span>);
             check_max_borrow(<span class="kw-2">&amp;</span>health_cache, <span class="number">50.0</span>);
             check_max_borrow(<span class="kw-2">&amp;</span>health_cache, <span class="number">0.0</span>);
+        }
+    }
+
+    <span class="attribute">#[test]
+    </span><span class="kw">fn </span>test_assets_and_borrows() {
+        <span class="kw">let </span>health_cache = HealthCache {
+            token_infos: <span class="macro">vec!</span>[
+                TokenInfo {
+                    token_index: <span class="number">0</span>,
+                    ..default_token_info(<span class="number">0.0</span>, <span class="number">1.0</span>)
+                },
+                TokenInfo {
+                    token_index: <span class="number">1</span>,
+                    ..default_token_info(<span class="number">0.2</span>, <span class="number">2.0</span>)
+                },
+            ],
+            serum3_infos: <span class="macro">vec!</span>[],
+            perp_infos: <span class="macro">vec!</span>[PerpInfo {
+                perp_market_index: <span class="number">0</span>,
+                settle_token_index: <span class="number">0</span>,
+                ..default_perp_info(<span class="number">0.3</span>)
+            }],
+            being_liquidated: <span class="bool-val">false</span>,
+        };
+
+        {
+            <span class="kw">let </span><span class="kw-2">mut </span>hc = health_cache.clone();
+            hc.token_infos[<span class="number">1</span>].balance_spot = I80F48::from(<span class="number">10</span>);
+            hc.perp_infos[<span class="number">0</span>].quote = I80F48::from(-<span class="number">12</span>);
+
+            <span class="kw">let </span>(assets, liabs) = hc.health_assets_and_liabs_stable_assets(HealthType::Init);
+            <span class="macro">assert!</span>((assets.to_num::&lt;f64&gt;() - <span class="number">2.0 </span>* <span class="number">10.0 </span>* <span class="number">0.8</span>) &lt; <span class="number">0.01</span>);
+            <span class="macro">assert!</span>((liabs.to_num::&lt;f64&gt;() - <span class="number">2.0 </span>* (<span class="number">10.0 </span>* <span class="number">0.8 </span>+ <span class="number">2.0 </span>* <span class="number">1.2</span>)) &lt; <span class="number">0.01</span>);
+
+            <span class="kw">let </span>(assets, liabs) = hc.health_assets_and_liabs_stable_liabs(HealthType::Init);
+            <span class="macro">assert!</span>((liabs.to_num::&lt;f64&gt;() - <span class="number">2.0 </span>* <span class="number">12.0 </span>* <span class="number">1.2</span>) &lt; <span class="number">0.01</span>);
+            <span class="macro">assert!</span>((assets.to_num::&lt;f64&gt;() - <span class="number">2.0 </span>* <span class="number">10.0 </span>* <span class="number">1.2</span>) &lt; <span class="number">0.01</span>);
+        }
+
+        {
+            <span class="kw">let </span><span class="kw-2">mut </span>hc = health_cache.clone();
+            hc.token_infos[<span class="number">1</span>].balance_spot = I80F48::from(<span class="number">12</span>);
+            hc.perp_infos[<span class="number">0</span>].quote = I80F48::from(-<span class="number">10</span>);
+
+            <span class="kw">let </span>(assets, liabs) = hc.health_assets_and_liabs_stable_assets(HealthType::Init);
+            <span class="macro">assert!</span>((assets.to_num::&lt;f64&gt;() - <span class="number">2.0 </span>* <span class="number">12.0 </span>* <span class="number">0.8</span>) &lt; <span class="number">0.01</span>);
+            <span class="macro">assert!</span>((liabs.to_num::&lt;f64&gt;() - <span class="number">2.0 </span>* <span class="number">10.0 </span>* <span class="number">0.8</span>) &lt; <span class="number">0.01</span>);
+
+            <span class="kw">let </span>(assets, liabs) = hc.health_assets_and_liabs_stable_liabs(HealthType::Init);
+            <span class="macro">assert!</span>((liabs.to_num::&lt;f64&gt;() - <span class="number">2.0 </span>* <span class="number">10.0 </span>* <span class="number">1.2</span>) &lt; <span class="number">0.01</span>);
+            <span class="macro">assert!</span>((assets.to_num::&lt;f64&gt;() - <span class="number">2.0 </span>* (<span class="number">10.0 </span>* <span class="number">1.2 </span>+ <span class="number">2.0 </span>* <span class="number">0.8</span>)) &lt; <span class="number">0.01</span>);
         }
     }
 }

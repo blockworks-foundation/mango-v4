@@ -435,6 +435,17 @@
 <span id="435">435</span>
 <span id="436">436</span>
 <span id="437">437</span>
+<span id="438">438</span>
+<span id="439">439</span>
+<span id="440">440</span>
+<span id="441">441</span>
+<span id="442">442</span>
+<span id="443">443</span>
+<span id="444">444</span>
+<span id="445">445</span>
+<span id="446">446</span>
+<span id="447">447</span>
+<span id="448">448</span>
 </pre><pre class="rust"><code><span class="kw">use crate</span>::{
     accounts_ix::FlashLoanType,
     state::{OracleType, PerpMarket, PerpPosition},
@@ -693,6 +704,17 @@
     <span class="kw">pub </span>loan_origination_fee: i128, <span class="comment">// I80F48
     </span><span class="kw">pub </span>instruction: LoanOriginationFeeInstruction,
 }
+
+<span class="attribute">#[event]
+</span><span class="kw">pub struct </span>WithdrawLoanLog {
+    <span class="kw">pub </span>mango_group: Pubkey,
+    <span class="kw">pub </span>mango_account: Pubkey,
+    <span class="kw">pub </span>token_index: u16,
+    <span class="kw">pub </span>loan_amount: i128,
+    <span class="kw">pub </span>loan_origination_fee: i128,
+    <span class="kw">pub </span>instruction: LoanOriginationFeeInstruction,
+    <span class="kw">pub </span>price: <span class="prelude-ty">Option</span>&lt;i128&gt;, <span class="comment">// Ideally would log price everywhere but in serum3_settle_funds oracle is not a passed in account
+</span>}
 
 <span class="attribute">#[event]
 </span><span class="kw">pub struct </span>TokenLiqBankruptcyLog {
