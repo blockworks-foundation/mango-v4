@@ -1036,8 +1036,25 @@ impl<
     ) -> Result<()> {
         let post_init_health = health_cache.health(HealthType::Init);
         msg!("post_init_health: {}", post_init_health);
+
+        // Accounts that have negative init health may only take actions that don't further
+        // decrease their health.
+        // To avoid issues with rounding, we allow accounts to decrease their health by up to
+        // $1e-6. This is safe because the grace amount is way less than the cost of a transaction.
+        // And worst case, users can only use this to gradually drive their own account into
+        // liquidation.
+        // There is an exception for accounts with health between $0 and -$0.001 (-1000 native),
+        // because we don't want to allow empty accounts or accounts with extremely tiny deposits
+        // to immediately drive themselves into bankruptcy. (accounts with large deposits can also
+        // be in this health range, but it's really unlikely)
+        let health_does_not_decrease = if post_init_health < -1000 {
+            post_init_health.ceil() >= pre_init_health.ceil()
+        } else {
+            post_init_health >= pre_init_health
+        };
+
         require!(
-            post_init_health >= 0 || post_init_health > pre_init_health,
+            post_init_health >= 0 || health_does_not_decrease,
             MangoError::HealthMustBePositiveOrIncrease
         );
         Ok(())
