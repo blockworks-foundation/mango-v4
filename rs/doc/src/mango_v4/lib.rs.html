@@ -1167,6 +1167,7 @@
 <span id="1167">1167</span>
 <span id="1168">1168</span>
 <span id="1169">1169</span>
+<span id="1170">1170</span>
 </pre><pre class="rust"><code><span class="attribute">#![allow(unused_variables)]
 
 </span><span class="kw">use </span>fixed::types::I80F48;
@@ -1656,13 +1657,14 @@
         <span class="prelude-val">Ok</span>(())
     }
 
-    <span class="doccomment">/// Settles all free funds from the OpenOrders account into the MangoAccount.
+    <span class="doccomment">/// Deprecated instruction that used to settles all free funds from the OpenOrders account
+    /// into the MangoAccount.
     ///
     /// Any serum &quot;referrer rebates&quot; (ui fees) are considered Mango fees.
     </span><span class="kw">pub fn </span>serum3_settle_funds(ctx: Context&lt;Serum3SettleFunds&gt;) -&gt; <span class="prelude-ty">Result</span>&lt;()&gt; {
-        <span class="attribute">#[cfg(feature = <span class="string">&quot;enable-gpl&quot;</span>)]
-        </span>instructions::serum3_settle_funds(ctx.accounts, <span class="prelude-val">None</span>, <span class="bool-val">true</span>)<span class="question-mark">?</span>;
-        <span class="prelude-val">Ok</span>(())
+        <span class="prelude-val">Err</span>(<span class="macro">error_msg!</span>(
+            <span class="string">&quot;Serum3SettleFunds was replaced by Serum3SettleFundsV2&quot;
+        </span>))
     }
 
     <span class="doccomment">/// Like Serum3SettleFunds, but `fees_to_dao` determines if referrer rebates are considered fees

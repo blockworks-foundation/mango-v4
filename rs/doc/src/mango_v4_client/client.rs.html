@@ -1806,6 +1806,14 @@
 <span id="1806">1806</span>
 <span id="1807">1807</span>
 <span id="1808">1808</span>
+<span id="1809">1809</span>
+<span id="1810">1810</span>
+<span id="1811">1811</span>
+<span id="1812">1812</span>
+<span id="1813">1813</span>
+<span id="1814">1814</span>
+<span id="1815">1815</span>
+<span id="1816">1816</span>
 </pre><pre class="rust"><code><span class="kw">use </span>std::str::FromStr;
 <span class="kw">use </span>std::sync::Arc;
 <span class="kw">use </span>std::time::Duration;
@@ -2403,26 +2411,34 @@
         <span class="kw">let </span>ix = Instruction {
             program_id: mango_v4::id(),
             accounts: anchor_lang::ToAccountMetas::to_account_metas(
-                <span class="kw-2">&amp;</span>mango_v4::accounts::Serum3SettleFunds {
-                    group: <span class="self">self</span>.group(),
-                    account: <span class="self">self</span>.mango_account_address,
-                    open_orders,
-                    quote_bank: quote.mint_info.first_bank(),
-                    quote_vault: quote.mint_info.first_vault(),
-                    base_bank: base.mint_info.first_bank(),
-                    base_vault: base.mint_info.first_vault(),
-                    serum_market: s3.address,
-                    serum_program: s3.market.serum_program,
-                    serum_market_external: s3.market.serum_market_external,
-                    market_base_vault: s3.coin_vault,
-                    market_quote_vault: s3.pc_vault,
-                    market_vault_signer: s3.vault_signer,
-                    owner: <span class="self">self</span>.owner(),
-                    token_program: Token::id(),
+                <span class="kw-2">&amp;</span>mango_v4::accounts::Serum3SettleFundsV2 {
+                    v1: mango_v4::accounts::Serum3SettleFunds {
+                        group: <span class="self">self</span>.group(),
+                        account: <span class="self">self</span>.mango_account_address,
+                        open_orders,
+                        quote_bank: quote.mint_info.first_bank(),
+                        quote_vault: quote.mint_info.first_vault(),
+                        base_bank: base.mint_info.first_bank(),
+                        base_vault: base.mint_info.first_vault(),
+                        serum_market: s3.address,
+                        serum_program: s3.market.serum_program,
+                        serum_market_external: s3.market.serum_market_external,
+                        market_base_vault: s3.coin_vault,
+                        market_quote_vault: s3.pc_vault,
+                        market_vault_signer: s3.vault_signer,
+                        owner: <span class="self">self</span>.owner(),
+                        token_program: Token::id(),
+                    },
+                    v2: mango_v4::accounts::Serum3SettleFundsV2Extra {
+                        quote_oracle: quote.mint_info.oracle,
+                        base_oracle: base.mint_info.oracle,
+                    },
                 },
                 <span class="prelude-val">None</span>,
             ),
-            data: anchor_lang::InstructionData::data(<span class="kw-2">&amp;</span>mango_v4::instruction::Serum3SettleFunds {}),
+            data: anchor_lang::InstructionData::data(<span class="kw-2">&amp;</span>mango_v4::instruction::Serum3SettleFundsV2 {
+                fees_to_dao: <span class="bool-val">true</span>,
+            }),
         };
         <span class="self">self</span>.send_and_confirm_owner_tx(<span class="macro">vec!</span>[ix]).<span class="kw">await
     </span>}
