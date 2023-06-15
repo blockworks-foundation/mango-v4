@@ -204,7 +204,7 @@
         }
     }
 
-    <span class="comment">// Negative pnl needs to be limited by perp_max_settle.
+    <span class="comment">// Negative pnl needs to be limited by perp_settle_health.
     // We&#39;re doing it in a second step, because it&#39;s pretty expensive and we don&#39;t
     // want to run this for all accounts.
     </span><span class="kw">if </span>direction == Direction::MaxNegative {
@@ -216,11 +216,11 @@
             </span>} <span class="kw">else </span>{
                 I80F48::ZERO
             };
-            <span class="kw">let </span>perp_max_settle = <span class="kw">crate</span>::health_cache::new(context, account_fetcher, <span class="kw-2">&amp;</span>acc)
+            <span class="kw">let </span>perp_settle_health = <span class="kw">crate</span>::health_cache::new(context, account_fetcher, <span class="kw-2">&amp;</span>acc)
                 .<span class="kw">await</span><span class="question-mark">?
-                </span>.perp_max_settle(perp_market.settle_token_index)<span class="question-mark">?</span>;
-            <span class="kw">let </span>settleable_pnl = <span class="kw">if </span>perp_max_settle &gt; <span class="number">0 </span>{
-                (<span class="kw-2">*</span>pnl).max(-perp_max_settle)
+                </span>.perp_settle_health();
+            <span class="kw">let </span>settleable_pnl = <span class="kw">if </span>perp_settle_health &gt; <span class="number">0 </span>{
+                (<span class="kw-2">*</span>pnl).max(-perp_settle_health)
             } <span class="kw">else </span>{
                 I80F48::ZERO
             };

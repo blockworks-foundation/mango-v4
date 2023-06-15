@@ -986,7 +986,6 @@
 <span id="986">986</span>
 <span id="987">987</span>
 <span id="988">988</span>
-<span id="989">989</span>
 </pre><pre class="rust"><code><span class="kw">pub use </span>book::<span class="kw-2">*</span>;
 <span class="kw">pub use </span>bookside::<span class="kw-2">*</span>;
 <span class="kw">pub use </span>bookside_iterator::<span class="kw-2">*</span>;
@@ -1010,7 +1009,7 @@
 <span class="attribute">#[cfg(test)]
 </span><span class="kw">mod </span>tests {
     <span class="kw">use super</span>::<span class="kw-2">*</span>;
-    <span class="kw">use </span><span class="kw">crate</span>::state::{Group, MangoAccount, MangoAccountValue, PerpMarket, FREE_ORDER_SLOT};
+    <span class="kw">use </span><span class="kw">crate</span>::state::{MangoAccount, MangoAccountValue, PerpMarket, FREE_ORDER_SLOT};
     <span class="kw">use </span>anchor_lang::prelude::<span class="kw-2">*</span>;
     <span class="kw">use </span>bytemuck::Zeroable;
     <span class="kw">use </span>fixed::types::I80F48;
@@ -1227,7 +1226,6 @@
 
     <span class="attribute">#[test]
     </span><span class="kw">fn </span>book_new_order() {
-        <span class="kw">let </span>group = Group::zeroed();
         <span class="kw">let </span>(<span class="kw-2">mut </span>market, oracle_price, <span class="kw-2">mut </span>event_queue, book_accs) = test_setup(<span class="number">1000.0</span>);
         <span class="kw">let </span><span class="kw-2">mut </span>book = book_accs.orderbook();
         <span class="kw">let </span>settle_token_index = <span class="number">0</span>;
@@ -1386,7 +1384,7 @@
 
         <span class="comment">// simulate event queue processing
         </span>maker
-            .execute_perp_maker(market.perp_market_index, <span class="kw-2">&amp;mut </span>market, fill, <span class="kw-2">&amp;</span>group)
+            .execute_perp_maker(market.perp_market_index, <span class="kw-2">&amp;mut </span>market, fill)
             .unwrap();
         taker
             .execute_perp_taker(market.perp_market_index, <span class="kw-2">&amp;mut </span>market, fill)

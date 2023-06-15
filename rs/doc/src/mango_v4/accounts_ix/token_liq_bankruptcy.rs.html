@@ -61,7 +61,6 @@
 <span id="61">61</span>
 <span id="62">62</span>
 <span id="63">63</span>
-<span id="64">64</span>
 </pre><pre class="rust"><code><span class="kw">use </span>anchor_lang::prelude::<span class="kw-2">*</span>;
 <span class="kw">use </span>anchor_spl::token;
 <span class="kw">use </span>anchor_spl::token::Token;
@@ -104,7 +103,6 @@
 
     <span class="attribute">#[account(<span class="kw-2">mut</span>)]
     </span><span class="comment">// address is checked at #2 a) and b)
-    // better name would be &quot;insurance_bank_vault&quot;
     </span><span class="kw">pub </span>quote_vault: Account&lt;<span class="lifetime">&#39;info</span>, TokenAccount&gt;,
 
     <span class="comment">// future: this would be an insurance fund vault specific to a
