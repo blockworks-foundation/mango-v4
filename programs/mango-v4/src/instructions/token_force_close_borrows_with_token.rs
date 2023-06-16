@@ -56,6 +56,12 @@ pub fn token_force_close_borrows_with_token(
         // account constraint #2
         require!(liab_bank.is_force_close(), MangoError::TokenInForceClose);
 
+        // We might create asset borrows, so forbid asset tokens that don't allow them.
+        require!(
+            !asset_bank.are_borrows_reduce_only(),
+            MangoError::TokenInReduceOnlyMode
+        );
+
         // account constraint #3
         // only allow combination of asset and liab token,
         // where liqee's health would be guaranteed to not decrease

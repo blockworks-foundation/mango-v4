@@ -60,14 +60,12 @@ pub fn serum3_liq_force_cancel_orders(
         let health_cache =
             new_health_cache(&account.borrow(), &retriever).context("create health cache")?;
 
-        {
-            let liquidatable = account.check_liquidatable(&health_cache)?;
-            if account.fixed.is_operational()
-                && liquidatable != CheckLiquidatable::Liquidatable
-                && !serum_market.is_force_close()
-            {
-                return Ok(());
-            }
+        let liquidatable = account.check_liquidatable(&health_cache)?;
+        let can_force_cancel = !account.fixed.is_operational()
+            || liquidatable == CheckLiquidatable::Liquidatable
+            || serum_market.is_force_close();
+        if !can_force_cancel {
+            return Ok(());
         }
 
         health_cache
