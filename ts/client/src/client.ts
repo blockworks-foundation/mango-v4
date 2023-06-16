@@ -2843,6 +2843,13 @@ export class MangoClient {
     userDefinedAlts: AddressLookupTableAccount[];
     flashLoanType: FlashLoanType;
   }): Promise<TransactionSignature> {
+    const isDelegate = (
+      this.program.provider as AnchorProvider
+    ).wallet.publicKey.equals(mangoAccount.delegate);
+    const swapExecutingWallet = isDelegate
+      ? mangoAccount.delegate
+      : mangoAccount.owner;
+
     const inputBank: Bank = group.getFirstBankByMint(inputMintPk);
     const outputBank: Bank = group.getFirstBankByMint(outputMintPk);
 
@@ -2867,7 +2874,7 @@ export class MangoClient {
      */
     const inputTokenAccountPk = await getAssociatedTokenAddress(
       inputBank.mint,
-      mangoAccount.delegate,
+      swapExecutingWallet,
     );
     const inputTokenAccExists =
       await this.program.provider.connection.getAccountInfo(
@@ -2877,8 +2884,8 @@ export class MangoClient {
     if (!inputTokenAccExists) {
       preInstructions.push(
         await createAssociatedTokenAccountIdempotentInstruction(
-          mangoAccount.delegate,
-          mangoAccount.delegate,
+          swapExecutingWallet,
+          swapExecutingWallet,
           inputBank.mint,
         ),
       );
@@ -2886,7 +2893,7 @@ export class MangoClient {
 
     const outputTokenAccountPk = await getAssociatedTokenAddress(
       outputBank.mint,
-      mangoAccount.delegate,
+      swapExecutingWallet,
     );
     const outputTokenAccExists =
       await this.program.provider.connection.getAccountInfo(
@@ -2895,8 +2902,8 @@ export class MangoClient {
     if (!outputTokenAccExists) {
       preInstructions.push(
         await createAssociatedTokenAccountIdempotentInstruction(
-          mangoAccount.delegate,
-          mangoAccount.delegate,
+          swapExecutingWallet,
+          swapExecutingWallet,
           outputBank.mint,
         ),
       );
