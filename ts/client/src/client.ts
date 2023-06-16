@@ -2392,7 +2392,7 @@ export class MangoClient {
     expiryTimestamp?: number,
     limit?: number,
   ): Promise<TransactionSignature> {
-    const ix = await this.perpPlaceOrderPegged2Ix(
+    const ix = await this.perpPlaceOrderPeggedV2Ix(
       group,
       mangoAccount,
       perpMarketIndex,
