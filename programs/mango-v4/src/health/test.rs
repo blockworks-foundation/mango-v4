@@ -125,5 +125,6 @@ pub fn mock_perp_market(
     pm.data().quote_lot_size = 100;
     pm.data().base_lot_size = 10;
     pm.data().stable_price_model.reset_to_price(price, 0);
+    pm.data().settle_pnl_limit_window_size_ts = 1;
     pm
 }

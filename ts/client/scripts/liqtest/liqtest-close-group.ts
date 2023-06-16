@@ -8,18 +8,17 @@ import { MANGO_V4_ID } from '../../src/constants';
 // example script to close accounts - banks, markets, group etc. which require admin to be the signer
 //
 
-// Use to close only a specific group by number. Use "all" to close all groups.
-const GROUP_NUM = process.env.GROUP_NUM;
+const GROUP_NUM = Number(process.env.GROUP_NUM || 200);
 
 const CLUSTER = process.env.CLUSTER || 'mainnet-beta';
 
 async function main() {
   const options = AnchorProvider.defaultOptions();
-  const connection = new Connection(process.env.MB_CLUSTER_URL!, options);
+  const connection = new Connection(process.env.CLUSTER_URL!, options);
 
   const admin = Keypair.fromSecretKey(
     Buffer.from(
-      JSON.parse(fs.readFileSync(process.env.MB_PAYER_KEYPAIR!, 'utf-8')),
+      JSON.parse(fs.readFileSync(process.env.PAYER_KEYPAIR!, 'utf-8')),
     ),
   );
   const adminWallet = new Wallet(admin);
@@ -36,13 +35,9 @@ async function main() {
   );
 
   const groups = await (async () => {
-    if (GROUP_NUM === 'all') {
-      return await client.getGroupsForCreator(admin.publicKey);
-    } else {
-      return [
-        await client.getGroupForCreator(admin.publicKey, Number(GROUP_NUM)),
-      ];
-    }
+    return [
+      await client.getGroupForCreator(admin.publicKey, Number(GROUP_NUM)),
+    ];
   })();
   for (const group of groups) {
     console.log(`Group ${group.publicKey}`);

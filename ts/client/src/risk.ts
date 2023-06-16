@@ -66,7 +66,6 @@ export async function computePriceImpactOnJup(
 
   try {
     const res = await response.json();
-
     if (res['data'] && res.data.length > 0 && res.data[0].outAmount) {
       return {
         outAmount: parseFloat(res.data[0].outAmount),
@@ -115,9 +114,6 @@ export async function getPriceImpactForLiqor(
       account: a,
       health: a.getHealth(group, HealthType.liquidationEnd),
       healthRatio: a.getHealthRatioUi(group, HealthType.liquidationEnd),
-      liabs: toUiDecimalsForQuote(
-        a.getLiabsValue(group, HealthType.liquidationEnd),
-      ),
     };
   });
 
@@ -315,9 +311,6 @@ export async function getPerpPositionsToBeLiquidated(
       account: a,
       health: a.getHealth(group, HealthType.liquidationEnd),
       healthRatio: a.getHealthRatioUi(group, HealthType.liquidationEnd),
-      liabs: toUiDecimalsForQuote(
-        a.getLiabsValue(group, HealthType.liquidationEnd),
-      ),
     };
   });
 

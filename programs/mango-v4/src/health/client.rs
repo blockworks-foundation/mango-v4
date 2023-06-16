@@ -27,7 +27,7 @@ impl HealthCache {
     ///
     /// Maybe talking about the collateralization ratio assets/liabs is more intuitive?
     pub fn health_ratio(&self, health_type: HealthType) -> I80F48 {
-        let (assets, liabs) = self.health_assets_and_liabs(health_type);
+        let (assets, liabs) = self.health_assets_and_liabs_stable_liabs(health_type);
         let hundred = I80F48::from(100);
         if liabs > 0 {
             // feel free to saturate to MAX for tiny liabs
@@ -152,8 +152,12 @@ impl HealthCache {
         let target = &self.token_infos[target_index];
 
         let (tokens_max_reserved, _) = self.compute_serum3_reservations(health_type);
-        let source_reserved = tokens_max_reserved[source_index];
-        let target_reserved = tokens_max_reserved[target_index];
+        let source_reserved = tokens_max_reserved[source_index].max_serum_reserved;
+        let target_reserved = tokens_max_reserved[target_index].max_serum_reserved;
+
+        let token_balances = self.effective_token_balances(health_type);
+        let source_balance = token_balances[source_index].spot_and_perp;
+        let target_balance = token_balances[target_index].spot_and_perp;
 
         // If the price is sufficiently good, then health will just increase from swapping:
         // once we've swapped enough, swapping x reduces health by x * source_liab_weight and
@@ -194,8 +198,8 @@ impl HealthCache {
         // The first thing we do is to find this maximum.
         let (amount_for_max_value, max_value) = {
             // The largest amount that the maximum could be at
-            let rightmost = (source.balance_native.abs() + source_reserved)
-                .max((target.balance_native.abs() + target_reserved) / price);
+            let rightmost = (source_balance.abs() + source_reserved)
+                .max((target_balance.abs() + target_reserved) / price);
             find_maximum(
                 I80F48::ZERO,
                 rightmost,
@@ -279,20 +283,24 @@ impl HealthCache {
 
         let perp_info_index = self.perp_info_index(perp_market_index)?;
         let perp_info = &self.perp_infos[perp_info_index];
-        let prices = &perp_info.prices;
+        let prices = &perp_info.base_prices;
         let base_lot_size = I80F48::from(perp_info.base_lot_size);
 
+        let settle_info_index = self.token_info_index(perp_info.settle_token_index)?;
+        let settle_info = &self.token_infos[settle_info_index];
+
         // If the price is sufficiently good then health will just increase from trading.
-        // It's ok to ignore the pnl_asset_weight here because we'll jump out early if this
-        // slope is >=0, and the extra asset weight would just decrease it.
-        let final_health_slope = if direction == 1 {
+        // It's ok to ignore the overall_asset_weight and token asset weight here because
+        // we'll jump out early if this slope is >=0, and those weights would just decrease it.
+        let mut final_health_slope = if direction == 1 {
             perp_info.init_base_asset_weight * prices.asset(health_type) - price
         } else {
-            price - perp_info.init_base_liab_weight * prices.liab(health_type)
+            -perp_info.init_base_liab_weight * prices.liab(health_type) + price
         };
         if final_health_slope >= 0 {
             return Ok(i64::MAX);
         }
+        final_health_slope *= settle_info.liab_weighted_price(health_type);
 
         let cache_after_trade = |base_lots: i64| -> Result<HealthCache> {
             let mut adjusted_cache = self.clone();
@@ -302,7 +310,7 @@ impl HealthCache {
             Ok(adjusted_cache)
         };
         let health_ratio_after_trade =
-            |base_lots: i64| Ok(cache_after_trade(base_lots)?.health_ratio(HealthType::Init));
+            |base_lots: i64| Ok(cache_after_trade(base_lots)?.health_ratio(health_type));
         let health_ratio_after_trade_trunc =
             |base_lots: I80F48| health_ratio_after_trade(base_lots.round_to_zero().to_num());
 
@@ -336,22 +344,29 @@ impl HealthCache {
             // Need to figure out how many lots to trade to reach zero health (zero_health_amount).
             // We do this by looking at the starting health and the health slope per
             // traded base lot (final_health_slope).
-            let start_cache = cache_after_trade(case1_start)?;
-            let start_health = start_cache.health(HealthType::Init);
+            let mut start_cache = cache_after_trade(case1_start)?;
+            // The perp market's contribution to the health above may be capped. But we need to trade
+            // enough to fully reduce any positive-pnl buffer. Thus get the uncapped health by fixing
+            // the overall weight.
+            start_cache.perp_infos[perp_info_index].init_overall_asset_weight = I80F48::ONE;
+            // We don't want to deal with slope changes due to settle token assets being
+            // reduced first, so modify the weights to use settle token liab scaling everywhere.
+            // That way the final_health_slope is applicable from the start.
+            {
+                let settle_info = &mut start_cache.token_infos[settle_info_index];
+                settle_info.init_asset_weight = settle_info.init_liab_weight;
+                settle_info.init_scaled_asset_weight = settle_info.init_scaled_liab_weight;
+            }
+            let start_health = start_cache.health(health_type);
             if start_health <= 0 {
                 return Ok(0);
             }
 
-            // The perp market's contribution to the health above may be capped. But we need to trade
-            // enough to fully reduce any positive-pnl buffer. Thus get the uncapped health:
-            let perp_info = &start_cache.perp_infos[perp_info_index];
-            let start_health_uncapped = start_health
-                - perp_info.health_contribution(HealthType::Init)
-                + perp_info.unweighted_health_contribution(HealthType::Init);
             // We add 1 here because health is computed for truncated base_lots and we want to guarantee
-            // zero_health_ratio <= 0.
+            // zero_health_ratio <= 0. Similarly, scale down the per-lot slope slightly for a benign
+            // overestimation that guards against rounding issues.
             let zero_health_amount = case1_start_i80f48
-                - start_health_uncapped / final_health_slope / base_lot_size
+                - start_health / (final_health_slope * base_lot_size * I80F48::from_num(0.99))
                 + I80F48::ONE;
             let zero_health_ratio = health_ratio_after_trade_trunc(zero_health_amount)?;
             assert!(zero_health_ratio <= 0);
@@ -397,6 +412,8 @@ impl HealthCache {
         // positions for the source and target token index.
         let token_info_index = find_token_info_index(&self.token_infos, bank.token_index)?;
         let token = &self.token_infos[token_info_index];
+        let token_balance =
+            self.effective_token_balances(health_type)[token_info_index].spot_and_perp;
 
         let cache_after_borrow = |amount: I80F48| -> Result<HealthCache> {
             let now_ts = system_epoch_secs();
@@ -421,7 +438,7 @@ impl HealthCache {
 
         // At most withdraw all deposits plus enough borrows to bring health to zero
         // (ensure this works with zero asset weight)
-        let limit = token.balance_native.max(I80F48::ZERO)
+        let limit = token_balance.max(I80F48::ZERO)
             + self.health(health_type).max(I80F48::ZERO) / token.init_scaled_liab_weight;
         if limit <= 0 {
             return Ok(I80F48::ZERO);
@@ -621,7 +638,28 @@ mod tests {
             init_liab_weight: I80F48::from_num(1.0 + x),
             init_scaled_liab_weight: I80F48::from_num(1.0 + x),
             prices: Prices::new_single_price(I80F48::from_num(price)),
-            balance_native: I80F48::ZERO,
+            balance_spot: I80F48::ZERO,
+        }
+    }
+
+    fn default_perp_info(x: f64) -> PerpInfo {
+        PerpInfo {
+            perp_market_index: 0,
+            settle_token_index: 0,
+            maint_base_asset_weight: I80F48::from_num(1.0 - x),
+            init_base_asset_weight: I80F48::from_num(1.0 - x),
+            maint_base_liab_weight: I80F48::from_num(1.0 + x),
+            init_base_liab_weight: I80F48::from_num(1.0 + x),
+            maint_overall_asset_weight: I80F48::from_num(0.6),
+            init_overall_asset_weight: I80F48::from_num(0.6),
+            base_lot_size: 1,
+            base_lots: 0,
+            bids_base_lots: 0,
+            asks_base_lots: 0,
+            quote: I80F48::ZERO,
+            base_prices: Prices::new_single_price(I80F48::from_num(2.0)),
+            has_open_orders: false,
+            has_open_fills: false,
         }
     }
 
@@ -683,7 +721,7 @@ mod tests {
 
         let adjust_by_usdc = |c: &mut HealthCache, ti: TokenIndex, usdc: f64| {
             let ti = &mut c.token_infos[ti as usize];
-            ti.balance_native += I80F48::from_num(usdc) / ti.prices.oracle;
+            ti.balance_spot += I80F48::from_num(usdc) / ti.prices.oracle;
         };
         let find_max_swap_actual = |c: &HealthCache,
                                     source: TokenIndex,
@@ -900,8 +938,8 @@ mod tests {
                 println!("test 6 {test_name}");
                 let mut health_cache = health_cache.clone();
                 health_cache.serum3_infos = vec![Serum3Info {
-                    base_index: 1,
-                    quote_index: 0,
+                    base_info_index: 1,
+                    quote_info_index: 0,
                     market_index: 0,
                     reserved_base: I80F48::from(30 / 3),
                     reserved_quote: I80F48::from(30 / 2),
@@ -980,39 +1018,54 @@ mod tests {
                     }
                 }
             }
+
+            {
+                // swap while influenced by a perp market
+                println!("test 10 {test_name}");
+                let mut health_cache = health_cache.clone();
+                health_cache.perp_infos.push(PerpInfo {
+                    perp_market_index: 0,
+                    settle_token_index: 1,
+                    ..default_perp_info(0.3)
+                });
+                adjust_by_usdc(&mut health_cache, 0, 60.0);
+
+                for perp_quote in [-10, 10] {
+                    health_cache.perp_infos[0].quote = I80F48::from_num(perp_quote);
+                    for price_factor in [0.9, 1.1] {
+                        for target in 1..100 {
+                            let target = target as f64;
+                            check(&health_cache, 0, 1, target, price_factor, banks);
+                            check(&health_cache, 1, 0, target, price_factor, banks);
+                        }
+                    }
+                }
+            }
         }
     }
 
     #[test]
     fn test_max_perp() {
         let base_lot_size = 100;
-        let default_perp_info = |x| PerpInfo {
-            perp_market_index: 0,
-            maint_base_asset_weight: I80F48::from_num(1.0 - x),
-            init_base_asset_weight: I80F48::from_num(1.0 - x),
-            maint_base_liab_weight: I80F48::from_num(1.0 + x),
-            init_base_liab_weight: I80F48::from_num(1.0 + x),
-            maint_overall_asset_weight: I80F48::from_num(0.6),
-            init_overall_asset_weight: I80F48::from_num(0.6),
-            base_lot_size,
-            base_lots: 0,
-            bids_base_lots: 0,
-            asks_base_lots: 0,
-            quote: I80F48::ZERO,
-            prices: Prices::new_single_price(I80F48::from_num(2.0)),
-            has_open_orders: false,
-            has_open_fills: false,
-        };
 
         let health_cache = HealthCache {
-            token_infos: vec![TokenInfo {
-                token_index: 0,
-                balance_native: I80F48::ZERO,
-                ..default_token_info(0.0, 1.0)
-            }],
+            token_infos: vec![
+                TokenInfo {
+                    token_index: 0,
+                    balance_spot: I80F48::ZERO,
+                    ..default_token_info(0.0, 1.0)
+                },
+                TokenInfo {
+                    token_index: 1,
+                    balance_spot: I80F48::ZERO,
+                    ..default_token_info(0.2, 1.5)
+                },
+            ],
             serum3_infos: vec![],
             perp_infos: vec![PerpInfo {
                 perp_market_index: 0,
+                settle_token_index: 1,
+                base_lot_size,
                 ..default_perp_info(0.3)
             }],
             being_liquidated: false,
@@ -1032,13 +1085,13 @@ mod tests {
             I80F48::ZERO
         );
 
-        let adjust_token = |c: &mut HealthCache, value: f64| {
-            let ti = &mut c.token_infos[0];
-            ti.balance_native += I80F48::from_num(value);
+        let adjust_token = |c: &mut HealthCache, info_index: usize, value: f64| {
+            let ti = &mut c.token_infos[info_index];
+            ti.balance_spot += I80F48::from_num(value);
         };
         let find_max_trade =
             |c: &HealthCache, side: PerpOrderSide, ratio: f64, price_factor: f64| {
-                let prices = &c.perp_infos[0].prices;
+                let prices = &c.perp_infos[0].base_prices;
                 let trade_price = I80F48::from_num(price_factor) * prices.oracle;
                 let base_lots = c
                     .max_perp_for_health_ratio(0, trade_price, side, I80F48::from_num(ratio))
@@ -1088,18 +1141,24 @@ mod tests {
 
         {
             let mut health_cache = health_cache.clone();
-            adjust_token(&mut health_cache, 3000.0);
+            adjust_token(&mut health_cache, 0, 3000.0);
 
-            for existing in [-5, 0, 3] {
+            for existing_settle in [-500.0, 0.0, 300.0] {
                 let mut c = health_cache.clone();
-                c.perp_infos[0].base_lots += existing;
-                c.perp_infos[0].quote -= I80F48::from(existing * base_lot_size * 2);
+                adjust_token(&mut c, 1, existing_settle);
+                for existing_lots in [-5, 0, 3] {
+                    let mut c = c.clone();
+                    c.perp_infos[0].base_lots += existing_lots;
+                    c.perp_infos[0].quote -= I80F48::from(existing_lots * base_lot_size * 2);
 
-                for side in [PerpOrderSide::Bid, PerpOrderSide::Ask] {
-                    println!("test 0: existing {existing}, side {side:?}");
-                    for price_factor in [0.8, 1.0, 1.1] {
-                        for ratio in 1..=100 {
-                            check_max_trade(&c, side, ratio as f64, price_factor);
+                    for side in [PerpOrderSide::Bid, PerpOrderSide::Ask] {
+                        println!(
+                            "test 0: lots {existing_lots}, settle {existing_settle}, side {side:?}"
+                        );
+                        for price_factor in [0.8, 1.0, 1.1] {
+                            for ratio in 1..=100 {
+                                check_max_trade(&c, side, ratio as f64, price_factor);
+                            }
                         }
                     }
                 }
@@ -1128,11 +1187,11 @@ mod tests {
 
         let group = Pubkey::new_unique();
 
-        let (mut bank1, mut oracle1) = mock_bank_and_oracle(group, 1, 1.0, 0.2, 0.1);
+        let (mut bank1, mut oracle1) = mock_bank_and_oracle(group, 0, 1.0, 0.2, 0.1);
         bank1
             .data()
             .change_without_fee(
-                account.ensure_token_position(1).unwrap().0,
+                account.ensure_token_position(0).unwrap().0,
                 I80F48::from(100),
                 DUMMY_NOW_TS,
             )
@@ -1140,7 +1199,7 @@ mod tests {
 
         let mut perp1 = mock_perp_market(group, oracle1.pubkey, 1.0, 9, (0.2, 0.1), (0.05, 0.02));
         perp1.data().long_funding = I80F48::from_num(10.1);
-        let perpaccount = account.ensure_perp_position(9, 1).unwrap().0;
+        let perpaccount = account.ensure_perp_position(9, 0).unwrap().0;
         perpaccount.record_trade(perp1.data(), 10, I80F48::from(-110));
         perpaccount.long_settled_funding = I80F48::from_num(10.0);
 
@@ -1157,13 +1216,13 @@ mod tests {
         assert!(health_eq(
             compute_health(&account.borrow(), HealthType::Init, &retriever).unwrap(),
             // token
-            0.8 * 100.0
+            0.8 * (100.0
             // perp base
             + 0.8 * 100.0
             // perp quote
             - 110.0
             // perp funding (10 * (10.1 - 10.0))
-            - 1.0
+            - 1.0)
         ));
     }
 
@@ -1209,12 +1268,12 @@ mod tests {
 
         let group = Pubkey::new_unique();
 
-        let (mut bank1, mut oracle1) = mock_bank_and_oracle(group, 1, 1.0, 0.2, 0.1);
+        let (mut bank1, mut oracle1) = mock_bank_and_oracle(group, 0, 1.0, 0.2, 0.1);
         bank1.data().stable_price_model.stable_price = 0.5;
         bank1
             .data()
             .change_without_fee(
-                account.ensure_token_position(1).unwrap().0,
+                account.ensure_token_position(0).unwrap().0,
                 I80F48::from(100),
                 DUMMY_NOW_TS,
             )
@@ -1222,7 +1281,7 @@ mod tests {
         bank1
             .data()
             .change_without_fee(
-                account2.ensure_token_position(1).unwrap().0,
+                account2.ensure_token_position(0).unwrap().0,
                 I80F48::from(-100),
                 DUMMY_NOW_TS,
             )
@@ -1230,7 +1289,7 @@ mod tests {
 
         let mut perp1 = mock_perp_market(group, oracle1.pubkey, 1.0, 9, (0.2, 0.1), (0.05, 0.02));
         perp1.data().stable_price_model.stable_price = 0.5;
-        let perpaccount = account3.ensure_perp_position(9, 1).unwrap().0;
+        let perpaccount = account3.ensure_perp_position(9, 0).unwrap().0;
         perpaccount.record_trade(perp1.data(), 10, I80F48::from(-100));
 
         let oracle1_ai = oracle1.as_account_info();
@@ -1261,11 +1320,11 @@ mod tests {
         ));
         assert!(health_eq(
             compute_health(&account3.borrow(), HealthType::Init, &retriever).unwrap(),
-            0.8 * 0.5 * 10.0 * 10.0 - 100.0
+            1.2 * (0.8 * 0.5 * 10.0 * 10.0 - 100.0)
         ));
         assert!(health_eq(
             compute_health(&account3.borrow(), HealthType::Maint, &retriever).unwrap(),
-            0.9 * 1.0 * 10.0 * 10.0 - 100.0
+            1.1 * (0.9 * 1.0 * 10.0 * 10.0 - 100.0)
         ));
     }
 
@@ -1312,13 +1371,13 @@ mod tests {
             // compute the health ratio we'd get when executing the trade
             let actual_ratio = {
                 let mut c = c.clone();
-                c.token_infos[0].balance_native -= max_borrow;
+                c.token_infos[0].balance_spot -= max_borrow;
                 c.health_ratio(HealthType::Init).to_num::<f64>()
             };
             // the ratio for borrowing one native token extra
             let plus_ratio = {
                 let mut c = c.clone();
-                c.token_infos[0].balance_native -= max_borrow + I80F48::ONE;
+                c.token_infos[0].balance_spot -= max_borrow + I80F48::ONE;
                 c.health_ratio(HealthType::Init).to_num::<f64>()
             };
             (max_borrow, actual_ratio, plus_ratio)
@@ -1339,31 +1398,82 @@ mod tests {
 
         {
             let mut health_cache = health_cache.clone();
-            health_cache.token_infos[0].balance_native = I80F48::from_num(100.0);
+            health_cache.token_infos[0].balance_spot = I80F48::from_num(100.0);
             assert_eq!(check_max_borrow(&health_cache, 50.0), 100.0);
         }
         {
             let mut health_cache = health_cache.clone();
-            health_cache.token_infos[1].balance_native = I80F48::from_num(50.0); // price 2, so 2*50*0.8 = 80 health
+            health_cache.token_infos[1].balance_spot = I80F48::from_num(50.0); // price 2, so 2*50*0.8 = 80 health
             check_max_borrow(&health_cache, 100.0);
             check_max_borrow(&health_cache, 50.0);
             check_max_borrow(&health_cache, 0.0);
         }
         {
             let mut health_cache = health_cache.clone();
-            health_cache.token_infos[0].balance_native = I80F48::from_num(50.0);
-            health_cache.token_infos[1].balance_native = I80F48::from_num(50.0);
+            health_cache.token_infos[0].balance_spot = I80F48::from_num(50.0);
+            health_cache.token_infos[1].balance_spot = I80F48::from_num(50.0);
             check_max_borrow(&health_cache, 100.0);
             check_max_borrow(&health_cache, 50.0);
             check_max_borrow(&health_cache, 0.0);
         }
         {
             let mut health_cache = health_cache.clone();
-            health_cache.token_infos[0].balance_native = I80F48::from_num(-50.0);
-            health_cache.token_infos[1].balance_native = I80F48::from_num(50.0);
+            health_cache.token_infos[0].balance_spot = I80F48::from_num(-50.0);
+            health_cache.token_infos[1].balance_spot = I80F48::from_num(50.0);
             check_max_borrow(&health_cache, 100.0);
             check_max_borrow(&health_cache, 50.0);
             check_max_borrow(&health_cache, 0.0);
+        }
+    }
+
+    #[test]
+    fn test_assets_and_borrows() {
+        let health_cache = HealthCache {
+            token_infos: vec![
+                TokenInfo {
+                    token_index: 0,
+                    ..default_token_info(0.0, 1.0)
+                },
+                TokenInfo {
+                    token_index: 1,
+                    ..default_token_info(0.2, 2.0)
+                },
+            ],
+            serum3_infos: vec![],
+            perp_infos: vec![PerpInfo {
+                perp_market_index: 0,
+                settle_token_index: 0,
+                ..default_perp_info(0.3)
+            }],
+            being_liquidated: false,
+        };
+
+        {
+            let mut hc = health_cache.clone();
+            hc.token_infos[1].balance_spot = I80F48::from(10);
+            hc.perp_infos[0].quote = I80F48::from(-12);
+
+            let (assets, liabs) = hc.health_assets_and_liabs_stable_assets(HealthType::Init);
+            assert!((assets.to_num::<f64>() - 2.0 * 10.0 * 0.8) < 0.01);
+            assert!((liabs.to_num::<f64>() - 2.0 * (10.0 * 0.8 + 2.0 * 1.2)) < 0.01);
+
+            let (assets, liabs) = hc.health_assets_and_liabs_stable_liabs(HealthType::Init);
+            assert!((liabs.to_num::<f64>() - 2.0 * 12.0 * 1.2) < 0.01);
+            assert!((assets.to_num::<f64>() - 2.0 * 10.0 * 1.2) < 0.01);
+        }
+
+        {
+            let mut hc = health_cache.clone();
+            hc.token_infos[1].balance_spot = I80F48::from(12);
+            hc.perp_infos[0].quote = I80F48::from(-10);
+
+            let (assets, liabs) = hc.health_assets_and_liabs_stable_assets(HealthType::Init);
+            assert!((assets.to_num::<f64>() - 2.0 * 12.0 * 0.8) < 0.01);
+            assert!((liabs.to_num::<f64>() - 2.0 * 10.0 * 0.8) < 0.01);
+
+            let (assets, liabs) = hc.health_assets_and_liabs_stable_liabs(HealthType::Init);
+            assert!((liabs.to_num::<f64>() - 2.0 * 10.0 * 1.2) < 0.01);
+            assert!((assets.to_num::<f64>() - 2.0 * (10.0 * 1.2 + 2.0 * 0.8)) < 0.01);
         }
     }
 }

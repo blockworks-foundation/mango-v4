@@ -32,8 +32,11 @@ pub struct PerpLiqBaseOrPositivePnl<'info> {
     )]
     pub liqee: AccountLoader<'info, MangoAccountFixed>,
 
-    // bank correctness is checked at #2
-    #[account(mut, has_one = group)]
+    #[account(
+        mut,
+        has_one = group,
+        constraint = settle_bank.load()?.token_index == perp_market.load()?.settle_token_index @ MangoError::InvalidBank
+    )]
     pub settle_bank: AccountLoader<'info, Bank>,
 
     #[account(
