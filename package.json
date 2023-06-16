@@ -58,7 +58,7 @@
     "trailingComma": "all"
   },
   "dependencies": {
-    "@coral-xyz/anchor": "^0.26.0",
+    "@coral-xyz/anchor": "^0.27.0",
     "@project-serum/serum": "0.13.65",
     "@pythnetwork/client": "~2.14.0",
     "@solana/spl-token": "0.3.7",
@@ -72,7 +72,7 @@
     "node-kraken-api": "^2.2.2"
   },
   "resolutions": {
-    "@coral-xyz/anchor": "^0.26.0"
+    "@coral-xyz/anchor": "^0.27.0"
   },
   "license": "MIT"
 }
