@@ -2867,7 +2867,7 @@ export class MangoClient {
      */
     const inputTokenAccountPk = await getAssociatedTokenAddress(
       inputBank.mint,
-      mangoAccount.owner,
+      mangoAccount.delegate,
     );
     const inputTokenAccExists =
       await this.program.provider.connection.getAccountInfo(
@@ -2877,8 +2877,8 @@ export class MangoClient {
     if (!inputTokenAccExists) {
       preInstructions.push(
         await createAssociatedTokenAccountIdempotentInstruction(
-          mangoAccount.owner,
-          mangoAccount.owner,
+          mangoAccount.delegate,
+          mangoAccount.delegate,
           inputBank.mint,
         ),
       );
@@ -2886,7 +2886,7 @@ export class MangoClient {
 
     const outputTokenAccountPk = await getAssociatedTokenAddress(
       outputBank.mint,
-      mangoAccount.owner,
+      mangoAccount.delegate,
     );
     const outputTokenAccExists =
       await this.program.provider.connection.getAccountInfo(
@@ -2895,8 +2895,8 @@ export class MangoClient {
     if (!outputTokenAccExists) {
       preInstructions.push(
         await createAssociatedTokenAccountIdempotentInstruction(
-          mangoAccount.owner,
-          mangoAccount.owner,
+          mangoAccount.delegate,
+          mangoAccount.delegate,
           outputBank.mint,
         ),
       );
@@ -2942,6 +2942,7 @@ export class MangoClient {
       .flashLoanEndV2(2, flashLoanType)
       .accounts({
         account: mangoAccount.publicKey,
+        owner: (this.program.provider as AnchorProvider).wallet.publicKey,
       })
       .remainingAccounts([
         ...parsedHealthAccounts,
