@@ -2471,7 +2471,7 @@ export class MangoClient {
       .instruction();
   }
 
-  public async perpPlaceOrderPegged2Ix(
+  public async perpPlaceOrderPeggedV2Ix(
     group: Group,
     mangoAccount: MangoAccount,
     perpMarketIndex: PerpMarketIndex,
