@@ -78,13 +78,9 @@ async function x(): Promise<void> {
       mangoAccount: await client.getMangoAccount(
         new PublicKey(MANGO_ACCOUNT_PK!),
       ),
-      inputMintPk: new PublicKey(
-        'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v',
-      ),
+      inputMintPk: usdcMint,
       amountIn: 1,
-      outputMintPk: new PublicKey(
-        'So11111111111111111111111111111111111111112',
-      ),
+      outputMintPk: wsolMint,
       userDefinedInstructions: ixs,
       userDefinedAlts: alts,
       flashLoanType: { swap: {} },
