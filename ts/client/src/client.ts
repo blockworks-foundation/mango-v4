@@ -1,4 +1,10 @@
-import { AnchorProvider, BN, Program, Provider } from '@coral-xyz/anchor';
+import {
+  AnchorProvider,
+  BN,
+  Program,
+  Provider,
+  Wallet,
+} from '@coral-xyz/anchor';
 import {
   createCloseAccountInstruction,
   createInitializeAccount3Instruction,
@@ -54,7 +60,7 @@ import {
   TokenEditParams,
   buildIxGate,
 } from './clientIxParamBuilder';
-import { OPENBOOK_PROGRAM_ID, RUST_U64_MAX } from './constants';
+import { MANGO_V4_ID, OPENBOOK_PROGRAM_ID, RUST_U64_MAX } from './constants';
 import { Id } from './ids';
 import { IDL, MangoV4 } from './mango_v4';
 import { I80F48 } from './numbers/I80F48';
@@ -3059,6 +3065,35 @@ export class MangoClient {
       programId,
       cluster,
       opts,
+    );
+  }
+
+  /**
+   * Connect with defaults,
+   *  - random ephemeral keypair,
+   *  - fetch ids using gPa
+   *  - connects to mainnet-beta
+   *  - uses well known program Id
+   * @param clusterUrl
+   * @returns
+   */
+  static connectDefault(clusterUrl: string): MangoClient {
+    const idl = IDL;
+
+    const options = AnchorProvider.defaultOptions();
+    const connection = new Connection(clusterUrl, options);
+
+    return new MangoClient(
+      new Program<MangoV4>(
+        idl as MangoV4,
+        MANGO_V4_ID['mainnet-beta'],
+        new AnchorProvider(connection, new Wallet(new Keypair()), options),
+      ),
+      MANGO_V4_ID['mainnet-beta'],
+      'mainnet-beta' as Cluster,
+      {
+        idsSource: 'get-program-accounts',
+      },
     );
   }
 

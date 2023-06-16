@@ -71,5 +71,8 @@
     "dotenv": "^16.0.3",
     "node-kraken-api": "^2.2.2"
   },
+  "resolutions": {
+    "@coral-xyz/anchor": "^0.26.0"
+  },
   "license": "MIT"
 }
