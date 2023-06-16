@@ -9055,6 +9055,50 @@ export type MangoV4 = {
       ]
     },
     {
+      "name": "WithdrawLoanLog",
+      "fields": [
+        {
+          "name": "mangoGroup",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "mangoAccount",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "tokenIndex",
+          "type": "u16",
+          "index": false
+        },
+        {
+          "name": "loanAmount",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "loanOriginationFee",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "instruction",
+          "type": {
+            "defined": "LoanOriginationFeeInstruction"
+          },
+          "index": false
+        },
+        {
+          "name": "price",
+          "type": {
+            "option": "i128"
+          },
+          "index": false
+        }
+      ]
+    },
+    {
       "name": "TokenLiqBankruptcyLog",
       "fields": [
         {
@@ -9749,7 +9793,7 @@ export type MangoV4 = {
     {
       "code": 6007,
       "name": "HealthMustBePositiveOrIncrease",
-      "msg": "health must be positive or increase"
+      "msg": "health must be positive or not decrease"
     },
     {
       "code": 6008,
@@ -19016,6 +19060,50 @@ export const IDL: MangoV4 = {
       ]
     },
     {
+      "name": "WithdrawLoanLog",
+      "fields": [
+        {
+          "name": "mangoGroup",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "mangoAccount",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "tokenIndex",
+          "type": "u16",
+          "index": false
+        },
+        {
+          "name": "loanAmount",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "loanOriginationFee",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "instruction",
+          "type": {
+            "defined": "LoanOriginationFeeInstruction"
+          },
+          "index": false
+        },
+        {
+          "name": "price",
+          "type": {
+            "option": "i128"
+          },
+          "index": false
+        }
+      ]
+    },
+    {
       "name": "TokenLiqBankruptcyLog",
       "fields": [
         {
@@ -19710,7 +19798,7 @@ export const IDL: MangoV4 = {
     {
       "code": 6007,
       "name": "HealthMustBePositiveOrIncrease",
-      "msg": "health must be positive or increase"
+      "msg": "health must be positive or not decrease"
     },
     {
       "code": 6008,

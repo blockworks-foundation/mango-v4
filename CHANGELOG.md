@@ -37,6 +37,7 @@ Update this for each program release and mainnet deployment.
 - Improve logging of loans (#599, #603)
 - Pyth oracle status is checked (#607)
 - Fixes to the inactive fee buyback feature (#608)
+- Fix token force close to respect the reduce-only flag (#613)
 - Improve docs (#590, #594)
 - Use workspace dependencies (#588)
 
