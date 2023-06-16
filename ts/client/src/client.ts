@@ -45,6 +45,7 @@ import {
   PerpMarketIndex,
   PerpOrderSide,
   PerpOrderType,
+  PerpSelfTradeBehavior,
 } from './accounts/perp';
 import {
   MarketIndex,
@@ -2243,7 +2244,7 @@ export class MangoClient {
     expiryTimestamp?: number,
     limit?: number,
   ): Promise<TransactionSignature> {
-    const ix = await this.perpPlaceOrderIx(
+    const ix = await this.perpPlaceOrderV2Ix(
       group,
       mangoAccount,
       perpMarketIndex,
@@ -2253,6 +2254,7 @@ export class MangoClient {
       maxQuoteQuantity,
       clientOrderId,
       orderType,
+      PerpSelfTradeBehavior.decrementTake,
       reduceOnly,
       expiryTimestamp,
       limit,
@@ -2317,6 +2319,64 @@ export class MangoClient {
       .instruction();
   }
 
+  public async perpPlaceOrderV2Ix(
+    group: Group,
+    mangoAccount: MangoAccount,
+    perpMarketIndex: PerpMarketIndex,
+    side: PerpOrderSide,
+    price: number,
+    quantity: number,
+    maxQuoteQuantity?: number,
+    clientOrderId?: number,
+    orderType?: PerpOrderType,
+    selfTradeBehavior?: PerpSelfTradeBehavior,
+    reduceOnly?: boolean,
+    expiryTimestamp?: number,
+    limit?: number,
+  ): Promise<TransactionInstruction> {
+    const perpMarket = group.getPerpMarketByMarketIndex(perpMarketIndex);
+    const healthRemainingAccounts: PublicKey[] =
+      this.buildHealthRemainingAccounts(
+        group,
+        [mangoAccount],
+        // Settlement token bank, because a position for it may be created
+        [group.getFirstBankForPerpSettlement()],
+        [perpMarket],
+      );
+    return await this.program.methods
+      .perpPlaceOrderV2(
+        side,
+        perpMarket.uiPriceToLots(price),
+        perpMarket.uiBaseToLots(quantity),
+        maxQuoteQuantity
+          ? perpMarket.uiQuoteToLots(maxQuoteQuantity)
+          : I64_MAX_BN,
+        new BN(clientOrderId ? clientOrderId : Date.now()),
+        orderType ?? PerpOrderType.limit,
+        selfTradeBehavior ?? PerpSelfTradeBehavior.decrementTake,
+        reduceOnly ?? false,
+        new BN(expiryTimestamp ? expiryTimestamp : 0),
+        limit ?? 10,
+      )
+      .accounts({
+        group: group.publicKey,
+        account: mangoAccount.publicKey,
+        perpMarket: perpMarket.publicKey,
+        bids: perpMarket.bids,
+        asks: perpMarket.asks,
+        eventQueue: perpMarket.eventQueue,
+        oracle: perpMarket.oracle,
+        owner: (this.program.provider as AnchorProvider).wallet.publicKey,
+      })
+      .remainingAccounts(
+        healthRemainingAccounts.map(
+          (pk) =>
+            ({ pubkey: pk, isWritable: false, isSigner: false } as AccountMeta),
+        ),
+      )
+      .instruction();
+  }
+
   public async perpPlaceOrderPegged(
     group: Group,
     mangoAccount: MangoAccount,
@@ -2332,7 +2392,7 @@ export class MangoClient {
     expiryTimestamp?: number,
     limit?: number,
   ): Promise<TransactionSignature> {
-    const ix = await this.perpPlaceOrderPeggedIx(
+    const ix = await this.perpPlaceOrderPegged2Ix(
       group,
       mangoAccount,
       perpMarketIndex,
@@ -2343,6 +2403,7 @@ export class MangoClient {
       maxQuoteQuantity,
       clientOrderId,
       orderType,
+      PerpSelfTradeBehavior.decrementTake,
       reduceOnly,
       expiryTimestamp,
       limit,
@@ -2389,6 +2450,67 @@ export class MangoClient {
         reduceOnly ? reduceOnly : false,
         new BN(expiryTimestamp ?? 0),
         limit ? limit : 10,
+        -1,
+      )
+      .accounts({
+        group: group.publicKey,
+        account: mangoAccount.publicKey,
+        perpMarket: perpMarket.publicKey,
+        bids: perpMarket.bids,
+        asks: perpMarket.asks,
+        eventQueue: perpMarket.eventQueue,
+        oracle: perpMarket.oracle,
+        owner: (this.program.provider as AnchorProvider).wallet.publicKey,
+      })
+      .remainingAccounts(
+        healthRemainingAccounts.map(
+          (pk) =>
+            ({ pubkey: pk, isWritable: false, isSigner: false } as AccountMeta),
+        ),
+      )
+      .instruction();
+  }
+
+  public async perpPlaceOrderPegged2Ix(
+    group: Group,
+    mangoAccount: MangoAccount,
+    perpMarketIndex: PerpMarketIndex,
+    side: PerpOrderSide,
+    priceOffset: number,
+    quantity: number,
+    pegLimit?: number,
+    maxQuoteQuantity?: number,
+    clientOrderId?: number,
+    orderType?: PerpOrderType,
+    selfTradeBehavior?: PerpSelfTradeBehavior,
+    reduceOnly?: boolean,
+    expiryTimestamp?: number,
+    limit?: number,
+  ): Promise<TransactionInstruction> {
+    const perpMarket = group.getPerpMarketByMarketIndex(perpMarketIndex);
+    const healthRemainingAccounts: PublicKey[] =
+      this.buildHealthRemainingAccounts(
+        group,
+        [mangoAccount],
+        // Settlement token bank, because a position for it may be created
+        [group.getFirstBankForPerpSettlement()],
+        [perpMarket],
+      );
+    return await this.program.methods
+      .perpPlaceOrderPeggedV2(
+        side,
+        perpMarket.uiPriceToLots(priceOffset),
+        pegLimit ? perpMarket.uiPriceToLots(pegLimit) : new BN(-1),
+        perpMarket.uiBaseToLots(quantity),
+        maxQuoteQuantity
+          ? perpMarket.uiQuoteToLots(maxQuoteQuantity)
+          : I64_MAX_BN,
+        new BN(clientOrderId ?? Date.now()),
+        orderType ?? PerpOrderType.limit,
+        selfTradeBehavior ?? PerpSelfTradeBehavior.decrementTake,
+        reduceOnly ?? false,
+        new BN(expiryTimestamp ?? 0),
+        limit ?? 10,
         -1,
       )
       .accounts({
