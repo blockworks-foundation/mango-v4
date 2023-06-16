@@ -83,7 +83,10 @@ pub struct PerpMarket {
     pub maint_base_liab_weight: I80F48,
     pub init_base_liab_weight: I80F48,
 
-    /// Number of base lot pairs currently active in the market. Always >= 0.
+    /// Number of base lots currently active in the market. Always >= 0.
+    ///
+    /// Since this counts positive base lots and negative base lots, the more relevant
+    /// number of open base lot pairs is half this value.
     pub open_interest: i64,
 
     /// Total number of orders seen
