@@ -507,13 +507,14 @@ pub mod mango_v4 {
         Ok(())
     }
 
-    /// Settles all free funds from the OpenOrders account into the MangoAccount.
+    /// Deprecated instruction that used to settles all free funds from the OpenOrders account
+    /// into the MangoAccount.
     ///
     /// Any serum "referrer rebates" (ui fees) are considered Mango fees.
     pub fn serum3_settle_funds(ctx: Context<Serum3SettleFunds>) -> Result<()> {
-        #[cfg(feature = "enable-gpl")]
-        instructions::serum3_settle_funds(ctx.accounts, None, true)?;
-        Ok(())
+        Err(error_msg!(
+            "Serum3SettleFunds was replaced by Serum3SettleFundsV2"
+        ))
     }
 
     /// Like Serum3SettleFunds, but `fees_to_dao` determines if referrer rebates are considered fees

@@ -19,8 +19,8 @@ pub enum MangoError {
     InvalidFlashLoanTargetCpiProgram,
     #[msg("health must be positive")]
     HealthMustBePositive,
-    #[msg("health must be positive or increase")]
-    HealthMustBePositiveOrIncrease,
+    #[msg("health must be positive or not decrease")]
+    HealthMustBePositiveOrIncrease, // outdated name is kept for backwards compatibility
     #[msg("health must be negative")]
     HealthMustBeNegative,
     #[msg("the account is bankrupt")]

@@ -7,9 +7,7 @@ use anchor_spl::token;
 use fixed::types::I80F48;
 
 use crate::accounts_ix::*;
-use crate::logs::{
-    LoanOriginationFeeInstruction, TokenBalanceLog, WithdrawLoanOriginationFeeLog, WithdrawLog,
-};
+use crate::logs::{LoanOriginationFeeInstruction, TokenBalanceLog, WithdrawLoanLog, WithdrawLog};
 
 pub fn token_withdraw(ctx: Context<TokenWithdraw>, amount: u64, allow_borrow: bool) -> Result<()> {
     require_msg!(amount > 0, "withdraw amount must be positive");
@@ -65,7 +63,7 @@ pub fn token_withdraw(ctx: Context<TokenWithdraw>, amount: u64, allow_borrow: bo
     )?;
 
     // Update the bank and position
-    let (position_is_active, loan_origination_fee) = bank.withdraw_with_fee(
+    let withdraw_result = bank.withdraw_with_fee(
         position,
         amount_i80f48,
         Clock::get()?.unix_timestamp.try_into().unwrap(),
@@ -116,7 +114,7 @@ pub fn token_withdraw(ctx: Context<TokenWithdraw>, amount: u64, allow_borrow: bo
     // remaining_accounts for all banks/oracles, including the account that will now be
     // deactivated.
     //
-    if !position_is_active {
+    if !withdraw_result.position_is_active {
         account.deactivate_token_position_and_log(raw_token_index, ctx.accounts.account.key());
     }
 
@@ -129,13 +127,15 @@ pub fn token_withdraw(ctx: Context<TokenWithdraw>, amount: u64, allow_borrow: bo
         price: oracle_price.to_bits(),
     });
 
-    if loan_origination_fee.is_positive() {
-        emit!(WithdrawLoanOriginationFeeLog {
+    if withdraw_result.loan_origination_fee.is_positive() {
+        emit!(WithdrawLoanLog {
             mango_group: ctx.accounts.group.key(),
             mango_account: ctx.accounts.account.key(),
             token_index,
-            loan_origination_fee: loan_origination_fee.to_bits(),
+            loan_amount: withdraw_result.loan_amount.to_bits(),
+            loan_origination_fee: withdraw_result.loan_origination_fee.to_bits(),
             instruction: LoanOriginationFeeInstruction::TokenWithdraw,
+            price: Some(oracle_price.to_bits()),
         });
     }
 

@@ -24,7 +24,20 @@ Update this for each program release and mainnet deployment.
   PerpLiqNegativePnlOrBankruptcy was replaced by a new
   PerpLiqNegativePnlOrBankruptcyV2 instruction.
 
+- Allow reduce-only actions when init health is low (#592)
+
+  Previously when init health was negative, the program only allowed actions that
+  increased init health. Now it also accepts actions that keep init health the
+  same.
+
+  This is helpful for users because they now can place reducing limit orders on
+  the spot or perp orderbooks while their account has low health.
+
 - Whitelist PerpPlaceOrderV2 and PerpPlaceOrderPeggedV2 for HealthRegions (#597)
+- Improve logging of loans (#599, #603)
+- Pyth oracle status is checked (#607)
+- Fixes to the inactive fee buyback feature (#608)
+- Fix token force close to respect the reduce-only flag (#613)
 - Improve docs (#590, #594)
 - Use workspace dependencies (#588)
 

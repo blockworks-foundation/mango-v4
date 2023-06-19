@@ -56,6 +56,12 @@ pub fn token_force_close_borrows_with_token(
         // account constraint #2
         require!(liab_bank.is_force_close(), MangoError::TokenInForceClose);
 
+        // We might create asset borrows, so forbid asset tokens that don't allow them.
+        require!(
+            !asset_bank.are_borrows_reduce_only(),
+            MangoError::TokenInReduceOnlyMode
+        );
+
         // account constraint #3
         // only allow combination of asset and liab token,
         // where liqee's health would be guaranteed to not decrease
@@ -98,7 +104,7 @@ pub fn token_force_close_borrows_with_token(
             liab_bank.deposit_with_dusting(liqee_liab_position, liab_transfer, now_ts)?;
         let liqee_liab_indexed_position = liqee_liab_position.indexed_position;
 
-        let (liqor_liab_active, loan_origination_fee) =
+        let liqor_liab_withdraw_result =
             liab_bank.withdraw_with_fee(liqor_liab_position, liab_transfer, now_ts)?;
         let liqor_liab_indexed_position = liqor_liab_position.indexed_position;
         let liqee_liab_native_after = liqee_liab_position.native(liab_bank);
@@ -174,6 +180,12 @@ pub fn token_force_close_borrows_with_token(
             fee_factor: fee_factor.to_bits(),
         });
 
+        // liqor should never have a borrow
+        require!(
+            liqor_liab_withdraw_result.loan_amount.is_zero(),
+            MangoError::SomeError
+        );
+
         let liqee_health_cache = new_health_cache(&liqee.borrow(), &mut account_retriever)
             .context("create liqee health cache")?;
         let liqee_liq_end_health = liqee_health_cache.health(HealthType::LiquidationEnd);
@@ -191,7 +203,7 @@ pub fn token_force_close_borrows_with_token(
         if !liqor_asset_active {
             liqor.deactivate_token_position_and_log(liqor_asset_raw_index, liqor_key);
         }
-        if !liqor_liab_active {
+        if !liqor_liab_withdraw_result.position_is_active {
             liqor.deactivate_token_position_and_log(liqor_liab_raw_index, liqor_key)
         }
     };

@@ -1,4 +1,10 @@
-import { AnchorProvider, BN, Program, Provider } from '@coral-xyz/anchor';
+import {
+  AnchorProvider,
+  BN,
+  Program,
+  Provider,
+  Wallet,
+} from '@coral-xyz/anchor';
 import {
   createCloseAccountInstruction,
   createInitializeAccount3Instruction,
@@ -39,6 +45,7 @@ import {
   PerpMarketIndex,
   PerpOrderSide,
   PerpOrderType,
+  PerpSelfTradeBehavior,
 } from './accounts/perp';
 import {
   MarketIndex,
@@ -54,7 +61,7 @@ import {
   TokenEditParams,
   buildIxGate,
 } from './clientIxParamBuilder';
-import { OPENBOOK_PROGRAM_ID, RUST_U64_MAX } from './constants';
+import { MANGO_V4_ID, OPENBOOK_PROGRAM_ID, RUST_U64_MAX } from './constants';
 import { Id } from './ids';
 import { IDL, MangoV4 } from './mango_v4';
 import { I80F48 } from './numbers/I80F48';
@@ -1768,48 +1775,11 @@ export class MangoClient {
       );
     }
 
-    const serum3Market = group.serum3MarketsMapByExternal.get(
-      externalMarketPk.toBase58(),
-    )!;
-    const serum3MarketExternal = group.serum3ExternalMarketsMap.get(
-      externalMarketPk.toBase58(),
-    )!;
-
-    const [serum3MarketExternalVaultSigner, openOrderPublicKey] =
-      await Promise.all([
-        generateSerum3MarketExternalVaultSignerAddress(
-          this.cluster,
-          serum3Market,
-          serum3MarketExternal,
-        ),
-        serum3Market.findOoPda(this.program.programId, mangoAccount.publicKey),
-      ]);
-
-    const ix = await this.program.methods
-      .serum3SettleFunds()
-      .accounts({
-        group: group.publicKey,
-        account: mangoAccount.publicKey,
-        owner: (this.program.provider as AnchorProvider).wallet.publicKey,
-        openOrders: openOrderPublicKey,
-        serumMarket: serum3Market.publicKey,
-        serumProgram: OPENBOOK_PROGRAM_ID[this.cluster],
-        serumMarketExternal: serum3Market.serumMarketExternal,
-        marketBaseVault: serum3MarketExternal.decoded.baseVault,
-        marketQuoteVault: serum3MarketExternal.decoded.quoteVault,
-        marketVaultSigner: serum3MarketExternalVaultSigner,
-        quoteBank: group.getFirstBankByTokenIndex(serum3Market.quoteTokenIndex)
-          .publicKey,
-        quoteVault: group.getFirstBankByTokenIndex(serum3Market.quoteTokenIndex)
-          .vault,
-        baseBank: group.getFirstBankByTokenIndex(serum3Market.baseTokenIndex)
-          .publicKey,
-        baseVault: group.getFirstBankByTokenIndex(serum3Market.baseTokenIndex)
-          .vault,
-      })
-      .instruction();
-
-    return ix;
+    return await this.serum3SettleFundsV2Ix(
+      group,
+      mangoAccount,
+      externalMarketPk,
+    );
   }
 
   public async serum3SettleFundsV2Ix(
@@ -2237,7 +2207,7 @@ export class MangoClient {
     expiryTimestamp?: number,
     limit?: number,
   ): Promise<TransactionSignature> {
-    const ix = await this.perpPlaceOrderIx(
+    const ix = await this.perpPlaceOrderV2Ix(
       group,
       mangoAccount,
       perpMarketIndex,
@@ -2247,6 +2217,7 @@ export class MangoClient {
       maxQuoteQuantity,
       clientOrderId,
       orderType,
+      PerpSelfTradeBehavior.decrementTake,
       reduceOnly,
       expiryTimestamp,
       limit,
@@ -2311,6 +2282,64 @@ export class MangoClient {
       .instruction();
   }
 
+  public async perpPlaceOrderV2Ix(
+    group: Group,
+    mangoAccount: MangoAccount,
+    perpMarketIndex: PerpMarketIndex,
+    side: PerpOrderSide,
+    price: number,
+    quantity: number,
+    maxQuoteQuantity?: number,
+    clientOrderId?: number,
+    orderType?: PerpOrderType,
+    selfTradeBehavior?: PerpSelfTradeBehavior,
+    reduceOnly?: boolean,
+    expiryTimestamp?: number,
+    limit?: number,
+  ): Promise<TransactionInstruction> {
+    const perpMarket = group.getPerpMarketByMarketIndex(perpMarketIndex);
+    const healthRemainingAccounts: PublicKey[] =
+      this.buildHealthRemainingAccounts(
+        group,
+        [mangoAccount],
+        // Settlement token bank, because a position for it may be created
+        [group.getFirstBankForPerpSettlement()],
+        [perpMarket],
+      );
+    return await this.program.methods
+      .perpPlaceOrderV2(
+        side,
+        perpMarket.uiPriceToLots(price),
+        perpMarket.uiBaseToLots(quantity),
+        maxQuoteQuantity
+          ? perpMarket.uiQuoteToLots(maxQuoteQuantity)
+          : I64_MAX_BN,
+        new BN(clientOrderId ? clientOrderId : Date.now()),
+        orderType ?? PerpOrderType.limit,
+        selfTradeBehavior ?? PerpSelfTradeBehavior.decrementTake,
+        reduceOnly ?? false,
+        new BN(expiryTimestamp ? expiryTimestamp : 0),
+        limit ?? 10,
+      )
+      .accounts({
+        group: group.publicKey,
+        account: mangoAccount.publicKey,
+        perpMarket: perpMarket.publicKey,
+        bids: perpMarket.bids,
+        asks: perpMarket.asks,
+        eventQueue: perpMarket.eventQueue,
+        oracle: perpMarket.oracle,
+        owner: (this.program.provider as AnchorProvider).wallet.publicKey,
+      })
+      .remainingAccounts(
+        healthRemainingAccounts.map(
+          (pk) =>
+            ({ pubkey: pk, isWritable: false, isSigner: false } as AccountMeta),
+        ),
+      )
+      .instruction();
+  }
+
   public async perpPlaceOrderPegged(
     group: Group,
     mangoAccount: MangoAccount,
@@ -2326,7 +2355,7 @@ export class MangoClient {
     expiryTimestamp?: number,
     limit?: number,
   ): Promise<TransactionSignature> {
-    const ix = await this.perpPlaceOrderPeggedIx(
+    const ix = await this.perpPlaceOrderPeggedV2Ix(
       group,
       mangoAccount,
       perpMarketIndex,
@@ -2337,6 +2366,7 @@ export class MangoClient {
       maxQuoteQuantity,
       clientOrderId,
       orderType,
+      PerpSelfTradeBehavior.decrementTake,
       reduceOnly,
       expiryTimestamp,
       limit,
@@ -2383,6 +2413,67 @@ export class MangoClient {
         reduceOnly ? reduceOnly : false,
         new BN(expiryTimestamp ?? 0),
         limit ? limit : 10,
+        -1,
+      )
+      .accounts({
+        group: group.publicKey,
+        account: mangoAccount.publicKey,
+        perpMarket: perpMarket.publicKey,
+        bids: perpMarket.bids,
+        asks: perpMarket.asks,
+        eventQueue: perpMarket.eventQueue,
+        oracle: perpMarket.oracle,
+        owner: (this.program.provider as AnchorProvider).wallet.publicKey,
+      })
+      .remainingAccounts(
+        healthRemainingAccounts.map(
+          (pk) =>
+            ({ pubkey: pk, isWritable: false, isSigner: false } as AccountMeta),
+        ),
+      )
+      .instruction();
+  }
+
+  public async perpPlaceOrderPeggedV2Ix(
+    group: Group,
+    mangoAccount: MangoAccount,
+    perpMarketIndex: PerpMarketIndex,
+    side: PerpOrderSide,
+    priceOffset: number,
+    quantity: number,
+    pegLimit?: number,
+    maxQuoteQuantity?: number,
+    clientOrderId?: number,
+    orderType?: PerpOrderType,
+    selfTradeBehavior?: PerpSelfTradeBehavior,
+    reduceOnly?: boolean,
+    expiryTimestamp?: number,
+    limit?: number,
+  ): Promise<TransactionInstruction> {
+    const perpMarket = group.getPerpMarketByMarketIndex(perpMarketIndex);
+    const healthRemainingAccounts: PublicKey[] =
+      this.buildHealthRemainingAccounts(
+        group,
+        [mangoAccount],
+        // Settlement token bank, because a position for it may be created
+        [group.getFirstBankForPerpSettlement()],
+        [perpMarket],
+      );
+    return await this.program.methods
+      .perpPlaceOrderPeggedV2(
+        side,
+        perpMarket.uiPriceToLots(priceOffset),
+        pegLimit ? perpMarket.uiPriceToLots(pegLimit) : new BN(-1),
+        perpMarket.uiBaseToLots(quantity),
+        maxQuoteQuantity
+          ? perpMarket.uiQuoteToLots(maxQuoteQuantity)
+          : I64_MAX_BN,
+        new BN(clientOrderId ?? Date.now()),
+        orderType ?? PerpOrderType.limit,
+        selfTradeBehavior ?? PerpSelfTradeBehavior.decrementTake,
+        reduceOnly ?? false,
+        new BN(expiryTimestamp ?? 0),
+        limit ?? 10,
         -1,
       )
       .accounts({
@@ -3059,6 +3150,35 @@ export class MangoClient {
       programId,
       cluster,
       opts,
+    );
+  }
+
+  /**
+   * Connect with defaults,
+   *  - random ephemeral keypair,
+   *  - fetch ids using gPa
+   *  - connects to mainnet-beta
+   *  - uses well known program Id
+   * @param clusterUrl
+   * @returns
+   */
+  static connectDefault(clusterUrl: string): MangoClient {
+    const idl = IDL;
+
+    const options = AnchorProvider.defaultOptions();
+    const connection = new Connection(clusterUrl, options);
+
+    return new MangoClient(
+      new Program<MangoV4>(
+        idl as MangoV4,
+        MANGO_V4_ID['mainnet-beta'],
+        new AnchorProvider(connection, new Wallet(new Keypair()), options),
+      ),
+      MANGO_V4_ID['mainnet-beta'],
+      'mainnet-beta' as Cluster,
+      {
+        idsSource: 'get-program-accounts',
+      },
     );
   }
 
