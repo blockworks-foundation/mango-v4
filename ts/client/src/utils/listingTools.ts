@@ -22,6 +22,8 @@ const PREMIUM_LISTING_BASE = {
   insuranceFound: true,
   borrowWeightScale: toNative(250000, 6).toNumber(),
   depositWeightScale: toNative(250000, 6).toNumber(),
+  name: 'Blue chip',
+  key: 'PREMIUM',
 };
 
 export type ListingPreset = typeof PREMIUM_LISTING_BASE;
@@ -34,12 +36,7 @@ export type LISTING_PRESETS_KEYS =
   | 'UNTRUSTED';
 
 export const LISTING_PRESETS: {
-  [key in LISTING_PRESETS_KEYS]:
-    | (typeof PREMIUM_LISTING_BASE & {
-        name: string;
-        key: LISTING_PRESETS_KEYS;
-      })
-    | Record<string, never>;
+  [key in LISTING_PRESETS_KEYS]: ListingPreset | Record<string, never>;
 } = {
   //Price impact on $100,000 swap lower then 1%
   PREMIUM: {
