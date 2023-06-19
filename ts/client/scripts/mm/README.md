@@ -16,6 +16,10 @@ The following open source code contains an automated bot designed to market make
 
 By using this open source code, you acknowledge and agree to the above disclaimer. If you do not agree with any part of the disclaimer, refrain from using the code.
 
+## License
+
+See https://github.com/blockworks-foundation/mango-v4/blob/dev/LICENSE
+
 ---
 
 This directory contains a sample market maker (`market-maker.ts`) in typescript, which can be run using ts-node.
