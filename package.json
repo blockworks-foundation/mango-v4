@@ -72,7 +72,8 @@
     "node-kraken-api": "^2.2.2"
   },
   "resolutions": {
-    "@coral-xyz/anchor": "^0.27.0"
+    "@coral-xyz/anchor": "^0.27.0",
+    "**/@solana/web3.js/node-fetch": "https://github.com/blockworks-foundation/node-fetch.git#v2.6.11-fixed"
   },
   "license": "MIT"
 }
