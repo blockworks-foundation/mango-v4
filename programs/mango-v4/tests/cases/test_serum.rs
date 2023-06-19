@@ -561,7 +561,7 @@ async fn test_serum_loan_origination_fees() -> Result<(), TransportError> {
         let account_data = solana.get_account::<MangoAccount>(account).await;
         assert_eq!(
             account_data.buyback_fees_accrued_current,
-            0 // the v1 function doesn't accumulate buyback fees
+            serum_maker_rebate(fill_amount) as u64
         );
 
         assert_eq!(
