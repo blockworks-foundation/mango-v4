@@ -91,12 +91,16 @@ export async function getOnChainPriceForMints(
 ): Promise<number[]> {
   return await Promise.all(
     mints.map(async (mint) => {
-      let data = await (
+      const resp = await (
         await buildFetch()
-      )(`https://price.jup.ag/v4/price?ids=${mint}`, { mode: 'no-cors' });
-      data = await data.json();
-      data = data['data'];
-      return data[mint]['price'];
+      )(`https://public-api.birdeye.so/public/price?address=${mint}`, {
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      const data = await resp.json();
+      return data?.data?.value;
     }),
   );
 }
@@ -229,7 +233,8 @@ export async function getPriceImpactForLiqor(
         }, ZERO_I80F48());
 
         const [pi1, pi2] = await Promise.all([
-          !liabsInUsdc.eq(ZERO_I80F48())
+          !liabsInUsdc.eq(ZERO_I80F48()) &&
+          usdcMint.toBase58() !== bank.mint.toBase58()
             ? computePriceImpactOnJup(
                 liabsInUsdc.toString(),
                 usdcMint.toBase58(),
@@ -237,7 +242,8 @@ export async function getPriceImpactForLiqor(
               )
             : Promise.resolve({ priceImpactPct: 0, outAmount: 0 }),
 
-          !assets.eq(ZERO_I80F48())
+          !assets.eq(ZERO_I80F48()) &&
+          usdcMint.toBase58() !== bank.mint.toBase58()
             ? computePriceImpactOnJup(
                 assets.floor().toString(),
                 bank.mint.toBase58(),

@@ -867,6 +867,12 @@ export class InnerNode {
   constructor(public children: [number]) {}
 }
 
+export class PerpSelfTradeBehavior {
+  static decrementTake = { decrementTake: {} };
+  static cancelProvide = { cancelProvide: {} };
+  static abortTransaction = { abortTransaction: {} };
+}
+
 export class PerpOrderSide {
   static bid = { bid: {} };
   static ask = { ask: {} };
