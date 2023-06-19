@@ -33,13 +33,17 @@ export type LISTING_PRESETS_KEYS =
 
 export const LISTING_PRESETS: {
   [key in LISTING_PRESETS_KEYS]:
-    | (typeof PREMIUM_LISTING_BASE & { name: string })
+    | (typeof PREMIUM_LISTING_BASE & {
+        name: string;
+        key: LISTING_PRESETS_KEYS;
+      })
     | Record<string, never>;
 } = {
   //Price impact on $100,000 swap lower then 1%
   PREMIUM: {
     ...PREMIUM_LISTING_BASE,
     name: 'Blue chip',
+    key: 'PREMIUM',
   },
   //Price impact on $20,000 swap lower then 1%
   MID: {
@@ -51,6 +55,7 @@ export const LISTING_PRESETS: {
     liquidationFee: 0.1,
     netBorrowLimitPerWindowQuote: toNative(20000, 6).toNumber(),
     name: 'Midwit',
+    key: 'MID',
     borrowWeightScale: toNative(50000, 6).toNumber(),
     depositWeightScale: toNative(50000, 6).toNumber(),
     insuranceFound: false,
@@ -70,6 +75,7 @@ export const LISTING_PRESETS: {
     depositWeightScale: toNative(20000, 6).toNumber(),
     insuranceFound: false,
     name: 'Meme Coin',
+    key: 'MEME',
   },
   //Price impact on $1,000 swap lower then 1%
   SHIT: {
@@ -86,6 +92,7 @@ export const LISTING_PRESETS: {
     depositWeightScale: toNative(5000, 6).toNumber(),
     insuranceFound: false,
     name: 'Shit Coin',
+    key: 'SHIT',
   },
   //should run untrusted instruction
   UNTRUSTED: {},
