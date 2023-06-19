@@ -53,10 +53,10 @@ pub struct TokenConditionalSwap {
     pub price_premium_bps: u16,
 
     /// The taker receives only premium_price * (1 - taker_fee_bps/10000)
-    pub taker_fee_bps: u16,
+    pub taker_fee_bps: i16,
 
     /// The maker has to pay premium_price * (1 + maker_fee_bps/10000)
-    pub maker_fee_bps: u16,
+    pub maker_fee_bps: i16,
 
     /// indexes of tokens for the swap
     pub buy_token_index: TokenIndex,

@@ -88,11 +88,14 @@ pub struct Group {
     /// When set to 0, there's no expiry of buyback fees.
     pub buyback_fees_expiry_interval: u64,
 
-    pub reserved: [u8; 1824],
+    pub token_conditional_swap_taker_fee_bps: i16,
+    pub token_conditional_swap_maker_fee_bps: i16,
+
+    pub reserved: [u8; 1820],
 }
 const_assert_eq!(
     size_of::<Group>(),
-    32 + 4 + 32 * 2 + 4 + 32 * 2 + 4 + 4 + 20 * 32 + 32 + 8 + 16 + 32 + 8 + 1824
+    32 + 4 + 32 * 2 + 4 + 32 * 2 + 4 + 4 + 20 * 32 + 32 + 8 + 16 + 32 + 8 + 2 * 2 + 1820
 );
 const_assert_eq!(size_of::<Group>(), 2736);
 const_assert_eq!(size_of::<Group>() % 8, 0);

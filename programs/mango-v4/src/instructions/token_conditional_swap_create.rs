@@ -9,11 +9,9 @@ pub fn token_conditional_swap_create(
     ctx: Context<AccountAndAuthority>,
     token_conditional_swap: TokenConditionalSwap,
 ) -> Result<()> {
+    let group = ctx.accounts.group.load()?;
     require!(
-        ctx.accounts
-            .group
-            .load()?
-            .is_ix_enabled(IxGate::TokenConditionalSwapCreate),
+        group.is_ix_enabled(IxGate::TokenConditionalSwapCreate),
         MangoError::IxIsDisabled
     );
 
@@ -25,6 +23,8 @@ pub fn token_conditional_swap_create(
     let tcs = account.add_token_conditional_swap()?;
     *tcs = token_conditional_swap;
     tcs.id = id;
+    tcs.taker_fee_bps = group.token_conditional_swap_taker_fee_bps;
+    tcs.maker_fee_bps = group.token_conditional_swap_maker_fee_bps;
 
     Ok(())
 }

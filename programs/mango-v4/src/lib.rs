@@ -68,6 +68,8 @@ pub mod mango_v4 {
         buyback_fees_swap_mango_account_opt: Option<Pubkey>,
         mngo_token_index_opt: Option<TokenIndex>,
         buyback_fees_expiry_interval_opt: Option<u64>,
+        token_conditional_swap_taker_fee_bps_opt: Option<i16>,
+        token_conditional_swap_maker_fee_bps_opt: Option<i16>,
     ) -> Result<()> {
         #[cfg(feature = "enable-gpl")]
         instructions::group_edit(
@@ -83,6 +85,8 @@ pub mod mango_v4 {
             buyback_fees_swap_mango_account_opt,
             mngo_token_index_opt,
             buyback_fees_expiry_interval_opt,
+            token_conditional_swap_taker_fee_bps_opt,
+            token_conditional_swap_maker_fee_bps_opt,
         )?;
         Ok(())
     }
@@ -1147,7 +1151,7 @@ pub mod mango_v4 {
         allow_creating_borrows: bool,
     ) -> Result<()> {
         let tcs = TokenConditionalSwap {
-            id: 0,
+            id: u64::MAX, // set inside
             max_buy,
             max_sell,
             bought: 0,
@@ -1155,8 +1159,8 @@ pub mod mango_v4 {
             price_threshold,
             price_limit,
             price_premium_bps,
-            taker_fee_bps: 1, // TODO: read from group?!
-            maker_fee_bps: 1,
+            taker_fee_bps: 0, // set inside
+            maker_fee_bps: 0, // set inside
             buy_token_index,
             sell_token_index,
             is_active: 1,

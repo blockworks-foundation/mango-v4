@@ -18,6 +18,8 @@ pub fn group_edit(
     buyback_fees_swap_mango_account_opt: Option<Pubkey>,
     mngo_token_index_opt: Option<TokenIndex>,
     buyback_fees_expiry_interval_opt: Option<u64>,
+    token_conditional_swap_taker_fee_bps_opt: Option<i16>,
+    token_conditional_swap_maker_fee_bps_opt: Option<i16>,
 ) -> Result<()> {
     let mut group = ctx.accounts.group.load_mut()?;
 
@@ -104,6 +106,25 @@ pub fn group_edit(
             buyback_fees_expiry_interval
         );
         group.buyback_fees_expiry_interval = buyback_fees_expiry_interval;
+    }
+
+    if let Some(fees_bps) = token_conditional_swap_taker_fee_bps_opt {
+        msg!(
+            "Token conditional swap taker fee bps old {:?}, new {:?}",
+            group.token_conditional_swap_taker_fee_bps,
+            fees_bps
+        );
+        require_gte!(fees_bps, 0); // values <0 are not currently supported
+        group.token_conditional_swap_taker_fee_bps = fees_bps;
+    }
+    if let Some(fees_bps) = token_conditional_swap_maker_fee_bps_opt {
+        msg!(
+            "Token conditional swap maker fee bps old {:?}, new {:?}",
+            group.token_conditional_swap_maker_fee_bps,
+            fees_bps
+        );
+        require_gte!(fees_bps, 0); // values <0 are not currently supported
+        group.token_conditional_swap_maker_fee_bps = fees_bps;
     }
 
     Ok(())

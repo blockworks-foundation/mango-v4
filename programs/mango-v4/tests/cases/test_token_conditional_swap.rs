@@ -51,6 +51,21 @@ async fn test_token_conditional_swap() -> Result<(), TransportError> {
     )
     .await;
 
+    send_tx(
+        solana,
+        GroupEdit {
+            group,
+            admin,
+            options: mango_v4::instruction::GroupEdit {
+                token_conditional_swap_taker_fee_bps_opt: Some(500),
+                token_conditional_swap_maker_fee_bps_opt: Some(1000),
+                ..group_edit_instruction_default()
+            },
+        },
+    )
+    .await
+    .unwrap();
+
     //
     // TEST: Trying to add a tcs on an account without space will fail
     //
@@ -232,15 +247,15 @@ async fn test_token_conditional_swap() -> Result<(), TransportError> {
     let liqee_base = account_position_f64(solana, account, base_token.bank).await;
     assert!(assert_equal_f_f(
         liqee_quote,
-        1000.0 + 46.0, // roughly 50 / 1.1
+        1000.0 + 42.0, // roughly 50 / (1.1 * 1.1)
         0.01
     ));
     assert!(assert_equal_f_f(liqee_base, 1000.0 - 50.0, 0.01));
 
     let liqor_quote = account_position_f64(solana, liqor, quote_token.bank).await;
     let liqor_base = account_position_f64(solana, liqor, base_token.bank).await;
-    assert!(assert_equal_f_f(liqor_quote, 1000.0 - 46.0, 0.01));
-    assert!(assert_equal_f_f(liqor_base, 1000.0 + 50.0, 0.01));
+    assert!(assert_equal_f_f(liqor_quote, 1000.0 - 42.0, 0.01));
+    assert!(assert_equal_f_f(liqor_base, 1000.0 + 44.0, 0.01)); // roughly 42*1.1*0.95
 
     //
     // TEST: trigger fully
@@ -261,13 +276,13 @@ async fn test_token_conditional_swap() -> Result<(), TransportError> {
 
     let liqee_quote = account_position_f64(solana, account, quote_token.bank).await;
     let liqee_base = account_position_f64(solana, account, base_token.bank).await;
-    assert!(assert_equal_f_f(liqee_quote, 1000.0 + 92.0, 0.01));
+    assert!(assert_equal_f_f(liqee_quote, 1000.0 + 84.0, 0.01));
     assert!(assert_equal_f_f(liqee_base, 1000.0 - 100.0, 0.01));
 
     let liqor_quote = account_position_f64(solana, liqor, quote_token.bank).await;
     let liqor_base = account_position_f64(solana, liqor, base_token.bank).await;
-    assert!(assert_equal_f_f(liqor_quote, 1000.0 - 92.0, 0.01));
-    assert!(assert_equal_f_f(liqor_base, 1000.0 + 100.0, 0.01));
+    assert!(assert_equal_f_f(liqor_quote, 1000.0 - 84.0, 0.01));
+    assert!(assert_equal_f_f(liqor_base, 1000.0 + 88.0, 0.01));
 
     let account_data = get_mango_account(solana, account).await;
     assert!(!account_data

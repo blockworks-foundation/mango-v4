@@ -1530,6 +1530,8 @@ pub fn group_edit_instruction_default() -> mango_v4::instruction::GroupEdit {
         buyback_fees_swap_mango_account_opt: None,
         mngo_token_index_opt: None,
         buyback_fees_expiry_interval_opt: None,
+        token_conditional_swap_taker_fee_bps_opt: None,
+        token_conditional_swap_maker_fee_bps_opt: None,
     }
 }
 
