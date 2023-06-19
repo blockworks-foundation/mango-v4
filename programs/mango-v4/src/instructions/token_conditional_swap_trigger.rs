@@ -5,8 +5,7 @@ use crate::accounts_ix::*;
 use crate::error::*;
 use crate::health::*;
 use crate::logs::{
-    LoanOriginationFeeInstruction, TokenBalanceLog, TokenConditionalSwapTriggerLog,
-    WithdrawLoanOriginationFeeLog,
+    LoanOriginationFeeInstruction, TokenBalanceLog, TokenConditionalSwapTriggerLog, WithdrawLoanLog,
 };
 use crate::state::*;
 
@@ -205,7 +204,7 @@ fn action(
     let (liqor_buy_token, liqor_buy_raw_index, _) =
         liqor.ensure_token_position(tcs.buy_token_index)?;
     let liqee_buy_active = buy_bank.deposit(liqee_buy_token, buy_token_amount_i80f48, now_ts)?;
-    let (liqor_buy_active, liqor_buy_loan_origination) =
+    let liqor_buy_withdraw =
         buy_bank.withdraw_with_fee(liqor_buy_token, buy_token_amount_i80f48, now_ts)?;
 
     let post_liqee_buy_token = liqee_buy_token.native(&buy_bank);
@@ -220,7 +219,7 @@ fn action(
         I80F48::from(sell_token_amount_to_liqor),
         now_ts,
     )?;
-    let (liqee_sell_active, liqee_sell_loan_origination) = sell_bank.withdraw_with_fee(
+    let liqee_sell_withdraw = sell_bank.withdraw_with_fee(
         liqee_sell_token,
         I80F48::from(sell_token_amount_from_liqee),
         now_ts,
@@ -228,10 +227,10 @@ fn action(
 
     sell_bank.collected_fees_native += I80F48::from(maker_fee + taker_fee);
 
-    if liqor_buy_loan_origination > 0 {
+    if liqor_buy_withdraw.has_loan() {
         buy_bank.check_net_borrows(buy_token_price)?;
     }
-    if liqee_sell_loan_origination > 0 {
+    if liqee_sell_withdraw.has_loan() {
         sell_bank.check_net_borrows(sell_token_price)?;
     }
 
@@ -242,10 +241,10 @@ fn action(
     if !liqee_buy_active {
         liqee.deactivate_token_position_and_log(liqee_buy_raw_index, liqee_key);
     }
-    if !liqee_sell_active {
+    if !liqee_sell_withdraw.position_is_active {
         liqee.deactivate_token_position_and_log(liqee_sell_raw_index, liqee_key);
     }
-    if !liqor_buy_active {
+    if !liqor_buy_withdraw.position_is_active {
         liqor.deactivate_token_position_and_log(liqor_buy_raw_index, liqor_key);
     }
     if !liqor_sell_active {
@@ -291,22 +290,26 @@ fn action(
         borrow_index: sell_bank.borrow_index.to_bits(),
     });
 
-    if liqor_buy_loan_origination.is_positive() {
-        emit!(WithdrawLoanOriginationFeeLog {
+    if liqor_buy_withdraw.has_loan() {
+        emit!(WithdrawLoanLog {
             mango_group: liqee.fixed.group,
             mango_account: liqor_key,
             token_index: tcs.buy_token_index,
-            loan_origination_fee: liqor_buy_loan_origination.to_bits(),
-            instruction: LoanOriginationFeeInstruction::TokenConditionalSwapTrigger
+            loan_amount: liqor_buy_withdraw.loan_amount.to_bits(),
+            loan_origination_fee: liqor_buy_withdraw.loan_origination_fee.to_bits(),
+            instruction: LoanOriginationFeeInstruction::TokenConditionalSwapTrigger,
+            price: Some(buy_token_price.to_bits()),
         });
     }
-    if liqee_sell_loan_origination.is_positive() {
-        emit!(WithdrawLoanOriginationFeeLog {
+    if liqee_sell_withdraw.has_loan() {
+        emit!(WithdrawLoanLog {
             mango_group: liqee.fixed.group,
             mango_account: liqee_key,
             token_index: tcs.sell_token_index,
-            loan_origination_fee: liqee_sell_loan_origination.to_bits(),
-            instruction: LoanOriginationFeeInstruction::TokenConditionalSwapTrigger
+            loan_amount: liqee_sell_withdraw.loan_amount.to_bits(),
+            loan_origination_fee: liqee_sell_withdraw.loan_origination_fee.to_bits(),
+            instruction: LoanOriginationFeeInstruction::TokenConditionalSwapTrigger,
+            price: Some(sell_token_price.to_bits()),
         });
     }
 

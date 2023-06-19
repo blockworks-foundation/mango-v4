@@ -177,6 +177,12 @@ pub struct WithdrawResult {
     pub loan_amount: I80F48,
 }
 
+impl WithdrawResult {
+    pub fn has_loan(&self) -> bool {
+        self.loan_amount.is_positive()
+    }
+}
+
 impl Bank {
     pub fn from_existing_bank(
         existing_bank: &Bank,
