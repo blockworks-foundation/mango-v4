@@ -164,7 +164,11 @@ fn action(
     let premium_price = tcs.premium_price(price);
     let maker_price = tcs.maker_price(premium_price);
 
-    require_gte!(tcs.price_limit, maker_price);
+    require_gte!(
+        tcs.price_limit,
+        maker_price,
+        MangoError::TokenConditionalSwapPriceExceedsLimit
+    );
     let maker_price_i80f48 = I80F48::from_num(maker_price);
 
     let pre_liqee_buy_token = liqee

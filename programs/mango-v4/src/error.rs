@@ -105,6 +105,8 @@ pub enum MangoError {
     WouldSelfTrade,
     #[msg("conditional token swap price threshold not reached")]
     TokenConditionalSwapPriceThresholdNotReached,
+    #[msg("conditional token swap price exceeds limit")]
+    TokenConditionalSwapPriceExceedsLimit,
 }
 
 impl MangoError {
