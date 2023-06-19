@@ -55,6 +55,7 @@ import {
   Serum3Side,
   generateSerum3MarketExternalVaultSignerAddress,
 } from './accounts/serum3';
+import { TokenConditionalSwapPriceThresholdType } from './accounts/stoploss';
 import {
   IxGateParams,
   PerpEditParams,
@@ -186,6 +187,8 @@ export class MangoClient {
     feesSwapMangoAccount?: PublicKey,
     feesMngoTokenIndex?: TokenIndex,
     feesExpiryInterval?: BN,
+    tokenConditionalSwapTakerFeeBps?: number,
+    tokenConditionalSwapMakerFeeBps?: number,
   ): Promise<TransactionSignature> {
     const ix = await this.program.methods
       .groupEdit(
@@ -200,6 +203,8 @@ export class MangoClient {
         feesSwapMangoAccount ?? null,
         feesMngoTokenIndex ?? null,
         feesExpiryInterval ?? null,
+        tokenConditionalSwapTakerFeeBps ?? null,
+        tokenConditionalSwapMakerFeeBps ?? null,
       )
       .accounts({
         group: group.publicKey,
@@ -743,6 +748,33 @@ export class MangoClient {
   ): Promise<TransactionSignature> {
     const ix = await this.program.methods
       .accountExpand(tokenCount, serum3Count, perpCount, perpOoCount)
+      .accounts({
+        group: group.publicKey,
+        account: account.publicKey,
+        owner: (this.program.provider as AnchorProvider).wallet.publicKey,
+        payer: (this.program.provider as AnchorProvider).wallet.publicKey,
+      })
+      .instruction();
+    return await this.sendAndConfirmTransactionForGroup(group, [ix]);
+  }
+
+  public async accountExpandV2(
+    group: Group,
+    account: MangoAccount,
+    tokenCount: number,
+    serum3Count: number,
+    perpCount: number,
+    perpOoCount: number,
+    tokenConditionalSwapCount: number,
+  ): Promise<TransactionSignature> {
+    const ix = await this.program.methods
+      .accountExpandV2(
+        tokenCount,
+        serum3Count,
+        perpCount,
+        perpOoCount,
+        tokenConditionalSwapCount,
+      )
       .accounts({
         group: group.publicKey,
         account: account.publicKey,
@@ -3033,6 +3065,82 @@ export class MangoClient {
         liqorOwner: liqor.owner,
       })
       .remainingAccounts(parsedHealthAccounts)
+      .instruction();
+
+    return await this.sendAndConfirmTransactionForGroup(group, [ix]);
+  }
+
+  public async tokenConditionalSwapCreate(
+    group: Group,
+    account: MangoAccount,
+    buyTokenIndex: TokenIndex,
+    sellTokenIndex: TokenIndex,
+    maxBuy: number,
+    maxSell: number,
+    priceThreshold: number,
+    priceThresholdType: TokenConditionalSwapPriceThresholdType,
+    pricePremiumBps: number,
+    priceLimit: number,
+    allowCreatingDeposits: boolean,
+    allowCreatingBorrows: boolean,
+  ): Promise<TransactionSignature> {
+    const ix = await this.program.methods
+      .tokenConditionalSwapCreate(
+        buyTokenIndex,
+        sellTokenIndex,
+        new BN(maxBuy),
+        new BN(maxSell),
+        priceThreshold,
+        priceThresholdType,
+        pricePremiumBps,
+        priceLimit,
+        allowCreatingDeposits,
+        allowCreatingBorrows,
+      )
+      .accounts({ group: group.publicKey, account: account.publicKey })
+      .instruction();
+
+    return await this.sendAndConfirmTransactionForGroup(group, [ix]);
+  }
+
+  public async tokenConditionalSwapCancel(
+    group: Group,
+    account: MangoAccount,
+    tokenConditionalSwapIndex: number,
+    tokenConditionalSwapId: number,
+  ): Promise<TransactionSignature> {
+    const ix = await this.program.methods
+      .tokenConditionalSwapCancel(
+        tokenConditionalSwapIndex,
+        new BN(tokenConditionalSwapId),
+      )
+      .accounts({ group: group.publicKey, account: account.publicKey })
+      .instruction();
+
+    return await this.sendAndConfirmTransactionForGroup(group, [ix]);
+  }
+
+  public async tokenConditionalSwapTrigger(
+    group: Group,
+    liqee: MangoAccount,
+    liqor: MangoAccount,
+    tokenConditionalSwapIndex: number,
+    tokenConditionalSwapId: number,
+    maxBuyTokenToLiqee: number,
+    maxSellTokenToLiqor: number,
+  ): Promise<TransactionSignature> {
+    const ix = await this.program.methods
+      .tokenConditionalSwapTrigger(
+        tokenConditionalSwapIndex,
+        new BN(tokenConditionalSwapId),
+        new BN(maxBuyTokenToLiqee),
+        new BN(maxSellTokenToLiqor),
+      )
+      .accounts({
+        group: group.publicKey,
+        liqee: liqee.publicKey,
+        liqor: liqor.publicKey,
+      })
       .instruction();
 
     return await this.sendAndConfirmTransactionForGroup(group, [ix]);

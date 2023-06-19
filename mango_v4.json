@@ -100,10 +100,7 @@
         {
           "name": "group",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "admin"
-          ]
+          "isSigner": false
         },
         {
           "name": "admin",
@@ -177,6 +174,18 @@
           "type": {
             "option": "u64"
           }
+        },
+        {
+          "name": "tokenConditionalSwapTakerFeeBpsOpt",
+          "type": {
+            "option": "i16"
+          }
+        },
+        {
+          "name": "tokenConditionalSwapMakerFeeBpsOpt",
+          "type": {
+            "option": "i16"
+          }
         }
       ]
     },
@@ -186,11 +195,7 @@
         {
           "name": "group",
           "isMut": false,
-          "isSigner": false,
-          "relations": [
-            "insurance_vault",
-            "admin"
-          ]
+          "isSigner": false
         },
         {
           "name": "admin",
@@ -247,11 +252,7 @@
         {
           "name": "group",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "admin",
-            "insurance_vault"
-          ]
+          "isSigner": false
         },
         {
           "name": "admin",
@@ -282,10 +283,7 @@
         {
           "name": "group",
           "isMut": false,
-          "isSigner": false,
-          "relations": [
-            "admin"
-          ]
+          "isSigner": false
         },
         {
           "name": "admin",
@@ -623,10 +621,7 @@
         {
           "name": "mintInfo",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "group"
-          ]
+          "isSigner": false
         },
         {
           "name": "oracle",
@@ -791,10 +786,7 @@
         {
           "name": "group",
           "isMut": false,
-          "isSigner": false,
-          "relations": [
-            "admin"
-          ]
+          "isSigner": false
         },
         {
           "name": "admin",
@@ -809,11 +801,7 @@
         {
           "name": "existingBank",
           "isMut": false,
-          "isSigner": false,
-          "relations": [
-            "group",
-            "mint"
-          ]
+          "isSigner": false
         },
         {
           "name": "bank",
@@ -876,11 +864,7 @@
         {
           "name": "mintInfo",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "group",
-            "mint"
-          ]
+          "isSigner": false
         },
         {
           "name": "payer",
@@ -920,10 +904,7 @@
         {
           "name": "group",
           "isMut": false,
-          "isSigner": false,
-          "relations": [
-            "admin"
-          ]
+          "isSigner": false
         },
         {
           "name": "admin",
@@ -933,10 +914,7 @@
         {
           "name": "mintInfo",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "group"
-          ]
+          "isSigner": false
         },
         {
           "name": "dustVault",
@@ -967,11 +945,7 @@
         {
           "name": "mintInfo",
           "isMut": false,
-          "isSigner": false,
-          "relations": [
-            "oracle",
-            "group"
-          ]
+          "isSigner": false
         },
         {
           "name": "oracle",
@@ -1077,11 +1051,7 @@
         {
           "name": "account",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "group",
-            "owner"
-          ]
+          "isSigner": false
         },
         {
           "name": "owner",
@@ -1129,11 +1099,7 @@
         {
           "name": "account",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "group",
-            "owner"
-          ]
+          "isSigner": false
         },
         {
           "name": "owner",
@@ -1185,11 +1151,7 @@
         {
           "name": "account",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "group",
-            "owner"
-          ]
+          "isSigner": false
         },
         {
           "name": "owner",
@@ -1223,10 +1185,7 @@
         {
           "name": "account",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "group"
-          ]
+          "isSigner": false
         },
         {
           "name": "admin",
@@ -1252,11 +1211,7 @@
         {
           "name": "account",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "group",
-            "owner"
-          ]
+          "isSigner": false
         },
         {
           "name": "owner",
@@ -1292,10 +1247,7 @@
         {
           "name": "account",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "group"
-          ]
+          "isSigner": false
         },
         {
           "name": "owner",
@@ -1305,18 +1257,12 @@
         {
           "name": "daoAccount",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "group"
-          ]
+          "isSigner": false
         },
         {
           "name": "mngoBank",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "group"
-          ]
+          "isSigner": false
         },
         {
           "name": "mngoOracle",
@@ -1326,10 +1272,7 @@
         {
           "name": "feesBank",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "group"
-          ]
+          "isSigner": false
         },
         {
           "name": "feesOracle",
@@ -1350,10 +1293,7 @@
         {
           "name": "group",
           "isMut": false,
-          "isSigner": false,
-          "relations": [
-            "admin"
-          ]
+          "isSigner": false
         },
         {
           "name": "oracle",
@@ -1416,10 +1356,7 @@
         {
           "name": "group",
           "isMut": false,
-          "isSigner": false,
-          "relations": [
-            "admin"
-          ]
+          "isSigner": false
         },
         {
           "name": "admin",
@@ -1429,10 +1366,7 @@
         {
           "name": "oracle",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "group"
-          ]
+          "isSigner": false
         },
         {
           "name": "solDestination",
@@ -1453,10 +1387,7 @@
         {
           "name": "group",
           "isMut": false,
-          "isSigner": false,
-          "relations": [
-            "admin"
-          ]
+          "isSigner": false
         },
         {
           "name": "admin",
@@ -1466,10 +1397,7 @@
         {
           "name": "oracle",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "group"
-          ]
+          "isSigner": false
         }
       ],
       "args": [
@@ -1492,11 +1420,7 @@
         {
           "name": "account",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "group",
-            "owner"
-          ]
+          "isSigner": false
         },
         {
           "name": "owner",
@@ -1506,12 +1430,7 @@
         {
           "name": "bank",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "group",
-            "vault",
-            "oracle"
-          ]
+          "isSigner": false
         },
         {
           "name": "vault",
@@ -1561,20 +1480,12 @@
         {
           "name": "account",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "group"
-          ]
+          "isSigner": false
         },
         {
           "name": "bank",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "group",
-            "vault",
-            "oracle"
-          ]
+          "isSigner": false
         },
         {
           "name": "vault",
@@ -1624,11 +1535,7 @@
         {
           "name": "account",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "group",
-            "owner"
-          ]
+          "isSigner": false
         },
         {
           "name": "owner",
@@ -1638,12 +1545,7 @@
         {
           "name": "bank",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "group",
-            "vault",
-            "oracle"
-          ]
+          "isSigner": false
         },
         {
           "name": "vault",
@@ -1792,10 +1694,7 @@
         {
           "name": "account",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "group"
-          ]
+          "isSigner": false
         }
       ],
       "args": []
@@ -1822,10 +1721,7 @@
         {
           "name": "group",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "admin"
-          ]
+          "isSigner": false
         },
         {
           "name": "admin",
@@ -1893,18 +1789,12 @@
         {
           "name": "quoteBank",
           "isMut": false,
-          "isSigner": false,
-          "relations": [
-            "group"
-          ]
+          "isSigner": false
         },
         {
           "name": "baseBank",
           "isMut": false,
-          "isSigner": false,
-          "relations": [
-            "group"
-          ]
+          "isSigner": false
         },
         {
           "name": "payer",
@@ -1944,10 +1834,7 @@
         {
           "name": "market",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "group"
-          ]
+          "isSigner": false
         }
       ],
       "args": [
@@ -1971,10 +1858,7 @@
         {
           "name": "group",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "admin"
-          ]
+          "isSigner": false
         },
         {
           "name": "admin",
@@ -1984,18 +1868,12 @@
         {
           "name": "serumMarket",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "group"
-          ]
+          "isSigner": false
         },
         {
           "name": "indexReservation",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "group"
-          ]
+          "isSigner": false
         },
         {
           "name": "solDestination",
@@ -2021,10 +1899,7 @@
         {
           "name": "account",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "group"
-          ]
+          "isSigner": false
         },
         {
           "name": "owner",
@@ -2034,12 +1909,7 @@
         {
           "name": "serumMarket",
           "isMut": false,
-          "isSigner": false,
-          "relations": [
-            "group",
-            "serum_program",
-            "serum_market_external"
-          ]
+          "isSigner": false
         },
         {
           "name": "serumProgram",
@@ -2104,10 +1974,7 @@
         {
           "name": "account",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "group"
-          ]
+          "isSigner": false
         },
         {
           "name": "owner",
@@ -2117,12 +1984,7 @@
         {
           "name": "serumMarket",
           "isMut": false,
-          "isSigner": false,
-          "relations": [
-            "group",
-            "serum_program",
-            "serum_market_external"
-          ]
+          "isSigner": false
         },
         {
           "name": "serumProgram",
@@ -2158,10 +2020,7 @@
         {
           "name": "account",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "group"
-          ]
+          "isSigner": false
         },
         {
           "name": "owner",
@@ -2176,12 +2035,7 @@
         {
           "name": "serumMarket",
           "isMut": false,
-          "isSigner": false,
-          "relations": [
-            "group",
-            "serum_program",
-            "serum_market_external"
-          ]
+          "isSigner": false
         },
         {
           "name": "serumProgram",
@@ -2237,9 +2091,6 @@
           "isSigner": false,
           "docs": [
             "The bank that pays for the order, if necessary"
-          ],
-          "relations": [
-            "group"
           ]
         },
         {
@@ -2313,10 +2164,7 @@
         {
           "name": "account",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "group"
-          ]
+          "isSigner": false
         },
         {
           "name": "owner",
@@ -2331,12 +2179,7 @@
         {
           "name": "serumMarket",
           "isMut": false,
-          "isSigner": false,
-          "relations": [
-            "group",
-            "serum_program",
-            "serum_market_external"
-          ]
+          "isSigner": false
         },
         {
           "name": "serumProgram",
@@ -2388,10 +2231,7 @@
         {
           "name": "account",
           "isMut": false,
-          "isSigner": false,
-          "relations": [
-            "group"
-          ]
+          "isSigner": false
         },
         {
           "name": "owner",
@@ -2406,12 +2246,7 @@
         {
           "name": "serumMarket",
           "isMut": false,
-          "isSigner": false,
-          "relations": [
-            "group",
-            "serum_program",
-            "serum_market_external"
-          ]
+          "isSigner": false
         },
         {
           "name": "serumProgram",
@@ -2449,7 +2284,8 @@
     {
       "name": "serum3SettleFunds",
       "docs": [
-        "Settles all free funds from the OpenOrders account into the MangoAccount.",
+        "Deprecated instruction that used to settles all free funds from the OpenOrders account",
+        "into the MangoAccount.",
         "",
         "Any serum \"referrer rebates\" (ui fees) are considered Mango fees."
       ],
@@ -2462,10 +2298,7 @@
         {
           "name": "account",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "group"
-          ]
+          "isSigner": false
         },
         {
           "name": "owner",
@@ -2480,12 +2313,7 @@
         {
           "name": "serumMarket",
           "isMut": false,
-          "isSigner": false,
-          "relations": [
-            "group",
-            "serum_program",
-            "serum_market_external"
-          ]
+          "isSigner": false
         },
         {
           "name": "serumProgram",
@@ -2518,10 +2346,7 @@
         {
           "name": "quoteBank",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "group"
-          ]
+          "isSigner": false
         },
         {
           "name": "quoteVault",
@@ -2531,10 +2356,7 @@
         {
           "name": "baseBank",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "group"
-          ]
+          "isSigner": false
         },
         {
           "name": "baseVault",
@@ -2567,10 +2389,7 @@
             {
               "name": "account",
               "isMut": true,
-              "isSigner": false,
-              "relations": [
-                "group"
-              ]
+              "isSigner": false
             },
             {
               "name": "owner",
@@ -2585,12 +2404,7 @@
             {
               "name": "serumMarket",
               "isMut": false,
-              "isSigner": false,
-              "relations": [
-                "group",
-                "serum_program",
-                "serum_market_external"
-              ]
+              "isSigner": false
             },
             {
               "name": "serumProgram",
@@ -2623,10 +2437,7 @@
             {
               "name": "quoteBank",
               "isMut": true,
-              "isSigner": false,
-              "relations": [
-                "group"
-              ]
+              "isSigner": false
             },
             {
               "name": "quoteVault",
@@ -2636,10 +2447,7 @@
             {
               "name": "baseBank",
               "isMut": true,
-              "isSigner": false,
-              "relations": [
-                "group"
-              ]
+              "isSigner": false
             },
             {
               "name": "baseVault",
@@ -2687,10 +2495,7 @@
         {
           "name": "account",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "group"
-          ]
+          "isSigner": false
         },
         {
           "name": "openOrders",
@@ -2700,12 +2505,7 @@
         {
           "name": "serumMarket",
           "isMut": false,
-          "isSigner": false,
-          "relations": [
-            "group",
-            "serum_program",
-            "serum_market_external"
-          ]
+          "isSigner": false
         },
         {
           "name": "serumProgram",
@@ -2750,10 +2550,7 @@
         {
           "name": "quoteBank",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "group"
-          ]
+          "isSigner": false
         },
         {
           "name": "quoteVault",
@@ -2763,10 +2560,7 @@
         {
           "name": "baseBank",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "group"
-          ]
+          "isSigner": false
         },
         {
           "name": "baseVault",
@@ -2797,10 +2591,7 @@
         {
           "name": "liqor",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "group"
-          ]
+          "isSigner": false
         },
         {
           "name": "liqorOwner",
@@ -2810,10 +2601,7 @@
         {
           "name": "liqee",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "group"
-          ]
+          "isSigner": false
         }
       ],
       "args": [
@@ -2839,18 +2627,12 @@
         {
           "name": "group",
           "isMut": false,
-          "isSigner": false,
-          "relations": [
-            "insurance_vault"
-          ]
+          "isSigner": false
         },
         {
           "name": "liqor",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "group"
-          ]
+          "isSigner": false
         },
         {
           "name": "liqorOwner",
@@ -2860,18 +2642,12 @@
         {
           "name": "liqee",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "group"
-          ]
+          "isSigner": false
         },
         {
           "name": "liabMintInfo",
           "isMut": false,
-          "isSigner": false,
-          "relations": [
-            "group"
-          ]
+          "isSigner": false
         },
         {
           "name": "quoteVault",
@@ -2909,10 +2685,7 @@
         {
           "name": "liqor",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "group"
-          ]
+          "isSigner": false
         },
         {
           "name": "liqorOwner",
@@ -2922,10 +2695,7 @@
         {
           "name": "liqee",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "group"
-          ]
+          "isSigner": false
         }
       ],
       "args": [
@@ -2956,10 +2726,7 @@
         {
           "name": "liqor",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "group"
-          ]
+          "isSigner": false
         },
         {
           "name": "liqorOwner",
@@ -2969,10 +2736,7 @@
         {
           "name": "liqee",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "group"
-          ]
+          "isSigner": false
         }
       ],
       "args": [
@@ -2996,18 +2760,12 @@
         {
           "name": "group",
           "isMut": false,
-          "isSigner": false,
-          "relations": [
-            "insurance_vault"
-          ]
+          "isSigner": false
         },
         {
           "name": "liqor",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "group"
-          ]
+          "isSigner": false
         },
         {
           "name": "liqorOwner",
@@ -3017,18 +2775,12 @@
         {
           "name": "liqee",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "group"
-          ]
+          "isSigner": false
         },
         {
           "name": "liabMintInfo",
           "isMut": false,
-          "isSigner": false,
-          "relations": [
-            "group"
-          ]
+          "isSigner": false
         },
         {
           "name": "quoteVault",
@@ -3066,10 +2818,7 @@
         {
           "name": "group",
           "isMut": false,
-          "isSigner": false,
-          "relations": [
-            "admin"
-          ]
+          "isSigner": false
         },
         {
           "name": "admin",
@@ -3264,10 +3013,7 @@
         {
           "name": "perpMarket",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "group"
-          ]
+          "isSigner": false
         },
         {
           "name": "oracle",
@@ -3468,10 +3214,7 @@
         {
           "name": "group",
           "isMut": false,
-          "isSigner": false,
-          "relations": [
-            "admin"
-          ]
+          "isSigner": false
         },
         {
           "name": "admin",
@@ -3481,13 +3224,7 @@
         {
           "name": "perpMarket",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "group",
-            "bids",
-            "asks",
-            "event_queue"
-          ]
+          "isSigner": false
         },
         {
           "name": "bids",
@@ -3528,10 +3265,7 @@
         {
           "name": "account",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "group"
-          ]
+          "isSigner": false
         },
         {
           "name": "owner",
@@ -3541,10 +3275,7 @@
         {
           "name": "perpMarket",
           "isMut": false,
-          "isSigner": false,
-          "relations": [
-            "group"
-          ]
+          "isSigner": false
         }
       ],
       "args": []
@@ -3560,10 +3291,7 @@
         {
           "name": "account",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "group"
-          ]
+          "isSigner": false
         },
         {
           "name": "owner",
@@ -3573,14 +3301,7 @@
         {
           "name": "perpMarket",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "group",
-            "bids",
-            "asks",
-            "event_queue",
-            "oracle"
-          ]
+          "isSigner": false
         },
         {
           "name": "bids",
@@ -3660,10 +3381,7 @@
         {
           "name": "account",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "group"
-          ]
+          "isSigner": false
         },
         {
           "name": "owner",
@@ -3673,14 +3391,7 @@
         {
           "name": "perpMarket",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "group",
-            "bids",
-            "asks",
-            "event_queue",
-            "oracle"
-          ]
+          "isSigner": false
         },
         {
           "name": "bids",
@@ -3766,10 +3477,7 @@
         {
           "name": "account",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "group"
-          ]
+          "isSigner": false
         },
         {
           "name": "owner",
@@ -3779,14 +3487,7 @@
         {
           "name": "perpMarket",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "group",
-            "bids",
-            "asks",
-            "event_queue",
-            "oracle"
-          ]
+          "isSigner": false
         },
         {
           "name": "bids",
@@ -3874,10 +3575,7 @@
         {
           "name": "account",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "group"
-          ]
+          "isSigner": false
         },
         {
           "name": "owner",
@@ -3887,14 +3585,7 @@
         {
           "name": "perpMarket",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "group",
-            "bids",
-            "asks",
-            "event_queue",
-            "oracle"
-          ]
+          "isSigner": false
         },
         {
           "name": "bids",
@@ -3988,10 +3679,7 @@
         {
           "name": "account",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "group"
-          ]
+          "isSigner": false
         },
         {
           "name": "owner",
@@ -4001,12 +3689,7 @@
         {
           "name": "perpMarket",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "group",
-            "bids",
-            "asks"
-          ]
+          "isSigner": false
         },
         {
           "name": "bids",
@@ -4037,10 +3720,7 @@
         {
           "name": "account",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "group"
-          ]
+          "isSigner": false
         },
         {
           "name": "owner",
@@ -4050,12 +3730,7 @@
         {
           "name": "perpMarket",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "group",
-            "bids",
-            "asks"
-          ]
+          "isSigner": false
         },
         {
           "name": "bids",
@@ -4086,10 +3761,7 @@
         {
           "name": "account",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "group"
-          ]
+          "isSigner": false
         },
         {
           "name": "owner",
@@ -4099,12 +3771,7 @@
         {
           "name": "perpMarket",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "group",
-            "bids",
-            "asks"
-          ]
+          "isSigner": false
         },
         {
           "name": "bids",
@@ -4135,10 +3802,7 @@
         {
           "name": "account",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "group"
-          ]
+          "isSigner": false
         },
         {
           "name": "owner",
@@ -4148,12 +3812,7 @@
         {
           "name": "perpMarket",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "group",
-            "bids",
-            "asks"
-          ]
+          "isSigner": false
         },
         {
           "name": "bids",
@@ -4192,11 +3851,7 @@
         {
           "name": "perpMarket",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "group",
-            "event_queue"
-          ]
+          "isSigner": false
         },
         {
           "name": "eventQueue",
@@ -4222,13 +3877,7 @@
         {
           "name": "perpMarket",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "group",
-            "bids",
-            "asks",
-            "oracle"
-          ]
+          "isSigner": false
         },
         {
           "name": "bids",
@@ -4259,10 +3908,7 @@
         {
           "name": "settler",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "group"
-          ]
+          "isSigner": false
         },
         {
           "name": "settlerOwner",
@@ -4272,27 +3918,17 @@
         {
           "name": "perpMarket",
           "isMut": false,
-          "isSigner": false,
-          "relations": [
-            "group",
-            "oracle"
-          ]
+          "isSigner": false
         },
         {
           "name": "accountA",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "group"
-          ]
+          "isSigner": false
         },
         {
           "name": "accountB",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "group"
-          ]
+          "isSigner": false
         },
         {
           "name": "oracle",
@@ -4302,10 +3938,7 @@
         {
           "name": "settleBank",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "group"
-          ]
+          "isSigner": false
         },
         {
           "name": "settleOracle",
@@ -4326,27 +3959,17 @@
         {
           "name": "perpMarket",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "group",
-            "oracle"
-          ]
+          "isSigner": false
         },
         {
           "name": "accountA",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "group"
-          ]
+          "isSigner": false
         },
         {
           "name": "accountB",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "group"
-          ]
+          "isSigner": false
         },
         {
           "name": "oracle",
@@ -4367,19 +3990,12 @@
         {
           "name": "perpMarket",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "group",
-            "oracle"
-          ]
+          "isSigner": false
         },
         {
           "name": "account",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "group"
-          ]
+          "isSigner": false
         },
         {
           "name": "oracle",
@@ -4389,10 +4005,7 @@
         {
           "name": "settleBank",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "group"
-          ]
+          "isSigner": false
         },
         {
           "name": "settleOracle",
@@ -4418,11 +4031,7 @@
         {
           "name": "perpMarket",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "group",
-            "oracle"
-          ]
+          "isSigner": false
         },
         {
           "name": "oracle",
@@ -4432,10 +4041,7 @@
         {
           "name": "liqor",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "group"
-          ]
+          "isSigner": false
         },
         {
           "name": "liqorOwner",
@@ -4445,18 +4051,12 @@
         {
           "name": "liqee",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "group"
-          ]
+          "isSigner": false
         },
         {
           "name": "settleBank",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "group"
-          ]
+          "isSigner": false
         },
         {
           "name": "settleVault",
@@ -4491,20 +4091,12 @@
         {
           "name": "account",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "group"
-          ]
+          "isSigner": false
         },
         {
           "name": "perpMarket",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "group",
-            "bids",
-            "asks"
-          ]
+          "isSigner": false
         },
         {
           "name": "bids",
@@ -4530,18 +4122,12 @@
         {
           "name": "group",
           "isMut": false,
-          "isSigner": false,
-          "relations": [
-            "insurance_vault"
-          ]
+          "isSigner": false
         },
         {
           "name": "liqor",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "group"
-          ]
+          "isSigner": false
         },
         {
           "name": "liqorOwner",
@@ -4551,19 +4137,12 @@
         {
           "name": "liqee",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "group"
-          ]
+          "isSigner": false
         },
         {
           "name": "perpMarket",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "group",
-            "oracle"
-          ]
+          "isSigner": false
         },
         {
           "name": "oracle",
@@ -4573,10 +4152,7 @@
         {
           "name": "settleBank",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "group"
-          ]
+          "isSigner": false
         },
         {
           "name": "settleVault",
@@ -4612,18 +4188,12 @@
         {
           "name": "group",
           "isMut": false,
-          "isSigner": false,
-          "relations": [
-            "insurance_vault"
-          ]
+          "isSigner": false
         },
         {
           "name": "liqor",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "group"
-          ]
+          "isSigner": false
         },
         {
           "name": "liqorOwner",
@@ -4633,19 +4203,12 @@
         {
           "name": "liqee",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "group"
-          ]
+          "isSigner": false
         },
         {
           "name": "perpMarket",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "group",
-            "oracle"
-          ]
+          "isSigner": false
         },
         {
           "name": "oracle",
@@ -4655,10 +4218,7 @@
         {
           "name": "settleBank",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "group"
-          ]
+          "isSigner": false
         },
         {
           "name": "settleVault",
@@ -4678,10 +4238,7 @@
         {
           "name": "insuranceBank",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "group"
-          ]
+          "isSigner": false
         },
         {
           "name": "insuranceBankVault",
@@ -4717,10 +4274,7 @@
         {
           "name": "account",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "group"
-          ]
+          "isSigner": false
         },
         {
           "name": "authority",
@@ -4757,7 +4311,7 @@
         },
         {
           "name": "pricePremiumBps",
-          "type": "u32"
+          "type": "u16"
         },
         {
           "name": "priceLimit",
@@ -4784,10 +4338,7 @@
         {
           "name": "account",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "group"
-          ]
+          "isSigner": false
         },
         {
           "name": "authority",
@@ -4817,18 +4368,12 @@
         {
           "name": "liqee",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "group"
-          ]
+          "isSigner": false
         },
         {
           "name": "liqor",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "group"
-          ]
+          "isSigner": false
         },
         {
           "name": "liqorAuthority",
@@ -4861,10 +4406,7 @@
         {
           "name": "group",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "admin"
-          ]
+          "isSigner": false
         },
         {
           "name": "admin",
@@ -4890,10 +4432,7 @@
         {
           "name": "group",
           "isMut": false,
-          "isSigner": false,
-          "relations": [
-            "admin"
-          ]
+          "isSigner": false
         },
         {
           "name": "admin",
@@ -4935,10 +4474,7 @@
         {
           "name": "account",
           "isMut": false,
-          "isSigner": false,
-          "relations": [
-            "group"
-          ]
+          "isSigner": false
         }
       ],
       "args": []
@@ -5350,11 +4886,19 @@
             "type": "u64"
           },
           {
+            "name": "tokenConditionalSwapTakerFeeBps",
+            "type": "i16"
+          },
+          {
+            "name": "tokenConditionalSwapMakerFeeBps",
+            "type": "i16"
+          },
+          {
             "name": "reserved",
             "type": {
               "array": [
                 "u8",
-                1824
+                1820
               ]
             }
           }
@@ -5896,7 +5440,10 @@
           {
             "name": "openInterest",
             "docs": [
-              "Number of base lot pairs currently active in the market. Always >= 0."
+              "Number of base lots currently active in the market. Always >= 0.",
+              "",
+              "Since this counts positive base lots and negative base lots, the more relevant",
+              "number of open base lot pairs is half this value."
             ],
             "type": "i64"
           },
@@ -7844,23 +7391,41 @@
           {
             "name": "priceThreshold",
             "docs": [
-              "the threshold at which to allow execution"
+              "The price threshold at which to allow execution",
+              "",
+              "Uses the sell_token oracle per buy_token oracle price, without accounting for fees."
             ],
             "type": "f32"
           },
           {
             "name": "priceLimit",
             "docs": [
-              "the maximum price at which execution is allowed"
+              "The maximum sell_token per buy_token price at which execution is allowed",
+              "",
+              "this includes the premium and fees."
             ],
             "type": "f32"
           },
           {
             "name": "pricePremiumBps",
             "docs": [
-              "the premium to pay over oracle price"
+              "The premium to pay over oracle price to incentivize execution."
             ],
-            "type": "u32"
+            "type": "u16"
+          },
+          {
+            "name": "takerFeeBps",
+            "docs": [
+              "The taker receives only premium_price * (1 - taker_fee_bps/10000)"
+            ],
+            "type": "i16"
+          },
+          {
+            "name": "makerFeeBps",
+            "docs": [
+              "The maker has to pay premium_price * (1 + maker_fee_bps/10000)"
+            ],
+            "type": "i16"
           },
           {
             "name": "buyTokenIndex",
@@ -7903,7 +7468,7 @@
             "type": {
               "array": [
                 "u8",
-                124
+                122
               ]
             }
           }
@@ -9394,6 +8959,50 @@
       ]
     },
     {
+      "name": "WithdrawLoanLog",
+      "fields": [
+        {
+          "name": "mangoGroup",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "mangoAccount",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "tokenIndex",
+          "type": "u16",
+          "index": false
+        },
+        {
+          "name": "loanAmount",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "loanOriginationFee",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "instruction",
+          "type": {
+            "defined": "LoanOriginationFeeInstruction"
+          },
+          "index": false
+        },
+        {
+          "name": "price",
+          "type": {
+            "option": "i128"
+          },
+          "index": false
+        }
+      ]
+    },
+    {
       "name": "TokenLiqBankruptcyLog",
       "fields": [
         {
@@ -10092,6 +9701,16 @@
           "index": false
         },
         {
+          "name": "makerFee",
+          "type": "u64",
+          "index": false
+        },
+        {
+          "name": "takerFee",
+          "type": "u64",
+          "index": false
+        },
+        {
           "name": "buyTokenPrice",
           "type": "i128",
           "index": false
@@ -10148,7 +9767,7 @@
     {
       "code": 6007,
       "name": "HealthMustBePositiveOrIncrease",
-      "msg": "health must be positive or increase"
+      "msg": "health must be positive or not decrease"
     },
     {
       "code": 6008,
@@ -10359,6 +9978,11 @@
       "code": 6049,
       "name": "TokenConditionalSwapPriceThresholdNotReached",
       "msg": "conditional token swap price threshold not reached"
+    },
+    {
+      "code": 6050,
+      "name": "TokenConditionalSwapPriceExceedsLimit",
+      "msg": "conditional token swap price exceeds limit"
     }
   ]
 }
