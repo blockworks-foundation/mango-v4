@@ -228,7 +228,12 @@ fn action(
 
     sell_bank.collected_fees_native += I80F48::from(maker_fee + taker_fee);
 
-    // TODO: safety features on net borrows
+    if liqor_buy_loan_origination > 0 {
+        buy_bank.check_net_borrows(buy_token_price)?;
+    }
+    if liqee_sell_loan_origination > 0 {
+        sell_bank.check_net_borrows(sell_token_price)?;
+    }
 
     let post_liqee_sell_token = liqee_sell_token.native(&sell_bank);
     let post_liqor_sell_token = liqor_sell_token.native(&sell_bank);
