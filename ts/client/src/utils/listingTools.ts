@@ -24,6 +24,8 @@ const PREMIUM_LISTING_BASE = {
   depositWeightScale: toNative(250000, 6).toNumber(),
 };
 
+export type ListingPreset = typeof PREMIUM_LISTING_BASE;
+
 export type LISTING_PRESETS_KEYS =
   | 'PREMIUM'
   | 'MID'
