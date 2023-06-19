@@ -1,6 +1,6 @@
 import { toNative } from '../utils';
 
-const PREMIUM_LISTING_BASE = {
+const PREMIUM_LISTING = {
   maxStalenessSlots: 120 as number | null,
   oracleConfFilter: 0.1,
   adjustmentFactor: 0.004,
@@ -26,7 +26,7 @@ const PREMIUM_LISTING_BASE = {
   key: 'PREMIUM',
 };
 
-export type ListingPreset = typeof PREMIUM_LISTING_BASE;
+export type ListingPreset = typeof PREMIUM_LISTING;
 
 export type LISTING_PRESETS_KEYS =
   | 'PREMIUM'
@@ -40,13 +40,13 @@ export const LISTING_PRESETS: {
 } = {
   //Price impact on $100,000 swap lower then 1%
   PREMIUM: {
-    ...PREMIUM_LISTING_BASE,
+    ...PREMIUM_LISTING,
     name: 'Blue chip',
     key: 'PREMIUM',
   },
   //Price impact on $20,000 swap lower then 1%
   MID: {
-    ...PREMIUM_LISTING_BASE,
+    ...PREMIUM_LISTING,
     maintAssetWeight: 0.75,
     initAssetWeight: 0.5,
     maintLiabWeight: 1.2,
@@ -61,7 +61,7 @@ export const LISTING_PRESETS: {
   },
   //Price impact on $5,000 swap lower then 1%
   MEME: {
-    ...PREMIUM_LISTING_BASE,
+    ...PREMIUM_LISTING,
     maxStalenessSlots: 800,
     loanOriginationFeeRate: 0.002,
     maintAssetWeight: 0,
@@ -78,7 +78,7 @@ export const LISTING_PRESETS: {
   },
   //Price impact on $1,000 swap lower then 1%
   SHIT: {
-    ...PREMIUM_LISTING_BASE,
+    ...PREMIUM_LISTING,
     maxStalenessSlots: 800,
     loanOriginationFeeRate: 0.002,
     maintAssetWeight: 0,
