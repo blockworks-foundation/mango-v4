@@ -1906,6 +1906,12 @@ export type MangoV4 = {
           "type": {
             "option": "bool"
           }
+        },
+        {
+          "name": "nameOpt",
+          "type": {
+            "option": "string"
+          }
         }
       ]
     },
@@ -2393,7 +2399,8 @@ export type MangoV4 = {
     {
       "name": "serum3SettleFunds",
       "docs": [
-        "Settles all free funds from the OpenOrders account into the MangoAccount.",
+        "Deprecated instruction that used to settles all free funds from the OpenOrders account",
+        "into the MangoAccount.",
         "",
         "Any serum \"referrer rebates\" (ui fees) are considered Mango fees."
       ],
@@ -5687,7 +5694,10 @@ export type MangoV4 = {
           {
             "name": "openInterest",
             "docs": [
-              "Number of base lot pairs currently active in the market. Always >= 0."
+              "Number of base lots currently active in the market. Always >= 0.",
+              "",
+              "Since this counts positive base lots and negative base lots, the more relevant",
+              "number of open base lot pairs is half this value."
             ],
             "type": "i64"
           },
@@ -9055,6 +9065,50 @@ export type MangoV4 = {
       ]
     },
     {
+      "name": "WithdrawLoanLog",
+      "fields": [
+        {
+          "name": "mangoGroup",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "mangoAccount",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "tokenIndex",
+          "type": "u16",
+          "index": false
+        },
+        {
+          "name": "loanAmount",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "loanOriginationFee",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "instruction",
+          "type": {
+            "defined": "LoanOriginationFeeInstruction"
+          },
+          "index": false
+        },
+        {
+          "name": "price",
+          "type": {
+            "option": "i128"
+          },
+          "index": false
+        }
+      ]
+    },
+    {
       "name": "TokenLiqBankruptcyLog",
       "fields": [
         {
@@ -9749,7 +9803,7 @@ export type MangoV4 = {
     {
       "code": 6007,
       "name": "HealthMustBePositiveOrIncrease",
-      "msg": "health must be positive or increase"
+      "msg": "health must be positive or not decrease"
     },
     {
       "code": 6008,
@@ -11867,6 +11921,12 @@ export const IDL: MangoV4 = {
           "type": {
             "option": "bool"
           }
+        },
+        {
+          "name": "nameOpt",
+          "type": {
+            "option": "string"
+          }
         }
       ]
     },
@@ -12354,7 +12414,8 @@ export const IDL: MangoV4 = {
     {
       "name": "serum3SettleFunds",
       "docs": [
-        "Settles all free funds from the OpenOrders account into the MangoAccount.",
+        "Deprecated instruction that used to settles all free funds from the OpenOrders account",
+        "into the MangoAccount.",
         "",
         "Any serum \"referrer rebates\" (ui fees) are considered Mango fees."
       ],
@@ -15648,7 +15709,10 @@ export const IDL: MangoV4 = {
           {
             "name": "openInterest",
             "docs": [
-              "Number of base lot pairs currently active in the market. Always >= 0."
+              "Number of base lots currently active in the market. Always >= 0.",
+              "",
+              "Since this counts positive base lots and negative base lots, the more relevant",
+              "number of open base lot pairs is half this value."
             ],
             "type": "i64"
           },
@@ -19016,6 +19080,50 @@ export const IDL: MangoV4 = {
       ]
     },
     {
+      "name": "WithdrawLoanLog",
+      "fields": [
+        {
+          "name": "mangoGroup",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "mangoAccount",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "tokenIndex",
+          "type": "u16",
+          "index": false
+        },
+        {
+          "name": "loanAmount",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "loanOriginationFee",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "instruction",
+          "type": {
+            "defined": "LoanOriginationFeeInstruction"
+          },
+          "index": false
+        },
+        {
+          "name": "price",
+          "type": {
+            "option": "i128"
+          },
+          "index": false
+        }
+      ]
+    },
+    {
       "name": "TokenLiqBankruptcyLog",
       "fields": [
         {
@@ -19710,7 +19818,7 @@ export const IDL: MangoV4 = {
     {
       "code": 6007,
       "name": "HealthMustBePositiveOrIncrease",
-      "msg": "health must be positive or increase"
+      "msg": "health must be positive or not decrease"
     },
     {
       "code": 6008,
