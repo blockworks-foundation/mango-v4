@@ -1,4 +1,10 @@
-import { AnchorProvider, BN, Program, Wallet } from '@coral-xyz/anchor';
+import {
+  AnchorProvider,
+  BN,
+  Program,
+  Provider,
+  Wallet,
+} from '@coral-xyz/anchor';
 import {
   createCloseAccountInstruction,
   createInitializeAccount3Instruction,
@@ -55,6 +61,7 @@ import {
 } from './accounts/serum3';
 import {
   IxGateParams,
+  PerpEditParams,
   TokenEditParams,
   buildIxGate,
 } from './clientIxParamBuilder';
@@ -820,6 +827,7 @@ export class MangoClient {
       ai.data,
     );
 
+    // Start reading tokenConditionalSwaps from this point in account buffer
     const start =
       // anchor headers
       8 +
@@ -867,18 +875,18 @@ export class MangoClient {
       tokenConditionalSwaps = [];
     } else {
       // mango accounts which have been expanded for tokenConditionalSwaps already
-      const tcsSpan = (this.program as any)._coder.types.typeLayouts.get(
+      const tcsSize = (this.program as any)._coder.types.typeLayouts.get(
         'TokenConditionalSwap',
       ).span;
-      const tcsLength = u32.u32().decode(ai?.data, start - 4);
-      tokenConditionalSwaps = range(tcsLength).map((i) =>
+      const tcsSequenceLength = u32.u32().decode(ai?.data, start - 4);
+      tokenConditionalSwaps = range(tcsSequenceLength).map((i) =>
         (this.program as any)._coder.types.typeLayouts
           .get('TokenConditionalSwap')
           .decode(
-            ai.data.slice(start + i * tcsSpan, start + (i + 1) * tcsSpan),
+            ai.data.slice(start + i * tcsSize, start + (i + 1) * tcsSize),
           ),
       );
-      if (ai.data.length - start - tcsLength * tcsSpan !== 0) {
+      if (ai.data.length - start - tcsSequenceLength * tcsSize !== 0) {
         throw new Error("The size of the account doesn't match expectations");
       }
     }

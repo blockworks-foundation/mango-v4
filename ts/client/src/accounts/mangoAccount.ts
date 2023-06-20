@@ -182,6 +182,10 @@ export class MangoAccount {
     return this.perps.filter((perp) => perp.isActive());
   }
 
+  public tokenConditionalSwapsActive(): TokenConditionalSwap[] {
+    return this.tokenConditionalSwaps.filter((tcs) => tcs.isActive);
+  }
+
   public perpOrdersActive(): PerpOo[] {
     return this.perpOpenOrders.filter(
       (oo) => oo.orderMarket !== PerpOo.OrderMarketUnset,
