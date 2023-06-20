@@ -231,12 +231,10 @@ fn action(
 
     sell_bank.collected_fees_native += I80F48::from(maker_fee + taker_fee);
 
-    if liqor_buy_withdraw.has_loan() {
-        buy_bank.check_net_borrows(buy_token_price)?;
-    }
-    if liqee_sell_withdraw.has_loan() {
-        sell_bank.check_net_borrows(sell_token_price)?;
-    }
+    // No need to check net borrow limits on buy_bank or sell_bank, because this mostly transfers
+    // tokens between two accounts. For the sell token, the withdraw is higher than the deposit
+    // due to fees, so net borrows can technically increase a bit: but the difference gets "deposited"
+    // into collected_fees_native.
 
     let post_liqee_sell_token = liqee_sell_token.native(&sell_bank);
     let post_liqor_sell_token = liqor_sell_token.native(&sell_bank);
