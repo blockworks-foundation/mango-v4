@@ -22,8 +22,9 @@ const PREMIUM_LISTING = {
   insuranceFound: true,
   borrowWeightScale: toNative(250000, 6).toNumber(),
   depositWeightScale: toNative(250000, 6).toNumber(),
-  name: 'Blue chip',
-  key: 'PREMIUM',
+  preset_name: 'Blue chip',
+  preset_key: 'PREMIUM',
+  preset_target_amount: 100000,
 };
 
 export type ListingPreset = typeof PREMIUM_LISTING;
@@ -41,8 +42,6 @@ export const LISTING_PRESETS: {
   //Price impact on $100,000 swap lower then 1%
   PREMIUM: {
     ...PREMIUM_LISTING,
-    name: 'Blue chip',
-    key: 'PREMIUM',
   },
   //Price impact on $20,000 swap lower then 1%
   MID: {
@@ -53,11 +52,12 @@ export const LISTING_PRESETS: {
     initLiabWeight: 1.4,
     liquidationFee: 0.1,
     netBorrowLimitPerWindowQuote: toNative(20000, 6).toNumber(),
-    name: 'Midwit',
-    key: 'MID',
     borrowWeightScale: toNative(50000, 6).toNumber(),
     depositWeightScale: toNative(50000, 6).toNumber(),
     insuranceFound: false,
+    preset_name: 'Midwit',
+    preset_key: 'MID',
+    preset_target_amount: 20000,
   },
   //Price impact on $5,000 swap lower then 1%
   MEME: {
@@ -73,8 +73,9 @@ export const LISTING_PRESETS: {
     borrowWeightScale: toNative(20000, 6).toNumber(),
     depositWeightScale: toNative(20000, 6).toNumber(),
     insuranceFound: false,
-    name: 'Meme Coin',
-    key: 'MEME',
+    preset_name: 'Meme Coin',
+    preset_key: 'MEME',
+    preset_target_amount: 5000,
   },
   //Price impact on $1,000 swap lower then 1%
   SHIT: {
@@ -90,8 +91,9 @@ export const LISTING_PRESETS: {
     borrowWeightScale: toNative(5000, 6).toNumber(),
     depositWeightScale: toNative(5000, 6).toNumber(),
     insuranceFound: false,
-    name: 'Shit Coin',
-    key: 'SHIT',
+    preset_name: 'Shit Coin',
+    preset_key: 'SHIT',
+    preset_target_amount: 1000,
   },
   //should run untrusted instruction
   UNTRUSTED: {},
