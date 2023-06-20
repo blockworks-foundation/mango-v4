@@ -107,7 +107,7 @@ async function main(): Promise<void> {
     }
 
     const offChain =
-      offChainEntry['long_funding'] + offChainEntry['short_funding'];
+      -offChainEntry['long_funding'] - offChainEntry['short_funding'];
     return [onChain, offChain];
   }
   for (const a of largeMangoAccounts) {
