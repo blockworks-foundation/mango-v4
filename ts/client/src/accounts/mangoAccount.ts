@@ -17,6 +17,7 @@ export class MangoAccount {
   public serum3: Serum3Orders[];
   public perps: PerpPosition[];
   public perpOpenOrders: PerpOo[];
+  public tokenConditionalSwaps: TokenConditionalSwap[];
 
   static from(
     publicKey: PublicKey,
@@ -41,6 +42,7 @@ export class MangoAccount {
       perps: unknown;
       perpOpenOrders: unknown;
     },
+    tokenConditionalSwaps: TokenConditionalSwapDto[],
   ): MangoAccount {
     return new MangoAccount(
       publicKey,
@@ -63,6 +65,7 @@ export class MangoAccount {
       obj.serum3 as Serum3PositionDto[],
       obj.perps as PerpPositionDto[],
       obj.perpOpenOrders as PerpOoDto[],
+      tokenConditionalSwaps,
       new Map(), // serum3OosMapByMarketIndex
     );
   }
@@ -88,6 +91,7 @@ export class MangoAccount {
     serum3: Serum3PositionDto[],
     perps: PerpPositionDto[],
     perpOpenOrders: PerpOoDto[],
+    tokenConditionalSwaps: TokenConditionalSwapDto[],
     public serum3OosMapByMarketIndex: Map<number, OpenOrders>,
   ) {
     this.name = utf8.decode(new Uint8Array(name)).split('\x00')[0];
@@ -95,10 +99,13 @@ export class MangoAccount {
     this.serum3 = serum3.map((dto) => Serum3Orders.from(dto));
     this.perps = perps.map((dto) => PerpPosition.from(dto));
     this.perpOpenOrders = perpOpenOrders.map((dto) => PerpOo.from(dto));
+    this.tokenConditionalSwaps = tokenConditionalSwaps.map((dto) =>
+      TokenConditionalSwap.from(dto),
+    );
   }
 
   public async reload(client: MangoClient): Promise<MangoAccount> {
-    const mangoAccount = await client.getMangoAccount(this);
+    const mangoAccount = await client.getMangoAccount(this.publicKey);
     await mangoAccount.reloadSerum3OpenOrders(client);
     Object.assign(this, mangoAccount);
     return mangoAccount;
@@ -1675,6 +1682,76 @@ export class PerpOoDto {
     public clientId: BN,
     public id: BN,
   ) {}
+}
+
+export class TokenConditionalSwap {
+  static from(dto: TokenConditionalSwapDto): TokenConditionalSwap {
+    return new TokenConditionalSwap(
+      dto.id,
+      dto.maxBuy,
+      dto.maxSell,
+      dto.bought,
+      dto.sold,
+      dto.priceThreshold,
+      dto.priceLimit,
+      dto.pricePremiumBps,
+      dto.takerFeeBps,
+      dto.makerFeeBps,
+      dto.buyTokenIndex as TokenIndex,
+      dto.sellTokenIndex as TokenIndex,
+      dto.isActive == 1,
+      dto.priceThresholdType == 0
+        ? 'priceOverThreshold'
+        : 'priceUnderThreshold',
+      dto.allowCreatingDeposits == 1,
+      dto.allowCreatingBorrows == 1,
+    );
+  }
+
+  constructor(
+    public id: BN,
+    public maxBuy: BN,
+    public maxSell: BN,
+    public bought: BN,
+    public sold: BN,
+    public priceThreshold: number,
+    public priceLimit: number,
+    public pricePremiumBps: number,
+    public takerFeeBps: number,
+    public makerFeeBps: number,
+    public buyTokenIndex: TokenIndex,
+    public sellTokenIndex: TokenIndex,
+    public isActive: boolean,
+    public priceThresholdType: 'priceOverThreshold' | 'priceUnderThreshold',
+    public allowCreatingDeposits: boolean,
+    public allowCreatingBorrows: boolean,
+  ) {}
+}
+
+export class TokenConditionalSwapDto {
+  constructor(
+    public id: BN,
+    public maxBuy: BN,
+    public maxSell: BN,
+    public bought: BN,
+    public sold: BN,
+    public priceThreshold: number,
+    public priceLimit: number,
+    public pricePremiumBps: number,
+    public takerFeeBps: number,
+    public makerFeeBps: number,
+    public buyTokenIndex: number,
+    public sellTokenIndex: number,
+    public isActive: number,
+    public priceThresholdType: number,
+    public allowCreatingDeposits: number,
+    public allowCreatingBorrows: number,
+  ) {}
+}
+
+export class TokenConditionalSwapPriceThresholdType {
+  static priceOverThreshold = { priceOverThreshold: {} };
+  static priceUnderThreshold = { priceUnderThreshold: {} };
 }
 
 export class HealthType {

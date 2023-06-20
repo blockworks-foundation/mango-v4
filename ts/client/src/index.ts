@@ -6,7 +6,6 @@ import { MANGO_V4_ID } from './constants';
 export * from './accounts/bank';
 export * from './accounts/mangoAccount';
 export * from './accounts/perp';
-export * from './accounts/stoploss';
 export {
   Serum3Market,
   Serum3OrderType,
