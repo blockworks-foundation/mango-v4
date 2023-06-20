@@ -1,10 +1,4 @@
-import {
-  AnchorProvider,
-  BN,
-  Program,
-  Provider,
-  Wallet,
-} from '@coral-xyz/anchor';
+import { AnchorProvider, BN, Program, Wallet } from '@coral-xyz/anchor';
 import {
   createCloseAccountInstruction,
   createInitializeAccount3Instruction,
@@ -61,7 +55,6 @@ import {
 } from './accounts/serum3';
 import {
   IxGateParams,
-  PerpEditParams,
   TokenEditParams,
   buildIxGate,
 } from './clientIxParamBuilder';
@@ -864,9 +857,16 @@ export class MangoClient {
       4;
 
     let tokenConditionalSwaps;
-    if (start == ai.data.length + 4 + 4) {
+    if (
+      // mango accounts which haven't been expanded for tokenConditionalSwaps
+      start ==
+      ai.data.length +
+        4 + // padding
+        4 // length of tokenConditionalSwaps
+    ) {
       tokenConditionalSwaps = [];
     } else {
+      // mango accounts which have been expanded for tokenConditionalSwaps already
       const tcsSpan = (this.program as any)._coder.types.typeLayouts.get(
         'TokenConditionalSwap',
       ).span;
