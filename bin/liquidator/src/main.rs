@@ -200,7 +200,8 @@ async fn main() -> anyhow::Result<()> {
     };
 
     let liq_config = liquidate::Config {
-        min_health_ratio: cli.min_health_ratio,
+        liq_min_health_ratio: cli.min_health_ratio,
+        tcs_min_health_ratio: cli.min_health_ratio,
         // TODO: config
         refresh_timeout: Duration::from_secs(30),
     };

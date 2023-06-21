@@ -13,7 +13,8 @@ use rand::seq::SliceRandom;
 use {anyhow::Context, fixed::types::I80F48, solana_sdk::pubkey::Pubkey};
 
 pub struct Config {
-    pub min_health_ratio: f64,
+    pub liq_min_health_ratio: f64,
+    pub tcs_min_health_ratio: f64,
     pub refresh_timeout: Duration,
 }
 
@@ -613,7 +614,7 @@ pub async fn maybe_liquidate_account(
     pubkey: &Pubkey,
     config: &Config,
 ) -> anyhow::Result<bool> {
-    let liqor_min_health_ratio = I80F48::from_num(config.min_health_ratio);
+    let liqor_min_health_ratio = I80F48::from_num(config.liq_min_health_ratio);
 
     let account = account_fetcher.fetch_mango_account(pubkey)?;
     let health_cache = health_cache::new(&mango_client.context, account_fetcher, &account)
@@ -699,7 +700,7 @@ async fn tcs_is_executable(
     }
 
     // TODO: requirements on premium
-    if tcs.price_premium_bps < 1000 {
+    if tcs.price_premium_bps < 100 {
         return Ok(false);
     }
 
@@ -757,8 +758,7 @@ pub async fn maybe_execute_token_conditional_swap(
         return Ok(false);
     }
 
-    // TODO: separate min-health for stop loss!?
-    let liqor_min_health_ratio = I80F48::from_num(config.min_health_ratio);
+    let liqor_min_health_ratio = I80F48::from_num(config.tcs_min_health_ratio);
 
     // Compute the max viable swap (for liqor and liqee) and min it
     let buy_token_price = mango_client.bank_oracle_price(tcs.buy_token_index).await?;
@@ -800,9 +800,12 @@ pub async fn maybe_execute_token_conditional_swap(
     }
 
     log::trace!(
-        "executing token conditional swap for: {}, with owner: {}, TODO", // TODO: details
+        "executing token conditional swap for: {}, with owner: {}, id: {}, max_buy: {}, max_sell: {}",
         pubkey,
         liqee.fixed.owner,
+        tcs_id,
+        max_buy_token_to_liqee,
+        max_sell_token_to_liqor,
     );
 
     let txsig = mango_client
@@ -813,7 +816,12 @@ pub async fn maybe_execute_token_conditional_swap(
             max_sell_token_to_liqor,
         )
         .await?;
-    // TODO: log txsig, see liquidation
+    log::info!(
+        "Executed swap account {}, tcs index {}, tx sig {:?}",
+        pubkey,
+        tcs_id,
+        txsig
+    );
 
     let slot = account_fetcher.transaction_max_slot(&[txsig]).await?;
     if let Err(e) = account_fetcher
@@ -824,7 +832,7 @@ pub async fn maybe_execute_token_conditional_swap(
         )
         .await
     {
-        log::info!("could not refresh after stop loss: {}", e);
+        log::info!("could not refresh after tcs: {}", e);
     }
 
     Ok(true)
