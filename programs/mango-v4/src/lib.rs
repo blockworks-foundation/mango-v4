@@ -415,9 +415,10 @@ pub mod mango_v4 {
         ctx: Context<Serum3EditMarket>,
         reduce_only_opt: Option<bool>,
         force_close_opt: Option<bool>,
+        name_opt: Option<String>,
     ) -> Result<()> {
         #[cfg(feature = "enable-gpl")]
-        instructions::serum3_edit_market(ctx, reduce_only_opt, force_close_opt)?;
+        instructions::serum3_edit_market(ctx, reduce_only_opt, force_close_opt, name_opt)?;
         Ok(())
     }
 
