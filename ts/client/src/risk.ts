@@ -492,7 +492,7 @@ export async function getRiskStats(
 
   // Clone group, and simulate change % price drop for usdc
   const groupUsdcDepeg: Group = cloneDeep(group);
-  Array.from(groupDrop.banksMapByTokenIndex.values())
+  Array.from(groupUsdcDepeg.banksMapByTokenIndex.values())
     .flat()
     .filter((b) => b.name.includes('USDC'))
     .forEach((b) => {
@@ -503,7 +503,7 @@ export async function getRiskStats(
 
   // Clone group, and simulate change % price drop for usdt
   const groupUsdtDepeg: Group = cloneDeep(group);
-  Array.from(groupDrop.banksMapByTokenIndex.values())
+  Array.from(groupUsdtDepeg.banksMapByTokenIndex.values())
     .flat()
     .filter((b) => b.name.includes('USDT'))
     .forEach((b) => {
