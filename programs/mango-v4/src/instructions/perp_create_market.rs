@@ -94,11 +94,15 @@ pub fn perp_create_market(
         reserved: [0; 1888],
     };
 
-    let oracle_price =
-        perp_market.oracle_price(&AccountInfoRef::borrow(ctx.accounts.oracle.as_ref())?, None)?;
-    perp_market
-        .stable_price_model
-        .reset_to_price(oracle_price.to_num(), now_ts);
+    if let Ok(oracle_price) =
+        perp_market.oracle_price(&AccountInfoRef::borrow(ctx.accounts.oracle.as_ref())?, None)
+    {
+        perp_market
+            .stable_price_model
+            .reset_to_price(oracle_price.to_num(), now_ts);
+    } else {
+        perp_market.stable_price_model.reset_on_nonzero_price = 1;
+    }
 
     let mut orderbook = Orderbook {
         bids: ctx.accounts.bids.load_init()?,
