@@ -161,14 +161,6 @@ impl MangoAccount {
         }
     }
 
-    pub fn to_bytes(&self) -> Vec<u8> {
-        let b = AnchorSerialize::try_to_vec(&self).unwrap();
-        // We could extend for u32 padding and u32 size of TokenConditionalSwap entries here,
-        // but the from_bytes() code must support reading older account data, so it's fine.
-        // b.extend(&[0u8; 8]);
-        b
-    }
-
     /// Number of bytes needed for the MangoAccount, including the discriminator
     pub fn space(
         token_count: u8,
@@ -1446,7 +1438,32 @@ mod tests {
     use super::*;
 
     fn make_test_account() -> MangoAccountValue {
-        let bytes = MangoAccount::default_for_tests().to_bytes();
+        let account = MangoAccount::default_for_tests();
+        let mut bytes = AnchorSerialize::try_to_vec(&account).unwrap();
+
+        // The MangoAccount struct is missing some dynamic fields, add space for them
+        let tcs_length = 2;
+        let expected_space = MangoAccount::space(
+            account.tokens.len() as u8,
+            account.serum3.len() as u8,
+            account.perps.len() as u8,
+            account.perp_open_orders.len() as u8,
+            tcs_length,
+        )
+        .unwrap();
+        bytes.extend(vec![0u8; expected_space - bytes.len()]);
+
+        // Set the length of these dynamic parts
+        let (fixed, dynamic) = bytes.split_at_mut(size_of::<MangoAccountFixed>());
+        let mut header = MangoAccountDynamicHeader::from_bytes(dynamic).unwrap();
+        header.token_conditional_swap_count = tcs_length;
+        let mut account = MangoAccountRefMut {
+            header: &mut header,
+            fixed: bytemuck::from_bytes_mut(fixed),
+            dynamic,
+        };
+        account.write_token_conditional_swap_length();
+
         MangoAccountValue::from_bytes(&bytes).unwrap()
     }
 
@@ -1474,15 +1491,19 @@ mod tests {
         account.perp_open_orders.resize(8, PerpOpenOrder::default());
         account.next_conditional_swap_id = 13;
 
-        let account_bytes = account.to_bytes();
+        let account_bytes_without_tcs = AnchorSerialize::try_to_vec(&account).unwrap();
+        let account_bytes_with_tcs = {
+            let mut b = account_bytes_without_tcs.clone();
+            // tcs adds 4 bytes of padding and 4 bytes of Vec size
+            b.extend([0u8; 8]);
+            b
+        };
         assert_eq!(
-            8 + account_bytes.len(),
-            // MangoAccount.to_bytes() creates an account without token stop loss, so
-            // subtract 8 bytes for TokenConditionalSwap padding and size
-            MangoAccount::space(8, 8, 8, 8, 0).unwrap() - 8
+            8 + account_bytes_with_tcs.len(),
+            MangoAccount::space(8, 8, 8, 8, 0).unwrap()
         );
 
-        let account2 = MangoAccountValue::from_bytes(&account_bytes).unwrap();
+        let account2 = MangoAccountValue::from_bytes(&account_bytes_without_tcs).unwrap();
         assert_eq!(account.group, account2.fixed.group);
         assert_eq!(account.owner, account2.fixed.owner);
         assert_eq!(account.name, account2.fixed.name);
@@ -1532,6 +1553,10 @@ mod tests {
                 .perp_position_by_raw_index_unchecked(0)
                 .market_index
         );
+        assert_eq!(account2.all_token_conditional_swap().count(), 0);
+
+        let account3 = MangoAccountValue::from_bytes(&account_bytes_with_tcs).unwrap();
+        assert_eq!(account3.all_token_conditional_swap().count(), 0);
     }
 
     #[test]
@@ -1763,5 +1788,53 @@ mod tests {
 
         fixed.reduce_buyback_fees_accrued(12);
         assert_eq!(fixed.buyback_fees_accrued(), 0);
+    }
+
+    #[test]
+    fn test_token_conditional_swap() {
+        let mut account = make_test_account();
+        assert_eq!(account.all_token_conditional_swap().count(), 2);
+        assert_eq!(account.active_token_conditional_swap().count(), 0);
+        assert_eq!(account.token_conditional_swap_free_index().unwrap(), 0);
+
+        let tcs = account.add_token_conditional_swap().unwrap();
+        tcs.id = 123;
+        assert_eq!(account.all_token_conditional_swap().count(), 2);
+        assert_eq!(account.active_token_conditional_swap().count(), 1);
+        assert_eq!(account.token_conditional_swap_free_index().unwrap(), 1);
+
+        let tcs = account.add_token_conditional_swap().unwrap();
+        tcs.id = 234;
+        assert_eq!(account.all_token_conditional_swap().count(), 2);
+        assert_eq!(account.active_token_conditional_swap().count(), 2);
+
+        let (index, tcs) = account.token_conditional_swap_by_id(123).unwrap();
+        assert_eq!(index, 0);
+        assert_eq!(tcs.id, 123);
+        let tcs = account.token_conditional_swap_by_index(0).unwrap();
+        assert_eq!(tcs.id, 123);
+
+        let (index, tcs) = account.token_conditional_swap_by_id(234).unwrap();
+        assert_eq!(index, 1);
+        assert_eq!(tcs.id, 234);
+        let tcs = account.token_conditional_swap_by_index(1).unwrap();
+        assert_eq!(tcs.id, 234);
+
+        assert!(account.add_token_conditional_swap().is_err());
+        assert!(account.token_conditional_swap_free_index().is_err());
+
+        let tcs = account.token_conditional_swap_mut_by_index(0).unwrap();
+        tcs.is_active = 0;
+        assert_eq!(account.all_token_conditional_swap().count(), 2);
+        assert_eq!(account.active_token_conditional_swap().count(), 1);
+        assert_eq!(
+            account.active_token_conditional_swap().next().unwrap().id,
+            234
+        );
+        assert!(account.token_conditional_swap_by_id(123).is_err());
+
+        assert_eq!(account.token_conditional_swap_free_index().unwrap(), 0);
+        let tcs = account.add_token_conditional_swap().unwrap();
+        assert_eq!(tcs.id, 123); // old data
     }
 }
