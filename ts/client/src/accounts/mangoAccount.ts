@@ -2,7 +2,6 @@ import { AnchorProvider, BN } from '@coral-xyz/anchor';
 import { utf8 } from '@coral-xyz/anchor/dist/cjs/utils/bytes';
 import { OpenOrders, Order, Orderbook } from '@project-serum/serum/lib/market';
 import { AccountInfo, PublicKey, TransactionSignature } from '@solana/web3.js';
-import cloneDeep from 'lodash/cloneDeep';
 import { MangoClient } from '../client';
 import { OPENBOOK_PROGRAM_ID, RUST_I64_MAX, RUST_I64_MIN } from '../constants';
 import {
@@ -1741,8 +1740,8 @@ export class PerpPosition {
   ): { sizeLots: BN; quoteNative: I80F48 } {
     const filtered = orders.filter((oo) =>
       side == PerpOrderSide.bid
-        ? perpMarket.priceLotsToNative(oo.priceLots).gte(tillPriceExclusive)
-        : perpMarket.priceLotsToNative(oo.priceLots).lte(tillPriceExclusive),
+        ? perpMarket.priceLotsToNative(oo.priceLots).gt(tillPriceExclusive)
+        : perpMarket.priceLotsToNative(oo.priceLots).lt(tillPriceExclusive),
     );
     return {
       sizeLots: filtered.reduce((sum, a) => sum.add(a.sizeLots), new BN(0)),
@@ -1790,7 +1789,7 @@ export class PerpPosition {
         const ret = PerpPosition.getAggregatePerpOrderSizeAndQuoteNative(
           perpMarket,
           sortedOo,
-          PerpOrderSide.ask,
+          PerpOrderSide.bid,
           tillPriceExclusive,
         );
         wbpn = perpMarket.maintBaseLiabWeight.mul(
@@ -1823,26 +1822,12 @@ export class PerpPosition {
       return MINUS_ONE_I80F48();
     }
 
-    // Health contribution of perp position in question would be considered separately
-    const mAClone: MangoAccount = cloneDeep(mangoAccount);
-    const ppToBeErased: PerpPosition = mAClone.getPerpPosition(
-      perpMarket.perpMarketIndex,
-    )!;
-    ppToBeErased.marketIndex =
-      PerpPosition.PerpMarketIndexUnset as PerpMarketIndex;
-    const healthCacheWoPerpPosition = HealthCache.fromMangoAccount(
-      group,
-      mAClone,
-    );
+    const hc = HealthCache.fromMangoAccount(group, mangoAccount);
 
-    // Unused, TODO what to do with this?
-    // const basePrice = qpn.neg().div(wbpn);
-
-    const healthContributionWithoutSettleToken =
-      healthCacheWoPerpPosition.healthExcludingToken(
-        HealthType.maint,
-        perpMarket.settleTokenIndex,
-      ); // C
+    const healthContributionWithoutSettleToken = hc.healthExcludingToken(
+      HealthType.maint,
+      perpMarket.settleTokenIndex,
+    ); // C
 
     const settleTokenWeight = healthContributionWithoutSettleToken.lt(
       ZERO_I80F48(),
@@ -1850,23 +1835,16 @@ export class PerpPosition {
       ? settleTokenBank.maintAssetWeight
       : settleTokenBank.maintLiabWeight;
     const settleTokenSpot =
-      healthCacheWoPerpPosition.tokenInfos[
-        healthCacheWoPerpPosition.getOrCreateTokenInfoIndex(settleTokenBank)
-      ].balanceSpot;
-    const otherPerpsSettledInSettleTokenUhuPnl =
-      healthCacheWoPerpPosition.perpInfos
-        .filter((pi) => pi.settleTokenIndex == perpMarket.settleTokenIndex)
-        .reduce(
-          (sum, pi) => sum.add(pi.healthUnsettledPnl(HealthType.maint)),
-          ZERO_I80F48(),
-        );
-    const openBookFree = mangoAccount.getSerum3TokenFreeBalance(
-      group,
-      settleTokenBank,
-    );
+      hc.tokenInfos[hc.getOrCreateTokenInfoIndex(settleTokenBank)].balanceSpot;
+    const otherPerpsSettledInSettleTokenUhuPnl = hc.perpInfos
+      .filter((pi) => pi.settleTokenIndex == perpMarket.settleTokenIndex)
+      .filter((pi) => pi.perpMarketIndex != perpMarket.perpMarketIndex)
+      .reduce(
+        (sum, pi) => sum.add(pi.healthUnsettledPnl(HealthType.maint)),
+        ZERO_I80F48(),
+      );
     const settleTokenContribution = settleTokenSpot
       .add(otherPerpsSettledInSettleTokenUhuPnl)
-      .add(openBookFree)
       .add(qpn); // T
 
     const liqPrice = healthContributionWithoutSettleToken
