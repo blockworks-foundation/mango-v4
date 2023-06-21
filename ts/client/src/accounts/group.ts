@@ -17,9 +17,9 @@ import { I80F48, ONE_I80F48 } from '../numbers/I80F48';
 import { toNative, toNativeI80F48, toUiDecimals } from '../utils';
 import { Bank, MintInfo, TokenIndex } from './bank';
 import {
+  OracleProvider,
   isPythOracle,
   isSwitchboardOracle,
-  OracleProvider,
   parseSwitchboardOracle,
 } from './oracle';
 import { BookSide, PerpMarket, PerpMarketIndex } from './perp';
