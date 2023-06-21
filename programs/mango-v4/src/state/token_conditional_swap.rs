@@ -39,6 +39,9 @@ pub struct TokenConditionalSwap {
     pub bought: u64,
     pub sold: u64,
 
+    /// timestamp until which the conditional swap is valid
+    pub expiry_timestamp: u64,
+
     /// The price threshold at which to allow execution
     ///
     /// Uses the sell_token oracle per buy_token oracle price, without accounting for fees.
@@ -72,14 +75,13 @@ pub struct TokenConditionalSwap {
     /// may token selling create borrows? (often users just want to get out of a long)
     pub allow_creating_borrows: u8,
 
-    // TODO: Add some kind of expiry timestamp
     #[derivative(Debug = "ignore")]
-    pub reserved: [u8; 122],
+    pub reserved: [u8; 114],
 }
 
 const_assert_eq!(
     size_of::<TokenConditionalSwap>(),
-    8 * 5 + 2 * 4 + 2 * 5 + 1 * 4 + 122
+    8 * 6 + 2 * 4 + 2 * 5 + 1 * 4 + 114
 );
 const_assert_eq!(size_of::<TokenConditionalSwap>(), 184);
 const_assert_eq!(size_of::<TokenConditionalSwap>() % 8, 0);
@@ -92,6 +94,7 @@ impl Default for TokenConditionalSwap {
             max_sell: 0,
             bought: 0,
             sold: 0,
+            expiry_timestamp: u64::MAX,
             price_threshold: 0.0,
             price_limit: 0.0,
             price_premium_bps: 0,
@@ -103,18 +106,25 @@ impl Default for TokenConditionalSwap {
             price_threshold_type: TokenConditionalSwapPriceThresholdType::PriceOverThreshold.into(),
             allow_creating_borrows: 0,
             allow_creating_deposits: 0,
-            reserved: [0; 122],
+            reserved: [0; 114],
         }
     }
 }
 
 impl TokenConditionalSwap {
+    /// Whether the entry is in use
+    ///
+    /// Note that it's possible for an entry to be active but expired
     pub fn is_active(&self) -> bool {
         self.is_active == 1
     }
 
     pub fn set_active(&mut self, active: bool) {
         self.is_active = u8::from(active);
+    }
+
+    pub fn is_expired(&self, now_ts: u64) -> bool {
+        now_ts >= self.expiry_timestamp
     }
 
     pub fn allow_creating_deposits(&self) -> bool {

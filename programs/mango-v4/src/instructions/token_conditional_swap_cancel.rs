@@ -29,5 +29,7 @@ pub fn token_conditional_swap_cancel(
     require_eq!(tcs.id, token_conditional_swap_id);
     *tcs = TokenConditionalSwap::default();
 
+    // TODO: logging
+
     Ok(())
 }

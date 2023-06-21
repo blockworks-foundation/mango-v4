@@ -177,6 +177,18 @@ export type MangoV4 = {
           "type": {
             "option": "u64"
           }
+        },
+        {
+          "name": "tokenConditionalSwapTakerFeeBpsOpt",
+          "type": {
+            "option": "i16"
+          }
+        },
+        {
+          "name": "tokenConditionalSwapMakerFeeBpsOpt",
+          "type": {
+            "option": "i16"
+          }
         }
       ]
     },
@@ -2449,7 +2461,8 @@ export type MangoV4 = {
     {
       "name": "serum3SettleFunds",
       "docs": [
-        "Settles all free funds from the OpenOrders account into the MangoAccount.",
+        "Deprecated instruction that used to settles all free funds from the OpenOrders account",
+        "into the MangoAccount.",
         "",
         "Any serum \"referrer rebates\" (ui fees) are considered Mango fees."
       ],
@@ -4746,6 +4759,10 @@ export type MangoV4 = {
           "type": "u64"
         },
         {
+          "name": "expireTs",
+          "type": "u64"
+        },
+        {
           "name": "priceThreshold",
           "type": "f32"
         },
@@ -4757,7 +4774,7 @@ export type MangoV4 = {
         },
         {
           "name": "pricePremiumBps",
-          "type": "u32"
+          "type": "u16"
         },
         {
           "name": "priceLimit",
@@ -5350,11 +5367,19 @@ export type MangoV4 = {
             "type": "u64"
           },
           {
+            "name": "tokenConditionalSwapTakerFeeBps",
+            "type": "i16"
+          },
+          {
+            "name": "tokenConditionalSwapMakerFeeBps",
+            "type": "i16"
+          },
+          {
             "name": "reserved",
             "type": {
               "array": [
                 "u8",
-                1824
+                1820
               ]
             }
           }
@@ -5896,7 +5921,10 @@ export type MangoV4 = {
           {
             "name": "openInterest",
             "docs": [
-              "Number of base lot pairs currently active in the market. Always >= 0."
+              "Number of base lots currently active in the market. Always >= 0.",
+              "",
+              "Since this counts positive base lots and negative base lots, the more relevant",
+              "number of open base lot pairs is half this value."
             ],
             "type": "i64"
           },
@@ -7842,25 +7870,50 @@ export type MangoV4 = {
             "type": "u64"
           },
           {
+            "name": "expireTs",
+            "docs": [
+              "timestamp until which the conditional swap is valid"
+            ],
+            "type": "u64"
+          },
+          {
             "name": "priceThreshold",
             "docs": [
-              "the threshold at which to allow execution"
+              "The price threshold at which to allow execution",
+              "",
+              "Uses the sell_token oracle per buy_token oracle price, without accounting for fees."
             ],
             "type": "f32"
           },
           {
             "name": "priceLimit",
             "docs": [
-              "the maximum price at which execution is allowed"
+              "The maximum sell_token per buy_token price at which execution is allowed",
+              "",
+              "this includes the premium and fees."
             ],
             "type": "f32"
           },
           {
             "name": "pricePremiumBps",
             "docs": [
-              "the premium to pay over oracle price"
+              "The premium to pay over oracle price to incentivize execution."
             ],
-            "type": "u32"
+            "type": "u16"
+          },
+          {
+            "name": "takerFeeBps",
+            "docs": [
+              "The taker receives only premium_price * (1 - taker_fee_bps/10000)"
+            ],
+            "type": "i16"
+          },
+          {
+            "name": "makerFeeBps",
+            "docs": [
+              "The maker has to pay premium_price * (1 + maker_fee_bps/10000)"
+            ],
+            "type": "i16"
           },
           {
             "name": "buyTokenIndex",
@@ -7903,7 +7956,7 @@ export type MangoV4 = {
             "type": {
               "array": [
                 "u8",
-                124
+                114
               ]
             }
           }
@@ -9394,6 +9447,50 @@ export type MangoV4 = {
       ]
     },
     {
+      "name": "WithdrawLoanLog",
+      "fields": [
+        {
+          "name": "mangoGroup",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "mangoAccount",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "tokenIndex",
+          "type": "u16",
+          "index": false
+        },
+        {
+          "name": "loanAmount",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "loanOriginationFee",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "instruction",
+          "type": {
+            "defined": "LoanOriginationFeeInstruction"
+          },
+          "index": false
+        },
+        {
+          "name": "price",
+          "type": {
+            "option": "i128"
+          },
+          "index": false
+        }
+      ]
+    },
+    {
       "name": "TokenLiqBankruptcyLog",
       "fields": [
         {
@@ -10092,6 +10189,16 @@ export type MangoV4 = {
           "index": false
         },
         {
+          "name": "makerFee",
+          "type": "u64",
+          "index": false
+        },
+        {
+          "name": "takerFee",
+          "type": "u64",
+          "index": false
+        },
+        {
           "name": "buyTokenPrice",
           "type": "i128",
           "index": false
@@ -10148,7 +10255,7 @@ export type MangoV4 = {
     {
       "code": 6007,
       "name": "HealthMustBePositiveOrIncrease",
-      "msg": "health must be positive or increase"
+      "msg": "health must be positive or not decrease"
     },
     {
       "code": 6008,
@@ -10359,6 +10466,11 @@ export type MangoV4 = {
       "code": 6049,
       "name": "TokenConditionalSwapPriceThresholdNotReached",
       "msg": "conditional token swap price threshold not reached"
+    },
+    {
+      "code": 6050,
+      "name": "TokenConditionalSwapPriceExceedsLimit",
+      "msg": "conditional token swap price exceeds limit"
     }
   ]
 };
@@ -10542,6 +10654,18 @@ export const IDL: MangoV4 = {
           "type": {
             "option": "u64"
           }
+        },
+        {
+          "name": "tokenConditionalSwapTakerFeeBpsOpt",
+          "type": {
+            "option": "i16"
+          }
+        },
+        {
+          "name": "tokenConditionalSwapMakerFeeBpsOpt",
+          "type": {
+            "option": "i16"
+          }
         }
       ]
     },
@@ -12814,7 +12938,8 @@ export const IDL: MangoV4 = {
     {
       "name": "serum3SettleFunds",
       "docs": [
-        "Settles all free funds from the OpenOrders account into the MangoAccount.",
+        "Deprecated instruction that used to settles all free funds from the OpenOrders account",
+        "into the MangoAccount.",
         "",
         "Any serum \"referrer rebates\" (ui fees) are considered Mango fees."
       ],
@@ -15111,6 +15236,10 @@ export const IDL: MangoV4 = {
           "type": "u64"
         },
         {
+          "name": "expireTs",
+          "type": "u64"
+        },
+        {
           "name": "priceThreshold",
           "type": "f32"
         },
@@ -15122,7 +15251,7 @@ export const IDL: MangoV4 = {
         },
         {
           "name": "pricePremiumBps",
-          "type": "u32"
+          "type": "u16"
         },
         {
           "name": "priceLimit",
@@ -15715,11 +15844,19 @@ export const IDL: MangoV4 = {
             "type": "u64"
           },
           {
+            "name": "tokenConditionalSwapTakerFeeBps",
+            "type": "i16"
+          },
+          {
+            "name": "tokenConditionalSwapMakerFeeBps",
+            "type": "i16"
+          },
+          {
             "name": "reserved",
             "type": {
               "array": [
                 "u8",
-                1824
+                1820
               ]
             }
           }
@@ -16261,7 +16398,10 @@ export const IDL: MangoV4 = {
           {
             "name": "openInterest",
             "docs": [
-              "Number of base lot pairs currently active in the market. Always >= 0."
+              "Number of base lots currently active in the market. Always >= 0.",
+              "",
+              "Since this counts positive base lots and negative base lots, the more relevant",
+              "number of open base lot pairs is half this value."
             ],
             "type": "i64"
           },
@@ -18207,25 +18347,50 @@ export const IDL: MangoV4 = {
             "type": "u64"
           },
           {
+            "name": "expireTs",
+            "docs": [
+              "timestamp until which the conditional swap is valid"
+            ],
+            "type": "u64"
+          },
+          {
             "name": "priceThreshold",
             "docs": [
-              "the threshold at which to allow execution"
+              "The price threshold at which to allow execution",
+              "",
+              "Uses the sell_token oracle per buy_token oracle price, without accounting for fees."
             ],
             "type": "f32"
           },
           {
             "name": "priceLimit",
             "docs": [
-              "the maximum price at which execution is allowed"
+              "The maximum sell_token per buy_token price at which execution is allowed",
+              "",
+              "this includes the premium and fees."
             ],
             "type": "f32"
           },
           {
             "name": "pricePremiumBps",
             "docs": [
-              "the premium to pay over oracle price"
+              "The premium to pay over oracle price to incentivize execution."
             ],
-            "type": "u32"
+            "type": "u16"
+          },
+          {
+            "name": "takerFeeBps",
+            "docs": [
+              "The taker receives only premium_price * (1 - taker_fee_bps/10000)"
+            ],
+            "type": "i16"
+          },
+          {
+            "name": "makerFeeBps",
+            "docs": [
+              "The maker has to pay premium_price * (1 + maker_fee_bps/10000)"
+            ],
+            "type": "i16"
           },
           {
             "name": "buyTokenIndex",
@@ -18268,7 +18433,7 @@ export const IDL: MangoV4 = {
             "type": {
               "array": [
                 "u8",
-                124
+                114
               ]
             }
           }
@@ -19759,6 +19924,50 @@ export const IDL: MangoV4 = {
       ]
     },
     {
+      "name": "WithdrawLoanLog",
+      "fields": [
+        {
+          "name": "mangoGroup",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "mangoAccount",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "tokenIndex",
+          "type": "u16",
+          "index": false
+        },
+        {
+          "name": "loanAmount",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "loanOriginationFee",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "instruction",
+          "type": {
+            "defined": "LoanOriginationFeeInstruction"
+          },
+          "index": false
+        },
+        {
+          "name": "price",
+          "type": {
+            "option": "i128"
+          },
+          "index": false
+        }
+      ]
+    },
+    {
       "name": "TokenLiqBankruptcyLog",
       "fields": [
         {
@@ -20457,6 +20666,16 @@ export const IDL: MangoV4 = {
           "index": false
         },
         {
+          "name": "makerFee",
+          "type": "u64",
+          "index": false
+        },
+        {
+          "name": "takerFee",
+          "type": "u64",
+          "index": false
+        },
+        {
           "name": "buyTokenPrice",
           "type": "i128",
           "index": false
@@ -20513,7 +20732,7 @@ export const IDL: MangoV4 = {
     {
       "code": 6007,
       "name": "HealthMustBePositiveOrIncrease",
-      "msg": "health must be positive or increase"
+      "msg": "health must be positive or not decrease"
     },
     {
       "code": 6008,
@@ -20724,6 +20943,11 @@ export const IDL: MangoV4 = {
       "code": 6049,
       "name": "TokenConditionalSwapPriceThresholdNotReached",
       "msg": "conditional token swap price threshold not reached"
+    },
+    {
+      "code": 6050,
+      "name": "TokenConditionalSwapPriceExceedsLimit",
+      "msg": "conditional token swap price exceeds limit"
     }
   ]
 };

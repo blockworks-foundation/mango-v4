@@ -758,6 +758,8 @@ pub async fn maybe_execute_token_conditional_swap(
         return Ok(false);
     }
 
+    // TODO: if it's expired, just trigger it to close it?
+
     let liqor_min_health_ratio = I80F48::from_num(config.tcs_min_health_ratio);
 
     // Compute the max viable swap (for liqor and liqee) and min it

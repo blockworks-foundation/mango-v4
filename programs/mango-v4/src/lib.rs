@@ -1143,6 +1143,7 @@ pub mod mango_v4 {
         sell_token_index: TokenIndex,
         max_buy: u64,
         max_sell: u64,
+        expiry_timestamp: u64,
         price_threshold: f32,
         price_threshold_type: TokenConditionalSwapPriceThresholdType,
         price_premium_bps: u16,
@@ -1156,6 +1157,7 @@ pub mod mango_v4 {
             max_sell,
             bought: 0,
             sold: 0,
+            expiry_timestamp,
             price_threshold,
             price_limit,
             price_premium_bps,
@@ -1167,7 +1169,7 @@ pub mod mango_v4 {
             price_threshold_type: price_threshold_type.into(),
             allow_creating_deposits: u8::from(allow_creating_deposits),
             allow_creating_borrows: u8::from(allow_creating_borrows),
-            reserved: [0; 122],
+            reserved: [0; 114],
         };
 
         #[cfg(feature = "enable-gpl")]

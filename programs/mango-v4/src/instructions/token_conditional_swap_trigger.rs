@@ -41,11 +41,22 @@ pub fn token_conditional_swap_trigger(
     require!(tcs.is_active(), MangoError::SomeError);
     require_eq!(tcs.id, token_conditional_swap_id);
 
+    // Possibly wipe the tcs and exit, if it's already expired
+    let now_ts: u64 = Clock::get()?.unix_timestamp.try_into().unwrap();
+    if tcs.is_expired(now_ts) {
+        drop(tcs);
+        let tcs = liqee.token_conditional_swap_mut_by_index(token_conditional_swap_index)?;
+        *tcs = TokenConditionalSwap::default();
+
+        // TODO: logging?
+
+        return Ok(());
+    }
+
     let (buy_bank, buy_token_price, sell_bank_and_oracle_opt) =
         account_retriever.banks_mut_and_oracles(tcs.buy_token_index, tcs.sell_token_index)?;
     let (sell_bank, sell_token_price) = sell_bank_and_oracle_opt.unwrap();
 
-    let now_ts: u64 = Clock::get().unwrap().unix_timestamp.try_into().unwrap();
     let (liqee_buy_change, liqee_sell_change) = action(
         &mut liqor.borrow_mut(),
         liqor_key,
@@ -151,6 +162,7 @@ fn action(
         .token_conditional_swap_by_index(token_conditional_swap_index)?
         .clone();
     require!(tcs.is_active(), MangoError::SomeError);
+    require!(!tcs.is_expired(now_ts), MangoError::SomeError);
     require_eq!(buy_bank.token_index, tcs.buy_token_index);
     require_eq!(sell_bank.token_index, tcs.sell_token_index);
 

@@ -4159,6 +4159,7 @@ impl ClientInstruction for TokenConditionalSwapCreateInstruction {
             sell_token_index: self.sell_token_index,
             max_buy: self.max_buy,
             max_sell: self.max_sell,
+            expiry_timestamp: u64::MAX,
             price_threshold: self.price_threshold,
             price_threshold_type: self.price_threshold_type,
             price_limit: self.price_limit,
