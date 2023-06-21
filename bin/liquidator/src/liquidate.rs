@@ -769,6 +769,9 @@ pub async fn maybe_execute_token_conditional_swap(
     let maker_price = I80F48::from_num(tcs.maker_price(premium_price));
     let taker_price = I80F48::from_num(tcs.taker_price(premium_price));
 
+    // TODO: configurable
+    let max_take_quote = I80F48::from(1_000_000_000);
+
     let max_sell_token_to_liqor = LiquidateHelper::max_swap_source(
         mango_client,
         account_fetcher,
@@ -779,8 +782,10 @@ pub async fn maybe_execute_token_conditional_swap(
         I80F48::from_num(0.01), // TODO: what target?
     )
     .await?
+    .min(max_take_quote / sell_token_price)
     .floor()
-    .to_num();
+    .to_num::<u64>()
+    .min(tcs.remaining_sell());
 
     let max_buy_token_to_liqee = LiquidateHelper::max_swap_source(
         mango_client,
@@ -792,11 +797,35 @@ pub async fn maybe_execute_token_conditional_swap(
         liqor_min_health_ratio,
     )
     .await?
+    .min(max_take_quote / buy_token_price)
     .floor()
-    .to_num();
+    .to_num::<u64>()
+    .min(tcs.remaining_buy());
 
     if max_sell_token_to_liqor == 0 || max_buy_token_to_liqee == 0 {
         return Ok(false);
+    }
+
+    // Final check of the reverse trade on jupiter
+    // TODO: doing this every time is hugely expensive, there needs to be a layer
+    // in front, that rejects nonsensical tcs based on cached slippage values.
+    {
+        let buy_mint = mango_client.context.mint_info(tcs.buy_token_index).mint;
+        let sell_mint = mango_client.context.mint_info(tcs.sell_token_index).mint;
+        let slippage = 100; // TODO: configurable
+        let swap_mode = JupiterSwapMode::ExactIn;
+        let input_amount = max_sell_token_to_liqor.min(
+            (I80F48::from(max_buy_token_to_liqee) * taker_price)
+                .floor()
+                .to_num(),
+        );
+        let route = mango_client
+            .jupiter_route(sell_mint, buy_mint, input_amount, slippage, swap_mode)
+            .await?;
+        log::info!("tcs pre execution jupiter query: {:#?}", route);
+
+        // TODO: check if the output_amount is large enough
+        // TODO: technically, we could just execute this at the same time?
     }
 
     log::trace!(

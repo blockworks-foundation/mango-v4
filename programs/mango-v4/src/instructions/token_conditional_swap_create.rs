@@ -26,5 +26,7 @@ pub fn token_conditional_swap_create(
     tcs.taker_fee_bps = group.token_conditional_swap_taker_fee_bps;
     tcs.maker_fee_bps = group.token_conditional_swap_maker_fee_bps;
 
+    // TODO: should we check that the token indexes are at least valid?
+
     Ok(())
 }
