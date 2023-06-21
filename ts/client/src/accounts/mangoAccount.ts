@@ -1717,7 +1717,7 @@ export class PerpPosition {
         perpMarket,
         mangoAccount,
         sortedOo,
-        prevLp && prevLp.gt(ZERO_I80F48) ? prevLp : perpMarket.price,
+        prevLp && prevLp.gt(ZERO_I80F48()) ? prevLp : perpMarket.price,
       );
 
       if (prevLp && pp.getBasePositionNative(perpMarket).isPos()) {
