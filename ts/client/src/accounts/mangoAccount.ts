@@ -1690,6 +1690,11 @@ export class PerpPosition {
       );
     }
 
+    const baseNative = this.getBasePositionNative(perpMarket);
+    if (baseNative.isZero()) {
+      return MINUS_ONE_I80F48();
+    }
+
     // Orders in direction of our current position, would be considered for execution as long as their price
     // is between liquidtion price and current market price
     const sortedOo = await (pp.getBasePositionNative(perpMarket).isPos()
@@ -1781,15 +1786,12 @@ export class PerpPosition {
     );
     {
       const baseNative = this.getBasePositionNative(perpMarket);
-      if (baseNative.isZero()) {
-        return MINUS_ONE_I80F48();
-      }
 
       if (baseNative.isNeg()) {
         const ret = PerpPosition.getAggregatePerpOrderSizeAndQuoteNative(
           perpMarket,
           sortedOo,
-          PerpOrderSide.bid,
+          PerpOrderSide.ask,
           tillPriceExclusive,
         );
         wbpn = perpMarket.maintBaseLiabWeight.mul(
@@ -1804,7 +1806,7 @@ export class PerpPosition {
         const ret = PerpPosition.getAggregatePerpOrderSizeAndQuoteNative(
           perpMarket,
           sortedOo,
-          PerpOrderSide.ask,
+          PerpOrderSide.bid,
           tillPriceExclusive,
         );
         wbpn = perpMarket.maintBaseAssetWeight.mul(
@@ -1816,10 +1818,6 @@ export class PerpPosition {
         );
         qpn = qpn.sub(ret.quoteNative);
       }
-    }
-
-    if (wbpn.isZero()) {
-      return MINUS_ONE_I80F48();
     }
 
     const hc = HealthCache.fromMangoAccount(group, mangoAccount);
@@ -1889,7 +1887,7 @@ export class PerpPosition {
         )
       ).toNumber(),
     );
-    return lpUi;
+    return lpUi < 0 ? -1 : lpUi;
   }
 }
 

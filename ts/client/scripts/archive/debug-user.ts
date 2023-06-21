@@ -297,16 +297,23 @@ async function debugUser(
       mClone.getHealth(gClone, HealthType.maint),
     );
 
-    console.log(
-      `account https://app.mango.markets/?address=${mangoAccount.publicKey}`,
-    );
-    console.log(
-      `${pm.name}, health: ${health.toLocaleString()}, side: ${
-        pp.getBasePositionNative(pm).isPos() ? 'LONG' : 'SHORT'
-      }, notional: ${pp.getNotionalValueUi(
-        pm,
-      )}, liq price ui: ${lpUi.toLocaleString()}, sim health: ${simHealth.toLocaleString()}`,
-    );
+    // if (
+    //   Math.abs(simHealth) >= 0.001 &&
+    //   health - simHealth <= 0.1 &&
+    //   pp.getNotionalValueUi(pm) > 1
+    // )
+    if (pp.getNotionalValueUi(pm) > 1000) {
+      console.log(
+        `account https://app.mango.markets/?address=${mangoAccount.publicKey}`,
+      );
+      console.log(
+        `${pm.name}, health: ${health.toLocaleString()}, side: ${
+          pp.getBasePositionNative(pm).isPos() ? 'LONG' : 'SHORT'
+        }, notional: ${pp.getNotionalValueUi(
+          pm,
+        )}, liq price ui: ${lpUi.toLocaleString()}, sim health: ${simHealth.toLocaleString()}`,
+      );
+    }
   }
 }
 
