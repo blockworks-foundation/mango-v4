@@ -1382,6 +1382,21 @@ impl MangoClient {
 
     // jupiter
 
+    async fn http_error_handling<T: serde::de::DeserializeOwned>(
+        response: reqwest::Response,
+    ) -> anyhow::Result<T> {
+        let status = response.status();
+        let response_text = response
+            .text()
+            .await
+            .context("awaiting body of quote request to jupiter")?;
+        if !status.is_success() {
+            anyhow::bail!("request failed, status: {status}, body: {response_text}");
+        }
+        serde_json::from_str::<T>(&response_text)
+            .with_context(|| format!("response has unexpected format, body: {response_text}"))
+    }
+
     pub async fn jupiter_route(
         &self,
         input_mint: Pubkey,
@@ -1390,7 +1405,7 @@ impl MangoClient {
         slippage: u64,
         swap_mode: JupiterSwapMode,
     ) -> anyhow::Result<jupiter::QueryRoute> {
-        let quote = self
+        let response = self
             .http_client
             .get("https://quote-api.jup.ag/v4/quote")
             .query(&[
@@ -1412,10 +1427,11 @@ impl MangoClient {
             ])
             .send()
             .await
-            .context("quote request to jupiter")?
-            .json::<jupiter::QueryResult>()
-            .await
-            .context("receiving json response from jupiter quote request")?;
+            .context("quote request to jupiter")?;
+        let quote: jupiter::QueryResult =
+            Self::http_error_handling(response).await.with_context(|| {
+                format!("error requesting jupiter route between {input_mint} and {output_mint}")
+            })?;
 
         // Find the top route that doesn't involve Raydium (that has too many accounts)
         let route = quote
@@ -1451,7 +1467,7 @@ impl MangoClient {
             .jupiter_route(input_mint, output_mint, amount, slippage, swap_mode)
             .await?;
 
-        let swap = self
+        let swap_response = self
             .http_client
             .post("https://quote-api.jup.ag/v4/swap")
             .json(&jupiter::SwapRequest {
@@ -1462,10 +1478,11 @@ impl MangoClient {
             })
             .send()
             .await
-            .context("swap transaction request to jupiter")?
-            .json::<jupiter::SwapResponse>()
+            .context("swap transaction request to jupiter")?;
+
+        let swap: jupiter::SwapResponse = Self::http_error_handling(swap_response)
             .await
-            .context("receiving json response from jupiter swap transaction request")?;
+            .context("error requesting jupiter swap")?;
 
         if swap.setup_transaction.is_some() || swap.cleanup_transaction.is_some() {
             anyhow::bail!(
