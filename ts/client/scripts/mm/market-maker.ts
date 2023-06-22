@@ -268,6 +268,7 @@ async function fullMarketMaker() {
   await group.reloadAll(client);
 
   // Cancel all existing orders
+  console.log(`Cancelling all orders...`);
   for (const perpMarket of Array.from(
     group.perpMarketsMapByMarketIndex.values(),
   )) {
@@ -313,6 +314,7 @@ async function fullMarketMaker() {
   }
 
   // Init sequence enforcer accounts
+  console.log(`Init sequence enforcer...`);
   await initSequenceEnforcerAccounts(
     client,
     Array.from(marketContexts.values()),
