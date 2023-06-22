@@ -1,7 +1,6 @@
 import {
   AnchorProvider,
   BN,
-  BorshAccountsCoder,
   Program,
   Provider,
   Wallet,
@@ -831,17 +830,13 @@ export class MangoClient {
     // Re-encode decoded mango account with v1 layout, this will help identifying
     // if account is of type v1 or v2
     // Do whole encoding manually, since anchor uses a buffer of a constant length which is too small
-    let mangoAccountV1Buffer = Buffer.alloc(ai.data.length);
+    const mangoAccountV1Buffer = Buffer.alloc(ai.data.length);
     const layout =
       this.program.coder.accounts['accountLayouts'].get('mangoAccount');
     const len = layout.encode(decodedMangoAccount, mangoAccountV1Buffer);
-    mangoAccountV1Buffer = mangoAccountV1Buffer.subarray(0, len);
-    const discriminator =
-      BorshAccountsCoder.accountDiscriminator('mangoAccount');
-    mangoAccountV1Buffer = Buffer.concat([discriminator, mangoAccountV1Buffer]);
 
     const tokenConditionalSwaps =
-      mangoAccountV1Buffer.length < ai.data.length
+      len + 8 < ai.data.length
         ? (borsh
             .vec(
               (this.program as any)._coder.types.typeLayouts.get(
