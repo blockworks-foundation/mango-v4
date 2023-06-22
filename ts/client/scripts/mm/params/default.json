@@ -41,13 +41,13 @@
     },
     "RNDR": {
       "perp": {
-        "sizePerc": 0.05,
+        "sizePerc": 0.025,
         "leanCoeff": 0.00025,
         "bias": 0.0,
         "requoteThresh": 0.0002,
         "takeSpammers": true,
         "spammerCharge": 2,
-        "charge": 0.003,
+        "charge": 0.005,
         "krakenCode": "RNDRUSD"
       }
     }
