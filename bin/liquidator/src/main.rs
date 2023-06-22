@@ -76,6 +76,12 @@ struct Cli {
     /// prioritize each transaction with this many microlamports/cu
     #[clap(long, env, default_value = "0")]
     prioritization_micro_lamports: u64,
+
+    /// use a jupiter mock instead of actual queries
+    ///
+    /// This is required for devnet testing.
+    #[clap(long, env, default_value = "false")]
+    mock_jupiter: bool,
 }
 
 pub fn encode_address(addr: &Pubkey) -> String {
@@ -202,6 +208,7 @@ async fn main() -> anyhow::Result<()> {
     let liq_config = liquidate::Config {
         liq_min_health_ratio: cli.min_health_ratio,
         tcs_min_health_ratio: cli.min_health_ratio,
+        mock_jupiter: cli.mock_jupiter,
         // TODO: config
         refresh_timeout: Duration::from_secs(30),
     };

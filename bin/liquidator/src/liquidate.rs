@@ -16,6 +16,65 @@ pub struct Config {
     pub liq_min_health_ratio: f64,
     pub tcs_min_health_ratio: f64,
     pub refresh_timeout: Duration,
+    pub mock_jupiter: bool,
+}
+
+async fn jupiter_route(
+    mango_client: &MangoClient,
+    input_mint: Pubkey,
+    output_mint: Pubkey,
+    amount: u64,
+    slippage: u64,
+    swap_mode: JupiterSwapMode,
+    config: &Config,
+) -> anyhow::Result<mango_v4_client::jupiter::QueryRoute> {
+    if !config.mock_jupiter {
+        return mango_client
+            .jupiter_route(input_mint, output_mint, amount, slippage, swap_mode)
+            .await;
+    }
+
+    let input_price = mango_client
+        .bank_oracle_price(mango_client.context.token_by_mint(&input_mint)?.token_index)
+        .await?;
+    let output_price = mango_client
+        .bank_oracle_price(
+            mango_client
+                .context
+                .token_by_mint(&output_mint)?
+                .token_index,
+        )
+        .await?;
+    let in_amount: u64;
+    let out_amount: u64;
+    let other_amount_threshold: u64;
+    let swap_mode_str;
+    match swap_mode {
+        JupiterSwapMode::ExactIn => {
+            in_amount = amount;
+            out_amount = (I80F48::from(amount) * input_price / output_price).to_num();
+            other_amount_threshold = out_amount;
+            swap_mode_str = "ExactIn".to_string();
+        }
+        JupiterSwapMode::ExactOut => {
+            in_amount = (I80F48::from(amount) * output_price / input_price).to_num();
+            out_amount = amount;
+            other_amount_threshold = in_amount;
+            swap_mode_str = "ExactOut".to_string();
+        }
+    }
+
+    Ok(mango_v4_client::jupiter::QueryRoute {
+        in_amount: in_amount.to_string(),
+        out_amount: out_amount.to_string(),
+        price_impact_pct: 0.1,
+        market_infos: vec![],
+        amount: amount.to_string(),
+        slippage_bps: 1,
+        other_amount_threshold: other_amount_threshold.to_string(),
+        swap_mode: swap_mode_str,
+        fees: None,
+    })
 }
 
 pub async fn jupiter_market_can_buy(
@@ -821,9 +880,16 @@ pub async fn maybe_execute_token_conditional_swap(
                 .floor()
                 .to_num(),
         );
-        let route = mango_client
-            .jupiter_route(sell_mint, buy_mint, input_amount, slippage, swap_mode)
-            .await?;
+        let route = jupiter_route(
+            mango_client,
+            sell_mint,
+            buy_mint,
+            input_amount,
+            slippage,
+            swap_mode,
+            config,
+        )
+        .await?;
         log::info!("tcs pre execution jupiter query: {:#?}", route);
 
         // TODO: check if the output_amount is large enough
