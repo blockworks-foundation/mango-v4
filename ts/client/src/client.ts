@@ -10,6 +10,7 @@ import {
   createInitializeAccount3Instruction,
 } from '@solana/spl-token';
 import {
+  AccountInfo,
   AccountMeta,
   AddressLookupTableAccount,
   Cluster,
@@ -26,7 +27,9 @@ import {
   TransactionSignature,
 } from '@solana/web3.js';
 import bs58 from 'bs58';
+import u32 from 'buffer-layout';
 import cloneDeep from 'lodash/cloneDeep';
+import range from 'lodash/range';
 import uniq from 'lodash/uniq';
 import { Bank, MintInfo, TokenIndex } from './accounts/bank';
 import { Group } from './accounts/group';
@@ -34,6 +37,7 @@ import {
   MangoAccount,
   PerpPosition,
   Serum3Orders,
+  TokenConditionalSwapPriceThresholdType,
   TokenPosition,
 } from './accounts/mangoAccount';
 import { StubOracle } from './accounts/oracle';
@@ -186,6 +190,8 @@ export class MangoClient {
     feesSwapMangoAccount?: PublicKey,
     feesMngoTokenIndex?: TokenIndex,
     feesExpiryInterval?: BN,
+    tokenConditionalSwapTakerFeeBps?: number,
+    tokenConditionalSwapMakerFeeBps?: number,
   ): Promise<TransactionSignature> {
     const ix = await this.program.methods
       .groupEdit(
@@ -200,6 +206,8 @@ export class MangoClient {
         feesSwapMangoAccount ?? null,
         feesMngoTokenIndex ?? null,
         feesExpiryInterval ?? null,
+        tokenConditionalSwapTakerFeeBps ?? null,
+        tokenConditionalSwapMakerFeeBps ?? null,
       )
       .accounts({
         group: group.publicKey,
@@ -655,28 +663,6 @@ export class MangoClient {
 
   // MangoAccount
 
-  public async getOrCreateMangoAccount(
-    group: Group,
-    loadSerum3Oo = false,
-  ): Promise<MangoAccount> {
-    const clientOwner = (this.program.provider as AnchorProvider).wallet
-      .publicKey;
-    let mangoAccounts = await this.getMangoAccountsForOwner(
-      group,
-      (this.program.provider as AnchorProvider).wallet.publicKey,
-      loadSerum3Oo,
-    );
-    if (mangoAccounts.length === 0) {
-      await this.createMangoAccount(group);
-      mangoAccounts = await this.getMangoAccountsForOwner(
-        group,
-        clientOwner,
-        loadSerum3Oo,
-      );
-    }
-    return mangoAccounts.sort((a, b) => a.accountNum - b.accountNum)[0];
-  }
-
   public async createMangoAccount(
     group: Group,
     accountNumber?: number,
@@ -705,34 +691,6 @@ export class MangoClient {
     return await this.sendAndConfirmTransactionForGroup(group, [ix]);
   }
 
-  public async createAndFetchMangoAccount(
-    group: Group,
-    accountNumber?: number,
-    name?: string,
-    tokenCount?: number,
-    serum3Count?: number,
-    perpCount?: number,
-    perpOoCount?: number,
-    loadSerum3Oo = false,
-  ): Promise<MangoAccount | undefined> {
-    const accNum = accountNumber ?? 0;
-    await this.createMangoAccount(
-      group,
-      accNum,
-      name,
-      tokenCount,
-      serum3Count,
-      perpCount,
-      perpOoCount,
-    );
-    return await this.getMangoAccountForOwner(
-      group,
-      (this.program.provider as AnchorProvider).wallet.publicKey,
-      accNum,
-      loadSerum3Oo,
-    );
-  }
-
   public async expandMangoAccount(
     group: Group,
     account: MangoAccount,
@@ -743,6 +701,33 @@ export class MangoClient {
   ): Promise<TransactionSignature> {
     const ix = await this.program.methods
       .accountExpand(tokenCount, serum3Count, perpCount, perpOoCount)
+      .accounts({
+        group: group.publicKey,
+        account: account.publicKey,
+        owner: (this.program.provider as AnchorProvider).wallet.publicKey,
+        payer: (this.program.provider as AnchorProvider).wallet.publicKey,
+      })
+      .instruction();
+    return await this.sendAndConfirmTransactionForGroup(group, [ix]);
+  }
+
+  public async accountExpandV2(
+    group: Group,
+    account: MangoAccount,
+    tokenCount: number,
+    serum3Count: number,
+    perpCount: number,
+    perpOoCount: number,
+    tokenConditionalSwapCount: number,
+  ): Promise<TransactionSignature> {
+    const ix = await this.program.methods
+      .accountExpandV2(
+        tokenCount,
+        serum3Count,
+        perpCount,
+        perpOoCount,
+        tokenConditionalSwapCount,
+      )
       .accounts({
         group: group.publicKey,
         account: account.publicKey,
@@ -812,21 +797,105 @@ export class MangoClient {
   }
 
   public async getMangoAccount(
-    mangoAccount: MangoAccount | PublicKey,
+    mangoAccountPk: PublicKey,
     loadSerum3Oo = false,
   ): Promise<MangoAccount> {
-    const mangoAccountPk =
-      mangoAccount instanceof MangoAccount
-        ? mangoAccount.publicKey
-        : mangoAccount;
-    const mangoAccount_ = MangoAccount.from(
-      mangoAccountPk,
-      await this.program.account.mangoAccount.fetch(mangoAccountPk),
-    );
+    const mangoAccount = await this.getMangoAccountFromPk(mangoAccountPk);
     if (loadSerum3Oo) {
-      await mangoAccount_?.reloadSerum3OpenOrders(this);
+      await mangoAccount?.reloadSerum3OpenOrders(this);
     }
-    return mangoAccount_;
+    return mangoAccount;
+  }
+
+  private async getMangoAccountFromPk(
+    mangoAccountPk: PublicKey,
+  ): Promise<MangoAccount> {
+    return this.getMangoAccountFromAi(
+      mangoAccountPk,
+      (await this.program.provider.connection.getAccountInfo(
+        mangoAccountPk,
+      )) as AccountInfo<Buffer>,
+    );
+  }
+
+  private getMangoAccountFromAi(
+    mangoAccountPk: PublicKey,
+    ai: AccountInfo<Buffer>,
+  ): MangoAccount {
+    const decodedMangoAccount = this.program.coder.accounts.decode(
+      'mangoAccount',
+      ai.data,
+    );
+
+    // Start reading tokenConditionalSwaps from this point in account buffer
+    const start =
+      // anchor headers
+      8 +
+      // fixed portion
+      (this.program as any)._coder.types.typeLayouts.get('MangoAccountFixed')
+        .span +
+      // dynamic portion header
+      8 +
+      4 +
+      // tokens
+      4 +
+      decodedMangoAccount.tokens.length *
+        (this.program as any)._coder.types.typeLayouts.get('TokenPosition')
+          .span +
+      4 +
+      // serum3Orders
+      4 +
+      decodedMangoAccount.serum3.length *
+        (this.program as any)._coder.types.typeLayouts.get('Serum3Orders')
+          .span +
+      4 +
+      // perpPositions
+      4 +
+      decodedMangoAccount.perps.length *
+        (this.program as any)._coder.types.typeLayouts.get('PerpPosition')
+          .span +
+      4 +
+      // perpOpenOrders
+      4 +
+      decodedMangoAccount.perpOpenOrders.length *
+        (this.program as any)._coder.types.typeLayouts.get('PerpOpenOrder')
+          .span +
+      4 +
+      // tokenConditionalSwaps
+      4;
+
+    let tokenConditionalSwaps;
+    if (
+      // mango accounts which haven't been expanded for tokenConditionalSwaps
+      start ==
+      ai.data.length +
+        4 + // padding
+        4 // length of tokenConditionalSwaps
+    ) {
+      tokenConditionalSwaps = [];
+    } else {
+      // mango accounts which have been expanded for tokenConditionalSwaps already
+      const tcsSize = (this.program as any)._coder.types.typeLayouts.get(
+        'TokenConditionalSwap',
+      ).span;
+      const tcsSequenceLength = u32.u32().decode(ai?.data, start - 4);
+      tokenConditionalSwaps = range(tcsSequenceLength).map((i) =>
+        (this.program as any)._coder.types.typeLayouts
+          .get('TokenConditionalSwap')
+          .decode(
+            ai.data.slice(start + i * tcsSize, start + (i + 1) * tcsSize),
+          ),
+      );
+      if (ai.data.length - start - tcsSequenceLength * tcsSize !== 0) {
+        throw new Error("The size of the account doesn't match expectations");
+      }
+    }
+
+    return MangoAccount.from(
+      mangoAccountPk,
+      decodedMangoAccount,
+      tokenConditionalSwaps,
+    );
   }
 
   public async getMangoAccountWithSlot(
@@ -838,11 +907,7 @@ export class MangoClient {
         mangoAccountPk,
       );
     if (!resp?.value) return;
-    const decodedMangoAccount = this.program.coder.accounts.decode(
-      'mangoAccount',
-      resp.value.data,
-    );
-    const mangoAccount = MangoAccount.from(mangoAccountPk, decodedMangoAccount);
+    const mangoAccount = this.getMangoAccountFromAi(mangoAccountPk, resp.value);
     if (loadSerum3Oo) {
       await mangoAccount?.reloadSerum3OpenOrders(this);
     }
@@ -872,23 +937,43 @@ export class MangoClient {
     ownerPk: PublicKey,
     loadSerum3Oo = false,
   ): Promise<MangoAccount[]> {
+    const anchroHeaderFilter: {
+      offset: number;
+      bytes: string;
+    } = this.program.account.mangoAccount.coder.accounts.memcmp(
+      this.program.account.mangoAccount['_idlAccount'].name,
+      undefined,
+    );
+
     const accounts = (
-      await this.program.account.mangoAccount.all([
+      await this.program.provider.connection.getProgramAccounts(
+        this.programId,
         {
-          memcmp: {
-            bytes: group.publicKey.toBase58(),
-            offset: 8,
-          },
+          filters: [
+            {
+              memcmp: {
+                bytes: anchroHeaderFilter.bytes,
+                offset: anchroHeaderFilter.offset,
+              },
+            },
+            {
+              memcmp: {
+                bytes: group.publicKey.toBase58(),
+                offset: 8,
+              },
+            },
+            {
+              memcmp: {
+                bytes: ownerPk.toBase58(),
+                offset: 40,
+              },
+            },
+          ],
         },
-        {
-          memcmp: {
-            bytes: ownerPk.toBase58(),
-            offset: 40,
-          },
-        },
-      ])
-    ).map((pa) => {
-      return MangoAccount.from(pa.publicKey, pa.account);
+      )
+    ).map((account) => {
+      console.log(account.pubkey);
+      return this.getMangoAccountFromAi(account.pubkey, account.account);
     });
 
     if (loadSerum3Oo) {
@@ -906,22 +991,27 @@ export class MangoClient {
     loadSerum3Oo = false,
   ): Promise<MangoAccount[]> {
     const accounts = (
-      await this.program.account.mangoAccount.all([
+      await this.program.provider.connection.getProgramAccounts(
+        this.programId,
         {
-          memcmp: {
-            bytes: group.publicKey.toBase58(),
-            offset: 8,
-          },
+          filters: [
+            {
+              memcmp: {
+                bytes: group.publicKey.toBase58(),
+                offset: 8,
+              },
+            },
+            {
+              memcmp: {
+                bytes: delegate.toBase58(),
+                offset: 104,
+              },
+            },
+          ],
         },
-        {
-          memcmp: {
-            bytes: delegate.toBase58(),
-            offset: 104,
-          },
-        },
-      ])
-    ).map((pa) => {
-      return MangoAccount.from(pa.publicKey, pa.account);
+      )
+    ).map((account) => {
+      return this.getMangoAccountFromAi(account.pubkey, account.account);
     });
 
     if (loadSerum3Oo) {
@@ -938,16 +1028,21 @@ export class MangoClient {
     loadSerum3Oo = false,
   ): Promise<MangoAccount[]> {
     const accounts = (
-      await this.program.account.mangoAccount.all([
+      await this.program.provider.connection.getProgramAccounts(
+        this.programId,
         {
-          memcmp: {
-            bytes: group.publicKey.toBase58(),
-            offset: 8,
-          },
+          filters: [
+            {
+              memcmp: {
+                bytes: group.publicKey.toBase58(),
+                offset: 8,
+              },
+            },
+          ],
         },
-      ])
-    ).map((pa) => {
-      return MangoAccount.from(pa.publicKey, pa.account);
+      )
+    ).map((account) => {
+      return this.getMangoAccountFromAi(account.pubkey, account.account);
     });
 
     if (loadSerum3Oo) {
@@ -3033,6 +3128,92 @@ export class MangoClient {
         liqorOwner: liqor.owner,
       })
       .remainingAccounts(parsedHealthAccounts)
+      .instruction();
+
+    return await this.sendAndConfirmTransactionForGroup(group, [ix]);
+  }
+
+  public async tokenConditionalSwapCreate(
+    group: Group,
+    account: MangoAccount,
+    buyTokenIndex: TokenIndex,
+    sellTokenIndex: TokenIndex,
+    maxBuy: number,
+    maxSell: number,
+    priceThreshold: number,
+    priceThresholdType: TokenConditionalSwapPriceThresholdType,
+    pricePremiumBps: number,
+    priceLimit: number,
+    allowCreatingDeposits: boolean,
+    allowCreatingBorrows: boolean,
+  ): Promise<TransactionSignature> {
+    const ix = await this.program.methods
+      .tokenConditionalSwapCreate(
+        buyTokenIndex,
+        sellTokenIndex,
+        new BN(maxBuy),
+        new BN(maxSell),
+        priceThreshold,
+        priceThresholdType,
+        pricePremiumBps,
+        priceLimit,
+        allowCreatingDeposits,
+        allowCreatingBorrows,
+      )
+      .accounts({
+        group: group.publicKey,
+        account: account.publicKey,
+        authority: (this.program.provider as AnchorProvider).wallet.publicKey,
+      })
+      .instruction();
+
+    return await this.sendAndConfirmTransactionForGroup(group, [ix]);
+  }
+
+  public async tokenConditionalSwapCancel(
+    group: Group,
+    account: MangoAccount,
+    tokenConditionalSwapIndex: number,
+    tokenConditionalSwapId: number,
+  ): Promise<TransactionSignature> {
+    const ix = await this.program.methods
+      .tokenConditionalSwapCancel(
+        tokenConditionalSwapIndex,
+        new BN(tokenConditionalSwapId),
+      )
+      .accounts({
+        group: group.publicKey,
+        account: account.publicKey,
+        authority: (this.program.provider as AnchorProvider).wallet.publicKey,
+      })
+      .instruction();
+
+    return await this.sendAndConfirmTransactionForGroup(group, [ix]);
+  }
+
+  public async tokenConditionalSwapTrigger(
+    group: Group,
+    liqee: MangoAccount,
+    liqor: MangoAccount,
+    tokenConditionalSwapIndex: number,
+    tokenConditionalSwapId: number,
+    maxBuyTokenToLiqee: number,
+    maxSellTokenToLiqor: number,
+  ): Promise<TransactionSignature> {
+    const ix = await this.program.methods
+      .tokenConditionalSwapTrigger(
+        tokenConditionalSwapIndex,
+        new BN(tokenConditionalSwapId),
+        new BN(maxBuyTokenToLiqee),
+        new BN(maxSellTokenToLiqor),
+      )
+      .accounts({
+        group: group.publicKey,
+        liqee: liqee.publicKey,
+        liqor: liqor.publicKey,
+        liqorAuthority: (this.program.provider as AnchorProvider).wallet
+          .publicKey,
+      })
       .instruction();
 
     return await this.sendAndConfirmTransactionForGroup(group, [ix]);

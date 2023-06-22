@@ -4759,7 +4759,7 @@ export type MangoV4 = {
           "type": "u64"
         },
         {
-          "name": "expireTs",
+          "name": "expiryTimestamp",
           "type": "u64"
         },
         {
@@ -7870,7 +7870,7 @@ export type MangoV4 = {
             "type": "u64"
           },
           {
-            "name": "expireTs",
+            "name": "expiryTimestamp",
             "docs": [
               "timestamp until which the conditional swap is valid"
             ],
@@ -15236,7 +15236,7 @@ export const IDL: MangoV4 = {
           "type": "u64"
         },
         {
-          "name": "expireTs",
+          "name": "expiryTimestamp",
           "type": "u64"
         },
         {
@@ -18347,7 +18347,7 @@ export const IDL: MangoV4 = {
             "type": "u64"
           },
           {
-            "name": "expireTs",
+            "name": "expiryTimestamp",
             "docs": [
               "timestamp until which the conditional swap is valid"
             ],

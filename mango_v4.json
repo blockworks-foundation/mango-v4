@@ -4759,7 +4759,7 @@
           "type": "u64"
         },
         {
-          "name": "expireTs",
+          "name": "expiryTimestamp",
           "type": "u64"
         },
         {
@@ -7870,7 +7870,7 @@
             "type": "u64"
           },
           {
-            "name": "expireTs",
+            "name": "expiryTimestamp",
             "docs": [
               "timestamp until which the conditional swap is valid"
             ],
