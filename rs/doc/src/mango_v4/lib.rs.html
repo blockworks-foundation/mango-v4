@@ -1168,6 +1168,7 @@
 <span id="1168">1168</span>
 <span id="1169">1169</span>
 <span id="1170">1170</span>
+<span id="1171">1171</span>
 </pre><pre class="rust"><code><span class="attribute">#![allow(unused_variables)]
 
 </span><span class="kw">use </span>fixed::types::I80F48;
@@ -1585,9 +1586,10 @@
         ctx: Context&lt;Serum3EditMarket&gt;,
         reduce_only_opt: <span class="prelude-ty">Option</span>&lt;bool&gt;,
         force_close_opt: <span class="prelude-ty">Option</span>&lt;bool&gt;,
+        name_opt: <span class="prelude-ty">Option</span>&lt;String&gt;,
     ) -&gt; <span class="prelude-ty">Result</span>&lt;()&gt; {
         <span class="attribute">#[cfg(feature = <span class="string">&quot;enable-gpl&quot;</span>)]
-        </span>instructions::serum3_edit_market(ctx, reduce_only_opt, force_close_opt)<span class="question-mark">?</span>;
+        </span>instructions::serum3_edit_market(ctx, reduce_only_opt, force_close_opt, name_opt)<span class="question-mark">?</span>;
         <span class="prelude-val">Ok</span>(())
     }
 
