@@ -1,10 +1,12 @@
 import {
   AnchorProvider,
   BN,
+  BorshAccountsCoder,
   Program,
   Provider,
   Wallet,
 } from '@coral-xyz/anchor';
+import * as borsh from '@coral-xyz/borsh';
 import {
   createCloseAccountInstruction,
   createInitializeAccount3Instruction,
@@ -27,9 +29,7 @@ import {
   TransactionSignature,
 } from '@solana/web3.js';
 import bs58 from 'bs58';
-import u32 from 'buffer-layout';
 import cloneDeep from 'lodash/cloneDeep';
-import range from 'lodash/range';
 import uniq from 'lodash/uniq';
 import { Bank, MintInfo, TokenIndex } from './accounts/bank';
 import { Group } from './accounts/group';
@@ -37,6 +37,7 @@ import {
   MangoAccount,
   PerpPosition,
   Serum3Orders,
+  TokenConditionalSwapDto,
   TokenConditionalSwapPriceThresholdType,
   TokenPosition,
 } from './accounts/mangoAccount';
@@ -810,7 +811,7 @@ export class MangoClient {
   private async getMangoAccountFromPk(
     mangoAccountPk: PublicKey,
   ): Promise<MangoAccount> {
-    return this.getMangoAccountFromAi(
+    return await this.getMangoAccountFromAi(
       mangoAccountPk,
       (await this.program.provider.connection.getAccountInfo(
         mangoAccountPk,
@@ -818,78 +819,39 @@ export class MangoClient {
     );
   }
 
-  private getMangoAccountFromAi(
+  private async getMangoAccountFromAi(
     mangoAccountPk: PublicKey,
     ai: AccountInfo<Buffer>,
-  ): MangoAccount {
+  ): Promise<MangoAccount> {
     const decodedMangoAccount = this.program.coder.accounts.decode(
       'mangoAccount',
       ai.data,
     );
 
-    // Start reading tokenConditionalSwaps from this point in account buffer
-    const start =
-      // anchor headers
-      8 +
-      // fixed portion
-      (this.program as any)._coder.types.typeLayouts.get('MangoAccountFixed')
-        .span +
-      // dynamic portion header
-      8 +
-      4 +
-      // tokens
-      4 +
-      decodedMangoAccount.tokens.length *
-        (this.program as any)._coder.types.typeLayouts.get('TokenPosition')
-          .span +
-      4 +
-      // serum3Orders
-      4 +
-      decodedMangoAccount.serum3.length *
-        (this.program as any)._coder.types.typeLayouts.get('Serum3Orders')
-          .span +
-      4 +
-      // perpPositions
-      4 +
-      decodedMangoAccount.perps.length *
-        (this.program as any)._coder.types.typeLayouts.get('PerpPosition')
-          .span +
-      4 +
-      // perpOpenOrders
-      4 +
-      decodedMangoAccount.perpOpenOrders.length *
-        (this.program as any)._coder.types.typeLayouts.get('PerpOpenOrder')
-          .span +
-      4 +
-      // tokenConditionalSwaps
-      4;
+    // Re-encode decoded mango account with v1 layout, this will help identifying
+    // if account is of type v1 or v2
+    // Do whole encoding manually, since anchor uses a buffer of a constant length which is too small
+    let mangoAccountV1Buffer = Buffer.alloc(ai.data.length);
+    const layout =
+      this.program.coder.accounts['accountLayouts'].get('mangoAccount');
+    const len = layout.encode(decodedMangoAccount, mangoAccountV1Buffer);
+    mangoAccountV1Buffer = mangoAccountV1Buffer.subarray(0, len);
+    const discriminator =
+      BorshAccountsCoder.accountDiscriminator('mangoAccount');
+    mangoAccountV1Buffer = Buffer.concat([discriminator, mangoAccountV1Buffer]);
 
-    let tokenConditionalSwaps;
-    if (
-      // mango accounts which haven't been expanded for tokenConditionalSwaps
-      start ==
-      ai.data.length +
-        4 + // padding
-        4 // length of tokenConditionalSwaps
-    ) {
-      tokenConditionalSwaps = [];
-    } else {
-      // mango accounts which have been expanded for tokenConditionalSwaps already
-      const tcsSize = (this.program as any)._coder.types.typeLayouts.get(
-        'TokenConditionalSwap',
-      ).span;
-      const tcsSequenceLength = u32.u32().decode(ai?.data, start - 4);
-      tokenConditionalSwaps = range(tcsSequenceLength).map((i) =>
-        (this.program as any)._coder.types.typeLayouts
-          .get('TokenConditionalSwap')
-          .decode(
-            ai.data.slice(start + i * tcsSize, start + (i + 1) * tcsSize),
-          ),
-      );
-      if (ai.data.length - start - tcsSequenceLength * tcsSize !== 0) {
-        throw new Error("The size of the account doesn't match expectations");
-      }
-    }
+    const tokenConditionalSwaps =
+      mangoAccountV1Buffer.length < ai.data.length
+        ? (borsh
+            .vec(
+              (this.program as any)._coder.types.typeLayouts.get(
+                'TokenConditionalSwap',
+              ),
+            )
+            .decode(
+              ai.data.subarray(mangoAccountV1Buffer.length + 4),
+            ) as TokenConditionalSwapDto[])
+        : new Array<TokenConditionalSwapDto>();
 
     return MangoAccount.from(
       mangoAccountPk,
@@ -907,7 +869,10 @@ export class MangoClient {
         mangoAccountPk,
       );
     if (!resp?.value) return;
-    const mangoAccount = this.getMangoAccountFromAi(mangoAccountPk, resp.value);
+    const mangoAccount = await this.getMangoAccountFromAi(
+      mangoAccountPk,
+      resp.value,
+    );
     if (loadSerum3Oo) {
       await mangoAccount?.reloadSerum3OpenOrders(this);
     }
@@ -937,7 +902,7 @@ export class MangoClient {
     ownerPk: PublicKey,
     loadSerum3Oo = false,
   ): Promise<MangoAccount[]> {
-    const anchroHeaderFilter: {
+    const discriminatorMemcmp: {
       offset: number;
       bytes: string;
     } = this.program.account.mangoAccount.coder.accounts.memcmp(
@@ -945,36 +910,37 @@ export class MangoClient {
       undefined,
     );
 
-    const accounts = (
-      await this.program.provider.connection.getProgramAccounts(
-        this.programId,
-        {
-          filters: [
-            {
-              memcmp: {
-                bytes: anchroHeaderFilter.bytes,
-                offset: anchroHeaderFilter.offset,
+    const accounts = await Promise.all(
+      (
+        await this.program.provider.connection.getProgramAccounts(
+          this.programId,
+          {
+            filters: [
+              {
+                memcmp: {
+                  bytes: discriminatorMemcmp.bytes,
+                  offset: discriminatorMemcmp.offset,
+                },
               },
-            },
-            {
-              memcmp: {
-                bytes: group.publicKey.toBase58(),
-                offset: 8,
+              {
+                memcmp: {
+                  bytes: group.publicKey.toBase58(),
+                  offset: 8,
+                },
               },
-            },
-            {
-              memcmp: {
-                bytes: ownerPk.toBase58(),
-                offset: 40,
+              {
+                memcmp: {
+                  bytes: ownerPk.toBase58(),
+                  offset: 40,
+                },
               },
-            },
-          ],
-        },
-      )
-    ).map((account) => {
-      console.log(account.pubkey);
-      return this.getMangoAccountFromAi(account.pubkey, account.account);
-    });
+            ],
+          },
+        )
+      ).map((account) => {
+        return this.getMangoAccountFromAi(account.pubkey, account.account);
+      }),
+    );
 
     if (loadSerum3Oo) {
       await Promise.all(
@@ -990,29 +956,45 @@ export class MangoClient {
     delegate: PublicKey,
     loadSerum3Oo = false,
   ): Promise<MangoAccount[]> {
-    const accounts = (
-      await this.program.provider.connection.getProgramAccounts(
-        this.programId,
-        {
-          filters: [
-            {
-              memcmp: {
-                bytes: group.publicKey.toBase58(),
-                offset: 8,
+    const discriminatorMemcmp: {
+      offset: number;
+      bytes: string;
+    } = this.program.account.mangoAccount.coder.accounts.memcmp(
+      this.program.account.mangoAccount['_idlAccount'].name,
+      undefined,
+    );
+
+    const accounts = await Promise.all(
+      (
+        await this.program.provider.connection.getProgramAccounts(
+          this.programId,
+          {
+            filters: [
+              {
+                memcmp: {
+                  bytes: discriminatorMemcmp.bytes,
+                  offset: discriminatorMemcmp.offset,
+                },
               },
-            },
-            {
-              memcmp: {
-                bytes: delegate.toBase58(),
-                offset: 104,
+              {
+                memcmp: {
+                  bytes: group.publicKey.toBase58(),
+                  offset: 8,
+                },
               },
-            },
-          ],
-        },
-      )
-    ).map((account) => {
-      return this.getMangoAccountFromAi(account.pubkey, account.account);
-    });
+              {
+                memcmp: {
+                  bytes: delegate.toBase58(),
+                  offset: 104,
+                },
+              },
+            ],
+          },
+        )
+      ).map((account) => {
+        return this.getMangoAccountFromAi(account.pubkey, account.account);
+      }),
+    );
 
     if (loadSerum3Oo) {
       await Promise.all(
@@ -1027,23 +1009,39 @@ export class MangoClient {
     group: Group,
     loadSerum3Oo = false,
   ): Promise<MangoAccount[]> {
-    const accounts = (
-      await this.program.provider.connection.getProgramAccounts(
-        this.programId,
-        {
-          filters: [
-            {
-              memcmp: {
-                bytes: group.publicKey.toBase58(),
-                offset: 8,
+    const discriminatorMemcmp: {
+      offset: number;
+      bytes: string;
+    } = this.program.account.mangoAccount.coder.accounts.memcmp(
+      this.program.account.mangoAccount['_idlAccount'].name,
+      undefined,
+    );
+
+    const accounts = await Promise.all(
+      (
+        await this.program.provider.connection.getProgramAccounts(
+          this.programId,
+          {
+            filters: [
+              {
+                memcmp: {
+                  bytes: discriminatorMemcmp.bytes,
+                  offset: discriminatorMemcmp.offset,
+                },
               },
-            },
-          ],
-        },
-      )
-    ).map((account) => {
-      return this.getMangoAccountFromAi(account.pubkey, account.account);
-    });
+              {
+                memcmp: {
+                  bytes: group.publicKey.toBase58(),
+                  offset: 8,
+                },
+              },
+            ],
+          },
+        )
+      ).map((account) => {
+        return this.getMangoAccountFromAi(account.pubkey, account.account);
+      }),
+    );
 
     if (loadSerum3Oo) {
       await Promise.all(

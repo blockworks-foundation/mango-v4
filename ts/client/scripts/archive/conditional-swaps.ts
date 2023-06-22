@@ -16,6 +16,11 @@ async function main(): Promise<void> {
     );
     const userWallet = new Wallet(user);
     const userProvider = new AnchorProvider(connection, userWallet, options);
+
+    //
+    // mainnet
+    //
+
     const client = await MangoClient.connect(
       userProvider,
       'mainnet-beta',
@@ -41,6 +46,19 @@ async function main(): Promise<void> {
       ),
     );
 
+    //
+    // devnet
+    //
+
+    // const client = await MangoClient.connect(
+    //   userProvider,
+    //   'devnet',
+    //   MANGO_V4_ID['devnet'],
+    //   {
+    //     idsSource: 'get-program-accounts',
+    //   },
+    // );
+
     // const admin = Keypair.fromSecretKey(
     //   Buffer.from(
     //     JSON.parse(fs.readFileSync(process.env.ADMIN_KEYPAIR!, 'utf-8')),
@@ -52,7 +70,10 @@ async function main(): Promise<void> {
     //   user.publicKey,
     //   0,
     // )) as MangoAccount;
-    // console.log(mangoAccount);
+    // console.log(mangoAccount.tokenConditionalSwaps.length);
+    // console.log(mangoAccount.tokenConditionalSwaps);
+    // console.log(mangoAccount.tokenConditionalSwaps[1]);
+    // console.log(mangoAccount.tokenConditionalSwaps[0]);
 
     // let sig = await client.accountExpandV2(
     //   group,
