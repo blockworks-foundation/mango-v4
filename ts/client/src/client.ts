@@ -906,7 +906,7 @@ export class MangoClient {
       offset: number;
       bytes: string;
     } = this.program.account.mangoAccount.coder.accounts.memcmp(
-      this.program.account.mangoAccount['_idlAccount'].name,
+      'mangoAccount',
       undefined,
     );
 
@@ -960,7 +960,7 @@ export class MangoClient {
       offset: number;
       bytes: string;
     } = this.program.account.mangoAccount.coder.accounts.memcmp(
-      this.program.account.mangoAccount['_idlAccount'].name,
+      'mangoAccount',
       undefined,
     );
 
@@ -1013,7 +1013,7 @@ export class MangoClient {
       offset: number;
       bytes: string;
     } = this.program.account.mangoAccount.coder.accounts.memcmp(
-      this.program.account.mangoAccount['_idlAccount'].name,
+      'mangoAccount',
       undefined,
     );
 
