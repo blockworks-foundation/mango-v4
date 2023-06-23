@@ -52,6 +52,8 @@ const TOKEN_SCENARIOS: [string, [string, number][], [string, number][]][] = [
   ],
   ['LIQTEST, LIQOR', [['USDC', 1000000]], []],
   ['LIQTEST, LIQEE1', [['USDC', 10000]], []],
+  ['LIQTEST, LIQEE2', [['USDC', 1000000]], []],
+  ['LIQTEST, LIQEE3', [['USDC', 1000000]], []],
 ];
 
 async function main() {
@@ -175,36 +177,78 @@ async function main() {
     group,
     admin.publicKey,
   );
-  const fundingAccount = ensure(
-    accounts2.find((account) => account.name == 'LIQTEST, FUNDING'),
-  );
 
-  const liqee1 = ensure(
-    accounts2.find((account) => account.name == 'LIQTEST, LIQEE1'),
-  );
+  // Case LIQEE1: The liqee does not have enough health for the tcs
+  {
+    const account = ensure(
+      accounts2.find((account) => account.name == 'LIQTEST, LIQEE1'),
+    );
+    await client.accountExpandV2(group, account, 4, 4, 4, 4, 4);
+    await client.tokenConditionalSwapCreate(
+      group,
+      account,
+      MINTS.get('SOL')!,
+      MINTS.get('USDC')!,
+      100000000,
+      20000, // liqee only has 10k USDC-native
+      null,
+      0.0,
+      TokenConditionalSwapPriceThresholdType.priceOverThreshold,
+      100,
+      1000000.0,
+      true,
+      true,
+    );
+  }
 
-  await client.accountExpandV2(group, liqee1, 4, 4, 4, 4, 4);
+  // Case LIQEE2: Full execution - tcs closes afterward
+  {
+    const account = ensure(
+      accounts2.find((account) => account.name == 'LIQTEST, LIQEE2'),
+    );
+    await client.accountExpandV2(group, account, 4, 4, 4, 4, 4);
+    await client.tokenConditionalSwapCreate(
+      group,
+      account,
+      MINTS.get('SOL')!,
+      MINTS.get('USDC')!,
+      1000,
+      1000,
+      null,
+      0.0,
+      TokenConditionalSwapPriceThresholdType.priceOverThreshold,
+      100,
+      1000000.0,
+      true,
+      true,
+    );
+  }
 
-  // Scenarios to test:
-  // - partial execution due to liqee health
-  // - partial execution due to liqor health
-  // - expired tcs are closed
-
-  await client.tokenConditionalSwapCreate(
-    group,
-    liqee1,
-    MINTS.get('SOL')!,
-    MINTS.get('USDC')!,
-    1000000,
-    1000,
-    null,
-    0.0,
-    TokenConditionalSwapPriceThresholdType.priceOverThreshold,
-    100,
-    1000000.0,
-    true,
-    true,
-  );
+  // Case LIQEE3: Create a tcs that will expire very soon
+  {
+    const blockHeight = await connection.getBlockHeight();
+    const productionTime =
+      (await connection.getBlockTime(blockHeight)) ?? Date.now() / 1000;
+    const account = ensure(
+      accounts2.find((account) => account.name == 'LIQTEST, LIQEE3'),
+    );
+    await client.accountExpandV2(group, account, 4, 4, 4, 4, 4);
+    await client.tokenConditionalSwapCreate(
+      group,
+      account,
+      MINTS.get('SOL')!,
+      MINTS.get('USDC')!,
+      1000,
+      1000,
+      productionTime + 10, // expire in 10s
+      0.0,
+      TokenConditionalSwapPriceThresholdType.priceOverThreshold,
+      100,
+      1000000.0,
+      true,
+      true,
+    );
+  }
 
   process.exit();
 }
