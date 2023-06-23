@@ -4,6 +4,7 @@ use fixed::types::I80F48;
 use crate::accounts_ix::*;
 use crate::error::*;
 use crate::health::*;
+use crate::i80f48::ClampToInt;
 use crate::logs::{
     LoanOriginationFeeInstruction, TokenBalanceLog, TokenConditionalSwapTriggerLog, WithdrawLoanLog,
 };
@@ -98,32 +99,57 @@ pub fn token_conditional_swap_trigger(
     Ok(())
 }
 
+/// Figure out the trade amounts based on:
+/// - the max requested
+/// - remainder on the tcs
+/// - allow_deposits / allow_borrows flags
+/// - bank reduce only state
+///
+/// Returns (buy_amount, sell_amount)
 fn trade_amount(
     tcs: &TokenConditionalSwap,
     sell_per_buy_price: I80F48,
     max_buy_token_to_liqee: u64,
     max_sell_token_to_liqor: u64,
-    buy_balance: I80F48,
-    sell_balance: I80F48,
+    liqee_buy_balance: I80F48,
+    liqee_sell_balance: I80F48,
+    liqor_buy_balance: I80F48,
+    liqor_sell_balance: I80F48,
+    buy_bank: &Bank,
+    sell_bank: &Bank,
 ) -> (u64, u64) {
-    let max_buy =
-        max_buy_token_to_liqee
-            .min(tcs.remaining_buy())
-            .min(if tcs.allow_creating_deposits() {
+    let max_buy = max_buy_token_to_liqee
+        .min(tcs.remaining_buy())
+        .min(
+            if tcs.allow_creating_deposits() && !buy_bank.are_deposits_reduce_only() {
                 u64::MAX
             } else {
                 // ceil() because we're ok reaching 0..1 deposited native tokens
-                (-buy_balance).max(I80F48::ZERO).ceil().to_num::<u64>()
-            });
-    let max_sell =
-        max_sell_token_to_liqor
-            .min(tcs.remaining_sell())
-            .min(if tcs.allow_creating_borrows() {
+                (-liqee_buy_balance).ceil().clamp_to_u64()
+            },
+        )
+        .min(if buy_bank.are_borrows_reduce_only() {
+            // floor() so we never go below 0
+            liqor_buy_balance.floor().clamp_to_u64()
+        } else {
+            u64::MAX
+        });
+    let max_sell = max_sell_token_to_liqor
+        .min(tcs.remaining_sell())
+        .min(
+            if tcs.allow_creating_borrows() && !sell_bank.are_borrows_reduce_only() {
                 u64::MAX
             } else {
                 // floor() so we never go below 0
-                sell_balance.max(I80F48::ZERO).floor().to_num::<u64>()
-            });
+                liqee_sell_balance.floor().clamp_to_u64()
+            },
+        )
+        .min(if sell_bank.are_deposits_reduce_only() {
+            // ceil() because we're ok reaching 0..1 deposited native tokens
+            (-liqor_sell_balance).ceil().clamp_to_u64()
+        } else {
+            u64::MAX
+        });
     trade_amount_inner(max_buy, max_sell, sell_per_buy_price)
 }
 
@@ -197,12 +223,16 @@ fn action(
     );
     let maker_price_i80f48 = I80F48::from_num(maker_price);
 
-    let pre_liqee_buy_token = liqee
-        .token_position_mut(tcs.buy_token_index)?
+    let pre_liqee_buy_token = liqee.token_position(tcs.buy_token_index)?.native(&buy_bank);
+    let pre_liqee_sell_token = liqee
+        .token_position(tcs.sell_token_index)?
+        .native(&sell_bank);
+    let pre_liqor_buy_token = liqor
+        .ensure_token_position(tcs.buy_token_index)?
         .0
         .native(&buy_bank);
-    let pre_liqee_sell_token = liqee
-        .token_position_mut(tcs.sell_token_index)?
+    let pre_liqor_sell_token = liqor
+        .ensure_token_position(tcs.sell_token_index)?
         .0
         .native(&sell_bank);
 
@@ -216,6 +246,10 @@ fn action(
         max_sell_token_to_liqor,
         pre_liqee_buy_token,
         pre_liqee_sell_token,
+        pre_liqor_buy_token,
+        pre_liqor_sell_token,
+        buy_bank,
+        sell_bank,
     );
     // NOTE: It's possible that buy_token_amount == sell_token_amount == 0!
     // Proceed with it anyway because we already mutated the account anyway and might want
@@ -231,8 +265,7 @@ fn action(
     let buy_token_amount_i80f48 = I80F48::from(buy_token_amount);
 
     let (liqee_buy_token, liqee_buy_raw_index) = liqee.token_position_mut(tcs.buy_token_index)?;
-    let (liqor_buy_token, liqor_buy_raw_index, _) =
-        liqor.ensure_token_position(tcs.buy_token_index)?;
+    let (liqor_buy_token, liqor_buy_raw_index) = liqor.token_position_mut(tcs.buy_token_index)?;
     let liqee_buy_active = buy_bank.deposit(liqee_buy_token, buy_token_amount_i80f48, now_ts)?;
     let liqor_buy_withdraw =
         buy_bank.withdraw_with_fee(liqor_buy_token, buy_token_amount_i80f48, now_ts)?;
@@ -242,8 +275,8 @@ fn action(
 
     let (liqee_sell_token, liqee_sell_raw_index) =
         liqee.token_position_mut(tcs.sell_token_index)?;
-    let (liqor_sell_token, liqor_sell_raw_index, _) =
-        liqor.ensure_token_position(tcs.sell_token_index)?;
+    let (liqor_sell_token, liqor_sell_raw_index) =
+        liqor.token_position_mut(tcs.sell_token_index)?;
     let liqor_sell_active = sell_bank.deposit(
         liqor_sell_token,
         I80F48::from(sell_token_amount_to_liqor),
@@ -363,6 +396,10 @@ fn action(
             u64::MAX,
             post_liqee_buy_token,
             post_liqee_sell_token,
+            I80F48::MAX, // other liqors might not have reduce-only related restrictions
+            I80F48::MIN,
+            buy_bank,
+            sell_bank,
         );
         if future_buy == 0 || future_sell == 0 {
             *tcs = TokenConditionalSwap::default();
@@ -398,6 +435,8 @@ fn action(
 
 #[cfg(test)]
 mod tests {
+    use bytemuck::Zeroable;
+
     use super::*;
     use crate::health::test::*;
 
@@ -436,69 +475,123 @@ mod tests {
         let cases = vec![
             (
                 "limit 1",
-                (1, 100, 100, 100, 0.0, 0.0, true, true, 1.0),
+                (1, 100, 100, 100, 1.0),
+                (0.0, 0.0, true, true),
+                (0.0, 0.0, 0, 0),
                 (1, 1),
             ),
             (
                 "limit 2",
-                (100, 1, 100, 100, 0.0, 0.0, true, true, 1.0),
+                (100, 1, 100, 100, 1.0),
+                (0.0, 0.0, true, true),
+                (0.0, 0.0, 0, 0),
                 (1, 1),
             ),
             (
                 "limit 3",
-                (100, 100, 1, 100, 0.0, 0.0, true, true, 1.0),
+                (100, 100, 1, 100, 1.0),
+                (0.0, 0.0, true, true),
+                (0.0, 0.0, 0, 0),
                 (1, 1),
             ),
             (
                 "limit 4",
-                (100, 100, 100, 1, 0.0, 0.0, true, true, 1.0),
+                (100, 100, 100, 1, 1.0),
+                (0.0, 0.0, true, true),
+                (0.0, 0.0, 0, 0),
                 (1, 1),
             ),
             (
                 "limit 5",
-                (100, 100, 100, 100, -0.3, 0.0, false, true, 1.0),
+                (100, 100, 100, 100, 1.0),
+                (-0.3, 0.0, false, true),
+                (0.0, 0.0, 0, 0),
                 (1, 1),
             ),
             (
                 "limit 6",
-                (100, 100, 100, 100, 0.0, 1.8, true, false, 1.0),
+                (100, 100, 100, 100, 1.0),
+                (0.0, 1.8, true, false),
+                (0.0, 0.0, 0, 0),
                 (1, 1),
             ),
             (
                 "full 1",
-                (100, 100, 100, 100, -100.0, 100.0, false, false, 1.0),
+                (100, 100, 100, 100, 1.0),
+                (-100.0, 100.0, false, false),
+                (0.0, 0.0, 0, 0),
                 (100, 100),
             ),
             (
                 "full 2",
-                (100, 100, 100, 100, 0.0, 0.0, true, true, 1.0),
+                (100, 100, 100, 100, 1.0),
+                (0.0, 0.0, true, true),
+                (0.0, 0.0, 0, 0),
                 (100, 100),
             ),
             (
+                "reduce only buy 1",
+                (100, 100, 100, 100, 1.0),
+                (-10.0, 0.0, true, true),
+                (20.0, 0.0, 1, 0),
+                (10, 10),
+            ),
+            (
+                "reduce only buy 2",
+                (100, 100, 100, 100, 1.0),
+                (-20.0, 0.0, true, true),
+                (10.0, 0.0, 1, 0),
+                (10, 10),
+            ),
+            (
+                "reduce only buy 3",
+                (100, 100, 100, 100, 1.0),
+                (-10.0, 0.0, true, true),
+                (20.0, 0.0, 2, 0),
+                (20, 20),
+            ),
+            (
+                "reduce only sell 1",
+                (100, 100, 100, 100, 1.0),
+                (0.0, 10.0, true, true),
+                (0.0, -20.0, 0, 1),
+                (10, 10),
+            ),
+            (
+                "reduce only sell 2",
+                (100, 100, 100, 100, 1.0),
+                (0.0, 20.0, true, true),
+                (0.0, -10.0, 0, 1),
+                (10, 10),
+            ),
+            (
+                "reduce only sell 3",
+                (100, 100, 100, 100, 1.0),
+                (0.0, 20.0, true, true),
+                (0.0, -10.0, 0, 2),
+                (20, 20),
+            ),
+            (
                 "price 1",
-                (100, 100, 100, 100, 0.0, 0.0, true, true, 1.23456),
+                (100, 100, 100, 100, 1.23456),
+                (0.0, 0.0, true, true),
+                (0.0, 0.0, 0, 0),
                 (81, 99),
             ),
             (
                 "price 2",
-                (100, 100, 100, 100, 0.0, 0.0, true, true, 0.76543),
+                (100, 100, 100, 100, 0.76543),
+                (0.0, 0.0, true, true),
+                (0.0, 0.0, 0, 0),
                 (100, 76),
             ),
         ];
 
         for (
             name,
-            (
-                tcs_buy,
-                tcs_sell,
-                liqor_buy,
-                liqor_sell,
-                buy_balance,
-                sell_balance,
-                allow_deposit,
-                allow_borrow,
-                price,
-            ),
+            (tcs_buy, tcs_sell, liqor_buy, liqor_sell, price),
+            (liqee_buy_balance, liqee_sell_balance, liqee_allow_deposit, liqee_allow_borrow),
+            (liqor_buy_balance, liqor_sell_balance, buy_reduce_only, sell_reduce_only),
             (buy_amount, sell_amount),
         ) in cases
         {
@@ -509,9 +602,19 @@ mod tests {
                 max_sell: 100 + tcs_sell,
                 bought: 42,
                 sold: 100,
-                allow_creating_borrows: u8::from(allow_borrow),
-                allow_creating_deposits: u8::from(allow_deposit),
+                allow_creating_borrows: u8::from(liqee_allow_borrow),
+                allow_creating_deposits: u8::from(liqee_allow_deposit),
                 ..Default::default()
+            };
+
+            let buy_bank = Bank {
+                reduce_only: buy_reduce_only,
+                ..Bank::zeroed()
+            };
+
+            let sell_bank = Bank {
+                reduce_only: sell_reduce_only,
+                ..Bank::zeroed()
             };
 
             let (actual_buy, actual_sell) = trade_amount(
@@ -519,8 +622,12 @@ mod tests {
                 I80F48::from_num(price),
                 liqor_buy,
                 liqor_sell,
-                I80F48::from_num(buy_balance),
-                I80F48::from_num(sell_balance),
+                I80F48::from_num(liqee_buy_balance),
+                I80F48::from_num(liqee_sell_balance),
+                I80F48::from_num(liqor_buy_balance),
+                I80F48::from_num(liqor_sell_balance),
+                &buy_bank,
+                &sell_bank,
             );
             println!("actual: {actual_buy} {actual_sell}, expected: {buy_amount}, {sell_amount}");
             assert_eq!(actual_buy, buy_amount);
