@@ -1974,6 +1974,12 @@ export type MangoV4 = {
           "type": {
             "option": "bool"
           }
+        },
+        {
+          "name": "nameOpt",
+          "type": {
+            "option": "string"
+          }
         }
       ]
     },
@@ -12458,6 +12464,12 @@ export const IDL: MangoV4 = {
           "name": "forceCloseOpt",
           "type": {
             "option": "bool"
+          }
+        },
+        {
+          "name": "nameOpt",
+          "type": {
+            "option": "string"
           }
         }
       ]

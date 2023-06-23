@@ -1,3 +1,4 @@
+use crate::util::fill_from_str;
 use crate::{accounts_ix::*, error::MangoError};
 use anchor_lang::prelude::*;
 
@@ -5,6 +6,7 @@ pub fn serum3_edit_market(
     ctx: Context<Serum3EditMarket>,
     reduce_only_opt: Option<bool>,
     force_close_opt: Option<bool>,
+    name_opt: Option<String>,
 ) -> Result<()> {
     let mut serum3_market = ctx.accounts.market.load_mut()?;
 
@@ -35,6 +37,12 @@ pub fn serum3_edit_market(
             u8::from(force_close)
         );
         serum3_market.force_close = u8::from(force_close);
+        require_group_admin = true;
+    };
+
+    if let Some(name) = name_opt.as_ref() {
+        msg!("Name: old - {:?}, new - {:?}", serum3_market.name, name);
+        serum3_market.name = fill_from_str(&name)?;
         require_group_admin = true;
     };
 

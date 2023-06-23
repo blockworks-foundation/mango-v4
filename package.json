@@ -73,7 +73,8 @@
   },
   "resolutions": {
     "@coral-xyz/anchor": "^0.26.0",
-    "**/@solana/web3.js/node-fetch": "https://github.com/blockworks-foundation/node-fetch.git#v2.6.11-fixed"
+    "**/@solana/web3.js/node-fetch": "npm:@blockworks-foundation/node-fetch@2.6.11",
+    "**/cross-fetch/node-fetch": "npm:@blockworks-foundation/node-fetch@2.6.11"
   },
   "license": "MIT"
 }

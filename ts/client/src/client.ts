@@ -1400,11 +1400,12 @@ export class MangoClient {
     serum3MarketIndex: MarketIndex,
     reduceOnly: boolean | null,
     forceClose: boolean | null,
+    name: string | null,
   ): Promise<TransactionSignature> {
     const serum3Market =
       group.serum3MarketsMapByMarketIndex.get(serum3MarketIndex);
     const ix = await this.program.methods
-      .serum3EditMarket(reduceOnly, forceClose)
+      .serum3EditMarket(reduceOnly, forceClose, name)
       .accounts({
         group: group.publicKey,
         admin: (this.program.provider as AnchorProvider).wallet.publicKey,

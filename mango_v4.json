@@ -1974,6 +1974,12 @@
           "type": {
             "option": "bool"
           }
+        },
+        {
+          "name": "nameOpt",
+          "type": {
+            "option": "string"
+          }
         }
       ]
     },
