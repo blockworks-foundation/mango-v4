@@ -59,7 +59,6 @@ pub fn token_conditional_swap_trigger(
     // Possibly wipe the tcs and exit, if it's already expired
     let now_ts: u64 = Clock::get()?.unix_timestamp.try_into().unwrap();
     if tcs.is_expired(now_ts) {
-        drop(tcs);
         let tcs = liqee.token_conditional_swap_mut_by_index(token_conditional_swap_index)?;
         *tcs = TokenConditionalSwap::default();
 
