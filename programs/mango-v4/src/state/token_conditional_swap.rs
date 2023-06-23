@@ -65,7 +65,7 @@ pub struct TokenConditionalSwap {
     pub buy_token_index: TokenIndex,
     pub sell_token_index: TokenIndex,
 
-    pub is_active: u8,
+    pub has_data: u8,
 
     /// holds a TokenConditionalSwapPriceThresholdType
     pub price_threshold_type: u8,
@@ -102,7 +102,7 @@ impl Default for TokenConditionalSwap {
             maker_fee_bps: 0,
             buy_token_index: TokenIndex::MAX,
             sell_token_index: TokenIndex::MAX,
-            is_active: 0,
+            has_data: 0,
             price_threshold_type: TokenConditionalSwapPriceThresholdType::PriceOverThreshold.into(),
             allow_creating_borrows: 0,
             allow_creating_deposits: 0,
@@ -114,13 +114,13 @@ impl Default for TokenConditionalSwap {
 impl TokenConditionalSwap {
     /// Whether the entry is in use
     ///
-    /// Note that it's possible for an entry to be active but expired
-    pub fn is_active(&self) -> bool {
-        self.is_active == 1
+    /// Note that it's possible for an entry to be in use but be expired
+    pub fn has_data(&self) -> bool {
+        self.has_data == 1
     }
 
-    pub fn set_active(&mut self, active: bool) {
-        self.is_active = u8::from(active);
+    pub fn set_has_data(&mut self, has_data: bool) {
+        self.has_data = u8::from(has_data);
     }
 
     pub fn is_expired(&self, now_ts: u64) -> bool {

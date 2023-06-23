@@ -7935,7 +7935,7 @@
             "type": "u16"
           },
           {
-            "name": "isActive",
+            "name": "hasData",
             "type": "u8"
           },
           {

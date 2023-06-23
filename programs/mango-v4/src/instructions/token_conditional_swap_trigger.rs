@@ -53,7 +53,7 @@ pub fn token_conditional_swap_trigger(
     let liqee_pre_init_health = liqee.check_health_pre(&liqee_health_cache)?;
 
     let tcs = liqee.token_conditional_swap_by_index(token_conditional_swap_index)?;
-    require!(tcs.is_active(), MangoError::SomeError);
+    require!(tcs.has_data(), MangoError::SomeError);
     require_eq!(tcs.id, token_conditional_swap_id);
 
     // Possibly wipe the tcs and exit, if it's already expired
@@ -63,6 +63,7 @@ pub fn token_conditional_swap_trigger(
         let tcs = liqee.token_conditional_swap_mut_by_index(token_conditional_swap_index)?;
         *tcs = TokenConditionalSwap::default();
 
+        msg!("TokenConditionalSwap is expired, removing");
         // TODO: logging?
 
         return Ok(());
@@ -201,7 +202,7 @@ fn action(
     let tcs = liqee
         .token_conditional_swap_by_index(token_conditional_swap_index)?
         .clone();
-    require!(tcs.is_active(), MangoError::SomeError);
+    require!(tcs.has_data(), MangoError::SomeError);
     require!(!tcs.is_expired(now_ts), MangoError::SomeError);
     require_eq!(buy_bank.token_index, tcs.buy_token_index);
     require_eq!(sell_bank.token_index, tcs.sell_token_index);
@@ -735,7 +736,7 @@ mod tests {
             price_premium_bps: 1000,
             buy_token_index: 1,
             sell_token_index: 0,
-            is_active: 1,
+            has_data: 1,
             allow_creating_borrows: 1,
             allow_creating_deposits: 1,
             ..Default::default()
@@ -790,7 +791,7 @@ mod tests {
             taker_fee_bps: 500,
             buy_token_index: 1,
             sell_token_index: 0,
-            is_active: 1,
+            has_data: 1,
             allow_creating_borrows: 1,
             allow_creating_deposits: 1,
             ..Default::default()

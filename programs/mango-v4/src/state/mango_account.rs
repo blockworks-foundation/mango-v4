@@ -729,8 +729,8 @@ impl<
     pub fn token_conditional_swap_by_id(&self, id: u64) -> Result<(usize, &TokenConditionalSwap)> {
         let index = self
             .all_token_conditional_swap()
-            .position(|tcs| tcs.is_active() && tcs.id == id)
-            .ok_or_else(|| error_msg!("token stop loss with id {} not found", id))?;
+            .position(|tcs| tcs.has_data() && tcs.id == id)
+            .ok_or_else(|| error_msg!("token conditional swap with id {} not found", id))?;
         Ok((index, self.token_conditional_swap_by_index_unchecked(index)))
     }
 
@@ -740,13 +740,13 @@ impl<
     }
 
     pub fn active_token_conditional_swap(&self) -> impl Iterator<Item = &TokenConditionalSwap> {
-        self.all_token_conditional_swap().filter(|p| p.is_active())
+        self.all_token_conditional_swap().filter(|p| p.has_data())
     }
 
     pub fn token_conditional_swap_free_index(&self) -> Result<usize> {
         self.all_token_conditional_swap()
-            .position(|&v| !v.is_active())
-            .ok_or_else(|| error_msg!("no free token stop loss index"))
+            .position(|&v| !v.has_data())
+            .ok_or_else(|| error_msg!("no free token conditional swap index"))
     }
 
     pub fn borrow(&self) -> MangoAccountRef {
@@ -1141,7 +1141,7 @@ impl<
     pub fn add_token_conditional_swap(&mut self) -> Result<&mut TokenConditionalSwap> {
         let index = self.token_conditional_swap_free_index()?;
         let tcs = self.token_conditional_swap_mut_by_index(index)?;
-        tcs.set_active(true);
+        tcs.set_has_data(true);
         Ok(tcs)
     }
 
@@ -1824,7 +1824,7 @@ mod tests {
         assert!(account.token_conditional_swap_free_index().is_err());
 
         let tcs = account.token_conditional_swap_mut_by_index(0).unwrap();
-        tcs.is_active = 0;
+        tcs.has_data = 0;
         assert_eq!(account.all_token_conditional_swap().count(), 2);
         assert_eq!(account.active_token_conditional_swap().count(), 1);
         assert_eq!(

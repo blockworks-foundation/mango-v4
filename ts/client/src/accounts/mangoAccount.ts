@@ -183,7 +183,7 @@ export class MangoAccount {
   }
 
   public tokenConditionalSwapsActive(): TokenConditionalSwap[] {
-    return this.tokenConditionalSwaps.filter((tcs) => tcs.isActive);
+    return this.tokenConditionalSwaps.filter((tcs) => tcs.hasData);
   }
 
   public perpOrdersActive(): PerpOo[] {
@@ -1704,7 +1704,7 @@ export class TokenConditionalSwap {
       dto.makerFeeBps,
       dto.buyTokenIndex as TokenIndex,
       dto.sellTokenIndex as TokenIndex,
-      dto.isActive == 1,
+      dto.hasData == 1,
       dto.priceThresholdType == 0
         ? 'priceOverThreshold'
         : 'priceUnderThreshold',
@@ -1727,7 +1727,7 @@ export class TokenConditionalSwap {
     public makerFeeBps: number,
     public buyTokenIndex: TokenIndex,
     public sellTokenIndex: TokenIndex,
-    public isActive: boolean,
+    public hasData: boolean,
     public priceThresholdType: 'priceOverThreshold' | 'priceUnderThreshold',
     public allowCreatingDeposits: boolean,
     public allowCreatingBorrows: boolean,
@@ -1749,7 +1749,7 @@ export class TokenConditionalSwapDto {
     public makerFeeBps: number,
     public buyTokenIndex: number,
     public sellTokenIndex: number,
-    public isActive: number,
+    public hasData: number,
     public priceThresholdType: number,
     public allowCreatingDeposits: number,
     public allowCreatingBorrows: number,

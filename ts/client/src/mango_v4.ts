@@ -7935,7 +7935,7 @@ export type MangoV4 = {
             "type": "u16"
           },
           {
-            "name": "isActive",
+            "name": "hasData",
             "type": "u8"
           },
           {
@@ -18420,7 +18420,7 @@ export const IDL: MangoV4 = {
             "type": "u16"
           },
           {
-            "name": "isActive",
+            "name": "hasData",
             "type": "u8"
           },
           {

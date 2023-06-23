@@ -288,7 +288,7 @@ async fn test_token_conditional_swap() -> Result<(), TransportError> {
     assert!(!account_data
         .token_conditional_swap_by_index(0)
         .unwrap()
-        .is_active());
+        .has_data());
 
     Ok(())
 }

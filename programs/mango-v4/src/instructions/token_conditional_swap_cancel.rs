@@ -22,7 +22,7 @@ pub fn token_conditional_swap_cancel(
     let tcs = account.token_conditional_swap_mut_by_index(token_conditional_swap_index)?;
 
     // If the tcs is already inactive, this just is a noop
-    if !tcs.is_active() {
+    if !tcs.has_data() {
         return Ok(());
     }
 

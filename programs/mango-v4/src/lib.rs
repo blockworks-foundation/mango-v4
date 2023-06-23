@@ -1163,7 +1163,7 @@ pub mod mango_v4 {
             maker_fee_bps: 0, // set inside
             buy_token_index: ctx.accounts.buy_bank.load()?.token_index,
             sell_token_index: ctx.accounts.sell_bank.load()?.token_index,
-            is_active: 1,
+            has_data: 1,
             price_threshold_type: price_threshold_type.into(),
             allow_creating_deposits: u8::from(allow_creating_deposits),
             allow_creating_borrows: u8::from(allow_creating_borrows),
