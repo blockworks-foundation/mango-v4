@@ -833,10 +833,12 @@ export class MangoClient {
     const mangoAccountV1Buffer = Buffer.alloc(ai.data.length);
     const layout =
       this.program.coder.accounts['accountLayouts'].get('mangoAccount');
-    const len = layout.encode(decodedMangoAccount, mangoAccountV1Buffer);
+    const discriminatorLen = 8;
+    const v1DataLen = layout.encode(decodedMangoAccount, mangoAccountV1Buffer);
+    const v1Len = discriminatorLen + v1DataLen;
 
     const tokenConditionalSwaps =
-      len + 8 < ai.data.length
+      ai.data.length > v1Len
         ? (borsh
             .vec(
               (this.program as any)._coder.types.typeLayouts.get(
@@ -845,7 +847,7 @@ export class MangoClient {
             )
             .decode(
               ai.data.subarray(
-                mangoAccountV1Buffer.length +
+                v1Len +
                   // This is the padding before tokenConditionalSwaps
                   4,
               ),
