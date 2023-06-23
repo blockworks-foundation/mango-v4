@@ -1432,17 +1432,24 @@ export class PerpPosition {
     );
   }
 
-  public getBreakEvenPriceUi(perpMarket: PerpMarket): number {
+  public getBreakEvenPrice(perpMarket: PerpMarket): I80F48 {
     if (perpMarket.perpMarketIndex !== this.marketIndex) {
       throw new Error("PerpPosition doesn't belong to the given market!");
     }
 
     if (this.basePositionLots.eq(new BN(0))) {
-      return 0;
+      return ZERO_I80F48();
     }
+
+    return I80F48.fromI64(this.quoteRunningNative)
+      .sub(this.getUnsettledFunding(perpMarket))
+      .neg()
+      .div(I80F48.fromI64(this.basePositionLots.mul(perpMarket.baseLotSize)));
+  }
+
+  public getBreakEvenPriceUi(perpMarket: PerpMarket): number {
     return perpMarket.priceNativeToUi(
-      -this.quoteRunningNative.toNumber() /
-        this.basePositionLots.mul(perpMarket.baseLotSize).toNumber(),
+      this.getBreakEvenPrice(perpMarket).toNumber(),
     );
   }
 
