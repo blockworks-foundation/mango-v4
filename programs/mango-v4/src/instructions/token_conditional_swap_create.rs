@@ -15,6 +15,12 @@ pub fn token_conditional_swap_create(
         MangoError::IxIsDisabled
     );
 
+    let now_ts: u64 = Clock::get()?.unix_timestamp.try_into().unwrap();
+    if token_conditional_swap.is_expired(now_ts) {
+        msg!("Already expired, ignoring");
+        return Ok(());
+    }
+
     let mut account = ctx.accounts.account.load_full_mut()?;
 
     let id = account.fixed.next_conditional_swap_id;
