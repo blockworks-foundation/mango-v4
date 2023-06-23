@@ -1138,9 +1138,7 @@ pub mod mango_v4 {
     }
 
     pub fn token_conditional_swap_create(
-        ctx: Context<AccountAndAuthority>,
-        buy_token_index: TokenIndex,
-        sell_token_index: TokenIndex,
+        ctx: Context<TokenConditionalSwapCreate>,
         max_buy: u64,
         max_sell: u64,
         expiry_timestamp: u64,
@@ -1163,8 +1161,8 @@ pub mod mango_v4 {
             price_premium_bps,
             taker_fee_bps: 0, // set inside
             maker_fee_bps: 0, // set inside
-            buy_token_index,
-            sell_token_index,
+            buy_token_index: ctx.accounts.buy_bank.load()?.token_index,
+            sell_token_index: ctx.accounts.sell_bank.load()?.token_index,
             is_active: 1,
             price_threshold_type: price_threshold_type.into(),
             allow_creating_deposits: u8::from(allow_creating_deposits),

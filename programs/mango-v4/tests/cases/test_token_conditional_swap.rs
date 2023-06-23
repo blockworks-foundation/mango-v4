@@ -74,8 +74,8 @@ async fn test_token_conditional_swap() -> Result<(), TransportError> {
         TokenConditionalSwapCreateInstruction {
             account,
             owner,
-            buy_token_index: quote_token.index,
-            sell_token_index: base_token.index,
+            buy_mint: quote_token.mint.pubkey,
+            sell_mint: base_token.mint.pubkey,
             max_buy: 1000,
             max_sell: 1000,
             price_threshold: 1.0,
@@ -118,8 +118,8 @@ async fn test_token_conditional_swap() -> Result<(), TransportError> {
     let tcs_ix = TokenConditionalSwapCreateInstruction {
         account,
         owner,
-        buy_token_index: quote_token.index,
-        sell_token_index: base_token.index,
+        buy_mint: quote_token.mint.pubkey,
+        sell_mint: base_token.mint.pubkey,
         max_buy: 100,
         max_sell: 100,
         price_threshold: 0.9,

@@ -3,7 +3,10 @@ import { Cluster, Connection, Keypair, PublicKey } from '@solana/web3.js';
 import { assert } from 'console';
 import fs from 'fs';
 import { Bank } from '../../src/accounts/bank';
-import { MangoAccount, TokenConditionalSwapPriceThresholdType } from '../../src/accounts/mangoAccount';
+import {
+  MangoAccount,
+  TokenConditionalSwapPriceThresholdType,
+} from '../../src/accounts/mangoAccount';
 import {
   PerpMarket,
   PerpOrderSide,
@@ -172,16 +175,15 @@ async function main() {
     group,
     admin.publicKey,
   );
-  const fundingAccount = ensure(accounts2.find(
-    (account) => account.name == 'LIQTEST, FUNDING',
-  ));
+  const fundingAccount = ensure(
+    accounts2.find((account) => account.name == 'LIQTEST, FUNDING'),
+  );
 
-  const liqee1 = ensure(accounts2.find(
-    (account) => account.name == 'LIQTEST, LIQEE1',
-  ));
+  const liqee1 = ensure(
+    accounts2.find((account) => account.name == 'LIQTEST, LIQEE1'),
+  );
 
   await client.accountExpandV2(group, liqee1, 4, 4, 4, 4, 4);
-
 
   // Scenarios to test:
   // - partial execution due to liqee health
@@ -191,8 +193,8 @@ async function main() {
   await client.tokenConditionalSwapCreate(
     group,
     liqee1,
-    group.getFirstBankByMint(MINTS.get('SOL')!).tokenIndex,
-    group.getFirstBankByMint(MINTS.get('USDC')!).tokenIndex,
+    MINTS.get('SOL')!,
+    MINTS.get('USDC')!,
     1000000,
     1000,
     null,

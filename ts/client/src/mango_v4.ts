@@ -4739,17 +4739,25 @@ export type MangoV4 = {
           "name": "authority",
           "isMut": false,
           "isSigner": true
+        },
+        {
+          "name": "buyBank",
+          "isMut": false,
+          "isSigner": false,
+          "relations": [
+            "group"
+          ]
+        },
+        {
+          "name": "sellBank",
+          "isMut": false,
+          "isSigner": false,
+          "relations": [
+            "group"
+          ]
         }
       ],
       "args": [
-        {
-          "name": "buyTokenIndex",
-          "type": "u16"
-        },
-        {
-          "name": "sellTokenIndex",
-          "type": "u16"
-        },
         {
           "name": "maxBuy",
           "type": "u64"
@@ -15216,17 +15224,25 @@ export const IDL: MangoV4 = {
           "name": "authority",
           "isMut": false,
           "isSigner": true
+        },
+        {
+          "name": "buyBank",
+          "isMut": false,
+          "isSigner": false,
+          "relations": [
+            "group"
+          ]
+        },
+        {
+          "name": "sellBank",
+          "isMut": false,
+          "isSigner": false,
+          "relations": [
+            "group"
+          ]
         }
       ],
       "args": [
-        {
-          "name": "buyTokenIndex",
-          "type": "u16"
-        },
-        {
-          "name": "sellTokenIndex",
-          "type": "u16"
-        },
         {
           "name": "maxBuy",
           "type": "u64"

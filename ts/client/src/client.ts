@@ -3133,8 +3133,8 @@ export class MangoClient {
   public async tokenConditionalSwapCreate(
     group: Group,
     account: MangoAccount,
-    buyTokenIndex: TokenIndex,
-    sellTokenIndex: TokenIndex,
+    buyMintPk: PublicKey,
+    sellMintPk: PublicKey,
     maxBuy: number,
     maxSell: number,
     expiryTimestamp: number | null,
@@ -3145,10 +3145,10 @@ export class MangoClient {
     allowCreatingDeposits: boolean,
     allowCreatingBorrows: boolean,
   ): Promise<TransactionSignature> {
+    const buyBank: Bank = group.getFirstBankByMint(buyMintPk);
+    const sellBank: Bank = group.getFirstBankByMint(sellMintPk);
     const ix = await this.program.methods
       .tokenConditionalSwapCreate(
-        buyTokenIndex,
-        sellTokenIndex,
         new BN(maxBuy),
         new BN(maxSell),
         expiryTimestamp !== null ? new BN(expiryTimestamp) : U64_MAX_BN,
@@ -3163,6 +3163,8 @@ export class MangoClient {
         group: group.publicKey,
         account: account.publicKey,
         authority: (this.program.provider as AnchorProvider).wallet.publicKey,
+        buyBank: buyBank.publicKey,
+        sellBank: sellBank.publicKey,
       })
       .instruction();
 

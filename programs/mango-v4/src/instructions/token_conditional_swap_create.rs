@@ -6,7 +6,7 @@ use crate::state::*;
 
 #[allow(clippy::too_many_arguments)]
 pub fn token_conditional_swap_create(
-    ctx: Context<AccountAndAuthority>,
+    ctx: Context<TokenConditionalSwapCreate>,
     token_conditional_swap: TokenConditionalSwap,
 ) -> Result<()> {
     let group = ctx.accounts.group.load()?;
@@ -26,7 +26,6 @@ pub fn token_conditional_swap_create(
     tcs.taker_fee_bps = group.token_conditional_swap_taker_fee_bps;
     tcs.maker_fee_bps = group.token_conditional_swap_maker_fee_bps;
 
-    // TODO: should we check that the token indexes are at least valid?
     // TODO: logging
 
     Ok(())

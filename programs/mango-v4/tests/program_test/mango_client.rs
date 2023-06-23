@@ -4134,8 +4134,8 @@ impl ClientInstruction for AltExtendInstruction {
 pub struct TokenConditionalSwapCreateInstruction {
     pub account: Pubkey,
     pub owner: TestKeypair,
-    pub buy_token_index: TokenIndex,
-    pub sell_token_index: TokenIndex,
+    pub buy_mint: Pubkey,
+    pub sell_mint: Pubkey,
     pub max_buy: u64,
     pub max_sell: u64,
     pub price_threshold: f32,
@@ -4147,7 +4147,7 @@ pub struct TokenConditionalSwapCreateInstruction {
 }
 #[async_trait::async_trait(?Send)]
 impl ClientInstruction for TokenConditionalSwapCreateInstruction {
-    type Accounts = mango_v4::accounts::AccountAndAuthority;
+    type Accounts = mango_v4::accounts::TokenConditionalSwapCreate;
     type Instruction = mango_v4::instruction::TokenConditionalSwapCreate;
     async fn to_instruction(
         &self,
@@ -4155,8 +4155,6 @@ impl ClientInstruction for TokenConditionalSwapCreateInstruction {
     ) -> (Self::Accounts, instruction::Instruction) {
         let program_id = mango_v4::id();
         let instruction = Self::Instruction {
-            buy_token_index: self.buy_token_index,
-            sell_token_index: self.sell_token_index,
             max_buy: self.max_buy,
             max_sell: self.max_sell,
             expiry_timestamp: u64::MAX,
@@ -4173,10 +4171,33 @@ impl ClientInstruction for TokenConditionalSwapCreateInstruction {
             .await
             .unwrap();
 
+        let buy_mint_info_address = Pubkey::find_program_address(
+            &[
+                b"MintInfo".as_ref(),
+                account.fixed.group.as_ref(),
+                self.buy_mint.as_ref(),
+            ],
+            &program_id,
+        )
+        .0;
+        let sell_mint_info_address = Pubkey::find_program_address(
+            &[
+                b"MintInfo".as_ref(),
+                account.fixed.group.as_ref(),
+                self.sell_mint.as_ref(),
+            ],
+            &program_id,
+        )
+        .0;
+        let buy_mint_info: MintInfo = account_loader.load(&buy_mint_info_address).await.unwrap();
+        let sell_mint_info: MintInfo = account_loader.load(&sell_mint_info_address).await.unwrap();
+
         let accounts = Self::Accounts {
             group: account.fixed.group,
             account: self.account,
             authority: self.owner.pubkey(),
+            buy_bank: buy_mint_info.first_bank(),
+            sell_bank: sell_mint_info.first_bank(),
         };
 
         let instruction = make_instruction(program_id, &accounts, &instruction);
