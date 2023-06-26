@@ -2,7 +2,10 @@ import { AnchorProvider, Wallet } from '@coral-xyz/anchor';
 import { Cluster, Connection, Keypair, PublicKey } from '@solana/web3.js';
 import cloneDeep from 'lodash/cloneDeep';
 import { Group } from '../../src/accounts/group';
+import { HealthCache } from '../../src/accounts/healthCache';
 import { HealthType, MangoAccount } from '../../src/accounts/mangoAccount';
+import { PerpMarket } from '../../src/accounts/perp';
+import { Serum3Market } from '../../src/accounts/serum3';
 import { MangoClient } from '../../src/client';
 import { MANGO_V4_ID } from '../../src/constants';
 import { ZERO_I80F48 } from '../../src/numbers/I80F48';
@@ -234,7 +237,7 @@ async function debugUser(
       true
     ) {
       const lp = await pp.getLiquidationPrice(group, mangoAccount);
-      if (lp.lt(ZERO_I80F48())) {
+      if (lp == null || lp.lt(ZERO_I80F48())) {
         continue;
       }
       const lpUi = group
