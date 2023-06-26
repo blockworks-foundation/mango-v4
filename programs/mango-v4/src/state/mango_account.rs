@@ -1170,7 +1170,7 @@ impl<
         &mut self,
         health_cache: &HealthCache,
         pre_init_health: I80F48,
-    ) -> Result<()> {
+    ) -> Result<I80F48> {
         let post_init_health = health_cache.health(HealthType::Init);
         msg!("post_init_health: {}", post_init_health);
 
@@ -1194,7 +1194,7 @@ impl<
             post_init_health >= 0 || health_does_not_decrease,
             MangoError::HealthMustBePositiveOrIncrease
         );
-        Ok(())
+        Ok(post_init_health)
     }
 
     pub fn check_liquidatable(&mut self, health_cache: &HealthCache) -> Result<CheckLiquidatable> {
