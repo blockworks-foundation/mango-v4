@@ -7,6 +7,7 @@ import {
   I80F48,
   I80F48Dto,
   MAX_I80F48,
+  MINUS_ONE_I80F48,
   ONE_I80F48,
   ZERO_I80F48,
 } from '../numbers/I80F48';
@@ -654,7 +655,7 @@ export class HealthCache {
     const rightValue = fun(right);
 
     // console.log(
-    //   ` - binaryApproximationSearch left ${left.toLocaleString()}, leftValue ${leftValue.toLocaleString()}, right ${right.toLocaleString()}, rightValue ${rightValue.toLocaleString()}, targetValue ${targetValue.toLocaleString()}`,
+    //   ` - binaryApproximationSearch left ${left.toLocaleString()}, leftValue ${leftValue.toLocaleString()}, right ${right.toLocaleString()}, rightValue ${rightValue.toLocaleString()}, targetValue ${targetValue.toLocaleString()}, minStep ${minStep}`,
     // );
 
     if (
@@ -1158,6 +1159,53 @@ export class HealthCache {
     }
 
     return baseLots.floor();
+  }
+
+  public getPerpPositionLiquidationPrice(
+    group: Group,
+    mangoAccount: MangoAccount,
+    perpPosition: PerpPosition,
+  ): I80F48 {
+    const hc = HealthCache.fromMangoAccount(group, mangoAccount);
+    const health = hc.health(HealthType.maint);
+    const perpMarket = group.getPerpMarketByMarketIndex(
+      perpPosition.marketIndex,
+    );
+
+    function healthAfterPriceChange(newPrice: I80F48): I80F48 {
+      const gClone = cloneDeep(group);
+      gClone.getPerpMarketByMarketIndex(perpMarket.perpMarketIndex)._price =
+        newPrice;
+      const hc = HealthCache.fromMangoAccount(gClone, mangoAccount);
+      return hc.health(HealthType.maint);
+    }
+
+    if (perpPosition.getBasePosition(perpMarket).isPos()) {
+      const price = ZERO_I80F48();
+      const healthAfter = healthAfterPriceChange(price);
+      if (healthAfter.gt(ZERO_I80F48())) {
+        return MINUS_ONE_I80F48();
+      }
+
+      return HealthCache.binaryApproximationSearch(
+        price,
+        healthAfter,
+        perpMarket.price,
+        ZERO_I80F48(),
+        perpMarket.priceLotsToNative(new BN(1)),
+        healthAfterPriceChange,
+      );
+    }
+
+    const price = perpMarket.price.mul(I80F48.fromNumber(1000));
+    return HealthCache.binaryApproximationSearch(
+      perpMarket.price,
+      health,
+      price,
+      ZERO_I80F48(),
+      perpMarket.priceLotsToNative(new BN(1)),
+      healthAfterPriceChange,
+    );
   }
 }
 

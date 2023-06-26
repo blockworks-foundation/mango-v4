@@ -232,6 +232,10 @@ export function ONE_I80F48(): I80F48 {
   return I80F48.fromNumber(1);
 }
 
+export function MINUS_ONE_I80F48(): I80F48 {
+  return I80F48.fromNumber(-1);
+}
+
 export function ZERO_I80F48(): I80F48 {
   return I80F48.fromNumber(0);
 }

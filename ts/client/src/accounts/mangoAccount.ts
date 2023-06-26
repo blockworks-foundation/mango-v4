@@ -4,7 +4,13 @@ import { OpenOrders, Order, Orderbook } from '@project-serum/serum/lib/market';
 import { AccountInfo, PublicKey, TransactionSignature } from '@solana/web3.js';
 import { MangoClient } from '../client';
 import { OPENBOOK_PROGRAM_ID, RUST_I64_MAX, RUST_I64_MIN } from '../constants';
-import { I80F48, I80F48Dto, ONE_I80F48, ZERO_I80F48 } from '../numbers/I80F48';
+import {
+  I80F48,
+  I80F48Dto,
+  MINUS_ONE_I80F48,
+  ONE_I80F48,
+  ZERO_I80F48,
+} from '../numbers/I80F48';
 import { toNativeI80F48, toUiDecimals, toUiDecimalsForQuote } from '../utils';
 import { Bank, TokenIndex } from './bank';
 import { Group } from './group';
@@ -1430,6 +1436,17 @@ export class PerpPosition {
     return perpMarket.priceNativeToUi(
       this.getAverageEntryPrice(perpMarket).toNumber(),
     );
+  }
+
+  public getLiquidationPrice(group: Group, mangoAccount: MangoAccount): I80F48 {
+    if (this.basePositionLots.eq(new BN(0))) {
+      return MINUS_ONE_I80F48();
+    }
+
+    return HealthCache.fromMangoAccount(
+      group,
+      mangoAccount,
+    ).getPerpPositionLiquidationPrice(group, mangoAccount, this);
   }
 
   public getBreakEvenPrice(perpMarket: PerpMarket): I80F48 {
