@@ -1167,7 +1167,6 @@ export class HealthCache {
     perpPosition: PerpPosition,
   ): I80F48 {
     const hc = HealthCache.fromMangoAccount(group, mangoAccount);
-    const health = hc.health(HealthType.maint);
     const perpMarket = group.getPerpMarketByMarketIndex(
       perpPosition.marketIndex,
     );
@@ -1181,15 +1180,15 @@ export class HealthCache {
     }
 
     if (perpPosition.getBasePosition(perpMarket).isPos()) {
-      const price = ZERO_I80F48();
-      const healthAfter = healthAfterPriceChange(price);
-      if (healthAfter.gt(ZERO_I80F48())) {
+      const zero = ZERO_I80F48();
+      const healthAtPriceZero = healthAfterPriceChange(zero);
+      if (healthAtPriceZero.gt(ZERO_I80F48())) {
         return MINUS_ONE_I80F48();
       }
 
       return HealthCache.binaryApproximationSearch(
-        price,
-        healthAfter,
+        zero,
+        healthAtPriceZero,
         perpMarket.price,
         ZERO_I80F48(),
         perpMarket.priceLotsToNative(new BN(1)),
@@ -1197,11 +1196,11 @@ export class HealthCache {
       );
     }
 
-    const price = perpMarket.price.mul(I80F48.fromNumber(1000));
+    const price1000x = perpMarket.price.mul(I80F48.fromNumber(1000));
     return HealthCache.binaryApproximationSearch(
       perpMarket.price,
-      health,
-      price,
+      hc.health(HealthType.maint),
+      price1000x,
       ZERO_I80F48(),
       perpMarket.priceLotsToNative(new BN(1)),
       healthAfterPriceChange,
