@@ -839,8 +839,8 @@ pub async fn maybe_execute_token_conditional_swap(
         &liqee,
         tcs.sell_token_index,
         tcs.buy_token_index,
-        maker_price,
-        I80F48::from_num(0.01), // TODO: what target?
+        I80F48::ONE / maker_price,
+        I80F48::from_num(0.5), // TODO: explain that this target relates to the 1% closure target in the program
     )
     .await?
     .min(max_take_quote / sell_token_price)
@@ -854,7 +854,7 @@ pub async fn maybe_execute_token_conditional_swap(
         &mango_client.mango_account().await?,
         tcs.buy_token_index,
         tcs.sell_token_index,
-        I80F48::ONE / taker_price,
+        taker_price,
         liqor_min_health_ratio,
     )
     .await?
