@@ -1449,6 +1449,16 @@ export class PerpPosition {
     ).getPerpPositionLiquidationPrice(group, mangoAccount, this);
   }
 
+  public getLiquidationPriceUi(
+    group: Group,
+    mangoAccount: MangoAccount,
+  ): number {
+    const pm = group.getPerpMarketByMarketIndex(this.marketIndex);
+    return pm.priceNativeToUi(
+      this.getLiquidationPrice(group, mangoAccount).toNumber(),
+    );
+  }
+
   public getBreakEvenPrice(perpMarket: PerpMarket): I80F48 {
     if (perpMarket.perpMarketIndex !== this.marketIndex) {
       throw new Error("PerpPosition doesn't belong to the given market!");
