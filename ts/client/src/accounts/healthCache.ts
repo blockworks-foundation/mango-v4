@@ -654,7 +654,7 @@ export class HealthCache {
     const rightValue = fun(right);
 
     // console.log(
-    //   ` - binaryApproximationSearch left ${left.toLocaleString()}, leftValue ${leftValue.toLocaleString()}, right ${right.toLocaleString()}, rightValue ${rightValue.toLocaleString()}, targetValue ${targetValue.toLocaleString()}`,
+    //   ` - binaryApproximationSearch left ${left.toLocaleString()}, leftValue ${leftValue.toLocaleString()}, right ${right.toLocaleString()}, rightValue ${rightValue.toLocaleString()}, targetValue ${targetValue.toLocaleString()}, minStep ${minStep}`,
     // );
 
     if (
@@ -1158,6 +1158,52 @@ export class HealthCache {
     }
 
     return baseLots.floor();
+  }
+
+  public getPerpPositionLiquidationPrice(
+    group: Group,
+    mangoAccount: MangoAccount,
+    perpPosition: PerpPosition,
+  ): I80F48 | null {
+    const hc = HealthCache.fromMangoAccount(group, mangoAccount);
+    const perpMarket = group.getPerpMarketByMarketIndex(
+      perpPosition.marketIndex,
+    );
+
+    function healthAfterPriceChange(newPrice: I80F48): I80F48 {
+      const gClone = cloneDeep(group);
+      gClone.getPerpMarketByMarketIndex(perpMarket.perpMarketIndex)._price =
+        newPrice;
+      const hc = HealthCache.fromMangoAccount(gClone, mangoAccount);
+      return hc.health(HealthType.maint);
+    }
+
+    if (perpPosition.getBasePosition(perpMarket).isPos()) {
+      const zero = ZERO_I80F48();
+      const healthAtPriceZero = healthAfterPriceChange(zero);
+      if (healthAtPriceZero.gt(ZERO_I80F48())) {
+        return null;
+      }
+
+      return HealthCache.binaryApproximationSearch(
+        zero,
+        healthAtPriceZero,
+        perpMarket.price,
+        ZERO_I80F48(),
+        perpMarket.priceLotsToNative(new BN(1)),
+        healthAfterPriceChange,
+      );
+    }
+
+    const price1000x = perpMarket.price.mul(I80F48.fromNumber(1000));
+    return HealthCache.binaryApproximationSearch(
+      perpMarket.price,
+      hc.health(HealthType.maint),
+      price1000x,
+      ZERO_I80F48(),
+      perpMarket.priceLotsToNative(new BN(1)),
+      healthAfterPriceChange,
+    );
   }
 }
 

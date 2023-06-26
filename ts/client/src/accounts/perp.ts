@@ -436,6 +436,10 @@ export class PerpMarket {
     return toNative(uiQuote, QUOTE_DECIMALS).div(this.quoteLotSize);
   }
 
+  public priceLotsToNative(price: BN): I80F48 {
+    return I80F48.fromI64(price.mul(this.quoteLotSize).div(this.baseLotSize));
+  }
+
   public priceLotsToUi(price: BN): number {
     return parseFloat(price.toString()) * this.priceLotsToUiConverter;
   }

@@ -1432,6 +1432,29 @@ export class PerpPosition {
     );
   }
 
+  public getLiquidationPrice(
+    group: Group,
+    mangoAccount: MangoAccount,
+  ): I80F48 | null {
+    if (this.basePositionLots.eq(new BN(0))) {
+      return null;
+    }
+
+    return HealthCache.fromMangoAccount(
+      group,
+      mangoAccount,
+    ).getPerpPositionLiquidationPrice(group, mangoAccount, this);
+  }
+
+  public getLiquidationPriceUi(
+    group: Group,
+    mangoAccount: MangoAccount,
+  ): number | null {
+    const pm = group.getPerpMarketByMarketIndex(this.marketIndex);
+    const lp = this.getLiquidationPrice(group, mangoAccount);
+    return lp == null ? null : pm.priceNativeToUi(lp.toNumber());
+  }
+
   public getBreakEvenPrice(perpMarket: PerpMarket): I80F48 {
     if (perpMarket.perpMarketIndex !== this.marketIndex) {
       throw new Error("PerpPosition doesn't belong to the given market!");
