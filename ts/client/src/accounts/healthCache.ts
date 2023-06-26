@@ -7,7 +7,6 @@ import {
   I80F48,
   I80F48Dto,
   MAX_I80F48,
-  MINUS_ONE_I80F48,
   ONE_I80F48,
   ZERO_I80F48,
 } from '../numbers/I80F48';
@@ -1165,7 +1164,7 @@ export class HealthCache {
     group: Group,
     mangoAccount: MangoAccount,
     perpPosition: PerpPosition,
-  ): I80F48 {
+  ): I80F48 | null {
     const hc = HealthCache.fromMangoAccount(group, mangoAccount);
     const perpMarket = group.getPerpMarketByMarketIndex(
       perpPosition.marketIndex,
@@ -1183,7 +1182,7 @@ export class HealthCache {
       const zero = ZERO_I80F48();
       const healthAtPriceZero = healthAfterPriceChange(zero);
       if (healthAtPriceZero.gt(ZERO_I80F48())) {
-        return MINUS_ONE_I80F48();
+        return null;
       }
 
       return HealthCache.binaryApproximationSearch(
