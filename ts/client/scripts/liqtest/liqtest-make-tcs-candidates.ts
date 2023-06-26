@@ -51,7 +51,7 @@ const TOKEN_SCENARIOS: [string, [string, number][], [string, number][]][] = [
     [],
   ],
   ['LIQTEST, LIQOR', [['USDC', 1000000]], []],
-  ['LIQTEST, LIQEE1', [['USDC', 10000]], []],
+  ['LIQTEST, LIQEE1', [['USDC', 1000]], []],
   ['LIQTEST, LIQEE2', [['USDC', 1000000]], []],
   ['LIQTEST, LIQEE3', [['USDC', 1000000]], []],
 ];
@@ -190,7 +190,7 @@ async function main() {
       MINTS.get('SOL')!,
       MINTS.get('USDC')!,
       100000000,
-      20000, // liqee only has 10k USDC-native
+      20000, // liqee only has 1k USDC-native, leverage does not go that far!
       null,
       0.0,
       TokenConditionalSwapPriceThresholdType.priceOverThreshold,
@@ -226,9 +226,6 @@ async function main() {
 
   // Case LIQEE3: Create a tcs that will expire very soon
   {
-    const blockHeight = await connection.getBlockHeight();
-    const productionTime =
-      (await connection.getBlockTime(blockHeight)) ?? Date.now() / 1000;
     const account = ensure(
       accounts2.find((account) => account.name == 'LIQTEST, LIQEE3'),
     );
@@ -240,7 +237,7 @@ async function main() {
       MINTS.get('USDC')!,
       1000,
       1000,
-      productionTime + 10, // expire in 10s
+      Date.now() / 1000 + 15, // expire in 15s
       0.0,
       TokenConditionalSwapPriceThresholdType.priceOverThreshold,
       100,
