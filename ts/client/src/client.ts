@@ -2809,6 +2809,7 @@ export class MangoClient {
   }): Promise<TransactionSignature> {
     const inputBank: Bank = group.getFirstBankByMint(inputMintPk);
     const outputBank: Bank = group.getFirstBankByMint(outputMintPk);
+    const walletPk = (this.program.provider as AnchorProvider).wallet.publicKey;
 
     const healthRemainingAccounts: PublicKey[] =
       this.buildHealthRemainingAccounts(
@@ -2831,7 +2832,7 @@ export class MangoClient {
      */
     const inputTokenAccountPk = await getAssociatedTokenAddress(
       inputBank.mint,
-      mangoAccount.owner,
+      walletPk,
     );
     const inputTokenAccExists =
       await this.program.provider.connection.getAccountInfo(
@@ -2841,8 +2842,8 @@ export class MangoClient {
     if (!inputTokenAccExists) {
       preInstructions.push(
         await createAssociatedTokenAccountIdempotentInstruction(
-          mangoAccount.owner,
-          mangoAccount.owner,
+          walletPk,
+          walletPk,
           inputBank.mint,
         ),
       );
@@ -2850,7 +2851,7 @@ export class MangoClient {
 
     const outputTokenAccountPk = await getAssociatedTokenAddress(
       outputBank.mint,
-      mangoAccount.owner,
+      walletPk,
     );
     const outputTokenAccExists =
       await this.program.provider.connection.getAccountInfo(
@@ -2859,8 +2860,8 @@ export class MangoClient {
     if (!outputTokenAccExists) {
       preInstructions.push(
         await createAssociatedTokenAccountIdempotentInstruction(
-          mangoAccount.owner,
-          mangoAccount.owner,
+          walletPk,
+          walletPk,
           outputBank.mint,
         ),
       );
@@ -2930,7 +2931,7 @@ export class MangoClient {
       ])
       .accounts({
         account: mangoAccount.publicKey,
-        owner: (this.program.provider as AnchorProvider).wallet.publicKey,
+        owner: walletPk,
         instructions: SYSVAR_INSTRUCTIONS_PUBKEY,
       })
       .remainingAccounts([
