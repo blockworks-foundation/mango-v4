@@ -45,10 +45,6 @@ struct Cli {
     #[clap(short, long, env)]
     rpc_url: String,
 
-    // TODO: different serum markets could use different serum programs, should come from registered markets
-    #[clap(long, env)]
-    serum_program: Pubkey,
-
     #[clap(long, env)]
     liqor_mango_account: Pubkey,
 
@@ -70,6 +66,13 @@ struct Cli {
     #[clap(long, env, default_value = "50")]
     min_health_ratio: f64,
 
+    /// if rebalancing is enabled
+    ///
+    /// typically only disabled for tests where swaps are unavailable
+    #[clap(long, env, default_value = "true")]
+    rebalance: bool,
+
+    /// max slippage to request on swaps to rebalance spot tokens
     #[clap(long, env, default_value = "100")]
     rebalance_slippage_bps: u64,
 
@@ -141,6 +144,15 @@ async fn main() -> anyhow::Result<()> {
         .unique()
         .collect::<Vec<Pubkey>>();
 
+    let serum_programs = group_context
+        .serum3_markets
+        .values()
+        .map(|s3| s3.market.serum_program)
+        .unique()
+        .collect_vec();
+    // TODO: Currently the websocket source only supports a single serum program address!
+    assert_eq!(serum_programs.len(), 1);
+
     //
     // feed setup
     //
@@ -160,7 +172,7 @@ async fn main() -> anyhow::Result<()> {
     websocket_source::start(
         websocket_source::Config {
             rpc_ws_url: ws_url.clone(),
-            serum_program: cli.serum_program,
+            serum_program: *serum_programs.first().unwrap(),
             open_orders_authority: mango_group,
         },
         mango_oracles.clone(),
@@ -215,6 +227,7 @@ async fn main() -> anyhow::Result<()> {
 
     let mut rebalance_interval = tokio::time::interval(Duration::from_secs(5));
     let rebalance_config = rebalance::Config {
+        enabled: cli.rebalance,
         slippage_bps: cli.rebalance_slippage_bps,
         // TODO: config
         borrow_settle_excess: 1.05,

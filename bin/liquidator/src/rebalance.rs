@@ -15,6 +15,7 @@ use std::{collections::HashMap, time::Duration};
 
 #[derive(Clone)]
 pub struct Config {
+    pub enabled: bool,
     /// Maximum slippage allowed in Jupiter
     pub slippage_bps: u64,
     /// When closing borrows, the rebalancer can't close token positions exactly.
@@ -77,6 +78,10 @@ pub struct Rebalancer {
 
 impl Rebalancer {
     pub async fn zero_all_non_quote(&self) -> anyhow::Result<()> {
+        if !self.config.enabled {
+            return Ok(());
+        }
+
         log::trace!("checking for rebalance: {}", self.mango_account_address);
 
         self.rebalance_perps().await?;
