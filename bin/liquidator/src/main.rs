@@ -217,6 +217,9 @@ async fn main() -> anyhow::Result<()> {
         )?)
     };
 
+    let token_swap_info_updater =
+        Arc::new(liquidate::TokenSwapInfoUpdater::new(mango_client.clone()));
+
     let liq_config = liquidate::Config {
         liq_min_health_ratio: cli.min_health_ratio,
         tcs_min_health_ratio: cli.min_health_ratio,
@@ -350,14 +353,22 @@ async fn main() -> anyhow::Result<()> {
         }
     });
 
-    let rebalance_job = tokio::spawn({
+    // The other jobs only start when a snapshot is done - wait for it
+    // TODO: what if the above job aborts and we never exit?
+    {
         let shared_state = shared_state.clone();
+        loop {
+            if shared_state.read().unwrap().one_snapshot_done {
+                break;
+            }
+            std::thread::sleep(Duration::from_secs(1));
+        }
+    }
+
+    let rebalance_job = tokio::spawn({
         async move {
             loop {
                 rebalance_interval.tick().await;
-                if !shared_state.read().unwrap().one_snapshot_done {
-                    continue;
-                }
                 if let Err(err) = rebalancer.zero_all_non_quote().await {
                     log::error!("failed to rebalance liqor: {:?}", err);
 
@@ -371,6 +382,7 @@ async fn main() -> anyhow::Result<()> {
     });
 
     let liquidation_job = tokio::spawn({
+        let shared_state = shared_state.clone();
         async move {
             loop {
                 liquidation_trigger_receiver.recv().await.unwrap();
@@ -378,9 +390,6 @@ async fn main() -> anyhow::Result<()> {
                 let account_addresses;
                 {
                     let mut state = shared_state.write().unwrap();
-                    if !state.one_snapshot_done {
-                        continue;
-                    }
                     account_addresses = if state.health_check_all {
                         state.mango_accounts.iter().cloned().collect()
                     } else {
@@ -405,11 +414,44 @@ async fn main() -> anyhow::Result<()> {
         }
     });
 
+    let token_swap_info_job = tokio::spawn({
+        // TODO: configurable interval
+        let mut interval = tokio::time::interval(Duration::from_secs(60));
+        async move {
+            loop {
+                let token_indexes = token_swap_info_updater
+                    .mango_client()
+                    .context
+                    .token_indexes_by_name
+                    .values()
+                    .copied()
+                    .collect_vec();
+                for token_index in token_indexes {
+                    match token_swap_info_updater.update_one(token_index).await {
+                        Ok(()) => {}
+                        Err(err) => {
+                            log::warn!(
+                                "failed to update token swap info for token {token_index}: {:?}",
+                                err
+                            );
+                        }
+                    }
+                }
+
+                interval.tick().await;
+            }
+        }
+    });
+
     use futures::StreamExt;
-    let mut jobs: futures::stream::FuturesUnordered<_> =
-        vec![data_job, rebalance_job, liquidation_job]
-            .into_iter()
-            .collect();
+    let mut jobs: futures::stream::FuturesUnordered<_> = vec![
+        data_job,
+        rebalance_job,
+        liquidation_job,
+        token_swap_info_job,
+    ]
+    .into_iter()
+    .collect();
     jobs.next().await;
 
     log::error!("a critical job aborted, exiting");

@@ -1,10 +1,13 @@
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
+use std::sync::{Arc, RwLock};
 use std::time::Duration;
 
+use itertools::Itertools;
 use mango_v4::health::{HealthCache, HealthType};
 use mango_v4::state::{
     MangoAccountValue, PerpMarketIndex, Side, TokenConditionalSwap, TokenIndex, QUOTE_TOKEN_INDEX,
 };
+use mango_v4_client::jupiter::QueryRoute;
 use mango_v4_client::{chain_data, health_cache, AccountFetcher, JupiterSwapMode, MangoClient};
 use solana_sdk::signature::Signature;
 
@@ -26,9 +29,9 @@ async fn jupiter_route(
     amount: u64,
     slippage: u64,
     swap_mode: JupiterSwapMode,
-    config: &Config,
+    mock: bool,
 ) -> anyhow::Result<mango_v4_client::jupiter::QueryRoute> {
-    if !config.mock_jupiter {
+    if !mock {
         return mango_client
             .jupiter_route(input_mint, output_mint, amount, slippage, swap_mode)
             .await;
@@ -887,13 +890,22 @@ pub async fn maybe_execute_token_conditional_swap(
             input_amount,
             slippage,
             swap_mode,
-            config,
+            config.mock_jupiter,
         )
         .await?;
-        log::info!("tcs pre execution jupiter query: {:#?}", route);
 
-        // TODO: check if the output_amount is large enough
-        // TODO: technically, we could just execute this at the same time?
+        let sell_amount = route.in_amount.parse::<f64>()?;
+        let buy_amount = route.out_amount.parse::<f64>()?;
+        let swap_price = sell_amount / buy_amount;
+
+        if swap_price > taker_price.to_num::<f64>() {
+            log::trace!(
+                "skipping token conditional swap for: {pubkey}, id: {tcs_id}, \
+                max_buy: {max_buy_token_to_liqee}, max_sell: {max_sell_token_to_liqor}, \
+                because counter swap price: {swap_price} while taker price: {taker_price}",
+            );
+            return Ok(false);
+        }
     }
 
     log::trace!(
@@ -933,4 +945,126 @@ pub async fn maybe_execute_token_conditional_swap(
     }
 
     Ok(true)
+}
+
+#[derive(Clone, Default)]
+pub struct TokenSwapInfo {
+    pub buy_bps_over_oracle: f64,
+    pub sell_bps_over_oracle: f64,
+}
+
+/// Track the buy/sell slippage for tokens
+///
+/// Needed to evaluate whether a token conditional swap premium might be good enough
+/// without having to query each time.
+pub struct TokenSwapInfoUpdater {
+    mango_client: Arc<MangoClient>,
+    slippage_by_token: RwLock<HashMap<TokenIndex, TokenSwapInfo>>,
+    quote_amount: u64,
+    mock_jupiter: bool,
+}
+
+impl TokenSwapInfoUpdater {
+    pub fn new(mango_client: Arc<MangoClient>) -> Self {
+        Self {
+            mango_client,
+            slippage_by_token: RwLock::new(HashMap::new()),
+            quote_amount: 1_000_000_000, // TODO: config
+            mock_jupiter: false,
+        }
+    }
+
+    pub fn mango_client(&self) -> &Arc<MangoClient> {
+        &self.mango_client
+    }
+
+    fn update(&self, token_index: TokenIndex, slippage: TokenSwapInfo) {
+        let mut lock = self.slippage_by_token.write().unwrap();
+        let entry = lock.entry(token_index).or_default();
+        *entry = slippage;
+    }
+
+    pub fn swap_info(&self, token_index: TokenIndex) -> Option<TokenSwapInfo> {
+        let lock = self.slippage_by_token.read().unwrap();
+        lock.get(&token_index).cloned()
+    }
+
+    /// oracle price is how many "in" tokens to pay for one "out" token
+    fn price_over_oracle_bps(oracle_price: f64, route: QueryRoute) -> anyhow::Result<f64> {
+        let in_amount = route.in_amount.parse::<f64>()?;
+        let out_amount = route.out_amount.parse::<f64>()?;
+        let actual_price = in_amount / out_amount;
+        log::info!("check actual {actual_price}, oralce {oracle_price}");
+        if actual_price <= oracle_price {
+            Ok(0.0)
+        } else {
+            Ok(10000.0 * (actual_price / oracle_price - 1.0))
+        }
+    }
+
+    pub async fn update_one(&self, token_index: TokenIndex) -> anyhow::Result<()> {
+        let quote_index = 0;
+        let slippage = 100;
+        if token_index == quote_index {
+            self.update(quote_index, TokenSwapInfo::default());
+            return Ok(());
+        }
+
+        let token_mint = self.mango_client.context.mint_info(token_index).mint;
+        let quote_mint = self.mango_client.context.mint_info(quote_index).mint;
+
+        // these prices are in USD, which doesn't exist on chain
+        let token_price = self
+            .mango_client
+            .bank_oracle_price(token_index)
+            .await?
+            .to_num::<f64>();
+        let quote_price = self
+            .mango_client
+            .bank_oracle_price(quote_index)
+            .await?
+            .to_num::<f64>();
+
+        // prices for the pair
+        let quote_per_token_price = token_price / quote_price;
+        let token_per_quote_price = quote_price / token_price;
+
+        let token_amount = (self.quote_amount as f64 * token_per_quote_price) as u64;
+        let sell_route = jupiter_route(
+            &self.mango_client,
+            token_mint,
+            quote_mint,
+            token_amount,
+            slippage,
+            JupiterSwapMode::ExactIn,
+            self.mock_jupiter,
+        )
+        .await?;
+        let buy_route = jupiter_route(
+            &self.mango_client,
+            quote_mint,
+            token_mint,
+            self.quote_amount,
+            slippage,
+            JupiterSwapMode::ExactIn,
+            self.mock_jupiter,
+        )
+        .await?;
+
+        let sell_bps_over_oracle = Self::price_over_oracle_bps(token_per_quote_price, sell_route)?;
+        let buy_bps_over_oracle = Self::price_over_oracle_bps(quote_per_token_price, buy_route)?;
+
+        log::info!(
+            "token {token_index}, buy bps {buy_bps_over_oracle}, sell bps {sell_bps_over_oracle}"
+        );
+
+        self.update(
+            token_index,
+            TokenSwapInfo {
+                buy_bps_over_oracle,
+                sell_bps_over_oracle,
+            },
+        );
+        Ok(())
+    }
 }
