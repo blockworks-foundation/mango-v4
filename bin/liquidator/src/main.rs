@@ -417,6 +417,7 @@ async fn main() -> anyhow::Result<()> {
     let token_swap_info_job = tokio::spawn({
         // TODO: configurable interval
         let mut interval = tokio::time::interval(Duration::from_secs(60));
+        let mut min_delay = tokio::time::interval(Duration::from_secs(1));
         async move {
             loop {
                 let token_indexes = token_swap_info_updater
@@ -436,6 +437,7 @@ async fn main() -> anyhow::Result<()> {
                             );
                         }
                     }
+                    min_delay.tick().await;
                 }
 
                 interval.tick().await;
