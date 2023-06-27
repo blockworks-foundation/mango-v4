@@ -22,6 +22,7 @@ use crate::state::*;
 #[repr(u8)]
 pub enum TokenConditionalSwapPriceThresholdType {
     PriceOverThreshold,
+    // TODO: this may be useless, just use price_limit?
     PriceUnderThreshold,
 }
 
@@ -42,14 +43,23 @@ pub struct TokenConditionalSwap {
     /// timestamp until which the conditional swap is valid
     pub expiry_timestamp: u64,
 
-    /// The price threshold at which to allow execution
+    /// The price threshold at which to allow execution.
     ///
-    /// Uses the sell_token oracle per buy_token oracle price, without accounting for fees.
+    /// This threshold is compared to the "sell_token per buy_token" oracle price
+    /// (which can be computed by dividing the buy token oracle price by the
+    /// sell token oracle price). If the comparison according to price_threshold_type
+    /// succeeds, the tcs might be executable.
+    ///
+    /// Example: Stop loss to get out of a SOL long: The user bought SOL at 20 USDC/SOL
+    /// and wants to stop loss at 18 USDC/SOL. They'd set buy_token=USDC, sell_token=SOL
+    /// so the reference price is in SOL/USDC units. Set price_threshold=toNative(1/18)
+    /// and price_threshold_type=Over. Also set allow_borrows=false. Set a price_limit
+    /// that is larger than 1/18.
     pub price_threshold: f32,
 
-    /// The maximum sell_token per buy_token price at which execution is allowed
+    /// The highest "sell_token per buy_token" price at which execution is allowed.
     ///
-    /// this includes the premium and fees.
+    /// The check is for the price including premium and fees.
     pub price_limit: f32,
 
     /// The premium to pay over oracle price to incentivize execution.

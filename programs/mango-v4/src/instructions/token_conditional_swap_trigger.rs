@@ -50,7 +50,6 @@ pub fn token_conditional_swap_trigger(
 
     let mut liqee_health_cache = new_health_cache(&liqee.borrow(), &account_retriever)
         .context("create liqee health cache")?;
-    let liqee_pre_init_health = liqee.check_health_pre(&liqee_health_cache)?;
 
     let tcs = liqee.token_conditional_swap_by_index(token_conditional_swap_index)?;
     require!(tcs.has_data(), MangoError::SomeError);
@@ -67,6 +66,8 @@ pub fn token_conditional_swap_trigger(
 
         return Ok(());
     }
+
+    let liqee_pre_init_health = liqee.check_health_pre(&liqee_health_cache)?;
 
     let (buy_bank, buy_token_price, sell_bank_and_oracle_opt) =
         account_retriever.banks_mut_and_oracles(buy_token_index, sell_token_index)?;
