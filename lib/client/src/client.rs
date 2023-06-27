@@ -1433,22 +1433,12 @@ impl MangoClient {
                 format!("error requesting jupiter route between {input_mint} and {output_mint}")
             })?;
 
-        // Find the top route that doesn't involve Raydium (that has too many accounts)
-        let route = quote
-            .data
-            .iter()
-            .find(|route| {
-                !route
-                    .market_infos
-                    .iter()
-                    .any(|mi| mi.label.contains("Raydium"))
-            })
-            .ok_or_else(|| {
-                anyhow::anyhow!(
-                    "no route for swap. found {} routes, but none were usable",
-                    quote.data.len()
-                )
-            })?;
+        let route = quote.data.first().ok_or_else(|| {
+            anyhow::anyhow!(
+                "no route for swap. found {} routes, but none were usable",
+                quote.data.len()
+            )
+        })?;
 
         Ok(route.clone())
     }
