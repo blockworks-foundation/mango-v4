@@ -232,6 +232,7 @@ async fn main() -> anyhow::Result<()> {
 
     let tcs_config = trigger_tcs::Config {
         min_health_ratio: cli.min_health_ratio,
+        max_trigger_quote_amount: 1_000_000_000, // TODO: config, $1000
         mock_jupiter: cli.mock_jupiter,
         // TODO: config
         refresh_timeout: Duration::from_secs(30),
