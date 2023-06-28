@@ -1173,10 +1173,9 @@ export class HealthCache {
     );
 
     function healthAfterPriceChange(newPrice: I80F48): I80F48 {
-      const gClone = cloneDeep(group);
-      gClone.getPerpMarketByMarketIndex(perpMarket.perpMarketIndex)._price =
-        newPrice;
-      const hc = HealthCache.fromMangoAccount(gClone, mangoAccount);
+      const pi: PerpInfo =
+        hc.perpInfos[hc.findPerpInfoIndex(perpPosition.marketIndex)];
+      pi.prices.oracle = newPrice;
       return hc.health(HealthType.maint);
     }
 
@@ -1194,7 +1193,6 @@ export class HealthCache {
         ZERO_I80F48(),
         perpMarket.priceLotsToNative(new BN(1)),
         healthAfterPriceChange,
-        { maxIterations: 20 },
       );
     }
 
@@ -1206,7 +1204,6 @@ export class HealthCache {
       ZERO_I80F48(),
       perpMarket.priceLotsToNative(new BN(1)),
       healthAfterPriceChange,
-      { maxIterations: 20 },
     );
   }
 }
