@@ -219,8 +219,15 @@ async fn main() -> anyhow::Result<()> {
         )?)
     };
 
+    let token_swap_info_config = token_swap_info::Config {
+        quote_index: 0,              // USDC
+        quote_amount: 1_000_000_000, // TODO: config, $1000, should be >= tcs_config.max_trigger_quote_amount
+        mock_jupiter: cli.mock_jupiter,
+    };
+
     let token_swap_info_updater = Arc::new(token_swap_info::TokenSwapInfoUpdater::new(
         mango_client.clone(),
+        token_swap_info_config,
     ));
 
     let liq_config = liquidate::Config {

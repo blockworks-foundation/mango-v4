@@ -8,6 +8,12 @@ use mango_v4_client::{JupiterSwapMode, MangoClient};
 
 use crate::util;
 
+pub struct Config {
+    pub quote_index: TokenIndex,
+    pub quote_amount: u64,
+    pub mock_jupiter: bool,
+}
+
 #[derive(Clone, Default)]
 pub struct TokenSwapInfo {
     /// multiplier to the oracle price for executing a buy, so 1.5 would mean buying 50% over oracle price
@@ -24,17 +30,15 @@ pub struct TokenSwapInfo {
 pub struct TokenSwapInfoUpdater {
     mango_client: Arc<MangoClient>,
     swap_infos: RwLock<HashMap<TokenIndex, TokenSwapInfo>>,
-    quote_amount: u64,
-    mock_jupiter: bool,
+    config: Config,
 }
 
 impl TokenSwapInfoUpdater {
-    pub fn new(mango_client: Arc<MangoClient>) -> Self {
+    pub fn new(mango_client: Arc<MangoClient>, config: Config) -> Self {
         Self {
             mango_client,
             swap_infos: RwLock::new(HashMap::new()),
-            quote_amount: 1_000_000_000, // TODO: config
-            mock_jupiter: false,
+            config,
         }
     }
 
@@ -62,8 +66,10 @@ impl TokenSwapInfoUpdater {
     }
 
     pub async fn update_one(&self, token_index: TokenIndex) -> anyhow::Result<()> {
-        let quote_index = 0;
+        // since we're only quoting, the slippage does not matter
         let slippage = 100;
+
+        let quote_index = self.config.quote_index;
         if token_index == quote_index {
             self.update(quote_index, TokenSwapInfo::default());
             return Ok(());
@@ -88,7 +94,7 @@ impl TokenSwapInfoUpdater {
         let quote_per_token_price = token_price / quote_price;
         let token_per_quote_price = quote_price / token_price;
 
-        let token_amount = (self.quote_amount as f64 * token_per_quote_price) as u64;
+        let token_amount = (self.config.quote_amount as f64 * token_per_quote_price) as u64;
         let sell_route = util::jupiter_route(
             &self.mango_client,
             token_mint,
@@ -96,17 +102,17 @@ impl TokenSwapInfoUpdater {
             token_amount,
             slippage,
             JupiterSwapMode::ExactIn,
-            self.mock_jupiter,
+            self.config.mock_jupiter,
         )
         .await?;
         let buy_route = util::jupiter_route(
             &self.mango_client,
             quote_mint,
             token_mint,
-            self.quote_amount,
+            self.config.quote_amount,
             slippage,
             JupiterSwapMode::ExactIn,
-            self.mock_jupiter,
+            self.config.mock_jupiter,
         )
         .await?;
 
