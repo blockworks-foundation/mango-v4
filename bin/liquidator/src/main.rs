@@ -20,6 +20,8 @@ use std::collections::HashSet;
 pub mod liquidate;
 pub mod metrics;
 pub mod rebalance;
+pub mod token_swap_info;
+pub mod trigger_tcs;
 pub mod util;
 
 use crate::util::{is_mango_account, is_mango_bank, is_mint_info, is_perp_market};
@@ -217,12 +219,19 @@ async fn main() -> anyhow::Result<()> {
         )?)
     };
 
-    let token_swap_info_updater =
-        Arc::new(liquidate::TokenSwapInfoUpdater::new(mango_client.clone()));
+    let token_swap_info_updater = Arc::new(token_swap_info::TokenSwapInfoUpdater::new(
+        mango_client.clone(),
+    ));
 
     let liq_config = liquidate::Config {
-        liq_min_health_ratio: cli.min_health_ratio,
-        tcs_min_health_ratio: cli.min_health_ratio,
+        min_health_ratio: cli.min_health_ratio,
+        mock_jupiter: cli.mock_jupiter,
+        // TODO: config
+        refresh_timeout: Duration::from_secs(30),
+    };
+
+    let tcs_config = trigger_tcs::Config {
+        min_health_ratio: cli.min_health_ratio,
         mock_jupiter: cli.mock_jupiter,
         // TODO: config
         refresh_timeout: Duration::from_secs(30),
@@ -248,6 +257,7 @@ async fn main() -> anyhow::Result<()> {
         mango_client,
         account_fetcher,
         liquidation_config: liq_config,
+        trigger_tcs_config: tcs_config,
         rebalancer: rebalancer.clone(),
         token_swap_info: token_swap_info_updater.clone(),
         accounts_with_liq_errors: Default::default(),
@@ -488,8 +498,9 @@ struct LiquidationState {
     mango_client: Arc<MangoClient>,
     account_fetcher: Arc<chain_data::AccountFetcher>,
     rebalancer: Arc<rebalance::Rebalancer>,
-    token_swap_info: Arc<liquidate::TokenSwapInfoUpdater>,
+    token_swap_info: Arc<token_swap_info::TokenSwapInfoUpdater>,
     liquidation_config: liquidate::Config,
+    trigger_tcs_config: trigger_tcs::Config,
     accounts_with_liq_errors: HashMap<Pubkey, ErrorTracking>,
     accounts_with_tcs_errors: HashMap<Pubkey, ErrorTracking>,
     error_skip_threshold: u64,
@@ -647,12 +658,12 @@ impl LiquidationState {
             }
         }
 
-        let result = liquidate::maybe_execute_token_conditional_swap(
+        let result = trigger_tcs::maybe_execute_token_conditional_swap(
             &self.mango_client,
             &self.account_fetcher,
             &self.token_swap_info,
             pubkey,
-            &self.liquidation_config,
+            &self.trigger_tcs_config,
         )
         .await;
 
