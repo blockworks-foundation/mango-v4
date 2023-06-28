@@ -249,6 +249,7 @@ async fn main() -> anyhow::Result<()> {
         account_fetcher,
         liquidation_config: liq_config,
         rebalancer: rebalancer.clone(),
+        token_swap_info: token_swap_info_updater.clone(),
         accounts_with_liq_errors: Default::default(),
         accounts_with_tcs_errors: Default::default(),
         error_skip_threshold: 5,
@@ -353,22 +354,17 @@ async fn main() -> anyhow::Result<()> {
         }
     });
 
-    // The other jobs only start when a snapshot is done - wait for it
-    // TODO: what if the above job aborts and we never exit?
-    {
-        let shared_state = shared_state.clone();
-        loop {
-            if shared_state.read().unwrap().one_snapshot_done {
-                break;
-            }
-            std::thread::sleep(Duration::from_secs(1));
-        }
-    }
+    // Could be refactored to only start the below jobs when the first snapshot is done.
+    // But need to take care to abort if the above job aborts beforehand.
 
     let rebalance_job = tokio::spawn({
+        let shared_state = shared_state.clone();
         async move {
             loop {
                 rebalance_interval.tick().await;
+                if !shared_state.read().unwrap().one_snapshot_done {
+                    continue;
+                }
                 if let Err(err) = rebalancer.zero_all_non_quote().await {
                     log::error!("failed to rebalance liqor: {:?}", err);
 
@@ -390,6 +386,9 @@ async fn main() -> anyhow::Result<()> {
                 let account_addresses;
                 {
                     let mut state = shared_state.write().unwrap();
+                    if !state.one_snapshot_done {
+                        continue;
+                    }
                     account_addresses = if state.health_check_all {
                         state.mango_accounts.iter().cloned().collect()
                     } else {
@@ -418,8 +417,12 @@ async fn main() -> anyhow::Result<()> {
         // TODO: configurable interval
         let mut interval = tokio::time::interval(Duration::from_secs(60));
         let mut min_delay = tokio::time::interval(Duration::from_secs(1));
+        let shared_state = shared_state.clone();
         async move {
             loop {
+                if !shared_state.read().unwrap().one_snapshot_done {
+                    continue;
+                }
                 let token_indexes = token_swap_info_updater
                     .mango_client()
                     .context
@@ -485,6 +488,7 @@ struct LiquidationState {
     mango_client: Arc<MangoClient>,
     account_fetcher: Arc<chain_data::AccountFetcher>,
     rebalancer: Arc<rebalance::Rebalancer>,
+    token_swap_info: Arc<liquidate::TokenSwapInfoUpdater>,
     liquidation_config: liquidate::Config,
     accounts_with_liq_errors: HashMap<Pubkey, ErrorTracking>,
     accounts_with_tcs_errors: HashMap<Pubkey, ErrorTracking>,
@@ -646,6 +650,7 @@ impl LiquidationState {
         let result = liquidate::maybe_execute_token_conditional_swap(
             &self.mango_client,
             &self.account_fetcher,
+            &self.token_swap_info,
             pubkey,
             &self.liquidation_config,
         )

@@ -2,7 +2,6 @@ use std::collections::{HashMap, HashSet};
 use std::sync::{Arc, RwLock};
 use std::time::Duration;
 
-use itertools::Itertools;
 use mango_v4::health::{HealthCache, HealthType};
 use mango_v4::state::{
     MangoAccountValue, PerpMarketIndex, Side, TokenConditionalSwap, TokenIndex, QUOTE_TOKEN_INDEX,
@@ -761,18 +760,50 @@ async fn tcs_is_executable(
         return Ok(false);
     }
 
-    // TODO: requirements on premium
-    if tcs.price_premium_bps < 100 {
+    return Ok(true);
+}
+
+fn tcs_has_plausible_premium(
+    tcs: &TokenConditionalSwap,
+    token_swap_info: &TokenSwapInfoUpdater,
+) -> anyhow::Result<bool> {
+    // The premium the taker receives needs to take taker fees into account
+    let premium = tcs.taker_price(tcs.premium_price(1.0)) as f64;
+
+    // Never take tcs where the fee exceeds the premium and the triggerer exchanges
+    // tokens at below oracle price.
+    if premium < 1.0 {
         return Ok(false);
     }
 
-    return Ok(true);
+    let buy_info = token_swap_info
+        .swap_info(tcs.buy_token_index)
+        .ok_or_else(|| anyhow::anyhow!("no swap info for token {}", tcs.buy_token_index))?;
+    let sell_info = token_swap_info
+        .swap_info(tcs.sell_token_index)
+        .ok_or_else(|| anyhow::anyhow!("no swap info for token {}", tcs.sell_token_index))?;
+
+    // If this is 1.0 then the exchange can (probably) happen at oracle price.
+    // 1.5 would mean we need to pay 50% more than oracle etc.
+    let cost = buy_info.buy_over_oracle * sell_info.sell_over_oracle;
+
+    Ok(cost <= premium)
+}
+
+async fn tcs_is_interesting(
+    mango_client: &MangoClient,
+    tcs: &TokenConditionalSwap,
+    token_swap_info: &TokenSwapInfoUpdater,
+) -> anyhow::Result<bool> {
+    Ok(tcs_is_executable(mango_client, tcs).await?
+        && tcs_has_plausible_premium(tcs, token_swap_info)?)
 }
 
 #[allow(clippy::too_many_arguments)]
 pub async fn maybe_execute_token_conditional_swap(
     mango_client: &MangoClient,
     account_fetcher: &chain_data::AccountFetcher,
+    token_swap_info: &TokenSwapInfoUpdater,
     pubkey: &Pubkey,
     config: &Config,
 ) -> anyhow::Result<bool> {
@@ -788,7 +819,7 @@ pub async fn maybe_execute_token_conditional_swap(
             tcs_shuffled.shuffle(&mut rng);
         }
         for tcs in tcs_shuffled {
-            if tcs_is_executable(mango_client, tcs).await? {
+            if tcs_is_interesting(mango_client, tcs, token_swap_info).await? {
                 tcs_id_inner = Some(tcs.id);
                 break;
             }
@@ -809,7 +840,7 @@ pub async fn maybe_execute_token_conditional_swap(
     // get a fresh account and re-check the tcs and health
     let liqee = account_fetcher.fetch_fresh_mango_account(pubkey).await?;
     let (_, tcs) = liqee.token_conditional_swap_by_id(tcs_id)?;
-    if !tcs_is_executable(mango_client, tcs).await? {
+    if !tcs_is_interesting(mango_client, tcs, token_swap_info).await? {
         return Ok(false);
     }
 
@@ -871,8 +902,6 @@ pub async fn maybe_execute_token_conditional_swap(
     }
 
     // Final check of the reverse trade on jupiter
-    // TODO: doing this every time is hugely expensive, there needs to be a layer
-    // in front, that rejects nonsensical tcs based on cached slippage values.
     {
         let buy_mint = mango_client.context.mint_info(tcs.buy_token_index).mint;
         let sell_mint = mango_client.context.mint_info(tcs.sell_token_index).mint;
@@ -949,8 +978,11 @@ pub async fn maybe_execute_token_conditional_swap(
 
 #[derive(Clone, Default)]
 pub struct TokenSwapInfo {
-    pub buy_bps_over_oracle: f64,
-    pub sell_bps_over_oracle: f64,
+    /// multiplier to the oracle price for executing a buy, so 1.5 would mean buying 50% over oracle price
+    pub buy_over_oracle: f64,
+    /// multiplier to the oracle price for executing a sell,
+    /// but with the price inverted, so values > 1 mean a worse deal than oracle price
+    pub sell_over_oracle: f64,
 }
 
 /// Track the buy/sell slippage for tokens
@@ -990,16 +1022,12 @@ impl TokenSwapInfoUpdater {
     }
 
     /// oracle price is how many "in" tokens to pay for one "out" token
-    fn price_over_oracle_bps(oracle_price: f64, route: QueryRoute) -> anyhow::Result<f64> {
+    fn price_over_oracle(oracle_price: f64, route: QueryRoute) -> anyhow::Result<f64> {
         let in_amount = route.in_amount.parse::<f64>()?;
         let out_amount = route.out_amount.parse::<f64>()?;
         let actual_price = in_amount / out_amount;
         log::info!("check actual {actual_price}, oralce {oracle_price}");
-        if actual_price <= oracle_price {
-            Ok(0.0)
-        } else {
-            Ok(10000.0 * (actual_price / oracle_price - 1.0))
-        }
+        Ok(actual_price / oracle_price)
     }
 
     pub async fn update_one(&self, token_index: TokenIndex) -> anyhow::Result<()> {
@@ -1051,18 +1079,16 @@ impl TokenSwapInfoUpdater {
         )
         .await?;
 
-        let sell_bps_over_oracle = Self::price_over_oracle_bps(token_per_quote_price, sell_route)?;
-        let buy_bps_over_oracle = Self::price_over_oracle_bps(quote_per_token_price, buy_route)?;
+        let buy_over_oracle = Self::price_over_oracle(quote_per_token_price, buy_route)?;
+        let sell_over_oracle = Self::price_over_oracle(token_per_quote_price, sell_route)?;
 
-        log::info!(
-            "token {token_index}, buy bps {buy_bps_over_oracle}, sell bps {sell_bps_over_oracle}"
-        );
+        log::info!("token {token_index}, buy bps {buy_over_oracle}, sell bps {sell_over_oracle}");
 
         self.update(
             token_index,
             TokenSwapInfo {
-                buy_bps_over_oracle,
-                sell_bps_over_oracle,
+                buy_over_oracle,
+                sell_over_oracle,
             },
         );
         Ok(())
