@@ -32,7 +32,7 @@ compile_error!("compiling the program entrypoint without 'enable-gpl' makes no s
 
 use state::{
     OracleConfigParams, PerpMarketIndex, PlaceOrderType, SelfTradeBehavior, Serum3MarketIndex,
-    Side, TokenConditionalSwap, TokenConditionalSwapPriceThresholdType, TokenIndex,
+    Side, TokenConditionalSwap, TokenIndex,
 };
 
 declare_id!("4MangoMjqJ2firMokCjjGgoK8d4MXcrgL7XJaL3w6fVg");
@@ -1143,10 +1143,9 @@ pub mod mango_v4 {
         max_buy: u64,
         max_sell: u64,
         expiry_timestamp: u64,
-        price_threshold: f32,
-        price_threshold_type: TokenConditionalSwapPriceThresholdType,
+        price_lower_limit: f32,
+        price_upper_limit: f32,
         price_premium_bps: u16,
-        price_limit: f32,
         allow_creating_deposits: bool,
         allow_creating_borrows: bool,
     ) -> Result<()> {
@@ -1157,18 +1156,17 @@ pub mod mango_v4 {
             bought: 0,
             sold: 0,
             expiry_timestamp,
-            price_threshold,
-            price_limit,
+            price_lower_limit,
+            price_upper_limit,
             price_premium_bps,
             taker_fee_bps: 0, // set inside
             maker_fee_bps: 0, // set inside
             buy_token_index: ctx.accounts.buy_bank.load()?.token_index,
             sell_token_index: ctx.accounts.sell_bank.load()?.token_index,
             has_data: 1,
-            price_threshold_type: price_threshold_type.into(),
             allow_creating_deposits: u8::from(allow_creating_deposits),
             allow_creating_borrows: u8::from(allow_creating_borrows),
-            reserved: [0; 114],
+            reserved: [0; 115],
         };
 
         #[cfg(feature = "enable-gpl")]

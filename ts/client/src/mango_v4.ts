@@ -4777,22 +4777,16 @@ export type MangoV4 = {
           "type": "u64"
         },
         {
-          "name": "priceThreshold",
+          "name": "priceLowerLimit",
           "type": "f32"
         },
         {
-          "name": "priceThresholdType",
-          "type": {
-            "defined": "TokenConditionalSwapPriceThresholdType"
-          }
+          "name": "priceUpperLimit",
+          "type": "f32"
         },
         {
           "name": "pricePremiumBps",
           "type": "u16"
-        },
-        {
-          "name": "priceLimit",
-          "type": "f32"
         },
         {
           "name": "allowCreatingDeposits",
@@ -7832,11 +7826,18 @@ export type MangoV4 = {
             "type": "u8"
           },
           {
+            "name": "resetOnNonzeroPrice",
+            "docs": [
+              "If set to 1, the stable price will reset on the next non-zero price it sees."
+            ],
+            "type": "u8"
+          },
+          {
             "name": "padding",
             "type": {
               "array": [
                 "u8",
-                7
+                6
               ]
             }
           },
@@ -7891,20 +7892,30 @@ export type MangoV4 = {
             "type": "u64"
           },
           {
-            "name": "priceThreshold",
+            "name": "priceLowerLimit",
             "docs": [
-              "The price threshold at which to allow execution",
+              "The price must exceed this threshold to allow execution.",
               "",
-              "Uses the sell_token oracle per buy_token oracle price, without accounting for fees."
+              "This threshold is compared to the \"sell_token per buy_token\" oracle price",
+              "(which can be computed by dividing the buy token oracle price by the",
+              "sell token oracle price). If that price is >= lower_limit and <= upper_limit",
+              "the tcs may be executable.",
+              "",
+              "Example: Stop loss to get out of a SOL long: The user bought SOL at 20 USDC/SOL",
+              "and wants to stop loss at 18 USDC/SOL. They'd set buy_token=USDC, sell_token=SOL",
+              "so the reference price is in SOL/USDC units. Set price_lower_limit=toNative(1/18)",
+              "and price_upper_limit=toNative(1/10). Also set allow_borrows=false.",
+              "",
+              "Example: Want to buy SOL with USDC if the price falls below 22 USDC/SOL.",
+              "buy_token=SOL, sell_token=USDC, reference price is in USDC/SOL units. Set",
+              "price_upper_limit=toNative(22), price_lower_limit=0."
             ],
             "type": "f32"
           },
           {
-            "name": "priceLimit",
+            "name": "priceUpperLimit",
             "docs": [
-              "The maximum sell_token per buy_token price at which execution is allowed",
-              "",
-              "this includes the premium and fees."
+              "Parallel to price_lower_limit, but an upper limit."
             ],
             "type": "f32"
           },
@@ -7945,13 +7956,6 @@ export type MangoV4 = {
             "type": "u8"
           },
           {
-            "name": "priceThresholdType",
-            "docs": [
-              "holds a TokenConditionalSwapPriceThresholdType"
-            ],
-            "type": "u8"
-          },
-          {
             "name": "allowCreatingDeposits",
             "docs": [
               "may token purchases create deposits? (often users just want to get out of a borrow)"
@@ -7970,7 +7974,7 @@ export type MangoV4 = {
             "type": {
               "array": [
                 "u8",
-                114
+                115
               ]
             }
           }
@@ -8622,20 +8626,6 @@ export type MangoV4 = {
           },
           {
             "name": "Liquidate"
-          }
-        ]
-      }
-    },
-    {
-      "name": "TokenConditionalSwapPriceThresholdType",
-      "type": {
-        "kind": "enum",
-        "variants": [
-          {
-            "name": "PriceOverThreshold"
-          },
-          {
-            "name": "PriceUnderThreshold"
           }
         ]
       }
@@ -10478,13 +10468,8 @@ export type MangoV4 = {
     },
     {
       "code": 6049,
-      "name": "TokenConditionalSwapPriceThresholdNotReached",
-      "msg": "conditional token swap price threshold not reached"
-    },
-    {
-      "code": 6050,
-      "name": "TokenConditionalSwapPriceExceedsLimit",
-      "msg": "conditional token swap price exceeds limit"
+      "name": "TokenConditionalSwapPriceNotInRange",
+      "msg": "conditional token swap price is not in execution range"
     }
   ]
 };
@@ -15268,22 +15253,16 @@ export const IDL: MangoV4 = {
           "type": "u64"
         },
         {
-          "name": "priceThreshold",
+          "name": "priceLowerLimit",
           "type": "f32"
         },
         {
-          "name": "priceThresholdType",
-          "type": {
-            "defined": "TokenConditionalSwapPriceThresholdType"
-          }
+          "name": "priceUpperLimit",
+          "type": "f32"
         },
         {
           "name": "pricePremiumBps",
           "type": "u16"
-        },
-        {
-          "name": "priceLimit",
-          "type": "f32"
         },
         {
           "name": "allowCreatingDeposits",
@@ -18323,11 +18302,18 @@ export const IDL: MangoV4 = {
             "type": "u8"
           },
           {
+            "name": "resetOnNonzeroPrice",
+            "docs": [
+              "If set to 1, the stable price will reset on the next non-zero price it sees."
+            ],
+            "type": "u8"
+          },
+          {
             "name": "padding",
             "type": {
               "array": [
                 "u8",
-                7
+                6
               ]
             }
           },
@@ -18382,20 +18368,30 @@ export const IDL: MangoV4 = {
             "type": "u64"
           },
           {
-            "name": "priceThreshold",
+            "name": "priceLowerLimit",
             "docs": [
-              "The price threshold at which to allow execution",
+              "The price must exceed this threshold to allow execution.",
               "",
-              "Uses the sell_token oracle per buy_token oracle price, without accounting for fees."
+              "This threshold is compared to the \"sell_token per buy_token\" oracle price",
+              "(which can be computed by dividing the buy token oracle price by the",
+              "sell token oracle price). If that price is >= lower_limit and <= upper_limit",
+              "the tcs may be executable.",
+              "",
+              "Example: Stop loss to get out of a SOL long: The user bought SOL at 20 USDC/SOL",
+              "and wants to stop loss at 18 USDC/SOL. They'd set buy_token=USDC, sell_token=SOL",
+              "so the reference price is in SOL/USDC units. Set price_lower_limit=toNative(1/18)",
+              "and price_upper_limit=toNative(1/10). Also set allow_borrows=false.",
+              "",
+              "Example: Want to buy SOL with USDC if the price falls below 22 USDC/SOL.",
+              "buy_token=SOL, sell_token=USDC, reference price is in USDC/SOL units. Set",
+              "price_upper_limit=toNative(22), price_lower_limit=0."
             ],
             "type": "f32"
           },
           {
-            "name": "priceLimit",
+            "name": "priceUpperLimit",
             "docs": [
-              "The maximum sell_token per buy_token price at which execution is allowed",
-              "",
-              "this includes the premium and fees."
+              "Parallel to price_lower_limit, but an upper limit."
             ],
             "type": "f32"
           },
@@ -18436,13 +18432,6 @@ export const IDL: MangoV4 = {
             "type": "u8"
           },
           {
-            "name": "priceThresholdType",
-            "docs": [
-              "holds a TokenConditionalSwapPriceThresholdType"
-            ],
-            "type": "u8"
-          },
-          {
             "name": "allowCreatingDeposits",
             "docs": [
               "may token purchases create deposits? (often users just want to get out of a borrow)"
@@ -18461,7 +18450,7 @@ export const IDL: MangoV4 = {
             "type": {
               "array": [
                 "u8",
-                114
+                115
               ]
             }
           }
@@ -19113,20 +19102,6 @@ export const IDL: MangoV4 = {
           },
           {
             "name": "Liquidate"
-          }
-        ]
-      }
-    },
-    {
-      "name": "TokenConditionalSwapPriceThresholdType",
-      "type": {
-        "kind": "enum",
-        "variants": [
-          {
-            "name": "PriceOverThreshold"
-          },
-          {
-            "name": "PriceUnderThreshold"
           }
         ]
       }
@@ -20969,13 +20944,8 @@ export const IDL: MangoV4 = {
     },
     {
       "code": 6049,
-      "name": "TokenConditionalSwapPriceThresholdNotReached",
-      "msg": "conditional token swap price threshold not reached"
-    },
-    {
-      "code": 6050,
-      "name": "TokenConditionalSwapPriceExceedsLimit",
-      "msg": "conditional token swap price exceeds limit"
+      "name": "TokenConditionalSwapPriceNotInRange",
+      "msg": "conditional token swap price is not in execution range"
     }
   ]
 };

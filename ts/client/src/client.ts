@@ -37,7 +37,6 @@ import {
   PerpPosition,
   Serum3Orders,
   TokenConditionalSwapDto,
-  TokenConditionalSwapPriceThresholdType,
   TokenPosition,
 } from './accounts/mangoAccount';
 import { StubOracle } from './accounts/oracle';
@@ -3141,10 +3140,9 @@ export class MangoClient {
     maxBuy: number,
     maxSell: number,
     expiryTimestamp: number | null,
-    priceThreshold: number,
-    priceThresholdType: TokenConditionalSwapPriceThresholdType,
+    priceLowerLimit: number,
+    priceUpperLimit: number,
     pricePremiumBps: number,
-    priceLimit: number,
     allowCreatingDeposits: boolean,
     allowCreatingBorrows: boolean,
   ): Promise<TransactionSignature> {
@@ -3155,10 +3153,9 @@ export class MangoClient {
         new BN(maxBuy),
         new BN(maxSell),
         expiryTimestamp !== null ? new BN(expiryTimestamp) : U64_MAX_BN,
-        priceThreshold,
-        priceThresholdType,
+        priceLowerLimit,
+        priceUpperLimit,
         pricePremiumBps,
-        priceLimit,
         allowCreatingDeposits,
         allowCreatingBorrows,
       )

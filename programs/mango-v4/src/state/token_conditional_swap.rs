@@ -2,29 +2,10 @@ use anchor_lang::prelude::*;
 
 use derivative::Derivative;
 use fixed::types::I80F48;
-use num_enum::{IntoPrimitive, TryFromPrimitive};
 use static_assertions::const_assert_eq;
 use std::mem::size_of;
 
 use crate::state::*;
-
-#[derive(
-    Eq,
-    PartialEq,
-    Copy,
-    Clone,
-    TryFromPrimitive,
-    IntoPrimitive,
-    Debug,
-    AnchorSerialize,
-    AnchorDeserialize,
-)]
-#[repr(u8)]
-pub enum TokenConditionalSwapPriceThresholdType {
-    PriceOverThreshold,
-    // TODO: this may be useless, just use price_limit?
-    PriceUnderThreshold,
-}
 
 #[zero_copy]
 #[derive(AnchorDeserialize, AnchorSerialize, Derivative, bytemuck::Pod)]
@@ -43,24 +24,25 @@ pub struct TokenConditionalSwap {
     /// timestamp until which the conditional swap is valid
     pub expiry_timestamp: u64,
 
-    /// The price threshold at which to allow execution.
+    /// The price must exceed this threshold to allow execution.
     ///
     /// This threshold is compared to the "sell_token per buy_token" oracle price
     /// (which can be computed by dividing the buy token oracle price by the
-    /// sell token oracle price). If the comparison according to price_threshold_type
-    /// succeeds, the tcs might be executable.
+    /// sell token oracle price). If that price is >= lower_limit and <= upper_limit
+    /// the tcs may be executable.
     ///
     /// Example: Stop loss to get out of a SOL long: The user bought SOL at 20 USDC/SOL
     /// and wants to stop loss at 18 USDC/SOL. They'd set buy_token=USDC, sell_token=SOL
-    /// so the reference price is in SOL/USDC units. Set price_threshold=toNative(1/18)
-    /// and price_threshold_type=Over. Also set allow_borrows=false. Set a price_limit
-    /// that is larger than 1/18.
-    pub price_threshold: f32,
-
-    /// The highest "sell_token per buy_token" price at which execution is allowed.
+    /// so the reference price is in SOL/USDC units. Set price_lower_limit=toNative(1/18)
+    /// and price_upper_limit=toNative(1/10). Also set allow_borrows=false.
     ///
-    /// The check is for the price including premium and fees.
-    pub price_limit: f32,
+    /// Example: Want to buy SOL with USDC if the price falls below 22 USDC/SOL.
+    /// buy_token=SOL, sell_token=USDC, reference price is in USDC/SOL units. Set
+    /// price_upper_limit=toNative(22), price_lower_limit=0.
+    pub price_lower_limit: f32,
+
+    /// Parallel to price_lower_limit, but an upper limit.
+    pub price_upper_limit: f32,
 
     /// The premium to pay over oracle price to incentivize execution.
     pub price_premium_bps: u16,
@@ -77,21 +59,18 @@ pub struct TokenConditionalSwap {
 
     pub has_data: u8,
 
-    /// holds a TokenConditionalSwapPriceThresholdType
-    pub price_threshold_type: u8,
-
     /// may token purchases create deposits? (often users just want to get out of a borrow)
     pub allow_creating_deposits: u8,
     /// may token selling create borrows? (often users just want to get out of a long)
     pub allow_creating_borrows: u8,
 
     #[derivative(Debug = "ignore")]
-    pub reserved: [u8; 114],
+    pub reserved: [u8; 115],
 }
 
 const_assert_eq!(
     size_of::<TokenConditionalSwap>(),
-    8 * 6 + 2 * 4 + 2 * 5 + 1 * 4 + 114
+    8 * 6 + 2 * 4 + 2 * 5 + 1 * 3 + 115
 );
 const_assert_eq!(size_of::<TokenConditionalSwap>(), 184);
 const_assert_eq!(size_of::<TokenConditionalSwap>() % 8, 0);
@@ -105,18 +84,17 @@ impl Default for TokenConditionalSwap {
             bought: 0,
             sold: 0,
             expiry_timestamp: u64::MAX,
-            price_threshold: 0.0,
-            price_limit: 0.0,
+            price_lower_limit: 0.0,
+            price_upper_limit: 0.0,
             price_premium_bps: 0,
             taker_fee_bps: 0,
             maker_fee_bps: 0,
             buy_token_index: TokenIndex::MAX,
             sell_token_index: TokenIndex::MAX,
             has_data: 0,
-            price_threshold_type: TokenConditionalSwapPriceThresholdType::PriceOverThreshold.into(),
             allow_creating_borrows: 0,
             allow_creating_deposits: 0,
-            reserved: [0; 114],
+            reserved: [0; 115],
         }
     }
 }
@@ -153,10 +131,6 @@ impl TokenConditionalSwap {
         self.max_sell - self.sold
     }
 
-    pub fn price_threshold_type(&self) -> TokenConditionalSwapPriceThresholdType {
-        TokenConditionalSwapPriceThresholdType::try_from(self.price_threshold_type).unwrap()
-    }
-
     /// Base price adjusted for the premium
     ///
     /// Base price is the amount of sell_token to pay for one buy_token.
@@ -186,14 +160,7 @@ impl TokenConditionalSwap {
             .to_num()
     }
 
-    pub fn price_threshold_reached(&self, price: f32) -> bool {
-        match self.price_threshold_type() {
-            TokenConditionalSwapPriceThresholdType::PriceOverThreshold => {
-                price >= self.price_threshold
-            }
-            TokenConditionalSwapPriceThresholdType::PriceUnderThreshold => {
-                price <= self.price_threshold
-            }
-        }
+    pub fn price_in_range(&self, price: f32) -> bool {
+        price >= self.price_lower_limit && price <= self.price_upper_limit
     }
 }

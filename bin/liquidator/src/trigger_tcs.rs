@@ -15,17 +15,14 @@ pub struct Config {
     pub mock_jupiter: bool,
 }
 
-async fn tcs_is_executable(
+async fn tcs_is_in_price_range(
     mango_client: &MangoClient,
     tcs: &TokenConditionalSwap,
 ) -> anyhow::Result<bool> {
     let buy_token_price = mango_client.bank_oracle_price(tcs.buy_token_index).await?;
     let sell_token_price = mango_client.bank_oracle_price(tcs.sell_token_index).await?;
     let base_price = (buy_token_price / sell_token_price).to_num();
-    let premium_price = tcs.premium_price(base_price);
-    let maker_price = tcs.maker_price(premium_price);
-
-    if !tcs.price_threshold_reached(base_price) || maker_price > tcs.price_limit {
+    if !tcs.price_in_range(base_price) {
         return Ok(false);
     }
 
@@ -66,7 +63,7 @@ async fn tcs_is_interesting(
     now_ts: u64,
 ) -> anyhow::Result<bool> {
     Ok(!tcs.is_expired(now_ts)
-        && tcs_is_executable(mango_client, tcs).await?
+        && tcs_is_in_price_range(mango_client, tcs).await?
         && tcs_has_plausible_premium(tcs, token_swap_info)?)
 }
 

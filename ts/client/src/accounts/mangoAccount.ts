@@ -1697,17 +1697,14 @@ export class TokenConditionalSwap {
       dto.bought,
       dto.sold,
       dto.expiryTimestamp,
-      dto.priceThreshold,
-      dto.priceLimit,
+      dto.priceLowerLimit,
+      dto.priceUpperLimit,
       dto.pricePremiumBps,
       dto.takerFeeBps,
       dto.makerFeeBps,
       dto.buyTokenIndex as TokenIndex,
       dto.sellTokenIndex as TokenIndex,
       dto.hasData == 1,
-      dto.priceThresholdType == 0
-        ? 'priceOverThreshold'
-        : 'priceUnderThreshold',
       dto.allowCreatingDeposits == 1,
       dto.allowCreatingBorrows == 1,
     );
@@ -1720,15 +1717,14 @@ export class TokenConditionalSwap {
     public bought: BN,
     public sold: BN,
     public expiryTimestamp: BN,
-    public priceThreshold: number,
-    public priceLimit: number,
+    public priceLowerLimit: number,
+    public priceUpperLimit: number,
     public pricePremiumBps: number,
     public takerFeeBps: number,
     public makerFeeBps: number,
     public buyTokenIndex: TokenIndex,
     public sellTokenIndex: TokenIndex,
     public hasData: boolean,
-    public priceThresholdType: 'priceOverThreshold' | 'priceUnderThreshold',
     public allowCreatingDeposits: boolean,
     public allowCreatingBorrows: boolean,
   ) {}
@@ -1742,23 +1738,17 @@ export class TokenConditionalSwapDto {
     public bought: BN,
     public sold: BN,
     public expiryTimestamp: BN,
-    public priceThreshold: number,
-    public priceLimit: number,
+    public priceLowerLimit: number,
+    public priceUpperLimit: number,
     public pricePremiumBps: number,
     public takerFeeBps: number,
     public makerFeeBps: number,
     public buyTokenIndex: number,
     public sellTokenIndex: number,
     public hasData: number,
-    public priceThresholdType: number,
     public allowCreatingDeposits: number,
     public allowCreatingBorrows: number,
   ) {}
-}
-
-export class TokenConditionalSwapPriceThresholdType {
-  static priceOverThreshold = { priceOverThreshold: {} };
-  static priceUnderThreshold = { priceUnderThreshold: {} };
 }
 
 export class HealthType {

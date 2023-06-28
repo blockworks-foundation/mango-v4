@@ -209,18 +209,12 @@ fn action(
     // amount of sell token native per buy token native
     let price: f32 = (buy_token_price.to_num::<f64>() / sell_token_price.to_num::<f64>()) as f32;
     require!(
-        tcs.price_threshold_reached(price),
-        MangoError::TokenConditionalSwapPriceThresholdNotReached
+        tcs.price_in_range(price),
+        MangoError::TokenConditionalSwapPriceNotInRange
     );
 
     let premium_price = tcs.premium_price(price);
     let maker_price = tcs.maker_price(premium_price);
-
-    require_gte!(
-        tcs.price_limit,
-        maker_price,
-        MangoError::TokenConditionalSwapPriceExceedsLimit
-    );
     let maker_price_i80f48 = I80F48::from_num(maker_price);
 
     let pre_liqee_buy_token = liqee.token_position(tcs.buy_token_index)?.native(&buy_bank);
@@ -776,8 +770,8 @@ mod tests {
         let tcs = TokenConditionalSwap {
             max_buy: 100,
             max_sell: 100,
-            price_threshold: 1.0,
-            price_limit: 3.0,
+            price_lower_limit: 1.0,
+            price_upper_limit: 3.0,
             price_premium_bps: 1000,
             buy_token_index: 1,
             sell_token_index: 0,
@@ -839,8 +833,8 @@ mod tests {
         let tcs = TokenConditionalSwap {
             max_buy: 10000,
             max_sell: 10000,
-            price_threshold: 1.0,
-            price_limit: 3.0,
+            price_lower_limit: 1.0,
+            price_upper_limit: 3.0,
             price_premium_bps: 0,
             buy_token_index: 1,
             sell_token_index: 0,
@@ -868,8 +862,8 @@ mod tests {
         let tcs = TokenConditionalSwap {
             max_buy: 1000,
             max_sell: 1000,
-            price_threshold: 1.0,
-            price_limit: 3.0,
+            price_lower_limit: 1.0,
+            price_upper_limit: 3.0,
             price_premium_bps: 200,
             maker_fee_bps: 300,
             taker_fee_bps: 500,

@@ -55,7 +55,9 @@ async function main() {
       accounts.find((account) => account.name == 'LIQTEST, LIQEE1'),
     );
     expect(account.tokenConditionalSwapsActive.length).equal(0);
-    expect(Math.round(account.getTokenBalance(usdcBank).toNumber())).equal(1000 - 4715);
+    expect(Math.round(account.getTokenBalance(usdcBank).toNumber())).equal(
+      1000 - 4715,
+    );
     expect(account.getHealthRatioUi(group, HealthType.init)).lessThan(1);
   }
 
@@ -74,7 +76,9 @@ async function main() {
       accounts.find((account) => account.name == 'LIQTEST, LIQEE3'),
     );
     expect(account.tokenConditionalSwapsActive.length).equal(0);
-    expect(Math.round(account.getTokenBalance(usdcBank).toNumber())).equal(1000000);
+    expect(Math.round(account.getTokenBalance(usdcBank).toNumber())).equal(
+      1000000,
+    );
   }
 
   process.exit();

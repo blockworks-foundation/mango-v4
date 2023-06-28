@@ -78,9 +78,8 @@ async fn test_token_conditional_swap() -> Result<(), TransportError> {
             sell_mint: base_token.mint.pubkey,
             max_buy: 1000,
             max_sell: 1000,
-            price_threshold: 1.0,
-            price_threshold_type: TokenConditionalSwapPriceThresholdType::PriceOverThreshold,
-            price_limit: 10.0,
+            price_lower_limit: 1.0,
+            price_upper_limit: 10.0,
             price_premium_bps: 100,
             allow_creating_deposits: true,
             allow_creating_borrows: true,
@@ -122,9 +121,8 @@ async fn test_token_conditional_swap() -> Result<(), TransportError> {
         sell_mint: base_token.mint.pubkey,
         max_buy: 100,
         max_sell: 100,
-        price_threshold: 0.9,
-        price_threshold_type: TokenConditionalSwapPriceThresholdType::PriceOverThreshold,
-        price_limit: 10.0,
+        price_lower_limit: 0.9,
+        price_upper_limit: 10.0,
         price_premium_bps: 1000,
         allow_creating_deposits: true,
         allow_creating_borrows: true,
@@ -142,7 +140,7 @@ async fn test_token_conditional_swap() -> Result<(), TransportError> {
         solana,
         TokenConditionalSwapCreateInstruction {
             max_buy: 102,
-            price_threshold: 1.1,
+            price_lower_limit: 1.1,
             ..tcs_ix
         },
     )
