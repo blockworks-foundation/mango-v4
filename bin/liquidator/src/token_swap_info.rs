@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
 
+use itertools::Itertools;
 use mango_v4::state::TokenIndex;
 use mango_v4_client::jupiter::QueryRoute;
 use mango_v4_client::{JupiterSwapMode, MangoClient};
@@ -22,7 +23,7 @@ pub struct TokenSwapInfo {
 /// without having to query each time.
 pub struct TokenSwapInfoUpdater {
     mango_client: Arc<MangoClient>,
-    slippage_by_token: RwLock<HashMap<TokenIndex, TokenSwapInfo>>,
+    swap_infos: RwLock<HashMap<TokenIndex, TokenSwapInfo>>,
     quote_amount: u64,
     mock_jupiter: bool,
 }
@@ -31,7 +32,7 @@ impl TokenSwapInfoUpdater {
     pub fn new(mango_client: Arc<MangoClient>) -> Self {
         Self {
             mango_client,
-            slippage_by_token: RwLock::new(HashMap::new()),
+            swap_infos: RwLock::new(HashMap::new()),
             quote_amount: 1_000_000_000, // TODO: config
             mock_jupiter: false,
         }
@@ -42,13 +43,13 @@ impl TokenSwapInfoUpdater {
     }
 
     fn update(&self, token_index: TokenIndex, slippage: TokenSwapInfo) {
-        let mut lock = self.slippage_by_token.write().unwrap();
+        let mut lock = self.swap_infos.write().unwrap();
         let entry = lock.entry(token_index).or_default();
         *entry = slippage;
     }
 
     pub fn swap_info(&self, token_index: TokenIndex) -> Option<TokenSwapInfo> {
-        let lock = self.slippage_by_token.read().unwrap();
+        let lock = self.swap_infos.read().unwrap();
         lock.get(&token_index).cloned()
     }
 
@@ -57,7 +58,6 @@ impl TokenSwapInfoUpdater {
         let in_amount = route.in_amount.parse::<f64>()?;
         let out_amount = route.out_amount.parse::<f64>()?;
         let actual_price = in_amount / out_amount;
-        log::info!("check actual {actual_price}, oralce {oracle_price}");
         Ok(actual_price / oracle_price)
     }
 
@@ -113,8 +113,6 @@ impl TokenSwapInfoUpdater {
         let buy_over_oracle = Self::price_over_oracle(quote_per_token_price, buy_route)?;
         let sell_over_oracle = Self::price_over_oracle(token_per_quote_price, sell_route)?;
 
-        log::info!("token {token_index}, buy bps {buy_over_oracle}, sell bps {sell_over_oracle}");
-
         self.update(
             token_index,
             TokenSwapInfo {
@@ -123,5 +121,32 @@ impl TokenSwapInfoUpdater {
             },
         );
         Ok(())
+    }
+
+    pub fn log_all(&self) {
+        let mut tokens = self
+            .mango_client
+            .context
+            .token_indexes_by_name
+            .clone()
+            .into_iter()
+            .collect_vec();
+        tokens.sort_by(|a, b| a.0.cmp(&b.0));
+        let infos = self.swap_infos.read().unwrap();
+
+        let mut msg = String::new();
+        for (token, token_index) in tokens {
+            let info = infos
+                .get(&token_index)
+                .map(|info| {
+                    format!(
+                        "buy {}, sell {}",
+                        info.buy_over_oracle, info.sell_over_oracle
+                    )
+                })
+                .unwrap_or("no data".into());
+            msg.push_str(&format!("token {token}, {info}"));
+        }
+        log::trace!("swap infos:{}", msg);
     }
 }

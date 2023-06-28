@@ -452,6 +452,7 @@ async fn main() -> anyhow::Result<()> {
                     }
                     min_delay.tick().await;
                 }
+                token_swap_info_updater.log_all();
 
                 interval.tick().await;
             }
