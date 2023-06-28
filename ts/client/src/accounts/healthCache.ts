@@ -1168,15 +1168,16 @@ export class HealthCache {
     perpPosition: PerpPosition,
   ): I80F48 | null {
     const hc = HealthCache.fromMangoAccount(group, mangoAccount);
+    const hcClone = cloneDeep(hc);
     const perpMarket = group.getPerpMarketByMarketIndex(
       perpPosition.marketIndex,
     );
 
     function healthAfterPriceChange(newPrice: I80F48): I80F48 {
       const pi: PerpInfo =
-        hc.perpInfos[hc.findPerpInfoIndex(perpPosition.marketIndex)];
+        hcClone.perpInfos[hcClone.findPerpInfoIndex(perpPosition.marketIndex)];
       pi.prices.oracle = newPrice;
-      return hc.health(HealthType.maint);
+      return hcClone.health(HealthType.maint);
     }
 
     if (perpPosition.getBasePosition(perpMarket).isPos()) {
@@ -1199,7 +1200,7 @@ export class HealthCache {
     const price1000x = perpMarket.price.mul(I80F48.fromNumber(1000));
     return HealthCache.binaryApproximationSearch(
       perpMarket.price,
-      hc.health(HealthType.maint),
+      hcClone.health(HealthType.maint),
       price1000x,
       ZERO_I80F48(),
       perpMarket.priceLotsToNative(new BN(1)),
