@@ -648,9 +648,11 @@ export class HealthCache {
     targetValue: I80F48,
     minStep: I80F48,
     fun: (I80F48) => I80F48,
+    options: { maxIterations?: number; targetError?: number } = {},
   ): I80F48 {
-    const maxIterations = 50;
-    const targetError = I80F48.fromNumber(0.1);
+    const maxIterations = options?.maxIterations || 50;
+    const targetError = I80F48.fromNumber(options?.targetError || 0.1);
+
     const rightValue = fun(right);
 
     // console.log(
@@ -1192,6 +1194,7 @@ export class HealthCache {
         ZERO_I80F48(),
         perpMarket.priceLotsToNative(new BN(1)),
         healthAfterPriceChange,
+        { maxIterations: 20 },
       );
     }
 
@@ -1203,6 +1206,7 @@ export class HealthCache {
       ZERO_I80F48(),
       perpMarket.priceLotsToNative(new BN(1)),
       healthAfterPriceChange,
+      { maxIterations: 20 },
     );
   }
 }

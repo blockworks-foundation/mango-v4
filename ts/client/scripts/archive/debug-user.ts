@@ -1,11 +1,9 @@
 import { AnchorProvider, Wallet } from '@coral-xyz/anchor';
 import { Cluster, Connection, Keypair, PublicKey } from '@solana/web3.js';
 import cloneDeep from 'lodash/cloneDeep';
+import { cpuUsage } from 'process';
 import { Group } from '../../src/accounts/group';
-import { HealthCache } from '../../src/accounts/healthCache';
 import { HealthType, MangoAccount } from '../../src/accounts/mangoAccount';
-import { PerpMarket } from '../../src/accounts/perp';
-import { Serum3Market } from '../../src/accounts/serum3';
 import { MangoClient } from '../../src/client';
 import { MANGO_V4_ID } from '../../src/constants';
 import { ZERO_I80F48 } from '../../src/numbers/I80F48';
@@ -236,6 +234,9 @@ async function debugUser(
       // eslint-disable-next-line no-constant-condition
       true
     ) {
+      const then = Date.now();
+      const startUsage = cpuUsage();
+
       const lp = await pp.getLiquidationPrice(group, mangoAccount);
       if (lp == null || lp.lt(ZERO_I80F48())) {
         continue;
@@ -251,12 +252,17 @@ async function debugUser(
         mangoAccount.getHealth(gClone, HealthType.maint),
       );
 
+      const now = Date.now();
+      const endUsage = cpuUsage(startUsage);
+
       console.log(
         ` - ${pm.name}, health: ${health.toLocaleString()}, side: ${
           pp.getBasePosition(pm).isPos() ? 'LONG' : 'SHORT'
         }, notional: ${pp
           .getNotionalValueUi(pm)
-          .toLocaleString()}, liq price: ${lpUi.toLocaleString()}, sim health: ${simHealth.toLocaleString()}`,
+          .toLocaleString()}, liq price: ${lpUi.toLocaleString()}, sim health: ${simHealth.toLocaleString()}, time ${
+          now - then
+        }ms, cpu usage ${(endUsage['user'] / 1000).toLocaleString()}ms`,
       );
     }
   }
