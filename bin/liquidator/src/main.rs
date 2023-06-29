@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use anchor_client::Cluster;
 use clap::Parser;
@@ -268,11 +268,18 @@ async fn main() -> anyhow::Result<()> {
         trigger_tcs_config: tcs_config,
         rebalancer: rebalancer.clone(),
         token_swap_info: token_swap_info_updater.clone(),
-        accounts_with_liq_errors: Default::default(),
-        accounts_with_tcs_errors: Default::default(),
-        error_skip_threshold: 5,
-        error_skip_duration: std::time::Duration::from_secs(120),
-        error_reset_duration: std::time::Duration::from_secs(360),
+        liq_errors: ErrorTracking {
+            skip_threshold: 5,
+            skip_duration: std::time::Duration::from_secs(120),
+            reset_duration: std::time::Duration::from_secs(360),
+            ..ErrorTracking::default()
+        },
+        tcs_errors: ErrorTracking {
+            skip_threshold: 2,
+            skip_duration: std::time::Duration::from_secs(120),
+            reset_duration: std::time::Duration::from_secs(360),
+            ..ErrorTracking::default()
+        },
     };
 
     let (liquidation_trigger_sender, liquidation_trigger_receiver) =
@@ -498,9 +505,50 @@ struct SharedState {
     health_check_all: bool,
 }
 
-struct ErrorTracking {
+#[derive(Clone)]
+struct AccountErrorState {
     count: u64,
     last_at: std::time::Instant,
+}
+
+#[derive(Default)]
+struct ErrorTracking {
+    accounts: HashMap<Pubkey, AccountErrorState>,
+    skip_threshold: u64,
+    skip_duration: std::time::Duration,
+    reset_duration: std::time::Duration,
+}
+
+impl ErrorTracking {
+    pub fn had_too_many_errors(&self, pubkey: &Pubkey, now: Instant) -> Option<AccountErrorState> {
+        if let Some(error_entry) = self.accounts.get(pubkey) {
+            if error_entry.count >= self.skip_threshold
+                && now.duration_since(error_entry.last_at) < self.skip_duration
+            {
+                Some(error_entry.clone())
+            } else {
+                None
+            }
+        } else {
+            None
+        }
+    }
+
+    pub fn record_error(&mut self, pubkey: &Pubkey, now: Instant) {
+        let error_entry = self.accounts.entry(*pubkey).or_insert(AccountErrorState {
+            count: 0,
+            last_at: now,
+        });
+        if now.duration_since(error_entry.last_at) > self.reset_duration {
+            error_entry.count = 0;
+        }
+        error_entry.count += 1;
+        error_entry.last_at = now;
+    }
+
+    pub fn clear_errors(&mut self, pubkey: &Pubkey) {
+        self.accounts.remove(pubkey);
+    }
 }
 
 struct LiquidationState {
@@ -510,11 +558,8 @@ struct LiquidationState {
     token_swap_info: Arc<token_swap_info::TokenSwapInfoUpdater>,
     liquidation_config: liquidate::Config,
     trigger_tcs_config: trigger_tcs::Config,
-    accounts_with_liq_errors: HashMap<Pubkey, ErrorTracking>,
-    accounts_with_tcs_errors: HashMap<Pubkey, ErrorTracking>,
-    error_skip_threshold: u64,
-    error_skip_duration: std::time::Duration,
-    error_reset_duration: std::time::Duration,
+    liq_errors: ErrorTracking,
+    tcs_errors: ErrorTracking,
 }
 
 impl LiquidationState {
@@ -553,18 +598,15 @@ impl LiquidationState {
 
     async fn maybe_liquidate_and_log_error(&mut self, pubkey: &Pubkey) -> anyhow::Result<bool> {
         let now = std::time::Instant::now();
+        let error_tracking = &mut self.liq_errors;
 
         // Skip a pubkey if there've been too many errors recently
-        if let Some(error_entry) = self.accounts_with_liq_errors.get(pubkey) {
-            if error_entry.count >= self.error_skip_threshold
-                && now.duration_since(error_entry.last_at) < self.error_skip_duration
-            {
-                log::trace!(
-                    "skip checking account {pubkey}, had {} errors recently",
-                    error_entry.count
-                );
-                return Ok(false);
-            }
+        if let Some(error_entry) = error_tracking.had_too_many_errors(pubkey, now) {
+            log::trace!(
+                "skip checking account {pubkey}, had {} errors recently",
+                error_entry.count
+            );
+            return Ok(false);
         }
 
         let result = liquidate::maybe_liquidate_account(
@@ -577,18 +619,7 @@ impl LiquidationState {
 
         if let Err(err) = result.as_ref() {
             // Keep track of pubkeys that had errors
-            let error_entry =
-                self.accounts_with_liq_errors
-                    .entry(*pubkey)
-                    .or_insert(ErrorTracking {
-                        count: 0,
-                        last_at: now,
-                    });
-            if now.duration_since(error_entry.last_at) > self.error_reset_duration {
-                error_entry.count = 0;
-            }
-            error_entry.count += 1;
-            error_entry.last_at = now;
+            error_tracking.record_error(pubkey, now);
 
             // Not all errors need to be raised to the user's attention.
             let mut log_level = log::Level::Error;
@@ -607,7 +638,7 @@ impl LiquidationState {
             };
             log::log!(log_level, "liquidating account {}: {:?}", pubkey, err);
         } else {
-            self.accounts_with_liq_errors.remove(pubkey);
+            error_tracking.clear_errors(pubkey);
         }
 
         result
@@ -651,20 +682,15 @@ impl LiquidationState {
         pubkey: &Pubkey,
     ) -> anyhow::Result<bool> {
         let now = std::time::Instant::now();
+        let error_tracking = &mut self.tcs_errors;
 
         // Skip a pubkey if there've been too many errors recently
-        // TODO: separate token conditional swap errors from liq errors
-        // TODO: this whole thing could use some work
-        if let Some(error_entry) = self.accounts_with_tcs_errors.get(pubkey) {
-            if error_entry.count >= self.error_skip_threshold
-                && now.duration_since(error_entry.last_at) < self.error_skip_duration
-            {
-                log::trace!(
-                    "skip checking for tcs on account {pubkey}, had {} errors recently",
-                    error_entry.count
-                );
-                return Ok(false);
-            }
+        if let Some(error_entry) = error_tracking.had_too_many_errors(pubkey, now) {
+            log::trace!(
+                "skip checking for tcs on account {pubkey}, had {} errors recently",
+                error_entry.count
+            );
+            return Ok(false);
         }
 
         let result = trigger_tcs::maybe_execute_token_conditional_swap(
@@ -678,18 +704,7 @@ impl LiquidationState {
 
         if let Err(err) = result.as_ref() {
             // Keep track of pubkeys that had errors
-            let error_entry =
-                self.accounts_with_tcs_errors
-                    .entry(*pubkey)
-                    .or_insert(ErrorTracking {
-                        count: 0,
-                        last_at: now,
-                    });
-            if now.duration_since(error_entry.last_at) > self.error_reset_duration {
-                error_entry.count = 0;
-            }
-            error_entry.count += 1;
-            error_entry.last_at = now;
+            error_tracking.record_error(pubkey, now);
 
             // Not all errors need to be raised to the user's attention.
             let mut log_level = log::Level::Error;
@@ -698,10 +713,10 @@ impl LiquidationState {
             // will commonly happen if our liquidator is late or if there are chain forks.
             match err.downcast_ref::<MangoClientError>() {
                 Some(MangoClientError::SendTransactionPreflightFailure { logs, .. }) => {
-                    if logs.iter().any(|line| {
-                        line.contains("TokenConditionalSwapPriceThresholdNotReached")
-                            || line.contains("TokenConditionalSwapPriceExceedsLimit")
-                    }) {
+                    if logs
+                        .iter()
+                        .any(|line| line.contains("TokenConditionalSwapPriceNotInRange"))
+                    {
                         log_level = log::Level::Trace;
                     }
                 }
@@ -714,7 +729,7 @@ impl LiquidationState {
                 err
             );
         } else {
-            self.accounts_with_tcs_errors.remove(pubkey);
+            error_tracking.clear_errors(pubkey);
         }
 
         result
