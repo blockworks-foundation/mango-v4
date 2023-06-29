@@ -449,6 +449,25 @@ pub struct TokenForceCloseBorrowsWithTokenLog {
 }
 
 #[event]
+pub struct TokenConditionalSwapCreateLog {
+    pub mango_group: Pubkey,
+    pub mango_account: Pubkey,
+    pub id: u64,
+    pub max_buy: u64,
+    pub max_sell: u64,
+    pub expiry_timestamp: u64,
+    pub price_lower_limit: f32,
+    pub price_upper_limit: f32,
+    pub price_premium_bps: u16,
+    pub taker_fee_bps: i16,
+    pub maker_fee_bps: i16,
+    pub buy_token_index: u16,
+    pub sell_token_index: u16,
+    pub allow_creating_deposits: bool,
+    pub allow_creating_borrows: bool,
+}
+
+#[event]
 pub struct TokenConditionalSwapTriggerLog {
     pub mango_group: Pubkey,
     pub liqee: Pubkey,
@@ -463,4 +482,11 @@ pub struct TokenConditionalSwapTriggerLog {
     pub buy_token_price: i128, // I80F48
     pub sell_token_price: i128, // I80F48
     pub closed: bool,
+}
+
+#[event]
+pub struct TokenConditionalSwapCancelLog {
+    pub mango_group: Pubkey,
+    pub mango_account: Pubkey,
+    pub id: u64,
 }

@@ -10150,6 +10150,86 @@ export type MangoV4 = {
       ]
     },
     {
+      "name": "TokenConditionalSwapCreateLog",
+      "fields": [
+        {
+          "name": "mangoGroup",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "mangoAccount",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "id",
+          "type": "u64",
+          "index": false
+        },
+        {
+          "name": "maxBuy",
+          "type": "u64",
+          "index": false
+        },
+        {
+          "name": "maxSell",
+          "type": "u64",
+          "index": false
+        },
+        {
+          "name": "expiryTimestamp",
+          "type": "u64",
+          "index": false
+        },
+        {
+          "name": "priceLowerLimit",
+          "type": "f32",
+          "index": false
+        },
+        {
+          "name": "priceUpperLimit",
+          "type": "f32",
+          "index": false
+        },
+        {
+          "name": "pricePremiumBps",
+          "type": "u16",
+          "index": false
+        },
+        {
+          "name": "takerFeeBps",
+          "type": "i16",
+          "index": false
+        },
+        {
+          "name": "makerFeeBps",
+          "type": "i16",
+          "index": false
+        },
+        {
+          "name": "buyTokenIndex",
+          "type": "u16",
+          "index": false
+        },
+        {
+          "name": "sellTokenIndex",
+          "type": "u16",
+          "index": false
+        },
+        {
+          "name": "allowCreatingDeposits",
+          "type": "bool",
+          "index": false
+        },
+        {
+          "name": "allowCreatingBorrows",
+          "type": "bool",
+          "index": false
+        }
+      ]
+    },
+    {
       "name": "TokenConditionalSwapTriggerLog",
       "fields": [
         {
@@ -10215,6 +10295,26 @@ export type MangoV4 = {
         {
           "name": "closed",
           "type": "bool",
+          "index": false
+        }
+      ]
+    },
+    {
+      "name": "TokenConditionalSwapCloseLog",
+      "fields": [
+        {
+          "name": "mangoGroup",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "mangoAccount",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "id",
+          "type": "u64",
           "index": false
         }
       ]
@@ -20626,6 +20726,86 @@ export const IDL: MangoV4 = {
       ]
     },
     {
+      "name": "TokenConditionalSwapCreateLog",
+      "fields": [
+        {
+          "name": "mangoGroup",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "mangoAccount",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "id",
+          "type": "u64",
+          "index": false
+        },
+        {
+          "name": "maxBuy",
+          "type": "u64",
+          "index": false
+        },
+        {
+          "name": "maxSell",
+          "type": "u64",
+          "index": false
+        },
+        {
+          "name": "expiryTimestamp",
+          "type": "u64",
+          "index": false
+        },
+        {
+          "name": "priceLowerLimit",
+          "type": "f32",
+          "index": false
+        },
+        {
+          "name": "priceUpperLimit",
+          "type": "f32",
+          "index": false
+        },
+        {
+          "name": "pricePremiumBps",
+          "type": "u16",
+          "index": false
+        },
+        {
+          "name": "takerFeeBps",
+          "type": "i16",
+          "index": false
+        },
+        {
+          "name": "makerFeeBps",
+          "type": "i16",
+          "index": false
+        },
+        {
+          "name": "buyTokenIndex",
+          "type": "u16",
+          "index": false
+        },
+        {
+          "name": "sellTokenIndex",
+          "type": "u16",
+          "index": false
+        },
+        {
+          "name": "allowCreatingDeposits",
+          "type": "bool",
+          "index": false
+        },
+        {
+          "name": "allowCreatingBorrows",
+          "type": "bool",
+          "index": false
+        }
+      ]
+    },
+    {
       "name": "TokenConditionalSwapTriggerLog",
       "fields": [
         {
@@ -20691,6 +20871,26 @@ export const IDL: MangoV4 = {
         {
           "name": "closed",
           "type": "bool",
+          "index": false
+        }
+      ]
+    },
+    {
+      "name": "TokenConditionalSwapCloseLog",
+      "fields": [
+        {
+          "name": "mangoGroup",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "mangoAccount",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "id",
+          "type": "u64",
           "index": false
         }
       ]

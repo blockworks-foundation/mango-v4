@@ -2,6 +2,7 @@ use anchor_lang::prelude::*;
 
 use crate::accounts_ix::*;
 use crate::error::*;
+use crate::logs::TokenConditionalSwapCreateLog;
 use crate::state::*;
 
 #[allow(clippy::too_many_arguments)]
@@ -36,7 +37,23 @@ pub fn token_conditional_swap_create(
     tcs.taker_fee_bps = group.token_conditional_swap_taker_fee_bps;
     tcs.maker_fee_bps = group.token_conditional_swap_maker_fee_bps;
 
-    // TODO: logging
+    emit!(TokenConditionalSwapCreateLog {
+        mango_group: ctx.accounts.group.key(),
+        mango_account: ctx.accounts.account.key(),
+        id,
+        max_buy: tcs.max_buy,
+        max_sell: tcs.max_sell,
+        expiry_timestamp: tcs.expiry_timestamp,
+        price_lower_limit: tcs.price_lower_limit,
+        price_upper_limit: tcs.price_upper_limit,
+        price_premium_bps: tcs.price_premium_bps,
+        taker_fee_bps: tcs.taker_fee_bps,
+        maker_fee_bps: tcs.maker_fee_bps,
+        buy_token_index: tcs.buy_token_index,
+        sell_token_index: tcs.sell_token_index,
+        allow_creating_borrows: tcs.allow_creating_borrows(),
+        allow_creating_deposits: tcs.allow_creating_deposits(),
+    });
 
     Ok(())
 }

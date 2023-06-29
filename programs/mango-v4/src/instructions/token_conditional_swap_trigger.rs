@@ -5,6 +5,7 @@ use crate::accounts_ix::*;
 use crate::error::*;
 use crate::health::*;
 use crate::i80f48::ClampToInt;
+use crate::logs::TokenConditionalSwapCancelLog;
 use crate::logs::{
     LoanOriginationFeeInstruction, TokenBalanceLog, TokenConditionalSwapTriggerLog, WithdrawLoanLog,
 };
@@ -62,7 +63,11 @@ pub fn token_conditional_swap_trigger(
         *tcs = TokenConditionalSwap::default();
 
         msg!("TokenConditionalSwap is expired, removing");
-        // TODO: logging?
+        emit!(TokenConditionalSwapCancelLog {
+            mango_group: ctx.accounts.group.key(),
+            mango_account: ctx.accounts.liqee.key(),
+            id: token_conditional_swap_id,
+        });
 
         return Ok(());
     }
