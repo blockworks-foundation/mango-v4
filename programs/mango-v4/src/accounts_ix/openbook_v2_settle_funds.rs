@@ -3,6 +3,10 @@ use anchor_spl::token::{Token, TokenAccount};
 
 use crate::error::*;
 use crate::state::*;
+use openbook_v2::{
+    program::OpenbookV2,
+    state::{Market, OpenOrdersAccount},
+};
 
 #[derive(Accounts)]
 pub struct OpenbookV2SettleFunds<'info> {
@@ -21,8 +25,7 @@ pub struct OpenbookV2SettleFunds<'info> {
     pub owner: Signer<'info>,
 
     #[account(mut)]
-    /// CHECK: Validated inline by checking against the pubkey stored in the account at #2
-    pub open_orders: UncheckedAccount<'info>,
+    pub open_orders: AccountLoader<'info, OpenOrdersAccount>,
 
     #[account(
         has_one = group,
@@ -30,20 +33,18 @@ pub struct OpenbookV2SettleFunds<'info> {
         has_one = openbook_v2_market_external,
     )]
     pub openbook_v2_market: AccountLoader<'info, OpenbookV2Market>,
-    /// CHECK: The pubkey is checked and then it's passed to the openbook_v2 cpi
-    pub openbook_v2_program: UncheckedAccount<'info>,
-    #[account(mut)]
-    /// CHECK: The pubkey is checked and then it's passed to the openbook_v2 cpi
-    pub openbook_v2_market_external: UncheckedAccount<'info>,
 
-    // These accounts are forwarded directly to the openbook_v2 cpi call
-    // and are validated there.
+    pub openbook_v2_program: Program<'info, OpenbookV2>,
+
     #[account(mut)]
-    /// CHECK: Validated by the openbook_v2 cpi call
-    pub market_base_vault: UncheckedAccount<'info>,
+    pub openbook_v2_market_external: AccountLoader<'info, Market>,
+
     #[account(mut)]
-    /// CHECK: Validated by the openbook_v2 cpi call
-    pub market_quote_vault: UncheckedAccount<'info>,
+    pub market_base_vault: Box<Account<'info, TokenAccount>>,
+
+    #[account(mut)]
+    pub market_quote_vault: Box<Account<'info, TokenAccount>>,
+
     /// needed for the automatic settle_funds call
     /// CHECK: Validated by the openbook_v2 cpi call
     pub market_vault_signer: UncheckedAccount<'info>,

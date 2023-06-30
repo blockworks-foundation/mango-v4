@@ -1268,8 +1268,8 @@ pub mod mango_v4 {
         limit_price: u64,
         max_base_qty: u64,
         max_native_quote_qty_including_fees: u64,
-        self_trade_behavior: OpenbookV2SelfTradeBehavior,
-        order_type: OpenbookV2PlaceOrderType,
+        self_trade_behavior: openbook_v2::state::SelfTradeBehavior,
+        order_type: openbook_v2::state::PlaceOrderType,
         client_order_id: u64,
         limit: u16,
     ) -> Result<()> {
@@ -1283,7 +1283,7 @@ pub mod mango_v4 {
         limit_price: u64,
         max_base_qty: u64,
         max_native_quote_qty_including_fees: u64,
-        self_trade_behavior: OpenbookV2SelfTradeBehavior,
+        self_trade_behavior: openbook_v2::state::SelfTradeBehavior,
         client_order_id: u64,
         limit: u16,
     ) -> Result<()> {

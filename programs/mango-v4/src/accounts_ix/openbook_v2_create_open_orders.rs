@@ -2,7 +2,10 @@ use anchor_lang::prelude::*;
 
 use crate::error::*;
 use crate::state::*;
-use openbook_v2::state::OpenOrdersAccount;
+use openbook_v2::{
+    program::OpenbookV2,
+    state::{Market, OpenOrdersAccount},
+};
 
 #[derive(Accounts)]
 #[instruction(account_num: u32, open_orders_count: u8)]
@@ -27,10 +30,9 @@ pub struct OpenbookV2CreateOpenOrders<'info> {
         has_one = openbook_v2_market_external,
     )]
     pub openbook_v2_market: AccountLoader<'info, OpenbookV2Market>,
-    /// CHECK: The pubkey is checked and then it's passed to the openbook_v2 cpi
-    pub openbook_v2_program: UncheckedAccount<'info>,
-    /// CHECK: The pubkey is checked and then it's passed to the openbook_v2 cpi
-    pub openbook_v2_market_external: UncheckedAccount<'info>,
+
+    pub openbook_v2_program: Program<'info, OpenbookV2>,
+    pub openbook_v2_market_external: AccountLoader<'info, Market>,
 
     // initialized by this instruction via cpi to openbook_v2
     #[account(
@@ -39,10 +41,10 @@ pub struct OpenbookV2CreateOpenOrders<'info> {
         bump,
         payer = payer,
         owner = openbook_v2_market.key(),
-        space = OpenOrdersAccount::space(open_orders_count).unwrap(),
+        space = OpenOrdersAccount::space().unwrap(),
     )]
     /// CHECK: Newly created by openbook_v2 cpi call
-    pub open_orders: UncheckedAccount<'info>,
+    pub open_orders: AccountLoader<'info, OpenOrdersAccount>,
 
     #[account(mut)]
     pub payer: Signer<'info>,

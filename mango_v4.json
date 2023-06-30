@@ -5013,6 +5013,209 @@
       "args": []
     },
     {
+      "name": "openbookV2RegisterMarket",
+      "docs": [
+        "",
+        "OpenbookV2",
+        ""
+      ],
+      "accounts": [
+        {
+          "name": "group",
+          "isMut": true,
+          "isSigner": false,
+          "relations": [
+            "admin"
+          ]
+        },
+        {
+          "name": "admin",
+          "isMut": false,
+          "isSigner": true
+        },
+        {
+          "name": "openbookV2Program",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "openbookV2MarketExternal",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "openbookV2Market",
+          "isMut": true,
+          "isSigner": false,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "type": "string",
+                "value": "OpenbookV2Market"
+              },
+              {
+                "kind": "account",
+                "type": "publicKey",
+                "path": "group"
+              },
+              {
+                "kind": "account",
+                "type": "publicKey",
+                "path": "openbook_v2_market_external"
+              }
+            ]
+          }
+        },
+        {
+          "name": "indexReservation",
+          "isMut": true,
+          "isSigner": false,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "type": "string",
+                "value": "OpenbookV2Index"
+              },
+              {
+                "kind": "account",
+                "type": "publicKey",
+                "path": "group"
+              },
+              {
+                "kind": "arg",
+                "type": {
+                  "defined": "OpenbookV2MarketIndex"
+                },
+                "path": "market_index"
+              }
+            ]
+          }
+        },
+        {
+          "name": "quoteBank",
+          "isMut": false,
+          "isSigner": false,
+          "relations": [
+            "group"
+          ]
+        },
+        {
+          "name": "baseBank",
+          "isMut": false,
+          "isSigner": false,
+          "relations": [
+            "group"
+          ]
+        },
+        {
+          "name": "payer",
+          "isMut": true,
+          "isSigner": true
+        },
+        {
+          "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "marketIndex",
+          "type": {
+            "defined": "OpenbookV2MarketIndex"
+          }
+        },
+        {
+          "name": "name",
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "name": "openbookV2EditMarket",
+      "accounts": [
+        {
+          "name": "group",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "admin",
+          "isMut": false,
+          "isSigner": true
+        },
+        {
+          "name": "market",
+          "isMut": true,
+          "isSigner": false,
+          "relations": [
+            "group"
+          ]
+        }
+      ],
+      "args": [
+        {
+          "name": "reduceOnlyOpt",
+          "type": {
+            "option": "bool"
+          }
+        },
+        {
+          "name": "forceCloseOpt",
+          "type": {
+            "option": "bool"
+          }
+        }
+      ]
+    },
+    {
+      "name": "openbookV2DeregisterMarket",
+      "accounts": [
+        {
+          "name": "group",
+          "isMut": true,
+          "isSigner": false,
+          "relations": [
+            "admin"
+          ]
+        },
+        {
+          "name": "admin",
+          "isMut": false,
+          "isSigner": true
+        },
+        {
+          "name": "openbookV2Market",
+          "isMut": true,
+          "isSigner": false,
+          "relations": [
+            "group"
+          ]
+        },
+        {
+          "name": "indexReservation",
+          "isMut": true,
+          "isSigner": false,
+          "relations": [
+            "group"
+          ]
+        },
+        {
+          "name": "solDestination",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "tokenProgram",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": []
+    },
+    {
       "name": "openbookV2CreateOpenOrders",
       "accounts": [
         {
@@ -5216,11 +5419,6 @@
           "isSigner": false
         },
         {
-          "name": "marketRequestQueue",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
           "name": "marketBaseVault",
           "isMut": true,
           "isSigner": false
@@ -5233,10 +5431,7 @@
         {
           "name": "marketVaultSigner",
           "isMut": false,
-          "isSigner": false,
-          "docs": [
-            "needed for the automatic settle_funds call"
-          ]
+          "isSigner": false
         },
         {
           "name": "payerBank",
@@ -5290,13 +5485,13 @@
         {
           "name": "selfTradeBehavior",
           "type": {
-            "defined": "OpenbookV2SelfTradeBehavior"
+            "defined": "openbook_v2::state::SelfTradeBehavior"
           }
         },
         {
           "name": "orderType",
           "type": {
-            "defined": "OpenbookV2PlaceOrderType"
+            "defined": "openbook_v2::state::PlaceOrderType"
           }
         },
         {
@@ -5440,7 +5635,7 @@
         {
           "name": "selfTradeBehavior",
           "type": {
-            "defined": "OpenbookV2SelfTradeBehavior"
+            "defined": "openbook_v2::state::SelfTradeBehavior"
           }
         },
         {
@@ -9403,46 +9598,6 @@
           },
           {
             "name": "BecameNotLiquidatable"
-          }
-        ]
-      }
-    },
-    {
-      "name": "OpenbookV2SelfTradeBehavior",
-      "type": {
-        "kind": "enum",
-        "variants": [
-          {
-            "name": "DecrementTake"
-          },
-          {
-            "name": "CancelProvide"
-          },
-          {
-            "name": "AbortTransaction"
-          }
-        ]
-      }
-    },
-    {
-      "name": "OpenbookV2PlaceOrderType",
-      "type": {
-        "kind": "enum",
-        "variants": [
-          {
-            "name": "Limit"
-          },
-          {
-            "name": "ImmediateOrCancel"
-          },
-          {
-            "name": "PostOnly"
-          },
-          {
-            "name": "Market"
-          },
-          {
-            "name": "PostOnlySlide"
           }
         ]
       }

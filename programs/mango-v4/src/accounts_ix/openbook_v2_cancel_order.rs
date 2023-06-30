@@ -2,6 +2,10 @@ use anchor_lang::prelude::*;
 
 use crate::error::*;
 use crate::state::*;
+use openbook_v2::{
+    program::OpenbookV2,
+    state::{BookSide, Market, OpenOrdersAccount},
+};
 
 #[derive(Accounts)]
 pub struct OpenbookV2CancelOrder<'info> {
@@ -20,8 +24,7 @@ pub struct OpenbookV2CancelOrder<'info> {
     pub owner: Signer<'info>,
 
     #[account(mut)]
-    /// CHECK: Validated inline by checking against the pubkey stored in the account at #2
-    pub open_orders: UncheckedAccount<'info>,
+    pub open_orders: AccountLoader<'info, OpenOrdersAccount>,
 
     #[account(
         has_one = group,
@@ -29,21 +32,18 @@ pub struct OpenbookV2CancelOrder<'info> {
         has_one = openbook_v2_market_external,
     )]
     pub openbook_v2_market: AccountLoader<'info, OpenbookV2Market>,
-    /// CHECK: The pubkey is checked and then it's passed to the openbook_v2 cpi
-    pub openbook_v2_program: UncheckedAccount<'info>,
-    #[account(mut)]
-    /// CHECK: The pubkey is checked and then it's passed to the openbook_v2 cpi
-    pub openbook_v2_market_external: UncheckedAccount<'info>,
 
-    // These accounts are forwarded directly to the openbook_v2 cpi call
-    // and are validated there.
+    pub openbook_v2_program: Program<'info, OpenbookV2>,
+
     #[account(mut)]
-    /// CHECK: Validated by the openbook_v2 cpi call
-    pub market_bids: UncheckedAccount<'info>,
+    pub openbook_v2_market_external: AccountLoader<'info, Market>,
+
     #[account(mut)]
-    /// CHECK: Validated by the openbook_v2 cpi call
-    pub market_asks: UncheckedAccount<'info>,
+    pub market_bids: AccountLoader<'info, BookSide>,
+
     #[account(mut)]
-    /// CHECK: Validated by the openbook_v2 cpi call
-    pub market_event_queue: UncheckedAccount<'info>,
+    pub market_asks: AccountLoader<'info, BookSide>,
+
+    #[account(mut)]
+    pub market_event_queue: AccountLoader<'info, EventQueue>,
 }

@@ -2,6 +2,10 @@ use anchor_lang::prelude::*;
 
 use crate::error::MangoError;
 use crate::state::*;
+use openbook_v2::{
+    program::OpenbookV2,
+    state::{Market, OpenOrdersAccount},
+};
 
 #[derive(Accounts)]
 pub struct OpenbookV2CloseOpenOrders<'info> {
@@ -25,14 +29,11 @@ pub struct OpenbookV2CloseOpenOrders<'info> {
         has_one = openbook_v2_market_external,
     )]
     pub openbook_v2_market: AccountLoader<'info, OpenbookV2Market>,
-    /// CHECK: The pubkey is checked and then it's passed to the openbook_v2 cpi
-    pub openbook_v2_program: UncheckedAccount<'info>,
-    /// CHECK: The pubkey is checked and then it's passed to the openbook_v2 cpi
-    pub openbook_v2_market_external: UncheckedAccount<'info>,
+    pub openbook_v2_program: Program<'info, OpenbookV2>,
+    pub openbook_v2_market_external: AccountLoader<'info, Market>,
 
     #[account(mut)]
-    /// CHECK: Validated inline by checking against the pubkey stored in the account at #2
-    pub open_orders: UncheckedAccount<'info>,
+    pub open_orders: AccountLoader<'info, OpenOrdersAccount>,
 
     #[account(mut)]
     /// CHECK: target for account rent needs no checks

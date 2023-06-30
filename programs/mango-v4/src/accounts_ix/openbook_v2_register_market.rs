@@ -1,6 +1,7 @@
 use crate::error::MangoError;
 use crate::state::*;
 use anchor_lang::prelude::*;
+use openbook_v2::{program::OpenbookV2, state::Market};
 
 #[derive(Accounts)]
 #[instruction(market_index: OpenbookV2MarketIndex)]
@@ -15,9 +16,9 @@ pub struct OpenbookV2RegisterMarket<'info> {
     pub admin: Signer<'info>,
 
     /// CHECK: Can register a market for any openbook_v2 program
-    pub openbook_v2_program: UncheckedAccount<'info>,
+    pub openbook_v2_program: Program<'info, OpenbookV2>,
     /// CHECK: Can register any openbook_v2 market
-    pub openbook_v2_market_external: UncheckedAccount<'info>,
+    pub openbook_v2_market_external: AccountLoader<'info, Market>,
 
     #[account(
         init,

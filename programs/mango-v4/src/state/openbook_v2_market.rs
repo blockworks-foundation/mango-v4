@@ -1,5 +1,4 @@
 use anchor_lang::prelude::*;
-use num_enum::{IntoPrimitive, TryFromPrimitive};
 use static_assertions::const_assert_eq;
 use std::mem::size_of;
 
@@ -7,7 +6,7 @@ use crate::state::*;
 
 pub type OpenbookV2MarketIndex = u16;
 
-#[account(zero_copy(safe_bytemuck_derives))]
+#[account(zero_copy)]
 #[derive(Debug)]
 pub struct OpenbookV2Market {
     // ABI: Clients rely on this being at offset 8
@@ -80,47 +79,3 @@ macro_rules! openbook_v2_market_seeds {
 }
 
 pub use openbook_v2_market_seeds;
-
-// Enums copied from openbook_v2
-
-#[derive(
-    Eq,
-    PartialEq,
-    Copy,
-    Clone,
-    Default,
-    TryFromPrimitive,
-    IntoPrimitive,
-    Debug,
-    AnchorSerialize,
-    AnchorDeserialize,
-)]
-#[repr(u8)]
-pub enum OpenbookV2SelfTradeBehavior {
-    #[default]
-    DecrementTake = 0,
-
-    CancelProvide = 1,
-
-    AbortTransaction = 2,
-}
-
-#[derive(
-    Eq,
-    PartialEq,
-    Copy,
-    Clone,
-    TryFromPrimitive,
-    IntoPrimitive,
-    Debug,
-    AnchorSerialize,
-    AnchorDeserialize,
-)]
-#[repr(u8)]
-pub enum OpenbookV2PlaceOrderType {
-    Limit = 0,
-    ImmediateOrCancel = 1,
-    PostOnly = 2,
-    Market = 3,
-    PostOnlySlide = 4,
-}

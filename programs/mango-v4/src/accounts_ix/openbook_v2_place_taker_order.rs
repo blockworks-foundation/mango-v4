@@ -2,6 +2,10 @@ use crate::error::*;
 use crate::state::*;
 use anchor_lang::prelude::*;
 use anchor_spl::token::{Token, TokenAccount};
+use openbook_v2::{
+    program::OpenbookV2,
+    state::{BookSide, Market},
+};
 
 #[derive(Accounts)]
 pub struct OpenbookV2PlaceTakerOrder<'info> {
@@ -25,20 +29,19 @@ pub struct OpenbookV2PlaceTakerOrder<'info> {
         has_one = openbook_v2_market_external,
     )]
     pub openbook_v2_market: AccountLoader<'info, OpenbookV2Market>,
-    /// CHECK: The pubkey is checked and then it's passed to the openbook_v2 cpi
-    pub openbook_v2_program: UncheckedAccount<'info>,
+
+    pub openbook_v2_program: Program<'info, OpenbookV2>,
+
     #[account(mut)]
-    /// CHECK: The pubkey is checked and then it's passed to the openbook_v2 cpi
-    pub openbook_v2_market_external: UncheckedAccount<'info>,
+    pub openbook_v2_market_external: AccountLoader<'info, Market>,
 
     // These accounts are forwarded directly to the openbook_v2 cpi call
     // and are validated there.
     #[account(mut)]
-    /// CHECK: Validated by the openbook_v2 cpi call
-    pub market_bids: UncheckedAccount<'info>,
+    pub market_bids: AccountLoader<'info, BookSide>,
     #[account(mut)]
     /// CHECK: Validated by the openbook_v2 cpi call
-    pub market_asks: UncheckedAccount<'info>,
+    pub market_asks: AccountLoader<'info, BookSide>,
     #[account(mut)]
     /// CHECK: Validated by the openbook_v2 cpi call
     pub market_event_queue: UncheckedAccount<'info>,
