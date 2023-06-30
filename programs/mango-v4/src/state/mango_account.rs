@@ -1798,12 +1798,14 @@ mod tests {
 
         let tcs = account.free_token_conditional_swap_mut().unwrap();
         tcs.id = 123;
+        tcs.has_data = 1;
         assert_eq!(account.all_token_conditional_swaps().count(), 2);
         assert_eq!(account.active_token_conditional_swaps().count(), 1);
         assert_eq!(account.token_conditional_swap_free_index().unwrap(), 1);
 
         let tcs = account.free_token_conditional_swap_mut().unwrap();
         tcs.id = 234;
+        tcs.has_data = 1;
         assert_eq!(account.all_token_conditional_swaps().count(), 2);
         assert_eq!(account.active_token_conditional_swaps().count(), 2);
 

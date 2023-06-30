@@ -36,25 +36,11 @@ pub fn token_conditional_swap_trigger(
 
     let mut liqee = ctx.accounts.liqee.load_full_mut()?;
 
-    let buy_token_index;
-    let sell_token_index;
-    {
-        let tcs = liqee.token_conditional_swap_by_index(token_conditional_swap_index)?;
-        buy_token_index = tcs.buy_token_index;
-        sell_token_index = tcs.sell_token_index;
-    }
-
-    // Guarantee that the liqee health cache will have an entry for both tokens:
-    // we will want to adjust their values later.
-    liqee.ensure_token_position(buy_token_index)?;
-    liqee.ensure_token_position(sell_token_index)?;
-
-    let mut liqee_health_cache = new_health_cache(&liqee.borrow(), &account_retriever)
-        .context("create liqee health cache")?;
-
     let tcs = liqee.token_conditional_swap_by_index(token_conditional_swap_index)?;
     require!(tcs.has_data(), MangoError::SomeError);
     require_eq!(tcs.id, token_conditional_swap_id);
+    let buy_token_index = tcs.buy_token_index;
+    let sell_token_index = tcs.sell_token_index;
 
     // Possibly wipe the tcs and exit, if it's already expired
     let now_ts: u64 = Clock::get()?.unix_timestamp.try_into().unwrap();
@@ -72,6 +58,13 @@ pub fn token_conditional_swap_trigger(
         return Ok(());
     }
 
+    // Guarantee that the liqee health cache will have an entry for both tokens:
+    // we will want to adjust their values later.
+    liqee.ensure_token_position(buy_token_index)?;
+    liqee.ensure_token_position(sell_token_index)?;
+
+    let mut liqee_health_cache = new_health_cache(&liqee.borrow(), &account_retriever)
+        .context("create liqee health cache")?;
     let liqee_pre_init_health = liqee.check_health_pre(&liqee_health_cache)?;
 
     let (buy_bank, buy_token_price, sell_bank_and_oracle_opt) =
