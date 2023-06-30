@@ -1,5 +1,5 @@
 use anchor_lang::prelude::*;
-use num_enum::{TryFromPrimitive, IntoPrimitive};
+use num_enum::{IntoPrimitive, TryFromPrimitive};
 use static_assertions::const_assert_eq;
 use std::mem::size_of;
 
@@ -81,7 +81,6 @@ macro_rules! openbook_v2_market_seeds {
 
 pub use openbook_v2_market_seeds;
 
-
 // Enums copied from openbook_v2
 
 #[derive(
@@ -125,4 +124,3 @@ pub enum OpenbookV2PlaceOrderType {
     Market = 3,
     PostOnlySlide = 4,
 }
-

@@ -169,7 +169,9 @@
         {
           "name": "mngoTokenIndexOpt",
           "type": {
-            "option": "u16"
+            "option": {
+              "defined": "TokenIndex"
+            }
           }
         },
         {
@@ -327,7 +329,9 @@
               },
               {
                 "kind": "arg",
-                "type": "u16",
+                "type": {
+                  "defined": "TokenIndex"
+                },
                 "path": "token_index"
               },
               {
@@ -356,7 +360,9 @@
               },
               {
                 "kind": "arg",
-                "type": "u16",
+                "type": {
+                  "defined": "TokenIndex"
+                },
                 "path": "token_index"
               },
               {
@@ -421,7 +427,9 @@
       "args": [
         {
           "name": "tokenIndex",
-          "type": "u16"
+          "type": {
+            "defined": "TokenIndex"
+          }
         },
         {
           "name": "name",
@@ -517,7 +525,9 @@
               },
               {
                 "kind": "arg",
-                "type": "u16",
+                "type": {
+                  "defined": "TokenIndex"
+                },
                 "path": "token_index"
               },
               {
@@ -546,7 +556,9 @@
               },
               {
                 "kind": "arg",
-                "type": "u16",
+                "type": {
+                  "defined": "TokenIndex"
+                },
                 "path": "token_index"
               },
               {
@@ -611,7 +623,9 @@
       "args": [
         {
           "name": "tokenIndex",
-          "type": "u16"
+          "type": {
+            "defined": "TokenIndex"
+          }
         },
         {
           "name": "name",
@@ -845,7 +859,9 @@
               },
               {
                 "kind": "arg",
-                "type": "u16",
+                "type": {
+                  "defined": "TokenIndex"
+                },
                 "path": "token_index"
               },
               {
@@ -874,7 +890,9 @@
               },
               {
                 "kind": "arg",
-                "type": "u16",
+                "type": {
+                  "defined": "TokenIndex"
+                },
                 "path": "token_index"
               },
               {
@@ -918,7 +936,9 @@
       "args": [
         {
           "name": "tokenIndex",
-          "type": "u16"
+          "type": {
+            "defined": "TokenIndex"
+          }
         },
         {
           "name": "bankNum",
@@ -1896,7 +1916,9 @@
               },
               {
                 "kind": "arg",
-                "type": "u16",
+                "type": {
+                  "defined": "Serum3MarketIndex"
+                },
                 "path": "market_index"
               }
             ]
@@ -1932,7 +1954,9 @@
       "args": [
         {
           "name": "marketIndex",
-          "type": "u16"
+          "type": {
+            "defined": "Serum3MarketIndex"
+          }
         },
         {
           "name": "name",
@@ -2838,11 +2862,15 @@
       "args": [
         {
           "name": "assetTokenIndex",
-          "type": "u16"
+          "type": {
+            "defined": "TokenIndex"
+          }
         },
         {
           "name": "liabTokenIndex",
-          "type": "u16"
+          "type": {
+            "defined": "TokenIndex"
+          }
         },
         {
           "name": "maxLiabTransfer",
@@ -2950,11 +2978,15 @@
       "args": [
         {
           "name": "assetTokenIndex",
-          "type": "u16"
+          "type": {
+            "defined": "TokenIndex"
+          }
         },
         {
           "name": "liabTokenIndex",
-          "type": "u16"
+          "type": {
+            "defined": "TokenIndex"
+          }
         },
         {
           "name": "maxLiabTransfer",
@@ -2997,11 +3029,15 @@
       "args": [
         {
           "name": "assetTokenIndex",
-          "type": "u16"
+          "type": {
+            "defined": "TokenIndex"
+          }
         },
         {
           "name": "liabTokenIndex",
-          "type": "u16"
+          "type": {
+            "defined": "TokenIndex"
+          }
         },
         {
           "name": "maxLiabTransfer",
@@ -3118,7 +3154,9 @@
               },
               {
                 "kind": "arg",
-                "type": "u16",
+                "type": {
+                  "defined": "PerpMarketIndex"
+                },
                 "path": "perp_market_index"
               }
             ]
@@ -3157,7 +3195,9 @@
       "args": [
         {
           "name": "perpMarketIndex",
-          "type": "u16"
+          "type": {
+            "defined": "PerpMarketIndex"
+          }
         },
         {
           "name": "name",
@@ -3251,7 +3291,9 @@
         },
         {
           "name": "settleTokenIndex",
-          "type": "u16"
+          "type": {
+            "defined": "TokenIndex"
+          }
         },
         {
           "name": "settlePnlLimitFactor",
@@ -4226,7 +4268,9 @@
       "args": [
         {
           "name": "limit",
-          "type": "u64"
+          "type": {
+            "defined": "usize"
+          }
         }
       ]
     },
@@ -4969,6 +5013,799 @@
       "args": []
     },
     {
+      "name": "openbookV2CreateOpenOrders",
+      "accounts": [
+        {
+          "name": "group",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "account",
+          "isMut": true,
+          "isSigner": false,
+          "relations": [
+            "group"
+          ]
+        },
+        {
+          "name": "owner",
+          "isMut": false,
+          "isSigner": true
+        },
+        {
+          "name": "openbookV2Market",
+          "isMut": false,
+          "isSigner": false,
+          "relations": [
+            "group",
+            "openbook_v2_program",
+            "openbook_v2_market_external"
+          ]
+        },
+        {
+          "name": "openbookV2Program",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "openbookV2MarketExternal",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "openOrders",
+          "isMut": true,
+          "isSigner": false,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "type": "string",
+                "value": "OpenOrders"
+              },
+              {
+                "kind": "account",
+                "type": "publicKey",
+                "path": "owner"
+              },
+              {
+                "kind": "account",
+                "type": "publicKey",
+                "path": "account"
+              },
+              {
+                "kind": "arg",
+                "type": "u32",
+                "path": "account_num"
+              }
+            ]
+          }
+        },
+        {
+          "name": "payer",
+          "isMut": true,
+          "isSigner": true
+        },
+        {
+          "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "rent",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "openbookV2CloseOpenOrders",
+      "accounts": [
+        {
+          "name": "group",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "account",
+          "isMut": true,
+          "isSigner": false,
+          "relations": [
+            "group"
+          ]
+        },
+        {
+          "name": "owner",
+          "isMut": false,
+          "isSigner": true
+        },
+        {
+          "name": "openbookV2Market",
+          "isMut": false,
+          "isSigner": false,
+          "relations": [
+            "group",
+            "openbook_v2_program",
+            "openbook_v2_market_external"
+          ]
+        },
+        {
+          "name": "openbookV2Program",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "openbookV2MarketExternal",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "openOrders",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "solDestination",
+          "isMut": true,
+          "isSigner": false
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "openbookV2PlaceOrder",
+      "accounts": [
+        {
+          "name": "group",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "account",
+          "isMut": true,
+          "isSigner": false,
+          "relations": [
+            "group"
+          ]
+        },
+        {
+          "name": "owner",
+          "isMut": false,
+          "isSigner": true
+        },
+        {
+          "name": "openOrders",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "openbookV2Market",
+          "isMut": false,
+          "isSigner": false,
+          "relations": [
+            "group",
+            "openbook_v2_program",
+            "openbook_v2_market_external"
+          ]
+        },
+        {
+          "name": "openbookV2Program",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "openbookV2MarketExternal",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "marketBids",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "marketAsks",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "marketEventQueue",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "marketRequestQueue",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "marketBaseVault",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "marketQuoteVault",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "marketVaultSigner",
+          "isMut": false,
+          "isSigner": false,
+          "docs": [
+            "needed for the automatic settle_funds call"
+          ]
+        },
+        {
+          "name": "payerBank",
+          "isMut": true,
+          "isSigner": false,
+          "docs": [
+            "The bank that pays for the order, if necessary"
+          ],
+          "relations": [
+            "group"
+          ]
+        },
+        {
+          "name": "payerVault",
+          "isMut": true,
+          "isSigner": false,
+          "docs": [
+            "The bank vault that pays for the order, if necessary"
+          ]
+        },
+        {
+          "name": "payerOracle",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "tokenProgram",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "side",
+          "type": {
+            "defined": "openbook_v2::state::Side"
+          }
+        },
+        {
+          "name": "limitPrice",
+          "type": "u64"
+        },
+        {
+          "name": "maxBaseQty",
+          "type": "u64"
+        },
+        {
+          "name": "maxNativeQuoteQtyIncludingFees",
+          "type": "u64"
+        },
+        {
+          "name": "selfTradeBehavior",
+          "type": {
+            "defined": "OpenbookV2SelfTradeBehavior"
+          }
+        },
+        {
+          "name": "orderType",
+          "type": {
+            "defined": "OpenbookV2PlaceOrderType"
+          }
+        },
+        {
+          "name": "clientOrderId",
+          "type": "u64"
+        },
+        {
+          "name": "limit",
+          "type": "u16"
+        }
+      ]
+    },
+    {
+      "name": "openbookV2PlaceTakerOrder",
+      "accounts": [
+        {
+          "name": "group",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "account",
+          "isMut": true,
+          "isSigner": false,
+          "relations": [
+            "group"
+          ]
+        },
+        {
+          "name": "owner",
+          "isMut": false,
+          "isSigner": true
+        },
+        {
+          "name": "openbookV2Market",
+          "isMut": false,
+          "isSigner": false,
+          "relations": [
+            "group",
+            "openbook_v2_program",
+            "openbook_v2_market_external"
+          ]
+        },
+        {
+          "name": "openbookV2Program",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "openbookV2MarketExternal",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "marketBids",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "marketAsks",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "marketEventQueue",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "marketRequestQueue",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "marketBaseVault",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "marketQuoteVault",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "marketVaultSigner",
+          "isMut": false,
+          "isSigner": false,
+          "docs": [
+            "needed for the automatic settle_funds call"
+          ]
+        },
+        {
+          "name": "payerBank",
+          "isMut": true,
+          "isSigner": false,
+          "docs": [
+            "The bank that pays for the order, if necessary"
+          ],
+          "relations": [
+            "group"
+          ]
+        },
+        {
+          "name": "payerVault",
+          "isMut": true,
+          "isSigner": false,
+          "docs": [
+            "The bank vault that pays for the order, if necessary"
+          ]
+        },
+        {
+          "name": "payerOracle",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "tokenProgram",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "side",
+          "type": {
+            "defined": "openbook_v2::state::Side"
+          }
+        },
+        {
+          "name": "limitPrice",
+          "type": "u64"
+        },
+        {
+          "name": "maxBaseQty",
+          "type": "u64"
+        },
+        {
+          "name": "maxNativeQuoteQtyIncludingFees",
+          "type": "u64"
+        },
+        {
+          "name": "selfTradeBehavior",
+          "type": {
+            "defined": "OpenbookV2SelfTradeBehavior"
+          }
+        },
+        {
+          "name": "clientOrderId",
+          "type": "u64"
+        },
+        {
+          "name": "limit",
+          "type": "u16"
+        }
+      ]
+    },
+    {
+      "name": "openbookV2CancelOrder",
+      "accounts": [
+        {
+          "name": "group",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "account",
+          "isMut": true,
+          "isSigner": false,
+          "relations": [
+            "group"
+          ]
+        },
+        {
+          "name": "owner",
+          "isMut": false,
+          "isSigner": true
+        },
+        {
+          "name": "openOrders",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "openbookV2Market",
+          "isMut": false,
+          "isSigner": false,
+          "relations": [
+            "group",
+            "openbook_v2_program",
+            "openbook_v2_market_external"
+          ]
+        },
+        {
+          "name": "openbookV2Program",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "openbookV2MarketExternal",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "marketBids",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "marketAsks",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "marketEventQueue",
+          "isMut": true,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "side",
+          "type": {
+            "defined": "openbook_v2::state::Side"
+          }
+        },
+        {
+          "name": "orderId",
+          "type": "u128"
+        }
+      ]
+    },
+    {
+      "name": "openbookV2CancelAllOrders",
+      "accounts": [
+        {
+          "name": "group",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "account",
+          "isMut": false,
+          "isSigner": false,
+          "relations": [
+            "group"
+          ]
+        },
+        {
+          "name": "owner",
+          "isMut": false,
+          "isSigner": true
+        },
+        {
+          "name": "openOrders",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "openbookV2Market",
+          "isMut": false,
+          "isSigner": false,
+          "relations": [
+            "group",
+            "openbook_v2_program",
+            "openbook_v2_market_external"
+          ]
+        },
+        {
+          "name": "openbookV2Program",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "openbookV2MarketExternal",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "marketBids",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "marketAsks",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "marketEventQueue",
+          "isMut": true,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "limit",
+          "type": "u8"
+        }
+      ]
+    },
+    {
+      "name": "openbookV2SettleFunds",
+      "accounts": [
+        {
+          "name": "group",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "account",
+          "isMut": true,
+          "isSigner": false,
+          "relations": [
+            "group"
+          ]
+        },
+        {
+          "name": "owner",
+          "isMut": false,
+          "isSigner": true
+        },
+        {
+          "name": "openOrders",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "openbookV2Market",
+          "isMut": false,
+          "isSigner": false,
+          "relations": [
+            "group",
+            "openbook_v2_program",
+            "openbook_v2_market_external"
+          ]
+        },
+        {
+          "name": "openbookV2Program",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "openbookV2MarketExternal",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "marketBaseVault",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "marketQuoteVault",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "marketVaultSigner",
+          "isMut": false,
+          "isSigner": false,
+          "docs": [
+            "needed for the automatic settle_funds call"
+          ]
+        },
+        {
+          "name": "quoteBank",
+          "isMut": true,
+          "isSigner": false,
+          "relations": [
+            "group"
+          ]
+        },
+        {
+          "name": "quoteVault",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "baseBank",
+          "isMut": true,
+          "isSigner": false,
+          "relations": [
+            "group"
+          ]
+        },
+        {
+          "name": "baseVault",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "tokenProgram",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "openbookV2LiqForceCancelOrders",
+      "accounts": [
+        {
+          "name": "group",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "account",
+          "isMut": true,
+          "isSigner": false,
+          "relations": [
+            "group"
+          ]
+        },
+        {
+          "name": "openOrders",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "openbookV2Market",
+          "isMut": false,
+          "isSigner": false,
+          "relations": [
+            "group",
+            "openbook_v2_program",
+            "openbook_v2_market_external"
+          ]
+        },
+        {
+          "name": "openbookV2Program",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "openbookV2MarketExternal",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "marketBids",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "marketAsks",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "marketEventQueue",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "marketBaseVault",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "marketQuoteVault",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "marketVaultSigner",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "quoteBank",
+          "isMut": true,
+          "isSigner": false,
+          "relations": [
+            "group"
+          ]
+        },
+        {
+          "name": "quoteVault",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "baseBank",
+          "isMut": true,
+          "isSigner": false,
+          "relations": [
+            "group"
+          ]
+        },
+        {
+          "name": "baseVault",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "tokenProgram",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "limit",
+          "type": "u8"
+        }
+      ]
+    },
+    {
       "name": "benchmark",
       "docs": [
         "",
@@ -5181,7 +6018,9 @@
           },
           {
             "name": "tokenIndex",
-            "type": "u16"
+            "type": {
+              "defined": "TokenIndex"
+            }
           },
           {
             "name": "bump",
@@ -5298,7 +6137,9 @@
           },
           {
             "name": "mngoTokenIndex",
-            "type": "u16"
+            "type": {
+              "defined": "TokenIndex"
+            }
           },
           {
             "name": "padding",
@@ -5596,7 +6437,9 @@
           },
           {
             "name": "tokenIndex",
-            "type": "u16"
+            "type": {
+              "defined": "TokenIndex"
+            }
           },
           {
             "name": "groupInsuranceFund",
@@ -5647,6 +6490,123 @@
               "array": [
                 "u8",
                 2560
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "OpenbookV2Market",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "group",
+            "type": "publicKey"
+          },
+          {
+            "name": "baseTokenIndex",
+            "type": {
+              "defined": "TokenIndex"
+            }
+          },
+          {
+            "name": "quoteTokenIndex",
+            "type": {
+              "defined": "TokenIndex"
+            }
+          },
+          {
+            "name": "reduceOnly",
+            "type": "u8"
+          },
+          {
+            "name": "forceClose",
+            "type": "u8"
+          },
+          {
+            "name": "padding1",
+            "type": {
+              "array": [
+                "u8",
+                2
+              ]
+            }
+          },
+          {
+            "name": "name",
+            "type": {
+              "array": [
+                "u8",
+                16
+              ]
+            }
+          },
+          {
+            "name": "openbookV2Program",
+            "type": "publicKey"
+          },
+          {
+            "name": "openbookV2MarketExternal",
+            "type": "publicKey"
+          },
+          {
+            "name": "marketIndex",
+            "type": {
+              "defined": "OpenbookV2MarketIndex"
+            }
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          },
+          {
+            "name": "padding2",
+            "type": {
+              "array": [
+                "u8",
+                5
+              ]
+            }
+          },
+          {
+            "name": "registrationTime",
+            "type": "u64"
+          },
+          {
+            "name": "reserved",
+            "type": {
+              "array": [
+                "u8",
+                128
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "OpenbookV2MarketIndexReservation",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "group",
+            "type": "publicKey"
+          },
+          {
+            "name": "marketIndex",
+            "type": {
+              "defined": "OpenbookV2MarketIndex"
+            }
+          },
+          {
+            "name": "reserved",
+            "type": {
+              "array": [
+                "u8",
+                38
               ]
             }
           }
@@ -5784,7 +6744,9 @@
               "Currently required to be 0, USDC. In the future settlement",
               "may be allowed to happen in other tokens."
             ],
-            "type": "u16"
+            "type": {
+              "defined": "TokenIndex"
+            }
           },
           {
             "name": "perpMarketIndex",
@@ -5792,7 +6754,9 @@
               "Index of this perp market. Other data, like the MangoAccount's PerpPosition",
               "reference this market via this index. Unique for this group's perp markets."
             ],
-            "type": "u16"
+            "type": {
+              "defined": "PerpMarketIndex"
+            }
           },
           {
             "name": "blocked1",
@@ -6183,11 +7147,15 @@
           },
           {
             "name": "baseTokenIndex",
-            "type": "u16"
+            "type": {
+              "defined": "TokenIndex"
+            }
           },
           {
             "name": "quoteTokenIndex",
-            "type": "u16"
+            "type": {
+              "defined": "TokenIndex"
+            }
           },
           {
             "name": "reduceOnly",
@@ -6225,7 +7193,9 @@
           },
           {
             "name": "marketIndex",
-            "type": "u16"
+            "type": {
+              "defined": "Serum3MarketIndex"
+            }
           },
           {
             "name": "bump",
@@ -6267,7 +7237,9 @@
           },
           {
             "name": "marketIndex",
-            "type": "u16"
+            "type": {
+              "defined": "Serum3MarketIndex"
+            }
           },
           {
             "name": "reserved",
@@ -6346,7 +7318,9 @@
         "fields": [
           {
             "name": "tokenIndex",
-            "type": "u16"
+            "type": {
+              "defined": "TokenIndex"
+            }
           },
           {
             "name": "value",
@@ -6364,7 +7338,9 @@
         "fields": [
           {
             "name": "perpMarketIndex",
-            "type": "u16"
+            "type": {
+              "defined": "PerpMarketIndex"
+            }
           },
           {
             "name": "value",
@@ -6411,7 +7387,9 @@
         "fields": [
           {
             "name": "tokenIndex",
-            "type": "u16"
+            "type": {
+              "defined": "TokenIndex"
+            }
           },
           {
             "name": "maintAssetWeight",
@@ -6505,7 +7483,9 @@
           },
           {
             "name": "marketIndex",
-            "type": "u16"
+            "type": {
+              "defined": "Serum3MarketIndex"
+            }
           },
           {
             "name": "hasZeroFunds",
@@ -6530,7 +7510,9 @@
         "fields": [
           {
             "name": "perpMarketIndex",
-            "type": "u16"
+            "type": {
+              "defined": "PerpMarketIndex"
+            }
           },
           {
             "name": "settleTokenIndex",
@@ -6717,7 +7699,9 @@
             "docs": [
               "index into Group.tokens"
             ],
-            "type": "u16"
+            "type": {
+              "defined": "TokenIndex"
+            }
           },
           {
             "name": "inUseCount",
@@ -6786,7 +7770,9 @@
           },
           {
             "name": "marketIndex",
-            "type": "u16"
+            "type": {
+              "defined": "Serum3MarketIndex"
+            }
           },
           {
             "name": "baseTokenIndex",
@@ -6795,11 +7781,15 @@
               "to get passed the static SerumMarket to find which tokens a market",
               "uses and look up the correct oracles."
             ],
-            "type": "u16"
+            "type": {
+              "defined": "TokenIndex"
+            }
           },
           {
             "name": "quoteTokenIndex",
-            "type": "u16"
+            "type": {
+              "defined": "TokenIndex"
+            }
           },
           {
             "name": "padding",
@@ -6829,7 +7819,9 @@
         "fields": [
           {
             "name": "marketIndex",
-            "type": "u16"
+            "type": {
+              "defined": "PerpMarketIndex"
+            }
           },
           {
             "name": "padding",
@@ -7077,7 +8069,9 @@
           },
           {
             "name": "market",
-            "type": "u16"
+            "type": {
+              "defined": "PerpMarketIndex"
+            }
           },
           {
             "name": "padding2",
@@ -7295,7 +8289,9 @@
             ],
             "type": {
               "array": [
-                "u32",
+                {
+                  "defined": "NodeHandle"
+                },
                 2
               ]
             }
@@ -7467,7 +8463,9 @@
         "fields": [
           {
             "name": "maybeNode",
-            "type": "u32"
+            "type": {
+              "defined": "NodeHandle"
+            }
           },
           {
             "name": "leafCount",
@@ -7509,7 +8507,9 @@
           },
           {
             "name": "freeListHead",
-            "type": "u32"
+            "type": {
+              "defined": "NodeHandle"
+            }
           },
           {
             "name": "reserved",
@@ -8353,6 +9353,39 @@
           },
           {
             "name": "TokenConditionalSwapCancel"
+          },
+          {
+            "name": "OpenbookV2CancelAllOrders"
+          },
+          {
+            "name": "OpenbookV2CancelOrder"
+          },
+          {
+            "name": "OpenbookV2CloseOpenOrders"
+          },
+          {
+            "name": "OpenbookV2CreateOpenOrders"
+          },
+          {
+            "name": "OpenbookV2DeregisterMarket"
+          },
+          {
+            "name": "OpenbookV2EditMarket"
+          },
+          {
+            "name": "OpenbookV2LiqForceCancelOrders"
+          },
+          {
+            "name": "OpenbookV2PlaceOrder"
+          },
+          {
+            "name": "OpenbookV2RegisterMarket"
+          },
+          {
+            "name": "OpenbookV2SettleFunds"
+          },
+          {
+            "name": "OpenbookV2PlaceTakerOrder"
           }
         ]
       }
@@ -8370,6 +9403,46 @@
           },
           {
             "name": "BecameNotLiquidatable"
+          }
+        ]
+      }
+    },
+    {
+      "name": "OpenbookV2SelfTradeBehavior",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "DecrementTake"
+          },
+          {
+            "name": "CancelProvide"
+          },
+          {
+            "name": "AbortTransaction"
+          }
+        ]
+      }
+    },
+    {
+      "name": "OpenbookV2PlaceOrderType",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "Limit"
+          },
+          {
+            "name": "ImmediateOrCancel"
+          },
+          {
+            "name": "PostOnly"
+          },
+          {
+            "name": "Market"
+          },
+          {
+            "name": "PostOnlySlide"
           }
         ]
       }
