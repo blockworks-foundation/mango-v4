@@ -22,6 +22,10 @@ pub fn token_conditional_swap_create(
         return Ok(());
     }
 
+    require_neq!(
+        token_conditional_swap.buy_token_index,
+        token_conditional_swap.sell_token_index
+    );
     require_gte!(token_conditional_swap.price_premium_bps, 0);
     require_gte!(token_conditional_swap.maker_fee_bps, 0);
     require_gte!(token_conditional_swap.taker_fee_bps, 0);
