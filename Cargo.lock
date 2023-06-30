@@ -107,7 +107,7 @@ version = "0.27.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2d5e1a413b311b039d29b61d0dbb401c9dbf04f792497ceca87593454bf6d7dd"
 dependencies = [
- "anchor-syn 0.25.0",
+ "anchor-syn",
  "anyhow",
  "proc-macro2 1.0.56",
  "quote 1.0.27",
@@ -121,7 +121,7 @@ version = "0.27.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "cca9aeaf633c6e2365fed0525dcac68610be58eee5dc69d3b86fe0b1d4b320b9"
 dependencies = [
- "anchor-syn 0.25.0",
+ "anchor-syn",
  "anyhow",
  "bs58 0.4.0",
  "proc-macro2 1.0.56",
@@ -159,7 +159,7 @@ version = "0.27.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7a3b07d5c5d87b5edc72428b447b8e9ee1143b83dd1afc6a6b1d352c6a6164d8"
 dependencies = [
- "anchor-syn 0.25.0",
+ "anchor-syn",
  "anyhow",
  "proc-macro2 1.0.56",
  "quote 1.0.27",
@@ -172,7 +172,7 @@ version = "0.27.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b22ad0445115dbea5869b1d062da49ae125abed9132fc20c33227f25e42dfa6b"
 dependencies = [
- "anchor-syn 0.25.0",
+ "anchor-syn",
  "anyhow",
  "proc-macro2 1.0.56",
  "quote 1.0.27",
@@ -185,7 +185,7 @@ version = "0.27.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "04c06e06497b5b4f392845e0d04dde8374fd244fa2832dd0e5c27bfd99cb0342"
 dependencies = [
- "anchor-lang 0.25.0",
+ "anchor-lang",
  "anyhow",
  "regex",
  "serde",
@@ -202,7 +202,7 @@ version = "0.27.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "48daeff6781ba2f02961b0ad211feb9a2de75af345d42c62b1a252fd4dfb0724"
 dependencies = [
- "anchor-syn 0.25.0",
+ "anchor-syn",
  "anyhow",
  "proc-macro2 1.0.56",
  "quote 1.0.27",
@@ -250,19 +250,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "75cc8066fbd45e0e03edf48342c79265aa34ca76cefeace48ef6c402b6946665"
 dependencies = [
  "anchor-lang",
- "solana-program",
- "spl-associated-token-account",
- "spl-token",
- "spl-token-2022 0.5.0",
-]
-
-[[package]]
-name = "anchor-spl"
-version = "0.27.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "75cc8066fbd45e0e03edf48342c79265aa34ca76cefeace48ef6c402b6946665"
-dependencies = [
- "anchor-lang 0.27.0",
  "solana-program",
  "spl-associated-token-account",
  "spl-token",
@@ -1812,7 +1799,7 @@ dependencies = [
 [[package]]
 name = "fixed"
 version = "1.11.0"
-source = "git+https://github.com/openbook-dex/openbook-v2.git#921d52c58064c3f197600b90929cedb845314a22"
+source = "git+https://github.com/openbook-dex/openbook-v2.git#21614b799ca82c324df50453562a2ad452e41edf"
 dependencies = [
  "az",
  "borsh",
@@ -2956,8 +2943,8 @@ dependencies = [
 name = "mango-v4"
 version = "0.18.0"
 dependencies = [
- "anchor-lang 0.25.0",
- "anchor-spl 0.25.0",
+ "anchor-lang",
+ "anchor-spl",
  "arrayref",
  "async-trait",
  "base64 0.13.1",
@@ -2967,7 +2954,7 @@ dependencies = [
  "default-env",
  "derivative",
  "env_logger 0.9.3",
- "fixed",
+ "fixed 1.11.0",
  "itertools",
  "lazy_static",
  "log 0.4.17",
@@ -2996,8 +2983,8 @@ name = "mango-v4-cli"
 version = "0.3.0"
 dependencies = [
  "anchor-client",
- "anchor-lang 0.25.0",
- "anchor-spl 0.25.0",
+ "anchor-lang",
+ "anchor-spl",
  "anyhow",
  "clap 3.2.23",
  "dotenv",
@@ -3019,8 +3006,8 @@ name = "mango-v4-client"
 version = "0.3.0"
 dependencies = [
  "anchor-client",
- "anchor-lang 0.25.0",
- "anchor-spl 0.25.0",
+ "anchor-lang",
+ "anchor-spl",
  "anyhow",
  "async-channel",
  "async-once-cell",
@@ -3057,8 +3044,8 @@ name = "mango-v4-keeper"
 version = "0.3.0"
 dependencies = [
  "anchor-client",
- "anchor-lang 0.25.0",
- "anchor-spl 0.25.0",
+ "anchor-lang",
+ "anchor-spl",
  "anyhow",
  "clap 3.2.23",
  "dotenv",
@@ -3084,7 +3071,7 @@ name = "mango-v4-liquidator"
 version = "0.0.1"
 dependencies = [
  "anchor-client",
- "anchor-lang 0.25.0",
+ "anchor-lang",
  "anyhow",
  "arrayref",
  "async-channel",
@@ -3129,7 +3116,7 @@ name = "mango-v4-settler"
 version = "0.0.1"
 dependencies = [
  "anchor-client",
- "anchor-lang 0.25.0",
+ "anchor-lang",
  "anyhow",
  "arrayref",
  "async-channel",
@@ -3643,10 +3630,10 @@ checksum = "624a8340c38c1b80fd549087862da4ba43e08858af025b236e509b6649fc13d5"
 [[package]]
 name = "openbook-v2"
 version = "0.1.0"
-source = "git+https://github.com/openbook-dex/openbook-v2.git#921d52c58064c3f197600b90929cedb845314a22"
+source = "git+https://github.com/openbook-dex/openbook-v2.git#21614b799ca82c324df50453562a2ad452e41edf"
 dependencies = [
- "anchor-lang 0.27.0",
- "anchor-spl 0.27.0",
+ "anchor-lang",
+ "anchor-spl",
  "arrayref",
  "borsh",
  "bytemuck",
@@ -5020,7 +5007,7 @@ name = "serum_dex"
 version = "0.5.10"
 source = "git+https://github.com/openbook-dex/program.git#c85e56deeaead43abbc33b7301058838b9c5136d"
 dependencies = [
- "anchor-lang 0.25.0",
+ "anchor-lang",
  "arrayref",
  "bincode",
  "bytemuck",
@@ -6616,8 +6603,8 @@ version = "0.1.23"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7c5dc6a4b8c0d2e6c61db595a0f86f04f72205f515fcd51b9d05636f237953d4"
 dependencies = [
- "anchor-lang 0.25.0",
- "anchor-spl 0.25.0",
+ "anchor-lang",
+ "anchor-spl",
  "bytemuck",
  "rust_decimal",
  "solana-program",
