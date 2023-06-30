@@ -238,7 +238,6 @@ impl MangoAccount {
 
 // Mango Account fixed part for easy zero copy deserialization
 #[zero_copy]
-#[derive(bytemuck::Pod, bytemuck::Zeroable)]
 pub struct MangoAccountFixed {
     pub group: Pubkey,
     pub owner: Pubkey,

@@ -57,7 +57,7 @@ pub mod switchboard_v2_mainnet_oracle {
 }
 
 #[zero_copy]
-#[derive(AnchorDeserialize, AnchorSerialize, Debug, bytemuck::Pod)]
+#[derive(AnchorDeserialize, AnchorSerialize, Debug)]
 pub struct OracleConfig {
     pub conf_filter: I80F48,
     pub max_staleness_slots: i64,

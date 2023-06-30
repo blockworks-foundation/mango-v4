@@ -8,7 +8,7 @@ use std::mem::size_of;
 use crate::state::*;
 
 #[zero_copy]
-#[derive(AnchorDeserialize, AnchorSerialize, Derivative, bytemuck::Pod)]
+#[derive(AnchorDeserialize, AnchorSerialize, Derivative)]
 #[derivative(Debug)]
 pub struct TokenConditionalSwap {
     pub id: u64,
