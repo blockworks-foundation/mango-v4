@@ -105,7 +105,8 @@ pub struct MangoAccount {
     /// End timestamp of the current expiry interval of the buyback fees amount.
     pub buyback_fees_expiry_timestamp: u64,
 
-    pub next_conditional_swap_id: u64,
+    /// Next id to use when adding a token condition swap
+    pub next_token_conditional_swap_id: u64,
 
     pub reserved: [u8; 200],
 
@@ -145,7 +146,7 @@ impl MangoAccount {
             buyback_fees_accrued_current: 0,
             buyback_fees_accrued_previous: 0,
             buyback_fees_expiry_timestamp: 0,
-            next_conditional_swap_id: 0,
+            next_token_conditional_swap_id: 0,
             reserved: [0; 200],
             header_version: DEFAULT_MANGO_ACCOUNT_VERSION,
             padding3: Default::default(),
@@ -255,7 +256,7 @@ pub struct MangoAccountFixed {
     pub buyback_fees_accrued_current: u64,
     pub buyback_fees_accrued_previous: u64,
     pub buyback_fees_expiry_timestamp: u64,
-    pub next_conditional_swap_id: u64,
+    pub next_token_conditional_swap_id: u64,
     pub reserved: [u8; 200],
 }
 const_assert_eq!(size_of::<MangoAccountFixed>(), 32 * 4 + 8 + 8 * 8 + 200);
@@ -727,23 +728,23 @@ impl<
 
     pub fn token_conditional_swap_by_id(&self, id: u64) -> Result<(usize, &TokenConditionalSwap)> {
         let index = self
-            .all_token_conditional_swap()
+            .all_token_conditional_swaps()
             .position(|tcs| tcs.has_data() && tcs.id == id)
             .ok_or_else(|| error_msg!("token conditional swap with id {} not found", id))?;
         Ok((index, self.token_conditional_swap_by_index_unchecked(index)))
     }
 
-    pub fn all_token_conditional_swap(&self) -> impl Iterator<Item = &TokenConditionalSwap> {
+    pub fn all_token_conditional_swaps(&self) -> impl Iterator<Item = &TokenConditionalSwap> {
         (0..self.header().token_conditional_swap_count())
             .map(|i| self.token_conditional_swap_by_index_unchecked(i))
     }
 
-    pub fn active_token_conditional_swap(&self) -> impl Iterator<Item = &TokenConditionalSwap> {
-        self.all_token_conditional_swap().filter(|p| p.has_data())
+    pub fn active_token_conditional_swaps(&self) -> impl Iterator<Item = &TokenConditionalSwap> {
+        self.all_token_conditional_swaps().filter(|p| p.has_data())
     }
 
     pub fn token_conditional_swap_free_index(&self) -> Result<usize> {
-        self.all_token_conditional_swap()
+        self.all_token_conditional_swaps()
             .position(|&v| !v.has_data())
             .ok_or_else(|| error_msg!("no free token conditional swap index"))
     }
@@ -1137,10 +1138,9 @@ impl<
         Ok(get_helper_mut(self.dynamic_mut(), offset))
     }
 
-    pub fn add_token_conditional_swap(&mut self) -> Result<&mut TokenConditionalSwap> {
+    pub fn free_token_conditional_swap_mut(&mut self) -> Result<&mut TokenConditionalSwap> {
         let index = self.token_conditional_swap_free_index()?;
         let tcs = self.token_conditional_swap_mut_by_index(index)?;
-        tcs.set_has_data(true);
         Ok(tcs)
     }
 
@@ -1287,7 +1287,7 @@ impl<
 
         // expand dynamic components by first moving existing positions, and then setting new ones to defaults
 
-        // token stop loss
+        // token conditional swaps
         if old_header.token_conditional_swap_count() > 0 {
             unsafe {
                 sol_memmove(
@@ -1488,7 +1488,7 @@ mod tests {
         account.perps.resize(8, PerpPosition::default());
         account.perps[0].market_index = 9;
         account.perp_open_orders.resize(8, PerpOpenOrder::default());
-        account.next_conditional_swap_id = 13;
+        account.next_token_conditional_swap_id = 13;
 
         let account_bytes_without_tcs = AnchorSerialize::try_to_vec(&account).unwrap();
         let account_bytes_with_tcs = {
@@ -1533,8 +1533,8 @@ mod tests {
             account2.fixed.buyback_fees_expiry_timestamp
         );
         assert_eq!(
-            account.next_conditional_swap_id,
-            account2.fixed.next_conditional_swap_id
+            account.next_token_conditional_swap_id,
+            account2.fixed.next_token_conditional_swap_id
         );
         assert_eq!(
             account.tokens[0].token_index,
@@ -1552,10 +1552,10 @@ mod tests {
                 .perp_position_by_raw_index_unchecked(0)
                 .market_index
         );
-        assert_eq!(account2.all_token_conditional_swap().count(), 0);
+        assert_eq!(account2.all_token_conditional_swaps().count(), 0);
 
         let account3 = MangoAccountValue::from_bytes(&account_bytes_with_tcs).unwrap();
-        assert_eq!(account3.all_token_conditional_swap().count(), 0);
+        assert_eq!(account3.all_token_conditional_swaps().count(), 0);
     }
 
     #[test]
@@ -1792,20 +1792,20 @@ mod tests {
     #[test]
     fn test_token_conditional_swap() {
         let mut account = make_test_account();
-        assert_eq!(account.all_token_conditional_swap().count(), 2);
-        assert_eq!(account.active_token_conditional_swap().count(), 0);
+        assert_eq!(account.all_token_conditional_swaps().count(), 2);
+        assert_eq!(account.active_token_conditional_swaps().count(), 0);
         assert_eq!(account.token_conditional_swap_free_index().unwrap(), 0);
 
-        let tcs = account.add_token_conditional_swap().unwrap();
+        let tcs = account.free_token_conditional_swap_mut().unwrap();
         tcs.id = 123;
-        assert_eq!(account.all_token_conditional_swap().count(), 2);
-        assert_eq!(account.active_token_conditional_swap().count(), 1);
+        assert_eq!(account.all_token_conditional_swaps().count(), 2);
+        assert_eq!(account.active_token_conditional_swaps().count(), 1);
         assert_eq!(account.token_conditional_swap_free_index().unwrap(), 1);
 
-        let tcs = account.add_token_conditional_swap().unwrap();
+        let tcs = account.free_token_conditional_swap_mut().unwrap();
         tcs.id = 234;
-        assert_eq!(account.all_token_conditional_swap().count(), 2);
-        assert_eq!(account.active_token_conditional_swap().count(), 2);
+        assert_eq!(account.all_token_conditional_swaps().count(), 2);
+        assert_eq!(account.active_token_conditional_swaps().count(), 2);
 
         let (index, tcs) = account.token_conditional_swap_by_id(123).unwrap();
         assert_eq!(index, 0);
@@ -1819,21 +1819,21 @@ mod tests {
         let tcs = account.token_conditional_swap_by_index(1).unwrap();
         assert_eq!(tcs.id, 234);
 
-        assert!(account.add_token_conditional_swap().is_err());
+        assert!(account.free_token_conditional_swap_mut().is_err());
         assert!(account.token_conditional_swap_free_index().is_err());
 
         let tcs = account.token_conditional_swap_mut_by_index(0).unwrap();
         tcs.has_data = 0;
-        assert_eq!(account.all_token_conditional_swap().count(), 2);
-        assert_eq!(account.active_token_conditional_swap().count(), 1);
+        assert_eq!(account.all_token_conditional_swaps().count(), 2);
+        assert_eq!(account.active_token_conditional_swaps().count(), 1);
         assert_eq!(
-            account.active_token_conditional_swap().next().unwrap().id,
+            account.active_token_conditional_swaps().next().unwrap().id,
             234
         );
         assert!(account.token_conditional_swap_by_id(123).is_err());
 
         assert_eq!(account.token_conditional_swap_free_index().unwrap(), 0);
-        let tcs = account.add_token_conditional_swap().unwrap();
+        let tcs = account.free_token_conditional_swap_mut().unwrap();
         assert_eq!(tcs.id, 123); // old data
     }
 }

@@ -785,8 +785,8 @@ mod tests {
             allow_creating_deposits: 1,
             ..Default::default()
         };
-        *setup.liqee.add_token_conditional_swap().unwrap() = tcs.clone();
-        assert_eq!(setup.liqee.active_token_conditional_swap().count(), 1);
+        *setup.liqee.free_token_conditional_swap_mut().unwrap() = tcs.clone();
+        assert_eq!(setup.liqee.active_token_conditional_swaps().count(), 1);
 
         assert!(setup.trigger(0.99, 40, 1.0, 100,).is_err());
         assert!(setup.trigger(1.0, 40, 0.33, 100,).is_err());
@@ -795,7 +795,7 @@ mod tests {
         assert_eq!(buy_change.round(), 40);
         assert_eq!(sell_change.round(), -88);
 
-        assert_eq!(setup.liqee.active_token_conditional_swap().count(), 1);
+        assert_eq!(setup.liqee.active_token_conditional_swaps().count(), 1);
         let tcs = setup
             .liqee
             .token_conditional_swap_by_index(0)
@@ -813,7 +813,7 @@ mod tests {
         assert_eq!(buy_change.round(), 5);
         assert_eq!(sell_change.round(), -11);
 
-        assert_eq!(setup.liqee.active_token_conditional_swap().count(), 0);
+        assert_eq!(setup.liqee.active_token_conditional_swaps().count(), 0);
 
         assert_eq!(setup.liqee_liab_pos().round(), 45);
         assert_eq!(setup.liqee_asset_pos().round(), 1000 - 99);
@@ -848,13 +848,13 @@ mod tests {
             allow_creating_deposits: 1,
             ..Default::default()
         };
-        *setup.liqee.add_token_conditional_swap().unwrap() = tcs.clone();
+        *setup.liqee.free_token_conditional_swap_mut().unwrap() = tcs.clone();
         let (buy_change, sell_change) = setup.trigger(2.0, 1000, 1.0, 1000).unwrap();
         assert_eq!(buy_change.round(), 500);
         assert_eq!(sell_change.round(), -1000);
 
         // Overall health went negative, causing the tcs to close (even though max_buy/max_sell aren't reached)
-        assert_eq!(setup.liqee.active_token_conditional_swap().count(), 0);
+        assert_eq!(setup.liqee.active_token_conditional_swaps().count(), 0);
 
         assert_eq!(setup.liqee_liab_pos().round(), 500);
         assert_eq!(setup.liqee_asset_pos().round(), -900);
@@ -879,8 +879,8 @@ mod tests {
             allow_creating_deposits: 1,
             ..Default::default()
         };
-        *setup.liqee.add_token_conditional_swap().unwrap() = tcs.clone();
-        assert_eq!(setup.liqee.active_token_conditional_swap().count(), 1);
+        *setup.liqee.free_token_conditional_swap_mut().unwrap() = tcs.clone();
+        assert_eq!(setup.liqee.active_token_conditional_swaps().count(), 1);
 
         let (buy_change, sell_change) = setup.trigger(1.0, 1000, 1.0, 1000).unwrap();
         assert_eq!(buy_change.round(), 952);

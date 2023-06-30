@@ -263,7 +263,7 @@ pub async fn maybe_execute_token_conditional_swap(
     let liqee = account_fetcher.fetch_mango_account(pubkey)?;
 
     // Find an interesting triggerable conditional swap
-    let mut tcs_shuffled = liqee.active_token_conditional_swap().collect::<Vec<&_>>();
+    let mut tcs_shuffled = liqee.active_token_conditional_swaps().collect::<Vec<&_>>();
     {
         let mut rng = rand::thread_rng();
         tcs_shuffled.shuffle(&mut rng);
