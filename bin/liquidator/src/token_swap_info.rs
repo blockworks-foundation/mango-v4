@@ -150,7 +150,7 @@ impl TokenSwapInfoUpdater {
                         info.buy_over_oracle, info.sell_over_oracle
                     )
                 })
-                .unwrap_or("no data".into());
+                .unwrap_or_else(|| "no data".into());
             msg.push_str(&format!("token {token}, {info}"));
         }
         log::trace!("swap infos:{}", msg);
