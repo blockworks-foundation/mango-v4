@@ -38,12 +38,13 @@ pub fn perp_settle_pnl(ctx: Context<PerpSettlePnl>) -> Result<()> {
 
     let a_liq_end_health;
     let a_maint_health;
-    let b_settle_health;
+    let b_max_settle;
     {
         let retriever =
             ScanningAccountRetriever::new(ctx.remaining_accounts, &ctx.accounts.group.key())
                 .context("create account retriever")?;
-        b_settle_health = new_health_cache(&account_b.borrow(), &retriever)?.perp_settle_health();
+        b_max_settle = new_health_cache(&account_b.borrow(), &retriever)?
+            .perp_max_settle(settle_token_index)?;
         let a_cache = new_health_cache(&account_a.borrow(), &retriever)?;
         a_liq_end_health = a_cache.health(HealthType::LiquidationEnd);
         a_maint_health = a_cache.health(HealthType::Maint);
@@ -119,16 +120,16 @@ pub fn perp_settle_pnl(ctx: Context<PerpSettlePnl>) -> Result<()> {
     //   100 - 1.1*80 = 12 USD perp pnl, even though the overall health is already negative.
     //   Further settlement would convert perp-losses into unbacked token-losses and isn't allowed.
     require_msg_typed!(
-        b_settle_health >= 0,
+        b_max_settle > 0,
         MangoError::HealthMustBePositive,
-        "account b settle health is negative: {}",
-        b_settle_health
+        "account b settle max is not positive: {}",
+        b_max_settle
     );
 
     // Settle for the maximum possible capped to target's settle health
     let settlement = a_settleable_pnl
         .min(-b_settleable_pnl)
-        .min(b_settle_health)
+        .min(b_max_settle)
         .max(I80F48::ZERO);
     require_msg_typed!(
         settlement >= 0,
@@ -136,7 +137,7 @@ pub fn perp_settle_pnl(ctx: Context<PerpSettlePnl>) -> Result<()> {
         "a settleable: {}, b settleable: {}, b settle health: {}",
         a_settleable_pnl,
         b_settleable_pnl,
-        b_settle_health,
+        b_max_settle,
     );
 
     let fee = perp_market.compute_settle_fee(settlement, a_liq_end_health, a_maint_health)?;

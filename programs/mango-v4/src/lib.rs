@@ -1098,6 +1098,15 @@ pub mod mango_v4 {
         ctx: Context<PerpLiqNegativePnlOrBankruptcy>,
         max_liab_transfer: u64,
     ) -> Result<()> {
+        Err(error_msg!(
+            "PerpLiqNegativePnlOrBankruptcy was replaced by PerpLiqNegativePnlOrBankruptcyV2"
+        ))
+    }
+
+    pub fn perp_liq_negative_pnl_or_bankruptcy_v2(
+        ctx: Context<PerpLiqNegativePnlOrBankruptcyV2>,
+        max_liab_transfer: u64,
+    ) -> Result<()> {
         #[cfg(feature = "enable-gpl")]
         instructions::perp_liq_negative_pnl_or_bankruptcy(ctx, max_liab_transfer)?;
         Ok(())

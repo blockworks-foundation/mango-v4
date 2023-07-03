@@ -74,7 +74,12 @@ pub fn perp_consume_events(ctx: Context<PerpConsumeEvents>, limit: usize) -> Res
                         group,
                         event_queue
                     );
-                    maker_taker.execute_perp_maker(perp_market_index, &mut perp_market, fill)?;
+                    maker_taker.execute_perp_maker(
+                        perp_market_index,
+                        &mut perp_market,
+                        fill,
+                        &group,
+                    )?;
                     maker_taker.execute_perp_taker(perp_market_index, &mut perp_market, fill)?;
                     emit_perp_balances(
                         group_key,
@@ -86,7 +91,7 @@ pub fn perp_consume_events(ctx: Context<PerpConsumeEvents>, limit: usize) -> Res
                     load_mango_account!(maker, fill.maker, mango_account_ais, group, event_queue);
                     load_mango_account!(taker, fill.taker, mango_account_ais, group, event_queue);
 
-                    maker.execute_perp_maker(perp_market_index, &mut perp_market, fill)?;
+                    maker.execute_perp_maker(perp_market_index, &mut perp_market, fill, &group)?;
                     taker.execute_perp_taker(perp_market_index, &mut perp_market, fill)?;
                     emit_perp_balances(
                         group_key,

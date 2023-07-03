@@ -1,14 +1,16 @@
 use super::*;
 
 #[tokio::test]
-async fn test_perp_settle_pnl() -> Result<(), TransportError> {
-    let context = TestContext::new().await;
+async fn test_perp_settle_pnl_basic() -> Result<(), TransportError> {
+    let mut test_builder = TestContextBuilder::new();
+    test_builder.test().set_compute_max_units(90_000); // the divisions in perp_max_settle are costly!
+    let context = test_builder.start_default().await;
     let solana = &context.solana.clone();
 
     let admin = TestKeypair::new();
     let owner = context.users[0].key;
     let payer = context.users[1].key;
-    let mints = &context.mints[0..=2];
+    let mints = &context.mints[0..=3];
 
     let initial_token_deposit = 10_000;
 
@@ -173,26 +175,6 @@ async fn test_perp_settle_pnl() -> Result<(), TransportError> {
         assert_eq!(mango_account_1.perps[0].quote_position_native(), 100_000);
     }
 
-    // Bank must be valid for quote currency
-    let result = send_tx(
-        solana,
-        PerpSettlePnlInstruction {
-            settler,
-            settler_owner,
-            account_a: account_1,
-            account_b: account_0,
-            perp_market,
-            settle_bank: tokens[1].bank,
-        },
-    )
-    .await;
-
-    assert_mango_error(
-        &result,
-        MangoError::InvalidBank.into(),
-        "Bank must be valid for quote currency".to_string(),
-    );
-
     // Cannot settle with yourself
     let result = send_tx(
         solana,
@@ -202,7 +184,6 @@ async fn test_perp_settle_pnl() -> Result<(), TransportError> {
             account_a: account_0,
             account_b: account_0,
             perp_market,
-            settle_bank: tokens[0].bank,
         },
     )
     .await;
@@ -222,7 +203,6 @@ async fn test_perp_settle_pnl() -> Result<(), TransportError> {
             account_a: account_0,
             account_b: account_1,
             perp_market: perp_market_2,
-            settle_bank: tokens[0].bank,
         },
     )
     .await;
@@ -263,7 +243,6 @@ async fn test_perp_settle_pnl() -> Result<(), TransportError> {
             account_a: account_1,
             account_b: account_0,
             perp_market,
-            settle_bank: tokens[0].bank,
         },
     )
     .await;
@@ -285,11 +264,16 @@ async fn test_perp_settle_pnl() -> Result<(), TransportError> {
         let mango_account_1 = solana.get_account::<MangoAccount>(account_1).await;
         let perp_market = solana.get_account::<PerpMarket>(perp_market).await;
         assert_eq!(
-            get_pnl_native(&mango_account_0.perps[0], &perp_market, I80F48::from(1005)).round(),
+            mango_account_0.perps[0]
+                .unsettled_pnl(&perp_market, I80F48::from(1005))
+                .unwrap()
+                .round(),
             expected_pnl_0
         );
         assert_eq!(
-            get_pnl_native(&mango_account_1.perps[0], &perp_market, I80F48::from(1005)),
+            mango_account_1.perps[0]
+                .unsettled_pnl(&perp_market, I80F48::from(1005))
+                .unwrap(),
             expected_pnl_1
         );
     }
@@ -305,18 +289,43 @@ async fn test_perp_settle_pnl() -> Result<(), TransportError> {
         let mango_account_1 = solana.get_account::<MangoAccount>(account_1).await;
         let perp_market = solana.get_account::<PerpMarket>(perp_market).await;
         assert_eq!(
-            get_pnl_native(&mango_account_0.perps[0], &perp_market, I80F48::from(1500)).round(),
+            mango_account_0.perps[0]
+                .unsettled_pnl(&perp_market, I80F48::from(1500))
+                .unwrap()
+                .round(),
             expected_pnl_0
         );
         assert_eq!(
-            get_pnl_native(&mango_account_1.perps[0], &perp_market, I80F48::from(1500)),
+            mango_account_1.perps[0]
+                .unsettled_pnl(&perp_market, I80F48::from(1500))
+                .unwrap(),
             expected_pnl_1
         );
     }
 
-    // Settle as much PNL as account_1's health allows
-    let account_1_health_non_perp = I80F48::from_num(0.8 * 10000.0);
-    let expected_total_settle = account_1_health_non_perp;
+    //
+    // SETUP: Add some non-settle token, so the account's health has more contributions
+    //
+    send_tx(
+        solana,
+        TokenDepositInstruction {
+            amount: 1001,
+            reduce_only: false,
+            account: account_1,
+            owner,
+            token_account: context.users[1].token_accounts[2],
+            token_authority: payer.clone(),
+            bank_index: 0,
+        },
+    )
+    .await
+    .unwrap();
+
+    // Settle as much PNL as account_1's health allows:
+    // The account perp_settle_health is 0.8 * 10000.0 + 0.8 * 1001.0,
+    // meaning we can bring it to zero by settling 10000 * 0.8 / 0.8 + 1001 * 0.8 / 1.2 = 10667.333
+    // because then we'd be left with -667.333 * 1.2 + 0.8 * 1000 = 0
+    let expected_total_settle = I80F48::from(10667);
     send_tx(
         solana,
         PerpSettlePnlInstruction {
@@ -325,7 +334,6 @@ async fn test_perp_settle_pnl() -> Result<(), TransportError> {
             account_a: account_0,
             account_b: account_1,
             perp_market,
-            settle_bank: tokens[0].bank,
         },
     )
     .await
@@ -390,19 +398,25 @@ async fn test_perp_settle_pnl() -> Result<(), TransportError> {
     // Change the oracle to a reasonable price in other direction
     set_perp_stub_oracle_price(solana, group, perp_market, &tokens[1], admin, 995.0).await;
 
-    let expected_pnl_0 = I80F48::from(-8520);
-    let expected_pnl_1 = I80F48::from(8500);
+    let expected_pnl_0 = I80F48::from(1 * 100 * 995 - 1 * 100 * 1000 - 20) - expected_total_settle;
+    let expected_pnl_1 = I80F48::from(-1 * 100 * 995 + 1 * 100 * 1000) + expected_total_settle;
 
     {
         let mango_account_0 = solana.get_account::<MangoAccount>(account_0).await;
         let mango_account_1 = solana.get_account::<MangoAccount>(account_1).await;
         let perp_market = solana.get_account::<PerpMarket>(perp_market).await;
         assert_eq!(
-            get_pnl_native(&mango_account_0.perps[0], &perp_market, I80F48::from(995)).round(),
+            mango_account_0.perps[0]
+                .unsettled_pnl(&perp_market, I80F48::from(995))
+                .unwrap()
+                .round(),
             expected_pnl_0
         );
         assert_eq!(
-            get_pnl_native(&mango_account_1.perps[0], &perp_market, I80F48::from(995)).round(),
+            mango_account_1.perps[0]
+                .unsettled_pnl(&perp_market, I80F48::from(995))
+                .unwrap()
+                .round(),
             expected_pnl_1
         );
     }
@@ -417,7 +431,6 @@ async fn test_perp_settle_pnl() -> Result<(), TransportError> {
             account_a: account_1,
             account_b: account_0,
             perp_market,
-            settle_bank: tokens[0].bank,
         },
     )
     .await
@@ -478,11 +491,17 @@ async fn test_perp_settle_pnl() -> Result<(), TransportError> {
         let mango_account_1 = solana.get_account::<MangoAccount>(account_1).await;
         let perp_market = solana.get_account::<PerpMarket>(perp_market).await;
         assert_eq!(
-            get_pnl_native(&mango_account_0.perps[0], &perp_market, I80F48::from(995)).round(),
+            mango_account_0.perps[0]
+                .unsettled_pnl(&perp_market, I80F48::from(995))
+                .unwrap()
+                .round(),
             -20 // fees
         );
         assert_eq!(
-            get_pnl_native(&mango_account_1.perps[0], &perp_market, I80F48::from(995)).round(),
+            mango_account_1.perps[0]
+                .unsettled_pnl(&perp_market, I80F48::from(995))
+                .unwrap()
+                .round(),
             0
         );
     }
@@ -670,7 +689,6 @@ async fn test_perp_settle_pnl_fees() -> Result<(), TransportError> {
             account_a: account_0,
             account_b: account_1,
             perp_market,
-            settle_bank,
         },
     )
     .await
@@ -738,7 +756,6 @@ async fn test_perp_settle_pnl_fees() -> Result<(), TransportError> {
             account_a: account_0,
             account_b: account_1,
             perp_market,
-            settle_bank,
         },
     )
     .await
@@ -950,7 +967,6 @@ async fn test_perp_pnl_settle_limit() -> Result<(), TransportError> {
             account_a: account_0,
             account_b: account_1,
             perp_market,
-            settle_bank: tokens[0].bank,
         },
     )
     .await
@@ -983,7 +999,6 @@ async fn test_perp_pnl_settle_limit() -> Result<(), TransportError> {
             account_a: account_0,
             account_b: account_1,
             perp_market,
-            settle_bank: tokens[0].bank,
         },
     )
     .await;
@@ -1071,7 +1086,6 @@ async fn test_perp_pnl_settle_limit() -> Result<(), TransportError> {
             account_a: account_0,
             account_b: account_1,
             perp_market,
-            settle_bank: tokens[0].bank,
         },
     )
     .await
@@ -1113,7 +1127,6 @@ async fn test_perp_pnl_settle_limit() -> Result<(), TransportError> {
             account_a: account_0,
             account_b: account_1,
             perp_market,
-            settle_bank: tokens[0].bank,
         },
     )
     .await
@@ -1143,7 +1156,6 @@ async fn test_perp_pnl_settle_limit() -> Result<(), TransportError> {
             account_a: account_0,
             account_b: account_1,
             perp_market,
-            settle_bank: tokens[0].bank,
         },
     )
     .await
@@ -1176,7 +1188,6 @@ async fn test_perp_pnl_settle_limit() -> Result<(), TransportError> {
             account_a: account_0,
             account_b: account_1,
             perp_market,
-            settle_bank: tokens[0].bank,
         },
     )
     .await

@@ -9,8 +9,7 @@ use crate::state::*;
 
 use crate::accounts_ix::*;
 use crate::logs::{
-    LoanOriginationFeeInstruction, TokenBalanceLog, TokenLiqBankruptcyLog,
-    WithdrawLoanOriginationFeeLog,
+    LoanOriginationFeeInstruction, TokenBalanceLog, TokenLiqBankruptcyLog, WithdrawLoanLog,
 };
 
 pub fn token_liq_bankruptcy(
@@ -59,7 +58,18 @@ pub fn token_liq_bankruptcy(
     let liab_borrow_index = liab_bank.borrow_index;
     let (liqee_liab, liqee_raw_token_index) = liqee.token_position_mut(liab_token_index)?;
     let initial_liab_native = liqee_liab.native(liab_bank);
-    let mut remaining_liab_loss = -initial_liab_native;
+
+    let liqee_health_token_balances =
+        liqee_health_cache.effective_token_balances(HealthType::LiquidationEnd);
+    let liqee_liab_health_balance = liqee_health_token_balances
+        [liqee_health_cache.token_info_index(liab_token_index)?]
+    .spot_and_perp;
+
+    // Allow token bankruptcy only while the spot position and health token position are both negative.
+    // In particular, a very negative perp hupnl does not allow token bankruptcy to happen,
+    // and if the perp hupnl is positive, we need to liquidate that before dealing with token
+    // bankruptcy!
+    let mut remaining_liab_loss = (-initial_liab_native).min(-liqee_liab_health_balance);
     require_gt!(remaining_liab_loss, I80F48::ZERO);
 
     // We pay for the liab token in quote. Example: SOL is at $20 and USDC is at $2, then for a liab
@@ -100,7 +110,8 @@ pub fn token_liq_bankruptcy(
         // liqee gets liab assets (enable dusting to prevent a case where the position is brought
         // to +I80F48::DELTA)
         liqee_liab_active = liab_bank.deposit_with_dusting(liqee_liab, liab_transfer, now_ts)?;
-        remaining_liab_loss = -liqee_liab.native(liab_bank);
+        // update correctly even if dusting happened
+        remaining_liab_loss -= liqee_liab.native(liab_bank) - initial_liab_native;
 
         // move insurance assets into quote bank
         let group_seeds = group_seeds!(group);
@@ -137,7 +148,7 @@ pub fn token_liq_bankruptcy(
             // transfer liab from liqee to liqor
             let (liqor_liab, liqor_liab_raw_token_index, _) =
                 liqor.ensure_token_position(liab_token_index)?;
-            let (liqor_liab_active, loan_origination_fee) =
+            let liqor_liab_withdraw_result =
                 liab_bank.withdraw_with_fee(liqor_liab, liab_transfer, now_ts)?;
 
             // liqor liab
@@ -157,13 +168,18 @@ pub fn token_liq_bankruptcy(
                 require!(liqor_health >= 0, MangoError::HealthMustBePositive);
             }
 
-            if loan_origination_fee.is_positive() {
-                emit!(WithdrawLoanOriginationFeeLog {
+            if liqor_liab_withdraw_result
+                .loan_origination_fee
+                .is_positive()
+            {
+                emit!(WithdrawLoanLog {
                     mango_group: ctx.accounts.group.key(),
                     mango_account: ctx.accounts.liqor.key(),
                     token_index: liab_token_index,
-                    loan_origination_fee: loan_origination_fee.to_bits(),
-                    instruction: LoanOriginationFeeInstruction::LiqTokenBankruptcy
+                    loan_amount: liqor_liab_withdraw_result.loan_amount.to_bits(),
+                    loan_origination_fee: liqor_liab_withdraw_result.loan_origination_fee.to_bits(),
+                    instruction: LoanOriginationFeeInstruction::LiqTokenBankruptcy,
+                    price: Some(liab_oracle_price.to_bits())
                 });
             }
 
@@ -173,7 +189,7 @@ pub fn token_liq_bankruptcy(
                     ctx.accounts.liqor.key(),
                 );
             }
-            if !liqor_liab_active {
+            if !liqor_liab_withdraw_result.position_is_active {
                 liqor.deactivate_token_position_and_log(
                     liqor_liab_raw_token_index,
                     ctx.accounts.liqor.key(),

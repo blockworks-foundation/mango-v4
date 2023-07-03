@@ -40,6 +40,11 @@ export interface BankForHealth {
 
   scaledInitAssetWeight(price: I80F48): I80F48;
   scaledInitLiabWeight(price: I80F48): I80F48;
+  nativeDeposits(): I80F48;
+  nativeBorrows(): I80F48;
+
+  depositWeightScaleStartQuote: number;
+  borrowWeightScaleStartQuote: number;
 }
 
 export class Bank implements BankForHealth {

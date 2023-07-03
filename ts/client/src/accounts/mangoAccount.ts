@@ -317,9 +317,12 @@ export class MangoAccount {
     return hc.health(healthType);
   }
 
-  public getPerpSettleHealth(group: Group): I80F48 {
+  public perpMaxSettle(
+    group: Group,
+    perpMarketSettleTokenIndex: TokenIndex,
+  ): I80F48 {
     const hc = HealthCache.fromMangoAccount(group, this);
-    return hc.perpSettleHealth();
+    return hc.perpMaxSettle(perpMarketSettleTokenIndex);
   }
 
   /**
@@ -361,15 +364,9 @@ export class MangoAccount {
         .get(baseBank.tokenIndex)!
         .iadd(I80F48.fromI64(oo.baseTokenTotal).mul(baseBank.price));
       const quoteBank = group.getFirstBankByTokenIndex(sp.quoteTokenIndex);
-      // NOTE: referrerRebatesAccrued is not declared on oo class, but the layout
-      // is aware of it
       tokensMap
         .get(baseBank.tokenIndex)!
-        .iadd(
-          I80F48.fromI64(
-            oo.quoteTokenTotal.add((oo as any).referrerRebatesAccrued),
-          ).mul(quoteBank.price),
-        );
+        .iadd(I80F48.fromI64(oo.quoteTokenTotal).mul(quoteBank.price));
     }
 
     const tokenEquity = Array.from(tokensMap.values()).reduce(
@@ -398,18 +395,18 @@ export class MangoAccount {
    * Sum of all positive assets.
    * @returns assets, in native quote
    */
-  public getAssetsValue(group: Group, healthType?: HealthType): I80F48 {
+  public getAssetsValue(group: Group): I80F48 {
     const hc = HealthCache.fromMangoAccount(group, this);
-    return hc.assets(healthType);
+    return hc.healthAssetsAndLiabs(undefined, false).assets;
   }
 
   /**
    * Sum of all negative assets.
    * @returns liabs, in native quote
    */
-  public getLiabsValue(group: Group, healthType?: HealthType): I80F48 {
+  public getLiabsValue(group: Group): I80F48 {
     const hc = HealthCache.fromMangoAccount(group, this);
-    return hc.liabs(healthType);
+    return hc.healthAssetsAndLiabs(undefined, false).liabs;
   }
 
   /**
@@ -466,6 +463,7 @@ export class MangoAccount {
    * @returns amount of given native token you can borrow, considering all existing assets as collateral, in native token
    *
    * TODO: take into account net_borrow_limit and min_vault_to_deposits_ratio
+   * TODO: see max_borrow_for_health_fn
    */
   public getMaxWithdrawWithBorrowForToken(
     group: Group,
@@ -1582,13 +1580,16 @@ export class PerpPosition {
       throw new Error("PerpPosition doesn't belong to the given market!");
     }
     this.updateSettleLimit(perpMarket);
-    const perpSettleHealth = account.getPerpSettleHealth(group);
+    const perpMaxSettle = account.perpMaxSettle(
+      group,
+      perpMarket.settleTokenIndex,
+    );
     const limitedUnsettled = this.applyPnlSettleLimit(
       this.getUnsettledPnl(perpMarket),
       perpMarket,
     );
     if (limitedUnsettled.lt(ZERO_I80F48())) {
-      return limitedUnsettled.max(perpSettleHealth.max(ZERO_I80F48()).neg());
+      return limitedUnsettled.max(perpMaxSettle.max(ZERO_I80F48()).neg());
     }
     return limitedUnsettled;
   }

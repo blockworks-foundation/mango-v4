@@ -1,6 +1,7 @@
 import { AnchorProvider, Wallet } from '@coral-xyz/anchor';
 import {
   AddressLookupTableProgram,
+  Cluster,
   Connection,
   Keypair,
   PublicKey,
@@ -16,33 +17,38 @@ import { MANGO_V4_ID } from '../../src/constants';
 
 // default to group 1, to not conflict with the normal group
 const GROUP_NUM = Number(process.env.GROUP_NUM || 200);
+const CLUSTER = process.env.CLUSTER || 'mainnet-beta';
+const MINTS = JSON.parse(process.env.MINTS || '').map((s) => new PublicKey(s));
+const SERUM_MARKETS = JSON.parse(process.env.SERUM_MARKETS || '').map(
+  (s) => new PublicKey(s),
+);
 
 const MAINNET_MINTS = new Map([
-  ['USDC', 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v'],
-  ['ETH', '7vfCXTUXx5WJV5JADk17DUJ4ksgau7utNKj4b963voxs'],
-  ['SOL', 'So11111111111111111111111111111111111111112'],
-  ['MNGO', 'MangoCzJ36AjZyKwVj3VnYU4GTonjfVEnJmvvWaxLac'],
+  ['USDC', MINTS[0]],
+  ['ETH', MINTS[1]],
+  ['SOL', MINTS[2]],
+  ['MNGO', MINTS[3]],
 ]);
 
 const STUB_PRICES = new Map([
   ['USDC', 1.0],
   ['ETH', 1200.0], // eth and usdc both have 6 decimals
   ['SOL', 0.015], // sol has 9 decimals, equivalent to $15 per SOL
-  ['MNGO', 0.02], // same price/decimals as SOL for convenience
+  ['MNGO', 0.02],
 ]);
 
 // External markets are matched with those in https://github.com/blockworks-foundation/mango-client-v3/blob/main/src/ids.json
 // and verified to have best liquidity for pair on https://openserum.io/
 const MAINNET_SERUM3_MARKETS = new Map([
-  ['ETH/USDC', 'FZxi3yWkE5mMjyaZj6utmYL54QQYfMCKMcLaQZq4UwnA'],
-  ['SOL/USDC', '8BnEgHoWFysVcuFFX7QztDmzuH8r5ZFvyP3sYwn1XTh6'],
+  ['ETH/USDC', SERUM_MARKETS[0]],
+  ['SOL/USDC', SERUM_MARKETS[1]],
 ]);
 
 const MIN_VAULT_TO_DEPOSITS_RATIO = 0.2;
 const NET_BORROWS_WINDOW_SIZE_TS = 24 * 60 * 60;
 const NET_BORROWS_LIMIT_NATIVE = 1 * Math.pow(10, 7) * Math.pow(10, 6);
 
-async function main() {
+async function main(): Promise<void> {
   const options = AnchorProvider.defaultOptions();
   options.commitment = 'processed';
   options.preflightCommitment = 'finalized';
@@ -50,9 +56,7 @@ async function main() {
 
   const admin = Keypair.fromSecretKey(
     Buffer.from(
-      JSON.parse(
-        fs.readFileSync(process.env.MANGO_MAINNET_PAYER_KEYPAIR!, 'utf-8'),
-      ),
+      JSON.parse(fs.readFileSync(process.env.PAYER_KEYPAIR!, 'utf-8')),
     ),
   );
   const adminWallet = new Wallet(admin);
@@ -60,8 +64,8 @@ async function main() {
   const adminProvider = new AnchorProvider(connection, adminWallet, options);
   const client = await MangoClient.connect(
     adminProvider,
-    'mainnet-beta',
-    MANGO_V4_ID['mainnet-beta'],
+    CLUSTER as Cluster,
+    MANGO_V4_ID[CLUSTER],
     {
       idsSource: 'get-program-accounts',
       prioritizationFee: 100,
@@ -81,8 +85,8 @@ async function main() {
   console.log(`...registered group ${group.publicKey}`);
 
   // stub oracles
-  let oracles = new Map();
-  for (let [name, mint] of MAINNET_MINTS) {
+  const oracles = new Map();
+  for (const [name, mint] of MAINNET_MINTS) {
     console.log(`Creating stub oracle for ${name}...`);
     const mintPk = new PublicKey(mint);
     try {
@@ -111,13 +115,13 @@ async function main() {
 
   // register token 0
   console.log(`Registering USDC...`);
-  const usdcMainnetMint = new PublicKey(MAINNET_MINTS.get('USDC')!);
-  const usdcMainnetOracle = oracles.get('USDC');
+  const usdcMint = new PublicKey(MAINNET_MINTS.get('USDC')!);
+  const usdcOracle = oracles.get('USDC');
   try {
     await client.tokenRegister(
       group,
-      usdcMainnetMint,
-      usdcMainnetOracle,
+      usdcMint,
+      usdcOracle,
       defaultOracleConfig,
       0,
       'USDC',
@@ -140,13 +144,13 @@ async function main() {
 
   // register token 1
   console.log(`Registering ETH...`);
-  const ethMainnetMint = new PublicKey(MAINNET_MINTS.get('ETH')!);
-  const ethMainnetOracle = oracles.get('ETH');
+  const ethMint = new PublicKey(MAINNET_MINTS.get('ETH')!);
+  const ethOracle = oracles.get('ETH');
   try {
     await client.tokenRegister(
       group,
-      ethMainnetMint,
-      ethMainnetOracle,
+      ethMint,
+      ethOracle,
       defaultOracleConfig,
       1,
       'ETH',
@@ -169,13 +173,13 @@ async function main() {
 
   // register token 2
   console.log(`Registering SOL...`);
-  const solMainnetMint = new PublicKey(MAINNET_MINTS.get('SOL')!);
-  const solMainnetOracle = oracles.get('SOL');
+  const solMint = new PublicKey(MAINNET_MINTS.get('SOL')!);
+  const solOracle = oracles.get('SOL');
   try {
     await client.tokenRegister(
       group,
-      solMainnetMint,
-      solMainnetOracle,
+      solMint,
+      solOracle,
       defaultOracleConfig,
       2, // tokenIndex
       'SOL',
@@ -216,11 +220,11 @@ async function main() {
   }
 
   console.log('Registering MNGO-PERP market...');
-  const mngoMainnetOracle = oracles.get('MNGO');
+  const mngoOracle = oracles.get('MNGO');
   try {
     await client.perpCreateMarket(
       group,
-      mngoMainnetOracle,
+      mngoOracle,
       0,
       'MNGO-PERP',
       defaultOracleConfig,
@@ -260,7 +264,10 @@ async function main() {
 
 main();
 
-async function createAndPopulateAlt(client: MangoClient, admin: Keypair) {
+async function createAndPopulateAlt(
+  client: MangoClient,
+  admin: Keypair,
+): Promise<void> {
   let group = await client.getGroupForCreator(admin.publicKey, GROUP_NUM);
 
   const connection = client.program.provider.connection;
@@ -289,9 +296,35 @@ async function createAndPopulateAlt(client: MangoClient, admin: Keypair) {
     }
   }
 
+  async function extendTable(addresses: PublicKey[]): Promise<void> {
+    await group.reloadAll(client);
+    const alt = await client.program.provider.connection.getAddressLookupTable(
+      group.addressLookupTables[0],
+    );
+
+    addresses = addresses.filter(
+      (newAddress) =>
+        alt.value?.state.addresses &&
+        alt.value?.state.addresses.findIndex((addressInALt) =>
+          addressInALt.equals(newAddress),
+        ) === -1,
+    );
+    if (addresses.length === 0) {
+      return;
+    }
+    const extendIx = AddressLookupTableProgram.extendLookupTable({
+      lookupTable: group.addressLookupTables[0],
+      payer: admin.publicKey,
+      authority: admin.publicKey,
+      addresses,
+    });
+    const sig = await client.sendAndConfirmTransaction([extendIx]);
+    console.log(`https://explorer.solana.com/tx/${sig}`);
+  }
+
   // Extend using mango v4 relevant pub keys
   try {
-    let bankAddresses = Array.from(group.banksMapByMint.values())
+    const bankAddresses = Array.from(group.banksMapByMint.values())
       .flat()
       .map((bank) => [bank.publicKey, bank.oracle, bank.vault])
       .flat()
@@ -301,13 +334,13 @@ async function createAndPopulateAlt(client: MangoClient, admin: Keypair) {
           .map((mintInfo) => mintInfo.publicKey),
       );
 
-    let serum3MarketAddresses = Array.from(
+    const serum3MarketAddresses = Array.from(
       group.serum3MarketsMapByExternal.values(),
     )
       .flat()
       .map((serum3Market) => serum3Market.publicKey);
 
-    let serum3ExternalMarketAddresses = Array.from(
+    const serum3ExternalMarketAddresses = Array.from(
       group.serum3ExternalMarketsMap.values(),
     )
       .flat()
@@ -318,7 +351,7 @@ async function createAndPopulateAlt(client: MangoClient, admin: Keypair) {
       ])
       .flat();
 
-    let perpMarketAddresses = Array.from(
+    const perpMarketAddresses = Array.from(
       group.perpMarketsMapByMarketIndex.values(),
     )
       .flat()
@@ -330,33 +363,6 @@ async function createAndPopulateAlt(client: MangoClient, admin: Keypair) {
         perpMarket.eventQueue,
       ])
       .flat();
-
-    async function extendTable(addresses: PublicKey[]) {
-      await group.reloadAll(client);
-      const alt =
-        await client.program.provider.connection.getAddressLookupTable(
-          group.addressLookupTables[0],
-        );
-
-      addresses = addresses.filter(
-        (newAddress) =>
-          alt.value?.state.addresses &&
-          alt.value?.state.addresses.findIndex((addressInALt) =>
-            addressInALt.equals(newAddress),
-          ) === -1,
-      );
-      if (addresses.length === 0) {
-        return;
-      }
-      const extendIx = AddressLookupTableProgram.extendLookupTable({
-        lookupTable: group.addressLookupTables[0],
-        payer: admin.publicKey,
-        authority: admin.publicKey,
-        addresses,
-      });
-      const sig = await client.sendAndConfirmTransaction([extendIx]);
-      console.log(`https://explorer.solana.com/tx/${sig}`);
-    }
 
     console.log(`ALT: extending using mango v4 relevant public keys`);
     await extendTable(bankAddresses);

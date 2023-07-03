@@ -1,5 +1,6 @@
 import { AnchorProvider, BN, Wallet } from '@coral-xyz/anchor';
-import { Connection, Keypair, PublicKey } from '@solana/web3.js';
+import { Cluster, Connection, Keypair, PublicKey } from '@solana/web3.js';
+import { assert } from 'console';
 import fs from 'fs';
 import { Bank } from '../../src/accounts/bank';
 import { MangoAccount } from '../../src/accounts/mangoAccount';
@@ -26,6 +27,7 @@ import { MANGO_V4_ID } from '../../src/constants';
 //
 
 const GROUP_NUM = Number(process.env.GROUP_NUM || 200);
+const CLUSTER = process.env.CLUSTER || 'mainnet-beta';
 
 // native prices
 const PRICES = {
@@ -63,17 +65,15 @@ async function main() {
 
   const admin = Keypair.fromSecretKey(
     Buffer.from(
-      JSON.parse(
-        fs.readFileSync(process.env.MANGO_MAINNET_PAYER_KEYPAIR!, 'utf-8'),
-      ),
+      JSON.parse(fs.readFileSync(process.env.PAYER_KEYPAIR!, 'utf-8')),
     ),
   );
   const userWallet = new Wallet(admin);
   const userProvider = new AnchorProvider(connection, userWallet, options);
   const client = await MangoClient.connect(
     userProvider,
-    'mainnet-beta',
-    MANGO_V4_ID['mainnet-beta'],
+    CLUSTER as Cluster,
+    MANGO_V4_ID[CLUSTER],
     {
       idsSource: 'get-program-accounts',
       prioritizationFee: 100,
@@ -136,12 +136,12 @@ async function main() {
 
     // create account
     console.log(`Creating mangoaccount...`);
-    let mangoAccount = await createMangoAccount(name);
+    const mangoAccount = await createMangoAccount(name);
     console.log(
       `...created mangoAccount ${mangoAccount.publicKey} for ${name}`,
     );
 
-    for (let [assetName, assetAmount] of assets) {
+    for (const [assetName, assetAmount] of assets) {
       const assetMint = new PublicKey(MAINNET_MINTS.get(assetName)!);
       await client.tokenDepositNative(
         group,
@@ -152,7 +152,7 @@ async function main() {
       await mangoAccount.reload(client);
     }
 
-    for (let [liabName, liabAmount] of liabs) {
+    for (const [liabName, liabAmount] of liabs) {
       const liabMint = new PublicKey(MAINNET_MINTS.get(liabName)!);
 
       // temporarily drop the borrowed token value, so the borrow goes through
@@ -190,7 +190,7 @@ async function main() {
     const name = 'LIQTEST, serum orders';
 
     console.log(`Creating mangoaccount...`);
-    let mangoAccount = await createMangoAccount(name);
+    const mangoAccount = await createMangoAccount(name);
     console.log(
       `...created mangoAccount ${mangoAccount.publicKey} for ${name}`,
     );
@@ -251,7 +251,7 @@ async function main() {
     const name = 'LIQTEST, perp orders';
 
     console.log(`Creating mangoaccount...`);
-    let mangoAccount = await createMangoAccount(name);
+    const mangoAccount = await createMangoAccount(name);
     console.log(
       `...created mangoAccount ${mangoAccount.publicKey} for ${name}`,
     );
@@ -274,7 +274,9 @@ async function main() {
       await client.perpPlaceOrder(
         group,
         mangoAccount,
-        group.perpMarketsMapByName.get('MNGO-PERP')?.perpMarketIndex!,
+        assertNotUndefined(
+          group.perpMarketsMapByName.get('MNGO-PERP')?.perpMarketIndex,
+        ),
         PerpOrderSide.bid,
         0.001, // ui price that won't get hit
         3.0, // ui base quantity, 30 base lots, 3.0 MNGO, $0.06
@@ -295,7 +297,7 @@ async function main() {
     const name = 'LIQTEST, perp base pos';
 
     console.log(`Creating mangoaccount...`);
-    let mangoAccount = await createMangoAccount(name);
+    const mangoAccount = await createMangoAccount(name);
     console.log(
       `...created mangoAccount ${mangoAccount.publicKey} for ${name}`,
     );
@@ -317,7 +319,9 @@ async function main() {
       await client.perpPlaceOrder(
         group,
         fundingAccount,
-        group.perpMarketsMapByName.get('MNGO-PERP')?.perpMarketIndex!,
+        assertNotUndefined(
+          group.perpMarketsMapByName.get('MNGO-PERP')?.perpMarketIndex,
+        ),
         PerpOrderSide.ask,
         0.03,
         1.1, // ui base quantity, 11 base lots, $0.022 value, gain $0.033
@@ -332,7 +336,9 @@ async function main() {
       await client.perpPlaceOrder(
         group,
         mangoAccount,
-        group.perpMarketsMapByName.get('MNGO-PERP')?.perpMarketIndex!,
+        assertNotUndefined(
+          group.perpMarketsMapByName.get('MNGO-PERP')?.perpMarketIndex,
+        ),
         PerpOrderSide.bid,
         0.03,
         1.1, // ui base quantity, 11 base lots, $0.022 value, cost $0.033
@@ -346,7 +352,9 @@ async function main() {
 
       await client.perpConsumeAllEvents(
         group,
-        group.perpMarketsMapByName.get('MNGO-PERP')?.perpMarketIndex!,
+        assertNotUndefined(
+          group.perpMarketsMapByName.get('MNGO-PERP')?.perpMarketIndex,
+        ),
       );
     } finally {
       await setBankPrice(collateralBank, PRICES['SOL']);
@@ -358,7 +366,7 @@ async function main() {
     const name = 'LIQTEST, perp positive pnl';
 
     console.log(`Creating mangoaccount...`);
-    let mangoAccount = await createMangoAccount(name);
+    const mangoAccount = await createMangoAccount(name);
     console.log(
       `...created mangoAccount ${mangoAccount.publicKey} for ${name}`,
     );
@@ -464,7 +472,7 @@ async function main() {
     const name = 'LIQTEST, perp negative pnl';
 
     console.log(`Creating mangoaccount...`);
-    let mangoAccount = await createMangoAccount(name);
+    const mangoAccount = await createMangoAccount(name);
     console.log(
       `...created mangoAccount ${mangoAccount.publicKey} for ${name}`,
     );
@@ -556,6 +564,13 @@ async function main() {
   }
 
   process.exit();
+}
+
+function assertNotUndefined<T>(value: T | undefined): T {
+  if (value === undefined) {
+    throw new Error('Value was undefined');
+  }
+  return value;
 }
 
 main();
