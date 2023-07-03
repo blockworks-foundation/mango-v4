@@ -3,10 +3,7 @@ import { Cluster, Connection, Keypair, PublicKey } from '@solana/web3.js';
 import { assert } from 'console';
 import fs from 'fs';
 import { Bank } from '../../src/accounts/bank';
-import {
-  MangoAccount,
-  TokenConditionalSwapPriceThresholdType,
-} from '../../src/accounts/mangoAccount';
+import { MangoAccount } from '../../src/accounts/mangoAccount';
 import {
   PerpMarket,
   PerpOrderSide,
@@ -193,9 +190,8 @@ async function main() {
       20000, // liqee only has 1k USDC-native, leverage does not go that far!
       null,
       0.0,
-      TokenConditionalSwapPriceThresholdType.priceOverThreshold,
-      100,
       1000000.0,
+      0.01,
       true,
       true,
     );
@@ -216,9 +212,8 @@ async function main() {
       1000,
       null,
       0.0,
-      TokenConditionalSwapPriceThresholdType.priceOverThreshold,
-      100,
       1000000.0,
+      0.01,
       true,
       true,
     );
@@ -239,9 +234,8 @@ async function main() {
       1000,
       Date.now() / 1000 + 15, // expire in 15s
       0.0,
-      TokenConditionalSwapPriceThresholdType.priceOverThreshold,
-      100,
       1000000.0,
+      0.01,
       true,
       true,
     );
