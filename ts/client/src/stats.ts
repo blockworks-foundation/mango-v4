@@ -1,6 +1,7 @@
 import { PublicKey } from '@solana/web3.js';
 import { Group } from './accounts/group';
 import { PerpPosition } from './accounts/mangoAccount';
+import { PerpMarket } from './accounts/perp';
 import { MangoClient } from './client';
 import { I80F48 } from './numbers/I80F48';
 
@@ -13,10 +14,11 @@ import { I80F48 } from './numbers/I80F48';
 export async function getLargestPerpPositions(
   client: MangoClient,
   group: Group,
+  perpMarket?: PerpMarket,
 ): Promise<{ mangoAccount: PublicKey; perpPosition: PerpPosition }[]> {
   const accounts = await client.getAllMangoAccounts(group, true);
 
-  const allPps = accounts
+  let allPps = accounts
     .map((a) => {
       const pps = a.perpActive().map((pp) => {
         pp['mangoAccount'] = a.publicKey;
@@ -25,6 +27,12 @@ export async function getLargestPerpPositions(
       return pps;
     })
     .flat();
+
+  if (perpMarket) {
+    allPps = allPps.filter(
+      (pp) => pp.marketIndex == perpMarket?.perpMarketIndex,
+    );
+  }
 
   allPps.sort(
     (a, b) =>
