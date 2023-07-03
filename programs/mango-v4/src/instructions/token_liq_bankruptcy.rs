@@ -69,8 +69,10 @@ pub fn token_liq_bankruptcy(
     // In particular, a very negative perp hupnl does not allow token bankruptcy to happen,
     // and if the perp hupnl is positive, we need to liquidate that before dealing with token
     // bankruptcy!
+    require_gt!(I80F48::ZERO, initial_liab_native);
+    require_gt!(I80F48::ZERO, liqee_liab_health_balance);
+    // guaranteed positive
     let mut remaining_liab_loss = (-initial_liab_native).min(-liqee_liab_health_balance);
-    require_gt!(remaining_liab_loss, I80F48::ZERO);
 
     // We pay for the liab token in quote. Example: SOL is at $20 and USDC is at $2, then for a liab
     // of 3 SOL, we'd pay 3 * 20 / 2 * (1+fee) = 30 * (1+fee) USDC.
