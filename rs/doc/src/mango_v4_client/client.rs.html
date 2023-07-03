@@ -1814,6 +1814,92 @@
 <span id="1814">1814</span>
 <span id="1815">1815</span>
 <span id="1816">1816</span>
+<span id="1817">1817</span>
+<span id="1818">1818</span>
+<span id="1819">1819</span>
+<span id="1820">1820</span>
+<span id="1821">1821</span>
+<span id="1822">1822</span>
+<span id="1823">1823</span>
+<span id="1824">1824</span>
+<span id="1825">1825</span>
+<span id="1826">1826</span>
+<span id="1827">1827</span>
+<span id="1828">1828</span>
+<span id="1829">1829</span>
+<span id="1830">1830</span>
+<span id="1831">1831</span>
+<span id="1832">1832</span>
+<span id="1833">1833</span>
+<span id="1834">1834</span>
+<span id="1835">1835</span>
+<span id="1836">1836</span>
+<span id="1837">1837</span>
+<span id="1838">1838</span>
+<span id="1839">1839</span>
+<span id="1840">1840</span>
+<span id="1841">1841</span>
+<span id="1842">1842</span>
+<span id="1843">1843</span>
+<span id="1844">1844</span>
+<span id="1845">1845</span>
+<span id="1846">1846</span>
+<span id="1847">1847</span>
+<span id="1848">1848</span>
+<span id="1849">1849</span>
+<span id="1850">1850</span>
+<span id="1851">1851</span>
+<span id="1852">1852</span>
+<span id="1853">1853</span>
+<span id="1854">1854</span>
+<span id="1855">1855</span>
+<span id="1856">1856</span>
+<span id="1857">1857</span>
+<span id="1858">1858</span>
+<span id="1859">1859</span>
+<span id="1860">1860</span>
+<span id="1861">1861</span>
+<span id="1862">1862</span>
+<span id="1863">1863</span>
+<span id="1864">1864</span>
+<span id="1865">1865</span>
+<span id="1866">1866</span>
+<span id="1867">1867</span>
+<span id="1868">1868</span>
+<span id="1869">1869</span>
+<span id="1870">1870</span>
+<span id="1871">1871</span>
+<span id="1872">1872</span>
+<span id="1873">1873</span>
+<span id="1874">1874</span>
+<span id="1875">1875</span>
+<span id="1876">1876</span>
+<span id="1877">1877</span>
+<span id="1878">1878</span>
+<span id="1879">1879</span>
+<span id="1880">1880</span>
+<span id="1881">1881</span>
+<span id="1882">1882</span>
+<span id="1883">1883</span>
+<span id="1884">1884</span>
+<span id="1885">1885</span>
+<span id="1886">1886</span>
+<span id="1887">1887</span>
+<span id="1888">1888</span>
+<span id="1889">1889</span>
+<span id="1890">1890</span>
+<span id="1891">1891</span>
+<span id="1892">1892</span>
+<span id="1893">1893</span>
+<span id="1894">1894</span>
+<span id="1895">1895</span>
+<span id="1896">1896</span>
+<span id="1897">1897</span>
+<span id="1898">1898</span>
+<span id="1899">1899</span>
+<span id="1900">1900</span>
+<span id="1901">1901</span>
+<span id="1902">1902</span>
 </pre><pre class="rust"><code><span class="kw">use </span>std::str::FromStr;
 <span class="kw">use </span>std::sync::Arc;
 <span class="kw">use </span>std::time::Duration;
@@ -1832,6 +1918,7 @@
 <span class="kw">use </span>itertools::Itertools;
 
 <span class="kw">use </span>mango_v4::accounts_ix::{Serum3OrderType, Serum3SelfTradeBehavior, Serum3Side};
+<span class="kw">use </span>mango_v4::accounts_zerocopy::KeyedAccountSharedData;
 <span class="kw">use </span>mango_v4::state::{
     Bank, Group, MangoAccountValue, PerpMarketIndex, PlaceOrderType, SelfTradeBehavior,
     Serum3MarketIndex, Side, TokenIndex, INSURANCE_TOKEN_INDEX,
@@ -2228,7 +2315,38 @@
         <span class="self">self</span>.send_and_confirm_owner_tx(ixs).<span class="kw">await
     </span>}
 
-    <span class="kw">pub async fn </span>get_oracle_price(
+    <span class="kw">pub async fn </span>bank_oracle_price(<span class="kw-2">&amp;</span><span class="self">self</span>, token_index: TokenIndex) -&gt; anyhow::Result&lt;I80F48&gt; {
+        <span class="kw">let </span>bank = <span class="self">self</span>.first_bank(token_index).<span class="kw">await</span><span class="question-mark">?</span>;
+        <span class="kw">let </span>mint_info = <span class="self">self</span>.context.mint_info(token_index);
+        <span class="kw">let </span>oracle = <span class="self">self
+            </span>.account_fetcher
+            .fetch_raw_account(<span class="kw-2">&amp;</span>mint_info.oracle)
+            .<span class="kw">await</span><span class="question-mark">?</span>;
+        <span class="kw">let </span>price = bank.oracle_price(
+            <span class="kw-2">&amp;</span>KeyedAccountSharedData::new(mint_info.oracle, oracle.into()),
+            <span class="prelude-val">None</span>,
+        )<span class="question-mark">?</span>;
+        <span class="prelude-val">Ok</span>(price)
+    }
+
+    <span class="kw">pub async fn </span>perp_oracle_price(
+        <span class="kw-2">&amp;</span><span class="self">self</span>,
+        perp_market_index: PerpMarketIndex,
+    ) -&gt; anyhow::Result&lt;I80F48&gt; {
+        <span class="kw">let </span>perp = <span class="self">self</span>.context.perp(perp_market_index);
+        <span class="kw">let </span>oracle = <span class="self">self
+            </span>.account_fetcher
+            .fetch_raw_account(<span class="kw-2">&amp;</span>perp.market.oracle)
+            .<span class="kw">await</span><span class="question-mark">?</span>;
+        <span class="kw">let </span>price = perp.market.oracle_price(
+            <span class="kw-2">&amp;</span>KeyedAccountSharedData::new(perp.market.oracle, oracle.into()),
+            <span class="prelude-val">None</span>,
+        )<span class="question-mark">?</span>;
+        <span class="prelude-val">Ok</span>(price)
+    }
+
+    <span class="doccomment">/// returns ui price?! pyth only!
+    </span><span class="kw">pub async fn </span>get_oracle_price_deprecated(
         <span class="kw-2">&amp;</span><span class="self">self</span>,
         token_name: <span class="kw-2">&amp;</span>str,
     ) -&gt; <span class="prelude-ty">Result</span>&lt;pyth_sdk_solana::Price, anyhow::Error&gt; {
@@ -3049,6 +3167,53 @@
         <span class="self">self</span>.send_and_confirm_owner_tx(<span class="macro">vec!</span>[ix]).<span class="kw">await
     </span>}
 
+    <span class="kw">pub async fn </span>token_conditional_swap_trigger(
+        <span class="kw-2">&amp;</span><span class="self">self</span>,
+        liqee: (<span class="kw-2">&amp;</span>Pubkey, <span class="kw-2">&amp;</span>MangoAccountValue),
+        token_conditional_swap_id: u64,
+        max_buy_token_to_liqee: u64,
+        max_sell_token_to_liqor: u64,
+    ) -&gt; anyhow::Result&lt;Signature&gt; {
+        <span class="kw">let </span>(tcs_index, tcs) = liqee
+            .<span class="number">1
+            </span>.token_conditional_swap_by_id(token_conditional_swap_id)<span class="question-mark">?</span>;
+
+        <span class="kw">let </span>health_remaining_ams = <span class="self">self
+            </span>.derive_liquidation_health_check_remaining_account_metas(
+                liqee.<span class="number">1</span>,
+                <span class="macro">vec!</span>[tcs.buy_token_index, tcs.sell_token_index],
+                <span class="kw-2">&amp;</span>[tcs.buy_token_index, tcs.sell_token_index],
+            )
+            .<span class="kw">await
+            </span>.unwrap();
+
+        <span class="kw">let </span>ix = Instruction {
+            program_id: mango_v4::id(),
+            accounts: {
+                <span class="kw">let </span><span class="kw-2">mut </span>ams = anchor_lang::ToAccountMetas::to_account_metas(
+                    <span class="kw-2">&amp;</span>mango_v4::accounts::TokenConditionalSwapTrigger {
+                        group: <span class="self">self</span>.group(),
+                        liqee: <span class="kw-2">*</span>liqee.<span class="number">0</span>,
+                        liqor: <span class="self">self</span>.mango_account_address,
+                        liqor_authority: <span class="self">self</span>.owner(),
+                    },
+                    <span class="prelude-val">None</span>,
+                );
+                ams.extend(health_remaining_ams);
+                ams
+            },
+            data: anchor_lang::InstructionData::data(
+                <span class="kw-2">&amp;</span>mango_v4::instruction::TokenConditionalSwapTrigger {
+                    token_conditional_swap_id,
+                    token_conditional_swap_index: tcs_index.try_into().unwrap(),
+                    max_buy_token_to_liqee,
+                    max_sell_token_to_liqor,
+                },
+            ),
+        };
+        <span class="self">self</span>.send_and_confirm_owner_tx(<span class="macro">vec!</span>[ix]).<span class="kw">await
+    </span>}
+
     <span class="comment">// health region
 
     </span><span class="kw">pub fn </span>health_region_begin_instruction(
@@ -3119,7 +3284,22 @@
 
     <span class="comment">// jupiter
 
-    </span><span class="kw">pub async fn </span>jupiter_route(
+    </span><span class="kw">async fn </span>http_error_handling&lt;T: serde::de::DeserializeOwned&gt;(
+        response: reqwest::Response,
+    ) -&gt; anyhow::Result&lt;T&gt; {
+        <span class="kw">let </span>status = response.status();
+        <span class="kw">let </span>response_text = response
+            .text()
+            .<span class="kw">await
+            </span>.context(<span class="string">&quot;awaiting body of quote request to jupiter&quot;</span>)<span class="question-mark">?</span>;
+        <span class="kw">if </span>!status.is_success() {
+            <span class="macro">anyhow::bail!</span>(<span class="string">&quot;request failed, status: {status}, body: {response_text}&quot;</span>);
+        }
+        serde_json::from_str::&lt;T&gt;(<span class="kw-2">&amp;</span>response_text)
+            .with_context(|| <span class="macro">format!</span>(<span class="string">&quot;response has unexpected format, body: {response_text}&quot;</span>))
+    }
+
+    <span class="kw">pub async fn </span>jupiter_route(
         <span class="kw-2">&amp;</span><span class="self">self</span>,
         input_mint: Pubkey,
         output_mint: Pubkey,
@@ -3127,7 +3307,7 @@
         slippage: u64,
         swap_mode: JupiterSwapMode,
     ) -&gt; anyhow::Result&lt;jupiter::QueryRoute&gt; {
-        <span class="kw">let </span>quote = <span class="self">self
+        <span class="kw">let </span>response = <span class="self">self
             </span>.http_client
             .get(<span class="string">&quot;https://quote-api.jup.ag/v4/quote&quot;</span>)
             .query(<span class="kw-2">&amp;</span>[
@@ -3149,27 +3329,18 @@
             ])
             .send()
             .<span class="kw">await
-            </span>.context(<span class="string">&quot;quote request to jupiter&quot;</span>)<span class="question-mark">?
-            </span>.json::&lt;jupiter::QueryResult&gt;()
-            .<span class="kw">await
-            </span>.context(<span class="string">&quot;receiving json response from jupiter quote request&quot;</span>)<span class="question-mark">?</span>;
-
-        <span class="comment">// Find the top route that doesn&#39;t involve Raydium (that has too many accounts)
-        </span><span class="kw">let </span>route = quote
-            .data
-            .iter()
-            .find(|route| {
-                !route
-                    .market_infos
-                    .iter()
-                    .any(|mi| mi.label.contains(<span class="string">&quot;Raydium&quot;</span>))
-            })
-            .ok_or_else(|| {
-                <span class="macro">anyhow::anyhow!</span>(
-                    <span class="string">&quot;no route for swap. found {} routes, but none were usable&quot;</span>,
-                    quote.data.len()
-                )
+            </span>.context(<span class="string">&quot;quote request to jupiter&quot;</span>)<span class="question-mark">?</span>;
+        <span class="kw">let </span>quote: jupiter::QueryResult =
+            <span class="self">Self</span>::http_error_handling(response).<span class="kw">await</span>.with_context(|| {
+                <span class="macro">format!</span>(<span class="string">&quot;error requesting jupiter route between {input_mint} and {output_mint}&quot;</span>)
             })<span class="question-mark">?</span>;
+
+        <span class="kw">let </span>route = quote.data.first().ok_or_else(|| {
+            <span class="macro">anyhow::anyhow!</span>(
+                <span class="string">&quot;no route for swap. found {} routes, but none were usable&quot;</span>,
+                quote.data.len()
+            )
+        })<span class="question-mark">?</span>;
 
         <span class="prelude-val">Ok</span>(route.clone())
     }
@@ -3188,7 +3359,7 @@
             </span>.jupiter_route(input_mint, output_mint, amount, slippage, swap_mode)
             .<span class="kw">await</span><span class="question-mark">?</span>;
 
-        <span class="kw">let </span>swap = <span class="self">self
+        <span class="kw">let </span>swap_response = <span class="self">self
             </span>.http_client
             .post(<span class="string">&quot;https://quote-api.jup.ag/v4/swap&quot;</span>)
             .json(<span class="kw-2">&amp;</span>jupiter::SwapRequest {
@@ -3199,10 +3370,11 @@
             </span>})
             .send()
             .<span class="kw">await
-            </span>.context(<span class="string">&quot;swap transaction request to jupiter&quot;</span>)<span class="question-mark">?
-            </span>.json::&lt;jupiter::SwapResponse&gt;()
+            </span>.context(<span class="string">&quot;swap transaction request to jupiter&quot;</span>)<span class="question-mark">?</span>;
+
+        <span class="kw">let </span>swap: jupiter::SwapResponse = <span class="self">Self</span>::http_error_handling(swap_response)
             .<span class="kw">await
-            </span>.context(<span class="string">&quot;receiving json response from jupiter swap transaction request&quot;</span>)<span class="question-mark">?</span>;
+            </span>.context(<span class="string">&quot;error requesting jupiter swap&quot;</span>)<span class="question-mark">?</span>;
 
         <span class="kw">if </span>swap.setup_transaction.is_some() || swap.cleanup_transaction.is_some() {
             <span class="macro">anyhow::bail!</span>(

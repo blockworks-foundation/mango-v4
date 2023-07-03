@@ -446,7 +446,7 @@
 }
 
 <span class="attribute">#[zero_copy]
-#[derive(AnchorDeserialize, AnchorSerialize, Debug, bytemuck::Pod)]
+#[derive(AnchorDeserialize, AnchorSerialize, Debug)]
 </span><span class="kw">pub struct </span>OracleConfig {
     <span class="kw">pub </span>conf_filter: I80F48,
     <span class="kw">pub </span>max_staleness_slots: i64,
