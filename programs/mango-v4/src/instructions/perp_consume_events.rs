@@ -5,7 +5,7 @@ use crate::error::MangoError;
 use crate::state::*;
 
 use crate::accounts_ix::*;
-use crate::logs::{emit_perp_balances, FillLogV2};
+use crate::logs::{emit_perp_balances, FillLogV3};
 
 /// Load a mango account by key from the list of account infos.
 ///
@@ -66,7 +66,9 @@ pub fn perp_consume_events(ctx: Context<PerpConsumeEvents>, limit: usize) -> Res
                 let fill: &FillEvent = cast_ref(event);
 
                 // handle self trade separately because of rust borrow checker
-                if fill.maker == fill.taker {
+                let (maker_prior_avg_entry_price, taker_prior_avg_entry_price) = if fill.maker
+                    == fill.taker
+                {
                     load_mango_account!(
                         maker_taker,
                         fill.maker,
@@ -74,6 +76,9 @@ pub fn perp_consume_events(ctx: Context<PerpConsumeEvents>, limit: usize) -> Res
                         group,
                         event_queue
                     );
+                    let prior_avg_entry_price = maker_taker
+                        .perp_position(perp_market_index)?
+                        .avg_entry_price(&perp_market);
                     maker_taker.execute_perp_maker(
                         perp_market_index,
                         &mut perp_market,
@@ -87,9 +92,17 @@ pub fn perp_consume_events(ctx: Context<PerpConsumeEvents>, limit: usize) -> Res
                         maker_taker.perp_position(perp_market_index).unwrap(),
                         &perp_market,
                     );
+                    (prior_avg_entry_price, prior_avg_entry_price)
                 } else {
                     load_mango_account!(maker, fill.maker, mango_account_ais, group, event_queue);
                     load_mango_account!(taker, fill.taker, mango_account_ais, group, event_queue);
+
+                    let maker_prior_avg_entry_price = maker
+                        .perp_position(perp_market_index)?
+                        .avg_entry_price(&perp_market);
+                    let taker_prior_avg_entry_price = taker
+                        .perp_position(perp_market_index)?
+                        .avg_entry_price(&perp_market);
 
                     maker.execute_perp_maker(perp_market_index, &mut perp_market, fill, &group)?;
                     taker.execute_perp_taker(perp_market_index, &mut perp_market, fill)?;
@@ -105,8 +118,11 @@ pub fn perp_consume_events(ctx: Context<PerpConsumeEvents>, limit: usize) -> Res
                         taker.perp_position(perp_market_index).unwrap(),
                         &perp_market,
                     );
-                }
-                emit!(FillLogV2 {
+                    (maker_prior_avg_entry_price, taker_prior_avg_entry_price)
+                };
+                let fill_quote_native = (fill.quantity * &perp_market.quote_lot_size) as f64;
+                let fill_price_native: f64 = perp_market.lot_to_native_price(fill.price).to_num();
+                emit!(FillLogV3 {
                     mango_group: group_key,
                     market_index: perp_market_index,
                     taker_side: fill.taker_side as u8,
@@ -123,6 +139,10 @@ pub fn perp_consume_events(ctx: Context<PerpConsumeEvents>, limit: usize) -> Res
                     taker_fee: fill.taker_fee,
                     price: fill.price,
                     quantity: fill.quantity,
+                    maker_closed_pnl: (fill_price_native - maker_prior_avg_entry_price)
+                        * fill_quote_native,
+                    taker_closed_pnl: (fill_price_native - taker_prior_avg_entry_price)
+                        * fill_quote_native
                 });
             }
             EventType::Out => {
