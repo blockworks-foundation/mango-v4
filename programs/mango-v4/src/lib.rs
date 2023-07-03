@@ -68,8 +68,8 @@ pub mod mango_v4 {
         buyback_fees_swap_mango_account_opt: Option<Pubkey>,
         mngo_token_index_opt: Option<TokenIndex>,
         buyback_fees_expiry_interval_opt: Option<u64>,
-        token_conditional_swap_taker_fee_bps_opt: Option<i16>,
-        token_conditional_swap_maker_fee_bps_opt: Option<i16>,
+        token_conditional_swap_taker_fee_fraction_opt: Option<f32>,
+        token_conditional_swap_maker_fee_fraction_opt: Option<f32>,
     ) -> Result<()> {
         #[cfg(feature = "enable-gpl")]
         instructions::group_edit(
@@ -85,8 +85,8 @@ pub mod mango_v4 {
             buyback_fees_swap_mango_account_opt,
             mngo_token_index_opt,
             buyback_fees_expiry_interval_opt,
-            token_conditional_swap_taker_fee_bps_opt,
-            token_conditional_swap_maker_fee_bps_opt,
+            token_conditional_swap_taker_fee_fraction_opt,
+            token_conditional_swap_maker_fee_fraction_opt,
         )?;
         Ok(())
     }
@@ -1145,7 +1145,7 @@ pub mod mango_v4 {
         expiry_timestamp: u64,
         price_lower_limit: f32,
         price_upper_limit: f32,
-        price_premium_bps: u16,
+        price_premium_fraction: f32,
         allow_creating_deposits: bool,
         allow_creating_borrows: bool,
     ) -> Result<()> {
@@ -1158,15 +1158,15 @@ pub mod mango_v4 {
             expiry_timestamp,
             price_lower_limit,
             price_upper_limit,
-            price_premium_bps,
-            taker_fee_bps: 0, // set inside
-            maker_fee_bps: 0, // set inside
+            price_premium_fraction,
+            taker_fee_fraction: 0.0, // set inside
+            maker_fee_fraction: 0.0, // set inside
             buy_token_index: ctx.accounts.buy_bank.load()?.token_index,
             sell_token_index: ctx.accounts.sell_bank.load()?.token_index,
             has_data: 1,
             allow_creating_deposits: u8::from(allow_creating_deposits),
             allow_creating_borrows: u8::from(allow_creating_borrows),
-            reserved: [0; 115],
+            reserved: [0; 109],
         };
 
         #[cfg(feature = "enable-gpl")]

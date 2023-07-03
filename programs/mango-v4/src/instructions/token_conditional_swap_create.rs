@@ -26,16 +26,16 @@ pub fn token_conditional_swap_create(
     let tcs = account.free_token_conditional_swap_mut()?;
     *tcs = token_conditional_swap;
     tcs.id = id;
-    tcs.taker_fee_bps = group.token_conditional_swap_taker_fee_bps;
-    tcs.maker_fee_bps = group.token_conditional_swap_maker_fee_bps;
+    tcs.taker_fee_fraction = group.token_conditional_swap_taker_fee_fraction;
+    tcs.maker_fee_fraction = group.token_conditional_swap_maker_fee_fraction;
     tcs.has_data = 1;
     tcs.bought = 0;
     tcs.sold = 0;
 
     require_neq!(tcs.buy_token_index, tcs.sell_token_index);
-    require_gte!(tcs.price_premium_bps, 0);
-    require_gte!(tcs.maker_fee_bps, 0);
-    require_gte!(tcs.taker_fee_bps, 0);
+    require_gte!(tcs.price_premium_fraction, 0.0);
+    require_gte!(tcs.maker_fee_fraction, 0.0);
+    require_gte!(tcs.taker_fee_fraction, 0.0);
     require_gte!(tcs.price_lower_limit, 0.0);
     require_gte!(tcs.price_upper_limit, 0.0);
 
@@ -48,9 +48,9 @@ pub fn token_conditional_swap_create(
         expiry_timestamp: tcs.expiry_timestamp,
         price_lower_limit: tcs.price_lower_limit,
         price_upper_limit: tcs.price_upper_limit,
-        price_premium_bps: tcs.price_premium_bps,
-        taker_fee_bps: tcs.taker_fee_bps,
-        maker_fee_bps: tcs.maker_fee_bps,
+        price_premium_fraction: tcs.price_premium_fraction,
+        taker_fee_fraction: tcs.taker_fee_fraction,
+        maker_fee_fraction: tcs.maker_fee_fraction,
         buy_token_index: tcs.buy_token_index,
         sell_token_index: tcs.sell_token_index,
         allow_creating_borrows: tcs.allow_creating_borrows(),

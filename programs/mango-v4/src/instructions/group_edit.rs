@@ -18,8 +18,8 @@ pub fn group_edit(
     buyback_fees_swap_mango_account_opt: Option<Pubkey>,
     mngo_token_index_opt: Option<TokenIndex>,
     buyback_fees_expiry_interval_opt: Option<u64>,
-    token_conditional_swap_taker_fee_bps_opt: Option<i16>,
-    token_conditional_swap_maker_fee_bps_opt: Option<i16>,
+    token_conditional_swap_taker_fee_fraction_opt: Option<f32>,
+    token_conditional_swap_maker_fee_fraction_opt: Option<f32>,
 ) -> Result<()> {
     let mut group = ctx.accounts.group.load_mut()?;
 
@@ -108,23 +108,23 @@ pub fn group_edit(
         group.buyback_fees_expiry_interval = buyback_fees_expiry_interval;
     }
 
-    if let Some(fees_bps) = token_conditional_swap_taker_fee_bps_opt {
+    if let Some(fee_fraction) = token_conditional_swap_taker_fee_fraction_opt {
         msg!(
-            "Token conditional swap taker fee bps old {:?}, new {:?}",
-            group.token_conditional_swap_taker_fee_bps,
-            fees_bps
+            "Token conditional swap taker fee fraction old {:?}, new {:?}",
+            group.token_conditional_swap_taker_fee_fraction,
+            fee_fraction
         );
-        require_gte!(fees_bps, 0); // values <0 are not currently supported
-        group.token_conditional_swap_taker_fee_bps = fees_bps;
+        require_gte!(fee_fraction, 0.0); // values <0 are not currently supported
+        group.token_conditional_swap_taker_fee_fraction = fee_fraction;
     }
-    if let Some(fees_bps) = token_conditional_swap_maker_fee_bps_opt {
+    if let Some(fees_fraction) = token_conditional_swap_maker_fee_fraction_opt {
         msg!(
-            "Token conditional swap maker fee bps old {:?}, new {:?}",
-            group.token_conditional_swap_maker_fee_bps,
-            fees_bps
+            "Token conditional swap maker fee fraction old {:?}, new {:?}",
+            group.token_conditional_swap_maker_fee_fraction,
+            fees_fraction
         );
-        require_gte!(fees_bps, 0); // values <0 are not currently supported
-        group.token_conditional_swap_maker_fee_bps = fees_bps;
+        require_gte!(fees_fraction, 0.0); // values <0 are not currently supported
+        group.token_conditional_swap_maker_fee_fraction = fees_fraction;
     }
 
     Ok(())

@@ -57,8 +57,8 @@ async fn test_token_conditional_swap() -> Result<(), TransportError> {
             group,
             admin,
             options: mango_v4::instruction::GroupEdit {
-                token_conditional_swap_taker_fee_bps_opt: Some(500),
-                token_conditional_swap_maker_fee_bps_opt: Some(1000),
+                token_conditional_swap_taker_fee_fraction_opt: Some(0.05),
+                token_conditional_swap_maker_fee_fraction_opt: Some(0.1),
                 ..group_edit_instruction_default()
             },
         },
@@ -80,7 +80,7 @@ async fn test_token_conditional_swap() -> Result<(), TransportError> {
             max_sell: 1000,
             price_lower_limit: 1.0,
             price_upper_limit: 10.0,
-            price_premium_bps: 100,
+            price_premium_fraction: 0.01,
             allow_creating_deposits: true,
             allow_creating_borrows: true,
         },
@@ -123,7 +123,7 @@ async fn test_token_conditional_swap() -> Result<(), TransportError> {
         max_sell: 100,
         price_lower_limit: 0.9,
         price_upper_limit: 10.0,
-        price_premium_bps: 1000,
+        price_premium_fraction: 0.1,
         allow_creating_deposits: true,
         allow_creating_borrows: true,
     };

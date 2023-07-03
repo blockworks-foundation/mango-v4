@@ -1530,8 +1530,8 @@ pub fn group_edit_instruction_default() -> mango_v4::instruction::GroupEdit {
         buyback_fees_swap_mango_account_opt: None,
         mngo_token_index_opt: None,
         buyback_fees_expiry_interval_opt: None,
-        token_conditional_swap_taker_fee_bps_opt: None,
-        token_conditional_swap_maker_fee_bps_opt: None,
+        token_conditional_swap_taker_fee_fraction_opt: None,
+        token_conditional_swap_maker_fee_fraction_opt: None,
     }
 }
 
@@ -4140,7 +4140,7 @@ pub struct TokenConditionalSwapCreateInstruction {
     pub max_sell: u64,
     pub price_lower_limit: f32,
     pub price_upper_limit: f32,
-    pub price_premium_bps: u16,
+    pub price_premium_fraction: f32,
     pub allow_creating_deposits: bool,
     pub allow_creating_borrows: bool,
 }
@@ -4159,7 +4159,7 @@ impl ClientInstruction for TokenConditionalSwapCreateInstruction {
             expiry_timestamp: u64::MAX,
             price_lower_limit: self.price_lower_limit,
             price_upper_limit: self.price_upper_limit,
-            price_premium_bps: self.price_premium_bps,
+            price_premium_fraction: self.price_premium_fraction,
             allow_creating_deposits: self.allow_creating_deposits,
             allow_creating_borrows: self.allow_creating_borrows,
         };
