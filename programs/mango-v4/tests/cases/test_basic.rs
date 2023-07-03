@@ -68,6 +68,7 @@ async fn test_basic() -> Result<(), TransportError> {
             group,
             owner,
             payer,
+            ..Default::default()
         },
     )
     .await

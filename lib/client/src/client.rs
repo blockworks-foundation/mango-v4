@@ -16,6 +16,7 @@ use futures::{stream, StreamExt, TryStreamExt};
 use itertools::Itertools;
 
 use mango_v4::accounts_ix::{Serum3OrderType, Serum3SelfTradeBehavior, Serum3Side};
+use mango_v4::accounts_zerocopy::KeyedAccountSharedData;
 use mango_v4::state::{
     Bank, Group, MangoAccountValue, PerpMarketIndex, PlaceOrderType, SelfTradeBehavior,
     Serum3MarketIndex, Side, TokenIndex, INSURANCE_TOKEN_INDEX,
@@ -412,7 +413,38 @@ impl MangoClient {
         self.send_and_confirm_owner_tx(ixs).await
     }
 
-    pub async fn get_oracle_price(
+    pub async fn bank_oracle_price(&self, token_index: TokenIndex) -> anyhow::Result<I80F48> {
+        let bank = self.first_bank(token_index).await?;
+        let mint_info = self.context.mint_info(token_index);
+        let oracle = self
+            .account_fetcher
+            .fetch_raw_account(&mint_info.oracle)
+            .await?;
+        let price = bank.oracle_price(
+            &KeyedAccountSharedData::new(mint_info.oracle, oracle.into()),
+            None,
+        )?;
+        Ok(price)
+    }
+
+    pub async fn perp_oracle_price(
+        &self,
+        perp_market_index: PerpMarketIndex,
+    ) -> anyhow::Result<I80F48> {
+        let perp = self.context.perp(perp_market_index);
+        let oracle = self
+            .account_fetcher
+            .fetch_raw_account(&perp.market.oracle)
+            .await?;
+        let price = perp.market.oracle_price(
+            &KeyedAccountSharedData::new(perp.market.oracle, oracle.into()),
+            None,
+        )?;
+        Ok(price)
+    }
+
+    /// returns ui price?! pyth only!
+    pub async fn get_oracle_price_deprecated(
         &self,
         token_name: &str,
     ) -> Result<pyth_sdk_solana::Price, anyhow::Error> {
@@ -1233,6 +1265,53 @@ impl MangoClient {
         self.send_and_confirm_owner_tx(vec![ix]).await
     }
 
+    pub async fn token_conditional_swap_trigger(
+        &self,
+        liqee: (&Pubkey, &MangoAccountValue),
+        token_conditional_swap_id: u64,
+        max_buy_token_to_liqee: u64,
+        max_sell_token_to_liqor: u64,
+    ) -> anyhow::Result<Signature> {
+        let (tcs_index, tcs) = liqee
+            .1
+            .token_conditional_swap_by_id(token_conditional_swap_id)?;
+
+        let health_remaining_ams = self
+            .derive_liquidation_health_check_remaining_account_metas(
+                liqee.1,
+                vec![tcs.buy_token_index, tcs.sell_token_index],
+                &[tcs.buy_token_index, tcs.sell_token_index],
+            )
+            .await
+            .unwrap();
+
+        let ix = Instruction {
+            program_id: mango_v4::id(),
+            accounts: {
+                let mut ams = anchor_lang::ToAccountMetas::to_account_metas(
+                    &mango_v4::accounts::TokenConditionalSwapTrigger {
+                        group: self.group(),
+                        liqee: *liqee.0,
+                        liqor: self.mango_account_address,
+                        liqor_authority: self.owner(),
+                    },
+                    None,
+                );
+                ams.extend(health_remaining_ams);
+                ams
+            },
+            data: anchor_lang::InstructionData::data(
+                &mango_v4::instruction::TokenConditionalSwapTrigger {
+                    token_conditional_swap_id,
+                    token_conditional_swap_index: tcs_index.try_into().unwrap(),
+                    max_buy_token_to_liqee,
+                    max_sell_token_to_liqor,
+                },
+            ),
+        };
+        self.send_and_confirm_owner_tx(vec![ix]).await
+    }
+
     // health region
 
     pub fn health_region_begin_instruction(
@@ -1303,6 +1382,21 @@ impl MangoClient {
 
     // jupiter
 
+    async fn http_error_handling<T: serde::de::DeserializeOwned>(
+        response: reqwest::Response,
+    ) -> anyhow::Result<T> {
+        let status = response.status();
+        let response_text = response
+            .text()
+            .await
+            .context("awaiting body of quote request to jupiter")?;
+        if !status.is_success() {
+            anyhow::bail!("request failed, status: {status}, body: {response_text}");
+        }
+        serde_json::from_str::<T>(&response_text)
+            .with_context(|| format!("response has unexpected format, body: {response_text}"))
+    }
+
     pub async fn jupiter_route(
         &self,
         input_mint: Pubkey,
@@ -1311,7 +1405,7 @@ impl MangoClient {
         slippage: u64,
         swap_mode: JupiterSwapMode,
     ) -> anyhow::Result<jupiter::QueryRoute> {
-        let quote = self
+        let response = self
             .http_client
             .get("https://quote-api.jup.ag/v4/quote")
             .query(&[
@@ -1333,27 +1427,18 @@ impl MangoClient {
             ])
             .send()
             .await
-            .context("quote request to jupiter")?
-            .json::<jupiter::QueryResult>()
-            .await
-            .context("receiving json response from jupiter quote request")?;
-
-        // Find the top route that doesn't involve Raydium (that has too many accounts)
-        let route = quote
-            .data
-            .iter()
-            .find(|route| {
-                !route
-                    .market_infos
-                    .iter()
-                    .any(|mi| mi.label.contains("Raydium"))
-            })
-            .ok_or_else(|| {
-                anyhow::anyhow!(
-                    "no route for swap. found {} routes, but none were usable",
-                    quote.data.len()
-                )
+            .context("quote request to jupiter")?;
+        let quote: jupiter::QueryResult =
+            Self::http_error_handling(response).await.with_context(|| {
+                format!("error requesting jupiter route between {input_mint} and {output_mint}")
             })?;
+
+        let route = quote.data.first().ok_or_else(|| {
+            anyhow::anyhow!(
+                "no route for swap. found {} routes, but none were usable",
+                quote.data.len()
+            )
+        })?;
 
         Ok(route.clone())
     }
@@ -1372,7 +1457,7 @@ impl MangoClient {
             .jupiter_route(input_mint, output_mint, amount, slippage, swap_mode)
             .await?;
 
-        let swap = self
+        let swap_response = self
             .http_client
             .post("https://quote-api.jup.ag/v4/swap")
             .json(&jupiter::SwapRequest {
@@ -1383,10 +1468,11 @@ impl MangoClient {
             })
             .send()
             .await
-            .context("swap transaction request to jupiter")?
-            .json::<jupiter::SwapResponse>()
+            .context("swap transaction request to jupiter")?;
+
+        let swap: jupiter::SwapResponse = Self::http_error_handling(swap_response)
             .await
-            .context("receiving json response from jupiter swap transaction request")?;
+            .context("error requesting jupiter swap")?;
 
         if swap.setup_transaction.is_some() || swap.cleanup_transaction.is_some() {
             anyhow::bail!(

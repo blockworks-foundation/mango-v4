@@ -11,7 +11,7 @@ mod client;
 mod context;
 mod gpa;
 pub mod health_cache;
-mod jupiter;
+pub mod jupiter;
 pub mod perp_pnl;
 pub mod snapshot_source;
 mod util;

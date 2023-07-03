@@ -15,7 +15,7 @@ pub struct AccountCreate<'info> {
         seeds = [b"MangoAccount".as_ref(), group.key().as_ref(), owner.key().as_ref(), &account_num.to_le_bytes()],
         bump,
         payer = payer,
-        space = MangoAccount::space(token_count, serum3_count, perp_count, perp_oo_count)?,
+        space = MangoAccount::space(token_count, serum3_count, perp_count, perp_oo_count, 0)?,
     )]
     pub account: AccountLoader<'info, MangoAccountFixed>,
     pub owner: Signer<'info>,

@@ -32,7 +32,7 @@ compile_error!("compiling the program entrypoint without 'enable-gpl' makes no s
 
 use state::{
     OracleConfigParams, PerpMarketIndex, PlaceOrderType, SelfTradeBehavior, Serum3MarketIndex,
-    Side, TokenIndex,
+    Side, TokenConditionalSwap, TokenIndex,
 };
 
 declare_id!("4MangoMjqJ2firMokCjjGgoK8d4MXcrgL7XJaL3w6fVg");
@@ -68,6 +68,8 @@ pub mod mango_v4 {
         buyback_fees_swap_mango_account_opt: Option<Pubkey>,
         mngo_token_index_opt: Option<TokenIndex>,
         buyback_fees_expiry_interval_opt: Option<u64>,
+        token_conditional_swap_taker_fee_fraction_opt: Option<f32>,
+        token_conditional_swap_maker_fee_fraction_opt: Option<f32>,
     ) -> Result<()> {
         #[cfg(feature = "enable-gpl")]
         instructions::group_edit(
@@ -83,6 +85,8 @@ pub mod mango_v4 {
             buyback_fees_swap_mango_account_opt,
             mngo_token_index_opt,
             buyback_fees_expiry_interval_opt,
+            token_conditional_swap_taker_fee_fraction_opt,
+            token_conditional_swap_maker_fee_fraction_opt,
         )?;
         Ok(())
     }
@@ -271,7 +275,27 @@ pub mod mango_v4 {
         perp_oo_count: u8,
     ) -> Result<()> {
         #[cfg(feature = "enable-gpl")]
-        instructions::account_expand(ctx, token_count, serum3_count, perp_count, perp_oo_count)?;
+        instructions::account_expand(ctx, token_count, serum3_count, perp_count, perp_oo_count, 0)?;
+        Ok(())
+    }
+
+    pub fn account_expand_v2(
+        ctx: Context<AccountExpand>,
+        token_count: u8,
+        serum3_count: u8,
+        perp_count: u8,
+        perp_oo_count: u8,
+        token_conditional_swap_count: u8,
+    ) -> Result<()> {
+        #[cfg(feature = "enable-gpl")]
+        instructions::account_expand(
+            ctx,
+            token_count,
+            serum3_count,
+            perp_count,
+            perp_oo_count,
+            token_conditional_swap_count,
+        )?;
         Ok(())
     }
 
@@ -1111,6 +1135,75 @@ pub mod mango_v4 {
     ) -> Result<()> {
         #[cfg(feature = "enable-gpl")]
         instructions::perp_liq_negative_pnl_or_bankruptcy(ctx, max_liab_transfer)?;
+        Ok(())
+    }
+
+    pub fn token_conditional_swap_create(
+        ctx: Context<TokenConditionalSwapCreate>,
+        max_buy: u64,
+        max_sell: u64,
+        expiry_timestamp: u64,
+        price_lower_limit: f32,
+        price_upper_limit: f32,
+        price_premium_fraction: f32,
+        allow_creating_deposits: bool,
+        allow_creating_borrows: bool,
+    ) -> Result<()> {
+        let tcs = TokenConditionalSwap {
+            id: u64::MAX, // set inside
+            max_buy,
+            max_sell,
+            bought: 0,
+            sold: 0,
+            expiry_timestamp,
+            price_lower_limit,
+            price_upper_limit,
+            price_premium_fraction,
+            taker_fee_fraction: 0.0, // set inside
+            maker_fee_fraction: 0.0, // set inside
+            buy_token_index: ctx.accounts.buy_bank.load()?.token_index,
+            sell_token_index: ctx.accounts.sell_bank.load()?.token_index,
+            has_data: 1,
+            allow_creating_deposits: u8::from(allow_creating_deposits),
+            allow_creating_borrows: u8::from(allow_creating_borrows),
+            reserved: [0; 109],
+        };
+
+        #[cfg(feature = "enable-gpl")]
+        instructions::token_conditional_swap_create(ctx, tcs)?;
+        Ok(())
+    }
+
+    pub fn token_conditional_swap_cancel(
+        ctx: Context<AccountAndAuthority>,
+        token_conditional_swap_index: u8,
+        token_conditional_swap_id: u64,
+    ) -> Result<()> {
+        #[cfg(feature = "enable-gpl")]
+        instructions::token_conditional_swap_cancel(
+            ctx,
+            token_conditional_swap_index.into(),
+            token_conditional_swap_id,
+        )?;
+        Ok(())
+    }
+
+    // NOTE: It's the triggerer's job to compute liqor_max_* numbers that work with the liqee's health.
+    pub fn token_conditional_swap_trigger(
+        ctx: Context<TokenConditionalSwapTrigger>,
+        token_conditional_swap_index: u8,
+        token_conditional_swap_id: u64,
+        max_buy_token_to_liqee: u64,
+        max_sell_token_to_liqor: u64,
+    ) -> Result<()> {
+        #[cfg(feature = "enable-gpl")]
+        instructions::token_conditional_swap_trigger(
+            ctx,
+            token_conditional_swap_index.into(),
+            token_conditional_swap_id,
+            max_buy_token_to_liqee,
+            max_sell_token_to_liqor,
+        )?;
         Ok(())
     }
 
