@@ -2,10 +2,7 @@ use anchor_lang::prelude::*;
 
 use crate::error::*;
 use crate::state::*;
-use openbook_v2::{
-    program::OpenbookV2,
-    state::{Market, OpenOrdersAccount},
-};
+use openbook_v2::{program::OpenbookV2, state::Market};
 
 #[derive(Accounts)]
 pub struct OpenbookV2CancelOrder<'info> {
@@ -18,17 +15,15 @@ pub struct OpenbookV2CancelOrder<'info> {
         mut,
         has_one = group,
         constraint = account.load()?.is_operational() @ MangoError::AccountIsFrozen
-        // owner is checked at #1
+        // authority is checked at #1
     )]
     pub account: AccountLoader<'info, MangoAccountFixed>,
 
     pub authority: Signer<'info>,
 
-    #[account(
-        mut,
-        constraint = open_orders.load()?.market == openbook_v2_market_external.key()
-    )]
-    pub open_orders: AccountLoader<'info, OpenOrdersAccount>,
+    #[account(mut)]
+    /// CHECK: openorders will be checked by openbook_v2
+    pub open_orders: UncheckedAccount<'info>,
 
     #[account(
         has_one = group,
@@ -47,9 +42,9 @@ pub struct OpenbookV2CancelOrder<'info> {
 
     #[account(mut)]
     /// CHECK: bids will be checked by openbook_v2
-    pub bids: AccountLoader<'info, ObV2BookSize>,
+    pub bids: UncheckedAccount<'info>,
 
     #[account(mut)]
     /// CHECK: asks will be checked by openbook_v2
-    pub asks: AccountLoader<'info, ObV2BookSize>,
+    pub asks: UncheckedAccount<'info>,
 }

@@ -5259,7 +5259,36 @@
         {
           "name": "openOrders",
           "isMut": true,
-          "isSigner": false
+          "isSigner": false,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "type": "string",
+                "value": "OpenOrders"
+              },
+              {
+                "kind": "account",
+                "type": "publicKey",
+                "path": "openbook_v2_market"
+              },
+              {
+                "kind": "account",
+                "type": "publicKey",
+                "path": "openbook_v2_market_external"
+              },
+              {
+                "kind": "arg",
+                "type": "u32",
+                "path": "account_num"
+              }
+            ],
+            "programId": {
+              "kind": "account",
+              "type": "publicKey",
+              "path": "openbook_v2_program"
+            }
+          }
         },
         {
           "name": "payer",
@@ -5355,7 +5384,7 @@
           ]
         },
         {
-          "name": "owner",
+          "name": "authority",
           "isMut": false,
           "isSigner": true
         },
@@ -5502,7 +5531,7 @@
           ]
         },
         {
-          "name": "owner",
+          "name": "authority",
           "isMut": false,
           "isSigner": true
         },
@@ -9582,13 +9611,13 @@
             "name": "OpenbookV2PlaceOrder"
           },
           {
+            "name": "OpenbookV2PlaceTakeOrder"
+          },
+          {
             "name": "OpenbookV2RegisterMarket"
           },
           {
             "name": "OpenbookV2SettleFunds"
-          },
-          {
-            "name": "OpenbookV2PlaceTakerOrder"
           }
         ]
       }

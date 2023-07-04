@@ -1281,7 +1281,7 @@ pub mod mango_v4 {
 
     #[allow(clippy::too_many_arguments)]
     pub fn openbook_v2_place_taker_order(
-        ctx: Context<OpenbookV2PlaceTakerOrder>,
+        ctx: Context<OpenbookV2PlaceTakeOrder>,
         side: openbook_v2::state::Side,
         limit_price: u64,
         max_base_qty: u64,

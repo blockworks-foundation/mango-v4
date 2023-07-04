@@ -3,10 +3,7 @@ use anchor_spl::token::{Token, TokenAccount};
 
 use crate::error::*;
 use crate::state::*;
-use openbook_v2::{
-    program::OpenbookV2,
-    state::{Market, OpenOrdersAccount},
-};
+use openbook_v2::{program::OpenbookV2, state::Market};
 
 #[derive(Accounts)]
 pub struct OpenbookV2SettleFunds<'info> {
@@ -19,14 +16,15 @@ pub struct OpenbookV2SettleFunds<'info> {
         mut,
         has_one = group,
         constraint = account.load()?.is_operational() @ MangoError::AccountIsFrozen
-        // owner is checked at #1
+        // authority is checked at #1
     )]
     pub account: AccountLoader<'info, MangoAccountFixed>,
 
     pub authority: Signer<'info>,
 
     #[account(mut)]
-    pub open_orders: AccountLoader<'info, OpenOrdersAccount>,
+    /// CHECK: open_orders will be checked by openbook_v2
+    pub open_orders: UncheckedAccount<'info>,
 
     #[account(
         has_one = group,
@@ -37,13 +35,7 @@ pub struct OpenbookV2SettleFunds<'info> {
 
     pub openbook_v2_program: Program<'info, OpenbookV2>,
 
-    #[account(
-        mut,
-        constraint = openbook_v2_market_external.load()?.base_vault == market_base_vault.key(),
-        constraint = openbook_v2_market_external.load()?.quote_vault == market_quote_vault.key(),
-        constraint = openbook_v2_market_external.load()?.base_mint == base_bank.load()?.mint,
-        constraint = openbook_v2_market_external.load()?.quote_mint == quote_bank.load()?.mint,
-    )]
+    #[account(mut)]
     pub openbook_v2_market_external: AccountLoader<'info, Market>,
 
     #[account(

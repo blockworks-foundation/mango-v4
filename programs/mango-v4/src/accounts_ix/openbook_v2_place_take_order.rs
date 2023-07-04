@@ -5,9 +5,9 @@ use anchor_spl::token::{Token, TokenAccount};
 use openbook_v2::{program::OpenbookV2, state::Market};
 
 #[derive(Accounts)]
-pub struct OpenbookV2PlaceTakerOrder<'info> {
+pub struct OpenbookV2PlaceTakeOrder<'info> {
     #[account(
-        constraint = group.load()?.is_ix_enabled(IxGate::OpenbookV2PlaceOrder) @ MangoError::IxIsDisabled,
+        constraint = group.load()?.is_ix_enabled(IxGate::OpenbookV2PlaceTakeOrder) @ MangoError::IxIsDisabled,
     )]
     pub group: AccountLoader<'info, Group>,
 
@@ -15,10 +15,11 @@ pub struct OpenbookV2PlaceTakerOrder<'info> {
         mut,
         has_one = group,
         constraint = account.load()?.is_operational() @ MangoError::AccountIsFrozen
-        // owner is checked at #1
+        // authority is checked at #1
     )]
     pub account: AccountLoader<'info, MangoAccountFixed>,
-    pub owner: Signer<'info>,
+
+    pub authority: Signer<'info>,
 
     #[account(
         has_one = group,
@@ -34,23 +35,20 @@ pub struct OpenbookV2PlaceTakerOrder<'info> {
         has_one = bids,
         has_one = asks,
         has_one = event_queue,
-        constraint = openbook_v2_market_external.load()?.base_vault == market_base_vault.key(),
-        constraint = openbook_v2_market_external.load()?.quote_vault == market_quote_vault.key(),
     )]
     pub openbook_v2_market_external: AccountLoader<'info, Market>,
 
-    // These accounts are forwarded directly to the openbook_v2 cpi call
-    // and are validated there.
+    /// CHECK: Validated by the openbook_v2 cpi call
     #[account(mut)]
-    pub bids: AccountLoader<'info, ObV2BookSize>,
+    pub bids: UncheckedAccount<'info>,
 
     #[account(mut)]
     /// CHECK: Validated by the openbook_v2 cpi call
-    pub asks: AccountLoader<'info, ObV2BookSize>,
+    pub asks: UncheckedAccount<'info>,
 
     #[account(mut)]
     /// CHECK: Validated by the openbook_v2 cpi call
-    pub event_queue: AccountLoader<'info, ObV2EventQueue>,
+    pub event_queue: UncheckedAccount<'info>,
 
     #[account(mut)]
     /// CHECK: Validated by the openbook_v2 cpi call

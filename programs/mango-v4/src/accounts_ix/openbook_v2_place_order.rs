@@ -2,10 +2,7 @@ use crate::error::*;
 use crate::state::*;
 use anchor_lang::prelude::*;
 use anchor_spl::token::{Token, TokenAccount};
-use openbook_v2::{
-    program::OpenbookV2,
-    state::{Market, OpenOrdersAccount},
-};
+use openbook_v2::{program::OpenbookV2, state::Market};
 
 #[derive(Accounts)]
 pub struct OpenbookV2PlaceOrder<'info> {
@@ -18,14 +15,15 @@ pub struct OpenbookV2PlaceOrder<'info> {
         mut,
         has_one = group,
         constraint = account.load()?.is_operational() @ MangoError::AccountIsFrozen
-        // owner is checked at #1
+        // authority is checked at #1
     )]
     pub account: AccountLoader<'info, MangoAccountFixed>,
-    pub owner: Signer<'info>,
+
+    pub authority: Signer<'info>,
 
     #[account(mut)]
-    /// CHECK: Validated inline by checking against the pubkey stored in the account at #2
-    pub open_orders: AccountLoader<'info, OpenOrdersAccount>,
+    /// CHECK: open_orders will be checked by openbook_v2
+    pub open_orders: UncheckedAccount<'info>,
 
     pub openbook_v2_market: AccountLoader<'info, OpenbookV2Market>,
 
@@ -36,22 +34,20 @@ pub struct OpenbookV2PlaceOrder<'info> {
         has_one = bids,
         has_one = asks,
         has_one = event_queue,
-        constraint = openbook_v2_market_external.load()?.base_vault == market_base_vault.key(),
-        constraint = openbook_v2_market_external.load()?.quote_vault == market_quote_vault.key(),
     )]
     pub openbook_v2_market_external: AccountLoader<'info, Market>,
 
     #[account(mut)]
     /// CHECK: bids will be checked by openbook_v2
-    pub bids: AccountLoader<'info, ObV2BookSize>,
+    pub bids: UncheckedAccount<'info>,
 
     #[account(mut)]
     /// CHECK: asks will be checked by openbook_v2
-    pub asks: AccountLoader<'info, ObV2BookSize>,
+    pub asks: UncheckedAccount<'info>,
 
     #[account(mut)]
     /// CHECK: event queue will be checked by openbook_v2
-    pub event_queue: AccountLoader<'info, ObV2EventQueue>,
+    pub event_queue: UncheckedAccount<'info>,
 
     #[account(mut)]
     /// CHECK: base vault will be checked by openbook_v2

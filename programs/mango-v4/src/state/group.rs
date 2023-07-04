@@ -208,9 +208,9 @@ pub enum IxGate {
     OpenbookV2EditMarket = 59,
     OpenbookV2LiqForceCancelOrders = 60,
     OpenbookV2PlaceOrder = 61,
-    OpenbookV2RegisterMarket = 62,
-    OpenbookV2SettleFunds = 63,
-    OpenbookV2PlaceTakerOrder = 64,
+    OpenbookV2PlaceTakeOrder = 62,
+    OpenbookV2RegisterMarket = 63,
+    OpenbookV2SettleFunds = 64,
     // NOTE: Adding new variants requires matching changes in ts and the ix_gate_set instruction.
 }
 

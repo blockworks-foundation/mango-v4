@@ -1,10 +1,10 @@
-use anchor_lang::prelude::*;
-
 use crate::error::*;
 use crate::state::*;
+use anchor_lang::prelude::*;
 use openbook_v2::{program::OpenbookV2, state::Market};
 
 #[derive(Accounts)]
+#[instruction(account_num: u32)]
 pub struct OpenbookV2CreateOpenOrders<'info> {
     #[account(
         constraint = group.load()?.is_ix_enabled(IxGate::OpenbookV2CreateOpenOrders) @ MangoError::IxIsDisabled,
@@ -15,7 +15,7 @@ pub struct OpenbookV2CreateOpenOrders<'info> {
         mut,
         has_one = group,
         constraint = account.load()?.is_operational() @ MangoError::AccountIsFrozen
-        // owner is checked at #1
+        // authority is checked at #1
     )]
     pub account: AccountLoader<'info, MangoAccountFixed>,
 
@@ -33,8 +33,12 @@ pub struct OpenbookV2CreateOpenOrders<'info> {
     pub openbook_v2_market_external: AccountLoader<'info, Market>,
 
     // initialized by this instruction via cpi to openbook_v2
-    // should have seeds [b"OpenOrders".as_ref(), openbook_v2_market.key().as_ref(), openbook_v2_market_external.key().as_ref(), &account_num.to_le_bytes()]
-    #[account(mut)]
+    #[account(
+        mut,
+        seeds = [b"OpenOrders".as_ref(), openbook_v2_market.key().as_ref(), openbook_v2_market_external.key().as_ref(), &account_num.to_le_bytes()],
+        bump,
+        seeds::program = openbook_v2_program.key(),
+    )]
     /// CHECK: Will be checked against seeds and will be initiated by openbook v2
     pub open_orders: UncheckedAccount<'info>,
 

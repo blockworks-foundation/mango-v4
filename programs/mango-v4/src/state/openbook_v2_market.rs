@@ -5,8 +5,6 @@ use std::mem::size_of;
 use crate::state::*;
 
 pub type OpenbookV2MarketIndex = u16;
-pub type ObV2BookSize = openbook_v2::state::BookSide;
-pub type ObV2EventQueue = openbook_v2::state::EventQueue;
 
 #[account(zero_copy)]
 #[derive(Debug)]

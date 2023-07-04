@@ -3,10 +3,7 @@ use anchor_spl::token::{Token, TokenAccount};
 
 use crate::error::*;
 use crate::state::*;
-use openbook_v2::{
-    program::OpenbookV2,
-    state::{Market, OpenOrdersAccount},
-};
+use openbook_v2::{program::OpenbookV2, state::Market};
 
 #[derive(Accounts)]
 pub struct OpenbookV2LiqForceCancelOrders<'info> {
@@ -22,11 +19,9 @@ pub struct OpenbookV2LiqForceCancelOrders<'info> {
     )]
     pub account: AccountLoader<'info, MangoAccountFixed>,
 
-    #[account(
-        mut,
-        constraint = open_orders.load()?.market == openbook_v2_market_external.key(),
-    )]
-    pub open_orders: AccountLoader<'info, OpenOrdersAccount>,
+    #[account(mut)]
+    /// CHECK: open_orders will be checked by openbook_v2
+    pub open_orders: UncheckedAccount<'info>,
 
     #[account(
         has_one = group,
@@ -41,22 +36,20 @@ pub struct OpenbookV2LiqForceCancelOrders<'info> {
         has_one = bids,
         has_one = asks,
         has_one = event_queue,
-        constraint = openbook_v2_market_external.load()?.base_vault == market_base_vault.key(),
-        constraint = openbook_v2_market_external.load()?.quote_vault == market_quote_vault.key(),
     )]
     pub openbook_v2_market_external: AccountLoader<'info, Market>,
 
     #[account(mut)]
     /// CHECK: bids will be checked by openbook_v2
-    pub bids: AccountLoader<'info, ObV2BookSize>,
+    pub bids: UncheckedAccount<'info>,
 
     #[account(mut)]
     /// CHECK: asks will be checked by openbook_v2
-    pub asks: AccountLoader<'info, ObV2BookSize>,
+    pub asks: UncheckedAccount<'info>,
 
     #[account(mut)]
     /// CHECK: event will be checked by openbook_v2
-    pub event_queue: AccountLoader<'info, ObV2EventQueue>,
+    pub event_queue: UncheckedAccount<'info>,
 
     #[account(mut)]
     pub market_base_vault: Box<Account<'info, TokenAccount>>,
