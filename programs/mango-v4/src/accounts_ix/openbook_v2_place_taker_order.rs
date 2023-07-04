@@ -2,10 +2,7 @@ use crate::error::*;
 use crate::state::*;
 use anchor_lang::prelude::*;
 use anchor_spl::token::{Token, TokenAccount};
-use openbook_v2::{
-    program::OpenbookV2,
-    state::{Market},
-};
+use openbook_v2::{program::OpenbookV2, state::Market};
 
 #[derive(Accounts)]
 pub struct OpenbookV2PlaceTakerOrder<'info> {
@@ -69,7 +66,7 @@ pub struct OpenbookV2PlaceTakerOrder<'info> {
     #[account(mut)]
     /// CHECK: Validated by the openbook_v2 cpi call
     pub market_quote_vault: Box<Account<'info, TokenAccount>>,
-    
+
     /// CHECK: Validated by the openbook_v2 cpi call
     pub market_vault_signer: UncheckedAccount<'info>,
 

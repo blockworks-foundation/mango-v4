@@ -1253,7 +1253,10 @@ pub mod mango_v4 {
         Ok(())
     }
 
-    pub fn openbook_v2_create_open_orders(ctx: Context<OpenbookV2CreateOpenOrders>, account_num: u32) -> Result<()> {
+    pub fn openbook_v2_create_open_orders(
+        ctx: Context<OpenbookV2CreateOpenOrders>,
+        account_num: u32,
+    ) -> Result<()> {
         Ok(())
     }
 
@@ -1298,7 +1301,10 @@ pub mod mango_v4 {
         Ok(())
     }
 
-    pub fn openbook_v2_settle_funds(ctx: Context<OpenbookV2SettleFunds>, fees_to_dao: bool,) -> Result<()> {
+    pub fn openbook_v2_settle_funds(
+        ctx: Context<OpenbookV2SettleFunds>,
+        fees_to_dao: bool,
+    ) -> Result<()> {
         Ok(())
     }
 
@@ -1309,7 +1315,10 @@ pub mod mango_v4 {
         Ok(())
     }
 
-    pub fn openbook_v2_cancel_all_orders(ctx: Context<OpenbookV2CancelOrder>, limit: u8) -> Result<()> {
+    pub fn openbook_v2_cancel_all_orders(
+        ctx: Context<OpenbookV2CancelOrder>,
+        limit: u8,
+    ) -> Result<()> {
         Ok(())
     }
 

@@ -2,10 +2,7 @@ use anchor_lang::prelude::*;
 
 use crate::error::*;
 use crate::state::*;
-use openbook_v2::{
-    program::OpenbookV2,
-    state::{Market},
-};
+use openbook_v2::{program::OpenbookV2, state::Market};
 
 #[derive(Accounts)]
 pub struct OpenbookV2CreateOpenOrders<'info> {
