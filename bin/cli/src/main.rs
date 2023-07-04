@@ -7,6 +7,8 @@ use solana_sdk::pubkey::Pubkey;
 use std::str::FromStr;
 use std::sync::Arc;
 
+mod test_oracles;
+
 #[derive(Parser, Debug, Clone)]
 #[clap()]
 struct Cli {
@@ -108,6 +110,14 @@ enum Command {
         #[clap(short, long, default_value = "0")]
         num: u32,
     },
+    /// Regularly fetches all oracles and prints their prices
+    TestOracles {
+        #[clap(short, long)]
+        group: String,
+
+        #[clap(flatten)]
+        rpc: Rpc,
+    },
 }
 
 impl Rpc {
@@ -207,6 +217,11 @@ async fn main() -> Result<(), anyhow::Error> {
             )
             .0;
             println!("{}", address);
+        }
+        Command::TestOracles { group, rpc } => {
+            let client = rpc.client(None)?;
+            let group = pubkey_from_cli(&group);
+            test_oracles::run(&client, group).await?;
         }
     };
 

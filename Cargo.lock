@@ -2986,6 +2986,7 @@ dependencies = [
  "env_logger 0.8.4",
  "fixed",
  "futures 0.3.25",
+ "itertools",
  "log 0.4.17",
  "mango-v4",
  "mango-v4-client",
