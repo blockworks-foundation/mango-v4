@@ -1253,7 +1253,7 @@ pub mod mango_v4 {
         Ok(())
     }
 
-    pub fn openbook_v2_create_open_orders(ctx: Context<OpenbookV2CreateOpenOrders>) -> Result<()> {
+    pub fn openbook_v2_create_open_orders(ctx: Context<OpenbookV2CreateOpenOrders>, account_num: u32) -> Result<()> {
         Ok(())
     }
 
