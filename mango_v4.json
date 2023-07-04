@@ -169,9 +169,7 @@
         {
           "name": "mngoTokenIndexOpt",
           "type": {
-            "option": {
-              "defined": "TokenIndex"
-            }
+            "option": "u16"
           }
         },
         {
@@ -329,9 +327,7 @@
               },
               {
                 "kind": "arg",
-                "type": {
-                  "defined": "TokenIndex"
-                },
+                "type": "u16",
                 "path": "token_index"
               },
               {
@@ -360,9 +356,7 @@
               },
               {
                 "kind": "arg",
-                "type": {
-                  "defined": "TokenIndex"
-                },
+                "type": "u16",
                 "path": "token_index"
               },
               {
@@ -427,9 +421,7 @@
       "args": [
         {
           "name": "tokenIndex",
-          "type": {
-            "defined": "TokenIndex"
-          }
+          "type": "u16"
         },
         {
           "name": "name",
@@ -525,9 +517,7 @@
               },
               {
                 "kind": "arg",
-                "type": {
-                  "defined": "TokenIndex"
-                },
+                "type": "u16",
                 "path": "token_index"
               },
               {
@@ -556,9 +546,7 @@
               },
               {
                 "kind": "arg",
-                "type": {
-                  "defined": "TokenIndex"
-                },
+                "type": "u16",
                 "path": "token_index"
               },
               {
@@ -623,9 +611,7 @@
       "args": [
         {
           "name": "tokenIndex",
-          "type": {
-            "defined": "TokenIndex"
-          }
+          "type": "u16"
         },
         {
           "name": "name",
@@ -859,9 +845,7 @@
               },
               {
                 "kind": "arg",
-                "type": {
-                  "defined": "TokenIndex"
-                },
+                "type": "u16",
                 "path": "token_index"
               },
               {
@@ -890,9 +874,7 @@
               },
               {
                 "kind": "arg",
-                "type": {
-                  "defined": "TokenIndex"
-                },
+                "type": "u16",
                 "path": "token_index"
               },
               {
@@ -936,9 +918,7 @@
       "args": [
         {
           "name": "tokenIndex",
-          "type": {
-            "defined": "TokenIndex"
-          }
+          "type": "u16"
         },
         {
           "name": "bankNum",
@@ -1916,9 +1896,7 @@
               },
               {
                 "kind": "arg",
-                "type": {
-                  "defined": "Serum3MarketIndex"
-                },
+                "type": "u16",
                 "path": "market_index"
               }
             ]
@@ -1954,9 +1932,7 @@
       "args": [
         {
           "name": "marketIndex",
-          "type": {
-            "defined": "Serum3MarketIndex"
-          }
+          "type": "u16"
         },
         {
           "name": "name",
@@ -2862,15 +2838,11 @@
       "args": [
         {
           "name": "assetTokenIndex",
-          "type": {
-            "defined": "TokenIndex"
-          }
+          "type": "u16"
         },
         {
           "name": "liabTokenIndex",
-          "type": {
-            "defined": "TokenIndex"
-          }
+          "type": "u16"
         },
         {
           "name": "maxLiabTransfer",
@@ -2978,15 +2950,11 @@
       "args": [
         {
           "name": "assetTokenIndex",
-          "type": {
-            "defined": "TokenIndex"
-          }
+          "type": "u16"
         },
         {
           "name": "liabTokenIndex",
-          "type": {
-            "defined": "TokenIndex"
-          }
+          "type": "u16"
         },
         {
           "name": "maxLiabTransfer",
@@ -3029,15 +2997,11 @@
       "args": [
         {
           "name": "assetTokenIndex",
-          "type": {
-            "defined": "TokenIndex"
-          }
+          "type": "u16"
         },
         {
           "name": "liabTokenIndex",
-          "type": {
-            "defined": "TokenIndex"
-          }
+          "type": "u16"
         },
         {
           "name": "maxLiabTransfer",
@@ -3154,9 +3118,7 @@
               },
               {
                 "kind": "arg",
-                "type": {
-                  "defined": "PerpMarketIndex"
-                },
+                "type": "u16",
                 "path": "perp_market_index"
               }
             ]
@@ -3195,9 +3157,7 @@
       "args": [
         {
           "name": "perpMarketIndex",
-          "type": {
-            "defined": "PerpMarketIndex"
-          }
+          "type": "u16"
         },
         {
           "name": "name",
@@ -3291,9 +3251,7 @@
         },
         {
           "name": "settleTokenIndex",
-          "type": {
-            "defined": "TokenIndex"
-          }
+          "type": "u16"
         },
         {
           "name": "settlePnlLimitFactor",
@@ -4268,9 +4226,7 @@
       "args": [
         {
           "name": "limit",
-          "type": {
-            "defined": "usize"
-          }
+          "type": "u64"
         }
       ]
     },
@@ -6243,9 +6199,7 @@
           },
           {
             "name": "tokenIndex",
-            "type": {
-              "defined": "TokenIndex"
-            }
+            "type": "u16"
           },
           {
             "name": "bump",
@@ -6362,9 +6316,7 @@
           },
           {
             "name": "mngoTokenIndex",
-            "type": {
-              "defined": "TokenIndex"
-            }
+            "type": "u16"
           },
           {
             "name": "padding",
@@ -6662,9 +6614,7 @@
           },
           {
             "name": "tokenIndex",
-            "type": {
-              "defined": "TokenIndex"
-            }
+            "type": "u16"
           },
           {
             "name": "groupInsuranceFund",
@@ -6732,15 +6682,11 @@
           },
           {
             "name": "baseTokenIndex",
-            "type": {
-              "defined": "TokenIndex"
-            }
+            "type": "u16"
           },
           {
             "name": "quoteTokenIndex",
-            "type": {
-              "defined": "TokenIndex"
-            }
+            "type": "u16"
           },
           {
             "name": "reduceOnly",
@@ -6969,9 +6915,7 @@
               "Currently required to be 0, USDC. In the future settlement",
               "may be allowed to happen in other tokens."
             ],
-            "type": {
-              "defined": "TokenIndex"
-            }
+            "type": "u16"
           },
           {
             "name": "perpMarketIndex",
@@ -6979,9 +6923,7 @@
               "Index of this perp market. Other data, like the MangoAccount's PerpPosition",
               "reference this market via this index. Unique for this group's perp markets."
             ],
-            "type": {
-              "defined": "PerpMarketIndex"
-            }
+            "type": "u16"
           },
           {
             "name": "blocked1",
@@ -7372,15 +7314,11 @@
           },
           {
             "name": "baseTokenIndex",
-            "type": {
-              "defined": "TokenIndex"
-            }
+            "type": "u16"
           },
           {
             "name": "quoteTokenIndex",
-            "type": {
-              "defined": "TokenIndex"
-            }
+            "type": "u16"
           },
           {
             "name": "reduceOnly",
@@ -7418,9 +7356,7 @@
           },
           {
             "name": "marketIndex",
-            "type": {
-              "defined": "Serum3MarketIndex"
-            }
+            "type": "u16"
           },
           {
             "name": "bump",
@@ -7462,9 +7398,7 @@
           },
           {
             "name": "marketIndex",
-            "type": {
-              "defined": "Serum3MarketIndex"
-            }
+            "type": "u16"
           },
           {
             "name": "reserved",
@@ -7543,9 +7477,7 @@
         "fields": [
           {
             "name": "tokenIndex",
-            "type": {
-              "defined": "TokenIndex"
-            }
+            "type": "u16"
           },
           {
             "name": "value",
@@ -7563,9 +7495,7 @@
         "fields": [
           {
             "name": "perpMarketIndex",
-            "type": {
-              "defined": "PerpMarketIndex"
-            }
+            "type": "u16"
           },
           {
             "name": "value",
@@ -7612,9 +7542,7 @@
         "fields": [
           {
             "name": "tokenIndex",
-            "type": {
-              "defined": "TokenIndex"
-            }
+            "type": "u16"
           },
           {
             "name": "maintAssetWeight",
@@ -7700,21 +7628,15 @@
           },
           {
             "name": "baseInfoIndex",
-            "type": {
-              "defined": "usize"
-            }
+            "type": "u64"
           },
           {
             "name": "quoteInfoIndex",
-            "type": {
-              "defined": "usize"
-            }
+            "type": "u64"
           },
           {
             "name": "marketIndex",
-            "type": {
-              "defined": "Serum3MarketIndex"
-            }
+            "type": "u16"
           },
           {
             "name": "hasZeroFunds",
@@ -7739,15 +7661,11 @@
         "fields": [
           {
             "name": "perpMarketIndex",
-            "type": {
-              "defined": "PerpMarketIndex"
-            }
+            "type": "u16"
           },
           {
             "name": "settleTokenIndex",
-            "type": {
-              "defined": "TokenIndex"
-            }
+            "type": "u16"
           },
           {
             "name": "maintBaseAssetWeight",
@@ -7930,9 +7848,7 @@
             "docs": [
               "index into Group.tokens"
             ],
-            "type": {
-              "defined": "TokenIndex"
-            }
+            "type": "u16"
           },
           {
             "name": "inUseCount",
@@ -8001,9 +7917,7 @@
           },
           {
             "name": "marketIndex",
-            "type": {
-              "defined": "Serum3MarketIndex"
-            }
+            "type": "u16"
           },
           {
             "name": "baseTokenIndex",
@@ -8012,15 +7926,11 @@
               "to get passed the static SerumMarket to find which tokens a market",
               "uses and look up the correct oracles."
             ],
-            "type": {
-              "defined": "TokenIndex"
-            }
+            "type": "u16"
           },
           {
             "name": "quoteTokenIndex",
-            "type": {
-              "defined": "TokenIndex"
-            }
+            "type": "u16"
           },
           {
             "name": "padding",
@@ -8050,9 +7960,7 @@
         "fields": [
           {
             "name": "marketIndex",
-            "type": {
-              "defined": "PerpMarketIndex"
-            }
+            "type": "u16"
           },
           {
             "name": "padding",
@@ -8300,9 +8208,7 @@
           },
           {
             "name": "market",
-            "type": {
-              "defined": "PerpMarketIndex"
-            }
+            "type": "u16"
           },
           {
             "name": "padding2",
@@ -8520,9 +8426,7 @@
             ],
             "type": {
               "array": [
-                {
-                  "defined": "NodeHandle"
-                },
+                "u32",
                 2
               ]
             }
@@ -8694,9 +8598,7 @@
         "fields": [
           {
             "name": "maybeNode",
-            "type": {
-              "defined": "NodeHandle"
-            }
+            "type": "u32"
           },
           {
             "name": "leafCount",
@@ -8738,9 +8640,7 @@
           },
           {
             "name": "freeListHead",
-            "type": {
-              "defined": "NodeHandle"
-            }
+            "type": "u32"
           },
           {
             "name": "reserved",
@@ -9182,15 +9082,11 @@
             "docs": [
               "indexes of tokens for the swap"
             ],
-            "type": {
-              "defined": "TokenIndex"
-            }
+            "type": "u16"
           },
           {
             "name": "sellTokenIndex",
-            "type": {
-              "defined": "TokenIndex"
-            }
+            "type": "u16"
           },
           {
             "name": "hasData",
