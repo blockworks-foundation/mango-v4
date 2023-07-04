@@ -5277,7 +5277,12 @@
           "isSigner": false
         }
       ],
-      "args": []
+      "args": [
+        {
+          "name": "accountNum",
+          "type": "u32"
+        }
+      ]
     },
     {
       "name": "openbookV2CloseOpenOrders",
@@ -7666,11 +7671,15 @@
           },
           {
             "name": "baseInfoIndex",
-            "type": "u64"
+            "type": {
+              "defined": "usize"
+            }
           },
           {
             "name": "quoteInfoIndex",
-            "type": "u64"
+            "type": {
+              "defined": "usize"
+            }
           },
           {
             "name": "marketIndex",
@@ -7707,7 +7716,9 @@
           },
           {
             "name": "settleTokenIndex",
-            "type": "u16"
+            "type": {
+              "defined": "TokenIndex"
+            }
           },
           {
             "name": "maintBaseAssetWeight",
@@ -9142,11 +9153,15 @@
             "docs": [
               "indexes of tokens for the swap"
             ],
-            "type": "u16"
+            "type": {
+              "defined": "TokenIndex"
+            }
           },
           {
             "name": "sellTokenIndex",
-            "type": "u16"
+            "type": {
+              "defined": "TokenIndex"
+            }
           },
           {
             "name": "hasData",
@@ -9544,9 +9559,6 @@
           },
           {
             "name": "TokenConditionalSwapCancel"
-          },
-          {
-            "name": "OpenbookV2CancelAllOrders"
           },
           {
             "name": "OpenbookV2CancelOrder"
