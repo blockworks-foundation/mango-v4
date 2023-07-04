@@ -1,5 +1,6 @@
 import {
   createApproveInstruction,
+  createCloseAccountInstruction,
   createSyncNativeInstruction,
   createTransferInstruction,
   getAccount,
@@ -97,12 +98,18 @@ async function main(): Promise<void> {
     console.log(
       `- delegate ${w2WsolAtaInfo.delegate}, amount ${w2WsolAtaInfo.delegatedAmount}`,
     );
+
+    // wallet 2 unwrap all wsol
+    const closeAtaIx = new Transaction().add(
+      createCloseAccountInstruction(w2WsolTA, w2.publicKey, w2.publicKey),
+    );
+    sig = await sendAndConfirmTransaction(conn, closeAtaIx, [w2], {
+      skipPreflight: true,
+    });
+    console.log(`sig w2 unwrap wsol https://explorer.solana.com/tx/${sig}`);
   } catch (error) {
     console.log(error);
   }
-
-  // wallet 2 unwrap all wsol
-  // todo
 }
 
 main();
