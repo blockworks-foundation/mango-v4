@@ -471,11 +471,12 @@ export class PerpMarket {
   public async getSettlePnlCandidates(
     client: MangoClient,
     group: Group,
-    direction: 'negative' | 'positive',
+    accounts?: MangoAccount[],
+    direction: 'negative' | 'positive' = 'positive',
     count = 2,
   ): Promise<{ account: MangoAccount; settleablePnl: I80F48 }[]> {
     let accountsWithSettleablePnl = (
-      await client.getAllMangoAccounts(group, true)
+      accounts ?? (await client.getAllMangoAccounts(group, true))
     )
       .filter((acc) => acc.perpPositionExistsForMarket(this))
       .map((acc) => {

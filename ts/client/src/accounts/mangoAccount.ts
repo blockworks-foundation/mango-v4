@@ -141,6 +141,22 @@ export class MangoAccount {
     return this;
   }
 
+  loadSerum3OpenOrders(serum3OosMapByOo: Map<string, OpenOrders>): void {
+    const serum3Active = this.serum3Active();
+    if (!serum3Active.length) return;
+    this.serum3OosMapByMarketIndex = new Map(
+      Array.from(
+        serum3Active.map((mangoOo) => {
+          const oo = serum3OosMapByOo.get(mangoOo.openOrders.toBase58());
+          if (!oo) {
+            throw new Error(`Undefined open orders for ${mangoOo.openOrders}`);
+          }
+          return [mangoOo.marketIndex, oo];
+        }),
+      ),
+    );
+  }
+
   public isDelegate(client: MangoClient): boolean {
     return this.delegate.equals(
       (client.program.provider as AnchorProvider).wallet.publicKey,

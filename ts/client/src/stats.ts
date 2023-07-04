@@ -1,6 +1,6 @@
 import { PublicKey } from '@solana/web3.js';
 import { Group } from './accounts/group';
-import { PerpPosition } from './accounts/mangoAccount';
+import { MangoAccount, PerpPosition } from './accounts/mangoAccount';
 import { PerpMarket } from './accounts/perp';
 import { MangoClient } from './client';
 import { I80F48 } from './numbers/I80F48';
@@ -14,9 +14,12 @@ import { I80F48 } from './numbers/I80F48';
 export async function getLargestPerpPositions(
   client: MangoClient,
   group: Group,
+  accounts?: MangoAccount[],
   perpMarket?: PerpMarket,
 ): Promise<{ mangoAccount: PublicKey; perpPosition: PerpPosition }[]> {
-  const accounts = await client.getAllMangoAccounts(group, true);
+  if (!accounts) {
+    accounts = await client.getAllMangoAccounts(group, true);
+  }
 
   let allPps = accounts
     .map((a) => {
@@ -56,11 +59,14 @@ export async function getLargestPerpPositions(
 export async function getClosestToLiquidationPerpPositions(
   client: MangoClient,
   group: Group,
+  accounts?: MangoAccount[],
   filterByNotionalValueUi = 10,
 ): Promise<
   { mangoAccount: PublicKey; perpPosition: PerpPosition; pct: I80F48 }[]
 > {
-  const accounts = await client.getAllMangoAccounts(group, true);
+  if (!accounts) {
+    accounts = await client.getAllMangoAccounts(group, true);
+  }
   const accountsMap = new Map(accounts.map((a) => [a.publicKey.toBase58(), a]));
 
   let allPps: any = accounts
