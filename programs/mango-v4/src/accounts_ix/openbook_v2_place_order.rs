@@ -4,7 +4,7 @@ use anchor_lang::prelude::*;
 use anchor_spl::token::{Token, TokenAccount};
 use openbook_v2::{
     program::OpenbookV2,
-    state::{BookSide, Market, OpenOrdersAccount},
+    state::{Market, OpenOrdersAccount},
 };
 
 #[derive(Accounts)]
@@ -27,30 +27,38 @@ pub struct OpenbookV2PlaceOrder<'info> {
     /// CHECK: Validated inline by checking against the pubkey stored in the account at #2
     pub open_orders: AccountLoader<'info, OpenOrdersAccount>,
 
-    #[account(
-        has_one = group,
-        has_one = openbook_v2_program,
-        has_one = openbook_v2_market_external,
-    )]
     pub openbook_v2_market: AccountLoader<'info, OpenbookV2Market>,
 
     pub openbook_v2_program: Program<'info, OpenbookV2>,
 
-    #[account(mut)]
+    #[account(
+        mut,
+        has_one = bids,
+        has_one = asks,
+        has_one = event_queue,
+        constraint = openbook_v2_market_external.load()?.base_vault == market_base_vault.key(),
+        constraint = openbook_v2_market_external.load()?.quote_vault == market_quote_vault.key(),
+    )]
     pub openbook_v2_market_external: AccountLoader<'info, Market>,
 
     #[account(mut)]
-    pub market_bids: AccountLoader<'info, BookSide>,
+    /// CHECK: bids will be checked by openbook_v2
+    pub bids: AccountLoader<'info, ObV2BookSize>,
 
     #[account(mut)]
-    pub market_asks: AccountLoader<'info, BookSide>,
+    /// CHECK: asks will be checked by openbook_v2
+    pub asks: AccountLoader<'info, ObV2BookSize>,
 
     #[account(mut)]
-    pub market_event_queue: AccountLoader<'info, EventQueue>,
+    /// CHECK: event queue will be checked by openbook_v2
+    pub event_queue: AccountLoader<'info, ObV2EventQueue>,
 
     #[account(mut)]
+    /// CHECK: base vault will be checked by openbook_v2
     pub market_base_vault: Box<Account<'info, TokenAccount>>,
+
     #[account(mut)]
+    /// CHECK: quote vault will be checked by openbook_v2
     pub market_quote_vault: Box<Account<'info, TokenAccount>>,
 
     /// CHECK: Validated by the openbook_v2 cpi call

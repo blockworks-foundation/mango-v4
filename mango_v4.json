@@ -5232,7 +5232,7 @@
           ]
         },
         {
-          "name": "owner",
+          "name": "authority",
           "isMut": false,
           "isSigner": true
         },
@@ -5259,31 +5259,7 @@
         {
           "name": "openOrders",
           "isMut": true,
-          "isSigner": false,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "type": "string",
-                "value": "OpenOrders"
-              },
-              {
-                "kind": "account",
-                "type": "publicKey",
-                "path": "owner"
-              },
-              {
-                "kind": "account",
-                "type": "publicKey",
-                "path": "account"
-              },
-              {
-                "kind": "arg",
-                "type": "u32",
-                "path": "account_num"
-              }
-            ]
-          }
+          "isSigner": false
         },
         {
           "name": "payer",
@@ -5320,7 +5296,7 @@
           ]
         },
         {
-          "name": "owner",
+          "name": "authority",
           "isMut": false,
           "isSigner": true
         },
@@ -5386,12 +5362,7 @@
         {
           "name": "openbookV2Market",
           "isMut": false,
-          "isSigner": false,
-          "relations": [
-            "group",
-            "openbook_v2_program",
-            "openbook_v2_market_external"
-          ]
+          "isSigner": false
         },
         {
           "name": "openbookV2Program",
@@ -5401,20 +5372,25 @@
         {
           "name": "openbookV2MarketExternal",
           "isMut": true,
-          "isSigner": false
+          "isSigner": false,
+          "relations": [
+            "bids",
+            "asks",
+            "event_queue"
+          ]
         },
         {
-          "name": "marketBids",
+          "name": "bids",
           "isMut": true,
           "isSigner": false
         },
         {
-          "name": "marketAsks",
+          "name": "asks",
           "isMut": true,
           "isSigner": false
         },
         {
-          "name": "marketEventQueue",
+          "name": "eventQueue",
           "isMut": true,
           "isSigner": false
         },
@@ -5543,20 +5519,25 @@
         {
           "name": "openbookV2MarketExternal",
           "isMut": true,
-          "isSigner": false
+          "isSigner": false,
+          "relations": [
+            "bids",
+            "asks",
+            "event_queue"
+          ]
         },
         {
-          "name": "marketBids",
+          "name": "bids",
           "isMut": true,
           "isSigner": false
         },
         {
-          "name": "marketAsks",
+          "name": "asks",
           "isMut": true,
           "isSigner": false
         },
         {
-          "name": "marketEventQueue",
+          "name": "eventQueue",
           "isMut": true,
           "isSigner": false
         },
@@ -5578,10 +5559,7 @@
         {
           "name": "marketVaultSigner",
           "isMut": false,
-          "isSigner": false,
-          "docs": [
-            "needed for the automatic settle_funds call"
-          ]
+          "isSigner": false
         },
         {
           "name": "payerBank",
@@ -5665,7 +5643,7 @@
           ]
         },
         {
-          "name": "owner",
+          "name": "authority",
           "isMut": false,
           "isSigner": true
         },
@@ -5691,21 +5669,20 @@
         },
         {
           "name": "openbookV2MarketExternal",
+          "isMut": false,
+          "isSigner": false,
+          "relations": [
+            "bids",
+            "asks"
+          ]
+        },
+        {
+          "name": "bids",
           "isMut": true,
           "isSigner": false
         },
         {
-          "name": "marketBids",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "marketAsks",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "marketEventQueue",
+          "name": "asks",
           "isMut": true,
           "isSigner": false
         }
@@ -5720,75 +5697,6 @@
         {
           "name": "orderId",
           "type": "u128"
-        }
-      ]
-    },
-    {
-      "name": "openbookV2CancelAllOrders",
-      "accounts": [
-        {
-          "name": "group",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "account",
-          "isMut": false,
-          "isSigner": false,
-          "relations": [
-            "group"
-          ]
-        },
-        {
-          "name": "owner",
-          "isMut": false,
-          "isSigner": true
-        },
-        {
-          "name": "openOrders",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "openbookV2Market",
-          "isMut": false,
-          "isSigner": false,
-          "relations": [
-            "group",
-            "openbook_v2_program",
-            "openbook_v2_market_external"
-          ]
-        },
-        {
-          "name": "openbookV2Program",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "openbookV2MarketExternal",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "marketBids",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "marketAsks",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "marketEventQueue",
-          "isMut": true,
-          "isSigner": false
-        }
-      ],
-      "args": [
-        {
-          "name": "limit",
-          "type": "u8"
         }
       ]
     },
@@ -5809,7 +5717,7 @@
           ]
         },
         {
-          "name": "owner",
+          "name": "authority",
           "isMut": false,
           "isSigner": true
         },
@@ -5883,12 +5791,27 @@
           "isSigner": false
         },
         {
+          "name": "quoteOracle",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "baseOracle",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
           "name": "tokenProgram",
           "isMut": false,
           "isSigner": false
         }
       ],
-      "args": []
+      "args": [
+        {
+          "name": "feesToDao",
+          "type": "bool"
+        }
+      ]
     },
     {
       "name": "openbookV2LiqForceCancelOrders",
@@ -5928,21 +5851,26 @@
         },
         {
           "name": "openbookV2MarketExternal",
+          "isMut": false,
+          "isSigner": false,
+          "relations": [
+            "bids",
+            "asks",
+            "event_queue"
+          ]
+        },
+        {
+          "name": "bids",
           "isMut": true,
           "isSigner": false
         },
         {
-          "name": "marketBids",
+          "name": "asks",
           "isMut": true,
           "isSigner": false
         },
         {
-          "name": "marketAsks",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "marketEventQueue",
+          "name": "eventQueue",
           "isMut": true,
           "isSigner": false
         },
@@ -5990,6 +5918,74 @@
         {
           "name": "tokenProgram",
           "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "limit",
+          "type": "u8"
+        }
+      ]
+    },
+    {
+      "name": "openbookV2CancelAllOrders",
+      "accounts": [
+        {
+          "name": "group",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "account",
+          "isMut": true,
+          "isSigner": false,
+          "relations": [
+            "group"
+          ]
+        },
+        {
+          "name": "authority",
+          "isMut": false,
+          "isSigner": true
+        },
+        {
+          "name": "openOrders",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "openbookV2Market",
+          "isMut": false,
+          "isSigner": false,
+          "relations": [
+            "group",
+            "openbook_v2_program",
+            "openbook_v2_market_external"
+          ]
+        },
+        {
+          "name": "openbookV2Program",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "openbookV2MarketExternal",
+          "isMut": false,
+          "isSigner": false,
+          "relations": [
+            "bids",
+            "asks"
+          ]
+        },
+        {
+          "name": "bids",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "asks",
+          "isMut": true,
           "isSigner": false
         }
       ],
@@ -6774,7 +6770,7 @@
             "type": {
               "array": [
                 "u8",
-                128
+                512
               ]
             }
           }

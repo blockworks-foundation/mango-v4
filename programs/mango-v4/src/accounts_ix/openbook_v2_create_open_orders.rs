@@ -4,11 +4,10 @@ use crate::error::*;
 use crate::state::*;
 use openbook_v2::{
     program::OpenbookV2,
-    state::{Market, OpenOrdersAccount},
+    state::{Market},
 };
 
 #[derive(Accounts)]
-#[instruction(account_num: u32, open_orders_count: u8)]
 pub struct OpenbookV2CreateOpenOrders<'info> {
     #[account(
         constraint = group.load()?.is_ix_enabled(IxGate::OpenbookV2CreateOpenOrders) @ MangoError::IxIsDisabled,
@@ -22,7 +21,8 @@ pub struct OpenbookV2CreateOpenOrders<'info> {
         // owner is checked at #1
     )]
     pub account: AccountLoader<'info, MangoAccountFixed>,
-    pub owner: Signer<'info>,
+
+    pub authority: Signer<'info>,
 
     #[account(
         has_one = group,
@@ -32,19 +32,14 @@ pub struct OpenbookV2CreateOpenOrders<'info> {
     pub openbook_v2_market: AccountLoader<'info, OpenbookV2Market>,
 
     pub openbook_v2_program: Program<'info, OpenbookV2>,
+
     pub openbook_v2_market_external: AccountLoader<'info, Market>,
 
     // initialized by this instruction via cpi to openbook_v2
-    #[account(
-        init,
-        seeds = [b"OpenOrders".as_ref(), owner.key().as_ref(), account.key().as_ref(), &account_num.to_le_bytes()],
-        bump,
-        payer = payer,
-        owner = openbook_v2_market.key(),
-        space = OpenOrdersAccount::space().unwrap(),
-    )]
-    /// CHECK: Newly created by openbook_v2 cpi call
-    pub open_orders: AccountLoader<'info, OpenOrdersAccount>,
+    // should have seeds [b"OpenOrders".as_ref(), openbook_v2_market.key().as_ref(), openbook_v2_market_external.key().as_ref(), &account_num.to_le_bytes()]
+    #[account(mut)]
+    /// CHECK: Will be checked against seeds and will be initiated by openbook v2
+    pub open_orders: UncheckedAccount<'info>,
 
     #[account(mut)]
     pub payer: Signer<'info>,

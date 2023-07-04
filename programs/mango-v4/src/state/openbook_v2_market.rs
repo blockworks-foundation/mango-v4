@@ -5,6 +5,8 @@ use std::mem::size_of;
 use crate::state::*;
 
 pub type OpenbookV2MarketIndex = u16;
+pub type ObV2BookSize = openbook_v2::state::BookSide;
+pub type ObV2EventQueue = openbook_v2::state::EventQueue;
 
 #[account(zero_copy)]
 #[derive(Debug)]
@@ -30,13 +32,13 @@ pub struct OpenbookV2Market {
 
     pub registration_time: u64,
 
-    pub reserved: [u8; 128],
+    pub reserved: [u8; 512],
 }
 const_assert_eq!(
     size_of::<OpenbookV2Market>(),
-    32 + 2 + 2 + 1 + 3 + 16 + 2 * 32 + 2 + 1 + 5 + 8 + 128
+    32 + 2 + 2 + 1 + 3 + 16 + 2 * 32 + 2 + 1 + 5 + 8 + 512
 );
-const_assert_eq!(size_of::<OpenbookV2Market>(), 264);
+const_assert_eq!(size_of::<OpenbookV2Market>(), 648);
 const_assert_eq!(size_of::<OpenbookV2Market>() % 8, 0);
 
 impl OpenbookV2Market {

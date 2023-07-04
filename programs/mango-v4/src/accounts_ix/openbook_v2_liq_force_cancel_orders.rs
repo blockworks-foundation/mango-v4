@@ -5,7 +5,7 @@ use crate::error::*;
 use crate::state::*;
 use openbook_v2::{
     program::OpenbookV2,
-    state::{BookSide, Market, OpenOrdersAccount},
+    state::{Market, OpenOrdersAccount},
 };
 
 #[derive(Accounts)]
@@ -22,7 +22,10 @@ pub struct OpenbookV2LiqForceCancelOrders<'info> {
     )]
     pub account: AccountLoader<'info, MangoAccountFixed>,
 
-    #[account(mut)]
+    #[account(
+        mut,
+        constraint = open_orders.load()?.market == openbook_v2_market_external.key(),
+    )]
     pub open_orders: AccountLoader<'info, OpenOrdersAccount>,
 
     #[account(
@@ -34,17 +37,26 @@ pub struct OpenbookV2LiqForceCancelOrders<'info> {
 
     pub openbook_v2_program: Program<'info, OpenbookV2>,
 
-    #[account(mut)]
+    #[account(
+        has_one = bids,
+        has_one = asks,
+        has_one = event_queue,
+        constraint = openbook_v2_market_external.load()?.base_vault == market_base_vault.key(),
+        constraint = openbook_v2_market_external.load()?.quote_vault == market_quote_vault.key(),
+    )]
     pub openbook_v2_market_external: AccountLoader<'info, Market>,
 
     #[account(mut)]
-    pub market_bids: AccountLoader<'info, BookSide>,
+    /// CHECK: bids will be checked by openbook_v2
+    pub bids: AccountLoader<'info, ObV2BookSize>,
 
     #[account(mut)]
-    pub market_asks: AccountLoader<'info, BookSide>,
+    /// CHECK: asks will be checked by openbook_v2
+    pub asks: AccountLoader<'info, ObV2BookSize>,
 
     #[account(mut)]
-    pub market_event_queue: AccountLoader<'info, EventQueue>,
+    /// CHECK: event will be checked by openbook_v2
+    pub event_queue: AccountLoader<'info, ObV2EventQueue>,
 
     #[account(mut)]
     pub market_base_vault: Box<Account<'info, TokenAccount>>,

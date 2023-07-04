@@ -22,7 +22,8 @@ pub struct OpenbookV2SettleFunds<'info> {
         // owner is checked at #1
     )]
     pub account: AccountLoader<'info, MangoAccountFixed>,
-    pub owner: Signer<'info>,
+
+    pub authority: Signer<'info>,
 
     #[account(mut)]
     pub open_orders: AccountLoader<'info, OpenOrdersAccount>,
@@ -36,13 +37,25 @@ pub struct OpenbookV2SettleFunds<'info> {
 
     pub openbook_v2_program: Program<'info, OpenbookV2>,
 
-    #[account(mut)]
+    #[account(
+        mut,
+        constraint = openbook_v2_market_external.load()?.base_vault == market_base_vault.key(),
+        constraint = openbook_v2_market_external.load()?.quote_vault == market_quote_vault.key(),
+        constraint = openbook_v2_market_external.load()?.base_mint == base_bank.load()?.mint,
+        constraint = openbook_v2_market_external.load()?.quote_mint == quote_bank.load()?.mint,
+    )]
     pub openbook_v2_market_external: AccountLoader<'info, Market>,
 
-    #[account(mut)]
+    #[account(
+        mut,
+        constraint = market_base_vault.mint == base_vault.mint,
+    )]
     pub market_base_vault: Box<Account<'info, TokenAccount>>,
 
-    #[account(mut)]
+    #[account(
+        mut,
+        constraint = market_quote_vault.mint == quote_vault.mint,
+    )]
     pub market_quote_vault: Box<Account<'info, TokenAccount>>,
 
     /// needed for the automatic settle_funds call
@@ -52,12 +65,20 @@ pub struct OpenbookV2SettleFunds<'info> {
     // token_index and bank.vault == vault is validated inline at #3
     #[account(mut, has_one = group)]
     pub quote_bank: AccountLoader<'info, Bank>,
+
     #[account(mut)]
     pub quote_vault: Box<Account<'info, TokenAccount>>,
+
     #[account(mut, has_one = group)]
     pub base_bank: AccountLoader<'info, Bank>,
+
     #[account(mut)]
     pub base_vault: Box<Account<'info, TokenAccount>>,
+
+    /// CHECK: The oracle can be one of several different account types and the pubkey is checked in the parent
+    pub quote_oracle: UncheckedAccount<'info>,
+    /// CHECK: The oracle can be one of several different account types and the pubkey is checked in the parent
+    pub base_oracle: UncheckedAccount<'info>,
 
     pub token_program: Program<'info, Token>,
 }

@@ -13,11 +13,17 @@ pub struct OpenbookV2RegisterMarket<'info> {
         constraint = group.load()?.openbook_v2_supported()
     )]
     pub group: AccountLoader<'info, Group>,
+
     pub admin: Signer<'info>,
 
     /// CHECK: Can register a market for any openbook_v2 program
     pub openbook_v2_program: Program<'info, OpenbookV2>,
+
     /// CHECK: Can register any openbook_v2 market
+    #[account(
+        constraint = openbook_v2_market_external.load()?.base_mint == base_bank.load()?.mint,
+        constraint = openbook_v2_market_external.load()?.quote_mint == quote_bank.load()?.mint,
+    )]
     pub openbook_v2_market_external: AccountLoader<'info, Market>,
 
     #[account(

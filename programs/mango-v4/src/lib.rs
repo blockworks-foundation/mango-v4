@@ -1298,14 +1298,7 @@ pub mod mango_v4 {
         Ok(())
     }
 
-    pub fn openbook_v2_cancel_all_orders(
-        ctx: Context<OpenbookV2CancelAllOrders>,
-        limit: u8,
-    ) -> Result<()> {
-        Ok(())
-    }
-
-    pub fn openbook_v2_settle_funds(ctx: Context<OpenbookV2SettleFunds>) -> Result<()> {
+    pub fn openbook_v2_settle_funds(ctx: Context<OpenbookV2SettleFunds>, fees_to_dao: bool,) -> Result<()> {
         Ok(())
     }
 
@@ -1313,6 +1306,10 @@ pub mod mango_v4 {
         ctx: Context<OpenbookV2LiqForceCancelOrders>,
         limit: u8,
     ) -> Result<()> {
+        Ok(())
+    }
+
+    pub fn openbook_v2_cancel_all_orders(ctx: Context<OpenbookV2CancelOrder>, limit: u8) -> Result<()> {
         Ok(())
     }
 

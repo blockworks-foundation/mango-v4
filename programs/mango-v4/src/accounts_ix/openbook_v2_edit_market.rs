@@ -7,9 +7,11 @@ use crate::state::*;
 pub struct OpenbookV2EditMarket<'info> {
     #[account(
         // group <-> admin relation is checked at #1
-        constraint = group.load()?.openbook_v2_supported()
+        constraint = group.load()?.openbook_v2_supported(),
+        constraint = group.load()?.admin == admin.key(),
     )]
     pub group: AccountLoader<'info, Group>,
+
     pub admin: Signer<'info>,
 
     #[account(

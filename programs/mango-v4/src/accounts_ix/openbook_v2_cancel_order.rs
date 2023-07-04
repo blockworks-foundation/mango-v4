@@ -4,7 +4,7 @@ use crate::error::*;
 use crate::state::*;
 use openbook_v2::{
     program::OpenbookV2,
-    state::{BookSide, Market, OpenOrdersAccount},
+    state::{Market, OpenOrdersAccount},
 };
 
 #[derive(Accounts)]
@@ -21,9 +21,13 @@ pub struct OpenbookV2CancelOrder<'info> {
         // owner is checked at #1
     )]
     pub account: AccountLoader<'info, MangoAccountFixed>,
-    pub owner: Signer<'info>,
 
-    #[account(mut)]
+    pub authority: Signer<'info>,
+
+    #[account(
+        mut,
+        constraint = open_orders.load()?.market == openbook_v2_market_external.key()
+    )]
     pub open_orders: AccountLoader<'info, OpenOrdersAccount>,
 
     #[account(
@@ -35,15 +39,17 @@ pub struct OpenbookV2CancelOrder<'info> {
 
     pub openbook_v2_program: Program<'info, OpenbookV2>,
 
-    #[account(mut)]
+    #[account(
+        has_one = bids,
+        has_one = asks,
+    )]
     pub openbook_v2_market_external: AccountLoader<'info, Market>,
 
     #[account(mut)]
-    pub market_bids: AccountLoader<'info, BookSide>,
+    /// CHECK: bids will be checked by openbook_v2
+    pub bids: AccountLoader<'info, ObV2BookSize>,
 
     #[account(mut)]
-    pub market_asks: AccountLoader<'info, BookSide>,
-
-    #[account(mut)]
-    pub market_event_queue: AccountLoader<'info, EventQueue>,
+    /// CHECK: asks will be checked by openbook_v2
+    pub asks: AccountLoader<'info, ObV2BookSize>,
 }

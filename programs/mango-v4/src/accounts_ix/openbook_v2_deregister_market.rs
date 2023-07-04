@@ -12,6 +12,10 @@ pub struct OpenbookV2DeregisterMarket<'info> {
         constraint = group.load()?.is_ix_enabled(IxGate::OpenbookV2DeregisterMarket) @ MangoError::IxIsDisabled,
     )]
     pub group: AccountLoader<'info, Group>,
+
+    #[account(
+        constraint = group.load()?.admin == admin.key(),
+    )]
     pub admin: Signer<'info>,
 
     #[account(

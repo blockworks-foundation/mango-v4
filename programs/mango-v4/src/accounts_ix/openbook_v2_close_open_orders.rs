@@ -21,7 +21,8 @@ pub struct OpenbookV2CloseOpenOrders<'info> {
         // owner is checked at #1
     )]
     pub account: AccountLoader<'info, MangoAccountFixed>,
-    pub owner: Signer<'info>,
+
+    pub authority: Signer<'info>,
 
     #[account(
         has_one = group,
@@ -29,10 +30,15 @@ pub struct OpenbookV2CloseOpenOrders<'info> {
         has_one = openbook_v2_market_external,
     )]
     pub openbook_v2_market: AccountLoader<'info, OpenbookV2Market>,
+
     pub openbook_v2_program: Program<'info, OpenbookV2>,
+
     pub openbook_v2_market_external: AccountLoader<'info, Market>,
 
-    #[account(mut)]
+    #[account(
+        mut,
+        constraint = open_orders.load()?.market == openbook_v2_market_external.key(),
+    )]
     pub open_orders: AccountLoader<'info, OpenOrdersAccount>,
 
     #[account(mut)]
