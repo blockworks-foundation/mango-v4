@@ -20,7 +20,7 @@ pub struct OpenbookV2LiqForceCancelOrders<'info> {
     pub account: AccountLoader<'info, MangoAccountFixed>,
 
     #[account(mut)]
-    /// CHECK: open_orders will be checked by openbook_v2
+    /// CHECK: Validated inline by checking against the pubkey stored in the account at #2
     pub open_orders: UncheckedAccount<'info>,
 
     #[account(

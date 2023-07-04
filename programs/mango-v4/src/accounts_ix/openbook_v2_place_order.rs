@@ -22,7 +22,7 @@ pub struct OpenbookV2PlaceOrder<'info> {
     pub authority: Signer<'info>,
 
     #[account(mut)]
-    /// CHECK: open_orders will be checked by openbook_v2
+    /// CHECK: Validated inline by checking against the pubkey stored in the account at #2
     pub open_orders: UncheckedAccount<'info>,
 
     pub openbook_v2_market: AccountLoader<'info, OpenbookV2Market>,

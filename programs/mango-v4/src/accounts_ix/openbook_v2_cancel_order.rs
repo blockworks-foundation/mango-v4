@@ -6,9 +6,7 @@ use openbook_v2::{program::OpenbookV2, state::Market};
 
 #[derive(Accounts)]
 pub struct OpenbookV2CancelOrder<'info> {
-    #[account(
-        constraint = group.load()?.is_ix_enabled(IxGate::OpenbookV2CancelOrder) @ MangoError::IxIsDisabled,
-    )]
+    /// CHECK: Instruction gate will be checked in instruction code as this is used by multiple instructions.
     pub group: AccountLoader<'info, Group>,
 
     #[account(
@@ -22,7 +20,7 @@ pub struct OpenbookV2CancelOrder<'info> {
     pub authority: Signer<'info>,
 
     #[account(mut)]
-    /// CHECK: openorders will be checked by openbook_v2
+    /// CHECK: Validated inline by checking against the pubkey stored in the account at #2
     pub open_orders: UncheckedAccount<'info>,
 
     #[account(
