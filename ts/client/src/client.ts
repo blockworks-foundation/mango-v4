@@ -6,6 +6,7 @@ import {
   Wallet,
 } from '@coral-xyz/anchor';
 import * as borsh from '@coral-xyz/borsh';
+import { OpenOrders } from '@project-serum/serum';
 import {
   createCloseAccountInstruction,
   createInitializeAccount3Instruction,
@@ -28,6 +29,7 @@ import {
   TransactionSignature,
 } from '@solana/web3.js';
 import bs58 from 'bs58';
+import chunk from 'lodash/chunk';
 import cloneDeep from 'lodash/cloneDeep';
 import uniq from 'lodash/uniq';
 import { Bank, MintInfo, TokenIndex } from './accounts/bank';
@@ -1044,8 +1046,43 @@ export class MangoClient {
     );
 
     if (loadSerum3Oo) {
-      await Promise.all(
-        accounts.map(async (a) => await a.reloadSerum3OpenOrders(this)),
+      const ooPks = accounts
+        .map((a) => a.serum3Active().map((serum3) => serum3.openOrders))
+        .flat();
+
+      const ais: AccountInfo<Buffer>[] = (
+        await Promise.all(
+          chunk(ooPks, 100).map(
+            async (ooPksChunk) =>
+              await this.program.provider.connection.getMultipleAccountsInfo(
+                ooPksChunk,
+              ),
+          ),
+        )
+      ).flat();
+
+      if (ooPks.length != ais.length) {
+        throw new Error(`Error in fetch all open orders accounts!`);
+      }
+
+      const serum3OosMapByOo = new Map(
+        Array.from(
+          ais.map((ai, i) => {
+            if (ai == null) {
+              throw new Error(`Undefined AI for open orders ${ooPks[i]}!`);
+            }
+            const oo = OpenOrders.fromAccountInfo(
+              ooPks[i],
+              ai,
+              OPENBOOK_PROGRAM_ID[this.cluster],
+            );
+            return [ooPks[i].toBase58(), oo];
+          }),
+        ),
+      );
+
+      accounts.forEach(
+        async (a) => await a.loadSerum3OpenOrders(serum3OosMapByOo),
       );
     }
 
@@ -2900,6 +2937,13 @@ export class MangoClient {
     userDefinedAlts: AddressLookupTableAccount[];
     flashLoanType: FlashLoanType;
   }): Promise<TransactionSignature> {
+    const isDelegate = (
+      this.program.provider as AnchorProvider
+    ).wallet.publicKey.equals(mangoAccount.delegate);
+    const swapExecutingWallet = isDelegate
+      ? mangoAccount.delegate
+      : mangoAccount.owner;
+
     const inputBank: Bank = group.getFirstBankByMint(inputMintPk);
     const outputBank: Bank = group.getFirstBankByMint(outputMintPk);
 
@@ -2924,7 +2968,7 @@ export class MangoClient {
      */
     const inputTokenAccountPk = await getAssociatedTokenAddress(
       inputBank.mint,
-      mangoAccount.owner,
+      swapExecutingWallet,
     );
     const inputTokenAccExists =
       await this.program.provider.connection.getAccountInfo(
@@ -2934,8 +2978,8 @@ export class MangoClient {
     if (!inputTokenAccExists) {
       preInstructions.push(
         await createAssociatedTokenAccountIdempotentInstruction(
-          mangoAccount.owner,
-          mangoAccount.owner,
+          swapExecutingWallet,
+          swapExecutingWallet,
           inputBank.mint,
         ),
       );
@@ -2943,7 +2987,7 @@ export class MangoClient {
 
     const outputTokenAccountPk = await getAssociatedTokenAddress(
       outputBank.mint,
-      mangoAccount.owner,
+      swapExecutingWallet,
     );
     const outputTokenAccExists =
       await this.program.provider.connection.getAccountInfo(
@@ -2952,8 +2996,8 @@ export class MangoClient {
     if (!outputTokenAccExists) {
       preInstructions.push(
         await createAssociatedTokenAccountIdempotentInstruction(
-          mangoAccount.owner,
-          mangoAccount.owner,
+          swapExecutingWallet,
+          swapExecutingWallet,
           outputBank.mint,
         ),
       );
@@ -2999,6 +3043,7 @@ export class MangoClient {
       .flashLoanEndV2(2, flashLoanType)
       .accounts({
         account: mangoAccount.publicKey,
+        owner: (this.program.provider as AnchorProvider).wallet.publicKey,
       })
       .remainingAccounts([
         ...parsedHealthAccounts,

@@ -680,13 +680,15 @@ export class HealthCache {
     targetValue: I80F48,
     minStep: I80F48,
     fun: (I80F48) => I80F48,
+    options: { maxIterations?: number; targetError?: number } = {},
   ): I80F48 {
-    const maxIterations = 50;
-    const targetError = I80F48.fromNumber(0.1);
+    const maxIterations = options?.maxIterations || 50;
+    const targetError = I80F48.fromNumber(options?.targetError || 0.1);
+
     const rightValue = fun(right);
 
     // console.log(
-    //   ` - binaryApproximationSearch left ${left.toLocaleString()}, leftValue ${leftValue.toLocaleString()}, right ${right.toLocaleString()}, rightValue ${rightValue.toLocaleString()}, targetValue ${targetValue.toLocaleString()}`,
+    //   ` - binaryApproximationSearch left ${left.toLocaleString()}, leftValue ${leftValue.toLocaleString()}, right ${right.toLocaleString()}, rightValue ${rightValue.toLocaleString()}, targetValue ${targetValue.toLocaleString()}, minStep ${minStep}`,
     // );
 
     if (
@@ -1205,6 +1207,52 @@ export class HealthCache {
     }
 
     return baseLots.floor();
+  }
+
+  public getPerpPositionLiquidationPrice(
+    group: Group,
+    mangoAccount: MangoAccount,
+    perpPosition: PerpPosition,
+  ): I80F48 | null {
+    const hc = HealthCache.fromMangoAccount(group, mangoAccount);
+    const hcClone = cloneDeep(hc);
+    const perpMarket = group.getPerpMarketByMarketIndex(
+      perpPosition.marketIndex,
+    );
+
+    function healthAfterPriceChange(newPrice: I80F48): I80F48 {
+      const pi: PerpInfo =
+        hcClone.perpInfos[hcClone.findPerpInfoIndex(perpPosition.marketIndex)];
+      pi.basePrices.oracle = newPrice;
+      return hcClone.health(HealthType.maint);
+    }
+
+    if (perpPosition.getBasePosition(perpMarket).isPos()) {
+      const zero = ZERO_I80F48();
+      const healthAtPriceZero = healthAfterPriceChange(zero);
+      if (healthAtPriceZero.gt(ZERO_I80F48())) {
+        return null;
+      }
+
+      return HealthCache.binaryApproximationSearch(
+        zero,
+        healthAtPriceZero,
+        perpMarket.price,
+        ZERO_I80F48(),
+        perpMarket.priceLotsToNative(new BN(1)),
+        healthAfterPriceChange,
+      );
+    }
+
+    const price1000x = perpMarket.price.mul(I80F48.fromNumber(1000));
+    return HealthCache.binaryApproximationSearch(
+      perpMarket.price,
+      hcClone.health(HealthType.maint),
+      price1000x,
+      ZERO_I80F48(),
+      perpMarket.priceLotsToNative(new BN(1)),
+      healthAfterPriceChange,
+    );
   }
 }
 

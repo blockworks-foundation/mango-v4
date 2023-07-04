@@ -427,10 +427,10 @@ export async function getRiskStats(
 
   // Get known mms
   const mms = [
-    new PublicKey('CtHuPg2ctVVV7nqmvVEcMtcWyJAgtZw9YcNHFQidjPgF'),
-    new PublicKey('F1SZxEDxxCSLVjEBbMEjDYqajWRJQRCZBwPQnmcVvTLV'),
+    new PublicKey('BLgb4NFwhpurMrGX5LQfb8D8dBpGSGtBqqew2Em8uyRT'),
+    new PublicKey('DA5G4mUdFmQXyKuFqvGGZGBzPAPYDYQsdjmiEJAYzUXQ'),
     new PublicKey('BGYWnqfaauCeebFQXEfYuDCktiVG8pqpprrsD4qfqL53'),
-    new PublicKey('9XJt2tvSZghsMAhWto1VuPBrwXsiimPtsTR8XwGgDxK2'),
+    new PublicKey('F1SZxEDxxCSLVjEBbMEjDYqajWRJQRCZBwPQnmcVvTLV'),
   ];
 
   // Get all mango accounts
@@ -485,7 +485,7 @@ export async function getRiskStats(
 
   // Clone group, and simulate change % price drop for usdc
   const groupUsdcDepeg: Group = cloneDeep(group);
-  Array.from(groupDrop.banksMapByTokenIndex.values())
+  Array.from(groupUsdcDepeg.banksMapByTokenIndex.values())
     .flat()
     .filter((b) => b.name.includes('USDC'))
     .forEach((b) => {
@@ -496,7 +496,7 @@ export async function getRiskStats(
 
   // Clone group, and simulate change % price drop for usdt
   const groupUsdtDepeg: Group = cloneDeep(group);
-  Array.from(groupDrop.banksMapByTokenIndex.values())
+  Array.from(groupUsdtDepeg.banksMapByTokenIndex.values())
     .flat()
     .filter((b) => b.name.includes('USDT'))
     .forEach((b) => {
