@@ -1886,20 +1886,6 @@
 <span id="1886">1886</span>
 <span id="1887">1887</span>
 <span id="1888">1888</span>
-<span id="1889">1889</span>
-<span id="1890">1890</span>
-<span id="1891">1891</span>
-<span id="1892">1892</span>
-<span id="1893">1893</span>
-<span id="1894">1894</span>
-<span id="1895">1895</span>
-<span id="1896">1896</span>
-<span id="1897">1897</span>
-<span id="1898">1898</span>
-<span id="1899">1899</span>
-<span id="1900">1900</span>
-<span id="1901">1901</span>
-<span id="1902">1902</span>
 </pre><pre class="rust"><code><span class="kw">use </span>std::str::FromStr;
 <span class="kw">use </span>std::sync::Arc;
 <span class="kw">use </span>std::time::Duration;
@@ -2343,20 +2329,6 @@
             <span class="prelude-val">None</span>,
         )<span class="question-mark">?</span>;
         <span class="prelude-val">Ok</span>(price)
-    }
-
-    <span class="doccomment">/// returns ui price?! pyth only!
-    </span><span class="kw">pub async fn </span>get_oracle_price_deprecated(
-        <span class="kw-2">&amp;</span><span class="self">self</span>,
-        token_name: <span class="kw-2">&amp;</span>str,
-    ) -&gt; <span class="prelude-ty">Result</span>&lt;pyth_sdk_solana::Price, anyhow::Error&gt; {
-        <span class="kw">let </span>token_index = <span class="kw-2">*</span><span class="self">self</span>.context.token_indexes_by_name.get(token_name).unwrap();
-        <span class="kw">let </span>mint_info = <span class="self">self</span>.context.mint_info(token_index);
-        <span class="kw">let </span>oracle_account = <span class="self">self
-            </span>.account_fetcher
-            .fetch_raw_account(<span class="kw-2">&amp;</span>mint_info.oracle)
-            .<span class="kw">await</span><span class="question-mark">?</span>;
-        <span class="prelude-val">Ok</span>(pyth_sdk_solana::load_price(<span class="kw-2">&amp;</span>oracle_account.data()).unwrap())
     }
 
     <span class="comment">//
