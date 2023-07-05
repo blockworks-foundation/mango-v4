@@ -6,7 +6,10 @@ use std::{
 
 use fixed::types::I80F48;
 use futures::Future;
-use mango_v4::accounts_ix::{Serum3OrderType, Serum3SelfTradeBehavior, Serum3Side};
+use mango_v4::{
+    accounts_ix::{Serum3OrderType, Serum3SelfTradeBehavior, Serum3Side},
+    state::TokenIndex,
+};
 
 use tokio::time;
 
@@ -20,47 +23,34 @@ pub async fn runner(
     ensure_oo(&mango_client).await?;
 
     let mut price_arcs = HashMap::new();
-    for market_name in mango_client.context.serum3_market_indexes_by_name.keys() {
+    for s3_market in mango_client.context.serum3_markets.values() {
+        let base_token_index = s3_market.market.base_token_index;
         let price = mango_client
-            .get_oracle_price_deprecated(
-                market_name
-                    .split('/')
-                    .collect::<Vec<&str>>()
-                    .first()
-                    .unwrap(),
-            )
+            .bank_oracle_price(base_token_index)
             .await
             .unwrap();
-        price_arcs.insert(
-            market_name.to_owned(),
-            Arc::new(RwLock::new(
-                I80F48::from_num(price.price) / I80F48::from_num(10u64.pow(-price.expo as u32)),
-            )),
-        );
+        price_arcs.insert(base_token_index, Arc::new(RwLock::new(price)));
     }
 
-    let handles1 = mango_client
-        .context
-        .serum3_market_indexes_by_name
-        .keys()
-        .map(|market_name| {
-            loop_blocking_price_update(
-                mango_client.clone(),
-                market_name.to_owned(),
-                price_arcs.get(market_name).unwrap().clone(),
-            )
+    let handles1 = price_arcs
+        .iter()
+        .map(|(base_token_index, price)| {
+            loop_blocking_price_update(mango_client.clone(), *base_token_index, price.clone())
         })
         .collect::<Vec<_>>();
 
     let handles2 = mango_client
         .context
-        .serum3_market_indexes_by_name
-        .keys()
-        .map(|market_name| {
+        .serum3_markets
+        .values()
+        .map(|s3_market| {
             loop_blocking_orders(
                 mango_client.clone(),
-                market_name.to_owned(),
-                price_arcs.get(market_name).unwrap().clone(),
+                s3_market.market.name().to_string(),
+                price_arcs
+                    .get(&s3_market.market.base_token_index)
+                    .unwrap()
+                    .clone(),
             )
         })
         .collect::<Vec<_>>();
@@ -126,22 +116,18 @@ async fn ensure_deposit(mango_client: &Arc<MangoClient>) -> Result<(), anyhow::E
 
 pub async fn loop_blocking_price_update(
     mango_client: Arc<MangoClient>,
-    market_name: String,
+    token_index: TokenIndex,
     price: Arc<RwLock<I80F48>>,
 ) {
     let mut interval = time::interval(Duration::from_secs(1));
-    let token_name = market_name.split('/').collect::<Vec<&str>>()[0];
+    let token_name = &mango_client.context.token(token_index).name;
     loop {
         interval.tick().await;
 
-        let fresh_price = mango_client
-            .get_oracle_price_deprecated(token_name)
-            .await
-            .unwrap();
-        log::info!("{} Updated price is {:?}", token_name, fresh_price.price);
+        let fresh_price = mango_client.bank_oracle_price(token_index).await.unwrap();
+        log::info!("{} Updated price is {:?}", token_name, fresh_price);
         if let Ok(mut price) = price.write() {
-            *price = I80F48::from_num(fresh_price.price)
-                / I80F48::from_num(10f64.powi(-fresh_price.expo));
+            *price = fresh_price;
         }
     }
 }
@@ -163,15 +149,6 @@ pub async fn loop_blocking_orders(
     let market_index = mango_client.context.serum3_market_index(&market_name);
     let s3 = mango_client.context.serum3(market_index);
 
-    let base_decimals = mango_client
-        .context
-        .token(s3.market.base_token_index)
-        .decimals as i32;
-    let quote_decimals = mango_client
-        .context
-        .token(s3.market.quote_token_index)
-        .decimals as i32;
-
     loop {
         interval.tick().await;
 
@@ -185,9 +162,7 @@ pub async fn loop_blocking_orders(
             let fresh_price = price.read().unwrap().to_num::<f64>();
             let bid_price = fresh_price * 1.1;
 
-            let bid_price_lots =
-                bid_price * 10f64.powi(quote_decimals - base_decimals) * s3.coin_lot_size as f64
-                    / s3.pc_lot_size as f64;
+            let bid_price_lots = bid_price * s3.coin_lot_size as f64 / s3.pc_lot_size as f64;
 
             let res = client
                 .serum3_place_order(
@@ -209,9 +184,7 @@ pub async fn loop_blocking_orders(
             }
 
             let ask_price = fresh_price * 0.9;
-            let ask_price_lots =
-                ask_price * 10f64.powi(quote_decimals - base_decimals) * s3.coin_lot_size as f64
-                    / s3.pc_lot_size as f64;
+            let ask_price_lots = ask_price * s3.coin_lot_size as f64 / s3.pc_lot_size as f64;
 
             let res = client
                 .serum3_place_order(

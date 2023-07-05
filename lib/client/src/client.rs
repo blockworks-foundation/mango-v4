@@ -443,20 +443,6 @@ impl MangoClient {
         Ok(price)
     }
 
-    /// returns ui price?! pyth only!
-    pub async fn get_oracle_price_deprecated(
-        &self,
-        token_name: &str,
-    ) -> Result<pyth_sdk_solana::Price, anyhow::Error> {
-        let token_index = *self.context.token_indexes_by_name.get(token_name).unwrap();
-        let mint_info = self.context.mint_info(token_index);
-        let oracle_account = self
-            .account_fetcher
-            .fetch_raw_account(&mint_info.oracle)
-            .await?;
-        Ok(pyth_sdk_solana::load_price(&oracle_account.data()).unwrap())
-    }
-
     //
     // Serum3
     //

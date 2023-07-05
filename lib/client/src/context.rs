@@ -2,10 +2,10 @@ use std::collections::HashMap;
 
 use anchor_client::ClientError;
 
-use anchor_lang::__private::bytemuck;
+use anchor_lang::__private::bytemuck::{self, Zeroable};
 
 use mango_v4::state::{
-    Group, MangoAccountValue, MintInfo, PerpMarket, PerpMarketIndex, Serum3Market,
+    Bank, Group, MangoAccountValue, MintInfo, PerpMarket, PerpMarketIndex, Serum3Market,
     Serum3MarketIndex, TokenIndex,
 };
 
@@ -27,6 +27,8 @@ pub struct TokenContext {
     pub mint_info: MintInfo,
     pub mint_info_address: Pubkey,
     pub decimals: u8,
+    /// Bank snapshot is never updated, only use static parts!
+    pub bank: Bank,
 }
 
 impl TokenContext {
@@ -51,6 +53,7 @@ pub struct Serum3MarketContext {
 
 pub struct PerpMarketContext {
     pub address: Pubkey,
+    /// PerpMarket snapshot is never updated, only use static parts!
     pub market: PerpMarket,
 }
 
@@ -129,6 +132,7 @@ impl MangoGroupContext {
                         mint_info: *mi,
                         mint_info_address: *pk,
                         decimals: u8::MAX,
+                        bank: Bank::zeroed(),
                     },
                 )
             })
@@ -142,6 +146,7 @@ impl MangoGroupContext {
             let token = tokens.get_mut(&bank.token_index).unwrap();
             token.name = bank.name().into();
             token.decimals = bank.mint_decimals;
+            token.bank = bank.clone();
         }
         assert!(tokens.values().all(|t| t.decimals != u8::MAX));
 

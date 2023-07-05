@@ -27,3 +27,4 @@ serum_dex = { workspace = true, default-features=false,features = ["no-entrypoin
 solana-client = { workspace = true }
 solana-sdk = { workspace = true }
 tokio = { version = "1.14.1", features = ["rt-multi-thread", "time", "macros", "sync"] }
+itertools = "0.10.3"
