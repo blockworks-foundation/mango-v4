@@ -162,11 +162,18 @@ impl<'a> ConditionRef<'a> {
     // actions needs too much context knowledge...
     pub fn accounts(&self) -> Vec<AccountMeta> {
         match self {
-            ConditionRef::OraclePrice(op) => vec![AccountMeta {
-                pubkey: op.oracle,
-                is_writable: false,
-                is_signer: false,
-            }],
+            ConditionRef::OraclePrice(op) => vec![
+                AccountMeta {
+                    pubkey: op.base_oracle,
+                    is_writable: false,
+                    is_signer: false,
+                },
+                AccountMeta {
+                    pubkey: op.quote_oracle,
+                    is_writable: false,
+                    is_signer: false,
+                },
+            ],
         }
     }
 }
@@ -178,43 +185,60 @@ pub struct OraclePriceCondition {
     pub condition_type: u32, // always ConditionType::OraclePrice
     #[derivative(Debug = "ignore")]
     pub padding0: u32,
-    pub oracle: Pubkey,
-    pub threshold_ui: I80F48,
-    pub max_staleness_slots: i64, // negative means: don't check
-    pub conf_filter: f32,
+    pub base_oracle: Pubkey,
+    pub quote_oracle: Pubkey,
+    pub base_max_staleness_slots: i64, // negative means: don't check
+    pub quote_max_staleness_slots: i64, // negative means: don't check
+    pub base_conf_filter: f32,
+    pub quote_conf_filter: f32,
+    pub threshold_ui: f64,
     pub trigger_when_above: u8, // TODO: don't use a bool
     #[derivative(Debug = "ignore")]
-    pub padding: [u8; 3],
+    pub padding: [u8; 7],
 }
 const_assert_eq!(
     size_of::<OraclePriceCondition>(),
-    4 + 4 + 32 + 16 + 8 + 4 + 1 + 3
+    4 + 4 + 32 * 2 + 8 * 2 + 4 * 2 + 8 + 1 + 7
 );
-const_assert_eq!(size_of::<OraclePriceCondition>(), 72);
+const_assert_eq!(size_of::<OraclePriceCondition>(), 112);
 const_assert_eq!(size_of::<OraclePriceCondition>() % 8, 0);
 
 impl OraclePriceCondition {
     // TODO: should this distinguish a (possibly permanent) error from a temporary failure (due to staleness, price being wrong, etc)?
     pub fn check(&self, accounts: &[AccountInfo]) -> Result<()> {
-        require_eq!(accounts.len(), 1);
-        let oracle_ai = &accounts[0];
-        require_keys_eq!(*oracle_ai.key, self.oracle);
+        require_eq!(accounts.len(), 2);
+        let base_oracle_ai = &accounts[0];
+        require_keys_eq!(*base_oracle_ai.key, self.base_oracle);
+        let quote_oracle_ai = &accounts[1];
+        require_keys_eq!(*quote_oracle_ai.key, self.quote_oracle);
 
-        let config = OracleConfig {
-            conf_filter: I80F48::from_num(self.conf_filter),
-            max_staleness_slots: self.max_staleness_slots,
+        let base_config = OracleConfig {
+            conf_filter: I80F48::from_num(self.base_conf_filter),
+            max_staleness_slots: self.base_max_staleness_slots,
+            ..Default::default()
+        };
+        let quote_config = OracleConfig {
+            conf_filter: I80F48::from_num(self.quote_conf_filter),
+            max_staleness_slots: self.quote_max_staleness_slots,
             ..Default::default()
         };
         let slot = Clock::get()?.slot;
         // Using this as decimals produces the ui price
         let decimals = QUOTE_DECIMALS.try_into().unwrap();
 
-        let (price_ui, _) = oracle_price_and_state(
-            &AccountInfoRef::borrow(oracle_ai)?,
-            &config,
+        let (base_price_ui, _) = oracle_price_and_state(
+            &AccountInfoRef::borrow(base_oracle_ai)?,
+            &base_config,
             decimals,
             Some(slot),
         )?;
+        let (quote_price_ui, _) = oracle_price_and_state(
+            &AccountInfoRef::borrow(quote_oracle_ai)?,
+            &quote_config,
+            decimals,
+            Some(slot),
+        )?;
+        let price_ui = base_price_ui.to_num::<f64>() / quote_price_ui.to_num::<f64>();
         let price_good = if self.trigger_when_above != 0 {
             price_ui >= self.threshold_ui
         } else {

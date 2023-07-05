@@ -3,7 +3,7 @@ use super::*;
 #[tokio::test]
 async fn test_trigger() -> Result<(), TransportError> {
     let mut test_builder = TestContextBuilder::new();
-    test_builder.test().set_compute_max_units(120_000); // logging..
+    test_builder.test().set_compute_max_units(140_000); // logging..
     let context = test_builder.start_default().await;
     let solana = &context.solana.clone();
 
@@ -147,11 +147,14 @@ async fn test_trigger() -> Result<(), TransportError> {
         let oracle_condition = OraclePriceCondition {
             condition_type: ConditionType::OraclePrice.into(),
             padding0: 0,
-            oracle: tokens[1].oracle,
-            threshold_ui: I80F48::from_num(0.5),
+            base_oracle: tokens[1].oracle,
+            quote_oracle: tokens[0].oracle,
+            threshold_ui: 0.5,
             trigger_when_above: 1,
-            conf_filter: 0.1,
-            max_staleness_slots: -1,
+            base_conf_filter: 0.1,
+            quote_conf_filter: 0.1,
+            base_max_staleness_slots: -1,
+            quote_max_staleness_slots: -1,
             padding: Default::default(),
         };
 
@@ -198,11 +201,14 @@ async fn test_trigger() -> Result<(), TransportError> {
         let oracle_condition = OraclePriceCondition {
             condition_type: ConditionType::OraclePrice.into(),
             padding0: 0,
-            oracle: tokens[1].oracle,
-            threshold_ui: I80F48::from_num(0.5),
+            base_oracle: tokens[1].oracle,
+            quote_oracle: tokens[0].oracle,
+            threshold_ui: 0.5,
             trigger_when_above: 1,
-            conf_filter: 0.1,
-            max_staleness_slots: -1,
+            base_conf_filter: 0.1,
+            quote_conf_filter: 0.1,
+            base_max_staleness_slots: -1,
+            quote_max_staleness_slots: -1,
             padding: Default::default(),
         };
 
