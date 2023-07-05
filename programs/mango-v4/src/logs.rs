@@ -159,9 +159,9 @@ pub struct FillLogV3 {
     pub taker_fee: f32,
 
     pub price: i64,
-    pub quantity: i64, // number of base lots
-    pub maker_closed_pnl: f64,
-    pub taker_closed_pnl: f64,
+    pub quantity: i64,         // number of base lots
+    pub maker_closed_pnl: f64, // settle-token-native units
+    pub taker_closed_pnl: f64, // settle-token-native units
 }
 
 #[event]
