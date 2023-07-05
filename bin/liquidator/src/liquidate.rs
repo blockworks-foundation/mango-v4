@@ -1,11 +1,8 @@
 use std::collections::HashSet;
 use std::time::Duration;
 
-use mango_v4::accounts_zerocopy::KeyedAccountSharedData;
 use mango_v4::health::{HealthCache, HealthType};
-use mango_v4::state::{
-    Bank, MangoAccountValue, PerpMarketIndex, Side, TokenIndex, QUOTE_TOKEN_INDEX,
-};
+use mango_v4::state::{MangoAccountValue, PerpMarketIndex, Side, TokenIndex, QUOTE_TOKEN_INDEX};
 use mango_v4_client::{chain_data, health_cache, AccountFetcher, JupiterSwapMode, MangoClient};
 use solana_sdk::signature::Signature;
 
@@ -13,9 +10,12 @@ use futures::{stream, StreamExt, TryStreamExt};
 use rand::seq::SliceRandom;
 use {anyhow::Context, fixed::types::I80F48, solana_sdk::pubkey::Pubkey};
 
+use crate::util;
+
 pub struct Config {
     pub min_health_ratio: f64,
     pub refresh_timeout: Duration,
+    pub mock_jupiter: bool,
 }
 
 pub async fn jupiter_market_can_buy(
@@ -172,15 +172,7 @@ impl<'a> LiquidateHelper<'a> {
                 {
                     return Ok(None);
                 }
-                let perp = self.client.context.perp(pp.market_index);
-                let oracle = self
-                    .account_fetcher
-                    .fetch_raw_account(&perp.market.oracle)
-                    .await?;
-                let price = perp.market.oracle_price(
-                    &KeyedAccountSharedData::new(perp.market.oracle, oracle.into()),
-                    None,
-                )?;
+                let price = self.client.perp_oracle_price(pp.market_index).await?;
                 Ok(Some((
                     pp.market_index,
                     base_lots,
@@ -328,18 +320,9 @@ impl<'a> LiquidateHelper<'a> {
         let tokens_maybe: anyhow::Result<Vec<(TokenIndex, I80F48, I80F48)>> =
             stream::iter(self.liqee.active_token_positions())
                 .then(|token_position| async {
-                    let token = self.client.context.token(token_position.token_index);
-                    let bank = self
-                        .account_fetcher
-                        .fetch::<Bank>(&token.mint_info.first_bank())?;
-                    let oracle = self
-                        .account_fetcher
-                        .fetch_raw_account(&token.mint_info.oracle)
-                        .await?;
-                    let price = bank.oracle_price(
-                        &KeyedAccountSharedData::new(token.mint_info.oracle, oracle.into()),
-                        None,
-                    )?;
+                    let token_index = token_position.token_index;
+                    let price = self.client.bank_oracle_price(token_index).await?;
+                    let bank = self.client.first_bank(token_index).await?;
                     Ok((
                         token_position.token_index,
                         price,
@@ -358,40 +341,28 @@ impl<'a> LiquidateHelper<'a> {
         source: TokenIndex,
         target: TokenIndex,
     ) -> anyhow::Result<I80F48> {
-        let mut liqor = self
+        let liqor = self
             .account_fetcher
             .fetch_fresh_mango_account(&self.client.mango_account_address)
             .await
             .context("getting liquidator account")?;
 
-        // Ensure the tokens are activated, so they appear in the health cache and
-        // max_swap_source() will work.
-        liqor.ensure_token_position(source)?;
-        liqor.ensure_token_position(target)?;
+        let source_price = self.client.bank_oracle_price(source).await?;
+        let target_price = self.client.bank_oracle_price(target).await?;
 
-        let health_cache = health_cache::new(&self.client.context, self.account_fetcher, &liqor)
-            .await
-            .expect("always ok");
-
-        let source_bank = self.client.first_bank(source).await?;
-        let target_bank = self.client.first_bank(target).await?;
-
-        let source_price = health_cache.token_info(source).unwrap().prices.oracle;
-        let target_price = health_cache.token_info(target).unwrap().prices.oracle;
         // TODO: This is where we could multiply in the liquidation fee factors
-        let oracle_swap_price = source_price / target_price;
+        let price = source_price / target_price;
 
-        let amount = health_cache
-            .max_swap_source_for_health_ratio(
-                &liqor,
-                &source_bank,
-                source_price,
-                &target_bank,
-                oracle_swap_price,
-                self.liqor_min_health_ratio,
-            )
-            .context("getting max_swap_source")?;
-        Ok(amount)
+        util::max_swap_source(
+            self.client,
+            self.account_fetcher,
+            &liqor,
+            source,
+            target,
+            price,
+            self.liqor_min_health_ratio,
+        )
+        .await
     }
 
     async fn token_liq(&self) -> anyhow::Result<Option<Signature>> {

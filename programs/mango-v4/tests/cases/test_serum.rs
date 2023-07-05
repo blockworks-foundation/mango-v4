@@ -135,16 +135,7 @@ impl SerumOrderPlacer {
     }
 
     async fn settle(&self) {
-        send_tx(
-            &self.solana,
-            Serum3SettleFundsInstruction {
-                account: self.account,
-                owner: self.owner,
-                serum_market: self.serum_market,
-            },
-        )
-        .await
-        .unwrap();
+        self.settle_v2(true).await
     }
 
     async fn settle_v2(&self, fees_to_dao: bool) {
@@ -298,10 +289,28 @@ async fn test_serum_basics() -> Result<(), TransportError> {
     assert_eq!(native1, 900);
 
     let account_data = get_mango_account(solana, account).await;
-    assert_eq!(account_data.token_position_by_raw_index(0).in_use_count, 1);
-    assert_eq!(account_data.token_position_by_raw_index(1).in_use_count, 1);
-    assert_eq!(account_data.token_position_by_raw_index(2).in_use_count, 0);
-    let serum_orders = account_data.serum3_orders_by_raw_index(0);
+    assert_eq!(
+        account_data
+            .token_position_by_raw_index(0)
+            .unwrap()
+            .in_use_count,
+        1
+    );
+    assert_eq!(
+        account_data
+            .token_position_by_raw_index(1)
+            .unwrap()
+            .in_use_count,
+        1
+    );
+    assert_eq!(
+        account_data
+            .token_position_by_raw_index(2)
+            .unwrap()
+            .in_use_count,
+        0
+    );
+    let serum_orders = account_data.serum3_orders_by_raw_index(0).unwrap();
     assert_eq!(serum_orders.base_borrows_without_fee, 0);
     assert_eq!(serum_orders.quote_borrows_without_fee, 0);
 
@@ -342,8 +351,20 @@ async fn test_serum_basics() -> Result<(), TransportError> {
     .unwrap();
 
     let account_data = get_mango_account(solana, account).await;
-    assert_eq!(account_data.token_position_by_raw_index(0).in_use_count, 0);
-    assert_eq!(account_data.token_position_by_raw_index(1).in_use_count, 0);
+    assert_eq!(
+        account_data
+            .token_position_by_raw_index(0)
+            .unwrap()
+            .in_use_count,
+        0
+    );
+    assert_eq!(
+        account_data
+            .token_position_by_raw_index(1)
+            .unwrap()
+            .in_use_count,
+        0
+    );
 
     // deregister serum3 market
     send_tx(
@@ -540,7 +561,7 @@ async fn test_serum_loan_origination_fees() -> Result<(), TransportError> {
         let account_data = solana.get_account::<MangoAccount>(account).await;
         assert_eq!(
             account_data.buyback_fees_accrued_current,
-            0 // the v1 function doesn't accumulate buyback fees
+            serum_maker_rebate(fill_amount) as u64
         );
 
         assert_eq!(
@@ -998,6 +1019,65 @@ async fn test_serum_reduce_only_deposits2() -> Result<(), TransportError> {
     // the limit for orders is reduced now, 100 received, 100 on the book
     let err = order_placer.try_bid(1.0, 400, true).await;
     assert_mango_error(&err, MangoError::TokenInReduceOnlyMode.into(), "".into());
+
+    Ok(())
+}
+
+#[tokio::test]
+async fn test_serum_place_reducing_when_liquidatable() -> Result<(), TransportError> {
+    let mut test_builder = TestContextBuilder::new();
+    test_builder.test().set_compute_max_units(150_000); // Serum3PlaceOrder needs lots
+    let context = test_builder.start_default().await;
+    let solana = &context.solana.clone();
+
+    //
+    // SETUP: Create a group, accounts, market etc
+    //
+    let deposit_amount = 1000;
+    let CommonSetup {
+        group_with_tokens,
+        base_token,
+        mut order_placer,
+        ..
+    } = common_setup(&context, deposit_amount).await;
+
+    // Give account some base token borrows (-500)
+    send_tx(
+        solana,
+        TokenWithdrawInstruction {
+            amount: 1500,
+            allow_borrow: true,
+            account: order_placer.account,
+            owner: order_placer.owner,
+            token_account: context.users[0].token_accounts[1],
+            bank_index: 0,
+        },
+    )
+    .await
+    .unwrap();
+
+    // Change the base price to make the account liquidatable
+    set_bank_stub_oracle_price(
+        solana,
+        group_with_tokens.group,
+        &base_token,
+        group_with_tokens.admin,
+        10.0,
+    )
+    .await;
+
+    assert!(account_init_health(solana, order_placer.account).await < 0.0);
+
+    // can place an order that would close some of the borrows
+    order_placer.try_bid(10.0, 200, false).await.unwrap();
+
+    // if too much base is bought, health would decrease: forbidden
+    let err = order_placer.try_bid(10.0, 800, false).await;
+    assert_mango_error(
+        &err,
+        MangoError::HealthMustBePositiveOrIncrease.into(),
+        "".into(),
+    );
 
     Ok(())
 }

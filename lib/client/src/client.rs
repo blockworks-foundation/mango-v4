@@ -2,7 +2,7 @@ use std::str::FromStr;
 use std::sync::Arc;
 use std::time::Duration;
 
-use anchor_client::{ClientError, Cluster};
+use anchor_client::Cluster;
 
 use anchor_lang::__private::bytemuck;
 use anchor_lang::prelude::System;
@@ -16,6 +16,7 @@ use futures::{stream, StreamExt, TryStreamExt};
 use itertools::Itertools;
 
 use mango_v4::accounts_ix::{Serum3OrderType, Serum3SelfTradeBehavior, Serum3Side};
+use mango_v4::accounts_zerocopy::KeyedAccountSharedData;
 use mango_v4::state::{
     Bank, Group, MangoAccountValue, PerpMarketIndex, PlaceOrderType, SelfTradeBehavior,
     Serum3MarketIndex, Side, TokenIndex, INSURANCE_TOKEN_INDEX,
@@ -31,7 +32,7 @@ use solana_sdk::signer::keypair;
 use solana_sdk::transaction::TransactionError;
 
 use crate::account_fetcher::*;
-use crate::context::{MangoGroupContext, Serum3MarketContext, TokenContext};
+use crate::context::MangoGroupContext;
 use crate::gpa::{fetch_anchor_account, fetch_mango_accounts};
 use crate::jupiter;
 
@@ -412,7 +413,38 @@ impl MangoClient {
         self.send_and_confirm_owner_tx(ixs).await
     }
 
-    pub async fn get_oracle_price(
+    pub async fn bank_oracle_price(&self, token_index: TokenIndex) -> anyhow::Result<I80F48> {
+        let bank = self.first_bank(token_index).await?;
+        let mint_info = self.context.mint_info(token_index);
+        let oracle = self
+            .account_fetcher
+            .fetch_raw_account(&mint_info.oracle)
+            .await?;
+        let price = bank.oracle_price(
+            &KeyedAccountSharedData::new(mint_info.oracle, oracle.into()),
+            None,
+        )?;
+        Ok(price)
+    }
+
+    pub async fn perp_oracle_price(
+        &self,
+        perp_market_index: PerpMarketIndex,
+    ) -> anyhow::Result<I80F48> {
+        let perp = self.context.perp(perp_market_index);
+        let oracle = self
+            .account_fetcher
+            .fetch_raw_account(&perp.market.oracle)
+            .await?;
+        let price = perp.market.oracle_price(
+            &KeyedAccountSharedData::new(perp.market.oracle, oracle.into()),
+            None,
+        )?;
+        Ok(price)
+    }
+
+    /// returns ui price?! pyth only!
+    pub async fn get_oracle_price_deprecated(
         &self,
         token_name: &str,
     ) -> Result<pyth_sdk_solana::Price, anyhow::Error> {
@@ -429,36 +461,32 @@ impl MangoClient {
     // Serum3
     //
 
-    pub async fn serum3_create_open_orders(&self, name: &str) -> anyhow::Result<Signature> {
+    pub fn serum3_create_open_orders_instruction(
+        &self,
+        market_index: Serum3MarketIndex,
+    ) -> Instruction {
         let account_pubkey = self.mango_account_address;
-
-        let market_index = *self
-            .context
-            .serum3_market_indexes_by_name
-            .get(name)
-            .unwrap();
-        let serum3_info = self.context.serum3_markets.get(&market_index).unwrap();
+        let s3 = self.context.serum3(market_index);
 
         let open_orders = Pubkey::find_program_address(
             &[
-                account_pubkey.as_ref(),
                 b"Serum3OO".as_ref(),
-                serum3_info.address.as_ref(),
+                account_pubkey.as_ref(),
+                s3.address.as_ref(),
             ],
             &mango_v4::ID,
         )
         .0;
 
-        let ix = Instruction {
+        Instruction {
             program_id: mango_v4::id(),
             accounts: anchor_lang::ToAccountMetas::to_account_metas(
                 &mango_v4::accounts::Serum3CreateOpenOrders {
                     group: self.group(),
                     account: account_pubkey,
-
-                    serum_market: serum3_info.address,
-                    serum_program: serum3_info.market.serum_program,
-                    serum_market_external: serum3_info.market.serum_market_external,
+                    serum_market: s3.address,
+                    serum_program: s3.market.serum_program,
+                    serum_market_external: s3.market.serum_market_external,
                     open_orders,
                     owner: self.owner(),
                     payer: self.owner(),
@@ -470,116 +498,47 @@ impl MangoClient {
             data: anchor_lang::InstructionData::data(
                 &mango_v4::instruction::Serum3CreateOpenOrders {},
             ),
-        };
+        }
+    }
+
+    pub async fn serum3_create_open_orders(&self, name: &str) -> anyhow::Result<Signature> {
+        let market_index = self.context.serum3_market_index(name);
+        let ix = self.serum3_create_open_orders_instruction(market_index);
         self.send_and_confirm_owner_tx(vec![ix]).await
     }
 
-    fn serum3_data_by_market_name<'a>(&'a self, name: &str) -> Result<Serum3Data<'a>, ClientError> {
-        let market_index = *self
-            .context
-            .serum3_market_indexes_by_name
-            .get(name)
-            .unwrap();
-        self.serum3_data_by_market_index(market_index)
-    }
-
-    fn serum3_data_by_market_index<'a>(
-        &'a self,
-        market_index: Serum3MarketIndex,
-    ) -> Result<Serum3Data<'a>, ClientError> {
-        let serum3_info = self.context.serum3_markets.get(&market_index).unwrap();
-
-        let quote_info = self.context.token(serum3_info.market.quote_token_index);
-        let base_info = self.context.token(serum3_info.market.base_token_index);
-
-        Ok(Serum3Data {
-            market_index,
-            market: serum3_info,
-            quote: quote_info,
-            base: base_info,
-        })
-    }
-
     #[allow(clippy::too_many_arguments)]
-    pub async fn serum3_place_order(
+    pub fn serum3_place_order_instruction(
         &self,
-        name: &str,
+        account: &MangoAccountValue,
+        market_index: Serum3MarketIndex,
         side: Serum3Side,
-        price: f64,
-        size: f64,
+        limit_price: u64,
+        max_base_qty: u64,
+        max_native_quote_qty_including_fees: u64,
         self_trade_behavior: Serum3SelfTradeBehavior,
         order_type: Serum3OrderType,
         client_order_id: u64,
         limit: u16,
-    ) -> anyhow::Result<Signature> {
-        let s3 = self.serum3_data_by_market_name(name)?;
+    ) -> anyhow::Result<Instruction> {
+        let s3 = self.context.serum3(market_index);
+        let base = self.context.serum3_base_token(market_index);
+        let quote = self.context.serum3_quote_token(market_index);
+        let open_orders = account
+            .serum3_orders(market_index)
+            .expect("oo is created")
+            .open_orders;
 
-        let account = self.mango_account().await?;
-        let open_orders = account.serum3_orders(s3.market_index).unwrap().open_orders;
+        let health_check_metas = self.context.derive_health_check_remaining_account_metas(
+            account,
+            vec![],
+            vec![],
+            vec![],
+        )?;
 
-        let health_check_metas = self
-            .derive_health_check_remaining_account_metas(vec![], vec![], vec![])
-            .await?;
-
-        // https://github.com/project-serum/serum-ts/blob/master/packages/serum/src/market.ts#L1306
-        let limit_price = {
-            (price * ((10u64.pow(s3.quote.decimals as u32) * s3.market.coin_lot_size) as f64))
-                as u64
-                / (10u64.pow(s3.base.decimals as u32) * s3.market.pc_lot_size)
-        };
-        // https://github.com/project-serum/serum-ts/blob/master/packages/serum/src/market.ts#L1333
-        let max_base_qty =
-            { (size * 10u64.pow(s3.base.decimals as u32) as f64) as u64 / s3.market.coin_lot_size };
-        let max_native_quote_qty_including_fees = {
-            fn get_fee_tier(msrm_balance: u64, srm_balance: u64) -> u64 {
-                if msrm_balance >= 1 {
-                    6
-                } else if srm_balance >= 1_000_000 {
-                    5
-                } else if srm_balance >= 100_000 {
-                    4
-                } else if srm_balance >= 10_000 {
-                    3
-                } else if srm_balance >= 1_000 {
-                    2
-                } else if srm_balance >= 100 {
-                    1
-                } else {
-                    0
-                }
-            }
-
-            fn get_fee_rates(fee_tier: u64) -> (f64, f64) {
-                if fee_tier == 1 {
-                    // SRM2
-                    return (0.002, -0.0003);
-                } else if fee_tier == 2 {
-                    // SRM3
-                    return (0.0018, -0.0003);
-                } else if fee_tier == 3 {
-                    // SRM4
-                    return (0.0016, -0.0003);
-                } else if fee_tier == 4 {
-                    // SRM5
-                    return (0.0014, -0.0003);
-                } else if fee_tier == 5 {
-                    // SRM6
-                    return (0.0012, -0.0003);
-                } else if fee_tier == 6 {
-                    // MSRM
-                    return (0.001, -0.0005);
-                }
-                // Base
-                (0.0022, -0.0003)
-            }
-
-            let fee_tier = get_fee_tier(0, 0);
-            let rates = get_fee_rates(fee_tier);
-            (s3.market.pc_lot_size as f64 * (1f64 + rates.0)) as u64 * (limit_price * max_base_qty)
-        };
         let payer_mint_info = match side {
-            Serum3Side::Bid => s3.quote.mint_info,
-            Serum3Side::Ask => s3.base.mint_info,
+            Serum3Side::Bid => quote.mint_info,
+            Serum3Side::Ask => base.mint_info,
         };
 
         let ix = Instruction {
@@ -593,16 +552,16 @@ impl MangoClient {
                         payer_bank: payer_mint_info.first_bank(),
                         payer_vault: payer_mint_info.first_vault(),
                         payer_oracle: payer_mint_info.oracle,
-                        serum_market: s3.market.address,
-                        serum_program: s3.market.market.serum_program,
-                        serum_market_external: s3.market.market.serum_market_external,
-                        market_bids: s3.market.bids,
-                        market_asks: s3.market.asks,
-                        market_event_queue: s3.market.event_q,
-                        market_request_queue: s3.market.req_q,
-                        market_base_vault: s3.market.coin_vault,
-                        market_quote_vault: s3.market.pc_vault,
-                        market_vault_signer: s3.market.vault_signer,
+                        serum_market: s3.address,
+                        serum_program: s3.market.serum_program,
+                        serum_market_external: s3.market.serum_market_external,
+                        market_bids: s3.bids,
+                        market_asks: s3.asks,
+                        market_event_queue: s3.event_q,
+                        market_request_queue: s3.req_q,
+                        market_base_vault: s3.coin_vault,
+                        market_quote_vault: s3.pc_vault,
+                        market_vault_signer: s3.vault_signer,
                         owner: self.owner(),
                         token_program: Token::id(),
                     },
@@ -622,51 +581,123 @@ impl MangoClient {
                 limit,
             }),
         };
+
+        Ok(ix)
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    pub async fn serum3_place_order(
+        &self,
+        name: &str,
+        side: Serum3Side,
+        limit_price: u64,
+        max_base_qty: u64,
+        max_native_quote_qty_including_fees: u64,
+        self_trade_behavior: Serum3SelfTradeBehavior,
+        order_type: Serum3OrderType,
+        client_order_id: u64,
+        limit: u16,
+    ) -> anyhow::Result<Signature> {
+        let account = self.mango_account().await?;
+        let market_index = self.context.serum3_market_index(name);
+        let ix = self.serum3_place_order_instruction(
+            &account,
+            market_index,
+            side,
+            limit_price,
+            max_base_qty,
+            max_native_quote_qty_including_fees,
+            self_trade_behavior,
+            order_type,
+            client_order_id,
+            limit,
+        )?;
         self.send_and_confirm_owner_tx(vec![ix]).await
     }
 
     pub async fn serum3_settle_funds(&self, name: &str) -> anyhow::Result<Signature> {
-        let s3 = self.serum3_data_by_market_name(name)?;
+        let market_index = self.context.serum3_market_index(name);
+        let s3 = self.context.serum3(market_index);
+        let base = self.context.serum3_base_token(market_index);
+        let quote = self.context.serum3_quote_token(market_index);
 
         let account = self.mango_account().await?;
-        let open_orders = account.serum3_orders(s3.market_index).unwrap().open_orders;
+        let open_orders = account.serum3_orders(market_index).unwrap().open_orders;
 
         let ix = Instruction {
             program_id: mango_v4::id(),
             accounts: anchor_lang::ToAccountMetas::to_account_metas(
-                &mango_v4::accounts::Serum3SettleFunds {
-                    group: self.group(),
-                    account: self.mango_account_address,
-                    open_orders,
-                    quote_bank: s3.quote.mint_info.first_bank(),
-                    quote_vault: s3.quote.mint_info.first_vault(),
-                    base_bank: s3.base.mint_info.first_bank(),
-                    base_vault: s3.base.mint_info.first_vault(),
-                    serum_market: s3.market.address,
-                    serum_program: s3.market.market.serum_program,
-                    serum_market_external: s3.market.market.serum_market_external,
-                    market_base_vault: s3.market.coin_vault,
-                    market_quote_vault: s3.market.pc_vault,
-                    market_vault_signer: s3.market.vault_signer,
-                    owner: self.owner(),
-                    token_program: Token::id(),
+                &mango_v4::accounts::Serum3SettleFundsV2 {
+                    v1: mango_v4::accounts::Serum3SettleFunds {
+                        group: self.group(),
+                        account: self.mango_account_address,
+                        open_orders,
+                        quote_bank: quote.mint_info.first_bank(),
+                        quote_vault: quote.mint_info.first_vault(),
+                        base_bank: base.mint_info.first_bank(),
+                        base_vault: base.mint_info.first_vault(),
+                        serum_market: s3.address,
+                        serum_program: s3.market.serum_program,
+                        serum_market_external: s3.market.serum_market_external,
+                        market_base_vault: s3.coin_vault,
+                        market_quote_vault: s3.pc_vault,
+                        market_vault_signer: s3.vault_signer,
+                        owner: self.owner(),
+                        token_program: Token::id(),
+                    },
+                    v2: mango_v4::accounts::Serum3SettleFundsV2Extra {
+                        quote_oracle: quote.mint_info.oracle,
+                        base_oracle: base.mint_info.oracle,
+                    },
                 },
                 None,
             ),
-            data: anchor_lang::InstructionData::data(&mango_v4::instruction::Serum3SettleFunds {}),
+            data: anchor_lang::InstructionData::data(&mango_v4::instruction::Serum3SettleFundsV2 {
+                fees_to_dao: true,
+            }),
         };
         self.send_and_confirm_owner_tx(vec![ix]).await
+    }
+
+    pub fn serum3_cancel_all_orders_instruction(
+        &self,
+        account: &MangoAccountValue,
+        market_index: Serum3MarketIndex,
+        limit: u8,
+    ) -> anyhow::Result<Instruction> {
+        let s3 = self.context.serum3(market_index);
+        let open_orders = account.serum3_orders(market_index)?.open_orders;
+
+        let ix = Instruction {
+            program_id: mango_v4::id(),
+            accounts: anchor_lang::ToAccountMetas::to_account_metas(
+                &mango_v4::accounts::Serum3CancelAllOrders {
+                    group: self.group(),
+                    account: self.mango_account_address,
+                    open_orders,
+                    market_bids: s3.bids,
+                    market_asks: s3.asks,
+                    market_event_queue: s3.event_q,
+                    serum_market: s3.address,
+                    serum_program: s3.market.serum_program,
+                    serum_market_external: s3.market.serum_market_external,
+                    owner: self.owner(),
+                },
+                None,
+            ),
+            data: anchor_lang::InstructionData::data(
+                &mango_v4::instruction::Serum3CancelAllOrders { limit },
+            ),
+        };
+
+        Ok(ix)
     }
 
     pub async fn serum3_cancel_all_orders(
         &self,
         market_name: &str,
     ) -> Result<Vec<u128>, anyhow::Error> {
-        let market_index = *self
-            .context
-            .serum3_market_indexes_by_name
-            .get(market_name)
-            .unwrap();
+        let market_index = self.context.serum3_market_index(market_name);
         let account = self.mango_account().await?;
         let open_orders = account.serum3_orders(market_index).unwrap().open_orders;
         let open_orders_acc = self.account_fetcher.fetch_raw_account(&open_orders).await?;
@@ -699,7 +730,9 @@ impl MangoClient {
         market_index: Serum3MarketIndex,
         open_orders: &Pubkey,
     ) -> anyhow::Result<Signature> {
-        let s3 = self.serum3_data_by_market_index(market_index)?;
+        let s3 = self.context.serum3(market_index);
+        let base = self.context.serum3_base_token(market_index);
+        let quote = self.context.serum3_quote_token(market_index);
 
         let health_remaining_ams = self
             .context
@@ -714,19 +747,19 @@ impl MangoClient {
                         group: self.group(),
                         account: *liqee.0,
                         open_orders: *open_orders,
-                        serum_market: s3.market.address,
-                        serum_program: s3.market.market.serum_program,
-                        serum_market_external: s3.market.market.serum_market_external,
-                        market_bids: s3.market.bids,
-                        market_asks: s3.market.asks,
-                        market_event_queue: s3.market.event_q,
-                        market_base_vault: s3.market.coin_vault,
-                        market_quote_vault: s3.market.pc_vault,
-                        market_vault_signer: s3.market.vault_signer,
-                        quote_bank: s3.quote.mint_info.first_bank(),
-                        quote_vault: s3.quote.mint_info.first_vault(),
-                        base_bank: s3.base.mint_info.first_bank(),
-                        base_vault: s3.base.mint_info.first_vault(),
+                        serum_market: s3.address,
+                        serum_program: s3.market.serum_program,
+                        serum_market_external: s3.market.serum_market_external,
+                        market_bids: s3.bids,
+                        market_asks: s3.asks,
+                        market_event_queue: s3.event_q,
+                        market_base_vault: s3.coin_vault,
+                        market_quote_vault: s3.pc_vault,
+                        market_vault_signer: s3.vault_signer,
+                        quote_bank: quote.mint_info.first_bank(),
+                        quote_vault: quote.mint_info.first_vault(),
+                        base_bank: base.mint_info.first_bank(),
+                        base_vault: base.mint_info.first_vault(),
                         token_program: Token::id(),
                     },
                     None,
@@ -747,10 +780,11 @@ impl MangoClient {
         side: Serum3Side,
         order_id: u128,
     ) -> anyhow::Result<Signature> {
-        let s3 = self.serum3_data_by_market_name(market_name)?;
+        let market_index = self.context.serum3_market_index(market_name);
+        let s3 = self.context.serum3(market_index);
 
         let account = self.mango_account().await?;
-        let open_orders = account.serum3_orders(s3.market_index).unwrap().open_orders;
+        let open_orders = account.serum3_orders(market_index).unwrap().open_orders;
 
         let ix = Instruction {
             program_id: mango_v4::id(),
@@ -759,13 +793,13 @@ impl MangoClient {
                     &mango_v4::accounts::Serum3CancelOrder {
                         group: self.group(),
                         account: self.mango_account_address,
-                        serum_market: s3.market.address,
-                        serum_program: s3.market.market.serum_program,
-                        serum_market_external: s3.market.market.serum_market_external,
+                        serum_market: s3.address,
+                        serum_program: s3.market.serum_program,
+                        serum_market_external: s3.market.serum_market_external,
                         open_orders,
-                        market_bids: s3.market.bids,
-                        market_asks: s3.market.asks,
-                        market_event_queue: s3.market.event_q,
+                        market_bids: s3.bids,
+                        market_asks: s3.asks,
+                        market_event_queue: s3.event_q,
                         owner: self.owner(),
                     },
                     None,
@@ -782,6 +816,8 @@ impl MangoClient {
     //
     // Perps
     //
+
+    #[allow(clippy::too_many_arguments)]
     pub fn perp_place_order_instruction(
         &self,
         account: &MangoAccountValue,
@@ -841,6 +877,7 @@ impl MangoClient {
         Ok(ix)
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub async fn perp_place_order(
         &self,
         market_index: PerpMarketIndex,
@@ -1228,6 +1265,53 @@ impl MangoClient {
         self.send_and_confirm_owner_tx(vec![ix]).await
     }
 
+    pub async fn token_conditional_swap_trigger(
+        &self,
+        liqee: (&Pubkey, &MangoAccountValue),
+        token_conditional_swap_id: u64,
+        max_buy_token_to_liqee: u64,
+        max_sell_token_to_liqor: u64,
+    ) -> anyhow::Result<Signature> {
+        let (tcs_index, tcs) = liqee
+            .1
+            .token_conditional_swap_by_id(token_conditional_swap_id)?;
+
+        let health_remaining_ams = self
+            .derive_liquidation_health_check_remaining_account_metas(
+                liqee.1,
+                vec![tcs.buy_token_index, tcs.sell_token_index],
+                &[tcs.buy_token_index, tcs.sell_token_index],
+            )
+            .await
+            .unwrap();
+
+        let ix = Instruction {
+            program_id: mango_v4::id(),
+            accounts: {
+                let mut ams = anchor_lang::ToAccountMetas::to_account_metas(
+                    &mango_v4::accounts::TokenConditionalSwapTrigger {
+                        group: self.group(),
+                        liqee: *liqee.0,
+                        liqor: self.mango_account_address,
+                        liqor_authority: self.owner(),
+                    },
+                    None,
+                );
+                ams.extend(health_remaining_ams);
+                ams
+            },
+            data: anchor_lang::InstructionData::data(
+                &mango_v4::instruction::TokenConditionalSwapTrigger {
+                    token_conditional_swap_id,
+                    token_conditional_swap_index: tcs_index.try_into().unwrap(),
+                    max_buy_token_to_liqee,
+                    max_sell_token_to_liqor,
+                },
+            ),
+        };
+        self.send_and_confirm_owner_tx(vec![ix]).await
+    }
+
     // health region
 
     pub fn health_region_begin_instruction(
@@ -1298,6 +1382,21 @@ impl MangoClient {
 
     // jupiter
 
+    async fn http_error_handling<T: serde::de::DeserializeOwned>(
+        response: reqwest::Response,
+    ) -> anyhow::Result<T> {
+        let status = response.status();
+        let response_text = response
+            .text()
+            .await
+            .context("awaiting body of quote request to jupiter")?;
+        if !status.is_success() {
+            anyhow::bail!("request failed, status: {status}, body: {response_text}");
+        }
+        serde_json::from_str::<T>(&response_text)
+            .with_context(|| format!("response has unexpected format, body: {response_text}"))
+    }
+
     pub async fn jupiter_route(
         &self,
         input_mint: Pubkey,
@@ -1306,7 +1405,7 @@ impl MangoClient {
         slippage: u64,
         swap_mode: JupiterSwapMode,
     ) -> anyhow::Result<jupiter::QueryRoute> {
-        let quote = self
+        let response = self
             .http_client
             .get("https://quote-api.jup.ag/v4/quote")
             .query(&[
@@ -1328,27 +1427,18 @@ impl MangoClient {
             ])
             .send()
             .await
-            .context("quote request to jupiter")?
-            .json::<jupiter::QueryResult>()
-            .await
-            .context("receiving json response from jupiter quote request")?;
-
-        // Find the top route that doesn't involve Raydium (that has too many accounts)
-        let route = quote
-            .data
-            .iter()
-            .find(|route| {
-                !route
-                    .market_infos
-                    .iter()
-                    .any(|mi| mi.label.contains("Raydium"))
-            })
-            .ok_or_else(|| {
-                anyhow::anyhow!(
-                    "no route for swap. found {} routes, but none were usable",
-                    quote.data.len()
-                )
+            .context("quote request to jupiter")?;
+        let quote: jupiter::QueryResult =
+            Self::http_error_handling(response).await.with_context(|| {
+                format!("error requesting jupiter route between {input_mint} and {output_mint}")
             })?;
+
+        let route = quote.data.first().ok_or_else(|| {
+            anyhow::anyhow!(
+                "no route for swap. found {} routes, but none were usable",
+                quote.data.len()
+            )
+        })?;
 
         Ok(route.clone())
     }
@@ -1367,7 +1457,7 @@ impl MangoClient {
             .jupiter_route(input_mint, output_mint, amount, slippage, swap_mode)
             .await?;
 
-        let swap = self
+        let swap_response = self
             .http_client
             .post("https://quote-api.jup.ag/v4/swap")
             .json(&jupiter::SwapRequest {
@@ -1378,10 +1468,11 @@ impl MangoClient {
             })
             .send()
             .await
-            .context("swap transaction request to jupiter")?
-            .json::<jupiter::SwapResponse>()
+            .context("swap transaction request to jupiter")?;
+
+        let swap: jupiter::SwapResponse = Self::http_error_handling(swap_response)
             .await
-            .context("receiving json response from jupiter swap transaction request")?;
+            .context("error requesting jupiter swap")?;
 
         if swap.setup_transaction.is_some() || swap.cleanup_transaction.is_some() {
             anyhow::bail!(
@@ -1651,13 +1742,6 @@ impl MangoClient {
         .send_and_confirm(&self.client)
         .await
     }
-}
-
-struct Serum3Data<'a> {
-    market_index: Serum3MarketIndex,
-    market: &'a Serum3MarketContext,
-    quote: &'a TokenContext,
-    base: &'a TokenContext,
 }
 
 #[derive(Debug, thiserror::Error)]

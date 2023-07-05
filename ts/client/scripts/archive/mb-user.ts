@@ -1,7 +1,7 @@
 import { AnchorProvider, Wallet } from '@coral-xyz/anchor';
 import { Connection, Keypair } from '@solana/web3.js';
 import fs from 'fs';
-import { HealthType } from '../../src/accounts/mangoAccount';
+import { HealthType, MangoAccount } from '../../src/accounts/mangoAccount';
 import {
   MANGO_V4_ID,
   MangoClient,
@@ -38,10 +38,15 @@ async function main() {
 
   // create + fetch account
   console.log(`Creating mangoaccount...`);
-  const mangoAccount = await client.getOrCreateMangoAccount(group);
+  const mangoAccount = (await client.getMangoAccountForOwner(
+    group,
+    user.publicKey,
+    0,
+  )) as MangoAccount;
   console.log(`...created/found mangoAccount ${mangoAccount.publicKey}`);
   console.log(mangoAccount.toString(group));
 
+  // eslint-disable-next-line no-constant-condition
   if (true) {
     console.log(`...depositing 0.0001 USDC`);
     await client.tokenDeposit(

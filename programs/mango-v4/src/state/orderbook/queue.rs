@@ -123,7 +123,6 @@ impl<'a> Iterator for EventQueueIterator<'a> {
 }
 
 #[zero_copy]
-#[derive(bytemuck::Pod, bytemuck::Zeroable)]
 pub struct EventQueueHeader {
     head: u32,
     count: u32,
@@ -157,7 +156,7 @@ impl QueueHeader for EventQueueHeader {
 
 const EVENT_SIZE: usize = 208;
 #[zero_copy]
-#[derive(Debug, bytemuck::Pod, bytemuck::Zeroable)]
+#[derive(Debug)]
 pub struct AnyEvent {
     pub event_type: u8,
     pub padding: [u8; 207],

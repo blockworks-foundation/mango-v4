@@ -17,6 +17,7 @@ export class MangoAccount {
   public serum3: Serum3Orders[];
   public perps: PerpPosition[];
   public perpOpenOrders: PerpOo[];
+  public tokenConditionalSwaps: TokenConditionalSwap[];
 
   static from(
     publicKey: PublicKey,
@@ -41,6 +42,7 @@ export class MangoAccount {
       perps: unknown;
       perpOpenOrders: unknown;
     },
+    tokenConditionalSwaps: TokenConditionalSwapDto[],
   ): MangoAccount {
     return new MangoAccount(
       publicKey,
@@ -63,6 +65,7 @@ export class MangoAccount {
       obj.serum3 as Serum3PositionDto[],
       obj.perps as PerpPositionDto[],
       obj.perpOpenOrders as PerpOoDto[],
+      tokenConditionalSwaps,
       new Map(), // serum3OosMapByMarketIndex
     );
   }
@@ -88,6 +91,7 @@ export class MangoAccount {
     serum3: Serum3PositionDto[],
     perps: PerpPositionDto[],
     perpOpenOrders: PerpOoDto[],
+    tokenConditionalSwaps: TokenConditionalSwapDto[],
     public serum3OosMapByMarketIndex: Map<number, OpenOrders>,
   ) {
     this.name = utf8.decode(new Uint8Array(name)).split('\x00')[0];
@@ -95,10 +99,13 @@ export class MangoAccount {
     this.serum3 = serum3.map((dto) => Serum3Orders.from(dto));
     this.perps = perps.map((dto) => PerpPosition.from(dto));
     this.perpOpenOrders = perpOpenOrders.map((dto) => PerpOo.from(dto));
+    this.tokenConditionalSwaps = tokenConditionalSwaps.map((dto) =>
+      TokenConditionalSwap.from(dto),
+    );
   }
 
   public async reload(client: MangoClient): Promise<MangoAccount> {
-    const mangoAccount = await client.getMangoAccount(this);
+    const mangoAccount = await client.getMangoAccount(this.publicKey);
     await mangoAccount.reloadSerum3OpenOrders(client);
     Object.assign(this, mangoAccount);
     return mangoAccount;
@@ -141,6 +148,22 @@ export class MangoAccount {
     return this;
   }
 
+  loadSerum3OpenOrders(serum3OosMapByOo: Map<string, OpenOrders>): void {
+    const serum3Active = this.serum3Active();
+    if (!serum3Active.length) return;
+    this.serum3OosMapByMarketIndex = new Map(
+      Array.from(
+        serum3Active.map((mangoOo) => {
+          const oo = serum3OosMapByOo.get(mangoOo.openOrders.toBase58());
+          if (!oo) {
+            throw new Error(`Undefined open orders for ${mangoOo.openOrders}`);
+          }
+          return [mangoOo.marketIndex, oo];
+        }),
+      ),
+    );
+  }
+
   public isDelegate(client: MangoClient): boolean {
     return this.delegate.equals(
       (client.program.provider as AnchorProvider).wallet.publicKey,
@@ -173,6 +196,10 @@ export class MangoAccount {
 
   public perpActive(): PerpPosition[] {
     return this.perps.filter((perp) => perp.isActive());
+  }
+
+  public tokenConditionalSwapsActive(): TokenConditionalSwap[] {
+    return this.tokenConditionalSwaps.filter((tcs) => tcs.hasData);
   }
 
   public perpOrdersActive(): PerpOo[] {
@@ -364,15 +391,9 @@ export class MangoAccount {
         .get(baseBank.tokenIndex)!
         .iadd(I80F48.fromI64(oo.baseTokenTotal).mul(baseBank.price));
       const quoteBank = group.getFirstBankByTokenIndex(sp.quoteTokenIndex);
-      // NOTE: referrerRebatesAccrued is not declared on oo class, but the layout
-      // is aware of it
       tokensMap
         .get(baseBank.tokenIndex)!
-        .iadd(
-          I80F48.fromI64(
-            oo.quoteTokenTotal.add((oo as any).referrerRebatesAccrued),
-          ).mul(quoteBank.price),
-        );
+        .iadd(I80F48.fromI64(oo.quoteTokenTotal).mul(quoteBank.price));
     }
 
     const tokenEquity = Array.from(tokensMap.values()).reduce(
@@ -1319,7 +1340,7 @@ export class PerpPosition {
     return this.marketIndex !== PerpPosition.PerpMarketIndexUnset;
   }
 
-  public getBasePositionNative(perpMarket: PerpMarket): I80F48 {
+  public getBasePosition(perpMarket: PerpMarket): I80F48 {
     return I80F48.fromI64(this.basePositionLots.mul(perpMarket.baseLotSize));
   }
 
@@ -1382,14 +1403,6 @@ export class PerpPosition {
     return toUiDecimalsForQuote(this.getUnsettledFunding(perpMarket));
   }
 
-  public getEquityUi(perpMarket: PerpMarket): number {
-    if (perpMarket.perpMarketIndex !== this.marketIndex) {
-      throw new Error("PerpPosition doesn't belong to the given market!");
-    }
-
-    return toUiDecimalsForQuote(this.getEquity(perpMarket));
-  }
-
   public getEquity(perpMarket: PerpMarket): I80F48 {
     if (perpMarket.perpMarketIndex !== this.marketIndex) {
       throw new Error("PerpPosition doesn't belong to the given market!");
@@ -1414,6 +1427,14 @@ export class PerpPosition {
     return baseLots.mul(lotsToQuote).add(quoteCurrent);
   }
 
+  public getEquityUi(perpMarket: PerpMarket): number {
+    if (perpMarket.perpMarketIndex !== this.marketIndex) {
+      throw new Error("PerpPosition doesn't belong to the given market!");
+    }
+
+    return toUiDecimalsForQuote(this.getEquity(perpMarket));
+  }
+
   public hasOpenOrders(): boolean {
     const zero = new BN(0);
     return (
@@ -1436,48 +1457,56 @@ export class PerpPosition {
     );
   }
 
-  public getBreakEvenPriceUi(perpMarket: PerpMarket): number {
+  public getLiquidationPrice(
+    group: Group,
+    mangoAccount: MangoAccount,
+  ): I80F48 | null {
+    if (this.basePositionLots.eq(new BN(0))) {
+      return null;
+    }
+
+    return HealthCache.fromMangoAccount(
+      group,
+      mangoAccount,
+    ).getPerpPositionLiquidationPrice(group, mangoAccount, this);
+  }
+
+  public getLiquidationPriceUi(
+    group: Group,
+    mangoAccount: MangoAccount,
+  ): number | null {
+    const pm = group.getPerpMarketByMarketIndex(this.marketIndex);
+    const lp = this.getLiquidationPrice(group, mangoAccount);
+    return lp == null ? null : pm.priceNativeToUi(lp.toNumber());
+  }
+
+  public getBreakEvenPrice(perpMarket: PerpMarket): I80F48 {
     if (perpMarket.perpMarketIndex !== this.marketIndex) {
       throw new Error("PerpPosition doesn't belong to the given market!");
     }
 
     if (this.basePositionLots.eq(new BN(0))) {
-      return 0;
+      return ZERO_I80F48();
     }
+
+    return I80F48.fromI64(this.quoteRunningNative)
+      .sub(this.getUnsettledFunding(perpMarket))
+      .neg()
+      .div(I80F48.fromI64(this.basePositionLots.mul(perpMarket.baseLotSize)));
+  }
+
+  public getBreakEvenPriceUi(perpMarket: PerpMarket): number {
     return perpMarket.priceNativeToUi(
-      -this.quoteRunningNative.toNumber() /
-        this.basePositionLots.mul(perpMarket.baseLotSize).toNumber(),
+      this.getBreakEvenPrice(perpMarket).toNumber(),
     );
   }
 
-  public cumulativePnlOverPositionLifetimeUi(perpMarket: PerpMarket): number {
-    if (perpMarket.perpMarketIndex !== this.marketIndex) {
-      throw new Error("PerpPosition doesn't belong to the given market!");
-    }
-
-    const priceChange = perpMarket.price.sub(
-      this.getAverageEntryPrice(perpMarket),
-    );
-
-    return toUiDecimalsForQuote(
-      this.realizedPnlForPositionNative.add(
-        this.getBasePositionNative(perpMarket).mul(priceChange),
-      ),
-    );
-  }
-
-  public getUnsettledPnl(perpMarket: PerpMarket): I80F48 {
-    if (perpMarket.perpMarketIndex !== this.marketIndex) {
-      throw new Error("PerpPosition doesn't belong to the given market!");
-    }
-
-    return this.quotePositionNative.add(
-      this.getBasePositionNative(perpMarket).mul(perpMarket.price),
-    );
-  }
-
-  public getUnsettledPnlUi(perpMarket: PerpMarket): number {
-    return toUiDecimalsForQuote(this.getUnsettledPnl(perpMarket));
+  public canSettlePnl(
+    group: Group,
+    perpMarket: PerpMarket,
+    account: MangoAccount,
+  ): boolean {
+    return !this.getSettleablePnl(group, perpMarket, account).eq(ZERO_I80F48());
   }
 
   public updateSettleLimit(perpMarket: PerpMarket): void {
@@ -1555,6 +1584,20 @@ export class PerpPosition {
     }
   }
 
+  public getUnsettledPnl(perpMarket: PerpMarket): I80F48 {
+    if (perpMarket.perpMarketIndex !== this.marketIndex) {
+      throw new Error("PerpPosition doesn't belong to the given market!");
+    }
+
+    return this.quotePositionNative.add(
+      this.getBasePosition(perpMarket).mul(perpMarket.price),
+    );
+  }
+
+  public getUnsettledPnlUi(perpMarket: PerpMarket): number {
+    return toUiDecimalsForQuote(this.getUnsettledPnl(perpMarket));
+  }
+
   public getSettleablePnl(
     group: Group,
     perpMarket: PerpMarket,
@@ -1578,7 +1621,7 @@ export class PerpPosition {
     return limitedUnsettled;
   }
 
-  getSettleablePnlUi(
+  public getSettleablePnlUi(
     group: Group,
     perpMarket: PerpMarket,
     account: MangoAccount,
@@ -1588,12 +1631,38 @@ export class PerpPosition {
     );
   }
 
-  public canSettlePnl(
-    group: Group,
-    perpMarket: PerpMarket,
-    account: MangoAccount,
-  ): boolean {
-    return !this.getSettleablePnl(group, perpMarket, account).eq(ZERO_I80F48());
+  public cumulativePnlOverPositionLifetimeUi(perpMarket: PerpMarket): number {
+    if (perpMarket.perpMarketIndex !== this.marketIndex) {
+      throw new Error("PerpPosition doesn't belong to the given market!");
+    }
+
+    const priceChange = perpMarket.price.sub(
+      this.getAverageEntryPrice(perpMarket),
+    );
+
+    return toUiDecimalsForQuote(
+      this.realizedPnlForPositionNative.add(
+        this.getBasePosition(perpMarket).mul(priceChange),
+      ),
+    );
+  }
+
+  public getUnRealizedPnlUi(perpMarket: PerpMarket): number {
+    if (perpMarket.perpMarketIndex !== this.marketIndex) {
+      throw new Error("PerpPosition doesn't belong to the given market!");
+    }
+
+    const priceChange = perpMarket.price.sub(
+      this.getAverageEntryPrice(perpMarket),
+    );
+
+    return toUiDecimalsForQuote(
+      this.getBasePosition(perpMarket).mul(priceChange),
+    );
+  }
+
+  public getRealizedPnlUi(): number {
+    return toUiDecimalsForQuote(this.realizedPnlForPositionNative);
   }
 
   toString(perpMarket?: PerpMarket): string {
@@ -1680,6 +1749,69 @@ export class PerpOoDto {
     public market: number,
     public clientId: BN,
     public id: BN,
+  ) {}
+}
+
+export class TokenConditionalSwap {
+  static from(dto: TokenConditionalSwapDto): TokenConditionalSwap {
+    return new TokenConditionalSwap(
+      dto.id,
+      dto.maxBuy,
+      dto.maxSell,
+      dto.bought,
+      dto.sold,
+      dto.expiryTimestamp,
+      dto.priceLowerLimit,
+      dto.priceUpperLimit,
+      dto.pricePremiumFraction,
+      dto.takerFeeFraction,
+      dto.makerFeeFraction,
+      dto.buyTokenIndex as TokenIndex,
+      dto.sellTokenIndex as TokenIndex,
+      dto.hasData == 1,
+      dto.allowCreatingDeposits == 1,
+      dto.allowCreatingBorrows == 1,
+    );
+  }
+
+  constructor(
+    public id: BN,
+    public maxBuy: BN,
+    public maxSell: BN,
+    public bought: BN,
+    public sold: BN,
+    public expiryTimestamp: BN,
+    public priceLowerLimit: number,
+    public priceUpperLimit: number,
+    public pricePremiumFraction: number,
+    public takerFeeFraction: number,
+    public makerFeeFraction: number,
+    public buyTokenIndex: TokenIndex,
+    public sellTokenIndex: TokenIndex,
+    public hasData: boolean,
+    public allowCreatingDeposits: boolean,
+    public allowCreatingBorrows: boolean,
+  ) {}
+}
+
+export class TokenConditionalSwapDto {
+  constructor(
+    public id: BN,
+    public maxBuy: BN,
+    public maxSell: BN,
+    public bought: BN,
+    public sold: BN,
+    public expiryTimestamp: BN,
+    public priceLowerLimit: number,
+    public priceUpperLimit: number,
+    public pricePremiumFraction: number,
+    public takerFeeFraction: number,
+    public makerFeeFraction: number,
+    public buyTokenIndex: number,
+    public sellTokenIndex: number,
+    public hasData: number,
+    public allowCreatingDeposits: number,
+    public allowCreatingBorrows: number,
   ) {}
 }
 

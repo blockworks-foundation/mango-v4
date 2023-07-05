@@ -436,6 +436,10 @@ export class PerpMarket {
     return toNative(uiQuote, QUOTE_DECIMALS).div(this.quoteLotSize);
   }
 
+  public priceLotsToNative(price: BN): I80F48 {
+    return I80F48.fromI64(price.mul(this.quoteLotSize).div(this.baseLotSize));
+  }
+
   public priceLotsToUi(price: BN): number {
     return parseFloat(price.toString()) * this.priceLotsToUiConverter;
   }
@@ -467,11 +471,12 @@ export class PerpMarket {
   public async getSettlePnlCandidates(
     client: MangoClient,
     group: Group,
-    direction: 'negative' | 'positive',
+    accounts?: MangoAccount[],
+    direction: 'negative' | 'positive' = 'positive',
     count = 2,
   ): Promise<{ account: MangoAccount; settleablePnl: I80F48 }[]> {
     let accountsWithSettleablePnl = (
-      await client.getAllMangoAccounts(group, true)
+      accounts ?? (await client.getAllMangoAccounts(group, true))
     )
       .filter((acc) => acc.perpPositionExistsForMarket(this))
       .map((acc) => {
@@ -865,6 +870,12 @@ export class InnerNode {
   }
 
   constructor(public children: [number]) {}
+}
+
+export class PerpSelfTradeBehavior {
+  static decrementTake = { decrementTake: {} };
+  static cancelProvide = { cancelProvide: {} };
+  static abortTransaction = { abortTransaction: {} };
 }
 
 export class PerpOrderSide {

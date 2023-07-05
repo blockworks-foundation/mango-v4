@@ -88,11 +88,15 @@ pub struct Group {
     /// When set to 0, there's no expiry of buyback fees.
     pub buyback_fees_expiry_interval: u64,
 
-    pub reserved: [u8; 1824],
+    /// Fees for the token conditional swap feature
+    pub token_conditional_swap_taker_fee_fraction: f32,
+    pub token_conditional_swap_maker_fee_fraction: f32,
+
+    pub reserved: [u8; 1816],
 }
 const_assert_eq!(
     size_of::<Group>(),
-    32 + 4 + 32 * 2 + 4 + 32 * 2 + 4 + 4 + 20 * 32 + 32 + 8 + 16 + 32 + 8 + 1824
+    32 + 4 + 32 * 2 + 4 + 32 * 2 + 4 + 4 + 20 * 32 + 32 + 8 + 16 + 32 + 8 + 4 * 2 + 1816
 );
 const_assert_eq!(size_of::<Group>(), 2736);
 const_assert_eq!(size_of::<Group>() % 8, 0);
@@ -190,6 +194,9 @@ pub enum IxGate {
     TokenForceCloseBorrowsWithToken = 49,
     PerpForceClosePosition = 50,
     GroupWithdrawInsuranceFund = 51,
+    TokenConditionalSwapCreate = 52,
+    TokenConditionalSwapTrigger = 53,
+    TokenConditionalSwapCancel = 54,
     // NOTE: Adding new variants requires matching changes in ts and the ix_gate_set instruction.
 }
 

@@ -62,7 +62,7 @@ export async function computePriceImpactOnJup(
   outputMint: string,
 ): Promise<{ outAmount: number; priceImpactPct: number }> {
   const url = `https://quote-api.jup.ag/v4/quote?inputMint=${inputMint}&outputMint=${outputMint}&amount=${amount}&swapMode=ExactIn&slippageBps=10000&onlyDirectRoutes=false&asLegacyTransaction=false`;
-  const response = await (await buildFetch())(url);
+  const response = await (await buildFetch())(url, { mode: 'no-cors' });
 
   try {
     const res = await response.json();
@@ -91,12 +91,16 @@ export async function getOnChainPriceForMints(
 ): Promise<number[]> {
   return await Promise.all(
     mints.map(async (mint) => {
-      let data = await (
+      const resp = await (
         await buildFetch()
-      )(`https://price.jup.ag/v4/price?ids=${mint}`);
-      data = await data.json();
-      data = data['data'];
-      return data[mint]['price'];
+      )(`https://public-api.birdeye.so/public/price?address=${mint}`, {
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      const data = await resp.json();
+      return data?.data?.value;
     }),
   );
 }
@@ -229,7 +233,8 @@ export async function getPriceImpactForLiqor(
         }, ZERO_I80F48());
 
         const [pi1, pi2] = await Promise.all([
-          !liabsInUsdc.eq(ZERO_I80F48())
+          !liabsInUsdc.eq(ZERO_I80F48()) &&
+          usdcMint.toBase58() !== bank.mint.toBase58()
             ? computePriceImpactOnJup(
                 liabsInUsdc.toString(),
                 usdcMint.toBase58(),
@@ -237,7 +242,8 @@ export async function getPriceImpactForLiqor(
               )
             : Promise.resolve({ priceImpactPct: 0, outAmount: 0 }),
 
-          !assets.eq(ZERO_I80F48())
+          !assets.eq(ZERO_I80F48()) &&
+          usdcMint.toBase58() !== bank.mint.toBase58()
             ? computePriceImpactOnJup(
                 assets.floor().toString(),
                 bank.mint.toBase58(),
@@ -411,6 +417,7 @@ export async function getRiskStats(
           await buildFetch()
         )(
           `https://api.mngo.cloud/data/v4/stats/liqors-over_period?over_period=1MONTH`,
+          { mode: 'no-cors' },
         )
       ).json()
     ).map((data) => new PublicKey(data['liqor']));
@@ -420,10 +427,10 @@ export async function getRiskStats(
 
   // Get known mms
   const mms = [
-    new PublicKey('CtHuPg2ctVVV7nqmvVEcMtcWyJAgtZw9YcNHFQidjPgF'),
-    new PublicKey('F1SZxEDxxCSLVjEBbMEjDYqajWRJQRCZBwPQnmcVvTLV'),
+    new PublicKey('BLgb4NFwhpurMrGX5LQfb8D8dBpGSGtBqqew2Em8uyRT'),
+    new PublicKey('DA5G4mUdFmQXyKuFqvGGZGBzPAPYDYQsdjmiEJAYzUXQ'),
     new PublicKey('BGYWnqfaauCeebFQXEfYuDCktiVG8pqpprrsD4qfqL53'),
-    new PublicKey('9XJt2tvSZghsMAhWto1VuPBrwXsiimPtsTR8XwGgDxK2'),
+    new PublicKey('F1SZxEDxxCSLVjEBbMEjDYqajWRJQRCZBwPQnmcVvTLV'),
   ];
 
   // Get all mango accounts
@@ -478,7 +485,7 @@ export async function getRiskStats(
 
   // Clone group, and simulate change % price drop for usdc
   const groupUsdcDepeg: Group = cloneDeep(group);
-  Array.from(groupDrop.banksMapByTokenIndex.values())
+  Array.from(groupUsdcDepeg.banksMapByTokenIndex.values())
     .flat()
     .filter((b) => b.name.includes('USDC'))
     .forEach((b) => {
@@ -489,7 +496,7 @@ export async function getRiskStats(
 
   // Clone group, and simulate change % price drop for usdt
   const groupUsdtDepeg: Group = cloneDeep(group);
-  Array.from(groupDrop.banksMapByTokenIndex.values())
+  Array.from(groupUsdtDepeg.banksMapByTokenIndex.values())
     .flat()
     .filter((b) => b.name.includes('USDT'))
     .forEach((b) => {

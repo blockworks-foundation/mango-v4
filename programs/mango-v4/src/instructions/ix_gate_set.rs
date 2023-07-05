@@ -67,6 +67,9 @@ pub fn ix_gate_set(ctx: Context<IxGateSet>, ix_gate: u128) -> Result<()> {
     log_if_changed(&group, ix_gate, IxGate::TokenForceCloseBorrowsWithToken);
     log_if_changed(&group, ix_gate, IxGate::PerpForceClosePosition);
     log_if_changed(&group, ix_gate, IxGate::GroupWithdrawInsuranceFund);
+    log_if_changed(&group, ix_gate, IxGate::TokenConditionalSwapCreate);
+    log_if_changed(&group, ix_gate, IxGate::TokenConditionalSwapTrigger);
+    log_if_changed(&group, ix_gate, IxGate::TokenConditionalSwapCancel);
 
     group.ix_gate = ix_gate;
 

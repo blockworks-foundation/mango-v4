@@ -3,6 +3,7 @@ import { Connection, Keypair, PublicKey } from '@solana/web3.js';
 import { expect } from 'chai';
 import fs from 'fs';
 import { Group } from '../../src/accounts/group';
+import { MangoAccount } from '../../src/accounts/mangoAccount';
 import { PerpOrderSide, PerpOrderType } from '../../src/accounts/perp';
 import { MangoClient } from '../../src/client';
 import { MANGO_V4_ID } from '../../src/constants';
@@ -62,14 +63,19 @@ async function main(): Promise<void> {
 
   // create + fetch account
   console.log(`Creating mangoaccount...`);
-  let mangoAccount = (await client.getOrCreateMangoAccount(group))!;
-  await mangoAccount.reload(client);
+  const mangoAccount = (await client.getMangoAccountForOwner(
+    group,
+    user.publicKey,
+    0,
+  )) as MangoAccount;
+  await mangoAccount!.reload(client);
   if (!mangoAccount) {
     throw new Error(`MangoAccount not found for user ${user.publicKey}`);
   }
   console.log(`...created/found mangoAccount ${mangoAccount.publicKey}`);
 
   // set delegate, and change name
+  // eslint-disable-next-line no-constant-condition
   if (true) {
     console.log(`...changing mango account name, and setting a delegate`);
     const newName = 'my_changed_name';
@@ -105,7 +111,14 @@ async function main(): Promise<void> {
     console.log(
       `...expanding mango account to max 16 token positions, 8 serum3, 8 perp position and 8 perp oo slots, previous (tokens ${mangoAccount.tokens.length}, serum3 ${mangoAccount.serum3.length}, perps ${mangoAccount.perps.length}, perps oo ${mangoAccount.perpOpenOrders.length})`,
     );
-    let sig = await client.expandMangoAccount(group, mangoAccount, 16, 8, 8, 8);
+    const sig = await client.expandMangoAccount(
+      group,
+      mangoAccount,
+      16,
+      8,
+      8,
+      8,
+    );
     console.log(`sig https://explorer.solana.com/tx/${sig}?cluster=devnet`);
     await mangoAccount.reload(client);
     expect(mangoAccount.tokens.length).equals(16);
@@ -115,12 +128,12 @@ async function main(): Promise<void> {
   }
 
   // deposit and withdraw
+  // eslint-disable-next-line no-constant-condition
   if (true) {
     console.log(`...depositing 50 USDC, 1 SOL, 1 MNGO`);
 
     // deposit USDC
     let oldBalance = mangoAccount.getTokenBalance(
-      group,
       group.getFirstBankByMint(new PublicKey(DEVNET_MINTS.get('USDC')!)),
     );
     await client.tokenDeposit(
@@ -131,7 +144,6 @@ async function main(): Promise<void> {
     );
     await mangoAccount.reload(client);
     let newBalance = mangoAccount.getTokenBalance(
-      group,
       group.getFirstBankByMint(new PublicKey(DEVNET_MINTS.get('USDC')!)),
     );
     expect(toUiDecimalsForQuote(newBalance.sub(oldBalance)).toString()).equals(
@@ -159,7 +171,6 @@ async function main(): Promise<void> {
     // withdraw USDC
     console.log(`...withdrawing 1 USDC`);
     oldBalance = mangoAccount.getTokenBalance(
-      group,
       group.getFirstBankByMint(new PublicKey(DEVNET_MINTS.get('USDC')!)),
     );
     await client.tokenWithdraw(
@@ -171,7 +182,6 @@ async function main(): Promise<void> {
     );
     await mangoAccount.reload(client);
     newBalance = mangoAccount.getTokenBalance(
-      group,
       group.getFirstBankByMint(new PublicKey(DEVNET_MINTS.get('USDC')!)),
     );
     expect(toUiDecimalsForQuote(oldBalance.sub(newBalance)).toString()).equals(
@@ -315,6 +325,7 @@ async function main(): Promise<void> {
   //   );
   // }
 
+  // eslint-disable-next-line no-constant-condition
   if (true) {
     await mangoAccount.reload(client);
     console.log(
@@ -348,8 +359,10 @@ async function main(): Promise<void> {
     );
   }
 
+  // eslint-disable-next-line no-constant-condition
   if (true) {
-    function getMaxSourceForTokenSwapWrapper(src, tgt) {
+    // eslint-disable-next-line no-inner-declarations
+    function getMaxSourceForTokenSwapWrapper(src, tgt): void {
       console.log(
         `getMaxSourceForTokenSwap ${src.padEnd(4)} ${tgt.padEnd(4)} ` +
           mangoAccount.getMaxSourceUiForTokenSwap(
@@ -401,9 +414,10 @@ async function main(): Promise<void> {
   }
 
   // perps
+  // eslint-disable-next-line no-constant-condition
   if (true) {
     let sig;
-    let perpMarket = group.getPerpMarketByName('BTC-PERP');
+    const perpMarket = group.getPerpMarketByName('BTC-PERP');
     const orders = await mangoAccount.loadPerpOpenOrdersForMarket(
       client,
       group,
@@ -705,6 +719,7 @@ async function main(): Promise<void> {
     // sig = await client.perpCancelAllOrders(group, mangoAccount, perpMarket.perpMarketIndex, 10);
     // console.log(`sig https://explorer.solana.com/tx/${sig}?cluster=devnet`);
 
+    // eslint-disable-next-line @typescript-eslint/no-non-null-asserted-optional-chain
     await perpMarket?.loadEventQueue(client)!;
     const fr = perpMarket?.getInstantaneousFundingRateUi(
       await perpMarket.loadBids(client),
@@ -712,6 +727,7 @@ async function main(): Promise<void> {
     );
     console.log(`current funding rate per hour is ${fr}`);
 
+    // eslint-disable-next-line @typescript-eslint/no-non-null-asserted-optional-chain
     const eq = await perpMarket?.loadEventQueue(client)!;
     console.log(
       `raw events - ${JSON.stringify(eq.eventsSince(new BN(0)), null, 2)}`,
@@ -729,11 +745,13 @@ async function main(): Promise<void> {
   process.exit();
 }
 
+// eslint-disable-next-line @typescript-eslint/explicit-function-return-type
 async function logBidsAndAsks(client: MangoClient, group: Group) {
   await group.reloadAll(client);
   const perpMarket = group.getPerpMarketByName('BTC-PERP');
   const res = [
     (await perpMarket?.loadBids(client)).items(),
+    // eslint-disable-next-line @typescript-eslint/no-non-null-asserted-optional-chain
     (await perpMarket?.loadAsks(client)!).items(),
   ];
   console.log(`bids ${JSON.stringify(Array.from(res[0]), null, 2)}`);

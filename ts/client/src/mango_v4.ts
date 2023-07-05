@@ -1,5 +1,5 @@
 export type MangoV4 = {
-  "version": "0.16.0",
+  "version": "0.18.0",
   "name": "mango_v4",
   "instructions": [
     {
@@ -176,6 +176,18 @@ export type MangoV4 = {
           "name": "buybackFeesExpiryIntervalOpt",
           "type": {
             "option": "u64"
+          }
+        },
+        {
+          "name": "tokenConditionalSwapTakerFeeFractionOpt",
+          "type": {
+            "option": "f32"
+          }
+        },
+        {
+          "name": "tokenConditionalSwapMakerFeeFractionOpt",
+          "type": {
+            "option": "f32"
           }
         }
       ]
@@ -1119,6 +1131,62 @@ export type MangoV4 = {
       ]
     },
     {
+      "name": "accountExpandV2",
+      "accounts": [
+        {
+          "name": "group",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "account",
+          "isMut": true,
+          "isSigner": false,
+          "relations": [
+            "group",
+            "owner"
+          ]
+        },
+        {
+          "name": "owner",
+          "isMut": false,
+          "isSigner": true
+        },
+        {
+          "name": "payer",
+          "isMut": true,
+          "isSigner": true
+        },
+        {
+          "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "tokenCount",
+          "type": "u8"
+        },
+        {
+          "name": "serum3Count",
+          "type": "u8"
+        },
+        {
+          "name": "perpCount",
+          "type": "u8"
+        },
+        {
+          "name": "perpOoCount",
+          "type": "u8"
+        },
+        {
+          "name": "tokenConditionalSwapCount",
+          "type": "u8"
+        }
+      ]
+    },
+    {
       "name": "accountEdit",
       "accounts": [
         {
@@ -1906,6 +1974,12 @@ export type MangoV4 = {
           "type": {
             "option": "bool"
           }
+        },
+        {
+          "name": "nameOpt",
+          "type": {
+            "option": "string"
+          }
         }
       ]
     },
@@ -2393,7 +2467,8 @@ export type MangoV4 = {
     {
       "name": "serum3SettleFunds",
       "docs": [
-        "Settles all free funds from the OpenOrders account into the MangoAccount.",
+        "Deprecated instruction that used to settles all free funds from the OpenOrders account",
+        "into the MangoAccount.",
         "",
         "Any serum \"referrer rebates\" (ui fees) are considered Mango fees."
       ],
@@ -4556,12 +4631,18 @@ export type MangoV4 = {
         {
           "name": "group",
           "isMut": false,
-          "isSigner": false
+          "isSigner": false,
+          "relations": [
+            "insurance_vault"
+          ]
         },
         {
           "name": "liqor",
           "isMut": true,
-          "isSigner": false
+          "isSigner": false,
+          "relations": [
+            "group"
+          ]
         },
         {
           "name": "liqorOwner",
@@ -4571,12 +4652,19 @@ export type MangoV4 = {
         {
           "name": "liqee",
           "isMut": true,
-          "isSigner": false
+          "isSigner": false,
+          "relations": [
+            "group"
+          ]
         },
         {
           "name": "perpMarket",
           "isMut": true,
-          "isSigner": false
+          "isSigner": false,
+          "relations": [
+            "group",
+            "oracle"
+          ]
         },
         {
           "name": "oracle",
@@ -4586,7 +4674,10 @@ export type MangoV4 = {
         {
           "name": "settleBank",
           "isMut": true,
-          "isSigner": false
+          "isSigner": false,
+          "relations": [
+            "group"
+          ]
         },
         {
           "name": "settleVault",
@@ -4606,7 +4697,10 @@ export type MangoV4 = {
         {
           "name": "insuranceBank",
           "isMut": true,
-          "isSigner": false
+          "isSigner": false,
+          "relations": [
+            "group"
+          ]
         },
         {
           "name": "insuranceBankVault",
@@ -4627,6 +4721,161 @@ export type MangoV4 = {
       "args": [
         {
           "name": "maxLiabTransfer",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "tokenConditionalSwapCreate",
+      "accounts": [
+        {
+          "name": "group",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "account",
+          "isMut": true,
+          "isSigner": false,
+          "relations": [
+            "group"
+          ]
+        },
+        {
+          "name": "authority",
+          "isMut": false,
+          "isSigner": true
+        },
+        {
+          "name": "buyBank",
+          "isMut": false,
+          "isSigner": false,
+          "relations": [
+            "group"
+          ]
+        },
+        {
+          "name": "sellBank",
+          "isMut": false,
+          "isSigner": false,
+          "relations": [
+            "group"
+          ]
+        }
+      ],
+      "args": [
+        {
+          "name": "maxBuy",
+          "type": "u64"
+        },
+        {
+          "name": "maxSell",
+          "type": "u64"
+        },
+        {
+          "name": "expiryTimestamp",
+          "type": "u64"
+        },
+        {
+          "name": "priceLowerLimit",
+          "type": "f32"
+        },
+        {
+          "name": "priceUpperLimit",
+          "type": "f32"
+        },
+        {
+          "name": "pricePremiumFraction",
+          "type": "f32"
+        },
+        {
+          "name": "allowCreatingDeposits",
+          "type": "bool"
+        },
+        {
+          "name": "allowCreatingBorrows",
+          "type": "bool"
+        }
+      ]
+    },
+    {
+      "name": "tokenConditionalSwapCancel",
+      "accounts": [
+        {
+          "name": "group",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "account",
+          "isMut": true,
+          "isSigner": false,
+          "relations": [
+            "group"
+          ]
+        },
+        {
+          "name": "authority",
+          "isMut": false,
+          "isSigner": true
+        }
+      ],
+      "args": [
+        {
+          "name": "tokenConditionalSwapIndex",
+          "type": "u8"
+        },
+        {
+          "name": "tokenConditionalSwapId",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "tokenConditionalSwapTrigger",
+      "accounts": [
+        {
+          "name": "group",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "liqee",
+          "isMut": true,
+          "isSigner": false,
+          "relations": [
+            "group"
+          ]
+        },
+        {
+          "name": "liqor",
+          "isMut": true,
+          "isSigner": false,
+          "relations": [
+            "group"
+          ]
+        },
+        {
+          "name": "liqorAuthority",
+          "isMut": false,
+          "isSigner": true
+        }
+      ],
+      "args": [
+        {
+          "name": "tokenConditionalSwapIndex",
+          "type": "u8"
+        },
+        {
+          "name": "tokenConditionalSwapId",
+          "type": "u64"
+        },
+        {
+          "name": "maxBuyTokenToLiqee",
+          "type": "u64"
+        },
+        {
+          "name": "maxSellTokenToLiqor",
           "type": "u64"
         }
       ]
@@ -5126,11 +5375,22 @@ export type MangoV4 = {
             "type": "u64"
           },
           {
+            "name": "tokenConditionalSwapTakerFeeFraction",
+            "docs": [
+              "Fees for the token conditional swap feature"
+            ],
+            "type": "f32"
+          },
+          {
+            "name": "tokenConditionalSwapMakerFeeFraction",
+            "type": "f32"
+          },
+          {
             "name": "reserved",
             "type": {
               "array": [
                 "u8",
-                1824
+                1816
               ]
             }
           }
@@ -5246,11 +5506,18 @@ export type MangoV4 = {
             "type": "u64"
           },
           {
+            "name": "nextTokenConditionalSwapId",
+            "docs": [
+              "Next id to use when adding a token condition swap"
+            ],
+            "type": "u64"
+          },
+          {
             "name": "reserved",
             "type": {
               "array": [
                 "u8",
-                208
+                200
               ]
             }
           },
@@ -5668,7 +5935,10 @@ export type MangoV4 = {
           {
             "name": "openInterest",
             "docs": [
-              "Number of base lot pairs currently active in the market. Always >= 0."
+              "Number of base lots currently active in the market. Always >= 0.",
+              "",
+              "Since this counts positive base lots and negative base lots, the more relevant",
+              "number of open base lot pairs is half this value."
             ],
             "type": "i64"
           },
@@ -6202,6 +6472,14 @@ export type MangoV4 = {
     },
     {
       "name": "Serum3Info",
+      "docs": [
+        "Information about reserved funds on Serum3 open orders accounts.",
+        "",
+        "Note that all \"free\" funds on open orders accounts are added directly",
+        "to the token info. This is only about dealing with the reserved funds",
+        "that might end up as base OR quote tokens, depending on whether the",
+        "open orders execute on not."
+      ],
       "type": {
         "kind": "struct",
         "fields": [
@@ -6218,11 +6496,11 @@ export type MangoV4 = {
             }
           },
           {
-            "name": "baseIndex",
+            "name": "baseInfoIndex",
             "type": "u64"
           },
           {
-            "name": "quoteIndex",
+            "name": "quoteInfoIndex",
             "type": "u64"
           },
           {
@@ -6241,6 +6519,12 @@ export type MangoV4 = {
     },
     {
       "name": "PerpInfo",
+      "docs": [
+        "Stores information about perp market positions and their open orders.",
+        "",
+        "Perp markets affect account health indirectly, though the token balance in the",
+        "perp market's settle token. See `effective_token_balances()`."
+      ],
       "type": {
         "kind": "struct",
         "fields": [
@@ -6329,6 +6613,21 @@ export type MangoV4 = {
     },
     {
       "name": "HealthCache",
+      "docs": [
+        "Store information needed to compute account health",
+        "",
+        "This is called a cache, because it extracts information from a MangoAccount and",
+        "the Bank, Perp, oracle accounts once and then allows computing different types",
+        "of health.",
+        "",
+        "For compute-saving reasons, it also allows applying adjustments to the extracted",
+        "positions. That's often helpful for instructions that want to re-compute health",
+        "after having made small, well-known changes to an account. Recomputing the",
+        "HealthCache from scratch would be significantly more expensive.",
+        "",
+        "However, there's a real risk of getting the adjustments wrong and computing an",
+        "inconsistent result, so particular care needs to be taken when this is done."
+      ],
       "type": {
         "kind": "struct",
         "fields": [
@@ -6889,11 +7188,15 @@ export type MangoV4 = {
             "type": "u64"
           },
           {
+            "name": "nextTokenConditionalSwapId",
+            "type": "u64"
+          },
+          {
             "name": "reserved",
             "type": {
               "array": [
                 "u8",
-                208
+                200
               ]
             }
           }
@@ -7529,11 +7832,18 @@ export type MangoV4 = {
             "type": "u8"
           },
           {
+            "name": "resetOnNonzeroPrice",
+            "docs": [
+              "If set to 1, the stable price will reset on the next non-zero price it sees."
+            ],
+            "type": "u8"
+          },
+          {
             "name": "padding",
             "type": {
               "array": [
                 "u8",
-                7
+                6
               ]
             }
           },
@@ -7543,6 +7853,134 @@ export type MangoV4 = {
               "array": [
                 "u8",
                 48
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "TokenConditionalSwap",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "id",
+            "type": "u64"
+          },
+          {
+            "name": "maxBuy",
+            "docs": [
+              "maximum amount of native tokens to buy or sell"
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "maxSell",
+            "type": "u64"
+          },
+          {
+            "name": "bought",
+            "docs": [
+              "how many native tokens were already bought/sold"
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "sold",
+            "type": "u64"
+          },
+          {
+            "name": "expiryTimestamp",
+            "docs": [
+              "timestamp until which the conditional swap is valid"
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "priceLowerLimit",
+            "docs": [
+              "The price must exceed this threshold to allow execution.",
+              "",
+              "This threshold is compared to the \"sell_token per buy_token\" oracle price",
+              "(which can be computed by dividing the buy token oracle price by the",
+              "sell token oracle price). If that price is >= lower_limit and <= upper_limit",
+              "the tcs may be executable.",
+              "",
+              "Example: Stop loss to get out of a SOL long: The user bought SOL at 20 USDC/SOL",
+              "and wants to stop loss at 18 USDC/SOL. They'd set buy_token=USDC, sell_token=SOL",
+              "so the reference price is in SOL/USDC units. Set price_lower_limit=toNative(1/18)",
+              "and price_upper_limit=toNative(1/10). Also set allow_borrows=false.",
+              "",
+              "Example: Want to buy SOL with USDC if the price falls below 22 USDC/SOL.",
+              "buy_token=SOL, sell_token=USDC, reference price is in USDC/SOL units. Set",
+              "price_upper_limit=toNative(22), price_lower_limit=0."
+            ],
+            "type": "f32"
+          },
+          {
+            "name": "priceUpperLimit",
+            "docs": [
+              "Parallel to price_lower_limit, but an upper limit."
+            ],
+            "type": "f32"
+          },
+          {
+            "name": "pricePremiumFraction",
+            "docs": [
+              "The premium to pay over oracle price to incentivize execution."
+            ],
+            "type": "f32"
+          },
+          {
+            "name": "takerFeeFraction",
+            "docs": [
+              "The taker receives only premium_price * (1 - taker_fee_fraction)"
+            ],
+            "type": "f32"
+          },
+          {
+            "name": "makerFeeFraction",
+            "docs": [
+              "The maker has to pay premium_price * (1 + maker_fee_fraction)"
+            ],
+            "type": "f32"
+          },
+          {
+            "name": "buyTokenIndex",
+            "docs": [
+              "indexes of tokens for the swap"
+            ],
+            "type": "u16"
+          },
+          {
+            "name": "sellTokenIndex",
+            "type": "u16"
+          },
+          {
+            "name": "hasData",
+            "type": "u8"
+          },
+          {
+            "name": "allowCreatingDeposits",
+            "docs": [
+              "may token purchases create deposits? (often users just want to get out of a borrow)"
+            ],
+            "type": "u8"
+          },
+          {
+            "name": "allowCreatingBorrows",
+            "docs": [
+              "may token selling create borrows? (often users just want to get out of a long)"
+            ],
+            "type": "u8"
+          },
+          {
+            "name": "reserved",
+            "type": {
+              "array": [
+                "u8",
+                109
               ]
             }
           }
@@ -7724,6 +8162,9 @@ export type MangoV4 = {
           },
           {
             "name": "TokenWithdraw"
+          },
+          {
+            "name": "TokenConditionalSwapTrigger"
           }
         ]
       }
@@ -7903,6 +8344,15 @@ export type MangoV4 = {
           },
           {
             "name": "GroupWithdrawInsuranceFund"
+          },
+          {
+            "name": "TokenConditionalSwapCreate"
+          },
+          {
+            "name": "TokenConditionalSwapTrigger"
+          },
+          {
+            "name": "TokenConditionalSwapCancel"
           }
         ]
       }
@@ -9007,6 +9457,50 @@ export type MangoV4 = {
       ]
     },
     {
+      "name": "WithdrawLoanLog",
+      "fields": [
+        {
+          "name": "mangoGroup",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "mangoAccount",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "tokenIndex",
+          "type": "u16",
+          "index": false
+        },
+        {
+          "name": "loanAmount",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "loanOriginationFee",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "instruction",
+          "type": {
+            "defined": "LoanOriginationFeeInstruction"
+          },
+          "index": false
+        },
+        {
+          "name": "price",
+          "type": {
+            "option": "i128"
+          },
+          "index": false
+        }
+      ]
+    },
+    {
       "name": "TokenLiqBankruptcyLog",
       "fields": [
         {
@@ -9660,6 +10154,176 @@ export type MangoV4 = {
           "index": false
         }
       ]
+    },
+    {
+      "name": "TokenConditionalSwapCreateLog",
+      "fields": [
+        {
+          "name": "mangoGroup",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "mangoAccount",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "id",
+          "type": "u64",
+          "index": false
+        },
+        {
+          "name": "maxBuy",
+          "type": "u64",
+          "index": false
+        },
+        {
+          "name": "maxSell",
+          "type": "u64",
+          "index": false
+        },
+        {
+          "name": "expiryTimestamp",
+          "type": "u64",
+          "index": false
+        },
+        {
+          "name": "priceLowerLimit",
+          "type": "f32",
+          "index": false
+        },
+        {
+          "name": "priceUpperLimit",
+          "type": "f32",
+          "index": false
+        },
+        {
+          "name": "pricePremiumFraction",
+          "type": "f32",
+          "index": false
+        },
+        {
+          "name": "takerFeeFraction",
+          "type": "f32",
+          "index": false
+        },
+        {
+          "name": "makerFeeFraction",
+          "type": "f32",
+          "index": false
+        },
+        {
+          "name": "buyTokenIndex",
+          "type": "u16",
+          "index": false
+        },
+        {
+          "name": "sellTokenIndex",
+          "type": "u16",
+          "index": false
+        },
+        {
+          "name": "allowCreatingDeposits",
+          "type": "bool",
+          "index": false
+        },
+        {
+          "name": "allowCreatingBorrows",
+          "type": "bool",
+          "index": false
+        }
+      ]
+    },
+    {
+      "name": "TokenConditionalSwapTriggerLog",
+      "fields": [
+        {
+          "name": "mangoGroup",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "liqee",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "liqor",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "tokenConditionalSwapId",
+          "type": "u64",
+          "index": false
+        },
+        {
+          "name": "buyTokenIndex",
+          "type": "u16",
+          "index": false
+        },
+        {
+          "name": "sellTokenIndex",
+          "type": "u16",
+          "index": false
+        },
+        {
+          "name": "buyAmount",
+          "type": "u64",
+          "index": false
+        },
+        {
+          "name": "sellAmount",
+          "type": "u64",
+          "index": false
+        },
+        {
+          "name": "makerFee",
+          "type": "u64",
+          "index": false
+        },
+        {
+          "name": "takerFee",
+          "type": "u64",
+          "index": false
+        },
+        {
+          "name": "buyTokenPrice",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "sellTokenPrice",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "closed",
+          "type": "bool",
+          "index": false
+        }
+      ]
+    },
+    {
+      "name": "TokenConditionalSwapCancelLog",
+      "fields": [
+        {
+          "name": "mangoGroup",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "mangoAccount",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "id",
+          "type": "u64",
+          "index": false
+        }
+      ]
     }
   ],
   "errors": [
@@ -9701,7 +10365,7 @@ export type MangoV4 = {
     {
       "code": 6007,
       "name": "HealthMustBePositiveOrIncrease",
-      "msg": "health must be positive or increase"
+      "msg": "health must be positive or not decrease"
     },
     {
       "code": 6008,
@@ -9907,12 +10571,17 @@ export type MangoV4 = {
       "code": 6048,
       "name": "WouldSelfTrade",
       "msg": "would self trade"
+    },
+    {
+      "code": 6049,
+      "name": "TokenConditionalSwapPriceNotInRange",
+      "msg": "conditional token swap price is not in execution range"
     }
   ]
 };
 
 export const IDL: MangoV4 = {
-  "version": "0.16.0",
+  "version": "0.18.0",
   "name": "mango_v4",
   "instructions": [
     {
@@ -10089,6 +10758,18 @@ export const IDL: MangoV4 = {
           "name": "buybackFeesExpiryIntervalOpt",
           "type": {
             "option": "u64"
+          }
+        },
+        {
+          "name": "tokenConditionalSwapTakerFeeFractionOpt",
+          "type": {
+            "option": "f32"
+          }
+        },
+        {
+          "name": "tokenConditionalSwapMakerFeeFractionOpt",
+          "type": {
+            "option": "f32"
           }
         }
       ]
@@ -11032,6 +11713,62 @@ export const IDL: MangoV4 = {
       ]
     },
     {
+      "name": "accountExpandV2",
+      "accounts": [
+        {
+          "name": "group",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "account",
+          "isMut": true,
+          "isSigner": false,
+          "relations": [
+            "group",
+            "owner"
+          ]
+        },
+        {
+          "name": "owner",
+          "isMut": false,
+          "isSigner": true
+        },
+        {
+          "name": "payer",
+          "isMut": true,
+          "isSigner": true
+        },
+        {
+          "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "tokenCount",
+          "type": "u8"
+        },
+        {
+          "name": "serum3Count",
+          "type": "u8"
+        },
+        {
+          "name": "perpCount",
+          "type": "u8"
+        },
+        {
+          "name": "perpOoCount",
+          "type": "u8"
+        },
+        {
+          "name": "tokenConditionalSwapCount",
+          "type": "u8"
+        }
+      ]
+    },
+    {
       "name": "accountEdit",
       "accounts": [
         {
@@ -11819,6 +12556,12 @@ export const IDL: MangoV4 = {
           "type": {
             "option": "bool"
           }
+        },
+        {
+          "name": "nameOpt",
+          "type": {
+            "option": "string"
+          }
         }
       ]
     },
@@ -12306,7 +13049,8 @@ export const IDL: MangoV4 = {
     {
       "name": "serum3SettleFunds",
       "docs": [
-        "Settles all free funds from the OpenOrders account into the MangoAccount.",
+        "Deprecated instruction that used to settles all free funds from the OpenOrders account",
+        "into the MangoAccount.",
         "",
         "Any serum \"referrer rebates\" (ui fees) are considered Mango fees."
       ],
@@ -14469,12 +15213,18 @@ export const IDL: MangoV4 = {
         {
           "name": "group",
           "isMut": false,
-          "isSigner": false
+          "isSigner": false,
+          "relations": [
+            "insurance_vault"
+          ]
         },
         {
           "name": "liqor",
           "isMut": true,
-          "isSigner": false
+          "isSigner": false,
+          "relations": [
+            "group"
+          ]
         },
         {
           "name": "liqorOwner",
@@ -14484,12 +15234,19 @@ export const IDL: MangoV4 = {
         {
           "name": "liqee",
           "isMut": true,
-          "isSigner": false
+          "isSigner": false,
+          "relations": [
+            "group"
+          ]
         },
         {
           "name": "perpMarket",
           "isMut": true,
-          "isSigner": false
+          "isSigner": false,
+          "relations": [
+            "group",
+            "oracle"
+          ]
         },
         {
           "name": "oracle",
@@ -14499,7 +15256,10 @@ export const IDL: MangoV4 = {
         {
           "name": "settleBank",
           "isMut": true,
-          "isSigner": false
+          "isSigner": false,
+          "relations": [
+            "group"
+          ]
         },
         {
           "name": "settleVault",
@@ -14519,7 +15279,10 @@ export const IDL: MangoV4 = {
         {
           "name": "insuranceBank",
           "isMut": true,
-          "isSigner": false
+          "isSigner": false,
+          "relations": [
+            "group"
+          ]
         },
         {
           "name": "insuranceBankVault",
@@ -14540,6 +15303,161 @@ export const IDL: MangoV4 = {
       "args": [
         {
           "name": "maxLiabTransfer",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "tokenConditionalSwapCreate",
+      "accounts": [
+        {
+          "name": "group",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "account",
+          "isMut": true,
+          "isSigner": false,
+          "relations": [
+            "group"
+          ]
+        },
+        {
+          "name": "authority",
+          "isMut": false,
+          "isSigner": true
+        },
+        {
+          "name": "buyBank",
+          "isMut": false,
+          "isSigner": false,
+          "relations": [
+            "group"
+          ]
+        },
+        {
+          "name": "sellBank",
+          "isMut": false,
+          "isSigner": false,
+          "relations": [
+            "group"
+          ]
+        }
+      ],
+      "args": [
+        {
+          "name": "maxBuy",
+          "type": "u64"
+        },
+        {
+          "name": "maxSell",
+          "type": "u64"
+        },
+        {
+          "name": "expiryTimestamp",
+          "type": "u64"
+        },
+        {
+          "name": "priceLowerLimit",
+          "type": "f32"
+        },
+        {
+          "name": "priceUpperLimit",
+          "type": "f32"
+        },
+        {
+          "name": "pricePremiumFraction",
+          "type": "f32"
+        },
+        {
+          "name": "allowCreatingDeposits",
+          "type": "bool"
+        },
+        {
+          "name": "allowCreatingBorrows",
+          "type": "bool"
+        }
+      ]
+    },
+    {
+      "name": "tokenConditionalSwapCancel",
+      "accounts": [
+        {
+          "name": "group",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "account",
+          "isMut": true,
+          "isSigner": false,
+          "relations": [
+            "group"
+          ]
+        },
+        {
+          "name": "authority",
+          "isMut": false,
+          "isSigner": true
+        }
+      ],
+      "args": [
+        {
+          "name": "tokenConditionalSwapIndex",
+          "type": "u8"
+        },
+        {
+          "name": "tokenConditionalSwapId",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "tokenConditionalSwapTrigger",
+      "accounts": [
+        {
+          "name": "group",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "liqee",
+          "isMut": true,
+          "isSigner": false,
+          "relations": [
+            "group"
+          ]
+        },
+        {
+          "name": "liqor",
+          "isMut": true,
+          "isSigner": false,
+          "relations": [
+            "group"
+          ]
+        },
+        {
+          "name": "liqorAuthority",
+          "isMut": false,
+          "isSigner": true
+        }
+      ],
+      "args": [
+        {
+          "name": "tokenConditionalSwapIndex",
+          "type": "u8"
+        },
+        {
+          "name": "tokenConditionalSwapId",
+          "type": "u64"
+        },
+        {
+          "name": "maxBuyTokenToLiqee",
+          "type": "u64"
+        },
+        {
+          "name": "maxSellTokenToLiqor",
           "type": "u64"
         }
       ]
@@ -15039,11 +15957,22 @@ export const IDL: MangoV4 = {
             "type": "u64"
           },
           {
+            "name": "tokenConditionalSwapTakerFeeFraction",
+            "docs": [
+              "Fees for the token conditional swap feature"
+            ],
+            "type": "f32"
+          },
+          {
+            "name": "tokenConditionalSwapMakerFeeFraction",
+            "type": "f32"
+          },
+          {
             "name": "reserved",
             "type": {
               "array": [
                 "u8",
-                1824
+                1816
               ]
             }
           }
@@ -15159,11 +16088,18 @@ export const IDL: MangoV4 = {
             "type": "u64"
           },
           {
+            "name": "nextTokenConditionalSwapId",
+            "docs": [
+              "Next id to use when adding a token condition swap"
+            ],
+            "type": "u64"
+          },
+          {
             "name": "reserved",
             "type": {
               "array": [
                 "u8",
-                208
+                200
               ]
             }
           },
@@ -15581,7 +16517,10 @@ export const IDL: MangoV4 = {
           {
             "name": "openInterest",
             "docs": [
-              "Number of base lot pairs currently active in the market. Always >= 0."
+              "Number of base lots currently active in the market. Always >= 0.",
+              "",
+              "Since this counts positive base lots and negative base lots, the more relevant",
+              "number of open base lot pairs is half this value."
             ],
             "type": "i64"
           },
@@ -16115,6 +17054,14 @@ export const IDL: MangoV4 = {
     },
     {
       "name": "Serum3Info",
+      "docs": [
+        "Information about reserved funds on Serum3 open orders accounts.",
+        "",
+        "Note that all \"free\" funds on open orders accounts are added directly",
+        "to the token info. This is only about dealing with the reserved funds",
+        "that might end up as base OR quote tokens, depending on whether the",
+        "open orders execute on not."
+      ],
       "type": {
         "kind": "struct",
         "fields": [
@@ -16131,11 +17078,11 @@ export const IDL: MangoV4 = {
             }
           },
           {
-            "name": "baseIndex",
+            "name": "baseInfoIndex",
             "type": "u64"
           },
           {
-            "name": "quoteIndex",
+            "name": "quoteInfoIndex",
             "type": "u64"
           },
           {
@@ -16154,6 +17101,12 @@ export const IDL: MangoV4 = {
     },
     {
       "name": "PerpInfo",
+      "docs": [
+        "Stores information about perp market positions and their open orders.",
+        "",
+        "Perp markets affect account health indirectly, though the token balance in the",
+        "perp market's settle token. See `effective_token_balances()`."
+      ],
       "type": {
         "kind": "struct",
         "fields": [
@@ -16242,6 +17195,21 @@ export const IDL: MangoV4 = {
     },
     {
       "name": "HealthCache",
+      "docs": [
+        "Store information needed to compute account health",
+        "",
+        "This is called a cache, because it extracts information from a MangoAccount and",
+        "the Bank, Perp, oracle accounts once and then allows computing different types",
+        "of health.",
+        "",
+        "For compute-saving reasons, it also allows applying adjustments to the extracted",
+        "positions. That's often helpful for instructions that want to re-compute health",
+        "after having made small, well-known changes to an account. Recomputing the",
+        "HealthCache from scratch would be significantly more expensive.",
+        "",
+        "However, there's a real risk of getting the adjustments wrong and computing an",
+        "inconsistent result, so particular care needs to be taken when this is done."
+      ],
       "type": {
         "kind": "struct",
         "fields": [
@@ -16802,11 +17770,15 @@ export const IDL: MangoV4 = {
             "type": "u64"
           },
           {
+            "name": "nextTokenConditionalSwapId",
+            "type": "u64"
+          },
+          {
             "name": "reserved",
             "type": {
               "array": [
                 "u8",
-                208
+                200
               ]
             }
           }
@@ -17442,11 +18414,18 @@ export const IDL: MangoV4 = {
             "type": "u8"
           },
           {
+            "name": "resetOnNonzeroPrice",
+            "docs": [
+              "If set to 1, the stable price will reset on the next non-zero price it sees."
+            ],
+            "type": "u8"
+          },
+          {
             "name": "padding",
             "type": {
               "array": [
                 "u8",
-                7
+                6
               ]
             }
           },
@@ -17456,6 +18435,134 @@ export const IDL: MangoV4 = {
               "array": [
                 "u8",
                 48
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "TokenConditionalSwap",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "id",
+            "type": "u64"
+          },
+          {
+            "name": "maxBuy",
+            "docs": [
+              "maximum amount of native tokens to buy or sell"
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "maxSell",
+            "type": "u64"
+          },
+          {
+            "name": "bought",
+            "docs": [
+              "how many native tokens were already bought/sold"
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "sold",
+            "type": "u64"
+          },
+          {
+            "name": "expiryTimestamp",
+            "docs": [
+              "timestamp until which the conditional swap is valid"
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "priceLowerLimit",
+            "docs": [
+              "The price must exceed this threshold to allow execution.",
+              "",
+              "This threshold is compared to the \"sell_token per buy_token\" oracle price",
+              "(which can be computed by dividing the buy token oracle price by the",
+              "sell token oracle price). If that price is >= lower_limit and <= upper_limit",
+              "the tcs may be executable.",
+              "",
+              "Example: Stop loss to get out of a SOL long: The user bought SOL at 20 USDC/SOL",
+              "and wants to stop loss at 18 USDC/SOL. They'd set buy_token=USDC, sell_token=SOL",
+              "so the reference price is in SOL/USDC units. Set price_lower_limit=toNative(1/18)",
+              "and price_upper_limit=toNative(1/10). Also set allow_borrows=false.",
+              "",
+              "Example: Want to buy SOL with USDC if the price falls below 22 USDC/SOL.",
+              "buy_token=SOL, sell_token=USDC, reference price is in USDC/SOL units. Set",
+              "price_upper_limit=toNative(22), price_lower_limit=0."
+            ],
+            "type": "f32"
+          },
+          {
+            "name": "priceUpperLimit",
+            "docs": [
+              "Parallel to price_lower_limit, but an upper limit."
+            ],
+            "type": "f32"
+          },
+          {
+            "name": "pricePremiumFraction",
+            "docs": [
+              "The premium to pay over oracle price to incentivize execution."
+            ],
+            "type": "f32"
+          },
+          {
+            "name": "takerFeeFraction",
+            "docs": [
+              "The taker receives only premium_price * (1 - taker_fee_fraction)"
+            ],
+            "type": "f32"
+          },
+          {
+            "name": "makerFeeFraction",
+            "docs": [
+              "The maker has to pay premium_price * (1 + maker_fee_fraction)"
+            ],
+            "type": "f32"
+          },
+          {
+            "name": "buyTokenIndex",
+            "docs": [
+              "indexes of tokens for the swap"
+            ],
+            "type": "u16"
+          },
+          {
+            "name": "sellTokenIndex",
+            "type": "u16"
+          },
+          {
+            "name": "hasData",
+            "type": "u8"
+          },
+          {
+            "name": "allowCreatingDeposits",
+            "docs": [
+              "may token purchases create deposits? (often users just want to get out of a borrow)"
+            ],
+            "type": "u8"
+          },
+          {
+            "name": "allowCreatingBorrows",
+            "docs": [
+              "may token selling create borrows? (often users just want to get out of a long)"
+            ],
+            "type": "u8"
+          },
+          {
+            "name": "reserved",
+            "type": {
+              "array": [
+                "u8",
+                109
               ]
             }
           }
@@ -17637,6 +18744,9 @@ export const IDL: MangoV4 = {
           },
           {
             "name": "TokenWithdraw"
+          },
+          {
+            "name": "TokenConditionalSwapTrigger"
           }
         ]
       }
@@ -17816,6 +18926,15 @@ export const IDL: MangoV4 = {
           },
           {
             "name": "GroupWithdrawInsuranceFund"
+          },
+          {
+            "name": "TokenConditionalSwapCreate"
+          },
+          {
+            "name": "TokenConditionalSwapTrigger"
+          },
+          {
+            "name": "TokenConditionalSwapCancel"
           }
         ]
       }
@@ -18920,6 +20039,50 @@ export const IDL: MangoV4 = {
       ]
     },
     {
+      "name": "WithdrawLoanLog",
+      "fields": [
+        {
+          "name": "mangoGroup",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "mangoAccount",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "tokenIndex",
+          "type": "u16",
+          "index": false
+        },
+        {
+          "name": "loanAmount",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "loanOriginationFee",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "instruction",
+          "type": {
+            "defined": "LoanOriginationFeeInstruction"
+          },
+          "index": false
+        },
+        {
+          "name": "price",
+          "type": {
+            "option": "i128"
+          },
+          "index": false
+        }
+      ]
+    },
+    {
       "name": "TokenLiqBankruptcyLog",
       "fields": [
         {
@@ -19573,6 +20736,176 @@ export const IDL: MangoV4 = {
           "index": false
         }
       ]
+    },
+    {
+      "name": "TokenConditionalSwapCreateLog",
+      "fields": [
+        {
+          "name": "mangoGroup",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "mangoAccount",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "id",
+          "type": "u64",
+          "index": false
+        },
+        {
+          "name": "maxBuy",
+          "type": "u64",
+          "index": false
+        },
+        {
+          "name": "maxSell",
+          "type": "u64",
+          "index": false
+        },
+        {
+          "name": "expiryTimestamp",
+          "type": "u64",
+          "index": false
+        },
+        {
+          "name": "priceLowerLimit",
+          "type": "f32",
+          "index": false
+        },
+        {
+          "name": "priceUpperLimit",
+          "type": "f32",
+          "index": false
+        },
+        {
+          "name": "pricePremiumFraction",
+          "type": "f32",
+          "index": false
+        },
+        {
+          "name": "takerFeeFraction",
+          "type": "f32",
+          "index": false
+        },
+        {
+          "name": "makerFeeFraction",
+          "type": "f32",
+          "index": false
+        },
+        {
+          "name": "buyTokenIndex",
+          "type": "u16",
+          "index": false
+        },
+        {
+          "name": "sellTokenIndex",
+          "type": "u16",
+          "index": false
+        },
+        {
+          "name": "allowCreatingDeposits",
+          "type": "bool",
+          "index": false
+        },
+        {
+          "name": "allowCreatingBorrows",
+          "type": "bool",
+          "index": false
+        }
+      ]
+    },
+    {
+      "name": "TokenConditionalSwapTriggerLog",
+      "fields": [
+        {
+          "name": "mangoGroup",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "liqee",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "liqor",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "tokenConditionalSwapId",
+          "type": "u64",
+          "index": false
+        },
+        {
+          "name": "buyTokenIndex",
+          "type": "u16",
+          "index": false
+        },
+        {
+          "name": "sellTokenIndex",
+          "type": "u16",
+          "index": false
+        },
+        {
+          "name": "buyAmount",
+          "type": "u64",
+          "index": false
+        },
+        {
+          "name": "sellAmount",
+          "type": "u64",
+          "index": false
+        },
+        {
+          "name": "makerFee",
+          "type": "u64",
+          "index": false
+        },
+        {
+          "name": "takerFee",
+          "type": "u64",
+          "index": false
+        },
+        {
+          "name": "buyTokenPrice",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "sellTokenPrice",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "closed",
+          "type": "bool",
+          "index": false
+        }
+      ]
+    },
+    {
+      "name": "TokenConditionalSwapCancelLog",
+      "fields": [
+        {
+          "name": "mangoGroup",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "mangoAccount",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "id",
+          "type": "u64",
+          "index": false
+        }
+      ]
     }
   ],
   "errors": [
@@ -19614,7 +20947,7 @@ export const IDL: MangoV4 = {
     {
       "code": 6007,
       "name": "HealthMustBePositiveOrIncrease",
-      "msg": "health must be positive or increase"
+      "msg": "health must be positive or not decrease"
     },
     {
       "code": 6008,
@@ -19820,6 +21153,11 @@ export const IDL: MangoV4 = {
       "code": 6048,
       "name": "WouldSelfTrade",
       "msg": "would self trade"
+    },
+    {
+      "code": 6049,
+      "name": "TokenConditionalSwapPriceNotInRange",
+      "msg": "conditional token swap price is not in execution range"
     }
   ]
 };

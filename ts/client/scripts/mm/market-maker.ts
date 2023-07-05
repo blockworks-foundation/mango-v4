@@ -18,6 +18,7 @@ import {
   PerpMarketIndex,
   PerpOrderSide,
   PerpOrderType,
+  PerpSelfTradeBehavior,
 } from '../../src/accounts/perp';
 import { MangoClient } from '../../src/client';
 import { MANGO_V4_ID } from '../../src/constants';
@@ -267,6 +268,7 @@ async function fullMarketMaker() {
   await group.reloadAll(client);
 
   // Cancel all existing orders
+  console.log(`Cancelling all orders...`);
   for (const perpMarket of Array.from(
     group.perpMarketsMapByMarketIndex.values(),
   )) {
@@ -312,6 +314,7 @@ async function fullMarketMaker() {
   }
 
   // Init sequence enforcer accounts
+  console.log(`Init sequence enforcer...`);
   await initSequenceEnforcerAccounts(
     client,
     Array.from(marketContexts.values()),
@@ -506,7 +509,7 @@ async function makeMarketUpdateInstructions(
 
     moveOrders = openOrders.length < 2;
 
-    const placeBidOPegIx = await client.perpPlaceOrderPeggedIx(
+    const placeBidOPegIx = await client.perpPlaceOrderPeggedV2Ix(
       group,
       mangoAccount,
       perpMarketIndex,
@@ -519,12 +522,13 @@ async function makeMarketUpdateInstructions(
       undefined,
       Date.now(),
       PerpOrderType.limit,
+      PerpSelfTradeBehavior.cancelProvide,
       false,
       expiryTimestamp,
       20,
     );
 
-    const placeAskOPegIx = await client.perpPlaceOrderPeggedIx(
+    const placeAskOPegIx = await client.perpPlaceOrderPeggedV2Ix(
       group,
       mangoAccount,
       perpMarketIndex,
@@ -537,6 +541,7 @@ async function makeMarketUpdateInstructions(
       undefined,
       Date.now(),
       PerpOrderType.limit,
+      PerpSelfTradeBehavior.cancelProvide,
       false,
       expiryTimestamp,
       20,
@@ -624,7 +629,7 @@ async function makeMarketUpdateInstructions(
         10,
       );
 
-      const placeBidIx = await client.perpPlaceOrderIx(
+      const placeBidIx = await client.perpPlaceOrderV2Ix(
         group,
         mangoAccount,
         perpMarketIndex,
@@ -634,12 +639,13 @@ async function makeMarketUpdateInstructions(
         undefined,
         Date.now(),
         PerpOrderType.postOnlySlide,
+        PerpSelfTradeBehavior.cancelProvide,
         false,
         expiryTimestamp,
         20,
       );
 
-      const placeAskIx = await client.perpPlaceOrderIx(
+      const placeAskIx = await client.perpPlaceOrderV2Ix(
         group,
         mangoAccount,
         perpMarketIndex,
@@ -649,6 +655,7 @@ async function makeMarketUpdateInstructions(
         undefined,
         Date.now(),
         PerpOrderType.postOnlySlide,
+        PerpSelfTradeBehavior.cancelProvide,
         false,
         expiryTimestamp,
         20,

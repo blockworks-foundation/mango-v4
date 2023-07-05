@@ -19,8 +19,8 @@ pub enum MangoError {
     InvalidFlashLoanTargetCpiProgram,
     #[msg("health must be positive")]
     HealthMustBePositive,
-    #[msg("health must be positive or increase")]
-    HealthMustBePositiveOrIncrease,
+    #[msg("health must be positive or not decrease")]
+    HealthMustBePositiveOrIncrease, // outdated name is kept for backwards compatibility
     #[msg("health must be negative")]
     HealthMustBeNegative,
     #[msg("the account is bankrupt")]
@@ -103,6 +103,8 @@ pub enum MangoError {
     InvalidHealthAccountCount,
     #[msg("would self trade")]
     WouldSelfTrade,
+    #[msg("conditional token swap price is not in execution range")]
+    TokenConditionalSwapPriceNotInRange,
 }
 
 impl MangoError {

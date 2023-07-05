@@ -22,6 +22,7 @@ export * from './constants';
 export * from './numbers/I80F48';
 export * from './risk';
 export * from './router';
+export * from './stats';
 export * from './types';
 export * from './utils';
 export { Group, MANGO_V4_ID, MangoClient, OracleProvider, StubOracle };

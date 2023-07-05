@@ -1,6 +1,7 @@
 import { AnchorProvider, Wallet } from '@coral-xyz/anchor';
 import { Cluster, Connection, Keypair, PublicKey } from '@solana/web3.js';
-import fs from 'fs';
+import cloneDeep from 'lodash/cloneDeep';
+import { cpuUsage } from 'process';
 import { Group } from '../../src/accounts/group';
 import { HealthCache } from '../../src/accounts/healthCache';
 import { HealthType, MangoAccount } from '../../src/accounts/mangoAccount';
@@ -8,16 +9,16 @@ import { PerpMarket } from '../../src/accounts/perp';
 import { Serum3Market } from '../../src/accounts/serum3';
 import { MangoClient } from '../../src/client';
 import { MANGO_V4_ID } from '../../src/constants';
+import { ZERO_I80F48 } from '../../src/numbers/I80F48';
 import { toUiDecimalsForQuote } from '../../src/utils';
 
 const CLUSTER_URL =
   process.env.CLUSTER_URL_OVERRIDE || process.env.MB_CLUSTER_URL;
-const PAYER_KEYPAIR =
-  process.env.PAYER_KEYPAIR_OVERRIDE || process.env.MB_PAYER_KEYPAIR;
 const USER_KEYPAIR =
   process.env.USER_KEYPAIR_OVERRIDE || process.env.MB_PAYER_KEYPAIR;
-const GROUP_NUM = Number(process.env.GROUP_NUM || 0);
-const MANGO_ACCOUNT_PK = process.env.MANGO_ACCOUNT_PK;
+const MANGO_ACCOUNT_PK = new PublicKey(
+  process.env.MANGO_ACCOUNT_PK || PublicKey.default.toBase58(),
+);
 const CLUSTER: Cluster =
   (process.env.CLUSTER_OVERRIDE as Cluster) || 'mainnet-beta';
 
@@ -218,57 +219,90 @@ async function debugUser(
   )) {
     getMaxForSerum3Wrapper(serum3Market);
   }
+
+  // Liquidation price for perp positions
+  for (const pp of mangoAccount.perpActive()) {
+    const pm = group.getPerpMarketByMarketIndex(pp.marketIndex);
+    const health = toUiDecimalsForQuote(
+      mangoAccount.getHealth(group, HealthType.maint),
+    );
+
+    if (
+      // pp.getNotionalValueUi(pm) > 1000 &&
+      // !(pp.getNotionalValueUi(pm) < health && pp.getBasePosition(pm).isPos())
+      // eslint-disable-next-line no-constant-condition
+      true
+    ) {
+      const then = Date.now();
+      const startUsage = cpuUsage();
+
+      const lp = await pp.getLiquidationPrice(group, mangoAccount);
+      if (lp == null || lp.lt(ZERO_I80F48())) {
+        continue;
+      }
+      const lpUi = group
+        .getPerpMarketByMarketIndex(pp.marketIndex)
+        .priceNativeToUi(lp.toNumber());
+
+      const gClone: Group = cloneDeep(group);
+      gClone.getPerpMarketByMarketIndex(pm.perpMarketIndex)._price = lp;
+
+      const simHealth = toUiDecimalsForQuote(
+        mangoAccount.getHealth(gClone, HealthType.maint),
+      );
+
+      const now = Date.now();
+      const endUsage = cpuUsage(startUsage);
+
+      console.log(
+        ` - ${pm.name}, health: ${health.toLocaleString()}, side: ${
+          pp.getBasePosition(pm).isPos() ? 'LONG' : 'SHORT'
+        }, notional: ${pp
+          .getNotionalValueUi(pm)
+          .toLocaleString()}, liq price: ${lpUi.toLocaleString()}, sim health: ${simHealth.toLocaleString()}, time ${
+          now - then
+        }ms, cpu usage ${(endUsage['user'] / 1000).toLocaleString()}ms`,
+      );
+    }
+  }
 }
 
 async function main(): Promise<void> {
   const options = AnchorProvider.defaultOptions();
   const connection = new Connection(CLUSTER_URL!, options);
+  const wallet = new Wallet(new Keypair());
+  const provider = new AnchorProvider(connection, wallet, options);
+  const client = MangoClient.connect(provider, CLUSTER, MANGO_V4_ID[CLUSTER], {
+    idsSource: 'api',
+  });
 
-  const admin = Keypair.fromSecretKey(
-    Buffer.from(JSON.parse(fs.readFileSync(PAYER_KEYPAIR!, 'utf-8'))),
-  );
-  console.log(`Admin ${admin.publicKey.toBase58()}`);
-
-  const adminWallet = new Wallet(admin);
-  const adminProvider = new AnchorProvider(connection, adminWallet, options);
-  const client = MangoClient.connect(
-    adminProvider,
-    CLUSTER,
-    MANGO_V4_ID[CLUSTER],
-    {
-      idsSource: 'api',
-    },
+  const group = await client.getGroup(
+    new PublicKey('78b8f4cGCwmZ9ysPFMWLaLTkkaYnUjwMJYStWe5RTSSX'),
   );
 
-  const group = await client.getGroupForCreator(admin.publicKey, GROUP_NUM);
+  const mangoAccounts = await client.getAllMangoAccounts(group, true);
+  mangoAccounts.sort((a, b) => b.getEquity(group).cmp(a.getEquity(group)));
 
-  for (const keypair of [USER_KEYPAIR!]) {
-    console.log();
-    const user = Keypair.fromSecretKey(
-      Buffer.from(JSON.parse(fs.readFileSync(keypair, 'utf-8'))),
-    );
-    const userWallet = new Wallet(user);
-    console.log(`User ${userWallet.publicKey.toBase58()}`);
-
-    const mangoAccounts = await client.getAllMangoAccounts(group, true);
-
-    for (const mangoAccount of mangoAccounts) {
-      if (
-        !MANGO_ACCOUNT_PK ||
-        mangoAccount.publicKey.equals(new PublicKey(MANGO_ACCOUNT_PK))
-      ) {
-        // console.log();
-        console.log(
-          `${mangoAccount.publicKey
-            .toBase58()
-            .padStart(48)}, health ${toUiDecimalsForQuote(
-            mangoAccount.getHealth(group, HealthType.maint),
-          ).toFixed(2)}, ${toUiDecimalsForQuote(
-            mangoAccount.getHealth(group, HealthType.init),
-          ).toFixed(2)}`,
-        );
-        // await debugUser(client, group, mangoAccount);
-      }
+  for (const mangoAccount of mangoAccounts) {
+    if (
+      true &&
+      (MANGO_ACCOUNT_PK!.equals(PublicKey.default) ||
+        // For specific account
+        mangoAccount.publicKey.equals(new PublicKey(MANGO_ACCOUNT_PK!))) &&
+      // Only interesting perp liq price candidates
+      mangoAccount.perpActive().length > 0 &&
+      mangoAccount
+        .perpActive()
+        .filter((pp) =>
+          pp
+            .getBasePosition(group.getPerpMarketByMarketIndex(pp.marketIndex))
+            .gt(ZERO_I80F48()),
+        ).length > 0
+    ) {
+      console.log(
+        `account https://app.mango.markets/?address=${mangoAccount.publicKey}`,
+      );
+      await debugUser(client, group, mangoAccount);
     }
   }
 
