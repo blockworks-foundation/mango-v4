@@ -47,14 +47,7 @@ pub fn trigger_check<'key, 'accounts, 'remaining, 'info>(
         incentive_lamports = trigger.incentive_lamports;
     }
 
-    // Transfer reward lamports
-    {
-        let mut triggers_lamports = triggers_ai.try_borrow_mut_lamports()?;
-        let triggerer_ai = ctx.accounts.triggerer.as_ref();
-        let mut triggerer_lamports = triggerer_ai.try_borrow_mut_lamports()?;
-        **triggerer_lamports += incentive_lamports;
-        **triggers_lamports -= incentive_lamports;
-    }
+    Triggers::transfer_lamports(triggers_ai, &ctx.accounts.triggerer, incentive_lamports)?;
 
     Ok(())
 }

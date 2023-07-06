@@ -48,6 +48,57 @@ impl Triggers {
             offset += trigger.total_bytes as usize;
         }
     }
+
+    /// Delete a trigger from the list. Returns new account size and freed up lamports.
+    ///
+    /// Afterwards, the account must be realloc'd and the lamports must be transfered.
+    pub fn remove_trigger(
+        bytes: &mut [u8],
+        trigger_id: u64,
+        trigger_offset: usize,
+    ) -> Result<(usize, u64)> {
+        let trigger = Trigger::from_bytes(&bytes[trigger_offset..])?;
+        require_eq!(trigger.id, trigger_id);
+
+        // Figure out the new size and incentive the triggerer gets
+        let trigger_size = trigger.total_bytes as usize;
+        let new_account_len = bytes.len() - trigger_size;
+
+        let previous_rent = Rent::get()?.minimum_balance(bytes.len());
+        let new_rent = Rent::get()?.minimum_balance(new_account_len);
+        let freed_up_rent = previous_rent - new_rent;
+
+        let freed_lamports = if trigger.condition_was_met == 0 {
+            2 * trigger.incentive_lamports + freed_up_rent
+        } else {
+            trigger.incentive_lamports + freed_up_rent
+        };
+
+        // Move all trailing triggers forward, overwriting the closed one
+        let trigger_end_offset = trigger_offset + trigger_size;
+        if trigger_end_offset < bytes.len() {
+            unsafe {
+                solana_program::program_memory::sol_memmove(
+                    &mut bytes[trigger_offset],
+                    &mut bytes[trigger_end_offset],
+                    bytes.len() - trigger_end_offset,
+                );
+            }
+        }
+
+        Ok((new_account_len, freed_lamports))
+    }
+
+    /// Move some lamports, only works if source is owned
+    ///
+    /// This is a weird location for this function, also this must exist already.
+    pub fn transfer_lamports(from: &AccountInfo, to: &AccountInfo, amount: u64) -> Result<()> {
+        let mut from_lamports = from.try_borrow_mut_lamports()?;
+        let mut to_lamports = to.try_borrow_mut_lamports()?;
+        **to_lamports += amount;
+        **from_lamports -= amount;
+        Ok(())
+    }
 }
 
 #[account(zero_copy)]
