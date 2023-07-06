@@ -374,20 +374,11 @@ export async function getPerpPositionsToBeLiquidated(
 export async function getEquityForMangoAccounts(
   client: MangoClient,
   group: Group,
-  mangoAccounts: PublicKey[],
+  mangoAccountPks: PublicKey[],
+  allMangoAccounts: MangoAccount[],
 ): Promise<AccountEquity[]> {
-  // Filter mango accounts which might be closed
-  const liqors = (
-    await client.connection.getMultipleAccountsInfo(mangoAccounts)
-  )
-    .map((ai, i) => {
-      return { ai: ai, pk: mangoAccounts[i] };
-    })
-    .filter((val) => val.ai)
-    .map((val) => val.pk);
-
-  const liqorMangoAccounts = await Promise.all(
-    liqors.map((liqor) => client.getMangoAccount(liqor, true)),
+  const liqorMangoAccounts = allMangoAccounts.filter((a) =>
+    mangoAccountPks.find((pk) => pk.equals(a.publicKey)),
   );
 
   const accountsWithEquity = liqorMangoAccounts.map((a: MangoAccount) => {
@@ -435,12 +426,6 @@ export async function getRiskStats(
 
   // Get all mango accounts
   const mangoAccounts = await client.getAllMangoAccounts(group, true);
-  // const mangoAccounts = [
-  //   await client.getMangoAccount(
-  //     new PublicKey('5G9XriaoqQy1V4s9RmnbczWAozzbv6h2RuEeAHk4R6Lb'), // https://app.mango.markets/stats?token=SOL
-  //     true,
-  //   ),
-  // ];
 
   // Get on chain prices
   const mints = [
@@ -538,8 +523,8 @@ export async function getRiskStats(
     getPriceImpactForLiqor(groupUsdtDepeg, mangoAccounts),
     getPerpPositionsToBeLiquidated(groupDrop, mangoAccounts),
     getPerpPositionsToBeLiquidated(groupRally, mangoAccounts),
-    getEquityForMangoAccounts(client, group, liqors),
-    getEquityForMangoAccounts(client, group, mms),
+    getEquityForMangoAccounts(client, group, liqors, mangoAccounts),
+    getEquityForMangoAccounts(client, group, mms, mangoAccounts),
   ]);
 
   return {
