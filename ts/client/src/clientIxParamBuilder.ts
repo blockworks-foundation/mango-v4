@@ -182,6 +182,11 @@ export interface IxGateParams {
   TokenConditionalSwapCreate: boolean;
   TokenConditionalSwapTrigger: boolean;
   TokenConditionalSwapCancel: boolean;
+  TriggerCreate: boolean;
+  TriggerClose: boolean;
+  TriggerCheck: boolean;
+  TriggerCheckAndExecute: boolean;
+  TriggersCreate: boolean;
 }
 
 // Default with all ixs enabled, use with buildIxGate
@@ -244,6 +249,11 @@ export const TrueIxGateParams: IxGateParams = {
   TokenConditionalSwapCreate: true,
   TokenConditionalSwapTrigger: true,
   TokenConditionalSwapCancel: true,
+  TriggerCreate: true,
+  TriggerClose: true,
+  TriggerCheck: true,
+  TriggerCheckAndExecute: true,
+  TriggersCreate: true,
 };
 
 // build ix gate e.g. buildIxGate(Builder(TrueIxGateParams).TokenDeposit(false).build()).toNumber(),
@@ -316,6 +326,11 @@ export function buildIxGate(p: IxGateParams): BN {
   toggleIx(ixGate, p, 'TokenConditionalSwapCreate', 52);
   toggleIx(ixGate, p, 'TokenConditionalSwapTrigger', 53);
   toggleIx(ixGate, p, 'TokenConditionalSwapCancel', 54);
+  toggleIx(ixGate, p, 'TriggerCreate', 55);
+  toggleIx(ixGate, p, 'TriggerClose', 56);
+  toggleIx(ixGate, p, 'TriggerCheck', 57);
+  toggleIx(ixGate, p, 'TriggerCheckAndExecute', 58);
+  toggleIx(ixGate, p, 'TriggersCreate', 59);
 
   return ixGate;
 }

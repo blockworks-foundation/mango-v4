@@ -1,12 +1,10 @@
-use crate::error::*;
 use crate::state::*;
 use anchor_lang::prelude::*;
 
 #[derive(Accounts)]
 pub struct TriggerCheck<'info> {
-    #[account(
-        // TODO: constraint = group.load()?.is_ix_enabled(IxGate::AccountCreate) @ MangoError::IxIsDisabled,
-    )]
+    // IxGate check needs to happen in the instruction, as this is shared among
+    // TriggerCheck and TriggerCheckAndExecute
     pub group: AccountLoader<'info, Group>,
 
     #[account(

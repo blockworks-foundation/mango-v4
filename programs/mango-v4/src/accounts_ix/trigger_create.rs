@@ -5,7 +5,7 @@ use anchor_lang::prelude::*;
 #[derive(Accounts)]
 pub struct TriggerCreate<'info> {
     #[account(
-        // TODO: constraint = group.load()?.is_ix_enabled(IxGate::TriggerCreate) @ MangoError::IxIsDisabled,
+        constraint = group.load()?.is_ix_enabled(IxGate::TriggerCreate) @ MangoError::IxIsDisabled,
     )]
     pub group: AccountLoader<'info, Group>,
 
@@ -14,6 +14,7 @@ pub struct TriggerCreate<'info> {
         // authority is checked at #1
     )]
     pub account: AccountLoader<'info, MangoAccountFixed>,
+    pub authority: Signer<'info>,
 
     #[account(
         mut,
@@ -21,8 +22,6 @@ pub struct TriggerCreate<'info> {
         has_one = account,
     )]
     pub triggers: AccountLoader<'info, Triggers>,
-
-    pub authority: Signer<'info>,
 
     #[account(mut)]
     pub payer: Signer<'info>,

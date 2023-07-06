@@ -197,6 +197,11 @@ pub enum IxGate {
     TokenConditionalSwapCreate = 52,
     TokenConditionalSwapTrigger = 53,
     TokenConditionalSwapCancel = 54,
+    TriggerCreate = 55,
+    TriggerClose = 56,
+    TriggerCheck = 57,
+    TriggerCheckAndExecute = 58,
+    TriggersCreate = 59,
     // NOTE: Adding new variants requires matching changes in ts and the ix_gate_set instruction.
 }
 

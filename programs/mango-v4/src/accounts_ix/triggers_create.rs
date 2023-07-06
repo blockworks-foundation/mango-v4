@@ -6,7 +6,7 @@ use anchor_lang::prelude::*;
 #[instruction()]
 pub struct TriggersCreate<'info> {
     #[account(
-        // TODO: constraint = group.load()?.is_ix_enabled(IxGate::TriggersCreate) @ MangoError::IxIsDisabled,
+        constraint = group.load()?.is_ix_enabled(IxGate::TriggersCreate) @ MangoError::IxIsDisabled,
     )]
     pub group: AccountLoader<'info, Group>,
 
@@ -15,6 +15,7 @@ pub struct TriggersCreate<'info> {
         // authority is checked at #1
     )]
     pub account: AccountLoader<'info, MangoAccountFixed>,
+    pub authority: Signer<'info>,
 
     #[account(
         init,
@@ -24,8 +25,6 @@ pub struct TriggersCreate<'info> {
         space = 8 + std::mem::size_of::<Triggers>(),
     )]
     pub triggers: AccountLoader<'info, Triggers>,
-
-    pub authority: Signer<'info>,
 
     #[account(mut)]
     pub payer: Signer<'info>,

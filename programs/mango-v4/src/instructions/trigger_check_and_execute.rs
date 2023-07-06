@@ -12,8 +12,16 @@ pub fn trigger_check_and_execute<'key, 'accounts, 'remaining, 'info>(
 ) -> Result<()> {
     let num_condition_accounts: usize = num_condition_accounts.into();
 
+    require!(
+        ctx.accounts
+            .group
+            .load()?
+            .is_ix_enabled(IxGate::TriggerCheckAndExecute),
+        MangoError::IxIsDisabled
+    );
+
     {
-        // just to ensure it's good?!
+        // just to ensure the account is good
         ctx.accounts.triggers.load()?;
     }
 

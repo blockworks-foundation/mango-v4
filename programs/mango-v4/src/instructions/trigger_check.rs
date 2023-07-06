@@ -8,10 +8,16 @@ pub fn trigger_check<'key, 'accounts, 'remaining, 'info>(
     ctx: Context<'key, 'accounts, 'remaining, 'info, TriggerCheck<'info>>,
     trigger_id: u64,
 ) -> Result<()> {
-    {
-        // just to ensure it's good?!
-        ctx.accounts.triggers.load()?;
-    }
+    require!(
+        ctx.accounts
+            .group
+            .load()?
+            .is_ix_enabled(IxGate::TriggerCheck),
+        MangoError::IxIsDisabled
+    );
+
+    // just to ensure the account is good
+    ctx.accounts.triggers.load()?;
 
     let triggers_ai = ctx.accounts.triggers.as_ref();
     let now_slot = Clock::get()?.slot;

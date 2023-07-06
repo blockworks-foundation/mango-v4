@@ -70,6 +70,11 @@ pub fn ix_gate_set(ctx: Context<IxGateSet>, ix_gate: u128) -> Result<()> {
     log_if_changed(&group, ix_gate, IxGate::TokenConditionalSwapCreate);
     log_if_changed(&group, ix_gate, IxGate::TokenConditionalSwapTrigger);
     log_if_changed(&group, ix_gate, IxGate::TokenConditionalSwapCancel);
+    log_if_changed(&group, ix_gate, IxGate::TriggerCreate);
+    log_if_changed(&group, ix_gate, IxGate::TriggerClose);
+    log_if_changed(&group, ix_gate, IxGate::TriggerCheck);
+    log_if_changed(&group, ix_gate, IxGate::TriggerCheckAndExecute);
+    log_if_changed(&group, ix_gate, IxGate::TriggersCreate);
 
     group.ix_gate = ix_gate;
 
