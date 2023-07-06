@@ -205,13 +205,13 @@
     /// Example: Want to buy SOL with USDC if the price falls below 22 USDC/SOL.
     /// buy_token=SOL, sell_token=USDC, reference price is in USDC/SOL units. Set
     /// price_upper_limit=toNative(22), price_lower_limit=0.
-    </span><span class="kw">pub </span>price_lower_limit: f32,
+    </span><span class="kw">pub </span>price_lower_limit: f64,
 
     <span class="doccomment">/// Parallel to price_lower_limit, but an upper limit.
-    </span><span class="kw">pub </span>price_upper_limit: f32,
+    </span><span class="kw">pub </span>price_upper_limit: f64,
 
     <span class="doccomment">/// The premium to pay over oracle price to incentivize execution.
-    </span><span class="kw">pub </span>price_premium_fraction: f32,
+    </span><span class="kw">pub </span>price_premium_fraction: f64,
 
     <span class="doccomment">/// The taker receives only premium_price * (1 - taker_fee_fraction)
     </span><span class="kw">pub </span>taker_fee_fraction: f32,
@@ -231,14 +231,14 @@
     </span><span class="kw">pub </span>allow_creating_borrows: u8,
 
     <span class="attribute">#[derivative(Debug = <span class="string">&quot;ignore&quot;</span>)]
-    </span><span class="kw">pub </span>reserved: [u8; <span class="number">109</span>],
+    </span><span class="kw">pub </span>reserved: [u8; <span class="number">113</span>],
 }
 
 <span class="macro">const_assert_eq!</span>(
     size_of::&lt;TokenConditionalSwap&gt;(),
-    <span class="number">8 </span>* <span class="number">6 </span>+ <span class="number">4 </span>* <span class="number">5 </span>+ <span class="number">2 </span>* <span class="number">2 </span>+ <span class="number">1 </span>* <span class="number">3 </span>+ <span class="number">109
+    <span class="number">8 </span>* <span class="number">6 </span>+ <span class="number">8 </span>* <span class="number">3 </span>+ <span class="number">2 </span>* <span class="number">4 </span>+ <span class="number">2 </span>* <span class="number">2 </span>+ <span class="number">1 </span>* <span class="number">3 </span>+ <span class="number">113
 </span>);
-<span class="macro">const_assert_eq!</span>(size_of::&lt;TokenConditionalSwap&gt;(), <span class="number">184</span>);
+<span class="macro">const_assert_eq!</span>(size_of::&lt;TokenConditionalSwap&gt;(), <span class="number">200</span>);
 <span class="macro">const_assert_eq!</span>(size_of::&lt;TokenConditionalSwap&gt;() % <span class="number">8</span>, <span class="number">0</span>);
 
 <span class="kw">impl </span>Default <span class="kw">for </span>TokenConditionalSwap {
@@ -260,7 +260,7 @@
             has_data: <span class="number">0</span>,
             allow_creating_borrows: <span class="number">0</span>,
             allow_creating_deposits: <span class="number">0</span>,
-            reserved: [<span class="number">0</span>; <span class="number">109</span>],
+            reserved: [<span class="number">0</span>; <span class="number">113</span>],
         }
     }
 }
@@ -300,18 +300,18 @@
     <span class="doccomment">/// Base price adjusted for the premium
     ///
     /// Base price is the amount of sell_token to pay for one buy_token.
-    </span><span class="kw">pub fn </span>premium_price(<span class="kw-2">&amp;</span><span class="self">self</span>, base_price: f32) -&gt; f32 {
+    </span><span class="kw">pub fn </span>premium_price(<span class="kw-2">&amp;</span><span class="self">self</span>, base_price: f64) -&gt; f64 {
         base_price * (<span class="number">1.0 </span>+ <span class="self">self</span>.price_premium_fraction)
     }
 
     <span class="doccomment">/// Premium price adjusted for the maker fee
-    </span><span class="kw">pub fn </span>maker_price(<span class="kw-2">&amp;</span><span class="self">self</span>, premium_price: f32) -&gt; f32 {
-        premium_price * (<span class="number">1.0 </span>+ <span class="self">self</span>.maker_fee_fraction)
+    </span><span class="kw">pub fn </span>maker_price(<span class="kw-2">&amp;</span><span class="self">self</span>, premium_price: f64) -&gt; f64 {
+        premium_price * (<span class="number">1.0 </span>+ <span class="self">self</span>.maker_fee_fraction <span class="kw">as </span>f64)
     }
 
     <span class="doccomment">/// Premium price adjusted for the taker fee
-    </span><span class="kw">pub fn </span>taker_price(<span class="kw-2">&amp;</span><span class="self">self</span>, premium_price: f32) -&gt; f32 {
-        premium_price * (<span class="number">1.0 </span>- <span class="self">self</span>.taker_fee_fraction)
+    </span><span class="kw">pub fn </span>taker_price(<span class="kw-2">&amp;</span><span class="self">self</span>, premium_price: f64) -&gt; f64 {
+        premium_price * (<span class="number">1.0 </span>- <span class="self">self</span>.taker_fee_fraction <span class="kw">as </span>f64)
     }
 
     <span class="kw">pub fn </span>maker_fee(<span class="kw-2">&amp;</span><span class="self">self</span>, base_sell_amount: I80F48) -&gt; u64 {
@@ -326,7 +326,7 @@
             .to_num()
     }
 
-    <span class="kw">pub fn </span>price_in_range(<span class="kw-2">&amp;</span><span class="self">self</span>, price: f32) -&gt; bool {
+    <span class="kw">pub fn </span>price_in_range(<span class="kw-2">&amp;</span><span class="self">self</span>, price: f64) -&gt; bool {
         price &gt;= <span class="self">self</span>.price_lower_limit &amp;&amp; price &lt;= <span class="self">self</span>.price_upper_limit
     }
 }

@@ -2407,9 +2407,9 @@
         max_buy: u64,
         max_sell: u64,
         expiry_timestamp: u64,
-        price_lower_limit: f32,
-        price_upper_limit: f32,
-        price_premium_fraction: f32,
+        price_lower_limit: f64,
+        price_upper_limit: f64,
+        price_premium_fraction: f64,
         allow_creating_deposits: bool,
         allow_creating_borrows: bool,
     ) -&gt; <span class="prelude-ty">Result</span>&lt;()&gt; {
@@ -2430,7 +2430,7 @@
             has_data: <span class="number">1</span>,
             allow_creating_deposits: u8::from(allow_creating_deposits),
             allow_creating_borrows: u8::from(allow_creating_borrows),
-            reserved: [<span class="number">0</span>; <span class="number">109</span>],
+            reserved: [<span class="number">0</span>; <span class="number">113</span>],
         };
 
         <span class="attribute">#[cfg(feature = <span class="string">&quot;enable-gpl&quot;</span>)]
