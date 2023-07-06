@@ -1143,9 +1143,9 @@ pub mod mango_v4 {
         max_buy: u64,
         max_sell: u64,
         expiry_timestamp: u64,
-        price_lower_limit: f32,
-        price_upper_limit: f32,
-        price_premium_fraction: f32,
+        price_lower_limit: f64,
+        price_upper_limit: f64,
+        price_premium_fraction: f64,
         allow_creating_deposits: bool,
         allow_creating_borrows: bool,
     ) -> Result<()> {
@@ -1166,7 +1166,7 @@ pub mod mango_v4 {
             has_data: 1,
             allow_creating_deposits: u8::from(allow_creating_deposits),
             allow_creating_borrows: u8::from(allow_creating_borrows),
-            reserved: [0; 109],
+            reserved: [0; 113],
         };
 
         #[cfg(feature = "enable-gpl")]

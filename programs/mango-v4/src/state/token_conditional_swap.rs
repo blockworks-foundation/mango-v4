@@ -39,13 +39,13 @@ pub struct TokenConditionalSwap {
     /// Example: Want to buy SOL with USDC if the price falls below 22 USDC/SOL.
     /// buy_token=SOL, sell_token=USDC, reference price is in USDC/SOL units. Set
     /// price_upper_limit=toNative(22), price_lower_limit=0.
-    pub price_lower_limit: f32,
+    pub price_lower_limit: f64,
 
     /// Parallel to price_lower_limit, but an upper limit.
-    pub price_upper_limit: f32,
+    pub price_upper_limit: f64,
 
     /// The premium to pay over oracle price to incentivize execution.
-    pub price_premium_fraction: f32,
+    pub price_premium_fraction: f64,
 
     /// The taker receives only premium_price * (1 - taker_fee_fraction)
     pub taker_fee_fraction: f32,
@@ -65,14 +65,14 @@ pub struct TokenConditionalSwap {
     pub allow_creating_borrows: u8,
 
     #[derivative(Debug = "ignore")]
-    pub reserved: [u8; 109],
+    pub reserved: [u8; 113],
 }
 
 const_assert_eq!(
     size_of::<TokenConditionalSwap>(),
-    8 * 6 + 4 * 5 + 2 * 2 + 1 * 3 + 109
+    8 * 6 + 8 * 3 + 2 * 4 + 2 * 2 + 1 * 3 + 113
 );
-const_assert_eq!(size_of::<TokenConditionalSwap>(), 184);
+const_assert_eq!(size_of::<TokenConditionalSwap>(), 200);
 const_assert_eq!(size_of::<TokenConditionalSwap>() % 8, 0);
 
 impl Default for TokenConditionalSwap {
@@ -94,7 +94,7 @@ impl Default for TokenConditionalSwap {
             has_data: 0,
             allow_creating_borrows: 0,
             allow_creating_deposits: 0,
-            reserved: [0; 109],
+            reserved: [0; 113],
         }
     }
 }
@@ -134,18 +134,18 @@ impl TokenConditionalSwap {
     /// Base price adjusted for the premium
     ///
     /// Base price is the amount of sell_token to pay for one buy_token.
-    pub fn premium_price(&self, base_price: f32) -> f32 {
+    pub fn premium_price(&self, base_price: f64) -> f64 {
         base_price * (1.0 + self.price_premium_fraction)
     }
 
     /// Premium price adjusted for the maker fee
-    pub fn maker_price(&self, premium_price: f32) -> f32 {
-        premium_price * (1.0 + self.maker_fee_fraction)
+    pub fn maker_price(&self, premium_price: f64) -> f64 {
+        premium_price * (1.0 + self.maker_fee_fraction as f64)
     }
 
     /// Premium price adjusted for the taker fee
-    pub fn taker_price(&self, premium_price: f32) -> f32 {
-        premium_price * (1.0 - self.taker_fee_fraction)
+    pub fn taker_price(&self, premium_price: f64) -> f64 {
+        premium_price * (1.0 - self.taker_fee_fraction as f64)
     }
 
     pub fn maker_fee(&self, base_sell_amount: I80F48) -> u64 {
@@ -160,7 +160,7 @@ impl TokenConditionalSwap {
             .to_num()
     }
 
-    pub fn price_in_range(&self, price: f32) -> bool {
+    pub fn price_in_range(&self, price: f64) -> bool {
         price >= self.price_lower_limit && price <= self.price_upper_limit
     }
 }
