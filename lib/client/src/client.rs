@@ -181,8 +181,8 @@ impl MangoClient {
     ) -> anyhow::Result<(Pubkey, Signature)> {
         let account = Pubkey::find_program_address(
             &[
-                group.as_ref(),
                 b"MangoAccount".as_ref(),
+                group.as_ref(),
                 owner.pubkey().as_ref(),
                 &account_num.to_le_bytes(),
             ],
