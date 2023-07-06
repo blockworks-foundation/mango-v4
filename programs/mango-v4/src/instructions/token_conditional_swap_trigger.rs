@@ -205,7 +205,7 @@ fn action(
     require_eq!(sell_bank.token_index, tcs.sell_token_index);
 
     // amount of sell token native per buy token native
-    let price: f32 = (buy_token_price.to_num::<f64>() / sell_token_price.to_num::<f64>()) as f32;
+    let price = buy_token_price.to_num::<f64>() / sell_token_price.to_num::<f64>();
     require!(
         tcs.price_in_range(price),
         MangoError::TokenConditionalSwapPriceNotInRange
@@ -770,7 +770,7 @@ mod tests {
             max_sell: 100,
             price_lower_limit: 1.0,
             price_upper_limit: 3.0,
-            price_premium_fraction: 0.1,
+            price_premium_fraction: 0.11,
             buy_token_index: 1,
             sell_token_index: 0,
             has_data: 1,

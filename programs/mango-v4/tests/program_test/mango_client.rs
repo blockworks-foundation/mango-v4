@@ -4138,9 +4138,9 @@ pub struct TokenConditionalSwapCreateInstruction {
     pub sell_mint: Pubkey,
     pub max_buy: u64,
     pub max_sell: u64,
-    pub price_lower_limit: f32,
-    pub price_upper_limit: f32,
-    pub price_premium_fraction: f32,
+    pub price_lower_limit: f64,
+    pub price_upper_limit: f64,
+    pub price_premium_fraction: f64,
     pub allow_creating_deposits: bool,
     pub allow_creating_borrows: bool,
 }

@@ -4778,15 +4778,15 @@ export type MangoV4 = {
         },
         {
           "name": "priceLowerLimit",
-          "type": "f32"
+          "type": "f64"
         },
         {
           "name": "priceUpperLimit",
-          "type": "f32"
+          "type": "f64"
         },
         {
           "name": "pricePremiumFraction",
-          "type": "f32"
+          "type": "f64"
         },
         {
           "name": "allowCreatingDeposits",
@@ -7916,21 +7916,21 @@ export type MangoV4 = {
               "buy_token=SOL, sell_token=USDC, reference price is in USDC/SOL units. Set",
               "price_upper_limit=toNative(22), price_lower_limit=0."
             ],
-            "type": "f32"
+            "type": "f64"
           },
           {
             "name": "priceUpperLimit",
             "docs": [
               "Parallel to price_lower_limit, but an upper limit."
             ],
-            "type": "f32"
+            "type": "f64"
           },
           {
             "name": "pricePremiumFraction",
             "docs": [
               "The premium to pay over oracle price to incentivize execution."
             ],
-            "type": "f32"
+            "type": "f64"
           },
           {
             "name": "takerFeeFraction",
@@ -7980,7 +7980,7 @@ export type MangoV4 = {
             "type": {
               "array": [
                 "u8",
-                109
+                113
               ]
             }
           }
@@ -9028,6 +9028,101 @@ export type MangoV4 = {
         {
           "name": "quantity",
           "type": "i64",
+          "index": false
+        }
+      ]
+    },
+    {
+      "name": "FillLogV3",
+      "fields": [
+        {
+          "name": "mangoGroup",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "marketIndex",
+          "type": "u16",
+          "index": false
+        },
+        {
+          "name": "takerSide",
+          "type": "u8",
+          "index": false
+        },
+        {
+          "name": "makerSlot",
+          "type": "u8",
+          "index": false
+        },
+        {
+          "name": "makerOut",
+          "type": "bool",
+          "index": false
+        },
+        {
+          "name": "timestamp",
+          "type": "u64",
+          "index": false
+        },
+        {
+          "name": "seqNum",
+          "type": "u64",
+          "index": false
+        },
+        {
+          "name": "maker",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "makerClientOrderId",
+          "type": "u64",
+          "index": false
+        },
+        {
+          "name": "makerFee",
+          "type": "f32",
+          "index": false
+        },
+        {
+          "name": "makerTimestamp",
+          "type": "u64",
+          "index": false
+        },
+        {
+          "name": "taker",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "takerClientOrderId",
+          "type": "u64",
+          "index": false
+        },
+        {
+          "name": "takerFee",
+          "type": "f32",
+          "index": false
+        },
+        {
+          "name": "price",
+          "type": "i64",
+          "index": false
+        },
+        {
+          "name": "quantity",
+          "type": "i64",
+          "index": false
+        },
+        {
+          "name": "makerClosedPnl",
+          "type": "f64",
+          "index": false
+        },
+        {
+          "name": "takerClosedPnl",
+          "type": "f64",
           "index": false
         }
       ]
@@ -10190,17 +10285,17 @@ export type MangoV4 = {
         },
         {
           "name": "priceLowerLimit",
-          "type": "f32",
+          "type": "f64",
           "index": false
         },
         {
           "name": "priceUpperLimit",
-          "type": "f32",
+          "type": "f64",
           "index": false
         },
         {
           "name": "pricePremiumFraction",
-          "type": "f32",
+          "type": "f64",
           "index": false
         },
         {
@@ -15360,15 +15455,15 @@ export const IDL: MangoV4 = {
         },
         {
           "name": "priceLowerLimit",
-          "type": "f32"
+          "type": "f64"
         },
         {
           "name": "priceUpperLimit",
-          "type": "f32"
+          "type": "f64"
         },
         {
           "name": "pricePremiumFraction",
-          "type": "f32"
+          "type": "f64"
         },
         {
           "name": "allowCreatingDeposits",
@@ -18498,21 +18593,21 @@ export const IDL: MangoV4 = {
               "buy_token=SOL, sell_token=USDC, reference price is in USDC/SOL units. Set",
               "price_upper_limit=toNative(22), price_lower_limit=0."
             ],
-            "type": "f32"
+            "type": "f64"
           },
           {
             "name": "priceUpperLimit",
             "docs": [
               "Parallel to price_lower_limit, but an upper limit."
             ],
-            "type": "f32"
+            "type": "f64"
           },
           {
             "name": "pricePremiumFraction",
             "docs": [
               "The premium to pay over oracle price to incentivize execution."
             ],
-            "type": "f32"
+            "type": "f64"
           },
           {
             "name": "takerFeeFraction",
@@ -18562,7 +18657,7 @@ export const IDL: MangoV4 = {
             "type": {
               "array": [
                 "u8",
-                109
+                113
               ]
             }
           }
@@ -19610,6 +19705,101 @@ export const IDL: MangoV4 = {
         {
           "name": "quantity",
           "type": "i64",
+          "index": false
+        }
+      ]
+    },
+    {
+      "name": "FillLogV3",
+      "fields": [
+        {
+          "name": "mangoGroup",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "marketIndex",
+          "type": "u16",
+          "index": false
+        },
+        {
+          "name": "takerSide",
+          "type": "u8",
+          "index": false
+        },
+        {
+          "name": "makerSlot",
+          "type": "u8",
+          "index": false
+        },
+        {
+          "name": "makerOut",
+          "type": "bool",
+          "index": false
+        },
+        {
+          "name": "timestamp",
+          "type": "u64",
+          "index": false
+        },
+        {
+          "name": "seqNum",
+          "type": "u64",
+          "index": false
+        },
+        {
+          "name": "maker",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "makerClientOrderId",
+          "type": "u64",
+          "index": false
+        },
+        {
+          "name": "makerFee",
+          "type": "f32",
+          "index": false
+        },
+        {
+          "name": "makerTimestamp",
+          "type": "u64",
+          "index": false
+        },
+        {
+          "name": "taker",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "takerClientOrderId",
+          "type": "u64",
+          "index": false
+        },
+        {
+          "name": "takerFee",
+          "type": "f32",
+          "index": false
+        },
+        {
+          "name": "price",
+          "type": "i64",
+          "index": false
+        },
+        {
+          "name": "quantity",
+          "type": "i64",
+          "index": false
+        },
+        {
+          "name": "makerClosedPnl",
+          "type": "f64",
+          "index": false
+        },
+        {
+          "name": "takerClosedPnl",
+          "type": "f64",
           "index": false
         }
       ]
@@ -20772,17 +20962,17 @@ export const IDL: MangoV4 = {
         },
         {
           "name": "priceLowerLimit",
-          "type": "f32",
+          "type": "f64",
           "index": false
         },
         {
           "name": "priceUpperLimit",
-          "type": "f32",
+          "type": "f64",
           "index": false
         },
         {
           "name": "pricePremiumFraction",
-          "type": "f32",
+          "type": "f64",
           "index": false
         },
         {
