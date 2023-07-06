@@ -9,7 +9,7 @@ import {
   ONE_I80F48,
   ZERO_I80F48,
 } from '../numbers/I80F48';
-import { toNativeI80F48ForQuote } from '../utils';
+import { toNativeI80F48ForQuote, toUiDecimalsForQuote } from '../utils';
 import { Bank, BankForHealth, TokenIndex } from './bank';
 import { Group } from './group';
 
@@ -260,6 +260,46 @@ export class HealthCache {
       health.iadd(contrib);
     }
     return health;
+  }
+
+  healthContributionPerAssetUi(
+    group: Group,
+    healthType: HealthType,
+  ): { asset: string; contribution: number }[] {
+    const tokenBalances = this.effectiveTokenBalancesInternal(
+      healthType,
+      false,
+    );
+
+    const ret = new Array<{ asset: string; contribution: number }>();
+    for (const index of this.tokenInfos.keys()) {
+      const tokenInfo = this.tokenInfos[index];
+      const tokenBalance = tokenBalances[index];
+      const contrib = tokenInfo.healthContribution(
+        healthType,
+        tokenBalance.spotAndPerp,
+      );
+      ret.push({
+        asset: group.getFirstBankByTokenIndex(tokenInfo.tokenIndex).name,
+        contribution: toUiDecimalsForQuote(contrib),
+      });
+    }
+    const res = this.computeSerum3Reservations(healthType);
+    for (const [index, serum3Info] of this.serum3Infos.entries()) {
+      const contrib = serum3Info.healthContribution(
+        healthType,
+        this.tokenInfos,
+        tokenBalances,
+        res.tokenMaxReserved,
+        res.serum3Reserved[index],
+      );
+      ret.push({
+        asset: group.getSerum3MarketByMarketIndex(serum3Info.marketIndex).name,
+        contribution: toUiDecimalsForQuote(contrib),
+      });
+    }
+
+    return ret;
   }
 
   public health(healthType: HealthType): I80F48 {

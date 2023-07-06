@@ -333,6 +333,14 @@ export class MangoAccount {
     return hc.health(healthType);
   }
 
+  public getHealthContributionPerAssetUi(
+    group: Group,
+    healthType: HealthType,
+  ): { asset: string; contribution: number }[] {
+    const hc = HealthCache.fromMangoAccount(group, this);
+    return hc.healthContributionPerAssetUi(group, healthType);
+  }
+
   public perpMaxSettle(
     group: Group,
     perpMarketSettleTokenIndex: TokenIndex,
