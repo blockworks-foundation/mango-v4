@@ -1297,6 +1297,12 @@ pub mod mango_v4 {
         Ok(())
     }
 
+    pub fn trigger_cancel(ctx: Context<TriggerCancel>, trigger_id: u64) -> Result<()> {
+        #[cfg(feature = "enable-gpl")]
+        instructions::trigger_cancel(ctx, trigger_id)?;
+        Ok(())
+    }
+
     pub fn trigger_check<'key, 'accounts, 'remaining, 'info>(
         ctx: Context<'key, 'accounts, 'remaining, 'info, TriggerCheck<'info>>,
         trigger_id: u64,

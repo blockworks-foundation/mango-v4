@@ -59,8 +59,8 @@ pub use token_register::*;
 pub use token_register_trustless::*;
 pub use token_update_index_and_rate::*;
 pub use token_withdraw::*;
+pub use trigger_cancel::*;
 pub use trigger_check::*;
-pub use trigger_check_and_execute::*;
 pub use trigger_create::*;
 pub use triggers_create::*;
 
@@ -125,7 +125,7 @@ mod token_register;
 mod token_register_trustless;
 mod token_update_index_and_rate;
 mod token_withdraw;
+mod trigger_cancel;
 mod trigger_check;
-mod trigger_check_and_execute;
 mod trigger_create;
 mod triggers_create;
