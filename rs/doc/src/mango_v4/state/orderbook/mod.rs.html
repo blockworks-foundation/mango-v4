@@ -987,83 +987,6 @@
 <span id="987">987</span>
 <span id="988">988</span>
 <span id="989">989</span>
-<span id="990">990</span>
-<span id="991">991</span>
-<span id="992">992</span>
-<span id="993">993</span>
-<span id="994">994</span>
-<span id="995">995</span>
-<span id="996">996</span>
-<span id="997">997</span>
-<span id="998">998</span>
-<span id="999">999</span>
-<span id="1000">1000</span>
-<span id="1001">1001</span>
-<span id="1002">1002</span>
-<span id="1003">1003</span>
-<span id="1004">1004</span>
-<span id="1005">1005</span>
-<span id="1006">1006</span>
-<span id="1007">1007</span>
-<span id="1008">1008</span>
-<span id="1009">1009</span>
-<span id="1010">1010</span>
-<span id="1011">1011</span>
-<span id="1012">1012</span>
-<span id="1013">1013</span>
-<span id="1014">1014</span>
-<span id="1015">1015</span>
-<span id="1016">1016</span>
-<span id="1017">1017</span>
-<span id="1018">1018</span>
-<span id="1019">1019</span>
-<span id="1020">1020</span>
-<span id="1021">1021</span>
-<span id="1022">1022</span>
-<span id="1023">1023</span>
-<span id="1024">1024</span>
-<span id="1025">1025</span>
-<span id="1026">1026</span>
-<span id="1027">1027</span>
-<span id="1028">1028</span>
-<span id="1029">1029</span>
-<span id="1030">1030</span>
-<span id="1031">1031</span>
-<span id="1032">1032</span>
-<span id="1033">1033</span>
-<span id="1034">1034</span>
-<span id="1035">1035</span>
-<span id="1036">1036</span>
-<span id="1037">1037</span>
-<span id="1038">1038</span>
-<span id="1039">1039</span>
-<span id="1040">1040</span>
-<span id="1041">1041</span>
-<span id="1042">1042</span>
-<span id="1043">1043</span>
-<span id="1044">1044</span>
-<span id="1045">1045</span>
-<span id="1046">1046</span>
-<span id="1047">1047</span>
-<span id="1048">1048</span>
-<span id="1049">1049</span>
-<span id="1050">1050</span>
-<span id="1051">1051</span>
-<span id="1052">1052</span>
-<span id="1053">1053</span>
-<span id="1054">1054</span>
-<span id="1055">1055</span>
-<span id="1056">1056</span>
-<span id="1057">1057</span>
-<span id="1058">1058</span>
-<span id="1059">1059</span>
-<span id="1060">1060</span>
-<span id="1061">1061</span>
-<span id="1062">1062</span>
-<span id="1063">1063</span>
-<span id="1064">1064</span>
-<span id="1065">1065</span>
-<span id="1066">1066</span>
 </pre><pre class="rust"><code><span class="kw">pub use </span>book::<span class="kw-2">*</span>;
 <span class="kw">pub use </span>bookside::<span class="kw-2">*</span>;
 <span class="kw">pub use </span>bookside_iterator::<span class="kw-2">*</span>;
@@ -1207,7 +1130,7 @@
                 u8::MAX,
             )
             .unwrap();
-            account.perp_order_by_raw_index_unchecked(<span class="number">0</span>).id
+            account.perp_order_by_raw_index(<span class="number">0</span>).id
         };
 
         <span class="comment">// insert bids until book side is full
@@ -1358,8 +1281,7 @@
         )
         .unwrap();
         <span class="kw">let </span>order =
-            order_tree_leaf_by_key(<span class="kw-2">&amp;</span>book.bids, maker.perp_order_by_raw_index_unchecked(<span class="number">0</span>).id)
-                .unwrap();
+            order_tree_leaf_by_key(<span class="kw-2">&amp;</span>book.bids, maker.perp_order_by_raw_index(<span class="number">0</span>).id).unwrap();
         <span class="macro">assert_eq!</span>(order.client_order_id, <span class="number">42</span>);
         <span class="macro">assert_eq!</span>(order.quantity, bid_quantity);
         <span class="macro">assert_eq!</span>(
@@ -1379,34 +1301,16 @@
         ));
         <span class="macro">assert!</span>(order_tree_contains_price(<span class="kw-2">&amp;</span>book.bids, price_lots <span class="kw">as </span>u64));
         <span class="macro">assert_eq!</span>(
-            maker.perp_position_by_raw_index_unchecked(<span class="number">0</span>).bids_base_lots,
+            maker.perp_position_by_raw_index(<span class="number">0</span>).bids_base_lots,
             bid_quantity
         );
-        <span class="macro">assert_eq!</span>(
-            maker.perp_position_by_raw_index_unchecked(<span class="number">0</span>).asks_base_lots,
-            <span class="number">0
-        </span>);
-        <span class="macro">assert_eq!</span>(
-            maker
-                .perp_position_by_raw_index_unchecked(<span class="number">0</span>)
-                .taker_base_lots,
-            <span class="number">0
-        </span>);
+        <span class="macro">assert_eq!</span>(maker.perp_position_by_raw_index(<span class="number">0</span>).asks_base_lots, <span class="number">0</span>);
+        <span class="macro">assert_eq!</span>(maker.perp_position_by_raw_index(<span class="number">0</span>).taker_base_lots, <span class="number">0</span>);
+        <span class="macro">assert_eq!</span>(maker.perp_position_by_raw_index(<span class="number">0</span>).taker_quote_lots, <span class="number">0</span>);
+        <span class="macro">assert_eq!</span>(maker.perp_position_by_raw_index(<span class="number">0</span>).base_position_lots(), <span class="number">0</span>);
         <span class="macro">assert_eq!</span>(
             maker
-                .perp_position_by_raw_index_unchecked(<span class="number">0</span>)
-                .taker_quote_lots,
-            <span class="number">0
-        </span>);
-        <span class="macro">assert_eq!</span>(
-            maker
-                .perp_position_by_raw_index_unchecked(<span class="number">0</span>)
-                .base_position_lots(),
-            <span class="number">0
-        </span>);
-        <span class="macro">assert_eq!</span>(
-            maker
-                .perp_position_by_raw_index_unchecked(<span class="number">0</span>)
+                .perp_position_by_raw_index(<span class="number">0</span>)
                 .quote_position_native()
                 .to_num::&lt;u32&gt;(),
             <span class="number">0
@@ -1441,8 +1345,7 @@
         <span class="comment">// the remainder of the maker order is still on the book
         // (the maker account is unchanged: it was not even passed in)
         </span><span class="kw">let </span>order =
-            order_tree_leaf_by_key(<span class="kw-2">&amp;</span>book.bids, maker.perp_order_by_raw_index_unchecked(<span class="number">0</span>).id)
-                .unwrap();
+            order_tree_leaf_by_key(<span class="kw-2">&amp;</span>book.bids, maker.perp_order_by_raw_index(<span class="number">0</span>).id).unwrap();
         <span class="macro">assert_eq!</span>(fixed_price_lots(order.price_data()), price_lots);
         <span class="macro">assert_eq!</span>(order.quantity, bid_quantity - match_quantity);
 
@@ -1451,40 +1354,20 @@
         <span class="macro">assert_eq!</span>(market.fees_accrued, match_quote * (maker_fee + taker_fee));
 
         <span class="comment">// the taker account is updated
-        </span><span class="macro">assert_eq!</span>(
-            taker.perp_order_by_raw_index_unchecked(<span class="number">0</span>).market,
-            FREE_ORDER_SLOT
-        );
+        </span><span class="macro">assert_eq!</span>(taker.perp_order_by_raw_index(<span class="number">0</span>).market, FREE_ORDER_SLOT);
+        <span class="macro">assert_eq!</span>(taker.perp_position_by_raw_index(<span class="number">0</span>).bids_base_lots, <span class="number">0</span>);
+        <span class="macro">assert_eq!</span>(taker.perp_position_by_raw_index(<span class="number">0</span>).asks_base_lots, <span class="number">0</span>);
         <span class="macro">assert_eq!</span>(
-            taker.perp_position_by_raw_index_unchecked(<span class="number">0</span>).bids_base_lots,
-            <span class="number">0
-        </span>);
-        <span class="macro">assert_eq!</span>(
-            taker.perp_position_by_raw_index_unchecked(<span class="number">0</span>).asks_base_lots,
-            <span class="number">0
-        </span>);
-        <span class="macro">assert_eq!</span>(
-            taker
-                .perp_position_by_raw_index_unchecked(<span class="number">0</span>)
-                .taker_base_lots,
+            taker.perp_position_by_raw_index(<span class="number">0</span>).taker_base_lots,
             -match_quantity
         );
         <span class="macro">assert_eq!</span>(
-            taker
-                .perp_position_by_raw_index_unchecked(<span class="number">0</span>)
-                .taker_quote_lots,
+            taker.perp_position_by_raw_index(<span class="number">0</span>).taker_quote_lots,
             match_quantity * price_lots
         );
+        <span class="macro">assert_eq!</span>(taker.perp_position_by_raw_index(<span class="number">0</span>).base_position_lots(), <span class="number">0</span>);
         <span class="macro">assert_eq!</span>(
-            taker
-                .perp_position_by_raw_index_unchecked(<span class="number">0</span>)
-                .base_position_lots(),
-            <span class="number">0
-        </span>);
-        <span class="macro">assert_eq!</span>(
-            taker
-                .perp_position_by_raw_index_unchecked(<span class="number">0</span>)
-                .quote_position_native(),
+            taker.perp_position_by_raw_index(<span class="number">0</span>).quote_position_native(),
             -match_quote * taker_fee
         );
 
@@ -1510,70 +1393,33 @@
             .unwrap();
         <span class="macro">assert_eq!</span>(market.open_interest, <span class="number">2 </span>* match_quantity);
 
-        <span class="macro">assert_eq!</span>(maker.perp_order_by_raw_index_unchecked(<span class="number">0</span>).market, <span class="number">0</span>);
+        <span class="macro">assert_eq!</span>(maker.perp_order_by_raw_index(<span class="number">0</span>).market, <span class="number">0</span>);
         <span class="macro">assert_eq!</span>(
-            maker.perp_position_by_raw_index_unchecked(<span class="number">0</span>).bids_base_lots,
+            maker.perp_position_by_raw_index(<span class="number">0</span>).bids_base_lots,
             bid_quantity - match_quantity
         );
+        <span class="macro">assert_eq!</span>(maker.perp_position_by_raw_index(<span class="number">0</span>).asks_base_lots, <span class="number">0</span>);
+        <span class="macro">assert_eq!</span>(maker.perp_position_by_raw_index(<span class="number">0</span>).taker_base_lots, <span class="number">0</span>);
+        <span class="macro">assert_eq!</span>(maker.perp_position_by_raw_index(<span class="number">0</span>).taker_quote_lots, <span class="number">0</span>);
         <span class="macro">assert_eq!</span>(
-            maker.perp_position_by_raw_index_unchecked(<span class="number">0</span>).asks_base_lots,
-            <span class="number">0
-        </span>);
-        <span class="macro">assert_eq!</span>(
-            maker
-                .perp_position_by_raw_index_unchecked(<span class="number">0</span>)
-                .taker_base_lots,
-            <span class="number">0
-        </span>);
-        <span class="macro">assert_eq!</span>(
-            maker
-                .perp_position_by_raw_index_unchecked(<span class="number">0</span>)
-                .taker_quote_lots,
-            <span class="number">0
-        </span>);
-        <span class="macro">assert_eq!</span>(
-            maker
-                .perp_position_by_raw_index_unchecked(<span class="number">0</span>)
-                .base_position_lots(),
+            maker.perp_position_by_raw_index(<span class="number">0</span>).base_position_lots(),
             match_quantity
         );
         <span class="macro">assert_eq!</span>(
-            maker
-                .perp_position_by_raw_index_unchecked(<span class="number">0</span>)
-                .quote_position_native(),
+            maker.perp_position_by_raw_index(<span class="number">0</span>).quote_position_native(),
             -match_quote - match_quote * maker_fee
         );
 
+        <span class="macro">assert_eq!</span>(taker.perp_position_by_raw_index(<span class="number">0</span>).bids_base_lots, <span class="number">0</span>);
+        <span class="macro">assert_eq!</span>(taker.perp_position_by_raw_index(<span class="number">0</span>).asks_base_lots, <span class="number">0</span>);
+        <span class="macro">assert_eq!</span>(taker.perp_position_by_raw_index(<span class="number">0</span>).taker_base_lots, <span class="number">0</span>);
+        <span class="macro">assert_eq!</span>(taker.perp_position_by_raw_index(<span class="number">0</span>).taker_quote_lots, <span class="number">0</span>);
         <span class="macro">assert_eq!</span>(
-            taker.perp_position_by_raw_index_unchecked(<span class="number">0</span>).bids_base_lots,
-            <span class="number">0
-        </span>);
-        <span class="macro">assert_eq!</span>(
-            taker.perp_position_by_raw_index_unchecked(<span class="number">0</span>).asks_base_lots,
-            <span class="number">0
-        </span>);
-        <span class="macro">assert_eq!</span>(
-            taker
-                .perp_position_by_raw_index_unchecked(<span class="number">0</span>)
-                .taker_base_lots,
-            <span class="number">0
-        </span>);
-        <span class="macro">assert_eq!</span>(
-            taker
-                .perp_position_by_raw_index_unchecked(<span class="number">0</span>)
-                .taker_quote_lots,
-            <span class="number">0
-        </span>);
-        <span class="macro">assert_eq!</span>(
-            taker
-                .perp_position_by_raw_index_unchecked(<span class="number">0</span>)
-                .base_position_lots(),
+            taker.perp_position_by_raw_index(<span class="number">0</span>).base_position_lots(),
             -match_quantity
         );
         <span class="macro">assert_eq!</span>(
-            taker
-                .perp_position_by_raw_index_unchecked(<span class="number">0</span>)
-                .quote_position_native(),
+            taker.perp_position_by_raw_index(<span class="number">0</span>).quote_position_native(),
             match_quote - match_quote * taker_fee
         );
     }
@@ -1747,7 +1593,7 @@
                 </span>u8::MAX,
             )
             .unwrap();
-            account.perp_order_by_raw_index_unchecked(<span class="number">0</span>).id
+            account.perp_order_by_raw_index(<span class="number">0</span>).id
         };
 
         <span class="comment">// Setup

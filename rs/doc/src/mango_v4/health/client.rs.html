@@ -1459,6 +1459,24 @@
 <span id="1459">1459</span>
 <span id="1460">1460</span>
 <span id="1461">1461</span>
+<span id="1462">1462</span>
+<span id="1463">1463</span>
+<span id="1464">1464</span>
+<span id="1465">1465</span>
+<span id="1466">1466</span>
+<span id="1467">1467</span>
+<span id="1468">1468</span>
+<span id="1469">1469</span>
+<span id="1470">1470</span>
+<span id="1471">1471</span>
+<span id="1472">1472</span>
+<span id="1473">1473</span>
+<span id="1474">1474</span>
+<span id="1475">1475</span>
+<span id="1476">1476</span>
+<span id="1477">1477</span>
+<span id="1478">1478</span>
+<span id="1479">1479</span>
 </pre><pre class="rust"><code><span class="attribute">#![cfg(feature = <span class="string">&quot;client&quot;</span>)]
 
 </span><span class="kw">use </span>anchor_lang::prelude::<span class="kw-2">*</span>;
@@ -1477,6 +1495,24 @@
             <span class="self">self</span>.health(HealthType::LiquidationEnd).is_negative()
         } <span class="kw">else </span>{
             <span class="self">self</span>.health(HealthType::Maint).is_negative()
+        }
+    }
+
+    <span class="doccomment">/// The health ratio is
+    /// - 0 if health is 0 - meaning assets = liabs
+    /// - 100 if there&#39;s 2x as many assets as liabs
+    /// - 200 if there&#39;s 3x as many assets as liabs
+    /// - MAX if liabs = 0
+    ///
+    /// Maybe talking about the collateralization ratio assets/liabs is more intuitive?
+    </span><span class="kw">pub fn </span>health_ratio(<span class="kw-2">&amp;</span><span class="self">self</span>, health_type: HealthType) -&gt; I80F48 {
+        <span class="kw">let </span>(assets, liabs) = <span class="self">self</span>.health_assets_and_liabs_stable_liabs(health_type);
+        <span class="kw">let </span>hundred = I80F48::from(<span class="number">100</span>);
+        <span class="kw">if </span>liabs &gt; <span class="number">0 </span>{
+            <span class="comment">// feel free to saturate to MAX for tiny liabs
+            </span>(hundred * (assets - liabs)).saturating_div(liabs)
+        } <span class="kw">else </span>{
+            I80F48::MAX
         }
     }
 

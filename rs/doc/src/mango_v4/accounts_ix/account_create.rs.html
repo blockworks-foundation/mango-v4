@@ -42,7 +42,7 @@
         seeds = [<span class="string">b&quot;MangoAccount&quot;</span>.as_ref(), group.key().as_ref(), owner.key().as_ref(), <span class="kw-2">&amp;</span>account_num.to_le_bytes()]</span>,
         bump,
         payer = payer,
-        space = MangoAccount::space(token_count, serum3_count, perp_count, perp_oo_count, <span class="number">0</span>)<span class="question-mark">?</span>,
+        space = MangoAccount::space(token_count, serum3_count, perp_count, perp_oo_count)<span class="question-mark">?</span>,
     )]
     <span class="kw">pub </span>account: AccountLoader&lt;<span class="lifetime">&#39;info</span>, MangoAccountFixed&gt;,
     <span class="kw">pub </span>owner: Signer&lt;<span class="lifetime">&#39;info</span>&gt;,
