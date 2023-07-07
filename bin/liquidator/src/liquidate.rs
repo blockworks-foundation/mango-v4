@@ -8,6 +8,7 @@ use solana_sdk::signature::Signature;
 
 use futures::{stream, StreamExt, TryStreamExt};
 use rand::seq::SliceRandom;
+use tracing::*;
 use {anyhow::Context, fixed::types::I80F48, solana_sdk::pubkey::Pubkey};
 
 use crate::util;
@@ -126,7 +127,7 @@ impl<'a> LiquidateHelper<'a> {
                 &serum_orders.open_orders,
             )
             .await?;
-        log::info!(
+        info!(
             "Force cancelled serum orders on account {}, market index {}, maint_health was {}, tx sig {:?}",
             self.pubkey,
             serum_orders.market_index,
@@ -152,7 +153,7 @@ impl<'a> LiquidateHelper<'a> {
             .client
             .perp_liq_force_cancel_orders((self.pubkey, &self.liqee), perp_market_index)
             .await?;
-        log::info!(
+        info!(
             "Force cancelled perp orders on account {}, market index {}, maint_health was {}, tx sig {:?}",
             self.pubkey,
             perp_market_index,
@@ -254,7 +255,7 @@ impl<'a> LiquidateHelper<'a> {
 
             (max_base_transfer, max_pnl_transfer.floor().to_num::<u64>())
         };
-        log::info!("computed max_base_transfer: {max_base_transfer_abs}, max_pnl_transfer: {max_pnl_transfer}");
+        info!("computed max_base_transfer: {max_base_transfer_abs}, max_pnl_transfer: {max_pnl_transfer}");
 
         let sig = self
             .client
@@ -265,7 +266,7 @@ impl<'a> LiquidateHelper<'a> {
                 max_pnl_transfer,
             )
             .await?;
-        log::info!(
+        info!(
             "Liquidated base position for perp market on account {}, market index {}, maint_health was {}, tx sig {:?}",
             self.pubkey,
             perp_market_index,
@@ -306,7 +307,7 @@ impl<'a> LiquidateHelper<'a> {
                 u64::MAX,
             )
             .await?;
-        log::info!(
+        info!(
             "Liquidated negative perp pnl on account {}, market index {}, maint_health was {}, tx sig {:?}",
             self.pubkey,
             perp_market_index,
@@ -425,11 +426,9 @@ impl<'a> LiquidateHelper<'a> {
             )
             .await
             .context("sending liq_token_with_token")?;
-        log::info!(
+        info!(
             "Liquidated token with token for {}, maint_health was {}, tx sig {:?}",
-            self.pubkey,
-            self.maint_health,
-            sig
+            self.pubkey, self.maint_health, sig
         );
         Ok(Some(sig))
     }
@@ -478,11 +477,9 @@ impl<'a> LiquidateHelper<'a> {
             )
             .await
             .context("sending liq_token_bankruptcy")?;
-        log::info!(
+        info!(
             "Liquidated bankruptcy for {}, maint_health was {}, tx sig {:?}",
-            self.pubkey,
-            self.maint_health,
-            sig
+            self.pubkey, self.maint_health, sig
         );
         Ok(Some(sig))
     }
@@ -529,10 +526,9 @@ impl<'a> LiquidateHelper<'a> {
         }
 
         if self.health_cache.has_perp_open_fills() {
-            log::info!(
+            info!(
                 "Account {} has open perp fills, maint_health {}, waiting...",
-                self.pubkey,
-                self.maint_health
+                self.pubkey, self.maint_health
             );
             return Ok(None);
         }
@@ -587,7 +583,7 @@ pub async fn maybe_liquidate_account(
         return Ok(false);
     }
 
-    log::trace!(
+    trace!(
         "possible candidate: {}, with owner: {}, maint health: {}",
         pubkey,
         account.fixed.owner,
@@ -640,7 +636,7 @@ pub async fn maybe_liquidate_account(
             )
             .await
         {
-            log::info!("could not refresh after liquidation: {}", e);
+            info!("could not refresh after liquidation: {}", e);
         }
     }
 

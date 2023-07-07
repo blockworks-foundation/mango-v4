@@ -16,7 +16,7 @@ use std::{thread, time};
 //             Ok(res) => return Ok(res),
 //             Err(err) => {
 //                 // TODO: only retry for recoverable errors
-//                 log::error!("{:#?}", err);
+//                 error!("{:#?}", err);
 //                 continue;
 //             }
 //         }

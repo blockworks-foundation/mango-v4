@@ -12,6 +12,7 @@ use futures::{stream, StreamExt, TryStreamExt};
 use solana_sdk::signature::Signature;
 use std::sync::Arc;
 use std::{collections::HashMap, time::Duration};
+use tracing::*;
 
 #[derive(Clone)]
 pub struct Config {
@@ -82,7 +83,7 @@ impl Rebalancer {
             return Ok(());
         }
 
-        log::trace!("checking for rebalance: {}", self.mango_account_address);
+        trace!("checking for rebalance: {}", self.mango_account_address);
 
         self.rebalance_perps().await?;
         self.rebalance_tokens().await?;
@@ -104,7 +105,7 @@ impl Rebalancer {
         {
             // If we don't get fresh data, maybe the tx landed on a fork?
             // Rebalance is technically still ok.
-            log::info!("could not refresh account data: {}", e);
+            info!("could not refresh account data: {}", e);
             return Ok(false);
         }
         Ok(true)
@@ -131,7 +132,7 @@ impl Rebalancer {
                 .try_collect()
                 .await;
         let tokens = tokens?;
-        log::trace!("account tokens: {:?}", tokens);
+        trace!("account tokens: {:?}", tokens);
 
         for (token_index, token_state) in tokens {
             let token = self.mango_client.context.token(token_index);
@@ -172,7 +173,7 @@ impl Rebalancer {
                         JupiterSwapMode::ExactIn,
                     )
                     .await?;
-                log::info!(
+                info!(
                     "bought {} {} for {} in tx {}",
                     token.native_to_ui(buy_amount),
                     token.name,
@@ -204,7 +205,7 @@ impl Rebalancer {
                         JupiterSwapMode::ExactIn,
                     )
                     .await?;
-                log::info!(
+                info!(
                     "sold {} {} for {} in tx {}",
                     token.native_to_ui(amount),
                     token.name,
@@ -232,7 +233,7 @@ impl Rebalancer {
                     .mango_client
                     .token_withdraw(token_mint, u64::MAX, allow_borrow)
                     .await?;
-                log::info!(
+                info!(
                     "withdrew {} {} to liqor wallet in {}",
                     token.native_to_ui(amount),
                     token.name,
@@ -267,7 +268,7 @@ impl Rebalancer {
             let base_lots = perp_position.base_position_lots();
             let effective_lots = perp_position.effective_base_position_lots();
             let quote_native = perp_position.quote_position_native();
-            log::info!(
+            info!(
                 "active perp position on {}, base lots: {}, effective lots: {}, quote native: {}",
                 perp.market.name(),
                 base_lots,
@@ -298,7 +299,7 @@ impl Rebalancer {
                 let price_lots = perp.market.native_price_to_lot(order_price);
                 let max_base_lots = effective_lots.abs() - oo_lots;
                 if max_base_lots <= 0 {
-                    log::warn!(
+                    warn!(
                         "cannot place reduce-only order on {} {:?}, base pos: {}, in open orders: {}",
                         perp.market.name(),
                         side,
@@ -317,7 +318,7 @@ impl Rebalancer {
                 };
                 let bookside = self.account_fetcher.fetch::<BookSide>(&opposite_side_key)?;
                 if bookside.quantity_at_price(price_lots, now_ts, oracle_price_lots) <= 0 {
-                    log::warn!(
+                    warn!(
                         "no liquidity on {} {:?} at price {}, oracle price {}",
                         perp.market.name(),
                         side.invert_side(),
@@ -343,7 +344,7 @@ impl Rebalancer {
                         mango_v4::state::SelfTradeBehavior::DecrementTake,
                     )
                     .await?;
-                log::info!(
+                info!(
                     "attempt to ioc reduce perp base position of {} {} at price {} in {}",
                     perp_position.base_position_native(&perp.market),
                     perp.market.name(),
@@ -371,7 +372,7 @@ impl Rebalancer {
                 if counters.is_empty() {
                     // If we can't settle some positive PNL because we're lacking a suitable counterparty,
                     // then liquidation should continue, even though this step produced no transaction
-                    log::info!(
+                    info!(
                         "could not settle perp pnl on perp market {}: no counterparty",
                         perp.market.name()
                     );
@@ -394,7 +395,7 @@ impl Rebalancer {
                     .mango_client
                     .perp_settle_pnl(perp_position.market_index, account_a, account_b)
                     .await?;
-                log::info!("settled perp {} pnl, tx sig {}", perp.market.name(), txsig);
+                info!("settled perp {} pnl, tx sig {}", perp.market.name(), txsig);
                 if !self.refresh_mango_account_after_tx(txsig).await? {
                     return Ok(());
                 }
@@ -404,7 +405,7 @@ impl Rebalancer {
                     .mango_client
                     .perp_deactivate_position(perp_position.market_index)
                     .await?;
-                log::info!(
+                info!(
                     "closed perp position on {} in {}",
                     perp.market.name(),
                     txsig
@@ -414,7 +415,7 @@ impl Rebalancer {
                 }
             } else {
                 // maybe we're still waiting for consume_events
-                log::info!(
+                info!(
                     "cannot deactivate perp {} position, base lots {}, effective lots {}, quote {}",
                     perp.market.name(),
                     perp_position.base_position_lots(),

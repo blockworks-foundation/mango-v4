@@ -1,10 +1,10 @@
 use std::collections::HashMap;
+use std::collections::HashSet;
 use std::sync::{Arc, RwLock};
 use std::time::{Duration, Instant};
 
 use anchor_client::Cluster;
 use clap::Parser;
-use log::*;
 use mango_v4::state::{PerpMarketIndex, TokenIndex};
 use mango_v4_client::{
     account_update_stream, chain_data, keypair_from_cli, snapshot_source, websocket_source,
@@ -15,7 +15,7 @@ use mango_v4_client::{
 use itertools::Itertools;
 use solana_sdk::commitment_config::CommitmentConfig;
 use solana_sdk::pubkey::Pubkey;
-use std::collections::HashSet;
+use tracing::*;
 
 pub mod liquidate;
 pub mod metrics;
@@ -161,7 +161,7 @@ async fn main() -> anyhow::Result<()> {
     // FUTURE: decouple feed setup and liquidator business logic
     // feed should send updates to a channel which liquidator can consume
 
-    solana_logger::setup_with_default("info");
+    tracing_subscriber::fmt::init();
     info!("startup");
 
     let metrics = metrics::start();
@@ -316,7 +316,7 @@ async fn main() -> anyhow::Result<()> {
                         let mut state = shared_state.write().unwrap();
                         if is_mango_account(&account_write.account, &mango_group).is_some() {
                             // e.g. to render debug logs RUST_LOG="liquidator=debug"
-                            log::debug!(
+                            debug!(
                                 "change to mango account {}...",
                                 &account_write.pubkey.to_string()[0..3]
                             );
@@ -332,15 +332,15 @@ async fn main() -> anyhow::Result<()> {
                         } else {
                             let mut must_check_all = false;
                             if is_mango_bank(&account_write.account, &mango_group).is_some() {
-                                log::debug!("change to bank {}", &account_write.pubkey);
+                                debug!("change to bank {}", &account_write.pubkey);
                                 must_check_all = true;
                             }
                             if is_perp_market(&account_write.account, &mango_group).is_some() {
-                                log::debug!("change to perp market {}", &account_write.pubkey);
+                                debug!("change to perp market {}", &account_write.pubkey);
                                 must_check_all = true;
                             }
                             if oracles.contains(&account_write.pubkey) {
-                                log::debug!("change to oracle {}", &account_write.pubkey);
+                                debug!("change to oracle {}", &account_write.pubkey);
                                 must_check_all = true;
                             }
                             if must_check_all {
@@ -391,7 +391,7 @@ async fn main() -> anyhow::Result<()> {
                     continue;
                 }
                 if let Err(err) = rebalancer.zero_all_non_quote().await {
-                    log::error!("failed to rebalance liqor: {:?}", err);
+                    error!("failed to rebalance liqor: {:?}", err);
 
                     // Workaround: We really need a sequence enforcer in the liquidator since we don't want to
                     // accidentally send a similar tx again when we incorrectly believe an earlier one got forked
@@ -459,7 +459,7 @@ async fn main() -> anyhow::Result<()> {
                     match token_swap_info_updater.update_one(token_index).await {
                         Ok(()) => {}
                         Err(err) => {
-                            log::warn!(
+                            warn!(
                                 "failed to update token swap info for token {token_index}: {:?}",
                                 err
                             );
@@ -485,7 +485,7 @@ async fn main() -> anyhow::Result<()> {
     .collect();
     jobs.next().await;
 
-    log::error!("a critical job aborted, exiting");
+    error!("a critical job aborted, exiting");
     Ok(())
 }
 
@@ -591,7 +591,7 @@ impl LiquidationState {
         }
 
         if let Err(err) = self.rebalancer.zero_all_non_quote().await {
-            log::error!("failed to rebalance liqor: {:?}", err);
+            error!("failed to rebalance liqor: {:?}", err);
         }
         Ok(true)
     }
@@ -602,7 +602,7 @@ impl LiquidationState {
 
         // Skip a pubkey if there've been too many errors recently
         if let Some(error_entry) = error_tracking.had_too_many_errors(pubkey, now) {
-            log::trace!(
+            trace!(
                 "skip checking account {pubkey}, had {} errors recently",
                 error_entry.count
             );
@@ -622,7 +622,7 @@ impl LiquidationState {
             error_tracking.record_error(pubkey, now);
 
             // Not all errors need to be raised to the user's attention.
-            let mut log_level = log::Level::Error;
+            let mut is_error = true;
 
             // Simulation errors due to liqee precondition failures on the liquidation instructions
             // will commonly happen if our liquidator is late or if there are chain forks.
@@ -631,12 +631,16 @@ impl LiquidationState {
                     if logs.iter().any(|line| {
                         line.contains("HealthMustBeNegative") || line.contains("IsNotBankrupt")
                     }) {
-                        log_level = log::Level::Trace;
+                        is_error = false;
                     }
                 }
                 _ => {}
             };
-            log::log!(log_level, "liquidating account {}: {:?}", pubkey, err);
+            if is_error {
+                error!("liquidating account {}: {:?}", pubkey, err);
+            } else {
+                trace!("liquidating account {}: {:?}", pubkey, err);
+            }
         } else {
             error_tracking.clear_errors(pubkey);
         }
@@ -672,7 +676,7 @@ impl LiquidationState {
         }
 
         if let Err(err) = self.rebalancer.zero_all_non_quote().await {
-            log::error!("failed to rebalance liqor: {:?}", err);
+            error!("failed to rebalance liqor: {:?}", err);
         }
         Ok(())
     }
@@ -686,7 +690,7 @@ impl LiquidationState {
 
         // Skip a pubkey if there've been too many errors recently
         if let Some(error_entry) = error_tracking.had_too_many_errors(pubkey, now) {
-            log::trace!(
+            trace!(
                 "skip checking for tcs on account {pubkey}, had {} errors recently",
                 error_entry.count
             );
@@ -707,7 +711,7 @@ impl LiquidationState {
             error_tracking.record_error(pubkey, now);
 
             // Not all errors need to be raised to the user's attention.
-            let mut log_level = log::Level::Error;
+            let mut is_error = true;
 
             // Simulation errors due to liqee precondition failures
             // will commonly happen if our liquidator is late or if there are chain forks.
@@ -717,17 +721,16 @@ impl LiquidationState {
                         .iter()
                         .any(|line| line.contains("TokenConditionalSwapPriceNotInRange"))
                     {
-                        log_level = log::Level::Trace;
+                        is_error = false;
                     }
                 }
                 _ => {}
             };
-            log::log!(
-                log_level,
-                "token conditional swap on account {}: {:?}",
-                pubkey,
-                err
-            );
+            if is_error {
+                error!("token conditional swap on account {}: {:?}", pubkey, err);
+            } else {
+                trace!("token conditional swap on account {}: {:?}", pubkey, err);
+            }
         } else {
             error_tracking.clear_errors(pubkey);
         }

@@ -33,7 +33,6 @@ solana-address-lookup-table-program = { workspace = true }
 mango-feeds-connector = "0.1.1"
 spl-associated-token-account = "1.0.3"
 thiserror = "1.0.31"
-log = "0.4"
 reqwest = "0.11.11"
 tokio = { version = "1", features = ["full"] }
 tokio-stream = { version = "0.1.9"}
@@ -41,3 +40,4 @@ serde = "1.0.141"
 serde_json = "1.0.82"
 base64 = "0.13.0"
 bincode = "1.3.3"
+tracing = { version = "0.1", features = ["log"] }
