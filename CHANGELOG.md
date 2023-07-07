@@ -4,7 +4,22 @@ Update this for each program release and mainnet deployment.
 
 ## not on mainnet
 
-### v0.17.0, 2023-6-
+### v0.17.1, 2023-7-
+
+- Remove extra Pyth oracle status check added in v0.17.0
+
+  The Pyth oracle status also reverts to Unknown if not enough publishers have
+  reported in a 25 slot window. So checking for the "Trading" status means an
+  implicit staleness limit of 25 slots.
+
+  This staleness limit is much more strict than the ones configured on the
+  oracles currently used by Mango and caused occasional transaction failures.
+
+## mainnet
+
+### v0.17.0, 2023-7-3
+
+Deployment: Jul 3, 2023 at 09:46:14 Central European Summer Time, https://explorer.solana.com/tx/4G6b1uihopkHqp968sq3RYacYHn5ND8mMmeNd1RfswTCmiqeappTN2747JTvswVXxs7oqgfU6M3VKPGVRFPGJYuL
 
 - Configurable perp market settle token (#550)
 
@@ -40,8 +55,6 @@ Update this for each program release and mainnet deployment.
 - Fix token force close to respect the reduce-only flag (#613)
 - Improve docs (#590, #594)
 - Use workspace dependencies (#588)
-
-## mainnet
 
 ### v0.16.0, 2023-5-19
 
