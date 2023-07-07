@@ -469,6 +469,7 @@
 <span id="469">469</span>
 <span id="470">470</span>
 <span id="471">471</span>
+<span id="472">472</span>
 </pre><pre class="rust"><code><span class="kw">use </span><span class="kw">crate</span>::logs::{FilledPerpOrderLog, PerpTakerTradeLog};
 <span class="kw">use </span><span class="kw">crate</span>::state::MangoAccountRefMut;
 <span class="kw">use crate</span>::{
@@ -829,8 +830,9 @@
         <span class="kw-2">mut </span>limit: u8,
         side_to_cancel_option: <span class="prelude-ty">Option</span>&lt;Side&gt;,
     ) -&gt; <span class="prelude-ty">Result</span>&lt;()&gt; {
-        <span class="kw">for </span>i <span class="kw">in </span><span class="number">0</span>..mango_account.header.perp_oo_count() {
-            <span class="kw">let </span>oo = mango_account.perp_order_by_raw_index(i);
+        <span class="comment">// Can&#39;t use mango_account.all_perp_orders() for borrow checking reasons.
+        </span><span class="kw">for </span>i <span class="kw">in </span><span class="number">0</span>..mango_account.header.perp_oo_count() {
+            <span class="kw">let </span>oo = mango_account.perp_order_by_raw_index(i)<span class="question-mark">?</span>;
             <span class="kw">if </span>!oo.is_active_for_market(perp_market.perp_market_index) {
                 <span class="kw">continue</span>;
             }

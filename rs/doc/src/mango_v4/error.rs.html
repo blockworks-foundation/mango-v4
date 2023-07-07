@@ -232,6 +232,8 @@
 <span id="232">232</span>
 <span id="233">233</span>
 <span id="234">234</span>
+<span id="235">235</span>
+<span id="236">236</span>
 </pre><pre class="rust"><code><span class="kw">use </span>anchor_lang::prelude::<span class="kw-2">*</span>;
 <span class="kw">use </span>core::fmt::Display;
 
@@ -337,6 +339,8 @@
     </span>InvalidHealthAccountCount,
     <span class="attribute">#[msg(<span class="string">&quot;would self trade&quot;</span>)]
     </span>WouldSelfTrade,
+    <span class="attribute">#[msg(<span class="string">&quot;conditional token swap price is not in execution range&quot;</span>)]
+    </span>TokenConditionalSwapPriceNotInRange,
 }
 
 <span class="kw">impl </span>MangoError {

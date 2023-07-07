@@ -365,14 +365,35 @@
 <span id="365">365</span>
 <span id="366">366</span>
 <span id="367">367</span>
+<span id="368">368</span>
+<span id="369">369</span>
+<span id="370">370</span>
+<span id="371">371</span>
+<span id="372">372</span>
+<span id="373">373</span>
+<span id="374">374</span>
+<span id="375">375</span>
+<span id="376">376</span>
+<span id="377">377</span>
+<span id="378">378</span>
+<span id="379">379</span>
+<span id="380">380</span>
+<span id="381">381</span>
+<span id="382">382</span>
+<span id="383">383</span>
+<span id="384">384</span>
+<span id="385">385</span>
+<span id="386">386</span>
+<span id="387">387</span>
+<span id="388">388</span>
 </pre><pre class="rust"><code><span class="kw">use </span>std::collections::HashMap;
 
 <span class="kw">use </span>anchor_client::ClientError;
 
-<span class="kw">use </span>anchor_lang::__private::bytemuck;
+<span class="kw">use </span>anchor_lang::__private::bytemuck::{<span class="self">self</span>, Zeroable};
 
 <span class="kw">use </span>mango_v4::state::{
-    Group, MangoAccountValue, MintInfo, PerpMarket, PerpMarketIndex, Serum3Market,
+    Bank, Group, MangoAccountValue, MintInfo, PerpMarket, PerpMarketIndex, Serum3Market,
     Serum3MarketIndex, TokenIndex,
 };
 
@@ -394,6 +415,8 @@
     <span class="kw">pub </span>mint_info: MintInfo,
     <span class="kw">pub </span>mint_info_address: Pubkey,
     <span class="kw">pub </span>decimals: u8,
+    <span class="doccomment">/// Bank snapshot is never updated, only use static parts!
+    </span><span class="kw">pub </span>bank: Bank,
 }
 
 <span class="kw">impl </span>TokenContext {
@@ -418,7 +441,8 @@
 
 <span class="kw">pub struct </span>PerpMarketContext {
     <span class="kw">pub </span>address: Pubkey,
-    <span class="kw">pub </span>market: PerpMarket,
+    <span class="doccomment">/// PerpMarket snapshot is never updated, only use static parts!
+    </span><span class="kw">pub </span>market: PerpMarket,
 }
 
 <span class="kw">pub struct </span>MangoGroupContext {
@@ -445,12 +469,32 @@
         <span class="self">self</span>.token(token_index).mint_info
     }
 
-    <span class="kw">pub fn </span>token(<span class="kw-2">&amp;</span><span class="self">self</span>, token_index: TokenIndex) -&gt; <span class="kw-2">&amp;</span>TokenContext {
-        <span class="self">self</span>.tokens.get(<span class="kw-2">&amp;</span>token_index).unwrap()
-    }
-
     <span class="kw">pub fn </span>perp(<span class="kw-2">&amp;</span><span class="self">self</span>, perp_market_index: PerpMarketIndex) -&gt; <span class="kw-2">&amp;</span>PerpMarketContext {
         <span class="self">self</span>.perp_markets.get(<span class="kw-2">&amp;</span>perp_market_index).unwrap()
+    }
+
+    <span class="kw">pub fn </span>perp_market_address(<span class="kw-2">&amp;</span><span class="self">self</span>, perp_market_index: PerpMarketIndex) -&gt; Pubkey {
+        <span class="self">self</span>.perp(perp_market_index).address
+    }
+
+    <span class="kw">pub fn </span>serum3_market_index(<span class="kw-2">&amp;</span><span class="self">self</span>, name: <span class="kw-2">&amp;</span>str) -&gt; Serum3MarketIndex {
+        <span class="kw-2">*</span><span class="self">self</span>.serum3_market_indexes_by_name.get(name).unwrap()
+    }
+
+    <span class="kw">pub fn </span>serum3(<span class="kw-2">&amp;</span><span class="self">self</span>, market_index: Serum3MarketIndex) -&gt; <span class="kw-2">&amp;</span>Serum3MarketContext {
+        <span class="self">self</span>.serum3_markets.get(<span class="kw-2">&amp;</span>market_index).unwrap()
+    }
+
+    <span class="kw">pub fn </span>serum3_base_token(<span class="kw-2">&amp;</span><span class="self">self</span>, market_index: Serum3MarketIndex) -&gt; <span class="kw-2">&amp;</span>TokenContext {
+        <span class="self">self</span>.token(<span class="self">self</span>.serum3(market_index).market.base_token_index)
+    }
+
+    <span class="kw">pub fn </span>serum3_quote_token(<span class="kw-2">&amp;</span><span class="self">self</span>, market_index: Serum3MarketIndex) -&gt; <span class="kw-2">&amp;</span>TokenContext {
+        <span class="self">self</span>.token(<span class="self">self</span>.serum3(market_index).market.quote_token_index)
+    }
+
+    <span class="kw">pub fn </span>token(<span class="kw-2">&amp;</span><span class="self">self</span>, token_index: TokenIndex) -&gt; <span class="kw-2">&amp;</span>TokenContext {
+        <span class="self">self</span>.tokens.get(<span class="kw-2">&amp;</span>token_index).unwrap()
     }
 
     <span class="kw">pub fn </span>token_by_mint(<span class="kw-2">&amp;</span><span class="self">self</span>, mint: <span class="kw-2">&amp;</span>Pubkey) -&gt; anyhow::Result&lt;<span class="kw-2">&amp;</span>TokenContext&gt; {
@@ -458,10 +502,6 @@
             .iter()
             .find_map(|(<span class="kw">_</span>, tc)| (tc.mint_info.mint == <span class="kw-2">*</span>mint).then(|| tc))
             .ok_or_else(|| <span class="macro">anyhow::anyhow!</span>(<span class="string">&quot;no token for mint {}&quot;</span>, mint))
-    }
-
-    <span class="kw">pub fn </span>perp_market_address(<span class="kw-2">&amp;</span><span class="self">self</span>, perp_market_index: PerpMarketIndex) -&gt; Pubkey {
-        <span class="self">self</span>.perp(perp_market_index).address
     }
 
     <span class="kw">pub async fn </span>new_from_rpc(rpc: <span class="kw-2">&amp;</span>RpcClientAsync, group: Pubkey) -&gt; anyhow::Result&lt;<span class="self">Self</span>&gt; {
@@ -480,6 +520,7 @@
                         mint_info: <span class="kw-2">*</span>mi,
                         mint_info_address: <span class="kw-2">*</span>pk,
                         decimals: u8::MAX,
+                        bank: Bank::zeroed(),
                     },
                 )
             })
@@ -493,6 +534,7 @@
             <span class="kw">let </span>token = tokens.get_mut(<span class="kw-2">&amp;</span>bank.token_index).unwrap();
             token.name = bank.name().into();
             token.decimals = bank.mint_decimals;
+            token.bank = bank.clone();
         }
         <span class="macro">assert!</span>(tokens.values().all(|t| t.decimals != u8::MAX));
 

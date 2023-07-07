@@ -289,6 +289,16 @@
 <span id="289">289</span>
 <span id="290">290</span>
 <span id="291">291</span>
+<span id="292">292</span>
+<span id="293">293</span>
+<span id="294">294</span>
+<span id="295">295</span>
+<span id="296">296</span>
+<span id="297">297</span>
+<span id="298">298</span>
+<span id="299">299</span>
+<span id="300">300</span>
+<span id="301">301</span>
 </pre><pre class="rust"><code><span class="kw">use </span>anchor_lang::prelude::<span class="kw-2">*</span>;
 <span class="kw">use </span>derivative::Derivative;
 <span class="kw">use </span>static_assertions::const_assert_eq;
@@ -306,7 +316,7 @@
 /// price over every `delay_interval_seconds` (assume 1h) and then applying the
 /// `delay_growth_limit` between intervals.
 </span><span class="attribute">#[zero_copy]
-#[derive(Derivative, Debug, bytemuck::Pod, bytemuck::Zeroable)]
+#[derive(Derivative, Debug)]
 </span><span class="kw">pub struct </span>StablePriceModel {
     <span class="doccomment">/// Current stable price to use in health
     </span><span class="kw">pub </span>stable_price: f64,
@@ -340,15 +350,18 @@
     <span class="doccomment">/// The delay_interval_index that update() was last called on.
     </span><span class="kw">pub </span>last_delay_interval_index: u8,
 
+    <span class="doccomment">/// If set to 1, the stable price will reset on the next non-zero price it sees.
+    </span><span class="kw">pub </span>reset_on_nonzero_price: u8,
+
     <span class="attribute">#[derivative(Debug = <span class="string">&quot;ignore&quot;</span>)]
-    </span><span class="kw">pub </span>padding: [u8; <span class="number">7</span>],
+    </span><span class="kw">pub </span>padding: [u8; <span class="number">6</span>],
 
     <span class="attribute">#[derivative(Debug = <span class="string">&quot;ignore&quot;</span>)]
     </span><span class="kw">pub </span>reserved: [u8; <span class="number">48</span>],
 }
 <span class="macro">const_assert_eq!</span>(
     size_of::&lt;StablePriceModel&gt;(),
-    <span class="number">8 </span>+ <span class="number">8 </span>+ <span class="number">8 </span>* <span class="number">24 </span>+ <span class="number">8 </span>+ <span class="number">4 </span>+ <span class="number">4 </span>+ <span class="number">4 </span>+ <span class="number">4 </span>+ <span class="number">1 </span>+ <span class="number">7 </span>+ <span class="number">48
+    <span class="number">8 </span>+ <span class="number">8 </span>+ <span class="number">8 </span>* <span class="number">24 </span>+ <span class="number">8 </span>+ <span class="number">4 </span>+ <span class="number">4 </span>+ <span class="number">4 </span>+ <span class="number">4 </span>+ <span class="number">1 </span>* <span class="number">2 </span>+ <span class="number">6 </span>+ <span class="number">48
 </span>);
 <span class="macro">const_assert_eq!</span>(size_of::&lt;StablePriceModel&gt;(), <span class="number">288</span>);
 <span class="macro">const_assert_eq!</span>(size_of::&lt;StablePriceModel&gt;() % <span class="number">8</span>, <span class="number">0</span>);
@@ -365,6 +378,7 @@
             </span>delay_growth_limit: <span class="number">0.06</span>,        <span class="comment">// 6% per hour, 400% per day
             </span>stable_growth_limit: <span class="number">0.0003</span>, <span class="comment">// 0.03% per second, 293% in 1h if updated every 10s, 281% in 1h if updated every 5min
             </span>last_delay_interval_index: <span class="number">0</span>,
+            reset_on_nonzero_price: <span class="number">0</span>,
             padding: Default::default(),
             reserved: [<span class="number">0</span>; <span class="number">48</span>],
         }
@@ -378,6 +392,7 @@
         <span class="self">self</span>.delay_accumulator_price = <span class="number">0.0</span>;
         <span class="self">self</span>.delay_accumulator_time = <span class="number">0</span>;
         <span class="self">self</span>.last_update_timestamp = now_ts;
+        <span class="self">self</span>.reset_on_nonzero_price = <span class="kw">if </span>oracle_price &gt; <span class="number">0.0 </span>{ <span class="number">0 </span>} <span class="kw">else </span>{ <span class="number">1 </span>};
     }
 
     <span class="kw">pub fn </span>delay_interval_index(<span class="kw-2">&amp;</span><span class="self">self</span>, timestamp: u64) -&gt; u8 {
@@ -394,6 +409,11 @@
     }
 
     <span class="kw">pub fn </span>update(<span class="kw-2">&amp;mut </span><span class="self">self</span>, now_ts: u64, oracle_price: f64) {
+        <span class="comment">// If a reset is requested (maybe there never was a non-zero price), jump to the current value
+        </span><span class="kw">if </span><span class="self">self</span>.reset_on_nonzero_price == <span class="number">1 </span>&amp;&amp; oracle_price &gt; <span class="number">0.0 </span>{
+            <span class="self">self</span>.reset_to_price(oracle_price, now_ts);
+        }
+
         <span class="kw">let </span>dt = now_ts.saturating_sub(<span class="self">self</span>.last_update_timestamp);
         <span class="comment">// Hardcoded. Requiring a minimum time between updates reduces the possible difference
         // between frequent updates and infrequent ones.

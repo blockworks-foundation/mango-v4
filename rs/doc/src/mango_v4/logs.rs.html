@@ -446,6 +446,77 @@
 <span id="446">446</span>
 <span id="447">447</span>
 <span id="448">448</span>
+<span id="449">449</span>
+<span id="450">450</span>
+<span id="451">451</span>
+<span id="452">452</span>
+<span id="453">453</span>
+<span id="454">454</span>
+<span id="455">455</span>
+<span id="456">456</span>
+<span id="457">457</span>
+<span id="458">458</span>
+<span id="459">459</span>
+<span id="460">460</span>
+<span id="461">461</span>
+<span id="462">462</span>
+<span id="463">463</span>
+<span id="464">464</span>
+<span id="465">465</span>
+<span id="466">466</span>
+<span id="467">467</span>
+<span id="468">468</span>
+<span id="469">469</span>
+<span id="470">470</span>
+<span id="471">471</span>
+<span id="472">472</span>
+<span id="473">473</span>
+<span id="474">474</span>
+<span id="475">475</span>
+<span id="476">476</span>
+<span id="477">477</span>
+<span id="478">478</span>
+<span id="479">479</span>
+<span id="480">480</span>
+<span id="481">481</span>
+<span id="482">482</span>
+<span id="483">483</span>
+<span id="484">484</span>
+<span id="485">485</span>
+<span id="486">486</span>
+<span id="487">487</span>
+<span id="488">488</span>
+<span id="489">489</span>
+<span id="490">490</span>
+<span id="491">491</span>
+<span id="492">492</span>
+<span id="493">493</span>
+<span id="494">494</span>
+<span id="495">495</span>
+<span id="496">496</span>
+<span id="497">497</span>
+<span id="498">498</span>
+<span id="499">499</span>
+<span id="500">500</span>
+<span id="501">501</span>
+<span id="502">502</span>
+<span id="503">503</span>
+<span id="504">504</span>
+<span id="505">505</span>
+<span id="506">506</span>
+<span id="507">507</span>
+<span id="508">508</span>
+<span id="509">509</span>
+<span id="510">510</span>
+<span id="511">511</span>
+<span id="512">512</span>
+<span id="513">513</span>
+<span id="514">514</span>
+<span id="515">515</span>
+<span id="516">516</span>
+<span id="517">517</span>
+<span id="518">518</span>
+<span id="519">519</span>
 </pre><pre class="rust"><code><span class="kw">use crate</span>::{
     accounts_ix::FlashLoanType,
     state::{OracleType, PerpMarket, PerpPosition},
@@ -586,6 +657,33 @@
 </span>}
 
 <span class="attribute">#[event]
+</span><span class="kw">pub struct </span>FillLogV3 {
+    <span class="kw">pub </span>mango_group: Pubkey,
+    <span class="kw">pub </span>market_index: u16,
+    <span class="kw">pub </span>taker_side: u8, <span class="comment">// side from the taker&#39;s POV
+    </span><span class="kw">pub </span>maker_slot: u8,
+    <span class="kw">pub </span>maker_out: bool, <span class="comment">// true if maker order quantity == 0
+    </span><span class="kw">pub </span>timestamp: u64,
+    <span class="kw">pub </span>seq_num: u64, <span class="comment">// note: usize same as u64
+
+    </span><span class="kw">pub </span>maker: Pubkey,
+    <span class="kw">pub </span>maker_client_order_id: u64,
+    <span class="kw">pub </span>maker_fee: f32,
+
+    <span class="comment">// Timestamp of when the maker order was placed; copied over from the LeafNode
+    </span><span class="kw">pub </span>maker_timestamp: u64,
+
+    <span class="kw">pub </span>taker: Pubkey,
+    <span class="kw">pub </span>taker_client_order_id: u64,
+    <span class="kw">pub </span>taker_fee: f32,
+
+    <span class="kw">pub </span>price: i64,
+    <span class="kw">pub </span>quantity: i64,         <span class="comment">// number of base lots
+    </span><span class="kw">pub </span>maker_closed_pnl: f64, <span class="comment">// settle-token-native units
+    </span><span class="kw">pub </span>taker_closed_pnl: f64, <span class="comment">// settle-token-native units
+</span>}
+
+<span class="attribute">#[event]
 </span><span class="kw">pub struct </span>PerpUpdateFundingLog {
     <span class="kw">pub </span>mango_group: Pubkey,
     <span class="kw">pub </span>market_index: u16,
@@ -694,6 +792,7 @@
     Serum3PlaceOrder,
     Serum3SettleFunds,
     TokenWithdraw,
+    TokenConditionalSwapTrigger,
 }
 
 <span class="attribute">#[event]
@@ -893,6 +992,49 @@
     <span class="kw">pub </span>asset_price: i128,
     <span class="kw">pub </span>liab_price: i128,
     <span class="kw">pub </span>fee_factor: i128,
+}
+
+<span class="attribute">#[event]
+</span><span class="kw">pub struct </span>TokenConditionalSwapCreateLog {
+    <span class="kw">pub </span>mango_group: Pubkey,
+    <span class="kw">pub </span>mango_account: Pubkey,
+    <span class="kw">pub </span>id: u64,
+    <span class="kw">pub </span>max_buy: u64,
+    <span class="kw">pub </span>max_sell: u64,
+    <span class="kw">pub </span>expiry_timestamp: u64,
+    <span class="kw">pub </span>price_lower_limit: f64,
+    <span class="kw">pub </span>price_upper_limit: f64,
+    <span class="kw">pub </span>price_premium_fraction: f64,
+    <span class="kw">pub </span>taker_fee_fraction: f32,
+    <span class="kw">pub </span>maker_fee_fraction: f32,
+    <span class="kw">pub </span>buy_token_index: u16,
+    <span class="kw">pub </span>sell_token_index: u16,
+    <span class="kw">pub </span>allow_creating_deposits: bool,
+    <span class="kw">pub </span>allow_creating_borrows: bool,
+}
+
+<span class="attribute">#[event]
+</span><span class="kw">pub struct </span>TokenConditionalSwapTriggerLog {
+    <span class="kw">pub </span>mango_group: Pubkey,
+    <span class="kw">pub </span>liqee: Pubkey,
+    <span class="kw">pub </span>liqor: Pubkey,
+    <span class="kw">pub </span>token_conditional_swap_id: u64,
+    <span class="kw">pub </span>buy_token_index: u16,
+    <span class="kw">pub </span>sell_token_index: u16,
+    <span class="kw">pub </span>buy_amount: u64,        <span class="comment">// amount the liqee got
+    </span><span class="kw">pub </span>sell_amount: u64,       <span class="comment">// amount the liqee paid (including fees)
+    </span><span class="kw">pub </span>maker_fee: u64,         <span class="comment">// in native units of sell token (included in sell amount)
+    </span><span class="kw">pub </span>taker_fee: u64, <span class="comment">// in native units of sell token (deducted from the sell amount the liqor received)
+    </span><span class="kw">pub </span>buy_token_price: i128, <span class="comment">// I80F48
+    </span><span class="kw">pub </span>sell_token_price: i128, <span class="comment">// I80F48
+    </span><span class="kw">pub </span>closed: bool,
+}
+
+<span class="attribute">#[event]
+</span><span class="kw">pub struct </span>TokenConditionalSwapCancelLog {
+    <span class="kw">pub </span>mango_group: Pubkey,
+    <span class="kw">pub </span>mango_account: Pubkey,
+    <span class="kw">pub </span>id: u64,
 }
 </code></pre></div>
 </section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="mango_v4" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.65.0 (897e37553 2022-11-02)" ></div></body></html>
