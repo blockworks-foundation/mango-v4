@@ -447,12 +447,9 @@ impl HealthCache {
         })
     }
 
-    /// Computes the account leverage as ratio of assets / (assets - liabs)
-    ///
-    /// The goal of this function is to provide a quick overview over the accounts balance sheet.
-    /// It's not actually used to make any margin decisions internally and doesn't account for
-    /// open orders or stable / oracle price differences. Use health_ratio to make risk decisions.
-    pub fn leverage(&self) -> I80F48 {
+    /// Computes the account equity and the summarized balance sheet marked to market.
+    /// Returns (equity, assets, liabilities)
+    pub fn equity(&self) ->  (I80F48, I80F48, I80F48) {
         let mut assets = I80F48::ZERO;
         let mut liabs = I80F48::ZERO;
 
@@ -464,16 +461,12 @@ impl HealthCache {
             }
         }
 
-        println!("leverage token {} {}", assets, liabs);
-
         for serum_info in self.serum3_infos.iter() {
             let quote = &self.token_infos[serum_info.quote_info_index];
             let base = &self.token_infos[serum_info.base_info_index];
             assets += serum_info.reserved_base * base.prices.oracle;
             assets += serum_info.reserved_quote * quote.prices.oracle;
         }
-
-        println!("leverage serum {} {}", assets, liabs);
 
         for perp_info in self.perp_infos.iter() {
             // TODO: multiply with quote price
@@ -492,14 +485,18 @@ impl HealthCache {
             }
         }
 
-        println!("leverage perp {} {}", assets, liabs);
-
         let equity = assets - liabs;
-        if equity < 0.01 {
-            I80F48::ZERO
-        } else {
-            liabs / equity
-        }
+        return (equity, assets, liabs)
+    }
+
+    /// Computes the account leverage as ratio of liabs / (assets - liabs)
+    ///
+    /// The goal of this function is to provide a quick overview over the accounts balance sheet.
+    /// It's not actually used to make any margin decisions internally and doesn't account for
+    /// open orders or stable / oracle price differences. Use health_ratio to make risk decisions.
+    pub fn leverage(&self) -> I80F48 {
+        let (equity, _, liabs) = self.equity();
+        liabs / equity.max(I80F48::from_num(0.001))
     }
 }
 
