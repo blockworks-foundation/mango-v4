@@ -446,6 +446,61 @@ impl HealthCache {
             cache.health_ratio(HealthType::Init)
         })
     }
+
+    /// Computes the account leverage as ratio of assets / (assets - liabs)
+    ///
+    /// The goal of this function is to provide a quick overview over the accounts balance sheet.
+    /// It's not actually used to make any margin decisions internally and doesn't account for
+    /// open orders or stable / oracle price differences. Use health_ratio to make risk decisions.
+    pub fn leverage(&self) -> I80F48 {
+        let mut assets = I80F48::ZERO;
+        let mut liabs = I80F48::ZERO;
+
+        for token_info in self.token_infos.iter() {
+            if token_info.balance_spot.is_negative() {
+                liabs -= token_info.balance_spot * token_info.prices.oracle;
+            } else {
+                assets += token_info.balance_spot * token_info.prices.oracle;
+            }
+        }
+
+        println!("leverage token {} {}", assets, liabs);
+
+        for serum_info in self.serum3_infos.iter() {
+            let quote = &self.token_infos[serum_info.quote_info_index];
+            let base = &self.token_infos[serum_info.base_info_index];
+            assets += serum_info.reserved_base * base.prices.oracle;
+            assets += serum_info.reserved_quote * quote.prices.oracle;
+        }
+
+        println!("leverage serum {} {}", assets, liabs);
+
+        for perp_info in self.perp_infos.iter() {
+            // TODO: multiply with quote price
+            if perp_info.quote.is_negative() {
+                liabs -= perp_info.quote;
+            } else {
+                assets += perp_info.quote;
+            }
+
+            let base_position_value = I80F48::from(perp_info.base_lots * perp_info.base_lot_size)
+                * perp_info.base_prices.oracle;
+            if base_position_value.is_negative() {
+                liabs -= base_position_value;
+            } else {
+                assets += base_position_value;
+            }
+        }
+
+        println!("leverage perp {} {}", assets, liabs);
+
+        let equity = assets - liabs;
+        if equity < 0.01 {
+            I80F48::ZERO
+        } else {
+            liabs / equity
+        }
+    }
 }
 
 fn scan_right_until_less_than(
@@ -610,6 +665,16 @@ mod tests {
         }
     }
 
+    fn leverage_eq(h: &HealthCache, b: f64) -> bool {
+        let a = h.leverage();
+        if (a - I80F48::from_num(b)).abs() < 0.001 {
+            true
+        } else {
+            println!("leverage is {}, but expected {}", a, b);
+            false
+        }
+    }
+
     fn default_token_info(x: f64, price: f64) -> TokenInfo {
         TokenInfo {
             token_index: 0,
@@ -624,7 +689,7 @@ mod tests {
         }
     }
 
-    fn default_perp_info(x: f64) -> PerpInfo {
+    fn default_perp_info(x: f64, price: f64) -> PerpInfo {
         PerpInfo {
             perp_market_index: 0,
             settle_token_index: 0,
@@ -639,7 +704,7 @@ mod tests {
             bids_base_lots: 0,
             asks_base_lots: 0,
             quote: I80F48::ZERO,
-            base_prices: Prices::new_single_price(I80F48::from_num(2.0)),
+            base_prices: Prices::new_single_price(I80F48::from_num(price)),
             has_open_orders: false,
             has_open_fills: false,
         }
@@ -1008,7 +1073,7 @@ mod tests {
                 health_cache.perp_infos.push(PerpInfo {
                     perp_market_index: 0,
                     settle_token_index: 1,
-                    ..default_perp_info(0.3)
+                    ..default_perp_info(0.3, 2.0)
                 });
                 adjust_by_usdc(&mut health_cache, 0, 60.0);
 
@@ -1048,7 +1113,7 @@ mod tests {
                 perp_market_index: 0,
                 settle_token_index: 1,
                 base_lot_size,
-                ..default_perp_info(0.3)
+                ..default_perp_info(0.3, 2.0)
             }],
             being_liquidated: false,
         };
@@ -1425,7 +1490,7 @@ mod tests {
             perp_infos: vec![PerpInfo {
                 perp_market_index: 0,
                 settle_token_index: 0,
-                ..default_perp_info(0.3)
+                ..default_perp_info(0.3, 2.0)
             }],
             being_liquidated: false,
         };
@@ -1457,5 +1522,111 @@ mod tests {
             assert!((liabs.to_num::<f64>() - 2.0 * 10.0 * 1.2) < 0.01);
             assert!((assets.to_num::<f64>() - 2.0 * (10.0 * 1.2 + 2.0 * 0.8)) < 0.01);
         }
+    }
+
+    #[test]
+    fn test_leverage() {
+        let buffer = MangoAccount::default_for_tests().try_to_vec().unwrap();
+        let mut account = MangoAccountValue::from_bytes(&buffer).unwrap();
+        account.ensure_token_position(0).unwrap();
+        account.ensure_token_position(1).unwrap();
+
+        // only deposits
+        let health_cache = HealthCache {
+            token_infos: vec![
+                TokenInfo {
+                    token_index: 0,
+                    balance_spot: I80F48::ONE,
+                    ..default_token_info(0.0, 1.0)
+                },
+                TokenInfo {
+                    token_index: 1,
+                    ..default_token_info(0.2, 2.0)
+                },
+            ],
+            serum3_infos: vec![],
+            perp_infos: vec![],
+            being_liquidated: false,
+        };
+        assert!(leverage_eq(&health_cache, 0.0));
+
+        // deposits and borrows: assets = 10, equity = 1
+        let health_cache = HealthCache {
+            token_infos: vec![
+                TokenInfo {
+                    token_index: 0,
+                    balance_spot: I80F48::from_num(-9),
+                    ..default_token_info(0.0, 1.0)
+                },
+                TokenInfo {
+                    token_index: 1,
+                    balance_spot: I80F48::from_num(5),
+                    ..default_token_info(0.2, 2.0)
+                },
+            ],
+            serum3_infos: vec![],
+            perp_infos: vec![],
+            being_liquidated: false,
+        };
+
+        assert!(leverage_eq(&health_cache, 9.0));
+
+        // perp trade: assets = 1 + 9.9, equity = 1
+        let health_cache = HealthCache {
+            token_infos: vec![
+                TokenInfo {
+                    token_index: 0,
+                    balance_spot: I80F48::ONE,
+                    ..default_token_info(0.0, 1.0)
+                },
+                TokenInfo {
+                    token_index: 1,
+                    ..default_token_info(0.2, 2.0)
+                },
+            ],
+            serum3_infos: vec![],
+            perp_infos: vec![PerpInfo {
+                perp_market_index: 0,
+                base_lot_size: 3,
+                base_lots: -3,
+                quote: I80F48::from_num(9.9),
+                ..default_perp_info(0.1, 1.1)
+            }],
+            being_liquidated: false,
+        };
+        assert!(leverage_eq(&health_cache, 9.9));
+
+        // open orders: assets = , equity =
+        let health_cache = HealthCache {
+            token_infos: vec![
+                TokenInfo {
+                    token_index: 0,
+                    balance_spot: I80F48::ONE,
+                    ..default_token_info(0.0, 1.0)
+                },
+                TokenInfo {
+                    token_index: 1,
+                    ..default_token_info(0.2, 2.0)
+                },
+            ],
+            serum3_infos: vec![Serum3Info {
+                reserved_base: I80F48::ZERO,
+                reserved_quote: I80F48::ZERO,
+                base_info_index: 1,
+                quote_info_index: 0,
+                market_index: 0,
+                has_zero_funds: true,
+            }],
+            perp_infos: vec![PerpInfo {
+                perp_market_index: 0,
+                base_lot_size: 3,
+                base_lots: -1,
+                quote: I80F48::from_num(3.3),
+                ..default_perp_info(0.1, 1.1)
+            }],
+            being_liquidated: false,
+        };
+
+        // assert_eq!(health_cache.leverage(), I80F48::ZERO);
     }
 }
