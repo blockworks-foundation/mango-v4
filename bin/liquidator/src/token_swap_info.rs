@@ -104,6 +104,7 @@ impl TokenSwapInfoUpdater {
             token_amount,
             slippage,
             JupiterSwapMode::ExactIn,
+            false,
             self.config.mock_jupiter,
         )
         .await?;
@@ -114,6 +115,7 @@ impl TokenSwapInfoUpdater {
             self.config.quote_amount,
             slippage,
             JupiterSwapMode::ExactIn,
+            false,
             self.config.mock_jupiter,
         )
         .await?;

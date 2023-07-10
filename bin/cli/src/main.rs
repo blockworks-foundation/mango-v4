@@ -146,7 +146,7 @@ async fn main() -> Result<(), anyhow::Error> {
         Command::CreateAccount(cmd) => {
             let client = cmd.rpc.client(Some(&cmd.owner))?;
             let group = pubkey_from_cli(&cmd.group);
-            let owner = keypair_from_cli(&cmd.owner);
+            let owner = Arc::new(keypair_from_cli(&cmd.owner));
 
             let account_num = if let Some(num) = cmd.account_num {
                 num
@@ -164,9 +164,15 @@ async fn main() -> Result<(), anyhow::Error> {
                         + 1
                 }
             };
-            let (account, txsig) =
-                MangoClient::create_account(&client, group, &owner, &owner, account_num, &cmd.name)
-                    .await?;
+            let (account, txsig) = MangoClient::create_account(
+                &client,
+                group,
+                owner.clone(),
+                owner.clone(),
+                account_num,
+                &cmd.name,
+            )
+            .await?;
             println!("{}", account);
             println!("{}", txsig);
         }
@@ -193,6 +199,7 @@ async fn main() -> Result<(), anyhow::Error> {
                     cmd.amount,
                     cmd.slippage_bps,
                     JupiterSwapMode::ExactIn,
+                    false,
                 )
                 .await?;
             println!("{}", txsig);
