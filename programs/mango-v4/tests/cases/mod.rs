@@ -36,3 +36,4 @@ mod test_reduce_only;
 mod test_serum;
 mod test_token_conditional_swap;
 mod test_token_update_index_and_rate;
+mod test_trigger;

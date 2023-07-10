@@ -67,6 +67,16 @@ const_assert_eq!(size_of::<OracleConfig>(), 16 + 8 + 72);
 const_assert_eq!(size_of::<OracleConfig>(), 96);
 const_assert_eq!(size_of::<OracleConfig>() % 8, 0);
 
+impl Default for OracleConfig {
+    fn default() -> Self {
+        Self {
+            conf_filter: I80F48::ZERO,
+            max_staleness_slots: 0,
+            reserved: [0; 72],
+        }
+    }
+}
+
 #[derive(AnchorDeserialize, AnchorSerialize, Debug)]
 pub struct OracleConfigParams {
     pub conf_filter: f32,

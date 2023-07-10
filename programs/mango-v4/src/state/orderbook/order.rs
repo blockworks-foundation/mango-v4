@@ -3,6 +3,8 @@ use anchor_lang::prelude::*;
 use super::*;
 
 /// Perp order parameters
+///
+/// This is a purely internal struct and safe to change.
 pub struct Order {
     pub side: Side,
 

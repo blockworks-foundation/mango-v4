@@ -26,6 +26,10 @@ pub trait ClientAccountLoader {
         let bytes = self.load_bytes(pubkey).await?;
         AccountDeserialize::try_deserialize(&mut &bytes[..]).ok()
     }
+    async fn load_bytemuck<T: AccountDeserialize>(&self, pubkey: &Pubkey) -> Option<T> {
+        let bytes = self.load_bytes(pubkey).await?;
+        AccountDeserialize::try_deserialize(&mut &bytes[..(8 + std::mem::size_of::<T>())]).ok()
+    }
     async fn load_mango_account(&self, pubkey: &Pubkey) -> Option<MangoAccountValue> {
         self.load_bytes(pubkey)
             .await
@@ -311,9 +315,9 @@ async fn derive_liquidation_remaining_account_metas(
         .collect()
 }
 
-fn from_serum_style_pubkey(d: &[u64; 4]) -> Pubkey {
-    let b: &[u8; 32] = bytemuck::cast_ref(d);
-    Pubkey::from(*b)
+fn from_serum_style_pubkey(d: [u64; 4]) -> Pubkey {
+    let b: [u8; 32] = bytemuck::cast(d);
+    Pubkey::from(b)
 }
 
 pub async fn get_mango_account(solana: &SolanaCookie, account: Pubkey) -> MangoAccountValue {
@@ -2200,13 +2204,6 @@ impl ClientInstruction for Serum3PlaceOrderInstruction {
         let market_external: &serum_dex::state::MarketState = bytemuck::from_bytes(
             &market_external_bytes[5..5 + std::mem::size_of::<serum_dex::state::MarketState>()],
         );
-        // unpack the data, to avoid unaligned references
-        let bids = market_external.bids;
-        let asks = market_external.asks;
-        let event_q = market_external.event_q;
-        let req_q = market_external.req_q;
-        let coin_vault = market_external.coin_vault;
-        let pc_vault = market_external.pc_vault;
         let vault_signer = serum_dex::state::gen_vault_signer_key(
             market_external.vault_signer_nonce,
             &serum_market.serum_market_external,
@@ -2238,12 +2235,12 @@ impl ClientInstruction for Serum3PlaceOrderInstruction {
             serum_market: self.serum_market,
             serum_program: serum_market.serum_program,
             serum_market_external: serum_market.serum_market_external,
-            market_bids: from_serum_style_pubkey(&bids),
-            market_asks: from_serum_style_pubkey(&asks),
-            market_event_queue: from_serum_style_pubkey(&event_q),
-            market_request_queue: from_serum_style_pubkey(&req_q),
-            market_base_vault: from_serum_style_pubkey(&coin_vault),
-            market_quote_vault: from_serum_style_pubkey(&pc_vault),
+            market_bids: from_serum_style_pubkey(market_external.bids),
+            market_asks: from_serum_style_pubkey(market_external.asks),
+            market_event_queue: from_serum_style_pubkey(market_external.event_q),
+            market_request_queue: from_serum_style_pubkey(market_external.req_q),
+            market_base_vault: from_serum_style_pubkey(market_external.coin_vault),
+            market_quote_vault: from_serum_style_pubkey(market_external.pc_vault),
             market_vault_signer: vault_signer,
             owner: self.owner.pubkey(),
             token_program: Token::id(),
@@ -2300,10 +2297,6 @@ impl ClientInstruction for Serum3CancelOrderInstruction {
         let market_external: &serum_dex::state::MarketState = bytemuck::from_bytes(
             &market_external_bytes[5..5 + std::mem::size_of::<serum_dex::state::MarketState>()],
         );
-        // unpack the data, to avoid unaligned references
-        let bids = market_external.bids;
-        let asks = market_external.asks;
-        let event_q = market_external.event_q;
 
         let accounts = Self::Accounts {
             group: account.fixed.group,
@@ -2312,9 +2305,9 @@ impl ClientInstruction for Serum3CancelOrderInstruction {
             serum_market: self.serum_market,
             serum_program: serum_market.serum_program,
             serum_market_external: serum_market.serum_market_external,
-            market_bids: from_serum_style_pubkey(&bids),
-            market_asks: from_serum_style_pubkey(&asks),
-            market_event_queue: from_serum_style_pubkey(&event_q),
+            market_bids: from_serum_style_pubkey(market_external.bids),
+            market_asks: from_serum_style_pubkey(market_external.asks),
+            market_event_queue: from_serum_style_pubkey(market_external.event_q),
             owner: self.owner.pubkey(),
         };
 
@@ -2361,10 +2354,6 @@ impl ClientInstruction for Serum3CancelAllOrdersInstruction {
         let market_external: &serum_dex::state::MarketState = bytemuck::from_bytes(
             &market_external_bytes[5..5 + std::mem::size_of::<serum_dex::state::MarketState>()],
         );
-        // unpack the data, to avoid unaligned references
-        let bids = market_external.bids;
-        let asks = market_external.asks;
-        let event_q = market_external.event_q;
 
         let accounts = Self::Accounts {
             group: account.fixed.group,
@@ -2373,9 +2362,9 @@ impl ClientInstruction for Serum3CancelAllOrdersInstruction {
             serum_market: self.serum_market,
             serum_program: serum_market.serum_program,
             serum_market_external: serum_market.serum_market_external,
-            market_bids: from_serum_style_pubkey(&bids),
-            market_asks: from_serum_style_pubkey(&asks),
-            market_event_queue: from_serum_style_pubkey(&event_q),
+            market_bids: from_serum_style_pubkey(market_external.bids),
+            market_asks: from_serum_style_pubkey(market_external.asks),
+            market_event_queue: from_serum_style_pubkey(market_external.event_q),
             owner: self.owner.pubkey(),
         };
 
@@ -2431,9 +2420,6 @@ impl ClientInstruction for Serum3SettleFundsV2Instruction {
         let market_external: &serum_dex::state::MarketState = bytemuck::from_bytes(
             &market_external_bytes[5..5 + std::mem::size_of::<serum_dex::state::MarketState>()],
         );
-        // unpack the data, to avoid unaligned references
-        let coin_vault = market_external.coin_vault;
-        let pc_vault = market_external.pc_vault;
         let vault_signer = serum_dex::state::gen_vault_signer_key(
             market_external.vault_signer_nonce,
             &serum_market.serum_market_external,
@@ -2453,8 +2439,8 @@ impl ClientInstruction for Serum3SettleFundsV2Instruction {
                 serum_market: self.serum_market,
                 serum_program: serum_market.serum_program,
                 serum_market_external: serum_market.serum_market_external,
-                market_base_vault: from_serum_style_pubkey(&coin_vault),
-                market_quote_vault: from_serum_style_pubkey(&pc_vault),
+                market_base_vault: from_serum_style_pubkey(market_external.coin_vault),
+                market_quote_vault: from_serum_style_pubkey(market_external.pc_vault),
                 market_vault_signer: vault_signer,
                 owner: self.owner.pubkey(),
                 token_program: Token::id(),
@@ -2513,12 +2499,6 @@ impl ClientInstruction for Serum3LiqForceCancelOrdersInstruction {
         let market_external: &serum_dex::state::MarketState = bytemuck::from_bytes(
             &market_external_bytes[5..5 + std::mem::size_of::<serum_dex::state::MarketState>()],
         );
-        // unpack the data, to avoid unaligned references
-        let bids = market_external.bids;
-        let asks = market_external.asks;
-        let event_q = market_external.event_q;
-        let coin_vault = market_external.coin_vault;
-        let pc_vault = market_external.pc_vault;
         let vault_signer = serum_dex::state::gen_vault_signer_key(
             market_external.vault_signer_nonce,
             &serum_market.serum_market_external,
@@ -2546,11 +2526,11 @@ impl ClientInstruction for Serum3LiqForceCancelOrdersInstruction {
             serum_market: self.serum_market,
             serum_program: serum_market.serum_program,
             serum_market_external: serum_market.serum_market_external,
-            market_bids: from_serum_style_pubkey(&bids),
-            market_asks: from_serum_style_pubkey(&asks),
-            market_event_queue: from_serum_style_pubkey(&event_q),
-            market_base_vault: from_serum_style_pubkey(&coin_vault),
-            market_quote_vault: from_serum_style_pubkey(&pc_vault),
+            market_bids: from_serum_style_pubkey(market_external.bids),
+            market_asks: from_serum_style_pubkey(market_external.asks),
+            market_event_queue: from_serum_style_pubkey(market_external.event_q),
+            market_base_vault: from_serum_style_pubkey(market_external.coin_vault),
+            market_quote_vault: from_serum_style_pubkey(market_external.pc_vault),
             market_vault_signer: vault_signer,
             token_program: Token::id(),
         };
@@ -4313,5 +4293,329 @@ impl ClientInstruction for TokenConditionalSwapTriggerInstruction {
 
     fn signers(&self) -> Vec<TestKeypair> {
         vec![self.liqor_owner]
+    }
+}
+
+pub struct TriggersCreateInstruction {
+    pub account: Pubkey,
+    pub authority: TestKeypair,
+    pub payer: TestKeypair,
+}
+#[async_trait::async_trait(?Send)]
+impl ClientInstruction for TriggersCreateInstruction {
+    type Accounts = mango_v4::accounts::TriggersCreate;
+    type Instruction = mango_v4::instruction::TriggersCreate;
+    async fn to_instruction(
+        &self,
+        account_loader: impl ClientAccountLoader + 'async_trait,
+    ) -> (Self::Accounts, instruction::Instruction) {
+        let program_id = mango_v4::id();
+
+        let account = account_loader
+            .load_mango_account(&self.account)
+            .await
+            .unwrap();
+
+        let instruction = Self::Instruction {};
+
+        let triggers = Pubkey::find_program_address(
+            &[b"Triggers".as_ref(), self.account.as_ref()],
+            &program_id,
+        )
+        .0;
+
+        let accounts = Self::Accounts {
+            group: account.fixed.group,
+            account: self.account,
+            triggers,
+            authority: self.authority.pubkey(),
+            payer: self.payer.pubkey(),
+            system_program: System::id(),
+        };
+
+        let instruction = make_instruction(program_id, &accounts, &instruction);
+        (accounts, instruction)
+    }
+
+    fn signers(&self) -> Vec<TestKeypair> {
+        vec![self.authority, self.payer]
+    }
+}
+
+pub struct TriggerCreateInstruction {
+    pub account: Pubkey,
+    pub authority: TestKeypair,
+    pub payer: TestKeypair,
+    pub condition: Vec<u8>,
+    pub action: Vec<u8>,
+}
+#[async_trait::async_trait(?Send)]
+impl ClientInstruction for TriggerCreateInstruction {
+    type Accounts = mango_v4::accounts::TriggerCreate;
+    type Instruction = mango_v4::instruction::TriggerCreate;
+    async fn to_instruction(
+        &self,
+        account_loader: impl ClientAccountLoader + 'async_trait,
+    ) -> (Self::Accounts, instruction::Instruction) {
+        let program_id = mango_v4::id();
+
+        let account = account_loader
+            .load_mango_account(&self.account)
+            .await
+            .unwrap();
+
+        let instruction = Self::Instruction {
+            condition: self.condition.clone(),
+            action: self.action.clone(),
+        };
+
+        let triggers = Pubkey::find_program_address(
+            &[b"Triggers".as_ref(), self.account.as_ref()],
+            &program_id,
+        )
+        .0;
+
+        let accounts = Self::Accounts {
+            group: account.fixed.group,
+            account: self.account,
+            triggers,
+            authority: self.authority.pubkey(),
+            payer: self.payer.pubkey(),
+            system_program: System::id(),
+        };
+
+        let instruction = make_instruction(program_id, &accounts, &instruction);
+        (accounts, instruction)
+    }
+
+    fn signers(&self) -> Vec<TestKeypair> {
+        vec![self.authority, self.payer]
+    }
+}
+
+pub struct TriggerCheckInstruction {
+    pub account: Pubkey,
+    pub id: u64,
+    pub triggerer: TestKeypair,
+}
+#[async_trait::async_trait(?Send)]
+impl ClientInstruction for TriggerCheckInstruction {
+    type Accounts = mango_v4::accounts::TriggerCheck;
+    type Instruction = mango_v4::instruction::TriggerCheck;
+    async fn to_instruction(
+        &self,
+        account_loader: impl ClientAccountLoader + 'async_trait,
+    ) -> (Self::Accounts, instruction::Instruction) {
+        let program_id = mango_v4::id();
+
+        let triggers_key = Pubkey::find_program_address(
+            &[b"Triggers".as_ref(), self.account.as_ref()],
+            &program_id,
+        )
+        .0;
+
+        let bytes = account_loader.load_bytes(&triggers_key).await.unwrap();
+        let trigger_offset = Triggers::find_trigger_offset_by_id(&bytes, self.id).unwrap();
+        let (triggers, _trigger, condition, _action) =
+            Trigger::all_from_bytes(&bytes, trigger_offset).unwrap();
+
+        let instruction = Self::Instruction {
+            trigger_id: self.id,
+        };
+
+        let accounts = Self::Accounts {
+            group: triggers.group,
+            triggers: triggers_key,
+            triggerer: self.triggerer.pubkey(),
+            system_program: System::id(),
+        };
+
+        let mut instruction = make_instruction(program_id, &accounts, &instruction);
+        instruction
+            .accounts
+            .extend(condition.accounts().into_iter());
+        (accounts, instruction)
+    }
+
+    fn signers(&self) -> Vec<TestKeypair> {
+        vec![self.triggerer]
+    }
+}
+
+pub struct TriggerCheckAndExecuteInstruction {
+    pub account: Pubkey,
+    pub id: u64,
+    pub triggerer: TestKeypair,
+}
+#[async_trait::async_trait(?Send)]
+impl ClientInstruction for TriggerCheckAndExecuteInstruction {
+    type Accounts = mango_v4::accounts::TriggerCheck;
+    type Instruction = mango_v4::instruction::TriggerCheckAndExecute;
+    async fn to_instruction(
+        &self,
+        account_loader: impl ClientAccountLoader + 'async_trait,
+    ) -> (Self::Accounts, instruction::Instruction) {
+        let program_id = mango_v4::id();
+
+        let triggers_key = Pubkey::find_program_address(
+            &[b"Triggers".as_ref(), self.account.as_ref()],
+            &program_id,
+        )
+        .0;
+
+        let bytes = account_loader.load_bytes(&triggers_key).await.unwrap();
+        let trigger_offset = Triggers::find_trigger_offset_by_id(&bytes, self.id).unwrap();
+        let (triggers, _trigger, condition, action) =
+            Trigger::all_from_bytes(&bytes, trigger_offset).unwrap();
+
+        let condition_accounts = condition.accounts();
+
+        let instruction = Self::Instruction {
+            trigger_id: self.id,
+            num_condition_accounts: condition_accounts.len().try_into().unwrap(),
+        };
+
+        let accounts = Self::Accounts {
+            group: triggers.group,
+            triggers: triggers_key,
+            triggerer: self.triggerer.pubkey(),
+            system_program: System::id(),
+        };
+
+        let mut instruction = make_instruction(program_id, &accounts, &instruction);
+        instruction.accounts.extend(condition_accounts.into_iter());
+
+        let account = account_loader
+            .load_mango_account(&triggers.account)
+            .await
+            .unwrap();
+
+        // also add all the action-specific accounts
+        let action_accounts = match action {
+            ActionRef::PerpCpi((perp_cpi, ix_data)) => {
+                let perp_market_address = Pubkey::find_program_address(
+                    &[
+                        b"PerpMarket".as_ref(),
+                        triggers.group.as_ref(),
+                        perp_cpi.perp_market_index.to_le_bytes().as_ref(),
+                    ],
+                    &program_id,
+                )
+                .0;
+                let perp_market: PerpMarket =
+                    account_loader.load(&perp_market_address).await.unwrap();
+                let mut ams = perp_cpi
+                    .accounts(
+                        triggers.group,
+                        triggers.account,
+                        ix_data,
+                        perp_market_address,
+                        perp_market.bids,
+                        perp_market.asks,
+                        perp_market.event_queue,
+                        perp_market.oracle,
+                    )
+                    .unwrap();
+
+                let health_check_metas = derive_health_check_remaining_account_metas(
+                    &account_loader,
+                    &account,
+                    None,
+                    false,
+                    Some(perp_cpi.perp_market_index),
+                )
+                .await;
+                ams.extend(health_check_metas.into_iter());
+
+                ams
+            }
+            ActionRef::Serum3Cpi((cpi, ix_data)) => {
+                let serum_market: Serum3Market =
+                    account_loader.load(&cpi.serum3_market).await.unwrap();
+                let open_orders = account
+                    .serum3_orders(serum_market.market_index)
+                    .unwrap()
+                    .open_orders;
+                let market_external_bytes = account_loader
+                    .load_bytes(&serum_market.serum_market_external)
+                    .await
+                    .unwrap();
+                let market_external: &serum_dex::state::MarketState = bytemuck::from_bytes(
+                    &market_external_bytes
+                        [5..5 + std::mem::size_of::<serum_dex::state::MarketState>()],
+                );
+                let vault_signer = serum_dex::state::gen_vault_signer_key(
+                    market_external.vault_signer_nonce,
+                    &serum_market.serum_market_external,
+                    &serum_market.serum_program,
+                )
+                .unwrap();
+                let quote_bank_key = Pubkey::find_program_address(
+                    &[
+                        b"Bank".as_ref(),
+                        triggers.group.as_ref(),
+                        &serum_market.quote_token_index.to_le_bytes(),
+                        &0u32.to_le_bytes(),
+                    ],
+                    &program_id,
+                )
+                .0;
+                let base_bank_key = Pubkey::find_program_address(
+                    &[
+                        b"Bank".as_ref(),
+                        triggers.group.as_ref(),
+                        &serum_market.base_token_index.to_le_bytes(),
+                        &0u32.to_le_bytes(),
+                    ],
+                    &program_id,
+                )
+                .0;
+                let quote_bank: Bank = account_loader.load(&quote_bank_key).await.unwrap();
+                let base_bank: Bank = account_loader.load(&base_bank_key).await.unwrap();
+                let mut ams = cpi
+                    .accounts(
+                        triggers.group,
+                        triggers.account,
+                        ix_data,
+                        open_orders,
+                        cpi.serum3_market,
+                        serum_market.serum_program,
+                        serum_market.serum_market_external,
+                        from_serum_style_pubkey(market_external.bids),
+                        from_serum_style_pubkey(market_external.asks),
+                        from_serum_style_pubkey(market_external.event_q),
+                        from_serum_style_pubkey(market_external.req_q),
+                        from_serum_style_pubkey(market_external.coin_vault),
+                        from_serum_style_pubkey(market_external.pc_vault),
+                        vault_signer,
+                        quote_bank_key,
+                        quote_bank.vault,
+                        quote_bank.oracle,
+                        base_bank_key,
+                        base_bank.vault,
+                        base_bank.oracle,
+                    )
+                    .unwrap();
+
+                let health_check_metas = derive_health_check_remaining_account_metas(
+                    &account_loader,
+                    &account,
+                    None,
+                    false,
+                    None,
+                )
+                .await;
+                ams.extend(health_check_metas.into_iter());
+
+                ams
+            }
+        };
+        instruction.accounts.extend(action_accounts.into_iter());
+
+        (accounts, instruction)
+    }
+
+    fn signers(&self) -> Vec<TestKeypair> {
+        vec![self.triggerer]
     }
 }
