@@ -301,16 +301,6 @@ pub fn flash_loan_end<'key, 'accounts, 'remaining, 'info>(
         });
     }
 
-    match flash_loan_type {
-        FlashLoanType::Unknown => {}
-        FlashLoanType::Swap => {
-            require_msg!(
-                changes.len() == 2,
-                "when flash_loan_type is Swap there must be exactly 2 token vault changes"
-            )
-        }
-    }
-
     // all vaults must have had matching banks
     for (i, has_bank) in vaults_with_banks.iter().enumerate() {
         require_msg!(
@@ -319,6 +309,16 @@ pub fn flash_loan_end<'key, 'accounts, 'remaining, 'info>(
             i,
             vaults[i].key
         );
+    }
+
+    match flash_loan_type {
+        FlashLoanType::Unknown => {}
+        FlashLoanType::Swap => {
+            require_msg!(
+                changes.len() == 2,
+                "when flash_loan_type is Swap there must be exactly 2 token vault changes"
+            )
+        }
     }
 
     // Check health before balance adjustments
