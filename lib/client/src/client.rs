@@ -1,3 +1,4 @@
+use std::ops::Deref;
 use std::str::FromStr;
 use std::sync::Arc;
 use std::time::Duration;
@@ -133,16 +134,16 @@ impl MangoClient {
     pub async fn find_or_create_account(
         client: &Client,
         group: Pubkey,
-        owner: &Keypair,
-        payer: &Keypair, // pays the SOL for the new account
+        owner: Arc<Keypair>,
+        payer: Arc<Keypair>, // pays the SOL for the new account
         mango_account_name: &str,
     ) -> anyhow::Result<Pubkey> {
         let rpc = client.rpc_async();
         let program = mango_v4::ID;
+        let owner_pk = owner.pubkey();
 
         // Mango Account
-        let mut mango_account_tuples =
-            fetch_mango_accounts(&rpc, program, group, owner.pubkey()).await?;
+        let mut mango_account_tuples = fetch_mango_accounts(&rpc, program, group, owner_pk).await?;
         let mango_account_opt = mango_account_tuples
             .iter()
             .find(|(_, account)| account.fixed.name() == mango_account_name);
@@ -157,12 +158,18 @@ impl MangoClient {
                 Some(tuple) => tuple.1.fixed.account_num + 1,
                 None => 0u32,
             };
-            Self::create_account(client, group, owner, payer, account_num, mango_account_name)
-                .await
-                .context("Failed to create account...")?;
+            Self::create_account(
+                client,
+                group,
+                owner.clone(),
+                payer,
+                account_num,
+                mango_account_name,
+            )
+            .await
+            .context("Failed to create account...")?;
         }
-        let mango_account_tuples =
-            fetch_mango_accounts(&rpc, program, group, owner.pubkey()).await?;
+        let mango_account_tuples = fetch_mango_accounts(&rpc, program, group, owner_pk).await?;
         let index = mango_account_tuples
             .iter()
             .position(|tuple| tuple.1.fixed.name() == mango_account_name)
@@ -173,8 +180,8 @@ impl MangoClient {
     pub async fn create_account(
         client: &Client,
         group: Pubkey,
-        owner: &Keypair,
-        payer: &Keypair, // pays the SOL for the new account
+        owner: Arc<Keypair>,
+        payer: Arc<Keypair>, // pays the SOL for the new account
         account_num: u32,
         mango_account_name: &str,
     ) -> anyhow::Result<(Pubkey, Signature)> {
@@ -1305,6 +1312,7 @@ impl MangoClient {
         amount: u64,
         slippage: u64,
         swap_mode: JupiterSwapMode,
+        only_direct_routes: bool,
     ) -> anyhow::Result<jupiter::QueryRoute> {
         let quote = self
             .http_client
@@ -1313,7 +1321,7 @@ impl MangoClient {
                 ("inputMint", input_mint.to_string()),
                 ("outputMint", output_mint.to_string()),
                 ("amount", format!("{}", amount)),
-                ("onlyDirectRoutes", "true".into()),
+                ("onlyDirectRoutes", only_direct_routes.to_string()),
                 ("enforceSingleTx", "true".into()),
                 ("filterTopNResult", "10".into()),
                 ("slippageBps", format!("{}", slippage)),
@@ -1353,19 +1361,18 @@ impl MangoClient {
         Ok(route.clone())
     }
 
-    pub async fn jupiter_swap(
+    /// Find the instructions and account lookup tables for a jupiter swap through mango
+    ///
+    /// It would be nice if we didn't have to pass input_mint/output_mint - the data is
+    /// definitely in QueryRoute - but it's unclear how.
+    pub async fn prepare_jupiter_swap_transaction(
         &self,
         input_mint: Pubkey,
         output_mint: Pubkey,
-        amount: u64,
-        slippage: u64,
-        swap_mode: JupiterSwapMode,
-    ) -> anyhow::Result<Signature> {
+        route: &jupiter::QueryRoute,
+    ) -> anyhow::Result<TransactionBuilder> {
         let source_token = self.context.token_by_mint(&input_mint)?;
         let target_token = self.context.token_by_mint(&output_mint)?;
-        let route = self
-            .jupiter_route(input_mint, output_mint, amount, slippage, swap_mode)
-            .await?;
 
         let swap = self
             .http_client
@@ -1400,22 +1407,25 @@ impl MangoClient {
         let ata_program = anchor_spl::associated_token::ID;
         let token_program = anchor_spl::token::ID;
         let compute_budget_program = solana_sdk::compute_budget::ID;
-        // these setup instructions are unnecessary since FlashLoan already takes care of it
+        // these setup instructions should be placed outside of flashloan begin-end
         let is_setup_ix = |k: Pubkey| -> bool {
             k == ata_program || k == token_program || k == compute_budget_program
         };
         let (jup_ixs, jup_alts) = self
             .deserialize_instructions_and_alts(&jup_tx.message)
             .await?;
-        let jup_cu_ix = jup_ixs
+        let jup_action_ix_begin = jup_ixs
             .iter()
-            .filter(|ix| ix.program_id == compute_budget_program)
-            .cloned()
-            .collect::<Vec<_>>();
-        let jup_action_ix = jup_ixs
-            .into_iter()
-            .filter(|ix| !is_setup_ix(ix.program_id))
-            .collect::<Vec<_>>();
+            .position(|ix| !is_setup_ix(ix.program_id))
+            .ok_or_else(|| {
+                anyhow::anyhow!("jupiter swap response only had setup-like instructions")
+            })?;
+        let jup_action_ix_end = jup_ixs.len()
+            - jup_ixs
+                .iter()
+                .rev()
+                .position(|ix| !is_setup_ix(ix.program_id))
+                .unwrap();
 
         let bank_ams = [
             source_token.mint_info.first_bank(),
@@ -1445,14 +1455,14 @@ impl MangoClient {
             })
             .collect::<Vec<_>>();
 
-        let loan_amounts = vec![
-            match swap_mode {
-                JupiterSwapMode::ExactIn => amount,
-                // in amount + slippage
-                JupiterSwapMode::ExactOut => u64::from_str(&route.other_amount_threshold).unwrap(),
-            },
-            0u64,
-        ];
+        let source_loan = if route.swap_mode == "ExactIn" {
+            u64::from_str(&route.amount).unwrap()
+        } else if route.swap_mode == "ExactOut" {
+            u64::from_str(&route.other_amount_threshold).unwrap()
+        } else {
+            anyhow::bail!("unknown swap mode: {}", route.swap_mode);
+        };
+        let loan_amounts = vec![source_loan, 0u64];
         let num_loans: u8 = loan_amounts.len().try_into().unwrap();
 
         // This relies on the fact that health account banks will be identical to the first_bank above!
@@ -1467,25 +1477,9 @@ impl MangoClient {
 
         let mut instructions = Vec::new();
 
-        for ix in jup_cu_ix {
+        for ix in &jup_ixs[..jup_action_ix_begin] {
             instructions.push(ix.clone());
         }
-        instructions.push(
-            spl_associated_token_account::instruction::create_associated_token_account_idempotent(
-                &self.owner.pubkey(),
-                &self.owner.pubkey(),
-                &source_token.mint_info.mint,
-                &Token::id(),
-            ),
-        );
-        instructions.push(
-            spl_associated_token_account::instruction::create_associated_token_account_idempotent(
-                &self.owner.pubkey(),
-                &self.owner.pubkey(),
-                &target_token.mint_info.mint,
-                &Token::id(),
-            ),
-        );
         instructions.push(Instruction {
             program_id: mango_v4::id(),
             accounts: {
@@ -1508,7 +1502,7 @@ impl MangoClient {
                 loan_amounts,
             }),
         });
-        for ix in jup_action_ix {
+        for ix in &jup_ixs[jup_action_ix_begin..jup_action_ix_end] {
             instructions.push(ix.clone());
         }
         instructions.push(Instruction {
@@ -1533,20 +1527,49 @@ impl MangoClient {
                 flash_loan_type: mango_v4::accounts_ix::FlashLoanType::Swap,
             }),
         });
+        for ix in &jup_ixs[jup_action_ix_end..] {
+            instructions.push(ix.clone());
+        }
 
-        let payer = self.owner.pubkey(); // maybe use fee_payer? but usually it's the same
         let mut address_lookup_tables = self.mango_address_lookup_tables().await?;
         address_lookup_tables.extend(jup_alts.into_iter());
 
-        TransactionBuilder {
+        let payer = self.owner.pubkey(); // maybe use fee_payer? but usually it's the same
+
+        Ok(TransactionBuilder {
             instructions,
             address_lookup_tables,
             payer,
-            signers: vec![&*self.owner],
+            signers: vec![self.owner.clone()],
             config: self.client.transaction_builder_config,
-        }
-        .send_and_confirm(&self.client)
-        .await
+        })
+    }
+
+    pub async fn jupiter_swap(
+        &self,
+        input_mint: Pubkey,
+        output_mint: Pubkey,
+        amount: u64,
+        slippage: u64,
+        swap_mode: JupiterSwapMode,
+        only_direct_routes: bool,
+    ) -> anyhow::Result<Signature> {
+        let route = self
+            .jupiter_route(
+                input_mint,
+                output_mint,
+                amount,
+                slippage,
+                swap_mode,
+                only_direct_routes,
+            )
+            .await?;
+
+        let tx_builder = self
+            .prepare_jupiter_swap_transaction(input_mint, output_mint, &route)
+            .await?;
+
+        tx_builder.send_and_confirm(&self.client).await
     }
 
     async fn fetch_address_lookup_table(
@@ -1630,7 +1653,7 @@ impl MangoClient {
             instructions,
             address_lookup_tables: vec![],
             payer: self.client.fee_payer.pubkey(),
-            signers: vec![&*self.owner, &*self.client.fee_payer],
+            signers: vec![self.owner.clone(), self.client.fee_payer.clone()],
             config: self.client.transaction_builder_config,
         }
         .send_and_confirm(&self.client)
@@ -1645,7 +1668,7 @@ impl MangoClient {
             instructions,
             address_lookup_tables: vec![],
             payer: self.client.fee_payer.pubkey(),
-            signers: vec![&*self.client.fee_payer],
+            signers: vec![self.client.fee_payer.clone()],
             config: self.client.transaction_builder_config,
         }
         .send_and_confirm(&self.client)
@@ -1677,17 +1700,17 @@ pub struct TransactionBuilderConfig {
     pub prioritization_micro_lamports: Option<u64>,
 }
 
-pub struct TransactionBuilder<'a> {
+pub struct TransactionBuilder {
     pub instructions: Vec<Instruction>,
     pub address_lookup_tables: Vec<AddressLookupTableAccount>,
-    pub signers: Vec<&'a Keypair>,
+    pub signers: Vec<Arc<Keypair>>,
     pub payer: Pubkey,
     pub config: TransactionBuilderConfig,
 }
 
-impl<'a> TransactionBuilder<'a> {
+impl TransactionBuilder {
     pub async fn transaction(
-        self,
+        &self,
         rpc: &RpcClientAsync,
     ) -> anyhow::Result<solana_sdk::transaction::VersionedTransaction> {
         let latest_blockhash = rpc.get_latest_blockhash().await?;
@@ -1695,11 +1718,12 @@ impl<'a> TransactionBuilder<'a> {
     }
 
     pub fn transaction_with_blockhash(
-        mut self,
+        &self,
         blockhash: Hash,
     ) -> anyhow::Result<solana_sdk::transaction::VersionedTransaction> {
+        let mut ix = self.instructions.clone();
         if let Some(prio_price) = self.config.prioritization_micro_lamports {
-            self.instructions.insert(
+            ix.insert(
                 0,
                 solana_sdk::compute_budget::ComputeBudgetInstruction::set_compute_unit_price(
                     prio_price,
@@ -1708,15 +1732,16 @@ impl<'a> TransactionBuilder<'a> {
         }
         let v0_message = solana_sdk::message::v0::Message::try_compile(
             &self.payer,
-            &self.instructions,
+            &ix,
             &self.address_lookup_tables,
             blockhash,
         )?;
         let versioned_message = solana_sdk::message::VersionedMessage::V0(v0_message);
         let signers = self
             .signers
-            .into_iter()
+            .iter()
             .unique_by(|s| s.pubkey())
+            .map(|v| v.deref())
             .collect::<Vec<_>>();
         let tx =
             solana_sdk::transaction::VersionedTransaction::try_new(versioned_message, &signers)?;
@@ -1725,7 +1750,7 @@ impl<'a> TransactionBuilder<'a> {
 
     // These two send() functions don't really belong into the transaction builder!
 
-    pub async fn send(self, client: &Client) -> anyhow::Result<Signature> {
+    pub async fn send(&self, client: &Client) -> anyhow::Result<Signature> {
         let rpc = client.rpc_async();
         let tx = self.transaction(&rpc).await?;
         rpc.send_transaction_with_config(&tx, client.rpc_send_transaction_config)
@@ -1733,13 +1758,19 @@ impl<'a> TransactionBuilder<'a> {
             .map_err(prettify_solana_client_error)
     }
 
-    pub async fn send_and_confirm(self, client: &Client) -> anyhow::Result<Signature> {
+    pub async fn send_and_confirm(&self, client: &Client) -> anyhow::Result<Signature> {
         let rpc = client.rpc_async();
         let tx = self.transaction(&rpc).await?;
         // TODO: Wish we could use client.rpc_send_transaction_config here too!
         rpc.send_and_confirm_transaction(&tx)
             .await
             .map_err(prettify_solana_client_error)
+    }
+
+    pub fn transaction_size_ok(&self) -> anyhow::Result<bool> {
+        let tx = self.transaction_with_blockhash(solana_sdk::hash::Hash::default())?;
+        let bytes = bincode::serialize(&tx)?;
+        Ok(bytes.len() <= solana_sdk::packet::PACKET_DATA_SIZE)
     }
 }
 

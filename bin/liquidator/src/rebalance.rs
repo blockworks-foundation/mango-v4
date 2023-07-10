@@ -165,6 +165,7 @@ impl Rebalancer {
                         input_amount.to_num::<u64>(),
                         self.config.slippage_bps,
                         JupiterSwapMode::ExactIn,
+                        false,
                     )
                     .await?;
                 log::info!(
@@ -197,6 +198,7 @@ impl Rebalancer {
                         amount.to_num::<u64>(),
                         self.config.slippage_bps,
                         JupiterSwapMode::ExactIn,
+                        false,
                     )
                     .await?;
                 log::info!(
