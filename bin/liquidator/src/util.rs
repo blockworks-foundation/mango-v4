@@ -45,11 +45,19 @@ pub async fn jupiter_route(
     amount: u64,
     slippage: u64,
     swap_mode: JupiterSwapMode,
+    only_direct_routes: bool,
     mock: bool,
 ) -> anyhow::Result<mango_v4_client::jupiter::QueryRoute> {
     if !mock {
         return mango_client
-            .jupiter_route(input_mint, output_mint, amount, slippage, swap_mode)
+            .jupiter_route(
+                input_mint,
+                output_mint,
+                amount,
+                slippage,
+                swap_mode,
+                only_direct_routes,
+            )
             .await;
     }
 

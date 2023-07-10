@@ -172,6 +172,7 @@ pub async fn maybe_execute_token_conditional_swap_inner(
             input_amount,
             slippage,
             swap_mode,
+            false,
             config.mock_jupiter,
         )
         .await?;

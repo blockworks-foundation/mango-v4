@@ -42,6 +42,7 @@ pub async fn jupiter_market_can_buy(
             quote_amount,
             slippage,
             JupiterSwapMode::ExactIn,
+            false,
         )
         .await
         .is_ok()
@@ -70,6 +71,7 @@ pub async fn jupiter_market_can_sell(
             quote_amount,
             slippage,
             JupiterSwapMode::ExactOut,
+            false,
         )
         .await
         .is_ok()
