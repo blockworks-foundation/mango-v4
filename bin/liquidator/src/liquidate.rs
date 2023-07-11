@@ -1,6 +1,7 @@
 use std::collections::HashSet;
 use std::time::Duration;
 
+use itertools::Itertools;
 use mango_v4::accounts_zerocopy::KeyedAccountSharedData;
 use mango_v4::health::{HealthCache, HealthType};
 use mango_v4::state::{
@@ -91,17 +92,15 @@ struct LiquidateHelper<'a> {
 impl<'a> LiquidateHelper<'a> {
     async fn serum3_close_orders(&self) -> anyhow::Result<Option<Signature>> {
         // look for any open serum orders or settleable balances
-        let serum_oos: anyhow::Result<Vec<_>> = stream::iter(self.liqee.active_serum3_orders())
-            .then(|orders| async {
-                let open_orders_account = self
-                    .account_fetcher
-                    .fetch_raw_account(&orders.open_orders)
-                    .await?;
+        let serum_oos: anyhow::Result<Vec<_>> = self
+            .liqee
+            .active_serum3_orders()
+            .map(|orders| {
+                let open_orders_account = self.account_fetcher.fetch_raw(&orders.open_orders)?;
                 let open_orders = mango_v4::serum3_cpi::load_open_orders(&open_orders_account)?;
                 Ok((*orders, *open_orders))
             })
-            .try_collect()
-            .await;
+            .try_collect();
         let serum_force_cancels = serum_oos?
             .into_iter()
             .filter_map(|(orders, open_orders)| {

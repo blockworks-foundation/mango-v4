@@ -17,6 +17,7 @@ use futures::{stream, StreamExt, TryStreamExt};
 use itertools::Itertools;
 
 use mango_v4::accounts_ix::{Serum3OrderType, Serum3SelfTradeBehavior, Serum3Side};
+use mango_v4::accounts_zerocopy::KeyedAccountSharedData;
 use mango_v4::state::{
     Bank, Group, MangoAccountValue, PerpMarketIndex, PlaceOrderType, SelfTradeBehavior,
     Serum3MarketIndex, Side, TokenIndex, INSURANCE_TOKEN_INDEX,
@@ -417,6 +418,20 @@ impl MangoClient {
             },
         ];
         self.send_and_confirm_owner_tx(ixs).await
+    }
+
+    pub async fn bank_oracle_price(&self, token_index: TokenIndex) -> anyhow::Result<I80F48> {
+        let bank = self.first_bank(token_index).await?;
+        let mint_info = self.context.mint_info(token_index);
+        let oracle = self
+            .account_fetcher
+            .fetch_raw_account(&mint_info.oracle)
+            .await?;
+        let price = bank.oracle_price(
+            &KeyedAccountSharedData::new(mint_info.oracle, oracle.into()),
+            None,
+        )?;
+        Ok(price)
     }
 
     pub async fn get_oracle_price(
