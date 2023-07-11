@@ -2624,13 +2624,13 @@
     <span class="attribute">#[allow(clippy::too_many_arguments)]
     </span><span class="kw">pub fn </span>openbook_v2_place_order(
         ctx: Context&lt;OpenbookV2PlaceOrder&gt;,
-        side: openbook_v2::state::Side,
-        limit_price: u64,
+        side: u8, <span class="comment">// openbook_v2::state::Side
+        </span>limit_price: u64,
         max_base_qty: u64,
         max_native_quote_qty_including_fees: u64,
-        self_trade_behavior: openbook_v2::state::SelfTradeBehavior,
-        order_type: openbook_v2::state::PlaceOrderType,
-        client_order_id: u64,
+        self_trade_behavior: u8, <span class="comment">// openbook_v2::state::SelfTradeBehavior
+        </span>order_type: u8,          <span class="comment">// openbook_v2::state::PlaceOrderType
+        </span>client_order_id: u64,
         limit: u16,
     ) -&gt; <span class="prelude-ty">Result</span>&lt;()&gt; {
         <span class="prelude-val">Ok</span>(())
@@ -2639,12 +2639,12 @@
     <span class="attribute">#[allow(clippy::too_many_arguments)]
     </span><span class="kw">pub fn </span>openbook_v2_place_taker_order(
         ctx: Context&lt;OpenbookV2PlaceTakeOrder&gt;,
-        side: openbook_v2::state::Side,
-        limit_price: u64,
+        side: u8, <span class="comment">// openbook_v2::state::Side
+        </span>limit_price: u64,
         max_base_qty: u64,
         max_native_quote_qty_including_fees: u64,
-        self_trade_behavior: openbook_v2::state::SelfTradeBehavior,
-        client_order_id: u64,
+        self_trade_behavior: u8, <span class="comment">// openbook_v2::state::SelfTradeBehavior
+        </span>client_order_id: u64,
         limit: u16,
     ) -&gt; <span class="prelude-ty">Result</span>&lt;()&gt; {
         <span class="prelude-val">Ok</span>(())
@@ -2652,8 +2652,8 @@
 
     <span class="kw">pub fn </span>openbook_v2_cancel_order(
         ctx: Context&lt;OpenbookV2CancelOrder&gt;,
-        side: openbook_v2::state::Side,
-        order_id: u128,
+        side: u8, <span class="comment">// openbook_v2::state::Side
+        </span>order_id: u128,
     ) -&gt; <span class="prelude-ty">Result</span>&lt;()&gt; {
         <span class="prelude-val">Ok</span>(())
     }
