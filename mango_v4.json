@@ -5041,9 +5041,7 @@
               },
               {
                 "kind": "arg",
-                "type": {
-                  "defined": "OpenbookV2MarketIndex"
-                },
+                "type": "u16",
                 "path": "market_index"
               }
             ]
@@ -5079,9 +5077,7 @@
       "args": [
         {
           "name": "marketIndex",
-          "type": {
-            "defined": "OpenbookV2MarketIndex"
-          }
+          "type": "u16"
         },
         {
           "name": "name",
@@ -6724,9 +6720,7 @@
           },
           {
             "name": "marketIndex",
-            "type": {
-              "defined": "OpenbookV2MarketIndex"
-            }
+            "type": "u16"
           },
           {
             "name": "bump",
@@ -6768,9 +6762,7 @@
           },
           {
             "name": "marketIndex",
-            "type": {
-              "defined": "OpenbookV2MarketIndex"
-            }
+            "type": "u16"
           },
           {
             "name": "reserved",

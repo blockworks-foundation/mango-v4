@@ -2970,7 +2970,7 @@ dependencies = [
  "num 0.4.0",
  "num_enum",
  "openbook-v2",
- "pyth-sdk-solana",
+ "pyth-sdk-solana 0.7.2",
  "rand 0.8.5",
  "serde",
  "serum_dex",
@@ -3004,7 +3004,7 @@ dependencies = [
  "log 0.4.17",
  "mango-v4",
  "mango-v4-client",
- "pyth-sdk-solana",
+ "pyth-sdk-solana 0.7.2",
  "serum_dex",
  "solana-client",
  "solana-sdk",
@@ -3032,7 +3032,7 @@ dependencies = [
  "log 0.4.17",
  "mango-feeds-connector",
  "mango-v4",
- "pyth-sdk-solana",
+ "pyth-sdk-solana 0.7.2",
  "reqwest",
  "serde",
  "serde_json",
@@ -3068,7 +3068,7 @@ dependencies = [
  "mango-v4",
  "mango-v4-client",
  "prometheus",
- "pyth-sdk-solana",
+ "pyth-sdk-solana 0.7.2",
  "serum_dex",
  "solana-client",
  "solana-sdk",
@@ -3104,7 +3104,7 @@ dependencies = [
  "mango-v4",
  "mango-v4-client",
  "once_cell",
- "pyth-sdk-solana",
+ "pyth-sdk-solana 0.7.2",
  "rand 0.7.3",
  "serde",
  "serde_derive",
@@ -3151,7 +3151,7 @@ dependencies = [
  "mango-v4-client",
  "once_cell",
  "priority-queue",
- "pyth-sdk-solana",
+ "pyth-sdk-solana 0.7.2",
  "rand 0.7.3",
  "serde",
  "serde_derive",
@@ -3650,7 +3650,7 @@ dependencies = [
  "derivative",
  "fixed 1.11.0 (git+https://github.com/openbook-dex/openbook-v2.git)",
  "num_enum",
- "pyth-sdk-solana",
+ "pyth-sdk-solana 0.1.0",
  "solana-program",
  "static_assertions",
  "switchboard-program",
@@ -4150,6 +4150,18 @@ dependencies = [
 
 [[package]]
 name = "pyth-sdk"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "446ff07d7ef3bd98214f9b4fe6a611a69e36b5aad74b18cdbad5150193c1f204"
+dependencies = [
+ "borsh",
+ "borsh-derive",
+ "schemars",
+ "serde",
+]
+
+[[package]]
+name = "pyth-sdk"
 version = "0.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "00bf2540203ca3c7a5712fdb8b5897534b7f6a0b6e7b0923ff00466c5f9efcb3"
@@ -4163,6 +4175,23 @@ dependencies = [
 
 [[package]]
 name = "pyth-sdk-solana"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "27a648739aa69cab94edd900a0d7ca37d8a789e9c88741b23deec11fab418d16"
+dependencies = [
+ "borsh",
+ "borsh-derive",
+ "bytemuck",
+ "num-derive",
+ "num-traits",
+ "pyth-sdk 0.1.0",
+ "serde",
+ "solana-program",
+ "thiserror",
+]
+
+[[package]]
+name = "pyth-sdk-solana"
 version = "0.7.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e1fcd2dcd063ea85004667cf5cb07f30de7387f17249df988a295e764a47b9f5"
@@ -4172,7 +4201,7 @@ dependencies = [
  "bytemuck",
  "num-derive",
  "num-traits",
- "pyth-sdk",
+ "pyth-sdk 0.7.0",
  "serde",
  "solana-program",
  "thiserror",

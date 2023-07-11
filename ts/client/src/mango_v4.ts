@@ -5041,9 +5041,7 @@ export type MangoV4 = {
               },
               {
                 "kind": "arg",
-                "type": {
-                  "defined": "OpenbookV2MarketIndex"
-                },
+                "type": "u16",
                 "path": "market_index"
               }
             ]
@@ -5079,9 +5077,7 @@ export type MangoV4 = {
       "args": [
         {
           "name": "marketIndex",
-          "type": {
-            "defined": "OpenbookV2MarketIndex"
-          }
+          "type": "u16"
         },
         {
           "name": "name",
@@ -6724,9 +6720,7 @@ export type MangoV4 = {
           },
           {
             "name": "marketIndex",
-            "type": {
-              "defined": "OpenbookV2MarketIndex"
-            }
+            "type": "u16"
           },
           {
             "name": "bump",
@@ -6768,9 +6762,7 @@ export type MangoV4 = {
           },
           {
             "name": "marketIndex",
-            "type": {
-              "defined": "OpenbookV2MarketIndex"
-            }
+            "type": "u16"
           },
           {
             "name": "reserved",
@@ -16879,9 +16871,7 @@ export const IDL: MangoV4 = {
               },
               {
                 "kind": "arg",
-                "type": {
-                  "defined": "OpenbookV2MarketIndex"
-                },
+                "type": "u16",
                 "path": "market_index"
               }
             ]
@@ -16917,9 +16907,7 @@ export const IDL: MangoV4 = {
       "args": [
         {
           "name": "marketIndex",
-          "type": {
-            "defined": "OpenbookV2MarketIndex"
-          }
+          "type": "u16"
         },
         {
           "name": "name",
@@ -18562,9 +18550,7 @@ export const IDL: MangoV4 = {
           },
           {
             "name": "marketIndex",
-            "type": {
-              "defined": "OpenbookV2MarketIndex"
-            }
+            "type": "u16"
           },
           {
             "name": "bump",
@@ -18606,9 +18592,7 @@ export const IDL: MangoV4 = {
           },
           {
             "name": "marketIndex",
-            "type": {
-              "defined": "OpenbookV2MarketIndex"
-            }
+            "type": "u16"
           },
           {
             "name": "reserved",
