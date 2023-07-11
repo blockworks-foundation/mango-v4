@@ -214,6 +214,20 @@
 <span id="214">214</span>
 <span id="215">215</span>
 <span id="216">216</span>
+<span id="217">217</span>
+<span id="218">218</span>
+<span id="219">219</span>
+<span id="220">220</span>
+<span id="221">221</span>
+<span id="222">222</span>
+<span id="223">223</span>
+<span id="224">224</span>
+<span id="225">225</span>
+<span id="226">226</span>
+<span id="227">227</span>
+<span id="228">228</span>
+<span id="229">229</span>
+<span id="230">230</span>
 </pre><pre class="rust"><code><span class="kw">use </span>anchor_lang::prelude::<span class="kw-2">*</span>;
 <span class="kw">use </span>static_assertions::const_assert_eq;
 <span class="kw">use </span>std::mem::size_of;
@@ -341,6 +355,10 @@
     <span class="kw">pub fn </span>is_ix_enabled(<span class="kw-2">&amp;</span><span class="self">self</span>, ix: IxGate) -&gt; bool {
         <span class="self">self</span>.ix_gate &amp; (<span class="number">1 </span>&lt;&lt; ix <span class="kw">as </span>u128) == <span class="number">0
     </span>}
+
+    <span class="kw">pub fn </span>openbook_v2_supported(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool {
+        <span class="self">self</span>.is_testing()
+    }
 }
 
 <span class="doccomment">/// Enum for lookup into ix gate
@@ -413,6 +431,16 @@
     TokenConditionalSwapCreate = <span class="number">52</span>,
     TokenConditionalSwapTrigger = <span class="number">53</span>,
     TokenConditionalSwapCancel = <span class="number">54</span>,
+    OpenbookV2CancelOrder = <span class="number">55</span>,
+    OpenbookV2CloseOpenOrders = <span class="number">56</span>,
+    OpenbookV2CreateOpenOrders = <span class="number">57</span>,
+    OpenbookV2DeregisterMarket = <span class="number">58</span>,
+    OpenbookV2EditMarket = <span class="number">59</span>,
+    OpenbookV2LiqForceCancelOrders = <span class="number">60</span>,
+    OpenbookV2PlaceOrder = <span class="number">61</span>,
+    OpenbookV2PlaceTakeOrder = <span class="number">62</span>,
+    OpenbookV2RegisterMarket = <span class="number">63</span>,
+    OpenbookV2SettleFunds = <span class="number">64</span>,
     <span class="comment">// NOTE: Adding new variants requires matching changes in ts and the ix_gate_set instruction.
 </span>}
 
