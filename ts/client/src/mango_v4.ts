@@ -5428,9 +5428,7 @@ export type MangoV4 = {
       "args": [
         {
           "name": "side",
-          "type": {
-            "defined": "openbook_v2::state::Side"
-          }
+          "type": "u8"
         },
         {
           "name": "limitPrice",
@@ -5446,15 +5444,11 @@ export type MangoV4 = {
         },
         {
           "name": "selfTradeBehavior",
-          "type": {
-            "defined": "openbook_v2::state::SelfTradeBehavior"
-          }
+          "type": "u8"
         },
         {
           "name": "orderType",
-          "type": {
-            "defined": "openbook_v2::state::PlaceOrderType"
-          }
+          "type": "u8"
         },
         {
           "name": "clientOrderId",
@@ -5580,9 +5574,7 @@ export type MangoV4 = {
       "args": [
         {
           "name": "side",
-          "type": {
-            "defined": "openbook_v2::state::Side"
-          }
+          "type": "u8"
         },
         {
           "name": "limitPrice",
@@ -5598,9 +5590,7 @@ export type MangoV4 = {
         },
         {
           "name": "selfTradeBehavior",
-          "type": {
-            "defined": "openbook_v2::state::SelfTradeBehavior"
-          }
+          "type": "u8"
         },
         {
           "name": "clientOrderId",
@@ -5676,9 +5666,7 @@ export type MangoV4 = {
       "args": [
         {
           "name": "side",
-          "type": {
-            "defined": "openbook_v2::state::Side"
-          }
+          "type": "u8"
         },
         {
           "name": "orderId",
@@ -17258,9 +17246,7 @@ export const IDL: MangoV4 = {
       "args": [
         {
           "name": "side",
-          "type": {
-            "defined": "openbook_v2::state::Side"
-          }
+          "type": "u8"
         },
         {
           "name": "limitPrice",
@@ -17276,15 +17262,11 @@ export const IDL: MangoV4 = {
         },
         {
           "name": "selfTradeBehavior",
-          "type": {
-            "defined": "openbook_v2::state::SelfTradeBehavior"
-          }
+          "type": "u8"
         },
         {
           "name": "orderType",
-          "type": {
-            "defined": "openbook_v2::state::PlaceOrderType"
-          }
+          "type": "u8"
         },
         {
           "name": "clientOrderId",
@@ -17410,9 +17392,7 @@ export const IDL: MangoV4 = {
       "args": [
         {
           "name": "side",
-          "type": {
-            "defined": "openbook_v2::state::Side"
-          }
+          "type": "u8"
         },
         {
           "name": "limitPrice",
@@ -17428,9 +17408,7 @@ export const IDL: MangoV4 = {
         },
         {
           "name": "selfTradeBehavior",
-          "type": {
-            "defined": "openbook_v2::state::SelfTradeBehavior"
-          }
+          "type": "u8"
         },
         {
           "name": "clientOrderId",
@@ -17506,9 +17484,7 @@ export const IDL: MangoV4 = {
       "args": [
         {
           "name": "side",
-          "type": {
-            "defined": "openbook_v2::state::Side"
-          }
+          "type": "u8"
         },
         {
           "name": "orderId",

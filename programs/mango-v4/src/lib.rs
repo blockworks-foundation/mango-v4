@@ -1267,12 +1267,12 @@ pub mod mango_v4 {
     #[allow(clippy::too_many_arguments)]
     pub fn openbook_v2_place_order(
         ctx: Context<OpenbookV2PlaceOrder>,
-        side: openbook_v2::state::Side,
+        side: u8, // openbook_v2::state::Side
         limit_price: u64,
         max_base_qty: u64,
         max_native_quote_qty_including_fees: u64,
-        self_trade_behavior: openbook_v2::state::SelfTradeBehavior,
-        order_type: openbook_v2::state::PlaceOrderType,
+        self_trade_behavior: u8, // openbook_v2::state::SelfTradeBehavior
+        order_type: u8,          // openbook_v2::state::PlaceOrderType
         client_order_id: u64,
         limit: u16,
     ) -> Result<()> {
@@ -1282,11 +1282,11 @@ pub mod mango_v4 {
     #[allow(clippy::too_many_arguments)]
     pub fn openbook_v2_place_taker_order(
         ctx: Context<OpenbookV2PlaceTakeOrder>,
-        side: openbook_v2::state::Side,
+        side: u8, // openbook_v2::state::Side
         limit_price: u64,
         max_base_qty: u64,
         max_native_quote_qty_including_fees: u64,
-        self_trade_behavior: openbook_v2::state::SelfTradeBehavior,
+        self_trade_behavior: u8, // openbook_v2::state::SelfTradeBehavior
         client_order_id: u64,
         limit: u16,
     ) -> Result<()> {
@@ -1295,7 +1295,7 @@ pub mod mango_v4 {
 
     pub fn openbook_v2_cancel_order(
         ctx: Context<OpenbookV2CancelOrder>,
-        side: openbook_v2::state::Side,
+        side: u8, // openbook_v2::state::Side
         order_id: u128,
     ) -> Result<()> {
         Ok(())
