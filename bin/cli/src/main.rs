@@ -137,7 +137,7 @@ impl Rpc {
 
 #[tokio::main]
 async fn main() -> Result<(), anyhow::Error> {
-    tracing_subscriber::fmt::init();
+    mango_v4_client::tracing_subscriber_init();
 
     dotenv::dotenv().ok();
     let cli = Cli::parse();

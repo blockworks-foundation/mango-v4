@@ -75,7 +75,7 @@ pub fn encode_address(addr: &Pubkey) -> String {
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    tracing_subscriber::fmt::init();
+    mango_v4_client::tracing_subscriber_init();
 
     let args = if let Ok(cli_dotenv) = CliDotenv::try_parse() {
         dotenv::from_path(cli_dotenv.dotenv)?;

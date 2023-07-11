@@ -27,4 +27,3 @@ solana-sdk = { workspace = true }
 tokio = { version = "1.14.1", features = ["rt-multi-thread", "time", "macros", "sync"] }
 itertools = "0.10.3"
 tracing = "0.1"
-tracing-subscriber = "0.3"

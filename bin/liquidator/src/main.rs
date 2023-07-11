@@ -103,6 +103,8 @@ pub fn encode_address(addr: &Pubkey) -> String {
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
+    mango_v4_client::tracing_subscriber_init();
+
     let args = if let Ok(cli_dotenv) = CliDotenv::try_parse() {
         dotenv::from_path(cli_dotenv.dotenv)?;
         cli_dotenv.remaining_args
@@ -169,7 +171,6 @@ async fn main() -> anyhow::Result<()> {
     // FUTURE: decouple feed setup and liquidator business logic
     // feed should send updates to a channel which liquidator can consume
 
-    tracing_subscriber::fmt::init();
     info!("startup");
 
     let metrics = metrics::start();
