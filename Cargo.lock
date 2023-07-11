@@ -1797,6 +1797,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "fixed"
+version = "1.11.0"
+source = "git+https://github.com/openbook-dex/openbook-v2.git#21614b799ca82c324df50453562a2ad452e41edf"
+dependencies = [
+ "az",
+ "borsh",
+ "bytemuck",
+ "half",
+ "serde",
+ "typenum",
+]
+
+[[package]]
 name = "fixedbitset"
 version = "0.4.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2950,12 +2963,13 @@ dependencies = [
  "default-env",
  "derivative",
  "env_logger 0.9.3",
- "fixed",
+ "fixed 1.11.0",
  "itertools",
  "lazy_static",
  "log 0.4.17",
  "num 0.4.0",
  "num_enum",
+ "openbook-v2",
  "pyth-sdk-solana",
  "rand 0.8.5",
  "serde",
@@ -2984,7 +2998,7 @@ dependencies = [
  "clap 3.2.23",
  "dotenv",
  "env_logger 0.8.4",
- "fixed",
+ "fixed 1.11.0",
  "futures 0.3.25",
  "itertools",
  "log 0.4.17",
@@ -3010,7 +3024,7 @@ dependencies = [
  "async-trait",
  "base64 0.13.1",
  "bincode",
- "fixed",
+ "fixed 1.11.0",
  "futures 0.3.25",
  "itertools",
  "jsonrpc-core 18.0.0 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -3046,7 +3060,7 @@ dependencies = [
  "clap 3.2.23",
  "dotenv",
  "env_logger 0.8.4",
- "fixed",
+ "fixed 1.11.0",
  "futures 0.3.25",
  "itertools",
  "lazy_static",
@@ -3078,7 +3092,7 @@ dependencies = [
  "bytes 1.3.0",
  "clap 3.2.23",
  "dotenv",
- "fixed",
+ "fixed 1.11.0",
  "futures 0.3.25",
  "futures-core",
  "futures-util",
@@ -3124,7 +3138,7 @@ dependencies = [
  "bytes 1.3.0",
  "clap 3.2.23",
  "dotenv",
- "fixed",
+ "fixed 1.11.0",
  "futures 0.3.25",
  "futures-core",
  "futures-util",
@@ -3622,6 +3636,26 @@ name = "opaque-debug"
 version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "624a8340c38c1b80fd549087862da4ba43e08858af025b236e509b6649fc13d5"
+
+[[package]]
+name = "openbook-v2"
+version = "0.1.0"
+source = "git+https://github.com/openbook-dex/openbook-v2.git#21614b799ca82c324df50453562a2ad452e41edf"
+dependencies = [
+ "anchor-lang",
+ "anchor-spl",
+ "arrayref",
+ "borsh",
+ "bytemuck",
+ "derivative",
+ "fixed 1.11.0 (git+https://github.com/openbook-dex/openbook-v2.git)",
+ "num_enum",
+ "pyth-sdk-solana",
+ "solana-program",
+ "static_assertions",
+ "switchboard-program",
+ "switchboard-v2",
+]
 
 [[package]]
 name = "openssl"

@@ -31,8 +31,8 @@ pub mod instructions;
 compile_error!("compiling the program entrypoint without 'enable-gpl' makes no sense, enable it or use the 'cpi' or 'client' features");
 
 use state::{
-    OracleConfigParams, PerpMarketIndex, PlaceOrderType, SelfTradeBehavior, Serum3MarketIndex,
-    Side, TokenConditionalSwap, TokenIndex,
+    OpenbookV2MarketIndex, OracleConfigParams, PerpMarketIndex, PlaceOrderType, SelfTradeBehavior,
+    Serum3MarketIndex, Side, TokenConditionalSwap, TokenIndex,
 };
 
 declare_id!("4MangoMjqJ2firMokCjjGgoK8d4MXcrgL7XJaL3w6fVg");
@@ -1226,6 +1226,99 @@ pub mod mango_v4 {
     pub fn compute_account_data(ctx: Context<ComputeAccountData>) -> Result<()> {
         #[cfg(feature = "enable-gpl")]
         instructions::compute_account_data(ctx)?;
+        Ok(())
+    }
+
+    ///
+    /// OpenbookV2
+    ///
+
+    pub fn openbook_v2_register_market(
+        ctx: Context<OpenbookV2RegisterMarket>,
+        market_index: OpenbookV2MarketIndex,
+        name: String,
+    ) -> Result<()> {
+        Ok(())
+    }
+
+    pub fn openbook_v2_edit_market(
+        ctx: Context<OpenbookV2EditMarket>,
+        reduce_only_opt: Option<bool>,
+        force_close_opt: Option<bool>,
+    ) -> Result<()> {
+        Ok(())
+    }
+
+    pub fn openbook_v2_deregister_market(ctx: Context<OpenbookV2DeregisterMarket>) -> Result<()> {
+        Ok(())
+    }
+
+    pub fn openbook_v2_create_open_orders(
+        ctx: Context<OpenbookV2CreateOpenOrders>,
+        account_num: u32,
+    ) -> Result<()> {
+        Ok(())
+    }
+
+    pub fn openbook_v2_close_open_orders(ctx: Context<OpenbookV2CloseOpenOrders>) -> Result<()> {
+        Ok(())
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    pub fn openbook_v2_place_order(
+        ctx: Context<OpenbookV2PlaceOrder>,
+        side: openbook_v2::state::Side,
+        limit_price: u64,
+        max_base_qty: u64,
+        max_native_quote_qty_including_fees: u64,
+        self_trade_behavior: openbook_v2::state::SelfTradeBehavior,
+        order_type: openbook_v2::state::PlaceOrderType,
+        client_order_id: u64,
+        limit: u16,
+    ) -> Result<()> {
+        Ok(())
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    pub fn openbook_v2_place_taker_order(
+        ctx: Context<OpenbookV2PlaceTakeOrder>,
+        side: openbook_v2::state::Side,
+        limit_price: u64,
+        max_base_qty: u64,
+        max_native_quote_qty_including_fees: u64,
+        self_trade_behavior: openbook_v2::state::SelfTradeBehavior,
+        client_order_id: u64,
+        limit: u16,
+    ) -> Result<()> {
+        Ok(())
+    }
+
+    pub fn openbook_v2_cancel_order(
+        ctx: Context<OpenbookV2CancelOrder>,
+        side: openbook_v2::state::Side,
+        order_id: u128,
+    ) -> Result<()> {
+        Ok(())
+    }
+
+    pub fn openbook_v2_settle_funds(
+        ctx: Context<OpenbookV2SettleFunds>,
+        fees_to_dao: bool,
+    ) -> Result<()> {
+        Ok(())
+    }
+
+    pub fn openbook_v2_liq_force_cancel_orders(
+        ctx: Context<OpenbookV2LiqForceCancelOrders>,
+        limit: u8,
+    ) -> Result<()> {
+        Ok(())
+    }
+
+    pub fn openbook_v2_cancel_all_orders(
+        ctx: Context<OpenbookV2CancelOrder>,
+        limit: u8,
+    ) -> Result<()> {
         Ok(())
     }
 
