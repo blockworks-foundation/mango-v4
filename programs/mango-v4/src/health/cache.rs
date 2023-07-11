@@ -1092,10 +1092,9 @@ impl HealthCache {
         Ok(total_reserved)
     }
 
-
     /// Computes the account equity and the summarized balance sheet marked to market.
     /// Returns (equity, assets, liabilities)
-    pub fn equity(&self) ->  (I80F48, I80F48, I80F48) {
+    pub fn equity(&self) -> (I80F48, I80F48, I80F48) {
         let mut assets = I80F48::ZERO;
         let mut liabs = I80F48::ZERO;
 
@@ -1132,7 +1131,7 @@ impl HealthCache {
         }
 
         let equity = assets - liabs;
-        return (equity, assets, liabs)
+        return (equity, assets, liabs);
     }
 }
 
