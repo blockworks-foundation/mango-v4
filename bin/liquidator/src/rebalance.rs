@@ -1,17 +1,18 @@
+use itertools::Itertools;
 use mango_v4::accounts_zerocopy::KeyedAccountSharedData;
 use mango_v4::state::{
     Bank, BookSide, MangoAccountValue, PerpPosition, PlaceOrderType, Side, TokenIndex,
     TokenPosition, QUOTE_TOKEN_INDEX,
 };
 use mango_v4_client::{
-    chain_data, perp_pnl, AccountFetcher, AnyhowWrap, JupiterSwapMode, MangoClient,
-    PerpMarketContext, TokenContext,
+    chain_data, jupiter::QueryRoute, perp_pnl, AnyhowWrap, JupiterSwapMode, MangoClient,
+    PerpMarketContext, TokenContext, TransactionBuilder,
 };
 
 use {fixed::types::I80F48, solana_sdk::pubkey::Pubkey};
 
-use futures::{stream, StreamExt, TryStreamExt};
 use solana_sdk::signature::Signature;
+use std::str::FromStr;
 use std::sync::Arc;
 use std::{collections::HashMap, time::Duration};
 use tracing::*;
@@ -36,14 +37,14 @@ struct TokenState {
 }
 
 impl TokenState {
-    async fn new_position(
+    fn new_position(
         token: &TokenContext,
         position: &TokenPosition,
         account_fetcher: &chain_data::AccountFetcher,
     ) -> anyhow::Result<Self> {
         let bank = Self::bank(token, account_fetcher)?;
         Ok(Self {
-            price: Self::fetch_price(token, &bank, account_fetcher).await?,
+            price: Self::fetch_price(token, &bank, account_fetcher)?,
             native_position: position.native(&bank),
             in_use: position.is_in_use(),
         })
@@ -56,20 +57,25 @@ impl TokenState {
         account_fetcher.fetch::<Bank>(&token.mint_info.first_bank())
     }
 
-    async fn fetch_price(
+    fn fetch_price(
         token: &TokenContext,
         bank: &Bank,
         account_fetcher: &chain_data::AccountFetcher,
     ) -> anyhow::Result<I80F48> {
-        let oracle = account_fetcher
-            .fetch_raw_account(&token.mint_info.oracle)
-            .await?;
+        let oracle = account_fetcher.fetch_raw(&token.mint_info.oracle)?;
         bank.oracle_price(
             &KeyedAccountSharedData::new(token.mint_info.oracle, oracle.into()),
             None,
         )
         .map_err_anyhow()
     }
+}
+
+#[derive(Clone)]
+struct WrappedJupRoute {
+    input_mint: Pubkey,
+    output_mint: Pubkey,
+    route: QueryRoute,
 }
 
 pub struct Rebalancer {
@@ -116,6 +122,188 @@ impl Rebalancer {
         Ok(true)
     }
 
+    /// Wrapping client.jupiter_route() in a way that preserves the in/out mints
+    async fn jupiter_route(
+        &self,
+        input_mint: Pubkey,
+        output_mint: Pubkey,
+        amount: u64,
+        only_direct_routes: bool,
+    ) -> anyhow::Result<WrappedJupRoute> {
+        let route = self
+            .mango_client
+            .jupiter_route(
+                input_mint,
+                output_mint,
+                amount,
+                self.config.slippage_bps,
+                JupiterSwapMode::ExactIn,
+                only_direct_routes,
+            )
+            .await?;
+        Ok(WrappedJupRoute {
+            input_mint,
+            output_mint,
+            route,
+        })
+    }
+
+    /// Grab three possible routes:
+    /// 1. USDC -> output (complex routes)
+    /// 2. USDC -> output (direct route only)
+    /// 3. SOL -> output (direct route only)
+    /// Use 1. if it fits into a tx. Otherwise use the better of 2./3.
+    async fn token_swap_buy(
+        &self,
+        output_mint: Pubkey,
+        in_amount_quote: u64,
+    ) -> anyhow::Result<(Signature, WrappedJupRoute)> {
+        let quote_token = self.mango_client.context.token(QUOTE_TOKEN_INDEX);
+        let sol_token = self.mango_client.context.token(
+            *self
+                .mango_client
+                .context
+                .token_indexes_by_name
+                .get("SOL") // TODO: better use mint
+                .unwrap(),
+        );
+
+        let full_route_job = self.jupiter_route(
+            quote_token.mint_info.mint,
+            output_mint,
+            in_amount_quote,
+            false,
+        );
+        let direct_quote_route_job = self.jupiter_route(
+            quote_token.mint_info.mint,
+            output_mint,
+            in_amount_quote,
+            true,
+        );
+
+        // For the SOL -> output route we need to adjust the in amount by the SOL price
+        let sol_bank = TokenState::bank(sol_token, &self.account_fetcher)?;
+        let sol_price = TokenState::fetch_price(sol_token, &sol_bank, &self.account_fetcher)?;
+        let in_amount_sol = (I80F48::from(in_amount_quote) / sol_price)
+            .ceil()
+            .to_num::<u64>();
+        let direct_sol_route_job =
+            self.jupiter_route(sol_token.mint_info.mint, output_mint, in_amount_sol, true);
+
+        let (full_route, direct_quote_route, direct_sol_route) =
+            tokio::join!(full_route_job, direct_quote_route_job, direct_sol_route_job);
+        let alternatives = [direct_quote_route, direct_sol_route]
+            .into_iter()
+            .filter_map(|v| v.ok())
+            .collect_vec();
+
+        let (tx_builder, route) = self
+            .determine_best_jupiter_tx(
+                // If the best_route couldn't be fetched, something is wrong
+                &full_route?,
+                &alternatives,
+            )
+            .await?;
+        let sig = tx_builder
+            .send_and_confirm(&self.mango_client.client)
+            .await?;
+        Ok((sig, route))
+    }
+
+    /// Grab three possible routes:
+    /// 1. input -> USDC (complex routes)
+    /// 2. input -> USDC (direct route only)
+    /// 3. input -> SOL (direct route only)
+    /// Use 1. if it fits into a tx. Otherwise use the better of 2./3.
+    async fn token_swap_sell(
+        &self,
+        input_mint: Pubkey,
+        in_amount: u64,
+    ) -> anyhow::Result<(Signature, WrappedJupRoute)> {
+        let quote_token = self.mango_client.context.token(QUOTE_TOKEN_INDEX);
+        let sol_token = self.mango_client.context.token(
+            *self
+                .mango_client
+                .context
+                .token_indexes_by_name
+                .get("SOL") // TODO: better use mint
+                .unwrap(),
+        );
+
+        let full_route_job =
+            self.jupiter_route(input_mint, quote_token.mint_info.mint, in_amount, false);
+        let direct_quote_route_job =
+            self.jupiter_route(input_mint, quote_token.mint_info.mint, in_amount, true);
+        let direct_sol_route_job =
+            self.jupiter_route(input_mint, sol_token.mint_info.mint, in_amount, true);
+        let (full_route, direct_quote_route, direct_sol_route) =
+            tokio::join!(full_route_job, direct_quote_route_job, direct_sol_route_job);
+        let alternatives = [direct_quote_route, direct_sol_route]
+            .into_iter()
+            .filter_map(|v| v.ok())
+            .collect_vec();
+
+        let (tx_builder, route) = self
+            .determine_best_jupiter_tx(
+                // If the best_route couldn't be fetched, something is wrong
+                &full_route?,
+                &alternatives,
+            )
+            .await?;
+
+        let sig = tx_builder
+            .send_and_confirm(&self.mango_client.client)
+            .await?;
+        Ok((sig, route))
+    }
+
+    async fn determine_best_jupiter_tx(
+        &self,
+        full: &WrappedJupRoute,
+        alternatives: &[WrappedJupRoute],
+    ) -> anyhow::Result<(TransactionBuilder, WrappedJupRoute)> {
+        let builder = self
+            .mango_client
+            .prepare_jupiter_swap_transaction(full.input_mint, full.output_mint, &full.route)
+            .await?;
+        if builder.transaction_size_ok()? {
+            return Ok((builder, full.clone()));
+        }
+        log::trace!(
+            "full route from {} to {} does not fit in a tx, market_info.label {}",
+            full.input_mint,
+            full.output_mint,
+            full.route
+                .market_infos
+                .first()
+                .map(|v| v.label.clone())
+                .unwrap_or_else(|| "no market_info".into())
+        );
+
+        if alternatives.is_empty() {
+            anyhow::bail!(
+                "no alternative routes from {} to {}",
+                full.input_mint,
+                full.output_mint
+            );
+        }
+
+        let best = alternatives
+            .iter()
+            .min_by(|a, b| {
+                a.route
+                    .price_impact_pct
+                    .partial_cmp(&b.route.price_impact_pct)
+                    .unwrap()
+            })
+            .unwrap();
+        let builder = self
+            .mango_client
+            .prepare_jupiter_swap_transaction(best.input_mint, best.output_mint, &best.route)
+            .await?;
+        Ok((builder, best.clone()))
+    }
+
     async fn rebalance_tokens(&self) -> anyhow::Result<()> {
         let account = self
             .account_fetcher
@@ -124,18 +312,16 @@ impl Rebalancer {
         // TODO: configurable?
         let quote_token = self.mango_client.context.token(QUOTE_TOKEN_INDEX);
 
-        let tokens: anyhow::Result<HashMap<TokenIndex, TokenState>> =
-            stream::iter(account.active_token_positions())
-                .then(|token_position| async {
-                    let token = self.mango_client.context.token(token_position.token_index);
-                    Ok((
-                        token.token_index,
-                        TokenState::new_position(token, token_position, &self.account_fetcher)
-                            .await?,
-                    ))
-                })
-                .try_collect()
-                .await;
+        let tokens: anyhow::Result<HashMap<TokenIndex, TokenState>> = account
+            .active_token_positions()
+            .map(|token_position| {
+                let token = self.mango_client.context.token(token_position.token_index);
+                Ok((
+                    token.token_index,
+                    TokenState::new_position(token, token_position, &self.account_fetcher)?,
+                ))
+            })
+            .try_collect();
         let tokens = tokens?;
         trace!(?tokens, "account tokens");
 
@@ -145,7 +331,6 @@ impl Rebalancer {
                 continue;
             }
             let token_mint = token.mint_info.mint;
-            let quote_mint = quote_token.mint_info.mint;
 
             // It's not always possible to bring the native balance to 0 through swaps:
             // Consider a price <1. You need to sell a bunch of tokens to get 1 USDC native and
@@ -168,23 +353,21 @@ impl Rebalancer {
                 let input_amount = buy_amount
                     * token_state.price
                     * I80F48::from_num(self.config.borrow_settle_excess);
-                let txsig = self
-                    .mango_client
-                    .jupiter_swap(
-                        quote_mint,
-                        token_mint,
-                        input_amount.to_num::<u64>(),
-                        self.config.slippage_bps,
-                        JupiterSwapMode::ExactIn,
-                        false,
-                    )
+                let (txsig, route) = self
+                    .token_swap_buy(token_mint, input_amount.to_num())
                     .await?;
+                let in_token = self
+                    .mango_client
+                    .context
+                    .token_by_mint(&route.input_mint)
+                    .unwrap();
                 info!(
                     %txsig,
-                    "bought {} {} for {}",
-                    token.native_to_ui(buy_amount),
+                    "bought {} {} for {} {}",
+                    token.native_to_ui(I80F48::from_str(&route.route.out_amount).unwrap()),
                     token.name,
-                    quote_token.name,
+                    in_token.native_to_ui(I80F48::from_str(&route.route.in_amount).unwrap()),
+                    in_token.name,
                 );
                 if !self.refresh_mango_account_after_tx(txsig).await? {
                     return Ok(());
@@ -201,23 +384,21 @@ impl Rebalancer {
 
             if amount > dust_threshold {
                 // Sell
-                let txsig = self
-                    .mango_client
-                    .jupiter_swap(
-                        token_mint,
-                        quote_mint,
-                        amount.to_num::<u64>(),
-                        self.config.slippage_bps,
-                        JupiterSwapMode::ExactIn,
-                        false,
-                    )
+                let (txsig, route) = self
+                    .token_swap_sell(token_mint, amount.to_num::<u64>())
                     .await?;
+                let out_token = self
+                    .mango_client
+                    .context
+                    .token_by_mint(&route.output_mint)
+                    .unwrap();
                 info!(
                     %txsig,
-                    "sold {} {} for {}",
-                    token.native_to_ui(amount),
+                    "sold {} {} for {} {}",
+                    token.native_to_ui(I80F48::from_str(&route.route.in_amount).unwrap()),
                     token.name,
-                    quote_token.name,
+                    out_token.native_to_ui(I80F48::from_str(&route.route.out_amount).unwrap()),
+                    out_token.name,
                 );
                 if !self.refresh_mango_account_after_tx(txsig).await? {
                     return Ok(());
