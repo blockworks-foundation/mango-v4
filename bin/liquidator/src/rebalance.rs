@@ -317,7 +317,7 @@ impl Rebalancer {
                 Side::Bid => perp.market.bids,
                 Side::Ask => perp.market.asks,
             };
-            let bookside = self.account_fetcher.fetch::<BookSide>(&opposite_side_key)?;
+            let bookside = Box::new(self.account_fetcher.fetch::<BookSide>(&opposite_side_key)?);
             if bookside.quantity_at_price(price_lots, now_ts, oracle_price_lots) <= 0 {
                 warn!(
                     other_side = ?side.invert_side(),
@@ -414,9 +414,10 @@ impl Rebalancer {
     }
 
     async fn rebalance_perps(&self) -> anyhow::Result<()> {
-        let account = self
-            .account_fetcher
-            .fetch_mango_account(&self.mango_account_address)?;
+        let account = Box::new(
+            self.account_fetcher
+                .fetch_mango_account(&self.mango_account_address)?,
+        );
 
         for perp_position in account.active_perp_positions() {
             let perp = self.mango_client.context.perp(perp_position.market_index);

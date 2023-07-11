@@ -269,7 +269,7 @@ async fn main() -> anyhow::Result<()> {
         config: rebalance_config,
     });
 
-    let mut liquidation = LiquidationState {
+    let mut liquidation = Box::new(LiquidationState {
         mango_client,
         account_fetcher,
         liquidation_config: liq_config,
@@ -288,7 +288,7 @@ async fn main() -> anyhow::Result<()> {
             reset_duration: std::time::Duration::from_secs(360),
             ..ErrorTracking::default()
         },
-    };
+    });
 
     let (liquidation_trigger_sender, liquidation_trigger_receiver) =
         async_channel::bounded::<()>(1);
