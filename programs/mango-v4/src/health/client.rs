@@ -1551,7 +1551,7 @@ mod tests {
         };
         assert!(leverage_eq(&health_cache, 9.9));
 
-        // open orders: assets = , equity =
+        // open orders: assets = 3, equity = 1
         let health_cache = HealthCache {
             token_infos: vec![
                 TokenInfo {
@@ -1561,27 +1561,22 @@ mod tests {
                 },
                 TokenInfo {
                     token_index: 1,
+                    balance_spot: I80F48::from_num(-1),
                     ..default_token_info(0.2, 2.0)
                 },
             ],
             serum3_infos: vec![Serum3Info {
-                reserved_base: I80F48::ZERO,
+                reserved_base: I80F48::ONE,
                 reserved_quote: I80F48::ZERO,
                 base_info_index: 1,
                 quote_info_index: 0,
                 market_index: 0,
                 has_zero_funds: true,
             }],
-            perp_infos: vec![PerpInfo {
-                perp_market_index: 0,
-                base_lot_size: 3,
-                base_lots: -1,
-                quote: I80F48::from_num(3.3),
-                ..default_perp_info(0.1, 1.1)
-            }],
+            perp_infos: vec![],
             being_liquidated: false,
         };
 
-        // assert_eq!(health_cache.leverage(), I80F48::ZERO);
+        assert!(leverage_eq(&health_cache, 2.0));
     }
 }
