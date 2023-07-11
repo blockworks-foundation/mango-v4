@@ -119,7 +119,7 @@ impl<'a> LiquidateHelper<'a> {
         }
         // Cancel all orders on a random serum market
         let serum_orders = serum_force_cancels.choose(&mut rand::thread_rng()).unwrap();
-        let sig = self
+        let txsig = self
             .client
             .serum3_liq_force_cancel_orders(
                 (self.pubkey, &self.liqee),
@@ -128,13 +128,11 @@ impl<'a> LiquidateHelper<'a> {
             )
             .await?;
         info!(
-            "Force cancelled serum orders on account {}, market index {}, maint_health was {}, tx sig {:?}",
-            self.pubkey,
-            serum_orders.market_index,
-            self.maint_health,
-            sig
+            market_index = serum_orders.market_index,
+            %txsig,
+            "Force cancelled serum orders",
         );
-        Ok(Some(sig))
+        Ok(Some(txsig))
     }
 
     async fn perp_close_orders(&self) -> anyhow::Result<Option<Signature>> {
@@ -149,18 +147,16 @@ impl<'a> LiquidateHelper<'a> {
 
         // Cancel all orders on a random perp market
         let perp_market_index = *perp_force_cancels.choose(&mut rand::thread_rng()).unwrap();
-        let sig = self
+        let txsig = self
             .client
             .perp_liq_force_cancel_orders((self.pubkey, &self.liqee), perp_market_index)
             .await?;
         info!(
-            "Force cancelled perp orders on account {}, market index {}, maint_health was {}, tx sig {:?}",
-            self.pubkey,
             perp_market_index,
-            self.maint_health,
-            sig
+            %txsig,
+            "Force cancelled perp orders",
         );
-        Ok(Some(sig))
+        Ok(Some(txsig))
     }
 
     async fn perp_liq_base_or_positive_pnl(&self) -> anyhow::Result<Option<Signature>> {
@@ -255,9 +251,13 @@ impl<'a> LiquidateHelper<'a> {
 
             (max_base_transfer, max_pnl_transfer.floor().to_num::<u64>())
         };
-        info!("computed max_base_transfer: {max_base_transfer_abs}, max_pnl_transfer: {max_pnl_transfer}");
+        trace!(
+            max_base_transfer_abs,
+            max_pnl_transfer,
+            "computed transfer maximums"
+        );
 
-        let sig = self
+        let txsig = self
             .client
             .perp_liq_base_or_positive_pnl(
                 (self.pubkey, &self.liqee),
@@ -267,13 +267,11 @@ impl<'a> LiquidateHelper<'a> {
             )
             .await?;
         info!(
-            "Liquidated base position for perp market on account {}, market index {}, maint_health was {}, tx sig {:?}",
-            self.pubkey,
             perp_market_index,
-            self.maint_health,
-            sig
+            %txsig,
+            "Liquidated base position for perp market",
         );
-        Ok(Some(sig))
+        Ok(Some(txsig))
     }
 
     async fn perp_liq_negative_pnl_or_bankruptcy(&self) -> anyhow::Result<Option<Signature>> {
@@ -298,7 +296,7 @@ impl<'a> LiquidateHelper<'a> {
         }
         let (perp_market_index, _) = perp_negative_pnl.first().unwrap();
 
-        let sig = self
+        let txsig = self
             .client
             .perp_liq_negative_pnl_or_bankruptcy(
                 (self.pubkey, &self.liqee),
@@ -308,13 +306,11 @@ impl<'a> LiquidateHelper<'a> {
             )
             .await?;
         info!(
-            "Liquidated negative perp pnl on account {}, market index {}, maint_health was {}, tx sig {:?}",
-            self.pubkey,
             perp_market_index,
-            self.maint_health,
-            sig
+            %txsig,
+            "Liquidated negative perp pnl",
         );
-        Ok(Some(sig))
+        Ok(Some(txsig))
     }
 
     async fn tokens(&self) -> anyhow::Result<Vec<(TokenIndex, I80F48, I80F48)>> {
@@ -416,7 +412,7 @@ impl<'a> LiquidateHelper<'a> {
         // TODO: log liqor's assets in UI form
         // TODO: log liquee's liab_needed, need to refactor program code to be able to be accessed from client side
         //
-        let sig = self
+        let txsig = self
             .client
             .token_liq_with_token(
                 (self.pubkey, &self.liqee),
@@ -427,10 +423,12 @@ impl<'a> LiquidateHelper<'a> {
             .await
             .context("sending liq_token_with_token")?;
         info!(
-            "Liquidated token with token for {}, maint_health was {}, tx sig {:?}",
-            self.pubkey, self.maint_health, sig
+            asset_token_index,
+            liab_token_index,
+            %txsig,
+            "Liquidated token with token",
         );
-        Ok(Some(sig))
+        Ok(Some(txsig))
     }
 
     async fn token_liq_bankruptcy(&self) -> anyhow::Result<Option<Signature>> {
@@ -468,7 +466,7 @@ impl<'a> LiquidateHelper<'a> {
             .max_token_liab_transfer(liab_token_index, quote_token_index)
             .await?;
 
-        let sig = self
+        let txsig = self
             .client
             .token_liq_bankruptcy(
                 (self.pubkey, &self.liqee),
@@ -478,12 +476,14 @@ impl<'a> LiquidateHelper<'a> {
             .await
             .context("sending liq_token_bankruptcy")?;
         info!(
-            "Liquidated bankruptcy for {}, maint_health was {}, tx sig {:?}",
-            self.pubkey, self.maint_health, sig
+            liab_token_index,
+            %txsig,
+            "Liquidated token bankruptcy",
         );
-        Ok(Some(sig))
+        Ok(Some(txsig))
     }
 
+    #[instrument(skip(self), fields(pubkey = %*self.pubkey, maint = %self.maint_health))]
     async fn send_liq_tx(&self) -> anyhow::Result<Option<Signature>> {
         // TODO: Should we make an attempt to settle positive PNL first?
         // The problem with it is that small market movements can continuously create
@@ -526,10 +526,7 @@ impl<'a> LiquidateHelper<'a> {
         }
 
         if self.health_cache.has_perp_open_fills() {
-            info!(
-                "Account {} has open perp fills, maint_health {}, waiting...",
-                self.pubkey, self.maint_health
-            );
+            info!("there are open perp fills, waiting...",);
             return Ok(None);
         }
 
@@ -584,10 +581,9 @@ pub async fn maybe_liquidate_account(
     }
 
     trace!(
-        "possible candidate: {}, with owner: {}, maint health: {}",
-        pubkey,
-        account.fixed.owner,
-        maint_health,
+        %pubkey,
+        %maint_health,
+        "possible candidate",
     );
 
     // Fetch a fresh account and re-compute

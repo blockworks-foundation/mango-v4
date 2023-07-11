@@ -1700,19 +1700,6 @@ dependencies = [
 
 [[package]]
 name = "env_logger"
-version = "0.8.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a19187fea3ac7e84da7dacf48de0c45d63c6a76f9490dae389aead16c243fce3"
-dependencies = [
- "atty",
- "humantime",
- "log 0.4.17",
- "regex",
- "termcolor",
-]
-
-[[package]]
-name = "env_logger"
 version = "0.9.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a12e6657c4c97ebab115a42dcee77225f7f482cdd841cf7088c657a42e9e00e7"
@@ -2962,7 +2949,7 @@ dependencies = [
  "bytemuck",
  "default-env",
  "derivative",
- "env_logger 0.9.3",
+ "env_logger",
  "fixed 1.11.0",
  "itertools",
  "lazy_static",
@@ -2997,11 +2984,9 @@ dependencies = [
  "anyhow",
  "clap 3.2.23",
  "dotenv",
- "env_logger 0.8.4",
  "fixed 1.11.0",
  "futures 0.3.25",
  "itertools",
- "log 0.4.17",
  "mango-v4",
  "mango-v4-client",
  "pyth-sdk-solana 0.7.2",
@@ -3009,6 +2994,8 @@ dependencies = [
  "solana-client",
  "solana-sdk",
  "tokio",
+ "tracing",
+ "tracing-subscriber",
 ]
 
 [[package]]
@@ -3029,7 +3016,6 @@ dependencies = [
  "itertools",
  "jsonrpc-core 18.0.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "jsonrpc-core-client",
- "log 0.4.17",
  "mango-feeds-connector",
  "mango-v4",
  "pyth-sdk-solana 0.7.2",
@@ -3047,6 +3033,7 @@ dependencies = [
  "thiserror",
  "tokio",
  "tokio-stream",
+ "tracing",
 ]
 
 [[package]]
@@ -3059,12 +3046,10 @@ dependencies = [
  "anyhow",
  "clap 3.2.23",
  "dotenv",
- "env_logger 0.8.4",
  "fixed 1.11.0",
  "futures 0.3.25",
  "itertools",
  "lazy_static",
- "log 0.4.17",
  "mango-v4",
  "mango-v4-client",
  "prometheus",
@@ -3073,6 +3058,8 @@ dependencies = [
  "solana-client",
  "solana-sdk",
  "tokio",
+ "tracing",
+ "tracing-subscriber",
  "warp",
 ]
 
@@ -3100,7 +3087,6 @@ dependencies = [
  "jemallocator",
  "jsonrpc-core 18.0.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "jsonrpc-core-client",
- "log 0.4.17",
  "mango-v4",
  "mango-v4-client",
  "once_cell",
@@ -3119,6 +3105,8 @@ dependencies = [
  "tokio",
  "tokio-stream",
  "tokio-tungstenite 0.16.1",
+ "tracing",
+ "tracing-subscriber",
 ]
 
 [[package]]
@@ -3146,7 +3134,6 @@ dependencies = [
  "jemallocator",
  "jsonrpc-core 18.0.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "jsonrpc-core-client",
- "log 0.4.17",
  "mango-v4",
  "mango-v4-client",
  "once_cell",
@@ -3166,6 +3153,8 @@ dependencies = [
  "tokio",
  "tokio-stream",
  "tokio-tungstenite 0.16.1",
+ "tracing",
+ "tracing-subscriber",
 ]
 
 [[package]]
@@ -3436,6 +3425,16 @@ version = "0.3.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c28774a7fd2fbb4f0babd8237ce554b73af68021b5f695a3cebd6c59bac0980f"
 dependencies = [
+ "winapi 0.3.9",
+]
+
+[[package]]
+name = "nu-ansi-term"
+version = "0.46.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "77a8165726e8236064dbb45459242600304b42a5ea24ee2948e18e023bf7ba84"
+dependencies = [
+ "overload",
  "winapi 0.3.9",
 ]
 
@@ -3759,6 +3758,12 @@ dependencies = [
  "quote 1.0.27",
  "syn 1.0.105",
 ]
+
+[[package]]
+name = "overload"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b15813163c1d831bf4a13c3610c05c0d03b39feb07f7e09fa234dac9b15aaf39"
 
 [[package]]
 name = "parking_lot"
@@ -5744,7 +5749,7 @@ version = "1.14.17"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2b502866be84a799633c0744e1d72b819a256337149e9fb6c7eee4db84ec63f5"
 dependencies = [
- "env_logger 0.9.3",
+ "env_logger",
  "lazy_static",
  "log 0.4.17",
 ]
@@ -7302,6 +7307,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "tracing-log"
+version = "0.1.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "78ddad33d2d10b1ed7eb9d1f518a5674713876e97e5bb9b7345a7984fbb4f922"
+dependencies = [
+ "lazy_static",
+ "log 0.4.17",
+ "tracing-core",
+]
+
+[[package]]
 name = "tracing-opentelemetry"
 version = "0.17.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -7320,9 +7336,12 @@ version = "0.3.16"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a6176eae26dd70d0c919749377897b54a9276bd7061339665dd68777926b5a70"
 dependencies = [
+ "nu-ansi-term",
  "sharded-slab",
+ "smallvec 1.10.0",
  "thread_local",
  "tracing-core",
+ "tracing-log",
 ]
 
 [[package]]

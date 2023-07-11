@@ -1,9 +1,11 @@
 use mango_v4::accounts_zerocopy::KeyedAccountSharedData;
 use mango_v4::state::{
-    Bank, BookSide, PlaceOrderType, Side, TokenIndex, TokenPosition, QUOTE_TOKEN_INDEX,
+    Bank, BookSide, MangoAccountValue, PerpPosition, PlaceOrderType, Side, TokenIndex,
+    TokenPosition, QUOTE_TOKEN_INDEX,
 };
 use mango_v4_client::{
-    chain_data, perp_pnl, AccountFetcher, AnyhowWrap, JupiterSwapMode, MangoClient, TokenContext,
+    chain_data, perp_pnl, AccountFetcher, AnyhowWrap, JupiterSwapMode, MangoClient,
+    PerpMarketContext, TokenContext,
 };
 
 use {fixed::types::I80F48, solana_sdk::pubkey::Pubkey};
@@ -83,7 +85,10 @@ impl Rebalancer {
             return Ok(());
         }
 
-        trace!("checking for rebalance: {}", self.mango_account_address);
+        trace!(
+            pubkey = %self.mango_account_address,
+            "checking for rebalance"
+        );
 
         self.rebalance_perps().await?;
         self.rebalance_tokens().await?;
@@ -132,7 +137,7 @@ impl Rebalancer {
                 .try_collect()
                 .await;
         let tokens = tokens?;
-        trace!("account tokens: {:?}", tokens);
+        trace!(?tokens, "account tokens");
 
         for (token_index, token_state) in tokens {
             let token = self.mango_client.context.token(token_index);
@@ -174,11 +179,11 @@ impl Rebalancer {
                     )
                     .await?;
                 info!(
-                    "bought {} {} for {} in tx {}",
+                    %txsig,
+                    "bought {} {} for {}",
                     token.native_to_ui(buy_amount),
                     token.name,
                     quote_token.name,
-                    txsig
                 );
                 if !self.refresh_mango_account_after_tx(txsig).await? {
                     return Ok(());
@@ -206,11 +211,11 @@ impl Rebalancer {
                     )
                     .await?;
                 info!(
-                    "sold {} {} for {} in tx {}",
+                    %txsig,
+                    "sold {} {} for {}",
                     token.native_to_ui(amount),
                     token.name,
                     quote_token.name,
-                    txsig
                 );
                 if !self.refresh_mango_account_after_tx(txsig).await? {
                     return Ok(());
@@ -234,10 +239,10 @@ impl Rebalancer {
                     .token_withdraw(token_mint, u64::MAX, allow_borrow)
                     .await?;
                 info!(
-                    "withdrew {} {} to liqor wallet in {}",
+                    %txsig,
+                    "withdrew {} {} to liqor wallet",
                     token.native_to_ui(amount),
                     token.name,
-                    txsig
                 );
                 if !self.refresh_mango_account_after_tx(txsig).await? {
                     return Ok(());
@@ -254,174 +259,169 @@ impl Rebalancer {
         Ok(())
     }
 
-    async fn rebalance_perps(&self) -> anyhow::Result<()> {
+    #[instrument(
+        skip_all,
+        fields(
+            perp_market_name = perp.market.name(),
+            base_lots = perp_position.base_position_lots(),
+            effective_lots = perp_position.effective_base_position_lots(),
+            quote_native = %perp_position.quote_position_native()
+        )
+    )]
+    async fn rebalance_perp(
+        &self,
+        account: &MangoAccountValue,
+        perp: &PerpMarketContext,
+        perp_position: &PerpPosition,
+    ) -> anyhow::Result<bool> {
         let now_ts: u64 = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)?
             .as_secs()
             .try_into()?;
+
+        let base_lots = perp_position.base_position_lots();
+        let effective_lots = perp_position.effective_base_position_lots();
+        let quote_native = perp_position.quote_position_native();
+
+        if effective_lots != 0 {
+            // send an ioc order to reduce the base position
+            let oracle_account_data = self.account_fetcher.fetch_raw(&perp.market.oracle)?;
+            let oracle_account =
+                KeyedAccountSharedData::new(perp.market.oracle, oracle_account_data);
+            let oracle_price = perp.market.oracle_price(&oracle_account, None)?;
+            let oracle_price_lots = perp.market.native_price_to_lot(oracle_price);
+            let (side, order_price, oo_lots) = if effective_lots > 0 {
+                (
+                    Side::Ask,
+                    oracle_price * (I80F48::ONE - perp.market.base_liquidation_fee),
+                    perp_position.asks_base_lots,
+                )
+            } else {
+                (
+                    Side::Bid,
+                    oracle_price * (I80F48::ONE + perp.market.base_liquidation_fee),
+                    perp_position.bids_base_lots,
+                )
+            };
+            let price_lots = perp.market.native_price_to_lot(order_price);
+            let max_base_lots = effective_lots.abs() - oo_lots;
+            if max_base_lots <= 0 {
+                warn!(?side, oo_lots, "cannot place reduce-only order",);
+                return Ok(true);
+            }
+
+            // Check the orderbook before sending the ioc order to see if we could
+            // even match anything. That way we don't need to pay the tx fee and
+            // ioc penalty fee unnecessarily.
+            let opposite_side_key = match side.invert_side() {
+                Side::Bid => perp.market.bids,
+                Side::Ask => perp.market.asks,
+            };
+            let bookside = self.account_fetcher.fetch::<BookSide>(&opposite_side_key)?;
+            if bookside.quantity_at_price(price_lots, now_ts, oracle_price_lots) <= 0 {
+                warn!(
+                    other_side = ?side.invert_side(),
+                    %order_price,
+                    %oracle_price,
+                    "no liquidity",
+                );
+                return Ok(true);
+            }
+
+            let txsig = self
+                .mango_client
+                .perp_place_order(
+                    perp_position.market_index,
+                    side,
+                    price_lots,
+                    max_base_lots,
+                    i64::MAX,
+                    0,
+                    PlaceOrderType::ImmediateOrCancel,
+                    true, // reduce only
+                    0,
+                    10,
+                    mango_v4::state::SelfTradeBehavior::DecrementTake,
+                )
+                .await?;
+            info!(
+                %txsig,
+                %order_price,
+                "attempt to ioc reduce perp base position"
+            );
+            if !self.refresh_mango_account_after_tx(txsig).await? {
+                return Ok(false);
+            }
+        } else if base_lots == 0 && quote_native != 0 {
+            // settle pnl
+            let direction = if quote_native > 0 {
+                perp_pnl::Direction::MaxNegative
+            } else {
+                perp_pnl::Direction::MaxPositive
+            };
+            let counters = perp_pnl::fetch_top(
+                &self.mango_client.context,
+                self.account_fetcher.as_ref(),
+                perp_position.market_index,
+                direction,
+                2,
+            )
+            .await?;
+            if counters.is_empty() {
+                // If we can't settle some positive PNL because we're lacking a suitable counterparty,
+                // then liquidation should continue, even though this step produced no transaction
+                info!("could not settle perp pnl on perp market: no counterparty",);
+                return Ok(true);
+            }
+            let (counter_key, counter_acc, _counter_pnl) = counters.first().unwrap();
+
+            let (account_a, account_b) = if quote_native > 0 {
+                (
+                    (&self.mango_account_address, account),
+                    (counter_key, counter_acc),
+                )
+            } else {
+                (
+                    (counter_key, counter_acc),
+                    (&self.mango_account_address, account),
+                )
+            };
+            let txsig = self
+                .mango_client
+                .perp_settle_pnl(perp_position.market_index, account_a, account_b)
+                .await?;
+            info!(%txsig, "settled perp pnl");
+            if !self.refresh_mango_account_after_tx(txsig).await? {
+                return Ok(false);
+            }
+        } else if base_lots == 0 && quote_native == 0 {
+            // close perp position
+            let txsig = self
+                .mango_client
+                .perp_deactivate_position(perp_position.market_index)
+                .await?;
+            info!(
+                %txsig, "closed perp position"
+            );
+            if !self.refresh_mango_account_after_tx(txsig).await? {
+                return Ok(false);
+            }
+        } else {
+            // maybe we're still waiting for consume_events
+            info!("cannot deactivate perp position, waiting for consume events?");
+        }
+        Ok(true)
+    }
+
+    async fn rebalance_perps(&self) -> anyhow::Result<()> {
         let account = self
             .account_fetcher
             .fetch_mango_account(&self.mango_account_address)?;
 
         for perp_position in account.active_perp_positions() {
             let perp = self.mango_client.context.perp(perp_position.market_index);
-            let base_lots = perp_position.base_position_lots();
-            let effective_lots = perp_position.effective_base_position_lots();
-            let quote_native = perp_position.quote_position_native();
-            info!(
-                "active perp position on {}, base lots: {}, effective lots: {}, quote native: {}",
-                perp.market.name(),
-                base_lots,
-                effective_lots,
-                quote_native,
-            );
-
-            if effective_lots != 0 {
-                // send an ioc order to reduce the base position
-                let oracle_account_data = self.account_fetcher.fetch_raw(&perp.market.oracle)?;
-                let oracle_account =
-                    KeyedAccountSharedData::new(perp.market.oracle, oracle_account_data);
-                let oracle_price = perp.market.oracle_price(&oracle_account, None)?;
-                let oracle_price_lots = perp.market.native_price_to_lot(oracle_price);
-                let (side, order_price, oo_lots) = if effective_lots > 0 {
-                    (
-                        Side::Ask,
-                        oracle_price * (I80F48::ONE - perp.market.base_liquidation_fee),
-                        perp_position.asks_base_lots,
-                    )
-                } else {
-                    (
-                        Side::Bid,
-                        oracle_price * (I80F48::ONE + perp.market.base_liquidation_fee),
-                        perp_position.bids_base_lots,
-                    )
-                };
-                let price_lots = perp.market.native_price_to_lot(order_price);
-                let max_base_lots = effective_lots.abs() - oo_lots;
-                if max_base_lots <= 0 {
-                    warn!(
-                        "cannot place reduce-only order on {} {:?}, base pos: {}, in open orders: {}",
-                        perp.market.name(),
-                        side,
-                        effective_lots,
-                        oo_lots,
-                    );
-                    continue;
-                }
-
-                // Check the orderbook before sending the ioc order to see if we could
-                // even match anything. That way we don't need to pay the tx fee and
-                // ioc penalty fee unnecessarily.
-                let opposite_side_key = match side.invert_side() {
-                    Side::Bid => perp.market.bids,
-                    Side::Ask => perp.market.asks,
-                };
-                let bookside = self.account_fetcher.fetch::<BookSide>(&opposite_side_key)?;
-                if bookside.quantity_at_price(price_lots, now_ts, oracle_price_lots) <= 0 {
-                    warn!(
-                        "no liquidity on {} {:?} at price {}, oracle price {}",
-                        perp.market.name(),
-                        side.invert_side(),
-                        order_price,
-                        oracle_price,
-                    );
-                    continue;
-                }
-
-                let txsig = self
-                    .mango_client
-                    .perp_place_order(
-                        perp_position.market_index,
-                        side,
-                        price_lots,
-                        max_base_lots,
-                        i64::MAX,
-                        0,
-                        PlaceOrderType::ImmediateOrCancel,
-                        true, // reduce only
-                        0,
-                        10,
-                        mango_v4::state::SelfTradeBehavior::DecrementTake,
-                    )
-                    .await?;
-                info!(
-                    "attempt to ioc reduce perp base position of {} {} at price {} in {}",
-                    perp_position.base_position_native(&perp.market),
-                    perp.market.name(),
-                    order_price,
-                    txsig
-                );
-                if !self.refresh_mango_account_after_tx(txsig).await? {
-                    return Ok(());
-                }
-            } else if base_lots == 0 && quote_native != 0 {
-                // settle pnl
-                let direction = if quote_native > 0 {
-                    perp_pnl::Direction::MaxNegative
-                } else {
-                    perp_pnl::Direction::MaxPositive
-                };
-                let counters = perp_pnl::fetch_top(
-                    &self.mango_client.context,
-                    self.account_fetcher.as_ref(),
-                    perp_position.market_index,
-                    direction,
-                    2,
-                )
-                .await?;
-                if counters.is_empty() {
-                    // If we can't settle some positive PNL because we're lacking a suitable counterparty,
-                    // then liquidation should continue, even though this step produced no transaction
-                    info!(
-                        "could not settle perp pnl on perp market {}: no counterparty",
-                        perp.market.name()
-                    );
-                    continue;
-                }
-                let (counter_key, counter_acc, _counter_pnl) = counters.first().unwrap();
-
-                let (account_a, account_b) = if quote_native > 0 {
-                    (
-                        (&self.mango_account_address, &account),
-                        (counter_key, counter_acc),
-                    )
-                } else {
-                    (
-                        (counter_key, counter_acc),
-                        (&self.mango_account_address, &account),
-                    )
-                };
-                let txsig = self
-                    .mango_client
-                    .perp_settle_pnl(perp_position.market_index, account_a, account_b)
-                    .await?;
-                info!("settled perp {} pnl, tx sig {}", perp.market.name(), txsig);
-                if !self.refresh_mango_account_after_tx(txsig).await? {
-                    return Ok(());
-                }
-            } else if base_lots == 0 && quote_native == 0 {
-                // close perp position
-                let txsig = self
-                    .mango_client
-                    .perp_deactivate_position(perp_position.market_index)
-                    .await?;
-                info!(
-                    "closed perp position on {} in {}",
-                    perp.market.name(),
-                    txsig
-                );
-                if !self.refresh_mango_account_after_tx(txsig).await? {
-                    return Ok(());
-                }
-            } else {
-                // maybe we're still waiting for consume_events
-                info!(
-                    "cannot deactivate perp {} position, base lots {}, effective lots {}, quote {}",
-                    perp.market.name(),
-                    perp_position.base_position_lots(),
-                    effective_lots,
-                    perp_position.quote_position_native()
-                );
+            if !self.rebalance_perp(&account, perp, perp_position).await? {
+                return Ok(());
             }
         }
 
