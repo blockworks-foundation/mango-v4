@@ -41,6 +41,14 @@ struct CliDotenv {
     remaining_args: Vec<std::ffi::OsString>,
 }
 
+// Prefer "--rebalance false" over "--no-rebalance" because it works
+// better with REBALANCE=false env values.
+#[derive(clap::ValueEnum, Clone, Copy, Debug, PartialEq, Eq)]
+enum BoolArg {
+    True,
+    False,
+}
+
 #[derive(Parser)]
 #[clap()]
 struct Cli {
@@ -71,8 +79,8 @@ struct Cli {
     /// if rebalancing is enabled
     ///
     /// typically only disabled for tests where swaps are unavailable
-    #[clap(long, env, default_value = "true")]
-    rebalance: bool,
+    #[clap(long, env, value_enum, default_value = "true")]
+    rebalance: BoolArg,
 
     /// max slippage to request on swaps to rebalance spot tokens
     #[clap(long, env, default_value = "100")]
@@ -85,8 +93,8 @@ struct Cli {
     /// use a jupiter mock instead of actual queries
     ///
     /// This is required for devnet testing.
-    #[clap(long, env, default_value = "false")]
-    mock_jupiter: bool,
+    #[clap(long, env, value_enum, default_value = "false")]
+    mock_jupiter: BoolArg,
 }
 
 pub fn encode_address(addr: &Pubkey) -> String {
@@ -222,7 +230,7 @@ async fn main() -> anyhow::Result<()> {
     let token_swap_info_config = token_swap_info::Config {
         quote_index: 0,              // USDC
         quote_amount: 1_000_000_000, // TODO: config, $1000, should be >= tcs_config.max_trigger_quote_amount
-        mock_jupiter: cli.mock_jupiter,
+        mock_jupiter: cli.mock_jupiter == BoolArg::True,
     };
 
     let token_swap_info_updater = Arc::new(token_swap_info::TokenSwapInfoUpdater::new(
@@ -232,7 +240,7 @@ async fn main() -> anyhow::Result<()> {
 
     let liq_config = liquidate::Config {
         min_health_ratio: cli.min_health_ratio,
-        mock_jupiter: cli.mock_jupiter,
+        mock_jupiter: cli.mock_jupiter == BoolArg::True,
         // TODO: config
         refresh_timeout: Duration::from_secs(30),
     };
@@ -240,14 +248,14 @@ async fn main() -> anyhow::Result<()> {
     let tcs_config = trigger_tcs::Config {
         min_health_ratio: cli.min_health_ratio,
         max_trigger_quote_amount: 1_000_000_000, // TODO: config, $1000
-        mock_jupiter: cli.mock_jupiter,
+        mock_jupiter: cli.mock_jupiter == BoolArg::True,
         // TODO: config
         refresh_timeout: Duration::from_secs(30),
     };
 
     let mut rebalance_interval = tokio::time::interval(Duration::from_secs(5));
     let rebalance_config = rebalance::Config {
-        enabled: cli.rebalance,
+        enabled: cli.rebalance == BoolArg::True,
         slippage_bps: cli.rebalance_slippage_bps,
         // TODO: config
         borrow_settle_excess: 1.05,
