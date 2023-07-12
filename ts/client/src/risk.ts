@@ -414,9 +414,10 @@ export async function getRiskStats(
       )(
         `https://api.mngo.cloud/data/v4/risk/listed-tokens-one-week-price-impacts`,
         {
-          mode: 'no-cors',
+          mode: 'cors',
           headers: {
             'Content-Type': 'application/json',
+            'Access-Control-Allow-Origin': '*',
           },
         },
       )
@@ -435,9 +436,10 @@ export async function getRiskStats(
         )(
           `https://api.mngo.cloud/data/v4/stats/liqors-over_period?over_period=1MONTH`,
           {
-            mode: 'no-cors',
+            mode: 'cors',
             headers: {
               'Content-Type': 'application/json',
+              'Access-Control-Allow-Origin': '*',
             },
           },
         )
