@@ -1886,7 +1886,39 @@
 <span id="1886">1886</span>
 <span id="1887">1887</span>
 <span id="1888">1888</span>
-</pre><pre class="rust"><code><span class="kw">use </span>std::str::FromStr;
+<span id="1889">1889</span>
+<span id="1890">1890</span>
+<span id="1891">1891</span>
+<span id="1892">1892</span>
+<span id="1893">1893</span>
+<span id="1894">1894</span>
+<span id="1895">1895</span>
+<span id="1896">1896</span>
+<span id="1897">1897</span>
+<span id="1898">1898</span>
+<span id="1899">1899</span>
+<span id="1900">1900</span>
+<span id="1901">1901</span>
+<span id="1902">1902</span>
+<span id="1903">1903</span>
+<span id="1904">1904</span>
+<span id="1905">1905</span>
+<span id="1906">1906</span>
+<span id="1907">1907</span>
+<span id="1908">1908</span>
+<span id="1909">1909</span>
+<span id="1910">1910</span>
+<span id="1911">1911</span>
+<span id="1912">1912</span>
+<span id="1913">1913</span>
+<span id="1914">1914</span>
+<span id="1915">1915</span>
+<span id="1916">1916</span>
+<span id="1917">1917</span>
+<span id="1918">1918</span>
+<span id="1919">1919</span>
+</pre><pre class="rust"><code><span class="kw">use </span>std::ops::Deref;
+<span class="kw">use </span>std::str::FromStr;
 <span class="kw">use </span>std::sync::Arc;
 <span class="kw">use </span>std::time::Duration;
 
@@ -2022,16 +2054,16 @@
     <span class="kw">pub async fn </span>find_or_create_account(
         client: <span class="kw-2">&amp;</span>Client,
         group: Pubkey,
-        owner: <span class="kw-2">&amp;</span>Keypair,
-        payer: <span class="kw-2">&amp;</span>Keypair, <span class="comment">// pays the SOL for the new account
+        owner: Arc&lt;Keypair&gt;,
+        payer: Arc&lt;Keypair&gt;, <span class="comment">// pays the SOL for the new account
         </span>mango_account_name: <span class="kw-2">&amp;</span>str,
     ) -&gt; anyhow::Result&lt;Pubkey&gt; {
         <span class="kw">let </span>rpc = client.rpc_async();
         <span class="kw">let </span>program = mango_v4::ID;
+        <span class="kw">let </span>owner_pk = owner.pubkey();
 
         <span class="comment">// Mango Account
-        </span><span class="kw">let </span><span class="kw-2">mut </span>mango_account_tuples =
-            fetch_mango_accounts(<span class="kw-2">&amp;</span>rpc, program, group, owner.pubkey()).<span class="kw">await</span><span class="question-mark">?</span>;
+        </span><span class="kw">let </span><span class="kw-2">mut </span>mango_account_tuples = fetch_mango_accounts(<span class="kw-2">&amp;</span>rpc, program, group, owner_pk).<span class="kw">await</span><span class="question-mark">?</span>;
         <span class="kw">let </span>mango_account_opt = mango_account_tuples
             .iter()
             .find(|(<span class="kw">_</span>, account)| account.fixed.name() == mango_account_name);
@@ -2046,12 +2078,18 @@
                 <span class="prelude-val">Some</span>(tuple) =&gt; tuple.<span class="number">1</span>.fixed.account_num + <span class="number">1</span>,
                 <span class="prelude-val">None </span>=&gt; <span class="number">0u32</span>,
             };
-            <span class="self">Self</span>::create_account(client, group, owner, payer, account_num, mango_account_name)
-                .<span class="kw">await
-                </span>.context(<span class="string">&quot;Failed to create account...&quot;</span>)<span class="question-mark">?</span>;
+            <span class="self">Self</span>::create_account(
+                client,
+                group,
+                owner.clone(),
+                payer,
+                account_num,
+                mango_account_name,
+            )
+            .<span class="kw">await
+            </span>.context(<span class="string">&quot;Failed to create account...&quot;</span>)<span class="question-mark">?</span>;
         }
-        <span class="kw">let </span>mango_account_tuples =
-            fetch_mango_accounts(<span class="kw-2">&amp;</span>rpc, program, group, owner.pubkey()).<span class="kw">await</span><span class="question-mark">?</span>;
+        <span class="kw">let </span>mango_account_tuples = fetch_mango_accounts(<span class="kw-2">&amp;</span>rpc, program, group, owner_pk).<span class="kw">await</span><span class="question-mark">?</span>;
         <span class="kw">let </span>index = mango_account_tuples
             .iter()
             .position(|tuple| tuple.<span class="number">1</span>.fixed.name() == mango_account_name)
@@ -2062,8 +2100,8 @@
     <span class="kw">pub async fn </span>create_account(
         client: <span class="kw-2">&amp;</span>Client,
         group: Pubkey,
-        owner: <span class="kw-2">&amp;</span>Keypair,
-        payer: <span class="kw-2">&amp;</span>Keypair, <span class="comment">// pays the SOL for the new account
+        owner: Arc&lt;Keypair&gt;,
+        payer: Arc&lt;Keypair&gt;, <span class="comment">// pays the SOL for the new account
         </span>account_num: u32,
         mango_account_name: <span class="kw-2">&amp;</span>str,
     ) -&gt; anyhow::Result&lt;(Pubkey, Signature)&gt; {
@@ -3278,6 +3316,7 @@
         amount: u64,
         slippage: u64,
         swap_mode: JupiterSwapMode,
+        only_direct_routes: bool,
     ) -&gt; anyhow::Result&lt;jupiter::QueryRoute&gt; {
         <span class="kw">let </span>response = <span class="self">self
             </span>.http_client
@@ -3286,7 +3325,7 @@
                 (<span class="string">&quot;inputMint&quot;</span>, input_mint.to_string()),
                 (<span class="string">&quot;outputMint&quot;</span>, output_mint.to_string()),
                 (<span class="string">&quot;amount&quot;</span>, <span class="macro">format!</span>(<span class="string">&quot;{}&quot;</span>, amount)),
-                (<span class="string">&quot;onlyDirectRoutes&quot;</span>, <span class="string">&quot;true&quot;</span>.into()),
+                (<span class="string">&quot;onlyDirectRoutes&quot;</span>, only_direct_routes.to_string()),
                 (<span class="string">&quot;enforceSingleTx&quot;</span>, <span class="string">&quot;true&quot;</span>.into()),
                 (<span class="string">&quot;filterTopNResult&quot;</span>, <span class="string">&quot;10&quot;</span>.into()),
                 (<span class="string">&quot;slippageBps&quot;</span>, <span class="macro">format!</span>(<span class="string">&quot;{}&quot;</span>, slippage)),
@@ -3317,19 +3356,18 @@
         <span class="prelude-val">Ok</span>(route.clone())
     }
 
-    <span class="kw">pub async fn </span>jupiter_swap(
+    <span class="doccomment">/// Find the instructions and account lookup tables for a jupiter swap through mango
+    ///
+    /// It would be nice if we didn&#39;t have to pass input_mint/output_mint - the data is
+    /// definitely in QueryRoute - but it&#39;s unclear how.
+    </span><span class="kw">pub async fn </span>prepare_jupiter_swap_transaction(
         <span class="kw-2">&amp;</span><span class="self">self</span>,
         input_mint: Pubkey,
         output_mint: Pubkey,
-        amount: u64,
-        slippage: u64,
-        swap_mode: JupiterSwapMode,
-    ) -&gt; anyhow::Result&lt;Signature&gt; {
+        route: <span class="kw-2">&amp;</span>jupiter::QueryRoute,
+    ) -&gt; anyhow::Result&lt;TransactionBuilder&gt; {
         <span class="kw">let </span>source_token = <span class="self">self</span>.context.token_by_mint(<span class="kw-2">&amp;</span>input_mint)<span class="question-mark">?</span>;
         <span class="kw">let </span>target_token = <span class="self">self</span>.context.token_by_mint(<span class="kw-2">&amp;</span>output_mint)<span class="question-mark">?</span>;
-        <span class="kw">let </span>route = <span class="self">self
-            </span>.jupiter_route(input_mint, output_mint, amount, slippage, swap_mode)
-            .<span class="kw">await</span><span class="question-mark">?</span>;
 
         <span class="kw">let </span>swap_response = <span class="self">self
             </span>.http_client
@@ -3365,22 +3403,25 @@
         <span class="kw">let </span>ata_program = anchor_spl::associated_token::ID;
         <span class="kw">let </span>token_program = anchor_spl::token::ID;
         <span class="kw">let </span>compute_budget_program = solana_sdk::compute_budget::ID;
-        <span class="comment">// these setup instructions are unnecessary since FlashLoan already takes care of it
+        <span class="comment">// these setup instructions should be placed outside of flashloan begin-end
         </span><span class="kw">let </span>is_setup_ix = |k: Pubkey| -&gt; bool {
             k == ata_program || k == token_program || k == compute_budget_program
         };
         <span class="kw">let </span>(jup_ixs, jup_alts) = <span class="self">self
             </span>.deserialize_instructions_and_alts(<span class="kw-2">&amp;</span>jup_tx.message)
             .<span class="kw">await</span><span class="question-mark">?</span>;
-        <span class="kw">let </span>jup_cu_ix = jup_ixs
+        <span class="kw">let </span>jup_action_ix_begin = jup_ixs
             .iter()
-            .filter(|ix| ix.program_id == compute_budget_program)
-            .cloned()
-            .collect::&lt;Vec&lt;<span class="kw">_</span>&gt;&gt;();
-        <span class="kw">let </span>jup_action_ix = jup_ixs
-            .into_iter()
-            .filter(|ix| !is_setup_ix(ix.program_id))
-            .collect::&lt;Vec&lt;<span class="kw">_</span>&gt;&gt;();
+            .position(|ix| !is_setup_ix(ix.program_id))
+            .ok_or_else(|| {
+                <span class="macro">anyhow::anyhow!</span>(<span class="string">&quot;jupiter swap response only had setup-like instructions&quot;</span>)
+            })<span class="question-mark">?</span>;
+        <span class="kw">let </span>jup_action_ix_end = jup_ixs.len()
+            - jup_ixs
+                .iter()
+                .rev()
+                .position(|ix| !is_setup_ix(ix.program_id))
+                .unwrap();
 
         <span class="kw">let </span>bank_ams = [
             source_token.mint_info.first_bank(),
@@ -3410,14 +3451,14 @@
             })
             .collect::&lt;Vec&lt;<span class="kw">_</span>&gt;&gt;();
 
-        <span class="kw">let </span>loan_amounts = <span class="macro">vec!</span>[
-            <span class="kw">match </span>swap_mode {
-                JupiterSwapMode::ExactIn =&gt; amount,
-                <span class="comment">// in amount + slippage
-                </span>JupiterSwapMode::ExactOut =&gt; u64::from_str(<span class="kw-2">&amp;</span>route.other_amount_threshold).unwrap(),
-            },
-            <span class="number">0u64</span>,
-        ];
+        <span class="kw">let </span>source_loan = <span class="kw">if </span>route.swap_mode == <span class="string">&quot;ExactIn&quot; </span>{
+            u64::from_str(<span class="kw-2">&amp;</span>route.amount).unwrap()
+        } <span class="kw">else if </span>route.swap_mode == <span class="string">&quot;ExactOut&quot; </span>{
+            u64::from_str(<span class="kw-2">&amp;</span>route.other_amount_threshold).unwrap()
+        } <span class="kw">else </span>{
+            <span class="macro">anyhow::bail!</span>(<span class="string">&quot;unknown swap mode: {}&quot;</span>, route.swap_mode);
+        };
+        <span class="kw">let </span>loan_amounts = <span class="macro">vec!</span>[source_loan, <span class="number">0u64</span>];
         <span class="kw">let </span>num_loans: u8 = loan_amounts.len().try_into().unwrap();
 
         <span class="comment">// This relies on the fact that health account banks will be identical to the first_bank above!
@@ -3432,25 +3473,9 @@
 
         <span class="kw">let </span><span class="kw-2">mut </span>instructions = Vec::new();
 
-        <span class="kw">for </span>ix <span class="kw">in </span>jup_cu_ix {
+        <span class="kw">for </span>ix <span class="kw">in </span><span class="kw-2">&amp;</span>jup_ixs[..jup_action_ix_begin] {
             instructions.push(ix.clone());
         }
-        instructions.push(
-            spl_associated_token_account::instruction::create_associated_token_account_idempotent(
-                <span class="kw-2">&amp;</span><span class="self">self</span>.owner.pubkey(),
-                <span class="kw-2">&amp;</span><span class="self">self</span>.owner.pubkey(),
-                <span class="kw-2">&amp;</span>source_token.mint_info.mint,
-                <span class="kw-2">&amp;</span>Token::id(),
-            ),
-        );
-        instructions.push(
-            spl_associated_token_account::instruction::create_associated_token_account_idempotent(
-                <span class="kw-2">&amp;</span><span class="self">self</span>.owner.pubkey(),
-                <span class="kw-2">&amp;</span><span class="self">self</span>.owner.pubkey(),
-                <span class="kw-2">&amp;</span>target_token.mint_info.mint,
-                <span class="kw-2">&amp;</span>Token::id(),
-            ),
-        );
         instructions.push(Instruction {
             program_id: mango_v4::id(),
             accounts: {
@@ -3473,7 +3498,7 @@
                 loan_amounts,
             }),
         });
-        <span class="kw">for </span>ix <span class="kw">in </span>jup_action_ix {
+        <span class="kw">for </span>ix <span class="kw">in </span><span class="kw-2">&amp;</span>jup_ixs[jup_action_ix_begin..jup_action_ix_end] {
             instructions.push(ix.clone());
         }
         instructions.push(Instruction {
@@ -3498,20 +3523,49 @@
                 flash_loan_type: mango_v4::accounts_ix::FlashLoanType::Swap,
             }),
         });
+        <span class="kw">for </span>ix <span class="kw">in </span><span class="kw-2">&amp;</span>jup_ixs[jup_action_ix_end..] {
+            instructions.push(ix.clone());
+        }
 
-        <span class="kw">let </span>payer = <span class="self">self</span>.owner.pubkey(); <span class="comment">// maybe use fee_payer? but usually it&#39;s the same
-        </span><span class="kw">let </span><span class="kw-2">mut </span>address_lookup_tables = <span class="self">self</span>.mango_address_lookup_tables().<span class="kw">await</span><span class="question-mark">?</span>;
+        <span class="kw">let </span><span class="kw-2">mut </span>address_lookup_tables = <span class="self">self</span>.mango_address_lookup_tables().<span class="kw">await</span><span class="question-mark">?</span>;
         address_lookup_tables.extend(jup_alts.into_iter());
 
-        TransactionBuilder {
+        <span class="kw">let </span>payer = <span class="self">self</span>.owner.pubkey(); <span class="comment">// maybe use fee_payer? but usually it&#39;s the same
+
+        </span><span class="prelude-val">Ok</span>(TransactionBuilder {
             instructions,
             address_lookup_tables,
             payer,
-            signers: <span class="macro">vec!</span>[<span class="kw-2">&amp;*</span><span class="self">self</span>.owner],
+            signers: <span class="macro">vec!</span>[<span class="self">self</span>.owner.clone()],
             config: <span class="self">self</span>.client.transaction_builder_config,
-        }
-        .send_and_confirm(<span class="kw-2">&amp;</span><span class="self">self</span>.client)
-        .<span class="kw">await
+        })
+    }
+
+    <span class="kw">pub async fn </span>jupiter_swap(
+        <span class="kw-2">&amp;</span><span class="self">self</span>,
+        input_mint: Pubkey,
+        output_mint: Pubkey,
+        amount: u64,
+        slippage: u64,
+        swap_mode: JupiterSwapMode,
+        only_direct_routes: bool,
+    ) -&gt; anyhow::Result&lt;Signature&gt; {
+        <span class="kw">let </span>route = <span class="self">self
+            </span>.jupiter_route(
+                input_mint,
+                output_mint,
+                amount,
+                slippage,
+                swap_mode,
+                only_direct_routes,
+            )
+            .<span class="kw">await</span><span class="question-mark">?</span>;
+
+        <span class="kw">let </span>tx_builder = <span class="self">self
+            </span>.prepare_jupiter_swap_transaction(input_mint, output_mint, <span class="kw-2">&amp;</span>route)
+            .<span class="kw">await</span><span class="question-mark">?</span>;
+
+        tx_builder.send_and_confirm(<span class="kw-2">&amp;</span><span class="self">self</span>.client).<span class="kw">await
     </span>}
 
     <span class="kw">async fn </span>fetch_address_lookup_table(
@@ -3595,7 +3649,7 @@
             instructions,
             address_lookup_tables: <span class="macro">vec!</span>[],
             payer: <span class="self">self</span>.client.fee_payer.pubkey(),
-            signers: <span class="macro">vec!</span>[<span class="kw-2">&amp;*</span><span class="self">self</span>.owner, <span class="kw-2">&amp;*</span><span class="self">self</span>.client.fee_payer],
+            signers: <span class="macro">vec!</span>[<span class="self">self</span>.owner.clone(), <span class="self">self</span>.client.fee_payer.clone()],
             config: <span class="self">self</span>.client.transaction_builder_config,
         }
         .send_and_confirm(<span class="kw-2">&amp;</span><span class="self">self</span>.client)
@@ -3610,7 +3664,7 @@
             instructions,
             address_lookup_tables: <span class="macro">vec!</span>[],
             payer: <span class="self">self</span>.client.fee_payer.pubkey(),
-            signers: <span class="macro">vec!</span>[<span class="kw-2">&amp;*</span><span class="self">self</span>.client.fee_payer],
+            signers: <span class="macro">vec!</span>[<span class="self">self</span>.client.fee_payer.clone()],
             config: <span class="self">self</span>.client.transaction_builder_config,
         }
         .send_and_confirm(<span class="kw-2">&amp;</span><span class="self">self</span>.client)
@@ -3635,17 +3689,17 @@
     </span><span class="kw">pub </span>prioritization_micro_lamports: <span class="prelude-ty">Option</span>&lt;u64&gt;,
 }
 
-<span class="kw">pub struct </span>TransactionBuilder&lt;<span class="lifetime">&#39;a</span>&gt; {
+<span class="kw">pub struct </span>TransactionBuilder {
     <span class="kw">pub </span>instructions: Vec&lt;Instruction&gt;,
     <span class="kw">pub </span>address_lookup_tables: Vec&lt;AddressLookupTableAccount&gt;,
-    <span class="kw">pub </span>signers: Vec&lt;<span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span>Keypair&gt;,
+    <span class="kw">pub </span>signers: Vec&lt;Arc&lt;Keypair&gt;&gt;,
     <span class="kw">pub </span>payer: Pubkey,
     <span class="kw">pub </span>config: TransactionBuilderConfig,
 }
 
-<span class="kw">impl</span>&lt;<span class="lifetime">&#39;a</span>&gt; TransactionBuilder&lt;<span class="lifetime">&#39;a</span>&gt; {
+<span class="kw">impl </span>TransactionBuilder {
     <span class="kw">pub async fn </span>transaction(
-        <span class="self">self</span>,
+        <span class="kw-2">&amp;</span><span class="self">self</span>,
         rpc: <span class="kw-2">&amp;</span>RpcClientAsync,
     ) -&gt; anyhow::Result&lt;solana_sdk::transaction::VersionedTransaction&gt; {
         <span class="kw">let </span>latest_blockhash = rpc.get_latest_blockhash().<span class="kw">await</span><span class="question-mark">?</span>;
@@ -3653,11 +3707,12 @@
     }
 
     <span class="kw">pub fn </span>transaction_with_blockhash(
-        <span class="kw-2">mut </span><span class="self">self</span>,
+        <span class="kw-2">&amp;</span><span class="self">self</span>,
         blockhash: Hash,
     ) -&gt; anyhow::Result&lt;solana_sdk::transaction::VersionedTransaction&gt; {
+        <span class="kw">let </span><span class="kw-2">mut </span>ix = <span class="self">self</span>.instructions.clone();
         <span class="kw">if let </span><span class="prelude-val">Some</span>(prio_price) = <span class="self">self</span>.config.prioritization_micro_lamports {
-            <span class="self">self</span>.instructions.insert(
+            ix.insert(
                 <span class="number">0</span>,
                 solana_sdk::compute_budget::ComputeBudgetInstruction::set_compute_unit_price(
                     prio_price,
@@ -3666,15 +3721,16 @@
         }
         <span class="kw">let </span>v0_message = solana_sdk::message::v0::Message::try_compile(
             <span class="kw-2">&amp;</span><span class="self">self</span>.payer,
-            <span class="kw-2">&amp;</span><span class="self">self</span>.instructions,
+            <span class="kw-2">&amp;</span>ix,
             <span class="kw-2">&amp;</span><span class="self">self</span>.address_lookup_tables,
             blockhash,
         )<span class="question-mark">?</span>;
         <span class="kw">let </span>versioned_message = solana_sdk::message::VersionedMessage::V0(v0_message);
         <span class="kw">let </span>signers = <span class="self">self
             </span>.signers
-            .into_iter()
+            .iter()
             .unique_by(|s| s.pubkey())
+            .map(|v| v.deref())
             .collect::&lt;Vec&lt;<span class="kw">_</span>&gt;&gt;();
         <span class="kw">let </span>tx =
             solana_sdk::transaction::VersionedTransaction::try_new(versioned_message, <span class="kw-2">&amp;</span>signers)<span class="question-mark">?</span>;
@@ -3683,7 +3739,7 @@
 
     <span class="comment">// These two send() functions don&#39;t really belong into the transaction builder!
 
-    </span><span class="kw">pub async fn </span>send(<span class="self">self</span>, client: <span class="kw-2">&amp;</span>Client) -&gt; anyhow::Result&lt;Signature&gt; {
+    </span><span class="kw">pub async fn </span>send(<span class="kw-2">&amp;</span><span class="self">self</span>, client: <span class="kw-2">&amp;</span>Client) -&gt; anyhow::Result&lt;Signature&gt; {
         <span class="kw">let </span>rpc = client.rpc_async();
         <span class="kw">let </span>tx = <span class="self">self</span>.transaction(<span class="kw-2">&amp;</span>rpc).<span class="kw">await</span><span class="question-mark">?</span>;
         rpc.send_transaction_with_config(<span class="kw-2">&amp;</span>tx, client.rpc_send_transaction_config)
@@ -3691,13 +3747,19 @@
             </span>.map_err(prettify_solana_client_error)
     }
 
-    <span class="kw">pub async fn </span>send_and_confirm(<span class="self">self</span>, client: <span class="kw-2">&amp;</span>Client) -&gt; anyhow::Result&lt;Signature&gt; {
+    <span class="kw">pub async fn </span>send_and_confirm(<span class="kw-2">&amp;</span><span class="self">self</span>, client: <span class="kw-2">&amp;</span>Client) -&gt; anyhow::Result&lt;Signature&gt; {
         <span class="kw">let </span>rpc = client.rpc_async();
         <span class="kw">let </span>tx = <span class="self">self</span>.transaction(<span class="kw-2">&amp;</span>rpc).<span class="kw">await</span><span class="question-mark">?</span>;
         <span class="comment">// TODO: Wish we could use client.rpc_send_transaction_config here too!
         </span>rpc.send_and_confirm_transaction(<span class="kw-2">&amp;</span>tx)
             .<span class="kw">await
             </span>.map_err(prettify_solana_client_error)
+    }
+
+    <span class="kw">pub fn </span>transaction_size_ok(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; anyhow::Result&lt;bool&gt; {
+        <span class="kw">let </span>tx = <span class="self">self</span>.transaction_with_blockhash(solana_sdk::hash::Hash::default())<span class="question-mark">?</span>;
+        <span class="kw">let </span>bytes = bincode::serialize(<span class="kw-2">&amp;</span>tx)<span class="question-mark">?</span>;
+        <span class="prelude-val">Ok</span>(bytes.len() &lt;= solana_sdk::packet::PACKET_DATA_SIZE)
     }
 }
 
