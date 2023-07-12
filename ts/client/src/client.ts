@@ -2688,6 +2688,53 @@ export class MangoClient {
       .instruction();
   }
 
+  async perpSettleAll(
+    client: MangoClient,
+    group: Group,
+    mangoAccount: MangoAccount,
+    allMangoAccounts?: MangoAccount[],
+  ): Promise<TransactionSignature> {
+    if (!allMangoAccounts) {
+      allMangoAccounts = await client.getAllMangoAccounts(group, true);
+    }
+
+    const ixs = new Array<TransactionInstruction>();
+    // This is optimistic, since we might find the same opponent candidate for all markets,
+    // and they have might not be able to settle at some point due to safety limits
+    // Future: correct way to do is, to apply the settlement on a copy and then move to next position
+    for (const pa of mangoAccount.perpActive()) {
+      const pm = group.getPerpMarketByMarketIndex(pa.marketIndex);
+      const candidates = pm.getSettlePnlCandidates(
+        client,
+        group,
+        allMangoAccounts,
+        pa.getEquityUi(pm) > 0 ? 'negative' : 'positive',
+        2,
+      );
+      ixs.push(
+        await this.perpSettlePnlIx(
+          group,
+          pa.getEquityUi(pm) > 0 ? mangoAccount : candidates[0],
+          pa.getEquityUi(pm) < 0 ? candidates[0] : mangoAccount,
+          mangoAccount,
+          pm.perpMarketIndex,
+        ),
+      );
+      ixs.push(
+        await this.perpSettleFeesIx(
+          group,
+          mangoAccount,
+          pm.perpMarketIndex,
+          undefined,
+        ),
+      );
+    }
+
+    return await this.sendAndConfirmTransactionForGroup(group, ixs, {
+      prioritizationFee: true,
+    });
+  }
+
   async perpSettlePnlAndFees(
     group: Group,
     profitableAccount: MangoAccount,
