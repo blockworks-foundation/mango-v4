@@ -502,6 +502,12 @@ export class Bank implements BankForHealth {
     // vaults can be depleted
     return maxBorrow.add(userDeposits).min(I80F48.fromI64(vaultBalance));
   }
+
+  getWhenNextBorrowLimitWindowStartsTs(): number {
+    return this.netBorrowLimitWindowSizeTs
+      .sub(new BN(Date.now() / 1000).sub(this.lastNetBorrowsWindowStartTs))
+      .toNumber();
+  }
 }
 
 export class MintInfo {
