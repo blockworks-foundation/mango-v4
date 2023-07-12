@@ -413,7 +413,12 @@ export async function getRiskStats(
         await buildFetch()
       )(
         `https://api.mngo.cloud/data/v4/risk/listed-tokens-one-week-price-impacts`,
-        { mode: 'no-cors' },
+        {
+          mode: 'no-cors',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+        },
       )
     ).json();
   } catch (error) {
@@ -429,7 +434,12 @@ export async function getRiskStats(
           await buildFetch()
         )(
           `https://api.mngo.cloud/data/v4/stats/liqors-over_period?over_period=1MONTH`,
-          { mode: 'no-cors' },
+          {
+            mode: 'no-cors',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+          },
         )
       ).json()
     ).map((data) => new PublicKey(data['liqor']));
