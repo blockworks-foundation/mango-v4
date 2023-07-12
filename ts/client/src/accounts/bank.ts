@@ -488,8 +488,6 @@ export class Bank implements BankForHealth {
   }
 
   getMaxWithdrawNative(userDeposits = ZERO_I80F48()): I80F48 {
-    // user deposits can always be withdrawn
-
     // borrow is capped to minVaultToDepositsRatio and netBorrowLimitPerWindowQuote
     const maxWithdrawFromVault = this.nativeDeposits().mul(
       I80F48.fromNumber(1 - this.minVaultToDepositsRatio),
@@ -500,6 +498,7 @@ export class Bank implements BankForHealth {
     maxBorrow = maxBorrow.min(this.getNetBorrowLimitPerWindow());
     maxBorrow = maxBorrow.div(ONE_I80F48().add(this.loanOriginationFeeRate));
 
+    // user deposits can always be withdrawn
     return maxBorrow.add(userDeposits);
   }
 }
