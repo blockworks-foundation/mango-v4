@@ -16,10 +16,8 @@ anchor-spl = { workspace = true }
 anyhow = "1.0"
 clap = { version = "3.1.8", features = ["derive", "env"] }
 dotenv = "0.15.0"
-env_logger = "0.8.4"
 fixed = { workspace = true, features = ["serde", "borsh"] }
 futures = "0.3.21"
-log = "0.4.0"
 mango-v4 = { path = "../../programs/mango-v4", features = ["client"] }
 mango-v4-client = { path = "../../lib/client" }
 pyth-sdk-solana = { workspace = true }
@@ -28,3 +26,4 @@ solana-client = { workspace = true }
 solana-sdk = { workspace = true }
 tokio = { version = "1.14.1", features = ["rt-multi-thread", "time", "macros", "sync"] }
 itertools = "0.10.3"
+tracing = "0.1"
