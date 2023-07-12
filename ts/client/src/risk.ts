@@ -56,33 +56,39 @@ export interface Risk {
   liqorEquity: { title: string; data: AccountEquity[] };
 }
 
-export async function computePriceImpactOnJup(
-  amount: string,
-  inputMint: string,
-  outputMint: string,
-): Promise<{ outAmount: number; priceImpactPct: number }> {
-  const url = `https://quote-api.jup.ag/v4/quote?inputMint=${inputMint}&outputMint=${outputMint}&amount=${amount}&swapMode=ExactIn&slippageBps=10000&onlyDirectRoutes=false&asLegacyTransaction=false`;
-  const response = await (await buildFetch())(url, { mode: 'no-cors' });
+type PriceImpact = {
+  symbol: string;
+  side: 'bid' | 'ask';
+  target_amount: number;
+  avg_price_impact_percent: number;
+  min_price_impact_percent: number;
+  max_price_impact_percent: number;
+};
 
+export async function computePriceImpactOnJup(
+  pis: PriceImpact[],
+  usdcAmount: number,
+  tokenName: string,
+): Promise<number> {
+  console.log(pis);
   try {
-    const res = await response.json();
-    if (res['data'] && res.data.length > 0 && res.data[0].outAmount) {
-      return {
-        outAmount: parseFloat(res.data[0].outAmount),
-        priceImpactPct: parseFloat(res.data[0].priceImpactPct),
-      };
+    const closestTo = [1000, 5000, 20000, 100000].reduce((prev, curr) =>
+      Math.abs(curr - usdcAmount) < Math.abs(prev - usdcAmount) ? curr : prev,
+    );
+    // Workaround api
+    if (tokenName == 'ETH (Portal)') {
+      tokenName = 'ETH';
+    }
+    const filteredPis: PriceImpact[] = pis.filter(
+      (pi) => pi.symbol == tokenName && pi.target_amount == closestTo,
+    );
+    if (filteredPis.length > 0) {
+      return (filteredPis[0].max_price_impact_percent * 10000) / 100;
     } else {
-      return {
-        outAmount: -1 / 10000,
-        priceImpactPct: -1 / 10000,
-      };
+      return -1;
     }
   } catch (e) {
-    console.log(e);
-    return {
-      outAmount: -1 / 10000,
-      priceImpactPct: -1 / 10000,
-    };
+    return -1;
   }
 }
 
@@ -107,6 +113,7 @@ export async function getOnChainPriceForMints(
 
 export async function getPriceImpactForLiqor(
   group: Group,
+  pis: PriceImpact[],
   mangoAccounts: MangoAccount[],
 ): Promise<LiqorPriceImpact[]> {
   const mangoAccountsWithHealth = mangoAccounts.map((a: MangoAccount) => {
@@ -236,20 +243,20 @@ export async function getPriceImpactForLiqor(
           !liabsInUsdc.eq(ZERO_I80F48()) &&
           usdcMint.toBase58() !== bank.mint.toBase58()
             ? computePriceImpactOnJup(
-                liabsInUsdc.toString(),
-                usdcMint.toBase58(),
-                bank.mint.toBase58(),
+                pis,
+                toUiDecimalsForQuote(liabsInUsdc),
+                bank.name,
               )
-            : Promise.resolve({ priceImpactPct: 0, outAmount: 0 }),
+            : Promise.resolve(0),
 
           !assets.eq(ZERO_I80F48()) &&
           usdcMint.toBase58() !== bank.mint.toBase58()
             ? computePriceImpactOnJup(
-                assets.floor().toString(),
-                bank.mint.toBase58(),
-                usdcMint.toBase58(),
+                pis,
+                toUiDecimals(assets.mul(bank.price), bank.mintDecimals),
+                bank.name,
               )
-            : Promise.resolve({ priceImpactPct: 0, outAmount: 0 }),
+            : Promise.resolve(0),
         ]);
 
         return {
@@ -277,9 +284,9 @@ export async function getPriceImpactForLiqor(
             highlight: Math.round(toUiDecimalsForQuote(liabsInUsdc)) > 5000,
           },
           'Liabs Slippage': {
-            val: Math.round(pi1.priceImpactPct * 10000),
+            val: Math.round(pi1),
             highlight:
-              Math.round(pi1.priceImpactPct * 10000) >
+              Math.round(pi1) >
               Math.round(bank.liquidationFee.toNumber() * 10000),
           },
           Assets: {
@@ -292,9 +299,9 @@ export async function getPriceImpactForLiqor(
               ) > 5000,
           },
           'Assets Slippage': {
-            val: Math.round(pi2.priceImpactPct * 10000),
+            val: Math.round(pi2),
             highlight:
-              Math.round(pi2.priceImpactPct * 10000) >
+              Math.round(pi2) >
               Math.round(bank.liquidationFee.toNumber() * 10000),
           },
         };
@@ -377,11 +384,11 @@ export async function getEquityForMangoAccounts(
   mangoAccountPks: PublicKey[],
   allMangoAccounts: MangoAccount[],
 ): Promise<AccountEquity[]> {
-  const liqorMangoAccounts = allMangoAccounts.filter((a) =>
+  const mangoAccounts = allMangoAccounts.filter((a) =>
     mangoAccountPks.find((pk) => pk.equals(a.publicKey)),
   );
 
-  const accountsWithEquity = liqorMangoAccounts.map((a: MangoAccount) => {
+  const accountsWithEquity = mangoAccounts.map((a: MangoAccount) => {
     return {
       Account: { val: a.publicKey, highlight: false },
       Equity: {
@@ -399,6 +406,20 @@ export async function getRiskStats(
   group: Group,
   change = 0.4, // simulates 40% price rally and price drop on tokens and markets
 ): Promise<Risk> {
+  let pis;
+  try {
+    pis = await (
+      await (
+        await buildFetch()
+      )(
+        `https://api.mngo.cloud/data/v4/risk/listed-tokens-one-week-price-impacts`,
+        { mode: 'no-cors' },
+      )
+    ).json();
+  } catch (error) {
+    pis = [];
+  }
+
   // Get known liqors
   let liqors: PublicKey[];
   try {
@@ -517,10 +538,10 @@ export async function getRiskStats(
     liqorEquity,
     marketMakerEquity,
   ] = await Promise.all([
-    getPriceImpactForLiqor(groupDrop, mangoAccounts),
-    getPriceImpactForLiqor(groupRally, mangoAccounts),
-    getPriceImpactForLiqor(groupUsdcDepeg, mangoAccounts),
-    getPriceImpactForLiqor(groupUsdtDepeg, mangoAccounts),
+    getPriceImpactForLiqor(groupDrop, pis, mangoAccounts),
+    getPriceImpactForLiqor(groupRally, pis, mangoAccounts),
+    getPriceImpactForLiqor(groupUsdcDepeg, pis, mangoAccounts),
+    getPriceImpactForLiqor(groupUsdtDepeg, pis, mangoAccounts),
     getPerpPositionsToBeLiquidated(groupDrop, mangoAccounts),
     getPerpPositionsToBeLiquidated(groupRally, mangoAccounts),
     getEquityForMangoAccounts(client, group, liqors, mangoAccounts),
