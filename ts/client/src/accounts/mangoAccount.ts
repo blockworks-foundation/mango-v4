@@ -600,6 +600,10 @@ export class MangoAccount {
         sourceBorrow.div(ONE_I80F48().add(sourceBank.loanOriginationFeeRate)),
       );
     }
+
+    // Cannot swap more than total deposits in mango for the token
+    maxSource = maxSource.min(sourceBank.nativeDeposits());
+
     return toUiDecimals(maxSource, group.getMintDecimals(sourceMintPk));
   }
 
