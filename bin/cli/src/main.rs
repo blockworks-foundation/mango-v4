@@ -137,9 +137,7 @@ impl Rpc {
 
 #[tokio::main]
 async fn main() -> Result<(), anyhow::Error> {
-    env_logger::init_from_env(
-        env_logger::Env::default().filter_or(env_logger::DEFAULT_FILTER_ENV, "info"),
-    );
+    mango_v4_client::tracing_subscriber_init();
 
     dotenv::dotenv().ok();
     let cli = Cli::parse();

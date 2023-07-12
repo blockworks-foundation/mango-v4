@@ -10,6 +10,7 @@ use mango_v4::{
     accounts_ix::{Serum3OrderType, Serum3SelfTradeBehavior, Serum3Side},
     state::TokenIndex,
 };
+use tracing::*;
 
 use tokio::time;
 
@@ -90,7 +91,7 @@ async fn ensure_deposit(mango_client: &Arc<MangoClient>) -> Result<(), anyhow::E
             Some(token_account) => {
                 let native = token_account.native(&bank);
                 let ui = token_account.ui(&bank);
-                log::info!("Current balance {} {}", ui, bank.name());
+                info!("Current balance {} {}", ui, bank.name());
 
                 if native < I80F48::ZERO {
                     desired_balance - native
@@ -105,7 +106,7 @@ async fn ensure_deposit(mango_client: &Arc<MangoClient>) -> Result<(), anyhow::E
             continue;
         }
 
-        log::info!("Depositing {} {}", deposit_native, bank.name());
+        info!("Depositing {} {}", deposit_native, bank.name());
         mango_client
             .token_deposit(bank.mint, desired_balance.to_num(), false)
             .await?;
@@ -125,7 +126,7 @@ pub async fn loop_blocking_price_update(
         interval.tick().await;
 
         let fresh_price = mango_client.bank_oracle_price(token_index).await.unwrap();
-        log::info!("{} Updated price is {:?}", token_name, fresh_price);
+        info!("{} Updated price is {:?}", token_name, fresh_price);
         if let Ok(mut price) = price.write() {
             *price = fresh_price;
         }
@@ -144,7 +145,7 @@ pub async fn loop_blocking_orders(
         .serum3_cancel_all_orders(&market_name)
         .await
         .unwrap();
-    log::info!("Cancelled orders - {:?} for {}", orders, market_name);
+    info!("Cancelled orders - {:?} for {}", orders, market_name);
 
     let market_index = mango_client.context.serum3_market_index(&market_name);
     let s3 = mango_client.context.serum3(market_index);
@@ -178,9 +179,9 @@ pub async fn loop_blocking_orders(
                 )
                 .await;
             if let Err(e) = res {
-                log::error!("Error while placing taker bid {:#?}", e)
+                error!("Error while placing taker bid {:#?}", e)
             } else {
-                log::info!("Placed bid at {} for {}", bid_price, market_name)
+                info!("Placed bid at {} for {}", bid_price, market_name)
             }
 
             let ask_price = fresh_price * 0.9;
@@ -200,9 +201,9 @@ pub async fn loop_blocking_orders(
                 )
                 .await;
             if let Err(e) = res {
-                log::error!("Error while placing taker ask {:#?}", e)
+                error!("Error while placing taker ask {:#?}", e)
             } else {
-                log::info!("Placed ask at {} for {}", ask_price, market_name)
+                info!("Placed ask at {} for {}", ask_price, market_name)
             }
 
             Ok(())
@@ -210,7 +211,7 @@ pub async fn loop_blocking_orders(
         .await;
 
         if let Err(err) = res {
-            log::error!("{:?}", err);
+            error!("{:?}", err);
         }
     }
 }

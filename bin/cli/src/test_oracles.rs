@@ -3,6 +3,7 @@ use mango_v4::accounts_zerocopy::KeyedAccount;
 use mango_v4_client::{Client, MangoGroupContext};
 use solana_sdk::commitment_config::CommitmentConfig;
 use solana_sdk::pubkey::Pubkey;
+use tracing::*;
 
 pub async fn run(client: &Client, group: Pubkey) -> anyhow::Result<()> {
     let rpc_async = client.rpc_async();
@@ -23,7 +24,7 @@ pub async fn run(client: &Client, group: Pubkey) -> anyhow::Result<()> {
             .get_multiple_accounts_with_commitment(&oracles, CommitmentConfig::processed())
             .await;
         if response.is_err() {
-            log::warn!("could not fetch oracles");
+            warn!("could not fetch oracles");
             continue;
         }
         let response = response.unwrap();
@@ -32,7 +33,7 @@ pub async fn run(client: &Client, group: Pubkey) -> anyhow::Result<()> {
 
         for (pubkey, account_opt) in oracles.iter().zip(accounts.into_iter()) {
             if account_opt.is_none() {
-                log::warn!("no oracle data for {pubkey}");
+                warn!("no oracle data for {pubkey}");
                 continue;
             }
             let keyed_account = KeyedAccount {
@@ -53,7 +54,7 @@ pub async fn run(client: &Client, group: Pubkey) -> anyhow::Result<()> {
                 match tc.bank.oracle_price(&keyed_account, Some(slot)) {
                     Ok(p) => price = Some(p),
                     Err(e) => {
-                        log::error!("could not read bank oracle {}: {e:?}", keyed_account.key);
+                        error!("could not read bank oracle {}: {e:?}", keyed_account.key);
                     }
                 }
             }
@@ -61,12 +62,12 @@ pub async fn run(client: &Client, group: Pubkey) -> anyhow::Result<()> {
                 match pc.market.oracle_price(&keyed_account, Some(slot)) {
                     Ok(p) => price = Some(p),
                     Err(e) => {
-                        log::error!("could not read perp oracle {}: {e:?}", keyed_account.key);
+                        error!("could not read perp oracle {}: {e:?}", keyed_account.key);
                     }
                 }
             }
             if let Some(p) = price {
-                log::info!("{pubkey},{p}");
+                info!("{pubkey},{p}");
             }
         }
     }

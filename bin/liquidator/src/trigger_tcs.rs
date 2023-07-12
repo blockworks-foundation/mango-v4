@@ -4,6 +4,7 @@ use mango_v4::state::{MangoAccountValue, TokenConditionalSwap};
 use mango_v4_client::{chain_data, health_cache, JupiterSwapMode, MangoClient};
 
 use rand::seq::SliceRandom;
+use tracing::*;
 use {anyhow::Context, fixed::types::I80F48, solana_sdk::pubkey::Pubkey};
 
 use crate::{token_swap_info, util};
@@ -180,7 +181,7 @@ pub async fn maybe_execute_token_conditional_swap_inner(
         let swap_price = sell_amount / buy_amount;
 
         if swap_price > taker_price.to_num::<f64>() {
-            log::trace!(
+            trace!(
                 "skipping token conditional swap for: {pubkey}, id: {tcs_id}, \
                 max_buy: {max_buy_token_to_liqee}, max_sell: {max_sell_token_to_liqor}, \
                 because counter swap price: {swap_price} while taker price: {taker_price}",
@@ -189,7 +190,7 @@ pub async fn maybe_execute_token_conditional_swap_inner(
         }
     }
 
-    log::trace!(
+    trace!(
         "executing token conditional swap for: {}, with owner: {}, id: {}, max_buy: {}, max_sell: {}",
         pubkey,
         liqee.fixed.owner,
@@ -206,11 +207,9 @@ pub async fn maybe_execute_token_conditional_swap_inner(
             max_sell_token_to_liqor,
         )
         .await?;
-    log::info!(
+    info!(
         "Executed swap account {}, tcs index {}, tx sig {:?}",
-        pubkey,
-        tcs_id,
-        txsig
+        pubkey, tcs_id, txsig
     );
 
     let slot = account_fetcher.transaction_max_slot(&[txsig]).await?;
@@ -222,7 +221,7 @@ pub async fn maybe_execute_token_conditional_swap_inner(
         )
         .await
     {
-        log::info!("could not refresh after tcs: {}", e);
+        info!("could not refresh after tcs: {}", e);
     }
 
     Ok(true)
@@ -238,11 +237,9 @@ pub async fn remove_expired_token_conditional_swap(
     let txsig = mango_client
         .token_conditional_swap_trigger((pubkey, &liqee), tcs_id, 0, 0)
         .await?;
-    log::info!(
+    info!(
         "Removed expired token conditional swap account {}, tcs index {}, tx sig {:?}",
-        pubkey,
-        tcs_id,
-        txsig
+        pubkey, tcs_id, txsig
     );
 
     Ok(true)
