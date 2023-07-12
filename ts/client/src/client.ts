@@ -2265,6 +2265,52 @@ export class MangoClient {
     return await this.sendAndConfirmTransactionForGroup(group, [ix]);
   }
 
+  public async perpCloseAll(
+    group: Group,
+    mangoAccount: MangoAccount,
+    slippage = 0.01, // 1%, 100bps
+  ): Promise<TransactionSignature> {
+    if (mangoAccount.perpActive().length > 0) {
+      throw new Error(`No perp positions found.`);
+    }
+
+    if (mangoAccount.perpActive().length > 8) {
+      // Technically we can fit in 16, 1.6M CU, 100k CU per ix, but lets be conservative
+      throw new Error(
+        `Can't close more than 8 positions in one tx, due to compute usage limit.`,
+      );
+    }
+
+    const ixs = await Promise.all(
+      mangoAccount.perpActive().map(async (pa) => {
+        const pm = group.getPerpMarketByMarketIndex(pa.marketIndex);
+
+        return await this.perpPlaceOrderV2Ix(
+          group,
+          mangoAccount,
+          pa.marketIndex,
+          pa.basePositionLots.gt(new BN(0))
+            ? PerpOrderSide.ask
+            : PerpOrderSide.bid,
+          pm.uiPrice *
+            (pa.basePositionLots.gt(new BN(0)) ? 1 + slippage : 1 - slippage), // Try to cross the spread to guarantee matching
+          pa.getBasePositionUi(pm) * 1.01, // Send a larger size to ensure full order is closed
+          undefined,
+          Date.now(),
+          PerpOrderType.immediateOrCancel,
+          PerpSelfTradeBehavior.decrementTake,
+          true, // Reduce only
+          undefined,
+          undefined,
+        );
+      }),
+    );
+
+    return await this.sendAndConfirmTransactionForGroup(group, ixs, {
+      prioritizationFee: true,
+    });
+  }
+
   // perpPlaceOrder ix returns an optional, custom order id,
   // but, since we use a customer tx sender, this method
   // doesn't return it
