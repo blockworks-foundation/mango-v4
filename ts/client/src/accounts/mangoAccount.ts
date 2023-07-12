@@ -595,7 +595,13 @@ export class MangoAccount {
     );
     const sourceBalance = this.getEffectiveTokenBalance(group, sourceBank);
     if (maxSource.gt(sourceBalance)) {
-      const sourceBorrow = maxSource.sub(sourceBalance);
+      // Cannot borrow more than the window limit
+      let sourceBorrow = maxSource.sub(sourceBalance);
+      const netBorrowLimitPerWindow = I80F48.fromI64(
+        sourceBank.netBorrowLimitPerWindowQuote,
+      ).div(sourceBank.price);
+      sourceBorrow = sourceBorrow.min(netBorrowLimitPerWindow);
+
       maxSource = sourceBalance.add(
         sourceBorrow.div(ONE_I80F48().add(sourceBank.loanOriginationFeeRate)),
       );
