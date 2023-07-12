@@ -1,7 +1,7 @@
 import { BN } from '@coral-xyz/anchor';
 import { utf8 } from '@coral-xyz/anchor/dist/cjs/utils/bytes';
 import { PublicKey } from '@solana/web3.js';
-import { I80F48, I80F48Dto, ZERO_I80F48 } from '../numbers/I80F48';
+import { I80F48, I80F48Dto, ONE_I80F48, ZERO_I80F48 } from '../numbers/I80F48';
 import { As, toUiDecimals } from '../utils';
 import { OracleProvider } from './oracle';
 
@@ -397,17 +397,11 @@ export class Bank implements BankForHealth {
   }
 
   uiDeposits(): number {
-    return toUiDecimals(
-      this.indexedDeposits.mul(this.depositIndex),
-      this.mintDecimals,
-    );
+    return toUiDecimals(this.nativeDeposits(), this.mintDecimals);
   }
 
   uiBorrows(): number {
-    return toUiDecimals(
-      this.indexedBorrows.mul(this.borrowIndex),
-      this.mintDecimals,
-    );
+    return toUiDecimals(this.nativeBorrows(), this.mintDecimals);
   }
 
   /**
@@ -480,6 +474,33 @@ export class Bank implements BankForHealth {
    */
   getDepositRateUi(): number {
     return this.getDepositRate().toNumber() * 100;
+  }
+
+  getNetBorrowLimitPerWindow(): I80F48 {
+    return I80F48.fromI64(this.netBorrowLimitPerWindowQuote).div(this.price);
+  }
+
+  getNetBorrowLimitPerWindowUi(): number {
+    return toUiDecimals(
+      I80F48.fromI64(this.netBorrowLimitPerWindowQuote).div(this.price),
+      this.mintDecimals,
+    );
+  }
+
+  getMaxWithdrawNative(userDeposits = ZERO_I80F48()): I80F48 {
+    // user deposits can always be withdrawn
+
+    // borrow is capped to minVaultToDepositsRatio and netBorrowLimitPerWindowQuote
+    const maxWithdrawFromVault = this.nativeDeposits().mul(
+      I80F48.fromNumber(1 - this.minVaultToDepositsRatio),
+    );
+
+    // userDeposits can exceed maxWithdrawFromVault
+    let maxBorrow = maxWithdrawFromVault.sub(userDeposits).min(ZERO_I80F48());
+    maxBorrow = maxBorrow.min(this.getNetBorrowLimitPerWindow());
+    maxBorrow = maxBorrow.div(ONE_I80F48().add(this.loanOriginationFeeRate));
+
+    return maxBorrow.add(userDeposits);
   }
 }
 
