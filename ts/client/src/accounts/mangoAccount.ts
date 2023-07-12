@@ -594,7 +594,10 @@ export class MangoAccount {
       ),
     );
     const sourceBalance = this.getEffectiveTokenBalance(group, sourceBank);
-    const maxWithdrawNative = sourceBank.getMaxWithdrawNative(sourceBalance);
+    const maxWithdrawNative = sourceBank.getMaxWithdrawNative(
+      group.getTokenVaultBalanceByMint(sourceBank.mint),
+      sourceBalance,
+    );
     maxSource = maxSource.min(maxWithdrawNative);
     return toUiDecimals(maxSource, group.getMintDecimals(sourceMintPk));
   }
@@ -726,7 +729,10 @@ export class MangoAccount {
     // If its a bid then the reserved fund and potential loan is in base
     // also keep some buffer for fees, use taker fees for worst case simulation.
     const quoteBalance = this.getEffectiveTokenBalance(group, quoteBank);
-    const maxWithdrawNative = quoteBank.getMaxWithdrawNative(quoteBalance);
+    const maxWithdrawNative = quoteBank.getMaxWithdrawNative(
+      group.getTokenVaultBalanceByMint(quoteBank.mint),
+      quoteBalance,
+    );
     quoteAmount = quoteAmount.min(maxWithdrawNative);
     quoteAmount = quoteAmount.div(
       ONE_I80F48().add(I80F48.fromNumber(serum3Market.getFeeRates(true))),
@@ -764,7 +770,10 @@ export class MangoAccount {
     // If its a ask then the reserved fund and potential loan is in base
     // also keep some buffer for fees, use taker fees for worst case simulation.
     const baseBalance = this.getEffectiveTokenBalance(group, baseBank);
-    const maxWithdrawNative = baseBank.getMaxWithdrawNative(baseBalance);
+    const maxWithdrawNative = baseBank.getMaxWithdrawNative(
+      group.getTokenVaultBalanceByMint(baseBank.mint),
+      baseBalance,
+    );
     baseAmount = baseAmount.min(maxWithdrawNative);
     baseAmount = baseAmount.div(
       ONE_I80F48().add(I80F48.fromNumber(serum3Market.getFeeRates(true))),
