@@ -262,10 +262,10 @@
 
 <span class="kw">use </span>anyhow::Context;
 <span class="kw">use </span>futures::{stream, StreamExt};
-<span class="kw">use </span>log::<span class="kw-2">*</span>;
 <span class="kw">use </span>std::str::FromStr;
 <span class="kw">use </span>std::time::Duration;
 <span class="kw">use </span>tokio::time;
+<span class="kw">use </span>tracing::<span class="kw-2">*</span>;
 
 <span class="kw">use </span><span class="kw">crate</span>::account_update_stream::{AccountUpdate, Message};
 <span class="kw">use </span><span class="kw">crate</span>::AnyhowWrap;
@@ -480,10 +480,10 @@
                 }))
                 .<span class="kw">await
                 </span>.expect(<span class="string">&quot;always Ok&quot;</span>);
-            <span class="macro">log::debug!</span>(<span class="string">&quot;latest slot for snapshot {}&quot;</span>, epoch_info.absolute_slot);
+            <span class="macro">debug!</span>(<span class="string">&quot;latest slot for snapshot {}&quot;</span>, epoch_info.absolute_slot);
 
             <span class="kw">if </span>epoch_info.absolute_slot &gt; config.min_slot {
-                <span class="macro">log::debug!</span>(<span class="string">&quot;continuing to fetch snapshot now, min_slot {} is older than latest epoch slot {}&quot;</span>, config.min_slot, epoch_info.absolute_slot);
+                <span class="macro">debug!</span>(<span class="string">&quot;continuing to fetch snapshot now, min_slot {} is older than latest epoch slot {}&quot;</span>, config.min_slot, epoch_info.absolute_slot);
                 <span class="kw">break</span>;
             }
         }

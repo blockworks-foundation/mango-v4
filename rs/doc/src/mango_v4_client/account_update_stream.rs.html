@@ -101,8 +101,8 @@
 </pre><pre class="rust"><code><span class="kw">use </span>solana_client::rpc_response::{Response, RpcKeyedAccount};
 <span class="kw">use </span>solana_sdk::{account::AccountSharedData, pubkey::Pubkey};
 
-<span class="kw">use </span>log::<span class="kw-2">*</span>;
 <span class="kw">use </span>std::{str::FromStr, sync::Arc};
+<span class="kw">use </span>tracing::<span class="kw-2">*</span>;
 
 <span class="kw">use </span><span class="kw">crate</span>::chain_data;
 

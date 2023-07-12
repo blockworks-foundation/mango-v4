@@ -203,9 +203,9 @@
 <span class="kw">use </span>solana_sdk::{commitment_config::CommitmentConfig, pubkey::Pubkey};
 
 <span class="kw">use </span>anyhow::Context;
-<span class="kw">use </span>log::<span class="kw-2">*</span>;
 <span class="kw">use </span>std::time::Duration;
 <span class="kw">use </span>tokio_stream::StreamMap;
+<span class="kw">use </span>tracing::<span class="kw-2">*</span>;
 
 <span class="kw">use </span><span class="kw">crate</span>::account_update_stream::{AccountUpdate, Message};
 <span class="kw">use </span><span class="kw">crate</span>::AnyhowWrap;
