@@ -2711,6 +2711,9 @@ export class MangoClient {
         pa.getEquityUi(pm) > 0 ? 'negative' : 'positive',
         2,
       );
+      if ((await candidates).length == 0) {
+        continue;
+      }
       ixs.push(
         await this.perpSettlePnlIx(
           group,
