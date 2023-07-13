@@ -43,6 +43,18 @@ pub mod mango_v4 {
     use super::*;
     use error::*;
 
+    pub fn dao_withdraw_fees_token(ctx: Context<DaoWithdrawFeesToken>) -> Result<()> {
+        #[cfg(feature = "enable-gpl")]
+        instructions::dao_withdraw_fees_token(ctx)?;
+        Ok(())
+    }
+
+    pub fn dao_withdraw_fees_perp_market(ctx: Context<DaoWithdrawFeesPerpMarket>) -> Result<()> {
+        #[cfg(feature = "enable-gpl")]
+        instructions::dao_withdraw_fees_perp_market(ctx)?;
+        Ok(())
+    }
+
     pub fn group_create(
         ctx: Context<GroupCreate>,
         group_num: u32,
