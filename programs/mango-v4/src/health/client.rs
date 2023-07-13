@@ -469,11 +469,14 @@ impl HealthCache {
         }
 
         for perp_info in self.perp_infos.iter() {
-            // TODO: multiply with quote price
+            let quote_position_value = perp_info.quote
+                * self.token_infos[perp_info.settle_token_index as usize]
+                    .prices
+                    .oracle;
             if perp_info.quote.is_negative() {
-                liabs -= perp_info.quote;
+                liabs -= quote_position_value;
             } else {
-                assets += perp_info.quote;
+                assets += quote_position_value;
             }
 
             let base_position_value = I80F48::from(perp_info.base_lots * perp_info.base_lot_size)
@@ -1523,11 +1526,6 @@ mod tests {
 
     #[test]
     fn test_leverage() {
-        let buffer = MangoAccount::default_for_tests().try_to_vec().unwrap();
-        let mut account = MangoAccountValue::from_bytes(&buffer).unwrap();
-        account.ensure_token_position(0).unwrap();
-        account.ensure_token_position(1).unwrap();
-
         // only deposits
         let health_cache = HealthCache {
             token_infos: vec![
