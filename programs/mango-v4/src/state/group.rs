@@ -197,6 +197,18 @@ pub enum IxGate {
     TokenConditionalSwapCreate = 52,
     TokenConditionalSwapTrigger = 53,
     TokenConditionalSwapCancel = 54,
+    OpenbookV2CancelOrder = 55,
+    OpenbookV2CloseOpenOrders = 56,
+    OpenbookV2CreateOpenOrders = 57,
+    OpenbookV2DeregisterMarket = 58,
+    OpenbookV2EditMarket = 59,
+    OpenbookV2LiqForceCancelOrders = 60,
+    OpenbookV2PlaceOrder = 61,
+    OpenbookV2PlaceTakeOrder = 62,
+    OpenbookV2RegisterMarket = 63,
+    OpenbookV2SettleFunds = 64,
+    AdminTokenWithdrawFees = 65,
+    AdminPerpWithdrawFees = 66,
     // NOTE: Adding new variants requires matching changes in ts and the ix_gate_set instruction.
 }
 

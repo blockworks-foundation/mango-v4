@@ -43,6 +43,18 @@ pub mod mango_v4 {
     use super::*;
     use error::*;
 
+    pub fn admin_withdraw_token_fees(ctx: Context<AdminTokenWithdrawFees>) -> Result<()> {
+        #[cfg(feature = "enable-gpl")]
+        instructions::admin_withdraw_token_fees(ctx)?;
+        Ok(())
+    }
+
+    pub fn admin_perp_withdraw_fees(ctx: Context<AdminPerpWithdrawFees>) -> Result<()> {
+        #[cfg(feature = "enable-gpl")]
+        instructions::admin_perp_withdraw_fees(ctx)?;
+        Ok(())
+    }
+
     pub fn group_create(
         ctx: Context<GroupCreate>,
         group_num: u32,
