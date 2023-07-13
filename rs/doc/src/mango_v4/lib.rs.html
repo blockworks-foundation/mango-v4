@@ -1412,9 +1412,9 @@
     <span class="kw">use super</span>::<span class="kw-2">*</span>;
     <span class="kw">use </span>error::<span class="kw-2">*</span>;
 
-    <span class="kw">pub fn </span>admin_withdraw_token_fees(ctx: Context&lt;AdminTokenWithdrawFees&gt;) -&gt; <span class="prelude-ty">Result</span>&lt;()&gt; {
+    <span class="kw">pub fn </span>adming_token_withdraw_fees(ctx: Context&lt;AdminTokenWithdrawFees&gt;) -&gt; <span class="prelude-ty">Result</span>&lt;()&gt; {
         <span class="attribute">#[cfg(feature = <span class="string">&quot;enable-gpl&quot;</span>)]
-        </span>instructions::admin_withdraw_token_fees(ctx)<span class="question-mark">?</span>;
+        </span>instructions::admin_token_withdraw_fees(ctx)<span class="question-mark">?</span>;
         <span class="prelude-val">Ok</span>(())
     }
 
