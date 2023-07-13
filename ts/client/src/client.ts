@@ -2712,7 +2712,7 @@ export class MangoClient {
         client,
         group,
         allMangoAccounts,
-        pa.getEquityUi(pm) > 0 ? 'negative' : 'positive',
+        pa.getUnsettledPnlUi(pm) > 0 ? 'negative' : 'positive',
         2,
       );
       if (candidates.length == 0) {
