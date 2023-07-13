@@ -43,9 +43,9 @@ pub mod mango_v4 {
     use super::*;
     use error::*;
 
-    pub fn dao_withdraw_fees_token(ctx: Context<DaoWithdrawFeesToken>) -> Result<()> {
+    pub fn dao_withdraw_fees_token(ctx: Context<AdminTokenWithdrawFees>) -> Result<()> {
         #[cfg(feature = "enable-gpl")]
-        instructions::dao_withdraw_fees_token(ctx)?;
+        instructions::admin_withdraw_token_fees(ctx)?;
         Ok(())
     }
 

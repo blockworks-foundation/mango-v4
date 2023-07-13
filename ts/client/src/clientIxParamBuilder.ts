@@ -192,7 +192,7 @@ export interface IxGateParams {
   OpenbookV2PlaceTakeOrder: boolean;
   OpenbookV2RegisterMarket: boolean;
   OpenbookV2SettleFunds: boolean;
-  DaoWithdrawFeesToken: boolean;
+  AdminTokenWithdrawFees: boolean;
   DaoWithdrawFeesPerpMarket: boolean;
 }
 
@@ -266,7 +266,7 @@ export const TrueIxGateParams: IxGateParams = {
   OpenbookV2PlaceTakeOrder: true,
   OpenbookV2RegisterMarket: true,
   OpenbookV2SettleFunds: true,
-  DaoWithdrawFeesToken: true,
+  AdminTokenWithdrawFees: true,
   DaoWithdrawFeesPerpMarket: true,
 };
 
@@ -350,7 +350,7 @@ export function buildIxGate(p: IxGateParams): BN {
   toggleIx(ixGate, p, 'OpenbookV2PlaceTakeOrder', 62);
   toggleIx(ixGate, p, 'OpenbookV2RegisterMarket', 63);
   toggleIx(ixGate, p, 'OpenbookV2SettleFunds', 63);
-  toggleIx(ixGate, p, 'DaoWithdrawFeesToken', 65);
+  toggleIx(ixGate, p, 'AdminTokenWithdrawFees', 65);
   toggleIx(ixGate, p, 'DaoWithdrawFeesPerpMarket', 66);
 
   return ixGate;

@@ -211,7 +211,7 @@ pub enum IxGate {
     OpenbookV2PlaceTakeOrder = 62,
     OpenbookV2RegisterMarket = 63,
     OpenbookV2SettleFunds = 64,
-    DaoWithdrawFeesToken = 65,
+    AdminTokenWithdrawFees = 65,
     DaoWithdrawFeesPerpMarket = 66,
     // NOTE: Adding new variants requires matching changes in ts and the ix_gate_set instruction.
 }

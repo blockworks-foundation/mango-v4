@@ -4,7 +4,7 @@ use fixed::types::I80F48;
 
 use crate::{accounts_ix::*, group_seeds};
 
-pub fn dao_withdraw_fees_token(ctx: Context<DaoWithdrawFeesToken>) -> Result<()> {
+pub fn admin_withdraw_token_fees(ctx: Context<AdminTokenWithdrawFees>) -> Result<()> {
     let group = ctx.accounts.group.load()?;
     let mut bank = ctx.accounts.bank.load_mut()?;
 
