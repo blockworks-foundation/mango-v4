@@ -2265,6 +2265,56 @@ export class MangoClient {
     return await this.sendAndConfirmTransactionForGroup(group, [ix]);
   }
 
+  public async perpCloseAll(
+    group: Group,
+    mangoAccount: MangoAccount,
+    slippage = 0.01, // 1%, 100bps
+  ): Promise<TransactionSignature> {
+    if (mangoAccount.perpActive().length == 0) {
+      throw new Error(`No perp positions found.`);
+    }
+
+    if (mangoAccount.perpActive().length > 8) {
+      // Technically we can fit in 16, 1.6M CU, 100k CU per ix, but lets be conservative
+      throw new Error(
+        `Can't close more than 8 positions in one tx, due to compute usage limit.`,
+      );
+    }
+
+    const hrix1 = await this.healthRegionBeginIx(group, mangoAccount);
+    const ixs = await Promise.all(
+      mangoAccount.perpActive().map(async (pa) => {
+        const pm = group.getPerpMarketByMarketIndex(pa.marketIndex);
+        const isLong = pa.basePositionLots.gt(new BN(0));
+
+        return await this.perpPlaceOrderV2Ix(
+          group,
+          mangoAccount,
+          pa.marketIndex,
+          isLong ? PerpOrderSide.ask : PerpOrderSide.bid,
+          pm.uiPrice * (isLong ? 1 - slippage : 1 + slippage), // Try to cross the spread to guarantee matching
+          pa.getBasePositionUi(pm) * 1.01, // Send a larger size to ensure full order is closed
+          undefined,
+          Date.now(),
+          PerpOrderType.immediateOrCancel,
+          PerpSelfTradeBehavior.decrementTake,
+          true, // Reduce only
+          undefined,
+          undefined,
+        );
+      }),
+    );
+    const hrix2 = await this.healthRegionEndIx(group, mangoAccount);
+
+    return await this.sendAndConfirmTransactionForGroup(
+      group,
+      [hrix1, ...ixs, hrix2],
+      {
+        prioritizationFee: true,
+      },
+    );
+  }
+
   // perpPlaceOrder ix returns an optional, custom order id,
   // but, since we use a customer tx sender, this method
   // doesn't return it
@@ -2640,6 +2690,56 @@ export class MangoClient {
         owner: (this.program.provider as AnchorProvider).wallet.publicKey,
       })
       .instruction();
+  }
+
+  async perpSettleAll(
+    client: MangoClient,
+    group: Group,
+    mangoAccount: MangoAccount,
+    allMangoAccounts?: MangoAccount[],
+  ): Promise<TransactionSignature> {
+    if (!allMangoAccounts) {
+      allMangoAccounts = await client.getAllMangoAccounts(group, true);
+    }
+
+    const ixs = new Array<TransactionInstruction>();
+    // This is optimistic, since we might find the same opponent candidate for all markets,
+    // and they have might not be able to settle at some point due to safety limits
+    // Future: correct way to do is, to apply the settlement on a copy and then move to next position
+    for (const pa of mangoAccount.perpActive()) {
+      const pm = group.getPerpMarketByMarketIndex(pa.marketIndex);
+      const candidates = await pm.getSettlePnlCandidates(
+        client,
+        group,
+        allMangoAccounts,
+        pa.getUnsettledPnlUi(pm) > 0 ? 'negative' : 'positive',
+        2,
+      );
+      if (candidates.length == 0) {
+        continue;
+      }
+      ixs.push(
+        await this.perpSettlePnlIx(
+          group,
+          pa.getUnsettledPnlUi(pm) > 0 ? mangoAccount : candidates[0].account,
+          pa.getUnsettledPnlUi(pm) < 0 ? candidates[0].account : mangoAccount,
+          mangoAccount,
+          pm.perpMarketIndex,
+        ),
+      );
+      ixs.push(
+        await this.perpSettleFeesIx(
+          group,
+          mangoAccount,
+          pm.perpMarketIndex,
+          undefined,
+        ),
+      );
+    }
+
+    return await this.sendAndConfirmTransactionForGroup(group, ixs, {
+      prioritizationFee: true,
+    });
   }
 
   async perpSettlePnlAndFees(
