@@ -594,22 +594,11 @@ export class MangoAccount {
       ),
     );
     const sourceBalance = this.getEffectiveTokenBalance(group, sourceBank);
-    if (maxSource.gt(sourceBalance)) {
-      // Cannot borrow more than the window limit
-      let sourceBorrow = maxSource.sub(sourceBalance);
-      const netBorrowLimitPerWindow = I80F48.fromI64(
-        sourceBank.netBorrowLimitPerWindowQuote,
-      ).div(sourceBank.price);
-      sourceBorrow = sourceBorrow.min(netBorrowLimitPerWindow);
-
-      maxSource = sourceBalance.add(
-        sourceBorrow.div(ONE_I80F48().add(sourceBank.loanOriginationFeeRate)),
-      );
-    }
-
-    // Cannot swap more than total deposits in mango for the token
-    maxSource = maxSource.min(sourceBank.nativeDeposits());
-
+    const maxWithdrawNative = sourceBank.getMaxWithdraw(
+      group.getTokenVaultBalanceByMint(sourceBank.mint),
+      sourceBalance,
+    );
+    maxSource = maxSource.min(maxWithdrawNative);
     return toUiDecimals(maxSource, group.getMintDecimals(sourceMintPk));
   }
 
@@ -740,12 +729,11 @@ export class MangoAccount {
     // If its a bid then the reserved fund and potential loan is in base
     // also keep some buffer for fees, use taker fees for worst case simulation.
     const quoteBalance = this.getEffectiveTokenBalance(group, quoteBank);
-    if (quoteAmount.gt(quoteBalance)) {
-      const quoteBorrow = quoteAmount.sub(quoteBalance);
-      quoteAmount = quoteBalance.add(
-        quoteBorrow.div(ONE_I80F48().add(quoteBank.loanOriginationFeeRate)),
-      );
-    }
+    const maxWithdrawNative = quoteBank.getMaxWithdraw(
+      group.getTokenVaultBalanceByMint(quoteBank.mint),
+      quoteBalance,
+    );
+    quoteAmount = quoteAmount.min(maxWithdrawNative);
     quoteAmount = quoteAmount.div(
       ONE_I80F48().add(I80F48.fromNumber(serum3Market.getFeeRates(true))),
     );
@@ -782,12 +770,11 @@ export class MangoAccount {
     // If its a ask then the reserved fund and potential loan is in base
     // also keep some buffer for fees, use taker fees for worst case simulation.
     const baseBalance = this.getEffectiveTokenBalance(group, baseBank);
-    if (baseAmount.gt(baseBalance)) {
-      const baseBorrow = baseAmount.sub(baseBalance);
-      baseAmount = baseBalance.add(
-        baseBorrow.div(ONE_I80F48().add(baseBank.loanOriginationFeeRate)),
-      );
-    }
+    const maxWithdrawNative = baseBank.getMaxWithdraw(
+      group.getTokenVaultBalanceByMint(baseBank.mint),
+      baseBalance,
+    );
+    baseAmount = baseAmount.min(maxWithdrawNative);
     baseAmount = baseAmount.div(
       ONE_I80F48().add(I80F48.fromNumber(serum3Market.getFeeRates(true))),
     );

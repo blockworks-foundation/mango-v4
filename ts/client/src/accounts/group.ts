@@ -488,12 +488,7 @@ export class Group {
     return this.getFirstBankByTokenIndex(0 as TokenIndex);
   }
 
-  /**
-   *
-   * @param mintPk
-   * @returns sum of ui balances of vaults for all banks for a token
-   */
-  public getTokenVaultBalanceByMintUi(mintPk: PublicKey): number {
+  public getTokenVaultBalanceByMint(mintPk: PublicKey): BN {
     const banks = this.banksMapByMint.get(mintPk.toBase58());
     if (!banks) {
       throw new Error(`No bank found for mint ${mintPk}!`);
@@ -509,7 +504,19 @@ export class Group {
       totalAmount.iadd(amount);
     }
 
-    return toUiDecimals(totalAmount, this.getMintDecimals(mintPk));
+    return totalAmount;
+  }
+
+  /**
+   *
+   * @param mintPk
+   * @returns sum of ui balances of vaults for all banks for a token
+   */
+  public getTokenVaultBalanceByMintUi(mintPk: PublicKey): number {
+    return toUiDecimals(
+      this.getTokenVaultBalanceByMint(mintPk),
+      this.getMintDecimals(mintPk),
+    );
   }
 
   public getSerum3MarketByMarketIndex(marketIndex: MarketIndex): Serum3Market {
