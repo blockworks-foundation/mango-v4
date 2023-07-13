@@ -2270,7 +2270,7 @@ export class MangoClient {
     mangoAccount: MangoAccount,
     slippage = 0.01, // 1%, 100bps
   ): Promise<TransactionSignature> {
-    if (mangoAccount.perpActive().length > 0) {
+    if (mangoAccount.perpActive().length == 0) {
       throw new Error(`No perp positions found.`);
     }
 
@@ -2281,19 +2281,18 @@ export class MangoClient {
       );
     }
 
+    const hrix1 = await this.healthRegionBeginIx(group, mangoAccount);
     const ixs = await Promise.all(
       mangoAccount.perpActive().map(async (pa) => {
         const pm = group.getPerpMarketByMarketIndex(pa.marketIndex);
+        const isLong = pa.basePositionLots.gt(new BN(0));
 
         return await this.perpPlaceOrderV2Ix(
           group,
           mangoAccount,
           pa.marketIndex,
-          pa.basePositionLots.gt(new BN(0))
-            ? PerpOrderSide.ask
-            : PerpOrderSide.bid,
-          pm.uiPrice *
-            (pa.basePositionLots.gt(new BN(0)) ? 1 + slippage : 1 - slippage), // Try to cross the spread to guarantee matching
+          isLong ? PerpOrderSide.ask : PerpOrderSide.bid,
+          pm.uiPrice * (isLong ? 1 - slippage : 1 + slippage), // Try to cross the spread to guarantee matching
           pa.getBasePositionUi(pm) * 1.01, // Send a larger size to ensure full order is closed
           undefined,
           Date.now(),
@@ -2305,10 +2304,15 @@ export class MangoClient {
         );
       }),
     );
+    const hrix2 = await this.healthRegionEndIx(group, mangoAccount);
 
-    return await this.sendAndConfirmTransactionForGroup(group, ixs, {
-      prioritizationFee: true,
-    });
+    return await this.sendAndConfirmTransactionForGroup(
+      group,
+      [hrix1, ...ixs, hrix2],
+      {
+        prioritizationFee: true,
+      },
+    );
   }
 
   // perpPlaceOrder ix returns an optional, custom order id,
@@ -2704,21 +2708,21 @@ export class MangoClient {
     // Future: correct way to do is, to apply the settlement on a copy and then move to next position
     for (const pa of mangoAccount.perpActive()) {
       const pm = group.getPerpMarketByMarketIndex(pa.marketIndex);
-      const candidates = pm.getSettlePnlCandidates(
+      const candidates = await pm.getSettlePnlCandidates(
         client,
         group,
         allMangoAccounts,
         pa.getEquityUi(pm) > 0 ? 'negative' : 'positive',
         2,
       );
-      if ((await candidates).length == 0) {
+      if (candidates.length == 0) {
         continue;
       }
       ixs.push(
         await this.perpSettlePnlIx(
           group,
-          pa.getEquityUi(pm) > 0 ? mangoAccount : candidates[0],
-          pa.getEquityUi(pm) < 0 ? candidates[0] : mangoAccount,
+          pa.getUnsettledPnlUi(pm) > 0 ? mangoAccount : candidates[0].account,
+          pa.getUnsettledPnlUi(pm) < 0 ? candidates[0].account : mangoAccount,
           mangoAccount,
           pm.perpMarketIndex,
         ),
