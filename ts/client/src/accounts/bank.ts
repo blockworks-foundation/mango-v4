@@ -480,31 +480,30 @@ export class Bank implements BankForHealth {
     return I80F48.fromI64(this.netBorrowLimitPerWindowQuote).div(this.price);
   }
 
-  geBorrowLimitLeftInWindow(): I80F48 {
-    return I80F48.fromI64(this.netBorrowLimitPerWindowQuote)
-      .div(this.price)
-      .sub(I80F48.fromI64(this.netBorrowsInWindow));
+  getBorrowLimitLeftInWindow(): I80F48 {
+    return this.getNetBorrowLimitPerWindow()
+      .sub(I80F48.fromI64(this.netBorrowsInWindow))
+      .max(ZERO_I80F48());
   }
 
   getNetBorrowLimitPerWindowUi(): number {
-    return toUiDecimals(
-      I80F48.fromI64(this.netBorrowLimitPerWindowQuote).div(this.price),
-      this.mintDecimals,
-    );
+    return toUiDecimals(this.getNetBorrowLimitPerWindow(), this.mintDecimals);
   }
 
   getMaxWithdraw(vaultBalance: BN, userDeposits = ZERO_I80F48()): I80F48 {
+    userDeposits = userDeposits.max(ZERO_I80F48());
+
     // any borrow must respect the minVaultToDepositsRatio
     const minVaultBalanceRequired = this.nativeDeposits().mul(
       I80F48.fromNumber(this.minVaultToDepositsRatio),
     );
-    const maxWithdrawFromVault = I80F48.fromI64(vaultBalance)
+    const maxBorrowFromVault = I80F48.fromI64(vaultBalance)
       .sub(minVaultBalanceRequired)
       .max(ZERO_I80F48());
     // User deposits can exceed maxWithdrawFromVault
-    let maxBorrow = maxWithdrawFromVault.sub(userDeposits).max(ZERO_I80F48());
+    let maxBorrow = maxBorrowFromVault.sub(userDeposits).max(ZERO_I80F48());
     // any borrow must respect the limit left in window
-    maxBorrow = maxBorrow.min(this.geBorrowLimitLeftInWindow());
+    maxBorrow = maxBorrow.min(this.getBorrowLimitLeftInWindow());
     // borrows would be applied a fee
     maxBorrow = maxBorrow.div(ONE_I80F48().add(this.loanOriginationFeeRate));
 
