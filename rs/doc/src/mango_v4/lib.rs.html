@@ -1355,6 +1355,18 @@
 <span id="1355">1355</span>
 <span id="1356">1356</span>
 <span id="1357">1357</span>
+<span id="1358">1358</span>
+<span id="1359">1359</span>
+<span id="1360">1360</span>
+<span id="1361">1361</span>
+<span id="1362">1362</span>
+<span id="1363">1363</span>
+<span id="1364">1364</span>
+<span id="1365">1365</span>
+<span id="1366">1366</span>
+<span id="1367">1367</span>
+<span id="1368">1368</span>
+<span id="1369">1369</span>
 </pre><pre class="rust"><code><span class="attribute">#![allow(unused_variables)]
 
 </span><span class="kw">use </span>fixed::types::I80F48;
@@ -1399,6 +1411,18 @@
 
     <span class="kw">use super</span>::<span class="kw-2">*</span>;
     <span class="kw">use </span>error::<span class="kw-2">*</span>;
+
+    <span class="kw">pub fn </span>admin_withdraw_token_fees(ctx: Context&lt;AdminTokenWithdrawFees&gt;) -&gt; <span class="prelude-ty">Result</span>&lt;()&gt; {
+        <span class="attribute">#[cfg(feature = <span class="string">&quot;enable-gpl&quot;</span>)]
+        </span>instructions::admin_withdraw_token_fees(ctx)<span class="question-mark">?</span>;
+        <span class="prelude-val">Ok</span>(())
+    }
+
+    <span class="kw">pub fn </span>admin_perp_withdraw_fees(ctx: Context&lt;AdminPerpWithdrawFees&gt;) -&gt; <span class="prelude-ty">Result</span>&lt;()&gt; {
+        <span class="attribute">#[cfg(feature = <span class="string">&quot;enable-gpl&quot;</span>)]
+        </span>instructions::admin_perp_withdraw_fees(ctx)<span class="question-mark">?</span>;
+        <span class="prelude-val">Ok</span>(())
+    }
 
     <span class="kw">pub fn </span>group_create(
         ctx: Context&lt;GroupCreate&gt;,

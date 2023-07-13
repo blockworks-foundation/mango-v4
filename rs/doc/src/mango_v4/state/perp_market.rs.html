@@ -499,6 +499,14 @@
 <span id="499">499</span>
 <span id="500">500</span>
 <span id="501">501</span>
+<span id="502">502</span>
+<span id="503">503</span>
+<span id="504">504</span>
+<span id="505">505</span>
+<span id="506">506</span>
+<span id="507">507</span>
+<span id="508">508</span>
+<span id="509">509</span>
 </pre><pre class="rust"><code><span class="kw">use </span>std::mem::size_of;
 
 <span class="kw">use </span>anchor_lang::prelude::<span class="kw-2">*</span>;
@@ -625,8 +633,10 @@
     </span><span class="kw">pub </span>taker_fee: I80F48,
 
     <span class="doccomment">/// Fees accrued in native quote currency
+    /// these are increased when new fees are paid and decreased when perp_settle_fees is called
     </span><span class="kw">pub </span>fees_accrued: I80F48,
     <span class="doccomment">/// Fees settled in native quote currency
+    /// these are increased when perp_settle_fees is called, and never decreased
     </span><span class="kw">pub </span>fees_settled: I80F48,
 
     <span class="doccomment">/// Fee (in quote native) to charge for ioc orders
@@ -671,7 +681,11 @@
 
     <span class="kw">pub </span>positive_pnl_liquidation_fee: I80F48,
 
-    <span class="kw">pub </span>reserved: [u8; <span class="number">1888</span>],
+    <span class="comment">// Do separate bookkeping for how many tokens were withdrawn
+    // This ensures that fees_settled is strictly increasing for stats gathering purposes
+    </span><span class="kw">pub </span>fees_withdrawn: u64,
+
+    <span class="kw">pub </span>reserved: [u8; <span class="number">1880</span>],
 }
 
 <span class="macro">const_assert_eq!</span>(
@@ -707,7 +721,8 @@
         </span>+ <span class="number">1
         </span>+ <span class="number">7
         </span>+ <span class="number">3 </span>* <span class="number">16
-        </span>+ <span class="number">1888
+        </span>+ <span class="number">8
+        </span>+ <span class="number">1880
 </span>);
 <span class="macro">const_assert_eq!</span>(size_of::&lt;PerpMarket&gt;(), <span class="number">2808</span>);
 <span class="macro">const_assert_eq!</span>(size_of::&lt;PerpMarket&gt;() % <span class="number">8</span>, <span class="number">0</span>);
@@ -996,7 +1011,8 @@
             maint_overall_asset_weight: I80F48::ONE,
             init_overall_asset_weight: I80F48::ONE,
             positive_pnl_liquidation_fee: I80F48::ZERO,
-            reserved: [<span class="number">0</span>; <span class="number">1888</span>],
+            fees_withdrawn: <span class="number">0</span>,
+            reserved: [<span class="number">0</span>; <span class="number">1880</span>],
         }
     }
 }
