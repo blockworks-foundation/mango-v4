@@ -140,7 +140,7 @@ pub struct Bank {
 
     // Do separate bookkeping for how many tokens were withdrawn
     // This ensures that collected_fees_native is strictly increasing for stats gathering purposes
-    pub fees_withdrawn_to_dao: u64,
+    pub fees_withdrawn: u64,
 
     #[derivative(Debug = "ignore")]
     pub reserved: [u8; 2104],
@@ -249,7 +249,7 @@ impl Bank {
             reduce_only: 0,
             force_close: 0,
             padding: [0; 6],
-            fees_withdrawn_to_dao: 0,
+            fees_withdrawn: 0,
             reserved: [0; 2104],
         }
     }

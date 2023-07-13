@@ -8,14 +8,14 @@ pub fn dao_withdraw_fees_perp_market(ctx: Context<DaoWithdrawFeesPerpMarket>) ->
     let mut perp_market = ctx.accounts.perp_market.load_mut()?;
 
     let group_seeds = group_seeds!(group);
-    let fees = perp_market.fees_settled.floor().to_num::<u64>() - perp_market.fees_withdrawn_to_dao;
+    let fees = perp_market.fees_settled.floor().to_num::<u64>() - perp_market.fees_withdrawn;
     let amount = fees.min(ctx.accounts.vault.amount);
     token::transfer(
         ctx.accounts.transfer_ctx().with_signer(&[group_seeds]),
         amount,
     )?;
 
-    perp_market.fees_withdrawn_to_dao += amount;
+    perp_market.fees_withdrawn += amount;
 
     Ok(())
 }

@@ -124,8 +124,10 @@ pub struct PerpMarket {
     pub taker_fee: I80F48,
 
     /// Fees accrued in native quote currency
+    /// these are increased when new fees are paid and decreased when perp_settle_fees is called
     pub fees_accrued: I80F48,
     /// Fees settled in native quote currency
+    /// these are increased when perp_settle_fees is called, and never decreased
     pub fees_settled: I80F48,
 
     /// Fee (in quote native) to charge for ioc orders
@@ -172,7 +174,7 @@ pub struct PerpMarket {
 
     // Do separate bookkeping for how many tokens were withdrawn
     // This ensures that fees_settled is strictly increasing for stats gathering purposes
-    pub fees_withdrawn_to_dao: u64,
+    pub fees_withdrawn: u64,
 
     pub reserved: [u8; 1880],
 }
@@ -500,7 +502,7 @@ impl PerpMarket {
             maint_overall_asset_weight: I80F48::ONE,
             init_overall_asset_weight: I80F48::ONE,
             positive_pnl_liquidation_fee: I80F48::ZERO,
-            fees_withdrawn_to_dao: 0,
+            fees_withdrawn: 0,
             reserved: [0; 1880],
         }
     }

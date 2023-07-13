@@ -76,7 +76,7 @@ pub fn token_register_trustless(
         reduce_only: 2,                                   // deposit-only
         force_close: 0,
         padding: [0; 6],
-        fees_withdrawn_to_dao: 0,
+        fees_withdrawn: 0,
         reserved: [0; 2104],
     };
     require_gt!(bank.max_rate, MINIMUM_MAX_RATE);
