@@ -9,18 +9,15 @@ pub fn dao_withdraw_fees_token(ctx: Context<DaoWithdrawFeesToken>) -> Result<()>
     let mut bank = ctx.accounts.bank.load_mut()?;
 
     let group_seeds = group_seeds!(group);
-    let amount = bank
-        .collected_fees_native
-        .floor()
-        .to_num::<u64>()
-        .min(ctx.accounts.vault.amount);
+    let fees = bank.collected_fees_native.floor().to_num::<u64>() - bank.fees_withdrawn_to_dao;
+    let amount = fees.min(ctx.accounts.vault.amount);
     token::transfer(
         ctx.accounts.transfer_ctx().with_signer(&[group_seeds]),
         amount,
     )?;
 
     let amount_i80f48 = I80F48::from(amount);
-    bank.collected_fees_native -= amount_i80f48;
+    bank.fees_withdrawn_to_dao += amount_i80f48;
 
     Ok(())
 }

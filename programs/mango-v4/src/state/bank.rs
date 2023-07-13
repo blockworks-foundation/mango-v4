@@ -136,8 +136,10 @@ pub struct Bank {
     pub reduce_only: u8,
     pub force_close: u8,
 
+    pub fees_withdrawn_to_dao: u64,
+
     #[derivative(Debug = "ignore")]
-    pub reserved: [u8; 2118],
+    pub reserved: [u8; 2110],
 }
 const_assert_eq!(
     size_of::<Bank>(),
@@ -165,8 +167,8 @@ const_assert_eq!(
         + 8
         + 8
         + 1
-        + 1
-        + 2118
+        + 8
+        + 2110
 );
 const_assert_eq!(size_of::<Bank>(), 3064);
 const_assert_eq!(size_of::<Bank>() % 8, 0);

@@ -170,7 +170,9 @@ pub struct PerpMarket {
 
     pub positive_pnl_liquidation_fee: I80F48,
 
-    pub reserved: [u8; 1888],
+    pub fees_withdrawn_to_dao: u64,
+
+    pub reserved: [u8; 1880],
 }
 
 const_assert_eq!(
