@@ -15,6 +15,7 @@ pub fn dao_withdraw_fees_token(ctx: Context<DaoWithdrawFeesToken>) -> Result<()>
         bank.collected_fees_native.floor().to_num::<u64>(),
     )?;
 
+    let amount_i80f48 = I80F48::from(amount);
     bank.collected_fees_native -= amount_i80f48;
 
     Ok(())
