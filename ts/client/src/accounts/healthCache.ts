@@ -9,7 +9,11 @@ import {
   ONE_I80F48,
   ZERO_I80F48,
 } from '../numbers/I80F48';
-import { toNativeI80F48ForQuote, toUiDecimalsForQuote } from '../utils';
+import {
+  toNativeI80F48ForQuote,
+  toUiDecimals,
+  toUiDecimalsForQuote,
+} from '../utils';
 import { Bank, BankForHealth, TokenIndex } from './bank';
 import { Group } from './group';
 
@@ -254,7 +258,10 @@ export class HealthCache {
         market: group.getPerpMarketByMarketIndex(
           perpInfo.perpMarketIndex as PerpMarketIndex,
         ).name,
-        contributionUi: toUiDecimalsForQuote(healthUnsettled),
+        contributionUi: toUiDecimals(
+          healthUnsettled,
+          group.getMintDecimalsByTokenIndex(perpInfo.settleTokenIndex),
+        ),
       });
       if (!ignoreNegativePerp || healthUnsettled.gt(ZERO_I80F48())) {
         perpSettleToken.spotAndPerp.iadd(healthUnsettled);
@@ -265,7 +272,10 @@ export class HealthCache {
       const tokenInfo = this.tokenInfos[index];
       const tokenBalance = tokenBalances[index];
       tokenBalance.spotAndPerp.iadd(tokenInfo.balanceSpot);
-      tokenBalance.spotUi += toUiDecimalsForQuote(tokenInfo.balanceSpot);
+      tokenBalance.spotUi += toUiDecimals(
+        tokenInfo.balanceSpot,
+        group.getMintDecimalsByTokenIndex(tokenInfo.tokenIndex),
+      );
     }
 
     return tokenBalances;
