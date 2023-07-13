@@ -193,7 +193,7 @@ export interface IxGateParams {
   OpenbookV2RegisterMarket: boolean;
   OpenbookV2SettleFunds: boolean;
   AdminTokenWithdrawFees: boolean;
-  DaoWithdrawFeesPerpMarket: boolean;
+  AdminPerpWithdrawFees: boolean;
 }
 
 // Default with all ixs enabled, use with buildIxGate
@@ -267,7 +267,7 @@ export const TrueIxGateParams: IxGateParams = {
   OpenbookV2RegisterMarket: true,
   OpenbookV2SettleFunds: true,
   AdminTokenWithdrawFees: true,
-  DaoWithdrawFeesPerpMarket: true,
+  AdminPerpWithdrawFees: true,
 };
 
 // build ix gate e.g. buildIxGate(Builder(TrueIxGateParams).TokenDeposit(false).build()).toNumber(),
@@ -351,7 +351,7 @@ export function buildIxGate(p: IxGateParams): BN {
   toggleIx(ixGate, p, 'OpenbookV2RegisterMarket', 63);
   toggleIx(ixGate, p, 'OpenbookV2SettleFunds', 63);
   toggleIx(ixGate, p, 'AdminTokenWithdrawFees', 65);
-  toggleIx(ixGate, p, 'DaoWithdrawFeesPerpMarket', 66);
+  toggleIx(ixGate, p, 'AdminPerpWithdrawFees', 66);
 
   return ixGate;
 }

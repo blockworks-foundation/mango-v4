@@ -3,7 +3,7 @@ use anchor_spl::token;
 
 use crate::{accounts_ix::*, group_seeds};
 
-pub fn dao_withdraw_fees_perp_market(ctx: Context<DaoWithdrawFeesPerpMarket>) -> Result<()> {
+pub fn admin_perp_withdraw_fees(ctx: Context<AdminPerpWithdrawFees>) -> Result<()> {
     let group = ctx.accounts.group.load()?;
     let mut perp_market = ctx.accounts.perp_market.load_mut()?;
 

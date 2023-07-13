@@ -7,9 +7,9 @@ use crate::error::*;
 use crate::state::*;
 
 #[derive(Accounts)]
-pub struct DaoWithdrawFeesPerpMarket<'info> {
+pub struct AdminPerpWithdrawFees<'info> {
     #[account(
-        constraint = group.load()?.is_ix_enabled(IxGate::DaoWithdrawFeesPerpMarket) @ MangoError::IxIsDisabled,
+        constraint = group.load()?.is_ix_enabled(IxGate::AdminPerpWithdrawFees) @ MangoError::IxIsDisabled,
         has_one = admin,
     )]
     pub group: AccountLoader<'info, Group>,
@@ -39,7 +39,7 @@ pub struct DaoWithdrawFeesPerpMarket<'info> {
     pub admin: Signer<'info>,
 }
 
-impl<'info> DaoWithdrawFeesPerpMarket<'info> {
+impl<'info> AdminPerpWithdrawFees<'info> {
     pub fn transfer_ctx(&self) -> CpiContext<'_, '_, '_, 'info, token::Transfer<'info>> {
         let program = self.token_program.to_account_info();
         let accounts = token::Transfer {

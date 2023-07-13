@@ -43,15 +43,15 @@ pub mod mango_v4 {
     use super::*;
     use error::*;
 
-    pub fn dao_withdraw_fees_token(ctx: Context<AdminTokenWithdrawFees>) -> Result<()> {
+    pub fn admin_withdraw_token_fees(ctx: Context<AdminTokenWithdrawFees>) -> Result<()> {
         #[cfg(feature = "enable-gpl")]
         instructions::admin_withdraw_token_fees(ctx)?;
         Ok(())
     }
 
-    pub fn dao_withdraw_fees_perp_market(ctx: Context<DaoWithdrawFeesPerpMarket>) -> Result<()> {
+    pub fn admin_perp_withdraw_fees(ctx: Context<AdminPerpWithdrawFees>) -> Result<()> {
         #[cfg(feature = "enable-gpl")]
-        instructions::dao_withdraw_fees_perp_market(ctx)?;
+        instructions::admin_perp_withdraw_fees(ctx)?;
         Ok(())
     }
 
