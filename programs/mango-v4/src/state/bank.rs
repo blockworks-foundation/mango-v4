@@ -136,10 +136,14 @@ pub struct Bank {
     pub reduce_only: u8,
     pub force_close: u8,
 
+    pub padding: [u8; 6],
+
+    // Do separate bookkeping for how many tokens were withdrawn
+    // This ensures that collected_fees_native is strictly increasing for stats gathering purposes
     pub fees_withdrawn_to_dao: u64,
 
     #[derivative(Debug = "ignore")]
-    pub reserved: [u8; 2110],
+    pub reserved: [u8; 2104],
 }
 const_assert_eq!(
     size_of::<Bank>(),
@@ -167,8 +171,10 @@ const_assert_eq!(
         + 8
         + 8
         + 1
+        + 1
+        + 6
         + 8
-        + 2110
+        + 2104
 );
 const_assert_eq!(size_of::<Bank>(), 3064);
 const_assert_eq!(size_of::<Bank>() % 8, 0);
@@ -242,7 +248,9 @@ impl Bank {
             deposit_weight_scale_start_quote: f64::MAX,
             reduce_only: 0,
             force_close: 0,
-            reserved: [0; 2118],
+            padding: [0; 6],
+            fees_withdrawn_to_dao: 0,
+            reserved: [0; 2104],
         }
     }
 

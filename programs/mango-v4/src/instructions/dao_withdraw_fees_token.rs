@@ -16,8 +16,7 @@ pub fn dao_withdraw_fees_token(ctx: Context<DaoWithdrawFeesToken>) -> Result<()>
         amount,
     )?;
 
-    let amount_i80f48 = I80F48::from(amount);
-    bank.fees_withdrawn_to_dao += amount_i80f48;
+    bank.fees_withdrawn_to_dao += amount;
 
     Ok(())
 }

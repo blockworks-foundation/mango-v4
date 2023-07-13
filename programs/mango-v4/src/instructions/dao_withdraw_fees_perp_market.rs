@@ -1,6 +1,5 @@
 use anchor_lang::prelude::*;
 use anchor_spl::token;
-use fixed::types::I80F48;
 
 use crate::{accounts_ix::*, group_seeds};
 
@@ -16,8 +15,7 @@ pub fn dao_withdraw_fees_perp_market(ctx: Context<DaoWithdrawFeesPerpMarket>) ->
         amount,
     )?;
 
-    let amount_i80f48 = I80F48::from(amount);
-    perp_market.fees_withdrawn_to_dao += amount_i80f48;
+    perp_market.fees_withdrawn_to_dao += amount;
 
     Ok(())
 }

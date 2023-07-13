@@ -170,6 +170,8 @@ pub struct PerpMarket {
 
     pub positive_pnl_liquidation_fee: I80F48,
 
+    // Do separate bookkeping for how many tokens were withdrawn
+    // This ensures that fees_settled is strictly increasing for stats gathering purposes
     pub fees_withdrawn_to_dao: u64,
 
     pub reserved: [u8; 1880],
@@ -208,7 +210,8 @@ const_assert_eq!(
         + 1
         + 7
         + 3 * 16
-        + 1888
+        + 8
+        + 1880
 );
 const_assert_eq!(size_of::<PerpMarket>(), 2808);
 const_assert_eq!(size_of::<PerpMarket>() % 8, 0);
@@ -497,7 +500,8 @@ impl PerpMarket {
             maint_overall_asset_weight: I80F48::ONE,
             init_overall_asset_weight: I80F48::ONE,
             positive_pnl_liquidation_fee: I80F48::ZERO,
-            reserved: [0; 1888],
+            fees_withdrawn_to_dao: 0,
+            reserved: [0; 1880],
         }
     }
 }
