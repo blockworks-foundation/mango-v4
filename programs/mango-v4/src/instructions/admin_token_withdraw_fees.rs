@@ -3,7 +3,7 @@ use anchor_spl::token;
 
 use crate::{accounts_ix::*, group_seeds};
 
-pub fn admin_withdraw_token_fees(ctx: Context<AdminTokenWithdrawFees>) -> Result<()> {
+pub fn admin_token_withdraw_fees(ctx: Context<AdminTokenWithdrawFees>) -> Result<()> {
     let group = ctx.accounts.group.load()?;
     let mut bank = ctx.accounts.bank.load_mut()?;
 
