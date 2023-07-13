@@ -12,7 +12,7 @@ pub fn dao_withdraw_fees_token(ctx: Context<DaoWithdrawFeesToken>) -> Result<()>
     let amount = bank.collected_fees_native.floor().to_num::<u64>();
     token::transfer(
         ctx.accounts.transfer_ctx().with_signer(&[group_seeds]),
-        bank.collected_fees_native.floor().to_num::<u64>(),
+        amount,
     )?;
 
     let amount_i80f48 = I80F48::from(amount);
