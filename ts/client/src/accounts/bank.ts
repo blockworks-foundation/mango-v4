@@ -480,6 +480,12 @@ export class Bank implements BankForHealth {
     return I80F48.fromI64(this.netBorrowLimitPerWindowQuote).div(this.price);
   }
 
+  geBorrowLimitLeftInWindow(): I80F48 {
+    return I80F48.fromI64(this.netBorrowLimitPerWindowQuote)
+      .div(this.price)
+      .sub(I80F48.fromI64(this.netBorrowsInWindow));
+  }
+
   getNetBorrowLimitPerWindowUi(): number {
     return toUiDecimals(
       I80F48.fromI64(this.netBorrowLimitPerWindowQuote).div(this.price),
@@ -487,23 +493,27 @@ export class Bank implements BankForHealth {
     );
   }
 
-  getMaxWithdrawNative(vaultBalance: BN, userDeposits = ZERO_I80F48()): I80F48 {
-    // borrow is capped to minVaultToDepositsRatio and netBorrowLimitPerWindowQuote
-    const maxWithdrawFromVault = this.nativeDeposits().mul(
-      I80F48.fromNumber(1 - this.minVaultToDepositsRatio),
+  getMaxWithdraw(vaultBalance: BN, userDeposits = ZERO_I80F48()): I80F48 {
+    // any borrow must respect the minVaultToDepositsRatio
+    const minVaultBalanceRequired = this.nativeDeposits().mul(
+      I80F48.fromNumber(this.minVaultToDepositsRatio),
     );
-
-    // userDeposits can exceed maxWithdrawFromVault
-    let maxBorrow = maxWithdrawFromVault.sub(userDeposits).min(ZERO_I80F48());
-    maxBorrow = maxBorrow.min(this.getNetBorrowLimitPerWindow());
+    const maxWithdrawFromVault = I80F48.fromI64(vaultBalance)
+      .sub(minVaultBalanceRequired)
+      .max(ZERO_I80F48());
+    // User deposits can exceed maxWithdrawFromVault
+    let maxBorrow = maxWithdrawFromVault.sub(userDeposits).max(ZERO_I80F48());
+    // any borrow must respect the limit left in window
+    maxBorrow = maxBorrow.min(this.geBorrowLimitLeftInWindow());
+    // borrows would be applied a fee
     maxBorrow = maxBorrow.div(ONE_I80F48().add(this.loanOriginationFeeRate));
 
     // user deposits can always be withdrawn
-    // vaults can be depleted
+    // even if vaults can be depleted
     return maxBorrow.add(userDeposits).min(I80F48.fromI64(vaultBalance));
   }
 
-  getWhenNextBorrowLimitWindowStartsTs(): number {
+  getTimeToNextBorrowLimitWindowStartsTs(): number {
     return this.netBorrowLimitWindowSizeTs
       .sub(new BN(Date.now() / 1000).sub(this.lastNetBorrowsWindowStartTs))
       .toNumber();

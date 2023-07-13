@@ -594,7 +594,7 @@ export class MangoAccount {
       ),
     );
     const sourceBalance = this.getEffectiveTokenBalance(group, sourceBank);
-    const maxWithdrawNative = sourceBank.getMaxWithdrawNative(
+    const maxWithdrawNative = sourceBank.getMaxWithdraw(
       group.getTokenVaultBalanceByMint(sourceBank.mint),
       sourceBalance,
     );
@@ -729,7 +729,7 @@ export class MangoAccount {
     // If its a bid then the reserved fund and potential loan is in base
     // also keep some buffer for fees, use taker fees for worst case simulation.
     const quoteBalance = this.getEffectiveTokenBalance(group, quoteBank);
-    const maxWithdrawNative = quoteBank.getMaxWithdrawNative(
+    const maxWithdrawNative = quoteBank.getMaxWithdraw(
       group.getTokenVaultBalanceByMint(quoteBank.mint),
       quoteBalance,
     );
@@ -770,7 +770,7 @@ export class MangoAccount {
     // If its a ask then the reserved fund and potential loan is in base
     // also keep some buffer for fees, use taker fees for worst case simulation.
     const baseBalance = this.getEffectiveTokenBalance(group, baseBank);
-    const maxWithdrawNative = baseBank.getMaxWithdrawNative(
+    const maxWithdrawNative = baseBank.getMaxWithdraw(
       group.getTokenVaultBalanceByMint(baseBank.mint),
       baseBalance,
     );
