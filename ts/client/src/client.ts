@@ -2692,7 +2692,7 @@ export class MangoClient {
       .instruction();
   }
 
-  async perpSettleAll(
+  async settleAll(
     client: MangoClient,
     group: Group,
     mangoAccount: MangoAccount,
@@ -2702,7 +2702,7 @@ export class MangoClient {
       allMangoAccounts = await client.getAllMangoAccounts(group, true);
     }
 
-    const ixs = new Array<TransactionInstruction>();
+    const ixs1 = new Array<TransactionInstruction>();
     // This is optimistic, since we might find the same opponent candidate for all markets,
     // and they have might not be able to settle at some point due to safety limits
     // Future: correct way to do is, to apply the settlement on a copy and then move to next position
@@ -2718,7 +2718,8 @@ export class MangoClient {
       if (candidates.length == 0) {
         continue;
       }
-      ixs.push(
+      ixs1.push(
+        // Takes ~130k CU
         await this.perpSettlePnlIx(
           group,
           pa.getUnsettledPnlUi(pm) > 0 ? mangoAccount : candidates[0].account,
@@ -2727,7 +2728,8 @@ export class MangoClient {
           pm.perpMarketIndex,
         ),
       );
-      ixs.push(
+      ixs1.push(
+        // Takes ~20k CU
         await this.perpSettleFeesIx(
           group,
           mangoAccount,
@@ -2737,9 +2739,35 @@ export class MangoClient {
       );
     }
 
-    return await this.sendAndConfirmTransactionForGroup(group, ixs, {
-      prioritizationFee: true,
-    });
+    const ixs2 = await Promise.all(
+      mangoAccount.serum3Active().map((s) => {
+        const serum3Market = group.getSerum3MarketByMarketIndex(s.marketIndex);
+        // Takes ~65k CU
+        return this.serum3SettleFundsV2Ix(
+          group,
+          mangoAccount,
+          serum3Market.serumMarketExternal,
+        );
+      }),
+    );
+
+    if (
+      mangoAccount.perpActive().length * 150 +
+        mangoAccount.serum3Active().length * 65 >
+      1600
+    ) {
+      throw new Error(
+        `Too many perp positions and serum open orders to settle in one tx! Please try settling individually!`,
+      );
+    }
+
+    return await this.sendAndConfirmTransactionForGroup(
+      group,
+      [...ixs1, ...ixs2],
+      {
+        prioritizationFee: true,
+      },
+    );
   }
 
   async perpSettlePnlAndFees(
