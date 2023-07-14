@@ -91,7 +91,8 @@ pub fn perp_create_market(
         maint_overall_asset_weight: I80F48::from_num(maint_overall_asset_weight),
         init_overall_asset_weight: I80F48::from_num(init_overall_asset_weight),
         positive_pnl_liquidation_fee: I80F48::from_num(positive_pnl_liquidation_fee),
-        reserved: [0; 1888],
+        fees_withdrawn: 0,
+        reserved: [0; 1880],
     };
 
     if let Ok(oracle_price) =
