@@ -336,7 +336,16 @@ export class MangoAccount {
   public getHealthContributionPerAssetUi(
     group: Group,
     healthType: HealthType,
-  ): { asset: string; contribution: number }[] {
+  ): {
+    asset: string;
+    contribution: number;
+    contributionDetails:
+      | {
+          spotUi: number;
+          perpMarketContributions: { market: string; contributionUi: number }[];
+        }
+      | undefined;
+  }[] {
     const hc = HealthCache.fromMangoAccount(group, this);
     return hc.healthContributionPerAssetUi(group, healthType);
   }
