@@ -87,13 +87,20 @@ impl<'a, 'info> DepositCommon<'a, 'info> {
         token::transfer(self.transfer_ctx(), amount_i80f48.to_num::<u64>())?;
 
         let indexed_position = position.indexed_position;
-        let oracle_price = bank.oracle_price(
+
+        let now_slot = Clock::get()?.slot;
+        let oracle_price_result = bank.oracle_price(
             &AccountInfoRef::borrow(self.oracle.as_ref())?,
-            None, // staleness checked in health
-        )?;
+            Some(now_slot),
+        );
+        let oracle_or_stable_price = if oracle_price_result.is_oracle_error() {
+            bank.stable_price()
+        } else {
+            oracle_price_result?
+        };
 
         // Update the net deposits - adjust by price so different tokens are on the same basis (in USD terms)
-        let amount_usd = (amount_i80f48 * oracle_price).to_num::<i64>();
+        let amount_usd = (amount_i80f48 * oracle_or_stable_price).to_num::<i64>();
         account.fixed.net_deposits += amount_usd;
 
         emit!(TokenBalanceLog {
@@ -110,7 +117,11 @@ impl<'a, 'info> DepositCommon<'a, 'info> {
         // Health computation
         //
         let retriever = new_fixed_order_account_retriever(remaining_accounts, &account.borrow())?;
-        let cache = new_health_cache(&account.borrow(), &retriever)?;
+
+        // We only compute health to check if the account leaves the being_liquidated state.
+        // So it's ok to possibly skip token positions for bad oracles and compute a health
+        // value that is too low.
+        let cache = new_health_cache_skipping_bad_oracles(&account.borrow(), &retriever)?;
 
         // Since depositing can only increase health, we can skip the usual pre-health computation.
         // Also, TokenDeposit is one of the rare instructions that is allowed even during being_liquidated.
@@ -160,7 +171,7 @@ impl<'a, 'info> DepositCommon<'a, 'info> {
             signer: self.token_authority.key(),
             token_index,
             quantity: amount_i80f48.to_num::<u64>(),
-            price: oracle_price.to_bits(),
+            price: oracle_or_stable_price.to_bits(),
         });
 
         Ok(())
