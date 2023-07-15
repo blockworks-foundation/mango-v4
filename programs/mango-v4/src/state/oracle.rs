@@ -93,7 +93,7 @@ pub enum OracleType {
 
 pub struct OracleState {
     pub price: I80F48,
-    pub confidence: I80F48,
+    pub deviation: I80F48,
     pub last_update_slot: u64,
     pub oracle_type: OracleType,
 }
@@ -137,12 +137,12 @@ impl OracleState {
     }
 
     pub fn check_confidence(&self, oracle_pk: &Pubkey, config: &OracleConfig) -> Result<()> {
-        if self.confidence > config.conf_filter * self.price {
+        if self.deviation > config.conf_filter * self.price {
             msg!(
-                "Oracle confidence not good enough: pubkey {}, price: {}, confidence: {}, conf_filter: {}",
+                "Oracle confidence not good enough: pubkey {}, price: {}, deviation: {}, conf_filter: {}",
                 oracle_pk,
                 self.price.to_num::<f64>(),
-                self.confidence,
+                self.deviation,
                 config.conf_filter,
             );
             return Err(MangoError::OracleConfidence.into());
@@ -240,7 +240,7 @@ pub fn oracle_state_unchecked(
         OracleType::Stub => OracleState {
             price: acc_info.load::<StubOracle>()?.price,
             last_update_slot: 0,
-            confidence: I80F48::MIN, // allows the confidence check to pass even for negative prices
+            deviation: I80F48::MIN, // allows the confidence check to pass even for negative prices
             oracle_type: OracleType::Stub,
         },
         OracleType::Pyth => {
@@ -255,7 +255,7 @@ pub fn oracle_state_unchecked(
             OracleState {
                 price,
                 last_update_slot,
-                confidence: I80F48::from_num(price_data.conf),
+                deviation: I80F48::from_num(price_data.conf),
                 oracle_type: OracleType::Pyth,
             }
         }
@@ -286,7 +286,7 @@ pub fn oracle_state_unchecked(
             OracleState {
                 price,
                 last_update_slot,
-                confidence: I80F48::from_num(std_deviation_decimal),
+                deviation: I80F48::from_num(std_deviation_decimal),
                 oracle_type: OracleType::SwitchboardV2,
             }
         }
@@ -294,7 +294,7 @@ pub fn oracle_state_unchecked(
             let result = FastRoundResultAccountData::deserialize(data).unwrap();
             let ui_price = I80F48::from_num(result.result.result);
 
-            let confidence =
+            let deviation =
                 I80F48::from_num(result.result.max_response - result.result.min_response);
             let last_update_slot = result.result.round_open_slot;
 
@@ -305,7 +305,7 @@ pub fn oracle_state_unchecked(
             OracleState {
                 price,
                 last_update_slot,
-                confidence,
+                deviation,
                 oracle_type: OracleType::SwitchboardV1,
             }
         }

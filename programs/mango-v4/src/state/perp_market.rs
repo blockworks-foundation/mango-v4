@@ -340,7 +340,7 @@ impl PerpMarket {
             short_funding: self.short_funding.to_bits(),
             price: oracle_price.to_bits(),
             oracle_slot: oracle_state.last_update_slot,
-            oracle_confidence: oracle_state.confidence.to_bits(),
+            oracle_confidence: oracle_state.deviation.to_bits(),
             oracle_type: oracle_state.oracle_type,
             stable_price: self.stable_price().to_bits(),
             fees_accrued: self.fees_accrued.to_bits(),
