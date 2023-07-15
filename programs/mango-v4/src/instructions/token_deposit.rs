@@ -88,19 +88,16 @@ impl<'a, 'info> DepositCommon<'a, 'info> {
 
         let indexed_position = position.indexed_position;
 
-        let now_slot = Clock::get()?.slot;
-        let oracle_price_result = bank.oracle_price(
+        // Get the oracle price, even if stale or unconfident: We want to allow users
+        // to deposit to close borrows or do other fixes even if the oracle is bad.
+        let unsafe_oracle_price = oracle_state_unchecked(
             &AccountInfoRef::borrow(self.oracle.as_ref())?,
-            Some(now_slot),
-        );
-        let oracle_or_stable_price = if oracle_price_result.is_oracle_error() {
-            bank.stable_price()
-        } else {
-            oracle_price_result?
-        };
+            bank.mint_decimals,
+        )?
+        .price;
 
         // Update the net deposits - adjust by price so different tokens are on the same basis (in USD terms)
-        let amount_usd = (amount_i80f48 * oracle_or_stable_price).to_num::<i64>();
+        let amount_usd = (amount_i80f48 * unsafe_oracle_price).to_num::<i64>();
         account.fixed.net_deposits += amount_usd;
 
         emit!(TokenBalanceLog {
@@ -171,7 +168,7 @@ impl<'a, 'info> DepositCommon<'a, 'info> {
             signer: self.token_authority.key(),
             token_index,
             quantity: amount_i80f48.to_num::<u64>(),
-            price: oracle_or_stable_price.to_bits(),
+            price: unsafe_oracle_price.to_bits(),
         });
 
         Ok(())

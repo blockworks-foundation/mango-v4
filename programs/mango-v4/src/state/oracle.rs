@@ -99,6 +99,7 @@ pub struct OracleState {
 }
 
 impl OracleState {
+    #[inline]
     pub fn check_confidence_and_maybe_staleness(
         &self,
         oracle_pk: &Pubkey,
@@ -239,19 +240,21 @@ pub fn oracle_state_unchecked(
         OracleType::Stub => OracleState {
             price: acc_info.load::<StubOracle>()?.price,
             last_update_slot: 0,
-            confidence: I80F48::ZERO,
+            confidence: I80F48::MIN, // allows the confidence check to pass even for negative prices
             oracle_type: OracleType::Stub,
         },
         OracleType::Pyth => {
             let price_account = pyth_sdk_solana::state::load_price_account(data).unwrap();
-            let (price_data, pub_slot) = pyth_get_price(acc_info.key(), price_account);
+            let (price_data, last_update_slot) = pyth_get_price(acc_info.key(), price_account);
             let raw_price = I80F48::from_num(price_data.price);
 
             let decimals = (price_account.expo as i8) + QUOTE_DECIMALS - (base_decimals as i8);
             let decimal_adj = power_of_ten(decimals);
+            let price = raw_price * decimal_adj;
+            require_gte!(price, 0);
             OracleState {
-                price: raw_price * decimal_adj,
-                last_update_slot: pub_slot,
+                price,
+                last_update_slot,
                 confidence: I80F48::from_num(price_data.conf),
                 oracle_type: OracleType::Pyth,
             }
@@ -272,16 +275,17 @@ pub fn oracle_state_unchecked(
                 .try_into()
                 .map_err(from_foreign_error)?;
 
-            // The round_open_slot is an overestimate of the oracle staleness: Reporters will see
+            // The round_open_slot is an underestimate of the last update slot: Reporters will see
             // the round opening and only then start executing the price tasks.
-            let round_open_slot = feed.latest_confirmed_round.round_open_slot;
+            let last_update_slot = feed.latest_confirmed_round.round_open_slot;
 
             let decimals = QUOTE_DECIMALS - (base_decimals as i8);
             let decimal_adj = power_of_ten(decimals);
-
+            let price = ui_price * decimal_adj;
+            require_gte!(price, 0);
             OracleState {
-                price: ui_price * decimal_adj,
-                last_update_slot: round_open_slot,
+                price,
+                last_update_slot,
                 confidence: I80F48::from_num(std_deviation_decimal),
                 oracle_type: OracleType::SwitchboardV2,
             }
@@ -292,14 +296,15 @@ pub fn oracle_state_unchecked(
 
             let confidence =
                 I80F48::from_num(result.result.max_response - result.result.min_response);
-            let round_open_slot = result.result.round_open_slot;
+            let last_update_slot = result.result.round_open_slot;
 
             let decimals = QUOTE_DECIMALS - (base_decimals as i8);
             let decimal_adj = power_of_ten(decimals);
-
+            let price = ui_price * decimal_adj;
+            require_gte!(price, 0);
             OracleState {
-                price: ui_price * decimal_adj,
-                last_update_slot: round_open_slot,
+                price,
+                last_update_slot,
                 confidence,
                 oracle_type: OracleType::SwitchboardV1,
             }

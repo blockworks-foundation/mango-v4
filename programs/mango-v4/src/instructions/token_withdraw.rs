@@ -65,16 +65,12 @@ pub fn token_withdraw(ctx: Context<TokenWithdraw>, amount: u64, allow_borrow: bo
 
     let amount_i80f48 = I80F48::from(amount);
 
-    let now_slot = Clock::get()?.slot;
-    let oracle_price_result = bank.oracle_price(
+    // Get the oracle price, even if stale or unconfident: We want to allow users
+    // to deposit to close borrows or do other fixes even if the oracle is bad.
+    let unsafe_oracle_state = oracle_state_unchecked(
         &AccountInfoRef::borrow(ctx.accounts.oracle.as_ref())?,
-        Some(now_slot),
-    );
-    let oracle_or_stable_price = if oracle_price_result.is_oracle_error() {
-        bank.stable_price()
-    } else {
-        oracle_price_result?
-    };
+        bank.mint_decimals,
+    )?;
 
     // Update the bank and position
     let withdraw_result = bank.withdraw_with_fee(
@@ -112,7 +108,7 @@ pub fn token_withdraw(ctx: Context<TokenWithdraw>, amount: u64, allow_borrow: bo
     });
 
     // Update the net deposits - adjust by price so different tokens are on the same basis (in USD terms)
-    let amount_usd = (amount_i80f48 * oracle_or_stable_price).to_num::<i64>();
+    let amount_usd = (amount_i80f48 * unsafe_oracle_state.price).to_num::<i64>();
     account.fixed.net_deposits -= amount_usd;
 
     //
@@ -155,7 +151,7 @@ pub fn token_withdraw(ctx: Context<TokenWithdraw>, amount: u64, allow_borrow: bo
         signer: ctx.accounts.owner.key(),
         token_index,
         quantity: amount,
-        price: oracle_or_stable_price.to_bits(),
+        price: unsafe_oracle_state.price.to_bits(),
     });
 
     if withdraw_result.loan_origination_fee.is_positive() {
@@ -166,7 +162,7 @@ pub fn token_withdraw(ctx: Context<TokenWithdraw>, amount: u64, allow_borrow: bo
             loan_amount: withdraw_result.loan_amount.to_bits(),
             loan_origination_fee: withdraw_result.loan_origination_fee.to_bits(),
             instruction: LoanOriginationFeeInstruction::TokenWithdraw,
-            price: Some(oracle_or_stable_price.to_bits()),
+            price: Some(unsafe_oracle_state.price.to_bits()),
         });
     }
 
@@ -174,7 +170,15 @@ pub fn token_withdraw(ctx: Context<TokenWithdraw>, amount: u64, allow_borrow: bo
     if is_borrow {
         ctx.accounts.vault.reload()?;
         bank.enforce_min_vault_to_deposits_ratio(ctx.accounts.vault.as_ref())?;
-        bank.check_net_borrows(oracle_or_stable_price)?;
+
+        // When borrowing the price has be trustworthy, so we can do a reasonable
+        // net borrow check.
+        unsafe_oracle_state.check_confidence_and_maybe_staleness(
+            &bank.oracle,
+            &bank.oracle_config,
+            Some(Clock::get()?.slot),
+        )?;
+        bank.check_net_borrows(unsafe_oracle_state.price)?;
     }
 
     Ok(())

@@ -385,7 +385,7 @@ async fn test_serum_basics() -> Result<(), TransportError> {
 #[tokio::test]
 async fn test_serum_loan_origination_fees() -> Result<(), TransportError> {
     let mut test_builder = TestContextBuilder::new();
-    test_builder.test().set_compute_max_units(95_000); // Serum3PlaceOrder needs 92.8k
+    test_builder.test().set_compute_max_units(100_000); // Serum3PlaceOrder needs 95.1k
     let context = test_builder.start_default().await;
     let solana = &context.solana.clone();
 
