@@ -365,6 +365,17 @@ pub mod mango_v4 {
         Ok(())
     }
 
+    pub fn stub_oracle_set_test(
+        ctx: Context<StubOracleSet>,
+        price: I80F48,
+        last_update_slot: u64,
+        deviation: I80F48,
+    ) -> Result<()> {
+        #[cfg(feature = "enable-gpl")]
+        instructions::stub_oracle_set_test(ctx, price, last_update_slot, deviation)?;
+        Ok(())
+    }
+
     pub fn token_deposit(ctx: Context<TokenDeposit>, amount: u64, reduce_only: bool) -> Result<()> {
         #[cfg(feature = "enable-gpl")]
         instructions::token_deposit(ctx, amount, reduce_only)?;

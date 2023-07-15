@@ -79,6 +79,10 @@ pub fn token_withdraw(ctx: Context<TokenWithdraw>, amount: u64, allow_borrow: bo
         Clock::get()?.unix_timestamp.try_into().unwrap(),
     )?;
 
+    // Avoid getting in trouble because of the mutable bank account borrow later
+    drop(bank);
+    let bank = ctx.accounts.bank.load()?;
+
     // Provide a readable error message in case the vault doesn't have enough tokens
     if ctx.accounts.vault.amount < amount {
         return err!(MangoError::InsufficentBankVaultFunds).with_context(|| {

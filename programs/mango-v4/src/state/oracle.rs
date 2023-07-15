@@ -142,8 +142,8 @@ impl OracleState {
                 "Oracle confidence not good enough: pubkey {}, price: {}, deviation: {}, conf_filter: {}",
                 oracle_pk,
                 self.price.to_num::<f64>(),
-                self.deviation,
-                config.conf_filter,
+                self.deviation.to_num::<f64>(),
+                config.conf_filter.to_num::<f32>(),
             );
             return Err(MangoError::OracleConfidence.into());
         }
@@ -158,10 +158,12 @@ pub struct StubOracle {
     // ABI: Clients rely on this being at offset 40
     pub mint: Pubkey,
     pub price: I80F48,
-    pub last_updated: i64,
-    pub reserved: [u8; 128],
+    pub last_update_ts: i64,
+    pub last_update_slot: u64,
+    pub deviation: I80F48,
+    pub reserved: [u8; 104],
 }
-const_assert_eq!(size_of::<StubOracle>(), 32 + 32 + 16 + 8 + 128);
+const_assert_eq!(size_of::<StubOracle>(), 32 + 32 + 16 + 8 + 8 + 16 + 104);
 const_assert_eq!(size_of::<StubOracle>(), 216);
 const_assert_eq!(size_of::<StubOracle>() % 8, 0);
 
@@ -237,12 +239,27 @@ pub fn oracle_state_unchecked(
     let oracle_type = determine_oracle_type(acc_info)?;
 
     Ok(match oracle_type {
-        OracleType::Stub => OracleState {
-            price: acc_info.load::<StubOracle>()?.price,
-            last_update_slot: 0,
-            deviation: I80F48::MIN, // allows the confidence check to pass even for negative prices
-            oracle_type: OracleType::Stub,
-        },
+        OracleType::Stub => {
+            let stub = acc_info.load::<StubOracle>()?;
+            let deviation = if stub.deviation == 0 {
+                // allows the confidence check to pass even for negative prices
+                I80F48::MIN
+            } else {
+                stub.deviation
+            };
+            let last_update_slot = if stub.last_update_slot == 0 {
+                // ensure staleness checks will never fail
+                u64::MAX
+            } else {
+                stub.last_update_slot
+            };
+            OracleState {
+                price: stub.price,
+                last_update_slot,
+                deviation,
+                oracle_type: OracleType::Stub,
+            }
+        }
         OracleType::Pyth => {
             let price_account = pyth_sdk_solana::state::load_price_account(data).unwrap();
             let (price_data, last_update_slot) = pyth_get_price(acc_info.key(), price_account);
