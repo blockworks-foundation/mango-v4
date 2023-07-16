@@ -587,6 +587,19 @@ impl Bank {
         })
     }
 
+    /// Returns true if the position remains active
+    pub fn dust_if_possible(&mut self, position: &mut TokenPosition, now_ts: u64) -> Result<bool> {
+        if position.is_in_use() {
+            return Ok(true);
+        }
+        let native = position.native(self);
+        if native >= 0 && native < 1 {
+            // Withdrawing 0 triggers the dusting check
+            return self.withdraw_without_fee(position, I80F48::ZERO, now_ts);
+        }
+        Ok(true)
+    }
+
     /// Change a position without applying the loan origination fee
     pub fn change_without_fee(
         &mut self,
@@ -971,7 +984,7 @@ mod tests {
                 let mut account = TokenPosition {
                     indexed_position: I80F48::ZERO,
                     token_index: 0,
-                    in_use_count: u8::from(is_in_use),
+                    in_use_count: u16::from(is_in_use),
                     cumulative_deposit_interest: 0.0,
                     cumulative_borrow_interest: 0.0,
                     previous_index: I80F48::ZERO,

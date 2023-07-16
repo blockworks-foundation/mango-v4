@@ -27,10 +27,10 @@ pub struct TokenPosition {
     pub token_index: TokenIndex,
 
     /// incremented when a market requires this position to stay alive
-    pub in_use_count: u8,
+    pub in_use_count: u16,
 
     #[derivative(Debug = "ignore")]
-    pub padding: [u8; 5],
+    pub padding: [u8; 4],
 
     // bookkeeping variable for onchain interest calculation
     // either deposit_index or borrow_index at last indexed_position change
@@ -48,7 +48,7 @@ pub struct TokenPosition {
 
 const_assert_eq!(
     size_of::<TokenPosition>(),
-    16 + 2 + 1 + 5 + 16 + 8 + 8 + 128
+    16 + 2 + 2 + 4 + 16 + 8 + 8 + 128
 );
 const_assert_eq!(size_of::<TokenPosition>(), 184);
 const_assert_eq!(size_of::<TokenPosition>() % 8, 0);
@@ -98,6 +98,14 @@ impl TokenPosition {
 
     pub fn is_in_use(&self) -> bool {
         self.in_use_count > 0
+    }
+
+    pub fn increment_in_use(&mut self) {
+        self.in_use_count += 1; // panic on overflow
+    }
+
+    pub fn decrement_in_use(&mut self) {
+        self.in_use_count = self.in_use_count.saturating_sub(1);
     }
 }
 

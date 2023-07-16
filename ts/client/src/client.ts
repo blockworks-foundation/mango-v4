@@ -3220,8 +3220,16 @@ export class MangoClient {
     group: Group,
     account: MangoAccount,
     tokenConditionalSwapIndex: number,
-    tokenConditionalSwapId: number,
+    tokenConditionalSwapId: BN,
   ): Promise<TransactionSignature> {
+    const tcs = account.tokenConditionalSwapsActive().find(tcs => tcs.id.eq(tokenConditionalSwapId));
+    if (!tcs) {
+      throw new Error('tcs with id not found');
+    }
+
+    const buyBank = group.banksMapByTokenIndex.get(tcs.buyTokenIndex)![0];
+    const sellBank = group.banksMapByTokenIndex.get(tcs.sellTokenIndex)![0];
+
     const ix = await this.program.methods
       .tokenConditionalSwapCancel(
         tokenConditionalSwapIndex,
@@ -3231,6 +3239,8 @@ export class MangoClient {
         group: group.publicKey,
         account: account.publicKey,
         authority: (this.program.provider as AnchorProvider).wallet.publicKey,
+        buyBank: buyBank.publicKey,
+        sellBank: sellBank.publicKey,
       })
       .instruction();
 
@@ -3242,10 +3252,38 @@ export class MangoClient {
     liqee: MangoAccount,
     liqor: MangoAccount,
     tokenConditionalSwapIndex: number,
-    tokenConditionalSwapId: number,
+    tokenConditionalSwapId: BN,
     maxBuyTokenToLiqee: number,
     maxSellTokenToLiqor: number,
   ): Promise<TransactionSignature> {
+    const tcs = liqee.tokenConditionalSwapsActive().find(tcs => tcs.id.eq(tokenConditionalSwapId));
+    if (!tcs) {
+      throw new Error('tcs with id not found');
+    }
+
+    const buyBank = group.banksMapByTokenIndex.get(tcs.buyTokenIndex)![0];
+    const sellBank = group.banksMapByTokenIndex.get(tcs.sellTokenIndex)![0];
+
+    const healthRemainingAccounts: PublicKey[] =
+      this.buildHealthRemainingAccounts(
+        group,
+        [liqor, liqee],
+        [buyBank, sellBank],
+        [],
+      );
+
+    const parsedHealthAccounts = healthRemainingAccounts.map(
+      (pk) =>
+      ({
+        pubkey: pk,
+        isWritable:
+          pk.equals(buyBank.publicKey) || pk.equals(sellBank.publicKey)
+            ? true
+            : false,
+        isSigner: false,
+      } as AccountMeta),
+    );
+
     const ix = await this.program.methods
       .tokenConditionalSwapTrigger(
         tokenConditionalSwapIndex,
@@ -3260,6 +3298,7 @@ export class MangoClient {
         liqorAuthority: (this.program.provider as AnchorProvider).wallet
           .publicKey,
       })
+      .remainingAccounts(parsedHealthAccounts)
       .instruction();
 
     return await this.sendAndConfirmTransactionForGroup(group, [ix]);

@@ -421,6 +421,12 @@ fn action(
         }
     };
 
+    if closed {
+        // Free up token position locks, maybe dusting and deactivating them
+        liqee.token_decrement_dust_deactivate(buy_bank, now_ts, liqee_key)?;
+        liqee.token_decrement_dust_deactivate(sell_bank, now_ts, liqee_key)?;
+    }
+
     emit!(TokenConditionalSwapTriggerLog {
         mango_group: liqee.fixed.group,
         liqee: liqee_key,

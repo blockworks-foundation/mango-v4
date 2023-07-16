@@ -18,6 +18,16 @@ pub fn token_conditional_swap_create(
     }
 
     let mut account = ctx.accounts.account.load_full_mut()?;
+    {
+        let buy_pos = account
+            .ensure_token_position(token_conditional_swap.buy_token_index)?
+            .0;
+        buy_pos.increment_in_use();
+        let sell_pos = account
+            .ensure_token_position(token_conditional_swap.sell_token_index)?
+            .0;
+        sell_pos.increment_in_use();
+    }
 
     let id = account.fixed.next_token_conditional_swap_id;
     account.fixed.next_token_conditional_swap_id =

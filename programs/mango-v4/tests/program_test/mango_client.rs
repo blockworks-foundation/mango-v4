@@ -4216,7 +4216,7 @@ pub struct TokenConditionalSwapCancelInstruction {
 }
 #[async_trait::async_trait(?Send)]
 impl ClientInstruction for TokenConditionalSwapCancelInstruction {
-    type Accounts = mango_v4::accounts::AccountAndAuthority;
+    type Accounts = mango_v4::accounts::TokenConditionalSwapCancel;
     type Instruction = mango_v4::instruction::TokenConditionalSwapCancel;
     async fn to_instruction(
         &self,
@@ -4232,11 +4232,19 @@ impl ClientInstruction for TokenConditionalSwapCancelInstruction {
             .load_mango_account(&self.account)
             .await
             .unwrap();
+        let tcs = account.token_conditional_swap_by_id(self.id).unwrap().1;
+
+        let buy_mint_info =
+            get_mint_info_by_token_index(&account_loader, &account, tcs.buy_token_index).await;
+        let sell_mint_info =
+            get_mint_info_by_token_index(&account_loader, &account, tcs.sell_token_index).await;
 
         let accounts = Self::Accounts {
             group: account.fixed.group,
             account: self.account,
             authority: self.owner.pubkey(),
+            buy_bank: buy_mint_info.first_bank(),
+            sell_bank: sell_mint_info.first_bank(),
         };
 
         let instruction = make_instruction(program_id, &accounts, &instruction);
