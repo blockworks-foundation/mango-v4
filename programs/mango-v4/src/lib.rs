@@ -1187,7 +1187,7 @@ pub mod mango_v4 {
     }
 
     pub fn token_conditional_swap_cancel(
-        ctx: Context<AccountAndAuthority>,
+        ctx: Context<TokenConditionalSwapCancel>,
         token_conditional_swap_index: u8,
         token_conditional_swap_id: u64,
     ) -> Result<()> {

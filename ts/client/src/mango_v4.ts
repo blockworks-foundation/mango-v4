@@ -3,6 +3,100 @@ export type MangoV4 = {
   "name": "mango_v4",
   "instructions": [
     {
+      "name": "admingTokenWithdrawFees",
+      "accounts": [
+        {
+          "name": "group",
+          "isMut": false,
+          "isSigner": false,
+          "relations": [
+            "admin"
+          ]
+        },
+        {
+          "name": "bank",
+          "isMut": true,
+          "isSigner": false,
+          "relations": [
+            "group",
+            "vault"
+          ]
+        },
+        {
+          "name": "vault",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "tokenAccount",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "tokenProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "admin",
+          "isMut": false,
+          "isSigner": true
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "adminPerpWithdrawFees",
+      "accounts": [
+        {
+          "name": "group",
+          "isMut": false,
+          "isSigner": false,
+          "relations": [
+            "admin"
+          ]
+        },
+        {
+          "name": "perpMarket",
+          "isMut": true,
+          "isSigner": false,
+          "relations": [
+            "group"
+          ]
+        },
+        {
+          "name": "bank",
+          "isMut": true,
+          "isSigner": false,
+          "relations": [
+            "group",
+            "vault"
+          ]
+        },
+        {
+          "name": "vault",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "tokenAccount",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "tokenProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "admin",
+          "isMut": false,
+          "isSigner": true
+        }
+      ],
+      "args": []
+    },
+    {
       "name": "groupCreate",
       "accounts": [
         {
@@ -4818,6 +4912,25 @@ export type MangoV4 = {
           "name": "authority",
           "isMut": false,
           "isSigner": true
+        },
+        {
+          "name": "buyBank",
+          "isMut": true,
+          "isSigner": false,
+          "docs": [
+            "The bank's token_index is checked at #1"
+          ],
+          "relations": [
+            "group"
+          ]
+        },
+        {
+          "name": "sellBank",
+          "isMut": true,
+          "isSigner": false,
+          "relations": [
+            "group"
+          ]
         }
       ],
       "args": [
@@ -5264,11 +5377,24 @@ export type MangoV4 = {
             "type": "u8"
           },
           {
+            "name": "padding",
+            "type": {
+              "array": [
+                "u8",
+                6
+              ]
+            }
+          },
+          {
+            "name": "feesWithdrawn",
+            "type": "u64"
+          },
+          {
             "name": "reserved",
             "type": {
               "array": [
                 "u8",
-                2118
+                2104
               ]
             }
           }
@@ -6041,7 +6167,8 @@ export type MangoV4 = {
           {
             "name": "feesAccrued",
             "docs": [
-              "Fees accrued in native quote currency"
+              "Fees accrued in native quote currency",
+              "these are increased when new fees are paid and decreased when perp_settle_fees is called"
             ],
             "type": {
               "defined": "I80F48"
@@ -6050,7 +6177,8 @@ export type MangoV4 = {
           {
             "name": "feesSettled",
             "docs": [
-              "Fees settled in native quote currency"
+              "Fees settled in native quote currency",
+              "these are increased when perp_settle_fees is called, and never decreased"
             ],
             "type": {
               "defined": "I80F48"
@@ -6161,11 +6289,15 @@ export type MangoV4 = {
             }
           },
           {
+            "name": "feesWithdrawn",
+            "type": "u64"
+          },
+          {
             "name": "reserved",
             "type": {
               "array": [
                 "u8",
-                1888
+                1880
               ]
             }
           }
@@ -6724,14 +6856,14 @@ export type MangoV4 = {
             "docs": [
               "incremented when a market requires this position to stay alive"
             ],
-            "type": "u8"
+            "type": "u16"
           },
           {
             "name": "padding",
             "type": {
               "array": [
                 "u8",
-                5
+                4
               ]
             }
           },
@@ -8353,6 +8485,42 @@ export type MangoV4 = {
           },
           {
             "name": "TokenConditionalSwapCancel"
+          },
+          {
+            "name": "OpenbookV2CancelOrder"
+          },
+          {
+            "name": "OpenbookV2CloseOpenOrders"
+          },
+          {
+            "name": "OpenbookV2CreateOpenOrders"
+          },
+          {
+            "name": "OpenbookV2DeregisterMarket"
+          },
+          {
+            "name": "OpenbookV2EditMarket"
+          },
+          {
+            "name": "OpenbookV2LiqForceCancelOrders"
+          },
+          {
+            "name": "OpenbookV2PlaceOrder"
+          },
+          {
+            "name": "OpenbookV2PlaceTakeOrder"
+          },
+          {
+            "name": "OpenbookV2RegisterMarket"
+          },
+          {
+            "name": "OpenbookV2SettleFunds"
+          },
+          {
+            "name": "AdminTokenWithdrawFees"
+          },
+          {
+            "name": "AdminPerpWithdrawFees"
           }
         ]
       }
@@ -10680,6 +10848,100 @@ export const IDL: MangoV4 = {
   "name": "mango_v4",
   "instructions": [
     {
+      "name": "admingTokenWithdrawFees",
+      "accounts": [
+        {
+          "name": "group",
+          "isMut": false,
+          "isSigner": false,
+          "relations": [
+            "admin"
+          ]
+        },
+        {
+          "name": "bank",
+          "isMut": true,
+          "isSigner": false,
+          "relations": [
+            "group",
+            "vault"
+          ]
+        },
+        {
+          "name": "vault",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "tokenAccount",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "tokenProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "admin",
+          "isMut": false,
+          "isSigner": true
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "adminPerpWithdrawFees",
+      "accounts": [
+        {
+          "name": "group",
+          "isMut": false,
+          "isSigner": false,
+          "relations": [
+            "admin"
+          ]
+        },
+        {
+          "name": "perpMarket",
+          "isMut": true,
+          "isSigner": false,
+          "relations": [
+            "group"
+          ]
+        },
+        {
+          "name": "bank",
+          "isMut": true,
+          "isSigner": false,
+          "relations": [
+            "group",
+            "vault"
+          ]
+        },
+        {
+          "name": "vault",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "tokenAccount",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "tokenProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "admin",
+          "isMut": false,
+          "isSigner": true
+        }
+      ],
+      "args": []
+    },
+    {
       "name": "groupCreate",
       "accounts": [
         {
@@ -15495,6 +15757,25 @@ export const IDL: MangoV4 = {
           "name": "authority",
           "isMut": false,
           "isSigner": true
+        },
+        {
+          "name": "buyBank",
+          "isMut": true,
+          "isSigner": false,
+          "docs": [
+            "The bank's token_index is checked at #1"
+          ],
+          "relations": [
+            "group"
+          ]
+        },
+        {
+          "name": "sellBank",
+          "isMut": true,
+          "isSigner": false,
+          "relations": [
+            "group"
+          ]
         }
       ],
       "args": [
@@ -15941,11 +16222,24 @@ export const IDL: MangoV4 = {
             "type": "u8"
           },
           {
+            "name": "padding",
+            "type": {
+              "array": [
+                "u8",
+                6
+              ]
+            }
+          },
+          {
+            "name": "feesWithdrawn",
+            "type": "u64"
+          },
+          {
             "name": "reserved",
             "type": {
               "array": [
                 "u8",
-                2118
+                2104
               ]
             }
           }
@@ -16718,7 +17012,8 @@ export const IDL: MangoV4 = {
           {
             "name": "feesAccrued",
             "docs": [
-              "Fees accrued in native quote currency"
+              "Fees accrued in native quote currency",
+              "these are increased when new fees are paid and decreased when perp_settle_fees is called"
             ],
             "type": {
               "defined": "I80F48"
@@ -16727,7 +17022,8 @@ export const IDL: MangoV4 = {
           {
             "name": "feesSettled",
             "docs": [
-              "Fees settled in native quote currency"
+              "Fees settled in native quote currency",
+              "these are increased when perp_settle_fees is called, and never decreased"
             ],
             "type": {
               "defined": "I80F48"
@@ -16838,11 +17134,15 @@ export const IDL: MangoV4 = {
             }
           },
           {
+            "name": "feesWithdrawn",
+            "type": "u64"
+          },
+          {
             "name": "reserved",
             "type": {
               "array": [
                 "u8",
-                1888
+                1880
               ]
             }
           }
@@ -17401,14 +17701,14 @@ export const IDL: MangoV4 = {
             "docs": [
               "incremented when a market requires this position to stay alive"
             ],
-            "type": "u8"
+            "type": "u16"
           },
           {
             "name": "padding",
             "type": {
               "array": [
                 "u8",
-                5
+                4
               ]
             }
           },
@@ -19030,6 +19330,42 @@ export const IDL: MangoV4 = {
           },
           {
             "name": "TokenConditionalSwapCancel"
+          },
+          {
+            "name": "OpenbookV2CancelOrder"
+          },
+          {
+            "name": "OpenbookV2CloseOpenOrders"
+          },
+          {
+            "name": "OpenbookV2CreateOpenOrders"
+          },
+          {
+            "name": "OpenbookV2DeregisterMarket"
+          },
+          {
+            "name": "OpenbookV2EditMarket"
+          },
+          {
+            "name": "OpenbookV2LiqForceCancelOrders"
+          },
+          {
+            "name": "OpenbookV2PlaceOrder"
+          },
+          {
+            "name": "OpenbookV2PlaceTakeOrder"
+          },
+          {
+            "name": "OpenbookV2RegisterMarket"
+          },
+          {
+            "name": "OpenbookV2SettleFunds"
+          },
+          {
+            "name": "AdminTokenWithdrawFees"
+          },
+          {
+            "name": "AdminPerpWithdrawFees"
           }
         ]
       }

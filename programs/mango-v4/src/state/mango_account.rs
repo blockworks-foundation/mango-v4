@@ -863,7 +863,7 @@ impl<
         raw_index: usize,
         mango_account_pubkey: Pubkey,
     ) {
-        let mango_group = self.fixed.deref_or_borrow().group;
+        let mango_group = self.fixed().group;
         let token_position = self.token_position_mut_by_raw_index(raw_index);
         assert!(token_position.in_use_count == 0);
         emit!(DeactivateTokenPositionLog {
@@ -874,6 +874,32 @@ impl<
             cumulative_borrow_interest: token_position.cumulative_borrow_interest,
         });
         self.token_position_mut_by_raw_index(raw_index).token_index = TokenIndex::MAX;
+    }
+
+    /// Decrements the in_use_count for the token position for the bank.
+    ///
+    /// If it goes to 0, the position may be dusted (if between 0 and 1 native tokens)
+    /// and closed.
+    pub fn token_decrement_dust_deactivate(
+        &mut self,
+        bank: &mut crate::state::Bank,
+        now_ts: u64,
+        mango_account_pubkey: Pubkey,
+    ) -> Result<()> {
+        let token_result = self.token_position_mut(bank.token_index);
+        if token_result.is_anchor_error_with_code(MangoError::TokenPositionDoesNotExist.into()) {
+            // Already deactivated is ok
+            return Ok(());
+        }
+        let (position, raw_index) = token_result?;
+
+        position.decrement_in_use();
+        let active = bank.dust_if_possible(position, now_ts)?;
+        if !active {
+            self.deactivate_token_position_and_log(raw_index, mango_account_pubkey);
+        }
+
+        Ok(())
     }
 
     // get mut Serum3Orders at raw_index
@@ -961,8 +987,8 @@ impl<
                 *perp_position = PerpPosition::default();
                 perp_position.market_index = perp_market_index;
 
-                let mut settle_token_position = self.ensure_token_position(settle_token_index)?.0;
-                settle_token_position.in_use_count += 1;
+                let settle_token_position = self.ensure_token_position(settle_token_index)?.0;
+                settle_token_position.increment_in_use();
             }
         }
         if let Some(raw_index) = raw_index_opt {
@@ -979,8 +1005,8 @@ impl<
     ) -> Result<()> {
         self.perp_position_mut(perp_market_index)?.market_index = PerpMarketIndex::MAX;
 
-        let mut settle_token_position = self.token_position_mut(settle_token_index)?.0;
-        settle_token_position.in_use_count -= 1;
+        let settle_token_position = self.token_position_mut(settle_token_index)?.0;
+        settle_token_position.decrement_in_use();
 
         Ok(())
     }
@@ -991,7 +1017,7 @@ impl<
         settle_token_index: TokenIndex,
         mango_account_pubkey: Pubkey,
     ) -> Result<()> {
-        let mango_group = self.fixed.deref_or_borrow().group;
+        let mango_group = self.fixed().group;
         let perp_position = self.perp_position_mut(perp_market_index)?;
 
         emit!(DeactivatePerpPositionLog {
@@ -1007,8 +1033,8 @@ impl<
 
         perp_position.market_index = PerpMarketIndex::MAX;
 
-        let mut settle_token_position = self.token_position_mut(settle_token_index)?.0;
-        settle_token_position.in_use_count -= 1;
+        let settle_token_position = self.token_position_mut(settle_token_index)?.0;
+        settle_token_position.decrement_in_use();
 
         Ok(())
     }
