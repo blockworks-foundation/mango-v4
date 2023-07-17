@@ -957,6 +957,7 @@ export class MangoAccount {
     group: Group,
     perpMarketIndex: PerpMarketIndex,
     size: number,
+    healthType: HealthType = HealthType.init,
   ): number {
     const perpMarket = group.getPerpMarketByMarketIndex(perpMarketIndex);
     const pp = this.getPerpPosition(perpMarket.perpMarketIndex);
@@ -970,7 +971,7 @@ export class MangoAccount {
         PerpOrderSide.bid,
         perpMarket.uiBaseToLots(size),
         perpMarket.price,
-        HealthType.init,
+        healthType,
       )
       .toNumber();
   }
@@ -979,6 +980,7 @@ export class MangoAccount {
     group: Group,
     perpMarketIndex: PerpMarketIndex,
     size: number,
+    healthType: HealthType = HealthType.init,
   ): number {
     const perpMarket = group.getPerpMarketByMarketIndex(perpMarketIndex);
     const pp = this.getPerpPosition(perpMarket.perpMarketIndex);
@@ -992,7 +994,7 @@ export class MangoAccount {
         PerpOrderSide.ask,
         perpMarket.uiBaseToLots(size),
         perpMarket.price,
-        HealthType.init,
+        healthType,
       )
       .toNumber();
   }
