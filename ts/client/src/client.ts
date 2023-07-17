@@ -3222,7 +3222,9 @@ export class MangoClient {
     tokenConditionalSwapIndex: number,
     tokenConditionalSwapId: BN,
   ): Promise<TransactionSignature> {
-    const tcs = account.tokenConditionalSwapsActive().find(tcs => tcs.id.eq(tokenConditionalSwapId));
+    const tcs = account
+      .tokenConditionalSwapsActive()
+      .find((tcs) => tcs.id.eq(tokenConditionalSwapId));
     if (!tcs) {
       throw new Error('tcs with id not found');
     }
@@ -3256,7 +3258,9 @@ export class MangoClient {
     maxBuyTokenToLiqee: number,
     maxSellTokenToLiqor: number,
   ): Promise<TransactionSignature> {
-    const tcs = liqee.tokenConditionalSwapsActive().find(tcs => tcs.id.eq(tokenConditionalSwapId));
+    const tcs = liqee
+      .tokenConditionalSwapsActive()
+      .find((tcs) => tcs.id.eq(tokenConditionalSwapId));
     if (!tcs) {
       throw new Error('tcs with id not found');
     }
@@ -3274,14 +3278,14 @@ export class MangoClient {
 
     const parsedHealthAccounts = healthRemainingAccounts.map(
       (pk) =>
-      ({
-        pubkey: pk,
-        isWritable:
-          pk.equals(buyBank.publicKey) || pk.equals(sellBank.publicKey)
-            ? true
-            : false,
-        isSigner: false,
-      } as AccountMeta),
+        ({
+          pubkey: pk,
+          isWritable:
+            pk.equals(buyBank.publicKey) || pk.equals(sellBank.publicKey)
+              ? true
+              : false,
+          isSigner: false,
+        } as AccountMeta),
     );
 
     const ix = await this.program.methods
