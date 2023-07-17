@@ -1421,6 +1421,14 @@
 <span id="1421">1421</span>
 <span id="1422">1422</span>
 <span id="1423">1423</span>
+<span id="1424">1424</span>
+<span id="1425">1425</span>
+<span id="1426">1426</span>
+<span id="1427">1427</span>
+<span id="1428">1428</span>
+<span id="1429">1429</span>
+<span id="1430">1430</span>
+<span id="1431">1431</span>
 </pre><pre class="rust"><code><span class="kw">use </span>anchor_lang::prelude::<span class="kw-2">*</span>;
 
 <span class="kw">use </span>derivative::Derivative;
@@ -1450,10 +1458,10 @@
     </span><span class="kw">pub </span>token_index: TokenIndex,
 
     <span class="doccomment">/// incremented when a market requires this position to stay alive
-    </span><span class="kw">pub </span>in_use_count: u8,
+    </span><span class="kw">pub </span>in_use_count: u16,
 
     <span class="attribute">#[derivative(Debug = <span class="string">&quot;ignore&quot;</span>)]
-    </span><span class="kw">pub </span>padding: [u8; <span class="number">5</span>],
+    </span><span class="kw">pub </span>padding: [u8; <span class="number">4</span>],
 
     <span class="comment">// bookkeeping variable for onchain interest calculation
     // either deposit_index or borrow_index at last indexed_position change
@@ -1471,7 +1479,7 @@
 
 <span class="macro">const_assert_eq!</span>(
     size_of::&lt;TokenPosition&gt;(),
-    <span class="number">16 </span>+ <span class="number">2 </span>+ <span class="number">1 </span>+ <span class="number">5 </span>+ <span class="number">16 </span>+ <span class="number">8 </span>+ <span class="number">8 </span>+ <span class="number">128
+    <span class="number">16 </span>+ <span class="number">2 </span>+ <span class="number">2 </span>+ <span class="number">4 </span>+ <span class="number">16 </span>+ <span class="number">8 </span>+ <span class="number">8 </span>+ <span class="number">128
 </span>);
 <span class="macro">const_assert_eq!</span>(size_of::&lt;TokenPosition&gt;(), <span class="number">184</span>);
 <span class="macro">const_assert_eq!</span>(size_of::&lt;TokenPosition&gt;() % <span class="number">8</span>, <span class="number">0</span>);
@@ -1522,6 +1530,14 @@
     <span class="kw">pub fn </span>is_in_use(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool {
         <span class="self">self</span>.in_use_count &gt; <span class="number">0
     </span>}
+
+    <span class="kw">pub fn </span>increment_in_use(<span class="kw-2">&amp;mut </span><span class="self">self</span>) {
+        <span class="self">self</span>.in_use_count += <span class="number">1</span>; <span class="comment">// panic on overflow
+    </span>}
+
+    <span class="kw">pub fn </span>decrement_in_use(<span class="kw-2">&amp;mut </span><span class="self">self</span>) {
+        <span class="self">self</span>.in_use_count = <span class="self">self</span>.in_use_count.saturating_sub(<span class="number">1</span>);
+    }
 }
 
 <span class="attribute">#[zero_copy]

@@ -1839,6 +1839,32 @@
 <span id="1839">1839</span>
 <span id="1840">1840</span>
 <span id="1841">1841</span>
+<span id="1842">1842</span>
+<span id="1843">1843</span>
+<span id="1844">1844</span>
+<span id="1845">1845</span>
+<span id="1846">1846</span>
+<span id="1847">1847</span>
+<span id="1848">1848</span>
+<span id="1849">1849</span>
+<span id="1850">1850</span>
+<span id="1851">1851</span>
+<span id="1852">1852</span>
+<span id="1853">1853</span>
+<span id="1854">1854</span>
+<span id="1855">1855</span>
+<span id="1856">1856</span>
+<span id="1857">1857</span>
+<span id="1858">1858</span>
+<span id="1859">1859</span>
+<span id="1860">1860</span>
+<span id="1861">1861</span>
+<span id="1862">1862</span>
+<span id="1863">1863</span>
+<span id="1864">1864</span>
+<span id="1865">1865</span>
+<span id="1866">1866</span>
+<span id="1867">1867</span>
 </pre><pre class="rust"><code><span class="kw">use </span>std::cell::{Ref, RefMut};
 <span class="kw">use </span>std::mem::size_of;
 
@@ -2704,7 +2730,7 @@
         raw_index: usize,
         mango_account_pubkey: Pubkey,
     ) {
-        <span class="kw">let </span>mango_group = <span class="self">self</span>.fixed.deref_or_borrow().group;
+        <span class="kw">let </span>mango_group = <span class="self">self</span>.fixed().group;
         <span class="kw">let </span>token_position = <span class="self">self</span>.token_position_mut_by_raw_index(raw_index);
         <span class="macro">assert!</span>(token_position.in_use_count == <span class="number">0</span>);
         <span class="macro">emit!</span>(DeactivateTokenPositionLog {
@@ -2715,6 +2741,32 @@
             cumulative_borrow_interest: token_position.cumulative_borrow_interest,
         });
         <span class="self">self</span>.token_position_mut_by_raw_index(raw_index).token_index = TokenIndex::MAX;
+    }
+
+    <span class="doccomment">/// Decrements the in_use_count for the token position for the bank.
+    ///
+    /// If it goes to 0, the position may be dusted (if between 0 and 1 native tokens)
+    /// and closed.
+    </span><span class="kw">pub fn </span>token_decrement_dust_deactivate(
+        <span class="kw-2">&amp;mut </span><span class="self">self</span>,
+        bank: <span class="kw-2">&amp;mut </span><span class="kw">crate</span>::state::Bank,
+        now_ts: u64,
+        mango_account_pubkey: Pubkey,
+    ) -&gt; <span class="prelude-ty">Result</span>&lt;()&gt; {
+        <span class="kw">let </span>token_result = <span class="self">self</span>.token_position_mut(bank.token_index);
+        <span class="kw">if </span>token_result.is_anchor_error_with_code(MangoError::TokenPositionDoesNotExist.into()) {
+            <span class="comment">// Already deactivated is ok
+            </span><span class="kw">return </span><span class="prelude-val">Ok</span>(());
+        }
+        <span class="kw">let </span>(position, raw_index) = token_result<span class="question-mark">?</span>;
+
+        position.decrement_in_use();
+        <span class="kw">let </span>active = bank.dust_if_possible(position, now_ts)<span class="question-mark">?</span>;
+        <span class="kw">if </span>!active {
+            <span class="self">self</span>.deactivate_token_position_and_log(raw_index, mango_account_pubkey);
+        }
+
+        <span class="prelude-val">Ok</span>(())
     }
 
     <span class="comment">// get mut Serum3Orders at raw_index
@@ -2802,8 +2854,8 @@
                 <span class="kw-2">*</span>perp_position = PerpPosition::default();
                 perp_position.market_index = perp_market_index;
 
-                <span class="kw">let </span><span class="kw-2">mut </span>settle_token_position = <span class="self">self</span>.ensure_token_position(settle_token_index)<span class="question-mark">?</span>.<span class="number">0</span>;
-                settle_token_position.in_use_count += <span class="number">1</span>;
+                <span class="kw">let </span>settle_token_position = <span class="self">self</span>.ensure_token_position(settle_token_index)<span class="question-mark">?</span>.<span class="number">0</span>;
+                settle_token_position.increment_in_use();
             }
         }
         <span class="kw">if let </span><span class="prelude-val">Some</span>(raw_index) = raw_index_opt {
@@ -2820,8 +2872,8 @@
     ) -&gt; <span class="prelude-ty">Result</span>&lt;()&gt; {
         <span class="self">self</span>.perp_position_mut(perp_market_index)<span class="question-mark">?</span>.market_index = PerpMarketIndex::MAX;
 
-        <span class="kw">let </span><span class="kw-2">mut </span>settle_token_position = <span class="self">self</span>.token_position_mut(settle_token_index)<span class="question-mark">?</span>.<span class="number">0</span>;
-        settle_token_position.in_use_count -= <span class="number">1</span>;
+        <span class="kw">let </span>settle_token_position = <span class="self">self</span>.token_position_mut(settle_token_index)<span class="question-mark">?</span>.<span class="number">0</span>;
+        settle_token_position.decrement_in_use();
 
         <span class="prelude-val">Ok</span>(())
     }
@@ -2832,7 +2884,7 @@
         settle_token_index: TokenIndex,
         mango_account_pubkey: Pubkey,
     ) -&gt; <span class="prelude-ty">Result</span>&lt;()&gt; {
-        <span class="kw">let </span>mango_group = <span class="self">self</span>.fixed.deref_or_borrow().group;
+        <span class="kw">let </span>mango_group = <span class="self">self</span>.fixed().group;
         <span class="kw">let </span>perp_position = <span class="self">self</span>.perp_position_mut(perp_market_index)<span class="question-mark">?</span>;
 
         <span class="macro">emit!</span>(DeactivatePerpPositionLog {
@@ -2848,8 +2900,8 @@
 
         perp_position.market_index = PerpMarketIndex::MAX;
 
-        <span class="kw">let </span><span class="kw-2">mut </span>settle_token_position = <span class="self">self</span>.token_position_mut(settle_token_index)<span class="question-mark">?</span>.<span class="number">0</span>;
-        settle_token_position.in_use_count -= <span class="number">1</span>;
+        <span class="kw">let </span>settle_token_position = <span class="self">self</span>.token_position_mut(settle_token_index)<span class="question-mark">?</span>.<span class="number">0</span>;
+        settle_token_position.decrement_in_use();
 
         <span class="prelude-val">Ok</span>(())
     }
