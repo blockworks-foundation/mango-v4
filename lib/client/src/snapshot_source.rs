@@ -12,10 +12,10 @@ use solana_sdk::{account::AccountSharedData, commitment_config::CommitmentConfig
 
 use anyhow::Context;
 use futures::{stream, StreamExt};
-use log::*;
 use std::str::FromStr;
 use std::time::Duration;
 use tokio::time;
+use tracing::*;
 
 use crate::account_update_stream::{AccountUpdate, Message};
 use crate::AnyhowWrap;
@@ -230,10 +230,10 @@ pub fn start(config: Config, mango_oracles: Vec<Pubkey>, sender: async_channel::
                 }))
                 .await
                 .expect("always Ok");
-            log::debug!("latest slot for snapshot {}", epoch_info.absolute_slot);
+            debug!("latest slot for snapshot {}", epoch_info.absolute_slot);
 
             if epoch_info.absolute_slot > config.min_slot {
-                log::debug!("continuing to fetch snapshot now, min_slot {} is older than latest epoch slot {}", config.min_slot, epoch_info.absolute_slot);
+                debug!("continuing to fetch snapshot now, min_slot {} is older than latest epoch slot {}", config.min_slot, epoch_info.absolute_slot);
                 break;
             }
         }

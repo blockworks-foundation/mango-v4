@@ -57,7 +57,7 @@ pub mod switchboard_v2_mainnet_oracle {
 }
 
 #[zero_copy]
-#[derive(AnchorDeserialize, AnchorSerialize, Debug, bytemuck::Pod)]
+#[derive(AnchorDeserialize, AnchorSerialize, Debug)]
 pub struct OracleConfig {
     pub conf_filter: I80F48,
     pub max_staleness_slots: i64,
@@ -134,6 +134,56 @@ pub fn determine_oracle_type(acc_info: &impl KeyedAccountReader) -> Result<Oracl
     Err(MangoError::UnknownOracleType.into())
 }
 
+/// A modified version of PriceAccount::get_price_no_older_than() which
+/// - doesn't need a Clock instance
+/// - has the staleness check be optional (negative max_staleness)
+/// - returns the publish slot of the price
+fn pyth_get_price(
+    pubkey: &Pubkey,
+    account: &pyth_sdk_solana::state::PriceAccount,
+    now_slot: u64,
+    max_staleness: i64,
+) -> Result<(pyth_sdk_solana::Price, u64)> {
+    use pyth_sdk_solana::*;
+    if account.agg.status == state::PriceStatus::Trading
+        && (max_staleness < 0
+            || account.agg.pub_slot.saturating_add(max_staleness as u64) >= now_slot)
+    {
+        return Ok((
+            Price {
+                conf: account.agg.conf,
+                expo: account.expo,
+                price: account.agg.price,
+                publish_time: account.timestamp,
+            },
+            account.agg.pub_slot,
+        ));
+    }
+
+    if max_staleness < 0 || account.prev_slot.saturating_add(max_staleness as u64) >= now_slot {
+        return Ok((
+            Price {
+                conf: account.prev_conf,
+                expo: account.expo,
+                price: account.prev_price,
+                publish_time: account.prev_timestamp,
+            },
+            account.prev_slot,
+        ));
+    }
+
+    msg!(
+        "Pyth price too stale; pubkey {} prev price: {} prev slot: {} agg pub slot: {} agg status: {:?}",
+        pubkey,
+        account.prev_price,
+        account.prev_slot,
+        account.agg.pub_slot,
+        account.agg.status,
+    );
+
+    Err(MangoError::OracleStale.into())
+}
+
 /// Returns the price of one native base token, in native quote tokens
 ///
 /// Example: The for SOL at 40 USDC/SOL it would return 0.04 (the unit is USDC-native/SOL-native)
@@ -162,7 +212,12 @@ pub fn oracle_price_and_state(
         ),
         OracleType::Pyth => {
             let price_account = pyth_sdk_solana::state::load_price_account(data).unwrap();
-            let price_data = price_account.to_price();
+            let (price_data, pub_slot) = pyth_get_price(
+                acc_info.key(),
+                price_account,
+                staleness_slot,
+                config.max_staleness_slots,
+            )?;
             let price = I80F48::from_num(price_data.price);
 
             // Filter out bad prices
@@ -180,30 +235,12 @@ pub fn oracle_price_and_state(
                 return Err(MangoError::OracleConfidence.into());
             }
 
-            // The last_slot is when the price was actually updated
-            let last_slot = price_account.last_slot;
-            if config.max_staleness_slots >= 0
-                && price_account
-                    .last_slot
-                    .saturating_add(config.max_staleness_slots as u64)
-                    < staleness_slot
-            {
-                msg!(
-                    "Pyth price too stale; pubkey {} price: {} last slot: {}",
-                    acc_info.key(),
-                    price.to_num::<f64>(),
-                    last_slot,
-                );
-
-                return Err(MangoError::OracleStale.into());
-            }
-
             let decimals = (price_account.expo as i8) + QUOTE_DECIMALS - (base_decimals as i8);
             let decimal_adj = power_of_ten(decimals);
             (
                 price * decimal_adj,
                 OracleState {
-                    last_update_slot: last_slot,
+                    last_update_slot: pub_slot,
                     confidence: I80F48::from_num(price_data.conf),
                     oracle_type: OracleType::Pyth,
                 },

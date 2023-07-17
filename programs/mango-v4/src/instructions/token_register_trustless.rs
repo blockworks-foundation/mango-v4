@@ -75,14 +75,20 @@ pub fn token_register_trustless(
         deposit_weight_scale_start_quote: 5_000_000_000.0, // $5k
         reduce_only: 2,                                   // deposit-only
         force_close: 0,
-        reserved: [0; 2118],
+        padding: Default::default(),
+        fees_withdrawn: 0,
+        reserved: [0; 2104],
     };
     require_gt!(bank.max_rate, MINIMUM_MAX_RATE);
 
-    let oracle_price =
-        bank.oracle_price(&AccountInfoRef::borrow(ctx.accounts.oracle.as_ref())?, None)?;
-    bank.stable_price_model
-        .reset_to_price(oracle_price.to_num(), now_ts);
+    if let Ok(oracle_price) =
+        bank.oracle_price(&AccountInfoRef::borrow(ctx.accounts.oracle.as_ref())?, None)
+    {
+        bank.stable_price_model
+            .reset_to_price(oracle_price.to_num(), now_ts);
+    } else {
+        bank.stable_price_model.reset_on_nonzero_price = 1;
+    }
 
     let mut mint_info = ctx.accounts.mint_info.load_init()?;
     *mint_info = MintInfo {

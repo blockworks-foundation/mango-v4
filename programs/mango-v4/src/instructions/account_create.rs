@@ -29,7 +29,7 @@ pub fn account_create(
     account.fixed.delegate = Pubkey::default();
     account.fixed.set_being_liquidated(false);
 
-    account.expand_dynamic_content(token_count, serum3_count, perp_count, perp_oo_count)?;
+    account.expand_dynamic_content(token_count, serum3_count, perp_count, perp_oo_count, 0)?;
 
     Ok(())
 }

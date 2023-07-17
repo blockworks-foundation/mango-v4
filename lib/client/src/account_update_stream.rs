@@ -1,8 +1,8 @@
 use solana_client::rpc_response::{Response, RpcKeyedAccount};
 use solana_sdk::{account::AccountSharedData, pubkey::Pubkey};
 
-use log::*;
 use std::{str::FromStr, sync::Arc};
+use tracing::*;
 
 use crate::chain_data;
 

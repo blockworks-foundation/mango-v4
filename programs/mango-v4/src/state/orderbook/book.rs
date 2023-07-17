@@ -358,8 +358,9 @@ impl<'a> Orderbook<'a> {
         mut limit: u8,
         side_to_cancel_option: Option<Side>,
     ) -> Result<()> {
+        // Can't use mango_account.all_perp_orders() for borrow checking reasons.
         for i in 0..mango_account.header.perp_oo_count() {
-            let oo = mango_account.perp_order_by_raw_index(i);
+            let oo = mango_account.perp_order_by_raw_index(i)?;
             if !oo.is_active_for_market(perp_market.perp_market_index) {
                 continue;
             }

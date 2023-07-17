@@ -1,10 +1,10 @@
 use std::collections::HashMap;
+use std::collections::HashSet;
 use std::sync::{Arc, RwLock};
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use anchor_client::Cluster;
 use clap::Parser;
-use log::*;
 use mango_v4::state::{PerpMarketIndex, TokenIndex};
 use mango_v4_client::{
     account_update_stream, chain_data, keypair_from_cli, snapshot_source, websocket_source,
@@ -15,11 +15,13 @@ use mango_v4_client::{
 use itertools::Itertools;
 use solana_sdk::commitment_config::CommitmentConfig;
 use solana_sdk::pubkey::Pubkey;
-use std::collections::HashSet;
+use tracing::*;
 
 pub mod liquidate;
 pub mod metrics;
 pub mod rebalance;
+pub mod token_swap_info;
+pub mod trigger_tcs;
 pub mod util;
 
 use crate::util::{is_mango_account, is_mango_bank, is_mint_info, is_perp_market};
@@ -39,15 +41,19 @@ struct CliDotenv {
     remaining_args: Vec<std::ffi::OsString>,
 }
 
+// Prefer "--rebalance false" over "--no-rebalance" because it works
+// better with REBALANCE=false env values.
+#[derive(clap::ValueEnum, Clone, Copy, Debug, PartialEq, Eq)]
+enum BoolArg {
+    True,
+    False,
+}
+
 #[derive(Parser)]
 #[clap()]
 struct Cli {
     #[clap(short, long, env)]
     rpc_url: String,
-
-    // TODO: different serum markets could use different serum programs, should come from registered markets
-    #[clap(long, env)]
-    serum_program: Pubkey,
 
     #[clap(long, env)]
     liqor_mango_account: Pubkey,
@@ -70,12 +76,25 @@ struct Cli {
     #[clap(long, env, default_value = "50")]
     min_health_ratio: f64,
 
+    /// if rebalancing is enabled
+    ///
+    /// typically only disabled for tests where swaps are unavailable
+    #[clap(long, env, value_enum, default_value = "true")]
+    rebalance: BoolArg,
+
+    /// max slippage to request on swaps to rebalance spot tokens
     #[clap(long, env, default_value = "100")]
     rebalance_slippage_bps: u64,
 
     /// prioritize each transaction with this many microlamports/cu
     #[clap(long, env, default_value = "0")]
     prioritization_micro_lamports: u64,
+
+    /// use a jupiter mock instead of actual queries
+    ///
+    /// This is required for devnet testing.
+    #[clap(long, env, value_enum, default_value = "false")]
+    mock_jupiter: BoolArg,
 }
 
 pub fn encode_address(addr: &Pubkey) -> String {
@@ -84,6 +103,8 @@ pub fn encode_address(addr: &Pubkey) -> String {
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
+    mango_v4_client::tracing_subscriber_init();
+
     let args = if let Ok(cli_dotenv) = CliDotenv::try_parse() {
         dotenv::from_path(cli_dotenv.dotenv)?;
         cli_dotenv.remaining_args
@@ -135,13 +156,21 @@ async fn main() -> anyhow::Result<()> {
         .unique()
         .collect::<Vec<Pubkey>>();
 
+    let serum_programs = group_context
+        .serum3_markets
+        .values()
+        .map(|s3| s3.market.serum_program)
+        .unique()
+        .collect_vec();
+    // TODO: Currently the websocket source only supports a single serum program address!
+    assert_eq!(serum_programs.len(), 1);
+
     //
     // feed setup
     //
     // FUTURE: decouple feed setup and liquidator business logic
     // feed should send updates to a channel which liquidator can consume
 
-    solana_logger::setup_with_default("info");
     info!("startup");
 
     let metrics = metrics::start();
@@ -154,7 +183,7 @@ async fn main() -> anyhow::Result<()> {
     websocket_source::start(
         websocket_source::Config {
             rpc_ws_url: ws_url.clone(),
-            serum_program: cli.serum_program,
+            serum_program: *serum_programs.first().unwrap(),
             open_orders_authority: mango_group,
         },
         mango_oracles.clone(),
@@ -199,14 +228,35 @@ async fn main() -> anyhow::Result<()> {
         )?)
     };
 
+    let token_swap_info_config = token_swap_info::Config {
+        quote_index: 0,              // USDC
+        quote_amount: 1_000_000_000, // TODO: config, $1000, should be >= tcs_config.max_trigger_quote_amount
+        mock_jupiter: cli.mock_jupiter == BoolArg::True,
+    };
+
+    let token_swap_info_updater = Arc::new(token_swap_info::TokenSwapInfoUpdater::new(
+        mango_client.clone(),
+        token_swap_info_config,
+    ));
+
     let liq_config = liquidate::Config {
         min_health_ratio: cli.min_health_ratio,
+        mock_jupiter: cli.mock_jupiter == BoolArg::True,
+        // TODO: config
+        refresh_timeout: Duration::from_secs(30),
+    };
+
+    let tcs_config = trigger_tcs::Config {
+        min_health_ratio: cli.min_health_ratio,
+        max_trigger_quote_amount: 1_000_000_000, // TODO: config, $1000
+        mock_jupiter: cli.mock_jupiter == BoolArg::True,
         // TODO: config
         refresh_timeout: Duration::from_secs(30),
     };
 
     let mut rebalance_interval = tokio::time::interval(Duration::from_secs(5));
     let rebalance_config = rebalance::Config {
+        enabled: cli.rebalance == BoolArg::True,
         slippage_bps: cli.rebalance_slippage_bps,
         // TODO: config
         borrow_settle_excess: 1.05,
@@ -220,16 +270,26 @@ async fn main() -> anyhow::Result<()> {
         config: rebalance_config,
     });
 
-    let mut liquidation = LiquidationState {
+    let mut liquidation = Box::new(LiquidationState {
         mango_client,
         account_fetcher,
         liquidation_config: liq_config,
+        trigger_tcs_config: tcs_config,
         rebalancer: rebalancer.clone(),
-        accounts_with_errors: Default::default(),
-        error_skip_threshold: 5,
-        error_skip_duration: std::time::Duration::from_secs(120),
-        error_reset_duration: std::time::Duration::from_secs(360),
-    };
+        token_swap_info: token_swap_info_updater.clone(),
+        liq_errors: ErrorTracking {
+            skip_threshold: 5,
+            skip_duration: std::time::Duration::from_secs(120),
+            reset_duration: std::time::Duration::from_secs(360),
+            ..ErrorTracking::default()
+        },
+        tcs_errors: ErrorTracking {
+            skip_threshold: 2,
+            skip_duration: std::time::Duration::from_secs(120),
+            reset_duration: std::time::Duration::from_secs(360),
+            ..ErrorTracking::default()
+        },
+    });
 
     let (liquidation_trigger_sender, liquidation_trigger_receiver) =
         async_channel::bounded::<()>(1);
@@ -265,7 +325,7 @@ async fn main() -> anyhow::Result<()> {
                         let mut state = shared_state.write().unwrap();
                         if is_mango_account(&account_write.account, &mango_group).is_some() {
                             // e.g. to render debug logs RUST_LOG="liquidator=debug"
-                            log::debug!(
+                            debug!(
                                 "change to mango account {}...",
                                 &account_write.pubkey.to_string()[0..3]
                             );
@@ -281,15 +341,15 @@ async fn main() -> anyhow::Result<()> {
                         } else {
                             let mut must_check_all = false;
                             if is_mango_bank(&account_write.account, &mango_group).is_some() {
-                                log::debug!("change to bank {}", &account_write.pubkey);
+                                debug!("change to bank {}", &account_write.pubkey);
                                 must_check_all = true;
                             }
                             if is_perp_market(&account_write.account, &mango_group).is_some() {
-                                log::debug!("change to perp market {}", &account_write.pubkey);
+                                debug!("change to perp market {}", &account_write.pubkey);
                                 must_check_all = true;
                             }
                             if oracles.contains(&account_write.pubkey) {
-                                log::debug!("change to oracle {}", &account_write.pubkey);
+                                debug!("change to oracle {}", &account_write.pubkey);
                                 must_check_all = true;
                             }
                             if must_check_all {
@@ -328,6 +388,9 @@ async fn main() -> anyhow::Result<()> {
         }
     });
 
+    // Could be refactored to only start the below jobs when the first snapshot is done.
+    // But need to take care to abort if the above job aborts beforehand.
+
     let rebalance_job = tokio::spawn({
         let shared_state = shared_state.clone();
         async move {
@@ -337,7 +400,7 @@ async fn main() -> anyhow::Result<()> {
                     continue;
                 }
                 if let Err(err) = rebalancer.zero_all_non_quote().await {
-                    log::error!("failed to rebalance liqor: {:?}", err);
+                    error!("failed to rebalance liqor: {:?}", err);
 
                     // Workaround: We really need a sequence enforcer in the liquidator since we don't want to
                     // accidentally send a similar tx again when we incorrectly believe an earlier one got forked
@@ -349,6 +412,7 @@ async fn main() -> anyhow::Result<()> {
     });
 
     let liquidation_job = tokio::spawn({
+        let shared_state = shared_state.clone();
         async move {
             loop {
                 liquidation_trigger_receiver.recv().await.unwrap();
@@ -368,22 +432,69 @@ async fn main() -> anyhow::Result<()> {
                     state.health_check_accounts = vec![];
                 }
 
-                liquidation
+                let liquidated = liquidation
                     .maybe_liquidate_one_and_rebalance(account_addresses.iter())
                     .await
                     .unwrap();
+
+                if !liquidated {
+                    liquidation
+                        .maybe_take_token_conditional_swap(account_addresses.iter())
+                        .await
+                        .unwrap();
+                }
+            }
+        }
+    });
+
+    let token_swap_info_job = tokio::spawn({
+        // TODO: configurable interval
+        let mut interval = tokio::time::interval(Duration::from_secs(60));
+        let mut min_delay = tokio::time::interval(Duration::from_secs(1));
+        let shared_state = shared_state.clone();
+        async move {
+            loop {
+                if !shared_state.read().unwrap().one_snapshot_done {
+                    continue;
+                }
+                let token_indexes = token_swap_info_updater
+                    .mango_client()
+                    .context
+                    .token_indexes_by_name
+                    .values()
+                    .copied()
+                    .collect_vec();
+                for token_index in token_indexes {
+                    match token_swap_info_updater.update_one(token_index).await {
+                        Ok(()) => {}
+                        Err(err) => {
+                            warn!(
+                                "failed to update token swap info for token {token_index}: {:?}",
+                                err
+                            );
+                        }
+                    }
+                    min_delay.tick().await;
+                }
+                token_swap_info_updater.log_all();
+
+                interval.tick().await;
             }
         }
     });
 
     use futures::StreamExt;
-    let mut jobs: futures::stream::FuturesUnordered<_> =
-        vec![data_job, rebalance_job, liquidation_job]
-            .into_iter()
-            .collect();
+    let mut jobs: futures::stream::FuturesUnordered<_> = vec![
+        data_job,
+        rebalance_job,
+        liquidation_job,
+        token_swap_info_job,
+    ]
+    .into_iter()
+    .collect();
     jobs.next().await;
 
-    log::error!("a critical job aborted, exiting");
+    error!("a critical job aborted, exiting");
     Ok(())
 }
 
@@ -403,27 +514,68 @@ struct SharedState {
     health_check_all: bool,
 }
 
-struct ErrorTracking {
+#[derive(Clone)]
+struct AccountErrorState {
     count: u64,
     last_at: std::time::Instant,
+}
+
+#[derive(Default)]
+struct ErrorTracking {
+    accounts: HashMap<Pubkey, AccountErrorState>,
+    skip_threshold: u64,
+    skip_duration: std::time::Duration,
+    reset_duration: std::time::Duration,
+}
+
+impl ErrorTracking {
+    pub fn had_too_many_errors(&self, pubkey: &Pubkey, now: Instant) -> Option<AccountErrorState> {
+        if let Some(error_entry) = self.accounts.get(pubkey) {
+            if error_entry.count >= self.skip_threshold
+                && now.duration_since(error_entry.last_at) < self.skip_duration
+            {
+                Some(error_entry.clone())
+            } else {
+                None
+            }
+        } else {
+            None
+        }
+    }
+
+    pub fn record_error(&mut self, pubkey: &Pubkey, now: Instant) {
+        let error_entry = self.accounts.entry(*pubkey).or_insert(AccountErrorState {
+            count: 0,
+            last_at: now,
+        });
+        if now.duration_since(error_entry.last_at) > self.reset_duration {
+            error_entry.count = 0;
+        }
+        error_entry.count += 1;
+        error_entry.last_at = now;
+    }
+
+    pub fn clear_errors(&mut self, pubkey: &Pubkey) {
+        self.accounts.remove(pubkey);
+    }
 }
 
 struct LiquidationState {
     mango_client: Arc<MangoClient>,
     account_fetcher: Arc<chain_data::AccountFetcher>,
     rebalancer: Arc<rebalance::Rebalancer>,
+    token_swap_info: Arc<token_swap_info::TokenSwapInfoUpdater>,
     liquidation_config: liquidate::Config,
-    accounts_with_errors: HashMap<Pubkey, ErrorTracking>,
-    error_skip_threshold: u64,
-    error_skip_duration: std::time::Duration,
-    error_reset_duration: std::time::Duration,
+    trigger_tcs_config: trigger_tcs::Config,
+    liq_errors: ErrorTracking,
+    tcs_errors: ErrorTracking,
 }
 
 impl LiquidationState {
     async fn maybe_liquidate_one_and_rebalance<'b>(
         &mut self,
         accounts_iter: impl Iterator<Item = &'b Pubkey>,
-    ) -> anyhow::Result<()> {
+    ) -> anyhow::Result<bool> {
         use rand::seq::SliceRandom;
 
         let mut accounts = accounts_iter.collect::<Vec<&Pubkey>>();
@@ -444,29 +596,26 @@ impl LiquidationState {
             }
         }
         if !liquidated_one {
-            return Ok(());
+            return Ok(false);
         }
 
         if let Err(err) = self.rebalancer.zero_all_non_quote().await {
-            log::error!("failed to rebalance liqor: {:?}", err);
+            error!("failed to rebalance liqor: {:?}", err);
         }
-        Ok(())
+        Ok(true)
     }
 
     async fn maybe_liquidate_and_log_error(&mut self, pubkey: &Pubkey) -> anyhow::Result<bool> {
         let now = std::time::Instant::now();
+        let error_tracking = &mut self.liq_errors;
 
         // Skip a pubkey if there've been too many errors recently
-        if let Some(error_entry) = self.accounts_with_errors.get(pubkey) {
-            if error_entry.count >= self.error_skip_threshold
-                && now.duration_since(error_entry.last_at) < self.error_skip_duration
-            {
-                log::trace!(
-                    "skip checking account {pubkey}, had {} errors recently",
-                    error_entry.count
-                );
-                return Ok(false);
-            }
+        if let Some(error_entry) = error_tracking.had_too_many_errors(pubkey, now) {
+            trace!(
+                "skip checking account {pubkey}, had {} errors recently",
+                error_entry.count
+            );
+            return Ok(false);
         }
 
         let result = liquidate::maybe_liquidate_account(
@@ -479,21 +628,10 @@ impl LiquidationState {
 
         if let Err(err) = result.as_ref() {
             // Keep track of pubkeys that had errors
-            let error_entry = self
-                .accounts_with_errors
-                .entry(*pubkey)
-                .or_insert(ErrorTracking {
-                    count: 0,
-                    last_at: now,
-                });
-            if now.duration_since(error_entry.last_at) > self.error_reset_duration {
-                error_entry.count = 0;
-            }
-            error_entry.count += 1;
-            error_entry.last_at = now;
+            error_tracking.record_error(pubkey, now);
 
             // Not all errors need to be raised to the user's attention.
-            let mut log_level = log::Level::Error;
+            let mut is_error = true;
 
             // Simulation errors due to liqee precondition failures on the liquidation instructions
             // will commonly happen if our liquidator is late or if there are chain forks.
@@ -502,14 +640,108 @@ impl LiquidationState {
                     if logs.iter().any(|line| {
                         line.contains("HealthMustBeNegative") || line.contains("IsNotBankrupt")
                     }) {
-                        log_level = log::Level::Trace;
+                        is_error = false;
                     }
                 }
                 _ => {}
             };
-            log::log!(log_level, "liquidating account {}: {:?}", pubkey, err);
+            if is_error {
+                error!("liquidating account {}: {:?}", pubkey, err);
+            } else {
+                trace!("liquidating account {}: {:?}", pubkey, err);
+            }
         } else {
-            self.accounts_with_errors.remove(pubkey);
+            error_tracking.clear_errors(pubkey);
+        }
+
+        result
+    }
+
+    async fn maybe_take_token_conditional_swap<'b>(
+        &mut self,
+        accounts_iter: impl Iterator<Item = &'b Pubkey>,
+    ) -> anyhow::Result<()> {
+        use rand::seq::SliceRandom;
+
+        let mut accounts = accounts_iter.collect::<Vec<&Pubkey>>();
+        {
+            let mut rng = rand::thread_rng();
+            accounts.shuffle(&mut rng);
+        }
+
+        let mut took_one = false;
+        for pubkey in accounts {
+            if self
+                .maybe_take_conditional_swap_and_log_error(pubkey)
+                .await
+                .unwrap_or(false)
+            {
+                took_one = true;
+                break;
+            }
+        }
+        if !took_one {
+            return Ok(());
+        }
+
+        if let Err(err) = self.rebalancer.zero_all_non_quote().await {
+            error!("failed to rebalance liqor: {:?}", err);
+        }
+        Ok(())
+    }
+
+    async fn maybe_take_conditional_swap_and_log_error(
+        &mut self,
+        pubkey: &Pubkey,
+    ) -> anyhow::Result<bool> {
+        let now = std::time::Instant::now();
+        let error_tracking = &mut self.tcs_errors;
+
+        // Skip a pubkey if there've been too many errors recently
+        if let Some(error_entry) = error_tracking.had_too_many_errors(pubkey, now) {
+            trace!(
+                "skip checking for tcs on account {pubkey}, had {} errors recently",
+                error_entry.count
+            );
+            return Ok(false);
+        }
+
+        let result = trigger_tcs::maybe_execute_token_conditional_swap(
+            &self.mango_client,
+            &self.account_fetcher,
+            &self.token_swap_info,
+            pubkey,
+            &self.trigger_tcs_config,
+        )
+        .await;
+
+        if let Err(err) = result.as_ref() {
+            // Keep track of pubkeys that had errors
+            error_tracking.record_error(pubkey, now);
+
+            // Not all errors need to be raised to the user's attention.
+            let mut is_error = true;
+
+            // Simulation errors due to liqee precondition failures
+            // will commonly happen if our liquidator is late or if there are chain forks.
+            match err.downcast_ref::<MangoClientError>() {
+                Some(MangoClientError::SendTransactionPreflightFailure { logs, .. }) => {
+                    if logs
+                        .iter()
+                        .any(|line| line.contains("TokenConditionalSwapPriceNotInRange"))
+                    {
+                        is_error = false;
+                    }
+                }
+                _ => {}
+            };
+            if is_error {
+                error!("token conditional swap on account {}: {:?}", pubkey, err);
+            } else {
+                trace!("token conditional swap on account {}: {:?}", pubkey, err);
+            }
+        } else {
+            error_tracking.clear_errors(pubkey);
         }
 
         result

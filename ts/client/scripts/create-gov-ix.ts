@@ -1,4 +1,5 @@
-import { AnchorProvider, BN, Wallet } from '@coral-xyz/anchor';
+import { AnchorProvider, Wallet } from '@coral-xyz/anchor';
+import { BN } from '@project-serum/anchor';
 import { serializeInstructionToBase64 } from '@solana/spl-governance';
 import {
   AccountMeta,

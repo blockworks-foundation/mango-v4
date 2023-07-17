@@ -34,9 +34,9 @@ pub fn serum3_close_open_orders(ctx: Context<Serum3CloseOpenOrders>) -> Result<(
     // Reduce the in_use_count on the token positions - they no longer need to be forced open.
     // We cannot immediately dust tiny positions because we don't have the banks.
     let (base_position, _) = account.token_position_mut(serum_market.base_token_index)?;
-    base_position.in_use_count = base_position.in_use_count.saturating_sub(1);
+    base_position.decrement_in_use();
     let (quote_position, _) = account.token_position_mut(serum_market.quote_token_index)?;
-    quote_position.in_use_count = quote_position.in_use_count.saturating_sub(1);
+    quote_position.decrement_in_use();
 
     // Deactivate the serum open orders account itself
     account.deactivate_serum3_orders(serum_market.market_index)?;

@@ -103,6 +103,8 @@ pub enum MangoError {
     InvalidHealthAccountCount,
     #[msg("would self trade")]
     WouldSelfTrade,
+    #[msg("conditional token swap price is not in execution range")]
+    TokenConditionalSwapPriceNotInRange,
 }
 
 impl MangoError {

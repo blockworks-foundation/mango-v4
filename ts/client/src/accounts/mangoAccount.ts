@@ -17,6 +17,7 @@ export class MangoAccount {
   public serum3: Serum3Orders[];
   public perps: PerpPosition[];
   public perpOpenOrders: PerpOo[];
+  public tokenConditionalSwaps: TokenConditionalSwap[];
 
   static from(
     publicKey: PublicKey,
@@ -41,6 +42,7 @@ export class MangoAccount {
       perps: unknown;
       perpOpenOrders: unknown;
     },
+    tokenConditionalSwaps: TokenConditionalSwapDto[],
   ): MangoAccount {
     return new MangoAccount(
       publicKey,
@@ -63,6 +65,7 @@ export class MangoAccount {
       obj.serum3 as Serum3PositionDto[],
       obj.perps as PerpPositionDto[],
       obj.perpOpenOrders as PerpOoDto[],
+      tokenConditionalSwaps,
       new Map(), // serum3OosMapByMarketIndex
     );
   }
@@ -88,6 +91,7 @@ export class MangoAccount {
     serum3: Serum3PositionDto[],
     perps: PerpPositionDto[],
     perpOpenOrders: PerpOoDto[],
+    tokenConditionalSwaps: TokenConditionalSwapDto[],
     public serum3OosMapByMarketIndex: Map<number, OpenOrders>,
   ) {
     this.name = utf8.decode(new Uint8Array(name)).split('\x00')[0];
@@ -95,10 +99,13 @@ export class MangoAccount {
     this.serum3 = serum3.map((dto) => Serum3Orders.from(dto));
     this.perps = perps.map((dto) => PerpPosition.from(dto));
     this.perpOpenOrders = perpOpenOrders.map((dto) => PerpOo.from(dto));
+    this.tokenConditionalSwaps = tokenConditionalSwaps.map((dto) =>
+      TokenConditionalSwap.from(dto),
+    );
   }
 
   public async reload(client: MangoClient): Promise<MangoAccount> {
-    const mangoAccount = await client.getMangoAccount(this);
+    const mangoAccount = await client.getMangoAccount(this.publicKey);
     await mangoAccount.reloadSerum3OpenOrders(client);
     Object.assign(this, mangoAccount);
     return mangoAccount;
@@ -189,6 +196,10 @@ export class MangoAccount {
 
   public perpActive(): PerpPosition[] {
     return this.perps.filter((perp) => perp.isActive());
+  }
+
+  public tokenConditionalSwapsActive(): TokenConditionalSwap[] {
+    return this.tokenConditionalSwaps.filter((tcs) => tcs.hasData);
   }
 
   public perpOrdersActive(): PerpOo[] {
@@ -1754,6 +1765,69 @@ export class PerpOoDto {
     public market: number,
     public clientId: BN,
     public id: BN,
+  ) {}
+}
+
+export class TokenConditionalSwap {
+  static from(dto: TokenConditionalSwapDto): TokenConditionalSwap {
+    return new TokenConditionalSwap(
+      dto.id,
+      dto.maxBuy,
+      dto.maxSell,
+      dto.bought,
+      dto.sold,
+      dto.expiryTimestamp,
+      dto.priceLowerLimit,
+      dto.priceUpperLimit,
+      dto.pricePremiumFraction,
+      dto.takerFeeFraction,
+      dto.makerFeeFraction,
+      dto.buyTokenIndex as TokenIndex,
+      dto.sellTokenIndex as TokenIndex,
+      dto.hasData == 1,
+      dto.allowCreatingDeposits == 1,
+      dto.allowCreatingBorrows == 1,
+    );
+  }
+
+  constructor(
+    public id: BN,
+    public maxBuy: BN,
+    public maxSell: BN,
+    public bought: BN,
+    public sold: BN,
+    public expiryTimestamp: BN,
+    public priceLowerLimit: number,
+    public priceUpperLimit: number,
+    public pricePremiumFraction: number,
+    public takerFeeFraction: number,
+    public makerFeeFraction: number,
+    public buyTokenIndex: TokenIndex,
+    public sellTokenIndex: TokenIndex,
+    public hasData: boolean,
+    public allowCreatingDeposits: boolean,
+    public allowCreatingBorrows: boolean,
+  ) {}
+}
+
+export class TokenConditionalSwapDto {
+  constructor(
+    public id: BN,
+    public maxBuy: BN,
+    public maxSell: BN,
+    public bought: BN,
+    public sold: BN,
+    public expiryTimestamp: BN,
+    public priceLowerLimit: number,
+    public priceUpperLimit: number,
+    public pricePremiumFraction: number,
+    public takerFeeFraction: number,
+    public makerFeeFraction: number,
+    public buyTokenIndex: number,
+    public sellTokenIndex: number,
+    public hasData: number,
+    public allowCreatingDeposits: number,
+    public allowCreatingBorrows: number,
   ) {}
 }
 

@@ -19,24 +19,6 @@ impl HealthCache {
         }
     }
 
-    /// The health ratio is
-    /// - 0 if health is 0 - meaning assets = liabs
-    /// - 100 if there's 2x as many assets as liabs
-    /// - 200 if there's 3x as many assets as liabs
-    /// - MAX if liabs = 0
-    ///
-    /// Maybe talking about the collateralization ratio assets/liabs is more intuitive?
-    pub fn health_ratio(&self, health_type: HealthType) -> I80F48 {
-        let (assets, liabs) = self.health_assets_and_liabs_stable_liabs(health_type);
-        let hundred = I80F48::from(100);
-        if liabs > 0 {
-            // feel free to saturate to MAX for tiny liabs
-            (hundred * (assets - liabs)).saturating_div(liabs)
-        } else {
-            I80F48::MAX
-        }
-    }
-
     /// Return a copy of the current cache where a swap between two banks was executed.
     ///
     /// Errors:

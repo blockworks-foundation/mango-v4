@@ -394,7 +394,11 @@ async function createUser(userKeypair: string) {
   const user = result[2];
 
   console.log(`Creating MangoAccount...`);
-  const mangoAccount = await client.getOrCreateMangoAccount(group);
+  const mangoAccount = await client.getMangoAccountForOwner(
+    group,
+    user.publicKey,
+    0,
+  );
   if (!mangoAccount) {
     throw new Error(`MangoAccount not found for user ${user.publicKey}`);
   }
