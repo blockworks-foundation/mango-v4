@@ -269,15 +269,16 @@ impl Rebalancer {
         if builder.transaction_size_ok()? {
             return Ok((builder, full.clone()));
         }
-        log::trace!(
-            "full route from {} to {} does not fit in a tx, market_info.label {}",
-            full.input_mint,
-            full.output_mint,
-            full.route
+        trace!(
+            market_info_label = full
+                .route
                 .market_infos
                 .first()
                 .map(|v| v.label.clone())
-                .unwrap_or_else(|| "no market_info".into())
+                .unwrap_or_else(|| "no market_info".into()),
+            %full.input_mint,
+            %full.output_mint,
+            "full route does not fit in a tx",
         );
 
         if alternatives.is_empty() {
