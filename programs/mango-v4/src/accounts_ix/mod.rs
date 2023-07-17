@@ -1,4 +1,3 @@
-pub use account_and_authority::*;
 pub use account_buyback_fees_with_mngo::*;
 pub use account_close::*;
 pub use account_create::*;
@@ -59,6 +58,7 @@ pub use stub_oracle_close::*;
 pub use stub_oracle_create::*;
 pub use stub_oracle_set::*;
 pub use token_add_bank::*;
+pub use token_conditional_swap_cancel::*;
 pub use token_conditional_swap_create::*;
 pub use token_conditional_swap_trigger::*;
 pub use token_deposit::*;
@@ -72,7 +72,6 @@ pub use token_register_trustless::*;
 pub use token_update_index_and_rate::*;
 pub use token_withdraw::*;
 
-mod account_and_authority;
 mod account_buyback_fees_with_mngo;
 mod account_close;
 mod account_create;
@@ -133,6 +132,7 @@ mod stub_oracle_close;
 mod stub_oracle_create;
 mod stub_oracle_set;
 mod token_add_bank;
+mod token_conditional_swap_cancel;
 mod token_conditional_swap_create;
 mod token_conditional_swap_trigger;
 mod token_deposit;
