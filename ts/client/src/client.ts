@@ -3332,7 +3332,7 @@ export class MangoClient {
     sellMintPk: PublicKey,
     maxSell: number,
     expiryTimestamp: number | null,
-    priceLowerLimit: number,
+    priceLowerLimit: number, // Note: priceLowerLimit should be higher than priceUpperLimit
     priceUpperLimit: number,
     pricePremiumFraction: number,
   ): Promise<TransactionSignature> {
@@ -3390,7 +3390,7 @@ export class MangoClient {
     sellMintPk: PublicKey,
     maxBuy: number,
     expiryTimestamp: number | null,
-    priceLowerLimit: number,
+    priceLowerLimit: number, // Note: priceLowerLimit should be lower than priceUpperLimit
     priceUpperLimit: number,
     pricePremiumFraction: number,
   ): Promise<TransactionSignature> {
