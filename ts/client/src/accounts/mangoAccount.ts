@@ -5,7 +5,13 @@ import { AccountInfo, PublicKey, TransactionSignature } from '@solana/web3.js';
 import { MangoClient } from '../client';
 import { OPENBOOK_PROGRAM_ID, RUST_I64_MAX, RUST_I64_MIN } from '../constants';
 import { I80F48, I80F48Dto, ONE_I80F48, ZERO_I80F48 } from '../numbers/I80F48';
-import { toNativeI80F48, toUiDecimals, toUiDecimalsForQuote } from '../utils';
+import {
+  U64_MAX_BN,
+  roundTo5,
+  toNativeI80F48,
+  toUiDecimals,
+  toUiDecimalsForQuote,
+} from '../utils';
 import { Bank, TokenIndex } from './bank';
 import { Group } from './group';
 import { HealthCache } from './healthCache';
@@ -1808,6 +1814,99 @@ export class TokenConditionalSwap {
     public allowCreatingDeposits: boolean,
     public allowCreatingBorrows: boolean,
   ) {}
+
+  getMaxBuyUi(group: Group): number {
+    const buyBank = this.getBuyToken(group);
+    return toUiDecimals(this.maxBuy, buyBank.mintDecimals);
+  }
+
+  getMaxSellUi(group: Group): number {
+    const sellBank = this.getSellToken(group);
+    return toUiDecimals(this.maxSell, sellBank.mintDecimals);
+  }
+
+  getBoughtUi(group: Group): number {
+    const buyBank = this.getBuyToken(group);
+    return toUiDecimals(this.bought, buyBank.mintDecimals);
+  }
+
+  getSoldUi(group: Group): number {
+    const sellBank = this.getSellToken(group);
+    return toUiDecimals(this.sold, sellBank.mintDecimals);
+  }
+
+  getExpiryTimestamp(): number {
+    return this.expiryTimestamp.toNumber();
+  }
+
+  private priceLimitToUi(
+    group: Group,
+    sellTokenPerBuyTokenNative: number,
+  ): number {
+    const buyBank = this.getBuyToken(group);
+    const sellBank = this.getSellToken(group);
+    const sellTokenPerBuyTokenUi = toUiDecimals(
+      sellTokenPerBuyTokenNative,
+      sellBank.mintDecimals - buyBank.mintDecimals,
+    );
+
+    // Below are workarounds to know when to show an inverted price in ui
+    // We want to identify if the pair user is wanting to trade is
+    // buytoken/selltoken or selltoken/buytoken
+
+    // Buy limit / close short
+    if (this.maxSell.eq(U64_MAX_BN)) {
+      return roundTo5(sellTokenPerBuyTokenUi);
+    }
+
+    // Stop loss / take profit
+    const buyTokenPerSellTokenUi = 1 / sellTokenPerBuyTokenUi;
+    return roundTo5(buyTokenPerSellTokenUi);
+  }
+
+  getPriceLowerLimitUi(group: Group): number {
+    return this.priceLimitToUi(group, this.priceLowerLimit);
+  }
+
+  getPriceUpperLimitUi(group: Group): number {
+    return this.priceLimitToUi(group, this.priceUpperLimit);
+  }
+
+  getPricePremium(): number {
+    return this.pricePremiumFraction * 100;
+  }
+
+  getBuyToken(group: Group): Bank {
+    return group.getFirstBankByTokenIndex(this.buyTokenIndex);
+  }
+
+  getSellToken(group: Group): Bank {
+    return group.getFirstBankByTokenIndex(this.sellTokenIndex);
+  }
+
+  getAllowCreatingDeposits(): boolean {
+    return this.allowCreatingDeposits;
+  }
+
+  getAllowCreatingBorrows(): boolean {
+    return this.allowCreatingBorrows;
+  }
+
+  toString(group: Group): string {
+    return `getMaxBuy ${this.getMaxBuyUi(
+      group,
+    )}, getMaxSell ${this.getMaxSellUi(
+      group,
+    )}, getMaxSellUi ${this.getMaxSellUi(
+      group,
+    )}, getPriceLowerLimitUi ${this.getPriceLowerLimitUi(
+      group,
+    )},  getPriceUpperLimitUi ${this.getPriceUpperLimitUi(
+      group,
+    )},  this.priceUpperLimit ${
+      this.priceUpperLimit
+    }, getPricePremium ${this.getPricePremium()}`;
+  }
 }
 
 export class TokenConditionalSwapDto {

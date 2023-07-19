@@ -721,7 +721,28 @@ export class MangoClient {
     perpOoCount: number,
     tokenConditionalSwapCount: number,
   ): Promise<TransactionSignature> {
-    const ix = await this.program.methods
+    const ix = await this.accountExpandV2Ix(
+      group,
+      account,
+      tokenCount,
+      serum3Count,
+      perpCount,
+      perpOoCount,
+      tokenConditionalSwapCount,
+    );
+    return await this.sendAndConfirmTransactionForGroup(group, [ix]);
+  }
+
+  public async accountExpandV2Ix(
+    group: Group,
+    account: MangoAccount,
+    tokenCount: number,
+    serum3Count: number,
+    perpCount: number,
+    perpOoCount: number,
+    tokenConditionalSwapCount: number,
+  ): Promise<TransactionInstruction> {
+    return await this.program.methods
       .accountExpandV2(
         tokenCount,
         serum3Count,
@@ -736,7 +757,6 @@ export class MangoClient {
         payer: (this.program.provider as AnchorProvider).wallet.publicKey,
       })
       .instruction();
-    return await this.sendAndConfirmTransactionForGroup(group, [ix]);
   }
 
   public async editMangoAccount(
@@ -3305,6 +3325,122 @@ export class MangoClient {
     return await this.sendAndConfirmTransactionForGroup(group, [ix]);
   }
 
+  public async tokenConditionalSwapStopLoss(
+    group: Group,
+    account: MangoAccount,
+    buyMintPk: PublicKey,
+    sellMintPk: PublicKey,
+    maxSell: number,
+    expiryTimestamp: number | null,
+    priceLowerLimit: number,
+    priceUpperLimit: number,
+    pricePremiumFraction: number,
+  ): Promise<TransactionSignature> {
+    const buyBank: Bank = group.getFirstBankByMint(buyMintPk);
+    const sellBank: Bank = group.getFirstBankByMint(sellMintPk);
+    priceLowerLimit =
+      (1 / priceLowerLimit) *
+      Math.pow(10, sellBank.mintDecimals - buyBank.mintDecimals);
+    priceUpperLimit =
+      (1 / priceUpperLimit) *
+      Math.pow(10, sellBank.mintDecimals - buyBank.mintDecimals);
+
+    const ix = await this.program.methods
+      .tokenConditionalSwapCreate(
+        U64_MAX_BN,
+        toNative(maxSell, sellBank.mintDecimals),
+        expiryTimestamp !== null ? new BN(expiryTimestamp) : U64_MAX_BN,
+        priceLowerLimit,
+        priceUpperLimit,
+        pricePremiumFraction / 100,
+        true,
+        false,
+      )
+      .accounts({
+        group: group.publicKey,
+        account: account.publicKey,
+        authority: (this.program.provider as AnchorProvider).wallet.publicKey,
+        buyBank: buyBank.publicKey,
+        sellBank: sellBank.publicKey,
+      })
+      .instruction();
+
+    const ixs = [ix];
+    if (account.tokenConditionalSwaps.length == 0) {
+      ixs.push(
+        await this.accountExpandV2Ix(
+          group,
+          account,
+          account.tokens.length,
+          account.serum3.length,
+          account.perps.length,
+          account.perpOpenOrders.length,
+          8,
+        ),
+      );
+    }
+
+    return await this.sendAndConfirmTransactionForGroup(group, ixs);
+  }
+
+  public async tokenConditionalSwapBuyLimit(
+    group: Group,
+    account: MangoAccount,
+    buyMintPk: PublicKey,
+    sellMintPk: PublicKey,
+    maxBuy: number,
+    expiryTimestamp: number | null,
+    priceLowerLimit: number,
+    priceUpperLimit: number,
+    pricePremiumFraction: number,
+  ): Promise<TransactionSignature> {
+    const buyBank: Bank = group.getFirstBankByMint(buyMintPk);
+    const sellBank: Bank = group.getFirstBankByMint(sellMintPk);
+    priceLowerLimit =
+      priceLowerLimit *
+      Math.pow(10, sellBank.mintDecimals - buyBank.mintDecimals);
+    priceUpperLimit =
+      priceUpperLimit *
+      Math.pow(10, sellBank.mintDecimals - buyBank.mintDecimals);
+
+    const ix = await this.program.methods
+      .tokenConditionalSwapCreate(
+        toNative(maxBuy, buyBank.mintDecimals),
+        U64_MAX_BN,
+        expiryTimestamp !== null ? new BN(expiryTimestamp) : U64_MAX_BN,
+        priceLowerLimit,
+        priceUpperLimit,
+        pricePremiumFraction / 100,
+        true,
+        false,
+      )
+      .accounts({
+        group: group.publicKey,
+        account: account.publicKey,
+        authority: (this.program.provider as AnchorProvider).wallet.publicKey,
+        buyBank: buyBank.publicKey,
+        sellBank: sellBank.publicKey,
+      })
+      .instruction();
+
+    const ixs = [ix];
+    if (account.tokenConditionalSwaps.length == 0) {
+      ixs.push(
+        await this.accountExpandV2Ix(
+          group,
+          account,
+          account.tokens.length,
+          account.serum3.length,
+          account.perps.length,
+          account.perpOpenOrders.length,
+          8,
+        ),
+      );
+    }
+
+    return await this.sendAndConfirmTransactionForGroup(group, ixs);
+  }
+
   public async tokenConditionalSwapCreate(
     group: Group,
     account: MangoAccount,
@@ -3341,7 +3477,22 @@ export class MangoClient {
       })
       .instruction();
 
-    return await this.sendAndConfirmTransactionForGroup(group, [ix]);
+    const ixs = [ix];
+    if (account.tokenConditionalSwaps.length == 0) {
+      ixs.push(
+        await this.accountExpandV2Ix(
+          group,
+          account,
+          account.tokens.length,
+          account.serum3.length,
+          account.perps.length,
+          account.perpOpenOrders.length,
+          8,
+        ),
+      );
+    }
+
+    return await this.sendAndConfirmTransactionForGroup(group, ixs);
   }
 
   public async tokenConditionalSwapCancel(
