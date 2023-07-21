@@ -159,6 +159,46 @@ export class MangoClient {
     });
   }
 
+  public async adminTokenWithdrawFees(
+    group: Group,
+    bank: Bank,
+    tokenAccountPk: PublicKey,
+  ): Promise<TransactionSignature> {
+    const admin = (this.program.provider as AnchorProvider).wallet.publicKey;
+    const ix = await this.program.methods
+      .admingTokenWithdrawFees()
+      .accounts({
+        group: group.publicKey,
+        bank: bank.publicKey,
+        vault: bank.vault,
+        tokenAccount: tokenAccountPk,
+        admin,
+      })
+      .instruction();
+    return await this.sendAndConfirmTransaction([ix]);
+  }
+
+  public async adminPerpWithdrawFees(
+    group: Group,
+    perpMarket: PerpMarket,
+    tokenAccountPk: PublicKey,
+  ): Promise<TransactionSignature> {
+    const bank = group.getFirstBankByTokenIndex(perpMarket.settleTokenIndex);
+    const admin = (this.program.provider as AnchorProvider).wallet.publicKey;
+    const ix = await this.program.methods
+      .adminPerpWithdrawFees()
+      .accounts({
+        group: group.publicKey,
+        perpMarket: perpMarket.publicKey,
+        bank: bank.publicKey,
+        vault: bank.vault,
+        tokenAccount: tokenAccountPk,
+        admin,
+      })
+      .instruction();
+    return await this.sendAndConfirmTransaction([ix]);
+  }
+
   // Group
   public async groupCreate(
     groupNum: number,
