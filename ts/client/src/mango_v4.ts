@@ -8,19 +8,12 @@ export type MangoV4 = {
         {
           "name": "group",
           "isMut": false,
-          "isSigner": false,
-          "relations": [
-            "admin"
-          ]
+          "isSigner": false
         },
         {
           "name": "bank",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "group",
-            "vault"
-          ]
+          "isSigner": false
         },
         {
           "name": "vault",
@@ -51,27 +44,17 @@ export type MangoV4 = {
         {
           "name": "group",
           "isMut": false,
-          "isSigner": false,
-          "relations": [
-            "admin"
-          ]
+          "isSigner": false
         },
         {
           "name": "perpMarket",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "group"
-          ]
+          "isSigner": false
         },
         {
           "name": "bank",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "group",
-            "vault"
-          ]
+          "isSigner": false
         },
         {
           "name": "vault",
@@ -194,10 +177,7 @@ export type MangoV4 = {
         {
           "name": "group",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "admin"
-          ]
+          "isSigner": false
         },
         {
           "name": "admin",
@@ -292,11 +272,7 @@ export type MangoV4 = {
         {
           "name": "group",
           "isMut": false,
-          "isSigner": false,
-          "relations": [
-            "insurance_vault",
-            "admin"
-          ]
+          "isSigner": false
         },
         {
           "name": "admin",
@@ -353,11 +329,7 @@ export type MangoV4 = {
         {
           "name": "group",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "admin",
-            "insurance_vault"
-          ]
+          "isSigner": false
         },
         {
           "name": "admin",
@@ -388,10 +360,7 @@ export type MangoV4 = {
         {
           "name": "group",
           "isMut": false,
-          "isSigner": false,
-          "relations": [
-            "admin"
-          ]
+          "isSigner": false
         },
         {
           "name": "admin",
@@ -729,10 +698,7 @@ export type MangoV4 = {
         {
           "name": "mintInfo",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "group"
-          ]
+          "isSigner": false
         },
         {
           "name": "oracle",
@@ -897,10 +863,7 @@ export type MangoV4 = {
         {
           "name": "group",
           "isMut": false,
-          "isSigner": false,
-          "relations": [
-            "admin"
-          ]
+          "isSigner": false
         },
         {
           "name": "admin",
@@ -915,11 +878,7 @@ export type MangoV4 = {
         {
           "name": "existingBank",
           "isMut": false,
-          "isSigner": false,
-          "relations": [
-            "group",
-            "mint"
-          ]
+          "isSigner": false
         },
         {
           "name": "bank",
@@ -982,11 +941,7 @@ export type MangoV4 = {
         {
           "name": "mintInfo",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "group",
-            "mint"
-          ]
+          "isSigner": false
         },
         {
           "name": "payer",
@@ -1026,10 +981,7 @@ export type MangoV4 = {
         {
           "name": "group",
           "isMut": false,
-          "isSigner": false,
-          "relations": [
-            "admin"
-          ]
+          "isSigner": false
         },
         {
           "name": "admin",
@@ -1039,10 +991,7 @@ export type MangoV4 = {
         {
           "name": "mintInfo",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "group"
-          ]
+          "isSigner": false
         },
         {
           "name": "dustVault",
@@ -1073,11 +1022,7 @@ export type MangoV4 = {
         {
           "name": "mintInfo",
           "isMut": false,
-          "isSigner": false,
-          "relations": [
-            "oracle",
-            "group"
-          ]
+          "isSigner": false
         },
         {
           "name": "oracle",
@@ -1183,11 +1128,7 @@ export type MangoV4 = {
         {
           "name": "account",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "group",
-            "owner"
-          ]
+          "isSigner": false
         },
         {
           "name": "owner",
@@ -1235,11 +1176,7 @@ export type MangoV4 = {
         {
           "name": "account",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "group",
-            "owner"
-          ]
+          "isSigner": false
         },
         {
           "name": "owner",
@@ -1291,11 +1228,7 @@ export type MangoV4 = {
         {
           "name": "account",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "group",
-            "owner"
-          ]
+          "isSigner": false
         },
         {
           "name": "owner",
@@ -1329,10 +1262,7 @@ export type MangoV4 = {
         {
           "name": "account",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "group"
-          ]
+          "isSigner": false
         },
         {
           "name": "admin",
@@ -1358,11 +1288,7 @@ export type MangoV4 = {
         {
           "name": "account",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "group",
-            "owner"
-          ]
+          "isSigner": false
         },
         {
           "name": "owner",
@@ -1398,10 +1324,7 @@ export type MangoV4 = {
         {
           "name": "account",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "group"
-          ]
+          "isSigner": false
         },
         {
           "name": "owner",
@@ -1411,18 +1334,12 @@ export type MangoV4 = {
         {
           "name": "daoAccount",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "group"
-          ]
+          "isSigner": false
         },
         {
           "name": "mngoBank",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "group"
-          ]
+          "isSigner": false
         },
         {
           "name": "mngoOracle",
@@ -1432,10 +1349,7 @@ export type MangoV4 = {
         {
           "name": "feesBank",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "group"
-          ]
+          "isSigner": false
         },
         {
           "name": "feesOracle",
@@ -1456,10 +1370,7 @@ export type MangoV4 = {
         {
           "name": "group",
           "isMut": false,
-          "isSigner": false,
-          "relations": [
-            "admin"
-          ]
+          "isSigner": false
         },
         {
           "name": "oracle",
@@ -1522,10 +1433,7 @@ export type MangoV4 = {
         {
           "name": "group",
           "isMut": false,
-          "isSigner": false,
-          "relations": [
-            "admin"
-          ]
+          "isSigner": false
         },
         {
           "name": "admin",
@@ -1535,10 +1443,7 @@ export type MangoV4 = {
         {
           "name": "oracle",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "group"
-          ]
+          "isSigner": false
         },
         {
           "name": "solDestination",
@@ -1559,10 +1464,7 @@ export type MangoV4 = {
         {
           "name": "group",
           "isMut": false,
-          "isSigner": false,
-          "relations": [
-            "admin"
-          ]
+          "isSigner": false
         },
         {
           "name": "admin",
@@ -1572,10 +1474,7 @@ export type MangoV4 = {
         {
           "name": "oracle",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "group"
-          ]
+          "isSigner": false
         }
       ],
       "args": [
@@ -1598,11 +1497,7 @@ export type MangoV4 = {
         {
           "name": "account",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "group",
-            "owner"
-          ]
+          "isSigner": false
         },
         {
           "name": "owner",
@@ -1612,12 +1507,7 @@ export type MangoV4 = {
         {
           "name": "bank",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "group",
-            "vault",
-            "oracle"
-          ]
+          "isSigner": false
         },
         {
           "name": "vault",
@@ -1667,20 +1557,12 @@ export type MangoV4 = {
         {
           "name": "account",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "group"
-          ]
+          "isSigner": false
         },
         {
           "name": "bank",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "group",
-            "vault",
-            "oracle"
-          ]
+          "isSigner": false
         },
         {
           "name": "vault",
@@ -1730,11 +1612,7 @@ export type MangoV4 = {
         {
           "name": "account",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "group",
-            "owner"
-          ]
+          "isSigner": false
         },
         {
           "name": "owner",
@@ -1744,12 +1622,7 @@ export type MangoV4 = {
         {
           "name": "bank",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "group",
-            "vault",
-            "oracle"
-          ]
+          "isSigner": false
         },
         {
           "name": "vault",
@@ -1898,10 +1771,7 @@ export type MangoV4 = {
         {
           "name": "account",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "group"
-          ]
+          "isSigner": false
         }
       ],
       "args": []
@@ -1928,10 +1798,7 @@ export type MangoV4 = {
         {
           "name": "group",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "admin"
-          ]
+          "isSigner": false
         },
         {
           "name": "admin",
@@ -1999,18 +1866,12 @@ export type MangoV4 = {
         {
           "name": "quoteBank",
           "isMut": false,
-          "isSigner": false,
-          "relations": [
-            "group"
-          ]
+          "isSigner": false
         },
         {
           "name": "baseBank",
           "isMut": false,
-          "isSigner": false,
-          "relations": [
-            "group"
-          ]
+          "isSigner": false
         },
         {
           "name": "payer",
@@ -2050,10 +1911,7 @@ export type MangoV4 = {
         {
           "name": "market",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "group"
-          ]
+          "isSigner": false
         }
       ],
       "args": [
@@ -2083,10 +1941,7 @@ export type MangoV4 = {
         {
           "name": "group",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "admin"
-          ]
+          "isSigner": false
         },
         {
           "name": "admin",
@@ -2096,18 +1951,12 @@ export type MangoV4 = {
         {
           "name": "serumMarket",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "group"
-          ]
+          "isSigner": false
         },
         {
           "name": "indexReservation",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "group"
-          ]
+          "isSigner": false
         },
         {
           "name": "solDestination",
@@ -2133,10 +1982,7 @@ export type MangoV4 = {
         {
           "name": "account",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "group"
-          ]
+          "isSigner": false
         },
         {
           "name": "owner",
@@ -2146,12 +1992,7 @@ export type MangoV4 = {
         {
           "name": "serumMarket",
           "isMut": false,
-          "isSigner": false,
-          "relations": [
-            "group",
-            "serum_program",
-            "serum_market_external"
-          ]
+          "isSigner": false
         },
         {
           "name": "serumProgram",
@@ -2216,10 +2057,7 @@ export type MangoV4 = {
         {
           "name": "account",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "group"
-          ]
+          "isSigner": false
         },
         {
           "name": "owner",
@@ -2229,12 +2067,7 @@ export type MangoV4 = {
         {
           "name": "serumMarket",
           "isMut": false,
-          "isSigner": false,
-          "relations": [
-            "group",
-            "serum_program",
-            "serum_market_external"
-          ]
+          "isSigner": false
         },
         {
           "name": "serumProgram",
@@ -2270,10 +2103,7 @@ export type MangoV4 = {
         {
           "name": "account",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "group"
-          ]
+          "isSigner": false
         },
         {
           "name": "owner",
@@ -2288,12 +2118,7 @@ export type MangoV4 = {
         {
           "name": "serumMarket",
           "isMut": false,
-          "isSigner": false,
-          "relations": [
-            "group",
-            "serum_program",
-            "serum_market_external"
-          ]
+          "isSigner": false
         },
         {
           "name": "serumProgram",
@@ -2349,9 +2174,6 @@ export type MangoV4 = {
           "isSigner": false,
           "docs": [
             "The bank that pays for the order, if necessary"
-          ],
-          "relations": [
-            "group"
           ]
         },
         {
@@ -2425,10 +2247,7 @@ export type MangoV4 = {
         {
           "name": "account",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "group"
-          ]
+          "isSigner": false
         },
         {
           "name": "owner",
@@ -2443,12 +2262,7 @@ export type MangoV4 = {
         {
           "name": "serumMarket",
           "isMut": false,
-          "isSigner": false,
-          "relations": [
-            "group",
-            "serum_program",
-            "serum_market_external"
-          ]
+          "isSigner": false
         },
         {
           "name": "serumProgram",
@@ -2500,10 +2314,7 @@ export type MangoV4 = {
         {
           "name": "account",
           "isMut": false,
-          "isSigner": false,
-          "relations": [
-            "group"
-          ]
+          "isSigner": false
         },
         {
           "name": "owner",
@@ -2518,12 +2329,7 @@ export type MangoV4 = {
         {
           "name": "serumMarket",
           "isMut": false,
-          "isSigner": false,
-          "relations": [
-            "group",
-            "serum_program",
-            "serum_market_external"
-          ]
+          "isSigner": false
         },
         {
           "name": "serumProgram",
@@ -2575,10 +2381,7 @@ export type MangoV4 = {
         {
           "name": "account",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "group"
-          ]
+          "isSigner": false
         },
         {
           "name": "owner",
@@ -2593,12 +2396,7 @@ export type MangoV4 = {
         {
           "name": "serumMarket",
           "isMut": false,
-          "isSigner": false,
-          "relations": [
-            "group",
-            "serum_program",
-            "serum_market_external"
-          ]
+          "isSigner": false
         },
         {
           "name": "serumProgram",
@@ -2631,10 +2429,7 @@ export type MangoV4 = {
         {
           "name": "quoteBank",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "group"
-          ]
+          "isSigner": false
         },
         {
           "name": "quoteVault",
@@ -2644,10 +2439,7 @@ export type MangoV4 = {
         {
           "name": "baseBank",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "group"
-          ]
+          "isSigner": false
         },
         {
           "name": "baseVault",
@@ -2680,10 +2472,7 @@ export type MangoV4 = {
             {
               "name": "account",
               "isMut": true,
-              "isSigner": false,
-              "relations": [
-                "group"
-              ]
+              "isSigner": false
             },
             {
               "name": "owner",
@@ -2698,12 +2487,7 @@ export type MangoV4 = {
             {
               "name": "serumMarket",
               "isMut": false,
-              "isSigner": false,
-              "relations": [
-                "group",
-                "serum_program",
-                "serum_market_external"
-              ]
+              "isSigner": false
             },
             {
               "name": "serumProgram",
@@ -2736,10 +2520,7 @@ export type MangoV4 = {
             {
               "name": "quoteBank",
               "isMut": true,
-              "isSigner": false,
-              "relations": [
-                "group"
-              ]
+              "isSigner": false
             },
             {
               "name": "quoteVault",
@@ -2749,10 +2530,7 @@ export type MangoV4 = {
             {
               "name": "baseBank",
               "isMut": true,
-              "isSigner": false,
-              "relations": [
-                "group"
-              ]
+              "isSigner": false
             },
             {
               "name": "baseVault",
@@ -2800,10 +2578,7 @@ export type MangoV4 = {
         {
           "name": "account",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "group"
-          ]
+          "isSigner": false
         },
         {
           "name": "openOrders",
@@ -2813,12 +2588,7 @@ export type MangoV4 = {
         {
           "name": "serumMarket",
           "isMut": false,
-          "isSigner": false,
-          "relations": [
-            "group",
-            "serum_program",
-            "serum_market_external"
-          ]
+          "isSigner": false
         },
         {
           "name": "serumProgram",
@@ -2863,10 +2633,7 @@ export type MangoV4 = {
         {
           "name": "quoteBank",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "group"
-          ]
+          "isSigner": false
         },
         {
           "name": "quoteVault",
@@ -2876,10 +2643,7 @@ export type MangoV4 = {
         {
           "name": "baseBank",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "group"
-          ]
+          "isSigner": false
         },
         {
           "name": "baseVault",
@@ -2910,10 +2674,7 @@ export type MangoV4 = {
         {
           "name": "liqor",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "group"
-          ]
+          "isSigner": false
         },
         {
           "name": "liqorOwner",
@@ -2923,10 +2684,7 @@ export type MangoV4 = {
         {
           "name": "liqee",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "group"
-          ]
+          "isSigner": false
         }
       ],
       "args": [
@@ -2952,18 +2710,12 @@ export type MangoV4 = {
         {
           "name": "group",
           "isMut": false,
-          "isSigner": false,
-          "relations": [
-            "insurance_vault"
-          ]
+          "isSigner": false
         },
         {
           "name": "liqor",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "group"
-          ]
+          "isSigner": false
         },
         {
           "name": "liqorOwner",
@@ -2973,18 +2725,12 @@ export type MangoV4 = {
         {
           "name": "liqee",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "group"
-          ]
+          "isSigner": false
         },
         {
           "name": "liabMintInfo",
           "isMut": false,
-          "isSigner": false,
-          "relations": [
-            "group"
-          ]
+          "isSigner": false
         },
         {
           "name": "quoteVault",
@@ -3022,10 +2768,7 @@ export type MangoV4 = {
         {
           "name": "liqor",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "group"
-          ]
+          "isSigner": false
         },
         {
           "name": "liqorOwner",
@@ -3035,10 +2778,7 @@ export type MangoV4 = {
         {
           "name": "liqee",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "group"
-          ]
+          "isSigner": false
         }
       ],
       "args": [
@@ -3069,10 +2809,7 @@ export type MangoV4 = {
         {
           "name": "liqor",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "group"
-          ]
+          "isSigner": false
         },
         {
           "name": "liqorOwner",
@@ -3082,10 +2819,7 @@ export type MangoV4 = {
         {
           "name": "liqee",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "group"
-          ]
+          "isSigner": false
         }
       ],
       "args": [
@@ -3109,18 +2843,12 @@ export type MangoV4 = {
         {
           "name": "group",
           "isMut": false,
-          "isSigner": false,
-          "relations": [
-            "insurance_vault"
-          ]
+          "isSigner": false
         },
         {
           "name": "liqor",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "group"
-          ]
+          "isSigner": false
         },
         {
           "name": "liqorOwner",
@@ -3130,18 +2858,12 @@ export type MangoV4 = {
         {
           "name": "liqee",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "group"
-          ]
+          "isSigner": false
         },
         {
           "name": "liabMintInfo",
           "isMut": false,
-          "isSigner": false,
-          "relations": [
-            "group"
-          ]
+          "isSigner": false
         },
         {
           "name": "quoteVault",
@@ -3179,10 +2901,7 @@ export type MangoV4 = {
         {
           "name": "group",
           "isMut": false,
-          "isSigner": false,
-          "relations": [
-            "admin"
-          ]
+          "isSigner": false
         },
         {
           "name": "admin",
@@ -3377,10 +3096,7 @@ export type MangoV4 = {
         {
           "name": "perpMarket",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "group"
-          ]
+          "isSigner": false
         },
         {
           "name": "oracle",
@@ -3581,10 +3297,7 @@ export type MangoV4 = {
         {
           "name": "group",
           "isMut": false,
-          "isSigner": false,
-          "relations": [
-            "admin"
-          ]
+          "isSigner": false
         },
         {
           "name": "admin",
@@ -3594,13 +3307,7 @@ export type MangoV4 = {
         {
           "name": "perpMarket",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "group",
-            "bids",
-            "asks",
-            "event_queue"
-          ]
+          "isSigner": false
         },
         {
           "name": "bids",
@@ -3641,10 +3348,7 @@ export type MangoV4 = {
         {
           "name": "account",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "group"
-          ]
+          "isSigner": false
         },
         {
           "name": "owner",
@@ -3654,10 +3358,7 @@ export type MangoV4 = {
         {
           "name": "perpMarket",
           "isMut": false,
-          "isSigner": false,
-          "relations": [
-            "group"
-          ]
+          "isSigner": false
         }
       ],
       "args": []
@@ -3673,10 +3374,7 @@ export type MangoV4 = {
         {
           "name": "account",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "group"
-          ]
+          "isSigner": false
         },
         {
           "name": "owner",
@@ -3686,14 +3384,7 @@ export type MangoV4 = {
         {
           "name": "perpMarket",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "group",
-            "bids",
-            "asks",
-            "event_queue",
-            "oracle"
-          ]
+          "isSigner": false
         },
         {
           "name": "bids",
@@ -3773,10 +3464,7 @@ export type MangoV4 = {
         {
           "name": "account",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "group"
-          ]
+          "isSigner": false
         },
         {
           "name": "owner",
@@ -3786,14 +3474,7 @@ export type MangoV4 = {
         {
           "name": "perpMarket",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "group",
-            "bids",
-            "asks",
-            "event_queue",
-            "oracle"
-          ]
+          "isSigner": false
         },
         {
           "name": "bids",
@@ -3879,10 +3560,7 @@ export type MangoV4 = {
         {
           "name": "account",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "group"
-          ]
+          "isSigner": false
         },
         {
           "name": "owner",
@@ -3892,14 +3570,7 @@ export type MangoV4 = {
         {
           "name": "perpMarket",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "group",
-            "bids",
-            "asks",
-            "event_queue",
-            "oracle"
-          ]
+          "isSigner": false
         },
         {
           "name": "bids",
@@ -3987,10 +3658,7 @@ export type MangoV4 = {
         {
           "name": "account",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "group"
-          ]
+          "isSigner": false
         },
         {
           "name": "owner",
@@ -4000,14 +3668,7 @@ export type MangoV4 = {
         {
           "name": "perpMarket",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "group",
-            "bids",
-            "asks",
-            "event_queue",
-            "oracle"
-          ]
+          "isSigner": false
         },
         {
           "name": "bids",
@@ -4101,10 +3762,7 @@ export type MangoV4 = {
         {
           "name": "account",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "group"
-          ]
+          "isSigner": false
         },
         {
           "name": "owner",
@@ -4114,12 +3772,7 @@ export type MangoV4 = {
         {
           "name": "perpMarket",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "group",
-            "bids",
-            "asks"
-          ]
+          "isSigner": false
         },
         {
           "name": "bids",
@@ -4150,10 +3803,7 @@ export type MangoV4 = {
         {
           "name": "account",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "group"
-          ]
+          "isSigner": false
         },
         {
           "name": "owner",
@@ -4163,12 +3813,7 @@ export type MangoV4 = {
         {
           "name": "perpMarket",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "group",
-            "bids",
-            "asks"
-          ]
+          "isSigner": false
         },
         {
           "name": "bids",
@@ -4199,10 +3844,7 @@ export type MangoV4 = {
         {
           "name": "account",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "group"
-          ]
+          "isSigner": false
         },
         {
           "name": "owner",
@@ -4212,12 +3854,7 @@ export type MangoV4 = {
         {
           "name": "perpMarket",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "group",
-            "bids",
-            "asks"
-          ]
+          "isSigner": false
         },
         {
           "name": "bids",
@@ -4248,10 +3885,7 @@ export type MangoV4 = {
         {
           "name": "account",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "group"
-          ]
+          "isSigner": false
         },
         {
           "name": "owner",
@@ -4261,12 +3895,7 @@ export type MangoV4 = {
         {
           "name": "perpMarket",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "group",
-            "bids",
-            "asks"
-          ]
+          "isSigner": false
         },
         {
           "name": "bids",
@@ -4305,11 +3934,7 @@ export type MangoV4 = {
         {
           "name": "perpMarket",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "group",
-            "event_queue"
-          ]
+          "isSigner": false
         },
         {
           "name": "eventQueue",
@@ -4335,13 +3960,7 @@ export type MangoV4 = {
         {
           "name": "perpMarket",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "group",
-            "bids",
-            "asks",
-            "oracle"
-          ]
+          "isSigner": false
         },
         {
           "name": "bids",
@@ -4372,10 +3991,7 @@ export type MangoV4 = {
         {
           "name": "settler",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "group"
-          ]
+          "isSigner": false
         },
         {
           "name": "settlerOwner",
@@ -4385,27 +4001,17 @@ export type MangoV4 = {
         {
           "name": "perpMarket",
           "isMut": false,
-          "isSigner": false,
-          "relations": [
-            "group",
-            "oracle"
-          ]
+          "isSigner": false
         },
         {
           "name": "accountA",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "group"
-          ]
+          "isSigner": false
         },
         {
           "name": "accountB",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "group"
-          ]
+          "isSigner": false
         },
         {
           "name": "oracle",
@@ -4415,10 +4021,7 @@ export type MangoV4 = {
         {
           "name": "settleBank",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "group"
-          ]
+          "isSigner": false
         },
         {
           "name": "settleOracle",
@@ -4439,27 +4042,17 @@ export type MangoV4 = {
         {
           "name": "perpMarket",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "group",
-            "oracle"
-          ]
+          "isSigner": false
         },
         {
           "name": "accountA",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "group"
-          ]
+          "isSigner": false
         },
         {
           "name": "accountB",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "group"
-          ]
+          "isSigner": false
         },
         {
           "name": "oracle",
@@ -4480,19 +4073,12 @@ export type MangoV4 = {
         {
           "name": "perpMarket",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "group",
-            "oracle"
-          ]
+          "isSigner": false
         },
         {
           "name": "account",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "group"
-          ]
+          "isSigner": false
         },
         {
           "name": "oracle",
@@ -4502,10 +4088,7 @@ export type MangoV4 = {
         {
           "name": "settleBank",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "group"
-          ]
+          "isSigner": false
         },
         {
           "name": "settleOracle",
@@ -4531,11 +4114,7 @@ export type MangoV4 = {
         {
           "name": "perpMarket",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "group",
-            "oracle"
-          ]
+          "isSigner": false
         },
         {
           "name": "oracle",
@@ -4545,10 +4124,7 @@ export type MangoV4 = {
         {
           "name": "liqor",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "group"
-          ]
+          "isSigner": false
         },
         {
           "name": "liqorOwner",
@@ -4558,18 +4134,12 @@ export type MangoV4 = {
         {
           "name": "liqee",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "group"
-          ]
+          "isSigner": false
         },
         {
           "name": "settleBank",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "group"
-          ]
+          "isSigner": false
         },
         {
           "name": "settleVault",
@@ -4604,20 +4174,12 @@ export type MangoV4 = {
         {
           "name": "account",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "group"
-          ]
+          "isSigner": false
         },
         {
           "name": "perpMarket",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "group",
-            "bids",
-            "asks"
-          ]
+          "isSigner": false
         },
         {
           "name": "bids",
@@ -4643,18 +4205,12 @@ export type MangoV4 = {
         {
           "name": "group",
           "isMut": false,
-          "isSigner": false,
-          "relations": [
-            "insurance_vault"
-          ]
+          "isSigner": false
         },
         {
           "name": "liqor",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "group"
-          ]
+          "isSigner": false
         },
         {
           "name": "liqorOwner",
@@ -4664,19 +4220,12 @@ export type MangoV4 = {
         {
           "name": "liqee",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "group"
-          ]
+          "isSigner": false
         },
         {
           "name": "perpMarket",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "group",
-            "oracle"
-          ]
+          "isSigner": false
         },
         {
           "name": "oracle",
@@ -4686,10 +4235,7 @@ export type MangoV4 = {
         {
           "name": "settleBank",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "group"
-          ]
+          "isSigner": false
         },
         {
           "name": "settleVault",
@@ -4725,18 +4271,12 @@ export type MangoV4 = {
         {
           "name": "group",
           "isMut": false,
-          "isSigner": false,
-          "relations": [
-            "insurance_vault"
-          ]
+          "isSigner": false
         },
         {
           "name": "liqor",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "group"
-          ]
+          "isSigner": false
         },
         {
           "name": "liqorOwner",
@@ -4746,19 +4286,12 @@ export type MangoV4 = {
         {
           "name": "liqee",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "group"
-          ]
+          "isSigner": false
         },
         {
           "name": "perpMarket",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "group",
-            "oracle"
-          ]
+          "isSigner": false
         },
         {
           "name": "oracle",
@@ -4768,10 +4301,7 @@ export type MangoV4 = {
         {
           "name": "settleBank",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "group"
-          ]
+          "isSigner": false
         },
         {
           "name": "settleVault",
@@ -4791,10 +4321,7 @@ export type MangoV4 = {
         {
           "name": "insuranceBank",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "group"
-          ]
+          "isSigner": false
         },
         {
           "name": "insuranceBankVault",
@@ -4830,10 +4357,7 @@ export type MangoV4 = {
         {
           "name": "account",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "group"
-          ]
+          "isSigner": false
         },
         {
           "name": "authority",
@@ -4843,18 +4367,12 @@ export type MangoV4 = {
         {
           "name": "buyBank",
           "isMut": false,
-          "isSigner": false,
-          "relations": [
-            "group"
-          ]
+          "isSigner": false
         },
         {
           "name": "sellBank",
           "isMut": false,
-          "isSigner": false,
-          "relations": [
-            "group"
-          ]
+          "isSigner": false
         }
       ],
       "args": [
@@ -4903,10 +4421,7 @@ export type MangoV4 = {
         {
           "name": "account",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "group"
-          ]
+          "isSigner": false
         },
         {
           "name": "authority",
@@ -4919,18 +4434,12 @@ export type MangoV4 = {
           "isSigner": false,
           "docs": [
             "The bank's token_index is checked at #1"
-          ],
-          "relations": [
-            "group"
           ]
         },
         {
           "name": "sellBank",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "group"
-          ]
+          "isSigner": false
         }
       ],
       "args": [
@@ -4955,18 +4464,12 @@ export type MangoV4 = {
         {
           "name": "liqee",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "group"
-          ]
+          "isSigner": false
         },
         {
           "name": "liqor",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "group"
-          ]
+          "isSigner": false
         },
         {
           "name": "liqorAuthority",
@@ -4999,10 +4502,7 @@ export type MangoV4 = {
         {
           "name": "group",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "admin"
-          ]
+          "isSigner": false
         },
         {
           "name": "admin",
@@ -5028,10 +4528,7 @@ export type MangoV4 = {
         {
           "name": "group",
           "isMut": false,
-          "isSigner": false,
-          "relations": [
-            "admin"
-          ]
+          "isSigner": false
         },
         {
           "name": "admin",
@@ -5073,10 +4570,7 @@ export type MangoV4 = {
         {
           "name": "account",
           "isMut": false,
-          "isSigner": false,
-          "relations": [
-            "group"
-          ]
+          "isSigner": false
         }
       ],
       "args": []
@@ -10853,19 +10347,12 @@ export const IDL: MangoV4 = {
         {
           "name": "group",
           "isMut": false,
-          "isSigner": false,
-          "relations": [
-            "admin"
-          ]
+          "isSigner": false
         },
         {
           "name": "bank",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "group",
-            "vault"
-          ]
+          "isSigner": false
         },
         {
           "name": "vault",
@@ -10896,27 +10383,17 @@ export const IDL: MangoV4 = {
         {
           "name": "group",
           "isMut": false,
-          "isSigner": false,
-          "relations": [
-            "admin"
-          ]
+          "isSigner": false
         },
         {
           "name": "perpMarket",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "group"
-          ]
+          "isSigner": false
         },
         {
           "name": "bank",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "group",
-            "vault"
-          ]
+          "isSigner": false
         },
         {
           "name": "vault",
@@ -11039,10 +10516,7 @@ export const IDL: MangoV4 = {
         {
           "name": "group",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "admin"
-          ]
+          "isSigner": false
         },
         {
           "name": "admin",
@@ -11137,11 +10611,7 @@ export const IDL: MangoV4 = {
         {
           "name": "group",
           "isMut": false,
-          "isSigner": false,
-          "relations": [
-            "insurance_vault",
-            "admin"
-          ]
+          "isSigner": false
         },
         {
           "name": "admin",
@@ -11198,11 +10668,7 @@ export const IDL: MangoV4 = {
         {
           "name": "group",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "admin",
-            "insurance_vault"
-          ]
+          "isSigner": false
         },
         {
           "name": "admin",
@@ -11233,10 +10699,7 @@ export const IDL: MangoV4 = {
         {
           "name": "group",
           "isMut": false,
-          "isSigner": false,
-          "relations": [
-            "admin"
-          ]
+          "isSigner": false
         },
         {
           "name": "admin",
@@ -11574,10 +11037,7 @@ export const IDL: MangoV4 = {
         {
           "name": "mintInfo",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "group"
-          ]
+          "isSigner": false
         },
         {
           "name": "oracle",
@@ -11742,10 +11202,7 @@ export const IDL: MangoV4 = {
         {
           "name": "group",
           "isMut": false,
-          "isSigner": false,
-          "relations": [
-            "admin"
-          ]
+          "isSigner": false
         },
         {
           "name": "admin",
@@ -11760,11 +11217,7 @@ export const IDL: MangoV4 = {
         {
           "name": "existingBank",
           "isMut": false,
-          "isSigner": false,
-          "relations": [
-            "group",
-            "mint"
-          ]
+          "isSigner": false
         },
         {
           "name": "bank",
@@ -11827,11 +11280,7 @@ export const IDL: MangoV4 = {
         {
           "name": "mintInfo",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "group",
-            "mint"
-          ]
+          "isSigner": false
         },
         {
           "name": "payer",
@@ -11871,10 +11320,7 @@ export const IDL: MangoV4 = {
         {
           "name": "group",
           "isMut": false,
-          "isSigner": false,
-          "relations": [
-            "admin"
-          ]
+          "isSigner": false
         },
         {
           "name": "admin",
@@ -11884,10 +11330,7 @@ export const IDL: MangoV4 = {
         {
           "name": "mintInfo",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "group"
-          ]
+          "isSigner": false
         },
         {
           "name": "dustVault",
@@ -11918,11 +11361,7 @@ export const IDL: MangoV4 = {
         {
           "name": "mintInfo",
           "isMut": false,
-          "isSigner": false,
-          "relations": [
-            "oracle",
-            "group"
-          ]
+          "isSigner": false
         },
         {
           "name": "oracle",
@@ -12028,11 +11467,7 @@ export const IDL: MangoV4 = {
         {
           "name": "account",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "group",
-            "owner"
-          ]
+          "isSigner": false
         },
         {
           "name": "owner",
@@ -12080,11 +11515,7 @@ export const IDL: MangoV4 = {
         {
           "name": "account",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "group",
-            "owner"
-          ]
+          "isSigner": false
         },
         {
           "name": "owner",
@@ -12136,11 +11567,7 @@ export const IDL: MangoV4 = {
         {
           "name": "account",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "group",
-            "owner"
-          ]
+          "isSigner": false
         },
         {
           "name": "owner",
@@ -12174,10 +11601,7 @@ export const IDL: MangoV4 = {
         {
           "name": "account",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "group"
-          ]
+          "isSigner": false
         },
         {
           "name": "admin",
@@ -12203,11 +11627,7 @@ export const IDL: MangoV4 = {
         {
           "name": "account",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "group",
-            "owner"
-          ]
+          "isSigner": false
         },
         {
           "name": "owner",
@@ -12243,10 +11663,7 @@ export const IDL: MangoV4 = {
         {
           "name": "account",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "group"
-          ]
+          "isSigner": false
         },
         {
           "name": "owner",
@@ -12256,18 +11673,12 @@ export const IDL: MangoV4 = {
         {
           "name": "daoAccount",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "group"
-          ]
+          "isSigner": false
         },
         {
           "name": "mngoBank",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "group"
-          ]
+          "isSigner": false
         },
         {
           "name": "mngoOracle",
@@ -12277,10 +11688,7 @@ export const IDL: MangoV4 = {
         {
           "name": "feesBank",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "group"
-          ]
+          "isSigner": false
         },
         {
           "name": "feesOracle",
@@ -12301,10 +11709,7 @@ export const IDL: MangoV4 = {
         {
           "name": "group",
           "isMut": false,
-          "isSigner": false,
-          "relations": [
-            "admin"
-          ]
+          "isSigner": false
         },
         {
           "name": "oracle",
@@ -12367,10 +11772,7 @@ export const IDL: MangoV4 = {
         {
           "name": "group",
           "isMut": false,
-          "isSigner": false,
-          "relations": [
-            "admin"
-          ]
+          "isSigner": false
         },
         {
           "name": "admin",
@@ -12380,10 +11782,7 @@ export const IDL: MangoV4 = {
         {
           "name": "oracle",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "group"
-          ]
+          "isSigner": false
         },
         {
           "name": "solDestination",
@@ -12404,10 +11803,7 @@ export const IDL: MangoV4 = {
         {
           "name": "group",
           "isMut": false,
-          "isSigner": false,
-          "relations": [
-            "admin"
-          ]
+          "isSigner": false
         },
         {
           "name": "admin",
@@ -12417,10 +11813,7 @@ export const IDL: MangoV4 = {
         {
           "name": "oracle",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "group"
-          ]
+          "isSigner": false
         }
       ],
       "args": [
@@ -12443,11 +11836,7 @@ export const IDL: MangoV4 = {
         {
           "name": "account",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "group",
-            "owner"
-          ]
+          "isSigner": false
         },
         {
           "name": "owner",
@@ -12457,12 +11846,7 @@ export const IDL: MangoV4 = {
         {
           "name": "bank",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "group",
-            "vault",
-            "oracle"
-          ]
+          "isSigner": false
         },
         {
           "name": "vault",
@@ -12512,20 +11896,12 @@ export const IDL: MangoV4 = {
         {
           "name": "account",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "group"
-          ]
+          "isSigner": false
         },
         {
           "name": "bank",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "group",
-            "vault",
-            "oracle"
-          ]
+          "isSigner": false
         },
         {
           "name": "vault",
@@ -12575,11 +11951,7 @@ export const IDL: MangoV4 = {
         {
           "name": "account",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "group",
-            "owner"
-          ]
+          "isSigner": false
         },
         {
           "name": "owner",
@@ -12589,12 +11961,7 @@ export const IDL: MangoV4 = {
         {
           "name": "bank",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "group",
-            "vault",
-            "oracle"
-          ]
+          "isSigner": false
         },
         {
           "name": "vault",
@@ -12743,10 +12110,7 @@ export const IDL: MangoV4 = {
         {
           "name": "account",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "group"
-          ]
+          "isSigner": false
         }
       ],
       "args": []
@@ -12773,10 +12137,7 @@ export const IDL: MangoV4 = {
         {
           "name": "group",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "admin"
-          ]
+          "isSigner": false
         },
         {
           "name": "admin",
@@ -12844,18 +12205,12 @@ export const IDL: MangoV4 = {
         {
           "name": "quoteBank",
           "isMut": false,
-          "isSigner": false,
-          "relations": [
-            "group"
-          ]
+          "isSigner": false
         },
         {
           "name": "baseBank",
           "isMut": false,
-          "isSigner": false,
-          "relations": [
-            "group"
-          ]
+          "isSigner": false
         },
         {
           "name": "payer",
@@ -12895,10 +12250,7 @@ export const IDL: MangoV4 = {
         {
           "name": "market",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "group"
-          ]
+          "isSigner": false
         }
       ],
       "args": [
@@ -12928,10 +12280,7 @@ export const IDL: MangoV4 = {
         {
           "name": "group",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "admin"
-          ]
+          "isSigner": false
         },
         {
           "name": "admin",
@@ -12941,18 +12290,12 @@ export const IDL: MangoV4 = {
         {
           "name": "serumMarket",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "group"
-          ]
+          "isSigner": false
         },
         {
           "name": "indexReservation",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "group"
-          ]
+          "isSigner": false
         },
         {
           "name": "solDestination",
@@ -12978,10 +12321,7 @@ export const IDL: MangoV4 = {
         {
           "name": "account",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "group"
-          ]
+          "isSigner": false
         },
         {
           "name": "owner",
@@ -12991,12 +12331,7 @@ export const IDL: MangoV4 = {
         {
           "name": "serumMarket",
           "isMut": false,
-          "isSigner": false,
-          "relations": [
-            "group",
-            "serum_program",
-            "serum_market_external"
-          ]
+          "isSigner": false
         },
         {
           "name": "serumProgram",
@@ -13061,10 +12396,7 @@ export const IDL: MangoV4 = {
         {
           "name": "account",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "group"
-          ]
+          "isSigner": false
         },
         {
           "name": "owner",
@@ -13074,12 +12406,7 @@ export const IDL: MangoV4 = {
         {
           "name": "serumMarket",
           "isMut": false,
-          "isSigner": false,
-          "relations": [
-            "group",
-            "serum_program",
-            "serum_market_external"
-          ]
+          "isSigner": false
         },
         {
           "name": "serumProgram",
@@ -13115,10 +12442,7 @@ export const IDL: MangoV4 = {
         {
           "name": "account",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "group"
-          ]
+          "isSigner": false
         },
         {
           "name": "owner",
@@ -13133,12 +12457,7 @@ export const IDL: MangoV4 = {
         {
           "name": "serumMarket",
           "isMut": false,
-          "isSigner": false,
-          "relations": [
-            "group",
-            "serum_program",
-            "serum_market_external"
-          ]
+          "isSigner": false
         },
         {
           "name": "serumProgram",
@@ -13194,9 +12513,6 @@ export const IDL: MangoV4 = {
           "isSigner": false,
           "docs": [
             "The bank that pays for the order, if necessary"
-          ],
-          "relations": [
-            "group"
           ]
         },
         {
@@ -13270,10 +12586,7 @@ export const IDL: MangoV4 = {
         {
           "name": "account",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "group"
-          ]
+          "isSigner": false
         },
         {
           "name": "owner",
@@ -13288,12 +12601,7 @@ export const IDL: MangoV4 = {
         {
           "name": "serumMarket",
           "isMut": false,
-          "isSigner": false,
-          "relations": [
-            "group",
-            "serum_program",
-            "serum_market_external"
-          ]
+          "isSigner": false
         },
         {
           "name": "serumProgram",
@@ -13345,10 +12653,7 @@ export const IDL: MangoV4 = {
         {
           "name": "account",
           "isMut": false,
-          "isSigner": false,
-          "relations": [
-            "group"
-          ]
+          "isSigner": false
         },
         {
           "name": "owner",
@@ -13363,12 +12668,7 @@ export const IDL: MangoV4 = {
         {
           "name": "serumMarket",
           "isMut": false,
-          "isSigner": false,
-          "relations": [
-            "group",
-            "serum_program",
-            "serum_market_external"
-          ]
+          "isSigner": false
         },
         {
           "name": "serumProgram",
@@ -13420,10 +12720,7 @@ export const IDL: MangoV4 = {
         {
           "name": "account",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "group"
-          ]
+          "isSigner": false
         },
         {
           "name": "owner",
@@ -13438,12 +12735,7 @@ export const IDL: MangoV4 = {
         {
           "name": "serumMarket",
           "isMut": false,
-          "isSigner": false,
-          "relations": [
-            "group",
-            "serum_program",
-            "serum_market_external"
-          ]
+          "isSigner": false
         },
         {
           "name": "serumProgram",
@@ -13476,10 +12768,7 @@ export const IDL: MangoV4 = {
         {
           "name": "quoteBank",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "group"
-          ]
+          "isSigner": false
         },
         {
           "name": "quoteVault",
@@ -13489,10 +12778,7 @@ export const IDL: MangoV4 = {
         {
           "name": "baseBank",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "group"
-          ]
+          "isSigner": false
         },
         {
           "name": "baseVault",
@@ -13525,10 +12811,7 @@ export const IDL: MangoV4 = {
             {
               "name": "account",
               "isMut": true,
-              "isSigner": false,
-              "relations": [
-                "group"
-              ]
+              "isSigner": false
             },
             {
               "name": "owner",
@@ -13543,12 +12826,7 @@ export const IDL: MangoV4 = {
             {
               "name": "serumMarket",
               "isMut": false,
-              "isSigner": false,
-              "relations": [
-                "group",
-                "serum_program",
-                "serum_market_external"
-              ]
+              "isSigner": false
             },
             {
               "name": "serumProgram",
@@ -13581,10 +12859,7 @@ export const IDL: MangoV4 = {
             {
               "name": "quoteBank",
               "isMut": true,
-              "isSigner": false,
-              "relations": [
-                "group"
-              ]
+              "isSigner": false
             },
             {
               "name": "quoteVault",
@@ -13594,10 +12869,7 @@ export const IDL: MangoV4 = {
             {
               "name": "baseBank",
               "isMut": true,
-              "isSigner": false,
-              "relations": [
-                "group"
-              ]
+              "isSigner": false
             },
             {
               "name": "baseVault",
@@ -13645,10 +12917,7 @@ export const IDL: MangoV4 = {
         {
           "name": "account",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "group"
-          ]
+          "isSigner": false
         },
         {
           "name": "openOrders",
@@ -13658,12 +12927,7 @@ export const IDL: MangoV4 = {
         {
           "name": "serumMarket",
           "isMut": false,
-          "isSigner": false,
-          "relations": [
-            "group",
-            "serum_program",
-            "serum_market_external"
-          ]
+          "isSigner": false
         },
         {
           "name": "serumProgram",
@@ -13708,10 +12972,7 @@ export const IDL: MangoV4 = {
         {
           "name": "quoteBank",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "group"
-          ]
+          "isSigner": false
         },
         {
           "name": "quoteVault",
@@ -13721,10 +12982,7 @@ export const IDL: MangoV4 = {
         {
           "name": "baseBank",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "group"
-          ]
+          "isSigner": false
         },
         {
           "name": "baseVault",
@@ -13755,10 +13013,7 @@ export const IDL: MangoV4 = {
         {
           "name": "liqor",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "group"
-          ]
+          "isSigner": false
         },
         {
           "name": "liqorOwner",
@@ -13768,10 +13023,7 @@ export const IDL: MangoV4 = {
         {
           "name": "liqee",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "group"
-          ]
+          "isSigner": false
         }
       ],
       "args": [
@@ -13797,18 +13049,12 @@ export const IDL: MangoV4 = {
         {
           "name": "group",
           "isMut": false,
-          "isSigner": false,
-          "relations": [
-            "insurance_vault"
-          ]
+          "isSigner": false
         },
         {
           "name": "liqor",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "group"
-          ]
+          "isSigner": false
         },
         {
           "name": "liqorOwner",
@@ -13818,18 +13064,12 @@ export const IDL: MangoV4 = {
         {
           "name": "liqee",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "group"
-          ]
+          "isSigner": false
         },
         {
           "name": "liabMintInfo",
           "isMut": false,
-          "isSigner": false,
-          "relations": [
-            "group"
-          ]
+          "isSigner": false
         },
         {
           "name": "quoteVault",
@@ -13867,10 +13107,7 @@ export const IDL: MangoV4 = {
         {
           "name": "liqor",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "group"
-          ]
+          "isSigner": false
         },
         {
           "name": "liqorOwner",
@@ -13880,10 +13117,7 @@ export const IDL: MangoV4 = {
         {
           "name": "liqee",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "group"
-          ]
+          "isSigner": false
         }
       ],
       "args": [
@@ -13914,10 +13148,7 @@ export const IDL: MangoV4 = {
         {
           "name": "liqor",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "group"
-          ]
+          "isSigner": false
         },
         {
           "name": "liqorOwner",
@@ -13927,10 +13158,7 @@ export const IDL: MangoV4 = {
         {
           "name": "liqee",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "group"
-          ]
+          "isSigner": false
         }
       ],
       "args": [
@@ -13954,18 +13182,12 @@ export const IDL: MangoV4 = {
         {
           "name": "group",
           "isMut": false,
-          "isSigner": false,
-          "relations": [
-            "insurance_vault"
-          ]
+          "isSigner": false
         },
         {
           "name": "liqor",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "group"
-          ]
+          "isSigner": false
         },
         {
           "name": "liqorOwner",
@@ -13975,18 +13197,12 @@ export const IDL: MangoV4 = {
         {
           "name": "liqee",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "group"
-          ]
+          "isSigner": false
         },
         {
           "name": "liabMintInfo",
           "isMut": false,
-          "isSigner": false,
-          "relations": [
-            "group"
-          ]
+          "isSigner": false
         },
         {
           "name": "quoteVault",
@@ -14024,10 +13240,7 @@ export const IDL: MangoV4 = {
         {
           "name": "group",
           "isMut": false,
-          "isSigner": false,
-          "relations": [
-            "admin"
-          ]
+          "isSigner": false
         },
         {
           "name": "admin",
@@ -14222,10 +13435,7 @@ export const IDL: MangoV4 = {
         {
           "name": "perpMarket",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "group"
-          ]
+          "isSigner": false
         },
         {
           "name": "oracle",
@@ -14426,10 +13636,7 @@ export const IDL: MangoV4 = {
         {
           "name": "group",
           "isMut": false,
-          "isSigner": false,
-          "relations": [
-            "admin"
-          ]
+          "isSigner": false
         },
         {
           "name": "admin",
@@ -14439,13 +13646,7 @@ export const IDL: MangoV4 = {
         {
           "name": "perpMarket",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "group",
-            "bids",
-            "asks",
-            "event_queue"
-          ]
+          "isSigner": false
         },
         {
           "name": "bids",
@@ -14486,10 +13687,7 @@ export const IDL: MangoV4 = {
         {
           "name": "account",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "group"
-          ]
+          "isSigner": false
         },
         {
           "name": "owner",
@@ -14499,10 +13697,7 @@ export const IDL: MangoV4 = {
         {
           "name": "perpMarket",
           "isMut": false,
-          "isSigner": false,
-          "relations": [
-            "group"
-          ]
+          "isSigner": false
         }
       ],
       "args": []
@@ -14518,10 +13713,7 @@ export const IDL: MangoV4 = {
         {
           "name": "account",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "group"
-          ]
+          "isSigner": false
         },
         {
           "name": "owner",
@@ -14531,14 +13723,7 @@ export const IDL: MangoV4 = {
         {
           "name": "perpMarket",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "group",
-            "bids",
-            "asks",
-            "event_queue",
-            "oracle"
-          ]
+          "isSigner": false
         },
         {
           "name": "bids",
@@ -14618,10 +13803,7 @@ export const IDL: MangoV4 = {
         {
           "name": "account",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "group"
-          ]
+          "isSigner": false
         },
         {
           "name": "owner",
@@ -14631,14 +13813,7 @@ export const IDL: MangoV4 = {
         {
           "name": "perpMarket",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "group",
-            "bids",
-            "asks",
-            "event_queue",
-            "oracle"
-          ]
+          "isSigner": false
         },
         {
           "name": "bids",
@@ -14724,10 +13899,7 @@ export const IDL: MangoV4 = {
         {
           "name": "account",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "group"
-          ]
+          "isSigner": false
         },
         {
           "name": "owner",
@@ -14737,14 +13909,7 @@ export const IDL: MangoV4 = {
         {
           "name": "perpMarket",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "group",
-            "bids",
-            "asks",
-            "event_queue",
-            "oracle"
-          ]
+          "isSigner": false
         },
         {
           "name": "bids",
@@ -14832,10 +13997,7 @@ export const IDL: MangoV4 = {
         {
           "name": "account",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "group"
-          ]
+          "isSigner": false
         },
         {
           "name": "owner",
@@ -14845,14 +14007,7 @@ export const IDL: MangoV4 = {
         {
           "name": "perpMarket",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "group",
-            "bids",
-            "asks",
-            "event_queue",
-            "oracle"
-          ]
+          "isSigner": false
         },
         {
           "name": "bids",
@@ -14946,10 +14101,7 @@ export const IDL: MangoV4 = {
         {
           "name": "account",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "group"
-          ]
+          "isSigner": false
         },
         {
           "name": "owner",
@@ -14959,12 +14111,7 @@ export const IDL: MangoV4 = {
         {
           "name": "perpMarket",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "group",
-            "bids",
-            "asks"
-          ]
+          "isSigner": false
         },
         {
           "name": "bids",
@@ -14995,10 +14142,7 @@ export const IDL: MangoV4 = {
         {
           "name": "account",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "group"
-          ]
+          "isSigner": false
         },
         {
           "name": "owner",
@@ -15008,12 +14152,7 @@ export const IDL: MangoV4 = {
         {
           "name": "perpMarket",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "group",
-            "bids",
-            "asks"
-          ]
+          "isSigner": false
         },
         {
           "name": "bids",
@@ -15044,10 +14183,7 @@ export const IDL: MangoV4 = {
         {
           "name": "account",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "group"
-          ]
+          "isSigner": false
         },
         {
           "name": "owner",
@@ -15057,12 +14193,7 @@ export const IDL: MangoV4 = {
         {
           "name": "perpMarket",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "group",
-            "bids",
-            "asks"
-          ]
+          "isSigner": false
         },
         {
           "name": "bids",
@@ -15093,10 +14224,7 @@ export const IDL: MangoV4 = {
         {
           "name": "account",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "group"
-          ]
+          "isSigner": false
         },
         {
           "name": "owner",
@@ -15106,12 +14234,7 @@ export const IDL: MangoV4 = {
         {
           "name": "perpMarket",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "group",
-            "bids",
-            "asks"
-          ]
+          "isSigner": false
         },
         {
           "name": "bids",
@@ -15150,11 +14273,7 @@ export const IDL: MangoV4 = {
         {
           "name": "perpMarket",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "group",
-            "event_queue"
-          ]
+          "isSigner": false
         },
         {
           "name": "eventQueue",
@@ -15180,13 +14299,7 @@ export const IDL: MangoV4 = {
         {
           "name": "perpMarket",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "group",
-            "bids",
-            "asks",
-            "oracle"
-          ]
+          "isSigner": false
         },
         {
           "name": "bids",
@@ -15217,10 +14330,7 @@ export const IDL: MangoV4 = {
         {
           "name": "settler",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "group"
-          ]
+          "isSigner": false
         },
         {
           "name": "settlerOwner",
@@ -15230,27 +14340,17 @@ export const IDL: MangoV4 = {
         {
           "name": "perpMarket",
           "isMut": false,
-          "isSigner": false,
-          "relations": [
-            "group",
-            "oracle"
-          ]
+          "isSigner": false
         },
         {
           "name": "accountA",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "group"
-          ]
+          "isSigner": false
         },
         {
           "name": "accountB",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "group"
-          ]
+          "isSigner": false
         },
         {
           "name": "oracle",
@@ -15260,10 +14360,7 @@ export const IDL: MangoV4 = {
         {
           "name": "settleBank",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "group"
-          ]
+          "isSigner": false
         },
         {
           "name": "settleOracle",
@@ -15284,27 +14381,17 @@ export const IDL: MangoV4 = {
         {
           "name": "perpMarket",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "group",
-            "oracle"
-          ]
+          "isSigner": false
         },
         {
           "name": "accountA",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "group"
-          ]
+          "isSigner": false
         },
         {
           "name": "accountB",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "group"
-          ]
+          "isSigner": false
         },
         {
           "name": "oracle",
@@ -15325,19 +14412,12 @@ export const IDL: MangoV4 = {
         {
           "name": "perpMarket",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "group",
-            "oracle"
-          ]
+          "isSigner": false
         },
         {
           "name": "account",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "group"
-          ]
+          "isSigner": false
         },
         {
           "name": "oracle",
@@ -15347,10 +14427,7 @@ export const IDL: MangoV4 = {
         {
           "name": "settleBank",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "group"
-          ]
+          "isSigner": false
         },
         {
           "name": "settleOracle",
@@ -15376,11 +14453,7 @@ export const IDL: MangoV4 = {
         {
           "name": "perpMarket",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "group",
-            "oracle"
-          ]
+          "isSigner": false
         },
         {
           "name": "oracle",
@@ -15390,10 +14463,7 @@ export const IDL: MangoV4 = {
         {
           "name": "liqor",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "group"
-          ]
+          "isSigner": false
         },
         {
           "name": "liqorOwner",
@@ -15403,18 +14473,12 @@ export const IDL: MangoV4 = {
         {
           "name": "liqee",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "group"
-          ]
+          "isSigner": false
         },
         {
           "name": "settleBank",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "group"
-          ]
+          "isSigner": false
         },
         {
           "name": "settleVault",
@@ -15449,20 +14513,12 @@ export const IDL: MangoV4 = {
         {
           "name": "account",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "group"
-          ]
+          "isSigner": false
         },
         {
           "name": "perpMarket",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "group",
-            "bids",
-            "asks"
-          ]
+          "isSigner": false
         },
         {
           "name": "bids",
@@ -15488,18 +14544,12 @@ export const IDL: MangoV4 = {
         {
           "name": "group",
           "isMut": false,
-          "isSigner": false,
-          "relations": [
-            "insurance_vault"
-          ]
+          "isSigner": false
         },
         {
           "name": "liqor",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "group"
-          ]
+          "isSigner": false
         },
         {
           "name": "liqorOwner",
@@ -15509,19 +14559,12 @@ export const IDL: MangoV4 = {
         {
           "name": "liqee",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "group"
-          ]
+          "isSigner": false
         },
         {
           "name": "perpMarket",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "group",
-            "oracle"
-          ]
+          "isSigner": false
         },
         {
           "name": "oracle",
@@ -15531,10 +14574,7 @@ export const IDL: MangoV4 = {
         {
           "name": "settleBank",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "group"
-          ]
+          "isSigner": false
         },
         {
           "name": "settleVault",
@@ -15570,18 +14610,12 @@ export const IDL: MangoV4 = {
         {
           "name": "group",
           "isMut": false,
-          "isSigner": false,
-          "relations": [
-            "insurance_vault"
-          ]
+          "isSigner": false
         },
         {
           "name": "liqor",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "group"
-          ]
+          "isSigner": false
         },
         {
           "name": "liqorOwner",
@@ -15591,19 +14625,12 @@ export const IDL: MangoV4 = {
         {
           "name": "liqee",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "group"
-          ]
+          "isSigner": false
         },
         {
           "name": "perpMarket",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "group",
-            "oracle"
-          ]
+          "isSigner": false
         },
         {
           "name": "oracle",
@@ -15613,10 +14640,7 @@ export const IDL: MangoV4 = {
         {
           "name": "settleBank",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "group"
-          ]
+          "isSigner": false
         },
         {
           "name": "settleVault",
@@ -15636,10 +14660,7 @@ export const IDL: MangoV4 = {
         {
           "name": "insuranceBank",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "group"
-          ]
+          "isSigner": false
         },
         {
           "name": "insuranceBankVault",
@@ -15675,10 +14696,7 @@ export const IDL: MangoV4 = {
         {
           "name": "account",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "group"
-          ]
+          "isSigner": false
         },
         {
           "name": "authority",
@@ -15688,18 +14706,12 @@ export const IDL: MangoV4 = {
         {
           "name": "buyBank",
           "isMut": false,
-          "isSigner": false,
-          "relations": [
-            "group"
-          ]
+          "isSigner": false
         },
         {
           "name": "sellBank",
           "isMut": false,
-          "isSigner": false,
-          "relations": [
-            "group"
-          ]
+          "isSigner": false
         }
       ],
       "args": [
@@ -15748,10 +14760,7 @@ export const IDL: MangoV4 = {
         {
           "name": "account",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "group"
-          ]
+          "isSigner": false
         },
         {
           "name": "authority",
@@ -15764,18 +14773,12 @@ export const IDL: MangoV4 = {
           "isSigner": false,
           "docs": [
             "The bank's token_index is checked at #1"
-          ],
-          "relations": [
-            "group"
           ]
         },
         {
           "name": "sellBank",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "group"
-          ]
+          "isSigner": false
         }
       ],
       "args": [
@@ -15800,18 +14803,12 @@ export const IDL: MangoV4 = {
         {
           "name": "liqee",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "group"
-          ]
+          "isSigner": false
         },
         {
           "name": "liqor",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "group"
-          ]
+          "isSigner": false
         },
         {
           "name": "liqorAuthority",
@@ -15844,10 +14841,7 @@ export const IDL: MangoV4 = {
         {
           "name": "group",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "admin"
-          ]
+          "isSigner": false
         },
         {
           "name": "admin",
@@ -15873,10 +14867,7 @@ export const IDL: MangoV4 = {
         {
           "name": "group",
           "isMut": false,
-          "isSigner": false,
-          "relations": [
-            "admin"
-          ]
+          "isSigner": false
         },
         {
           "name": "admin",
@@ -15918,10 +14909,7 @@ export const IDL: MangoV4 = {
         {
           "name": "account",
           "isMut": false,
-          "isSigner": false,
-          "relations": [
-            "group"
-          ]
+          "isSigner": false
         }
       ],
       "args": []
