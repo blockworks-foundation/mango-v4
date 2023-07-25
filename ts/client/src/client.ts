@@ -1151,6 +1151,7 @@ export class MangoClient {
     const tokenAccountPk = await getAssociatedTokenAddress(
       mintPk,
       mangoAccount.owner,
+      true,
     );
 
     let wrappedSolAccount: Keypair | undefined;
@@ -1246,6 +1247,7 @@ export class MangoClient {
     const tokenAccountPk = await getAssociatedTokenAddress(
       bank.mint,
       mangoAccount.owner,
+      true,
     );
 
     // ensure withdraws don't fail with missing ATAs
@@ -3041,6 +3043,7 @@ export class MangoClient {
     const inputTokenAccountPk = await getAssociatedTokenAddress(
       inputBank.mint,
       swapExecutingWallet,
+      true,
     );
     const inputTokenAccExists =
       await this.program.provider.connection.getAccountInfo(
@@ -3060,6 +3063,7 @@ export class MangoClient {
     const outputTokenAccountPk = await getAssociatedTokenAddress(
       outputBank.mint,
       swapExecutingWallet,
+      true,
     );
     const outputTokenAccExists =
       await this.program.provider.connection.getAccountInfo(
