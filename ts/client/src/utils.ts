@@ -99,6 +99,23 @@ export function roundTo5(number): number {
 }
 
 ///
+
+export async function buildFetch(): Promise<
+  (
+    input: RequestInfo | URL,
+    init?: RequestInit | undefined,
+  ) => Promise<Response>
+> {
+  let fetch = globalThis?.fetch;
+  if (!fetch && process?.versions?.node) {
+    fetch = (await import('node-fetch')).default;
+  }
+  return fetch;
+}
+
+///
+
+///
 /// web3js extensions
 ///
 

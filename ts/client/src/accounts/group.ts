@@ -14,7 +14,8 @@ import { MangoClient } from '../client';
 import { OPENBOOK_PROGRAM_ID } from '../constants';
 import { Id } from '../ids';
 import { I80F48, ONE_I80F48 } from '../numbers/I80F48';
-import { toNative, toNativeI80F48, toUiDecimals } from '../utils';
+import { PriceImpact, computePriceImpactOnJup } from '../risk';
+import { buildFetch, toNative, toNativeI80F48, toUiDecimals } from '../utils';
 import { Bank, MintInfo, TokenIndex } from './bank';
 import {
   OracleProvider,
@@ -80,6 +81,7 @@ export class Group {
       new Map(), // mintInfosMapByTokenIndex
       new Map(), // mintInfosMapByMint
       new Map(), // vaultAmountsMap
+      [],
     );
   }
 
@@ -115,6 +117,7 @@ export class Group {
     public mintInfosMapByTokenIndex: Map<TokenIndex, MintInfo>,
     public mintInfosMapByMint: Map<string, MintInfo>,
     public vaultAmountsMap: Map<string, BN>,
+    public pis: PriceImpact[],
   ) {}
 
   public async reloadAll(client: MangoClient): Promise<void> {
@@ -122,6 +125,7 @@ export class Group {
 
     // console.time('group.reload');
     await Promise.all([
+      this.reloadPriceImpactData(),
       this.reloadAlts(client),
       this.reloadBanks(client, ids).then(() =>
         Promise.all([
@@ -138,6 +142,27 @@ export class Group {
       ),
     ]);
     // console.timeEnd('group.reload');
+  }
+
+  public async reloadPriceImpactData(): Promise<void> {
+    try {
+      this.pis = await (
+        await (
+          await buildFetch()
+        )(
+          `https://api.mngo.cloud/data/v4/risk/listed-tokens-one-week-price-impacts`,
+          {
+            mode: 'cors',
+            headers: {
+              'Content-Type': 'application/json',
+              'Access-Control-Allow-Origin': '*',
+            },
+          },
+        )
+      ).json();
+    } catch (error) {
+      console.log(`Error while loading price impact: ${error}`);
+    }
   }
 
   public async reloadAlts(client: MangoClient): Promise<void> {
@@ -478,6 +503,19 @@ export class Group {
     const banks = this.banksMapByTokenIndex.get(tokenIndex);
     if (!banks) throw new Error(`No bank found for tokenIndex ${tokenIndex}!`);
     return banks[0];
+  }
+
+  /**
+   * Returns a price impact, between 0 to 1 for a token,
+   * returns -1 if data is bad
+   */
+  public getPriceImpactByTokenIndex(
+    tokenIndex: TokenIndex,
+    usdcAmountUi: number,
+  ): number {
+    const bank = this.getFirstBankByTokenIndex(tokenIndex);
+    const pisBps = computePriceImpactOnJup(this.pis, usdcAmountUi, bank.name);
+    return (pisBps * 100) / 10000;
   }
 
   public getFirstBankForMngo(): Bank {
