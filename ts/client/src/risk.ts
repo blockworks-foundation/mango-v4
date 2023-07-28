@@ -6,20 +6,7 @@ import { Group } from './accounts/group';
 import { HealthType, MangoAccount } from './accounts/mangoAccount';
 import { MangoClient } from './client';
 import { I80F48, ONE_I80F48, ZERO_I80F48 } from './numbers/I80F48';
-import { toUiDecimals, toUiDecimalsForQuote } from './utils';
-
-async function buildFetch(): Promise<
-  (
-    input: RequestInfo | URL,
-    init?: RequestInit | undefined,
-  ) => Promise<Response>
-> {
-  let fetch = globalThis?.fetch;
-  if (!fetch && process?.versions?.node) {
-    fetch = (await import('node-fetch')).default;
-  }
-  return fetch;
-}
+import { buildFetch, toUiDecimals, toUiDecimalsForQuote } from './utils';
 
 export interface LiqorPriceImpact {
   Coin: { val: string; highlight: boolean };
@@ -56,7 +43,7 @@ export interface Risk {
   liqorEquity: { title: string; data: AccountEquity[] };
 }
 
-type PriceImpact = {
+export type PriceImpact = {
   symbol: string;
   side: 'bid' | 'ask';
   target_amount: number;
@@ -65,12 +52,15 @@ type PriceImpact = {
   max_price_impact_percent: number;
 };
 
-export async function computePriceImpactOnJup(
+/**
+ * Returns price impact in bps,
+ * returns -1 if data is missing
+ */
+export function computePriceImpactOnJup(
   pis: PriceImpact[],
   usdcAmount: number,
   tokenName: string,
-): Promise<number> {
-  console.log(pis);
+): number {
   try {
     const closestTo = [1000, 5000, 20000, 100000].reduce((prev, curr) =>
       Math.abs(curr - usdcAmount) < Math.abs(prev - usdcAmount) ? curr : prev,
@@ -239,7 +229,7 @@ export async function getPriceImpactForLiqor(
           return sum.add(maxAsset);
         }, ZERO_I80F48());
 
-        const [pi1, pi2] = await Promise.all([
+        const pi1 =
           !liabsInUsdc.eq(ZERO_I80F48()) &&
           usdcMint.toBase58() !== bank.mint.toBase58()
             ? computePriceImpactOnJup(
@@ -247,8 +237,8 @@ export async function getPriceImpactForLiqor(
                 toUiDecimalsForQuote(liabsInUsdc),
                 bank.name,
               )
-            : Promise.resolve(0),
-
+            : 0;
+        const pi2 =
           !assets.eq(ZERO_I80F48()) &&
           usdcMint.toBase58() !== bank.mint.toBase58()
             ? computePriceImpactOnJup(
@@ -256,8 +246,7 @@ export async function getPriceImpactForLiqor(
                 toUiDecimals(assets.mul(bank.price), bank.mintDecimals),
                 bank.name,
               )
-            : Promise.resolve(0),
-        ]);
+            : 0;
 
         return {
           Coin: { val: bank.name, highlight: false },
