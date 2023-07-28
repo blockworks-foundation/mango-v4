@@ -23,6 +23,10 @@ async fn tcs_is_in_price_range(
     let buy_token_price = mango_client.bank_oracle_price(tcs.buy_token_index).await?;
     let sell_token_price = mango_client.bank_oracle_price(tcs.sell_token_index).await?;
     let base_price = (buy_token_price / sell_token_price).to_num();
+    info!(
+        base_price,
+        tcs.price_lower_limit, tcs.price_upper_limit, "price_in_range",
+    );
     if !tcs.price_in_range(base_price) {
         return Ok(false);
     }
@@ -40,6 +44,7 @@ fn tcs_has_plausible_premium(
     // Never take tcs where the fee exceeds the premium and the triggerer exchanges
     // tokens at below oracle price.
     if premium < 1.0 {
+        info!(premium, "tcs_has_plausible_premium premium",);
         return Ok(false);
     }
 
@@ -53,6 +58,8 @@ fn tcs_has_plausible_premium(
     // If this is 1.0 then the exchange can (probably) happen at oracle price.
     // 1.5 would mean we need to pay 50% more than oracle etc.
     let cost = buy_info.buy_over_oracle * sell_info.sell_over_oracle;
+
+    info!(cost, "tcs_has_plausible_premium cost",);
 
     Ok(cost <= premium)
 }
