@@ -73,8 +73,8 @@ async fn tcs_is_interesting(
     info!("{} {}", tcs.is_expired(now_ts), "tcs.is_expired(now_ts)");
     info!(
         "{} {}",
-        tcs.tcs_has_plausible_premium(tcs, token_swap_info),
-        "tcs.tcs_has_plausible_premium(tcs, token_swap_info)"
+        tcs_has_plausible_premium(tcs, token_swap_info)?,
+        "tcs_has_plausible_premium(tcs, token_swap_info)"
     );
     Ok(!tcs.is_expired(now_ts)
         && tcs_is_in_price_range(mango_client, tcs).await?
