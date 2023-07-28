@@ -1314,41 +1314,33 @@ export class MangoClient {
     let wrappedSolAccount: Keypair | undefined;
     let preInstructions: TransactionInstruction[] = [];
     let postInstructions: TransactionInstruction[] = [];
+    const additionalSigners: Signer[] = [];
     if (mintPk.equals(NATIVE_MINT)) {
-      // Generate a random seed for wrappedSolAccount.
-      const seed = Keypair.generate().publicKey.toBase58().slice(0, 32);
-      // Calculate a publicKey that will be controlled by the `mangoAccount.owner`.
-      const wrappedSolAccount = await PublicKey.createWithSeed(
-        mangoAccount.owner,
-        seed,
-        TOKEN_PROGRAM_ID,
-      );
-
+      wrappedSolAccount = new Keypair();
       const lamports = nativeAmount.add(new BN(1e7));
 
       preInstructions = [
-        SystemProgram.createAccountWithSeed({
+        SystemProgram.createAccount({
           fromPubkey: mangoAccount.owner,
-          basePubkey: mangoAccount.owner,
-          seed,
-          newAccountPubkey: wrappedSolAccount,
+          newAccountPubkey: wrappedSolAccount.publicKey,
           lamports: lamports.toNumber(),
           space: 165,
           programId: TOKEN_PROGRAM_ID,
         }),
         createInitializeAccount3Instruction(
-          wrappedSolAccount,
+          wrappedSolAccount.publicKey,
           NATIVE_MINT,
           mangoAccount.owner,
         ),
       ];
       postInstructions = [
         createCloseAccountInstruction(
-          wrappedSolAccount,
+          wrappedSolAccount.publicKey,
           mangoAccount.owner,
           mangoAccount.owner,
         ),
       ];
+      additionalSigners.push(wrappedSolAccount);
     }
 
     const healthRemainingAccounts: PublicKey[] =
@@ -1374,11 +1366,11 @@ export class MangoClient {
       )
       .instruction();
 
-    return await this.sendAndConfirmTransactionForGroup(group, [
-      ...preInstructions,
-      ix,
-      ...postInstructions,
-    ]);
+    return await this.sendAndConfirmTransactionForGroup(
+      group,
+      [...preInstructions, ix, ...postInstructions],
+      { additionalSigners },
+    );
   }
 
   public async tokenWithdraw(
