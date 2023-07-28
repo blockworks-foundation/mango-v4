@@ -879,7 +879,7 @@ export class MangoClient {
     );
   }
 
-  private async getMangoAccountFromAi(
+  public async getMangoAccountFromAi(
     mangoAccountPk: PublicKey,
     ai: AccountInfo<Buffer>,
   ): Promise<MangoAccount> {
