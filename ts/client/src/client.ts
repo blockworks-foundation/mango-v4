@@ -3577,15 +3577,15 @@ export class MangoClient {
   public async tokenConditionalSwapCancel(
     group: Group,
     account: MangoAccount,
-    tokenConditionalSwapIndex: number,
     tokenConditionalSwapId: BN,
   ): Promise<TransactionSignature> {
-    const tcs = account
-      .tokenConditionalSwapsActive()
-      .find((tcs) => tcs.id.eq(tokenConditionalSwapId));
-    if (!tcs) {
+    const tokenConditionalSwapIndex = account.tokenConditionalSwaps.findIndex(
+      (tcs) => tcs.id.eq(tokenConditionalSwapId),
+    );
+    if (tokenConditionalSwapIndex == -1) {
       throw new Error('tcs with id not found');
     }
+    const tcs = account.tokenConditionalSwaps[tokenConditionalSwapIndex];
 
     const buyBank = group.banksMapByTokenIndex.get(tcs.buyTokenIndex)![0];
     const sellBank = group.banksMapByTokenIndex.get(tcs.sellTokenIndex)![0];
@@ -3611,17 +3611,17 @@ export class MangoClient {
     group: Group,
     liqee: MangoAccount,
     liqor: MangoAccount,
-    tokenConditionalSwapIndex: number,
     tokenConditionalSwapId: BN,
     maxBuyTokenToLiqee: number,
     maxSellTokenToLiqor: number,
   ): Promise<TransactionSignature> {
-    const tcs = liqee
-      .tokenConditionalSwapsActive()
-      .find((tcs) => tcs.id.eq(tokenConditionalSwapId));
-    if (!tcs) {
+    const tokenConditionalSwapIndex = liqee.tokenConditionalSwaps.findIndex(
+      (tcs) => tcs.id.eq(tokenConditionalSwapId),
+    );
+    if (tokenConditionalSwapIndex == -1) {
       throw new Error('tcs with id not found');
     }
+    const tcs = liqee.tokenConditionalSwaps[tokenConditionalSwapIndex];
 
     const buyBank = group.banksMapByTokenIndex.get(tcs.buyTokenIndex)![0];
     const sellBank = group.banksMapByTokenIndex.get(tcs.sellTokenIndex)![0];

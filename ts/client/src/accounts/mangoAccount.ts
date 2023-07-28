@@ -188,6 +188,10 @@ export class MangoAccount {
     return this.serum3.filter((serum3) => serum3.isActive());
   }
 
+  public tokenConditionalSwapsActive(): TokenConditionalSwap[] {
+    return this.tokenConditionalSwaps.filter((tcs) => tcs.hasData);
+  }
+
   public perpPositionExistsForMarket(perpMarket: PerpMarket): boolean {
     return this.perps.some(
       (pp) => pp.isActive() && pp.marketIndex == perpMarket.perpMarketIndex,
