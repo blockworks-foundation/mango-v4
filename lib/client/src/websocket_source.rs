@@ -11,9 +11,9 @@ use solana_rpc::rpc_pubsub::RpcSolPubSubClient;
 use solana_sdk::{commitment_config::CommitmentConfig, pubkey::Pubkey};
 
 use anyhow::Context;
-use log::*;
 use std::time::Duration;
 use tokio_stream::StreamMap;
+use tracing::*;
 
 use crate::account_update_stream::{AccountUpdate, Message};
 use crate::AnyhowWrap;

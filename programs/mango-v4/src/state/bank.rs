@@ -16,6 +16,7 @@ use std::mem::size_of;
 pub const HOUR: i64 = 3600;
 pub const DAY: i64 = 86400;
 pub const DAY_I80F48: I80F48 = I80F48::from_bits(86_400 * I80F48::ONE.to_bits());
+pub const ONE_BPS: I80F48 = I80F48::from_bits(28147497671);
 pub const YEAR_I80F48: I80F48 = I80F48::from_bits(31_536_000 * I80F48::ONE.to_bits());
 pub const MINIMUM_MAX_RATE: I80F48 = I80F48::from_bits(I80F48::ONE.to_bits() / 2);
 
@@ -135,8 +136,14 @@ pub struct Bank {
     pub reduce_only: u8,
     pub force_close: u8,
 
+    pub padding: [u8; 6],
+
+    // Do separate bookkeping for how many tokens were withdrawn
+    // This ensures that collected_fees_native is strictly increasing for stats gathering purposes
+    pub fees_withdrawn: u64,
+
     #[derivative(Debug = "ignore")]
-    pub reserved: [u8; 2118],
+    pub reserved: [u8; 2104],
 }
 const_assert_eq!(
     size_of::<Bank>(),
@@ -165,7 +172,9 @@ const_assert_eq!(
         + 8
         + 1
         + 1
-        + 2118
+        + 6
+        + 8
+        + 2104
 );
 const_assert_eq!(size_of::<Bank>(), 3064);
 const_assert_eq!(size_of::<Bank>() % 8, 0);
@@ -174,6 +183,12 @@ pub struct WithdrawResult {
     pub position_is_active: bool,
     pub loan_origination_fee: I80F48,
     pub loan_amount: I80F48,
+}
+
+impl WithdrawResult {
+    pub fn has_loan(&self) -> bool {
+        self.loan_amount.is_positive()
+    }
 }
 
 impl Bank {
@@ -233,7 +248,9 @@ impl Bank {
             deposit_weight_scale_start_quote: f64::MAX,
             reduce_only: 0,
             force_close: 0,
-            reserved: [0; 2118],
+            padding: [0; 6],
+            fees_withdrawn: 0,
+            reserved: [0; 2104],
         }
     }
 
@@ -568,6 +585,19 @@ impl Bank {
             // To avoid double counting of loans return loan_amount of 0 here (as the loan_amount has already been returned earlier with loan_origination_fee == 0)
             loan_amount: I80F48::ZERO,
         })
+    }
+
+    /// Returns true if the position remains active
+    pub fn dust_if_possible(&mut self, position: &mut TokenPosition, now_ts: u64) -> Result<bool> {
+        if position.is_in_use() {
+            return Ok(true);
+        }
+        let native = position.native(self);
+        if native >= 0 && native < 1 {
+            // Withdrawing 0 triggers the dusting check
+            return self.withdraw_without_fee(position, I80F48::ZERO, now_ts);
+        }
+        Ok(true)
     }
 
     /// Change a position without applying the loan origination fee
@@ -954,7 +984,7 @@ mod tests {
                 let mut account = TokenPosition {
                     indexed_position: I80F48::ZERO,
                     token_index: 0,
-                    in_use_count: u8::from(is_in_use),
+                    in_use_count: u16::from(is_in_use),
                     cumulative_deposit_interest: 0.0,
                     cumulative_borrow_interest: 0.0,
                     previous_index: I80F48::ZERO,

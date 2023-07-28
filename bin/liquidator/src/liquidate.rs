@@ -2,21 +2,22 @@ use std::collections::HashSet;
 use std::time::Duration;
 
 use itertools::Itertools;
-use mango_v4::accounts_zerocopy::KeyedAccountSharedData;
 use mango_v4::health::{HealthCache, HealthType};
-use mango_v4::state::{
-    Bank, MangoAccountValue, PerpMarketIndex, Side, TokenIndex, QUOTE_TOKEN_INDEX,
-};
-use mango_v4_client::{chain_data, health_cache, AccountFetcher, JupiterSwapMode, MangoClient};
+use mango_v4::state::{MangoAccountValue, PerpMarketIndex, Side, TokenIndex, QUOTE_TOKEN_INDEX};
+use mango_v4_client::{chain_data, health_cache, JupiterSwapMode, MangoClient};
 use solana_sdk::signature::Signature;
 
 use futures::{stream, StreamExt, TryStreamExt};
 use rand::seq::SliceRandom;
+use tracing::*;
 use {anyhow::Context, fixed::types::I80F48, solana_sdk::pubkey::Pubkey};
+
+use crate::util;
 
 pub struct Config {
     pub min_health_ratio: f64,
     pub refresh_timeout: Duration,
+    pub mock_jupiter: bool,
 }
 
 pub async fn jupiter_market_can_buy(
@@ -119,7 +120,7 @@ impl<'a> LiquidateHelper<'a> {
         }
         // Cancel all orders on a random serum market
         let serum_orders = serum_force_cancels.choose(&mut rand::thread_rng()).unwrap();
-        let sig = self
+        let txsig = self
             .client
             .serum3_liq_force_cancel_orders(
                 (self.pubkey, &self.liqee),
@@ -127,14 +128,12 @@ impl<'a> LiquidateHelper<'a> {
                 &serum_orders.open_orders,
             )
             .await?;
-        log::info!(
-            "Force cancelled serum orders on account {}, market index {}, maint_health was {}, tx sig {:?}",
-            self.pubkey,
-            serum_orders.market_index,
-            self.maint_health,
-            sig
+        info!(
+            market_index = serum_orders.market_index,
+            %txsig,
+            "Force cancelled serum orders",
         );
-        Ok(Some(sig))
+        Ok(Some(txsig))
     }
 
     async fn perp_close_orders(&self) -> anyhow::Result<Option<Signature>> {
@@ -149,18 +148,16 @@ impl<'a> LiquidateHelper<'a> {
 
         // Cancel all orders on a random perp market
         let perp_market_index = *perp_force_cancels.choose(&mut rand::thread_rng()).unwrap();
-        let sig = self
+        let txsig = self
             .client
             .perp_liq_force_cancel_orders((self.pubkey, &self.liqee), perp_market_index)
             .await?;
-        log::info!(
-            "Force cancelled perp orders on account {}, market index {}, maint_health was {}, tx sig {:?}",
-            self.pubkey,
+        info!(
             perp_market_index,
-            self.maint_health,
-            sig
+            %txsig,
+            "Force cancelled perp orders",
         );
-        Ok(Some(sig))
+        Ok(Some(txsig))
     }
 
     async fn perp_liq_base_or_positive_pnl(&self) -> anyhow::Result<Option<Signature>> {
@@ -173,15 +170,7 @@ impl<'a> LiquidateHelper<'a> {
                 {
                     return Ok(None);
                 }
-                let perp = self.client.context.perp(pp.market_index);
-                let oracle = self
-                    .account_fetcher
-                    .fetch_raw_account(&perp.market.oracle)
-                    .await?;
-                let price = perp.market.oracle_price(
-                    &KeyedAccountSharedData::new(perp.market.oracle, oracle.into()),
-                    None,
-                )?;
+                let price = self.client.perp_oracle_price(pp.market_index).await?;
                 Ok(Some((
                     pp.market_index,
                     base_lots,
@@ -263,9 +252,13 @@ impl<'a> LiquidateHelper<'a> {
 
             (max_base_transfer, max_pnl_transfer.floor().to_num::<u64>())
         };
-        log::info!("computed max_base_transfer: {max_base_transfer_abs}, max_pnl_transfer: {max_pnl_transfer}");
+        trace!(
+            max_base_transfer_abs,
+            max_pnl_transfer,
+            "computed transfer maximums"
+        );
 
-        let sig = self
+        let txsig = self
             .client
             .perp_liq_base_or_positive_pnl(
                 (self.pubkey, &self.liqee),
@@ -274,14 +267,12 @@ impl<'a> LiquidateHelper<'a> {
                 max_pnl_transfer,
             )
             .await?;
-        log::info!(
-            "Liquidated base position for perp market on account {}, market index {}, maint_health was {}, tx sig {:?}",
-            self.pubkey,
+        info!(
             perp_market_index,
-            self.maint_health,
-            sig
+            %txsig,
+            "Liquidated base position for perp market",
         );
-        Ok(Some(sig))
+        Ok(Some(txsig))
     }
 
     async fn perp_liq_negative_pnl_or_bankruptcy(&self) -> anyhow::Result<Option<Signature>> {
@@ -306,7 +297,7 @@ impl<'a> LiquidateHelper<'a> {
         }
         let (perp_market_index, _) = perp_negative_pnl.first().unwrap();
 
-        let sig = self
+        let txsig = self
             .client
             .perp_liq_negative_pnl_or_bankruptcy(
                 (self.pubkey, &self.liqee),
@@ -315,32 +306,21 @@ impl<'a> LiquidateHelper<'a> {
                 u64::MAX,
             )
             .await?;
-        log::info!(
-            "Liquidated negative perp pnl on account {}, market index {}, maint_health was {}, tx sig {:?}",
-            self.pubkey,
+        info!(
             perp_market_index,
-            self.maint_health,
-            sig
+            %txsig,
+            "Liquidated negative perp pnl",
         );
-        Ok(Some(sig))
+        Ok(Some(txsig))
     }
 
     async fn tokens(&self) -> anyhow::Result<Vec<(TokenIndex, I80F48, I80F48)>> {
         let tokens_maybe: anyhow::Result<Vec<(TokenIndex, I80F48, I80F48)>> =
             stream::iter(self.liqee.active_token_positions())
                 .then(|token_position| async {
-                    let token = self.client.context.token(token_position.token_index);
-                    let bank = self
-                        .account_fetcher
-                        .fetch::<Bank>(&token.mint_info.first_bank())?;
-                    let oracle = self
-                        .account_fetcher
-                        .fetch_raw_account(&token.mint_info.oracle)
-                        .await?;
-                    let price = bank.oracle_price(
-                        &KeyedAccountSharedData::new(token.mint_info.oracle, oracle.into()),
-                        None,
-                    )?;
+                    let token_index = token_position.token_index;
+                    let price = self.client.bank_oracle_price(token_index).await?;
+                    let bank = self.client.first_bank(token_index).await?;
                     Ok((
                         token_position.token_index,
                         price,
@@ -359,40 +339,28 @@ impl<'a> LiquidateHelper<'a> {
         source: TokenIndex,
         target: TokenIndex,
     ) -> anyhow::Result<I80F48> {
-        let mut liqor = self
+        let liqor = self
             .account_fetcher
             .fetch_fresh_mango_account(&self.client.mango_account_address)
             .await
             .context("getting liquidator account")?;
 
-        // Ensure the tokens are activated, so they appear in the health cache and
-        // max_swap_source() will work.
-        liqor.ensure_token_position(source)?;
-        liqor.ensure_token_position(target)?;
+        let source_price = self.client.bank_oracle_price(source).await?;
+        let target_price = self.client.bank_oracle_price(target).await?;
 
-        let health_cache = health_cache::new(&self.client.context, self.account_fetcher, &liqor)
-            .await
-            .expect("always ok");
-
-        let source_bank = self.client.first_bank(source).await?;
-        let target_bank = self.client.first_bank(target).await?;
-
-        let source_price = health_cache.token_info(source).unwrap().prices.oracle;
-        let target_price = health_cache.token_info(target).unwrap().prices.oracle;
         // TODO: This is where we could multiply in the liquidation fee factors
-        let oracle_swap_price = source_price / target_price;
+        let price = source_price / target_price;
 
-        let amount = health_cache
-            .max_swap_source_for_health_ratio(
-                &liqor,
-                &source_bank,
-                source_price,
-                &target_bank,
-                oracle_swap_price,
-                self.liqor_min_health_ratio,
-            )
-            .context("getting max_swap_source")?;
-        Ok(amount)
+        util::max_swap_source(
+            self.client,
+            self.account_fetcher,
+            &liqor,
+            source,
+            target,
+            price,
+            self.liqor_min_health_ratio,
+        )
+        .await
     }
 
     async fn token_liq(&self) -> anyhow::Result<Option<Signature>> {
@@ -445,7 +413,7 @@ impl<'a> LiquidateHelper<'a> {
         // TODO: log liqor's assets in UI form
         // TODO: log liquee's liab_needed, need to refactor program code to be able to be accessed from client side
         //
-        let sig = self
+        let txsig = self
             .client
             .token_liq_with_token(
                 (self.pubkey, &self.liqee),
@@ -455,13 +423,13 @@ impl<'a> LiquidateHelper<'a> {
             )
             .await
             .context("sending liq_token_with_token")?;
-        log::info!(
-            "Liquidated token with token for {}, maint_health was {}, tx sig {:?}",
-            self.pubkey,
-            self.maint_health,
-            sig
+        info!(
+            asset_token_index,
+            liab_token_index,
+            %txsig,
+            "Liquidated token with token",
         );
-        Ok(Some(sig))
+        Ok(Some(txsig))
     }
 
     async fn token_liq_bankruptcy(&self) -> anyhow::Result<Option<Signature>> {
@@ -499,7 +467,7 @@ impl<'a> LiquidateHelper<'a> {
             .max_token_liab_transfer(liab_token_index, quote_token_index)
             .await?;
 
-        let sig = self
+        let txsig = self
             .client
             .token_liq_bankruptcy(
                 (self.pubkey, &self.liqee),
@@ -508,15 +476,15 @@ impl<'a> LiquidateHelper<'a> {
             )
             .await
             .context("sending liq_token_bankruptcy")?;
-        log::info!(
-            "Liquidated bankruptcy for {}, maint_health was {}, tx sig {:?}",
-            self.pubkey,
-            self.maint_health,
-            sig
+        info!(
+            liab_token_index,
+            %txsig,
+            "Liquidated token bankruptcy",
         );
-        Ok(Some(sig))
+        Ok(Some(txsig))
     }
 
+    #[instrument(skip(self), fields(pubkey = %*self.pubkey, maint = %self.maint_health))]
     async fn send_liq_tx(&self) -> anyhow::Result<Option<Signature>> {
         // TODO: Should we make an attempt to settle positive PNL first?
         // The problem with it is that small market movements can continuously create
@@ -559,11 +527,7 @@ impl<'a> LiquidateHelper<'a> {
         }
 
         if self.health_cache.has_perp_open_fills() {
-            log::info!(
-                "Account {} has open perp fills, maint_health {}, waiting...",
-                self.pubkey,
-                self.maint_health
-            );
+            info!("there are open perp fills, waiting...",);
             return Ok(None);
         }
 
@@ -617,11 +581,10 @@ pub async fn maybe_liquidate_account(
         return Ok(false);
     }
 
-    log::trace!(
-        "possible candidate: {}, with owner: {}, maint health: {}",
-        pubkey,
-        account.fixed.owner,
-        maint_health,
+    trace!(
+        %pubkey,
+        %maint_health,
+        "possible candidate",
     );
 
     // Fetch a fresh account and re-compute
@@ -670,7 +633,7 @@ pub async fn maybe_liquidate_account(
             )
             .await
         {
-            log::info!("could not refresh after liquidation: {}", e);
+            info!("could not refresh after liquidation: {}", e);
         }
     }
 

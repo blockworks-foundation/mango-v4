@@ -2,7 +2,9 @@ use super::*;
 
 #[tokio::test]
 async fn test_ix_gate_set() -> Result<(), TransportError> {
-    let context = TestContext::new().await;
+    let mut test_builder = TestContextBuilder::new();
+    test_builder.test().set_compute_max_units(200_000); // lots of logging
+    let context = test_builder.start_default().await;
     let solana = &context.solana.clone();
 
     let admin = TestKeypair::new();

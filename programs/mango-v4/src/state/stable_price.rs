@@ -15,7 +15,7 @@ use std::mem::size_of;
 /// price over every `delay_interval_seconds` (assume 1h) and then applying the
 /// `delay_growth_limit` between intervals.
 #[zero_copy]
-#[derive(Derivative, Debug, bytemuck::Pod, bytemuck::Zeroable)]
+#[derive(Derivative, Debug)]
 pub struct StablePriceModel {
     /// Current stable price to use in health
     pub stable_price: f64,
@@ -49,15 +49,18 @@ pub struct StablePriceModel {
     /// The delay_interval_index that update() was last called on.
     pub last_delay_interval_index: u8,
 
+    /// If set to 1, the stable price will reset on the next non-zero price it sees.
+    pub reset_on_nonzero_price: u8,
+
     #[derivative(Debug = "ignore")]
-    pub padding: [u8; 7],
+    pub padding: [u8; 6],
 
     #[derivative(Debug = "ignore")]
     pub reserved: [u8; 48],
 }
 const_assert_eq!(
     size_of::<StablePriceModel>(),
-    8 + 8 + 8 * 24 + 8 + 4 + 4 + 4 + 4 + 1 + 7 + 48
+    8 + 8 + 8 * 24 + 8 + 4 + 4 + 4 + 4 + 1 * 2 + 6 + 48
 );
 const_assert_eq!(size_of::<StablePriceModel>(), 288);
 const_assert_eq!(size_of::<StablePriceModel>() % 8, 0);
@@ -74,6 +77,7 @@ impl Default for StablePriceModel {
             delay_growth_limit: 0.06,        // 6% per hour, 400% per day
             stable_growth_limit: 0.0003, // 0.03% per second, 293% in 1h if updated every 10s, 281% in 1h if updated every 5min
             last_delay_interval_index: 0,
+            reset_on_nonzero_price: 0,
             padding: Default::default(),
             reserved: [0; 48],
         }
@@ -87,6 +91,7 @@ impl StablePriceModel {
         self.delay_accumulator_price = 0.0;
         self.delay_accumulator_time = 0;
         self.last_update_timestamp = now_ts;
+        self.reset_on_nonzero_price = if oracle_price > 0.0 { 0 } else { 1 };
     }
 
     pub fn delay_interval_index(&self, timestamp: u64) -> u8 {
@@ -103,6 +108,11 @@ impl StablePriceModel {
     }
 
     pub fn update(&mut self, now_ts: u64, oracle_price: f64) {
+        // If a reset is requested (maybe there never was a non-zero price), jump to the current value
+        if self.reset_on_nonzero_price == 1 && oracle_price > 0.0 {
+            self.reset_to_price(oracle_price, now_ts);
+        }
+
         let dt = now_ts.saturating_sub(self.last_update_timestamp);
         // Hardcoded. Requiring a minimum time between updates reduces the possible difference
         // between frequent updates and infrequent ones.

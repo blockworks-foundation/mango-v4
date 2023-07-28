@@ -4,7 +4,31 @@ Update this for each program release and mainnet deployment.
 
 ## not on mainnet
 
-### v0.17.1, 2023-7-
+### v0.18.0, 2023-7-
+
+- Introduce limit and stop loss orders for arbitrary spot pairs (#604, #634)
+
+  Allow users to request that a swap between two spot tokens should be executed
+  once the price crosses a threshold. Independent of OpenBook markets.
+
+- Improve behavior when listing tokens or markets with upcoming oracles (#620)
+
+  When we listed RNDR before the oracle started publishing a price, there
+  was an issue where the stable price got initialized to 0. Now, the stable
+  price is only initialized the first time a valid oracle value is read.
+
+- Deprecate Serum3SettleFunds (#606)
+
+  Use the Serum3SettleFundsV2 instruction introduced in v0.8.0.
+
+- Perp FillEventLog: Include amount of closed pnl (#624)
+- Pyth: Fix reading most recent valid price (#631)
+
+## mainnet
+
+### v0.17.1, 2023-7-6
+
+Deployment: Jul 6, 2023 at 20:26:34 Central European Summer Time, https://explorer.solana.com/tx/4kiVtR1G3xNh8bTP4FetfG7rjPjLThFjrQNzMMs2TfQHnw7Ezp6JX4rboQbGrJsfZDd6zaMuEa1ZTxahRwPPb9JR
 
 - Remove extra Pyth oracle status check added in v0.17.0
 
@@ -14,8 +38,6 @@ Update this for each program release and mainnet deployment.
 
   This staleness limit is much more strict than the ones configured on the
   oracles currently used by Mango and caused occasional transaction failures.
-
-## mainnet
 
 ### v0.17.0, 2023-7-3
 

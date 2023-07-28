@@ -135,16 +135,7 @@ impl SerumOrderPlacer {
     }
 
     async fn settle(&self) {
-        send_tx(
-            &self.solana,
-            Serum3SettleFundsInstruction {
-                account: self.account,
-                owner: self.owner,
-                serum_market: self.serum_market,
-            },
-        )
-        .await
-        .unwrap();
+        self.settle_v2(true).await
     }
 
     async fn settle_v2(&self, fees_to_dao: bool) {
@@ -298,10 +289,28 @@ async fn test_serum_basics() -> Result<(), TransportError> {
     assert_eq!(native1, 900);
 
     let account_data = get_mango_account(solana, account).await;
-    assert_eq!(account_data.token_position_by_raw_index(0).in_use_count, 1);
-    assert_eq!(account_data.token_position_by_raw_index(1).in_use_count, 1);
-    assert_eq!(account_data.token_position_by_raw_index(2).in_use_count, 0);
-    let serum_orders = account_data.serum3_orders_by_raw_index(0);
+    assert_eq!(
+        account_data
+            .token_position_by_raw_index(0)
+            .unwrap()
+            .in_use_count,
+        1
+    );
+    assert_eq!(
+        account_data
+            .token_position_by_raw_index(1)
+            .unwrap()
+            .in_use_count,
+        1
+    );
+    assert_eq!(
+        account_data
+            .token_position_by_raw_index(2)
+            .unwrap()
+            .in_use_count,
+        0
+    );
+    let serum_orders = account_data.serum3_orders_by_raw_index(0).unwrap();
     assert_eq!(serum_orders.base_borrows_without_fee, 0);
     assert_eq!(serum_orders.quote_borrows_without_fee, 0);
 
@@ -342,8 +351,20 @@ async fn test_serum_basics() -> Result<(), TransportError> {
     .unwrap();
 
     let account_data = get_mango_account(solana, account).await;
-    assert_eq!(account_data.token_position_by_raw_index(0).in_use_count, 0);
-    assert_eq!(account_data.token_position_by_raw_index(1).in_use_count, 0);
+    assert_eq!(
+        account_data
+            .token_position_by_raw_index(0)
+            .unwrap()
+            .in_use_count,
+        0
+    );
+    assert_eq!(
+        account_data
+            .token_position_by_raw_index(1)
+            .unwrap()
+            .in_use_count,
+        0
+    );
 
     // deregister serum3 market
     send_tx(
@@ -540,7 +561,7 @@ async fn test_serum_loan_origination_fees() -> Result<(), TransportError> {
         let account_data = solana.get_account::<MangoAccount>(account).await;
         assert_eq!(
             account_data.buyback_fees_accrued_current,
-            0 // the v1 function doesn't accumulate buyback fees
+            serum_maker_rebate(fill_amount) as u64
         );
 
         assert_eq!(

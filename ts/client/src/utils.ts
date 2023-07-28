@@ -66,6 +66,55 @@ export function toUiI80F48(nativeAmount: I80F48, decimals: number): I80F48 {
   return nativeAmount.div(I80F48.fromNumber(Math.pow(10, decimals)));
 }
 
+export function roundTo5(number): number {
+  if (number < 1) {
+    const numString = number.toString();
+    const nonZeroIndex = numString.search(/[1-9]/);
+    if (nonZeroIndex === -1 || nonZeroIndex >= numString.length - 5) {
+      return number;
+    }
+    return Number(numString.slice(0, nonZeroIndex + 5));
+  } else if (number < 10) {
+    return (
+      Math.floor(number) +
+      Number((number % 1).toString().padEnd(10, '0').slice(0, 6))
+    );
+  } else if (number < 100) {
+    return (
+      Math.floor(number) +
+      Number((number % 1).toString().padEnd(10, '0').slice(0, 5))
+    );
+  } else if (number < 1000) {
+    return (
+      Math.floor(number) +
+      Number((number % 1).toString().padEnd(10, '0').slice(0, 4))
+    );
+  } else if (number < 10000) {
+    return (
+      Math.floor(number) +
+      Number((number % 1).toString().padEnd(10, '0').slice(0, 3))
+    );
+  }
+  return Math.round(number);
+}
+
+///
+
+export async function buildFetch(): Promise<
+  (
+    input: RequestInfo | URL,
+    init?: RequestInit | undefined,
+  ) => Promise<Response>
+> {
+  let fetch = globalThis?.fetch;
+  if (!fetch && process?.versions?.node) {
+    fetch = (await import('node-fetch')).default;
+  }
+  return fetch;
+}
+
+///
+
 ///
 /// web3js extensions
 ///

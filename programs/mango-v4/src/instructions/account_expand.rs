@@ -9,8 +9,15 @@ pub fn account_expand(
     serum3_count: u8,
     perp_count: u8,
     perp_oo_count: u8,
+    token_conditional_swap_count: u8,
 ) -> Result<()> {
-    let new_space = MangoAccount::space(token_count, serum3_count, perp_count, perp_oo_count)?;
+    let new_space = MangoAccount::space(
+        token_count,
+        serum3_count,
+        perp_count,
+        perp_oo_count,
+        token_conditional_swap_count,
+    )?;
     let new_rent_minimum = Rent::get()?.minimum_balance(new_space);
 
     let realloc_account = ctx.accounts.account.as_ref();
@@ -36,7 +43,13 @@ pub fn account_expand(
 
     // expand dynamic content, e.g. to grow token positions, we need to slide serum3orders further later, and so on....
     let mut account = ctx.accounts.account.load_full_mut()?;
-    account.expand_dynamic_content(token_count, serum3_count, perp_count, perp_oo_count)?;
+    account.expand_dynamic_content(
+        token_count,
+        serum3_count,
+        perp_count,
+        perp_oo_count,
+        token_conditional_swap_count,
+    )?;
 
     Ok(())
 }
