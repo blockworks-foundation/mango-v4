@@ -70,6 +70,12 @@ async fn tcs_is_interesting(
     token_swap_info: &token_swap_info::TokenSwapInfoUpdater,
     now_ts: u64,
 ) -> anyhow::Result<bool> {
+    info!("{} {}", tcs.is_expired(now_ts), "tcs.is_expired(now_ts)");
+    info!(
+        "{} {}",
+        tcs.tcs_has_plausible_premium(tcs, token_swap_info),
+        "tcs.tcs_has_plausible_premium(tcs, token_swap_info)"
+    );
     Ok(!tcs.is_expired(now_ts)
         && tcs_is_in_price_range(mango_client, tcs).await?
         && tcs_has_plausible_premium(tcs, token_swap_info)?)
@@ -286,6 +292,8 @@ pub async fn maybe_execute_token_conditional_swap(
         let mut rng = rand::thread_rng();
         tcs_shuffled.shuffle(&mut rng);
     }
+
+    info!("{} {}", tcs_shuffled.len(), "tcs_shuffled.len()");
 
     for tcs in tcs_shuffled.iter() {
         if tcs_is_interesting(mango_client, tcs, token_swap_info, now_ts).await? {
