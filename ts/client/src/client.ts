@@ -66,7 +66,12 @@ import {
   TokenEditParams,
   buildIxGate,
 } from './clientIxParamBuilder';
-import { MANGO_V4_ID, OPENBOOK_PROGRAM_ID, RUST_U64_MAX } from './constants';
+import {
+  MANGO_V4_ID,
+  OPENBOOK_PROGRAM_ID,
+  RUST_U64_MAX,
+  USDC_MINT,
+} from './constants';
 import { Id } from './ids';
 import { IDL, MangoV4 } from './mango_v4';
 import { I80F48 } from './numbers/I80F48';
@@ -3369,29 +3374,62 @@ export class MangoClient {
     return await this.sendAndConfirmTransactionForGroup(group, [ix]);
   }
 
+  /**
+   * Example:
+   * For a stop loss on SOL, assuming SOL/USDC pair
+   * priceLowerLimit - e.g.
+   *
+   * @param group
+   * @param account
+   * @param sellMintPk - would be SOL mint
+   * @param priceLowerLimit - priceLowerLimit would be greater than priceUpperLimit e.g. if SOL is at 25$, then priceLowerLimit could be 22$
+   * @param buyMintPk - would be USDC mint
+   * @param priceUpperLimit - priceLowerLimit would be greater than priceUpperLimit e.g. if SOL is at 25$, then priceUpperLimit could be 0$
+   * @param maxSell - max ui amount of tokens to sell, e.g. account.getTokenBalanceUi(solBank)
+   * @param pricePremiumFraction - premium in % the liquidator earns for executing this stop loss, this can be the slippage usually found for a particular size plus some buffer
+   * @param expiryTimestamp - is epoch in seconds at which this stop loss should expire, set null if you want it to never expire
+   * @returns
+   */
   public async tokenConditionalSwapStopLoss(
     group: Group,
     account: MangoAccount,
-    buyMintPk: PublicKey,
     sellMintPk: PublicKey,
-    maxSell: number,
+    priceLowerLimit: number,
+    buyMintPk: PublicKey | null,
+    priceUpperLimit: number | null,
+    maxSell: number | null,
+    pricePremiumFraction: number | null,
     expiryTimestamp: number | null,
-    priceLowerLimit: number, // Note: priceLowerLimit should be higher than priceUpperLimit
-    priceUpperLimit: number,
-    pricePremiumFraction: number,
   ): Promise<TransactionSignature> {
-    const buyBank: Bank = group.getFirstBankByMint(buyMintPk);
+    const buyBank: Bank = group.getFirstBankByMint(buyMintPk ?? USDC_MINT);
     const sellBank: Bank = group.getFirstBankByMint(sellMintPk);
+
+    priceUpperLimit = priceUpperLimit ?? 0;
+    maxSell = maxSell ?? account.getTokenBalanceUi(sellBank);
+    pricePremiumFraction = group.getPriceImpactByTokenIndex(
+      sellBank.tokenIndex,
+      maxSell * sellBank.uiPrice,
+    );
+    pricePremiumFraction =
+      pricePremiumFraction != -1 ? pricePremiumFraction : 0.3;
+    const expiryTimestampBn =
+      expiryTimestamp !== null ? new BN(expiryTimestamp) : U64_MAX_BN;
+
     const tcsIx = await this.program.methods
       .tokenConditionalSwapCreate(
         U64_MAX_BN,
         toNative(maxSell, sellBank.mintDecimals),
-        expiryTimestamp !== null ? new BN(expiryTimestamp) : U64_MAX_BN,
+        expiryTimestampBn,
         (1 / priceLowerLimit) *
           Math.pow(10, sellBank.mintDecimals - buyBank.mintDecimals),
         (1 / priceUpperLimit) *
           Math.pow(10, sellBank.mintDecimals - buyBank.mintDecimals),
-        pricePremiumFraction / 100,
+        pricePremiumFraction != null
+          ? pricePremiumFraction / 100
+          : group.getPriceImpactByTokenIndex(
+              sellBank.tokenIndex,
+              maxSell * sellBank.uiPrice,
+            ),
         true,
         false,
       )

@@ -53,7 +53,7 @@ export type PriceImpact = {
 };
 
 /**
- * Returns price impact in bps,
+ * Returns price impact in bps i.e. 0 to 10,000
  * returns -1 if data is missing
  */
 export function computePriceImpactOnJup(

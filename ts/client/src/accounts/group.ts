@@ -506,7 +506,7 @@ export class Group {
   }
 
   /**
-   * Returns a price impact, between 0 to 1 for a token,
+   * Returns a price impact in percentage, between 0 to 100 for a token,
    * returns -1 if data is bad
    */
   public getPriceImpactByTokenIndex(

@@ -204,10 +204,6 @@ export class MangoAccount {
     return this.perps.filter((perp) => perp.isActive());
   }
 
-  public tokenConditionalSwapsActive(): TokenConditionalSwap[] {
-    return this.tokenConditionalSwaps.filter((tcs) => tcs.hasData);
-  }
-
   public perpOrdersActive(): PerpOo[] {
     return this.perpOpenOrders.filter(
       (oo) => oo.orderMarket !== PerpOo.OrderMarketUnset,
@@ -1835,7 +1831,7 @@ export class TokenConditionalSwap {
     return toUiDecimals(this.sold, sellBank.mintDecimals);
   }
 
-  getExpiryTimestamp(): number {
+  getExpiryTimestampInEpochSeconds(): number {
     return this.expiryTimestamp.toNumber();
   }
 
