@@ -23,10 +23,6 @@ async fn tcs_is_in_price_range(
     let buy_token_price = mango_client.bank_oracle_price(tcs.buy_token_index).await?;
     let sell_token_price = mango_client.bank_oracle_price(tcs.sell_token_index).await?;
     let base_price = (buy_token_price / sell_token_price).to_num();
-    info!(
-        base_price,
-        tcs.price_lower_limit, tcs.price_upper_limit, "price_in_range",
-    );
     if !tcs.price_in_range(base_price) {
         return Ok(false);
     }
@@ -44,7 +40,6 @@ fn tcs_has_plausible_premium(
     // Never take tcs where the fee exceeds the premium and the triggerer exchanges
     // tokens at below oracle price.
     if premium < 1.0 {
-        info!(premium, "tcs_has_plausible_premium premium",);
         return Ok(false);
     }
 
@@ -59,8 +54,6 @@ fn tcs_has_plausible_premium(
     // 1.5 would mean we need to pay 50% more than oracle etc.
     let cost = buy_info.buy_over_oracle * sell_info.sell_over_oracle;
 
-    info!(cost, "tcs_has_plausible_premium cost",);
-
     Ok(cost <= premium)
 }
 
@@ -70,12 +63,6 @@ async fn tcs_is_interesting(
     token_swap_info: &token_swap_info::TokenSwapInfoUpdater,
     now_ts: u64,
 ) -> anyhow::Result<bool> {
-    info!("{} {}", tcs.is_expired(now_ts), "tcs.is_expired(now_ts)");
-    info!(
-        "{} {}",
-        tcs_has_plausible_premium(tcs, token_swap_info)?,
-        "tcs_has_plausible_premium(tcs, token_swap_info)"
-    );
     Ok(!tcs.is_expired(now_ts)
         && tcs_is_in_price_range(mango_client, tcs).await?
         && tcs_has_plausible_premium(tcs, token_swap_info)?)
@@ -292,8 +279,6 @@ pub async fn maybe_execute_token_conditional_swap(
         let mut rng = rand::thread_rng();
         tcs_shuffled.shuffle(&mut rng);
     }
-
-    info!("{} {}", tcs_shuffled.len(), "tcs_shuffled.len()");
 
     for tcs in tcs_shuffled.iter() {
         if tcs_is_interesting(mango_client, tcs, token_swap_info, now_ts).await? {

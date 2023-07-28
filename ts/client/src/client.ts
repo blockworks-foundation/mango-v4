@@ -3382,20 +3382,15 @@ export class MangoClient {
   ): Promise<TransactionSignature> {
     const buyBank: Bank = group.getFirstBankByMint(buyMintPk);
     const sellBank: Bank = group.getFirstBankByMint(sellMintPk);
-    priceLowerLimit =
-      (1 / priceLowerLimit) *
-      Math.pow(10, sellBank.mintDecimals - buyBank.mintDecimals);
-    priceUpperLimit =
-      (1 / priceUpperLimit) *
-      Math.pow(10, sellBank.mintDecimals - buyBank.mintDecimals);
-
-    const ix = await this.program.methods
+    const tcsIx = await this.program.methods
       .tokenConditionalSwapCreate(
         U64_MAX_BN,
         toNative(maxSell, sellBank.mintDecimals),
         expiryTimestamp !== null ? new BN(expiryTimestamp) : U64_MAX_BN,
-        priceLowerLimit,
-        priceUpperLimit,
+        (1 / priceLowerLimit) *
+          Math.pow(10, sellBank.mintDecimals - buyBank.mintDecimals),
+        (1 / priceUpperLimit) *
+          Math.pow(10, sellBank.mintDecimals - buyBank.mintDecimals),
         pricePremiumFraction / 100,
         true,
         false,
@@ -3409,7 +3404,7 @@ export class MangoClient {
       })
       .instruction();
 
-    const ixs = [ix];
+    const ixs: TransactionInstruction[] = [];
     if (account.tokenConditionalSwaps.length == 0) {
       ixs.push(
         await this.accountExpandV2Ix(
@@ -3423,6 +3418,7 @@ export class MangoClient {
         ),
       );
     }
+    ixs.push(tcsIx);
 
     return await this.sendAndConfirmTransactionForGroup(group, ixs);
   }
@@ -3447,7 +3443,7 @@ export class MangoClient {
       priceUpperLimit *
       Math.pow(10, sellBank.mintDecimals - buyBank.mintDecimals);
 
-    const ix = await this.program.methods
+    const tcsIx = await this.program.methods
       .tokenConditionalSwapCreate(
         toNative(maxBuy, buyBank.mintDecimals),
         U64_MAX_BN,
@@ -3467,7 +3463,7 @@ export class MangoClient {
       })
       .instruction();
 
-    const ixs = [ix];
+    const ixs: TransactionInstruction[] = [];
     if (account.tokenConditionalSwaps.length == 0) {
       ixs.push(
         await this.accountExpandV2Ix(
@@ -3481,6 +3477,7 @@ export class MangoClient {
         ),
       );
     }
+    ixs.push(tcsIx);
 
     return await this.sendAndConfirmTransactionForGroup(group, ixs);
   }

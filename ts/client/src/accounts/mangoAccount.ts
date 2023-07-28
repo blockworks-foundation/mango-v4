@@ -1895,17 +1895,15 @@ export class TokenConditionalSwap {
   toString(group: Group): string {
     return `getMaxBuy ${this.getMaxBuyUi(
       group,
-    )}, getMaxSell ${this.getMaxSellUi(
+    )}, getMaxSell ${this.getMaxSellUi(group)}, bought ${this.getBoughtUi(
       group,
-    )}, getMaxSellUi ${this.getMaxSellUi(
+    )}, sold ${this.getSoldUi(
       group,
     )}, getPriceLowerLimitUi ${this.getPriceLowerLimitUi(
       group,
     )},  getPriceUpperLimitUi ${this.getPriceUpperLimitUi(
       group,
-    )},  this.priceUpperLimit ${
-      this.priceUpperLimit
-    }, getPricePremium ${this.getPricePremium()}`;
+    )}, getPricePremium ${this.getPricePremium()}, expiry ${this.expiryTimestamp.toString()}`;
   }
 }
 
