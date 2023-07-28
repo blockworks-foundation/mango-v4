@@ -3461,64 +3461,64 @@ export class MangoClient {
     return await this.sendAndConfirmTransactionForGroup(group, ixs);
   }
 
-  public async tokenConditionalSwapBuyLimit(
-    group: Group,
-    account: MangoAccount,
-    buyMintPk: PublicKey,
-    sellMintPk: PublicKey,
-    maxBuy: number,
-    expiryTimestamp: number | null,
-    priceLowerLimit: number, // Note: priceLowerLimit should be lower than priceUpperLimit
-    priceUpperLimit: number,
-    pricePremiumFraction: number,
-  ): Promise<TransactionSignature> {
-    const buyBank: Bank = group.getFirstBankByMint(buyMintPk);
-    const sellBank: Bank = group.getFirstBankByMint(sellMintPk);
-    priceLowerLimit =
-      priceLowerLimit *
-      Math.pow(10, sellBank.mintDecimals - buyBank.mintDecimals);
-    priceUpperLimit =
-      priceUpperLimit *
-      Math.pow(10, sellBank.mintDecimals - buyBank.mintDecimals);
+  // public async tokenConditionalSwapBuyLimit(
+  //   group: Group,
+  //   account: MangoAccount,
+  //   buyMintPk: PublicKey,
+  //   sellMintPk: PublicKey,
+  //   maxBuy: number,
+  //   expiryTimestamp: number | null,
+  //   priceLowerLimit: number, // Note: priceLowerLimit should be lower than priceUpperLimit
+  //   priceUpperLimit: number,
+  //   pricePremiumFraction: number,
+  // ): Promise<TransactionSignature> {
+  //   const buyBank: Bank = group.getFirstBankByMint(buyMintPk);
+  //   const sellBank: Bank = group.getFirstBankByMint(sellMintPk);
+  //   priceLowerLimit =
+  //     priceLowerLimit *
+  //     Math.pow(10, sellBank.mintDecimals - buyBank.mintDecimals);
+  //   priceUpperLimit =
+  //     priceUpperLimit *
+  //     Math.pow(10, sellBank.mintDecimals - buyBank.mintDecimals);
 
-    const tcsIx = await this.program.methods
-      .tokenConditionalSwapCreate(
-        toNative(maxBuy, buyBank.mintDecimals),
-        U64_MAX_BN,
-        expiryTimestamp !== null ? new BN(expiryTimestamp) : U64_MAX_BN,
-        priceLowerLimit,
-        priceUpperLimit,
-        pricePremiumFraction / 100,
-        true,
-        false,
-      )
-      .accounts({
-        group: group.publicKey,
-        account: account.publicKey,
-        authority: (this.program.provider as AnchorProvider).wallet.publicKey,
-        buyBank: buyBank.publicKey,
-        sellBank: sellBank.publicKey,
-      })
-      .instruction();
+  //   const tcsIx = await this.program.methods
+  //     .tokenConditionalSwapCreate(
+  //       toNative(maxBuy, buyBank.mintDecimals),
+  //       U64_MAX_BN,
+  //       expiryTimestamp !== null ? new BN(expiryTimestamp) : U64_MAX_BN,
+  //       priceLowerLimit,
+  //       priceUpperLimit,
+  //       pricePremiumFraction / 100,
+  //       true,
+  //       false,
+  //     )
+  //     .accounts({
+  //       group: group.publicKey,
+  //       account: account.publicKey,
+  //       authority: (this.program.provider as AnchorProvider).wallet.publicKey,
+  //       buyBank: buyBank.publicKey,
+  //       sellBank: sellBank.publicKey,
+  //     })
+  //     .instruction();
 
-    const ixs: TransactionInstruction[] = [];
-    if (account.tokenConditionalSwaps.length == 0) {
-      ixs.push(
-        await this.accountExpandV2Ix(
-          group,
-          account,
-          account.tokens.length,
-          account.serum3.length,
-          account.perps.length,
-          account.perpOpenOrders.length,
-          8,
-        ),
-      );
-    }
-    ixs.push(tcsIx);
+  //   const ixs: TransactionInstruction[] = [];
+  //   if (account.tokenConditionalSwaps.length == 0) {
+  //     ixs.push(
+  //       await this.accountExpandV2Ix(
+  //         group,
+  //         account,
+  //         account.tokens.length,
+  //         account.serum3.length,
+  //         account.perps.length,
+  //         account.perpOpenOrders.length,
+  //         8,
+  //       ),
+  //     );
+  //   }
+  //   ixs.push(tcsIx);
 
-    return await this.sendAndConfirmTransactionForGroup(group, ixs);
-  }
+  //   return await this.sendAndConfirmTransactionForGroup(group, ixs);
+  // }
 
   public async tokenConditionalSwapCreate(
     group: Group,
