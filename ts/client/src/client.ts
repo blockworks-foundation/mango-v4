@@ -3411,7 +3411,7 @@ export class MangoClient {
       maxSell * sellBank.uiPrice,
     );
     pricePremiumFraction =
-      pricePremiumFraction != -1 ? pricePremiumFraction : 0.3;
+      pricePremiumFraction > 0 ? pricePremiumFraction : 0.3;
     const expiryTimestampBn =
       expiryTimestamp !== null ? new BN(expiryTimestamp) : U64_MAX_BN;
 
