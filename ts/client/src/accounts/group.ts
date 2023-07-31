@@ -47,6 +47,8 @@ export class Group {
       ixGate: BN;
       buybackFeesSwapMangoAccount: PublicKey;
       buybackFeesExpiryInterval: BN;
+      tokenConditionalSwapTakerFeeFraction: number;
+      tokenConditionalSwapMakerFeeFraction: number;
     },
   ): Group {
     return new Group(
@@ -68,6 +70,8 @@ export class Group {
       obj.ixGate,
       obj.buybackFeesSwapMangoAccount,
       obj.buybackFeesExpiryInterval,
+      obj.tokenConditionalSwapTakerFeeFraction,
+      obj.tokenConditionalSwapMakerFeeFraction,
       [], // addressLookupTablesList
       new Map(), // banksMapByName
       new Map(), // banksMapByMint
@@ -104,6 +108,8 @@ export class Group {
     public ixGate: BN,
     public buybackFeesSwapMangoAccount: PublicKey,
     public buybackFeesExpiryInterval: BN,
+    public tokenConditionalSwapTakerFeeFraction: number,
+    public tokenConditionalSwapMakerFeeFraction: number,
     public addressLookupTablesList: AddressLookupTableAccount[],
     public banksMapByName: Map<string, Bank[]>,
     public banksMapByMint: Map<string, Bank[]>,
