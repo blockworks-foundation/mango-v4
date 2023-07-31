@@ -3607,6 +3607,35 @@ export class MangoClient {
     return await this.sendAndConfirmTransactionForGroup(group, [ix]);
   }
 
+  public async tokenConditionalSwapCancelAll(
+    group: Group,
+    account: MangoAccount,
+  ): Promise<TransactionSignature> {
+    const ixs = await Promise.all(
+      account.tokenConditionalSwaps
+        .filter((tcs) => tcs.hasData)
+        .map(async (tcs, i) => {
+          const buyBank = group.banksMapByTokenIndex.get(tcs.buyTokenIndex)![0];
+          const sellBank = group.banksMapByTokenIndex.get(
+            tcs.sellTokenIndex,
+          )![0];
+          return await this.program.methods
+            .tokenConditionalSwapCancel(i, new BN(tcs.id))
+            .accounts({
+              group: group.publicKey,
+              account: account.publicKey,
+              authority: (this.program.provider as AnchorProvider).wallet
+                .publicKey,
+              buyBank: buyBank.publicKey,
+              sellBank: sellBank.publicKey,
+            })
+            .instruction();
+        }),
+    );
+
+    return await this.sendAndConfirmTransactionForGroup(group, ixs);
+  }
+
   public async tokenConditionalSwapTrigger(
     group: Group,
     liqee: MangoAccount,
