@@ -270,6 +270,8 @@ fn action(
 
     let post_liqee_buy_token = liqee_buy_token.native(&buy_bank);
     let post_liqor_buy_token = liqor_buy_token.native(&buy_bank);
+    let liqee_buy_indexed_position = liqee_buy_token.indexed_position;
+    let liqor_buy_indexed_position = liqor_buy_token.indexed_position;
 
     let (liqee_sell_token, liqee_sell_raw_index) =
         liqee.token_position_mut(tcs.sell_token_index)?;
@@ -295,6 +297,8 @@ fn action(
 
     let post_liqee_sell_token = liqee_sell_token.native(&sell_bank);
     let post_liqor_sell_token = liqor_sell_token.native(&sell_bank);
+    let liqee_sell_indexed_position = liqee_sell_token.indexed_position;
+    let liqor_sell_indexed_position = liqor_sell_token.indexed_position;
 
     // With a scanning account retriever, it's safe to deactivate inactive token positions immediately
     if !liqee_buy_active {
@@ -317,7 +321,7 @@ fn action(
         mango_group: liqee.fixed.group,
         mango_account: liqee_key,
         token_index: tcs.buy_token_index,
-        indexed_position: post_liqee_buy_token.to_bits(),
+        indexed_position: liqee_buy_indexed_position.to_bits(),
         deposit_index: buy_bank.deposit_index.to_bits(),
         borrow_index: buy_bank.borrow_index.to_bits(),
     });
@@ -326,7 +330,7 @@ fn action(
         mango_group: liqee.fixed.group,
         mango_account: liqee_key,
         token_index: tcs.sell_token_index,
-        indexed_position: post_liqee_sell_token.to_bits(),
+        indexed_position: liqee_sell_indexed_position.to_bits(),
         deposit_index: sell_bank.deposit_index.to_bits(),
         borrow_index: sell_bank.borrow_index.to_bits(),
     });
@@ -335,7 +339,7 @@ fn action(
         mango_group: liqee.fixed.group,
         mango_account: liqor_key,
         token_index: tcs.buy_token_index,
-        indexed_position: post_liqor_buy_token.to_bits(),
+        indexed_position: liqor_buy_indexed_position.to_bits(),
         deposit_index: buy_bank.deposit_index.to_bits(),
         borrow_index: buy_bank.borrow_index.to_bits(),
     });
@@ -344,7 +348,7 @@ fn action(
         mango_group: liqee.fixed.group,
         mango_account: liqor_key,
         token_index: tcs.sell_token_index,
-        indexed_position: post_liqor_sell_token.to_bits(),
+        indexed_position: liqor_sell_indexed_position.to_bits(),
         deposit_index: sell_bank.deposit_index.to_bits(),
         borrow_index: sell_bank.borrow_index.to_bits(),
     });
