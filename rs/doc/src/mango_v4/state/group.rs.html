@@ -226,10 +226,6 @@
 <span id="226">226</span>
 <span id="227">227</span>
 <span id="228">228</span>
-<span id="229">229</span>
-<span id="230">230</span>
-<span id="231">231</span>
-<span id="232">232</span>
 </pre><pre class="rust"><code><span class="kw">use </span>anchor_lang::prelude::<span class="kw-2">*</span>;
 <span class="kw">use </span>static_assertions::const_assert_eq;
 <span class="kw">use </span>std::mem::size_of;
@@ -357,10 +353,6 @@
     <span class="kw">pub fn </span>is_ix_enabled(<span class="kw-2">&amp;</span><span class="self">self</span>, ix: IxGate) -&gt; bool {
         <span class="self">self</span>.ix_gate &amp; (<span class="number">1 </span>&lt;&lt; ix <span class="kw">as </span>u128) == <span class="number">0
     </span>}
-
-    <span class="kw">pub fn </span>openbook_v2_supported(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool {
-        <span class="self">self</span>.is_testing()
-    }
 }
 
 <span class="doccomment">/// Enum for lookup into ix gate

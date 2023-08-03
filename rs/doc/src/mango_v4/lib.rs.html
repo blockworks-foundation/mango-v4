@@ -1274,99 +1274,6 @@
 <span id="1274">1274</span>
 <span id="1275">1275</span>
 <span id="1276">1276</span>
-<span id="1277">1277</span>
-<span id="1278">1278</span>
-<span id="1279">1279</span>
-<span id="1280">1280</span>
-<span id="1281">1281</span>
-<span id="1282">1282</span>
-<span id="1283">1283</span>
-<span id="1284">1284</span>
-<span id="1285">1285</span>
-<span id="1286">1286</span>
-<span id="1287">1287</span>
-<span id="1288">1288</span>
-<span id="1289">1289</span>
-<span id="1290">1290</span>
-<span id="1291">1291</span>
-<span id="1292">1292</span>
-<span id="1293">1293</span>
-<span id="1294">1294</span>
-<span id="1295">1295</span>
-<span id="1296">1296</span>
-<span id="1297">1297</span>
-<span id="1298">1298</span>
-<span id="1299">1299</span>
-<span id="1300">1300</span>
-<span id="1301">1301</span>
-<span id="1302">1302</span>
-<span id="1303">1303</span>
-<span id="1304">1304</span>
-<span id="1305">1305</span>
-<span id="1306">1306</span>
-<span id="1307">1307</span>
-<span id="1308">1308</span>
-<span id="1309">1309</span>
-<span id="1310">1310</span>
-<span id="1311">1311</span>
-<span id="1312">1312</span>
-<span id="1313">1313</span>
-<span id="1314">1314</span>
-<span id="1315">1315</span>
-<span id="1316">1316</span>
-<span id="1317">1317</span>
-<span id="1318">1318</span>
-<span id="1319">1319</span>
-<span id="1320">1320</span>
-<span id="1321">1321</span>
-<span id="1322">1322</span>
-<span id="1323">1323</span>
-<span id="1324">1324</span>
-<span id="1325">1325</span>
-<span id="1326">1326</span>
-<span id="1327">1327</span>
-<span id="1328">1328</span>
-<span id="1329">1329</span>
-<span id="1330">1330</span>
-<span id="1331">1331</span>
-<span id="1332">1332</span>
-<span id="1333">1333</span>
-<span id="1334">1334</span>
-<span id="1335">1335</span>
-<span id="1336">1336</span>
-<span id="1337">1337</span>
-<span id="1338">1338</span>
-<span id="1339">1339</span>
-<span id="1340">1340</span>
-<span id="1341">1341</span>
-<span id="1342">1342</span>
-<span id="1343">1343</span>
-<span id="1344">1344</span>
-<span id="1345">1345</span>
-<span id="1346">1346</span>
-<span id="1347">1347</span>
-<span id="1348">1348</span>
-<span id="1349">1349</span>
-<span id="1350">1350</span>
-<span id="1351">1351</span>
-<span id="1352">1352</span>
-<span id="1353">1353</span>
-<span id="1354">1354</span>
-<span id="1355">1355</span>
-<span id="1356">1356</span>
-<span id="1357">1357</span>
-<span id="1358">1358</span>
-<span id="1359">1359</span>
-<span id="1360">1360</span>
-<span id="1361">1361</span>
-<span id="1362">1362</span>
-<span id="1363">1363</span>
-<span id="1364">1364</span>
-<span id="1365">1365</span>
-<span id="1366">1366</span>
-<span id="1367">1367</span>
-<span id="1368">1368</span>
-<span id="1369">1369</span>
 </pre><pre class="rust"><code><span class="attribute">#![allow(unused_variables)]
 
 </span><span class="kw">use </span>fixed::types::I80F48;
@@ -1400,8 +1307,8 @@
 </span><span class="macro">compile_error!</span>(<span class="string">&quot;compiling the program entrypoint without &#39;enable-gpl&#39; makes no sense, enable it or use the &#39;cpi&#39; or &#39;client&#39; features&quot;</span>);
 
 <span class="kw">use </span>state::{
-    OpenbookV2MarketIndex, OracleConfigParams, PerpMarketIndex, PlaceOrderType, SelfTradeBehavior,
-    Serum3MarketIndex, Side, TokenConditionalSwap, TokenIndex,
+    OracleConfigParams, PerpMarketIndex, PlaceOrderType, SelfTradeBehavior, Serum3MarketIndex,
+    Side, TokenConditionalSwap, TokenIndex,
 };
 
 <span class="macro">declare_id!</span>(<span class="string">&quot;4MangoMjqJ2firMokCjjGgoK8d4MXcrgL7XJaL3w6fVg&quot;</span>);
@@ -2607,99 +2514,6 @@
     <span class="kw">pub fn </span>compute_account_data(ctx: Context&lt;ComputeAccountData&gt;) -&gt; <span class="prelude-ty">Result</span>&lt;()&gt; {
         <span class="attribute">#[cfg(feature = <span class="string">&quot;enable-gpl&quot;</span>)]
         </span>instructions::compute_account_data(ctx)<span class="question-mark">?</span>;
-        <span class="prelude-val">Ok</span>(())
-    }
-
-    <span class="doccomment">///
-    /// OpenbookV2
-    ///
-
-    </span><span class="kw">pub fn </span>openbook_v2_register_market(
-        ctx: Context&lt;OpenbookV2RegisterMarket&gt;,
-        market_index: OpenbookV2MarketIndex,
-        name: String,
-    ) -&gt; <span class="prelude-ty">Result</span>&lt;()&gt; {
-        <span class="prelude-val">Ok</span>(())
-    }
-
-    <span class="kw">pub fn </span>openbook_v2_edit_market(
-        ctx: Context&lt;OpenbookV2EditMarket&gt;,
-        reduce_only_opt: <span class="prelude-ty">Option</span>&lt;bool&gt;,
-        force_close_opt: <span class="prelude-ty">Option</span>&lt;bool&gt;,
-    ) -&gt; <span class="prelude-ty">Result</span>&lt;()&gt; {
-        <span class="prelude-val">Ok</span>(())
-    }
-
-    <span class="kw">pub fn </span>openbook_v2_deregister_market(ctx: Context&lt;OpenbookV2DeregisterMarket&gt;) -&gt; <span class="prelude-ty">Result</span>&lt;()&gt; {
-        <span class="prelude-val">Ok</span>(())
-    }
-
-    <span class="kw">pub fn </span>openbook_v2_create_open_orders(
-        ctx: Context&lt;OpenbookV2CreateOpenOrders&gt;,
-        account_num: u32,
-    ) -&gt; <span class="prelude-ty">Result</span>&lt;()&gt; {
-        <span class="prelude-val">Ok</span>(())
-    }
-
-    <span class="kw">pub fn </span>openbook_v2_close_open_orders(ctx: Context&lt;OpenbookV2CloseOpenOrders&gt;) -&gt; <span class="prelude-ty">Result</span>&lt;()&gt; {
-        <span class="prelude-val">Ok</span>(())
-    }
-
-    <span class="attribute">#[allow(clippy::too_many_arguments)]
-    </span><span class="kw">pub fn </span>openbook_v2_place_order(
-        ctx: Context&lt;OpenbookV2PlaceOrder&gt;,
-        side: u8, <span class="comment">// openbook_v2::state::Side
-        </span>limit_price: u64,
-        max_base_qty: u64,
-        max_native_quote_qty_including_fees: u64,
-        self_trade_behavior: u8, <span class="comment">// openbook_v2::state::SelfTradeBehavior
-        </span>order_type: u8,          <span class="comment">// openbook_v2::state::PlaceOrderType
-        </span>client_order_id: u64,
-        limit: u16,
-    ) -&gt; <span class="prelude-ty">Result</span>&lt;()&gt; {
-        <span class="prelude-val">Ok</span>(())
-    }
-
-    <span class="attribute">#[allow(clippy::too_many_arguments)]
-    </span><span class="kw">pub fn </span>openbook_v2_place_taker_order(
-        ctx: Context&lt;OpenbookV2PlaceTakeOrder&gt;,
-        side: u8, <span class="comment">// openbook_v2::state::Side
-        </span>limit_price: u64,
-        max_base_qty: u64,
-        max_native_quote_qty_including_fees: u64,
-        self_trade_behavior: u8, <span class="comment">// openbook_v2::state::SelfTradeBehavior
-        </span>client_order_id: u64,
-        limit: u16,
-    ) -&gt; <span class="prelude-ty">Result</span>&lt;()&gt; {
-        <span class="prelude-val">Ok</span>(())
-    }
-
-    <span class="kw">pub fn </span>openbook_v2_cancel_order(
-        ctx: Context&lt;OpenbookV2CancelOrder&gt;,
-        side: u8, <span class="comment">// openbook_v2::state::Side
-        </span>order_id: u128,
-    ) -&gt; <span class="prelude-ty">Result</span>&lt;()&gt; {
-        <span class="prelude-val">Ok</span>(())
-    }
-
-    <span class="kw">pub fn </span>openbook_v2_settle_funds(
-        ctx: Context&lt;OpenbookV2SettleFunds&gt;,
-        fees_to_dao: bool,
-    ) -&gt; <span class="prelude-ty">Result</span>&lt;()&gt; {
-        <span class="prelude-val">Ok</span>(())
-    }
-
-    <span class="kw">pub fn </span>openbook_v2_liq_force_cancel_orders(
-        ctx: Context&lt;OpenbookV2LiqForceCancelOrders&gt;,
-        limit: u8,
-    ) -&gt; <span class="prelude-ty">Result</span>&lt;()&gt; {
-        <span class="prelude-val">Ok</span>(())
-    }
-
-    <span class="kw">pub fn </span>openbook_v2_cancel_all_orders(
-        ctx: Context&lt;OpenbookV2CancelOrder&gt;,
-        limit: u8,
-    ) -&gt; <span class="prelude-ty">Result</span>&lt;()&gt; {
         <span class="prelude-val">Ok</span>(())
     }
 
