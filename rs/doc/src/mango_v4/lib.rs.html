@@ -1367,6 +1367,33 @@
 <span id="1367">1367</span>
 <span id="1368">1368</span>
 <span id="1369">1369</span>
+<span id="1370">1370</span>
+<span id="1371">1371</span>
+<span id="1372">1372</span>
+<span id="1373">1373</span>
+<span id="1374">1374</span>
+<span id="1375">1375</span>
+<span id="1376">1376</span>
+<span id="1377">1377</span>
+<span id="1378">1378</span>
+<span id="1379">1379</span>
+<span id="1380">1380</span>
+<span id="1381">1381</span>
+<span id="1382">1382</span>
+<span id="1383">1383</span>
+<span id="1384">1384</span>
+<span id="1385">1385</span>
+<span id="1386">1386</span>
+<span id="1387">1387</span>
+<span id="1388">1388</span>
+<span id="1389">1389</span>
+<span id="1390">1390</span>
+<span id="1391">1391</span>
+<span id="1392">1392</span>
+<span id="1393">1393</span>
+<span id="1394">1394</span>
+<span id="1395">1395</span>
+<span id="1396">1396</span>
 </pre><pre class="rust"><code><span class="attribute">#![allow(unused_variables)]
 
 </span><span class="kw">use </span>fixed::types::I80F48;
@@ -1401,14 +1428,14 @@
 
 <span class="kw">use </span>state::{
     OpenbookV2MarketIndex, OracleConfigParams, PerpMarketIndex, PlaceOrderType, SelfTradeBehavior,
-    Serum3MarketIndex, Side, TokenConditionalSwap, TokenIndex,
+    Serum3MarketIndex, Side, TokenConditionalSwap, TokenConditionalSwapDisplayPriceStyle,
+    TokenIndex,
 };
 
 <span class="macro">declare_id!</span>(<span class="string">&quot;4MangoMjqJ2firMokCjjGgoK8d4MXcrgL7XJaL3w6fVg&quot;</span>);
 
 <span class="attribute">#[program]
 </span><span class="kw">pub mod </span>mango_v4 {
-
     <span class="kw">use super</span>::<span class="kw-2">*</span>;
     <span class="kw">use </span>error::<span class="kw-2">*</span>;
 
@@ -2530,6 +2557,32 @@
         allow_creating_deposits: bool,
         allow_creating_borrows: bool,
     ) -&gt; <span class="prelude-ty">Result</span>&lt;()&gt; {
+        token_conditional_swap_create_v2(
+            ctx,
+            max_buy,
+            max_sell,
+            expiry_timestamp,
+            price_lower_limit,
+            price_upper_limit,
+            price_premium_fraction,
+            allow_creating_deposits,
+            allow_creating_borrows,
+            TokenConditionalSwapDisplayPriceStyle::SellTokenPerBuyToken,
+        )
+    }
+
+    <span class="kw">pub fn </span>token_conditional_swap_create_v2(
+        ctx: Context&lt;TokenConditionalSwapCreate&gt;,
+        max_buy: u64,
+        max_sell: u64,
+        expiry_timestamp: u64,
+        price_lower_limit: f64,
+        price_upper_limit: f64,
+        price_premium_fraction: f64,
+        allow_creating_deposits: bool,
+        allow_creating_borrows: bool,
+        display_price_style: TokenConditionalSwapDisplayPriceStyle,
+    ) -&gt; <span class="prelude-ty">Result</span>&lt;()&gt; {
         <span class="kw">let </span>tcs = TokenConditionalSwap {
             id: u64::MAX, <span class="comment">// set inside
             </span>max_buy,
@@ -2547,7 +2600,8 @@
             has_data: <span class="number">1</span>,
             allow_creating_deposits: u8::from(allow_creating_deposits),
             allow_creating_borrows: u8::from(allow_creating_borrows),
-            reserved: [<span class="number">0</span>; <span class="number">113</span>],
+            display_price_style: display_price_style.into(),
+            reserved: [<span class="number">0</span>; <span class="number">112</span>],
         };
 
         <span class="attribute">#[cfg(feature = <span class="string">&quot;enable-gpl&quot;</span>)]
