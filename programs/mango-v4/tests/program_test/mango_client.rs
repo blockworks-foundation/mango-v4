@@ -4162,6 +4162,7 @@ impl ClientInstruction for TokenConditionalSwapCreateInstruction {
             price_premium_fraction: self.price_premium_fraction,
             allow_creating_deposits: self.allow_creating_deposits,
             allow_creating_borrows: self.allow_creating_borrows,
+            display_price_style: TokenConditionalSwapDisplayPriceStyle::SellTokenPerBuyToken,
         };
 
         let account = account_loader
