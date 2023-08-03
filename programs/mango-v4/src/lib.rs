@@ -1160,6 +1160,31 @@ pub mod mango_v4 {
         price_premium_fraction: f64,
         allow_creating_deposits: bool,
         allow_creating_borrows: bool,
+    ) -> Result<()> {
+        token_conditional_swap_create_v2(
+            ctx,
+            max_buy,
+            max_sell,
+            expiry_timestamp,
+            price_lower_limit,
+            price_upper_limit,
+            price_premium_fraction,
+            allow_creating_deposits,
+            allow_creating_borrows,
+            TokenConditionalSwapDisplayPriceStyle::SellTokenPerBuyToken,
+        )
+    }
+
+    pub fn token_conditional_swap_create_v2(
+        ctx: Context<TokenConditionalSwapCreate>,
+        max_buy: u64,
+        max_sell: u64,
+        expiry_timestamp: u64,
+        price_lower_limit: f64,
+        price_upper_limit: f64,
+        price_premium_fraction: f64,
+        allow_creating_deposits: bool,
+        allow_creating_borrows: bool,
         display_price_style: TokenConditionalSwapDisplayPriceStyle,
     ) -> Result<()> {
         let tcs = TokenConditionalSwap {
