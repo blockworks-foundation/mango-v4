@@ -38,6 +38,7 @@ import {
   MangoAccount,
   PerpPosition,
   Serum3Orders,
+  TokenConditionalSwapDisplayPriceStyle,
   TokenConditionalSwapDto,
   TokenPosition,
 } from './accounts/mangoAccount';
@@ -3198,11 +3199,12 @@ export class MangoClient {
     pricePremiumFraction: number,
     allowCreatingDeposits: boolean,
     allowCreatingBorrows: boolean,
+    priceDisplayStyle: TokenConditionalSwapDisplayPriceStyle,
   ): Promise<TransactionSignature> {
     const buyBank: Bank = group.getFirstBankByMint(buyMintPk);
     const sellBank: Bank = group.getFirstBankByMint(sellMintPk);
     const ix = await this.program.methods
-      .tokenConditionalSwapCreate(
+      .tokenConditionalSwapCreateV2(
         new BN(maxBuy),
         new BN(maxSell),
         expiryTimestamp !== null ? new BN(expiryTimestamp) : U64_MAX_BN,
@@ -3211,6 +3213,7 @@ export class MangoClient {
         pricePremiumFraction,
         allowCreatingDeposits,
         allowCreatingBorrows,
+        priceDisplayStyle,
       )
       .accounts({
         group: group.publicKey,

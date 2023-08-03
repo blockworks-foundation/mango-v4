@@ -4147,7 +4147,7 @@ pub struct TokenConditionalSwapCreateInstruction {
 #[async_trait::async_trait(?Send)]
 impl ClientInstruction for TokenConditionalSwapCreateInstruction {
     type Accounts = mango_v4::accounts::TokenConditionalSwapCreate;
-    type Instruction = mango_v4::instruction::TokenConditionalSwapCreate;
+    type Instruction = mango_v4::instruction::TokenConditionalSwapCreateV2;
     async fn to_instruction(
         &self,
         account_loader: impl ClientAccountLoader + 'async_trait,
@@ -4162,6 +4162,7 @@ impl ClientInstruction for TokenConditionalSwapCreateInstruction {
             price_premium_fraction: self.price_premium_fraction,
             allow_creating_deposits: self.allow_creating_deposits,
             allow_creating_borrows: self.allow_creating_borrows,
+            display_price_style: TokenConditionalSwapDisplayPriceStyle::SellTokenPerBuyToken,
         };
 
         let account = account_loader

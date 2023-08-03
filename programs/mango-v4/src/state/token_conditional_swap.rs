@@ -2,10 +2,20 @@ use anchor_lang::prelude::*;
 
 use derivative::Derivative;
 use fixed::types::I80F48;
+use num_enum::{IntoPrimitive, TryFromPrimitive};
 use static_assertions::const_assert_eq;
 use std::mem::size_of;
 
 use crate::state::*;
+
+#[derive(
+    Clone, Copy, PartialEq, Eq, IntoPrimitive, TryFromPrimitive, AnchorDeserialize, AnchorSerialize,
+)]
+#[repr(u8)]
+pub enum TokenConditionalSwapDisplayPriceStyle {
+    SellTokenPerBuyToken,
+    BuyTokenPerSellToken,
+}
 
 #[zero_copy]
 #[derive(AnchorDeserialize, AnchorSerialize, Derivative)]
@@ -64,13 +74,20 @@ pub struct TokenConditionalSwap {
     /// may token selling create borrows? (often users just want to get out of a long)
     pub allow_creating_borrows: u8,
 
+    /// The stored prices are always "sell token per buy token", but if the user
+    /// used "buy token per sell token" when creating the tcs order, we should continue
+    /// to show them prices in that way.
+    ///
+    /// Stores a TokenConditionalSwapDisplayPriceStyle enum value
+    pub display_price_style: u8,
+
     #[derivative(Debug = "ignore")]
-    pub reserved: [u8; 113],
+    pub reserved: [u8; 112],
 }
 
 const_assert_eq!(
     size_of::<TokenConditionalSwap>(),
-    8 * 6 + 8 * 3 + 2 * 4 + 2 * 2 + 1 * 3 + 113
+    8 * 6 + 8 * 3 + 2 * 4 + 2 * 2 + 1 * 4 + 112
 );
 const_assert_eq!(size_of::<TokenConditionalSwap>(), 200);
 const_assert_eq!(size_of::<TokenConditionalSwap>() % 8, 0);
@@ -94,7 +111,8 @@ impl Default for TokenConditionalSwap {
             has_data: 0,
             allow_creating_borrows: 0,
             allow_creating_deposits: 0,
-            reserved: [0; 113],
+            display_price_style: TokenConditionalSwapDisplayPriceStyle::SellTokenPerBuyToken.into(),
+            reserved: [0; 112],
         }
     }
 }

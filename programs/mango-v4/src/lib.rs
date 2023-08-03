@@ -32,14 +32,14 @@ compile_error!("compiling the program entrypoint without 'enable-gpl' makes no s
 
 use state::{
     OpenbookV2MarketIndex, OracleConfigParams, PerpMarketIndex, PlaceOrderType, SelfTradeBehavior,
-    Serum3MarketIndex, Side, TokenConditionalSwap, TokenIndex,
+    Serum3MarketIndex, Side, TokenConditionalSwap, TokenConditionalSwapDisplayPriceStyle,
+    TokenIndex,
 };
 
 declare_id!("4MangoMjqJ2firMokCjjGgoK8d4MXcrgL7XJaL3w6fVg");
 
 #[program]
 pub mod mango_v4 {
-
     use super::*;
     use error::*;
 
@@ -1161,6 +1161,32 @@ pub mod mango_v4 {
         allow_creating_deposits: bool,
         allow_creating_borrows: bool,
     ) -> Result<()> {
+        token_conditional_swap_create_v2(
+            ctx,
+            max_buy,
+            max_sell,
+            expiry_timestamp,
+            price_lower_limit,
+            price_upper_limit,
+            price_premium_fraction,
+            allow_creating_deposits,
+            allow_creating_borrows,
+            TokenConditionalSwapDisplayPriceStyle::SellTokenPerBuyToken,
+        )
+    }
+
+    pub fn token_conditional_swap_create_v2(
+        ctx: Context<TokenConditionalSwapCreate>,
+        max_buy: u64,
+        max_sell: u64,
+        expiry_timestamp: u64,
+        price_lower_limit: f64,
+        price_upper_limit: f64,
+        price_premium_fraction: f64,
+        allow_creating_deposits: bool,
+        allow_creating_borrows: bool,
+        display_price_style: TokenConditionalSwapDisplayPriceStyle,
+    ) -> Result<()> {
         let tcs = TokenConditionalSwap {
             id: u64::MAX, // set inside
             max_buy,
@@ -1178,7 +1204,8 @@ pub mod mango_v4 {
             has_data: 1,
             allow_creating_deposits: u8::from(allow_creating_deposits),
             allow_creating_borrows: u8::from(allow_creating_borrows),
-            reserved: [0; 113],
+            display_price_style: display_price_style.into(),
+            reserved: [0; 112],
         };
 
         #[cfg(feature = "enable-gpl")]
