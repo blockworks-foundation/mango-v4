@@ -43,7 +43,7 @@ pub mod mango_v4 {
     use super::*;
     use error::*;
 
-    pub fn adming_token_withdraw_fees(ctx: Context<AdminTokenWithdrawFees>) -> Result<()> {
+    pub fn admin_token_withdraw_fees(ctx: Context<AdminTokenWithdrawFees>) -> Result<()> {
         #[cfg(feature = "enable-gpl")]
         instructions::admin_token_withdraw_fees(ctx)?;
         Ok(())

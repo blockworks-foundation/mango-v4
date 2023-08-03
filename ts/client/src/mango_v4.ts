@@ -3,7 +3,7 @@ export type MangoV4 = {
   "name": "mango_v4",
   "instructions": [
     {
-      "name": "admingTokenWithdrawFees",
+      "name": "adminTokenWithdrawFees",
       "accounts": [
         {
           "name": "group",
@@ -11959,7 +11959,7 @@ export const IDL: MangoV4 = {
   "name": "mango_v4",
   "instructions": [
     {
-      "name": "admingTokenWithdrawFees",
+      "name": "adminTokenWithdrawFees",
       "accounts": [
         {
           "name": "group",

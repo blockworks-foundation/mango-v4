@@ -3,7 +3,7 @@
   "name": "mango_v4",
   "instructions": [
     {
-      "name": "admingTokenWithdrawFees",
+      "name": "adminTokenWithdrawFees",
       "accounts": [
         {
           "name": "group",
