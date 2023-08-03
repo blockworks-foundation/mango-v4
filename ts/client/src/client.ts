@@ -66,12 +66,7 @@ import {
   TokenEditParams,
   buildIxGate,
 } from './clientIxParamBuilder';
-import {
-  MANGO_V4_ID,
-  OPENBOOK_PROGRAM_ID,
-  RUST_U64_MAX,
-  USDC_MINT,
-} from './constants';
+import { MANGO_V4_ID, OPENBOOK_PROGRAM_ID, RUST_U64_MAX } from './constants';
 import { Id } from './ids';
 import { IDL, MangoV4 } from './mango_v4';
 import { I80F48 } from './numbers/I80F48';
@@ -82,9 +77,12 @@ import {
   createAssociatedTokenAccountIdempotentInstruction,
   getAssociatedTokenAddress,
   toNative,
+  toNativeSellPerBuyTokenPrice,
 } from './utils';
 import { sendTransaction } from './utils/rpc';
 import { NATIVE_MINT, TOKEN_PROGRAM_ID } from './utils/spl';
+
+export const DEFAULT_TOKEN_CONDITIONAL_SWAP_COUNT = 8;
 
 export enum AccountRetriever {
   Scanning,
@@ -3374,64 +3372,230 @@ export class MangoClient {
     return await this.sendAndConfirmTransactionForGroup(group, [ix]);
   }
 
-  /**
-   * Example:
-   * For a stop loss on SOL, assuming SOL/USDC pair
-   * priceLowerLimit - e.g.
-   *
-   * @param group
-   * @param account
-   * @param sellMintPk - would be SOL mint
-   * @param priceLowerLimit - priceLowerLimit would be greater than priceUpperLimit e.g. if SOL is at 25$, then priceLowerLimit could be 22$
-   * @param buyMintPk - would be USDC mint
-   * @param priceUpperLimit - priceLowerLimit would be greater than priceUpperLimit e.g. if SOL is at 25$, then priceUpperLimit could be 0$
-   * @param maxSell - max ui amount of tokens to sell, e.g. account.getTokenBalanceUi(solBank)
-   * @param pricePremiumFraction - premium in % the liquidator earns for executing this stop loss, this can be the slippage usually found for a particular size plus some buffer
-   * @param expiryTimestamp - is epoch in seconds at which this stop loss should expire, set null if you want it to never expire
-   * @returns
-   */
-  public async tokenConditionalSwapStopLoss(
+  public async tcsTakeProfitOnDeposit(
     group: Group,
     account: MangoAccount,
-    sellMintPk: PublicKey,
-    priceLowerLimit: number,
-    buyMintPk: PublicKey | null,
-    priceUpperLimit: number | null,
-    maxSell: number | null,
-    pricePremiumFraction: number | null,
+    sellBank: Bank,
+    buyBank: Bank,
+    thresholdPriceUi: number,
+    thresholdPriceInSellPerBuyToken: boolean,
+    maxBuyUi: number | null,
+    maxSellUi: number | null,
+    pricePremium: number | null,
+    allowCreatingDeposits: boolean | null,
+    allowCreatingBorrows: boolean | null,
     expiryTimestamp: number | null,
   ): Promise<TransactionSignature> {
-    const buyBank: Bank = group.getFirstBankByMint(buyMintPk ?? USDC_MINT);
-    const sellBank: Bank = group.getFirstBankByMint(sellMintPk);
+    if (maxSellUi == null && account.getTokenBalanceUi(sellBank) < 0) {
+      throw new Error(
+        `Only allowed to take profits on deposits! Current balance ${account.getTokenBalanceUi(
+          sellBank,
+        )}`,
+      );
+    }
 
-    priceUpperLimit = priceUpperLimit ?? 0;
-    maxSell = maxSell ?? account.getTokenBalanceUi(sellBank);
-    pricePremiumFraction = group.getPriceImpactByTokenIndex(
-      sellBank.tokenIndex,
-      maxSell * sellBank.uiPrice,
+    return await this.tokenConditionalSwapCreate(
+      group,
+      account,
+      sellBank,
+      buyBank,
+      thresholdPriceUi,
+      thresholdPriceInSellPerBuyToken,
+      maxBuyUi ?? Number.MAX_SAFE_INTEGER,
+      maxSellUi ?? account.getTokenBalanceUi(sellBank),
+      'TakeProfitOnDeposit',
+      pricePremium,
+      allowCreatingDeposits ?? true,
+      allowCreatingBorrows ?? false,
+      expiryTimestamp,
     );
-    pricePremiumFraction =
-      pricePremiumFraction > 0 ? pricePremiumFraction : 0.3;
+  }
+
+  public async tcsStopLossOnDeposit(
+    group: Group,
+    account: MangoAccount,
+    sellBank: Bank,
+    buyBank: Bank,
+    thresholdPriceUi: number,
+    thresholdPriceInSellPerBuyToken: boolean,
+    maxBuyUi: number | null,
+    maxSellUi: number | null,
+    pricePremium: number | null,
+    allowCreatingDeposits: boolean | null,
+    allowCreatingBorrows: boolean | null,
+    expiryTimestamp: number | null,
+  ): Promise<TransactionSignature> {
+    if (maxSellUi == null && account.getTokenBalanceUi(sellBank) < 0) {
+      throw new Error(
+        `Only allowed to set a stop loss on deposits! Current balance ${account.getTokenBalanceUi(
+          sellBank,
+        )}`,
+      );
+    }
+
+    return await this.tokenConditionalSwapCreate(
+      group,
+      account,
+      sellBank,
+      buyBank,
+      thresholdPriceUi,
+      thresholdPriceInSellPerBuyToken,
+      maxBuyUi ?? Number.MAX_SAFE_INTEGER,
+      maxSellUi ?? account.getTokenBalanceUi(sellBank),
+      'StopLossOnDeposit',
+      pricePremium,
+      allowCreatingDeposits ?? true,
+      allowCreatingBorrows ?? false,
+      expiryTimestamp,
+    );
+  }
+
+  public async tcsTakeProfitOnBorrow(
+    group: Group,
+    account: MangoAccount,
+    sellBank: Bank,
+    buyBank: Bank,
+    thresholdPriceUi: number,
+    thresholdPriceInSellPerBuyToken: boolean,
+    maxBuyUi: number | null,
+    maxSellUi: number | null,
+    pricePremium: number | null,
+    allowCreatingDeposits: boolean | null,
+    allowCreatingBorrows: boolean | null,
+    expiryTimestamp: number | null,
+  ): Promise<TransactionSignature> {
+    if (maxBuyUi == null && account.getTokenBalanceUi(sellBank) > 0) {
+      throw new Error(
+        `Only allowed to take profits on borrows! Current balance ${account.getTokenBalanceUi(
+          buyBank,
+        )}`,
+      );
+    }
+
+    return await this.tokenConditionalSwapCreate(
+      group,
+      account,
+      sellBank,
+      buyBank,
+      thresholdPriceUi,
+      thresholdPriceInSellPerBuyToken,
+      maxBuyUi ?? -account.getTokenBalanceUi(buyBank),
+      maxSellUi ?? Number.MAX_SAFE_INTEGER,
+      'TakeProfitOnBorrow',
+      pricePremium,
+      allowCreatingDeposits ?? false,
+      allowCreatingBorrows ?? false,
+      expiryTimestamp,
+    );
+  }
+
+  public async tcsStopLossOnBorrow(
+    group: Group,
+    account: MangoAccount,
+    sellBank: Bank,
+    buyBank: Bank,
+    thresholdPriceUi: number,
+    thresholdPriceInSellPerBuyToken: boolean,
+    maxBuyUi: number | null,
+    maxSellUi: number | null,
+    pricePremium: number | null,
+    allowCreatingDeposits: boolean | null,
+    allowCreatingBorrows: boolean | null,
+    expiryTimestamp: number | null,
+  ): Promise<TransactionSignature> {
+    if (maxBuyUi == null && account.getTokenBalanceUi(sellBank) > 0) {
+      throw new Error(
+        `Only allowed to set stop loss on borrows! Current balance ${account.getTokenBalanceUi(
+          buyBank,
+        )}`,
+      );
+    }
+
+    return await this.tokenConditionalSwapCreate(
+      group,
+      account,
+      sellBank,
+      buyBank,
+      thresholdPriceUi,
+      thresholdPriceInSellPerBuyToken,
+      maxBuyUi ?? -account.getTokenBalanceUi(buyBank),
+      maxSellUi ?? Number.MAX_SAFE_INTEGER,
+      'StopLossOnBorrow',
+      pricePremium,
+      allowCreatingDeposits ?? false,
+      allowCreatingBorrows ?? false,
+      expiryTimestamp,
+    );
+  }
+
+  public async tokenConditionalSwapCreate(
+    group: Group,
+    account: MangoAccount,
+    sellBank: Bank,
+    buyBank: Bank,
+    thresholdPriceUi: number,
+    thresholdPriceInSellPerBuyToken: boolean,
+    maxBuyUi: number,
+    maxSellUi: number,
+    tcsIntention:
+      | 'TakeProfitOnDeposit'
+      | 'StopLossOnDeposit'
+      | 'TakeProfitOnBorrow'
+      | 'StopLossOnBorrow'
+      | null,
+    pricePremium: number | null,
+    allowCreatingDeposits: boolean,
+    allowCreatingBorrows: boolean,
+    expiryTimestamp: number | null,
+  ): Promise<TransactionSignature> {
+    const maxBuy = toNative(maxBuyUi, buyBank.mintDecimals);
+    const maxSell = toNative(maxSellUi, sellBank.mintDecimals);
+
+    if (!thresholdPriceInSellPerBuyToken) {
+      thresholdPriceUi = 1 / thresholdPriceUi;
+    }
+
+    let lowerLimit, upperLimit;
+    const thresholdPrice = toNativeSellPerBuyTokenPrice(
+      thresholdPriceUi,
+      sellBank,
+      buyBank,
+    );
+    const sellTokenPerBuyTokenPrice = buyBank.price
+      .div(sellBank.price)
+      .toNumber();
+
+    if (
+      tcsIntention == 'TakeProfitOnDeposit' ||
+      tcsIntention == 'StopLossOnBorrow' ||
+      (tcsIntention == null && thresholdPrice > sellTokenPerBuyTokenPrice)
+    ) {
+      lowerLimit = thresholdPrice;
+      upperLimit = Number.MAX_SAFE_INTEGER;
+    } else {
+      lowerLimit = 0;
+      upperLimit = thresholdPrice;
+    }
+
     const expiryTimestampBn =
       expiryTimestamp !== null ? new BN(expiryTimestamp) : U64_MAX_BN;
 
+    pricePremium = group.getPriceImpactByTokenIndex(
+      sellBank.tokenIndex,
+      maxSellUi * sellBank.uiPrice,
+    );
+    const pricePremiumFraction = pricePremium > 0 ? pricePremium : 0.03;
+
     const tcsIx = await this.program.methods
       .tokenConditionalSwapCreate(
-        U64_MAX_BN,
-        toNative(maxSell, sellBank.mintDecimals),
+        maxBuy,
+        maxSell,
         expiryTimestampBn,
-        (1 / priceLowerLimit) *
-          Math.pow(10, sellBank.mintDecimals - buyBank.mintDecimals),
-        (1 / priceUpperLimit) *
-          Math.pow(10, sellBank.mintDecimals - buyBank.mintDecimals),
-        pricePremiumFraction != null
-          ? pricePremiumFraction / 100
-          : group.getPriceImpactByTokenIndex(
-              sellBank.tokenIndex,
-              maxSell * sellBank.uiPrice,
-            ),
-        true,
-        false,
+        lowerLimit,
+        upperLimit,
+        pricePremiumFraction,
+        allowCreatingDeposits,
+        allowCreatingBorrows,
       )
       .accounts({
         group: group.publicKey,
@@ -3452,7 +3616,7 @@ export class MangoClient {
           account.serum3.length,
           account.perps.length,
           account.perpOpenOrders.length,
-          8,
+          DEFAULT_TOKEN_CONDITIONAL_SWAP_COUNT,
         ),
       );
     }
@@ -3461,66 +3625,7 @@ export class MangoClient {
     return await this.sendAndConfirmTransactionForGroup(group, ixs);
   }
 
-  // public async tokenConditionalSwapBuyLimit(
-  //   group: Group,
-  //   account: MangoAccount,
-  //   buyMintPk: PublicKey,
-  //   sellMintPk: PublicKey,
-  //   maxBuy: number,
-  //   expiryTimestamp: number | null,
-  //   priceLowerLimit: number, // Note: priceLowerLimit should be lower than priceUpperLimit
-  //   priceUpperLimit: number,
-  //   pricePremiumFraction: number,
-  // ): Promise<TransactionSignature> {
-  //   const buyBank: Bank = group.getFirstBankByMint(buyMintPk);
-  //   const sellBank: Bank = group.getFirstBankByMint(sellMintPk);
-  //   priceLowerLimit =
-  //     priceLowerLimit *
-  //     Math.pow(10, sellBank.mintDecimals - buyBank.mintDecimals);
-  //   priceUpperLimit =
-  //     priceUpperLimit *
-  //     Math.pow(10, sellBank.mintDecimals - buyBank.mintDecimals);
-
-  //   const tcsIx = await this.program.methods
-  //     .tokenConditionalSwapCreate(
-  //       toNative(maxBuy, buyBank.mintDecimals),
-  //       U64_MAX_BN,
-  //       expiryTimestamp !== null ? new BN(expiryTimestamp) : U64_MAX_BN,
-  //       priceLowerLimit,
-  //       priceUpperLimit,
-  //       pricePremiumFraction / 100,
-  //       true,
-  //       false,
-  //     )
-  //     .accounts({
-  //       group: group.publicKey,
-  //       account: account.publicKey,
-  //       authority: (this.program.provider as AnchorProvider).wallet.publicKey,
-  //       buyBank: buyBank.publicKey,
-  //       sellBank: sellBank.publicKey,
-  //     })
-  //     .instruction();
-
-  //   const ixs: TransactionInstruction[] = [];
-  //   if (account.tokenConditionalSwaps.length == 0) {
-  //     ixs.push(
-  //       await this.accountExpandV2Ix(
-  //         group,
-  //         account,
-  //         account.tokens.length,
-  //         account.serum3.length,
-  //         account.perps.length,
-  //         account.perpOpenOrders.length,
-  //         8,
-  //       ),
-  //     );
-  //   }
-  //   ixs.push(tcsIx);
-
-  //   return await this.sendAndConfirmTransactionForGroup(group, ixs);
-  // }
-
-  public async tokenConditionalSwapCreate(
+  public async tokenConditionalSwapCreateOld(
     group: Group,
     account: MangoAccount,
     buyMintPk: PublicKey,

@@ -1,6 +1,5 @@
 import { AnchorProvider, BN, Wallet } from '@coral-xyz/anchor';
 import { Cluster, Connection, Keypair, PublicKey } from '@solana/web3.js';
-import { assert } from 'console';
 import fs from 'fs';
 import { Bank } from '../../src/accounts/bank';
 import { MangoAccount } from '../../src/accounts/mangoAccount';

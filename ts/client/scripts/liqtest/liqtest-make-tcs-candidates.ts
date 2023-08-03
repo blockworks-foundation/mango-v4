@@ -1,19 +1,9 @@
 import { AnchorProvider, BN, Wallet } from '@coral-xyz/anchor';
 import { Cluster, Connection, Keypair, PublicKey } from '@solana/web3.js';
-import { assert } from 'console';
 import fs from 'fs';
 import { Bank } from '../../src/accounts/bank';
 import { MangoAccount } from '../../src/accounts/mangoAccount';
-import {
-  PerpMarket,
-  PerpOrderSide,
-  PerpOrderType,
-} from '../../src/accounts/perp';
-import {
-  Serum3OrderType,
-  Serum3SelfTradeBehavior,
-  Serum3Side,
-} from '../../src/accounts/serum3';
+import { PerpMarket } from '../../src/accounts/perp';
 import { Builder } from '../../src/builder';
 import { MangoClient } from '../../src/client';
 import {
@@ -181,7 +171,7 @@ async function main() {
       accounts2.find((account) => account.name == 'LIQTEST, LIQEE1'),
     );
     await client.accountExpandV2(group, account, 4, 4, 4, 4, 4);
-    await client.tokenConditionalSwapCreate(
+    await client.tokenConditionalSwapCreateOld(
       group,
       account,
       MINTS.get('SOL')!,
@@ -203,7 +193,7 @@ async function main() {
       accounts2.find((account) => account.name == 'LIQTEST, LIQEE2'),
     );
     await client.accountExpandV2(group, account, 4, 4, 4, 4, 4);
-    await client.tokenConditionalSwapCreate(
+    await client.tokenConditionalSwapCreateOld(
       group,
       account,
       MINTS.get('SOL')!,
@@ -225,7 +215,7 @@ async function main() {
       accounts2.find((account) => account.name == 'LIQTEST, LIQEE3'),
     );
     await client.accountExpandV2(group, account, 4, 4, 4, 4, 4);
-    await client.tokenConditionalSwapCreate(
+    await client.tokenConditionalSwapCreateOld(
       group,
       account,
       MINTS.get('SOL')!,
