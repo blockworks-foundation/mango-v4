@@ -33,11 +33,18 @@ pub fn token_conditional_swap_create(
     account.fixed.next_token_conditional_swap_id =
         account.fixed.next_token_conditional_swap_id.wrapping_add(1);
 
+    let buy_bank = ctx.accounts.buy_bank.load()?;
+    let sell_bank = ctx.accounts.sell_bank.load()?;
+
     let tcs = account.free_token_conditional_swap_mut()?;
     *tcs = token_conditional_swap;
     tcs.id = id;
-    tcs.taker_fee_fraction = group.token_conditional_swap_taker_fee_fraction;
-    tcs.maker_fee_fraction = group.token_conditional_swap_maker_fee_fraction;
+    tcs.taker_fee_fraction = buy_bank
+        .token_conditional_swap_taker_fee_fraction
+        .max(sell_bank.token_conditional_swap_taker_fee_fraction);
+    tcs.maker_fee_fraction = buy_bank
+        .token_conditional_swap_maker_fee_fraction
+        .max(sell_bank.token_conditional_swap_maker_fee_fraction);
     tcs.has_data = 1;
     tcs.bought = 0;
     tcs.sold = 0;

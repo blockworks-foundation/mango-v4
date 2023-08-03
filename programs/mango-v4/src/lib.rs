@@ -80,8 +80,6 @@ pub mod mango_v4 {
         buyback_fees_swap_mango_account_opt: Option<Pubkey>,
         mngo_token_index_opt: Option<TokenIndex>,
         buyback_fees_expiry_interval_opt: Option<u64>,
-        token_conditional_swap_taker_fee_fraction_opt: Option<f32>,
-        token_conditional_swap_maker_fee_fraction_opt: Option<f32>,
     ) -> Result<()> {
         #[cfg(feature = "enable-gpl")]
         instructions::group_edit(
@@ -97,8 +95,6 @@ pub mod mango_v4 {
             buyback_fees_swap_mango_account_opt,
             mngo_token_index_opt,
             buyback_fees_expiry_interval_opt,
-            token_conditional_swap_taker_fee_fraction_opt,
-            token_conditional_swap_maker_fee_fraction_opt,
         )?;
         Ok(())
     }
@@ -200,6 +196,8 @@ pub mod mango_v4 {
         reduce_only_opt: Option<u8>,
         name_opt: Option<String>,
         force_close_opt: Option<bool>,
+        token_conditional_swap_taker_fee_fraction_opt: Option<f32>,
+        token_conditional_swap_maker_fee_fraction_opt: Option<f32>,
     ) -> Result<()> {
         #[cfg(feature = "enable-gpl")]
         instructions::token_edit(
@@ -228,6 +226,8 @@ pub mod mango_v4 {
             reduce_only_opt,
             name_opt,
             force_close_opt,
+            token_conditional_swap_taker_fee_fraction_opt,
+            token_conditional_swap_maker_fee_fraction_opt,
         )?;
         Ok(())
     }

@@ -142,8 +142,12 @@ pub struct Bank {
     // This ensures that collected_fees_native is strictly increasing for stats gathering purposes
     pub fees_withdrawn: u64,
 
+    /// Fees for the token conditional swap feature
+    pub token_conditional_swap_taker_fee_fraction: f32,
+    pub token_conditional_swap_maker_fee_fraction: f32,
+
     #[derivative(Debug = "ignore")]
-    pub reserved: [u8; 2104],
+    pub reserved: [u8; 2096],
 }
 const_assert_eq!(
     size_of::<Bank>(),
@@ -174,7 +178,8 @@ const_assert_eq!(
         + 1
         + 6
         + 8
-        + 2104
+        + 2 * 4
+        + 2096
 );
 const_assert_eq!(size_of::<Bank>(), 3064);
 const_assert_eq!(size_of::<Bank>() % 8, 0);
@@ -250,7 +255,9 @@ impl Bank {
             force_close: 0,
             padding: [0; 6],
             fees_withdrawn: 0,
-            reserved: [0; 2104],
+            token_conditional_swap_taker_fee_fraction: 0.0,
+            token_conditional_swap_maker_fee_fraction: 0.0,
+            reserved: [0; 2096],
         }
     }
 

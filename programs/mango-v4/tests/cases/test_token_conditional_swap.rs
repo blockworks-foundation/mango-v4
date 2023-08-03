@@ -53,13 +53,14 @@ async fn test_token_conditional_swap() -> Result<(), TransportError> {
 
     send_tx(
         solana,
-        GroupEdit {
+        TokenEdit {
             group,
             admin,
-            options: mango_v4::instruction::GroupEdit {
+            mint: quote_token.mint.pubkey,
+            options: mango_v4::instruction::TokenEdit {
                 token_conditional_swap_taker_fee_fraction_opt: Some(0.05),
                 token_conditional_swap_maker_fee_fraction_opt: Some(0.1),
-                ..group_edit_instruction_default()
+                ..token_edit_instruction_default()
             },
         },
     )
