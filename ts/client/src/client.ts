@@ -3383,7 +3383,7 @@ export class MangoClient {
     pricePremium: number | null,
     expiryTimestamp: number | null,
   ): Promise<TransactionSignature> {
-    if (maxSellUi == null && account.getTokenBalanceUi(sellBank) < 0) {
+    if (account.getTokenBalanceUi(sellBank) < 0) {
       throw new Error(
         `Only allowed to take profits on deposits! Current balance ${account.getTokenBalanceUi(
           sellBank,
@@ -3419,7 +3419,7 @@ export class MangoClient {
     pricePremium: number | null,
     expiryTimestamp: number | null,
   ): Promise<TransactionSignature> {
-    if (maxSellUi == null && account.getTokenBalanceUi(sellBank) < 0) {
+    if (account.getTokenBalanceUi(sellBank) < 0) {
       throw new Error(
         `Only allowed to set a stop loss on deposits! Current balance ${account.getTokenBalanceUi(
           sellBank,
@@ -3453,10 +3453,10 @@ export class MangoClient {
     thresholdPriceInSellPerBuyToken: boolean,
     maxBuyUi: number | null,
     pricePremium: number | null,
-    allowCreatingBorrows: boolean | null,
+    allowMargin: boolean | null,
     expiryTimestamp: number | null,
   ): Promise<TransactionSignature> {
-    if (maxBuyUi == null && account.getTokenBalanceUi(sellBank) > 0) {
+    if (account.getTokenBalanceUi(buyBank) > 0) {
       throw new Error(
         `Only allowed to take profits on borrows! Current balance ${account.getTokenBalanceUi(
           buyBank,
@@ -3476,7 +3476,7 @@ export class MangoClient {
       'TakeProfitOnBorrow',
       pricePremium,
       false,
-      allowCreatingBorrows ?? false,
+      allowMargin ?? false,
       expiryTimestamp,
     );
   }
@@ -3490,10 +3490,10 @@ export class MangoClient {
     thresholdPriceInSellPerBuyToken: boolean,
     maxBuyUi: number | null,
     pricePremium: number | null,
-    allowCreatingBorrows: boolean | null,
+    allowMargin: boolean | null,
     expiryTimestamp: number | null,
   ): Promise<TransactionSignature> {
-    if (maxBuyUi == null && account.getTokenBalanceUi(sellBank) > 0) {
+    if (account.getTokenBalanceUi(buyBank) > 0) {
       throw new Error(
         `Only allowed to set stop loss on borrows! Current balance ${account.getTokenBalanceUi(
           buyBank,
@@ -3513,7 +3513,7 @@ export class MangoClient {
       'StopLossOnBorrow',
       pricePremium,
       false,
-      allowCreatingBorrows ?? false,
+      allowMargin ?? false,
       expiryTimestamp,
     );
   }
@@ -3576,7 +3576,7 @@ export class MangoClient {
         group.getPriceImpactByTokenIndex(buyBank.tokenIndex, 10000),
       );
     }
-    const pricePremiumFraction = pricePremium > 0 ? pricePremium : 0.03;
+    const pricePremiumFraction = pricePremium > 0 ? pricePremium / 100 : 0.03;
 
     const tcsIx = await this.program.methods
       .tokenConditionalSwapCreate(
