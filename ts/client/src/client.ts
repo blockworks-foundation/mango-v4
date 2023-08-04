@@ -3571,10 +3571,18 @@ export class MangoClient {
       expiryTimestamp !== null ? new BN(expiryTimestamp) : U64_MAX_BN;
 
     if (!pricePremium) {
-      pricePremium = Math.max(
-        group.getPriceImpactByTokenIndex(sellBank.tokenIndex, 10000),
-        group.getPriceImpactByTokenIndex(buyBank.tokenIndex, 10000),
+      const buyTokenPriceImpact = group.getPriceImpactByTokenIndex(
+        buyBank.tokenIndex,
+        5000,
       );
+      const sellTokenPriceImpact = group.getPriceImpactByTokenIndex(
+        sellBank.tokenIndex,
+        5000,
+      );
+      pricePremium =
+        ((1 + buyTokenPriceImpact / 100) * (1 + sellTokenPriceImpact / 100) -
+          1) *
+        100;
     }
     const pricePremiumFraction = pricePremium > 0 ? pricePremium / 100 : 0.03;
 
