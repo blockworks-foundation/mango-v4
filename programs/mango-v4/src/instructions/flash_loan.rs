@@ -3,7 +3,7 @@ use crate::accounts_zerocopy::*;
 use crate::error::*;
 use crate::group_seeds;
 use crate::health::{new_fixed_order_account_retriever, new_health_cache, AccountRetriever};
-use crate::logs::{FlashLoanLog, FlashLoanTokenDetail, TokenBalanceLog};
+use crate::logs::{FlashLoanLogV2, FlashLoanTokenDetailV2, TokenBalanceLog};
 use crate::state::*;
 
 use anchor_lang::prelude::*;
@@ -360,7 +360,14 @@ pub fn flash_loan_end<'key, 'accounts, 'remaining, 'info>(
         let loan_origination_fee = loan * bank.loan_origination_fee_rate;
         bank.collected_fees_native += loan_origination_fee;
 
-        let change_amount = change.amount - loan_origination_fee;
+        let swap_fee = if flash_loan_type == FlashLoanType::Swap {
+            change.amount * I80F48::from_num(bank.flash_loan_swap_fee_fraction)
+        } else {
+            I80F48::ZERO
+        };
+        bank.collected_fees_native += swap_fee;
+
+        let change_amount = change.amount - loan_origination_fee - swap_fee;
         let native_after_change = native + change_amount;
         if bank.are_deposits_reduce_only() {
             require!(
@@ -396,7 +403,7 @@ pub fn flash_loan_end<'key, 'accounts, 'remaining, 'info>(
         bank.flash_loan_approved_amount = 0;
         bank.flash_loan_token_account_initial = u64::MAX;
 
-        token_loan_details.push(FlashLoanTokenDetail {
+        token_loan_details.push(FlashLoanTokenDetailV2 {
             token_index: position.token_index,
             change_amount: change.amount.to_bits(),
             loan: loan.to_bits(),
@@ -404,6 +411,7 @@ pub fn flash_loan_end<'key, 'accounts, 'remaining, 'info>(
             deposit_index: bank.deposit_index.to_bits(),
             borrow_index: bank.borrow_index.to_bits(),
             price: oracle_price.to_bits(),
+            swap_fee: swap_fee.to_bits(),
         });
 
         emit!(TokenBalanceLog {
@@ -416,7 +424,7 @@ pub fn flash_loan_end<'key, 'accounts, 'remaining, 'info>(
         });
     }
 
-    emit!(FlashLoanLog {
+    emit!(FlashLoanLogV2 {
         mango_group: group.key(),
         mango_account: ctx.accounts.account.key(),
         flash_loan_type,

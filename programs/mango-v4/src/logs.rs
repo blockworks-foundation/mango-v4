@@ -58,11 +58,31 @@ pub struct FlashLoanTokenDetail {
     pub price: i128,
 }
 
+#[derive(AnchorSerialize, AnchorDeserialize)]
+pub struct FlashLoanTokenDetailV2 {
+    pub token_index: u16,
+    pub change_amount: i128,
+    pub loan: i128,
+    pub loan_origination_fee: i128,
+    pub deposit_index: i128,
+    pub borrow_index: i128,
+    pub price: i128,
+    pub swap_fee: i128,
+}
+
 #[event]
 pub struct FlashLoanLog {
     pub mango_group: Pubkey,
     pub mango_account: Pubkey,
     pub token_loan_details: Vec<FlashLoanTokenDetail>,
+    pub flash_loan_type: FlashLoanType,
+}
+
+#[event]
+pub struct FlashLoanLogV2 {
+    pub mango_group: Pubkey,
+    pub mango_account: Pubkey,
+    pub token_loan_details: Vec<FlashLoanTokenDetailV2>,
     pub flash_loan_type: FlashLoanType,
 }
 
