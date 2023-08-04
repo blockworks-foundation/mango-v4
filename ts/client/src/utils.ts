@@ -84,7 +84,7 @@ export function toUiI80F48(nativeAmount: I80F48, decimals: number): I80F48 {
 export async function getAssociatedTokenAddress(
   mint: PublicKey,
   owner: PublicKey,
-  allowOwnerOffCurve = false,
+  allowOwnerOffCurve = true,
   programId = TOKEN_PROGRAM_ID,
   associatedTokenProgramId = ASSOCIATED_TOKEN_PROGRAM_ID,
 ): Promise<PublicKey> {
