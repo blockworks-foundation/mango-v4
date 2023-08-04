@@ -3580,10 +3580,12 @@ export class MangoClient {
     const expiryTimestampBn =
       expiryTimestamp !== null ? new BN(expiryTimestamp) : U64_MAX_BN;
 
-    pricePremium = group.getPriceImpactByTokenIndex(
-      sellBank.tokenIndex,
-      maxSellUi * sellBank.uiPrice,
-    );
+    if (!pricePremium) {
+      pricePremium = Math.max(
+        group.getPriceImpactByTokenIndex(sellBank.tokenIndex, 10000),
+        group.getPriceImpactByTokenIndex(buyBank.tokenIndex, 10000),
+      );
+    }
     const pricePremiumFraction = pricePremium > 0 ? pricePremium : 0.03;
 
     const tcsIx = await this.program.methods
@@ -3625,7 +3627,7 @@ export class MangoClient {
     return await this.sendAndConfirmTransactionForGroup(group, ixs);
   }
 
-  public async tokenConditionalSwapCreateOld(
+  public async tokenConditionalSwapCreateRaw(
     group: Group,
     account: MangoAccount,
     buyMintPk: PublicKey,
