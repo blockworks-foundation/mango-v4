@@ -315,6 +315,7 @@ pub fn token_edit(
             );
             require_gte!(fee_fraction, 0.0); // values <0 are not currently supported
             bank.token_conditional_swap_taker_fee_fraction = fee_fraction;
+            require_group_admin = true;
         }
         if let Some(fees_fraction) = token_conditional_swap_maker_fee_fraction_opt {
             msg!(
@@ -324,6 +325,7 @@ pub fn token_edit(
             );
             require_gte!(fees_fraction, 0.0); // values <0 are not currently supported
             bank.token_conditional_swap_maker_fee_fraction = fees_fraction;
+            require_group_admin = true;
         }
     }
 
