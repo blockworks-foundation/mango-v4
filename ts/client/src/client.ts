@@ -3379,11 +3379,8 @@ export class MangoClient {
     buyBank: Bank,
     thresholdPriceUi: number,
     thresholdPriceInSellPerBuyToken: boolean,
-    maxBuyUi: number | null,
     maxSellUi: number | null,
     pricePremium: number | null,
-    allowCreatingDeposits: boolean | null,
-    allowCreatingBorrows: boolean | null,
     expiryTimestamp: number | null,
   ): Promise<TransactionSignature> {
     if (maxSellUi == null && account.getTokenBalanceUi(sellBank) < 0) {
@@ -3401,12 +3398,12 @@ export class MangoClient {
       buyBank,
       thresholdPriceUi,
       thresholdPriceInSellPerBuyToken,
-      maxBuyUi ?? Number.MAX_SAFE_INTEGER,
+      Number.MAX_SAFE_INTEGER,
       maxSellUi ?? account.getTokenBalanceUi(sellBank),
       'TakeProfitOnDeposit',
       pricePremium,
-      allowCreatingDeposits ?? true,
-      allowCreatingBorrows ?? false,
+      true,
+      false,
       expiryTimestamp,
     );
   }
@@ -3418,11 +3415,8 @@ export class MangoClient {
     buyBank: Bank,
     thresholdPriceUi: number,
     thresholdPriceInSellPerBuyToken: boolean,
-    maxBuyUi: number | null,
     maxSellUi: number | null,
     pricePremium: number | null,
-    allowCreatingDeposits: boolean | null,
-    allowCreatingBorrows: boolean | null,
     expiryTimestamp: number | null,
   ): Promise<TransactionSignature> {
     if (maxSellUi == null && account.getTokenBalanceUi(sellBank) < 0) {
@@ -3440,12 +3434,12 @@ export class MangoClient {
       buyBank,
       thresholdPriceUi,
       thresholdPriceInSellPerBuyToken,
-      maxBuyUi ?? Number.MAX_SAFE_INTEGER,
+      Number.MAX_SAFE_INTEGER,
       maxSellUi ?? account.getTokenBalanceUi(sellBank),
       'StopLossOnDeposit',
       pricePremium,
-      allowCreatingDeposits ?? true,
-      allowCreatingBorrows ?? false,
+      true,
+      false,
       expiryTimestamp,
     );
   }
@@ -3458,9 +3452,7 @@ export class MangoClient {
     thresholdPriceUi: number,
     thresholdPriceInSellPerBuyToken: boolean,
     maxBuyUi: number | null,
-    maxSellUi: number | null,
     pricePremium: number | null,
-    allowCreatingDeposits: boolean | null,
     allowCreatingBorrows: boolean | null,
     expiryTimestamp: number | null,
   ): Promise<TransactionSignature> {
@@ -3480,10 +3472,10 @@ export class MangoClient {
       thresholdPriceUi,
       thresholdPriceInSellPerBuyToken,
       maxBuyUi ?? -account.getTokenBalanceUi(buyBank),
-      maxSellUi ?? Number.MAX_SAFE_INTEGER,
+      Number.MAX_SAFE_INTEGER,
       'TakeProfitOnBorrow',
       pricePremium,
-      allowCreatingDeposits ?? false,
+      false,
       allowCreatingBorrows ?? false,
       expiryTimestamp,
     );
@@ -3497,9 +3489,7 @@ export class MangoClient {
     thresholdPriceUi: number,
     thresholdPriceInSellPerBuyToken: boolean,
     maxBuyUi: number | null,
-    maxSellUi: number | null,
     pricePremium: number | null,
-    allowCreatingDeposits: boolean | null,
     allowCreatingBorrows: boolean | null,
     expiryTimestamp: number | null,
   ): Promise<TransactionSignature> {
@@ -3519,10 +3509,10 @@ export class MangoClient {
       thresholdPriceUi,
       thresholdPriceInSellPerBuyToken,
       maxBuyUi ?? -account.getTokenBalanceUi(buyBank),
-      maxSellUi ?? Number.MAX_SAFE_INTEGER,
+      Number.MAX_SAFE_INTEGER,
       'StopLossOnBorrow',
       pricePremium,
-      allowCreatingDeposits ?? false,
+      false,
       allowCreatingBorrows ?? false,
       expiryTimestamp,
     );
