@@ -1246,14 +1246,14 @@ export class MangoClient {
       mangoAccount.owner,
     );
 
-    let wrappedSolAccount: Keypair | undefined;
+    let wrappedSolAccount: PublicKey | undefined;
     let preInstructions: TransactionInstruction[] = [];
     let postInstructions: TransactionInstruction[] = [];
     if (mintPk.equals(NATIVE_MINT)) {
       // Generate a random seed for wrappedSolAccount.
       const seed = Keypair.generate().publicKey.toBase58().slice(0, 32);
       // Calculate a publicKey that will be controlled by the `mangoAccount.owner`.
-      const wrappedSolAccount = await PublicKey.createWithSeed(
+      wrappedSolAccount = await PublicKey.createWithSeed(
         mangoAccount.owner,
         seed,
         TOKEN_PROGRAM_ID,
@@ -1298,7 +1298,7 @@ export class MangoClient {
         bank: bank.publicKey,
         vault: bank.vault,
         oracle: bank.oracle,
-        tokenAccount: wrappedSolAccount?.publicKey ?? tokenAccountPk,
+        tokenAccount: wrappedSolAccount ?? tokenAccountPk,
         tokenAuthority: mangoAccount.owner,
       })
       .remainingAccounts(
