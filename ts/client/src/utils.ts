@@ -9,6 +9,7 @@ import {
   VersionedTransaction,
 } from '@solana/web3.js';
 import BN from 'bn.js';
+import { Bank } from './accounts/bank';
 import { I80F48 } from './numbers/I80F48';
 import { ASSOCIATED_TOKEN_PROGRAM_ID, TOKEN_PROGRAM_ID } from './utils/spl';
 
@@ -36,6 +37,22 @@ export function toNativeI80F48(uiAmount: number, decimals: number): I80F48 {
 
 export function toNative(uiAmount: number, decimals: number): BN {
   return new BN((uiAmount * Math.pow(10, decimals)).toFixed(0));
+}
+
+export function toNativeSellPerBuyTokenPrice(
+  price: number,
+  sellBank: Bank,
+  buyBank: Bank,
+): number {
+  return price * Math.pow(10, sellBank.mintDecimals - buyBank.mintDecimals);
+}
+
+export function toUiSellPerBuyTokenPrice(
+  price: number,
+  sellBank: Bank,
+  buyBank: Bank,
+): number {
+  return toUiDecimals(price, sellBank.mintDecimals - buyBank.mintDecimals);
 }
 
 export function toUiDecimals(

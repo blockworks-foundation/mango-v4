@@ -11,6 +11,7 @@ import {
   toNativeI80F48,
   toUiDecimals,
   toUiDecimalsForQuote,
+  toUiSellPerBuyTokenPrice,
 } from '../utils';
 import { Bank, TokenIndex } from './bank';
 import { Group } from './group';
@@ -1845,9 +1846,10 @@ export class TokenConditionalSwap {
   ): number {
     const buyBank = this.getBuyToken(group);
     const sellBank = this.getSellToken(group);
-    const sellTokenPerBuyTokenUi = toUiDecimals(
+    const sellTokenPerBuyTokenUi = toUiSellPerBuyTokenPrice(
       sellTokenPerBuyTokenNative,
-      sellBank.mintDecimals - buyBank.mintDecimals,
+      sellBank,
+      buyBank,
     );
 
     // Below are workarounds to know when to show an inverted price in ui
