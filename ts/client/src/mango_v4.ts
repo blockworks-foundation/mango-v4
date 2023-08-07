@@ -888,6 +888,12 @@ export type MangoV4 = {
           "type": {
             "option": "f32"
           }
+        },
+        {
+          "name": "flashLoanSwapFeeRateOpt",
+          "type": {
+            "option": "f32"
+          }
         }
       ]
     },
@@ -6403,11 +6409,15 @@ export type MangoV4 = {
             "type": "f32"
           },
           {
+            "name": "flashLoanSwapFeeRate",
+            "type": "f32"
+          },
+          {
             "name": "reserved",
             "type": {
               "array": [
                 "u8",
-                2096
+                2092
               ]
             }
           }
@@ -7936,6 +7946,46 @@ export type MangoV4 = {
           },
           {
             "name": "price",
+            "type": "i128"
+          }
+        ]
+      }
+    },
+    {
+      "name": "FlashLoanTokenDetailV2",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "tokenIndex",
+            "type": "u16"
+          },
+          {
+            "name": "changeAmount",
+            "type": "i128"
+          },
+          {
+            "name": "loan",
+            "type": "i128"
+          },
+          {
+            "name": "loanOriginationFee",
+            "type": "i128"
+          },
+          {
+            "name": "depositIndex",
+            "type": "i128"
+          },
+          {
+            "name": "borrowIndex",
+            "type": "i128"
+          },
+          {
+            "name": "price",
+            "type": "i128"
+          },
+          {
+            "name": "swapFee",
             "type": "i128"
           }
         ]
@@ -10053,6 +10103,37 @@ export type MangoV4 = {
           "type": {
             "vec": {
               "defined": "FlashLoanTokenDetail"
+            }
+          },
+          "index": false
+        },
+        {
+          "name": "flashLoanType",
+          "type": {
+            "defined": "FlashLoanType"
+          },
+          "index": false
+        }
+      ]
+    },
+    {
+      "name": "FlashLoanLogV2",
+      "fields": [
+        {
+          "name": "mangoGroup",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "mangoAccount",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "tokenLoanDetails",
+          "type": {
+            "vec": {
+              "defined": "FlashLoanTokenDetailV2"
             }
           },
           "index": false
@@ -12844,6 +12925,12 @@ export const IDL: MangoV4 = {
           "type": {
             "option": "f32"
           }
+        },
+        {
+          "name": "flashLoanSwapFeeRateOpt",
+          "type": {
+            "option": "f32"
+          }
         }
       ]
     },
@@ -18359,11 +18446,15 @@ export const IDL: MangoV4 = {
             "type": "f32"
           },
           {
+            "name": "flashLoanSwapFeeRate",
+            "type": "f32"
+          },
+          {
             "name": "reserved",
             "type": {
               "array": [
                 "u8",
-                2096
+                2092
               ]
             }
           }
@@ -19892,6 +19983,46 @@ export const IDL: MangoV4 = {
           },
           {
             "name": "price",
+            "type": "i128"
+          }
+        ]
+      }
+    },
+    {
+      "name": "FlashLoanTokenDetailV2",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "tokenIndex",
+            "type": "u16"
+          },
+          {
+            "name": "changeAmount",
+            "type": "i128"
+          },
+          {
+            "name": "loan",
+            "type": "i128"
+          },
+          {
+            "name": "loanOriginationFee",
+            "type": "i128"
+          },
+          {
+            "name": "depositIndex",
+            "type": "i128"
+          },
+          {
+            "name": "borrowIndex",
+            "type": "i128"
+          },
+          {
+            "name": "price",
+            "type": "i128"
+          },
+          {
+            "name": "swapFee",
             "type": "i128"
           }
         ]
@@ -22009,6 +22140,37 @@ export const IDL: MangoV4 = {
           "type": {
             "vec": {
               "defined": "FlashLoanTokenDetail"
+            }
+          },
+          "index": false
+        },
+        {
+          "name": "flashLoanType",
+          "type": {
+            "defined": "FlashLoanType"
+          },
+          "index": false
+        }
+      ]
+    },
+    {
+      "name": "FlashLoanLogV2",
+      "fields": [
+        {
+          "name": "mangoGroup",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "mangoAccount",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "tokenLoanDetails",
+          "type": {
+            "vec": {
+              "defined": "FlashLoanTokenDetailV2"
             }
           },
           "index": false

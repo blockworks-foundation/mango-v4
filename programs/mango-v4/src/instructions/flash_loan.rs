@@ -361,7 +361,7 @@ pub fn flash_loan_end<'key, 'accounts, 'remaining, 'info>(
         bank.collected_fees_native += loan_origination_fee;
 
         let swap_fee = if flash_loan_type == FlashLoanType::Swap {
-            change.amount * I80F48::from_num(bank.flash_loan_swap_fee_fraction)
+            change.amount * I80F48::from_num(bank.flash_loan_swap_fee_rate)
         } else {
             I80F48::ZERO
         };
