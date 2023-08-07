@@ -271,18 +271,6 @@ export type MangoV4 = {
           "type": {
             "option": "u64"
           }
-        },
-        {
-          "name": "tokenConditionalSwapTakerFeeFractionOpt",
-          "type": {
-            "option": "f32"
-          }
-        },
-        {
-          "name": "tokenConditionalSwapMakerFeeFractionOpt",
-          "type": {
-            "option": "f32"
-          }
         }
       ]
     },
@@ -887,6 +875,18 @@ export type MangoV4 = {
           "name": "forceCloseOpt",
           "type": {
             "option": "bool"
+          }
+        },
+        {
+          "name": "tokenConditionalSwapTakerFeeRateOpt",
+          "type": {
+            "option": "f32"
+          }
+        },
+        {
+          "name": "tokenConditionalSwapMakerFeeRateOpt",
+          "type": {
+            "option": "f32"
           }
         }
       ]
@@ -4879,7 +4879,7 @@ export type MangoV4 = {
           "type": "f64"
         },
         {
-          "name": "pricePremiumFraction",
+          "name": "pricePremiumRate",
           "type": "f64"
         },
         {
@@ -6392,11 +6392,22 @@ export type MangoV4 = {
             "type": "u64"
           },
           {
+            "name": "tokenConditionalSwapTakerFeeRate",
+            "docs": [
+              "Fees for the token conditional swap feature"
+            ],
+            "type": "f32"
+          },
+          {
+            "name": "tokenConditionalSwapMakerFeeRate",
+            "type": "f32"
+          },
+          {
             "name": "reserved",
             "type": {
               "array": [
                 "u8",
-                2104
+                2096
               ]
             }
           }
@@ -6503,22 +6514,11 @@ export type MangoV4 = {
             "type": "u64"
           },
           {
-            "name": "tokenConditionalSwapTakerFeeFraction",
-            "docs": [
-              "Fees for the token conditional swap feature"
-            ],
-            "type": "f32"
-          },
-          {
-            "name": "tokenConditionalSwapMakerFeeFraction",
-            "type": "f32"
-          },
-          {
             "name": "reserved",
             "type": {
               "array": [
                 "u8",
-                1816
+                1824
               ]
             }
           }
@@ -9169,23 +9169,23 @@ export type MangoV4 = {
             "type": "f64"
           },
           {
-            "name": "pricePremiumFraction",
+            "name": "pricePremiumRate",
             "docs": [
               "The premium to pay over oracle price to incentivize execution."
             ],
             "type": "f64"
           },
           {
-            "name": "takerFeeFraction",
+            "name": "takerFeeRate",
             "docs": [
-              "The taker receives only premium_price * (1 - taker_fee_fraction)"
+              "The taker receives only premium_price * (1 - taker_fee_rate)"
             ],
             "type": "f32"
           },
           {
-            "name": "makerFeeFraction",
+            "name": "makerFeeRate",
             "docs": [
-              "The maker has to pay premium_price * (1 + maker_fee_fraction)"
+              "The maker has to pay premium_price * (1 + maker_fee_rate)"
             ],
             "type": "f32"
           },
@@ -11573,17 +11573,17 @@ export type MangoV4 = {
           "index": false
         },
         {
-          "name": "pricePremiumFraction",
+          "name": "pricePremiumRate",
           "type": "f64",
           "index": false
         },
         {
-          "name": "takerFeeFraction",
+          "name": "takerFeeRate",
           "type": "f32",
           "index": false
         },
         {
-          "name": "makerFeeFraction",
+          "name": "makerFeeRate",
           "type": "f32",
           "index": false
         },
@@ -12227,18 +12227,6 @@ export const IDL: MangoV4 = {
           "type": {
             "option": "u64"
           }
-        },
-        {
-          "name": "tokenConditionalSwapTakerFeeFractionOpt",
-          "type": {
-            "option": "f32"
-          }
-        },
-        {
-          "name": "tokenConditionalSwapMakerFeeFractionOpt",
-          "type": {
-            "option": "f32"
-          }
         }
       ]
     },
@@ -12843,6 +12831,18 @@ export const IDL: MangoV4 = {
           "name": "forceCloseOpt",
           "type": {
             "option": "bool"
+          }
+        },
+        {
+          "name": "tokenConditionalSwapTakerFeeRateOpt",
+          "type": {
+            "option": "f32"
+          }
+        },
+        {
+          "name": "tokenConditionalSwapMakerFeeRateOpt",
+          "type": {
+            "option": "f32"
           }
         }
       ]
@@ -16835,7 +16835,7 @@ export const IDL: MangoV4 = {
           "type": "f64"
         },
         {
-          "name": "pricePremiumFraction",
+          "name": "pricePremiumRate",
           "type": "f64"
         },
         {
@@ -18348,11 +18348,22 @@ export const IDL: MangoV4 = {
             "type": "u64"
           },
           {
+            "name": "tokenConditionalSwapTakerFeeRate",
+            "docs": [
+              "Fees for the token conditional swap feature"
+            ],
+            "type": "f32"
+          },
+          {
+            "name": "tokenConditionalSwapMakerFeeRate",
+            "type": "f32"
+          },
+          {
             "name": "reserved",
             "type": {
               "array": [
                 "u8",
-                2104
+                2096
               ]
             }
           }
@@ -18459,22 +18470,11 @@ export const IDL: MangoV4 = {
             "type": "u64"
           },
           {
-            "name": "tokenConditionalSwapTakerFeeFraction",
-            "docs": [
-              "Fees for the token conditional swap feature"
-            ],
-            "type": "f32"
-          },
-          {
-            "name": "tokenConditionalSwapMakerFeeFraction",
-            "type": "f32"
-          },
-          {
             "name": "reserved",
             "type": {
               "array": [
                 "u8",
-                1816
+                1824
               ]
             }
           }
@@ -21125,23 +21125,23 @@ export const IDL: MangoV4 = {
             "type": "f64"
           },
           {
-            "name": "pricePremiumFraction",
+            "name": "pricePremiumRate",
             "docs": [
               "The premium to pay over oracle price to incentivize execution."
             ],
             "type": "f64"
           },
           {
-            "name": "takerFeeFraction",
+            "name": "takerFeeRate",
             "docs": [
-              "The taker receives only premium_price * (1 - taker_fee_fraction)"
+              "The taker receives only premium_price * (1 - taker_fee_rate)"
             ],
             "type": "f32"
           },
           {
-            "name": "makerFeeFraction",
+            "name": "makerFeeRate",
             "docs": [
-              "The maker has to pay premium_price * (1 + maker_fee_fraction)"
+              "The maker has to pay premium_price * (1 + maker_fee_rate)"
             ],
             "type": "f32"
           },
@@ -23529,17 +23529,17 @@ export const IDL: MangoV4 = {
           "index": false
         },
         {
-          "name": "pricePremiumFraction",
+          "name": "pricePremiumRate",
           "type": "f64",
           "index": false
         },
         {
-          "name": "takerFeeFraction",
+          "name": "takerFeeRate",
           "type": "f32",
           "index": false
         },
         {
-          "name": "makerFeeFraction",
+          "name": "makerFeeRate",
           "type": "f32",
           "index": false
         },

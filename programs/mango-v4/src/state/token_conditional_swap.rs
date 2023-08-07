@@ -45,13 +45,13 @@ pub struct TokenConditionalSwap {
     pub price_upper_limit: f64,
 
     /// The premium to pay over oracle price to incentivize execution.
-    pub price_premium_fraction: f64,
+    pub price_premium_rate: f64,
 
-    /// The taker receives only premium_price * (1 - taker_fee_fraction)
-    pub taker_fee_fraction: f32,
+    /// The taker receives only premium_price * (1 - taker_fee_rate)
+    pub taker_fee_rate: f32,
 
-    /// The maker has to pay premium_price * (1 + maker_fee_fraction)
-    pub maker_fee_fraction: f32,
+    /// The maker has to pay premium_price * (1 + maker_fee_rate)
+    pub maker_fee_rate: f32,
 
     /// indexes of tokens for the swap
     pub buy_token_index: TokenIndex,
@@ -86,9 +86,9 @@ impl Default for TokenConditionalSwap {
             expiry_timestamp: u64::MAX,
             price_lower_limit: 0.0,
             price_upper_limit: 0.0,
-            price_premium_fraction: 0.0,
-            taker_fee_fraction: 0.0,
-            maker_fee_fraction: 0.0,
+            price_premium_rate: 0.0,
+            taker_fee_rate: 0.0,
+            maker_fee_rate: 0.0,
             buy_token_index: TokenIndex::MAX,
             sell_token_index: TokenIndex::MAX,
             has_data: 0,
@@ -135,27 +135,27 @@ impl TokenConditionalSwap {
     ///
     /// Base price is the amount of sell_token to pay for one buy_token.
     pub fn premium_price(&self, base_price: f64) -> f64 {
-        base_price * (1.0 + self.price_premium_fraction)
+        base_price * (1.0 + self.price_premium_rate)
     }
 
     /// Premium price adjusted for the maker fee
     pub fn maker_price(&self, premium_price: f64) -> f64 {
-        premium_price * (1.0 + self.maker_fee_fraction as f64)
+        premium_price * (1.0 + self.maker_fee_rate as f64)
     }
 
     /// Premium price adjusted for the taker fee
     pub fn taker_price(&self, premium_price: f64) -> f64 {
-        premium_price * (1.0 - self.taker_fee_fraction as f64)
+        premium_price * (1.0 - self.taker_fee_rate as f64)
     }
 
     pub fn maker_fee(&self, base_sell_amount: I80F48) -> u64 {
-        (base_sell_amount * I80F48::from_num(self.maker_fee_fraction))
+        (base_sell_amount * I80F48::from_num(self.maker_fee_rate))
             .floor()
             .to_num()
     }
 
     pub fn taker_fee(&self, base_sell_amount: I80F48) -> u64 {
-        (base_sell_amount * I80F48::from_num(self.taker_fee_fraction))
+        (base_sell_amount * I80F48::from_num(self.taker_fee_rate))
             .floor()
             .to_num()
     }

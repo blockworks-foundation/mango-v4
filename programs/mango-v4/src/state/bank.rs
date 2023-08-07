@@ -143,8 +143,8 @@ pub struct Bank {
     pub fees_withdrawn: u64,
 
     /// Fees for the token conditional swap feature
-    pub token_conditional_swap_taker_fee_fraction: f32,
-    pub token_conditional_swap_maker_fee_fraction: f32,
+    pub token_conditional_swap_taker_fee_rate: f32,
+    pub token_conditional_swap_maker_fee_rate: f32,
 
     #[derivative(Debug = "ignore")]
     pub reserved: [u8; 2096],
@@ -255,8 +255,8 @@ impl Bank {
             force_close: 0,
             padding: [0; 6],
             fees_withdrawn: 0,
-            token_conditional_swap_taker_fee_fraction: 0.0,
-            token_conditional_swap_maker_fee_fraction: 0.0,
+            token_conditional_swap_taker_fee_rate: 0.0,
+            token_conditional_swap_maker_fee_rate: 0.0,
             reserved: [0; 2096],
         }
     }

@@ -1082,8 +1082,8 @@ pub fn token_edit_instruction_default() -> mango_v4::instruction::TokenEdit {
         reduce_only_opt: None,
         name_opt: None,
         force_close_opt: None,
-        token_conditional_swap_taker_fee_fraction_opt: None,
-        token_conditional_swap_maker_fee_fraction_opt: None,
+        token_conditional_swap_taker_fee_rate_opt: None,
+        token_conditional_swap_maker_fee_rate_opt: None,
     }
 }
 

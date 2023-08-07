@@ -27,6 +27,8 @@ export interface TokenEditParams {
   reduceOnly: number | null;
   name: string | null;
   forceClose: boolean | null;
+  tokenConditionalSwapTakerFeeRate: number | null;
+  tokenConditionalSwapMakerFeeRate: number | null;
 }
 
 export const NullTokenEditParams: TokenEditParams = {
@@ -54,6 +56,8 @@ export const NullTokenEditParams: TokenEditParams = {
   reduceOnly: null,
   name: null,
   forceClose: null,
+  tokenConditionalSwapTakerFeeRate: null,
+  tokenConditionalSwapMakerFeeRate: null,
 };
 
 export interface PerpEditParams {

@@ -140,6 +140,8 @@ async function tokenEdit(): Promise<void> {
       params.reduceOnly,
       params.name,
       params.forceClose,
+      params.tokenConditionalSwapTakerFeeRate,
+      params.tokenConditionalSwapMakerFeeRate,
     )
     .accounts({
       group: group.publicKey,
