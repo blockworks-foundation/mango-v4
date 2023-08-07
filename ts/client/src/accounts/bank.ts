@@ -352,6 +352,14 @@ export class Bank implements BankForHealth {
     );
   }
 
+  getAssetPrice(): I80F48 {
+    return this.price.min(I80F48.fromNumber(this.stablePriceModel.stablePrice));
+  }
+
+  getLiabPrice(): I80F48 {
+    return this.price.max(I80F48.fromNumber(this.stablePriceModel.stablePrice));
+  }
+
   get price(): I80F48 {
     if (this._price === undefined) {
       throw new Error(
