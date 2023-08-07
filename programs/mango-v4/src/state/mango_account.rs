@@ -1173,7 +1173,15 @@ impl<
     pub fn check_health_pre(&mut self, health_cache: &HealthCache) -> Result<I80F48> {
         let pre_init_health = health_cache.health(HealthType::Init);
         msg!("pre_init_health: {}", pre_init_health);
+        self.check_health_pre_checks(health_cache, pre_init_health)?;
+        Ok(pre_init_health)
+    }
 
+    pub fn check_health_pre_checks(
+        &mut self,
+        health_cache: &HealthCache,
+        pre_init_health: I80F48,
+    ) -> Result<()> {
         // We can skip computing LiquidationEnd health if Init health > 0, because
         // LiquidationEnd health >= Init health.
         self.fixed_mut()
@@ -1187,8 +1195,7 @@ impl<
             !self.fixed().being_liquidated(),
             MangoError::BeingLiquidated
         );
-
-        Ok(pre_init_health)
+        Ok(())
     }
 
     pub fn check_health_post(
@@ -1198,7 +1205,15 @@ impl<
     ) -> Result<I80F48> {
         let post_init_health = health_cache.health(HealthType::Init);
         msg!("post_init_health: {}", post_init_health);
+        self.check_health_post_checks(pre_init_health, post_init_health)?;
+        Ok(post_init_health)
+    }
 
+    pub fn check_health_post_checks(
+        &mut self,
+        pre_init_health: I80F48,
+        post_init_health: I80F48,
+    ) -> Result<()> {
         // Accounts that have negative init health may only take actions that don't further
         // decrease their health.
         // To avoid issues with rounding, we allow accounts to decrease their health by up to
@@ -1219,7 +1234,7 @@ impl<
             post_init_health >= 0 || health_does_not_decrease,
             MangoError::HealthMustBePositiveOrIncrease
         );
-        Ok(post_init_health)
+        Ok(())
     }
 
     pub fn check_liquidatable(&mut self, health_cache: &HealthCache) -> Result<CheckLiquidatable> {

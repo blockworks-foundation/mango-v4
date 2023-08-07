@@ -115,12 +115,22 @@ impl MangoError {
 
 pub trait IsAnchorErrorWithCode {
     fn is_anchor_error_with_code(&self, code: u32) -> bool;
+    fn is_oracle_error(&self) -> bool;
 }
 
 impl<T> IsAnchorErrorWithCode for anchor_lang::Result<T> {
     fn is_anchor_error_with_code(&self, code: u32) -> bool {
         match self {
             Err(Error::AnchorError(error)) => error.error_code_number == code,
+            _ => false,
+        }
+    }
+    fn is_oracle_error(&self) -> bool {
+        match self {
+            Err(Error::AnchorError(e)) => {
+                e.error_code_number == MangoError::OracleConfidence.error_code()
+                    || e.error_code_number == MangoError::OracleStale.error_code()
+            }
             _ => false,
         }
     }
