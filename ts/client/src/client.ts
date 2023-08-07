@@ -23,7 +23,6 @@ import {
   PublicKey,
   SYSVAR_INSTRUCTIONS_PUBKEY,
   SYSVAR_RENT_PUBKEY,
-  Signer,
   SystemProgram,
   TransactionInstruction,
   TransactionSignature,
@@ -745,9 +744,14 @@ export class MangoClient {
     mangoAccount: MangoAccount,
     name?: string,
     delegate?: PublicKey,
+    delegateExpiry?: number,
   ): Promise<TransactionSignature> {
     const ix = await this.program.methods
-      .accountEdit(name ?? null, delegate ?? null)
+      .accountEdit(
+        name ?? null,
+        delegate ?? null,
+        delegateExpiry ? new BN(delegateExpiry) : null,
+      )
       .accounts({
         group: group.publicKey,
         account: mangoAccount.publicKey,

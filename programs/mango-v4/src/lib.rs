@@ -315,9 +315,10 @@ pub mod mango_v4 {
         ctx: Context<AccountEdit>,
         name_opt: Option<String>,
         delegate_opt: Option<Pubkey>,
+        delegate_expiry_opt: Option<u64>,
     ) -> Result<()> {
         #[cfg(feature = "enable-gpl")]
-        instructions::account_edit(ctx, name_opt, delegate_opt)?;
+        instructions::account_edit(ctx, name_opt, delegate_opt, delegate_expiry_opt)?;
         Ok(())
     }
 
