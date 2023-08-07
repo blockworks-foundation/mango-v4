@@ -560,6 +560,30 @@ export type MangoV4 = {
         {
           "name": "netBorrowLimitPerWindowQuote",
           "type": "i64"
+        },
+        {
+          "name": "borrowWeightScaleStartQuote",
+          "type": "f64"
+        },
+        {
+          "name": "depositWeightScaleStartQuote",
+          "type": "f64"
+        },
+        {
+          "name": "reduceOnly",
+          "type": "u8"
+        },
+        {
+          "name": "tokenConditionalSwapTakerFeeRate",
+          "type": "f32"
+        },
+        {
+          "name": "tokenConditionalSwapMakerFeeRate",
+          "type": "f32"
+        },
+        {
+          "name": "flashLoanSwapFeeRate",
+          "type": "f32"
         }
       ]
     },
@@ -12597,6 +12621,30 @@ export const IDL: MangoV4 = {
         {
           "name": "netBorrowLimitPerWindowQuote",
           "type": "i64"
+        },
+        {
+          "name": "borrowWeightScaleStartQuote",
+          "type": "f64"
+        },
+        {
+          "name": "depositWeightScaleStartQuote",
+          "type": "f64"
+        },
+        {
+          "name": "reduceOnly",
+          "type": "u8"
+        },
+        {
+          "name": "tokenConditionalSwapTakerFeeRate",
+          "type": "f32"
+        },
+        {
+          "name": "tokenConditionalSwapMakerFeeRate",
+          "type": "f32"
+        },
+        {
+          "name": "flashLoanSwapFeeRate",
+          "type": "f32"
         }
       ]
     },

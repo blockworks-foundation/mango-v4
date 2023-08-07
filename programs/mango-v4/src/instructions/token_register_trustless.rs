@@ -93,6 +93,8 @@ pub fn token_register_trustless(
         bank.stable_price_model.reset_on_nonzero_price = 1;
     }
 
+    bank.verify()?;
+
     let mut mint_info = ctx.accounts.mint_info.load_init()?;
     *mint_info = MintInfo {
         group: ctx.accounts.group.key(),

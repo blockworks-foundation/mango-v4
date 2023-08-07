@@ -137,6 +137,12 @@ pub mod mango_v4 {
         min_vault_to_deposits_ratio: f64,
         net_borrow_limit_window_size_ts: u64,
         net_borrow_limit_per_window_quote: i64,
+        borrow_weight_scale_start_quote: f64,
+        deposit_weight_scale_start_quote: f64,
+        reduce_only: u8,
+        token_conditional_swap_taker_fee_rate: f32,
+        token_conditional_swap_maker_fee_rate: f32,
+        flash_loan_swap_fee_rate: f32,
     ) -> Result<()> {
         #[cfg(feature = "enable-gpl")]
         instructions::token_register(
@@ -155,6 +161,12 @@ pub mod mango_v4 {
             min_vault_to_deposits_ratio,
             net_borrow_limit_window_size_ts,
             net_borrow_limit_per_window_quote,
+            borrow_weight_scale_start_quote,
+            deposit_weight_scale_start_quote,
+            reduce_only,
+            token_conditional_swap_taker_fee_rate,
+            token_conditional_swap_maker_fee_rate,
+            flash_loan_swap_fee_rate,
         )?;
         Ok(())
     }
