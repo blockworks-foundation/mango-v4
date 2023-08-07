@@ -171,7 +171,7 @@ async function main() {
       accounts2.find((account) => account.name == 'LIQTEST, LIQEE1'),
     );
     await client.accountExpandV2(group, account, 4, 4, 4, 4, 4);
-    await client.tokenConditionalSwapCreateOld(
+    await client.tokenConditionalSwapCreateRaw(
       group,
       account,
       MINTS.get('SOL')!,
@@ -193,7 +193,7 @@ async function main() {
       accounts2.find((account) => account.name == 'LIQTEST, LIQEE2'),
     );
     await client.accountExpandV2(group, account, 4, 4, 4, 4, 4);
-    await client.tokenConditionalSwapCreateOld(
+    await client.tokenConditionalSwapCreateRaw(
       group,
       account,
       MINTS.get('SOL')!,
@@ -215,7 +215,7 @@ async function main() {
       accounts2.find((account) => account.name == 'LIQTEST, LIQEE3'),
     );
     await client.accountExpandV2(group, account, 4, 4, 4, 4, 4);
-    await client.tokenConditionalSwapCreateOld(
+    await client.tokenConditionalSwapCreateRaw(
       group,
       account,
       MINTS.get('SOL')!,
