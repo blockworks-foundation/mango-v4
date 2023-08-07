@@ -26,6 +26,9 @@ pub fn token_register(
     maint_liab_weight: f32,
     init_liab_weight: f32,
     liquidation_fee: f32,
+    stable_price_delay_interval_seconds: u32,
+    stable_price_delay_growth_limit: f32,
+    stable_price_growth_limit: f32,
     min_vault_to_deposits_ratio: f64,
     net_borrow_limit_window_size_ts: u64,
     net_borrow_limit_per_window_quote: i64,
@@ -84,7 +87,12 @@ pub fn token_register(
         mint_decimals: ctx.accounts.mint.decimals,
         bank_num: 0,
         oracle_config: oracle_config.to_oracle_config(),
-        stable_price_model: StablePriceModel::default(),
+        stable_price_model: StablePriceModel {
+            delay_interval_seconds: stable_price_delay_interval_seconds,
+            delay_growth_limit: stable_price_delay_growth_limit,
+            stable_growth_limit: stable_price_growth_limit,
+            ..StablePriceModel::default()
+        },
         min_vault_to_deposits_ratio,
         net_borrow_limit_window_size_ts,
         last_net_borrows_window_start_ts: now_ts / net_borrow_limit_window_size_ts

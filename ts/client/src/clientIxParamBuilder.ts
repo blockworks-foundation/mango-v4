@@ -13,9 +13,9 @@ export interface TokenRegisterParams {
   maintLiabWeight: number;
   initLiabWeight: number;
   liquidationFee: number;
-  // stablePriceDelayIntervalSeconds: number;
-  // stablePriceDelayGrowthLimit: number;
-  // stablePriceGrowthLimit: number;
+  stablePriceDelayIntervalSeconds: number;
+  stablePriceDelayGrowthLimit: number;
+  stablePriceGrowthLimit: number;
   minVaultToDepositsRatio: number;
   netBorrowLimitPerWindowQuote: number;
   netBorrowLimitWindowSizeTs: number;
@@ -48,9 +48,9 @@ export const DefaultTokenRegisterParams: TokenRegisterParams = {
   maintLiabWeight: 1.4,
   initLiabWeight: 1.8,
   liquidationFee: 0.2,
-  // stablePriceDelayIntervalSeconds: null,
-  // stablePriceDelayGrowthLimit: null,
-  // stablePriceGrowthLimit: null,
+  stablePriceDelayIntervalSeconds: 60 * 60,
+  stablePriceDelayGrowthLimit: 0.06,
+  stablePriceGrowthLimit: 0.0003,
   minVaultToDepositsRatio: 0.2,
   netBorrowLimitPerWindowQuote: 250_000_000_000,
   netBorrowLimitWindowSizeTs: 86_400,

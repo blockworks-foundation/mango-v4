@@ -550,6 +550,18 @@ export type MangoV4 = {
           "type": "f32"
         },
         {
+          "name": "stablePriceDelayIntervalSeconds",
+          "type": "u32"
+        },
+        {
+          "name": "stablePriceDelayGrowthLimit",
+          "type": "f32"
+        },
+        {
+          "name": "stablePriceGrowthLimit",
+          "type": "f32"
+        },
+        {
           "name": "minVaultToDepositsRatio",
           "type": "f64"
         },
@@ -12608,6 +12620,18 @@ export const IDL: MangoV4 = {
         },
         {
           "name": "liquidationFee",
+          "type": "f32"
+        },
+        {
+          "name": "stablePriceDelayIntervalSeconds",
+          "type": "u32"
+        },
+        {
+          "name": "stablePriceDelayGrowthLimit",
+          "type": "f32"
+        },
+        {
+          "name": "stablePriceGrowthLimit",
           "type": "f32"
         },
         {
