@@ -537,8 +537,8 @@ export class MangoAccount {
     let existingPositionHealthContrib = ZERO_I80F48();
     if (existingTokenDeposits.gt(ZERO_I80F48())) {
       existingPositionHealthContrib = existingTokenDeposits
-        .mul(tokenBank.price)
-        .imul(tokenBank.initAssetWeight);
+        .mul(tokenBank.getAssetPrice())
+        .imul(tokenBank.scaledInitAssetWeight(tokenBank.getAssetPrice()));
     }
 
     // Case 2: token deposits have higher contribution than initHealth,
@@ -546,8 +546,8 @@ export class MangoAccount {
     if (existingPositionHealthContrib.gt(initHealth)) {
       const withdrawAbleExistingPositionHealthContrib = initHealth;
       return withdrawAbleExistingPositionHealthContrib
-        .div(tokenBank.initAssetWeight)
-        .div(tokenBank.price);
+        .div(tokenBank.scaledInitAssetWeight(tokenBank.getAssetPrice()))
+        .div(tokenBank.getAssetPrice());
     }
 
     // Case 3: withdraw = withdraw existing deposits + borrows until initHealth reaches 0
