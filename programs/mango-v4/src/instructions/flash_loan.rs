@@ -236,6 +236,9 @@ pub fn flash_loan_end<'key, 'accounts, 'remaining, 'info>(
     // Verify that each mentioned vault has a bank in the health accounts
     let mut vaults_with_banks = vec![false; vaults.len()];
 
+    // Biggest flash_loan_swap_fee_rate over all involved banks
+    let mut max_swap_fee_rate = 0.0f32;
+
     // Loop over the banks, finding matching vaults
     // TODO: must be moved into health.rs, because it assumes something about the health accounts structure
     let mut changes = vec![];
@@ -292,6 +295,8 @@ pub fn flash_loan_end<'key, 'accounts, 'remaining, 'info>(
             let repay = I80F48::from(repay);
             change += repay;
         }
+
+        max_swap_fee_rate = max_swap_fee_rate.max(bank.flash_loan_swap_fee_rate);
 
         changes.push(TokenVaultChange {
             token_index: bank.token_index,
@@ -361,7 +366,7 @@ pub fn flash_loan_end<'key, 'accounts, 'remaining, 'info>(
         bank.collected_fees_native += loan_origination_fee;
 
         let swap_fee = if flash_loan_type == FlashLoanType::Swap {
-            change.amount * I80F48::from_num(bank.flash_loan_swap_fee_rate)
+            change.amount * I80F48::from_num(max_swap_fee_rate)
         } else {
             I80F48::ZERO
         };
