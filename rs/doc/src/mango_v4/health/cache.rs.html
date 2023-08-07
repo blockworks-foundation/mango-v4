@@ -1632,6 +1632,37 @@
 <span id="1632">1632</span>
 <span id="1633">1633</span>
 <span id="1634">1634</span>
+<span id="1635">1635</span>
+<span id="1636">1636</span>
+<span id="1637">1637</span>
+<span id="1638">1638</span>
+<span id="1639">1639</span>
+<span id="1640">1640</span>
+<span id="1641">1641</span>
+<span id="1642">1642</span>
+<span id="1643">1643</span>
+<span id="1644">1644</span>
+<span id="1645">1645</span>
+<span id="1646">1646</span>
+<span id="1647">1647</span>
+<span id="1648">1648</span>
+<span id="1649">1649</span>
+<span id="1650">1650</span>
+<span id="1651">1651</span>
+<span id="1652">1652</span>
+<span id="1653">1653</span>
+<span id="1654">1654</span>
+<span id="1655">1655</span>
+<span id="1656">1656</span>
+<span id="1657">1657</span>
+<span id="1658">1658</span>
+<span id="1659">1659</span>
+<span id="1660">1660</span>
+<span id="1661">1661</span>
+<span id="1662">1662</span>
+<span id="1663">1663</span>
+<span id="1664">1664</span>
+<span id="1665">1665</span>
 </pre><pre class="rust"><code><span class="doccomment">/*!
  * This module deals with computing different types of health for a mango account.
  *
@@ -2745,12 +2776,43 @@
     account: <span class="kw-2">&amp;</span>MangoAccountRef,
     retriever: <span class="kw-2">&amp;</span><span class="kw">impl </span>AccountRetriever,
 ) -&gt; <span class="prelude-ty">Result</span>&lt;HealthCache&gt; {
+    new_health_cache_impl(account, retriever, <span class="bool-val">false</span>)
+}
+
+<span class="doccomment">/// Generate a special HealthCache for an account and its health accounts
+/// where nonnegative token positions for bad oracles are skipped.
+///
+/// This health cache must be used carefully, since it doesn&#39;t provide the actual
+/// account health, just a value that is guaranteed to be less than it.
+</span><span class="kw">pub fn </span>new_health_cache_skipping_bad_oracles(
+    account: <span class="kw-2">&amp;</span>MangoAccountRef,
+    retriever: <span class="kw-2">&amp;</span><span class="kw">impl </span>AccountRetriever,
+) -&gt; <span class="prelude-ty">Result</span>&lt;HealthCache&gt; {
+    new_health_cache_impl(account, retriever, <span class="bool-val">true</span>)
+}
+
+<span class="kw">fn </span>new_health_cache_impl(
+    account: <span class="kw-2">&amp;</span>MangoAccountRef,
+    retriever: <span class="kw-2">&amp;</span><span class="kw">impl </span>AccountRetriever,
+    <span class="comment">// If an oracle is stale or inconfident and the health contribution would
+    // not be negative, skip it. This decreases health, but maybe overall it&#39;s
+    // still positive?
+    </span>skip_bad_oracles: bool,
+) -&gt; <span class="prelude-ty">Result</span>&lt;HealthCache&gt; {
     <span class="comment">// token contribution from token accounts
     </span><span class="kw">let </span><span class="kw-2">mut </span>token_infos = <span class="macro">vec!</span>[];
 
     <span class="kw">for </span>(i, position) <span class="kw">in </span>account.active_token_positions().enumerate() {
-        <span class="kw">let </span>(bank, oracle_price) =
-            retriever.bank_and_oracle(<span class="kw-2">&amp;</span>account.fixed.group, i, position.token_index)<span class="question-mark">?</span>;
+        <span class="kw">let </span>bank_oracle_result =
+            retriever.bank_and_oracle(<span class="kw-2">&amp;</span>account.fixed.group, i, position.token_index);
+        <span class="kw">if </span>skip_bad_oracles
+            &amp;&amp; bank_oracle_result.is_oracle_error()
+            &amp;&amp; position.indexed_position &gt;= <span class="number">0
+        </span>{
+            <span class="comment">// Ignore the asset because the oracle is bad, decreasing total health
+            </span><span class="kw">continue</span>;
+        }
+        <span class="kw">let </span>(bank, oracle_price) = bank_oracle_result<span class="question-mark">?</span>;
 
         <span class="kw">let </span>native = position.native(bank);
         <span class="kw">let </span>prices = Prices {

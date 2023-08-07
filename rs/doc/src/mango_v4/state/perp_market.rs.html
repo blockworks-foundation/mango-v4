@@ -499,14 +499,6 @@
 <span id="499">499</span>
 <span id="500">500</span>
 <span id="501">501</span>
-<span id="502">502</span>
-<span id="503">503</span>
-<span id="504">504</span>
-<span id="505">505</span>
-<span id="506">506</span>
-<span id="507">507</span>
-<span id="508">508</span>
-<span id="509">509</span>
 </pre><pre class="rust"><code><span class="kw">use </span>std::mem::size_of;
 
 <span class="kw">use </span>anchor_lang::prelude::<span class="kw-2">*</span>;
@@ -764,29 +756,22 @@
         oracle_acc: <span class="kw-2">&amp;</span><span class="kw">impl </span>KeyedAccountReader,
         staleness_slot: <span class="prelude-ty">Option</span>&lt;u64&gt;,
     ) -&gt; <span class="prelude-ty">Result</span>&lt;I80F48&gt; {
-        <span class="macro">require_keys_eq!</span>(<span class="self">self</span>.oracle, <span class="kw-2">*</span>oracle_acc.key());
-        <span class="kw">let </span>(price, <span class="kw">_</span>) = oracle::oracle_price_and_state(
-            oracle_acc,
-            <span class="kw-2">&amp;</span><span class="self">self</span>.oracle_config,
-            <span class="self">self</span>.base_decimals,
-            staleness_slot,
-        )<span class="question-mark">?</span>;
-
-        <span class="prelude-val">Ok</span>(price)
+        <span class="prelude-val">Ok</span>(<span class="self">self</span>.oracle_state(oracle_acc, staleness_slot)<span class="question-mark">?</span>.price)
     }
 
-    <span class="kw">pub fn </span>oracle_price_and_state(
+    <span class="kw">pub fn </span>oracle_state(
         <span class="kw-2">&amp;</span><span class="self">self</span>,
         oracle_acc: <span class="kw-2">&amp;</span><span class="kw">impl </span>KeyedAccountReader,
         staleness_slot: <span class="prelude-ty">Option</span>&lt;u64&gt;,
-    ) -&gt; <span class="prelude-ty">Result</span>&lt;(I80F48, OracleState)&gt; {
+    ) -&gt; <span class="prelude-ty">Result</span>&lt;OracleState&gt; {
         <span class="macro">require_keys_eq!</span>(<span class="self">self</span>.oracle, <span class="kw-2">*</span>oracle_acc.key());
-        oracle::oracle_price_and_state(
-            oracle_acc,
+        <span class="kw">let </span>state = oracle::oracle_state_unchecked(oracle_acc, <span class="self">self</span>.base_decimals)<span class="question-mark">?</span>;
+        state.check_confidence_and_maybe_staleness(
+            <span class="kw-2">&amp;</span><span class="self">self</span>.oracle,
             <span class="kw-2">&amp;</span><span class="self">self</span>.oracle_config,
-            <span class="self">self</span>.base_decimals,
             staleness_slot,
-        )
+        )<span class="question-mark">?</span>;
+        <span class="prelude-val">Ok</span>(state)
     }
 
     <span class="kw">pub fn </span>stable_price(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; I80F48 {
@@ -797,15 +782,14 @@
     </span><span class="kw">pub fn </span>update_funding_and_stable_price(
         <span class="kw-2">&amp;mut </span><span class="self">self</span>,
         book: <span class="kw-2">&amp;</span>Orderbook,
-        oracle_price: I80F48,
-        oracle_state: OracleState,
+        oracle_state: <span class="kw-2">&amp;</span>OracleState,
         now_ts: u64,
     ) -&gt; <span class="prelude-ty">Result</span>&lt;()&gt; {
         <span class="kw">if </span>now_ts &lt;= <span class="self">self</span>.funding_last_updated {
             <span class="kw">return </span><span class="prelude-val">Ok</span>(());
         }
 
-        <span class="kw">let </span>index_price = oracle_price;
+        <span class="kw">let </span>oracle_price = oracle_state.price;
         <span class="kw">let </span>oracle_price_lots = <span class="self">self</span>.native_price_to_lot(oracle_price);
 
         <span class="comment">// Get current book price &amp; compare it to index price
@@ -821,7 +805,7 @@
                 <span class="comment">// calculate mid-market rate
                 </span><span class="kw">let </span>mid_price = (bid + ask) / <span class="number">2</span>;
                 <span class="kw">let </span>book_price = <span class="self">self</span>.lot_to_native_price(mid_price);
-                <span class="kw">let </span>diff = book_price / index_price - I80F48::ONE;
+                <span class="kw">let </span>diff = book_price / oracle_price - I80F48::ONE;
                 diff.clamp(<span class="self">self</span>.min_funding, <span class="self">self</span>.max_funding)
             }
             (<span class="prelude-val">Some</span>(_bid), <span class="prelude-val">None</span>) =&gt; <span class="self">self</span>.max_funding,
@@ -841,7 +825,7 @@
         <span class="kw">let </span>base_lot_size = I80F48::from_num(<span class="self">self</span>.base_lot_size);
 
         <span class="comment">// The number of native quote that one base lot should pay in funding
-        </span><span class="kw">let </span>funding_delta = index_price * base_lot_size * funding_rate * time_factor;
+        </span><span class="kw">let </span>funding_delta = oracle_price * base_lot_size * funding_rate * time_factor;
 
         <span class="self">self</span>.long_funding += funding_delta;
         <span class="self">self</span>.short_funding += funding_delta;
@@ -857,7 +841,7 @@
             short_funding: <span class="self">self</span>.short_funding.to_bits(),
             price: oracle_price.to_bits(),
             oracle_slot: oracle_state.last_update_slot,
-            oracle_confidence: oracle_state.confidence.to_bits(),
+            oracle_confidence: oracle_state.deviation.to_bits(),
             oracle_type: oracle_state.oracle_type,
             stable_price: <span class="self">self</span>.stable_price().to_bits(),
             fees_accrued: <span class="self">self</span>.fees_accrued.to_bits(),

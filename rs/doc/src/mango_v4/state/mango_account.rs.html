@@ -1865,6 +1865,21 @@
 <span id="1865">1865</span>
 <span id="1866">1866</span>
 <span id="1867">1867</span>
+<span id="1868">1868</span>
+<span id="1869">1869</span>
+<span id="1870">1870</span>
+<span id="1871">1871</span>
+<span id="1872">1872</span>
+<span id="1873">1873</span>
+<span id="1874">1874</span>
+<span id="1875">1875</span>
+<span id="1876">1876</span>
+<span id="1877">1877</span>
+<span id="1878">1878</span>
+<span id="1879">1879</span>
+<span id="1880">1880</span>
+<span id="1881">1881</span>
+<span id="1882">1882</span>
 </pre><pre class="rust"><code><span class="kw">use </span>std::cell::{Ref, RefMut};
 <span class="kw">use </span>std::mem::size_of;
 
@@ -3040,7 +3055,15 @@
     <span class="kw">pub fn </span>check_health_pre(<span class="kw-2">&amp;mut </span><span class="self">self</span>, health_cache: <span class="kw-2">&amp;</span>HealthCache) -&gt; <span class="prelude-ty">Result</span>&lt;I80F48&gt; {
         <span class="kw">let </span>pre_init_health = health_cache.health(HealthType::Init);
         <span class="macro">msg!</span>(<span class="string">&quot;pre_init_health: {}&quot;</span>, pre_init_health);
+        <span class="self">self</span>.check_health_pre_checks(health_cache, pre_init_health)<span class="question-mark">?</span>;
+        <span class="prelude-val">Ok</span>(pre_init_health)
+    }
 
+    <span class="kw">pub fn </span>check_health_pre_checks(
+        <span class="kw-2">&amp;mut </span><span class="self">self</span>,
+        health_cache: <span class="kw-2">&amp;</span>HealthCache,
+        pre_init_health: I80F48,
+    ) -&gt; <span class="prelude-ty">Result</span>&lt;()&gt; {
         <span class="comment">// We can skip computing LiquidationEnd health if Init health &gt; 0, because
         // LiquidationEnd health &gt;= Init health.
         </span><span class="self">self</span>.fixed_mut()
@@ -3054,8 +3077,7 @@
             !<span class="self">self</span>.fixed().being_liquidated(),
             MangoError::BeingLiquidated
         );
-
-        <span class="prelude-val">Ok</span>(pre_init_health)
+        <span class="prelude-val">Ok</span>(())
     }
 
     <span class="kw">pub fn </span>check_health_post(
@@ -3065,7 +3087,15 @@
     ) -&gt; <span class="prelude-ty">Result</span>&lt;I80F48&gt; {
         <span class="kw">let </span>post_init_health = health_cache.health(HealthType::Init);
         <span class="macro">msg!</span>(<span class="string">&quot;post_init_health: {}&quot;</span>, post_init_health);
+        <span class="self">self</span>.check_health_post_checks(pre_init_health, post_init_health)<span class="question-mark">?</span>;
+        <span class="prelude-val">Ok</span>(post_init_health)
+    }
 
+    <span class="kw">pub fn </span>check_health_post_checks(
+        <span class="kw-2">&amp;mut </span><span class="self">self</span>,
+        pre_init_health: I80F48,
+        post_init_health: I80F48,
+    ) -&gt; <span class="prelude-ty">Result</span>&lt;()&gt; {
         <span class="comment">// Accounts that have negative init health may only take actions that don&#39;t further
         // decrease their health.
         // To avoid issues with rounding, we allow accounts to decrease their health by up to
@@ -3086,7 +3116,7 @@
             post_init_health &gt;= <span class="number">0 </span>|| health_does_not_decrease,
             MangoError::HealthMustBePositiveOrIncrease
         );
-        <span class="prelude-val">Ok</span>(post_init_health)
+        <span class="prelude-val">Ok</span>(())
     }
 
     <span class="kw">pub fn </span>check_liquidatable(<span class="kw-2">&amp;mut </span><span class="self">self</span>, health_cache: <span class="kw-2">&amp;</span>HealthCache) -&gt; <span class="prelude-ty">Result</span>&lt;CheckLiquidatable&gt; {

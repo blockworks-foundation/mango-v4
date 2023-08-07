@@ -397,22 +397,6 @@
 <span id="397">397</span>
 <span id="398">398</span>
 <span id="399">399</span>
-<span id="400">400</span>
-<span id="401">401</span>
-<span id="402">402</span>
-<span id="403">403</span>
-<span id="404">404</span>
-<span id="405">405</span>
-<span id="406">406</span>
-<span id="407">407</span>
-<span id="408">408</span>
-<span id="409">409</span>
-<span id="410">410</span>
-<span id="411">411</span>
-<span id="412">412</span>
-<span id="413">413</span>
-<span id="414">414</span>
-<span id="415">415</span>
 </pre><pre class="rust"><code><span class="kw">use </span>std::mem::size_of;
 
 <span class="kw">use </span>anchor_lang::prelude::<span class="kw-2">*</span>;
@@ -498,7 +482,7 @@
     }
 }
 
-<span class="attribute">#[derive(PartialEq, AnchorSerialize, AnchorDeserialize)]
+<span class="attribute">#[derive(Clone, Copy, PartialEq, AnchorSerialize, AnchorDeserialize)]
 </span><span class="kw">pub enum </span>OracleType {
     Pyth,
     Stub,
@@ -507,9 +491,63 @@
 }
 
 <span class="kw">pub struct </span>OracleState {
+    <span class="kw">pub </span>price: I80F48,
+    <span class="kw">pub </span>deviation: I80F48,
     <span class="kw">pub </span>last_update_slot: u64,
-    <span class="kw">pub </span>confidence: I80F48,
     <span class="kw">pub </span>oracle_type: OracleType,
+}
+
+<span class="kw">impl </span>OracleState {
+    <span class="attribute">#[inline]
+    </span><span class="kw">pub fn </span>check_confidence_and_maybe_staleness(
+        <span class="kw-2">&amp;</span><span class="self">self</span>,
+        oracle_pk: <span class="kw-2">&amp;</span>Pubkey,
+        config: <span class="kw-2">&amp;</span>OracleConfig,
+        staleness_slot: <span class="prelude-ty">Option</span>&lt;u64&gt;,
+    ) -&gt; <span class="prelude-ty">Result</span>&lt;()&gt; {
+        <span class="kw">if let </span><span class="prelude-val">Some</span>(now_slot) = staleness_slot {
+            <span class="self">self</span>.check_staleness(oracle_pk, config, now_slot)<span class="question-mark">?</span>;
+        }
+        <span class="self">self</span>.check_confidence(oracle_pk, config)
+    }
+
+    <span class="kw">pub fn </span>check_staleness(
+        <span class="kw-2">&amp;</span><span class="self">self</span>,
+        oracle_pk: <span class="kw-2">&amp;</span>Pubkey,
+        config: <span class="kw-2">&amp;</span>OracleConfig,
+        now_slot: u64,
+    ) -&gt; <span class="prelude-ty">Result</span>&lt;()&gt; {
+        <span class="kw">if </span>config.max_staleness_slots &gt;= <span class="number">0
+            </span>&amp;&amp; <span class="self">self
+                </span>.last_update_slot
+                .saturating_add(config.max_staleness_slots <span class="kw">as </span>u64)
+                &lt; now_slot
+        {
+            <span class="macro">msg!</span>(
+                <span class="string">&quot;Oracle is stale; pubkey {}, price: {}, last_update_slot: {}, now_slot: {}&quot;</span>,
+                oracle_pk,
+                <span class="self">self</span>.price.to_num::&lt;f64&gt;(),
+                <span class="self">self</span>.last_update_slot,
+                now_slot,
+            );
+            <span class="kw">return </span><span class="prelude-val">Err</span>(MangoError::OracleStale.into());
+        }
+        <span class="prelude-val">Ok</span>(())
+    }
+
+    <span class="kw">pub fn </span>check_confidence(<span class="kw-2">&amp;</span><span class="self">self</span>, oracle_pk: <span class="kw-2">&amp;</span>Pubkey, config: <span class="kw-2">&amp;</span>OracleConfig) -&gt; <span class="prelude-ty">Result</span>&lt;()&gt; {
+        <span class="kw">if </span><span class="self">self</span>.deviation &gt; config.conf_filter * <span class="self">self</span>.price {
+            <span class="macro">msg!</span>(
+                <span class="string">&quot;Oracle confidence not good enough: pubkey {}, price: {}, deviation: {}, conf_filter: {}&quot;</span>,
+                oracle_pk,
+                <span class="self">self</span>.price.to_num::&lt;f64&gt;(),
+                <span class="self">self</span>.deviation.to_num::&lt;f64&gt;(),
+                config.conf_filter.to_num::&lt;f32&gt;(),
+            );
+            <span class="kw">return </span><span class="prelude-val">Err</span>(MangoError::OracleConfidence.into());
+        }
+        <span class="prelude-val">Ok</span>(())
+    }
 }
 
 <span class="attribute">#[account(zero_copy)]
@@ -519,10 +557,12 @@
     <span class="comment">// ABI: Clients rely on this being at offset 40
     </span><span class="kw">pub </span>mint: Pubkey,
     <span class="kw">pub </span>price: I80F48,
-    <span class="kw">pub </span>last_updated: i64,
-    <span class="kw">pub </span>reserved: [u8; <span class="number">128</span>],
+    <span class="kw">pub </span>last_update_ts: i64,
+    <span class="kw">pub </span>last_update_slot: u64,
+    <span class="kw">pub </span>deviation: I80F48,
+    <span class="kw">pub </span>reserved: [u8; <span class="number">104</span>],
 }
-<span class="macro">const_assert_eq!</span>(size_of::&lt;StubOracle&gt;(), <span class="number">32 </span>+ <span class="number">32 </span>+ <span class="number">16 </span>+ <span class="number">8 </span>+ <span class="number">128</span>);
+<span class="macro">const_assert_eq!</span>(size_of::&lt;StubOracle&gt;(), <span class="number">32 </span>+ <span class="number">32 </span>+ <span class="number">16 </span>+ <span class="number">8 </span>+ <span class="number">8 </span>+ <span class="number">16 </span>+ <span class="number">104</span>);
 <span class="macro">const_assert_eq!</span>(size_of::&lt;StubOracle&gt;(), <span class="number">216</span>);
 <span class="macro">const_assert_eq!</span>(size_of::&lt;StubOracle&gt;() % <span class="number">8</span>, <span class="number">0</span>);
 
@@ -549,22 +589,18 @@
     <span class="prelude-val">Err</span>(MangoError::UnknownOracleType.into())
 }
 
-<span class="doccomment">/// A modified version of PriceAccount::get_price_no_older_than() which
-/// - doesn&#39;t need a Clock instance
-/// - has the staleness check be optional (negative max_staleness)
-/// - returns the publish slot of the price
+<span class="doccomment">/// Get the pyth agg price if it&#39;s available, otherwise take the prev price.
+///
+/// Returns the publish slot in addition to the price info.
+///
+/// Also see pyth&#39;s PriceAccount::get_price_no_older_than().
 </span><span class="kw">fn </span>pyth_get_price(
     pubkey: <span class="kw-2">&amp;</span>Pubkey,
     account: <span class="kw-2">&amp;</span>pyth_sdk_solana::state::PriceAccount,
-    now_slot: u64,
-    max_staleness: i64,
-) -&gt; <span class="prelude-ty">Result</span>&lt;(pyth_sdk_solana::Price, u64)&gt; {
+) -&gt; (pyth_sdk_solana::Price, u64) {
     <span class="kw">use </span>pyth_sdk_solana::<span class="kw-2">*</span>;
-    <span class="kw">if </span>account.agg.status == state::PriceStatus::Trading
-        &amp;&amp; (max_staleness &lt; <span class="number">0
-            </span>|| account.agg.pub_slot.saturating_add(max_staleness <span class="kw">as </span>u64) &gt;= now_slot)
-    {
-        <span class="kw">return </span><span class="prelude-val">Ok</span>((
+    <span class="kw">if </span>account.agg.status == state::PriceStatus::Trading {
+        (
             Price {
                 conf: account.agg.conf,
                 expo: account.expo,
@@ -572,11 +608,9 @@
                 publish_time: account.timestamp,
             },
             account.agg.pub_slot,
-        ));
-    }
-
-    <span class="kw">if </span>max_staleness &lt; <span class="number">0 </span>|| account.prev_slot.saturating_add(max_staleness <span class="kw">as </span>u64) &gt;= now_slot {
-        <span class="kw">return </span><span class="prelude-val">Ok</span>((
+        )
+    } <span class="kw">else </span>{
+        (
             Price {
                 conf: account.prev_conf,
                 expo: account.expo,
@@ -584,82 +618,62 @@
                 publish_time: account.prev_timestamp,
             },
             account.prev_slot,
-        ));
+        )
     }
-
-    <span class="macro">msg!</span>(
-        <span class="string">&quot;Pyth price too stale; pubkey {} prev price: {} prev slot: {} agg pub slot: {} agg status: {:?}&quot;</span>,
-        pubkey,
-        account.prev_price,
-        account.prev_slot,
-        account.agg.pub_slot,
-        account.agg.status,
-    );
-
-    <span class="prelude-val">Err</span>(MangoError::OracleStale.into())
 }
 
 <span class="doccomment">/// Returns the price of one native base token, in native quote tokens
 ///
 /// Example: The for SOL at 40 USDC/SOL it would return 0.04 (the unit is USDC-native/SOL-native)
 ///
-/// This currently assumes that quote decimals is 6, like for USDC.
+/// This currently assumes that quote decimals (i.e. decimals for USD) is 6, like for USDC.
 ///
-/// Pass `staleness_slot` = None to skip the staleness check
-</span><span class="kw">pub fn </span>oracle_price_and_state(
+/// The staleness and confidence of the oracle is not checked. Use the functions on
+/// OracleState to validate them if needed. That&#39;s why this function is called _unchecked.
+</span><span class="kw">pub fn </span>oracle_state_unchecked(
     acc_info: <span class="kw-2">&amp;</span><span class="kw">impl </span>KeyedAccountReader,
-    config: <span class="kw-2">&amp;</span>OracleConfig,
     base_decimals: u8,
-    staleness_slot: <span class="prelude-ty">Option</span>&lt;u64&gt;,
-) -&gt; <span class="prelude-ty">Result</span>&lt;(I80F48, OracleState)&gt; {
+) -&gt; <span class="prelude-ty">Result</span>&lt;OracleState&gt; {
     <span class="kw">let </span>data = <span class="kw-2">&amp;</span>acc_info.data();
     <span class="kw">let </span>oracle_type = determine_oracle_type(acc_info)<span class="question-mark">?</span>;
-    <span class="kw">let </span>staleness_slot = staleness_slot.unwrap_or(<span class="number">0</span>);
 
     <span class="prelude-val">Ok</span>(<span class="kw">match </span>oracle_type {
-        OracleType::Stub =&gt; (
-            acc_info.load::&lt;StubOracle&gt;()<span class="question-mark">?</span>.price,
+        OracleType::Stub =&gt; {
+            <span class="kw">let </span>stub = acc_info.load::&lt;StubOracle&gt;()<span class="question-mark">?</span>;
+            <span class="kw">let </span>deviation = <span class="kw">if </span>stub.deviation == <span class="number">0 </span>{
+                <span class="comment">// allows the confidence check to pass even for negative prices
+                </span>I80F48::MIN
+            } <span class="kw">else </span>{
+                stub.deviation
+            };
+            <span class="kw">let </span>last_update_slot = <span class="kw">if </span>stub.last_update_slot == <span class="number">0 </span>{
+                <span class="comment">// ensure staleness checks will never fail
+                </span>u64::MAX
+            } <span class="kw">else </span>{
+                stub.last_update_slot
+            };
             OracleState {
-                last_update_slot: <span class="number">0</span>,
-                confidence: I80F48::ZERO,
+                price: stub.price,
+                last_update_slot,
+                deviation,
                 oracle_type: OracleType::Stub,
-            },
-        ),
+            }
+        }
         OracleType::Pyth =&gt; {
             <span class="kw">let </span>price_account = pyth_sdk_solana::state::load_price_account(data).unwrap();
-            <span class="kw">let </span>(price_data, pub_slot) = pyth_get_price(
-                acc_info.key(),
-                price_account,
-                staleness_slot,
-                config.max_staleness_slots,
-            )<span class="question-mark">?</span>;
-            <span class="kw">let </span>price = I80F48::from_num(price_data.price);
-
-            <span class="comment">// Filter out bad prices
-            </span><span class="kw">if </span>I80F48::from_num(price_data.conf) &gt; (config.conf_filter * price) {
-                <span class="macro">msg!</span>(
-                    <span class="string">&quot;Pyth conf interval too high; pubkey {} price: {} price_data.conf: {}&quot;</span>,
-                    acc_info.key(),
-                    price.to_num::&lt;f64&gt;(),
-                    price_data.conf
-                );
-
-                <span class="comment">// future: in v3, we had pricecache, and in case of luna, when there were no updates, we used last known value from cache
-                // we&#39;ll have to add a CachedOracle that is based on one of the oracle types, needs a separate keeper and supports
-                // maintaining this &quot;last known good value&quot;
-                </span><span class="kw">return </span><span class="prelude-val">Err</span>(MangoError::OracleConfidence.into());
-            }
+            <span class="kw">let </span>(price_data, last_update_slot) = pyth_get_price(acc_info.key(), price_account);
+            <span class="kw">let </span>raw_price = I80F48::from_num(price_data.price);
 
             <span class="kw">let </span>decimals = (price_account.expo <span class="kw">as </span>i8) + QUOTE_DECIMALS - (base_decimals <span class="kw">as </span>i8);
             <span class="kw">let </span>decimal_adj = power_of_ten(decimals);
-            (
-                price * decimal_adj,
-                OracleState {
-                    last_update_slot: pub_slot,
-                    confidence: I80F48::from_num(price_data.conf),
-                    oracle_type: OracleType::Pyth,
-                },
-            )
+            <span class="kw">let </span>price = raw_price * decimal_adj;
+            <span class="macro">require_gte!</span>(price, <span class="number">0</span>);
+            OracleState {
+                price,
+                last_update_slot,
+                deviation: I80F48::from_num(price_data.conf),
+                oracle_type: OracleType::Pyth,
+            }
         }
         OracleType::SwitchboardV2 =&gt; {
             <span class="kw">fn </span>from_foreign_error(e: <span class="kw">impl </span>std::fmt::Display) -&gt; Error {
@@ -669,93 +683,47 @@
             <span class="kw">let </span>feed = bytemuck::from_bytes::&lt;AggregatorAccountData&gt;(<span class="kw-2">&amp;</span>data[<span class="number">8</span>..]);
             <span class="kw">let </span>feed_result = feed.get_result().map_err(from_foreign_error)<span class="question-mark">?</span>;
             <span class="kw">let </span>price_decimal: f64 = feed_result.try_into().map_err(from_foreign_error)<span class="question-mark">?</span>;
-            <span class="kw">let </span>price = I80F48::from_num(price_decimal);
+            <span class="kw">let </span>ui_price = I80F48::from_num(price_decimal);
 
-            <span class="comment">// Filter out bad prices
-            </span><span class="kw">let </span>std_deviation_decimal: f64 = feed
+            <span class="kw">let </span>std_deviation_decimal: f64 = feed
                 .latest_confirmed_round
                 .std_deviation
                 .try_into()
                 .map_err(from_foreign_error)<span class="question-mark">?</span>;
-            <span class="kw">if </span>I80F48::from_num(std_deviation_decimal) &gt; (config.conf_filter * price) {
-                <span class="macro">msg!</span>(
-                    <span class="string">&quot;Switchboard v2 std deviation too high; pubkey {} price: {} latest_confirmed_round.std_deviation: {}&quot;</span>,
-                    acc_info.key(),
-                    price.to_num::&lt;f64&gt;(),
-                    std_deviation_decimal
-                );
-                <span class="kw">return </span><span class="prelude-val">Err</span>(MangoError::OracleConfidence.into());
-            }
 
-            <span class="comment">// The round_open_slot is an overestimate of the oracle staleness: Reporters will see
+            <span class="comment">// The round_open_slot is an underestimate of the last update slot: Reporters will see
             // the round opening and only then start executing the price tasks.
-            </span><span class="kw">let </span>round_open_slot = feed.latest_confirmed_round.round_open_slot;
-            <span class="kw">if </span>config.max_staleness_slots &gt;= <span class="number">0
-                </span>&amp;&amp; round_open_slot.saturating_add(config.max_staleness_slots <span class="kw">as </span>u64)
-                    &lt; staleness_slot
-            {
-                <span class="macro">msg!</span>(
-                    <span class="string">&quot;Switchboard v2 price too stale; pubkey {} price: {} latest_confirmed_round.round_open_slot: {}&quot;</span>,
-                    acc_info.key(),
-                    price.to_num::&lt;f64&gt;(),
-                    round_open_slot,
-                );
-                <span class="kw">return </span><span class="prelude-val">Err</span>(MangoError::OracleConfidence.into());
-            }
+            </span><span class="kw">let </span>last_update_slot = feed.latest_confirmed_round.round_open_slot;
 
             <span class="kw">let </span>decimals = QUOTE_DECIMALS - (base_decimals <span class="kw">as </span>i8);
             <span class="kw">let </span>decimal_adj = power_of_ten(decimals);
-            (
-                price * decimal_adj,
-                OracleState {
-                    last_update_slot: round_open_slot,
-                    confidence: I80F48::from_num(std_deviation_decimal),
-                    oracle_type: OracleType::SwitchboardV2,
-                },
-            )
+            <span class="kw">let </span>price = ui_price * decimal_adj;
+            <span class="macro">require_gte!</span>(price, <span class="number">0</span>);
+            OracleState {
+                price,
+                last_update_slot,
+                deviation: I80F48::from_num(std_deviation_decimal),
+                oracle_type: OracleType::SwitchboardV2,
+            }
         }
         OracleType::SwitchboardV1 =&gt; {
             <span class="kw">let </span>result = FastRoundResultAccountData::deserialize(data).unwrap();
-            <span class="kw">let </span>price = I80F48::from_num(result.result.result);
+            <span class="kw">let </span>ui_price = I80F48::from_num(result.result.result);
 
-            <span class="comment">// Filter out bad prices
-            </span><span class="kw">let </span>min_response = I80F48::from_num(result.result.min_response);
-            <span class="kw">let </span>max_response = I80F48::from_num(result.result.max_response);
-            <span class="kw">if </span>(max_response - min_response) &gt; (config.conf_filter * price) {
-                <span class="macro">msg!</span>(
-                    <span class="string">&quot;Switchboard v1 min-max response gap too wide; pubkey {} price: {} min_response: {} max_response {}&quot;</span>,
-                    acc_info.key(),
-                    price.to_num::&lt;f64&gt;(),
-                    min_response,
-                    max_response
-                );
-                <span class="kw">return </span><span class="prelude-val">Err</span>(MangoError::OracleConfidence.into());
-            }
-
-            <span class="kw">let </span>round_open_slot = result.result.round_open_slot;
-            <span class="kw">if </span>config.max_staleness_slots &gt;= <span class="number">0
-                </span>&amp;&amp; round_open_slot.saturating_add(config.max_staleness_slots <span class="kw">as </span>u64)
-                    &lt; staleness_slot
-            {
-                <span class="macro">msg!</span>(
-                    <span class="string">&quot;Switchboard v1 price too stale; pubkey {} price: {} round_open_slot: {}&quot;</span>,
-                    acc_info.key(),
-                    price.to_num::&lt;f64&gt;(),
-                    round_open_slot,
-                );
-                <span class="kw">return </span><span class="prelude-val">Err</span>(MangoError::OracleConfidence.into());
-            }
+            <span class="kw">let </span>deviation =
+                I80F48::from_num(result.result.max_response - result.result.min_response);
+            <span class="kw">let </span>last_update_slot = result.result.round_open_slot;
 
             <span class="kw">let </span>decimals = QUOTE_DECIMALS - (base_decimals <span class="kw">as </span>i8);
             <span class="kw">let </span>decimal_adj = power_of_ten(decimals);
-            (
-                price * decimal_adj,
-                OracleState {
-                    last_update_slot: round_open_slot,
-                    confidence: max_response - min_response,
-                    oracle_type: OracleType::SwitchboardV1,
-                },
-            )
+            <span class="kw">let </span>price = ui_price * decimal_adj;
+            <span class="macro">require_gte!</span>(price, <span class="number">0</span>);
+            OracleState {
+                price,
+                last_update_slot,
+                deviation,
+                oracle_type: OracleType::SwitchboardV1,
+            }
         }
     })
 }
