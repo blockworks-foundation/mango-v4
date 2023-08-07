@@ -1,19 +1,12 @@
 import { AnchorProvider, BN, Wallet } from '@coral-xyz/anchor';
 import { Cluster, Connection, Keypair, PublicKey } from '@solana/web3.js';
-import { assert } from 'console';
 import fs from 'fs';
 import { Bank } from '../../src/accounts/bank';
-import { MangoAccount } from '../../src/accounts/mangoAccount';
 import {
-  PerpMarket,
-  PerpOrderSide,
-  PerpOrderType,
-} from '../../src/accounts/perp';
-import {
-  Serum3OrderType,
-  Serum3SelfTradeBehavior,
-  Serum3Side,
-} from '../../src/accounts/serum3';
+  MangoAccount,
+  TokenConditionalSwapDisplayPriceStyle,
+} from '../../src/accounts/mangoAccount';
+import { PerpMarket } from '../../src/accounts/perp';
 import { Builder } from '../../src/builder';
 import { MangoClient } from '../../src/client';
 import {
@@ -194,6 +187,7 @@ async function main() {
       0.01,
       true,
       true,
+      TokenConditionalSwapDisplayPriceStyle.buyTokenPerSellToken,
     );
   }
 
@@ -216,6 +210,7 @@ async function main() {
       0.01,
       true,
       true,
+      TokenConditionalSwapDisplayPriceStyle.buyTokenPerSellToken,
     );
   }
 
@@ -238,6 +233,7 @@ async function main() {
       0.01,
       true,
       true,
+      TokenConditionalSwapDisplayPriceStyle.buyTokenPerSellToken,
     );
   }
 
