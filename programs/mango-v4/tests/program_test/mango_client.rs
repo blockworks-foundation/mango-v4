@@ -4190,7 +4190,7 @@ pub struct TokenConditionalSwapCreateInstruction {
     pub max_sell: u64,
     pub price_lower_limit: f64,
     pub price_upper_limit: f64,
-    pub price_premium_fraction: f64,
+    pub price_premium_rate: f64,
     pub allow_creating_deposits: bool,
     pub allow_creating_borrows: bool,
 }
@@ -4209,7 +4209,7 @@ impl ClientInstruction for TokenConditionalSwapCreateInstruction {
             expiry_timestamp: u64::MAX,
             price_lower_limit: self.price_lower_limit,
             price_upper_limit: self.price_upper_limit,
-            price_premium_fraction: self.price_premium_fraction,
+            price_premium_rate: self.price_premium_rate,
             allow_creating_deposits: self.allow_creating_deposits,
             allow_creating_borrows: self.allow_creating_borrows,
         };
