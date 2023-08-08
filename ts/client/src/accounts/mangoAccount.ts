@@ -1874,6 +1874,21 @@ export class TokenConditionalSwap {
     return this.priceLimitToUi(group, this.priceUpperLimit);
   }
 
+  getThresholdPriceUi(group: Group): number {
+    const a = I80F48.fromNumber(this.priceLowerLimit);
+    const b = I80F48.fromNumber(this.priceUpperLimit);
+
+    const buyBank = this.getBuyToken(group);
+    const sellBank = this.getSellToken(group);
+    const o = buyBank.price.div(sellBank.price);
+
+    // Choose the price closest to oracle
+    if (o.sub(a).abs().lt(o.sub(b).abs())) {
+      return this.getPriceLowerLimitUi(group);
+    }
+    return this.getPriceUpperLimitUi(group);
+  }
+
   getPricePremium(): number {
     return this.pricePremiumFraction * 100;
   }
@@ -1904,6 +1919,8 @@ export class TokenConditionalSwap {
     )}, getPriceLowerLimitUi ${this.getPriceLowerLimitUi(
       group,
     )},  getPriceUpperLimitUi ${this.getPriceUpperLimitUi(
+      group,
+    )}, getThresholdPriceUi ${this.getThresholdPriceUi(
       group,
     )}, getPricePremium ${this.getPricePremium()}, expiry ${this.expiryTimestamp.toString()}`;
   }

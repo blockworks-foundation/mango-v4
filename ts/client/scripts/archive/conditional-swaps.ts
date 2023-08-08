@@ -1,6 +1,7 @@
 import { AnchorProvider, Wallet } from '@coral-xyz/anchor';
 import { Cluster, Connection, Keypair, PublicKey } from '@solana/web3.js';
 import fs from 'fs';
+import { TokenIndex } from '../../src/accounts/bank';
 import { MangoClient } from '../../src/client';
 import { MANGO_V4_ID } from '../../src/constants';
 
@@ -37,32 +38,68 @@ async function main(): Promise<void> {
     );
 
     let account = await client.getMangoAccount(new PublicKey(MANGO_ACCOUNT_PK));
-    // await Promise.all(
-    //   account.tokenConditionalSwaps.map((tcs, i) => {
-    //     if (!tcs.hasData) {
-    //       return Promise.resolve();
-    //     }
-    //     client.tokenConditionalSwapCancel(group, account, i, tcs.id);
-    //   }),
-    // );
+    await Promise.all(
+      account.tokenConditionalSwaps.map((tcs, i) => {
+        if (!tcs.hasData) {
+          return Promise.resolve();
+        }
+        client.tokenConditionalSwapCancel(group, account, tcs.id);
+      }),
+    );
 
-    // console.log(group.getPriceImpactByTokenIndex(6 as TokenIndex, 10000));
-
-    // await client.tokenConditionalSwapStopLoss(
+    // const sig = await client.tcsTakeProfitOnDeposit(
     //   group,
     //   account,
-    //   group.getFirstBankByTokenIndex(0 as TokenIndex).mint,
-    //   group.getFirstBankByTokenIndex(6 as TokenIndex).mint,
-    //   account.getTokenBalanceUi(
-    //     group.getFirstBankByTokenIndex(6 as TokenIndex),
-    //   ),
+    //   group.getFirstBankByTokenIndex(4 as TokenIndex),
+    //   group.getFirstBankByTokenIndex(0 as TokenIndex),
+    //   group.getFirstBankByTokenIndex(4 as TokenIndex).uiPrice + 1,
+    //   false,
     //   null,
-    //   group.getFirstBankByTokenIndex(6 as TokenIndex).uiPrice * 1.1,
-    //   0,
-    //   2,
+    //   null,
+    //   null,
     // );
 
-    // account = await client.getMangoAccount(new PublicKey(MANGO_ACCOUNT_PK));
+    // const sig = await client.tcsStopLossOnDeposit(
+    //   group,
+    //   account,
+    //   group.getFirstBankByTokenIndex(4 as TokenIndex),
+    //   group.getFirstBankByTokenIndex(0 as TokenIndex),
+    //   group.getFirstBankByTokenIndex(4 as TokenIndex).uiPrice - 1,
+    //   false,
+    //   null,
+    //   null,
+    //   null,
+    // );
+
+    // const sig = await client.tcsTakeProfitOnBorrow(
+    //   group,
+    //   account,
+    //   group.getFirstBankByTokenIndex(0 as TokenIndex),
+    //   group.getFirstBankByTokenIndex(4 as TokenIndex),
+    //   group.getFirstBankByTokenIndex(4 as TokenIndex).uiPrice - 1,
+    //   true,
+    //   null,
+    //   null,
+    //   null,
+    //   null,
+    // );
+
+    const sig = await client.tcsStopLossOnBorrow(
+      group,
+      account,
+      group.getFirstBankByTokenIndex(0 as TokenIndex),
+      group.getFirstBankByTokenIndex(4 as TokenIndex),
+      group.getFirstBankByTokenIndex(4 as TokenIndex).uiPrice + 1,
+      true,
+      null,
+      null,
+      null,
+      null,
+    );
+
+    console.log(sig);
+
+    account = await client.getMangoAccount(new PublicKey(MANGO_ACCOUNT_PK));
     console.log(account.tokenConditionalSwaps[0].toString(group));
   } catch (error) {
     console.log(error);
