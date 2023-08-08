@@ -3543,7 +3543,7 @@ export class MangoClient {
         ? U64_MAX_BN
         : toNative(maxBuyUi, buyBank.mintDecimals);
     const maxSell =
-      maxBuyUi == Number.MAX_SAFE_INTEGER
+      maxSellUi == Number.MAX_SAFE_INTEGER
         ? U64_MAX_BN
         : toNative(maxSellUi, sellBank.mintDecimals);
 
