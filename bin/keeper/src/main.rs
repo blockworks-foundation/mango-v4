@@ -11,6 +11,7 @@ use mango_v4_client::{keypair_from_cli, Client, MangoClient, TransactionBuilderC
 use solana_sdk::commitment_config::CommitmentConfig;
 use solana_sdk::pubkey::Pubkey;
 use tokio::time;
+use tracing::*;
 
 // TODO
 // - may be nice to have one-shot cranking as well as the interval cranking
@@ -73,9 +74,7 @@ enum Command {
 
 #[tokio::main]
 async fn main() -> Result<(), anyhow::Error> {
-    env_logger::init_from_env(
-        env_logger::Env::default().filter_or(env_logger::DEFAULT_FILTER_ENV, "info"),
-    );
+    mango_v4_client::tracing_subscriber_init();
 
     let args = if let Ok(cli_dotenv) = CliDotenv::try_parse() {
         dotenv::from_path(cli_dotenv.dotenv)?;
@@ -121,7 +120,7 @@ async fn main() -> Result<(), anyhow::Error> {
             interval.tick().await;
             let client = mango_client.clone();
             tokio::task::spawn_blocking(move || {
-                log::info!(
+                info!(
                     "Arc<MangoClient>::strong_count() {}",
                     Arc::<MangoClient>::strong_count(&client)
                 )

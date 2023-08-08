@@ -2,6 +2,7 @@ use {
     std::collections::HashMap,
     std::sync::{atomic, Arc, Mutex, RwLock},
     tokio::time,
+    tracing::*,
 };
 
 #[derive(Debug)]
@@ -151,7 +152,7 @@ pub fn start() -> Metrics {
                             0
                         };
                         let diff = new_value.wrapping_sub(previous_value) as i64;
-                        log::info!("metric: {}: {} ({:+})", name, new_value, diff);
+                        info!("metric: {}: {} ({:+})", name, new_value, diff);
                     }
                     Value::I64(v) => {
                         let new_value = v.load(atomic::Ordering::Acquire);
@@ -164,7 +165,7 @@ pub fn start() -> Metrics {
                             0
                         };
                         let diff = new_value - previous_value;
-                        log::info!("metric: {}: {} ({:+})", name, new_value, diff);
+                        info!("metric: {}: {} ({:+})", name, new_value, diff);
                     }
                     Value::String(v) => {
                         let new_value = v.lock().unwrap();
@@ -178,13 +179,11 @@ pub fn start() -> Metrics {
                             "".into()
                         };
                         if *new_value == previous_value {
-                            log::info!("metric: {}: {} (unchanged)", name, &*new_value);
+                            info!("metric: {}: {} (unchanged)", name, &*new_value);
                         } else {
-                            log::info!(
+                            info!(
                                 "metric: {}: {} (before: {})",
-                                name,
-                                &*new_value,
-                                previous_value
+                                name, &*new_value, previous_value
                             );
                         }
                     }

@@ -75,7 +75,11 @@ pub fn token_register_trustless(
         deposit_weight_scale_start_quote: 5_000_000_000.0, // $5k
         reduce_only: 2,                                   // deposit-only
         force_close: 0,
-        reserved: [0; 2118],
+        padding: Default::default(),
+        fees_withdrawn: 0,
+        token_conditional_swap_taker_fee_rate: 0.0005,
+        token_conditional_swap_maker_fee_rate: 0.0005,
+        reserved: [0; 2096],
     };
     require_gt!(bank.max_rate, MINIMUM_MAX_RATE);
 

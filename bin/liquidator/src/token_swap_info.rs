@@ -2,6 +2,8 @@ use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
 
 use itertools::Itertools;
+use tracing::*;
+
 use mango_v4::state::TokenIndex;
 use mango_v4_client::jupiter::QueryRoute;
 use mango_v4_client::{JupiterSwapMode, MangoClient};
@@ -102,6 +104,7 @@ impl TokenSwapInfoUpdater {
             token_amount,
             slippage,
             JupiterSwapMode::ExactIn,
+            false,
             self.config.mock_jupiter,
         )
         .await?;
@@ -112,6 +115,7 @@ impl TokenSwapInfoUpdater {
             self.config.quote_amount,
             slippage,
             JupiterSwapMode::ExactIn,
+            false,
             self.config.mock_jupiter,
         )
         .await?;
@@ -153,6 +157,6 @@ impl TokenSwapInfoUpdater {
                 .unwrap_or_else(|| "no data".into());
             msg.push_str(&format!("token {token}, {info}"));
         }
-        log::trace!("swap infos:{}", msg);
+        trace!("swap infos:{}", msg);
     }
 }

@@ -1171,12 +1171,43 @@ pub fn new_health_cache(
     account: &MangoAccountRef,
     retriever: &impl AccountRetriever,
 ) -> Result<HealthCache> {
+    new_health_cache_impl(account, retriever, false)
+}
+
+/// Generate a special HealthCache for an account and its health accounts
+/// where nonnegative token positions for bad oracles are skipped.
+///
+/// This health cache must be used carefully, since it doesn't provide the actual
+/// account health, just a value that is guaranteed to be less than it.
+pub fn new_health_cache_skipping_bad_oracles(
+    account: &MangoAccountRef,
+    retriever: &impl AccountRetriever,
+) -> Result<HealthCache> {
+    new_health_cache_impl(account, retriever, true)
+}
+
+fn new_health_cache_impl(
+    account: &MangoAccountRef,
+    retriever: &impl AccountRetriever,
+    // If an oracle is stale or inconfident and the health contribution would
+    // not be negative, skip it. This decreases health, but maybe overall it's
+    // still positive?
+    skip_bad_oracles: bool,
+) -> Result<HealthCache> {
     // token contribution from token accounts
     let mut token_infos = vec![];
 
     for (i, position) in account.active_token_positions().enumerate() {
-        let (bank, oracle_price) =
-            retriever.bank_and_oracle(&account.fixed.group, i, position.token_index)?;
+        let bank_oracle_result =
+            retriever.bank_and_oracle(&account.fixed.group, i, position.token_index);
+        if skip_bad_oracles
+            && bank_oracle_result.is_oracle_error()
+            && position.indexed_position >= 0
+        {
+            // Ignore the asset because the oracle is bad, decreasing total health
+            continue;
+        }
+        let (bank, oracle_price) = bank_oracle_result?;
 
         let native = position.native(bank);
         let prices = Prices {

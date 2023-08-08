@@ -4,12 +4,12 @@ use std::time::Duration;
 
 use anchor_client::Cluster;
 use clap::Parser;
-use log::*;
 use mango_v4::state::{PerpMarketIndex, TokenIndex};
 use mango_v4_client::{
     account_update_stream, chain_data, keypair_from_cli, snapshot_source, websocket_source,
     AsyncChannelSendUnlessFull, Client, MangoClient, MangoGroupContext, TransactionBuilderConfig,
 };
+use tracing::*;
 
 use itertools::Itertools;
 use solana_sdk::commitment_config::CommitmentConfig;
@@ -75,6 +75,8 @@ pub fn encode_address(addr: &Pubkey) -> String {
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
+    mango_v4_client::tracing_subscriber_init();
+
     let args = if let Ok(cli_dotenv) = CliDotenv::try_parse() {
         dotenv::from_path(cli_dotenv.dotenv)?;
         cli_dotenv.remaining_args
@@ -234,7 +236,7 @@ async fn main() -> anyhow::Result<()> {
                         let mut state = shared_state.write().unwrap();
                         if is_mango_account(&account_write.account, &mango_group).is_some() {
                             // e.g. to render debug logs RUST_LOG="liquidator=debug"
-                            log::debug!(
+                            debug!(
                                 "change to mango account {}...",
                                 &account_write.pubkey.to_string()[0..3]
                             );
@@ -250,15 +252,15 @@ async fn main() -> anyhow::Result<()> {
                         } else {
                             let mut must_check_all = false;
                             if is_mango_bank(&account_write.account, &mango_group).is_some() {
-                                log::debug!("change to bank {}", &account_write.pubkey);
+                                debug!("change to bank {}", &account_write.pubkey);
                                 must_check_all = true;
                             }
                             if is_perp_market(&account_write.account, &mango_group).is_some() {
-                                log::debug!("change to perp market {}", &account_write.pubkey);
+                                debug!("change to perp market {}", &account_write.pubkey);
                                 must_check_all = true;
                             }
                             if oracles.contains(&account_write.pubkey) {
-                                log::debug!("change to oracle {}", &account_write.pubkey);
+                                debug!("change to oracle {}", &account_write.pubkey);
                                 must_check_all = true;
                             }
                             if must_check_all {
@@ -324,7 +326,7 @@ async fn main() -> anyhow::Result<()> {
         vec![data_job, settle_job].into_iter().collect();
     jobs.next().await;
 
-    log::error!("a critical job aborted, exiting");
+    error!("a critical job aborted, exiting");
     Ok(())
 }
 

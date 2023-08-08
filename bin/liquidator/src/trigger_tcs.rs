@@ -4,6 +4,7 @@ use mango_v4::state::{MangoAccountValue, TokenConditionalSwap};
 use mango_v4_client::{chain_data, health_cache, JupiterSwapMode, MangoClient};
 
 use rand::seq::SliceRandom;
+use tracing::*;
 use {anyhow::Context, fixed::types::I80F48, solana_sdk::pubkey::Pubkey};
 
 use crate::{token_swap_info, util};
@@ -68,7 +69,7 @@ async fn tcs_is_interesting(
 }
 
 #[allow(clippy::too_many_arguments)]
-pub async fn maybe_execute_token_conditional_swap_inner(
+async fn maybe_execute_token_conditional_swap_inner(
     mango_client: &MangoClient,
     account_fetcher: &chain_data::AccountFetcher,
     token_swap_info: &token_swap_info::TokenSwapInfoUpdater,
@@ -99,6 +100,19 @@ pub async fn maybe_execute_token_conditional_swap_inner(
         return Ok(false);
     }
 
+    execute_token_conditional_swap(mango_client, account_fetcher, pubkey, config, &liqee, tcs).await
+}
+
+#[allow(clippy::too_many_arguments)]
+#[instrument(skip_all, fields(%pubkey, tcs_id = tcs.id))]
+async fn execute_token_conditional_swap(
+    mango_client: &MangoClient,
+    account_fetcher: &chain_data::AccountFetcher,
+    pubkey: &Pubkey,
+    config: &Config,
+    liqee: &MangoAccountValue,
+    tcs: &TokenConditionalSwap,
+) -> anyhow::Result<bool> {
     let liqor_min_health_ratio = I80F48::from_num(config.min_health_ratio);
 
     // Compute the max viable swap (for liqor and liqee) and min it
@@ -171,6 +185,7 @@ pub async fn maybe_execute_token_conditional_swap_inner(
             input_amount,
             slippage,
             swap_mode,
+            false,
             config.mock_jupiter,
         )
         .await?;
@@ -180,22 +195,21 @@ pub async fn maybe_execute_token_conditional_swap_inner(
         let swap_price = sell_amount / buy_amount;
 
         if swap_price > taker_price.to_num::<f64>() {
-            log::trace!(
-                "skipping token conditional swap for: {pubkey}, id: {tcs_id}, \
-                max_buy: {max_buy_token_to_liqee}, max_sell: {max_sell_token_to_liqor}, \
-                because counter swap price: {swap_price} while taker price: {taker_price}",
+            trace!(
+                max_buy = max_buy_token_to_liqee,
+                max_sell = max_sell_token_to_liqor,
+                jupiter_swap_price = %swap_price,
+                tcs_taker_price = %taker_price,
+                "skipping token conditional swap because of prices",
             );
             return Ok(false);
         }
     }
 
-    log::trace!(
-        "executing token conditional swap for: {}, with owner: {}, id: {}, max_buy: {}, max_sell: {}",
-        pubkey,
-        liqee.fixed.owner,
-        tcs_id,
-        max_buy_token_to_liqee,
-        max_sell_token_to_liqor,
+    trace!(
+        max_buy = max_buy_token_to_liqee,
+        max_sell = max_sell_token_to_liqor,
+        "executing token conditional swap",
     );
 
     let txsig = mango_client
@@ -206,11 +220,9 @@ pub async fn maybe_execute_token_conditional_swap_inner(
             max_sell_token_to_liqor,
         )
         .await?;
-    log::info!(
-        "Executed swap account {}, tcs index {}, tx sig {:?}",
-        pubkey,
-        tcs_id,
-        txsig
+    info!(
+        %txsig,
+        "Executed token conditional swap",
     );
 
     let slot = account_fetcher.transaction_max_slot(&[txsig]).await?;
@@ -222,13 +234,14 @@ pub async fn maybe_execute_token_conditional_swap_inner(
         )
         .await
     {
-        log::info!("could not refresh after tcs: {}", e);
+        info!(%txsig, "could not refresh after tcs execution: {}", e);
     }
 
     Ok(true)
 }
 
 #[allow(clippy::too_many_arguments)]
+#[instrument(skip_all, fields(%pubkey, tcs_id))]
 pub async fn remove_expired_token_conditional_swap(
     mango_client: &MangoClient,
     pubkey: &Pubkey,
@@ -238,11 +251,9 @@ pub async fn remove_expired_token_conditional_swap(
     let txsig = mango_client
         .token_conditional_swap_trigger((pubkey, &liqee), tcs_id, 0, 0)
         .await?;
-    log::info!(
-        "Removed expired token conditional swap account {}, tcs index {}, tx sig {:?}",
-        pubkey,
-        tcs_id,
-        txsig
+    info!(
+        %txsig,
+        "Removed expired token conditional swap",
     );
 
     Ok(true)

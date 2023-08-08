@@ -863,7 +863,7 @@ impl<
         raw_index: usize,
         mango_account_pubkey: Pubkey,
     ) {
-        let mango_group = self.fixed.deref_or_borrow().group;
+        let mango_group = self.fixed().group;
         let token_position = self.token_position_mut_by_raw_index(raw_index);
         assert!(token_position.in_use_count == 0);
         emit!(DeactivateTokenPositionLog {
@@ -874,6 +874,32 @@ impl<
             cumulative_borrow_interest: token_position.cumulative_borrow_interest,
         });
         self.token_position_mut_by_raw_index(raw_index).token_index = TokenIndex::MAX;
+    }
+
+    /// Decrements the in_use_count for the token position for the bank.
+    ///
+    /// If it goes to 0, the position may be dusted (if between 0 and 1 native tokens)
+    /// and closed.
+    pub fn token_decrement_dust_deactivate(
+        &mut self,
+        bank: &mut crate::state::Bank,
+        now_ts: u64,
+        mango_account_pubkey: Pubkey,
+    ) -> Result<()> {
+        let token_result = self.token_position_mut(bank.token_index);
+        if token_result.is_anchor_error_with_code(MangoError::TokenPositionDoesNotExist.into()) {
+            // Already deactivated is ok
+            return Ok(());
+        }
+        let (position, raw_index) = token_result?;
+
+        position.decrement_in_use();
+        let active = bank.dust_if_possible(position, now_ts)?;
+        if !active {
+            self.deactivate_token_position_and_log(raw_index, mango_account_pubkey);
+        }
+
+        Ok(())
     }
 
     // get mut Serum3Orders at raw_index
@@ -961,8 +987,8 @@ impl<
                 *perp_position = PerpPosition::default();
                 perp_position.market_index = perp_market_index;
 
-                let mut settle_token_position = self.ensure_token_position(settle_token_index)?.0;
-                settle_token_position.in_use_count += 1;
+                let settle_token_position = self.ensure_token_position(settle_token_index)?.0;
+                settle_token_position.increment_in_use();
             }
         }
         if let Some(raw_index) = raw_index_opt {
@@ -979,8 +1005,8 @@ impl<
     ) -> Result<()> {
         self.perp_position_mut(perp_market_index)?.market_index = PerpMarketIndex::MAX;
 
-        let mut settle_token_position = self.token_position_mut(settle_token_index)?.0;
-        settle_token_position.in_use_count -= 1;
+        let settle_token_position = self.token_position_mut(settle_token_index)?.0;
+        settle_token_position.decrement_in_use();
 
         Ok(())
     }
@@ -991,7 +1017,7 @@ impl<
         settle_token_index: TokenIndex,
         mango_account_pubkey: Pubkey,
     ) -> Result<()> {
-        let mango_group = self.fixed.deref_or_borrow().group;
+        let mango_group = self.fixed().group;
         let perp_position = self.perp_position_mut(perp_market_index)?;
 
         emit!(DeactivatePerpPositionLog {
@@ -1007,8 +1033,8 @@ impl<
 
         perp_position.market_index = PerpMarketIndex::MAX;
 
-        let mut settle_token_position = self.token_position_mut(settle_token_index)?.0;
-        settle_token_position.in_use_count -= 1;
+        let settle_token_position = self.token_position_mut(settle_token_index)?.0;
+        settle_token_position.decrement_in_use();
 
         Ok(())
     }
@@ -1147,7 +1173,15 @@ impl<
     pub fn check_health_pre(&mut self, health_cache: &HealthCache) -> Result<I80F48> {
         let pre_init_health = health_cache.health(HealthType::Init);
         msg!("pre_init_health: {}", pre_init_health);
+        self.check_health_pre_checks(health_cache, pre_init_health)?;
+        Ok(pre_init_health)
+    }
 
+    pub fn check_health_pre_checks(
+        &mut self,
+        health_cache: &HealthCache,
+        pre_init_health: I80F48,
+    ) -> Result<()> {
         // We can skip computing LiquidationEnd health if Init health > 0, because
         // LiquidationEnd health >= Init health.
         self.fixed_mut()
@@ -1161,8 +1195,7 @@ impl<
             !self.fixed().being_liquidated(),
             MangoError::BeingLiquidated
         );
-
-        Ok(pre_init_health)
+        Ok(())
     }
 
     pub fn check_health_post(
@@ -1172,7 +1205,15 @@ impl<
     ) -> Result<I80F48> {
         let post_init_health = health_cache.health(HealthType::Init);
         msg!("post_init_health: {}", post_init_health);
+        self.check_health_post_checks(pre_init_health, post_init_health)?;
+        Ok(post_init_health)
+    }
 
+    pub fn check_health_post_checks(
+        &mut self,
+        pre_init_health: I80F48,
+        post_init_health: I80F48,
+    ) -> Result<()> {
         // Accounts that have negative init health may only take actions that don't further
         // decrease their health.
         // To avoid issues with rounding, we allow accounts to decrease their health by up to
@@ -1193,7 +1234,7 @@ impl<
             post_init_health >= 0 || health_does_not_decrease,
             MangoError::HealthMustBePositiveOrIncrease
         );
-        Ok(post_init_health)
+        Ok(())
     }
 
     pub fn check_liquidatable(&mut self, health_cache: &HealthCache) -> Result<CheckLiquidatable> {

@@ -27,6 +27,8 @@ export interface TokenEditParams {
   reduceOnly: number | null;
   name: string | null;
   forceClose: boolean | null;
+  tokenConditionalSwapTakerFeeRate: number | null;
+  tokenConditionalSwapMakerFeeRate: number | null;
 }
 
 export const NullTokenEditParams: TokenEditParams = {
@@ -54,6 +56,8 @@ export const NullTokenEditParams: TokenEditParams = {
   reduceOnly: null,
   name: null,
   forceClose: null,
+  tokenConditionalSwapTakerFeeRate: null,
+  tokenConditionalSwapMakerFeeRate: null,
 };
 
 export interface PerpEditParams {
@@ -182,6 +186,18 @@ export interface IxGateParams {
   TokenConditionalSwapCreate: boolean;
   TokenConditionalSwapTrigger: boolean;
   TokenConditionalSwapCancel: boolean;
+  OpenbookV2CancelOrder: boolean;
+  OpenbookV2CloseOpenOrders: boolean;
+  OpenbookV2CreateOpenOrders: boolean;
+  OpenbookV2DeregisterMarket: boolean;
+  OpenbookV2EditMarket: boolean;
+  OpenbookV2LiqForceCancelOrders: boolean;
+  OpenbookV2PlaceOrder: boolean;
+  OpenbookV2PlaceTakeOrder: boolean;
+  OpenbookV2RegisterMarket: boolean;
+  OpenbookV2SettleFunds: boolean;
+  AdminTokenWithdrawFees: boolean;
+  AdminPerpWithdrawFees: boolean;
 }
 
 // Default with all ixs enabled, use with buildIxGate
@@ -244,6 +260,18 @@ export const TrueIxGateParams: IxGateParams = {
   TokenConditionalSwapCreate: true,
   TokenConditionalSwapTrigger: true,
   TokenConditionalSwapCancel: true,
+  OpenbookV2CancelOrder: true,
+  OpenbookV2CloseOpenOrders: true,
+  OpenbookV2CreateOpenOrders: true,
+  OpenbookV2DeregisterMarket: true,
+  OpenbookV2EditMarket: true,
+  OpenbookV2LiqForceCancelOrders: true,
+  OpenbookV2PlaceOrder: true,
+  OpenbookV2PlaceTakeOrder: true,
+  OpenbookV2RegisterMarket: true,
+  OpenbookV2SettleFunds: true,
+  AdminTokenWithdrawFees: true,
+  AdminPerpWithdrawFees: true,
 };
 
 // build ix gate e.g. buildIxGate(Builder(TrueIxGateParams).TokenDeposit(false).build()).toNumber(),
@@ -316,6 +344,18 @@ export function buildIxGate(p: IxGateParams): BN {
   toggleIx(ixGate, p, 'TokenConditionalSwapCreate', 52);
   toggleIx(ixGate, p, 'TokenConditionalSwapTrigger', 53);
   toggleIx(ixGate, p, 'TokenConditionalSwapCancel', 54);
+  toggleIx(ixGate, p, 'OpenbookV2CancelOrder', 55);
+  toggleIx(ixGate, p, 'OpenbookV2CloseOpenOrders', 56);
+  toggleIx(ixGate, p, 'OpenbookV2CreateOpenOrders', 57);
+  toggleIx(ixGate, p, 'OpenbookV2DeregisterMarket', 58);
+  toggleIx(ixGate, p, 'OpenbookV2EditMarket', 59);
+  toggleIx(ixGate, p, 'OpenbookV2LiqForceCancelOrders', 60);
+  toggleIx(ixGate, p, 'OpenbookV2PlaceOrder', 61);
+  toggleIx(ixGate, p, 'OpenbookV2PlaceTakeOrder', 62);
+  toggleIx(ixGate, p, 'OpenbookV2RegisterMarket', 63);
+  toggleIx(ixGate, p, 'OpenbookV2SettleFunds', 63);
+  toggleIx(ixGate, p, 'AdminTokenWithdrawFees', 65);
+  toggleIx(ixGate, p, 'AdminPerpWithdrawFees', 66);
 
   return ixGate;
 }

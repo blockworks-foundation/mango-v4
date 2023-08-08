@@ -39,6 +39,8 @@ pub fn token_edit(
     reduce_only_opt: Option<u8>,
     name_opt: Option<String>,
     force_close_opt: Option<bool>,
+    token_conditional_swap_taker_fee_rate_opt: Option<f32>,
+    token_conditional_swap_maker_fee_rate_opt: Option<f32>,
 ) -> Result<()> {
     let group = ctx.accounts.group.load()?;
 
@@ -304,6 +306,27 @@ pub fn token_edit(
             bank.force_close = u8::from(force_close);
             require_group_admin = true;
         };
+
+        if let Some(fee_fraction) = token_conditional_swap_taker_fee_rate_opt {
+            msg!(
+                "Token conditional swap taker fee fraction old {:?}, new {:?}",
+                bank.token_conditional_swap_taker_fee_rate,
+                fee_fraction
+            );
+            require_gte!(fee_fraction, 0.0); // values <0 are not currently supported
+            bank.token_conditional_swap_taker_fee_rate = fee_fraction;
+            require_group_admin = true;
+        }
+        if let Some(fees_fraction) = token_conditional_swap_maker_fee_rate_opt {
+            msg!(
+                "Token conditional swap maker fee fraction old {:?}, new {:?}",
+                bank.token_conditional_swap_maker_fee_rate,
+                fees_fraction
+            );
+            require_gte!(fees_fraction, 0.0); // values <0 are not currently supported
+            bank.token_conditional_swap_maker_fee_rate = fees_fraction;
+            require_group_admin = true;
+        }
     }
 
     // account constraint #1

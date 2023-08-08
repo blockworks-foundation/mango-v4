@@ -136,8 +136,18 @@ pub struct Bank {
     pub reduce_only: u8,
     pub force_close: u8,
 
+    pub padding: [u8; 6],
+
+    // Do separate bookkeping for how many tokens were withdrawn
+    // This ensures that collected_fees_native is strictly increasing for stats gathering purposes
+    pub fees_withdrawn: u64,
+
+    /// Fees for the token conditional swap feature
+    pub token_conditional_swap_taker_fee_rate: f32,
+    pub token_conditional_swap_maker_fee_rate: f32,
+
     #[derivative(Debug = "ignore")]
-    pub reserved: [u8; 2118],
+    pub reserved: [u8; 2096],
 }
 const_assert_eq!(
     size_of::<Bank>(),
@@ -166,7 +176,10 @@ const_assert_eq!(
         + 8
         + 1
         + 1
-        + 2118
+        + 6
+        + 8
+        + 2 * 4
+        + 2096
 );
 const_assert_eq!(size_of::<Bank>(), 3064);
 const_assert_eq!(size_of::<Bank>() % 8, 0);
@@ -240,7 +253,11 @@ impl Bank {
             deposit_weight_scale_start_quote: f64::MAX,
             reduce_only: 0,
             force_close: 0,
-            reserved: [0; 2118],
+            padding: [0; 6],
+            fees_withdrawn: 0,
+            token_conditional_swap_taker_fee_rate: 0.0,
+            token_conditional_swap_maker_fee_rate: 0.0,
+            reserved: [0; 2096],
         }
     }
 
@@ -577,6 +594,19 @@ impl Bank {
         })
     }
 
+    /// Returns true if the position remains active
+    pub fn dust_if_possible(&mut self, position: &mut TokenPosition, now_ts: u64) -> Result<bool> {
+        if position.is_in_use() {
+            return Ok(true);
+        }
+        let native = position.native(self);
+        if native >= 0 && native < 1 {
+            // Withdrawing 0 triggers the dusting check
+            return self.withdraw_without_fee(position, I80F48::ZERO, now_ts);
+        }
+        Ok(true)
+    }
+
     /// Change a position without applying the loan origination fee
     pub fn change_without_fee(
         &mut self,
@@ -827,14 +857,13 @@ impl Bank {
         staleness_slot: Option<u64>,
     ) -> Result<I80F48> {
         require_keys_eq!(self.oracle, *oracle_acc.key());
-        let (price, _) = oracle::oracle_price_and_state(
-            oracle_acc,
+        let state = oracle::oracle_state_unchecked(oracle_acc, self.mint_decimals)?;
+        state.check_confidence_and_maybe_staleness(
+            &self.oracle,
             &self.oracle_config,
-            self.mint_decimals,
             staleness_slot,
         )?;
-
-        Ok(price)
+        Ok(state.price)
     }
 
     pub fn stable_price(&self) -> I80F48 {
@@ -961,7 +990,7 @@ mod tests {
                 let mut account = TokenPosition {
                     indexed_position: I80F48::ZERO,
                     token_index: 0,
-                    in_use_count: u8::from(is_in_use),
+                    in_use_count: u16::from(is_in_use),
                     cumulative_deposit_interest: 0.0,
                     cumulative_borrow_interest: 0.0,
                     previous_index: I80F48::ZERO,

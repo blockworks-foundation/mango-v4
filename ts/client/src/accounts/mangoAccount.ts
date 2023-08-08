@@ -1752,6 +1752,11 @@ export class PerpOoDto {
   ) {}
 }
 
+export class TokenConditionalSwapDisplayPriceStyle {
+  static sellTokenPerBuyToken = { sellTokenPerBuyToken: {} };
+  static buyTokenPerSellToken = { buyTokenPerSellToken: {} };
+}
+
 export class TokenConditionalSwap {
   static from(dto: TokenConditionalSwapDto): TokenConditionalSwap {
     return new TokenConditionalSwap(
@@ -1763,14 +1768,17 @@ export class TokenConditionalSwap {
       dto.expiryTimestamp,
       dto.priceLowerLimit,
       dto.priceUpperLimit,
-      dto.pricePremiumFraction,
-      dto.takerFeeFraction,
-      dto.makerFeeFraction,
+      dto.pricePremiumRate,
+      dto.takerFeeRate,
+      dto.makerFeeRate,
       dto.buyTokenIndex as TokenIndex,
       dto.sellTokenIndex as TokenIndex,
       dto.hasData == 1,
       dto.allowCreatingDeposits == 1,
       dto.allowCreatingBorrows == 1,
+      dto.priceDisplayStyle == 0
+        ? TokenConditionalSwapDisplayPriceStyle.sellTokenPerBuyToken
+        : TokenConditionalSwapDisplayPriceStyle.buyTokenPerSellToken,
     );
   }
 
@@ -1783,14 +1791,15 @@ export class TokenConditionalSwap {
     public expiryTimestamp: BN,
     public priceLowerLimit: number,
     public priceUpperLimit: number,
-    public pricePremiumFraction: number,
-    public takerFeeFraction: number,
-    public makerFeeFraction: number,
+    public pricePremiumRate: number,
+    public takerFeeRate: number,
+    public makerFeeRate: number,
     public buyTokenIndex: TokenIndex,
     public sellTokenIndex: TokenIndex,
     public hasData: boolean,
     public allowCreatingDeposits: boolean,
     public allowCreatingBorrows: boolean,
+    public priceDisplayStyle: TokenConditionalSwapDisplayPriceStyle,
   ) {}
 }
 
@@ -1804,14 +1813,15 @@ export class TokenConditionalSwapDto {
     public expiryTimestamp: BN,
     public priceLowerLimit: number,
     public priceUpperLimit: number,
-    public pricePremiumFraction: number,
-    public takerFeeFraction: number,
-    public makerFeeFraction: number,
+    public pricePremiumRate: number,
+    public takerFeeRate: number,
+    public makerFeeRate: number,
     public buyTokenIndex: number,
     public sellTokenIndex: number,
     public hasData: number,
     public allowCreatingDeposits: number,
     public allowCreatingBorrows: number,
+    public priceDisplayStyle: number,
   ) {}
 }
 

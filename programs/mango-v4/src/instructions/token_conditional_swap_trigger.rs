@@ -41,12 +41,29 @@ pub fn token_conditional_swap_trigger(
     require_eq!(tcs.id, token_conditional_swap_id);
     let buy_token_index = tcs.buy_token_index;
     let sell_token_index = tcs.sell_token_index;
+    let now_ts: u64 = Clock::get()?.unix_timestamp.try_into().unwrap();
+    let tcs_is_expired = tcs.is_expired(now_ts);
+
+    // As a precaution, ensure that the liqee (and its health cache) will have an entry for both tokens:
+    // we will want to adjust their values later. This is already guaranteed by the in_use_count
+    // changes when the tcs was created.
+    liqee.ensure_token_position(buy_token_index)?;
+    liqee.ensure_token_position(sell_token_index)?;
+
+    let mut liqee_health_cache = new_health_cache(&liqee.borrow(), &account_retriever)
+        .context("create liqee health cache")?;
+    let (buy_bank, buy_token_price, sell_bank_and_oracle_opt) =
+        account_retriever.banks_mut_and_oracles(buy_token_index, sell_token_index)?;
+    let (sell_bank, sell_token_price) = sell_bank_and_oracle_opt.unwrap();
 
     // Possibly wipe the tcs and exit, if it's already expired
-    let now_ts: u64 = Clock::get()?.unix_timestamp.try_into().unwrap();
-    if tcs.is_expired(now_ts) {
+    if tcs_is_expired {
         let tcs = liqee.token_conditional_swap_mut_by_index(token_conditional_swap_index)?;
         *tcs = TokenConditionalSwap::default();
+
+        // Release the hold on token positions and potentially close them
+        liqee.token_decrement_dust_deactivate(buy_bank, now_ts, liqee_key)?;
+        liqee.token_decrement_dust_deactivate(sell_bank, now_ts, liqee_key)?;
 
         msg!("TokenConditionalSwap is expired, removing");
         emit!(TokenConditionalSwapCancelLog {
@@ -58,18 +75,7 @@ pub fn token_conditional_swap_trigger(
         return Ok(());
     }
 
-    // Guarantee that the liqee health cache will have an entry for both tokens:
-    // we will want to adjust their values later.
-    liqee.ensure_token_position(buy_token_index)?;
-    liqee.ensure_token_position(sell_token_index)?;
-
-    let mut liqee_health_cache = new_health_cache(&liqee.borrow(), &account_retriever)
-        .context("create liqee health cache")?;
     let liqee_pre_init_health = liqee.check_health_pre(&liqee_health_cache)?;
-
-    let (buy_bank, buy_token_price, sell_bank_and_oracle_opt) =
-        account_retriever.banks_mut_and_oracles(buy_token_index, sell_token_index)?;
-    let (sell_bank, sell_token_price) = sell_bank_and_oracle_opt.unwrap();
 
     let (liqee_buy_change, liqee_sell_change) = action(
         &mut liqor.borrow_mut(),
@@ -264,6 +270,8 @@ fn action(
 
     let post_liqee_buy_token = liqee_buy_token.native(&buy_bank);
     let post_liqor_buy_token = liqor_buy_token.native(&buy_bank);
+    let liqee_buy_indexed_position = liqee_buy_token.indexed_position;
+    let liqor_buy_indexed_position = liqor_buy_token.indexed_position;
 
     let (liqee_sell_token, liqee_sell_raw_index) =
         liqee.token_position_mut(tcs.sell_token_index)?;
@@ -289,6 +297,8 @@ fn action(
 
     let post_liqee_sell_token = liqee_sell_token.native(&sell_bank);
     let post_liqor_sell_token = liqor_sell_token.native(&sell_bank);
+    let liqee_sell_indexed_position = liqee_sell_token.indexed_position;
+    let liqor_sell_indexed_position = liqor_sell_token.indexed_position;
 
     // With a scanning account retriever, it's safe to deactivate inactive token positions immediately
     if !liqee_buy_active {
@@ -311,7 +321,7 @@ fn action(
         mango_group: liqee.fixed.group,
         mango_account: liqee_key,
         token_index: tcs.buy_token_index,
-        indexed_position: post_liqee_buy_token.to_bits(),
+        indexed_position: liqee_buy_indexed_position.to_bits(),
         deposit_index: buy_bank.deposit_index.to_bits(),
         borrow_index: buy_bank.borrow_index.to_bits(),
     });
@@ -320,7 +330,7 @@ fn action(
         mango_group: liqee.fixed.group,
         mango_account: liqee_key,
         token_index: tcs.sell_token_index,
-        indexed_position: post_liqee_sell_token.to_bits(),
+        indexed_position: liqee_sell_indexed_position.to_bits(),
         deposit_index: sell_bank.deposit_index.to_bits(),
         borrow_index: sell_bank.borrow_index.to_bits(),
     });
@@ -329,7 +339,7 @@ fn action(
         mango_group: liqee.fixed.group,
         mango_account: liqor_key,
         token_index: tcs.buy_token_index,
-        indexed_position: post_liqor_buy_token.to_bits(),
+        indexed_position: liqor_buy_indexed_position.to_bits(),
         deposit_index: buy_bank.deposit_index.to_bits(),
         borrow_index: buy_bank.borrow_index.to_bits(),
     });
@@ -338,7 +348,7 @@ fn action(
         mango_group: liqee.fixed.group,
         mango_account: liqor_key,
         token_index: tcs.sell_token_index,
-        indexed_position: post_liqor_sell_token.to_bits(),
+        indexed_position: liqor_sell_indexed_position.to_bits(),
         deposit_index: sell_bank.deposit_index.to_bits(),
         borrow_index: sell_bank.borrow_index.to_bits(),
     });
@@ -420,6 +430,12 @@ fn action(
             false
         }
     };
+
+    if closed {
+        // Free up token position locks, maybe dusting and deactivating them
+        liqee.token_decrement_dust_deactivate(buy_bank, now_ts, liqee_key)?;
+        liqee.token_decrement_dust_deactivate(sell_bank, now_ts, liqee_key)?;
+    }
 
     emit!(TokenConditionalSwapTriggerLog {
         mango_group: liqee.fixed.group,
@@ -770,7 +786,7 @@ mod tests {
             max_sell: 100,
             price_lower_limit: 1.0,
             price_upper_limit: 3.0,
-            price_premium_fraction: 0.11,
+            price_premium_rate: 0.11,
             buy_token_index: 1,
             sell_token_index: 0,
             has_data: 1,
@@ -833,7 +849,7 @@ mod tests {
             max_sell: 10000,
             price_lower_limit: 1.0,
             price_upper_limit: 3.0,
-            price_premium_fraction: 0.0,
+            price_premium_rate: 0.0,
             buy_token_index: 1,
             sell_token_index: 0,
             has_data: 1,
@@ -862,9 +878,9 @@ mod tests {
             max_sell: 1000,
             price_lower_limit: 1.0,
             price_upper_limit: 3.0,
-            price_premium_fraction: 0.02,
-            maker_fee_fraction: 0.03,
-            taker_fee_fraction: 0.05,
+            price_premium_rate: 0.02,
+            maker_fee_rate: 0.03,
+            taker_fee_rate: 0.05,
             buy_token_index: 1,
             sell_token_index: 0,
             has_data: 1,

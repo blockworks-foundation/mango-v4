@@ -31,17 +31,29 @@ pub mod instructions;
 compile_error!("compiling the program entrypoint without 'enable-gpl' makes no sense, enable it or use the 'cpi' or 'client' features");
 
 use state::{
-    OracleConfigParams, PerpMarketIndex, PlaceOrderType, SelfTradeBehavior, Serum3MarketIndex,
-    Side, TokenConditionalSwap, TokenIndex,
+    OpenbookV2MarketIndex, OracleConfigParams, PerpMarketIndex, PlaceOrderType, SelfTradeBehavior,
+    Serum3MarketIndex, Side, TokenConditionalSwap, TokenConditionalSwapDisplayPriceStyle,
+    TokenIndex,
 };
 
 declare_id!("4MangoMjqJ2firMokCjjGgoK8d4MXcrgL7XJaL3w6fVg");
 
 #[program]
 pub mod mango_v4 {
-
     use super::*;
     use error::*;
+
+    pub fn admin_token_withdraw_fees(ctx: Context<AdminTokenWithdrawFees>) -> Result<()> {
+        #[cfg(feature = "enable-gpl")]
+        instructions::admin_token_withdraw_fees(ctx)?;
+        Ok(())
+    }
+
+    pub fn admin_perp_withdraw_fees(ctx: Context<AdminPerpWithdrawFees>) -> Result<()> {
+        #[cfg(feature = "enable-gpl")]
+        instructions::admin_perp_withdraw_fees(ctx)?;
+        Ok(())
+    }
 
     pub fn group_create(
         ctx: Context<GroupCreate>,
@@ -68,8 +80,6 @@ pub mod mango_v4 {
         buyback_fees_swap_mango_account_opt: Option<Pubkey>,
         mngo_token_index_opt: Option<TokenIndex>,
         buyback_fees_expiry_interval_opt: Option<u64>,
-        token_conditional_swap_taker_fee_fraction_opt: Option<f32>,
-        token_conditional_swap_maker_fee_fraction_opt: Option<f32>,
     ) -> Result<()> {
         #[cfg(feature = "enable-gpl")]
         instructions::group_edit(
@@ -85,8 +95,6 @@ pub mod mango_v4 {
             buyback_fees_swap_mango_account_opt,
             mngo_token_index_opt,
             buyback_fees_expiry_interval_opt,
-            token_conditional_swap_taker_fee_fraction_opt,
-            token_conditional_swap_maker_fee_fraction_opt,
         )?;
         Ok(())
     }
@@ -188,6 +196,8 @@ pub mod mango_v4 {
         reduce_only_opt: Option<u8>,
         name_opt: Option<String>,
         force_close_opt: Option<bool>,
+        token_conditional_swap_taker_fee_rate_opt: Option<f32>,
+        token_conditional_swap_maker_fee_rate_opt: Option<f32>,
     ) -> Result<()> {
         #[cfg(feature = "enable-gpl")]
         instructions::token_edit(
@@ -216,6 +226,8 @@ pub mod mango_v4 {
             reduce_only_opt,
             name_opt,
             force_close_opt,
+            token_conditional_swap_taker_fee_rate_opt,
+            token_conditional_swap_maker_fee_rate_opt,
         )?;
         Ok(())
     }
@@ -350,6 +362,17 @@ pub mod mango_v4 {
     pub fn stub_oracle_set(ctx: Context<StubOracleSet>, price: I80F48) -> Result<()> {
         #[cfg(feature = "enable-gpl")]
         instructions::stub_oracle_set(ctx, price)?;
+        Ok(())
+    }
+
+    pub fn stub_oracle_set_test(
+        ctx: Context<StubOracleSet>,
+        price: I80F48,
+        last_update_slot: u64,
+        deviation: I80F48,
+    ) -> Result<()> {
+        #[cfg(feature = "enable-gpl")]
+        instructions::stub_oracle_set_test(ctx, price, last_update_slot, deviation)?;
         Ok(())
     }
 
@@ -1145,9 +1168,35 @@ pub mod mango_v4 {
         expiry_timestamp: u64,
         price_lower_limit: f64,
         price_upper_limit: f64,
-        price_premium_fraction: f64,
+        price_premium_rate: f64,
         allow_creating_deposits: bool,
         allow_creating_borrows: bool,
+    ) -> Result<()> {
+        token_conditional_swap_create_v2(
+            ctx,
+            max_buy,
+            max_sell,
+            expiry_timestamp,
+            price_lower_limit,
+            price_upper_limit,
+            price_premium_rate,
+            allow_creating_deposits,
+            allow_creating_borrows,
+            TokenConditionalSwapDisplayPriceStyle::SellTokenPerBuyToken,
+        )
+    }
+
+    pub fn token_conditional_swap_create_v2(
+        ctx: Context<TokenConditionalSwapCreate>,
+        max_buy: u64,
+        max_sell: u64,
+        expiry_timestamp: u64,
+        price_lower_limit: f64,
+        price_upper_limit: f64,
+        price_premium_rate: f64,
+        allow_creating_deposits: bool,
+        allow_creating_borrows: bool,
+        display_price_style: TokenConditionalSwapDisplayPriceStyle,
     ) -> Result<()> {
         let tcs = TokenConditionalSwap {
             id: u64::MAX, // set inside
@@ -1158,15 +1207,16 @@ pub mod mango_v4 {
             expiry_timestamp,
             price_lower_limit,
             price_upper_limit,
-            price_premium_fraction,
-            taker_fee_fraction: 0.0, // set inside
-            maker_fee_fraction: 0.0, // set inside
+            price_premium_rate,
+            taker_fee_rate: 0.0, // set inside
+            maker_fee_rate: 0.0, // set inside
             buy_token_index: ctx.accounts.buy_bank.load()?.token_index,
             sell_token_index: ctx.accounts.sell_bank.load()?.token_index,
             has_data: 1,
             allow_creating_deposits: u8::from(allow_creating_deposits),
             allow_creating_borrows: u8::from(allow_creating_borrows),
-            reserved: [0; 113],
+            display_price_style: display_price_style.into(),
+            reserved: [0; 112],
         };
 
         #[cfg(feature = "enable-gpl")]
@@ -1175,7 +1225,7 @@ pub mod mango_v4 {
     }
 
     pub fn token_conditional_swap_cancel(
-        ctx: Context<AccountAndAuthority>,
+        ctx: Context<TokenConditionalSwapCancel>,
         token_conditional_swap_index: u8,
         token_conditional_swap_id: u64,
     ) -> Result<()> {
@@ -1226,6 +1276,99 @@ pub mod mango_v4 {
     pub fn compute_account_data(ctx: Context<ComputeAccountData>) -> Result<()> {
         #[cfg(feature = "enable-gpl")]
         instructions::compute_account_data(ctx)?;
+        Ok(())
+    }
+
+    ///
+    /// OpenbookV2
+    ///
+
+    pub fn openbook_v2_register_market(
+        ctx: Context<OpenbookV2RegisterMarket>,
+        market_index: OpenbookV2MarketIndex,
+        name: String,
+    ) -> Result<()> {
+        Ok(())
+    }
+
+    pub fn openbook_v2_edit_market(
+        ctx: Context<OpenbookV2EditMarket>,
+        reduce_only_opt: Option<bool>,
+        force_close_opt: Option<bool>,
+    ) -> Result<()> {
+        Ok(())
+    }
+
+    pub fn openbook_v2_deregister_market(ctx: Context<OpenbookV2DeregisterMarket>) -> Result<()> {
+        Ok(())
+    }
+
+    pub fn openbook_v2_create_open_orders(
+        ctx: Context<OpenbookV2CreateOpenOrders>,
+        account_num: u32,
+    ) -> Result<()> {
+        Ok(())
+    }
+
+    pub fn openbook_v2_close_open_orders(ctx: Context<OpenbookV2CloseOpenOrders>) -> Result<()> {
+        Ok(())
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    pub fn openbook_v2_place_order(
+        ctx: Context<OpenbookV2PlaceOrder>,
+        side: u8, // openbook_v2::state::Side
+        limit_price: u64,
+        max_base_qty: u64,
+        max_native_quote_qty_including_fees: u64,
+        self_trade_behavior: u8, // openbook_v2::state::SelfTradeBehavior
+        order_type: u8,          // openbook_v2::state::PlaceOrderType
+        client_order_id: u64,
+        limit: u16,
+    ) -> Result<()> {
+        Ok(())
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    pub fn openbook_v2_place_taker_order(
+        ctx: Context<OpenbookV2PlaceTakeOrder>,
+        side: u8, // openbook_v2::state::Side
+        limit_price: u64,
+        max_base_qty: u64,
+        max_native_quote_qty_including_fees: u64,
+        self_trade_behavior: u8, // openbook_v2::state::SelfTradeBehavior
+        client_order_id: u64,
+        limit: u16,
+    ) -> Result<()> {
+        Ok(())
+    }
+
+    pub fn openbook_v2_cancel_order(
+        ctx: Context<OpenbookV2CancelOrder>,
+        side: u8, // openbook_v2::state::Side
+        order_id: u128,
+    ) -> Result<()> {
+        Ok(())
+    }
+
+    pub fn openbook_v2_settle_funds(
+        ctx: Context<OpenbookV2SettleFunds>,
+        fees_to_dao: bool,
+    ) -> Result<()> {
+        Ok(())
+    }
+
+    pub fn openbook_v2_liq_force_cancel_orders(
+        ctx: Context<OpenbookV2LiqForceCancelOrders>,
+        limit: u8,
+    ) -> Result<()> {
+        Ok(())
+    }
+
+    pub fn openbook_v2_cancel_all_orders(
+        ctx: Context<OpenbookV2CancelOrder>,
+        limit: u8,
+    ) -> Result<()> {
         Ok(())
     }
 

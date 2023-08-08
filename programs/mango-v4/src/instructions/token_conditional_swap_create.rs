@@ -18,24 +18,41 @@ pub fn token_conditional_swap_create(
     }
 
     let mut account = ctx.accounts.account.load_full_mut()?;
+    {
+        let buy_pos = account
+            .ensure_token_position(token_conditional_swap.buy_token_index)?
+            .0;
+        buy_pos.increment_in_use();
+        let sell_pos = account
+            .ensure_token_position(token_conditional_swap.sell_token_index)?
+            .0;
+        sell_pos.increment_in_use();
+    }
 
     let id = account.fixed.next_token_conditional_swap_id;
     account.fixed.next_token_conditional_swap_id =
         account.fixed.next_token_conditional_swap_id.wrapping_add(1);
 
+    let buy_bank = ctx.accounts.buy_bank.load()?;
+    let sell_bank = ctx.accounts.sell_bank.load()?;
+
     let tcs = account.free_token_conditional_swap_mut()?;
     *tcs = token_conditional_swap;
     tcs.id = id;
-    tcs.taker_fee_fraction = group.token_conditional_swap_taker_fee_fraction;
-    tcs.maker_fee_fraction = group.token_conditional_swap_maker_fee_fraction;
+    tcs.taker_fee_rate = buy_bank
+        .token_conditional_swap_taker_fee_rate
+        .max(sell_bank.token_conditional_swap_taker_fee_rate);
+    tcs.maker_fee_rate = buy_bank
+        .token_conditional_swap_maker_fee_rate
+        .max(sell_bank.token_conditional_swap_maker_fee_rate);
     tcs.has_data = 1;
     tcs.bought = 0;
     tcs.sold = 0;
 
     require_neq!(tcs.buy_token_index, tcs.sell_token_index);
-    require_gte!(tcs.price_premium_fraction, 0.0);
-    require_gte!(tcs.maker_fee_fraction, 0.0);
-    require_gte!(tcs.taker_fee_fraction, 0.0);
+    require_gte!(tcs.price_premium_rate, 0.0);
+    require_gte!(tcs.maker_fee_rate, 0.0);
+    require_gte!(tcs.taker_fee_rate, 0.0);
     require_gte!(tcs.price_lower_limit, 0.0);
     require_gte!(tcs.price_upper_limit, 0.0);
 
@@ -48,9 +65,9 @@ pub fn token_conditional_swap_create(
         expiry_timestamp: tcs.expiry_timestamp,
         price_lower_limit: tcs.price_lower_limit,
         price_upper_limit: tcs.price_upper_limit,
-        price_premium_fraction: tcs.price_premium_fraction,
-        taker_fee_fraction: tcs.taker_fee_fraction,
-        maker_fee_fraction: tcs.maker_fee_fraction,
+        price_premium_rate: tcs.price_premium_rate,
+        taker_fee_rate: tcs.taker_fee_rate,
+        maker_fee_rate: tcs.maker_fee_rate,
         buy_token_index: tcs.buy_token_index,
         sell_token_index: tcs.sell_token_index,
         allow_creating_borrows: tcs.allow_creating_borrows(),

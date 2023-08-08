@@ -38,6 +38,7 @@ import {
   MangoAccount,
   PerpPosition,
   Serum3Orders,
+  TokenConditionalSwapDisplayPriceStyle,
   TokenConditionalSwapDto,
   TokenPosition,
 } from './accounts/mangoAccount';
@@ -191,8 +192,6 @@ export class MangoClient {
     feesSwapMangoAccount?: PublicKey,
     feesMngoTokenIndex?: TokenIndex,
     feesExpiryInterval?: BN,
-    tokenConditionalSwapTakerFeeFraction?: number,
-    tokenConditionalSwapMakerFeeFraction?: number,
   ): Promise<TransactionSignature> {
     const ix = await this.program.methods
       .groupEdit(
@@ -207,8 +206,6 @@ export class MangoClient {
         feesSwapMangoAccount ?? null,
         feesMngoTokenIndex ?? null,
         feesExpiryInterval ?? null,
-        tokenConditionalSwapTakerFeeFraction ?? null,
-        tokenConditionalSwapMakerFeeFraction ?? null,
       )
       .accounts({
         group: group.publicKey,
@@ -418,6 +415,8 @@ export class MangoClient {
         params.reduceOnly,
         params.name,
         params.forceClose,
+        params.tokenConditionalSwapTakerFeeRate,
+        params.tokenConditionalSwapMakerFeeRate,
       )
       .accounts({
         group: group.publicKey,
@@ -1248,33 +1247,41 @@ export class MangoClient {
     let wrappedSolAccount: Keypair | undefined;
     let preInstructions: TransactionInstruction[] = [];
     let postInstructions: TransactionInstruction[] = [];
-    const additionalSigners: Signer[] = [];
     if (mintPk.equals(NATIVE_MINT)) {
-      wrappedSolAccount = new Keypair();
+      // Generate a random seed for wrappedSolAccount.
+      const seed = Keypair.generate().publicKey.toBase58().slice(0, 32);
+      // Calculate a publicKey that will be controlled by the `mangoAccount.owner`.
+      const wrappedSolAccount = await PublicKey.createWithSeed(
+        mangoAccount.owner,
+        seed,
+        TOKEN_PROGRAM_ID,
+      );
+
       const lamports = nativeAmount.add(new BN(1e7));
 
       preInstructions = [
-        SystemProgram.createAccount({
+        SystemProgram.createAccountWithSeed({
           fromPubkey: mangoAccount.owner,
-          newAccountPubkey: wrappedSolAccount.publicKey,
+          basePubkey: mangoAccount.owner,
+          seed,
+          newAccountPubkey: wrappedSolAccount,
           lamports: lamports.toNumber(),
           space: 165,
           programId: TOKEN_PROGRAM_ID,
         }),
         createInitializeAccount3Instruction(
-          wrappedSolAccount.publicKey,
+          wrappedSolAccount,
           NATIVE_MINT,
           mangoAccount.owner,
         ),
       ];
       postInstructions = [
         createCloseAccountInstruction(
-          wrappedSolAccount.publicKey,
+          wrappedSolAccount,
           mangoAccount.owner,
           mangoAccount.owner,
         ),
       ];
-      additionalSigners.push(wrappedSolAccount);
     }
 
     const healthRemainingAccounts: PublicKey[] =
@@ -1300,11 +1307,11 @@ export class MangoClient {
       )
       .instruction();
 
-    return await this.sendAndConfirmTransactionForGroup(
-      group,
-      [...preInstructions, ix, ...postInstructions],
-      { additionalSigners },
-    );
+    return await this.sendAndConfirmTransactionForGroup(group, [
+      ...preInstructions,
+      ix,
+      ...postInstructions,
+    ]);
   }
 
   public async tokenWithdraw(
@@ -3190,11 +3197,12 @@ export class MangoClient {
     pricePremiumFraction: number,
     allowCreatingDeposits: boolean,
     allowCreatingBorrows: boolean,
+    priceDisplayStyle: TokenConditionalSwapDisplayPriceStyle,
   ): Promise<TransactionSignature> {
     const buyBank: Bank = group.getFirstBankByMint(buyMintPk);
     const sellBank: Bank = group.getFirstBankByMint(sellMintPk);
     const ix = await this.program.methods
-      .tokenConditionalSwapCreate(
+      .tokenConditionalSwapCreateV2(
         new BN(maxBuy),
         new BN(maxSell),
         expiryTimestamp !== null ? new BN(expiryTimestamp) : U64_MAX_BN,
@@ -3203,6 +3211,7 @@ export class MangoClient {
         pricePremiumFraction,
         allowCreatingDeposits,
         allowCreatingBorrows,
+        priceDisplayStyle,
       )
       .accounts({
         group: group.publicKey,
@@ -3220,8 +3229,18 @@ export class MangoClient {
     group: Group,
     account: MangoAccount,
     tokenConditionalSwapIndex: number,
-    tokenConditionalSwapId: number,
+    tokenConditionalSwapId: BN,
   ): Promise<TransactionSignature> {
+    const tcs = account
+      .tokenConditionalSwapsActive()
+      .find((tcs) => tcs.id.eq(tokenConditionalSwapId));
+    if (!tcs) {
+      throw new Error('tcs with id not found');
+    }
+
+    const buyBank = group.banksMapByTokenIndex.get(tcs.buyTokenIndex)![0];
+    const sellBank = group.banksMapByTokenIndex.get(tcs.sellTokenIndex)![0];
+
     const ix = await this.program.methods
       .tokenConditionalSwapCancel(
         tokenConditionalSwapIndex,
@@ -3231,6 +3250,8 @@ export class MangoClient {
         group: group.publicKey,
         account: account.publicKey,
         authority: (this.program.provider as AnchorProvider).wallet.publicKey,
+        buyBank: buyBank.publicKey,
+        sellBank: sellBank.publicKey,
       })
       .instruction();
 
@@ -3242,10 +3263,40 @@ export class MangoClient {
     liqee: MangoAccount,
     liqor: MangoAccount,
     tokenConditionalSwapIndex: number,
-    tokenConditionalSwapId: number,
+    tokenConditionalSwapId: BN,
     maxBuyTokenToLiqee: number,
     maxSellTokenToLiqor: number,
   ): Promise<TransactionSignature> {
+    const tcs = liqee
+      .tokenConditionalSwapsActive()
+      .find((tcs) => tcs.id.eq(tokenConditionalSwapId));
+    if (!tcs) {
+      throw new Error('tcs with id not found');
+    }
+
+    const buyBank = group.banksMapByTokenIndex.get(tcs.buyTokenIndex)![0];
+    const sellBank = group.banksMapByTokenIndex.get(tcs.sellTokenIndex)![0];
+
+    const healthRemainingAccounts: PublicKey[] =
+      this.buildHealthRemainingAccounts(
+        group,
+        [liqor, liqee],
+        [buyBank, sellBank],
+        [],
+      );
+
+    const parsedHealthAccounts = healthRemainingAccounts.map(
+      (pk) =>
+        ({
+          pubkey: pk,
+          isWritable:
+            pk.equals(buyBank.publicKey) || pk.equals(sellBank.publicKey)
+              ? true
+              : false,
+          isSigner: false,
+        } as AccountMeta),
+    );
+
     const ix = await this.program.methods
       .tokenConditionalSwapTrigger(
         tokenConditionalSwapIndex,
@@ -3260,6 +3311,7 @@ export class MangoClient {
         liqorAuthority: (this.program.provider as AnchorProvider).wallet
           .publicKey,
       })
+      .remainingAccounts(parsedHealthAccounts)
       .instruction();
 
     return await this.sendAndConfirmTransactionForGroup(group, [ix]);
