@@ -20,6 +20,7 @@ use tracing::*;
 pub mod liquidate;
 pub mod metrics;
 pub mod rebalance;
+pub mod telemetry;
 pub mod token_swap_info;
 pub mod trigger_tcs;
 pub mod util;
@@ -95,6 +96,10 @@ struct Cli {
     /// This is required for devnet testing.
     #[clap(long, env, value_enum, default_value = "false")]
     mock_jupiter: BoolArg,
+
+    /// report liquidator's existence and pubkey
+    #[clap(long, env, value_enum, default_value = "true")]
+    telemetry: BoolArg,
 }
 
 pub fn encode_address(addr: &Pubkey) -> String {
@@ -271,7 +276,7 @@ async fn main() -> anyhow::Result<()> {
     });
 
     let mut liquidation = Box::new(LiquidationState {
-        mango_client,
+        mango_client: mango_client.clone(),
         account_fetcher,
         liquidation_config: liq_config,
         trigger_tcs_config: tcs_config,
@@ -482,6 +487,13 @@ async fn main() -> anyhow::Result<()> {
             }
         }
     });
+
+    if cli.telemetry == BoolArg::True {
+        tokio::spawn(telemetry::report_regularly(
+            mango_client,
+            cli.min_health_ratio,
+        ));
+    }
 
     use futures::StreamExt;
     let mut jobs: futures::stream::FuturesUnordered<_> = vec![
