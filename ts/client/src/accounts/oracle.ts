@@ -21,7 +21,7 @@ export enum OracleProvider {
 
 export class StubOracle {
   public price: I80F48;
-  public lastUpdated: BN;
+  public deviation: I80F48;
 
   static from(
     publicKey: PublicKey,
@@ -29,7 +29,9 @@ export class StubOracle {
       group: PublicKey;
       mint: PublicKey;
       price: I80F48Dto;
-      lastUpdated: BN;
+      lastUpdateTs: BN;
+      lastUpdateSlot: BN;
+      deviation: I80F48Dto;
     },
   ): StubOracle {
     return new StubOracle(
@@ -37,7 +39,9 @@ export class StubOracle {
       obj.group,
       obj.mint,
       obj.price,
-      obj.lastUpdated,
+      obj.lastUpdateTs,
+      obj.lastUpdateSlot,
+      obj.deviation,
     );
   }
 
@@ -46,10 +50,12 @@ export class StubOracle {
     public group: PublicKey,
     public mint: PublicKey,
     price: I80F48Dto,
-    lastUpdated: BN,
+    public lastUpdateTs: BN,
+    public lastUpdateSlot: BN,
+    deviation: I80F48Dto,
   ) {
     this.price = I80F48.from(price);
-    this.lastUpdated = lastUpdated;
+    this.deviation = I80F48.from(deviation);
   }
 }
 

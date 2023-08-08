@@ -1588,6 +1588,50 @@ export type MangoV4 = {
       ]
     },
     {
+      "name": "stubOracleSetTest",
+      "accounts": [
+        {
+          "name": "group",
+          "isMut": false,
+          "isSigner": false,
+          "relations": [
+            "admin"
+          ]
+        },
+        {
+          "name": "admin",
+          "isMut": false,
+          "isSigner": true
+        },
+        {
+          "name": "oracle",
+          "isMut": true,
+          "isSigner": false,
+          "relations": [
+            "group"
+          ]
+        }
+      ],
+      "args": [
+        {
+          "name": "price",
+          "type": {
+            "defined": "I80F48"
+          }
+        },
+        {
+          "name": "lastUpdateSlot",
+          "type": "u64"
+        },
+        {
+          "name": "deviation",
+          "type": {
+            "defined": "I80F48"
+          }
+        }
+      ]
+    },
+    {
       "name": "tokenDeposit",
       "accounts": [
         {
@@ -4952,7 +4996,7 @@ export type MangoV4 = {
           "type": "f64"
         },
         {
-          "name": "pricePremiumFraction",
+          "name": "pricePremiumRate",
           "type": "f64"
         },
         {
@@ -6989,15 +7033,25 @@ export type MangoV4 = {
             }
           },
           {
-            "name": "lastUpdated",
+            "name": "lastUpdateTs",
             "type": "i64"
+          },
+          {
+            "name": "lastUpdateSlot",
+            "type": "u64"
+          },
+          {
+            "name": "deviation",
+            "type": {
+              "defined": "I80F48"
+            }
           },
           {
             "name": "reserved",
             "type": {
               "array": [
                 "u8",
-                128
+                104
               ]
             }
           }
@@ -13648,6 +13702,50 @@ export const IDL: MangoV4 = {
       ]
     },
     {
+      "name": "stubOracleSetTest",
+      "accounts": [
+        {
+          "name": "group",
+          "isMut": false,
+          "isSigner": false,
+          "relations": [
+            "admin"
+          ]
+        },
+        {
+          "name": "admin",
+          "isMut": false,
+          "isSigner": true
+        },
+        {
+          "name": "oracle",
+          "isMut": true,
+          "isSigner": false,
+          "relations": [
+            "group"
+          ]
+        }
+      ],
+      "args": [
+        {
+          "name": "price",
+          "type": {
+            "defined": "I80F48"
+          }
+        },
+        {
+          "name": "lastUpdateSlot",
+          "type": "u64"
+        },
+        {
+          "name": "deviation",
+          "type": {
+            "defined": "I80F48"
+          }
+        }
+      ]
+    },
+    {
       "name": "tokenDeposit",
       "accounts": [
         {
@@ -17012,7 +17110,7 @@ export const IDL: MangoV4 = {
           "type": "f64"
         },
         {
-          "name": "pricePremiumFraction",
+          "name": "pricePremiumRate",
           "type": "f64"
         },
         {
@@ -19049,15 +19147,25 @@ export const IDL: MangoV4 = {
             }
           },
           {
-            "name": "lastUpdated",
+            "name": "lastUpdateTs",
             "type": "i64"
+          },
+          {
+            "name": "lastUpdateSlot",
+            "type": "u64"
+          },
+          {
+            "name": "deviation",
+            "type": {
+              "defined": "I80F48"
+            }
           },
           {
             "name": "reserved",
             "type": {
               "array": [
                 "u8",
-                128
+                104
               ]
             }
           }
