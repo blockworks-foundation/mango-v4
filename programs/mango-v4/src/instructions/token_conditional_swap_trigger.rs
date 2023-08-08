@@ -7,7 +7,8 @@ use crate::health::*;
 use crate::i80f48::ClampToInt;
 use crate::logs::TokenConditionalSwapCancelLog;
 use crate::logs::{
-    LoanOriginationFeeInstruction, TokenBalanceLog, TokenConditionalSwapTriggerLog, WithdrawLoanLog,
+    LoanOriginationFeeInstruction, TokenBalanceLog, TokenConditionalSwapTriggerLogV2,
+    WithdrawLoanLog,
 };
 use crate::state::*;
 
@@ -437,7 +438,7 @@ fn action(
         liqee.token_decrement_dust_deactivate(sell_bank, now_ts, liqee_key)?;
     }
 
-    emit!(TokenConditionalSwapTriggerLog {
+    emit!(TokenConditionalSwapTriggerLogV2 {
         mango_group: liqee.fixed.group,
         liqee: liqee_key,
         liqor: liqor_key,
@@ -451,6 +452,8 @@ fn action(
         buy_token_price: buy_token_price.to_bits(),
         sell_token_price: sell_token_price.to_bits(),
         closed,
+        display_price_style: tcs.display_price_style,
+        intention: tcs.intention,
     });
 
     // Return the change in liqee token account balances

@@ -40,6 +40,7 @@ import {
   Serum3Orders,
   TokenConditionalSwapDisplayPriceStyle,
   TokenConditionalSwapDto,
+  TokenConditionalSwapIntention,
   TokenPosition,
 } from './accounts/mangoAccount';
 import { StubOracle } from './accounts/oracle';
@@ -3198,6 +3199,7 @@ export class MangoClient {
     allowCreatingDeposits: boolean,
     allowCreatingBorrows: boolean,
     priceDisplayStyle: TokenConditionalSwapDisplayPriceStyle,
+    intention: TokenConditionalSwapIntention,
   ): Promise<TransactionSignature> {
     const buyBank: Bank = group.getFirstBankByMint(buyMintPk);
     const sellBank: Bank = group.getFirstBankByMint(sellMintPk);
@@ -3212,6 +3214,7 @@ export class MangoClient {
         allowCreatingDeposits,
         allowCreatingBorrows,
         priceDisplayStyle,
+        intention,
       )
       .accounts({
         group: group.publicKey,

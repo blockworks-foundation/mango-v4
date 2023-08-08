@@ -33,7 +33,7 @@ compile_error!("compiling the program entrypoint without 'enable-gpl' makes no s
 use state::{
     OpenbookV2MarketIndex, OracleConfigParams, PerpMarketIndex, PlaceOrderType, SelfTradeBehavior,
     Serum3MarketIndex, Side, TokenConditionalSwap, TokenConditionalSwapDisplayPriceStyle,
-    TokenIndex,
+    TokenConditionalSwapIntention, TokenIndex,
 };
 
 declare_id!("4MangoMjqJ2firMokCjjGgoK8d4MXcrgL7XJaL3w6fVg");
@@ -1183,6 +1183,7 @@ pub mod mango_v4 {
             allow_creating_deposits,
             allow_creating_borrows,
             TokenConditionalSwapDisplayPriceStyle::SellTokenPerBuyToken,
+            TokenConditionalSwapIntention::Unknown,
         )
     }
 
@@ -1197,6 +1198,7 @@ pub mod mango_v4 {
         allow_creating_deposits: bool,
         allow_creating_borrows: bool,
         display_price_style: TokenConditionalSwapDisplayPriceStyle,
+        intention: TokenConditionalSwapIntention,
     ) -> Result<()> {
         let tcs = TokenConditionalSwap {
             id: u64::MAX, // set inside
@@ -1216,7 +1218,8 @@ pub mod mango_v4 {
             allow_creating_deposits: u8::from(allow_creating_deposits),
             allow_creating_borrows: u8::from(allow_creating_borrows),
             display_price_style: display_price_style.into(),
-            reserved: [0; 112],
+            intention: intention.into(),
+            reserved: [0; 111],
         };
 
         #[cfg(feature = "enable-gpl")]

@@ -17,6 +17,18 @@ pub enum TokenConditionalSwapDisplayPriceStyle {
     BuyTokenPerSellToken,
 }
 
+#[derive(
+    Clone, Copy, PartialEq, Eq, IntoPrimitive, TryFromPrimitive, AnchorDeserialize, AnchorSerialize,
+)]
+#[repr(u8)]
+pub enum TokenConditionalSwapIntention {
+    Unknown,
+    /// Reducing a position when the price gets worse
+    StopLoss,
+    /// Reducing a position when the price gets better
+    TakeProfit,
+}
+
 #[zero_copy]
 #[derive(AnchorDeserialize, AnchorSerialize, Derivative)]
 #[derivative(Debug)]
@@ -81,13 +93,18 @@ pub struct TokenConditionalSwap {
     /// Stores a TokenConditionalSwapDisplayPriceStyle enum value
     pub display_price_style: u8,
 
+    /// The intention the user had when placing this order, display-only
+    ///
+    /// Stores a TokenConditionalSwapIntention enum value
+    pub intention: u8,
+
     #[derivative(Debug = "ignore")]
-    pub reserved: [u8; 112],
+    pub reserved: [u8; 111],
 }
 
 const_assert_eq!(
     size_of::<TokenConditionalSwap>(),
-    8 * 6 + 8 * 3 + 2 * 4 + 2 * 2 + 1 * 4 + 112
+    8 * 6 + 8 * 3 + 2 * 4 + 2 * 2 + 1 * 5 + 111
 );
 const_assert_eq!(size_of::<TokenConditionalSwap>(), 200);
 const_assert_eq!(size_of::<TokenConditionalSwap>() % 8, 0);
@@ -112,7 +129,8 @@ impl Default for TokenConditionalSwap {
             allow_creating_borrows: 0,
             allow_creating_deposits: 0,
             display_price_style: TokenConditionalSwapDisplayPriceStyle::SellTokenPerBuyToken.into(),
-            reserved: [0; 112],
+            intention: TokenConditionalSwapIntention::Unknown.into(),
+            reserved: [0; 111],
         }
     }
 }
