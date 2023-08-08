@@ -91,7 +91,9 @@ pub fn token_register(
         force_close: 0,
         padding: Default::default(),
         fees_withdrawn: 0,
-        reserved: [0; 2104],
+        token_conditional_swap_taker_fee_rate: 0.0005,
+        token_conditional_swap_maker_fee_rate: 0.0005,
+        reserved: [0; 2096],
     };
     require_gt!(bank.max_rate, MINIMUM_MAX_RATE);
 

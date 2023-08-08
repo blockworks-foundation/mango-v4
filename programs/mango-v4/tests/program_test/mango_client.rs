@@ -1056,7 +1056,7 @@ impl ClientInstruction for TokenDeregisterInstruction {
     }
 }
 
-fn token_edit_instruction_default() -> mango_v4::instruction::TokenEdit {
+pub fn token_edit_instruction_default() -> mango_v4::instruction::TokenEdit {
     mango_v4::instruction::TokenEdit {
         oracle_opt: None,
         oracle_config_opt: None,
@@ -1082,6 +1082,58 @@ fn token_edit_instruction_default() -> mango_v4::instruction::TokenEdit {
         reduce_only_opt: None,
         name_opt: None,
         force_close_opt: None,
+        token_conditional_swap_taker_fee_rate_opt: None,
+        token_conditional_swap_maker_fee_rate_opt: None,
+    }
+}
+
+pub struct TokenEdit {
+    pub group: Pubkey,
+    pub admin: TestKeypair,
+    pub mint: Pubkey,
+    pub options: mango_v4::instruction::TokenEdit,
+}
+#[async_trait::async_trait(?Send)]
+impl ClientInstruction for TokenEdit {
+    type Accounts = mango_v4::accounts::TokenEdit;
+    type Instruction = mango_v4::instruction::TokenEdit;
+    async fn to_instruction(
+        &self,
+        account_loader: impl ClientAccountLoader + 'async_trait,
+    ) -> (Self::Accounts, instruction::Instruction) {
+        let program_id = mango_v4::id();
+
+        let mint_info_key = Pubkey::find_program_address(
+            &[
+                b"MintInfo".as_ref(),
+                self.group.as_ref(),
+                self.mint.as_ref(),
+            ],
+            &program_id,
+        )
+        .0;
+        let mint_info: MintInfo = account_loader.load(&mint_info_key).await.unwrap();
+
+        let accounts = Self::Accounts {
+            group: self.group,
+            admin: self.admin.pubkey(),
+            mint_info: mint_info_key,
+            oracle: mint_info.oracle,
+        };
+
+        let mut instruction = make_instruction(program_id, &accounts, &self.options);
+        instruction
+            .accounts
+            .extend(mint_info.banks().iter().map(|&k| AccountMeta {
+                pubkey: k,
+                is_signer: false,
+                is_writable: true,
+            }));
+        (accounts, instruction)
+    }
+
+    fn signers(&self) -> Vec<TestKeypair> {
+        vec![self.admin]
     }
 }
 
@@ -1578,8 +1630,6 @@ pub fn group_edit_instruction_default() -> mango_v4::instruction::GroupEdit {
         buyback_fees_swap_mango_account_opt: None,
         mngo_token_index_opt: None,
         buyback_fees_expiry_interval_opt: None,
-        token_conditional_swap_taker_fee_fraction_opt: None,
-        token_conditional_swap_maker_fee_fraction_opt: None,
     }
 }
 
@@ -4188,7 +4238,7 @@ pub struct TokenConditionalSwapCreateInstruction {
     pub max_sell: u64,
     pub price_lower_limit: f64,
     pub price_upper_limit: f64,
-    pub price_premium_fraction: f64,
+    pub price_premium_rate: f64,
     pub allow_creating_deposits: bool,
     pub allow_creating_borrows: bool,
 }
@@ -4207,7 +4257,7 @@ impl ClientInstruction for TokenConditionalSwapCreateInstruction {
             expiry_timestamp: u64::MAX,
             price_lower_limit: self.price_lower_limit,
             price_upper_limit: self.price_upper_limit,
-            price_premium_fraction: self.price_premium_fraction,
+            price_premium_rate: self.price_premium_rate,
             allow_creating_deposits: self.allow_creating_deposits,
             allow_creating_borrows: self.allow_creating_borrows,
             display_price_style: TokenConditionalSwapDisplayPriceStyle::SellTokenPerBuyToken,

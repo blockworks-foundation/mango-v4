@@ -192,8 +192,6 @@ export class MangoClient {
     feesSwapMangoAccount?: PublicKey,
     feesMngoTokenIndex?: TokenIndex,
     feesExpiryInterval?: BN,
-    tokenConditionalSwapTakerFeeFraction?: number,
-    tokenConditionalSwapMakerFeeFraction?: number,
   ): Promise<TransactionSignature> {
     const ix = await this.program.methods
       .groupEdit(
@@ -208,8 +206,6 @@ export class MangoClient {
         feesSwapMangoAccount ?? null,
         feesMngoTokenIndex ?? null,
         feesExpiryInterval ?? null,
-        tokenConditionalSwapTakerFeeFraction ?? null,
-        tokenConditionalSwapMakerFeeFraction ?? null,
       )
       .accounts({
         group: group.publicKey,
@@ -419,6 +415,8 @@ export class MangoClient {
         params.reduceOnly,
         params.name,
         params.forceClose,
+        params.tokenConditionalSwapTakerFeeRate,
+        params.tokenConditionalSwapMakerFeeRate,
       )
       .accounts({
         group: group.publicKey,
