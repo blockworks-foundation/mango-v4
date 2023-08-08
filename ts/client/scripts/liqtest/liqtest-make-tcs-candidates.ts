@@ -5,6 +5,7 @@ import { Bank } from '../../src/accounts/bank';
 import {
   MangoAccount,
   TokenConditionalSwapDisplayPriceStyle,
+  TokenConditionalSwapIntention,
 } from '../../src/accounts/mangoAccount';
 import { PerpMarket } from '../../src/accounts/perp';
 import { Builder } from '../../src/builder';
@@ -188,6 +189,7 @@ async function main() {
       true,
       true,
       TokenConditionalSwapDisplayPriceStyle.buyTokenPerSellToken,
+      TokenConditionalSwapIntention.unknown,
     );
   }
 
@@ -211,6 +213,7 @@ async function main() {
       true,
       true,
       TokenConditionalSwapDisplayPriceStyle.buyTokenPerSellToken,
+      TokenConditionalSwapIntention.unknown,
     );
   }
 
@@ -234,6 +237,7 @@ async function main() {
       true,
       true,
       TokenConditionalSwapDisplayPriceStyle.buyTokenPerSellToken,
+      TokenConditionalSwapIntention.unknown,
     );
   }
 

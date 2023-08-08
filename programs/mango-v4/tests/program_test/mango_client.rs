@@ -4261,6 +4261,7 @@ impl ClientInstruction for TokenConditionalSwapCreateInstruction {
             allow_creating_deposits: self.allow_creating_deposits,
             allow_creating_borrows: self.allow_creating_borrows,
             display_price_style: TokenConditionalSwapDisplayPriceStyle::SellTokenPerBuyToken,
+            intention: TokenConditionalSwapIntention::Unknown,
         };
 
         let account = account_loader
