@@ -239,13 +239,13 @@
     </span><span class="kw">pub </span>price_upper_limit: f64,
 
     <span class="doccomment">/// The premium to pay over oracle price to incentivize execution.
-    </span><span class="kw">pub </span>price_premium_fraction: f64,
+    </span><span class="kw">pub </span>price_premium_rate: f64,
 
-    <span class="doccomment">/// The taker receives only premium_price * (1 - taker_fee_fraction)
-    </span><span class="kw">pub </span>taker_fee_fraction: f32,
+    <span class="doccomment">/// The taker receives only premium_price * (1 - taker_fee_rate)
+    </span><span class="kw">pub </span>taker_fee_rate: f32,
 
-    <span class="doccomment">/// The maker has to pay premium_price * (1 + maker_fee_fraction)
-    </span><span class="kw">pub </span>maker_fee_fraction: f32,
+    <span class="doccomment">/// The maker has to pay premium_price * (1 + maker_fee_rate)
+    </span><span class="kw">pub </span>maker_fee_rate: f32,
 
     <span class="doccomment">/// indexes of tokens for the swap
     </span><span class="kw">pub </span>buy_token_index: TokenIndex,
@@ -287,9 +287,9 @@
             expiry_timestamp: u64::MAX,
             price_lower_limit: <span class="number">0.0</span>,
             price_upper_limit: <span class="number">0.0</span>,
-            price_premium_fraction: <span class="number">0.0</span>,
-            taker_fee_fraction: <span class="number">0.0</span>,
-            maker_fee_fraction: <span class="number">0.0</span>,
+            price_premium_rate: <span class="number">0.0</span>,
+            taker_fee_rate: <span class="number">0.0</span>,
+            maker_fee_rate: <span class="number">0.0</span>,
             buy_token_index: TokenIndex::MAX,
             sell_token_index: TokenIndex::MAX,
             has_data: <span class="number">0</span>,
@@ -337,27 +337,27 @@
     ///
     /// Base price is the amount of sell_token to pay for one buy_token.
     </span><span class="kw">pub fn </span>premium_price(<span class="kw-2">&amp;</span><span class="self">self</span>, base_price: f64) -&gt; f64 {
-        base_price * (<span class="number">1.0 </span>+ <span class="self">self</span>.price_premium_fraction)
+        base_price * (<span class="number">1.0 </span>+ <span class="self">self</span>.price_premium_rate)
     }
 
     <span class="doccomment">/// Premium price adjusted for the maker fee
     </span><span class="kw">pub fn </span>maker_price(<span class="kw-2">&amp;</span><span class="self">self</span>, premium_price: f64) -&gt; f64 {
-        premium_price * (<span class="number">1.0 </span>+ <span class="self">self</span>.maker_fee_fraction <span class="kw">as </span>f64)
+        premium_price * (<span class="number">1.0 </span>+ <span class="self">self</span>.maker_fee_rate <span class="kw">as </span>f64)
     }
 
     <span class="doccomment">/// Premium price adjusted for the taker fee
     </span><span class="kw">pub fn </span>taker_price(<span class="kw-2">&amp;</span><span class="self">self</span>, premium_price: f64) -&gt; f64 {
-        premium_price * (<span class="number">1.0 </span>- <span class="self">self</span>.taker_fee_fraction <span class="kw">as </span>f64)
+        premium_price * (<span class="number">1.0 </span>- <span class="self">self</span>.taker_fee_rate <span class="kw">as </span>f64)
     }
 
     <span class="kw">pub fn </span>maker_fee(<span class="kw-2">&amp;</span><span class="self">self</span>, base_sell_amount: I80F48) -&gt; u64 {
-        (base_sell_amount * I80F48::from_num(<span class="self">self</span>.maker_fee_fraction))
+        (base_sell_amount * I80F48::from_num(<span class="self">self</span>.maker_fee_rate))
             .floor()
             .to_num()
     }
 
     <span class="kw">pub fn </span>taker_fee(<span class="kw-2">&amp;</span><span class="self">self</span>, base_sell_amount: I80F48) -&gt; u64 {
-        (base_sell_amount * I80F48::from_num(<span class="self">self</span>.taker_fee_fraction))
+        (base_sell_amount * I80F48::from_num(<span class="self">self</span>.taker_fee_rate))
             .floor()
             .to_num()
     }

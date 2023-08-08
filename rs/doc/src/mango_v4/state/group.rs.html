@@ -226,10 +226,6 @@
 <span id="226">226</span>
 <span id="227">227</span>
 <span id="228">228</span>
-<span id="229">229</span>
-<span id="230">230</span>
-<span id="231">231</span>
-<span id="232">232</span>
 </pre><pre class="rust"><code><span class="kw">use </span>anchor_lang::prelude::<span class="kw-2">*</span>;
 <span class="kw">use </span>static_assertions::const_assert_eq;
 <span class="kw">use </span>std::mem::size_of;
@@ -320,15 +316,11 @@
     /// When set to 0, there&#39;s no expiry of buyback fees.
     </span><span class="kw">pub </span>buyback_fees_expiry_interval: u64,
 
-    <span class="doccomment">/// Fees for the token conditional swap feature
-    </span><span class="kw">pub </span>token_conditional_swap_taker_fee_fraction: f32,
-    <span class="kw">pub </span>token_conditional_swap_maker_fee_fraction: f32,
-
-    <span class="kw">pub </span>reserved: [u8; <span class="number">1816</span>],
+    <span class="kw">pub </span>reserved: [u8; <span class="number">1824</span>],
 }
 <span class="macro">const_assert_eq!</span>(
     size_of::&lt;Group&gt;(),
-    <span class="number">32 </span>+ <span class="number">4 </span>+ <span class="number">32 </span>* <span class="number">2 </span>+ <span class="number">4 </span>+ <span class="number">32 </span>* <span class="number">2 </span>+ <span class="number">4 </span>+ <span class="number">4 </span>+ <span class="number">20 </span>* <span class="number">32 </span>+ <span class="number">32 </span>+ <span class="number">8 </span>+ <span class="number">16 </span>+ <span class="number">32 </span>+ <span class="number">8 </span>+ <span class="number">4 </span>* <span class="number">2 </span>+ <span class="number">1816
+    <span class="number">32 </span>+ <span class="number">4 </span>+ <span class="number">32 </span>* <span class="number">2 </span>+ <span class="number">4 </span>+ <span class="number">32 </span>* <span class="number">2 </span>+ <span class="number">4 </span>+ <span class="number">4 </span>+ <span class="number">20 </span>* <span class="number">32 </span>+ <span class="number">32 </span>+ <span class="number">8 </span>+ <span class="number">16 </span>+ <span class="number">32 </span>+ <span class="number">8 </span>+ <span class="number">1824
 </span>);
 <span class="macro">const_assert_eq!</span>(size_of::&lt;Group&gt;(), <span class="number">2736</span>);
 <span class="macro">const_assert_eq!</span>(size_of::&lt;Group&gt;() % <span class="number">8</span>, <span class="number">0</span>);

@@ -1487,8 +1487,6 @@
         buyback_fees_swap_mango_account_opt: <span class="prelude-ty">Option</span>&lt;Pubkey&gt;,
         mngo_token_index_opt: <span class="prelude-ty">Option</span>&lt;TokenIndex&gt;,
         buyback_fees_expiry_interval_opt: <span class="prelude-ty">Option</span>&lt;u64&gt;,
-        token_conditional_swap_taker_fee_fraction_opt: <span class="prelude-ty">Option</span>&lt;f32&gt;,
-        token_conditional_swap_maker_fee_fraction_opt: <span class="prelude-ty">Option</span>&lt;f32&gt;,
     ) -&gt; <span class="prelude-ty">Result</span>&lt;()&gt; {
         <span class="attribute">#[cfg(feature = <span class="string">&quot;enable-gpl&quot;</span>)]
         </span>instructions::group_edit(
@@ -1504,8 +1502,6 @@
             buyback_fees_swap_mango_account_opt,
             mngo_token_index_opt,
             buyback_fees_expiry_interval_opt,
-            token_conditional_swap_taker_fee_fraction_opt,
-            token_conditional_swap_maker_fee_fraction_opt,
         )<span class="question-mark">?</span>;
         <span class="prelude-val">Ok</span>(())
     }
@@ -1607,6 +1603,8 @@
         reduce_only_opt: <span class="prelude-ty">Option</span>&lt;u8&gt;,
         name_opt: <span class="prelude-ty">Option</span>&lt;String&gt;,
         force_close_opt: <span class="prelude-ty">Option</span>&lt;bool&gt;,
+        token_conditional_swap_taker_fee_rate_opt: <span class="prelude-ty">Option</span>&lt;f32&gt;,
+        token_conditional_swap_maker_fee_rate_opt: <span class="prelude-ty">Option</span>&lt;f32&gt;,
     ) -&gt; <span class="prelude-ty">Result</span>&lt;()&gt; {
         <span class="attribute">#[cfg(feature = <span class="string">&quot;enable-gpl&quot;</span>)]
         </span>instructions::token_edit(
@@ -1635,6 +1633,8 @@
             reduce_only_opt,
             name_opt,
             force_close_opt,
+            token_conditional_swap_taker_fee_rate_opt,
+            token_conditional_swap_maker_fee_rate_opt,
         )<span class="question-mark">?</span>;
         <span class="prelude-val">Ok</span>(())
     }
@@ -2575,7 +2575,7 @@
         expiry_timestamp: u64,
         price_lower_limit: f64,
         price_upper_limit: f64,
-        price_premium_fraction: f64,
+        price_premium_rate: f64,
         allow_creating_deposits: bool,
         allow_creating_borrows: bool,
     ) -&gt; <span class="prelude-ty">Result</span>&lt;()&gt; {
@@ -2586,7 +2586,7 @@
             expiry_timestamp,
             price_lower_limit,
             price_upper_limit,
-            price_premium_fraction,
+            price_premium_rate,
             allow_creating_deposits,
             allow_creating_borrows,
             TokenConditionalSwapDisplayPriceStyle::SellTokenPerBuyToken,
@@ -2600,7 +2600,7 @@
         expiry_timestamp: u64,
         price_lower_limit: f64,
         price_upper_limit: f64,
-        price_premium_fraction: f64,
+        price_premium_rate: f64,
         allow_creating_deposits: bool,
         allow_creating_borrows: bool,
         display_price_style: TokenConditionalSwapDisplayPriceStyle,
@@ -2614,9 +2614,9 @@
             expiry_timestamp,
             price_lower_limit,
             price_upper_limit,
-            price_premium_fraction,
-            taker_fee_fraction: <span class="number">0.0</span>, <span class="comment">// set inside
-            </span>maker_fee_fraction: <span class="number">0.0</span>, <span class="comment">// set inside
+            price_premium_rate,
+            taker_fee_rate: <span class="number">0.0</span>, <span class="comment">// set inside
+            </span>maker_fee_rate: <span class="number">0.0</span>, <span class="comment">// set inside
             </span>buy_token_index: ctx.accounts.buy_bank.load()<span class="question-mark">?</span>.token_index,
             sell_token_index: ctx.accounts.sell_bank.load()<span class="question-mark">?</span>.token_index,
             has_data: <span class="number">1</span>,
