@@ -517,6 +517,46 @@
 <span id="517">517</span>
 <span id="518">518</span>
 <span id="519">519</span>
+<span id="520">520</span>
+<span id="521">521</span>
+<span id="522">522</span>
+<span id="523">523</span>
+<span id="524">524</span>
+<span id="525">525</span>
+<span id="526">526</span>
+<span id="527">527</span>
+<span id="528">528</span>
+<span id="529">529</span>
+<span id="530">530</span>
+<span id="531">531</span>
+<span id="532">532</span>
+<span id="533">533</span>
+<span id="534">534</span>
+<span id="535">535</span>
+<span id="536">536</span>
+<span id="537">537</span>
+<span id="538">538</span>
+<span id="539">539</span>
+<span id="540">540</span>
+<span id="541">541</span>
+<span id="542">542</span>
+<span id="543">543</span>
+<span id="544">544</span>
+<span id="545">545</span>
+<span id="546">546</span>
+<span id="547">547</span>
+<span id="548">548</span>
+<span id="549">549</span>
+<span id="550">550</span>
+<span id="551">551</span>
+<span id="552">552</span>
+<span id="553">553</span>
+<span id="554">554</span>
+<span id="555">555</span>
+<span id="556">556</span>
+<span id="557">557</span>
+<span id="558">558</span>
+<span id="559">559</span>
 </pre><pre class="rust"><code><span class="kw">use crate</span>::{
     accounts_ix::FlashLoanType,
     state::{OracleType, PerpMarket, PerpPosition},
@@ -1014,6 +1054,27 @@
 }
 
 <span class="attribute">#[event]
+</span><span class="kw">pub struct </span>TokenConditionalSwapCreateLogV2 {
+    <span class="kw">pub </span>mango_group: Pubkey,
+    <span class="kw">pub </span>mango_account: Pubkey,
+    <span class="kw">pub </span>id: u64,
+    <span class="kw">pub </span>max_buy: u64,
+    <span class="kw">pub </span>max_sell: u64,
+    <span class="kw">pub </span>expiry_timestamp: u64,
+    <span class="kw">pub </span>price_lower_limit: f64,
+    <span class="kw">pub </span>price_upper_limit: f64,
+    <span class="kw">pub </span>price_premium_rate: f64,
+    <span class="kw">pub </span>taker_fee_rate: f32,
+    <span class="kw">pub </span>maker_fee_rate: f32,
+    <span class="kw">pub </span>buy_token_index: u16,
+    <span class="kw">pub </span>sell_token_index: u16,
+    <span class="kw">pub </span>allow_creating_deposits: bool,
+    <span class="kw">pub </span>allow_creating_borrows: bool,
+    <span class="kw">pub </span>display_price_style: u8,
+    <span class="kw">pub </span>intention: u8,
+}
+
+<span class="attribute">#[event]
 </span><span class="kw">pub struct </span>TokenConditionalSwapTriggerLog {
     <span class="kw">pub </span>mango_group: Pubkey,
     <span class="kw">pub </span>liqee: Pubkey,
@@ -1028,6 +1089,25 @@
     </span><span class="kw">pub </span>buy_token_price: i128, <span class="comment">// I80F48
     </span><span class="kw">pub </span>sell_token_price: i128, <span class="comment">// I80F48
     </span><span class="kw">pub </span>closed: bool,
+}
+
+<span class="attribute">#[event]
+</span><span class="kw">pub struct </span>TokenConditionalSwapTriggerLogV2 {
+    <span class="kw">pub </span>mango_group: Pubkey,
+    <span class="kw">pub </span>liqee: Pubkey,
+    <span class="kw">pub </span>liqor: Pubkey,
+    <span class="kw">pub </span>token_conditional_swap_id: u64,
+    <span class="kw">pub </span>buy_token_index: u16,
+    <span class="kw">pub </span>sell_token_index: u16,
+    <span class="kw">pub </span>buy_amount: u64,        <span class="comment">// amount the liqee got
+    </span><span class="kw">pub </span>sell_amount: u64,       <span class="comment">// amount the liqee paid (including fees)
+    </span><span class="kw">pub </span>maker_fee: u64,         <span class="comment">// in native units of sell token (included in sell amount)
+    </span><span class="kw">pub </span>taker_fee: u64, <span class="comment">// in native units of sell token (deducted from the sell amount the liqor received)
+    </span><span class="kw">pub </span>buy_token_price: i128, <span class="comment">// I80F48
+    </span><span class="kw">pub </span>sell_token_price: i128, <span class="comment">// I80F48
+    </span><span class="kw">pub </span>closed: bool,
+    <span class="kw">pub </span>display_price_style: u8,
+    <span class="kw">pub </span>intention: u8,
 }
 
 <span class="attribute">#[event]

@@ -182,6 +182,24 @@
 <span id="182">182</span>
 <span id="183">183</span>
 <span id="184">184</span>
+<span id="185">185</span>
+<span id="186">186</span>
+<span id="187">187</span>
+<span id="188">188</span>
+<span id="189">189</span>
+<span id="190">190</span>
+<span id="191">191</span>
+<span id="192">192</span>
+<span id="193">193</span>
+<span id="194">194</span>
+<span id="195">195</span>
+<span id="196">196</span>
+<span id="197">197</span>
+<span id="198">198</span>
+<span id="199">199</span>
+<span id="200">200</span>
+<span id="201">201</span>
+<span id="202">202</span>
 </pre><pre class="rust"><code><span class="kw">use </span>anchor_lang::prelude::<span class="kw-2">*</span>;
 
 <span class="kw">use </span>derivative::Derivative;
@@ -199,6 +217,18 @@
 </span><span class="kw">pub enum </span>TokenConditionalSwapDisplayPriceStyle {
     SellTokenPerBuyToken,
     BuyTokenPerSellToken,
+}
+
+<span class="attribute">#[derive(
+    Clone, Copy, PartialEq, Eq, IntoPrimitive, TryFromPrimitive, AnchorDeserialize, AnchorSerialize,
+)]
+#[repr(u8)]
+</span><span class="kw">pub enum </span>TokenConditionalSwapIntention {
+    Unknown,
+    <span class="doccomment">/// Reducing a position when the price gets worse
+    </span>StopLoss,
+    <span class="doccomment">/// Reducing a position when the price gets better
+    </span>TakeProfit,
 }
 
 <span class="attribute">#[zero_copy]
@@ -265,13 +295,18 @@
     /// Stores a TokenConditionalSwapDisplayPriceStyle enum value
     </span><span class="kw">pub </span>display_price_style: u8,
 
+    <span class="doccomment">/// The intention the user had when placing this order, display-only
+    ///
+    /// Stores a TokenConditionalSwapIntention enum value
+    </span><span class="kw">pub </span>intention: u8,
+
     <span class="attribute">#[derivative(Debug = <span class="string">&quot;ignore&quot;</span>)]
-    </span><span class="kw">pub </span>reserved: [u8; <span class="number">112</span>],
+    </span><span class="kw">pub </span>reserved: [u8; <span class="number">111</span>],
 }
 
 <span class="macro">const_assert_eq!</span>(
     size_of::&lt;TokenConditionalSwap&gt;(),
-    <span class="number">8 </span>* <span class="number">6 </span>+ <span class="number">8 </span>* <span class="number">3 </span>+ <span class="number">2 </span>* <span class="number">4 </span>+ <span class="number">2 </span>* <span class="number">2 </span>+ <span class="number">1 </span>* <span class="number">4 </span>+ <span class="number">112
+    <span class="number">8 </span>* <span class="number">6 </span>+ <span class="number">8 </span>* <span class="number">3 </span>+ <span class="number">2 </span>* <span class="number">4 </span>+ <span class="number">2 </span>* <span class="number">2 </span>+ <span class="number">1 </span>* <span class="number">5 </span>+ <span class="number">111
 </span>);
 <span class="macro">const_assert_eq!</span>(size_of::&lt;TokenConditionalSwap&gt;(), <span class="number">200</span>);
 <span class="macro">const_assert_eq!</span>(size_of::&lt;TokenConditionalSwap&gt;() % <span class="number">8</span>, <span class="number">0</span>);
@@ -296,7 +331,8 @@
             allow_creating_borrows: <span class="number">0</span>,
             allow_creating_deposits: <span class="number">0</span>,
             display_price_style: TokenConditionalSwapDisplayPriceStyle::SellTokenPerBuyToken.into(),
-            reserved: [<span class="number">0</span>; <span class="number">112</span>],
+            intention: TokenConditionalSwapIntention::Unknown.into(),
+            reserved: [<span class="number">0</span>; <span class="number">111</span>],
         }
     }
 }

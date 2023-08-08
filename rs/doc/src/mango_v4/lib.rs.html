@@ -1405,6 +1405,9 @@
 <span id="1405">1405</span>
 <span id="1406">1406</span>
 <span id="1407">1407</span>
+<span id="1408">1408</span>
+<span id="1409">1409</span>
+<span id="1410">1410</span>
 </pre><pre class="rust"><code><span class="attribute">#![allow(unused_variables)]
 
 </span><span class="kw">use </span>fixed::types::I80F48;
@@ -1440,7 +1443,7 @@
 <span class="kw">use </span>state::{
     OpenbookV2MarketIndex, OracleConfigParams, PerpMarketIndex, PlaceOrderType, SelfTradeBehavior,
     Serum3MarketIndex, Side, TokenConditionalSwap, TokenConditionalSwapDisplayPriceStyle,
-    TokenIndex,
+    TokenConditionalSwapIntention, TokenIndex,
 };
 
 <span class="macro">declare_id!</span>(<span class="string">&quot;4MangoMjqJ2firMokCjjGgoK8d4MXcrgL7XJaL3w6fVg&quot;</span>);
@@ -2590,6 +2593,7 @@
             allow_creating_deposits,
             allow_creating_borrows,
             TokenConditionalSwapDisplayPriceStyle::SellTokenPerBuyToken,
+            TokenConditionalSwapIntention::Unknown,
         )
     }
 
@@ -2604,6 +2608,7 @@
         allow_creating_deposits: bool,
         allow_creating_borrows: bool,
         display_price_style: TokenConditionalSwapDisplayPriceStyle,
+        intention: TokenConditionalSwapIntention,
     ) -&gt; <span class="prelude-ty">Result</span>&lt;()&gt; {
         <span class="kw">let </span>tcs = TokenConditionalSwap {
             id: u64::MAX, <span class="comment">// set inside
@@ -2623,7 +2628,8 @@
             allow_creating_deposits: u8::from(allow_creating_deposits),
             allow_creating_borrows: u8::from(allow_creating_borrows),
             display_price_style: display_price_style.into(),
-            reserved: [<span class="number">0</span>; <span class="number">112</span>],
+            intention: intention.into(),
+            reserved: [<span class="number">0</span>; <span class="number">111</span>],
         };
 
         <span class="attribute">#[cfg(feature = <span class="string">&quot;enable-gpl&quot;</span>)]
