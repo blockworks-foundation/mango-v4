@@ -446,62 +446,6 @@ impl HealthCache {
             cache.health_ratio(HealthType::Init)
         })
     }
-
-    /// Computes the account equity and the summarized balance sheet marked to market.
-    /// Returns (equity, assets, liabilities)
-    pub fn equity(&self) -> (I80F48, I80F48, I80F48) {
-        let mut assets = I80F48::ZERO;
-        let mut liabs = I80F48::ZERO;
-
-        for token_info in self.token_infos.iter() {
-            if token_info.balance_spot.is_negative() {
-                liabs -= token_info.balance_spot * token_info.prices.oracle;
-            } else {
-                assets += token_info.balance_spot * token_info.prices.oracle;
-            }
-        }
-
-        for serum_info in self.serum3_infos.iter() {
-            let quote = &self.token_infos[serum_info.quote_info_index];
-            let base = &self.token_infos[serum_info.base_info_index];
-            assets += serum_info.reserved_base * base.prices.oracle;
-            assets += serum_info.reserved_quote * quote.prices.oracle;
-        }
-
-        for perp_info in self.perp_infos.iter() {
-            let quote_price = self.token_infos[perp_info.settle_token_index as usize]
-                .prices
-                .oracle;
-            let quote_position_value = perp_info.quote * quote_price;
-            if perp_info.quote.is_negative() {
-                liabs -= quote_position_value;
-            } else {
-                assets += quote_position_value;
-            }
-
-            let base_position_value = I80F48::from(perp_info.base_lots * perp_info.base_lot_size)
-                * perp_info.base_prices.oracle
-                * quote_price;
-            if base_position_value.is_negative() {
-                liabs -= base_position_value;
-            } else {
-                assets += base_position_value;
-            }
-        }
-
-        let equity = assets - liabs;
-        return (equity, assets, liabs);
-    }
-
-    /// Computes the account leverage as ratio of liabs / (assets - liabs)
-    ///
-    /// The goal of this function is to provide a quick overview over the accounts balance sheet.
-    /// It's not actually used to make any margin decisions internally and doesn't account for
-    /// open orders or stable / oracle price differences. Use health_ratio to make risk decisions.
-    pub fn leverage(&self) -> I80F48 {
-        let (equity, _, liabs) = self.equity();
-        liabs / equity.max(I80F48::from_num(0.001))
-    }
 }
 
 fn scan_right_until_less_than(
