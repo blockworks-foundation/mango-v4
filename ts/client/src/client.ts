@@ -3538,8 +3538,14 @@ export class MangoClient {
     allowCreatingBorrows: boolean,
     expiryTimestamp: number | null,
   ): Promise<TransactionSignature> {
-    const maxBuy = toNative(maxBuyUi, buyBank.mintDecimals);
-    const maxSell = toNative(maxSellUi, sellBank.mintDecimals);
+    const maxBuy =
+      maxBuyUi == Number.MAX_SAFE_INTEGER
+        ? U64_MAX_BN
+        : toNative(maxBuyUi, buyBank.mintDecimals);
+    const maxSell =
+      maxBuyUi == Number.MAX_SAFE_INTEGER
+        ? U64_MAX_BN
+        : toNative(maxSellUi, sellBank.mintDecimals);
 
     if (!thresholdPriceInSellPerBuyToken) {
       thresholdPriceUi = 1 / thresholdPriceUi;
