@@ -469,10 +469,10 @@ impl HealthCache {
         }
 
         for perp_info in self.perp_infos.iter() {
-            let quote_position_value = perp_info.quote
-                * self.token_infos[perp_info.settle_token_index as usize]
-                    .prices
-                    .oracle;
+            let quote_price = self.token_infos[perp_info.settle_token_index as usize]
+                .prices
+                .oracle;
+            let quote_position_value = perp_info.quote * quote_price;
             if perp_info.quote.is_negative() {
                 liabs -= quote_position_value;
             } else {
@@ -480,7 +480,8 @@ impl HealthCache {
             }
 
             let base_position_value = I80F48::from(perp_info.base_lots * perp_info.base_lot_size)
-                * perp_info.base_prices.oracle;
+                * perp_info.base_prices.oracle
+                * quote_price;
             if base_position_value.is_negative() {
                 liabs -= base_position_value;
             } else {
