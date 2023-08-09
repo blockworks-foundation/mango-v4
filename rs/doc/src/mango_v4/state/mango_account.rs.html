@@ -1880,6 +1880,20 @@
 <span id="1880">1880</span>
 <span id="1881">1881</span>
 <span id="1882">1882</span>
+<span id="1883">1883</span>
+<span id="1884">1884</span>
+<span id="1885">1885</span>
+<span id="1886">1886</span>
+<span id="1887">1887</span>
+<span id="1888">1888</span>
+<span id="1889">1889</span>
+<span id="1890">1890</span>
+<span id="1891">1891</span>
+<span id="1892">1892</span>
+<span id="1893">1893</span>
+<span id="1894">1894</span>
+<span id="1895">1895</span>
+<span id="1896">1896</span>
 </pre><pre class="rust"><code><span class="kw">use </span>std::cell::{Ref, RefMut};
 <span class="kw">use </span>std::mem::size_of;
 
@@ -2139,9 +2153,14 @@
     <span class="kw">pub </span>buyback_fees_accrued_previous: u64,
     <span class="kw">pub </span>buyback_fees_expiry_timestamp: u64,
     <span class="kw">pub </span>next_token_conditional_swap_id: u64,
-    <span class="kw">pub </span>reserved: [u8; <span class="number">200</span>],
+    <span class="kw">pub </span>temporary_delegate: Pubkey,
+    <span class="kw">pub </span>temporary_delegate_expiry: u64,
+    <span class="kw">pub </span>reserved: [u8; <span class="number">160</span>],
 }
-<span class="macro">const_assert_eq!</span>(size_of::&lt;MangoAccountFixed&gt;(), <span class="number">32 </span>* <span class="number">4 </span>+ <span class="number">8 </span>+ <span class="number">8 </span>* <span class="number">8 </span>+ <span class="number">200</span>);
+<span class="macro">const_assert_eq!</span>(
+    size_of::&lt;MangoAccountFixed&gt;(),
+    <span class="number">32 </span>* <span class="number">4 </span>+ <span class="number">8 </span>+ <span class="number">8 </span>* <span class="number">8 </span>+ <span class="number">32 </span>+ <span class="number">8 </span>+ <span class="number">160
+</span>);
 <span class="macro">const_assert_eq!</span>(size_of::&lt;MangoAccountFixed&gt;(), <span class="number">400</span>);
 <span class="macro">const_assert_eq!</span>(size_of::&lt;MangoAccountFixed&gt;() % <span class="number">8</span>, <span class="number">0</span>);
 
@@ -2158,11 +2177,20 @@
     }
 
     <span class="kw">pub fn </span>is_owner_or_delegate(<span class="kw-2">&amp;</span><span class="self">self</span>, ix_signer: Pubkey) -&gt; bool {
-        <span class="self">self</span>.owner == ix_signer || <span class="self">self</span>.delegate == ix_signer
+        <span class="self">self</span>.owner == ix_signer || <span class="self">self</span>.is_delegate(ix_signer)
     }
 
     <span class="kw">pub fn </span>is_delegate(<span class="kw-2">&amp;</span><span class="self">self</span>, ix_signer: Pubkey) -&gt; bool {
-        <span class="self">self</span>.delegate == ix_signer
+        <span class="kw">if </span><span class="self">self</span>.delegate == ix_signer {
+            <span class="kw">return </span><span class="bool-val">true</span>;
+        }
+
+        <span class="kw">let </span>now_ts: u64 = Clock::get().unwrap().unix_timestamp.try_into().unwrap();
+        <span class="kw">if </span>now_ts &gt; <span class="self">self</span>.temporary_delegate_expiry {
+            <span class="kw">return </span><span class="bool-val">false</span>;
+        }
+
+        <span class="self">self</span>.temporary_delegate == ix_signer
     }
 
     <span class="kw">pub fn </span>being_liquidated(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool {

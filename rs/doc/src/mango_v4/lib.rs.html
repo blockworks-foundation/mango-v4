@@ -1408,6 +1408,14 @@
 <span id="1408">1408</span>
 <span id="1409">1409</span>
 <span id="1410">1410</span>
+<span id="1411">1411</span>
+<span id="1412">1412</span>
+<span id="1413">1413</span>
+<span id="1414">1414</span>
+<span id="1415">1415</span>
+<span id="1416">1416</span>
+<span id="1417">1417</span>
+<span id="1418">1418</span>
 </pre><pre class="rust"><code><span class="attribute">#![allow(unused_variables)]
 
 </span><span class="kw">use </span>fixed::types::I80F48;
@@ -1725,9 +1733,17 @@
         ctx: Context&lt;AccountEdit&gt;,
         name_opt: <span class="prelude-ty">Option</span>&lt;String&gt;,
         delegate_opt: <span class="prelude-ty">Option</span>&lt;Pubkey&gt;,
+        temporary_delegate_opt: <span class="prelude-ty">Option</span>&lt;Pubkey&gt;,
+        temporary_delegate_expiry_opt: <span class="prelude-ty">Option</span>&lt;u64&gt;,
     ) -&gt; <span class="prelude-ty">Result</span>&lt;()&gt; {
         <span class="attribute">#[cfg(feature = <span class="string">&quot;enable-gpl&quot;</span>)]
-        </span>instructions::account_edit(ctx, name_opt, delegate_opt)<span class="question-mark">?</span>;
+        </span>instructions::account_edit(
+            ctx,
+            name_opt,
+            delegate_opt,
+            temporary_delegate_opt,
+            temporary_delegate_expiry_opt,
+        )<span class="question-mark">?</span>;
         <span class="prelude-val">Ok</span>(())
     }
 
