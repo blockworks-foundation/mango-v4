@@ -105,7 +105,7 @@ pub async fn jupiter_route(
 }
 
 /// Convenience wrapper for getting max swap amounts for a token pair
-pub async fn max_swap_source(
+pub fn max_swap_source(
     client: &MangoClient,
     account_fetcher: &chain_data::AccountFetcher,
     account: &MangoAccountValue,
@@ -122,12 +122,13 @@ pub async fn max_swap_source(
     account.ensure_token_position(target)?;
 
     let health_cache =
-        mango_v4_client::health_cache::new(&client.context, account_fetcher, &account)
-            .await
+        mango_v4_client::health_cache::new_sync(&client.context, account_fetcher, &account)
             .expect("always ok");
 
-    let source_bank = client.first_bank(source).await?;
-    let target_bank = client.first_bank(target).await?;
+    let source_bank: Bank =
+        account_fetcher.fetch(&client.context.mint_info(source).first_bank())?;
+    let target_bank: Bank =
+        account_fetcher.fetch(&client.context.mint_info(target).first_bank())?;
 
     let source_price = health_cache.token_info(source).unwrap().prices.oracle;
 

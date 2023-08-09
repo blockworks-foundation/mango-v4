@@ -532,13 +532,13 @@ struct SharedState {
 }
 
 #[derive(Clone)]
-struct AccountErrorState {
-    count: u64,
-    last_at: std::time::Instant,
+pub struct AccountErrorState {
+    pub count: u64,
+    pub last_at: std::time::Instant,
 }
 
 #[derive(Default)]
-struct ErrorTracking {
+pub struct ErrorTracking {
     accounts: HashMap<Pubkey, AccountErrorState>,
     skip_threshold: u64,
     skip_duration: std::time::Duration,
@@ -678,18 +678,47 @@ impl LiquidationState {
         &mut self,
         accounts_iter: impl Iterator<Item = &'b Pubkey>,
     ) -> anyhow::Result<()> {
-        use rand::seq::SliceRandom;
+        let accounts = accounts_iter.collect::<Vec<&Pubkey>>();
 
-        let mut accounts = accounts_iter.collect::<Vec<&Pubkey>>();
-        {
-            let mut rng = rand::thread_rng();
-            accounts.shuffle(&mut rng);
+        let now = std::time::Instant::now();
+        let now_ts: u64 = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)?
+            .as_secs()
+            .try_into()?;
+
+        // Find interesting (pubkey, tcsid, volume)
+        let mut interesting_tcs = Vec::with_capacity(accounts.len());
+        for pubkey in accounts.iter() {
+            if let Ok(mut v) = trigger_tcs::find_interesting_tcs_for_account(
+                pubkey,
+                &self.mango_client,
+                &self.account_fetcher,
+                &self.token_swap_info,
+                &self.tcs_errors,
+                now,
+                now_ts,
+            ) {
+                interesting_tcs.append(&mut v);
+            }
         }
 
+        // Repeatedly pick one randomly (volume-weighted) and try to execute
+        use rand::distributions::{Distribution, WeightedIndex};
+        let weights = interesting_tcs
+            .iter()
+            .map(|(_, _, volume)| (*volume).min(self.trigger_tcs_config.max_trigger_quote_amount));
+        let mut dist = WeightedIndex::new(weights).unwrap();
         let mut took_one = false;
-        for pubkey in accounts {
+        for _ in 0..interesting_tcs.len() {
+            let (pubkey, tcs_id, _) = {
+                let mut rng = rand::thread_rng();
+                let sample = dist.sample(&mut rng);
+                dist.update_weights(&[(sample, &0)])?;
+                &interesting_tcs[sample]
+            };
+
             if self
-                .maybe_take_conditional_swap_and_log_error(pubkey)
+                .maybe_take_conditional_swap_and_log_error(pubkey, *tcs_id)
                 .await
                 .unwrap_or(false)
             {
@@ -697,6 +726,7 @@ impl LiquidationState {
                 break;
             }
         }
+
         if !took_one {
             return Ok(());
         }
@@ -710,6 +740,7 @@ impl LiquidationState {
     async fn maybe_take_conditional_swap_and_log_error(
         &mut self,
         pubkey: &Pubkey,
+        tcs_id: u64,
     ) -> anyhow::Result<bool> {
         let now = std::time::Instant::now();
         let error_tracking = &mut self.tcs_errors;
@@ -728,6 +759,7 @@ impl LiquidationState {
             &self.account_fetcher,
             &self.token_swap_info,
             pubkey,
+            tcs_id,
             &self.trigger_tcs_config,
         )
         .await;

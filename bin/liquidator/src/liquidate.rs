@@ -381,7 +381,6 @@ impl<'a> LiquidateHelper<'a> {
             price,
             self.liqor_min_health_ratio,
         )
-        .await
     }
 
     async fn token_liq(&self) -> anyhow::Result<Option<Signature>> {
