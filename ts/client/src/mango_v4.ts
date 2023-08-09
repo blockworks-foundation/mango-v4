@@ -1315,6 +1315,18 @@ export type MangoV4 = {
           "type": {
             "option": "publicKey"
           }
+        },
+        {
+          "name": "temporaryDelegateOpt",
+          "type": {
+            "option": "publicKey"
+          }
+        },
+        {
+          "name": "temporaryDelegateExpiryOpt",
+          "type": {
+            "option": "u64"
+          }
         }
       ]
     },
@@ -8574,11 +8586,19 @@ export type MangoV4 = {
             "type": "u64"
           },
           {
+            "name": "temporaryDelegate",
+            "type": "publicKey"
+          },
+          {
+            "name": "temporaryDelegateExpiry",
+            "type": "u64"
+          },
+          {
             "name": "reserved",
             "type": {
               "array": [
                 "u8",
-                200
+                160
               ]
             }
           }
@@ -13631,6 +13651,18 @@ export const IDL: MangoV4 = {
           "type": {
             "option": "publicKey"
           }
+        },
+        {
+          "name": "temporaryDelegateOpt",
+          "type": {
+            "option": "publicKey"
+          }
+        },
+        {
+          "name": "temporaryDelegateExpiryOpt",
+          "type": {
+            "option": "u64"
+          }
         }
       ]
     },
@@ -20890,11 +20922,19 @@ export const IDL: MangoV4 = {
             "type": "u64"
           },
           {
+            "name": "temporaryDelegate",
+            "type": "publicKey"
+          },
+          {
+            "name": "temporaryDelegateExpiry",
+            "type": "u64"
+          },
+          {
             "name": "reserved",
             "type": {
               "array": [
                 "u8",
-                200
+                160
               ]
             }
           }

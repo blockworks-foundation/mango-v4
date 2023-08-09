@@ -1315,6 +1315,18 @@
           "type": {
             "option": "publicKey"
           }
+        },
+        {
+          "name": "temporaryDelegateOpt",
+          "type": {
+            "option": "publicKey"
+          }
+        },
+        {
+          "name": "temporaryDelegateExpiryOpt",
+          "type": {
+            "option": "u64"
+          }
         }
       ]
     },
@@ -8574,11 +8586,19 @@
             "type": "u64"
           },
           {
+            "name": "temporaryDelegate",
+            "type": "publicKey"
+          },
+          {
+            "name": "temporaryDelegateExpiry",
+            "type": "u64"
+          },
+          {
             "name": "reserved",
             "type": {
               "array": [
                 "u8",
-                200
+                160
               ]
             }
           }
