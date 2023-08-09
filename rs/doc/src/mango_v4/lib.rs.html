@@ -1418,6 +1418,24 @@
 <span id="1418">1418</span>
 <span id="1419">1419</span>
 <span id="1420">1420</span>
+<span id="1421">1421</span>
+<span id="1422">1422</span>
+<span id="1423">1423</span>
+<span id="1424">1424</span>
+<span id="1425">1425</span>
+<span id="1426">1426</span>
+<span id="1427">1427</span>
+<span id="1428">1428</span>
+<span id="1429">1429</span>
+<span id="1430">1430</span>
+<span id="1431">1431</span>
+<span id="1432">1432</span>
+<span id="1433">1433</span>
+<span id="1434">1434</span>
+<span id="1435">1435</span>
+<span id="1436">1436</span>
+<span id="1437">1437</span>
+<span id="1438">1438</span>
 </pre><pre class="rust"><code><span class="attribute">#![allow(unused_variables)]
 
 </span><span class="kw">use </span>fixed::types::I80F48;
@@ -1554,9 +1572,18 @@
         maint_liab_weight: f32,
         init_liab_weight: f32,
         liquidation_fee: f32,
+        stable_price_delay_interval_seconds: u32,
+        stable_price_delay_growth_limit: f32,
+        stable_price_growth_limit: f32,
         min_vault_to_deposits_ratio: f64,
         net_borrow_limit_window_size_ts: u64,
         net_borrow_limit_per_window_quote: i64,
+        borrow_weight_scale_start_quote: f64,
+        deposit_weight_scale_start_quote: f64,
+        reduce_only: u8,
+        token_conditional_swap_taker_fee_rate: f32,
+        token_conditional_swap_maker_fee_rate: f32,
+        flash_loan_swap_fee_rate: f32,
     ) -&gt; <span class="prelude-ty">Result</span>&lt;()&gt; {
         <span class="attribute">#[cfg(feature = <span class="string">&quot;enable-gpl&quot;</span>)]
         </span>instructions::token_register(
@@ -1572,9 +1599,18 @@
             maint_liab_weight,
             init_liab_weight,
             liquidation_fee,
+            stable_price_delay_interval_seconds,
+            stable_price_delay_growth_limit,
+            stable_price_growth_limit,
             min_vault_to_deposits_ratio,
             net_borrow_limit_window_size_ts,
             net_borrow_limit_per_window_quote,
+            borrow_weight_scale_start_quote,
+            deposit_weight_scale_start_quote,
+            reduce_only,
+            token_conditional_swap_taker_fee_rate,
+            token_conditional_swap_maker_fee_rate,
+            flash_loan_swap_fee_rate,
         )<span class="question-mark">?</span>;
         <span class="prelude-val">Ok</span>(())
     }

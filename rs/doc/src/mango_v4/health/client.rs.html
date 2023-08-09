@@ -1459,6 +1459,112 @@
 <span id="1459">1459</span>
 <span id="1460">1460</span>
 <span id="1461">1461</span>
+<span id="1462">1462</span>
+<span id="1463">1463</span>
+<span id="1464">1464</span>
+<span id="1465">1465</span>
+<span id="1466">1466</span>
+<span id="1467">1467</span>
+<span id="1468">1468</span>
+<span id="1469">1469</span>
+<span id="1470">1470</span>
+<span id="1471">1471</span>
+<span id="1472">1472</span>
+<span id="1473">1473</span>
+<span id="1474">1474</span>
+<span id="1475">1475</span>
+<span id="1476">1476</span>
+<span id="1477">1477</span>
+<span id="1478">1478</span>
+<span id="1479">1479</span>
+<span id="1480">1480</span>
+<span id="1481">1481</span>
+<span id="1482">1482</span>
+<span id="1483">1483</span>
+<span id="1484">1484</span>
+<span id="1485">1485</span>
+<span id="1486">1486</span>
+<span id="1487">1487</span>
+<span id="1488">1488</span>
+<span id="1489">1489</span>
+<span id="1490">1490</span>
+<span id="1491">1491</span>
+<span id="1492">1492</span>
+<span id="1493">1493</span>
+<span id="1494">1494</span>
+<span id="1495">1495</span>
+<span id="1496">1496</span>
+<span id="1497">1497</span>
+<span id="1498">1498</span>
+<span id="1499">1499</span>
+<span id="1500">1500</span>
+<span id="1501">1501</span>
+<span id="1502">1502</span>
+<span id="1503">1503</span>
+<span id="1504">1504</span>
+<span id="1505">1505</span>
+<span id="1506">1506</span>
+<span id="1507">1507</span>
+<span id="1508">1508</span>
+<span id="1509">1509</span>
+<span id="1510">1510</span>
+<span id="1511">1511</span>
+<span id="1512">1512</span>
+<span id="1513">1513</span>
+<span id="1514">1514</span>
+<span id="1515">1515</span>
+<span id="1516">1516</span>
+<span id="1517">1517</span>
+<span id="1518">1518</span>
+<span id="1519">1519</span>
+<span id="1520">1520</span>
+<span id="1521">1521</span>
+<span id="1522">1522</span>
+<span id="1523">1523</span>
+<span id="1524">1524</span>
+<span id="1525">1525</span>
+<span id="1526">1526</span>
+<span id="1527">1527</span>
+<span id="1528">1528</span>
+<span id="1529">1529</span>
+<span id="1530">1530</span>
+<span id="1531">1531</span>
+<span id="1532">1532</span>
+<span id="1533">1533</span>
+<span id="1534">1534</span>
+<span id="1535">1535</span>
+<span id="1536">1536</span>
+<span id="1537">1537</span>
+<span id="1538">1538</span>
+<span id="1539">1539</span>
+<span id="1540">1540</span>
+<span id="1541">1541</span>
+<span id="1542">1542</span>
+<span id="1543">1543</span>
+<span id="1544">1544</span>
+<span id="1545">1545</span>
+<span id="1546">1546</span>
+<span id="1547">1547</span>
+<span id="1548">1548</span>
+<span id="1549">1549</span>
+<span id="1550">1550</span>
+<span id="1551">1551</span>
+<span id="1552">1552</span>
+<span id="1553">1553</span>
+<span id="1554">1554</span>
+<span id="1555">1555</span>
+<span id="1556">1556</span>
+<span id="1557">1557</span>
+<span id="1558">1558</span>
+<span id="1559">1559</span>
+<span id="1560">1560</span>
+<span id="1561">1561</span>
+<span id="1562">1562</span>
+<span id="1563">1563</span>
+<span id="1564">1564</span>
+<span id="1565">1565</span>
+<span id="1566">1566</span>
+<span id="1567">1567</span>
 </pre><pre class="rust"><code><span class="attribute">#![cfg(feature = <span class="string">&quot;client&quot;</span>)]
 
 </span><span class="kw">use </span>anchor_lang::prelude::<span class="kw-2">*</span>;
@@ -2071,6 +2177,16 @@
         </span>}
     }
 
+    <span class="kw">fn </span>leverage_eq(h: <span class="kw-2">&amp;</span>HealthCache, b: f64) -&gt; bool {
+        <span class="kw">let </span>a = h.leverage();
+        <span class="kw">if </span>(a - I80F48::from_num(b)).abs() &lt; <span class="number">0.001 </span>{
+            <span class="bool-val">true
+        </span>} <span class="kw">else </span>{
+            <span class="macro">println!</span>(<span class="string">&quot;leverage is {}, but expected {}&quot;</span>, a, b);
+            <span class="bool-val">false
+        </span>}
+    }
+
     <span class="kw">fn </span>default_token_info(x: f64, price: f64) -&gt; TokenInfo {
         TokenInfo {
             token_index: <span class="number">0</span>,
@@ -2085,7 +2201,7 @@
         }
     }
 
-    <span class="kw">fn </span>default_perp_info(x: f64) -&gt; PerpInfo {
+    <span class="kw">fn </span>default_perp_info(x: f64, price: f64) -&gt; PerpInfo {
         PerpInfo {
             perp_market_index: <span class="number">0</span>,
             settle_token_index: <span class="number">0</span>,
@@ -2100,7 +2216,7 @@
             bids_base_lots: <span class="number">0</span>,
             asks_base_lots: <span class="number">0</span>,
             quote: I80F48::ZERO,
-            base_prices: Prices::new_single_price(I80F48::from_num(<span class="number">2.0</span>)),
+            base_prices: Prices::new_single_price(I80F48::from_num(price)),
             has_open_orders: <span class="bool-val">false</span>,
             has_open_fills: <span class="bool-val">false</span>,
         }
@@ -2469,7 +2585,7 @@
                 health_cache.perp_infos.push(PerpInfo {
                     perp_market_index: <span class="number">0</span>,
                     settle_token_index: <span class="number">1</span>,
-                    ..default_perp_info(<span class="number">0.3</span>)
+                    ..default_perp_info(<span class="number">0.3</span>, <span class="number">2.0</span>)
                 });
                 adjust_by_usdc(<span class="kw-2">&amp;mut </span>health_cache, <span class="number">0</span>, <span class="number">60.0</span>);
 
@@ -2509,7 +2625,7 @@
                 perp_market_index: <span class="number">0</span>,
                 settle_token_index: <span class="number">1</span>,
                 base_lot_size,
-                ..default_perp_info(<span class="number">0.3</span>)
+                ..default_perp_info(<span class="number">0.3</span>, <span class="number">2.0</span>)
             }],
             being_liquidated: <span class="bool-val">false</span>,
         };
@@ -2886,7 +3002,7 @@
             perp_infos: <span class="macro">vec!</span>[PerpInfo {
                 perp_market_index: <span class="number">0</span>,
                 settle_token_index: <span class="number">0</span>,
-                ..default_perp_info(<span class="number">0.3</span>)
+                ..default_perp_info(<span class="number">0.3</span>, <span class="number">2.0</span>)
             }],
             being_liquidated: <span class="bool-val">false</span>,
         };
@@ -2918,6 +3034,102 @@
             <span class="macro">assert!</span>((liabs.to_num::&lt;f64&gt;() - <span class="number">2.0 </span>* <span class="number">10.0 </span>* <span class="number">1.2</span>) &lt; <span class="number">0.01</span>);
             <span class="macro">assert!</span>((assets.to_num::&lt;f64&gt;() - <span class="number">2.0 </span>* (<span class="number">10.0 </span>* <span class="number">1.2 </span>+ <span class="number">2.0 </span>* <span class="number">0.8</span>)) &lt; <span class="number">0.01</span>);
         }
+    }
+
+    <span class="attribute">#[test]
+    </span><span class="kw">fn </span>test_leverage() {
+        <span class="comment">// only deposits
+        </span><span class="kw">let </span>health_cache = HealthCache {
+            token_infos: <span class="macro">vec!</span>[
+                TokenInfo {
+                    token_index: <span class="number">0</span>,
+                    balance_spot: I80F48::ONE,
+                    ..default_token_info(<span class="number">0.0</span>, <span class="number">1.0</span>)
+                },
+                TokenInfo {
+                    token_index: <span class="number">1</span>,
+                    ..default_token_info(<span class="number">0.2</span>, <span class="number">2.0</span>)
+                },
+            ],
+            serum3_infos: <span class="macro">vec!</span>[],
+            perp_infos: <span class="macro">vec!</span>[],
+            being_liquidated: <span class="bool-val">false</span>,
+        };
+        <span class="macro">assert!</span>(leverage_eq(<span class="kw-2">&amp;</span>health_cache, <span class="number">0.0</span>));
+
+        <span class="comment">// deposits and borrows: assets = 10, equity = 1
+        </span><span class="kw">let </span>health_cache = HealthCache {
+            token_infos: <span class="macro">vec!</span>[
+                TokenInfo {
+                    token_index: <span class="number">0</span>,
+                    balance_spot: I80F48::from_num(-<span class="number">9</span>),
+                    ..default_token_info(<span class="number">0.0</span>, <span class="number">1.0</span>)
+                },
+                TokenInfo {
+                    token_index: <span class="number">1</span>,
+                    balance_spot: I80F48::from_num(<span class="number">5</span>),
+                    ..default_token_info(<span class="number">0.2</span>, <span class="number">2.0</span>)
+                },
+            ],
+            serum3_infos: <span class="macro">vec!</span>[],
+            perp_infos: <span class="macro">vec!</span>[],
+            being_liquidated: <span class="bool-val">false</span>,
+        };
+
+        <span class="macro">assert!</span>(leverage_eq(<span class="kw-2">&amp;</span>health_cache, <span class="number">9.0</span>));
+
+        <span class="comment">// perp trade: assets = 1 + 9.9, equity = 1
+        </span><span class="kw">let </span>health_cache = HealthCache {
+            token_infos: <span class="macro">vec!</span>[
+                TokenInfo {
+                    token_index: <span class="number">0</span>,
+                    balance_spot: I80F48::ONE,
+                    ..default_token_info(<span class="number">0.0</span>, <span class="number">1.0</span>)
+                },
+                TokenInfo {
+                    token_index: <span class="number">1</span>,
+                    ..default_token_info(<span class="number">0.2</span>, <span class="number">2.0</span>)
+                },
+            ],
+            serum3_infos: <span class="macro">vec!</span>[],
+            perp_infos: <span class="macro">vec!</span>[PerpInfo {
+                perp_market_index: <span class="number">0</span>,
+                base_lot_size: <span class="number">3</span>,
+                base_lots: -<span class="number">3</span>,
+                quote: I80F48::from_num(<span class="number">9.9</span>),
+                ..default_perp_info(<span class="number">0.1</span>, <span class="number">1.1</span>)
+            }],
+            being_liquidated: <span class="bool-val">false</span>,
+        };
+        <span class="macro">assert!</span>(leverage_eq(<span class="kw-2">&amp;</span>health_cache, <span class="number">9.9</span>));
+
+        <span class="comment">// open orders: assets = 3, equity = 1
+        </span><span class="kw">let </span>health_cache = HealthCache {
+            token_infos: <span class="macro">vec!</span>[
+                TokenInfo {
+                    token_index: <span class="number">0</span>,
+                    balance_spot: I80F48::ONE,
+                    ..default_token_info(<span class="number">0.0</span>, <span class="number">1.0</span>)
+                },
+                TokenInfo {
+                    token_index: <span class="number">1</span>,
+                    balance_spot: I80F48::from_num(-<span class="number">1</span>),
+                    ..default_token_info(<span class="number">0.2</span>, <span class="number">2.0</span>)
+                },
+            ],
+            serum3_infos: <span class="macro">vec!</span>[Serum3Info {
+                reserved_base: I80F48::ONE,
+                reserved_quote: I80F48::ZERO,
+                base_info_index: <span class="number">1</span>,
+                quote_info_index: <span class="number">0</span>,
+                market_index: <span class="number">0</span>,
+                has_zero_funds: <span class="bool-val">true</span>,
+            }],
+            perp_infos: <span class="macro">vec!</span>[],
+            being_liquidated: <span class="bool-val">false</span>,
+        };
+
+        <span class="macro">assert!</span>(leverage_eq(<span class="kw-2">&amp;</span>health_cache, <span class="number">2.0</span>));
     }
 }
 </code></pre></div>
