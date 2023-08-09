@@ -860,14 +860,13 @@ impl Bank {
         staleness_slot: Option<u64>,
     ) -> Result<I80F48> {
         require_keys_eq!(self.oracle, *oracle_acc.key());
-        let (price, _) = oracle::oracle_price_and_state(
-            oracle_acc,
+        let state = oracle::oracle_state_unchecked(oracle_acc, self.mint_decimals)?;
+        state.check_confidence_and_maybe_staleness(
+            &self.oracle,
             &self.oracle_config,
-            self.mint_decimals,
             staleness_slot,
         )?;
-
-        Ok(price)
+        Ok(state.price)
     }
 
     pub fn stable_price(&self) -> I80F48 {

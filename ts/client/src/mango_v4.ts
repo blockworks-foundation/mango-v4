@@ -3,7 +3,7 @@ export type MangoV4 = {
   "name": "mango_v4",
   "instructions": [
     {
-      "name": "admingTokenWithdrawFees",
+      "name": "adminTokenWithdrawFees",
       "accounts": [
         {
           "name": "group",
@@ -1321,6 +1321,18 @@ export type MangoV4 = {
           "type": {
             "option": "publicKey"
           }
+        },
+        {
+          "name": "temporaryDelegateOpt",
+          "type": {
+            "option": "publicKey"
+          }
+        },
+        {
+          "name": "temporaryDelegateExpiryOpt",
+          "type": {
+            "option": "u64"
+          }
         }
       ]
     },
@@ -1587,6 +1599,50 @@ export type MangoV4 = {
       "args": [
         {
           "name": "price",
+          "type": {
+            "defined": "I80F48"
+          }
+        }
+      ]
+    },
+    {
+      "name": "stubOracleSetTest",
+      "accounts": [
+        {
+          "name": "group",
+          "isMut": false,
+          "isSigner": false,
+          "relations": [
+            "admin"
+          ]
+        },
+        {
+          "name": "admin",
+          "isMut": false,
+          "isSigner": true
+        },
+        {
+          "name": "oracle",
+          "isMut": true,
+          "isSigner": false,
+          "relations": [
+            "group"
+          ]
+        }
+      ],
+      "args": [
+        {
+          "name": "price",
+          "type": {
+            "defined": "I80F48"
+          }
+        },
+        {
+          "name": "lastUpdateSlot",
+          "type": "u64"
+        },
+        {
+          "name": "deviation",
           "type": {
             "defined": "I80F48"
           }
@@ -4899,6 +4955,91 @@ export type MangoV4 = {
       ]
     },
     {
+      "name": "tokenConditionalSwapCreateV2",
+      "accounts": [
+        {
+          "name": "group",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "account",
+          "isMut": true,
+          "isSigner": false,
+          "relations": [
+            "group"
+          ]
+        },
+        {
+          "name": "authority",
+          "isMut": false,
+          "isSigner": true
+        },
+        {
+          "name": "buyBank",
+          "isMut": false,
+          "isSigner": false,
+          "relations": [
+            "group"
+          ]
+        },
+        {
+          "name": "sellBank",
+          "isMut": false,
+          "isSigner": false,
+          "relations": [
+            "group"
+          ]
+        }
+      ],
+      "args": [
+        {
+          "name": "maxBuy",
+          "type": "u64"
+        },
+        {
+          "name": "maxSell",
+          "type": "u64"
+        },
+        {
+          "name": "expiryTimestamp",
+          "type": "u64"
+        },
+        {
+          "name": "priceLowerLimit",
+          "type": "f64"
+        },
+        {
+          "name": "priceUpperLimit",
+          "type": "f64"
+        },
+        {
+          "name": "pricePremiumRate",
+          "type": "f64"
+        },
+        {
+          "name": "allowCreatingDeposits",
+          "type": "bool"
+        },
+        {
+          "name": "allowCreatingBorrows",
+          "type": "bool"
+        },
+        {
+          "name": "displayPriceStyle",
+          "type": {
+            "defined": "TokenConditionalSwapDisplayPriceStyle"
+          }
+        },
+        {
+          "name": "intention",
+          "type": {
+            "defined": "TokenConditionalSwapIntention"
+          }
+        }
+      ]
+    },
+    {
       "name": "tokenConditionalSwapCancel",
       "accounts": [
         {
@@ -6920,15 +7061,25 @@ export type MangoV4 = {
             }
           },
           {
-            "name": "lastUpdated",
+            "name": "lastUpdateTs",
             "type": "i64"
+          },
+          {
+            "name": "lastUpdateSlot",
+            "type": "u64"
+          },
+          {
+            "name": "deviation",
+            "type": {
+              "defined": "I80F48"
+            }
           },
           {
             "name": "reserved",
             "type": {
               "array": [
                 "u8",
-                128
+                104
               ]
             }
           }
@@ -8485,11 +8636,19 @@ export type MangoV4 = {
             "type": "u64"
           },
           {
+            "name": "temporaryDelegate",
+            "type": "publicKey"
+          },
+          {
+            "name": "temporaryDelegateExpiry",
+            "type": "u64"
+          },
+          {
             "name": "reserved",
             "type": {
               "array": [
                 "u8",
-                200
+                160
               ]
             }
           }
@@ -9269,11 +9428,31 @@ export type MangoV4 = {
             "type": "u8"
           },
           {
+            "name": "displayPriceStyle",
+            "docs": [
+              "The stored prices are always \"sell token per buy token\", but if the user",
+              "used \"buy token per sell token\" when creating the tcs order, we should continue",
+              "to show them prices in that way.",
+              "",
+              "Stores a TokenConditionalSwapDisplayPriceStyle enum value"
+            ],
+            "type": "u8"
+          },
+          {
+            "name": "intention",
+            "docs": [
+              "The intention the user had when placing this order, display-only",
+              "",
+              "Stores a TokenConditionalSwapIntention enum value"
+            ],
+            "type": "u8"
+          },
+          {
             "name": "reserved",
             "type": {
               "array": [
                 "u8",
-                113
+                111
               ]
             }
           }
@@ -9961,6 +10140,37 @@ export type MangoV4 = {
           },
           {
             "name": "Liquidate"
+          }
+        ]
+      }
+    },
+    {
+      "name": "TokenConditionalSwapDisplayPriceStyle",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "SellTokenPerBuyToken"
+          },
+          {
+            "name": "BuyTokenPerSellToken"
+          }
+        ]
+      }
+    },
+    {
+      "name": "TokenConditionalSwapIntention",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "Unknown"
+          },
+          {
+            "name": "StopLoss"
+          },
+          {
+            "name": "TakeProfit"
           }
         ]
       }
@@ -11691,6 +11901,96 @@ export type MangoV4 = {
       ]
     },
     {
+      "name": "TokenConditionalSwapCreateLogV2",
+      "fields": [
+        {
+          "name": "mangoGroup",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "mangoAccount",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "id",
+          "type": "u64",
+          "index": false
+        },
+        {
+          "name": "maxBuy",
+          "type": "u64",
+          "index": false
+        },
+        {
+          "name": "maxSell",
+          "type": "u64",
+          "index": false
+        },
+        {
+          "name": "expiryTimestamp",
+          "type": "u64",
+          "index": false
+        },
+        {
+          "name": "priceLowerLimit",
+          "type": "f64",
+          "index": false
+        },
+        {
+          "name": "priceUpperLimit",
+          "type": "f64",
+          "index": false
+        },
+        {
+          "name": "pricePremiumRate",
+          "type": "f64",
+          "index": false
+        },
+        {
+          "name": "takerFeeRate",
+          "type": "f32",
+          "index": false
+        },
+        {
+          "name": "makerFeeRate",
+          "type": "f32",
+          "index": false
+        },
+        {
+          "name": "buyTokenIndex",
+          "type": "u16",
+          "index": false
+        },
+        {
+          "name": "sellTokenIndex",
+          "type": "u16",
+          "index": false
+        },
+        {
+          "name": "allowCreatingDeposits",
+          "type": "bool",
+          "index": false
+        },
+        {
+          "name": "allowCreatingBorrows",
+          "type": "bool",
+          "index": false
+        },
+        {
+          "name": "displayPriceStyle",
+          "type": "u8",
+          "index": false
+        },
+        {
+          "name": "intention",
+          "type": "u8",
+          "index": false
+        }
+      ]
+    },
+    {
       "name": "TokenConditionalSwapTriggerLog",
       "fields": [
         {
@@ -11756,6 +12056,86 @@ export type MangoV4 = {
         {
           "name": "closed",
           "type": "bool",
+          "index": false
+        }
+      ]
+    },
+    {
+      "name": "TokenConditionalSwapTriggerLogV2",
+      "fields": [
+        {
+          "name": "mangoGroup",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "liqee",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "liqor",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "tokenConditionalSwapId",
+          "type": "u64",
+          "index": false
+        },
+        {
+          "name": "buyTokenIndex",
+          "type": "u16",
+          "index": false
+        },
+        {
+          "name": "sellTokenIndex",
+          "type": "u16",
+          "index": false
+        },
+        {
+          "name": "buyAmount",
+          "type": "u64",
+          "index": false
+        },
+        {
+          "name": "sellAmount",
+          "type": "u64",
+          "index": false
+        },
+        {
+          "name": "makerFee",
+          "type": "u64",
+          "index": false
+        },
+        {
+          "name": "takerFee",
+          "type": "u64",
+          "index": false
+        },
+        {
+          "name": "buyTokenPrice",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "sellTokenPrice",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "closed",
+          "type": "bool",
+          "index": false
+        },
+        {
+          "name": "displayPriceStyle",
+          "type": "u8",
+          "index": false
+        },
+        {
+          "name": "intention",
+          "type": "u8",
           "index": false
         }
       ]
@@ -12040,7 +12420,7 @@ export const IDL: MangoV4 = {
   "name": "mango_v4",
   "instructions": [
     {
-      "name": "admingTokenWithdrawFees",
+      "name": "adminTokenWithdrawFees",
       "accounts": [
         {
           "name": "group",
@@ -13358,6 +13738,18 @@ export const IDL: MangoV4 = {
           "type": {
             "option": "publicKey"
           }
+        },
+        {
+          "name": "temporaryDelegateOpt",
+          "type": {
+            "option": "publicKey"
+          }
+        },
+        {
+          "name": "temporaryDelegateExpiryOpt",
+          "type": {
+            "option": "u64"
+          }
         }
       ]
     },
@@ -13624,6 +14016,50 @@ export const IDL: MangoV4 = {
       "args": [
         {
           "name": "price",
+          "type": {
+            "defined": "I80F48"
+          }
+        }
+      ]
+    },
+    {
+      "name": "stubOracleSetTest",
+      "accounts": [
+        {
+          "name": "group",
+          "isMut": false,
+          "isSigner": false,
+          "relations": [
+            "admin"
+          ]
+        },
+        {
+          "name": "admin",
+          "isMut": false,
+          "isSigner": true
+        },
+        {
+          "name": "oracle",
+          "isMut": true,
+          "isSigner": false,
+          "relations": [
+            "group"
+          ]
+        }
+      ],
+      "args": [
+        {
+          "name": "price",
+          "type": {
+            "defined": "I80F48"
+          }
+        },
+        {
+          "name": "lastUpdateSlot",
+          "type": "u64"
+        },
+        {
+          "name": "deviation",
           "type": {
             "defined": "I80F48"
           }
@@ -16936,6 +17372,91 @@ export const IDL: MangoV4 = {
       ]
     },
     {
+      "name": "tokenConditionalSwapCreateV2",
+      "accounts": [
+        {
+          "name": "group",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "account",
+          "isMut": true,
+          "isSigner": false,
+          "relations": [
+            "group"
+          ]
+        },
+        {
+          "name": "authority",
+          "isMut": false,
+          "isSigner": true
+        },
+        {
+          "name": "buyBank",
+          "isMut": false,
+          "isSigner": false,
+          "relations": [
+            "group"
+          ]
+        },
+        {
+          "name": "sellBank",
+          "isMut": false,
+          "isSigner": false,
+          "relations": [
+            "group"
+          ]
+        }
+      ],
+      "args": [
+        {
+          "name": "maxBuy",
+          "type": "u64"
+        },
+        {
+          "name": "maxSell",
+          "type": "u64"
+        },
+        {
+          "name": "expiryTimestamp",
+          "type": "u64"
+        },
+        {
+          "name": "priceLowerLimit",
+          "type": "f64"
+        },
+        {
+          "name": "priceUpperLimit",
+          "type": "f64"
+        },
+        {
+          "name": "pricePremiumRate",
+          "type": "f64"
+        },
+        {
+          "name": "allowCreatingDeposits",
+          "type": "bool"
+        },
+        {
+          "name": "allowCreatingBorrows",
+          "type": "bool"
+        },
+        {
+          "name": "displayPriceStyle",
+          "type": {
+            "defined": "TokenConditionalSwapDisplayPriceStyle"
+          }
+        },
+        {
+          "name": "intention",
+          "type": {
+            "defined": "TokenConditionalSwapIntention"
+          }
+        }
+      ]
+    },
+    {
       "name": "tokenConditionalSwapCancel",
       "accounts": [
         {
@@ -18957,15 +19478,25 @@ export const IDL: MangoV4 = {
             }
           },
           {
-            "name": "lastUpdated",
+            "name": "lastUpdateTs",
             "type": "i64"
+          },
+          {
+            "name": "lastUpdateSlot",
+            "type": "u64"
+          },
+          {
+            "name": "deviation",
+            "type": {
+              "defined": "I80F48"
+            }
           },
           {
             "name": "reserved",
             "type": {
               "array": [
                 "u8",
-                128
+                104
               ]
             }
           }
@@ -20522,11 +21053,19 @@ export const IDL: MangoV4 = {
             "type": "u64"
           },
           {
+            "name": "temporaryDelegate",
+            "type": "publicKey"
+          },
+          {
+            "name": "temporaryDelegateExpiry",
+            "type": "u64"
+          },
+          {
             "name": "reserved",
             "type": {
               "array": [
                 "u8",
-                200
+                160
               ]
             }
           }
@@ -21306,11 +21845,31 @@ export const IDL: MangoV4 = {
             "type": "u8"
           },
           {
+            "name": "displayPriceStyle",
+            "docs": [
+              "The stored prices are always \"sell token per buy token\", but if the user",
+              "used \"buy token per sell token\" when creating the tcs order, we should continue",
+              "to show them prices in that way.",
+              "",
+              "Stores a TokenConditionalSwapDisplayPriceStyle enum value"
+            ],
+            "type": "u8"
+          },
+          {
+            "name": "intention",
+            "docs": [
+              "The intention the user had when placing this order, display-only",
+              "",
+              "Stores a TokenConditionalSwapIntention enum value"
+            ],
+            "type": "u8"
+          },
+          {
             "name": "reserved",
             "type": {
               "array": [
                 "u8",
-                113
+                111
               ]
             }
           }
@@ -21998,6 +22557,37 @@ export const IDL: MangoV4 = {
           },
           {
             "name": "Liquidate"
+          }
+        ]
+      }
+    },
+    {
+      "name": "TokenConditionalSwapDisplayPriceStyle",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "SellTokenPerBuyToken"
+          },
+          {
+            "name": "BuyTokenPerSellToken"
+          }
+        ]
+      }
+    },
+    {
+      "name": "TokenConditionalSwapIntention",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "Unknown"
+          },
+          {
+            "name": "StopLoss"
+          },
+          {
+            "name": "TakeProfit"
           }
         ]
       }
@@ -23728,6 +24318,96 @@ export const IDL: MangoV4 = {
       ]
     },
     {
+      "name": "TokenConditionalSwapCreateLogV2",
+      "fields": [
+        {
+          "name": "mangoGroup",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "mangoAccount",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "id",
+          "type": "u64",
+          "index": false
+        },
+        {
+          "name": "maxBuy",
+          "type": "u64",
+          "index": false
+        },
+        {
+          "name": "maxSell",
+          "type": "u64",
+          "index": false
+        },
+        {
+          "name": "expiryTimestamp",
+          "type": "u64",
+          "index": false
+        },
+        {
+          "name": "priceLowerLimit",
+          "type": "f64",
+          "index": false
+        },
+        {
+          "name": "priceUpperLimit",
+          "type": "f64",
+          "index": false
+        },
+        {
+          "name": "pricePremiumRate",
+          "type": "f64",
+          "index": false
+        },
+        {
+          "name": "takerFeeRate",
+          "type": "f32",
+          "index": false
+        },
+        {
+          "name": "makerFeeRate",
+          "type": "f32",
+          "index": false
+        },
+        {
+          "name": "buyTokenIndex",
+          "type": "u16",
+          "index": false
+        },
+        {
+          "name": "sellTokenIndex",
+          "type": "u16",
+          "index": false
+        },
+        {
+          "name": "allowCreatingDeposits",
+          "type": "bool",
+          "index": false
+        },
+        {
+          "name": "allowCreatingBorrows",
+          "type": "bool",
+          "index": false
+        },
+        {
+          "name": "displayPriceStyle",
+          "type": "u8",
+          "index": false
+        },
+        {
+          "name": "intention",
+          "type": "u8",
+          "index": false
+        }
+      ]
+    },
+    {
       "name": "TokenConditionalSwapTriggerLog",
       "fields": [
         {
@@ -23793,6 +24473,86 @@ export const IDL: MangoV4 = {
         {
           "name": "closed",
           "type": "bool",
+          "index": false
+        }
+      ]
+    },
+    {
+      "name": "TokenConditionalSwapTriggerLogV2",
+      "fields": [
+        {
+          "name": "mangoGroup",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "liqee",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "liqor",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "tokenConditionalSwapId",
+          "type": "u64",
+          "index": false
+        },
+        {
+          "name": "buyTokenIndex",
+          "type": "u16",
+          "index": false
+        },
+        {
+          "name": "sellTokenIndex",
+          "type": "u16",
+          "index": false
+        },
+        {
+          "name": "buyAmount",
+          "type": "u64",
+          "index": false
+        },
+        {
+          "name": "sellAmount",
+          "type": "u64",
+          "index": false
+        },
+        {
+          "name": "makerFee",
+          "type": "u64",
+          "index": false
+        },
+        {
+          "name": "takerFee",
+          "type": "u64",
+          "index": false
+        },
+        {
+          "name": "buyTokenPrice",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "sellTokenPrice",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "closed",
+          "type": "bool",
+          "index": false
+        },
+        {
+          "name": "displayPriceStyle",
+          "type": "u8",
+          "index": false
+        },
+        {
+          "name": "intention",
+          "type": "u8",
           "index": false
         }
       ]

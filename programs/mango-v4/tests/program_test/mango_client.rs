@@ -1447,6 +1447,54 @@ impl ClientInstruction for StubOracleSetInstruction {
     }
 }
 
+pub struct StubOracleSetTestInstruction {
+    pub mint: Pubkey,
+    pub group: Pubkey,
+    pub admin: TestKeypair,
+    pub price: f64,
+    pub last_update_slot: u64,
+    pub deviation: f64,
+}
+#[async_trait::async_trait(?Send)]
+impl ClientInstruction for StubOracleSetTestInstruction {
+    type Accounts = mango_v4::accounts::StubOracleSet;
+    type Instruction = mango_v4::instruction::StubOracleSetTest;
+
+    async fn to_instruction(
+        &self,
+        _loader: impl ClientAccountLoader + 'async_trait,
+    ) -> (Self::Accounts, Instruction) {
+        let program_id = mango_v4::id();
+        let instruction = Self::Instruction {
+            price: I80F48::from_num(self.price),
+            last_update_slot: self.last_update_slot,
+            deviation: I80F48::from_num(self.deviation),
+        };
+        let oracle = Pubkey::find_program_address(
+            &[
+                b"StubOracle".as_ref(),
+                self.group.as_ref(),
+                self.mint.as_ref(),
+            ],
+            &program_id,
+        )
+        .0;
+
+        let accounts = Self::Accounts {
+            oracle,
+            group: self.group,
+            admin: self.admin.pubkey(),
+        };
+
+        let instruction = make_instruction(program_id, &accounts, &instruction);
+        (accounts, instruction)
+    }
+
+    fn signers(&self) -> Vec<TestKeypair> {
+        vec![self.admin]
+    }
+}
+
 pub struct StubOracleCreate {
     pub group: Pubkey,
     pub mint: Pubkey,
@@ -4224,7 +4272,7 @@ pub struct TokenConditionalSwapCreateInstruction {
 #[async_trait::async_trait(?Send)]
 impl ClientInstruction for TokenConditionalSwapCreateInstruction {
     type Accounts = mango_v4::accounts::TokenConditionalSwapCreate;
-    type Instruction = mango_v4::instruction::TokenConditionalSwapCreate;
+    type Instruction = mango_v4::instruction::TokenConditionalSwapCreateV2;
     async fn to_instruction(
         &self,
         account_loader: impl ClientAccountLoader + 'async_trait,
@@ -4239,6 +4287,8 @@ impl ClientInstruction for TokenConditionalSwapCreateInstruction {
             price_premium_rate: self.price_premium_rate,
             allow_creating_deposits: self.allow_creating_deposits,
             allow_creating_borrows: self.allow_creating_borrows,
+            display_price_style: TokenConditionalSwapDisplayPriceStyle::SellTokenPerBuyToken,
+            intention: TokenConditionalSwapIntention::Unknown,
         };
 
         let account = account_loader
