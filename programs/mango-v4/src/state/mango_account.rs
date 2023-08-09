@@ -289,10 +289,6 @@ impl MangoAccountFixed {
             return true;
         }
 
-        if self.temporary_delegate_expiry == 0 {
-            return false;
-        }
-
         let now_ts: u64 = Clock::get().unwrap().unix_timestamp.try_into().unwrap();
         if now_ts > self.temporary_delegate_expiry {
             return false;
