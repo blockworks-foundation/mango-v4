@@ -264,6 +264,31 @@ impl Bank {
         }
     }
 
+    pub fn verify(&self) -> Result<()> {
+        require_gte!(self.oracle_config.conf_filter, 0.0);
+        require_gte!(self.util0, I80F48::ZERO);
+        require_gte!(self.rate0, I80F48::ZERO);
+        require_gte!(self.util1, I80F48::ZERO);
+        require_gte!(self.rate1, I80F48::ZERO);
+        require_gt!(self.max_rate, MINIMUM_MAX_RATE);
+        require_gte!(self.loan_fee_rate, 0.0);
+        require_gte!(self.loan_origination_fee_rate, 0.0);
+        require_gte!(self.maint_asset_weight, 0.0);
+        require_gte!(self.init_asset_weight, 0.0);
+        require_gte!(self.maint_liab_weight, 0.0);
+        require_gte!(self.init_liab_weight, 0.0);
+        require_gte!(self.liquidation_fee, 0.0);
+        require_gte!(self.min_vault_to_deposits_ratio, 0.0);
+        require_gte!(self.net_borrow_limit_per_window_quote, -1);
+        require_gt!(self.borrow_weight_scale_start_quote, 0.0);
+        require_gt!(self.deposit_weight_scale_start_quote, 0.0);
+        require_gte!(2, self.reduce_only);
+        require_gte!(self.token_conditional_swap_taker_fee_rate, 0.0);
+        require_gte!(self.token_conditional_swap_maker_fee_rate, 0.0);
+        require_gte!(self.flash_loan_swap_fee_rate, 0.0);
+        Ok(())
+    }
+
     pub fn name(&self) -> &str {
         std::str::from_utf8(&self.name)
             .unwrap()

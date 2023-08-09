@@ -8,6 +8,7 @@ import {
 } from '@solana/web3.js';
 import fs from 'fs';
 import { MangoClient } from '../../src/client';
+import { DefaultTokenRegisterParams } from '../../src/clientIxParamBuilder';
 import { MANGO_V4_ID } from '../../src/constants';
 
 //
@@ -118,25 +119,17 @@ async function main(): Promise<void> {
   const usdcMint = new PublicKey(MAINNET_MINTS.get('USDC')!);
   const usdcOracle = oracles.get('USDC');
   try {
-    await client.tokenRegister(
-      group,
-      usdcMint,
-      usdcOracle,
-      defaultOracleConfig,
-      0,
-      'USDC',
-      defaultInterestRate,
-      0.0,
-      0.0001,
-      1,
-      1,
-      1,
-      1,
-      0,
-      MIN_VAULT_TO_DEPOSITS_RATIO,
-      NET_BORROWS_WINDOW_SIZE_TS,
-      NET_BORROWS_LIMIT_NATIVE,
-    );
+    await client.tokenRegister(group, usdcMint, usdcOracle, 0, 'USDC', {
+      ...DefaultTokenRegisterParams,
+      loanOriginationFeeRate: 0,
+      loanFeeRate: 0.0001,
+      initAssetWeight: 1,
+      maintAssetWeight: 1,
+      initLiabWeight: 1,
+      maintLiabWeight: 1,
+      liquidationFee: 0,
+      netBorrowLimitPerWindowQuote: NET_BORROWS_LIMIT_NATIVE,
+    });
     await group.reloadAll(client);
   } catch (error) {
     console.log(error);
@@ -147,25 +140,17 @@ async function main(): Promise<void> {
   const ethMint = new PublicKey(MAINNET_MINTS.get('ETH')!);
   const ethOracle = oracles.get('ETH');
   try {
-    await client.tokenRegister(
-      group,
-      ethMint,
-      ethOracle,
-      defaultOracleConfig,
-      1,
-      'ETH',
-      defaultInterestRate,
-      0.0,
-      0.0001,
-      0.9,
-      0.8,
-      1.1,
-      1.2,
-      0.05,
-      MIN_VAULT_TO_DEPOSITS_RATIO,
-      NET_BORROWS_WINDOW_SIZE_TS,
-      NET_BORROWS_LIMIT_NATIVE,
-    );
+    await client.tokenRegister(group, ethMint, ethOracle, 1, 'ETH', {
+      ...DefaultTokenRegisterParams,
+      loanOriginationFeeRate: 0,
+      loanFeeRate: 0.0001,
+      maintAssetWeight: 0.9,
+      initAssetWeight: 0.8,
+      maintLiabWeight: 1.1,
+      initLiabWeight: 1.2,
+      liquidationFee: 0.05,
+      netBorrowLimitPerWindowQuote: NET_BORROWS_LIMIT_NATIVE,
+    });
     await group.reloadAll(client);
   } catch (error) {
     console.log(error);
@@ -180,20 +165,19 @@ async function main(): Promise<void> {
       group,
       solMint,
       solOracle,
-      defaultOracleConfig,
       2, // tokenIndex
       'SOL',
-      defaultInterestRate,
-      0.0,
-      0.0001,
-      0.9,
-      0.8,
-      1.1,
-      1.2,
-      0.05,
-      MIN_VAULT_TO_DEPOSITS_RATIO,
-      NET_BORROWS_WINDOW_SIZE_TS,
-      NET_BORROWS_LIMIT_NATIVE,
+      {
+        ...DefaultTokenRegisterParams,
+        loanOriginationFeeRate: 0,
+        loanFeeRate: 0.0001,
+        maintAssetWeight: 0.9,
+        initAssetWeight: 0.8,
+        maintLiabWeight: 1.1,
+        initLiabWeight: 1.2,
+        liquidationFee: 0.05,
+        netBorrowLimitPerWindowQuote: NET_BORROWS_LIMIT_NATIVE,
+      },
     );
     await group.reloadAll(client);
   } catch (error) {

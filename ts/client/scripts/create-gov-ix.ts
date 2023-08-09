@@ -81,9 +81,18 @@ async function tokenRegister(): Promise<void> {
       1.1,
       1.2,
       percentageToDecimal(5),
+      60 * 60,
+      0.06,
+      0.0003,
       percentageToDecimal(20),
       new BN(24 * 60 * 60),
       new BN(toNative(50000, 6).toNumber()),
+      5_000_000_000,
+      5_000_000_000,
+      0,
+      0.0005,
+      0.0005,
+      0.0005,
     )
     .accounts({
       group: group.publicKey,

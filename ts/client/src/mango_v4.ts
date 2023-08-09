@@ -550,6 +550,18 @@ export type MangoV4 = {
           "type": "f32"
         },
         {
+          "name": "stablePriceDelayIntervalSeconds",
+          "type": "u32"
+        },
+        {
+          "name": "stablePriceDelayGrowthLimit",
+          "type": "f32"
+        },
+        {
+          "name": "stablePriceGrowthLimit",
+          "type": "f32"
+        },
+        {
           "name": "minVaultToDepositsRatio",
           "type": "f64"
         },
@@ -560,6 +572,30 @@ export type MangoV4 = {
         {
           "name": "netBorrowLimitPerWindowQuote",
           "type": "i64"
+        },
+        {
+          "name": "borrowWeightScaleStartQuote",
+          "type": "f64"
+        },
+        {
+          "name": "depositWeightScaleStartQuote",
+          "type": "f64"
+        },
+        {
+          "name": "reduceOnly",
+          "type": "u8"
+        },
+        {
+          "name": "tokenConditionalSwapTakerFeeRate",
+          "type": "f32"
+        },
+        {
+          "name": "tokenConditionalSwapMakerFeeRate",
+          "type": "f32"
+        },
+        {
+          "name": "flashLoanSwapFeeRate",
+          "type": "f32"
         }
       ]
     },
@@ -12967,6 +13003,18 @@ export const IDL: MangoV4 = {
           "type": "f32"
         },
         {
+          "name": "stablePriceDelayIntervalSeconds",
+          "type": "u32"
+        },
+        {
+          "name": "stablePriceDelayGrowthLimit",
+          "type": "f32"
+        },
+        {
+          "name": "stablePriceGrowthLimit",
+          "type": "f32"
+        },
+        {
           "name": "minVaultToDepositsRatio",
           "type": "f64"
         },
@@ -12977,6 +13025,30 @@ export const IDL: MangoV4 = {
         {
           "name": "netBorrowLimitPerWindowQuote",
           "type": "i64"
+        },
+        {
+          "name": "borrowWeightScaleStartQuote",
+          "type": "f64"
+        },
+        {
+          "name": "depositWeightScaleStartQuote",
+          "type": "f64"
+        },
+        {
+          "name": "reduceOnly",
+          "type": "u8"
+        },
+        {
+          "name": "tokenConditionalSwapTakerFeeRate",
+          "type": "f32"
+        },
+        {
+          "name": "tokenConditionalSwapMakerFeeRate",
+          "type": "f32"
+        },
+        {
+          "name": "flashLoanSwapFeeRate",
+          "type": "f32"
         }
       ]
     },

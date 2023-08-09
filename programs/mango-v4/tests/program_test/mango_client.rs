@@ -864,9 +864,18 @@ impl ClientInstruction for TokenRegisterInstruction {
             maint_liab_weight: self.maint_liab_weight,
             init_liab_weight: self.init_liab_weight,
             liquidation_fee: self.liquidation_fee,
+            stable_price_delay_interval_seconds: StablePriceModel::default().delay_interval_seconds,
+            stable_price_delay_growth_limit: StablePriceModel::default().delay_growth_limit,
+            stable_price_growth_limit: StablePriceModel::default().stable_growth_limit,
             min_vault_to_deposits_ratio: self.min_vault_to_deposits_ratio,
             net_borrow_limit_per_window_quote: self.net_borrow_limit_per_window_quote,
             net_borrow_limit_window_size_ts: self.net_borrow_limit_window_size_ts,
+            borrow_weight_scale_start_quote: f64::MAX,
+            deposit_weight_scale_start_quote: f64::MAX,
+            reduce_only: 0,
+            token_conditional_swap_taker_fee_rate: 0.0,
+            token_conditional_swap_maker_fee_rate: 0.0,
+            flash_loan_swap_fee_rate: 0.0,
         };
 
         let bank = Pubkey::find_program_address(

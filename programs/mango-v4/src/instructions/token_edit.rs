@@ -357,6 +357,7 @@ pub fn token_edit(
 
     // Assumes that there is at least one bank
     let bank = ctx.remaining_accounts.first().unwrap().load_mut::<Bank>()?;
+    bank.verify()?;
 
     emit!(TokenMetaDataLog {
         mango_group: ctx.accounts.group.key(),
