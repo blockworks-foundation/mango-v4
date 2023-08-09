@@ -25,3 +25,4 @@ export const MANGO_V4_ID = {
 export const USDC_MINT = new PublicKey(
   'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v',
 );
+export const MAX_RECENT_PRIORITY_FEE_ACCOUNTS = 128;
