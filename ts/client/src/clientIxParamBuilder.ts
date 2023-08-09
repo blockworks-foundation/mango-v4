@@ -52,7 +52,7 @@ export const DefaultTokenRegisterParams: TokenRegisterParams = {
   stablePriceDelayGrowthLimit: 0.06,
   stablePriceGrowthLimit: 0.0003,
   minVaultToDepositsRatio: 0.2,
-  netBorrowLimitPerWindowQuote: 250_000_000_000,
+  netBorrowLimitPerWindowQuote: 5_000_000_000,
   netBorrowLimitWindowSizeTs: 86_400,
   borrowWeightScaleStartQuote: 5_000_000_000,
   depositWeightScaleStartQuote: 5_000_000_000,
