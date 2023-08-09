@@ -1136,6 +1136,31 @@
 <span id="1136">1136</span>
 <span id="1137">1137</span>
 <span id="1138">1138</span>
+<span id="1139">1139</span>
+<span id="1140">1140</span>
+<span id="1141">1141</span>
+<span id="1142">1142</span>
+<span id="1143">1143</span>
+<span id="1144">1144</span>
+<span id="1145">1145</span>
+<span id="1146">1146</span>
+<span id="1147">1147</span>
+<span id="1148">1148</span>
+<span id="1149">1149</span>
+<span id="1150">1150</span>
+<span id="1151">1151</span>
+<span id="1152">1152</span>
+<span id="1153">1153</span>
+<span id="1154">1154</span>
+<span id="1155">1155</span>
+<span id="1156">1156</span>
+<span id="1157">1157</span>
+<span id="1158">1158</span>
+<span id="1159">1159</span>
+<span id="1160">1160</span>
+<span id="1161">1161</span>
+<span id="1162">1162</span>
+<span id="1163">1163</span>
 </pre><pre class="rust"><code><span class="kw">use super</span>::{OracleConfig, TokenIndex, TokenPosition};
 <span class="kw">use </span><span class="kw">crate</span>::accounts_zerocopy::KeyedAccountReader;
 <span class="kw">use </span><span class="kw">crate</span>::error::<span class="kw-2">*</span>;
@@ -1400,6 +1425,31 @@
             flash_loan_swap_fee_rate: <span class="number">0.0</span>,
             reserved: [<span class="number">0</span>; <span class="number">2092</span>],
         }
+    }
+
+    <span class="kw">pub fn </span>verify(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Result</span>&lt;()&gt; {
+        <span class="macro">require_gte!</span>(<span class="self">self</span>.oracle_config.conf_filter, <span class="number">0.0</span>);
+        <span class="macro">require_gte!</span>(<span class="self">self</span>.util0, I80F48::ZERO);
+        <span class="macro">require_gte!</span>(<span class="self">self</span>.rate0, I80F48::ZERO);
+        <span class="macro">require_gte!</span>(<span class="self">self</span>.util1, I80F48::ZERO);
+        <span class="macro">require_gte!</span>(<span class="self">self</span>.rate1, I80F48::ZERO);
+        <span class="macro">require_gt!</span>(<span class="self">self</span>.max_rate, MINIMUM_MAX_RATE);
+        <span class="macro">require_gte!</span>(<span class="self">self</span>.loan_fee_rate, <span class="number">0.0</span>);
+        <span class="macro">require_gte!</span>(<span class="self">self</span>.loan_origination_fee_rate, <span class="number">0.0</span>);
+        <span class="macro">require_gte!</span>(<span class="self">self</span>.maint_asset_weight, <span class="number">0.0</span>);
+        <span class="macro">require_gte!</span>(<span class="self">self</span>.init_asset_weight, <span class="number">0.0</span>);
+        <span class="macro">require_gte!</span>(<span class="self">self</span>.maint_liab_weight, <span class="number">0.0</span>);
+        <span class="macro">require_gte!</span>(<span class="self">self</span>.init_liab_weight, <span class="number">0.0</span>);
+        <span class="macro">require_gte!</span>(<span class="self">self</span>.liquidation_fee, <span class="number">0.0</span>);
+        <span class="macro">require_gte!</span>(<span class="self">self</span>.min_vault_to_deposits_ratio, <span class="number">0.0</span>);
+        <span class="macro">require_gte!</span>(<span class="self">self</span>.net_borrow_limit_per_window_quote, -<span class="number">1</span>);
+        <span class="macro">require_gt!</span>(<span class="self">self</span>.borrow_weight_scale_start_quote, <span class="number">0.0</span>);
+        <span class="macro">require_gt!</span>(<span class="self">self</span>.deposit_weight_scale_start_quote, <span class="number">0.0</span>);
+        <span class="macro">require_gte!</span>(<span class="number">2</span>, <span class="self">self</span>.reduce_only);
+        <span class="macro">require_gte!</span>(<span class="self">self</span>.token_conditional_swap_taker_fee_rate, <span class="number">0.0</span>);
+        <span class="macro">require_gte!</span>(<span class="self">self</span>.token_conditional_swap_maker_fee_rate, <span class="number">0.0</span>);
+        <span class="macro">require_gte!</span>(<span class="self">self</span>.flash_loan_swap_fee_rate, <span class="number">0.0</span>);
+        <span class="prelude-val">Ok</span>(())
     }
 
     <span class="kw">pub fn </span>name(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span>str {

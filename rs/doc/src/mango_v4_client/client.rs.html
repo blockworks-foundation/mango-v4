@@ -2971,13 +2971,13 @@
         <span class="self">self</span>.send_and_confirm_permissionless_tx(<span class="macro">vec!</span>[ix]).<span class="kw">await
     </span>}
 
-    <span class="kw">pub async fn </span>perp_liq_base_or_positive_pnl(
+    <span class="kw">pub async fn </span>perp_liq_base_or_positive_pnl_instruction(
         <span class="kw-2">&amp;</span><span class="self">self</span>,
         liqee: (<span class="kw-2">&amp;</span>Pubkey, <span class="kw-2">&amp;</span>MangoAccountValue),
         market_index: PerpMarketIndex,
         max_base_transfer: i64,
         max_pnl_transfer: u64,
-    ) -&gt; anyhow::Result&lt;Signature&gt; {
+    ) -&gt; anyhow::Result&lt;Instruction&gt; {
         <span class="kw">let </span>perp = <span class="self">self</span>.context.perp(market_index);
         <span class="kw">let </span>settle_token_info = <span class="self">self</span>.context.token(perp.market.settle_token_index);
 
@@ -3013,15 +3013,15 @@
                 },
             ),
         };
-        <span class="self">self</span>.send_and_confirm_owner_tx(<span class="macro">vec!</span>[ix]).<span class="kw">await
-    </span>}
+        <span class="prelude-val">Ok</span>(ix)
+    }
 
-    <span class="kw">pub async fn </span>perp_liq_negative_pnl_or_bankruptcy(
+    <span class="kw">pub async fn </span>perp_liq_negative_pnl_or_bankruptcy_instruction(
         <span class="kw-2">&amp;</span><span class="self">self</span>,
         liqee: (<span class="kw-2">&amp;</span>Pubkey, <span class="kw-2">&amp;</span>MangoAccountValue),
         market_index: PerpMarketIndex,
         max_liab_transfer: u64,
-    ) -&gt; anyhow::Result&lt;Signature&gt; {
+    ) -&gt; anyhow::Result&lt;Instruction&gt; {
         <span class="kw">let </span>group = account_fetcher_fetch_anchor_account::&lt;Group&gt;(
             <span class="kw-2">&amp;*</span><span class="self">self</span>.account_fetcher,
             <span class="kw-2">&amp;</span><span class="self">self</span>.context.group,
@@ -3070,20 +3070,20 @@
                 <span class="kw-2">&amp;</span>mango_v4::instruction::PerpLiqNegativePnlOrBankruptcyV2 { max_liab_transfer },
             ),
         };
-        <span class="self">self</span>.send_and_confirm_owner_tx(<span class="macro">vec!</span>[ix]).<span class="kw">await
-    </span>}
+        <span class="prelude-val">Ok</span>(ix)
+    }
 
     <span class="comment">//
     // Liquidation
     //
 
-    </span><span class="kw">pub async fn </span>token_liq_with_token(
+    </span><span class="kw">pub async fn </span>token_liq_with_token_instruction(
         <span class="kw-2">&amp;</span><span class="self">self</span>,
         liqee: (<span class="kw-2">&amp;</span>Pubkey, <span class="kw-2">&amp;</span>MangoAccountValue),
         asset_token_index: TokenIndex,
         liab_token_index: TokenIndex,
         max_liab_transfer: I80F48,
-    ) -&gt; anyhow::Result&lt;Signature&gt; {
+    ) -&gt; anyhow::Result&lt;Instruction&gt; {
         <span class="kw">let </span>health_remaining_ams = <span class="self">self
             </span>.derive_liquidation_health_check_remaining_account_metas(
                 liqee.<span class="number">1</span>,
@@ -3114,15 +3114,15 @@
                 max_liab_transfer,
             }),
         };
-        <span class="self">self</span>.send_and_confirm_owner_tx(<span class="macro">vec!</span>[ix]).<span class="kw">await
-    </span>}
+        <span class="prelude-val">Ok</span>(ix)
+    }
 
-    <span class="kw">pub async fn </span>token_liq_bankruptcy(
+    <span class="kw">pub async fn </span>token_liq_bankruptcy_instruction(
         <span class="kw-2">&amp;</span><span class="self">self</span>,
         liqee: (<span class="kw-2">&amp;</span>Pubkey, <span class="kw-2">&amp;</span>MangoAccountValue),
         liab_token_index: TokenIndex,
         max_liab_transfer: I80F48,
-    ) -&gt; anyhow::Result&lt;Signature&gt; {
+    ) -&gt; anyhow::Result&lt;Instruction&gt; {
         <span class="kw">let </span>quote_token_index = <span class="number">0</span>;
 
         <span class="kw">let </span>quote_info = <span class="self">self</span>.context.token(quote_token_index);
@@ -3174,8 +3174,8 @@
                 max_liab_transfer,
             }),
         };
-        <span class="self">self</span>.send_and_confirm_owner_tx(<span class="macro">vec!</span>[ix]).<span class="kw">await
-    </span>}
+        <span class="prelude-val">Ok</span>(ix)
+    }
 
     <span class="kw">pub async fn </span>token_conditional_swap_trigger(
         <span class="kw-2">&amp;</span><span class="self">self</span>,
