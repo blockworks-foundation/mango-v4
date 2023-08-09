@@ -91,6 +91,10 @@ struct Cli {
     #[clap(long, env, default_value = "0")]
     prioritization_micro_lamports: u64,
 
+    /// compute limit requested for liquidation instructions
+    #[clap(long, env, default_value = "250000")]
+    compute_limit_for_liquidation: u32,
+
     /// use a jupiter mock instead of actual queries
     ///
     /// This is required for devnet testing.
@@ -247,6 +251,7 @@ async fn main() -> anyhow::Result<()> {
     let liq_config = liquidate::Config {
         min_health_ratio: cli.min_health_ratio,
         mock_jupiter: cli.mock_jupiter == BoolArg::True,
+        compute_limit_for_liq_ix: cli.compute_limit_for_liquidation,
         // TODO: config
         refresh_timeout: Duration::from_secs(30),
     };

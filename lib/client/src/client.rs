@@ -1052,13 +1052,13 @@ impl MangoClient {
         self.send_and_confirm_permissionless_tx(vec![ix]).await
     }
 
-    pub async fn perp_liq_base_or_positive_pnl(
+    pub async fn perp_liq_base_or_positive_pnl_instruction(
         &self,
         liqee: (&Pubkey, &MangoAccountValue),
         market_index: PerpMarketIndex,
         max_base_transfer: i64,
         max_pnl_transfer: u64,
-    ) -> anyhow::Result<Signature> {
+    ) -> anyhow::Result<Instruction> {
         let perp = self.context.perp(market_index);
         let settle_token_info = self.context.token(perp.market.settle_token_index);
 
@@ -1094,15 +1094,15 @@ impl MangoClient {
                 },
             ),
         };
-        self.send_and_confirm_owner_tx(vec![ix]).await
+        Ok(ix)
     }
 
-    pub async fn perp_liq_negative_pnl_or_bankruptcy(
+    pub async fn perp_liq_negative_pnl_or_bankruptcy_instruction(
         &self,
         liqee: (&Pubkey, &MangoAccountValue),
         market_index: PerpMarketIndex,
         max_liab_transfer: u64,
-    ) -> anyhow::Result<Signature> {
+    ) -> anyhow::Result<Instruction> {
         let group = account_fetcher_fetch_anchor_account::<Group>(
             &*self.account_fetcher,
             &self.context.group,
@@ -1151,20 +1151,20 @@ impl MangoClient {
                 &mango_v4::instruction::PerpLiqNegativePnlOrBankruptcyV2 { max_liab_transfer },
             ),
         };
-        self.send_and_confirm_owner_tx(vec![ix]).await
+        Ok(ix)
     }
 
     //
     // Liquidation
     //
 
-    pub async fn token_liq_with_token(
+    pub async fn token_liq_with_token_instruction(
         &self,
         liqee: (&Pubkey, &MangoAccountValue),
         asset_token_index: TokenIndex,
         liab_token_index: TokenIndex,
         max_liab_transfer: I80F48,
-    ) -> anyhow::Result<Signature> {
+    ) -> anyhow::Result<Instruction> {
         let health_remaining_ams = self
             .derive_liquidation_health_check_remaining_account_metas(
                 liqee.1,
@@ -1195,15 +1195,15 @@ impl MangoClient {
                 max_liab_transfer,
             }),
         };
-        self.send_and_confirm_owner_tx(vec![ix]).await
+        Ok(ix)
     }
 
-    pub async fn token_liq_bankruptcy(
+    pub async fn token_liq_bankruptcy_instruction(
         &self,
         liqee: (&Pubkey, &MangoAccountValue),
         liab_token_index: TokenIndex,
         max_liab_transfer: I80F48,
-    ) -> anyhow::Result<Signature> {
+    ) -> anyhow::Result<Instruction> {
         let quote_token_index = 0;
 
         let quote_info = self.context.token(quote_token_index);
@@ -1255,7 +1255,7 @@ impl MangoClient {
                 max_liab_transfer,
             }),
         };
-        self.send_and_confirm_owner_tx(vec![ix]).await
+        Ok(ix)
     }
 
     pub async fn token_conditional_swap_trigger(
