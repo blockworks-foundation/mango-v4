@@ -146,8 +146,10 @@ pub struct Bank {
     pub token_conditional_swap_taker_fee_rate: f32,
     pub token_conditional_swap_maker_fee_rate: f32,
 
+    pub flash_loan_swap_fee_rate: f32,
+
     #[derivative(Debug = "ignore")]
-    pub reserved: [u8; 2096],
+    pub reserved: [u8; 2092],
 }
 const_assert_eq!(
     size_of::<Bank>(),
@@ -178,8 +180,8 @@ const_assert_eq!(
         + 1
         + 6
         + 8
-        + 2 * 4
-        + 2096
+        + 3 * 4
+        + 2092
 );
 const_assert_eq!(size_of::<Bank>(), 3064);
 const_assert_eq!(size_of::<Bank>() % 8, 0);
@@ -257,7 +259,8 @@ impl Bank {
             fees_withdrawn: 0,
             token_conditional_swap_taker_fee_rate: 0.0,
             token_conditional_swap_maker_fee_rate: 0.0,
-            reserved: [0; 2096],
+            flash_loan_swap_fee_rate: 0.0,
+            reserved: [0; 2092],
         }
     }
 

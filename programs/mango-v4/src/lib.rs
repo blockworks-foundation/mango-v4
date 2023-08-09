@@ -198,6 +198,7 @@ pub mod mango_v4 {
         force_close_opt: Option<bool>,
         token_conditional_swap_taker_fee_rate_opt: Option<f32>,
         token_conditional_swap_maker_fee_rate_opt: Option<f32>,
+        flash_loan_swap_fee_rate_opt: Option<f32>,
     ) -> Result<()> {
         #[cfg(feature = "enable-gpl")]
         instructions::token_edit(
@@ -228,6 +229,7 @@ pub mod mango_v4 {
             force_close_opt,
             token_conditional_swap_taker_fee_rate_opt,
             token_conditional_swap_maker_fee_rate_opt,
+            flash_loan_swap_fee_rate_opt,
         )?;
         Ok(())
     }

@@ -436,14 +436,17 @@ pub async fn set_perp_stub_oracle_price(
 // ClientInstruction impl
 //
 
+#[derive(Clone)]
+pub struct FlashLoanPart {
+    pub bank: Pubkey,
+    pub token_account: Pubkey,
+    pub withdraw_amount: u64,
+}
+
 pub struct FlashLoanBeginInstruction {
     pub account: Pubkey,
-    pub group: Pubkey,
     pub owner: TestKeypair,
-    pub mango_token_bank: Pubkey,
-    pub mango_token_vault: Pubkey,
-    pub target_token_account: Pubkey,
-    pub withdraw_amount: u64,
+    pub loans: Vec<FlashLoanPart>,
 }
 #[async_trait::async_trait(?Send)]
 impl ClientInstruction for FlashLoanBeginInstruction {
@@ -451,9 +454,14 @@ impl ClientInstruction for FlashLoanBeginInstruction {
     type Instruction = mango_v4::instruction::FlashLoanBegin;
     async fn to_instruction(
         &self,
-        _account_loader: impl ClientAccountLoader + 'async_trait,
+        account_loader: impl ClientAccountLoader + 'async_trait,
     ) -> (Self::Accounts, instruction::Instruction) {
         let program_id = mango_v4::id();
+
+        let account = account_loader
+            .load_mango_account(&self.account)
+            .await
+            .unwrap();
 
         let accounts = Self::Accounts {
             account: self.account,
@@ -463,27 +471,38 @@ impl ClientInstruction for FlashLoanBeginInstruction {
         };
 
         let instruction = Self::Instruction {
-            loan_amounts: vec![self.withdraw_amount],
+            loan_amounts: self
+                .loans
+                .iter()
+                .map(|v| v.withdraw_amount)
+                .collect::<Vec<u64>>(),
         };
 
         let mut instruction = make_instruction(program_id, &accounts, &instruction);
+        for loan in self.loans.iter() {
+            instruction.accounts.push(AccountMeta {
+                pubkey: loan.bank,
+                is_writable: true,
+                is_signer: false,
+            });
+        }
+        for loan in self.loans.iter() {
+            let bank: Bank = account_loader.load(&loan.bank).await.unwrap();
+            instruction.accounts.push(AccountMeta {
+                pubkey: bank.vault,
+                is_writable: true,
+                is_signer: false,
+            });
+        }
+        for loan in self.loans.iter() {
+            instruction.accounts.push(AccountMeta {
+                pubkey: loan.token_account,
+                is_writable: true,
+                is_signer: false,
+            });
+        }
         instruction.accounts.push(AccountMeta {
-            pubkey: self.mango_token_bank,
-            is_writable: true,
-            is_signer: false,
-        });
-        instruction.accounts.push(AccountMeta {
-            pubkey: self.mango_token_vault,
-            is_writable: true,
-            is_signer: false,
-        });
-        instruction.accounts.push(AccountMeta {
-            pubkey: self.target_token_account,
-            is_writable: true,
-            is_signer: false,
-        });
-        instruction.accounts.push(AccountMeta {
-            pubkey: self.group,
+            pubkey: account.fixed.group,
             is_writable: false,
             is_signer: false,
         });
@@ -499,9 +518,7 @@ impl ClientInstruction for FlashLoanBeginInstruction {
 pub struct FlashLoanEndInstruction {
     pub account: Pubkey,
     pub owner: TestKeypair,
-    pub mango_token_bank: Pubkey,
-    pub mango_token_vault: Pubkey,
-    pub target_token_account: Pubkey,
+    pub loans: Vec<FlashLoanPart>,
     pub flash_loan_type: mango_v4::accounts_ix::FlashLoanType,
 }
 #[async_trait::async_trait(?Send)]
@@ -514,19 +531,23 @@ impl ClientInstruction for FlashLoanEndInstruction {
     ) -> (Self::Accounts, instruction::Instruction) {
         let program_id = mango_v4::id();
         let instruction = Self::Instruction {
-            num_loans: 1,
+            num_loans: self.loans.len() as u8,
             flash_loan_type: self.flash_loan_type,
         };
 
-        let account = account_loader
+        let mut account = account_loader
             .load_mango_account(&self.account)
             .await
             .unwrap();
+        for loan in self.loans.iter() {
+            let bank: Bank = account_loader.load(&loan.bank).await.unwrap();
+            account.ensure_token_position(bank.token_index).unwrap();
+        }
 
         let health_check_metas = derive_health_check_remaining_account_metas(
             &account_loader,
             &account,
-            Some(self.mango_token_bank),
+            None,
             true,
             None,
         )
@@ -540,16 +561,21 @@ impl ClientInstruction for FlashLoanEndInstruction {
 
         let mut instruction = make_instruction(program_id, &accounts, &instruction);
         instruction.accounts.extend(health_check_metas.into_iter());
-        instruction.accounts.push(AccountMeta {
-            pubkey: self.mango_token_vault,
-            is_writable: true,
-            is_signer: false,
-        });
-        instruction.accounts.push(AccountMeta {
-            pubkey: self.target_token_account,
-            is_writable: true,
-            is_signer: false,
-        });
+        for loan in self.loans.iter() {
+            let bank: Bank = account_loader.load(&loan.bank).await.unwrap();
+            instruction.accounts.push(AccountMeta {
+                pubkey: bank.vault,
+                is_writable: true,
+                is_signer: false,
+            });
+        }
+        for loan in self.loans.iter() {
+            instruction.accounts.push(AccountMeta {
+                pubkey: loan.token_account,
+                is_writable: true,
+                is_signer: false,
+            });
+        }
         instruction.accounts.push(AccountMeta {
             pubkey: account.fixed.group,
             is_writable: false,
@@ -1084,6 +1110,7 @@ pub fn token_edit_instruction_default() -> mango_v4::instruction::TokenEdit {
         force_close_opt: None,
         token_conditional_swap_taker_fee_rate_opt: None,
         token_conditional_swap_maker_fee_rate_opt: None,
+        flash_loan_swap_fee_rate_opt: None,
     }
 }
 

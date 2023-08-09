@@ -417,6 +417,7 @@ export class MangoClient {
         params.forceClose,
         params.tokenConditionalSwapTakerFeeRate,
         params.tokenConditionalSwapMakerFeeRate,
+        params.flashLoanSwapFeeRate,
       )
       .accounts({
         group: group.publicKey,
@@ -3201,7 +3202,7 @@ export class MangoClient {
     expiryTimestamp: number | null,
     priceLowerLimit: number,
     priceUpperLimit: number,
-    pricePremiumFraction: number,
+    pricePremiumRate: number,
     allowCreatingDeposits: boolean,
     allowCreatingBorrows: boolean,
     priceDisplayStyle: TokenConditionalSwapDisplayPriceStyle,
@@ -3216,7 +3217,7 @@ export class MangoClient {
         expiryTimestamp !== null ? new BN(expiryTimestamp) : U64_MAX_BN,
         priceLowerLimit,
         priceUpperLimit,
-        pricePremiumFraction,
+        pricePremiumRate,
         allowCreatingDeposits,
         allowCreatingBorrows,
         priceDisplayStyle,
