@@ -150,7 +150,7 @@ export async function buildFetch(): Promise<
 export async function getAssociatedTokenAddress(
   mint: PublicKey,
   owner: PublicKey,
-  allowOwnerOffCurve = false,
+  allowOwnerOffCurve = true,
   programId = TOKEN_PROGRAM_ID,
   associatedTokenProgramId = ASSOCIATED_TOKEN_PROGRAM_ID,
 ): Promise<PublicKey> {
