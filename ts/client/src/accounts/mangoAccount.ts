@@ -1752,6 +1752,34 @@ export class PerpOoDto {
   ) {}
 }
 
+export class TokenConditionalSwapDisplayPriceStyle {
+  static sellTokenPerBuyToken = { sellTokenPerBuyToken: {} };
+  static buyTokenPerSellToken = { buyTokenPerSellToken: {} };
+}
+
+export class TokenConditionalSwapIntention {
+  static unknown = { unknown: {} };
+  static stopLoss = { stopLoss: {} };
+  static takeProfit = { takeProfit: {} };
+}
+
+function tokenConditionalSwapIntentionFromDto(
+  intention: number,
+): TokenConditionalSwapIntention {
+  switch (intention) {
+    case 0:
+      return TokenConditionalSwapIntention.unknown;
+    case 1:
+      return TokenConditionalSwapIntention.stopLoss;
+    case 2:
+      return TokenConditionalSwapIntention.takeProfit;
+    default:
+      throw new Error(
+        `unexpected token conditional swap intention: ${intention}`,
+      );
+  }
+}
+
 export class TokenConditionalSwap {
   static from(dto: TokenConditionalSwapDto): TokenConditionalSwap {
     return new TokenConditionalSwap(
@@ -1771,6 +1799,10 @@ export class TokenConditionalSwap {
       dto.hasData == 1,
       dto.allowCreatingDeposits == 1,
       dto.allowCreatingBorrows == 1,
+      dto.priceDisplayStyle == 0
+        ? TokenConditionalSwapDisplayPriceStyle.sellTokenPerBuyToken
+        : TokenConditionalSwapDisplayPriceStyle.buyTokenPerSellToken,
+      tokenConditionalSwapIntentionFromDto(dto.intention),
     );
   }
 
@@ -1791,6 +1823,8 @@ export class TokenConditionalSwap {
     public hasData: boolean,
     public allowCreatingDeposits: boolean,
     public allowCreatingBorrows: boolean,
+    public priceDisplayStyle: TokenConditionalSwapDisplayPriceStyle,
+    public intention: TokenConditionalSwapIntention,
   ) {}
 }
 
@@ -1812,6 +1846,8 @@ export class TokenConditionalSwapDto {
     public hasData: number,
     public allowCreatingDeposits: number,
     public allowCreatingBorrows: number,
+    public priceDisplayStyle: number,
+    public intention: number,
   ) {}
 }
 

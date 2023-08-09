@@ -23,7 +23,6 @@ import {
   PublicKey,
   SYSVAR_INSTRUCTIONS_PUBKEY,
   SYSVAR_RENT_PUBKEY,
-  Signer,
   SystemProgram,
   TransactionInstruction,
   TransactionSignature,
@@ -38,7 +37,9 @@ import {
   MangoAccount,
   PerpPosition,
   Serum3Orders,
+  TokenConditionalSwapDisplayPriceStyle,
   TokenConditionalSwapDto,
+  TokenConditionalSwapIntention,
   TokenPosition,
 } from './accounts/mangoAccount';
 import { StubOracle } from './accounts/oracle';
@@ -742,9 +743,16 @@ export class MangoClient {
     mangoAccount: MangoAccount,
     name?: string,
     delegate?: PublicKey,
+    temporaryDelegate?: PublicKey,
+    delegateExpiry?: number,
   ): Promise<TransactionSignature> {
     const ix = await this.program.methods
-      .accountEdit(name ?? null, delegate ?? null)
+      .accountEdit(
+        name ?? null,
+        delegate ?? null,
+        temporaryDelegate ?? null,
+        delegateExpiry ? new BN(delegateExpiry) : null,
+      )
       .accounts({
         group: group.publicKey,
         account: mangoAccount.publicKey,
@@ -3196,11 +3204,13 @@ export class MangoClient {
     pricePremiumRate: number,
     allowCreatingDeposits: boolean,
     allowCreatingBorrows: boolean,
+    priceDisplayStyle: TokenConditionalSwapDisplayPriceStyle,
+    intention: TokenConditionalSwapIntention,
   ): Promise<TransactionSignature> {
     const buyBank: Bank = group.getFirstBankByMint(buyMintPk);
     const sellBank: Bank = group.getFirstBankByMint(sellMintPk);
     const ix = await this.program.methods
-      .tokenConditionalSwapCreate(
+      .tokenConditionalSwapCreateV2(
         new BN(maxBuy),
         new BN(maxSell),
         expiryTimestamp !== null ? new BN(expiryTimestamp) : U64_MAX_BN,
@@ -3209,6 +3219,8 @@ export class MangoClient {
         pricePremiumRate,
         allowCreatingDeposits,
         allowCreatingBorrows,
+        priceDisplayStyle,
+        intention,
       )
       .accounts({
         group: group.publicKey,

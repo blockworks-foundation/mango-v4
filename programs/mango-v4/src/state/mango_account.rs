@@ -257,9 +257,14 @@ pub struct MangoAccountFixed {
     pub buyback_fees_accrued_previous: u64,
     pub buyback_fees_expiry_timestamp: u64,
     pub next_token_conditional_swap_id: u64,
-    pub reserved: [u8; 200],
+    pub temporary_delegate: Pubkey,
+    pub temporary_delegate_expiry: u64,
+    pub reserved: [u8; 160],
 }
-const_assert_eq!(size_of::<MangoAccountFixed>(), 32 * 4 + 8 + 8 * 8 + 200);
+const_assert_eq!(
+    size_of::<MangoAccountFixed>(),
+    32 * 4 + 8 + 8 * 8 + 32 + 8 + 160
+);
 const_assert_eq!(size_of::<MangoAccountFixed>(), 400);
 const_assert_eq!(size_of::<MangoAccountFixed>() % 8, 0);
 
@@ -276,11 +281,20 @@ impl MangoAccountFixed {
     }
 
     pub fn is_owner_or_delegate(&self, ix_signer: Pubkey) -> bool {
-        self.owner == ix_signer || self.delegate == ix_signer
+        self.owner == ix_signer || self.is_delegate(ix_signer)
     }
 
     pub fn is_delegate(&self, ix_signer: Pubkey) -> bool {
-        self.delegate == ix_signer
+        if self.delegate == ix_signer {
+            return true;
+        }
+
+        let now_ts: u64 = Clock::get().unwrap().unix_timestamp.try_into().unwrap();
+        if now_ts > self.temporary_delegate_expiry {
+            return false;
+        }
+
+        self.temporary_delegate == ix_signer
     }
 
     pub fn being_liquidated(&self) -> bool {
@@ -1173,7 +1187,15 @@ impl<
     pub fn check_health_pre(&mut self, health_cache: &HealthCache) -> Result<I80F48> {
         let pre_init_health = health_cache.health(HealthType::Init);
         msg!("pre_init_health: {}", pre_init_health);
+        self.check_health_pre_checks(health_cache, pre_init_health)?;
+        Ok(pre_init_health)
+    }
 
+    pub fn check_health_pre_checks(
+        &mut self,
+        health_cache: &HealthCache,
+        pre_init_health: I80F48,
+    ) -> Result<()> {
         // We can skip computing LiquidationEnd health if Init health > 0, because
         // LiquidationEnd health >= Init health.
         self.fixed_mut()
@@ -1187,8 +1209,7 @@ impl<
             !self.fixed().being_liquidated(),
             MangoError::BeingLiquidated
         );
-
-        Ok(pre_init_health)
+        Ok(())
     }
 
     pub fn check_health_post(
@@ -1198,7 +1219,15 @@ impl<
     ) -> Result<I80F48> {
         let post_init_health = health_cache.health(HealthType::Init);
         msg!("post_init_health: {}", post_init_health);
+        self.check_health_post_checks(pre_init_health, post_init_health)?;
+        Ok(post_init_health)
+    }
 
+    pub fn check_health_post_checks(
+        &mut self,
+        pre_init_health: I80F48,
+        post_init_health: I80F48,
+    ) -> Result<()> {
         // Accounts that have negative init health may only take actions that don't further
         // decrease their health.
         // To avoid issues with rounding, we allow accounts to decrease their health by up to
@@ -1219,7 +1248,7 @@ impl<
             post_init_health >= 0 || health_does_not_decrease,
             MangoError::HealthMustBePositiveOrIncrease
         );
-        Ok(post_init_health)
+        Ok(())
     }
 
     pub fn check_liquidatable(&mut self, health_cache: &HealthCache) -> Result<CheckLiquidatable> {

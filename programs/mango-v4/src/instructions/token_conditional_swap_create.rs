@@ -1,7 +1,7 @@
 use anchor_lang::prelude::*;
 
 use crate::accounts_ix::*;
-use crate::logs::TokenConditionalSwapCreateLog;
+use crate::logs::TokenConditionalSwapCreateLogV2;
 use crate::state::*;
 
 #[allow(clippy::too_many_arguments)]
@@ -56,7 +56,7 @@ pub fn token_conditional_swap_create(
     require_gte!(tcs.price_lower_limit, 0.0);
     require_gte!(tcs.price_upper_limit, 0.0);
 
-    emit!(TokenConditionalSwapCreateLog {
+    emit!(TokenConditionalSwapCreateLogV2 {
         mango_group: ctx.accounts.group.key(),
         mango_account: ctx.accounts.account.key(),
         id,
@@ -72,6 +72,8 @@ pub fn token_conditional_swap_create(
         sell_token_index: tcs.sell_token_index,
         allow_creating_borrows: tcs.allow_creating_borrows(),
         allow_creating_deposits: tcs.allow_creating_deposits(),
+        display_price_style: tcs.display_price_style,
+        intention: tcs.intention,
     });
 
     Ok(())

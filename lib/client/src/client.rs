@@ -1382,9 +1382,9 @@ impl MangoClient {
         let response_text = response
             .text()
             .await
-            .context("awaiting body of quote request to jupiter")?;
+            .context("awaiting body of http request")?;
         if !status.is_success() {
-            anyhow::bail!("request failed, status: {status}, body: {response_text}");
+            anyhow::bail!("http request failed, status: {status}, body: {response_text}");
         }
         serde_json::from_str::<T>(&response_text)
             .with_context(|| format!("response has unexpected format, body: {response_text}"))
