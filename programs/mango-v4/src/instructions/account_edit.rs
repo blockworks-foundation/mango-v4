@@ -5,6 +5,8 @@ use crate::error::MangoError;
 use crate::state::*;
 use crate::util::fill_from_str;
 
+const ONE_WEEK_SECONDS: u64 = 24 * 7 * 60 * 60;
+
 pub fn account_edit(
     ctx: Context<AccountEdit>,
     name_opt: Option<String>,
@@ -30,6 +32,8 @@ pub fn account_edit(
 
     match (temporary_delegate_opt, temporary_delegate_expiry_opt) {
         (Some(temporary_delegate), Some(temporary_delegate_expiry)) => {
+            let now_ts: u64 = Clock::get().unwrap().unix_timestamp.try_into().unwrap();
+            require_gt!(now_ts + ONE_WEEK_SECONDS, temporary_delegate_expiry);
             account.fixed.temporary_delegate = temporary_delegate;
             account.fixed.temporary_delegate_expiry = temporary_delegate_expiry;
         }
