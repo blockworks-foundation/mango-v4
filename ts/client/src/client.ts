@@ -744,12 +744,14 @@ export class MangoClient {
     mangoAccount: MangoAccount,
     name?: string,
     delegate?: PublicKey,
+    temporaryDelegate?: PublicKey,
     delegateExpiry?: number,
   ): Promise<TransactionSignature> {
     const ix = await this.program.methods
       .accountEdit(
         name ?? null,
         delegate ?? null,
+        temporaryDelegate ?? null,
         delegateExpiry ? new BN(delegateExpiry) : null,
       )
       .accounts({

@@ -257,10 +257,14 @@ pub struct MangoAccountFixed {
     pub buyback_fees_accrued_previous: u64,
     pub buyback_fees_expiry_timestamp: u64,
     pub next_token_conditional_swap_id: u64,
-    pub delegate_expiry: u64,
-    pub reserved: [u8; 192],
+    pub temporary_delegate: Pubkey,
+    pub temporary_delegate_expiry: u64,
+    pub reserved: [u8; 160],
 }
-const_assert_eq!(size_of::<MangoAccountFixed>(), 32 * 4 + 8 + 8 * 8 + 8 + 192);
+const_assert_eq!(
+    size_of::<MangoAccountFixed>(),
+    32 * 4 + 8 + 8 * 8 + 32 + 8 + 160
+);
 const_assert_eq!(size_of::<MangoAccountFixed>(), 400);
 const_assert_eq!(size_of::<MangoAccountFixed>() % 8, 0);
 
@@ -277,15 +281,24 @@ impl MangoAccountFixed {
     }
 
     pub fn is_owner_or_delegate(&self, ix_signer: Pubkey) -> bool {
-        self.owner == ix_signer || self.delegate == ix_signer
+        self.owner == ix_signer || self.is_delegate(ix_signer)
     }
 
     pub fn is_delegate(&self, ix_signer: Pubkey) -> bool {
-        let now_ts: u64 = Clock::get().unwrap().unix_timestamp.try_into().unwrap();
-        if self.delegate_expiry != 0 && now_ts > self.delegate_expiry {
+        if self.delegate == ix_signer {
+            return true;
+        }
+
+        if self.temporary_delegate_expiry == 0 {
             return false;
         }
-        self.delegate == ix_signer
+
+        let now_ts: u64 = Clock::get().unwrap().unix_timestamp.try_into().unwrap();
+        if now_ts > self.temporary_delegate_expiry {
+            return false;
+        }
+
+        self.temporary_delegate == ix_signer
     }
 
     pub fn being_liquidated(&self) -> bool {

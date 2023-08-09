@@ -10,7 +10,8 @@ pub fn account_edit(
     name_opt: Option<String>,
     // note: can also be used to unset by using the default pubkey here as a param
     delegate_opt: Option<Pubkey>,
-    delegate_expiry_opt: Option<u64>,
+    temporary_delegate_opt: Option<Pubkey>,
+    temporary_delegate_expiry_opt: Option<u64>,
 ) -> Result<()> {
     require!(
         name_opt.is_some() || delegate_opt.is_some(),
@@ -27,8 +28,15 @@ pub fn account_edit(
         account.fixed.delegate = delegate;
     }
 
-    if let Some(delegate_expiry) = delegate_expiry_opt {
-        account.fixed.delegate_expiry = delegate_expiry;
+    match (temporary_delegate_opt, temporary_delegate_expiry_opt) {
+        (Some(temporary_delegate), Some(temporary_delegate_expiry)) => {
+            account.fixed.temporary_delegate = temporary_delegate;
+            account.fixed.temporary_delegate_expiry = temporary_delegate_expiry;
+        }
+        (None, None) => {}
+        _ => {
+            return err!(MangoError::SomeError);
+        }
     }
 
     Ok(())
