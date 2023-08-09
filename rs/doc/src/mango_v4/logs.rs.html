@@ -557,6 +557,26 @@
 <span id="557">557</span>
 <span id="558">558</span>
 <span id="559">559</span>
+<span id="560">560</span>
+<span id="561">561</span>
+<span id="562">562</span>
+<span id="563">563</span>
+<span id="564">564</span>
+<span id="565">565</span>
+<span id="566">566</span>
+<span id="567">567</span>
+<span id="568">568</span>
+<span id="569">569</span>
+<span id="570">570</span>
+<span id="571">571</span>
+<span id="572">572</span>
+<span id="573">573</span>
+<span id="574">574</span>
+<span id="575">575</span>
+<span id="576">576</span>
+<span id="577">577</span>
+<span id="578">578</span>
+<span id="579">579</span>
 </pre><pre class="rust"><code><span class="kw">use crate</span>::{
     accounts_ix::FlashLoanType,
     state::{OracleType, PerpMarket, PerpPosition},
@@ -617,11 +637,31 @@
     <span class="kw">pub </span>price: i128,
 }
 
+<span class="attribute">#[derive(AnchorSerialize, AnchorDeserialize)]
+</span><span class="kw">pub struct </span>FlashLoanTokenDetailV2 {
+    <span class="kw">pub </span>token_index: u16,
+    <span class="kw">pub </span>change_amount: i128,
+    <span class="kw">pub </span>loan: i128,
+    <span class="kw">pub </span>loan_origination_fee: i128,
+    <span class="kw">pub </span>deposit_index: i128,
+    <span class="kw">pub </span>borrow_index: i128,
+    <span class="kw">pub </span>price: i128,
+    <span class="kw">pub </span>swap_fee: i128,
+}
+
 <span class="attribute">#[event]
 </span><span class="kw">pub struct </span>FlashLoanLog {
     <span class="kw">pub </span>mango_group: Pubkey,
     <span class="kw">pub </span>mango_account: Pubkey,
     <span class="kw">pub </span>token_loan_details: Vec&lt;FlashLoanTokenDetail&gt;,
+    <span class="kw">pub </span>flash_loan_type: FlashLoanType,
+}
+
+<span class="attribute">#[event]
+</span><span class="kw">pub struct </span>FlashLoanLogV2 {
+    <span class="kw">pub </span>mango_group: Pubkey,
+    <span class="kw">pub </span>mango_account: Pubkey,
+    <span class="kw">pub </span>token_loan_details: Vec&lt;FlashLoanTokenDetailV2&gt;,
     <span class="kw">pub </span>flash_loan_type: FlashLoanType,
 }
 

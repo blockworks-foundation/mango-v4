@@ -1133,6 +1133,9 @@
 <span id="1133">1133</span>
 <span id="1134">1134</span>
 <span id="1135">1135</span>
+<span id="1136">1136</span>
+<span id="1137">1137</span>
+<span id="1138">1138</span>
 </pre><pre class="rust"><code><span class="kw">use super</span>::{OracleConfig, TokenIndex, TokenPosition};
 <span class="kw">use </span><span class="kw">crate</span>::accounts_zerocopy::KeyedAccountReader;
 <span class="kw">use </span><span class="kw">crate</span>::error::<span class="kw-2">*</span>;
@@ -1281,8 +1284,10 @@
     </span><span class="kw">pub </span>token_conditional_swap_taker_fee_rate: f32,
     <span class="kw">pub </span>token_conditional_swap_maker_fee_rate: f32,
 
+    <span class="kw">pub </span>flash_loan_swap_fee_rate: f32,
+
     <span class="attribute">#[derivative(Debug = <span class="string">&quot;ignore&quot;</span>)]
-    </span><span class="kw">pub </span>reserved: [u8; <span class="number">2096</span>],
+    </span><span class="kw">pub </span>reserved: [u8; <span class="number">2092</span>],
 }
 <span class="macro">const_assert_eq!</span>(
     size_of::&lt;Bank&gt;(),
@@ -1313,8 +1318,8 @@
         </span>+ <span class="number">1
         </span>+ <span class="number">6
         </span>+ <span class="number">8
-        </span>+ <span class="number">2 </span>* <span class="number">4
-        </span>+ <span class="number">2096
+        </span>+ <span class="number">3 </span>* <span class="number">4
+        </span>+ <span class="number">2092
 </span>);
 <span class="macro">const_assert_eq!</span>(size_of::&lt;Bank&gt;(), <span class="number">3064</span>);
 <span class="macro">const_assert_eq!</span>(size_of::&lt;Bank&gt;() % <span class="number">8</span>, <span class="number">0</span>);
@@ -1392,7 +1397,8 @@
             fees_withdrawn: <span class="number">0</span>,
             token_conditional_swap_taker_fee_rate: <span class="number">0.0</span>,
             token_conditional_swap_maker_fee_rate: <span class="number">0.0</span>,
-            reserved: [<span class="number">0</span>; <span class="number">2096</span>],
+            flash_loan_swap_fee_rate: <span class="number">0.0</span>,
+            reserved: [<span class="number">0</span>; <span class="number">2092</span>],
         }
     }
 
