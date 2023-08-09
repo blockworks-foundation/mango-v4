@@ -1902,8 +1902,10 @@ impl ClientInstruction for AccountEditInstruction {
     ) -> (Self::Accounts, instruction::Instruction) {
         let program_id = mango_v4::id();
         let instruction = mango_v4::instruction::AccountEdit {
-            name_opt: Option::from(self.name.to_string()),
-            delegate_opt: Option::from(self.delegate),
+            name_opt: Some(self.name.to_string()),
+            delegate_opt: Some(self.delegate),
+            temporary_delegate_opt: None,
+            temporary_delegate_expiry_opt: None,
         };
 
         let account = Pubkey::find_program_address(
