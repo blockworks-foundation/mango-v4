@@ -180,8 +180,8 @@ async function main() {
       account,
       MINTS.get('SOL')!,
       MINTS.get('USDC')!,
-      100000000,
-      20000, // liqee only has 1k USDC-native, leverage does not go that far!
+      new BN(100000000),
+      new BN(20000), // liqee only has 1k USDC-native, leverage does not go that far!
       null,
       0.0,
       1000000.0,
@@ -204,8 +204,8 @@ async function main() {
       account,
       MINTS.get('SOL')!,
       MINTS.get('USDC')!,
-      1000,
-      1000,
+      new BN(1000),
+      new BN(1000),
       null,
       0.0,
       1000000.0,
@@ -228,8 +228,8 @@ async function main() {
       account,
       MINTS.get('SOL')!,
       MINTS.get('USDC')!,
-      1000,
-      1000,
+      new BN(1000),
+      new BN(1000),
       Date.now() / 1000 + 15, // expire in 15s
       0.0,
       1000000.0,

@@ -3587,9 +3587,6 @@ export class MangoClient {
       upperLimit = thresholdPrice;
     }
 
-    const expiryTimestampBn =
-      expiryTimestamp !== null ? new BN(expiryTimestamp) : U64_MAX_BN;
-
     if (!pricePremium) {
       const buyTokenPriceImpact = group.getPriceImpactByTokenIndex(
         buyBank.tokenIndex,
@@ -3621,19 +3618,55 @@ export class MangoClient {
         break;
     }
 
+    return await this.tokenConditionalSwapCreateRaw(
+      group,
+      account,
+      buyBank.mint,
+      sellBank.mint,
+      maxBuy,
+      maxSell,
+      expiryTimestamp,
+      lowerLimit,
+      upperLimit,
+      pricePremiumRate,
+      allowCreatingDeposits,
+      allowCreatingBorrows,
+      thresholdPriceInSellPerBuyToken
+        ? TokenConditionalSwapDisplayPriceStyle.sellTokenPerBuyToken
+        : TokenConditionalSwapDisplayPriceStyle.buyTokenPerSellToken,
+      intention,
+    );
+  }
+
+  public async tokenConditionalSwapCreateRaw(
+    group: Group,
+    account: MangoAccount,
+    buyMintPk: PublicKey,
+    sellMintPk: PublicKey,
+    maxBuy: BN,
+    maxSell: BN,
+    expiryTimestamp: number | null,
+    priceLowerLimit: number,
+    priceUpperLimit: number,
+    pricePremiumRate: number,
+    allowCreatingDeposits: boolean,
+    allowCreatingBorrows: boolean,
+    priceDisplayStyle: TokenConditionalSwapDisplayPriceStyle,
+    intention: TokenConditionalSwapIntention,
+  ): Promise<TransactionSignature> {
+    const buyBank: Bank = group.getFirstBankByMint(buyMintPk);
+    const sellBank: Bank = group.getFirstBankByMint(sellMintPk);
     const tcsIx = await this.program.methods
       .tokenConditionalSwapCreateV2(
         maxBuy,
         maxSell,
-        expiryTimestampBn,
-        lowerLimit,
-        upperLimit,
+        expiryTimestamp !== null ? new BN(expiryTimestamp) : U64_MAX_BN,
+        priceLowerLimit,
+        priceUpperLimit,
         pricePremiumRate,
         allowCreatingDeposits,
         allowCreatingBorrows,
-        thresholdPriceInSellPerBuyToken
-          ? TokenConditionalSwapDisplayPriceStyle.sellTokenPerBuyToken
-          : TokenConditionalSwapDisplayPriceStyle.buyTokenPerSellToken,
+        priceDisplayStyle,
         intention,
       )
       .accounts({
@@ -3660,64 +3693,6 @@ export class MangoClient {
       );
     }
     ixs.push(tcsIx);
-
-    return await this.sendAndConfirmTransactionForGroup(group, ixs);
-  }
-
-  public async tokenConditionalSwapCreateRaw(
-    group: Group,
-    account: MangoAccount,
-    buyMintPk: PublicKey,
-    sellMintPk: PublicKey,
-    maxBuy: number,
-    maxSell: number,
-    expiryTimestamp: number | null,
-    priceLowerLimit: number,
-    priceUpperLimit: number,
-    pricePremiumRate: number,
-    allowCreatingDeposits: boolean,
-    allowCreatingBorrows: boolean,
-    priceDisplayStyle: TokenConditionalSwapDisplayPriceStyle,
-    intention: TokenConditionalSwapIntention,
-  ): Promise<TransactionSignature> {
-    const buyBank: Bank = group.getFirstBankByMint(buyMintPk);
-    const sellBank: Bank = group.getFirstBankByMint(sellMintPk);
-    const ix = await this.program.methods
-      .tokenConditionalSwapCreateV2(
-        new BN(maxBuy),
-        new BN(maxSell),
-        expiryTimestamp !== null ? new BN(expiryTimestamp) : U64_MAX_BN,
-        priceLowerLimit,
-        priceUpperLimit,
-        pricePremiumRate,
-        allowCreatingDeposits,
-        allowCreatingBorrows,
-        priceDisplayStyle,
-        intention,
-      )
-      .accounts({
-        group: group.publicKey,
-        account: account.publicKey,
-        authority: (this.program.provider as AnchorProvider).wallet.publicKey,
-        buyBank: buyBank.publicKey,
-        sellBank: sellBank.publicKey,
-      })
-      .instruction();
-
-    const ixs = [ix];
-    if (account.tokenConditionalSwaps.length == 0) {
-      ixs.push(
-        await this.accountExpandV2Ix(
-          group,
-          account,
-          account.tokens.length,
-          account.serum3.length,
-          account.perps.length,
-          account.perpOpenOrders.length,
-          8,
-        ),
-      );
-    }
 
     return await this.sendAndConfirmTransactionForGroup(group, ixs);
   }
