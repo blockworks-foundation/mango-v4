@@ -701,19 +701,27 @@ impl LiquidationState {
                 interesting_tcs.append(&mut v);
             }
         }
+        if interesting_tcs.is_empty() {
+            return Ok(());
+        }
 
         // Repeatedly pick one randomly (volume-weighted) and try to execute
         use rand::distributions::{Distribution, WeightedIndex};
-        let weights = interesting_tcs
-            .iter()
-            .map(|(_, _, volume)| (*volume).min(self.trigger_tcs_config.max_trigger_quote_amount));
+        let weights = interesting_tcs.iter().map(|(_, _, volume)| {
+            (*volume)
+                .min(self.trigger_tcs_config.max_trigger_quote_amount)
+                .max(1)
+        });
         let mut dist = WeightedIndex::new(weights).unwrap();
         let mut took_one = false;
-        for _ in 0..interesting_tcs.len() {
+        for i in 0..interesting_tcs.len() {
             let (pubkey, tcs_id, _) = {
                 let mut rng = rand::thread_rng();
                 let sample = dist.sample(&mut rng);
-                dist.update_weights(&[(sample, &0)])?;
+                if i != interesting_tcs.len() - 1 {
+                    // Would error if we updated the last weight to 0
+                    dist.update_weights(&[(sample, &0)])?;
+                }
                 &interesting_tcs[sample]
             };
 
