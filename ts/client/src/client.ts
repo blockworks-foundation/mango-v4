@@ -3606,8 +3606,23 @@ export class MangoClient {
     }
     const pricePremiumRate = pricePremium > 0 ? pricePremium / 100 : 0.03;
 
+    let intention: TokenConditionalSwapIntention;
+    switch (tcsIntention) {
+      case 'StopLossOnBorrow':
+      case 'StopLossOnDeposit':
+        intention = TokenConditionalSwapIntention.stopLoss;
+        break;
+      case 'TakeProfitOnBorrow':
+      case 'TakeProfitOnDeposit':
+        intention = TokenConditionalSwapIntention.takeProfit;
+        break;
+      default:
+        intention = TokenConditionalSwapIntention.unknown;
+        break;
+    }
+
     const tcsIx = await this.program.methods
-      .tokenConditionalSwapCreate(
+      .tokenConditionalSwapCreateV2(
         maxBuy,
         maxSell,
         expiryTimestampBn,
@@ -3616,6 +3631,10 @@ export class MangoClient {
         pricePremiumRate,
         allowCreatingDeposits,
         allowCreatingBorrows,
+        thresholdPriceInSellPerBuyToken
+          ? TokenConditionalSwapDisplayPriceStyle.sellTokenPerBuyToken
+          : TokenConditionalSwapDisplayPriceStyle.buyTokenPerSellToken,
+        intention,
       )
       .accounts({
         group: group.publicKey,
