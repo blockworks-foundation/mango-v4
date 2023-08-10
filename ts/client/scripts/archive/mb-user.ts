@@ -1,5 +1,5 @@
 import { AnchorProvider, Wallet } from '@coral-xyz/anchor';
-import { Connection, Keypair } from '@solana/web3.js';
+import { Connection, Keypair, PublicKey } from '@solana/web3.js';
 import fs from 'fs';
 import { HealthType, MangoAccount } from '../../src/accounts/mangoAccount';
 import {
@@ -33,7 +33,9 @@ async function main() {
   );
   console.log(`Admin ${admin.publicKey.toBase58()}`);
 
-  const group = await client.getGroupForCreator(admin.publicKey, 2);
+  const group = await client.getGroup(
+    new PublicKey('78b8f4cGCwmZ9ysPFMWLaLTkkaYnUjwMJYStWe5RTSSX'),
+  );
   console.log(`${group.toString()}`);
 
   // create + fetch account

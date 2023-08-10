@@ -9,6 +9,7 @@ import {
   VersionedTransaction,
 } from '@solana/web3.js';
 import BN from 'bn.js';
+import { Bank } from './accounts/bank';
 import { I80F48 } from './numbers/I80F48';
 import { ASSOCIATED_TOKEN_PROGRAM_ID, TOKEN_PROGRAM_ID } from './utils/spl';
 
@@ -36,6 +37,22 @@ export function toNativeI80F48(uiAmount: number, decimals: number): I80F48 {
 
 export function toNative(uiAmount: number, decimals: number): BN {
   return new BN((uiAmount * Math.pow(10, decimals)).toFixed(0));
+}
+
+export function toNativeSellPerBuyTokenPrice(
+  price: number,
+  sellBank: Bank,
+  buyBank: Bank,
+): number {
+  return price * Math.pow(10, sellBank.mintDecimals - buyBank.mintDecimals);
+}
+
+export function toUiSellPerBuyTokenPrice(
+  price: number,
+  sellBank: Bank,
+  buyBank: Bank,
+): number {
+  return toUiDecimals(price, sellBank.mintDecimals - buyBank.mintDecimals);
 }
 
 export function toUiDecimals(
@@ -66,6 +83,55 @@ export function toUiI80F48(nativeAmount: I80F48, decimals: number): I80F48 {
   return nativeAmount.div(I80F48.fromNumber(Math.pow(10, decimals)));
 }
 
+export function roundTo5(number): number {
+  if (number < 1) {
+    const numString = number.toString();
+    const nonZeroIndex = numString.search(/[1-9]/);
+    if (nonZeroIndex === -1 || nonZeroIndex >= numString.length - 5) {
+      return number;
+    }
+    return Number(numString.slice(0, nonZeroIndex + 5));
+  } else if (number < 10) {
+    return (
+      Math.floor(number) +
+      Number((number % 1).toString().padEnd(10, '0').slice(0, 6))
+    );
+  } else if (number < 100) {
+    return (
+      Math.floor(number) +
+      Number((number % 1).toString().padEnd(10, '0').slice(0, 5))
+    );
+  } else if (number < 1000) {
+    return (
+      Math.floor(number) +
+      Number((number % 1).toString().padEnd(10, '0').slice(0, 4))
+    );
+  } else if (number < 10000) {
+    return (
+      Math.floor(number) +
+      Number((number % 1).toString().padEnd(10, '0').slice(0, 3))
+    );
+  }
+  return Math.round(number);
+}
+
+///
+
+export async function buildFetch(): Promise<
+  (
+    input: RequestInfo | URL,
+    init?: RequestInit | undefined,
+  ) => Promise<Response>
+> {
+  let fetch = globalThis?.fetch;
+  if (!fetch && process?.versions?.node) {
+    fetch = (await import('node-fetch')).default;
+  }
+  return fetch;
+}
+
+///
+
 ///
 /// web3js extensions
 ///
@@ -84,7 +150,7 @@ export function toUiI80F48(nativeAmount: I80F48, decimals: number): I80F48 {
 export async function getAssociatedTokenAddress(
   mint: PublicKey,
   owner: PublicKey,
-  allowOwnerOffCurve = false,
+  allowOwnerOffCurve = true,
   programId = TOKEN_PROGRAM_ID,
   associatedTokenProgramId = ASSOCIATED_TOKEN_PROGRAM_ID,
 ): Promise<PublicKey> {
