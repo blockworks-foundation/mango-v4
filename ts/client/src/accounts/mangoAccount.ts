@@ -1875,15 +1875,16 @@ export class TokenConditionalSwap {
   }
 
   getThresholdPriceUi(group: Group): number {
-    const a = I80F48.fromNumber(this.priceLowerLimit);
-    const b = I80F48.fromNumber(this.priceUpperLimit);
-
     const buyBank = this.getBuyToken(group);
     const sellBank = this.getSellToken(group);
-    const o = buyBank.price.div(sellBank.price);
+
+    const a = toUiSellPerBuyTokenPrice(this.priceLowerLimit, sellBank, buyBank);
+    const b = toUiSellPerBuyTokenPrice(this.priceUpperLimit, sellBank, buyBank);
+
+    const o = buyBank.uiPrice / sellBank.uiPrice;
 
     // Choose the price closest to oracle
-    if (o.sub(a).abs().lt(o.sub(b).abs())) {
+    if (Math.abs(o - a) < Math.abs(o - b)) {
       return this.getPriceLowerLimitUi(group);
     }
     return this.getPriceUpperLimitUi(group);
