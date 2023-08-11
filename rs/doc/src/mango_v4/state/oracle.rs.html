@@ -662,16 +662,16 @@
         OracleType::Pyth =&gt; {
             <span class="kw">let </span>price_account = pyth_sdk_solana::state::load_price_account(data).unwrap();
             <span class="kw">let </span>(price_data, last_update_slot) = pyth_get_price(acc_info.key(), price_account);
-            <span class="kw">let </span>raw_price = I80F48::from_num(price_data.price);
 
             <span class="kw">let </span>decimals = (price_account.expo <span class="kw">as </span>i8) + QUOTE_DECIMALS - (base_decimals <span class="kw">as </span>i8);
             <span class="kw">let </span>decimal_adj = power_of_ten(decimals);
-            <span class="kw">let </span>price = raw_price * decimal_adj;
+            <span class="kw">let </span>price = I80F48::from_num(price_data.price) * decimal_adj;
+            <span class="kw">let </span>deviation = I80F48::from_num(price_data.conf) * decimal_adj;
             <span class="macro">require_gte!</span>(price, <span class="number">0</span>);
             OracleState {
                 price,
                 last_update_slot,
-                deviation: I80F48::from_num(price_data.conf),
+                deviation,
                 oracle_type: OracleType::Pyth,
             }
         }
@@ -682,10 +682,8 @@
 
             <span class="kw">let </span>feed = bytemuck::from_bytes::&lt;AggregatorAccountData&gt;(<span class="kw-2">&amp;</span>data[<span class="number">8</span>..]);
             <span class="kw">let </span>feed_result = feed.get_result().map_err(from_foreign_error)<span class="question-mark">?</span>;
-            <span class="kw">let </span>price_decimal: f64 = feed_result.try_into().map_err(from_foreign_error)<span class="question-mark">?</span>;
-            <span class="kw">let </span>ui_price = I80F48::from_num(price_decimal);
-
-            <span class="kw">let </span>std_deviation_decimal: f64 = feed
+            <span class="kw">let </span>ui_price: f64 = feed_result.try_into().map_err(from_foreign_error)<span class="question-mark">?</span>;
+            <span class="kw">let </span>ui_deviation: f64 = feed
                 .latest_confirmed_round
                 .std_deviation
                 .try_into()
@@ -697,12 +695,13 @@
 
             <span class="kw">let </span>decimals = QUOTE_DECIMALS - (base_decimals <span class="kw">as </span>i8);
             <span class="kw">let </span>decimal_adj = power_of_ten(decimals);
-            <span class="kw">let </span>price = ui_price * decimal_adj;
+            <span class="kw">let </span>price = I80F48::from_num(ui_price) * decimal_adj;
+            <span class="kw">let </span>deviation = I80F48::from_num(ui_deviation) * decimal_adj;
             <span class="macro">require_gte!</span>(price, <span class="number">0</span>);
             OracleState {
                 price,
                 last_update_slot,
-                deviation: I80F48::from_num(std_deviation_decimal),
+                deviation,
                 oracle_type: OracleType::SwitchboardV2,
             }
         }
@@ -710,13 +709,14 @@
             <span class="kw">let </span>result = FastRoundResultAccountData::deserialize(data).unwrap();
             <span class="kw">let </span>ui_price = I80F48::from_num(result.result.result);
 
-            <span class="kw">let </span>deviation =
+            <span class="kw">let </span>ui_deviation =
                 I80F48::from_num(result.result.max_response - result.result.min_response);
             <span class="kw">let </span>last_update_slot = result.result.round_open_slot;
 
             <span class="kw">let </span>decimals = QUOTE_DECIMALS - (base_decimals <span class="kw">as </span>i8);
             <span class="kw">let </span>decimal_adj = power_of_ten(decimals);
             <span class="kw">let </span>price = ui_price * decimal_adj;
+            <span class="kw">let </span>deviation = ui_deviation * decimal_adj;
             <span class="macro">require_gte!</span>(price, <span class="number">0</span>);
             OracleState {
                 price,
