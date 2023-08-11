@@ -149,7 +149,7 @@ export class MangoClient {
     );
   }
 
-  private async sendAndConfirmTransactionForGroup(
+  public async sendAndConfirmTransactionForGroup(
     group: Group,
     ixs: TransactionInstruction[],
     opts: any = {},
