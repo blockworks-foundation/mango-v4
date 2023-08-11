@@ -48,6 +48,7 @@ more advanced parameters
 - `REBALANCE_SLIPPAGE_BPS` - slippage liquidator should tolerate when offloading tokens (default 100)
 - `PRIORITIZATION_MICRO_LAMPORTS` - how much priority fee to pay (default 0)
 - `COMPUTE_LIMIT_FOR_LIQUIDATION` - compute to request for liq instructions (default 250k)
+- `COMPUTE_LIMIT_FOR_TCS` - compute to request for token conditional swap trigger instructions (default 300k)
 - `SNAPSHOT_INTERVAL_SECS` - how frequently to request a full on-chain snapshot (default 5min)
 - `PARALLEL_RPC_REQUESTS` - number of allowed parallel rpc calls (default 10)
 - `TELEMETRY` - report the liquidator's existence and pubkey occasionally (default true)

@@ -95,6 +95,10 @@ struct Cli {
     #[clap(long, env, default_value = "250000")]
     compute_limit_for_liquidation: u32,
 
+    /// compute limit requested for tcs trigger instructions
+    #[clap(long, env, default_value = "300000")]
+    compute_limit_for_tcs: u32,
+
     /// use a jupiter mock instead of actual queries
     ///
     /// This is required for devnet testing.
@@ -260,6 +264,7 @@ async fn main() -> anyhow::Result<()> {
         min_health_ratio: cli.min_health_ratio,
         max_trigger_quote_amount: 1_000_000_000, // TODO: config, $1000
         mock_jupiter: cli.mock_jupiter == BoolArg::True,
+        compute_limit_for_trigger: cli.compute_limit_for_tcs,
         // TODO: config
         refresh_timeout: Duration::from_secs(30),
     };
