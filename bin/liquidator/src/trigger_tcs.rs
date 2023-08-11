@@ -1,4 +1,4 @@
-use std::time::{Duration, Instant};
+use std::time::Duration;
 
 use itertools::Itertools;
 use mango_v4::{
@@ -10,7 +10,7 @@ use mango_v4_client::{chain_data, health_cache, JupiterSwapMode, MangoClient, Ma
 use tracing::*;
 use {anyhow::Context, fixed::types::I80F48, solana_sdk::pubkey::Pubkey};
 
-use crate::{token_swap_info, util, ErrorTracking};
+use crate::{token_swap_info, util};
 
 // The liqee health ratio to aim for when executing tcs orders that are bigger
 // than the liqee can support.
@@ -267,7 +267,7 @@ async fn execute_token_conditional_swap(
 }
 
 #[allow(clippy::too_many_arguments)]
-#[instrument(skip_all, fields(%pubkey, tcs_id))]
+#[instrument(skip_all, fields(%pubkey, %tcs_id))]
 pub async fn remove_expired_token_conditional_swap(
     mango_client: &MangoClient,
     pubkey: &Pubkey,
@@ -380,13 +380,8 @@ pub fn find_interesting_tcs_for_account(
     mango_client: &MangoClient,
     account_fetcher: &chain_data::AccountFetcher,
     token_swap_info: &token_swap_info::TokenSwapInfoUpdater,
-    error_tracking: &ErrorTracking,
-    now: Instant,
     now_ts: u64,
-) -> anyhow::Result<Vec<(Pubkey, u64, u64)>> {
-    if error_tracking.had_too_many_errors(pubkey, now).is_some() {
-        anyhow::bail!("too many errors");
-    }
+) -> anyhow::Result<Vec<anyhow::Result<(Pubkey, u64, u64)>>> {
     let liqee = account_fetcher.fetch_mango_account(pubkey)?;
 
     let interesting_tcs = liqee.active_token_conditional_swaps().filter_map(|tcs| {
@@ -397,12 +392,12 @@ pub fn find_interesting_tcs_for_account(
             token_swap_info,
             now_ts,
         ) {
-            Ok(false) | Err(_) => None,
             Ok(true) => {
-                let volume =
-                    tcs_max_volume(&liqee, mango_client, account_fetcher, tcs).unwrap_or(1);
-                Some((*pubkey, tcs.id, volume))
+                let volume_result = tcs_max_volume(&liqee, mango_client, account_fetcher, tcs);
+                Some(volume_result.map(|v| (*pubkey, tcs.id, v)))
             }
+            Ok(false) => None,
+            Err(e) => Some(Err(e)),
         }
     });
     Ok(interesting_tcs.collect_vec())
