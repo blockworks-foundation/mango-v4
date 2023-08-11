@@ -46,6 +46,7 @@ more advanced parameters
 
 - `MIN_HEALTH_RATIO` - minimum health ratio the liquidator should retain (default 50%)
 - `REBALANCE_SLIPPAGE_BPS` - slippage liquidator should tolerate when offloading tokens (default 100)
+- `COMPUTE_LIMIT_FOR_TCS` - compute to request for token conditional swap trigger instructions (default 300k)
 
 ```shell
 cargo run --bin liquidator

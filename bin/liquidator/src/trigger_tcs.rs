@@ -14,6 +14,7 @@ pub struct Config {
     pub max_trigger_quote_amount: u64,
     pub refresh_timeout: Duration,
     pub mock_jupiter: bool,
+    pub compute_limit_for_trigger: u32,
 }
 
 async fn tcs_is_in_price_range(
@@ -212,13 +213,19 @@ async fn execute_token_conditional_swap(
         "executing token conditional swap",
     );
 
-    let txsig = mango_client
-        .token_conditional_swap_trigger(
+    let compute_ix = solana_sdk::compute_budget::ComputeBudgetInstruction::set_compute_unit_limit(
+        config.compute_limit_for_trigger,
+    );
+    let trigger_ix = mango_client
+        .token_conditional_swap_trigger_instruction(
             (pubkey, &liqee),
             tcs.id,
             max_buy_token_to_liqee,
             max_sell_token_to_liqor,
         )
+        .await?;
+    let txsig = mango_client
+        .send_and_confirm_owner_tx(vec![compute_ix, trigger_ix])
         .await?;
     info!(
         %txsig,
@@ -248,9 +255,10 @@ pub async fn remove_expired_token_conditional_swap(
     liqee: &MangoAccountValue,
     tcs_id: u64,
 ) -> anyhow::Result<bool> {
-    let txsig = mango_client
-        .token_conditional_swap_trigger((pubkey, &liqee), tcs_id, 0, 0)
+    let ix = mango_client
+        .token_conditional_swap_trigger_instruction((pubkey, &liqee), tcs_id, 0, 0)
         .await?;
+    let txsig = mango_client.send_and_confirm_owner_tx(vec![ix]).await?;
     info!(
         %txsig,
         "Removed expired token conditional swap",
