@@ -8,6 +8,7 @@ import {
   TransactionConfirmationStatus,
   TransactionError,
   TransactionInstruction,
+  TransactionSignature,
   VersionedTransaction,
 } from '@solana/web3.js';
 
@@ -16,7 +17,7 @@ export interface MangoSignatureStatus {
   confirmations: number | null;
   err: TransactionError | null;
   confirmationStatus?: TransactionConfirmationStatus;
-  signature: string;
+  signature: TransactionSignature;
 }
 
 export async function sendTransaction(
