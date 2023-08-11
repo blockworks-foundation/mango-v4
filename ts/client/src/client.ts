@@ -23,7 +23,6 @@ import {
   PublicKey,
   SYSVAR_INSTRUCTIONS_PUBKEY,
   SYSVAR_RENT_PUBKEY,
-  Signer,
   SystemProgram,
   TransactionInstruction,
   TransactionSignature,
@@ -3398,13 +3397,24 @@ export class MangoClient {
       );
     }
 
+    if (!thresholdPriceInSellPerBuyToken) {
+      thresholdPriceUi = 1 / thresholdPriceUi;
+    }
+    const thresholdPrice = toNativeSellPerBuyTokenPrice(
+      thresholdPriceUi,
+      sellBank,
+      buyBank,
+    );
+    const lowerLimit = 0;
+    const upperLimit = thresholdPrice;
+
     return await this.tokenConditionalSwapCreate(
       group,
       account,
       sellBank,
       buyBank,
-      thresholdPriceUi,
-      thresholdPriceInSellPerBuyToken,
+      lowerLimit,
+      upperLimit,
       Number.MAX_SAFE_INTEGER,
       maxSellUi ?? account.getTokenBalanceUi(sellBank),
       'TakeProfitOnDeposit',
@@ -3434,13 +3444,24 @@ export class MangoClient {
       );
     }
 
+    if (!thresholdPriceInSellPerBuyToken) {
+      thresholdPriceUi = 1 / thresholdPriceUi;
+    }
+    const thresholdPrice = toNativeSellPerBuyTokenPrice(
+      thresholdPriceUi,
+      sellBank,
+      buyBank,
+    );
+    const lowerLimit = thresholdPrice;
+    const upperLimit = Number.MAX_SAFE_INTEGER;
+
     return await this.tokenConditionalSwapCreate(
       group,
       account,
       sellBank,
       buyBank,
-      thresholdPriceUi,
-      thresholdPriceInSellPerBuyToken,
+      lowerLimit,
+      upperLimit,
       Number.MAX_SAFE_INTEGER,
       maxSellUi ?? account.getTokenBalanceUi(sellBank),
       'StopLossOnDeposit',
@@ -3471,13 +3492,24 @@ export class MangoClient {
       );
     }
 
+    if (!thresholdPriceInSellPerBuyToken) {
+      thresholdPriceUi = 1 / thresholdPriceUi;
+    }
+    const thresholdPrice = toNativeSellPerBuyTokenPrice(
+      thresholdPriceUi,
+      sellBank,
+      buyBank,
+    );
+    const lowerLimit = thresholdPrice;
+    const upperLimit = Number.MAX_SAFE_INTEGER;
+
     return await this.tokenConditionalSwapCreate(
       group,
       account,
       sellBank,
       buyBank,
-      thresholdPriceUi,
-      thresholdPriceInSellPerBuyToken,
+      lowerLimit,
+      upperLimit,
       maxBuyUi ?? -account.getTokenBalanceUi(buyBank),
       Number.MAX_SAFE_INTEGER,
       'TakeProfitOnBorrow',
@@ -3508,13 +3540,24 @@ export class MangoClient {
       );
     }
 
+    if (!thresholdPriceInSellPerBuyToken) {
+      thresholdPriceUi = 1 / thresholdPriceUi;
+    }
+    const thresholdPrice = toNativeSellPerBuyTokenPrice(
+      thresholdPriceUi,
+      sellBank,
+      buyBank,
+    );
+    const lowerLimit = 0;
+    const upperLimit = thresholdPrice;
+
     return await this.tokenConditionalSwapCreate(
       group,
       account,
       sellBank,
       buyBank,
-      thresholdPriceUi,
-      thresholdPriceInSellPerBuyToken,
+      lowerLimit,
+      upperLimit,
       maxBuyUi ?? -account.getTokenBalanceUi(buyBank),
       Number.MAX_SAFE_INTEGER,
       'StopLossOnBorrow',
@@ -3530,8 +3573,8 @@ export class MangoClient {
     account: MangoAccount,
     sellBank: Bank,
     buyBank: Bank,
-    thresholdPriceUi: number,
-    thresholdPriceInSellPerBuyToken: boolean,
+    lowerLimit: number,
+    upperLimit: number,
     maxBuyUi: number,
     maxSellUi: number,
     tcsIntention:
@@ -3553,32 +3596,6 @@ export class MangoClient {
       maxSellUi == Number.MAX_SAFE_INTEGER
         ? U64_MAX_BN
         : toNative(maxSellUi, sellBank.mintDecimals);
-
-    if (!thresholdPriceInSellPerBuyToken) {
-      thresholdPriceUi = 1 / thresholdPriceUi;
-    }
-
-    let lowerLimit, upperLimit;
-    const thresholdPrice = toNativeSellPerBuyTokenPrice(
-      thresholdPriceUi,
-      sellBank,
-      buyBank,
-    );
-    const sellTokenPerBuyTokenPrice = buyBank.price
-      .div(sellBank.price)
-      .toNumber();
-
-    if (
-      tcsIntention == 'TakeProfitOnDeposit' ||
-      tcsIntention == 'StopLossOnBorrow' ||
-      (tcsIntention == null && thresholdPrice > sellTokenPerBuyTokenPrice)
-    ) {
-      lowerLimit = thresholdPrice;
-      upperLimit = Number.MAX_SAFE_INTEGER;
-    } else {
-      lowerLimit = 0;
-      upperLimit = thresholdPrice;
-    }
 
     const expiryTimestampBn =
       expiryTimestamp !== null ? new BN(expiryTimestamp) : U64_MAX_BN;
