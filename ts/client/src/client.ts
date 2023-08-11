@@ -1306,39 +1306,46 @@ export class MangoClient {
     const tokenAccountPk = await getAssociatedTokenAddress(
       mintPk,
       mangoAccount.owner,
-      true,
     );
 
-    let wrappedSolAccount: Keypair | undefined;
+    let wrappedSolAccount: PublicKey | undefined;
     let preInstructions: TransactionInstruction[] = [];
     let postInstructions: TransactionInstruction[] = [];
-    const additionalSigners: Signer[] = [];
     if (mintPk.equals(NATIVE_MINT)) {
-      wrappedSolAccount = new Keypair();
+      // Generate a random seed for wrappedSolAccount.
+      const seed = Keypair.generate().publicKey.toBase58().slice(0, 32);
+      // Calculate a publicKey that will be controlled by the `mangoAccount.owner`.
+      wrappedSolAccount = await PublicKey.createWithSeed(
+        mangoAccount.owner,
+        seed,
+        TOKEN_PROGRAM_ID,
+      );
+
       const lamports = nativeAmount.add(new BN(1e7));
 
       preInstructions = [
-        SystemProgram.createAccount({
+        SystemProgram.createAccountWithSeed({
           fromPubkey: mangoAccount.owner,
-          newAccountPubkey: wrappedSolAccount.publicKey,
+          basePubkey: mangoAccount.owner,
+          seed,
+          newAccountPubkey: wrappedSolAccount,
           lamports: lamports.toNumber(),
           space: 165,
           programId: TOKEN_PROGRAM_ID,
         }),
         createInitializeAccount3Instruction(
-          wrappedSolAccount.publicKey,
+          wrappedSolAccount,
           NATIVE_MINT,
           mangoAccount.owner,
         ),
       ];
       postInstructions = [
         createCloseAccountInstruction(
-          wrappedSolAccount.publicKey,
+          wrappedSolAccount,
           mangoAccount.owner,
           mangoAccount.owner,
         ),
       ];
-      additionalSigners.push(wrappedSolAccount);
     }
 
     const healthRemainingAccounts: PublicKey[] =
@@ -1353,7 +1360,7 @@ export class MangoClient {
         bank: bank.publicKey,
         vault: bank.vault,
         oracle: bank.oracle,
-        tokenAccount: wrappedSolAccount?.publicKey ?? tokenAccountPk,
+        tokenAccount: wrappedSolAccount ?? tokenAccountPk,
         tokenAuthority: mangoAccount.owner,
       })
       .remainingAccounts(
@@ -1364,11 +1371,11 @@ export class MangoClient {
       )
       .instruction();
 
-    return await this.sendAndConfirmTransactionForGroup(
-      group,
-      [...preInstructions, ix, ...postInstructions],
-      { additionalSigners },
-    );
+    return await this.sendAndConfirmTransactionForGroup(group, [
+      ...preInstructions,
+      ix,
+      ...postInstructions,
+    ]);
   }
 
   public async tokenWithdraw(
