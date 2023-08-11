@@ -12,6 +12,12 @@ use crate::logs::{
 };
 use crate::state::*;
 
+/// If init health is reduced below this number, the tcs is considered done.
+///
+/// This avoids a situation where the same tcs can be triggered again and again
+/// for small amounts every time the init health increases by small amounts.
+const TCS_TRIGGER_INIT_HEALTH_THRESHOLD: u64 = 1_000_000;
+
 #[allow(clippy::too_many_arguments)]
 pub fn token_conditional_swap_trigger(
     ctx: Context<TokenConditionalSwapTrigger>,
@@ -76,8 +82,6 @@ pub fn token_conditional_swap_trigger(
         return Ok(());
     }
 
-    let liqee_pre_init_health = liqee.check_health_pre(&liqee_health_cache)?;
-
     let (liqee_buy_change, liqee_sell_change) = action(
         &mut liqor.borrow_mut(),
         liqor_key,
@@ -94,8 +98,7 @@ pub fn token_conditional_swap_trigger(
         now_ts,
     )?;
 
-    // Check liqee and liqor health
-    liqee.check_health_post(&liqee_health_cache, liqee_pre_init_health)?;
+    // Check liqor health, liqee health is checked inside (has to be, since tcs closure depends on it)
     let liqor_health = compute_health(&liqor.borrow(), HealthType::Init, &account_retriever)
         .context("compute liqor health")?;
     require!(liqor_health >= 0, MangoError::HealthMustBePositive);
@@ -187,6 +190,8 @@ fn action(
     max_sell_token_to_liqor: u64,
     now_ts: u64,
 ) -> Result<(I80F48, I80F48)> {
+    let liqee_pre_init_health = liqee.check_health_pre(&liqee_health_cache)?;
+
     let tcs = liqee
         .token_conditional_swap_by_index(token_conditional_swap_index)?
         .clone();
@@ -372,6 +377,9 @@ fn action(
     liqee_health_cache.adjust_token_balance(&buy_bank, liqee_buy_change)?;
     liqee_health_cache.adjust_token_balance(&sell_bank, liqee_sell_change)?;
 
+    let liqee_post_init_health =
+        liqee.check_health_post(&liqee_health_cache, liqee_pre_init_health)?;
+
     // update tcs information on the account
     let closed = {
         // record amount
@@ -403,14 +411,9 @@ fn action(
             sell_bank,
         );
 
-        // The health check depends on the account's health _ratio_ because it needs to work
-        // with liquidators trying to trigger tcs maximally: they can't bring the health exactly
-        // to 0 or even very close to it, because oracles will change before the transaction
-        // is executed. So instead, they will target a certain health ratio.
-        // This says, that as long as they bring the account's health ratio below 1%, we will
-        // consider the tcs as fully executed.
-        let liqee_health_is_low =
-            liqee_health_cache.health_ratio(HealthType::Init) < I80F48::from(1);
+        // If the health is low enough, close the trigger. Otherwise it'd trigger repeatedly
+        // as oracle prices fluctuate.
+        let liqee_health_is_low = liqee_post_init_health < TCS_TRIGGER_INIT_HEALTH_THRESHOLD;
 
         if future_buy == 0 || future_sell == 0 || liqee_health_is_low {
             *tcs = TokenConditionalSwap::default();
@@ -762,12 +765,14 @@ mod tests {
     fn test_token_conditional_swap_trigger() {
         let mut setup = TestSetup::new();
 
+        let asset_pos = 100_000_000;
+
         setup
             .asset_bank
             .data()
             .deposit(
                 &mut setup.liqee.token_position_mut(0).unwrap().0,
-                I80F48::from(1000),
+                I80F48::from(asset_pos),
                 0,
             )
             .unwrap();
@@ -805,7 +810,7 @@ mod tests {
         assert_eq!(tcs.sold, 88);
 
         assert_eq!(setup.liqee_liab_pos().round(), 40);
-        assert_eq!(setup.liqee_asset_pos().round(), 1000 - 88);
+        assert_eq!(setup.liqee_asset_pos().round(), asset_pos - 88);
         assert_eq!(setup.liqor_liab_pos().round(), -40);
         assert_eq!(setup.liqor_asset_pos().round(), 88);
 
@@ -816,7 +821,7 @@ mod tests {
         assert_eq!(setup.liqee.active_token_conditional_swaps().count(), 0);
 
         assert_eq!(setup.liqee_liab_pos().round(), 45);
-        assert_eq!(setup.liqee_asset_pos().round(), 1000 - 99);
+        assert_eq!(setup.liqee_asset_pos().round(), asset_pos - 99);
         assert_eq!(setup.liqor_liab_pos().round(), -45);
         assert_eq!(setup.liqor_asset_pos().round(), 99);
     }
@@ -830,14 +835,14 @@ mod tests {
             .data()
             .deposit(
                 &mut setup.liqee.token_position_mut(0).unwrap().0,
-                I80F48::from(100),
+                I80F48::from(100_000_000),
                 0,
             )
             .unwrap();
 
         let tcs = TokenConditionalSwap {
-            max_buy: 10000,
-            max_sell: 10000,
+            max_buy: 10_000_000_000,
+            max_sell: 10_000_000_000,
             price_lower_limit: 1.0,
             price_upper_limit: 3.0,
             price_premium_rate: 0.0,
@@ -849,20 +854,39 @@ mod tests {
             ..Default::default()
         };
         *setup.liqee.free_token_conditional_swap_mut().unwrap() = tcs.clone();
-        let (buy_change, sell_change) = setup.trigger(2.0, 1000, 1.0, 1000).unwrap();
-        assert_eq!(buy_change.round(), 500);
-        assert_eq!(sell_change.round(), -1000);
 
-        // Overall health went negative, causing the tcs to close (even though max_buy/max_sell aren't reached)
+        let (buy_change, sell_change) = setup.trigger(2.0, 50_000_000, 1.0, 50_000_000).unwrap();
+        assert_eq!(buy_change.round(), 25_000_000);
+        assert_eq!(sell_change.round(), -50_000_000);
+
+        // Not closed yet, health still good
+        assert_eq!(setup.liqee.active_token_conditional_swaps().count(), 1);
+
+        let (buy_change, sell_change) = setup.trigger(2.0, 150_000_000, 1.0, 150_000_000).unwrap();
+        assert_eq!(buy_change.round(), 75_000_000);
+        assert_eq!(sell_change.round(), -150_000_000);
+
+        // Health is 0
         assert_eq!(setup.liqee.active_token_conditional_swaps().count(), 0);
 
-        assert_eq!(setup.liqee_liab_pos().round(), 500);
-        assert_eq!(setup.liqee_asset_pos().round(), -900);
+        assert_eq!(setup.liqee_liab_pos().round(), 100_000_000);
+        assert_eq!(setup.liqee_asset_pos().round(), -100_000_000);
     }
 
     #[test]
     fn test_token_conditional_swap_trigger_fees() {
         let mut setup = TestSetup::new();
+
+        let asset_pos = 100_000_000;
+        setup
+            .asset_bank
+            .data()
+            .deposit(
+                &mut setup.liqee.token_position_mut(0).unwrap().0,
+                I80F48::from(asset_pos),
+                0,
+            )
+            .unwrap();
 
         let tcs = TokenConditionalSwap {
             max_buy: 1000,
@@ -887,7 +911,7 @@ mod tests {
         assert_eq!(sell_change.round(), -1000);
 
         assert_eq!(setup.liqee_liab_pos().round(), 952);
-        assert_eq!(setup.liqee_asset_pos().round(), -1000);
+        assert_eq!(setup.liqee_asset_pos().round(), asset_pos - 1000);
         assert_eq!(setup.liqor_liab_pos().round(), -952);
         assert_eq!(setup.liqor_asset_pos().round(), 923); // floor(952*1.02*0.95)
 
