@@ -263,16 +263,16 @@ pub fn oracle_state_unchecked(
         OracleType::Pyth => {
             let price_account = pyth_sdk_solana::state::load_price_account(data).unwrap();
             let (price_data, last_update_slot) = pyth_get_price(acc_info.key(), price_account);
-            let raw_price = I80F48::from_num(price_data.price);
 
             let decimals = (price_account.expo as i8) + QUOTE_DECIMALS - (base_decimals as i8);
             let decimal_adj = power_of_ten(decimals);
-            let price = raw_price * decimal_adj;
+            let price = I80F48::from_num(price_data.price) * decimal_adj;
+            let deviation = I80F48::from_num(price_data.conf) * decimal_adj;
             require_gte!(price, 0);
             OracleState {
                 price,
                 last_update_slot,
-                deviation: I80F48::from_num(price_data.conf),
+                deviation,
                 oracle_type: OracleType::Pyth,
             }
         }
@@ -283,10 +283,8 @@ pub fn oracle_state_unchecked(
 
             let feed = bytemuck::from_bytes::<AggregatorAccountData>(&data[8..]);
             let feed_result = feed.get_result().map_err(from_foreign_error)?;
-            let price_decimal: f64 = feed_result.try_into().map_err(from_foreign_error)?;
-            let ui_price = I80F48::from_num(price_decimal);
-
-            let std_deviation_decimal: f64 = feed
+            let ui_price: f64 = feed_result.try_into().map_err(from_foreign_error)?;
+            let ui_deviation: f64 = feed
                 .latest_confirmed_round
                 .std_deviation
                 .try_into()
@@ -298,12 +296,13 @@ pub fn oracle_state_unchecked(
 
             let decimals = QUOTE_DECIMALS - (base_decimals as i8);
             let decimal_adj = power_of_ten(decimals);
-            let price = ui_price * decimal_adj;
+            let price = I80F48::from_num(ui_price) * decimal_adj;
+            let deviation = I80F48::from_num(ui_deviation) * decimal_adj;
             require_gte!(price, 0);
             OracleState {
                 price,
                 last_update_slot,
-                deviation: I80F48::from_num(std_deviation_decimal),
+                deviation,
                 oracle_type: OracleType::SwitchboardV2,
             }
         }
@@ -311,13 +310,14 @@ pub fn oracle_state_unchecked(
             let result = FastRoundResultAccountData::deserialize(data).unwrap();
             let ui_price = I80F48::from_num(result.result.result);
 
-            let deviation =
+            let ui_deviation =
                 I80F48::from_num(result.result.max_response - result.result.min_response);
             let last_update_slot = result.result.round_open_slot;
 
             let decimals = QUOTE_DECIMALS - (base_decimals as i8);
             let decimal_adj = power_of_ten(decimals);
             let price = ui_price * decimal_adj;
+            let deviation = ui_deviation * decimal_adj;
             require_gte!(price, 0);
             OracleState {
                 price,
