@@ -1,7 +1,7 @@
 import { AnchorProvider, BN } from '@coral-xyz/anchor';
 import { utf8 } from '@coral-xyz/anchor/dist/cjs/utils/bytes';
 import { OpenOrders, Order, Orderbook } from '@project-serum/serum/lib/market';
-import { AccountInfo, PublicKey, TransactionSignature } from '@solana/web3.js';
+import { AccountInfo, PublicKey } from '@solana/web3.js';
 import { MangoClient } from '../client';
 import { OPENBOOK_PROGRAM_ID, RUST_I64_MAX, RUST_I64_MIN } from '../constants';
 import { I80F48, I80F48Dto, ONE_I80F48, ZERO_I80F48 } from '../numbers/I80F48';
@@ -13,6 +13,7 @@ import {
   toUiDecimalsForQuote,
   toUiSellPerBuyTokenPrice,
 } from '../utils';
+import { MangoSignatureStatus } from '../utils/rpc';
 import { Bank, TokenIndex } from './bank';
 import { Group } from './group';
 import { HealthCache } from './healthCache';
@@ -888,7 +889,7 @@ export class MangoAccount {
   public async serum3SettleFundsForAllMarkets(
     client: MangoClient,
     group: Group,
-  ): Promise<TransactionSignature[]> {
+  ): Promise<MangoSignatureStatus[]> {
     // Future: collect ixs, batch them, and send them in fewer txs
     return await Promise.all(
       this.serum3Active().map((s) => {
@@ -906,7 +907,7 @@ export class MangoAccount {
   public async serum3CancelAllOrdersForAllMarkets(
     client: MangoClient,
     group: Group,
-  ): Promise<TransactionSignature[]> {
+  ): Promise<MangoSignatureStatus[]> {
     // Future: collect ixs, batch them, and send them in in fewer txs
     return await Promise.all(
       this.serum3Active().map((s) => {

@@ -5,16 +5,27 @@ import {
   ComputeBudgetProgram,
   MessageV0,
   Signer,
+  TransactionConfirmationStatus,
+  TransactionError,
   TransactionInstruction,
+  TransactionSignature,
   VersionedTransaction,
 } from '@solana/web3.js';
+
+export interface MangoSignatureStatus {
+  slot: number;
+  confirmations: number | null;
+  err: TransactionError | null;
+  confirmationStatus?: TransactionConfirmationStatus;
+  signature: TransactionSignature;
+}
 
 export async function sendTransaction(
   provider: AnchorProvider,
   ixs: TransactionInstruction[],
   alts: AddressLookupTableAccount[],
   opts: any = {},
-): Promise<string> {
+): Promise<MangoSignatureStatus> {
   const connection = provider.connection;
   const latestBlockhash =
     opts.latestBlockhash ??
@@ -102,7 +113,7 @@ export async function sendTransaction(
     });
   }
 
-  return signature;
+  return { signature, ...status };
 }
 
 export const createComputeBudgetIx = (
