@@ -31,6 +31,9 @@ import {
 import bs58 from 'bs58';
 import chunk from 'lodash/chunk';
 import cloneDeep from 'lodash/cloneDeep';
+import groupBy from 'lodash/groupBy';
+import mapValues from 'lodash/mapValues';
+import maxBy from 'lodash/maxBy';
 import uniq from 'lodash/uniq';
 import { Bank, MintInfo, TokenIndex } from './accounts/bank';
 import { Group } from './accounts/group';
@@ -4214,7 +4217,7 @@ export class MangoClient {
   /**
    * Returns an estimate of a prioritization fee for a set of instructions.
    *
-   * The estimate is based on the exponential moving average of the prioritization fees of accounts that will be involved in the transaction.
+   * The estimate is based on the median fees of writable accounts that will be involved in the transaction.
    *
    * @param ixs - the instructions that make up the transaction
    * @returns prioritizationFeeEstimate -- in microLamports
@@ -4222,43 +4225,42 @@ export class MangoClient {
   public async estimatePrioritizationFee(
     ixs: TransactionInstruction[],
   ): Promise<number> {
-    const accounts = [
-      ...new Set(ixs.map((x) => x.keys.map((k) => k.pubkey)).flat()),
-    ].slice(0, MAX_RECENT_PRIORITY_FEE_ACCOUNTS);
+    const writableAccounts = ixs
+      .map((x) => x.keys.filter((a) => a.isWritable).map((k) => k.pubkey))
+      .flat();
+    const uniqueWritableAccounts = uniq(
+      writableAccounts.map((x) => x.toBase58()),
+    )
+      .map((a) => new PublicKey(a))
+      .slice(0, MAX_RECENT_PRIORITY_FEE_ACCOUNTS);
+
     const priorityFees = await this.connection.getRecentPrioritizationFees({
-      lockedWritableAccounts: accounts,
+      lockedWritableAccounts: uniqueWritableAccounts,
     });
 
-    // get max priority fee per slot (and sort by slot from old to new)
-    const flatFees = priorityFees.flat();
-    const maxFeeBySlot = flatFees.reduce(
-      (
-        acc: Record<number, RecentPrioritizationFees>,
-        fee: RecentPrioritizationFees,
-      ) => {
-        if (
-          !acc[fee.slot] ||
-          fee.prioritizationFee > acc[fee.slot].prioritizationFee
-        ) {
-          acc[fee.slot] = fee;
-        }
-        return acc;
-      },
-      {},
-    );
-    const maximumFees = Object.values(maxFeeBySlot).sort(
-      (a, b) => a.slot - b.slot,
-    );
-
-    // take the EMA
-    const smoothingFactor = 2 / (maximumFees.length + 1);
-    let ema = maximumFees[0].prioritizationFee;
-    for (let i = 1; i < maximumFees.length; i++) {
-      ema =
-        maximumFees[i].prioritizationFee * smoothingFactor +
-        ema * (1 - smoothingFactor);
+    if (priorityFees.length < 1) {
+      return 1;
     }
 
-    return Math.ceil(1.2 * ema);
+    // get max priority fee per slot (and sort by slot from old to new)
+    const maxFeeBySlot = mapValues(groupBy(priorityFees, 'slot'), (items) =>
+      maxBy(items, 'prioritizationFee'),
+    );
+    const maximumFees = Object.values(maxFeeBySlot).sort(
+      (a: RecentPrioritizationFees, b: RecentPrioritizationFees) =>
+        a.slot - b.slot,
+    ) as RecentPrioritizationFees[];
+
+    // get median of last 20 fees
+    const recentFees = maximumFees.slice(Math.max(maximumFees.length - 20, 0));
+    const mid = Math.floor(recentFees.length / 2);
+    const medianFee =
+      recentFees.length % 2 !== 0
+        ? recentFees[mid].prioritizationFee
+        : (recentFees[mid - 1].prioritizationFee +
+            recentFees[mid].prioritizationFee) /
+          2;
+
+    return Math.max(1, Math.ceil(medianFee));
   }
 }
