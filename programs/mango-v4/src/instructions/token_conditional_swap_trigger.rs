@@ -123,15 +123,7 @@ fn trade_amount(
     sell_bank: &Bank,
 ) -> (u64, u64) {
     let max_buy = max_buy_token_to_liqee
-        .min(tcs.remaining_buy())
-        .min(
-            if tcs.allow_creating_deposits() && !buy_bank.are_deposits_reduce_only() {
-                u64::MAX
-            } else {
-                // ceil() because we're ok reaching 0..1 deposited native tokens
-                (-liqee_buy_balance).ceil().clamp_to_u64()
-            },
-        )
+        .min(tcs.max_buy_for_position(liqee_buy_balance, buy_bank))
         .min(if buy_bank.are_borrows_reduce_only() {
             // floor() so we never go below 0
             liqor_buy_balance.floor().clamp_to_u64()
@@ -139,15 +131,7 @@ fn trade_amount(
             u64::MAX
         });
     let max_sell = max_sell_token_to_liqor
-        .min(tcs.remaining_sell())
-        .min(
-            if tcs.allow_creating_borrows() && !sell_bank.are_borrows_reduce_only() {
-                u64::MAX
-            } else {
-                // floor() so we never go below 0
-                liqee_sell_balance.floor().clamp_to_u64()
-            },
-        )
+        .min(tcs.max_sell_for_position(liqee_sell_balance, sell_bank))
         .min(if sell_bank.are_deposits_reduce_only() {
             // ceil() because we're ok reaching 0..1 deposited native tokens
             (-liqor_sell_balance).ceil().clamp_to_u64()

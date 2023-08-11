@@ -6,6 +6,7 @@ use num_enum::{IntoPrimitive, TryFromPrimitive};
 use static_assertions::const_assert_eq;
 use std::mem::size_of;
 
+use crate::i80f48::ClampToInt;
 use crate::state::*;
 
 #[derive(
@@ -198,5 +199,35 @@ impl TokenConditionalSwap {
 
     pub fn price_in_range(&self, price: f64) -> bool {
         price >= self.price_lower_limit && price <= self.price_upper_limit
+    }
+
+    /// The remaining buy amount, taking the current buy token position and
+    /// buy bank's reduce-only status into account.
+    ///
+    /// Note that the account health might further restrict execution.
+    pub fn max_buy_for_position(&self, buy_position: I80F48, buy_bank: &Bank) -> u64 {
+        self.remaining_buy().min(
+            if self.allow_creating_deposits() && !buy_bank.are_deposits_reduce_only() {
+                u64::MAX
+            } else {
+                // ceil() because we're ok reaching 0..1 deposited native tokens
+                (-buy_position).ceil().clamp_to_u64()
+            },
+        )
+    }
+
+    /// The remaining sell amount, taking the current sell token position and
+    /// sell bank's reduce-only status into account.
+    ///
+    /// Note that the account health might further restrict execution.
+    pub fn max_sell_for_position(&self, sell_position: I80F48, sell_bank: &Bank) -> u64 {
+        self.remaining_sell().min(
+            if self.allow_creating_borrows() && !sell_bank.are_borrows_reduce_only() {
+                u64::MAX
+            } else {
+                // floor() so we never go below 0
+                sell_position.floor().clamp_to_u64()
+            },
+        )
     }
 }
