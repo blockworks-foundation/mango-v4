@@ -35,6 +35,37 @@
 <span id="35">35</span>
 <span id="36">36</span>
 <span id="37">37</span>
+<span id="38">38</span>
+<span id="39">39</span>
+<span id="40">40</span>
+<span id="41">41</span>
+<span id="42">42</span>
+<span id="43">43</span>
+<span id="44">44</span>
+<span id="45">45</span>
+<span id="46">46</span>
+<span id="47">47</span>
+<span id="48">48</span>
+<span id="49">49</span>
+<span id="50">50</span>
+<span id="51">51</span>
+<span id="52">52</span>
+<span id="53">53</span>
+<span id="54">54</span>
+<span id="55">55</span>
+<span id="56">56</span>
+<span id="57">57</span>
+<span id="58">58</span>
+<span id="59">59</span>
+<span id="60">60</span>
+<span id="61">61</span>
+<span id="62">62</span>
+<span id="63">63</span>
+<span id="64">64</span>
+<span id="65">65</span>
+<span id="66">66</span>
+<span id="67">67</span>
+<span id="68">68</span>
 </pre><pre class="rust"><code><span class="kw">use crate</span>::{AccountFetcher, MangoGroupContext};
 <span class="kw">use </span>anyhow::Context;
 <span class="kw">use </span>futures::{stream, StreamExt, TryStreamExt};
@@ -64,6 +95,37 @@
 
     <span class="kw">let </span>retriever = FixedOrderAccountRetriever {
         ais: accounts<span class="question-mark">?</span>,
+        n_banks: active_token_len,
+        n_perps: active_perp_len,
+        begin_perp: active_token_len * <span class="number">2</span>,
+        begin_serum3: active_token_len * <span class="number">2 </span>+ active_perp_len * <span class="number">2</span>,
+        staleness_slot: <span class="prelude-val">None</span>,
+    };
+    mango_v4::health::new_health_cache(<span class="kw-2">&amp;</span>account.borrow(), <span class="kw-2">&amp;</span>retriever).context(<span class="string">&quot;make health cache&quot;</span>)
+}
+
+<span class="kw">pub fn </span>new_sync(
+    context: <span class="kw-2">&amp;</span>MangoGroupContext,
+    account_fetcher: <span class="kw-2">&amp;</span><span class="kw">crate</span>::chain_data::AccountFetcher,
+    account: <span class="kw-2">&amp;</span>MangoAccountValue,
+) -&gt; anyhow::Result&lt;HealthCache&gt; {
+    <span class="kw">let </span>active_token_len = account.active_token_positions().count();
+    <span class="kw">let </span>active_perp_len = account.active_perp_positions().count();
+
+    <span class="kw">let </span>metas =
+        context.derive_health_check_remaining_account_metas(account, <span class="macro">vec!</span>[], <span class="macro">vec!</span>[], <span class="macro">vec!</span>[])<span class="question-mark">?</span>;
+    <span class="kw">let </span>accounts = metas
+        .iter()
+        .map(|meta| {
+            <span class="prelude-val">Ok</span>(KeyedAccountSharedData::new(
+                meta.pubkey,
+                account_fetcher.fetch_raw(<span class="kw-2">&amp;</span>meta.pubkey)<span class="question-mark">?</span>,
+            ))
+        })
+        .collect::&lt;anyhow::Result&lt;Vec&lt;<span class="kw">_</span>&gt;&gt;&gt;()<span class="question-mark">?</span>;
+
+    <span class="kw">let </span>retriever = FixedOrderAccountRetriever {
+        ais: accounts,
         n_banks: active_token_len,
         n_perps: active_perp_len,
         begin_perp: active_token_len * <span class="number">2</span>,
