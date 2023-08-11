@@ -3177,13 +3177,13 @@
         <span class="prelude-val">Ok</span>(ix)
     }
 
-    <span class="kw">pub async fn </span>token_conditional_swap_trigger(
+    <span class="kw">pub async fn </span>token_conditional_swap_trigger_instruction(
         <span class="kw-2">&amp;</span><span class="self">self</span>,
         liqee: (<span class="kw-2">&amp;</span>Pubkey, <span class="kw-2">&amp;</span>MangoAccountValue),
         token_conditional_swap_id: u64,
         max_buy_token_to_liqee: u64,
         max_sell_token_to_liqor: u64,
-    ) -&gt; anyhow::Result&lt;Signature&gt; {
+    ) -&gt; anyhow::Result&lt;Instruction&gt; {
         <span class="kw">let </span>(tcs_index, tcs) = liqee
             .<span class="number">1
             </span>.token_conditional_swap_by_id(token_conditional_swap_id)<span class="question-mark">?</span>;
@@ -3221,8 +3221,8 @@
                 },
             ),
         };
-        <span class="self">self</span>.send_and_confirm_owner_tx(<span class="macro">vec!</span>[ix]).<span class="kw">await
-    </span>}
+        <span class="prelude-val">Ok</span>(ix)
+    }
 
     <span class="comment">// health region
 
