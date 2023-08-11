@@ -1258,13 +1258,13 @@ impl MangoClient {
         Ok(ix)
     }
 
-    pub async fn token_conditional_swap_trigger(
+    pub async fn token_conditional_swap_trigger_instruction(
         &self,
         liqee: (&Pubkey, &MangoAccountValue),
         token_conditional_swap_id: u64,
         max_buy_token_to_liqee: u64,
         max_sell_token_to_liqor: u64,
-    ) -> anyhow::Result<Signature> {
+    ) -> anyhow::Result<Instruction> {
         let (tcs_index, tcs) = liqee
             .1
             .token_conditional_swap_by_id(token_conditional_swap_id)?;
@@ -1302,7 +1302,7 @@ impl MangoClient {
                 },
             ),
         };
-        self.send_and_confirm_owner_tx(vec![ix]).await
+        Ok(ix)
     }
 
     // health region
