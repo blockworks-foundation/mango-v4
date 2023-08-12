@@ -872,7 +872,7 @@ export class MangoClient {
   private async getMangoAccountFromPk(
     mangoAccountPk: PublicKey,
   ): Promise<MangoAccount> {
-    return await this.getMangoAccountFromAi(
+    return this.getMangoAccountFromAi(
       mangoAccountPk,
       (await this.program.provider.connection.getAccountInfo(
         mangoAccountPk,
@@ -880,10 +880,10 @@ export class MangoClient {
     );
   }
 
-  public async getMangoAccountFromAi(
+  public getMangoAccountFromAi(
     mangoAccountPk: PublicKey,
     ai: AccountInfo<Buffer>,
-  ): Promise<MangoAccount> {
+  ): MangoAccount {
     const decodedMangoAccount = this.program.coder.accounts.decode(
       'mangoAccount',
       ai.data,
