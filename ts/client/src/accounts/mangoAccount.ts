@@ -1841,6 +1841,14 @@ export class TokenConditionalSwap {
     return this.expiryTimestamp.toNumber();
   }
 
+  // TODO: will be replaced by onchain enum in next release
+  private getTokenConditionalSwapDisplayPriceStyle(): boolean {
+    if (this.maxSell.eq(U64_MAX_BN)) {
+      true;
+    }
+    return false;
+  }
+
   private priceLimitToUi(
     group: Group,
     sellTokenPerBuyTokenNative: number,
@@ -1858,7 +1866,7 @@ export class TokenConditionalSwap {
     // buytoken/selltoken or selltoken/buytoken
 
     // Buy limit / close short
-    if (this.maxSell.eq(U64_MAX_BN)) {
+    if (this.getTokenConditionalSwapDisplayPriceStyle()) {
       return roundTo5(sellTokenPerBuyTokenUi);
     }
 
@@ -1889,6 +1897,29 @@ export class TokenConditionalSwap {
       return this.getPriceLowerLimitUi(group);
     }
     return this.getPriceUpperLimitUi(group);
+  }
+
+  getCurrentPairPriceUi(group: Group): number {
+    const buyBank = this.getBuyToken(group);
+    const sellBank = this.getSellToken(group);
+    const sellTokenPerBuyTokenUi = toUiSellPerBuyTokenPrice(
+      buyBank.price.div(sellBank.price).toNumber(),
+      sellBank,
+      buyBank,
+    );
+
+    // Below are workarounds to know when to show an inverted price in ui
+    // We want to identify if the pair user is wanting to trade is
+    // buytoken/selltoken or selltoken/buytoken
+
+    // Buy limit / close short
+    if (this.getTokenConditionalSwapDisplayPriceStyle()) {
+      return roundTo5(sellTokenPerBuyTokenUi);
+    }
+
+    // Stop loss / take profit
+    const buyTokenPerSellTokenUi = 1 / sellTokenPerBuyTokenUi;
+    return roundTo5(buyTokenPerSellTokenUi);
   }
 
   getPricePremium(): number {
