@@ -430,7 +430,7 @@ export class Group {
       const stubOracle = coder.decode('stubOracle', ai.data);
       price = new I80F48(stubOracle.price.val);
       uiPrice = this.toUiPrice(price, baseDecimals);
-      lastUpdatedSlot = stubOracle.lastUpdated.val;
+      lastUpdatedSlot = stubOracle.lastUpdateSlot.toNumber();
       provider = OracleProvider.Stub;
     } else if (isPythOracle(ai)) {
       const priceData = parsePriceData(ai.data);
