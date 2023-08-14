@@ -41,11 +41,7 @@ fn tcs_is_in_price_range(
     let buy_token_price = account_fetcher.fetch_bank_price(&buy_bank)?;
     let sell_token_price = account_fetcher.fetch_bank_price(&sell_bank)?;
     let base_price = (buy_token_price / sell_token_price).to_num();
-    if !tcs.price_in_range(base_price) {
-        return Ok(false);
-    }
-
-    return Ok(true);
+    Ok(tcs.price_in_range(base_price))
 }
 
 fn tcs_has_plausible_premium(
@@ -440,7 +436,9 @@ fn tcs_max_liqee_execution(
     // just assume it'll be fully margined here
     let max_buy = max_buy_ignoring_net_borrows.min(available_buy_borrows);
 
-    let sell_borrows = (I80F48::from(max_sell_ignoring_net_borrows) - sell_position).clamp_to_u64();
+    let sell_borrows = (I80F48::from(max_sell_ignoring_net_borrows)
+        - sell_position.max(I80F48::ZERO))
+    .clamp_to_u64();
     let max_sell =
         max_sell_ignoring_net_borrows - sell_borrows + sell_borrows.min(available_sell_borrows);
 

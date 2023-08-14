@@ -7,9 +7,8 @@ use anchor_client::Cluster;
 use clap::Parser;
 use mango_v4::state::{PerpMarketIndex, TokenIndex};
 use mango_v4_client::{
-    account_update_stream, chain_data, keypair_from_cli, snapshot_source, websocket_source,
-    AsyncChannelSendUnlessFull, Client, MangoClient, MangoClientError, MangoGroupContext,
-    TransactionBuilderConfig,
+    account_update_stream, chain_data, keypair_from_cli, snapshot_source, websocket_source, Client,
+    MangoClient, MangoClientError, MangoGroupContext, TransactionBuilderConfig,
 };
 
 use itertools::Itertools;
@@ -25,7 +24,7 @@ pub mod token_swap_info;
 pub mod trigger_tcs;
 pub mod util;
 
-use crate::util::{is_mango_account, is_mango_bank, is_mint_info, is_perp_market};
+use crate::util::{is_mango_account, is_mint_info, is_perp_market};
 
 // jemalloc seems to be better at keeping the memory footprint reasonable over
 // longer periods of time
@@ -317,9 +316,6 @@ async fn main() -> anyhow::Result<()> {
         last_persistent_error_report: Instant::now(),
     });
 
-    let (liquidation_trigger_sender, liquidation_trigger_receiver) =
-        async_channel::bounded::<()>(1);
-
     info!("main loop");
 
     // Job to update chain_data and notify the liquidation job when a new check is needed.
@@ -359,29 +355,6 @@ async fn main() -> anyhow::Result<()> {
                             // Track all MangoAccounts: we need to iterate over them later
                             state.mango_accounts.insert(account_write.pubkey);
                             metric_mango_accounts.set(state.mango_accounts.len() as u64);
-
-                            if !state.health_check_all {
-                                state.health_check_accounts.push(account_write.pubkey);
-                            }
-                            liquidation_trigger_sender.send_unless_full(()).unwrap();
-                        } else {
-                            let mut must_check_all = false;
-                            if is_mango_bank(&account_write.account, &mango_group).is_some() {
-                                debug!("change to bank {}", &account_write.pubkey);
-                                must_check_all = true;
-                            }
-                            if is_perp_market(&account_write.account, &mango_group).is_some() {
-                                debug!("change to perp market {}", &account_write.pubkey);
-                                must_check_all = true;
-                            }
-                            if oracles.contains(&account_write.pubkey) {
-                                debug!("change to oracle {}", &account_write.pubkey);
-                                must_check_all = true;
-                            }
-                            if must_check_all {
-                                state.health_check_all = true;
-                                liquidation_trigger_sender.send_unless_full(()).unwrap();
-                            }
                         }
                     }
                     Message::Snapshot(snapshot) => {
@@ -404,9 +377,6 @@ async fn main() -> anyhow::Result<()> {
                         metric_mango_accounts.set(state.mango_accounts.len() as u64);
 
                         state.one_snapshot_done = true;
-                        state.health_check_all = true;
-
-                        liquidation_trigger_sender.send_unless_full(()).unwrap();
                     }
                     _ => {}
                 }
@@ -438,25 +408,20 @@ async fn main() -> anyhow::Result<()> {
     });
 
     let liquidation_job = tokio::spawn({
+        // TODO: configurable interval
+        let mut interval = tokio::time::interval(Duration::from_secs(5));
         let shared_state = shared_state.clone();
         async move {
             loop {
-                liquidation_trigger_receiver.recv().await.unwrap();
+                interval.tick().await;
 
-                let account_addresses;
-                {
-                    let mut state = shared_state.write().unwrap();
+                let account_addresses = {
+                    let state = shared_state.write().unwrap();
                     if !state.one_snapshot_done {
                         continue;
                     }
-                    account_addresses = if state.health_check_all {
-                        state.mango_accounts.iter().cloned().collect()
-                    } else {
-                        state.health_check_accounts.clone()
-                    };
-                    state.health_check_all = false;
-                    state.health_check_accounts = vec![];
-                }
+                    state.mango_accounts.iter().cloned().collect_vec()
+                };
 
                 liquidation.log_persistent_errors();
 
@@ -482,10 +447,12 @@ async fn main() -> anyhow::Result<()> {
         let shared_state = shared_state.clone();
         async move {
             loop {
-                interval.tick().await;
+                min_delay.tick().await;
                 if !shared_state.read().unwrap().one_snapshot_done {
                     continue;
                 }
+
+                interval.tick().await;
                 let token_indexes = token_swap_info_updater
                     .mango_client()
                     .context
@@ -499,8 +466,7 @@ async fn main() -> anyhow::Result<()> {
                         Ok(()) => {}
                         Err(err) => {
                             warn!(
-                                "failed to update token swap info for token {token_index}: {:?}",
-                                err
+                                "failed to update token swap info for token {token_index}: {err:?}",
                             );
                         }
                     }
@@ -540,12 +506,6 @@ struct SharedState {
 
     /// Is the first snapshot done? Only start checking account health when it is.
     one_snapshot_done: bool,
-
-    /// Accounts whose health might have changed
-    health_check_accounts: Vec<Pubkey>,
-
-    /// Check all accounts?
-    health_check_all: bool,
 }
 
 #[derive(Clone)]
