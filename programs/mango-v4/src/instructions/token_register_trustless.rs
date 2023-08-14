@@ -32,7 +32,7 @@ pub fn token_register_trustless(
         oracle: ctx.accounts.oracle.key(),
         oracle_config: OracleConfig {
             conf_filter: I80F48::from_num(0.10),
-            max_staleness_slots: 600,
+            max_staleness_slots: 10000,
             reserved: [0; 72],
         },
         stable_price_model: StablePriceModel::default(),
