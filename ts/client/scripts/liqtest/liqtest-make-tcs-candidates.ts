@@ -1,5 +1,6 @@
 import { AnchorProvider, BN, Wallet } from '@coral-xyz/anchor';
 import { Cluster, Connection, Keypair, PublicKey } from '@solana/web3.js';
+import * as splToken from '@solana/spl-token';
 import fs from 'fs';
 import { Bank } from '../../src/accounts/bank';
 import {
@@ -11,6 +12,7 @@ import { PerpMarket } from '../../src/accounts/perp';
 import { Builder } from '../../src/builder';
 import { MangoClient } from '../../src/client';
 import {
+  DefaultTokenRegisterParams,
   NullPerpEditParams,
   NullTokenEditParams,
 } from '../../src/clientIxParamBuilder';
@@ -33,7 +35,7 @@ const PRICES = {
 
 const TOKEN_SCENARIOS: [string, [string, number][], [string, number][]][] = [
   [
-    'LIQTEST, FUNDING',
+    'TCS, FUNDING',
     [
       ['USDC', 5000000],
       ['ETH', 100000],
@@ -41,10 +43,11 @@ const TOKEN_SCENARIOS: [string, [string, number][], [string, number][]][] = [
     ],
     [],
   ],
-  ['LIQTEST, LIQOR', [['USDC', 1000000]], []],
-  ['LIQTEST, LIQEE1', [['USDC', 1000]], []],
-  ['LIQTEST, LIQEE2', [['USDC', 1000000]], []],
-  ['LIQTEST, LIQEE3', [['USDC', 1000000]], []],
+  ['TCS, LIQOR', [['USDC', 1000000]], []],
+  ['TCS, HEALTH', [['USDC', 1000]], []],
+  ['TCS, FULL+CLOSE', [['USDC', 1000000]], []],
+  ['TCS, EXPIRE', [['USDC', 1000000]], []],
+  ['TCS, NET-BORROW', [['USDC', 10000000]], []],
 ];
 
 async function main() {
@@ -172,9 +175,8 @@ async function main() {
   // Case LIQEE1: The liqee does not have enough health for the tcs
   {
     const account = ensure(
-      accounts2.find((account) => account.name == 'LIQTEST, LIQEE1'),
+      accounts2.find((account) => account.name == 'TCS, HEALTH'),
     );
-    await client.accountExpandV2(group, account, 4, 4, 4, 4, 4);
     await client.tokenConditionalSwapCreateRaw(
       group,
       account,
@@ -196,9 +198,8 @@ async function main() {
   // Case LIQEE2: Full execution - tcs closes afterward
   {
     const account = ensure(
-      accounts2.find((account) => account.name == 'LIQTEST, LIQEE2'),
+      accounts2.find((account) => account.name == 'TCS, FULL+CLOSE'),
     );
-    await client.accountExpandV2(group, account, 4, 4, 4, 4, 4);
     await client.tokenConditionalSwapCreateRaw(
       group,
       account,
@@ -220,9 +221,8 @@ async function main() {
   // Case LIQEE3: Create a tcs that will expire very soon
   {
     const account = ensure(
-      accounts2.find((account) => account.name == 'LIQTEST, LIQEE3'),
+      accounts2.find((account) => account.name == 'TCS, EXPIRE'),
     );
-    await client.accountExpandV2(group, account, 4, 4, 4, 4, 4);
     await client.tokenConditionalSwapCreateRaw(
       group,
       account,
@@ -231,6 +231,76 @@ async function main() {
       new BN(1000),
       new BN(1000),
       Date.now() / 1000 + 15, // expire in 15s
+      0.0,
+      1000000.0,
+      0.01,
+      true,
+      true,
+      TokenConditionalSwapDisplayPriceStyle.buyTokenPerSellToken,
+      TokenConditionalSwapIntention.unknown,
+    );
+  }
+
+  // Case LIQEE4: Create a tcs that hits net borrow limits
+  {
+    const account = ensure(
+      accounts2.find((account) => account.name == 'TCS, NET-BORROW'),
+    );
+
+    // To do this, first make a new mint and register it as a new token with tight net borrow limits
+    const newMint = await splToken.createMint(
+      connection,
+      admin,
+      admin.publicKey,
+      null,
+      6,
+    );
+    const tokenAccount = await splToken.createAssociatedTokenAccountIdempotent(
+      connection,
+      admin,
+      newMint,
+      admin.publicKey,
+    );
+    await splToken.mintTo(
+      connection,
+      admin,
+      newMint,
+      tokenAccount,
+      admin,
+      1e15,
+    );
+
+    await client.stubOracleCreate(group, newMint, 1.0);
+    const newOracle = (await client.getStubOracle(group, newMint))[0];
+    const newTokenIndex = Math.max(...group.banksMapByTokenIndex.keys()) + 1;
+    await client.tokenRegister(
+      group,
+      newMint,
+      newOracle.publicKey,
+      newTokenIndex,
+      'TMP',
+      {
+        ...DefaultTokenRegisterParams,
+        loanOriginationFeeRate: 0,
+        loanFeeRate: 0,
+        initAssetWeight: 1,
+        maintAssetWeight: 1,
+        initLiabWeight: 1,
+        maintLiabWeight: 1,
+        liquidationFee: 0,
+        netBorrowLimitPerWindowQuote: 1500000, // less than the $2 of the tcs
+      },
+    );
+    await group.reloadAll(client);
+
+    await client.tokenConditionalSwapCreateRaw(
+      group,
+      account,
+      newMint,
+      MINTS.get('USDC')!,
+      new BN(2000000), // $2
+      new BN(2000000),
+      null,
       0.0,
       1000000.0,
       0.01,
