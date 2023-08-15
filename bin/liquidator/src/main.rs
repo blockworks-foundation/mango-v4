@@ -509,14 +509,14 @@ struct SharedState {
 }
 
 #[derive(Clone)]
-struct AccountErrorState {
+pub struct AccountErrorState {
     pub messages: Vec<String>,
     pub count: u64,
     pub last_at: Instant,
 }
 
 #[derive(Default)]
-struct ErrorTracking {
+pub struct ErrorTracking {
     accounts: HashMap<Pubkey, AccountErrorState>,
     skip_threshold: u64,
     skip_duration: Duration,
@@ -745,103 +745,35 @@ impl LiquidationState {
             return Ok(());
         }
 
-        // Repeatedly pick one randomly (volume-weighted) and try to execute
-        use rand::distributions::{Distribution, WeightedIndex};
-        let weights = interesting_tcs.iter().map(|(_, _, volume)| {
-            (*volume)
-                .min(self.trigger_tcs_config.max_trigger_quote_amount)
-                .max(1)
-        });
-        let mut dist = WeightedIndex::new(weights).unwrap();
-        let mut took_one = false;
-        for i in 0..interesting_tcs.len() {
-            let (pubkey, tcs_id, _) = {
-                let mut rng = rand::thread_rng();
-                let sample = dist.sample(&mut rng);
-                if i != interesting_tcs.len() - 1 {
-                    // Would error if we updated the last weight to 0
-                    dist.update_weights(&[(sample, &0)])?;
-                }
-                &interesting_tcs[sample]
-            };
+        let job_context = trigger_tcs::JobContext {
+            mango_client: self.mango_client.clone(),
+            account_fetcher: self.account_fetcher.clone(),
+            token_swap_info: self.token_swap_info.clone(),
+            config: self.trigger_tcs_config.clone(),
+        };
+        let (txsigs, mut changed_pubkeys) = job_context
+            .execute_tcs(&mut interesting_tcs, &mut self.tcs_execution_errors)
+            .await;
+        changed_pubkeys.push(self.mango_client.mango_account_address);
 
-            if self
-                .maybe_take_conditional_swap_and_log_error(pubkey, *tcs_id)
-                .await
-                .unwrap_or(false)
-            {
-                took_one = true;
-                break;
-            }
-        }
-
-        if !took_one {
-            return Ok(());
+        // Force a refresh of affected accounts
+        let slot = self.account_fetcher.transaction_max_slot(&txsigs).await?;
+        if let Err(e) = self
+            .account_fetcher
+            .refresh_accounts_via_rpc_until_slot(
+                &changed_pubkeys,
+                slot,
+                self.liquidation_config.refresh_timeout,
+            )
+            .await
+        {
+            info!(slot, "could not refresh after tcs execution: {}", e);
         }
 
         if let Err(err) = self.rebalancer.zero_all_non_quote().await {
             error!("failed to rebalance liqor: {:?}", err);
         }
         Ok(())
-    }
-
-    async fn maybe_take_conditional_swap_and_log_error(
-        &mut self,
-        pubkey: &Pubkey,
-        tcs_id: u64,
-    ) -> anyhow::Result<bool> {
-        let now = Instant::now();
-        let error_tracking = &mut self.tcs_execution_errors;
-
-        // Skip a pubkey if there've been too many errors recently
-        if let Some(error_entry) = error_tracking.had_too_many_errors(pubkey, now) {
-            trace!(
-                "skip checking for tcs on account {pubkey}, had {} errors recently",
-                error_entry.count
-            );
-            return Ok(false);
-        }
-
-        let result = trigger_tcs::maybe_execute_token_conditional_swap(
-            &self.mango_client,
-            &self.account_fetcher,
-            &self.token_swap_info,
-            pubkey,
-            tcs_id,
-            &self.trigger_tcs_config,
-        )
-        .await;
-
-        if let Err(err) = result.as_ref() {
-            // Keep track of pubkeys that had errors
-            error_tracking.record_error(pubkey, now, err.to_string());
-
-            // Not all errors need to be raised to the user's attention.
-            let mut is_error = true;
-
-            // Simulation errors due to liqee precondition failures
-            // will commonly happen if our liquidator is late or if there are chain forks.
-            match err.downcast_ref::<MangoClientError>() {
-                Some(MangoClientError::SendTransactionPreflightFailure { logs, .. }) => {
-                    if logs
-                        .iter()
-                        .any(|line| line.contains("TokenConditionalSwapPriceNotInRange"))
-                    {
-                        is_error = false;
-                    }
-                }
-                _ => {}
-            };
-            if is_error {
-                error!("token conditional swap on account {}: {:?}", pubkey, err);
-            } else {
-                trace!("token conditional swap on account {}: {:?}", pubkey, err);
-            }
-        } else {
-            error_tracking.clear_errors(pubkey);
-        }
-
-        result
     }
 
     fn log_persistent_errors(&mut self) {

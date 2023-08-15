@@ -1,5 +1,10 @@
-use std::time::Duration;
+use std::{
+    pin::Pin,
+    sync::Arc,
+    time::{Duration, Instant},
+};
 
+use futures_core::Future;
 use itertools::Itertools;
 use mango_v4::{
     i80f48::ClampToInt,
@@ -7,10 +12,11 @@ use mango_v4::{
 };
 use mango_v4_client::{chain_data, health_cache, JupiterSwapMode, MangoClient, MangoGroupContext};
 
+use solana_sdk::signature::Signature;
 use tracing::*;
 use {anyhow::Context, fixed::types::I80F48, solana_sdk::pubkey::Pubkey};
 
-use crate::{token_swap_info, util};
+use crate::{token_swap_info, util, ErrorTracking};
 
 /// When computing the max possible swap for a liqee, assume the price is this fraction worse for them.
 ///
@@ -23,6 +29,7 @@ const SLIPPAGE_BUFFER: f64 = 0.01; // 1%
 /// borrows are exhausted.
 const NET_BORROW_EXECUTION_THRESHOLD: u64 = 1_000_000; // 1 USD
 
+#[derive(Clone)]
 pub struct Config {
     pub min_health_ratio: f64,
     pub max_trigger_quote_amount: u64,
@@ -93,12 +100,12 @@ async fn maybe_execute_token_conditional_swap_inner(
     tcs_id: u64,
     config: &Config,
     now_ts: u64,
-) -> anyhow::Result<bool> {
+) -> anyhow::Result<Option<Signature>> {
     let health_cache = health_cache::new(&mango_client.context, account_fetcher, &liqee_old)
         .await
         .context("creating health cache 1")?;
     if health_cache.is_liquidatable() {
-        return Ok(false);
+        return Ok(None);
     }
 
     // get a fresh account and re-check the tcs and health
@@ -113,14 +120,14 @@ async fn maybe_execute_token_conditional_swap_inner(
             now_ts,
         )?
     {
-        return Ok(false);
+        return Ok(None);
     }
 
     let health_cache = health_cache::new(&mango_client.context, account_fetcher, &liqee)
         .await
         .context("creating health cache 1")?;
     if health_cache.is_liquidatable() {
-        return Ok(false);
+        return Ok(None);
     }
 
     execute_token_conditional_swap(mango_client, account_fetcher, pubkey, config, &liqee, tcs).await
@@ -135,7 +142,7 @@ async fn execute_token_conditional_swap(
     config: &Config,
     liqee: &MangoAccountValue,
     tcs: &TokenConditionalSwap,
-) -> anyhow::Result<bool> {
+) -> anyhow::Result<Option<Signature>> {
     let liqor_min_health_ratio = I80F48::from_num(config.min_health_ratio);
 
     // Compute the max viable swap (for liqor and liqee) and min it
@@ -159,7 +166,7 @@ async fn execute_token_conditional_swap(
     let (liqee_max_buy, liqee_max_sell) =
         match tcs_max_liqee_execution(liqee, mango_client, account_fetcher, tcs)? {
             Some(v) => v,
-            None => return Ok(false),
+            None => return Ok(None),
         };
     let max_sell_token_to_liqor = liqee_max_sell;
 
@@ -182,7 +189,7 @@ async fn execute_token_conditional_swap(
     .min(liqee_max_buy);
 
     if max_sell_token_to_liqor == 0 || max_buy_token_to_liqee == 0 {
-        return Ok(false);
+        return Ok(None);
     }
 
     // Final check of the reverse trade on jupiter
@@ -221,7 +228,7 @@ async fn execute_token_conditional_swap(
                 tcs_taker_price = %taker_price,
                 "skipping token conditional swap because of prices",
             );
-            return Ok(false);
+            return Ok(None);
         }
     }
 
@@ -250,19 +257,7 @@ async fn execute_token_conditional_swap(
         "Executed token conditional swap",
     );
 
-    let slot = account_fetcher.transaction_max_slot(&[txsig]).await?;
-    if let Err(e) = account_fetcher
-        .refresh_accounts_via_rpc_until_slot(
-            &[*pubkey, mango_client.mango_account_address],
-            slot,
-            config.refresh_timeout,
-        )
-        .await
-    {
-        info!(%txsig, "could not refresh after tcs execution: {}", e);
-    }
-
-    Ok(true)
+    Ok(Some(txsig))
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -272,7 +267,7 @@ pub async fn remove_expired_token_conditional_swap(
     pubkey: &Pubkey,
     liqee: &MangoAccountValue,
     tcs_id: u64,
-) -> anyhow::Result<bool> {
+) -> anyhow::Result<Option<Signature>> {
     let ix = mango_client
         .token_conditional_swap_trigger_instruction((pubkey, &liqee), tcs_id, 0, 0)
         .await?;
@@ -282,18 +277,18 @@ pub async fn remove_expired_token_conditional_swap(
         "Removed expired token conditional swap",
     );
 
-    Ok(true)
+    Ok(Some(txsig))
 }
 
 #[allow(clippy::too_many_arguments)]
-pub async fn maybe_execute_token_conditional_swap(
+async fn maybe_execute_token_conditional_swap(
     mango_client: &MangoClient,
     account_fetcher: &chain_data::AccountFetcher,
     token_swap_info: &token_swap_info::TokenSwapInfoUpdater,
     pubkey: &Pubkey,
     tcs_id: u64,
     config: &Config,
-) -> anyhow::Result<bool> {
+) -> anyhow::Result<Option<Signature>> {
     let now_ts: u64 = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)?
         .as_secs()
@@ -485,4 +480,162 @@ pub fn find_interesting_tcs_for_account(
         }
     });
     Ok(interesting_tcs.collect_vec())
+}
+
+#[derive(Clone)]
+pub struct JobContext {
+    pub mango_client: Arc<MangoClient>,
+    pub account_fetcher: Arc<chain_data::AccountFetcher>,
+    pub token_swap_info: Arc<token_swap_info::TokenSwapInfoUpdater>,
+    pub config: Config,
+}
+
+pub struct ExecutionResult {
+    pub pubkey: Pubkey,
+    pub volume: u64,
+    pub txsig_result: anyhow::Result<Option<Signature>>,
+}
+
+impl JobContext {
+    fn maybe_execute(
+        &self,
+        pubkey: &Pubkey,
+        tcs_id: u64,
+        volume: u64,
+        error_tracking: &ErrorTracking,
+    ) -> Option<Pin<Box<dyn Future<Output = ExecutionResult> + Send>>> {
+        // Skip a pubkey if there've been too many errors recently
+        if let Some(error_entry) = error_tracking.had_too_many_errors(pubkey, Instant::now()) {
+            trace!(
+                "skip checking for tcs on account {pubkey}, had {} errors recently",
+                error_entry.count
+            );
+            return None;
+        }
+
+        let context = self.clone();
+        let pubkey = pubkey.clone();
+        let job = async move {
+            ExecutionResult {
+                pubkey,
+                volume,
+                txsig_result: maybe_execute_token_conditional_swap(
+                    &context.mango_client,
+                    &context.account_fetcher,
+                    &context.token_swap_info,
+                    &pubkey,
+                    tcs_id,
+                    &context.config,
+                )
+                .await,
+            }
+        };
+        Some(Box::pin(job))
+    }
+
+    /// Runs tcs jobs in parallel
+    ///
+    /// Will run jobs until either the max_trigger_quote_amount is exhausted or
+    /// max_completed jobs have been run.
+    pub async fn execute_tcs(
+        &self,
+        tcs: &mut Vec<(Pubkey, u64, u64)>,
+        error_tracking: &mut ErrorTracking,
+    ) -> (Vec<Signature>, Vec<Pubkey>) {
+        use rand::distributions::{Distribution, WeightedError, WeightedIndex};
+        let now = Instant::now();
+
+        let max_volume = self.config.max_trigger_quote_amount;
+        let mut pending_volume = 0;
+        let mut completed_volume = 0;
+
+        let max_completed = 32;
+        let mut completed_txs = vec![];
+        let mut completed_pubkeys = vec![];
+        let mut pending = vec![];
+        let mut no_new_job = false;
+
+        // What goes on below is roughly the following:
+        //
+        // We have a bunch of tcs we want to try executing in `tcs`.
+        // We pick a random ones (weighted by volume) and collect their `pending` jobs.
+        // Once the maximum number of transactions (`max_completed`) or `max_volume`
+        // for this run is reached, we wait for one of the jobs to finish.
+        // This will either free up the tx slot and volume or commit it.
+        // If it freed up a slot, another job can be added to `pending`
+        // If `no_new_job` can be added to `pending`, we also start waiting for completion.
+        while completed_txs.len() < max_completed && completed_volume < max_volume {
+            // If it's impossible to start another job right now, we need to wait
+            // for one to complete (or we're done)
+            if completed_txs.len() + pending.len() >= max_completed
+                || completed_volume + pending_volume >= max_volume
+                || no_new_job
+            {
+                if pending.is_empty() {
+                    break;
+                }
+
+                // select_all to run until one completes
+                let (result, _index, remaining): (ExecutionResult, _, _) =
+                    futures::future::select_all(pending).await;
+                pending = remaining;
+                pending_volume -= result.volume;
+                match result.txsig_result {
+                    Ok(Some(txsig)) => {
+                        completed_volume += result.volume;
+                        completed_txs.push(txsig);
+                        completed_pubkeys.push(result.pubkey);
+                    }
+                    Ok(None) => {
+                        // maybe the tcs isn't executable after the account was updated
+                    }
+                    Err(e) => {
+                        error_tracking.record_error(&result.pubkey, now, e.to_string());
+                    }
+                }
+                no_new_job = false;
+                continue;
+            }
+
+            // Pick a random tcs with volume that would still fit the limit
+            let available_volume = max_volume - pending_volume - completed_volume;
+            let (pubkey, tcs_id, volume) = {
+                let weights = tcs.iter().map(|(_, _, volume)| {
+                    if *volume == u64::MAX {
+                        // entries marked like this have been processed already
+                        return 0;
+                    }
+                    let volume = (*volume).min(max_volume).max(1);
+                    if volume <= available_volume {
+                        volume
+                    } else {
+                        0
+                    }
+                });
+                let dist_result = WeightedIndex::new(weights);
+                if let Err(WeightedError::AllWeightsZero) = dist_result {
+                    // If there's no fitting new job, complete one of the pending
+                    // ones to check if that frees up some volume allowance
+                    no_new_job = true;
+                    continue;
+                }
+                let dist = dist_result.unwrap();
+
+                let mut rng = rand::thread_rng();
+                let sample = dist.sample(&mut rng);
+                let (pubkey, tcs_id, volume) = &mut tcs[sample];
+                let volume_copy = *volume;
+                *volume = u64::MAX; // don't run this one again
+                (*pubkey, *tcs_id, volume_copy)
+            };
+
+            // start the new one
+            if let Some(job) = self.maybe_execute(&pubkey, tcs_id, volume, error_tracking) {
+                pending_volume += volume;
+                pending.push(job);
+            }
+        }
+
+        (completed_txs, completed_pubkeys)
+    }
 }
