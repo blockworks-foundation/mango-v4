@@ -745,15 +745,15 @@ impl LiquidationState {
             return Ok(());
         }
 
-        let job_context = trigger_tcs::JobContext {
+        let tcs_context = trigger_tcs::ExecutionContext {
             mango_client: self.mango_client.clone(),
             account_fetcher: self.account_fetcher.clone(),
             token_swap_info: self.token_swap_info.clone(),
             config: self.trigger_tcs_config.clone(),
         };
-        let (txsigs, mut changed_pubkeys) = job_context
+        let (txsigs, mut changed_pubkeys) = tcs_context
             .execute_tcs(&mut interesting_tcs, &mut self.tcs_execution_errors)
-            .await;
+            .await?;
         changed_pubkeys.push(self.mango_client.mango_account_address);
 
         // Force a refresh of affected accounts

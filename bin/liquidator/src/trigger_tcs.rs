@@ -8,7 +8,7 @@ use futures_core::Future;
 use itertools::Itertools;
 use mango_v4::{
     i80f48::ClampToInt,
-    state::{Bank, MangoAccountValue, TokenConditionalSwap},
+    state::{Bank, MangoAccountValue, TokenConditionalSwap, TokenIndex},
 };
 use mango_v4_client::{chain_data, health_cache, JupiterSwapMode, MangoClient, MangoGroupContext};
 
@@ -88,229 +88,6 @@ fn tcs_is_interesting(
     Ok(tcs.is_expired(now_ts)
         || (tcs_is_in_price_range(context, account_fetcher, tcs)?
             && tcs_has_plausible_premium(tcs, token_swap_info)?))
-}
-
-#[allow(clippy::too_many_arguments)]
-async fn maybe_execute_token_conditional_swap_inner(
-    mango_client: &MangoClient,
-    account_fetcher: &chain_data::AccountFetcher,
-    token_swap_info: &token_swap_info::TokenSwapInfoUpdater,
-    pubkey: &Pubkey,
-    liqee_old: &MangoAccountValue,
-    tcs_id: u64,
-    config: &Config,
-    now_ts: u64,
-) -> anyhow::Result<Option<Signature>> {
-    let health_cache = health_cache::new(&mango_client.context, account_fetcher, &liqee_old)
-        .await
-        .context("creating health cache 1")?;
-    if health_cache.is_liquidatable() {
-        return Ok(None);
-    }
-
-    // get a fresh account and re-check the tcs and health
-    let liqee = account_fetcher.fetch_fresh_mango_account(pubkey).await?;
-    let (_, tcs) = liqee.token_conditional_swap_by_id(tcs_id)?;
-    if tcs.is_expired(now_ts)
-        || !tcs_is_interesting(
-            &mango_client.context,
-            account_fetcher,
-            tcs,
-            token_swap_info,
-            now_ts,
-        )?
-    {
-        return Ok(None);
-    }
-
-    let health_cache = health_cache::new(&mango_client.context, account_fetcher, &liqee)
-        .await
-        .context("creating health cache 1")?;
-    if health_cache.is_liquidatable() {
-        return Ok(None);
-    }
-
-    execute_token_conditional_swap(mango_client, account_fetcher, pubkey, config, &liqee, tcs).await
-}
-
-#[allow(clippy::too_many_arguments)]
-#[instrument(skip_all, fields(%pubkey, tcs_id = tcs.id))]
-async fn execute_token_conditional_swap(
-    mango_client: &MangoClient,
-    account_fetcher: &chain_data::AccountFetcher,
-    pubkey: &Pubkey,
-    config: &Config,
-    liqee: &MangoAccountValue,
-    tcs: &TokenConditionalSwap,
-) -> anyhow::Result<Option<Signature>> {
-    let liqor_min_health_ratio = I80F48::from_num(config.min_health_ratio);
-
-    // Compute the max viable swap (for liqor and liqee) and min it
-    let buy_bank = mango_client
-        .context
-        .mint_info(tcs.buy_token_index)
-        .first_bank();
-    let sell_bank = mango_client
-        .context
-        .mint_info(tcs.sell_token_index)
-        .first_bank();
-    let buy_token_price = account_fetcher.fetch_bank_price(&buy_bank)?;
-    let sell_token_price = account_fetcher.fetch_bank_price(&sell_bank)?;
-
-    let base_price = buy_token_price / sell_token_price;
-    let premium_price = tcs.premium_price(base_price.to_num());
-    let taker_price = I80F48::from_num(tcs.taker_price(premium_price));
-
-    let max_take_quote = I80F48::from(config.max_trigger_quote_amount);
-
-    let (liqee_max_buy, liqee_max_sell) =
-        match tcs_max_liqee_execution(liqee, mango_client, account_fetcher, tcs)? {
-            Some(v) => v,
-            None => return Ok(None),
-        };
-    let max_sell_token_to_liqor = liqee_max_sell;
-
-    // In addition to the liqee's requirements, the liqor also has requirements:
-    // - only swap while the health ratio stays high enough
-    // - possible net borrow limit restrictions from the liqor borrowing the buy token
-    // - liqor has a max_take_quote
-    let max_buy_token_to_liqee = util::max_swap_source(
-        mango_client,
-        account_fetcher,
-        &mango_client.mango_account().await?,
-        tcs.buy_token_index,
-        tcs.sell_token_index,
-        taker_price,
-        liqor_min_health_ratio,
-    )?
-    .min(max_take_quote / buy_token_price)
-    .floor()
-    .to_num::<u64>()
-    .min(liqee_max_buy);
-
-    if max_sell_token_to_liqor == 0 || max_buy_token_to_liqee == 0 {
-        return Ok(None);
-    }
-
-    // Final check of the reverse trade on jupiter
-    {
-        let buy_mint = mango_client.context.mint_info(tcs.buy_token_index).mint;
-        let sell_mint = mango_client.context.mint_info(tcs.sell_token_index).mint;
-        let swap_mode = JupiterSwapMode::ExactIn;
-        // The slippage does not matter since we're not going to execute it
-        let slippage = 100;
-        let input_amount = max_sell_token_to_liqor.min(
-            (I80F48::from(max_buy_token_to_liqee) * taker_price)
-                .floor()
-                .to_num(),
-        );
-        let route = util::jupiter_route(
-            mango_client,
-            sell_mint,
-            buy_mint,
-            input_amount,
-            slippage,
-            swap_mode,
-            false,
-            config.mock_jupiter,
-        )
-        .await?;
-
-        let sell_amount = route.in_amount.parse::<f64>()?;
-        let buy_amount = route.out_amount.parse::<f64>()?;
-        let swap_price = sell_amount / buy_amount;
-
-        if swap_price > taker_price.to_num::<f64>() {
-            trace!(
-                max_buy = max_buy_token_to_liqee,
-                max_sell = max_sell_token_to_liqor,
-                jupiter_swap_price = %swap_price,
-                tcs_taker_price = %taker_price,
-                "skipping token conditional swap because of prices",
-            );
-            return Ok(None);
-        }
-    }
-
-    trace!(
-        max_buy = max_buy_token_to_liqee,
-        max_sell = max_sell_token_to_liqor,
-        "executing token conditional swap",
-    );
-
-    let compute_ix = solana_sdk::compute_budget::ComputeBudgetInstruction::set_compute_unit_limit(
-        config.compute_limit_for_trigger,
-    );
-    let trigger_ix = mango_client
-        .token_conditional_swap_trigger_instruction(
-            (pubkey, &liqee),
-            tcs.id,
-            max_buy_token_to_liqee,
-            max_sell_token_to_liqor,
-        )
-        .await?;
-    let txsig = mango_client
-        .send_and_confirm_owner_tx(vec![compute_ix, trigger_ix])
-        .await?;
-    info!(
-        %txsig,
-        "Executed token conditional swap",
-    );
-
-    Ok(Some(txsig))
-}
-
-#[allow(clippy::too_many_arguments)]
-#[instrument(skip_all, fields(%pubkey, %tcs_id))]
-pub async fn remove_expired_token_conditional_swap(
-    mango_client: &MangoClient,
-    pubkey: &Pubkey,
-    liqee: &MangoAccountValue,
-    tcs_id: u64,
-) -> anyhow::Result<Option<Signature>> {
-    let ix = mango_client
-        .token_conditional_swap_trigger_instruction((pubkey, &liqee), tcs_id, 0, 0)
-        .await?;
-    let txsig = mango_client.send_and_confirm_owner_tx(vec![ix]).await?;
-    info!(
-        %txsig,
-        "Removed expired token conditional swap",
-    );
-
-    Ok(Some(txsig))
-}
-
-#[allow(clippy::too_many_arguments)]
-async fn maybe_execute_token_conditional_swap(
-    mango_client: &MangoClient,
-    account_fetcher: &chain_data::AccountFetcher,
-    token_swap_info: &token_swap_info::TokenSwapInfoUpdater,
-    pubkey: &Pubkey,
-    tcs_id: u64,
-    config: &Config,
-) -> anyhow::Result<Option<Signature>> {
-    let now_ts: u64 = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)?
-        .as_secs()
-        .try_into()?;
-    let liqee = account_fetcher.fetch_mango_account(pubkey)?;
-    let tcs = liqee.token_conditional_swap_by_id(tcs_id)?.1;
-
-    if tcs.is_expired(now_ts) {
-        remove_expired_token_conditional_swap(mango_client, pubkey, &liqee, tcs.id).await
-    } else {
-        maybe_execute_token_conditional_swap_inner(
-            mango_client,
-            account_fetcher,
-            token_swap_info,
-            pubkey,
-            &liqee,
-            tcs.id,
-            config,
-            now_ts,
-        )
-        .await
-    }
 }
 
 /// Returns the maximum execution size of a tcs order in quote units
@@ -483,75 +260,271 @@ pub fn find_interesting_tcs_for_account(
 }
 
 #[derive(Clone)]
-pub struct JobContext {
+struct PreparedExecution {
+    pubkey: Pubkey,
+    tcs_id: u64,
+    volume: u64,
+    token_indexes: Vec<TokenIndex>,
+    max_buy_token_to_liqee: u64,
+    max_sell_token_to_liqor: u64,
+}
+
+#[allow(clippy::too_many_arguments)]
+async fn prepare_token_conditional_swap(
+    mango_client: &MangoClient,
+    account_fetcher: &chain_data::AccountFetcher,
+    token_swap_info: &token_swap_info::TokenSwapInfoUpdater,
+    pubkey: &Pubkey,
+    tcs_id: u64,
+    config: &Config,
+) -> anyhow::Result<Option<PreparedExecution>> {
+    let now_ts: u64 = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)?
+        .as_secs()
+        .try_into()?;
+    let liqee = account_fetcher.fetch_mango_account(pubkey)?;
+    let tcs = liqee.token_conditional_swap_by_id(tcs_id)?.1;
+
+    if tcs.is_expired(now_ts) {
+        // Triggering like this will close the expired tcs and not affect the liqor
+        Ok(Some(PreparedExecution {
+            pubkey: *pubkey,
+            tcs_id,
+            volume: 0,
+            token_indexes: vec![],
+            max_buy_token_to_liqee: 0,
+            max_sell_token_to_liqor: 0,
+        }))
+    } else {
+        prepare_token_conditional_swap_inner(
+            mango_client,
+            account_fetcher,
+            token_swap_info,
+            pubkey,
+            &liqee,
+            tcs.id,
+            config,
+            now_ts,
+        )
+        .await
+    }
+}
+
+#[allow(clippy::too_many_arguments)]
+async fn prepare_token_conditional_swap_inner(
+    mango_client: &MangoClient,
+    account_fetcher: &chain_data::AccountFetcher,
+    token_swap_info: &token_swap_info::TokenSwapInfoUpdater,
+    pubkey: &Pubkey,
+    liqee_old: &MangoAccountValue,
+    tcs_id: u64,
+    config: &Config,
+    now_ts: u64,
+) -> anyhow::Result<Option<PreparedExecution>> {
+    let health_cache = health_cache::new(&mango_client.context, account_fetcher, &liqee_old)
+        .await
+        .context("creating health cache 1")?;
+    if health_cache.is_liquidatable() {
+        return Ok(None);
+    }
+
+    // get a fresh account and re-check the tcs and health
+    let liqee = account_fetcher.fetch_fresh_mango_account(pubkey).await?;
+    let (_, tcs) = liqee.token_conditional_swap_by_id(tcs_id)?;
+    if tcs.is_expired(now_ts)
+        || !tcs_is_interesting(
+            &mango_client.context,
+            account_fetcher,
+            tcs,
+            token_swap_info,
+            now_ts,
+        )?
+    {
+        return Ok(None);
+    }
+
+    let health_cache = health_cache::new(&mango_client.context, account_fetcher, &liqee)
+        .await
+        .context("creating health cache 2")?;
+    if health_cache.is_liquidatable() {
+        return Ok(None);
+    }
+
+    prepare_token_conditional_swap_inner2(
+        mango_client,
+        account_fetcher,
+        pubkey,
+        config,
+        &liqee,
+        tcs,
+    )
+    .await
+}
+
+#[allow(clippy::too_many_arguments)]
+#[instrument(skip_all, fields(%pubkey, tcs_id = tcs.id))]
+async fn prepare_token_conditional_swap_inner2(
+    mango_client: &MangoClient,
+    account_fetcher: &chain_data::AccountFetcher,
+    pubkey: &Pubkey,
+    config: &Config,
+    liqee: &MangoAccountValue,
+    tcs: &TokenConditionalSwap,
+) -> anyhow::Result<Option<PreparedExecution>> {
+    let liqor_min_health_ratio = I80F48::from_num(config.min_health_ratio);
+
+    // Compute the max viable swap (for liqor and liqee) and min it
+    let buy_bank = mango_client
+        .context
+        .mint_info(tcs.buy_token_index)
+        .first_bank();
+    let sell_bank = mango_client
+        .context
+        .mint_info(tcs.sell_token_index)
+        .first_bank();
+    let buy_token_price = account_fetcher.fetch_bank_price(&buy_bank)?;
+    let sell_token_price = account_fetcher.fetch_bank_price(&sell_bank)?;
+
+    let base_price = buy_token_price / sell_token_price;
+    let premium_price = tcs.premium_price(base_price.to_num());
+    let taker_price = I80F48::from_num(tcs.taker_price(premium_price));
+
+    let max_take_quote = I80F48::from(config.max_trigger_quote_amount);
+
+    let (liqee_max_buy, liqee_max_sell) =
+        match tcs_max_liqee_execution(liqee, mango_client, account_fetcher, tcs)? {
+            Some(v) => v,
+            None => return Ok(None),
+        };
+    let max_sell_token_to_liqor = liqee_max_sell;
+
+    // In addition to the liqee's requirements, the liqor also has requirements:
+    // - only swap while the health ratio stays high enough
+    // - possible net borrow limit restrictions from the liqor borrowing the buy token
+    // - liqor has a max_take_quote
+    let max_buy_token_to_liqee = util::max_swap_source(
+        mango_client,
+        account_fetcher,
+        &mango_client.mango_account().await?,
+        tcs.buy_token_index,
+        tcs.sell_token_index,
+        taker_price,
+        liqor_min_health_ratio,
+    )?
+    .min(max_take_quote / buy_token_price)
+    .floor()
+    .to_num::<u64>()
+    .min(liqee_max_buy);
+
+    if max_sell_token_to_liqor == 0 || max_buy_token_to_liqee == 0 {
+        return Ok(None);
+    }
+
+    // Final check of the reverse trade on jupiter
+    {
+        let buy_mint = mango_client.context.mint_info(tcs.buy_token_index).mint;
+        let sell_mint = mango_client.context.mint_info(tcs.sell_token_index).mint;
+        let swap_mode = JupiterSwapMode::ExactIn;
+        // The slippage does not matter since we're not going to execute it
+        let slippage = 100;
+        let input_amount = max_sell_token_to_liqor.min(
+            (I80F48::from(max_buy_token_to_liqee) * taker_price)
+                .floor()
+                .to_num(),
+        );
+        let route = util::jupiter_route(
+            mango_client,
+            sell_mint,
+            buy_mint,
+            input_amount,
+            slippage,
+            swap_mode,
+            false,
+            config.mock_jupiter,
+        )
+        .await?;
+
+        let sell_amount = route.in_amount.parse::<f64>()?;
+        let buy_amount = route.out_amount.parse::<f64>()?;
+        let swap_price = sell_amount / buy_amount;
+
+        if swap_price > taker_price.to_num::<f64>() {
+            trace!(
+                max_buy = max_buy_token_to_liqee,
+                max_sell = max_sell_token_to_liqor,
+                jupiter_swap_price = %swap_price,
+                tcs_taker_price = %taker_price,
+                "skipping because of prices",
+            );
+            return Ok(None);
+        }
+    }
+
+    trace!(
+        max_buy = max_buy_token_to_liqee,
+        max_sell = max_sell_token_to_liqor,
+        "prepared execution",
+    );
+
+    let volume = (I80F48::from(max_buy_token_to_liqee) * buy_token_price)
+        .min(I80F48::from(max_sell_token_to_liqor) * sell_token_price)
+        .floor()
+        .clamp_to_u64();
+
+    Ok(Some(PreparedExecution {
+        pubkey: *pubkey,
+        tcs_id: tcs.id,
+        volume,
+        token_indexes: vec![tcs.buy_token_index, tcs.sell_token_index],
+        max_buy_token_to_liqee,
+        max_sell_token_to_liqor,
+    }))
+}
+
+#[derive(Clone)]
+pub struct ExecutionContext {
     pub mango_client: Arc<MangoClient>,
     pub account_fetcher: Arc<chain_data::AccountFetcher>,
     pub token_swap_info: Arc<token_swap_info::TokenSwapInfoUpdater>,
     pub config: Config,
 }
 
-pub struct ExecutionResult {
-    pub pubkey: Pubkey,
-    pub volume: u64,
-    pub txsig_result: anyhow::Result<Option<Signature>>,
+struct PreparationResult {
+    pubkey: Pubkey,
+    pending_volume: u64,
+    prepared: anyhow::Result<Option<PreparedExecution>>,
 }
 
-impl JobContext {
-    fn maybe_execute(
-        &self,
-        pubkey: &Pubkey,
-        tcs_id: u64,
-        volume: u64,
-        error_tracking: &ErrorTracking,
-    ) -> Option<Pin<Box<dyn Future<Output = ExecutionResult> + Send>>> {
-        // Skip a pubkey if there've been too many errors recently
-        if let Some(error_entry) = error_tracking.had_too_many_errors(pubkey, Instant::now()) {
-            trace!(
-                "skip checking for tcs on account {pubkey}, had {} errors recently",
-                error_entry.count
-            );
-            return None;
-        }
-
-        let context = self.clone();
-        let pubkey = pubkey.clone();
-        let job = async move {
-            ExecutionResult {
-                pubkey,
-                volume,
-                txsig_result: maybe_execute_token_conditional_swap(
-                    &context.mango_client,
-                    &context.account_fetcher,
-                    &context.token_swap_info,
-                    &pubkey,
-                    tcs_id,
-                    &context.config,
-                )
-                .await,
-            }
-        };
-        Some(Box::pin(job))
-    }
-
+impl ExecutionContext {
     /// Runs tcs jobs in parallel
     ///
     /// Will run jobs until either the max_trigger_quote_amount is exhausted or
-    /// max_completed jobs have been run.
+    /// max_completed jobs have been run while respecting the available free token
+    /// positions on the liqor.
+    ///
+    /// It proceeds in two phases:
+    /// - Preparation: Evaluates tcs and collects a set of them to trigger.
+    ///   The preparation does things like check jupiter for profitability and
+    ///   refetching the account to make sure it's up to date.
+    /// - Execution: Selects the prepared jobs that fit the liqor's available or free
+    ///   token positions.
+    ///
+    /// Returns a list of transaction signatures as well as the pubkeys of liqees.
     pub async fn execute_tcs(
         &self,
         tcs: &mut Vec<(Pubkey, u64, u64)>,
         error_tracking: &mut ErrorTracking,
-    ) -> (Vec<Signature>, Vec<Pubkey>) {
+    ) -> anyhow::Result<(Vec<Signature>, Vec<Pubkey>)> {
         use rand::distributions::{Distribution, WeightedError, WeightedIndex};
         let now = Instant::now();
 
         let max_volume = self.config.max_trigger_quote_amount;
         let mut pending_volume = 0;
-        let mut completed_volume = 0;
+        let mut prepared_volume = 0;
 
-        let max_completed = 32;
-        let mut completed_txs = vec![];
-        let mut completed_pubkeys = vec![];
+        let max_prepared = 32;
+        let mut prepared_executions = vec![];
+
         let mut pending = vec![];
         let mut no_new_job = false;
 
@@ -559,16 +532,16 @@ impl JobContext {
         //
         // We have a bunch of tcs we want to try executing in `tcs`.
         // We pick a random ones (weighted by volume) and collect their `pending` jobs.
-        // Once the maximum number of transactions (`max_completed`) or `max_volume`
+        // Once the maximum number of prepared jobs (`max_prepared`) or `max_volume`
         // for this run is reached, we wait for one of the jobs to finish.
-        // This will either free up the tx slot and volume or commit it.
+        // This will either free up the job slot and volume or commit it.
         // If it freed up a slot, another job can be added to `pending`
         // If `no_new_job` can be added to `pending`, we also start waiting for completion.
-        while completed_txs.len() < max_completed && completed_volume < max_volume {
+        while prepared_executions.len() < max_prepared && prepared_volume < max_volume {
             // If it's impossible to start another job right now, we need to wait
             // for one to complete (or we're done)
-            if completed_txs.len() + pending.len() >= max_completed
-                || completed_volume + pending_volume >= max_volume
+            if prepared_executions.len() + pending.len() >= max_prepared
+                || prepared_volume + pending_volume >= max_volume
                 || no_new_job
             {
                 if pending.is_empty() {
@@ -576,15 +549,14 @@ impl JobContext {
                 }
 
                 // select_all to run until one completes
-                let (result, _index, remaining): (ExecutionResult, _, _) =
+                let (result, _index, remaining): (PreparationResult, _, _) =
                     futures::future::select_all(pending).await;
                 pending = remaining;
-                pending_volume -= result.volume;
-                match result.txsig_result {
-                    Ok(Some(txsig)) => {
-                        completed_volume += result.volume;
-                        completed_txs.push(txsig);
-                        completed_pubkeys.push(result.pubkey);
+                pending_volume -= result.pending_volume;
+                match result.prepared {
+                    Ok(Some(prepared)) => {
+                        prepared_volume += prepared.volume;
+                        prepared_executions.push(prepared);
                     }
                     Ok(None) => {
                         // maybe the tcs isn't executable after the account was updated
@@ -598,7 +570,7 @@ impl JobContext {
             }
 
             // Pick a random tcs with volume that would still fit the limit
-            let available_volume = max_volume - pending_volume - completed_volume;
+            let available_volume = max_volume - pending_volume - prepared_volume;
             let (pubkey, tcs_id, volume) = {
                 let weights = tcs.iter().map(|(_, _, volume)| {
                     if *volume == u64::MAX {
@@ -630,12 +602,130 @@ impl JobContext {
             };
 
             // start the new one
-            if let Some(job) = self.maybe_execute(&pubkey, tcs_id, volume, error_tracking) {
+            if let Some(job) = self.prepare_job(&pubkey, tcs_id, volume, error_tracking) {
                 pending_volume += volume;
                 pending.push(job);
             }
         }
 
-        (completed_txs, completed_pubkeys)
+        // We have now prepared a list of tcs we want to execute in `prepared_jobs`.
+        // The complication is that they will alter the liqor and we need to  make sure to send
+        // health accounts that will work independently of the order of these tx hitting the chain.
+
+        let mut liqor = self.mango_client.mango_account().await?;
+        let allowed_tokens = prepared_executions
+            .iter()
+            .map(|v| &v.token_indexes)
+            .flatten()
+            .copied()
+            .unique()
+            .filter(|&idx| liqor.ensure_token_position(idx).is_ok())
+            .collect_vec();
+
+        // Create futures for all the executions that use only allowed tokens
+        let jobs = prepared_executions
+            .into_iter()
+            .filter(|v| {
+                v.token_indexes
+                    .iter()
+                    .all(|token| allowed_tokens.contains(token))
+            })
+            .map(|v| self.start_prepared_job(v, allowed_tokens.clone()));
+
+        // Execute everything
+        let results = futures::future::join_all(jobs).await;
+        let successes = results
+            .into_iter()
+            .filter_map(|(pubkey, result)| match result {
+                Ok(v) => Some((pubkey, v)),
+                Err(err) => {
+                    error_tracking.record_error(&pubkey, Instant::now(), err.to_string());
+                    None
+                }
+            });
+
+        let (completed_pubkeys, completed_txs) = successes.unzip();
+        Ok((completed_txs, completed_pubkeys))
+    }
+
+    // Maybe returns a future that might return a PreparedExecution
+    fn prepare_job(
+        &self,
+        pubkey: &Pubkey,
+        tcs_id: u64,
+        volume: u64,
+        error_tracking: &ErrorTracking,
+    ) -> Option<Pin<Box<dyn Future<Output = PreparationResult> + Send>>> {
+        // Skip a pubkey if there've been too many errors recently
+        if let Some(error_entry) = error_tracking.had_too_many_errors(pubkey, Instant::now()) {
+            trace!(
+                "skip checking for tcs on account {pubkey}, had {} errors recently",
+                error_entry.count
+            );
+            return None;
+        }
+
+        let context = self.clone();
+        let pubkey = pubkey.clone();
+        let job = async move {
+            PreparationResult {
+                pubkey,
+                pending_volume: volume,
+                prepared: prepare_token_conditional_swap(
+                    &context.mango_client,
+                    &context.account_fetcher,
+                    &context.token_swap_info,
+                    &pubkey,
+                    tcs_id,
+                    &context.config,
+                )
+                .await,
+            }
+        };
+        Some(Box::pin(job))
+    }
+
+    async fn start_prepared_job(
+        &self,
+        pending: PreparedExecution,
+        allowed_tokens: Vec<TokenIndex>,
+    ) -> (Pubkey, anyhow::Result<Signature>) {
+        (
+            pending.pubkey,
+            self.start_prepared_job_inner(pending, allowed_tokens).await,
+        )
+    }
+
+    async fn start_prepared_job_inner(
+        &self,
+        pending: PreparedExecution,
+        allowed_tokens: Vec<TokenIndex>,
+    ) -> anyhow::Result<Signature> {
+        let liqee = self.account_fetcher.fetch_mango_account(&pending.pubkey)?;
+        let compute_ix =
+            solana_sdk::compute_budget::ComputeBudgetInstruction::set_compute_unit_limit(
+                self.config.compute_limit_for_trigger,
+            );
+        let trigger_ix = self
+            .mango_client
+            .token_conditional_swap_trigger_instruction(
+                (&pending.pubkey, &liqee),
+                pending.tcs_id,
+                pending.max_buy_token_to_liqee,
+                pending.max_sell_token_to_liqor,
+                &allowed_tokens,
+            )
+            .await?;
+        let txsig = self
+            .mango_client
+            .send_and_confirm_owner_tx(vec![compute_ix, trigger_ix])
+            .await?;
+        info!(
+            pubkey = %pending.pubkey,
+            tcs_id = pending.tcs_id,
+            %txsig,
+            "executed token conditional swap",
+        );
+        Ok(txsig)
     }
 }

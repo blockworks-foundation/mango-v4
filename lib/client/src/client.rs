@@ -313,7 +313,7 @@ impl MangoClient {
     pub async fn derive_liquidation_health_check_remaining_account_metas(
         &self,
         liqee: &MangoAccountValue,
-        affected_tokens: Vec<u16>,
+        affected_tokens: &[TokenIndex],
         writable_banks: &[TokenIndex],
     ) -> anyhow::Result<Vec<AccountMeta>> {
         let account = self.mango_account().await?;
@@ -321,7 +321,7 @@ impl MangoClient {
             .derive_health_check_remaining_account_metas_two_accounts(
                 &account,
                 liqee,
-                &affected_tokens,
+                affected_tokens,
                 writable_banks,
             )
     }
@@ -1063,7 +1063,7 @@ impl MangoClient {
         let settle_token_info = self.context.token(perp.market.settle_token_index);
 
         let health_remaining_ams = self
-            .derive_liquidation_health_check_remaining_account_metas(liqee.1, vec![], &[])
+            .derive_liquidation_health_check_remaining_account_metas(liqee.1, &[], &[])
             .await
             .unwrap();
 
@@ -1116,7 +1116,7 @@ impl MangoClient {
         let health_remaining_ams = self
             .derive_liquidation_health_check_remaining_account_metas(
                 liqee.1,
-                vec![INSURANCE_TOKEN_INDEX],
+                &[INSURANCE_TOKEN_INDEX],
                 &[],
             )
             .await
@@ -1168,7 +1168,7 @@ impl MangoClient {
         let health_remaining_ams = self
             .derive_liquidation_health_check_remaining_account_metas(
                 liqee.1,
-                vec![],
+                &[],
                 &[asset_token_index, liab_token_index],
             )
             .await
@@ -1219,7 +1219,7 @@ impl MangoClient {
         let health_remaining_ams = self
             .derive_liquidation_health_check_remaining_account_metas(
                 liqee.1,
-                vec![INSURANCE_TOKEN_INDEX],
+                &[INSURANCE_TOKEN_INDEX],
                 &[quote_token_index, liab_token_index],
             )
             .await
@@ -1264,15 +1264,21 @@ impl MangoClient {
         token_conditional_swap_id: u64,
         max_buy_token_to_liqee: u64,
         max_sell_token_to_liqor: u64,
+        extra_affected_tokens: &[TokenIndex],
     ) -> anyhow::Result<Instruction> {
         let (tcs_index, tcs) = liqee
             .1
             .token_conditional_swap_by_id(token_conditional_swap_id)?;
 
+        let affected_tokens = extra_affected_tokens
+            .iter()
+            .chain(&[tcs.buy_token_index, tcs.sell_token_index])
+            .copied()
+            .collect_vec();
         let health_remaining_ams = self
             .derive_liquidation_health_check_remaining_account_metas(
                 liqee.1,
-                vec![tcs.buy_token_index, tcs.sell_token_index],
+                &affected_tokens,
                 &[tcs.buy_token_index, tcs.sell_token_index],
             )
             .await
