@@ -26,10 +26,14 @@ import {
   SystemProgram,
   TransactionInstruction,
   TransactionSignature,
+  RecentPrioritizationFees,
 } from '@solana/web3.js';
 import bs58 from 'bs58';
 import chunk from 'lodash/chunk';
 import cloneDeep from 'lodash/cloneDeep';
+import groupBy from 'lodash/groupBy';
+import mapValues from 'lodash/mapValues';
+import maxBy from 'lodash/maxBy';
 import uniq from 'lodash/uniq';
 import { Bank, MintInfo, TokenIndex } from './accounts/bank';
 import { Group } from './accounts/group';
@@ -68,7 +72,12 @@ import {
   buildIxGate,
   TokenRegisterParams,
 } from './clientIxParamBuilder';
-import { MANGO_V4_ID, OPENBOOK_PROGRAM_ID, RUST_U64_MAX } from './constants';
+import {
+  MANGO_V4_ID,
+  MAX_RECENT_PRIORITY_FEE_ACCOUNTS,
+  OPENBOOK_PROGRAM_ID,
+  RUST_U64_MAX,
+} from './constants';
 import { Id } from './ids';
 import { IDL, MangoV4 } from './mango_v4';
 import { I80F48 } from './numbers/I80F48';
@@ -97,6 +106,7 @@ export type MangoClientOptions = {
   idsSource?: IdsSource;
   postSendTxCallback?: ({ txid }: { txid: string }) => void;
   prioritizationFee?: number;
+  estimateFee?: boolean;
   txConfirmationCommitment?: Commitment;
   openbookFeesToDao?: boolean;
 };
@@ -105,6 +115,7 @@ export class MangoClient {
   private idsSource: IdsSource;
   private postSendTxCallback?: ({ txid }) => void;
   private prioritizationFee: number;
+  private estimateFee: boolean;
   private txConfirmationCommitment: Commitment;
   private openbookFeesToDao: boolean;
 
@@ -116,6 +127,7 @@ export class MangoClient {
   ) {
     this.idsSource = opts?.idsSource || 'get-program-accounts';
     this.prioritizationFee = opts?.prioritizationFee || 0;
+    this.estimateFee = opts?.estimateFee || false;
     this.postSendTxCallback = opts?.postSendTxCallback;
     this.openbookFeesToDao = opts?.openbookFeesToDao ?? true;
     this.txConfirmationCommitment =
@@ -140,13 +152,21 @@ export class MangoClient {
     ixs: TransactionInstruction[],
     opts: any = {},
   ): Promise<string> {
+    let prioritizationFee: number;
+    if (opts.prioritizationFee) {
+      prioritizationFee = opts.prioritizationFee;
+    } else if (this.estimateFee) {
+      prioritizationFee = await this.estimatePrioritizationFee(ixs);
+    } else {
+      prioritizationFee = this.prioritizationFee;
+    }
     return await sendTransaction(
       this.program.provider as AnchorProvider,
       ixs,
       opts.alts ?? [],
       {
         postSendTxCallback: this.postSendTxCallback,
-        prioritizationFee: this.prioritizationFee,
+        prioritizationFee,
         txConfirmationCommitment: this.txConfirmationCommitment,
         ...opts,
       },
@@ -4192,5 +4212,55 @@ export class MangoClient {
       group,
       transactionInstructions,
     );
+  }
+
+  /**
+   * Returns an estimate of a prioritization fee for a set of instructions.
+   *
+   * The estimate is based on the median fees of writable accounts that will be involved in the transaction.
+   *
+   * @param ixs - the instructions that make up the transaction
+   * @returns prioritizationFeeEstimate -- in microLamports
+   */
+  public async estimatePrioritizationFee(
+    ixs: TransactionInstruction[],
+  ): Promise<number> {
+    const writableAccounts = ixs
+      .map((x) => x.keys.filter((a) => a.isWritable).map((k) => k.pubkey))
+      .flat();
+    const uniqueWritableAccounts = uniq(
+      writableAccounts.map((x) => x.toBase58()),
+    )
+      .map((a) => new PublicKey(a))
+      .slice(0, MAX_RECENT_PRIORITY_FEE_ACCOUNTS);
+
+    const priorityFees = await this.connection.getRecentPrioritizationFees({
+      lockedWritableAccounts: uniqueWritableAccounts,
+    });
+
+    if (priorityFees.length < 1) {
+      return 1;
+    }
+
+    // get max priority fee per slot (and sort by slot from old to new)
+    const maxFeeBySlot = mapValues(groupBy(priorityFees, 'slot'), (items) =>
+      maxBy(items, 'prioritizationFee'),
+    );
+    const maximumFees = Object.values(maxFeeBySlot).sort(
+      (a: RecentPrioritizationFees, b: RecentPrioritizationFees) =>
+        a.slot - b.slot,
+    ) as RecentPrioritizationFees[];
+
+    // get median of last 20 fees
+    const recentFees = maximumFees.slice(Math.max(maximumFees.length - 20, 0));
+    const mid = Math.floor(recentFees.length / 2);
+    const medianFee =
+      recentFees.length % 2 !== 0
+        ? recentFees[mid].prioritizationFee
+        : (recentFees[mid - 1].prioritizationFee +
+            recentFees[mid].prioritizationFee) /
+          2;
+
+    return Math.max(1, Math.ceil(medianFee));
   }
 }
