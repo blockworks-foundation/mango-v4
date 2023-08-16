@@ -51,20 +51,12 @@ pub fn token_conditional_swap_trigger(
     let now_ts: u64 = Clock::get()?.unix_timestamp.try_into().unwrap();
     let tcs_is_expired = tcs.is_expired(now_ts);
 
-    // As a precaution, ensure that the liqee (and its health cache) will have an entry for both tokens:
-    // we will want to adjust their values later. This is already guaranteed by the in_use_count
-    // changes when the tcs was created.
-    liqee.ensure_token_position(buy_token_index)?;
-    liqee.ensure_token_position(sell_token_index)?;
-
-    let mut liqee_health_cache = new_health_cache(&liqee.borrow(), &account_retriever)
-        .context("create liqee health cache")?;
-    let (buy_bank, buy_token_price, sell_bank_and_oracle_opt) =
-        account_retriever.banks_mut_and_oracles(buy_token_index, sell_token_index)?;
-    let (sell_bank, sell_token_price) = sell_bank_and_oracle_opt.unwrap();
-
     // Possibly wipe the tcs and exit, if it's already expired
     if tcs_is_expired {
+        let (buy_bank, _buy_token_price, sell_bank_and_oracle_opt) =
+            account_retriever.banks_mut_and_oracles(buy_token_index, sell_token_index)?;
+        let (sell_bank, _sell_token_price) = sell_bank_and_oracle_opt.unwrap();
+
         let tcs = liqee.token_conditional_swap_mut_by_index(token_conditional_swap_index)?;
         *tcs = TokenConditionalSwap::default();
 
@@ -81,6 +73,18 @@ pub fn token_conditional_swap_trigger(
 
         return Ok(());
     }
+
+    // As a precaution, ensure that the liqee (and its health cache) will have an entry for both tokens:
+    // we will want to adjust their values later. This is already guaranteed by the in_use_count
+    // changes when the tcs was created.
+    liqee.ensure_token_position(buy_token_index)?;
+    liqee.ensure_token_position(sell_token_index)?;
+    let mut liqee_health_cache = new_health_cache(&liqee.borrow(), &account_retriever)
+        .context("create liqee health cache")?;
+
+    let (buy_bank, buy_token_price, sell_bank_and_oracle_opt) =
+        account_retriever.banks_mut_and_oracles(buy_token_index, sell_token_index)?;
+    let (sell_bank, sell_token_price) = sell_bank_and_oracle_opt.unwrap();
 
     let (liqee_buy_change, liqee_sell_change) = action(
         &mut liqor.borrow_mut(),
