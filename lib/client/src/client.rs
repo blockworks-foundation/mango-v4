@@ -35,7 +35,7 @@ use solana_sdk::transaction::TransactionError;
 use crate::account_fetcher::*;
 use crate::context::MangoGroupContext;
 use crate::gpa::{fetch_anchor_account, fetch_mango_accounts};
-use crate::jupiter;
+use crate::{jupiter_v4, jupiter_v6};
 
 use anyhow::Context;
 use solana_sdk::account::ReadableAccount;
@@ -1390,7 +1390,7 @@ impl MangoClient {
             .with_context(|| format!("response has unexpected format, body: {response_text}"))
     }
 
-    pub async fn jupiter_route(
+    pub async fn jupiter_route_v4(
         &self,
         input_mint: Pubkey,
         output_mint: Pubkey,
@@ -1398,7 +1398,7 @@ impl MangoClient {
         slippage: u64,
         swap_mode: JupiterSwapMode,
         only_direct_routes: bool,
-    ) -> anyhow::Result<jupiter::QueryRoute> {
+    ) -> anyhow::Result<jupiter_v4::QueryRoute> {
         let response = self
             .http_client
             .get("https://quote-api.jup.ag/v4/quote")
@@ -1422,7 +1422,7 @@ impl MangoClient {
             .send()
             .await
             .context("quote request to jupiter")?;
-        let quote: jupiter::QueryResult =
+        let quote: jupiter_v4::QueryResult =
             Self::http_error_handling(response).await.with_context(|| {
                 format!("error requesting jupiter route between {input_mint} and {output_mint}")
             })?;
@@ -1441,11 +1441,11 @@ impl MangoClient {
     ///
     /// It would be nice if we didn't have to pass input_mint/output_mint - the data is
     /// definitely in QueryRoute - but it's unclear how.
-    pub async fn prepare_jupiter_swap_transaction(
+    pub async fn prepare_jupiter_v4_swap_transaction(
         &self,
         input_mint: Pubkey,
         output_mint: Pubkey,
-        route: &jupiter::QueryRoute,
+        route: &jupiter_v4::QueryRoute,
     ) -> anyhow::Result<TransactionBuilder> {
         let source_token = self.context.token_by_mint(&input_mint)?;
         let target_token = self.context.token_by_mint(&output_mint)?;
@@ -1453,7 +1453,7 @@ impl MangoClient {
         let swap_response = self
             .http_client
             .post("https://quote-api.jup.ag/v4/swap")
-            .json(&jupiter::SwapRequest {
+            .json(&jupiter_v4::SwapRequest {
                 route: route.clone(),
                 user_public_key: self.owner.pubkey().to_string(),
                 wrap_unwrap_sol: false,
@@ -1463,7 +1463,7 @@ impl MangoClient {
             .await
             .context("swap transaction request to jupiter")?;
 
-        let swap: jupiter::SwapResponse = Self::http_error_handling(swap_response)
+        let swap: jupiter_v4::SwapResponse = Self::http_error_handling(swap_response)
             .await
             .context("error requesting jupiter swap")?;
 
@@ -1622,7 +1622,7 @@ impl MangoClient {
         })
     }
 
-    pub async fn jupiter_swap(
+    pub async fn jupiter_swap_v4(
         &self,
         input_mint: Pubkey,
         output_mint: Pubkey,
@@ -1632,7 +1632,7 @@ impl MangoClient {
         only_direct_routes: bool,
     ) -> anyhow::Result<Signature> {
         let route = self
-            .jupiter_route(
+            .jupiter_route_v4(
                 input_mint,
                 output_mint,
                 amount,
@@ -1643,7 +1643,250 @@ impl MangoClient {
             .await?;
 
         let tx_builder = self
-            .prepare_jupiter_swap_transaction(input_mint, output_mint, &route)
+            .prepare_jupiter_v4_swap_transaction(input_mint, output_mint, &route)
+            .await?;
+
+        tx_builder.send_and_confirm(&self.client).await
+    }
+
+    pub async fn jupiter_quote_v6(
+        &self,
+        input_mint: Pubkey,
+        output_mint: Pubkey,
+        amount: u64,
+        slippage: u64,
+        only_direct_routes: bool,
+    ) -> anyhow::Result<jupiter_v6::QuoteResponse> {
+        let mut account = self.mango_account().await?;
+        let input_token_index = self.context.token_by_mint(&input_mint)?.token_index;
+        let output_token_index = self.context.token_by_mint(&output_mint)?.token_index;
+        account.ensure_token_position(input_token_index)?;
+        account.ensure_token_position(output_token_index)?;
+
+        let max_accounts_per_tx: u64 = 64;
+        let health_account_num =
+            // bank and oracle
+            2 * account.active_token_positions().count()
+            // perp market and oracle
+            + 2 * account.active_perp_positions().count()
+            // open orders account
+            + account.active_serum3_orders().count();
+        let flash_loan_account_num = (
+            health_account_num
+            // mango program and group and account and instruction introspection
+            + 4
+            // shared between jupiter and mango:
+            // token accounts, mints, token program, ata program, owner
+        ) as u64;
+
+        let response = self
+            .http_client
+            .get("https://quote-api.jup.ag/v6/quote")
+            .query(&[
+                ("inputMint", input_mint.to_string()),
+                ("outputMint", output_mint.to_string()),
+                ("amount", format!("{}", amount)),
+                ("slippageBps", format!("{}", slippage)),
+                ("onlyDirectRoutes", only_direct_routes.to_string()),
+                (
+                    "maxAccounts",
+                    format!("{}", max_accounts_per_tx - flash_loan_account_num),
+                ),
+            ])
+            .send()
+            .await
+            .context("quote request to jupiter")?;
+        let quote: jupiter_v6::QuoteResponse =
+            Self::http_error_handling(response).await.with_context(|| {
+                format!("error requesting jupiter route between {input_mint} and {output_mint}")
+            })?;
+
+        Ok(quote)
+    }
+
+    /// Find the instructions and account lookup tables for a jupiter swap through mango
+    ///
+    /// It would be nice if we didn't have to pass input_mint/output_mint - the data is
+    /// definitely in QueryRoute - but it's unclear how.
+    pub async fn prepare_jupiter_v6_swap_transaction(
+        &self,
+        input_mint: Pubkey,
+        output_mint: Pubkey,
+        quote: &jupiter_v6::QuoteResponse,
+    ) -> anyhow::Result<TransactionBuilder> {
+        let source_token = self.context.token_by_mint(&input_mint)?;
+        let target_token = self.context.token_by_mint(&output_mint)?;
+
+        let bank_ams = [
+            source_token.mint_info.first_bank(),
+            target_token.mint_info.first_bank(),
+        ]
+        .into_iter()
+        .map(to_writable_account_meta)
+        .collect::<Vec<_>>();
+
+        let vault_ams = [
+            source_token.mint_info.first_vault(),
+            target_token.mint_info.first_vault(),
+        ]
+        .into_iter()
+        .map(to_writable_account_meta)
+        .collect::<Vec<_>>();
+
+        let token_ams = [source_token.mint_info.mint, target_token.mint_info.mint]
+            .into_iter()
+            .map(|mint| {
+                to_writable_account_meta(
+                    anchor_spl::associated_token::get_associated_token_address(
+                        &self.owner(),
+                        &mint,
+                    ),
+                )
+            })
+            .collect::<Vec<_>>();
+
+        let source_loan = quote
+            .in_amount
+            .as_ref()
+            .map(|v| u64::from_str(v).unwrap())
+            .unwrap_or(0);
+        let loan_amounts = vec![source_loan, 0u64];
+        let num_loans: u8 = loan_amounts.len().try_into().unwrap();
+
+        // This relies on the fact that health account banks will be identical to the first_bank above!
+        let health_ams = self
+            .derive_health_check_remaining_account_metas(
+                vec![source_token.token_index, target_token.token_index],
+                vec![source_token.token_index, target_token.token_index],
+                vec![],
+            )
+            .await
+            .context("building health accounts")?;
+
+        let swap_response = self
+            .http_client
+            .post("https://quote-api.jup.ag/v6/swap-instructions")
+            .json(&jupiter_v6::SwapRequest {
+                user_public_key: self.owner.pubkey().to_string(),
+                wrap_and_unwrap_sol: false,
+                use_shared_accounts: true,
+                fee_account: None,
+                compute_unit_price_micro_lamports: None, // we already prioritize
+                as_legacy_transaction: false,
+                use_token_ledger: false,
+                destination_token_account: None, // default to user ata
+                quote_response: quote.clone(),
+            })
+            .send()
+            .await
+            .context("swap transaction request to jupiter")?;
+
+        let swap: jupiter_v6::SwapInstructionsResponse = Self::http_error_handling(swap_response)
+            .await
+            .context("error requesting jupiter swap")?;
+
+        let mut instructions: Vec<Instruction> = Vec::new();
+
+        for ix in &swap.compute_budget_instructions.unwrap_or(vec![]) {
+            instructions.push(ix.try_into()?);
+        }
+        for ix in &swap.setup_instructions.unwrap_or(vec![]) {
+            instructions.push(ix.try_into()?);
+        }
+        instructions.push(Instruction {
+            program_id: mango_v4::id(),
+            accounts: {
+                let mut ams = anchor_lang::ToAccountMetas::to_account_metas(
+                    &mango_v4::accounts::FlashLoanBegin {
+                        account: self.mango_account_address,
+                        owner: self.owner(),
+                        token_program: Token::id(),
+                        instructions: solana_sdk::sysvar::instructions::id(),
+                    },
+                    None,
+                );
+                ams.extend(bank_ams);
+                ams.extend(vault_ams.clone());
+                ams.extend(token_ams.clone());
+                ams.push(to_readonly_account_meta(self.group()));
+                ams
+            },
+            data: anchor_lang::InstructionData::data(&mango_v4::instruction::FlashLoanBegin {
+                loan_amounts,
+            }),
+        });
+        instructions.push((&swap.swap_instruction).try_into()?);
+        instructions.push(Instruction {
+            program_id: mango_v4::id(),
+            accounts: {
+                let mut ams = anchor_lang::ToAccountMetas::to_account_metas(
+                    &mango_v4::accounts::FlashLoanEnd {
+                        account: self.mango_account_address,
+                        owner: self.owner(),
+                        token_program: Token::id(),
+                    },
+                    None,
+                );
+                ams.extend(health_ams);
+                ams.extend(vault_ams);
+                ams.extend(token_ams);
+                ams.push(to_readonly_account_meta(self.group()));
+                ams
+            },
+            data: anchor_lang::InstructionData::data(&mango_v4::instruction::FlashLoanEndV2 {
+                num_loans,
+                flash_loan_type: mango_v4::accounts_ix::FlashLoanType::Swap,
+            }),
+        });
+        for ix in &swap.cleanup_instructions.unwrap_or(vec![]) {
+            instructions.push(ix.try_into()?);
+        }
+
+        let mut address_lookup_tables = self.mango_address_lookup_tables().await?;
+        let jup_alt_addresses = swap
+            .address_lookup_table_addresses
+            .map(|list| {
+                list.iter()
+                    .map(|s| Pubkey::from_str(s))
+                    .collect::<Result<Vec<_>, _>>()
+            })
+            .unwrap_or(Ok(vec![]))?;
+        let jup_alts = self
+            .fetch_address_lookup_tables(jup_alt_addresses.iter())
+            .await?;
+        address_lookup_tables.extend(jup_alts.into_iter());
+
+        let payer = self.owner.pubkey(); // maybe use fee_payer? but usually it's the same
+
+        Ok(TransactionBuilder {
+            instructions,
+            address_lookup_tables,
+            payer,
+            signers: vec![self.owner.clone()],
+            config: self.client.transaction_builder_config,
+        })
+    }
+
+    pub async fn jupiter_swap_v6(
+        &self,
+        input_mint: Pubkey,
+        output_mint: Pubkey,
+        amount: u64,
+        slippage: u64,
+        only_direct_routes: bool,
+    ) -> anyhow::Result<Signature> {
+        let route = self
+            .jupiter_quote_v6(
+                input_mint,
+                output_mint,
+                amount,
+                slippage,
+                only_direct_routes,
+            )
+            .await?;
+
+        let tx_builder = self
+            .prepare_jupiter_v6_swap_transaction(input_mint, output_mint, &route)
             .await?;
 
         tx_builder.send_and_confirm(&self.client).await
@@ -1673,14 +1916,23 @@ impl MangoClient {
             .await
     }
 
+    async fn fetch_address_lookup_tables(
+        &self,
+        alts: impl Iterator<Item = &Pubkey>,
+    ) -> anyhow::Result<Vec<AddressLookupTableAccount>> {
+        stream::iter(alts)
+            .then(|a| self.fetch_address_lookup_table(*a))
+            .try_collect::<Vec<_>>()
+            .await
+    }
+
     async fn deserialize_instructions_and_alts(
         &self,
         message: &solana_sdk::message::VersionedMessage,
     ) -> anyhow::Result<(Vec<Instruction>, Vec<AddressLookupTableAccount>)> {
         let lookups = message.address_table_lookups().unwrap_or_default();
-        let address_lookup_tables = stream::iter(lookups)
-            .then(|a| self.fetch_address_lookup_table(a.account_key))
-            .try_collect::<Vec<_>>()
+        let address_lookup_tables = self
+            .fetch_address_lookup_tables(lookups.iter().map(|a| &a.account_key))
             .await?;
 
         let mut account_keys = message.static_account_keys().to_vec();
