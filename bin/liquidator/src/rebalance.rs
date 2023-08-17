@@ -5,8 +5,8 @@ use mango_v4::state::{
     TokenPosition, QUOTE_TOKEN_INDEX,
 };
 use mango_v4_client::{
-    chain_data, jupiter::QueryRoute, perp_pnl, AnyhowWrap, JupiterSwapMode, MangoClient,
-    PerpMarketContext, TokenContext, TransactionBuilder,
+    chain_data, jupiter, perp_pnl, AnyhowWrap, JupiterSwapMode, MangoClient, PerpMarketContext,
+    TokenContext, TransactionBuilder,
 };
 
 use {fixed::types::I80F48, solana_sdk::pubkey::Pubkey};
@@ -27,6 +27,7 @@ pub struct Config {
     /// If this is 1.05, then it'll swap borrow_value * 1.05 quote token into borrow token.
     pub borrow_settle_excess: f64,
     pub refresh_timeout: Duration,
+    pub jupiter_version: jupiter::Version,
 }
 
 #[derive(Debug)]
@@ -69,13 +70,6 @@ impl TokenState {
         )
         .map_err_anyhow()
     }
-}
-
-#[derive(Clone)]
-struct WrappedJupRoute {
-    input_mint: Pubkey,
-    output_mint: Pubkey,
-    route: QueryRoute,
 }
 
 pub struct Rebalancer {
@@ -122,30 +116,23 @@ impl Rebalancer {
         Ok(true)
     }
 
-    /// Wrapping client.jupiter_route() in a way that preserves the in/out mints
-    async fn jupiter_route(
+    async fn jupiter_quote(
         &self,
         input_mint: Pubkey,
         output_mint: Pubkey,
         amount: u64,
         only_direct_routes: bool,
-    ) -> anyhow::Result<WrappedJupRoute> {
-        let route = self
-            .mango_client
-            .jupiter_route(
+    ) -> anyhow::Result<jupiter::Quote> {
+        self.mango_client
+            .jupiter_quote(
                 input_mint,
                 output_mint,
                 amount,
                 self.config.slippage_bps,
-                JupiterSwapMode::ExactIn,
                 only_direct_routes,
+                self.config.jupiter_version,
             )
-            .await?;
-        Ok(WrappedJupRoute {
-            input_mint,
-            output_mint,
-            route,
-        })
+            .await
     }
 
     /// Grab three possible routes:
@@ -157,7 +144,7 @@ impl Rebalancer {
         &self,
         output_mint: Pubkey,
         in_amount_quote: u64,
-    ) -> anyhow::Result<(Signature, WrappedJupRoute)> {
+    ) -> anyhow::Result<(Signature, jupiter::Quote)> {
         let quote_token = self.mango_client.context.token(QUOTE_TOKEN_INDEX);
         let sol_token = self.mango_client.context.token(
             *self
@@ -168,13 +155,13 @@ impl Rebalancer {
                 .unwrap(),
         );
 
-        let full_route_job = self.jupiter_route(
+        let full_route_job = self.jupiter_quote(
             quote_token.mint_info.mint,
             output_mint,
             in_amount_quote,
             false,
         );
-        let direct_quote_route_job = self.jupiter_route(
+        let direct_quote_route_job = self.jupiter_quote(
             quote_token.mint_info.mint,
             output_mint,
             in_amount_quote,
@@ -188,7 +175,7 @@ impl Rebalancer {
             .ceil()
             .to_num::<u64>();
         let direct_sol_route_job =
-            self.jupiter_route(sol_token.mint_info.mint, output_mint, in_amount_sol, true);
+            self.jupiter_quote(sol_token.mint_info.mint, output_mint, in_amount_sol, true);
 
         let (full_route, direct_quote_route, direct_sol_route) =
             tokio::join!(full_route_job, direct_quote_route_job, direct_sol_route_job);
@@ -219,7 +206,7 @@ impl Rebalancer {
         &self,
         input_mint: Pubkey,
         in_amount: u64,
-    ) -> anyhow::Result<(Signature, WrappedJupRoute)> {
+    ) -> anyhow::Result<(Signature, jupiter::Quote)> {
         let quote_token = self.mango_client.context.token(QUOTE_TOKEN_INDEX);
         let sol_token = self.mango_client.context.token(
             *self
@@ -231,11 +218,11 @@ impl Rebalancer {
         );
 
         let full_route_job =
-            self.jupiter_route(input_mint, quote_token.mint_info.mint, in_amount, false);
+            self.jupiter_quote(input_mint, quote_token.mint_info.mint, in_amount, false);
         let direct_quote_route_job =
-            self.jupiter_route(input_mint, quote_token.mint_info.mint, in_amount, true);
+            self.jupiter_quote(input_mint, quote_token.mint_info.mint, in_amount, true);
         let direct_sol_route_job =
-            self.jupiter_route(input_mint, sol_token.mint_info.mint, in_amount, true);
+            self.jupiter_quote(input_mint, sol_token.mint_info.mint, in_amount, true);
         let (full_route, direct_quote_route, direct_sol_route) =
             tokio::join!(full_route_job, direct_quote_route_job, direct_sol_route_job);
         let alternatives = [direct_quote_route, direct_sol_route]
@@ -259,12 +246,12 @@ impl Rebalancer {
 
     async fn determine_best_jupiter_tx(
         &self,
-        full: &WrappedJupRoute,
-        alternatives: &[WrappedJupRoute],
-    ) -> anyhow::Result<(TransactionBuilder, WrappedJupRoute)> {
+        full: &jupiter::Quote,
+        alternatives: &[jupiter::Quote],
+    ) -> anyhow::Result<(TransactionBuilder, jupiter::Quote)> {
         let builder = self
             .mango_client
-            .prepare_jupiter_swap_transaction(full.input_mint, full.output_mint, &full.route)
+            .prepare_jupiter_swap_transaction(full)
             .await?;
         if builder.transaction_size_ok()? {
             return Ok((builder, full.clone()));
@@ -291,16 +278,11 @@ impl Rebalancer {
 
         let best = alternatives
             .iter()
-            .min_by(|a, b| {
-                a.route
-                    .price_impact_pct
-                    .partial_cmp(&b.route.price_impact_pct)
-                    .unwrap()
-            })
+            .min_by(|a, b| a.price_impact_pct.partial_cmp(&b.price_impact_pct).unwrap())
             .unwrap();
         let builder = self
             .mango_client
-            .prepare_jupiter_swap_transaction(best.input_mint, best.output_mint, &best.route)
+            .prepare_jupiter_swap_transaction(best)
             .await?;
         Ok((builder, best.clone()))
     }
@@ -365,9 +347,9 @@ impl Rebalancer {
                 info!(
                     %txsig,
                     "bought {} {} for {} {}",
-                    token.native_to_ui(I80F48::from_str(&route.route.out_amount).unwrap()),
+                    token.native_to_ui(I80F48::from(route.out_amount)),
                     token.name,
-                    in_token.native_to_ui(I80F48::from_str(&route.route.in_amount).unwrap()),
+                    in_token.native_to_ui(I80F48::from(route.in_amount)),
                     in_token.name,
                 );
                 if !self.refresh_mango_account_after_tx(txsig).await? {
@@ -396,9 +378,9 @@ impl Rebalancer {
                 info!(
                     %txsig,
                     "sold {} {} for {} {}",
-                    token.native_to_ui(I80F48::from_str(&route.route.in_amount).unwrap()),
+                    token.native_to_ui(I80F48::from(route.in_amount)),
                     token.name,
-                    out_token.native_to_ui(I80F48::from_str(&route.route.out_amount).unwrap()),
+                    out_token.native_to_ui(I80F48::from(route.out_amount)),
                     out_token.name,
                 );
                 if !self.refresh_mango_account_after_tx(txsig).await? {

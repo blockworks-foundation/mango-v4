@@ -276,6 +276,7 @@ async fn main() -> anyhow::Result<()> {
         // TODO: config
         borrow_settle_excess: 1.05,
         refresh_timeout: Duration::from_secs(30),
+        jupiter_version: rebalance::JupiterVersion::V6, // TODO: config
     };
 
     let rebalancer = Arc::new(rebalance::Rebalancer {

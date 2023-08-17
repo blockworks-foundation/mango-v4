@@ -35,7 +35,7 @@ use solana_sdk::transaction::TransactionError;
 use crate::account_fetcher::*;
 use crate::context::MangoGroupContext;
 use crate::gpa::{fetch_anchor_account, fetch_mango_accounts};
-use crate::{jupiter_v4, jupiter_v6};
+use crate::jupiter;
 
 use anyhow::Context;
 use solana_sdk::account::ReadableAccount;
@@ -43,6 +43,8 @@ use solana_sdk::instruction::{AccountMeta, Instruction};
 use solana_sdk::signature::{Keypair, Signature};
 use solana_sdk::sysvar;
 use solana_sdk::{commitment_config::CommitmentConfig, pubkey::Pubkey, signer::Signer};
+
+pub const MAX_ACCOUNTS_PER_TRANSACTION: usize = 64;
 
 // very close to anchor_client::Client, which unfortunately has no accessors or Clone
 #[derive(Clone, Debug)]
@@ -1398,7 +1400,7 @@ impl MangoClient {
         slippage: u64,
         swap_mode: JupiterSwapMode,
         only_direct_routes: bool,
-    ) -> anyhow::Result<jupiter_v4::QueryRoute> {
+    ) -> anyhow::Result<jupiter::v4::QueryRoute> {
         let response = self
             .http_client
             .get("https://quote-api.jup.ag/v4/quote")
@@ -1422,7 +1424,7 @@ impl MangoClient {
             .send()
             .await
             .context("quote request to jupiter")?;
-        let quote: jupiter_v4::QueryResult =
+        let quote: jupiter::v4::QueryResult =
             Self::http_error_handling(response).await.with_context(|| {
                 format!("error requesting jupiter route between {input_mint} and {output_mint}")
             })?;
@@ -1445,7 +1447,7 @@ impl MangoClient {
         &self,
         input_mint: Pubkey,
         output_mint: Pubkey,
-        route: &jupiter_v4::QueryRoute,
+        route: &jupiter::v4::QueryRoute,
     ) -> anyhow::Result<TransactionBuilder> {
         let source_token = self.context.token_by_mint(&input_mint)?;
         let target_token = self.context.token_by_mint(&output_mint)?;
@@ -1453,7 +1455,7 @@ impl MangoClient {
         let swap_response = self
             .http_client
             .post("https://quote-api.jup.ag/v4/swap")
-            .json(&jupiter_v4::SwapRequest {
+            .json(&jupiter::v4::SwapRequest {
                 route: route.clone(),
                 user_public_key: self.owner.pubkey().to_string(),
                 wrap_unwrap_sol: false,
@@ -1463,7 +1465,7 @@ impl MangoClient {
             .await
             .context("swap transaction request to jupiter")?;
 
-        let swap: jupiter_v4::SwapResponse = Self::http_error_handling(swap_response)
+        let swap: jupiter::v4::SwapResponse = Self::http_error_handling(swap_response)
             .await
             .context("error requesting jupiter swap")?;
 
@@ -1656,14 +1658,13 @@ impl MangoClient {
         amount: u64,
         slippage: u64,
         only_direct_routes: bool,
-    ) -> anyhow::Result<jupiter_v6::QuoteResponse> {
+    ) -> anyhow::Result<jupiter::v6::QuoteResponse> {
         let mut account = self.mango_account().await?;
         let input_token_index = self.context.token_by_mint(&input_mint)?.token_index;
         let output_token_index = self.context.token_by_mint(&output_mint)?.token_index;
         account.ensure_token_position(input_token_index)?;
         account.ensure_token_position(output_token_index)?;
 
-        let max_accounts_per_tx: u64 = 64;
         let health_account_num =
             // bank and oracle
             2 * account.active_token_positions().count()
@@ -1671,13 +1672,11 @@ impl MangoClient {
             + 2 * account.active_perp_positions().count()
             // open orders account
             + account.active_serum3_orders().count();
-        let flash_loan_account_num = (
-            health_account_num
-            // mango program and group and account and instruction introspection
-            + 4
-            // shared between jupiter and mango:
-            // token accounts, mints, token program, ata program, owner
-        ) as u64;
+        // The mango instructions need the health account plus
+        // mango program and group and account and instruction introspection.
+        // Other accounts are shared between jupiter and mango:
+        // token accounts, mints, token program, ata program, owner
+        let flash_loan_account_num = health_account_num + 4;
 
         let response = self
             .http_client
@@ -1690,13 +1689,13 @@ impl MangoClient {
                 ("onlyDirectRoutes", only_direct_routes.to_string()),
                 (
                     "maxAccounts",
-                    format!("{}", max_accounts_per_tx - flash_loan_account_num),
+                    format!("{}", MAX_ACCOUNTS_PER_TRANSACTION - flash_loan_account_num),
                 ),
             ])
             .send()
             .await
             .context("quote request to jupiter")?;
-        let quote: jupiter_v6::QuoteResponse =
+        let quote: jupiter::v6::QuoteResponse =
             Self::http_error_handling(response).await.with_context(|| {
                 format!("error requesting jupiter route between {input_mint} and {output_mint}")
             })?;
@@ -1710,10 +1709,11 @@ impl MangoClient {
     /// definitely in QueryRoute - but it's unclear how.
     pub async fn prepare_jupiter_v6_swap_transaction(
         &self,
-        input_mint: Pubkey,
-        output_mint: Pubkey,
-        quote: &jupiter_v6::QuoteResponse,
+        quote: &jupiter::v6::QuoteResponse,
     ) -> anyhow::Result<TransactionBuilder> {
+        let input_mint = Pubkey::from_str(&quote.input_mint)?;
+        let output_mint = Pubkey::from_str(&quote.output_mint)?;
+
         let source_token = self.context.token_by_mint(&input_mint)?;
         let target_token = self.context.token_by_mint(&output_mint)?;
 
@@ -1766,7 +1766,7 @@ impl MangoClient {
         let swap_response = self
             .http_client
             .post("https://quote-api.jup.ag/v6/swap-instructions")
-            .json(&jupiter_v6::SwapRequest {
+            .json(&jupiter::v6::SwapRequest {
                 user_public_key: self.owner.pubkey().to_string(),
                 wrap_and_unwrap_sol: false,
                 use_shared_accounts: true,
@@ -1781,7 +1781,7 @@ impl MangoClient {
             .await
             .context("swap transaction request to jupiter")?;
 
-        let swap: jupiter_v6::SwapInstructionsResponse = Self::http_error_handling(swap_response)
+        let swap: jupiter::v6::SwapInstructionsResponse = Self::http_error_handling(swap_response)
             .await
             .context("error requesting jupiter swap")?;
 
@@ -1885,11 +1885,67 @@ impl MangoClient {
             )
             .await?;
 
-        let tx_builder = self
-            .prepare_jupiter_v6_swap_transaction(input_mint, output_mint, &route)
-            .await?;
+        let tx_builder = self.prepare_jupiter_v6_swap_transaction(&route).await?;
 
         tx_builder.send_and_confirm(&self.client).await
+    }
+
+    pub async fn jupiter_quote(
+        &self,
+        input_mint: Pubkey,
+        output_mint: Pubkey,
+        amount: u64,
+        slippage: u64,
+        only_direct_routes: bool,
+        version: jupiter::Version,
+    ) -> anyhow::Result<jupiter::Quote> {
+        Ok(match version {
+            jupiter::Version::Mock => jupiter::Quote {
+                input_mint,
+                output_mint,
+                price_impact_pct: 0.0,
+                in_amount: amount,
+                out_amount: amount,
+                raw: jupiter::RawQuote::Mock,
+            },
+            jupiter::Version::V4 => jupiter::Quote::try_from_v4(
+                input_mint,
+                output_mint,
+                self.jupiter_route_v4(
+                    input_mint,
+                    output_mint,
+                    amount,
+                    slippage,
+                    JupiterSwapMode::ExactIn,
+                    only_direct_routes,
+                )
+                .await?,
+            )?,
+            jupiter::Version::V6 => jupiter::Quote::try_from_v6(
+                self.jupiter_quote_v6(
+                    input_mint,
+                    output_mint,
+                    amount,
+                    slippage,
+                    only_direct_routes,
+                )
+                .await?,
+            )?,
+        })
+    }
+
+    pub async fn prepare_jupiter_swap_transaction(
+        &self,
+        quote: &jupiter::Quote,
+    ) -> anyhow::Result<TransactionBuilder> {
+        match &quote.raw {
+            jupiter::RawQuote::Mock => anyhow::bail!("can't prepare jupiter swap for the mock"),
+            jupiter::RawQuote::V4(raw) => {
+                self.prepare_jupiter_v4_swap_transaction(quote.input_mint, quote.output_mint, raw)
+                    .await
+            }
+            jupiter::RawQuote::V6(raw) => self.prepare_jupiter_v6_swap_transaction(raw).await,
+        }
     }
 
     async fn fetch_address_lookup_table(
@@ -2092,7 +2148,17 @@ impl TransactionBuilder {
     pub fn transaction_size_ok(&self) -> anyhow::Result<bool> {
         let tx = self.transaction_with_blockhash(solana_sdk::hash::Hash::default())?;
         let bytes = bincode::serialize(&tx)?;
-        Ok(bytes.len() <= solana_sdk::packet::PACKET_DATA_SIZE)
+        let accounts = tx.message.static_account_keys().len()
+            + tx.message
+                .address_table_lookups()
+                .map(|alts| {
+                    alts.iter()
+                        .map(|alt| alt.readonly_indexes.len() + alt.writable_indexes.len())
+                        .sum()
+                })
+                .unwrap_or(0);
+        Ok(bytes.len() <= solana_sdk::packet::PACKET_DATA_SIZE
+            && accounts <= MAX_ACCOUNTS_PER_TRANSACTION)
     }
 }
 

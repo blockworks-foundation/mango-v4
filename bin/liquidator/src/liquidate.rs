@@ -22,64 +22,6 @@ pub struct Config {
     pub compute_limit_for_liq_ix: u32,
 }
 
-pub async fn jupiter_market_can_buy(
-    mango_client: &MangoClient,
-    token: TokenIndex,
-    quote_token: TokenIndex,
-) -> bool {
-    if token == quote_token {
-        return true;
-    }
-    let token_mint = mango_client.context.token(token).mint_info.mint;
-    let quote_token_mint = mango_client.context.token(quote_token).mint_info.mint;
-
-    // Consider a market alive if we can swap $10 worth at 1% slippage
-    // TODO: configurable
-    // TODO: cache this, no need to recheck often
-    let quote_amount = 10_000_000u64;
-    let slippage = 100;
-    mango_client
-        .jupiter_route(
-            quote_token_mint,
-            token_mint,
-            quote_amount,
-            slippage,
-            JupiterSwapMode::ExactIn,
-            false,
-        )
-        .await
-        .is_ok()
-}
-
-pub async fn jupiter_market_can_sell(
-    mango_client: &MangoClient,
-    token: TokenIndex,
-    quote_token: TokenIndex,
-) -> bool {
-    if token == quote_token {
-        return true;
-    }
-    let token_mint = mango_client.context.token(token).mint_info.mint;
-    let quote_token_mint = mango_client.context.token(quote_token).mint_info.mint;
-
-    // Consider a market alive if we can swap $10 worth at 1% slippage
-    // TODO: configurable
-    // TODO: cache this, no need to recheck often
-    let quote_amount = 10_000_000u64;
-    let slippage = 100;
-    mango_client
-        .jupiter_route(
-            token_mint,
-            quote_token_mint,
-            quote_amount,
-            slippage,
-            JupiterSwapMode::ExactOut,
-            false,
-        )
-        .await
-        .is_ok()
-}
-
 struct LiquidateHelper<'a> {
     client: &'a MangoClient,
     account_fetcher: &'a chain_data::AccountFetcher,
