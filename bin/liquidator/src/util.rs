@@ -47,7 +47,7 @@ pub async fn jupiter_route(
     swap_mode: JupiterSwapMode,
     only_direct_routes: bool,
     mock: bool,
-) -> anyhow::Result<mango_v4_client::jupiter::QueryRoute> {
+) -> anyhow::Result<mango_v4_client::jupiter::Quote> {
     if !mock {
         return mango_client
             .jupiter_route(
@@ -61,6 +61,7 @@ pub async fn jupiter_route(
             .await;
     }
 
+    // TODO: elevate this mock to client.rs
     let input_price = mango_client
         .bank_oracle_price(mango_client.context.token_by_mint(&input_mint)?.token_index)
         .await?;

@@ -7,9 +7,9 @@ use anchor_client::Cluster;
 use clap::Parser;
 use mango_v4::state::{PerpMarketIndex, TokenIndex};
 use mango_v4_client::{
-    account_update_stream, chain_data, keypair_from_cli, snapshot_source, websocket_source,
-    AsyncChannelSendUnlessFull, Client, MangoClient, MangoClientError, MangoGroupContext,
-    TransactionBuilderConfig,
+    account_update_stream, chain_data, jupiter, keypair_from_cli, snapshot_source,
+    websocket_source, AsyncChannelSendUnlessFull, Client, MangoClient, MangoClientError,
+    MangoGroupContext, TransactionBuilderConfig,
 };
 
 use itertools::Itertools;
@@ -276,7 +276,7 @@ async fn main() -> anyhow::Result<()> {
         // TODO: config
         borrow_settle_excess: 1.05,
         refresh_timeout: Duration::from_secs(30),
-        jupiter_version: rebalance::JupiterVersion::V6, // TODO: config
+        jupiter_version: jupiter::Version::V6, // TODO: config
     };
 
     let rebalancer = Arc::new(rebalance::Rebalancer {

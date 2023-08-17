@@ -217,8 +217,8 @@ async fn execute_token_conditional_swap(
         )
         .await?;
 
-        let sell_amount = route.in_amount.parse::<f64>()?;
-        let buy_amount = route.out_amount.parse::<f64>()?;
+        let sell_amount = route.in_amount as f64;
+        let buy_amount = route.out_amount as f64;
         let swap_price = sell_amount / buy_amount;
 
         if swap_price > taker_price.to_num::<f64>() {

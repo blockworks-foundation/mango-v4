@@ -257,12 +257,7 @@ impl Rebalancer {
             return Ok((builder, full.clone()));
         }
         trace!(
-            market_info_label = full
-                .route
-                .market_infos
-                .first()
-                .map(|v| v.label.clone())
-                .unwrap_or_else(|| "no market_info".into()),
+            route_label = full.first_route_label(),
             %full.input_mint,
             %full.output_mint,
             "full route does not fit in a tx",

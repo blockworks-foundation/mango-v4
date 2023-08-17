@@ -5,7 +5,7 @@ use itertools::Itertools;
 use tracing::*;
 
 use mango_v4::state::TokenIndex;
-use mango_v4_client::jupiter::QueryRoute;
+use mango_v4_client::jupiter;
 use mango_v4_client::{JupiterSwapMode, MangoClient};
 
 use crate::util;
@@ -60,9 +60,9 @@ impl TokenSwapInfoUpdater {
     }
 
     /// oracle price is how many "in" tokens to pay for one "out" token
-    fn price_over_oracle(oracle_price: f64, route: QueryRoute) -> anyhow::Result<f64> {
-        let in_amount = route.in_amount.parse::<f64>()?;
-        let out_amount = route.out_amount.parse::<f64>()?;
+    fn price_over_oracle(oracle_price: f64, route: &jupiter::Quote) -> anyhow::Result<f64> {
+        let in_amount = route.in_amount as f64;
+        let out_amount = route.out_amount as f64;
         let actual_price = in_amount / out_amount;
         Ok(actual_price / oracle_price)
     }
@@ -120,8 +120,8 @@ impl TokenSwapInfoUpdater {
         )
         .await?;
 
-        let buy_over_oracle = Self::price_over_oracle(quote_per_token_price, buy_route)?;
-        let sell_over_oracle = Self::price_over_oracle(token_per_quote_price, sell_route)?;
+        let buy_over_oracle = Self::price_over_oracle(quote_per_token_price, &buy_route)?;
+        let sell_over_oracle = Self::price_over_oracle(token_per_quote_price, &sell_route)?;
 
         self.update(
             token_index,
