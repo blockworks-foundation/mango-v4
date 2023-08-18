@@ -126,6 +126,9 @@ pub struct MangoAccount {
     pub perps: Vec<PerpPosition>,
     pub padding7: u32,
     pub perp_open_orders: Vec<PerpOpenOrder>,
+    // WARNING: This does not have further fields, like tcs, intentionally:
+    // There are existing accounts that don't have them and adding them here
+    // would break backwards compatibility.
 }
 
 impl MangoAccount {
@@ -170,9 +173,9 @@ impl MangoAccount {
         perp_oo_count: u8,
         token_conditional_swap_count: u8,
     ) -> Result<usize> {
-        require_gte!(16, token_count);
+        require_gte!(8, token_count);
         require_gte!(8, serum3_count);
-        require_gte!(8, perp_count);
+        require_gte!(4, perp_count);
         require_gte!(64, perp_oo_count);
         require_gte!(64, token_conditional_swap_count);
 
@@ -1540,7 +1543,7 @@ mod tests {
         account.tokens.resize(8, TokenPosition::default());
         account.tokens[0].token_index = 8;
         account.serum3.resize(8, Serum3Orders::default());
-        account.perps.resize(8, PerpPosition::default());
+        account.perps.resize(4, PerpPosition::default());
         account.perps[0].market_index = 9;
         account.perp_open_orders.resize(8, PerpOpenOrder::default());
         account.next_token_conditional_swap_id = 13;
@@ -1554,7 +1557,7 @@ mod tests {
         };
         assert_eq!(
             8 + account_bytes_with_tcs.len(),
-            MangoAccount::space(8, 8, 8, 8, 0).unwrap()
+            MangoAccount::space(8, 8, 4, 8, 0).unwrap()
         );
 
         let account2 = MangoAccountValue::from_bytes(&account_bytes_without_tcs).unwrap();

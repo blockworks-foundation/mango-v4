@@ -370,7 +370,7 @@ async function createMangoAccount(): Promise<void> {
   const group = await client.getGroup(new PublicKey(GROUP_PK));
 
   const ix = await client.program.methods
-    .accountCreate(0, 8, 8, 8, 32, 'Mango DAO 0')
+    .accountCreate(0, 8, 8, 4, 32, 'Mango DAO 0')
     .accounts({
       group: group.publicKey,
       owner: new PublicKey('5tgfd6XgwiXB9otEnzFpXK11m7Q7yZUaAJzWK4oT5UGF'),
