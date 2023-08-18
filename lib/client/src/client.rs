@@ -2197,6 +2197,7 @@ impl TransactionBuilder {
                         .sum()
                 })
                 .unwrap_or(0);
+        println!("static accounts {:?}", tx.message.static_account_keys());
         Ok(TransactionSize {
             accounts,
             length: bytes.len(),
