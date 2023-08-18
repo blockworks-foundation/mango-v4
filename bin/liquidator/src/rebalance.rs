@@ -327,10 +327,9 @@ impl Rebalancer {
             };
             let mut amount = fresh_amount()?;
 
-            info!(token_index, %amount, %dust_threshold, "checking");
+            trace!(token_index, %amount, %dust_threshold, "checking");
             if amount < 0 {
                 // Buy
-                info!("buy");
                 let buy_amount =
                     amount.abs().ceil() + (dust_threshold - I80F48::ONE).max(I80F48::ZERO);
                 let input_amount =
@@ -358,7 +357,6 @@ impl Rebalancer {
             }
 
             if amount > dust_threshold {
-                info!("sell");
                 // Sell
                 let (txsig, route) = self
                     .token_swap_sell(token_mint, amount.to_num::<u64>())
@@ -385,7 +383,6 @@ impl Rebalancer {
             // Any remainder that could not be sold just gets withdrawn to ensure the
             // TokenPosition is freed up
             if amount > 0 && amount <= dust_threshold && !token_position.is_in_use() {
-                info!("withdraw");
                 let allow_borrow = false;
                 let txsig = self
                     .mango_client
@@ -401,7 +398,6 @@ impl Rebalancer {
                     return Ok(());
                 }
             } else if amount > dust_threshold {
-                info!("error");
                 anyhow::bail!(
                     "unexpected {} position after rebalance swap: {} native",
                     token.name,
