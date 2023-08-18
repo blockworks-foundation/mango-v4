@@ -97,7 +97,8 @@ impl TokenSwapInfoUpdater {
         let token_amount = (self.config.quote_amount as f64 * token_per_quote_price) as u64;
         let sell_route = self
             .mango_client
-            .jupiter_quote(
+            .jupiter()
+            .quote(
                 token_mint,
                 quote_mint,
                 token_amount,
@@ -108,7 +109,8 @@ impl TokenSwapInfoUpdater {
             .await?;
         let buy_route = self
             .mango_client
-            .jupiter_quote(
+            .jupiter()
+            .quote(
                 quote_mint,
                 token_mint,
                 self.config.quote_amount,

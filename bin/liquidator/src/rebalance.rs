@@ -88,7 +88,8 @@ impl Rebalancer {
         jupiter_version: jupiter::Version,
     ) -> anyhow::Result<jupiter::Quote> {
         self.mango_client
-            .jupiter_quote(
+            .jupiter()
+            .quote(
                 input_mint,
                 output_mint,
                 amount,
@@ -245,7 +246,8 @@ impl Rebalancer {
     ) -> anyhow::Result<(TransactionBuilder, jupiter::Quote)> {
         let builder = self
             .mango_client
-            .prepare_jupiter_swap_transaction(full)
+            .jupiter()
+            .prepare_swap_transaction(full)
             .await?;
         let tx_size = builder.transaction_size()?;
         if tx_size.is_ok() {
@@ -274,7 +276,8 @@ impl Rebalancer {
             .unwrap();
         let builder = self
             .mango_client
-            .prepare_jupiter_swap_transaction(best)
+            .jupiter()
+            .prepare_swap_transaction(best)
             .await?;
         Ok((builder, best.clone()))
     }

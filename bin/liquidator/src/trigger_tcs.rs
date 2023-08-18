@@ -205,7 +205,8 @@ async fn execute_token_conditional_swap(
                 .to_num(),
         );
         let route = mango_client
-            .jupiter_quote(
+            .jupiter()
+            .quote(
                 sell_mint,
                 buy_mint,
                 input_amount,
