@@ -1,19 +1,18 @@
 use itertools::Itertools;
 use mango_v4::accounts_zerocopy::KeyedAccountSharedData;
 use mango_v4::state::{
-    Bank, BookSide, MangoAccountValue, PerpPosition, PlaceOrderType, Side, TokenIndex,
-    TokenPosition, QUOTE_TOKEN_INDEX,
+    Bank, BookSide, MangoAccountValue, PerpPosition, PlaceOrderType, Side, QUOTE_TOKEN_INDEX,
 };
 use mango_v4_client::{
-    chain_data, jupiter, perp_pnl, AnyhowWrap, MangoClient, PerpMarketContext, TokenContext,
-    TransactionBuilder,
+    chain_data, jupiter, perp_pnl, MangoClient, PerpMarketContext, TokenContext,
+    TransactionBuilder, TransactionSize,
 };
 
 use {fixed::types::I80F48, solana_sdk::pubkey::Pubkey};
 
 use solana_sdk::signature::Signature;
 use std::sync::Arc;
-use std::{collections::HashMap, time::Duration};
+use std::time::Duration;
 use tracing::*;
 
 #[derive(Clone)]
@@ -29,46 +28,11 @@ pub struct Config {
     pub jupiter_version: jupiter::Version,
 }
 
-#[derive(Debug)]
-struct TokenState {
-    price: I80F48,
-    native_position: I80F48,
-    in_use: bool,
-}
-
-impl TokenState {
-    fn new_position(
-        token: &TokenContext,
-        position: &TokenPosition,
-        account_fetcher: &chain_data::AccountFetcher,
-    ) -> anyhow::Result<Self> {
-        let bank = Self::bank(token, account_fetcher)?;
-        Ok(Self {
-            price: Self::fetch_price(token, &bank, account_fetcher)?,
-            native_position: position.native(&bank),
-            in_use: position.is_in_use(),
-        })
-    }
-
-    fn bank(
-        token: &TokenContext,
-        account_fetcher: &chain_data::AccountFetcher,
-    ) -> anyhow::Result<Bank> {
-        account_fetcher.fetch::<Bank>(&token.mint_info.first_bank())
-    }
-
-    fn fetch_price(
-        token: &TokenContext,
-        bank: &Bank,
-        account_fetcher: &chain_data::AccountFetcher,
-    ) -> anyhow::Result<I80F48> {
-        let oracle = account_fetcher.fetch_raw(&token.mint_info.oracle)?;
-        bank.oracle_price(
-            &KeyedAccountSharedData::new(token.mint_info.oracle, oracle.into()),
-            None,
-        )
-        .map_err_anyhow()
-    }
+fn token_bank(
+    token: &TokenContext,
+    account_fetcher: &chain_data::AccountFetcher,
+) -> anyhow::Result<Bank> {
+    account_fetcher.fetch::<Bank>(&token.mint_info.first_bank())
 }
 
 pub struct Rebalancer {
@@ -168,8 +132,9 @@ impl Rebalancer {
         );
 
         // For the SOL -> output route we need to adjust the in amount by the SOL price
-        let sol_bank = TokenState::bank(sol_token, &self.account_fetcher)?;
-        let sol_price = TokenState::fetch_price(sol_token, &sol_bank, &self.account_fetcher)?;
+        let sol_price = self
+            .account_fetcher
+            .fetch_bank_price(&sol_token.mint_info.first_bank())?;
         let in_amount_sol = (I80F48::from(in_amount_quote) / sol_price)
             .ceil()
             .to_num::<u64>();
@@ -252,13 +217,16 @@ impl Rebalancer {
             .mango_client
             .prepare_jupiter_swap_transaction(full)
             .await?;
-        if builder.transaction_size_ok()? {
+        let tx_size = builder.transaction_size()?;
+        if tx_size.is_ok() {
             return Ok((builder, full.clone()));
         }
         trace!(
             route_label = full.first_route_label(),
             %full.input_mint,
             %full.output_mint,
+            ?tx_size,
+            limit = ?TransactionSize::limit(),
             "full route does not fit in a tx",
         );
 
@@ -281,33 +249,29 @@ impl Rebalancer {
         Ok((builder, best.clone()))
     }
 
+    fn mango_account(&self) -> anyhow::Result<Box<MangoAccountValue>> {
+        Ok(Box::new(
+            self.account_fetcher
+                .fetch_mango_account(&self.mango_account_address)?,
+        ))
+    }
+
     async fn rebalance_tokens(&self) -> anyhow::Result<()> {
-        let account = self
-            .account_fetcher
-            .fetch_mango_account(&self.mango_account_address)?;
+        let account = self.mango_account()?;
 
         // TODO: configurable?
         let quote_token = self.mango_client.context.token(QUOTE_TOKEN_INDEX);
 
-        let tokens: anyhow::Result<HashMap<TokenIndex, TokenState>> = account
-            .active_token_positions()
-            .map(|token_position| {
-                let token = self.mango_client.context.token(token_position.token_index);
-                Ok((
-                    token.token_index,
-                    TokenState::new_position(token, token_position, &self.account_fetcher)?,
-                ))
-            })
-            .try_collect();
-        let tokens = tokens?;
-        trace!(?tokens, "account tokens");
-
-        for (token_index, token_state) in tokens {
+        for token_position in account.active_token_positions() {
+            let token_index = token_position.token_index;
             let token = self.mango_client.context.token(token_index);
             if token_index == quote_token.token_index {
                 continue;
             }
             let token_mint = token.mint_info.mint;
+            let token_price = self
+                .account_fetcher
+                .fetch_bank_price(&token.mint_info.first_bank())?;
 
             // It's not always possible to bring the native balance to 0 through swaps:
             // Consider a price <1. You need to sell a bunch of tokens to get 1 USDC native and
@@ -319,17 +283,28 @@ impl Rebalancer {
             // to sell them. Instead they will be withdrawn at the end.
             // Purchases will aim to purchase slightly more than is needed, such that we can
             // again withdraw the dust at the end.
-            let dust_threshold = I80F48::from(2) / token_state.price;
+            let dust_threshold = I80F48::from(2) / token_price;
 
-            let mut amount = token_state.native_position;
+            // Some rebalancing can actually change non-USDC positions (rebalancing to SOL)
+            // So re-fetch the current token position amount
+            let bank = token_bank(token, &self.account_fetcher)?;
+            let fresh_amount = || -> anyhow::Result<I80F48> {
+                Ok(self
+                    .mango_account()?
+                    .token_position_and_raw_index(token_index)
+                    .map(|(position, _)| position.native(&bank))
+                    .unwrap_or(I80F48::ZERO))
+            };
+            let mut amount = fresh_amount()?;
 
+            info!(token_index, %amount, %dust_threshold, "checking");
             if amount < 0 {
                 // Buy
+                info!("buy");
                 let buy_amount =
                     amount.abs().ceil() + (dust_threshold - I80F48::ONE).max(I80F48::ZERO);
-                let input_amount = buy_amount
-                    * token_state.price
-                    * I80F48::from_num(self.config.borrow_settle_excess);
+                let input_amount =
+                    buy_amount * token_price * I80F48::from_num(self.config.borrow_settle_excess);
                 let (txsig, route) = self
                     .token_swap_buy(token_mint, input_amount.to_num())
                     .await?;
@@ -349,17 +324,11 @@ impl Rebalancer {
                 if !self.refresh_mango_account_after_tx(txsig).await? {
                     return Ok(());
                 }
-                let bank = TokenState::bank(token, &self.account_fetcher)?;
-                amount = self
-                    .mango_client
-                    .mango_account()
-                    .await?
-                    .token_position_and_raw_index(token_index)
-                    .map(|(position, _)| position.native(&bank))
-                    .unwrap_or(I80F48::ZERO);
+                amount = fresh_amount()?;
             }
 
             if amount > dust_threshold {
+                info!("sell");
                 // Sell
                 let (txsig, route) = self
                     .token_swap_sell(token_mint, amount.to_num::<u64>())
@@ -380,19 +349,13 @@ impl Rebalancer {
                 if !self.refresh_mango_account_after_tx(txsig).await? {
                     return Ok(());
                 }
-                let bank = TokenState::bank(token, &self.account_fetcher)?;
-                amount = self
-                    .mango_client
-                    .mango_account()
-                    .await?
-                    .token_position_and_raw_index(token_index)
-                    .map(|(position, _)| position.native(&bank))
-                    .unwrap_or(I80F48::ZERO);
+                amount = fresh_amount()?;
             }
 
             // Any remainder that could not be sold just gets withdrawn to ensure the
             // TokenPosition is freed up
-            if amount > 0 && amount <= dust_threshold && !token_state.in_use {
+            if amount > 0 && amount <= dust_threshold && !token_position.is_in_use() {
+                info!("withdraw");
                 let allow_borrow = false;
                 let txsig = self
                     .mango_client
@@ -408,6 +371,7 @@ impl Rebalancer {
                     return Ok(());
                 }
             } else if amount > dust_threshold {
+                info!("error");
                 anyhow::bail!(
                     "unexpected {} position after rebalance swap: {} native",
                     token.name,
@@ -574,10 +538,7 @@ impl Rebalancer {
     }
 
     async fn rebalance_perps(&self) -> anyhow::Result<()> {
-        let account = Box::new(
-            self.account_fetcher
-                .fetch_mango_account(&self.mango_account_address)?,
-        );
+        let account = self.mango_account()?;
 
         for perp_position in account.active_perp_positions() {
             let perp = self.mango_client.context.perp(perp_position.market_index);

@@ -1896,7 +1896,6 @@ impl MangoClient {
         output_mint: Pubkey,
         amount: u64,
     ) -> anyhow::Result<jupiter::Quote> {
-        // TODO: elevate this mock to client.rs
         let input_price = self
             .bank_oracle_price(self.context.token_by_mint(&input_mint)?.token_index)
             .await?;
@@ -2093,6 +2092,26 @@ pub enum MangoClientError {
     },
 }
 
+#[derive(Clone, Debug)]
+pub struct TransactionSize {
+    pub accounts: usize,
+    pub length: usize,
+}
+
+impl TransactionSize {
+    pub fn is_ok(&self) -> bool {
+        let limit = Self::limit();
+        self.length <= limit.length && self.accounts <= limit.accounts
+    }
+
+    pub fn limit() -> Self {
+        Self {
+            accounts: MAX_ACCOUNTS_PER_TRANSACTION,
+            length: solana_sdk::packet::PACKET_DATA_SIZE,
+        }
+    }
+}
+
 #[derive(Copy, Clone, Debug)]
 pub struct TransactionBuilderConfig {
     // adds a SetComputeUnitPrice instruction in front
@@ -2166,7 +2185,7 @@ impl TransactionBuilder {
             .map_err(prettify_solana_client_error)
     }
 
-    pub fn transaction_size_ok(&self) -> anyhow::Result<bool> {
+    pub fn transaction_size(&self) -> anyhow::Result<TransactionSize> {
         let tx = self.transaction_with_blockhash(solana_sdk::hash::Hash::default())?;
         let bytes = bincode::serialize(&tx)?;
         let accounts = tx.message.static_account_keys().len()
@@ -2178,8 +2197,10 @@ impl TransactionBuilder {
                         .sum()
                 })
                 .unwrap_or(0);
-        Ok(bytes.len() <= solana_sdk::packet::PACKET_DATA_SIZE
-            && accounts <= MAX_ACCOUNTS_PER_TRANSACTION)
+        Ok(TransactionSize {
+            accounts,
+            length: bytes.len(),
+        })
     }
 }
 
