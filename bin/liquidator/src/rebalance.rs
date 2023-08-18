@@ -85,6 +85,7 @@ impl Rebalancer {
         output_mint: Pubkey,
         amount: u64,
         only_direct_routes: bool,
+        jupiter_version: jupiter::Version,
     ) -> anyhow::Result<jupiter::Quote> {
         self.mango_client
             .jupiter_quote(
@@ -93,7 +94,7 @@ impl Rebalancer {
                 amount,
                 self.config.slippage_bps,
                 only_direct_routes,
-                self.config.jupiter_version,
+                jupiter_version,
             )
             .await
     }
@@ -117,18 +118,23 @@ impl Rebalancer {
                 .get("SOL") // TODO: better use mint
                 .unwrap(),
         );
+        let quote_mint = quote_token.mint_info.mint;
+        let sol_mint = sol_token.mint_info.mint;
+        let jupiter_version = self.config.jupiter_version;
 
         let full_route_job = self.jupiter_quote(
-            quote_token.mint_info.mint,
+            quote_mint,
             output_mint,
             in_amount_quote,
             false,
+            jupiter_version,
         );
         let direct_quote_route_job = self.jupiter_quote(
-            quote_token.mint_info.mint,
+            quote_mint,
             output_mint,
             in_amount_quote,
             true,
+            jupiter_version,
         );
 
         // For the SOL -> output route we need to adjust the in amount by the SOL price
@@ -139,19 +145,29 @@ impl Rebalancer {
             .ceil()
             .to_num::<u64>();
         let direct_sol_route_job =
-            self.jupiter_quote(sol_token.mint_info.mint, output_mint, in_amount_sol, true);
+            self.jupiter_quote(sol_mint, output_mint, in_amount_sol, true, jupiter_version);
 
-        let (full_route, direct_quote_route, direct_sol_route) =
-            tokio::join!(full_route_job, direct_quote_route_job, direct_sol_route_job);
-        let alternatives = [direct_quote_route, direct_sol_route]
-            .into_iter()
-            .filter_map(|v| v.ok())
-            .collect_vec();
+        let mut jobs = vec![full_route_job, direct_quote_route_job, direct_sol_route_job];
+
+        // for v6, add a v4 fallback
+        if self.config.jupiter_version == jupiter::Version::V6 {
+            jobs.push(self.jupiter_quote(
+                quote_mint,
+                output_mint,
+                in_amount_quote,
+                false,
+                jupiter::Version::V4,
+            ));
+        }
+
+        let mut results = futures::future::join_all(jobs).await;
+        let full_route = results.remove(0)?;
+        let alternatives = results.into_iter().filter_map(|v| v.ok()).collect_vec();
 
         let (tx_builder, route) = self
             .determine_best_jupiter_tx(
                 // If the best_route couldn't be fetched, something is wrong
-                &full_route?,
+                &full_route,
                 &alternatives,
             )
             .await?;
@@ -180,24 +196,38 @@ impl Rebalancer {
                 .get("SOL") // TODO: better use mint
                 .unwrap(),
         );
+        let quote_mint = quote_token.mint_info.mint;
+        let sol_mint = sol_token.mint_info.mint;
+        let jupiter_version = self.config.jupiter_version;
 
         let full_route_job =
-            self.jupiter_quote(input_mint, quote_token.mint_info.mint, in_amount, false);
+            self.jupiter_quote(input_mint, quote_mint, in_amount, false, jupiter_version);
         let direct_quote_route_job =
-            self.jupiter_quote(input_mint, quote_token.mint_info.mint, in_amount, true);
+            self.jupiter_quote(input_mint, quote_mint, in_amount, true, jupiter_version);
         let direct_sol_route_job =
-            self.jupiter_quote(input_mint, sol_token.mint_info.mint, in_amount, true);
-        let (full_route, direct_quote_route, direct_sol_route) =
-            tokio::join!(full_route_job, direct_quote_route_job, direct_sol_route_job);
-        let alternatives = [direct_quote_route, direct_sol_route]
-            .into_iter()
-            .filter_map(|v| v.ok())
-            .collect_vec();
+            self.jupiter_quote(input_mint, sol_mint, in_amount, true, jupiter_version);
+
+        let mut jobs = vec![full_route_job, direct_quote_route_job, direct_sol_route_job];
+
+        // for v6, add a v4 fallback
+        if self.config.jupiter_version == jupiter::Version::V6 {
+            jobs.push(self.jupiter_quote(
+                input_mint,
+                quote_mint,
+                in_amount,
+                false,
+                jupiter::Version::V4,
+            ));
+        }
+
+        let mut results = futures::future::join_all(jobs).await;
+        let full_route = results.remove(0)?;
+        let alternatives = results.into_iter().filter_map(|v| v.ok()).collect_vec();
 
         let (tx_builder, route) = self
             .determine_best_jupiter_tx(
                 // If the best_route couldn't be fetched, something is wrong
-                &full_route?,
+                &full_route,
                 &alternatives,
             )
             .await?;

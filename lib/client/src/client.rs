@@ -1676,7 +1676,14 @@ impl MangoClient {
         // mango program and group and account and instruction introspection.
         // Other accounts are shared between jupiter and mango:
         // token accounts, mints, token program, ata program, owner
-        let flash_loan_account_num = health_account_num + 4;
+        let extra_accounts = 4;
+        // To produce more of a margin for error (also for the tx bytes size)
+        let buffer_accounts = 5;
+        let flash_loan_account_num = health_account_num + extra_accounts + buffer_accounts;
+        println!(
+            "max acc {}",
+            MAX_ACCOUNTS_PER_TRANSACTION - flash_loan_account_num
+        );
 
         let response = self
             .http_client
