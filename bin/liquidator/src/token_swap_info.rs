@@ -6,14 +6,12 @@ use tracing::*;
 
 use mango_v4::state::TokenIndex;
 use mango_v4_client::jupiter;
-use mango_v4_client::{JupiterSwapMode, MangoClient};
-
-use crate::util;
+use mango_v4_client::MangoClient;
 
 pub struct Config {
     pub quote_index: TokenIndex,
     pub quote_amount: u64,
-    pub mock_jupiter: bool,
+    pub jupiter_version: jupiter::Version,
 }
 
 #[derive(Clone, Default)]
@@ -97,28 +95,28 @@ impl TokenSwapInfoUpdater {
         let token_per_quote_price = quote_price / token_price;
 
         let token_amount = (self.config.quote_amount as f64 * token_per_quote_price) as u64;
-        let sell_route = util::jupiter_route(
-            &self.mango_client,
-            token_mint,
-            quote_mint,
-            token_amount,
-            slippage,
-            JupiterSwapMode::ExactIn,
-            false,
-            self.config.mock_jupiter,
-        )
-        .await?;
-        let buy_route = util::jupiter_route(
-            &self.mango_client,
-            quote_mint,
-            token_mint,
-            self.config.quote_amount,
-            slippage,
-            JupiterSwapMode::ExactIn,
-            false,
-            self.config.mock_jupiter,
-        )
-        .await?;
+        let sell_route = self
+            .mango_client
+            .jupiter_quote(
+                token_mint,
+                quote_mint,
+                token_amount,
+                slippage,
+                false,
+                self.config.jupiter_version,
+            )
+            .await?;
+        let buy_route = self
+            .mango_client
+            .jupiter_quote(
+                quote_mint,
+                token_mint,
+                self.config.quote_amount,
+                slippage,
+                false,
+                self.config.jupiter_version,
+            )
+            .await?;
 
         let buy_over_oracle = Self::price_over_oracle(quote_per_token_price, &buy_route)?;
         let sell_over_oracle = Self::price_over_oracle(token_per_quote_price, &sell_route)?;

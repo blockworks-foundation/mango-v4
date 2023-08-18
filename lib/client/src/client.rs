@@ -1890,6 +1890,31 @@ impl MangoClient {
         tx_builder.send_and_confirm(&self.client).await
     }
 
+    pub async fn jupiter_quote_mock(
+        &self,
+        input_mint: Pubkey,
+        output_mint: Pubkey,
+        amount: u64,
+    ) -> anyhow::Result<jupiter::Quote> {
+        // TODO: elevate this mock to client.rs
+        let input_price = self
+            .bank_oracle_price(self.context.token_by_mint(&input_mint)?.token_index)
+            .await?;
+        let output_price = self
+            .bank_oracle_price(self.context.token_by_mint(&output_mint)?.token_index)
+            .await?;
+        let in_amount = amount;
+        let out_amount = (I80F48::from(amount) * input_price / output_price).to_num::<u64>();
+        Ok(jupiter::Quote {
+            input_mint,
+            output_mint,
+            price_impact_pct: 0.0,
+            in_amount,
+            out_amount,
+            raw: jupiter::RawQuote::Mock,
+        })
+    }
+
     pub async fn jupiter_quote(
         &self,
         input_mint: Pubkey,
@@ -1900,14 +1925,10 @@ impl MangoClient {
         version: jupiter::Version,
     ) -> anyhow::Result<jupiter::Quote> {
         Ok(match version {
-            jupiter::Version::Mock => jupiter::Quote {
-                input_mint,
-                output_mint,
-                price_impact_pct: 0.0,
-                in_amount: amount,
-                out_amount: amount,
-                raw: jupiter::RawQuote::Mock,
-            },
+            jupiter::Version::Mock => {
+                self.jupiter_quote_mock(input_mint, output_mint, amount)
+                    .await?
+            }
             jupiter::Version::V4 => jupiter::Quote::try_from_v4(
                 input_mint,
                 output_mint,

@@ -5,14 +5,13 @@ use mango_v4::state::{
     TokenPosition, QUOTE_TOKEN_INDEX,
 };
 use mango_v4_client::{
-    chain_data, jupiter, perp_pnl, AnyhowWrap, JupiterSwapMode, MangoClient, PerpMarketContext,
-    TokenContext, TransactionBuilder,
+    chain_data, jupiter, perp_pnl, AnyhowWrap, MangoClient, PerpMarketContext, TokenContext,
+    TransactionBuilder,
 };
 
 use {fixed::types::I80F48, solana_sdk::pubkey::Pubkey};
 
 use solana_sdk::signature::Signature;
-use std::str::FromStr;
 use std::sync::Arc;
 use std::{collections::HashMap, time::Duration};
 use tracing::*;

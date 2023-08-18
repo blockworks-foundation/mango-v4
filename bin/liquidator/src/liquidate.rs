@@ -4,7 +4,7 @@ use std::time::Duration;
 use itertools::Itertools;
 use mango_v4::health::{HealthCache, HealthType};
 use mango_v4::state::{MangoAccountValue, PerpMarketIndex, Side, TokenIndex, QUOTE_TOKEN_INDEX};
-use mango_v4_client::{chain_data, health_cache, JupiterSwapMode, MangoClient};
+use mango_v4_client::{chain_data, health_cache, MangoClient};
 use solana_sdk::signature::Signature;
 
 use futures::{stream, StreamExt, TryStreamExt};
@@ -18,7 +18,6 @@ use crate::util;
 pub struct Config {
     pub min_health_ratio: f64,
     pub refresh_timeout: Duration,
-    pub mock_jupiter: bool,
     pub compute_limit_for_liq_ix: u32,
 }
 

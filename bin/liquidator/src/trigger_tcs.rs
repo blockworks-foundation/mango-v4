@@ -5,7 +5,7 @@ use mango_v4::{
     i80f48::ClampToInt,
     state::{Bank, MangoAccountValue, TokenConditionalSwap},
 };
-use mango_v4_client::{chain_data, health_cache, JupiterSwapMode, MangoClient, MangoGroupContext};
+use mango_v4_client::{chain_data, health_cache, jupiter, MangoClient, MangoGroupContext};
 
 use tracing::*;
 use {anyhow::Context, fixed::types::I80F48, solana_sdk::pubkey::Pubkey};
@@ -25,7 +25,7 @@ pub struct Config {
     pub min_health_ratio: f64,
     pub max_trigger_quote_amount: u64,
     pub refresh_timeout: Duration,
-    pub mock_jupiter: bool,
+    pub jupiter_version: jupiter::Version,
     pub compute_limit_for_trigger: u32,
 }
 
@@ -197,7 +197,6 @@ async fn execute_token_conditional_swap(
     {
         let buy_mint = mango_client.context.mint_info(tcs.buy_token_index).mint;
         let sell_mint = mango_client.context.mint_info(tcs.sell_token_index).mint;
-        let swap_mode = JupiterSwapMode::ExactIn;
         // The slippage does not matter since we're not going to execute it
         let slippage = 100;
         let input_amount = max_sell_token_to_liqor.min(
@@ -205,17 +204,16 @@ async fn execute_token_conditional_swap(
                 .floor()
                 .to_num(),
         );
-        let route = util::jupiter_route(
-            mango_client,
-            sell_mint,
-            buy_mint,
-            input_amount,
-            slippage,
-            swap_mode,
-            false,
-            config.mock_jupiter,
-        )
-        .await?;
+        let route = mango_client
+            .jupiter_quote(
+                sell_mint,
+                buy_mint,
+                input_amount,
+                slippage,
+                false,
+                config.jupiter_version,
+            )
+            .await?;
 
         let sell_amount = route.in_amount as f64;
         let buy_amount = route.out_amount as f64;

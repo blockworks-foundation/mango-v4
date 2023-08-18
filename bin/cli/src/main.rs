@@ -1,7 +1,6 @@
 use clap::{Args, Parser, Subcommand};
 use mango_v4_client::{
-    keypair_from_cli, pubkey_from_cli, Client, JupiterSwapMode, MangoClient,
-    TransactionBuilderConfig,
+    keypair_from_cli, pubkey_from_cli, Client, MangoClient, TransactionBuilderConfig,
 };
 use solana_sdk::pubkey::Pubkey;
 use std::str::FromStr;
