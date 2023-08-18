@@ -63,22 +63,12 @@ impl Quote {
         let label_maybe = match &self.raw {
             RawQuote::Mock => Some("mock".into()),
             RawQuote::V4(raw) => raw.market_infos.first().map(|v| v.label.clone()),
-            RawQuote::V6(raw) => Some(
-                raw.route_plan
-                    .iter()
-                    .map(|route| {
-                        format!(
-                            "{} {}, ",
-                            route
-                                .swap_info
-                                .as_ref()
-                                .and_then(|si| si.label.as_ref())
-                                .unwrap_or(&"unknown".into()),
-                            route.percent
-                        )
-                    })
-                    .collect(),
-            ),
+            RawQuote::V6(raw) => raw
+                .route_plan
+                .first()
+                .and_then(|v| v.swap_info.as_ref())
+                .and_then(|v| v.label.as_ref())
+                .cloned(),
         };
         label_maybe.unwrap_or("unknown".into())
     }

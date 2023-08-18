@@ -248,14 +248,6 @@ impl Rebalancer {
             .prepare_jupiter_swap_transaction(full)
             .await?;
         let tx_size = builder.transaction_size()?;
-        trace!(
-            route_label = full.first_route_label(),
-            %full.input_mint,
-            %full.output_mint,
-            ?tx_size,
-            limit = ?TransactionSize::limit(),
-            "full route info",
-        );
         if tx_size.is_ok() {
             return Ok((builder, full.clone()));
         }
