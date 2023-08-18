@@ -12,6 +12,7 @@ pub fn account_create(
     serum3_count: u8,
     perp_count: u8,
     perp_oo_count: u8,
+    token_conditional_swap_count: u8,
     name: String,
 ) -> Result<()> {
     let mut account = ctx.accounts.account.load_full_init()?;
@@ -29,7 +30,13 @@ pub fn account_create(
     account.fixed.delegate = Pubkey::default();
     account.fixed.set_being_liquidated(false);
 
-    account.expand_dynamic_content(token_count, serum3_count, perp_count, perp_oo_count, 0)?;
+    account.expand_dynamic_content(
+        token_count,
+        serum3_count,
+        perp_count,
+        perp_oo_count,
+        token_conditional_swap_count,
+    )?;
 
     Ok(())
 }
