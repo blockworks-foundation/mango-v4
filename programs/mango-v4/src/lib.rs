@@ -288,7 +288,10 @@ pub mod mango_v4 {
     ) -> Result<()> {
         #[cfg(feature = "enable-gpl")]
         instructions::account_create(
-            ctx,
+            &ctx.accounts.account,
+            *ctx.bumps.get("account").ok_or(MangoError::SomeError)?,
+            ctx.accounts.group.key(),
+            ctx.accounts.owner.key(),
             account_num,
             token_count,
             serum3_count,
@@ -301,7 +304,7 @@ pub mod mango_v4 {
     }
 
     pub fn account_create_v2(
-        ctx: Context<AccountCreate>,
+        ctx: Context<AccountCreateV2>,
         account_num: u32,
         token_count: u8,
         serum3_count: u8,
@@ -312,7 +315,10 @@ pub mod mango_v4 {
     ) -> Result<()> {
         #[cfg(feature = "enable-gpl")]
         instructions::account_create(
-            ctx,
+            &ctx.accounts.account,
+            *ctx.bumps.get("account").ok_or(MangoError::SomeError)?,
+            ctx.accounts.group.key(),
+            ctx.accounts.owner.key(),
             account_num,
             token_count,
             serum3_count,
