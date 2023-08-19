@@ -50,6 +50,20 @@ async fn test_token_conditional_swap() -> Result<(), TransportError> {
         0,
     )
     .await;
+    let no_tcs_account = send_tx(
+        solana,
+        AccountCreateInstruction {
+            account_num: 2,
+            token_conditional_swap_count: 0,
+            group,
+            owner,
+            payer,
+            ..Default::default()
+        },
+    )
+    .await
+    .unwrap()
+    .account;
 
     send_tx(
         solana,
@@ -73,7 +87,7 @@ async fn test_token_conditional_swap() -> Result<(), TransportError> {
     let tx_result = send_tx(
         solana,
         TokenConditionalSwapCreateInstruction {
-            account,
+            account: no_tcs_account,
             owner,
             buy_mint: quote_token.mint.pubkey,
             sell_mint: base_token.mint.pubkey,
@@ -96,10 +110,10 @@ async fn test_token_conditional_swap() -> Result<(), TransportError> {
         solana,
         AccountExpandInstruction {
             account_num: 0,
-            token_count: 16,
+            token_count: 8,
             serum3_count: 8,
-            perp_count: 8,
-            perp_oo_count: 8,
+            perp_count: 4,
+            perp_oo_count: 16,
             token_conditional_swap_count: 2,
             group,
             owner,

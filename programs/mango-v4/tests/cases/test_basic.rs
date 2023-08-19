@@ -33,13 +33,47 @@ async fn test_basic() -> Result<(), TransportError> {
         solana,
         AccountCreateInstruction {
             account_num: 0,
-            token_count: 8,
+            token_count: 6,
             serum3_count: 7,
             perp_count: 0,
             perp_oo_count: 0,
+            token_conditional_swap_count: 0,
             group,
             owner,
             payer,
+        },
+    )
+    .await
+    .unwrap()
+    .account;
+    let account_data: MangoAccount = solana.get_account(account).await;
+    assert_eq!(account_data.tokens.len(), 6);
+    assert_eq!(
+        account_data.tokens.iter().filter(|t| t.is_active()).count(),
+        0
+    );
+    assert_eq!(account_data.serum3.len(), 7);
+    assert_eq!(
+        account_data.serum3.iter().filter(|s| s.is_active()).count(),
+        0
+    );
+
+    assert_eq!(account_data.perps.len(), 0);
+    assert_eq!(account_data.perp_open_orders.len(), 0);
+
+    send_tx(
+        solana,
+        AccountExpandInstruction {
+            account_num: 0,
+            token_count: 8,
+            serum3_count: 8,
+            perp_count: 4,
+            perp_oo_count: 8,
+            token_conditional_swap_count: 4,
+            group,
+            owner,
+            payer,
+            ..Default::default()
         },
     )
     .await
@@ -51,40 +85,14 @@ async fn test_basic() -> Result<(), TransportError> {
         account_data.tokens.iter().filter(|t| t.is_active()).count(),
         0
     );
-    assert_eq!(account_data.serum3.len(), 7);
-    assert_eq!(
-        account_data.serum3.iter().filter(|s| s.is_active()).count(),
-        0
-    );
-
-    send_tx(
-        solana,
-        AccountExpandInstruction {
-            account_num: 0,
-            token_count: 16,
-            serum3_count: 8,
-            perp_count: 8,
-            perp_oo_count: 8,
-            group,
-            owner,
-            payer,
-            ..Default::default()
-        },
-    )
-    .await
-    .unwrap()
-    .account;
-    let account_data: MangoAccount = solana.get_account(account).await;
-    assert_eq!(account_data.tokens.len(), 16);
-    assert_eq!(
-        account_data.tokens.iter().filter(|t| t.is_active()).count(),
-        0
-    );
     assert_eq!(account_data.serum3.len(), 8);
     assert_eq!(
         account_data.serum3.iter().filter(|s| s.is_active()).count(),
         0
     );
+
+    assert_eq!(account_data.perps.len(), 4);
+    assert_eq!(account_data.perp_open_orders.len(), 8);
 
     //
     // TEST: Deposit funds
