@@ -49,6 +49,8 @@ Update this for each program release and mainnet deployment.
 - Token register: Revamp API for simpler use from governance (#665)
 - Token register untrusted: Adjust default oracle staleness (#678)
 - Fix typo in name of admin_token_withdraw_fees instruction (#655)
+- Flash loan: Better errors for missing banks (#639)
+- OpenBook v2 integration: First draft of instructions (#628)
 
 ## mainnet
 
