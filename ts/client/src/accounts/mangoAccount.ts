@@ -1842,11 +1842,23 @@ export class TokenConditionalSwap {
   }
 
   // TODO: will be replaced by onchain enum in next release
-  private getTokenConditionalSwapDisplayPriceStyle(): boolean {
-    if (this.maxSell.eq(U64_MAX_BN)) {
-      true;
+  private getTokenConditionalSwapDisplayPriceStyle(group: Group): boolean {
+    const buyBank = this.getBuyToken(group);
+    const sellBank = this.getSellToken(group);
+
+    // If we are tp/sl'ing SOL borrow, then price is stored in sol/usdc
+    // then don't flip
+    if (sellBank.tokenIndex == 0) {
+      return true;
     }
-    return false;
+
+    // E.g.
+    // If we are tp/sl'ing SOL deposit, then price is stored in usdc/sol
+    if (this.maxSell.eq(U64_MAX_BN)) {
+      true; // dont flip, i.e. continue using sellTokenPerBuyTokenUi price
+    }
+    // Flip the price if we know we are selling an exact amount of SOL
+    return false; // flip, i.e. use buyTokenPerSellTokenUi price
   }
 
   private priceLimitToUi(
@@ -1866,7 +1878,7 @@ export class TokenConditionalSwap {
     // buytoken/selltoken or selltoken/buytoken
 
     // Buy limit / close short
-    if (this.getTokenConditionalSwapDisplayPriceStyle()) {
+    if (this.getTokenConditionalSwapDisplayPriceStyle(group)) {
       return roundTo5(sellTokenPerBuyTokenUi);
     }
 
@@ -1913,7 +1925,7 @@ export class TokenConditionalSwap {
     // buytoken/selltoken or selltoken/buytoken
 
     // Buy limit / close short
-    if (this.getTokenConditionalSwapDisplayPriceStyle()) {
+    if (this.getTokenConditionalSwapDisplayPriceStyle(group)) {
       return roundTo5(sellTokenPerBuyTokenUi);
     }
 
@@ -1943,15 +1955,19 @@ export class TokenConditionalSwap {
   }
 
   toString(group: Group): string {
-    return `getMaxBuy ${this.getMaxBuyUi(
+    return `${
+      group.getFirstBankByTokenIndex(this.buyTokenIndex).name +
+      '/' +
+      group.getFirstBankByTokenIndex(this.sellTokenIndex).name
+    } , getMaxBuy ${this.getMaxBuyUi(group)}, getMaxSell ${this.getMaxSellUi(
       group,
-    )}, getMaxSell ${this.getMaxSellUi(group)}, bought ${this.getBoughtUi(
-      group,
-    )}, sold ${this.getSoldUi(
+    )}, bought ${this.getBoughtUi(group)}, sold ${this.getSoldUi(
       group,
     )}, getPriceLowerLimitUi ${this.getPriceLowerLimitUi(
       group,
     )},  getPriceUpperLimitUi ${this.getPriceUpperLimitUi(
+      group,
+    )}, getCurrentPairPriceUi ${this.getCurrentPairPriceUi(
       group,
     )}, getThresholdPriceUi ${this.getThresholdPriceUi(
       group,
