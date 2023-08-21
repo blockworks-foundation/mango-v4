@@ -172,21 +172,15 @@ impl MangoAccount {
         perp_count: u8,
         perp_oo_count: u8,
         token_conditional_swap_count: u8,
-    ) -> Result<usize> {
-        require_gte!(8, token_count);
-        require_gte!(8, serum3_count);
-        require_gte!(4, perp_count);
-        require_gte!(64, perp_oo_count);
-        require_gte!(64, token_conditional_swap_count);
-
-        Ok(8 + size_of::<MangoAccountFixed>()
+    ) -> usize {
+        8 + size_of::<MangoAccountFixed>()
             + Self::dynamic_size(
                 token_count,
                 serum3_count,
                 perp_count,
                 perp_oo_count,
                 token_conditional_swap_count,
-            ))
+            )
     }
 
     pub fn dynamic_token_vec_offset() -> usize {
@@ -529,6 +523,65 @@ impl MangoAccountDynamicHeader {
     }
     pub fn token_conditional_swap_count(&self) -> usize {
         self.token_conditional_swap_count.into()
+    }
+
+    pub fn zero() -> Self {
+        Self {
+            token_count: 0,
+            serum3_count: 0,
+            perp_count: 0,
+            perp_oo_count: 0,
+            token_conditional_swap_count: 0,
+        }
+    }
+
+    fn expected_health_accounts(&self) -> usize {
+        self.token_count() * 2 + self.serum3_count() + self.perp_count() * 2
+    }
+
+    /// Error if this header isn't a valid resize from `prev`
+    ///
+    /// - Check that dynamic fields can only increase in size
+    /// - Check that if something increases, it is bounded by the limits
+    /// - If a field doesn't change, don't error if it exceeds the limits
+    ///   (might have been expanded earlier when it was valid to do)
+    /// - Check that the total health accounts stay limited
+    pub fn check_resize_from(&self, prev: &Self) -> Result<()> {
+        require_gte!(self.token_count, prev.token_count);
+        if self.token_count > prev.token_count {
+            require_gte!(8, self.token_count);
+        }
+
+        require_gte!(self.serum3_count, prev.serum3_count);
+        if self.serum3_count > prev.serum3_count {
+            require_gte!(8, self.serum3_count);
+        }
+
+        require_gte!(self.perp_count, prev.perp_count);
+        if self.perp_count > prev.perp_count {
+            require_gte!(4, self.perp_count);
+        }
+
+        require_gte!(self.perp_oo_count, prev.perp_oo_count);
+        if self.perp_oo_count > prev.perp_oo_count {
+            require_gte!(64, self.perp_oo_count);
+        }
+
+        require_gte!(
+            self.token_conditional_swap_count,
+            prev.token_conditional_swap_count
+        );
+        if self.token_conditional_swap_count > prev.token_conditional_swap_count {
+            require_gte!(64, self.token_conditional_swap_count);
+        }
+
+        let new_health_accounts = self.expected_health_accounts();
+        let prev_health_accounts = prev.expected_health_accounts();
+        if new_health_accounts > prev_health_accounts {
+            require_gte!(32, new_health_accounts);
+        }
+
+        Ok(())
     }
 }
 
@@ -1323,16 +1376,6 @@ impl<
         new_perp_oo_count: u8,
         new_token_conditional_swap_count: u8,
     ) -> Result<()> {
-        require_gte!(new_token_count, self.header().token_count);
-        require_gte!(new_serum3_count, self.header().serum3_count);
-        require_gte!(new_perp_count, self.header().perp_count);
-        require_gte!(new_perp_oo_count, self.header().perp_oo_count);
-        require_gte!(
-            new_token_conditional_swap_count,
-            self.header().token_conditional_swap_count
-        );
-
-        // create a temp copy to compute new starting offsets
         let new_header = MangoAccountDynamicHeader {
             token_count: new_token_count,
             serum3_count: new_serum3_count,
@@ -1341,6 +1384,9 @@ impl<
             token_conditional_swap_count: new_token_conditional_swap_count,
         };
         let old_header = self.header().clone();
+
+        new_header.check_resize_from(&old_header)?;
+
         let dynamic = self.dynamic_mut();
 
         // expand dynamic components by first moving existing positions, and then setting new ones to defaults
@@ -1506,8 +1552,7 @@ mod tests {
             account.perps.len() as u8,
             account.perp_open_orders.len() as u8,
             tcs_length,
-        )
-        .unwrap();
+        );
         bytes.extend(vec![0u8; expected_space - bytes.len()]);
 
         // Set the length of these dynamic parts
@@ -1557,7 +1602,7 @@ mod tests {
         };
         assert_eq!(
             8 + account_bytes_with_tcs.len(),
-            MangoAccount::space(8, 8, 4, 8, 0).unwrap()
+            MangoAccount::space(8, 8, 4, 8, 0)
         );
 
         let account2 = MangoAccountValue::from_bytes(&account_bytes_without_tcs).unwrap();

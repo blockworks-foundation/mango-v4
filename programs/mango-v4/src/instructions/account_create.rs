@@ -18,6 +18,15 @@ pub fn account_create(
 ) -> Result<()> {
     let mut account = account_ai.load_full_init()?;
 
+    let header = MangoAccountDynamicHeader {
+        token_count,
+        serum3_count,
+        perp_count,
+        perp_oo_count,
+        token_conditional_swap_count,
+    };
+    header.check_resize_from(&MangoAccountDynamicHeader::zero())?;
+
     msg!(
         "Initialized account with header version {}",
         account.header_version()
