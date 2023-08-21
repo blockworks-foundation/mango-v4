@@ -44,7 +44,7 @@ async fn test_health_compute_serum() -> Result<(), TransportError> {
     let admin = TestKeypair::new();
     let owner = context.users[0].key;
     let payer = context.users[1].key;
-    let mints = &context.mints[0..8];
+    let mints = &context.mints[0..7];
     let payer_mint_accounts = &context.users[1].token_accounts[0..mints.len()];
 
     //
@@ -161,7 +161,7 @@ async fn test_health_compute_perp() -> Result<(), TransportError> {
     let admin = TestKeypair::new();
     let owner = context.users[0].key;
     let payer = context.users[1].key;
-    let mints = &context.mints[0..5];
+    let mints = &context.mints[0..4];
     let payer_mint_accounts = &context.users[1].token_accounts[0..mints.len()];
 
     //

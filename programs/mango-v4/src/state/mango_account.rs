@@ -554,12 +554,12 @@ impl MangoAccountDynamicHeader {
 
         require_gte!(self.serum3_count, prev.serum3_count);
         if self.serum3_count > prev.serum3_count {
-            require_gte!(8, self.serum3_count);
+            require_gte!(6, self.serum3_count);
         }
 
         require_gte!(self.perp_count, prev.perp_count);
         if self.perp_count > prev.perp_count {
-            require_gte!(4, self.perp_count);
+            require_gte!(3, self.perp_count);
         }
 
         require_gte!(self.perp_oo_count, prev.perp_oo_count);
@@ -578,7 +578,7 @@ impl MangoAccountDynamicHeader {
         let new_health_accounts = self.expected_health_accounts();
         let prev_health_accounts = prev.expected_health_accounts();
         if new_health_accounts > prev_health_accounts {
-            require_gte!(32, new_health_accounts);
+            require_gte!(28, new_health_accounts);
         }
 
         Ok(())

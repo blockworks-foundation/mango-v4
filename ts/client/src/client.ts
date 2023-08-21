@@ -739,8 +739,8 @@ export class MangoClient {
       .accountCreate(
         accountNumber ?? 0,
         tokenCount ?? 8,
-        serum3Count ?? 8,
-        perpCount ?? 4,
+        serum3Count ?? 6,
+        perpCount ?? 3,
         perpOoCount ?? 32,
         name ?? '',
       )
