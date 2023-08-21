@@ -34,7 +34,7 @@ async fn test_basic() -> Result<(), TransportError> {
         AccountCreateInstruction {
             account_num: 0,
             token_count: 6,
-            serum3_count: 7,
+            serum3_count: 5,
             perp_count: 0,
             perp_oo_count: 0,
             token_conditional_swap_count: 0,
@@ -52,7 +52,7 @@ async fn test_basic() -> Result<(), TransportError> {
         account_data.tokens.iter().filter(|t| t.is_active()).count(),
         0
     );
-    assert_eq!(account_data.serum3.len(), 7);
+    assert_eq!(account_data.serum3.len(), 5);
     assert_eq!(
         account_data.serum3.iter().filter(|s| s.is_active()).count(),
         0
@@ -66,8 +66,8 @@ async fn test_basic() -> Result<(), TransportError> {
         AccountExpandInstruction {
             account_num: 0,
             token_count: 8,
-            serum3_count: 8,
-            perp_count: 4,
+            serum3_count: 6,
+            perp_count: 3,
             perp_oo_count: 8,
             token_conditional_swap_count: 4,
             group,
@@ -85,13 +85,13 @@ async fn test_basic() -> Result<(), TransportError> {
         account_data.tokens.iter().filter(|t| t.is_active()).count(),
         0
     );
-    assert_eq!(account_data.serum3.len(), 8);
+    assert_eq!(account_data.serum3.len(), 6);
     assert_eq!(
         account_data.serum3.iter().filter(|s| s.is_active()).count(),
         0
     );
 
-    assert_eq!(account_data.perps.len(), 4);
+    assert_eq!(account_data.perps.len(), 3);
     assert_eq!(account_data.perp_open_orders.len(), 8);
 
     //
