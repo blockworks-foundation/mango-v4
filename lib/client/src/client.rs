@@ -212,8 +212,8 @@ impl MangoClient {
                 account_num,
                 name: mango_account_name.to_owned(),
                 token_count: 8,
-                serum3_count: 6,
-                perp_count: 3,
+                serum3_count: 4,
+                perp_count: 4,
                 perp_oo_count: 8,
             }),
         };

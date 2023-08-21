@@ -45,7 +45,7 @@ Update this for each program release and mainnet deployment.
 - Stop loss: Fees are configured by-token instead of globally (#659)
 - Stop loss: Avoid expensive health cache for expired orders (#682)
 - Account creation: Add account_create_v2 instruction (#680, #685)
-- Account resizing: Lower maximums due to tx account limit (#686)
+- Account resizing: Lower maximums due to tx account limit (#686, #688, #689)
 - Token register: Revamp API for simpler use from governance (#665)
 - Token register untrusted: Adjust default oracle staleness (#678)
 - Fix typo in name of admin_token_withdraw_fees instruction (#655)

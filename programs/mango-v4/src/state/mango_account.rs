@@ -554,12 +554,12 @@ impl MangoAccountDynamicHeader {
 
         require_gte!(self.serum3_count, prev.serum3_count);
         if self.serum3_count > prev.serum3_count {
-            require_gte!(6, self.serum3_count);
+            require_gte!(4, self.serum3_count);
         }
 
         require_gte!(self.perp_count, prev.perp_count);
         if self.perp_count > prev.perp_count {
-            require_gte!(3, self.perp_count);
+            require_gte!(4, self.perp_count);
         }
 
         require_gte!(self.perp_oo_count, prev.perp_oo_count);
