@@ -293,10 +293,10 @@ impl<'a> JupiterV6<'a> {
 
         let mut instructions: Vec<Instruction> = Vec::new();
 
-        for ix in &swap.compute_budget_instructions.unwrap_or(vec![]) {
+        for ix in &swap.compute_budget_instructions.unwrap_or_default() {
             instructions.push(ix.try_into()?);
         }
-        for ix in &swap.setup_instructions.unwrap_or(vec![]) {
+        for ix in &swap.setup_instructions.unwrap_or_default() {
             instructions.push(ix.try_into()?);
         }
         instructions.push(Instruction {
@@ -344,7 +344,7 @@ impl<'a> JupiterV6<'a> {
                 flash_loan_type: mango_v4::accounts_ix::FlashLoanType::Swap,
             }),
         });
-        for ix in &swap.cleanup_instructions.unwrap_or(vec![]) {
+        for ix in &swap.cleanup_instructions.unwrap_or_default() {
             instructions.push(ix.try_into()?);
         }
 
