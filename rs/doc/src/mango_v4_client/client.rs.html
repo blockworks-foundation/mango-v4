@@ -1917,6 +1917,12 @@
 <span id="1917">1917</span>
 <span id="1918">1918</span>
 <span id="1919">1919</span>
+<span id="1920">1920</span>
+<span id="1921">1921</span>
+<span id="1922">1922</span>
+<span id="1923">1923</span>
+<span id="1924">1924</span>
+<span id="1925">1925</span>
 </pre><pre class="rust"><code><span class="kw">use </span>std::ops::Deref;
 <span class="kw">use </span>std::str::FromStr;
 <span class="kw">use </span>std::sync::Arc;
@@ -2131,8 +2137,8 @@
                 account_num,
                 name: mango_account_name.to_owned(),
                 token_count: <span class="number">8</span>,
-                serum3_count: <span class="number">8</span>,
-                perp_count: <span class="number">8</span>,
+                serum3_count: <span class="number">4</span>,
+                perp_count: <span class="number">4</span>,
                 perp_oo_count: <span class="number">8</span>,
             }),
         };
@@ -2232,7 +2238,7 @@
     <span class="kw">pub async fn </span>derive_liquidation_health_check_remaining_account_metas(
         <span class="kw-2">&amp;</span><span class="self">self</span>,
         liqee: <span class="kw-2">&amp;</span>MangoAccountValue,
-        affected_tokens: Vec&lt;u16&gt;,
+        affected_tokens: <span class="kw-2">&amp;</span>[TokenIndex],
         writable_banks: <span class="kw-2">&amp;</span>[TokenIndex],
     ) -&gt; anyhow::Result&lt;Vec&lt;AccountMeta&gt;&gt; {
         <span class="kw">let </span>account = <span class="self">self</span>.mango_account().<span class="kw">await</span><span class="question-mark">?</span>;
@@ -2240,7 +2246,7 @@
             .derive_health_check_remaining_account_metas_two_accounts(
                 <span class="kw-2">&amp;</span>account,
                 liqee,
-                <span class="kw-2">&amp;</span>affected_tokens,
+                affected_tokens,
                 writable_banks,
             )
     }
@@ -2982,7 +2988,7 @@
         <span class="kw">let </span>settle_token_info = <span class="self">self</span>.context.token(perp.market.settle_token_index);
 
         <span class="kw">let </span>health_remaining_ams = <span class="self">self
-            </span>.derive_liquidation_health_check_remaining_account_metas(liqee.<span class="number">1</span>, <span class="macro">vec!</span>[], <span class="kw-2">&amp;</span>[])
+            </span>.derive_liquidation_health_check_remaining_account_metas(liqee.<span class="number">1</span>, <span class="kw-2">&amp;</span>[], <span class="kw-2">&amp;</span>[])
             .<span class="kw">await
             </span>.unwrap();
 
@@ -3035,7 +3041,7 @@
         <span class="kw">let </span>health_remaining_ams = <span class="self">self
             </span>.derive_liquidation_health_check_remaining_account_metas(
                 liqee.<span class="number">1</span>,
-                <span class="macro">vec!</span>[INSURANCE_TOKEN_INDEX],
+                <span class="kw-2">&amp;</span>[INSURANCE_TOKEN_INDEX],
                 <span class="kw-2">&amp;</span>[],
             )
             .<span class="kw">await
@@ -3087,7 +3093,7 @@
         <span class="kw">let </span>health_remaining_ams = <span class="self">self
             </span>.derive_liquidation_health_check_remaining_account_metas(
                 liqee.<span class="number">1</span>,
-                <span class="macro">vec!</span>[],
+                <span class="kw-2">&amp;</span>[],
                 <span class="kw-2">&amp;</span>[asset_token_index, liab_token_index],
             )
             .<span class="kw">await
@@ -3138,7 +3144,7 @@
         <span class="kw">let </span>health_remaining_ams = <span class="self">self
             </span>.derive_liquidation_health_check_remaining_account_metas(
                 liqee.<span class="number">1</span>,
-                <span class="macro">vec!</span>[INSURANCE_TOKEN_INDEX],
+                <span class="kw-2">&amp;</span>[INSURANCE_TOKEN_INDEX],
                 <span class="kw-2">&amp;</span>[quote_token_index, liab_token_index],
             )
             .<span class="kw">await
@@ -3183,15 +3189,21 @@
         token_conditional_swap_id: u64,
         max_buy_token_to_liqee: u64,
         max_sell_token_to_liqor: u64,
+        extra_affected_tokens: <span class="kw-2">&amp;</span>[TokenIndex],
     ) -&gt; anyhow::Result&lt;Instruction&gt; {
         <span class="kw">let </span>(tcs_index, tcs) = liqee
             .<span class="number">1
             </span>.token_conditional_swap_by_id(token_conditional_swap_id)<span class="question-mark">?</span>;
 
+        <span class="kw">let </span>affected_tokens = extra_affected_tokens
+            .iter()
+            .chain(<span class="kw-2">&amp;</span>[tcs.buy_token_index, tcs.sell_token_index])
+            .copied()
+            .collect_vec();
         <span class="kw">let </span>health_remaining_ams = <span class="self">self
             </span>.derive_liquidation_health_check_remaining_account_metas(
                 liqee.<span class="number">1</span>,
-                <span class="macro">vec!</span>[tcs.buy_token_index, tcs.sell_token_index],
+                <span class="kw-2">&amp;</span>affected_tokens,
                 <span class="kw-2">&amp;</span>[tcs.buy_token_index, tcs.sell_token_index],
             )
             .<span class="kw">await

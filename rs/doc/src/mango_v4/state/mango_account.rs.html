@@ -1894,6 +1894,54 @@
 <span id="1894">1894</span>
 <span id="1895">1895</span>
 <span id="1896">1896</span>
+<span id="1897">1897</span>
+<span id="1898">1898</span>
+<span id="1899">1899</span>
+<span id="1900">1900</span>
+<span id="1901">1901</span>
+<span id="1902">1902</span>
+<span id="1903">1903</span>
+<span id="1904">1904</span>
+<span id="1905">1905</span>
+<span id="1906">1906</span>
+<span id="1907">1907</span>
+<span id="1908">1908</span>
+<span id="1909">1909</span>
+<span id="1910">1910</span>
+<span id="1911">1911</span>
+<span id="1912">1912</span>
+<span id="1913">1913</span>
+<span id="1914">1914</span>
+<span id="1915">1915</span>
+<span id="1916">1916</span>
+<span id="1917">1917</span>
+<span id="1918">1918</span>
+<span id="1919">1919</span>
+<span id="1920">1920</span>
+<span id="1921">1921</span>
+<span id="1922">1922</span>
+<span id="1923">1923</span>
+<span id="1924">1924</span>
+<span id="1925">1925</span>
+<span id="1926">1926</span>
+<span id="1927">1927</span>
+<span id="1928">1928</span>
+<span id="1929">1929</span>
+<span id="1930">1930</span>
+<span id="1931">1931</span>
+<span id="1932">1932</span>
+<span id="1933">1933</span>
+<span id="1934">1934</span>
+<span id="1935">1935</span>
+<span id="1936">1936</span>
+<span id="1937">1937</span>
+<span id="1938">1938</span>
+<span id="1939">1939</span>
+<span id="1940">1940</span>
+<span id="1941">1941</span>
+<span id="1942">1942</span>
+<span id="1943">1943</span>
+<span id="1944">1944</span>
 </pre><pre class="rust"><code><span class="kw">use </span>std::cell::{Ref, RefMut};
 <span class="kw">use </span>std::mem::size_of;
 
@@ -2022,7 +2070,10 @@
     <span class="kw">pub </span>perps: Vec&lt;PerpPosition&gt;,
     <span class="kw">pub </span>padding7: u32,
     <span class="kw">pub </span>perp_open_orders: Vec&lt;PerpOpenOrder&gt;,
-}
+    <span class="comment">// WARNING: This does not have further fields, like tcs, intentionally:
+    // There are existing accounts that don&#39;t have them and adding them here
+    // would break backwards compatibility.
+</span>}
 
 <span class="kw">impl </span>MangoAccount {
     <span class="kw">pub fn </span>default_for_tests() -&gt; <span class="self">Self </span>{
@@ -2065,21 +2116,15 @@
         perp_count: u8,
         perp_oo_count: u8,
         token_conditional_swap_count: u8,
-    ) -&gt; <span class="prelude-ty">Result</span>&lt;usize&gt; {
-        <span class="macro">require_gte!</span>(<span class="number">16</span>, token_count);
-        <span class="macro">require_gte!</span>(<span class="number">8</span>, serum3_count);
-        <span class="macro">require_gte!</span>(<span class="number">8</span>, perp_count);
-        <span class="macro">require_gte!</span>(<span class="number">64</span>, perp_oo_count);
-        <span class="macro">require_gte!</span>(<span class="number">64</span>, token_conditional_swap_count);
-
-        <span class="prelude-val">Ok</span>(<span class="number">8 </span>+ size_of::&lt;MangoAccountFixed&gt;()
+    ) -&gt; usize {
+        <span class="number">8 </span>+ size_of::&lt;MangoAccountFixed&gt;()
             + <span class="self">Self</span>::dynamic_size(
                 token_count,
                 serum3_count,
                 perp_count,
                 perp_oo_count,
                 token_conditional_swap_count,
-            ))
+            )
     }
 
     <span class="kw">pub fn </span>dynamic_token_vec_offset() -&gt; usize {
@@ -2422,6 +2467,65 @@
     }
     <span class="kw">pub fn </span>token_conditional_swap_count(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; usize {
         <span class="self">self</span>.token_conditional_swap_count.into()
+    }
+
+    <span class="kw">pub fn </span>zero() -&gt; <span class="self">Self </span>{
+        <span class="self">Self </span>{
+            token_count: <span class="number">0</span>,
+            serum3_count: <span class="number">0</span>,
+            perp_count: <span class="number">0</span>,
+            perp_oo_count: <span class="number">0</span>,
+            token_conditional_swap_count: <span class="number">0</span>,
+        }
+    }
+
+    <span class="kw">fn </span>expected_health_accounts(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; usize {
+        <span class="self">self</span>.token_count() * <span class="number">2 </span>+ <span class="self">self</span>.serum3_count() + <span class="self">self</span>.perp_count() * <span class="number">2
+    </span>}
+
+    <span class="doccomment">/// Error if this header isn&#39;t a valid resize from `prev`
+    ///
+    /// - Check that dynamic fields can only increase in size
+    /// - Check that if something increases, it is bounded by the limits
+    /// - If a field doesn&#39;t change, don&#39;t error if it exceeds the limits
+    ///   (might have been expanded earlier when it was valid to do)
+    /// - Check that the total health accounts stay limited
+    </span><span class="kw">pub fn </span>check_resize_from(<span class="kw-2">&amp;</span><span class="self">self</span>, prev: <span class="kw-2">&amp;</span><span class="self">Self</span>) -&gt; <span class="prelude-ty">Result</span>&lt;()&gt; {
+        <span class="macro">require_gte!</span>(<span class="self">self</span>.token_count, prev.token_count);
+        <span class="kw">if </span><span class="self">self</span>.token_count &gt; prev.token_count {
+            <span class="macro">require_gte!</span>(<span class="number">8</span>, <span class="self">self</span>.token_count);
+        }
+
+        <span class="macro">require_gte!</span>(<span class="self">self</span>.serum3_count, prev.serum3_count);
+        <span class="kw">if </span><span class="self">self</span>.serum3_count &gt; prev.serum3_count {
+            <span class="macro">require_gte!</span>(<span class="number">4</span>, <span class="self">self</span>.serum3_count);
+        }
+
+        <span class="macro">require_gte!</span>(<span class="self">self</span>.perp_count, prev.perp_count);
+        <span class="kw">if </span><span class="self">self</span>.perp_count &gt; prev.perp_count {
+            <span class="macro">require_gte!</span>(<span class="number">4</span>, <span class="self">self</span>.perp_count);
+        }
+
+        <span class="macro">require_gte!</span>(<span class="self">self</span>.perp_oo_count, prev.perp_oo_count);
+        <span class="kw">if </span><span class="self">self</span>.perp_oo_count &gt; prev.perp_oo_count {
+            <span class="macro">require_gte!</span>(<span class="number">64</span>, <span class="self">self</span>.perp_oo_count);
+        }
+
+        <span class="macro">require_gte!</span>(
+            <span class="self">self</span>.token_conditional_swap_count,
+            prev.token_conditional_swap_count
+        );
+        <span class="kw">if </span><span class="self">self</span>.token_conditional_swap_count &gt; prev.token_conditional_swap_count {
+            <span class="macro">require_gte!</span>(<span class="number">64</span>, <span class="self">self</span>.token_conditional_swap_count);
+        }
+
+        <span class="kw">let </span>new_health_accounts = <span class="self">self</span>.expected_health_accounts();
+        <span class="kw">let </span>prev_health_accounts = prev.expected_health_accounts();
+        <span class="kw">if </span>new_health_accounts &gt; prev_health_accounts {
+            <span class="macro">require_gte!</span>(<span class="number">28</span>, new_health_accounts);
+        }
+
+        <span class="prelude-val">Ok</span>(())
     }
 }
 
@@ -3216,17 +3320,7 @@
         new_perp_oo_count: u8,
         new_token_conditional_swap_count: u8,
     ) -&gt; <span class="prelude-ty">Result</span>&lt;()&gt; {
-        <span class="macro">require_gte!</span>(new_token_count, <span class="self">self</span>.header().token_count);
-        <span class="macro">require_gte!</span>(new_serum3_count, <span class="self">self</span>.header().serum3_count);
-        <span class="macro">require_gte!</span>(new_perp_count, <span class="self">self</span>.header().perp_count);
-        <span class="macro">require_gte!</span>(new_perp_oo_count, <span class="self">self</span>.header().perp_oo_count);
-        <span class="macro">require_gte!</span>(
-            new_token_conditional_swap_count,
-            <span class="self">self</span>.header().token_conditional_swap_count
-        );
-
-        <span class="comment">// create a temp copy to compute new starting offsets
-        </span><span class="kw">let </span>new_header = MangoAccountDynamicHeader {
+        <span class="kw">let </span>new_header = MangoAccountDynamicHeader {
             token_count: new_token_count,
             serum3_count: new_serum3_count,
             perp_count: new_perp_count,
@@ -3234,6 +3328,9 @@
             token_conditional_swap_count: new_token_conditional_swap_count,
         };
         <span class="kw">let </span>old_header = <span class="self">self</span>.header().clone();
+
+        new_header.check_resize_from(<span class="kw-2">&amp;</span>old_header)<span class="question-mark">?</span>;
+
         <span class="kw">let </span>dynamic = <span class="self">self</span>.dynamic_mut();
 
         <span class="comment">// expand dynamic components by first moving existing positions, and then setting new ones to defaults
@@ -3399,8 +3496,7 @@
             account.perps.len() <span class="kw">as </span>u8,
             account.perp_open_orders.len() <span class="kw">as </span>u8,
             tcs_length,
-        )
-        .unwrap();
+        );
         bytes.extend(<span class="macro">vec!</span>[<span class="number">0u8</span>; expected_space - bytes.len()]);
 
         <span class="comment">// Set the length of these dynamic parts
@@ -3436,7 +3532,7 @@
         account.tokens.resize(<span class="number">8</span>, TokenPosition::default());
         account.tokens[<span class="number">0</span>].token_index = <span class="number">8</span>;
         account.serum3.resize(<span class="number">8</span>, Serum3Orders::default());
-        account.perps.resize(<span class="number">8</span>, PerpPosition::default());
+        account.perps.resize(<span class="number">4</span>, PerpPosition::default());
         account.perps[<span class="number">0</span>].market_index = <span class="number">9</span>;
         account.perp_open_orders.resize(<span class="number">8</span>, PerpOpenOrder::default());
         account.next_token_conditional_swap_id = <span class="number">13</span>;
@@ -3450,7 +3546,7 @@
         };
         <span class="macro">assert_eq!</span>(
             <span class="number">8 </span>+ account_bytes_with_tcs.len(),
-            MangoAccount::space(<span class="number">8</span>, <span class="number">8</span>, <span class="number">8</span>, <span class="number">8</span>, <span class="number">0</span>).unwrap()
+            MangoAccount::space(<span class="number">8</span>, <span class="number">8</span>, <span class="number">4</span>, <span class="number">8</span>, <span class="number">0</span>)
         );
 
         <span class="kw">let </span>account2 = MangoAccountValue::from_bytes(<span class="kw-2">&amp;</span>account_bytes_without_tcs).unwrap();
