@@ -43,12 +43,11 @@ const TOKEN_SCENARIOS: [string, [string, number][], [string, number][]][] = [
     ],
     [],
   ],
-  ['TCS, LIQOR', [['USDC', 1000000]], []],
-  ['TCS, HEALTH', [['USDC', 1000]], []],
-  ['TCS, FULL+CLOSE', [['USDC', 1000000]], []],
-  ['TCS, EXPIRE', [['USDC', 1000000]], []],
-  ['TCS, NET-BORROW', [['USDC', 10000000]], []],
+  ['TCS, LIQOR', [['USDC', 100000000]], []],
 ];
+
+const NUM_ACCOUNTS = 4;
+const NUM_TCS_PER_ACCOUNT = 20;
 
 async function main() {
   const options = AnchorProvider.defaultOptions();
@@ -170,158 +169,46 @@ async function main() {
     }
   }
 
-  const accounts2 = await client.getMangoAccountsForOwner(
-    group,
-    admin.publicKey,
-  );
+  for (let i = 0; i < NUM_ACCOUNTS; i++) {
+    const name = `TCS, A${i}`;
 
-  // Case LIQEE1: The liqee does not have enough health for the tcs
-  {
-    const account = ensure(
-      accounts2.find((account) => account.name == 'TCS, HEALTH'),
+    console.log(`Creating mangoaccount...`);
+    const mangoAccount = await createMangoAccount(name);
+    console.log(
+      `...created mangoAccount ${mangoAccount.publicKey} for ${name}`,
     );
-    await client.tokenConditionalSwapCreateRaw(
+
+    const assetMint = new PublicKey(MINTS.get('USDC')!);
+    await client.tokenDepositNative(
       group,
-      account,
-      MINTS.get('SOL')!,
-      MINTS.get('USDC')!,
-      new BN(100000000),
-      new BN(20000), // liqee only has 1k USDC-native, leverage does not go that far!
-      null,
-      0.0,
-      1000000.0,
-      0.01,
-      true,
-      true,
-      TokenConditionalSwapDisplayPriceStyle.buyTokenPerSellToken,
-      TokenConditionalSwapIntention.unknown,
-    );
-  }
-
-  // Case LIQEE2: Full execution - tcs closes afterward
-  {
-    const account = ensure(
-      accounts2.find((account) => account.name == 'TCS, FULL+CLOSE'),
-    );
-    await client.tokenConditionalSwapCreateRaw(
-      group,
-      account,
-      MINTS.get('SOL')!,
-      MINTS.get('USDC')!,
-      new BN(1000),
-      new BN(1000),
-      null,
-      0.0,
-      1000000.0,
-      0.01,
-      true,
-      true,
-      TokenConditionalSwapDisplayPriceStyle.buyTokenPerSellToken,
-      TokenConditionalSwapIntention.unknown,
-    );
-  }
-
-  // Case LIQEE3: Create a tcs that will expire very soon
-  {
-    const account = ensure(
-      accounts2.find((account) => account.name == 'TCS, EXPIRE'),
-    );
-    await client.tokenConditionalSwapCreateRaw(
-      group,
-      account,
-      MINTS.get('SOL')!,
-      MINTS.get('USDC')!,
-      new BN(1000),
-      new BN(1000),
-      Date.now() / 1000 + 15, // expire in 15s
-      0.0,
-      1000000.0,
-      0.01,
-      true,
-      true,
-      TokenConditionalSwapDisplayPriceStyle.buyTokenPerSellToken,
-      TokenConditionalSwapIntention.unknown,
-    );
-  }
-
-  // Case LIQEE4: Create a tcs that hits net borrow limits
-  {
-    const account = ensure(
-      accounts2.find((account) => account.name == 'TCS, NET-BORROW'),
+      mangoAccount,
+      assetMint,
+      new BN(1000000),
     );
 
-    // To do this, first make a new mint and register it as a new token with tight net borrow limits
-    const newMint = await splToken.createMint(
-      connection,
-      admin,
-      admin.publicKey,
-      null,
-      6,
-    );
-    const tokenAccount = await splToken.createAssociatedTokenAccountIdempotent(
-      connection,
-      admin,
-      newMint,
-      admin.publicKey,
-    );
-    await splToken.mintTo(
-      connection,
-      admin,
-      newMint,
-      tokenAccount,
-      admin,
-      1e15,
-    );
+    await mangoAccount.reload(client);
 
-    await client.stubOracleCreate(group, newMint, 1.0);
-    const newOracle = (await client.getStubOracle(group, newMint))[0];
-    const newTokenIndex = Math.max(...group.banksMapByTokenIndex.keys()) + 1;
-    await client.tokenRegister(
-      group,
-      newMint,
-      newOracle.publicKey,
-      newTokenIndex,
-      'TMP',
-      {
-        ...DefaultTokenRegisterParams,
-        loanOriginationFeeRate: 0,
-        loanFeeRate: 0,
-        initAssetWeight: 1,
-        maintAssetWeight: 1,
-        initLiabWeight: 1,
-        maintLiabWeight: 1,
-        liquidationFee: 0,
-        netBorrowLimitPerWindowQuote: 1500000, // less than the $2 of the tcs
-      },
-    );
-    await group.reloadAll(client);
-
-    await client.tokenConditionalSwapCreateRaw(
-      group,
-      account,
-      newMint,
-      MINTS.get('USDC')!,
-      new BN(2000000), // $2
-      new BN(2000000),
-      null,
-      0.0,
-      1000000.0,
-      0.01,
-      true,
-      true,
-      TokenConditionalSwapDisplayPriceStyle.buyTokenPerSellToken,
-      TokenConditionalSwapIntention.unknown,
-    );
+    for (let i = 0; i < NUM_TCS_PER_ACCOUNT; i++) {
+      await client.tokenConditionalSwapCreateRaw(
+        group,
+        mangoAccount,
+        MINTS.get('SOL')!,
+        MINTS.get('USDC')!,
+        new BN(100000000),
+        new BN(20000),
+        null,
+        0.0,
+        1000000.0,
+        0.01,
+        true,
+        true,
+        TokenConditionalSwapDisplayPriceStyle.buyTokenPerSellToken,
+        TokenConditionalSwapIntention.unknown,
+      );
+    }
   }
 
   process.exit();
-}
-
-function ensure<T>(value: T | undefined): T {
-  if (value == null) {
-    throw new Error('Value was nullish');
-  }
-  return value;
 }
 
 main();

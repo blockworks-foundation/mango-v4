@@ -27,7 +27,7 @@ async fn test_token_conditional_swap() -> Result<(), TransportError> {
     let quote_token = &tokens[0];
     let base_token = &tokens[1];
 
-    let deposit_amount = 1000;
+    let deposit_amount = 1_000_000_000f64;
     let account = create_funded_account(
         &solana,
         group,
@@ -35,7 +35,7 @@ async fn test_token_conditional_swap() -> Result<(), TransportError> {
         0,
         &context.users[1],
         mints,
-        deposit_amount,
+        deposit_amount as u64,
         0,
     )
     .await;
@@ -46,10 +46,24 @@ async fn test_token_conditional_swap() -> Result<(), TransportError> {
         1,
         &context.users[1],
         mints,
-        deposit_amount,
+        deposit_amount as u64,
         0,
     )
     .await;
+    let no_tcs_account = send_tx(
+        solana,
+        AccountCreateInstruction {
+            account_num: 2,
+            token_conditional_swap_count: 0,
+            group,
+            owner,
+            payer,
+            ..Default::default()
+        },
+    )
+    .await
+    .unwrap()
+    .account;
 
     send_tx(
         solana,
@@ -73,7 +87,7 @@ async fn test_token_conditional_swap() -> Result<(), TransportError> {
     let tx_result = send_tx(
         solana,
         TokenConditionalSwapCreateInstruction {
-            account,
+            account: no_tcs_account,
             owner,
             buy_mint: quote_token.mint.pubkey,
             sell_mint: base_token.mint.pubkey,
@@ -96,10 +110,10 @@ async fn test_token_conditional_swap() -> Result<(), TransportError> {
         solana,
         AccountExpandInstruction {
             account_num: 0,
-            token_count: 16,
-            serum3_count: 8,
-            perp_count: 8,
-            perp_oo_count: 8,
+            token_count: 8,
+            serum3_count: 4,
+            perp_count: 4,
+            perp_oo_count: 16,
             token_conditional_swap_count: 2,
             group,
             owner,
@@ -113,7 +127,7 @@ async fn test_token_conditional_swap() -> Result<(), TransportError> {
     assert_eq!(account_data.header.token_conditional_swap_count, 2);
 
     //
-    // TEST: Can create tsls until all slots are filled
+    // TEST: Can create tcs until all slots are filled
     //
     let tcs_ix = TokenConditionalSwapCreateInstruction {
         account,
@@ -246,15 +260,15 @@ async fn test_token_conditional_swap() -> Result<(), TransportError> {
     let liqee_base = account_position_f64(solana, account, base_token.bank).await;
     assert!(assert_equal_f_f(
         liqee_quote,
-        1000.0 + 42.0, // roughly 50 / (1.1 * 1.1)
+        deposit_amount + 42.0, // roughly 50 / (1.1 * 1.1)
         0.01
     ));
-    assert!(assert_equal_f_f(liqee_base, 1000.0 - 50.0, 0.01));
+    assert!(assert_equal_f_f(liqee_base, deposit_amount - 50.0, 0.01));
 
     let liqor_quote = account_position_f64(solana, liqor, quote_token.bank).await;
     let liqor_base = account_position_f64(solana, liqor, base_token.bank).await;
-    assert!(assert_equal_f_f(liqor_quote, 1000.0 - 42.0, 0.01));
-    assert!(assert_equal_f_f(liqor_base, 1000.0 + 44.0, 0.01)); // roughly 42*1.1*0.95
+    assert!(assert_equal_f_f(liqor_quote, deposit_amount - 42.0, 0.01));
+    assert!(assert_equal_f_f(liqor_base, deposit_amount + 44.0, 0.01)); // roughly 42*1.1*0.95
 
     //
     // TEST: trigger fully
@@ -275,13 +289,13 @@ async fn test_token_conditional_swap() -> Result<(), TransportError> {
 
     let liqee_quote = account_position_f64(solana, account, quote_token.bank).await;
     let liqee_base = account_position_f64(solana, account, base_token.bank).await;
-    assert!(assert_equal_f_f(liqee_quote, 1000.0 + 84.0, 0.01));
-    assert!(assert_equal_f_f(liqee_base, 1000.0 - 100.0, 0.01));
+    assert!(assert_equal_f_f(liqee_quote, deposit_amount + 84.0, 0.01));
+    assert!(assert_equal_f_f(liqee_base, deposit_amount - 100.0, 0.01));
 
     let liqor_quote = account_position_f64(solana, liqor, quote_token.bank).await;
     let liqor_base = account_position_f64(solana, liqor, base_token.bank).await;
-    assert!(assert_equal_f_f(liqor_quote, 1000.0 - 84.0, 0.01));
-    assert!(assert_equal_f_f(liqor_base, 1000.0 + 88.0, 0.01));
+    assert!(assert_equal_f_f(liqor_quote, deposit_amount - 84.0, 0.01));
+    assert!(assert_equal_f_f(liqor_base, deposit_amount + 88.0, 0.01));
 
     let account_data = get_mango_account(solana, account).await;
     assert!(!account_data

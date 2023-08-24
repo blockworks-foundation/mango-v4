@@ -2937,7 +2937,7 @@ dependencies = [
 
 [[package]]
 name = "mango-v4"
-version = "0.18.0"
+version = "0.19.0"
 dependencies = [
  "anchor-lang",
  "anchor-spl",
@@ -2959,6 +2959,7 @@ dependencies = [
  "openbook-v2",
  "pyth-sdk-solana 0.7.2",
  "rand 0.8.5",
+ "regex",
  "serde",
  "serum_dex",
  "solana-address-lookup-table-program",

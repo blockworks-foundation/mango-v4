@@ -1,5 +1,5 @@
 export type MangoV4 = {
-  "version": "0.18.0",
+  "version": "0.19.0",
   "name": "mango_v4",
   "instructions": [
     {
@@ -1206,6 +1206,90 @@ export type MangoV4 = {
         },
         {
           "name": "perpOoCount",
+          "type": "u8"
+        },
+        {
+          "name": "name",
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "name": "accountCreateV2",
+      "accounts": [
+        {
+          "name": "group",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "account",
+          "isMut": true,
+          "isSigner": false,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "type": "string",
+                "value": "MangoAccount"
+              },
+              {
+                "kind": "account",
+                "type": "publicKey",
+                "path": "group"
+              },
+              {
+                "kind": "account",
+                "type": "publicKey",
+                "path": "owner"
+              },
+              {
+                "kind": "arg",
+                "type": "u32",
+                "path": "account_num"
+              }
+            ]
+          }
+        },
+        {
+          "name": "owner",
+          "isMut": false,
+          "isSigner": true
+        },
+        {
+          "name": "payer",
+          "isMut": true,
+          "isSigner": true
+        },
+        {
+          "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "accountNum",
+          "type": "u32"
+        },
+        {
+          "name": "tokenCount",
+          "type": "u8"
+        },
+        {
+          "name": "serum3Count",
+          "type": "u8"
+        },
+        {
+          "name": "perpCount",
+          "type": "u8"
+        },
+        {
+          "name": "perpOoCount",
+          "type": "u8"
+        },
+        {
+          "name": "tokenConditionalSwapCount",
           "type": "u8"
         },
         {
@@ -12452,7 +12536,7 @@ export type MangoV4 = {
 };
 
 export const IDL: MangoV4 = {
-  "version": "0.18.0",
+  "version": "0.19.0",
   "name": "mango_v4",
   "instructions": [
     {
@@ -13659,6 +13743,90 @@ export const IDL: MangoV4 = {
         },
         {
           "name": "perpOoCount",
+          "type": "u8"
+        },
+        {
+          "name": "name",
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "name": "accountCreateV2",
+      "accounts": [
+        {
+          "name": "group",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "account",
+          "isMut": true,
+          "isSigner": false,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "type": "string",
+                "value": "MangoAccount"
+              },
+              {
+                "kind": "account",
+                "type": "publicKey",
+                "path": "group"
+              },
+              {
+                "kind": "account",
+                "type": "publicKey",
+                "path": "owner"
+              },
+              {
+                "kind": "arg",
+                "type": "u32",
+                "path": "account_num"
+              }
+            ]
+          }
+        },
+        {
+          "name": "owner",
+          "isMut": false,
+          "isSigner": true
+        },
+        {
+          "name": "payer",
+          "isMut": true,
+          "isSigner": true
+        },
+        {
+          "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "accountNum",
+          "type": "u32"
+        },
+        {
+          "name": "tokenCount",
+          "type": "u8"
+        },
+        {
+          "name": "serum3Count",
+          "type": "u8"
+        },
+        {
+          "name": "perpCount",
+          "type": "u8"
+        },
+        {
+          "name": "perpOoCount",
+          "type": "u8"
+        },
+        {
+          "name": "tokenConditionalSwapCount",
           "type": "u8"
         },
         {

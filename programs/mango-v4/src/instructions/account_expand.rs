@@ -17,7 +17,7 @@ pub fn account_expand(
         perp_count,
         perp_oo_count,
         token_conditional_swap_count,
-    )?;
+    );
     let new_rent_minimum = Rent::get()?.minimum_balance(new_space);
 
     let realloc_account = ctx.accounts.account.as_ref();

@@ -146,14 +146,6 @@ pub fn flash_loan_begin<'key, 'accounts, 'remaining, 'info>(
 
             // Check that the mango program key is not used
             if ix.program_id == crate::id() {
-                // must be the last mango ix -- this could possibly be relaxed, but right now
-                // we need to guard against multiple FlashLoanEnds
-                require_msg!(
-                    !found_end,
-                    "the transaction must not contain a Mango instruction after FlashLoanEnd"
-                );
-                found_end = true;
-
                 // must be the FlashLoanEnd instruction
                 require!(
                     ix.data[0..8] == crate::instruction::FlashLoanEndV2::discriminator(),
@@ -173,6 +165,13 @@ pub fn flash_loan_begin<'key, 'accounts, 'remaining, 'info>(
                 for (begin_account, end_account) in begin_accounts.iter().zip(end_accounts.iter()) {
                     require_msg!(*begin_account.key == end_account.pubkey, "the trailing vault, token and group accounts passed to FlashLoanBegin and End must match, found {} on begin and {} on end", begin_account.key, end_account.pubkey);
                 }
+
+                // No need to check any instructions after the end instruction.
+                // "Duplicate FlashLoanEnd" is guarded against the same way as "End without Begin":
+                // The End instruction requires at least one bank-vault pair and that bank
+                // must have flash_loan_token_account_initial set - which only happens in Begin.
+                found_end = true;
+                break;
             } else {
                 // ensure no one can cpi into mango either
                 for meta in ix.accounts.iter() {

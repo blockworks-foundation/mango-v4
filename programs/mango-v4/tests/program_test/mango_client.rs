@@ -1814,25 +1814,42 @@ pub struct AccountCreateInstruction {
     pub serum3_count: u8,
     pub perp_count: u8,
     pub perp_oo_count: u8,
+    pub token_conditional_swap_count: u8,
     pub group: Pubkey,
     pub owner: TestKeypair,
     pub payer: TestKeypair,
 }
+impl Default for AccountCreateInstruction {
+    fn default() -> Self {
+        AccountCreateInstruction {
+            account_num: 0,
+            token_count: 8,
+            serum3_count: 4,
+            perp_count: 4,
+            perp_oo_count: 16,
+            token_conditional_swap_count: 1,
+            group: Default::default(),
+            owner: Default::default(),
+            payer: Default::default(),
+        }
+    }
+}
 #[async_trait::async_trait(?Send)]
 impl ClientInstruction for AccountCreateInstruction {
     type Accounts = mango_v4::accounts::AccountCreate;
-    type Instruction = mango_v4::instruction::AccountCreate;
+    type Instruction = mango_v4::instruction::AccountCreateV2;
     async fn to_instruction(
         &self,
         _account_loader: impl ClientAccountLoader + 'async_trait,
     ) -> (Self::Accounts, instruction::Instruction) {
         let program_id = mango_v4::id();
-        let instruction = mango_v4::instruction::AccountCreate {
+        let instruction = Self::Instruction {
             account_num: self.account_num,
             token_count: self.token_count,
             serum3_count: self.serum3_count,
             perp_count: self.perp_count,
             perp_oo_count: self.perp_oo_count,
+            token_conditional_swap_count: self.token_conditional_swap_count,
             name: "my_mango_account".to_string(),
         };
 
@@ -1847,7 +1864,7 @@ impl ClientInstruction for AccountCreateInstruction {
         )
         .0;
 
-        let accounts = mango_v4::accounts::AccountCreate {
+        let accounts = Self::Accounts {
             group: self.group,
             owner: self.owner.pubkey(),
             account,
