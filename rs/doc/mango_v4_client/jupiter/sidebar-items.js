@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"struct":[["QueryFee",""],["QueryMarketInfo",""],["QueryResult",""],["QueryRoute",""],["QueryRouteFees",""],["SwapRequest",""],["SwapResponse",""]]};
+window.SIDEBAR_ITEMS = {"enum":[["RawQuote",""],["Version",""]],"mod":[["v4",""],["v6",""]],"struct":[["Jupiter",""],["Quote",""]]};
