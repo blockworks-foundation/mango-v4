@@ -73,7 +73,7 @@ impl Quote {
                 .and_then(|v| v.label.as_ref())
                 .cloned(),
         };
-        label_maybe.unwrap_or("unknown".into())
+        label_maybe.unwrap_or_else(|| "unknown".into())
     }
 }
 
