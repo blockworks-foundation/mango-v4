@@ -4,7 +4,7 @@ use std::time::Duration;
 use itertools::Itertools;
 use mango_v4::health::{HealthCache, HealthType};
 use mango_v4::state::{MangoAccountValue, PerpMarketIndex, Side, TokenIndex, QUOTE_TOKEN_INDEX};
-use mango_v4_client::{chain_data, health_cache, JupiterSwapMode, MangoClient};
+use mango_v4_client::{chain_data, health_cache, MangoClient};
 use solana_sdk::signature::Signature;
 
 use futures::{stream, StreamExt, TryStreamExt};
@@ -18,66 +18,7 @@ use crate::util;
 pub struct Config {
     pub min_health_ratio: f64,
     pub refresh_timeout: Duration,
-    pub mock_jupiter: bool,
     pub compute_limit_for_liq_ix: u32,
-}
-
-pub async fn jupiter_market_can_buy(
-    mango_client: &MangoClient,
-    token: TokenIndex,
-    quote_token: TokenIndex,
-) -> bool {
-    if token == quote_token {
-        return true;
-    }
-    let token_mint = mango_client.context.token(token).mint_info.mint;
-    let quote_token_mint = mango_client.context.token(quote_token).mint_info.mint;
-
-    // Consider a market alive if we can swap $10 worth at 1% slippage
-    // TODO: configurable
-    // TODO: cache this, no need to recheck often
-    let quote_amount = 10_000_000u64;
-    let slippage = 100;
-    mango_client
-        .jupiter_route(
-            quote_token_mint,
-            token_mint,
-            quote_amount,
-            slippage,
-            JupiterSwapMode::ExactIn,
-            false,
-        )
-        .await
-        .is_ok()
-}
-
-pub async fn jupiter_market_can_sell(
-    mango_client: &MangoClient,
-    token: TokenIndex,
-    quote_token: TokenIndex,
-) -> bool {
-    if token == quote_token {
-        return true;
-    }
-    let token_mint = mango_client.context.token(token).mint_info.mint;
-    let quote_token_mint = mango_client.context.token(quote_token).mint_info.mint;
-
-    // Consider a market alive if we can swap $10 worth at 1% slippage
-    // TODO: configurable
-    // TODO: cache this, no need to recheck often
-    let quote_amount = 10_000_000u64;
-    let slippage = 100;
-    mango_client
-        .jupiter_route(
-            token_mint,
-            quote_token_mint,
-            quote_amount,
-            slippage,
-            JupiterSwapMode::ExactOut,
-            false,
-        )
-        .await
-        .is_ok()
 }
 
 struct LiquidateHelper<'a> {
