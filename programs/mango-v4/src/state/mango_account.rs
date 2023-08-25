@@ -1391,6 +1391,47 @@ impl<
 
         // expand dynamic components by first moving existing positions, and then setting new ones to defaults
 
+
+        // TODO: If we want to allow shrinking
+        // - Determine if new start pos is to the left or to the right,
+        //   and then either shift r-to-l or reverse.
+        // - "Defrag" by always copying only active positions over
+        // - zero memory with inactive positions to ensure there's
+        //   no leftover bytes in between active positions
+
+        // Possibly we could make i teasier for us by starting with the
+        // defrag step, then all useful data would be contiguous
+
+        // Attempt at defrag
+        let mut next_free = 0;
+        for (i, pos) in self.all_token_positions().enumerate() {
+            if pos.is_active() && i != next_free {
+                memmove(pos to bytes[next_free]);
+                next_free += 1;
+            }
+        }
+        // Do the same for the other positions
+
+        // Moving the data is difficult: cases:
+        //
+        // TTTT....PP....SSS...
+        // TTTTPPSSS (copy PP first then SSS)
+        //
+        // TTTTPPSSS
+        // TTTT....PP....SSS...  (copy SSS first, then PP
+        //
+        // Do all moves to the left l-to-r and all to the right r-to-l?
+
+        // Algorithm:
+        // - if it's copy to the left, do it, go next
+        // - if it's copy to the right, skip on first pass, go next
+        // on the second pass to copies to the right in reverse
+        // zero the empty spots in a third pass
+
+        // TTTT....PP....SSS...
+        // TTTT.....PP..SSS...
+    )
+
         // token conditional swaps
         if old_header.token_conditional_swap_count() > 0 {
             unsafe {
