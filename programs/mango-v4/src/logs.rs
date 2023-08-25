@@ -185,6 +185,43 @@ pub struct FillLogV3 {
 }
 
 #[event]
+pub struct FillLogV4 {
+    pub mango_group: Pubkey,
+    pub market_index: u16,
+    pub taker_side: u8, // side from the taker's POV
+    pub maker_slot: u8,
+    pub maker_out: bool, // true if maker order quantity == 0
+    pub timestamp: u64,
+    pub seq_num: u64, // note: usize same as u64
+
+    pub maker: Pubkey,
+    pub maker_client_order_id: u64,
+    pub maker_fee: f32,
+
+    // Timestamp of when the maker order was placed; copied over from the LeafNode
+    pub maker_timestamp: u64,
+
+    pub taker: Pubkey,
+    pub taker_client_order_id: u64,
+    pub taker_fee: f32,
+
+    pub price: i64,
+    pub quantity: i64,         // number of base lots
+    pub maker_closed_pnl: f64, // settle-token-native units
+    pub taker_closed_pnl: f64, // settle-token-native units
+
+    // Necessary to determine if a fill resulted in a
+    // * open short
+    // * open long
+    // * increase short,
+    // * increase long,
+    // * close (partial) short,
+    // * close (partial) long,
+    pub pre_fill_taker_base_position: i64,
+    pub pre_fill_maker_base_position: i64,
+}
+
+#[event]
 pub struct PerpUpdateFundingLog {
     pub mango_group: Pubkey,
     pub market_index: u16,
