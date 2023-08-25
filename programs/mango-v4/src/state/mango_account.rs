@@ -1407,7 +1407,6 @@ impl<
         // Use the active_* values to know how many slots are in-use afterwards!
         //
         // Perp OOs can't be collapsed this way because LeafNode::owner_slot is an index into it.
-        // TODO: tcs can be collapsed
         let mut active_token_positions = 0;
         for i in 0..old_header.token_count() {
             let src = old_header.token_offset(i);
@@ -1468,10 +1467,45 @@ impl<
             active_perp_positions += 1;
         }
 
+        // Can't rearrange perp oo because LeafNodes store indexes, so the equivalent
+        // to the "active" count for the other blocks is the max active index + 1.
+        let mut blocked_perp_oo = 0;
+        for i in 0..old_header.perp_oo_count() {
+            let idx = old_header.perp_oo_count() - 1 - i;
+            let src = old_header.perp_oo_offset(idx);
+            let pos: &PerpOpenOrder = get_helper(dynamic, src);
+            if pos.is_active() {
+                blocked_perp_oo = idx + 1;
+                break;
+            }
+        }
+
+        let mut active_tcs = 0;
+        for i in 0..old_header.token_conditional_swap_count() {
+            let src = old_header.token_conditional_swap_offset(i);
+            let pos: &TokenConditionalSwap = get_helper(dynamic, src);
+            if !pos.has_data() {
+                continue;
+            }
+            if i != active_tcs {
+                let dst = old_header.token_conditional_swap_offset(active_tcs);
+                unsafe {
+                    sol_memmove(
+                        &mut dynamic[dst],
+                        &mut dynamic[src],
+                        size_of::<TokenConditionalSwap>(),
+                    );
+                }
+            }
+            active_tcs += 1;
+        }
+
+        // Check that the new allocations can fit the existing data
         require_gte!(new_header.token_count(), active_token_positions);
         require_gte!(new_header.serum3_count(), active_serum3_orders);
         require_gte!(new_header.perp_count(), active_perp_positions);
-        // TODO: perp oo and tcs checks!
+        require_gte!(new_header.perp_oo_count(), blocked_perp_oo);
+        require_gte!(new_header.token_conditional_swap_count(), active_tcs);
 
         // Do the same for the other positions
 
@@ -1524,7 +1558,29 @@ impl<
                 }
             }
 
-            // TODO: Also move perp oo and tcs
+            let old_perp_oo_start = old_header.perp_oo_offset(0);
+            let new_perp_oo_start = new_header.perp_oo_offset(0);
+            if new_perp_oo_start < old_perp_oo_start && blocked_perp_oo > 0 {
+                unsafe {
+                    sol_memmove(
+                        &mut dynamic[new_perp_oo_start],
+                        &mut dynamic[old_perp_oo_start],
+                        size_of::<PerpOpenOrder>() * blocked_perp_oo,
+                    );
+                }
+            }
+
+            let old_tcs_start = old_header.token_conditional_swap_offset(0);
+            let new_tcs_start = new_header.token_conditional_swap_offset(0);
+            if new_tcs_start < old_tcs_start && active_tcs > 0 {
+                unsafe {
+                    sol_memmove(
+                        &mut dynamic[new_tcs_start],
+                        &mut dynamic[old_tcs_start],
+                        size_of::<TokenConditionalSwap>() * active_tcs,
+                    );
+                }
+            }
         }
 
         // Second move pass: Go right-to-left and move everything to the right if needed.
@@ -1534,7 +1590,29 @@ impl<
         // - if the block to the right was moved to the left, we know that its start will
         //   be >= our block's end
         {
-            // TODO: also move tcs and perp oo
+            let old_tcs_start = old_header.token_conditional_swap_offset(0);
+            let new_tcs_start = new_header.token_conditional_swap_offset(0);
+            if new_tcs_start > old_tcs_start && active_tcs > 0 {
+                unsafe {
+                    sol_memmove(
+                        &mut dynamic[new_tcs_start],
+                        &mut dynamic[old_tcs_start],
+                        size_of::<TokenConditionalSwap>() * active_tcs,
+                    );
+                }
+            }
+
+            let old_perp_oo_start = old_header.perp_oo_offset(0);
+            let new_perp_oo_start = new_header.perp_oo_offset(0);
+            if new_perp_oo_start > old_perp_oo_start && blocked_perp_oo > 0 {
+                unsafe {
+                    sol_memmove(
+                        &mut dynamic[new_perp_oo_start],
+                        &mut dynamic[old_perp_oo_start],
+                        size_of::<PerpOpenOrder>() * blocked_perp_oo,
+                    );
+                }
+            }
 
             let old_perp_start = old_header.perp_offset(0);
             let new_perp_start = new_header.perp_offset(0);
@@ -1565,46 +1643,22 @@ impl<
 
         // Defaulting pass: The blocks are in their final positions, clear out all unused slots
         {
-            for i in active_token_positions..new_token_count as usize {
+            for i in active_token_positions..new_header.token_count() {
                 *get_helper_mut(dynamic, new_header.token_offset(i)) = TokenPosition::default();
             }
-            for i in active_serum3_orders..new_serum3_count as usize {
+            for i in active_serum3_orders..new_header.serum3_count() {
                 *get_helper_mut(dynamic, new_header.serum3_offset(i)) = Serum3Orders::default();
             }
-            for i in active_perp_positions..new_perp_count as usize {
+            for i in active_perp_positions..new_header.perp_count() {
                 *get_helper_mut(dynamic, new_header.perp_offset(i)) = PerpPosition::default();
             }
-            // TODO: perp oo, tcs
-        }
-
-        // token conditional swaps
-        if old_header.token_conditional_swap_count() > 0 {
-            unsafe {
-                sol_memmove(
-                    &mut dynamic[new_header.token_conditional_swap_offset(0)],
-                    &mut dynamic[old_header.token_conditional_swap_offset(0)],
-                    size_of::<TokenConditionalSwap>() * old_header.token_conditional_swap_count(),
-                );
+            for i in blocked_perp_oo..new_header.perp_oo_count() {
+                *get_helper_mut(dynamic, new_header.perp_oo_offset(i)) = PerpOpenOrder::default();
             }
-        }
-        for i in old_header.token_conditional_swap_count..new_token_conditional_swap_count {
-            *get_helper_mut(dynamic, new_header.token_conditional_swap_offset(i.into())) =
-                TokenConditionalSwap::default();
-        }
-
-        // perp oo
-        if old_header.perp_oo_count() > 0 {
-            unsafe {
-                sol_memmove(
-                    &mut dynamic[new_header.perp_oo_offset(0)],
-                    &mut dynamic[old_header.perp_oo_offset(0)],
-                    size_of::<PerpOpenOrder>() * old_header.perp_oo_count(),
-                );
+            for i in active_tcs..new_header.token_conditional_swap_count() {
+                *get_helper_mut(dynamic, new_header.token_conditional_swap_offset(i)) =
+                    TokenConditionalSwap::default();
             }
-        }
-        for i in old_header.perp_oo_count..new_perp_oo_count {
-            *get_helper_mut(dynamic, new_header.perp_oo_offset(i.into())) =
-                PerpOpenOrder::default();
         }
 
         // update the already-parsed header
