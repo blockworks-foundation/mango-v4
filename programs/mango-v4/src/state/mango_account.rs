@@ -7,7 +7,7 @@ use arrayref::array_ref;
 
 use fixed::types::I80F48;
 
-use solana_program::program_memory::{sol_memcpy, sol_memmove};
+use solana_program::program_memory::sol_memmove;
 use static_assertions::const_assert_eq;
 
 use crate::error::*;
@@ -467,6 +467,16 @@ fn get_helper_mut<T: bytemuck::Pod>(data: &mut [u8], index: usize) -> &mut T {
 }
 
 impl MangoAccountDynamicHeader {
+    pub fn account_size(&self) -> usize {
+        MangoAccount::space(
+            self.token_count,
+            self.serum3_count,
+            self.perp_count,
+            self.perp_oo_count,
+            self.token_conditional_swap_count,
+        )
+    }
+
     // offset into dynamic data where 1st TokenPosition would be found
     // todo make fn private
     pub fn token_offset(&self, raw_index: usize) -> usize {
@@ -541,44 +551,24 @@ impl MangoAccountDynamicHeader {
 
     /// Error if this header isn't a valid resize from `prev`
     ///
-    /// - Check that dynamic fields can only increase in size
-    /// - Check that if something increases, it is bounded by the limits
+    /// - Check that the total health accounts stay limited
+    ///   (this coverers token, perp, serum position limits)
+    /// - Check that if perp oo/tcs size increases, it is bounded by the limits
     /// - If a field doesn't change, don't error if it exceeds the limits
     ///   (might have been expanded earlier when it was valid to do)
-    /// - Check that the total health accounts stay limited
     pub fn check_resize_from(&self, prev: &Self) -> Result<()> {
-        require_gte!(self.token_count, prev.token_count);
-        if self.token_count > prev.token_count {
-            require_gte!(8, self.token_count);
-        }
-
-        require_gte!(self.serum3_count, prev.serum3_count);
-        if self.serum3_count > prev.serum3_count {
-            require_gte!(4, self.serum3_count);
-        }
-
-        require_gte!(self.perp_count, prev.perp_count);
-        if self.perp_count > prev.perp_count {
-            require_gte!(4, self.perp_count);
-        }
-
-        require_gte!(self.perp_oo_count, prev.perp_oo_count);
-        if self.perp_oo_count > prev.perp_oo_count {
-            require_gte!(64, self.perp_oo_count);
-        }
-
-        require_gte!(
-            self.token_conditional_swap_count,
-            prev.token_conditional_swap_count
-        );
-        if self.token_conditional_swap_count > prev.token_conditional_swap_count {
-            require_gte!(64, self.token_conditional_swap_count);
-        }
-
         let new_health_accounts = self.expected_health_accounts();
         let prev_health_accounts = prev.expected_health_accounts();
         if new_health_accounts > prev_health_accounts {
             require_gte!(28, new_health_accounts);
+        }
+
+        if self.perp_oo_count > prev.perp_oo_count {
+            require_gte!(64, self.perp_oo_count);
+        }
+
+        if self.token_conditional_swap_count > prev.token_conditional_swap_count {
+            require_gte!(64, self.token_conditional_swap_count);
         }
 
         Ok(())
@@ -1736,6 +1726,8 @@ impl<'a, 'info: 'a> MangoAccountLoader<'a> for &'a AccountLoader<'info, MangoAcc
 
 #[cfg(test)]
 mod tests {
+    use itertools::Itertools;
+
     use super::*;
 
     fn make_test_account() -> MangoAccountValue {
@@ -2138,5 +2130,350 @@ mod tests {
         assert_eq!(account.token_conditional_swap_free_index().unwrap(), 0);
         let tcs = account.free_token_conditional_swap_mut().unwrap();
         assert_eq!(tcs.id, 123); // old data
+    }
+
+    fn make_resize_test_account(header: &MangoAccountDynamicHeader) -> MangoAccountValue {
+        let mut account = MangoAccount::default_for_tests();
+        account
+            .tokens
+            .resize(header.token_count(), TokenPosition::default());
+        account
+            .serum3
+            .resize(header.serum3_count(), Serum3Orders::default());
+        account
+            .perps
+            .resize(header.perp_count(), PerpPosition::default());
+        account
+            .perp_open_orders
+            .resize(header.perp_oo_count(), PerpOpenOrder::default());
+        let mut bytes = AnchorSerialize::try_to_vec(&account).unwrap();
+
+        // The MangoAccount struct is missing some dynamic fields, add space for them
+        let expected_space = header.account_size();
+        bytes.extend(vec![0u8; expected_space - bytes.len()]);
+
+        // Set the length of these dynamic parts
+        let (fixed, dynamic) = bytes.split_at_mut(size_of::<MangoAccountFixed>());
+        let mut out_header = MangoAccountDynamicHeader::from_bytes(dynamic).unwrap();
+        out_header.token_conditional_swap_count = header.token_conditional_swap_count;
+        let mut account = MangoAccountRefMut {
+            header: &mut out_header,
+            fixed: bytemuck::from_bytes_mut(fixed),
+            dynamic,
+        };
+        account.write_token_conditional_swap_length();
+
+        MangoAccountValue::from_bytes(&bytes).unwrap()
+    }
+
+    fn check_account_active_and_order(
+        account: &MangoAccountValue,
+        active: &MangoAccountDynamicHeader,
+    ) -> Result<()> {
+        let header = account.header();
+
+        assert_eq!(account.all_token_positions().count(), header.token_count());
+        assert_eq!(
+            account.active_token_positions().count(),
+            active.token_count()
+        );
+        for i in 0..active.token_count() {
+            assert_eq!(
+                account.token_position_by_raw_index(i)?.token_index,
+                i as TokenIndex
+            );
+        }
+        for i in active.token_count()..header.token_count() {
+            let def = TokenPosition::default().try_to_vec().unwrap();
+            assert_eq!(
+                account
+                    .token_position_by_raw_index(i)?
+                    .try_to_vec()
+                    .unwrap(),
+                def
+            );
+        }
+
+        assert_eq!(account.all_serum3_orders().count(), header.serum3_count());
+        assert_eq!(
+            account.active_serum3_orders().count(),
+            active.serum3_count()
+        );
+        for i in 0..active.serum3_count() {
+            assert_eq!(
+                account.serum3_orders_by_raw_index(i)?.market_index,
+                i as Serum3MarketIndex
+            );
+        }
+        for i in active.serum3_count()..header.serum3_count() {
+            let def = Serum3Orders::default().try_to_vec().unwrap();
+            assert_eq!(
+                account.serum3_orders_by_raw_index(i)?.try_to_vec().unwrap(),
+                def
+            );
+        }
+
+        assert_eq!(account.all_perp_positions().count(), header.perp_count());
+        assert_eq!(account.active_perp_positions().count(), active.perp_count());
+        for i in 0..active.perp_count() {
+            assert_eq!(
+                account.perp_position_by_raw_index(i)?.market_index,
+                i as PerpMarketIndex
+            );
+        }
+        for i in active.perp_count()..header.perp_count() {
+            let def = PerpPosition::default().try_to_vec().unwrap();
+            assert_eq!(
+                account.perp_position_by_raw_index(i)?.try_to_vec().unwrap(),
+                def
+            );
+        }
+
+        for i in 0..header.perp_oo_count() {
+            let perp_oo = account.perp_order_by_raw_index(i)?;
+            if i + 1 == active.perp_oo_count() {
+                assert_eq!(perp_oo.market, 0);
+            } else {
+                let def = PerpOpenOrder::default().try_to_vec().unwrap();
+                assert_eq!(perp_oo.try_to_vec().unwrap(), def);
+            }
+        }
+
+        assert_eq!(
+            account.all_token_conditional_swaps().count(),
+            header.token_conditional_swap_count()
+        );
+        assert_eq!(
+            account.active_token_conditional_swaps().count(),
+            active.token_conditional_swap_count()
+        );
+        for i in 0..active.token_conditional_swap_count() {
+            assert_eq!(account.token_conditional_swap_by_index(i)?.id, i as u64);
+        }
+        for i in active.token_conditional_swap_count()..header.token_conditional_swap_count() {
+            let def = TokenConditionalSwap::default().try_to_vec().unwrap();
+            assert_eq!(
+                account
+                    .token_conditional_swap_by_index(i)?
+                    .try_to_vec()
+                    .unwrap(),
+                def
+            );
+        }
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_account_resize_fixed() -> Result<()> {
+        let header = MangoAccountDynamicHeader {
+            token_count: 4,
+            serum3_count: 5,
+            perp_count: 6,
+            perp_oo_count: 7,
+            token_conditional_swap_count: 8,
+        };
+        let mut account = make_resize_test_account(&header);
+
+        // setup positions and leave gaps
+        account.ensure_token_position(7)?;
+        account.ensure_token_position(0)?;
+        account.ensure_token_position(8)?;
+        account.ensure_token_position(1)?;
+        account.deactivate_token_position(0);
+        account.deactivate_token_position(2);
+
+        account.create_serum3_orders(0)?;
+        account.create_serum3_orders(7)?;
+        account.create_serum3_orders(1)?;
+        *account.serum3_orders_mut_by_raw_index(1) = Serum3Orders::default();
+
+        account.ensure_perp_position(0, 0)?;
+        account.ensure_perp_position(1, 0)?;
+        account.ensure_perp_position(2, 0)?;
+        account.ensure_perp_position(7, 0)?;
+        account.ensure_perp_position(8, 0)?;
+        account.ensure_perp_position(3, 0)?;
+        account.deactivate_perp_position(7, 0)?;
+        account.deactivate_perp_position(8, 0)?;
+
+        let mut perp_oo = account.perp_order_mut_by_raw_index(4);
+        perp_oo.market = 0;
+
+        let mut make_tcs = |raw_index: usize, id| {
+            let mut tcs = account
+                .token_conditional_swap_mut_by_index(raw_index)
+                .unwrap();
+            tcs.set_has_data(true);
+            tcs.id = id;
+        };
+        make_tcs(2, 0);
+        make_tcs(4, 1);
+
+        let active = MangoAccountDynamicHeader {
+            token_count: 2,
+            serum3_count: 2,
+            perp_count: 4,
+            perp_oo_count: 5,
+            token_conditional_swap_count: 2,
+        };
+
+        // Resizing to the same size just removes the empty spaces
+        {
+            let mut ta = account.clone();
+            ta.expand_dynamic_content(
+                header.token_count,
+                header.serum3_count,
+                header.perp_count,
+                header.perp_oo_count,
+                header.token_conditional_swap_count,
+            )?;
+            check_account_active_and_order(&ta, &active)?;
+        }
+
+        // Resizing to the minimum size is fine
+        {
+            let mut ta = account.clone();
+            ta.expand_dynamic_content(
+                active.token_count,
+                active.serum3_count,
+                active.perp_count,
+                active.perp_oo_count,
+                active.token_conditional_swap_count,
+            )?;
+            check_account_active_and_order(&ta, &active)?;
+        }
+
+        // Resizing to less than what is active is forbidden
+        {
+            let mut ta = account.clone();
+            ta.expand_dynamic_content(
+                active.token_count - 1,
+                active.serum3_count,
+                active.perp_count,
+                active.perp_oo_count,
+                active.token_conditional_swap_count,
+            )
+            .unwrap_err();
+            ta.expand_dynamic_content(
+                active.token_count,
+                active.serum3_count - 1,
+                active.perp_count,
+                active.perp_oo_count,
+                active.token_conditional_swap_count,
+            )
+            .unwrap_err();
+            ta.expand_dynamic_content(
+                active.token_count,
+                active.serum3_count,
+                active.perp_count - 1,
+                active.perp_oo_count,
+                active.token_conditional_swap_count,
+            )
+            .unwrap_err();
+            ta.expand_dynamic_content(
+                active.token_count,
+                active.serum3_count,
+                active.perp_count,
+                active.perp_oo_count - 1,
+                active.token_conditional_swap_count,
+            )
+            .unwrap_err();
+            ta.expand_dynamic_content(
+                active.token_count,
+                active.serum3_count,
+                active.perp_count,
+                active.perp_oo_count,
+                active.token_conditional_swap_count - 1,
+            )
+            .unwrap_err();
+        }
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_account_resize_random() -> Result<()> {
+        use rand::{seq::SliceRandom, Rng};
+        let mut rng = rand::thread_rng();
+        for _ in 0..1000 {
+            let header = MangoAccountDynamicHeader {
+                token_count: 4,
+                serum3_count: 4,
+                perp_count: 4,
+                perp_oo_count: 8,
+                token_conditional_swap_count: 4,
+            };
+            let mut account = make_resize_test_account(&header);
+
+            let active = MangoAccountDynamicHeader {
+                token_count: rng.gen_range(0..header.token_count + 1),
+                serum3_count: rng.gen_range(0..header.serum3_count + 1),
+                perp_count: rng.gen_range(0..header.perp_count + 1),
+                perp_oo_count: rng.gen_range(0..header.perp_oo_count + 1),
+                token_conditional_swap_count: rng
+                    .gen_range(0..header.token_conditional_swap_count + 1),
+            };
+
+            let options = (0..header.token_count()).collect_vec();
+            let selected = options.choose_multiple(&mut rng, active.token_count());
+            for (i, index) in selected.sorted().enumerate() {
+                account.token_position_mut_by_raw_index(*index).token_index = i as TokenIndex;
+            }
+
+            let options = (0..header.serum3_count()).collect_vec();
+            let selected = options.choose_multiple(&mut rng, active.serum3_count());
+            for (i, index) in selected.sorted().enumerate() {
+                account.serum3_orders_mut_by_raw_index(*index).market_index =
+                    i as Serum3MarketIndex;
+            }
+
+            let options = (0..header.perp_count()).collect_vec();
+            let selected = options.choose_multiple(&mut rng, active.perp_count());
+            for (i, index) in selected.sorted().enumerate() {
+                account.perp_position_mut_by_raw_index(*index).market_index = i as PerpMarketIndex;
+            }
+
+            if active.perp_oo_count() > 0 {
+                let mut perp_oo = account.perp_order_mut_by_raw_index(active.perp_oo_count() - 1);
+                perp_oo.market = 0;
+            }
+
+            let options = (0..header.token_conditional_swap_count()).collect_vec();
+            let selected = options.choose_multiple(&mut rng, active.token_conditional_swap_count());
+            for (i, index) in selected.sorted().enumerate() {
+                let tcs = account.token_conditional_swap_mut_by_index(*index).unwrap();
+                tcs.set_has_data(true);
+                tcs.id = i as u64;
+            }
+
+            let target = MangoAccountDynamicHeader {
+                token_count: rng.gen_range(active.token_count..6),
+                serum3_count: rng.gen_range(active.serum3_count..7),
+                perp_count: rng.gen_range(active.perp_count..6),
+                perp_oo_count: rng.gen_range(active.perp_oo_count..16),
+                token_conditional_swap_count: rng.gen_range(active.token_conditional_swap_count..8),
+            };
+
+            let target_size = target.account_size();
+            if target_size > account.dynamic.len() {
+                account
+                    .dynamic
+                    .extend(vec![0u8; target_size - account.dynamic.len()]);
+            }
+
+            account
+                .expand_dynamic_content(
+                    target.token_count,
+                    target.serum3_count,
+                    target.perp_count,
+                    target.perp_oo_count,
+                    target.token_conditional_swap_count,
+                )
+                .unwrap();
+
+            check_account_active_and_order(&account, &active).unwrap();
+        }
+        Ok(())
     }
 }
