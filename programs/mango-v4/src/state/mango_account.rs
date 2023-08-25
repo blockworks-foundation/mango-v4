@@ -7,7 +7,7 @@ use arrayref::array_ref;
 
 use fixed::types::I80F48;
 
-use solana_program::program_memory::sol_memmove;
+use solana_program::program_memory::{sol_memcpy, sol_memmove};
 use static_assertions::const_assert_eq;
 
 use crate::error::*;
@@ -1391,7 +1391,6 @@ impl<
 
         // expand dynamic components by first moving existing positions, and then setting new ones to defaults
 
-
         // TODO: If we want to allow shrinking
         // - Determine if new start pos is to the left or to the right,
         //   and then either shift r-to-l or reverse.
@@ -1402,14 +1401,78 @@ impl<
         // Possibly we could make i teasier for us by starting with the
         // defrag step, then all useful data would be contiguous
 
-        // Attempt at defrag
-        let mut next_free = 0;
-        for (i, pos) in self.all_token_positions().enumerate() {
-            if pos.is_active() && i != next_free {
-                memmove(pos to bytes[next_free]);
-                next_free += 1;
+        // "Defrag" token, serum, perp by moving active positions into the front slots
+        //
+        // Dangerous because this does NOT reset the previous positions!
+        // Use the active_* values to know how many slots are in-use afterwards!
+        //
+        // Perp OOs can't be collapsed this way because LeafNode::owner_slot is an index into it.
+        // TODO: tcs can be collapsed
+        let mut active_token_positions = 0;
+        for i in 0..old_header.token_count() {
+            let src = old_header.token_offset(i);
+            let pos: &TokenPosition = get_helper(dynamic, src);
+            if !pos.is_active() {
+                continue;
             }
+            if i != active_token_positions {
+                let dst = old_header.token_offset(active_token_positions);
+                unsafe {
+                    sol_memmove(
+                        &mut dynamic[dst],
+                        &mut dynamic[src],
+                        size_of::<TokenPosition>(),
+                    );
+                }
+            }
+            active_token_positions += 1;
         }
+
+        let mut active_serum3_orders = 0;
+        for i in 0..old_header.serum3_count() {
+            let src = old_header.serum3_offset(i);
+            let pos: &Serum3Orders = get_helper(dynamic, src);
+            if !pos.is_active() {
+                continue;
+            }
+            if i != active_serum3_orders {
+                let dst = old_header.serum3_offset(active_serum3_orders);
+                unsafe {
+                    sol_memmove(
+                        &mut dynamic[dst],
+                        &mut dynamic[src],
+                        size_of::<Serum3Orders>(),
+                    );
+                }
+            }
+            active_serum3_orders += 1;
+        }
+
+        let mut active_perp_positions = 0;
+        for i in 0..old_header.perp_count() {
+            let src = old_header.perp_offset(i);
+            let pos: &PerpPosition = get_helper(dynamic, src);
+            if !pos.is_active() {
+                continue;
+            }
+            if i != active_perp_positions {
+                let dst = old_header.perp_offset(active_perp_positions);
+                unsafe {
+                    sol_memmove(
+                        &mut dynamic[dst],
+                        &mut dynamic[src],
+                        size_of::<PerpPosition>(),
+                    );
+                }
+            }
+            active_perp_positions += 1;
+        }
+
+        require_gte!(new_header.token_count(), active_token_positions);
+        require_gte!(new_header.serum3_count(), active_serum3_orders);
+        require_gte!(new_header.perp_count(), active_perp_positions);
+        // TODO: perp oo and tcs checks!
+
         // Do the same for the other positions
 
         // Moving the data is difficult: cases:
@@ -1428,9 +1491,91 @@ impl<
         // on the second pass to copies to the right in reverse
         // zero the empty spots in a third pass
 
-        // TTTT....PP....SSS...
-        // TTTT.....PP..SSS...
-    )
+        // First move pass: go left-to-right and move any blocks that need to be moved
+        // to the left. This will never overwrite other data, because:
+        // - moving to the left can only overwrite data to the left
+        // - the left of the target location is >= the right of the previous data location
+        //   because either the previous was already moved to the left (clearly good),
+        //   or still needs to be moved to the right (the new end will be <= the target start)
+        {
+            // Token positions never move
+
+            let old_serum3_start = old_header.serum3_offset(0);
+            let new_serum3_start = new_header.serum3_offset(0);
+            if new_serum3_start < old_serum3_start && active_serum3_orders > 0 {
+                unsafe {
+                    sol_memmove(
+                        &mut dynamic[new_serum3_start],
+                        &mut dynamic[old_serum3_start],
+                        size_of::<Serum3Orders>() * active_serum3_orders,
+                    );
+                }
+            }
+
+            let old_perp_start = old_header.perp_offset(0);
+            let new_perp_start = new_header.perp_offset(0);
+            if new_perp_start < old_perp_start && active_perp_positions > 0 {
+                unsafe {
+                    sol_memmove(
+                        &mut dynamic[new_perp_start],
+                        &mut dynamic[old_perp_start],
+                        size_of::<PerpPosition>() * active_perp_positions,
+                    );
+                }
+            }
+
+            // TODO: Also move perp oo and tcs
+        }
+
+        // Second move pass: Go right-to-left and move everything to the right if needed.
+        // This will never overwrite other data:
+        // - because of moving right, it could only overwrite a block to the right
+        // - if the block to the right needed moving to the right, that was already done
+        // - if the block to the right was moved to the left, we know that its start will
+        //   be >= our block's end
+        {
+            // TODO: also move tcs and perp oo
+
+            let old_perp_start = old_header.perp_offset(0);
+            let new_perp_start = new_header.perp_offset(0);
+            if new_perp_start > old_perp_start && active_perp_positions > 0 {
+                unsafe {
+                    sol_memmove(
+                        &mut dynamic[new_perp_start],
+                        &mut dynamic[old_perp_start],
+                        size_of::<PerpPosition>() * active_perp_positions,
+                    );
+                }
+            }
+
+            let old_serum3_start = old_header.serum3_offset(0);
+            let new_serum3_start = new_header.serum3_offset(0);
+            if new_serum3_start > old_serum3_start && active_serum3_orders > 0 {
+                unsafe {
+                    sol_memmove(
+                        &mut dynamic[new_serum3_start],
+                        &mut dynamic[old_serum3_start],
+                        size_of::<Serum3Orders>() * active_serum3_orders,
+                    );
+                }
+            }
+
+            // Token positions never move
+        }
+
+        // Defaulting pass: The blocks are in their final positions, clear out all unused slots
+        {
+            for i in active_token_positions..new_token_count as usize {
+                *get_helper_mut(dynamic, new_header.token_offset(i)) = TokenPosition::default();
+            }
+            for i in active_serum3_orders..new_serum3_count as usize {
+                *get_helper_mut(dynamic, new_header.serum3_offset(i)) = Serum3Orders::default();
+            }
+            for i in active_perp_positions..new_perp_count as usize {
+                *get_helper_mut(dynamic, new_header.perp_offset(i)) = PerpPosition::default();
+            }
+            // TODO: perp oo, tcs
+        }
 
         // token conditional swaps
         if old_header.token_conditional_swap_count() > 0 {
@@ -1460,48 +1605,6 @@ impl<
         for i in old_header.perp_oo_count..new_perp_oo_count {
             *get_helper_mut(dynamic, new_header.perp_oo_offset(i.into())) =
                 PerpOpenOrder::default();
-        }
-
-        // perp positions
-        if old_header.perp_count() > 0 {
-            unsafe {
-                sol_memmove(
-                    &mut dynamic[new_header.perp_offset(0)],
-                    &mut dynamic[old_header.perp_offset(0)],
-                    size_of::<PerpPosition>() * old_header.perp_count(),
-                );
-            }
-        }
-        for i in old_header.perp_count..new_perp_count {
-            *get_helper_mut(dynamic, new_header.perp_offset(i.into())) = PerpPosition::default();
-        }
-
-        // serum3 positions
-        if old_header.serum3_count() > 0 {
-            unsafe {
-                sol_memmove(
-                    &mut dynamic[new_header.serum3_offset(0)],
-                    &mut dynamic[old_header.serum3_offset(0)],
-                    size_of::<Serum3Orders>() * old_header.serum3_count(),
-                );
-            }
-        }
-        for i in old_header.serum3_count..new_serum3_count {
-            *get_helper_mut(dynamic, new_header.serum3_offset(i.into())) = Serum3Orders::default();
-        }
-
-        // token positions
-        if old_header.token_count() > 0 {
-            unsafe {
-                sol_memmove(
-                    &mut dynamic[new_header.token_offset(0)],
-                    &mut dynamic[old_header.token_offset(0)],
-                    size_of::<TokenPosition>() * old_header.token_count(),
-                );
-            }
-        }
-        for i in old_header.token_count..new_token_count {
-            *get_helper_mut(dynamic, new_header.token_offset(i.into())) = TokenPosition::default();
         }
 
         // update the already-parsed header
