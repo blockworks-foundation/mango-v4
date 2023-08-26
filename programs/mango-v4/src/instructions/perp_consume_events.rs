@@ -44,6 +44,41 @@ macro_rules! load_mango_account {
     };
 }
 
+#[derive(AnchorSerialize, AnchorDeserialize)]
+pub enum FillCategory {
+    OpenShort,
+    OpenLong,
+    IncreaseShort,
+    IncreaseLong,
+    DecreaseShort,
+    DecreaseLong,
+}
+
+fn get_fill_category(pre_fill_base_position: i64, side: Side) -> FillCategory {
+    // Note: if base position is 100 and 200 is sold (final base position -100)
+    // this is defined as DecreaseLong (conceivably this could also be defined as OpenShort)
+    match side {
+        Side::Bid => {
+            if pre_fill_base_position.is_positive() {
+                FillCategory::IncreaseLong
+            } else if pre_fill_base_position == 0 {
+                FillCategory::OpenLong
+            } else {
+                FillCategory::DecreaseShort
+            }
+        }
+        Side::Ask => {
+            if pre_fill_base_position.is_positive() {
+                FillCategory::DecreaseLong
+            } else if pre_fill_base_position == 0 {
+                FillCategory::OpenShort
+            } else {
+                FillCategory::IncreaseShort
+            }
+        }
+    }
+}
+
 pub fn perp_consume_events(ctx: Context<PerpConsumeEvents>, limit: usize) -> Result<()> {
     let group = ctx.accounts.group.load()?;
     let group_key = ctx.accounts.group.key();
@@ -148,6 +183,7 @@ pub fn perp_consume_events(ctx: Context<PerpConsumeEvents>, limit: usize) -> Res
                         pre_fill_taker_base_position,
                     )
                 };
+
                 emit!(FillLogV4 {
                     mango_group: group_key,
                     market_index: perp_market_index,
@@ -167,8 +203,14 @@ pub fn perp_consume_events(ctx: Context<PerpConsumeEvents>, limit: usize) -> Res
                     quantity: fill.quantity,
                     maker_closed_pnl: maker_closed_pnl.to_num(),
                     taker_closed_pnl: taker_closed_pnl.to_num(),
-                    pre_fill_maker_base_position: pre_fill_maker_base_position,
-                    pre_fill_taker_base_position: pre_fill_taker_base_position
+                    taker_fill_category: get_fill_category(
+                        pre_fill_taker_base_position,
+                        fill.taker_side()
+                    ),
+                    maker_fill_category: get_fill_category(
+                        pre_fill_maker_base_position,
+                        fill.taker_side().invert_side()
+                    )
                 });
             }
             EventType::Out => {

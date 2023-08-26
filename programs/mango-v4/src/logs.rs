@@ -1,5 +1,6 @@
 use crate::{
     accounts_ix::FlashLoanType,
+    instructions::FillCategory,
     state::{OracleType, PerpMarket, PerpPosition},
 };
 use anchor_lang::prelude::*;
@@ -210,15 +211,8 @@ pub struct FillLogV4 {
     pub maker_closed_pnl: f64, // settle-token-native units
     pub taker_closed_pnl: f64, // settle-token-native units
 
-    // Necessary to determine if a fill resulted in a
-    // * open short
-    // * open long
-    // * increase short,
-    // * increase long,
-    // * close (partial) short,
-    // * close (partial) long,
-    pub pre_fill_taker_base_position: i64,
-    pub pre_fill_maker_base_position: i64,
+    pub taker_fill_category: FillCategory,
+    pub maker_fill_category: FillCategory,
 }
 
 #[event]
