@@ -2419,7 +2419,7 @@ export class MangoClient {
           pa.marketIndex,
           isLong ? PerpOrderSide.ask : PerpOrderSide.bid,
           pm.uiPrice * (isLong ? 1 - slippage : 1 + slippage), // Try to cross the spread to guarantee matching
-          pa.getBasePositionUi(pm) * 1.01, // Send a larger size to ensure full order is closed
+          Math.abs(pa.getBasePositionUi(pm) * 1.01), // Send a larger size to ensure full order is closed
           undefined,
           Date.now(),
           PerpOrderType.immediateOrCancel,
