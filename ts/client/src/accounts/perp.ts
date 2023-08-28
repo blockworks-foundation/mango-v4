@@ -408,6 +408,13 @@ export class PerpMarket {
     return funding;
   }
 
+  public getInstantaneousFundingRatePerSecond(
+    bids: BookSide,
+    asks: BookSide,
+  ): number {
+    return this.getInstantaneousFundingRate(bids, asks) / (24 * 60 * 60);
+  }
+
   /**
    *
    * Returns instantaneous funding rate for the day. How is it actually applied - funding is
