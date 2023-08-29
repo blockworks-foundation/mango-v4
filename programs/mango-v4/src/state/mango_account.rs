@@ -573,8 +573,12 @@ impl MangoAccountDynamicHeader {
         }
     }
 
-    fn expected_health_accounts(&self) -> usize {
+    pub fn expected_health_accounts(&self) -> usize {
         self.token_count() * 2 + self.serum3_count() + self.perp_count() * 2
+    }
+
+    pub fn max_health_accounts() -> usize {
+        28
     }
 
     /// Error if this header isn't a valid resize from `prev`
@@ -588,7 +592,7 @@ impl MangoAccountDynamicHeader {
         let new_health_accounts = self.expected_health_accounts();
         let prev_health_accounts = prev.expected_health_accounts();
         if new_health_accounts > prev_health_accounts {
-            require_gte!(28, new_health_accounts);
+            require_gte!(Self::max_health_accounts(), new_health_accounts);
         }
 
         if self.perp_oo_count > prev.perp_oo_count {
