@@ -1614,7 +1614,7 @@
         reduce_only: u8,
         token_conditional_swap_taker_fee_rate: f32,
         token_conditional_swap_maker_fee_rate: f32,
-        flash_loan_swap_fee_rate: f32,
+        flash_loan_deposit_fee_rate: f32,
     ) -&gt; <span class="prelude-ty">Result</span>&lt;()&gt; {
         <span class="attribute">#[cfg(feature = <span class="string">&quot;enable-gpl&quot;</span>)]
         </span>instructions::token_register(
@@ -1641,7 +1641,7 @@
             reduce_only,
             token_conditional_swap_taker_fee_rate,
             token_conditional_swap_maker_fee_rate,
-            flash_loan_swap_fee_rate,
+            flash_loan_deposit_fee_rate,
         )<span class="question-mark">?</span>;
         <span class="prelude-val">Ok</span>(())
     }
@@ -1685,7 +1685,7 @@
         force_close_opt: <span class="prelude-ty">Option</span>&lt;bool&gt;,
         token_conditional_swap_taker_fee_rate_opt: <span class="prelude-ty">Option</span>&lt;f32&gt;,
         token_conditional_swap_maker_fee_rate_opt: <span class="prelude-ty">Option</span>&lt;f32&gt;,
-        flash_loan_swap_fee_rate_opt: <span class="prelude-ty">Option</span>&lt;f32&gt;,
+        flash_loan_deposit_fee_rate_opt: <span class="prelude-ty">Option</span>&lt;f32&gt;,
     ) -&gt; <span class="prelude-ty">Result</span>&lt;()&gt; {
         <span class="attribute">#[cfg(feature = <span class="string">&quot;enable-gpl&quot;</span>)]
         </span>instructions::token_edit(
@@ -1716,7 +1716,7 @@
             force_close_opt,
             token_conditional_swap_taker_fee_rate_opt,
             token_conditional_swap_maker_fee_rate_opt,
-            flash_loan_swap_fee_rate_opt,
+            flash_loan_deposit_fee_rate_opt,
         )<span class="question-mark">?</span>;
         <span class="prelude-val">Ok</span>(())
     }
