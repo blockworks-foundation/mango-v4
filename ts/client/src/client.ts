@@ -2795,6 +2795,26 @@ export class MangoClient {
       .instruction();
   }
 
+  public async perpCancelOrderByClientOrderIdIx(
+    group: Group,
+    mangoAccount: MangoAccount,
+    perpMarketIndex: PerpMarketIndex,
+    clientOrderId: BN,
+  ): Promise<TransactionInstruction> {
+    const perpMarket = group.getPerpMarketByMarketIndex(perpMarketIndex);
+    return await this.program.methods
+      .perpCancelOrderByClientOrderId(new BN(clientOrderId))
+      .accounts({
+        group: group.publicKey,
+        account: mangoAccount.publicKey,
+        owner: (this.program.provider as AnchorProvider).wallet.publicKey,
+        perpMarket: perpMarket.publicKey,
+        bids: perpMarket.bids,
+        asks: perpMarket.asks,
+      })
+      .instruction();
+  }
+
   public async perpCancelOrder(
     group: Group,
     mangoAccount: MangoAccount,
