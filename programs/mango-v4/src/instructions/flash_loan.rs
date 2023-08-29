@@ -235,8 +235,8 @@ pub fn flash_loan_end<'key, 'accounts, 'remaining, 'info>(
     // Verify that each mentioned vault has a bank in the health accounts
     let mut vaults_with_banks = vec![false; vaults.len()];
 
-    // Biggest flash_loan_swap_fee_rate over all involved banks
-    let mut max_swap_fee_rate = 0.0f32;
+    // Biggest flash_loan_deposit_fee_rate over all involved banks
+    let mut max_deposit_fee_rate = 0.0f32;
 
     // Loop over the banks, finding matching vaults
     // TODO: must be moved into health.rs, because it assumes something about the health accounts structure
@@ -295,7 +295,7 @@ pub fn flash_loan_end<'key, 'accounts, 'remaining, 'info>(
             change += repay;
         }
 
-        max_swap_fee_rate = max_swap_fee_rate.max(bank.flash_loan_swap_fee_rate);
+        max_deposit_fee_rate = max_deposit_fee_rate.max(bank.flash_loan_deposit_fee_rate);
 
         changes.push(TokenVaultChange {
             token_index: bank.token_index,
@@ -364,14 +364,14 @@ pub fn flash_loan_end<'key, 'accounts, 'remaining, 'info>(
         let loan_origination_fee = loan * bank.loan_origination_fee_rate;
         bank.collected_fees_native += loan_origination_fee;
 
-        let swap_fee = if flash_loan_type == FlashLoanType::Swap {
-            change.amount * I80F48::from_num(max_swap_fee_rate)
+        let deposit_fee = if change.amount > 0 {
+            change.amount * I80F48::from_num(max_deposit_fee_rate)
         } else {
             I80F48::ZERO
         };
-        bank.collected_fees_native += swap_fee;
+        bank.collected_fees_native += deposit_fee;
 
-        let change_amount = change.amount - loan_origination_fee - swap_fee;
+        let change_amount = change.amount - loan_origination_fee - deposit_fee;
         let native_after_change = native + change_amount;
         if bank.are_deposits_reduce_only() {
             require!(
@@ -415,7 +415,7 @@ pub fn flash_loan_end<'key, 'accounts, 'remaining, 'info>(
             deposit_index: bank.deposit_index.to_bits(),
             borrow_index: bank.borrow_index.to_bits(),
             price: oracle_price.to_bits(),
-            swap_fee: swap_fee.to_bits(),
+            deposit_fee: deposit_fee.to_bits(),
         });
 
         emit!(TokenBalanceLog {

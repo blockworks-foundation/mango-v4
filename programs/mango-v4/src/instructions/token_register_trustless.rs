@@ -79,7 +79,7 @@ pub fn token_register_trustless(
         fees_withdrawn: 0,
         token_conditional_swap_taker_fee_rate: 0.0005,
         token_conditional_swap_maker_fee_rate: 0.0005,
-        flash_loan_swap_fee_rate: 0.0005,
+        flash_loan_deposit_fee_rate: 0.0005,
         reserved: [0; 2092],
     };
     require_gt!(bank.max_rate, MINIMUM_MAX_RATE);
