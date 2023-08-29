@@ -42,6 +42,25 @@ pub enum CheckLiquidatable {
     BecameNotLiquidatable,
 }
 
+pub struct MangoAccountPdaSeeds {
+    pub group: Pubkey,
+    pub owner: Pubkey,
+    pub account_num_bytes: [u8; 4],
+    pub bump_bytes: [u8; 1],
+}
+
+impl MangoAccountPdaSeeds {
+    pub fn signer_seeds(&self) -> [&[u8]; 5] {
+        [
+            b"MangoAccount".as_ref(),
+            self.group.as_ref(),
+            self.owner.as_ref(),
+            &self.account_num_bytes,
+            &self.bump_bytes,
+        ]
+    }
+}
+
 // Mango Account
 // This struct definition is only for clients e.g. typescript, so that they can easily use out of the box
 // deserialization and not have to do custom deserialization
@@ -360,6 +379,15 @@ impl MangoAccountFixed {
             self.buyback_fees_accrued_previous = 0;
         } else {
             self.buyback_fees_accrued_previous -= amount;
+        }
+    }
+
+    pub fn pda_seeds(&self) -> MangoAccountPdaSeeds {
+        MangoAccountPdaSeeds {
+            group: self.group,
+            owner: self.owner,
+            account_num_bytes: self.account_num.to_le_bytes(),
+            bump_bytes: [self.bump],
         }
     }
 }
@@ -1358,7 +1386,7 @@ impl<
         self.write_borsh_vec_length(offset, count)
     }
 
-    pub fn expand_dynamic_content(
+    pub fn resize_dynamic_content(
         &mut self,
         new_token_count: u8,
         new_serum3_count: u8,
@@ -2321,7 +2349,7 @@ mod tests {
         // Resizing to the same size just removes the empty spaces
         {
             let mut ta = account.clone();
-            ta.expand_dynamic_content(
+            ta.resize_dynamic_content(
                 header.token_count,
                 header.serum3_count,
                 header.perp_count,
@@ -2334,7 +2362,7 @@ mod tests {
         // Resizing to the minimum size is fine
         {
             let mut ta = account.clone();
-            ta.expand_dynamic_content(
+            ta.resize_dynamic_content(
                 active.token_count,
                 active.serum3_count,
                 active.perp_count,
@@ -2347,7 +2375,7 @@ mod tests {
         // Resizing to less than what is active is forbidden
         {
             let mut ta = account.clone();
-            ta.expand_dynamic_content(
+            ta.resize_dynamic_content(
                 active.token_count - 1,
                 active.serum3_count,
                 active.perp_count,
@@ -2355,7 +2383,7 @@ mod tests {
                 active.token_conditional_swap_count,
             )
             .unwrap_err();
-            ta.expand_dynamic_content(
+            ta.resize_dynamic_content(
                 active.token_count,
                 active.serum3_count - 1,
                 active.perp_count,
@@ -2363,7 +2391,7 @@ mod tests {
                 active.token_conditional_swap_count,
             )
             .unwrap_err();
-            ta.expand_dynamic_content(
+            ta.resize_dynamic_content(
                 active.token_count,
                 active.serum3_count,
                 active.perp_count - 1,
@@ -2371,7 +2399,7 @@ mod tests {
                 active.token_conditional_swap_count,
             )
             .unwrap_err();
-            ta.expand_dynamic_content(
+            ta.resize_dynamic_content(
                 active.token_count,
                 active.serum3_count,
                 active.perp_count,
@@ -2379,7 +2407,7 @@ mod tests {
                 active.token_conditional_swap_count,
             )
             .unwrap_err();
-            ta.expand_dynamic_content(
+            ta.resize_dynamic_content(
                 active.token_count,
                 active.serum3_count,
                 active.perp_count,
@@ -2463,7 +2491,7 @@ mod tests {
             }
 
             account
-                .expand_dynamic_content(
+                .resize_dynamic_content(
                     target.token_count,
                     target.serum3_count,
                     target.perp_count,

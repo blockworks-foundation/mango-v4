@@ -24,10 +24,8 @@ pub fn account_expand(
     let old_space = realloc_account.data_len();
     let old_lamports = realloc_account.lamports();
 
-    require_gt!(new_space, old_space);
-
+    // Either get more lamports for rent, or transfer out the surplus
     if old_lamports < new_rent_minimum {
-        // transfer required additional rent
         anchor_lang::system_program::transfer(
             anchor_lang::context::CpiContext::new(
                 ctx.accounts.system_program.to_account_info(),
@@ -38,20 +36,40 @@ pub fn account_expand(
             ),
             new_rent_minimum - old_lamports,
         )?;
+    } else if old_lamports > new_rent_minimum {
+        // Transfer out excess lamports, but can't use a data-having account in spl::Tranfer::from,
+        // so adjust lamports manually.
+        let excess = old_lamports - new_rent_minimum;
+        let mut account_lamports = realloc_account.try_borrow_mut_lamports()?;
+        **account_lamports -= excess;
+        let mut payer_lamports = ctx.accounts.payer.as_ref().try_borrow_mut_lamports()?;
+        **payer_lamports += excess;
     }
 
-    // realloc: it's safe to not re-zero-init since we never shrink accounts
-    realloc_account.realloc(new_space, false)?;
+    // This instruction has <= 1 calls to AccountInfo::realloc(), meaning that the
+    // new data when expanding the account will be zero initialized already: it's not
+    // necessary to zero init it again.
+    let no_zero_init = false;
 
-    // expand dynamic content, e.g. to grow token positions, we need to slide serum3orders further later, and so on....
-    let mut account = ctx.accounts.account.load_full_mut()?;
-    account.expand_dynamic_content(
-        token_count,
-        serum3_count,
-        perp_count,
-        perp_oo_count,
-        token_conditional_swap_count,
-    )?;
+    if new_space > old_space {
+        realloc_account.realloc(new_space, no_zero_init)?;
+    }
+
+    // resize the dynamic content on the account
+    {
+        let mut account = ctx.accounts.account.load_full_mut()?;
+        account.resize_dynamic_content(
+            token_count,
+            serum3_count,
+            perp_count,
+            perp_oo_count,
+            token_conditional_swap_count,
+        )?;
+    }
+
+    if new_space < old_space {
+        realloc_account.realloc(new_space, no_zero_init)?;
+    }
 
     Ok(())
 }

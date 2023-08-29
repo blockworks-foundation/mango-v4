@@ -35,9 +35,9 @@ async fn test_basic() -> Result<(), TransportError> {
             account_num: 0,
             token_count: 6,
             serum3_count: 3,
-            perp_count: 0,
-            perp_oo_count: 0,
-            token_conditional_swap_count: 0,
+            perp_count: 3,
+            perp_oo_count: 3,
+            token_conditional_swap_count: 3,
             group,
             owner,
             payer,
@@ -58,8 +58,40 @@ async fn test_basic() -> Result<(), TransportError> {
         0
     );
 
-    assert_eq!(account_data.perps.len(), 0);
-    assert_eq!(account_data.perp_open_orders.len(), 0);
+    assert_eq!(account_data.perps.len(), 3);
+    assert_eq!(account_data.perp_open_orders.len(), 3);
+
+    send_tx(
+        solana,
+        AccountExpandInstruction {
+            account_num: 0,
+            token_count: 1,
+            serum3_count: 1,
+            perp_count: 1,
+            perp_oo_count: 1,
+            token_conditional_swap_count: 1,
+            group,
+            owner,
+            payer,
+            ..Default::default()
+        },
+    )
+    .await
+    .unwrap()
+    .account;
+    let account_data: MangoAccount = solana.get_account(account).await;
+    assert_eq!(account_data.tokens.len(), 1);
+    assert_eq!(
+        account_data.tokens.iter().filter(|t| t.is_active()).count(),
+        0
+    );
+    assert_eq!(account_data.serum3.len(), 1);
+    assert_eq!(
+        account_data.serum3.iter().filter(|s| s.is_active()).count(),
+        0
+    );
+    assert_eq!(account_data.perps.len(), 1);
+    assert_eq!(account_data.perp_open_orders.len(), 1);
 
     send_tx(
         solana,
@@ -90,7 +122,6 @@ async fn test_basic() -> Result<(), TransportError> {
         account_data.serum3.iter().filter(|s| s.is_active()).count(),
         0
     );
-
     assert_eq!(account_data.perps.len(), 4);
     assert_eq!(account_data.perp_open_orders.len(), 8);
 
