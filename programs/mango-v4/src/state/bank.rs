@@ -146,7 +146,7 @@ pub struct Bank {
     pub token_conditional_swap_taker_fee_rate: f32,
     pub token_conditional_swap_maker_fee_rate: f32,
 
-    pub flash_loan_swap_fee_rate: f32,
+    pub flash_loan_deposit_fee_rate: f32,
 
     #[derivative(Debug = "ignore")]
     pub reserved: [u8; 2092],
@@ -259,7 +259,7 @@ impl Bank {
             fees_withdrawn: 0,
             token_conditional_swap_taker_fee_rate: 0.0,
             token_conditional_swap_maker_fee_rate: 0.0,
-            flash_loan_swap_fee_rate: 0.0,
+            flash_loan_deposit_fee_rate: 0.0,
             reserved: [0; 2092],
         }
     }
@@ -285,7 +285,7 @@ impl Bank {
         require_gte!(2, self.reduce_only);
         require_gte!(self.token_conditional_swap_taker_fee_rate, 0.0);
         require_gte!(self.token_conditional_swap_maker_fee_rate, 0.0);
-        require_gte!(self.flash_loan_swap_fee_rate, 0.0);
+        require_gte!(self.flash_loan_deposit_fee_rate, 0.0);
         Ok(())
     }
 

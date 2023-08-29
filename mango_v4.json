@@ -594,7 +594,7 @@
           "type": "f32"
         },
         {
-          "name": "flashLoanSwapFeeRate",
+          "name": "flashLoanDepositFeeRate",
           "type": "f32"
         }
       ]
@@ -926,7 +926,7 @@
           }
         },
         {
-          "name": "flashLoanSwapFeeRateOpt",
+          "name": "flashLoanDepositFeeRateOpt",
           "type": {
             "option": "f32"
           }
@@ -6670,7 +6670,7 @@
             "type": "f32"
           },
           {
-            "name": "flashLoanSwapFeeRate",
+            "name": "flashLoanDepositFeeRate",
             "type": "f32"
           },
           {
@@ -8256,7 +8256,7 @@
             "type": "i128"
           },
           {
-            "name": "swapFee",
+            "name": "depositFee",
             "type": "i128"
           }
         ]
