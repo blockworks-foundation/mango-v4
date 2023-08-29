@@ -52,7 +52,7 @@ more advanced parameters
 - `SNAPSHOT_INTERVAL_SECS` - how frequently to request a full on-chain snapshot (default 5min)
 - `PARALLEL_RPC_REQUESTS` - number of allowed parallel rpc calls (default 10)
 - `TELEMETRY` - report the liquidator's existence and pubkey occasionally (default true)
-- `MOCK_JUPITER` - replace jupiter queries with mocks (for devnet testing only)
+- `JUPITER_VERSION` - choose between v4 and v6 jupiter (or mock, for devnet testing only)
 
 ```shell
 cargo run --bin liquidator

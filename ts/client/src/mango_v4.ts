@@ -594,7 +594,7 @@ export type MangoV4 = {
           "type": "f32"
         },
         {
-          "name": "flashLoanSwapFeeRate",
+          "name": "flashLoanDepositFeeRate",
           "type": "f32"
         }
       ]
@@ -926,7 +926,7 @@ export type MangoV4 = {
           }
         },
         {
-          "name": "flashLoanSwapFeeRateOpt",
+          "name": "flashLoanDepositFeeRateOpt",
           "type": {
             "option": "f32"
           }
@@ -6670,7 +6670,7 @@ export type MangoV4 = {
             "type": "f32"
           },
           {
-            "name": "flashLoanSwapFeeRate",
+            "name": "flashLoanDepositFeeRate",
             "type": "f32"
           },
           {
@@ -8256,7 +8256,7 @@ export type MangoV4 = {
             "type": "i128"
           },
           {
-            "name": "swapFee",
+            "name": "depositFee",
             "type": "i128"
           }
         ]
@@ -13131,7 +13131,7 @@ export const IDL: MangoV4 = {
           "type": "f32"
         },
         {
-          "name": "flashLoanSwapFeeRate",
+          "name": "flashLoanDepositFeeRate",
           "type": "f32"
         }
       ]
@@ -13463,7 +13463,7 @@ export const IDL: MangoV4 = {
           }
         },
         {
-          "name": "flashLoanSwapFeeRateOpt",
+          "name": "flashLoanDepositFeeRateOpt",
           "type": {
             "option": "f32"
           }
@@ -19207,7 +19207,7 @@ export const IDL: MangoV4 = {
             "type": "f32"
           },
           {
-            "name": "flashLoanSwapFeeRate",
+            "name": "flashLoanDepositFeeRate",
             "type": "f32"
           },
           {
@@ -20793,7 +20793,7 @@ export const IDL: MangoV4 = {
             "type": "i128"
           },
           {
-            "name": "swapFee",
+            "name": "depositFee",
             "type": "i128"
           }
         ]

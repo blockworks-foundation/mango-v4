@@ -24,7 +24,7 @@ export interface TokenRegisterParams {
   reduceOnly: number;
   tokenConditionalSwapTakerFeeRate: number;
   tokenConditionalSwapMakerFeeRate: number;
-  flashLoanSwapFeeRate: number;
+  flashLoanDepositFeeRate: number;
 }
 
 export const DefaultTokenRegisterParams: TokenRegisterParams = {
@@ -59,7 +59,7 @@ export const DefaultTokenRegisterParams: TokenRegisterParams = {
   reduceOnly: 0,
   tokenConditionalSwapTakerFeeRate: 0.0005,
   tokenConditionalSwapMakerFeeRate: 0.0005,
-  flashLoanSwapFeeRate: 0.0005,
+  flashLoanDepositFeeRate: 0.0005,
 };
 
 export interface TokenEditParams {
@@ -89,7 +89,7 @@ export interface TokenEditParams {
   forceClose: boolean | null;
   tokenConditionalSwapTakerFeeRate: number | null;
   tokenConditionalSwapMakerFeeRate: number | null;
-  flashLoanSwapFeeRate: number | null;
+  flashLoanDepositFeeRate: number | null;
 }
 
 export const NullTokenEditParams: TokenEditParams = {
@@ -119,7 +119,7 @@ export const NullTokenEditParams: TokenEditParams = {
   forceClose: null,
   tokenConditionalSwapTakerFeeRate: null,
   tokenConditionalSwapMakerFeeRate: null,
-  flashLoanSwapFeeRate: null,
+  flashLoanDepositFeeRate: null,
 };
 
 export interface PerpEditParams {

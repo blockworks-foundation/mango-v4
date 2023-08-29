@@ -67,7 +67,7 @@ pub struct FlashLoanTokenDetailV2 {
     pub deposit_index: i128,
     pub borrow_index: i128,
     pub price: i128,
-    pub swap_fee: i128,
+    pub deposit_fee: i128,
 }
 
 #[event]

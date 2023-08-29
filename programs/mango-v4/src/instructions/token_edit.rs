@@ -41,7 +41,7 @@ pub fn token_edit(
     force_close_opt: Option<bool>,
     token_conditional_swap_taker_fee_rate_opt: Option<f32>,
     token_conditional_swap_maker_fee_rate_opt: Option<f32>,
-    flash_loan_swap_fee_rate_opt: Option<f32>,
+    flash_loan_deposit_fee_rate_opt: Option<f32>,
 ) -> Result<()> {
     let group = ctx.accounts.group.load()?;
 
@@ -308,35 +308,35 @@ pub fn token_edit(
             require_group_admin = true;
         };
 
-        if let Some(fee_fraction) = token_conditional_swap_taker_fee_rate_opt {
+        if let Some(fee_rate) = token_conditional_swap_taker_fee_rate_opt {
             msg!(
                 "Token conditional swap taker fee fraction old {:?}, new {:?}",
                 bank.token_conditional_swap_taker_fee_rate,
-                fee_fraction
+                fee_rate
             );
-            require_gte!(fee_fraction, 0.0); // values <0 are not currently supported
-            bank.token_conditional_swap_taker_fee_rate = fee_fraction;
+            require_gte!(fee_rate, 0.0); // values <0 are not currently supported
+            bank.token_conditional_swap_taker_fee_rate = fee_rate;
             require_group_admin = true;
         }
-        if let Some(fees_fraction) = token_conditional_swap_maker_fee_rate_opt {
+        if let Some(fee_rate) = token_conditional_swap_maker_fee_rate_opt {
             msg!(
                 "Token conditional swap maker fee fraction old {:?}, new {:?}",
                 bank.token_conditional_swap_maker_fee_rate,
-                fees_fraction
+                fee_rate
             );
-            require_gte!(fees_fraction, 0.0); // values <0 are not currently supported
-            bank.token_conditional_swap_maker_fee_rate = fees_fraction;
+            require_gte!(fee_rate, 0.0); // values <0 are not currently supported
+            bank.token_conditional_swap_maker_fee_rate = fee_rate;
             require_group_admin = true;
         }
 
-        if let Some(fees_fraction) = flash_loan_swap_fee_rate_opt {
+        if let Some(fee_rate) = flash_loan_deposit_fee_rate_opt {
             msg!(
                 "Flash loan swap fee fraction old {:?}, new {:?}",
-                bank.flash_loan_swap_fee_rate,
-                fees_fraction
+                bank.flash_loan_deposit_fee_rate,
+                fee_rate
             );
-            require_gte!(fees_fraction, 0.0); // values <0 are not currently supported
-            bank.flash_loan_swap_fee_rate = fees_fraction;
+            require_gte!(fee_rate, 0.0); // values <0 are not currently supported
+            bank.flash_loan_deposit_fee_rate = fee_rate;
             require_group_admin = true;
         }
     }

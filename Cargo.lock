@@ -2959,6 +2959,7 @@ dependencies = [
  "openbook-v2",
  "pyth-sdk-solana 0.7.2",
  "rand 0.8.5",
+ "regex",
  "serde",
  "serum_dex",
  "solana-address-lookup-table-program",

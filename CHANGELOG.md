@@ -35,10 +35,13 @@ Update this for each program release and mainnet deployment.
   Liquidators may be interested in performing actions in the same transaction
   as a flash loan swap.
 
-- Flash loan swaps: The DAO can now charge a fee (#660)
+- Flash loan: The DAO can now charge a deposit fee (#660, #693)
 
-  The DAO can now configure a fee on flash loan based swaps. Previously flash
-  loans that did not use more than the user's deposits were free.
+  The DAO can now configure a fee on deposits that happen in flash loans. This
+  could be used to apply a fee to flash loan swaps.
+
+  Previously flash loans that did not increase the user's token balance and did
+  not borrow tokens were free.
 
 - Stop loss: Respect net borrow limits and change low-health completion (#677)
 - Stop loss: Store helpful UI fields (#654, #667)
@@ -46,6 +49,7 @@ Update this for each program release and mainnet deployment.
 - Stop loss: Avoid expensive health cache for expired orders (#682)
 - Account creation: Add account_create_v2 instruction (#680, #685)
 - Account resizing: Lower maximums due to tx account limit (#686, #688, #689)
+- Account resizing: Fix denial of service if account has too many lamports (#694)
 - Token register: Revamp API for simpler use from governance (#665)
 - Token register untrusted: Adjust default oracle staleness (#678)
 - Fix typo in name of admin_token_withdraw_fees instruction (#655)

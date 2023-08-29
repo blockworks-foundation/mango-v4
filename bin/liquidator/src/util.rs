@@ -8,7 +8,7 @@ use solana_sdk::account::AccountSharedData;
 use solana_sdk::pubkey::Pubkey;
 
 pub use mango_v4_client::snapshot_source::is_mango_account;
-use mango_v4_client::{chain_data, JupiterSwapMode, MangoClient};
+use mango_v4_client::{chain_data, MangoClient};
 
 pub fn is_mango_bank<'a>(account: &'a AccountSharedData, group_id: &Pubkey) -> Option<&'a Bank> {
     let bank = account.load::<Bank>().ok()?;
@@ -35,73 +35,6 @@ pub fn is_perp_market<'a>(
         return None;
     }
     Some(perp_market)
-}
-
-/// A wrapper that can mock the response
-pub async fn jupiter_route(
-    mango_client: &MangoClient,
-    input_mint: Pubkey,
-    output_mint: Pubkey,
-    amount: u64,
-    slippage: u64,
-    swap_mode: JupiterSwapMode,
-    only_direct_routes: bool,
-    mock: bool,
-) -> anyhow::Result<mango_v4_client::jupiter::QueryRoute> {
-    if !mock {
-        return mango_client
-            .jupiter_route(
-                input_mint,
-                output_mint,
-                amount,
-                slippage,
-                swap_mode,
-                only_direct_routes,
-            )
-            .await;
-    }
-
-    let input_price = mango_client
-        .bank_oracle_price(mango_client.context.token_by_mint(&input_mint)?.token_index)
-        .await?;
-    let output_price = mango_client
-        .bank_oracle_price(
-            mango_client
-                .context
-                .token_by_mint(&output_mint)?
-                .token_index,
-        )
-        .await?;
-    let in_amount: u64;
-    let out_amount: u64;
-    let other_amount_threshold: u64;
-    let swap_mode_str;
-    match swap_mode {
-        JupiterSwapMode::ExactIn => {
-            in_amount = amount;
-            out_amount = (I80F48::from(amount) * input_price / output_price).to_num();
-            other_amount_threshold = out_amount;
-            swap_mode_str = "ExactIn".to_string();
-        }
-        JupiterSwapMode::ExactOut => {
-            in_amount = (I80F48::from(amount) * output_price / input_price).to_num();
-            out_amount = amount;
-            other_amount_threshold = in_amount;
-            swap_mode_str = "ExactOut".to_string();
-        }
-    }
-
-    Ok(mango_v4_client::jupiter::QueryRoute {
-        in_amount: in_amount.to_string(),
-        out_amount: out_amount.to_string(),
-        price_impact_pct: 0.1,
-        market_infos: vec![],
-        amount: amount.to_string(),
-        slippage_bps: 1,
-        other_amount_threshold: other_amount_threshold.to_string(),
-        swap_mode: swap_mode_str,
-        fees: None,
-    })
 }
 
 /// Convenience wrapper for getting max swap amounts for a token pair
