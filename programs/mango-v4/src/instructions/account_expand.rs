@@ -26,17 +26,19 @@ pub fn account_expand(
 
     require_gt!(new_space, old_space);
 
-    // transfer required additional rent
-    anchor_lang::system_program::transfer(
-        anchor_lang::context::CpiContext::new(
-            ctx.accounts.system_program.to_account_info(),
-            anchor_lang::system_program::Transfer {
-                from: ctx.accounts.payer.to_account_info(),
-                to: realloc_account.clone(),
-            },
-        ),
-        new_rent_minimum - old_lamports,
-    )?;
+    if old_lamports < new_rent_minimum {
+        // transfer required additional rent
+        anchor_lang::system_program::transfer(
+            anchor_lang::context::CpiContext::new(
+                ctx.accounts.system_program.to_account_info(),
+                anchor_lang::system_program::Transfer {
+                    from: ctx.accounts.payer.to_account_info(),
+                    to: realloc_account.clone(),
+                },
+            ),
+            new_rent_minimum - old_lamports,
+        )?;
+    }
 
     // realloc: it's safe to not re-zero-init since we never shrink accounts
     realloc_account.realloc(new_space, false)?;
