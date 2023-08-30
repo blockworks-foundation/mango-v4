@@ -32,6 +32,7 @@ type BorshVecLength = u32;
 const BORSH_VEC_PADDING_BYTES: usize = 4;
 const BORSH_VEC_SIZE_BYTES: usize = 4;
 const DEFAULT_MANGO_ACCOUNT_VERSION: u8 = 1;
+const DYNAMIC_RESERVED_BYTES: usize = 64;
 
 // Return variants for check_liquidatable method, should be wrapped in a Result
 // for a future possiblity of returning any error
@@ -259,14 +260,13 @@ impl MangoAccount {
         perp_oo_count: u8,
         token_conditional_swap_count: u8,
     ) -> usize {
-        let reserved_size = 64;
         Self::dynamic_reserved_bytes_offset(
             token_count,
             serum3_count,
             perp_count,
             perp_oo_count,
             token_conditional_swap_count,
-        ) + reserved_size
+        ) + DYNAMIC_RESERVED_BYTES
     }
 }
 
@@ -562,6 +562,16 @@ impl MangoAccountDynamicHeader {
             self.perp_oo_count,
         ) + BORSH_VEC_SIZE_BYTES
             + raw_index * size_of::<TokenConditionalSwap>()
+    }
+
+    fn reserved_bytes_offset(&self) -> usize {
+        MangoAccount::dynamic_reserved_bytes_offset(
+            self.token_count,
+            self.serum3_count,
+            self.perp_count,
+            self.perp_oo_count,
+            self.token_conditional_swap_count,
+        )
     }
 
     pub fn token_count(&self) -> usize {
@@ -1687,6 +1697,11 @@ impl<
                     TokenConditionalSwap::default();
             }
         }
+        {
+            let offset = new_header.reserved_bytes_offset();
+            dynamic[offset..offset + DYNAMIC_RESERVED_BYTES]
+                .copy_from_slice(&[0u8; DYNAMIC_RESERVED_BYTES]);
+        }
 
         // update the already-parsed header
         *self.header_mut() = new_header;
@@ -2297,6 +2312,13 @@ mod tests {
                 def
             );
         }
+
+        let reserved_offset = account.header.reserved_bytes_offset();
+        assert!(
+            account.dynamic[reserved_offset..reserved_offset + DYNAMIC_RESERVED_BYTES]
+                .iter()
+                .all(|&v| v == 0)
+        );
 
         Ok(())
     }
