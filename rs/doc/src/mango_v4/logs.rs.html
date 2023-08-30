@@ -577,6 +577,25 @@
 <span id="577">577</span>
 <span id="578">578</span>
 <span id="579">579</span>
+<span id="580">580</span>
+<span id="581">581</span>
+<span id="582">582</span>
+<span id="583">583</span>
+<span id="584">584</span>
+<span id="585">585</span>
+<span id="586">586</span>
+<span id="587">587</span>
+<span id="588">588</span>
+<span id="589">589</span>
+<span id="590">590</span>
+<span id="591">591</span>
+<span id="592">592</span>
+<span id="593">593</span>
+<span id="594">594</span>
+<span id="595">595</span>
+<span id="596">596</span>
+<span id="597">597</span>
+<span id="598">598</span>
 </pre><pre class="rust"><code><span class="kw">use crate</span>::{
     accounts_ix::FlashLoanType,
     state::{OracleType, PerpMarket, PerpPosition},
@@ -640,13 +659,32 @@
 <span class="attribute">#[derive(AnchorSerialize, AnchorDeserialize)]
 </span><span class="kw">pub struct </span>FlashLoanTokenDetailV2 {
     <span class="kw">pub </span>token_index: u16,
-    <span class="kw">pub </span>change_amount: i128,
-    <span class="kw">pub </span>loan: i128,
-    <span class="kw">pub </span>loan_origination_fee: i128,
+
+    <span class="doccomment">/// The amount by which the user&#39;s token position changed at the end
+    ///
+    /// So if the user repaid the approved_amount in full, it&#39;d be 0.
+    ///
+    /// Does NOT include the loan_origination_fee or deposit_fee, so the true
+    /// change is `change_amount - loan_origination_fee - deposit_fee`.
+    </span><span class="kw">pub </span>change_amount: i128,
+
+    <span class="doccomment">/// The amount that was a loan (&lt;= approved_amount, depends on user&#39;s deposits)
+    </span><span class="kw">pub </span>loan: i128,
+
+    <span class="doccomment">/// The fee paid on the loan, not included in `loan` or `change_amount`
+    </span><span class="kw">pub </span>loan_origination_fee: i128,
+
     <span class="kw">pub </span>deposit_index: i128,
     <span class="kw">pub </span>borrow_index: i128,
     <span class="kw">pub </span>price: i128,
-    <span class="kw">pub </span>deposit_fee: i128,
+
+    <span class="doccomment">/// Deposit fee paid for positive change_amount.
+    ///
+    /// Not factored into change_amount.
+    </span><span class="kw">pub </span>deposit_fee: i128,
+
+    <span class="doccomment">/// The amount that was transfered out to the user
+    </span><span class="kw">pub </span>approved_amount: u64,
 }
 
 <span class="attribute">#[event]
