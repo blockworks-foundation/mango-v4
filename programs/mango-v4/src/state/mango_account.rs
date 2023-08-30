@@ -1407,17 +1407,19 @@ impl<
 
         let dynamic = self.dynamic_mut();
 
-        // expand dynamic components by first moving existing positions, and then setting new ones to defaults
-
-        // TODO: If we want to allow shrinking
-        // - Determine if new start pos is to the left or to the right,
-        //   and then either shift r-to-l or reverse.
-        // - "Defrag" by always copying only active positions over
-        // - zero memory with inactive positions to ensure there's
-        //   no leftover bytes in between active positions
-
-        // Possibly we could make i teasier for us by starting with the
-        // defrag step, then all useful data would be contiguous
+        // Resizing needs to move the existing bytes in `dynamic` around, preserving
+        // existing data, possibly creating new entries or removing unused slots.
+        //
+        // The operation has four steps:
+        // - Defrag: Move all active slots to the front. If a user's token slots were
+        //       (unused, token pos for 4, unused, token pos for 500, unused)
+        //   before, they'd be
+        //       (token pos for 4, token pos for 500, garbage, garbage, garbage)
+        //   after. That way all data that needs to be preserved for each type of
+        //   slot is one block.
+        // - Moving preserved blocks to the left where needed, iterating blocks left to right.
+        // - Moving preserved blocks to the right where needed, iterating blocks right to left.
+        // - Default-initializing all non-preserved spaces.
 
         // "Defrag" token, serum, perp by moving active positions into the front slots
         //
@@ -1524,24 +1526,6 @@ impl<
         require_gte!(new_header.perp_count(), active_perp_positions);
         require_gte!(new_header.perp_oo_count(), blocked_perp_oo);
         require_gte!(new_header.token_conditional_swap_count(), active_tcs);
-
-        // Do the same for the other positions
-
-        // Moving the data is difficult: cases:
-        //
-        // TTTT....PP....SSS...
-        // TTTTPPSSS (copy PP first then SSS)
-        //
-        // TTTTPPSSS
-        // TTTT....PP....SSS...  (copy SSS first, then PP
-        //
-        // Do all moves to the left l-to-r and all to the right r-to-l?
-
-        // Algorithm:
-        // - if it's copy to the left, do it, go next
-        // - if it's copy to the right, skip on first pass, go next
-        // on the second pass to copies to the right in reverse
-        // zero the empty spots in a third pass
 
         // First move pass: go left-to-right and move any blocks that need to be moved
         // to the left. This will never overwrite other data, because:
