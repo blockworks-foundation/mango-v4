@@ -370,10 +370,7 @@ async fn test_account_size_migration() -> Result<(), TransportError> {
     new_bytes
         .extend_from_slice(&mango_account.dynamic[perp_start..mango_account.dynamic.len() - 64]);
 
-    let new_mango_account = MangoAccountValue::from_bytes(&new_bytes[8..]).unwrap();
-    assert_eq!(new_mango_account.all_perp_positions().count(), 13);
-
-    account_raw.data = new_bytes;
+    account_raw.data = new_bytes.clone();
     account_raw.lamports = 1_000_000_000; // 1 SOL is enough
     solana
         .context
@@ -384,10 +381,12 @@ async fn test_account_size_migration() -> Result<(), TransportError> {
     // TEST: Size migration reduces number of available perp positions
     //
 
+    let new_mango_account = MangoAccountValue::from_bytes(&new_bytes[8..]).unwrap();
     assert!(
         new_mango_account.header.expected_health_accounts()
             > MangoAccountDynamicHeader::max_health_accounts()
     );
+    assert_eq!(new_mango_account.header.perp_count, 13);
 
     send_tx(solana, AccountSizeMigrationInstruction { account, payer })
         .await
@@ -398,6 +397,7 @@ async fn test_account_size_migration() -> Result<(), TransportError> {
         mango_account.header.expected_health_accounts()
             <= MangoAccountDynamicHeader::max_health_accounts()
     );
+    assert_eq!(mango_account.header.perp_count, 4);
 
     println!("{:#?}", mango_account.header);
 
