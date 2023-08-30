@@ -61,13 +61,32 @@ pub struct FlashLoanTokenDetail {
 #[derive(AnchorSerialize, AnchorDeserialize)]
 pub struct FlashLoanTokenDetailV2 {
     pub token_index: u16,
+
+    /// The amount by which the user's token position changed at the end
+    ///
+    /// So if the user repaid the approved_amount in full, it'd be 0.
+    ///
+    /// Does NOT include the loan_origination_fee or deposit_fee, so the true
+    /// change is `change_amount - loan_origination_fee - deposit_fee`.
     pub change_amount: i128,
+
+    /// The amount that was a loan (<= approved_amount, depends on user's deposits)
     pub loan: i128,
+
+    /// The fee paid on the loan, not included in `loan` or `change_amount`
     pub loan_origination_fee: i128,
+
     pub deposit_index: i128,
     pub borrow_index: i128,
     pub price: i128,
+
+    /// Deposit fee paid for positive change_amount.
+    ///
+    /// Not factored into change_amount.
     pub deposit_fee: i128,
+
+    /// The amount that was transfered out to the user
+    pub approved_amount: u64,
 }
 
 #[event]
