@@ -1835,19 +1835,18 @@ mod tests {
         account.perp_open_orders.resize(8, PerpOpenOrder::default());
         account.next_token_conditional_swap_id = 13;
 
-        let account_bytes_without_tcs = AnchorSerialize::try_to_vec(&account).unwrap();
-        let account_bytes_with_tcs = {
-            let mut b = account_bytes_without_tcs.clone();
+        let account_bytes_without_tcs_and_reserved = AnchorSerialize::try_to_vec(&account).unwrap();
+        let account_bytes = {
+            let mut b = account_bytes_without_tcs_and_reserved.clone();
             // tcs adds 4 bytes of padding and 4 bytes of Vec size
-            b.extend([0u8; 8]);
+            // plus 64 bytes of reserved space at the end
+            b.extend([0u8; 8 + 64]);
             b
         };
-        assert_eq!(
-            8 + account_bytes_with_tcs.len(),
-            MangoAccount::space(8, 8, 4, 8, 0)
-        );
+        assert_eq!(8 + account_bytes.len(), MangoAccount::space(8, 8, 4, 8, 0));
 
-        let account2 = MangoAccountValue::from_bytes(&account_bytes_without_tcs).unwrap();
+        let account2 =
+            MangoAccountValue::from_bytes(&account_bytes_without_tcs_and_reserved).unwrap();
         assert_eq!(account.group, account2.fixed.group);
         assert_eq!(account.owner, account2.fixed.owner);
         assert_eq!(account.name, account2.fixed.name);
@@ -1899,7 +1898,7 @@ mod tests {
         );
         assert_eq!(account2.all_token_conditional_swaps().count(), 0);
 
-        let account3 = MangoAccountValue::from_bytes(&account_bytes_with_tcs).unwrap();
+        let account3 = MangoAccountValue::from_bytes(&account_bytes).unwrap();
         assert_eq!(account3.all_token_conditional_swaps().count(), 0);
     }
 

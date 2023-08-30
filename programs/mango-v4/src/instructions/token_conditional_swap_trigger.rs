@@ -676,7 +676,7 @@ mod tests {
             let (liab_bank, liab_oracle) = mock_bank_and_oracle(group, 1, 1.0, 0.0, 0.0);
 
             let mut liqee_buffer = MangoAccount::default_for_tests().try_to_vec().unwrap();
-            liqee_buffer.extend_from_slice(&[0u8; 256]);
+            liqee_buffer.extend_from_slice(&[0u8; 512]);
             let mut liqee = MangoAccountValue::from_bytes(&liqee_buffer).unwrap();
             {
                 liqee.resize_dynamic_content(3, 5, 4, 6, 1).unwrap();
