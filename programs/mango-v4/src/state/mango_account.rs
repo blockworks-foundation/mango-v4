@@ -404,7 +404,7 @@ impl Discriminator for MangoAccountFixed {
 
 impl anchor_lang::ZeroCopy for MangoAccountFixed {}
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct MangoAccountDynamicHeader {
     pub token_count: u8,
     pub serum3_count: u8,
@@ -522,7 +522,7 @@ impl MangoAccountDynamicHeader {
     }
 
     // offset into dynamic data where 1st PerpPosition would be found
-    fn perp_offset(&self, raw_index: usize) -> usize {
+    pub fn perp_offset(&self, raw_index: usize) -> usize {
         MangoAccount::dynamic_perp_vec_offset(self.token_count, self.serum3_count)
             + BORSH_VEC_SIZE_BYTES
             + raw_index * size_of::<PerpPosition>()

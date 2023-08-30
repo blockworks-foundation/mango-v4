@@ -309,3 +309,90 @@ async fn test_basic() -> Result<(), TransportError> {
 
     Ok(())
 }
+
+#[tokio::test]
+async fn test_account_force_shrink() -> Result<(), TransportError> {
+    let context = TestContext::new().await;
+    let solana = &context.solana.clone();
+
+    let admin = TestKeypair::new();
+    let owner = context.users[0].key;
+    let payer = context.users[1].key;
+    let mints = &context.mints[0..1];
+
+    let mango_setup::GroupWithTokens { group, .. } = mango_setup::GroupWithTokensConfig {
+        admin,
+        payer,
+        mints: mints.to_vec(),
+        ..mango_setup::GroupWithTokensConfig::default()
+    }
+    .create(solana)
+    .await;
+
+    let account = send_tx(
+        solana,
+        AccountCreateInstruction {
+            account_num: 0,
+            token_count: 6,
+            serum3_count: 3,
+            perp_count: 3,
+            perp_oo_count: 3,
+            token_conditional_swap_count: 3,
+            group,
+            owner,
+            payer,
+        },
+    )
+    .await
+    .unwrap()
+    .account;
+
+    // Manually extend the account to have too many perp positions
+    let mut account_raw = solana
+        .context
+        .borrow_mut()
+        .banks_client
+        .get_account(account)
+        .await
+        .unwrap()
+        .unwrap();
+    let mango_account = MangoAccountValue::from_bytes(&account_raw.data[8..]).unwrap();
+
+    let perp_start = mango_account.header.perp_offset(0);
+    let mut new_bytes: Vec<u8> = Vec::new();
+    new_bytes.extend_from_slice(&account_raw.data[..8 + std::mem::size_of::<MangoAccountFixed>()]);
+    new_bytes.extend_from_slice(&mango_account.dynamic[..perp_start - 4]);
+    new_bytes.extend_from_slice(&13u32.to_le_bytes()); // perp pos len
+    for _ in 0..10 {
+        new_bytes.extend_from_slice(&bytemuck::bytes_of(&PerpPosition::default()));
+    }
+    new_bytes.extend_from_slice(&mango_account.dynamic[perp_start..]);
+
+    let new_mango_account = MangoAccountValue::from_bytes(&new_bytes[8..]).unwrap();
+    assert_eq!(new_mango_account.all_perp_positions().count(), 13);
+    assert!(
+        new_mango_account.header.expected_health_accounts()
+            > MangoAccountDynamicHeader::max_health_accounts()
+    );
+
+    account_raw.data = new_bytes;
+    account_raw.lamports = 1_000_000_000; // 1 SOL is enough
+    solana
+        .context
+        .borrow_mut()
+        .set_account(&account, &account_raw.into());
+
+    send_tx(solana, AccountForceShrinkInstruction { account })
+        .await
+        .unwrap();
+
+    let mango_account = get_mango_account(solana, account).await;
+    assert!(
+        mango_account.header.expected_health_accounts()
+            <= MangoAccountDynamicHeader::max_health_accounts()
+    );
+
+    println!("{:#?}", mango_account.header);
+
+    Ok(())
+}

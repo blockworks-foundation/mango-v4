@@ -1938,6 +1938,41 @@ impl ClientInstruction for AccountExpandInstruction {
     }
 }
 
+#[derive(Default)]
+pub struct AccountForceShrinkInstruction {
+    pub account: Pubkey,
+}
+#[async_trait::async_trait(?Send)]
+impl ClientInstruction for AccountForceShrinkInstruction {
+    type Accounts = mango_v4::accounts::AccountForceShrink;
+    type Instruction = mango_v4::instruction::AccountForceShrink;
+    async fn to_instruction(
+        &self,
+        account_loader: impl ClientAccountLoader + 'async_trait,
+    ) -> (Self::Accounts, instruction::Instruction) {
+        let program_id = mango_v4::id();
+        let instruction = Self::Instruction {};
+
+        let account = account_loader
+            .load_mango_account(&self.account)
+            .await
+            .unwrap();
+
+        let accounts = Self::Accounts {
+            group: account.fixed.group,
+            account: self.account,
+            system_program: System::id(),
+        };
+
+        let instruction = make_instruction(program_id, &accounts, &instruction);
+        (accounts, instruction)
+    }
+
+    fn signers(&self) -> Vec<TestKeypair> {
+        vec![]
+    }
+}
+
 pub struct AccountEditInstruction {
     pub account_num: u32,
     pub group: Pubkey,

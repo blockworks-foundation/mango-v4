@@ -362,6 +362,12 @@ pub mod mango_v4 {
         Ok(())
     }
 
+    pub fn account_force_shrink(ctx: Context<AccountForceShrink>) -> Result<()> {
+        #[cfg(feature = "enable-gpl")]
+        instructions::account_force_shrink(ctx)?;
+        Ok(())
+    }
+
     pub fn account_edit(
         ctx: Context<AccountEdit>,
         name_opt: Option<String>,
