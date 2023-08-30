@@ -3,9 +3,9 @@ use crate::state::*;
 use anchor_lang::prelude::*;
 
 #[derive(Accounts)]
-pub struct AccountForceShrink<'info> {
+pub struct AccountSizeMigration<'info> {
     #[account(
-        constraint = group.load()?.is_ix_enabled(IxGate::AccountForceShrink) @ MangoError::IxIsDisabled,
+        constraint = group.load()?.is_ix_enabled(IxGate::AccountSizeMigration) @ MangoError::IxIsDisabled,
     )]
     pub group: AccountLoader<'info, Group>,
 
@@ -14,6 +14,9 @@ pub struct AccountForceShrink<'info> {
         has_one = group,
     )]
     pub account: AccountLoader<'info, MangoAccountFixed>,
+
+    #[account(mut)]
+    pub payer: Signer<'info>,
 
     pub system_program: Program<'info, System>,
 }

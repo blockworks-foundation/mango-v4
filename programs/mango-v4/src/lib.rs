@@ -362,9 +362,9 @@ pub mod mango_v4 {
         Ok(())
     }
 
-    pub fn account_force_shrink(ctx: Context<AccountForceShrink>) -> Result<()> {
+    pub fn account_size_migration(ctx: Context<AccountSizeMigration>) -> Result<()> {
         #[cfg(feature = "enable-gpl")]
-        instructions::account_force_shrink(ctx)?;
+        instructions::account_size_migration(ctx)?;
         Ok(())
     }
 

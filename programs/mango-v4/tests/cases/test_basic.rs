@@ -311,7 +311,7 @@ async fn test_basic() -> Result<(), TransportError> {
 }
 
 #[tokio::test]
-async fn test_account_force_shrink() -> Result<(), TransportError> {
+async fn test_account_size_migration() -> Result<(), TransportError> {
     let context = TestContext::new().await;
     let solana = &context.solana.clone();
 
@@ -362,18 +362,16 @@ async fn test_account_force_shrink() -> Result<(), TransportError> {
     let mut new_bytes: Vec<u8> = Vec::new();
     new_bytes.extend_from_slice(&account_raw.data[..8 + std::mem::size_of::<MangoAccountFixed>()]);
     new_bytes.extend_from_slice(&mango_account.dynamic[..perp_start - 4]);
-    new_bytes.extend_from_slice(&13u32.to_le_bytes()); // perp pos len
+    new_bytes.extend_from_slice(&(3u32 + 10u32).to_le_bytes()); // perp pos len
     for _ in 0..10 {
         new_bytes.extend_from_slice(&bytemuck::bytes_of(&PerpPosition::default()));
     }
-    new_bytes.extend_from_slice(&mango_account.dynamic[perp_start..]);
+    // remove the 64 reserved bytes at the end
+    new_bytes
+        .extend_from_slice(&mango_account.dynamic[perp_start..mango_account.dynamic.len() - 64]);
 
     let new_mango_account = MangoAccountValue::from_bytes(&new_bytes[8..]).unwrap();
     assert_eq!(new_mango_account.all_perp_positions().count(), 13);
-    assert!(
-        new_mango_account.header.expected_health_accounts()
-            > MangoAccountDynamicHeader::max_health_accounts()
-    );
 
     account_raw.data = new_bytes;
     account_raw.lamports = 1_000_000_000; // 1 SOL is enough
@@ -382,7 +380,16 @@ async fn test_account_force_shrink() -> Result<(), TransportError> {
         .borrow_mut()
         .set_account(&account, &account_raw.into());
 
-    send_tx(solana, AccountForceShrinkInstruction { account })
+    //
+    // TEST: Size migration reduces number of available perp positions
+    //
+
+    assert!(
+        new_mango_account.header.expected_health_accounts()
+            > MangoAccountDynamicHeader::max_health_accounts()
+    );
+
+    send_tx(solana, AccountSizeMigrationInstruction { account, payer })
         .await
         .unwrap();
 
@@ -393,6 +400,17 @@ async fn test_account_force_shrink() -> Result<(), TransportError> {
     );
 
     println!("{:#?}", mango_account.header);
+
+    //
+    // TEST: running size migration again has no effect
+    //
+
+    let before_bytes = solana.get_account_data(account).await;
+    send_tx(solana, AccountSizeMigrationInstruction { account, payer })
+        .await
+        .unwrap();
+    let after_bytes = solana.get_account_data(account).await;
+    assert_eq!(before_bytes, after_bytes);
 
     Ok(())
 }

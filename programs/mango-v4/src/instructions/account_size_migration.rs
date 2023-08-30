@@ -3,17 +3,16 @@ use anchor_lang::prelude::*;
 use crate::accounts_ix::*;
 use crate::state::*;
 
-pub fn account_force_shrink(ctx: Context<AccountForceShrink>) -> Result<()> {
+pub fn account_size_migration(ctx: Context<AccountSizeMigration>) -> Result<()> {
     let account = ctx.accounts.account.load_full()?;
     let current_header = account.header.clone();
 
-    // If we could resize to the current size from 0 or the health accounts are fine, stop.
-    let zero_header = MangoAccountDynamicHeader::zero();
-    if let Ok(_) = current_header.check_resize_from(&zero_header) {
-        return Ok(());
-    }
-    if current_header.expected_health_accounts() <= MangoAccountDynamicHeader::max_health_accounts()
-    {
+    let account_ai = ctx.accounts.account.as_ref();
+    let current_size = account_ai.data_len();
+    let current_lamports = account_ai.lamports();
+
+    // If the account has the expected size, we were already called on it
+    if current_size == current_header.account_size() {
         return Ok(());
     }
 
@@ -46,19 +45,31 @@ pub fn account_force_shrink(ctx: Context<AccountForceShrink>) -> Result<()> {
     };
     drop(account);
 
-    let new_space = new_header.account_size();
-    let new_rent_minimum = Rent::get()?.minimum_balance(new_space);
+    let new_size = new_header.account_size();
+    let new_rent_minimum = Rent::get()?.minimum_balance(new_size);
 
-    let realloc_account = ctx.accounts.account.as_ref();
-    let old_space = realloc_account.data_len();
-    let old_lamports = realloc_account.lamports();
-
-    require_gte!(old_lamports, new_rent_minimum);
+    if current_lamports < new_rent_minimum {
+        anchor_lang::system_program::transfer(
+            anchor_lang::context::CpiContext::new(
+                ctx.accounts.system_program.to_account_info(),
+                anchor_lang::system_program::Transfer {
+                    from: ctx.accounts.payer.to_account_info(),
+                    to: account_ai.clone(),
+                },
+            ),
+            new_rent_minimum - current_lamports,
+        )?;
+    }
+    // If there's too many lamports, they belong to the user and are kept on the account
 
     // This instruction has <= 1 calls to AccountInfo::realloc(), meaning that the
     // new data when expanding the account will be zero initialized already: it's not
     // necessary to zero init it again.
     let no_zero_init = false;
+
+    if new_size > current_size {
+        account_ai.realloc(new_size, no_zero_init)?;
+    }
 
     // resize the dynamic content on the account
     {
@@ -72,8 +83,8 @@ pub fn account_force_shrink(ctx: Context<AccountForceShrink>) -> Result<()> {
         )?;
     }
 
-    if new_space < old_space {
-        realloc_account.realloc(new_space, no_zero_init)?;
+    if new_size < current_size {
+        account_ai.realloc(new_size, no_zero_init)?;
     }
 
     Ok(())

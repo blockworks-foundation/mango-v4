@@ -1939,13 +1939,14 @@ impl ClientInstruction for AccountExpandInstruction {
 }
 
 #[derive(Default)]
-pub struct AccountForceShrinkInstruction {
+pub struct AccountSizeMigrationInstruction {
     pub account: Pubkey,
+    pub payer: TestKeypair,
 }
 #[async_trait::async_trait(?Send)]
-impl ClientInstruction for AccountForceShrinkInstruction {
-    type Accounts = mango_v4::accounts::AccountForceShrink;
-    type Instruction = mango_v4::instruction::AccountForceShrink;
+impl ClientInstruction for AccountSizeMigrationInstruction {
+    type Accounts = mango_v4::accounts::AccountSizeMigration;
+    type Instruction = mango_v4::instruction::AccountSizeMigration;
     async fn to_instruction(
         &self,
         account_loader: impl ClientAccountLoader + 'async_trait,
@@ -1961,6 +1962,7 @@ impl ClientInstruction for AccountForceShrinkInstruction {
         let accounts = Self::Accounts {
             group: account.fixed.group,
             account: self.account,
+            payer: self.payer.pubkey(),
             system_program: System::id(),
         };
 
@@ -1969,7 +1971,7 @@ impl ClientInstruction for AccountForceShrinkInstruction {
     }
 
     fn signers(&self) -> Vec<TestKeypair> {
-        vec![]
+        vec![self.payer]
     }
 }
 

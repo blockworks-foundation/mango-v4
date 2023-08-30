@@ -260,7 +260,7 @@ export interface IxGateParams {
   OpenbookV2SettleFunds: boolean;
   AdminTokenWithdrawFees: boolean;
   AdminPerpWithdrawFees: boolean;
-  AccountForceShrink: boolean;
+  AccountSizeMigration: boolean;
 }
 
 // Default with all ixs enabled, use with buildIxGate
@@ -335,7 +335,7 @@ export const TrueIxGateParams: IxGateParams = {
   OpenbookV2SettleFunds: true,
   AdminTokenWithdrawFees: true,
   AdminPerpWithdrawFees: true,
-  AccountForceShrink: true,
+  AccountSizeMigration: true,
 };
 
 // build ix gate e.g. buildIxGate(Builder(TrueIxGateParams).TokenDeposit(false).build()).toNumber(),
@@ -420,7 +420,7 @@ export function buildIxGate(p: IxGateParams): BN {
   toggleIx(ixGate, p, 'OpenbookV2SettleFunds', 63);
   toggleIx(ixGate, p, 'AdminTokenWithdrawFees', 65);
   toggleIx(ixGate, p, 'AdminPerpWithdrawFees', 66);
-  toggleIx(ixGate, p, 'AccountForceShrink', 67);
+  toggleIx(ixGate, p, 'AccountSizeMigration', 67);
 
   return ixGate;
 }

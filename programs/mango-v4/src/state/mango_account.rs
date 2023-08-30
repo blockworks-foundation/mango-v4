@@ -236,7 +236,7 @@ impl MangoAccount {
             + BORSH_VEC_PADDING_BYTES
     }
 
-    pub fn dynamic_size(
+    pub fn dynamic_reserved_bytes_offset(
         token_count: u8,
         serum3_count: u8,
         perp_count: u8,
@@ -250,6 +250,23 @@ impl MangoAccount {
             perp_oo_count,
         ) + (BORSH_VEC_SIZE_BYTES
             + size_of::<TokenConditionalSwap>() * usize::from(token_conditional_swap_count))
+    }
+
+    pub fn dynamic_size(
+        token_count: u8,
+        serum3_count: u8,
+        perp_count: u8,
+        perp_oo_count: u8,
+        token_conditional_swap_count: u8,
+    ) -> usize {
+        let reserved_size = 64;
+        Self::dynamic_reserved_bytes_offset(
+            token_count,
+            serum3_count,
+            perp_count,
+            perp_oo_count,
+            token_conditional_swap_count,
+        ) + reserved_size
     }
 }
 
@@ -1353,7 +1370,11 @@ impl<
         return Ok(CheckLiquidatable::Liquidatable);
     }
 
-    fn write_borsh_vec_length(&mut self, offset: usize, count: u8) {
+    fn write_borsh_vec_length_and_padding(&mut self, offset: usize, count: u8) {
+        let dst: &mut [u8] =
+            &mut self.dynamic_mut()[offset - BORSH_VEC_SIZE_BYTES - BORSH_VEC_PADDING_BYTES
+                ..offset - BORSH_VEC_SIZE_BYTES];
+        dst.copy_from_slice(&[0u8; BORSH_VEC_PADDING_BYTES]);
         let dst: &mut [u8] = &mut self.dynamic_mut()[offset - BORSH_VEC_SIZE_BYTES..offset];
         dst.copy_from_slice(&BorshVecLength::from(count).to_le_bytes());
     }
@@ -1363,31 +1384,31 @@ impl<
     fn write_token_length(&mut self) {
         let offset = self.header().token_offset(0);
         let count = self.header().token_count;
-        self.write_borsh_vec_length(offset, count)
+        self.write_borsh_vec_length_and_padding(offset, count)
     }
 
     fn write_serum3_length(&mut self) {
         let offset = self.header().serum3_offset(0);
         let count = self.header().serum3_count;
-        self.write_borsh_vec_length(offset, count)
+        self.write_borsh_vec_length_and_padding(offset, count)
     }
 
     fn write_perp_length(&mut self) {
         let offset = self.header().perp_offset(0);
         let count = self.header().perp_count;
-        self.write_borsh_vec_length(offset, count)
+        self.write_borsh_vec_length_and_padding(offset, count)
     }
 
     fn write_perp_oo_length(&mut self) {
         let offset = self.header().perp_oo_offset(0);
         let count = self.header().perp_oo_count;
-        self.write_borsh_vec_length(offset, count)
+        self.write_borsh_vec_length_and_padding(offset, count)
     }
 
     fn write_token_conditional_swap_length(&mut self) {
         let offset = self.header().token_conditional_swap_offset(0);
         let count = self.header().token_conditional_swap_count;
-        self.write_borsh_vec_length(offset, count)
+        self.write_borsh_vec_length_and_padding(offset, count)
     }
 
     pub fn resize_dynamic_content(
