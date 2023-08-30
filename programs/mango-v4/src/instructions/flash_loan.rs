@@ -353,7 +353,8 @@ pub fn flash_loan_end<'key, 'accounts, 'remaining, 'info>(
         let position = account.token_position_mut_by_raw_index(change.raw_token_index);
         let native = position.native(&bank);
 
-        let approved_amount = I80F48::from(bank.flash_loan_approved_amount);
+        let approved_amount_u64 = bank.flash_loan_approved_amount;
+        let approved_amount = I80F48::from(approved_amount_u64);
 
         let loan = if native.is_positive() {
             (approved_amount - native).max(I80F48::ZERO)
@@ -416,6 +417,7 @@ pub fn flash_loan_end<'key, 'accounts, 'remaining, 'info>(
             borrow_index: bank.borrow_index.to_bits(),
             price: oracle_price.to_bits(),
             deposit_fee: deposit_fee.to_bits(),
+            approved_amount: approved_amount_u64,
         });
 
         emit!(TokenBalanceLog {
