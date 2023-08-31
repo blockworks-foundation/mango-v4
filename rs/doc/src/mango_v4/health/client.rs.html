@@ -1565,6 +1565,59 @@
 <span id="1565">1565</span>
 <span id="1566">1566</span>
 <span id="1567">1567</span>
+<span id="1568">1568</span>
+<span id="1569">1569</span>
+<span id="1570">1570</span>
+<span id="1571">1571</span>
+<span id="1572">1572</span>
+<span id="1573">1573</span>
+<span id="1574">1574</span>
+<span id="1575">1575</span>
+<span id="1576">1576</span>
+<span id="1577">1577</span>
+<span id="1578">1578</span>
+<span id="1579">1579</span>
+<span id="1580">1580</span>
+<span id="1581">1581</span>
+<span id="1582">1582</span>
+<span id="1583">1583</span>
+<span id="1584">1584</span>
+<span id="1585">1585</span>
+<span id="1586">1586</span>
+<span id="1587">1587</span>
+<span id="1588">1588</span>
+<span id="1589">1589</span>
+<span id="1590">1590</span>
+<span id="1591">1591</span>
+<span id="1592">1592</span>
+<span id="1593">1593</span>
+<span id="1594">1594</span>
+<span id="1595">1595</span>
+<span id="1596">1596</span>
+<span id="1597">1597</span>
+<span id="1598">1598</span>
+<span id="1599">1599</span>
+<span id="1600">1600</span>
+<span id="1601">1601</span>
+<span id="1602">1602</span>
+<span id="1603">1603</span>
+<span id="1604">1604</span>
+<span id="1605">1605</span>
+<span id="1606">1606</span>
+<span id="1607">1607</span>
+<span id="1608">1608</span>
+<span id="1609">1609</span>
+<span id="1610">1610</span>
+<span id="1611">1611</span>
+<span id="1612">1612</span>
+<span id="1613">1613</span>
+<span id="1614">1614</span>
+<span id="1615">1615</span>
+<span id="1616">1616</span>
+<span id="1617">1617</span>
+<span id="1618">1618</span>
+<span id="1619">1619</span>
+<span id="1620">1620</span>
 </pre><pre class="rust"><code><span class="attribute">#![cfg(feature = <span class="string">&quot;client&quot;</span>)]
 
 </span><span class="kw">use </span>anchor_lang::prelude::<span class="kw-2">*</span>;
@@ -1764,7 +1817,7 @@
         }
 
         <span class="kw">let </span>amount = {
-            <span class="comment">// Now max_value is bigger than min_fn_value, the target amount must be &gt;amount_for_max_value.
+            <span class="comment">// Now max_value is bigger than min_fn_value, the target amount must be &gt;=amount_for_max_value.
             // Search to the right of amount_for_max_value: but how far?
             // Use a simple estimation for the amount that would lead to zero health:
             //           health
@@ -1776,8 +1829,11 @@
             </span><span class="kw">let </span>health_at_max_value = cache_after_swap(amount_for_max_value)<span class="question-mark">?
                 </span>.map(|c| c.health(health_type))
                 .unwrap_or(I80F48::MIN);
-            <span class="kw">if </span>health_at_max_value &lt;= <span class="number">0 </span>{
-                <span class="kw">return </span><span class="prelude-val">Ok</span>(I80F48::ZERO);
+            <span class="kw">if </span>health_at_max_value == <span class="number">0 </span>{
+                <span class="kw">return </span><span class="prelude-val">Ok</span>(amount_for_max_value);
+            } <span class="kw">else if </span>health_at_max_value &lt; <span class="number">0 </span>{
+                <span class="comment">// target_fn suggests health is good but health suggests it&#39;s not
+                </span><span class="kw">return </span><span class="prelude-val">Ok</span>(I80F48::ZERO);
             }
             <span class="kw">let </span>zero_health_estimate =
                 amount_for_max_value - health_at_max_value / final_health_slope;
@@ -2073,7 +2129,11 @@
     <span class="prelude-val">Err</span>(<span class="macro">error_msg!</span>(<span class="string">&quot;binary search iterations exhausted&quot;</span>))
 }
 
-<span class="doccomment">/// This is not a generic function. It assumes there is a unique maximum between left and right.
+<span class="doccomment">/// This is not a generic function. It assumes there is a almost-unique maximum between left and right,
+/// in the sense that `fun` might be constant on the maximum value for a while, but there won&#39;t be
+/// distinct maximums with non-maximal values between them.
+///
+/// If the maximum isn&#39;t just a single point, it returns the rightmost value.
 </span><span class="kw">fn </span>find_maximum(
     <span class="kw-2">mut </span>left: I80F48,
     <span class="kw-2">mut </span>right: I80F48,
@@ -2087,7 +2147,7 @@
     <span class="kw">let </span><span class="kw-2">mut </span>right_value = fun(right)<span class="question-mark">?</span>;
     <span class="kw">let </span><span class="kw-2">mut </span>mid_value = fun(mid)<span class="question-mark">?</span>;
     <span class="kw">while </span>(right - left) &gt; min_step {
-        <span class="kw">if </span>left_value &gt;= mid_value {
+        <span class="kw">if </span>left_value &gt; mid_value {
             <span class="comment">// max must be between left and mid
             </span><span class="macro">assert!</span>(mid_value &gt;= right_value);
             right = mid;
@@ -2106,7 +2166,7 @@
             </span><span class="kw">let </span>leftmid = half * (left + mid);
             <span class="kw">let </span>leftmid_value = fun(leftmid)<span class="question-mark">?</span>;
             <span class="macro">assert!</span>(leftmid_value &gt;= left_value);
-            <span class="kw">if </span>leftmid_value &gt;= mid_value {
+            <span class="kw">if </span>leftmid_value &gt; mid_value {
                 <span class="comment">// max between left and mid
                 </span>right = mid;
                 right_value = mid_value;
@@ -2135,9 +2195,9 @@
         }
     }
 
-    <span class="kw">if </span>left_value &gt;= mid_value {
+    <span class="kw">if </span>left_value &gt; mid_value {
         <span class="prelude-val">Ok</span>((left, left_value))
-    } <span class="kw">else if </span>mid_value &gt;= right_value {
+    } <span class="kw">else if </span>mid_value &gt; right_value {
         <span class="prelude-val">Ok</span>((mid, mid_value))
     } <span class="kw">else </span>{
         <span class="prelude-val">Ok</span>((right, right_value))
@@ -2289,18 +2349,28 @@
                                     price_factor: f64,
                                     banks: [Bank; <span class="number">3</span>],
                                     max_swap_fn: MaxSwapFn| {
-            <span class="kw">let </span>source_price = <span class="kw-2">&amp;</span>c.token_infos[source <span class="kw">as </span>usize].prices;
-            <span class="kw">let </span>source_bank = <span class="kw-2">&amp;</span>banks[source <span class="kw">as </span>usize];
-            <span class="kw">let </span>target_price = <span class="kw-2">&amp;</span>c.token_infos[target <span class="kw">as </span>usize].prices;
-            <span class="kw">let </span>target_bank = <span class="kw-2">&amp;</span>banks[target <span class="kw">as </span>usize];
+            <span class="kw">let </span>source_ti = <span class="kw-2">&amp;</span>c.token_infos[source <span class="kw">as </span>usize];
+            <span class="kw">let </span>source_price = <span class="kw-2">&amp;</span>source_ti.prices;
+            <span class="kw">let </span><span class="kw-2">mut </span>source_bank = banks[source <span class="kw">as </span>usize].clone();
+            <span class="comment">// Update the bank weights, because the tests like to modify the cache
+            // weights and expect them to stick
+            </span>source_bank.init_asset_weight = source_ti.init_asset_weight;
+            source_bank.init_liab_weight = source_ti.init_liab_weight;
+
+            <span class="kw">let </span>target_ti = <span class="kw-2">&amp;</span>c.token_infos[target <span class="kw">as </span>usize];
+            <span class="kw">let </span>target_price = <span class="kw-2">&amp;</span>target_ti.prices;
+            <span class="kw">let </span><span class="kw-2">mut </span>target_bank = banks[target <span class="kw">as </span>usize].clone();
+            target_bank.init_asset_weight = target_ti.init_asset_weight;
+            target_bank.init_liab_weight = target_ti.init_liab_weight;
+
             <span class="kw">let </span>swap_price =
                 I80F48::from_num(price_factor) * source_price.oracle / target_price.oracle;
             <span class="kw">let </span>source_amount = c
                 .max_swap_source_for_health_fn(
                     <span class="kw-2">&amp;</span>account,
-                    source_bank,
+                    <span class="kw-2">&amp;</span>source_bank,
                     source_price.oracle,
-                    target_bank,
+                    <span class="kw-2">&amp;</span>target_bank,
                     swap_price,
                     I80F48::from_num(min_value),
                     max_swap_fn,
@@ -2312,9 +2382,9 @@
             <span class="kw">let </span>value_for_amount = |amount| {
                 c.cache_after_swap(
                     <span class="kw-2">&amp;</span>account,
-                    source_bank,
+                    <span class="kw-2">&amp;</span>source_bank,
                     source_price.oracle,
-                    target_bank,
+                    <span class="kw-2">&amp;</span>target_bank,
                     I80F48::from(amount),
                     swap_price,
                 )
@@ -2597,6 +2667,42 @@
                             check(<span class="kw-2">&amp;</span>health_cache, <span class="number">0</span>, <span class="number">1</span>, target, price_factor, banks);
                             check(<span class="kw-2">&amp;</span>health_cache, <span class="number">1</span>, <span class="number">0</span>, target, price_factor, banks);
                         }
+                    }
+                }
+            }
+
+            {
+                <span class="comment">// swap some assets between zero-asset-weight tokens
+                </span><span class="macro">println!</span>(<span class="string">&quot;test 11 {test_name}&quot;</span>);
+                <span class="kw">let </span><span class="kw-2">mut </span>health_cache = health_cache.clone();
+                adjust_by_usdc(<span class="kw-2">&amp;mut </span>health_cache, <span class="number">0</span>, <span class="number">10.0</span>); <span class="comment">// 5 tokens
+                </span>health_cache.token_infos[<span class="number">0</span>].init_asset_weight = I80F48::from(<span class="number">0</span>);
+                health_cache.token_infos[<span class="number">1</span>].init_asset_weight = I80F48::from(<span class="number">0</span>);
+
+                <span class="kw">let </span>amount = find_max_swap(<span class="kw-2">&amp;</span>health_cache, <span class="number">0</span>, <span class="number">1</span>, <span class="number">1.0</span>, <span class="number">1.0</span>, banks).<span class="number">0</span>;
+                <span class="macro">assert_eq!</span>(amount, <span class="number">5.0</span>);
+
+                <span class="kw">for </span>price_factor <span class="kw">in </span>[<span class="number">0.9</span>, <span class="number">1.1</span>] {
+                    <span class="kw">for </span>target <span class="kw">in </span><span class="number">1</span>..<span class="number">100 </span>{
+                        <span class="kw">let </span>target = target <span class="kw">as </span>f64;
+
+                        <span class="comment">// Result is always the same: swap all deposits
+                        </span><span class="kw">let </span>amount =
+                            find_max_swap(<span class="kw-2">&amp;</span>health_cache, <span class="number">0</span>, <span class="number">1</span>, target, price_factor, banks).<span class="number">0</span>;
+                        <span class="macro">assert_eq!</span>(amount, <span class="number">5.0</span>);
+                    }
+                }
+
+                adjust_by_usdc(<span class="kw-2">&amp;mut </span>health_cache, <span class="number">1</span>, <span class="number">6.0</span>); <span class="comment">// 2 tokens
+
+                </span><span class="kw">for </span>price_factor <span class="kw">in </span>[<span class="number">0.9</span>, <span class="number">1.1</span>] {
+                    <span class="kw">for </span>target <span class="kw">in </span><span class="number">1</span>..<span class="number">100 </span>{
+                        <span class="kw">let </span>target = target <span class="kw">as </span>f64;
+
+                        <span class="comment">// Result is always the same: swap all deposits
+                        </span><span class="kw">let </span>amount =
+                            find_max_swap(<span class="kw-2">&amp;</span>health_cache, <span class="number">0</span>, <span class="number">1</span>, target, price_factor, banks).<span class="number">0</span>;
+                        <span class="macro">assert_eq!</span>(amount, <span class="number">5.0</span>);
                     }
                 }
             }
