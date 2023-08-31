@@ -103,6 +103,16 @@ export class MangoClient {
   private prioritizationFee: number;
   private txConfirmationCommitment: Commitment;
   private openbookFeesToDao: boolean;
+  /**
+   * @param tempAdditionalInstructions - Instructions to be appended ixes of to the next sendAndConfirmTransaction call.
+   * Cleared automatically after the sendAndConfirmTransaction call is executed.
+   */
+  private tempAdditionalInstructions: TransactionInstruction[] = [];
+  /**
+   * @param prependedGlobalAdditionalInstructions - Instructions to be prepended (unshift) to ixes inside any sendAndConfirmTransaction call.
+   * They remain effective until cleared with clearPrependedGlobalAdditionalInstructions.
+   */
+  private prependedGlobalAdditionalInstructions: TransactionInstruction[] = [];
 
   constructor(
     public program: Program<MangoV4>,
@@ -131,14 +141,52 @@ export class MangoClient {
     return (this.program.provider as AnchorProvider).wallet.publicKey;
   }
 
+  public clearTempAdditionalInstructions(): void {
+    this.tempAdditionalInstructions = [];
+  }
+
+  public addTempAdditionalInstructions(ixs: TransactionInstruction[]): void {
+    this.tempAdditionalInstructions = [
+      ...this.tempAdditionalInstructions,
+      ...ixs,
+    ];
+  }
+
+  public clearPrependedGlobalAdditionalInstructions(): void {
+    this.prependedGlobalAdditionalInstructions = [];
+  }
+
+  public addPrependedGlobalAdditionalInstructions(
+    ixs: TransactionInstruction[],
+  ): void {
+    this.prependedGlobalAdditionalInstructions = [
+      ...this.prependedGlobalAdditionalInstructions,
+      ...ixs,
+    ];
+  }
+
   /// Transactions
   public async sendAndConfirmTransaction(
     ixs: TransactionInstruction[],
     opts: any = {},
   ): Promise<MangoSignatureStatus> {
-    return await sendTransaction(
-      this.program.provider as AnchorProvider,
+    return await this.sendTransactionWithClearTempAdditionalInstructions(
       ixs,
+      opts,
+    );
+  }
+
+  public async sendTransactionWithClearTempAdditionalInstructions(
+    ixs: TransactionInstruction[],
+    opts: any = {},
+  ): Promise<MangoSignatureStatus> {
+    const status = await sendTransaction(
+      this.program.provider as AnchorProvider,
+      [
+        ...this.prependedGlobalAdditionalInstructions,
+        ...ixs,
+        ...this.tempAdditionalInstructions,
+      ],
       opts.alts ?? [],
       {
         postSendTxCallback: this.postSendTxCallback,
@@ -147,6 +195,8 @@ export class MangoClient {
         ...opts,
       },
     );
+    this.clearTempAdditionalInstructions();
+    return status;
   }
 
   public async sendAndConfirmTransactionForGroup(
