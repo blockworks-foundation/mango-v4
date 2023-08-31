@@ -936,11 +936,10 @@ export class MangoClient {
               ),
             )
             .decode(
-              ai.data.subarray(
-                v1Len +
-                  // This is the padding before tokenConditionalSwaps
-                  4,
-              ),
+              ai.data,
+              v1Len +
+                // This is the padding before tokenConditionalSwaps
+                4,
             ) as TokenConditionalSwapDto[])
         : new Array<TokenConditionalSwapDto>();
 
