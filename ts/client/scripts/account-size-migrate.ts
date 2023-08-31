@@ -5,17 +5,11 @@ import {
   Connection,
   Keypair,
   PublicKey,
+  TransactionInstruction,
 } from '@solana/web3.js';
 import fs from 'fs';
-import { TokenIndex } from '../src/accounts/bank';
 import { MangoClient } from '../src/client';
 import { MANGO_V4_ID } from '../src/constants';
-import {
-  fetchJupiterTransaction,
-  fetchRoutes,
-  prepareMangoRouterInstructions,
-} from '../src/router';
-import { toNative, toUiDecimals } from '../src/utils';
 import * as borsh from '@coral-xyz/borsh';
 import { TokenConditionalSwapDto } from '../src/accounts/mangoAccount';
 
@@ -68,29 +62,37 @@ async function run(): Promise<void> {
 
   console.log('accounts', accountAis.length);
 
-  for (const accountAi of accountAis) {
+  const accountsToMigrate = accountAis.filter((accountAi) => {
     const version = getAccountVersion(client, accountAi.account);
-    console.log(accountAi.pubkey.toString(), version);
+    return version != 'v3';
+  });
 
-    if (version == 'v3') {
-      continue;
-    }
-
-    const account = await client.getMangoAccountFromAi(
-      accountAi.pubkey,
-      accountAi.account,
+  for (let i = 0; i < accountsToMigrate.length; i += 8) {
+    const batch = accountsToMigrate.slice(i, i + 8);
+    const ixs = await Promise.all(
+      batch.map((accountAi) =>
+        makeMigationIx(client, accountAi.pubkey, accountAi.account),
+      ),
     );
-
-    const ix = await client.program.methods
-      .accountSizeMigration()
-      .accounts({
-        group: account.group,
-        account: accountAi.pubkey,
-        payer: (client.program.provider as AnchorProvider).wallet.publicKey,
-      })
-      .instruction();
-    await client.sendAndConfirmTransaction([ix]);
+    await client.sendAndConfirmTransaction(ixs);
   }
+}
+
+async function makeMigationIx(
+  client: MangoClient,
+  pubkey: PublicKey,
+  ai: AccountInfo<Buffer>,
+): Promise<TransactionInstruction> {
+  const account = await client.getMangoAccountFromAi(pubkey, ai);
+
+  return await client.program.methods
+    .accountSizeMigration()
+    .accounts({
+      group: account.group,
+      account: pubkey,
+      payer: (client.program.provider as AnchorProvider).wallet.publicKey,
+    })
+    .instruction();
 }
 
 function getAccountVersion(
