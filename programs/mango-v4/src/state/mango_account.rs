@@ -66,6 +66,22 @@ impl MangoAccountPdaSeeds {
 // This struct definition is only for clients e.g. typescript, so that they can easily use out of the box
 // deserialization and not have to do custom deserialization
 // On chain, we would prefer zero-copying to optimize for compute
+//
+// The MangoAccount binary data has changed over time:
+// - v1: The original version, many mainnet accounts still are this version.
+//       The MangoAccount struct below describes v1 to make sure reading by IDL works for all live
+//       accounts.
+// - v2: Introduced in v0.18.0 to add token conditional swaps at the end. Users using account
+//       resizing will migrate to this version.
+// - v3: Introduced in v0.20.0 to add 64 zero bytes at the end for future expansion.
+//       Users will migrate to this version when resizing their accounts. Also the
+//       AccountSizeMigration instruction is intended to be used to bring all accounts to
+//       this version after v0.20.0 is deployed.
+//
+// Version v0.21.0 will likely drop support for v1 and v2 accounts.
+//
+// MangoAccount binary data is backwards compatible: when ignoring trailing bytes, a v2 account can
+// be read as a v1 account and a v3 account can be read as v1 or v2 etc.
 #[account]
 pub struct MangoAccount {
     // fixed
