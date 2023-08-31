@@ -30,6 +30,17 @@ pub enum TokenConditionalSwapIntention {
     TakeProfit,
 }
 
+#[derive(
+    Clone, Copy, PartialEq, Eq, IntoPrimitive, TryFromPrimitive, AnchorDeserialize, AnchorSerialize,
+)]
+#[repr(u8)]
+pub enum TokenConditionalSwapType {
+    FixedPremium,
+    PremiumAuction,
+    AuctionUp,
+    AuctionDown,
+}
+
 #[zero_copy]
 #[derive(AnchorDeserialize, AnchorSerialize, Derivative)]
 #[derivative(Debug)]
@@ -99,13 +110,16 @@ pub struct TokenConditionalSwap {
     /// Stores a TokenConditionalSwapIntention enum value
     pub intention: u8,
 
+    /// Stores a TokenConditionalSwapType enum value
+    pub tcs_type: u8,
+
     #[derivative(Debug = "ignore")]
-    pub reserved: [u8; 111],
+    pub reserved: [u8; 110],
 }
 
 const_assert_eq!(
     size_of::<TokenConditionalSwap>(),
-    8 * 6 + 8 * 3 + 2 * 4 + 2 * 2 + 1 * 5 + 111
+    8 * 6 + 8 * 3 + 2 * 4 + 2 * 2 + 1 * 6 + 110
 );
 const_assert_eq!(size_of::<TokenConditionalSwap>(), 200);
 const_assert_eq!(size_of::<TokenConditionalSwap>() % 8, 0);
@@ -131,7 +145,8 @@ impl Default for TokenConditionalSwap {
             allow_creating_deposits: 0,
             display_price_style: TokenConditionalSwapDisplayPriceStyle::SellTokenPerBuyToken.into(),
             intention: TokenConditionalSwapIntention::Unknown.into(),
-            reserved: [0; 111],
+            tcs_type: TokenConditionalSwapType::FixedPremium.into(),
+            reserved: [0; 110],
         }
     }
 }
@@ -146,6 +161,10 @@ impl TokenConditionalSwap {
 
     pub fn set_has_data(&mut self, has_data: bool) {
         self.has_data = u8::from(has_data);
+    }
+
+    pub fn tcs_type(&self) -> TokenConditionalSwapType {
+        self.tcs_type.try_into().unwrap()
     }
 
     pub fn is_expired(&self, now_ts: u64) -> bool {
