@@ -147,7 +147,7 @@ async fn main() -> anyhow::Result<()> {
     websocket_source::start(
         websocket_source::Config {
             rpc_ws_url: ws_url.clone(),
-            serum_program: cli.serum_program,
+            serum_program: Some(cli.serum_program),
             open_orders_authority: mango_group,
         },
         mango_oracles.clone(),

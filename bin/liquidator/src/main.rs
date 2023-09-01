@@ -191,7 +191,7 @@ async fn main() -> anyhow::Result<()> {
         .unique()
         .collect_vec();
     // TODO: Currently the websocket source only supports a single serum program address!
-    assert_eq!(serum_programs.len(), 1);
+    assert!(serum_programs.len() <= 1);
 
     //
     // feed setup
@@ -211,7 +211,7 @@ async fn main() -> anyhow::Result<()> {
     websocket_source::start(
         websocket_source::Config {
             rpc_ws_url: ws_url.clone(),
-            serum_program: *serum_programs.first().unwrap(),
+            serum_program: serum_programs.first().copied(),
             open_orders_authority: mango_group,
         },
         mango_oracles.clone(),

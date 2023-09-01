@@ -1,5 +1,5 @@
 use jsonrpc_core::futures::StreamExt;
-use jsonrpc_core_client::transports::ws;
+use jsonrpc_core_client::{transports::ws, TypedSubscriptionStream};
 
 use solana_account_decoder::UiAccountEncoding;
 use solana_client::{
@@ -20,7 +20,7 @@ use crate::AnyhowWrap;
 
 pub struct Config {
     pub rpc_ws_url: String,
-    pub serum_program: Pubkey,
+    pub serum_program: Option<Pubkey>,
     pub open_orders_authority: Pubkey,
 }
 
@@ -84,12 +84,24 @@ async fn feed_data(
                 .map_err_anyhow()?,
         );
     }
-    let mut open_orders_sub = client
-        .program_subscribe(
-            config.serum_program.to_string(),
-            Some(open_orders_accounts_config.clone()),
-        )
-        .map_err_anyhow()?;
+
+    // If we make a stub channel, keep the sender around so it doesn't close early
+    let mut _stub_oo_sender = None;
+
+    let mut open_orders_sub = if let Some(serum_program) = config.serum_program.as_ref() {
+        client
+            .program_subscribe(
+                serum_program.to_string(),
+                Some(open_orders_accounts_config.clone()),
+            )
+            .map_err_anyhow()?
+    } else {
+        // Make a stub stream that never has any data
+        let (sender, receiver) = futures::channel::mpsc::unbounded();
+        _stub_oo_sender = Some(sender);
+        TypedSubscriptionStream::new(receiver, "no-data")
+    };
+
     let mut slot_sub = client.slots_updates_subscribe().map_err_anyhow()?;
 
     loop {
