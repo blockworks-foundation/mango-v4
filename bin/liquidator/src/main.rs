@@ -79,6 +79,9 @@ struct Cli {
     #[clap(long, env)]
     liqor_owner: String,
 
+    #[clap(long, env, default_value = "1000")]
+    check_interval_ms: u64,
+
     #[clap(long, env, default_value = "300")]
     snapshot_interval_secs: u64,
 
@@ -422,8 +425,7 @@ async fn main() -> anyhow::Result<()> {
     });
 
     let liquidation_job = tokio::spawn({
-        // TODO: configurable interval
-        let mut interval = tokio::time::interval(Duration::from_secs(5));
+        let mut interval = tokio::time::interval(Duration::from_millis(cli.check_interval_ms));
         let shared_state = shared_state.clone();
         async move {
             loop {
