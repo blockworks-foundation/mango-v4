@@ -190,8 +190,6 @@ async fn main() -> anyhow::Result<()> {
         .map(|s3| s3.market.serum_program)
         .unique()
         .collect_vec();
-    // TODO: Currently the websocket source only supports a single serum program address!
-    assert_eq!(serum_programs.len(), 1);
 
     //
     // feed setup
@@ -211,7 +209,7 @@ async fn main() -> anyhow::Result<()> {
     websocket_source::start(
         websocket_source::Config {
             rpc_ws_url: ws_url.clone(),
-            serum_program: *serum_programs.first().unwrap(),
+            serum_programs,
             open_orders_authority: mango_group,
         },
         mango_oracles.clone(),
