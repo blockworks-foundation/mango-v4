@@ -213,6 +213,8 @@ pub struct FillLogV4 {
 
     pub taker_fill_category: FillCategory,
     pub maker_fill_category: FillCategory,
+    pub post_taker_lots: i64,
+    pub post_maker_lots: i64,
 }
 
 #[event]

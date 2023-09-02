@@ -52,28 +52,51 @@ pub enum FillCategory {
     IncreaseLong,
     DecreaseShort,
     DecreaseLong,
+    CloseShort,
+    CloseLong,
+    ShortToLong,
+    LongToShort,
+    NoChange,
 }
 
-fn get_fill_category(pre_fill_base_position: i64, side: Side) -> FillCategory {
-    // Note: if base position is 100 and 200 is sold (final base position -100)
-    // this is defined as DecreaseLong (conceivably this could also be defined as OpenShort)
-    match side {
-        Side::Bid => {
-            if pre_fill_base_position.is_positive() {
-                FillCategory::IncreaseLong
-            } else if pre_fill_base_position == 0 {
-                FillCategory::OpenLong
-            } else {
-                FillCategory::DecreaseShort
+fn get_fill_category(
+    pre_fill_base_position: i64,
+    post_fill_base_position: i64,
+    side: Side,
+) -> FillCategory {
+    if pre_fill_base_position == post_fill_base_position {
+        FillCategory::NoChange
+    } else {
+        match side {
+            Side::Bid => {
+                if pre_fill_base_position > 0 {
+                    FillCategory::IncreaseLong
+                } else if pre_fill_base_position == 0 {
+                    FillCategory::OpenLong
+                } else {
+                    if post_fill_base_position > 0 {
+                        FillCategory::ShortToLong
+                    } else if post_fill_base_position == 0 {
+                        FillCategory::CloseShort
+                    } else {
+                        FillCategory::DecreaseShort
+                    }
+                }
             }
-        }
-        Side::Ask => {
-            if pre_fill_base_position.is_positive() {
-                FillCategory::DecreaseLong
-            } else if pre_fill_base_position == 0 {
-                FillCategory::OpenShort
-            } else {
-                FillCategory::IncreaseShort
+            Side::Ask => {
+                if pre_fill_base_position < 0 {
+                    FillCategory::IncreaseShort
+                } else if pre_fill_base_position == 0 {
+                    FillCategory::OpenShort
+                } else {
+                    if post_fill_base_position < 0 {
+                        FillCategory::LongToShort
+                    } else if post_fill_base_position == 0 {
+                        FillCategory::CloseLong
+                    } else {
+                        FillCategory::DecreaseLong
+                    }
+                }
             }
         }
     }
@@ -106,6 +129,8 @@ pub fn perp_consume_events(ctx: Context<PerpConsumeEvents>, limit: usize) -> Res
                     taker_closed_pnl,
                     pre_fill_maker_base_position,
                     pre_fill_taker_base_position,
+                    post_fill_maker_base_position,
+                    post_fill_taker_base_position,
                 ) = if fill.maker == fill.taker {
                     load_mango_account!(
                         maker_taker,
@@ -131,15 +156,18 @@ pub fn perp_consume_events(ctx: Context<PerpConsumeEvents>, limit: usize) -> Res
                         maker_taker.perp_position(perp_market_index).unwrap(),
                         &perp_market,
                     );
-                    let after_pnl = maker_taker
-                        .perp_position(perp_market_index)?
-                        .realized_trade_pnl_native;
+                    let maker_taker_perp_position = maker_taker.perp_position(perp_market_index)?;
+                    let post_fill_maker_taker_base_position =
+                        maker_taker_perp_position.base_position_lots;
+                    let after_pnl = maker_taker_perp_position.realized_trade_pnl_native;
                     let closed_pnl = after_pnl - before_pnl;
                     (
                         closed_pnl,
                         closed_pnl,
                         pre_fill_maker_taker_base_position,
                         pre_fill_maker_taker_base_position,
+                        post_fill_maker_taker_base_position,
+                        post_fill_maker_taker_base_position,
                     )
                 } else {
                     load_mango_account!(maker, fill.maker, mango_account_ais, group, event_queue);
@@ -167,12 +195,13 @@ pub fn perp_consume_events(ctx: Context<PerpConsumeEvents>, limit: usize) -> Res
                         taker.perp_position(perp_market_index).unwrap(),
                         &perp_market,
                     );
-                    let maker_after_pnl = maker
-                        .perp_position(perp_market_index)?
-                        .realized_trade_pnl_native;
-                    let taker_after_pnl = taker
-                        .perp_position(perp_market_index)?
-                        .realized_trade_pnl_native;
+                    let maker_perp_position = maker.perp_position(perp_market_index)?;
+                    let post_fill_maker_base_position = maker_perp_position.base_position_lots;
+                    let maker_after_pnl = maker_perp_position.realized_trade_pnl_native;
+
+                    let taker_perp_position = taker.perp_position(perp_market_index)?;
+                    let post_fill_taker_base_position = taker_perp_position.base_position_lots;
+                    let taker_after_pnl = taker_perp_position.realized_trade_pnl_native;
 
                     let maker_closed_pnl = maker_after_pnl - maker_before_pnl;
                     let taker_closed_pnl = taker_after_pnl - taker_before_pnl;
@@ -181,6 +210,8 @@ pub fn perp_consume_events(ctx: Context<PerpConsumeEvents>, limit: usize) -> Res
                         taker_closed_pnl,
                         pre_fill_maker_base_position,
                         pre_fill_taker_base_position,
+                        post_fill_maker_base_position,
+                        post_fill_taker_base_position,
                     )
                 };
 
@@ -205,12 +236,16 @@ pub fn perp_consume_events(ctx: Context<PerpConsumeEvents>, limit: usize) -> Res
                     taker_closed_pnl: taker_closed_pnl.to_num(),
                     taker_fill_category: get_fill_category(
                         pre_fill_taker_base_position,
+                        post_fill_taker_base_position,
                         fill.taker_side()
                     ),
                     maker_fill_category: get_fill_category(
                         pre_fill_maker_base_position,
+                        post_fill_maker_base_position,
                         fill.taker_side().invert_side()
-                    )
+                    ),
+                    post_taker_lots: post_fill_taker_base_position,
+                    post_maker_lots: post_fill_maker_base_position,
                 });
             }
             EventType::Out => {
