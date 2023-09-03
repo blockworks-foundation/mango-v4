@@ -140,7 +140,6 @@ export class MangoClient {
     ixs: TransactionInstruction[],
     opts: any = {},
   ): Promise<MangoSignatureStatus> {
-    console.log(this, '@@@@@@@@@@@@');
     const status = await sendTransaction(
       this.program.provider as AnchorProvider,
       [...this.prependedGlobalAdditionalInstructions, ...ixs],
