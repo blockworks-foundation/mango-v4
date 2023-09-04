@@ -1467,7 +1467,7 @@ impl<
         //   before, they'd be
         //       (token pos for 4, token pos for 500, garbage, garbage, garbage)
         //   after. That way all data that needs to be preserved for each type of
-        //   slot is one block.
+        //   slot is one contiguous block.
         // - Moving preserved blocks to the left where needed, iterating blocks left to right.
         // - Moving preserved blocks to the right where needed, iterating blocks right to left.
         // - Default-initializing all non-preserved spaces.

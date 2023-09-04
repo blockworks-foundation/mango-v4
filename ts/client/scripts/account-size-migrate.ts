@@ -125,13 +125,10 @@ function getAccountVersion(
     'TokenConditionalSwap',
   );
   const tcsVecLayout = borsh.vec(tcsLayout);
-  const tokenConditionalSwaps =
-    currentSize > v1Len
-      ? (tcsVecLayout.decode(
-          ai.data,
-          v1Len + tcsAlign,
-        ) as TokenConditionalSwapDto[])
-      : new Array<TokenConditionalSwapDto>();
+  const tokenConditionalSwaps = tcsVecLayout.decode(
+    ai.data,
+    v1Len + tcsAlign,
+  ) as TokenConditionalSwapDto[];
   const tcsBytesSize = tcsVecLayout.encode(
     tokenConditionalSwaps,
     mangoAccountBuffer,
