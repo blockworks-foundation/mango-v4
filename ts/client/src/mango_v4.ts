@@ -1407,6 +1407,35 @@ export type MangoV4 = {
       ]
     },
     {
+      "name": "accountSizeMigration",
+      "accounts": [
+        {
+          "name": "group",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "account",
+          "isMut": true,
+          "isSigner": false,
+          "relations": [
+            "group"
+          ]
+        },
+        {
+          "name": "payer",
+          "isMut": true,
+          "isSigner": true
+        },
+        {
+          "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": []
+    },
+    {
       "name": "accountEdit",
       "accounts": [
         {
@@ -9981,6 +10010,9 @@ export type MangoV4 = {
           },
           {
             "name": "AdminPerpWithdrawFees"
+          },
+          {
+            "name": "AccountSizeMigration"
           }
         ]
       }
@@ -13944,6 +13976,35 @@ export const IDL: MangoV4 = {
       ]
     },
     {
+      "name": "accountSizeMigration",
+      "accounts": [
+        {
+          "name": "group",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "account",
+          "isMut": true,
+          "isSigner": false,
+          "relations": [
+            "group"
+          ]
+        },
+        {
+          "name": "payer",
+          "isMut": true,
+          "isSigner": true
+        },
+        {
+          "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": []
+    },
+    {
       "name": "accountEdit",
       "accounts": [
         {
@@ -22518,6 +22579,9 @@ export const IDL: MangoV4 = {
           },
           {
             "name": "AdminPerpWithdrawFees"
+          },
+          {
+            "name": "AccountSizeMigration"
           }
         ]
       }

@@ -833,6 +833,10 @@ impl PerpOpenOrder {
     pub fn is_active_for_market(&self, perp_market_index: PerpMarketIndex) -> bool {
         self.market == perp_market_index
     }
+
+    pub fn is_active(&self) -> bool {
+        self.market != FREE_ORDER_SLOT
+    }
 }
 
 #[macro_export]
