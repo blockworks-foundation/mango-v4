@@ -1429,6 +1429,10 @@
 <span id="1429">1429</span>
 <span id="1430">1430</span>
 <span id="1431">1431</span>
+<span id="1432">1432</span>
+<span id="1433">1433</span>
+<span id="1434">1434</span>
+<span id="1435">1435</span>
 </pre><pre class="rust"><code><span class="kw">use </span>anchor_lang::prelude::<span class="kw-2">*</span>;
 
 <span class="kw">use </span>derivative::Derivative;
@@ -2263,6 +2267,10 @@
 
     <span class="kw">pub fn </span>is_active_for_market(<span class="kw-2">&amp;</span><span class="self">self</span>, perp_market_index: PerpMarketIndex) -&gt; bool {
         <span class="self">self</span>.market == perp_market_index
+    }
+
+    <span class="kw">pub fn </span>is_active(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool {
+        <span class="self">self</span>.market != FREE_ORDER_SLOT
     }
 }
 
