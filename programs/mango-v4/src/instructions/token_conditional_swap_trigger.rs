@@ -196,22 +196,27 @@ fn action(
 ) -> Result<(I80F48, I80F48)> {
     let liqee_pre_init_health = liqee.check_health_pre(&liqee_health_cache)?;
 
-    let tcs = liqee
-        .token_conditional_swap_by_index(token_conditional_swap_index)?
-        .clone();
-    require!(tcs.has_data(), MangoError::SomeError);
-    require!(!tcs.is_expired(now_ts), MangoError::SomeError);
-    require_eq!(buy_bank.token_index, tcs.buy_token_index);
-    require_eq!(sell_bank.token_index, tcs.sell_token_index);
-
     // amount of sell token native per buy token native
     let price = buy_token_price.to_num::<f64>() / sell_token_price.to_num::<f64>();
-    require!(
-        tcs.price_in_range(price),
-        MangoError::TokenConditionalSwapPriceNotInRange
-    );
 
-    let premium_price = tcs.premium_price(price);
+    let tcs = {
+        let tcs = liqee.token_conditional_swap_by_index(token_conditional_swap_index)?;
+        require!(tcs.has_data(), MangoError::SomeError);
+        require!(!tcs.is_expired(now_ts), MangoError::SomeError);
+        require_eq!(buy_bank.token_index, tcs.buy_token_index);
+        require_eq!(sell_bank.token_index, tcs.sell_token_index);
+
+        require!(
+            tcs.is_triggerable(price, now_ts),
+            MangoError::TokenConditionalSwapPriceNotInRange // TODO: reword error
+        );
+
+        // We need to borrow liqee token positions mutably and can't hold the tcs borrow at the
+        // same time. Copying the whole struct is convenience.
+        tcs.clone()
+    };
+
+    let premium_price = tcs.premium_price(price, now_ts);
     let maker_price = tcs.maker_price(premium_price);
     let maker_price_i80f48 = I80F48::from_num(maker_price);
 
@@ -392,6 +397,11 @@ fn action(
         tcs.sold += sell_token_amount_from_liqee;
         assert!(tcs.bought <= tcs.max_buy);
         assert!(tcs.sold <= tcs.max_sell);
+
+        // mark it as started
+        if !tcs.is_started(now_ts) {
+            tcs.start_timestamp = now_ts;
+        }
 
         // Maybe remove token stop loss entry
         //

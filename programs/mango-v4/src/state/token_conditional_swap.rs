@@ -38,7 +38,7 @@ pub enum TokenConditionalSwapType {
     FixedPremium,
     PremiumAuction,
     AuctionUp,
-    AuctionDown,
+    //AuctionDown,
 }
 
 #[zero_copy]
@@ -113,13 +113,22 @@ pub struct TokenConditionalSwap {
     /// Stores a TokenConditionalSwapType enum value
     pub tcs_type: u8,
 
+    pub padding: [u8; 6],
+
+    /// 0 means not-started
+    // TODO: auction start?
+    pub start_timestamp: u64,
+
+    // TODO: auction duration?
+    pub duration: u64, // in seconds
+
     #[derivative(Debug = "ignore")]
-    pub reserved: [u8; 110],
+    pub reserved: [u8; 88],
 }
 
 const_assert_eq!(
     size_of::<TokenConditionalSwap>(),
-    8 * 6 + 8 * 3 + 2 * 4 + 2 * 2 + 1 * 6 + 110
+    8 * 6 + 8 * 3 + 2 * 4 + 2 * 2 + 1 * 6 + 6 + 2 * 8 + 88
 );
 const_assert_eq!(size_of::<TokenConditionalSwap>(), 200);
 const_assert_eq!(size_of::<TokenConditionalSwap>() % 8, 0);
@@ -146,7 +155,10 @@ impl Default for TokenConditionalSwap {
             display_price_style: TokenConditionalSwapDisplayPriceStyle::SellTokenPerBuyToken.into(),
             intention: TokenConditionalSwapIntention::Unknown.into(),
             tcs_type: TokenConditionalSwapType::FixedPremium.into(),
-            reserved: [0; 110],
+            padding: Default::default(),
+            start_timestamp: 0,
+            duration: 0,
+            reserved: [0; 88],
         }
     }
 }
@@ -171,6 +183,11 @@ impl TokenConditionalSwap {
         now_ts >= self.expiry_timestamp
     }
 
+    // TODO: must set "started" also for older tcs that are fixed premium
+    pub fn is_started(&self, now_ts: u64) -> bool {
+        self.start_timestamp > 0 && now_ts >= self.start_timestamp
+    }
+
     pub fn allow_creating_deposits(&self) -> bool {
         self.allow_creating_deposits == 1
     }
@@ -187,11 +204,47 @@ impl TokenConditionalSwap {
         self.max_sell - self.sold
     }
 
+    fn start_timestamp_or_now(&self, now_ts: u64) -> u64 {
+        if self.start_timestamp > 0 {
+            self.start_timestamp
+        } else {
+            now_ts
+        }
+    }
+
     /// Base price adjusted for the premium
     ///
     /// Base price is the amount of sell_token to pay for one buy_token.
-    pub fn premium_price(&self, base_price: f64) -> f64 {
-        base_price * (1.0 + self.price_premium_rate)
+    pub fn premium_price(&self, base_price: f64, now_ts: u64) -> f64 {
+        match self.tcs_type() {
+            TokenConditionalSwapType::FixedPremium => base_price * (1.0 + self.price_premium_rate),
+            TokenConditionalSwapType::PremiumAuction => {
+                // Start dynamically when triggerable
+                let start = self.start_timestamp_or_now(now_ts);
+                assert!(start <= now_ts);
+
+                let duration = self.duration as f64;
+                let current = (now_ts - start) as f64;
+                if current < duration {
+                    base_price * (1.0 + current / duration * self.price_premium_rate)
+                } else {
+                    base_price * (1.0 + self.price_premium_rate)
+                }
+            }
+            TokenConditionalSwapType::AuctionUp => {
+                // Start time is fixed
+                assert!(self.is_started(now_ts));
+
+                let duration = self.duration as f64;
+                let current = (now_ts - self.start_timestamp) as f64;
+                if current < duration {
+                    self.price_lower_limit
+                        + current / duration * (self.price_upper_limit - self.price_lower_limit)
+                } else {
+                    self.price_upper_limit
+                }
+            }
+        }
     }
 
     /// Premium price adjusted for the maker fee
@@ -216,8 +269,20 @@ impl TokenConditionalSwap {
             .to_num()
     }
 
-    pub fn price_in_range(&self, price: f64) -> bool {
+    fn price_in_range(&self, price: f64) -> bool {
         price >= self.price_lower_limit && price <= self.price_upper_limit
+    }
+
+    pub fn is_triggerable(&self, price: f64, now_ts: u64) -> bool {
+        if self.is_expired(now_ts) {
+            return false;
+        }
+        match self.tcs_type() {
+            TokenConditionalSwapType::FixedPremium | TokenConditionalSwapType::PremiumAuction => {
+                self.price_in_range(price)
+            }
+            TokenConditionalSwapType::AuctionUp => self.is_started(now_ts),
+        }
     }
 
     /// The remaining buy amount, taking the current buy token position and

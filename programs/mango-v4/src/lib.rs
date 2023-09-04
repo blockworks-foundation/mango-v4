@@ -42,6 +42,7 @@ declare_id!("4MangoMjqJ2firMokCjjGgoK8d4MXcrgL7XJaL3w6fVg");
 pub mod mango_v4 {
     use super::*;
     use error::*;
+    use state::TokenConditionalSwapType;
 
     pub fn admin_token_withdraw_fees(ctx: Context<AdminTokenWithdrawFees>) -> Result<()> {
         #[cfg(feature = "enable-gpl")]
@@ -1278,7 +1279,11 @@ pub mod mango_v4 {
             allow_creating_borrows: u8::from(allow_creating_borrows),
             display_price_style: display_price_style.into(),
             intention: intention.into(),
-            reserved: [0; 111],
+            tcs_type: TokenConditionalSwapType::FixedPremium.into(),
+            padding: Default::default(),
+            start_timestamp: 0,
+            duration: 0,
+            reserved: [0; 88],
         };
 
         #[cfg(feature = "enable-gpl")]

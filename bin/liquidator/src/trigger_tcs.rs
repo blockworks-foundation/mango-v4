@@ -38,25 +38,28 @@ pub struct Config {
     pub compute_limit_for_trigger: u32,
 }
 
-fn tcs_is_in_price_range(
+fn tcs_is_triggerable(
     context: &MangoGroupContext,
     account_fetcher: &chain_data::AccountFetcher,
     tcs: &TokenConditionalSwap,
+    now_ts: u64,
 ) -> anyhow::Result<bool> {
     let buy_bank = context.mint_info(tcs.buy_token_index).first_bank();
     let sell_bank = context.mint_info(tcs.sell_token_index).first_bank();
     let buy_token_price = account_fetcher.fetch_bank_price(&buy_bank)?;
     let sell_token_price = account_fetcher.fetch_bank_price(&sell_bank)?;
     let base_price = (buy_token_price / sell_token_price).to_num();
-    Ok(tcs.price_in_range(base_price))
+    Ok(tcs.is_triggerable(base_price, now_ts))
 }
 
 fn tcs_has_plausible_premium(
     tcs: &TokenConditionalSwap,
     token_swap_info: &token_swap_info::TokenSwapInfoUpdater,
+    now_ts: u64,
 ) -> anyhow::Result<bool> {
     // The premium the taker receives needs to take taker fees into account
-    let premium = tcs.taker_price(tcs.premium_price(1.0)) as f64;
+    // TOOD: This no longer works at all, with price = 1.0
+    let premium = tcs.taker_price(tcs.premium_price(1.0, now_ts)) as f64;
 
     // Never take tcs where the fee exceeds the premium and the triggerer exchanges
     // tokens at below oracle price.
@@ -86,8 +89,8 @@ fn tcs_is_interesting(
     now_ts: u64,
 ) -> anyhow::Result<bool> {
     Ok(tcs.is_expired(now_ts)
-        || (tcs_is_in_price_range(context, account_fetcher, tcs)?
-            && tcs_has_plausible_premium(tcs, token_swap_info)?))
+        || (tcs_is_triggerable(context, account_fetcher, tcs, now_ts)?
+            && tcs_has_plausible_premium(tcs, token_swap_info, now_ts)?))
 }
 
 /// Returns the maximum execution size of a tcs order in quote units
@@ -96,6 +99,7 @@ fn tcs_max_volume(
     mango_client: &MangoClient,
     account_fetcher: &chain_data::AccountFetcher,
     tcs: &TokenConditionalSwap,
+    now_ts: u64,
 ) -> anyhow::Result<Option<u64>> {
     let buy_bank_pk = mango_client
         .context
@@ -109,7 +113,7 @@ fn tcs_max_volume(
     let sell_token_price = account_fetcher.fetch_bank_price(&sell_bank_pk)?;
 
     let (max_buy, max_sell) =
-        match tcs_max_liqee_execution(account, mango_client, account_fetcher, tcs)? {
+        match tcs_max_liqee_execution(account, mango_client, account_fetcher, tcs, now_ts)? {
             Some(v) => v,
             None => return Ok(None),
         };
@@ -135,6 +139,7 @@ fn tcs_max_liqee_execution(
     mango_client: &MangoClient,
     account_fetcher: &chain_data::AccountFetcher,
     tcs: &TokenConditionalSwap,
+    now_ts: u64,
 ) -> anyhow::Result<Option<(u64, u64)>> {
     let buy_bank_pk = mango_client
         .context
@@ -150,7 +155,7 @@ fn tcs_max_liqee_execution(
     let sell_token_price = account_fetcher.fetch_bank_price(&sell_bank_pk)?;
 
     let base_price = buy_token_price / sell_token_price;
-    let premium_price = tcs.premium_price(base_price.to_num());
+    let premium_price = tcs.premium_price(base_price.to_num(), now_ts);
     let maker_price = tcs.maker_price(premium_price);
 
     let buy_position = account
@@ -246,7 +251,7 @@ pub fn find_interesting_tcs_for_account(
         ) {
             Ok(true) => {
                 // Filter out Ok(None) resuts of tcs that shouldn't be executed right now
-                match tcs_max_volume(&liqee, mango_client, account_fetcher, tcs) {
+                match tcs_max_volume(&liqee, mango_client, account_fetcher, tcs, now_ts) {
                     Ok(Some(v)) => Some(Ok((*pubkey, tcs.id, v))),
                     Ok(None) => None,
                     Err(e) => Some(Err(e)),
@@ -357,6 +362,7 @@ async fn prepare_token_conditional_swap_inner(
         config,
         &liqee,
         tcs,
+        now_ts,
     )
     .await
 }
@@ -370,6 +376,7 @@ async fn prepare_token_conditional_swap_inner2(
     config: &Config,
     liqee: &MangoAccountValue,
     tcs: &TokenConditionalSwap,
+    now_ts: u64,
 ) -> anyhow::Result<Option<PreparedExecution>> {
     let liqor_min_health_ratio = I80F48::from_num(config.min_health_ratio);
 
@@ -386,13 +393,13 @@ async fn prepare_token_conditional_swap_inner2(
     let sell_token_price = account_fetcher.fetch_bank_price(&sell_bank)?;
 
     let base_price = buy_token_price / sell_token_price;
-    let premium_price = tcs.premium_price(base_price.to_num());
+    let premium_price = tcs.premium_price(base_price.to_num(), now_ts);
     let taker_price = I80F48::from_num(tcs.taker_price(premium_price));
 
     let max_take_quote = I80F48::from(config.max_trigger_quote_amount);
 
     let (liqee_max_buy, liqee_max_sell) =
-        match tcs_max_liqee_execution(liqee, mango_client, account_fetcher, tcs)? {
+        match tcs_max_liqee_execution(liqee, mango_client, account_fetcher, tcs, now_ts)? {
             Some(v) => v,
             None => return Ok(None),
         };
