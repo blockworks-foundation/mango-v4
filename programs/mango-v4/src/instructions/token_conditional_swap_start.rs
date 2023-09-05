@@ -12,104 +12,74 @@ use crate::logs::{
 };
 use crate::state::*;
 
-/// If init health is reduced below this number, the tcs is considered done.
-///
-/// This avoids a situation where the same tcs can be triggered again and again
-/// for small amounts every time the init health increases by small amounts.
-const TCS_TRIGGER_INIT_HEALTH_THRESHOLD: u64 = 1_000_000;
-
 /// Incentive to pay to callers who start an auction
 // TODO: $0.001 is ok? around 10x tx fee currently
-const TCS_START_INCENTIVE: f64 = 1_000.0; // $0.001
+const TCS_START_INCENTIVE: u64 = 1_000; // $0.001
 
 #[allow(clippy::too_many_arguments)]
-pub fn token_conditional_swap_trigger(
-    ctx: Context<TokenConditionalSwapTrigger>,
+pub fn token_conditional_swap_start(
+    ctx: Context<TokenConditionalSwapStart>,
     token_conditional_swap_index: usize,
     token_conditional_swap_id: u64,
-    max_buy_token_to_liqee: u64,
-    max_sell_token_to_liqor: u64,
 ) -> Result<()> {
     let group_pk = &ctx.accounts.group.key();
-    let liqee_key = ctx.accounts.liqee.key();
-    let liqor_key = ctx.accounts.liqor.key();
-    require_keys_neq!(liqee_key, liqor_key);
+    let account_key = ctx.accounts.account.key();
+    let caller_key = ctx.accounts.caller.key();
+    require_keys_neq!(account_key, caller_key);
 
-    let mut liqor = ctx.accounts.liqor.load_full_mut()?;
+    let mut account = ctx.accounts.account.load_full_mut()?;
     require_msg_typed!(
-        !liqor.fixed.being_liquidated(),
+        !account.fixed.being_liquidated(),
         MangoError::BeingLiquidated,
-        "liqor account"
     );
+
+    let mut caller = ctx.accounts.caller.load_full_mut()?;
 
     let mut account_retriever = ScanningAccountRetriever::new(ctx.remaining_accounts, group_pk)
         .context("create account retriever")?;
 
-    let mut liqee = ctx.accounts.liqee.load_full_mut()?;
-
-    let tcs = liqee.token_conditional_swap_by_index(token_conditional_swap_index)?;
+    let tcs = account.token_conditional_swap_by_index(token_conditional_swap_index)?;
     require!(tcs.has_data(), MangoError::SomeError);
     require_eq!(tcs.id, token_conditional_swap_id);
     let buy_token_index = tcs.buy_token_index;
     let sell_token_index = tcs.sell_token_index;
     let now_ts: u64 = Clock::get()?.unix_timestamp.try_into().unwrap();
-    let tcs_is_expired = tcs.is_expired(now_ts);
+    require!(!tcs.is_expired(now_ts), MangoError::SomeError);
+    require!(tcs.has_incentive_for_starting(), MangoError::SomeError);
+    require!(!tcs.is_started(now_ts), MangoError::SomeError);
 
-    // Possibly wipe the tcs and exit, if it's already expired
-    if tcs_is_expired {
-        let (buy_bank, _buy_token_price, sell_bank_and_oracle_opt) =
-            account_retriever.banks_mut_and_oracles(buy_token_index, sell_token_index)?;
-        let (sell_bank, _sell_token_price) = sell_bank_and_oracle_opt.unwrap();
-
-        let tcs = liqee.token_conditional_swap_mut_by_index(token_conditional_swap_index)?;
-        *tcs = TokenConditionalSwap::default();
-
-        // Release the hold on token positions and potentially close them
-        liqee.token_decrement_dust_deactivate(buy_bank, now_ts, liqee_key)?;
-        liqee.token_decrement_dust_deactivate(sell_bank, now_ts, liqee_key)?;
-
-        msg!("TokenConditionalSwap is expired, removing");
-        emit!(TokenConditionalSwapCancelLog {
-            mango_group: ctx.accounts.group.key(),
-            mango_account: ctx.accounts.liqee.key(),
-            id: token_conditional_swap_id,
-        });
-
-        return Ok(());
-    }
-
-    // As a precaution, ensure that the liqee (and its health cache) will have an entry for both tokens:
-    // we will want to adjust their values later. This is already guaranteed by the in_use_count
-    // changes when the tcs was created.
-    liqee.ensure_token_position(buy_token_index)?;
-    liqee.ensure_token_position(sell_token_index)?;
-    let mut liqee_health_cache = new_health_cache(&liqee.borrow(), &account_retriever)
+    let mut health_cache = new_health_cache(&account.borrow(), &account_retriever)
         .context("create liqee health cache")?;
+    let pre_init_health = account.check_health_pre(&health_cache)?;
 
-    let (buy_bank, buy_token_price, sell_bank_and_oracle_opt) =
-        account_retriever.banks_mut_and_oracles(buy_token_index, sell_token_index)?;
-    let (sell_bank, sell_token_price) = sell_bank_and_oracle_opt.unwrap();
+    //
+    // Transfer the starting incentive
+    //
+    let (sell_bank, sell_oracle_price) =
+        account_retriever.scanned_bank_and_oracle(sell_token_index)?;
 
-    let (liqee_buy_change, liqee_sell_change) = action(
-        &mut liqor.borrow_mut(),
-        liqor_key,
-        &mut liqee.borrow_mut(),
-        liqee_key,
-        &mut liqee_health_cache,
-        token_conditional_swap_index,
-        buy_bank,
-        buy_token_price,
-        max_buy_token_to_liqee,
-        sell_bank,
-        sell_token_price,
-        max_sell_token_to_liqor,
-        now_ts,
-    )?;
+    // TODO: What about reduce-only sell token?
+    let incentive = (I80F48::from(TCS_START_INCENTIVE) / sell_oracle_price)
+        .clamp_to_u64()
+        .min(tcs.remaining_sell());
 
-    // Check liqor health, liqee health is checked inside (has to be, since tcs closure depends on it)
-    let liqor_health = compute_health(&liqor.borrow(), HealthType::Init, &account_retriever)
-        .context("compute liqor health")?;
-    require!(liqor_health >= 0, MangoError::HealthMustBePositive);
+    let (account_sell_token, account_sell_raw_index) =
+        account.token_position_mut(sell_token_index)?;
+    let (caller_sell_token, caller_sell_raw_index, _) =
+        caller.ensure_token_position(tcs.sell_token_index)?;
+
+    sell_bank.deposit(caller_sell_token, I80F48::from(incentive), now_ts)?;
+    sell_bank.withdraw_with_fee(account_sell_token, I80F48::from(incentive), now_ts)?;
+
+    //
+    // Start the tcs
+    //
+    let tcs = account.token_conditional_swap_mut_by_index(token_conditional_swap_index)?;
+    tcs.start_timestamp = now_ts;
+    tcs.sold += incentive;
+    assert!(tcs.is_started(now_ts));
+
+    account.check_health_post(&health_cache, pre_init_health)?;
 
     Ok(())
 }
