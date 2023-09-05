@@ -709,6 +709,14 @@ impl LiquidationState {
             .as_secs()
             .try_into()?;
 
+        let tcs_context = trigger_tcs::Context {
+            mango_client: self.mango_client.clone(),
+            account_fetcher: self.account_fetcher.clone(),
+            token_swap_info: self.token_swap_info.clone(),
+            config: self.trigger_tcs_config.clone(),
+            now_ts,
+        };
+
         // Find interesting (pubkey, tcsid, volume)
         let mut interesting_tcs = Vec::with_capacity(accounts.len());
         for pubkey in accounts.iter() {
@@ -724,13 +732,7 @@ impl LiquidationState {
                 continue;
             }
 
-            match trigger_tcs::find_interesting_tcs_for_account(
-                pubkey,
-                &self.mango_client,
-                &self.account_fetcher,
-                &self.token_swap_info,
-                now_ts,
-            ) {
+            match tcs_context.find_interesting_tcs_for_account(pubkey) {
                 Ok(v) => {
                     self.tcs_collection_hard_errors.clear_errors(pubkey);
                     if v.is_empty() {
@@ -761,12 +763,6 @@ impl LiquidationState {
             return Ok(());
         }
 
-        let tcs_context = trigger_tcs::ExecutionContext {
-            mango_client: self.mango_client.clone(),
-            account_fetcher: self.account_fetcher.clone(),
-            token_swap_info: self.token_swap_info.clone(),
-            config: self.trigger_tcs_config.clone(),
-        };
         let (txsigs, mut changed_pubkeys) = tcs_context
             .execute_tcs(&mut interesting_tcs, &mut self.tcs_execution_errors)
             .await?;

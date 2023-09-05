@@ -183,7 +183,6 @@ impl TokenConditionalSwap {
         now_ts >= self.expiry_timestamp
     }
 
-    // TODO: must set "started" also for older tcs that are fixed premium
     pub fn is_started(&self, now_ts: u64) -> bool {
         self.start_timestamp > 0 && now_ts >= self.start_timestamp
     }
