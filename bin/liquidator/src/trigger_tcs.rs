@@ -65,24 +65,17 @@ pub struct Context {
 }
 
 impl Context {
-    pub fn tcs_is_triggerable(&self, tcs: &TokenConditionalSwap) -> anyhow::Result<bool> {
-        let context = &self.mango_client.context;
-        let buy_bank = context.mint_info(tcs.buy_token_index).first_bank();
-        let sell_bank = context.mint_info(tcs.sell_token_index).first_bank();
-        let buy_token_price = self.account_fetcher.fetch_bank_price(&buy_bank)?;
-        let sell_token_price = self.account_fetcher.fetch_bank_price(&sell_bank)?;
-        let base_price = (buy_token_price / sell_token_price).to_num();
-        Ok(tcs.is_triggerable(base_price, self.now_ts))
-    }
-
-    pub fn tcs_has_plausible_premium(&self, tcs: &TokenConditionalSwap) -> anyhow::Result<bool> {
+    fn tcs_has_plausible_price(
+        &self,
+        tcs: &TokenConditionalSwap,
+        base_price: f64,
+    ) -> anyhow::Result<bool> {
         // The premium the taker receives needs to take taker fees into account
-        // TODO: This no longer works at all, with price = 1.0
-        let premium = tcs.taker_price(tcs.premium_price(1.0, self.now_ts)) as f64;
+        let taker_price = tcs.taker_price(tcs.premium_price(base_price, self.now_ts)) as f64;
 
         // Never take tcs where the fee exceeds the premium and the triggerer exchanges
         // tokens at below oracle price.
-        if premium < 1.0 {
+        if taker_price < base_price {
             return Ok(false);
         }
 
@@ -97,14 +90,26 @@ impl Context {
 
         // If this is 1.0 then the exchange can (probably) happen at oracle price.
         // 1.5 would mean we need to pay 50% more than oracle etc.
-        let cost = buy_info.buy_over_oracle * sell_info.sell_over_oracle;
+        let cost_over_oracle = buy_info.buy_over_oracle * sell_info.sell_over_oracle;
 
-        Ok(cost <= premium)
+        Ok(taker_price >= base_price * cost_over_oracle)
     }
 
-    pub fn tcs_is_interesting(&self, tcs: &TokenConditionalSwap) -> anyhow::Result<bool> {
-        Ok(tcs.is_expired(self.now_ts)
-            || (self.tcs_is_triggerable(tcs)? && self.tcs_has_plausible_premium(tcs)?))
+    // Either expired or triggerable with ok-looking price.
+    fn tcs_is_interesting(&self, tcs: &TokenConditionalSwap) -> anyhow::Result<bool> {
+        if tcs.is_expired(self.now_ts) {
+            return Ok(true);
+        }
+
+        let context = &self.mango_client.context;
+        let buy_bank = context.mint_info(tcs.buy_token_index).first_bank();
+        let sell_bank = context.mint_info(tcs.sell_token_index).first_bank();
+        let buy_token_price = self.account_fetcher.fetch_bank_price(&buy_bank)?;
+        let sell_token_price = self.account_fetcher.fetch_bank_price(&sell_bank)?;
+        let base_price = (buy_token_price / sell_token_price).to_num();
+
+        Ok(tcs.is_triggerable(base_price, self.now_ts)
+            && self.tcs_has_plausible_price(tcs, base_price)?)
     }
 
     /// Returns the maximum execution size of a tcs order in quote units
