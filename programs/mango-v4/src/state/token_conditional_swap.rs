@@ -187,6 +187,10 @@ impl TokenConditionalSwap {
         self.start_timestamp > 0 && now_ts >= self.start_timestamp
     }
 
+    pub fn has_incentive_for_starting(&self) -> bool {
+        self.tcs_type() == TokenConditionalSwapType::PremiumAuction
+    }
+
     pub fn allow_creating_deposits(&self) -> bool {
         self.allow_creating_deposits == 1
     }
@@ -277,8 +281,9 @@ impl TokenConditionalSwap {
             return false;
         }
         match self.tcs_type() {
-            TokenConditionalSwapType::FixedPremium | TokenConditionalSwapType::PremiumAuction => {
-                self.price_in_range(price)
+            TokenConditionalSwapType::FixedPremium => self.price_in_range(price),
+            TokenConditionalSwapType::PremiumAuction => {
+                self.price_in_range(price) || self.is_started(now_ts)
             }
             TokenConditionalSwapType::AuctionUp => self.is_started(now_ts),
         }
