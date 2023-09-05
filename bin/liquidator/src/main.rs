@@ -79,6 +79,9 @@ struct Cli {
     #[clap(long, env)]
     liqor_owner: String,
 
+    #[clap(long, env, default_value = "1000")]
+    check_interval_ms: u64,
+
     #[clap(long, env, default_value = "300")]
     snapshot_interval_secs: u64,
 
@@ -190,8 +193,6 @@ async fn main() -> anyhow::Result<()> {
         .map(|s3| s3.market.serum_program)
         .unique()
         .collect_vec();
-    // TODO: Currently the websocket source only supports a single serum program address!
-    assert_eq!(serum_programs.len(), 1);
 
     //
     // feed setup
@@ -211,7 +212,7 @@ async fn main() -> anyhow::Result<()> {
     websocket_source::start(
         websocket_source::Config {
             rpc_ws_url: ws_url.clone(),
-            serum_program: *serum_programs.first().unwrap(),
+            serum_programs,
             open_orders_authority: mango_group,
         },
         mango_oracles.clone(),
@@ -424,8 +425,7 @@ async fn main() -> anyhow::Result<()> {
     });
 
     let liquidation_job = tokio::spawn({
-        // TODO: configurable interval
-        let mut interval = tokio::time::interval(Duration::from_secs(5));
+        let mut interval = tokio::time::interval(Duration::from_millis(cli.check_interval_ms));
         let shared_state = shared_state.clone();
         async move {
             loop {

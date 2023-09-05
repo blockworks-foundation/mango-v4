@@ -20,7 +20,7 @@ use crate::AnyhowWrap;
 
 pub struct Config {
     pub rpc_ws_url: String,
-    pub serum_program: Pubkey,
+    pub serum_programs: Vec<Pubkey>,
     pub open_orders_authority: Pubkey,
 }
 
@@ -67,6 +67,7 @@ async fn feed_data(
             Some(all_accounts_config.clone()),
         )
         .map_err_anyhow()?;
+
     let mut mango_oracles_sub_map = StreamMap::new();
     for oracle in mango_oracles.into_iter() {
         mango_oracles_sub_map.insert(
@@ -84,12 +85,20 @@ async fn feed_data(
                 .map_err_anyhow()?,
         );
     }
-    let mut open_orders_sub = client
-        .program_subscribe(
-            config.serum_program.to_string(),
-            Some(open_orders_accounts_config.clone()),
-        )
-        .map_err_anyhow()?;
+
+    let mut serum3_oo_sub_map = StreamMap::new();
+    for serum_program in config.serum_programs.iter() {
+        serum3_oo_sub_map.insert(
+            *serum_program,
+            client
+                .program_subscribe(
+                    serum_program.to_string(),
+                    Some(open_orders_accounts_config.clone()),
+                )
+                .map_err_anyhow()?,
+        );
+    }
+
     let mut slot_sub = client.slots_updates_subscribe().map_err_anyhow()?;
 
     loop {
@@ -113,9 +122,10 @@ async fn feed_data(
                     return Ok(());
                 }
             },
-            message = open_orders_sub.next() => {
+            message = serum3_oo_sub_map.next() => {
                 if let Some(data) = message {
-                    let response = data.map_err_anyhow()?;
+                    info!("got serum message");
+                    let response = data.1.map_err_anyhow()?;
                     sender.send(Message::Account(AccountUpdate::from_rpc(response)?)).await.expect("sending must succeed");
                 } else {
                     warn!("serum stream closed");

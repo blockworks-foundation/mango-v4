@@ -43,10 +43,6 @@ struct Cli {
     #[clap(short, long, env)]
     rpc_url: String,
 
-    // TODO: different serum markets could use different serum programs, should come from registered markets
-    #[clap(long, env)]
-    serum_program: Pubkey,
-
     #[clap(long, env)]
     settler_mango_account: Pubkey,
 
@@ -128,6 +124,13 @@ async fn main() -> anyhow::Result<()> {
         .unique()
         .collect::<Vec<Pubkey>>();
 
+    let serum_programs = group_context
+        .serum3_markets
+        .values()
+        .map(|s3| s3.market.serum_program)
+        .unique()
+        .collect_vec();
+
     //
     // feed setup
     //
@@ -147,7 +150,7 @@ async fn main() -> anyhow::Result<()> {
     websocket_source::start(
         websocket_source::Config {
             rpc_ws_url: ws_url.clone(),
-            serum_program: cli.serum_program,
+            serum_programs,
             open_orders_authority: mango_group,
         },
         mango_oracles.clone(),
