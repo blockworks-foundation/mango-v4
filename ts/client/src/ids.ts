@@ -28,11 +28,7 @@ export class Id {
   ) {}
 
   public getBanks(): PublicKey[] {
-    return Array.from(
-      this.banks
-        .filter((bank) => bank.active)
-        .map((bank) => new PublicKey(bank.publicKey)),
-    );
+    return Array.from(this.banks.map((bank) => new PublicKey(bank.publicKey)));
   }
 
   public getStubOracles(): PublicKey[] {
@@ -49,25 +45,23 @@ export class Id {
 
   public getSerum3Markets(): PublicKey[] {
     return Array.from(
-      this.serum3Markets
-        .filter((serum3Market) => serum3Market.active)
-        .map((serum3Market) => new PublicKey(serum3Market.publicKey)),
+      this.serum3Markets.map(
+        (serum3Market) => new PublicKey(serum3Market.publicKey),
+      ),
     );
   }
 
   public getSerum3ExternalMarkets(): PublicKey[] {
     return Array.from(
-      this.serum3Markets
-        .filter((serum3Market) => serum3Market.active)
-        .map((serum3Market) => new PublicKey(serum3Market.marketExternal)),
+      this.serum3Markets.map(
+        (serum3Market) => new PublicKey(serum3Market.marketExternal),
+      ),
     );
   }
 
   public getPerpMarkets(): PublicKey[] {
     return Array.from(
-      this.perpMarkets
-        .filter((perpMarket) => perpMarket.active)
-        .map((perpMarket) => new PublicKey(perpMarket.publicKey)),
+      this.perpMarkets.map((perpMarket) => new PublicKey(perpMarket.publicKey)),
     );
   }
 
