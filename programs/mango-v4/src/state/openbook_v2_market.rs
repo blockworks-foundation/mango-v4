@@ -32,6 +32,7 @@ pub struct OpenbookV2Market {
 
     pub reserved: [u8; 512],
 }
+
 const_assert_eq!(
     size_of::<OpenbookV2Market>(),
     32 + 2 + 2 + 1 + 3 + 16 + 2 * 32 + 2 + 1 + 5 + 8 + 512

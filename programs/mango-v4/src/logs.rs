@@ -596,3 +596,14 @@ pub struct TokenConditionalSwapCancelLog {
     pub mango_account: Pubkey,
     pub id: u64,
 }
+
+#[event]
+pub struct OpenbookV2RegisterMarketLog {
+    pub mango_group: Pubkey,
+    pub openbook_v2_market: Pubkey,
+    pub market_index: u16,
+    pub base_token_index: u16,
+    pub quote_token_index: u16,
+    pub openbook_v2_program: Pubkey,
+    pub openbook_v2_program_external: Pubkey,
+}

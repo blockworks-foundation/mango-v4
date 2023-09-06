@@ -1356,6 +1356,8 @@ pub mod mango_v4 {
         market_index: OpenbookV2MarketIndex,
         name: String,
     ) -> Result<()> {
+        #[cfg(feature = "enable-gpl")]
+        instructions::openbook_v2_register_market(ctx, market_index, name)?;
         Ok(())
     }
 
