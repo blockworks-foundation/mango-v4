@@ -4,6 +4,7 @@ import fs from 'fs';
 import { TokenIndex } from '../src/accounts/bank';
 import { Group } from '../src/accounts/group';
 import { MangoClient } from '../src/client';
+import { DefaultTokenRegisterParams } from '../src/clientIxParamBuilder';
 import { MANGO_V4_ID } from '../src/constants';
 import { toNative } from '../src/utils';
 
@@ -28,10 +29,6 @@ const {
   GROUP_NUM: number;
 } = process.env as any;
 
-const MIN_VAULT_TO_DEPOSITS_RATIO = 1;
-const NET_BORROWS_WINDOW_SIZE_TS = 24 * 60 * 60;
-const NET_BORROW_LIMIT_PER_WINDOW_QUOTE = toNative(0, 6).toNumber();
-
 const defaultOracleConfig = {
   confFilter: 0.1,
   maxStalenessSlots: null,
@@ -44,6 +41,21 @@ const defaultInterestRate = {
   util1: 0.0,
   rate1: 0.0,
   maxRate: 0.51,
+};
+
+const defaultTokenParams = {
+  ...DefaultTokenRegisterParams,
+  oracleConfig: defaultOracleConfig,
+  interestRateParams: defaultInterestRate,
+  loanOriginationFeeRate: 0.0,
+  loanFeeRate: 0.0,
+  initAssetWeight: 0,
+  maintAssetWeight: 0,
+  initLiabWeight: 1,
+  maintLiabWeight: 1,
+  liquidationFee: 0,
+  minVaultToDepositsRatio: 1,
+  netBorrowLimitPerWindowQuote: 0,
 };
 
 async function buildAdminClient(): Promise<[MangoClient, Keypair]> {
@@ -108,20 +120,9 @@ async function registerTokens(): Promise<void> {
     group,
     usdcMainnetMint,
     usdcMainnetOracle,
-    defaultOracleConfig,
     0,
     'USDC',
-    defaultInterestRate,
-    0.0,
-    0.0,
-    0,
-    0,
-    0,
-    0,
-    0,
-    MIN_VAULT_TO_DEPOSITS_RATIO,
-    NET_BORROWS_WINDOW_SIZE_TS,
-    NET_BORROW_LIMIT_PER_WINDOW_QUOTE,
+    defaultTokenParams,
   );
   console.log(`registered usdc ${sig}`);
 
@@ -131,20 +132,9 @@ async function registerTokens(): Promise<void> {
     group,
     solMainnetMint,
     solMainnetOracle,
-    defaultOracleConfig,
     1,
     'SOL',
-    defaultInterestRate,
-    0.0,
-    0.0,
-    0,
-    0,
-    0,
-    0,
-    0,
-    MIN_VAULT_TO_DEPOSITS_RATIO,
-    NET_BORROWS_WINDOW_SIZE_TS,
-    NET_BORROW_LIMIT_PER_WINDOW_QUOTE,
+    defaultTokenParams,
   );
   console.log(`registered sol ${sig}`);
 }
