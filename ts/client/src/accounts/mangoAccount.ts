@@ -1966,10 +1966,8 @@ export class TokenConditionalSwap {
       group,
       buyBank,
       sellBank,
-      this.maxBuy,
-      this.maxSell,
-      this.getMaxBuyUi(group),
-      this.getMaxSellUi(group),
+      this.maxBuy.sub(this.bought),
+      this.maxSell.sub(this.sold),
     );
   }
 
@@ -1979,9 +1977,10 @@ export class TokenConditionalSwap {
     sellBank: Bank,
     maxBuy: BN,
     maxSell: BN,
-    maxBuyUi: number,
-    maxSellUi: number,
   ): number {
+    const maxBuyUi = toUiDecimals(maxBuy, buyBank.mintDecimals);
+    const maxSellUi = toUiDecimals(maxSell, sellBank.mintDecimals);
+
     const buyAmountInUsd =
       maxBuy != U64_MAX_BN
         ? maxBuyUi * buyBank.uiPrice

@@ -3659,8 +3659,6 @@ export class MangoClient {
       sellBank,
       maxBuy,
       maxSell,
-      maxBuyUi,
-      maxSellUi,
     );
     const pricePremiumRate = pricePremium > 0 ? pricePremium / 100 : 0.03;
 
