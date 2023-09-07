@@ -238,12 +238,6 @@ fn action(
         .0
         .native(&sell_bank);
 
-    let start_incentive_sell_token = if tcs.has_incentive_for_starting() {
-        (TCS_START_INCENTIVE / sell_token_price_f64) as u64
-    } else {
-        0
-    };
-
     // derive trade amount based on limits in the tcs and by the liqor
     // the sell_token_amount_with_maker_fee is the amount to deduct from the liqee, it's adjusted upwards
     // for the maker fee (since this is included in the maker_price)
@@ -253,9 +247,7 @@ fn action(
         max_buy_token_to_liqee,
         max_sell_token_to_liqor,
         pre_liqee_buy_token,
-        // The starting incentive needs to be considered in the trade amount computation:
-        // it's a flat fee that possibly reduces the available trade amount!
-        pre_liqee_sell_token - I80F48::from(start_incentive_sell_token),
+        pre_liqee_sell_token,
         pre_liqor_buy_token,
         pre_liqor_sell_token,
         buy_bank,
@@ -270,10 +262,8 @@ fn action(
     let maker_fee = tcs.maker_fee(sell_token_amount);
     let taker_fee = tcs.taker_fee(sell_token_amount);
 
-    let sell_token_amount_from_liqee =
-        sell_token_amount_with_maker_fee + start_incentive_sell_token;
-    let sell_token_amount_to_liqor =
-        sell_token_amount_with_maker_fee - maker_fee - taker_fee + start_incentive_sell_token;
+    let sell_token_amount_from_liqee = sell_token_amount_with_maker_fee;
+    let sell_token_amount_to_liqor = sell_token_amount_with_maker_fee - maker_fee - taker_fee;
 
     // do the token transfer between liqee and liqor
     let buy_token_amount_i80f48 = I80F48::from(buy_token_amount);
