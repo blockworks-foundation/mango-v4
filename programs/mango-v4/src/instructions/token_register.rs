@@ -26,9 +26,18 @@ pub fn token_register(
     maint_liab_weight: f32,
     init_liab_weight: f32,
     liquidation_fee: f32,
+    stable_price_delay_interval_seconds: u32,
+    stable_price_delay_growth_limit: f32,
+    stable_price_growth_limit: f32,
     min_vault_to_deposits_ratio: f64,
     net_borrow_limit_window_size_ts: u64,
     net_borrow_limit_per_window_quote: i64,
+    borrow_weight_scale_start_quote: f64,
+    deposit_weight_scale_start_quote: f64,
+    reduce_only: u8,
+    token_conditional_swap_taker_fee_rate: f32,
+    token_conditional_swap_maker_fee_rate: f32,
+    flash_loan_deposit_fee_rate: f32,
 ) -> Result<()> {
     // Require token 0 to be in the insurance token
     if token_index == INSURANCE_TOKEN_INDEX {
@@ -78,22 +87,29 @@ pub fn token_register(
         mint_decimals: ctx.accounts.mint.decimals,
         bank_num: 0,
         oracle_config: oracle_config.to_oracle_config(),
-        stable_price_model: StablePriceModel::default(),
+        stable_price_model: StablePriceModel {
+            delay_interval_seconds: stable_price_delay_interval_seconds,
+            delay_growth_limit: stable_price_delay_growth_limit,
+            stable_growth_limit: stable_price_growth_limit,
+            ..StablePriceModel::default()
+        },
         min_vault_to_deposits_ratio,
         net_borrow_limit_window_size_ts,
         last_net_borrows_window_start_ts: now_ts / net_borrow_limit_window_size_ts
             * net_borrow_limit_window_size_ts,
         net_borrow_limit_per_window_quote,
         net_borrows_in_window: 0,
-        borrow_weight_scale_start_quote: f64::MAX,
-        deposit_weight_scale_start_quote: f64::MAX,
-        reduce_only: 0,
+        borrow_weight_scale_start_quote,
+        deposit_weight_scale_start_quote,
+        reduce_only,
         force_close: 0,
         padding: Default::default(),
         fees_withdrawn: 0,
-        reserved: [0; 2104],
+        token_conditional_swap_taker_fee_rate,
+        token_conditional_swap_maker_fee_rate,
+        flash_loan_deposit_fee_rate,
+        reserved: [0; 2092],
     };
-    require_gt!(bank.max_rate, MINIMUM_MAX_RATE);
 
     if let Ok(oracle_price) =
         bank.oracle_price(&AccountInfoRef::borrow(ctx.accounts.oracle.as_ref())?, None)
@@ -103,6 +119,8 @@ pub fn token_register(
     } else {
         bank.stable_price_model.reset_on_nonzero_price = 1;
     }
+
+    bank.verify()?;
 
     let mut mint_info = ctx.accounts.mint_info.load_init()?;
     *mint_info = MintInfo {

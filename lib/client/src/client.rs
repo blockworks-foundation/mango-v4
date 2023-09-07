@@ -212,8 +212,8 @@ impl MangoClient {
                 account_num,
                 name: mango_account_name.to_owned(),
                 token_count: 8,
-                serum3_count: 8,
-                perp_count: 8,
+                serum3_count: 4,
+                perp_count: 4,
                 perp_oo_count: 8,
             }),
         };
@@ -313,7 +313,7 @@ impl MangoClient {
     pub async fn derive_liquidation_health_check_remaining_account_metas(
         &self,
         liqee: &MangoAccountValue,
-        affected_tokens: Vec<u16>,
+        affected_tokens: &[TokenIndex],
         writable_banks: &[TokenIndex],
     ) -> anyhow::Result<Vec<AccountMeta>> {
         let account = self.mango_account().await?;
@@ -321,7 +321,7 @@ impl MangoClient {
             .derive_health_check_remaining_account_metas_two_accounts(
                 &account,
                 liqee,
-                &affected_tokens,
+                affected_tokens,
                 writable_banks,
             )
     }
@@ -1052,18 +1052,18 @@ impl MangoClient {
         self.send_and_confirm_permissionless_tx(vec![ix]).await
     }
 
-    pub async fn perp_liq_base_or_positive_pnl(
+    pub async fn perp_liq_base_or_positive_pnl_instruction(
         &self,
         liqee: (&Pubkey, &MangoAccountValue),
         market_index: PerpMarketIndex,
         max_base_transfer: i64,
         max_pnl_transfer: u64,
-    ) -> anyhow::Result<Signature> {
+    ) -> anyhow::Result<Instruction> {
         let perp = self.context.perp(market_index);
         let settle_token_info = self.context.token(perp.market.settle_token_index);
 
         let health_remaining_ams = self
-            .derive_liquidation_health_check_remaining_account_metas(liqee.1, vec![], &[])
+            .derive_liquidation_health_check_remaining_account_metas(liqee.1, &[], &[])
             .await
             .unwrap();
 
@@ -1094,15 +1094,15 @@ impl MangoClient {
                 },
             ),
         };
-        self.send_and_confirm_owner_tx(vec![ix]).await
+        Ok(ix)
     }
 
-    pub async fn perp_liq_negative_pnl_or_bankruptcy(
+    pub async fn perp_liq_negative_pnl_or_bankruptcy_instruction(
         &self,
         liqee: (&Pubkey, &MangoAccountValue),
         market_index: PerpMarketIndex,
         max_liab_transfer: u64,
-    ) -> anyhow::Result<Signature> {
+    ) -> anyhow::Result<Instruction> {
         let group = account_fetcher_fetch_anchor_account::<Group>(
             &*self.account_fetcher,
             &self.context.group,
@@ -1116,7 +1116,7 @@ impl MangoClient {
         let health_remaining_ams = self
             .derive_liquidation_health_check_remaining_account_metas(
                 liqee.1,
-                vec![INSURANCE_TOKEN_INDEX],
+                &[INSURANCE_TOKEN_INDEX],
                 &[],
             )
             .await
@@ -1151,24 +1151,24 @@ impl MangoClient {
                 &mango_v4::instruction::PerpLiqNegativePnlOrBankruptcyV2 { max_liab_transfer },
             ),
         };
-        self.send_and_confirm_owner_tx(vec![ix]).await
+        Ok(ix)
     }
 
     //
     // Liquidation
     //
 
-    pub async fn token_liq_with_token(
+    pub async fn token_liq_with_token_instruction(
         &self,
         liqee: (&Pubkey, &MangoAccountValue),
         asset_token_index: TokenIndex,
         liab_token_index: TokenIndex,
         max_liab_transfer: I80F48,
-    ) -> anyhow::Result<Signature> {
+    ) -> anyhow::Result<Instruction> {
         let health_remaining_ams = self
             .derive_liquidation_health_check_remaining_account_metas(
                 liqee.1,
-                vec![],
+                &[],
                 &[asset_token_index, liab_token_index],
             )
             .await
@@ -1195,15 +1195,15 @@ impl MangoClient {
                 max_liab_transfer,
             }),
         };
-        self.send_and_confirm_owner_tx(vec![ix]).await
+        Ok(ix)
     }
 
-    pub async fn token_liq_bankruptcy(
+    pub async fn token_liq_bankruptcy_instruction(
         &self,
         liqee: (&Pubkey, &MangoAccountValue),
         liab_token_index: TokenIndex,
         max_liab_transfer: I80F48,
-    ) -> anyhow::Result<Signature> {
+    ) -> anyhow::Result<Instruction> {
         let quote_token_index = 0;
 
         let quote_info = self.context.token(quote_token_index);
@@ -1219,7 +1219,7 @@ impl MangoClient {
         let health_remaining_ams = self
             .derive_liquidation_health_check_remaining_account_metas(
                 liqee.1,
-                vec![INSURANCE_TOKEN_INDEX],
+                &[INSURANCE_TOKEN_INDEX],
                 &[quote_token_index, liab_token_index],
             )
             .await
@@ -1255,7 +1255,7 @@ impl MangoClient {
                 max_liab_transfer,
             }),
         };
-        self.send_and_confirm_owner_tx(vec![ix]).await
+        Ok(ix)
     }
 
     pub async fn token_conditional_swap_trigger_instruction(
@@ -1264,15 +1264,21 @@ impl MangoClient {
         token_conditional_swap_id: u64,
         max_buy_token_to_liqee: u64,
         max_sell_token_to_liqor: u64,
+        extra_affected_tokens: &[TokenIndex],
     ) -> anyhow::Result<Instruction> {
         let (tcs_index, tcs) = liqee
             .1
             .token_conditional_swap_by_id(token_conditional_swap_id)?;
 
+        let affected_tokens = extra_affected_tokens
+            .iter()
+            .chain(&[tcs.buy_token_index, tcs.sell_token_index])
+            .copied()
+            .collect_vec();
         let health_remaining_ams = self
             .derive_liquidation_health_check_remaining_account_metas(
                 liqee.1,
-                vec![tcs.buy_token_index, tcs.sell_token_index],
+                &affected_tokens,
                 &[tcs.buy_token_index, tcs.sell_token_index],
             )
             .await
@@ -1382,9 +1388,9 @@ impl MangoClient {
         let response_text = response
             .text()
             .await
-            .context("awaiting body of quote request to jupiter")?;
+            .context("awaiting body of http request")?;
         if !status.is_success() {
-            anyhow::bail!("request failed, status: {status}, body: {response_text}");
+            anyhow::bail!("http request failed, status: {status}, body: {response_text}");
         }
         serde_json::from_str::<T>(&response_text)
             .with_context(|| format!("response has unexpected format, body: {response_text}"))

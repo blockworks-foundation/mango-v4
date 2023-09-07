@@ -4,7 +4,63 @@ Update this for each program release and mainnet deployment.
 
 ## not on mainnet
 
-### v0.18.0, 2023-7-
+### v0.19.0, 2023-8-
+
+- Token deposits and withdraws: Allow full withdraw or full borrow repays
+  even when the oracle is stale (#646, #675)
+
+  Stale oracles are a problem for Mango because the risk engine can then no
+  longer safely determine if a user action is safe or not. Before, a stale oracle
+  would completely block interactions with an account until the oracle got
+  updated again.
+
+  This change allows some actions even while an oracle is stale:
+
+  - Users with deposits in a token with a stale oracle can now withdraw tokens
+    as long as their account health provided by tokens with non-stale oracles
+    remains positive.
+  - Users with borrows of a token with a stale oracle can now repay the borrows
+    (unless they were being liquidated at the time).
+
+  These actions can be used to unblock an account by removing the offending token
+  from its balance sheet.
+
+- Expiring delegate: Accounts can now have a short-term delegate (#663)
+
+  This might allow users to temporarily delegate to an in-memory key, so they
+  can trade without having to re-approve every transaction on their wallet.
+
+- Flash loan: Start allowing Mango instructions after flash_loan_end (#681)
+
+  Liquidators may be interested in performing actions in the same transaction
+  as a flash loan swap.
+
+- Flash loan: The DAO can now charge a deposit fee (#660, #693)
+
+  The DAO can now configure a fee on deposits that happen in flash loans. This
+  could be used to apply a fee to flash loan swaps.
+
+  Previously flash loans that did not increase the user's token balance and did
+  not borrow tokens were free.
+
+- Stop loss: Respect net borrow limits and change low-health completion (#677)
+- Stop loss: Store helpful UI fields (#654, #667)
+- Stop loss: Fees are configured by-token instead of globally (#659)
+- Stop loss: Avoid expensive health cache for expired orders (#682)
+- Account creation: Add account_create_v2 instruction (#680, #685)
+- Account resizing: Lower maximums due to tx account limit (#686, #688, #689)
+- Account resizing: Fix denial of service if account has too many lamports (#694)
+- Token register: Revamp API for simpler use from governance (#665)
+- Token register untrusted: Adjust default oracle staleness (#678)
+- Fix typo in name of admin_token_withdraw_fees instruction (#655)
+- Flash loan: Better errors for missing banks (#639)
+- OpenBook v2 integration: First draft of instructions (#628)
+
+## mainnet
+
+### v0.18.0, 2023-7-28
+
+Deployment: Jul 28, 2023 at 08:29:46 Central European Summer Time, https://explorer.solana.com/tx/TaPcQ8dUDyFEaqprasGVEeG3x4Z2nMT7jY9tr2G8KVVf3kvDUQv8TRTjzDirasx3YkyYq3PmQcmcMbCcHsAnUNT
 
 - Introduce limit and stop loss orders for arbitrary spot pairs (#604, #634)
 
@@ -23,8 +79,7 @@ Update this for each program release and mainnet deployment.
 
 - Perp FillEventLog: Include amount of closed pnl (#624)
 - Pyth: Fix reading most recent valid price (#631)
-
-## mainnet
+- Introduce mechanism for moving collected fees to DAO (#644)
 
 ### v0.17.1, 2023-7-6
 
@@ -390,25 +445,30 @@ Deployment: Jan 13, 2023 at 11:31:05 Central European Standard Time, https://exp
 ### Dec 16, 2022 at 16:40 Central European Standard Time
 
 ### Oct 8, 2022 at 14:38:31 Central European Summer Time
+
 https://explorer.solana.com/tx/3m8EDohkgwJZyiwpGXztBWARWQVxyhnSNDVuH467D7FPS2wxJerr79HhdhDEed5hpConHgGsKHvxtW1HJP6GixX9
 
 ### Oct 8, 2022 at 14:38:31 Central European Summer Time
+
 https://explorer.solana.com/tx/3m8EDohkgwJZyiwpGXztBWARWQVxyhnSNDVuH467D7FPS2wxJerr79HhdhDEed5hpConHgGsKHvxtW1HJP6GixX9
 
 - New ix `TokenDepositIntoExisting`
 
 ### Sep 1, 2022 at 10:24:35 Central European Summer Time
+
 https://explorer.solana.com/tx/3NnX13A3QwsREKKKo3iYR4jqgoongpCjdhhXuJ3y5iP6FwfPcNieVop623tpgPbyreC7m7KtphwdWdoHYE5YC394
 
 - Add HealthRegionBegin, -End instructions
 - Add explicit "oracle" account argument for TokenDeposit and TokenWithdraw instructions
 
 ### Aug 20, 2022 at 19:58:29 Central European Summer Time
+
 https://explorer.solana.com/tx/3R4frko1AekQKJmmQ5T6k3mdXF9uZVHTR7oocdspTPsc82xX7qrbgnG61r28UdhCxsjMxtQHgBqMc37FSvoHQfCN
 
 - loan fee logging for off-chain services
 
 ### Aug 18, 2022 at 17:17:40 Central European Summer Time
+
 https://explorer.solana.com/tx/4Xnyswcwx98y6khw8ptNVmdhQZwJjuNy2BvmQg2pJayoThFiw8kmS2ecRAg5cg2DncvW3NQgn2vtP8mCUtv6Q1yB
 
 - liq_token_bankruptcy: removed liab_token_index argument
@@ -455,6 +515,7 @@ https://explorer.solana.com/tx/4Xnyswcwx98y6khw8ptNVmdhQZwJjuNy2BvmQg2pJayoThFiw
   marginTrade takes flashLoanType as an argument
 
 ### Aug 8, 2022 at 18:56:04 Central European Summer Time
+
 https://explorer.solana.com/tx/yjZggRTrcDNquMkftNvBKLv77Dk4xp5yQPYXgN3qvBHTBWWJVhLPGHxqpGwosmEq3j8byHZMa13oxLLerBWUdgW
 
 - improved logging for off chain services
@@ -487,6 +548,7 @@ New features
 - Enforced a minimum maximum rate of 50% so that rates don't fall so low that they cannot recover.
 
 ### Jul 14, 2022 at 09:33:52 Central European Summer Time
+
 https://explorer.solana.com/tx/vZ5hP1vGp37fgzBfG9nb4nfA5ZdmYgk8meq53YPR4ReFxrcTwBUxTYBQUgnfAnq9u5fH36S3QTfb9mVkBXt5A6C
 
 - Account data was rearranged to put fields that are often used with gPA first

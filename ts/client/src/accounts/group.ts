@@ -47,8 +47,6 @@ export class Group {
       ixGate: BN;
       buybackFeesSwapMangoAccount: PublicKey;
       buybackFeesExpiryInterval: BN;
-      tokenConditionalSwapTakerFeeFraction: number;
-      tokenConditionalSwapMakerFeeFraction: number;
     },
   ): Group {
     return new Group(
@@ -70,8 +68,6 @@ export class Group {
       obj.ixGate,
       obj.buybackFeesSwapMangoAccount,
       obj.buybackFeesExpiryInterval,
-      obj.tokenConditionalSwapTakerFeeFraction,
-      obj.tokenConditionalSwapMakerFeeFraction,
       [], // addressLookupTablesList
       new Map(), // banksMapByName
       new Map(), // banksMapByMint
@@ -108,8 +104,6 @@ export class Group {
     public ixGate: BN,
     public buybackFeesSwapMangoAccount: PublicKey,
     public buybackFeesExpiryInterval: BN,
-    public tokenConditionalSwapTakerFeeFraction: number,
-    public tokenConditionalSwapMakerFeeFraction: number,
     public addressLookupTablesList: AddressLookupTableAccount[],
     public banksMapByName: Map<string, Bank[]>,
     public banksMapByMint: Map<string, Bank[]>,
@@ -476,7 +470,7 @@ export class Group {
       const stubOracle = coder.decode('stubOracle', ai.data);
       price = new I80F48(stubOracle.price.val);
       uiPrice = this.toUiPrice(price, baseDecimals);
-      lastUpdatedSlot = stubOracle.lastUpdated.val;
+      lastUpdatedSlot = stubOracle.lastUpdateSlot.toNumber();
       provider = OracleProvider.Stub;
     } else if (isPythOracle(ai)) {
       const priceData = parsePriceData(ai.data);

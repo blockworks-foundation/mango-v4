@@ -32,7 +32,7 @@ pub fn token_register_trustless(
         oracle: ctx.accounts.oracle.key(),
         oracle_config: OracleConfig {
             conf_filter: I80F48::from_num(0.10),
-            max_staleness_slots: 600,
+            max_staleness_slots: 10000,
             reserved: [0; 72],
         },
         stable_price_model: StablePriceModel::default(),
@@ -69,7 +69,7 @@ pub fn token_register_trustless(
         net_borrow_limit_window_size_ts,
         last_net_borrows_window_start_ts: now_ts / net_borrow_limit_window_size_ts
             * net_borrow_limit_window_size_ts,
-        net_borrow_limit_per_window_quote: 250_000_000_000, // $250k
+        net_borrow_limit_per_window_quote: 5_000_000_000, // $5k
         net_borrows_in_window: 0,
         borrow_weight_scale_start_quote: 5_000_000_000.0, // $5k
         deposit_weight_scale_start_quote: 5_000_000_000.0, // $5k
@@ -77,7 +77,10 @@ pub fn token_register_trustless(
         force_close: 0,
         padding: Default::default(),
         fees_withdrawn: 0,
-        reserved: [0; 2104],
+        token_conditional_swap_taker_fee_rate: 0.0005,
+        token_conditional_swap_maker_fee_rate: 0.0005,
+        flash_loan_deposit_fee_rate: 0.0005,
+        reserved: [0; 2092],
     };
     require_gt!(bank.max_rate, MINIMUM_MAX_RATE);
 
@@ -89,6 +92,8 @@ pub fn token_register_trustless(
     } else {
         bank.stable_price_model.reset_on_nonzero_price = 1;
     }
+
+    bank.verify()?;
 
     let mut mint_info = ctx.accounts.mint_info.load_init()?;
     *mint_info = MintInfo {

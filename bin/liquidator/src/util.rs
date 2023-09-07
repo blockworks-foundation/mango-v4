@@ -105,7 +105,7 @@ pub async fn jupiter_route(
 }
 
 /// Convenience wrapper for getting max swap amounts for a token pair
-pub async fn max_swap_source(
+pub fn max_swap_source(
     client: &MangoClient,
     account_fetcher: &chain_data::AccountFetcher,
     account: &MangoAccountValue,
@@ -122,12 +122,56 @@ pub async fn max_swap_source(
     account.ensure_token_position(target)?;
 
     let health_cache =
-        mango_v4_client::health_cache::new(&client.context, account_fetcher, &account)
-            .await
+        mango_v4_client::health_cache::new_sync(&client.context, account_fetcher, &account)
             .expect("always ok");
 
-    let source_bank = client.first_bank(source).await?;
-    let target_bank = client.first_bank(target).await?;
+    let source_bank: Bank =
+        account_fetcher.fetch(&client.context.mint_info(source).first_bank())?;
+    let target_bank: Bank =
+        account_fetcher.fetch(&client.context.mint_info(target).first_bank())?;
+
+    let source_price = health_cache.token_info(source).unwrap().prices.oracle;
+
+    let amount = health_cache
+        .max_swap_source_for_health_ratio(
+            &account,
+            &source_bank,
+            source_price,
+            &target_bank,
+            price,
+            min_health_ratio,
+        )
+        .context("getting max_swap_source")?;
+    Ok(amount)
+}
+
+/// Convenience wrapper for getting max swap amounts for a token pair
+pub fn max_swap_source_ignore_net_borrows(
+    client: &MangoClient,
+    account_fetcher: &chain_data::AccountFetcher,
+    account: &MangoAccountValue,
+    source: TokenIndex,
+    target: TokenIndex,
+    price: I80F48,
+    min_health_ratio: I80F48,
+) -> anyhow::Result<I80F48> {
+    let mut account = account.clone();
+
+    // Ensure the tokens are activated, so they appear in the health cache and
+    // max_swap_source() will work.
+    account.ensure_token_position(source)?;
+    account.ensure_token_position(target)?;
+
+    let health_cache =
+        mango_v4_client::health_cache::new_sync(&client.context, account_fetcher, &account)
+            .expect("always ok");
+
+    let mut source_bank: Bank =
+        account_fetcher.fetch(&client.context.mint_info(source).first_bank())?;
+    source_bank.net_borrow_limit_per_window_quote = -1;
+    let mut target_bank: Bank =
+        account_fetcher.fetch(&client.context.mint_info(target).first_bank())?;
+    target_bank.net_borrow_limit_per_window_quote = -1;
 
     let source_price = health_cache.token_info(source).unwrap().prices.oracle;
 

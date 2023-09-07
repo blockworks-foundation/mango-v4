@@ -112,7 +112,7 @@ impl TestContextBuilder {
         let mut test = ProgramTest::new("mango_v4", mango_v4::id(), processor!(mango_v4::entry));
 
         // intentionally set to as tight as possible, to catch potential problems early
-        test.set_compute_max_units(75000);
+        test.set_compute_max_units(80000);
 
         Self {
             test,

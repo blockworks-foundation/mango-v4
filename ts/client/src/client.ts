@@ -25,10 +25,15 @@ import {
   SYSVAR_RENT_PUBKEY,
   SystemProgram,
   TransactionInstruction,
+  TransactionSignature,
+  RecentPrioritizationFees,
 } from '@solana/web3.js';
 import bs58 from 'bs58';
 import chunk from 'lodash/chunk';
 import cloneDeep from 'lodash/cloneDeep';
+import groupBy from 'lodash/groupBy';
+import mapValues from 'lodash/mapValues';
+import maxBy from 'lodash/maxBy';
 import uniq from 'lodash/uniq';
 import { Bank, MintInfo, TokenIndex } from './accounts/bank';
 import { Group } from './accounts/group';
@@ -36,7 +41,9 @@ import {
   MangoAccount,
   PerpPosition,
   Serum3Orders,
+  TokenConditionalSwapDisplayPriceStyle,
   TokenConditionalSwapDto,
+  TokenConditionalSwapIntention,
   TokenPosition,
 } from './accounts/mangoAccount';
 import { StubOracle } from './accounts/oracle';
@@ -63,8 +70,14 @@ import {
   PerpEditParams,
   TokenEditParams,
   buildIxGate,
+  TokenRegisterParams,
 } from './clientIxParamBuilder';
-import { MANGO_V4_ID, OPENBOOK_PROGRAM_ID, RUST_U64_MAX } from './constants';
+import {
+  MANGO_V4_ID,
+  MAX_RECENT_PRIORITY_FEE_ACCOUNTS,
+  OPENBOOK_PROGRAM_ID,
+  RUST_U64_MAX,
+} from './constants';
 import { Id } from './ids';
 import { IDL, MangoV4 } from './mango_v4';
 import { I80F48 } from './numbers/I80F48';
@@ -93,6 +106,7 @@ export type MangoClientOptions = {
   idsSource?: IdsSource;
   postSendTxCallback?: ({ txid }: { txid: string }) => void;
   prioritizationFee?: number;
+  estimateFee?: boolean;
   txConfirmationCommitment?: Commitment;
   openbookFeesToDao?: boolean;
   prependedGlobalAdditionalInstructions?: TransactionInstruction[];
@@ -102,6 +116,7 @@ export class MangoClient {
   private idsSource: IdsSource;
   private postSendTxCallback?: ({ txid }) => void;
   private prioritizationFee: number;
+  private estimateFee: boolean;
   private txConfirmationCommitment: Commitment;
   private openbookFeesToDao: boolean;
   private prependedGlobalAdditionalInstructions: TransactionInstruction[] = [];
@@ -114,6 +129,7 @@ export class MangoClient {
   ) {
     this.idsSource = opts?.idsSource || 'get-program-accounts';
     this.prioritizationFee = opts?.prioritizationFee || 0;
+    this.estimateFee = opts?.estimateFee || false;
     this.postSendTxCallback = opts?.postSendTxCallback;
     this.openbookFeesToDao = opts?.openbookFeesToDao ?? true;
     this.prependedGlobalAdditionalInstructions =
@@ -140,13 +156,21 @@ export class MangoClient {
     ixs: TransactionInstruction[],
     opts: any = {},
   ): Promise<MangoSignatureStatus> {
+    let prioritizationFee: number;
+    if (opts.prioritizationFee) {
+      prioritizationFee = opts.prioritizationFee;
+    } else if (this.estimateFee) {
+      prioritizationFee = await this.estimatePrioritizationFee(ixs);
+    } else {
+      prioritizationFee = this.prioritizationFee;
+    }
     const status = await sendTransaction(
       this.program.provider as AnchorProvider,
       [...this.prependedGlobalAdditionalInstructions, ...ixs],
       opts.alts ?? [],
       {
         postSendTxCallback: this.postSendTxCallback,
-        prioritizationFee: this.prioritizationFee,
+        prioritizationFee,
         txConfirmationCommitment: this.txConfirmationCommitment,
         ...opts,
       },
@@ -172,7 +196,7 @@ export class MangoClient {
   ): Promise<MangoSignatureStatus> {
     const admin = (this.program.provider as AnchorProvider).wallet.publicKey;
     const ix = await this.program.methods
-      .admingTokenWithdrawFees()
+      .adminTokenWithdrawFees()
       .accounts({
         group: group.publicKey,
         bank: bank.publicKey,
@@ -237,8 +261,6 @@ export class MangoClient {
     feesSwapMangoAccount?: PublicKey,
     feesMngoTokenIndex?: TokenIndex,
     feesExpiryInterval?: BN,
-    tokenConditionalSwapTakerFeeFraction?: number,
-    tokenConditionalSwapMakerFeeFraction?: number,
   ): Promise<MangoSignatureStatus> {
     const ix = await this.program.methods
       .groupEdit(
@@ -253,8 +275,6 @@ export class MangoClient {
         feesSwapMangoAccount ?? null,
         feesMngoTokenIndex ?? null,
         feesExpiryInterval ?? null,
-        tokenConditionalSwapTakerFeeFraction ?? null,
-        tokenConditionalSwapMakerFeeFraction ?? null,
       )
       .accounts({
         group: group.publicKey,
@@ -361,37 +381,35 @@ export class MangoClient {
     group: Group,
     mintPk: PublicKey,
     oraclePk: PublicKey,
-    oracleConfig: OracleConfigParams,
     tokenIndex: number,
     name: string,
-    interestRateParams: InterestRateParams,
-    loanFeeRate: number,
-    loanOriginationFeeRate: number,
-    maintAssetWeight: number,
-    initAssetWeight: number,
-    maintLiabWeight: number,
-    initLiabWeight: number,
-    liquidationFee: number,
-    minVaultToDepositsRatio: number,
-    netBorrowLimitWindowSizeTs: number,
-    netBorrowLimitPerWindowQuote: number,
+    params: TokenRegisterParams,
   ): Promise<MangoSignatureStatus> {
     const ix = await this.program.methods
       .tokenRegister(
         tokenIndex,
         name,
-        oracleConfig,
-        interestRateParams,
-        loanFeeRate,
-        loanOriginationFeeRate,
-        maintAssetWeight,
-        initAssetWeight,
-        maintLiabWeight,
-        initLiabWeight,
-        liquidationFee,
-        minVaultToDepositsRatio,
-        new BN(netBorrowLimitWindowSizeTs),
-        new BN(netBorrowLimitPerWindowQuote),
+        params.oracleConfig,
+        params.interestRateParams,
+        params.loanFeeRate,
+        params.loanOriginationFeeRate,
+        params.maintAssetWeight,
+        params.initAssetWeight,
+        params.maintLiabWeight,
+        params.initLiabWeight,
+        params.liquidationFee,
+        params.stablePriceDelayIntervalSeconds,
+        params.stablePriceDelayGrowthLimit,
+        params.stablePriceGrowthLimit,
+        params.minVaultToDepositsRatio,
+        new BN(params.netBorrowLimitWindowSizeTs),
+        new BN(params.netBorrowLimitPerWindowQuote),
+        params.borrowWeightScaleStartQuote,
+        params.depositWeightScaleStartQuote,
+        params.reduceOnly,
+        params.tokenConditionalSwapTakerFeeRate,
+        params.tokenConditionalSwapMakerFeeRate,
+        params.flashLoanDepositFeeRate,
       )
       .accounts({
         group: group.publicKey,
@@ -464,6 +482,9 @@ export class MangoClient {
         params.reduceOnly,
         params.name,
         params.forceClose,
+        params.tokenConditionalSwapTakerFeeRate,
+        params.tokenConditionalSwapMakerFeeRate,
+        params.flashLoanDepositFeeRate,
       )
       .accounts({
         group: group.publicKey,
@@ -723,8 +744,8 @@ export class MangoClient {
       .accountCreate(
         accountNumber ?? 0,
         tokenCount ?? 8,
-        serum3Count ?? 8,
-        perpCount ?? 8,
+        serum3Count ?? 4,
+        perpCount ?? 4,
         perpOoCount ?? 32,
         name ?? '',
       )
@@ -810,9 +831,16 @@ export class MangoClient {
     mangoAccount: MangoAccount,
     name?: string,
     delegate?: PublicKey,
+    temporaryDelegate?: PublicKey,
+    delegateExpiry?: number,
   ): Promise<MangoSignatureStatus> {
     const ix = await this.program.methods
-      .accountEdit(name ?? null, delegate ?? null)
+      .accountEdit(
+        name ?? null,
+        delegate ?? null,
+        temporaryDelegate ?? null,
+        delegateExpiry ? new BN(delegateExpiry) : null,
+      )
       .accounts({
         group: group.publicKey,
         account: mangoAccount.publicKey,
@@ -3446,6 +3474,7 @@ export class MangoClient {
       true,
       false,
       expiryTimestamp,
+      thresholdPriceInSellPerBuyToken,
     );
   }
 
@@ -3493,6 +3522,7 @@ export class MangoClient {
       true,
       false,
       expiryTimestamp,
+      thresholdPriceInSellPerBuyToken,
     );
   }
 
@@ -3541,6 +3571,7 @@ export class MangoClient {
       false,
       allowMargin ?? false,
       expiryTimestamp,
+      thresholdPriceInSellPerBuyToken,
     );
   }
 
@@ -3589,6 +3620,7 @@ export class MangoClient {
       false,
       allowMargin ?? false,
       expiryTimestamp,
+      thresholdPriceInSellPerBuyToken,
     );
   }
 
@@ -3611,6 +3643,7 @@ export class MangoClient {
     allowCreatingDeposits: boolean,
     allowCreatingBorrows: boolean,
     expiryTimestamp: number | null,
+    displayPriceInSellTokenPerBuyToken: boolean,
   ): Promise<MangoSignatureStatus> {
     let maxBuy, maxSell, buyAmountInUsd, sellAmountInUsd;
     if (maxBuyUi == Number.MAX_SAFE_INTEGER) {
@@ -3636,9 +3669,6 @@ export class MangoClient {
       liqorTcsChunkSizeInUsd = 1000;
     }
 
-    const expiryTimestampBn =
-      expiryTimestamp !== null ? new BN(expiryTimestamp) : U64_MAX_BN;
-
     if (!pricePremium) {
       if (maxBuy.eq(U64_MAX_BN)) {
         maxSell.toNumber() * sellBank.uiPrice;
@@ -3656,18 +3686,73 @@ export class MangoClient {
           1) *
         100;
     }
-    const pricePremiumFraction = pricePremium > 0 ? pricePremium / 100 : 0.03;
+    const pricePremiumRate = pricePremium > 0 ? pricePremium / 100 : 0.03;
 
+    let intention: TokenConditionalSwapIntention;
+    switch (tcsIntention) {
+      case 'StopLossOnBorrow':
+      case 'StopLossOnDeposit':
+        intention = TokenConditionalSwapIntention.stopLoss;
+        break;
+      case 'TakeProfitOnBorrow':
+      case 'TakeProfitOnDeposit':
+        intention = TokenConditionalSwapIntention.takeProfit;
+        break;
+      default:
+        intention = TokenConditionalSwapIntention.unknown;
+        break;
+    }
+
+    return await this.tokenConditionalSwapCreateRaw(
+      group,
+      account,
+      buyBank.mint,
+      sellBank.mint,
+      maxBuy,
+      maxSell,
+      expiryTimestamp,
+      lowerLimit,
+      upperLimit,
+      pricePremiumRate,
+      allowCreatingDeposits,
+      allowCreatingBorrows,
+      displayPriceInSellTokenPerBuyToken
+        ? TokenConditionalSwapDisplayPriceStyle.sellTokenPerBuyToken
+        : TokenConditionalSwapDisplayPriceStyle.buyTokenPerSellToken,
+      intention,
+    );
+  }
+
+  public async tokenConditionalSwapCreateRaw(
+    group: Group,
+    account: MangoAccount,
+    buyMintPk: PublicKey,
+    sellMintPk: PublicKey,
+    maxBuy: BN,
+    maxSell: BN,
+    expiryTimestamp: number | null,
+    priceLowerLimit: number,
+    priceUpperLimit: number,
+    pricePremiumRate: number,
+    allowCreatingDeposits: boolean,
+    allowCreatingBorrows: boolean,
+    priceDisplayStyle: TokenConditionalSwapDisplayPriceStyle,
+    intention: TokenConditionalSwapIntention,
+  ): Promise<MangoSignatureStatus> {
+    const buyBank: Bank = group.getFirstBankByMint(buyMintPk);
+    const sellBank: Bank = group.getFirstBankByMint(sellMintPk);
     const tcsIx = await this.program.methods
-      .tokenConditionalSwapCreate(
+      .tokenConditionalSwapCreateV2(
         maxBuy,
         maxSell,
-        expiryTimestampBn,
-        lowerLimit,
-        upperLimit,
-        pricePremiumFraction,
+        expiryTimestamp !== null ? new BN(expiryTimestamp) : U64_MAX_BN,
+        priceLowerLimit,
+        priceUpperLimit,
+        pricePremiumRate,
         allowCreatingDeposits,
         allowCreatingBorrows,
+        priceDisplayStyle,
+        intention,
       )
       .accounts({
         group: group.publicKey,
@@ -3693,60 +3778,6 @@ export class MangoClient {
       );
     }
     ixs.push(tcsIx);
-
-    return await this.sendAndConfirmTransactionForGroup(group, ixs);
-  }
-
-  public async tokenConditionalSwapCreateRaw(
-    group: Group,
-    account: MangoAccount,
-    buyMintPk: PublicKey,
-    sellMintPk: PublicKey,
-    maxBuy: number,
-    maxSell: number,
-    expiryTimestamp: number | null,
-    priceLowerLimit: number,
-    priceUpperLimit: number,
-    pricePremiumFraction: number,
-    allowCreatingDeposits: boolean,
-    allowCreatingBorrows: boolean,
-  ): Promise<MangoSignatureStatus> {
-    const buyBank: Bank = group.getFirstBankByMint(buyMintPk);
-    const sellBank: Bank = group.getFirstBankByMint(sellMintPk);
-    const ix = await this.program.methods
-      .tokenConditionalSwapCreate(
-        new BN(maxBuy),
-        new BN(maxSell),
-        expiryTimestamp !== null ? new BN(expiryTimestamp) : U64_MAX_BN,
-        priceLowerLimit,
-        priceUpperLimit,
-        pricePremiumFraction,
-        allowCreatingDeposits,
-        allowCreatingBorrows,
-      )
-      .accounts({
-        group: group.publicKey,
-        account: account.publicKey,
-        authority: (this.program.provider as AnchorProvider).wallet.publicKey,
-        buyBank: buyBank.publicKey,
-        sellBank: sellBank.publicKey,
-      })
-      .instruction();
-
-    const ixs = [ix];
-    if (account.tokenConditionalSwaps.length == 0) {
-      ixs.push(
-        await this.accountExpandV2Ix(
-          group,
-          account,
-          account.tokens.length,
-          account.serum3.length,
-          account.perps.length,
-          account.perpOpenOrders.length,
-          8,
-        ),
-      );
-    }
 
     return await this.sendAndConfirmTransactionForGroup(group, ixs);
   }
@@ -4246,5 +4277,55 @@ export class MangoClient {
       group,
       transactionInstructions,
     );
+  }
+
+  /**
+   * Returns an estimate of a prioritization fee for a set of instructions.
+   *
+   * The estimate is based on the median fees of writable accounts that will be involved in the transaction.
+   *
+   * @param ixs - the instructions that make up the transaction
+   * @returns prioritizationFeeEstimate -- in microLamports
+   */
+  public async estimatePrioritizationFee(
+    ixs: TransactionInstruction[],
+  ): Promise<number> {
+    const writableAccounts = ixs
+      .map((x) => x.keys.filter((a) => a.isWritable).map((k) => k.pubkey))
+      .flat();
+    const uniqueWritableAccounts = uniq(
+      writableAccounts.map((x) => x.toBase58()),
+    )
+      .map((a) => new PublicKey(a))
+      .slice(0, MAX_RECENT_PRIORITY_FEE_ACCOUNTS);
+
+    const priorityFees = await this.connection.getRecentPrioritizationFees({
+      lockedWritableAccounts: uniqueWritableAccounts,
+    });
+
+    if (priorityFees.length < 1) {
+      return 1;
+    }
+
+    // get max priority fee per slot (and sort by slot from old to new)
+    const maxFeeBySlot = mapValues(groupBy(priorityFees, 'slot'), (items) =>
+      maxBy(items, 'prioritizationFee'),
+    );
+    const maximumFees = Object.values(maxFeeBySlot).sort(
+      (a: RecentPrioritizationFees, b: RecentPrioritizationFees) =>
+        a.slot - b.slot,
+    ) as RecentPrioritizationFees[];
+
+    // get median of last 20 fees
+    const recentFees = maximumFees.slice(Math.max(maximumFees.length - 20, 0));
+    const mid = Math.floor(recentFees.length / 2);
+    const medianFee =
+      recentFees.length % 2 !== 0
+        ? recentFees[mid].prioritizationFee
+        : (recentFees[mid - 1].prioritizationFee +
+            recentFees[mid].prioritizationFee) /
+          2;
+
+    return Math.max(1, Math.ceil(medianFee));
   }
 }

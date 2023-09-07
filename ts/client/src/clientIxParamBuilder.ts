@@ -2,6 +2,66 @@ import { BN } from '@coral-xyz/anchor';
 import { PublicKey } from '@solana/web3.js';
 import { InterestRateParams, OracleConfigParams } from './types';
 
+export interface TokenRegisterParams {
+  oracleConfig: OracleConfigParams;
+  groupInsuranceFund: boolean;
+  interestRateParams: InterestRateParams;
+  loanFeeRate: number;
+  loanOriginationFeeRate: number;
+  maintAssetWeight: number;
+  initAssetWeight: number;
+  maintLiabWeight: number;
+  initLiabWeight: number;
+  liquidationFee: number;
+  stablePriceDelayIntervalSeconds: number;
+  stablePriceDelayGrowthLimit: number;
+  stablePriceGrowthLimit: number;
+  minVaultToDepositsRatio: number;
+  netBorrowLimitPerWindowQuote: number;
+  netBorrowLimitWindowSizeTs: number;
+  borrowWeightScaleStartQuote: number;
+  depositWeightScaleStartQuote: number;
+  reduceOnly: number;
+  tokenConditionalSwapTakerFeeRate: number;
+  tokenConditionalSwapMakerFeeRate: number;
+  flashLoanDepositFeeRate: number;
+}
+
+export const DefaultTokenRegisterParams: TokenRegisterParams = {
+  oracleConfig: {
+    confFilter: 0,
+    maxStalenessSlots: null,
+  },
+  groupInsuranceFund: false,
+  interestRateParams: {
+    util0: 0.5,
+    rate0: 0.072,
+    util1: 0.8,
+    rate1: 0.2,
+    maxRate: 2,
+    adjustmentFactor: 0.004,
+  },
+  loanFeeRate: 0.0005,
+  loanOriginationFeeRate: 0.005,
+  maintAssetWeight: 0,
+  initAssetWeight: 0,
+  maintLiabWeight: 1.4,
+  initLiabWeight: 1.8,
+  liquidationFee: 0.2,
+  stablePriceDelayIntervalSeconds: 60 * 60,
+  stablePriceDelayGrowthLimit: 0.06,
+  stablePriceGrowthLimit: 0.0003,
+  minVaultToDepositsRatio: 0.2,
+  netBorrowLimitPerWindowQuote: 5_000_000_000,
+  netBorrowLimitWindowSizeTs: 86_400,
+  borrowWeightScaleStartQuote: 5_000_000_000,
+  depositWeightScaleStartQuote: 5_000_000_000,
+  reduceOnly: 0,
+  tokenConditionalSwapTakerFeeRate: 0.0005,
+  tokenConditionalSwapMakerFeeRate: 0.0005,
+  flashLoanDepositFeeRate: 0.0005,
+};
+
 export interface TokenEditParams {
   oracle: PublicKey | null;
   oracleConfig: OracleConfigParams | null;
@@ -27,6 +87,9 @@ export interface TokenEditParams {
   reduceOnly: number | null;
   name: string | null;
   forceClose: boolean | null;
+  tokenConditionalSwapTakerFeeRate: number | null;
+  tokenConditionalSwapMakerFeeRate: number | null;
+  flashLoanDepositFeeRate: number | null;
 }
 
 export const NullTokenEditParams: TokenEditParams = {
@@ -54,6 +117,9 @@ export const NullTokenEditParams: TokenEditParams = {
   reduceOnly: null,
   name: null,
   forceClose: null,
+  tokenConditionalSwapTakerFeeRate: null,
+  tokenConditionalSwapMakerFeeRate: null,
+  flashLoanDepositFeeRate: null,
 };
 
 export interface PerpEditParams {

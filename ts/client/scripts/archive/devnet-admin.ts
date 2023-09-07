@@ -8,6 +8,7 @@ import {
 import fs from 'fs';
 import { PerpMarketIndex } from '../../src/accounts/perp';
 import { MangoClient } from '../../src/client';
+import { DefaultTokenRegisterParams } from '../../src/clientIxParamBuilder';
 import { MANGO_V4_ID } from '../../src/constants';
 import { buildVersionedTx } from '../../src/utils';
 
@@ -36,8 +37,6 @@ const DEVNET_ORACLES = new Map([
 ]);
 
 // TODO: should these constants be baked right into client.ts or even program?
-const MIN_VAULT_TO_DEPOSITS_RATIO = 0.2;
-const NET_BORROWS_WINDOW_SIZE_TS = 24 * 60 * 60;
 const NET_BORROWS_LIMIT_NATIVE = 1 * Math.pow(10, 7) * Math.pow(10, 6);
 
 const GROUP_NUM = Number(process.env.GROUP_NUM || 0);
@@ -79,19 +78,6 @@ async function main() {
   const group = await client.getGroupForCreator(admin.publicKey, GROUP_NUM);
   console.log(`...registered group ${group.publicKey}`);
 
-  const defaultOracleConfig = {
-    confFilter: 0.1,
-    maxStalenessSlots: null,
-  };
-  const defaultInterestRate = {
-    adjustmentFactor: 0.004,
-    util0: 0.7,
-    rate0: 0.1,
-    util1: 0.85,
-    rate1: 0.2,
-    maxRate: 2.0,
-  };
-
   // stub usdc oracle + register token 0
   console.log(`Registering USDC...`);
   const usdcDevnetMint = new PublicKey(DEVNET_MINTS.get('USDC')!);
@@ -108,20 +94,17 @@ async function main() {
       group,
       usdcDevnetMint,
       usdcDevnetOracle.publicKey,
-      defaultOracleConfig,
       0, // tokenIndex
       'USDC',
-      defaultInterestRate,
-      0.005,
-      0.0005,
-      1,
-      1,
-      1,
-      1,
-      0,
-      MIN_VAULT_TO_DEPOSITS_RATIO,
-      NET_BORROWS_WINDOW_SIZE_TS,
-      NET_BORROWS_LIMIT_NATIVE,
+      {
+        ...DefaultTokenRegisterParams,
+        initAssetWeight: 1,
+        maintAssetWeight: 1,
+        initLiabWeight: 1,
+        maintLiabWeight: 1,
+        liquidationFee: 0,
+        netBorrowLimitPerWindowQuote: NET_BORROWS_LIMIT_NATIVE,
+      },
     );
     await group.reloadAll(client);
     const bank = group.getFirstBankByMint(usdcDevnetMint);
@@ -141,20 +124,17 @@ async function main() {
       group,
       solDevnetMint,
       solDevnetOracle,
-      defaultOracleConfig,
       1, // tokenIndex
       'SOL',
-      defaultInterestRate,
-      0.005,
-      0.0005,
-      0.9,
-      0.8,
-      1.1,
-      1.2,
-      0.05,
-      MIN_VAULT_TO_DEPOSITS_RATIO,
-      NET_BORROWS_WINDOW_SIZE_TS,
-      NET_BORROWS_LIMIT_NATIVE,
+      {
+        ...DefaultTokenRegisterParams,
+        maintAssetWeight: 0.9,
+        initAssetWeight: 0.8,
+        maintLiabWeight: 1.1,
+        initLiabWeight: 1.2,
+        liquidationFee: 0.05,
+        netBorrowLimitPerWindowQuote: NET_BORROWS_LIMIT_NATIVE,
+      },
     );
     await group.reloadAll(client);
     const bank = group.getFirstBankByMint(solDevnetMint);
@@ -212,7 +192,7 @@ async function main() {
       new PublicKey(DEVNET_ORACLES.get('BTC')!),
       0,
       'BTC-PERP',
-      defaultOracleConfig,
+      DefaultTokenRegisterParams.oracleConfig,
       6,
       10,
       100,

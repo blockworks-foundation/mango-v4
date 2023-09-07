@@ -30,13 +30,13 @@ pub fn perp_place_order(
             asks: ctx.accounts.asks.load_mut()?,
         };
 
-        let oracle_state;
-        (oracle_price, oracle_state) = perp_market.oracle_price_and_state(
+        let oracle_state = perp_market.oracle_state(
             &AccountInfoRef::borrow(ctx.accounts.oracle.as_ref())?,
             None, // staleness checked in health
         )?;
+        oracle_price = oracle_state.price;
 
-        perp_market.update_funding_and_stable_price(&book, oracle_price, oracle_state, now_ts)?;
+        perp_market.update_funding_and_stable_price(&book, &oracle_state, now_ts)?;
     }
 
     let mut account = ctx.accounts.account.load_full_mut()?;

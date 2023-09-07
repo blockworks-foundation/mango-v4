@@ -30,13 +30,10 @@ async fn test_position_lifetime() -> Result<(), TransportError> {
         solana,
         AccountCreateInstruction {
             account_num: 0,
-            token_count: 16,
-            serum3_count: 8,
-            perp_count: 8,
-            perp_oo_count: 8,
             group,
             owner,
             payer,
+            ..Default::default()
         },
     )
     .await

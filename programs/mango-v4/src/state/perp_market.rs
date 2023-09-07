@@ -255,29 +255,22 @@ impl PerpMarket {
         oracle_acc: &impl KeyedAccountReader,
         staleness_slot: Option<u64>,
     ) -> Result<I80F48> {
-        require_keys_eq!(self.oracle, *oracle_acc.key());
-        let (price, _) = oracle::oracle_price_and_state(
-            oracle_acc,
-            &self.oracle_config,
-            self.base_decimals,
-            staleness_slot,
-        )?;
-
-        Ok(price)
+        Ok(self.oracle_state(oracle_acc, staleness_slot)?.price)
     }
 
-    pub fn oracle_price_and_state(
+    pub fn oracle_state(
         &self,
         oracle_acc: &impl KeyedAccountReader,
         staleness_slot: Option<u64>,
-    ) -> Result<(I80F48, OracleState)> {
+    ) -> Result<OracleState> {
         require_keys_eq!(self.oracle, *oracle_acc.key());
-        oracle::oracle_price_and_state(
-            oracle_acc,
+        let state = oracle::oracle_state_unchecked(oracle_acc, self.base_decimals)?;
+        state.check_confidence_and_maybe_staleness(
+            &self.oracle,
             &self.oracle_config,
-            self.base_decimals,
             staleness_slot,
-        )
+        )?;
+        Ok(state)
     }
 
     pub fn stable_price(&self) -> I80F48 {
@@ -288,15 +281,14 @@ impl PerpMarket {
     pub fn update_funding_and_stable_price(
         &mut self,
         book: &Orderbook,
-        oracle_price: I80F48,
-        oracle_state: OracleState,
+        oracle_state: &OracleState,
         now_ts: u64,
     ) -> Result<()> {
         if now_ts <= self.funding_last_updated {
             return Ok(());
         }
 
-        let index_price = oracle_price;
+        let oracle_price = oracle_state.price;
         let oracle_price_lots = self.native_price_to_lot(oracle_price);
 
         // Get current book price & compare it to index price
@@ -312,7 +304,7 @@ impl PerpMarket {
                 // calculate mid-market rate
                 let mid_price = (bid + ask) / 2;
                 let book_price = self.lot_to_native_price(mid_price);
-                let diff = book_price / index_price - I80F48::ONE;
+                let diff = book_price / oracle_price - I80F48::ONE;
                 diff.clamp(self.min_funding, self.max_funding)
             }
             (Some(_bid), None) => self.max_funding,
@@ -332,7 +324,7 @@ impl PerpMarket {
         let base_lot_size = I80F48::from_num(self.base_lot_size);
 
         // The number of native quote that one base lot should pay in funding
-        let funding_delta = index_price * base_lot_size * funding_rate * time_factor;
+        let funding_delta = oracle_price * base_lot_size * funding_rate * time_factor;
 
         self.long_funding += funding_delta;
         self.short_funding += funding_delta;
@@ -348,7 +340,7 @@ impl PerpMarket {
             short_funding: self.short_funding.to_bits(),
             price: oracle_price.to_bits(),
             oracle_slot: oracle_state.last_update_slot,
-            oracle_confidence: oracle_state.confidence.to_bits(),
+            oracle_confidence: oracle_state.deviation.to_bits(),
             oracle_type: oracle_state.oracle_type,
             stable_price: self.stable_price().to_bits(),
             fees_accrued: self.fees_accrued.to_bits(),

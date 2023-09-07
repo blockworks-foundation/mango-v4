@@ -9,7 +9,7 @@ async fn test_health_compute_tokens() -> Result<(), TransportError> {
     let admin = TestKeypair::new();
     let owner = context.users[0].key;
     let payer = context.users[1].key;
-    let mints = &context.mints[0..10];
+    let mints = &context.mints[0..8];
 
     //
     // SETUP: Create a group and an account
@@ -28,7 +28,7 @@ async fn test_health_compute_tokens() -> Result<(), TransportError> {
     create_funded_account(&solana, group, owner, 0, &context.users[1], mints, 1000, 0).await;
 
     // TODO: actual explicit CU comparisons.
-    // On 2023-2-5 the final deposit costs 57622 CU and each new token increases it by roughly 2400 CU
+    // On 2023-8-18 the final deposit costs 56245 CU and each new token increases it by roughly 2800 CU
 
     Ok(())
 }
@@ -44,7 +44,7 @@ async fn test_health_compute_serum() -> Result<(), TransportError> {
     let admin = TestKeypair::new();
     let owner = context.users[0].key;
     let payer = context.users[1].key;
-    let mints = &context.mints[0..8];
+    let mints = &context.mints[0..5];
     let payer_mint_accounts = &context.users[1].token_accounts[0..mints.len()];
 
     //
@@ -64,13 +64,10 @@ async fn test_health_compute_serum() -> Result<(), TransportError> {
         solana,
         AccountCreateInstruction {
             account_num: 0,
-            token_count: 16,
-            serum3_count: 8,
-            perp_count: 8,
-            perp_oo_count: 8,
             group,
             owner,
             payer,
+            ..Default::default()
         },
     )
     .await
@@ -164,7 +161,7 @@ async fn test_health_compute_perp() -> Result<(), TransportError> {
     let admin = TestKeypair::new();
     let owner = context.users[0].key;
     let payer = context.users[1].key;
-    let mints = &context.mints[0..8];
+    let mints = &context.mints[0..5];
     let payer_mint_accounts = &context.users[1].token_accounts[0..mints.len()];
 
     //
@@ -266,7 +263,7 @@ async fn test_health_compute_perp() -> Result<(), TransportError> {
     }
 
     // TODO: actual explicit CU comparisons.
-    // On 2023-2-5 the final deposit costs 60732 CU and each new market increases it by roughly 3400 CU
+    // On 2023-8-18 the final deposit costs 51879 CU and each new market increases it by roughly 4100 CU
 
     Ok(())
 }

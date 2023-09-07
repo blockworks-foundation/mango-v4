@@ -121,6 +121,10 @@ export class Bank implements BankForHealth {
       depositWeightScaleStartQuote: number;
       reduceOnly: number;
       forceClose: number;
+      feesWithdrawn: BN;
+      tokenConditionalSwapTakerFeeRate: number;
+      tokenConditionalSwapMakerFeeRate: number;
+      flashLoanDepositFeeRate: number;
     },
   ): Bank {
     return new Bank(
@@ -168,6 +172,10 @@ export class Bank implements BankForHealth {
       obj.depositWeightScaleStartQuote,
       obj.reduceOnly,
       obj.forceClose == 1,
+      obj.feesWithdrawn,
+      obj.tokenConditionalSwapTakerFeeRate,
+      obj.tokenConditionalSwapMakerFeeRate,
+      obj.flashLoanDepositFeeRate,
     );
   }
 
@@ -216,6 +224,10 @@ export class Bank implements BankForHealth {
     public depositWeightScaleStartQuote: number,
     public reduceOnly: number,
     public forceClose: boolean,
+    public feesWithdrawn: BN,
+    public tokenConditionalSwapTakerFeeRate: number,
+    public tokenConditionalSwapMakerFeeRate: number,
+    public flashLoanDepositFeeRate: number,
   ) {
     this.name = utf8.decode(new Uint8Array(name)).split('\x00')[0];
     this.oracleConfig = {
