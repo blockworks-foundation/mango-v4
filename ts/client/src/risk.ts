@@ -73,7 +73,7 @@ export function computePriceImpactOnJup(
       (pi) => pi.symbol == tokenName && pi.target_amount == closestTo,
     );
     if (filteredPis.length > 0) {
-      return (filteredPis[0].max_price_impact_percent * 10000) / 100;
+      return (filteredPis[0].avg_price_impact_percent * 10000) / 100;
     } else {
       return -1;
     }

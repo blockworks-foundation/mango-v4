@@ -26,4 +26,5 @@ export * from './router';
 export * from './stats';
 export * from './types';
 export * from './utils';
+export * from './utils/rpc';
 export { Group, MANGO_V4_ID, MangoClient, OracleProvider, StubOracle };

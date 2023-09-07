@@ -138,7 +138,7 @@ export class Group {
       ),
       this.reloadMintInfos(client, ids),
       this.reloadSerum3Markets(client, ids).then(() =>
-        this.reloadSerum3ExternalMarkets(client),
+        this.reloadSerum3ExternalMarkets(client, ids),
       ),
     ]);
     // console.timeEnd('group.reload');
@@ -274,23 +274,63 @@ export class Group {
     );
   }
 
-  public async reloadSerum3ExternalMarkets(client: MangoClient): Promise<void> {
-    const externalMarkets = await Promise.all(
-      Array.from(this.serum3MarketsMapByExternal.values()).map((serum3Market) =>
-        Market.load(
-          client.program.provider.connection,
-          serum3Market.serumMarketExternal,
-          { commitment: client.program.provider.connection.commitment },
-          OPENBOOK_PROGRAM_ID[client.cluster],
+  public async reloadSerum3ExternalMarkets(
+    client: MangoClient,
+    ids?: Id,
+  ): Promise<void> {
+    let markets: Market[] = [];
+    const externalMarketIds = ids?.getSerum3ExternalMarkets();
+
+    if (ids && externalMarketIds && externalMarketIds.length) {
+      markets = await Promise.all(
+        (
+          await client.program.provider.connection.getMultipleAccountsInfo(
+            externalMarketIds,
+          )
+        ).map(
+          (account, index) =>
+            new Market(
+              Market.getLayout(OPENBOOK_PROGRAM_ID[client.cluster]).decode(
+                account?.data,
+              ),
+              ids.banks.find(
+                (b) =>
+                  b.tokenIndex ===
+                  this.serum3MarketsMapByExternal.get(
+                    externalMarketIds[index].toString(),
+                  )?.baseTokenIndex,
+              )?.decimals || 6,
+              ids.banks.find(
+                (b) =>
+                  b.tokenIndex ===
+                  this.serum3MarketsMapByExternal.get(
+                    externalMarketIds[index].toString(),
+                  )?.quoteTokenIndex,
+              )?.decimals || 6,
+              { commitment: client.program.provider.connection.commitment },
+              OPENBOOK_PROGRAM_ID[client.cluster],
+            ),
         ),
-      ),
-    );
+      );
+    } else {
+      markets = await Promise.all(
+        Array.from(this.serum3MarketsMapByExternal.values()).map(
+          (serum3Market) =>
+            Market.load(
+              client.program.provider.connection,
+              serum3Market.serumMarketExternal,
+              { commitment: client.program.provider.connection.commitment },
+              OPENBOOK_PROGRAM_ID[client.cluster],
+            ),
+        ),
+      );
+    }
 
     this.serum3ExternalMarketsMap = new Map(
       Array.from(this.serum3MarketsMapByExternal.values()).map(
         (serum3Market, index) => [
           serum3Market.serumMarketExternal.toBase58(),
-          externalMarkets[index],
+          markets[index],
         ],
       ),
     );
@@ -463,7 +503,6 @@ export class Group {
       await client.program.provider.connection.getMultipleAccountsInfo(
         vaultPks,
       );
-    const coder = new BorshAccountsCoder(client.program.idl);
     this.vaultAmountsMap = new Map(
       vaultAccounts.map((vaultAi, i) => {
         if (!vaultAi) {
