@@ -1,9 +1,24 @@
 import BN from 'bn.js';
 import { expect } from 'chai';
-import { U64_MAX_BN } from '../utils';
+import { U64_MAX_BN, roundTo5 } from '../utils';
 import { I80F48 } from './I80F48';
 
 describe('Math', () => {
+  it('round to accuracy 5', () => {
+    expect(roundTo5(0.012)).equals(0.012);
+    expect(roundTo5(0.0123456789)).equals(0.012345);
+    expect(roundTo5(0.123456789)).equals(0.12345);
+    expect(roundTo5(1.23456789)).equals(1.2345);
+    expect(roundTo5(12.3456789)).equals(12.345);
+    expect(roundTo5(123.456789)).equals(123.45);
+    expect(roundTo5(1234.56789)).equals(1234.5);
+    expect(roundTo5(12345.6789)).equals(12346);
+    expect(roundTo5(123456.789)).equals(123457);
+
+    expect(roundTo5(1.23)).equals(1.2299);
+    expect(roundTo5(1.2)).equals(1.1999);
+  });
+
   it('js number to BN and I80F48', () => {
     // BN can be only be created from js numbers which are <=2^53
     expect(function () {

@@ -58,11 +58,50 @@ pub struct FlashLoanTokenDetail {
     pub price: i128,
 }
 
+#[derive(AnchorSerialize, AnchorDeserialize)]
+pub struct FlashLoanTokenDetailV2 {
+    pub token_index: u16,
+
+    /// The amount by which the user's token position changed at the end
+    ///
+    /// So if the user repaid the approved_amount in full, it'd be 0.
+    ///
+    /// Does NOT include the loan_origination_fee or deposit_fee, so the true
+    /// change is `change_amount - loan_origination_fee - deposit_fee`.
+    pub change_amount: i128,
+
+    /// The amount that was a loan (<= approved_amount, depends on user's deposits)
+    pub loan: i128,
+
+    /// The fee paid on the loan, not included in `loan` or `change_amount`
+    pub loan_origination_fee: i128,
+
+    pub deposit_index: i128,
+    pub borrow_index: i128,
+    pub price: i128,
+
+    /// Deposit fee paid for positive change_amount.
+    ///
+    /// Not factored into change_amount.
+    pub deposit_fee: i128,
+
+    /// The amount that was transfered out to the user
+    pub approved_amount: u64,
+}
+
 #[event]
 pub struct FlashLoanLog {
     pub mango_group: Pubkey,
     pub mango_account: Pubkey,
     pub token_loan_details: Vec<FlashLoanTokenDetail>,
+    pub flash_loan_type: FlashLoanType,
+}
+
+#[event]
+pub struct FlashLoanLogV2 {
+    pub mango_group: Pubkey,
+    pub mango_account: Pubkey,
+    pub token_loan_details: Vec<FlashLoanTokenDetailV2>,
     pub flash_loan_type: FlashLoanType,
 }
 
@@ -485,13 +524,34 @@ pub struct TokenConditionalSwapCreateLog {
     pub expiry_timestamp: u64,
     pub price_lower_limit: f64,
     pub price_upper_limit: f64,
-    pub price_premium_fraction: f64,
-    pub taker_fee_fraction: f32,
-    pub maker_fee_fraction: f32,
+    pub price_premium_rate: f64,
+    pub taker_fee_rate: f32,
+    pub maker_fee_rate: f32,
     pub buy_token_index: u16,
     pub sell_token_index: u16,
     pub allow_creating_deposits: bool,
     pub allow_creating_borrows: bool,
+}
+
+#[event]
+pub struct TokenConditionalSwapCreateLogV2 {
+    pub mango_group: Pubkey,
+    pub mango_account: Pubkey,
+    pub id: u64,
+    pub max_buy: u64,
+    pub max_sell: u64,
+    pub expiry_timestamp: u64,
+    pub price_lower_limit: f64,
+    pub price_upper_limit: f64,
+    pub price_premium_rate: f64,
+    pub taker_fee_rate: f32,
+    pub maker_fee_rate: f32,
+    pub buy_token_index: u16,
+    pub sell_token_index: u16,
+    pub allow_creating_deposits: bool,
+    pub allow_creating_borrows: bool,
+    pub display_price_style: u8,
+    pub intention: u8,
 }
 
 #[event]
@@ -509,6 +569,25 @@ pub struct TokenConditionalSwapTriggerLog {
     pub buy_token_price: i128, // I80F48
     pub sell_token_price: i128, // I80F48
     pub closed: bool,
+}
+
+#[event]
+pub struct TokenConditionalSwapTriggerLogV2 {
+    pub mango_group: Pubkey,
+    pub liqee: Pubkey,
+    pub liqor: Pubkey,
+    pub token_conditional_swap_id: u64,
+    pub buy_token_index: u16,
+    pub sell_token_index: u16,
+    pub buy_amount: u64,        // amount the liqee got
+    pub sell_amount: u64,       // amount the liqee paid (including fees)
+    pub maker_fee: u64,         // in native units of sell token (included in sell amount)
+    pub taker_fee: u64, // in native units of sell token (deducted from the sell amount the liqor received)
+    pub buy_token_price: i128, // I80F48
+    pub sell_token_price: i128, // I80F48
+    pub closed: bool,
+    pub display_price_style: u8,
+    pub intention: u8,
 }
 
 #[event]

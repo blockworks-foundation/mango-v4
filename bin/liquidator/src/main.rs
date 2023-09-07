@@ -7,9 +7,8 @@ use anchor_client::Cluster;
 use clap::Parser;
 use mango_v4::state::{PerpMarketIndex, TokenIndex};
 use mango_v4_client::{
-    account_update_stream, chain_data, keypair_from_cli, snapshot_source, websocket_source,
-    AsyncChannelSendUnlessFull, Client, MangoClient, MangoClientError, MangoGroupContext,
-    TransactionBuilderConfig,
+    account_update_stream, chain_data, keypair_from_cli, snapshot_source, websocket_source, Client,
+    MangoClient, MangoClientError, MangoGroupContext, TransactionBuilderConfig,
 };
 
 use itertools::Itertools;
@@ -20,11 +19,12 @@ use tracing::*;
 pub mod liquidate;
 pub mod metrics;
 pub mod rebalance;
+pub mod telemetry;
 pub mod token_swap_info;
 pub mod trigger_tcs;
 pub mod util;
 
-use crate::util::{is_mango_account, is_mango_bank, is_mint_info, is_perp_market};
+use crate::util::{is_mango_account, is_mint_info, is_perp_market};
 
 // jemalloc seems to be better at keeping the memory footprint reasonable over
 // longer periods of time
@@ -90,11 +90,23 @@ struct Cli {
     #[clap(long, env, default_value = "0")]
     prioritization_micro_lamports: u64,
 
+    /// compute limit requested for liquidation instructions
+    #[clap(long, env, default_value = "250000")]
+    compute_limit_for_liquidation: u32,
+
+    /// compute limit requested for tcs trigger instructions
+    #[clap(long, env, default_value = "300000")]
+    compute_limit_for_tcs: u32,
+
     /// use a jupiter mock instead of actual queries
     ///
     /// This is required for devnet testing.
     #[clap(long, env, value_enum, default_value = "false")]
     mock_jupiter: BoolArg,
+
+    /// report liquidator's existence and pubkey
+    #[clap(long, env, value_enum, default_value = "true")]
+    telemetry: BoolArg,
 }
 
 pub fn encode_address(addr: &Pubkey) -> String {
@@ -204,7 +216,7 @@ async fn main() -> anyhow::Result<()> {
             mango_group,
             get_multiple_accounts_count: cli.get_multiple_accounts_count,
             parallel_rpc_requests: cli.parallel_rpc_requests,
-            snapshot_interval: std::time::Duration::from_secs(cli.snapshot_interval_secs),
+            snapshot_interval: Duration::from_secs(cli.snapshot_interval_secs),
             min_slot: first_websocket_slot + 10,
         },
         mango_oracles,
@@ -242,6 +254,7 @@ async fn main() -> anyhow::Result<()> {
     let liq_config = liquidate::Config {
         min_health_ratio: cli.min_health_ratio,
         mock_jupiter: cli.mock_jupiter == BoolArg::True,
+        compute_limit_for_liq_ix: cli.compute_limit_for_liquidation,
         // TODO: config
         refresh_timeout: Duration::from_secs(30),
     };
@@ -250,6 +263,7 @@ async fn main() -> anyhow::Result<()> {
         min_health_ratio: cli.min_health_ratio,
         max_trigger_quote_amount: 1_000_000_000, // TODO: config, $1000
         mock_jupiter: cli.mock_jupiter == BoolArg::True,
+        compute_limit_for_trigger: cli.compute_limit_for_tcs,
         // TODO: config
         refresh_timeout: Duration::from_secs(30),
     };
@@ -271,7 +285,7 @@ async fn main() -> anyhow::Result<()> {
     });
 
     let mut liquidation = Box::new(LiquidationState {
-        mango_client,
+        mango_client: mango_client.clone(),
         account_fetcher,
         liquidation_config: liq_config,
         trigger_tcs_config: tcs_config,
@@ -279,20 +293,28 @@ async fn main() -> anyhow::Result<()> {
         token_swap_info: token_swap_info_updater.clone(),
         liq_errors: ErrorTracking {
             skip_threshold: 5,
-            skip_duration: std::time::Duration::from_secs(120),
-            reset_duration: std::time::Duration::from_secs(360),
+            skip_duration: Duration::from_secs(120),
             ..ErrorTracking::default()
         },
-        tcs_errors: ErrorTracking {
+        tcs_collection_hard_errors: ErrorTracking {
             skip_threshold: 2,
-            skip_duration: std::time::Duration::from_secs(120),
-            reset_duration: std::time::Duration::from_secs(360),
+            skip_duration: Duration::from_secs(120),
             ..ErrorTracking::default()
         },
+        tcs_collection_partial_errors: ErrorTracking {
+            skip_threshold: 2,
+            skip_duration: Duration::from_secs(120),
+            ..ErrorTracking::default()
+        },
+        tcs_execution_errors: ErrorTracking {
+            skip_threshold: 2,
+            skip_duration: Duration::from_secs(120),
+            ..ErrorTracking::default()
+        },
+        persistent_error_report_interval: Duration::from_secs(300),
+        persistent_error_min_duration: Duration::from_secs(300),
+        last_persistent_error_report: Instant::now(),
     });
-
-    let (liquidation_trigger_sender, liquidation_trigger_receiver) =
-        async_channel::bounded::<()>(1);
 
     info!("main loop");
 
@@ -333,29 +355,6 @@ async fn main() -> anyhow::Result<()> {
                             // Track all MangoAccounts: we need to iterate over them later
                             state.mango_accounts.insert(account_write.pubkey);
                             metric_mango_accounts.set(state.mango_accounts.len() as u64);
-
-                            if !state.health_check_all {
-                                state.health_check_accounts.push(account_write.pubkey);
-                            }
-                            liquidation_trigger_sender.send_unless_full(()).unwrap();
-                        } else {
-                            let mut must_check_all = false;
-                            if is_mango_bank(&account_write.account, &mango_group).is_some() {
-                                debug!("change to bank {}", &account_write.pubkey);
-                                must_check_all = true;
-                            }
-                            if is_perp_market(&account_write.account, &mango_group).is_some() {
-                                debug!("change to perp market {}", &account_write.pubkey);
-                                must_check_all = true;
-                            }
-                            if oracles.contains(&account_write.pubkey) {
-                                debug!("change to oracle {}", &account_write.pubkey);
-                                must_check_all = true;
-                            }
-                            if must_check_all {
-                                state.health_check_all = true;
-                                liquidation_trigger_sender.send_unless_full(()).unwrap();
-                            }
                         }
                     }
                     Message::Snapshot(snapshot) => {
@@ -378,9 +377,6 @@ async fn main() -> anyhow::Result<()> {
                         metric_mango_accounts.set(state.mango_accounts.len() as u64);
 
                         state.one_snapshot_done = true;
-                        state.health_check_all = true;
-
-                        liquidation_trigger_sender.send_unless_full(()).unwrap();
                     }
                     _ => {}
                 }
@@ -412,25 +408,22 @@ async fn main() -> anyhow::Result<()> {
     });
 
     let liquidation_job = tokio::spawn({
+        // TODO: configurable interval
+        let mut interval = tokio::time::interval(Duration::from_secs(5));
         let shared_state = shared_state.clone();
         async move {
             loop {
-                liquidation_trigger_receiver.recv().await.unwrap();
+                interval.tick().await;
 
-                let account_addresses;
-                {
-                    let mut state = shared_state.write().unwrap();
+                let account_addresses = {
+                    let state = shared_state.write().unwrap();
                     if !state.one_snapshot_done {
                         continue;
                     }
-                    account_addresses = if state.health_check_all {
-                        state.mango_accounts.iter().cloned().collect()
-                    } else {
-                        state.health_check_accounts.clone()
-                    };
-                    state.health_check_all = false;
-                    state.health_check_accounts = vec![];
-                }
+                    state.mango_accounts.iter().cloned().collect_vec()
+                };
+
+                liquidation.log_persistent_errors();
 
                 let liquidated = liquidation
                     .maybe_liquidate_one_and_rebalance(account_addresses.iter())
@@ -454,9 +447,12 @@ async fn main() -> anyhow::Result<()> {
         let shared_state = shared_state.clone();
         async move {
             loop {
+                min_delay.tick().await;
                 if !shared_state.read().unwrap().one_snapshot_done {
                     continue;
                 }
+
+                interval.tick().await;
                 let token_indexes = token_swap_info_updater
                     .mango_client()
                     .context
@@ -465,23 +461,27 @@ async fn main() -> anyhow::Result<()> {
                     .copied()
                     .collect_vec();
                 for token_index in token_indexes {
+                    min_delay.tick().await;
                     match token_swap_info_updater.update_one(token_index).await {
                         Ok(()) => {}
                         Err(err) => {
                             warn!(
-                                "failed to update token swap info for token {token_index}: {:?}",
-                                err
+                                "failed to update token swap info for token {token_index}: {err:?}",
                             );
                         }
                     }
-                    min_delay.tick().await;
                 }
                 token_swap_info_updater.log_all();
-
-                interval.tick().await;
             }
         }
     });
+
+    if cli.telemetry == BoolArg::True {
+        tokio::spawn(telemetry::report_regularly(
+            mango_client,
+            cli.min_health_ratio,
+        ));
+    }
 
     use futures::StreamExt;
     let mut jobs: futures::stream::FuturesUnordered<_> = vec![
@@ -506,26 +506,20 @@ struct SharedState {
 
     /// Is the first snapshot done? Only start checking account health when it is.
     one_snapshot_done: bool,
-
-    /// Accounts whose health might have changed
-    health_check_accounts: Vec<Pubkey>,
-
-    /// Check all accounts?
-    health_check_all: bool,
 }
 
 #[derive(Clone)]
-struct AccountErrorState {
-    count: u64,
-    last_at: std::time::Instant,
+pub struct AccountErrorState {
+    pub messages: Vec<String>,
+    pub count: u64,
+    pub last_at: Instant,
 }
 
 #[derive(Default)]
-struct ErrorTracking {
+pub struct ErrorTracking {
     accounts: HashMap<Pubkey, AccountErrorState>,
     skip_threshold: u64,
-    skip_duration: std::time::Duration,
-    reset_duration: std::time::Duration,
+    skip_duration: Duration,
 }
 
 impl ErrorTracking {
@@ -543,20 +537,41 @@ impl ErrorTracking {
         }
     }
 
-    pub fn record_error(&mut self, pubkey: &Pubkey, now: Instant) {
+    pub fn record_error(&mut self, pubkey: &Pubkey, now: Instant, message: String) {
         let error_entry = self.accounts.entry(*pubkey).or_insert(AccountErrorState {
+            messages: Vec::with_capacity(1),
             count: 0,
             last_at: now,
         });
-        if now.duration_since(error_entry.last_at) > self.reset_duration {
-            error_entry.count = 0;
-        }
         error_entry.count += 1;
         error_entry.last_at = now;
+        if !error_entry.messages.contains(&message) {
+            error_entry.messages.push(message);
+        }
+        if error_entry.messages.len() > 5 {
+            error_entry.messages.remove(0);
+        }
     }
 
     pub fn clear_errors(&mut self, pubkey: &Pubkey) {
         self.accounts.remove(pubkey);
+    }
+
+    #[instrument(skip_all, fields(%error_type))]
+    #[allow(unused_variables)]
+    pub fn log_persistent_errors(&self, error_type: &str, min_duration: Duration) {
+        let now = Instant::now();
+        for (pubkey, errors) in self.accounts.iter() {
+            if now.duration_since(errors.last_at) < min_duration {
+                continue;
+            }
+            info!(
+                %pubkey,
+                count = errors.count,
+                messages = ?errors.messages,
+                "has persistent errors",
+            );
+        }
     }
 }
 
@@ -567,8 +582,16 @@ struct LiquidationState {
     token_swap_info: Arc<token_swap_info::TokenSwapInfoUpdater>,
     liquidation_config: liquidate::Config,
     trigger_tcs_config: trigger_tcs::Config,
+
     liq_errors: ErrorTracking,
-    tcs_errors: ErrorTracking,
+    /// Errors that suggest we maybe should skip trying to collect tcs for that pubkey
+    tcs_collection_hard_errors: ErrorTracking,
+    /// Recording errors when some tcs have errors during collection but others don't
+    tcs_collection_partial_errors: ErrorTracking,
+    tcs_execution_errors: ErrorTracking,
+    persistent_error_report_interval: Duration,
+    last_persistent_error_report: Instant,
+    persistent_error_min_duration: Duration,
 }
 
 impl LiquidationState {
@@ -606,14 +629,15 @@ impl LiquidationState {
     }
 
     async fn maybe_liquidate_and_log_error(&mut self, pubkey: &Pubkey) -> anyhow::Result<bool> {
-        let now = std::time::Instant::now();
+        let now = Instant::now();
         let error_tracking = &mut self.liq_errors;
 
         // Skip a pubkey if there've been too many errors recently
         if let Some(error_entry) = error_tracking.had_too_many_errors(pubkey, now) {
             trace!(
-                "skip checking account {pubkey}, had {} errors recently",
-                error_entry.count
+                %pubkey,
+                error_entry.count,
+                "skip checking account for liquidation, had errors recently",
             );
             return Ok(false);
         }
@@ -628,7 +652,7 @@ impl LiquidationState {
 
         if let Err(err) = result.as_ref() {
             // Keep track of pubkeys that had errors
-            error_tracking.record_error(pubkey, now);
+            error_tracking.record_error(pubkey, now, err.to_string());
 
             // Not all errors need to be raised to the user's attention.
             let mut is_error = true;
@@ -661,27 +685,89 @@ impl LiquidationState {
         &mut self,
         accounts_iter: impl Iterator<Item = &'b Pubkey>,
     ) -> anyhow::Result<()> {
-        use rand::seq::SliceRandom;
+        let accounts = accounts_iter.collect::<Vec<&Pubkey>>();
 
-        let mut accounts = accounts_iter.collect::<Vec<&Pubkey>>();
-        {
-            let mut rng = rand::thread_rng();
-            accounts.shuffle(&mut rng);
-        }
+        let now = Instant::now();
+        let now_ts: u64 = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)?
+            .as_secs()
+            .try_into()?;
 
-        let mut took_one = false;
-        for pubkey in accounts {
-            if self
-                .maybe_take_conditional_swap_and_log_error(pubkey)
-                .await
-                .unwrap_or(false)
+        // Find interesting (pubkey, tcsid, volume)
+        let mut interesting_tcs = Vec::with_capacity(accounts.len());
+        for pubkey in accounts.iter() {
+            if let Some(error_entry) = self
+                .tcs_collection_hard_errors
+                .had_too_many_errors(pubkey, now)
             {
-                took_one = true;
-                break;
+                trace!(
+                    %pubkey,
+                    error_entry.count,
+                    "skip checking account for tcs, had errors recently",
+                );
+                continue;
+            }
+
+            match trigger_tcs::find_interesting_tcs_for_account(
+                pubkey,
+                &self.mango_client,
+                &self.account_fetcher,
+                &self.token_swap_info,
+                now_ts,
+            ) {
+                Ok(v) => {
+                    self.tcs_collection_hard_errors.clear_errors(pubkey);
+                    if v.is_empty() {
+                        self.tcs_collection_partial_errors.clear_errors(pubkey);
+                        self.tcs_execution_errors.clear_errors(pubkey);
+                    } else if v.iter().all(|it| it.is_ok()) {
+                        self.tcs_collection_partial_errors.clear_errors(pubkey);
+                    } else {
+                        for it in v.iter() {
+                            if let Err(e) = it {
+                                self.tcs_collection_partial_errors.record_error(
+                                    pubkey,
+                                    now,
+                                    e.to_string(),
+                                );
+                            }
+                        }
+                    }
+                    interesting_tcs.extend(v.iter().filter_map(|it| it.as_ref().ok()));
+                }
+                Err(e) => {
+                    self.tcs_collection_hard_errors
+                        .record_error(pubkey, now, e.to_string());
+                }
             }
         }
-        if !took_one {
+        if interesting_tcs.is_empty() {
             return Ok(());
+        }
+
+        let tcs_context = trigger_tcs::ExecutionContext {
+            mango_client: self.mango_client.clone(),
+            account_fetcher: self.account_fetcher.clone(),
+            token_swap_info: self.token_swap_info.clone(),
+            config: self.trigger_tcs_config.clone(),
+        };
+        let (txsigs, mut changed_pubkeys) = tcs_context
+            .execute_tcs(&mut interesting_tcs, &mut self.tcs_execution_errors)
+            .await?;
+        changed_pubkeys.push(self.mango_client.mango_account_address);
+
+        // Force a refresh of affected accounts
+        let slot = self.account_fetcher.transaction_max_slot(&txsigs).await?;
+        if let Err(e) = self
+            .account_fetcher
+            .refresh_accounts_via_rpc_until_slot(
+                &changed_pubkeys,
+                slot,
+                self.liquidation_config.refresh_timeout,
+            )
+            .await
+        {
+            info!(slot, "could not refresh after tcs execution: {}", e);
         }
 
         if let Err(err) = self.rebalancer.zero_all_non_quote().await {
@@ -690,66 +776,29 @@ impl LiquidationState {
         Ok(())
     }
 
-    async fn maybe_take_conditional_swap_and_log_error(
-        &mut self,
-        pubkey: &Pubkey,
-    ) -> anyhow::Result<bool> {
-        let now = std::time::Instant::now();
-        let error_tracking = &mut self.tcs_errors;
-
-        // Skip a pubkey if there've been too many errors recently
-        if let Some(error_entry) = error_tracking.had_too_many_errors(pubkey, now) {
-            trace!(
-                "skip checking for tcs on account {pubkey}, had {} errors recently",
-                error_entry.count
-            );
-            return Ok(false);
+    fn log_persistent_errors(&mut self) {
+        let now = Instant::now();
+        if now.duration_since(self.last_persistent_error_report)
+            < self.persistent_error_report_interval
+        {
+            return;
         }
+        self.last_persistent_error_report = now;
 
-        let result = trigger_tcs::maybe_execute_token_conditional_swap(
-            &self.mango_client,
-            &self.account_fetcher,
-            &self.token_swap_info,
-            pubkey,
-            &self.trigger_tcs_config,
-        )
-        .await;
-
-        if let Err(err) = result.as_ref() {
-            // Keep track of pubkeys that had errors
-            error_tracking.record_error(pubkey, now);
-
-            // Not all errors need to be raised to the user's attention.
-            let mut is_error = true;
-
-            // Simulation errors due to liqee precondition failures
-            // will commonly happen if our liquidator is late or if there are chain forks.
-            match err.downcast_ref::<MangoClientError>() {
-                Some(MangoClientError::SendTransactionPreflightFailure { logs, .. }) => {
-                    if logs
-                        .iter()
-                        .any(|line| line.contains("TokenConditionalSwapPriceNotInRange"))
-                    {
-                        is_error = false;
-                    }
-                }
-                _ => {}
-            };
-            if is_error {
-                error!("token conditional swap on account {}: {:?}", pubkey, err);
-            } else {
-                trace!("token conditional swap on account {}: {:?}", pubkey, err);
-            }
-        } else {
-            error_tracking.clear_errors(pubkey);
-        }
-
-        result
+        let min_duration = self.persistent_error_min_duration;
+        self.liq_errors
+            .log_persistent_errors("liquidation", min_duration);
+        self.tcs_execution_errors
+            .log_persistent_errors("tcs execution", min_duration);
+        self.tcs_collection_hard_errors
+            .log_persistent_errors("tcs collection hard", min_duration);
+        self.tcs_collection_partial_errors
+            .log_persistent_errors("tcs collection partial", min_duration);
     }
 }
 
 fn start_chain_data_metrics(chain: Arc<RwLock<chain_data::ChainData>>, metrics: &metrics::Metrics) {
-    let mut interval = tokio::time::interval(std::time::Duration::from_secs(600));
+    let mut interval = tokio::time::interval(Duration::from_secs(600));
 
     let mut metric_slots_count = metrics.register_u64("chain_data_slots_count".into());
     let mut metric_accounts_count = metrics.register_u64("chain_data_accounts_count".into());

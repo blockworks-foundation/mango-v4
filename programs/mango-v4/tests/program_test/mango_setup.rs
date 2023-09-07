@@ -163,13 +163,10 @@ pub async fn create_funded_account(
         solana,
         AccountCreateInstruction {
             account_num,
-            token_count: 16,
-            serum3_count: 8,
-            perp_count: 8,
-            perp_oo_count: 8,
             group,
             owner,
             payer: payer.key,
+            ..Default::default()
         },
     )
     .await

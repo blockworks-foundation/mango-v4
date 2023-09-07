@@ -6,6 +6,7 @@
 for pair_str in \
         "TokenIndex u16" \
         "Serum3MarketIndex u16" \
+        "OpenbookV2MarketIndex u16" \
         "PerpMarketIndex u16" \
         "usize u64" \
         "NodeHandle u32" \

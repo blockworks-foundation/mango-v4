@@ -39,8 +39,12 @@ export async function getLargestPerpPositions(
 
   allPps.sort(
     (a, b) =>
-      b.getNotionalValueUi(group.getPerpMarketByMarketIndex(b.marketIndex)) -
-      a.getNotionalValueUi(group.getPerpMarketByMarketIndex(a.marketIndex)),
+      Math.abs(
+        b.getNotionalValueUi(group.getPerpMarketByMarketIndex(b.marketIndex)),
+      ) -
+      Math.abs(
+        a.getNotionalValueUi(group.getPerpMarketByMarketIndex(a.marketIndex)),
+      ),
   );
 
   return allPps.map((pp) => ({

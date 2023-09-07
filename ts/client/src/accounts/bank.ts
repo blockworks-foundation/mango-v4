@@ -1,7 +1,7 @@
 import { BN } from '@coral-xyz/anchor';
 import { utf8 } from '@coral-xyz/anchor/dist/cjs/utils/bytes';
 import { PublicKey } from '@solana/web3.js';
-import { I80F48, I80F48Dto, ZERO_I80F48 } from '../numbers/I80F48';
+import { I80F48, I80F48Dto, ONE_I80F48, ZERO_I80F48 } from '../numbers/I80F48';
 import { As, toUiDecimals } from '../utils';
 import { OracleProvider } from './oracle';
 
@@ -121,6 +121,10 @@ export class Bank implements BankForHealth {
       depositWeightScaleStartQuote: number;
       reduceOnly: number;
       forceClose: number;
+      feesWithdrawn: BN;
+      tokenConditionalSwapTakerFeeRate: number;
+      tokenConditionalSwapMakerFeeRate: number;
+      flashLoanDepositFeeRate: number;
     },
   ): Bank {
     return new Bank(
@@ -168,6 +172,10 @@ export class Bank implements BankForHealth {
       obj.depositWeightScaleStartQuote,
       obj.reduceOnly,
       obj.forceClose == 1,
+      obj.feesWithdrawn,
+      obj.tokenConditionalSwapTakerFeeRate,
+      obj.tokenConditionalSwapMakerFeeRate,
+      obj.flashLoanDepositFeeRate,
     );
   }
 
@@ -202,8 +210,8 @@ export class Bank implements BankForHealth {
     initLiabWeight: I80F48Dto,
     liquidationFee: I80F48Dto,
     dust: I80F48Dto,
-    flashLoanTokenAccountInitial: BN,
-    flashLoanApprovedAmount: BN,
+    public flashLoanTokenAccountInitial: BN,
+    public flashLoanApprovedAmount: BN,
     public tokenIndex: TokenIndex,
     public mintDecimals: number,
     public bankNum: number,
@@ -216,6 +224,10 @@ export class Bank implements BankForHealth {
     public depositWeightScaleStartQuote: number,
     public reduceOnly: number,
     public forceClose: boolean,
+    public feesWithdrawn: BN,
+    public tokenConditionalSwapTakerFeeRate: number,
+    public tokenConditionalSwapMakerFeeRate: number,
+    public flashLoanDepositFeeRate: number,
   ) {
     this.name = utf8.decode(new Uint8Array(name)).split('\x00')[0];
     this.oracleConfig = {
@@ -352,6 +364,14 @@ export class Bank implements BankForHealth {
     );
   }
 
+  getAssetPrice(): I80F48 {
+    return this.price.min(I80F48.fromNumber(this.stablePriceModel.stablePrice));
+  }
+
+  getLiabPrice(): I80F48 {
+    return this.price.max(I80F48.fromNumber(this.stablePriceModel.stablePrice));
+  }
+
   get price(): I80F48 {
     if (this._price === undefined) {
       throw new Error(
@@ -397,17 +417,11 @@ export class Bank implements BankForHealth {
   }
 
   uiDeposits(): number {
-    return toUiDecimals(
-      this.indexedDeposits.mul(this.depositIndex),
-      this.mintDecimals,
-    );
+    return toUiDecimals(this.nativeDeposits(), this.mintDecimals);
   }
 
   uiBorrows(): number {
-    return toUiDecimals(
-      this.indexedBorrows.mul(this.borrowIndex),
-      this.mintDecimals,
-    );
+    return toUiDecimals(this.nativeBorrows(), this.mintDecimals);
   }
 
   /**
@@ -480,6 +494,48 @@ export class Bank implements BankForHealth {
    */
   getDepositRateUi(): number {
     return this.getDepositRate().toNumber() * 100;
+  }
+
+  getNetBorrowLimitPerWindow(): I80F48 {
+    return I80F48.fromI64(this.netBorrowLimitPerWindowQuote).div(this.price);
+  }
+
+  getBorrowLimitLeftInWindow(): I80F48 {
+    return this.getNetBorrowLimitPerWindow()
+      .sub(I80F48.fromI64(this.netBorrowsInWindow))
+      .max(ZERO_I80F48());
+  }
+
+  getNetBorrowLimitPerWindowUi(): number {
+    return toUiDecimals(this.getNetBorrowLimitPerWindow(), this.mintDecimals);
+  }
+
+  getMaxWithdraw(vaultBalance: BN, userDeposits = ZERO_I80F48()): I80F48 {
+    userDeposits = userDeposits.max(ZERO_I80F48());
+
+    // any borrow must respect the minVaultToDepositsRatio
+    const minVaultBalanceRequired = this.nativeDeposits().mul(
+      I80F48.fromNumber(this.minVaultToDepositsRatio),
+    );
+    const maxBorrowFromVault = I80F48.fromI64(vaultBalance)
+      .sub(minVaultBalanceRequired)
+      .max(ZERO_I80F48());
+    // User deposits can exceed maxWithdrawFromVault
+    let maxBorrow = maxBorrowFromVault.sub(userDeposits).max(ZERO_I80F48());
+    // any borrow must respect the limit left in window
+    maxBorrow = maxBorrow.min(this.getBorrowLimitLeftInWindow());
+    // borrows would be applied a fee
+    maxBorrow = maxBorrow.div(ONE_I80F48().add(this.loanOriginationFeeRate));
+
+    // user deposits can always be withdrawn
+    // even if vaults can be depleted
+    return maxBorrow.add(userDeposits).min(I80F48.fromI64(vaultBalance));
+  }
+
+  getTimeToNextBorrowLimitWindowStartsTs(): number {
+    return this.netBorrowLimitWindowSizeTs
+      .sub(new BN(Date.now() / 1000).sub(this.lastNetBorrowsWindowStartTs))
+      .toNumber();
   }
 }
 
