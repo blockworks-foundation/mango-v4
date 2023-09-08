@@ -38,6 +38,10 @@ async function main(): Promise<void> {
     );
 
     let account = await client.getMangoAccount(new PublicKey(MANGO_ACCOUNT_PK));
+    account
+      .tokenConditionalSwapsActive()
+      .forEach((tcs) => console.log(tcs.toString(group)));
+
     await Promise.all(
       account.tokenConditionalSwaps.map((tcs, i) => {
         if (!tcs.hasData) {
