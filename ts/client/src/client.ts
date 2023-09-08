@@ -3692,7 +3692,9 @@ export class MangoClient {
       pricePremiumRate,
       allowCreatingDeposits,
       allowCreatingBorrows,
-      displayPriceInSellTokenPerBuyToken,
+      displayPriceInSellTokenPerBuyToken
+        ? TokenConditionalSwapDisplayPriceStyle.sellTokenPerBuyToken
+        : TokenConditionalSwapDisplayPriceStyle.buyTokenPerSellToken,
       intention,
     );
   }
