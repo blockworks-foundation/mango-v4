@@ -1823,7 +1823,7 @@ export class TokenConditionalSwap {
       dto.hasData == 1,
       dto.allowCreatingDeposits == 1,
       dto.allowCreatingBorrows == 1,
-      dto.priceDisplayStyle == 0
+      dto.displayPriceStyle == 0
         ? TokenConditionalSwapDisplayPriceStyle.sellTokenPerBuyToken
         : TokenConditionalSwapDisplayPriceStyle.buyTokenPerSellToken,
       tokenConditionalSwapIntentionFromDto(dto.intention),
@@ -2070,7 +2070,7 @@ export class TokenConditionalSwapDto {
     public hasData: number,
     public allowCreatingDeposits: number,
     public allowCreatingBorrows: number,
-    public priceDisplayStyle: number,
+    public displayPriceStyle: number,
     public intention: number,
   ) {}
 }
