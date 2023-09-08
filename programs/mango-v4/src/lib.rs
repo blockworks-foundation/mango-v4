@@ -1287,8 +1287,102 @@ pub mod mango_v4 {
             intention: intention.into(),
             tcs_type: TokenConditionalSwapType::FixedPremium.into(),
             padding: Default::default(),
-            start_timestamp: 0,
-            duration: 0,
+            start_timestamp: 0,  // not started
+            duration_seconds: 0, // duration does not matter for FixedPremium
+            reserved: [0; 88],
+        };
+
+        #[cfg(feature = "enable-gpl")]
+        instructions::token_conditional_swap_create(ctx, tcs)?;
+        Ok(())
+    }
+
+    pub fn token_conditional_swap_create_premium_auction(
+        ctx: Context<TokenConditionalSwapCreate>,
+        max_buy: u64,
+        max_sell: u64,
+        expiry_timestamp: u64,
+        price_lower_limit: f64,
+        price_upper_limit: f64,
+        max_price_premium_rate: f64,
+        allow_creating_deposits: bool,
+        allow_creating_borrows: bool, // TODO: require that this is false?
+        display_price_style: TokenConditionalSwapDisplayPriceStyle,
+        intention: TokenConditionalSwapIntention,
+        duration_seconds: u64,
+    ) -> Result<()> {
+        let tcs = TokenConditionalSwap {
+            id: u64::MAX, // set inside
+            max_buy,
+            max_sell,
+            bought: 0,
+            sold: 0,
+            expiry_timestamp,
+            price_lower_limit,
+            price_upper_limit,
+            price_premium_rate: max_price_premium_rate,
+            taker_fee_rate: 0.0, // set inside
+            maker_fee_rate: 0.0, // set inside
+            buy_token_index: ctx.accounts.buy_bank.load()?.token_index,
+            sell_token_index: ctx.accounts.sell_bank.load()?.token_index,
+            has_data: 1,
+            allow_creating_deposits: u8::from(allow_creating_deposits),
+            allow_creating_borrows: u8::from(allow_creating_borrows),
+            display_price_style: display_price_style.into(),
+            intention: intention.into(),
+            tcs_type: TokenConditionalSwapType::PremiumAuction.into(),
+            padding: Default::default(),
+            start_timestamp: 0, // not started
+            duration_seconds,
+            reserved: [0; 88],
+        };
+
+        #[cfg(feature = "enable-gpl")]
+        instructions::token_conditional_swap_create(ctx, tcs)?;
+        Ok(())
+    }
+
+    pub fn token_conditional_swap_create_linear_auction(
+        ctx: Context<TokenConditionalSwapCreate>,
+        max_buy: u64,
+        max_sell: u64,
+        expiry_timestamp: u64,
+        price_lower_limit: f64,
+        price_upper_limit: f64,
+        allow_creating_deposits: bool,
+        allow_creating_borrows: bool,
+        display_price_style: TokenConditionalSwapDisplayPriceStyle,
+        start_timestamp: u64,
+        duration_seconds: u64,
+        auction_is_up: bool, // TODO: enum
+    ) -> Result<()> {
+        let tcs = TokenConditionalSwap {
+            id: u64::MAX, // set inside
+            max_buy,
+            max_sell,
+            bought: 0,
+            sold: 0,
+            expiry_timestamp,
+            price_lower_limit,
+            price_upper_limit,
+            price_premium_rate: 0.0, // ignored for linear auctions
+            taker_fee_rate: 0.0,     // set inside
+            maker_fee_rate: 0.0,     // set inside
+            buy_token_index: ctx.accounts.buy_bank.load()?.token_index,
+            sell_token_index: ctx.accounts.sell_bank.load()?.token_index,
+            has_data: 1,
+            allow_creating_deposits: u8::from(allow_creating_deposits),
+            allow_creating_borrows: u8::from(allow_creating_borrows),
+            display_price_style: display_price_style.into(),
+            intention: TokenConditionalSwapIntention::Unknown.into(),
+            tcs_type: if auction_is_up {
+                TokenConditionalSwapType::AuctionUp.into()
+            } else {
+                TokenConditionalSwapType::AuctionUp.into()
+            }, // TODO AuctionDown
+            padding: Default::default(),
+            start_timestamp,
+            duration_seconds,
             reserved: [0; 88],
         };
 

@@ -119,8 +119,9 @@ pub struct TokenConditionalSwap {
     // TODO: auction start?
     pub start_timestamp: u64,
 
+    // ignored for FixedPremium type
     // TODO: auction duration?
-    pub duration: u64, // in seconds
+    pub duration_seconds: u64,
 
     #[derivative(Debug = "ignore")]
     pub reserved: [u8; 88],
@@ -157,7 +158,7 @@ impl Default for TokenConditionalSwap {
             tcs_type: TokenConditionalSwapType::FixedPremium.into(),
             padding: Default::default(),
             start_timestamp: 0,
-            duration: 0,
+            duration_seconds: 0,
             reserved: [0; 88],
         }
     }
@@ -226,24 +227,23 @@ impl TokenConditionalSwap {
                 let start = self.start_timestamp_or_now(now_ts);
                 assert!(start <= now_ts);
 
-                let duration = self.duration as f64;
+                let duration = self.duration_seconds as f64;
                 let current = (now_ts - start) as f64;
-                if current < duration {
-                    base_price * (1.0 + current / duration * self.price_premium_rate)
-                } else {
-                    base_price * (1.0 + self.price_premium_rate)
-                }
+                let progress = (current / duration).min(1.0);
+                base_price * (1.0 + progress * self.price_premium_rate)
             }
             TokenConditionalSwapType::AuctionUp => {
                 // Start time is fixed
                 assert!(self.is_started(now_ts));
 
-                let duration = self.duration as f64;
-                let current = (now_ts - self.start_timestamp) as f64;
+                let duration = self.duration_seconds;
+                let current = now_ts - self.start_timestamp;
                 if current < duration {
+                    let progress = (current as f64) / (duration as f64);
                     self.price_lower_limit
-                        + current / duration * (self.price_upper_limit - self.price_lower_limit)
+                        + progress * (self.price_upper_limit - self.price_lower_limit)
                 } else {
+                    // explicitly handle the end to avoid rounding issues
                     self.price_upper_limit
                 }
             }
