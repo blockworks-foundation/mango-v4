@@ -37,8 +37,7 @@ pub enum TokenConditionalSwapIntention {
 pub enum TokenConditionalSwapType {
     FixedPremium,
     PremiumAuction,
-    AuctionUp,
-    //AuctionDown,
+    LinearAuction,
 }
 
 #[zero_copy]
@@ -58,12 +57,20 @@ pub struct TokenConditionalSwap {
     /// timestamp until which the conditional swap is valid
     pub expiry_timestamp: u64,
 
+    /// The lower or starting price:
+    /// - For FixedPremium or PremiumAuctions, it's the lower end of the price range:
+    ///   the tcs can only be triggered if the oracle price exceeds this value.
+    /// - For LinearAuctions it's the starting price that's offered at start_timestamp.
+    ///
+    /// The price is always in "sell_token per buy_token" units, which can be computed
+    /// by dividing the buy token price by the sell token price.
+    ///
+    /// For FixedPremium or PremiumAuctions:
+    ///
     /// The price must exceed this threshold to allow execution.
     ///
-    /// This threshold is compared to the "sell_token per buy_token" oracle price
-    /// (which can be computed by dividing the buy token oracle price by the
-    /// sell token oracle price). If that price is >= lower_limit and <= upper_limit
-    /// the tcs may be executable.
+    /// This threshold is compared to the "sell_token per buy_token" oracle price.
+    /// If that price is >= lower_limit and <= upper_limit the tcs may be executable.
     ///
     /// Example: Stop loss to get out of a SOL long: The user bought SOL at 20 USDC/SOL
     /// and wants to stop loss at 18 USDC/SOL. They'd set buy_token=USDC, sell_token=SOL
@@ -75,7 +82,7 @@ pub struct TokenConditionalSwap {
     /// price_upper_limit=toNative(22), price_lower_limit=0.
     pub price_lower_limit: f64,
 
-    /// Parallel to price_lower_limit, but an upper limit.
+    /// Parallel to price_lower_limit, but an upper limit / auction end price.
     pub price_upper_limit: f64,
 
     /// The premium to pay over oracle price to incentivize execution.
@@ -232,7 +239,7 @@ impl TokenConditionalSwap {
                 let progress = (current / duration).min(1.0);
                 base_price * (1.0 + progress * self.price_premium_rate)
             }
-            TokenConditionalSwapType::AuctionUp => {
+            TokenConditionalSwapType::LinearAuction => {
                 // Start time is fixed
                 assert!(self.is_started(now_ts));
 
@@ -285,7 +292,7 @@ impl TokenConditionalSwap {
             TokenConditionalSwapType::PremiumAuction => {
                 self.price_in_range(price) || self.is_started(now_ts)
             }
-            TokenConditionalSwapType::AuctionUp => self.is_started(now_ts),
+            TokenConditionalSwapType::LinearAuction => self.is_started(now_ts),
         }
     }
 

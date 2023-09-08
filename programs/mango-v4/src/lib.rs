@@ -1347,14 +1347,13 @@ pub mod mango_v4 {
         max_buy: u64,
         max_sell: u64,
         expiry_timestamp: u64,
-        price_lower_limit: f64,
-        price_upper_limit: f64,
+        price_start: f64,
+        price_end: f64,
         allow_creating_deposits: bool,
         allow_creating_borrows: bool,
         display_price_style: TokenConditionalSwapDisplayPriceStyle,
         start_timestamp: u64,
         duration_seconds: u64,
-        auction_is_up: bool, // TODO: enum
     ) -> Result<()> {
         let tcs = TokenConditionalSwap {
             id: u64::MAX, // set inside
@@ -1363,8 +1362,8 @@ pub mod mango_v4 {
             bought: 0,
             sold: 0,
             expiry_timestamp,
-            price_lower_limit,
-            price_upper_limit,
+            price_lower_limit: price_start,
+            price_upper_limit: price_end,
             price_premium_rate: 0.0, // ignored for linear auctions
             taker_fee_rate: 0.0,     // set inside
             maker_fee_rate: 0.0,     // set inside
@@ -1375,11 +1374,7 @@ pub mod mango_v4 {
             allow_creating_borrows: u8::from(allow_creating_borrows),
             display_price_style: display_price_style.into(),
             intention: TokenConditionalSwapIntention::Unknown.into(),
-            tcs_type: if auction_is_up {
-                TokenConditionalSwapType::AuctionUp.into()
-            } else {
-                TokenConditionalSwapType::AuctionUp.into()
-            }, // TODO AuctionDown
+            tcs_type: TokenConditionalSwapType::LinearAuction.into(),
             padding: Default::default(),
             start_timestamp,
             duration_seconds,
