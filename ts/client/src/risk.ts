@@ -75,7 +75,7 @@ export function computePriceImpactOnJup(
       (pi) => pi.symbol == tokenName && pi.target_amount == closestTo,
     );
     if (filteredPis.length > 0) {
-      return (filteredPis[0].p95 * 10000) / 100;
+      return (filteredPis[0].p90 * 10000) / 100;
     } else {
       return -1;
     }
