@@ -449,12 +449,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "216261ddc8289130e551ddcd5ce8a064710c0d064a4d2895c67151c92b5443f6"
 
 [[package]]
-name = "arbitrary"
-version = "1.2.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3e90af4de65aa7b293ef2d09daff88501eb254f58edde2e1ac02c82d873eadad"
-
-[[package]]
 name = "arc-swap"
 version = "1.5.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1931,13 +1925,12 @@ dependencies = [
 [[package]]
 name = "fixed"
 version = "1.11.0"
+source = "git+https://gitlab.com/ckamm/fixed.git?branch=v1.11.0-mango#95bf614b09742333451e073704f11ea502d4563b"
 dependencies = [
- "arbitrary",
  "az",
  "borsh",
  "bytemuck",
  "half",
- "num-traits",
  "serde",
  "typenum",
 ]

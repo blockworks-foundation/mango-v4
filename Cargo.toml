@@ -9,7 +9,7 @@ members = [
 anchor-client = { git = "https://github.com/coral-xyz/anchor.git", rev = "2af9cc669", version = "0.28.0" }
 anchor-lang = { git = "https://github.com/coral-xyz/anchor.git", rev = "2af9cc669", version = "0.28.0" }
 anchor-spl = { git = "https://github.com/coral-xyz/anchor.git", rev = "2af9cc669", version = "0.28.0" }
-fixed = { path = "./3rdparty/fixed", version = "1.11.0" }
+fixed = { git = "https://gitlab.com/ckamm/fixed.git", branch = "v1.11.0-mango" }
 pyth-sdk-solana = "0.7.0"
 serum_dex = { git = "https://github.com/openbook-dex/program.git" }
 solana-address-lookup-table-program = "~1.14.9"
