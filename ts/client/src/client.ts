@@ -3554,8 +3554,8 @@ export class MangoClient {
       sellBank,
       buyBank,
     );
-    const lowerLimit = thresholdPrice;
-    const upperLimit = Number.MAX_SAFE_INTEGER;
+    const lowerLimit = 0;
+    const upperLimit = thresholdPrice;
 
     return await this.tokenConditionalSwapCreate(
       group,
@@ -3603,8 +3603,8 @@ export class MangoClient {
       sellBank,
       buyBank,
     );
-    const lowerLimit = 0;
-    const upperLimit = thresholdPrice;
+    const lowerLimit = thresholdPrice;
+    const upperLimit = Number.MAX_SAFE_INTEGER;
 
     return await this.tokenConditionalSwapCreate(
       group,
