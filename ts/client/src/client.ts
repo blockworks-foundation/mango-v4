@@ -40,6 +40,7 @@ import {
   MangoAccount,
   PerpPosition,
   Serum3Orders,
+  TokenConditionalSwap,
   TokenConditionalSwapDisplayPriceStyle,
   TokenConditionalSwapDto,
   TokenConditionalSwapIntention,
@@ -3644,47 +3645,23 @@ export class MangoClient {
     expiryTimestamp: number | null,
     displayPriceInSellTokenPerBuyToken: boolean,
   ): Promise<MangoSignatureStatus> {
-    let maxBuy, maxSell, buyAmountInUsd, sellAmountInUsd;
-    if (maxBuyUi == Number.MAX_SAFE_INTEGER) {
-      maxBuy = U64_MAX_BN;
-    } else {
-      buyAmountInUsd = maxBuyUi * buyBank.uiPrice;
-      maxBuy = toNative(maxBuyUi, buyBank.mintDecimals);
-    }
-    if (maxSellUi == Number.MAX_SAFE_INTEGER) {
-      maxSell = U64_MAX_BN;
-    } else {
-      sellAmountInUsd = maxSellUi * sellBank.uiPrice;
-      maxSell = toNative(maxSellUi, sellBank.mintDecimals);
-    }
-
-    // Used for computing optimal premium
-    let liqorTcsChunkSizeInUsd = Math.min(buyAmountInUsd, sellAmountInUsd);
-    if (liqorTcsChunkSizeInUsd > 5000) {
-      liqorTcsChunkSizeInUsd = 5000;
-    }
-    // For small TCS swaps, reduce chunk size to 1000 USD
-    else {
-      liqorTcsChunkSizeInUsd = 1000;
-    }
-
-    if (!pricePremium) {
-      if (maxBuy.eq(U64_MAX_BN)) {
-        maxSell.toNumber() * sellBank.uiPrice;
-      }
-      const buyTokenPriceImpact = group.getPriceImpactByTokenIndex(
-        buyBank.tokenIndex,
-        liqorTcsChunkSizeInUsd,
-      );
-      const sellTokenPriceImpact = group.getPriceImpactByTokenIndex(
-        sellBank.tokenIndex,
-        liqorTcsChunkSizeInUsd,
-      );
-      pricePremium =
-        ((1 + buyTokenPriceImpact / 100) * (1 + sellTokenPriceImpact / 100) -
-          1) *
-        100;
-    }
+    const maxBuy =
+      maxBuyUi == Number.MAX_SAFE_INTEGER
+        ? U64_MAX_BN
+        : toNative(maxBuyUi, buyBank.mintDecimals);
+    const maxSell =
+      maxSellUi == Number.MAX_SAFE_INTEGER
+        ? U64_MAX_BN
+        : toNative(maxSellUi, sellBank.mintDecimals);
+    pricePremium = TokenConditionalSwap.computePremium(
+      group,
+      buyBank,
+      sellBank,
+      maxBuy,
+      maxSell,
+      maxBuyUi,
+      maxSellUi,
+    );
     const pricePremiumRate = pricePremium > 0 ? pricePremium / 100 : 0.03;
 
     let intention: TokenConditionalSwapIntention;
