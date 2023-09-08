@@ -18,10 +18,6 @@ use crate::state::*;
 /// for small amounts every time the init health increases by small amounts.
 const TCS_TRIGGER_INIT_HEALTH_THRESHOLD: u64 = 1_000_000;
 
-/// Incentive to pay to callers who start an auction
-// TODO: $0.001 is ok? around 10x tx fee currently
-const TCS_START_INCENTIVE: f64 = 1_000.0; // $0.001
-
 #[allow(clippy::too_many_arguments)]
 pub fn token_conditional_swap_trigger(
     ctx: Context<TokenConditionalSwapTrigger>,

@@ -1330,6 +1330,20 @@ pub mod mango_v4 {
         Ok(())
     }
 
+    pub fn token_conditional_swap_start(
+        ctx: Context<TokenConditionalSwapStart>,
+        token_conditional_swap_index: u8,
+        token_conditional_swap_id: u64,
+    ) -> Result<()> {
+        #[cfg(feature = "enable-gpl")]
+        instructions::token_conditional_swap_start(
+            ctx,
+            token_conditional_swap_index.into(),
+            token_conditional_swap_id,
+        )?;
+        Ok(())
+    }
+
     pub fn alt_set(ctx: Context<AltSet>, index: u8) -> Result<()> {
         #[cfg(feature = "enable-gpl")]
         instructions::alt_set(ctx, index)?;

@@ -5,11 +5,6 @@ use crate::accounts_ix::*;
 use crate::error::*;
 use crate::health::*;
 use crate::i80f48::ClampToInt;
-use crate::logs::TokenConditionalSwapCancelLog;
-use crate::logs::{
-    LoanOriginationFeeInstruction, TokenBalanceLog, TokenConditionalSwapTriggerLogV2,
-    WithdrawLoanLog,
-};
 use crate::state::*;
 
 /// Incentive to pay to callers who start an auction
@@ -44,6 +39,7 @@ pub fn token_conditional_swap_start(
     let buy_token_index = tcs.buy_token_index;
     let sell_token_index = tcs.sell_token_index;
     let remaining_sell = tcs.remaining_sell();
+    let allow_borrows = tcs.allow_creating_borrows();
     let now_ts: u64 = Clock::get()?.unix_timestamp.try_into().unwrap();
     require!(!tcs.is_expired(now_ts), MangoError::SomeError);
     require!(tcs.has_incentive_for_starting(), MangoError::SomeError);
@@ -74,10 +70,20 @@ pub fn token_conditional_swap_start(
 
     sell_bank.deposit(caller_sell_token, I80F48::from(incentive), now_ts)?;
 
-    // This withdraw might be a borrow:
-    // - we ignore net borrow limits (but that produces a borrowing loophole!?)
-    // - reduce only banks might not allow borrows: then abort
+    // This withdraw might be a borrow, so can fail due to net borrows or reduce-only
+    let account_sell_pre_balance = account_sell_token.native(sell_bank);
     sell_bank.withdraw_with_fee(account_sell_token, I80F48::from(incentive), now_ts)?;
+    let account_sell_post_balance = account_sell_token.native(sell_bank);
+    if account_sell_post_balance < 0 {
+        require!(allow_borrows, MangoError::SomeError);
+        require!(!sell_bank.are_borrows_reduce_only(), MangoError::SomeError);
+        sell_bank.check_net_borrows(sell_oracle_price)?;
+    }
+
+    health_cache.adjust_token_balance(
+        sell_bank,
+        account_sell_post_balance - account_sell_pre_balance,
+    )?;
 
     //
     // Start the tcs
@@ -87,7 +93,7 @@ pub fn token_conditional_swap_start(
     tcs.sold += incentive_native;
     assert!(tcs.is_started(now_ts));
 
-    // TODO: adjust health_cache!
+    // TODO: log auction start
 
     account.check_health_post(&health_cache, pre_init_health)?;
 
