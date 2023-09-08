@@ -21,12 +21,11 @@ import {
   Keypair,
   MemcmpFilter,
   PublicKey,
+  RecentPrioritizationFees,
   SYSVAR_INSTRUCTIONS_PUBKEY,
   SYSVAR_RENT_PUBKEY,
   SystemProgram,
   TransactionInstruction,
-  TransactionSignature,
-  RecentPrioritizationFees,
 } from '@solana/web3.js';
 import bs58 from 'bs58';
 import chunk from 'lodash/chunk';
@@ -69,8 +68,8 @@ import {
   IxGateParams,
   PerpEditParams,
   TokenEditParams,
-  buildIxGate,
   TokenRegisterParams,
+  buildIxGate,
 } from './clientIxParamBuilder';
 import {
   MANGO_V4_ID,
@@ -81,7 +80,7 @@ import {
 import { Id } from './ids';
 import { IDL, MangoV4 } from './mango_v4';
 import { I80F48 } from './numbers/I80F48';
-import { FlashLoanType, InterestRateParams, OracleConfigParams } from './types';
+import { FlashLoanType, OracleConfigParams } from './types';
 import {
   I64_MAX_BN,
   U64_MAX_BN,
@@ -4106,6 +4105,10 @@ export class MangoClient {
         );
         if (inactiveTokenPosition != -1) {
           tokenPositionIndices[inactiveTokenPosition] = bank.tokenIndex;
+        } else {
+          throw new Error(
+            `All token positions are occupied, either expand mango account, or close an existing token position, e.g. by withdrawing token deposits, or repaying all borrows!`,
+          );
         }
       }
     }
