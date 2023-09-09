@@ -533,13 +533,10 @@ export class Bank implements BankForHealth {
   }
 
   getTimeToNextBorrowLimitWindowStartsTs(): number {
-    const r = this.netBorrowLimitWindowSizeTs
+    const timeToNextBorrowLimitWindowStartsTs = this.netBorrowLimitWindowSizeTs
       .sub(new BN(Date.now() / 1000).sub(this.lastNetBorrowsWindowStartTs))
       .toNumber();
-    if (r < 0) {
-      return 0;
-    }
-    return r;
+    return Math.max(timeToNextBorrowLimitWindowStartsTs, 0);
   }
 }
 
