@@ -1409,6 +1409,14 @@ export class MangoClient {
     ]);
   }
 
+  /**
+   * Withdraw the entire deposit balance for a token, effectively freeing the token position
+   *
+   * @param group
+   * @param mangoAccount
+   * @param mintPk
+   * @returns
+   */
   public async tokenWithdrawAllDepositForMint(
     group: Group,
     mangoAccount: MangoAccount,
