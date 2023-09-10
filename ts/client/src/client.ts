@@ -1423,11 +1423,15 @@ export class MangoClient {
     mintPk: PublicKey,
   ): Promise<MangoSignatureStatus> {
     const bank = group.getFirstBankByMint(mintPk);
+    const b = mangoAccount.getTokenBalance(bank).toNumber();
+    if (b < 0) {
+      throw new Error(`Only call this method for deposits and not borrows!`);
+    }
     const ixes = await this.tokenWithdrawNativeIx(
       group,
       mangoAccount,
       mintPk,
-      new BN(mangoAccount.getTokenBalance(bank).toNumber()),
+      new BN(b),
       false,
     );
 
