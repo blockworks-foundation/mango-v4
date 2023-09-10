@@ -7,13 +7,14 @@ use solana_client::{
     rpc_config::{RpcAccountInfoConfig, RpcContextConfig, RpcProgramAccountsConfig},
     rpc_response::{OptionalContext, Response, RpcKeyedAccount},
 };
-use solana_rpc::rpc::{rpc_accounts::AccountsDataClient, rpc_minimal::MinimalClient};
+use solana_rpc::rpc::rpc_minimal::MinimalClient;
 use solana_sdk::{account::AccountSharedData, commitment_config::CommitmentConfig, pubkey::Pubkey};
 
 use anyhow::Context;
 use futures::{stream, StreamExt};
 use std::str::FromStr;
 use std::time::Duration;
+use mango_feeds_connector::GetProgramAccountsClient;
 use tokio::time;
 use tracing::*;
 
@@ -93,7 +94,15 @@ async fn feed_snapshots(
     mango_oracles: Vec<Pubkey>,
     sender: &async_channel::Sender<Message>,
 ) -> anyhow::Result<()> {
-    let rpc_client = http::connect_with_options::<AccountsDataClient>(&config.rpc_http_url, true)
+    // TODO replace the following with mango-feeds connector's snapshot.rs
+
+    // don't know if rpc_client and rpc_client_scan can be the merged into one
+    let rpc_client = http::connect_with_options::<solana_rpc::rpc::rpc_accounts::AccountsDataClient>(&config.rpc_http_url, true)
+        .await
+        .map_err_anyhow()?;
+
+    // account scan client introduced with 1.15
+    let rpc_client_scan = http::connect_with_options::<GetProgramAccountsClient>(&config.rpc_http_url, true)
         .await
         .map_err_anyhow()?;
 
@@ -114,7 +123,7 @@ async fn feed_snapshots(
     let mut snapshot = AccountSnapshot::default();
 
     // Get all accounts of the mango program
-    let response = rpc_client
+    let response = rpc_client_scan
         .get_program_accounts(
             mango_v4::id().to_string(),
             Some(all_accounts_config.clone()),
