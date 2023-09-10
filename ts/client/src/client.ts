@@ -1409,6 +1409,23 @@ export class MangoClient {
     ]);
   }
 
+  public async tokenWithdrawAllDepositForMint(
+    group: Group,
+    mangoAccount: MangoAccount,
+    mintPk: PublicKey,
+  ): Promise<MangoSignatureStatus> {
+    const bank = group.getFirstBankByMint(mintPk);
+    const ixes = await this.tokenWithdrawNativeIx(
+      group,
+      mangoAccount,
+      mintPk,
+      new BN(mangoAccount.getTokenBalance(bank).toNumber()),
+      false,
+    );
+
+    return await this.sendAndConfirmTransactionForGroup(group, ixes);
+  }
+
   public async tokenWithdraw(
     group: Group,
     mangoAccount: MangoAccount,
