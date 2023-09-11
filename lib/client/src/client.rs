@@ -26,7 +26,7 @@ use mango_v4::state::{
 use solana_address_lookup_table_program::state::AddressLookupTable;
 use solana_client::nonblocking::rpc_client::RpcClient as RpcClientAsync;
 use solana_client::rpc_config::RpcSendTransactionConfig;
-use solana_client::rpc_response::{RpcSimulateTransactionResult, RpcResult};
+use solana_client::rpc_response::RpcSimulateTransactionResult;
 use solana_sdk::address_lookup_table_account::AddressLookupTableAccount;
 use solana_sdk::commitment_config::CommitmentLevel;
 use solana_sdk::hash::Hash;
@@ -1762,7 +1762,7 @@ impl MangoClient {
     pub async fn simulate(
         &self,
         instructions: Vec<Instruction>,
-    ) -> anyhow::Result<RpcResult<RpcSimulateTransactionResult>> {
+    ) -> anyhow::Result<SimulateTransactionResponse> {
         TransactionBuilder {
             instructions,
             address_lookup_tables: vec![],
@@ -1799,6 +1799,9 @@ pub struct TransactionBuilder {
     pub payer: Pubkey,
     pub config: TransactionBuilderConfig,
 }
+
+pub type SimulateTransactionResponse =
+    solana_client::rpc_response::Response<RpcSimulateTransactionResult>;
 
 impl TransactionBuilder {
     pub async fn transaction(
@@ -1850,13 +1853,10 @@ impl TransactionBuilder {
             .map_err(prettify_solana_client_error)
     }
 
-    pub async fn simulate(
-        &self,
-        client: &Client,
-    ) -> anyhow::Result<RpcResult<RpcSimulateTransactionResult>> {
+    pub async fn simulate(&self, client: &Client) -> anyhow::Result<SimulateTransactionResponse> {
         let rpc = client.rpc_async();
         let tx = self.transaction(&rpc).await?;
-        Ok(rpc.simulate_transaction(&tx).await)
+        Ok(rpc.simulate_transaction(&tx).await?)
     }
 
     pub async fn send_and_confirm(&self, client: &Client) -> anyhow::Result<Signature> {

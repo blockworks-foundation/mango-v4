@@ -220,19 +220,20 @@ pub async fn loop_update_index_and_rate(
 
             ix.accounts.append(&mut banks);
 
-            let sim_result = client
-                .simulate(vec![ix.clone()])
-                .await
-                .unwrap()
-                .unwrap()
-                .value;
-
-            match sim_result.err {
-                Some(e) => {
-                    error!("{} {:?} {:?}", token.name, e, sim_result.logs)
+            let sim_result = match client.simulate(vec![ix.clone()]).await {
+                Ok(response) => response.value,
+                Err(e) => {
+                    error!(token.name, "simulation request error: {e:?}");
+                    continue;
                 }
-                None => instructions.push(ix),
             };
+
+            if let Some(e) = sim_result.err {
+                error!(token.name, "simulation error: {e:?} {:?}", sim_result.logs);
+                continue;
+            }
+
+            instructions.push(ix);
         }
         let pre = Instant::now();
         let sig_result = client
