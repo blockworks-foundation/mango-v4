@@ -4,9 +4,9 @@ use crate::accounts_ix::*;
 use crate::error::*;
 use crate::health::*;
 use crate::instructions::apply_settle_changes;
-use crate::instructions::{charge_loan_origination_fees, OpenOrdersAmounts, OpenOrdersSlim};
+use crate::instructions::charge_loan_origination_fees;
 use crate::logs::Serum3OpenOrdersBalanceLogV2;
-use crate::serum3_cpi::load_open_orders_ref;
+use crate::serum3_cpi::{load_open_orders_ref, OpenOrdersAmounts, OpenOrdersSlim};
 use crate::state::*;
 
 pub fn serum3_liq_force_cancel_orders(
