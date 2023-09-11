@@ -13,6 +13,7 @@ anchor-spl = { git = "https://github.com/coral-xyz/anchor.git", rev = "2af9cc669
 fixed = { git = "https://gitlab.com/ckamm/fixed.git", branch = "v1.11.0-mango" }
 pyth-sdk-solana = "0.8.0"
 serum_dex = { git = "https://github.com/openbook-dex/program.git" }
+# 1.16.7+ is required due to thishttps://github.com/blockworks-foundation/mango-v4/issues/712
 solana-address-lookup-table-program = "~1.16.7"
 solana-account-decoder = "~1.16.7"
 solana-client = "~1.16.7"
