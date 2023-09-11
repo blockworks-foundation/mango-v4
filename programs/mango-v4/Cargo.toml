@@ -44,9 +44,7 @@ solana-sdk = { workspace = true, default-features = false, optional = true }
 solana-security-txt = "1.1.0"
 static_assertions = "1.1"
 switchboard-program = ">=0.2.0"
-# branch sbv2-anchor-28
-#switchboard-v2 = { git = "https://github.com/switchboard-xyz/solana-sdk.git", tag = "sbv2-crate-0.4.0" }
-switchboard-v2 = { path = "/Users/stefan/mango/code/switchboard-solana-new/rust/switchboard-solana-new/rust/switchboard-v2" }
+switchboard-v2 = { git = "https://github.com/switchboard-xyz/solana-sdk.git", tag = "sbv2-crate-0.4.0" }
 
 [dev-dependencies]
 solana-sdk = { workspace = true, default-features = false }

@@ -10,10 +10,11 @@ members = [
 anchor-client = { git = "https://github.com/coral-xyz/anchor.git", rev = "2af9cc669", version = "0.28.0" }
 anchor-lang = { git = "https://github.com/coral-xyz/anchor.git", rev = "2af9cc669", version = "0.28.0" }
 anchor-spl = { git = "https://github.com/coral-xyz/anchor.git", rev = "2af9cc669", version = "0.28.0" }
-fixed = { git = "https://gitlab.com/ckamm/fixed.git", branch = "v1.11.0-mango" }
+# use ckamm commit 2363acc4 (v1.23.0-mango -1)
+fixed = { git = "https://gitlab.com/ckamm/fixed.git", rev = "2363acc4" }
 pyth-sdk-solana = "0.8.0"
 serum_dex = { git = "https://github.com/openbook-dex/program.git" }
-# 1.16.7+ is required due to thishttps://github.com/blockworks-foundation/mango-v4/issues/712
+# 1.16.7+ is required due to this: https://github.com/blockworks-foundation/mango-v4/issues/712
 solana-address-lookup-table-program = "~1.16.7"
 solana-account-decoder = "~1.16.7"
 solana-client = "~1.16.7"

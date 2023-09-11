@@ -32,7 +32,7 @@ solana-rpc = { workspace = true }
 solana-sdk = { workspace = true }
 solana-address-lookup-table-program = { workspace = true }
 # groovie/MAN-68-mango-feeds-dependencies but with solana 1.16.1
-mango-feeds-connector = { path = "/Users/stefan/mango/code/mango-feeds/connector", features = ["solana-1-16"] }
+mango-feeds-connector = { git = "https://github.com/blockworks-foundation/mango-feeds.git", branch = "update-solana-1-16-anchor-28", features = ["solana-1-16"] }
 spl-associated-token-account = "1.0.3"
 thiserror = "1.0.31"
 reqwest = "0.11.9"
