@@ -302,7 +302,7 @@ version = "0.28.0"
 source = "git+https://github.com/coral-xyz/anchor.git?rev=2af9cc669#2af9cc669b734ca4b3a1ef4f590eec2a2dc097e5"
 dependencies = [
  "anchor-syn 0.28.0 (git+https://github.com/coral-xyz/anchor.git?rev=2af9cc669)",
- "borsh-derive-internal 0.10.3",
+ "borsh-derive-internal 0.9.3",
  "proc-macro2 1.0.66",
  "quote 1.0.33",
  "syn 1.0.109",
@@ -346,7 +346,7 @@ dependencies = [
  "arrayref",
  "base64 0.13.1",
  "bincode",
- "borsh 0.10.3",
+ "borsh 0.9.3",
  "bytemuck",
  "getrandom 0.2.10",
  "solana-program",
@@ -370,7 +370,7 @@ dependencies = [
  "arrayref",
  "base64 0.13.1",
  "bincode",
- "borsh 0.10.3",
+ "borsh 0.9.3",
  "bytemuck",
  "getrandom 0.2.10",
  "solana-program",
@@ -1033,7 +1033,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4114279215a005bc675e386011e594e1d9b800918cea18fcadadcce864a2046b"
 dependencies = [
  "borsh-derive 0.10.3",
- "hashbrown 0.13.2",
+ "hashbrown 0.12.3",
 ]
 
 [[package]]
@@ -3278,7 +3278,7 @@ dependencies = [
  "async-trait",
  "base64 0.13.1",
  "bincode",
- "borsh 0.9.3",
+ "borsh 0.10.3",
  "bytemuck",
  "default-env",
  "derivative",
