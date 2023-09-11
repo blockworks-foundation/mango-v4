@@ -1409,6 +1409,35 @@ export class MangoClient {
     ]);
   }
 
+  /**
+   * Withdraw the entire deposit balance for a token, effectively freeing the token position
+   *
+   * @param group
+   * @param mangoAccount
+   * @param mintPk
+   * @returns
+   */
+  public async tokenWithdrawAllDepositForMint(
+    group: Group,
+    mangoAccount: MangoAccount,
+    mintPk: PublicKey,
+  ): Promise<MangoSignatureStatus> {
+    const bank = group.getFirstBankByMint(mintPk);
+    const b = mangoAccount.getTokenBalance(bank).toNumber();
+    if (b < 0) {
+      throw new Error(`Only call this method for deposits and not borrows!`);
+    }
+    const ixes = await this.tokenWithdrawNativeIx(
+      group,
+      mangoAccount,
+      mintPk,
+      U64_MAX_BN,
+      false,
+    );
+
+    return await this.sendAndConfirmTransactionForGroup(group, ixes);
+  }
+
   public async tokenWithdraw(
     group: Group,
     mangoAccount: MangoAccount,

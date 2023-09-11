@@ -217,7 +217,22 @@ pub async fn loop_update_index_and_rate(
                     is_writable: true,
                 })
                 .collect::<Vec<_>>();
+
             ix.accounts.append(&mut banks);
+
+            let sim_result = match client.simulate(vec![ix.clone()]).await {
+                Ok(response) => response.value,
+                Err(e) => {
+                    error!(token.name, "simulation request error: {e:?}");
+                    continue;
+                }
+            };
+
+            if let Some(e) = sim_result.err {
+                error!(token.name, "simulation error: {e:?} {:?}", sim_result.logs);
+                continue;
+            }
+
             instructions.push(ix);
         }
         let pre = Instant::now();
