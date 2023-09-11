@@ -217,8 +217,22 @@ pub async fn loop_update_index_and_rate(
                     is_writable: true,
                 })
                 .collect::<Vec<_>>();
+
             ix.accounts.append(&mut banks);
-            instructions.push(ix);
+
+            match client
+                .simulate(vec![ix.clone()])
+                .await
+                .unwrap()
+                .unwrap()
+                .value
+                .err
+            {
+                Some(e) => {
+                    error!("{:?}", e)
+                }
+                None => instructions.push(ix),
+            };
         }
         let pre = Instant::now();
         let sig_result = client
