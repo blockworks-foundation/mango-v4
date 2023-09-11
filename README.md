@@ -25,16 +25,11 @@ See DEVELOPING.md
 
 ### Dependencies
 
-- rust version 1.65.0
-- solana-cli 1.14.9
-- anchor-cli 0.27.0
+- rust version 1.79.0
+- solana-cli 1.16.7
+- anchor-cli 0.28.0
 - npm 8.1.2
 - node v16.13.1
-
-### Submodules
-
-After cloning this repo you'll need to init and update its git submodules.
-Consider setting the git option `submodule.recurse=true`.
 
 ### Deployments
 
