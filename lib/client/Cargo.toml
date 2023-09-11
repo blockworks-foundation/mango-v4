@@ -35,7 +35,8 @@ solana-address-lookup-table-program = { workspace = true }
 mango-feeds-connector = { git = "https://github.com/blockworks-foundation/mango-feeds.git", branch = "update-solana-1-16-anchor-28", features = ["solana-1-16"] }
 spl-associated-token-account = "1.0.3"
 thiserror = "1.0.31"
-reqwest = "0.11.9"
+# note: should match the version used in solana
+reqwest = "0.11.11"
 tokio = { version = "1", features = ["full"] }
 tokio-stream = { version = "0.1.9"}
 serde = "1.0.141"
