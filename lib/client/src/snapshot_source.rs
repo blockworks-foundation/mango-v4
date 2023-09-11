@@ -12,9 +12,9 @@ use solana_sdk::{account::AccountSharedData, commitment_config::CommitmentConfig
 
 use anyhow::Context;
 use futures::{stream, StreamExt};
+use mango_feeds_connector::GetProgramAccountsClient;
 use std::str::FromStr;
 use std::time::Duration;
-use mango_feeds_connector::GetProgramAccountsClient;
 use tokio::time;
 use tracing::*;
 
@@ -97,14 +97,19 @@ async fn feed_snapshots(
     // TODO replace the following with mango-feeds connector's snapshot.rs
 
     // don't know if rpc_client and rpc_client_scan can be the merged into one
-    let rpc_client = http::connect_with_options::<solana_rpc::rpc::rpc_accounts::AccountsDataClient>(&config.rpc_http_url, true)
+    let rpc_client =
+        http::connect_with_options::<solana_rpc::rpc::rpc_accounts::AccountsDataClient>(
+            &config.rpc_http_url,
+            true,
+        )
         .await
         .map_err_anyhow()?;
 
     // account scan client introduced with 1.15
-    let rpc_client_scan = http::connect_with_options::<GetProgramAccountsClient>(&config.rpc_http_url, true)
-        .await
-        .map_err_anyhow()?;
+    let rpc_client_scan =
+        http::connect_with_options::<GetProgramAccountsClient>(&config.rpc_http_url, true)
+            .await
+            .map_err_anyhow()?;
 
     let account_info_config = RpcAccountInfoConfig {
         encoding: Some(UiAccountEncoding::Base64),
