@@ -1431,7 +1431,7 @@ export class MangoClient {
       group,
       mangoAccount,
       mintPk,
-      new BN(b),
+      U64_MAX_BN,
       false,
     );
 
