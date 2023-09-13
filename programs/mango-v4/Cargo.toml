@@ -43,8 +43,9 @@ solana-program = { workspace = true }
 solana-sdk = { workspace = true, default-features = false, optional = true }
 solana-security-txt = "1.1.0"
 static_assertions = "1.1"
+
 switchboard-program = ">=0.2.0"
-switchboard-v2 = { git = "https://github.com/switchboard-xyz/solana-sdk.git", tag = "sbv2-crate-0.4.0" }
+switchboard-v2 = { package = "switchboard-solana", version = "0.28.18" }
 
 [dev-dependencies]
 solana-sdk = { workspace = true, default-features = false }
