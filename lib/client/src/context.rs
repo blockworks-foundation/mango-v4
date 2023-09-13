@@ -246,8 +246,8 @@ impl MangoGroupContext {
         affected_perp_markets: Vec<PerpMarketIndex>,
     ) -> anyhow::Result<Vec<AccountMeta>> {
         let mut account = account.clone();
-        for affected_token_index in affected_tokens {
-            account.ensure_token_position(affected_token_index)?;
+        for affected_token_index in affected_tokens.iter().chain(writable_banks.iter()) {
+            account.ensure_token_position(*affected_token_index)?;
         }
         for affected_perp_market_index in affected_perp_markets {
             let settle_token_index = self

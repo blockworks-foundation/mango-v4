@@ -1312,6 +1312,46 @@ impl MangoClient {
         Ok(ix)
     }
 
+    pub async fn token_conditional_swap_start_instruction(
+        &self,
+        account: (&Pubkey, &MangoAccountValue),
+        token_conditional_swap_id: u64,
+    ) -> anyhow::Result<Instruction> {
+        let (tcs_index, tcs) = account
+            .1
+            .token_conditional_swap_by_id(token_conditional_swap_id)?;
+
+        let affected_tokens = vec![tcs.buy_token_index, tcs.sell_token_index];
+        let health_remaining_ams = self
+            .derive_health_check_remaining_account_metas(vec![], affected_tokens, vec![])
+            .await
+            .unwrap();
+
+        let ix = Instruction {
+            program_id: mango_v4::id(),
+            accounts: {
+                let mut ams = anchor_lang::ToAccountMetas::to_account_metas(
+                    &mango_v4::accounts::TokenConditionalSwapStart {
+                        group: self.group(),
+                        account: *account.0,
+                        caller: self.mango_account_address,
+                        caller_authority: self.owner(),
+                    },
+                    None,
+                );
+                ams.extend(health_remaining_ams);
+                ams
+            },
+            data: anchor_lang::InstructionData::data(
+                &mango_v4::instruction::TokenConditionalSwapStart {
+                    token_conditional_swap_id,
+                    token_conditional_swap_index: tcs_index.try_into().unwrap(),
+                },
+            ),
+        };
+        Ok(ix)
+    }
+
     // health region
 
     pub fn health_region_begin_instruction(

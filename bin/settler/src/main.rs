@@ -6,8 +6,8 @@ use anchor_client::Cluster;
 use clap::Parser;
 use mango_v4::state::{PerpMarketIndex, TokenIndex};
 use mango_v4_client::{
-    account_update_stream, chain_data, keypair_from_cli, snapshot_source, websocket_source,
-    AsyncChannelSendUnlessFull, Client, MangoClient, MangoGroupContext, TransactionBuilderConfig,
+    account_update_stream, chain_data, keypair_from_cli, snapshot_source, websocket_source, Client,
+    MangoClient, MangoGroupContext, TransactionBuilderConfig,
 };
 use tracing::*;
 
@@ -18,9 +18,10 @@ use std::collections::HashSet;
 
 pub mod metrics;
 pub mod settle;
+pub mod tcs_start;
 pub mod util;
 
-use crate::util::{is_mango_account, is_mango_bank, is_mint_info, is_perp_market};
+use crate::util::{is_mango_account, is_mint_info, is_perp_market};
 
 // jemalloc seems to be better at keeping the memory footprint reasonable over
 // longer periods of time
@@ -206,7 +207,11 @@ async fn main() -> anyhow::Result<()> {
         recently_settled: Default::default(),
     };
 
-    let (settle_trigger_sender, settle_trigger_receiver) = async_channel::bounded::<()>(1);
+    let mut tcs_start = tcs_start::State {
+        mango_client: mango_client.clone(),
+        account_fetcher: account_fetcher.clone(),
+        config: tcs_start::Config {},
+    };
 
     info!("main loop");
 
@@ -247,29 +252,6 @@ async fn main() -> anyhow::Result<()> {
                             // Track all MangoAccounts: we need to iterate over them later
                             state.mango_accounts.insert(account_write.pubkey);
                             metric_mango_accounts.set(state.mango_accounts.len() as u64);
-
-                            if !state.health_check_all {
-                                state.health_check_accounts.push(account_write.pubkey);
-                            }
-                            settle_trigger_sender.send_unless_full(()).unwrap();
-                        } else {
-                            let mut must_check_all = false;
-                            if is_mango_bank(&account_write.account, &mango_group).is_some() {
-                                debug!("change to bank {}", &account_write.pubkey);
-                                must_check_all = true;
-                            }
-                            if is_perp_market(&account_write.account, &mango_group).is_some() {
-                                debug!("change to perp market {}", &account_write.pubkey);
-                                must_check_all = true;
-                            }
-                            if oracles.contains(&account_write.pubkey) {
-                                debug!("change to oracle {}", &account_write.pubkey);
-                                must_check_all = true;
-                            }
-                            if must_check_all {
-                                state.health_check_all = true;
-                                settle_trigger_sender.send_unless_full(()).unwrap();
-                            }
                         }
                     }
                     Message::Snapshot(snapshot) => {
@@ -292,9 +274,6 @@ async fn main() -> anyhow::Result<()> {
                         metric_mango_accounts.set(state.mango_accounts.len() as u64);
 
                         state.one_snapshot_done = true;
-                        state.health_check_all = true;
-
-                        settle_trigger_sender.send_unless_full(()).unwrap();
                     }
                     _ => {}
                 }
@@ -303,10 +282,11 @@ async fn main() -> anyhow::Result<()> {
     });
 
     let settle_job = tokio::spawn({
+        let mut interval = tokio::time::interval(Duration::from_millis(100));
         let shared_state = shared_state.clone();
         async move {
             loop {
-                settle_trigger_receiver.recv().await.unwrap();
+                interval.tick().await;
 
                 let account_addresses;
                 {
@@ -314,8 +294,6 @@ async fn main() -> anyhow::Result<()> {
                     if !state.one_snapshot_done {
                         continue;
                     }
-                    state.health_check_all = false;
-                    state.health_check_accounts = vec![];
                     account_addresses = state.mango_accounts.iter().cloned().collect();
                 }
 
@@ -324,9 +302,31 @@ async fn main() -> anyhow::Result<()> {
         }
     });
 
+    let tcs_start_job = tokio::spawn({
+        let mut interval = tokio::time::interval(Duration::from_millis(100));
+        let shared_state = shared_state.clone();
+        async move {
+            loop {
+                interval.tick().await;
+
+                let account_addresses;
+                {
+                    let mut state = shared_state.write().unwrap();
+                    if !state.one_snapshot_done {
+                        continue;
+                    }
+                    account_addresses = state.mango_accounts.iter().cloned().collect();
+                }
+
+                tcs_start.run_pass(account_addresses).await.unwrap();
+            }
+        }
+    });
+
     use futures::StreamExt;
-    let mut jobs: futures::stream::FuturesUnordered<_> =
-        vec![data_job, settle_job].into_iter().collect();
+    let mut jobs: futures::stream::FuturesUnordered<_> = vec![data_job, settle_job, tcs_start_job]
+        .into_iter()
+        .collect();
     jobs.next().await;
 
     error!("a critical job aborted, exiting");
@@ -341,12 +341,6 @@ struct SharedState {
 
     /// Is the first snapshot done? Only start checking account health when it is.
     one_snapshot_done: bool,
-
-    /// Accounts whose health might have changed
-    health_check_accounts: Vec<Pubkey>,
-
-    /// Check all accounts?
-    health_check_all: bool,
 }
 
 fn start_chain_data_metrics(chain: Arc<RwLock<chain_data::ChainData>>, metrics: &metrics::Metrics) {
