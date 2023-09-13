@@ -1,5 +1,5 @@
 export type MangoV4 = {
-  "version": "0.19.0",
+  "version": "0.19.1",
   "name": "mango_v4",
   "instructions": [
     {
@@ -8020,6 +8020,18 @@ export type MangoV4 = {
             }
           },
           {
+            "name": "reservedBaseAsQuoteLowestAsk",
+            "type": {
+              "defined": "I80F48"
+            }
+          },
+          {
+            "name": "reservedQuoteAsBaseHighestBid",
+            "type": {
+              "defined": "I80F48"
+            }
+          },
+          {
             "name": "baseInfoIndex",
             "type": "u64"
           },
@@ -8401,11 +8413,30 @@ export type MangoV4 = {
             }
           },
           {
+            "name": "highestPlacedBidInv",
+            "docs": [
+              "Track something like the highest open bid / lowest open ask, in native/native units.",
+              "",
+              "Tracking it exactly isn't possible since we don't see fills. So instead track",
+              "the min/max of the _placed_ bids and asks.",
+              "",
+              "The value is reset in serum3_place_order when a new order is placed without an",
+              "existing one on the book.",
+              "",
+              "0 is a special \"unset\" state."
+            ],
+            "type": "f64"
+          },
+          {
+            "name": "lowestPlacedAsk",
+            "type": "f64"
+          },
+          {
             "name": "reserved",
             "type": {
               "array": [
                 "u8",
-                64
+                48
               ]
             }
           }
@@ -12562,7 +12593,7 @@ export type MangoV4 = {
 };
 
 export const IDL: MangoV4 = {
-  "version": "0.19.0",
+  "version": "0.19.1",
   "name": "mango_v4",
   "instructions": [
     {
@@ -20583,6 +20614,18 @@ export const IDL: MangoV4 = {
             }
           },
           {
+            "name": "reservedBaseAsQuoteLowestAsk",
+            "type": {
+              "defined": "I80F48"
+            }
+          },
+          {
+            "name": "reservedQuoteAsBaseHighestBid",
+            "type": {
+              "defined": "I80F48"
+            }
+          },
+          {
             "name": "baseInfoIndex",
             "type": "u64"
           },
@@ -20964,11 +21007,30 @@ export const IDL: MangoV4 = {
             }
           },
           {
+            "name": "highestPlacedBidInv",
+            "docs": [
+              "Track something like the highest open bid / lowest open ask, in native/native units.",
+              "",
+              "Tracking it exactly isn't possible since we don't see fills. So instead track",
+              "the min/max of the _placed_ bids and asks.",
+              "",
+              "The value is reset in serum3_place_order when a new order is placed without an",
+              "existing one on the book.",
+              "",
+              "0 is a special \"unset\" state."
+            ],
+            "type": "f64"
+          },
+          {
+            "name": "lowestPlacedAsk",
+            "type": "f64"
+          },
+          {
             "name": "reserved",
             "type": {
               "array": [
                 "u8",
-                64
+                48
               ]
             }
           }
