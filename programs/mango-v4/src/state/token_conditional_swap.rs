@@ -191,7 +191,7 @@ impl TokenConditionalSwap {
         now_ts >= self.expiry_timestamp
     }
 
-    pub fn is_started(&self, now_ts: u64) -> bool {
+    pub fn passed_start(&self, now_ts: u64) -> bool {
         self.start_timestamp > 0 && now_ts >= self.start_timestamp
     }
 
@@ -241,7 +241,7 @@ impl TokenConditionalSwap {
             }
             TokenConditionalSwapType::LinearAuction => {
                 // Start time is fixed
-                assert!(self.is_started(now_ts));
+                assert!(self.passed_start(now_ts));
 
                 let duration = self.duration_seconds;
                 let current = now_ts - self.start_timestamp;
@@ -283,6 +283,20 @@ impl TokenConditionalSwap {
         price >= self.price_lower_limit && price <= self.price_upper_limit
     }
 
+    pub fn is_startable(&self, price: f64, now_ts: u64) -> bool {
+        if self.is_expired(now_ts) {
+            return false;
+        }
+        if self.start_timestamp != 0 {
+            return false;
+        }
+        match self.tcs_type() {
+            TokenConditionalSwapType::FixedPremium => self.price_in_range(price),
+            TokenConditionalSwapType::PremiumAuction => self.price_in_range(price),
+            TokenConditionalSwapType::LinearAuction => false,
+        }
+    }
+
     pub fn is_triggerable(&self, price: f64, now_ts: u64) -> bool {
         if self.is_expired(now_ts) {
             return false;
@@ -290,9 +304,9 @@ impl TokenConditionalSwap {
         match self.tcs_type() {
             TokenConditionalSwapType::FixedPremium => self.price_in_range(price),
             TokenConditionalSwapType::PremiumAuction => {
-                self.price_in_range(price) || self.is_started(now_ts)
+                self.price_in_range(price) || self.passed_start(now_ts)
             }
-            TokenConditionalSwapType::LinearAuction => self.is_started(now_ts),
+            TokenConditionalSwapType::LinearAuction => self.passed_start(now_ts),
         }
     }
 

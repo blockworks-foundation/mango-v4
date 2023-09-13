@@ -401,7 +401,7 @@ fn action(
         assert!(tcs.bought <= tcs.max_buy);
         assert!(tcs.sold <= tcs.max_sell);
 
-        if !tcs.is_started(now_ts) {
+        if !tcs.passed_start(now_ts) {
             tcs.start_timestamp = now_ts;
         }
 

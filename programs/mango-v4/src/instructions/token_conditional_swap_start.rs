@@ -41,19 +41,25 @@ pub fn token_conditional_swap_start(
     let remaining_sell = tcs.remaining_sell();
     let allow_borrows = tcs.allow_creating_borrows();
     let now_ts: u64 = Clock::get()?.unix_timestamp.try_into().unwrap();
-    require!(!tcs.is_expired(now_ts), MangoError::SomeError);
     require!(tcs.has_incentive_for_starting(), MangoError::SomeError);
-    require!(!tcs.is_started(now_ts), MangoError::SomeError);
 
     let mut health_cache = new_health_cache(&account.borrow(), &account_retriever)
         .context("create liqee health cache")?;
     let pre_init_health = account.check_health_pre(&health_cache)?;
 
+    let (sell_bank, sell_oracle_price, buy_bank_and_oracle_opt) =
+        account_retriever.banks_mut_and_oracles(sell_token_index, buy_token_index)?;
+    let (_, buy_oracle_price) = buy_bank_and_oracle_opt.unwrap();
+
+    //
+    // Check the tcs price condition
+    //
+    let price = buy_oracle_price.to_num::<f64>() / sell_oracle_price.to_num::<f64>();
+    require!(tcs.is_startable(price, now_ts), MangoError::SomeError);
+
     //
     // Transfer the starting incentive
     //
-    let (sell_bank, sell_oracle_price, _) =
-        account_retriever.banks_mut_and_oracles(sell_token_index, sell_token_index)?;
 
     // We allow the incentive to be < 1 native token because of tokens like BTC, where 1 native token
     // far exceeds the incentive value.
@@ -91,7 +97,7 @@ pub fn token_conditional_swap_start(
     let tcs = account.token_conditional_swap_mut_by_index(token_conditional_swap_index)?;
     tcs.start_timestamp = now_ts;
     tcs.sold += incentive_native;
-    assert!(tcs.is_started(now_ts));
+    assert!(tcs.passed_start(now_ts));
 
     // TODO: log auction start
 

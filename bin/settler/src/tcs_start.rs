@@ -66,12 +66,29 @@ impl State {
             }
             // TODO: skip errors
 
-            // TODO: check if any tcs is startable
-            // - is premium auction (has incentive)?
-            // - trigger condition is met?
-            // - can pay incentive?
-            let tcs_id = 0u64;
-            startable.push((account_key, tcs_id));
+            for tcs in account.active_token_conditional_swaps() {
+                if !tcs.has_incentive_for_starting()
+                    || tcs.is_expired(now_ts)
+                    || tcs.passed_start(now_ts)
+                {
+                    continue;
+                }
+
+                // TODO: don't error out on error, probably put all of this in a function
+                let buy_price = self.oracle_for_token(tcs.buy_token_index)?;
+                let sell_price = self.oracle_for_token(tcs.sell_token_index)?;
+
+                let price = buy_price.to_num::<f64>() / sell_price.to_num::<f64>();
+                if !tcs.is_startable(price, now_ts) {
+                    continue;
+                }
+
+                // TODO: check if any tcs is startable
+                // - can pay incentive?
+
+                let tcs_id = 0u64;
+                startable.push((account_key, tcs_id));
+            }
         }
 
         for startable_chunk in startable.chunks(8) {
@@ -94,6 +111,7 @@ impl State {
                     continue;
                 }
             };
+            // TODO: also track successses, so we don't try to start the same thing too often
             info!(%txsig, "started");
         }
 
@@ -105,5 +123,14 @@ impl State {
         self.mango_client
             .token_conditional_swap_start_instruction((pubkey, &account), tcs_id)
             .await
+    }
+
+    fn oracle_for_token(&self, token_index: TokenIndex) -> anyhow::Result<I80F48> {
+        let bank_pk = mango_client
+            .context
+            .token(token_index)
+            .mint_info
+            .first_bank();
+        account_fetcher.fetch_bank_price(&bank_pk)
     }
 }
