@@ -2,10 +2,10 @@ use anchor_lang::prelude::*;
 use fixed::types::I80F48;
 
 use crate::error::*;
-use crate::serum3_cpi::load_open_orders_ref;
+use crate::serum3_cpi::{load_open_orders_ref, OpenOrdersAmounts, OpenOrdersSlim};
 use crate::state::*;
 
-use super::{apply_settle_changes, OpenOrdersAmounts, OpenOrdersSlim};
+use super::apply_settle_changes;
 use crate::accounts_ix::*;
 use crate::logs::Serum3OpenOrdersBalanceLogV2;
 use crate::logs::{LoanOriginationFeeInstruction, WithdrawLoanLog};
