@@ -1433,6 +1433,23 @@
 <span id="1433">1433</span>
 <span id="1434">1434</span>
 <span id="1435">1435</span>
+<span id="1436">1436</span>
+<span id="1437">1437</span>
+<span id="1438">1438</span>
+<span id="1439">1439</span>
+<span id="1440">1440</span>
+<span id="1441">1441</span>
+<span id="1442">1442</span>
+<span id="1443">1443</span>
+<span id="1444">1444</span>
+<span id="1445">1445</span>
+<span id="1446">1446</span>
+<span id="1447">1447</span>
+<span id="1448">1448</span>
+<span id="1449">1449</span>
+<span id="1450">1450</span>
+<span id="1451">1451</span>
+<span id="1452">1452</span>
 </pre><pre class="rust"><code><span class="kw">use </span>anchor_lang::prelude::<span class="kw-2">*</span>;
 
 <span class="kw">use </span>derivative::Derivative;
@@ -1568,10 +1585,25 @@
     <span class="attribute">#[derivative(Debug = <span class="string">&quot;ignore&quot;</span>)]
     </span><span class="kw">pub </span>padding: [u8; <span class="number">2</span>],
 
+    <span class="doccomment">/// Track something like the highest open bid / lowest open ask, in native/native units.
+    ///
+    /// Tracking it exactly isn&#39;t possible since we don&#39;t see fills. So instead track
+    /// the min/max of the _placed_ bids and asks.
+    ///
+    /// The value is reset in serum3_place_order when a new order is placed without an
+    /// existing one on the book.
+    ///
+    /// 0 is a special &quot;unset&quot; state.
+    </span><span class="kw">pub </span>highest_placed_bid_inv: f64,
+    <span class="kw">pub </span>lowest_placed_ask: f64,
+
     <span class="attribute">#[derivative(Debug = <span class="string">&quot;ignore&quot;</span>)]
-    </span><span class="kw">pub </span>reserved: [u8; <span class="number">64</span>],
+    </span><span class="kw">pub </span>reserved: [u8; <span class="number">48</span>],
 }
-<span class="macro">const_assert_eq!</span>(size_of::&lt;Serum3Orders&gt;(), <span class="number">32 </span>+ <span class="number">8 </span>* <span class="number">2 </span>+ <span class="number">2 </span>* <span class="number">3 </span>+ <span class="number">2 </span>+ <span class="number">64</span>);
+<span class="macro">const_assert_eq!</span>(
+    size_of::&lt;Serum3Orders&gt;(),
+    <span class="number">32 </span>+ <span class="number">8 </span>* <span class="number">2 </span>+ <span class="number">2 </span>* <span class="number">3 </span>+ <span class="number">2 </span>+ <span class="number">2 </span>* <span class="number">8 </span>+ <span class="number">48
+</span>);
 <span class="macro">const_assert_eq!</span>(size_of::&lt;Serum3Orders&gt;(), <span class="number">120</span>);
 <span class="macro">const_assert_eq!</span>(size_of::&lt;Serum3Orders&gt;() % <span class="number">8</span>, <span class="number">0</span>);
 
@@ -1592,10 +1624,12 @@
             market_index: Serum3MarketIndex::MAX,
             base_token_index: TokenIndex::MAX,
             quote_token_index: TokenIndex::MAX,
-            reserved: [<span class="number">0</span>; <span class="number">64</span>],
             padding: Default::default(),
             base_borrows_without_fee: <span class="number">0</span>,
             quote_borrows_without_fee: <span class="number">0</span>,
+            highest_placed_bid_inv: <span class="number">0.0</span>,
+            lowest_placed_ask: <span class="number">0.0</span>,
+            reserved: [<span class="number">0</span>; <span class="number">48</span>],
         }
     }
 }

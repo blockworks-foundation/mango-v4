@@ -1723,6 +1723,93 @@
 <span id="1723">1723</span>
 <span id="1724">1724</span>
 <span id="1725">1725</span>
+<span id="1726">1726</span>
+<span id="1727">1727</span>
+<span id="1728">1728</span>
+<span id="1729">1729</span>
+<span id="1730">1730</span>
+<span id="1731">1731</span>
+<span id="1732">1732</span>
+<span id="1733">1733</span>
+<span id="1734">1734</span>
+<span id="1735">1735</span>
+<span id="1736">1736</span>
+<span id="1737">1737</span>
+<span id="1738">1738</span>
+<span id="1739">1739</span>
+<span id="1740">1740</span>
+<span id="1741">1741</span>
+<span id="1742">1742</span>
+<span id="1743">1743</span>
+<span id="1744">1744</span>
+<span id="1745">1745</span>
+<span id="1746">1746</span>
+<span id="1747">1747</span>
+<span id="1748">1748</span>
+<span id="1749">1749</span>
+<span id="1750">1750</span>
+<span id="1751">1751</span>
+<span id="1752">1752</span>
+<span id="1753">1753</span>
+<span id="1754">1754</span>
+<span id="1755">1755</span>
+<span id="1756">1756</span>
+<span id="1757">1757</span>
+<span id="1758">1758</span>
+<span id="1759">1759</span>
+<span id="1760">1760</span>
+<span id="1761">1761</span>
+<span id="1762">1762</span>
+<span id="1763">1763</span>
+<span id="1764">1764</span>
+<span id="1765">1765</span>
+<span id="1766">1766</span>
+<span id="1767">1767</span>
+<span id="1768">1768</span>
+<span id="1769">1769</span>
+<span id="1770">1770</span>
+<span id="1771">1771</span>
+<span id="1772">1772</span>
+<span id="1773">1773</span>
+<span id="1774">1774</span>
+<span id="1775">1775</span>
+<span id="1776">1776</span>
+<span id="1777">1777</span>
+<span id="1778">1778</span>
+<span id="1779">1779</span>
+<span id="1780">1780</span>
+<span id="1781">1781</span>
+<span id="1782">1782</span>
+<span id="1783">1783</span>
+<span id="1784">1784</span>
+<span id="1785">1785</span>
+<span id="1786">1786</span>
+<span id="1787">1787</span>
+<span id="1788">1788</span>
+<span id="1789">1789</span>
+<span id="1790">1790</span>
+<span id="1791">1791</span>
+<span id="1792">1792</span>
+<span id="1793">1793</span>
+<span id="1794">1794</span>
+<span id="1795">1795</span>
+<span id="1796">1796</span>
+<span id="1797">1797</span>
+<span id="1798">1798</span>
+<span id="1799">1799</span>
+<span id="1800">1800</span>
+<span id="1801">1801</span>
+<span id="1802">1802</span>
+<span id="1803">1803</span>
+<span id="1804">1804</span>
+<span id="1805">1805</span>
+<span id="1806">1806</span>
+<span id="1807">1807</span>
+<span id="1808">1808</span>
+<span id="1809">1809</span>
+<span id="1810">1810</span>
+<span id="1811">1811</span>
+<span id="1812">1812</span>
 </pre><pre class="rust"><code><span class="doccomment">/*!
  * This module deals with computing different types of health for a mango account.
  *
@@ -1744,8 +1831,10 @@
 <span class="kw">use </span>fixed::types::I80F48;
 
 <span class="kw">use </span><span class="kw">crate</span>::error::<span class="kw-2">*</span>;
+<span class="kw">use </span><span class="kw">crate</span>::serum3_cpi::{OpenOrdersAmounts, OpenOrdersSlim};
 <span class="kw">use </span><span class="kw">crate</span>::state::{
-    Bank, MangoAccountRef, PerpMarket, PerpMarketIndex, PerpPosition, Serum3MarketIndex, TokenIndex,
+    Bank, MangoAccountRef, PerpMarket, PerpMarketIndex, PerpPosition, Serum3MarketIndex,
+    Serum3Orders, TokenIndex,
 };
 
 <span class="kw">use super</span>::<span class="kw-2">*</span>;
@@ -1962,6 +2051,11 @@
     </span><span class="kw">pub </span>reserved_base: I80F48,
     <span class="kw">pub </span>reserved_quote: I80F48,
 
+    <span class="comment">// Reserved amounts, converted to the opposite token, while using the most extreme order price
+    // May be zero if the extreme bid/ask price is not available (for orders placed in the past)
+    </span><span class="kw">pub </span>reserved_base_as_quote_lowest_ask: I80F48,
+    <span class="kw">pub </span>reserved_quote_as_base_highest_bid: I80F48,
+
     <span class="comment">// Index into TokenInfos _not_ a TokenIndex
     </span><span class="kw">pub </span>base_info_index: usize,
     <span class="kw">pub </span>quote_info_index: usize,
@@ -1973,6 +2067,35 @@
 }
 
 <span class="kw">impl </span>Serum3Info {
+    <span class="kw">fn </span>new(
+        serum_account: <span class="kw-2">&amp;</span>Serum3Orders,
+        open_orders: <span class="kw-2">&amp;</span><span class="kw">impl </span>OpenOrdersAmounts,
+        base_info_index: usize,
+        quote_info_index: usize,
+    ) -&gt; <span class="self">Self </span>{
+        <span class="comment">// track the reserved amounts
+        </span><span class="kw">let </span>reserved_base = I80F48::from(open_orders.native_base_reserved());
+        <span class="kw">let </span>reserved_quote = I80F48::from(open_orders.native_quote_reserved());
+
+        <span class="kw">let </span>reserved_base_as_quote_lowest_ask =
+            reserved_base * I80F48::from_num(serum_account.lowest_placed_ask);
+        <span class="kw">let </span>reserved_quote_as_base_highest_bid =
+            reserved_quote * I80F48::from_num(serum_account.highest_placed_bid_inv);
+
+        <span class="self">Self </span>{
+            reserved_base,
+            reserved_quote,
+            reserved_base_as_quote_lowest_ask,
+            reserved_quote_as_base_highest_bid,
+            base_info_index,
+            quote_info_index,
+            market_index: serum_account.market_index,
+            has_zero_funds: open_orders.native_base_total() == <span class="number">0
+                </span>&amp;&amp; open_orders.native_quote_total() == <span class="number">0
+                </span>&amp;&amp; open_orders.native_rebates() == <span class="number">0</span>,
+        }
+    }
+
     <span class="attribute">#[inline(always)]
     </span><span class="kw">fn </span>all_reserved_as_base(
         <span class="kw-2">&amp;</span><span class="self">self</span>,
@@ -1983,7 +2106,13 @@
         <span class="kw">let </span>quote_asset = quote_info.prices.asset(health_type);
         <span class="kw">let </span>base_liab = base_info.prices.liab(health_type);
         <span class="comment">// OPTIMIZATION: These divisions can be extremely expensive (up to 5k CU each)
-        </span><span class="self">self</span>.reserved_base + <span class="self">self</span>.reserved_quote * quote_asset / base_liab
+        </span><span class="kw">let </span>reserved_quote_as_base_oracle = <span class="self">self</span>.reserved_quote * quote_asset / base_liab;
+        <span class="kw">if </span><span class="self">self</span>.reserved_quote_as_base_highest_bid != <span class="number">0 </span>{
+            <span class="self">self</span>.reserved_base
+                + reserved_quote_as_base_oracle.min(<span class="self">self</span>.reserved_quote_as_base_highest_bid)
+        } <span class="kw">else </span>{
+            <span class="self">self</span>.reserved_base + reserved_quote_as_base_oracle
+        }
     }
 
     <span class="attribute">#[inline(always)]
@@ -1996,7 +2125,13 @@
         <span class="kw">let </span>base_asset = base_info.prices.asset(health_type);
         <span class="kw">let </span>quote_liab = quote_info.prices.liab(health_type);
         <span class="comment">// OPTIMIZATION: These divisions can be extremely expensive (up to 5k CU each)
-        </span><span class="self">self</span>.reserved_quote + <span class="self">self</span>.reserved_base * base_asset / quote_liab
+        </span><span class="kw">let </span>reserved_base_as_quote_oracle = <span class="self">self</span>.reserved_base * base_asset / quote_liab;
+        <span class="kw">if </span><span class="self">self</span>.reserved_base_as_quote_lowest_ask != <span class="number">0 </span>{
+            <span class="self">self</span>.reserved_quote
+                + reserved_base_as_quote_oracle.min(<span class="self">self</span>.reserved_base_as_quote_lowest_ask)
+        } <span class="kw">else </span>{
+            <span class="self">self</span>.reserved_quote + reserved_base_as_quote_oracle
+        }
     }
 
     <span class="doccomment">/// Compute the health contribution from active open orders.
@@ -2525,42 +2660,40 @@
         <span class="prelude-val">Ok</span>(())
     }
 
-    <span class="doccomment">/// Changes the cached user account token and serum balances.
+    <span class="doccomment">/// Recompute the cached information about a serum market.
     ///
     /// WARNING: You must also call recompute_token_weights() after all bank
     /// deposit/withdraw changes!
-    </span><span class="attribute">#[allow(clippy::too_many_arguments)]
-    </span><span class="kw">pub fn </span>adjust_serum3_reserved(
+    </span><span class="kw">pub fn </span>recompute_serum3_info(
         <span class="kw-2">&amp;mut </span><span class="self">self</span>,
-        market_index: Serum3MarketIndex,
-        base_token_index: TokenIndex,
-        reserved_base_change: I80F48,
+        serum_account: <span class="kw-2">&amp;</span>Serum3Orders,
+        open_orders: <span class="kw-2">&amp;</span>OpenOrdersSlim,
         free_base_change: I80F48,
-        quote_token_index: TokenIndex,
-        reserved_quote_change: I80F48,
         free_quote_change: I80F48,
     ) -&gt; <span class="prelude-ty">Result</span>&lt;()&gt; {
-        <span class="kw">let </span>base_entry_index = <span class="self">self</span>.token_info_index(base_token_index)<span class="question-mark">?</span>;
-        <span class="kw">let </span>quote_entry_index = <span class="self">self</span>.token_info_index(quote_token_index)<span class="question-mark">?</span>;
+        <span class="kw">let </span>serum_info_index = <span class="self">self
+            </span>.serum3_infos
+            .iter_mut()
+            .position(|m| m.market_index == serum_account.market_index)
+            .ok_or_else(|| <span class="macro">error_msg!</span>(<span class="string">&quot;serum3 market {} not found&quot;</span>, serum_account.market_index))<span class="question-mark">?</span>;
 
-        <span class="comment">// Apply it to the tokens
-        </span>{
-            <span class="kw">let </span>base_entry = <span class="kw-2">&amp;mut </span><span class="self">self</span>.token_infos[base_entry_index];
+        <span class="kw">let </span>serum_info = <span class="kw-2">&amp;</span><span class="self">self</span>.serum3_infos[serum_info_index];
+        {
+            <span class="kw">let </span>base_entry = <span class="kw-2">&amp;mut </span><span class="self">self</span>.token_infos[serum_info.base_info_index];
             base_entry.balance_spot += free_base_change;
         }
         {
-            <span class="kw">let </span>quote_entry = <span class="kw-2">&amp;mut </span><span class="self">self</span>.token_infos[quote_entry_index];
+            <span class="kw">let </span>quote_entry = <span class="kw-2">&amp;mut </span><span class="self">self</span>.token_infos[serum_info.quote_info_index];
             quote_entry.balance_spot += free_quote_change;
         }
 
-        <span class="comment">// Apply it to the serum3 info
-        </span><span class="kw">let </span>market_entry = <span class="self">self
-            </span>.serum3_infos
-            .iter_mut()
-            .find(|m| m.market_index == market_index)
-            .ok_or_else(|| <span class="macro">error_msg!</span>(<span class="string">&quot;serum3 market {} not found&quot;</span>, market_index))<span class="question-mark">?</span>;
-        market_entry.reserved_base += reserved_base_change;
-        market_entry.reserved_quote += reserved_quote_change;
+        <span class="kw">let </span>serum_info = <span class="kw-2">&amp;mut </span><span class="self">self</span>.serum3_infos[serum_info_index];
+        <span class="kw-2">*</span>serum_info = Serum3Info::new(
+            serum_account,
+            open_orders,
+            serum_info.base_info_index,
+            serum_info.quote_info_index,
+        );
         <span class="prelude-val">Ok</span>(())
     }
 
@@ -2973,20 +3106,12 @@
         <span class="kw">let </span>quote_info = <span class="kw-2">&amp;mut </span>token_infos[quote_info_index];
         quote_info.balance_spot += quote_free;
 
-        <span class="comment">// track the reserved amounts
-        </span><span class="kw">let </span>reserved_base = I80F48::from(oo.native_coin_total - oo.native_coin_free);
-        <span class="kw">let </span>reserved_quote = I80F48::from(oo.native_pc_total - oo.native_pc_free);
-
-        serum3_infos.push(Serum3Info {
-            reserved_base,
-            reserved_quote,
+        serum3_infos.push(Serum3Info::new(
+            serum_account,
+            oo,
             base_info_index,
             quote_info_index,
-            market_index: serum_account.market_index,
-            has_zero_funds: oo.native_coin_total == <span class="number">0
-                </span>&amp;&amp; oo.native_pc_total == <span class="number">0
-                </span>&amp;&amp; oo.referrer_rebates_accrued == <span class="number">0</span>,
-        });
+        ));
     }
 
     <span class="comment">// health contribution from perp accounts
@@ -3148,6 +3273,7 @@
         perp1: (i64, i64, i64, i64),
         expected_health: f64,
         bank_settings: [BankSettings; <span class="number">3</span>],
+        extra: <span class="prelude-ty">Option</span>&lt;<span class="kw">fn</span>(<span class="kw-2">&amp;mut </span>MangoAccountValue)&gt;,
     }
     <span class="kw">fn </span>test_health1_runner(testcase: <span class="kw-2">&amp;</span>TestHealth1Case) {
         <span class="kw">let </span>buffer = MangoAccount::default_for_tests().try_to_vec().unwrap();
@@ -3225,6 +3351,10 @@
         );
         perpaccount.bids_base_lots = testcase.perp1.<span class="number">2</span>;
         perpaccount.asks_base_lots = testcase.perp1.<span class="number">3</span>;
+
+        <span class="kw">if let </span><span class="prelude-val">Some</span>(extra_fn) = testcase.extra {
+            extra_fn(<span class="kw-2">&amp;mut </span>account);
+        }
 
         <span class="kw">let </span>oracle2_ai = oracle2.as_account_info();
         <span class="kw">let </span>ais = <span class="macro">vec!</span>[
@@ -3438,6 +3568,50 @@
                 </span>token1: <span class="number">100</span>,
                 perp1: (-<span class="number">1</span>, -<span class="number">100</span>, <span class="number">0</span>, <span class="number">0</span>),
                 expected_health: <span class="number">1.2 </span>* (<span class="number">100.0 </span>- <span class="number">100.0 </span>- <span class="number">1.2 </span>* <span class="number">1.0 </span>* base_lots_to_quote),
+                ..Default::default()
+            },
+            TestHealth1Case {
+                <span class="comment">// 14, reserved oo funds with max bid/min ask
+                </span>token1: -<span class="number">100</span>,
+                token2: -<span class="number">10</span>,
+                token3: <span class="number">0</span>,
+                oo_1_2: (<span class="number">1</span>, <span class="number">1</span>),
+                oo_1_3: (<span class="number">11</span>, <span class="number">1</span>),
+                expected_health:
+                    <span class="comment">// tokens
+                    </span>-<span class="number">100.0 </span>* <span class="number">1.2 </span>- <span class="number">10.0 </span>* <span class="number">5.0 </span>* <span class="number">1.5
+                    </span><span class="comment">// oo_1_2 (-&gt; token1)
+                    </span>+ (<span class="number">1.0 </span>+ <span class="number">3.0</span>) * <span class="number">1.2
+                    </span><span class="comment">// oo_1_3 (-&gt; token3)
+                    </span>+ (<span class="number">11.0 </span>/ <span class="number">12.0 </span>+ <span class="number">1.0</span>) * <span class="number">10.0 </span>* <span class="number">0.5</span>,
+                extra: <span class="prelude-val">Some</span>(|account: <span class="kw-2">&amp;mut </span>MangoAccountValue| {
+                    <span class="kw">let </span>s2 = account.serum3_orders_mut(<span class="number">2</span>).unwrap();
+                    s2.lowest_placed_ask = <span class="number">3.0</span>;
+                    <span class="kw">let </span>s3 = account.serum3_orders_mut(<span class="number">3</span>).unwrap();
+                    s3.highest_placed_bid_inv = <span class="number">1.0 </span>/ <span class="number">12.0</span>;
+                }),
+                ..Default::default()
+            },
+            TestHealth1Case {
+                <span class="comment">// 15, reserved oo funds with max bid/min ask not crossing oracle
+                </span>token1: -<span class="number">100</span>,
+                token2: -<span class="number">10</span>,
+                token3: <span class="number">0</span>,
+                oo_1_2: (<span class="number">1</span>, <span class="number">1</span>),
+                oo_1_3: (<span class="number">11</span>, <span class="number">1</span>),
+                expected_health:
+                    <span class="comment">// tokens
+                    </span>-<span class="number">100.0 </span>* <span class="number">1.2 </span>- <span class="number">10.0 </span>* <span class="number">5.0 </span>* <span class="number">1.5
+                    </span><span class="comment">// oo_1_2 (-&gt; token1)
+                    </span>+ (<span class="number">1.0 </span>+ <span class="number">5.0</span>) * <span class="number">1.2
+                    </span><span class="comment">// oo_1_3 (-&gt; token3)
+                    </span>+ (<span class="number">11.0 </span>/ <span class="number">10.0 </span>+ <span class="number">1.0</span>) * <span class="number">10.0 </span>* <span class="number">0.5</span>,
+                extra: <span class="prelude-val">Some</span>(|account: <span class="kw-2">&amp;mut </span>MangoAccountValue| {
+                    <span class="kw">let </span>s2 = account.serum3_orders_mut(<span class="number">2</span>).unwrap();
+                    s2.lowest_placed_ask = <span class="number">6.0</span>;
+                    <span class="kw">let </span>s3 = account.serum3_orders_mut(<span class="number">3</span>).unwrap();
+                    s3.highest_placed_bid_inv = <span class="number">1.0 </span>/ <span class="number">9.0</span>;
+                }),
                 ..Default::default()
             },
         ];

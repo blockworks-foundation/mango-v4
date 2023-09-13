@@ -1618,6 +1618,10 @@
 <span id="1618">1618</span>
 <span id="1619">1619</span>
 <span id="1620">1620</span>
+<span id="1621">1621</span>
+<span id="1622">1622</span>
+<span id="1623">1623</span>
+<span id="1624">1624</span>
 </pre><pre class="rust"><code><span class="attribute">#![cfg(feature = <span class="string">&quot;client&quot;</span>)]
 
 </span><span class="kw">use </span>anchor_lang::prelude::<span class="kw-2">*</span>;
@@ -2572,6 +2576,8 @@
                     market_index: <span class="number">0</span>,
                     reserved_base: I80F48::from(<span class="number">30 </span>/ <span class="number">3</span>),
                     reserved_quote: I80F48::from(<span class="number">30 </span>/ <span class="number">2</span>),
+                    reserved_base_as_quote_lowest_ask: I80F48::ZERO,
+                    reserved_quote_as_base_highest_bid: I80F48::ZERO,
                     has_zero_funds: <span class="bool-val">false</span>,
                 }];
                 adjust_by_usdc(<span class="kw-2">&amp;mut </span>health_cache, <span class="number">0</span>, -<span class="number">20.0</span>);
@@ -3226,6 +3232,8 @@
             serum3_infos: <span class="macro">vec!</span>[Serum3Info {
                 reserved_base: I80F48::ONE,
                 reserved_quote: I80F48::ZERO,
+                reserved_base_as_quote_lowest_ask: I80F48::ONE,
+                reserved_quote_as_base_highest_bid: I80F48::ZERO,
                 base_info_index: <span class="number">1</span>,
                 quote_info_index: <span class="number">0</span>,
                 market_index: <span class="number">0</span>,
