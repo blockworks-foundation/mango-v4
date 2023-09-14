@@ -935,6 +935,8 @@ mod tests {
                     market_index: 0,
                     reserved_base: I80F48::from(30 / 3),
                     reserved_quote: I80F48::from(30 / 2),
+                    reserved_base_as_quote_lowest_ask: I80F48::ZERO,
+                    reserved_quote_as_base_highest_bid: I80F48::ZERO,
                     has_zero_funds: false,
                 }];
                 adjust_by_usdc(&mut health_cache, 0, -20.0);
@@ -1553,6 +1555,8 @@ mod tests {
             serum3_infos: vec![Serum3Info {
                 reserved_base: I80F48::ONE,
                 reserved_quote: I80F48::ZERO,
+                reserved_base_as_quote_lowest_ask: I80F48::ONE,
+                reserved_quote_as_base_highest_bid: I80F48::ZERO,
                 base_info_index: 1,
                 quote_info_index: 0,
                 market_index: 0,
