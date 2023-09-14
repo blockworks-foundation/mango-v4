@@ -29,7 +29,8 @@ anchor-lang = { workspace = true }
 anchor-spl = { workspace = true }
 arrayref = "0.3.6"
 bincode = "1.3.3"
-borsh = { version = "0.10.3" }
+borsh = { version = "0.10.3", features = ["const-generics"] }
+borsh0-9 = { package = "borsh", version = "0.9.3", features = ["const-generics"] }
 bytemuck = { version = "^1.7.2", features = ["min_const_generics"] }
 default-env = "0.1.1"
 derivative = "2.2.0"
@@ -46,12 +47,15 @@ static_assertions = "1.1"
 
 switchboard-program = ">=0.2.0"
 switchboard-v2 = { package = "switchboard-solana", version = "0.28.18" }
+#switchboard-v2 = { git = "https://github.com/switchboard-xyz/solana-sdk.git", tag = "sbv2-crate-0.4.0" }
 
-# commit bf0ff1c (anchor 0.28)
-openbook-v2 = { path = "/Users/stefan/mango/code/openbook-v2/programs/openbook-v2", default-features=false, features = ["no-entrypoint", "solana-sdk"] }
+# commit bf0ff1c
+openbook-v2 = { path = "/Users/stefan/mango/code/openbook-v2/programs/openbook-v2", default-features=false, features = ["no-entrypoint"] }
 raydium-amm-v3 = { git = "https://github.com/raydium-io/raydium-clmm.git", rev = "bcee27a" }
 # required by mpl-token-metadata
 mpl-utils = { version = "0.3.2", features = ["spl-token"] }
+
+
 
 [dev-dependencies]
 solana-sdk = { workspace = true, default-features = false }
