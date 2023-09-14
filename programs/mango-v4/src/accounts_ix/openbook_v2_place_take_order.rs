@@ -34,7 +34,7 @@ pub struct OpenbookV2PlaceTakeOrder<'info> {
         mut,
         has_one = bids,
         has_one = asks,
-        has_one = event_queue,
+        has_one = event_heap,
     )]
     pub openbook_v2_market_external: AccountLoader<'info, Market>,
 
@@ -48,7 +48,7 @@ pub struct OpenbookV2PlaceTakeOrder<'info> {
 
     #[account(mut)]
     /// CHECK: Validated by the openbook_v2 cpi call
-    pub event_queue: UncheckedAccount<'info>,
+    pub event_heap: UncheckedAccount<'info>,
 
     #[account(mut)]
     /// CHECK: Validated by the openbook_v2 cpi call
