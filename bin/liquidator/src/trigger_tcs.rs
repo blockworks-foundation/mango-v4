@@ -10,10 +10,10 @@ use mango_v4::{
     i80f48::ClampToInt,
     state::{Bank, MangoAccountValue, TokenConditionalSwap, TokenIndex},
 };
-use mango_v4_client::{chain_data, health_cache, jupiter, MangoClient};
+use mango_v4_client::{chain_data, health_cache, jupiter, MangoClient, TransactionBuilder};
 
 use anyhow::Context as AnyhowContext;
-use solana_sdk::signature::Signature;
+use solana_sdk::{signature::Signature, signer::Signer};
 use tracing::*;
 use {fixed::types::I80F48, solana_sdk::pubkey::Pubkey};
 
@@ -47,6 +47,7 @@ struct PreparedExecution {
     token_indexes: Vec<TokenIndex>,
     max_buy_token_to_liqee: u64,
     max_sell_token_to_liqor: u64,
+    jupiter_quote: Option<jupiter::Quote>,
 }
 
 struct PreparationResult {
@@ -295,6 +296,7 @@ impl Context {
                 token_indexes: vec![],
                 max_buy_token_to_liqee: 0,
                 max_sell_token_to_liqor: 0,
+                jupiter_quote: None,
             }))
         } else {
             self.prepare_token_conditional_swap_inner(pubkey, &liqee, tcs.id)
@@ -397,7 +399,7 @@ impl Context {
         }
 
         // Final check of the reverse trade on jupiter
-        {
+        let jupiter_quote = {
             let buy_mint = self
                 .mango_client
                 .context
@@ -408,28 +410,28 @@ impl Context {
                 .context
                 .mint_info(tcs.sell_token_index)
                 .mint;
-            // The slippage does not matter since we're not going to execute it
-            let slippage = 100;
+            // TODO: make slippage configurable
+            let slippage_bps = 100;
             let input_amount = max_sell_token_to_liqor.min(
                 (I80F48::from(max_buy_token_to_liqee) * taker_price)
                     .floor()
                     .to_num(),
             );
-            let route = self
+            let quote = self
                 .mango_client
                 .jupiter()
                 .quote(
                     sell_mint,
                     buy_mint,
                     input_amount,
-                    slippage,
+                    slippage_bps,
                     false,
                     self.config.jupiter_version,
                 )
                 .await?;
 
-            let sell_amount = route.in_amount as f64;
-            let buy_amount = route.out_amount as f64;
+            let sell_amount = quote.in_amount as f64;
+            let buy_amount = quote.out_amount as f64;
             let swap_price = sell_amount / buy_amount;
 
             if swap_price > taker_price.to_num::<f64>() {
@@ -442,7 +444,9 @@ impl Context {
                 );
                 return Ok(None);
             }
-        }
+
+            quote
+        };
 
         trace!(
             max_buy = max_buy_token_to_liqee,
@@ -462,6 +466,7 @@ impl Context {
             token_indexes: vec![tcs.buy_token_index, tcs.sell_token_index],
             max_buy_token_to_liqee,
             max_sell_token_to_liqor,
+            jupiter_quote: Some(jupiter_quote),
         }))
     }
 
@@ -664,14 +669,35 @@ impl Context {
         pending: PreparedExecution,
         allowed_tokens: Vec<TokenIndex>,
     ) -> anyhow::Result<Signature> {
+        // Jupiter quote is provided only for triggers, not close-expired
+        let mut tx_builder = if let Some(jupiter_quote) = pending.jupiter_quote {
+            self.mango_client
+                .jupiter()
+                .prepare_swap_transaction(&jupiter_quote)
+                .await?
+        } else {
+            // compute ix is part of the jupiter swap in the above case
+            let compute_ix =
+                solana_sdk::compute_budget::ComputeBudgetInstruction::set_compute_unit_limit(
+                    self.config.compute_limit_for_trigger,
+                );
+            TransactionBuilder {
+                instructions: vec![compute_ix],
+                address_lookup_tables: vec![],
+                payer: self.mango_client.client.fee_payer.pubkey(),
+                signers: vec![
+                    self.mango_client.owner.clone(),
+                    self.mango_client.client.fee_payer.clone(),
+                ],
+                config: self.mango_client.client.transaction_builder_config,
+            }
+        };
+
         let liqee = self.account_fetcher.fetch_mango_account(&pending.pubkey)?;
-        let compute_ix =
-            solana_sdk::compute_budget::ComputeBudgetInstruction::set_compute_unit_limit(
-                self.config.compute_limit_for_trigger,
-            );
         let trigger_ix = self
             .mango_client
             .token_conditional_swap_trigger_instruction(
+                // TODO: Triggering needs to abort on failure/reduction!
                 (&pending.pubkey, &liqee),
                 pending.tcs_id,
                 pending.max_buy_token_to_liqee,
@@ -679,9 +705,10 @@ impl Context {
                 &allowed_tokens,
             )
             .await?;
-        let txsig = self
-            .mango_client
-            .send_and_confirm_owner_tx(vec![compute_ix, trigger_ix])
+        tx_builder.instructions.push(trigger_ix);
+
+        let txsig = tx_builder
+            .send_and_confirm(&self.mango_client.client)
             .await?;
         info!(
             pubkey = %pending.pubkey,
