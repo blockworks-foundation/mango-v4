@@ -7,10 +7,6 @@ use crate::health::*;
 use crate::i80f48::ClampToInt;
 use crate::state::*;
 
-/// Incentive to pay to callers who start an auction
-// TODO: $0.001 is ok? around 10x tx fee currently
-const TCS_START_INCENTIVE: u64 = 1_000; // $0.001
-
 #[allow(clippy::too_many_arguments)]
 pub fn token_conditional_swap_start(
     ctx: Context<TokenConditionalSwapStart>,
@@ -33,13 +29,13 @@ pub fn token_conditional_swap_start(
     let mut account_retriever = ScanningAccountRetriever::new(ctx.remaining_accounts, group_pk)
         .context("create account retriever")?;
 
-    let tcs = account.token_conditional_swap_by_index(token_conditional_swap_index)?;
+    let tcs = account
+        .token_conditional_swap_by_index(token_conditional_swap_index)?
+        .clone();
     require!(tcs.has_data(), MangoError::SomeError);
     require_eq!(tcs.id, token_conditional_swap_id);
     let buy_token_index = tcs.buy_token_index;
     let sell_token_index = tcs.sell_token_index;
-    let remaining_sell = tcs.remaining_sell();
-    let allow_borrows = tcs.allow_creating_borrows();
     let now_ts: u64 = Clock::get()?.unix_timestamp.try_into().unwrap();
     require!(tcs.has_incentive_for_starting(), MangoError::SomeError);
 
@@ -63,8 +59,8 @@ pub fn token_conditional_swap_start(
 
     // We allow the incentive to be < 1 native token because of tokens like BTC, where 1 native token
     // far exceeds the incentive value.
-    let incentive =
-        (I80F48::from(TCS_START_INCENTIVE) / sell_oracle_price).min(I80F48::from(remaining_sell));
+    let incentive = (I80F48::from(TCS_START_INCENTIVE) / sell_oracle_price)
+        .min(I80F48::from(tcs.remaining_sell()));
     // However, the tcs tracking is in u64 units. We need to live with the fact of
     // not accounting the incentive fee perfectly.
     let incentive_native = incentive.clamp_to_u64();
@@ -81,7 +77,7 @@ pub fn token_conditional_swap_start(
     sell_bank.withdraw_with_fee(account_sell_token, I80F48::from(incentive), now_ts)?;
     let account_sell_post_balance = account_sell_token.native(sell_bank);
     if account_sell_post_balance < 0 {
-        require!(allow_borrows, MangoError::SomeError);
+        require!(tcs.allow_creating_borrows(), MangoError::SomeError);
         require!(!sell_bank.are_borrows_reduce_only(), MangoError::SomeError);
         sell_bank.check_net_borrows(sell_oracle_price)?;
     }

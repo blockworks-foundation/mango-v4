@@ -4,8 +4,9 @@ use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use itertools::Itertools;
 use mango_v4::accounts_zerocopy::KeyedAccountSharedData;
+use mango_v4::error::{IsAnchorErrorWithCode, MangoError};
 use mango_v4::health::HealthType;
-use mango_v4::state::{PerpMarket, PerpMarketIndex};
+use mango_v4::state::*;
 use mango_v4_client::{
     chain_data, health_cache, prettify_solana_client_error, MangoClient, TransactionBuilder,
 };
@@ -67,27 +68,13 @@ impl State {
             // TODO: skip errors
 
             for tcs in account.active_token_conditional_swaps() {
-                if !tcs.has_incentive_for_starting()
-                    || tcs.is_expired(now_ts)
-                    || tcs.passed_start(now_ts)
-                {
-                    continue;
+                match self.is_tcs_startable(&account, tcs, now_ts) {
+                    Ok(true) => startable.push((account_key, tcs.id)),
+                    Ok(false) => {}
+                    Err(e) => {
+                        // TODO: error tracking
+                    }
                 }
-
-                // TODO: don't error out on error, probably put all of this in a function
-                let buy_price = self.oracle_for_token(tcs.buy_token_index)?;
-                let sell_price = self.oracle_for_token(tcs.sell_token_index)?;
-
-                let price = buy_price.to_num::<f64>() / sell_price.to_num::<f64>();
-                if !tcs.is_startable(price, now_ts) {
-                    continue;
-                }
-
-                // TODO: check if any tcs is startable
-                // - can pay incentive?
-
-                let tcs_id = 0u64;
-                startable.push((account_key, tcs_id));
             }
         }
 
@@ -126,11 +113,62 @@ impl State {
     }
 
     fn oracle_for_token(&self, token_index: TokenIndex) -> anyhow::Result<I80F48> {
-        let bank_pk = mango_client
+        let bank_pk = self
+            .mango_client
             .context
             .token(token_index)
             .mint_info
             .first_bank();
-        account_fetcher.fetch_bank_price(&bank_pk)
+        self.account_fetcher.fetch_bank_price(&bank_pk)
+    }
+
+    fn is_tcs_startable(
+        &self,
+        account: &MangoAccountValue,
+        tcs: &TokenConditionalSwap,
+        now_ts: u64,
+    ) -> anyhow::Result<bool> {
+        if !tcs.has_incentive_for_starting() || tcs.is_expired(now_ts) || tcs.passed_start(now_ts) {
+            return Ok(false);
+        }
+
+        let buy_price = self.oracle_for_token(tcs.buy_token_index)?;
+        let sell_price = self.oracle_for_token(tcs.sell_token_index)?;
+
+        let price = buy_price.to_num::<f64>() / sell_price.to_num::<f64>();
+        if !tcs.is_startable(price, now_ts) {
+            return Ok(false);
+        }
+
+        // Check if it's possible to deduct the incentive:
+        // borrow limitations in the tcs, the bank or the net borrow limit may intervene
+        let incentive = (I80F48::from(TCS_START_INCENTIVE) / sell_price)
+            .min(I80F48::from(tcs.remaining_sell()));
+        let sell_bank_pk = self
+            .mango_client
+            .context
+            .token(tcs.sell_token_index)
+            .mint_info
+            .first_bank();
+        let mut sell_bank: Bank = self.account_fetcher.fetch(&sell_bank_pk)?;
+        let sell_pos = account.token_position(tcs.sell_token_index)?;
+        let sell_pos_native = sell_pos.native(&sell_bank);
+        if sell_pos_native < incentive {
+            if !tcs.allow_creating_borrows() || sell_bank.are_borrows_reduce_only() {
+                return Ok(false);
+            }
+
+            let mut account_copy = account.clone();
+            let sell_pos_mut = account_copy.token_position_mut(tcs.sell_token_index)?.0;
+            sell_bank.withdraw_with_fee(sell_pos_mut, incentive, now_ts)?;
+
+            let result = sell_bank.check_net_borrows(sell_price);
+            if result.is_anchor_error_with_code(MangoError::BankNetBorrowsLimitReached.into()) {
+                return Ok(false);
+            }
+            result?;
+        }
+
+        Ok(true)
     }
 }
