@@ -47,7 +47,11 @@ static_assertions = "1.1"
 switchboard-program = ">=0.2.0"
 switchboard-v2 = { package = "switchboard-solana", version = "0.28.18" }
 
-openbook-v2 = { git = "https://github.com/openbook-dex/openbook-v2.git", default-features=false, features = ["no-entrypoint"] }
+# commit bf0ff1c (anchor 0.28)
+openbook-v2 = { path = "/Users/stefan/mango/code/openbook-v2/programs/openbook-v2", default-features=false, features = ["no-entrypoint", "solana-sdk"] }
+raydium-amm-v3 = { git = "https://github.com/raydium-io/raydium-clmm.git", rev = "bcee27a" }
+# required by mpl-token-metadata
+mpl-utils = { version = "0.3.2", features = ["spl-token"] }
 
 [dev-dependencies]
 solana-sdk = { workspace = true, default-features = false }
