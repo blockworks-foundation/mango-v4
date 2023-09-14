@@ -26,7 +26,7 @@ See https://github.com/blockworks-foundation/mango-v4/blob/dev/LICENSE
 
 Two branches are relevant here:
 
-- `devnet`: bleeding edge, may be unstable, could be incompatible with deployed program
+- `dev`: bleeding edge, may be unstable, could be incompatible with deployed program
 - `main`: stable, currently running on the `mainnet-beta` cluster
 
 ## Setup Environment
@@ -40,12 +40,19 @@ The environment variables required are
 - `LIQOR_MANGO_ACCOUNT` - public key of the mango account
 - `LIQOR_OWNER` - private key of the owner of the mango account
 - `RPC_URL` - RPC cluster url
-- `SERUM_PROGRAM` - the Openbook program Id the mango group is configured with e.g. primary mango group `78b8f4cGCwmZ9ysPFMWLaLTkkaYnUjwMJYStWe5RTSSX` is configured to work with `srmqPvymJeFKQ4zGQed1GFppgkRHL9kaELCbyksJtPX`
+- `MIN_HEALTH_RATIO` - minimum health ratio the liquidator should retain (default 50%)
 
 more advanced parameters
 
-- `MIN_HEALTH_RATIO` - minimum health ratio the liquidator should retain (default 50%)
+- `REBALANCE` - if rebalancing should happen (default true)
 - `REBALANCE_SLIPPAGE_BPS` - slippage liquidator should tolerate when offloading tokens (default 100)
+- `PRIORITIZATION_MICRO_LAMPORTS` - how much priority fee to pay (default 0)
+- `COMPUTE_LIMIT_FOR_LIQUIDATION` - compute to request for liq instructions (default 250k)
+- `COMPUTE_LIMIT_FOR_TCS` - compute to request for token conditional swap trigger instructions (default 300k)
+- `SNAPSHOT_INTERVAL_SECS` - how frequently to request a full on-chain snapshot (default 5min)
+- `PARALLEL_RPC_REQUESTS` - number of allowed parallel rpc calls (default 10)
+- `TELEMETRY` - report the liquidator's existence and pubkey occasionally (default true)
+- `MOCK_JUPITER` - replace jupiter queries with mocks (for devnet testing only)
 
 ```shell
 cargo run --bin liquidator

@@ -5,7 +5,14 @@ import { AccountInfo, PublicKey, TransactionSignature } from '@solana/web3.js';
 import { MangoClient } from '../client';
 import { OPENBOOK_PROGRAM_ID, RUST_I64_MAX, RUST_I64_MIN } from '../constants';
 import { I80F48, I80F48Dto, ONE_I80F48, ZERO_I80F48 } from '../numbers/I80F48';
-import { toNativeI80F48, toUiDecimals, toUiDecimalsForQuote } from '../utils';
+import {
+  U64_MAX_BN,
+  roundTo5,
+  toNativeI80F48,
+  toUiDecimals,
+  toUiDecimalsForQuote,
+  toUiSellPerBuyTokenPrice,
+} from '../utils';
 import { Bank, TokenIndex } from './bank';
 import { Group } from './group';
 import { HealthCache } from './healthCache';
@@ -182,6 +189,10 @@ export class MangoAccount {
     return this.serum3.filter((serum3) => serum3.isActive());
   }
 
+  public tokenConditionalSwapsActive(): TokenConditionalSwap[] {
+    return this.tokenConditionalSwaps.filter((tcs) => tcs.hasData);
+  }
+
   public perpPositionExistsForMarket(perpMarket: PerpMarket): boolean {
     return this.perps.some(
       (pp) => pp.isActive() && pp.marketIndex == perpMarket.perpMarketIndex,
@@ -196,10 +207,6 @@ export class MangoAccount {
 
   public perpActive(): PerpPosition[] {
     return this.perps.filter((perp) => perp.isActive());
-  }
-
-  public tokenConditionalSwapsActive(): TokenConditionalSwap[] {
-    return this.tokenConditionalSwaps.filter((tcs) => tcs.hasData);
   }
 
   public perpOrdersActive(): PerpOo[] {
@@ -344,6 +351,23 @@ export class MangoAccount {
     return hc.health(healthType);
   }
 
+  public getHealthContributionPerAssetUi(
+    group: Group,
+    healthType: HealthType,
+  ): {
+    asset: string;
+    contribution: number;
+    contributionDetails:
+      | {
+          spotUi: number;
+          perpMarketContributions: { market: string; contributionUi: number }[];
+        }
+      | undefined;
+  }[] {
+    const hc = HealthCache.fromMangoAccount(group, this);
+    return hc.healthContributionPerAssetUi(group, healthType);
+  }
+
   public perpMaxSettle(
     group: Group,
     perpMarketSettleTokenIndex: TokenIndex,
@@ -422,9 +446,9 @@ export class MangoAccount {
    * Sum of all positive assets.
    * @returns assets, in native quote
    */
-  public getAssetsValue(group: Group): I80F48 {
+  public getAssetsValue(group: Group, healthType?: HealthType): I80F48 {
     const hc = HealthCache.fromMangoAccount(group, this);
-    return hc.healthAssetsAndLiabs(undefined, false).assets;
+    return hc.healthAssetsAndLiabs(healthType, false).assets;
   }
 
   /**
@@ -513,8 +537,8 @@ export class MangoAccount {
     let existingPositionHealthContrib = ZERO_I80F48();
     if (existingTokenDeposits.gt(ZERO_I80F48())) {
       existingPositionHealthContrib = existingTokenDeposits
-        .mul(tokenBank.price)
-        .imul(tokenBank.initAssetWeight);
+        .mul(tokenBank.getAssetPrice())
+        .imul(tokenBank.scaledInitAssetWeight(tokenBank.getAssetPrice()));
     }
 
     // Case 2: token deposits have higher contribution than initHealth,
@@ -522,8 +546,8 @@ export class MangoAccount {
     if (existingPositionHealthContrib.gt(initHealth)) {
       const withdrawAbleExistingPositionHealthContrib = initHealth;
       return withdrawAbleExistingPositionHealthContrib
-        .div(tokenBank.initAssetWeight)
-        .div(tokenBank.price);
+        .div(tokenBank.scaledInitAssetWeight(tokenBank.getAssetPrice()))
+        .div(tokenBank.getAssetPrice());
     }
 
     // Case 3: withdraw = withdraw existing deposits + borrows until initHealth reaches 0
@@ -597,12 +621,11 @@ export class MangoAccount {
       ),
     );
     const sourceBalance = this.getEffectiveTokenBalance(group, sourceBank);
-    if (maxSource.gt(sourceBalance)) {
-      const sourceBorrow = maxSource.sub(sourceBalance);
-      maxSource = sourceBalance.add(
-        sourceBorrow.div(ONE_I80F48().add(sourceBank.loanOriginationFeeRate)),
-      );
-    }
+    const maxWithdrawNative = sourceBank.getMaxWithdraw(
+      group.getTokenVaultBalanceByMint(sourceBank.mint),
+      sourceBalance,
+    );
+    maxSource = maxSource.min(maxWithdrawNative);
     return toUiDecimals(maxSource, group.getMintDecimals(sourceMintPk));
   }
 
@@ -733,12 +756,11 @@ export class MangoAccount {
     // If its a bid then the reserved fund and potential loan is in base
     // also keep some buffer for fees, use taker fees for worst case simulation.
     const quoteBalance = this.getEffectiveTokenBalance(group, quoteBank);
-    if (quoteAmount.gt(quoteBalance)) {
-      const quoteBorrow = quoteAmount.sub(quoteBalance);
-      quoteAmount = quoteBalance.add(
-        quoteBorrow.div(ONE_I80F48().add(quoteBank.loanOriginationFeeRate)),
-      );
-    }
+    const maxWithdrawNative = quoteBank.getMaxWithdraw(
+      group.getTokenVaultBalanceByMint(quoteBank.mint),
+      quoteBalance,
+    );
+    quoteAmount = quoteAmount.min(maxWithdrawNative);
     quoteAmount = quoteAmount.div(
       ONE_I80F48().add(I80F48.fromNumber(serum3Market.getFeeRates(true))),
     );
@@ -775,12 +797,11 @@ export class MangoAccount {
     // If its a ask then the reserved fund and potential loan is in base
     // also keep some buffer for fees, use taker fees for worst case simulation.
     const baseBalance = this.getEffectiveTokenBalance(group, baseBank);
-    if (baseAmount.gt(baseBalance)) {
-      const baseBorrow = baseAmount.sub(baseBalance);
-      baseAmount = baseBalance.add(
-        baseBorrow.div(ONE_I80F48().add(baseBank.loanOriginationFeeRate)),
-      );
-    }
+    const maxWithdrawNative = baseBank.getMaxWithdraw(
+      group.getTokenVaultBalanceByMint(baseBank.mint),
+      baseBalance,
+    );
+    baseAmount = baseAmount.min(maxWithdrawNative);
     baseAmount = baseAmount.div(
       ONE_I80F48().add(I80F48.fromNumber(serum3Market.getFeeRates(true))),
     );
@@ -954,6 +975,7 @@ export class MangoAccount {
     group: Group,
     perpMarketIndex: PerpMarketIndex,
     size: number,
+    healthType: HealthType = HealthType.init,
   ): number {
     const perpMarket = group.getPerpMarketByMarketIndex(perpMarketIndex);
     const pp = this.getPerpPosition(perpMarket.perpMarketIndex);
@@ -967,7 +989,7 @@ export class MangoAccount {
         PerpOrderSide.bid,
         perpMarket.uiBaseToLots(size),
         perpMarket.price,
-        HealthType.init,
+        healthType,
       )
       .toNumber();
   }
@@ -976,6 +998,7 @@ export class MangoAccount {
     group: Group,
     perpMarketIndex: PerpMarketIndex,
     size: number,
+    healthType: HealthType = HealthType.init,
   ): number {
     const perpMarket = group.getPerpMarketByMarketIndex(perpMarketIndex);
     const pp = this.getPerpPosition(perpMarket.perpMarketIndex);
@@ -989,7 +1012,7 @@ export class MangoAccount {
         PerpOrderSide.ask,
         perpMarket.uiBaseToLots(size),
         perpMarket.price,
-        HealthType.init,
+        healthType,
       )
       .toNumber();
   }
@@ -1752,6 +1775,34 @@ export class PerpOoDto {
   ) {}
 }
 
+export class TokenConditionalSwapDisplayPriceStyle {
+  static sellTokenPerBuyToken = { sellTokenPerBuyToken: {} };
+  static buyTokenPerSellToken = { buyTokenPerSellToken: {} };
+}
+
+export class TokenConditionalSwapIntention {
+  static unknown = { unknown: {} };
+  static stopLoss = { stopLoss: {} };
+  static takeProfit = { takeProfit: {} };
+}
+
+function tokenConditionalSwapIntentionFromDto(
+  intention: number,
+): TokenConditionalSwapIntention {
+  switch (intention) {
+    case 0:
+      return TokenConditionalSwapIntention.unknown;
+    case 1:
+      return TokenConditionalSwapIntention.stopLoss;
+    case 2:
+      return TokenConditionalSwapIntention.takeProfit;
+    default:
+      throw new Error(
+        `unexpected token conditional swap intention: ${intention}`,
+      );
+  }
+}
+
 export class TokenConditionalSwap {
   static from(dto: TokenConditionalSwapDto): TokenConditionalSwap {
     return new TokenConditionalSwap(
@@ -1763,14 +1814,18 @@ export class TokenConditionalSwap {
       dto.expiryTimestamp,
       dto.priceLowerLimit,
       dto.priceUpperLimit,
-      dto.pricePremiumFraction,
-      dto.takerFeeFraction,
-      dto.makerFeeFraction,
+      dto.pricePremiumRate,
+      dto.takerFeeRate,
+      dto.makerFeeRate,
       dto.buyTokenIndex as TokenIndex,
       dto.sellTokenIndex as TokenIndex,
       dto.hasData == 1,
       dto.allowCreatingDeposits == 1,
       dto.allowCreatingBorrows == 1,
+      dto.priceDisplayStyle == 0
+        ? TokenConditionalSwapDisplayPriceStyle.sellTokenPerBuyToken
+        : TokenConditionalSwapDisplayPriceStyle.buyTokenPerSellToken,
+      tokenConditionalSwapIntentionFromDto(dto.intention),
     );
   }
 
@@ -1783,15 +1838,127 @@ export class TokenConditionalSwap {
     public expiryTimestamp: BN,
     public priceLowerLimit: number,
     public priceUpperLimit: number,
-    public pricePremiumFraction: number,
-    public takerFeeFraction: number,
-    public makerFeeFraction: number,
+    public pricePremiumRate: number,
+    public takerFeeRate: number,
+    public makerFeeRate: number,
     public buyTokenIndex: TokenIndex,
     public sellTokenIndex: TokenIndex,
     public hasData: boolean,
     public allowCreatingDeposits: boolean,
     public allowCreatingBorrows: boolean,
+    public priceDisplayStyle: TokenConditionalSwapDisplayPriceStyle,
+    public intention: TokenConditionalSwapIntention,
   ) {}
+
+  getMaxBuyUi(group: Group): number {
+    const buyBank = this.getBuyToken(group);
+    return toUiDecimals(this.maxBuy, buyBank.mintDecimals);
+  }
+
+  getMaxSellUi(group: Group): number {
+    const sellBank = this.getSellToken(group);
+    return toUiDecimals(this.maxSell, sellBank.mintDecimals);
+  }
+
+  getBoughtUi(group: Group): number {
+    const buyBank = this.getBuyToken(group);
+    return toUiDecimals(this.bought, buyBank.mintDecimals);
+  }
+
+  getSoldUi(group: Group): number {
+    const sellBank = this.getSellToken(group);
+    return toUiDecimals(this.sold, sellBank.mintDecimals);
+  }
+
+  getExpiryTimestampInEpochSeconds(): number {
+    return this.expiryTimestamp.toNumber();
+  }
+
+  private priceLimitToUi(
+    group: Group,
+    sellTokenPerBuyTokenNative: number,
+  ): number {
+    const buyBank = this.getBuyToken(group);
+    const sellBank = this.getSellToken(group);
+    const sellTokenPerBuyTokenUi = toUiSellPerBuyTokenPrice(
+      sellTokenPerBuyTokenNative,
+      sellBank,
+      buyBank,
+    );
+
+    // Below are workarounds to know when to show an inverted price in ui
+    // We want to identify if the pair user is wanting to trade is
+    // buytoken/selltoken or selltoken/buytoken
+
+    // Buy limit / close short
+    if (this.maxSell.eq(U64_MAX_BN)) {
+      return roundTo5(sellTokenPerBuyTokenUi);
+    }
+
+    // Stop loss / take profit
+    const buyTokenPerSellTokenUi = 1 / sellTokenPerBuyTokenUi;
+    return roundTo5(buyTokenPerSellTokenUi);
+  }
+
+  getPriceLowerLimitUi(group: Group): number {
+    return this.priceLimitToUi(group, this.priceLowerLimit);
+  }
+
+  getPriceUpperLimitUi(group: Group): number {
+    return this.priceLimitToUi(group, this.priceUpperLimit);
+  }
+
+  getThresholdPriceUi(group: Group): number {
+    const a = I80F48.fromNumber(this.priceLowerLimit);
+    const b = I80F48.fromNumber(this.priceUpperLimit);
+
+    const buyBank = this.getBuyToken(group);
+    const sellBank = this.getSellToken(group);
+    const o = buyBank.price.div(sellBank.price);
+
+    // Choose the price closest to oracle
+    if (o.sub(a).abs().lt(o.sub(b).abs())) {
+      return this.getPriceLowerLimitUi(group);
+    }
+    return this.getPriceUpperLimitUi(group);
+  }
+
+  // in percent
+  getPricePremium(): number {
+    return this.pricePremiumRate * 100;
+  }
+
+  getBuyToken(group: Group): Bank {
+    return group.getFirstBankByTokenIndex(this.buyTokenIndex);
+  }
+
+  getSellToken(group: Group): Bank {
+    return group.getFirstBankByTokenIndex(this.sellTokenIndex);
+  }
+
+  getAllowCreatingDeposits(): boolean {
+    return this.allowCreatingDeposits;
+  }
+
+  getAllowCreatingBorrows(): boolean {
+    return this.allowCreatingBorrows;
+  }
+
+  toString(group: Group): string {
+    return `getMaxBuy ${this.getMaxBuyUi(
+      group,
+    )}, getMaxSell ${this.getMaxSellUi(group)}, bought ${this.getBoughtUi(
+      group,
+    )}, sold ${this.getSoldUi(
+      group,
+    )}, getPriceLowerLimitUi ${this.getPriceLowerLimitUi(
+      group,
+    )},  getPriceUpperLimitUi ${this.getPriceUpperLimitUi(
+      group,
+    )}, getThresholdPriceUi ${this.getThresholdPriceUi(
+      group,
+    )}, getPricePremium ${this.getPricePremium()}, expiry ${this.expiryTimestamp.toString()}`;
+  }
 }
 
 export class TokenConditionalSwapDto {
@@ -1804,14 +1971,16 @@ export class TokenConditionalSwapDto {
     public expiryTimestamp: BN,
     public priceLowerLimit: number,
     public priceUpperLimit: number,
-    public pricePremiumFraction: number,
-    public takerFeeFraction: number,
-    public makerFeeFraction: number,
+    public pricePremiumRate: number,
+    public takerFeeRate: number,
+    public makerFeeRate: number,
     public buyTokenIndex: number,
     public sellTokenIndex: number,
     public hasData: number,
     public allowCreatingDeposits: number,
     public allowCreatingBorrows: number,
+    public priceDisplayStyle: number,
+    public intention: number,
   ) {}
 }
 

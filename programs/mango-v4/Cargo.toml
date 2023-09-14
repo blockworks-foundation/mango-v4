@@ -2,7 +2,7 @@ cargo-features = ["workspace-inheritance"]
 
 [package]
 name = "mango-v4"
-version = "0.18.0"
+version = "0.19.0"
 description = "Created with Anchor"
 edition = "2021"
 
@@ -46,6 +46,8 @@ static_assertions = "1.1"
 
 switchboard-program = ">=0.2.0"
 switchboard-v2 = { package = "switchboard-solana", version = "0.28.18" }
+
+openbook-v2 = { git = "https://github.com/openbook-dex/openbook-v2.git", default-features=false, features = ["no-entrypoint"] }
 
 [dev-dependencies]
 solana-sdk = { workspace = true, default-features = false }

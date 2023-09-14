@@ -23,10 +23,19 @@ pub fn token_withdraw(ctx: Context<TokenWithdraw>, amount: u64, allow_borrow: bo
     let pre_health_opt = if !account.fixed.is_in_health_region() {
         let retriever =
             new_fixed_order_account_retriever(ctx.remaining_accounts, &account.borrow())?;
-        let health_cache =
-            new_health_cache(&account.borrow(), &retriever).context("pre-withdraw init health")?;
-        let pre_init_health = account.check_health_pre(&health_cache)?;
-        Some((health_cache, pre_init_health))
+        let hc_result =
+            new_health_cache(&account.borrow(), &retriever).context("pre-withdraw health cache");
+        if hc_result.is_oracle_error() {
+            // We allow NOT checking the pre init health. That means later on the health
+            // check will be stricter (post_init > 0, without the post_init >= pre_init option)
+            // Then later we can compute the health while ignoring potential nonnegative
+            // health contributions from tokens with stale oracles.
+            None
+        } else {
+            let health_cache = hc_result?;
+            let pre_init_health = account.check_health_pre(&health_cache)?;
+            Some((health_cache, pre_init_health))
+        }
     } else {
         None
     };
@@ -56,10 +65,11 @@ pub fn token_withdraw(ctx: Context<TokenWithdraw>, amount: u64, allow_borrow: bo
 
     let amount_i80f48 = I80F48::from(amount);
 
-    let now_slot = Clock::get()?.slot;
-    let oracle_price = bank.oracle_price(
+    // Get the oracle price, even if stale or unconfident: We want to allow users
+    // to withdraw deposits (while staying healthy otherwise) if the oracle is bad.
+    let unsafe_oracle_state = oracle_state_unchecked(
         &AccountInfoRef::borrow(ctx.accounts.oracle.as_ref())?,
-        Some(now_slot),
+        bank.mint_decimals,
     )?;
 
     // Update the bank and position
@@ -68,6 +78,10 @@ pub fn token_withdraw(ctx: Context<TokenWithdraw>, amount: u64, allow_borrow: bo
         amount_i80f48,
         Clock::get()?.unix_timestamp.try_into().unwrap(),
     )?;
+
+    // Avoid getting in trouble because of the mutable bank account borrow later
+    drop(bank);
+    let bank = ctx.accounts.bank.load()?;
 
     // Provide a readable error message in case the vault doesn't have enough tokens
     if ctx.accounts.vault.amount < amount {
@@ -98,15 +112,32 @@ pub fn token_withdraw(ctx: Context<TokenWithdraw>, amount: u64, allow_borrow: bo
     });
 
     // Update the net deposits - adjust by price so different tokens are on the same basis (in USD terms)
-    let amount_usd = (amount_i80f48 * oracle_price).to_num::<i64>();
+    let amount_usd = (amount_i80f48 * unsafe_oracle_state.price).to_num::<i64>();
     account.fixed.net_deposits -= amount_usd;
 
     //
     // Health check
     //
-    if let Some((mut health_cache, pre_init_health)) = pre_health_opt {
-        health_cache.adjust_token_balance(&bank, native_position_after - native_position)?;
-        account.check_health_post(&health_cache, pre_init_health)?;
+    if !account.fixed.is_in_health_region() {
+        if let Some((mut health_cache, pre_init_health)) = pre_health_opt {
+            // This is the normal case
+            health_cache.adjust_token_balance(&bank, native_position_after - native_position)?;
+            account.check_health_post(&health_cache, pre_init_health)?;
+        } else {
+            // Some oracle was stale/not confident enough above.
+            //
+            // Try computing health while ignoring nonnegative contributions from bad oracles.
+            // If the health is good enough without those, we can pass.
+            //
+            // Note that this must include the normal pre and post health checks.
+            let retriever =
+                new_fixed_order_account_retriever(ctx.remaining_accounts, &account.borrow())?;
+            let health_cache = new_health_cache_skipping_bad_oracles(&account.borrow(), &retriever)
+                .context("special post-withdraw health-cache")?;
+            let post_init_health = health_cache.health(HealthType::Init);
+            account.check_health_pre_checks(&health_cache, post_init_health)?;
+            account.check_health_post_checks(I80F48::MAX, post_init_health)?;
+        }
     }
 
     //
@@ -124,7 +155,7 @@ pub fn token_withdraw(ctx: Context<TokenWithdraw>, amount: u64, allow_borrow: bo
         signer: ctx.accounts.owner.key(),
         token_index,
         quantity: amount,
-        price: oracle_price.to_bits(),
+        price: unsafe_oracle_state.price.to_bits(),
     });
 
     if withdraw_result.loan_origination_fee.is_positive() {
@@ -135,7 +166,7 @@ pub fn token_withdraw(ctx: Context<TokenWithdraw>, amount: u64, allow_borrow: bo
             loan_amount: withdraw_result.loan_amount.to_bits(),
             loan_origination_fee: withdraw_result.loan_origination_fee.to_bits(),
             instruction: LoanOriginationFeeInstruction::TokenWithdraw,
-            price: Some(oracle_price.to_bits()),
+            price: Some(unsafe_oracle_state.price.to_bits()),
         });
     }
 
@@ -143,7 +174,15 @@ pub fn token_withdraw(ctx: Context<TokenWithdraw>, amount: u64, allow_borrow: bo
     if is_borrow {
         ctx.accounts.vault.reload()?;
         bank.enforce_min_vault_to_deposits_ratio(ctx.accounts.vault.as_ref())?;
-        bank.check_net_borrows(oracle_price)?;
+
+        // When borrowing the price has be trustworthy, so we can do a reasonable
+        // net borrow check.
+        unsafe_oracle_state.check_confidence_and_maybe_staleness(
+            &bank.oracle,
+            &bank.oracle_config,
+            Some(Clock::get()?.slot),
+        )?;
+        bank.check_net_borrows(unsafe_oracle_state.price)?;
     }
 
     Ok(())

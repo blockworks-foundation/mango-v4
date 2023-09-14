@@ -126,6 +126,9 @@ pub struct MangoAccount {
     pub perps: Vec<PerpPosition>,
     pub padding7: u32,
     pub perp_open_orders: Vec<PerpOpenOrder>,
+    // WARNING: This does not have further fields, like tcs, intentionally:
+    // There are existing accounts that don't have them and adding them here
+    // would break backwards compatibility.
 }
 
 impl MangoAccount {
@@ -169,21 +172,15 @@ impl MangoAccount {
         perp_count: u8,
         perp_oo_count: u8,
         token_conditional_swap_count: u8,
-    ) -> Result<usize> {
-        require_gte!(16, token_count);
-        require_gte!(8, serum3_count);
-        require_gte!(8, perp_count);
-        require_gte!(64, perp_oo_count);
-        require_gte!(64, token_conditional_swap_count);
-
-        Ok(8 + size_of::<MangoAccountFixed>()
+    ) -> usize {
+        8 + size_of::<MangoAccountFixed>()
             + Self::dynamic_size(
                 token_count,
                 serum3_count,
                 perp_count,
                 perp_oo_count,
                 token_conditional_swap_count,
-            ))
+            )
     }
 
     pub fn dynamic_token_vec_offset() -> usize {
@@ -257,9 +254,14 @@ pub struct MangoAccountFixed {
     pub buyback_fees_accrued_previous: u64,
     pub buyback_fees_expiry_timestamp: u64,
     pub next_token_conditional_swap_id: u64,
-    pub reserved: [u8; 200],
+    pub temporary_delegate: Pubkey,
+    pub temporary_delegate_expiry: u64,
+    pub reserved: [u8; 160],
 }
-const_assert_eq!(size_of::<MangoAccountFixed>(), 32 * 4 + 8 + 8 * 8 + 200);
+const_assert_eq!(
+    size_of::<MangoAccountFixed>(),
+    32 * 4 + 8 + 8 * 8 + 32 + 8 + 160
+);
 const_assert_eq!(size_of::<MangoAccountFixed>(), 400);
 const_assert_eq!(size_of::<MangoAccountFixed>() % 8, 0);
 
@@ -276,11 +278,20 @@ impl MangoAccountFixed {
     }
 
     pub fn is_owner_or_delegate(&self, ix_signer: Pubkey) -> bool {
-        self.owner == ix_signer || self.delegate == ix_signer
+        self.owner == ix_signer || self.is_delegate(ix_signer)
     }
 
     pub fn is_delegate(&self, ix_signer: Pubkey) -> bool {
-        self.delegate == ix_signer
+        if self.delegate == ix_signer {
+            return true;
+        }
+
+        let now_ts: u64 = Clock::get().unwrap().unix_timestamp.try_into().unwrap();
+        if now_ts > self.temporary_delegate_expiry {
+            return false;
+        }
+
+        self.temporary_delegate == ix_signer
     }
 
     pub fn being_liquidated(&self) -> bool {
@@ -512,6 +523,65 @@ impl MangoAccountDynamicHeader {
     }
     pub fn token_conditional_swap_count(&self) -> usize {
         self.token_conditional_swap_count.into()
+    }
+
+    pub fn zero() -> Self {
+        Self {
+            token_count: 0,
+            serum3_count: 0,
+            perp_count: 0,
+            perp_oo_count: 0,
+            token_conditional_swap_count: 0,
+        }
+    }
+
+    fn expected_health_accounts(&self) -> usize {
+        self.token_count() * 2 + self.serum3_count() + self.perp_count() * 2
+    }
+
+    /// Error if this header isn't a valid resize from `prev`
+    ///
+    /// - Check that dynamic fields can only increase in size
+    /// - Check that if something increases, it is bounded by the limits
+    /// - If a field doesn't change, don't error if it exceeds the limits
+    ///   (might have been expanded earlier when it was valid to do)
+    /// - Check that the total health accounts stay limited
+    pub fn check_resize_from(&self, prev: &Self) -> Result<()> {
+        require_gte!(self.token_count, prev.token_count);
+        if self.token_count > prev.token_count {
+            require_gte!(8, self.token_count);
+        }
+
+        require_gte!(self.serum3_count, prev.serum3_count);
+        if self.serum3_count > prev.serum3_count {
+            require_gte!(4, self.serum3_count);
+        }
+
+        require_gte!(self.perp_count, prev.perp_count);
+        if self.perp_count > prev.perp_count {
+            require_gte!(4, self.perp_count);
+        }
+
+        require_gte!(self.perp_oo_count, prev.perp_oo_count);
+        if self.perp_oo_count > prev.perp_oo_count {
+            require_gte!(64, self.perp_oo_count);
+        }
+
+        require_gte!(
+            self.token_conditional_swap_count,
+            prev.token_conditional_swap_count
+        );
+        if self.token_conditional_swap_count > prev.token_conditional_swap_count {
+            require_gte!(64, self.token_conditional_swap_count);
+        }
+
+        let new_health_accounts = self.expected_health_accounts();
+        let prev_health_accounts = prev.expected_health_accounts();
+        if new_health_accounts > prev_health_accounts {
+            require_gte!(28, new_health_accounts);
+        }
+
+        Ok(())
     }
 }
 
@@ -1173,7 +1243,15 @@ impl<
     pub fn check_health_pre(&mut self, health_cache: &HealthCache) -> Result<I80F48> {
         let pre_init_health = health_cache.health(HealthType::Init);
         msg!("pre_init_health: {}", pre_init_health);
+        self.check_health_pre_checks(health_cache, pre_init_health)?;
+        Ok(pre_init_health)
+    }
 
+    pub fn check_health_pre_checks(
+        &mut self,
+        health_cache: &HealthCache,
+        pre_init_health: I80F48,
+    ) -> Result<()> {
         // We can skip computing LiquidationEnd health if Init health > 0, because
         // LiquidationEnd health >= Init health.
         self.fixed_mut()
@@ -1187,8 +1265,7 @@ impl<
             !self.fixed().being_liquidated(),
             MangoError::BeingLiquidated
         );
-
-        Ok(pre_init_health)
+        Ok(())
     }
 
     pub fn check_health_post(
@@ -1198,7 +1275,15 @@ impl<
     ) -> Result<I80F48> {
         let post_init_health = health_cache.health(HealthType::Init);
         msg!("post_init_health: {}", post_init_health);
+        self.check_health_post_checks(pre_init_health, post_init_health)?;
+        Ok(post_init_health)
+    }
 
+    pub fn check_health_post_checks(
+        &mut self,
+        pre_init_health: I80F48,
+        post_init_health: I80F48,
+    ) -> Result<()> {
         // Accounts that have negative init health may only take actions that don't further
         // decrease their health.
         // To avoid issues with rounding, we allow accounts to decrease their health by up to
@@ -1219,7 +1304,7 @@ impl<
             post_init_health >= 0 || health_does_not_decrease,
             MangoError::HealthMustBePositiveOrIncrease
         );
-        Ok(post_init_health)
+        Ok(())
     }
 
     pub fn check_liquidatable(&mut self, health_cache: &HealthCache) -> Result<CheckLiquidatable> {
@@ -1291,16 +1376,6 @@ impl<
         new_perp_oo_count: u8,
         new_token_conditional_swap_count: u8,
     ) -> Result<()> {
-        require_gte!(new_token_count, self.header().token_count);
-        require_gte!(new_serum3_count, self.header().serum3_count);
-        require_gte!(new_perp_count, self.header().perp_count);
-        require_gte!(new_perp_oo_count, self.header().perp_oo_count);
-        require_gte!(
-            new_token_conditional_swap_count,
-            self.header().token_conditional_swap_count
-        );
-
-        // create a temp copy to compute new starting offsets
         let new_header = MangoAccountDynamicHeader {
             token_count: new_token_count,
             serum3_count: new_serum3_count,
@@ -1309,6 +1384,9 @@ impl<
             token_conditional_swap_count: new_token_conditional_swap_count,
         };
         let old_header = self.header().clone();
+
+        new_header.check_resize_from(&old_header)?;
+
         let dynamic = self.dynamic_mut();
 
         // expand dynamic components by first moving existing positions, and then setting new ones to defaults
@@ -1474,8 +1552,7 @@ mod tests {
             account.perps.len() as u8,
             account.perp_open_orders.len() as u8,
             tcs_length,
-        )
-        .unwrap();
+        );
         bytes.extend(vec![0u8; expected_space - bytes.len()]);
 
         // Set the length of these dynamic parts
@@ -1511,7 +1588,7 @@ mod tests {
         account.tokens.resize(8, TokenPosition::default());
         account.tokens[0].token_index = 8;
         account.serum3.resize(8, Serum3Orders::default());
-        account.perps.resize(8, PerpPosition::default());
+        account.perps.resize(4, PerpPosition::default());
         account.perps[0].market_index = 9;
         account.perp_open_orders.resize(8, PerpOpenOrder::default());
         account.next_token_conditional_swap_id = 13;
@@ -1525,7 +1602,7 @@ mod tests {
         };
         assert_eq!(
             8 + account_bytes_with_tcs.len(),
-            MangoAccount::space(8, 8, 8, 8, 0).unwrap()
+            MangoAccount::space(8, 8, 4, 8, 0)
         );
 
         let account2 = MangoAccountValue::from_bytes(&account_bytes_without_tcs).unwrap();

@@ -9,12 +9,16 @@ import {
   ONE_I80F48,
   ZERO_I80F48,
 } from '../numbers/I80F48';
-import { toNativeI80F48ForQuote } from '../utils';
+import {
+  toNativeI80F48ForQuote,
+  toUiDecimals,
+  toUiDecimalsForQuote,
+} from '../utils';
 import { Bank, BankForHealth, TokenIndex } from './bank';
 import { Group } from './group';
 
 import { HealthType, MangoAccount, PerpPosition } from './mangoAccount';
-import { PerpMarket, PerpOrderSide } from './perp';
+import { PerpMarket, PerpMarketIndex, PerpOrderSide } from './perp';
 import { MarketIndex, Serum3Market, Serum3Side } from './serum3';
 
 //               ░░░░
@@ -235,6 +239,48 @@ export class HealthCache {
     return tokenBalances;
   }
 
+  effectiveTokenBalancesInternalDisplay(
+    group: Group,
+    healthType: HealthType | undefined,
+    ignoreNegativePerp: boolean,
+  ): TokenBalanceDisplay[] {
+    const tokenBalances = new Array(this.tokenInfos.length)
+      .fill(null)
+      .map((ignored) => new TokenBalanceDisplay(ZERO_I80F48(), 0, []));
+
+    for (const perpInfo of this.perpInfos) {
+      const settleTokenIndex = this.findTokenInfoIndex(
+        perpInfo.settleTokenIndex,
+      );
+      const perpSettleToken = tokenBalances[settleTokenIndex];
+      const healthUnsettled = perpInfo.healthUnsettledPnl(healthType);
+      perpSettleToken.perpMarketContributions.push({
+        market: group.getPerpMarketByMarketIndex(
+          perpInfo.perpMarketIndex as PerpMarketIndex,
+        ).name,
+        contributionUi: toUiDecimals(
+          healthUnsettled,
+          group.getMintDecimalsByTokenIndex(perpInfo.settleTokenIndex),
+        ),
+      });
+      if (!ignoreNegativePerp || healthUnsettled.gt(ZERO_I80F48())) {
+        perpSettleToken.spotAndPerp.iadd(healthUnsettled);
+      }
+    }
+
+    for (const index of this.tokenInfos.keys()) {
+      const tokenInfo = this.tokenInfos[index];
+      const tokenBalance = tokenBalances[index];
+      tokenBalance.spotAndPerp.iadd(tokenInfo.balanceSpot);
+      tokenBalance.spotUi += toUiDecimals(
+        tokenInfo.balanceSpot,
+        group.getMintDecimalsByTokenIndex(tokenInfo.tokenIndex),
+      );
+    }
+
+    return tokenBalances;
+  }
+
   healthSum(healthType: HealthType, tokenBalances: TokenBalance[]): I80F48 {
     const health = ZERO_I80F48();
     for (const index of this.tokenInfos.keys()) {
@@ -260,6 +306,70 @@ export class HealthCache {
       health.iadd(contrib);
     }
     return health;
+  }
+
+  healthContributionPerAssetUi(
+    group: Group,
+    healthType: HealthType,
+  ): {
+    asset: string;
+    contribution: number;
+    contributionDetails:
+      | {
+          spotUi: number;
+          perpMarketContributions: { market: string; contributionUi: number }[];
+        }
+      | undefined;
+  }[] {
+    const tokenBalancesDisplay: TokenBalanceDisplay[] =
+      this.effectiveTokenBalancesInternalDisplay(group, healthType, false);
+
+    const ret = new Array<{
+      asset: string;
+      contribution: number;
+      contributionDetails:
+        | {
+            spotUi: number;
+            perpMarketContributions: {
+              market: string;
+              contributionUi: number;
+            }[];
+          }
+        | undefined;
+    }>();
+    for (const index of this.tokenInfos.keys()) {
+      const tokenInfo = this.tokenInfos[index];
+      const tokenBalance = tokenBalancesDisplay[index];
+      const contrib = tokenInfo.healthContribution(
+        healthType,
+        tokenBalance.spotAndPerp,
+      );
+      ret.push({
+        asset: group.getFirstBankByTokenIndex(tokenInfo.tokenIndex).name,
+        contribution: toUiDecimalsForQuote(contrib),
+        contributionDetails: {
+          spotUi: tokenBalance.spotUi,
+          perpMarketContributions: tokenBalance.perpMarketContributions,
+        },
+      });
+    }
+    const res = this.computeSerum3Reservations(healthType);
+    for (const [index, serum3Info] of this.serum3Infos.entries()) {
+      const contrib = serum3Info.healthContribution(
+        healthType,
+        this.tokenInfos,
+        tokenBalancesDisplay,
+        res.tokenMaxReserved,
+        res.serum3Reserved[index],
+      );
+      ret.push({
+        asset: group.getSerum3MarketByMarketIndex(serum3Info.marketIndex).name,
+        contribution: toUiDecimalsForQuote(contrib),
+        contributionDetails: undefined,
+      });
+    }
+
+    return ret;
   }
 
   public health(healthType: HealthType): I80F48 {
@@ -1387,6 +1497,17 @@ export class TokenInfo {
 
 class TokenBalance {
   constructor(public spotAndPerp: I80F48) {}
+}
+
+class TokenBalanceDisplay {
+  constructor(
+    public spotAndPerp: I80F48,
+    public spotUi: number,
+    public perpMarketContributions: {
+      market: string;
+      contributionUi: number;
+    }[],
+  ) {}
 }
 
 class TokenMaxReserved {

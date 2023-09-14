@@ -3,7 +3,7 @@ use crate::accounts_zerocopy::*;
 use crate::error::*;
 use crate::group_seeds;
 use crate::health::{new_fixed_order_account_retriever, new_health_cache, AccountRetriever};
-use crate::logs::{FlashLoanLog, FlashLoanTokenDetail, TokenBalanceLog};
+use crate::logs::{FlashLoanLogV2, FlashLoanTokenDetailV2, TokenBalanceLog};
 use crate::state::*;
 
 use anchor_lang::prelude::*;
@@ -146,14 +146,6 @@ pub fn flash_loan_begin<'key, 'accounts, 'remaining, 'info>(
 
             // Check that the mango program key is not used
             if ix.program_id == crate::id() {
-                // must be the last mango ix -- this could possibly be relaxed, but right now
-                // we need to guard against multiple FlashLoanEnds
-                require_msg!(
-                    !found_end,
-                    "the transaction must not contain a Mango instruction after FlashLoanEnd"
-                );
-                found_end = true;
-
                 // must be the FlashLoanEnd instruction
                 require!(
                     ix.data[0..8] == crate::instruction::FlashLoanEndV2::discriminator(),
@@ -173,6 +165,13 @@ pub fn flash_loan_begin<'key, 'accounts, 'remaining, 'info>(
                 for (begin_account, end_account) in begin_accounts.iter().zip(end_accounts.iter()) {
                     require_msg!(*begin_account.key == end_account.pubkey, "the trailing vault, token and group accounts passed to FlashLoanBegin and End must match, found {} on begin and {} on end", begin_account.key, end_account.pubkey);
                 }
+
+                // No need to check any instructions after the end instruction.
+                // "Duplicate FlashLoanEnd" is guarded against the same way as "End without Begin":
+                // The End instruction requires at least one bank-vault pair and that bank
+                // must have flash_loan_token_account_initial set - which only happens in Begin.
+                found_end = true;
+                break;
             } else {
                 // ensure no one can cpi into mango either
                 for meta in ix.accounts.iter() {
@@ -236,6 +235,9 @@ pub fn flash_loan_end<'key, 'accounts, 'remaining, 'info>(
     // Verify that each mentioned vault has a bank in the health accounts
     let mut vaults_with_banks = vec![false; vaults.len()];
 
+    // Biggest flash_loan_deposit_fee_rate over all involved banks
+    let mut max_deposit_fee_rate = 0.0f32;
+
     // Loop over the banks, finding matching vaults
     // TODO: must be moved into health.rs, because it assumes something about the health accounts structure
     let mut changes = vec![];
@@ -293,22 +295,14 @@ pub fn flash_loan_end<'key, 'accounts, 'remaining, 'info>(
             change += repay;
         }
 
+        max_deposit_fee_rate = max_deposit_fee_rate.max(bank.flash_loan_deposit_fee_rate);
+
         changes.push(TokenVaultChange {
             token_index: bank.token_index,
             bank_index: i,
             raw_token_index,
             amount: change,
         });
-    }
-
-    match flash_loan_type {
-        FlashLoanType::Unknown => {}
-        FlashLoanType::Swap => {
-            require_msg!(
-                changes.len() == 2,
-                "when flash_loan_type is Swap there must be exactly 2 token vault changes"
-            )
-        }
     }
 
     // all vaults must have had matching banks
@@ -319,6 +313,16 @@ pub fn flash_loan_end<'key, 'accounts, 'remaining, 'info>(
             i,
             vaults[i].key
         );
+    }
+
+    match flash_loan_type {
+        FlashLoanType::Unknown => {}
+        FlashLoanType::Swap => {
+            require_msg!(
+                changes.len() == 2,
+                "when flash_loan_type is Swap there must be exactly 2 token vault changes"
+            )
+        }
     }
 
     // Check health before balance adjustments
@@ -349,7 +353,8 @@ pub fn flash_loan_end<'key, 'accounts, 'remaining, 'info>(
         let position = account.token_position_mut_by_raw_index(change.raw_token_index);
         let native = position.native(&bank);
 
-        let approved_amount = I80F48::from(bank.flash_loan_approved_amount);
+        let approved_amount_u64 = bank.flash_loan_approved_amount;
+        let approved_amount = I80F48::from(approved_amount_u64);
 
         let loan = if native.is_positive() {
             (approved_amount - native).max(I80F48::ZERO)
@@ -360,7 +365,14 @@ pub fn flash_loan_end<'key, 'accounts, 'remaining, 'info>(
         let loan_origination_fee = loan * bank.loan_origination_fee_rate;
         bank.collected_fees_native += loan_origination_fee;
 
-        let change_amount = change.amount - loan_origination_fee;
+        let deposit_fee = if change.amount > 0 {
+            change.amount * I80F48::from_num(max_deposit_fee_rate)
+        } else {
+            I80F48::ZERO
+        };
+        bank.collected_fees_native += deposit_fee;
+
+        let change_amount = change.amount - loan_origination_fee - deposit_fee;
         let native_after_change = native + change_amount;
         if bank.are_deposits_reduce_only() {
             require!(
@@ -396,7 +408,7 @@ pub fn flash_loan_end<'key, 'accounts, 'remaining, 'info>(
         bank.flash_loan_approved_amount = 0;
         bank.flash_loan_token_account_initial = u64::MAX;
 
-        token_loan_details.push(FlashLoanTokenDetail {
+        token_loan_details.push(FlashLoanTokenDetailV2 {
             token_index: position.token_index,
             change_amount: change.amount.to_bits(),
             loan: loan.to_bits(),
@@ -404,6 +416,8 @@ pub fn flash_loan_end<'key, 'accounts, 'remaining, 'info>(
             deposit_index: bank.deposit_index.to_bits(),
             borrow_index: bank.borrow_index.to_bits(),
             price: oracle_price.to_bits(),
+            deposit_fee: deposit_fee.to_bits(),
+            approved_amount: approved_amount_u64,
         });
 
         emit!(TokenBalanceLog {
@@ -416,7 +430,7 @@ pub fn flash_loan_end<'key, 'accounts, 'remaining, 'info>(
         });
     }
 
-    emit!(FlashLoanLog {
+    emit!(FlashLoanLogV2 {
         mango_group: group.key(),
         mango_account: ctx.accounts.account.key(),
         flash_loan_type,

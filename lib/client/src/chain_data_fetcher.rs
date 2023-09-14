@@ -6,8 +6,9 @@ use crate::chain_data::*;
 
 use anchor_lang::Discriminator;
 
-use mango_v4::accounts_zerocopy::LoadZeroCopy;
-use mango_v4::state::{MangoAccount, MangoAccountValue};
+use fixed::types::I80F48;
+use mango_v4::accounts_zerocopy::{KeyedAccountSharedData, LoadZeroCopy};
+use mango_v4::state::{Bank, MangoAccount, MangoAccountValue};
 
 use anyhow::Context;
 
@@ -17,6 +18,13 @@ use solana_sdk::clock::Slot;
 use solana_sdk::pubkey::Pubkey;
 use solana_sdk::signature::Signature;
 
+/// A complex account fetcher that mostly depends on an external job keeping
+/// the chain_data up to date.
+///
+/// In addition to the usual async fetching interface, it also has synchronous
+/// functions to access some kinds of data with less overhead.
+///
+/// Also, there's functions for fetching up to date data via rpc.
 pub struct AccountFetcher {
     pub chain_data: Arc<RwLock<ChainData>>,
     pub rpc: RpcClientAsync,
@@ -52,6 +60,13 @@ impl AccountFetcher {
 
         MangoAccountValue::from_bytes(&data[8..])
             .with_context(|| format!("loading mango account {}", address))
+    }
+
+    pub fn fetch_bank_price(&self, bank: &Pubkey) -> anyhow::Result<I80F48> {
+        let bank: Bank = self.fetch(bank)?;
+        let oracle = self.fetch_raw(&bank.oracle)?;
+        let price = bank.oracle_price(&KeyedAccountSharedData::new(bank.oracle, oracle), None)?;
+        Ok(price)
     }
 
     // fetches via RPC, stores in ChainData, returns new version

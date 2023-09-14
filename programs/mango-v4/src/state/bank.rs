@@ -142,8 +142,14 @@ pub struct Bank {
     // This ensures that collected_fees_native is strictly increasing for stats gathering purposes
     pub fees_withdrawn: u64,
 
+    /// Fees for the token conditional swap feature
+    pub token_conditional_swap_taker_fee_rate: f32,
+    pub token_conditional_swap_maker_fee_rate: f32,
+
+    pub flash_loan_deposit_fee_rate: f32,
+
     #[derivative(Debug = "ignore")]
-    pub reserved: [u8; 2104],
+    pub reserved: [u8; 2092],
 }
 const_assert_eq!(
     size_of::<Bank>(),
@@ -174,7 +180,8 @@ const_assert_eq!(
         + 1
         + 6
         + 8
-        + 2104
+        + 3 * 4
+        + 2092
 );
 const_assert_eq!(size_of::<Bank>(), 3064);
 const_assert_eq!(size_of::<Bank>() % 8, 0);
@@ -250,8 +257,36 @@ impl Bank {
             force_close: 0,
             padding: [0; 6],
             fees_withdrawn: 0,
-            reserved: [0; 2104],
+            token_conditional_swap_taker_fee_rate: 0.0,
+            token_conditional_swap_maker_fee_rate: 0.0,
+            flash_loan_deposit_fee_rate: 0.0,
+            reserved: [0; 2092],
         }
+    }
+
+    pub fn verify(&self) -> Result<()> {
+        require_gte!(self.oracle_config.conf_filter, 0.0);
+        require_gte!(self.util0, I80F48::ZERO);
+        require_gte!(self.rate0, I80F48::ZERO);
+        require_gte!(self.util1, I80F48::ZERO);
+        require_gte!(self.rate1, I80F48::ZERO);
+        require_gt!(self.max_rate, MINIMUM_MAX_RATE);
+        require_gte!(self.loan_fee_rate, 0.0);
+        require_gte!(self.loan_origination_fee_rate, 0.0);
+        require_gte!(self.maint_asset_weight, 0.0);
+        require_gte!(self.init_asset_weight, 0.0);
+        require_gte!(self.maint_liab_weight, 0.0);
+        require_gte!(self.init_liab_weight, 0.0);
+        require_gte!(self.liquidation_fee, 0.0);
+        require_gte!(self.min_vault_to_deposits_ratio, 0.0);
+        require_gte!(self.net_borrow_limit_per_window_quote, -1);
+        require_gt!(self.borrow_weight_scale_start_quote, 0.0);
+        require_gt!(self.deposit_weight_scale_start_quote, 0.0);
+        require_gte!(2, self.reduce_only);
+        require_gte!(self.token_conditional_swap_taker_fee_rate, 0.0);
+        require_gte!(self.token_conditional_swap_maker_fee_rate, 0.0);
+        require_gte!(self.flash_loan_deposit_fee_rate, 0.0);
+        Ok(())
     }
 
     pub fn name(&self) -> &str {
@@ -850,14 +885,13 @@ impl Bank {
         staleness_slot: Option<u64>,
     ) -> Result<I80F48> {
         require_keys_eq!(self.oracle, *oracle_acc.key());
-        let (price, _) = oracle::oracle_price_and_state(
-            oracle_acc,
+        let state = oracle::oracle_state_unchecked(oracle_acc, self.mint_decimals)?;
+        state.check_confidence_and_maybe_staleness(
+            &self.oracle,
             &self.oracle_config,
-            self.mint_decimals,
             staleness_slot,
         )?;
-
-        Ok(price)
+        Ok(state.price)
     }
 
     pub fn stable_price(&self) -> I80F48 {
