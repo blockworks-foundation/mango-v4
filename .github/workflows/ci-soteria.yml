@@ -46,8 +46,8 @@ jobs:
           solana --version
           echo "Generating keypair..."
           solana-keygen new -o "$HOME/.config/solana/id.json" --no-passphrase --silent
-          echo Installing bpf toolchain...
-          (cd /home/runner/.local/share/solana/install/active_release/bin/sdk/bpf/scripts; ./install.sh)
+          echo Installing sbf toolchain...
+          (cd /home/runner/.local/share/solana/install/active_release/bin/sdk/sbf/scripts; ./install.sh)
 
       - name: Install Soteria
         run: |
