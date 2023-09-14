@@ -1,33 +1,27 @@
-use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use itertools::Itertools;
-use mango_v4::accounts_zerocopy::KeyedAccountSharedData;
 use mango_v4::error::{IsAnchorErrorWithCode, MangoError};
-use mango_v4::health::HealthType;
 use mango_v4::state::*;
-use mango_v4_client::{
-    chain_data, health_cache, prettify_solana_client_error, MangoClient, TransactionBuilder,
-};
-use solana_sdk::address_lookup_table_account::AddressLookupTableAccount;
-use solana_sdk::commitment_config::CommitmentConfig;
+use mango_v4_client::{chain_data, error_tracking::ErrorTracking, MangoClient};
 use solana_sdk::instruction::Instruction;
-use solana_sdk::signature::Signature;
 
-use solana_sdk::signer::Signer;
-use solana_sdk::transaction::VersionedTransaction;
 use tracing::*;
-use {anyhow::Context, fixed::types::I80F48, solana_sdk::pubkey::Pubkey};
+use {fixed::types::I80F48, solana_sdk::pubkey::Pubkey};
 
-pub struct Config {}
+pub struct Config {
+    pub persistent_error_report_interval: Duration,
+    pub persistent_error_min_duration: Duration,
+}
 
 pub struct State {
     pub mango_client: Arc<MangoClient>,
     pub account_fetcher: Arc<chain_data::AccountFetcher>,
     pub config: Config,
-    // TODO: reuse liquidator error tracking and escalation?
-    //pub recently_settled: HashMap<Pubkey, Instant>,
+
+    pub errors: ErrorTracking,
+    pub last_persistent_error_report: Instant,
 }
 
 impl State {
@@ -38,23 +32,30 @@ impl State {
             accounts.shuffle(&mut rng);
         }
 
-        // self.expire_recently_settled();
-
-        self.run_pass_inner(&accounts).await
+        self.run_pass_inner(&accounts).await?;
+        self.log_persistent_errors();
+        Ok(())
     }
 
-    // fn expire_recently_settled(&mut self) {
-    //     let now = Instant::now();
-    //     self.recently_settled.retain(|_, last_settle| {
-    //         now.duration_since(*last_settle) < self.config.settle_cooldown
-    //     });
-    // }
+    fn log_persistent_errors(&mut self) {
+        let now = Instant::now();
+        if now.duration_since(self.last_persistent_error_report)
+            < self.config.persistent_error_report_interval
+        {
+            return;
+        }
+        self.last_persistent_error_report = now;
+
+        let min_duration = self.config.persistent_error_min_duration;
+        self.errors.log_persistent_errors("start_tcs", min_duration);
+    }
 
     async fn run_pass_inner(&mut self, accounts: &Vec<Pubkey>) -> anyhow::Result<()> {
         let now_ts: u64 = SystemTime::now()
             .duration_since(UNIX_EPOCH)?
             .as_secs()
             .try_into()?;
+        let now = Instant::now();
 
         let mango_client = &*self.mango_client;
         let account_fetcher = &*self.account_fetcher;
@@ -65,41 +66,76 @@ impl State {
             if account.fixed.group != mango_client.group() {
                 continue;
             }
-            // TODO: skip errors
+            if self.errors.had_too_many_errors(account_key, now).is_some() {
+                continue;
+            }
 
+            let mut had_tcs = false;
             for tcs in account.active_token_conditional_swaps() {
                 match self.is_tcs_startable(&account, tcs, now_ts) {
-                    Ok(true) => startable.push((account_key, tcs.id)),
-                    Ok(false) => {}
+                    Ok(true) => {}
+                    Ok(false) => continue,
                     Err(e) => {
-                        // TODO: error tracking
+                        self.errors.record_error(
+                            account_key,
+                            now,
+                            format!("error in is_tcs_startable: tcsid={}, {e:?}", tcs.id),
+                        );
                     }
                 }
+                had_tcs = true;
+                startable.push((account_key, tcs.id));
+            }
+
+            if !had_tcs {
+                self.errors.clear_errors(account_key);
             }
         }
 
         for startable_chunk in startable.chunks(8) {
             let mut instructions = vec![];
+            let mut ix_targets = vec![];
             for (pubkey, tcs_id) in startable_chunk {
                 let ix = match self.make_start_ix(pubkey, *tcs_id).await {
                     Ok(v) => v,
                     Err(e) => {
-                        // TODO: error tracking
+                        self.errors.record_error(
+                            pubkey,
+                            now,
+                            format!("error in make_start_ix: tcsid={tcs_id}, {e:?}"),
+                        );
                         continue;
                     }
                 };
                 instructions.push(ix);
+                ix_targets.push((*pubkey, *tcs_id));
             }
 
             let txsig = match mango_client.send_and_confirm_owner_tx(instructions).await {
                 Ok(v) => v,
                 Err(e) => {
-                    // TODO: error tracking for involved ones
+                    warn!("error sending transaction: {e:?}");
+                    for pubkey in ix_targets.iter().map(|(pk, _)| pk).unique() {
+                        let tcs_ids = ix_targets
+                            .iter()
+                            .filter_map(|(pk, tcs_id)| (pk == pubkey).then_some(tcs_id))
+                            .collect_vec();
+                        self.errors.record_error(
+                            pubkey,
+                            now,
+                            format!("error sending transaction: tcsids={tcs_ids:?}, {e:?}"),
+                        );
+                    }
                     continue;
                 }
             };
-            // TODO: also track successses, so we don't try to start the same thing too often
-            info!(%txsig, "started");
+
+            info!(%txsig, "sent starting transaction");
+
+            // clear errors on pubkeys with successes
+            for pubkey in ix_targets.iter().map(|(pk, _)| pk).unique() {
+                self.errors.clear_errors(pubkey);
+            }
         }
 
         Ok(())
