@@ -47,11 +47,11 @@ static_assertions = "1.1"
 
 switchboard-program = ">=0.2.0"
 switchboard-v2 = { package = "switchboard-solana", version = "0.28.18" }
-#switchboard-v2 = { git = "https://github.com/switchboard-xyz/solana-sdk.git", tag = "sbv2-crate-0.4.0" }
 
-# commit bf0ff1c
-openbook-v2 = { path = "/Users/stefan/mango/code/openbook-v2/programs/openbook-v2", default-features=false, features = ["no-entrypoint"] }
-raydium-amm-v3 = { git = "https://github.com/raydium-io/raydium-clmm.git", rev = "bcee27a" }
+#openbook-v2 = { git = "https://github.com/openbook-dex/openbook-v2.git", rev = "bf0ff1c", default-features=false, features = ["no-entrypoint"] }
+openbook-v2 = { git = "https://github.com/grooviegermanikus/openbook-v2.git", branch = "sync-with-mangov4-update-solana-1-16-anchor-28", default-features=false, features = ["no-entrypoint"] }
+
+raydium-amm-v3 = { git = "https://github.com/raydium-io/raydium-clmm.git" }
 # required by mpl-token-metadata
 mpl-utils = { version = "0.3.2", features = ["spl-token"] }
 

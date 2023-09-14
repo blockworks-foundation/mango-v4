@@ -2153,18 +2153,6 @@ dependencies = [
 [[package]]
 name = "fixed"
 version = "1.11.0"
-dependencies = [
- "az",
- "borsh 0.9.3",
- "bytemuck",
- "half",
- "serde",
- "typenum",
-]
-
-[[package]]
-name = "fixed"
-version = "1.11.0"
 source = "git+https://github.com/blockworks-foundation/fixed.git?branch=v1.11.0-borsh0_10-mango#01516ae3e29418feb066b67830540aa81d04df05"
 dependencies = [
  "az",
@@ -3350,11 +3338,12 @@ dependencies = [
  "base64 0.13.1",
  "bincode",
  "borsh 0.10.3",
+ "borsh 0.9.3",
  "bytemuck",
  "default-env",
  "derivative",
  "env_logger",
- "fixed 1.11.0 (git+https://github.com/blockworks-foundation/fixed.git?branch=v1.11.0-borsh0_10-mango)",
+ "fixed",
  "itertools",
  "lazy_static",
  "log 0.4.20",
@@ -3364,7 +3353,7 @@ dependencies = [
  "openbook-v2",
  "pyth-sdk-solana",
  "rand 0.8.5",
- "raydium-amm-v3 0.1.0 (git+https://github.com/raydium-io/raydium-clmm.git?rev=bcee27a)",
+ "raydium-amm-v3",
  "serde",
  "serum_dex",
  "solana-address-lookup-table-program",
@@ -3390,7 +3379,7 @@ dependencies = [
  "anyhow",
  "clap 3.2.25",
  "dotenv",
- "fixed 1.11.0 (git+https://github.com/blockworks-foundation/fixed.git?branch=v1.11.0-borsh0_10-mango)",
+ "fixed",
  "futures 0.3.28",
  "itertools",
  "mango-v4",
@@ -3417,7 +3406,7 @@ dependencies = [
  "atty",
  "base64 0.13.1",
  "bincode",
- "fixed 1.11.0 (git+https://github.com/blockworks-foundation/fixed.git?branch=v1.11.0-borsh0_10-mango)",
+ "fixed",
  "futures 0.3.28",
  "itertools",
  "jsonrpc-core 18.0.0 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -3453,7 +3442,7 @@ dependencies = [
  "anyhow",
  "clap 3.2.25",
  "dotenv",
- "fixed 1.11.0 (git+https://github.com/blockworks-foundation/fixed.git?branch=v1.11.0-borsh0_10-mango)",
+ "fixed",
  "futures 0.3.28",
  "itertools",
  "lazy_static",
@@ -3486,7 +3475,7 @@ dependencies = [
  "chrono",
  "clap 3.2.25",
  "dotenv",
- "fixed 1.11.0 (git+https://github.com/blockworks-foundation/fixed.git?branch=v1.11.0-borsh0_10-mango)",
+ "fixed",
  "futures 0.3.28",
  "futures-core",
  "futures-util",
@@ -3532,7 +3521,7 @@ dependencies = [
  "bytes 1.5.0",
  "clap 3.2.25",
  "dotenv",
- "fixed 1.11.0 (git+https://github.com/blockworks-foundation/fixed.git?branch=v1.11.0-borsh0_10-mango)",
+ "fixed",
  "futures 0.3.28",
  "futures-core",
  "futures-util",
@@ -4188,19 +4177,19 @@ checksum = "624a8340c38c1b80fd549087862da4ba43e08858af025b236e509b6649fc13d5"
 [[package]]
 name = "openbook-v2"
 version = "0.1.0"
+source = "git+https://github.com/grooviegermanikus/openbook-v2.git?branch=sync-with-mangov4-update-solana-1-16-anchor-28#86ac608e32de1037ef0911509f1a8cbe529619db"
 dependencies = [
- "anchor-lang 0.28.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "anchor-spl 0.28.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "anchor-lang 0.28.0 (git+https://github.com/coral-xyz/anchor.git?rev=2af9cc669)",
+ "anchor-spl 0.28.0 (git+https://github.com/coral-xyz/anchor.git?rev=2af9cc669)",
  "arrayref",
  "bytemuck",
  "derivative",
- "fixed 1.11.0",
+ "fixed",
  "itertools",
  "num_enum 0.5.11",
  "pyth-sdk-solana",
- "raydium-amm-v3 0.1.0 (git+https://github.com/raydium-io/raydium-clmm.git)",
+ "raydium-amm-v3",
  "solana-program",
- "solana-sdk",
  "static_assertions",
  "switchboard-program",
  "switchboard-v2",
@@ -5013,20 +5002,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6f97cdb2a36ed4183de61b2f824cc45c9f1037f28afe0a322e9fff4c108b5aaa"
 dependencies = [
  "rand_core 0.6.4",
-]
-
-[[package]]
-name = "raydium-amm-v3"
-version = "0.1.0"
-source = "git+https://github.com/raydium-io/raydium-clmm.git?rev=bcee27a#bcee27ac83feece4f1849f4ec1b57c7f2ea12770"
-dependencies = [
- "anchor-lang 0.28.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "anchor-spl 0.28.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "arrayref",
- "bytemuck",
- "mpl-token-metadata",
- "solana-program",
- "uint",
 ]
 
 [[package]]
