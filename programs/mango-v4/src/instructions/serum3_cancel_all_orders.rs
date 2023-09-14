@@ -1,10 +1,9 @@
 use anchor_lang::prelude::*;
 
-use super::{OpenOrdersAmounts, OpenOrdersSlim};
 use crate::accounts_ix::*;
 use crate::error::*;
 use crate::logs::Serum3OpenOrdersBalanceLogV2;
-use crate::serum3_cpi::load_open_orders_ref;
+use crate::serum3_cpi::{load_open_orders_ref, OpenOrdersAmounts, OpenOrdersSlim};
 use crate::state::*;
 
 pub fn serum3_cancel_all_orders(ctx: Context<Serum3CancelAllOrders>, limit: u8) -> Result<()> {

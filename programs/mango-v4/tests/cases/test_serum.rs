@@ -2,7 +2,7 @@
 use super::*;
 
 use mango_v4::accounts_ix::{Serum3OrderType, Serum3SelfTradeBehavior, Serum3Side};
-use mango_v4::{instructions::OpenOrdersSlim, serum3_cpi::load_open_orders_bytes};
+use mango_v4::serum3_cpi::{load_open_orders_bytes, OpenOrdersSlim};
 use std::sync::Arc;
 
 struct SerumOrderPlacer {
@@ -132,6 +132,34 @@ impl SerumOrderPlacer {
         )
         .await
         .unwrap();
+    }
+
+    async fn cancel_all(&self) {
+        let open_orders = self.serum.load_open_orders(self.open_orders).await;
+        let orders = open_orders.orders;
+        for (idx, order_id) in orders.iter().enumerate() {
+            if *order_id == 0 {
+                continue;
+            }
+            let side = if open_orders.is_bid_bits & (1u128 << idx) == 0 {
+                Serum3Side::Ask
+            } else {
+                Serum3Side::Bid
+            };
+
+            send_tx(
+                &self.solana,
+                Serum3CancelOrderInstruction {
+                    side,
+                    order_id: *order_id,
+                    account: self.account,
+                    owner: self.owner,
+                    serum_market: self.serum_market,
+                },
+            )
+            .await
+            .unwrap();
+        }
     }
 
     async fn settle(&self) {
@@ -1077,6 +1105,152 @@ async fn test_serum_place_reducing_when_liquidatable() -> Result<(), TransportEr
         &err,
         MangoError::HealthMustBePositiveOrIncrease.into(),
         "".into(),
+    );
+
+    Ok(())
+}
+
+#[tokio::test]
+async fn test_serum_track_bid_ask() -> Result<(), TransportError> {
+    let mut test_builder = TestContextBuilder::new();
+    test_builder.test().set_compute_max_units(150_000); // Serum3PlaceOrder needs lots
+    let context = test_builder.start_default().await;
+
+    //
+    // SETUP: Create a group, accounts, market etc
+    //
+    let deposit_amount = 10000;
+    let CommonSetup {
+        serum_market_cookie,
+        mut order_placer,
+        ..
+    } = common_setup(&context, deposit_amount).await;
+
+    //
+    // TEST: highest bid/lowest ask updating
+    //
+
+    assert_eq!(
+        order_placer
+            .mango_serum_orders()
+            .await
+            .highest_placed_bid_inv,
+        0.0
+    );
+    assert_eq!(
+        order_placer.mango_serum_orders().await.lowest_placed_ask,
+        0.0
+    );
+
+    order_placer.bid_maker(10.0, 100).await.unwrap();
+    assert_eq!(
+        order_placer
+            .mango_serum_orders()
+            .await
+            .highest_placed_bid_inv,
+        1.0 / 10.0
+    );
+
+    order_placer.bid_maker(9.0, 100).await.unwrap();
+    assert_eq!(
+        order_placer
+            .mango_serum_orders()
+            .await
+            .highest_placed_bid_inv,
+        1.0 / 10.0
+    );
+
+    order_placer.bid_maker(11.0, 100).await.unwrap();
+    assert_eq!(
+        order_placer
+            .mango_serum_orders()
+            .await
+            .highest_placed_bid_inv,
+        1.0 / 11.0
+    );
+
+    assert_eq!(
+        order_placer.mango_serum_orders().await.lowest_placed_ask,
+        0.0
+    );
+    order_placer.ask(20.0, 100).await.unwrap();
+    assert_eq!(
+        order_placer.mango_serum_orders().await.lowest_placed_ask,
+        20.0
+    );
+    order_placer.ask(19.0, 100).await.unwrap();
+    assert_eq!(
+        order_placer.mango_serum_orders().await.lowest_placed_ask,
+        19.0
+    );
+    order_placer.ask(21.0, 100).await.unwrap();
+    assert_eq!(
+        order_placer.mango_serum_orders().await.lowest_placed_ask,
+        19.0
+    );
+
+    assert_eq!(
+        order_placer
+            .mango_serum_orders()
+            .await
+            .highest_placed_bid_inv,
+        1.0 / 11.0
+    );
+
+    //
+    // TEST: cancellation allows for resets
+    //
+
+    order_placer.cancel_all().await;
+    assert_eq!(
+        order_placer.mango_serum_orders().await.lowest_placed_ask,
+        19.0
+    );
+    assert_eq!(
+        order_placer
+            .mango_serum_orders()
+            .await
+            .highest_placed_bid_inv,
+        1.0 / 11.0
+    );
+
+    // Process events such that the OutEvent deactivates the closed order on open_orders
+    context
+        .serum
+        .consume_spot_events(&serum_market_cookie, &[order_placer.open_orders])
+        .await;
+
+    // takes new value for bid, resets ask
+    order_placer.bid_maker(1.0, 100).await.unwrap();
+    assert_eq!(
+        order_placer.mango_serum_orders().await.lowest_placed_ask,
+        0.0
+    );
+    assert_eq!(
+        order_placer
+            .mango_serum_orders()
+            .await
+            .highest_placed_bid_inv,
+        1.0
+    );
+
+    //
+    // TEST: can reset even when there's still an order on the other side
+    //
+    let (oid, _) = order_placer.ask(10.0, 100).await.unwrap();
+    assert_eq!(
+        order_placer.mango_serum_orders().await.lowest_placed_ask,
+        10.0
+    );
+    order_placer.cancel(oid).await;
+    context
+        .serum
+        .consume_spot_events(&serum_market_cookie, &[order_placer.open_orders])
+        .await;
+    order_placer.ask(9.0, 100).await.unwrap();
+    assert_eq!(
+        order_placer.mango_serum_orders().await.lowest_placed_ask,
+        9.0
     );
 
     Ok(())

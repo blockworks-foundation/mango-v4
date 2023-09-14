@@ -4,7 +4,24 @@ Update this for each program release and mainnet deployment.
 
 ## not on mainnet
 
-### v0.19.0, 2023-8-
+### v0.19.1, 2023-9-
+
+- Fix a health overestimation with OpenBook open orders
+
+  When bids or asks crossed the oracle price, the serum3 health would be
+  overestimated before.
+
+  Now we track an account's max bid and min ask in each market and use that
+  as a worst-case price. The tracking isn't perfect for technical reasons
+  (compute cost, no notifications on fill) but produces an upper bound on
+  bids (lower bound on asks) that is sufficient to make health not
+  overestimate.
+
+## mainnet
+
+### v0.19.0, 2023-9-7
+
+Deployment: Sep 7, 2023 at 13:10:08 Central European Summer Time, https://explorer.solana.com/tx/3xcQWmAinBjFF4QgUCS7v5KxS7CjUQMJmENBHMyMMoeNCdKpLQL6fJXcKRRDmzW4ajPUywgPxBzMoYJn9c8CteEP
 
 - Token deposits and withdraws: Allow full withdraw or full borrow repays
   even when the oracle is stale (#646, #675)
@@ -55,8 +72,6 @@ Update this for each program release and mainnet deployment.
 - Fix typo in name of admin_token_withdraw_fees instruction (#655)
 - Flash loan: Better errors for missing banks (#639)
 - OpenBook v2 integration: First draft of instructions (#628)
-
-## mainnet
 
 ### v0.18.0, 2023-7-28
 
