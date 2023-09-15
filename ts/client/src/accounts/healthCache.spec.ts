@@ -4,10 +4,11 @@ import { expect } from 'chai';
 import cloneDeep from 'lodash/cloneDeep';
 import range from 'lodash/range';
 
+import { PublicKey } from '@solana/web3.js';
 import { I80F48, ONE_I80F48, ZERO_I80F48 } from '../numbers/I80F48';
 import { BankForHealth, StablePriceModel, TokenIndex } from './bank';
 import { HealthCache, PerpInfo, Serum3Info, TokenInfo } from './healthCache';
-import { HealthType, PerpPosition } from './mangoAccount';
+import { HealthType, PerpPosition, Serum3Orders } from './mangoAccount';
 import { PerpMarket, PerpOrderSide } from './perp';
 import { MarketIndex } from './serum3';
 
@@ -108,6 +109,14 @@ describe('Health Cache', () => {
     const ti2 = TokenInfo.fromBank(targetBank, I80F48.fromNumber(-10));
 
     const si1 = Serum3Info.fromOoModifyingTokenInfos(
+      new Serum3Orders(
+        PublicKey.default,
+        2 as MarketIndex,
+        4 as TokenIndex,
+        0 as TokenIndex,
+        0,
+        0,
+      ),
       1,
       ti2,
       0,
@@ -185,6 +194,8 @@ describe('Health Cache', () => {
       bs3: [number, number];
       oo12: [number, number];
       oo13: [number, number];
+      sa12: [number, number];
+      sa13: [number, number];
       perp1: [number, number, number, number];
       expectedHealth: number;
     }): void {
@@ -228,6 +239,14 @@ describe('Health Cache', () => {
       const ti3 = TokenInfo.fromBank(bank3, I80F48.fromNumber(fixture.token3));
 
       const si1 = Serum3Info.fromOoModifyingTokenInfos(
+        new Serum3Orders(
+          PublicKey.default,
+          2 as MarketIndex,
+          4 as TokenIndex,
+          0 as TokenIndex,
+          fixture.sa12[0],
+          fixture.sa12[1],
+        ),
         1,
         ti2,
         0,
@@ -243,11 +262,19 @@ describe('Health Cache', () => {
       );
 
       const si2 = Serum3Info.fromOoModifyingTokenInfos(
+        new Serum3Orders(
+          PublicKey.default,
+          3 as MarketIndex,
+          5 as TokenIndex,
+          0 as TokenIndex,
+          fixture.sa13[0],
+          fixture.sa13[1],
+        ),
         2,
         ti3,
         0,
         ti1,
-        2 as MarketIndex,
+        3 as MarketIndex,
         {
           quoteTokenTotal: new BN(fixture.oo13[0]),
           baseTokenTotal: new BN(fixture.oo13[1]),
@@ -291,7 +318,7 @@ describe('Health Cache', () => {
           .toFixed(3)
           .padStart(10)}, expected ${fixture.expectedHealth}`,
       );
-      expect(health - fixture.expectedHealth).lessThan(0.0000001);
+      expect(Math.abs(health - fixture.expectedHealth)).lessThan(0.0000001);
     }
 
     const basePrice = 5;
@@ -307,6 +334,8 @@ describe('Health Cache', () => {
       bs3: [0, Number.MAX_SAFE_INTEGER],
       oo12: [20, 15],
       oo13: [0, 0],
+      sa12: [0, 0],
+      sa13: [0, 0],
       perp1: [3, -131, 7, 11],
       expectedHealth:
         // for token1
@@ -331,6 +360,8 @@ describe('Health Cache', () => {
       bs3: [0, Number.MAX_SAFE_INTEGER],
       oo12: [20, 15],
       oo13: [0, 0],
+      sa12: [0, 0],
+      sa13: [0, 0],
       perp1: [-10, -131, 7, 11],
       expectedHealth:
         // for token1
@@ -353,6 +384,8 @@ describe('Health Cache', () => {
       bs3: [0, Number.MAX_SAFE_INTEGER],
       oo12: [0, 0],
       oo13: [0, 0],
+      sa12: [0, 0],
+      sa13: [0, 0],
       perp1: [-1, 100, 0, 0],
       expectedHealth: 0.8 * 0.95 * (100.0 - 1.2 * 1.0 * baseLotsToQuote),
     });
@@ -367,6 +400,8 @@ describe('Health Cache', () => {
       bs3: [0, Number.MAX_SAFE_INTEGER],
       oo12: [0, 0],
       oo13: [0, 0],
+      sa12: [0, 0],
+      sa13: [0, 0],
       perp1: [1, -100, 0, 0],
       expectedHealth: 1.2 * (-100.0 + 0.8 * 1.0 * baseLotsToQuote),
     });
@@ -381,6 +416,8 @@ describe('Health Cache', () => {
       bs3: [0, Number.MAX_SAFE_INTEGER],
       oo12: [0, 0],
       oo13: [0, 0],
+      sa12: [0, 0],
+      sa13: [0, 0],
       perp1: [10, 100, 0, 0],
       expectedHealth: 0.8 * 0.95 * (100.0 + 0.8 * 10.0 * baseLotsToQuote),
     });
@@ -395,6 +432,8 @@ describe('Health Cache', () => {
       bs3: [0, Number.MAX_SAFE_INTEGER],
       oo12: [0, 0],
       oo13: [0, 0],
+      sa12: [0, 0],
+      sa13: [0, 0],
       perp1: [30, -100, 0, 0],
       expectedHealth: 0.8 * 0.95 * (-100.0 + 0.8 * 30.0 * baseLotsToQuote),
     });
@@ -409,6 +448,8 @@ describe('Health Cache', () => {
       bs3: [0, Number.MAX_SAFE_INTEGER],
       oo12: [1, 1],
       oo13: [1, 1],
+      sa12: [0, 0],
+      sa13: [0, 0],
       perp1: [0, 0, 0, 0],
       expectedHealth:
         // tokens
@@ -431,6 +472,8 @@ describe('Health Cache', () => {
       bs3: [0, Number.MAX_SAFE_INTEGER],
       oo12: [1, 1],
       oo13: [1, 1],
+      sa12: [0, 0],
+      sa13: [0, 0],
       perp1: [0, 0, 0, 0],
       expectedHealth:
         -14.0 * 1.2 -
@@ -454,6 +497,8 @@ describe('Health Cache', () => {
       bs3: [0, Number.MAX_SAFE_INTEGER],
       oo12: [0, 0],
       oo13: [10, 1],
+      sa12: [0, 0],
+      sa13: [0, 0],
       perp1: [0, 0, 0, 0],
       expectedHealth:
         // tokens
@@ -475,6 +520,8 @@ describe('Health Cache', () => {
       bs3: [0, Number.MAX_SAFE_INTEGER],
       oo12: [100, 0],
       oo13: [10, 1],
+      sa12: [0, 0],
+      sa13: [0, 0],
       perp1: [0, 0, 0, 0],
       expectedHealth:
         // tokens
@@ -498,6 +545,8 @@ describe('Health Cache', () => {
       bs3: [10000, 10000],
       oo12: [0, 0],
       oo13: [0, 0],
+      sa12: [0, 0],
+      sa13: [0, 0],
       perp1: [0, 0, 0, 0],
       expectedHealth:
         // token1
@@ -518,6 +567,8 @@ describe('Health Cache', () => {
       bs3: [10000, 10000],
       oo12: [0, 0],
       oo13: [0, 0],
+      sa12: [0, 0],
+      sa13: [0, 0],
       perp1: [0, 0, 0, 0],
       expectedHealth:
         // token1
@@ -538,6 +589,8 @@ describe('Health Cache', () => {
       bs3: [0, Number.MAX_SAFE_INTEGER],
       oo12: [0, 0],
       oo13: [0, 0],
+      sa12: [0, 0],
+      sa13: [0, 0],
       perp1: [1, 100, 0, 0],
       expectedHealth:
         0.8 * (-100.0 + 0.95 * (100.0 + 0.8 * 1.0 * baseLotsToQuote)),
@@ -553,8 +606,56 @@ describe('Health Cache', () => {
       bs3: [0, Number.MAX_SAFE_INTEGER],
       oo12: [0, 0],
       oo13: [0, 0],
+      sa12: [0, 0],
+      sa13: [0, 0],
       perp1: [-1, -100, 0, 0],
       expectedHealth: 1.2 * (100.0 - 100.0 - 1.2 * 1.0 * baseLotsToQuote),
+    });
+
+    testFixture({
+      name: '14, reserved oo funds with max bid/min ask',
+      token1: -100,
+      token2: -10,
+      token3: 0,
+      bs1: [0, Number.MAX_SAFE_INTEGER],
+      bs2: [0, Number.MAX_SAFE_INTEGER],
+      bs3: [0, Number.MAX_SAFE_INTEGER],
+      oo12: [1, 1],
+      oo13: [11, 1],
+      sa12: [0, 3],
+      sa13: [1.0 / 12.0, 0],
+      perp1: [0, 0, 0, 0],
+      expectedHealth:
+        // tokens
+        -100.0 * 1.2 -
+        10.0 * 5.0 * 1.5 +
+        // oo_1_2 (-> token1)
+        (1.0 + 3.0) * 1.2 +
+        // oo_1_3 (-> token3)
+        (11.0 / 12.0 + 1.0) * 10.0 * 0.5,
+    });
+
+    testFixture({
+      name: '15, reserved oo funds with max bid/min ask not crossing oracle',
+      token1: -100,
+      token2: -10,
+      token3: 0,
+      bs1: [0, Number.MAX_SAFE_INTEGER],
+      bs2: [0, Number.MAX_SAFE_INTEGER],
+      bs3: [0, Number.MAX_SAFE_INTEGER],
+      oo12: [1, 1],
+      oo13: [11, 1],
+      sa12: [0, 6],
+      sa13: [1.0 / 9.0, 0],
+      perp1: [0, 0, 0, 0],
+      expectedHealth:
+        // tokens
+        -100.0 * 1.2 -
+        10.0 * 5.0 * 1.5 +
+        // oo_1_2 (-> token1)
+        (1.0 + 5.0) * 1.2 +
+        // oo_1_3 (-> token3)
+        (11.0 / 10.0 + 1.0) * 10.0 * 0.5,
     });
 
     done();
@@ -861,6 +962,8 @@ describe('Health Cache', () => {
           new Serum3Info(
             I80F48.fromNumber(30 / 3),
             I80F48.fromNumber(30 / 2),
+            ZERO_I80F48(),
+            ZERO_I80F48(),
             1,
             0,
             0 as MarketIndex,
