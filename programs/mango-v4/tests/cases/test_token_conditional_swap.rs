@@ -234,6 +234,7 @@ async fn test_token_conditional_swap() -> Result<(), TransportError> {
             index: 1,
             max_buy_token_to_liqee: 50,
             max_sell_token_to_liqor: 50,
+            min_buy_token: 0,
         },
     )
     .await;
@@ -251,6 +252,7 @@ async fn test_token_conditional_swap() -> Result<(), TransportError> {
             index: 0,
             max_buy_token_to_liqee: 50,
             max_sell_token_to_liqor: 50,
+            min_buy_token: 0,
         },
     )
     .await
@@ -271,6 +273,24 @@ async fn test_token_conditional_swap() -> Result<(), TransportError> {
     assert!(assert_equal_f_f(liqor_base, deposit_amount + 44.0, 0.01)); // roughly 42*1.1*0.95
 
     //
+    // TEST: requiring a too-high min buy token execution makes it fail
+    //
+    let r = send_tx(
+        solana,
+        TokenConditionalSwapTriggerInstruction {
+            liqee: account,
+            liqor,
+            liqor_owner: owner,
+            index: 0,
+            max_buy_token_to_liqee: 5000,
+            max_sell_token_to_liqor: 5000,
+            min_buy_token: 50,
+        },
+    )
+    .await;
+    assert!(r.is_err());
+
+    //
     // TEST: trigger fully
     //
     send_tx(
@@ -282,6 +302,7 @@ async fn test_token_conditional_swap() -> Result<(), TransportError> {
             index: 0,
             max_buy_token_to_liqee: 5000,
             max_sell_token_to_liqor: 5000,
+            min_buy_token: 40,
         },
     )
     .await

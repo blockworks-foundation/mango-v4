@@ -4456,11 +4456,12 @@ pub struct TokenConditionalSwapTriggerInstruction {
     pub index: u8,
     pub max_buy_token_to_liqee: u64,
     pub max_sell_token_to_liqor: u64,
+    pub min_buy_token: u64,
 }
 #[async_trait::async_trait(?Send)]
 impl ClientInstruction for TokenConditionalSwapTriggerInstruction {
     type Accounts = mango_v4::accounts::TokenConditionalSwapTrigger;
-    type Instruction = mango_v4::instruction::TokenConditionalSwapTrigger;
+    type Instruction = mango_v4::instruction::TokenConditionalSwapTriggerV2;
     async fn to_instruction(
         &self,
         account_loader: impl ClientAccountLoader + 'async_trait,
@@ -4486,6 +4487,7 @@ impl ClientInstruction for TokenConditionalSwapTriggerInstruction {
             token_conditional_swap_id: tcs.id,
             max_buy_token_to_liqee: self.max_buy_token_to_liqee,
             max_sell_token_to_liqor: self.max_sell_token_to_liqor,
+            min_buy_token: self.min_buy_token,
         };
 
         let health_check_metas = derive_liquidation_remaining_account_metas(
