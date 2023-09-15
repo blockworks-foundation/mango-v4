@@ -278,10 +278,15 @@ async fn main() -> anyhow::Result<()> {
     let tcs_config = trigger_tcs::Config {
         min_health_ratio: cli.min_health_ratio,
         max_trigger_quote_amount: 1_000_000_000, // TODO: config, $1000
-        jupiter_version: cli.jupiter_version.into(),
         compute_limit_for_trigger: cli.compute_limit_for_tcs,
         // TODO: config
         refresh_timeout: Duration::from_secs(30),
+
+        jupiter_version: cli.jupiter_version.into(),
+        jupiter_mode: trigger_tcs::JupiterMode::SwapBuySell {
+            slippage_bps: cli.rebalance_slippage_bps,
+        },
+        min_buy_fraction: 0.7,
     };
 
     let mut rebalance_interval = tokio::time::interval(Duration::from_secs(5));

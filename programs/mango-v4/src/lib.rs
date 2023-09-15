@@ -1415,6 +1415,28 @@ pub mod mango_v4 {
             token_conditional_swap_id,
             max_buy_token_to_liqee,
             max_sell_token_to_liqor,
+            0,
+        )?;
+        Ok(())
+    }
+
+    // NOTE: It's the triggerer's job to compute liqor_max_* numbers that work with the liqee's health.
+    pub fn token_conditional_swap_trigger_v2(
+        ctx: Context<TokenConditionalSwapTrigger>,
+        token_conditional_swap_index: u8,
+        token_conditional_swap_id: u64,
+        max_buy_token_to_liqee: u64,
+        max_sell_token_to_liqor: u64,
+        min_buy_token: u64,
+    ) -> Result<()> {
+        #[cfg(feature = "enable-gpl")]
+        instructions::token_conditional_swap_trigger(
+            ctx,
+            token_conditional_swap_index.into(),
+            token_conditional_swap_id,
+            max_buy_token_to_liqee,
+            max_sell_token_to_liqor,
+            min_buy_token,
         )?;
         Ok(())
     }

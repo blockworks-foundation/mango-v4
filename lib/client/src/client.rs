@@ -1265,6 +1265,7 @@ impl MangoClient {
         token_conditional_swap_id: u64,
         max_buy_token_to_liqee: u64,
         max_sell_token_to_liqor: u64,
+        min_buy_token: u64,
         extra_affected_tokens: &[TokenIndex],
     ) -> anyhow::Result<Instruction> {
         let (tcs_index, tcs) = liqee
@@ -1301,11 +1302,12 @@ impl MangoClient {
                 ams
             },
             data: anchor_lang::InstructionData::data(
-                &mango_v4::instruction::TokenConditionalSwapTrigger {
+                &mango_v4::instruction::TokenConditionalSwapTriggerV2 {
                     token_conditional_swap_id,
                     token_conditional_swap_index: tcs_index.try_into().unwrap(),
                     max_buy_token_to_liqee,
                     max_sell_token_to_liqor,
+                    min_buy_token,
                 },
             ),
         };

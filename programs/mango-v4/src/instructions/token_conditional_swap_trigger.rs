@@ -25,6 +25,7 @@ pub fn token_conditional_swap_trigger(
     token_conditional_swap_id: u64,
     max_buy_token_to_liqee: u64,
     max_sell_token_to_liqor: u64,
+    min_buy_token: u64,
 ) -> Result<()> {
     let group_pk = &ctx.accounts.group.key();
     let liqee_key = ctx.accounts.liqee.key();
@@ -53,6 +54,10 @@ pub fn token_conditional_swap_trigger(
 
     // Possibly wipe the tcs and exit, if it's already expired
     if tcs_is_expired {
+        if min_buy_token > 0 {
+            require!(!tcs_is_expired, MangoError::SomeError); // TODO: better error
+        }
+
         let (buy_bank, _buy_token_price, sell_bank_and_oracle_opt) =
             account_retriever.banks_mut_and_oracles(buy_token_index, sell_token_index)?;
         let (sell_bank, _sell_token_price) = sell_bank_and_oracle_opt.unwrap();
@@ -101,6 +106,8 @@ pub fn token_conditional_swap_trigger(
         max_sell_token_to_liqor,
         now_ts,
     )?;
+
+    require_gte!(liqee_buy_change, min_buy_token, MangoError::SomeError); // TODO: better error
 
     // Check liqor health, liqee health is checked inside (has to be, since tcs closure depends on it)
     let liqor_health = compute_health(&liqor.borrow(), HealthType::Init, &account_retriever)
