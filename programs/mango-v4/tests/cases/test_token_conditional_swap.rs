@@ -1,7 +1,7 @@
 use super::*;
 
 #[tokio::test]
-async fn test_token_conditional_swap() -> Result<(), TransportError> {
+async fn test_token_conditional_swap_basic() -> Result<(), TransportError> {
     pub use utils::assert_equal_f64_f64 as assert_equal_f_f;
 
     let context = TestContext::new().await;
@@ -323,6 +323,117 @@ async fn test_token_conditional_swap() -> Result<(), TransportError> {
         .token_conditional_swap_by_index(0)
         .unwrap()
         .has_data());
+
+    Ok(())
+}
+
+#[tokio::test]
+async fn test_token_conditional_swap_auction() -> Result<(), TransportError> {
+    pub use utils::assert_equal_f64_f64 as assert_equal_f_f;
+
+    let context = TestContext::new().await;
+    let solana = &context.solana.clone();
+
+    let admin = TestKeypair::new();
+    let owner = context.users[0].key;
+    let payer = context.users[1].key;
+    let mints = &context.mints[0..2];
+
+    //
+    // SETUP: Create a group, account, register a token (mint0)
+    //
+
+    let mango_setup::GroupWithTokens { group, tokens, .. } = mango_setup::GroupWithTokensConfig {
+        admin,
+        payer,
+        mints: mints.to_vec(),
+        ..mango_setup::GroupWithTokensConfig::default()
+    }
+    .create(solana)
+    .await;
+    let quote_token = &tokens[0];
+    let base_token = &tokens[1];
+
+    let deposit_amount = 1_000_000_000f64;
+    let account = create_funded_account(
+        &solana,
+        group,
+        owner,
+        0,
+        &context.users[1],
+        mints,
+        deposit_amount as u64,
+        0,
+    )
+    .await;
+    let liqor = create_funded_account(
+        &solana,
+        group,
+        owner,
+        1,
+        &context.users[1],
+        mints,
+        deposit_amount as u64,
+        0,
+    )
+    .await;
+
+    send_tx(
+        solana,
+        TokenEdit {
+            group,
+            admin,
+            mint: quote_token.mint.pubkey,
+            options: mango_v4::instruction::TokenEdit {
+                token_conditional_swap_taker_fee_rate_opt: Some(0.05),
+                token_conditional_swap_maker_fee_rate_opt: Some(0.1),
+                ..token_edit_instruction_default()
+            },
+        },
+    )
+    .await
+    .unwrap();
+
+    //
+    // TEST: Extending an account to have space for tcs works
+    //
+    send_tx(
+        solana,
+        AccountExpandInstruction {
+            account_num: 0,
+            token_count: 8,
+            serum3_count: 4,
+            perp_count: 4,
+            perp_oo_count: 16,
+            token_conditional_swap_count: 2,
+            group,
+            owner,
+            payer,
+        },
+    )
+    .await
+    .unwrap()
+    .account;
+    let account_data = get_mango_account(solana, account).await;
+    assert_eq!(account_data.header.token_conditional_swap_count, 2);
+
+    //
+    // TEST: Can create tcs auction
+    //
+    let tcs_ix = TokenConditionalSwapCreateLinearAuctionInstruction {
+        account,
+        owner,
+        buy_mint: quote_token.mint.pubkey,
+        sell_mint: base_token.mint.pubkey,
+        max_buy: 100,
+        max_sell: 100,
+        price_start: 1.0,
+        price_end: 11.0,
+        allow_creating_deposits: true,
+        allow_creating_borrows: true,
+        start_timestamp: 5,
+        duration_seconds: 5,
+    };
 
     Ok(())
 }
