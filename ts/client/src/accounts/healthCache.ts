@@ -17,7 +17,12 @@ import {
 import { Bank, BankForHealth, TokenIndex } from './bank';
 import { Group } from './group';
 
-import { HealthType, MangoAccount, PerpPosition } from './mangoAccount';
+import {
+  HealthType,
+  MangoAccount,
+  PerpPosition,
+  Serum3Orders,
+} from './mangoAccount';
 import { PerpMarket, PerpMarketIndex, PerpOrderSide } from './perp';
 import { MarketIndex, Serum3Market, Serum3Side } from './serum3';
 
@@ -132,6 +137,7 @@ export class HealthCache {
       }
 
       return Serum3Info.fromOoModifyingTokenInfos(
+        serum3,
         baseInfoIndex,
         baseInfo,
         quoteInfoIndex,
@@ -182,14 +188,31 @@ export class HealthCache {
 
       const quoteAsset = quote.prices.asset(healthType);
       const baseLiab = base.prices.liab(healthType);
-      const allReservedAsBase = reservedBase.add(
-        reservedQuote.mul(quoteAsset).div(baseLiab),
+      const reservedQuoteAsBaseOracle = reservedQuote.mul(
+        quoteAsset.div(baseLiab),
       );
+      let allReservedAsBase;
+      if (!info.reservedQuoteAsBaseHighestBid.eq(ZERO_I80F48())) {
+        allReservedAsBase = reservedBase.add(
+          reservedQuoteAsBaseOracle.min(info.reservedQuoteAsBaseHighestBid),
+        );
+      } else {
+        allReservedAsBase = reservedBase.add(reservedQuoteAsBaseOracle);
+      }
+
       const baseAsset = base.prices.asset(healthType);
       const quoteLiab = quote.prices.liab(healthType);
-      const allReservedAsQuote = reservedQuote.add(
-        reservedBase.mul(baseAsset).div(quoteLiab),
+      const reservedBaseAsQuoteOracle = reservedBase.mul(
+        baseAsset.div(quoteLiab),
       );
+      let allReservedAsQuote;
+      if (!info.reservedBaseAsQuoteLowestAsk.eq(ZERO_I80F48())) {
+        allReservedAsQuote = reservedQuote.add(
+          reservedBaseAsQuoteOracle.min(info.reservedBaseAsQuoteLowestAsk),
+        );
+      } else {
+        allReservedAsQuote = reservedQuote.add(reservedBaseAsQuoteOracle);
+      }
 
       const baseMaxReserved = tokenMaxReserved[info.baseInfoIndex];
       baseMaxReserved.maxSerumReserved.iadd(allReservedAsBase);
@@ -1525,6 +1548,8 @@ export class Serum3Info {
   constructor(
     public reservedBase: I80F48,
     public reservedQuote: I80F48,
+    public reservedBaseAsQuoteLowestAsk: I80F48,
+    public reservedQuoteAsBaseHighestBid: I80F48,
     public baseInfoIndex: number,
     public quoteInfoIndex: number,
     public marketIndex: MarketIndex,
@@ -1534,6 +1559,8 @@ export class Serum3Info {
     return new Serum3Info(
       I80F48.from(dto.reservedBase),
       I80F48.from(dto.reservedQuote),
+      I80F48.from(dto.reservedBaseAsQuoteLowestAsk),
+      I80F48.from(dto.reservedQuoteAsBaseHighestBid),
       dto.baseInfoIndex,
       dto.quoteInfoIndex,
       dto.marketIndex as MarketIndex,
@@ -1548,6 +1575,8 @@ export class Serum3Info {
     return new Serum3Info(
       ZERO_I80F48(),
       ZERO_I80F48(),
+      ZERO_I80F48(),
+      ZERO_I80F48(),
       baseEntryIndex,
       quoteEntryIndex,
       serum3Market.marketIndex,
@@ -1555,6 +1584,7 @@ export class Serum3Info {
   }
 
   static fromOoModifyingTokenInfos(
+    serumAccount: Serum3Orders,
     baseInfoIndex: number,
     baseInfo: TokenInfo,
     quoteInfoIndex: number,
@@ -1576,9 +1606,18 @@ export class Serum3Info {
       oo.quoteTokenTotal.sub(oo.quoteTokenFree),
     );
 
+    const reservedBaseAsQuoteLowestAsk = reservedBase.mul(
+      I80F48.fromNumber(serumAccount.lowestPlacedAsk),
+    );
+    const reservedQuoteAsBaseHighestBid = reservedQuote.mul(
+      I80F48.fromNumber(serumAccount.highestPlacedBidInv),
+    );
+
     return new Serum3Info(
       reservedBase,
       reservedQuote,
+      reservedBaseAsQuoteLowestAsk,
+      reservedQuoteAsBaseHighestBid,
       baseInfoIndex,
       quoteInfoIndex,
       marketIndex,
@@ -1967,6 +2006,8 @@ export class TokenInfoDto {
 export class Serum3InfoDto {
   reservedBase: I80F48Dto;
   reservedQuote: I80F48Dto;
+  reservedBaseAsQuoteLowestAsk: I80F48Dto;
+  reservedQuoteAsBaseHighestBid: I80F48Dto;
   baseInfoIndex: number;
   quoteInfoIndex: number;
   marketIndex: number;
