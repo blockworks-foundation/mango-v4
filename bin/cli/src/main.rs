@@ -192,8 +192,15 @@ async fn main() -> Result<(), anyhow::Error> {
             let output_mint = pubkey_from_cli(&cmd.output_mint);
             let client = MangoClient::new_for_existing_account(client, account, owner).await?;
             let txsig = client
-                .jupiter_v6()
-                .swap(input_mint, output_mint, cmd.amount, cmd.slippage_bps, false)
+                .jupiter_v4()
+                .swap(
+                    input_mint,
+                    output_mint,
+                    cmd.amount,
+                    cmd.slippage_bps,
+                    mango_v4_client::JupiterSwapMode::ExactIn,
+                    false,
+                )
                 .await?;
             println!("{}", txsig);
         }
