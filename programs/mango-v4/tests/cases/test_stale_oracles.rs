@@ -67,7 +67,7 @@ async fn test_stale_oracle_deposit_withdraw() -> Result<(), TransportError> {
     .await
     .unwrap();
 
-    // Make both oracles invalid by increasing deviation
+    // Make oracles invalid by increasing deviation
     send_tx(
         solana,
         StubOracleSetTestInstruction {
@@ -94,6 +94,35 @@ async fn test_stale_oracle_deposit_withdraw() -> Result<(), TransportError> {
     )
     .await
     .unwrap();
+    send_tx(
+        solana,
+        StubOracleSetTestInstruction {
+            group,
+            mint: mints[2].pubkey,
+            admin,
+            price: 1.0,
+            last_update_slot: 0,
+            deviation: 100.0,
+        },
+    )
+    .await
+    .unwrap();
+
+    // Can't activate a token position for a bad oracle
+    assert!(send_tx(
+        solana,
+        TokenDepositInstruction {
+            amount: 11,
+            reduce_only: false,
+            account,
+            owner,
+            token_account: payer_token_accounts[2],
+            token_authority: payer.clone(),
+            bank_index: 0,
+        },
+    )
+    .await
+    .is_err());
 
     // Verify that creating a new borrow won't work
     assert!(send_tx(
