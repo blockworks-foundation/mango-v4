@@ -1564,6 +1564,17 @@ impl MangoClient {
         for ix in &jup_ixs[..jup_action_ix_begin] {
             instructions.push(ix.clone());
         }
+
+        // Ensure the source token account is created (jupiter takes care of the output account)
+        instructions.push(
+            spl_associated_token_account::instruction::create_associated_token_account_idempotent(
+                &self.owner(),
+                &self.owner(),
+                &source_token.mint_info.mint,
+                &Token::id(),
+            ),
+        );
+
         instructions.push(Instruction {
             program_id: mango_v4::id(),
             accounts: {
