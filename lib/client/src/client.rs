@@ -1735,7 +1735,7 @@ impl MangoClient {
     ) -> anyhow::Result<Signature> {
         TransactionBuilder {
             instructions,
-            address_lookup_tables: vec![],
+            address_lookup_tables: self.mango_address_lookup_tables().await?,
             payer: self.client.fee_payer.pubkey(),
             signers: vec![self.owner.clone(), self.client.fee_payer.clone()],
             config: self.client.transaction_builder_config,
@@ -1750,7 +1750,7 @@ impl MangoClient {
     ) -> anyhow::Result<Signature> {
         TransactionBuilder {
             instructions,
-            address_lookup_tables: vec![],
+            address_lookup_tables: self.mango_address_lookup_tables().await?,
             payer: self.client.fee_payer.pubkey(),
             signers: vec![self.client.fee_payer.clone()],
             config: self.client.transaction_builder_config,
