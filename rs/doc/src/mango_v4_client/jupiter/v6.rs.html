@@ -397,6 +397,15 @@
 <span id="397">397</span>
 <span id="398">398</span>
 <span id="399">399</span>
+<span id="400">400</span>
+<span id="401">401</span>
+<span id="402">402</span>
+<span id="403">403</span>
+<span id="404">404</span>
+<span id="405">405</span>
+<span id="406">406</span>
+<span id="407">407</span>
+<span id="408">408</span>
 </pre><pre class="rust"><code><span class="kw">use </span>std::str::FromStr;
 
 <span class="kw">use </span>anchor_lang::prelude::Pubkey;
@@ -409,7 +418,6 @@
 <span class="kw">use crate</span>::{util, TransactionBuilder};
 
 <span class="kw">use </span>anyhow::Context;
-<span class="kw">use </span>solana_sdk::signer::Signer;
 <span class="kw">use </span>solana_sdk::{instruction::Instruction, signature::Signature};
 
 <span class="attribute">#[derive(Deserialize, Serialize, Debug, Clone)]
@@ -547,7 +555,7 @@
         input_mint: Pubkey,
         output_mint: Pubkey,
         amount: u64,
-        slippage: u64,
+        slippage_bps: u64,
         only_direct_routes: bool,
     ) -&gt; anyhow::Result&lt;QuoteResponse&gt; {
         <span class="kw">let </span><span class="kw-2">mut </span>account = <span class="self">self</span>.mango_client.mango_account().<span class="kw">await</span><span class="question-mark">?</span>;
@@ -588,7 +596,7 @@
                 (<span class="string">&quot;inputMint&quot;</span>, input_mint.to_string()),
                 (<span class="string">&quot;outputMint&quot;</span>, output_mint.to_string()),
                 (<span class="string">&quot;amount&quot;</span>, <span class="macro">format!</span>(<span class="string">&quot;{}&quot;</span>, amount)),
-                (<span class="string">&quot;slippageBps&quot;</span>, <span class="macro">format!</span>(<span class="string">&quot;{}&quot;</span>, slippage)),
+                (<span class="string">&quot;slippageBps&quot;</span>, <span class="macro">format!</span>(<span class="string">&quot;{}&quot;</span>, slippage_bps)),
                 (<span class="string">&quot;onlyDirectRoutes&quot;</span>, only_direct_routes.to_string()),
                 (
                     <span class="string">&quot;maxAccounts&quot;</span>,
@@ -636,14 +644,13 @@
         .map(util::to_writable_account_meta)
         .collect::&lt;Vec&lt;<span class="kw">_</span>&gt;&gt;();
 
+        <span class="kw">let </span>owner = <span class="self">self</span>.mango_client.owner();
+
         <span class="kw">let </span>token_ams = [source_token.mint_info.mint, target_token.mint_info.mint]
             .into_iter()
             .map(|mint| {
                 util::to_writable_account_meta(
-                    anchor_spl::associated_token::get_associated_token_address(
-                        <span class="kw-2">&amp;</span><span class="self">self</span>.mango_client.owner(),
-                        <span class="kw-2">&amp;</span>mint,
-                    ),
+                    anchor_spl::associated_token::get_associated_token_address(<span class="kw-2">&amp;</span>owner, <span class="kw-2">&amp;</span>mint),
                 )
             })
             .collect::&lt;Vec&lt;<span class="kw">_</span>&gt;&gt;();
@@ -672,7 +679,7 @@
             .http_client
             .post(<span class="string">&quot;https://quote-api.jup.ag/v6/swap-instructions&quot;</span>)
             .json(<span class="kw-2">&amp;</span>SwapRequest {
-                user_public_key: <span class="self">self</span>.mango_client.owner.pubkey().to_string(),
+                user_public_key: owner.to_string(),
                 wrap_and_unwrap_sol: <span class="bool-val">false</span>,
                 use_shared_accounts: <span class="bool-val">true</span>,
                 fee_account: <span class="prelude-val">None</span>,
@@ -698,13 +705,24 @@
         <span class="kw">for </span>ix <span class="kw">in </span><span class="kw-2">&amp;</span>swap.setup_instructions.unwrap_or_default() {
             instructions.push(ix.try_into()<span class="question-mark">?</span>);
         }
+
+        <span class="comment">// Ensure the source token account is created (jupiter takes care of the output account)
+        </span>instructions.push(
+            spl_associated_token_account::instruction::create_associated_token_account_idempotent(
+                <span class="kw-2">&amp;</span>owner,
+                <span class="kw-2">&amp;</span>owner,
+                <span class="kw-2">&amp;</span>source_token.mint_info.mint,
+                <span class="kw-2">&amp;</span>Token::id(),
+            ),
+        );
+
         instructions.push(Instruction {
             program_id: mango_v4::id(),
             accounts: {
                 <span class="kw">let </span><span class="kw-2">mut </span>ams = anchor_lang::ToAccountMetas::to_account_metas(
                     <span class="kw-2">&amp;</span>mango_v4::accounts::FlashLoanBegin {
                         account: <span class="self">self</span>.mango_client.mango_account_address,
-                        owner: <span class="self">self</span>.mango_client.owner(),
+                        owner,
                         token_program: Token::id(),
                         instructions: solana_sdk::sysvar::instructions::id(),
                     },
@@ -727,7 +745,7 @@
                 <span class="kw">let </span><span class="kw-2">mut </span>ams = anchor_lang::ToAccountMetas::to_account_metas(
                     <span class="kw-2">&amp;</span>mango_v4::accounts::FlashLoanEnd {
                         account: <span class="self">self</span>.mango_client.mango_account_address,
-                        owner: <span class="self">self</span>.mango_client.owner(),
+                        owner,
                         token_program: Token::id(),
                     },
                     <span class="prelude-val">None</span>,
@@ -762,7 +780,7 @@
             .<span class="kw">await</span><span class="question-mark">?</span>;
         address_lookup_tables.extend(jup_alts.into_iter());
 
-        <span class="kw">let </span>payer = <span class="self">self</span>.mango_client.owner.pubkey(); <span class="comment">// maybe use fee_payer? but usually it&#39;s the same
+        <span class="kw">let </span>payer = owner; <span class="comment">// maybe use fee_payer? but usually it&#39;s the same
 
         </span><span class="prelude-val">Ok</span>(TransactionBuilder {
             instructions,
@@ -778,7 +796,7 @@
         input_mint: Pubkey,
         output_mint: Pubkey,
         amount: u64,
-        slippage: u64,
+        slippage_bps: u64,
         only_direct_routes: bool,
     ) -&gt; anyhow::Result&lt;Signature&gt; {
         <span class="kw">let </span>route = <span class="self">self
@@ -786,7 +804,7 @@
                 input_mint,
                 output_mint,
                 amount,
-                slippage,
+                slippage_bps,
                 only_direct_routes,
             )
             .<span class="kw">await</span><span class="question-mark">?</span>;
