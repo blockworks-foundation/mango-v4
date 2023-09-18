@@ -3171,7 +3171,7 @@
     ) -&gt; anyhow::Result&lt;Signature&gt; {
         TransactionBuilder {
             instructions,
-            address_lookup_tables: <span class="macro">vec!</span>[],
+            address_lookup_tables: <span class="self">self</span>.mango_address_lookup_tables().<span class="kw">await</span><span class="question-mark">?</span>,
             payer: <span class="self">self</span>.client.fee_payer.pubkey(),
             signers: <span class="macro">vec!</span>[<span class="self">self</span>.owner.clone(), <span class="self">self</span>.client.fee_payer.clone()],
             config: <span class="self">self</span>.client.transaction_builder_config,
@@ -3186,7 +3186,7 @@
     ) -&gt; anyhow::Result&lt;Signature&gt; {
         TransactionBuilder {
             instructions,
-            address_lookup_tables: <span class="macro">vec!</span>[],
+            address_lookup_tables: <span class="self">self</span>.mango_address_lookup_tables().<span class="kw">await</span><span class="question-mark">?</span>,
             payer: <span class="self">self</span>.client.fee_payer.pubkey(),
             signers: <span class="macro">vec!</span>[<span class="self">self</span>.client.fee_payer.clone()],
             config: <span class="self">self</span>.client.transaction_builder_config,
