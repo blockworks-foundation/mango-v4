@@ -51,7 +51,7 @@ pub fn token_conditional_swap_start(
     // Check the tcs price condition
     //
     let price = buy_oracle_price.to_num::<f64>() / sell_oracle_price.to_num::<f64>();
-    require!(tcs.is_startable(price, now_ts), MangoError::SomeError);
+    tcs.check_startable(price, now_ts)?;
 
     //
     // Transfer the starting incentive

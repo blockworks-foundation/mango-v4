@@ -862,5 +862,93 @@ async fn test_token_conditional_swap_premium_auction() -> Result<(), TransportEr
     assert!(assert_equal_f64_f64(liqor_quote, liqor_quote_expected, 0.1));
     assert!(assert_equal_f64_f64(liqor_base, liqor_base_expected, 0.1));
 
+    //
+    // SETUP: make another premium auction to test starting
+    //
+
+    send_tx(
+        solana,
+        TokenConditionalSwapCreatePremiumAuctionInstruction {
+            account,
+            owner,
+            buy_mint: quote_token.mint.pubkey,
+            sell_mint: base_token.mint.pubkey,
+            max_buy: 100000,
+            max_sell: 100000,
+            price_lower_limit: 1.5,
+            price_upper_limit: 3.0,
+            max_price_premium_rate: 0.01,
+            allow_creating_deposits: true,
+            allow_creating_borrows: true,
+            duration_seconds: 10,
+        },
+    )
+    .await
+    .unwrap();
+
+    //
+    // TEST: Can't start if oracle not in range
+    //
+
+    let res = send_tx(
+        solana,
+        TokenConditionalSwapStartInstruction {
+            account,
+            caller: liqor,
+            caller_owner: owner,
+            index: 1,
+        },
+    )
+    .await;
+    assert_mango_error(
+        &res,
+        MangoError::TokenConditionalSwapPriceNotInRange.into(),
+        "price is not in range".to_string(),
+    );
+
+    //
+    // TEST: Can start if in range
+    //
+
+    set_bank_stub_oracle_price(solana, group, &base_token, admin, 0.5).await;
+    send_tx(
+        solana,
+        TokenConditionalSwapStartInstruction {
+            account,
+            caller: liqor,
+            caller_owner: owner,
+            index: 1,
+        },
+    )
+    .await
+    .unwrap();
+
+    let account_data = get_mango_account(solana, account).await;
+    let tcs = account_data.active_token_conditional_swaps().collect_vec()[1];
+    assert!(tcs.start_timestamp > 0);
+
+    // TODO: more checks of the incentive payment!
+    assert!(tcs.sold > 0);
+
+    //
+    // TEST: Can't start a second time
+    //
+
+    let res = send_tx(
+        solana,
+        TokenConditionalSwapStartInstruction {
+            account,
+            caller: liqor,
+            caller_owner: owner,
+            index: 1,
+        },
+    )
+    .await;
+    assert_mango_error(
+        &res,
+        MangoError::TokenConditionalSwapAlreadyStarted.into(),
+        "already started".to_string(),
+    );
+
     Ok(())
 }

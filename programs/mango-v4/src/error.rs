@@ -109,6 +109,8 @@ pub enum MangoError {
     TokenConditionalSwapExpired,
     #[msg("token conditional swap is not available yet")]
     TokenConditionalSwapNotStarted,
+    #[msg("token conditional swap was already started")]
+    TokenConditionalSwapAlreadyStarted,
 }
 
 impl MangoError {

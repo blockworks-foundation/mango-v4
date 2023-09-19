@@ -288,18 +288,35 @@ impl TokenConditionalSwap {
         price >= self.price_lower_limit && price <= self.price_upper_limit
     }
 
-    pub fn is_startable(&self, price: f64, now_ts: u64) -> bool {
-        if self.is_expired(now_ts) {
-            return false;
-        }
-        if self.start_timestamp != 0 {
-            return false;
-        }
+    pub fn check_startable(&self, price: f64, now_ts: u64) -> Result<()> {
+        require!(
+            !self.is_expired(now_ts),
+            MangoError::TokenConditionalSwapExpired
+        );
+        require!(
+            self.start_timestamp == 0,
+            MangoError::TokenConditionalSwapAlreadyStarted
+        );
         match self.tcs_type() {
-            TokenConditionalSwapType::FixedPremium => self.price_in_range(price),
-            TokenConditionalSwapType::PremiumAuction => self.price_in_range(price),
-            TokenConditionalSwapType::LinearAuction => false,
-        }
+            TokenConditionalSwapType::FixedPremium => {
+                require!(
+                    self.price_in_range(price),
+                    MangoError::TokenConditionalSwapPriceNotInRange
+                );
+            }
+            TokenConditionalSwapType::PremiumAuction => {
+                require!(
+                    self.price_in_range(price),
+                    MangoError::TokenConditionalSwapPriceNotInRange
+                );
+            }
+            TokenConditionalSwapType::LinearAuction => {}
+        };
+        Ok(())
+    }
+
+    pub fn is_startable(&self, price: f64, now_ts: u64) -> bool {
+        self.check_startable(price, now_ts).is_ok()
     }
 
     pub fn check_triggerable(&self, price: f64, now_ts: u64) -> Result<()> {

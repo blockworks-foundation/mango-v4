@@ -4679,3 +4679,64 @@ impl ClientInstruction for TokenConditionalSwapTriggerInstruction {
         vec![self.liqor_owner]
     }
 }
+
+#[derive(Clone)]
+pub struct TokenConditionalSwapStartInstruction {
+    pub account: Pubkey,
+    pub caller: Pubkey,
+    pub caller_owner: TestKeypair,
+    pub index: u8,
+}
+#[async_trait::async_trait(?Send)]
+impl ClientInstruction for TokenConditionalSwapStartInstruction {
+    type Accounts = mango_v4::accounts::TokenConditionalSwapStart;
+    type Instruction = mango_v4::instruction::TokenConditionalSwapStart;
+    async fn to_instruction(
+        &self,
+        account_loader: impl ClientAccountLoader + 'async_trait,
+    ) -> (Self::Accounts, instruction::Instruction) {
+        let program_id = mango_v4::id();
+
+        let account = account_loader
+            .load_mango_account(&self.account)
+            .await
+            .unwrap();
+
+        let tcs = account
+            .token_conditional_swap_by_index(self.index.into())
+            .unwrap()
+            .clone();
+
+        let sell_mint_info =
+            get_mint_info_by_token_index(&account_loader, &account, tcs.sell_token_index).await;
+
+        let instruction = Self::Instruction {
+            token_conditional_swap_index: self.index,
+            token_conditional_swap_id: tcs.id,
+        };
+
+        let health_check_metas = derive_health_check_remaining_account_metas(
+            &account_loader,
+            &account,
+            Some(sell_mint_info.first_bank()),
+            true,
+            None,
+        )
+        .await;
+
+        let accounts = Self::Accounts {
+            group: account.fixed.group,
+            account: self.account,
+            caller: self.caller,
+            caller_authority: self.caller_owner.pubkey(),
+        };
+
+        let mut instruction = make_instruction(program_id, &accounts, &instruction);
+        instruction.accounts.extend(health_check_metas.into_iter());
+        (accounts, instruction)
+    }
+
+    fn signers(&self) -> Vec<TestKeypair> {
+        vec![self.caller_owner]
+    }
+}
