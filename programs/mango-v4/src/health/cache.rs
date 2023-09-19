@@ -28,7 +28,7 @@ use crate::state::{
 use super::*;
 
 /// Information about prices for a bank or perp market.
-#[derive(Clone, AnchorDeserialize, AnchorSerialize, Debug)]
+#[derive(Clone, Debug)]
 pub struct Prices {
     /// The current oracle price
     pub oracle: I80F48, // native/native
@@ -156,7 +156,7 @@ pub fn spot_amount_given_for_health_zero(
     )
 }
 
-#[derive(Clone, AnchorDeserialize, AnchorSerialize, Debug)]
+#[derive(Clone, Debug)]
 pub struct TokenInfo {
     pub token_index: TokenIndex,
     pub maint_asset_weight: I80F48,
@@ -233,7 +233,7 @@ impl TokenInfo {
 /// to the token info. This is only about dealing with the reserved funds
 /// that might end up as base OR quote tokens, depending on whether the
 /// open orders execute on not.
-#[derive(Clone, AnchorDeserialize, AnchorSerialize, Debug)]
+#[derive(Clone, Debug)]
 pub struct Serum3Info {
     // reserved amounts as stored on the open orders
     pub reserved_base: I80F48,
@@ -420,7 +420,7 @@ pub(crate) struct Serum3Reserved {
 ///
 /// Perp markets affect account health indirectly, though the token balance in the
 /// perp market's settle token. See `effective_token_balances()`.
-#[derive(Clone, AnchorDeserialize, AnchorSerialize, Debug)]
+#[derive(Clone, Debug)]
 pub struct PerpInfo {
     pub perp_market_index: PerpMarketIndex,
     pub settle_token_index: TokenIndex,
@@ -582,11 +582,13 @@ impl PerpInfo {
 ///
 /// However, there's a real risk of getting the adjustments wrong and computing an
 /// inconsistent result, so particular care needs to be taken when this is done.
-#[derive(Clone, AnchorDeserialize, AnchorSerialize, Debug)]
+#[allow(unused)]
+#[derive(Clone, Debug)]
 pub struct HealthCache {
     pub(crate) token_infos: Vec<TokenInfo>,
     pub(crate) serum3_infos: Vec<Serum3Info>,
     pub(crate) perp_infos: Vec<PerpInfo>,
+    #[allow(unused)]
     pub(crate) being_liquidated: bool,
 }
 

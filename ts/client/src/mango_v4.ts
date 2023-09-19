@@ -5360,6 +5360,9 @@ export type MangoV4 = {
     },
     {
       "name": "computeAccountData",
+      "docs": [
+        "Warning, this instruction is for testing purposes only!"
+      ],
       "accounts": [
         {
           "name": "group",
@@ -7929,293 +7932,6 @@ export type MangoV4 = {
       }
     },
     {
-      "name": "Prices",
-      "docs": [
-        "Information about prices for a bank or perp market."
-      ],
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "oracle",
-            "docs": [
-              "The current oracle price"
-            ],
-            "type": {
-              "defined": "I80F48"
-            }
-          },
-          {
-            "name": "stable",
-            "docs": [
-              "A \"stable\" price, provided by StablePriceModel"
-            ],
-            "type": {
-              "defined": "I80F48"
-            }
-          }
-        ]
-      }
-    },
-    {
-      "name": "TokenInfo",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "tokenIndex",
-            "type": "u16"
-          },
-          {
-            "name": "maintAssetWeight",
-            "type": {
-              "defined": "I80F48"
-            }
-          },
-          {
-            "name": "initAssetWeight",
-            "type": {
-              "defined": "I80F48"
-            }
-          },
-          {
-            "name": "initScaledAssetWeight",
-            "type": {
-              "defined": "I80F48"
-            }
-          },
-          {
-            "name": "maintLiabWeight",
-            "type": {
-              "defined": "I80F48"
-            }
-          },
-          {
-            "name": "initLiabWeight",
-            "type": {
-              "defined": "I80F48"
-            }
-          },
-          {
-            "name": "initScaledLiabWeight",
-            "type": {
-              "defined": "I80F48"
-            }
-          },
-          {
-            "name": "prices",
-            "type": {
-              "defined": "Prices"
-            }
-          },
-          {
-            "name": "balanceSpot",
-            "docs": [
-              "Freely available spot balance for the token.",
-              "",
-              "Includes TokenPosition and free Serum3OpenOrders balances.",
-              "Does not include perp upnl or Serum3 reserved amounts."
-            ],
-            "type": {
-              "defined": "I80F48"
-            }
-          }
-        ]
-      }
-    },
-    {
-      "name": "Serum3Info",
-      "docs": [
-        "Information about reserved funds on Serum3 open orders accounts.",
-        "",
-        "Note that all \"free\" funds on open orders accounts are added directly",
-        "to the token info. This is only about dealing with the reserved funds",
-        "that might end up as base OR quote tokens, depending on whether the",
-        "open orders execute on not."
-      ],
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "reservedBase",
-            "type": {
-              "defined": "I80F48"
-            }
-          },
-          {
-            "name": "reservedQuote",
-            "type": {
-              "defined": "I80F48"
-            }
-          },
-          {
-            "name": "baseInfoIndex",
-            "type": "u64"
-          },
-          {
-            "name": "quoteInfoIndex",
-            "type": "u64"
-          },
-          {
-            "name": "marketIndex",
-            "type": "u16"
-          },
-          {
-            "name": "hasZeroFunds",
-            "docs": [
-              "The open orders account has no free or reserved funds"
-            ],
-            "type": "bool"
-          }
-        ]
-      }
-    },
-    {
-      "name": "PerpInfo",
-      "docs": [
-        "Stores information about perp market positions and their open orders.",
-        "",
-        "Perp markets affect account health indirectly, though the token balance in the",
-        "perp market's settle token. See `effective_token_balances()`."
-      ],
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "perpMarketIndex",
-            "type": "u16"
-          },
-          {
-            "name": "settleTokenIndex",
-            "type": "u16"
-          },
-          {
-            "name": "maintBaseAssetWeight",
-            "type": {
-              "defined": "I80F48"
-            }
-          },
-          {
-            "name": "initBaseAssetWeight",
-            "type": {
-              "defined": "I80F48"
-            }
-          },
-          {
-            "name": "maintBaseLiabWeight",
-            "type": {
-              "defined": "I80F48"
-            }
-          },
-          {
-            "name": "initBaseLiabWeight",
-            "type": {
-              "defined": "I80F48"
-            }
-          },
-          {
-            "name": "maintOverallAssetWeight",
-            "type": {
-              "defined": "I80F48"
-            }
-          },
-          {
-            "name": "initOverallAssetWeight",
-            "type": {
-              "defined": "I80F48"
-            }
-          },
-          {
-            "name": "baseLotSize",
-            "type": "i64"
-          },
-          {
-            "name": "baseLots",
-            "type": "i64"
-          },
-          {
-            "name": "bidsBaseLots",
-            "type": "i64"
-          },
-          {
-            "name": "asksBaseLots",
-            "type": "i64"
-          },
-          {
-            "name": "quote",
-            "type": {
-              "defined": "I80F48"
-            }
-          },
-          {
-            "name": "basePrices",
-            "type": {
-              "defined": "Prices"
-            }
-          },
-          {
-            "name": "hasOpenOrders",
-            "type": "bool"
-          },
-          {
-            "name": "hasOpenFills",
-            "type": "bool"
-          }
-        ]
-      }
-    },
-    {
-      "name": "HealthCache",
-      "docs": [
-        "Store information needed to compute account health",
-        "",
-        "This is called a cache, because it extracts information from a MangoAccount and",
-        "the Bank, Perp, oracle accounts once and then allows computing different types",
-        "of health.",
-        "",
-        "For compute-saving reasons, it also allows applying adjustments to the extracted",
-        "positions. That's often helpful for instructions that want to re-compute health",
-        "after having made small, well-known changes to an account. Recomputing the",
-        "HealthCache from scratch would be significantly more expensive.",
-        "",
-        "However, there's a real risk of getting the adjustments wrong and computing an",
-        "inconsistent result, so particular care needs to be taken when this is done."
-      ],
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "tokenInfos",
-            "type": {
-              "vec": {
-                "defined": "TokenInfo"
-              }
-            }
-          },
-          {
-            "name": "serum3Infos",
-            "type": {
-              "vec": {
-                "defined": "Serum3Info"
-              }
-            }
-          },
-          {
-            "name": "perpInfos",
-            "type": {
-              "vec": {
-                "defined": "PerpInfo"
-              }
-            }
-          },
-          {
-            "name": "beingLiquidated",
-            "type": "bool"
-          }
-        ]
-      }
-    },
-    {
       "name": "FlashLoanTokenDetail",
       "type": {
         "kind": "struct",
@@ -8430,11 +8146,30 @@ export type MangoV4 = {
             }
           },
           {
+            "name": "highestPlacedBidInv",
+            "docs": [
+              "Track something like the highest open bid / lowest open ask, in native/native units.",
+              "",
+              "Tracking it exactly isn't possible since we don't see fills. So instead track",
+              "the min/max of the _placed_ bids and asks.",
+              "",
+              "The value is reset in serum3_place_order when a new order is placed without an",
+              "existing one on the book.",
+              "",
+              "0 is a special \"unset\" state."
+            ],
+            "type": "f64"
+          },
+          {
+            "name": "lowestPlacedAsk",
+            "type": "f64"
+          },
+          {
             "name": "reserved",
             "type": {
               "array": [
                 "u8",
-                64
+                48
               ]
             }
           }
@@ -10358,13 +10093,6 @@ export type MangoV4 = {
     {
       "name": "MangoAccountData",
       "fields": [
-        {
-          "name": "healthCache",
-          "type": {
-            "defined": "HealthCache"
-          },
-          "index": false
-        },
         {
           "name": "initHealth",
           "type": {
@@ -17955,6 +17683,9 @@ export const IDL: MangoV4 = {
     },
     {
       "name": "computeAccountData",
+      "docs": [
+        "Warning, this instruction is for testing purposes only!"
+      ],
       "accounts": [
         {
           "name": "group",
@@ -20524,293 +20255,6 @@ export const IDL: MangoV4 = {
       }
     },
     {
-      "name": "Prices",
-      "docs": [
-        "Information about prices for a bank or perp market."
-      ],
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "oracle",
-            "docs": [
-              "The current oracle price"
-            ],
-            "type": {
-              "defined": "I80F48"
-            }
-          },
-          {
-            "name": "stable",
-            "docs": [
-              "A \"stable\" price, provided by StablePriceModel"
-            ],
-            "type": {
-              "defined": "I80F48"
-            }
-          }
-        ]
-      }
-    },
-    {
-      "name": "TokenInfo",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "tokenIndex",
-            "type": "u16"
-          },
-          {
-            "name": "maintAssetWeight",
-            "type": {
-              "defined": "I80F48"
-            }
-          },
-          {
-            "name": "initAssetWeight",
-            "type": {
-              "defined": "I80F48"
-            }
-          },
-          {
-            "name": "initScaledAssetWeight",
-            "type": {
-              "defined": "I80F48"
-            }
-          },
-          {
-            "name": "maintLiabWeight",
-            "type": {
-              "defined": "I80F48"
-            }
-          },
-          {
-            "name": "initLiabWeight",
-            "type": {
-              "defined": "I80F48"
-            }
-          },
-          {
-            "name": "initScaledLiabWeight",
-            "type": {
-              "defined": "I80F48"
-            }
-          },
-          {
-            "name": "prices",
-            "type": {
-              "defined": "Prices"
-            }
-          },
-          {
-            "name": "balanceSpot",
-            "docs": [
-              "Freely available spot balance for the token.",
-              "",
-              "Includes TokenPosition and free Serum3OpenOrders balances.",
-              "Does not include perp upnl or Serum3 reserved amounts."
-            ],
-            "type": {
-              "defined": "I80F48"
-            }
-          }
-        ]
-      }
-    },
-    {
-      "name": "Serum3Info",
-      "docs": [
-        "Information about reserved funds on Serum3 open orders accounts.",
-        "",
-        "Note that all \"free\" funds on open orders accounts are added directly",
-        "to the token info. This is only about dealing with the reserved funds",
-        "that might end up as base OR quote tokens, depending on whether the",
-        "open orders execute on not."
-      ],
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "reservedBase",
-            "type": {
-              "defined": "I80F48"
-            }
-          },
-          {
-            "name": "reservedQuote",
-            "type": {
-              "defined": "I80F48"
-            }
-          },
-          {
-            "name": "baseInfoIndex",
-            "type": "u64"
-          },
-          {
-            "name": "quoteInfoIndex",
-            "type": "u64"
-          },
-          {
-            "name": "marketIndex",
-            "type": "u16"
-          },
-          {
-            "name": "hasZeroFunds",
-            "docs": [
-              "The open orders account has no free or reserved funds"
-            ],
-            "type": "bool"
-          }
-        ]
-      }
-    },
-    {
-      "name": "PerpInfo",
-      "docs": [
-        "Stores information about perp market positions and their open orders.",
-        "",
-        "Perp markets affect account health indirectly, though the token balance in the",
-        "perp market's settle token. See `effective_token_balances()`."
-      ],
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "perpMarketIndex",
-            "type": "u16"
-          },
-          {
-            "name": "settleTokenIndex",
-            "type": "u16"
-          },
-          {
-            "name": "maintBaseAssetWeight",
-            "type": {
-              "defined": "I80F48"
-            }
-          },
-          {
-            "name": "initBaseAssetWeight",
-            "type": {
-              "defined": "I80F48"
-            }
-          },
-          {
-            "name": "maintBaseLiabWeight",
-            "type": {
-              "defined": "I80F48"
-            }
-          },
-          {
-            "name": "initBaseLiabWeight",
-            "type": {
-              "defined": "I80F48"
-            }
-          },
-          {
-            "name": "maintOverallAssetWeight",
-            "type": {
-              "defined": "I80F48"
-            }
-          },
-          {
-            "name": "initOverallAssetWeight",
-            "type": {
-              "defined": "I80F48"
-            }
-          },
-          {
-            "name": "baseLotSize",
-            "type": "i64"
-          },
-          {
-            "name": "baseLots",
-            "type": "i64"
-          },
-          {
-            "name": "bidsBaseLots",
-            "type": "i64"
-          },
-          {
-            "name": "asksBaseLots",
-            "type": "i64"
-          },
-          {
-            "name": "quote",
-            "type": {
-              "defined": "I80F48"
-            }
-          },
-          {
-            "name": "basePrices",
-            "type": {
-              "defined": "Prices"
-            }
-          },
-          {
-            "name": "hasOpenOrders",
-            "type": "bool"
-          },
-          {
-            "name": "hasOpenFills",
-            "type": "bool"
-          }
-        ]
-      }
-    },
-    {
-      "name": "HealthCache",
-      "docs": [
-        "Store information needed to compute account health",
-        "",
-        "This is called a cache, because it extracts information from a MangoAccount and",
-        "the Bank, Perp, oracle accounts once and then allows computing different types",
-        "of health.",
-        "",
-        "For compute-saving reasons, it also allows applying adjustments to the extracted",
-        "positions. That's often helpful for instructions that want to re-compute health",
-        "after having made small, well-known changes to an account. Recomputing the",
-        "HealthCache from scratch would be significantly more expensive.",
-        "",
-        "However, there's a real risk of getting the adjustments wrong and computing an",
-        "inconsistent result, so particular care needs to be taken when this is done."
-      ],
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "tokenInfos",
-            "type": {
-              "vec": {
-                "defined": "TokenInfo"
-              }
-            }
-          },
-          {
-            "name": "serum3Infos",
-            "type": {
-              "vec": {
-                "defined": "Serum3Info"
-              }
-            }
-          },
-          {
-            "name": "perpInfos",
-            "type": {
-              "vec": {
-                "defined": "PerpInfo"
-              }
-            }
-          },
-          {
-            "name": "beingLiquidated",
-            "type": "bool"
-          }
-        ]
-      }
-    },
-    {
       "name": "FlashLoanTokenDetail",
       "type": {
         "kind": "struct",
@@ -21025,11 +20469,30 @@ export const IDL: MangoV4 = {
             }
           },
           {
+            "name": "highestPlacedBidInv",
+            "docs": [
+              "Track something like the highest open bid / lowest open ask, in native/native units.",
+              "",
+              "Tracking it exactly isn't possible since we don't see fills. So instead track",
+              "the min/max of the _placed_ bids and asks.",
+              "",
+              "The value is reset in serum3_place_order when a new order is placed without an",
+              "existing one on the book.",
+              "",
+              "0 is a special \"unset\" state."
+            ],
+            "type": "f64"
+          },
+          {
+            "name": "lowestPlacedAsk",
+            "type": "f64"
+          },
+          {
             "name": "reserved",
             "type": {
               "array": [
                 "u8",
-                64
+                48
               ]
             }
           }
@@ -22953,13 +22416,6 @@ export const IDL: MangoV4 = {
     {
       "name": "MangoAccountData",
       "fields": [
-        {
-          "name": "healthCache",
-          "type": {
-            "defined": "HealthCache"
-          },
-          "index": false
-        },
         {
           "name": "initHealth",
           "type": {

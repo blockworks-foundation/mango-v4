@@ -1341,6 +1341,7 @@ pub mod mango_v4 {
         Ok(())
     }
 
+    /// Warning, this instruction is for testing purposes only!
     pub fn compute_account_data(ctx: Context<ComputeAccountData>) -> Result<()> {
         #[cfg(feature = "enable-gpl")]
         instructions::compute_account_data(ctx)?;
