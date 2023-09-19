@@ -17,6 +17,7 @@ import {
   AddressLookupTableAccount,
   Cluster,
   Commitment,
+  ComputeBudgetProgram,
   Connection,
   Keypair,
   MemcmpFilter,
@@ -2927,7 +2928,7 @@ export class MangoClient {
         continue;
       }
       ixs1.push(
-        // Takes ~130k CU
+        // Takes ~250k CU
         await this.perpSettlePnlIx(
           group,
           pa.getUnsettledPnlUi(pm) > 0 ? mangoAccount : candidates[0].account,
@@ -2960,9 +2961,9 @@ export class MangoClient {
     );
 
     if (
-      mangoAccount.perpActive().length * 150 +
-        mangoAccount.serum3Active().length * 65 >
-      1600
+      mangoAccount.perpActive().length * (250000 + 20000) +
+        mangoAccount.serum3Active().length * 65000 >
+      1600000
     ) {
       throw new Error(
         `Too many perp positions and serum open orders to settle in one tx! Please try settling individually!`,
@@ -2971,7 +2972,15 @@ export class MangoClient {
 
     return await this.sendAndConfirmTransactionForGroup(
       group,
-      [...ixs1, ...ixs2],
+      [
+        ComputeBudgetProgram.setComputeUnitLimit({
+          units:
+            mangoAccount.perpActive().length * (250000 + 20000) +
+            mangoAccount.serum3Active().length * 65000,
+        }),
+        ...ixs1,
+        ...ixs2,
+      ],
       {
         prioritizationFee: true,
       },
@@ -2988,6 +2997,9 @@ export class MangoClient {
     maxSettleAmount?: number,
   ): Promise<MangoSignatureStatus> {
     return await this.sendAndConfirmTransactionForGroup(group, [
+      ComputeBudgetProgram.setComputeUnitLimit({
+        units: 250000 + 20000,
+      }),
       await this.perpSettlePnlIx(
         group,
         profitableAccount,
@@ -3012,6 +3024,9 @@ export class MangoClient {
     perpMarketIndex: PerpMarketIndex,
   ): Promise<MangoSignatureStatus> {
     return await this.sendAndConfirmTransactionForGroup(group, [
+      ComputeBudgetProgram.setComputeUnitLimit({
+        units: 250000,
+      }),
       await this.perpSettlePnlIx(
         group,
         profitableAccount,
