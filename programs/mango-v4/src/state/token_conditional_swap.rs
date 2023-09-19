@@ -6,6 +6,7 @@ use num_enum::{IntoPrimitive, TryFromPrimitive};
 use static_assertions::const_assert_eq;
 use std::mem::size_of;
 
+use crate::error::MangoError;
 use crate::i80f48::ClampToInt;
 use crate::state::*;
 
@@ -301,17 +302,37 @@ impl TokenConditionalSwap {
         }
     }
 
-    pub fn is_triggerable(&self, price: f64, now_ts: u64) -> bool {
-        if self.is_expired(now_ts) {
-            return false;
-        }
+    pub fn check_triggerable(&self, price: f64, now_ts: u64) -> Result<()> {
+        require!(
+            !self.is_expired(now_ts),
+            MangoError::TokenConditionalSwapExpired
+        );
         match self.tcs_type() {
-            TokenConditionalSwapType::FixedPremium => self.price_in_range(price),
-            TokenConditionalSwapType::PremiumAuction => {
-                self.price_in_range(price) || self.passed_start(now_ts)
+            TokenConditionalSwapType::FixedPremium => {
+                require!(
+                    self.price_in_range(price),
+                    MangoError::TokenConditionalSwapPriceNotInRange
+                );
             }
-            TokenConditionalSwapType::LinearAuction => self.passed_start(now_ts),
+            TokenConditionalSwapType::PremiumAuction => {
+                // Technically the error is lying, since it's also triggerable once started
+                require!(
+                    self.price_in_range(price) || self.passed_start(now_ts),
+                    MangoError::TokenConditionalSwapPriceNotInRange
+                );
+            }
+            TokenConditionalSwapType::LinearAuction => {
+                require!(
+                    self.passed_start(now_ts),
+                    MangoError::TokenConditionalSwapNotStarted
+                );
+            }
         }
+        Ok(())
+    }
+
+    pub fn is_triggerable(&self, price: f64, now_ts: u64) -> bool {
+        self.check_triggerable(price, now_ts).is_ok()
     }
 
     /// The remaining buy amount, taking the current buy token position and

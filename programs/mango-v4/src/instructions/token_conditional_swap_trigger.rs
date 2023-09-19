@@ -55,7 +55,7 @@ pub fn token_conditional_swap_trigger(
     // Possibly wipe the tcs and exit, if it's already expired
     if tcs_is_expired {
         if min_buy_token > 0 {
-            require!(!tcs_is_expired, MangoError::SomeError); // TODO: better error
+            require!(!tcs_is_expired, MangoError::TokenConditionalSwapExpired);
         }
 
         let (buy_bank, _buy_token_price, sell_bank_and_oracle_opt) =
@@ -214,10 +214,7 @@ fn action(
         require_eq!(buy_bank.token_index, tcs.buy_token_index);
         require_eq!(sell_bank.token_index, tcs.sell_token_index);
 
-        require!(
-            tcs.is_triggerable(price, now_ts),
-            MangoError::TokenConditionalSwapPriceNotInRange // TODO: reword error
-        );
+        tcs.check_triggerable(price, now_ts)?;
 
         // We need to borrow liqee token positions mutably and can't hold the tcs borrow at the
         // same time. Copying the whole struct is convenience.

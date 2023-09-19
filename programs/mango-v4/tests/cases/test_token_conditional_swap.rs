@@ -420,6 +420,7 @@ async fn test_token_conditional_swap_linear_auction() -> Result<(), TransportErr
     //
     // TEST: Can create tcs auction
     //
+    let initial_time = solana.clock_timestamp().await;
     send_tx(
         solana,
         TokenConditionalSwapCreateLinearAuctionInstruction {
@@ -427,14 +428,15 @@ async fn test_token_conditional_swap_linear_auction() -> Result<(), TransportErr
             owner,
             buy_mint: quote_token.mint.pubkey,
             sell_mint: base_token.mint.pubkey,
-            max_buy: 100,
-            max_sell: 100,
+            max_buy: 100000,
+            max_sell: 100000,
             price_start: 1.0,
             price_end: 11.0,
             allow_creating_deposits: true,
             allow_creating_borrows: true,
-            start_timestamp: 5,
-            duration_seconds: 5,
+            start_timestamp: initial_time + 5,
+            duration_seconds: 10,
+            expiry_timestamp: initial_time + 5 + 10 + 5,
         },
     )
     .await
@@ -446,6 +448,136 @@ async fn test_token_conditional_swap_linear_auction() -> Result<(), TransportErr
     assert_eq!(
         tcss[0].tcs_type,
         TokenConditionalSwapType::LinearAuction as u8
+    );
+
+    //
+    // TEST: Can't take an auction at any price when it's not started yet
+    //
+
+    let res = send_tx(
+        solana,
+        TokenConditionalSwapTriggerInstruction {
+            liqee: account,
+            liqor,
+            liqor_owner: owner,
+            index: 0,
+            max_buy_token_to_liqee: 100,
+            max_sell_token_to_liqor: 100,
+            min_buy_token: 0,
+        },
+    )
+    .await;
+    assert_mango_error(
+        &res,
+        MangoError::TokenConditionalSwapNotStarted.into(),
+        "tcs should not be started yet".to_string(),
+    );
+
+    //
+    // TEST: Check the auction price in the middle
+    //
+    solana.set_clock_timestamp(initial_time + 7).await;
+    send_tx(
+        solana,
+        TokenConditionalSwapTriggerInstruction {
+            liqee: account,
+            liqor,
+            liqor_owner: owner,
+            index: 0,
+            max_buy_token_to_liqee: 1000,
+            max_sell_token_to_liqor: 3300, // expected price of 3.0 sell per buy, with 10% maker fee
+            min_buy_token: 1,
+        },
+    )
+    .await
+    .unwrap();
+
+    let mut account_quote_expected = deposit_amount as f64 + 1000.0;
+    let mut account_base_expected = deposit_amount as f64 + -3300.0;
+    let mut liqor_quote_expected = deposit_amount as f64 + -1000.0;
+    let mut liqor_base_expected = deposit_amount as f64 + 2850.0;
+
+    let account_quote = account_position_f64(solana, account, quote_token.bank).await;
+    let account_base = account_position_f64(solana, account, base_token.bank).await;
+    assert!(assert_equal_f64_f64(
+        account_quote,
+        account_quote_expected,
+        0.1
+    ));
+    assert!(assert_equal_f64_f64(
+        account_base,
+        account_base_expected,
+        0.1
+    ));
+
+    let liqor_quote = account_position_f64(solana, liqor, quote_token.bank).await;
+    let liqor_base = account_position_f64(solana, liqor, base_token.bank).await;
+    assert!(assert_equal_f64_f64(liqor_quote, liqor_quote_expected, 0.1));
+    assert!(assert_equal_f64_f64(liqor_base, liqor_base_expected, 0.1));
+
+    //
+    // TEST: Stays at end price after end and before expiry
+    //
+    solana.set_clock_timestamp(initial_time + 17).await;
+    send_tx(
+        solana,
+        TokenConditionalSwapTriggerInstruction {
+            liqee: account,
+            liqor,
+            liqor_owner: owner,
+            index: 0,
+            max_buy_token_to_liqee: 1000,
+            max_sell_token_to_liqor: 12100, // expected price of 11.0 sell per buy, with 10% maker fee
+            min_buy_token: 1,
+        },
+    )
+    .await
+    .unwrap();
+
+    account_quote_expected += 1000.0;
+    account_base_expected += -12100.0;
+    liqor_quote_expected += -1000.0;
+    liqor_base_expected += 10450.0;
+
+    let account_quote = account_position_f64(solana, account, quote_token.bank).await;
+    let account_base = account_position_f64(solana, account, base_token.bank).await;
+    assert!(assert_equal_f64_f64(
+        account_quote,
+        account_quote_expected,
+        0.1
+    ));
+    assert!(assert_equal_f64_f64(
+        account_base,
+        account_base_expected,
+        0.1
+    ));
+
+    let liqor_quote = account_position_f64(solana, liqor, quote_token.bank).await;
+    let liqor_base = account_position_f64(solana, liqor, base_token.bank).await;
+    assert!(assert_equal_f64_f64(liqor_quote, liqor_quote_expected, 0.1));
+    assert!(assert_equal_f64_f64(liqor_base, liqor_base_expected, 0.1));
+
+    //
+    // TEST: Can't take when expired
+    //
+    solana.set_clock_timestamp(initial_time + 22).await;
+    let res = send_tx(
+        solana,
+        TokenConditionalSwapTriggerInstruction {
+            liqee: account,
+            liqor,
+            liqor_owner: owner,
+            index: 0,
+            max_buy_token_to_liqee: 100,
+            max_sell_token_to_liqor: 100,
+            min_buy_token: 1,
+        },
+    )
+    .await;
+    assert_mango_error(
+        &res,
+        MangoError::TokenConditionalSwapExpired.into(),
+        "tcs should be expired".to_string(),
     );
 
     Ok(())

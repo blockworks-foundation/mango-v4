@@ -53,9 +53,9 @@ async fn test_token_update_index_and_rate() -> Result<(), TransportError> {
 
     let bank_before = solana.get_account::<Bank>(tokens[0].bank).await;
 
-    let time_before = solana.get_clock().await.unix_timestamp;
+    let time_before = solana.clock().await.unix_timestamp;
     solana.advance_clock().await;
-    let time_after = solana.get_clock().await.unix_timestamp;
+    let time_after = solana.clock().await.unix_timestamp;
 
     send_tx(
         solana,

@@ -4413,6 +4413,7 @@ pub struct TokenConditionalSwapCreateLinearAuctionInstruction {
     pub allow_creating_borrows: bool,
     pub start_timestamp: u64,
     pub duration_seconds: u64,
+    pub expiry_timestamp: u64,
 }
 #[async_trait::async_trait(?Send)]
 impl ClientInstruction for TokenConditionalSwapCreateLinearAuctionInstruction {
@@ -4426,7 +4427,7 @@ impl ClientInstruction for TokenConditionalSwapCreateLinearAuctionInstruction {
         let instruction = Self::Instruction {
             max_buy: self.max_buy,
             max_sell: self.max_sell,
-            expiry_timestamp: u64::MAX,
+            expiry_timestamp: self.expiry_timestamp,
             price_start: self.price_start,
             price_end: self.price_end,
             allow_creating_deposits: self.allow_creating_deposits,

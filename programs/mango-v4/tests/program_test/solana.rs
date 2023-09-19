@@ -82,7 +82,7 @@ impl SolanaCookie {
         result
     }
 
-    pub async fn get_clock(&self) -> solana_program::clock::Clock {
+    pub async fn clock(&self) -> solana_program::clock::Clock {
         self.context
             .borrow_mut()
             .banks_client
@@ -91,8 +91,22 @@ impl SolanaCookie {
             .unwrap()
     }
 
+    pub fn set_clock(&self, clock: &solana_program::clock::Clock) {
+        self.context.borrow_mut().set_sysvar(clock);
+    }
+
+    pub async fn clock_timestamp(&self) -> u64 {
+        self.clock().await.unix_timestamp.try_into().unwrap()
+    }
+
+    pub async fn set_clock_timestamp(&self, timestamp: u64) {
+        let mut clock = self.clock().await;
+        clock.unix_timestamp = timestamp.try_into().unwrap();
+        self.set_clock(&clock);
+    }
+
     pub async fn advance_by_slots(&self, slots: u64) {
-        let clock = self.get_clock().await;
+        let clock = self.clock().await;
         self.context
             .borrow_mut()
             .warp_to_slot(clock.slot + slots + 1)
@@ -100,7 +114,7 @@ impl SolanaCookie {
     }
 
     pub async fn advance_clock_to(&self, target: i64) {
-        let mut clock = self.get_clock().await;
+        let mut clock = self.clock().await;
 
         // just advance enough to ensure we get changes over last_updated in various ix
         // if this gets too slow for our tests, remove and replace with manual time offset
@@ -110,17 +124,17 @@ impl SolanaCookie {
                 .borrow_mut()
                 .warp_to_slot(clock.slot + 50)
                 .unwrap();
-            clock = self.get_clock().await;
+            clock = self.clock().await;
         }
     }
 
     pub async fn advance_clock_to_next_multiple(&self, window: i64) {
-        let ts = self.get_clock().await.unix_timestamp;
+        let ts = self.clock().await.unix_timestamp;
         self.advance_clock_to(ts / window * window + window).await
     }
 
     pub async fn advance_clock(&self) {
-        let clock = self.get_clock().await;
+        let clock = self.clock().await;
         self.advance_clock_to(clock.unix_timestamp + 1).await
     }
 
