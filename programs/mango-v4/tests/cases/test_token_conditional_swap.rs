@@ -683,14 +683,14 @@ async fn test_token_conditional_swap_premium_auction() -> Result<(), TransportEr
             owner,
             buy_mint: quote_token.mint.pubkey,
             sell_mint: base_token.mint.pubkey,
-            max_buy: 100,
-            max_sell: 100,
-            price_lower_limit: 1.0,
-            price_upper_limit: 11.0,
-            max_price_premium_rate: 0.001,
+            max_buy: 100000,
+            max_sell: 100000,
+            price_lower_limit: 0.5,
+            price_upper_limit: 2.0,
+            max_price_premium_rate: 0.01,
             allow_creating_deposits: true,
             allow_creating_borrows: true,
-            duration_seconds: 5,
+            duration_seconds: 10,
         },
     )
     .await
@@ -703,6 +703,164 @@ async fn test_token_conditional_swap_premium_auction() -> Result<(), TransportEr
         tcss[0].tcs_type,
         TokenConditionalSwapType::PremiumAuction as u8
     );
+
+    //
+    // TEST: Can't take an auction when the oracle price is out of range
+    //
+
+    set_bank_stub_oracle_price(solana, group, &base_token, admin, 10.0).await;
+    let res = send_tx(
+        solana,
+        TokenConditionalSwapTriggerInstruction {
+            liqee: account,
+            liqor,
+            liqor_owner: owner,
+            index: 0,
+            max_buy_token_to_liqee: 100,
+            max_sell_token_to_liqor: 100,
+            min_buy_token: 0,
+        },
+    )
+    .await;
+    assert_mango_error(
+        &res,
+        MangoError::TokenConditionalSwapPriceNotInRange.into(),
+        "price is not in range".to_string(),
+    );
+
+    //
+    // TEST: Can trigger (and implicitly start) when price in range
+    //
+    set_bank_stub_oracle_price(solana, group, &base_token, admin, 1.0).await;
+    send_tx(
+        solana,
+        TokenConditionalSwapTriggerInstruction {
+            liqee: account,
+            liqor,
+            liqor_owner: owner,
+            index: 0,
+            max_buy_token_to_liqee: 1000,
+            max_sell_token_to_liqor: 1100, // expected price of 1.0 sell per buy, with 10% maker fee
+            min_buy_token: 1,
+        },
+    )
+    .await
+    .unwrap();
+
+    // 0 premium because only just started
+    let mut account_quote_expected = deposit_amount as f64 + 1000.0;
+    let mut account_base_expected = deposit_amount as f64 + -1100.0;
+    let mut liqor_quote_expected = deposit_amount as f64 + -1000.0;
+    let mut liqor_base_expected = deposit_amount as f64 + 950.0;
+
+    let account_quote = account_position_f64(solana, account, quote_token.bank).await;
+    let account_base = account_position_f64(solana, account, base_token.bank).await;
+    assert!(assert_equal_f64_f64(
+        account_quote,
+        account_quote_expected,
+        0.1
+    ));
+    assert!(assert_equal_f64_f64(
+        account_base,
+        account_base_expected,
+        0.1
+    ));
+
+    let liqor_quote = account_position_f64(solana, liqor, quote_token.bank).await;
+    let liqor_base = account_position_f64(solana, liqor, base_token.bank).await;
+    assert!(assert_equal_f64_f64(liqor_quote, liqor_quote_expected, 0.1));
+    assert!(assert_equal_f64_f64(liqor_base, liqor_base_expected, 0.1));
+
+    let account_data = get_mango_account(solana, account).await;
+    let tcs = account_data
+        .active_token_conditional_swaps()
+        .next()
+        .unwrap();
+    assert!(tcs.start_timestamp > 0);
+
+    //
+    // TEST: Premium increases
+    //
+    solana.set_clock_timestamp(tcs.start_timestamp + 5).await;
+    send_tx(
+        solana,
+        TokenConditionalSwapTriggerInstruction {
+            liqee: account,
+            liqor,
+            liqor_owner: owner,
+            index: 0,
+            max_buy_token_to_liqee: 10000,
+            max_sell_token_to_liqor: 11055, // expected price of 1.0+0.5% premium sell per buy, with 10% maker fee
+            min_buy_token: 1,
+        },
+    )
+    .await
+    .unwrap();
+
+    account_quote_expected += 10000.0;
+    account_base_expected += -11055.0;
+    liqor_quote_expected += -10000.0;
+    liqor_base_expected += 9549.0; // roughly 10000 * 1 * 1.005 premium * 0.95 taker fee
+
+    let account_quote = account_position_f64(solana, account, quote_token.bank).await;
+    let account_base = account_position_f64(solana, account, base_token.bank).await;
+    assert!(assert_equal_f64_f64(
+        account_quote,
+        account_quote_expected,
+        0.1
+    ));
+    assert!(assert_equal_f64_f64(
+        account_base,
+        account_base_expected,
+        0.1
+    ));
+
+    let liqor_quote = account_position_f64(solana, liqor, quote_token.bank).await;
+    let liqor_base = account_position_f64(solana, liqor, base_token.bank).await;
+    assert!(assert_equal_f64_f64(liqor_quote, liqor_quote_expected, 0.1));
+    assert!(assert_equal_f64_f64(liqor_base, liqor_base_expected, 0.1));
+
+    //
+    // TEST: Premium stops at max increases
+    //
+    solana.set_clock_timestamp(tcs.start_timestamp + 50).await;
+    send_tx(
+        solana,
+        TokenConditionalSwapTriggerInstruction {
+            liqee: account,
+            liqor,
+            liqor_owner: owner,
+            index: 0,
+            max_buy_token_to_liqee: 10000,
+            max_sell_token_to_liqor: 11110, // expected price of 1.0+1% premium sell per buy, with 10% maker fee
+            min_buy_token: 1,
+        },
+    )
+    .await
+    .unwrap();
+
+    account_quote_expected += 10000.0;
+    account_base_expected += -11110.0;
+    liqor_quote_expected += -10000.0;
+    liqor_base_expected += 9595.0; // roughly 10000 * 1 * 1.01 premium * 0.95 taker fee
+
+    let account_quote = account_position_f64(solana, account, quote_token.bank).await;
+    let account_base = account_position_f64(solana, account, base_token.bank).await;
+    assert!(assert_equal_f64_f64(
+        account_quote,
+        account_quote_expected,
+        0.1
+    ));
+    assert!(assert_equal_f64_f64(
+        account_base,
+        account_base_expected,
+        0.1
+    ));
+
+    let liqor_quote = account_position_f64(solana, liqor, quote_token.bank).await;
+    let liqor_base = account_position_f64(solana, liqor, base_token.bank).await;
+    assert!(assert_equal_f64_f64(liqor_quote, liqor_quote_expected, 0.1));
+    assert!(assert_equal_f64_f64(liqor_base, liqor_base_expected, 0.1));
 
     Ok(())
 }
