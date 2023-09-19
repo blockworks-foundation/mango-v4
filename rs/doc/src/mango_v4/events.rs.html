@@ -27,17 +27,13 @@
 <span id="27">27</span>
 <span id="28">28</span>
 <span id="29">29</span>
-<span id="30">30</span>
-<span id="31">31</span>
 </pre><pre class="rust"><code><span class="kw">use </span>anchor_lang::prelude::<span class="kw-2">*</span>;
 <span class="kw">use </span>fixed::types::I80F48;
 
-<span class="kw">use </span><span class="kw">crate</span>::health::HealthCache;
 <span class="kw">use </span><span class="kw">crate</span>::state::{PerpMarketIndex, TokenIndex};
 
 <span class="attribute">#[event]
 </span><span class="kw">pub struct </span>MangoAccountData {
-    <span class="kw">pub </span>health_cache: HealthCache,
     <span class="kw">pub </span>init_health: I80F48,
     <span class="kw">pub </span>maint_health: I80F48,
     <span class="kw">pub </span>equity: Equity,

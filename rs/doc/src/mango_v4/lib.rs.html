@@ -1473,6 +1473,7 @@
 <span id="1473">1473</span>
 <span id="1474">1474</span>
 <span id="1475">1475</span>
+<span id="1476">1476</span>
 </pre><pre class="rust"><code><span class="attribute">#![allow(unused_variables)]
 
 </span><span class="kw">use </span>fixed::types::I80F48;
@@ -2816,7 +2817,8 @@
         <span class="prelude-val">Ok</span>(())
     }
 
-    <span class="kw">pub fn </span>compute_account_data(ctx: Context&lt;ComputeAccountData&gt;) -&gt; <span class="prelude-ty">Result</span>&lt;()&gt; {
+    <span class="doccomment">/// Warning, this instruction is for testing purposes only!
+    </span><span class="kw">pub fn </span>compute_account_data(ctx: Context&lt;ComputeAccountData&gt;) -&gt; <span class="prelude-ty">Result</span>&lt;()&gt; {
         <span class="attribute">#[cfg(feature = <span class="string">&quot;enable-gpl&quot;</span>)]
         </span>instructions::compute_account_data(ctx)<span class="question-mark">?</span>;
         <span class="prelude-val">Ok</span>(())
