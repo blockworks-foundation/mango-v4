@@ -477,7 +477,7 @@ export class Group {
       price = this.toNativePrice(uiPrice, baseDecimals);
       lastUpdatedSlot = parseInt(priceData.lastSlot.toString());
       deviation =
-        priceData.confidence !== undefined
+        priceData.previousConfidence !== undefined
           ? I80F48.fromNumber(
               priceData.previousConfidence *
                 Math.pow(10, this.getInsuranceMintDecimals() - baseDecimals),
