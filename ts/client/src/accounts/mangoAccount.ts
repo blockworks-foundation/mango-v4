@@ -182,6 +182,17 @@ export class MangoAccount {
     return this.frozenUntil.lt(new BN(Date.now() / 1000));
   }
 
+  public async tokenPositionsForNotConfidentOrStaleOracles(
+    client: MangoClient,
+    group: Group,
+  ): Promise<Bank[]> {
+    const nowSlot = await client.connection.getSlot();
+
+    return this.tokensActive()
+      .map((tp) => group.getFirstBankByTokenIndex(tp.tokenIndex))
+      .filter((bank) => bank.checkOracleConfidenceAndStaleness(nowSlot));
+  }
+
   public tokensActive(): TokenPosition[] {
     return this.tokens.filter((token) => token.isActive());
   }

@@ -1413,6 +1413,30 @@ export class MangoClient {
     ]);
   }
 
+  public async tokenWithdrawAllDepositForAllNotConfidentOrStaleOracles(
+    group: Group,
+    mangoAccount: MangoAccount,
+  ): Promise<MangoSignatureStatus> {
+    const nowSlot = await this.connection.getSlot();
+
+    const ixs = await Promise.all(
+      Array.from(group.banksMapByTokenIndex.values())
+        .map((banks) => banks[0])
+        .filter((bank) => bank.checkOracleConfidenceAndStaleness(nowSlot))
+        .map((bank) => {
+          return this.tokenWithdrawNativeIx(
+            group,
+            mangoAccount,
+            bank.mint,
+            U64_MAX_BN,
+            false,
+          );
+        }),
+    );
+
+    return await this.sendAndConfirmTransactionForGroup(group, ixs.flat());
+  }
+
   /**
    * Withdraw the entire deposit balance for a token, effectively freeing the token position
    *
@@ -1431,7 +1455,7 @@ export class MangoClient {
     if (b < 0) {
       throw new Error(`Only call this method for deposits and not borrows!`);
     }
-    const ixes = await this.tokenWithdrawNativeIx(
+    const ixs = await this.tokenWithdrawNativeIx(
       group,
       mangoAccount,
       mintPk,
@@ -1439,7 +1463,7 @@ export class MangoClient {
       false,
     );
 
-    return await this.sendAndConfirmTransactionForGroup(group, ixes);
+    return await this.sendAndConfirmTransactionForGroup(group, ixs);
   }
 
   public async tokenWithdraw(
@@ -1450,7 +1474,7 @@ export class MangoClient {
     allowBorrow: boolean,
   ): Promise<MangoSignatureStatus> {
     const nativeAmount = toNative(amount, group.getMintDecimals(mintPk));
-    const ixes = await this.tokenWithdrawNativeIx(
+    const ixs = await this.tokenWithdrawNativeIx(
       group,
       mangoAccount,
       mintPk,
@@ -1458,7 +1482,7 @@ export class MangoClient {
       allowBorrow,
     );
 
-    return await this.sendAndConfirmTransactionForGroup(group, ixes);
+    return await this.sendAndConfirmTransactionForGroup(group, ixs);
   }
 
   public async tokenWithdrawNativeIx(
@@ -1957,7 +1981,7 @@ export class MangoClient {
     clientOrderId: number,
     limit: number,
   ): Promise<MangoSignatureStatus> {
-    const placeOrderIxes = await this.serum3PlaceOrderIx(
+    const placeOrderIxs = await this.serum3PlaceOrderIx(
       group,
       mangoAccount,
       externalMarketPk,
@@ -1976,7 +2000,7 @@ export class MangoClient {
       externalMarketPk,
     );
 
-    const ixs = [...placeOrderIxes, settleIx];
+    const ixs = [...placeOrderIxs, settleIx];
 
     return await this.sendAndConfirmTransactionForGroup(group, ixs);
   }
@@ -2165,7 +2189,7 @@ export class MangoClient {
     side: Serum3Side,
     orderId: BN,
   ): Promise<MangoSignatureStatus> {
-    const ixes = await Promise.all([
+    const ixs = await Promise.all([
       this.serum3CancelOrderIx(
         group,
         mangoAccount,
@@ -2176,7 +2200,7 @@ export class MangoClient {
       this.serum3SettleFundsV2Ix(group, mangoAccount, externalMarketPk),
     ]);
 
-    return await this.sendAndConfirmTransactionForGroup(group, ixes);
+    return await this.sendAndConfirmTransactionForGroup(group, ixs);
   }
 
   /// perps

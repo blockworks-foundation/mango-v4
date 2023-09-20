@@ -3,7 +3,7 @@ import { utf8 } from '@coral-xyz/anchor/dist/cjs/utils/bytes';
 import { PublicKey } from '@solana/web3.js';
 import { I80F48, I80F48Dto, ONE_I80F48, ZERO_I80F48 } from '../numbers/I80F48';
 import { As, toUiDecimals } from '../utils';
-import { OracleProvider } from './oracle';
+import { OracleProvider, checkOracleConfidenceAndStaleness } from './oracle';
 
 export type TokenIndex = number & As<'token-index'>;
 
@@ -64,6 +64,7 @@ export class Bank implements BankForHealth {
   public _price: I80F48 | undefined;
   public _uiPrice: number | undefined;
   public _oracleLastUpdatedSlot: number | undefined;
+  public _oracleLastKnowndeviation: I80F48 | undefined;
   public _oracleProvider: OracleProvider | undefined;
   public collectedFeesNative: I80F48;
   public loanFeeRate: I80F48;
@@ -327,6 +328,16 @@ export class Bank implements BankForHealth {
       this.getDepositRate().toString() +
       '\n getBorrowRate() - ' +
       this.getBorrowRate().toString()
+    );
+  }
+
+  checkOracleConfidenceAndStaleness(nowSlot: number): boolean {
+    return checkOracleConfidenceAndStaleness(
+      nowSlot,
+      this.oracleConfig.maxStalenessSlots.toNumber(),
+      this.oracleLastUpdatedSlot,
+      this._oracleLastKnowndeviation,
+      this.oracleConfig.confFilter,
     );
   }
 

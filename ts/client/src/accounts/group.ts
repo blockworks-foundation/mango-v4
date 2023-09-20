@@ -397,7 +397,7 @@ export class Group {
             throw new Error(
               `Undefined accountInfo object in reloadBankOraclePrices for ${bank.oracle}!`,
             );
-          const { price, uiPrice, lastUpdatedSlot, provider } =
+          const { price, uiPrice, lastUpdatedSlot, provider, deviation } =
             await this.decodePriceFromOracleAi(
               coder,
               bank.oracle,
@@ -409,6 +409,7 @@ export class Group {
           bank._uiPrice = uiPrice;
           bank._oracleLastUpdatedSlot = lastUpdatedSlot;
           bank._oracleProvider = provider;
+          bank._oracleLastKnowndeviation = deviation;
         }
       }
     }
@@ -433,7 +434,7 @@ export class Group {
             `Undefined ai object in reloadPerpMarketOraclePrices for ${perpMarket.oracle}!`,
           );
 
-        const { price, uiPrice, lastUpdatedSlot, provider } =
+        const { price, uiPrice, lastUpdatedSlot, provider, deviation } =
           await this.decodePriceFromOracleAi(
             coder,
             perpMarket.oracle,
@@ -445,6 +446,7 @@ export class Group {
         perpMarket._uiPrice = uiPrice;
         perpMarket._oracleLastUpdatedSlot = lastUpdatedSlot;
         perpMarket._oracleProvider = provider;
+        perpMarket._oracleLastKnowndeviation = deviation;
       }),
     );
   }
@@ -460,8 +462,9 @@ export class Group {
     uiPrice: number;
     lastUpdatedSlot: number;
     provider: OracleProvider;
+    deviation: I80F48;
   }> {
-    let price, uiPrice, lastUpdatedSlot, provider;
+    let price, uiPrice, lastUpdatedSlot, provider, deviation;
     if (
       !BorshAccountsCoder.accountDiscriminator('stubOracle').compare(
         ai.data.slice(0, 8),
@@ -472,11 +475,19 @@ export class Group {
       uiPrice = this.toUiPrice(price, baseDecimals);
       lastUpdatedSlot = stubOracle.lastUpdateSlot.toNumber();
       provider = OracleProvider.Stub;
+      deviation = stubOracle.deviation;
     } else if (isPythOracle(ai)) {
       const priceData = parsePriceData(ai.data);
       uiPrice = priceData.previousPrice;
       price = this.toNativePrice(uiPrice, baseDecimals);
       lastUpdatedSlot = parseInt(priceData.lastSlot.toString());
+      deviation = priceData.confidence
+        ? priceData.confidence *
+          Math.pow(
+            10,
+            priceData.exponent + this.getInsuranceMintDecimals() - baseDecimals,
+          )
+        : undefined;
       provider = OracleProvider.Pyth;
     } else if (isSwitchboardOracle(ai)) {
       const priceData = await parseSwitchboardOracle(
@@ -486,13 +497,14 @@ export class Group {
       uiPrice = priceData.price;
       price = this.toNativePrice(uiPrice, baseDecimals);
       lastUpdatedSlot = priceData.lastUpdatedSlot;
+      deviation = this.toNativePrice(priceData.uiDeviation, baseDecimals);
       provider = OracleProvider.Switchboard;
     } else {
       throw new Error(
         `Unknown oracle provider (parsing not implemented) for oracle ${oracle}, with owner ${ai.owner}!`,
       );
     }
-    return { price, uiPrice, lastUpdatedSlot, provider };
+    return { price, uiPrice, lastUpdatedSlot, provider, deviation };
   }
 
   public async reloadVaults(client: MangoClient): Promise<void> {

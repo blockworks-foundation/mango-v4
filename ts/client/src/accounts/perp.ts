@@ -21,7 +21,7 @@ import {
 } from './bank';
 import { Group } from './group';
 import { MangoAccount } from './mangoAccount';
-import { OracleProvider } from './oracle';
+import { OracleProvider, checkOracleConfidenceAndStaleness } from './oracle';
 
 export type PerpMarketIndex = number & As<'perp-market-index'>;
 
@@ -56,6 +56,7 @@ export class PerpMarket {
   public _price: I80F48;
   public _uiPrice: number;
   public _oracleLastUpdatedSlot: number;
+  public _oracleLastKnowndeviation: I80F48 | undefined;
   public _oracleProvider: OracleProvider;
 
   public _bids: BookSide;
@@ -242,6 +243,16 @@ export class PerpMarket {
     this.quoteLotsToUiConverter = new Big(this.quoteLotSize.toString())
       .div(new Big(10).pow(QUOTE_DECIMALS))
       .toNumber();
+  }
+
+  checkOracleConfidenceAndStaleness(nowSlot: number): boolean {
+    return checkOracleConfidenceAndStaleness(
+      nowSlot,
+      this.oracleConfig.maxStalenessSlots.toNumber(),
+      this.oracleLastUpdatedSlot,
+      this._oracleLastKnowndeviation,
+      this.oracleConfig.confFilter,
+    );
   }
 
   get price(): I80F48 {
