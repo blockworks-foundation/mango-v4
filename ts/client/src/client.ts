@@ -1423,6 +1423,7 @@ export class MangoClient {
       Array.from(group.banksMapByTokenIndex.values())
         .map((banks) => banks[0])
         .filter((bank) => bank.checkOracleConfidenceAndStaleness(nowSlot))
+        .filter((b) => mangoAccount.getTokenBalanceUi(b) > 0)
         .map((bank) => {
           return this.tokenWithdrawNativeIx(
             group,
