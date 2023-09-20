@@ -21,7 +21,7 @@ import {
 } from './bank';
 import { Group } from './group';
 import { MangoAccount } from './mangoAccount';
-import { OracleProvider, checkOracleConfidenceAndStaleness } from './oracle';
+import { OracleProvider, isOracleStaleOrUncofident } from './oracle';
 
 export type PerpMarketIndex = number & As<'perp-market-index'>;
 
@@ -56,7 +56,7 @@ export class PerpMarket {
   public _price: I80F48;
   public _uiPrice: number;
   public _oracleLastUpdatedSlot: number;
-  public _oracleLastKnowndeviation: I80F48 | undefined;
+  public _oracleLastKnownDeviation: I80F48 | undefined;
   public _oracleProvider: OracleProvider;
 
   public _bids: BookSide;
@@ -245,12 +245,12 @@ export class PerpMarket {
       .toNumber();
   }
 
-  checkOracleConfidenceAndStaleness(nowSlot: number): boolean {
-    return checkOracleConfidenceAndStaleness(
+  isOracleStaleOrUncofident(nowSlot: number): boolean {
+    return isOracleStaleOrUncofident(
       nowSlot,
       this.oracleConfig.maxStalenessSlots.toNumber(),
       this.oracleLastUpdatedSlot,
-      this._oracleLastKnowndeviation,
+      this._oracleLastKnownDeviation,
       this.oracleConfig.confFilter,
       this.price,
     );

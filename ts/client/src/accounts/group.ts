@@ -405,7 +405,7 @@ export class Group {
         bank._uiPrice = uiPrice;
         bank._oracleLastUpdatedSlot = lastUpdatedSlot;
         bank._oracleProvider = provider;
-        bank._oracleLastKnowndeviation = deviation;
+        bank._oracleLastKnownDeviation = deviation;
       }
     }
   }
@@ -441,7 +441,7 @@ export class Group {
         perpMarket._uiPrice = uiPrice;
         perpMarket._oracleLastUpdatedSlot = lastUpdatedSlot;
         perpMarket._oracleProvider = provider;
-        perpMarket._oracleLastKnowndeviation = deviation;
+        perpMarket._oracleLastKnownDeviation = deviation;
       }),
     );
   }
@@ -476,17 +476,13 @@ export class Group {
       uiPrice = priceData.previousPrice;
       price = this.toNativePrice(uiPrice, baseDecimals);
       lastUpdatedSlot = parseInt(priceData.lastSlot.toString());
-      deviation = priceData.confidence
-        ? I80F48.fromNumber(
-            priceData.confidence *
-              Math.pow(
-                10,
-                priceData.exponent +
-                  this.getInsuranceMintDecimals() -
-                  baseDecimals,
-              ),
-          )
-        : undefined;
+      deviation =
+        priceData.confidence !== undefined
+          ? I80F48.fromNumber(
+              priceData.previousConfidence *
+                Math.pow(10, this.getInsuranceMintDecimals() - baseDecimals),
+            )
+          : undefined;
       provider = OracleProvider.Pyth;
     } else if (isSwitchboardOracle(ai)) {
       const priceData = await parseSwitchboardOracle(
