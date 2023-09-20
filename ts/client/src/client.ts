@@ -95,6 +95,9 @@ import { MangoSignatureStatus, sendTransaction } from './utils/rpc';
 import { NATIVE_MINT, TOKEN_PROGRAM_ID } from './utils/spl';
 
 export const DEFAULT_TOKEN_CONDITIONAL_SWAP_COUNT = 8;
+export const PERP_SETTLE_PNL_CU_LIMIT = 250000;
+export const PERP_SETTLE_FEES_CU_LIMIT = 20000;
+export const SERUM_SETTLE_FUNDS_CU_LIMIT = 65000;
 
 export enum AccountRetriever {
   Scanning,
@@ -2961,8 +2964,9 @@ export class MangoClient {
     );
 
     if (
-      mangoAccount.perpActive().length * (250000 + 20000) +
-        mangoAccount.serum3Active().length * 65000 >
+      mangoAccount.perpActive().length *
+        (PERP_SETTLE_PNL_CU_LIMIT + PERP_SETTLE_FEES_CU_LIMIT) +
+        mangoAccount.serum3Active().length * SERUM_SETTLE_FUNDS_CU_LIMIT >
       1600000
     ) {
       throw new Error(
@@ -2975,8 +2979,9 @@ export class MangoClient {
       [
         ComputeBudgetProgram.setComputeUnitLimit({
           units:
-            mangoAccount.perpActive().length * (250000 + 20000) +
-            mangoAccount.serum3Active().length * 65000,
+            mangoAccount.perpActive().length *
+              (PERP_SETTLE_PNL_CU_LIMIT + PERP_SETTLE_FEES_CU_LIMIT) +
+            mangoAccount.serum3Active().length * SERUM_SETTLE_FUNDS_CU_LIMIT,
         }),
         ...ixs1,
         ...ixs2,
@@ -2998,7 +3003,7 @@ export class MangoClient {
   ): Promise<MangoSignatureStatus> {
     return await this.sendAndConfirmTransactionForGroup(group, [
       ComputeBudgetProgram.setComputeUnitLimit({
-        units: 250000 + 20000,
+        units: PERP_SETTLE_PNL_CU_LIMIT + PERP_SETTLE_FEES_CU_LIMIT,
       }),
       await this.perpSettlePnlIx(
         group,
@@ -3025,7 +3030,7 @@ export class MangoClient {
   ): Promise<MangoSignatureStatus> {
     return await this.sendAndConfirmTransactionForGroup(group, [
       ComputeBudgetProgram.setComputeUnitLimit({
-        units: 250000,
+        units: PERP_SETTLE_PNL_CU_LIMIT,
       }),
       await this.perpSettlePnlIx(
         group,
