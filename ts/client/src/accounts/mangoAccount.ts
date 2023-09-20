@@ -190,7 +190,7 @@ export class MangoAccount {
 
     return this.tokensActive()
       .map((tp) => group.getFirstBankByTokenIndex(tp.tokenIndex))
-      .filter((bank) => bank.isOracleStaleOrUncofident(nowSlot));
+      .filter((bank) => bank.isOracleStaleOrUnconfident(nowSlot));
   }
 
   public tokensActive(): TokenPosition[] {

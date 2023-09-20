@@ -1421,7 +1421,7 @@ export class MangoClient {
 
     const banksToWithdrawFrom = Array.from(group.banksMapByTokenIndex.values())
       .map((banks) => banks[0])
-      .filter((bank) => bank.isOracleStaleOrUncofident(nowSlot))
+      .filter((bank) => bank.isOracleStaleOrUnconfident(nowSlot))
       .filter((b) => mangoAccount.getTokenBalanceUi(b) > 0);
 
     if (banksToWithdrawFrom.length === 0) {

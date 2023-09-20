@@ -156,7 +156,7 @@ export function isPythOracle(accountInfo: AccountInfo<Buffer>): boolean {
   return accountInfo.data.readUInt32LE(0) === PythMagic;
 }
 
-export function isOracleStaleOrUncofident(
+export function isOracleStaleOrUnconfident(
   nowSlot: number,
   maxStalenessSlots: number,
   oracleLastUpdatedSlot: number | undefined,

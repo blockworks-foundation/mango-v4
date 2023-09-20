@@ -21,7 +21,7 @@ import {
 } from './bank';
 import { Group } from './group';
 import { MangoAccount } from './mangoAccount';
-import { OracleProvider, isOracleStaleOrUncofident } from './oracle';
+import { OracleProvider, isOracleStaleOrUnconfident } from './oracle';
 
 export type PerpMarketIndex = number & As<'perp-market-index'>;
 
@@ -245,8 +245,8 @@ export class PerpMarket {
       .toNumber();
   }
 
-  isOracleStaleOrUncofident(nowSlot: number): boolean {
-    return isOracleStaleOrUncofident(
+  isOracleStaleOrUnconfident(nowSlot: number): boolean {
+    return isOracleStaleOrUnconfident(
       nowSlot,
       this.oracleConfig.maxStalenessSlots.toNumber(),
       this.oracleLastUpdatedSlot,
