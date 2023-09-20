@@ -252,6 +252,7 @@ export class PerpMarket {
       this.oracleLastUpdatedSlot,
       this._oracleLastKnowndeviation,
       this.oracleConfig.confFilter,
+      this.price,
     );
   }
 

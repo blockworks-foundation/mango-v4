@@ -338,6 +338,7 @@ export class Bank implements BankForHealth {
       this.oracleLastUpdatedSlot,
       this._oracleLastKnowndeviation,
       this.oracleConfig.confFilter,
+      this.price,
     );
   }
 

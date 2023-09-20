@@ -13,7 +13,7 @@ import merge from 'lodash/merge';
 import { MangoClient } from '../client';
 import { OPENBOOK_PROGRAM_ID } from '../constants';
 import { Id } from '../ids';
-import { I80F48, ONE_I80F48 } from '../numbers/I80F48';
+import { I80F48 } from '../numbers/I80F48';
 import { PriceImpact, computePriceImpactOnJup } from '../risk';
 import { buildFetch, toNative, toNativeI80F48, toUiDecimals } from '../utils';
 import { Bank, MintInfo, TokenIndex } from './bank';
@@ -389,28 +389,23 @@ export class Group {
     const coder = new BorshAccountsCoder(client.program.idl);
     for (const [index, ai] of ais.entries()) {
       for (const bank of banks[index]) {
-        if (bank.name === 'USDC') {
-          bank._price = ONE_I80F48();
-          bank._uiPrice = 1;
-        } else {
-          if (!ai)
-            throw new Error(
-              `Undefined accountInfo object in reloadBankOraclePrices for ${bank.oracle}!`,
-            );
-          const { price, uiPrice, lastUpdatedSlot, provider, deviation } =
-            await this.decodePriceFromOracleAi(
-              coder,
-              bank.oracle,
-              ai,
-              this.getMintDecimals(bank.mint),
-              client,
-            );
-          bank._price = price;
-          bank._uiPrice = uiPrice;
-          bank._oracleLastUpdatedSlot = lastUpdatedSlot;
-          bank._oracleProvider = provider;
-          bank._oracleLastKnowndeviation = deviation;
-        }
+        if (!ai)
+          throw new Error(
+            `Undefined accountInfo object in reloadBankOraclePrices for ${bank.oracle}!`,
+          );
+        const { price, uiPrice, lastUpdatedSlot, provider, deviation } =
+          await this.decodePriceFromOracleAi(
+            coder,
+            bank.oracle,
+            ai,
+            this.getMintDecimals(bank.mint),
+            client,
+          );
+        bank._price = price;
+        bank._uiPrice = uiPrice;
+        bank._oracleLastUpdatedSlot = lastUpdatedSlot;
+        bank._oracleProvider = provider;
+        bank._oracleLastKnowndeviation = deviation;
       }
     }
   }
@@ -482,10 +477,14 @@ export class Group {
       price = this.toNativePrice(uiPrice, baseDecimals);
       lastUpdatedSlot = parseInt(priceData.lastSlot.toString());
       deviation = priceData.confidence
-        ? priceData.confidence *
-          Math.pow(
-            10,
-            priceData.exponent + this.getInsuranceMintDecimals() - baseDecimals,
+        ? I80F48.fromNumber(
+            priceData.confidence *
+              Math.pow(
+                10,
+                priceData.exponent +
+                  this.getInsuranceMintDecimals() -
+                  baseDecimals,
+              ),
           )
         : undefined;
       provider = OracleProvider.Pyth;

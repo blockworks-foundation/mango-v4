@@ -162,6 +162,7 @@ export function checkOracleConfidenceAndStaleness(
   oracleLastUpdatedSlot: number | undefined,
   deviation: I80F48 | undefined,
   confFilter: I80F48,
+  price: I80F48,
 ): boolean {
   if (
     maxStalenessSlots >= 0 &&
@@ -171,7 +172,7 @@ export function checkOracleConfidenceAndStaleness(
     return true;
   }
 
-  if (deviation && deviation.gt(confFilter.mul(this.price))) {
+  if (deviation && deviation.gt(confFilter.mul(price))) {
     return true;
   }
 
