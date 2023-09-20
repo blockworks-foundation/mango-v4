@@ -1413,7 +1413,7 @@ export class MangoClient {
     ]);
   }
 
-  public async tokenWithdrawAllDepositForAllNotConfidentOrStaleOracles(
+  public async tokenWithdrawAllDepositForAllUnconfidentOrStaleOracles(
     group: Group,
     mangoAccount: MangoAccount,
   ): Promise<MangoSignatureStatus> {
