@@ -478,11 +478,9 @@ export class Group {
       lastUpdatedSlot = parseInt(priceData.lastSlot.toString());
       deviation =
         priceData.previousConfidence !== undefined
-          ? I80F48.fromNumber(
-              priceData.previousConfidence *
-                Math.pow(10, this.getInsuranceMintDecimals() - baseDecimals),
-            )
+          ? this.toNativePrice(priceData.previousConfidence, baseDecimals)
           : undefined;
+
       provider = OracleProvider.Pyth;
     } else if (isSwitchboardOracle(ai)) {
       const priceData = await parseSwitchboardOracle(
