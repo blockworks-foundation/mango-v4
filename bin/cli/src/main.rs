@@ -1,7 +1,6 @@
 use clap::{Args, Parser, Subcommand};
 use mango_v4_client::{
-    keypair_from_cli, pubkey_from_cli, Client, JupiterSwapMode, MangoClient,
-    TransactionBuilderConfig,
+    keypair_from_cli, pubkey_from_cli, Client, MangoClient, TransactionBuilderConfig,
 };
 use solana_sdk::pubkey::Pubkey;
 use std::str::FromStr;
@@ -193,12 +192,13 @@ async fn main() -> Result<(), anyhow::Error> {
             let output_mint = pubkey_from_cli(&cmd.output_mint);
             let client = MangoClient::new_for_existing_account(client, account, owner).await?;
             let txsig = client
-                .jupiter_swap(
+                .jupiter_v4()
+                .swap(
                     input_mint,
                     output_mint,
                     cmd.amount,
                     cmd.slippage_bps,
-                    JupiterSwapMode::ExactIn,
+                    mango_v4_client::JupiterSwapMode::ExactIn,
                     false,
                 )
                 .await?;

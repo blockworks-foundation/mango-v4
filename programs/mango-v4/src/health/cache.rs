@@ -19,14 +19,16 @@ use anchor_lang::prelude::*;
 use fixed::types::I80F48;
 
 use crate::error::*;
+use crate::serum3_cpi::{OpenOrdersAmounts, OpenOrdersSlim};
 use crate::state::{
-    Bank, MangoAccountRef, PerpMarket, PerpMarketIndex, PerpPosition, Serum3MarketIndex, TokenIndex,
+    Bank, MangoAccountRef, PerpMarket, PerpMarketIndex, PerpPosition, Serum3MarketIndex,
+    Serum3Orders, TokenIndex,
 };
 
 use super::*;
 
 /// Information about prices for a bank or perp market.
-#[derive(Clone, AnchorDeserialize, AnchorSerialize, Debug)]
+#[derive(Clone, Debug)]
 pub struct Prices {
     /// The current oracle price
     pub oracle: I80F48, // native/native
@@ -154,7 +156,7 @@ pub fn spot_amount_given_for_health_zero(
     )
 }
 
-#[derive(Clone, AnchorDeserialize, AnchorSerialize, Debug)]
+#[derive(Clone, Debug)]
 pub struct TokenInfo {
     pub token_index: TokenIndex,
     pub maint_asset_weight: I80F48,
@@ -231,11 +233,16 @@ impl TokenInfo {
 /// to the token info. This is only about dealing with the reserved funds
 /// that might end up as base OR quote tokens, depending on whether the
 /// open orders execute on not.
-#[derive(Clone, AnchorDeserialize, AnchorSerialize, Debug)]
+#[derive(Clone, Debug)]
 pub struct Serum3Info {
     // reserved amounts as stored on the open orders
     pub reserved_base: I80F48,
     pub reserved_quote: I80F48,
+
+    // Reserved amounts, converted to the opposite token, while using the most extreme order price
+    // May be zero if the extreme bid/ask price is not available (for orders placed in the past)
+    pub reserved_base_as_quote_lowest_ask: I80F48,
+    pub reserved_quote_as_base_highest_bid: I80F48,
 
     // Index into TokenInfos _not_ a TokenIndex
     pub base_info_index: usize,
@@ -248,6 +255,35 @@ pub struct Serum3Info {
 }
 
 impl Serum3Info {
+    fn new(
+        serum_account: &Serum3Orders,
+        open_orders: &impl OpenOrdersAmounts,
+        base_info_index: usize,
+        quote_info_index: usize,
+    ) -> Self {
+        // track the reserved amounts
+        let reserved_base = I80F48::from(open_orders.native_base_reserved());
+        let reserved_quote = I80F48::from(open_orders.native_quote_reserved());
+
+        let reserved_base_as_quote_lowest_ask =
+            reserved_base * I80F48::from_num(serum_account.lowest_placed_ask);
+        let reserved_quote_as_base_highest_bid =
+            reserved_quote * I80F48::from_num(serum_account.highest_placed_bid_inv);
+
+        Self {
+            reserved_base,
+            reserved_quote,
+            reserved_base_as_quote_lowest_ask,
+            reserved_quote_as_base_highest_bid,
+            base_info_index,
+            quote_info_index,
+            market_index: serum_account.market_index,
+            has_zero_funds: open_orders.native_base_total() == 0
+                && open_orders.native_quote_total() == 0
+                && open_orders.native_rebates() == 0,
+        }
+    }
+
     #[inline(always)]
     fn all_reserved_as_base(
         &self,
@@ -258,7 +294,13 @@ impl Serum3Info {
         let quote_asset = quote_info.prices.asset(health_type);
         let base_liab = base_info.prices.liab(health_type);
         // OPTIMIZATION: These divisions can be extremely expensive (up to 5k CU each)
-        self.reserved_base + self.reserved_quote * quote_asset / base_liab
+        let reserved_quote_as_base_oracle = self.reserved_quote * quote_asset / base_liab;
+        if self.reserved_quote_as_base_highest_bid != 0 {
+            self.reserved_base
+                + reserved_quote_as_base_oracle.min(self.reserved_quote_as_base_highest_bid)
+        } else {
+            self.reserved_base + reserved_quote_as_base_oracle
+        }
     }
 
     #[inline(always)]
@@ -271,7 +313,13 @@ impl Serum3Info {
         let base_asset = base_info.prices.asset(health_type);
         let quote_liab = quote_info.prices.liab(health_type);
         // OPTIMIZATION: These divisions can be extremely expensive (up to 5k CU each)
-        self.reserved_quote + self.reserved_base * base_asset / quote_liab
+        let reserved_base_as_quote_oracle = self.reserved_base * base_asset / quote_liab;
+        if self.reserved_base_as_quote_lowest_ask != 0 {
+            self.reserved_quote
+                + reserved_base_as_quote_oracle.min(self.reserved_base_as_quote_lowest_ask)
+        } else {
+            self.reserved_quote + reserved_base_as_quote_oracle
+        }
     }
 
     /// Compute the health contribution from active open orders.
@@ -372,7 +420,7 @@ pub(crate) struct Serum3Reserved {
 ///
 /// Perp markets affect account health indirectly, though the token balance in the
 /// perp market's settle token. See `effective_token_balances()`.
-#[derive(Clone, AnchorDeserialize, AnchorSerialize, Debug)]
+#[derive(Clone, Debug)]
 pub struct PerpInfo {
     pub perp_market_index: PerpMarketIndex,
     pub settle_token_index: TokenIndex,
@@ -534,11 +582,13 @@ impl PerpInfo {
 ///
 /// However, there's a real risk of getting the adjustments wrong and computing an
 /// inconsistent result, so particular care needs to be taken when this is done.
-#[derive(Clone, AnchorDeserialize, AnchorSerialize, Debug)]
+#[allow(unused)]
+#[derive(Clone, Debug)]
 pub struct HealthCache {
     pub(crate) token_infos: Vec<TokenInfo>,
     pub(crate) serum3_infos: Vec<Serum3Info>,
     pub(crate) perp_infos: Vec<PerpInfo>,
+    #[allow(unused)]
     pub(crate) being_liquidated: bool,
 }
 
@@ -800,42 +850,40 @@ impl HealthCache {
         Ok(())
     }
 
-    /// Changes the cached user account token and serum balances.
+    /// Recompute the cached information about a serum market.
     ///
     /// WARNING: You must also call recompute_token_weights() after all bank
     /// deposit/withdraw changes!
-    #[allow(clippy::too_many_arguments)]
-    pub fn adjust_serum3_reserved(
+    pub fn recompute_serum3_info(
         &mut self,
-        market_index: Serum3MarketIndex,
-        base_token_index: TokenIndex,
-        reserved_base_change: I80F48,
+        serum_account: &Serum3Orders,
+        open_orders: &OpenOrdersSlim,
         free_base_change: I80F48,
-        quote_token_index: TokenIndex,
-        reserved_quote_change: I80F48,
         free_quote_change: I80F48,
     ) -> Result<()> {
-        let base_entry_index = self.token_info_index(base_token_index)?;
-        let quote_entry_index = self.token_info_index(quote_token_index)?;
+        let serum_info_index = self
+            .serum3_infos
+            .iter_mut()
+            .position(|m| m.market_index == serum_account.market_index)
+            .ok_or_else(|| error_msg!("serum3 market {} not found", serum_account.market_index))?;
 
-        // Apply it to the tokens
+        let serum_info = &self.serum3_infos[serum_info_index];
         {
-            let base_entry = &mut self.token_infos[base_entry_index];
+            let base_entry = &mut self.token_infos[serum_info.base_info_index];
             base_entry.balance_spot += free_base_change;
         }
         {
-            let quote_entry = &mut self.token_infos[quote_entry_index];
+            let quote_entry = &mut self.token_infos[serum_info.quote_info_index];
             quote_entry.balance_spot += free_quote_change;
         }
 
-        // Apply it to the serum3 info
-        let market_entry = self
-            .serum3_infos
-            .iter_mut()
-            .find(|m| m.market_index == market_index)
-            .ok_or_else(|| error_msg!("serum3 market {} not found", market_index))?;
-        market_entry.reserved_base += reserved_base_change;
-        market_entry.reserved_quote += reserved_quote_change;
+        let serum_info = &mut self.serum3_infos[serum_info_index];
+        *serum_info = Serum3Info::new(
+            serum_account,
+            open_orders,
+            serum_info.base_info_index,
+            serum_info.quote_info_index,
+        );
         Ok(())
     }
 
@@ -1248,20 +1296,12 @@ fn new_health_cache_impl(
         let quote_info = &mut token_infos[quote_info_index];
         quote_info.balance_spot += quote_free;
 
-        // track the reserved amounts
-        let reserved_base = I80F48::from(oo.native_coin_total - oo.native_coin_free);
-        let reserved_quote = I80F48::from(oo.native_pc_total - oo.native_pc_free);
-
-        serum3_infos.push(Serum3Info {
-            reserved_base,
-            reserved_quote,
+        serum3_infos.push(Serum3Info::new(
+            serum_account,
+            oo,
             base_info_index,
             quote_info_index,
-            market_index: serum_account.market_index,
-            has_zero_funds: oo.native_coin_total == 0
-                && oo.native_pc_total == 0
-                && oo.referrer_rebates_accrued == 0,
-        });
+        ));
     }
 
     // health contribution from perp accounts
@@ -1423,6 +1463,7 @@ mod tests {
         perp1: (i64, i64, i64, i64),
         expected_health: f64,
         bank_settings: [BankSettings; 3],
+        extra: Option<fn(&mut MangoAccountValue)>,
     }
     fn test_health1_runner(testcase: &TestHealth1Case) {
         let buffer = MangoAccount::default_for_tests().try_to_vec().unwrap();
@@ -1500,6 +1541,10 @@ mod tests {
         );
         perpaccount.bids_base_lots = testcase.perp1.2;
         perpaccount.asks_base_lots = testcase.perp1.3;
+
+        if let Some(extra_fn) = testcase.extra {
+            extra_fn(&mut account);
+        }
 
         let oracle2_ai = oracle2.as_account_info();
         let ais = vec![
@@ -1713,6 +1758,50 @@ mod tests {
                 token1: 100,
                 perp1: (-1, -100, 0, 0),
                 expected_health: 1.2 * (100.0 - 100.0 - 1.2 * 1.0 * base_lots_to_quote),
+                ..Default::default()
+            },
+            TestHealth1Case {
+                // 14, reserved oo funds with max bid/min ask
+                token1: -100,
+                token2: -10,
+                token3: 0,
+                oo_1_2: (1, 1),
+                oo_1_3: (11, 1),
+                expected_health:
+                    // tokens
+                    -100.0 * 1.2 - 10.0 * 5.0 * 1.5
+                    // oo_1_2 (-> token1)
+                    + (1.0 + 3.0) * 1.2
+                    // oo_1_3 (-> token3)
+                    + (11.0 / 12.0 + 1.0) * 10.0 * 0.5,
+                extra: Some(|account: &mut MangoAccountValue| {
+                    let s2 = account.serum3_orders_mut(2).unwrap();
+                    s2.lowest_placed_ask = 3.0;
+                    let s3 = account.serum3_orders_mut(3).unwrap();
+                    s3.highest_placed_bid_inv = 1.0 / 12.0;
+                }),
+                ..Default::default()
+            },
+            TestHealth1Case {
+                // 15, reserved oo funds with max bid/min ask not crossing oracle
+                token1: -100,
+                token2: -10,
+                token3: 0,
+                oo_1_2: (1, 1),
+                oo_1_3: (11, 1),
+                expected_health:
+                    // tokens
+                    -100.0 * 1.2 - 10.0 * 5.0 * 1.5
+                    // oo_1_2 (-> token1)
+                    + (1.0 + 5.0) * 1.2
+                    // oo_1_3 (-> token3)
+                    + (11.0 / 10.0 + 1.0) * 10.0 * 0.5,
+                extra: Some(|account: &mut MangoAccountValue| {
+                    let s2 = account.serum3_orders_mut(2).unwrap();
+                    s2.lowest_placed_ask = 6.0;
+                    let s3 = account.serum3_orders_mut(3).unwrap();
+                    s3.highest_placed_bid_inv = 1.0 / 9.0;
+                }),
                 ..Default::default()
             },
         ];

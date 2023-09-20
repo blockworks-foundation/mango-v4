@@ -197,7 +197,7 @@ impl HealthCache {
         }
 
         let amount = {
-            // Now max_value is bigger than min_fn_value, the target amount must be >amount_for_max_value.
+            // Now max_value is bigger than min_fn_value, the target amount must be >=amount_for_max_value.
             // Search to the right of amount_for_max_value: but how far?
             // Use a simple estimation for the amount that would lead to zero health:
             //           health
@@ -209,7 +209,10 @@ impl HealthCache {
             let health_at_max_value = cache_after_swap(amount_for_max_value)?
                 .map(|c| c.health(health_type))
                 .unwrap_or(I80F48::MIN);
-            if health_at_max_value <= 0 {
+            if health_at_max_value == 0 {
+                return Ok(amount_for_max_value);
+            } else if health_at_max_value < 0 {
+                // target_fn suggests health is good but health suggests it's not
                 return Ok(I80F48::ZERO);
             }
             let zero_health_estimate =
@@ -506,7 +509,11 @@ fn binary_search(
     Err(error_msg!("binary search iterations exhausted"))
 }
 
-/// This is not a generic function. It assumes there is a unique maximum between left and right.
+/// This is not a generic function. It assumes there is a almost-unique maximum between left and right,
+/// in the sense that `fun` might be constant on the maximum value for a while, but there won't be
+/// distinct maximums with non-maximal values between them.
+///
+/// If the maximum isn't just a single point, it returns the rightmost value.
 fn find_maximum(
     mut left: I80F48,
     mut right: I80F48,
@@ -520,7 +527,7 @@ fn find_maximum(
     let mut right_value = fun(right)?;
     let mut mid_value = fun(mid)?;
     while (right - left) > min_step {
-        if left_value >= mid_value {
+        if left_value > mid_value {
             // max must be between left and mid
             assert!(mid_value >= right_value);
             right = mid;
@@ -539,7 +546,7 @@ fn find_maximum(
             let leftmid = half * (left + mid);
             let leftmid_value = fun(leftmid)?;
             assert!(leftmid_value >= left_value);
-            if leftmid_value >= mid_value {
+            if leftmid_value > mid_value {
                 // max between left and mid
                 right = mid;
                 right_value = mid_value;
@@ -568,9 +575,9 @@ fn find_maximum(
         }
     }
 
-    if left_value >= mid_value {
+    if left_value > mid_value {
         Ok((left, left_value))
-    } else if mid_value >= right_value {
+    } else if mid_value > right_value {
         Ok((mid, mid_value))
     } else {
         Ok((right, right_value))
@@ -722,18 +729,28 @@ mod tests {
                                     price_factor: f64,
                                     banks: [Bank; 3],
                                     max_swap_fn: MaxSwapFn| {
-            let source_price = &c.token_infos[source as usize].prices;
-            let source_bank = &banks[source as usize];
-            let target_price = &c.token_infos[target as usize].prices;
-            let target_bank = &banks[target as usize];
+            let source_ti = &c.token_infos[source as usize];
+            let source_price = &source_ti.prices;
+            let mut source_bank = banks[source as usize].clone();
+            // Update the bank weights, because the tests like to modify the cache
+            // weights and expect them to stick
+            source_bank.init_asset_weight = source_ti.init_asset_weight;
+            source_bank.init_liab_weight = source_ti.init_liab_weight;
+
+            let target_ti = &c.token_infos[target as usize];
+            let target_price = &target_ti.prices;
+            let mut target_bank = banks[target as usize].clone();
+            target_bank.init_asset_weight = target_ti.init_asset_weight;
+            target_bank.init_liab_weight = target_ti.init_liab_weight;
+
             let swap_price =
                 I80F48::from_num(price_factor) * source_price.oracle / target_price.oracle;
             let source_amount = c
                 .max_swap_source_for_health_fn(
                     &account,
-                    source_bank,
+                    &source_bank,
                     source_price.oracle,
-                    target_bank,
+                    &target_bank,
                     swap_price,
                     I80F48::from_num(min_value),
                     max_swap_fn,
@@ -745,9 +762,9 @@ mod tests {
             let value_for_amount = |amount| {
                 c.cache_after_swap(
                     &account,
-                    source_bank,
+                    &source_bank,
                     source_price.oracle,
-                    target_bank,
+                    &target_bank,
                     I80F48::from(amount),
                     swap_price,
                 )
@@ -935,6 +952,8 @@ mod tests {
                     market_index: 0,
                     reserved_base: I80F48::from(30 / 3),
                     reserved_quote: I80F48::from(30 / 2),
+                    reserved_base_as_quote_lowest_ask: I80F48::ZERO,
+                    reserved_quote_as_base_highest_bid: I80F48::ZERO,
                     has_zero_funds: false,
                 }];
                 adjust_by_usdc(&mut health_cache, 0, -20.0);
@@ -1030,6 +1049,42 @@ mod tests {
                             check(&health_cache, 0, 1, target, price_factor, banks);
                             check(&health_cache, 1, 0, target, price_factor, banks);
                         }
+                    }
+                }
+            }
+
+            {
+                // swap some assets between zero-asset-weight tokens
+                println!("test 11 {test_name}");
+                let mut health_cache = health_cache.clone();
+                adjust_by_usdc(&mut health_cache, 0, 10.0); // 5 tokens
+                health_cache.token_infos[0].init_asset_weight = I80F48::from(0);
+                health_cache.token_infos[1].init_asset_weight = I80F48::from(0);
+
+                let amount = find_max_swap(&health_cache, 0, 1, 1.0, 1.0, banks).0;
+                assert_eq!(amount, 5.0);
+
+                for price_factor in [0.9, 1.1] {
+                    for target in 1..100 {
+                        let target = target as f64;
+
+                        // Result is always the same: swap all deposits
+                        let amount =
+                            find_max_swap(&health_cache, 0, 1, target, price_factor, banks).0;
+                        assert_eq!(amount, 5.0);
+                    }
+                }
+
+                adjust_by_usdc(&mut health_cache, 1, 6.0); // 2 tokens
+
+                for price_factor in [0.9, 1.1] {
+                    for target in 1..100 {
+                        let target = target as f64;
+
+                        // Result is always the same: swap all deposits
+                        let amount =
+                            find_max_swap(&health_cache, 0, 1, target, price_factor, banks).0;
+                        assert_eq!(amount, 5.0);
                     }
                 }
             }
@@ -1553,6 +1608,8 @@ mod tests {
             serum3_infos: vec![Serum3Info {
                 reserved_base: I80F48::ONE,
                 reserved_quote: I80F48::ZERO,
+                reserved_base_as_quote_lowest_ask: I80F48::ONE,
+                reserved_quote_as_base_highest_bid: I80F48::ZERO,
                 base_info_index: 1,
                 quote_info_index: 0,
                 market_index: 0,

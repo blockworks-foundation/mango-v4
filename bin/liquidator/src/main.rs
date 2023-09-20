@@ -7,8 +7,9 @@ use anchor_client::Cluster;
 use clap::Parser;
 use mango_v4::state::{PerpMarketIndex, TokenIndex};
 use mango_v4_client::{
-    account_update_stream, chain_data, keypair_from_cli, snapshot_source, websocket_source, Client,
-    MangoClient, MangoClientError, MangoGroupContext, TransactionBuilderConfig,
+    account_update_stream, chain_data, jupiter, keypair_from_cli, snapshot_source,
+    websocket_source, Client, MangoClient, MangoClientError, MangoGroupContext,
+    TransactionBuilderConfig,
 };
 
 use itertools::Itertools;
@@ -49,6 +50,23 @@ enum BoolArg {
     False,
 }
 
+#[derive(clap::ValueEnum, Clone, Copy, Debug, PartialEq, Eq)]
+enum JupiterVersionArg {
+    Mock,
+    V4,
+    V6,
+}
+
+impl From<JupiterVersionArg> for jupiter::Version {
+    fn from(a: JupiterVersionArg) -> Self {
+        match a {
+            JupiterVersionArg::Mock => jupiter::Version::Mock,
+            JupiterVersionArg::V4 => jupiter::Version::V4,
+            JupiterVersionArg::V6 => jupiter::Version::V6,
+        }
+    }
+}
+
 #[derive(Parser)]
 #[clap()]
 struct Cli {
@@ -60,6 +78,9 @@ struct Cli {
 
     #[clap(long, env)]
     liqor_owner: String,
+
+    #[clap(long, env, default_value = "1000")]
+    check_interval_ms: u64,
 
     #[clap(long, env, default_value = "300")]
     snapshot_interval_secs: u64,
@@ -98,11 +119,9 @@ struct Cli {
     #[clap(long, env, default_value = "300000")]
     compute_limit_for_tcs: u32,
 
-    /// use a jupiter mock instead of actual queries
-    ///
-    /// This is required for devnet testing.
-    #[clap(long, env, value_enum, default_value = "false")]
-    mock_jupiter: BoolArg,
+    /// control which version of jupiter to use
+    #[clap(long, env, value_enum, default_value = "v6")]
+    jupiter_version: JupiterVersionArg,
 
     /// report liquidator's existence and pubkey
     #[clap(long, env, value_enum, default_value = "true")]
@@ -174,8 +193,6 @@ async fn main() -> anyhow::Result<()> {
         .map(|s3| s3.market.serum_program)
         .unique()
         .collect_vec();
-    // TODO: Currently the websocket source only supports a single serum program address!
-    assert_eq!(serum_programs.len(), 1);
 
     //
     // feed setup
@@ -195,7 +212,7 @@ async fn main() -> anyhow::Result<()> {
     websocket_source::start(
         websocket_source::Config {
             rpc_ws_url: ws_url.clone(),
-            serum_program: *serum_programs.first().unwrap(),
+            serum_programs,
             open_orders_authority: mango_group,
         },
         mango_oracles.clone(),
@@ -243,7 +260,7 @@ async fn main() -> anyhow::Result<()> {
     let token_swap_info_config = token_swap_info::Config {
         quote_index: 0,              // USDC
         quote_amount: 1_000_000_000, // TODO: config, $1000, should be >= tcs_config.max_trigger_quote_amount
-        mock_jupiter: cli.mock_jupiter == BoolArg::True,
+        jupiter_version: cli.jupiter_version.into(),
     };
 
     let token_swap_info_updater = Arc::new(token_swap_info::TokenSwapInfoUpdater::new(
@@ -253,7 +270,6 @@ async fn main() -> anyhow::Result<()> {
 
     let liq_config = liquidate::Config {
         min_health_ratio: cli.min_health_ratio,
-        mock_jupiter: cli.mock_jupiter == BoolArg::True,
         compute_limit_for_liq_ix: cli.compute_limit_for_liquidation,
         // TODO: config
         refresh_timeout: Duration::from_secs(30),
@@ -262,7 +278,7 @@ async fn main() -> anyhow::Result<()> {
     let tcs_config = trigger_tcs::Config {
         min_health_ratio: cli.min_health_ratio,
         max_trigger_quote_amount: 1_000_000_000, // TODO: config, $1000
-        mock_jupiter: cli.mock_jupiter == BoolArg::True,
+        jupiter_version: cli.jupiter_version.into(),
         compute_limit_for_trigger: cli.compute_limit_for_tcs,
         // TODO: config
         refresh_timeout: Duration::from_secs(30),
@@ -275,6 +291,7 @@ async fn main() -> anyhow::Result<()> {
         // TODO: config
         borrow_settle_excess: 1.05,
         refresh_timeout: Duration::from_secs(30),
+        jupiter_version: cli.jupiter_version.into(),
     };
 
     let rebalancer = Arc::new(rebalance::Rebalancer {
@@ -408,8 +425,7 @@ async fn main() -> anyhow::Result<()> {
     });
 
     let liquidation_job = tokio::spawn({
-        // TODO: configurable interval
-        let mut interval = tokio::time::interval(Duration::from_secs(5));
+        let mut interval = tokio::time::interval(Duration::from_millis(cli.check_interval_ms));
         let shared_state = shared_state.clone();
         async move {
             loop {

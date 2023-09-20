@@ -7,6 +7,8 @@ use solana_sdk::{
     transaction::uses_durable_nonce,
 };
 
+use anchor_lang::prelude::{AccountMeta, Pubkey};
+use anyhow::Context;
 use std::{thread, time};
 
 /// Some Result<> types don't convert to anyhow::Result nicely. Force them through stringification.
@@ -109,4 +111,35 @@ pub fn tracing_subscriber_init() {
         .with_env_filter(tracing_subscriber::EnvFilter::from_default_env())
         .event_format(format)
         .init();
+}
+
+pub async fn http_error_handling<T: serde::de::DeserializeOwned>(
+    response: reqwest::Response,
+) -> anyhow::Result<T> {
+    let status = response.status();
+    let response_text = response
+        .text()
+        .await
+        .context("awaiting body of http request")?;
+    if !status.is_success() {
+        anyhow::bail!("http request failed, status: {status}, body: {response_text}");
+    }
+    serde_json::from_str::<T>(&response_text)
+        .with_context(|| format!("response has unexpected format, body: {response_text}"))
+}
+
+pub fn to_readonly_account_meta(pubkey: Pubkey) -> AccountMeta {
+    AccountMeta {
+        pubkey,
+        is_writable: false,
+        is_signer: false,
+    }
+}
+
+pub fn to_writable_account_meta(pubkey: Pubkey) -> AccountMeta {
+    AccountMeta {
+        pubkey,
+        is_writable: true,
+        is_signer: false,
+    }
 }

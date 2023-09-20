@@ -3393,6 +3393,7 @@ dependencies = [
  "pyth-sdk-solana",
  "rand 0.8.5",
  "raydium-amm-v3",
+ "regex",
  "serde",
  "serum_dex",
  "solana-address-lookup-table-program",

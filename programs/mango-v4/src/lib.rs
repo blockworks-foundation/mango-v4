@@ -363,6 +363,12 @@ pub mod mango_v4 {
         Ok(())
     }
 
+    pub fn account_size_migration(ctx: Context<AccountSizeMigration>) -> Result<()> {
+        #[cfg(feature = "enable-gpl")]
+        instructions::account_size_migration(ctx)?;
+        Ok(())
+    }
+
     pub fn account_edit(
         ctx: Context<AccountEdit>,
         name_opt: Option<String>,
@@ -1336,6 +1342,7 @@ pub mod mango_v4 {
         Ok(())
     }
 
+    /// Warning, this instruction is for testing purposes only!
     pub fn compute_account_data(ctx: Context<ComputeAccountData>) -> Result<()> {
         #[cfg(feature = "enable-gpl")]
         instructions::compute_account_data(ctx)?;

@@ -662,7 +662,7 @@ async function createAndPopulateAlt() {
       );
 
       console.log(`ALT: set at index 0 for group...`);
-      sig = await client.altSet(group, createIx[1], 0);
+      sig = (await client.altSet(group, createIx[1], 0)).signature;
       console.log(`...https://explorer.solana.com/tx/${sig}`);
     } catch (error) {
       console.log(error);

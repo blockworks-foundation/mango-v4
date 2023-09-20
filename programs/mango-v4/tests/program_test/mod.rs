@@ -67,6 +67,8 @@ impl Log for LoggerWrapper {
                 self.capture.write().unwrap().push(data.into());
             } else if let Some(data) = msg.strip_prefix("Program data: ") {
                 self.capture.write().unwrap().push(data.into());
+            } else if let Some(data) = msg.strip_prefix("Program consumption: ") {
+                self.capture.write().unwrap().push(data.into());
             }
         }
         self.inner.log(record);
