@@ -1809,12 +1809,13 @@ impl TransactionBuilder {
         rpc: &RpcClientAsync,
     ) -> anyhow::Result<solana_sdk::transaction::VersionedTransaction> {
         let latest_blockhash = rpc.get_latest_blockhash().await?;
-        self.transaction_with_blockhash(latest_blockhash)
+        self.transaction_with_blockhash(latest_blockhash, Option::None)
     }
 
     pub fn transaction_with_blockhash(
         &self,
         blockhash: Hash,
+        compute_unit_limit_opt: Option<u32>,
     ) -> anyhow::Result<solana_sdk::transaction::VersionedTransaction> {
         let mut ix = self.instructions.clone();
         if let Some(prio_price) = self.config.prioritization_micro_lamports {
@@ -1822,6 +1823,15 @@ impl TransactionBuilder {
                 0,
                 solana_sdk::compute_budget::ComputeBudgetInstruction::set_compute_unit_price(
                     prio_price,
+                ),
+            )
+        }
+        let mut ix = self.instructions.clone();
+        if let Some(compute_unit_limit) = compute_unit_limit_opt {
+            ix.insert(
+                1,
+                solana_sdk::compute_budget::ComputeBudgetInstruction::set_compute_unit_limit(
+                    compute_unit_limit,
                 ),
             )
         }
@@ -1869,7 +1879,8 @@ impl TransactionBuilder {
     }
 
     pub fn transaction_size_ok(&self) -> anyhow::Result<bool> {
-        let tx = self.transaction_with_blockhash(solana_sdk::hash::Hash::default())?;
+        let tx =
+            self.transaction_with_blockhash(solana_sdk::hash::Hash::default(), Option::None)?;
         let bytes = bincode::serialize(&tx)?;
         Ok(bytes.len() <= solana_sdk::packet::PACKET_DATA_SIZE)
     }

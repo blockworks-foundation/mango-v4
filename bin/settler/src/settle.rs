@@ -260,7 +260,10 @@ impl<'a> SettleBatchProcessor<'a> {
             signers: vec![fee_payer],
             config: client.transaction_builder_config,
         }
-        .transaction_with_blockhash(self.blockhash)
+        .transaction_with_blockhash(
+            self.blockhash,
+            Option::from(self.instructions.len() as u32 * 250_000),
+        )
     }
 
     async fn send(&mut self) -> anyhow::Result<Option<Signature>> {
