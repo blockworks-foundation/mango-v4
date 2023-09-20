@@ -45,16 +45,11 @@ solana-sdk = { workspace = true, default-features = false, optional = true }
 solana-security-txt = "1.1.0"
 static_assertions = "1.1"
 
-switchboard-program = "0.2.0"
-# note: 0.8.19 seems broken
-switchboard-common = "=0.8.18"
+# note: switchboard-common 0.8.19 is broken - use 0.8.18 instead
+switchboard-program = "0.2"
 switchboard-v2 = { package = "switchboard-solana", version = "0.28" }
 
 openbook-v2 = { git = "https://github.com/grooviegermanikus/openbook-v2.git", branch = "sync-with-mangov4-update-solana-1-16-anchor-28", default-features=false, features = ["no-entrypoint"] }
-
-raydium-amm-v3 = { git = "https://github.com/raydium-io/raydium-clmm.git" }
-
-
 
 [dev-dependencies]
 solana-sdk = { workspace = true, default-features = false }
