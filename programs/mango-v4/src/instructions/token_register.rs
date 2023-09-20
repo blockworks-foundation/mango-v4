@@ -112,7 +112,8 @@ pub fn token_register(
         flash_loan_swap_fee_rate: flash_loan_swap_fee_rate,
         interest_target_utilization,
         interest_curve_scaling: interest_curve_scaling.into(),
-        reserved: [0; 2080],
+        deposits_in_serum: 0,
+        reserved: [0; 2072],
     };
 
     if let Ok(oracle_price) =

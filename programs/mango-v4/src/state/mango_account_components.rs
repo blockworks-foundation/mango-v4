@@ -145,12 +145,20 @@ pub struct Serum3Orders {
     pub highest_placed_bid_inv: f64,
     pub lowest_placed_ask: f64,
 
+    /// Tracks the amount of deposits that flowed into the serum open orders account.
+    ///
+    /// The bank still considers these amounts user deposits (see deposits_in_serum)
+    /// and they need to be deducted from there when they flow back into the bank
+    /// as real tokens.
+    pub base_deposits_reserved: u64,
+    pub quote_deposits_reserved: u64,
+
     #[derivative(Debug = "ignore")]
-    pub reserved: [u8; 48],
+    pub reserved: [u8; 32],
 }
 const_assert_eq!(
     size_of::<Serum3Orders>(),
-    32 + 8 * 2 + 2 * 3 + 2 + 2 * 8 + 48
+    32 + 8 * 2 + 2 * 3 + 2 + 4 * 8 + 32
 );
 const_assert_eq!(size_of::<Serum3Orders>(), 120);
 const_assert_eq!(size_of::<Serum3Orders>() % 8, 0);
@@ -177,7 +185,9 @@ impl Default for Serum3Orders {
             quote_borrows_without_fee: 0,
             highest_placed_bid_inv: 0.0,
             lowest_placed_ask: 0.0,
-            reserved: [0; 48],
+            base_deposits_reserved: 0,
+            quote_deposits_reserved: 0,
+            reserved: [0; 32],
         }
     }
 }
