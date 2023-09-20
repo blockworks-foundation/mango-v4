@@ -1419,20 +1419,25 @@ export class MangoClient {
   ): Promise<MangoSignatureStatus> {
     const nowSlot = await this.connection.getSlot();
 
+    const banksToWithdrawFrom = Array.from(group.banksMapByTokenIndex.values())
+      .map((banks) => banks[0])
+      .filter((bank) => bank.checkOracleConfidenceAndStaleness(nowSlot))
+      .filter((b) => mangoAccount.getTokenBalanceUi(b) > 0);
+
+    if (banksToWithdrawFrom.length === 0) {
+      throw new Error(`No stale oracle or bad confidence oracle deposits!`);
+    }
+
     const ixs = await Promise.all(
-      Array.from(group.banksMapByTokenIndex.values())
-        .map((banks) => banks[0])
-        .filter((bank) => bank.checkOracleConfidenceAndStaleness(nowSlot))
-        .filter((b) => mangoAccount.getTokenBalanceUi(b) > 0)
-        .map((bank) => {
-          return this.tokenWithdrawNativeIx(
-            group,
-            mangoAccount,
-            bank.mint,
-            U64_MAX_BN,
-            false,
-          );
-        }),
+      banksToWithdrawFrom.map((bank) => {
+        return this.tokenWithdrawNativeIx(
+          group,
+          mangoAccount,
+          bank.mint,
+          U64_MAX_BN,
+          false,
+        );
+      }),
     );
 
     return await this.sendAndConfirmTransactionForGroup(group, ixs.flat());
