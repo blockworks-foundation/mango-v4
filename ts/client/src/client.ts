@@ -17,6 +17,7 @@ import {
   AddressLookupTableAccount,
   Cluster,
   Commitment,
+  ComputeBudgetProgram,
   Connection,
   Keypair,
   MemcmpFilter,
@@ -94,6 +95,9 @@ import { MangoSignatureStatus, sendTransaction } from './utils/rpc';
 import { NATIVE_MINT, TOKEN_PROGRAM_ID } from './utils/spl';
 
 export const DEFAULT_TOKEN_CONDITIONAL_SWAP_COUNT = 8;
+export const PERP_SETTLE_PNL_CU_LIMIT = 250000;
+export const PERP_SETTLE_FEES_CU_LIMIT = 20000;
+export const SERUM_SETTLE_FUNDS_CU_LIMIT = 65000;
 
 export enum AccountRetriever {
   Scanning,
@@ -2927,7 +2931,7 @@ export class MangoClient {
         continue;
       }
       ixs1.push(
-        // Takes ~130k CU
+        // Takes ~250k CU
         await this.perpSettlePnlIx(
           group,
           pa.getUnsettledPnlUi(pm) > 0 ? mangoAccount : candidates[0].account,
@@ -2960,9 +2964,10 @@ export class MangoClient {
     );
 
     if (
-      mangoAccount.perpActive().length * 150 +
-        mangoAccount.serum3Active().length * 65 >
-      1600
+      mangoAccount.perpActive().length *
+        (PERP_SETTLE_PNL_CU_LIMIT + PERP_SETTLE_FEES_CU_LIMIT) +
+        mangoAccount.serum3Active().length * SERUM_SETTLE_FUNDS_CU_LIMIT >
+      1600000
     ) {
       throw new Error(
         `Too many perp positions and serum open orders to settle in one tx! Please try settling individually!`,
@@ -2971,7 +2976,16 @@ export class MangoClient {
 
     return await this.sendAndConfirmTransactionForGroup(
       group,
-      [...ixs1, ...ixs2],
+      [
+        ComputeBudgetProgram.setComputeUnitLimit({
+          units:
+            mangoAccount.perpActive().length *
+              (PERP_SETTLE_PNL_CU_LIMIT + PERP_SETTLE_FEES_CU_LIMIT) +
+            mangoAccount.serum3Active().length * SERUM_SETTLE_FUNDS_CU_LIMIT,
+        }),
+        ...ixs1,
+        ...ixs2,
+      ],
       {
         prioritizationFee: true,
       },
@@ -2988,6 +3002,9 @@ export class MangoClient {
     maxSettleAmount?: number,
   ): Promise<MangoSignatureStatus> {
     return await this.sendAndConfirmTransactionForGroup(group, [
+      ComputeBudgetProgram.setComputeUnitLimit({
+        units: PERP_SETTLE_PNL_CU_LIMIT + PERP_SETTLE_FEES_CU_LIMIT,
+      }),
       await this.perpSettlePnlIx(
         group,
         profitableAccount,
@@ -3012,6 +3029,9 @@ export class MangoClient {
     perpMarketIndex: PerpMarketIndex,
   ): Promise<MangoSignatureStatus> {
     return await this.sendAndConfirmTransactionForGroup(group, [
+      ComputeBudgetProgram.setComputeUnitLimit({
+        units: PERP_SETTLE_PNL_CU_LIMIT,
+      }),
       await this.perpSettlePnlIx(
         group,
         profitableAccount,
