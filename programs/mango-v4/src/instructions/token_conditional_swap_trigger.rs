@@ -45,7 +45,7 @@ pub fn token_conditional_swap_trigger(
     let mut liqee = ctx.accounts.liqee.load_full_mut()?;
 
     let tcs = liqee.token_conditional_swap_by_index(token_conditional_swap_index)?;
-    require!(tcs.has_data(), MangoError::SomeError);
+    require!(tcs.has_data(), MangoError::TokenConditionalSwapNotSet);
     require_eq!(tcs.id, token_conditional_swap_id);
     let buy_token_index = tcs.buy_token_index;
     let sell_token_index = tcs.sell_token_index;
@@ -107,7 +107,11 @@ pub fn token_conditional_swap_trigger(
         now_ts,
     )?;
 
-    require_gte!(liqee_buy_change, min_buy_token, MangoError::SomeError); // TODO: better error
+    require_gte!(
+        liqee_buy_change,
+        min_buy_token,
+        MangoError::TokenConditionalSwapMinBuyTokenNotReached
+    );
 
     // Check liqor health, liqee health is checked inside (has to be, since tcs closure depends on it)
     let liqor_health = compute_health(&liqor.borrow(), HealthType::Init, &account_retriever)
@@ -209,8 +213,11 @@ fn action(
 
     let tcs = {
         let tcs = liqee.token_conditional_swap_by_index(token_conditional_swap_index)?;
-        require!(tcs.has_data(), MangoError::SomeError);
-        require!(!tcs.is_expired(now_ts), MangoError::SomeError);
+        require!(tcs.has_data(), MangoError::TokenConditionalSwapNotSet);
+        require!(
+            !tcs.is_expired(now_ts),
+            MangoError::TokenConditionalSwapExpired
+        );
         require_eq!(buy_bank.token_index, tcs.buy_token_index);
         require_eq!(sell_bank.token_index, tcs.sell_token_index);
 

@@ -111,6 +111,12 @@ pub enum MangoError {
     TokenConditionalSwapNotStarted,
     #[msg("token conditional swap was already started")]
     TokenConditionalSwapAlreadyStarted,
+    #[msg("token conditional swap it not set")]
+    TokenConditionalSwapNotSet,
+    #[msg("token conditional swap trigger did not reach min_buy_token")]
+    TokenConditionalSwapMinBuyTokenNotReached,
+    #[msg("token conditional swap cannot pay incentive")]
+    TokenConditionalSwapCantPayIncentive,
 }
 
 impl MangoError {

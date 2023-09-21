@@ -32,12 +32,15 @@ pub fn token_conditional_swap_start(
     let tcs = account
         .token_conditional_swap_by_index(token_conditional_swap_index)?
         .clone();
-    require!(tcs.has_data(), MangoError::SomeError);
+    require!(tcs.has_data(), MangoError::TokenConditionalSwapNotSet);
     require_eq!(tcs.id, token_conditional_swap_id);
     let buy_token_index = tcs.buy_token_index;
     let sell_token_index = tcs.sell_token_index;
     let now_ts: u64 = Clock::get()?.unix_timestamp.try_into().unwrap();
-    require!(tcs.has_incentive_for_starting(), MangoError::SomeError);
+    require!(
+        tcs.has_incentive_for_starting(),
+        MangoError::TokenConditionalSwapCantPayIncentive
+    );
 
     let mut health_cache = new_health_cache(&account.borrow(), &account_retriever)
         .context("create liqee health cache")?;
@@ -77,8 +80,14 @@ pub fn token_conditional_swap_start(
     sell_bank.withdraw_with_fee(account_sell_token, I80F48::from(incentive), now_ts)?;
     let account_sell_post_balance = account_sell_token.native(sell_bank);
     if account_sell_post_balance < 0 {
-        require!(tcs.allow_creating_borrows(), MangoError::SomeError);
-        require!(!sell_bank.are_borrows_reduce_only(), MangoError::SomeError);
+        require!(
+            tcs.allow_creating_borrows(),
+            MangoError::TokenConditionalSwapCantPayIncentive
+        );
+        require!(
+            !sell_bank.are_borrows_reduce_only(),
+            MangoError::TokenInReduceOnlyMode
+        );
         sell_bank.check_net_borrows(sell_oracle_price)?;
     }
 

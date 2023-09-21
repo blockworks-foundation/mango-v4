@@ -5189,6 +5189,178 @@
       ]
     },
     {
+      "name": "tokenConditionalSwapCreatePremiumAuction",
+      "accounts": [
+        {
+          "name": "group",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "account",
+          "isMut": true,
+          "isSigner": false,
+          "relations": [
+            "group"
+          ]
+        },
+        {
+          "name": "authority",
+          "isMut": false,
+          "isSigner": true
+        },
+        {
+          "name": "buyBank",
+          "isMut": false,
+          "isSigner": false,
+          "relations": [
+            "group"
+          ]
+        },
+        {
+          "name": "sellBank",
+          "isMut": false,
+          "isSigner": false,
+          "relations": [
+            "group"
+          ]
+        }
+      ],
+      "args": [
+        {
+          "name": "maxBuy",
+          "type": "u64"
+        },
+        {
+          "name": "maxSell",
+          "type": "u64"
+        },
+        {
+          "name": "expiryTimestamp",
+          "type": "u64"
+        },
+        {
+          "name": "priceLowerLimit",
+          "type": "f64"
+        },
+        {
+          "name": "priceUpperLimit",
+          "type": "f64"
+        },
+        {
+          "name": "maxPricePremiumRate",
+          "type": "f64"
+        },
+        {
+          "name": "allowCreatingDeposits",
+          "type": "bool"
+        },
+        {
+          "name": "allowCreatingBorrows",
+          "type": "bool"
+        },
+        {
+          "name": "displayPriceStyle",
+          "type": {
+            "defined": "TokenConditionalSwapDisplayPriceStyle"
+          }
+        },
+        {
+          "name": "intention",
+          "type": {
+            "defined": "TokenConditionalSwapIntention"
+          }
+        },
+        {
+          "name": "durationSeconds",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "tokenConditionalSwapCreateLinearAuction",
+      "accounts": [
+        {
+          "name": "group",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "account",
+          "isMut": true,
+          "isSigner": false,
+          "relations": [
+            "group"
+          ]
+        },
+        {
+          "name": "authority",
+          "isMut": false,
+          "isSigner": true
+        },
+        {
+          "name": "buyBank",
+          "isMut": false,
+          "isSigner": false,
+          "relations": [
+            "group"
+          ]
+        },
+        {
+          "name": "sellBank",
+          "isMut": false,
+          "isSigner": false,
+          "relations": [
+            "group"
+          ]
+        }
+      ],
+      "args": [
+        {
+          "name": "maxBuy",
+          "type": "u64"
+        },
+        {
+          "name": "maxSell",
+          "type": "u64"
+        },
+        {
+          "name": "expiryTimestamp",
+          "type": "u64"
+        },
+        {
+          "name": "priceStart",
+          "type": "f64"
+        },
+        {
+          "name": "priceEnd",
+          "type": "f64"
+        },
+        {
+          "name": "allowCreatingDeposits",
+          "type": "bool"
+        },
+        {
+          "name": "allowCreatingBorrows",
+          "type": "bool"
+        },
+        {
+          "name": "displayPriceStyle",
+          "type": {
+            "defined": "TokenConditionalSwapDisplayPriceStyle"
+          }
+        },
+        {
+          "name": "startTimestamp",
+          "type": "u64"
+        },
+        {
+          "name": "durationSeconds",
+          "type": "u64"
+        }
+      ]
+    },
+    {
       "name": "tokenConditionalSwapCancel",
       "accounts": [
         {
@@ -5285,6 +5457,100 @@
         },
         {
           "name": "maxSellTokenToLiqor",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "tokenConditionalSwapTriggerV2",
+      "accounts": [
+        {
+          "name": "group",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "liqee",
+          "isMut": true,
+          "isSigner": false,
+          "relations": [
+            "group"
+          ]
+        },
+        {
+          "name": "liqor",
+          "isMut": true,
+          "isSigner": false,
+          "relations": [
+            "group"
+          ]
+        },
+        {
+          "name": "liqorAuthority",
+          "isMut": false,
+          "isSigner": true
+        }
+      ],
+      "args": [
+        {
+          "name": "tokenConditionalSwapIndex",
+          "type": "u8"
+        },
+        {
+          "name": "tokenConditionalSwapId",
+          "type": "u64"
+        },
+        {
+          "name": "maxBuyTokenToLiqee",
+          "type": "u64"
+        },
+        {
+          "name": "maxSellTokenToLiqor",
+          "type": "u64"
+        },
+        {
+          "name": "minBuyToken",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "tokenConditionalSwapStart",
+      "accounts": [
+        {
+          "name": "group",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "account",
+          "isMut": true,
+          "isSigner": false,
+          "relations": [
+            "group"
+          ]
+        },
+        {
+          "name": "caller",
+          "isMut": true,
+          "isSigner": false,
+          "relations": [
+            "group"
+          ]
+        },
+        {
+          "name": "callerAuthority",
+          "isMut": false,
+          "isSigner": true
+        }
+      ],
+      "args": [
+        {
+          "name": "tokenConditionalSwapIndex",
+          "type": "u8"
+        },
+        {
+          "name": "tokenConditionalSwapId",
           "type": "u64"
         }
       ]
@@ -9262,12 +9528,20 @@
           {
             "name": "priceLowerLimit",
             "docs": [
+              "The lower or starting price:",
+              "- For FixedPremium or PremiumAuctions, it's the lower end of the price range:",
+              "the tcs can only be triggered if the oracle price exceeds this value.",
+              "- For LinearAuctions it's the starting price that's offered at start_timestamp.",
+              "",
+              "The price is always in \"sell_token per buy_token\" units, which can be computed",
+              "by dividing the buy token price by the sell token price.",
+              "",
+              "For FixedPremium or PremiumAuctions:",
+              "",
               "The price must exceed this threshold to allow execution.",
               "",
-              "This threshold is compared to the \"sell_token per buy_token\" oracle price",
-              "(which can be computed by dividing the buy token oracle price by the",
-              "sell token oracle price). If that price is >= lower_limit and <= upper_limit",
-              "the tcs may be executable.",
+              "This threshold is compared to the \"sell_token per buy_token\" oracle price.",
+              "If that price is >= lower_limit and <= upper_limit the tcs may be executable.",
               "",
               "Example: Stop loss to get out of a SOL long: The user bought SOL at 20 USDC/SOL",
               "and wants to stop loss at 18 USDC/SOL. They'd set buy_token=USDC, sell_token=SOL",
@@ -9283,7 +9557,7 @@
           {
             "name": "priceUpperLimit",
             "docs": [
-              "Parallel to price_lower_limit, but an upper limit."
+              "Parallel to price_lower_limit, but an upper limit / auction end price."
             ],
             "type": "f64"
           },
@@ -9358,11 +9632,38 @@
             "type": "u8"
           },
           {
+            "name": "tcsType",
+            "docs": [
+              "Stores a TokenConditionalSwapType enum value"
+            ],
+            "type": "u8"
+          },
+          {
+            "name": "padding",
+            "type": {
+              "array": [
+                "u8",
+                6
+              ]
+            }
+          },
+          {
+            "name": "startTimestamp",
+            "docs": [
+              "0 means not-started"
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "durationSeconds",
+            "type": "u64"
+          },
+          {
             "name": "reserved",
             "type": {
               "array": [
                 "u8",
-                111
+                88
               ]
             }
           }
@@ -9774,6 +10075,9 @@
           },
           {
             "name": "AccountSizeMigration"
+          },
+          {
+            "name": "TokenConditionalSwapStart"
           }
         ]
       }
@@ -10084,6 +10388,23 @@
           },
           {
             "name": "TakeProfit"
+          }
+        ]
+      }
+    },
+    {
+      "name": "TokenConditionalSwapType",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "FixedPremium"
+          },
+          {
+            "name": "PremiumAuction"
+          },
+          {
+            "name": "LinearAuction"
           }
         ]
       }
@@ -12316,7 +12637,37 @@
     {
       "code": 6049,
       "name": "TokenConditionalSwapPriceNotInRange",
-      "msg": "conditional token swap price is not in execution range"
+      "msg": "token conditional swap oracle price is not in execution range"
+    },
+    {
+      "code": 6050,
+      "name": "TokenConditionalSwapExpired",
+      "msg": "token conditional swap is expired"
+    },
+    {
+      "code": 6051,
+      "name": "TokenConditionalSwapNotStarted",
+      "msg": "token conditional swap is not available yet"
+    },
+    {
+      "code": 6052,
+      "name": "TokenConditionalSwapAlreadyStarted",
+      "msg": "token conditional swap was already started"
+    },
+    {
+      "code": 6053,
+      "name": "TokenConditionalSwapNotSet",
+      "msg": "token conditional swap it not set"
+    },
+    {
+      "code": 6054,
+      "name": "TokenConditionalSwapMinBuyTokenNotReached",
+      "msg": "token conditional swap trigger did not reach min_buy_token"
+    },
+    {
+      "code": 6055,
+      "name": "TokenConditionalSwapCantPayIncentive",
+      "msg": "token conditional swap cannot pay incentive"
     }
   ]
 }
