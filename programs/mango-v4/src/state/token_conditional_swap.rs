@@ -127,12 +127,18 @@ pub struct TokenConditionalSwap {
 
     pub padding: [u8; 6],
 
-    /// 0 means not-started
-    // TODO: auction start?
+    /// In seconds since epoch. 0 means not-started.
+    ///
+    /// FixedPremium: Time of first trigger call. No other effect.
+    /// PremiumAuction: Time of start or first trigger call. Can continue to trigger once started.
+    /// LinearAuction: Set during creation, auction starts with price_lower_limit at this timestamp.
     pub start_timestamp: u64,
 
-    // ignored for FixedPremium type
-    // TODO: auction duration?
+    /// Duration of the auction mechanism
+    ///
+    /// FixedPremium: ignored
+    /// PremiumAuction: time after start that the premium needs to scale to price_premium_rate
+    /// LinearAuction: time after start to go from price_lower_limit to price_upper_limit
     pub duration_seconds: u64,
 
     #[derivative(Debug = "ignore")]
