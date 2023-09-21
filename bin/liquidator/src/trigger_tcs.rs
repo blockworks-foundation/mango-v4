@@ -54,6 +54,10 @@ pub struct Config {
     pub refresh_timeout: Duration,
     pub compute_limit_for_trigger: u32,
 
+    /// At 0, the liquidator would trigger tcs if the cost to the liquidator is the
+    /// same as the cost to the liqee. 0.1 would mean a 10% better price to the liquidator.
+    pub profit_fraction: f64,
+
     /// Minimum fraction of max_buy to buy for success when triggering,
     /// useful in conjuction with jupiter swaps in same tx to avoid over-buying.
     ///
@@ -119,7 +123,7 @@ impl Context {
         // 1.5 would mean we need to pay 50% more than oracle etc.
         let cost_over_oracle = buy_info.buy_over_oracle * sell_info.sell_over_oracle;
 
-        Ok(taker_price >= base_price * cost_over_oracle)
+        Ok(taker_price >= base_price * cost_over_oracle * (1.0 + self.config.profit_fraction))
     }
 
     // Either expired or triggerable with ok-looking price.
@@ -540,14 +544,13 @@ impl Context {
                 }
             };
 
-            // TODO: give this a buffer in case there's execution issues
-            if swap_price > taker_price.to_num::<f64>() {
+            if swap_price * (1.0 + self.config.profit_fraction) > taker_price.to_num::<f64>() {
                 trace!(
                     max_buy = max_buy_token_to_liqee,
                     max_sell = max_sell_token_to_liqor,
                     jupiter_swap_price = %swap_price,
                     tcs_taker_price = %taker_price,
-                    "skipping because of prices",
+                    "skipping because swap price isn't good enough compared to trigger price",
                 );
                 return Ok(None);
             }

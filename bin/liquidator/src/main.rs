@@ -107,6 +107,16 @@ struct Cli {
     #[clap(long, env, default_value = "100")]
     rebalance_slippage_bps: u64,
 
+    /// if taking tcs orders is enabled
+    ///
+    /// typically only disabled for tests where swaps are unavailable
+    #[clap(long, env, value_enum, default_value = "true")]
+    take_tcs: BoolArg,
+
+    /// profit margin at which to take tcs orders
+    #[clap(long, env, default_value = "0.0005")]
+    tcs_profit_fraction: f64,
+
     /// prioritize each transaction with this many microlamports/cu
     #[clap(long, env, default_value = "0")]
     prioritization_micro_lamports: u64,
@@ -279,6 +289,7 @@ async fn main() -> anyhow::Result<()> {
         min_health_ratio: cli.min_health_ratio,
         max_trigger_quote_amount: 1_000_000_000, // TODO: config, $1000
         compute_limit_for_trigger: cli.compute_limit_for_tcs,
+        profit_fraction: cli.tcs_profit_fraction,
         // TODO: config
         refresh_timeout: Duration::from_secs(30),
 
@@ -451,7 +462,7 @@ async fn main() -> anyhow::Result<()> {
                     .await
                     .unwrap();
 
-                if !liquidated {
+                if !liquidated && cli.take_tcs == BoolArg::True {
                     liquidation
                         .maybe_take_token_conditional_swap(account_addresses.iter())
                         .await
