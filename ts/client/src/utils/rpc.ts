@@ -5,7 +5,6 @@ import {
   AddressLookupTableAccount,
   ComputeBudgetProgram,
   MessageV0,
-  PublicKey,
   Signer,
   TransactionConfirmationStatus,
   TransactionError,
@@ -13,6 +12,7 @@ import {
   TransactionSignature,
   VersionedTransaction,
 } from '@solana/web3.js';
+import { COMPUTE_BUDGET_PROGRAM_ID } from '../constants';
 
 export interface MangoSignatureStatus {
   slot: number;
@@ -45,15 +45,18 @@ export async function sendTransaction(
   // https://github.com/solana-labs/solana-web3.js/blob/master/packages/library-legacy/src/programs/compute-budget.ts#L202
   const computeUnitLimitIxFound = ixs.some(
     (ix) =>
-      ix.programId.equals(
-        new PublicKey('ComputeBudget111111111111111111111111111111'),
-      ) && u8().decode(ix.data.subarray(0, 1)) == 2,
+      ix.programId.equals(COMPUTE_BUDGET_PROGRAM_ID) &&
+      u8().decode(ix.data.subarray(0, 1)) == 2,
   );
 
   if (!computeUnitLimitIxFound) {
+    const totalUserIntendedIxs = ixs.filter(
+      (ix) => !ix.programId.equals(COMPUTE_BUDGET_PROGRAM_ID),
+    ).length;
+    const requestCu = Math.min(totalUserIntendedIxs * 250_000, 1_600_000);
     ixs = [
       ComputeBudgetProgram.setComputeUnitLimit({
-        units: 250_000,
+        units: requestCu,
       }),
       ...ixs,
     ];
