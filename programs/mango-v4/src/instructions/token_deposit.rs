@@ -179,7 +179,28 @@ pub fn token_deposit(ctx: Context<TokenDeposit>, amount: u64, reduce_only: bool)
     {
         let token_index = ctx.accounts.bank.load()?.token_index;
         let mut account = ctx.accounts.account.load_full_mut()?;
-        account.ensure_token_position(token_index)?;
+
+        let token_position_exists = account
+            .all_token_positions()
+            .any(|p| p.is_active_for_token(token_index));
+
+        // Activating a new token position requires that the oracle is in a good state.
+        // Otherwise users could abuse oracle staleness to delay liquidation.
+        if !token_position_exists {
+            let now_slot = Clock::get()?.slot;
+            let bank = ctx.accounts.bank.load()?;
+
+            let oracle_result = bank.oracle_price(
+                &AccountInfoRef::borrow(ctx.accounts.oracle.as_ref())?,
+                Some(now_slot),
+            );
+            if let Err(e) = oracle_result {
+                msg!("oracle must be valid when creating a new token position");
+                return Err(e);
+            }
+
+            account.ensure_token_position(token_index)?;
+        }
     }
 
     DepositCommon {

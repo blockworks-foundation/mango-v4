@@ -851,30 +851,6 @@ export class MangoClient {
     return await this.sendAndConfirmTransactionForGroup(group, [ix]);
   }
 
-  public async computeAccountData(
-    group: Group,
-    mangoAccount: MangoAccount,
-  ): Promise<MangoSignatureStatus> {
-    const healthRemainingAccounts: PublicKey[] =
-      this.buildHealthRemainingAccounts(group, [mangoAccount], [], []);
-
-    const ix = await this.program.methods
-      .computeAccountData()
-      .accounts({
-        group: group.publicKey,
-        account: mangoAccount.publicKey,
-      })
-      .remainingAccounts(
-        healthRemainingAccounts.map(
-          (pk) =>
-            ({ pubkey: pk, isWritable: false, isSigner: false } as AccountMeta),
-        ),
-      )
-      .instruction();
-
-    return await this.sendAndConfirmTransactionForGroup(group, [ix]);
-  }
-
   public async toggleMangoAccountFreeze(
     group: Group,
     mangoAccount: MangoAccount,

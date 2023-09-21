@@ -1,9 +1,13 @@
 use crate::accounts_ix::*;
-use crate::{events::MangoAccountData, health::*, state::*};
+use crate::{error::MangoError, events::MangoAccountData, health::*, state::*};
 use anchor_lang::prelude::*;
 
 pub fn compute_account_data(ctx: Context<ComputeAccountData>) -> Result<()> {
     let group_pk = ctx.accounts.group.key();
+
+    // Avoid people depending on this instruction
+    let group = ctx.accounts.group.load()?;
+    require!(group.is_testing(), MangoError::SomeError);
 
     let account = ctx.accounts.account.load_full()?;
 
@@ -16,7 +20,6 @@ pub fn compute_account_data(ctx: Context<ComputeAccountData>) -> Result<()> {
     let equity = compute_equity(&account.borrow(), &account_retriever)?;
 
     emit!(MangoAccountData {
-        health_cache,
         init_health,
         maint_health,
         equity,
