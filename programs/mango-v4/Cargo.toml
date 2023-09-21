@@ -49,7 +49,9 @@ static_assertions = "1.1"
 switchboard-program = "0.2"
 switchboard-v2 = { package = "switchboard-solana", version = "0.28" }
 
-openbook-v2 = { git = "https://github.com/grooviegermanikus/openbook-v2.git", branch = "sync-with-mangov4-update-solana-1-16-anchor-28", default-features=false, features = ["no-entrypoint"] }
+
+openbook-v2 = { git = "https://github.com/openbook-dex/openbook-v2.git", default-features=false, features = ["no-entrypoint"] }
+
 
 [dev-dependencies]
 solana-sdk = { workspace = true, default-features = false }
