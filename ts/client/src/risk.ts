@@ -62,7 +62,9 @@ export function computePriceImpactOnJup(
   tokenName: string,
 ): number {
   try {
-    const closestTo = [1000, 5000, 20000, 100000].reduce((prev, curr) =>
+    const closestTo = [
+      1_000, 5_000, 20_000, 100_000, 250_000, 500_000, 1_000_000, 5_000_000,
+    ].reduce((prev, curr) =>
       Math.abs(curr - usdcAmount) < Math.abs(prev - usdcAmount) ? curr : prev,
     );
     // Workaround api
