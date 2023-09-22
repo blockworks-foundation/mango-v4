@@ -14,6 +14,7 @@ use mango_feeds_lib::{
 };
 use mango_v4::accounts_zerocopy::{AccountReader, KeyedAccountReader};
 use mango_v4::state::OracleConfigParams;
+use mango_v4::state::oracle_state_unchecked;
 use mango_v4::{
     serum3_cpi::OrderBookStateHeader,
     state::{self, BookSide, OrderTreeType},
@@ -367,12 +368,16 @@ pub async fn init(
                                 max_staleness_slots: None, // don't check oracle staleness to get an orderbook
                             };
 
-                            if let Ok((oracle_price, _state)) = state::oracle_price_and_state(
+                            let oracle_state = oracle_state_unchecked(
                                 &keyed_account,
-                                &oracle_config.to_oracle_config(),
                                 mkt.1.base_decimals,
+                            ).and_then(|oracle_state| oracle_state.check_confidence_and_maybe_staleness(
+                                &oracle_pk,
+                                &oracle_config.to_oracle_config(),
                                 None, // force this to always return a price no matter how stale
-                            ) {
+                            ));
+
+                            if let Ok((oracle_price, _state)) = oracle_state {
                                 let account = &side_info.account;
                                 let bookside: BookSide = BookSide::try_deserialize(
                                     solana_sdk::account::ReadableAccount::data(account)
