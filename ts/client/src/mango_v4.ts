@@ -5511,6 +5511,10 @@ export type MangoV4 = {
         {
           "name": "minBuyToken",
           "type": "u64"
+        },
+        {
+          "name": "minTakerPrice",
+          "type": "f64"
         }
       ]
     },
@@ -12909,6 +12913,16 @@ export type MangoV4 = {
       "code": 6055,
       "name": "TokenConditionalSwapCantPayIncentive",
       "msg": "token conditional swap cannot pay incentive"
+    },
+    {
+      "code": 6056,
+      "name": "TokenConditionalSwapTakerPriceTooLow",
+      "msg": "token conditional swap taker price is too low"
+    },
+    {
+      "code": 6057,
+      "name": "TokenConditionalSwapIndexIdMismatch",
+      "msg": "token conditional swap index and id don't match"
     }
   ]
 };
@@ -18426,6 +18440,10 @@ export const IDL: MangoV4 = {
         {
           "name": "minBuyToken",
           "type": "u64"
+        },
+        {
+          "name": "minTakerPrice",
+          "type": "f64"
         }
       ]
     },
@@ -25824,6 +25842,16 @@ export const IDL: MangoV4 = {
       "code": 6055,
       "name": "TokenConditionalSwapCantPayIncentive",
       "msg": "token conditional swap cannot pay incentive"
+    },
+    {
+      "code": 6056,
+      "name": "TokenConditionalSwapTakerPriceTooLow",
+      "msg": "token conditional swap taker price is too low"
+    },
+    {
+      "code": 6057,
+      "name": "TokenConditionalSwapIndexIdMismatch",
+      "msg": "token conditional swap index and id don't match"
     }
   ]
 };
