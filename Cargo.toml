@@ -12,7 +12,11 @@ anchor-spl = "0.28.0"
 # use ckamm commit 2363acc4 (v1.23.0-mango -1)
 fixed = { git = "https://github.com/blockworks-foundation/fixed.git", branch = "v1.11.0-borsh0_10-mango" }
 pyth-sdk-solana = "0.8.0"
-serum_dex = { git = "https://github.com/openbook-dex/program.git" }
+# commit c85e56d: 0.5.10 plus depedency updates
+#serum_dex = { git = "https://github.com/openbook-dex/program.git" }
+# branch groovie/mango-plus-slab-iter-patch is commit c85e56d (see above) plus commit 17dea36 from jup-ag fork
+serum_dex = { git = "https://github.com/grooviegermanikus/program.git", branch = "groovie/v0.5.10-updates-expose-things" }
+
 # 1.16.7+ is required due to this: https://github.com/blockworks-foundation/mango-v4/issues/712
 solana-address-lookup-table-program = "~1.16.7"
 solana-account-decoder = "~1.16.7"

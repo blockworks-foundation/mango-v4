@@ -5727,7 +5727,7 @@ dependencies = [
 [[package]]
 name = "serum_dex"
 version = "0.5.10"
-source = "git+https://github.com/openbook-dex/program.git#c85e56deeaead43abbc33b7301058838b9c5136d"
+source = "git+https://github.com/grooviegermanikus/program.git?branch=groovie/v0.5.10-updates-expose-things#03f1b242db2a709af2601b4df445b2ea33a8d97d"
 dependencies = [
  "anchor-lang",
  "arrayref",
