@@ -1266,6 +1266,7 @@ impl MangoClient {
         max_buy_token_to_liqee: u64,
         max_sell_token_to_liqor: u64,
         min_buy_token: u64,
+        min_taker_price: f64,
         extra_affected_tokens: &[TokenIndex],
     ) -> anyhow::Result<Instruction> {
         let (tcs_index, tcs) = liqee
@@ -1308,6 +1309,7 @@ impl MangoClient {
                     max_buy_token_to_liqee,
                     max_sell_token_to_liqor,
                     min_buy_token,
+                    min_taker_price,
                 },
             ),
         };

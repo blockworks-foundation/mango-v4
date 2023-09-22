@@ -77,6 +77,7 @@ struct PreparedExecution {
     max_buy_token_to_liqee: u64,
     max_sell_token_to_liqor: u64,
     min_buy_token: u64,
+    min_taker_price: f64,
     jupiter_quote: Option<jupiter::Quote>,
 }
 
@@ -327,6 +328,7 @@ impl Context {
                 max_buy_token_to_liqee: 0,
                 max_sell_token_to_liqor: 0,
                 min_buy_token: 0,
+                min_taker_price: 0.0,
                 jupiter_quote: None,
             }))
         } else {
@@ -434,6 +436,7 @@ impl Context {
 
         // Final check of the reverse trade on jupiter
         let jupiter_quote;
+        let min_taker_price;
         {
             let buy_mint = self
                 .mango_client
@@ -544,7 +547,8 @@ impl Context {
                 }
             };
 
-            if swap_price * (1.0 + self.config.profit_fraction) > taker_price.to_num::<f64>() {
+            min_taker_price = swap_price * (1.0 + self.config.profit_fraction);
+            if min_taker_price > taker_price.to_num::<f64>() {
                 trace!(
                     max_buy = max_buy_token_to_liqee,
                     max_sell = max_sell_token_to_liqor,
@@ -572,6 +576,7 @@ impl Context {
             max_buy_token_to_liqee,
             max_sell_token_to_liqor,
             min_buy_token: min_buy as u64,
+            min_taker_price,
             jupiter_quote,
         }))
     }
@@ -808,6 +813,7 @@ impl Context {
                 pending.max_buy_token_to_liqee,
                 pending.max_sell_token_to_liqor,
                 pending.min_buy_token,
+                pending.min_taker_price,
                 &allowed_tokens,
             )
             .await?;
