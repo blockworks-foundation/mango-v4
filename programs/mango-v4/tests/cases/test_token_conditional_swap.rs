@@ -235,6 +235,7 @@ async fn test_token_conditional_swap_basic() -> Result<(), TransportError> {
             max_buy_token_to_liqee: 50,
             max_sell_token_to_liqor: 50,
             min_buy_token: 0,
+            min_taker_price: 0.0,
         },
     )
     .await;
@@ -253,6 +254,7 @@ async fn test_token_conditional_swap_basic() -> Result<(), TransportError> {
             max_buy_token_to_liqee: 50,
             max_sell_token_to_liqor: 50,
             min_buy_token: 0,
+            min_taker_price: 0.0,
         },
     )
     .await
@@ -285,6 +287,7 @@ async fn test_token_conditional_swap_basic() -> Result<(), TransportError> {
             max_buy_token_to_liqee: 5000,
             max_sell_token_to_liqor: 5000,
             min_buy_token: 50,
+            min_taker_price: 0.0,
         },
     )
     .await;
@@ -303,6 +306,7 @@ async fn test_token_conditional_swap_basic() -> Result<(), TransportError> {
             max_buy_token_to_liqee: 5000,
             max_sell_token_to_liqor: 5000,
             min_buy_token: 40,
+            min_taker_price: 0.0,
         },
     )
     .await
@@ -464,6 +468,7 @@ async fn test_token_conditional_swap_linear_auction() -> Result<(), TransportErr
             max_buy_token_to_liqee: 100,
             max_sell_token_to_liqor: 100,
             min_buy_token: 0,
+            min_taker_price: 0.0,
         },
     )
     .await;
@@ -487,6 +492,7 @@ async fn test_token_conditional_swap_linear_auction() -> Result<(), TransportErr
             max_buy_token_to_liqee: 1000,
             max_sell_token_to_liqor: 3300, // expected price of 3.0 sell per buy, with 10% maker fee
             min_buy_token: 1,
+            min_taker_price: 0.0,
         },
     )
     .await
@@ -529,6 +535,7 @@ async fn test_token_conditional_swap_linear_auction() -> Result<(), TransportErr
             max_buy_token_to_liqee: 1000,
             max_sell_token_to_liqor: 12100, // expected price of 11.0 sell per buy, with 10% maker fee
             min_buy_token: 1,
+            min_taker_price: 0.0,
         },
     )
     .await
@@ -571,6 +578,7 @@ async fn test_token_conditional_swap_linear_auction() -> Result<(), TransportErr
             max_buy_token_to_liqee: 100,
             max_sell_token_to_liqor: 100,
             min_buy_token: 1,
+            min_taker_price: 0.0,
         },
     )
     .await;
@@ -719,6 +727,7 @@ async fn test_token_conditional_swap_premium_auction() -> Result<(), TransportEr
             max_buy_token_to_liqee: 100,
             max_sell_token_to_liqor: 100,
             min_buy_token: 0,
+            min_taker_price: 0.0,
         },
     )
     .await;
@@ -742,6 +751,7 @@ async fn test_token_conditional_swap_premium_auction() -> Result<(), TransportEr
             max_buy_token_to_liqee: 1000,
             max_sell_token_to_liqor: 1100, // expected price of 1.0 sell per buy, with 10% maker fee
             min_buy_token: 1,
+            min_taker_price: 0.0,
         },
     )
     .await
@@ -792,6 +802,7 @@ async fn test_token_conditional_swap_premium_auction() -> Result<(), TransportEr
             max_buy_token_to_liqee: 10000,
             max_sell_token_to_liqor: 11055, // expected price of 1.0+0.5% premium sell per buy, with 10% maker fee
             min_buy_token: 1,
+            min_taker_price: 0.0,
         },
     )
     .await
@@ -834,6 +845,7 @@ async fn test_token_conditional_swap_premium_auction() -> Result<(), TransportEr
             max_buy_token_to_liqee: 10000,
             max_sell_token_to_liqor: 11110, // expected price of 1.0+1% premium sell per buy, with 10% maker fee
             min_buy_token: 1,
+            min_taker_price: 0.0,
         },
     )
     .await

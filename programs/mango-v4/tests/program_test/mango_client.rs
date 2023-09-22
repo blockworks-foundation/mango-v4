@@ -4619,6 +4619,7 @@ pub struct TokenConditionalSwapTriggerInstruction {
     pub max_buy_token_to_liqee: u64,
     pub max_sell_token_to_liqor: u64,
     pub min_buy_token: u64,
+    pub min_taker_price: f64,
 }
 #[async_trait::async_trait(?Send)]
 impl ClientInstruction for TokenConditionalSwapTriggerInstruction {
@@ -4650,6 +4651,7 @@ impl ClientInstruction for TokenConditionalSwapTriggerInstruction {
             max_buy_token_to_liqee: self.max_buy_token_to_liqee,
             max_sell_token_to_liqor: self.max_sell_token_to_liqor,
             min_buy_token: self.min_buy_token,
+            min_taker_price: self.min_taker_price,
         };
 
         let health_check_metas = derive_liquidation_remaining_account_metas(

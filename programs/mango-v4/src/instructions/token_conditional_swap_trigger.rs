@@ -26,6 +26,7 @@ pub fn token_conditional_swap_trigger(
     max_buy_token_to_liqee: u64,
     max_sell_token_to_liqor: u64,
     min_buy_token: u64,
+    min_taker_price: f64,
 ) -> Result<()> {
     let group_pk = &ctx.accounts.group.key();
     let liqee_key = ctx.accounts.liqee.key();
@@ -105,6 +106,7 @@ pub fn token_conditional_swap_trigger(
         sell_token_price,
         max_sell_token_to_liqor,
         now_ts,
+        min_taker_price,
     )?;
 
     require_gte!(
@@ -204,6 +206,7 @@ fn action(
     sell_token_price: I80F48,
     max_sell_token_to_liqor: u64,
     now_ts: u64,
+    min_taker_price: f64,
 ) -> Result<(I80F48, I80F48)> {
     let liqee_pre_init_health = liqee.check_health_pre(&liqee_health_cache)?;
 
@@ -231,6 +234,13 @@ fn action(
     let premium_price = tcs.premium_price(price, now_ts);
     let maker_price = tcs.maker_price(premium_price);
     let maker_price_i80f48 = I80F48::from_num(maker_price);
+
+    let taker_price = tcs.taker_price(premium_price);
+    require_gte!(
+        taker_price,
+        min_taker_price,
+        MangoError::TokenConditionalSwapTakerPriceTooLow
+    );
 
     let pre_liqee_buy_token = liqee.token_position(tcs.buy_token_index)?.native(&buy_bank);
     let pre_liqee_sell_token = liqee
@@ -786,6 +796,7 @@ mod tests {
                 I80F48::from_num(sell_price),
                 sell_max,
                 0,
+                0.0,
             )
         }
     }
