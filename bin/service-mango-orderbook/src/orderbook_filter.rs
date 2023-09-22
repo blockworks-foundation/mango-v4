@@ -13,7 +13,7 @@ use mango_feeds_lib::{
     OrderbookSide,
 };
 use mango_v4::accounts_zerocopy::{AccountReader, KeyedAccountReader};
-use mango_v4::state::OracleConfigParams;
+use mango_v4::state::{OracleConfigParams, OracleState};
 use mango_v4::state::oracle_state_unchecked;
 use mango_v4::{
     serum3_cpi::OrderBookStateHeader,
@@ -368,72 +368,74 @@ pub async fn init(
                                 max_staleness_slots: None, // don't check oracle staleness to get an orderbook
                             };
 
-                            let oracle_state = oracle_state_unchecked(
+                            if let Ok(unchecked_oracle_state) = oracle_state_unchecked(
                                 &keyed_account,
                                 mkt.1.base_decimals,
-                            ).and_then(|oracle_state| oracle_state.check_confidence_and_maybe_staleness(
-                                &oracle_pk,
-                                &oracle_config.to_oracle_config(),
-                                None, // force this to always return a price no matter how stale
-                            ));
+                            ) {
+                                if unchecked_oracle_state.check_confidence_and_maybe_staleness(
+                                        &oracle_pk,
+                                        &oracle_config.to_oracle_config(),
+                                        None, // force this to always return a price no matter how stale
+                                    ).is_ok() {
+                                    let oracle_price = unchecked_oracle_state.price;
+                                    let account = &side_info.account;
+                                    let bookside: BookSide = BookSide::try_deserialize(
+                                        solana_sdk::account::ReadableAccount::data(account)
+                                            .borrow_mut(),
+                                    )
+                                        .unwrap();
+                                    let side = match bookside.nodes.order_tree_type() {
+                                        OrderTreeType::Bids => OrderbookSide::Bid,
+                                        OrderTreeType::Asks => OrderbookSide::Ask,
+                                    };
+                                    let time_now = SystemTime::now()
+                                        .duration_since(UNIX_EPOCH)
+                                        .unwrap()
+                                        .as_secs();
+                                    let oracle_price_lots = (oracle_price
+                                        * I80F48::from_num(mkt.1.base_lot_size)
+                                        / I80F48::from_num(mkt.1.quote_lot_size))
+                                        .to_num();
+                                    let bookside: Vec<Order> = bookside
+                                        .iter_valid(time_now, oracle_price_lots)
+                                        .map(|item| Order {
+                                            price: price_lots_to_ui_perp(
+                                                item.price_lots,
+                                                mkt.1.base_decimals,
+                                                mkt.1.quote_decimals,
+                                                mkt.1.base_lot_size,
+                                                mkt.1.quote_lot_size,
+                                            ),
+                                            quantity: base_lots_to_ui_perp(
+                                                item.node.quantity,
+                                                mkt.1.base_decimals,
+                                                mkt.1.base_lot_size,
+                                            ),
+                                            owner_pubkey: item.node.owner.to_string(),
+                                        })
+                                        .collect();
 
-                            if let Ok((oracle_price, _state)) = oracle_state {
-                                let account = &side_info.account;
-                                let bookside: BookSide = BookSide::try_deserialize(
-                                    solana_sdk::account::ReadableAccount::data(account)
-                                        .borrow_mut(),
-                                )
-                                .unwrap();
-                                let side = match bookside.nodes.order_tree_type() {
-                                    OrderTreeType::Bids => OrderbookSide::Bid,
-                                    OrderTreeType::Asks => OrderbookSide::Ask,
-                                };
-                                let time_now = SystemTime::now()
-                                    .duration_since(UNIX_EPOCH)
-                                    .unwrap()
-                                    .as_secs();
-                                let oracle_price_lots = (oracle_price
-                                    * I80F48::from_num(mkt.1.base_lot_size)
-                                    / I80F48::from_num(mkt.1.quote_lot_size))
-                                .to_num();
-                                let bookside: Vec<Order> = bookside
-                                    .iter_valid(time_now, oracle_price_lots)
-                                    .map(|item| Order {
-                                        price: price_lots_to_ui_perp(
-                                            item.price_lots,
-                                            mkt.1.base_decimals,
-                                            mkt.1.quote_decimals,
-                                            mkt.1.base_lot_size,
-                                            mkt.1.quote_lot_size,
+                                    let other_bookside = bookside_cache.get(&other_side_pk.to_string());
+
+                                    match bookside_cache.get(&side_pk_string) {
+                                        Some(old_bookside) => publish_changes(
+                                            side_info.slot,
+                                            side_info.write_version,
+                                            mkt,
+                                            side,
+                                            &bookside,
+                                            old_bookside,
+                                            other_bookside,
+                                            &book_update_sender,
+                                            &mut metric_book_events_new,
+                                            &mut metric_level_events_new,
                                         ),
-                                        quantity: base_lots_to_ui_perp(
-                                            item.node.quantity,
-                                            mkt.1.base_decimals,
-                                            mkt.1.base_lot_size,
-                                        ),
-                                        owner_pubkey: item.node.owner.to_string(),
-                                    })
-                                    .collect();
+                                        _ => info!("bookside_cache could not find {}", side_pk_string),
+                                    }
 
-                                let other_bookside = bookside_cache.get(&other_side_pk.to_string());
-
-                                match bookside_cache.get(&side_pk_string) {
-                                    Some(old_bookside) => publish_changes(
-                                        side_info.slot,
-                                        side_info.write_version,
-                                        mkt,
-                                        side,
-                                        &bookside,
-                                        old_bookside,
-                                        other_bookside,
-                                        &book_update_sender,
-                                        &mut metric_book_events_new,
-                                        &mut metric_level_events_new,
-                                    ),
-                                    _ => info!("bookside_cache could not find {}", side_pk_string),
+                                    bookside_cache.insert(side_pk_string.clone(), bookside.clone());
                                 }
 
-                                bookside_cache.insert(side_pk_string.clone(), bookside.clone());
                             }
                         }
                         (side, oracle) => debug!(
