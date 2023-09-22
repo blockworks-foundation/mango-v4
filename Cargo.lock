@@ -5751,6 +5751,40 @@ dependencies = [
 ]
 
 [[package]]
+name = "service-mango-crank"
+version = "0.1.0"
+dependencies = [
+ "anchor-client",
+ "anchor-lang",
+ "anyhow",
+ "async-channel",
+ "async-trait",
+ "bs58 0.3.1",
+ "bytemuck",
+ "futures-channel",
+ "futures-util",
+ "itertools",
+ "jsonrpc-core 18.0.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "jsonrpc-core-client",
+ "log 0.4.20",
+ "mango-feeds-connector",
+ "mango-feeds-lib",
+ "mango-v4",
+ "mango-v4-client",
+ "serde",
+ "serde_derive",
+ "serde_json",
+ "serum_dex",
+ "solana-client",
+ "solana-logger",
+ "solana-sdk",
+ "tokio",
+ "tokio-tungstenite 0.16.1",
+ "toml",
+ "ws",
+]
+
+[[package]]
 name = "service-mango-orderbook"
 version = "0.1.0"
 dependencies = [
