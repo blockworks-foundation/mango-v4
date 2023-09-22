@@ -1,0 +1,42 @@
+[package]
+name = "service-mango-orderbook"
+version = "0.1.0"
+authors = ["Riordan Panayides <riordan@panayid.es>"]
+edition = "2021"
+license = "AGPL-3.0-or-later"
+
+[dependencies]
+mango-feeds-lib = { path = "../lib" }
+mango-feeds-connector = { path = "../connector" }
+
+solana-client = { workspace = true }
+solana-logger = { workspace = true }
+solana-sdk = { workspace = true }
+
+anchor-lang = { workspace = true }
+anchor-client = { workspace = true }
+
+mango-v4 = { workspace = true }
+mango-v4-client = { workspace = true }
+
+serum_dex = { workspace = true }
+
+fixed = { workspace = true }
+
+bs58 = { workspace = true }
+log = { workspace = true }
+anyhow = { workspace = true }
+toml = { workspace = true }
+
+serde = { workspace = true }
+serde_derive = { workspace = true }
+serde_json = { workspace = true }
+futures-channel = { workspace = true }
+futures-util = { workspace = true }
+ws = { workspace = true }
+async-channel = { workspace = true }
+async-trait = { workspace = true }
+tokio = { workspace = true }
+tokio-tungstenite = { workspace = true }
+bytemuck = { workspace = true }
+itertools = { workspace = true }
