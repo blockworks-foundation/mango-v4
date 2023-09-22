@@ -35,7 +35,11 @@ pub fn token_conditional_swap_start(
         .token_conditional_swap_by_index(token_conditional_swap_index)?
         .clone();
     require!(tcs.has_data(), MangoError::TokenConditionalSwapNotSet);
-    require_eq!(tcs.id, token_conditional_swap_id);
+    require_eq!(
+        tcs.id,
+        token_conditional_swap_id,
+        MangoError::TokenConditionalSwapIndexIdMismatch
+    );
     let buy_token_index = tcs.buy_token_index;
     let sell_token_index = tcs.sell_token_index;
     let now_ts: u64 = Clock::get()?.unix_timestamp.try_into().unwrap();

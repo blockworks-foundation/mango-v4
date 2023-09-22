@@ -119,6 +119,8 @@ pub enum MangoError {
     TokenConditionalSwapCantPayIncentive,
     #[msg("token conditional swap taker price is too low")]
     TokenConditionalSwapTakerPriceTooLow,
+    #[msg("token conditional swap index and id don't match")]
+    TokenConditionalSwapIndexIdMismatch,
 }
 
 impl MangoError {

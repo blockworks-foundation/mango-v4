@@ -1,6 +1,7 @@
 use anchor_lang::prelude::*;
 
 use crate::accounts_ix::*;
+use crate::error::MangoError;
 use crate::logs::TokenConditionalSwapCancelLog;
 use crate::state::*;
 
@@ -23,7 +24,11 @@ pub fn token_conditional_swap_cancel(
         return Ok(());
     }
 
-    require_eq!(tcs.id, token_conditional_swap_id);
+    require_eq!(
+        tcs.id,
+        token_conditional_swap_id,
+        MangoError::TokenConditionalSwapIndexIdMismatch
+    );
     *tcs = TokenConditionalSwap::default();
 
     emit!(TokenConditionalSwapCancelLog {
