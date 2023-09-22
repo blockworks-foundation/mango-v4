@@ -384,16 +384,19 @@ impl Context {
         let liqor_min_health_ratio = I80F48::from_num(self.config.min_health_ratio);
 
         // Compute the max viable swap (for liqor and liqee) and min it
-        let buy_bank = self
-            .mango_client
-            .context
-            .mint_info(tcs.buy_token_index)
-            .first_bank();
-        let sell_bank = self
-            .mango_client
-            .context
-            .mint_info(tcs.sell_token_index)
-            .first_bank();
+        let buy_bank;
+        let buy_mint;
+        let sell_bank;
+        let sell_mint;
+        {
+            let buy_info = self.mango_client.context.mint_info(tcs.buy_token_index);
+            buy_bank = buy_info.first_bank();
+            buy_mint = buy_info.mint;
+
+            let sell_info = self.mango_client.context.mint_info(tcs.sell_token_index);
+            sell_bank = sell_info.first_bank();
+            sell_mint = sell_info.mint;
+        }
         let buy_token_price = self.account_fetcher.fetch_bank_price(&buy_bank)?;
         let sell_token_price = self.account_fetcher.fetch_bank_price(&sell_bank)?;
 
@@ -436,128 +439,113 @@ impl Context {
 
         // Final check of the reverse trade on jupiter
         let jupiter_quote;
-        let min_taker_price;
-        {
-            let buy_mint = self
-                .mango_client
-                .context
-                .mint_info(tcs.buy_token_index)
-                .mint;
-            let sell_mint = self
-                .mango_client
-                .context
-                .mint_info(tcs.sell_token_index)
-                .mint;
+        let swap_price;
+        match self.config.jupiter_mode {
+            JupiterMode::None => {
+                // Quote only to verify that the execution makes money
+                // Slippage does not matter.
+                let slippage_bps = 100;
+                let input_amount = volume / sell_token_price;
+                let quote = self
+                    .mango_client
+                    .jupiter()
+                    .quote(
+                        sell_mint,
+                        buy_mint,
+                        input_amount.clamp_to_u64(),
+                        slippage_bps,
+                        false,
+                        self.config.jupiter_version,
+                    )
+                    .await?;
 
-            let swap_price;
-            match self.config.jupiter_mode {
-                JupiterMode::None => {
-                    // Quote only to verify that the execution makes money
-                    // Slippage does not matter.
-                    let slippage_bps = 100;
-                    let input_amount = volume / sell_token_price;
-                    let quote = self
-                        .mango_client
-                        .jupiter()
-                        .quote(
-                            sell_mint,
-                            buy_mint,
-                            input_amount.clamp_to_u64(),
-                            slippage_bps,
-                            false,
-                            self.config.jupiter_version,
-                        )
-                        .await?;
+                let sell_amount = quote.in_amount as f64;
+                let buy_amount = quote.out_amount as f64;
 
-                    let sell_amount = quote.in_amount as f64;
-                    let buy_amount = quote.out_amount as f64;
-
-                    swap_price = sell_amount / buy_amount;
-                    jupiter_quote = None;
-                }
-                JupiterMode::SwapBuySell { slippage_bps } => {
-                    // Quote will get executed
-                    let input_amount = volume / sell_token_price;
-                    let quote = self
-                        .mango_client
-                        .jupiter()
-                        .quote(
-                            sell_mint,
-                            buy_mint,
-                            input_amount.clamp_to_u64(),
-                            slippage_bps,
-                            false,
-                            self.config.jupiter_version,
-                        )
-                        .await?;
-
-                    let sell_amount = quote.in_amount as f64;
-                    let buy_amount = quote.out_amount as f64;
-
-                    swap_price = sell_amount / buy_amount;
-                    jupiter_quote = Some(quote);
-                }
-                JupiterMode::SwapBuy {
-                    slippage_bps,
-                    collateral_token_index,
-                } => {
-                    let collateral_mint_info =
-                        &self.mango_client.context.mint_info(collateral_token_index);
-                    let collateral_bank = collateral_mint_info.first_bank();
-                    let collateral_mint = collateral_mint_info.mint;
-                    let collateral_price =
-                        self.account_fetcher.fetch_bank_price(&collateral_bank)?;
-
-                    let max_sell = volume / sell_token_price;
-                    let max_buy_collateral_cost = volume / collateral_price;
-
-                    let buy_quote = self
-                        .mango_client
-                        .jupiter()
-                        .quote(
-                            collateral_mint,
-                            buy_mint,
-                            max_buy_collateral_cost.clamp_to_u64(),
-                            slippage_bps,
-                            false,
-                            self.config.jupiter_version,
-                        )
-                        .await?;
-                    let sell_quote = self
-                        .mango_client
-                        .jupiter()
-                        .quote(
-                            sell_mint,
-                            collateral_mint,
-                            max_sell.clamp_to_u64(),
-                            slippage_bps,
-                            false,
-                            self.config.jupiter_version,
-                        )
-                        .await?;
-
-                    // collateral per buy token
-                    let buy_price = buy_quote.in_amount as f64 / buy_quote.out_amount as f64;
-                    // collateral per sell token
-                    let sell_price = sell_quote.out_amount as f64 / sell_quote.in_amount as f64;
-
-                    // sell token per buy token
-                    swap_price = buy_price / sell_price;
-                    jupiter_quote = Some(buy_quote);
-                }
-            };
-
-            min_taker_price = swap_price * (1.0 + self.config.profit_fraction);
-            if min_taker_price > taker_price.to_num::<f64>() {
-                trace!(
-                    max_buy = max_buy_token_to_liqee,
-                    max_sell = max_sell_token_to_liqor,
-                    jupiter_swap_price = %swap_price,
-                    tcs_taker_price = %taker_price,
-                    "skipping because swap price isn't good enough compared to trigger price",
-                );
-                return Ok(None);
+                swap_price = sell_amount / buy_amount;
+                jupiter_quote = None;
             }
+            JupiterMode::SwapBuySell { slippage_bps } => {
+                // Quote will get executed
+                let input_amount = volume / sell_token_price;
+                let quote = self
+                    .mango_client
+                    .jupiter()
+                    .quote(
+                        sell_mint,
+                        buy_mint,
+                        input_amount.clamp_to_u64(),
+                        slippage_bps,
+                        false,
+                        self.config.jupiter_version,
+                    )
+                    .await?;
+
+                let sell_amount = quote.in_amount as f64;
+                let buy_amount = quote.out_amount as f64;
+
+                swap_price = sell_amount / buy_amount;
+                jupiter_quote = Some(quote);
+            }
+            JupiterMode::SwapBuy {
+                slippage_bps,
+                collateral_token_index,
+            } => {
+                let collateral_mint_info =
+                    &self.mango_client.context.mint_info(collateral_token_index);
+                let collateral_bank = collateral_mint_info.first_bank();
+                let collateral_mint = collateral_mint_info.mint;
+                let collateral_price = self.account_fetcher.fetch_bank_price(&collateral_bank)?;
+
+                let max_sell = volume / sell_token_price;
+                let max_buy_collateral_cost = volume / collateral_price;
+
+                let buy_quote = self
+                    .mango_client
+                    .jupiter()
+                    .quote(
+                        collateral_mint,
+                        buy_mint,
+                        max_buy_collateral_cost.clamp_to_u64(),
+                        slippage_bps,
+                        false,
+                        self.config.jupiter_version,
+                    )
+                    .await?;
+                let sell_quote = self
+                    .mango_client
+                    .jupiter()
+                    .quote(
+                        sell_mint,
+                        collateral_mint,
+                        max_sell.clamp_to_u64(),
+                        slippage_bps,
+                        false,
+                        self.config.jupiter_version,
+                    )
+                    .await?;
+
+                // collateral per buy token
+                let buy_price = buy_quote.in_amount as f64 / buy_quote.out_amount as f64;
+                // collateral per sell token
+                let sell_price = sell_quote.out_amount as f64 / sell_quote.in_amount as f64;
+
+                // sell token per buy token
+                swap_price = buy_price / sell_price;
+                jupiter_quote = Some(buy_quote);
+            }
+        };
+
+        let min_taker_price = swap_price * (1.0 + self.config.profit_fraction);
+        if min_taker_price > taker_price.to_num::<f64>() {
+            trace!(
+                max_buy = max_buy_token_to_liqee,
+                max_sell = max_sell_token_to_liqor,
+                jupiter_swap_price = %swap_price,
+                tcs_taker_price = %taker_price,
+                "skipping because swap price isn't good enough compared to trigger price",
+            );
+            return Ok(None);
         }
 
         let min_buy = (volume / buy_token_price).to_num::<f64>() * self.config.min_buy_fraction;
