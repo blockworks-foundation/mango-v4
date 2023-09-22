@@ -1,0 +1,37 @@
+[package]
+name = "service-mango-pnl"
+version = "0.1.0"
+authors = ["Christian Kamm <mail@ckamm.de>"]
+edition = "2021"
+license = "AGPL-3.0-or-later"
+
+[dependencies]
+mango-feeds-lib = { path = "../../lib/mango-feeds-lib" }
+mango-feeds-connector = { git = "https://github.com/blockworks-foundation/mango-feeds.git", branch = "update-solana-1-16-anchor-28" }
+
+solana-client = { workspace = true }
+solana-logger = { workspace = true }
+solana-sdk = { workspace = true }
+
+anchor-lang = { workspace = true }
+anchor-client = { workspace = true }
+
+mango-v4 = { path = "../../programs/mango-v4", features = ["client"] }
+mango-v4-client = { path = "../../lib/client" }
+
+serum_dex = { workspace = true }
+
+bs58 = "0.3.1"
+log = "0.4"
+anyhow = "1.0"
+toml = "0.5"
+
+fixed = { workspace = true }
+
+jsonrpsee = { version = "0.9.0", features = ["http-server"] }
+
+async-trait = "0.1"
+tokio = { version = "1", features = ["full"] }
+
+serde = "1.0.130"
+serde_derive = "1.0.130"
