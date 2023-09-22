@@ -5,6 +5,8 @@ use crate::accounts_ix::*;
 use crate::error::*;
 use crate::health::*;
 use crate::i80f48::ClampToInt;
+use crate::logs::TokenBalanceLog;
+use crate::logs::TokenConditionalSwapStartLog;
 use crate::state::*;
 
 #[allow(clippy::too_many_arguments)]
@@ -96,6 +98,31 @@ pub fn token_conditional_swap_start(
         account_sell_post_balance - account_sell_pre_balance,
     )?;
 
+    emit!(TokenBalanceLog {
+        mango_group: *group_pk,
+        mango_account: account_key,
+        token_index: sell_token_index,
+        indexed_position: account_sell_token.indexed_position.to_bits(),
+        deposit_index: sell_bank.deposit_index.to_bits(),
+        borrow_index: sell_bank.borrow_index.to_bits(),
+    });
+    emit!(TokenBalanceLog {
+        mango_group: *group_pk,
+        mango_account: caller_key,
+        token_index: sell_token_index,
+        indexed_position: caller_sell_token.indexed_position.to_bits(),
+        deposit_index: sell_bank.deposit_index.to_bits(),
+        borrow_index: sell_bank.borrow_index.to_bits(),
+    });
+    emit!(TokenConditionalSwapStartLog {
+        mango_group: *group_pk,
+        mango_account: account_key,
+        caller: caller_key,
+        token_conditional_swap_id: tcs.id,
+        incentive_token_index: sell_token_index,
+        incentive_amount: incentive_native,
+    });
+
     //
     // Start the tcs
     //
@@ -103,8 +130,6 @@ pub fn token_conditional_swap_start(
     tcs.start_timestamp = now_ts;
     tcs.sold += incentive_native;
     assert!(tcs.passed_start(now_ts));
-
-    // TODO: log auction start
 
     account.check_health_post(&health_cache, pre_init_health)?;
 

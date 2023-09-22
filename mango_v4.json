@@ -9650,12 +9650,23 @@
           {
             "name": "startTimestamp",
             "docs": [
-              "0 means not-started"
+              "In seconds since epoch. 0 means not-started.",
+              "",
+              "FixedPremium: Time of first trigger call. No other effect.",
+              "PremiumAuction: Time of start or first trigger call. Can continue to trigger once started.",
+              "LinearAuction: Set during creation, auction starts with price_lower_limit at this timestamp."
             ],
             "type": "u64"
           },
           {
             "name": "durationSeconds",
+            "docs": [
+              "Duration of the auction mechanism",
+              "",
+              "FixedPremium: ignored",
+              "PremiumAuction: time after start that the premium needs to scale to price_premium_rate",
+              "LinearAuction: time after start to go from price_lower_limit to price_upper_limit"
+            ],
             "type": "u64"
           },
           {
@@ -12218,6 +12229,111 @@
       ]
     },
     {
+      "name": "TokenConditionalSwapCreateLogV3",
+      "fields": [
+        {
+          "name": "mangoGroup",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "mangoAccount",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "id",
+          "type": "u64",
+          "index": false
+        },
+        {
+          "name": "maxBuy",
+          "type": "u64",
+          "index": false
+        },
+        {
+          "name": "maxSell",
+          "type": "u64",
+          "index": false
+        },
+        {
+          "name": "expiryTimestamp",
+          "type": "u64",
+          "index": false
+        },
+        {
+          "name": "priceLowerLimit",
+          "type": "f64",
+          "index": false
+        },
+        {
+          "name": "priceUpperLimit",
+          "type": "f64",
+          "index": false
+        },
+        {
+          "name": "pricePremiumRate",
+          "type": "f64",
+          "index": false
+        },
+        {
+          "name": "takerFeeRate",
+          "type": "f32",
+          "index": false
+        },
+        {
+          "name": "makerFeeRate",
+          "type": "f32",
+          "index": false
+        },
+        {
+          "name": "buyTokenIndex",
+          "type": "u16",
+          "index": false
+        },
+        {
+          "name": "sellTokenIndex",
+          "type": "u16",
+          "index": false
+        },
+        {
+          "name": "allowCreatingDeposits",
+          "type": "bool",
+          "index": false
+        },
+        {
+          "name": "allowCreatingBorrows",
+          "type": "bool",
+          "index": false
+        },
+        {
+          "name": "displayPriceStyle",
+          "type": "u8",
+          "index": false
+        },
+        {
+          "name": "intention",
+          "type": "u8",
+          "index": false
+        },
+        {
+          "name": "tcsType",
+          "type": "u8",
+          "index": false
+        },
+        {
+          "name": "startTimestamp",
+          "type": "u64",
+          "index": false
+        },
+        {
+          "name": "durationSeconds",
+          "type": "u64",
+          "index": false
+        }
+      ]
+    },
+    {
       "name": "TokenConditionalSwapTriggerLog",
       "fields": [
         {
@@ -12368,6 +12484,96 @@
       ]
     },
     {
+      "name": "TokenConditionalSwapTriggerLogV3",
+      "fields": [
+        {
+          "name": "mangoGroup",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "liqee",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "liqor",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "tokenConditionalSwapId",
+          "type": "u64",
+          "index": false
+        },
+        {
+          "name": "buyTokenIndex",
+          "type": "u16",
+          "index": false
+        },
+        {
+          "name": "sellTokenIndex",
+          "type": "u16",
+          "index": false
+        },
+        {
+          "name": "buyAmount",
+          "type": "u64",
+          "index": false
+        },
+        {
+          "name": "sellAmount",
+          "type": "u64",
+          "index": false
+        },
+        {
+          "name": "makerFee",
+          "type": "u64",
+          "index": false
+        },
+        {
+          "name": "takerFee",
+          "type": "u64",
+          "index": false
+        },
+        {
+          "name": "buyTokenPrice",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "sellTokenPrice",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "closed",
+          "type": "bool",
+          "index": false
+        },
+        {
+          "name": "displayPriceStyle",
+          "type": "u8",
+          "index": false
+        },
+        {
+          "name": "intention",
+          "type": "u8",
+          "index": false
+        },
+        {
+          "name": "tcsType",
+          "type": "u8",
+          "index": false
+        },
+        {
+          "name": "startTimestamp",
+          "type": "u64",
+          "index": false
+        }
+      ]
+    },
+    {
       "name": "TokenConditionalSwapCancelLog",
       "fields": [
         {
@@ -12382,6 +12588,41 @@
         },
         {
           "name": "id",
+          "type": "u64",
+          "index": false
+        }
+      ]
+    },
+    {
+      "name": "TokenConditionalSwapStartLog",
+      "fields": [
+        {
+          "name": "mangoGroup",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "mangoAccount",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "caller",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "tokenConditionalSwapId",
+          "type": "u64",
+          "index": false
+        },
+        {
+          "name": "incentiveTokenIndex",
+          "type": "u16",
+          "index": false
+        },
+        {
+          "name": "incentiveAmount",
           "type": "u64",
           "index": false
         }
