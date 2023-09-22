@@ -1,23 +1,87 @@
 import { BN } from '@project-serum/anchor';
-import { serializeInstructionToBase64 } from '@solana/spl-governance';
-import { AccountMeta } from '@solana/web3.js';
+import {
+  getAllProposals,
+  getTokenOwnerRecord,
+  getTokenOwnerRecordAddress,
+  serializeInstructionToBase64,
+} from '@solana/spl-governance';
+import {
+  AccountMeta,
+  Connection,
+  Keypair,
+  PublicKey,
+  Transaction,
+  TransactionInstruction,
+} from '@solana/web3.js';
 import { Builder } from '../src/builder';
 import { MangoClient } from '../src/client';
 import { NullTokenEditParams } from '../src/clientIxParamBuilder';
 import { MANGO_V4_MAIN_GROUP as MANGO_V4_PRIMARY_GROUP } from '../src/constants';
 import { computePriceImpactOnJup } from '../src/risk';
 import { toNative } from '../src/utils';
+import { AnchorProvider, Wallet } from '@coral-xyz/anchor';
+import fs from 'fs';
+import {
+  DEFAULT_VSR_ID,
+  VsrClient,
+} from './governanceInstructions/voteStakeRegistryClient';
+import { createProposal } from './governanceInstructions/createProposal';
+import {
+  MANGO_DAO_WALLET_GOVERNANCE,
+  MANGO_GOVERNANCE_PROGRAM,
+  MANGO_MINT,
+  MANGO_REALM_PK,
+} from './governanceInstructions/constants';
 
-const { MB_CLUSTER_URL } = process.env;
+const {
+  MB_CLUSTER_URL,
+  MB_PAYER_KEYPAIR,
+  DELEGATED_FROM_WALLET_PK,
+  PROPOSAL_TITLE,
+} = process.env;
+
+const CLIENT_USER = MB_PAYER_KEYPAIR;
+const delegatedFromWalletPk = DELEGATED_FROM_WALLET_PK;
 
 async function buildClient(): Promise<MangoClient> {
   return await MangoClient.connectDefault(MB_CLUSTER_URL!);
 }
 
+async function setupWallet(): Promise<Wallet> {
+  const clientKeypair = Keypair.fromSecretKey(
+    Buffer.from(JSON.parse(fs.readFileSync(CLIENT_USER!, 'utf-8'))),
+  );
+  const clientWallet = new Wallet(clientKeypair);
+
+  return clientWallet;
+}
+
+async function setupVsr(
+  connection: Connection,
+  clientWallet: Wallet,
+): Promise<VsrClient> {
+  const options = AnchorProvider.defaultOptions();
+  const provider = new AnchorProvider(connection, clientWallet, options);
+  const vsrClient = await VsrClient.connect(provider, DEFAULT_VSR_ID);
+  return vsrClient;
+}
+
 async function updateTokenParams(): Promise<void> {
-  const client = await buildClient();
+  if (!MB_PAYER_KEYPAIR) {
+    return console.log('No keypair - MB_PAYER_KEYPAIR');
+  }
+  if (!delegatedFromWalletPk) {
+    return console.log(
+      'No delegated from wallet pk - DELEGATED_FROM_WALLET_PK',
+    );
+  }
+
+  const [client, wallet] = await Promise.all([buildClient(), setupWallet()]);
+  const vsrClient = await setupVsr(client.connection, wallet);
 
   const group = await client.getGroup(MANGO_V4_PRIMARY_GROUP);
+
+  const instructions: TransactionInstruction[] = [];
 
   Array.from(group.banksMapByTokenIndex.values())
     .map((banks) => banks[0])
@@ -118,8 +182,40 @@ async function updateTokenParams(): Promise<void> {
         ])
         .instruction();
 
-      console.log(`Bank ${bank.name} ${serializeInstructionToBase64(ix)}`);
+      console.log(`Bank ${bank.name}`);
+      instructions.push(ix);
     });
+
+  const tokenOwnerRecordPk = await getTokenOwnerRecordAddress(
+    MANGO_GOVERNANCE_PROGRAM,
+    MANGO_REALM_PK,
+    MANGO_MINT,
+    new PublicKey(delegatedFromWalletPk),
+  );
+
+  const [tokenOwnerRecord, proposals] = await Promise.all([
+    getTokenOwnerRecord(client.connection, tokenOwnerRecordPk),
+    getAllProposals(
+      client.connection,
+      MANGO_GOVERNANCE_PROGRAM,
+      MANGO_REALM_PK,
+    ),
+  ]);
+
+  const walletSigner = wallet as never;
+
+  const proposalAddress = await createProposal(
+    client.connection,
+    walletSigner,
+    MANGO_DAO_WALLET_GOVERNANCE,
+    tokenOwnerRecord,
+    PROPOSAL_TITLE ? PROPOSAL_TITLE : 'Update risk params for tokens',
+    '',
+    Object.values(proposals).length,
+    instructions,
+    vsrClient!,
+  );
+  console.log(proposalAddress.toBase58());
 }
 
 async function main(): Promise<void> {
