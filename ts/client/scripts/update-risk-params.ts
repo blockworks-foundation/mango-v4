@@ -3,14 +3,12 @@ import {
   getAllProposals,
   getTokenOwnerRecord,
   getTokenOwnerRecordAddress,
-  serializeInstructionToBase64,
 } from '@solana/spl-governance';
 import {
   AccountMeta,
   Connection,
   Keypair,
   PublicKey,
-  Transaction,
   TransactionInstruction,
 } from '@solana/web3.js';
 import { Builder } from '../src/builder';
@@ -32,15 +30,17 @@ import {
   MANGO_MINT,
   MANGO_REALM_PK,
 } from './governanceInstructions/constants';
+import bs58 from 'bs58';
 
 const {
   MB_CLUSTER_URL,
-  MB_PAYER_KEYPAIR,
+  //wallet private key
+  MB_PAYER_KEYPAIR = '',
+  //wallet that delegated to keypair wallet
   DELEGATED_FROM_WALLET_PK,
   PROPOSAL_TITLE,
 } = process.env;
 
-const CLIENT_USER = MB_PAYER_KEYPAIR;
 const delegatedFromWalletPk = DELEGATED_FROM_WALLET_PK;
 
 async function buildClient(): Promise<MangoClient> {
@@ -48,9 +48,7 @@ async function buildClient(): Promise<MangoClient> {
 }
 
 async function setupWallet(): Promise<Wallet> {
-  const clientKeypair = Keypair.fromSecretKey(
-    Buffer.from(JSON.parse(fs.readFileSync(CLIENT_USER!, 'utf-8'))),
-  );
+  const clientKeypair = Keypair.fromSecretKey(bs58.decode(MB_PAYER_KEYPAIR));
   const clientWallet = new Wallet(clientKeypair);
 
   return clientWallet;

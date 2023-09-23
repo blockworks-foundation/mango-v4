@@ -144,6 +144,7 @@ export const createProposal = async (
     tx.feePayer = payer;
     transactions.push(tx);
   }
+
   const signedTransactions = await wallet.signAllTransactions(transactions);
   for (const tx of signedTransactions) {
     const rawTransaction = tx.serialize();
