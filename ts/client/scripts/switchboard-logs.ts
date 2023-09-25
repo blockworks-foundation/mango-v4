@@ -1,22 +1,24 @@
 import { PublicKey } from '@solana/web3.js';
+import { Bank } from '../src/accounts/bank';
 import { Group } from '../src/accounts/group';
 import { isSwitchboardOracle } from '../src/accounts/oracle';
+import { PerpMarket } from '../src/accounts/perp';
 import { MangoClient } from '../src/client';
 import { buildFetch } from '../src/utils';
 
-function getNameForBank(group: Group, oracle: PublicKey): string {
-  let match: any[] = Array.from(group.banksMapByName.values())
+function getBankForOracle(group: Group, oracle: PublicKey): Bank | PerpMarket {
+  let match: Bank[] | PerpMarket[] = Array.from(group.banksMapByName.values())
     .flat()
     .filter((b) => b.oracle.equals(oracle));
   if (match.length > 0) {
-    return match[0].name;
+    return match[0];
   }
 
   match = Array.from(group.perpMarketsMapByName.values()).filter((p) =>
     p.oracle.equals(oracle),
   );
   if (match.length > 0) {
-    return match[0].name;
+    return match[0];
   }
 
   throw new Error(`No token or perp market found for ${oracle}`);
@@ -57,7 +59,8 @@ async function main(): Promise<void> {
       method: 'POST',
     });
 
-    console.log(`${getNameForBank(group, o)} ${o}`);
+    const bOrPm = getBankForOracle(group, o);
+    console.log(`${bOrPm.name} ${bOrPm.oracleLastUpdatedSlot} ${o}`);
 
     (await r.json()).forEach((e: { message: string; timestamp: string }) => {
       if (e.message.toLowerCase().includes('error')) {

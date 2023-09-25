@@ -17,6 +17,7 @@ import {
   AddressLookupTableAccount,
   Cluster,
   Commitment,
+  ComputeBudgetProgram,
   Connection,
   Keypair,
   MemcmpFilter,
@@ -94,6 +95,9 @@ import { MangoSignatureStatus, sendTransaction } from './utils/rpc';
 import { NATIVE_MINT, TOKEN_PROGRAM_ID } from './utils/spl';
 
 export const DEFAULT_TOKEN_CONDITIONAL_SWAP_COUNT = 8;
+export const PERP_SETTLE_PNL_CU_LIMIT = 250000;
+export const PERP_SETTLE_FEES_CU_LIMIT = 20000;
+export const SERUM_SETTLE_FUNDS_CU_LIMIT = 65000;
 
 export enum AccountRetriever {
   Scanning,
@@ -1409,6 +1413,36 @@ export class MangoClient {
     ]);
   }
 
+  public async tokenWithdrawAllDepositForAllUnconfidentOrStaleOracles(
+    group: Group,
+    mangoAccount: MangoAccount,
+  ): Promise<MangoSignatureStatus> {
+    const nowSlot = await this.connection.getSlot();
+
+    const banksToWithdrawFrom = Array.from(group.banksMapByTokenIndex.values())
+      .map((banks) => banks[0])
+      .filter((bank) => bank.isOracleStaleOrUnconfident(nowSlot))
+      .filter((b) => mangoAccount.getTokenBalanceUi(b) > 0);
+
+    if (banksToWithdrawFrom.length === 0) {
+      throw new Error(`No stale oracle or bad confidence oracle deposits!`);
+    }
+
+    const ixs = await Promise.all(
+      banksToWithdrawFrom.map((bank) => {
+        return this.tokenWithdrawNativeIx(
+          group,
+          mangoAccount,
+          bank.mint,
+          U64_MAX_BN,
+          false,
+        );
+      }),
+    );
+
+    return await this.sendAndConfirmTransactionForGroup(group, ixs.flat());
+  }
+
   /**
    * Withdraw the entire deposit balance for a token, effectively freeing the token position
    *
@@ -1427,7 +1461,7 @@ export class MangoClient {
     if (b < 0) {
       throw new Error(`Only call this method for deposits and not borrows!`);
     }
-    const ixes = await this.tokenWithdrawNativeIx(
+    const ixs = await this.tokenWithdrawNativeIx(
       group,
       mangoAccount,
       mintPk,
@@ -1435,7 +1469,7 @@ export class MangoClient {
       false,
     );
 
-    return await this.sendAndConfirmTransactionForGroup(group, ixes);
+    return await this.sendAndConfirmTransactionForGroup(group, ixs);
   }
 
   public async tokenWithdraw(
@@ -1446,7 +1480,7 @@ export class MangoClient {
     allowBorrow: boolean,
   ): Promise<MangoSignatureStatus> {
     const nativeAmount = toNative(amount, group.getMintDecimals(mintPk));
-    const ixes = await this.tokenWithdrawNativeIx(
+    const ixs = await this.tokenWithdrawNativeIx(
       group,
       mangoAccount,
       mintPk,
@@ -1454,7 +1488,7 @@ export class MangoClient {
       allowBorrow,
     );
 
-    return await this.sendAndConfirmTransactionForGroup(group, ixes);
+    return await this.sendAndConfirmTransactionForGroup(group, ixs);
   }
 
   public async tokenWithdrawNativeIx(
@@ -1953,7 +1987,7 @@ export class MangoClient {
     clientOrderId: number,
     limit: number,
   ): Promise<MangoSignatureStatus> {
-    const placeOrderIxes = await this.serum3PlaceOrderIx(
+    const placeOrderIxs = await this.serum3PlaceOrderIx(
       group,
       mangoAccount,
       externalMarketPk,
@@ -1972,7 +2006,7 @@ export class MangoClient {
       externalMarketPk,
     );
 
-    const ixs = [...placeOrderIxes, settleIx];
+    const ixs = [...placeOrderIxs, settleIx];
 
     return await this.sendAndConfirmTransactionForGroup(group, ixs);
   }
@@ -2161,7 +2195,7 @@ export class MangoClient {
     side: Serum3Side,
     orderId: BN,
   ): Promise<MangoSignatureStatus> {
-    const ixes = await Promise.all([
+    const ixs = await Promise.all([
       this.serum3CancelOrderIx(
         group,
         mangoAccount,
@@ -2172,7 +2206,7 @@ export class MangoClient {
       this.serum3SettleFundsV2Ix(group, mangoAccount, externalMarketPk),
     ]);
 
-    return await this.sendAndConfirmTransactionForGroup(group, ixes);
+    return await this.sendAndConfirmTransactionForGroup(group, ixs);
   }
 
   /// perps
@@ -2927,7 +2961,7 @@ export class MangoClient {
         continue;
       }
       ixs1.push(
-        // Takes ~130k CU
+        // Takes ~250k CU
         await this.perpSettlePnlIx(
           group,
           pa.getUnsettledPnlUi(pm) > 0 ? mangoAccount : candidates[0].account,
@@ -2960,9 +2994,10 @@ export class MangoClient {
     );
 
     if (
-      mangoAccount.perpActive().length * 150 +
-        mangoAccount.serum3Active().length * 65 >
-      1600
+      mangoAccount.perpActive().length *
+        (PERP_SETTLE_PNL_CU_LIMIT + PERP_SETTLE_FEES_CU_LIMIT) +
+        mangoAccount.serum3Active().length * SERUM_SETTLE_FUNDS_CU_LIMIT >
+      1600000
     ) {
       throw new Error(
         `Too many perp positions and serum open orders to settle in one tx! Please try settling individually!`,
@@ -2971,7 +3006,16 @@ export class MangoClient {
 
     return await this.sendAndConfirmTransactionForGroup(
       group,
-      [...ixs1, ...ixs2],
+      [
+        ComputeBudgetProgram.setComputeUnitLimit({
+          units:
+            mangoAccount.perpActive().length *
+              (PERP_SETTLE_PNL_CU_LIMIT + PERP_SETTLE_FEES_CU_LIMIT) +
+            mangoAccount.serum3Active().length * SERUM_SETTLE_FUNDS_CU_LIMIT,
+        }),
+        ...ixs1,
+        ...ixs2,
+      ],
       {
         prioritizationFee: true,
       },
@@ -2988,6 +3032,9 @@ export class MangoClient {
     maxSettleAmount?: number,
   ): Promise<MangoSignatureStatus> {
     return await this.sendAndConfirmTransactionForGroup(group, [
+      ComputeBudgetProgram.setComputeUnitLimit({
+        units: PERP_SETTLE_PNL_CU_LIMIT + PERP_SETTLE_FEES_CU_LIMIT,
+      }),
       await this.perpSettlePnlIx(
         group,
         profitableAccount,
@@ -3012,6 +3059,9 @@ export class MangoClient {
     perpMarketIndex: PerpMarketIndex,
   ): Promise<MangoSignatureStatus> {
     return await this.sendAndConfirmTransactionForGroup(group, [
+      ComputeBudgetProgram.setComputeUnitLimit({
+        units: PERP_SETTLE_PNL_CU_LIMIT,
+      }),
       await this.perpSettlePnlIx(
         group,
         profitableAccount,

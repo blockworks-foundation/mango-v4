@@ -11,7 +11,6 @@ use anchor_lang::{AccountDeserialize, AnchorDeserialize, Id};
 use anchor_spl::associated_token::get_associated_token_address;
 use anchor_spl::token::Token;
 
-use bincode::Options;
 use fixed::types::I80F48;
 use futures::{stream, StreamExt, TryStreamExt};
 use itertools::Itertools;
@@ -36,7 +35,7 @@ use solana_sdk::transaction::TransactionError;
 use crate::account_fetcher::*;
 use crate::context::MangoGroupContext;
 use crate::gpa::{fetch_anchor_account, fetch_mango_accounts};
-use crate::jupiter;
+use crate::{jupiter, util};
 
 use anyhow::Context;
 use solana_sdk::account::ReadableAccount;
@@ -44,6 +43,8 @@ use solana_sdk::instruction::{AccountMeta, Instruction};
 use solana_sdk::signature::{Keypair, Signature};
 use solana_sdk::sysvar;
 use solana_sdk::{commitment_config::CommitmentConfig, pubkey::Pubkey, signer::Signer};
+
+pub const MAX_ACCOUNTS_PER_TRANSACTION: usize = 64;
 
 // very close to anchor_client::Client, which unfortunately has no accessors or Clone
 #[derive(Clone, Debug)]
@@ -1214,7 +1215,7 @@ impl MangoClient {
             .mint_info
             .banks()
             .iter()
-            .map(|bank_pubkey| to_writable_account_meta(*bank_pubkey))
+            .map(|bank_pubkey| util::to_writable_account_meta(*bank_pubkey))
             .collect::<Vec<_>>();
 
         let health_remaining_ams = self
@@ -1382,281 +1383,19 @@ impl MangoClient {
 
     // jupiter
 
-    async fn http_error_handling<T: serde::de::DeserializeOwned>(
-        response: reqwest::Response,
-    ) -> anyhow::Result<T> {
-        let status = response.status();
-        let response_text = response
-            .text()
-            .await
-            .context("awaiting body of http request")?;
-        if !status.is_success() {
-            anyhow::bail!("http request failed, status: {status}, body: {response_text}");
-        }
-        serde_json::from_str::<T>(&response_text)
-            .with_context(|| format!("response has unexpected format, body: {response_text}"))
+    pub fn jupiter_v4(&self) -> jupiter::v4::JupiterV4 {
+        jupiter::v4::JupiterV4 { mango_client: self }
     }
 
-    pub async fn jupiter_route(
-        &self,
-        input_mint: Pubkey,
-        output_mint: Pubkey,
-        amount: u64,
-        slippage: u64,
-        swap_mode: JupiterSwapMode,
-        only_direct_routes: bool,
-    ) -> anyhow::Result<jupiter::QueryRoute> {
-        let response = self
-            .http_client
-            .get("https://quote-api.jup.ag/v4/quote")
-            .query(&[
-                ("inputMint", input_mint.to_string()),
-                ("outputMint", output_mint.to_string()),
-                ("amount", format!("{}", amount)),
-                ("onlyDirectRoutes", only_direct_routes.to_string()),
-                ("enforceSingleTx", "true".into()),
-                ("filterTopNResult", "10".into()),
-                ("slippageBps", format!("{}", slippage)),
-                (
-                    "swapMode",
-                    match swap_mode {
-                        JupiterSwapMode::ExactIn => "ExactIn",
-                        JupiterSwapMode::ExactOut => "ExactOut",
-                    }
-                    .into(),
-                ),
-            ])
-            .send()
-            .await
-            .context("quote request to jupiter")?;
-        let quote: jupiter::QueryResult =
-            Self::http_error_handling(response).await.with_context(|| {
-                format!("error requesting jupiter route between {input_mint} and {output_mint}")
-            })?;
-
-        let route = quote.data.first().ok_or_else(|| {
-            anyhow::anyhow!(
-                "no route for swap. found {} routes, but none were usable",
-                quote.data.len()
-            )
-        })?;
-
-        Ok(route.clone())
+    pub fn jupiter_v6(&self) -> jupiter::v6::JupiterV6 {
+        jupiter::v6::JupiterV6 { mango_client: self }
     }
 
-    /// Find the instructions and account lookup tables for a jupiter swap through mango
-    ///
-    /// It would be nice if we didn't have to pass input_mint/output_mint - the data is
-    /// definitely in QueryRoute - but it's unclear how.
-    pub async fn prepare_jupiter_swap_transaction(
-        &self,
-        input_mint: Pubkey,
-        output_mint: Pubkey,
-        route: &jupiter::QueryRoute,
-    ) -> anyhow::Result<TransactionBuilder> {
-        let source_token = self.context.token_by_mint(&input_mint)?;
-        let target_token = self.context.token_by_mint(&output_mint)?;
-
-        let swap_response = self
-            .http_client
-            .post("https://quote-api.jup.ag/v4/swap")
-            .json(&jupiter::SwapRequest {
-                route: route.clone(),
-                user_public_key: self.owner.pubkey().to_string(),
-                wrap_unwrap_sol: false,
-                compute_unit_price_micro_lamports: None, // we already prioritize
-            })
-            .send()
-            .await
-            .context("swap transaction request to jupiter")?;
-
-        let swap: jupiter::SwapResponse = Self::http_error_handling(swap_response)
-            .await
-            .context("error requesting jupiter swap")?;
-
-        if swap.setup_transaction.is_some() || swap.cleanup_transaction.is_some() {
-            anyhow::bail!(
-                "chosen jupiter route requires setup or cleanup transactions, can't execute"
-            );
-        }
-
-        let jup_tx = bincode::options()
-            .with_fixint_encoding()
-            .reject_trailing_bytes()
-            .deserialize::<solana_sdk::transaction::VersionedTransaction>(
-                &base64::decode(&swap.swap_transaction)
-                    .context("base64 decoding jupiter transaction")?,
-            )
-            .context("parsing jupiter transaction")?;
-        let ata_program = anchor_spl::associated_token::ID;
-        let token_program = anchor_spl::token::ID;
-        let compute_budget_program = solana_sdk::compute_budget::ID;
-        // these setup instructions should be placed outside of flashloan begin-end
-        let is_setup_ix = |k: Pubkey| -> bool {
-            k == ata_program || k == token_program || k == compute_budget_program
-        };
-        let (jup_ixs, jup_alts) = self
-            .deserialize_instructions_and_alts(&jup_tx.message)
-            .await?;
-        let jup_action_ix_begin = jup_ixs
-            .iter()
-            .position(|ix| !is_setup_ix(ix.program_id))
-            .ok_or_else(|| {
-                anyhow::anyhow!("jupiter swap response only had setup-like instructions")
-            })?;
-        let jup_action_ix_end = jup_ixs.len()
-            - jup_ixs
-                .iter()
-                .rev()
-                .position(|ix| !is_setup_ix(ix.program_id))
-                .unwrap();
-
-        let bank_ams = [
-            source_token.mint_info.first_bank(),
-            target_token.mint_info.first_bank(),
-        ]
-        .into_iter()
-        .map(to_writable_account_meta)
-        .collect::<Vec<_>>();
-
-        let vault_ams = [
-            source_token.mint_info.first_vault(),
-            target_token.mint_info.first_vault(),
-        ]
-        .into_iter()
-        .map(to_writable_account_meta)
-        .collect::<Vec<_>>();
-
-        let token_ams = [source_token.mint_info.mint, target_token.mint_info.mint]
-            .into_iter()
-            .map(|mint| {
-                to_writable_account_meta(
-                    anchor_spl::associated_token::get_associated_token_address(
-                        &self.owner(),
-                        &mint,
-                    ),
-                )
-            })
-            .collect::<Vec<_>>();
-
-        let source_loan = if route.swap_mode == "ExactIn" {
-            u64::from_str(&route.amount).unwrap()
-        } else if route.swap_mode == "ExactOut" {
-            u64::from_str(&route.other_amount_threshold).unwrap()
-        } else {
-            anyhow::bail!("unknown swap mode: {}", route.swap_mode);
-        };
-        let loan_amounts = vec![source_loan, 0u64];
-        let num_loans: u8 = loan_amounts.len().try_into().unwrap();
-
-        // This relies on the fact that health account banks will be identical to the first_bank above!
-        let health_ams = self
-            .derive_health_check_remaining_account_metas(
-                vec![source_token.token_index, target_token.token_index],
-                vec![source_token.token_index, target_token.token_index],
-                vec![],
-            )
-            .await
-            .context("building health accounts")?;
-
-        let mut instructions = Vec::new();
-
-        for ix in &jup_ixs[..jup_action_ix_begin] {
-            instructions.push(ix.clone());
-        }
-        instructions.push(Instruction {
-            program_id: mango_v4::id(),
-            accounts: {
-                let mut ams = anchor_lang::ToAccountMetas::to_account_metas(
-                    &mango_v4::accounts::FlashLoanBegin {
-                        account: self.mango_account_address,
-                        owner: self.owner(),
-                        token_program: Token::id(),
-                        instructions: solana_sdk::sysvar::instructions::id(),
-                    },
-                    None,
-                );
-                ams.extend(bank_ams);
-                ams.extend(vault_ams.clone());
-                ams.extend(token_ams.clone());
-                ams.push(to_readonly_account_meta(self.group()));
-                ams
-            },
-            data: anchor_lang::InstructionData::data(&mango_v4::instruction::FlashLoanBegin {
-                loan_amounts,
-            }),
-        });
-        for ix in &jup_ixs[jup_action_ix_begin..jup_action_ix_end] {
-            instructions.push(ix.clone());
-        }
-        instructions.push(Instruction {
-            program_id: mango_v4::id(),
-            accounts: {
-                let mut ams = anchor_lang::ToAccountMetas::to_account_metas(
-                    &mango_v4::accounts::FlashLoanEnd {
-                        account: self.mango_account_address,
-                        owner: self.owner(),
-                        token_program: Token::id(),
-                    },
-                    None,
-                );
-                ams.extend(health_ams);
-                ams.extend(vault_ams);
-                ams.extend(token_ams);
-                ams.push(to_readonly_account_meta(self.group()));
-                ams
-            },
-            data: anchor_lang::InstructionData::data(&mango_v4::instruction::FlashLoanEndV2 {
-                num_loans,
-                flash_loan_type: mango_v4::accounts_ix::FlashLoanType::Swap,
-            }),
-        });
-        for ix in &jup_ixs[jup_action_ix_end..] {
-            instructions.push(ix.clone());
-        }
-
-        let mut address_lookup_tables = self.mango_address_lookup_tables().await?;
-        address_lookup_tables.extend(jup_alts.into_iter());
-
-        let payer = self.owner.pubkey(); // maybe use fee_payer? but usually it's the same
-
-        Ok(TransactionBuilder {
-            instructions,
-            address_lookup_tables,
-            payer,
-            signers: vec![self.owner.clone()],
-            config: self.client.transaction_builder_config,
-        })
+    pub fn jupiter(&self) -> jupiter::Jupiter {
+        jupiter::Jupiter { mango_client: self }
     }
 
-    pub async fn jupiter_swap(
-        &self,
-        input_mint: Pubkey,
-        output_mint: Pubkey,
-        amount: u64,
-        slippage: u64,
-        swap_mode: JupiterSwapMode,
-        only_direct_routes: bool,
-    ) -> anyhow::Result<Signature> {
-        let route = self
-            .jupiter_route(
-                input_mint,
-                output_mint,
-                amount,
-                slippage,
-                swap_mode,
-                only_direct_routes,
-            )
-            .await?;
-
-        let tx_builder = self
-            .prepare_jupiter_swap_transaction(input_mint, output_mint, &route)
-            .await?;
-
-        tx_builder.send_and_confirm(&self.client).await
-    }
-
-    async fn fetch_address_lookup_table(
+    pub async fn fetch_address_lookup_table(
         &self,
         address: Pubkey,
     ) -> anyhow::Result<AddressLookupTableAccount> {
@@ -1671,6 +1410,16 @@ impl MangoClient {
         })
     }
 
+    pub async fn fetch_address_lookup_tables(
+        &self,
+        alts: impl Iterator<Item = &Pubkey>,
+    ) -> anyhow::Result<Vec<AddressLookupTableAccount>> {
+        stream::iter(alts)
+            .then(|a| self.fetch_address_lookup_table(*a))
+            .try_collect::<Vec<_>>()
+            .await
+    }
+
     pub async fn mango_address_lookup_tables(
         &self,
     ) -> anyhow::Result<Vec<AddressLookupTableAccount>> {
@@ -1680,14 +1429,13 @@ impl MangoClient {
             .await
     }
 
-    async fn deserialize_instructions_and_alts(
+    pub(crate) async fn deserialize_instructions_and_alts(
         &self,
         message: &solana_sdk::message::VersionedMessage,
     ) -> anyhow::Result<(Vec<Instruction>, Vec<AddressLookupTableAccount>)> {
         let lookups = message.address_table_lookups().unwrap_or_default();
-        let address_lookup_tables = stream::iter(lookups)
-            .then(|a| self.fetch_address_lookup_table(a.account_key))
-            .try_collect::<Vec<_>>()
+        let address_lookup_tables = self
+            .fetch_address_lookup_tables(lookups.iter().map(|a| &a.account_key))
             .await?;
 
         let mut account_keys = message.static_account_keys().to_vec();
@@ -1735,7 +1483,7 @@ impl MangoClient {
     ) -> anyhow::Result<Signature> {
         TransactionBuilder {
             instructions,
-            address_lookup_tables: vec![],
+            address_lookup_tables: self.mango_address_lookup_tables().await?,
             payer: self.client.fee_payer.pubkey(),
             signers: vec![self.owner.clone(), self.client.fee_payer.clone()],
             config: self.client.transaction_builder_config,
@@ -1750,7 +1498,7 @@ impl MangoClient {
     ) -> anyhow::Result<Signature> {
         TransactionBuilder {
             instructions,
-            address_lookup_tables: vec![],
+            address_lookup_tables: self.mango_address_lookup_tables().await?,
             payer: self.client.fee_payer.pubkey(),
             signers: vec![self.client.fee_payer.clone()],
             config: self.client.transaction_builder_config,
@@ -1787,6 +1535,26 @@ pub enum MangoClientError {
 }
 
 #[derive(Copy, Clone, Debug, Default)]
+pub struct TransactionSize {
+    pub accounts: usize,
+    pub length: usize,
+}
+
+impl TransactionSize {
+    pub fn is_ok(&self) -> bool {
+        let limit = Self::limit();
+        self.length <= limit.length && self.accounts <= limit.accounts
+    }
+
+    pub fn limit() -> Self {
+        Self {
+            accounts: MAX_ACCOUNTS_PER_TRANSACTION,
+            length: solana_sdk::packet::PACKET_DATA_SIZE,
+        }
+    }
+}
+
+#[derive(Copy, Clone, Debug)]
 pub struct TransactionBuilderConfig {
     // adds a SetComputeUnitPrice instruction in front if none exists
     pub prioritization_micro_lamports: Option<u64>,
@@ -1902,10 +1670,22 @@ impl TransactionBuilder {
             .map_err(prettify_solana_client_error)
     }
 
-    pub fn transaction_size_ok(&self) -> anyhow::Result<bool> {
+    pub fn transaction_size(&self) -> anyhow::Result<TransactionSize> {
         let tx = self.transaction_with_blockhash(solana_sdk::hash::Hash::default())?;
         let bytes = bincode::serialize(&tx)?;
-        Ok(bytes.len() <= solana_sdk::packet::PACKET_DATA_SIZE)
+        let accounts = tx.message.static_account_keys().len()
+            + tx.message
+                .address_table_lookups()
+                .map(|alts| {
+                    alts.iter()
+                        .map(|alt| alt.readonly_indexes.len() + alt.writable_indexes.len())
+                        .sum()
+                })
+                .unwrap_or(0);
+        Ok(TransactionSize {
+            accounts,
+            length: bytes.len(),
+        })
     }
 }
 
@@ -1964,21 +1744,5 @@ pub fn pubkey_from_cli(pubkey: &str) -> Pubkey {
     match Pubkey::from_str(pubkey) {
         Ok(p) => p,
         Err(_) => keypair_from_cli(pubkey).pubkey(),
-    }
-}
-
-fn to_readonly_account_meta(pubkey: Pubkey) -> AccountMeta {
-    AccountMeta {
-        pubkey,
-        is_writable: false,
-        is_signer: false,
-    }
-}
-
-fn to_writable_account_meta(pubkey: Pubkey) -> AccountMeta {
-    AccountMeta {
-        pubkey,
-        is_writable: true,
-        is_signer: false,
     }
 }
