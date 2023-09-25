@@ -6,7 +6,6 @@ edition = "2021"
 license = "AGPL-3.0-or-later"
 
 [dependencies]
-mango-feeds-lib = { path = "../../lib/mango-feeds-lib" }
 mango-feeds-connector = { git = "https://github.com/blockworks-foundation/mango-feeds.git", branch = "move-mango-feeds-services" }
 
 solana-client = { workspace = true }
@@ -18,8 +17,6 @@ anchor-client = { workspace = true }
 
 mango-v4 = { path = "../../programs/mango-v4", features = ["client"] }
 mango-v4-client = { path = "../../lib/client" }
-
-serum_dex = { workspace = true }
 
 bs58 = "0.3.1"
 log = "0.4"
