@@ -7,7 +7,7 @@ use anchor_client::Cluster;
 
 use anchor_lang::__private::bytemuck;
 use anchor_lang::prelude::System;
-use anchor_lang::{AccountDeserialize, Id};
+use anchor_lang::{AccountDeserialize, AnchorDeserialize, Id};
 use anchor_spl::associated_token::get_associated_token_address;
 use anchor_spl::token::Token;
 
@@ -1534,7 +1534,7 @@ pub enum MangoClientError {
     },
 }
 
-#[derive(Clone, Debug)]
+#[derive(Copy, Clone, Debug, Default)]
 pub struct TransactionSize {
     pub accounts: usize,
     pub length: usize,
@@ -1556,8 +1556,10 @@ impl TransactionSize {
 
 #[derive(Copy, Clone, Debug)]
 pub struct TransactionBuilderConfig {
-    // adds a SetComputeUnitPrice instruction in front
+    // adds a SetComputeUnitPrice instruction in front if none exists
     pub prioritization_micro_lamports: Option<u64>,
+    // adds a SetComputeUnitBudget instruction if none exists
+    pub compute_budget_per_instruction: Option<u32>,
 }
 
 pub struct TransactionBuilder {
@@ -1580,22 +1582,54 @@ impl TransactionBuilder {
         self.transaction_with_blockhash(latest_blockhash)
     }
 
+    fn instructions_with_cu_budget(&self) -> Vec<Instruction> {
+        use solana_sdk::compute_budget::{self, ComputeBudgetInstruction};
+        let mut ixs = self.instructions.clone();
+
+        let mut has_compute_unit_price = false;
+        let mut has_compute_unit_limit = false;
+        let mut cu_instructions = 0;
+        for ix in ixs.iter() {
+            if ix.program_id != compute_budget::id() {
+                continue;
+            }
+            cu_instructions += 1;
+            match ComputeBudgetInstruction::try_from_slice(&ix.data) {
+                Ok(ComputeBudgetInstruction::SetComputeUnitLimit(_)) => {
+                    has_compute_unit_limit = true
+                }
+                Ok(ComputeBudgetInstruction::SetComputeUnitPrice(_)) => {
+                    has_compute_unit_price = true
+                }
+                _ => {}
+            }
+        }
+
+        let cu_per_ix = self.config.compute_budget_per_instruction.unwrap_or(0);
+        if !has_compute_unit_limit && cu_per_ix > 0 {
+            let ix_count: u32 = (ixs.len() - cu_instructions).try_into().unwrap();
+            ixs.insert(
+                0,
+                ComputeBudgetInstruction::set_compute_unit_limit(cu_per_ix * ix_count),
+            );
+        }
+
+        let cu_prio = self.config.prioritization_micro_lamports.unwrap_or(0);
+        if !has_compute_unit_price && cu_prio > 0 {
+            ixs.insert(0, ComputeBudgetInstruction::set_compute_unit_price(cu_prio));
+        }
+
+        ixs
+    }
+
     pub fn transaction_with_blockhash(
         &self,
         blockhash: Hash,
     ) -> anyhow::Result<solana_sdk::transaction::VersionedTransaction> {
-        let mut ix = self.instructions.clone();
-        if let Some(prio_price) = self.config.prioritization_micro_lamports {
-            ix.insert(
-                0,
-                solana_sdk::compute_budget::ComputeBudgetInstruction::set_compute_unit_price(
-                    prio_price,
-                ),
-            )
-        }
+        let ixs = self.instructions_with_cu_budget();
         let v0_message = solana_sdk::message::v0::Message::try_compile(
             &self.payer,
-            &ix,
+            &ixs,
             &self.address_lookup_tables,
             blockhash,
         )?;

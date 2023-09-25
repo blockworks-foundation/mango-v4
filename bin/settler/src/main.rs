@@ -67,6 +67,10 @@ struct Cli {
     /// prioritize each transaction with this many microlamports/cu
     #[clap(long, env, default_value = "0")]
     prioritization_micro_lamports: u64,
+
+    /// compute budget for each instruction
+    #[clap(long, env, default_value = "250000")]
+    compute_budget_per_instruction: u32,
 }
 
 pub fn encode_address(addr: &Pubkey) -> String {
@@ -102,6 +106,7 @@ async fn main() -> anyhow::Result<()> {
         TransactionBuilderConfig {
             prioritization_micro_lamports: (cli.prioritization_micro_lamports > 0)
                 .then_some(cli.prioritization_micro_lamports),
+            compute_budget_per_instruction: Some(cli.compute_budget_per_instruction),
         },
     );
 
