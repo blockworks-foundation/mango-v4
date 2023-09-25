@@ -1,8 +1,6 @@
-pub mod postgres_types_numeric;
 pub mod serum;
 
 use serde::{ser::SerializeStruct, Serialize, Serializer};
-use serde_derive::Deserialize;
 use solana_sdk::pubkey::Pubkey;
 
 #[derive(Clone, Debug)]

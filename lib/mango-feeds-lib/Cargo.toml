@@ -16,8 +16,6 @@ solana-sdk = "~1.16.7"
 
 serum_dex = { workspace = true }
 
-mango-v4 = { path = "../../programs/mango-v4", features = ["client"] }
-mango-v4-client = { path = "../../lib/client" }
 fixed = { workspace = true }
 
 bs58 = "0.5"
@@ -37,21 +35,6 @@ async-channel = "1.6"
 async-trait = "0.1"
 bytemuck = "1.7.2"
 chrono = "0.4.23"
-
-tokio = { version = "1", features = ["full"] }
-tokio-postgres = { version = "0.7", features = ["with-chrono-0_4"] }
-tokio-postgres-rustls = "0.9.0"
-postgres-types = { version = "0.2", features = ["array-impls", "derive", "with-chrono-0_4"] }
-postgres-native-tls = "0.5"
-native-tls = "0.2"
-postgres_query = { git = "https://github.com/nolanderc/rust-postgres-query", rev = "b4422051c8a31fbba4a35f88004c1cefb1878dd5" }
-
-
-
-
-
-
-
 
 [build-dependencies]
 tonic-build = { version = "0.6", features = ["compression"] }

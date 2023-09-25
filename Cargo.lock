@@ -3288,12 +3288,6 @@ dependencies = [
  "futures-core",
  "itertools",
  "log 0.4.20",
- "mango-v4",
- "mango-v4-client",
- "native-tls",
- "postgres-native-tls",
- "postgres-types",
- "postgres_query",
  "rand 0.7.3",
  "serde",
  "serde_derive",
@@ -3302,9 +3296,6 @@ dependencies = [
  "solana-account-decoder",
  "solana-client",
  "solana-sdk",
- "tokio",
- "tokio-postgres",
- "tokio-postgres-rustls",
  "tonic-build 0.6.2",
 ]
 
