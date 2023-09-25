@@ -18,7 +18,7 @@ import { MangoClient } from '../src/client';
 import { NullTokenEditParams } from '../src/clientIxParamBuilder';
 import { MANGO_V4_MAIN_GROUP as MANGO_V4_PRIMARY_GROUP } from '../src/constants';
 import { computePriceImpactOnJup } from '../src/risk';
-import { toNative } from '../src/utils';
+import { toNative, toUiDecimalsForQuote } from '../src/utils';
 import {
   MANGO_DAO_WALLET_GOVERNANCE,
   MANGO_GOVERNANCE_PROGRAM,
@@ -36,6 +36,7 @@ const {
   PROPOSAL_TITLE,
   VSR_DELEGATE_KEYPAIR,
   VSR_DELEGATE_FROM_PK,
+  DRY_RUN,
 } = process.env;
 
 async function buildClient(): Promise<MangoClient> {
@@ -71,7 +72,12 @@ async function updateTokenParams(): Promise<void> {
 
   Array.from(group.banksMapByTokenIndex.values())
     .map((banks) => banks[0])
-    .filter((bank) => bank.name.toLocaleLowerCase().indexOf('msol') > -1)
+    .filter(
+      (bank) =>
+        bank.mint.toBase58() == 'So11111111111111111111111111111111111111112' ||
+        bank.name.toLocaleLowerCase().indexOf('usdc') > -1 ||
+        bank.name.toLocaleLowerCase().indexOf('stsol') > -1,
+    )
     .forEach(async (bank) => {
       const usdcAmounts = [
         1_000, 5_000, 20_000, 100_000, 250_000, 500_000, 1_000_000, 5_000_000,
@@ -95,23 +101,32 @@ async function updateTokenParams(): Promise<void> {
 
       // Kick in weight scaling as late as possible until liquidation fee remains reasonable
       // Only update if more than 10% different
-      const index = usdcAmounts
-        .map((usdcAmount) => {
-          const piFraction =
-            computePriceImpactOnJup(group.pis, usdcAmount, bank.name) / 10_000;
-          return bank.liquidationFee.toNumber() / 1.5 > piFraction;
-        })
-        .lastIndexOf(true);
-      let newWeightScaleQuote =
-        index > -1 ? new BN(toNative(usdcAmounts[index], 6)).toNumber() : null;
-      newWeightScaleQuote =
-        newWeightScaleQuote != null &&
-        Math.abs(
-          (newWeightScaleQuote - bank.depositWeightScaleStartQuote) /
-            bank.depositWeightScaleStartQuote,
-        ) > 0.1
-          ? newWeightScaleQuote
-          : null;
+      let newWeightScaleQuote: number | null = null;
+      if (
+        bank.tokenIndex != 0 && // USDC
+        bank.mint.toBase58() != 'So11111111111111111111111111111111111111112' // SOL
+      ) {
+        const index = usdcAmounts
+          .map((usdcAmount) => {
+            const piFraction =
+              computePriceImpactOnJup(group.pis, usdcAmount, bank.name) /
+              10_000;
+            return bank.liquidationFee.toNumber() / 1.5 > piFraction;
+          })
+          .lastIndexOf(true);
+        newWeightScaleQuote =
+          index > -1
+            ? new BN(toNative(usdcAmounts[index], 6)).toNumber()
+            : null;
+        newWeightScaleQuote =
+          newWeightScaleQuote != null &&
+          Math.abs(
+            (newWeightScaleQuote - bank.depositWeightScaleStartQuote) /
+              bank.depositWeightScaleStartQuote,
+          ) > 0.1
+            ? newWeightScaleQuote
+            : null;
+      }
 
       const params = Builder(NullTokenEditParams)
         .netBorrowLimitPerWindowQuote(newNetBorrowLimitPerWindowQuote)
@@ -170,6 +185,20 @@ async function updateTokenParams(): Promise<void> {
         .instruction();
 
       console.log(`Bank ${bank.name}`);
+      console.log(
+        `- netBorrowLimitPerWindowQuote UI old ${toUiDecimalsForQuote(
+          bank.netBorrowLimitPerWindowQuote.toNumber(),
+        ).toLocaleString()} new ${toUiDecimalsForQuote(
+          newNetBorrowLimitPerWindowQuote!,
+        ).toLocaleString()}`,
+      );
+      console.log(
+        `- WeightScaleQuote UI old ${toUiDecimalsForQuote(
+          bank.depositWeightScaleStartQuote,
+        ).toLocaleString()} new ${toUiDecimalsForQuote(
+          newWeightScaleQuote!,
+        ).toLocaleString()}`,
+      );
       instructions.push(ix);
     });
 
@@ -191,18 +220,20 @@ async function updateTokenParams(): Promise<void> {
 
   const walletSigner = wallet as never;
 
-  const proposalAddress = await createProposal(
-    client.connection,
-    walletSigner,
-    MANGO_DAO_WALLET_GOVERNANCE,
-    tokenOwnerRecord,
-    PROPOSAL_TITLE ? PROPOSAL_TITLE : 'Update risk paramaterss for tokens',
-    '',
-    Object.values(proposals).length,
-    instructions,
-    vsrClient!,
-  );
-  console.log(proposalAddress.toBase58());
+  if (!DRY_RUN) {
+    const proposalAddress = await createProposal(
+      client.connection,
+      walletSigner,
+      MANGO_DAO_WALLET_GOVERNANCE,
+      tokenOwnerRecord,
+      PROPOSAL_TITLE ? PROPOSAL_TITLE : 'Update risk paramaterss for tokens',
+      '',
+      Object.values(proposals).length,
+      instructions,
+      vsrClient!,
+    );
+    console.log(proposalAddress.toBase58());
+  }
 }
 
 async function main(): Promise<void> {
