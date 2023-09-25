@@ -314,7 +314,6 @@ async fn test_perp_fixed() -> Result<(), TransportError> {
     )
     .await
     .is_err());
-    solana.advance_by_slots(1).await;
 
     // Trade again to bring base_position_lots to 0
     send_tx(

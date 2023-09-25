@@ -42,6 +42,7 @@ impl SolanaCookie {
         self.logger_capture.write().unwrap().clear();
 
         let mut context = self.context.borrow_mut();
+        let blockhash = context.get_new_latest_blockhash().await?;
 
         let mut transaction =
             Transaction::new_with_payer(&instructions, Some(&context.payer.pubkey()));
@@ -57,10 +58,7 @@ impl SolanaCookie {
             all_signers.extend(signer_keypair_refs.iter());
         }
 
-        // This fails when warping is involved - https://gitmemory.com/issue/solana-labs/solana/18201/868325078
-        // let recent_blockhash = self.context.banks_client.get_recent_blockhash().await.unwrap();
-
-        transaction.sign(&all_signers, context.last_blockhash);
+        transaction.sign(&all_signers, blockhash);
 
         let result = context
             .banks_client
@@ -74,10 +72,6 @@ impl SolanaCookie {
 
         drop(tx_log_lock);
         drop(context);
-
-        // This makes sure every transaction gets a new blockhash, avoiding issues where sending
-        // the same transaction again would lead to it being skipped.
-        self.advance_by_slots(1).await;
 
         result
     }
