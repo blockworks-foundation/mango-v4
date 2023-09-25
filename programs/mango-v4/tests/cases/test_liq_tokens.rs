@@ -5,7 +5,7 @@ use mango_v4::accounts_ix::{Serum3OrderType, Serum3SelfTradeBehavior, Serum3Side
 #[tokio::test]
 async fn test_liq_tokens_force_cancel() -> Result<(), TransportError> {
     let mut test_builder = TestContextBuilder::new();
-    test_builder.test().set_compute_max_units(95_000); // Serum3PlaceOrder needs 92.8k
+    test_builder.test().set_compute_max_units(105_000); // force cancel needs >100k
     let context = test_builder.start_default().await;
     let solana = &context.solana.clone();
 
