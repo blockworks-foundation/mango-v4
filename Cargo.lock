@@ -491,7 +491,7 @@ dependencies = [
  "num-traits",
  "rusticata-macros",
  "thiserror",
- "time 0.3.28",
+ "time 0.3.29",
 ]
 
 [[package]]
@@ -2307,7 +2307,7 @@ dependencies = [
  "serde_json",
  "simpl",
  "smpl_jwt",
- "time 0.3.28",
+ "time 0.3.29",
  "tokio",
 ]
 
@@ -3551,10 +3551,11 @@ checksum = "60302e4db3a61da70c0cb7991976248362f30319e88850c487b9b95bbf059e00"
 
 [[package]]
 name = "md-5"
-version = "0.10.5"
+version = "0.10.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6365506850d44bff6e2fbcb5176cf63650e48bd45ef2fe2665ae1570e0f4b9ca"
+checksum = "d89e7ee0cfbedfc4da3340218492196241d89eefb6dab27de5df917a6d2e78cf"
 dependencies = [
+ "cfg-if 1.0.0",
  "digest 0.10.7",
 ]
 
@@ -5198,7 +5199,7 @@ checksum = "ffbe84efe2f38dea12e9bfc1f65377fdf03e53a18cb3b995faedf7934c7e785b"
 dependencies = [
  "pem",
  "ring",
- "time 0.3.28",
+ "time 0.3.29",
  "yasna",
 ]
 
@@ -5465,7 +5466,7 @@ version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "bfa0f585226d2e68097d4f95d113b15b83a82e819ab25717ec0590d9584ef366"
 dependencies = [
- "semver 1.0.18",
+ "semver 1.0.19",
 ]
 
 [[package]]
@@ -5687,9 +5688,9 @@ dependencies = [
 
 [[package]]
 name = "semver"
-version = "1.0.18"
+version = "1.0.19"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b0293b4b29daaf487284529cc2f5675b8e57c61f70167ba415a463651fd6a918"
+checksum = "ad977052201c6de01a8ef2aa3378c4bd23217a056337d1d6da40468d267a4fb0"
 
 [[package]]
 name = "semver-parser"
@@ -6220,7 +6221,7 @@ dependencies = [
  "serde_derive",
  "serde_json",
  "simpl",
- "time 0.3.28",
+ "time 0.3.29",
 ]
 
 [[package]]
@@ -6955,7 +6956,7 @@ dependencies = [
  "futures-util",
  "log 0.4.20",
  "reqwest",
- "semver 1.0.18",
+ "semver 1.0.19",
  "serde",
  "serde_derive",
  "serde_json",
@@ -7021,7 +7022,7 @@ dependencies = [
  "num-traits",
  "parking_lot 0.12.1",
  "qstring",
- "semver 1.0.18",
+ "semver 1.0.19",
  "solana-sdk",
  "thiserror",
  "uriparse",
@@ -7095,7 +7096,7 @@ dependencies = [
  "indicatif",
  "log 0.4.20",
  "reqwest",
- "semver 1.0.18",
+ "semver 1.0.19",
  "serde",
  "serde_derive",
  "serde_json",
@@ -7118,7 +7119,7 @@ dependencies = [
  "bs58 0.4.0",
  "jsonrpc-core 18.0.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "reqwest",
- "semver 1.0.18",
+ "semver 1.0.19",
  "serde",
  "serde_derive",
  "serde_json",
@@ -7502,7 +7503,7 @@ checksum = "7d62712e119d6c616d1dea0fa5c1464f7316abe446e0b1eb4796cc9c77324c69"
 dependencies = [
  "log 0.4.20",
  "rustc_version 0.4.0",
- "semver 1.0.18",
+ "semver 1.0.19",
  "serde",
  "serde_derive",
  "solana-frozen-abi",
@@ -7943,9 +7944,9 @@ checksum = "ab16ced94dbd8a46c82fd81e3ed9a8727dac2977ea869d217bcc4ea1f122e81f"
 
 [[package]]
 name = "switchboard-common"
-version = "0.8.20"
+version = "0.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bfd44010d7cc59eb0d70c2547b3f5ad144bac1cccf6bdcdb390efaf95cee9aae"
+checksum = "736f68ec1e444e96c99f0161e5b80d977e1ab5e4c1a30a31c6cf1f53dfd9769c"
 dependencies = [
  "envy",
  "getrandom 0.2.10",
@@ -7986,9 +7987,9 @@ dependencies = [
 
 [[package]]
 name = "switchboard-solana"
-version = "0.28.21"
+version = "0.28.27"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5470816a1cea4cbf0075afff853ee1a70570b3dca74f4f465127de902697ea1a"
+checksum = "625e34dba0d9bcf6b1f5db5ccf1c0aa8db8329ff89c4d51715bbe4514140127a"
 dependencies = [
  "anchor-client",
  "anchor-lang",
@@ -8223,9 +8224,9 @@ dependencies = [
 
 [[package]]
 name = "time"
-version = "0.3.28"
+version = "0.3.29"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "17f6bb557fd245c28e6411aa56b6403c689ad95061f50e4be16c274e70a17e48"
+checksum = "426f806f4089c493dcac0d24c29c01e2c38baf8e30f1b716ee37e83d200b18fe"
 dependencies = [
  "deranged",
  "itoa",
@@ -8236,15 +8237,15 @@ dependencies = [
 
 [[package]]
 name = "time-core"
-version = "0.1.1"
+version = "0.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7300fbefb4dadc1af235a9cef3737cea692a9d97e1b9cbcd4ebdae6f8868e6fb"
+checksum = "ef927ca75afb808a4d64dd374f00a2adf8d0fcff8e7b184af886c3c87ec4a3f3"
 
 [[package]]
 name = "time-macros"
-version = "0.2.14"
+version = "0.2.15"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1a942f44339478ef67935ab2bbaec2fb0322496cf3cbe84b261e06ac3814c572"
+checksum = "4ad70d68dba9e1f8aceda7aa6711965dfec1cac869f311a51bd08b3a2ccbce20"
 dependencies = [
  "time-core",
 ]
@@ -9618,7 +9619,7 @@ dependencies = [
  "oid-registry",
  "rusticata-macros",
  "thiserror",
- "time 0.3.28",
+ "time 0.3.29",
 ]
 
 [[package]]
@@ -9636,7 +9637,7 @@ version = "0.5.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e17bb3549cc1321ae1296b9cdc2698e2b6cb1992adfa19a8c72e5b7a738f44cd"
 dependencies = [
- "time 0.3.28",
+ "time 0.3.29",
 ]
 
 [[package]]
