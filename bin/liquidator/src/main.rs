@@ -142,6 +142,8 @@ async fn main() -> anyhow::Result<()> {
         TransactionBuilderConfig {
             prioritization_micro_lamports: (cli.prioritization_micro_lamports > 0)
                 .then_some(cli.prioritization_micro_lamports),
+            // Liquidation and tcs triggers set their own budgets, this is a default for other tx
+            compute_budget_per_instruction: Some(250_000),
         },
     );
 

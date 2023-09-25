@@ -106,6 +106,7 @@ async fn main() -> Result<(), anyhow::Error> {
                 TransactionBuilderConfig {
                     prioritization_micro_lamports: (cli.prioritization_micro_lamports > 0)
                         .then_some(cli.prioritization_micro_lamports),
+                    compute_budget_per_instruction: None,
                 },
             ),
             cli.mango_account,

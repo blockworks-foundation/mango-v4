@@ -130,6 +130,7 @@ impl Rpc {
             None,
             TransactionBuilderConfig {
                 prioritization_micro_lamports: Some(5),
+                compute_budget_per_instruction: Some(250_000),
             },
         ))
     }
