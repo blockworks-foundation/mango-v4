@@ -1,7 +1,7 @@
+use crate::postgres_config::PostgresConfig;
 use chrono::{TimeZone, Utc};
 use log::*;
 use mango_feeds_connector::metrics::{MetricType, MetricU64, Metrics};
-use mango_feeds_lib::PostgresConfig;
 use native_tls::{Certificate, Identity, TlsConnector};
 use postgres_native_tls::MakeTlsConnector;
 use postgres_query::Caching;

@@ -1,5 +1,6 @@
 mod fill_event_filter;
 mod fill_event_postgres_target;
+mod postgres_config;
 
 use anchor_client::Cluster;
 use anchor_lang::prelude::Pubkey;
@@ -15,7 +16,6 @@ use mango_feeds_connector::{
     websocket_source, EntityFilter, FilterConfig, MetricsConfig, SourceConfig,
 };
 use mango_feeds_lib::MarketConfig;
-use mango_feeds_lib::PostgresConfig;
 use mango_feeds_lib::StatusResponse;
 use mango_v4_client::{Client, MangoGroupContext, TransactionBuilderConfig};
 use service_mango_fills::{Command, FillCheckpoint, FillEventFilterMessage, FillEventType};
@@ -41,6 +41,7 @@ use tokio::{
 };
 use tokio_tungstenite::tungstenite::{protocol::Message, Error};
 
+use crate::postgres_config::PostgresConfig;
 use serde::Deserialize;
 
 type CheckpointMap = Arc<Mutex<HashMap<String, FillCheckpoint>>>;
