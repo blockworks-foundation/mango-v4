@@ -14,7 +14,6 @@ solana-client = "~1.16.7"
 solana-account-decoder = "~1.16.7"
 solana-sdk = "~1.16.7"
 
-serum_dex = { workspace = true }
 
 fixed = { workspace = true }
 

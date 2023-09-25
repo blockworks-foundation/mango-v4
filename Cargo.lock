@@ -3292,7 +3292,6 @@ dependencies = [
  "serde",
  "serde_derive",
  "serde_json",
- "serum_dex 0.5.10 (git+https://github.com/openbook-dex/program.git)",
  "solana-account-decoder",
  "solana-client",
  "solana-sdk",

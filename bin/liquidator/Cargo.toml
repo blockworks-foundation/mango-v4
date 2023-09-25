@@ -39,7 +39,7 @@ rand = "0.7"
 serde = "1.0.130"
 serde_derive = "1.0.130"
 serde_json = "1.0.68"
-serum_dex = { workspace = true, default-features=false,features = ["no-entrypoint", "program"] }
+serum_dex = { workspace = true, features = ["no-entrypoint", "program"] }
 shellexpand = "2.1.0"
 solana-account-decoder = { workspace = true }
 solana-client = { workspace = true }
