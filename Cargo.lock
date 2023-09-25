@@ -3310,7 +3310,6 @@ dependencies = [
  "base64 0.13.1",
  "bincode",
  "borsh 0.10.3",
- "borsh 0.9.3",
  "bytemuck",
  "default-env",
  "derivative",

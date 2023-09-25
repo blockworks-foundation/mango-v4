@@ -30,7 +30,6 @@ anchor-spl = { workspace = true }
 arrayref = "0.3.6"
 bincode = "1.3.3"
 borsh = { version = "0.10.3", features = ["const-generics"] }
-borsh0-9 = { package = "borsh", version = "0.9.3", features = ["const-generics"] }
 bytemuck = { version = "^1.7.2", features = ["min_const_generics"] }
 default-env = "0.1.1"
 derivative = "2.2.0"
