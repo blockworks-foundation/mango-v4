@@ -7,7 +7,7 @@ license = "AGPL-3.0-or-later"
 
 [dependencies]
 mango-feeds-lib = { path = "../../lib/mango-feeds-lib" }
-mango-feeds-connector = { git = "https://github.com/blockworks-foundation/mango-feeds.git", branch = "update-solana-1-16-anchor-28" }
+mango-feeds-connector = { git = "https://github.com/blockworks-foundation/mango-feeds.git", branch = "move-mango-feeds-services" }
 
 solana-client = { workspace = true }
 solana-logger = { workspace = true }
@@ -19,7 +19,9 @@ anchor-client = { workspace = true }
 mango-v4 = { path = "../../programs/mango-v4", features = ["client"] }
 mango-v4-client = { path = "../../lib/client" }
 
-serum_dex = { workspace = true, default-features=false, features = ["no-entrypoint", "program"] }
+# note: we use a patched version of serum-dex to expose iterators - the mango program still uses the version 0.5.10+updates (commit c85e56d)
+# 'groovie/v0.5.10-updates-expose-things' is a merge between https://github.com/jup-ag/openbook-program/tree/feat/expose-things and commit c85e56d
+serum_dex = { git = "https://github.com/grooviegermanikus/program.git", branch = "groovie/v0.5.10-updates-expose-things" }
 
 fixed = { workspace = true, features = ["serde"] }
 

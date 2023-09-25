@@ -3247,7 +3247,7 @@ dependencies = [
 [[package]]
 name = "mango-feeds-connector"
 version = "0.2.0"
-source = "git+https://github.com/blockworks-foundation/mango-feeds.git?branch=update-solana-1-16-anchor-28#28220992271fc0988bb41e3cef968570088db515"
+source = "git+https://github.com/blockworks-foundation/mango-feeds.git?branch=move-mango-feeds-services#55a9026e532943ba0466bbb52dd4835068afd4c4"
 dependencies = [
  "anyhow",
  "async-channel",
@@ -3298,7 +3298,7 @@ dependencies = [
  "serde",
  "serde_derive",
  "serde_json",
- "serum_dex",
+ "serum_dex 0.5.10 (git+https://github.com/openbook-dex/program.git)",
  "solana-account-decoder",
  "solana-client",
  "solana-sdk",
@@ -3335,7 +3335,7 @@ dependencies = [
  "rand 0.8.5",
  "regex",
  "serde",
- "serum_dex",
+ "serum_dex 0.5.10 (git+https://github.com/openbook-dex/program.git)",
  "solana-address-lookup-table-program",
  "solana-logger",
  "solana-program",
@@ -3365,7 +3365,7 @@ dependencies = [
  "mango-v4",
  "mango-v4-client",
  "pyth-sdk-solana",
- "serum_dex",
+ "serum_dex 0.5.10 (git+https://github.com/openbook-dex/program.git)",
  "solana-client",
  "solana-sdk",
  "tokio",
@@ -3397,7 +3397,7 @@ dependencies = [
  "reqwest",
  "serde",
  "serde_json",
- "serum_dex",
+ "serum_dex 0.5.10 (git+https://github.com/openbook-dex/program.git)",
  "shellexpand",
  "solana-account-decoder",
  "solana-address-lookup-table-program",
@@ -3430,7 +3430,7 @@ dependencies = [
  "mango-v4-client",
  "prometheus",
  "pyth-sdk-solana",
- "serum_dex",
+ "serum_dex 0.5.10 (git+https://github.com/openbook-dex/program.git)",
  "solana-client",
  "solana-sdk",
  "tokio",
@@ -3471,7 +3471,7 @@ dependencies = [
  "serde",
  "serde_derive",
  "serde_json",
- "serum_dex",
+ "serum_dex 0.5.10 (git+https://github.com/openbook-dex/program.git)",
  "shellexpand",
  "solana-account-decoder",
  "solana-client",
@@ -3518,7 +3518,7 @@ dependencies = [
  "serde",
  "serde_derive",
  "serde_json",
- "serum_dex",
+ "serum_dex 0.5.10 (git+https://github.com/openbook-dex/program.git)",
  "shellexpand",
  "solana-account-decoder",
  "solana-client",
@@ -5831,6 +5831,32 @@ dependencies = [
 ]
 
 [[package]]
+name = "serum_dex"
+version = "0.5.10"
+source = "git+https://github.com/openbook-dex/program.git#c85e56deeaead43abbc33b7301058838b9c5136d"
+dependencies = [
+ "anchor-lang",
+ "arrayref",
+ "bincode",
+ "bytemuck",
+ "byteorder",
+ "default-env",
+ "enumflags2",
+ "field-offset",
+ "itertools",
+ "num-traits",
+ "num_enum 0.5.11",
+ "safe-transmute",
+ "serde",
+ "solana-program",
+ "solana-security-txt",
+ "spl-token 3.5.0",
+ "static_assertions",
+ "thiserror",
+ "without-alloc",
+]
+
+[[package]]
 name = "service-mango-crank"
 version = "0.1.0"
 dependencies = [
@@ -5854,7 +5880,7 @@ dependencies = [
  "serde",
  "serde_derive",
  "serde_json",
- "serum_dex",
+ "serum_dex 0.5.10 (git+https://github.com/openbook-dex/program.git)",
  "solana-client",
  "solana-logger",
  "solana-sdk",
@@ -5898,7 +5924,7 @@ dependencies = [
  "serde",
  "serde_derive",
  "serde_json",
- "serum_dex",
+ "serum_dex 0.5.10 (git+https://github.com/openbook-dex/program.git)",
  "solana-client",
  "solana-logger",
  "solana-sdk",
@@ -5933,7 +5959,7 @@ dependencies = [
  "serde",
  "serde_derive",
  "serde_json",
- "serum_dex",
+ "serum_dex 0.5.10 (git+https://github.com/grooviegermanikus/program.git?branch=groovie/v0.5.10-updates-expose-things)",
  "solana-client",
  "solana-logger",
  "solana-sdk",
@@ -5961,7 +5987,7 @@ dependencies = [
  "mango-v4-client",
  "serde",
  "serde_derive",
- "serum_dex",
+ "serum_dex 0.5.10 (git+https://github.com/openbook-dex/program.git)",
  "solana-client",
  "solana-logger",
  "solana-sdk",

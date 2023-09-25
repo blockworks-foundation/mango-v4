@@ -60,7 +60,12 @@ async fn compute_pnl(
                 return None;
             }
             let pnl = pp.quote_position_native();
-            let settle_token_index = context.perp_markets.get(&pp.market_index).unwrap().market.settle_token_index;
+            let settle_token_index = context
+                .perp_markets
+                .get(&pp.market_index)
+                .unwrap()
+                .market
+                .settle_token_index;
             let perp_settle_health = health_cache.perp_max_settle(settle_token_index).unwrap();
             let settleable_pnl = if pnl > 0 {
                 pnl
