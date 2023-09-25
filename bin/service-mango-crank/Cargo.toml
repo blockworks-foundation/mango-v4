@@ -7,7 +7,7 @@ edition = "2018"
 
 [dependencies]
 mango-feeds-lib = { path = "../../lib/mango-feeds-lib" }
-mango-feeds-connector = { git = "https://github.com/blockworks-foundation/mango-feeds.git", branch = "update-solana-1-16-anchor-28" }
+mango-feeds-connector = { workspace = true }
 
 
 solana-client = { workspace = true }
