@@ -52,7 +52,6 @@ async fn compute_pnl(
     account: &MangoAccountValue,
 ) -> anyhow::Result<Vec<(PerpMarketIndex, I80F48)>> {
     let health_cache = health_cache::new(&context, account_fetcher.as_ref(), account).await?;
-    let perp_settle_health = health_cache.perp_settle_health();
 
     let pnls = account
         .active_perp_positions()
@@ -61,6 +60,8 @@ async fn compute_pnl(
                 return None;
             }
             let pnl = pp.quote_position_native();
+            let settle_token_index = context.perp_markets.get(&pp.market_index).unwrap().market.settle_token_index;
+            let perp_settle_health = health_cache.perp_max_settle(settle_token_index).unwrap();
             let settleable_pnl = if pnl > 0 {
                 pnl
             } else if pnl < 0 && perp_settle_health > 0 {
