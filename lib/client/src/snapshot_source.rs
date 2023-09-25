@@ -12,7 +12,6 @@ use solana_sdk::{account::AccountSharedData, commitment_config::CommitmentConfig
 
 use anyhow::Context;
 use futures::{stream, StreamExt};
-use mango_feeds_connector::GetProgramAccountsClient;
 use std::str::FromStr;
 use std::time::Duration;
 use tokio::time;
@@ -96,20 +95,18 @@ async fn feed_snapshots(
 ) -> anyhow::Result<()> {
     // TODO replace the following with mango-feeds connector's snapshot.rs
 
-    // don't know if rpc_client and rpc_client_scan can be the merged into one
-    let rpc_client =
+    // note: with solana 1.15 the gPA (get_program_accounts) rpc call was moved to a new mod rpc_client_scan
+    let rpc_client_data =
         http::connect_with_options::<solana_rpc::rpc::rpc_accounts::AccountsDataClient>(
-            &config.rpc_http_url,
-            true,
-        )
+            &config.rpc_http_url, true)
         .await
         .map_err_anyhow()?;
 
-    // account scan client introduced with 1.15
     let rpc_client_scan =
-        http::connect_with_options::<GetProgramAccountsClient>(&config.rpc_http_url, true)
-            .await
-            .map_err_anyhow()?;
+        http::connect_with_options::<solana_rpc::rpc::rpc_accounts_scan::AccountsScanClient>(
+            &config.rpc_http_url , true)
+        .await
+        .map_err_anyhow()?;
 
     let account_info_config = RpcAccountInfoConfig {
         encoding: Some(UiAccountEncoding::Base64),
@@ -149,7 +146,7 @@ async fn feed_snapshots(
     )> = stream::iter(mango_oracles)
         .chunks(config.get_multiple_accounts_count)
         .map(|keys| {
-            let rpc_client = &rpc_client;
+            let rpc_client = &rpc_client_data;
             let account_info_config = account_info_config.clone();
             async move {
                 let string_keys = keys.iter().map(|k| k.to_string()).collect::<Vec<_>>();
@@ -193,7 +190,7 @@ async fn feed_snapshots(
     )> = stream::iter(oo_account_pubkeys)
         .chunks(config.get_multiple_accounts_count)
         .map(|keys| {
-            let rpc_client = &rpc_client;
+            let rpc_client = &rpc_client_data;
             let account_info_config = account_info_config.clone();
             async move {
                 let string_keys = keys.iter().map(|k| k.to_string()).collect::<Vec<_>>();
