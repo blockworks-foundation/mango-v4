@@ -6,7 +6,7 @@ edition = "2021"
 license = "AGPL-3.0-or-later"
 
 [dependencies]
-mango-feeds-connector = { git = "https://github.com/blockworks-foundation/mango-feeds.git", branch = "move-mango-feeds-services" }
+mango-feeds-connector = { git = "https://github.com/blockworks-foundation/mango-feeds.git", branch = "update-solana-1-16-anchor-28" }
 
 solana-client = { workspace = true }
 solana-logger = { workspace = true }
