@@ -3514,9 +3514,9 @@ export class MangoClient {
     account: MangoAccount,
     sellBank: Bank,
     buyBank: Bank,
-    thresholdPriceUi: number,
+    thresholdPrice: number,
     thresholdPriceInSellPerBuyToken: boolean,
-    maxSellUi: number | null,
+    maxSell: number | null,
     pricePremium: number | null,
     expiryTimestamp: number | null,
   ): Promise<MangoSignatureStatus> {
@@ -3529,15 +3529,15 @@ export class MangoClient {
     }
 
     if (!thresholdPriceInSellPerBuyToken) {
-      thresholdPriceUi = 1 / thresholdPriceUi;
+      thresholdPrice = 1 / thresholdPrice;
     }
-    const thresholdPrice = toNativeSellPerBuyTokenPrice(
-      thresholdPriceUi,
+    const thresholdPriceNativeNative = toNativeSellPerBuyTokenPrice(
+      thresholdPrice,
       sellBank,
       buyBank,
     );
     const lowerLimit = 0;
-    const upperLimit = thresholdPrice;
+    const upperLimit = thresholdPriceNativeNative;
 
     return await this.tokenConditionalSwapCreate(
       group,
@@ -3547,7 +3547,7 @@ export class MangoClient {
       lowerLimit,
       upperLimit,
       Number.MAX_SAFE_INTEGER,
-      maxSellUi ?? account.getTokenBalanceUi(sellBank),
+      maxSell ?? account.getTokenBalanceUi(sellBank),
       'TakeProfitOnDeposit',
       pricePremium,
       true,
@@ -3562,9 +3562,9 @@ export class MangoClient {
     account: MangoAccount,
     sellBank: Bank,
     buyBank: Bank,
-    thresholdPriceUi: number,
+    thresholdPrice: number,
     thresholdPriceInSellPerBuyToken: boolean,
-    maxSellUi: number | null,
+    maxSell: number | null,
     pricePremium: number | null,
     expiryTimestamp: number | null,
   ): Promise<MangoSignatureStatus> {
@@ -3577,14 +3577,14 @@ export class MangoClient {
     }
 
     if (!thresholdPriceInSellPerBuyToken) {
-      thresholdPriceUi = 1 / thresholdPriceUi;
+      thresholdPrice = 1 / thresholdPrice;
     }
-    const thresholdPrice = toNativeSellPerBuyTokenPrice(
-      thresholdPriceUi,
+    const thresholdPriceNativeNative = toNativeSellPerBuyTokenPrice(
+      thresholdPrice,
       sellBank,
       buyBank,
     );
-    const lowerLimit = thresholdPrice;
+    const lowerLimit = thresholdPriceNativeNative;
     const upperLimit = Number.MAX_SAFE_INTEGER;
 
     return await this.tokenConditionalSwapCreate(
@@ -3595,7 +3595,7 @@ export class MangoClient {
       lowerLimit,
       upperLimit,
       Number.MAX_SAFE_INTEGER,
-      maxSellUi ?? account.getTokenBalanceUi(sellBank),
+      maxSell ?? account.getTokenBalanceUi(sellBank),
       'StopLossOnDeposit',
       pricePremium,
       true,
@@ -3610,7 +3610,7 @@ export class MangoClient {
     account: MangoAccount,
     sellBank: Bank,
     buyBank: Bank,
-    thresholdPriceUi: number,
+    thresholdPrice: number,
     thresholdPriceInSellPerBuyToken: boolean,
     maxBuyUi: number | null,
     pricePremium: number | null,
@@ -3626,15 +3626,15 @@ export class MangoClient {
     }
 
     if (!thresholdPriceInSellPerBuyToken) {
-      thresholdPriceUi = 1 / thresholdPriceUi;
+      thresholdPrice = 1 / thresholdPrice;
     }
-    const thresholdPrice = toNativeSellPerBuyTokenPrice(
-      thresholdPriceUi,
+    const thresholdPriceNativeNative = toNativeSellPerBuyTokenPrice(
+      thresholdPrice,
       sellBank,
       buyBank,
     );
     const lowerLimit = 0;
-    const upperLimit = thresholdPrice;
+    const upperLimit = thresholdPriceNativeNative;
 
     return await this.tokenConditionalSwapCreate(
       group,
@@ -3659,7 +3659,7 @@ export class MangoClient {
     account: MangoAccount,
     sellBank: Bank,
     buyBank: Bank,
-    thresholdPriceUi: number,
+    thresholdPrice: number,
     thresholdPriceInSellPerBuyToken: boolean,
     maxBuyUi: number | null,
     pricePremium: number | null,
@@ -3675,14 +3675,14 @@ export class MangoClient {
     }
 
     if (!thresholdPriceInSellPerBuyToken) {
-      thresholdPriceUi = 1 / thresholdPriceUi;
+      thresholdPrice = 1 / thresholdPrice;
     }
-    const thresholdPrice = toNativeSellPerBuyTokenPrice(
-      thresholdPriceUi,
+    const thresholdPriceNativeNative = toNativeSellPerBuyTokenPrice(
+      thresholdPrice,
       sellBank,
       buyBank,
     );
-    const lowerLimit = thresholdPrice;
+    const lowerLimit = thresholdPriceNativeNative;
     const upperLimit = Number.MAX_SAFE_INTEGER;
 
     return await this.tokenConditionalSwapCreate(
@@ -3708,10 +3708,10 @@ export class MangoClient {
     account: MangoAccount,
     sellBank: Bank,
     buyBank: Bank,
-    lowerLimit: number,
-    upperLimit: number,
-    maxBuyUi: number,
-    maxSellUi: number,
+    lowerLimitNativeNative: number,
+    upperLimitNativeNative: number,
+    maxBuy: number,
+    maxSell: number,
     tcsIntention:
       | 'TakeProfitOnDeposit'
       | 'StopLossOnDeposit'
@@ -3724,22 +3724,22 @@ export class MangoClient {
     expiryTimestamp: number | null,
     displayPriceInSellTokenPerBuyToken: boolean,
   ): Promise<MangoSignatureStatus> {
-    const maxBuy =
-      maxBuyUi == Number.MAX_SAFE_INTEGER
+    const maxBuyNative =
+      maxBuy == Number.MAX_SAFE_INTEGER
         ? U64_MAX_BN
-        : toNative(maxBuyUi, buyBank.mintDecimals);
-    const maxSell =
-      maxSellUi == Number.MAX_SAFE_INTEGER
+        : toNative(maxBuy, buyBank.mintDecimals);
+    const maxSellNative =
+      maxSell == Number.MAX_SAFE_INTEGER
         ? U64_MAX_BN
-        : toNative(maxSellUi, sellBank.mintDecimals);
+        : toNative(maxSell, sellBank.mintDecimals);
     pricePremium = TokenConditionalSwap.computePremium(
       group,
       buyBank,
       sellBank,
+      maxBuyNative,
+      maxSellNative,
       maxBuy,
       maxSell,
-      maxBuyUi,
-      maxSellUi,
     );
     const pricePremiumRate = pricePremium > 0 ? pricePremium / 100 : 0.03;
 
@@ -3763,11 +3763,11 @@ export class MangoClient {
       account,
       buyBank.mint,
       sellBank.mint,
-      maxBuy,
-      maxSell,
+      maxBuyNative,
+      maxSellNative,
       expiryTimestamp,
-      lowerLimit,
-      upperLimit,
+      lowerLimitNativeNative,
+      upperLimitNativeNative,
       pricePremiumRate,
       allowCreatingDeposits,
       allowCreatingBorrows,
