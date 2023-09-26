@@ -6,7 +6,8 @@ import { Group } from '../src/accounts/group';
 import { MangoClient } from '../src/client';
 import { DefaultTokenRegisterParams } from '../src/clientIxParamBuilder';
 import { MANGO_V4_ID } from '../src/constants';
-import { toNative } from '../src/utils';
+
+const MANGO_PROGRAM = MANGO_V4_ID['mainnet-beta'];
 
 const MAINNET_MINTS = new Map([
   ['USDC', 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v'], // 0
@@ -17,7 +18,7 @@ const MAINNET_ORACLES = new Map([
   ['SOL', 'H6ARHf6YXhGYeQfUzQNGk6rDNnLBQKrenN712K4AQJEG'],
 ]);
 const MAINNET_SERUM3_MARKETS = new Map([
-  ['SOL/USDC', '8BnEgHoWFysVcuFFX7QztDmzuH8r5ZFvyP3sYwn1XTh6'],
+  ['SOL/USDC', '8BnEgHoWFysVcuFFX7QztDmzuH8r5ZFvyP3sYwn1XTh6']
 ]);
 const {
   MB_CLUSTER_URL,
@@ -69,7 +70,7 @@ async function buildAdminClient(): Promise<[MangoClient, Keypair]> {
   const client = await MangoClient.connect(
     adminProvider,
     'mainnet-beta',
-    MANGO_V4_ID['mainnet-beta'],
+    MANGO_PROGRAM,
     {
       idsSource: 'get-program-accounts',
     },
@@ -90,7 +91,7 @@ async function buildUserClient(): Promise<[MangoClient, Group, Keypair]> {
   const client = await MangoClient.connect(
     userProvider,
     'mainnet-beta',
-    MANGO_V4_ID['mainnet-beta'],
+    MANGO_PROGRAM,
   );
   const group = await client.getGroupForCreator(user.publicKey, GROUP_NUM);
   return [client, group, user];
@@ -102,9 +103,16 @@ async function createGroup(): Promise<void> {
   const admin = result[1];
 
   const insuranceMint = new PublicKey(MAINNET_MINTS.get('USDC')!);
-  await client.groupCreate(GROUP_NUM, false, 2, insuranceMint);
+  await client.groupCreate(GROUP_NUM, true, 2, insuranceMint);
   const group = await client.getGroupForCreator(admin.publicKey, GROUP_NUM);
   console.log(`...registered group ${group.publicKey}`);
+
+  await client.groupEdit(
+    group,
+    undefined, // admin
+    admin.publicKey, // fast listing
+  );
+  console.log(`...set fast listing admin`);
 }
 
 async function registerTokens(): Promise<void> {
@@ -128,13 +136,12 @@ async function registerTokens(): Promise<void> {
 
   const solMainnetMint = new PublicKey(MAINNET_MINTS.get('SOL')!);
   const solMainnetOracle = new PublicKey(MAINNET_ORACLES.get('SOL')!);
-  sig = await client.tokenRegister(
+  sig = await client.tokenRegisterTrustless(
     group,
     solMainnetMint,
     solMainnetOracle,
     1,
     'SOL',
-    defaultTokenParams,
   );
   console.log(`registered sol ${sig}`);
 }
@@ -232,10 +239,10 @@ async function doUserAction2(): Promise<void> {
 
 async function main(): Promise<void> {
   try {
-    //   await createGroup();
-    // await registerTokens();
+    await createGroup();
+    await registerTokens();
     // await registerSerum3Market();
-    await doUserAction();
+    // await doUserAction();
     // await doUserAction2();
   } catch (error) {
     console.log(error);
