@@ -140,6 +140,7 @@ impl HealthCache {
         let token_balances = self.effective_token_balances(health_type);
         let source_balance = token_balances[source_index].spot_and_perp;
         let target_balance = token_balances[target_index].spot_and_perp;
+        println!("balances {source_balance} {target_balance}");
 
         // If the price is sufficiently good, then health will just increase from swapping:
         // once we've swapped enough, swapping x reduces health by x * source_liab_weight and
@@ -182,6 +183,7 @@ impl HealthCache {
             // The largest amount that the maximum could be at
             let rightmost = (source_balance.abs() + source_reserved)
                 .max((target_balance.abs() + target_reserved) / price);
+            println!("rm {rightmost}");
             find_maximum(
                 I80F48::ZERO,
                 rightmost,
@@ -190,6 +192,7 @@ impl HealthCache {
             )?
         };
         assert!(amount_for_max_value >= 0);
+        println!("afmx {amount_for_max_value} {max_value}");
 
         if max_value <= min_fn_value {
             // We cannot reach min_ratio, just return the max
@@ -223,6 +226,7 @@ impl HealthCache {
                 fn_value_after_swap,
             )?;
             if right_bound == zero_health_estimate {
+                println!("search 1 {amount_for_max_value} {right_bound}");
                 binary_search(
                     amount_for_max_value,
                     max_value,
@@ -232,6 +236,7 @@ impl HealthCache {
                     fn_value_after_swap,
                 )?
             } else {
+                println!("search 2 {zero_health_estimate} {right_bound}");
                 binary_search(
                     zero_health_estimate,
                     fn_value_after_swap(zero_health_estimate)?,
@@ -527,6 +532,7 @@ fn find_maximum(
     let mut right_value = fun(right)?;
     let mut mid_value = fun(mid)?;
     while (right - left) > min_step {
+        //println!("it {left} {left_value}; {mid} {mid_value}; {right} {right_value}");
         if left_value > mid_value {
             // max must be between left and mid
             assert!(mid_value >= right_value);
@@ -545,6 +551,7 @@ fn find_maximum(
             // mid is larger than both left and right, max could be on either side
             let leftmid = half * (left + mid);
             let leftmid_value = fun(leftmid)?;
+            //println!("lm {leftmid} {leftmid_value}");
             assert!(leftmid_value >= left_value);
             if leftmid_value > mid_value {
                 // max between left and mid
@@ -557,6 +564,7 @@ fn find_maximum(
 
             let rightmid = half * (mid + right);
             let rightmid_value = fun(rightmid)?;
+            //println!("rm {rightmid} {rightmid_value}");
             assert!(rightmid_value >= right_value);
             if rightmid_value >= mid_value {
                 // max between mid and right

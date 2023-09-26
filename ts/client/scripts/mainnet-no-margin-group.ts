@@ -254,11 +254,13 @@ async function placeAuction(): Promise<void> {
   const usdcBank = group.getFirstBankByMint(new PublicKey(MAINNET_MINTS.get('USDC')!));
   const solBank = group.getFirstBankByMint(new PublicKey(MAINNET_MINTS.get('SOL')!));
 
+  await client.tokenConditionalSwapCancelAll(group, mangoAccount!);
+
   await client.tokenConditionalSwapCreateLinearAuction(
     group,
     mangoAccount!,
-    solBank,
     usdcBank,
+    solBank,
     1.0,
     30.0,
     0.001,

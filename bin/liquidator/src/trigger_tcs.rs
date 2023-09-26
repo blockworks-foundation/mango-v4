@@ -220,7 +220,6 @@ impl Context {
 
         // this is in "buy token received per sell token given" units
         let swap_price = I80F48::from_num((1.0 - SLIPPAGE_BUFFER) / maker_price);
-        // TODO: The following doesn't work when we can't borrow!
         let max_sell_ignoring_net_borrows = util::max_swap_source_ignore_net_borrows(
             &self.mango_client,
             &self.account_fetcher,
@@ -423,18 +422,28 @@ impl Context {
         // - only swap while the health ratio stays high enough
         // - possible net borrow limit restrictions from the liqor borrowing the buy token
         // - liqor has a max_take_quote
-        let max_buy_token_to_liqee = util::max_swap_source(
-            &self.mango_client,
-            &self.account_fetcher,
-            &self.mango_client.mango_account().await?,
-            tcs.buy_token_index,
-            tcs.sell_token_index,
-            taker_price,
-            liqor_min_health_ratio,
-        )?
-        .min(max_take_quote / buy_token_price)
-        .clamp_to_u64()
-        .min(liqee_max_buy);
+
+        let liqor_available_buy_token = match self.config.jupiter_mode {
+            JupiterMode::None => util::max_swap_source(
+                &self.mango_client,
+                &self.account_fetcher,
+                &self.mango_client.mango_account().await?,
+                tcs.buy_token_index,
+                tcs.sell_token_index,
+                taker_price,
+                liqor_min_health_ratio,
+            )?,
+            // TODO: the liqor may not have enough funds to buy all buy token needed
+            // so use the collateral amount * fraction * price here
+            JupiterMode::SwapBuy { .. } => I80F48::MAX,
+            JupiterMode::SwapBuySell { .. } => unimplemented!(),
+        };
+        let max_buy_token_to_liqee = liqor_available_buy_token
+            .min(max_take_quote / buy_token_price)
+            .clamp_to_u64()
+            .min(liqee_max_buy);
+
+        info!(max_sell_token_to_liqor, max_buy_token_to_liqee, "pre prep");
 
         if max_sell_token_to_liqor == 0 || max_buy_token_to_liqee == 0 {
             return Ok(None);
