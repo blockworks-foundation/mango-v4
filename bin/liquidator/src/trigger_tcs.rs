@@ -167,6 +167,7 @@ impl Context {
             Some(v) => v,
             None => return Ok(None),
         };
+        info!(max_buy, max_sell, "max_execution");
 
         let max_quote = (I80F48::from(max_buy) * buy_token_price)
             .min(I80F48::from(max_sell) * sell_token_price);
@@ -219,6 +220,7 @@ impl Context {
 
         // this is in "buy token received per sell token given" units
         let swap_price = I80F48::from_num((1.0 - SLIPPAGE_BUFFER) / maker_price);
+        // TODO: The following doesn't work when we can't borrow!
         let max_sell_ignoring_net_borrows = util::max_swap_source_ignore_net_borrows(
             &self.mango_client,
             &self.account_fetcher,
@@ -233,6 +235,7 @@ impl Context {
         .min(tcs.max_sell_for_position(sell_position, &sell_bank));
 
         let max_buy_ignoring_net_borrows = tcs.max_buy_for_position(buy_position, &buy_bank);
+        info!(%swap_price, max_sell_ignoring_net_borrows, max_buy_ignoring_net_borrows, "step 1");
 
         // What follows is a complex manual handling of net borrow limits, for the following reason:
         // Usually, we _do_ want to execute tcs even for small amounts because that will close the
@@ -289,11 +292,15 @@ impl Context {
         let liqee = self.account_fetcher.fetch_mango_account(pubkey)?;
 
         let interesting_tcs = liqee.active_token_conditional_swaps().filter_map(|tcs| {
+            info!(tcs_id=tcs.id, %pubkey, "check if interesting");
             match self.tcs_is_interesting(tcs) {
                 Ok(true) => {
                     // Filter out Ok(None) resuts of tcs that shouldn't be executed right now
                     match self.tcs_max_volume(&liqee, tcs) {
-                        Ok(Some(v)) => Some(Ok((*pubkey, tcs.id, v))),
+                        Ok(Some(v)) => {
+                            info!(tcs_id=tcs.id, %pubkey, v, "interesting with max volume");
+                            Some(Ok((*pubkey, tcs.id, v)))
+                        }
                         Ok(None) => None,
                         Err(e) => Some(Err(e)),
                     }
