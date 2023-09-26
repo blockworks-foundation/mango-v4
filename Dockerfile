@@ -22,8 +22,15 @@ RUN cargo build --release --bins
 
 FROM debian:bullseye-slim as run
 RUN apt-get update && apt-get -y install ca-certificates libc6
+
 COPY --from=build /app/target/release/keeper /usr/local/bin/
 COPY --from=build /app/target/release/liquidator /usr/local/bin/
 COPY --from=build /app/target/release/settler /usr/local/bin/
+
+COPY --from=build /app/target/release/service-mango-crank /usr/local/bin/
+COPY --from=build /app/target/release/service-mango-fills /usr/local/bin/
+COPY --from=build /app/target/release/service-mango-orderbook /usr/local/bin/
+COPY --from=build /app/target/release/service-mango-pnl /usr/local/bin/
+
 RUN adduser --system --group --no-create-home mangouser
 USER mangouser
