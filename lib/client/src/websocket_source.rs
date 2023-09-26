@@ -98,6 +98,16 @@ async fn feed_data(
                 .map_err_anyhow()?,
         );
     }
+    // Make sure the serum3_oo_sub_map does not exit when there's no serum_programs
+    let _unused_serum_sender;
+    if config.serum_programs.is_empty() {
+        let (sender, receiver) = jsonrpc_core::futures::channel::mpsc::unbounded();
+        _unused_serum_sender = sender;
+        serum3_oo_sub_map.insert(
+            Pubkey::default(),
+            jsonrpc_core_client::TypedSubscriptionStream::new(receiver, "foo"),
+        );
+    }
 
     let mut slot_sub = client.slots_updates_subscribe().map_err_anyhow()?;
 
