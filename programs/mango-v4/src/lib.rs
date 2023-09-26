@@ -36,7 +36,7 @@ use state::{
     TokenConditionalSwapIntention, TokenIndex,
 };
 
-declare_id!("4MangoMjqJ2firMokCjjGgoK8d4MXcrgL7XJaL3w6fVg");
+declare_id!("4MTevvuuqC2sZtckP6RPeLZcqV3JyqoF3N5fswzc3NmT");
 
 #[program]
 pub mod mango_v4 {

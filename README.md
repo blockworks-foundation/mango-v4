@@ -38,8 +38,8 @@ Consider setting the git option `submodule.recurse=true`.
 
 ### Deployments
 
-- devnet: 4MangoMjqJ2firMokCjjGgoK8d4MXcrgL7XJaL3w6fVg
-- mainnet-beta: 4MangoMjqJ2firMokCjjGgoK8d4MXcrgL7XJaL3w6fVg
+- devnet: 4MTevvuuqC2sZtckP6RPeLZcqV3JyqoF3N5fswzc3NmT
+- mainnet-beta: 4MTevvuuqC2sZtckP6RPeLZcqV3JyqoF3N5fswzc3NmT
 - primary mango group on mainnet-beta: 78b8f4cGCwmZ9ysPFMWLaLTkkaYnUjwMJYStWe5RTSSX
 
 ### Release

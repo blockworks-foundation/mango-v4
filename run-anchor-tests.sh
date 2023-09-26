@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # WALLET_WITH_FUNDS=~/.config/solana/mango-devnet.json
-# PROGRAM_ID=4MangoMjqJ2firMokCjjGgoK8d4MXcrgL7XJaL3w6fVg
+# PROGRAM_ID=4MTevvuuqC2sZtckP6RPeLZcqV3JyqoF3N5fswzc3NmT
 
 anchor build -- --features enable-gpl
 ./idl-fixup.sh
