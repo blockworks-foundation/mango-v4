@@ -527,6 +527,7 @@ fn find_maximum(
     let mut right_value = fun(right)?;
     let mut mid_value = fun(mid)?;
     while (right - left) > min_step {
+        //println!("it {left} {left_value}; {mid} {mid_value}; {right} {right_value}");
         if left_value > mid_value {
             // max must be between left and mid
             assert!(mid_value >= right_value);
@@ -545,6 +546,7 @@ fn find_maximum(
             // mid is larger than both left and right, max could be on either side
             let leftmid = half * (left + mid);
             let leftmid_value = fun(leftmid)?;
+            //println!("lm {leftmid} {leftmid_value}");
             assert!(leftmid_value >= left_value);
             if leftmid_value > mid_value {
                 // max between left and mid
@@ -557,6 +559,7 @@ fn find_maximum(
 
             let rightmid = half * (mid + right);
             let rightmid_value = fun(rightmid)?;
+            //println!("rm {rightmid} {rightmid_value}");
             assert!(rightmid_value >= right_value);
             if rightmid_value >= mid_value {
                 // max between mid and right
