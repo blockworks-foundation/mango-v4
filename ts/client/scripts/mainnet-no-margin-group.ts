@@ -238,13 +238,48 @@ async function doUserAction2(): Promise<void> {
   );
 }
 
+async function placeAuction(): Promise<void> {
+  const result = await buildUserClient();
+  const client = result[0];
+  const group = result[1];
+  const user = result[2];
+
+  const mangoAccount = await client.getMangoAccountForOwner(
+    group,
+    user.publicKey,
+    1,
+  );
+  console.log(mangoAccount?.publicKey.toString());
+
+  const usdcBank = group.getFirstBankByMint(new PublicKey(MAINNET_MINTS.get('USDC')!));
+  const solBank = group.getFirstBankByMint(new PublicKey(MAINNET_MINTS.get('SOL')!));
+
+  await client.tokenConditionalSwapCreateLinearAuction(
+    group,
+    mangoAccount!,
+    solBank,
+    usdcBank,
+    1.0,
+    30.0,
+    0.001,
+    Number.MAX_SAFE_INTEGER,
+    true,
+    false,
+    true,
+    Math.floor(Date.now() / 1000) + 120,
+    180,
+    null,
+  );
+}
+
 async function main(): Promise<void> {
   try {
-    await createGroup();
-    await registerTokens();
+    // await createGroup();
+    // await registerTokens();
     // await registerSerum3Market();
     // await doUserAction();
     // await doUserAction2();
+    await placeAuction();
   } catch (error) {
     console.log(error);
   }
