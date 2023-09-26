@@ -3698,6 +3698,88 @@ export class MangoClient {
     );
   }
 
+  public async tokenConditionalSwapCreateLinearAuction(
+    group: Group,
+    account: MangoAccount,
+    sellBank: Bank,
+    buyBank: Bank,
+    priceStart: number,
+    priceEnd: number,
+    maxBuy: number,
+    maxSell: number,
+    allowCreatingDeposits: boolean,
+    allowCreatingBorrows: boolean,
+    displayPriceInSellTokenPerBuyToken: boolean,
+    startTimestamp: number,
+    durationSeconds: number,
+    expiryTimestamp: number | null,
+  ): Promise<MangoSignatureStatus> {
+    let maxBuyNative, maxSellNative;
+    if (maxBuy == Number.MAX_SAFE_INTEGER) {
+      maxBuyNative = U64_MAX_BN;
+    } else {
+      maxBuyNative = toNative(maxBuy, buyBank.mintDecimals);
+    }
+    if (maxSell == Number.MAX_SAFE_INTEGER) {
+      maxSellNative = U64_MAX_BN;
+    } else {
+      maxSellNative = toNative(maxSell, sellBank.mintDecimals);
+    }
+
+    const priceStartNative = toNativeSellPerBuyTokenPrice(
+      priceStart,
+      sellBank,
+      buyBank,
+    );
+    const priceEndNative = toNativeSellPerBuyTokenPrice(
+      priceEnd,
+      sellBank,
+      buyBank,
+    );
+
+    const tcsIx = await this.program.methods
+      .tokenConditionalSwapCreateLinearAuction(
+        maxBuyNative,
+        maxSellNative,
+        expiryTimestamp !== null ? new BN(expiryTimestamp) : U64_MAX_BN,
+        priceStartNative,
+        priceEndNative,
+        allowCreatingDeposits,
+        allowCreatingBorrows,
+        displayPriceInSellTokenPerBuyToken
+          ? TokenConditionalSwapDisplayPriceStyle.sellTokenPerBuyToken
+          : TokenConditionalSwapDisplayPriceStyle.buyTokenPerSellToken,
+        new BN(startTimestamp),
+        new BN(durationSeconds),
+      )
+      .accounts({
+        group: group.publicKey,
+        account: account.publicKey,
+        authority: (this.program.provider as AnchorProvider).wallet.publicKey,
+        buyBank: buyBank.publicKey,
+        sellBank: sellBank.publicKey,
+      })
+      .instruction();
+
+    const ixs: TransactionInstruction[] = [];
+    if (account.tokenConditionalSwaps.length == 0) {
+      ixs.push(
+        await this.accountExpandV2Ix(
+          group,
+          account,
+          account.tokens.length,
+          account.serum3.length,
+          account.perps.length,
+          account.perpOpenOrders.length,
+          DEFAULT_TOKEN_CONDITIONAL_SWAP_COUNT,
+        ),
+      );
+    }
+    ixs.push(tcsIx);
+
+    return await this.sendAndConfirmTransactionForGroup(group, ixs);
+  }
+
   public async tokenConditionalSwapCreateRaw(
     group: Group,
     account: MangoAccount,
