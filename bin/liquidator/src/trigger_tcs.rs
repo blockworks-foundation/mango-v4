@@ -178,7 +178,8 @@ impl Context {
             Some(v) => v,
             None => return Ok(None),
         };
-        info!(max_buy, max_sell, "max_execution");
+
+        info!(max_buy, max_sell, "step 2");
 
         let max_quote = (I80F48::from(max_buy) * buy_token_price)
             .min(I80F48::from(max_sell) * sell_token_price);
@@ -248,17 +249,12 @@ impl Context {
         // net borrow limits. Then skip. If it's tiny for other reasons we can proceed.
 
         fn available_borrows(bank: &Bank, price: I80F48) -> u64 {
-            if bank.net_borrow_limit_per_window_quote < 0 {
-                u64::MAX
-            } else {
-                let limit = (I80F48::from(bank.net_borrow_limit_per_window_quote) / price)
-                    .floor()
-                    .clamp_to_i64();
-                (limit - bank.net_borrows_in_window).max(0) as u64
-            }
+            (bank.remaining_net_borrows_quote(price) / price).clamp_to_u64()
         }
         let available_buy_borrows = available_borrows(&buy_bank, buy_token_price);
         let available_sell_borrows = available_borrows(&sell_bank, sell_token_price);
+
+        info!(available_buy_borrows, available_sell_borrows, "borrows?");
 
         // This technically depends on the liqor's buy token position, but we
         // just assume it'll be fully margined here
@@ -276,6 +272,7 @@ impl Context {
             max_buy < buy_threshold && max_buy_ignoring_net_borrows > buy_threshold
                 || max_sell < sell_threshold && max_sell_ignoring_net_borrows > sell_threshold
         };
+        info!(max_buy, max_sell, tiny_due_to_net_borrows, "tiny?");
         if tiny_due_to_net_borrows {
             return Ok(None);
         }
@@ -708,6 +705,7 @@ impl Context {
                         // maybe the tcs isn't executable after the account was updated
                     }
                     Err(e) => {
+                        error!("prepare error {:?}", e);
                         error_tracking.record_error(&result.pubkey, now, e.to_string());
                     }
                 }
@@ -785,6 +783,7 @@ impl Context {
             .filter_map(|(pubkey, result)| match result {
                 Ok(v) => Some((pubkey, v)),
                 Err(err) => {
+                    error!("exec error {:?}", err);
                     error_tracking.record_error(&pubkey, Instant::now(), err.to_string());
                     None
                 }

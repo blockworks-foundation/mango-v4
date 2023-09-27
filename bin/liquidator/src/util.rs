@@ -118,6 +118,5 @@ pub fn max_swap_source_ignore_net_borrows(
             min_health_ratio,
         )
         .context("getting max_swap_source")?;
-    tracing::info!(%amount, "max swap ignore net borrow");
     Ok(amount)
 }
