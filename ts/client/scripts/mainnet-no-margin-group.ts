@@ -272,6 +272,7 @@ async function placeAuction(): Promise<void> {
     180,
     null,
   );
+  console.log("expected at", Math.floor(Date.now() / 1000) + 120 +  114);
 }
 
 async function main(): Promise<void> {
