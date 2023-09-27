@@ -452,11 +452,30 @@ fn action(
             sell_bank,
         );
 
-        // If the health is low enough, close the trigger. Otherwise it'd trigger repeatedly
-        // as oracle prices fluctuate.
-        let liqee_health_is_low = liqee_post_init_health < TCS_TRIGGER_INIT_HEALTH_THRESHOLD;
+        // It's impossible to fulfill most requests exactly: You cannot buy 1 native SOL for 1 native USDC
+        // because 1 native-USDC = 50 native-SOL.
+        // Compute the smallest possible trade amount and close the tcs if it's close enough to it.
+        let max_trade_reached;
+        if maker_price > 1.0 {
+            // 1 native buy token converts to >1 native sell tokens
 
-        if future_buy == 0 || future_sell == 0 || liqee_health_is_low {
+            // Example: sell SOL, buy USDC, maker_price = 50 natSOL/natUSDC; if future_sell < 50, we can't
+            // possibly buy another native USDC for it.
+            max_trade_reached = future_sell < 2 * (maker_price as u64);
+        } else {
+            let buy_per_sell_price = 1.0 / maker_price;
+
+            // Example: sell USDC, buy SOL, maker_price = 0.02 natUSDC/natSOL; if future_buy < 50, selling
+            // even a single native USDC would overshoot it
+            max_trade_reached = future_buy < 2 * (buy_per_sell_price as u64);
+        }
+
+        // If the health went down and is low enough, close the trigger. Otherwise it'd trigger repeatedly
+        // as oracle prices fluctuate.
+        let liqee_health_is_low = liqee_post_init_health < liqee_pre_init_health
+            && liqee_post_init_health < TCS_TRIGGER_INIT_HEALTH_THRESHOLD;
+
+        if future_buy == 0 || future_sell == 0 || liqee_health_is_low || max_trade_reached {
             *tcs = TokenConditionalSwap::default();
             true
         } else {
