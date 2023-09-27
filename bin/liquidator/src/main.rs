@@ -434,7 +434,7 @@ async fn main() -> anyhow::Result<()> {
                     // Workaround: We really need a sequence enforcer in the liquidator since we don't want to
                     // accidentally send a similar tx again when we incorrectly believe an earlier one got forked
                     // off. For now, hard sleep on error to avoid the most frequent error cases.
-                    std::thread::sleep(Duration::from_secs(10));
+                    tokio::time::sleep(Duration::from_secs(10)).await;
                 }
             }
         }
@@ -458,15 +458,25 @@ async fn main() -> anyhow::Result<()> {
                 liquidation.log_persistent_errors();
 
                 let liquidated = liquidation
-                    .maybe_liquidate_one_and_rebalance(account_addresses.iter())
+                    .maybe_liquidate_one(account_addresses.iter())
                     .await
                     .unwrap();
 
+                let mut took_tcs = false;
                 if !liquidated && cli.take_tcs == BoolArg::True {
-                    liquidation
+                    took_tcs = liquidation
                         .maybe_take_token_conditional_swap(account_addresses.iter())
                         .await
                         .unwrap();
+                }
+
+                if liquidated || took_tcs {
+                    // It's awkward that this rebalance can run in parallel with the one
+                    // from the rebalance_job. Ideally we'd get only one at a time/in quick succession.
+                    // However, we do want to rebalance after a liquidation before liquidating further.
+                    if let Err(err) = liquidation.rebalancer.zero_all_non_quote().await {
+                        error!("failed to rebalance liqor: {:?}", err);
+                    }
                 }
             }
         }
@@ -560,7 +570,7 @@ struct LiquidationState {
 }
 
 impl LiquidationState {
-    async fn maybe_liquidate_one_and_rebalance<'b>(
+    async fn maybe_liquidate_one<'b>(
         &mut self,
         accounts_iter: impl Iterator<Item = &'b Pubkey>,
     ) -> anyhow::Result<bool> {
@@ -572,25 +582,17 @@ impl LiquidationState {
             accounts.shuffle(&mut rng);
         }
 
-        let mut liquidated_one = false;
         for pubkey in accounts {
             if self
                 .maybe_liquidate_and_log_error(pubkey)
                 .await
                 .unwrap_or(false)
             {
-                liquidated_one = true;
-                break;
+                return Ok(true);
             }
         }
-        if !liquidated_one {
-            return Ok(false);
-        }
 
-        if let Err(err) = self.rebalancer.zero_all_non_quote().await {
-            error!("failed to rebalance liqor: {:?}", err);
-        }
-        Ok(true)
+        Ok(false)
     }
 
     async fn maybe_liquidate_and_log_error(&mut self, pubkey: &Pubkey) -> anyhow::Result<bool> {
@@ -649,7 +651,7 @@ impl LiquidationState {
     async fn maybe_take_token_conditional_swap<'b>(
         &mut self,
         accounts_iter: impl Iterator<Item = &'b Pubkey>,
-    ) -> anyhow::Result<()> {
+    ) -> anyhow::Result<bool> {
         let accounts = accounts_iter.collect::<Vec<&Pubkey>>();
 
         let now = Instant::now();
@@ -709,7 +711,7 @@ impl LiquidationState {
             }
         }
         if interesting_tcs.is_empty() {
-            return Ok(());
+            return Ok(false);
         }
 
         let (txsigs, mut changed_pubkeys) = tcs_context
@@ -731,10 +733,7 @@ impl LiquidationState {
             info!(slot, "could not refresh after tcs execution: {}", e);
         }
 
-        if let Err(err) = self.rebalancer.zero_all_non_quote().await {
-            error!("failed to rebalance liqor: {:?}", err);
-        }
-        Ok(())
+        Ok(true)
     }
 
     fn log_persistent_errors(&mut self) {
