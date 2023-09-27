@@ -418,24 +418,45 @@ impl Context {
         };
         let max_sell_token_to_liqor = liqee_max_sell;
 
-        // In addition to the liqee's requirements, the liqor also has requirements:
-        // - only swap while the health ratio stays high enough
-        // - possible net borrow limit restrictions from the liqor borrowing the buy token
-        // - liqor has a max_take_quote
+        // In addition to the liqee's requirements, the liqor also has requirement,
+        // because it might not have enough buy token:
+        // - if taking by borrowing buy token or swapping sell into buy:
+        //   - respect the min_health_ratio
+        //   - possible net borrow limit restrictions from the liqor borrowing the token
+        // - if taking by buying buy token with collateral:
+        //   - limit by current current collateral
+        // - liqor has a defined max_take_quote
+
+        let liqor = self.mango_client.mango_account().await?;
 
         let liqor_available_buy_token = match self.config.jupiter_mode {
             JupiterMode::None => util::max_swap_source(
                 &self.mango_client,
                 &self.account_fetcher,
-                &self.mango_client.mango_account().await?,
+                &liqor,
                 tcs.buy_token_index,
                 tcs.sell_token_index,
                 taker_price,
                 liqor_min_health_ratio,
             )?,
-            // TODO: the liqor may not have enough funds to buy all buy token needed
-            // so use the collateral amount * fraction * price here
-            JupiterMode::SwapBuy { .. } => I80F48::MAX,
+            JupiterMode::SwapBuy {
+                collateral_token_index,
+                slippage_bps,
+            } => {
+                let collateral_mint_info =
+                    &self.mango_client.context.mint_info(collateral_token_index);
+                let collateral_bank_pk = collateral_mint_info.first_bank();
+                let collateral_bank: Bank = self.account_fetcher.fetch(&collateral_bank_pk)?;
+                let collateral_price =
+                    self.account_fetcher.fetch_bank_price(&collateral_bank_pk)?;
+                let collateral_position = liqor
+                    .token_position(collateral_token_index)
+                    .map(|p| p.native(&collateral_bank))
+                    .unwrap_or(I80F48::ZERO);
+
+                collateral_position * collateral_price / buy_token_price
+                    * I80F48::from_num(1.0 - slippage_bps as f64 * 0.0001)
+            }
             JupiterMode::SwapBuySell { .. } => unimplemented!(),
         };
         let max_buy_token_to_liqee = liqor_available_buy_token
@@ -516,39 +537,54 @@ impl Context {
                 let max_sell = volume / sell_token_price;
                 let max_buy_collateral_cost = volume / collateral_price;
 
-                let buy_quote = self
-                    .mango_client
-                    .jupiter()
-                    .quote(
-                        collateral_mint,
-                        buy_mint,
-                        max_buy_collateral_cost.clamp_to_u64(),
-                        slippage_bps,
-                        false,
-                        self.config.jupiter_version,
-                    )
-                    .await?;
-                let sell_quote = self
-                    .mango_client
-                    .jupiter()
-                    .quote(
-                        sell_mint,
-                        collateral_mint,
-                        max_sell.clamp_to_u64(),
-                        slippage_bps,
-                        false,
-                        self.config.jupiter_version,
-                    )
-                    .await?;
+                // In this mode, we buy the buy token with collateral token before taking the tcs.
+                // Get a quote and store it so it will get executed later.
+                let buy_price; // collateral per buy token
+                if collateral_token_index != tcs.buy_token_index {
+                    let buy_quote = self
+                        .mango_client
+                        .jupiter()
+                        .quote(
+                            collateral_mint,
+                            buy_mint,
+                            max_buy_collateral_cost.clamp_to_u64(),
+                            slippage_bps,
+                            false,
+                            self.config.jupiter_version,
+                        )
+                        .await?;
 
-                // collateral per buy token
-                let buy_price = buy_quote.in_amount as f64 / buy_quote.out_amount as f64;
-                // collateral per sell token
-                let sell_price = sell_quote.out_amount as f64 / sell_quote.in_amount as f64;
+                    buy_price = buy_quote.in_amount as f64 / buy_quote.out_amount as f64;
+                    jupiter_quote = Some(buy_quote)
+                } else {
+                    buy_price = 1.0;
+                    jupiter_quote = None;
+                }
+
+                // To get the overall price and profitability, we need to get a quote for converting back
+                let sell_price;
+                if collateral_token_index != tcs.sell_token_index {
+                    // this one verifies profitability
+                    let sell_quote = self
+                        .mango_client
+                        .jupiter()
+                        .quote(
+                            sell_mint,
+                            collateral_mint,
+                            max_sell.clamp_to_u64(),
+                            slippage_bps,
+                            false,
+                            self.config.jupiter_version,
+                        )
+                        .await?;
+                    sell_price = sell_quote.out_amount as f64 / sell_quote.in_amount as f64;
+                } else {
+                    sell_price = 1.0;
+                }
 
                 // sell token per buy token
                 swap_price = buy_price / sell_price;
-                jupiter_quote = Some(buy_quote);
+                info!(buy_price, sell_price, swap_price, "jup quotes");
             }
         };
 
