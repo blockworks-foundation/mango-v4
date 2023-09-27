@@ -432,7 +432,7 @@ export class Bank implements BankForHealth {
     const totalBorrows = this.nativeBorrows();
     const totalDeposits = this.nativeDeposits();
 
-    if (totalDeposits.isZero() && totalBorrows.isZero()) {
+    if (totalDeposits.isZero() || totalBorrows.isZero()) {
       return ZERO_I80F48();
     }
 
