@@ -246,14 +246,7 @@ impl Context {
         // net borrow limits. Then skip. If it's tiny for other reasons we can proceed.
 
         fn available_borrows(bank: &Bank, price: I80F48) -> u64 {
-            if bank.net_borrow_limit_per_window_quote < 0 {
-                u64::MAX
-            } else {
-                let limit = (I80F48::from(bank.net_borrow_limit_per_window_quote) / price)
-                    .floor()
-                    .clamp_to_i64();
-                (limit - bank.net_borrows_in_window).max(0) as u64
-            }
+            (bank.remaining_net_borrows_quote(price) / price).clamp_to_u64()
         }
         let available_buy_borrows = available_borrows(&buy_bank, buy_token_price);
         let available_sell_borrows = available_borrows(&sell_bank, sell_token_price);

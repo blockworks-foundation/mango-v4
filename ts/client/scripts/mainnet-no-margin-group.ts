@@ -6,6 +6,19 @@ import { Group } from '../src/accounts/group';
 import { MangoClient } from '../src/client';
 import { DefaultTokenRegisterParams } from '../src/clientIxParamBuilder';
 import { MANGO_V4_ID } from '../src/constants';
+import {
+  AddressLookupTableProgram,
+  ComputeBudgetProgram,
+  SYSVAR_INSTRUCTIONS_PUBKEY,
+  SYSVAR_RENT_PUBKEY,
+  SystemProgram,
+} from '@solana/web3.js';
+import { buildVersionedTx } from '../src/utils';
+import {
+  ASSOCIATED_TOKEN_PROGRAM_ID,
+  NATIVE_MINT,
+  TOKEN_PROGRAM_ID,
+} from '../src/utils/spl';
 
 const MANGO_PROGRAM = MANGO_V4_ID['mainnet-beta'];
 
@@ -18,7 +31,7 @@ const MAINNET_ORACLES = new Map([
   ['SOL', 'H6ARHf6YXhGYeQfUzQNGk6rDNnLBQKrenN712K4AQJEG'],
 ]);
 const MAINNET_SERUM3_MARKETS = new Map([
-  ['SOL/USDC', '8BnEgHoWFysVcuFFX7QztDmzuH8r5ZFvyP3sYwn1XTh6']
+  ['SOL/USDC', '8BnEgHoWFysVcuFFX7QztDmzuH8r5ZFvyP3sYwn1XTh6'],
 ]);
 const {
   MB_CLUSTER_URL,
@@ -162,6 +175,141 @@ async function registerSerum3Market(): Promise<void> {
   );
 }
 
+async function createAndPopulateAlt() {
+  const result = await buildAdminClient();
+  const client = result[0];
+  const admin = result[1];
+
+  const group = await client.getGroupForCreator(admin.publicKey, GROUP_NUM);
+
+  const connection = client.program.provider.connection;
+
+  // Create ALT, and set to group at index 0
+  if (group.addressLookupTables[0].equals(PublicKey.default)) {
+    try {
+      console.log(`ALT: Creating`);
+      const createIx = AddressLookupTableProgram.createLookupTable({
+        authority: admin.publicKey,
+        payer: admin.publicKey,
+        recentSlot: await connection.getSlot('finalized'),
+      });
+      const createTx = await buildVersionedTx(
+        client.program.provider as AnchorProvider,
+        [createIx[0]],
+      );
+      let sig = await connection.sendTransaction(createTx);
+      console.log(
+        `...created ALT ${createIx[1]} https://explorer.solana.com/tx/${sig}`,
+      );
+
+      console.log(`ALT: set at index 0 for group...`);
+      sig = (await client.altSet(group, createIx[1], 0)).signature;
+      console.log(`...https://explorer.solana.com/tx/${sig}`);
+    } catch (error) {
+      console.log(error);
+    }
+  }
+
+  // Extend using mango v4 relevant pub keys
+  try {
+    const bankAddresses = Array.from(group.banksMapByMint.values())
+      .flat()
+      .map((bank) => [bank.publicKey, bank.oracle, bank.vault])
+      .flat()
+      .concat(
+        Array.from(group.banksMapByMint.values())
+          .flat()
+          .map((mintInfo) => mintInfo.publicKey),
+      );
+
+    const serum3MarketAddresses = Array.from(
+      group.serum3MarketsMapByExternal.values(),
+    )
+      .flat()
+      .map((serum3Market) => serum3Market.publicKey);
+
+    const serum3ExternalMarketAddresses = Array.from(
+      group.serum3ExternalMarketsMap.values(),
+    )
+      .flat()
+      .map((serum3ExternalMarket) => [
+        serum3ExternalMarket.publicKey,
+        serum3ExternalMarket.bidsAddress,
+        serum3ExternalMarket.asksAddress,
+      ])
+      .flat();
+
+    const perpMarketAddresses = Array.from(
+      group.perpMarketsMapByMarketIndex.values(),
+    )
+      .flat()
+      .map((perpMarket) => [
+        perpMarket.publicKey,
+        perpMarket.oracle,
+        perpMarket.bids,
+        perpMarket.asks,
+        perpMarket.eventQueue,
+      ])
+      .flat();
+
+    // eslint-disable-next-line no-inner-declarations
+    async function extendTable(addresses: PublicKey[]): Promise<void> {
+      await group.reloadAll(client);
+      const alt =
+        await client.program.provider.connection.getAddressLookupTable(
+          group.addressLookupTables[0],
+        );
+
+      addresses = addresses.filter(
+        (newAddress) =>
+          alt.value?.state.addresses &&
+          alt.value?.state.addresses.findIndex((addressInALt) =>
+            addressInALt.equals(newAddress),
+          ) === -1,
+      );
+      if (addresses.length === 0) {
+        return;
+      }
+      const extendIx = AddressLookupTableProgram.extendLookupTable({
+        lookupTable: group.addressLookupTables[0],
+        payer: admin.publicKey,
+        authority: admin.publicKey,
+        addresses,
+      });
+      const extendTx = await buildVersionedTx(
+        client.program.provider as AnchorProvider,
+        [extendIx],
+      );
+      const sig = await client.program.provider.connection.sendTransaction(
+        extendTx,
+      );
+      console.log(`https://explorer.solana.com/tx/${sig}`);
+    }
+
+    console.log(`ALT: extending using mango v4 relevant public keys`);
+
+    await extendTable(bankAddresses);
+    await extendTable(serum3MarketAddresses);
+    await extendTable(serum3ExternalMarketAddresses);
+
+    // TODO: dont extend for perps atm
+    await extendTable(perpMarketAddresses);
+
+    // Well known addressess
+    await extendTable([
+      SystemProgram.programId,
+      SYSVAR_RENT_PUBKEY,
+      TOKEN_PROGRAM_ID,
+      ASSOCIATED_TOKEN_PROGRAM_ID,
+      NATIVE_MINT,
+      SYSVAR_INSTRUCTIONS_PUBKEY,
+      ComputeBudgetProgram.programId,
+    ]);
+  } catch (error) {
+    console.log(error);
+  }
+}
+
 async function doUserAction(): Promise<void> {
   const result = await buildUserClient();
   const client = result[0];
@@ -250,24 +398,44 @@ async function placeAuction(): Promise<void> {
   );
   console.log(mangoAccount?.publicKey.toString());
 
-  const usdcBank = group.getFirstBankByMint(new PublicKey(MAINNET_MINTS.get('USDC')!));
-  const solBank = group.getFirstBankByMint(new PublicKey(MAINNET_MINTS.get('SOL')!));
+  const usdcBank = group.getFirstBankByMint(
+    new PublicKey(MAINNET_MINTS.get('USDC')!),
+  );
+  const solBank = group.getFirstBankByMint(
+    new PublicKey(MAINNET_MINTS.get('SOL')!),
+  );
 
   await client.tokenConditionalSwapCancelAll(group, mangoAccount!);
 
+  // await client.tokenConditionalSwapCreateLinearAuction(
+  //   group,
+  //   mangoAccount!,
+  //   usdcBank,
+  //   solBank,
+  //   18.0,
+  //   22.0,
+  //   2.0,
+  //   Number.MAX_SAFE_INTEGER,
+  //   true,
+  //   false,
+  //   true,
+  //   Math.floor(Date.now() / 1000) + 30,
+  //   180,
+  //   null,
+  // );
   await client.tokenConditionalSwapCreateLinearAuction(
     group,
     mangoAccount!,
-    usdcBank,
     solBank,
-    1.0,
-    30.0,
-    0.001,
+    usdcBank,
+    1 / 20.0,
+    1 / 19.0,
+    2.0,
     Number.MAX_SAFE_INTEGER,
     true,
     false,
     true,
-    Math.floor(Date.now() / 1000) + 120,
+    Math.floor(Date.now() / 1000) + 30,
     180,
     null,
   );
@@ -278,6 +446,7 @@ async function main(): Promise<void> {
     // await createGroup();
     // await registerTokens();
     // await registerSerum3Market();
+    // await createAndPopulateAlt();
     // await doUserAction();
     // await doUserAction2();
     await placeAuction();

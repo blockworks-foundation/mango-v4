@@ -696,6 +696,7 @@ impl LiquidationState {
                     } else {
                         for it in v.iter() {
                             if let Err(e) = it {
+                                info!("error on tcs find_interesting: {:?}", e);
                                 self.tcs_collection_partial_errors.record_error(
                                     pubkey,
                                     now,
