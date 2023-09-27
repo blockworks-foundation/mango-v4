@@ -295,9 +295,9 @@ async fn main() -> anyhow::Result<()> {
 
         jupiter_version: cli.jupiter_version.into(),
         // TODO: configurable
-        jupiter_mode: trigger_tcs::JupiterMode::SwapBuy {
+        mode: trigger_tcs::Mode::SwapSellIntoBuy {
             slippage_bps: cli.rebalance_slippage_bps,
-            collateral_token_index: 0,
+            collateral_token_index: 0, // USDC
         },
         min_buy_fraction: 0.7,
     };

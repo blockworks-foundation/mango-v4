@@ -31,17 +31,30 @@ const SLIPPAGE_BUFFER: f64 = 0.01; // 1%
 const NET_BORROW_EXECUTION_THRESHOLD: u64 = 1_000_000; // 1 USD
 
 #[derive(Clone)]
-pub enum JupiterMode {
-    /// Normal rebalancing will resolve deposits and withdraws created by trigger execution
-    None,
+pub enum Mode {
+    /// Directly execute the trigger, borrowing any buy tokens needed. Normal rebalancing will
+    /// resolve deposits and withdraws created by trigger execution
+    BorrowBuyToken,
 
     /// Do a jupiter swap in the same tx as the trigger, possibly creating a buy token deposit
-    /// and a sell token borrow
-    SwapBuySell { slippage_bps: u64 },
+    /// and a sell token borrow. This can create a temporary sell token borrow that gets
+    /// mostly closed by the trigger execution.
+    ///
+    /// This is the nicest mode because it leaves the smallest buy/sell token balances, the
+    /// trigger execution is almost single transaction arbitrage.
+    ///
+    /// If sell token borrows are impossible (reduce only, borrow limits), this
+    /// will back back on SwapCollateralIntoBuy.
+    SwapSellIntoBuy {
+        /// Allowed slippage in jupiter swaps
+        slippage_bps: u64,
+        /// Used only for falling back onto SwapCollateralIntoBuy
+        collateral_token_index: TokenIndex,
+    },
 
     /// Do a jupiter swap in the same tx as the trigger, buying the buy token for the
     /// collateral token. This way the liquidator won't need to borrow tokens.
-    SwapBuy {
+    SwapCollateralIntoBuy {
         slippage_bps: u64,
         collateral_token_index: TokenIndex,
     },
@@ -65,7 +78,7 @@ pub struct Config {
     pub min_buy_fraction: f64,
 
     pub jupiter_version: jupiter::Version,
-    pub jupiter_mode: JupiterMode,
+    pub mode: Mode,
 }
 
 #[derive(Clone)]
@@ -97,6 +110,17 @@ pub struct Context {
 }
 
 impl Context {
+    fn token_bank_price_mint(
+        &self,
+        token_index: TokenIndex,
+    ) -> anyhow::Result<(Bank, I80F48, Pubkey)> {
+        let info = self.mango_client.context.mint_info(token_index);
+        let (bank, price) = self
+            .account_fetcher
+            .fetch_bank_and_price(&info.first_bank())?;
+        Ok((bank, price, info.mint))
+    }
+
     fn tcs_has_plausible_price(
         &self,
         tcs: &TokenConditionalSwap,
@@ -133,11 +157,8 @@ impl Context {
             return Ok(true);
         }
 
-        let context = &self.mango_client.context;
-        let buy_bank = context.mint_info(tcs.buy_token_index).first_bank();
-        let sell_bank = context.mint_info(tcs.sell_token_index).first_bank();
-        let buy_token_price = self.account_fetcher.fetch_bank_price(&buy_bank)?;
-        let sell_token_price = self.account_fetcher.fetch_bank_price(&sell_bank)?;
+        let (_, buy_token_price, _) = self.token_bank_price_mint(tcs.buy_token_index)?;
+        let (_, sell_token_price, _) = self.token_bank_price_mint(tcs.sell_token_index)?;
         let base_price = (buy_token_price / sell_token_price).to_num();
 
         Ok(tcs.is_triggerable(base_price, self.now_ts)
@@ -150,18 +171,8 @@ impl Context {
         account: &MangoAccountValue,
         tcs: &TokenConditionalSwap,
     ) -> anyhow::Result<Option<u64>> {
-        let buy_bank_pk = self
-            .mango_client
-            .context
-            .mint_info(tcs.buy_token_index)
-            .first_bank();
-        let sell_bank_pk = self
-            .mango_client
-            .context
-            .mint_info(tcs.sell_token_index)
-            .first_bank();
-        let buy_token_price = self.account_fetcher.fetch_bank_price(&buy_bank_pk)?;
-        let sell_token_price = self.account_fetcher.fetch_bank_price(&sell_bank_pk)?;
+        let (_, buy_token_price, _) = self.token_bank_price_mint(tcs.buy_token_index)?;
+        let (_, sell_token_price, _) = self.token_bank_price_mint(tcs.sell_token_index)?;
 
         let (max_buy, max_sell) = match self.tcs_max_liqee_execution(account, tcs)? {
             Some(v) => v,
@@ -190,20 +201,8 @@ impl Context {
         account: &MangoAccountValue,
         tcs: &TokenConditionalSwap,
     ) -> anyhow::Result<Option<(u64, u64)>> {
-        let buy_bank_pk = self
-            .mango_client
-            .context
-            .mint_info(tcs.buy_token_index)
-            .first_bank();
-        let sell_bank_pk = self
-            .mango_client
-            .context
-            .mint_info(tcs.sell_token_index)
-            .first_bank();
-        let buy_bank: Bank = self.account_fetcher.fetch(&buy_bank_pk)?;
-        let sell_bank: Bank = self.account_fetcher.fetch(&sell_bank_pk)?;
-        let buy_token_price = self.account_fetcher.fetch_bank_price(&buy_bank_pk)?;
-        let sell_token_price = self.account_fetcher.fetch_bank_price(&sell_bank_pk)?;
+        let (buy_bank, buy_token_price, _) = self.token_bank_price_mint(tcs.buy_token_index)?;
+        let (sell_bank, sell_token_price, _) = self.token_bank_price_mint(tcs.sell_token_index)?;
 
         let base_price = buy_token_price / sell_token_price;
         let premium_price = tcs.premium_price(base_price.to_num(), self.now_ts);
@@ -390,21 +389,10 @@ impl Context {
         let liqor_min_health_ratio = I80F48::from_num(self.config.min_health_ratio);
 
         // Compute the max viable swap (for liqor and liqee) and min it
-        let buy_bank;
-        let buy_mint;
-        let sell_bank;
-        let sell_mint;
-        {
-            let buy_info = self.mango_client.context.mint_info(tcs.buy_token_index);
-            buy_bank = buy_info.first_bank();
-            buy_mint = buy_info.mint;
-
-            let sell_info = self.mango_client.context.mint_info(tcs.sell_token_index);
-            sell_bank = sell_info.first_bank();
-            sell_mint = sell_info.mint;
-        }
-        let buy_token_price = self.account_fetcher.fetch_bank_price(&buy_bank)?;
-        let sell_token_price = self.account_fetcher.fetch_bank_price(&sell_bank)?;
+        let (_buy_bank, buy_token_price, buy_mint) =
+            self.token_bank_price_mint(tcs.buy_token_index)?;
+        let (sell_bank, sell_token_price, sell_mint) =
+            self.token_bank_price_mint(tcs.sell_token_index)?;
 
         let base_price = buy_token_price / sell_token_price;
         let premium_price = tcs.premium_price(base_price.to_num(), self.now_ts);
@@ -427,10 +415,37 @@ impl Context {
         //   - limit by current current collateral
         // - liqor has a defined max_take_quote
 
+        // Mode fallback?
+        let mode = match self.config.mode.clone() {
+            Mode::SwapSellIntoBuy {
+                slippage_bps,
+                collateral_token_index,
+            } => {
+                // This mode falls back on another when sell token borrows are impossible
+                // or too limited
+                let available_quote = sell_bank.remaining_net_borrows_quote(sell_token_price);
+                let needed_quote = (I80F48::from(max_sell_token_to_liqor) * sell_token_price)
+                    .min(I80F48::from(liqee_max_buy) * buy_token_price)
+                    .min(max_take_quote);
+                if sell_bank.are_borrows_reduce_only() || needed_quote > available_quote {
+                    Mode::SwapCollateralIntoBuy {
+                        slippage_bps,
+                        collateral_token_index,
+                    }
+                } else {
+                    Mode::SwapSellIntoBuy {
+                        slippage_bps,
+                        collateral_token_index,
+                    }
+                }
+            }
+            m @ _ => m,
+        };
+
         let liqor = self.mango_client.mango_account().await?;
 
-        let liqor_available_buy_token = match self.config.jupiter_mode {
-            JupiterMode::None => util::max_swap_source(
+        let liqor_available_buy_token = match mode {
+            Mode::BorrowBuyToken => util::max_swap_source(
                 &self.mango_client,
                 &self.account_fetcher,
                 &liqor,
@@ -439,16 +454,13 @@ impl Context {
                 taker_price,
                 liqor_min_health_ratio,
             )?,
-            JupiterMode::SwapBuy {
+            Mode::SwapCollateralIntoBuy {
                 collateral_token_index,
                 slippage_bps,
             } => {
-                let collateral_mint_info =
-                    &self.mango_client.context.mint_info(collateral_token_index);
-                let collateral_bank_pk = collateral_mint_info.first_bank();
-                let collateral_bank: Bank = self.account_fetcher.fetch(&collateral_bank_pk)?;
-                let collateral_price =
-                    self.account_fetcher.fetch_bank_price(&collateral_bank_pk)?;
+                // How much buy token could the collateral be swapped into?
+                let (collateral_bank, collateral_price, _) =
+                    self.token_bank_price_mint(collateral_token_index)?;
                 let collateral_position = liqor
                     .token_position(collateral_token_index)
                     .map(|p| p.native(&collateral_bank))
@@ -457,7 +469,19 @@ impl Context {
                 collateral_position * collateral_price / buy_token_price
                     * I80F48::from_num(1.0 - slippage_bps as f64 * 0.0001)
             }
-            JupiterMode::SwapBuySell { .. } => unimplemented!(),
+            Mode::SwapSellIntoBuy { .. } => {
+                // How big can the sell -> buy swap be?
+                let max_sell = util::max_swap_source(
+                    &self.mango_client,
+                    &self.account_fetcher,
+                    &liqor,
+                    tcs.sell_token_index,
+                    tcs.buy_token_index,
+                    I80F48::from(1) / taker_price,
+                    liqor_min_health_ratio,
+                )?;
+                max_sell * sell_token_price / buy_token_price
+            }
         };
         let max_buy_token_to_liqee = liqor_available_buy_token
             .min(max_take_quote / buy_token_price)
@@ -477,8 +501,8 @@ impl Context {
         // Final check of the reverse trade on jupiter
         let jupiter_quote;
         let swap_price;
-        match self.config.jupiter_mode {
-            JupiterMode::None => {
+        match self.config.mode {
+            Mode::BorrowBuyToken => {
                 // Quote only to verify that the execution makes money
                 // Slippage does not matter.
                 let slippage_bps = 100;
@@ -502,7 +526,7 @@ impl Context {
                 swap_price = sell_amount / buy_amount;
                 jupiter_quote = None;
             }
-            JupiterMode::SwapBuySell { slippage_bps } => {
+            Mode::SwapSellIntoBuy { slippage_bps, .. } => {
                 // Quote will get executed
                 let input_amount = volume / sell_token_price;
                 let quote = self
@@ -524,15 +548,12 @@ impl Context {
                 swap_price = sell_amount / buy_amount;
                 jupiter_quote = Some(quote);
             }
-            JupiterMode::SwapBuy {
+            Mode::SwapCollateralIntoBuy {
                 slippage_bps,
                 collateral_token_index,
             } => {
-                let collateral_mint_info =
-                    &self.mango_client.context.mint_info(collateral_token_index);
-                let collateral_bank = collateral_mint_info.first_bank();
-                let collateral_mint = collateral_mint_info.mint;
-                let collateral_price = self.account_fetcher.fetch_bank_price(&collateral_bank)?;
+                let (_, collateral_price, collateral_mint) =
+                    self.token_bank_price_mint(collateral_token_index)?;
 
                 let max_sell = volume / sell_token_price;
                 let max_buy_collateral_cost = volume / collateral_price;

@@ -62,11 +62,15 @@ impl AccountFetcher {
             .with_context(|| format!("loading mango account {}", address))
     }
 
-    pub fn fetch_bank_price(&self, bank: &Pubkey) -> anyhow::Result<I80F48> {
+    pub fn fetch_bank_and_price(&self, bank: &Pubkey) -> anyhow::Result<(Bank, I80F48)> {
         let bank: Bank = self.fetch(bank)?;
         let oracle = self.fetch_raw(&bank.oracle)?;
         let price = bank.oracle_price(&KeyedAccountSharedData::new(bank.oracle, oracle), None)?;
-        Ok(price)
+        Ok((bank, price))
+    }
+
+    pub fn fetch_bank_price(&self, bank: &Pubkey) -> anyhow::Result<I80F48> {
+        self.fetch_bank_and_price(bank).map(|(_, p)| p)
     }
 
     // fetches via RPC, stores in ChainData, returns new version
