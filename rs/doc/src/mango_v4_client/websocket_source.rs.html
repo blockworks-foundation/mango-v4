@@ -200,6 +200,16 @@
 <span id="200">200</span>
 <span id="201">201</span>
 <span id="202">202</span>
+<span id="203">203</span>
+<span id="204">204</span>
+<span id="205">205</span>
+<span id="206">206</span>
+<span id="207">207</span>
+<span id="208">208</span>
+<span id="209">209</span>
+<span id="210">210</span>
+<span id="211">211</span>
+<span id="212">212</span>
 </pre><pre class="rust"><code><span class="kw">use </span>jsonrpc_core::futures::StreamExt;
 <span class="kw">use </span>jsonrpc_core_client::transports::ws;
 
@@ -298,6 +308,16 @@
                     <span class="prelude-val">Some</span>(open_orders_accounts_config.clone()),
                 )
                 .map_err_anyhow()<span class="question-mark">?</span>,
+        );
+    }
+    <span class="comment">// Make sure the serum3_oo_sub_map does not exit when there&#39;s no serum_programs
+    </span><span class="kw">let </span>_unused_serum_sender;
+    <span class="kw">if </span>config.serum_programs.is_empty() {
+        <span class="kw">let </span>(sender, receiver) = jsonrpc_core::futures::channel::mpsc::unbounded();
+        _unused_serum_sender = sender;
+        serum3_oo_sub_map.insert(
+            Pubkey::default(),
+            jsonrpc_core_client::TypedSubscriptionStream::new(receiver, <span class="string">&quot;foo&quot;</span>),
         );
     }
 
