@@ -6,7 +6,7 @@ import {
   Wallet,
 } from '@coral-xyz/anchor';
 import * as borsh from '@coral-xyz/borsh';
-import { OpenOrders } from '@project-serum/serum';
+import { OpenOrders, decodeEventQueue } from '@project-serum/serum';
 import {
   createCloseAccountInstruction,
   createInitializeAccount3Instruction,
@@ -21,12 +21,11 @@ import {
   Keypair,
   MemcmpFilter,
   PublicKey,
+  RecentPrioritizationFees,
   SYSVAR_INSTRUCTIONS_PUBKEY,
   SYSVAR_RENT_PUBKEY,
   SystemProgram,
   TransactionInstruction,
-  TransactionSignature,
-  RecentPrioritizationFees,
 } from '@solana/web3.js';
 import bs58 from 'bs58';
 import chunk from 'lodash/chunk';
@@ -69,8 +68,8 @@ import {
   IxGateParams,
   PerpEditParams,
   TokenEditParams,
-  buildIxGate,
   TokenRegisterParams,
+  buildIxGate,
 } from './clientIxParamBuilder';
 import {
   MANGO_V4_ID,
@@ -81,7 +80,7 @@ import {
 import { Id } from './ids';
 import { IDL, MangoV4 } from './mango_v4';
 import { I80F48 } from './numbers/I80F48';
-import { FlashLoanType, InterestRateParams, OracleConfigParams } from './types';
+import { FlashLoanType, OracleConfigParams } from './types';
 import {
   I64_MAX_BN,
   U64_MAX_BN,
@@ -1531,6 +1530,28 @@ export class MangoClient {
       })
       .instruction();
     return await this.sendAndConfirmTransactionForGroup(group, [ix]);
+  }
+
+  public async serum3ConsumeEvents(
+    group: Group,
+    serum3MarketExternalPk: PublicKey,
+  ): Promise<MangoSignatureStatus> {
+    const serum3MarketExternal = group.serum3ExternalMarketsMap.get(
+      serum3MarketExternalPk.toBase58(),
+    )!;
+    const ai = await this.program.provider.connection.getAccountInfo(
+      serum3MarketExternal.decoded.eventQueue,
+    );
+    const eq = decodeEventQueue(ai!.data);
+    const orderedAccounts: PublicKey[] = eq
+      .map((e) => e.openOrders)
+      .sort((a, b) => a.toBuffer().swap64().compare(b.toBuffer().swap64()));
+    if (orderedAccounts.length == 0) {
+      throw new Error(`Event queue is empty!`);
+    }
+    return this.sendAndConfirmTransactionForGroup(group, [
+      serum3MarketExternal.makeConsumeEventsInstruction(orderedAccounts, 65535),
+    ]);
   }
 
   public async serum3EditMarket(
