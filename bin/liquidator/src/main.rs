@@ -290,6 +290,7 @@ async fn main() -> anyhow::Result<()> {
         max_trigger_quote_amount: 1_000_000_000, // TODO: config, $1000
         compute_limit_for_trigger: cli.compute_limit_for_tcs,
         profit_fraction: cli.tcs_profit_fraction,
+        collateral_token_index: 0, // USDC
         // TODO: config
         refresh_timeout: Duration::from_secs(30),
 
@@ -297,7 +298,6 @@ async fn main() -> anyhow::Result<()> {
         // TODO: configurable
         mode: trigger_tcs::Mode::SwapSellIntoBuy {
             slippage_bps: cli.rebalance_slippage_bps,
-            collateral_token_index: 0, // USDC
         },
         min_buy_fraction: 0.7,
     };
