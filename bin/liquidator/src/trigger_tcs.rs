@@ -30,7 +30,7 @@ const SLIPPAGE_BUFFER: f64 = 0.01; // 1%
 /// borrows are exhausted.
 const NET_BORROW_EXECUTION_THRESHOLD: u64 = 1_000_000; // 1 USD
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub enum Mode {
     /// Directly execute the trigger, borrowing any buy tokens needed. Normal rebalancing will
     /// resolve deposits and withdraws created by trigger execution
@@ -48,16 +48,11 @@ pub enum Mode {
     SwapSellIntoBuy {
         /// Allowed slippage in jupiter swaps
         slippage_bps: u64,
-        /// Used only for falling back onto SwapCollateralIntoBuy
-        collateral_token_index: TokenIndex,
     },
 
     /// Do a jupiter swap in the same tx as the trigger, buying the buy token for the
     /// collateral token. This way the liquidator won't need to borrow tokens.
-    SwapCollateralIntoBuy {
-        slippage_bps: u64,
-        collateral_token_index: TokenIndex,
-    },
+    SwapCollateralIntoBuy { slippage_bps: u64 },
 }
 
 #[derive(Clone)]
@@ -66,6 +61,7 @@ pub struct Config {
     pub max_trigger_quote_amount: u64,
     pub refresh_timeout: Duration,
     pub compute_limit_for_trigger: u32,
+    pub collateral_token_index: TokenIndex,
 
     /// At 0, the liquidator would trigger tcs if the cost to the liquidator is the
     /// same as the cost to the liqee. 0.1 would mean a 10% better price to the liquidator.
@@ -237,12 +233,12 @@ impl Context {
         info!(%swap_price, max_sell_ignoring_net_borrows, max_buy_ignoring_net_borrows, "step 1");
 
         // What follows is a complex manual handling of net borrow limits, for the following reason:
-        // Usually, we _do_ want to execute tcs even for small amounts because that will close the
+        // Usually, we want to execute tcs even for small amounts because that will close the
         // tcs order: either due to full execution or due to the health threshold being reached.
         //
-        // However, when the net borrow limits are hit, we do _not_ want to close the tcs order
-        // even though no further execution is possible at that time. Furthermore, we don't even
-        // want to send a too-tiny tcs execution transaction, because there's a good chance we
+        // However, when the net borrow limits are hit, it will not closed when no further execution
+        // is possible, because net borrow limit issues are considered transient. Furthermore, we
+        // don't even want to send a tiny tcs trigger transactions, because there's a good chance we
         // would then be sending lot of those as oracle prices fluctuate.
         //
         // Thus, we need to detect if the possible execution amount is tiny _because_ of the
@@ -254,17 +250,44 @@ impl Context {
         let available_buy_borrows = available_borrows(&buy_bank, buy_token_price);
         let available_sell_borrows = available_borrows(&sell_bank, sell_token_price);
 
-        info!(available_buy_borrows, available_sell_borrows, "borrows?");
-
-        // This technically depends on the liqor's buy token position, but we
-        // just assume it'll be fully margined here
-        let max_buy = max_buy_ignoring_net_borrows.min(available_buy_borrows);
-
+        // New borrows if max_sell_ignoring_net_borrows was withdrawn on the liqee
         let sell_borrows = (I80F48::from(max_sell_ignoring_net_borrows)
             - sell_position.max(I80F48::ZERO))
         .clamp_to_u64();
+
+        // On the buy side, the liqor might need to borrow
+        let buy_borrows = match self.config.mode {
+            Mode::BorrowBuyToken => {
+                // Assume that the liqor has enough buy token if it's collateral
+                if tcs.buy_token_index == self.config.collateral_token_index {
+                    0
+                } else {
+                    max_buy_ignoring_net_borrows
+                }
+            }
+            Mode::SwapCollateralIntoBuy { .. } => 0,
+            Mode::SwapSellIntoBuy { .. } => {
+                // Never needs buy borrows.
+                // This might need extra sell borrows, but falls back onto SwapCollateralIntoBuy if needed
+                0
+            }
+        };
+
+        // New maximums adjusted for net borrow limits
         let max_sell =
             max_sell_ignoring_net_borrows - sell_borrows + sell_borrows.min(available_sell_borrows);
+        let max_buy =
+            max_buy_ignoring_net_borrows - buy_borrows + buy_borrows.min(available_buy_borrows);
+
+        info!(
+            buy_borrows,
+            available_buy_borrows,
+            max_buy,
+            sell_borrows,
+            available_sell_borrows,
+            max_sell,
+            "borrows?"
+        );
 
         let tiny_due_to_net_borrows = {
             let buy_threshold = I80F48::from(NET_BORROW_EXECUTION_THRESHOLD) / buy_token_price;
@@ -272,7 +295,7 @@ impl Context {
             max_buy < buy_threshold && max_buy_ignoring_net_borrows > buy_threshold
                 || max_sell < sell_threshold && max_sell_ignoring_net_borrows > sell_threshold
         };
-        info!(max_buy, max_sell, tiny_due_to_net_borrows, "tiny?");
+        info!(tiny_due_to_net_borrows, "tiny?");
         if tiny_due_to_net_borrows {
             return Ok(None);
         }
@@ -386,7 +409,7 @@ impl Context {
         let liqor_min_health_ratio = I80F48::from_num(self.config.min_health_ratio);
 
         // Compute the max viable swap (for liqor and liqee) and min it
-        let (_buy_bank, buy_token_price, buy_mint) =
+        let (buy_bank, buy_token_price, buy_mint) =
             self.token_bank_price_mint(tcs.buy_token_index)?;
         let (sell_bank, sell_token_price, sell_mint) =
             self.token_bank_price_mint(tcs.sell_token_index)?;
@@ -414,33 +437,32 @@ impl Context {
 
         // Mode fallback?
         let mode = match self.config.mode.clone() {
-            Mode::SwapSellIntoBuy {
-                slippage_bps,
-                collateral_token_index,
-            } => {
+            Mode::SwapSellIntoBuy { slippage_bps } => {
                 // This mode falls back on another when sell token borrows are impossible
                 // or too limited
                 let available_quote = sell_bank.remaining_net_borrows_quote(sell_token_price);
+                // Note that needed_quote does not account for an existing sell token balance:
+                // That is fine - if sell token is the collateral, we can just use the collateral
+                // based mode and the result will be the same.
                 let needed_quote = (I80F48::from(max_sell_token_to_liqor) * sell_token_price)
                     .min(I80F48::from(liqee_max_buy) * buy_token_price)
                     .min(max_take_quote);
                 if sell_bank.are_borrows_reduce_only() || needed_quote > available_quote {
-                    Mode::SwapCollateralIntoBuy {
-                        slippage_bps,
-                        collateral_token_index,
-                    }
+                    Mode::SwapCollateralIntoBuy { slippage_bps }
                 } else {
-                    Mode::SwapSellIntoBuy {
-                        slippage_bps,
-                        collateral_token_index,
-                    }
+                    Mode::SwapSellIntoBuy { slippage_bps }
                 }
             }
             m @ _ => m,
         };
 
-        let liqor = self.mango_client.mango_account().await?;
+        let mut liqor = self.mango_client.mango_account().await?;
 
+        let collateral_token_index = self.config.collateral_token_index;
+        let liqor_existing_buy_token = liqor
+            .ensure_token_position(tcs.buy_token_index)?
+            .0
+            .native(&buy_bank);
         let liqor_available_buy_token = match mode {
             Mode::BorrowBuyToken => util::max_swap_source(
                 &self.mango_client,
@@ -451,33 +473,43 @@ impl Context {
                 taker_price,
                 liqor_min_health_ratio,
             )?,
-            Mode::SwapCollateralIntoBuy {
-                collateral_token_index,
-                slippage_bps,
-            } => {
-                // How much buy token could the collateral be swapped into?
-                let (collateral_bank, collateral_price, _) =
-                    self.token_bank_price_mint(collateral_token_index)?;
-                let collateral_position = liqor
-                    .token_position(collateral_token_index)
-                    .map(|p| p.native(&collateral_bank))
-                    .unwrap_or(I80F48::ZERO);
+            Mode::SwapCollateralIntoBuy { slippage_bps } => {
+                // The transaction will be net-positive, but how much buy token can
+                // the collateral be swapped into?
+                if tcs.buy_token_index == collateral_token_index {
+                    liqor_existing_buy_token
+                } else {
+                    let (_, collateral_price, _) =
+                        self.token_bank_price_mint(collateral_token_index)?;
+                    let buy_per_collateral_price = (collateral_price / buy_token_price)
+                        * I80F48::from_num(1.0 - slippage_bps as f64 * 0.0001);
+                    let collateral_amount = util::max_swap_source(
+                        &self.mango_client,
+                        &self.account_fetcher,
+                        &liqor,
+                        collateral_token_index,
+                        tcs.buy_token_index,
+                        buy_per_collateral_price,
+                        liqor_min_health_ratio,
+                    )?;
 
-                collateral_position * collateral_price / buy_token_price
-                    * I80F48::from_num(1.0 - slippage_bps as f64 * 0.0001)
+                    collateral_amount * buy_per_collateral_price
+                }
             }
-            Mode::SwapSellIntoBuy { .. } => {
+            Mode::SwapSellIntoBuy { slippage_bps } => {
                 // How big can the sell -> buy swap be?
+                let buy_per_sell_price = (I80F48::from(1) / taker_price)
+                    * I80F48::from_num(1.0 - slippage_bps as f64 * 0.0001);
                 let max_sell = util::max_swap_source(
                     &self.mango_client,
                     &self.account_fetcher,
                     &liqor,
                     tcs.sell_token_index,
                     tcs.buy_token_index,
-                    I80F48::from(1) / taker_price,
+                    buy_per_sell_price,
                     liqor_min_health_ratio,
                 )?;
-                max_sell * sell_token_price / buy_token_price
+                max_sell * buy_per_sell_price
             }
         };
         let max_buy_token_to_liqee = liqor_available_buy_token
@@ -485,7 +517,7 @@ impl Context {
             .clamp_to_u64()
             .min(liqee_max_buy);
 
-        info!(max_sell_token_to_liqor, max_buy_token_to_liqee, "pre prep");
+        info!(max_sell_token_to_liqor, max_buy_token_to_liqee, ?mode, %liqor_available_buy_token, "pre prep");
 
         if max_sell_token_to_liqor == 0 || max_buy_token_to_liqee == 0 {
             return Ok(None);
@@ -498,9 +530,9 @@ impl Context {
         // Final check of the reverse trade on jupiter
         let jupiter_quote;
         let swap_price;
-        match self.config.mode {
+        match mode {
             Mode::BorrowBuyToken => {
-                // Quote only to verify that the execution makes money
+                // Quote only to verify that the execution is profitable
                 // Slippage does not matter.
                 let slippage_bps = 100;
                 let input_amount = volume / sell_token_price;
@@ -545,10 +577,7 @@ impl Context {
                 swap_price = sell_amount / buy_amount;
                 jupiter_quote = Some(quote);
             }
-            Mode::SwapCollateralIntoBuy {
-                slippage_bps,
-                collateral_token_index,
-            } => {
+            Mode::SwapCollateralIntoBuy { slippage_bps } => {
                 let (_, collateral_price, collateral_mint) =
                     self.token_bank_price_mint(collateral_token_index)?;
 
@@ -573,7 +602,7 @@ impl Context {
                         .await?;
 
                     buy_price = buy_quote.in_amount as f64 / buy_quote.out_amount as f64;
-                    jupiter_quote = Some(buy_quote)
+                    jupiter_quote = Some(buy_quote);
                 } else {
                     buy_price = 1.0;
                     jupiter_quote = None;
