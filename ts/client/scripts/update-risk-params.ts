@@ -10,6 +10,7 @@ import {
   Connection,
   Keypair,
   PublicKey,
+  Transaction,
   TransactionInstruction,
 } from '@solana/web3.js';
 import fs from 'fs';
@@ -183,6 +184,14 @@ async function updateTokenParams(): Promise<void> {
           } as AccountMeta,
         ])
         .instruction();
+
+      const tx = new Transaction({ feePayer: wallet.publicKey }).add(ix);
+      const simulated = await client.connection.simulateTransaction(tx);
+
+      if (simulated.value.err) {
+        console.log('error', simulated.value.logs);
+        throw simulated.value.logs;
+      }
 
       console.log(`Bank ${bank.name}`);
       console.log(
