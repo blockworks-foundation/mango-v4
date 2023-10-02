@@ -423,21 +423,38 @@ async function placeAuction(): Promise<void> {
   //   180,
   //   null,
   // );
-  await client.tokenConditionalSwapCreateLinearAuction(
+  // await client.tokenConditionalSwapCreateLinearAuction(
+  //   group,
+  //   mangoAccount!,
+  //   solBank,
+  //   usdcBank,
+  //   1 / 20.0,
+  //   1 / 19.0,
+  //   2.0,
+  //   Number.MAX_SAFE_INTEGER,
+  //   true,
+  //   false,
+  //   true,
+  //   Math.floor(Date.now() / 1000) + 30,
+  //   180,
+  //   null,
+  // );
+  await client.tokenConditionalSwapCreatePremiumAuction(
     group,
     mangoAccount!,
-    solBank,
     usdcBank,
-    1 / 20.0,
-    1 / 19.0,
+    solBank,
+    22.0,
+    26.0,
     2.0,
     Number.MAX_SAFE_INTEGER,
+    null,
+    1, // in percent, eww
     true,
     false,
-    true,
-    Math.floor(Date.now() / 1000) + 30,
-    180,
     null,
+    true,
+    300,
   );
 }
 
