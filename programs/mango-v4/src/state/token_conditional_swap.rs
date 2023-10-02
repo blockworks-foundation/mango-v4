@@ -304,13 +304,7 @@ impl TokenConditionalSwap {
             MangoError::TokenConditionalSwapAlreadyStarted
         );
         match self.tcs_type() {
-            TokenConditionalSwapType::FixedPremium => {
-                require!(
-                    self.price_in_range(price),
-                    MangoError::TokenConditionalSwapPriceNotInRange
-                );
-            }
-            TokenConditionalSwapType::PremiumAuction => {
+            TokenConditionalSwapType::FixedPremium | TokenConditionalSwapType::PremiumAuction => {
                 require!(
                     self.price_in_range(price),
                     MangoError::TokenConditionalSwapPriceNotInRange
@@ -337,14 +331,8 @@ impl TokenConditionalSwap {
                     MangoError::TokenConditionalSwapPriceNotInRange
                 );
             }
-            TokenConditionalSwapType::PremiumAuction => {
-                // Technically the error is lying, since it's also triggerable once started
-                require!(
-                    self.price_in_range(price) || self.passed_start(now_ts),
-                    MangoError::TokenConditionalSwapPriceNotInRange
-                );
-            }
-            TokenConditionalSwapType::LinearAuction => {
+            TokenConditionalSwapType::PremiumAuction | TokenConditionalSwapType::LinearAuction => {
+                // Triggerable once started, whatever the current oracle price
                 require!(
                     self.passed_start(now_ts),
                     MangoError::TokenConditionalSwapNotStarted

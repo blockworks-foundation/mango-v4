@@ -713,7 +713,7 @@ async fn test_token_conditional_swap_premium_auction() -> Result<(), TransportEr
     );
 
     //
-    // TEST: Can't take an auction when the oracle price is out of range
+    // TEST: Can't take or start an auction when the oracle price is out of range
     //
 
     set_bank_stub_oracle_price(solana, group, &base_token, admin, 10.0).await;
@@ -733,14 +733,61 @@ async fn test_token_conditional_swap_premium_auction() -> Result<(), TransportEr
     .await;
     assert_mango_error(
         &res,
+        MangoError::TokenConditionalSwapNotStarted.into(),
+        "not started yet".to_string(),
+    );
+
+    let res = send_tx(
+        solana,
+        TokenConditionalSwapStartInstruction {
+            account,
+            caller: liqor,
+            caller_owner: owner,
+            index: 0,
+        },
+    )
+    .await;
+    assert_mango_error(
+        &res,
         MangoError::TokenConditionalSwapPriceNotInRange.into(),
-        "price is not in range".to_string(),
+        "price not in range".to_string(),
     );
 
     //
-    // TEST: Can trigger (and implicitly start) when price in range
+    // TEST: Cannot trigger without start
     //
     set_bank_stub_oracle_price(solana, group, &base_token, admin, 1.0).await;
+    let res = send_tx(
+        solana,
+        TokenConditionalSwapTriggerInstruction {
+            liqee: account,
+            liqor,
+            liqor_owner: owner,
+            index: 0,
+            max_buy_token_to_liqee: 1000,
+            max_sell_token_to_liqor: 1100,
+            min_buy_token: 1,
+            min_taker_price: 0.0,
+        },
+    )
+    .await;
+    assert_mango_error(
+        &res,
+        MangoError::TokenConditionalSwapNotStarted.into(),
+        "not started yet".to_string(),
+    );
+
+    send_tx(
+        solana,
+        TokenConditionalSwapStartInstruction {
+            account,
+            caller: liqor,
+            caller_owner: owner,
+            index: 0,
+        },
+    )
+    .await
+    .unwrap();
     send_tx(
         solana,
         TokenConditionalSwapTriggerInstruction {
@@ -759,9 +806,9 @@ async fn test_token_conditional_swap_premium_auction() -> Result<(), TransportEr
 
     // 0 premium because only just started
     let mut account_quote_expected = deposit_amount as f64 + 1000.0;
-    let mut account_base_expected = deposit_amount as f64 + -1100.0;
+    let mut account_base_expected = deposit_amount as f64 + -1100.0 - 1000.0;
     let mut liqor_quote_expected = deposit_amount as f64 + -1000.0;
-    let mut liqor_base_expected = deposit_amount as f64 + 950.0;
+    let mut liqor_base_expected = deposit_amount as f64 + 950.0 + 1000.0;
 
     let account_quote = account_position_f64(solana, account, quote_token.bank).await;
     let account_base = account_position_f64(solana, account, base_token.bank).await;
