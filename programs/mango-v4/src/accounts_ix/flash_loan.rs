@@ -4,6 +4,10 @@ use anchor_lang::prelude::*;
 use anchor_lang::solana_program::sysvar::instructions as tx_instructions;
 use anchor_spl::token::Token;
 
+pub mod jupiter_mainnet_6 {
+    use solana_program::declare_id;
+    declare_id!("JUP6LkbZbjS1jKKwapdHNy74zcZ3tLUZoi5QNyVTaV4");
+}
 pub mod jupiter_mainnet_4 {
     use solana_program::declare_id;
     declare_id!("JUP4Fb2cqiRUcaTHdrPC8h2gNsA2ETXiPDD33WcGuJB");
