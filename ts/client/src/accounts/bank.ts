@@ -432,12 +432,12 @@ export class Bank implements BankForHealth {
     const totalBorrows = this.nativeBorrows();
     const totalDeposits = this.nativeDeposits();
 
-    if (totalDeposits.isZero() && totalBorrows.isZero()) {
+    if (totalDeposits.isZero() || totalBorrows.isZero()) {
       return ZERO_I80F48();
     }
 
     const utilization = totalBorrows.div(totalDeposits);
-    if (utilization.lte(this.util0)) {
+    if (utilization.lt(this.util0)) {
       const slope = this.rate0.div(this.util0);
       return slope.mul(utilization);
     } else if (utilization.lt(this.util1)) {
