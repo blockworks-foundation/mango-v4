@@ -65,11 +65,21 @@
 <span id="65">65</span>
 <span id="66">66</span>
 <span id="67">67</span>
+<span id="68">68</span>
+<span id="69">69</span>
+<span id="70">70</span>
+<span id="71">71</span>
+<span id="72">72</span>
 </pre><pre class="rust"><code><span class="kw">use </span><span class="kw">crate</span>::error::<span class="kw-2">*</span>;
 <span class="kw">use </span><span class="kw">crate</span>::state::<span class="kw-2">*</span>;
 <span class="kw">use </span>anchor_lang::prelude::<span class="kw-2">*</span>;
 <span class="kw">use </span>anchor_lang::solana_program::sysvar::instructions <span class="kw">as </span>tx_instructions;
 <span class="kw">use </span>anchor_spl::token::Token;
+
+<span class="kw">pub mod </span>jupiter_mainnet_6 {
+    <span class="kw">use </span>solana_program::declare_id;
+    <span class="macro">declare_id!</span>(<span class="string">&quot;JUP6LkbZbjS1jKKwapdHNy74zcZ3tLUZoi5QNyVTaV4&quot;</span>);
+}
 
 <span class="kw">pub mod </span>jupiter_mainnet_4 {
     <span class="kw">use </span>solana_program::declare_id;
