@@ -1,5 +1,5 @@
 export type MangoV4 = {
-  "version": "0.19.1",
+  "version": "0.20.0",
   "name": "mango_v4",
   "instructions": [
     {
@@ -12322,7 +12322,7 @@ export type MangoV4 = {
 };
 
 export const IDL: MangoV4 = {
-  "version": "0.19.1",
+  "version": "0.20.0",
   "name": "mango_v4",
   "instructions": [
     {
