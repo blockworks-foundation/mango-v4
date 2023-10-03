@@ -270,7 +270,7 @@ impl Bank {
         require_gte!(self.rate0, I80F48::ZERO);
         require_gte!(self.util1, I80F48::ZERO);
         require_gte!(self.rate1, I80F48::ZERO);
-        require_gt!(self.max_rate, MINIMUM_MAX_RATE);
+        require_gte!(self.max_rate, MINIMUM_MAX_RATE);
         require_gte!(self.loan_fee_rate, 0.0);
         require_gte!(self.loan_origination_fee_rate, 0.0);
         require_gte!(self.maint_asset_weight, 0.0);
