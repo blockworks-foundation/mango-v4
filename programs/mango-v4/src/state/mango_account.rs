@@ -785,6 +785,30 @@ impl<
             .filter(|serum3_order| serum3_order.is_active())
     }
 
+    pub fn openbook_v2_orders(&self, market_index: Serum3MarketIndex) -> Result<&Serum3Orders> {
+        self.all_openbook_v2_orders()
+            .find(|p| p.is_active_for_market(market_index))
+            .ok_or_else(|| error_msg!("openbook_v2 orders for market index {} not found", market_index))
+    }
+
+    pub(crate) fn openbook_v2_orders_by_raw_index_unchecked(&self, raw_index: usize) -> &Serum3Orders {
+        get_helper(self.dynamic(), self.header().openbook_v2_offset(raw_index))
+    }
+
+    pub fn openbook_v2_orders_by_raw_index(&self, raw_index: usize) -> Result<&Serum3Orders> {
+        require_gt!(self.header().openbook_v2_count(), raw_index);
+        Ok(self.openbook_v2_orders_by_raw_index_unchecked(raw_index))
+    }
+
+    pub fn all_openbook_v2_orders(&self) -> impl Iterator<Item = &Serum3Orders> + '_ {
+        (0..self.header().openbook_v2_count()).map(|i| self.openbook_v2_orders_by_raw_index_unchecked(i))
+    }
+
+    pub fn active_openbook_v2_orders(&self) -> impl Iterator<Item = &Serum3Orders> + '_ {
+        self.all_openbook_v2_orders()
+            .filter(|openbook_order| openbook_order.is_active())
+    }
+
     pub fn perp_position(&self, market_index: PerpMarketIndex) -> Result<&PerpPosition> {
         self.all_perp_positions()
             .find(|p| p.is_active_for_market(market_index))

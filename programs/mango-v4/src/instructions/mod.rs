@@ -62,6 +62,7 @@ pub use token_register::*;
 pub use token_register_trustless::*;
 pub use token_update_index_and_rate::*;
 pub use token_withdraw::*;
+pub use openbook_v2_place_order::*;
 pub use openbook_v2_register_market::*;
 
 mod account_buyback_fees_with_mngo;
@@ -128,4 +129,5 @@ mod token_register;
 mod token_register_trustless;
 mod token_update_index_and_rate;
 mod token_withdraw;
+mod openbook_v2_place_order;
 mod openbook_v2_register_market;

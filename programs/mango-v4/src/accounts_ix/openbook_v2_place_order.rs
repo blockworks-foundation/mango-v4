@@ -19,7 +19,7 @@ pub struct OpenbookV2PlaceOrder<'info> {
     )]
     pub account: AccountLoader<'info, MangoAccountFixed>,
 
-    pub authority: Signer<'info>,
+    pub owner: Signer<'info>,
 
     #[account(mut)]
     /// CHECK: Validated inline by checking against the pubkey stored in the account at #2
