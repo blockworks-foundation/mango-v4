@@ -18,7 +18,6 @@ pub fn token_conditional_swap_start(
     let group_pk = &ctx.accounts.group.key();
     let account_key = ctx.accounts.account.key();
     let caller_key = ctx.accounts.caller.key();
-    require_keys_neq!(account_key, caller_key);
 
     let mut account = ctx.accounts.account.load_full_mut()?;
     require!(
