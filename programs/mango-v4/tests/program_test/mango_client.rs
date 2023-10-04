@@ -4619,7 +4619,7 @@ pub struct TokenConditionalSwapTriggerInstruction {
     pub max_buy_token_to_liqee: u64,
     pub max_sell_token_to_liqor: u64,
     pub min_buy_token: u64,
-    pub min_taker_price: f64,
+    pub min_taker_price: f32,
 }
 #[async_trait::async_trait(?Send)]
 impl ClientInstruction for TokenConditionalSwapTriggerInstruction {

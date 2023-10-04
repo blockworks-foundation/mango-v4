@@ -1429,7 +1429,7 @@ pub mod mango_v4 {
         max_buy_token_to_liqee: u64,
         max_sell_token_to_liqor: u64,
         min_buy_token: u64,
-        min_taker_price: f64,
+        min_taker_price: f32,
     ) -> Result<()> {
         #[cfg(feature = "enable-gpl")]
         instructions::token_conditional_swap_trigger(
@@ -1439,7 +1439,7 @@ pub mod mango_v4 {
             max_buy_token_to_liqee,
             max_sell_token_to_liqor,
             min_buy_token,
-            min_taker_price,
+            min_taker_price as f64,
         )?;
         Ok(())
     }

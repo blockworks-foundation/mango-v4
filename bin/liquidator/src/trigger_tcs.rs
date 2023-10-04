@@ -86,7 +86,7 @@ struct PreparedExecution {
     max_buy_token_to_liqee: u64,
     max_sell_token_to_liqor: u64,
     min_buy_token: u64,
-    min_taker_price: f64,
+    min_taker_price: f32,
     jupiter_quote: Option<jupiter::Quote>,
 }
 
@@ -624,8 +624,8 @@ impl Context {
             }
         };
 
-        let min_taker_price = swap_price * (1.0 + self.config.profit_fraction);
-        if min_taker_price > taker_price.to_num::<f64>() {
+        let min_taker_price = (swap_price * (1.0 + self.config.profit_fraction)) as f32;
+        if min_taker_price > taker_price.to_num::<f32>() {
             trace!(
                 max_buy = max_buy_token_to_liqee,
                 max_sell = max_sell_token_to_liqor,
