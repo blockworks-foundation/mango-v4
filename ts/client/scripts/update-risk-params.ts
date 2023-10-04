@@ -37,6 +37,9 @@ import {
   LISTING_PRESETS,
   LISTING_PRESETS_KEYS,
   LISTING_PRESETS_PYTH,
+  MidPriceImpact,
+  getMidPriceImpacts,
+  getProposedTier,
 } from '@blockworks-foundation/mango-v4-settings/lib/helpers/listingTools';
 
 const {
@@ -53,15 +56,6 @@ const getApiTokenName = (bankName: string) => {
   }
   return bankName;
 };
-
-export type PriceImpactResp = {
-  avg_price_impact_percent: number;
-  side: 'ask' | 'bid';
-  target_amount: number;
-  symbol: string;
-  //there is more fileds they are just not used on ui
-};
-export type PriceImpactRespWithoutSide = Omit<PriceImpactResp, 'side'>;
 
 async function buildClient(): Promise<MangoClient> {
   return await MangoClient.connectDefault(MB_CLUSTER_URL!);
@@ -93,29 +87,7 @@ async function updateTokenParams(): Promise<void> {
   const group = await client.getGroup(MANGO_V4_PRIMARY_GROUP);
 
   const instructions: TransactionInstruction[] = [];
-  const pisFiltred = group.pis.reduce(
-    (acc: PriceImpactRespWithoutSide[], val: PriceImpactResp) => {
-      if (val.side === 'ask') {
-        const bidSide = group.pis.find(
-          (x) =>
-            x.symbol === val.symbol &&
-            x.target_amount === val.target_amount &&
-            x.side === 'bid',
-        );
-        acc.push({
-          target_amount: val.target_amount,
-          avg_price_impact_percent: bidSide
-            ? (bidSide.avg_price_impact_percent +
-                val.avg_price_impact_percent) /
-              2
-            : val.avg_price_impact_percent,
-          symbol: val.symbol,
-        });
-      }
-      return acc;
-    },
-    [],
-  );
+  const midPriceImpacts = getMidPriceImpacts(group.pis);
 
   Array.from(group.banksMapByTokenIndex.values())
     .map((banks) => banks[0])
@@ -154,13 +126,10 @@ async function updateTokenParams(): Promise<void> {
             ? LISTING_PRESETS_PYTH
             : LISTING_PRESETS;
 
-        const tokenToPriceImpact = pisFiltred
+        const tokenToPriceImpact = midPriceImpacts
           .filter((x) => x.avg_price_impact_percent < 1)
           .reduce(
-            (
-              acc: { [key: string]: PriceImpactRespWithoutSide },
-              val: PriceImpactRespWithoutSide,
-            ) => {
+            (acc: { [key: string]: MidPriceImpact }, val: MidPriceImpact) => {
               if (
                 !acc[val.symbol] ||
                 val.target_amount > acc[val.symbol].target_amount
@@ -171,25 +140,14 @@ async function updateTokenParams(): Promise<void> {
             },
             {},
           );
-        const priceImapct = tokenToPriceImpact[getApiTokenName(bank.name)];
-        const liqudityTier = (Object.values(PRESETS).find(
-          (x) => x.preset_target_amount === priceImapct?.target_amount,
-        )?.preset_key || 'SHIT') as LISTING_PRESETS_KEYS;
-        const detieredTierWithoutPyth =
-          liqudityTier === 'ULTRA_PREMIUM' || liqudityTier === 'PREMIUM'
-            ? 'MID'
-            : liqudityTier === 'MID'
-            ? 'MEME'
-            : liqudityTier;
-        const isPythRecommended =
-          liqudityTier === 'MID' ||
-          liqudityTier === 'PREMIUM' ||
-          liqudityTier === 'ULTRA_PREMIUM';
-        const listingTier =
-          isPythRecommended && bank?.oracleProvider !== OracleProvider.Pyth
-            ? detieredTierWithoutPyth
-            : liqudityTier;
-        newWeightScaleQuote = PRESETS[listingTier].borrowWeightScaleStartQuote;
+        const priceImpact = tokenToPriceImpact[getApiTokenName(bank.name)];
+        const suggestedTier = getProposedTier(
+          PRESETS,
+          priceImpact.avg_price_impact_percent,
+          bank.oracleProvider === OracleProvider.Pyth,
+        );
+        newWeightScaleQuote =
+          PRESETS[suggestedTier].borrowWeightScaleStartQuote;
 
         newWeightScaleQuote =
           bank.depositWeightScaleStartQuote !== newWeightScaleQuote ||
