@@ -31,6 +31,13 @@ import {
   DEFAULT_VSR_ID,
   VsrClient,
 } from './governanceInstructions/voteStakeRegistryClient';
+import bs58 from 'bs58';
+import { OracleProvider } from '../src/accounts/oracle';
+import {
+  LISTING_PRESETS,
+  LISTING_PRESETS_KEYS,
+  LISTING_PRESETS_PYTH,
+} from '@blockworks-foundation/mango-v4-settings/lib/helpers/listingTools';
 
 const {
   MB_CLUSTER_URL,
@@ -39,6 +46,22 @@ const {
   VSR_DELEGATE_FROM_PK,
   DRY_RUN,
 } = process.env;
+
+const getApiTokenName = (bankName: string) => {
+  if (bankName === 'ETH (Portal)') {
+    return 'ETH';
+  }
+  return bankName;
+};
+
+export type PriceImpactResp = {
+  avg_price_impact_percent: number;
+  side: 'ask' | 'bid';
+  target_amount: number;
+  symbol: string;
+  //there is more fileds they are just not used on ui
+};
+export type PriceImpactRespWithoutSide = Omit<PriceImpactResp, 'side'>;
 
 async function buildClient(): Promise<MangoClient> {
   return await MangoClient.connectDefault(MB_CLUSTER_URL!);
@@ -70,6 +93,29 @@ async function updateTokenParams(): Promise<void> {
   const group = await client.getGroup(MANGO_V4_PRIMARY_GROUP);
 
   const instructions: TransactionInstruction[] = [];
+  const pisFiltred = group.pis.reduce(
+    (acc: PriceImpactRespWithoutSide[], val: PriceImpactResp) => {
+      if (val.side === 'ask') {
+        const bidSide = group.pis.find(
+          (x) =>
+            x.symbol === val.symbol &&
+            x.target_amount === val.target_amount &&
+            x.side === 'bid',
+        );
+        acc.push({
+          target_amount: val.target_amount,
+          avg_price_impact_percent: bidSide
+            ? (bidSide.avg_price_impact_percent +
+                val.avg_price_impact_percent) /
+              2
+            : val.avg_price_impact_percent,
+          symbol: val.symbol,
+        });
+      }
+      return acc;
+    },
+    [],
+  );
 
   Array.from(group.banksMapByTokenIndex.values())
     .map((banks) => banks[0])
@@ -80,10 +126,6 @@ async function updateTokenParams(): Promise<void> {
         bank.name.toLocaleLowerCase().indexOf('stsol') > -1,
     )
     .forEach(async (bank) => {
-      const usdcAmounts = [
-        1_000, 5_000, 20_000, 100_000, 250_000, 500_000, 1_000_000, 5_000_000,
-      ];
-
       // Limit borrows to 1/3rd of deposit, rounded to 1000, only update if more than 10% different
       const depositsInUsd = bank.nativeDeposits().mul(bank.price);
       let newNetBorrowLimitPerWindowQuote: number | null =
@@ -107,24 +149,51 @@ async function updateTokenParams(): Promise<void> {
         bank.tokenIndex != 0 && // USDC
         bank.mint.toBase58() != 'So11111111111111111111111111111111111111112' // SOL
       ) {
-        const index = usdcAmounts
-          .map((usdcAmount) => {
-            const piFraction =
-              computePriceImpactOnJup(group.pis, usdcAmount, bank.name) /
-              10_000;
-            return bank.liquidationFee.toNumber() / 1.5 > piFraction;
-          })
-          .lastIndexOf(true);
+        const PRESETS =
+          bank?.oracleProvider === OracleProvider.Pyth
+            ? LISTING_PRESETS_PYTH
+            : LISTING_PRESETS;
+
+        const tokenToPriceImpact = pisFiltred
+          .filter((x) => x.avg_price_impact_percent < 1)
+          .reduce(
+            (
+              acc: { [key: string]: PriceImpactRespWithoutSide },
+              val: PriceImpactRespWithoutSide,
+            ) => {
+              if (
+                !acc[val.symbol] ||
+                val.target_amount > acc[val.symbol].target_amount
+              ) {
+                acc[val.symbol] = val;
+              }
+              return acc;
+            },
+            {},
+          );
+        const priceImapct = tokenToPriceImpact[getApiTokenName(bank.name)];
+        const liqudityTier = (Object.values(PRESETS).find(
+          (x) => x.preset_target_amount === priceImapct?.target_amount,
+        )?.preset_key || 'SHIT') as LISTING_PRESETS_KEYS;
+        const detieredTierWithoutPyth =
+          liqudityTier === 'ULTRA_PREMIUM' || liqudityTier === 'PREMIUM'
+            ? 'MID'
+            : liqudityTier === 'MID'
+            ? 'MEME'
+            : liqudityTier;
+        const isPythRecommended =
+          liqudityTier === 'MID' ||
+          liqudityTier === 'PREMIUM' ||
+          liqudityTier === 'ULTRA_PREMIUM';
+        const listingTier =
+          isPythRecommended && bank?.oracleProvider !== OracleProvider.Pyth
+            ? detieredTierWithoutPyth
+            : liqudityTier;
+        newWeightScaleQuote = PRESETS[listingTier].borrowWeightScaleStartQuote;
+
         newWeightScaleQuote =
-          index > -1
-            ? new BN(toNative(usdcAmounts[index], 6)).toNumber()
-            : null;
-        newWeightScaleQuote =
-          newWeightScaleQuote != null &&
-          Math.abs(
-            (newWeightScaleQuote - bank.depositWeightScaleStartQuote) /
-              bank.depositWeightScaleStartQuote,
-          ) > 0.1
+          bank.depositWeightScaleStartQuote !== newWeightScaleQuote ||
+          bank.borrowWeightScaleStartQuote !== newWeightScaleQuote
             ? newWeightScaleQuote
             : null;
       }
