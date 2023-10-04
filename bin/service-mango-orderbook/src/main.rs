@@ -14,8 +14,7 @@ use solana_sdk::pubkey::Pubkey;
 use solana_sdk::signature::Keypair;
 use std::{
     collections::{HashMap, HashSet},
-    env,
-    fmt,
+    env, fmt,
     fs::File,
     io::Read,
     net::SocketAddr,
@@ -343,8 +342,7 @@ async fn main() -> anyhow::Result<()> {
 
     // load mango group and markets from rpc
     let rpc_url = match &config.rpc_http_url.chars().next().unwrap() {
-        '$' => env::var(&config.rpc_http_url[1..])
-            .expect("reading rpc url from env"),
+        '$' => env::var(&config.rpc_http_url[1..]).expect("reading rpc url from env"),
         _ => config.rpc_http_url.clone(),
     };
     let ws_url = rpc_url.replace("https", "wss");
