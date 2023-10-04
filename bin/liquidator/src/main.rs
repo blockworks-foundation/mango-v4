@@ -295,10 +295,10 @@ async fn main() -> anyhow::Result<()> {
         refresh_timeout: Duration::from_secs(30),
 
         jupiter_version: cli.jupiter_version.into(),
+        jupiter_slippage_bps: 100,
+
         // TODO: configurable
-        mode: trigger_tcs::Mode::SwapSellIntoBuy {
-            slippage_bps: cli.rebalance_slippage_bps,
-        },
+        mode: trigger_tcs::Mode::SwapSellIntoBuy,
         min_buy_fraction: 0.7,
     };
 
@@ -667,6 +667,7 @@ impl LiquidationState {
             account_fetcher: self.account_fetcher.clone(),
             token_swap_info: self.token_swap_info.clone(),
             config: self.trigger_tcs_config.clone(),
+            jupiter_quote_cache: Arc::new(trigger_tcs::JupiterQuoteCache::default()),
             now_ts,
         };
 

@@ -1,6 +1,7 @@
 use std::{
+    collections::HashMap,
     pin::Pin,
-    sync::Arc,
+    sync::{Arc, RwLock},
     time::{Duration, Instant},
 };
 
@@ -30,7 +31,7 @@ const SLIPPAGE_BUFFER: f64 = 0.01; // 1%
 /// borrows are exhausted.
 const NET_BORROW_EXECUTION_THRESHOLD: u64 = 1_000_000; // 1 USD
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Mode {
     /// Directly execute the trigger, borrowing any buy tokens needed. Normal rebalancing will
     /// resolve deposits and withdraws created by trigger execution
@@ -45,14 +46,11 @@ pub enum Mode {
     ///
     /// If sell token borrows are impossible (reduce only, borrow limits), this
     /// will back back on SwapCollateralIntoBuy.
-    SwapSellIntoBuy {
-        /// Allowed slippage in jupiter swaps
-        slippage_bps: u64,
-    },
+    SwapSellIntoBuy,
 
     /// Do a jupiter swap in the same tx as the trigger, buying the buy token for the
     /// collateral token. This way the liquidator won't need to borrow tokens.
-    SwapCollateralIntoBuy { slippage_bps: u64 },
+    SwapCollateralIntoBuy,
 }
 
 #[derive(Clone)]
@@ -74,7 +72,191 @@ pub struct Config {
     pub min_buy_fraction: f64,
 
     pub jupiter_version: jupiter::Version,
+    pub jupiter_slippage_bps: u64,
     pub mode: Mode,
+}
+
+pub enum JupiterQuoteCacheResult<T> {
+    Quote(T),
+    BadPrice(f64),
+}
+
+// While preparing tcs executions, there may be a lot of jupiter queries for the same
+// pairs. This caches results to avoid hitting jupiter with too many requests by allowing
+// a cheap-early out.
+#[derive(Default)]
+pub struct JupiterQuoteCache {
+    // cache lowest price for a in-out mint pair, in input-per-output tokens
+    pub quote_cache: RwLock<HashMap<(Pubkey, Pubkey), f64>>,
+}
+
+impl JupiterQuoteCache {
+    /// Quotes. Returns BadPrice if the cache or quote returns a price above max_in_per_out_price.
+    pub async fn quote(
+        &self,
+        client: &MangoClient,
+        input_mint: Pubkey,
+        output_mint: Pubkey,
+        input_amount: u64,
+        slippage_bps: u64,
+        version: jupiter::Version,
+        max_in_per_out_price: f64,
+    ) -> anyhow::Result<JupiterQuoteCacheResult<(f64, jupiter::Quote)>> {
+        let cache_key = (input_mint, output_mint);
+        {
+            let quote_cache = self.quote_cache.read().unwrap();
+            if let Some(&cached_price) = quote_cache.get(&cache_key) {
+                if cached_price > max_in_per_out_price {
+                    return Ok(JupiterQuoteCacheResult::BadPrice(cached_price));
+                }
+            }
+        }
+
+        let (price, quote) = self
+            .unchecked_quote(
+                client,
+                input_mint,
+                output_mint,
+                input_amount,
+                slippage_bps,
+                version,
+            )
+            .await?;
+        if price > max_in_per_out_price {
+            return Ok(JupiterQuoteCacheResult::BadPrice(price));
+        }
+
+        Ok(JupiterQuoteCacheResult::Quote((price, quote)))
+    }
+
+    async fn unchecked_quote(
+        &self,
+        client: &MangoClient,
+        input_mint: Pubkey,
+        output_mint: Pubkey,
+        input_amount: u64,
+        slippage_bps: u64,
+        version: jupiter::Version,
+    ) -> anyhow::Result<(f64, jupiter::Quote)> {
+        let quote = client
+            .jupiter()
+            .quote(
+                input_mint,
+                output_mint,
+                input_amount,
+                slippage_bps,
+                false,
+                version,
+            )
+            .await?;
+        let quote_price = quote.in_amount as f64 / quote.out_amount as f64;
+
+        let cache_key = (input_mint, output_mint);
+        let mut quote_cache = self.quote_cache.write().unwrap();
+        let cached_price = quote_cache.get(&cache_key).copied().unwrap_or(f64::MAX);
+        if quote_price < cached_price {
+            quote_cache.insert(cache_key, quote_price);
+        }
+
+        return Ok((quote_price, quote));
+    }
+
+    fn cached_price(&self, input_mint: Pubkey, output_mint: Pubkey) -> Option<f64> {
+        if input_mint == output_mint {
+            return Some(1.0);
+        }
+
+        let quote_cache = self.quote_cache.read().unwrap();
+        quote_cache.get(&(input_mint, output_mint)).copied()
+    }
+
+    /// Quotes collateral -> buy and sell -> collateral swaps
+    ///
+    /// Returns BadPrice if the full route (cached or queried) exceeds the max_sell_per_buy_price.
+    ///
+    /// Returns Quote((sell_per_buy price, collateral->buy quote, sell->collateral quote)) on success
+    pub async fn quote_collateral_swap(
+        &self,
+        client: &MangoClient,
+        collateral_mint: Pubkey,
+        buy_mint: Pubkey,
+        sell_mint: Pubkey,
+        collateral_amount: u64,
+        sell_amount: u64,
+        slippage_bps: u64,
+        version: jupiter::Version,
+        max_sell_per_buy_price: f64,
+    ) -> anyhow::Result<
+        JupiterQuoteCacheResult<(f64, Option<jupiter::Quote>, Option<jupiter::Quote>)>,
+    > {
+        // First check if we have cached prices for both legs and
+        // if those break the specified limit
+        let cached_collateral_to_buy = self.cached_price(collateral_mint, buy_mint);
+        let cached_sell_to_collateral = self.cached_price(sell_mint, collateral_mint);
+        match (cached_collateral_to_buy, cached_sell_to_collateral) {
+            (Some(c_to_b), Some(s_to_c)) => {
+                let s_to_b = s_to_c * c_to_b;
+                if s_to_b > max_sell_per_buy_price {
+                    return Ok(JupiterQuoteCacheResult::BadPrice(s_to_b));
+                }
+            }
+            _ => {}
+        }
+
+        // Get fresh quotes
+        let collateral_to_buy_quote;
+        let collateral_per_buy_price;
+        if collateral_mint != buy_mint {
+            let (buy_price, buy_quote) = self
+                .unchecked_quote(
+                    client,
+                    collateral_mint,
+                    buy_mint,
+                    collateral_amount,
+                    slippage_bps,
+                    version,
+                )
+                .await?;
+
+            collateral_per_buy_price = buy_price;
+            collateral_to_buy_quote = Some(buy_quote);
+        } else {
+            collateral_per_buy_price = 1.0;
+            collateral_to_buy_quote = None;
+        }
+
+        let sell_to_collateral_quote;
+        let sell_per_collateral_price;
+        if collateral_mint != sell_mint {
+            let (sell_price, sell_quote) = self
+                .unchecked_quote(
+                    client,
+                    sell_mint,
+                    collateral_mint,
+                    sell_amount,
+                    slippage_bps,
+                    version,
+                )
+                .await?;
+            sell_per_collateral_price = sell_price;
+            sell_to_collateral_quote = Some(sell_quote);
+        } else {
+            sell_per_collateral_price = 1.0;
+            sell_to_collateral_quote = None;
+        }
+
+        // Check price limit on the new quotes
+        let price = sell_per_collateral_price * collateral_per_buy_price;
+        if price > max_sell_per_buy_price {
+            return Ok(JupiterQuoteCacheResult::BadPrice(price));
+        }
+
+        Ok(JupiterQuoteCacheResult::Quote((
+            price,
+            collateral_to_buy_quote,
+            sell_to_collateral_quote,
+        )))
+    }
 }
 
 #[derive(Clone)]
@@ -100,7 +282,16 @@ struct PreparationResult {
 pub struct Context {
     pub mango_client: Arc<MangoClient>,
     pub account_fetcher: Arc<chain_data::AccountFetcher>,
+
+    /// Information about current token prices is used to reject tcs early
+    /// that are very likely to not be executable profitably.
     pub token_swap_info: Arc<token_swap_info::TokenSwapInfoUpdater>,
+
+    /// Cache jupiter prices. Sometimes a lot of tcs look potentially interesting at the same time.
+    /// To avoid spamming the jupiter API for each one, cache the returned prices and don't query again
+    /// if we are likely to get a result that would lead to us not wanting to trigger the tcs.
+    pub jupiter_quote_cache: Arc<JupiterQuoteCache>,
+
     pub config: Config,
     pub now_ts: u64,
 }
@@ -429,7 +620,7 @@ impl Context {
 
         // Mode fallback?
         let mode = match self.config.mode.clone() {
-            Mode::SwapSellIntoBuy { slippage_bps } => {
+            Mode::SwapSellIntoBuy => {
                 // This mode falls back on another when sell token borrows are impossible
                 // or too limited
                 let available_quote = sell_bank.remaining_net_borrows_quote(sell_token_price);
@@ -440,13 +631,15 @@ impl Context {
                     .min(I80F48::from(liqee_max_buy) * buy_token_price)
                     .min(max_take_quote);
                 if sell_bank.are_borrows_reduce_only() || needed_quote > available_quote {
-                    Mode::SwapCollateralIntoBuy { slippage_bps }
+                    Mode::SwapCollateralIntoBuy
                 } else {
-                    Mode::SwapSellIntoBuy { slippage_bps }
+                    Mode::SwapSellIntoBuy
                 }
             }
             m @ _ => m,
         };
+
+        let jupiter_slippage_fraction = 1.0 - self.config.jupiter_slippage_bps as f64 * 0.0001;
 
         let mut liqor = self.mango_client.mango_account().await?;
 
@@ -465,7 +658,7 @@ impl Context {
                 taker_price,
                 liqor_min_health_ratio,
             )?,
-            Mode::SwapCollateralIntoBuy { slippage_bps } => {
+            Mode::SwapCollateralIntoBuy => {
                 // The transaction will be net-positive, but how much buy token can
                 // the collateral be swapped into?
                 if tcs.buy_token_index == collateral_token_index {
@@ -474,7 +667,7 @@ impl Context {
                     let (_, collateral_price, _) =
                         self.token_bank_price_mint(collateral_token_index)?;
                     let buy_per_collateral_price = (collateral_price / buy_token_price)
-                        * I80F48::from_num(1.0 - slippage_bps as f64 * 0.0001);
+                        * I80F48::from_num(jupiter_slippage_fraction);
                     let collateral_amount = util::max_swap_source(
                         &self.mango_client,
                         &self.account_fetcher,
@@ -488,10 +681,10 @@ impl Context {
                     collateral_amount * buy_per_collateral_price
                 }
             }
-            Mode::SwapSellIntoBuy { slippage_bps } => {
+            Mode::SwapSellIntoBuy => {
                 // How big can the sell -> buy swap be?
-                let buy_per_sell_price = (I80F48::from(1) / taker_price)
-                    * I80F48::from_num(1.0 - slippage_bps as f64 * 0.0001);
+                let buy_per_sell_price =
+                    (I80F48::from(1) / taker_price) * I80F48::from_num(jupiter_slippage_fraction);
                 let max_sell = util::max_swap_source(
                     &self.mango_client,
                     &self.account_fetcher,
@@ -518,56 +711,44 @@ impl Context {
             .min(I80F48::from(max_sell_token_to_liqor) * sell_token_price);
 
         // Final check of the reverse trade on jupiter
+        //
+        // We want swap_at_taker_price * counterswap >= 1 + profit_fraction
+        // so 1/counterswap <= swap_at_taker_price / (1 + profit_fraction)
+        let taker_price_profit = taker_price.to_num::<f64>() / (1.0 + self.config.profit_fraction);
         let jupiter_quote;
         let swap_price;
+        let mut bad_price = false;
         match mode {
-            Mode::BorrowBuyToken => {
-                // Quote only to verify that the execution is profitable
-                // Slippage does not matter.
-                let slippage_bps = 100;
+            Mode::BorrowBuyToken | Mode::SwapSellIntoBuy => {
+                // Even if we borrow, we want to check that the rebalance would be profitable
                 let input_amount = volume / sell_token_price;
-                let quote = self
-                    .mango_client
-                    .jupiter()
+                match self
+                    .jupiter_quote_cache
                     .quote(
+                        &self.mango_client,
                         sell_mint,
                         buy_mint,
                         input_amount.clamp_to_u64(),
-                        slippage_bps,
-                        false,
+                        self.config.jupiter_slippage_bps,
                         self.config.jupiter_version,
+                        taker_price_profit,
                     )
-                    .await?;
+                    .await?
+                {
+                    JupiterQuoteCacheResult::Quote((price, quote)) => {
+                        swap_price = price;
 
-                let sell_amount = quote.in_amount as f64;
-                let buy_amount = quote.out_amount as f64;
-
-                swap_price = sell_amount / buy_amount;
-                jupiter_quote = None;
+                        // Store and execute quote if mode needs it
+                        jupiter_quote = (mode == Mode::SwapSellIntoBuy).then_some(quote);
+                    }
+                    JupiterQuoteCacheResult::BadPrice(price) => {
+                        swap_price = price;
+                        bad_price = true;
+                        jupiter_quote = None;
+                    }
+                }
             }
-            Mode::SwapSellIntoBuy { slippage_bps, .. } => {
-                // Quote will get executed
-                let input_amount = volume / sell_token_price;
-                let quote = self
-                    .mango_client
-                    .jupiter()
-                    .quote(
-                        sell_mint,
-                        buy_mint,
-                        input_amount.clamp_to_u64(),
-                        slippage_bps,
-                        false,
-                        self.config.jupiter_version,
-                    )
-                    .await?;
-
-                let sell_amount = quote.in_amount as f64;
-                let buy_amount = quote.out_amount as f64;
-
-                swap_price = sell_amount / buy_amount;
-                jupiter_quote = Some(quote);
-            }
-            Mode::SwapCollateralIntoBuy { slippage_bps } => {
+            Mode::SwapCollateralIntoBuy => {
                 let (_, collateral_price, collateral_mint) =
                     self.token_bank_price_mint(collateral_token_index)?;
 
@@ -576,56 +757,38 @@ impl Context {
 
                 // In this mode, we buy the buy token with collateral token before taking the tcs.
                 // Get a quote and store it so it will get executed later.
-                let buy_price; // collateral per buy token
-                if collateral_token_index != tcs.buy_token_index {
-                    let buy_quote = self
-                        .mango_client
-                        .jupiter()
-                        .quote(
-                            collateral_mint,
-                            buy_mint,
-                            max_buy_collateral_cost.clamp_to_u64(),
-                            slippage_bps,
-                            false,
-                            self.config.jupiter_version,
-                        )
-                        .await?;
-
-                    buy_price = buy_quote.in_amount as f64 / buy_quote.out_amount as f64;
-                    jupiter_quote = Some(buy_quote);
-                } else {
-                    buy_price = 1.0;
-                    jupiter_quote = None;
+                // The quote for sell_token -> collateral is just to check profitability, rebalancing
+                // will take care of it.
+                match self
+                    .jupiter_quote_cache
+                    .quote_collateral_swap(
+                        &self.mango_client,
+                        collateral_mint,
+                        buy_mint,
+                        sell_mint,
+                        max_buy_collateral_cost.clamp_to_u64(),
+                        max_sell.clamp_to_u64(),
+                        self.config.jupiter_slippage_bps,
+                        self.config.jupiter_version,
+                        taker_price_profit,
+                    )
+                    .await?
+                {
+                    JupiterQuoteCacheResult::Quote((price, collateral_to_buy_quote, _)) => {
+                        swap_price = price;
+                        jupiter_quote = collateral_to_buy_quote;
+                    }
+                    JupiterQuoteCacheResult::BadPrice(price) => {
+                        swap_price = price;
+                        bad_price = true;
+                        jupiter_quote = None;
+                    }
                 }
-
-                // To get the overall price and profitability, we need to get a quote for converting back
-                let sell_price;
-                if collateral_token_index != tcs.sell_token_index {
-                    // this one verifies profitability
-                    let sell_quote = self
-                        .mango_client
-                        .jupiter()
-                        .quote(
-                            sell_mint,
-                            collateral_mint,
-                            max_sell.clamp_to_u64(),
-                            slippage_bps,
-                            false,
-                            self.config.jupiter_version,
-                        )
-                        .await?;
-                    sell_price = sell_quote.out_amount as f64 / sell_quote.in_amount as f64;
-                } else {
-                    sell_price = 1.0;
-                }
-
-                // sell token per buy token
-                swap_price = buy_price / sell_price;
             }
         };
 
         let min_taker_price = (swap_price * (1.0 + self.config.profit_fraction)) as f32;
-        if min_taker_price > taker_price.to_num::<f32>() {
+        if bad_price || taker_price.to_num::<f32>() < min_taker_price {
             trace!(
                 max_buy = max_buy_token_to_liqee,
                 max_sell = max_sell_token_to_liqor,
