@@ -38,7 +38,6 @@ pub struct JsonRpcConfig {
 #[derive(Clone, Debug, Deserialize)]
 pub struct Config {
     pub source: SourceConfig,
-    pub snapshot_source: SnapshotSourceConfig,
     pub metrics: MetricsConfig,
     pub pnl: PnlConfig,
     pub jsonrpc_server: JsonRpcConfig,
@@ -160,7 +159,7 @@ struct PnlResponseItem {
 use jsonrpsee::http_server::HttpServerHandle;
 use mango_feeds_connector::{
     grpc_plugin_source, memory_target, metrics, EntityFilter, FilterConfig, MetricsConfig,
-    SnapshotSourceConfig, SourceConfig,
+    SourceConfig,
 };
 
 fn start_jsonrpc_server(
@@ -252,7 +251,7 @@ async fn main() -> anyhow::Result<()> {
     solana_logger::setup_with_default("info");
     info!("startup");
 
-    let rpc_url = config.snapshot_source.rpc_http_url;
+    let rpc_url = &config.source.snapshot.rpc_http_url;
     let ws_url = rpc_url.replace("https", "wss");
     let rpc_timeout = Duration::from_secs(10);
     let cluster = Cluster::Custom(rpc_url.clone(), ws_url.clone());
