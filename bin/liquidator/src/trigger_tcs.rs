@@ -142,7 +142,7 @@ impl Context {
 
         // If this is 1.0 then the exchange can (probably) happen at oracle price.
         // 1.5 would mean we need to pay 50% more than oracle etc.
-        let cost_over_oracle = buy_info.buy_over_oracle * sell_info.sell_over_oracle;
+        let cost_over_oracle = buy_info.buy_over_oracle() * sell_info.sell_over_oracle();
 
         Ok(taker_price >= base_price * cost_over_oracle * (1.0 + self.config.profit_fraction))
     }
