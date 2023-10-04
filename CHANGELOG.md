@@ -4,7 +4,50 @@ Update this for each program release and mainnet deployment.
 
 ## not on mainnet
 
-### v0.19.1, 2023-9-
+### v0.20.0, 2023-10-
+
+- Token conditional swaps: Add two auction mechanisms (#717)
+
+  The trigger orders that are used to implement stop loss and take profit orders
+  currently require users to set a fixed premium - an incentive for the order
+  triggerer. Two new types of trigger orders were added:
+
+  - Premium auctions: After starting, the premium offered to triggerers gradually
+    increases from zero. This way users are less likely to overpay on premium,
+    but execution will be delayed until the premium is sufficiently high.
+  - Linear auctions: A simple auction where users configure start and end for
+    both time and price. The offered trigger price changes linearly with time
+    instead of being tied to the oracle price.
+
+- Account shrinking and migration (#692)
+
+  The AccountExpand instruction can now shrink accounts. This allows users to
+  change the trade-off between token positions, perp positions and OpenBook open
+  order slots now. It will be particularly useful when the OpenBook v2 integration
+  arrives.
+
+  This also adds a AccountSizeMigration instruction to permissionlessly shrink
+  existing accounts where safe while migrating them to the v3 account layout.
+
+- Drop HealthCache from IDL and disable ComputeAccountData instruction (#723)
+
+  Both were not intended as public API and are only used in tests as an old
+  way of retrieving account information.
+
+- Token withdraw: Deactivate zero positions when withdrawing zero (#736)
+
+  Previously an "active but zero" token position would not be closed by a
+  withdraw-all style instruction.
+
+- Flash loan: Whitelist Jupiter v6 program for delegates (#737)
+- Token deposit: Require a valid oracle when opening a new token position (#722)
+- Fix computing maximum allowed amount when swapping zero asset-weight tokens (#699)
+
+## mainnet
+
+### v0.19.1, 2023-9-16
+
+Deployment: Sep 16, 2023 at 11:20:20 Central European Summer Time, https://explorer.solana.com/tx/K9BJ1uDBH6Xe8erhS6C8Rmz6k6V1cKJ8z6wNmf4DV2aF5Woin4H5xXKj1ypTNDSTccNvcsAUTHStoai3k2hYY5E
 
 - Fix a health overestimation with OpenBook open orders
 
@@ -16,8 +59,6 @@ Update this for each program release and mainnet deployment.
   (compute cost, no notifications on fill) but produces an upper bound on
   bids (lower bound on asks) that is sufficient to make health not
   overestimate.
-
-## mainnet
 
 ### v0.19.0, 2023-9-7
 

@@ -2,7 +2,7 @@ cargo-features = ["workspace-inheritance"]
 
 [package]
 name = "mango-v4"
-version = "0.19.1"
+version = "0.20.0"
 description = "Created with Anchor"
 edition = "2021"
 
