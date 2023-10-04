@@ -27,10 +27,10 @@ COPY --from=build /app/target/release/keeper /usr/local/bin/
 COPY --from=build /app/target/release/liquidator /usr/local/bin/
 COPY --from=build /app/target/release/settler /usr/local/bin/
 
-COPY --from=build /app/target/release/service-mango-crank /usr/local/bin/
-COPY --from=build /app/target/release/service-mango-fills /usr/local/bin/
-COPY --from=build /app/target/release/service-mango-orderbook /usr/local/bin/
-COPY --from=build /app/target/release/service-mango-pnl /usr/local/bin/
+COPY --from=build /app/target/release/service-mango-* /usr/local/bin/
+COPY --from=build /app/bin/service-mango-pnl/conf/template-config.toml ./pnl-config.toml
+COPY --from=build /app/bin/service-mango-fills/conf/template-config.toml ./fills-config.toml
+COPY --from=build /app/bin/service-mango-orderbook/conf/template-config.toml ./orderbook-config.toml
 
 RUN adduser --system --group --no-create-home mangouser
 USER mangouser
