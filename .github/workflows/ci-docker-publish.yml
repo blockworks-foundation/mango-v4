@@ -3,6 +3,8 @@ name: Publish Docker Image to GHCR
 on:
   push:
     branches: [deploy]
+    tags:
+      - groovie/experimental-build-push-docker-ghcr
     paths:
       [
         '.github/ci-docker-publish.yml',
@@ -55,6 +57,6 @@ jobs:
           push: true
           tags: |
             ${{ env.REGISTRY }}/blockworks-foundation/${{ env.IMAGE }}:${{ github.sha }}
-            ${{ env.REGISTRY }}/blockworks-foundation/${{ env.IMAGE }}:latest
+#            ${{ env.REGISTRY }}/blockworks-foundation/${{ env.IMAGE }}:latest
           cache-from: type=gha
           cache-to: type=gha,mode=max
