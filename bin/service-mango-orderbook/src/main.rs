@@ -14,6 +14,7 @@ use solana_sdk::pubkey::Pubkey;
 use solana_sdk::signature::Keypair;
 use std::{
     collections::{HashMap, HashSet},
+    env,
     fmt,
     fs::File,
     io::Read,
@@ -341,7 +342,11 @@ async fn main() -> anyhow::Result<()> {
         metrics_tx.register_u64("orderbook_closed_connections".into(), MetricType::Counter);
 
     // load mango group and markets from rpc
-    let rpc_url = config.rpc_http_url;
+    let rpc_url = match &config.rpc_http_url.chars().next().unwrap() {
+        '$' => env::var(&config.rpc_http_url[1..])
+            .expect("reading rpc url from env"),
+        _ => config.rpc_http_url.clone(),
+    };
     let ws_url = rpc_url.replace("https", "wss");
     let rpc_timeout = Duration::from_secs(10);
     let cluster = Cluster::Custom(rpc_url.clone(), ws_url.clone());
