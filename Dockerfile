@@ -32,5 +32,9 @@ COPY --from=build /app/target/release/service-mango-fills /usr/local/bin/
 COPY --from=build /app/target/release/service-mango-orderbook /usr/local/bin/
 COPY --from=build /app/target/release/service-mango-pnl /usr/local/bin/
 
+COPY --from=build /app/bin/service-mango-pnl/conf/template-config.toml ./pnl-config.toml
+COPY --from=build /app/bin/service-mango-fills/conf//template-config.toml ./fills-config.toml
+COPY --from=build /app/bin/service-mango-orderbook/conf/template-config.toml ./orderbook-config.toml
+
 RUN adduser --system --group --no-create-home mangouser
 USER mangouser
