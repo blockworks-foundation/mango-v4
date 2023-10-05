@@ -84,7 +84,7 @@ impl State {
                     }
                 }
                 had_tcs = true;
-                startable.push((account_key, tcs.id));
+                startable.push((account_key, tcs.id, tcs.sell_token_index));
             }
 
             if !had_tcs {
@@ -95,7 +95,8 @@ impl State {
         for startable_chunk in startable.chunks(8) {
             let mut instructions = vec![];
             let mut ix_targets = vec![];
-            for (pubkey, tcs_id) in startable_chunk {
+            let mut caller_account = mango_client.mango_account().await?;
+            for (pubkey, tcs_id, incentive_token_index) in startable_chunk {
                 let ix = match self.make_start_ix(pubkey, *tcs_id).await {
                     Ok(v) => v,
                     Err(e) => {
@@ -109,6 +110,18 @@ impl State {
                 };
                 instructions.push(ix);
                 ix_targets.push((*pubkey, *tcs_id));
+                caller_account.ensure_token_position(*incentive_token_index)?;
+            }
+
+            // Clear newly created token positions, so the caller account is mostly empty
+            for token_index in startable_chunk.iter().map(|(_, _, ti)| *ti).unique() {
+                let mint = mango_client.context.token(token_index).mint_info.mint;
+                instructions.append(&mut mango_client.token_withdraw_instructions(
+                    &caller_account,
+                    mint,
+                    u64::MAX,
+                    false,
+                )?);
             }
 
             let txsig = match mango_client.send_and_confirm_owner_tx(instructions).await {

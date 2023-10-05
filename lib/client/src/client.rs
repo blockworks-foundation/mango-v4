@@ -369,21 +369,28 @@ impl MangoClient {
         self.send_and_confirm_owner_tx(vec![ix]).await
     }
 
-    pub async fn token_withdraw(
+    /// Creates token withdraw instructions for the MangoClient's account/owner.
+    /// The `account` state is passed in separately so changes during the tx can be
+    /// accounted for when deriving health accounts.
+    pub fn token_withdraw_instructions(
         &self,
+        account: &MangoAccountValue,
         mint: Pubkey,
         amount: u64,
         allow_borrow: bool,
-    ) -> anyhow::Result<Signature> {
+    ) -> anyhow::Result<Vec<Instruction>> {
         let token = self.context.token_by_mint(&mint)?;
         let token_index = token.token_index;
         let mint_info = token.mint_info;
 
-        let health_check_metas = self
-            .derive_health_check_remaining_account_metas(vec![token_index], vec![], vec![])
-            .await?;
+        let health_check_metas = self.context.derive_health_check_remaining_account_metas(
+            account,
+            vec![token_index],
+            vec![],
+            vec![],
+        )?;
 
-        let ixs = vec![
+        Ok(vec![
             spl_associated_token_account::instruction::create_associated_token_account_idempotent(
                 &self.owner(),
                 &self.owner(),
@@ -417,7 +424,17 @@ impl MangoClient {
                     allow_borrow,
                 }),
             },
-        ];
+        ])
+    }
+
+    pub async fn token_withdraw(
+        &self,
+        mint: Pubkey,
+        amount: u64,
+        allow_borrow: bool,
+    ) -> anyhow::Result<Signature> {
+        let account = self.mango_account().await?;
+        let ixs = self.token_withdraw_instructions(&account, mint, amount, allow_borrow)?;
         self.send_and_confirm_owner_tx(ixs).await
     }
 
