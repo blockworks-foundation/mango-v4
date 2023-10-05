@@ -33,7 +33,7 @@ pub fn token_conditional_swap_start(
     let tcs = account
         .token_conditional_swap_by_index(token_conditional_swap_index)?
         .clone();
-    require!(tcs.has_data(), MangoError::TokenConditionalSwapNotSet);
+    require!(tcs.is_configured(), MangoError::TokenConditionalSwapNotSet);
     require_eq!(
         tcs.id,
         token_conditional_swap_id,

@@ -45,7 +45,7 @@ pub fn token_conditional_swap_create(
     tcs.maker_fee_rate = buy_bank
         .token_conditional_swap_maker_fee_rate
         .max(sell_bank.token_conditional_swap_maker_fee_rate);
-    tcs.has_data = 1;
+    tcs.is_configured = 1;
     tcs.bought = 0;
     tcs.sold = 0;
 

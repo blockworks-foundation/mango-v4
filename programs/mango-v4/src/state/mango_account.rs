@@ -864,7 +864,7 @@ impl<
     pub fn token_conditional_swap_by_id(&self, id: u64) -> Result<(usize, &TokenConditionalSwap)> {
         let index = self
             .all_token_conditional_swaps()
-            .position(|tcs| tcs.has_data() && tcs.id == id)
+            .position(|tcs| tcs.is_configured() && tcs.id == id)
             .ok_or_else(|| error_msg!("token conditional swap with id {} not found", id))?;
         Ok((index, self.token_conditional_swap_by_index_unchecked(index)))
     }
@@ -875,12 +875,13 @@ impl<
     }
 
     pub fn active_token_conditional_swaps(&self) -> impl Iterator<Item = &TokenConditionalSwap> {
-        self.all_token_conditional_swaps().filter(|p| p.has_data())
+        self.all_token_conditional_swaps()
+            .filter(|p| p.is_configured())
     }
 
     pub fn token_conditional_swap_free_index(&self) -> Result<usize> {
         self.all_token_conditional_swaps()
-            .position(|&v| !v.has_data())
+            .position(|&v| !v.is_configured())
             .ok_or_else(|| error_msg!("no free token conditional swap index"))
     }
 
@@ -1555,7 +1556,7 @@ impl<
         for i in 0..old_header.token_conditional_swap_count() {
             let src = old_header.token_conditional_swap_offset(i);
             let pos: &TokenConditionalSwap = get_helper(dynamic, src);
-            if !pos.has_data() {
+            if !pos.is_configured() {
                 continue;
             }
             if i != active_tcs {
@@ -2158,14 +2159,14 @@ mod tests {
 
         let tcs = account.free_token_conditional_swap_mut().unwrap();
         tcs.id = 123;
-        tcs.has_data = 1;
+        tcs.is_configured = 1;
         assert_eq!(account.all_token_conditional_swaps().count(), 2);
         assert_eq!(account.active_token_conditional_swaps().count(), 1);
         assert_eq!(account.token_conditional_swap_free_index().unwrap(), 1);
 
         let tcs = account.free_token_conditional_swap_mut().unwrap();
         tcs.id = 234;
-        tcs.has_data = 1;
+        tcs.is_configured = 1;
         assert_eq!(account.all_token_conditional_swaps().count(), 2);
         assert_eq!(account.active_token_conditional_swaps().count(), 2);
 
@@ -2185,7 +2186,7 @@ mod tests {
         assert!(account.token_conditional_swap_free_index().is_err());
 
         let tcs = account.token_conditional_swap_mut_by_index(0).unwrap();
-        tcs.has_data = 0;
+        tcs.is_configured = 0;
         assert_eq!(account.all_token_conditional_swaps().count(), 2);
         assert_eq!(account.active_token_conditional_swaps().count(), 1);
         assert_eq!(
@@ -2378,7 +2379,7 @@ mod tests {
             let mut tcs = account
                 .token_conditional_swap_mut_by_index(raw_index)
                 .unwrap();
-            tcs.set_has_data(true);
+            tcs.set_is_configured(true);
             tcs.id = id;
         };
         make_tcs(2, 0);
@@ -2517,7 +2518,7 @@ mod tests {
             let selected = options.choose_multiple(&mut rng, active.token_conditional_swap_count());
             for (i, index) in selected.sorted().enumerate() {
                 let tcs = account.token_conditional_swap_mut_by_index(*index).unwrap();
-                tcs.set_has_data(true);
+                tcs.set_is_configured(true);
                 tcs.id = i as u64;
             }
 

@@ -46,7 +46,7 @@ pub fn token_conditional_swap_trigger(
     let mut liqee = ctx.accounts.liqee.load_full_mut()?;
 
     let tcs = liqee.token_conditional_swap_by_index(token_conditional_swap_index)?;
-    require!(tcs.has_data(), MangoError::TokenConditionalSwapNotSet);
+    require!(tcs.is_configured(), MangoError::TokenConditionalSwapNotSet);
     require_eq!(
         tcs.id,
         token_conditional_swap_id,
@@ -220,7 +220,7 @@ fn action(
 
     let tcs = {
         let tcs = liqee.token_conditional_swap_by_index(token_conditional_swap_index)?;
-        require!(tcs.has_data(), MangoError::TokenConditionalSwapNotSet);
+        require!(tcs.is_configured(), MangoError::TokenConditionalSwapNotSet);
         require!(
             !tcs.is_expired(now_ts),
             MangoError::TokenConditionalSwapExpired
@@ -848,7 +848,7 @@ mod tests {
             price_premium_rate: 0.11,
             buy_token_index: 1,
             sell_token_index: 0,
-            has_data: 1,
+            is_configured: 1,
             allow_creating_borrows: 1,
             allow_creating_deposits: 1,
             ..Default::default()
@@ -911,7 +911,7 @@ mod tests {
             price_premium_rate: 0.0,
             buy_token_index: 1,
             sell_token_index: 0,
-            has_data: 1,
+            is_configured: 1,
             allow_creating_borrows: 1,
             allow_creating_deposits: 1,
             ..Default::default()
@@ -961,7 +961,7 @@ mod tests {
             taker_fee_rate: 0.05,
             buy_token_index: 1,
             sell_token_index: 0,
-            has_data: 1,
+            is_configured: 1,
             allow_creating_borrows: 1,
             allow_creating_deposits: 1,
             ..Default::default()

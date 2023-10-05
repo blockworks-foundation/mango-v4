@@ -103,7 +103,8 @@ pub struct TokenConditionalSwap {
     pub buy_token_index: TokenIndex,
     pub sell_token_index: TokenIndex,
 
-    pub has_data: u8,
+    /// If this struct is in use. (tcs are stored in a static-length array)
+    pub is_configured: u8,
 
     /// may token purchases create deposits? (often users just want to get out of a borrow)
     pub allow_creating_deposits: u8,
@@ -168,7 +169,7 @@ impl Default for TokenConditionalSwap {
             maker_fee_rate: 0.0,
             buy_token_index: TokenIndex::MAX,
             sell_token_index: TokenIndex::MAX,
-            has_data: 0,
+            is_configured: 0,
             allow_creating_borrows: 0,
             allow_creating_deposits: 0,
             display_price_style: TokenConditionalSwapDisplayPriceStyle::SellTokenPerBuyToken.into(),
@@ -185,13 +186,14 @@ impl Default for TokenConditionalSwap {
 impl TokenConditionalSwap {
     /// Whether the entry is in use
     ///
-    /// Note that it's possible for an entry to be in use but be expired
-    pub fn has_data(&self) -> bool {
-        self.has_data == 1
+    /// Note that it's possible for an entry to be configured but expired.
+    /// Or to be configured but not started yet.
+    pub fn is_configured(&self) -> bool {
+        self.is_configured == 1
     }
 
-    pub fn set_has_data(&mut self, has_data: bool) {
-        self.has_data = u8::from(has_data);
+    pub fn set_is_configured(&mut self, is_configured: bool) {
+        self.is_configured = u8::from(is_configured);
     }
 
     pub fn tcs_type(&self) -> TokenConditionalSwapType {

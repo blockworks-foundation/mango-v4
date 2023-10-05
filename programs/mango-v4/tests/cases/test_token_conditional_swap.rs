@@ -326,7 +326,7 @@ async fn test_token_conditional_swap_basic() -> Result<(), TransportError> {
     assert!(!account_data
         .token_conditional_swap_by_index(0)
         .unwrap()
-        .has_data());
+        .is_configured());
 
     Ok(())
 }

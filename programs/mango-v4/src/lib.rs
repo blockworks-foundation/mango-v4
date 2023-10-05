@@ -1280,7 +1280,7 @@ pub mod mango_v4 {
             maker_fee_rate: 0.0, // set inside
             buy_token_index: ctx.accounts.buy_bank.load()?.token_index,
             sell_token_index: ctx.accounts.sell_bank.load()?.token_index,
-            has_data: 1,
+            is_configured: 1,
             allow_creating_deposits: u8::from(allow_creating_deposits),
             allow_creating_borrows: u8::from(allow_creating_borrows),
             display_price_style: display_price_style.into(),
@@ -1325,7 +1325,7 @@ pub mod mango_v4 {
             maker_fee_rate: 0.0, // set inside
             buy_token_index: ctx.accounts.buy_bank.load()?.token_index,
             sell_token_index: ctx.accounts.sell_bank.load()?.token_index,
-            has_data: 1,
+            is_configured: 1,
             allow_creating_deposits: u8::from(allow_creating_deposits),
             allow_creating_borrows: u8::from(allow_creating_borrows),
             display_price_style: display_price_style.into(),
@@ -1369,7 +1369,7 @@ pub mod mango_v4 {
             maker_fee_rate: 0.0,     // set inside
             buy_token_index: ctx.accounts.buy_bank.load()?.token_index,
             sell_token_index: ctx.accounts.sell_bank.load()?.token_index,
-            has_data: 1,
+            is_configured: 1,
             allow_creating_deposits: u8::from(allow_creating_deposits),
             allow_creating_borrows: u8::from(allow_creating_borrows),
             display_price_style: display_price_style.into(),

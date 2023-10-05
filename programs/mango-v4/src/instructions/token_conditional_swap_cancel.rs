@@ -20,7 +20,7 @@ pub fn token_conditional_swap_cancel(
     require_eq!(tcs.sell_token_index, sell_bank.token_index);
 
     // If the tcs is already inactive, this just is a noop
-    if !tcs.has_data() {
+    if !tcs.is_configured() {
         return Ok(());
     }
 
