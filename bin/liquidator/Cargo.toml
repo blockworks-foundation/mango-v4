@@ -1,5 +1,3 @@
-cargo-features = ["workspace-inheritance"]
-
 [package]
 name = "mango-v4-liquidator"
 version = "0.0.1"
