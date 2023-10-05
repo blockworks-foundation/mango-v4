@@ -20,3 +20,5 @@ keeper/.env
 .env
 
 ts/client/src/scripts/archive/ts.ts
+
+**/.git

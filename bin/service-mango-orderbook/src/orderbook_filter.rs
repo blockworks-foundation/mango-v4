@@ -14,10 +14,10 @@ use mango_feeds_lib::{
 };
 use mango_v4::accounts_zerocopy::{AccountReader, KeyedAccountReader};
 use mango_v4::state::oracle_state_unchecked;
-use mango_v4::state::{OracleConfigParams, OracleState};
+use mango_v4::state::OracleConfigParams;
 use mango_v4::{
     serum3_cpi::OrderBookStateHeader,
-    state::{self, BookSide, OrderTreeType},
+    state::{BookSide, OrderTreeType},
 };
 use serum_dex::critbit::Slab;
 use service_mango_orderbook::{

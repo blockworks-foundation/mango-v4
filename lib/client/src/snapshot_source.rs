@@ -14,6 +14,8 @@ use anyhow::Context;
 use futures::{stream, StreamExt};
 use std::str::FromStr;
 use std::time::Duration;
+use solana_rpc::rpc::rpc_accounts::AccountsDataClient;
+use solana_rpc::rpc::rpc_accounts_scan::AccountsScanClient;
 use tokio::time;
 use tracing::*;
 
@@ -96,10 +98,10 @@ async fn feed_snapshots(
     // TODO replace the following with mango-feeds connector's snapshot.rs
 
     // note: with solana 1.15 the gPA (get_program_accounts) rpc call was moved to a new mod rpc_client_scan
-    let rpc_client_data = http::connect_with_options::<solana_rpc::rpc::rpc_accounts::AccountsDataClient>(&config.rpc_http_url, true)
+    let rpc_client_data = http::connect_with_options::<AccountsDataClient>(&config.rpc_http_url, true)
     .await.map_err_anyhow()?;
 
-    let rpc_client_scan = http::connect_with_options::<solana_rpc::rpc::rpc_accounts_scan::AccountsScanClient>(&config.rpc_http_url, true)
+    let rpc_client_scan = http::connect_with_options::<AccountsScanClient>(&config.rpc_http_url, true)
     .await.map_err_anyhow()?;
 
     let account_info_config = RpcAccountInfoConfig {
