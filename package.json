@@ -1,6 +1,6 @@
 {
   "name": "@blockworks-foundation/mango-v4",
-  "version": "0.19.32",
+  "version": "0.19.33",
   "description": "Typescript Client for mango-v4 program.",
   "repository": "https://github.com/blockworks-foundation/mango-v4",
   "author": {
@@ -46,10 +46,13 @@
     "eslint": "^7.28.0",
     "eslint-config-prettier": "^7.2.0",
     "fast-csv": "^4.3.6",
+    "js-sha3": "0.9.2",
     "mocha": "^9.1.3",
     "prettier": "^2.0.5",
+    "secp256k1": "5.0.0",
     "ts-mocha": "^10.0.0",
     "ts-node": "^10.9.1",
+    "tweetnacl": "1.0.3",
     "typedoc": "^0.22.5",
     "typescript": "^4.8.4"
   },
@@ -58,6 +61,7 @@
     "trailingComma": "all"
   },
   "dependencies": {
+    "@blockworks-foundation/mango-v4-settings": "^0.2.15",
     "@coral-xyz/anchor": "^0.27.0",
     "@project-serum/serum": "0.13.65",
     "@pythnetwork/client": "~2.14.0",

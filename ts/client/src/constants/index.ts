@@ -26,6 +26,10 @@ export const MANGO_V4_ID = {
   'mainnet-beta': new PublicKey('4MangoMjqJ2firMokCjjGgoK8d4MXcrgL7XJaL3w6fVg'),
 };
 
+export const MANGO_V4_MAIN_GROUP = new PublicKey(
+  '78b8f4cGCwmZ9ysPFMWLaLTkkaYnUjwMJYStWe5RTSSX',
+);
+
 export const USDC_MINT = new PublicKey(
   'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v',
 );
