@@ -1,5 +1,5 @@
 export type MangoV4 = {
-  "version": "0.19.0",
+  "version": "0.20.0",
   "name": "mango_v4",
   "instructions": [
     {
@@ -6044,7 +6044,7 @@ export type MangoV4 = {
           "relations": [
             "bids",
             "asks",
-            "event_queue"
+            "event_heap"
           ]
         },
         {
@@ -6058,7 +6058,7 @@ export type MangoV4 = {
           "isSigner": false
         },
         {
-          "name": "eventQueue",
+          "name": "eventHeap",
           "isMut": true,
           "isSigner": false
         },
@@ -6185,7 +6185,7 @@ export type MangoV4 = {
           "relations": [
             "bids",
             "asks",
-            "event_queue"
+            "event_heap"
           ]
         },
         {
@@ -6199,7 +6199,7 @@ export type MangoV4 = {
           "isSigner": false
         },
         {
-          "name": "eventQueue",
+          "name": "eventHeap",
           "isMut": true,
           "isSigner": false
         },
@@ -6512,7 +6512,7 @@ export type MangoV4 = {
           "relations": [
             "bids",
             "asks",
-            "event_queue"
+            "event_heap"
           ]
         },
         {
@@ -6526,7 +6526,7 @@ export type MangoV4 = {
           "isSigner": false
         },
         {
-          "name": "eventQueue",
+          "name": "eventHeap",
           "isMut": true,
           "isSigner": false
         },
@@ -12928,7 +12928,7 @@ export type MangoV4 = {
 };
 
 export const IDL: MangoV4 = {
-  "version": "0.19.0",
+  "version": "0.20.0",
   "name": "mango_v4",
   "instructions": [
     {
@@ -18973,7 +18973,7 @@ export const IDL: MangoV4 = {
           "relations": [
             "bids",
             "asks",
-            "event_queue"
+            "event_heap"
           ]
         },
         {
@@ -18987,7 +18987,7 @@ export const IDL: MangoV4 = {
           "isSigner": false
         },
         {
-          "name": "eventQueue",
+          "name": "eventHeap",
           "isMut": true,
           "isSigner": false
         },
@@ -19114,7 +19114,7 @@ export const IDL: MangoV4 = {
           "relations": [
             "bids",
             "asks",
-            "event_queue"
+            "event_heap"
           ]
         },
         {
@@ -19128,7 +19128,7 @@ export const IDL: MangoV4 = {
           "isSigner": false
         },
         {
-          "name": "eventQueue",
+          "name": "eventHeap",
           "isMut": true,
           "isSigner": false
         },
@@ -19441,7 +19441,7 @@ export const IDL: MangoV4 = {
           "relations": [
             "bids",
             "asks",
-            "event_queue"
+            "event_heap"
           ]
         },
         {
@@ -19455,7 +19455,7 @@ export const IDL: MangoV4 = {
           "isSigner": false
         },
         {
-          "name": "eventQueue",
+          "name": "eventHeap",
           "isMut": true,
           "isSigner": false
         },
