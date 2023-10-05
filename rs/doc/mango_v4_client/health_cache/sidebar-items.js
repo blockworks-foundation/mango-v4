@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"fn":[["new",""],["new_sync",""]]};
+window.SIDEBAR_ITEMS = {"fn":["new","new_sync"]};

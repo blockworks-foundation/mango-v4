@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"enum":[["RawQuote",""],["Version",""]],"mod":[["v4",""],["v6",""]],"struct":[["Jupiter",""],["Quote",""]]};
+window.SIDEBAR_ITEMS = {"enum":["RawQuote","Version"],"mod":["v4","v6"],"struct":["Jupiter","Quote"]};

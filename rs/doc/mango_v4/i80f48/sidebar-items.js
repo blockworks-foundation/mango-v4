@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"trait":[["ClampToInt",""],["LowPrecisionDivision",""]]};
+window.SIDEBAR_ITEMS = {"trait":["ClampToInt","LowPrecisionDivision"]};

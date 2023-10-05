@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"struct":[["Equity",""],["MangoAccountData",""],["PerpEquity",""],["TokenEquity",""]]};
+window.SIDEBAR_ITEMS = {"struct":["Equity","MangoAccountData","PerpEquity","TokenEquity"]};
