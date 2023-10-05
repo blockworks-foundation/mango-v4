@@ -33,7 +33,7 @@ pub struct OpenbookV2PlaceOrder<'info> {
         mut,
         has_one = bids,
         has_one = asks,
-        has_one = event_queue,
+        has_one = event_heap,
     )]
     pub openbook_v2_market_external: AccountLoader<'info, Market>,
 
@@ -47,7 +47,7 @@ pub struct OpenbookV2PlaceOrder<'info> {
 
     #[account(mut)]
     /// CHECK: event queue will be checked by openbook_v2
-    pub event_queue: UncheckedAccount<'info>,
+    pub event_heap: UncheckedAccount<'info>,
 
     #[account(mut)]
     /// CHECK: base vault will be checked by openbook_v2

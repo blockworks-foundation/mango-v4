@@ -31,8 +31,8 @@ on:
 
 env:
   CARGO_TERM_COLOR: always
-  SOLANA_VERSION: '1.14.9'
-  RUST_TOOLCHAIN: '1.65.0'
+  SOLANA_VERSION: '1.16.14'
+  RUST_TOOLCHAIN: '1.69.0'
   LOG_PROGRAM: '4MangoMjqJ2firMokCjjGgoK8d4MXcrgL7XJaL3w6fVg'
 
 jobs:

@@ -28,6 +28,7 @@ pub mod types;
 pub mod instructions;
 
 #[cfg(all(not(feature = "no-entrypoint"), not(feature = "enable-gpl")))]
+
 compile_error!("compiling the program entrypoint without 'enable-gpl' makes no sense, enable it or use the 'cpi' or 'client' features");
 
 use state::{

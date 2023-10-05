@@ -11,6 +11,10 @@ on:
         'bin/keeper/**',
         'bin/liquidator/**',
         'bin/settler/**',
+        'bin/service-mango-crank/**',
+        'bin/service-mango-fills/**',
+        'bin/service-mango-orderbook/**',
+        'bin/service-mango-pnl/**',
       ]
   workflow_dispatch:
 

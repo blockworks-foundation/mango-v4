@@ -24,17 +24,18 @@ jsonrpc-core = "18.0.0"
 jsonrpc-core-client = { version = "18.0.0", features = ["ws", "http", "tls"] }
 mango-v4 = { path = "../../programs/mango-v4", features = ["client"] }
 pyth-sdk-solana = { workspace = true }
-serum_dex = { workspace = true, default-features=false,features = ["no-entrypoint", "program"] }
+serum_dex = { workspace = true, features = ["no-entrypoint", "program"] }
 shellexpand = "2.1.0"
 solana-account-decoder = { workspace = true }
 solana-client = { workspace = true }
 solana-rpc = { workspace = true }
 solana-sdk = { workspace = true }
 solana-address-lookup-table-program = { workspace = true }
-mango-feeds-connector = "0.1.1"
+mango-feeds-connector = { workspace = true }
 spl-associated-token-account = "1.0.3"
 thiserror = "1.0.31"
-reqwest = "0.11.11"
+# note: should match the version used in solana
+reqwest = "0.11.17"
 tokio = { version = "1", features = ["full"] }
 tokio-stream = { version = "0.1.9"}
 serde = "1.0.141"

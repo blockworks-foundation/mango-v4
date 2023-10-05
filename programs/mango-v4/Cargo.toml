@@ -20,7 +20,7 @@ default = []
 test-bpf = ["client"]
 client = ["solana-sdk", "no-entrypoint"]
 # Enables GPL-licensed parts of the code. See LICENSE file.
-enable-gpl = []
+enable-gpl = ["openbook-v2/enable-gpl"]
 
 [dependencies]
 # todo: when to fix, when to use caret? need a regular chore to bump dependencies
@@ -29,7 +29,7 @@ anchor-lang = { workspace = true }
 anchor-spl = { workspace = true }
 arrayref = "0.3.6"
 bincode = "1.3.3"
-borsh = { version = "0.9.3", features = ["const-generics"] }
+borsh = { version = "0.10.3", features = ["const-generics"] }
 bytemuck = { version = "^1.7.2", features = ["min_const_generics"] }
 default-env = "0.1.1"
 derivative = "2.2.0"
@@ -37,15 +37,20 @@ fixed = { workspace = true, features = ["serde", "borsh", "debug-assert-in-relea
 num_enum = "0.5.1"
 pyth-sdk-solana = { workspace = true }
 serde = "^1.0"
-serum_dex = { workspace = true, default-features=false, features = ["no-entrypoint", "program"] }
+serum_dex = { workspace = true, features = ["no-entrypoint", "program"] }
 solana-address-lookup-table-program = { workspace = true }
 solana-program = { workspace = true }
 solana-sdk = { workspace = true, default-features = false, optional = true }
 solana-security-txt = "1.1.0"
 static_assertions = "1.1"
-switchboard-program = ">=0.2.0"
-switchboard-v2 = "0.1.17"
-openbook-v2 = { git = "https://github.com/openbook-dex/openbook-v2.git", default-features=false, features = ["no-entrypoint"] }
+
+# note: switchboard-common 0.8.19 is broken - use 0.8.18 instead
+switchboard-program = "0.2"
+switchboard-v2 = { package = "switchboard-solana", version = "0.28" }
+
+
+openbook-v2 = { git = "https://github.com/openbook-dex/openbook-v2.git", features = ["no-entrypoint"] }
+
 
 [dev-dependencies]
 solana-sdk = { workspace = true, default-features = false }
