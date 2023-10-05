@@ -31,7 +31,6 @@ solana-client = { workspace = true }
 solana-rpc = { workspace = true }
 solana-sdk = { workspace = true }
 solana-address-lookup-table-program = { workspace = true }
-# groovie/MAN-68-mango-feeds-dependencies but with solana 1.16.1
 mango-feeds-connector = { workspace = true }
 spl-associated-token-account = "1.0.3"
 thiserror = "1.0.31"
