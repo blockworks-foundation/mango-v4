@@ -1,3 +1,5 @@
+mod memory_target;
+
 use {
     log::*,
     mango_feeds_connector::chain_data::ChainData,
@@ -159,8 +161,8 @@ struct PnlResponseItem {
 
 use jsonrpsee::http_server::HttpServerHandle;
 use mango_feeds_connector::{
-    grpc_plugin_source, memory_target, metrics, EntityFilter, FilterConfig, MetricsConfig,
-    SnapshotSourceConfig, SourceConfig,
+    grpc_plugin_source, metrics, EntityFilter, FilterConfig, MetricsConfig, SnapshotSourceConfig,
+    SourceConfig,
 };
 
 fn start_jsonrpc_server(

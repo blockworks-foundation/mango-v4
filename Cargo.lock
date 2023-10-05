@@ -3247,7 +3247,8 @@ dependencies = [
 [[package]]
 name = "mango-feeds-connector"
 version = "0.2.0"
-source = "git+https://github.com/blockworks-foundation/mango-feeds.git?branch=update-solana-1-16-anchor-28#5b11abd6496cb2142d486ba074c5b9e1806a922b"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3c51f9dd65f5c5ce13a41aa099c7fd6f2462ad9bc0184333a348a4b683139f9d"
 dependencies = [
  "anyhow",
  "async-channel",
@@ -5962,6 +5963,7 @@ dependencies = [
  "anchor-client",
  "anchor-lang",
  "anyhow",
+ "async-channel",
  "async-trait",
  "bs58 0.3.1",
  "fixed 1.11.0 (git+https://github.com/blockworks-foundation/fixed.git?branch=v1.11.0-borsh0_10-mango)",
