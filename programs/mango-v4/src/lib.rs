@@ -33,7 +33,7 @@ compile_error!("compiling the program entrypoint without 'enable-gpl' makes no s
 use state::{
     OpenbookV2MarketIndex, OracleConfigParams, PerpMarketIndex, PlaceOrderType, SelfTradeBehavior,
     Serum3MarketIndex, Side, TokenConditionalSwap, TokenConditionalSwapDisplayPriceStyle,
-    TokenConditionalSwapIntention, TokenIndex,
+    TokenConditionalSwapIntention, TokenConditionalSwapType, TokenIndex, TCS_START_INCENTIVE,
 };
 
 declare_id!("4MangoMjqJ2firMokCjjGgoK8d4MXcrgL7XJaL3w6fVg");
@@ -42,7 +42,6 @@ declare_id!("4MangoMjqJ2firMokCjjGgoK8d4MXcrgL7XJaL3w6fVg");
 pub mod mango_v4 {
     use super::*;
     use error::*;
-    use state::TokenConditionalSwapType;
 
     pub fn admin_token_withdraw_fees(ctx: Context<AdminTokenWithdrawFees>) -> Result<()> {
         #[cfg(feature = "enable-gpl")]
@@ -1311,6 +1310,7 @@ pub mod mango_v4 {
         intention: TokenConditionalSwapIntention,
         duration_seconds: u64,
     ) -> Result<()> {
+        require_gte!(duration_seconds, 1);
         let tcs = TokenConditionalSwap {
             id: u64::MAX, // set inside
             max_buy,
@@ -1355,6 +1355,23 @@ pub mod mango_v4 {
         start_timestamp: u64,
         duration_seconds: u64,
     ) -> Result<()> {
+        require_gte!(duration_seconds, 1);
+
+        let buy_token_price = ctx.accounts.buy_bank.load()?.stable_price().to_num::<f64>();
+        let sell_token_price = ctx
+            .accounts
+            .sell_bank
+            .load()?
+            .stable_price()
+            .to_num::<f64>();
+        let max_volume =
+            (buy_token_price * max_buy as f64).min(sell_token_price * max_sell as f64) as u64;
+        require_gte!(
+            max_volume,
+            TCS_START_INCENTIVE * 10,
+            MangoError::TokenConditionalSwapTooSmallForStartIncentive
+        );
+
         let tcs = TokenConditionalSwap {
             id: u64::MAX, // set inside
             max_buy,

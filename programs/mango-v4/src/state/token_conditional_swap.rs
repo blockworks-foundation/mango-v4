@@ -10,9 +10,8 @@ use crate::error::MangoError;
 use crate::i80f48::ClampToInt;
 use crate::state::*;
 
-/// Incentive to pay to callers who start an auction
-// TODO: $0.001 is ok? around 10x tx fee currently
-pub const TCS_START_INCENTIVE: u64 = 1_000; // $0.001
+/// Incentive to pay to callers who start an auction, in $1e-6
+pub const TCS_START_INCENTIVE: u64 = 1_000; // $0.001 around 10x tx fee right now
 
 #[derive(
     Clone, Copy, PartialEq, Eq, IntoPrimitive, TryFromPrimitive, AnchorDeserialize, AnchorSerialize,
