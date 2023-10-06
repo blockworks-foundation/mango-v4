@@ -197,21 +197,35 @@ export class Serum3Market {
   }
 }
 
-export class Serum3SelfTradeBehavior {
-  static decrementTake = { decrementTake: {} };
-  static cancelProvide = { cancelProvide: {} };
-  static abortTransaction = { abortTransaction: {} };
+export type Serum3OrderType =
+  | { limit: Record<string, never> }
+  | { immediateOrCancel: Record<string, never> }
+  | { postOnly: Record<string, never> };
+// eslint-disable-next-line @typescript-eslint/no-namespace
+export namespace Serum3OrderType {
+  export const limit = { limit: {} };
+  export const immediateOrCancel = { immediateOrCancel: {} };
+  export const postOnly = { postOnly: {} };
 }
 
-export class Serum3OrderType {
-  static limit = { limit: {} };
-  static immediateOrCancel = { immediateOrCancel: {} };
-  static postOnly = { postOnly: {} };
+export type Serum3SelfTradeBehavior =
+  | { decrementTake: Record<string, never> }
+  | { cancelProvide: Record<string, never> }
+  | { abortTransaction: Record<string, never> };
+// eslint-disable-next-line @typescript-eslint/no-namespace
+export namespace Serum3SelfTradeBehavior {
+  export const decrementTake = { decrementTake: {} };
+  export const cancelProvide = { cancelProvide: {} };
+  export const abortTransaction = { abortTransaction: {} };
 }
 
-export class Serum3Side {
-  static bid = { bid: {} };
-  static ask = { ask: {} };
+export type Serum3Side =
+  | { bid: Record<string, never> }
+  | { ask: Record<string, never> };
+// eslint-disable-next-line @typescript-eslint/no-namespace
+export namespace Serum3Side {
+  export const bid = { bid: {} };
+  export const ask = { ask: {} };
 }
 
 export async function generateSerum3MarketExternalVaultSignerAddress(

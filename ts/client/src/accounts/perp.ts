@@ -646,11 +646,7 @@ export class BookSide {
    * iterates over all orders
    */
   public *items(): Generator<PerpOrder> {
-    function isBetter(
-      type: PerpOrderSide,
-      a: PerpOrder,
-      b: PerpOrder,
-    ): boolean {
+    function isBetter(type: BookSideType, a: PerpOrder, b: PerpOrder): boolean {
       return a.priceLots.eq(b.priceLots)
         ? a.seqNum.lt(b.seqNum) // if prices are equal prefer perp orders in the order they are placed
         : type === BookSideType.bids // else compare the actual prices
@@ -833,10 +829,15 @@ export class BookSide {
   }
 }
 
-export class BookSideType {
-  static bids = { bids: {} };
-  static asks = { asks: {} };
+export type BookSideType =
+  | { bids: Record<string, never> }
+  | { asks: Record<string, never> };
+// eslint-disable-next-line @typescript-eslint/no-namespace
+export namespace BookSideType {
+  export const bids = { bids: {} };
+  export const asks = { asks: {} };
 }
+
 export class LeafNode {
   static from(obj: {
     ownerSlot: number;
@@ -879,23 +880,39 @@ export class InnerNode {
   constructor(public children: [number]) {}
 }
 
-export class PerpSelfTradeBehavior {
-  static decrementTake = { decrementTake: {} };
-  static cancelProvide = { cancelProvide: {} };
-  static abortTransaction = { abortTransaction: {} };
+export type PerpSelfTradeBehavior =
+  | { decrementTake: Record<string, never> }
+  | { cancelProvide: Record<string, never> }
+  | { abortTransaction: Record<string, never> };
+// eslint-disable-next-line @typescript-eslint/no-namespace
+export namespace PerpSelfTradeBehavior {
+  export const decrementTake = { decrementTake: {} };
+  export const cancelProvide = { cancelProvide: {} };
+  export const abortTransaction = { abortTransaction: {} };
 }
 
-export class PerpOrderSide {
-  static bid = { bid: {} };
-  static ask = { ask: {} };
+export type PerpOrderSide =
+  | { bid: Record<string, never> }
+  | { ask: Record<string, never> };
+// eslint-disable-next-line @typescript-eslint/no-namespace
+export namespace PerpOrderSide {
+  export const bid = { bid: {} };
+  export const ask = { ask: {} };
 }
 
-export class PerpOrderType {
-  static limit = { limit: {} };
-  static immediateOrCancel = { immediateOrCancel: {} };
-  static postOnly = { postOnly: {} };
-  static market = { market: {} };
-  static postOnlySlide = { postOnlySlide: {} };
+export type PerpOrderType =
+  | { limit: Record<string, never> }
+  | { immediateOrCancel: Record<string, never> }
+  | { postOnly: Record<string, never> }
+  | { market: Record<string, never> }
+  | { postOnlySlide: Record<string, never> };
+// eslint-disable-next-line @typescript-eslint/no-namespace
+export namespace PerpOrderType {
+  export const limit = { limit: {} };
+  export const immediateOrCancel = { immediateOrCancel: {} };
+  export const postOnly = { postOnly: {} };
+  export const market = { market: {} };
+  export const postOnlySlide = { postOnlySlide: {} };
 }
 
 export class PerpOrder {

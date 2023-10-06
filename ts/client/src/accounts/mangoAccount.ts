@@ -1776,15 +1776,24 @@ export class PerpOoDto {
   ) {}
 }
 
-export class TokenConditionalSwapDisplayPriceStyle {
-  static sellTokenPerBuyToken = { sellTokenPerBuyToken: {} };
-  static buyTokenPerSellToken = { buyTokenPerSellToken: {} };
+export type TokenConditionalSwapDisplayPriceStyle =
+  | { sellTokenPerBuyToken: Record<string, never> }
+  | { buyTokenPerSellToken: Record<string, never> };
+// eslint-disable-next-line @typescript-eslint/no-namespace
+export namespace TokenConditionalSwapDisplayPriceStyle {
+  export const sellTokenPerBuyToken = { sellTokenPerBuyToken: {} };
+  export const buyTokenPerSellToken = { buyTokenPerSellToken: {} };
 }
 
-export class TokenConditionalSwapIntention {
-  static unknown = { unknown: {} };
-  static stopLoss = { stopLoss: {} };
-  static takeProfit = { takeProfit: {} };
+export type TokenConditionalSwapIntention =
+  | { unknown: Record<string, never> }
+  | { stopLoss: Record<string, never> }
+  | { takeProfit: Record<string, never> };
+// eslint-disable-next-line @typescript-eslint/no-namespace
+export namespace TokenConditionalSwapIntention {
+  export const unknown = { unknown: {} };
+  export const stopLoss = { stopLoss: {} };
+  export const takeProfit = { takeProfit: {} };
 }
 
 function tokenConditionalSwapIntentionFromDto(
