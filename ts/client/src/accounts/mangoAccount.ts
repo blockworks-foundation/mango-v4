@@ -1793,15 +1793,29 @@ export class PerpOoDto {
   ) {}
 }
 
-export class TokenConditionalSwapDisplayPriceStyle {
-  static sellTokenPerBuyToken = { sellTokenPerBuyToken: {} };
-  static buyTokenPerSellToken = { buyTokenPerSellToken: {} };
+export type TokenConditionalSwapDisplayPriceStyle =
+  // eslint-disable-next-line @typescript-eslint/ban-types
+  | { sellTokenPerBuyToken: {} }
+  // eslint-disable-next-line @typescript-eslint/ban-types
+  | { buyTokenPerSellToken: {} };
+// eslint-disable-next-line @typescript-eslint/no-namespace
+export namespace TokenConditionalSwapDisplayPriceStyle {
+  export const sellTokenPerBuyToken = { sellTokenPerBuyToken: {} };
+  export const buyTokenPerSellToken = { buyTokenPerSellToken: {} };
 }
 
-export class TokenConditionalSwapIntention {
-  static unknown = { unknown: {} };
-  static stopLoss = { stopLoss: {} };
-  static takeProfit = { takeProfit: {} };
+export type TokenConditionalSwapIntention =
+  // eslint-disable-next-line @typescript-eslint/ban-types
+  | { unknown: {} }
+  // eslint-disable-next-line @typescript-eslint/ban-types
+  | { stopLoss: {} }
+  // eslint-disable-next-line @typescript-eslint/ban-types
+  | { takeProfit: {} };
+// eslint-disable-next-line @typescript-eslint/no-namespace
+export namespace TokenConditionalSwapIntention {
+  export const unknown = { unknown: {} };
+  export const stopLoss = { stopLoss: {} };
+  export const takeProfit = { takeProfit: {} };
 }
 
 function tokenConditionalSwapIntentionFromDto(

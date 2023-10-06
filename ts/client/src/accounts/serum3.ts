@@ -197,21 +197,40 @@ export class Serum3Market {
   }
 }
 
-export class Serum3SelfTradeBehavior {
-  static decrementTake = { decrementTake: {} };
-  static cancelProvide = { cancelProvide: {} };
-  static abortTransaction = { abortTransaction: {} };
+export type Serum3OrderType =
+  // eslint-disable-next-line @typescript-eslint/ban-types
+  | { limit: {} }
+  // eslint-disable-next-line @typescript-eslint/ban-types
+  | { immediateOrCancel: {} }
+  // eslint-disable-next-line @typescript-eslint/ban-types
+  | { postOnly: {} };
+// eslint-disable-next-line @typescript-eslint/no-namespace
+export namespace Serum3OrderType {
+  export const limit = { limit: {} };
+  export const immediateOrCancel = { immediateOrCancel: {} };
+  export const postOnly = { postOnly: {} };
 }
 
-export class Serum3OrderType {
-  static limit = { limit: {} };
-  static immediateOrCancel = { immediateOrCancel: {} };
-  static postOnly = { postOnly: {} };
+export type Serum3SelfTradeBehavior =
+  // eslint-disable-next-line @typescript-eslint/ban-types
+  | { decrementTake: {} }
+  // eslint-disable-next-line @typescript-eslint/ban-types
+  | { cancelProvide: {} }
+  // eslint-disable-next-line @typescript-eslint/ban-types
+  | { abortTransaction: {} };
+// eslint-disable-next-line @typescript-eslint/no-namespace
+export namespace Serum3SelfTradeBehavior {
+  export const decrementTake = { decrementTake: {} };
+  export const cancelProvide = { cancelProvide: {} };
+  export const abortTransaction = { abortTransaction: {} };
 }
 
-export class Serum3Side {
-  static bid = { bid: {} };
-  static ask = { ask: {} };
+// eslint-disable-next-line @typescript-eslint/ban-types
+export type Serum3Side = { bid: {} } | { ask: {} };
+// eslint-disable-next-line @typescript-eslint/no-namespace
+export namespace Serum3Side {
+  export const bid = { bid: {} };
+  export const ask = { ask: {} };
 }
 
 export async function generateSerum3MarketExternalVaultSignerAddress(

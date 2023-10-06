@@ -7,9 +7,12 @@ export class FlashLoanWithdraw {
   static amount: BN;
 }
 
-export class FlashLoanType {
-  static unknown = { unknown: {} };
-  static swap = { swap: {} };
+// eslint-disable-next-line @typescript-eslint/ban-types
+export type FlashLoanType = { unknown: {} } | { swap: {} };
+// eslint-disable-next-line @typescript-eslint/no-namespace
+export namespace FlashLoanType {
+  export const unknown = { unknown: {} };
+  export const swap = { swap: {} };
 }
 
 export class InterestRateParams {
