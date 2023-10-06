@@ -19,11 +19,11 @@ jobs:
 
       - name: Setup Anchor
         run: |
-          cargo install --git https://github.com/coral-xyz/anchor --tag v0.27.0 anchor-cli --locked --force
+          cargo install --git https://github.com/coral-xyz/anchor --tag v0.28.0 anchor-cli --locked --force
 
       - name: Verifiable Build
         run: |
-          anchor build --verifiable --solana-version 1.14.13 -- --features enable-gpl
+          anchor build --verifiable --docker-image backpackapp/build:v0.28.0 --solana-version 1.16.14 -- --features enable-gpl
 
       - name: Generate Checksum
         run: |
