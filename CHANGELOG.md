@@ -40,6 +40,7 @@ Update this for each program release and mainnet deployment.
   withdraw-all style instruction.
 
 - Update dependencies to Anchor v0.28.0 and Solana v1.16.14 (#718)
+- Flash loan: Introduce specialized FlashLoanSwapBegin to save tx bytes (#744)
 - Flash loan: Whitelist Jupiter v6 program for delegates (#737)
 - Token deposit: Require a valid oracle when opening a new token position (#722)
 - Fix computing maximum allowed amount when swapping zero asset-weight tokens (#699)

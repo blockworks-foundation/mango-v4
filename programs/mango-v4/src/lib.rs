@@ -473,7 +473,26 @@ pub mod mango_v4 {
         loan_amounts: Vec<u64>,
     ) -> Result<()> {
         #[cfg(feature = "enable-gpl")]
-        instructions::flash_loan_begin(ctx, loan_amounts)?;
+        instructions::flash_loan_begin(
+            ctx.program_id,
+            &ctx.accounts.account,
+            ctx.accounts.owner.key,
+            &ctx.accounts.instructions,
+            &ctx.accounts.token_program,
+            ctx.remaining_accounts,
+            loan_amounts,
+        )?;
+        Ok(())
+    }
+
+    /// A version of flash_loan_begin that's specialized for swaps and needs fewer
+    /// bytes in the transaction
+    pub fn flash_loan_swap_begin<'key, 'accounts, 'remaining, 'info>(
+        ctx: Context<'key, 'accounts, 'remaining, 'info, FlashLoanSwapBegin<'info>>,
+        loan_amount: u64,
+    ) -> Result<()> {
+        #[cfg(feature = "enable-gpl")]
+        instructions::flash_loan_swap_begin(ctx, loan_amount)?;
         Ok(())
     }
 
