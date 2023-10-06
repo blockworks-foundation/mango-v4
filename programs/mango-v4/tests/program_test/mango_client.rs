@@ -2,6 +2,7 @@
 
 use anchor_lang::prelude::*;
 use anchor_lang::solana_program::sysvar::{self, SysvarId};
+use anchor_spl::associated_token::AssociatedToken;
 use anchor_spl::token::{Token, TokenAccount};
 use fixed::types::I80F48;
 use itertools::Itertools;
@@ -511,7 +512,100 @@ impl ClientInstruction for FlashLoanBeginInstruction {
     }
 
     fn signers(&self) -> Vec<TestKeypair> {
-        vec![]
+        vec![self.owner]
+    }
+}
+
+pub struct FlashLoanSwapBeginInstruction {
+    pub account: Pubkey,
+    pub owner: TestKeypair,
+    pub in_bank: Pubkey,
+    pub out_bank: Pubkey,
+    pub in_loan: u64,
+}
+#[async_trait::async_trait(?Send)]
+impl ClientInstruction for FlashLoanSwapBeginInstruction {
+    type Accounts = mango_v4::accounts::FlashLoanSwapBegin;
+    type Instruction = mango_v4::instruction::FlashLoanSwapBegin;
+    async fn to_instruction(
+        &self,
+        account_loader: impl ClientAccountLoader + 'async_trait,
+    ) -> (Self::Accounts, instruction::Instruction) {
+        let program_id = mango_v4::id();
+
+        let account = account_loader
+            .load_mango_account(&self.account)
+            .await
+            .unwrap();
+
+        let in_bank: Bank = account_loader.load(&self.in_bank).await.unwrap();
+        let out_bank: Bank = account_loader.load(&self.out_bank).await.unwrap();
+        let in_account = anchor_spl::associated_token::get_associated_token_address(
+            &self.owner.pubkey(),
+            &in_bank.mint,
+        );
+        let out_account = anchor_spl::associated_token::get_associated_token_address(
+            &self.owner.pubkey(),
+            &out_bank.mint,
+        );
+
+        let accounts = Self::Accounts {
+            account: self.account,
+            owner: self.owner.pubkey(),
+            input_mint: in_bank.mint,
+            output_mint: out_bank.mint,
+            system_program: System::id(),
+            token_program: Token::id(),
+            associated_token_program: AssociatedToken::id(),
+            instructions: solana_program::sysvar::instructions::id(),
+        };
+
+        let instruction = Self::Instruction {
+            loan_amount: self.in_loan,
+        };
+
+        let mut instruction = make_instruction(program_id, &accounts, &instruction);
+        instruction.accounts.push(AccountMeta {
+            pubkey: self.in_bank,
+            is_writable: true,
+            is_signer: false,
+        });
+        instruction.accounts.push(AccountMeta {
+            pubkey: self.out_bank,
+            is_writable: true,
+            is_signer: false,
+        });
+        instruction.accounts.push(AccountMeta {
+            pubkey: in_bank.vault,
+            is_writable: true,
+            is_signer: false,
+        });
+        instruction.accounts.push(AccountMeta {
+            pubkey: out_bank.vault,
+            is_writable: true,
+            is_signer: false,
+        });
+        instruction.accounts.push(AccountMeta {
+            pubkey: in_account,
+            is_writable: true,
+            is_signer: false,
+        });
+        instruction.accounts.push(AccountMeta {
+            pubkey: out_account,
+            is_writable: true,
+            is_signer: false,
+        });
+        instruction.accounts.push(AccountMeta {
+            pubkey: account.fixed.group,
+            is_writable: false,
+            is_signer: false,
+        });
+
+        (accounts, instruction)
+    }
+
+    fn signers(&self) -> Vec<TestKeypair> {
+        vec![self.owner]
     }
 }
 

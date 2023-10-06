@@ -2,7 +2,7 @@ use crate::error::*;
 use crate::state::*;
 use anchor_lang::prelude::*;
 use anchor_lang::solana_program::sysvar::instructions as tx_instructions;
-use anchor_spl::token::Token;
+use anchor_spl::{associated_token::AssociatedToken, token::Token};
 
 pub mod jupiter_mainnet_6 {
     use solana_program::declare_id;
@@ -36,6 +36,31 @@ pub struct FlashLoanBegin<'info> {
     pub owner: Signer<'info>,
 
     pub token_program: Program<'info, Token>,
+
+    /// Instructions Sysvar for instruction introspection
+    /// CHECK: fixed instructions sysvar account
+    #[account(address = tx_instructions::ID)]
+    pub instructions: UncheckedAccount<'info>,
+}
+
+#[derive(Accounts)]
+pub struct FlashLoanSwapBegin<'info> {
+    #[account(
+        constraint = account.load()?.is_operational() @ MangoError::AccountIsFrozen
+    )]
+    pub account: AccountLoader<'info, MangoAccountFixed>,
+    // owner is checked at #1
+    #[account(mut)]
+    pub owner: Signer<'info>,
+
+    /// CHECK: bank/vault/token account in remaining accounts match against this
+    pub input_mint: UncheckedAccount<'info>,
+    /// CHECK: bank/vault/token account in remaining accounts match against this
+    pub output_mint: UncheckedAccount<'info>,
+
+    pub system_program: Program<'info, System>,
+    pub token_program: Program<'info, Token>,
+    pub associated_token_program: Program<'info, AssociatedToken>,
 
     /// Instructions Sysvar for instruction introspection
     /// CHECK: fixed instructions sysvar account
