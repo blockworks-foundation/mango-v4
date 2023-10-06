@@ -295,7 +295,7 @@ async fn main() -> anyhow::Result<()> {
         refresh_timeout: Duration::from_secs(30),
 
         jupiter_version: cli.jupiter_version.into(),
-        jupiter_slippage_bps: 100,
+        jupiter_slippage_bps: cli.rebalance_slippage_bps,
 
         // TODO: configurable
         mode: trigger_tcs::Mode::SwapSellIntoBuy,
