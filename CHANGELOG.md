@@ -39,9 +39,11 @@ Update this for each program release and mainnet deployment.
   Previously an "active but zero" token position would not be closed by a
   withdraw-all style instruction.
 
+- Update dependencies to Anchor v0.28.0 and Solana v1.16.14 (#718)
 - Flash loan: Whitelist Jupiter v6 program for delegates (#737)
 - Token deposit: Require a valid oracle when opening a new token position (#722)
 - Fix computing maximum allowed amount when swapping zero asset-weight tokens (#699)
+- Fix too-strict validation of max rate on token edit (#734)
 
 ## mainnet
 
