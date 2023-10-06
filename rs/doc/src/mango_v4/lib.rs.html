@@ -1475,6 +1475,25 @@
 <a href="#1475" id="1475">1475</a>
 <a href="#1476" id="1476">1476</a>
 <a href="#1477" id="1477">1477</a>
+<a href="#1478" id="1478">1478</a>
+<a href="#1479" id="1479">1479</a>
+<a href="#1480" id="1480">1480</a>
+<a href="#1481" id="1481">1481</a>
+<a href="#1482" id="1482">1482</a>
+<a href="#1483" id="1483">1483</a>
+<a href="#1484" id="1484">1484</a>
+<a href="#1485" id="1485">1485</a>
+<a href="#1486" id="1486">1486</a>
+<a href="#1487" id="1487">1487</a>
+<a href="#1488" id="1488">1488</a>
+<a href="#1489" id="1489">1489</a>
+<a href="#1490" id="1490">1490</a>
+<a href="#1491" id="1491">1491</a>
+<a href="#1492" id="1492">1492</a>
+<a href="#1493" id="1493">1493</a>
+<a href="#1494" id="1494">1494</a>
+<a href="#1495" id="1495">1495</a>
+<a href="#1496" id="1496">1496</a>
 </pre><pre class="rust"><code><span class="attr">#![allow(unused_variables)]
 
 </span><span class="kw">use </span>fixed::types::I80F48;
@@ -1950,7 +1969,26 @@
         loan_amounts: Vec&lt;u64&gt;,
     ) -&gt; <span class="prelude-ty">Result</span>&lt;()&gt; {
         <span class="attr">#[cfg(feature = <span class="string">&quot;enable-gpl&quot;</span>)]
-        </span>instructions::flash_loan_begin(ctx, loan_amounts)<span class="question-mark">?</span>;
+        </span>instructions::flash_loan_begin(
+            ctx.program_id,
+            <span class="kw-2">&amp;</span>ctx.accounts.account,
+            ctx.accounts.owner.key,
+            <span class="kw-2">&amp;</span>ctx.accounts.instructions,
+            <span class="kw-2">&amp;</span>ctx.accounts.token_program,
+            ctx.remaining_accounts,
+            loan_amounts,
+        )<span class="question-mark">?</span>;
+        <span class="prelude-val">Ok</span>(())
+    }
+
+    <span class="doccomment">/// A version of flash_loan_begin that&#39;s specialized for swaps and needs fewer
+    /// bytes in the transaction
+    </span><span class="kw">pub fn </span>flash_loan_swap_begin&lt;<span class="lifetime">&#39;key</span>, <span class="lifetime">&#39;accounts</span>, <span class="lifetime">&#39;remaining</span>, <span class="lifetime">&#39;info</span>&gt;(
+        ctx: Context&lt;<span class="lifetime">&#39;key</span>, <span class="lifetime">&#39;accounts</span>, <span class="lifetime">&#39;remaining</span>, <span class="lifetime">&#39;info</span>, FlashLoanSwapBegin&lt;<span class="lifetime">&#39;info</span>&gt;&gt;,
+        loan_amount: u64,
+    ) -&gt; <span class="prelude-ty">Result</span>&lt;()&gt; {
+        <span class="attr">#[cfg(feature = <span class="string">&quot;enable-gpl&quot;</span>)]
+        </span>instructions::flash_loan_swap_begin(ctx, loan_amount)<span class="question-mark">?</span>;
         <span class="prelude-val">Ok</span>(())
     }
 
