@@ -7,8 +7,9 @@ export class FlashLoanWithdraw {
   static amount: BN;
 }
 
-// eslint-disable-next-line @typescript-eslint/ban-types
-export type FlashLoanType = { unknown: {} } | { swap: {} };
+export type FlashLoanType =
+  | { unknown: Record<string, never> }
+  | { swap: Record<string, never> };
 // eslint-disable-next-line @typescript-eslint/no-namespace
 export namespace FlashLoanType {
   export const unknown = { unknown: {} };

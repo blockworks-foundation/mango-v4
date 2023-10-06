@@ -841,8 +841,9 @@ export class BookSide {
   }
 }
 
-// eslint-disable-next-line @typescript-eslint/ban-types
-export type BookSideType = { bids: {} } | { asks: {} };
+export type BookSideType =
+  | { bids: Record<string, never> }
+  | { asks: Record<string, never> };
 // eslint-disable-next-line @typescript-eslint/no-namespace
 export namespace BookSideType {
   export const bids = { bids: {} };
@@ -892,12 +893,9 @@ export class InnerNode {
 }
 
 export type PerpSelfTradeBehavior =
-  // eslint-disable-next-line @typescript-eslint/ban-types
-  | { decrementTake: {} }
-  // eslint-disable-next-line @typescript-eslint/ban-types
-  | { cancelProvide: {} }
-  // eslint-disable-next-line @typescript-eslint/ban-types
-  | { abortTransaction: {} };
+  | { decrementTake: Record<string, never> }
+  | { cancelProvide: Record<string, never> }
+  | { abortTransaction: Record<string, never> };
 // eslint-disable-next-line @typescript-eslint/no-namespace
 export namespace PerpSelfTradeBehavior {
   export const decrementTake = { decrementTake: {} };
@@ -905,8 +903,9 @@ export namespace PerpSelfTradeBehavior {
   export const abortTransaction = { abortTransaction: {} };
 }
 
-// eslint-disable-next-line @typescript-eslint/ban-types
-export type PerpOrderSide = { bid: {} } | { ask: {} };
+export type PerpOrderSide =
+  | { bid: Record<string, never> }
+  | { ask: Record<string, never> };
 // eslint-disable-next-line @typescript-eslint/no-namespace
 export namespace PerpOrderSide {
   export const bid = { bid: {} };
@@ -914,16 +913,11 @@ export namespace PerpOrderSide {
 }
 
 export type PerpOrderType =
-  // eslint-disable-next-line @typescript-eslint/ban-types
-  | { limit: {} }
-  // eslint-disable-next-line @typescript-eslint/ban-types
-  | { immediateOrCancel: {} }
-  // eslint-disable-next-line @typescript-eslint/ban-types
-  | { postOnly: {} }
-  // eslint-disable-next-line @typescript-eslint/ban-types
-  | { market: {} }
-  // eslint-disable-next-line @typescript-eslint/ban-types
-  | { postOnlySlide: {} };
+  | { limit: Record<string, never> }
+  | { immediateOrCancel: Record<string, never> }
+  | { postOnly: Record<string, never> }
+  | { market: Record<string, never> }
+  | { postOnlySlide: Record<string, never> };
 // eslint-disable-next-line @typescript-eslint/no-namespace
 export namespace PerpOrderType {
   export const limit = { limit: {} };

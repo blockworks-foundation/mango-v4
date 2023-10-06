@@ -198,12 +198,9 @@ export class Serum3Market {
 }
 
 export type Serum3OrderType =
-  // eslint-disable-next-line @typescript-eslint/ban-types
-  | { limit: {} }
-  // eslint-disable-next-line @typescript-eslint/ban-types
-  | { immediateOrCancel: {} }
-  // eslint-disable-next-line @typescript-eslint/ban-types
-  | { postOnly: {} };
+  | { limit: Record<string, never> }
+  | { immediateOrCancel: Record<string, never> }
+  | { postOnly: Record<string, never> };
 // eslint-disable-next-line @typescript-eslint/no-namespace
 export namespace Serum3OrderType {
   export const limit = { limit: {} };
@@ -212,12 +209,9 @@ export namespace Serum3OrderType {
 }
 
 export type Serum3SelfTradeBehavior =
-  // eslint-disable-next-line @typescript-eslint/ban-types
-  | { decrementTake: {} }
-  // eslint-disable-next-line @typescript-eslint/ban-types
-  | { cancelProvide: {} }
-  // eslint-disable-next-line @typescript-eslint/ban-types
-  | { abortTransaction: {} };
+  | { decrementTake: Record<string, never> }
+  | { cancelProvide: Record<string, never> }
+  | { abortTransaction: Record<string, never> };
 // eslint-disable-next-line @typescript-eslint/no-namespace
 export namespace Serum3SelfTradeBehavior {
   export const decrementTake = { decrementTake: {} };
@@ -225,8 +219,9 @@ export namespace Serum3SelfTradeBehavior {
   export const abortTransaction = { abortTransaction: {} };
 }
 
-// eslint-disable-next-line @typescript-eslint/ban-types
-export type Serum3Side = { bid: {} } | { ask: {} };
+export type Serum3Side =
+  | { bid: Record<string, never> }
+  | { ask: Record<string, never> };
 // eslint-disable-next-line @typescript-eslint/no-namespace
 export namespace Serum3Side {
   export const bid = { bid: {} };

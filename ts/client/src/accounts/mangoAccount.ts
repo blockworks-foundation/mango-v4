@@ -1794,10 +1794,8 @@ export class PerpOoDto {
 }
 
 export type TokenConditionalSwapDisplayPriceStyle =
-  // eslint-disable-next-line @typescript-eslint/ban-types
-  | { sellTokenPerBuyToken: {} }
-  // eslint-disable-next-line @typescript-eslint/ban-types
-  | { buyTokenPerSellToken: {} };
+  | { sellTokenPerBuyToken: Record<string, never> }
+  | { buyTokenPerSellToken: Record<string, never> };
 // eslint-disable-next-line @typescript-eslint/no-namespace
 export namespace TokenConditionalSwapDisplayPriceStyle {
   export const sellTokenPerBuyToken = { sellTokenPerBuyToken: {} };
@@ -1805,12 +1803,9 @@ export namespace TokenConditionalSwapDisplayPriceStyle {
 }
 
 export type TokenConditionalSwapIntention =
-  // eslint-disable-next-line @typescript-eslint/ban-types
-  | { unknown: {} }
-  // eslint-disable-next-line @typescript-eslint/ban-types
-  | { stopLoss: {} }
-  // eslint-disable-next-line @typescript-eslint/ban-types
-  | { takeProfit: {} };
+  | { unknown: Record<string, never> }
+  | { stopLoss: Record<string, never> }
+  | { takeProfit: Record<string, never> };
 // eslint-disable-next-line @typescript-eslint/no-namespace
 export namespace TokenConditionalSwapIntention {
   export const unknown = { unknown: {} };
