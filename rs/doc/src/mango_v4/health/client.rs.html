@@ -1622,6 +1622,9 @@
 <a href="#1622" id="1622">1622</a>
 <a href="#1623" id="1623">1623</a>
 <a href="#1624" id="1624">1624</a>
+<a href="#1625" id="1625">1625</a>
+<a href="#1626" id="1626">1626</a>
+<a href="#1627" id="1627">1627</a>
 </pre><pre class="rust"><code><span class="attr">#![cfg(feature = <span class="string">&quot;client&quot;</span>)]
 
 </span><span class="kw">use </span>anchor_lang::prelude::<span class="kw-2">*</span>;
@@ -2151,7 +2154,8 @@
     <span class="kw">let </span><span class="kw-2">mut </span>right_value = fun(right)<span class="question-mark">?</span>;
     <span class="kw">let </span><span class="kw-2">mut </span>mid_value = fun(mid)<span class="question-mark">?</span>;
     <span class="kw">while </span>(right - left) &gt; min_step {
-        <span class="kw">if </span>left_value &gt; mid_value {
+        <span class="comment">//println!(&quot;it {left} {left_value}; {mid} {mid_value}; {right} {right_value}&quot;);
+        </span><span class="kw">if </span>left_value &gt; mid_value {
             <span class="comment">// max must be between left and mid
             </span><span class="macro">assert!</span>(mid_value &gt;= right_value);
             right = mid;
@@ -2169,7 +2173,8 @@
             <span class="comment">// mid is larger than both left and right, max could be on either side
             </span><span class="kw">let </span>leftmid = half * (left + mid);
             <span class="kw">let </span>leftmid_value = fun(leftmid)<span class="question-mark">?</span>;
-            <span class="macro">assert!</span>(leftmid_value &gt;= left_value);
+            <span class="comment">//println!(&quot;lm {leftmid} {leftmid_value}&quot;);
+            </span><span class="macro">assert!</span>(leftmid_value &gt;= left_value);
             <span class="kw">if </span>leftmid_value &gt; mid_value {
                 <span class="comment">// max between left and mid
                 </span>right = mid;
@@ -2181,7 +2186,8 @@
 
             <span class="kw">let </span>rightmid = half * (mid + right);
             <span class="kw">let </span>rightmid_value = fun(rightmid)<span class="question-mark">?</span>;
-            <span class="macro">assert!</span>(rightmid_value &gt;= right_value);
+            <span class="comment">//println!(&quot;rm {rightmid} {rightmid_value}&quot;);
+            </span><span class="macro">assert!</span>(rightmid_value &gt;= right_value);
             <span class="kw">if </span>rightmid_value &gt;= mid_value {
                 <span class="comment">// max between mid and right
                 </span>left = mid;

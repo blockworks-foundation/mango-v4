@@ -1161,6 +1161,12 @@
 <a href="#1161" id="1161">1161</a>
 <a href="#1162" id="1162">1162</a>
 <a href="#1163" id="1163">1163</a>
+<a href="#1164" id="1164">1164</a>
+<a href="#1165" id="1165">1165</a>
+<a href="#1166" id="1166">1166</a>
+<a href="#1167" id="1167">1167</a>
+<a href="#1168" id="1168">1168</a>
+<a href="#1169" id="1169">1169</a>
 </pre><pre class="rust"><code><span class="kw">use super</span>::{OracleConfig, TokenIndex, TokenPosition};
 <span class="kw">use </span><span class="kw">crate</span>::accounts_zerocopy::KeyedAccountReader;
 <span class="kw">use </span><span class="kw">crate</span>::error::<span class="kw-2">*</span>;
@@ -1849,19 +1855,25 @@
         };
     }
 
-    <span class="kw">pub fn </span>check_net_borrows(<span class="kw-2">&amp;</span><span class="self">self</span>, oracle_price: I80F48) -&gt; <span class="prelude-ty">Result</span>&lt;()&gt; {
+    <span class="kw">pub fn </span>remaining_net_borrows_quote(<span class="kw-2">&amp;</span><span class="self">self</span>, oracle_price: I80F48) -&gt; I80F48 {
         <span class="kw">if </span><span class="self">self</span>.net_borrows_in_window &lt; <span class="number">0 </span>|| <span class="self">self</span>.net_borrow_limit_per_window_quote &lt; <span class="number">0 </span>{
-            <span class="kw">return </span><span class="prelude-val">Ok</span>(());
+            <span class="kw">return </span>I80F48::MAX;
         }
 
         <span class="kw">let </span>price = oracle_price.max(<span class="self">self</span>.stable_price());
         <span class="kw">let </span>net_borrows_quote = price
             .checked_mul_int(<span class="self">self</span>.net_borrows_in_window.into())
             .unwrap();
-        <span class="kw">if </span>net_borrows_quote &gt; <span class="self">self</span>.net_borrow_limit_per_window_quote {
+
+        I80F48::from(<span class="self">self</span>.net_borrow_limit_per_window_quote) - net_borrows_quote
+    }
+
+    <span class="kw">pub fn </span>check_net_borrows(<span class="kw-2">&amp;</span><span class="self">self</span>, oracle_price: I80F48) -&gt; <span class="prelude-ty">Result</span>&lt;()&gt; {
+        <span class="kw">let </span>remaining_quote = <span class="self">self</span>.remaining_net_borrows_quote(oracle_price);
+        <span class="kw">if </span>remaining_quote &lt; <span class="number">0 </span>{
             <span class="kw">return </span><span class="prelude-val">Err</span>(<span class="macro">error_msg_typed!</span>(MangoError::BankNetBorrowsLimitReached,
-                    <span class="string">&quot;net_borrows_in_window ({:?}) valued at ({:?} exceed net_borrow_limit_per_window_quote ({:?}) for last_net_borrows_window_start_ts ({:?}) &quot;</span>,
-                    <span class="self">self</span>.net_borrows_in_window, net_borrows_quote, <span class="self">self</span>.net_borrow_limit_per_window_quote, <span class="self">self</span>.last_net_borrows_window_start_ts
+                    <span class="string">&quot;net_borrows_in_window: {:?}, remaining quote: {:?}, net_borrow_limit_per_window_quote: {:?}, last_net_borrows_window_start_ts: {:?}&quot;</span>,
+                    <span class="self">self</span>.net_borrows_in_window, remaining_quote, <span class="self">self</span>.net_borrow_limit_per_window_quote, <span class="self">self</span>.last_net_borrows_window_start_ts
 
             ));
         }

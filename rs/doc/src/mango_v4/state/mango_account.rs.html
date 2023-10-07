@@ -2551,6 +2551,7 @@
 <a href="#2551" id="2551">2551</a>
 <a href="#2552" id="2552">2552</a>
 <a href="#2553" id="2553">2553</a>
+<a href="#2554" id="2554">2554</a>
 </pre><pre class="rust"><code><span class="kw">use </span>std::cell::{Ref, RefMut};
 <span class="kw">use </span>std::mem::size_of;
 
@@ -3417,7 +3418,7 @@
     <span class="kw">pub fn </span>token_conditional_swap_by_id(<span class="kw-2">&amp;</span><span class="self">self</span>, id: u64) -&gt; <span class="prelude-ty">Result</span>&lt;(usize, <span class="kw-2">&amp;</span>TokenConditionalSwap)&gt; {
         <span class="kw">let </span>index = <span class="self">self
             </span>.all_token_conditional_swaps()
-            .position(|tcs| tcs.has_data() &amp;&amp; tcs.id == id)
+            .position(|tcs| tcs.is_configured() &amp;&amp; tcs.id == id)
             .ok_or_else(|| <span class="macro">error_msg!</span>(<span class="string">&quot;token conditional swap with id {} not found&quot;</span>, id))<span class="question-mark">?</span>;
         <span class="prelude-val">Ok</span>((index, <span class="self">self</span>.token_conditional_swap_by_index_unchecked(index)))
     }
@@ -3428,12 +3429,13 @@
     }
 
     <span class="kw">pub fn </span>active_token_conditional_swaps(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw">impl </span>Iterator&lt;Item = <span class="kw-2">&amp;</span>TokenConditionalSwap&gt; {
-        <span class="self">self</span>.all_token_conditional_swaps().filter(|p| p.has_data())
+        <span class="self">self</span>.all_token_conditional_swaps()
+            .filter(|p| p.is_configured())
     }
 
     <span class="kw">pub fn </span>token_conditional_swap_free_index(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Result</span>&lt;usize&gt; {
         <span class="self">self</span>.all_token_conditional_swaps()
-            .position(|<span class="kw-2">&amp;</span>v| !v.has_data())
+            .position(|<span class="kw-2">&amp;</span>v| !v.is_configured())
             .ok_or_else(|| <span class="macro">error_msg!</span>(<span class="string">&quot;no free token conditional swap index&quot;</span>))
     }
 
@@ -4108,7 +4110,7 @@
         <span class="kw">for </span>i <span class="kw">in </span><span class="number">0</span>..old_header.token_conditional_swap_count() {
             <span class="kw">let </span>src = old_header.token_conditional_swap_offset(i);
             <span class="kw">let </span>pos: <span class="kw-2">&amp;</span>TokenConditionalSwap = get_helper(dynamic, src);
-            <span class="kw">if </span>!pos.has_data() {
+            <span class="kw">if </span>!pos.is_configured() {
                 <span class="kw">continue</span>;
             }
             <span class="kw">if </span>i != active_tcs {
@@ -4711,14 +4713,14 @@
 
         <span class="kw">let </span>tcs = account.free_token_conditional_swap_mut().unwrap();
         tcs.id = <span class="number">123</span>;
-        tcs.has_data = <span class="number">1</span>;
+        tcs.is_configured = <span class="number">1</span>;
         <span class="macro">assert_eq!</span>(account.all_token_conditional_swaps().count(), <span class="number">2</span>);
         <span class="macro">assert_eq!</span>(account.active_token_conditional_swaps().count(), <span class="number">1</span>);
         <span class="macro">assert_eq!</span>(account.token_conditional_swap_free_index().unwrap(), <span class="number">1</span>);
 
         <span class="kw">let </span>tcs = account.free_token_conditional_swap_mut().unwrap();
         tcs.id = <span class="number">234</span>;
-        tcs.has_data = <span class="number">1</span>;
+        tcs.is_configured = <span class="number">1</span>;
         <span class="macro">assert_eq!</span>(account.all_token_conditional_swaps().count(), <span class="number">2</span>);
         <span class="macro">assert_eq!</span>(account.active_token_conditional_swaps().count(), <span class="number">2</span>);
 
@@ -4738,7 +4740,7 @@
         <span class="macro">assert!</span>(account.token_conditional_swap_free_index().is_err());
 
         <span class="kw">let </span>tcs = account.token_conditional_swap_mut_by_index(<span class="number">0</span>).unwrap();
-        tcs.has_data = <span class="number">0</span>;
+        tcs.is_configured = <span class="number">0</span>;
         <span class="macro">assert_eq!</span>(account.all_token_conditional_swaps().count(), <span class="number">2</span>);
         <span class="macro">assert_eq!</span>(account.active_token_conditional_swaps().count(), <span class="number">1</span>);
         <span class="macro">assert_eq!</span>(
@@ -4931,7 +4933,7 @@
             <span class="kw">let </span><span class="kw-2">mut </span>tcs = account
                 .token_conditional_swap_mut_by_index(raw_index)
                 .unwrap();
-            tcs.set_has_data(<span class="bool-val">true</span>);
+            tcs.set_is_configured(<span class="bool-val">true</span>);
             tcs.id = id;
         };
         make_tcs(<span class="number">2</span>, <span class="number">0</span>);
@@ -5070,7 +5072,7 @@
             <span class="kw">let </span>selected = options.choose_multiple(<span class="kw-2">&amp;mut </span>rng, active.token_conditional_swap_count());
             <span class="kw">for </span>(i, index) <span class="kw">in </span>selected.sorted().enumerate() {
                 <span class="kw">let </span>tcs = account.token_conditional_swap_mut_by_index(<span class="kw-2">*</span>index).unwrap();
-                tcs.set_has_data(<span class="bool-val">true</span>);
+                tcs.set_is_configured(<span class="bool-val">true</span>);
                 tcs.id = i <span class="kw">as </span>u64;
             }
 
