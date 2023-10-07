@@ -34,7 +34,7 @@ compile_error!("compiling the program entrypoint without 'enable-gpl' makes no s
 use state::{
     OpenbookV2MarketIndex, OracleConfigParams, PerpMarketIndex, PlaceOrderType, SelfTradeBehavior,
     Serum3MarketIndex, Side, TokenConditionalSwap, TokenConditionalSwapDisplayPriceStyle,
-    TokenConditionalSwapIntention, TokenIndex,
+    TokenConditionalSwapIntention, TokenConditionalSwapType, TokenIndex, TCS_START_INCENTIVE,
 };
 
 declare_id!("4MangoMjqJ2firMokCjjGgoK8d4MXcrgL7XJaL3w6fVg");
@@ -1299,12 +1299,123 @@ pub mod mango_v4 {
             maker_fee_rate: 0.0, // set inside
             buy_token_index: ctx.accounts.buy_bank.load()?.token_index,
             sell_token_index: ctx.accounts.sell_bank.load()?.token_index,
-            has_data: 1,
+            is_configured: 1,
             allow_creating_deposits: u8::from(allow_creating_deposits),
             allow_creating_borrows: u8::from(allow_creating_borrows),
             display_price_style: display_price_style.into(),
             intention: intention.into(),
-            reserved: [0; 111],
+            tcs_type: TokenConditionalSwapType::FixedPremium.into(),
+            padding: Default::default(),
+            start_timestamp: 0,  // not started
+            duration_seconds: 0, // duration does not matter for FixedPremium
+            reserved: [0; 88],
+        };
+
+        #[cfg(feature = "enable-gpl")]
+        instructions::token_conditional_swap_create(ctx, tcs)?;
+        Ok(())
+    }
+
+    pub fn token_conditional_swap_create_premium_auction(
+        ctx: Context<TokenConditionalSwapCreate>,
+        max_buy: u64,
+        max_sell: u64,
+        expiry_timestamp: u64,
+        price_lower_limit: f64,
+        price_upper_limit: f64,
+        max_price_premium_rate: f64,
+        allow_creating_deposits: bool,
+        allow_creating_borrows: bool, // TODO: require that this is false?
+        display_price_style: TokenConditionalSwapDisplayPriceStyle,
+        intention: TokenConditionalSwapIntention,
+        duration_seconds: u64,
+    ) -> Result<()> {
+        require_gte!(duration_seconds, 1);
+        let tcs = TokenConditionalSwap {
+            id: u64::MAX, // set inside
+            max_buy,
+            max_sell,
+            bought: 0,
+            sold: 0,
+            expiry_timestamp,
+            price_lower_limit,
+            price_upper_limit,
+            price_premium_rate: max_price_premium_rate,
+            taker_fee_rate: 0.0, // set inside
+            maker_fee_rate: 0.0, // set inside
+            buy_token_index: ctx.accounts.buy_bank.load()?.token_index,
+            sell_token_index: ctx.accounts.sell_bank.load()?.token_index,
+            is_configured: 1,
+            allow_creating_deposits: u8::from(allow_creating_deposits),
+            allow_creating_borrows: u8::from(allow_creating_borrows),
+            display_price_style: display_price_style.into(),
+            intention: intention.into(),
+            tcs_type: TokenConditionalSwapType::PremiumAuction.into(),
+            padding: Default::default(),
+            start_timestamp: 0, // not started
+            duration_seconds,
+            reserved: [0; 88],
+        };
+
+        #[cfg(feature = "enable-gpl")]
+        instructions::token_conditional_swap_create(ctx, tcs)?;
+        Ok(())
+    }
+
+    pub fn token_conditional_swap_create_linear_auction(
+        ctx: Context<TokenConditionalSwapCreate>,
+        max_buy: u64,
+        max_sell: u64,
+        expiry_timestamp: u64,
+        price_start: f64,
+        price_end: f64,
+        allow_creating_deposits: bool,
+        allow_creating_borrows: bool,
+        display_price_style: TokenConditionalSwapDisplayPriceStyle,
+        start_timestamp: u64,
+        duration_seconds: u64,
+    ) -> Result<()> {
+        require_gte!(duration_seconds, 1);
+
+        let buy_token_price = ctx.accounts.buy_bank.load()?.stable_price().to_num::<f64>();
+        let sell_token_price = ctx
+            .accounts
+            .sell_bank
+            .load()?
+            .stable_price()
+            .to_num::<f64>();
+        let max_volume =
+            (buy_token_price * max_buy as f64).min(sell_token_price * max_sell as f64) as u64;
+        require_gte!(
+            max_volume,
+            TCS_START_INCENTIVE * 10,
+            MangoError::TokenConditionalSwapTooSmallForStartIncentive
+        );
+
+        let tcs = TokenConditionalSwap {
+            id: u64::MAX, // set inside
+            max_buy,
+            max_sell,
+            bought: 0,
+            sold: 0,
+            expiry_timestamp,
+            price_lower_limit: price_start,
+            price_upper_limit: price_end,
+            price_premium_rate: 0.0, // ignored for linear auctions
+            taker_fee_rate: 0.0,     // set inside
+            maker_fee_rate: 0.0,     // set inside
+            buy_token_index: ctx.accounts.buy_bank.load()?.token_index,
+            sell_token_index: ctx.accounts.sell_bank.load()?.token_index,
+            is_configured: 1,
+            allow_creating_deposits: u8::from(allow_creating_deposits),
+            allow_creating_borrows: u8::from(allow_creating_borrows),
+            display_price_style: display_price_style.into(),
+            intention: TokenConditionalSwapIntention::Unknown.into(),
+            tcs_type: TokenConditionalSwapType::LinearAuction.into(),
+            padding: Default::default(),
+            start_timestamp,
+            duration_seconds,
+            reserved: [0; 88],
         };
 
         #[cfg(feature = "enable-gpl")]
@@ -1341,6 +1452,45 @@ pub mod mango_v4 {
             token_conditional_swap_id,
             max_buy_token_to_liqee,
             max_sell_token_to_liqor,
+            0,
+            0.0,
+        )?;
+        Ok(())
+    }
+
+    // NOTE: It's the triggerer's job to compute liqor_max_* numbers that work with the liqee's health.
+    pub fn token_conditional_swap_trigger_v2(
+        ctx: Context<TokenConditionalSwapTrigger>,
+        token_conditional_swap_index: u8,
+        token_conditional_swap_id: u64,
+        max_buy_token_to_liqee: u64,
+        max_sell_token_to_liqor: u64,
+        min_buy_token: u64,
+        min_taker_price: f32,
+    ) -> Result<()> {
+        #[cfg(feature = "enable-gpl")]
+        instructions::token_conditional_swap_trigger(
+            ctx,
+            token_conditional_swap_index.into(),
+            token_conditional_swap_id,
+            max_buy_token_to_liqee,
+            max_sell_token_to_liqor,
+            min_buy_token,
+            min_taker_price as f64,
+        )?;
+        Ok(())
+    }
+
+    pub fn token_conditional_swap_start(
+        ctx: Context<TokenConditionalSwapStart>,
+        token_conditional_swap_index: u8,
+        token_conditional_swap_id: u64,
+    ) -> Result<()> {
+        #[cfg(feature = "enable-gpl")]
+        instructions::token_conditional_swap_start(
+            ctx,
+            token_conditional_swap_index.into(),
+            token_conditional_swap_id,
         )?;
         Ok(())
     }

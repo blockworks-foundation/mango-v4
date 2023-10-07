@@ -7,7 +7,7 @@ use crate::health::*;
 use crate::i80f48::ClampToInt;
 use crate::logs::TokenConditionalSwapCancelLog;
 use crate::logs::{
-    LoanOriginationFeeInstruction, TokenBalanceLog, TokenConditionalSwapTriggerLogV2,
+    LoanOriginationFeeInstruction, TokenBalanceLog, TokenConditionalSwapTriggerLogV3,
     WithdrawLoanLog,
 };
 use crate::state::*;
@@ -25,6 +25,8 @@ pub fn token_conditional_swap_trigger(
     token_conditional_swap_id: u64,
     max_buy_token_to_liqee: u64,
     max_sell_token_to_liqor: u64,
+    min_buy_token: u64,
+    min_taker_price: f64,
 ) -> Result<()> {
     let group_pk = &ctx.accounts.group.key();
     let liqee_key = ctx.accounts.liqee.key();
@@ -44,8 +46,12 @@ pub fn token_conditional_swap_trigger(
     let mut liqee = ctx.accounts.liqee.load_full_mut()?;
 
     let tcs = liqee.token_conditional_swap_by_index(token_conditional_swap_index)?;
-    require!(tcs.has_data(), MangoError::SomeError);
-    require_eq!(tcs.id, token_conditional_swap_id);
+    require!(tcs.is_configured(), MangoError::TokenConditionalSwapNotSet);
+    require_eq!(
+        tcs.id,
+        token_conditional_swap_id,
+        MangoError::TokenConditionalSwapIndexIdMismatch
+    );
     let buy_token_index = tcs.buy_token_index;
     let sell_token_index = tcs.sell_token_index;
     let now_ts: u64 = Clock::get()?.unix_timestamp.try_into().unwrap();
@@ -53,6 +59,10 @@ pub fn token_conditional_swap_trigger(
 
     // Possibly wipe the tcs and exit, if it's already expired
     if tcs_is_expired {
+        if min_buy_token > 0 {
+            require!(!tcs_is_expired, MangoError::TokenConditionalSwapExpired);
+        }
+
         let (buy_bank, _buy_token_price, sell_bank_and_oracle_opt) =
             account_retriever.banks_mut_and_oracles(buy_token_index, sell_token_index)?;
         let (sell_bank, _sell_token_price) = sell_bank_and_oracle_opt.unwrap();
@@ -100,7 +110,14 @@ pub fn token_conditional_swap_trigger(
         sell_token_price,
         max_sell_token_to_liqor,
         now_ts,
+        min_taker_price,
     )?;
+
+    require_gte!(
+        liqee_buy_change,
+        min_buy_token,
+        MangoError::TokenConditionalSwapMinBuyTokenNotReached
+    );
 
     // Check liqor health, liqee health is checked inside (has to be, since tcs closure depends on it)
     let liqor_health = compute_health(&liqor.borrow(), HealthType::Init, &account_retriever)
@@ -193,27 +210,41 @@ fn action(
     sell_token_price: I80F48,
     max_sell_token_to_liqor: u64,
     now_ts: u64,
+    min_taker_price: f64,
 ) -> Result<(I80F48, I80F48)> {
     let liqee_pre_init_health = liqee.check_health_pre(&liqee_health_cache)?;
 
-    let tcs = liqee
-        .token_conditional_swap_by_index(token_conditional_swap_index)?
-        .clone();
-    require!(tcs.has_data(), MangoError::SomeError);
-    require!(!tcs.is_expired(now_ts), MangoError::SomeError);
-    require_eq!(buy_bank.token_index, tcs.buy_token_index);
-    require_eq!(sell_bank.token_index, tcs.sell_token_index);
-
     // amount of sell token native per buy token native
-    let price = buy_token_price.to_num::<f64>() / sell_token_price.to_num::<f64>();
-    require!(
-        tcs.price_in_range(price),
-        MangoError::TokenConditionalSwapPriceNotInRange
-    );
+    let sell_token_price_f64 = sell_token_price.to_num::<f64>();
+    let price = buy_token_price.to_num::<f64>() / sell_token_price_f64;
 
-    let premium_price = tcs.premium_price(price);
+    let tcs = {
+        let tcs = liqee.token_conditional_swap_by_index(token_conditional_swap_index)?;
+        require!(tcs.is_configured(), MangoError::TokenConditionalSwapNotSet);
+        require!(
+            !tcs.is_expired(now_ts),
+            MangoError::TokenConditionalSwapExpired
+        );
+        require_eq!(buy_bank.token_index, tcs.buy_token_index);
+        require_eq!(sell_bank.token_index, tcs.sell_token_index);
+
+        tcs.check_triggerable(price, now_ts)?;
+
+        // We need to borrow liqee token positions mutably and can't hold the tcs borrow at the
+        // same time. Copying the whole struct is convenience.
+        tcs.clone()
+    };
+
+    let premium_price = tcs.premium_price(price, now_ts);
     let maker_price = tcs.maker_price(premium_price);
     let maker_price_i80f48 = I80F48::from_num(maker_price);
+
+    let taker_price = tcs.taker_price(premium_price);
+    require_gte!(
+        taker_price,
+        min_taker_price,
+        MangoError::TokenConditionalSwapTakerPriceTooLow
+    );
 
     let pre_liqee_buy_token = liqee.token_position(tcs.buy_token_index)?.native(&buy_bank);
     let pre_liqee_sell_token = liqee
@@ -229,9 +260,9 @@ fn action(
         .native(&sell_bank);
 
     // derive trade amount based on limits in the tcs and by the liqor
-    // the sell_token_amount_from_liqee is the amount to deduct from the liqee, it's adjusted upwards
-    // for the taker fee (since this is included in the maker_price)
-    let (buy_token_amount, sell_token_amount_from_liqee) = trade_amount(
+    // the sell_token_amount_with_maker_fee is the amount to deduct from the liqee, it's adjusted upwards
+    // for the maker fee (since this is included in the maker_price)
+    let (buy_token_amount, sell_token_amount_with_maker_fee) = trade_amount(
         &tcs,
         maker_price_i80f48,
         max_buy_token_to_liqee,
@@ -251,7 +282,9 @@ fn action(
         (I80F48::from(buy_token_amount) * I80F48::from_num(premium_price)).floor();
     let maker_fee = tcs.maker_fee(sell_token_amount);
     let taker_fee = tcs.taker_fee(sell_token_amount);
-    let sell_token_amount_to_liqor = sell_token_amount_from_liqee - maker_fee - taker_fee;
+
+    let sell_token_amount_from_liqee = sell_token_amount_with_maker_fee;
+    let sell_token_amount_to_liqor = sell_token_amount_with_maker_fee - maker_fee - taker_fee;
 
     // do the token transfer between liqee and liqor
     let buy_token_amount_i80f48 = I80F48::from(buy_token_amount);
@@ -393,6 +426,10 @@ fn action(
         assert!(tcs.bought <= tcs.max_buy);
         assert!(tcs.sold <= tcs.max_sell);
 
+        if !tcs.passed_start(now_ts) {
+            tcs.start_timestamp = now_ts;
+        }
+
         // Maybe remove token stop loss entry
         //
         // This drops the tcs if no more swapping is possible at the current price:
@@ -415,11 +452,30 @@ fn action(
             sell_bank,
         );
 
-        // If the health is low enough, close the trigger. Otherwise it'd trigger repeatedly
-        // as oracle prices fluctuate.
-        let liqee_health_is_low = liqee_post_init_health < TCS_TRIGGER_INIT_HEALTH_THRESHOLD;
+        // It's impossible to fulfill most requests exactly: You cannot buy 1 native SOL for 1 native USDC
+        // because 1 native-USDC = 50 native-SOL.
+        // Compute the smallest possible trade amount and close the tcs if it's close enough to it.
+        let max_trade_reached;
+        if maker_price > 1.0 {
+            // 1 native buy token converts to >1 native sell tokens
 
-        if future_buy == 0 || future_sell == 0 || liqee_health_is_low {
+            // Example: sell SOL, buy USDC, maker_price = 50 natSOL/natUSDC; if future_sell < 50, we can't
+            // possibly buy another native USDC for it.
+            max_trade_reached = future_sell < 2 * (maker_price as u64);
+        } else {
+            let buy_per_sell_price = 1.0 / maker_price;
+
+            // Example: sell USDC, buy SOL, maker_price = 0.02 natUSDC/natSOL; if future_buy < 50, selling
+            // even a single native USDC would overshoot it
+            max_trade_reached = future_buy < 2 * (buy_per_sell_price as u64);
+        }
+
+        // If the health went down and is low enough, close the trigger. Otherwise it'd trigger repeatedly
+        // as oracle prices fluctuate.
+        let liqee_health_is_low = liqee_post_init_health < liqee_pre_init_health
+            && liqee_post_init_health < TCS_TRIGGER_INIT_HEALTH_THRESHOLD;
+
+        if future_buy == 0 || future_sell == 0 || liqee_health_is_low || max_trade_reached {
             *tcs = TokenConditionalSwap::default();
             true
         } else {
@@ -433,7 +489,7 @@ fn action(
         liqee.token_decrement_dust_deactivate(sell_bank, now_ts, liqee_key)?;
     }
 
-    emit!(TokenConditionalSwapTriggerLogV2 {
+    emit!(TokenConditionalSwapTriggerLogV3 {
         mango_group: liqee.fixed.group,
         liqee: liqee_key,
         liqor: liqor_key,
@@ -449,6 +505,8 @@ fn action(
         closed,
         display_price_style: tcs.display_price_style,
         intention: tcs.intention,
+        tcs_type: tcs.tcs_type,
+        start_timestamp: tcs.start_timestamp,
     });
 
     // Return the change in liqee token account balances
@@ -761,6 +819,7 @@ mod tests {
                 I80F48::from_num(sell_price),
                 sell_max,
                 0,
+                0.0,
             )
         }
     }
@@ -789,7 +848,7 @@ mod tests {
             price_premium_rate: 0.11,
             buy_token_index: 1,
             sell_token_index: 0,
-            has_data: 1,
+            is_configured: 1,
             allow_creating_borrows: 1,
             allow_creating_deposits: 1,
             ..Default::default()
@@ -852,7 +911,7 @@ mod tests {
             price_premium_rate: 0.0,
             buy_token_index: 1,
             sell_token_index: 0,
-            has_data: 1,
+            is_configured: 1,
             allow_creating_borrows: 1,
             allow_creating_deposits: 1,
             ..Default::default()
@@ -902,7 +961,7 @@ mod tests {
             taker_fee_rate: 0.05,
             buy_token_index: 1,
             sell_token_index: 0,
-            has_data: 1,
+            is_configured: 1,
             allow_creating_borrows: 1,
             allow_creating_deposits: 1,
             ..Default::default()

@@ -83,6 +83,7 @@ pub fn ix_gate_set(ctx: Context<IxGateSet>, ix_gate: u128) -> Result<()> {
     log_if_changed(&group, ix_gate, IxGate::AdminTokenWithdrawFees);
     log_if_changed(&group, ix_gate, IxGate::AdminPerpWithdrawFees);
     log_if_changed(&group, ix_gate, IxGate::AccountSizeMigration);
+    log_if_changed(&group, ix_gate, IxGate::TokenConditionalSwapStart);
 
     group.ix_gate = ix_gate;
 
