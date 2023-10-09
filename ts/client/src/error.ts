@@ -2,6 +2,7 @@ import { Connection } from '@solana/web3.js';
 import { JUPITER } from './constants';
 
 export enum WellKnownTransactionErrors {
+  // Slippage incurred was higher than user expected
   JupiterSlippageToleranceExceeded,
   Unknown,
 }
