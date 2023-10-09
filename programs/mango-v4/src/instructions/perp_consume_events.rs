@@ -54,8 +54,6 @@ pub enum FillCategory {
     DecreaseLong,
     CloseShort,
     CloseLong,
-    ShortToLong,
-    LongToShort,
     NoChange,
 }
 
@@ -74,9 +72,7 @@ fn get_fill_category(
                 } else if pre_fill_base_position == 0 {
                     FillCategory::OpenLong
                 } else {
-                    if post_fill_base_position > 0 {
-                        FillCategory::ShortToLong
-                    } else if post_fill_base_position == 0 {
+                    if post_fill_base_position == 0 {
                         FillCategory::CloseShort
                     } else {
                         FillCategory::DecreaseShort
@@ -89,9 +85,7 @@ fn get_fill_category(
                 } else if pre_fill_base_position == 0 {
                     FillCategory::OpenShort
                 } else {
-                    if post_fill_base_position < 0 {
-                        FillCategory::LongToShort
-                    } else if post_fill_base_position == 0 {
+                    if post_fill_base_position == 0 {
                         FillCategory::CloseLong
                     } else {
                         FillCategory::DecreaseLong
