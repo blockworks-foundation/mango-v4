@@ -1456,7 +1456,7 @@ export class PerpPosition {
       cumulativeLongFunding: cumulativeLongFunding,
       cumulativeShortFunding: cumulativeShortFunding,
     };
-  };
+  }
 
   public getEquity(perpMarket: PerpMarket): I80F48 {
     if (perpMarket.perpMarketIndex !== this.marketIndex) {
