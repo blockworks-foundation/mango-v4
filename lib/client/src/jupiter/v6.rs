@@ -10,7 +10,6 @@ use crate::MangoClient;
 use crate::{util, TransactionBuilder};
 
 use anyhow::Context;
-use solana_sdk::signer::Signer;
 use solana_sdk::{instruction::Instruction, signature::Signature};
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
@@ -148,7 +147,7 @@ impl<'a> JupiterV6<'a> {
         input_mint: Pubkey,
         output_mint: Pubkey,
         amount: u64,
-        slippage: u64,
+        slippage_bps: u64,
         only_direct_routes: bool,
     ) -> anyhow::Result<QuoteResponse> {
         let mut account = self.mango_client.mango_account().await?;
@@ -189,7 +188,7 @@ impl<'a> JupiterV6<'a> {
                 ("inputMint", input_mint.to_string()),
                 ("outputMint", output_mint.to_string()),
                 ("amount", format!("{}", amount)),
-                ("slippageBps", format!("{}", slippage)),
+                ("slippageBps", format!("{}", slippage_bps)),
                 ("onlyDirectRoutes", only_direct_routes.to_string()),
                 (
                     "maxAccounts",
@@ -237,14 +236,13 @@ impl<'a> JupiterV6<'a> {
         .map(util::to_writable_account_meta)
         .collect::<Vec<_>>();
 
+        let owner = self.mango_client.owner();
+
         let token_ams = [source_token.mint_info.mint, target_token.mint_info.mint]
             .into_iter()
             .map(|mint| {
                 util::to_writable_account_meta(
-                    anchor_spl::associated_token::get_associated_token_address(
-                        &self.mango_client.owner(),
-                        &mint,
-                    ),
+                    anchor_spl::associated_token::get_associated_token_address(&owner, &mint),
                 )
             })
             .collect::<Vec<_>>();
@@ -273,7 +271,7 @@ impl<'a> JupiterV6<'a> {
             .http_client
             .post("https://quote-api.jup.ag/v6/swap-instructions")
             .json(&SwapRequest {
-                user_public_key: self.mango_client.owner.pubkey().to_string(),
+                user_public_key: owner.to_string(),
                 wrap_and_unwrap_sol: false,
                 use_shared_accounts: true,
                 fee_account: None,
@@ -299,13 +297,24 @@ impl<'a> JupiterV6<'a> {
         for ix in &swap.setup_instructions.unwrap_or_default() {
             instructions.push(ix.try_into()?);
         }
+
+        // Ensure the source token account is created (jupiter takes care of the output account)
+        instructions.push(
+            spl_associated_token_account::instruction::create_associated_token_account_idempotent(
+                &owner,
+                &owner,
+                &source_token.mint_info.mint,
+                &Token::id(),
+            ),
+        );
+
         instructions.push(Instruction {
             program_id: mango_v4::id(),
             accounts: {
                 let mut ams = anchor_lang::ToAccountMetas::to_account_metas(
                     &mango_v4::accounts::FlashLoanBegin {
                         account: self.mango_client.mango_account_address,
-                        owner: self.mango_client.owner(),
+                        owner,
                         token_program: Token::id(),
                         instructions: solana_sdk::sysvar::instructions::id(),
                     },
@@ -328,7 +337,7 @@ impl<'a> JupiterV6<'a> {
                 let mut ams = anchor_lang::ToAccountMetas::to_account_metas(
                     &mango_v4::accounts::FlashLoanEnd {
                         account: self.mango_client.mango_account_address,
-                        owner: self.mango_client.owner(),
+                        owner,
                         token_program: Token::id(),
                     },
                     None,
@@ -363,7 +372,7 @@ impl<'a> JupiterV6<'a> {
             .await?;
         address_lookup_tables.extend(jup_alts.into_iter());
 
-        let payer = self.mango_client.owner.pubkey(); // maybe use fee_payer? but usually it's the same
+        let payer = owner; // maybe use fee_payer? but usually it's the same
 
         Ok(TransactionBuilder {
             instructions,
@@ -379,7 +388,7 @@ impl<'a> JupiterV6<'a> {
         input_mint: Pubkey,
         output_mint: Pubkey,
         amount: u64,
-        slippage: u64,
+        slippage_bps: u64,
         only_direct_routes: bool,
     ) -> anyhow::Result<Signature> {
         let route = self
@@ -387,7 +396,7 @@ impl<'a> JupiterV6<'a> {
                 input_mint,
                 output_mint,
                 amount,
-                slippage,
+                slippage_bps,
                 only_direct_routes,
             )
             .await?;

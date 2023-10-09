@@ -1,7 +1,7 @@
 import { AnchorProvider, BN } from '@coral-xyz/anchor';
 import { utf8 } from '@coral-xyz/anchor/dist/cjs/utils/bytes';
 import { OpenOrders, Order, Orderbook } from '@project-serum/serum/lib/market';
-import { AccountInfo, PublicKey, TransactionSignature } from '@solana/web3.js';
+import { AccountInfo, PublicKey } from '@solana/web3.js';
 import { MangoClient } from '../client';
 import { OPENBOOK_PROGRAM_ID, RUST_I64_MAX, RUST_I64_MIN } from '../constants';
 import { I80F48, I80F48Dto, ONE_I80F48, ZERO_I80F48 } from '../numbers/I80F48';
@@ -13,6 +13,7 @@ import {
   toUiDecimalsForQuote,
   toUiSellPerBuyTokenPrice,
 } from '../utils';
+import { MangoSignatureStatus } from '../utils/rpc';
 import { Bank, TokenIndex } from './bank';
 import { Group } from './group';
 import { HealthCache } from './healthCache';
@@ -888,7 +889,7 @@ export class MangoAccount {
   public async serum3SettleFundsForAllMarkets(
     client: MangoClient,
     group: Group,
-  ): Promise<TransactionSignature[]> {
+  ): Promise<MangoSignatureStatus[]> {
     // Future: collect ixs, batch them, and send them in fewer txs
     return await Promise.all(
       this.serum3Active().map((s) => {
@@ -906,7 +907,7 @@ export class MangoAccount {
   public async serum3CancelAllOrdersForAllMarkets(
     client: MangoClient,
     group: Group,
-  ): Promise<TransactionSignature[]> {
+  ): Promise<MangoSignatureStatus[]> {
     // Future: collect ixs, batch them, and send them in in fewer txs
     return await Promise.all(
       this.serum3Active().map((s) => {
@@ -1874,6 +1875,26 @@ export class TokenConditionalSwap {
     return this.expiryTimestamp.toNumber();
   }
 
+  // TODO: will be replaced by onchain enum in next release
+  private getTokenConditionalSwapDisplayPriceStyle(group: Group): boolean {
+    const buyBank = this.getBuyToken(group);
+    const sellBank = this.getSellToken(group);
+
+    // If we are tp/sl'ing SOL borrow, then price is stored in sol/usdc
+    // then don't flip
+    if (sellBank.tokenIndex == 0) {
+      return true;
+    }
+
+    // E.g.
+    // If we are tp/sl'ing SOL deposit, then price is stored in usdc/sol
+    if (this.maxSell.eq(U64_MAX_BN)) {
+      true; // dont flip, i.e. continue using sellTokenPerBuyTokenUi price
+    }
+    // Flip the price if we know we are selling an exact amount of SOL
+    return false; // flip, i.e. use buyTokenPerSellTokenUi price
+  }
+
   private priceLimitToUi(
     group: Group,
     sellTokenPerBuyTokenNative: number,
@@ -1891,7 +1912,7 @@ export class TokenConditionalSwap {
     // buytoken/selltoken or selltoken/buytoken
 
     // Buy limit / close short
-    if (this.maxSell.eq(U64_MAX_BN)) {
+    if (this.getTokenConditionalSwapDisplayPriceStyle(group)) {
       return roundTo5(sellTokenPerBuyTokenUi);
     }
 
@@ -1909,18 +1930,42 @@ export class TokenConditionalSwap {
   }
 
   getThresholdPriceUi(group: Group): number {
-    const a = I80F48.fromNumber(this.priceLowerLimit);
-    const b = I80F48.fromNumber(this.priceUpperLimit);
-
     const buyBank = this.getBuyToken(group);
     const sellBank = this.getSellToken(group);
-    const o = buyBank.price.div(sellBank.price);
+
+    const a = toUiSellPerBuyTokenPrice(this.priceLowerLimit, sellBank, buyBank);
+    const b = toUiSellPerBuyTokenPrice(this.priceUpperLimit, sellBank, buyBank);
+
+    const o = buyBank.uiPrice / sellBank.uiPrice;
 
     // Choose the price closest to oracle
-    if (o.sub(a).abs().lt(o.sub(b).abs())) {
+    if (Math.abs(o - a) < Math.abs(o - b)) {
       return this.getPriceLowerLimitUi(group);
     }
     return this.getPriceUpperLimitUi(group);
+  }
+
+  getCurrentPairPriceUi(group: Group): number {
+    const buyBank = this.getBuyToken(group);
+    const sellBank = this.getSellToken(group);
+    const sellTokenPerBuyTokenUi = toUiSellPerBuyTokenPrice(
+      buyBank.price.div(sellBank.price).toNumber(),
+      sellBank,
+      buyBank,
+    );
+
+    // Below are workarounds to know when to show an inverted price in ui
+    // We want to identify if the pair user is wanting to trade is
+    // buytoken/selltoken or selltoken/buytoken
+
+    // Buy limit / close short
+    if (this.getTokenConditionalSwapDisplayPriceStyle(group)) {
+      return roundTo5(sellTokenPerBuyTokenUi);
+    }
+
+    // Stop loss / take profit
+    const buyTokenPerSellTokenUi = 1 / sellTokenPerBuyTokenUi;
+    return roundTo5(buyTokenPerSellTokenUi);
   }
 
   // in percent
@@ -1945,15 +1990,19 @@ export class TokenConditionalSwap {
   }
 
   toString(group: Group): string {
-    return `getMaxBuy ${this.getMaxBuyUi(
+    return `${
+      group.getFirstBankByTokenIndex(this.buyTokenIndex).name +
+      '/' +
+      group.getFirstBankByTokenIndex(this.sellTokenIndex).name
+    } , getMaxBuy ${this.getMaxBuyUi(group)}, getMaxSell ${this.getMaxSellUi(
       group,
-    )}, getMaxSell ${this.getMaxSellUi(group)}, bought ${this.getBoughtUi(
-      group,
-    )}, sold ${this.getSoldUi(
+    )}, bought ${this.getBoughtUi(group)}, sold ${this.getSoldUi(
       group,
     )}, getPriceLowerLimitUi ${this.getPriceLowerLimitUi(
       group,
     )},  getPriceUpperLimitUi ${this.getPriceUpperLimitUi(
+      group,
+    )}, getCurrentPairPriceUi ${this.getCurrentPairPriceUi(
       group,
     )}, getThresholdPriceUi ${this.getThresholdPriceUi(
       group,

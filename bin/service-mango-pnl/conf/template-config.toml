@@ -1,0 +1,31 @@
+[metrics]
+output_stdout = true
+output_http = true
+
+[source]
+dedup_queue_size = 50000
+rpc_ws_url = ""
+
+[[source.grpc_sources]]
+name = "accountsdb-client"
+connection_string = "$GEYSER_CONNECTION_STRING"
+retry_connection_sleep_secs = 30
+
+[source.grpc_sources.tls]
+ca_cert_path = "$GEYSER_CA_CERT"
+client_cert_path = "$GEYSER_CLIENT_CERT"
+client_key_path = "$GEYSER_CLIENT_CERT"
+domain_name = "$GEYSER_CERT_DOMAIN"
+
+[source.snapshot]
+rpc_http_url = "$RPC_HTTP_URL"
+program_id = "mv3ekLzLbnVPNxjSKvqBpU3ZeZXPQdEC3bp5MDEBG68"
+
+[pnl]
+update_interval_millis = 5000
+mango_program = "mv3ekLzLbnVPNxjSKvqBpU3ZeZXPQdEC3bp5MDEBG68"
+mango_group = "98pjRuQjK3qA6gXts96PqZT4Ze5QmnCmt3QYjhbUSPue"
+mango_cache = "EBDRoayCDDUvDgCimta45ajQeXbexv7aKqJubruqpyvu"
+
+[jsonrpc_server]
+bind_address = "0.0.0.0:2052"

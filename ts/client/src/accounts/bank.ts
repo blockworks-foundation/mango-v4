@@ -124,7 +124,7 @@ export class Bank implements BankForHealth {
       feesWithdrawn: BN;
       tokenConditionalSwapTakerFeeRate: number;
       tokenConditionalSwapMakerFeeRate: number;
-      flashLoanSwapFeeRate: number;
+      flashLoanDepositFeeRate: number;
     },
   ): Bank {
     return new Bank(
@@ -175,7 +175,7 @@ export class Bank implements BankForHealth {
       obj.feesWithdrawn,
       obj.tokenConditionalSwapTakerFeeRate,
       obj.tokenConditionalSwapMakerFeeRate,
-      obj.flashLoanSwapFeeRate,
+      obj.flashLoanDepositFeeRate,
     );
   }
 
@@ -227,7 +227,7 @@ export class Bank implements BankForHealth {
     public feesWithdrawn: BN,
     public tokenConditionalSwapTakerFeeRate: number,
     public tokenConditionalSwapMakerFeeRate: number,
-    public flashLoanSwapFeeRate: number,
+    public flashLoanDepositFeeRate: number,
   ) {
     this.name = utf8.decode(new Uint8Array(name)).split('\x00')[0];
     this.oracleConfig = {
@@ -432,12 +432,12 @@ export class Bank implements BankForHealth {
     const totalBorrows = this.nativeBorrows();
     const totalDeposits = this.nativeDeposits();
 
-    if (totalDeposits.isZero() && totalBorrows.isZero()) {
+    if (totalDeposits.isZero() || totalBorrows.isZero()) {
       return ZERO_I80F48();
     }
 
     const utilization = totalBorrows.div(totalDeposits);
-    if (utilization.lte(this.util0)) {
+    if (utilization.lt(this.util0)) {
       const slope = this.rate0.div(this.util0);
       return slope.mul(utilization);
     } else if (utilization.lt(this.util1)) {

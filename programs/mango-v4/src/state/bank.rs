@@ -146,7 +146,7 @@ pub struct Bank {
     pub token_conditional_swap_taker_fee_rate: f32,
     pub token_conditional_swap_maker_fee_rate: f32,
 
-    pub flash_loan_swap_fee_rate: f32,
+    pub flash_loan_deposit_fee_rate: f32,
 
     #[derivative(Debug = "ignore")]
     pub reserved: [u8; 2092],
@@ -259,7 +259,7 @@ impl Bank {
             fees_withdrawn: 0,
             token_conditional_swap_taker_fee_rate: 0.0,
             token_conditional_swap_maker_fee_rate: 0.0,
-            flash_loan_swap_fee_rate: 0.0,
+            flash_loan_deposit_fee_rate: 0.0,
             reserved: [0; 2092],
         }
     }
@@ -270,7 +270,7 @@ impl Bank {
         require_gte!(self.rate0, I80F48::ZERO);
         require_gte!(self.util1, I80F48::ZERO);
         require_gte!(self.rate1, I80F48::ZERO);
-        require_gt!(self.max_rate, MINIMUM_MAX_RATE);
+        require_gte!(self.max_rate, MINIMUM_MAX_RATE);
         require_gte!(self.loan_fee_rate, 0.0);
         require_gte!(self.loan_origination_fee_rate, 0.0);
         require_gte!(self.maint_asset_weight, 0.0);
@@ -285,7 +285,7 @@ impl Bank {
         require_gte!(2, self.reduce_only);
         require_gte!(self.token_conditional_swap_taker_fee_rate, 0.0);
         require_gte!(self.token_conditional_swap_maker_fee_rate, 0.0);
-        require_gte!(self.flash_loan_swap_fee_rate, 0.0);
+        require_gte!(self.flash_loan_deposit_fee_rate, 0.0);
         Ok(())
     }
 
@@ -686,19 +686,25 @@ impl Bank {
         };
     }
 
-    pub fn check_net_borrows(&self, oracle_price: I80F48) -> Result<()> {
+    pub fn remaining_net_borrows_quote(&self, oracle_price: I80F48) -> I80F48 {
         if self.net_borrows_in_window < 0 || self.net_borrow_limit_per_window_quote < 0 {
-            return Ok(());
+            return I80F48::MAX;
         }
 
         let price = oracle_price.max(self.stable_price());
         let net_borrows_quote = price
             .checked_mul_int(self.net_borrows_in_window.into())
             .unwrap();
-        if net_borrows_quote > self.net_borrow_limit_per_window_quote {
+
+        I80F48::from(self.net_borrow_limit_per_window_quote) - net_borrows_quote
+    }
+
+    pub fn check_net_borrows(&self, oracle_price: I80F48) -> Result<()> {
+        let remaining_quote = self.remaining_net_borrows_quote(oracle_price);
+        if remaining_quote < 0 {
             return Err(error_msg_typed!(MangoError::BankNetBorrowsLimitReached,
-                    "net_borrows_in_window ({:?}) valued at ({:?} exceed net_borrow_limit_per_window_quote ({:?}) for last_net_borrows_window_start_ts ({:?}) ",
-                    self.net_borrows_in_window, net_borrows_quote, self.net_borrow_limit_per_window_quote, self.last_net_borrows_window_start_ts
+                    "net_borrows_in_window: {:?}, remaining quote: {:?}, net_borrow_limit_per_window_quote: {:?}, last_net_borrows_window_start_ts: {:?}",
+                    self.net_borrows_in_window, remaining_quote, self.net_borrow_limit_per_window_quote, self.last_net_borrows_window_start_ts
 
             ));
         }

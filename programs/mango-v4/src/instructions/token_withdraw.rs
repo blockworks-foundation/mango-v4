@@ -46,7 +46,7 @@ pub fn token_withdraw(ctx: Context<TokenWithdraw>, amount: u64, allow_borrow: bo
 
     // Handle amount special case for withdrawing everything
     let amount = if amount == u64::MAX && !allow_borrow {
-        if native_position.is_positive() {
+        if !native_position.is_negative() {
             // TODO: This rounding may mean that if we deposit and immediately withdraw
             //       we can't withdraw the full amount!
             native_position.floor().to_num::<u64>()

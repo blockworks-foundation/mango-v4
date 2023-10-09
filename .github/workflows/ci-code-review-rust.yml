@@ -31,8 +31,8 @@ on:
 
 env:
   CARGO_TERM_COLOR: always
-  SOLANA_VERSION: '1.14.9'
-  RUST_TOOLCHAIN: '1.65.0'
+  SOLANA_VERSION: '1.16.14'
+  RUST_TOOLCHAIN: '1.69.0'
   LOG_PROGRAM: '4MangoMjqJ2firMokCjjGgoK8d4MXcrgL7XJaL3w6fVg'
 
 jobs:
@@ -99,18 +99,18 @@ jobs:
 
       - name: Build all deps
         run: |
-          cargo build-bpf --features enable-gpl || true
-          cargo +bpf build-bpf --features enable-gpl
+          cargo build-sbf --features enable-gpl || true
+          cargo +solana build-sbf --features enable-gpl
 
-        # Run bpf tests and output to runner and log
-      - name: Run bpf tests
-        run: cargo +bpf test-bpf --features enable-gpl 2> >(tee raw-test-bpf.log >&2)
+        # Run sbf tests and output to runner and log
+      - name: Run sbf tests
+        run: cargo +solana test-sbf --features enable-gpl 2> >(tee raw-test-sbf.log >&2)
 
       - name: Save raw log
         uses: actions/upload-artifact@v3
         with:
-          name: raw-test-bpf
-          path: raw-test-bpf.log
+          name: raw-test-sbf
+          path: raw-test-sbf.log
 
   idl:
     name: IDL Check
@@ -182,7 +182,7 @@ jobs:
       - name: Download raw log
         uses: actions/download-artifact@v3
         with:
-          name: raw-test-bpf
+          name: raw-test-sbf
 
       - name: Install deps
         run: |
@@ -196,7 +196,7 @@ jobs:
 
       - name: Process raw log
         run: |
-          rg -oNI "(Instruction: |Program ${{ env.LOG_PROGRAM }} consumed).*$" raw-test-bpf.log \
+          rg -oNI "(Instruction: |Program ${{ env.LOG_PROGRAM }} consumed).*$" raw-test-sbf.log \
             | rg -U 'Instruction:.*\nProgram ${{ env.LOG_PROGRAM }}.*' \
             | awk 'NR % 2 == 1 { o=$0 ; next } { print o " " $0 }' \
             | sort | uniq -u | sort > cu-per-ix.log

@@ -6,97 +6,19 @@ use crate::state::*;
 
 use crate::accounts_ix::*;
 use crate::logs::{Serum3OpenOrdersBalanceLogV2, TokenBalanceLog};
-use crate::serum3_cpi::{load_market_state, load_open_orders_ref};
+use crate::serum3_cpi::{
+    load_market_state, load_open_orders_ref, OpenOrdersAmounts, OpenOrdersSlim,
+};
 use anchor_lang::prelude::*;
 
 use fixed::types::I80F48;
 use serum_dex::instruction::NewOrderInstructionV3;
-use serum_dex::state::OpenOrders;
-
-/// For loan origination fees bookkeeping purposes
-#[derive(Debug)]
-pub struct OpenOrdersSlim {
-    native_coin_free: u64,
-    native_coin_total: u64,
-    native_pc_free: u64,
-    native_pc_total: u64,
-    referrer_rebates_accrued: u64,
-}
-impl OpenOrdersSlim {
-    pub fn from_oo(oo: &OpenOrders) -> Self {
-        Self {
-            native_coin_free: oo.native_coin_free,
-            native_coin_total: oo.native_coin_total,
-            native_pc_free: oo.native_pc_free,
-            native_pc_total: oo.native_pc_total,
-            referrer_rebates_accrued: oo.referrer_rebates_accrued,
-        }
-    }
-}
-
-pub trait OpenOrdersAmounts {
-    fn native_base_reserved(&self) -> u64;
-    fn native_quote_reserved(&self) -> u64;
-    fn native_base_free(&self) -> u64;
-    fn native_quote_free(&self) -> u64;
-    fn native_base_total(&self) -> u64;
-    fn native_quote_total(&self) -> u64;
-    fn native_rebates(&self) -> u64;
-}
-
-impl OpenOrdersAmounts for OpenOrdersSlim {
-    fn native_base_reserved(&self) -> u64 {
-        self.native_coin_total - self.native_coin_free
-    }
-    fn native_quote_reserved(&self) -> u64 {
-        self.native_pc_total - self.native_pc_free
-    }
-    fn native_base_free(&self) -> u64 {
-        self.native_coin_free
-    }
-    fn native_quote_free(&self) -> u64 {
-        self.native_pc_free
-    }
-    fn native_base_total(&self) -> u64 {
-        self.native_coin_total
-    }
-    fn native_quote_total(&self) -> u64 {
-        self.native_pc_total
-    }
-    fn native_rebates(&self) -> u64 {
-        self.referrer_rebates_accrued
-    }
-}
-
-impl OpenOrdersAmounts for OpenOrders {
-    fn native_base_reserved(&self) -> u64 {
-        self.native_coin_total - self.native_coin_free
-    }
-    fn native_quote_reserved(&self) -> u64 {
-        self.native_pc_total - self.native_pc_free
-    }
-    fn native_base_free(&self) -> u64 {
-        self.native_coin_free
-    }
-    fn native_quote_free(&self) -> u64 {
-        self.native_pc_free
-    }
-    fn native_base_total(&self) -> u64 {
-        self.native_coin_total
-    }
-    fn native_quote_total(&self) -> u64 {
-        self.native_pc_total
-    }
-    fn native_rebates(&self) -> u64 {
-        self.referrer_rebates_accrued
-    }
-}
 
 #[allow(clippy::too_many_arguments)]
 pub fn serum3_place_order(
     ctx: Context<Serum3PlaceOrder>,
     side: Serum3Side,
-    limit_price: u64,
+    limit_price_lots: u64,
     max_base_qty: u64,
     max_native_quote_qty_including_fees: u64,
     self_trade_behavior: Serum3SelfTradeBehavior,
@@ -104,6 +26,9 @@ pub fn serum3_place_order(
     client_order_id: u64,
     limit: u16,
 ) -> Result<()> {
+    // Also required by serum3's place order
+    require_gt!(limit_price_lots, 0);
+
     let serum_market = ctx.accounts.serum_market.load()?;
     require!(
         !serum_market.is_reduce_only(),
@@ -179,19 +104,28 @@ pub fn serum3_place_order(
 
     let before_vault = ctx.accounts.payer_vault.amount;
 
+    let before_oo_free_slots;
+    let before_had_bids;
+    let before_had_asks;
     let before_oo = {
         let oo_ai = &ctx.accounts.open_orders.as_ref();
         let open_orders = load_open_orders_ref(oo_ai)?;
+        before_oo_free_slots = open_orders.free_slot_bits;
+        before_had_bids = (!open_orders.free_slot_bits & open_orders.is_bid_bits) != 0;
+        before_had_asks = (!open_orders.free_slot_bits & !open_orders.is_bid_bits) != 0;
         OpenOrdersSlim::from_oo(&open_orders)
     };
 
     // Provide a readable error message in case the vault doesn't have enough tokens
+    let base_lot_size;
+    let quote_lot_size;
     {
-        let base_lot_size = load_market_state(
+        let market_state = load_market_state(
             &ctx.accounts.serum_market_external,
             &ctx.accounts.serum_program.key(),
-        )?
-        .coin_lot_size;
+        )?;
+        base_lot_size = market_state.coin_lot_size;
+        quote_lot_size = market_state.pc_lot_size;
 
         let needed_amount = match side {
             Serum3Side::Ask => {
@@ -216,7 +150,7 @@ pub fn serum3_place_order(
     //
     let order = serum_dex::instruction::NewOrderInstructionV3 {
         side: u8::try_from(side).unwrap().try_into().unwrap(),
-        limit_price: limit_price.try_into().unwrap(),
+        limit_price: limit_price_lots.try_into().unwrap(),
         max_coin_qty: max_base_qty.try_into().unwrap(),
         max_native_pc_qty_including_fees: max_native_quote_qty_including_fees.try_into().unwrap(),
         self_trade_behavior: u8::try_from(self_trade_behavior)
@@ -233,12 +167,53 @@ pub fn serum3_place_order(
     //
     // After-order tracking
     //
+    let after_oo_free_slots;
     let after_oo = {
         let oo_ai = &ctx.accounts.open_orders.as_ref();
         let open_orders = load_open_orders_ref(oo_ai)?;
+        after_oo_free_slots = open_orders.free_slot_bits;
         OpenOrdersSlim::from_oo(&open_orders)
     };
     let oo_difference = OODifference::new(&before_oo, &after_oo);
+
+    //
+    // Track the highest bid and lowest ask, to be able to evaluate worst-case health even
+    // when they cross the oracle
+    //
+    let serum = account.serum3_orders_mut(serum_market.market_index)?;
+    if !before_had_bids {
+        // The 0 state means uninitialized/no value
+        serum.highest_placed_bid_inv = 0.0;
+    }
+    if !before_had_asks {
+        serum.lowest_placed_ask = 0.0;
+    }
+    let new_order_on_book = after_oo_free_slots != before_oo_free_slots;
+    if new_order_on_book {
+        match side {
+            Serum3Side::Ask => {
+                // in the normal quote per base units
+                let limit_price =
+                    limit_price_lots as f64 * quote_lot_size as f64 / base_lot_size as f64;
+                serum.lowest_placed_ask = if serum.lowest_placed_ask == 0.0 {
+                    limit_price
+                } else {
+                    serum.lowest_placed_ask.min(limit_price)
+                };
+            }
+            Serum3Side::Bid => {
+                // in base per quote units, to avoid a division in health
+                let limit_price_inv =
+                    base_lot_size as f64 / (limit_price_lots as f64 * quote_lot_size as f64);
+                serum.highest_placed_bid_inv = if serum.highest_placed_bid_inv == 0.0 {
+                    limit_price_inv
+                } else {
+                    // the highest bid has the lowest _inv value
+                    serum.highest_placed_bid_inv.min(limit_price_inv)
+                };
+            }
+        }
+    }
 
     emit!(Serum3OpenOrdersBalanceLogV2 {
         mango_group: ctx.accounts.group.key(),
@@ -246,11 +221,11 @@ pub fn serum3_place_order(
         market_index: serum_market.market_index,
         base_token_index: serum_market.base_token_index,
         quote_token_index: serum_market.quote_token_index,
-        base_total: after_oo.native_coin_total,
-        base_free: after_oo.native_coin_free,
-        quote_total: after_oo.native_pc_total,
-        quote_free: after_oo.native_pc_free,
-        referrer_rebates_accrued: after_oo.referrer_rebates_accrued,
+        base_total: after_oo.native_base_total(),
+        base_free: after_oo.native_base_free(),
+        quote_total: after_oo.native_quote_total(),
+        quote_free: after_oo.native_quote_free(),
+        referrer_rebates_accrued: after_oo.native_rebates(),
     });
 
     ctx.accounts.payer_vault.reload()?;
@@ -293,7 +268,13 @@ pub fn serum3_place_order(
     }
 
     vault_difference.adjust_health_cache_token_balance(&mut health_cache, &payer_bank)?;
-    oo_difference.adjust_health_cache_serum3_state(&mut health_cache, &serum_market)?;
+
+    let serum_account = account.serum3_orders(serum_market.market_index)?;
+    oo_difference.recompute_health_cache_serum3_state(
+        &mut health_cache,
+        &serum_account,
+        &after_oo,
+    )?;
 
     // Check the receiver's reduce only flag.
     //
@@ -322,8 +303,6 @@ pub fn serum3_place_order(
 }
 
 pub struct OODifference {
-    reserved_base_change: I80F48,
-    reserved_quote_change: I80F48,
     free_base_change: I80F48,
     free_quote_change: I80F48,
 }
@@ -331,10 +310,6 @@ pub struct OODifference {
 impl OODifference {
     pub fn new(before_oo: &OpenOrdersSlim, after_oo: &OpenOrdersSlim) -> Self {
         Self {
-            reserved_base_change: I80F48::from(after_oo.native_base_reserved())
-                - I80F48::from(before_oo.native_base_reserved()),
-            reserved_quote_change: I80F48::from(after_oo.native_quote_reserved())
-                - I80F48::from(before_oo.native_quote_reserved()),
             free_base_change: I80F48::from(after_oo.native_base_free())
                 - I80F48::from(before_oo.native_base_free()),
             free_quote_change: I80F48::from(after_oo.native_quote_free())
@@ -342,18 +317,16 @@ impl OODifference {
         }
     }
 
-    pub fn adjust_health_cache_serum3_state(
+    pub fn recompute_health_cache_serum3_state(
         &self,
         health_cache: &mut HealthCache,
-        market: &Serum3Market,
+        serum_account: &Serum3Orders,
+        open_orders: &OpenOrdersSlim,
     ) -> Result<()> {
-        health_cache.adjust_serum3_reserved(
-            market.market_index,
-            market.base_token_index,
-            self.reserved_base_change,
+        health_cache.recompute_serum3_info(
+            serum_account,
+            open_orders,
             self.free_base_change,
-            market.quote_token_index,
-            self.reserved_quote_change,
             self.free_quote_change,
         )
     }
@@ -516,8 +489,12 @@ pub fn apply_settle_changes(
         base_difference.adjust_health_cache_token_balance(health_cache, &base_bank)?;
         quote_difference.adjust_health_cache_token_balance(health_cache, &quote_bank)?;
 
-        OODifference::new(&before_oo, &after_oo)
-            .adjust_health_cache_serum3_state(health_cache, serum_market)?;
+        let serum_account = account.serum3_orders(serum_market.market_index)?;
+        OODifference::new(&before_oo, &after_oo).recompute_health_cache_serum3_state(
+            health_cache,
+            serum_account,
+            after_oo,
+        )?;
     }
 
     Ok(())

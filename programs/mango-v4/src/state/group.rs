@@ -209,6 +209,8 @@ pub enum IxGate {
     OpenbookV2SettleFunds = 64,
     AdminTokenWithdrawFees = 65,
     AdminPerpWithdrawFees = 66,
+    AccountSizeMigration = 67,
+    TokenConditionalSwapStart = 68,
     // NOTE: Adding new variants requires matching changes in ts and the ix_gate_set instruction.
 }
 

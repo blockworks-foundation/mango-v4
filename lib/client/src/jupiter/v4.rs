@@ -100,7 +100,7 @@ impl<'a> JupiterV4<'a> {
         input_mint: Pubkey,
         output_mint: Pubkey,
         amount: u64,
-        slippage: u64,
+        slippage_bps: u64,
         swap_mode: JupiterSwapMode,
         only_direct_routes: bool,
     ) -> anyhow::Result<QueryRoute> {
@@ -115,7 +115,7 @@ impl<'a> JupiterV4<'a> {
                 ("onlyDirectRoutes", only_direct_routes.to_string()),
                 ("enforceSingleTx", "true".into()),
                 ("filterTopNResult", "10".into()),
-                ("slippageBps", format!("{}", slippage)),
+                ("slippageBps", format!("{}", slippage_bps)),
                 (
                     "swapMode",
                     match swap_mode {
@@ -227,14 +227,13 @@ impl<'a> JupiterV4<'a> {
         .map(util::to_writable_account_meta)
         .collect::<Vec<_>>();
 
+        let owner = self.mango_client.owner();
+
         let token_ams = [source_token.mint_info.mint, target_token.mint_info.mint]
             .into_iter()
             .map(|mint| {
                 util::to_writable_account_meta(
-                    anchor_spl::associated_token::get_associated_token_address(
-                        &self.mango_client.owner(),
-                        &mint,
-                    ),
+                    anchor_spl::associated_token::get_associated_token_address(&owner, &mint),
                 )
             })
             .collect::<Vec<_>>();
@@ -265,13 +264,24 @@ impl<'a> JupiterV4<'a> {
         for ix in &jup_ixs[..jup_action_ix_begin] {
             instructions.push(ix.clone());
         }
+
+        // Ensure the source token account is created (jupiter takes care of the output account)
+        instructions.push(
+            spl_associated_token_account::instruction::create_associated_token_account_idempotent(
+                &owner,
+                &owner,
+                &source_token.mint_info.mint,
+                &Token::id(),
+            ),
+        );
+
         instructions.push(Instruction {
             program_id: mango_v4::id(),
             accounts: {
                 let mut ams = anchor_lang::ToAccountMetas::to_account_metas(
                     &mango_v4::accounts::FlashLoanBegin {
                         account: self.mango_client.mango_account_address,
-                        owner: self.mango_client.owner(),
+                        owner,
                         token_program: Token::id(),
                         instructions: solana_sdk::sysvar::instructions::id(),
                     },
@@ -296,7 +306,7 @@ impl<'a> JupiterV4<'a> {
                 let mut ams = anchor_lang::ToAccountMetas::to_account_metas(
                     &mango_v4::accounts::FlashLoanEnd {
                         account: self.mango_client.mango_account_address,
-                        owner: self.mango_client.owner(),
+                        owner,
                         token_program: Token::id(),
                     },
                     None,
@@ -319,7 +329,7 @@ impl<'a> JupiterV4<'a> {
         let mut address_lookup_tables = self.mango_client.mango_address_lookup_tables().await?;
         address_lookup_tables.extend(jup_alts.into_iter());
 
-        let payer = self.mango_client.owner.pubkey(); // maybe use fee_payer? but usually it's the same
+        let payer = owner; // maybe use fee_payer? but usually it's the same
 
         Ok(TransactionBuilder {
             instructions,
@@ -335,7 +345,7 @@ impl<'a> JupiterV4<'a> {
         input_mint: Pubkey,
         output_mint: Pubkey,
         amount: u64,
-        slippage: u64,
+        slippage_bps: u64,
         swap_mode: JupiterSwapMode,
         only_direct_routes: bool,
     ) -> anyhow::Result<Signature> {
@@ -344,7 +354,7 @@ impl<'a> JupiterV4<'a> {
                 input_mint,
                 output_mint,
                 amount,
-                slippage,
+                slippage_bps,
                 swap_mode,
                 only_direct_routes,
             )

@@ -7,8 +7,8 @@ use anchor_client::Cluster;
 use clap::Parser;
 use mango_v4::state::{PerpMarketIndex, TokenIndex};
 use mango_v4_client::{
-    account_update_stream, chain_data, jupiter, keypair_from_cli, snapshot_source,
-    websocket_source, Client, MangoClient, MangoClientError, MangoGroupContext,
+    account_update_stream, chain_data, error_tracking::ErrorTracking, jupiter, keypair_from_cli,
+    snapshot_source, websocket_source, Client, MangoClient, MangoClientError, MangoGroupContext,
     TransactionBuilderConfig,
 };
 
@@ -79,6 +79,9 @@ struct Cli {
     #[clap(long, env)]
     liqor_owner: String,
 
+    #[clap(long, env, default_value = "1000")]
+    check_interval_ms: u64,
+
     #[clap(long, env, default_value = "300")]
     snapshot_interval_secs: u64,
 
@@ -103,6 +106,16 @@ struct Cli {
     /// max slippage to request on swaps to rebalance spot tokens
     #[clap(long, env, default_value = "100")]
     rebalance_slippage_bps: u64,
+
+    /// if taking tcs orders is enabled
+    ///
+    /// typically only disabled for tests where swaps are unavailable
+    #[clap(long, env, value_enum, default_value = "true")]
+    take_tcs: BoolArg,
+
+    /// profit margin at which to take tcs orders
+    #[clap(long, env, default_value = "0.0005")]
+    tcs_profit_fraction: f64,
 
     /// prioritize each transaction with this many microlamports/cu
     #[clap(long, env, default_value = "0")]
@@ -190,8 +203,6 @@ async fn main() -> anyhow::Result<()> {
         .map(|s3| s3.market.serum_program)
         .unique()
         .collect_vec();
-    // TODO: Currently the websocket source only supports a single serum program address!
-    assert_eq!(serum_programs.len(), 1);
 
     //
     // feed setup
@@ -211,7 +222,7 @@ async fn main() -> anyhow::Result<()> {
     websocket_source::start(
         websocket_source::Config {
             rpc_ws_url: ws_url.clone(),
-            serum_program: *serum_programs.first().unwrap(),
+            serum_programs,
             open_orders_authority: mango_group,
         },
         mango_oracles.clone(),
@@ -277,10 +288,18 @@ async fn main() -> anyhow::Result<()> {
     let tcs_config = trigger_tcs::Config {
         min_health_ratio: cli.min_health_ratio,
         max_trigger_quote_amount: 1_000_000_000, // TODO: config, $1000
-        jupiter_version: cli.jupiter_version.into(),
         compute_limit_for_trigger: cli.compute_limit_for_tcs,
+        profit_fraction: cli.tcs_profit_fraction,
+        collateral_token_index: 0, // USDC
         // TODO: config
         refresh_timeout: Duration::from_secs(30),
+
+        jupiter_version: cli.jupiter_version.into(),
+        jupiter_slippage_bps: cli.rebalance_slippage_bps,
+
+        // TODO: configurable
+        mode: trigger_tcs::Mode::SwapSellIntoBuy,
+        min_buy_fraction: 0.7,
     };
 
     let mut rebalance_interval = tokio::time::interval(Duration::from_secs(5));
@@ -417,15 +436,14 @@ async fn main() -> anyhow::Result<()> {
                     // Workaround: We really need a sequence enforcer in the liquidator since we don't want to
                     // accidentally send a similar tx again when we incorrectly believe an earlier one got forked
                     // off. For now, hard sleep on error to avoid the most frequent error cases.
-                    std::thread::sleep(Duration::from_secs(10));
+                    tokio::time::sleep(Duration::from_secs(10)).await;
                 }
             }
         }
     });
 
     let liquidation_job = tokio::spawn({
-        // TODO: configurable interval
-        let mut interval = tokio::time::interval(Duration::from_secs(5));
+        let mut interval = tokio::time::interval(Duration::from_millis(cli.check_interval_ms));
         let shared_state = shared_state.clone();
         async move {
             loop {
@@ -442,15 +460,25 @@ async fn main() -> anyhow::Result<()> {
                 liquidation.log_persistent_errors();
 
                 let liquidated = liquidation
-                    .maybe_liquidate_one_and_rebalance(account_addresses.iter())
+                    .maybe_liquidate_one(account_addresses.iter())
                     .await
                     .unwrap();
 
-                if !liquidated {
-                    liquidation
+                let mut took_tcs = false;
+                if !liquidated && cli.take_tcs == BoolArg::True {
+                    took_tcs = liquidation
                         .maybe_take_token_conditional_swap(account_addresses.iter())
                         .await
                         .unwrap();
+                }
+
+                if liquidated || took_tcs {
+                    // It's awkward that this rebalance can run in parallel with the one
+                    // from the rebalance_job. Ideally we'd get only one at a time/in quick succession.
+                    // However, we do want to rebalance after a liquidation before liquidating further.
+                    if let Err(err) = liquidation.rebalancer.zero_all_non_quote().await {
+                        error!("failed to rebalance liqor: {:?}", err);
+                    }
                 }
             }
         }
@@ -524,73 +552,6 @@ struct SharedState {
     one_snapshot_done: bool,
 }
 
-#[derive(Clone)]
-pub struct AccountErrorState {
-    pub messages: Vec<String>,
-    pub count: u64,
-    pub last_at: Instant,
-}
-
-#[derive(Default)]
-pub struct ErrorTracking {
-    accounts: HashMap<Pubkey, AccountErrorState>,
-    skip_threshold: u64,
-    skip_duration: Duration,
-}
-
-impl ErrorTracking {
-    pub fn had_too_many_errors(&self, pubkey: &Pubkey, now: Instant) -> Option<AccountErrorState> {
-        if let Some(error_entry) = self.accounts.get(pubkey) {
-            if error_entry.count >= self.skip_threshold
-                && now.duration_since(error_entry.last_at) < self.skip_duration
-            {
-                Some(error_entry.clone())
-            } else {
-                None
-            }
-        } else {
-            None
-        }
-    }
-
-    pub fn record_error(&mut self, pubkey: &Pubkey, now: Instant, message: String) {
-        let error_entry = self.accounts.entry(*pubkey).or_insert(AccountErrorState {
-            messages: Vec::with_capacity(1),
-            count: 0,
-            last_at: now,
-        });
-        error_entry.count += 1;
-        error_entry.last_at = now;
-        if !error_entry.messages.contains(&message) {
-            error_entry.messages.push(message);
-        }
-        if error_entry.messages.len() > 5 {
-            error_entry.messages.remove(0);
-        }
-    }
-
-    pub fn clear_errors(&mut self, pubkey: &Pubkey) {
-        self.accounts.remove(pubkey);
-    }
-
-    #[instrument(skip_all, fields(%error_type))]
-    #[allow(unused_variables)]
-    pub fn log_persistent_errors(&self, error_type: &str, min_duration: Duration) {
-        let now = Instant::now();
-        for (pubkey, errors) in self.accounts.iter() {
-            if now.duration_since(errors.last_at) < min_duration {
-                continue;
-            }
-            info!(
-                %pubkey,
-                count = errors.count,
-                messages = ?errors.messages,
-                "has persistent errors",
-            );
-        }
-    }
-}
-
 struct LiquidationState {
     mango_client: Arc<MangoClient>,
     account_fetcher: Arc<chain_data::AccountFetcher>,
@@ -611,7 +572,7 @@ struct LiquidationState {
 }
 
 impl LiquidationState {
-    async fn maybe_liquidate_one_and_rebalance<'b>(
+    async fn maybe_liquidate_one<'b>(
         &mut self,
         accounts_iter: impl Iterator<Item = &'b Pubkey>,
     ) -> anyhow::Result<bool> {
@@ -623,25 +584,17 @@ impl LiquidationState {
             accounts.shuffle(&mut rng);
         }
 
-        let mut liquidated_one = false;
         for pubkey in accounts {
             if self
                 .maybe_liquidate_and_log_error(pubkey)
                 .await
                 .unwrap_or(false)
             {
-                liquidated_one = true;
-                break;
+                return Ok(true);
             }
         }
-        if !liquidated_one {
-            return Ok(false);
-        }
 
-        if let Err(err) = self.rebalancer.zero_all_non_quote().await {
-            error!("failed to rebalance liqor: {:?}", err);
-        }
-        Ok(true)
+        Ok(false)
     }
 
     async fn maybe_liquidate_and_log_error(&mut self, pubkey: &Pubkey) -> anyhow::Result<bool> {
@@ -700,7 +653,7 @@ impl LiquidationState {
     async fn maybe_take_token_conditional_swap<'b>(
         &mut self,
         accounts_iter: impl Iterator<Item = &'b Pubkey>,
-    ) -> anyhow::Result<()> {
+    ) -> anyhow::Result<bool> {
         let accounts = accounts_iter.collect::<Vec<&Pubkey>>();
 
         let now = Instant::now();
@@ -708,6 +661,15 @@ impl LiquidationState {
             .duration_since(std::time::UNIX_EPOCH)?
             .as_secs()
             .try_into()?;
+
+        let tcs_context = trigger_tcs::Context {
+            mango_client: self.mango_client.clone(),
+            account_fetcher: self.account_fetcher.clone(),
+            token_swap_info: self.token_swap_info.clone(),
+            config: self.trigger_tcs_config.clone(),
+            jupiter_quote_cache: Arc::new(trigger_tcs::JupiterQuoteCache::default()),
+            now_ts,
+        };
 
         // Find interesting (pubkey, tcsid, volume)
         let mut interesting_tcs = Vec::with_capacity(accounts.len());
@@ -724,13 +686,7 @@ impl LiquidationState {
                 continue;
             }
 
-            match trigger_tcs::find_interesting_tcs_for_account(
-                pubkey,
-                &self.mango_client,
-                &self.account_fetcher,
-                &self.token_swap_info,
-                now_ts,
-            ) {
+            match tcs_context.find_interesting_tcs_for_account(pubkey) {
                 Ok(v) => {
                     self.tcs_collection_hard_errors.clear_errors(pubkey);
                     if v.is_empty() {
@@ -741,6 +697,7 @@ impl LiquidationState {
                     } else {
                         for it in v.iter() {
                             if let Err(e) = it {
+                                info!("error on tcs find_interesting: {:?}", e);
                                 self.tcs_collection_partial_errors.record_error(
                                     pubkey,
                                     now,
@@ -758,15 +715,9 @@ impl LiquidationState {
             }
         }
         if interesting_tcs.is_empty() {
-            return Ok(());
+            return Ok(false);
         }
 
-        let tcs_context = trigger_tcs::ExecutionContext {
-            mango_client: self.mango_client.clone(),
-            account_fetcher: self.account_fetcher.clone(),
-            token_swap_info: self.token_swap_info.clone(),
-            config: self.trigger_tcs_config.clone(),
-        };
         let (txsigs, mut changed_pubkeys) = tcs_context
             .execute_tcs(&mut interesting_tcs, &mut self.tcs_execution_errors)
             .await?;
@@ -786,10 +737,7 @@ impl LiquidationState {
             info!(slot, "could not refresh after tcs execution: {}", e);
         }
 
-        if let Err(err) = self.rebalancer.zero_all_non_quote().await {
-            error!("failed to rebalance liqor: {:?}", err);
-        }
-        Ok(())
+        Ok(true)
     }
 
     fn log_persistent_errors(&mut self) {

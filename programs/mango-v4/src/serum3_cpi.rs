@@ -1,5 +1,5 @@
 use anchor_lang::prelude::*;
-use serum_dex::state::ToAlignedBytes;
+use serum_dex::state::{OpenOrders, ToAlignedBytes};
 
 use std::cell::{Ref, RefMut};
 use std::cmp::min;
@@ -126,6 +126,85 @@ pub fn load_open_orders_bytes(bytes: &[u8]) -> Result<&serum_dex::state::OpenOrd
 pub fn pubkey_from_u64_array(d: [u64; 4]) -> Pubkey {
     let b: [u8; 32] = bytemuck::cast(d);
     Pubkey::from(b)
+}
+
+/// For loan origination fees bookkeeping purposes
+#[derive(Debug)]
+pub struct OpenOrdersSlim {
+    native_coin_free: u64,
+    native_coin_total: u64,
+    native_pc_free: u64,
+    native_pc_total: u64,
+    referrer_rebates_accrued: u64,
+}
+impl OpenOrdersSlim {
+    pub fn from_oo(oo: &OpenOrders) -> Self {
+        Self {
+            native_coin_free: oo.native_coin_free,
+            native_coin_total: oo.native_coin_total,
+            native_pc_free: oo.native_pc_free,
+            native_pc_total: oo.native_pc_total,
+            referrer_rebates_accrued: oo.referrer_rebates_accrued,
+        }
+    }
+}
+
+pub trait OpenOrdersAmounts {
+    fn native_base_reserved(&self) -> u64;
+    fn native_quote_reserved(&self) -> u64;
+    fn native_base_free(&self) -> u64;
+    fn native_quote_free(&self) -> u64;
+    fn native_base_total(&self) -> u64;
+    fn native_quote_total(&self) -> u64;
+    fn native_rebates(&self) -> u64;
+}
+
+impl OpenOrdersAmounts for OpenOrdersSlim {
+    fn native_base_reserved(&self) -> u64 {
+        self.native_coin_total - self.native_coin_free
+    }
+    fn native_quote_reserved(&self) -> u64 {
+        self.native_pc_total - self.native_pc_free
+    }
+    fn native_base_free(&self) -> u64 {
+        self.native_coin_free
+    }
+    fn native_quote_free(&self) -> u64 {
+        self.native_pc_free
+    }
+    fn native_base_total(&self) -> u64 {
+        self.native_coin_total
+    }
+    fn native_quote_total(&self) -> u64 {
+        self.native_pc_total
+    }
+    fn native_rebates(&self) -> u64 {
+        self.referrer_rebates_accrued
+    }
+}
+
+impl OpenOrdersAmounts for OpenOrders {
+    fn native_base_reserved(&self) -> u64 {
+        self.native_coin_total - self.native_coin_free
+    }
+    fn native_quote_reserved(&self) -> u64 {
+        self.native_pc_total - self.native_pc_free
+    }
+    fn native_base_free(&self) -> u64 {
+        self.native_coin_free
+    }
+    fn native_quote_free(&self) -> u64 {
+        self.native_pc_free
+    }
+    fn native_base_total(&self) -> u64 {
+        self.native_coin_total
+    }
+    fn native_quote_total(&self) -> u64 {
+        self.native_pc_total
+    }
+    fn native_rebates(&self) -> u64 {
+        self.referrer_rebates_accrued
+    }
 }
 
 pub struct InitOpenOrders<'info> {

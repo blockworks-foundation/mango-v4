@@ -35,7 +35,7 @@ pub struct OpenbookV2LiqForceCancelOrders<'info> {
     #[account(
         has_one = bids,
         has_one = asks,
-        has_one = event_queue,
+        has_one = event_heap,
     )]
     pub openbook_v2_market_external: AccountLoader<'info, Market>,
 
@@ -49,7 +49,7 @@ pub struct OpenbookV2LiqForceCancelOrders<'info> {
 
     #[account(mut)]
     /// CHECK: event will be checked by openbook_v2
-    pub event_queue: UncheckedAccount<'info>,
+    pub event_heap: UncheckedAccount<'info>,
 
     #[account(mut)]
     pub market_base_vault: Box<Account<'info, TokenAccount>>,
