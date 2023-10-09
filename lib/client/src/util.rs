@@ -7,22 +7,9 @@ use solana_sdk::{
     transaction::uses_durable_nonce,
 };
 
+use anchor_lang::prelude::{AccountMeta, Pubkey};
+use anyhow::Context;
 use std::{thread, time};
-
-// #[allow(dead_code)]
-// pub fn retry<T>(request: impl Fn() -> Result<T, anchor_client::ClientError>) -> anyhow::Result<T> {
-//     for _i in 0..5 {
-//         match request() {
-//             Ok(res) => return Ok(res),
-//             Err(err) => {
-//                 // TODO: only retry for recoverable errors
-//                 log::error!("{:#?}", err);
-//                 continue;
-//             }
-//         }
-//     }
-//     Err(anyhow!("Retry failed"))
-// }
 
 /// Some Result<> types don't convert to anyhow::Result nicely. Force them through stringification.
 pub trait AnyhowWrap {
@@ -113,4 +100,46 @@ pub fn send_and_confirm_transaction(
             .to_string(),
     )
     .into())
+}
+
+/// Convenience function used in binaries to set up the fmt tracing_subscriber,
+/// with cololring enabled only if logging to a terminal and with EnvFilter.
+pub fn tracing_subscriber_init() {
+    let format = tracing_subscriber::fmt::format().with_ansi(atty::is(atty::Stream::Stdout));
+
+    tracing_subscriber::fmt()
+        .with_env_filter(tracing_subscriber::EnvFilter::from_default_env())
+        .event_format(format)
+        .init();
+}
+
+pub async fn http_error_handling<T: serde::de::DeserializeOwned>(
+    response: reqwest::Response,
+) -> anyhow::Result<T> {
+    let status = response.status();
+    let response_text = response
+        .text()
+        .await
+        .context("awaiting body of http request")?;
+    if !status.is_success() {
+        anyhow::bail!("http request failed, status: {status}, body: {response_text}");
+    }
+    serde_json::from_str::<T>(&response_text)
+        .with_context(|| format!("response has unexpected format, body: {response_text}"))
+}
+
+pub fn to_readonly_account_meta(pubkey: Pubkey) -> AccountMeta {
+    AccountMeta {
+        pubkey,
+        is_writable: false,
+        is_signer: false,
+    }
+}
+
+pub fn to_writable_account_meta(pubkey: Pubkey) -> AccountMeta {
+    AccountMeta {
+        pubkey,
+        is_writable: true,
+        is_signer: false,
+    }
 }

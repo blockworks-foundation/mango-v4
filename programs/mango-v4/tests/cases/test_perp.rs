@@ -314,7 +314,6 @@ async fn test_perp_fixed() -> Result<(), TransportError> {
     )
     .await
     .is_err());
-    solana.advance_by_slots(1).await;
 
     // Trade again to bring base_position_lots to 0
     send_tx(
@@ -1031,6 +1030,184 @@ async fn test_perp_realize_partially() -> Result<(), TransportError> {
         -50_000.0,
         0.001
     ));
+
+    Ok(())
+}
+
+#[tokio::test]
+async fn test_perp_reducing_when_liquidatable() -> Result<(), TransportError> {
+    let context = TestContext::new().await;
+    let solana = &context.solana.clone();
+
+    let admin = TestKeypair::new();
+    let owner = context.users[0].key;
+    let payer = context.users[1].key;
+    let mints = &context.mints[0..2];
+
+    //
+    // SETUP: Create a group and an account
+    //
+
+    let GroupWithTokens { group, tokens, .. } = GroupWithTokensConfig {
+        admin,
+        payer,
+        mints: mints.to_vec(),
+        ..GroupWithTokensConfig::default()
+    }
+    .create(solana)
+    .await;
+
+    let deposit_amount = 100000;
+    let account_0 = create_funded_account(
+        &solana,
+        group,
+        owner,
+        0,
+        &context.users[1],
+        &mints[0..1],
+        deposit_amount,
+        0,
+    )
+    .await;
+    let account_1 = create_funded_account(
+        &solana,
+        group,
+        owner,
+        1,
+        &context.users[1],
+        &mints[0..1],
+        deposit_amount,
+        0,
+    )
+    .await;
+
+    //
+    // TEST: Create a perp market
+    //
+    let mango_v4::accounts::PerpCreateMarket { perp_market, .. } = send_tx(
+        solana,
+        PerpCreateMarketInstruction {
+            group,
+            admin,
+            payer,
+            perp_market_index: 0,
+            quote_lot_size: 10,
+            base_lot_size: 100,
+            maint_base_asset_weight: 0.975,
+            init_base_asset_weight: 0.95,
+            maint_base_liab_weight: 1.025,
+            init_base_liab_weight: 1.05,
+            base_liquidation_fee: 0.012,
+            maker_fee: 0.0000,
+            taker_fee: 0.0000,
+            settle_pnl_limit_factor: -1.0,
+            settle_pnl_limit_window_size_ts: 24 * 60 * 60,
+            ..PerpCreateMarketInstruction::with_new_book_and_queue(&solana, &tokens[1]).await
+        },
+    )
+    .await
+    .unwrap();
+
+    let perp_market_data = solana.get_account::<PerpMarket>(perp_market).await;
+    let price_lots = perp_market_data.native_price_to_lot(I80F48::from(1000));
+    set_perp_stub_oracle_price(solana, group, perp_market, &tokens[1], admin, 1000.0).await;
+
+    //
+    // SETUP: Place a bid, corresponding ask, and consume event
+    //
+    send_tx(
+        solana,
+        PerpPlaceOrderInstruction {
+            account: account_0,
+            perp_market,
+            owner,
+            side: Side::Bid,
+            price_lots,
+            max_base_lots: 2,
+            client_order_id: 5,
+            ..PerpPlaceOrderInstruction::default()
+        },
+    )
+    .await
+    .unwrap();
+
+    send_tx(
+        solana,
+        PerpPlaceOrderInstruction {
+            account: account_1,
+            perp_market,
+            owner,
+            side: Side::Ask,
+            price_lots,
+            max_base_lots: 2,
+            client_order_id: 6,
+            ..PerpPlaceOrderInstruction::default()
+        },
+    )
+    .await
+    .unwrap();
+
+    send_tx(
+        solana,
+        PerpConsumeEventsInstruction {
+            perp_market,
+            mango_accounts: vec![account_0, account_1],
+        },
+    )
+    .await
+    .unwrap();
+
+    let mango_account_0 = solana.get_account::<MangoAccount>(account_0).await;
+    let perp_0 = mango_account_0.perps[0];
+    assert_eq!(perp_0.base_position_lots(), 2);
+
+    let mango_account_1 = solana.get_account::<MangoAccount>(account_1).await;
+    let perp_1 = mango_account_1.perps[0];
+    assert_eq!(perp_1.base_position_lots(), -2);
+
+    //
+    // SETUP: Change the price to make the SHORT account liquidatable
+    //
+    set_perp_stub_oracle_price(solana, group, perp_market, &tokens[1], admin, 4000.0).await;
+    assert!(account_init_health(solana, account_1).await < 0.0);
+
+    //
+    // TEST: Can place an order that reduces the position anyway
+    //
+    send_tx(
+        solana,
+        PerpPlaceOrderInstruction {
+            account: account_1,
+            perp_market,
+            owner,
+            side: Side::Bid,
+            price_lots: perp_market_data.native_price_to_lot(I80F48::from_num(4000)),
+            max_base_lots: 1,
+            client_order_id: 5,
+            ..PerpPlaceOrderInstruction::default()
+        },
+    )
+    .await
+    .unwrap();
+
+    //
+    // TEST: Can NOT place an order that goes too far
+    //
+    let err = send_tx(
+        solana,
+        PerpPlaceOrderInstruction {
+            account: account_1,
+            perp_market,
+            owner,
+            side: Side::Bid,
+            price_lots: perp_market_data.native_price_to_lot(I80F48::from_num(4000)),
+            max_base_lots: 5,
+            client_order_id: 5,
+            ..PerpPlaceOrderInstruction::default()
+        },
+    )
+    .await;
+    assert!(err.is_err());
 
     Ok(())
 }

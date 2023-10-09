@@ -7,15 +7,17 @@ use solana_client::{
     rpc_config::{RpcAccountInfoConfig, RpcContextConfig, RpcProgramAccountsConfig},
     rpc_response::{OptionalContext, Response, RpcKeyedAccount},
 };
-use solana_rpc::rpc::{rpc_accounts::AccountsDataClient, rpc_minimal::MinimalClient};
+use solana_rpc::rpc::rpc_minimal::MinimalClient;
 use solana_sdk::{account::AccountSharedData, commitment_config::CommitmentConfig, pubkey::Pubkey};
 
 use anyhow::Context;
 use futures::{stream, StreamExt};
-use log::*;
+use solana_rpc::rpc::rpc_accounts::AccountsDataClient;
+use solana_rpc::rpc::rpc_accounts_scan::AccountsScanClient;
 use std::str::FromStr;
 use std::time::Duration;
 use tokio::time;
+use tracing::*;
 
 use crate::account_update_stream::{AccountUpdate, Message};
 use crate::AnyhowWrap;
@@ -93,9 +95,18 @@ async fn feed_snapshots(
     mango_oracles: Vec<Pubkey>,
     sender: &async_channel::Sender<Message>,
 ) -> anyhow::Result<()> {
-    let rpc_client = http::connect_with_options::<AccountsDataClient>(&config.rpc_http_url, true)
-        .await
-        .map_err_anyhow()?;
+    // TODO replace the following with mango-feeds connector's snapshot.rs
+
+    // note: with solana 1.15 the gPA (get_program_accounts) rpc call was moved to a new mod rpc_client_scan
+    let rpc_client_data =
+        http::connect_with_options::<AccountsDataClient>(&config.rpc_http_url, true)
+            .await
+            .map_err_anyhow()?;
+
+    let rpc_client_scan =
+        http::connect_with_options::<AccountsScanClient>(&config.rpc_http_url, true)
+            .await
+            .map_err_anyhow()?;
 
     let account_info_config = RpcAccountInfoConfig {
         encoding: Some(UiAccountEncoding::Base64),
@@ -114,7 +125,7 @@ async fn feed_snapshots(
     let mut snapshot = AccountSnapshot::default();
 
     // Get all accounts of the mango program
-    let response = rpc_client
+    let response = rpc_client_scan
         .get_program_accounts(
             mango_v4::id().to_string(),
             Some(all_accounts_config.clone()),
@@ -135,7 +146,7 @@ async fn feed_snapshots(
     )> = stream::iter(mango_oracles)
         .chunks(config.get_multiple_accounts_count)
         .map(|keys| {
-            let rpc_client = &rpc_client;
+            let rpc_client = &rpc_client_data;
             let account_info_config = account_info_config.clone();
             async move {
                 let string_keys = keys.iter().map(|k| k.to_string()).collect::<Vec<_>>();
@@ -179,7 +190,7 @@ async fn feed_snapshots(
     )> = stream::iter(oo_account_pubkeys)
         .chunks(config.get_multiple_accounts_count)
         .map(|keys| {
-            let rpc_client = &rpc_client;
+            let rpc_client = &rpc_client_data;
             let account_info_config = account_info_config.clone();
             async move {
                 let string_keys = keys.iter().map(|k| k.to_string()).collect::<Vec<_>>();
@@ -230,10 +241,10 @@ pub fn start(config: Config, mango_oracles: Vec<Pubkey>, sender: async_channel::
                 }))
                 .await
                 .expect("always Ok");
-            log::debug!("latest slot for snapshot {}", epoch_info.absolute_slot);
+            debug!("latest slot for snapshot {}", epoch_info.absolute_slot);
 
             if epoch_info.absolute_slot > config.min_slot {
-                log::debug!("continuing to fetch snapshot now, min_slot {} is older than latest epoch slot {}", config.min_slot, epoch_info.absolute_slot);
+                debug!("continuing to fetch snapshot now, min_slot {} is older than latest epoch slot {}", config.min_slot, epoch_info.absolute_slot);
                 break;
             }
         }

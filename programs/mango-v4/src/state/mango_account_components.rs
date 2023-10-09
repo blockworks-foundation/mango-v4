@@ -12,7 +12,7 @@ use crate::state::*;
 pub const FREE_ORDER_SLOT: PerpMarketIndex = PerpMarketIndex::MAX;
 
 #[zero_copy]
-#[derive(AnchorDeserialize, AnchorSerialize, Derivative, bytemuck::Pod)]
+#[derive(AnchorDeserialize, AnchorSerialize, Derivative)]
 #[derivative(Debug)]
 pub struct TokenPosition {
     // TODO: Why did we have deposits and borrows as two different values
@@ -27,10 +27,10 @@ pub struct TokenPosition {
     pub token_index: TokenIndex,
 
     /// incremented when a market requires this position to stay alive
-    pub in_use_count: u8,
+    pub in_use_count: u16,
 
     #[derivative(Debug = "ignore")]
-    pub padding: [u8; 5],
+    pub padding: [u8; 4],
 
     // bookkeeping variable for onchain interest calculation
     // either deposit_index or borrow_index at last indexed_position change
@@ -48,7 +48,7 @@ pub struct TokenPosition {
 
 const_assert_eq!(
     size_of::<TokenPosition>(),
-    16 + 2 + 1 + 5 + 16 + 8 + 8 + 128
+    16 + 2 + 2 + 4 + 16 + 8 + 8 + 128
 );
 const_assert_eq!(size_of::<TokenPosition>(), 184);
 const_assert_eq!(size_of::<TokenPosition>() % 8, 0);
@@ -99,10 +99,18 @@ impl TokenPosition {
     pub fn is_in_use(&self) -> bool {
         self.in_use_count > 0
     }
+
+    pub fn increment_in_use(&mut self) {
+        self.in_use_count += 1; // panic on overflow
+    }
+
+    pub fn decrement_in_use(&mut self) {
+        self.in_use_count = self.in_use_count.saturating_sub(1);
+    }
 }
 
 #[zero_copy]
-#[derive(AnchorSerialize, AnchorDeserialize, Derivative, bytemuck::Pod)]
+#[derive(AnchorSerialize, AnchorDeserialize, Derivative)]
 #[derivative(Debug)]
 pub struct Serum3Orders {
     pub open_orders: Pubkey,
@@ -125,10 +133,25 @@ pub struct Serum3Orders {
     #[derivative(Debug = "ignore")]
     pub padding: [u8; 2],
 
+    /// Track something like the highest open bid / lowest open ask, in native/native units.
+    ///
+    /// Tracking it exactly isn't possible since we don't see fills. So instead track
+    /// the min/max of the _placed_ bids and asks.
+    ///
+    /// The value is reset in serum3_place_order when a new order is placed without an
+    /// existing one on the book.
+    ///
+    /// 0 is a special "unset" state.
+    pub highest_placed_bid_inv: f64,
+    pub lowest_placed_ask: f64,
+
     #[derivative(Debug = "ignore")]
-    pub reserved: [u8; 64],
+    pub reserved: [u8; 48],
 }
-const_assert_eq!(size_of::<Serum3Orders>(), 32 + 8 * 2 + 2 * 3 + 2 + 64);
+const_assert_eq!(
+    size_of::<Serum3Orders>(),
+    32 + 8 * 2 + 2 * 3 + 2 + 2 * 8 + 48
+);
 const_assert_eq!(size_of::<Serum3Orders>(), 120);
 const_assert_eq!(size_of::<Serum3Orders>() % 8, 0);
 
@@ -149,16 +172,18 @@ impl Default for Serum3Orders {
             market_index: Serum3MarketIndex::MAX,
             base_token_index: TokenIndex::MAX,
             quote_token_index: TokenIndex::MAX,
-            reserved: [0; 64],
             padding: Default::default(),
             base_borrows_without_fee: 0,
             quote_borrows_without_fee: 0,
+            highest_placed_bid_inv: 0.0,
+            lowest_placed_ask: 0.0,
+            reserved: [0; 48],
         }
     }
 }
 
 #[zero_copy]
-#[derive(AnchorSerialize, AnchorDeserialize, Derivative, bytemuck::Pod)]
+#[derive(AnchorSerialize, AnchorDeserialize, Derivative)]
 #[derivative(Debug)]
 pub struct PerpPosition {
     pub market_index: PerpMarketIndex,
@@ -789,7 +814,7 @@ impl PerpPosition {
 }
 
 #[zero_copy]
-#[derive(AnchorSerialize, AnchorDeserialize, Debug, bytemuck::Pod)]
+#[derive(AnchorSerialize, AnchorDeserialize, Debug)]
 pub struct PerpOpenOrder {
     pub side_and_tree: u8, // SideAndOrderTree -- enums aren't POD
     pub padding1: [u8; 1],
@@ -824,6 +849,10 @@ impl PerpOpenOrder {
 
     pub fn is_active_for_market(&self, perp_market_index: PerpMarketIndex) -> bool {
         self.market == perp_market_index
+    }
+
+    pub fn is_active(&self) -> bool {
+        self.market != FREE_ORDER_SLOT
     }
 }
 

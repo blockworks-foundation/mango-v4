@@ -71,14 +71,7 @@ async function main(): Promise<void> {
       mint,
       admin.publicKey,
     );
-    await splToken.mintTo(
-      connection,
-      admin,
-      mint,
-      tokenAccount,
-      admin,
-      1000 * 1e6,
-    );
+    await splToken.mintTo(connection, admin, mint, tokenAccount, admin, 1e15);
   }
   //const mints = [new PublicKey('5aMD1uEcWnXnptwmyfxmTWHzx3KeMsZ7jmiJAZ3eiAdH'), new PublicKey('FijXcDUkgTiMsghQVpjRDBdUPtkrJfQdfRZkr6zLkdkW'), new PublicKey('3tVDfiFQAAT3rqLNMXUaH2p5X5R4fjz8LYEvFEQ9fDYB')]
 

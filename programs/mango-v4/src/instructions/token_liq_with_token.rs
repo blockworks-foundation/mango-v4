@@ -5,8 +5,7 @@ use crate::accounts_ix::*;
 use crate::error::*;
 use crate::health::*;
 use crate::logs::{
-    LoanOriginationFeeInstruction, TokenBalanceLog, TokenLiqWithTokenLog,
-    WithdrawLoanOriginationFeeLog,
+    LoanOriginationFeeInstruction, TokenBalanceLog, TokenLiqWithTokenLog, WithdrawLoanLog,
 };
 use crate::state::*;
 
@@ -221,7 +220,7 @@ pub(crate) fn liquidation_action(
 
     let (liqor_liab_position, liqor_liab_raw_index, _) =
         liqor.ensure_token_position(liab_token_index)?;
-    let (liqor_liab_active, loan_origination_fee) =
+    let liqor_liab_withdraw_result =
         liab_bank.withdraw_with_fee(liqor_liab_position, liab_transfer, now_ts)?;
     let liqor_liab_indexed_position = liqor_liab_position.indexed_position;
     let liqee_liab_native_after = liqee_liab_position.native(liab_bank);
@@ -289,13 +288,18 @@ pub(crate) fn liquidation_action(
         borrow_index: liab_bank.borrow_index.to_bits(),
     });
 
-    if loan_origination_fee.is_positive() {
-        emit!(WithdrawLoanOriginationFeeLog {
+    if liqor_liab_withdraw_result
+        .loan_origination_fee
+        .is_positive()
+    {
+        emit!(WithdrawLoanLog {
             mango_group: liqee.fixed.group,
             mango_account: liqor_key,
             token_index: liab_token_index,
-            loan_origination_fee: loan_origination_fee.to_bits(),
-            instruction: LoanOriginationFeeInstruction::LiqTokenWithToken
+            loan_amount: liqor_liab_withdraw_result.loan_amount.to_bits(),
+            loan_origination_fee: liqor_liab_withdraw_result.loan_origination_fee.to_bits(),
+            instruction: LoanOriginationFeeInstruction::LiqTokenWithToken,
+            price: Some(liab_oracle_price.to_bits())
         });
     }
 
@@ -309,7 +313,7 @@ pub(crate) fn liquidation_action(
     if !liqor_asset_active {
         liqor.deactivate_token_position_and_log(liqor_asset_raw_index, liqor_key);
     }
-    if !liqor_liab_active {
+    if !liqor_liab_withdraw_result.position_is_active {
         liqor.deactivate_token_position_and_log(liqor_liab_raw_index, liqor_key)
     }
 

@@ -21,3 +21,8 @@ export const MANGO_V4_ID = {
   devnet: new PublicKey('4MangoMjqJ2firMokCjjGgoK8d4MXcrgL7XJaL3w6fVg'),
   'mainnet-beta': new PublicKey('4MangoMjqJ2firMokCjjGgoK8d4MXcrgL7XJaL3w6fVg'),
 };
+
+export const USDC_MINT = new PublicKey(
+  'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v',
+);
+export const MAX_RECENT_PRIORITY_FEE_ACCOUNTS = 128;

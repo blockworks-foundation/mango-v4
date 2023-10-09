@@ -1,5 +1,3 @@
-cargo-features = ["workspace-inheritance"]
-
 [package]
 name = "mango-v4-client"
 version = "0.3.0"
@@ -16,6 +14,7 @@ anyhow = "1.0"
 async-channel = "1.6"
 async-once-cell = { version = "0.4.2", features = ["unpin"] }
 async-trait = "0.1.52"
+atty = "0.2"
 fixed = { workspace = true, features = ["serde", "borsh"] }
 futures = "0.3.25"
 itertools = "0.10.3"
@@ -23,21 +22,23 @@ jsonrpc-core = "18.0.0"
 jsonrpc-core-client = { version = "18.0.0", features = ["ws", "http", "tls"] }
 mango-v4 = { path = "../../programs/mango-v4", features = ["client"] }
 pyth-sdk-solana = { workspace = true }
-serum_dex = { workspace = true, default-features=false,features = ["no-entrypoint", "program"] }
+serum_dex = { workspace = true, features = ["no-entrypoint", "program"] }
 shellexpand = "2.1.0"
 solana-account-decoder = { workspace = true }
 solana-client = { workspace = true }
 solana-rpc = { workspace = true }
 solana-sdk = { workspace = true }
 solana-address-lookup-table-program = { workspace = true }
-mango-feeds-connector = "0.1.1"
+mango-feeds-connector = { workspace = true }
 spl-associated-token-account = "1.0.3"
 thiserror = "1.0.31"
-log = "0.4"
-reqwest = "0.11.11"
+# note: should match the version used in solana
+reqwest = "0.11.17"
 tokio = { version = "1", features = ["full"] }
 tokio-stream = { version = "0.1.9"}
 serde = "1.0.141"
 serde_json = "1.0.82"
 base64 = "0.13.0"
 bincode = "1.3.3"
+tracing = { version = "0.1", features = ["log"] }
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }

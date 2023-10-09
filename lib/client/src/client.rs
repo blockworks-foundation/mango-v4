@@ -1,8 +1,9 @@
+use std::ops::Deref;
 use std::str::FromStr;
 use std::sync::Arc;
 use std::time::Duration;
 
-use anchor_client::{ClientError, Cluster};
+use anchor_client::Cluster;
 
 use anchor_lang::__private::bytemuck;
 use anchor_lang::prelude::System;
@@ -10,12 +11,12 @@ use anchor_lang::{AccountDeserialize, Id};
 use anchor_spl::associated_token::get_associated_token_address;
 use anchor_spl::token::Token;
 
-use bincode::Options;
 use fixed::types::I80F48;
 use futures::{stream, StreamExt, TryStreamExt};
 use itertools::Itertools;
 
 use mango_v4::accounts_ix::{Serum3OrderType, Serum3SelfTradeBehavior, Serum3Side};
+use mango_v4::accounts_zerocopy::KeyedAccountSharedData;
 use mango_v4::state::{
     Bank, Group, MangoAccountValue, PerpMarketIndex, PlaceOrderType, SelfTradeBehavior,
     Serum3MarketIndex, Side, TokenIndex, INSURANCE_TOKEN_INDEX,
@@ -31,9 +32,9 @@ use solana_sdk::signer::keypair;
 use solana_sdk::transaction::TransactionError;
 
 use crate::account_fetcher::*;
-use crate::context::{MangoGroupContext, Serum3MarketContext, TokenContext};
+use crate::context::MangoGroupContext;
 use crate::gpa::{fetch_anchor_account, fetch_mango_accounts};
-use crate::jupiter;
+use crate::{jupiter, util};
 
 use anyhow::Context;
 use solana_sdk::account::ReadableAccount;
@@ -41,6 +42,8 @@ use solana_sdk::instruction::{AccountMeta, Instruction};
 use solana_sdk::signature::{Keypair, Signature};
 use solana_sdk::sysvar;
 use solana_sdk::{commitment_config::CommitmentConfig, pubkey::Pubkey, signer::Signer};
+
+pub const MAX_ACCOUNTS_PER_TRANSACTION: usize = 64;
 
 // very close to anchor_client::Client, which unfortunately has no accessors or Clone
 #[derive(Clone, Debug)]
@@ -133,16 +136,16 @@ impl MangoClient {
     pub async fn find_or_create_account(
         client: &Client,
         group: Pubkey,
-        owner: &Keypair,
-        payer: &Keypair, // pays the SOL for the new account
+        owner: Arc<Keypair>,
+        payer: Arc<Keypair>, // pays the SOL for the new account
         mango_account_name: &str,
     ) -> anyhow::Result<Pubkey> {
         let rpc = client.rpc_async();
         let program = mango_v4::ID;
+        let owner_pk = owner.pubkey();
 
         // Mango Account
-        let mut mango_account_tuples =
-            fetch_mango_accounts(&rpc, program, group, owner.pubkey()).await?;
+        let mut mango_account_tuples = fetch_mango_accounts(&rpc, program, group, owner_pk).await?;
         let mango_account_opt = mango_account_tuples
             .iter()
             .find(|(_, account)| account.fixed.name() == mango_account_name);
@@ -157,12 +160,18 @@ impl MangoClient {
                 Some(tuple) => tuple.1.fixed.account_num + 1,
                 None => 0u32,
             };
-            Self::create_account(client, group, owner, payer, account_num, mango_account_name)
-                .await
-                .context("Failed to create account...")?;
+            Self::create_account(
+                client,
+                group,
+                owner.clone(),
+                payer,
+                account_num,
+                mango_account_name,
+            )
+            .await
+            .context("Failed to create account...")?;
         }
-        let mango_account_tuples =
-            fetch_mango_accounts(&rpc, program, group, owner.pubkey()).await?;
+        let mango_account_tuples = fetch_mango_accounts(&rpc, program, group, owner_pk).await?;
         let index = mango_account_tuples
             .iter()
             .position(|tuple| tuple.1.fixed.name() == mango_account_name)
@@ -173,15 +182,15 @@ impl MangoClient {
     pub async fn create_account(
         client: &Client,
         group: Pubkey,
-        owner: &Keypair,
-        payer: &Keypair, // pays the SOL for the new account
+        owner: Arc<Keypair>,
+        payer: Arc<Keypair>, // pays the SOL for the new account
         account_num: u32,
         mango_account_name: &str,
     ) -> anyhow::Result<(Pubkey, Signature)> {
         let account = Pubkey::find_program_address(
             &[
-                group.as_ref(),
                 b"MangoAccount".as_ref(),
+                group.as_ref(),
                 owner.pubkey().as_ref(),
                 &account_num.to_le_bytes(),
             ],
@@ -204,8 +213,8 @@ impl MangoClient {
                 account_num,
                 name: mango_account_name.to_owned(),
                 token_count: 8,
-                serum3_count: 8,
-                perp_count: 8,
+                serum3_count: 4,
+                perp_count: 4,
                 perp_oo_count: 8,
             }),
         };
@@ -305,7 +314,7 @@ impl MangoClient {
     pub async fn derive_liquidation_health_check_remaining_account_metas(
         &self,
         liqee: &MangoAccountValue,
-        affected_tokens: Vec<u16>,
+        affected_tokens: &[TokenIndex],
         writable_banks: &[TokenIndex],
     ) -> anyhow::Result<Vec<AccountMeta>> {
         let account = self.mango_account().await?;
@@ -313,7 +322,7 @@ impl MangoClient {
             .derive_health_check_remaining_account_metas_two_accounts(
                 &account,
                 liqee,
-                &affected_tokens,
+                affected_tokens,
                 writable_banks,
             )
     }
@@ -360,21 +369,28 @@ impl MangoClient {
         self.send_and_confirm_owner_tx(vec![ix]).await
     }
 
-    pub async fn token_withdraw(
+    /// Creates token withdraw instructions for the MangoClient's account/owner.
+    /// The `account` state is passed in separately so changes during the tx can be
+    /// accounted for when deriving health accounts.
+    pub fn token_withdraw_instructions(
         &self,
+        account: &MangoAccountValue,
         mint: Pubkey,
         amount: u64,
         allow_borrow: bool,
-    ) -> anyhow::Result<Signature> {
+    ) -> anyhow::Result<Vec<Instruction>> {
         let token = self.context.token_by_mint(&mint)?;
         let token_index = token.token_index;
         let mint_info = token.mint_info;
 
-        let health_check_metas = self
-            .derive_health_check_remaining_account_metas(vec![token_index], vec![], vec![])
-            .await?;
+        let health_check_metas = self.context.derive_health_check_remaining_account_metas(
+            account,
+            vec![token_index],
+            vec![],
+            vec![],
+        )?;
 
-        let ixs = vec![
+        Ok(vec![
             spl_associated_token_account::instruction::create_associated_token_account_idempotent(
                 &self.owner(),
                 &self.owner(),
@@ -408,57 +424,80 @@ impl MangoClient {
                     allow_borrow,
                 }),
             },
-        ];
+        ])
+    }
+
+    pub async fn token_withdraw(
+        &self,
+        mint: Pubkey,
+        amount: u64,
+        allow_borrow: bool,
+    ) -> anyhow::Result<Signature> {
+        let account = self.mango_account().await?;
+        let ixs = self.token_withdraw_instructions(&account, mint, amount, allow_borrow)?;
         self.send_and_confirm_owner_tx(ixs).await
     }
 
-    pub async fn get_oracle_price(
-        &self,
-        token_name: &str,
-    ) -> Result<pyth_sdk_solana::Price, anyhow::Error> {
-        let token_index = *self.context.token_indexes_by_name.get(token_name).unwrap();
+    pub async fn bank_oracle_price(&self, token_index: TokenIndex) -> anyhow::Result<I80F48> {
+        let bank = self.first_bank(token_index).await?;
         let mint_info = self.context.mint_info(token_index);
-        let oracle_account = self
+        let oracle = self
             .account_fetcher
             .fetch_raw_account(&mint_info.oracle)
             .await?;
-        Ok(pyth_sdk_solana::load_price(&oracle_account.data()).unwrap())
+        let price = bank.oracle_price(
+            &KeyedAccountSharedData::new(mint_info.oracle, oracle.into()),
+            None,
+        )?;
+        Ok(price)
+    }
+
+    pub async fn perp_oracle_price(
+        &self,
+        perp_market_index: PerpMarketIndex,
+    ) -> anyhow::Result<I80F48> {
+        let perp = self.context.perp(perp_market_index);
+        let oracle = self
+            .account_fetcher
+            .fetch_raw_account(&perp.market.oracle)
+            .await?;
+        let price = perp.market.oracle_price(
+            &KeyedAccountSharedData::new(perp.market.oracle, oracle.into()),
+            None,
+        )?;
+        Ok(price)
     }
 
     //
     // Serum3
     //
 
-    pub async fn serum3_create_open_orders(&self, name: &str) -> anyhow::Result<Signature> {
+    pub fn serum3_create_open_orders_instruction(
+        &self,
+        market_index: Serum3MarketIndex,
+    ) -> Instruction {
         let account_pubkey = self.mango_account_address;
-
-        let market_index = *self
-            .context
-            .serum3_market_indexes_by_name
-            .get(name)
-            .unwrap();
-        let serum3_info = self.context.serum3_markets.get(&market_index).unwrap();
+        let s3 = self.context.serum3(market_index);
 
         let open_orders = Pubkey::find_program_address(
             &[
-                account_pubkey.as_ref(),
                 b"Serum3OO".as_ref(),
-                serum3_info.address.as_ref(),
+                account_pubkey.as_ref(),
+                s3.address.as_ref(),
             ],
             &mango_v4::ID,
         )
         .0;
 
-        let ix = Instruction {
+        Instruction {
             program_id: mango_v4::id(),
             accounts: anchor_lang::ToAccountMetas::to_account_metas(
                 &mango_v4::accounts::Serum3CreateOpenOrders {
                     group: self.group(),
                     account: account_pubkey,
-
-                    serum_market: serum3_info.address,
-                    serum_program: serum3_info.market.serum_program,
-                    serum_market_external: serum3_info.market.serum_market_external,
+                    serum_market: s3.address,
+                    serum_program: s3.market.serum_program,
+                    serum_market_external: s3.market.serum_market_external,
                     open_orders,
                     owner: self.owner(),
                     payer: self.owner(),
@@ -470,116 +509,47 @@ impl MangoClient {
             data: anchor_lang::InstructionData::data(
                 &mango_v4::instruction::Serum3CreateOpenOrders {},
             ),
-        };
+        }
+    }
+
+    pub async fn serum3_create_open_orders(&self, name: &str) -> anyhow::Result<Signature> {
+        let market_index = self.context.serum3_market_index(name);
+        let ix = self.serum3_create_open_orders_instruction(market_index);
         self.send_and_confirm_owner_tx(vec![ix]).await
     }
 
-    fn serum3_data_by_market_name<'a>(&'a self, name: &str) -> Result<Serum3Data<'a>, ClientError> {
-        let market_index = *self
-            .context
-            .serum3_market_indexes_by_name
-            .get(name)
-            .unwrap();
-        self.serum3_data_by_market_index(market_index)
-    }
-
-    fn serum3_data_by_market_index<'a>(
-        &'a self,
-        market_index: Serum3MarketIndex,
-    ) -> Result<Serum3Data<'a>, ClientError> {
-        let serum3_info = self.context.serum3_markets.get(&market_index).unwrap();
-
-        let quote_info = self.context.token(serum3_info.market.quote_token_index);
-        let base_info = self.context.token(serum3_info.market.base_token_index);
-
-        Ok(Serum3Data {
-            market_index,
-            market: serum3_info,
-            quote: quote_info,
-            base: base_info,
-        })
-    }
-
     #[allow(clippy::too_many_arguments)]
-    pub async fn serum3_place_order(
+    pub fn serum3_place_order_instruction(
         &self,
-        name: &str,
+        account: &MangoAccountValue,
+        market_index: Serum3MarketIndex,
         side: Serum3Side,
-        price: f64,
-        size: f64,
+        limit_price: u64,
+        max_base_qty: u64,
+        max_native_quote_qty_including_fees: u64,
         self_trade_behavior: Serum3SelfTradeBehavior,
         order_type: Serum3OrderType,
         client_order_id: u64,
         limit: u16,
-    ) -> anyhow::Result<Signature> {
-        let s3 = self.serum3_data_by_market_name(name)?;
+    ) -> anyhow::Result<Instruction> {
+        let s3 = self.context.serum3(market_index);
+        let base = self.context.serum3_base_token(market_index);
+        let quote = self.context.serum3_quote_token(market_index);
+        let open_orders = account
+            .serum3_orders(market_index)
+            .expect("oo is created")
+            .open_orders;
 
-        let account = self.mango_account().await?;
-        let open_orders = account.serum3_orders(s3.market_index).unwrap().open_orders;
+        let health_check_metas = self.context.derive_health_check_remaining_account_metas(
+            account,
+            vec![],
+            vec![],
+            vec![],
+        )?;
 
-        let health_check_metas = self
-            .derive_health_check_remaining_account_metas(vec![], vec![], vec![])
-            .await?;
-
-        // https://github.com/project-serum/serum-ts/blob/master/packages/serum/src/market.ts#L1306
-        let limit_price = {
-            (price * ((10u64.pow(s3.quote.decimals as u32) * s3.market.coin_lot_size) as f64))
-                as u64
-                / (10u64.pow(s3.base.decimals as u32) * s3.market.pc_lot_size)
-        };
-        // https://github.com/project-serum/serum-ts/blob/master/packages/serum/src/market.ts#L1333
-        let max_base_qty =
-            { (size * 10u64.pow(s3.base.decimals as u32) as f64) as u64 / s3.market.coin_lot_size };
-        let max_native_quote_qty_including_fees = {
-            fn get_fee_tier(msrm_balance: u64, srm_balance: u64) -> u64 {
-                if msrm_balance >= 1 {
-                    6
-                } else if srm_balance >= 1_000_000 {
-                    5
-                } else if srm_balance >= 100_000 {
-                    4
-                } else if srm_balance >= 10_000 {
-                    3
-                } else if srm_balance >= 1_000 {
-                    2
-                } else if srm_balance >= 100 {
-                    1
-                } else {
-                    0
-                }
-            }
-
-            fn get_fee_rates(fee_tier: u64) -> (f64, f64) {
-                if fee_tier == 1 {
-                    // SRM2
-                    return (0.002, -0.0003);
-                } else if fee_tier == 2 {
-                    // SRM3
-                    return (0.0018, -0.0003);
-                } else if fee_tier == 3 {
-                    // SRM4
-                    return (0.0016, -0.0003);
-                } else if fee_tier == 4 {
-                    // SRM5
-                    return (0.0014, -0.0003);
-                } else if fee_tier == 5 {
-                    // SRM6
-                    return (0.0012, -0.0003);
-                } else if fee_tier == 6 {
-                    // MSRM
-                    return (0.001, -0.0005);
-                }
-                // Base
-                (0.0022, -0.0003)
-            }
-
-            let fee_tier = get_fee_tier(0, 0);
-            let rates = get_fee_rates(fee_tier);
-            (s3.market.pc_lot_size as f64 * (1f64 + rates.0)) as u64 * (limit_price * max_base_qty)
-        };
         let payer_mint_info = match side {
-            Serum3Side::Bid => s3.quote.mint_info,
-            Serum3Side::Ask => s3.base.mint_info,
+            Serum3Side::Bid => quote.mint_info,
+            Serum3Side::Ask => base.mint_info,
         };
 
         let ix = Instruction {
@@ -593,16 +563,16 @@ impl MangoClient {
                         payer_bank: payer_mint_info.first_bank(),
                         payer_vault: payer_mint_info.first_vault(),
                         payer_oracle: payer_mint_info.oracle,
-                        serum_market: s3.market.address,
-                        serum_program: s3.market.market.serum_program,
-                        serum_market_external: s3.market.market.serum_market_external,
-                        market_bids: s3.market.bids,
-                        market_asks: s3.market.asks,
-                        market_event_queue: s3.market.event_q,
-                        market_request_queue: s3.market.req_q,
-                        market_base_vault: s3.market.coin_vault,
-                        market_quote_vault: s3.market.pc_vault,
-                        market_vault_signer: s3.market.vault_signer,
+                        serum_market: s3.address,
+                        serum_program: s3.market.serum_program,
+                        serum_market_external: s3.market.serum_market_external,
+                        market_bids: s3.bids,
+                        market_asks: s3.asks,
+                        market_event_queue: s3.event_q,
+                        market_request_queue: s3.req_q,
+                        market_base_vault: s3.coin_vault,
+                        market_quote_vault: s3.pc_vault,
+                        market_vault_signer: s3.vault_signer,
                         owner: self.owner(),
                         token_program: Token::id(),
                     },
@@ -622,51 +592,123 @@ impl MangoClient {
                 limit,
             }),
         };
+
+        Ok(ix)
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    pub async fn serum3_place_order(
+        &self,
+        name: &str,
+        side: Serum3Side,
+        limit_price: u64,
+        max_base_qty: u64,
+        max_native_quote_qty_including_fees: u64,
+        self_trade_behavior: Serum3SelfTradeBehavior,
+        order_type: Serum3OrderType,
+        client_order_id: u64,
+        limit: u16,
+    ) -> anyhow::Result<Signature> {
+        let account = self.mango_account().await?;
+        let market_index = self.context.serum3_market_index(name);
+        let ix = self.serum3_place_order_instruction(
+            &account,
+            market_index,
+            side,
+            limit_price,
+            max_base_qty,
+            max_native_quote_qty_including_fees,
+            self_trade_behavior,
+            order_type,
+            client_order_id,
+            limit,
+        )?;
         self.send_and_confirm_owner_tx(vec![ix]).await
     }
 
     pub async fn serum3_settle_funds(&self, name: &str) -> anyhow::Result<Signature> {
-        let s3 = self.serum3_data_by_market_name(name)?;
+        let market_index = self.context.serum3_market_index(name);
+        let s3 = self.context.serum3(market_index);
+        let base = self.context.serum3_base_token(market_index);
+        let quote = self.context.serum3_quote_token(market_index);
 
         let account = self.mango_account().await?;
-        let open_orders = account.serum3_orders(s3.market_index).unwrap().open_orders;
+        let open_orders = account.serum3_orders(market_index).unwrap().open_orders;
 
         let ix = Instruction {
             program_id: mango_v4::id(),
             accounts: anchor_lang::ToAccountMetas::to_account_metas(
-                &mango_v4::accounts::Serum3SettleFunds {
-                    group: self.group(),
-                    account: self.mango_account_address,
-                    open_orders,
-                    quote_bank: s3.quote.mint_info.first_bank(),
-                    quote_vault: s3.quote.mint_info.first_vault(),
-                    base_bank: s3.base.mint_info.first_bank(),
-                    base_vault: s3.base.mint_info.first_vault(),
-                    serum_market: s3.market.address,
-                    serum_program: s3.market.market.serum_program,
-                    serum_market_external: s3.market.market.serum_market_external,
-                    market_base_vault: s3.market.coin_vault,
-                    market_quote_vault: s3.market.pc_vault,
-                    market_vault_signer: s3.market.vault_signer,
-                    owner: self.owner(),
-                    token_program: Token::id(),
+                &mango_v4::accounts::Serum3SettleFundsV2 {
+                    v1: mango_v4::accounts::Serum3SettleFunds {
+                        group: self.group(),
+                        account: self.mango_account_address,
+                        open_orders,
+                        quote_bank: quote.mint_info.first_bank(),
+                        quote_vault: quote.mint_info.first_vault(),
+                        base_bank: base.mint_info.first_bank(),
+                        base_vault: base.mint_info.first_vault(),
+                        serum_market: s3.address,
+                        serum_program: s3.market.serum_program,
+                        serum_market_external: s3.market.serum_market_external,
+                        market_base_vault: s3.coin_vault,
+                        market_quote_vault: s3.pc_vault,
+                        market_vault_signer: s3.vault_signer,
+                        owner: self.owner(),
+                        token_program: Token::id(),
+                    },
+                    v2: mango_v4::accounts::Serum3SettleFundsV2Extra {
+                        quote_oracle: quote.mint_info.oracle,
+                        base_oracle: base.mint_info.oracle,
+                    },
                 },
                 None,
             ),
-            data: anchor_lang::InstructionData::data(&mango_v4::instruction::Serum3SettleFunds {}),
+            data: anchor_lang::InstructionData::data(&mango_v4::instruction::Serum3SettleFundsV2 {
+                fees_to_dao: true,
+            }),
         };
         self.send_and_confirm_owner_tx(vec![ix]).await
+    }
+
+    pub fn serum3_cancel_all_orders_instruction(
+        &self,
+        account: &MangoAccountValue,
+        market_index: Serum3MarketIndex,
+        limit: u8,
+    ) -> anyhow::Result<Instruction> {
+        let s3 = self.context.serum3(market_index);
+        let open_orders = account.serum3_orders(market_index)?.open_orders;
+
+        let ix = Instruction {
+            program_id: mango_v4::id(),
+            accounts: anchor_lang::ToAccountMetas::to_account_metas(
+                &mango_v4::accounts::Serum3CancelAllOrders {
+                    group: self.group(),
+                    account: self.mango_account_address,
+                    open_orders,
+                    market_bids: s3.bids,
+                    market_asks: s3.asks,
+                    market_event_queue: s3.event_q,
+                    serum_market: s3.address,
+                    serum_program: s3.market.serum_program,
+                    serum_market_external: s3.market.serum_market_external,
+                    owner: self.owner(),
+                },
+                None,
+            ),
+            data: anchor_lang::InstructionData::data(
+                &mango_v4::instruction::Serum3CancelAllOrders { limit },
+            ),
+        };
+
+        Ok(ix)
     }
 
     pub async fn serum3_cancel_all_orders(
         &self,
         market_name: &str,
     ) -> Result<Vec<u128>, anyhow::Error> {
-        let market_index = *self
-            .context
-            .serum3_market_indexes_by_name
-            .get(market_name)
-            .unwrap();
+        let market_index = self.context.serum3_market_index(market_name);
         let account = self.mango_account().await?;
         let open_orders = account.serum3_orders(market_index).unwrap().open_orders;
         let open_orders_acc = self.account_fetcher.fetch_raw_account(&open_orders).await?;
@@ -699,7 +741,9 @@ impl MangoClient {
         market_index: Serum3MarketIndex,
         open_orders: &Pubkey,
     ) -> anyhow::Result<Signature> {
-        let s3 = self.serum3_data_by_market_index(market_index)?;
+        let s3 = self.context.serum3(market_index);
+        let base = self.context.serum3_base_token(market_index);
+        let quote = self.context.serum3_quote_token(market_index);
 
         let health_remaining_ams = self
             .context
@@ -714,19 +758,19 @@ impl MangoClient {
                         group: self.group(),
                         account: *liqee.0,
                         open_orders: *open_orders,
-                        serum_market: s3.market.address,
-                        serum_program: s3.market.market.serum_program,
-                        serum_market_external: s3.market.market.serum_market_external,
-                        market_bids: s3.market.bids,
-                        market_asks: s3.market.asks,
-                        market_event_queue: s3.market.event_q,
-                        market_base_vault: s3.market.coin_vault,
-                        market_quote_vault: s3.market.pc_vault,
-                        market_vault_signer: s3.market.vault_signer,
-                        quote_bank: s3.quote.mint_info.first_bank(),
-                        quote_vault: s3.quote.mint_info.first_vault(),
-                        base_bank: s3.base.mint_info.first_bank(),
-                        base_vault: s3.base.mint_info.first_vault(),
+                        serum_market: s3.address,
+                        serum_program: s3.market.serum_program,
+                        serum_market_external: s3.market.serum_market_external,
+                        market_bids: s3.bids,
+                        market_asks: s3.asks,
+                        market_event_queue: s3.event_q,
+                        market_base_vault: s3.coin_vault,
+                        market_quote_vault: s3.pc_vault,
+                        market_vault_signer: s3.vault_signer,
+                        quote_bank: quote.mint_info.first_bank(),
+                        quote_vault: quote.mint_info.first_vault(),
+                        base_bank: base.mint_info.first_bank(),
+                        base_vault: base.mint_info.first_vault(),
                         token_program: Token::id(),
                     },
                     None,
@@ -747,10 +791,11 @@ impl MangoClient {
         side: Serum3Side,
         order_id: u128,
     ) -> anyhow::Result<Signature> {
-        let s3 = self.serum3_data_by_market_name(market_name)?;
+        let market_index = self.context.serum3_market_index(market_name);
+        let s3 = self.context.serum3(market_index);
 
         let account = self.mango_account().await?;
-        let open_orders = account.serum3_orders(s3.market_index).unwrap().open_orders;
+        let open_orders = account.serum3_orders(market_index).unwrap().open_orders;
 
         let ix = Instruction {
             program_id: mango_v4::id(),
@@ -759,13 +804,13 @@ impl MangoClient {
                     &mango_v4::accounts::Serum3CancelOrder {
                         group: self.group(),
                         account: self.mango_account_address,
-                        serum_market: s3.market.address,
-                        serum_program: s3.market.market.serum_program,
-                        serum_market_external: s3.market.market.serum_market_external,
+                        serum_market: s3.address,
+                        serum_program: s3.market.serum_program,
+                        serum_market_external: s3.market.serum_market_external,
                         open_orders,
-                        market_bids: s3.market.bids,
-                        market_asks: s3.market.asks,
-                        market_event_queue: s3.market.event_q,
+                        market_bids: s3.bids,
+                        market_asks: s3.asks,
+                        market_event_queue: s3.event_q,
                         owner: self.owner(),
                     },
                     None,
@@ -782,6 +827,8 @@ impl MangoClient {
     //
     // Perps
     //
+
+    #[allow(clippy::too_many_arguments)]
     pub fn perp_place_order_instruction(
         &self,
         account: &MangoAccountValue,
@@ -841,6 +888,7 @@ impl MangoClient {
         Ok(ix)
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub async fn perp_place_order(
         &self,
         market_index: PerpMarketIndex,
@@ -1022,18 +1070,18 @@ impl MangoClient {
         self.send_and_confirm_permissionless_tx(vec![ix]).await
     }
 
-    pub async fn perp_liq_base_or_positive_pnl(
+    pub async fn perp_liq_base_or_positive_pnl_instruction(
         &self,
         liqee: (&Pubkey, &MangoAccountValue),
         market_index: PerpMarketIndex,
         max_base_transfer: i64,
         max_pnl_transfer: u64,
-    ) -> anyhow::Result<Signature> {
+    ) -> anyhow::Result<Instruction> {
         let perp = self.context.perp(market_index);
         let settle_token_info = self.context.token(perp.market.settle_token_index);
 
         let health_remaining_ams = self
-            .derive_liquidation_health_check_remaining_account_metas(liqee.1, vec![], &[])
+            .derive_liquidation_health_check_remaining_account_metas(liqee.1, &[], &[])
             .await
             .unwrap();
 
@@ -1064,15 +1112,15 @@ impl MangoClient {
                 },
             ),
         };
-        self.send_and_confirm_owner_tx(vec![ix]).await
+        Ok(ix)
     }
 
-    pub async fn perp_liq_negative_pnl_or_bankruptcy(
+    pub async fn perp_liq_negative_pnl_or_bankruptcy_instruction(
         &self,
         liqee: (&Pubkey, &MangoAccountValue),
         market_index: PerpMarketIndex,
         max_liab_transfer: u64,
-    ) -> anyhow::Result<Signature> {
+    ) -> anyhow::Result<Instruction> {
         let group = account_fetcher_fetch_anchor_account::<Group>(
             &*self.account_fetcher,
             &self.context.group,
@@ -1086,7 +1134,7 @@ impl MangoClient {
         let health_remaining_ams = self
             .derive_liquidation_health_check_remaining_account_metas(
                 liqee.1,
-                vec![INSURANCE_TOKEN_INDEX],
+                &[INSURANCE_TOKEN_INDEX],
                 &[],
             )
             .await
@@ -1121,24 +1169,24 @@ impl MangoClient {
                 &mango_v4::instruction::PerpLiqNegativePnlOrBankruptcyV2 { max_liab_transfer },
             ),
         };
-        self.send_and_confirm_owner_tx(vec![ix]).await
+        Ok(ix)
     }
 
     //
     // Liquidation
     //
 
-    pub async fn token_liq_with_token(
+    pub async fn token_liq_with_token_instruction(
         &self,
         liqee: (&Pubkey, &MangoAccountValue),
         asset_token_index: TokenIndex,
         liab_token_index: TokenIndex,
         max_liab_transfer: I80F48,
-    ) -> anyhow::Result<Signature> {
+    ) -> anyhow::Result<Instruction> {
         let health_remaining_ams = self
             .derive_liquidation_health_check_remaining_account_metas(
                 liqee.1,
-                vec![],
+                &[],
                 &[asset_token_index, liab_token_index],
             )
             .await
@@ -1165,15 +1213,15 @@ impl MangoClient {
                 max_liab_transfer,
             }),
         };
-        self.send_and_confirm_owner_tx(vec![ix]).await
+        Ok(ix)
     }
 
-    pub async fn token_liq_bankruptcy(
+    pub async fn token_liq_bankruptcy_instruction(
         &self,
         liqee: (&Pubkey, &MangoAccountValue),
         liab_token_index: TokenIndex,
         max_liab_transfer: I80F48,
-    ) -> anyhow::Result<Signature> {
+    ) -> anyhow::Result<Instruction> {
         let quote_token_index = 0;
 
         let quote_info = self.context.token(quote_token_index);
@@ -1183,13 +1231,13 @@ impl MangoClient {
             .mint_info
             .banks()
             .iter()
-            .map(|bank_pubkey| to_writable_account_meta(*bank_pubkey))
+            .map(|bank_pubkey| util::to_writable_account_meta(*bank_pubkey))
             .collect::<Vec<_>>();
 
         let health_remaining_ams = self
             .derive_liquidation_health_check_remaining_account_metas(
                 liqee.1,
-                vec![INSURANCE_TOKEN_INDEX],
+                &[INSURANCE_TOKEN_INDEX],
                 &[quote_token_index, liab_token_index],
             )
             .await
@@ -1225,7 +1273,104 @@ impl MangoClient {
                 max_liab_transfer,
             }),
         };
-        self.send_and_confirm_owner_tx(vec![ix]).await
+        Ok(ix)
+    }
+
+    pub async fn token_conditional_swap_trigger_instruction(
+        &self,
+        liqee: (&Pubkey, &MangoAccountValue),
+        token_conditional_swap_id: u64,
+        max_buy_token_to_liqee: u64,
+        max_sell_token_to_liqor: u64,
+        min_buy_token: u64,
+        min_taker_price: f32,
+        extra_affected_tokens: &[TokenIndex],
+    ) -> anyhow::Result<Instruction> {
+        let (tcs_index, tcs) = liqee
+            .1
+            .token_conditional_swap_by_id(token_conditional_swap_id)?;
+
+        let affected_tokens = extra_affected_tokens
+            .iter()
+            .chain(&[tcs.buy_token_index, tcs.sell_token_index])
+            .copied()
+            .collect_vec();
+        let health_remaining_ams = self
+            .derive_liquidation_health_check_remaining_account_metas(
+                liqee.1,
+                &affected_tokens,
+                &[tcs.buy_token_index, tcs.sell_token_index],
+            )
+            .await
+            .unwrap();
+
+        let ix = Instruction {
+            program_id: mango_v4::id(),
+            accounts: {
+                let mut ams = anchor_lang::ToAccountMetas::to_account_metas(
+                    &mango_v4::accounts::TokenConditionalSwapTrigger {
+                        group: self.group(),
+                        liqee: *liqee.0,
+                        liqor: self.mango_account_address,
+                        liqor_authority: self.owner(),
+                    },
+                    None,
+                );
+                ams.extend(health_remaining_ams);
+                ams
+            },
+            data: anchor_lang::InstructionData::data(
+                &mango_v4::instruction::TokenConditionalSwapTriggerV2 {
+                    token_conditional_swap_id,
+                    token_conditional_swap_index: tcs_index.try_into().unwrap(),
+                    max_buy_token_to_liqee,
+                    max_sell_token_to_liqor,
+                    min_buy_token,
+                    min_taker_price,
+                },
+            ),
+        };
+        Ok(ix)
+    }
+
+    pub async fn token_conditional_swap_start_instruction(
+        &self,
+        account: (&Pubkey, &MangoAccountValue),
+        token_conditional_swap_id: u64,
+    ) -> anyhow::Result<Instruction> {
+        let (tcs_index, tcs) = account
+            .1
+            .token_conditional_swap_by_id(token_conditional_swap_id)?;
+
+        let affected_tokens = vec![tcs.buy_token_index, tcs.sell_token_index];
+        let health_remaining_ams = self
+            .derive_health_check_remaining_account_metas(vec![], affected_tokens, vec![])
+            .await
+            .unwrap();
+
+        let ix = Instruction {
+            program_id: mango_v4::id(),
+            accounts: {
+                let mut ams = anchor_lang::ToAccountMetas::to_account_metas(
+                    &mango_v4::accounts::TokenConditionalSwapStart {
+                        group: self.group(),
+                        account: *account.0,
+                        caller: self.mango_account_address,
+                        caller_authority: self.owner(),
+                    },
+                    None,
+                );
+                ams.extend(health_remaining_ams);
+                ams
+            },
+            data: anchor_lang::InstructionData::data(
+                &mango_v4::instruction::TokenConditionalSwapStart {
+                    token_conditional_swap_id,
+                    token_conditional_swap_index: tcs_index.try_into().unwrap(),
+                },
+            ),
+        };
+        Ok(ix)
     }
 
     // health region
@@ -1298,258 +1443,19 @@ impl MangoClient {
 
     // jupiter
 
-    pub async fn jupiter_route(
-        &self,
-        input_mint: Pubkey,
-        output_mint: Pubkey,
-        amount: u64,
-        slippage: u64,
-        swap_mode: JupiterSwapMode,
-    ) -> anyhow::Result<jupiter::QueryRoute> {
-        let quote = self
-            .http_client
-            .get("https://quote-api.jup.ag/v4/quote")
-            .query(&[
-                ("inputMint", input_mint.to_string()),
-                ("outputMint", output_mint.to_string()),
-                ("amount", format!("{}", amount)),
-                ("onlyDirectRoutes", "true".into()),
-                ("enforceSingleTx", "true".into()),
-                ("filterTopNResult", "10".into()),
-                ("slippageBps", format!("{}", slippage)),
-                (
-                    "swapMode",
-                    match swap_mode {
-                        JupiterSwapMode::ExactIn => "ExactIn",
-                        JupiterSwapMode::ExactOut => "ExactOut",
-                    }
-                    .into(),
-                ),
-            ])
-            .send()
-            .await
-            .context("quote request to jupiter")?
-            .json::<jupiter::QueryResult>()
-            .await
-            .context("receiving json response from jupiter quote request")?;
-
-        // Find the top route that doesn't involve Raydium (that has too many accounts)
-        let route = quote
-            .data
-            .iter()
-            .find(|route| {
-                !route
-                    .market_infos
-                    .iter()
-                    .any(|mi| mi.label.contains("Raydium"))
-            })
-            .ok_or_else(|| {
-                anyhow::anyhow!(
-                    "no route for swap. found {} routes, but none were usable",
-                    quote.data.len()
-                )
-            })?;
-
-        Ok(route.clone())
+    pub fn jupiter_v4(&self) -> jupiter::v4::JupiterV4 {
+        jupiter::v4::JupiterV4 { mango_client: self }
     }
 
-    pub async fn jupiter_swap(
-        &self,
-        input_mint: Pubkey,
-        output_mint: Pubkey,
-        amount: u64,
-        slippage: u64,
-        swap_mode: JupiterSwapMode,
-    ) -> anyhow::Result<Signature> {
-        let source_token = self.context.token_by_mint(&input_mint)?;
-        let target_token = self.context.token_by_mint(&output_mint)?;
-        let route = self
-            .jupiter_route(input_mint, output_mint, amount, slippage, swap_mode)
-            .await?;
-
-        let swap = self
-            .http_client
-            .post("https://quote-api.jup.ag/v4/swap")
-            .json(&jupiter::SwapRequest {
-                route: route.clone(),
-                user_public_key: self.owner.pubkey().to_string(),
-                wrap_unwrap_sol: false,
-                compute_unit_price_micro_lamports: None, // we already prioritize
-            })
-            .send()
-            .await
-            .context("swap transaction request to jupiter")?
-            .json::<jupiter::SwapResponse>()
-            .await
-            .context("receiving json response from jupiter swap transaction request")?;
-
-        if swap.setup_transaction.is_some() || swap.cleanup_transaction.is_some() {
-            anyhow::bail!(
-                "chosen jupiter route requires setup or cleanup transactions, can't execute"
-            );
-        }
-
-        let jup_tx = bincode::options()
-            .with_fixint_encoding()
-            .reject_trailing_bytes()
-            .deserialize::<solana_sdk::transaction::VersionedTransaction>(
-                &base64::decode(&swap.swap_transaction)
-                    .context("base64 decoding jupiter transaction")?,
-            )
-            .context("parsing jupiter transaction")?;
-        let ata_program = anchor_spl::associated_token::ID;
-        let token_program = anchor_spl::token::ID;
-        let compute_budget_program = solana_sdk::compute_budget::ID;
-        // these setup instructions are unnecessary since FlashLoan already takes care of it
-        let is_setup_ix = |k: Pubkey| -> bool {
-            k == ata_program || k == token_program || k == compute_budget_program
-        };
-        let (jup_ixs, jup_alts) = self
-            .deserialize_instructions_and_alts(&jup_tx.message)
-            .await?;
-        let jup_cu_ix = jup_ixs
-            .iter()
-            .filter(|ix| ix.program_id == compute_budget_program)
-            .cloned()
-            .collect::<Vec<_>>();
-        let jup_action_ix = jup_ixs
-            .into_iter()
-            .filter(|ix| !is_setup_ix(ix.program_id))
-            .collect::<Vec<_>>();
-
-        let bank_ams = [
-            source_token.mint_info.first_bank(),
-            target_token.mint_info.first_bank(),
-        ]
-        .into_iter()
-        .map(to_writable_account_meta)
-        .collect::<Vec<_>>();
-
-        let vault_ams = [
-            source_token.mint_info.first_vault(),
-            target_token.mint_info.first_vault(),
-        ]
-        .into_iter()
-        .map(to_writable_account_meta)
-        .collect::<Vec<_>>();
-
-        let token_ams = [source_token.mint_info.mint, target_token.mint_info.mint]
-            .into_iter()
-            .map(|mint| {
-                to_writable_account_meta(
-                    anchor_spl::associated_token::get_associated_token_address(
-                        &self.owner(),
-                        &mint,
-                    ),
-                )
-            })
-            .collect::<Vec<_>>();
-
-        let loan_amounts = vec![
-            match swap_mode {
-                JupiterSwapMode::ExactIn => amount,
-                // in amount + slippage
-                JupiterSwapMode::ExactOut => u64::from_str(&route.other_amount_threshold).unwrap(),
-            },
-            0u64,
-        ];
-        let num_loans: u8 = loan_amounts.len().try_into().unwrap();
-
-        // This relies on the fact that health account banks will be identical to the first_bank above!
-        let health_ams = self
-            .derive_health_check_remaining_account_metas(
-                vec![source_token.token_index, target_token.token_index],
-                vec![source_token.token_index, target_token.token_index],
-                vec![],
-            )
-            .await
-            .context("building health accounts")?;
-
-        let mut instructions = Vec::new();
-
-        for ix in jup_cu_ix {
-            instructions.push(ix.clone());
-        }
-        instructions.push(
-            spl_associated_token_account::instruction::create_associated_token_account_idempotent(
-                &self.owner.pubkey(),
-                &self.owner.pubkey(),
-                &source_token.mint_info.mint,
-                &Token::id(),
-            ),
-        );
-        instructions.push(
-            spl_associated_token_account::instruction::create_associated_token_account_idempotent(
-                &self.owner.pubkey(),
-                &self.owner.pubkey(),
-                &target_token.mint_info.mint,
-                &Token::id(),
-            ),
-        );
-        instructions.push(Instruction {
-            program_id: mango_v4::id(),
-            accounts: {
-                let mut ams = anchor_lang::ToAccountMetas::to_account_metas(
-                    &mango_v4::accounts::FlashLoanBegin {
-                        account: self.mango_account_address,
-                        owner: self.owner(),
-                        token_program: Token::id(),
-                        instructions: solana_sdk::sysvar::instructions::id(),
-                    },
-                    None,
-                );
-                ams.extend(bank_ams);
-                ams.extend(vault_ams.clone());
-                ams.extend(token_ams.clone());
-                ams.push(to_readonly_account_meta(self.group()));
-                ams
-            },
-            data: anchor_lang::InstructionData::data(&mango_v4::instruction::FlashLoanBegin {
-                loan_amounts,
-            }),
-        });
-        for ix in jup_action_ix {
-            instructions.push(ix.clone());
-        }
-        instructions.push(Instruction {
-            program_id: mango_v4::id(),
-            accounts: {
-                let mut ams = anchor_lang::ToAccountMetas::to_account_metas(
-                    &mango_v4::accounts::FlashLoanEnd {
-                        account: self.mango_account_address,
-                        owner: self.owner(),
-                        token_program: Token::id(),
-                    },
-                    None,
-                );
-                ams.extend(health_ams);
-                ams.extend(vault_ams);
-                ams.extend(token_ams);
-                ams.push(to_readonly_account_meta(self.group()));
-                ams
-            },
-            data: anchor_lang::InstructionData::data(&mango_v4::instruction::FlashLoanEndV2 {
-                num_loans,
-                flash_loan_type: mango_v4::accounts_ix::FlashLoanType::Swap,
-            }),
-        });
-
-        let payer = self.owner.pubkey(); // maybe use fee_payer? but usually it's the same
-        let mut address_lookup_tables = self.mango_address_lookup_tables().await?;
-        address_lookup_tables.extend(jup_alts.into_iter());
-
-        TransactionBuilder {
-            instructions,
-            address_lookup_tables,
-            payer,
-            signers: vec![&*self.owner],
-            config: self.client.transaction_builder_config,
-        }
-        .send_and_confirm(&self.client)
-        .await
+    pub fn jupiter_v6(&self) -> jupiter::v6::JupiterV6 {
+        jupiter::v6::JupiterV6 { mango_client: self }
     }
 
-    async fn fetch_address_lookup_table(
+    pub fn jupiter(&self) -> jupiter::Jupiter {
+        jupiter::Jupiter { mango_client: self }
+    }
+
+    pub async fn fetch_address_lookup_table(
         &self,
         address: Pubkey,
     ) -> anyhow::Result<AddressLookupTableAccount> {
@@ -1564,6 +1470,16 @@ impl MangoClient {
         })
     }
 
+    pub async fn fetch_address_lookup_tables(
+        &self,
+        alts: impl Iterator<Item = &Pubkey>,
+    ) -> anyhow::Result<Vec<AddressLookupTableAccount>> {
+        stream::iter(alts)
+            .then(|a| self.fetch_address_lookup_table(*a))
+            .try_collect::<Vec<_>>()
+            .await
+    }
+
     pub async fn mango_address_lookup_tables(
         &self,
     ) -> anyhow::Result<Vec<AddressLookupTableAccount>> {
@@ -1573,14 +1489,13 @@ impl MangoClient {
             .await
     }
 
-    async fn deserialize_instructions_and_alts(
+    pub(crate) async fn deserialize_instructions_and_alts(
         &self,
         message: &solana_sdk::message::VersionedMessage,
     ) -> anyhow::Result<(Vec<Instruction>, Vec<AddressLookupTableAccount>)> {
         let lookups = message.address_table_lookups().unwrap_or_default();
-        let address_lookup_tables = stream::iter(lookups)
-            .then(|a| self.fetch_address_lookup_table(a.account_key))
-            .try_collect::<Vec<_>>()
+        let address_lookup_tables = self
+            .fetch_address_lookup_tables(lookups.iter().map(|a| &a.account_key))
             .await?;
 
         let mut account_keys = message.static_account_keys().to_vec();
@@ -1628,9 +1543,9 @@ impl MangoClient {
     ) -> anyhow::Result<Signature> {
         TransactionBuilder {
             instructions,
-            address_lookup_tables: vec![],
+            address_lookup_tables: self.mango_address_lookup_tables().await?,
             payer: self.client.fee_payer.pubkey(),
-            signers: vec![&*self.owner, &*self.client.fee_payer],
+            signers: vec![self.owner.clone(), self.client.fee_payer.clone()],
             config: self.client.transaction_builder_config,
         }
         .send_and_confirm(&self.client)
@@ -1643,21 +1558,14 @@ impl MangoClient {
     ) -> anyhow::Result<Signature> {
         TransactionBuilder {
             instructions,
-            address_lookup_tables: vec![],
+            address_lookup_tables: self.mango_address_lookup_tables().await?,
             payer: self.client.fee_payer.pubkey(),
-            signers: vec![&*self.client.fee_payer],
+            signers: vec![self.client.fee_payer.clone()],
             config: self.client.transaction_builder_config,
         }
         .send_and_confirm(&self.client)
         .await
     }
-}
-
-struct Serum3Data<'a> {
-    market_index: Serum3MarketIndex,
-    market: &'a Serum3MarketContext,
-    quote: &'a TokenContext,
-    base: &'a TokenContext,
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -1671,23 +1579,43 @@ pub enum MangoClientError {
     },
 }
 
+#[derive(Clone, Debug)]
+pub struct TransactionSize {
+    pub accounts: usize,
+    pub length: usize,
+}
+
+impl TransactionSize {
+    pub fn is_ok(&self) -> bool {
+        let limit = Self::limit();
+        self.length <= limit.length && self.accounts <= limit.accounts
+    }
+
+    pub fn limit() -> Self {
+        Self {
+            accounts: MAX_ACCOUNTS_PER_TRANSACTION,
+            length: solana_sdk::packet::PACKET_DATA_SIZE,
+        }
+    }
+}
+
 #[derive(Copy, Clone, Debug)]
 pub struct TransactionBuilderConfig {
     // adds a SetComputeUnitPrice instruction in front
     pub prioritization_micro_lamports: Option<u64>,
 }
 
-pub struct TransactionBuilder<'a> {
+pub struct TransactionBuilder {
     pub instructions: Vec<Instruction>,
     pub address_lookup_tables: Vec<AddressLookupTableAccount>,
-    pub signers: Vec<&'a Keypair>,
+    pub signers: Vec<Arc<Keypair>>,
     pub payer: Pubkey,
     pub config: TransactionBuilderConfig,
 }
 
-impl<'a> TransactionBuilder<'a> {
+impl TransactionBuilder {
     pub async fn transaction(
-        self,
+        &self,
         rpc: &RpcClientAsync,
     ) -> anyhow::Result<solana_sdk::transaction::VersionedTransaction> {
         let latest_blockhash = rpc.get_latest_blockhash().await?;
@@ -1695,11 +1623,12 @@ impl<'a> TransactionBuilder<'a> {
     }
 
     pub fn transaction_with_blockhash(
-        mut self,
+        &self,
         blockhash: Hash,
     ) -> anyhow::Result<solana_sdk::transaction::VersionedTransaction> {
+        let mut ix = self.instructions.clone();
         if let Some(prio_price) = self.config.prioritization_micro_lamports {
-            self.instructions.insert(
+            ix.insert(
                 0,
                 solana_sdk::compute_budget::ComputeBudgetInstruction::set_compute_unit_price(
                     prio_price,
@@ -1708,15 +1637,16 @@ impl<'a> TransactionBuilder<'a> {
         }
         let v0_message = solana_sdk::message::v0::Message::try_compile(
             &self.payer,
-            &self.instructions,
+            &ix,
             &self.address_lookup_tables,
             blockhash,
         )?;
         let versioned_message = solana_sdk::message::VersionedMessage::V0(v0_message);
         let signers = self
             .signers
-            .into_iter()
+            .iter()
             .unique_by(|s| s.pubkey())
+            .map(|v| v.deref())
             .collect::<Vec<_>>();
         let tx =
             solana_sdk::transaction::VersionedTransaction::try_new(versioned_message, &signers)?;
@@ -1725,7 +1655,7 @@ impl<'a> TransactionBuilder<'a> {
 
     // These two send() functions don't really belong into the transaction builder!
 
-    pub async fn send(self, client: &Client) -> anyhow::Result<Signature> {
+    pub async fn send(&self, client: &Client) -> anyhow::Result<Signature> {
         let rpc = client.rpc_async();
         let tx = self.transaction(&rpc).await?;
         rpc.send_transaction_with_config(&tx, client.rpc_send_transaction_config)
@@ -1733,13 +1663,31 @@ impl<'a> TransactionBuilder<'a> {
             .map_err(prettify_solana_client_error)
     }
 
-    pub async fn send_and_confirm(self, client: &Client) -> anyhow::Result<Signature> {
+    pub async fn send_and_confirm(&self, client: &Client) -> anyhow::Result<Signature> {
         let rpc = client.rpc_async();
         let tx = self.transaction(&rpc).await?;
         // TODO: Wish we could use client.rpc_send_transaction_config here too!
         rpc.send_and_confirm_transaction(&tx)
             .await
             .map_err(prettify_solana_client_error)
+    }
+
+    pub fn transaction_size(&self) -> anyhow::Result<TransactionSize> {
+        let tx = self.transaction_with_blockhash(solana_sdk::hash::Hash::default())?;
+        let bytes = bincode::serialize(&tx)?;
+        let accounts = tx.message.static_account_keys().len()
+            + tx.message
+                .address_table_lookups()
+                .map(|alts| {
+                    alts.iter()
+                        .map(|alt| alt.readonly_indexes.len() + alt.writable_indexes.len())
+                        .sum()
+                })
+                .unwrap_or(0);
+        Ok(TransactionSize {
+            accounts,
+            length: bytes.len(),
+        })
     }
 }
 
@@ -1798,21 +1746,5 @@ pub fn pubkey_from_cli(pubkey: &str) -> Pubkey {
     match Pubkey::from_str(pubkey) {
         Ok(p) => p,
         Err(_) => keypair_from_cli(pubkey).pubkey(),
-    }
-}
-
-fn to_readonly_account_meta(pubkey: Pubkey) -> AccountMeta {
-    AccountMeta {
-        pubkey,
-        is_writable: false,
-        is_signer: false,
-    }
-}
-
-fn to_writable_account_meta(pubkey: Pubkey) -> AccountMeta {
-    AccountMeta {
-        pubkey,
-        is_writable: true,
-        is_signer: false,
     }
 }

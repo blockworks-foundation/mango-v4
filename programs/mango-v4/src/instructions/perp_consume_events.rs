@@ -5,7 +5,7 @@ use crate::error::MangoError;
 use crate::state::*;
 
 use crate::accounts_ix::*;
-use crate::logs::{emit_perp_balances, FillLogV2};
+use crate::logs::{emit_perp_balances, FillLogV3};
 
 /// Load a mango account by key from the list of account infos.
 ///
@@ -66,7 +66,7 @@ pub fn perp_consume_events(ctx: Context<PerpConsumeEvents>, limit: usize) -> Res
                 let fill: &FillEvent = cast_ref(event);
 
                 // handle self trade separately because of rust borrow checker
-                if fill.maker == fill.taker {
+                let (maker_closed_pnl, taker_closed_pnl) = if fill.maker == fill.taker {
                     load_mango_account!(
                         maker_taker,
                         fill.maker,
@@ -74,7 +74,15 @@ pub fn perp_consume_events(ctx: Context<PerpConsumeEvents>, limit: usize) -> Res
                         group,
                         event_queue
                     );
-                    maker_taker.execute_perp_maker(perp_market_index, &mut perp_market, fill)?;
+                    let before_pnl = maker_taker
+                        .perp_position(perp_market_index)?
+                        .realized_trade_pnl_native;
+                    maker_taker.execute_perp_maker(
+                        perp_market_index,
+                        &mut perp_market,
+                        fill,
+                        &group,
+                    )?;
                     maker_taker.execute_perp_taker(perp_market_index, &mut perp_market, fill)?;
                     emit_perp_balances(
                         group_key,
@@ -82,11 +90,23 @@ pub fn perp_consume_events(ctx: Context<PerpConsumeEvents>, limit: usize) -> Res
                         maker_taker.perp_position(perp_market_index).unwrap(),
                         &perp_market,
                     );
+                    let after_pnl = maker_taker
+                        .perp_position(perp_market_index)?
+                        .realized_trade_pnl_native;
+                    let closed_pnl = after_pnl - before_pnl;
+                    (closed_pnl, closed_pnl)
                 } else {
                     load_mango_account!(maker, fill.maker, mango_account_ais, group, event_queue);
                     load_mango_account!(taker, fill.taker, mango_account_ais, group, event_queue);
 
-                    maker.execute_perp_maker(perp_market_index, &mut perp_market, fill)?;
+                    let maker_before_pnl = maker
+                        .perp_position(perp_market_index)?
+                        .realized_trade_pnl_native;
+                    let taker_before_pnl = taker
+                        .perp_position(perp_market_index)?
+                        .realized_trade_pnl_native;
+
+                    maker.execute_perp_maker(perp_market_index, &mut perp_market, fill, &group)?;
                     taker.execute_perp_taker(perp_market_index, &mut perp_market, fill)?;
                     emit_perp_balances(
                         group_key,
@@ -100,8 +120,18 @@ pub fn perp_consume_events(ctx: Context<PerpConsumeEvents>, limit: usize) -> Res
                         taker.perp_position(perp_market_index).unwrap(),
                         &perp_market,
                     );
-                }
-                emit!(FillLogV2 {
+                    let maker_after_pnl = maker
+                        .perp_position(perp_market_index)?
+                        .realized_trade_pnl_native;
+                    let taker_after_pnl = taker
+                        .perp_position(perp_market_index)?
+                        .realized_trade_pnl_native;
+
+                    let maker_closed_pnl = maker_after_pnl - maker_before_pnl;
+                    let taker_closed_pnl = taker_after_pnl - taker_before_pnl;
+                    (maker_closed_pnl, taker_closed_pnl)
+                };
+                emit!(FillLogV3 {
                     mango_group: group_key,
                     market_index: perp_market_index,
                     taker_side: fill.taker_side as u8,
@@ -118,6 +148,8 @@ pub fn perp_consume_events(ctx: Context<PerpConsumeEvents>, limit: usize) -> Res
                     taker_fee: fill.taker_fee,
                     price: fill.price,
                     quantity: fill.quantity,
+                    maker_closed_pnl: maker_closed_pnl.to_num(),
+                    taker_closed_pnl: taker_closed_pnl.to_num()
                 });
             }
             EventType::Out => {

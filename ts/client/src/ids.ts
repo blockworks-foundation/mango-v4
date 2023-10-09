@@ -8,7 +8,14 @@ export class Id {
     public publicKey: string,
     public serum3ProgramId: string,
     public mangoProgramId: string,
-    public banks: { name: string; publicKey: string; active: boolean }[],
+    public banks: {
+      name: string;
+      mint: string;
+      tokenIndex: number;
+      publicKey: string;
+      active: boolean;
+      decimals: number;
+    }[],
     public stubOracles: { name: string; publicKey: string }[],
     public mintInfos: { name: string; publicKey: string }[],
     public serum3Markets: {
@@ -23,7 +30,7 @@ export class Id {
   public getBanks(): PublicKey[] {
     return Array.from(
       this.banks
-        .filter((perpMarket) => perpMarket.active)
+        .filter((bank) => bank.active)
         .map((bank) => new PublicKey(bank.publicKey)),
     );
   }
@@ -43,19 +50,26 @@ export class Id {
   public getSerum3Markets(): PublicKey[] {
     return Array.from(
       this.serum3Markets
-        .filter((perpMarket) => perpMarket.active)
+        .filter((serum3Market) => serum3Market.active)
         .map((serum3Market) => new PublicKey(serum3Market.publicKey)),
+    );
+  }
+
+  public getSerum3ExternalMarkets(): PublicKey[] {
+    return Array.from(
+      this.serum3Markets
+        .filter((serum3Market) => serum3Market.active)
+        .map((serum3Market) => new PublicKey(serum3Market.marketExternal)),
     );
   }
 
   public getPerpMarkets(): PublicKey[] {
     return Array.from(
-      this.perpMarkets
-        .filter((perpMarket) => perpMarket.active)
-        .map((perpMarket) => new PublicKey(perpMarket.publicKey)),
+      this.perpMarkets.map((perpMarket) => new PublicKey(perpMarket.publicKey)),
     );
   }
 
+  // DEPRECATED
   static fromIdsByName(name: string): Id {
     const groupConfig = ids.groups.find((id) => id['name'] === name);
     if (!groupConfig) throw new Error(`No group config ${name} found in Ids!`);
@@ -73,6 +87,7 @@ export class Id {
     );
   }
 
+  // DEPRECATED
   static fromIdsByPk(groupPk: PublicKey): Id {
     const groupConfig = ids.groups.find(
       (id) => id['publicKey'] === groupPk.toString(),
@@ -115,6 +130,8 @@ export class Id {
           tokenIndex: t.tokenIndex,
           bankNum: b.bankNum,
           publicKey: b.publicKey,
+          active: t.active,
+          decimals: t.decimals,
         })),
       ),
       groupConfig.stubOracles.map((s) => ({
@@ -126,15 +143,18 @@ export class Id {
         mint: t.mint,
         tokenIndex: t.tokenIndex,
         publicKey: t.mintInfo,
+        active: t.active,
       })),
       groupConfig.serum3Markets.map((s) => ({
         name: s.name,
         publicKey: s.publicKey,
-        marketExternal: s.marketExternal,
+        marketExternal: s.serumMarketExternal,
+        active: s.active,
       })),
       groupConfig.perpMarkets.map((p) => ({
         name: p.name,
         publicKey: p.publicKey,
+        active: p.active,
       })),
     );
   }

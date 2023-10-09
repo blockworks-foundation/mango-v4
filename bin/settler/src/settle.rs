@@ -15,6 +15,7 @@ use solana_sdk::signature::Signature;
 
 use solana_sdk::signer::Signer;
 use solana_sdk::transaction::VersionedTransaction;
+use tracing::*;
 use {anyhow::Context, fixed::types::I80F48, solana_sdk::pubkey::Pubkey};
 
 pub struct Config {
@@ -44,7 +45,7 @@ fn perp_markets_and_prices(
             |v: anyhow::Result<(PerpMarketIndex, (PerpMarket, I80F48))>| match v {
                 Ok(v) => Some(v),
                 Err(err) => {
-                    log::error!("error while retriving perp market and price: {:?}", err);
+                    error!("error while retriving perp market and price: {:?}", err);
                     None
                 }
             },
@@ -250,7 +251,7 @@ struct SettleBatchProcessor<'a> {
 impl<'a> SettleBatchProcessor<'a> {
     fn transaction(&self) -> anyhow::Result<VersionedTransaction> {
         let client = &self.mango_client.client;
-        let fee_payer = &*client.fee_payer;
+        let fee_payer = client.fee_payer.clone();
 
         TransactionBuilder {
             instructions: self.instructions.clone(),
@@ -279,12 +280,12 @@ impl<'a> SettleBatchProcessor<'a> {
             .map_err(|e| prettify_solana_client_error(e));
 
         if let Err(err) = send_result {
-            log::info!("error while sending settle batch: {}", err);
+            info!("error while sending settle batch: {}", err);
             return Ok(None);
         }
 
         let txsig = send_result.unwrap();
-        log::info!("sent settle tx: {txsig}");
+        info!("sent settle tx: {txsig}");
         Ok(Some(txsig))
     }
 

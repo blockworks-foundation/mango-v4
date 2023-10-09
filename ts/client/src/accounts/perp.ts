@@ -408,6 +408,13 @@ export class PerpMarket {
     return funding;
   }
 
+  public getInstantaneousFundingRatePerSecond(
+    bids: BookSide,
+    asks: BookSide,
+  ): number {
+    return this.getInstantaneousFundingRate(bids, asks) / (24 * 60 * 60);
+  }
+
   /**
    *
    * Returns instantaneous funding rate for the day. How is it actually applied - funding is
@@ -434,6 +441,10 @@ export class PerpMarket {
 
   public uiQuoteToLots(uiQuote: number): BN {
     return toNative(uiQuote, QUOTE_DECIMALS).div(this.quoteLotSize);
+  }
+
+  public priceLotsToNative(price: BN): I80F48 {
+    return I80F48.fromI64(price.mul(this.quoteLotSize).div(this.baseLotSize));
   }
 
   public priceLotsToUi(price: BN): number {
@@ -467,11 +478,12 @@ export class PerpMarket {
   public async getSettlePnlCandidates(
     client: MangoClient,
     group: Group,
-    direction: 'negative' | 'positive',
+    accounts?: MangoAccount[],
+    direction: 'negative' | 'positive' = 'positive',
     count = 2,
   ): Promise<{ account: MangoAccount; settleablePnl: I80F48 }[]> {
     let accountsWithSettleablePnl = (
-      await client.getAllMangoAccounts(group, true)
+      accounts ?? (await client.getAllMangoAccounts(group, true))
     )
       .filter((acc) => acc.perpPositionExistsForMarket(this))
       .map((acc) => {
@@ -865,6 +877,12 @@ export class InnerNode {
   }
 
   constructor(public children: [number]) {}
+}
+
+export class PerpSelfTradeBehavior {
+  static decrementTake = { decrementTake: {} };
+  static cancelProvide = { cancelProvide: {} };
+  static abortTransaction = { abortTransaction: {} };
 }
 
 export class PerpOrderSide {

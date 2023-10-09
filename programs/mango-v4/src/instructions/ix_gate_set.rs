@@ -67,6 +67,23 @@ pub fn ix_gate_set(ctx: Context<IxGateSet>, ix_gate: u128) -> Result<()> {
     log_if_changed(&group, ix_gate, IxGate::TokenForceCloseBorrowsWithToken);
     log_if_changed(&group, ix_gate, IxGate::PerpForceClosePosition);
     log_if_changed(&group, ix_gate, IxGate::GroupWithdrawInsuranceFund);
+    log_if_changed(&group, ix_gate, IxGate::TokenConditionalSwapCreate);
+    log_if_changed(&group, ix_gate, IxGate::TokenConditionalSwapTrigger);
+    log_if_changed(&group, ix_gate, IxGate::TokenConditionalSwapCancel);
+    log_if_changed(&group, ix_gate, IxGate::OpenbookV2CancelOrder);
+    log_if_changed(&group, ix_gate, IxGate::OpenbookV2CloseOpenOrders);
+    log_if_changed(&group, ix_gate, IxGate::OpenbookV2CreateOpenOrders);
+    log_if_changed(&group, ix_gate, IxGate::OpenbookV2DeregisterMarket);
+    log_if_changed(&group, ix_gate, IxGate::OpenbookV2EditMarket);
+    log_if_changed(&group, ix_gate, IxGate::OpenbookV2LiqForceCancelOrders);
+    log_if_changed(&group, ix_gate, IxGate::OpenbookV2PlaceOrder);
+    log_if_changed(&group, ix_gate, IxGate::OpenbookV2PlaceTakeOrder);
+    log_if_changed(&group, ix_gate, IxGate::OpenbookV2RegisterMarket);
+    log_if_changed(&group, ix_gate, IxGate::OpenbookV2SettleFunds);
+    log_if_changed(&group, ix_gate, IxGate::AdminTokenWithdrawFees);
+    log_if_changed(&group, ix_gate, IxGate::AdminPerpWithdrawFees);
+    log_if_changed(&group, ix_gate, IxGate::AccountSizeMigration);
+    log_if_changed(&group, ix_gate, IxGate::TokenConditionalSwapStart);
 
     group.ix_gate = ix_gate;
 

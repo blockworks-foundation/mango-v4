@@ -25,9 +25,9 @@ pub fn serum3_create_open_orders(ctx: Context<Serum3CreateOpenOrders>) -> Result
     // stay permanently blocked. Otherwise users may end up in situations where
     // they can't settle a market because they don't have free token_account_map!
     let (quote_position, _, _) = account.ensure_token_position(serum_market.quote_token_index)?;
-    quote_position.in_use_count += 1;
+    quote_position.increment_in_use();
     let (base_position, _, _) = account.ensure_token_position(serum_market.base_token_index)?;
-    base_position.in_use_count += 1;
+    base_position.increment_in_use();
 
     Ok(())
 }

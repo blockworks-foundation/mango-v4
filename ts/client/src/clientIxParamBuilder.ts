@@ -2,6 +2,66 @@ import { BN } from '@coral-xyz/anchor';
 import { PublicKey } from '@solana/web3.js';
 import { InterestRateParams, OracleConfigParams } from './types';
 
+export interface TokenRegisterParams {
+  oracleConfig: OracleConfigParams;
+  groupInsuranceFund: boolean;
+  interestRateParams: InterestRateParams;
+  loanFeeRate: number;
+  loanOriginationFeeRate: number;
+  maintAssetWeight: number;
+  initAssetWeight: number;
+  maintLiabWeight: number;
+  initLiabWeight: number;
+  liquidationFee: number;
+  stablePriceDelayIntervalSeconds: number;
+  stablePriceDelayGrowthLimit: number;
+  stablePriceGrowthLimit: number;
+  minVaultToDepositsRatio: number;
+  netBorrowLimitPerWindowQuote: number;
+  netBorrowLimitWindowSizeTs: number;
+  borrowWeightScaleStartQuote: number;
+  depositWeightScaleStartQuote: number;
+  reduceOnly: number;
+  tokenConditionalSwapTakerFeeRate: number;
+  tokenConditionalSwapMakerFeeRate: number;
+  flashLoanDepositFeeRate: number;
+}
+
+export const DefaultTokenRegisterParams: TokenRegisterParams = {
+  oracleConfig: {
+    confFilter: 0,
+    maxStalenessSlots: null,
+  },
+  groupInsuranceFund: false,
+  interestRateParams: {
+    util0: 0.5,
+    rate0: 0.072,
+    util1: 0.8,
+    rate1: 0.2,
+    maxRate: 2,
+    adjustmentFactor: 0.004,
+  },
+  loanFeeRate: 0.0005,
+  loanOriginationFeeRate: 0.005,
+  maintAssetWeight: 0,
+  initAssetWeight: 0,
+  maintLiabWeight: 1.4,
+  initLiabWeight: 1.8,
+  liquidationFee: 0.2,
+  stablePriceDelayIntervalSeconds: 60 * 60,
+  stablePriceDelayGrowthLimit: 0.06,
+  stablePriceGrowthLimit: 0.0003,
+  minVaultToDepositsRatio: 0.2,
+  netBorrowLimitPerWindowQuote: 5_000_000_000,
+  netBorrowLimitWindowSizeTs: 86_400,
+  borrowWeightScaleStartQuote: 5_000_000_000,
+  depositWeightScaleStartQuote: 5_000_000_000,
+  reduceOnly: 0,
+  tokenConditionalSwapTakerFeeRate: 0.0005,
+  tokenConditionalSwapMakerFeeRate: 0.0005,
+  flashLoanDepositFeeRate: 0.0005,
+};
+
 export interface TokenEditParams {
   oracle: PublicKey | null;
   oracleConfig: OracleConfigParams | null;
@@ -27,6 +87,9 @@ export interface TokenEditParams {
   reduceOnly: number | null;
   name: string | null;
   forceClose: boolean | null;
+  tokenConditionalSwapTakerFeeRate: number | null;
+  tokenConditionalSwapMakerFeeRate: number | null;
+  flashLoanDepositFeeRate: number | null;
 }
 
 export const NullTokenEditParams: TokenEditParams = {
@@ -54,6 +117,9 @@ export const NullTokenEditParams: TokenEditParams = {
   reduceOnly: null,
   name: null,
   forceClose: null,
+  tokenConditionalSwapTakerFeeRate: null,
+  tokenConditionalSwapMakerFeeRate: null,
+  flashLoanDepositFeeRate: null,
 };
 
 export interface PerpEditParams {
@@ -179,6 +245,23 @@ export interface IxGateParams {
   TokenForceCloseBorrowsWithToken: boolean;
   PerpForceClosePosition: boolean;
   GroupWithdrawInsuranceFund: boolean;
+  TokenConditionalSwapCreate: boolean;
+  TokenConditionalSwapTrigger: boolean;
+  TokenConditionalSwapCancel: boolean;
+  OpenbookV2CancelOrder: boolean;
+  OpenbookV2CloseOpenOrders: boolean;
+  OpenbookV2CreateOpenOrders: boolean;
+  OpenbookV2DeregisterMarket: boolean;
+  OpenbookV2EditMarket: boolean;
+  OpenbookV2LiqForceCancelOrders: boolean;
+  OpenbookV2PlaceOrder: boolean;
+  OpenbookV2PlaceTakeOrder: boolean;
+  OpenbookV2RegisterMarket: boolean;
+  OpenbookV2SettleFunds: boolean;
+  AdminTokenWithdrawFees: boolean;
+  AdminPerpWithdrawFees: boolean;
+  AccountSizeMigration: boolean;
+  TokenConditionalSwapStart: boolean;
 }
 
 // Default with all ixs enabled, use with buildIxGate
@@ -238,6 +321,23 @@ export const TrueIxGateParams: IxGateParams = {
   TokenForceCloseBorrowsWithToken: true,
   PerpForceClosePosition: true,
   GroupWithdrawInsuranceFund: true,
+  TokenConditionalSwapCreate: true,
+  TokenConditionalSwapTrigger: true,
+  TokenConditionalSwapCancel: true,
+  OpenbookV2CancelOrder: true,
+  OpenbookV2CloseOpenOrders: true,
+  OpenbookV2CreateOpenOrders: true,
+  OpenbookV2DeregisterMarket: true,
+  OpenbookV2EditMarket: true,
+  OpenbookV2LiqForceCancelOrders: true,
+  OpenbookV2PlaceOrder: true,
+  OpenbookV2PlaceTakeOrder: true,
+  OpenbookV2RegisterMarket: true,
+  OpenbookV2SettleFunds: true,
+  AdminTokenWithdrawFees: true,
+  AdminPerpWithdrawFees: true,
+  AccountSizeMigration: true,
+  TokenConditionalSwapStart: true,
 };
 
 // build ix gate e.g. buildIxGate(Builder(TrueIxGateParams).TokenDeposit(false).build()).toNumber(),
@@ -307,6 +407,23 @@ export function buildIxGate(p: IxGateParams): BN {
   toggleIx(ixGate, p, 'TokenForceCloseBorrowsWithToken', 49);
   toggleIx(ixGate, p, 'PerpForceClosePosition', 50);
   toggleIx(ixGate, p, 'GroupWithdrawInsuranceFund', 51);
+  toggleIx(ixGate, p, 'TokenConditionalSwapCreate', 52);
+  toggleIx(ixGate, p, 'TokenConditionalSwapTrigger', 53);
+  toggleIx(ixGate, p, 'TokenConditionalSwapCancel', 54);
+  toggleIx(ixGate, p, 'OpenbookV2CancelOrder', 55);
+  toggleIx(ixGate, p, 'OpenbookV2CloseOpenOrders', 56);
+  toggleIx(ixGate, p, 'OpenbookV2CreateOpenOrders', 57);
+  toggleIx(ixGate, p, 'OpenbookV2DeregisterMarket', 58);
+  toggleIx(ixGate, p, 'OpenbookV2EditMarket', 59);
+  toggleIx(ixGate, p, 'OpenbookV2LiqForceCancelOrders', 60);
+  toggleIx(ixGate, p, 'OpenbookV2PlaceOrder', 61);
+  toggleIx(ixGate, p, 'OpenbookV2PlaceTakeOrder', 62);
+  toggleIx(ixGate, p, 'OpenbookV2RegisterMarket', 63);
+  toggleIx(ixGate, p, 'OpenbookV2SettleFunds', 63);
+  toggleIx(ixGate, p, 'AdminTokenWithdrawFees', 65);
+  toggleIx(ixGate, p, 'AdminPerpWithdrawFees', 66);
+  toggleIx(ixGate, p, 'AccountSizeMigration', 67);
+  toggleIx(ixGate, p, 'TokenConditionalSwapStart', 68);
 
   return ixGate;
 }

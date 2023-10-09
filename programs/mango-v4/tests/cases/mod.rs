@@ -1,5 +1,6 @@
 pub use anchor_lang::prelude::Pubkey;
 pub use fixed::types::I80F48;
+pub use itertools::Itertools;
 pub use solana_program_test::*;
 pub use solana_sdk::transport::TransportError;
 
@@ -34,4 +35,6 @@ mod test_perp_settle_fees;
 mod test_position_lifetime;
 mod test_reduce_only;
 mod test_serum;
+mod test_stale_oracles;
+mod test_token_conditional_swap;
 mod test_token_update_index_and_rate;

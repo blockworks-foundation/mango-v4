@@ -60,6 +60,7 @@ async function settlePnl(
     const candidates = await perpMarket.getSettlePnlCandidates(
       client,
       group,
+      undefined,
       'negative',
     );
     if (candidates.length === 0) {
@@ -83,6 +84,7 @@ async function settlePnl(
     const candidates = await perpMarket.getSettlePnlCandidates(
       client,
       group,
+      undefined,
       'positive',
     );
     if (candidates.length === 0) {

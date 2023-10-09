@@ -23,10 +23,10 @@ pub fn perp_liq_force_cancel_orders(
     // Early return if if liquidation is not allowed or if market is not in force close
     //
     let liquidatable = account.check_liquidatable(&health_cache)?;
-    if account.fixed.is_operational()
-        && liquidatable != CheckLiquidatable::Liquidatable
-        && !perp_market.is_force_close()
-    {
+    let can_force_cancel = !account.fixed.is_operational()
+        || liquidatable == CheckLiquidatable::Liquidatable
+        || perp_market.is_force_close();
+    if !can_force_cancel {
         return Ok(());
     }
 

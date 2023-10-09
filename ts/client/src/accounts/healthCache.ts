@@ -9,12 +9,16 @@ import {
   ONE_I80F48,
   ZERO_I80F48,
 } from '../numbers/I80F48';
-import { toNativeI80F48ForQuote } from '../utils';
+import {
+  toNativeI80F48ForQuote,
+  toUiDecimals,
+  toUiDecimalsForQuote,
+} from '../utils';
 import { Bank, BankForHealth, TokenIndex } from './bank';
 import { Group } from './group';
 
 import { HealthType, MangoAccount, PerpPosition } from './mangoAccount';
-import { PerpMarket, PerpOrderSide } from './perp';
+import { PerpMarket, PerpMarketIndex, PerpOrderSide } from './perp';
 import { MarketIndex, Serum3Market, Serum3Side } from './serum3';
 
 //               ░░░░
@@ -235,6 +239,48 @@ export class HealthCache {
     return tokenBalances;
   }
 
+  effectiveTokenBalancesInternalDisplay(
+    group: Group,
+    healthType: HealthType | undefined,
+    ignoreNegativePerp: boolean,
+  ): TokenBalanceDisplay[] {
+    const tokenBalances = new Array(this.tokenInfos.length)
+      .fill(null)
+      .map((ignored) => new TokenBalanceDisplay(ZERO_I80F48(), 0, []));
+
+    for (const perpInfo of this.perpInfos) {
+      const settleTokenIndex = this.findTokenInfoIndex(
+        perpInfo.settleTokenIndex,
+      );
+      const perpSettleToken = tokenBalances[settleTokenIndex];
+      const healthUnsettled = perpInfo.healthUnsettledPnl(healthType);
+      perpSettleToken.perpMarketContributions.push({
+        market: group.getPerpMarketByMarketIndex(
+          perpInfo.perpMarketIndex as PerpMarketIndex,
+        ).name,
+        contributionUi: toUiDecimals(
+          healthUnsettled,
+          group.getMintDecimalsByTokenIndex(perpInfo.settleTokenIndex),
+        ),
+      });
+      if (!ignoreNegativePerp || healthUnsettled.gt(ZERO_I80F48())) {
+        perpSettleToken.spotAndPerp.iadd(healthUnsettled);
+      }
+    }
+
+    for (const index of this.tokenInfos.keys()) {
+      const tokenInfo = this.tokenInfos[index];
+      const tokenBalance = tokenBalances[index];
+      tokenBalance.spotAndPerp.iadd(tokenInfo.balanceSpot);
+      tokenBalance.spotUi += toUiDecimals(
+        tokenInfo.balanceSpot,
+        group.getMintDecimalsByTokenIndex(tokenInfo.tokenIndex),
+      );
+    }
+
+    return tokenBalances;
+  }
+
   healthSum(healthType: HealthType, tokenBalances: TokenBalance[]): I80F48 {
     const health = ZERO_I80F48();
     for (const index of this.tokenInfos.keys()) {
@@ -260,6 +306,70 @@ export class HealthCache {
       health.iadd(contrib);
     }
     return health;
+  }
+
+  healthContributionPerAssetUi(
+    group: Group,
+    healthType: HealthType,
+  ): {
+    asset: string;
+    contribution: number;
+    contributionDetails:
+      | {
+          spotUi: number;
+          perpMarketContributions: { market: string; contributionUi: number }[];
+        }
+      | undefined;
+  }[] {
+    const tokenBalancesDisplay: TokenBalanceDisplay[] =
+      this.effectiveTokenBalancesInternalDisplay(group, healthType, false);
+
+    const ret = new Array<{
+      asset: string;
+      contribution: number;
+      contributionDetails:
+        | {
+            spotUi: number;
+            perpMarketContributions: {
+              market: string;
+              contributionUi: number;
+            }[];
+          }
+        | undefined;
+    }>();
+    for (const index of this.tokenInfos.keys()) {
+      const tokenInfo = this.tokenInfos[index];
+      const tokenBalance = tokenBalancesDisplay[index];
+      const contrib = tokenInfo.healthContribution(
+        healthType,
+        tokenBalance.spotAndPerp,
+      );
+      ret.push({
+        asset: group.getFirstBankByTokenIndex(tokenInfo.tokenIndex).name,
+        contribution: toUiDecimalsForQuote(contrib),
+        contributionDetails: {
+          spotUi: tokenBalance.spotUi,
+          perpMarketContributions: tokenBalance.perpMarketContributions,
+        },
+      });
+    }
+    const res = this.computeSerum3Reservations(healthType);
+    for (const [index, serum3Info] of this.serum3Infos.entries()) {
+      const contrib = serum3Info.healthContribution(
+        healthType,
+        this.tokenInfos,
+        tokenBalancesDisplay,
+        res.tokenMaxReserved,
+        res.serum3Reserved[index],
+      );
+      ret.push({
+        asset: group.getSerum3MarketByMarketIndex(serum3Info.marketIndex).name,
+        contribution: toUiDecimalsForQuote(contrib),
+        contributionDetails: undefined,
+      });
+    }
+
+    return ret;
   }
 
   public health(healthType: HealthType): I80F48 {
@@ -607,7 +717,11 @@ export class HealthCache {
     throw new Error('Could not find amount that led to health ratio <=0');
   }
 
-  /// This is not a generic function. It assumes there is a unique maximum between left and right.
+  /// This is not a generic function. It assumes there is a almost-unique maximum between left and right,
+  /// in the sense that `fun` might be constant on the maximum value for a while, but there won't be
+  /// distinct maximums with non-maximal values between them.
+  ///
+  /// If the maximum isn't just a single point, it returns the rightmost value.
   private static findMaximum(
     left: I80F48,
     right: I80F48,
@@ -620,7 +734,7 @@ export class HealthCache {
     let rightValue = fun(right);
     let midValue = fun(mid);
     while (right.sub(left).gt(minStep)) {
-      if (leftValue.gte(midValue)) {
+      if (leftValue.gt(midValue)) {
         // max must be between left and mid
         right = mid;
         rightValue = midValue;
@@ -636,7 +750,7 @@ export class HealthCache {
         // mid is larger than both left and right, max could be on either side
         const leftmid = half.mul(left.add(mid));
         const leftMidValue = fun(leftmid);
-        if (leftMidValue.gte(midValue)) {
+        if (leftMidValue.gt(midValue)) {
           // max between left and mid
           right = mid;
           rightValue = midValue;
@@ -664,9 +778,9 @@ export class HealthCache {
       }
     }
 
-    if (leftValue.gte(midValue)) {
+    if (leftValue.gt(midValue)) {
       return [left, leftValue];
-    } else if (midValue.gte(rightValue)) {
+    } else if (midValue.gt(rightValue)) {
       return [mid, midValue];
     } else {
       return [right, rightValue];
@@ -680,13 +794,15 @@ export class HealthCache {
     targetValue: I80F48,
     minStep: I80F48,
     fun: (I80F48) => I80F48,
+    options: { maxIterations?: number; targetError?: number } = {},
   ): I80F48 {
-    const maxIterations = 50;
-    const targetError = I80F48.fromNumber(0.1);
+    const maxIterations = options?.maxIterations || 50;
+    const targetError = I80F48.fromNumber(options?.targetError || 0.1);
+
     const rightValue = fun(right);
 
     // console.log(
-    //   ` - binaryApproximationSearch left ${left.toLocaleString()}, leftValue ${leftValue.toLocaleString()}, right ${right.toLocaleString()}, rightValue ${rightValue.toLocaleString()}, targetValue ${targetValue.toLocaleString()}`,
+    //   ` - binaryApproximationSearch left ${left.toLocaleString()}, leftValue ${leftValue.toLocaleString()}, right ${right.toLocaleString()}, rightValue ${rightValue.toLocaleString()}, targetValue ${targetValue.toLocaleString()}, minStep ${minStep}`,
     // );
 
     if (
@@ -906,7 +1022,9 @@ export class HealthCache {
     const healthAtMaxValue = cacheAfterSwap(amountForMaxValue).health(
       HealthType.init,
     );
-    if (healthAtMaxValue.lte(ZERO_I80F48())) {
+    if (healthAtMaxValue.eq(ZERO_I80F48())) {
+      return amountForMaxValue;
+    } else if (healthAtMaxValue.lt(ZERO_I80F48())) {
       return ZERO_I80F48();
     }
     const zeroHealthEstimate = amountForMaxValue.sub(
@@ -1206,6 +1324,52 @@ export class HealthCache {
 
     return baseLots.floor();
   }
+
+  public getPerpPositionLiquidationPrice(
+    group: Group,
+    mangoAccount: MangoAccount,
+    perpPosition: PerpPosition,
+  ): I80F48 | null {
+    const hc = HealthCache.fromMangoAccount(group, mangoAccount);
+    const hcClone = cloneDeep(hc);
+    const perpMarket = group.getPerpMarketByMarketIndex(
+      perpPosition.marketIndex,
+    );
+
+    function healthAfterPriceChange(newPrice: I80F48): I80F48 {
+      const pi: PerpInfo =
+        hcClone.perpInfos[hcClone.findPerpInfoIndex(perpPosition.marketIndex)];
+      pi.basePrices.oracle = newPrice;
+      return hcClone.health(HealthType.maint);
+    }
+
+    if (perpPosition.getBasePosition(perpMarket).isPos()) {
+      const zero = ZERO_I80F48();
+      const healthAtPriceZero = healthAfterPriceChange(zero);
+      if (healthAtPriceZero.gt(ZERO_I80F48())) {
+        return null;
+      }
+
+      return HealthCache.binaryApproximationSearch(
+        zero,
+        healthAtPriceZero,
+        perpMarket.price,
+        ZERO_I80F48(),
+        perpMarket.priceLotsToNative(new BN(1)),
+        healthAfterPriceChange,
+      );
+    }
+
+    const price1000x = perpMarket.price.mul(I80F48.fromNumber(1000));
+    return HealthCache.binaryApproximationSearch(
+      perpMarket.price,
+      hcClone.health(HealthType.maint),
+      price1000x,
+      ZERO_I80F48(),
+      perpMarket.priceLotsToNative(new BN(1)),
+      healthAfterPriceChange,
+    );
+  }
 }
 
 export class Prices {
@@ -1339,6 +1503,17 @@ export class TokenInfo {
 
 class TokenBalance {
   constructor(public spotAndPerp: I80F48) {}
+}
+
+class TokenBalanceDisplay {
+  constructor(
+    public spotAndPerp: I80F48,
+    public spotUi: number,
+    public perpMarketContributions: {
+      market: string;
+      contributionUi: number;
+    }[],
+  ) {}
 }
 
 class TokenMaxReserved {

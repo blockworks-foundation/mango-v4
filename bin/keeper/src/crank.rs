@@ -12,6 +12,7 @@ use solana_sdk::{
     pubkey::Pubkey,
 };
 use tokio::time;
+use tracing::*;
 use warp::Filter;
 
 lazy_static::lazy_static! {
@@ -229,21 +230,18 @@ pub async fn loop_update_index_and_rate(
 
         if let Err(e) = sig_result {
             METRIC_UPDATE_TOKENS_FAILURE.inc();
-            log::info!(
+            info!(
                 "metricName=UpdateTokensV4Failure tokens={} durationMs={} error={}",
-                token_names,
-                confirmation_time,
-                e
+                token_names, confirmation_time, e
             );
-            log::error!("{:?}", e)
+            error!("{:?}", e)
         } else {
             METRIC_UPDATE_TOKENS_SUCCESS.inc();
-            log::info!(
+            info!(
                 "metricName=UpdateTokensV4Success tokens={} durationMs={}",
-                token_names,
-                confirmation_time,
+                token_names, confirmation_time,
             );
-            log::info!("{:?}", sig_result);
+            info!("{:?}", sig_result);
         }
     }
 }
@@ -304,7 +302,7 @@ pub async fn loop_consume_events(
             Ok(Some(x)) => x,
             Ok(None) => continue,
             Err(err) => {
-                log::error!("preparing consume_events ams: {err:?}");
+                error!("preparing consume_events ams: {err:?}");
                 continue;
             }
         };
@@ -347,23 +345,23 @@ pub async fn loop_consume_events(
 
         if let Err(e) = sig_result {
             METRIC_CONSUME_EVENTS_FAILURE.inc();
-            log::info!(
+            info!(
                 "metricName=ConsumeEventsV4Failure market={} durationMs={} consumed={} error={}",
                 perp_market.name(),
                 confirmation_time,
                 num_of_events,
                 e.to_string()
             );
-            log::error!("{:?}", e)
+            error!("{:?}", e)
         } else {
             METRIC_CONSUME_EVENTS_SUCCESS.inc();
-            log::info!(
+            info!(
                 "metricName=ConsumeEventsV4Success market={} durationMs={} consumed={}",
                 perp_market.name(),
                 confirmation_time,
                 num_of_events,
             );
-            log::info!("{:?}", sig_result);
+            info!("{:?}", sig_result);
         }
     }
 }
@@ -402,21 +400,21 @@ pub async fn loop_update_funding(
 
         if let Err(e) = sig_result {
             METRIC_UPDATE_FUNDING_FAILURE.inc();
-            log::error!(
+            error!(
                 "metricName=UpdateFundingV4Error market={} durationMs={} error={}",
                 perp_market.name(),
                 confirmation_time,
                 e.to_string()
             );
-            log::error!("{:?}", e)
+            error!("{:?}", e)
         } else {
             METRIC_UPDATE_FUNDING_SUCCESS.inc();
-            log::info!(
+            info!(
                 "metricName=UpdateFundingV4Success market={} durationMs={}",
                 perp_market.name(),
                 confirmation_time,
             );
-            log::info!("{:?}", sig_result);
+            info!("{:?}", sig_result);
         }
     }
 }

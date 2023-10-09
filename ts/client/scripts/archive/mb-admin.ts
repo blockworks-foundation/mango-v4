@@ -22,6 +22,7 @@ import { MangoClient } from '../../src/client';
 import {
   NullPerpEditParams,
   NullTokenEditParams,
+  DefaultTokenRegisterParams,
 } from '../../src/clientIxParamBuilder';
 import { MANGO_V4_ID, OPENBOOK_PROGRAM_ID } from '../../src/constants';
 import { buildVersionedTx, toNative } from '../../src/utils';
@@ -205,20 +206,17 @@ async function registerTokens() {
     group,
     usdcMainnetMint,
     usdcMainnetOracle.publicKey,
-    defaultOracleConfig,
     0,
     'USDC',
-    defaultInterestRate,
-    0.005,
-    0.0005,
-    1,
-    1,
-    1,
-    1,
-    0,
-    MIN_VAULT_TO_DEPOSITS_RATIO,
-    NET_BORROWS_WINDOW_SIZE_TS,
-    NET_BORROW_LIMIT_PER_WINDOW_QUOTE,
+    {
+      ...DefaultTokenRegisterParams,
+      initAssetWeight: 1,
+      maintAssetWeight: 1,
+      initLiabWeight: 1,
+      maintLiabWeight: 1,
+      liquidationFee: 0,
+      netBorrowLimitPerWindowQuote: NET_BORROW_LIMIT_PER_WINDOW_QUOTE,
+    },
   );
 
   console.log(`Registering USDT...`);
@@ -228,20 +226,17 @@ async function registerTokens() {
     group,
     usdtMainnetMint,
     usdtMainnetOracle,
-    defaultOracleConfig,
     1,
     'USDT',
-    defaultInterestRate,
-    0.005,
-    0.0005,
-    0.95,
-    0.9,
-    1.05,
-    1.1,
-    0.025,
-    MIN_VAULT_TO_DEPOSITS_RATIO,
-    NET_BORROWS_WINDOW_SIZE_TS,
-    NET_BORROW_LIMIT_PER_WINDOW_QUOTE,
+    {
+      ...DefaultTokenRegisterParams,
+      maintAssetWeight: 0.95,
+      initAssetWeight: 0.9,
+      maintLiabWeight: 1.05,
+      initLiabWeight: 1.1,
+      liquidationFee: 0.025,
+      netBorrowLimitPerWindowQuote: NET_BORROW_LIMIT_PER_WINDOW_QUOTE,
+    },
   );
 
   console.log(`Registering DAI...`);
@@ -251,20 +246,17 @@ async function registerTokens() {
     group,
     daiMainnetMint,
     daiMainnetOracle,
-    defaultOracleConfig,
     2,
     'DAI',
-    defaultInterestRate,
-    0.005,
-    0.0005,
-    0.95,
-    0.9,
-    1.05,
-    1.1,
-    0.025,
-    MIN_VAULT_TO_DEPOSITS_RATIO,
-    NET_BORROWS_WINDOW_SIZE_TS,
-    NET_BORROW_LIMIT_PER_WINDOW_QUOTE,
+    {
+      ...DefaultTokenRegisterParams,
+      maintAssetWeight: 0.95,
+      initAssetWeight: 0.9,
+      maintLiabWeight: 1.05,
+      initLiabWeight: 1.1,
+      liquidationFee: 0.025,
+      netBorrowLimitPerWindowQuote: NET_BORROW_LIMIT_PER_WINDOW_QUOTE,
+    },
   );
 
   console.log(`Registering ETH...`);
@@ -274,20 +266,17 @@ async function registerTokens() {
     group,
     ethMainnetMint,
     ethMainnetOracle,
-    defaultOracleConfig,
     3,
     'ETH',
-    defaultInterestRate,
-    0.005,
-    0.0005,
-    0.9,
-    0.8,
-    1.1,
-    1.2,
-    0.05,
-    MIN_VAULT_TO_DEPOSITS_RATIO,
-    NET_BORROWS_WINDOW_SIZE_TS,
-    NET_BORROW_LIMIT_PER_WINDOW_QUOTE,
+    {
+      ...DefaultTokenRegisterParams,
+      maintAssetWeight: 0.9,
+      initAssetWeight: 0.8,
+      maintLiabWeight: 1.1,
+      initLiabWeight: 1.2,
+      liquidationFee: 0.05,
+      netBorrowLimitPerWindowQuote: NET_BORROW_LIMIT_PER_WINDOW_QUOTE,
+    },
   );
 
   console.log(`Registering SOL...`);
@@ -297,20 +286,17 @@ async function registerTokens() {
     group,
     solMainnetMint,
     solMainnetOracle,
-    defaultOracleConfig,
     4,
     'SOL',
-    defaultInterestRate,
-    0.005,
-    0.0005,
-    0.9,
-    0.8,
-    1.1,
-    1.2,
-    0.05,
-    MIN_VAULT_TO_DEPOSITS_RATIO,
-    NET_BORROWS_WINDOW_SIZE_TS,
-    NET_BORROW_LIMIT_PER_WINDOW_QUOTE,
+    {
+      ...DefaultTokenRegisterParams,
+      maintAssetWeight: 0.9,
+      initAssetWeight: 0.8,
+      maintLiabWeight: 1.1,
+      initLiabWeight: 1.2,
+      liquidationFee: 0.05,
+      netBorrowLimitPerWindowQuote: NET_BORROW_LIMIT_PER_WINDOW_QUOTE,
+    },
   );
 
   console.log(`Registering MSOL...`);
@@ -320,20 +306,17 @@ async function registerTokens() {
     group,
     msolMainnetMint,
     msolMainnetOracle,
-    defaultOracleConfig,
     5,
     'MSOL',
-    defaultInterestRate,
-    0.005,
-    0.0005,
-    0.9,
-    0.8,
-    1.1,
-    1.2,
-    0.05,
-    MIN_VAULT_TO_DEPOSITS_RATIO,
-    NET_BORROWS_WINDOW_SIZE_TS,
-    NET_BORROW_LIMIT_PER_WINDOW_QUOTE,
+    {
+      ...DefaultTokenRegisterParams,
+      maintAssetWeight: 0.9,
+      initAssetWeight: 0.8,
+      maintLiabWeight: 1.1,
+      initLiabWeight: 1.2,
+      liquidationFee: 0.05,
+      netBorrowLimitPerWindowQuote: NET_BORROW_LIMIT_PER_WINDOW_QUOTE,
+    },
   );
 
   console.log(`Registering MNGO...`);
@@ -394,7 +377,11 @@ async function createUser(userKeypair: string) {
   const user = result[2];
 
   console.log(`Creating MangoAccount...`);
-  const mangoAccount = await client.getOrCreateMangoAccount(group);
+  const mangoAccount = await client.getMangoAccountForOwner(
+    group,
+    user.publicKey,
+    0,
+  );
   if (!mangoAccount) {
     throw new Error(`MangoAccount not found for user ${user.publicKey}`);
   }
@@ -675,7 +662,7 @@ async function createAndPopulateAlt() {
       );
 
       console.log(`ALT: set at index 0 for group...`);
-      sig = await client.altSet(group, createIx[1], 0);
+      sig = (await client.altSet(group, createIx[1], 0)).signature;
       console.log(`...https://explorer.solana.com/tx/${sig}`);
     } catch (error) {
       console.log(error);

@@ -19,24 +19,6 @@ impl HealthCache {
         }
     }
 
-    /// The health ratio is
-    /// - 0 if health is 0 - meaning assets = liabs
-    /// - 100 if there's 2x as many assets as liabs
-    /// - 200 if there's 3x as many assets as liabs
-    /// - MAX if liabs = 0
-    ///
-    /// Maybe talking about the collateralization ratio assets/liabs is more intuitive?
-    pub fn health_ratio(&self, health_type: HealthType) -> I80F48 {
-        let (assets, liabs) = self.health_assets_and_liabs_stable_liabs(health_type);
-        let hundred = I80F48::from(100);
-        if liabs > 0 {
-            // feel free to saturate to MAX for tiny liabs
-            (hundred * (assets - liabs)).saturating_div(liabs)
-        } else {
-            I80F48::MAX
-        }
-    }
-
     /// Return a copy of the current cache where a swap between two banks was executed.
     ///
     /// Errors:
@@ -215,7 +197,7 @@ impl HealthCache {
         }
 
         let amount = {
-            // Now max_value is bigger than min_fn_value, the target amount must be >amount_for_max_value.
+            // Now max_value is bigger than min_fn_value, the target amount must be >=amount_for_max_value.
             // Search to the right of amount_for_max_value: but how far?
             // Use a simple estimation for the amount that would lead to zero health:
             //           health
@@ -227,7 +209,10 @@ impl HealthCache {
             let health_at_max_value = cache_after_swap(amount_for_max_value)?
                 .map(|c| c.health(health_type))
                 .unwrap_or(I80F48::MIN);
-            if health_at_max_value <= 0 {
+            if health_at_max_value == 0 {
+                return Ok(amount_for_max_value);
+            } else if health_at_max_value < 0 {
+                // target_fn suggests health is good but health suggests it's not
                 return Ok(I80F48::ZERO);
             }
             let zero_health_estimate =
@@ -524,7 +509,11 @@ fn binary_search(
     Err(error_msg!("binary search iterations exhausted"))
 }
 
-/// This is not a generic function. It assumes there is a unique maximum between left and right.
+/// This is not a generic function. It assumes there is a almost-unique maximum between left and right,
+/// in the sense that `fun` might be constant on the maximum value for a while, but there won't be
+/// distinct maximums with non-maximal values between them.
+///
+/// If the maximum isn't just a single point, it returns the rightmost value.
 fn find_maximum(
     mut left: I80F48,
     mut right: I80F48,
@@ -538,7 +527,8 @@ fn find_maximum(
     let mut right_value = fun(right)?;
     let mut mid_value = fun(mid)?;
     while (right - left) > min_step {
-        if left_value >= mid_value {
+        //println!("it {left} {left_value}; {mid} {mid_value}; {right} {right_value}");
+        if left_value > mid_value {
             // max must be between left and mid
             assert!(mid_value >= right_value);
             right = mid;
@@ -556,8 +546,9 @@ fn find_maximum(
             // mid is larger than both left and right, max could be on either side
             let leftmid = half * (left + mid);
             let leftmid_value = fun(leftmid)?;
+            //println!("lm {leftmid} {leftmid_value}");
             assert!(leftmid_value >= left_value);
-            if leftmid_value >= mid_value {
+            if leftmid_value > mid_value {
                 // max between left and mid
                 right = mid;
                 right_value = mid_value;
@@ -568,6 +559,7 @@ fn find_maximum(
 
             let rightmid = half * (mid + right);
             let rightmid_value = fun(rightmid)?;
+            //println!("rm {rightmid} {rightmid_value}");
             assert!(rightmid_value >= right_value);
             if rightmid_value >= mid_value {
                 // max between mid and right
@@ -586,9 +578,9 @@ fn find_maximum(
         }
     }
 
-    if left_value >= mid_value {
+    if left_value > mid_value {
         Ok((left, left_value))
-    } else if mid_value >= right_value {
+    } else if mid_value > right_value {
         Ok((mid, mid_value))
     } else {
         Ok((right, right_value))
@@ -628,6 +620,16 @@ mod tests {
         }
     }
 
+    fn leverage_eq(h: &HealthCache, b: f64) -> bool {
+        let a = h.leverage();
+        if (a - I80F48::from_num(b)).abs() < 0.001 {
+            true
+        } else {
+            println!("leverage is {}, but expected {}", a, b);
+            false
+        }
+    }
+
     fn default_token_info(x: f64, price: f64) -> TokenInfo {
         TokenInfo {
             token_index: 0,
@@ -642,7 +644,7 @@ mod tests {
         }
     }
 
-    fn default_perp_info(x: f64) -> PerpInfo {
+    fn default_perp_info(x: f64, price: f64) -> PerpInfo {
         PerpInfo {
             perp_market_index: 0,
             settle_token_index: 0,
@@ -657,7 +659,7 @@ mod tests {
             bids_base_lots: 0,
             asks_base_lots: 0,
             quote: I80F48::ZERO,
-            base_prices: Prices::new_single_price(I80F48::from_num(2.0)),
+            base_prices: Prices::new_single_price(I80F48::from_num(price)),
             has_open_orders: false,
             has_open_fills: false,
         }
@@ -730,18 +732,28 @@ mod tests {
                                     price_factor: f64,
                                     banks: [Bank; 3],
                                     max_swap_fn: MaxSwapFn| {
-            let source_price = &c.token_infos[source as usize].prices;
-            let source_bank = &banks[source as usize];
-            let target_price = &c.token_infos[target as usize].prices;
-            let target_bank = &banks[target as usize];
+            let source_ti = &c.token_infos[source as usize];
+            let source_price = &source_ti.prices;
+            let mut source_bank = banks[source as usize].clone();
+            // Update the bank weights, because the tests like to modify the cache
+            // weights and expect them to stick
+            source_bank.init_asset_weight = source_ti.init_asset_weight;
+            source_bank.init_liab_weight = source_ti.init_liab_weight;
+
+            let target_ti = &c.token_infos[target as usize];
+            let target_price = &target_ti.prices;
+            let mut target_bank = banks[target as usize].clone();
+            target_bank.init_asset_weight = target_ti.init_asset_weight;
+            target_bank.init_liab_weight = target_ti.init_liab_weight;
+
             let swap_price =
                 I80F48::from_num(price_factor) * source_price.oracle / target_price.oracle;
             let source_amount = c
                 .max_swap_source_for_health_fn(
                     &account,
-                    source_bank,
+                    &source_bank,
                     source_price.oracle,
-                    target_bank,
+                    &target_bank,
                     swap_price,
                     I80F48::from_num(min_value),
                     max_swap_fn,
@@ -753,9 +765,9 @@ mod tests {
             let value_for_amount = |amount| {
                 c.cache_after_swap(
                     &account,
-                    source_bank,
+                    &source_bank,
                     source_price.oracle,
-                    target_bank,
+                    &target_bank,
                     I80F48::from(amount),
                     swap_price,
                 )
@@ -943,6 +955,8 @@ mod tests {
                     market_index: 0,
                     reserved_base: I80F48::from(30 / 3),
                     reserved_quote: I80F48::from(30 / 2),
+                    reserved_base_as_quote_lowest_ask: I80F48::ZERO,
+                    reserved_quote_as_base_highest_bid: I80F48::ZERO,
                     has_zero_funds: false,
                 }];
                 adjust_by_usdc(&mut health_cache, 0, -20.0);
@@ -1026,7 +1040,7 @@ mod tests {
                 health_cache.perp_infos.push(PerpInfo {
                     perp_market_index: 0,
                     settle_token_index: 1,
-                    ..default_perp_info(0.3)
+                    ..default_perp_info(0.3, 2.0)
                 });
                 adjust_by_usdc(&mut health_cache, 0, 60.0);
 
@@ -1038,6 +1052,42 @@ mod tests {
                             check(&health_cache, 0, 1, target, price_factor, banks);
                             check(&health_cache, 1, 0, target, price_factor, banks);
                         }
+                    }
+                }
+            }
+
+            {
+                // swap some assets between zero-asset-weight tokens
+                println!("test 11 {test_name}");
+                let mut health_cache = health_cache.clone();
+                adjust_by_usdc(&mut health_cache, 0, 10.0); // 5 tokens
+                health_cache.token_infos[0].init_asset_weight = I80F48::from(0);
+                health_cache.token_infos[1].init_asset_weight = I80F48::from(0);
+
+                let amount = find_max_swap(&health_cache, 0, 1, 1.0, 1.0, banks).0;
+                assert_eq!(amount, 5.0);
+
+                for price_factor in [0.9, 1.1] {
+                    for target in 1..100 {
+                        let target = target as f64;
+
+                        // Result is always the same: swap all deposits
+                        let amount =
+                            find_max_swap(&health_cache, 0, 1, target, price_factor, banks).0;
+                        assert_eq!(amount, 5.0);
+                    }
+                }
+
+                adjust_by_usdc(&mut health_cache, 1, 6.0); // 2 tokens
+
+                for price_factor in [0.9, 1.1] {
+                    for target in 1..100 {
+                        let target = target as f64;
+
+                        // Result is always the same: swap all deposits
+                        let amount =
+                            find_max_swap(&health_cache, 0, 1, target, price_factor, banks).0;
+                        assert_eq!(amount, 5.0);
                     }
                 }
             }
@@ -1066,7 +1116,7 @@ mod tests {
                 perp_market_index: 0,
                 settle_token_index: 1,
                 base_lot_size,
-                ..default_perp_info(0.3)
+                ..default_perp_info(0.3, 2.0)
             }],
             being_liquidated: false,
         };
@@ -1443,7 +1493,7 @@ mod tests {
             perp_infos: vec![PerpInfo {
                 perp_market_index: 0,
                 settle_token_index: 0,
-                ..default_perp_info(0.3)
+                ..default_perp_info(0.3, 2.0)
             }],
             being_liquidated: false,
         };
@@ -1475,5 +1525,103 @@ mod tests {
             assert!((liabs.to_num::<f64>() - 2.0 * 10.0 * 1.2) < 0.01);
             assert!((assets.to_num::<f64>() - 2.0 * (10.0 * 1.2 + 2.0 * 0.8)) < 0.01);
         }
+    }
+
+    #[test]
+    fn test_leverage() {
+        // only deposits
+        let health_cache = HealthCache {
+            token_infos: vec![
+                TokenInfo {
+                    token_index: 0,
+                    balance_spot: I80F48::ONE,
+                    ..default_token_info(0.0, 1.0)
+                },
+                TokenInfo {
+                    token_index: 1,
+                    ..default_token_info(0.2, 2.0)
+                },
+            ],
+            serum3_infos: vec![],
+            perp_infos: vec![],
+            being_liquidated: false,
+        };
+        assert!(leverage_eq(&health_cache, 0.0));
+
+        // deposits and borrows: assets = 10, equity = 1
+        let health_cache = HealthCache {
+            token_infos: vec![
+                TokenInfo {
+                    token_index: 0,
+                    balance_spot: I80F48::from_num(-9),
+                    ..default_token_info(0.0, 1.0)
+                },
+                TokenInfo {
+                    token_index: 1,
+                    balance_spot: I80F48::from_num(5),
+                    ..default_token_info(0.2, 2.0)
+                },
+            ],
+            serum3_infos: vec![],
+            perp_infos: vec![],
+            being_liquidated: false,
+        };
+
+        assert!(leverage_eq(&health_cache, 9.0));
+
+        // perp trade: assets = 1 + 9.9, equity = 1
+        let health_cache = HealthCache {
+            token_infos: vec![
+                TokenInfo {
+                    token_index: 0,
+                    balance_spot: I80F48::ONE,
+                    ..default_token_info(0.0, 1.0)
+                },
+                TokenInfo {
+                    token_index: 1,
+                    ..default_token_info(0.2, 2.0)
+                },
+            ],
+            serum3_infos: vec![],
+            perp_infos: vec![PerpInfo {
+                perp_market_index: 0,
+                base_lot_size: 3,
+                base_lots: -3,
+                quote: I80F48::from_num(9.9),
+                ..default_perp_info(0.1, 1.1)
+            }],
+            being_liquidated: false,
+        };
+        assert!(leverage_eq(&health_cache, 9.9));
+
+        // open orders: assets = 3, equity = 1
+        let health_cache = HealthCache {
+            token_infos: vec![
+                TokenInfo {
+                    token_index: 0,
+                    balance_spot: I80F48::ONE,
+                    ..default_token_info(0.0, 1.0)
+                },
+                TokenInfo {
+                    token_index: 1,
+                    balance_spot: I80F48::from_num(-1),
+                    ..default_token_info(0.2, 2.0)
+                },
+            ],
+            serum3_infos: vec![Serum3Info {
+                reserved_base: I80F48::ONE,
+                reserved_quote: I80F48::ZERO,
+                reserved_base_as_quote_lowest_ask: I80F48::ONE,
+                reserved_quote_as_base_highest_bid: I80F48::ZERO,
+                base_info_index: 1,
+                quote_info_index: 0,
+                market_index: 0,
+                has_zero_funds: true,
+            }],
+            perp_infos: vec![],
+            being_liquidated: false,
+        };
+
+        assert!(leverage_eq(&health_cache, 2.0));
     }
 }

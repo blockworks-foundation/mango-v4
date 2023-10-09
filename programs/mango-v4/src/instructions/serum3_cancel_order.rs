@@ -5,10 +5,9 @@ use serum_dex::instruction::CancelOrderInstructionV2;
 use crate::error::*;
 use crate::state::*;
 
-use super::{OpenOrdersAmounts, OpenOrdersSlim};
 use crate::accounts_ix::*;
 use crate::logs::Serum3OpenOrdersBalanceLogV2;
-use crate::serum3_cpi::load_open_orders_ref;
+use crate::serum3_cpi::{load_open_orders_ref, OpenOrdersAmounts, OpenOrdersSlim};
 
 pub fn serum3_cancel_order(
     ctx: Context<Serum3CancelOrder>,

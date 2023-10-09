@@ -1,5 +1,3 @@
-cargo-features = ["workspace-inheritance"]
-
 [package]
 name = "mango-v4-liquidator"
 version = "0.0.1"
@@ -20,6 +18,7 @@ async-trait = "0.1"
 bs58 = "0.3.1"
 bytemuck = "^1.7.2"
 bytes = "1.0"
+chrono = "0.4"
 clap = { version = "3.1.8", features = ["derive", "env"] }
 dotenv = "0.15.0"
 fixed = { workspace = true, features = ["serde"] }
@@ -30,7 +29,6 @@ itertools = "0.10.3"
 jemallocator = "0.3.2"
 jsonrpc-core = "18.0.0"
 jsonrpc-core-client = { version = "18.0.0", features = ["ws", "http", "tls"] }
-log = "0.4"
 mango-v4 = { path = "../../programs/mango-v4", features = ["client"] }
 mango-v4-client = { path = "../../lib/client" }
 once_cell = "1.12.0"
@@ -39,7 +37,7 @@ rand = "0.7"
 serde = "1.0.130"
 serde_derive = "1.0.130"
 serde_json = "1.0.68"
-serum_dex = { workspace = true, default-features=false,features = ["no-entrypoint", "program"] }
+serum_dex = { workspace = true, features = ["no-entrypoint", "program"] }
 shellexpand = "2.1.0"
 solana-account-decoder = { workspace = true }
 solana-client = { workspace = true }
@@ -49,3 +47,4 @@ solana-sdk = { workspace = true }
 tokio = { version = "1", features = ["full"] }
 tokio-stream = { version = "0.1.9"}
 tokio-tungstenite = "0.16.1"
+tracing = "0.1"

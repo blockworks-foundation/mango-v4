@@ -28,20 +28,33 @@ pub mod types;
 pub mod instructions;
 
 #[cfg(all(not(feature = "no-entrypoint"), not(feature = "enable-gpl")))]
+
 compile_error!("compiling the program entrypoint without 'enable-gpl' makes no sense, enable it or use the 'cpi' or 'client' features");
 
 use state::{
-    OracleConfigParams, PerpMarketIndex, PlaceOrderType, SelfTradeBehavior, Serum3MarketIndex,
-    Side, TokenIndex,
+    OpenbookV2MarketIndex, OracleConfigParams, PerpMarketIndex, PlaceOrderType, SelfTradeBehavior,
+    Serum3MarketIndex, Side, TokenConditionalSwap, TokenConditionalSwapDisplayPriceStyle,
+    TokenConditionalSwapIntention, TokenConditionalSwapType, TokenIndex, TCS_START_INCENTIVE,
 };
 
 declare_id!("4MangoMjqJ2firMokCjjGgoK8d4MXcrgL7XJaL3w6fVg");
 
 #[program]
 pub mod mango_v4 {
-
     use super::*;
     use error::*;
+
+    pub fn admin_token_withdraw_fees(ctx: Context<AdminTokenWithdrawFees>) -> Result<()> {
+        #[cfg(feature = "enable-gpl")]
+        instructions::admin_token_withdraw_fees(ctx)?;
+        Ok(())
+    }
+
+    pub fn admin_perp_withdraw_fees(ctx: Context<AdminPerpWithdrawFees>) -> Result<()> {
+        #[cfg(feature = "enable-gpl")]
+        instructions::admin_perp_withdraw_fees(ctx)?;
+        Ok(())
+    }
 
     pub fn group_create(
         ctx: Context<GroupCreate>,
@@ -122,9 +135,18 @@ pub mod mango_v4 {
         maint_liab_weight: f32,
         init_liab_weight: f32,
         liquidation_fee: f32,
+        stable_price_delay_interval_seconds: u32,
+        stable_price_delay_growth_limit: f32,
+        stable_price_growth_limit: f32,
         min_vault_to_deposits_ratio: f64,
         net_borrow_limit_window_size_ts: u64,
         net_borrow_limit_per_window_quote: i64,
+        borrow_weight_scale_start_quote: f64,
+        deposit_weight_scale_start_quote: f64,
+        reduce_only: u8,
+        token_conditional_swap_taker_fee_rate: f32,
+        token_conditional_swap_maker_fee_rate: f32,
+        flash_loan_deposit_fee_rate: f32,
     ) -> Result<()> {
         #[cfg(feature = "enable-gpl")]
         instructions::token_register(
@@ -140,9 +162,18 @@ pub mod mango_v4 {
             maint_liab_weight,
             init_liab_weight,
             liquidation_fee,
+            stable_price_delay_interval_seconds,
+            stable_price_delay_growth_limit,
+            stable_price_growth_limit,
             min_vault_to_deposits_ratio,
             net_borrow_limit_window_size_ts,
             net_borrow_limit_per_window_quote,
+            borrow_weight_scale_start_quote,
+            deposit_weight_scale_start_quote,
+            reduce_only,
+            token_conditional_swap_taker_fee_rate,
+            token_conditional_swap_maker_fee_rate,
+            flash_loan_deposit_fee_rate,
         )?;
         Ok(())
     }
@@ -184,6 +215,9 @@ pub mod mango_v4 {
         reduce_only_opt: Option<u8>,
         name_opt: Option<String>,
         force_close_opt: Option<bool>,
+        token_conditional_swap_taker_fee_rate_opt: Option<f32>,
+        token_conditional_swap_maker_fee_rate_opt: Option<f32>,
+        flash_loan_deposit_fee_rate_opt: Option<f32>,
     ) -> Result<()> {
         #[cfg(feature = "enable-gpl")]
         instructions::token_edit(
@@ -212,6 +246,9 @@ pub mod mango_v4 {
             reduce_only_opt,
             name_opt,
             force_close_opt,
+            token_conditional_swap_taker_fee_rate_opt,
+            token_conditional_swap_maker_fee_rate_opt,
+            flash_loan_deposit_fee_rate_opt,
         )?;
         Ok(())
     }
@@ -252,12 +289,43 @@ pub mod mango_v4 {
     ) -> Result<()> {
         #[cfg(feature = "enable-gpl")]
         instructions::account_create(
-            ctx,
+            &ctx.accounts.account,
+            *ctx.bumps.get("account").ok_or(MangoError::SomeError)?,
+            ctx.accounts.group.key(),
+            ctx.accounts.owner.key(),
             account_num,
             token_count,
             serum3_count,
             perp_count,
             perp_oo_count,
+            0,
+            name,
+        )?;
+        Ok(())
+    }
+
+    pub fn account_create_v2(
+        ctx: Context<AccountCreateV2>,
+        account_num: u32,
+        token_count: u8,
+        serum3_count: u8,
+        perp_count: u8,
+        perp_oo_count: u8,
+        token_conditional_swap_count: u8,
+        name: String,
+    ) -> Result<()> {
+        #[cfg(feature = "enable-gpl")]
+        instructions::account_create(
+            &ctx.accounts.account,
+            *ctx.bumps.get("account").ok_or(MangoError::SomeError)?,
+            ctx.accounts.group.key(),
+            ctx.accounts.owner.key(),
+            account_num,
+            token_count,
+            serum3_count,
+            perp_count,
+            perp_oo_count,
+            token_conditional_swap_count,
             name,
         )?;
         Ok(())
@@ -271,7 +339,33 @@ pub mod mango_v4 {
         perp_oo_count: u8,
     ) -> Result<()> {
         #[cfg(feature = "enable-gpl")]
-        instructions::account_expand(ctx, token_count, serum3_count, perp_count, perp_oo_count)?;
+        instructions::account_expand(ctx, token_count, serum3_count, perp_count, perp_oo_count, 0)?;
+        Ok(())
+    }
+
+    pub fn account_expand_v2(
+        ctx: Context<AccountExpand>,
+        token_count: u8,
+        serum3_count: u8,
+        perp_count: u8,
+        perp_oo_count: u8,
+        token_conditional_swap_count: u8,
+    ) -> Result<()> {
+        #[cfg(feature = "enable-gpl")]
+        instructions::account_expand(
+            ctx,
+            token_count,
+            serum3_count,
+            perp_count,
+            perp_oo_count,
+            token_conditional_swap_count,
+        )?;
+        Ok(())
+    }
+
+    pub fn account_size_migration(ctx: Context<AccountSizeMigration>) -> Result<()> {
+        #[cfg(feature = "enable-gpl")]
+        instructions::account_size_migration(ctx)?;
         Ok(())
     }
 
@@ -279,9 +373,17 @@ pub mod mango_v4 {
         ctx: Context<AccountEdit>,
         name_opt: Option<String>,
         delegate_opt: Option<Pubkey>,
+        temporary_delegate_opt: Option<Pubkey>,
+        temporary_delegate_expiry_opt: Option<u64>,
     ) -> Result<()> {
         #[cfg(feature = "enable-gpl")]
-        instructions::account_edit(ctx, name_opt, delegate_opt)?;
+        instructions::account_edit(
+            ctx,
+            name_opt,
+            delegate_opt,
+            temporary_delegate_opt,
+            temporary_delegate_expiry_opt,
+        )?;
         Ok(())
     }
 
@@ -329,6 +431,17 @@ pub mod mango_v4 {
         Ok(())
     }
 
+    pub fn stub_oracle_set_test(
+        ctx: Context<StubOracleSet>,
+        price: I80F48,
+        last_update_slot: u64,
+        deviation: I80F48,
+    ) -> Result<()> {
+        #[cfg(feature = "enable-gpl")]
+        instructions::stub_oracle_set_test(ctx, price, last_update_slot, deviation)?;
+        Ok(())
+    }
+
     pub fn token_deposit(ctx: Context<TokenDeposit>, amount: u64, reduce_only: bool) -> Result<()> {
         #[cfg(feature = "enable-gpl")]
         instructions::token_deposit(ctx, amount, reduce_only)?;
@@ -360,7 +473,26 @@ pub mod mango_v4 {
         loan_amounts: Vec<u64>,
     ) -> Result<()> {
         #[cfg(feature = "enable-gpl")]
-        instructions::flash_loan_begin(ctx, loan_amounts)?;
+        instructions::flash_loan_begin(
+            ctx.program_id,
+            &ctx.accounts.account,
+            ctx.accounts.owner.key,
+            &ctx.accounts.instructions,
+            &ctx.accounts.token_program,
+            ctx.remaining_accounts,
+            loan_amounts,
+        )?;
+        Ok(())
+    }
+
+    /// A version of flash_loan_begin that's specialized for swaps and needs fewer
+    /// bytes in the transaction
+    pub fn flash_loan_swap_begin<'key, 'accounts, 'remaining, 'info>(
+        ctx: Context<'key, 'accounts, 'remaining, 'info, FlashLoanSwapBegin<'info>>,
+        loan_amount: u64,
+    ) -> Result<()> {
+        #[cfg(feature = "enable-gpl")]
+        instructions::flash_loan_swap_begin(ctx, loan_amount)?;
         Ok(())
     }
 
@@ -415,9 +547,10 @@ pub mod mango_v4 {
         ctx: Context<Serum3EditMarket>,
         reduce_only_opt: Option<bool>,
         force_close_opt: Option<bool>,
+        name_opt: Option<String>,
     ) -> Result<()> {
         #[cfg(feature = "enable-gpl")]
-        instructions::serum3_edit_market(ctx, reduce_only_opt, force_close_opt)?;
+        instructions::serum3_edit_market(ctx, reduce_only_opt, force_close_opt, name_opt)?;
         Ok(())
     }
 
@@ -487,13 +620,14 @@ pub mod mango_v4 {
         Ok(())
     }
 
-    /// Settles all free funds from the OpenOrders account into the MangoAccount.
+    /// Deprecated instruction that used to settles all free funds from the OpenOrders account
+    /// into the MangoAccount.
     ///
     /// Any serum "referrer rebates" (ui fees) are considered Mango fees.
     pub fn serum3_settle_funds(ctx: Context<Serum3SettleFunds>) -> Result<()> {
-        #[cfg(feature = "enable-gpl")]
-        instructions::serum3_settle_funds(ctx.accounts, None, true)?;
-        Ok(())
+        Err(error_msg!(
+            "Serum3SettleFunds was replaced by Serum3SettleFundsV2"
+        ))
     }
 
     /// Like Serum3SettleFunds, but `fees_to_dao` determines if referrer rebates are considered fees
@@ -1112,6 +1246,255 @@ pub mod mango_v4 {
         Ok(())
     }
 
+    pub fn token_conditional_swap_create(
+        ctx: Context<TokenConditionalSwapCreate>,
+        max_buy: u64,
+        max_sell: u64,
+        expiry_timestamp: u64,
+        price_lower_limit: f64,
+        price_upper_limit: f64,
+        price_premium_rate: f64,
+        allow_creating_deposits: bool,
+        allow_creating_borrows: bool,
+    ) -> Result<()> {
+        token_conditional_swap_create_v2(
+            ctx,
+            max_buy,
+            max_sell,
+            expiry_timestamp,
+            price_lower_limit,
+            price_upper_limit,
+            price_premium_rate,
+            allow_creating_deposits,
+            allow_creating_borrows,
+            TokenConditionalSwapDisplayPriceStyle::SellTokenPerBuyToken,
+            TokenConditionalSwapIntention::Unknown,
+        )
+    }
+
+    pub fn token_conditional_swap_create_v2(
+        ctx: Context<TokenConditionalSwapCreate>,
+        max_buy: u64,
+        max_sell: u64,
+        expiry_timestamp: u64,
+        price_lower_limit: f64,
+        price_upper_limit: f64,
+        price_premium_rate: f64,
+        allow_creating_deposits: bool,
+        allow_creating_borrows: bool,
+        display_price_style: TokenConditionalSwapDisplayPriceStyle,
+        intention: TokenConditionalSwapIntention,
+    ) -> Result<()> {
+        let tcs = TokenConditionalSwap {
+            id: u64::MAX, // set inside
+            max_buy,
+            max_sell,
+            bought: 0,
+            sold: 0,
+            expiry_timestamp,
+            price_lower_limit,
+            price_upper_limit,
+            price_premium_rate,
+            taker_fee_rate: 0.0, // set inside
+            maker_fee_rate: 0.0, // set inside
+            buy_token_index: ctx.accounts.buy_bank.load()?.token_index,
+            sell_token_index: ctx.accounts.sell_bank.load()?.token_index,
+            is_configured: 1,
+            allow_creating_deposits: u8::from(allow_creating_deposits),
+            allow_creating_borrows: u8::from(allow_creating_borrows),
+            display_price_style: display_price_style.into(),
+            intention: intention.into(),
+            tcs_type: TokenConditionalSwapType::FixedPremium.into(),
+            padding: Default::default(),
+            start_timestamp: 0,  // not started
+            duration_seconds: 0, // duration does not matter for FixedPremium
+            reserved: [0; 88],
+        };
+
+        #[cfg(feature = "enable-gpl")]
+        instructions::token_conditional_swap_create(ctx, tcs)?;
+        Ok(())
+    }
+
+    pub fn token_conditional_swap_create_premium_auction(
+        ctx: Context<TokenConditionalSwapCreate>,
+        max_buy: u64,
+        max_sell: u64,
+        expiry_timestamp: u64,
+        price_lower_limit: f64,
+        price_upper_limit: f64,
+        max_price_premium_rate: f64,
+        allow_creating_deposits: bool,
+        allow_creating_borrows: bool, // TODO: require that this is false?
+        display_price_style: TokenConditionalSwapDisplayPriceStyle,
+        intention: TokenConditionalSwapIntention,
+        duration_seconds: u64,
+    ) -> Result<()> {
+        require_gte!(duration_seconds, 1);
+        let tcs = TokenConditionalSwap {
+            id: u64::MAX, // set inside
+            max_buy,
+            max_sell,
+            bought: 0,
+            sold: 0,
+            expiry_timestamp,
+            price_lower_limit,
+            price_upper_limit,
+            price_premium_rate: max_price_premium_rate,
+            taker_fee_rate: 0.0, // set inside
+            maker_fee_rate: 0.0, // set inside
+            buy_token_index: ctx.accounts.buy_bank.load()?.token_index,
+            sell_token_index: ctx.accounts.sell_bank.load()?.token_index,
+            is_configured: 1,
+            allow_creating_deposits: u8::from(allow_creating_deposits),
+            allow_creating_borrows: u8::from(allow_creating_borrows),
+            display_price_style: display_price_style.into(),
+            intention: intention.into(),
+            tcs_type: TokenConditionalSwapType::PremiumAuction.into(),
+            padding: Default::default(),
+            start_timestamp: 0, // not started
+            duration_seconds,
+            reserved: [0; 88],
+        };
+
+        #[cfg(feature = "enable-gpl")]
+        instructions::token_conditional_swap_create(ctx, tcs)?;
+        Ok(())
+    }
+
+    pub fn token_conditional_swap_create_linear_auction(
+        ctx: Context<TokenConditionalSwapCreate>,
+        max_buy: u64,
+        max_sell: u64,
+        expiry_timestamp: u64,
+        price_start: f64,
+        price_end: f64,
+        allow_creating_deposits: bool,
+        allow_creating_borrows: bool,
+        display_price_style: TokenConditionalSwapDisplayPriceStyle,
+        start_timestamp: u64,
+        duration_seconds: u64,
+    ) -> Result<()> {
+        require_gte!(duration_seconds, 1);
+
+        let buy_token_price = ctx.accounts.buy_bank.load()?.stable_price().to_num::<f64>();
+        let sell_token_price = ctx
+            .accounts
+            .sell_bank
+            .load()?
+            .stable_price()
+            .to_num::<f64>();
+        let max_volume =
+            (buy_token_price * max_buy as f64).min(sell_token_price * max_sell as f64) as u64;
+        require_gte!(
+            max_volume,
+            TCS_START_INCENTIVE * 10,
+            MangoError::TokenConditionalSwapTooSmallForStartIncentive
+        );
+
+        let tcs = TokenConditionalSwap {
+            id: u64::MAX, // set inside
+            max_buy,
+            max_sell,
+            bought: 0,
+            sold: 0,
+            expiry_timestamp,
+            price_lower_limit: price_start,
+            price_upper_limit: price_end,
+            price_premium_rate: 0.0, // ignored for linear auctions
+            taker_fee_rate: 0.0,     // set inside
+            maker_fee_rate: 0.0,     // set inside
+            buy_token_index: ctx.accounts.buy_bank.load()?.token_index,
+            sell_token_index: ctx.accounts.sell_bank.load()?.token_index,
+            is_configured: 1,
+            allow_creating_deposits: u8::from(allow_creating_deposits),
+            allow_creating_borrows: u8::from(allow_creating_borrows),
+            display_price_style: display_price_style.into(),
+            intention: TokenConditionalSwapIntention::Unknown.into(),
+            tcs_type: TokenConditionalSwapType::LinearAuction.into(),
+            padding: Default::default(),
+            start_timestamp,
+            duration_seconds,
+            reserved: [0; 88],
+        };
+
+        #[cfg(feature = "enable-gpl")]
+        instructions::token_conditional_swap_create(ctx, tcs)?;
+        Ok(())
+    }
+
+    pub fn token_conditional_swap_cancel(
+        ctx: Context<TokenConditionalSwapCancel>,
+        token_conditional_swap_index: u8,
+        token_conditional_swap_id: u64,
+    ) -> Result<()> {
+        #[cfg(feature = "enable-gpl")]
+        instructions::token_conditional_swap_cancel(
+            ctx,
+            token_conditional_swap_index.into(),
+            token_conditional_swap_id,
+        )?;
+        Ok(())
+    }
+
+    // NOTE: It's the triggerer's job to compute liqor_max_* numbers that work with the liqee's health.
+    pub fn token_conditional_swap_trigger(
+        ctx: Context<TokenConditionalSwapTrigger>,
+        token_conditional_swap_index: u8,
+        token_conditional_swap_id: u64,
+        max_buy_token_to_liqee: u64,
+        max_sell_token_to_liqor: u64,
+    ) -> Result<()> {
+        #[cfg(feature = "enable-gpl")]
+        instructions::token_conditional_swap_trigger(
+            ctx,
+            token_conditional_swap_index.into(),
+            token_conditional_swap_id,
+            max_buy_token_to_liqee,
+            max_sell_token_to_liqor,
+            0,
+            0.0,
+        )?;
+        Ok(())
+    }
+
+    // NOTE: It's the triggerer's job to compute liqor_max_* numbers that work with the liqee's health.
+    pub fn token_conditional_swap_trigger_v2(
+        ctx: Context<TokenConditionalSwapTrigger>,
+        token_conditional_swap_index: u8,
+        token_conditional_swap_id: u64,
+        max_buy_token_to_liqee: u64,
+        max_sell_token_to_liqor: u64,
+        min_buy_token: u64,
+        min_taker_price: f32,
+    ) -> Result<()> {
+        #[cfg(feature = "enable-gpl")]
+        instructions::token_conditional_swap_trigger(
+            ctx,
+            token_conditional_swap_index.into(),
+            token_conditional_swap_id,
+            max_buy_token_to_liqee,
+            max_sell_token_to_liqor,
+            min_buy_token,
+            min_taker_price as f64,
+        )?;
+        Ok(())
+    }
+
+    pub fn token_conditional_swap_start(
+        ctx: Context<TokenConditionalSwapStart>,
+        token_conditional_swap_index: u8,
+        token_conditional_swap_id: u64,
+    ) -> Result<()> {
+        #[cfg(feature = "enable-gpl")]
+        instructions::token_conditional_swap_start(
+            ctx,
+            token_conditional_swap_index.into(),
+            token_conditional_swap_id,
+        )?;
+        Ok(())
+    }
+
     pub fn alt_set(ctx: Context<AltSet>, index: u8) -> Result<()> {
         #[cfg(feature = "enable-gpl")]
         instructions::alt_set(ctx, index)?;
@@ -1128,9 +1511,103 @@ pub mod mango_v4 {
         Ok(())
     }
 
+    /// Warning, this instruction is for testing purposes only!
     pub fn compute_account_data(ctx: Context<ComputeAccountData>) -> Result<()> {
         #[cfg(feature = "enable-gpl")]
         instructions::compute_account_data(ctx)?;
+        Ok(())
+    }
+
+    ///
+    /// OpenbookV2
+    ///
+
+    pub fn openbook_v2_register_market(
+        ctx: Context<OpenbookV2RegisterMarket>,
+        market_index: OpenbookV2MarketIndex,
+        name: String,
+    ) -> Result<()> {
+        Ok(())
+    }
+
+    pub fn openbook_v2_edit_market(
+        ctx: Context<OpenbookV2EditMarket>,
+        reduce_only_opt: Option<bool>,
+        force_close_opt: Option<bool>,
+    ) -> Result<()> {
+        Ok(())
+    }
+
+    pub fn openbook_v2_deregister_market(ctx: Context<OpenbookV2DeregisterMarket>) -> Result<()> {
+        Ok(())
+    }
+
+    pub fn openbook_v2_create_open_orders(
+        ctx: Context<OpenbookV2CreateOpenOrders>,
+        account_num: u32,
+    ) -> Result<()> {
+        Ok(())
+    }
+
+    pub fn openbook_v2_close_open_orders(ctx: Context<OpenbookV2CloseOpenOrders>) -> Result<()> {
+        Ok(())
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    pub fn openbook_v2_place_order(
+        ctx: Context<OpenbookV2PlaceOrder>,
+        side: u8, // openbook_v2::state::Side
+        limit_price: u64,
+        max_base_qty: u64,
+        max_native_quote_qty_including_fees: u64,
+        self_trade_behavior: u8, // openbook_v2::state::SelfTradeBehavior
+        order_type: u8,          // openbook_v2::state::PlaceOrderType
+        client_order_id: u64,
+        limit: u16,
+    ) -> Result<()> {
+        Ok(())
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    pub fn openbook_v2_place_taker_order(
+        ctx: Context<OpenbookV2PlaceTakeOrder>,
+        side: u8, // openbook_v2::state::Side
+        limit_price: u64,
+        max_base_qty: u64,
+        max_native_quote_qty_including_fees: u64,
+        self_trade_behavior: u8, // openbook_v2::state::SelfTradeBehavior
+        client_order_id: u64,
+        limit: u16,
+    ) -> Result<()> {
+        Ok(())
+    }
+
+    pub fn openbook_v2_cancel_order(
+        ctx: Context<OpenbookV2CancelOrder>,
+        side: u8, // openbook_v2::state::Side
+        order_id: u128,
+    ) -> Result<()> {
+        Ok(())
+    }
+
+    pub fn openbook_v2_settle_funds(
+        ctx: Context<OpenbookV2SettleFunds>,
+        fees_to_dao: bool,
+    ) -> Result<()> {
+        Ok(())
+    }
+
+    pub fn openbook_v2_liq_force_cancel_orders(
+        ctx: Context<OpenbookV2LiqForceCancelOrders>,
+        limit: u8,
+    ) -> Result<()> {
+        Ok(())
+    }
+
+    pub fn openbook_v2_cancel_all_orders(
+        ctx: Context<OpenbookV2CancelOrder>,
+        limit: u8,
+    ) -> Result<()> {
         Ok(())
     }
 

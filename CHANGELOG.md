@@ -4,7 +4,158 @@ Update this for each program release and mainnet deployment.
 
 ## not on mainnet
 
-### v0.17.0, 2023-6-
+### v0.20.0, 2023-10-
+
+- Token conditional swaps: Add two auction mechanisms (#717)
+
+  The trigger orders that are used to implement stop loss and take profit orders
+  currently require users to set a fixed premium - an incentive for the order
+  triggerer. Two new types of trigger orders were added:
+
+  - Premium auctions: After starting, the premium offered to triggerers gradually
+    increases from zero. This way users are less likely to overpay on premium,
+    but execution will be delayed until the premium is sufficiently high.
+  - Linear auctions: A simple auction where users configure start and end for
+    both time and price. The offered trigger price changes linearly with time
+    instead of being tied to the oracle price.
+
+- Account shrinking and migration (#692)
+
+  The AccountExpand instruction can now shrink accounts. This allows users to
+  change the trade-off between token positions, perp positions and OpenBook open
+  order slots now. It will be particularly useful when the OpenBook v2 integration
+  arrives.
+
+  This also adds a AccountSizeMigration instruction to permissionlessly shrink
+  existing accounts where safe while migrating them to the v3 account layout.
+
+- Drop HealthCache from IDL and disable ComputeAccountData instruction (#723)
+
+  Both were not intended as public API and are only used in tests as an old
+  way of retrieving account information.
+
+- Token withdraw: Deactivate zero positions when withdrawing zero (#736)
+
+  Previously an "active but zero" token position would not be closed by a
+  withdraw-all style instruction.
+
+- Update dependencies to Anchor v0.28.0 and Solana v1.16.14 (#718)
+- Flash loan: Introduce specialized FlashLoanSwapBegin to save tx bytes (#744)
+- Flash loan: Whitelist Jupiter v6 program for delegates (#737)
+- Token deposit: Require a valid oracle when opening a new token position (#722)
+- Fix computing maximum allowed amount when swapping zero asset-weight tokens (#699)
+- Fix too-strict validation of max rate on token edit (#734)
+
+## mainnet
+
+### v0.19.1, 2023-9-16
+
+Deployment: Sep 16, 2023 at 11:20:20 Central European Summer Time, https://explorer.solana.com/tx/K9BJ1uDBH6Xe8erhS6C8Rmz6k6V1cKJ8z6wNmf4DV2aF5Woin4H5xXKj1ypTNDSTccNvcsAUTHStoai3k2hYY5E
+
+- Fix a health overestimation with OpenBook open orders
+
+  When bids or asks crossed the oracle price, the serum3 health would be
+  overestimated before.
+
+  Now we track an account's max bid and min ask in each market and use that
+  as a worst-case price. The tracking isn't perfect for technical reasons
+  (compute cost, no notifications on fill) but produces an upper bound on
+  bids (lower bound on asks) that is sufficient to make health not
+  overestimate.
+
+### v0.19.0, 2023-9-7
+
+Deployment: Sep 7, 2023 at 13:10:08 Central European Summer Time, https://explorer.solana.com/tx/3xcQWmAinBjFF4QgUCS7v5KxS7CjUQMJmENBHMyMMoeNCdKpLQL6fJXcKRRDmzW4ajPUywgPxBzMoYJn9c8CteEP
+
+- Token deposits and withdraws: Allow full withdraw or full borrow repays
+  even when the oracle is stale (#646, #675)
+
+  Stale oracles are a problem for Mango because the risk engine can then no
+  longer safely determine if a user action is safe or not. Before, a stale oracle
+  would completely block interactions with an account until the oracle got
+  updated again.
+
+  This change allows some actions even while an oracle is stale:
+
+  - Users with deposits in a token with a stale oracle can now withdraw tokens
+    as long as their account health provided by tokens with non-stale oracles
+    remains positive.
+  - Users with borrows of a token with a stale oracle can now repay the borrows
+    (unless they were being liquidated at the time).
+
+  These actions can be used to unblock an account by removing the offending token
+  from its balance sheet.
+
+- Expiring delegate: Accounts can now have a short-term delegate (#663)
+
+  This might allow users to temporarily delegate to an in-memory key, so they
+  can trade without having to re-approve every transaction on their wallet.
+
+- Flash loan: Start allowing Mango instructions after flash_loan_end (#681)
+
+  Liquidators may be interested in performing actions in the same transaction
+  as a flash loan swap.
+
+- Flash loan: The DAO can now charge a deposit fee (#660, #693)
+
+  The DAO can now configure a fee on deposits that happen in flash loans. This
+  could be used to apply a fee to flash loan swaps.
+
+  Previously flash loans that did not increase the user's token balance and did
+  not borrow tokens were free.
+
+- Stop loss: Respect net borrow limits and change low-health completion (#677)
+- Stop loss: Store helpful UI fields (#654, #667)
+- Stop loss: Fees are configured by-token instead of globally (#659)
+- Stop loss: Avoid expensive health cache for expired orders (#682)
+- Account creation: Add account_create_v2 instruction (#680, #685)
+- Account resizing: Lower maximums due to tx account limit (#686, #688, #689)
+- Account resizing: Fix denial of service if account has too many lamports (#694)
+- Token register: Revamp API for simpler use from governance (#665)
+- Token register untrusted: Adjust default oracle staleness (#678)
+- Fix typo in name of admin_token_withdraw_fees instruction (#655)
+- Flash loan: Better errors for missing banks (#639)
+- OpenBook v2 integration: First draft of instructions (#628)
+
+### v0.18.0, 2023-7-28
+
+Deployment: Jul 28, 2023 at 08:29:46 Central European Summer Time, https://explorer.solana.com/tx/TaPcQ8dUDyFEaqprasGVEeG3x4Z2nMT7jY9tr2G8KVVf3kvDUQv8TRTjzDirasx3YkyYq3PmQcmcMbCcHsAnUNT
+
+- Introduce limit and stop loss orders for arbitrary spot pairs (#604, #634)
+
+  Allow users to request that a swap between two spot tokens should be executed
+  once the price crosses a threshold. Independent of OpenBook markets.
+
+- Improve behavior when listing tokens or markets with upcoming oracles (#620)
+
+  When we listed RNDR before the oracle started publishing a price, there
+  was an issue where the stable price got initialized to 0. Now, the stable
+  price is only initialized the first time a valid oracle value is read.
+
+- Deprecate Serum3SettleFunds (#606)
+
+  Use the Serum3SettleFundsV2 instruction introduced in v0.8.0.
+
+- Perp FillEventLog: Include amount of closed pnl (#624)
+- Pyth: Fix reading most recent valid price (#631)
+- Introduce mechanism for moving collected fees to DAO (#644)
+
+### v0.17.1, 2023-7-6
+
+Deployment: Jul 6, 2023 at 20:26:34 Central European Summer Time, https://explorer.solana.com/tx/4kiVtR1G3xNh8bTP4FetfG7rjPjLThFjrQNzMMs2TfQHnw7Ezp6JX4rboQbGrJsfZDd6zaMuEa1ZTxahRwPPb9JR
+
+- Remove extra Pyth oracle status check added in v0.17.0
+
+  The Pyth oracle status also reverts to Unknown if not enough publishers have
+  reported in a 25 slot window. So checking for the "Trading" status means an
+  implicit staleness limit of 25 slots.
+
+  This staleness limit is much more strict than the ones configured on the
+  oracles currently used by Mango and caused occasional transaction failures.
+
+### v0.17.0, 2023-7-3
+
+Deployment: Jul 3, 2023 at 09:46:14 Central European Summer Time, https://explorer.solana.com/tx/4G6b1uihopkHqp968sq3RYacYHn5ND8mMmeNd1RfswTCmiqeappTN2747JTvswVXxs7oqgfU6M3VKPGVRFPGJYuL
 
 - Configurable perp market settle token (#550)
 
@@ -24,11 +175,22 @@ Update this for each program release and mainnet deployment.
   PerpLiqNegativePnlOrBankruptcy was replaced by a new
   PerpLiqNegativePnlOrBankruptcyV2 instruction.
 
+- Allow reduce-only actions when init health is low (#592)
+
+  Previously when init health was negative, the program only allowed actions that
+  increased init health. Now it also accepts actions that keep init health the
+  same.
+
+  This is helpful for users because they now can place reducing limit orders on
+  the spot or perp orderbooks while their account has low health.
+
 - Whitelist PerpPlaceOrderV2 and PerpPlaceOrderPeggedV2 for HealthRegions (#597)
+- Improve logging of loans (#599, #603)
+- Pyth oracle status is checked (#607)
+- Fixes to the inactive fee buyback feature (#608)
+- Fix token force close to respect the reduce-only flag (#613)
 - Improve docs (#590, #594)
 - Use workspace dependencies (#588)
-
-## mainnet
 
 ### v0.16.0, 2023-5-19
 
@@ -342,25 +504,30 @@ Deployment: Jan 13, 2023 at 11:31:05 Central European Standard Time, https://exp
 ### Dec 16, 2022 at 16:40 Central European Standard Time
 
 ### Oct 8, 2022 at 14:38:31 Central European Summer Time
+
 https://explorer.solana.com/tx/3m8EDohkgwJZyiwpGXztBWARWQVxyhnSNDVuH467D7FPS2wxJerr79HhdhDEed5hpConHgGsKHvxtW1HJP6GixX9
 
 ### Oct 8, 2022 at 14:38:31 Central European Summer Time
+
 https://explorer.solana.com/tx/3m8EDohkgwJZyiwpGXztBWARWQVxyhnSNDVuH467D7FPS2wxJerr79HhdhDEed5hpConHgGsKHvxtW1HJP6GixX9
 
 - New ix `TokenDepositIntoExisting`
 
 ### Sep 1, 2022 at 10:24:35 Central European Summer Time
+
 https://explorer.solana.com/tx/3NnX13A3QwsREKKKo3iYR4jqgoongpCjdhhXuJ3y5iP6FwfPcNieVop623tpgPbyreC7m7KtphwdWdoHYE5YC394
 
 - Add HealthRegionBegin, -End instructions
 - Add explicit "oracle" account argument for TokenDeposit and TokenWithdraw instructions
 
 ### Aug 20, 2022 at 19:58:29 Central European Summer Time
+
 https://explorer.solana.com/tx/3R4frko1AekQKJmmQ5T6k3mdXF9uZVHTR7oocdspTPsc82xX7qrbgnG61r28UdhCxsjMxtQHgBqMc37FSvoHQfCN
 
 - loan fee logging for off-chain services
 
 ### Aug 18, 2022 at 17:17:40 Central European Summer Time
+
 https://explorer.solana.com/tx/4Xnyswcwx98y6khw8ptNVmdhQZwJjuNy2BvmQg2pJayoThFiw8kmS2ecRAg5cg2DncvW3NQgn2vtP8mCUtv6Q1yB
 
 - liq_token_bankruptcy: removed liab_token_index argument
@@ -407,6 +574,7 @@ https://explorer.solana.com/tx/4Xnyswcwx98y6khw8ptNVmdhQZwJjuNy2BvmQg2pJayoThFiw
   marginTrade takes flashLoanType as an argument
 
 ### Aug 8, 2022 at 18:56:04 Central European Summer Time
+
 https://explorer.solana.com/tx/yjZggRTrcDNquMkftNvBKLv77Dk4xp5yQPYXgN3qvBHTBWWJVhLPGHxqpGwosmEq3j8byHZMa13oxLLerBWUdgW
 
 - improved logging for off chain services
@@ -439,6 +607,7 @@ New features
 - Enforced a minimum maximum rate of 50% so that rates don't fall so low that they cannot recover.
 
 ### Jul 14, 2022 at 09:33:52 Central European Summer Time
+
 https://explorer.solana.com/tx/vZ5hP1vGp37fgzBfG9nb4nfA5ZdmYgk8meq53YPR4ReFxrcTwBUxTYBQUgnfAnq9u5fH36S3QTfb9mVkBXt5A6C
 
 - Account data was rearranged to put fields that are often used with gPA first

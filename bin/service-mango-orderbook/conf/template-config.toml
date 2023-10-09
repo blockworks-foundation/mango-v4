@@ -1,0 +1,21 @@
+bind_ws_addr = "[::]:8080"
+rpc_http_url = "$RPC_HTTP_URL"
+mango_group = "78b8f4cGCwmZ9ysPFMWLaLTkkaYnUjwMJYStWe5RTSSX"
+
+[metrics]
+output_stdout = true
+output_http = true
+
+[source]
+dedup_queue_size = 50000
+rpc_ws_url = "$RPC_WS_URL"
+
+[[source.grpc_sources]]
+name = "accountsdb-client"
+connection_string = "$GEYSER_CONNECTION_STRING"
+token = "$GEYSER_TOKEN"
+retry_connection_sleep_secs = 30
+
+[source.snapshot]
+rpc_http_url = "$RPC_HTTP_URL"
+program_id = "srmqPvymJeFKQ4zGQed1GFppgkRHL9kaELCbyksJtPX"

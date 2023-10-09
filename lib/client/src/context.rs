@@ -2,10 +2,10 @@ use std::collections::HashMap;
 
 use anchor_client::ClientError;
 
-use anchor_lang::__private::bytemuck;
+use anchor_lang::__private::bytemuck::{self, Zeroable};
 
 use mango_v4::state::{
-    Group, MangoAccountValue, MintInfo, PerpMarket, PerpMarketIndex, Serum3Market,
+    Bank, Group, MangoAccountValue, MintInfo, PerpMarket, PerpMarketIndex, Serum3Market,
     Serum3MarketIndex, TokenIndex,
 };
 
@@ -27,6 +27,8 @@ pub struct TokenContext {
     pub mint_info: MintInfo,
     pub mint_info_address: Pubkey,
     pub decimals: u8,
+    /// Bank snapshot is never updated, only use static parts!
+    pub bank: Bank,
 }
 
 impl TokenContext {
@@ -51,6 +53,7 @@ pub struct Serum3MarketContext {
 
 pub struct PerpMarketContext {
     pub address: Pubkey,
+    /// PerpMarket snapshot is never updated, only use static parts!
     pub market: PerpMarket,
 }
 
@@ -78,12 +81,32 @@ impl MangoGroupContext {
         self.token(token_index).mint_info
     }
 
-    pub fn token(&self, token_index: TokenIndex) -> &TokenContext {
-        self.tokens.get(&token_index).unwrap()
-    }
-
     pub fn perp(&self, perp_market_index: PerpMarketIndex) -> &PerpMarketContext {
         self.perp_markets.get(&perp_market_index).unwrap()
+    }
+
+    pub fn perp_market_address(&self, perp_market_index: PerpMarketIndex) -> Pubkey {
+        self.perp(perp_market_index).address
+    }
+
+    pub fn serum3_market_index(&self, name: &str) -> Serum3MarketIndex {
+        *self.serum3_market_indexes_by_name.get(name).unwrap()
+    }
+
+    pub fn serum3(&self, market_index: Serum3MarketIndex) -> &Serum3MarketContext {
+        self.serum3_markets.get(&market_index).unwrap()
+    }
+
+    pub fn serum3_base_token(&self, market_index: Serum3MarketIndex) -> &TokenContext {
+        self.token(self.serum3(market_index).market.base_token_index)
+    }
+
+    pub fn serum3_quote_token(&self, market_index: Serum3MarketIndex) -> &TokenContext {
+        self.token(self.serum3(market_index).market.quote_token_index)
+    }
+
+    pub fn token(&self, token_index: TokenIndex) -> &TokenContext {
+        self.tokens.get(&token_index).unwrap()
     }
 
     pub fn token_by_mint(&self, mint: &Pubkey) -> anyhow::Result<&TokenContext> {
@@ -91,10 +114,6 @@ impl MangoGroupContext {
             .iter()
             .find_map(|(_, tc)| (tc.mint_info.mint == *mint).then(|| tc))
             .ok_or_else(|| anyhow::anyhow!("no token for mint {}", mint))
-    }
-
-    pub fn perp_market_address(&self, perp_market_index: PerpMarketIndex) -> Pubkey {
-        self.perp(perp_market_index).address
     }
 
     pub async fn new_from_rpc(rpc: &RpcClientAsync, group: Pubkey) -> anyhow::Result<Self> {
@@ -113,6 +132,7 @@ impl MangoGroupContext {
                         mint_info: *mi,
                         mint_info_address: *pk,
                         decimals: u8::MAX,
+                        bank: Bank::zeroed(),
                     },
                 )
             })
@@ -126,6 +146,7 @@ impl MangoGroupContext {
             let token = tokens.get_mut(&bank.token_index).unwrap();
             token.name = bank.name().into();
             token.decimals = bank.mint_decimals;
+            token.bank = bank.clone();
         }
         assert!(tokens.values().all(|t| t.decimals != u8::MAX));
 
@@ -225,8 +246,8 @@ impl MangoGroupContext {
         affected_perp_markets: Vec<PerpMarketIndex>,
     ) -> anyhow::Result<Vec<AccountMeta>> {
         let mut account = account.clone();
-        for affected_token_index in affected_tokens {
-            account.ensure_token_position(affected_token_index)?;
+        for affected_token_index in affected_tokens.iter().chain(writable_banks.iter()) {
+            account.ensure_token_position(*affected_token_index)?;
         }
         for affected_perp_market_index in affected_perp_markets {
             let settle_token_index = self

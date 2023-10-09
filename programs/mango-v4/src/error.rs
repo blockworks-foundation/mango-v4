@@ -19,8 +19,8 @@ pub enum MangoError {
     InvalidFlashLoanTargetCpiProgram,
     #[msg("health must be positive")]
     HealthMustBePositive,
-    #[msg("health must be positive or increase")]
-    HealthMustBePositiveOrIncrease,
+    #[msg("health must be positive or not decrease")]
+    HealthMustBePositiveOrIncrease, // outdated name is kept for backwards compatibility
     #[msg("health must be negative")]
     HealthMustBeNegative,
     #[msg("the account is bankrupt")]
@@ -103,6 +103,26 @@ pub enum MangoError {
     InvalidHealthAccountCount,
     #[msg("would self trade")]
     WouldSelfTrade,
+    #[msg("token conditional swap oracle price is not in execution range")]
+    TokenConditionalSwapPriceNotInRange,
+    #[msg("token conditional swap is expired")]
+    TokenConditionalSwapExpired,
+    #[msg("token conditional swap is not available yet")]
+    TokenConditionalSwapNotStarted,
+    #[msg("token conditional swap was already started")]
+    TokenConditionalSwapAlreadyStarted,
+    #[msg("token conditional swap it not set")]
+    TokenConditionalSwapNotSet,
+    #[msg("token conditional swap trigger did not reach min_buy_token")]
+    TokenConditionalSwapMinBuyTokenNotReached,
+    #[msg("token conditional swap cannot pay incentive")]
+    TokenConditionalSwapCantPayIncentive,
+    #[msg("token conditional swap taker price is too low")]
+    TokenConditionalSwapTakerPriceTooLow,
+    #[msg("token conditional swap index and id don't match")]
+    TokenConditionalSwapIndexIdMismatch,
+    #[msg("token conditional swap volume is too small compared to the cost of starting it")]
+    TokenConditionalSwapTooSmallForStartIncentive,
 }
 
 impl MangoError {
@@ -113,12 +133,22 @@ impl MangoError {
 
 pub trait IsAnchorErrorWithCode {
     fn is_anchor_error_with_code(&self, code: u32) -> bool;
+    fn is_oracle_error(&self) -> bool;
 }
 
 impl<T> IsAnchorErrorWithCode for anchor_lang::Result<T> {
     fn is_anchor_error_with_code(&self, code: u32) -> bool {
         match self {
             Err(Error::AnchorError(error)) => error.error_code_number == code,
+            _ => false,
+        }
+    }
+    fn is_oracle_error(&self) -> bool {
+        match self {
+            Err(Error::AnchorError(e)) => {
+                e.error_code_number == MangoError::OracleConfidence.error_code()
+                    || e.error_code_number == MangoError::OracleStale.error_code()
+            }
             _ => false,
         }
     }

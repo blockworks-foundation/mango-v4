@@ -1,6 +1,7 @@
 import { AnchorProvider, Wallet } from '@coral-xyz/anchor';
 import { Connection, Keypair, PublicKey } from '@solana/web3.js';
 import fs from 'fs';
+import { MangoAccount } from '../../src/accounts/mangoAccount';
 import { MangoClient } from '../../src/client';
 import { MANGO_V4_ID } from '../../src/constants';
 
@@ -37,7 +38,7 @@ export const DEVNET_SERUM3_MARKETS = new Map([
 
 const GROUP_NUM = Number(process.env.GROUP_NUM || 0);
 
-async function main() {
+async function main(): Promise<void> {
   const options = AnchorProvider.defaultOptions();
   const connection = new Connection(
     'https://mango.devnet.rpcpool.com',
@@ -71,9 +72,14 @@ async function main() {
 
   // create + fetch account
   console.log(`Creating mangoaccount...`);
-  const mangoAccount = await client.getOrCreateMangoAccount(group);
+  const mangoAccount = (await client.getMangoAccountForOwner(
+    group,
+    user.publicKey,
+    0,
+  )) as MangoAccount;
   console.log(`...created/found mangoAccount ${mangoAccount.publicKey}`);
 
+  // eslint-disable-next-line no-constant-condition
   if (true) {
     // deposit and withdraw
 
@@ -135,7 +141,14 @@ async function main() {
     console.log(
       `...expanding mango account to max 16 token positions, 8 serum3, 8 perp position and 8 perp oo slots, previous (tokens ${mangoAccount.tokens.length}, serum3 ${mangoAccount.serum3.length}, perps ${mangoAccount.perps.length}, perps oo ${mangoAccount.perpOpenOrders.length})`,
     );
-    let sig = await client.expandMangoAccount(group, mangoAccount, 16, 8, 8, 8);
+    const sig = await client.expandMangoAccount(
+      group,
+      mangoAccount,
+      16,
+      8,
+      8,
+      8,
+    );
     console.log(`sig https://explorer.solana.com/tx/${sig}?cluster=devnet`);
     await mangoAccount.reload(client);
   }

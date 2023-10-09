@@ -2,6 +2,7 @@
 
 use anchor_lang::prelude::*;
 use anchor_lang::solana_program::sysvar::{self, SysvarId};
+use anchor_spl::associated_token::AssociatedToken;
 use anchor_spl::token::{Token, TokenAccount};
 use fixed::types::I80F48;
 use itertools::Itertools;
@@ -436,14 +437,17 @@ pub async fn set_perp_stub_oracle_price(
 // ClientInstruction impl
 //
 
+#[derive(Clone)]
+pub struct FlashLoanPart {
+    pub bank: Pubkey,
+    pub token_account: Pubkey,
+    pub withdraw_amount: u64,
+}
+
 pub struct FlashLoanBeginInstruction {
     pub account: Pubkey,
-    pub group: Pubkey,
     pub owner: TestKeypair,
-    pub mango_token_bank: Pubkey,
-    pub mango_token_vault: Pubkey,
-    pub target_token_account: Pubkey,
-    pub withdraw_amount: u64,
+    pub loans: Vec<FlashLoanPart>,
 }
 #[async_trait::async_trait(?Send)]
 impl ClientInstruction for FlashLoanBeginInstruction {
@@ -451,9 +455,14 @@ impl ClientInstruction for FlashLoanBeginInstruction {
     type Instruction = mango_v4::instruction::FlashLoanBegin;
     async fn to_instruction(
         &self,
-        _account_loader: impl ClientAccountLoader + 'async_trait,
+        account_loader: impl ClientAccountLoader + 'async_trait,
     ) -> (Self::Accounts, instruction::Instruction) {
         let program_id = mango_v4::id();
+
+        let account = account_loader
+            .load_mango_account(&self.account)
+            .await
+            .unwrap();
 
         let accounts = Self::Accounts {
             account: self.account,
@@ -463,27 +472,38 @@ impl ClientInstruction for FlashLoanBeginInstruction {
         };
 
         let instruction = Self::Instruction {
-            loan_amounts: vec![self.withdraw_amount],
+            loan_amounts: self
+                .loans
+                .iter()
+                .map(|v| v.withdraw_amount)
+                .collect::<Vec<u64>>(),
         };
 
         let mut instruction = make_instruction(program_id, &accounts, &instruction);
+        for loan in self.loans.iter() {
+            instruction.accounts.push(AccountMeta {
+                pubkey: loan.bank,
+                is_writable: true,
+                is_signer: false,
+            });
+        }
+        for loan in self.loans.iter() {
+            let bank: Bank = account_loader.load(&loan.bank).await.unwrap();
+            instruction.accounts.push(AccountMeta {
+                pubkey: bank.vault,
+                is_writable: true,
+                is_signer: false,
+            });
+        }
+        for loan in self.loans.iter() {
+            instruction.accounts.push(AccountMeta {
+                pubkey: loan.token_account,
+                is_writable: true,
+                is_signer: false,
+            });
+        }
         instruction.accounts.push(AccountMeta {
-            pubkey: self.mango_token_bank,
-            is_writable: true,
-            is_signer: false,
-        });
-        instruction.accounts.push(AccountMeta {
-            pubkey: self.mango_token_vault,
-            is_writable: true,
-            is_signer: false,
-        });
-        instruction.accounts.push(AccountMeta {
-            pubkey: self.target_token_account,
-            is_writable: true,
-            is_signer: false,
-        });
-        instruction.accounts.push(AccountMeta {
-            pubkey: self.group,
+            pubkey: account.fixed.group,
             is_writable: false,
             is_signer: false,
         });
@@ -492,16 +512,107 @@ impl ClientInstruction for FlashLoanBeginInstruction {
     }
 
     fn signers(&self) -> Vec<TestKeypair> {
-        vec![]
+        vec![self.owner]
+    }
+}
+
+pub struct FlashLoanSwapBeginInstruction {
+    pub account: Pubkey,
+    pub owner: TestKeypair,
+    pub in_bank: Pubkey,
+    pub out_bank: Pubkey,
+    pub in_loan: u64,
+}
+#[async_trait::async_trait(?Send)]
+impl ClientInstruction for FlashLoanSwapBeginInstruction {
+    type Accounts = mango_v4::accounts::FlashLoanSwapBegin;
+    type Instruction = mango_v4::instruction::FlashLoanSwapBegin;
+    async fn to_instruction(
+        &self,
+        account_loader: impl ClientAccountLoader + 'async_trait,
+    ) -> (Self::Accounts, instruction::Instruction) {
+        let program_id = mango_v4::id();
+
+        let account = account_loader
+            .load_mango_account(&self.account)
+            .await
+            .unwrap();
+
+        let in_bank: Bank = account_loader.load(&self.in_bank).await.unwrap();
+        let out_bank: Bank = account_loader.load(&self.out_bank).await.unwrap();
+        let in_account = anchor_spl::associated_token::get_associated_token_address(
+            &self.owner.pubkey(),
+            &in_bank.mint,
+        );
+        let out_account = anchor_spl::associated_token::get_associated_token_address(
+            &self.owner.pubkey(),
+            &out_bank.mint,
+        );
+
+        let accounts = Self::Accounts {
+            account: self.account,
+            owner: self.owner.pubkey(),
+            input_mint: in_bank.mint,
+            output_mint: out_bank.mint,
+            system_program: System::id(),
+            token_program: Token::id(),
+            associated_token_program: AssociatedToken::id(),
+            instructions: solana_program::sysvar::instructions::id(),
+        };
+
+        let instruction = Self::Instruction {
+            loan_amount: self.in_loan,
+        };
+
+        let mut instruction = make_instruction(program_id, &accounts, &instruction);
+        instruction.accounts.push(AccountMeta {
+            pubkey: self.in_bank,
+            is_writable: true,
+            is_signer: false,
+        });
+        instruction.accounts.push(AccountMeta {
+            pubkey: self.out_bank,
+            is_writable: true,
+            is_signer: false,
+        });
+        instruction.accounts.push(AccountMeta {
+            pubkey: in_bank.vault,
+            is_writable: true,
+            is_signer: false,
+        });
+        instruction.accounts.push(AccountMeta {
+            pubkey: out_bank.vault,
+            is_writable: true,
+            is_signer: false,
+        });
+        instruction.accounts.push(AccountMeta {
+            pubkey: in_account,
+            is_writable: true,
+            is_signer: false,
+        });
+        instruction.accounts.push(AccountMeta {
+            pubkey: out_account,
+            is_writable: true,
+            is_signer: false,
+        });
+        instruction.accounts.push(AccountMeta {
+            pubkey: account.fixed.group,
+            is_writable: false,
+            is_signer: false,
+        });
+
+        (accounts, instruction)
+    }
+
+    fn signers(&self) -> Vec<TestKeypair> {
+        vec![self.owner]
     }
 }
 
 pub struct FlashLoanEndInstruction {
     pub account: Pubkey,
     pub owner: TestKeypair,
-    pub mango_token_bank: Pubkey,
-    pub mango_token_vault: Pubkey,
-    pub target_token_account: Pubkey,
+    pub loans: Vec<FlashLoanPart>,
     pub flash_loan_type: mango_v4::accounts_ix::FlashLoanType,
 }
 #[async_trait::async_trait(?Send)]
@@ -514,19 +625,23 @@ impl ClientInstruction for FlashLoanEndInstruction {
     ) -> (Self::Accounts, instruction::Instruction) {
         let program_id = mango_v4::id();
         let instruction = Self::Instruction {
-            num_loans: 1,
+            num_loans: self.loans.len() as u8,
             flash_loan_type: self.flash_loan_type,
         };
 
-        let account = account_loader
+        let mut account = account_loader
             .load_mango_account(&self.account)
             .await
             .unwrap();
+        for loan in self.loans.iter() {
+            let bank: Bank = account_loader.load(&loan.bank).await.unwrap();
+            account.ensure_token_position(bank.token_index).unwrap();
+        }
 
         let health_check_metas = derive_health_check_remaining_account_metas(
             &account_loader,
             &account,
-            Some(self.mango_token_bank),
+            None,
             true,
             None,
         )
@@ -540,16 +655,21 @@ impl ClientInstruction for FlashLoanEndInstruction {
 
         let mut instruction = make_instruction(program_id, &accounts, &instruction);
         instruction.accounts.extend(health_check_metas.into_iter());
-        instruction.accounts.push(AccountMeta {
-            pubkey: self.mango_token_vault,
-            is_writable: true,
-            is_signer: false,
-        });
-        instruction.accounts.push(AccountMeta {
-            pubkey: self.target_token_account,
-            is_writable: true,
-            is_signer: false,
-        });
+        for loan in self.loans.iter() {
+            let bank: Bank = account_loader.load(&loan.bank).await.unwrap();
+            instruction.accounts.push(AccountMeta {
+                pubkey: bank.vault,
+                is_writable: true,
+                is_signer: false,
+            });
+        }
+        for loan in self.loans.iter() {
+            instruction.accounts.push(AccountMeta {
+                pubkey: loan.token_account,
+                is_writable: true,
+                is_signer: false,
+            });
+        }
         instruction.accounts.push(AccountMeta {
             pubkey: account.fixed.group,
             is_writable: false,
@@ -838,9 +958,18 @@ impl ClientInstruction for TokenRegisterInstruction {
             maint_liab_weight: self.maint_liab_weight,
             init_liab_weight: self.init_liab_weight,
             liquidation_fee: self.liquidation_fee,
+            stable_price_delay_interval_seconds: StablePriceModel::default().delay_interval_seconds,
+            stable_price_delay_growth_limit: StablePriceModel::default().delay_growth_limit,
+            stable_price_growth_limit: StablePriceModel::default().stable_growth_limit,
             min_vault_to_deposits_ratio: self.min_vault_to_deposits_ratio,
             net_borrow_limit_per_window_quote: self.net_borrow_limit_per_window_quote,
             net_borrow_limit_window_size_ts: self.net_borrow_limit_window_size_ts,
+            borrow_weight_scale_start_quote: f64::MAX,
+            deposit_weight_scale_start_quote: f64::MAX,
+            reduce_only: 0,
+            token_conditional_swap_taker_fee_rate: 0.0,
+            token_conditional_swap_maker_fee_rate: 0.0,
+            flash_loan_deposit_fee_rate: 0.0,
         };
 
         let bank = Pubkey::find_program_address(
@@ -1056,7 +1185,7 @@ impl ClientInstruction for TokenDeregisterInstruction {
     }
 }
 
-fn token_edit_instruction_default() -> mango_v4::instruction::TokenEdit {
+pub fn token_edit_instruction_default() -> mango_v4::instruction::TokenEdit {
     mango_v4::instruction::TokenEdit {
         oracle_opt: None,
         oracle_config_opt: None,
@@ -1082,6 +1211,59 @@ fn token_edit_instruction_default() -> mango_v4::instruction::TokenEdit {
         reduce_only_opt: None,
         name_opt: None,
         force_close_opt: None,
+        token_conditional_swap_taker_fee_rate_opt: None,
+        token_conditional_swap_maker_fee_rate_opt: None,
+        flash_loan_deposit_fee_rate_opt: None,
+    }
+}
+
+pub struct TokenEdit {
+    pub group: Pubkey,
+    pub admin: TestKeypair,
+    pub mint: Pubkey,
+    pub options: mango_v4::instruction::TokenEdit,
+}
+#[async_trait::async_trait(?Send)]
+impl ClientInstruction for TokenEdit {
+    type Accounts = mango_v4::accounts::TokenEdit;
+    type Instruction = mango_v4::instruction::TokenEdit;
+    async fn to_instruction(
+        &self,
+        account_loader: impl ClientAccountLoader + 'async_trait,
+    ) -> (Self::Accounts, instruction::Instruction) {
+        let program_id = mango_v4::id();
+
+        let mint_info_key = Pubkey::find_program_address(
+            &[
+                b"MintInfo".as_ref(),
+                self.group.as_ref(),
+                self.mint.as_ref(),
+            ],
+            &program_id,
+        )
+        .0;
+        let mint_info: MintInfo = account_loader.load(&mint_info_key).await.unwrap();
+
+        let accounts = Self::Accounts {
+            group: self.group,
+            admin: self.admin.pubkey(),
+            mint_info: mint_info_key,
+            oracle: mint_info.oracle,
+        };
+
+        let mut instruction = make_instruction(program_id, &accounts, &self.options);
+        instruction
+            .accounts
+            .extend(mint_info.banks().iter().map(|&k| AccountMeta {
+                pubkey: k,
+                is_signer: false,
+                is_writable: true,
+            }));
+        (accounts, instruction)
+    }
+
+    fn signers(&self) -> Vec<TestKeypair> {
+        vec![self.admin]
     }
 }
 
@@ -1343,6 +1525,54 @@ impl ClientInstruction for StubOracleSetInstruction {
             price: I80F48::from_num(self.price),
         };
         // TODO: remove copy pasta of pda derivation, use reference
+        let oracle = Pubkey::find_program_address(
+            &[
+                b"StubOracle".as_ref(),
+                self.group.as_ref(),
+                self.mint.as_ref(),
+            ],
+            &program_id,
+        )
+        .0;
+
+        let accounts = Self::Accounts {
+            oracle,
+            group: self.group,
+            admin: self.admin.pubkey(),
+        };
+
+        let instruction = make_instruction(program_id, &accounts, &instruction);
+        (accounts, instruction)
+    }
+
+    fn signers(&self) -> Vec<TestKeypair> {
+        vec![self.admin]
+    }
+}
+
+pub struct StubOracleSetTestInstruction {
+    pub mint: Pubkey,
+    pub group: Pubkey,
+    pub admin: TestKeypair,
+    pub price: f64,
+    pub last_update_slot: u64,
+    pub deviation: f64,
+}
+#[async_trait::async_trait(?Send)]
+impl ClientInstruction for StubOracleSetTestInstruction {
+    type Accounts = mango_v4::accounts::StubOracleSet;
+    type Instruction = mango_v4::instruction::StubOracleSetTest;
+
+    async fn to_instruction(
+        &self,
+        _loader: impl ClientAccountLoader + 'async_trait,
+    ) -> (Self::Accounts, Instruction) {
+        let program_id = mango_v4::id();
+        let instruction = Self::Instruction {
+            price: I80F48::from_num(self.price),
+            last_update_slot: self.last_update_slot,
+            deviation: I80F48::from_num(self.deviation),
+        };
         let oracle = Pubkey::find_program_address(
             &[
                 b"StubOracle".as_ref(),
@@ -1678,25 +1908,42 @@ pub struct AccountCreateInstruction {
     pub serum3_count: u8,
     pub perp_count: u8,
     pub perp_oo_count: u8,
+    pub token_conditional_swap_count: u8,
     pub group: Pubkey,
     pub owner: TestKeypair,
     pub payer: TestKeypair,
 }
+impl Default for AccountCreateInstruction {
+    fn default() -> Self {
+        AccountCreateInstruction {
+            account_num: 0,
+            token_count: 8,
+            serum3_count: 4,
+            perp_count: 4,
+            perp_oo_count: 16,
+            token_conditional_swap_count: 1,
+            group: Default::default(),
+            owner: Default::default(),
+            payer: Default::default(),
+        }
+    }
+}
 #[async_trait::async_trait(?Send)]
 impl ClientInstruction for AccountCreateInstruction {
     type Accounts = mango_v4::accounts::AccountCreate;
-    type Instruction = mango_v4::instruction::AccountCreate;
+    type Instruction = mango_v4::instruction::AccountCreateV2;
     async fn to_instruction(
         &self,
         _account_loader: impl ClientAccountLoader + 'async_trait,
     ) -> (Self::Accounts, instruction::Instruction) {
         let program_id = mango_v4::id();
-        let instruction = mango_v4::instruction::AccountCreate {
+        let instruction = Self::Instruction {
             account_num: self.account_num,
             token_count: self.token_count,
             serum3_count: self.serum3_count,
             perp_count: self.perp_count,
             perp_oo_count: self.perp_oo_count,
+            token_conditional_swap_count: self.token_conditional_swap_count,
             name: "my_mango_account".to_string(),
         };
 
@@ -1711,7 +1958,7 @@ impl ClientInstruction for AccountCreateInstruction {
         )
         .0;
 
-        let accounts = mango_v4::accounts::AccountCreate {
+        let accounts = Self::Accounts {
             group: self.group,
             owner: self.owner.pubkey(),
             account,
@@ -1728,6 +1975,7 @@ impl ClientInstruction for AccountCreateInstruction {
     }
 }
 
+#[derive(Default)]
 pub struct AccountExpandInstruction {
     pub account_num: u32,
     pub group: Pubkey,
@@ -1737,21 +1985,23 @@ pub struct AccountExpandInstruction {
     pub serum3_count: u8,
     pub perp_count: u8,
     pub perp_oo_count: u8,
+    pub token_conditional_swap_count: u8,
 }
 #[async_trait::async_trait(?Send)]
 impl ClientInstruction for AccountExpandInstruction {
     type Accounts = mango_v4::accounts::AccountExpand;
-    type Instruction = mango_v4::instruction::AccountExpand;
+    type Instruction = mango_v4::instruction::AccountExpandV2;
     async fn to_instruction(
         &self,
         _account_loader: impl ClientAccountLoader + 'async_trait,
     ) -> (Self::Accounts, instruction::Instruction) {
         let program_id = mango_v4::id();
-        let instruction = mango_v4::instruction::AccountExpand {
+        let instruction = Self::Instruction {
             token_count: self.token_count,
             serum3_count: self.serum3_count,
             perp_count: self.perp_count,
             perp_oo_count: self.perp_oo_count,
+            token_conditional_swap_count: self.token_conditional_swap_count,
         };
 
         let account = Pubkey::find_program_address(
@@ -1782,6 +2032,43 @@ impl ClientInstruction for AccountExpandInstruction {
     }
 }
 
+#[derive(Default)]
+pub struct AccountSizeMigrationInstruction {
+    pub account: Pubkey,
+    pub payer: TestKeypair,
+}
+#[async_trait::async_trait(?Send)]
+impl ClientInstruction for AccountSizeMigrationInstruction {
+    type Accounts = mango_v4::accounts::AccountSizeMigration;
+    type Instruction = mango_v4::instruction::AccountSizeMigration;
+    async fn to_instruction(
+        &self,
+        account_loader: impl ClientAccountLoader + 'async_trait,
+    ) -> (Self::Accounts, instruction::Instruction) {
+        let program_id = mango_v4::id();
+        let instruction = Self::Instruction {};
+
+        let account = account_loader
+            .load_mango_account(&self.account)
+            .await
+            .unwrap();
+
+        let accounts = Self::Accounts {
+            group: account.fixed.group,
+            account: self.account,
+            payer: self.payer.pubkey(),
+            system_program: System::id(),
+        };
+
+        let instruction = make_instruction(program_id, &accounts, &instruction);
+        (accounts, instruction)
+    }
+
+    fn signers(&self) -> Vec<TestKeypair> {
+        vec![self.payer]
+    }
+}
+
 pub struct AccountEditInstruction {
     pub account_num: u32,
     pub group: Pubkey,
@@ -1799,8 +2086,10 @@ impl ClientInstruction for AccountEditInstruction {
     ) -> (Self::Accounts, instruction::Instruction) {
         let program_id = mango_v4::id();
         let instruction = mango_v4::instruction::AccountEdit {
-            name_opt: Option::from(self.name.to_string()),
-            delegate_opt: Option::from(self.delegate),
+            name_opt: Some(self.name.to_string()),
+            delegate_opt: Some(self.delegate),
+            temporary_delegate_opt: None,
+            temporary_delegate_expiry_opt: None,
         };
 
         let account = Pubkey::find_program_address(
@@ -2372,83 +2661,6 @@ impl ClientInstruction for Serum3CancelAllOrdersInstruction {
             market_asks: from_serum_style_pubkey(&asks),
             market_event_queue: from_serum_style_pubkey(&event_q),
             owner: self.owner.pubkey(),
-        };
-
-        let instruction = make_instruction(program_id, &accounts, &instruction);
-        (accounts, instruction)
-    }
-
-    fn signers(&self) -> Vec<TestKeypair> {
-        vec![self.owner]
-    }
-}
-
-pub struct Serum3SettleFundsInstruction {
-    pub account: Pubkey,
-    pub owner: TestKeypair,
-
-    pub serum_market: Pubkey,
-}
-#[async_trait::async_trait(?Send)]
-impl ClientInstruction for Serum3SettleFundsInstruction {
-    type Accounts = mango_v4::accounts::Serum3SettleFunds;
-    type Instruction = mango_v4::instruction::Serum3SettleFunds;
-    async fn to_instruction(
-        &self,
-        account_loader: impl ClientAccountLoader + 'async_trait,
-    ) -> (Self::Accounts, instruction::Instruction) {
-        let program_id = mango_v4::id();
-        let instruction = Self::Instruction {};
-
-        let account = account_loader
-            .load_mango_account(&self.account)
-            .await
-            .unwrap();
-        let serum_market: Serum3Market = account_loader.load(&self.serum_market).await.unwrap();
-        let open_orders = account
-            .serum3_orders(serum_market.market_index)
-            .unwrap()
-            .open_orders;
-        let quote_info =
-            get_mint_info_by_token_index(&account_loader, &account, serum_market.quote_token_index)
-                .await;
-        let base_info =
-            get_mint_info_by_token_index(&account_loader, &account, serum_market.base_token_index)
-                .await;
-
-        let market_external_bytes = account_loader
-            .load_bytes(&serum_market.serum_market_external)
-            .await
-            .unwrap();
-        let market_external: &serum_dex::state::MarketState = bytemuck::from_bytes(
-            &market_external_bytes[5..5 + std::mem::size_of::<serum_dex::state::MarketState>()],
-        );
-        // unpack the data, to avoid unaligned references
-        let coin_vault = market_external.coin_vault;
-        let pc_vault = market_external.pc_vault;
-        let vault_signer = serum_dex::state::gen_vault_signer_key(
-            market_external.vault_signer_nonce,
-            &serum_market.serum_market_external,
-            &serum_market.serum_program,
-        )
-        .unwrap();
-
-        let accounts = Self::Accounts {
-            group: account.fixed.group,
-            account: self.account,
-            open_orders,
-            quote_bank: quote_info.first_bank(),
-            quote_vault: quote_info.first_vault(),
-            base_bank: base_info.first_bank(),
-            base_vault: base_info.first_vault(),
-            serum_market: self.serum_market,
-            serum_program: serum_market.serum_program,
-            serum_market_external: serum_market.serum_market_external,
-            market_base_vault: from_serum_style_pubkey(&coin_vault),
-            market_quote_vault: from_serum_style_pubkey(&pc_vault),
-            market_vault_signer: vault_signer,
-            owner: self.owner.pubkey(),
-            token_program: Token::id(),
         };
 
         let instruction = make_instruction(program_id, &accounts, &instruction);
@@ -4199,5 +4411,428 @@ impl ClientInstruction for AltExtendInstruction {
 
     fn signers(&self) -> Vec<TestKeypair> {
         vec![self.admin, self.payer]
+    }
+}
+
+#[derive(Clone)]
+pub struct TokenConditionalSwapCreateInstruction {
+    pub account: Pubkey,
+    pub owner: TestKeypair,
+    pub buy_mint: Pubkey,
+    pub sell_mint: Pubkey,
+    pub max_buy: u64,
+    pub max_sell: u64,
+    pub price_lower_limit: f64,
+    pub price_upper_limit: f64,
+    pub price_premium_rate: f64,
+    pub allow_creating_deposits: bool,
+    pub allow_creating_borrows: bool,
+}
+#[async_trait::async_trait(?Send)]
+impl ClientInstruction for TokenConditionalSwapCreateInstruction {
+    type Accounts = mango_v4::accounts::TokenConditionalSwapCreate;
+    type Instruction = mango_v4::instruction::TokenConditionalSwapCreateV2;
+    async fn to_instruction(
+        &self,
+        account_loader: impl ClientAccountLoader + 'async_trait,
+    ) -> (Self::Accounts, instruction::Instruction) {
+        let program_id = mango_v4::id();
+        let instruction = Self::Instruction {
+            max_buy: self.max_buy,
+            max_sell: self.max_sell,
+            expiry_timestamp: u64::MAX,
+            price_lower_limit: self.price_lower_limit,
+            price_upper_limit: self.price_upper_limit,
+            price_premium_rate: self.price_premium_rate,
+            allow_creating_deposits: self.allow_creating_deposits,
+            allow_creating_borrows: self.allow_creating_borrows,
+            display_price_style: TokenConditionalSwapDisplayPriceStyle::SellTokenPerBuyToken,
+            intention: TokenConditionalSwapIntention::Unknown,
+        };
+
+        let account = account_loader
+            .load_mango_account(&self.account)
+            .await
+            .unwrap();
+
+        let buy_mint_info_address = Pubkey::find_program_address(
+            &[
+                b"MintInfo".as_ref(),
+                account.fixed.group.as_ref(),
+                self.buy_mint.as_ref(),
+            ],
+            &program_id,
+        )
+        .0;
+        let sell_mint_info_address = Pubkey::find_program_address(
+            &[
+                b"MintInfo".as_ref(),
+                account.fixed.group.as_ref(),
+                self.sell_mint.as_ref(),
+            ],
+            &program_id,
+        )
+        .0;
+        let buy_mint_info: MintInfo = account_loader.load(&buy_mint_info_address).await.unwrap();
+        let sell_mint_info: MintInfo = account_loader.load(&sell_mint_info_address).await.unwrap();
+
+        let accounts = Self::Accounts {
+            group: account.fixed.group,
+            account: self.account,
+            authority: self.owner.pubkey(),
+            buy_bank: buy_mint_info.first_bank(),
+            sell_bank: sell_mint_info.first_bank(),
+        };
+
+        let instruction = make_instruction(program_id, &accounts, &instruction);
+        (accounts, instruction)
+    }
+
+    fn signers(&self) -> Vec<TestKeypair> {
+        vec![self.owner]
+    }
+}
+
+#[derive(Clone)]
+pub struct TokenConditionalSwapCreateLinearAuctionInstruction {
+    pub account: Pubkey,
+    pub owner: TestKeypair,
+    pub buy_mint: Pubkey,
+    pub sell_mint: Pubkey,
+    pub max_buy: u64,
+    pub max_sell: u64,
+    pub price_start: f64,
+    pub price_end: f64,
+    pub allow_creating_deposits: bool,
+    pub allow_creating_borrows: bool,
+    pub start_timestamp: u64,
+    pub duration_seconds: u64,
+    pub expiry_timestamp: u64,
+}
+#[async_trait::async_trait(?Send)]
+impl ClientInstruction for TokenConditionalSwapCreateLinearAuctionInstruction {
+    type Accounts = mango_v4::accounts::TokenConditionalSwapCreate;
+    type Instruction = mango_v4::instruction::TokenConditionalSwapCreateLinearAuction;
+    async fn to_instruction(
+        &self,
+        account_loader: impl ClientAccountLoader + 'async_trait,
+    ) -> (Self::Accounts, instruction::Instruction) {
+        let program_id = mango_v4::id();
+        let instruction = Self::Instruction {
+            max_buy: self.max_buy,
+            max_sell: self.max_sell,
+            expiry_timestamp: self.expiry_timestamp,
+            price_start: self.price_start,
+            price_end: self.price_end,
+            allow_creating_deposits: self.allow_creating_deposits,
+            allow_creating_borrows: self.allow_creating_borrows,
+            display_price_style: TokenConditionalSwapDisplayPriceStyle::SellTokenPerBuyToken,
+            start_timestamp: self.start_timestamp,
+            duration_seconds: self.duration_seconds,
+        };
+
+        let account = account_loader
+            .load_mango_account(&self.account)
+            .await
+            .unwrap();
+
+        let buy_mint_info_address = Pubkey::find_program_address(
+            &[
+                b"MintInfo".as_ref(),
+                account.fixed.group.as_ref(),
+                self.buy_mint.as_ref(),
+            ],
+            &program_id,
+        )
+        .0;
+        let sell_mint_info_address = Pubkey::find_program_address(
+            &[
+                b"MintInfo".as_ref(),
+                account.fixed.group.as_ref(),
+                self.sell_mint.as_ref(),
+            ],
+            &program_id,
+        )
+        .0;
+        let buy_mint_info: MintInfo = account_loader.load(&buy_mint_info_address).await.unwrap();
+        let sell_mint_info: MintInfo = account_loader.load(&sell_mint_info_address).await.unwrap();
+
+        let accounts = Self::Accounts {
+            group: account.fixed.group,
+            account: self.account,
+            authority: self.owner.pubkey(),
+            buy_bank: buy_mint_info.first_bank(),
+            sell_bank: sell_mint_info.first_bank(),
+        };
+
+        let instruction = make_instruction(program_id, &accounts, &instruction);
+        (accounts, instruction)
+    }
+
+    fn signers(&self) -> Vec<TestKeypair> {
+        vec![self.owner]
+    }
+}
+
+#[derive(Clone)]
+pub struct TokenConditionalSwapCreatePremiumAuctionInstruction {
+    pub account: Pubkey,
+    pub owner: TestKeypair,
+    pub buy_mint: Pubkey,
+    pub sell_mint: Pubkey,
+    pub max_buy: u64,
+    pub max_sell: u64,
+    pub price_lower_limit: f64,
+    pub price_upper_limit: f64,
+    pub max_price_premium_rate: f64,
+    pub allow_creating_deposits: bool,
+    pub allow_creating_borrows: bool,
+    pub duration_seconds: u64,
+}
+#[async_trait::async_trait(?Send)]
+impl ClientInstruction for TokenConditionalSwapCreatePremiumAuctionInstruction {
+    type Accounts = mango_v4::accounts::TokenConditionalSwapCreate;
+    type Instruction = mango_v4::instruction::TokenConditionalSwapCreatePremiumAuction;
+    async fn to_instruction(
+        &self,
+        account_loader: impl ClientAccountLoader + 'async_trait,
+    ) -> (Self::Accounts, instruction::Instruction) {
+        let program_id = mango_v4::id();
+        let instruction = Self::Instruction {
+            max_buy: self.max_buy,
+            max_sell: self.max_sell,
+            expiry_timestamp: u64::MAX,
+            price_lower_limit: self.price_lower_limit,
+            price_upper_limit: self.price_upper_limit,
+            max_price_premium_rate: self.max_price_premium_rate,
+            allow_creating_deposits: self.allow_creating_deposits,
+            allow_creating_borrows: self.allow_creating_borrows,
+            display_price_style: TokenConditionalSwapDisplayPriceStyle::SellTokenPerBuyToken,
+            intention: TokenConditionalSwapIntention::Unknown,
+            duration_seconds: self.duration_seconds,
+        };
+
+        let account = account_loader
+            .load_mango_account(&self.account)
+            .await
+            .unwrap();
+
+        let buy_mint_info_address = Pubkey::find_program_address(
+            &[
+                b"MintInfo".as_ref(),
+                account.fixed.group.as_ref(),
+                self.buy_mint.as_ref(),
+            ],
+            &program_id,
+        )
+        .0;
+        let sell_mint_info_address = Pubkey::find_program_address(
+            &[
+                b"MintInfo".as_ref(),
+                account.fixed.group.as_ref(),
+                self.sell_mint.as_ref(),
+            ],
+            &program_id,
+        )
+        .0;
+        let buy_mint_info: MintInfo = account_loader.load(&buy_mint_info_address).await.unwrap();
+        let sell_mint_info: MintInfo = account_loader.load(&sell_mint_info_address).await.unwrap();
+
+        let accounts = Self::Accounts {
+            group: account.fixed.group,
+            account: self.account,
+            authority: self.owner.pubkey(),
+            buy_bank: buy_mint_info.first_bank(),
+            sell_bank: sell_mint_info.first_bank(),
+        };
+
+        let instruction = make_instruction(program_id, &accounts, &instruction);
+        (accounts, instruction)
+    }
+
+    fn signers(&self) -> Vec<TestKeypair> {
+        vec![self.owner]
+    }
+}
+
+#[derive(Clone)]
+pub struct TokenConditionalSwapCancelInstruction {
+    pub account: Pubkey,
+    pub owner: TestKeypair,
+    pub index: u8,
+    pub id: u64,
+}
+#[async_trait::async_trait(?Send)]
+impl ClientInstruction for TokenConditionalSwapCancelInstruction {
+    type Accounts = mango_v4::accounts::TokenConditionalSwapCancel;
+    type Instruction = mango_v4::instruction::TokenConditionalSwapCancel;
+    async fn to_instruction(
+        &self,
+        account_loader: impl ClientAccountLoader + 'async_trait,
+    ) -> (Self::Accounts, instruction::Instruction) {
+        let program_id = mango_v4::id();
+        let instruction = Self::Instruction {
+            token_conditional_swap_index: self.index,
+            token_conditional_swap_id: self.id,
+        };
+
+        let account = account_loader
+            .load_mango_account(&self.account)
+            .await
+            .unwrap();
+        let tcs = account.token_conditional_swap_by_id(self.id).unwrap().1;
+
+        let buy_mint_info =
+            get_mint_info_by_token_index(&account_loader, &account, tcs.buy_token_index).await;
+        let sell_mint_info =
+            get_mint_info_by_token_index(&account_loader, &account, tcs.sell_token_index).await;
+
+        let accounts = Self::Accounts {
+            group: account.fixed.group,
+            account: self.account,
+            authority: self.owner.pubkey(),
+            buy_bank: buy_mint_info.first_bank(),
+            sell_bank: sell_mint_info.first_bank(),
+        };
+
+        let instruction = make_instruction(program_id, &accounts, &instruction);
+        (accounts, instruction)
+    }
+
+    fn signers(&self) -> Vec<TestKeypair> {
+        vec![self.owner]
+    }
+}
+
+#[derive(Clone)]
+pub struct TokenConditionalSwapTriggerInstruction {
+    pub liqee: Pubkey,
+    pub liqor: Pubkey,
+    pub liqor_owner: TestKeypair,
+    pub index: u8,
+    pub max_buy_token_to_liqee: u64,
+    pub max_sell_token_to_liqor: u64,
+    pub min_buy_token: u64,
+    pub min_taker_price: f32,
+}
+#[async_trait::async_trait(?Send)]
+impl ClientInstruction for TokenConditionalSwapTriggerInstruction {
+    type Accounts = mango_v4::accounts::TokenConditionalSwapTrigger;
+    type Instruction = mango_v4::instruction::TokenConditionalSwapTriggerV2;
+    async fn to_instruction(
+        &self,
+        account_loader: impl ClientAccountLoader + 'async_trait,
+    ) -> (Self::Accounts, instruction::Instruction) {
+        let program_id = mango_v4::id();
+
+        let liqee = account_loader
+            .load_mango_account(&self.liqee)
+            .await
+            .unwrap();
+        let liqor = account_loader
+            .load_mango_account(&self.liqor)
+            .await
+            .unwrap();
+
+        let tcs = liqee
+            .token_conditional_swap_by_index(self.index.into())
+            .unwrap()
+            .clone();
+
+        let instruction = Self::Instruction {
+            token_conditional_swap_index: self.index,
+            token_conditional_swap_id: tcs.id,
+            max_buy_token_to_liqee: self.max_buy_token_to_liqee,
+            max_sell_token_to_liqor: self.max_sell_token_to_liqor,
+            min_buy_token: self.min_buy_token,
+            min_taker_price: self.min_taker_price,
+        };
+
+        let health_check_metas = derive_liquidation_remaining_account_metas(
+            &account_loader,
+            &liqee,
+            &liqor,
+            tcs.buy_token_index,
+            0,
+            tcs.sell_token_index,
+            0,
+        )
+        .await;
+
+        let accounts = Self::Accounts {
+            group: liqee.fixed.group,
+            liqee: self.liqee,
+            liqor: self.liqor,
+            liqor_authority: self.liqor_owner.pubkey(),
+        };
+
+        let mut instruction = make_instruction(program_id, &accounts, &instruction);
+        instruction.accounts.extend(health_check_metas.into_iter());
+        (accounts, instruction)
+    }
+
+    fn signers(&self) -> Vec<TestKeypair> {
+        vec![self.liqor_owner]
+    }
+}
+
+#[derive(Clone)]
+pub struct TokenConditionalSwapStartInstruction {
+    pub account: Pubkey,
+    pub caller: Pubkey,
+    pub caller_owner: TestKeypair,
+    pub index: u8,
+}
+#[async_trait::async_trait(?Send)]
+impl ClientInstruction for TokenConditionalSwapStartInstruction {
+    type Accounts = mango_v4::accounts::TokenConditionalSwapStart;
+    type Instruction = mango_v4::instruction::TokenConditionalSwapStart;
+    async fn to_instruction(
+        &self,
+        account_loader: impl ClientAccountLoader + 'async_trait,
+    ) -> (Self::Accounts, instruction::Instruction) {
+        let program_id = mango_v4::id();
+
+        let account = account_loader
+            .load_mango_account(&self.account)
+            .await
+            .unwrap();
+
+        let tcs = account
+            .token_conditional_swap_by_index(self.index.into())
+            .unwrap()
+            .clone();
+
+        let sell_mint_info =
+            get_mint_info_by_token_index(&account_loader, &account, tcs.sell_token_index).await;
+
+        let instruction = Self::Instruction {
+            token_conditional_swap_index: self.index,
+            token_conditional_swap_id: tcs.id,
+        };
+
+        let health_check_metas = derive_health_check_remaining_account_metas(
+            &account_loader,
+            &account,
+            Some(sell_mint_info.first_bank()),
+            true,
+            None,
+        )
+        .await;
+
+        let accounts = Self::Accounts {
+            group: account.fixed.group,
+            account: self.account,
+            caller: self.caller,
+            caller_authority: self.caller_owner.pubkey(),
+        };
+
+        let mut instruction = make_instruction(program_id, &accounts, &instruction);
+        instruction.accounts.extend(health_check_metas.into_iter());
+        (accounts, instruction)
+    }
+
+    fn signers(&self) -> Vec<TestKeypair> {
+        vec![self.caller_owner]
     }
 }

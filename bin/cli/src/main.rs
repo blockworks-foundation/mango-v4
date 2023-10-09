@@ -1,11 +1,12 @@
 use clap::{Args, Parser, Subcommand};
 use mango_v4_client::{
-    keypair_from_cli, pubkey_from_cli, Client, JupiterSwapMode, MangoClient,
-    TransactionBuilderConfig,
+    keypair_from_cli, pubkey_from_cli, Client, MangoClient, TransactionBuilderConfig,
 };
 use solana_sdk::pubkey::Pubkey;
 use std::str::FromStr;
 use std::sync::Arc;
+
+mod test_oracles;
 
 #[derive(Parser, Debug, Clone)]
 #[clap()]
@@ -108,6 +109,14 @@ enum Command {
         #[clap(short, long, default_value = "0")]
         num: u32,
     },
+    /// Regularly fetches all oracles and prints their prices
+    TestOracles {
+        #[clap(short, long)]
+        group: String,
+
+        #[clap(flatten)]
+        rpc: Rpc,
+    },
 }
 
 impl Rpc {
@@ -127,9 +136,7 @@ impl Rpc {
 
 #[tokio::main]
 async fn main() -> Result<(), anyhow::Error> {
-    env_logger::init_from_env(
-        env_logger::Env::default().filter_or(env_logger::DEFAULT_FILTER_ENV, "info"),
-    );
+    mango_v4_client::tracing_subscriber_init();
 
     dotenv::dotenv().ok();
     let cli = Cli::parse();
@@ -138,7 +145,7 @@ async fn main() -> Result<(), anyhow::Error> {
         Command::CreateAccount(cmd) => {
             let client = cmd.rpc.client(Some(&cmd.owner))?;
             let group = pubkey_from_cli(&cmd.group);
-            let owner = keypair_from_cli(&cmd.owner);
+            let owner = Arc::new(keypair_from_cli(&cmd.owner));
 
             let account_num = if let Some(num) = cmd.account_num {
                 num
@@ -156,9 +163,15 @@ async fn main() -> Result<(), anyhow::Error> {
                         + 1
                 }
             };
-            let (account, txsig) =
-                MangoClient::create_account(&client, group, &owner, &owner, account_num, &cmd.name)
-                    .await?;
+            let (account, txsig) = MangoClient::create_account(
+                &client,
+                group,
+                owner.clone(),
+                owner.clone(),
+                account_num,
+                &cmd.name,
+            )
+            .await?;
             println!("{}", account);
             println!("{}", txsig);
         }
@@ -179,12 +192,14 @@ async fn main() -> Result<(), anyhow::Error> {
             let output_mint = pubkey_from_cli(&cmd.output_mint);
             let client = MangoClient::new_for_existing_account(client, account, owner).await?;
             let txsig = client
-                .jupiter_swap(
+                .jupiter_v4()
+                .swap(
                     input_mint,
                     output_mint,
                     cmd.amount,
                     cmd.slippage_bps,
-                    JupiterSwapMode::ExactIn,
+                    mango_v4_client::JupiterSwapMode::ExactIn,
+                    false,
                 )
                 .await?;
             println!("{}", txsig);
@@ -207,6 +222,11 @@ async fn main() -> Result<(), anyhow::Error> {
             )
             .0;
             println!("{}", address);
+        }
+        Command::TestOracles { group, rpc } => {
+            let client = rpc.client(None)?;
+            let group = pubkey_from_cli(&group);
+            test_oracles::run(&client, group).await?;
         }
     };
 

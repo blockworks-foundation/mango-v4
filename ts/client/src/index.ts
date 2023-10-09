@@ -19,9 +19,12 @@ export {
   buildIxGate,
 } from './clientIxParamBuilder';
 export * from './constants';
+export * from './mango_v4';
 export * from './numbers/I80F48';
 export * from './risk';
 export * from './router';
+export * from './stats';
 export * from './types';
 export * from './utils';
+export * from './utils/rpc';
 export { Group, MANGO_V4_ID, MangoClient, OracleProvider, StubOracle };

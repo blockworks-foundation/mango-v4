@@ -33,13 +33,79 @@ async fn test_basic() -> Result<(), TransportError> {
         solana,
         AccountCreateInstruction {
             account_num: 0,
-            token_count: 8,
-            serum3_count: 7,
-            perp_count: 0,
-            perp_oo_count: 0,
+            token_count: 6,
+            serum3_count: 3,
+            perp_count: 3,
+            perp_oo_count: 3,
+            token_conditional_swap_count: 3,
             group,
             owner,
             payer,
+        },
+    )
+    .await
+    .unwrap()
+    .account;
+    let account_data: MangoAccount = solana.get_account(account).await;
+    assert_eq!(account_data.tokens.len(), 6);
+    assert_eq!(
+        account_data.tokens.iter().filter(|t| t.is_active()).count(),
+        0
+    );
+    assert_eq!(account_data.serum3.len(), 3);
+    assert_eq!(
+        account_data.serum3.iter().filter(|s| s.is_active()).count(),
+        0
+    );
+
+    assert_eq!(account_data.perps.len(), 3);
+    assert_eq!(account_data.perp_open_orders.len(), 3);
+
+    send_tx(
+        solana,
+        AccountExpandInstruction {
+            account_num: 0,
+            token_count: 1,
+            serum3_count: 1,
+            perp_count: 1,
+            perp_oo_count: 1,
+            token_conditional_swap_count: 1,
+            group,
+            owner,
+            payer,
+            ..Default::default()
+        },
+    )
+    .await
+    .unwrap()
+    .account;
+    let account_data: MangoAccount = solana.get_account(account).await;
+    assert_eq!(account_data.tokens.len(), 1);
+    assert_eq!(
+        account_data.tokens.iter().filter(|t| t.is_active()).count(),
+        0
+    );
+    assert_eq!(account_data.serum3.len(), 1);
+    assert_eq!(
+        account_data.serum3.iter().filter(|s| s.is_active()).count(),
+        0
+    );
+    assert_eq!(account_data.perps.len(), 1);
+    assert_eq!(account_data.perp_open_orders.len(), 1);
+
+    send_tx(
+        solana,
+        AccountExpandInstruction {
+            account_num: 0,
+            token_count: 8,
+            serum3_count: 4,
+            perp_count: 4,
+            perp_oo_count: 8,
+            token_conditional_swap_count: 4,
+            group,
+            owner,
+            payer,
+            ..Default::default()
         },
     )
     .await
@@ -51,39 +117,13 @@ async fn test_basic() -> Result<(), TransportError> {
         account_data.tokens.iter().filter(|t| t.is_active()).count(),
         0
     );
-    assert_eq!(account_data.serum3.len(), 7);
+    assert_eq!(account_data.serum3.len(), 4);
     assert_eq!(
         account_data.serum3.iter().filter(|s| s.is_active()).count(),
         0
     );
-
-    send_tx(
-        solana,
-        AccountExpandInstruction {
-            account_num: 0,
-            token_count: 16,
-            serum3_count: 8,
-            perp_count: 8,
-            perp_oo_count: 8,
-            group,
-            owner,
-            payer,
-        },
-    )
-    .await
-    .unwrap()
-    .account;
-    let account_data: MangoAccount = solana.get_account(account).await;
-    assert_eq!(account_data.tokens.len(), 16);
-    assert_eq!(
-        account_data.tokens.iter().filter(|t| t.is_active()).count(),
-        0
-    );
-    assert_eq!(account_data.serum3.len(), 8);
-    assert_eq!(
-        account_data.serum3.iter().filter(|s| s.is_active()).count(),
-        0
-    );
+    assert_eq!(account_data.perps.len(), 4);
+    assert_eq!(account_data.perp_open_orders.len(), 8);
 
     //
     // TEST: Deposit funds
@@ -266,6 +306,111 @@ async fn test_basic() -> Result<(), TransportError> {
     )
     .await
     .unwrap();
+
+    Ok(())
+}
+
+#[tokio::test]
+async fn test_account_size_migration() -> Result<(), TransportError> {
+    let context = TestContext::new().await;
+    let solana = &context.solana.clone();
+
+    let admin = TestKeypair::new();
+    let owner = context.users[0].key;
+    let payer = context.users[1].key;
+    let mints = &context.mints[0..1];
+
+    let mango_setup::GroupWithTokens { group, .. } = mango_setup::GroupWithTokensConfig {
+        admin,
+        payer,
+        mints: mints.to_vec(),
+        ..mango_setup::GroupWithTokensConfig::default()
+    }
+    .create(solana)
+    .await;
+
+    let account = send_tx(
+        solana,
+        AccountCreateInstruction {
+            account_num: 0,
+            token_count: 6,
+            serum3_count: 3,
+            perp_count: 3,
+            perp_oo_count: 3,
+            token_conditional_swap_count: 3,
+            group,
+            owner,
+            payer,
+        },
+    )
+    .await
+    .unwrap()
+    .account;
+
+    // Manually extend the account to have too many perp positions
+    let mut account_raw = solana
+        .context
+        .borrow_mut()
+        .banks_client
+        .get_account(account)
+        .await
+        .unwrap()
+        .unwrap();
+    let mango_account = MangoAccountValue::from_bytes(&account_raw.data[8..]).unwrap();
+
+    let perp_start = mango_account.header.perp_offset(0);
+    let mut new_bytes: Vec<u8> = Vec::new();
+    new_bytes.extend_from_slice(&account_raw.data[..8 + std::mem::size_of::<MangoAccountFixed>()]);
+    new_bytes.extend_from_slice(&mango_account.dynamic[..perp_start - 4]);
+    new_bytes.extend_from_slice(&(3u32 + 10u32).to_le_bytes()); // perp pos len
+    for _ in 0..10 {
+        new_bytes.extend_from_slice(&bytemuck::bytes_of(&PerpPosition::default()));
+    }
+    // remove the 64 reserved bytes at the end
+    new_bytes
+        .extend_from_slice(&mango_account.dynamic[perp_start..mango_account.dynamic.len() - 64]);
+
+    account_raw.data = new_bytes.clone();
+    account_raw.lamports = 1_000_000_000; // 1 SOL is enough
+    solana
+        .context
+        .borrow_mut()
+        .set_account(&account, &account_raw.into());
+
+    //
+    // TEST: Size migration reduces number of available perp positions
+    //
+
+    let new_mango_account = MangoAccountValue::from_bytes(&new_bytes[8..]).unwrap();
+    assert!(
+        new_mango_account.header.expected_health_accounts()
+            > MangoAccountDynamicHeader::max_health_accounts()
+    );
+    assert_eq!(new_mango_account.header.perp_count, 13);
+
+    send_tx(solana, AccountSizeMigrationInstruction { account, payer })
+        .await
+        .unwrap();
+
+    let mango_account = get_mango_account(solana, account).await;
+    assert!(
+        mango_account.header.expected_health_accounts()
+            <= MangoAccountDynamicHeader::max_health_accounts()
+    );
+    assert_eq!(mango_account.header.perp_count, 4);
+
+    println!("{:#?}", mango_account.header);
+
+    //
+    // TEST: running size migration again has no effect
+    //
+
+    let before_bytes = solana.get_account_data(account).await;
+    send_tx(solana, AccountSizeMigrationInstruction { account, payer })
+        .await
+        .unwrap();
+    let after_bytes = solana.get_account_data(account).await;
+    assert_eq!(before_bytes, after_bytes);
 
     Ok(())
 }
