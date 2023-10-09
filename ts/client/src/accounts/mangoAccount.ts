@@ -1277,6 +1277,11 @@ export class Serum3PositionDto {
   ) {}
 }
 
+export interface CumulativeFunding {
+  cumulativeLongFunding: number;
+  cumulativeShortFunding: number;
+}
+
 export class PerpPosition {
   static PerpMarketIndexUnset = 65535;
   static from(dto: PerpPositionDto): PerpPosition {
@@ -1423,8 +1428,34 @@ export class PerpPosition {
     }
     return ZERO_I80F48();
   }
+
   public getUnsettledFundingUi(perpMarket: PerpMarket): number {
     return toUiDecimalsForQuote(this.getUnsettledFunding(perpMarket));
+  }
+
+  /**
+   * @returns perp position cumulative funding, in quote token units.
+   * If the user paid $1 in funding for a short position, this would be -1e6.
+   * Caveat: This will only return cumulative interest since the perp position was last opened.
+   * If the perp position was closed and reopened multiple times it is necessary to add this result to
+   * cumulative funding at each of the prior perp position closings (from mango API) to get the all time
+   * cumulative funding.
+   */
+  public getCumulativeFunding(perpMarket: PerpMarket): CumulativeFunding {
+    const funding = this.getUnsettledFunding(perpMarket).toNumber();
+    let cumulativeLongFunding = this.cumulativeLongFunding;
+    let cumulativeShortFunding = this.cumulativeShortFunding;
+
+    if (this.basePositionLots.toNumber() > 0) {
+      cumulativeLongFunding += funding;
+    } else {
+      cumulativeShortFunding -= funding;
+    }
+
+    return {
+      cumulativeLongFunding: cumulativeLongFunding,
+      cumulativeShortFunding: cumulativeShortFunding,
+    };
   }
 
   public getEquity(perpMarket: PerpMarket): I80F48 {
