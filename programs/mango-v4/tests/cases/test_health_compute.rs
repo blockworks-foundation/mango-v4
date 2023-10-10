@@ -1,4 +1,5 @@
 use super::*;
+use mango_v4::accounts_ix::{Serum3OrderType, Serum3SelfTradeBehavior, Serum3Side};
 
 // Try to reach compute limits in health checks by having many different tokens in an account
 #[tokio::test]
@@ -37,7 +38,7 @@ async fn test_health_compute_tokens() -> Result<(), TransportError> {
 #[tokio::test]
 async fn test_health_compute_serum() -> Result<(), TransportError> {
     let mut test_builder = TestContextBuilder::new();
-    test_builder.test().set_compute_max_units(90_000);
+    test_builder.test().set_compute_max_units(150_000);
     let context = test_builder.start_default().await;
     let solana = &context.solana.clone();
 
@@ -60,10 +61,29 @@ async fn test_health_compute_serum() -> Result<(), TransportError> {
     .create(solana)
     .await;
 
-    let account = send_tx(
+    // Also activate all token positions
+    let account = create_funded_account(
+        &solana,
+        group,
+        owner,
+        0,
+        &context.users[1],
+        &mints,
+        10000,
+        0,
+    )
+    .await;
+
+    // Allow 8 tokens + 8 serum
+    send_tx(
         solana,
-        AccountCreateInstruction {
+        AccountExpandInstruction {
             account_num: 0,
+            token_count: 8,
+            serum3_count: 8,
+            perp_count: 0,
+            perp_oo_count: 0,
+            token_conditional_swap_count: 0,
             group,
             owner,
             payer,
@@ -71,8 +91,7 @@ async fn test_health_compute_serum() -> Result<(), TransportError> {
         },
     )
     .await
-    .unwrap()
-    .account;
+    .unwrap();
 
     //
     // SETUP: Create serum markets and register them
@@ -111,11 +130,29 @@ async fn test_health_compute_serum() -> Result<(), TransportError> {
         );
     }
 
+    let mut cu_measurements = vec![];
+
+    // Get the baseline cost of a deposit without an active serum3 oo
+    let result = send_tx_get_metadata(
+        solana,
+        TokenDepositInstruction {
+            amount: 10,
+            reduce_only: false,
+            account,
+            owner,
+            token_account: payer_mint_accounts[0],
+            token_authority: payer.clone(),
+            bank_index: 0,
+        },
+    )
+    .await
+    .unwrap();
+    cu_measurements.push(result.metadata.unwrap().compute_units_consumed);
+
     //
     // TEST: Create open orders and trigger a Deposit to check health
     //
-    for (i, &serum_market) in serum_markets.iter().enumerate() {
-        println!("adding market {}", i);
+    for &serum_market in serum_markets.iter() {
         send_tx(
             solana,
             Serum3CreateOpenOrdersInstruction {
@@ -128,7 +165,46 @@ async fn test_health_compute_serum() -> Result<(), TransportError> {
         .await
         .unwrap();
 
+        // Place a bid and ask to make the health computation use more compute
         send_tx(
+            solana,
+            Serum3PlaceOrderInstruction {
+                side: Serum3Side::Bid,
+                limit_price: 1,
+                max_base_qty: 1,
+                max_native_quote_qty_including_fees: 1,
+                self_trade_behavior: Serum3SelfTradeBehavior::AbortTransaction,
+                order_type: Serum3OrderType::Limit,
+                client_order_id: 0,
+                limit: 10,
+                account,
+                owner,
+                serum_market,
+            },
+        )
+        .await
+        .unwrap();
+        send_tx(
+            solana,
+            Serum3PlaceOrderInstruction {
+                side: Serum3Side::Ask,
+                limit_price: 2,
+                max_base_qty: 1,
+                max_native_quote_qty_including_fees: 1,
+                self_trade_behavior: Serum3SelfTradeBehavior::AbortTransaction,
+                order_type: Serum3OrderType::Limit,
+                client_order_id: 1,
+                limit: 10,
+                account,
+                owner,
+                serum_market,
+            },
+        )
+        .await
+        .unwrap();
+
+        // Simple deposit: it's cost is what we use as reference for health compute cost
+        let result = send_tx_get_metadata(
             solana,
             TokenDepositInstruction {
                 amount: 10,
@@ -142,10 +218,22 @@ async fn test_health_compute_serum() -> Result<(), TransportError> {
         )
         .await
         .unwrap();
+        cu_measurements.push(result.metadata.unwrap().compute_units_consumed);
     }
 
-    // TODO: actual explicit CU comparisons.
-    // On 2023-2-23 the final deposit costs 81141 CU and each new market increases it by roughly 6184 CU
+    for (i, pair) in cu_measurements.windows(2).enumerate() {
+        println!(
+            "after adding market {}: {} (+{})",
+            i,
+            pair[1],
+            pair[1] - pair[0]
+        );
+    }
+
+    let avg_cu_increase = cu_measurements.windows(2).map(|p| p[1] - p[0]).sum::<u64>()
+        / (cu_measurements.len() - 1) as u64;
+    println!("average cu increase: {avg_cu_increase}");
+    assert!(avg_cu_increase < 10000);
 
     Ok(())
 }
