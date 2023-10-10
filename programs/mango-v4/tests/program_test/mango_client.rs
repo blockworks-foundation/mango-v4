@@ -11,7 +11,7 @@ use mango_v4::accounts_ix::{
 };
 use mango_v4::state::{MangoAccount, MangoAccountValue};
 use solana_program::instruction::Instruction;
-use solana_program_test::BanksClientError;
+use solana_program_test::{BanksClientError, BanksTransactionResultWithMetadata};
 use solana_sdk::instruction;
 use solana_sdk::transport::TransportError;
 use std::sync::Arc;
@@ -41,7 +41,7 @@ impl ClientAccountLoader for &SolanaCookie {
     }
 }
 
-// TODO: report error outwards etc
+// This fill return a failure if the tx resulted in an error
 pub async fn send_tx<CI: ClientInstruction>(
     solana: &SolanaCookie,
     ix: CI,
@@ -49,10 +49,24 @@ pub async fn send_tx<CI: ClientInstruction>(
     let (accounts, instruction) = ix.to_instruction(solana).await;
     let signers = ix.signers();
     let instructions = vec![instruction];
-    solana
+    let result = solana
         .process_transaction(&instructions, Some(&signers[..]))
         .await?;
+    result.result?;
     Ok(accounts)
+}
+
+// This will return success even if the tx failed to finish
+pub async fn send_tx_get_metadata<CI: ClientInstruction>(
+    solana: &SolanaCookie,
+    ix: CI,
+) -> std::result::Result<BanksTransactionResultWithMetadata, BanksClientError> {
+    let (_, instruction) = ix.to_instruction(solana).await;
+    let signers = ix.signers();
+    let instructions = vec![instruction];
+    solana
+        .process_transaction(&instructions, Some(&signers[..]))
+        .await
 }
 
 /// Build a transaction from multiple instructions
@@ -87,7 +101,20 @@ impl<'a> ClientTransaction {
         self.signers.push(keypair);
     }
 
+    // Fails on tx error
     pub async fn send(&self) -> std::result::Result<(), BanksClientError> {
+        let tx_result = self
+            .solana
+            .process_transaction(&self.instructions, Some(&self.signers))
+            .await?;
+        tx_result.result?;
+        Ok(())
+    }
+
+    // Tx error still returns success
+    pub async fn send_get_metadata(
+        &self,
+    ) -> std::result::Result<BanksTransactionResultWithMetadata, BanksClientError> {
         self.solana
             .process_transaction(&self.instructions, Some(&self.signers))
             .await
@@ -365,7 +392,7 @@ pub async fn check_prev_instruction_post_health(solana: &SolanaCookie, account: 
     let logs = solana.program_log();
     let post_health_str = logs
         .iter()
-        .find_map(|line| line.strip_prefix("post_init_health: "))
+        .find_map(|line| line.strip_prefix("Program log: post_init_health: "))
         .unwrap();
     let post_health = post_health_str.parse::<f64>().unwrap();
 

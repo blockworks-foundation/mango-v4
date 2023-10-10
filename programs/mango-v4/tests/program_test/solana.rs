@@ -1,7 +1,6 @@
 #![allow(dead_code)]
 
 use std::cell::RefCell;
-use std::sync::{Arc, RwLock};
 
 use super::utils::TestKeypair;
 use anchor_lang::AccountDeserialize;
@@ -20,8 +19,6 @@ use spl_token::*;
 pub struct SolanaCookie {
     pub context: RefCell<ProgramTestContext>,
     pub rent: Rent,
-    pub logger_capture: Arc<RwLock<Vec<String>>>,
-    pub logger_lock: Arc<RwLock<()>>,
     pub last_transaction_log: RefCell<Vec<String>>,
 }
 
@@ -30,17 +27,7 @@ impl SolanaCookie {
         &self,
         instructions: &[Instruction],
         signers: Option<&[TestKeypair]>,
-    ) -> Result<(), BanksClientError> {
-        // The locking in this function is convoluted:
-        // We capture the program log output by overriding the global logger and capturing
-        // messages there. This logger is potentially shared among multiple tests that run
-        // concurrently.
-        // To allow each independent SolanaCookie to capture only the logs from the transaction
-        // passed to process_transaction, wo globally hold the "program_log_lock" for the
-        // duration that the tx needs to process. So only a single one can run at a time.
-        let tx_log_lock = Arc::new(self.logger_lock.write().unwrap());
-        self.logger_capture.write().unwrap().clear();
-
+    ) -> Result<BanksTransactionResultWithMetadata, BanksClientError> {
         let mut context = self.context.borrow_mut();
         let blockhash = context.get_new_latest_blockhash().await?;
 
@@ -62,15 +49,16 @@ impl SolanaCookie {
 
         let result = context
             .banks_client
-            .process_transaction_with_commitment(
-                transaction,
-                solana_sdk::commitment_config::CommitmentLevel::Processed,
-            )
+            .process_transaction_with_metadata(transaction)
             .await;
 
-        *self.last_transaction_log.borrow_mut() = self.logger_capture.read().unwrap().clone();
+        *self.last_transaction_log.borrow_mut() = result
+            .as_ref()
+            .ok()
+            .and_then(|r| r.metadata.as_ref())
+            .map(|v| v.log_messages.clone())
+            .unwrap_or_default();
 
-        drop(tx_log_lock);
         drop(context);
 
         result
@@ -264,11 +252,15 @@ impl SolanaCookie {
         self.program_log()
             .iter()
             .filter_map(|data| {
-                let bytes = base64::decode(data).ok()?;
-                if bytes[0..8] != T::discriminator() {
-                    return None;
+                if let Some(event) = data.strip_prefix("Program data: ") {
+                    let bytes = base64::decode(event).ok()?;
+                    if bytes[0..8] != T::discriminator() {
+                        return None;
+                    }
+                    T::try_from_slice(&bytes[8..]).ok()
+                } else {
+                    None
                 }
-                T::try_from_slice(&bytes[8..]).ok()
             })
             .collect()
     }

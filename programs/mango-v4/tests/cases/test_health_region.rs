@@ -123,7 +123,7 @@ async fn test_health_wrap() -> Result<(), TransportError> {
                 affected_bank: None,
             })
             .await;
-            tx.send().await
+            tx.send_get_metadata().await
         }
     };
 
@@ -131,8 +131,9 @@ async fn test_health_wrap() -> Result<(), TransportError> {
     // TEST: Placing a giant order fails
     //
     {
-        send_test_tx(1.0, 100000, false).await.unwrap_err();
-        let logs = solana.program_log();
+        let result = send_test_tx(1.0, 100000, false).await.unwrap();
+        assert!(result.result.is_err());
+        let logs = result.metadata.unwrap().log_messages;
         // reaches the End instruction
         assert!(logs
             .iter()
@@ -154,8 +155,9 @@ async fn test_health_wrap() -> Result<(), TransportError> {
     // TEST: If we cancel the order again before the HealthRegionEnd, it can go through
     //
     {
-        send_test_tx(1.0, 100000, true).await.unwrap();
-        let logs = solana.program_log();
+        let result = send_test_tx(1.0, 100000, true).await.unwrap();
+        assert!(result.result.is_ok());
+        let logs = result.metadata.unwrap().log_messages;
         // health computed only once
         assert_eq!(
             logs.iter()
