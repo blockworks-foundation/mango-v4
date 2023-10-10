@@ -42,6 +42,7 @@ pub fn benchmark(_ctx: Context<Benchmark>) -> Result<()> {
         run_bench("conversion_f64_to_i80f48", || I80F48::from_num(f));
         let a2: I80F48 = a >> 64;
         let b2: I80F48 = b >> 64;
+        run_bench("add_i80f48", || a2.checked_add(b2).unwrap());
         run_bench("mul_i80f48", || a2.checked_mul(b2).unwrap());
     }
 
@@ -66,23 +67,32 @@ pub fn benchmark(_ctx: Context<Benchmark>) -> Result<()> {
     }
 
     {
-        let a = s as u32;
-        let b = t as u32;
-        run_bench("division_u32", || a.checked_div(b).unwrap());
-    }
-
-    {
         let a = s as f64;
         let b = t as f64;
-        run_bench("division_f64", || a / b);
+        run_bench("add_f64", || a + b);
         run_bench("mul_f64", || a * b);
+        run_bench("division_f64", || a / b);
     }
 
     {
         let a = s as f32;
         let b = t as f32;
-        run_bench("division_f32", || a / b);
+        run_bench("add_f32", || a + b);
         run_bench("mul_f32", || a * b);
+        run_bench("division_f32", || a / b);
+    }
+
+    {
+        let a = s as u32;
+        let b = t as u32;
+        run_bench("add_u32", || a + b);
+        run_bench("division_u32", || a.checked_div(b).unwrap());
+    }
+    {
+        let a = s as u64;
+        let b = t as u64;
+        run_bench("add_u64", || a + b);
+        run_bench("division_u64", || a.checked_div(b).unwrap());
     }
 
     Ok(())
