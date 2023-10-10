@@ -1,3 +1,10 @@
+import {
+  LISTING_PRESETS,
+  LISTING_PRESETS_PYTH,
+  MidPriceImpact,
+  getMidPriceImpacts,
+  getProposedTier,
+} from '@blockworks-foundation/mango-v4-settings/lib/helpers/listingTools';
 import { AnchorProvider, Wallet } from '@coral-xyz/anchor';
 import { BN } from '@project-serum/anchor';
 import {
@@ -14,12 +21,12 @@ import {
   TransactionInstruction,
 } from '@solana/web3.js';
 import fs from 'fs';
+import { OracleProvider } from '../src/accounts/oracle';
 import { Builder } from '../src/builder';
 import { MangoClient } from '../src/client';
 import { NullTokenEditParams } from '../src/clientIxParamBuilder';
 import { MANGO_V4_MAIN_GROUP as MANGO_V4_PRIMARY_GROUP } from '../src/constants';
-import { computePriceImpactOnJup } from '../src/risk';
-import { toNative, toUiDecimalsForQuote } from '../src/utils';
+import { toUiDecimalsForQuote } from '../src/utils';
 import {
   MANGO_DAO_WALLET_GOVERNANCE,
   MANGO_GOVERNANCE_PROGRAM,
@@ -31,16 +38,6 @@ import {
   DEFAULT_VSR_ID,
   VsrClient,
 } from './governanceInstructions/voteStakeRegistryClient';
-import bs58 from 'bs58';
-import { OracleProvider } from '../src/accounts/oracle';
-import {
-  LISTING_PRESETS,
-  LISTING_PRESETS_KEYS,
-  LISTING_PRESETS_PYTH,
-  MidPriceImpact,
-  getMidPriceImpacts,
-  getProposedTier,
-} from '@blockworks-foundation/mango-v4-settings/lib/helpers/listingTools';
 
 const {
   MB_CLUSTER_URL,
@@ -143,7 +140,7 @@ async function updateTokenParams(): Promise<void> {
         const priceImpact = tokenToPriceImpact[getApiTokenName(bank.name)];
         const suggestedTier = getProposedTier(
           PRESETS,
-          priceImpact.avg_price_impact_percent,
+          priceImpact.target_amount,
           bank.oracleProvider === OracleProvider.Pyth,
         );
         newWeightScaleQuote =
@@ -154,6 +151,13 @@ async function updateTokenParams(): Promise<void> {
           bank.borrowWeightScaleStartQuote !== newWeightScaleQuote
             ? newWeightScaleQuote
             : null;
+      }
+
+      if (
+        newNetBorrowLimitPerWindowQuote == null &&
+        newWeightScaleQuote == null
+      ) {
+        return;
       }
 
       const params = Builder(NullTokenEditParams)
