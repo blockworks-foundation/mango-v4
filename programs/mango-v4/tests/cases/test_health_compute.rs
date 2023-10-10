@@ -25,11 +25,41 @@ async fn test_health_compute_tokens() -> Result<(), TransportError> {
     .create(solana)
     .await;
 
-    // each deposit ends with a health check
-    create_funded_account(&solana, group, owner, 0, &context.users[1], mints, 1000, 0).await;
+    let account =
+        create_funded_account(&solana, group, owner, 0, &context.users[1], &[], 1000, 0).await;
 
-    // TODO: actual explicit CU comparisons.
-    // On 2023-8-18 the final deposit costs 56245 CU and each new token increases it by roughly 2800 CU
+    let mut cu_measurements = vec![];
+    for payer_account in &context.users[1].token_accounts[..mints.len()] {
+        let result = send_tx_get_metadata(
+            solana,
+            TokenDepositInstruction {
+                amount: 10,
+                reduce_only: false,
+                account,
+                owner,
+                token_account: *payer_account,
+                token_authority: payer.clone(),
+                bank_index: 0,
+            },
+        )
+        .await
+        .unwrap();
+        cu_measurements.push(result.metadata.unwrap().compute_units_consumed);
+    }
+
+    for (i, pair) in cu_measurements.windows(2).enumerate() {
+        println!(
+            "after adding token {}: {} (+{})",
+            i,
+            pair[1],
+            pair[1] - pair[0]
+        );
+    }
+
+    let avg_cu_increase = cu_measurements.windows(2).map(|p| p[1] - p[0]).sum::<u64>()
+        / (cu_measurements.len() - 1) as u64;
+    println!("average cu increase: {avg_cu_increase}");
+    assert!(avg_cu_increase < 3200);
 
     Ok(())
 }
@@ -314,6 +344,25 @@ async fn test_health_compute_perp() -> Result<(), TransportError> {
         perp_market.native_price_to_lot(I80F48::from(1))
     };
 
+    let mut cu_measurements = vec![];
+
+    // Get the baseline cost of a deposit without an active serum3 oo
+    let result = send_tx_get_metadata(
+        solana,
+        TokenDepositInstruction {
+            amount: 10,
+            reduce_only: false,
+            account,
+            owner,
+            token_account: payer_mint_accounts[0],
+            token_authority: payer.clone(),
+            bank_index: 0,
+        },
+    )
+    .await
+    .unwrap();
+    cu_measurements.push(result.metadata.unwrap().compute_units_consumed);
+
     //
     // TEST: Create a perp order for each market
     //
@@ -334,7 +383,7 @@ async fn test_health_compute_perp() -> Result<(), TransportError> {
         .await
         .unwrap();
 
-        send_tx(
+        let result = send_tx_get_metadata(
             solana,
             TokenDepositInstruction {
                 amount: 10,
@@ -348,10 +397,22 @@ async fn test_health_compute_perp() -> Result<(), TransportError> {
         )
         .await
         .unwrap();
+        cu_measurements.push(result.metadata.unwrap().compute_units_consumed);
     }
 
-    // TODO: actual explicit CU comparisons.
-    // On 2023-8-18 the final deposit costs 51879 CU and each new market increases it by roughly 4100 CU
+    for (i, pair) in cu_measurements.windows(2).enumerate() {
+        println!(
+            "after adding perp market {}: {} (+{})",
+            i,
+            pair[1],
+            pair[1] - pair[0]
+        );
+    }
+
+    let avg_cu_increase = cu_measurements.windows(2).map(|p| p[1] - p[0]).sum::<u64>()
+        / (cu_measurements.len() - 1) as u64;
+    println!("average cu increase: {avg_cu_increase}");
+    assert!(avg_cu_increase < 4800);
 
     Ok(())
 }
