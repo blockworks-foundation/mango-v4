@@ -19,6 +19,7 @@ use anchor_lang::prelude::*;
 use fixed::types::I80F48;
 
 use crate::error::*;
+use crate::i80f48::LowPrecisionDivision;
 use crate::serum3_cpi::{OpenOrdersAmounts, OpenOrdersSlim};
 use crate::state::{
     Bank, MangoAccountRef, PerpMarket, PerpMarketIndex, PerpPosition, Serum3MarketIndex,
@@ -293,8 +294,9 @@ impl Serum3Info {
     ) -> I80F48 {
         let quote_asset = quote_info.prices.asset(health_type);
         let base_liab = base_info.prices.liab(health_type);
-        // OPTIMIZATION: These divisions can be extremely expensive (up to 5k CU each)
-        let reserved_quote_as_base_oracle = self.reserved_quote * quote_asset / base_liab;
+        let reserved_quote_as_base_oracle = (self.reserved_quote * quote_asset)
+            .checked_div_f64_precision(base_liab)
+            .unwrap();
         if self.reserved_quote_as_base_highest_bid != 0 {
             self.reserved_base
                 + reserved_quote_as_base_oracle.min(self.reserved_quote_as_base_highest_bid)
@@ -312,8 +314,9 @@ impl Serum3Info {
     ) -> I80F48 {
         let base_asset = base_info.prices.asset(health_type);
         let quote_liab = quote_info.prices.liab(health_type);
-        // OPTIMIZATION: These divisions can be extremely expensive (up to 5k CU each)
-        let reserved_base_as_quote_oracle = self.reserved_base * base_asset / quote_liab;
+        let reserved_base_as_quote_oracle = (self.reserved_base * base_asset)
+            .checked_div_f64_precision(quote_liab)
+            .unwrap();
         if self.reserved_base_as_quote_lowest_ask != 0 {
             self.reserved_quote
                 + reserved_base_as_quote_oracle.min(self.reserved_base_as_quote_lowest_ask)
