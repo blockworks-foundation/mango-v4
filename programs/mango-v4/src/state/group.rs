@@ -211,6 +211,8 @@ pub enum IxGate {
     AdminPerpWithdrawFees = 66,
     AccountSizeMigration = 67,
     TokenConditionalSwapStart = 68,
+    TokenConditionalSwapCreatePremiumAuction = 69,
+    TokenConditionalSwapCreateLinearAuction = 70,
     // NOTE: Adding new variants requires matching changes in ts and the ix_gate_set instruction.
 }
 
