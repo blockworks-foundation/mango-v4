@@ -2,9 +2,8 @@
 
 use std::cell::RefCell;
 use std::str::FromStr;
-use std::{sync::Arc, sync::RwLock};
+use std::sync::Arc;
 
-use log::*;
 use solana_program::{program_option::COption, program_pack::Pack};
 use solana_program_test::*;
 use solana_sdk::pubkey::Pubkey;
@@ -47,36 +46,6 @@ impl AddPacked for ProgramTest {
     }
 }
 
-struct LoggerWrapper {
-    inner: env_logger::Logger,
-    capture: Arc<RwLock<Vec<String>>>,
-}
-
-impl Log for LoggerWrapper {
-    fn enabled(&self, metadata: &log::Metadata) -> bool {
-        self.inner.enabled(metadata)
-    }
-
-    fn log(&self, record: &log::Record) {
-        if record
-            .target()
-            .starts_with("solana_runtime::message_processor")
-        {
-            let msg = record.args().to_string();
-            if let Some(data) = msg.strip_prefix("Program log: ") {
-                self.capture.write().unwrap().push(data.into());
-            } else if let Some(data) = msg.strip_prefix("Program data: ") {
-                self.capture.write().unwrap().push(data.into());
-            } else if let Some(data) = msg.strip_prefix("Program consumption: ") {
-                self.capture.write().unwrap().push(data.into());
-            }
-        }
-        self.inner.log(record);
-    }
-
-    fn flush(&self) {}
-}
-
 pub struct MarginTradeCookie {
     pub program: Pubkey,
     pub token_account: TestKeypair,
@@ -86,13 +55,7 @@ pub struct MarginTradeCookie {
 
 pub struct TestContextBuilder {
     test: ProgramTest,
-    logger_capture: Arc<RwLock<Vec<String>>>,
     mint0: Pubkey,
-}
-
-lazy_static::lazy_static! {
-    static ref LOGGER_CAPTURE: Arc<RwLock<Vec<String>>> = Arc::new(RwLock::new(vec![]));
-    static ref LOGGER_LOCK: Arc<RwLock<()>> = Arc::new(RwLock::new(()));
 }
 
 impl TestContextBuilder {
@@ -106,10 +69,7 @@ impl TestContextBuilder {
             env_logger::Builder::from_env(env_logger::Env::new().default_filter_or(log_filter))
                 .format_timestamp_nanos()
                 .build();
-        let _ = log::set_boxed_logger(Box::new(LoggerWrapper {
-            inner: env_logger,
-            capture: LOGGER_CAPTURE.clone(),
-        }));
+        let _ = log::set_boxed_logger(Box::new(env_logger));
 
         let mut test = ProgramTest::new("mango_v4", mango_v4::id(), processor!(mango_v4::entry));
 
@@ -118,7 +78,6 @@ impl TestContextBuilder {
 
         Self {
             test,
-            logger_capture: LOGGER_CAPTURE.clone(),
             mint0: Pubkey::new_unique(),
         }
     }
@@ -282,8 +241,6 @@ impl TestContextBuilder {
         let solana = Arc::new(SolanaCookie {
             context: RefCell::new(context),
             rent,
-            logger_capture: self.logger_capture.clone(),
-            logger_lock: LOGGER_LOCK.clone(),
             last_transaction_log: RefCell::new(vec![]),
         });
 

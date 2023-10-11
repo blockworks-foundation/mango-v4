@@ -8,14 +8,17 @@ async fn test_benchmark() -> Result<(), TransportError> {
     let context = TestContext::new().await;
     let solana = &context.solana.clone();
 
-    send_tx(solana, BenchmarkInstruction {}).await.unwrap();
+    let result = send_tx_get_metadata(solana, BenchmarkInstruction {})
+        .await
+        .unwrap();
+    let meta = result.metadata.unwrap();
 
-    let log_lines = solana.program_log();
+    let log_lines = meta.log_messages;
     let bench_regions = log_lines
         .iter()
         .enumerate()
         .filter_map(|(index, line)| {
-            if line.starts_with(&"BENCH") {
+            if line.starts_with(&"Program log: BENCH") {
                 Some(index)
             } else {
                 None

@@ -440,10 +440,6 @@ async fn test_flash_loan_creates_ata_accounts() -> Result<(), BanksClientError> 
     let mints = &context.mints[0..2];
     let payer_mint0_account = context.users[1].token_accounts[0];
     let payer_mint1_account = context.users[1].token_accounts[1];
-    let loan_origination_fee = 0.0005;
-
-    // higher resolution that the loan_origination_fee for one token
-    let balance_f64eq = |a: f64, b: f64| utils::assert_equal_f64_f64(a, b, 0.0001);
 
     //
     // SETUP: Create a group, account, register a token (mint0)
