@@ -1812,6 +1812,9 @@
 <a href="#1812" id="1812">1812</a>
 <a href="#1813" id="1813">1813</a>
 <a href="#1814" id="1814">1814</a>
+<a href="#1815" id="1815">1815</a>
+<a href="#1816" id="1816">1816</a>
+<a href="#1817" id="1817">1817</a>
 </pre><pre class="rust"><code><span class="doccomment">/*!
  * This module deals with computing different types of health for a mango account.
  *
@@ -1833,6 +1836,7 @@
 <span class="kw">use </span>fixed::types::I80F48;
 
 <span class="kw">use </span><span class="kw">crate</span>::error::<span class="kw-2">*</span>;
+<span class="kw">use </span><span class="kw">crate</span>::i80f48::LowPrecisionDivision;
 <span class="kw">use </span><span class="kw">crate</span>::serum3_cpi::{OpenOrdersAmounts, OpenOrdersSlim};
 <span class="kw">use </span><span class="kw">crate</span>::state::{
     Bank, MangoAccountRef, PerpMarket, PerpMarketIndex, PerpPosition, Serum3MarketIndex,
@@ -2107,8 +2111,9 @@
     ) -&gt; I80F48 {
         <span class="kw">let </span>quote_asset = quote_info.prices.asset(health_type);
         <span class="kw">let </span>base_liab = base_info.prices.liab(health_type);
-        <span class="comment">// OPTIMIZATION: These divisions can be extremely expensive (up to 5k CU each)
-        </span><span class="kw">let </span>reserved_quote_as_base_oracle = <span class="self">self</span>.reserved_quote * quote_asset / base_liab;
+        <span class="kw">let </span>reserved_quote_as_base_oracle = (<span class="self">self</span>.reserved_quote * quote_asset)
+            .checked_div_f64_precision(base_liab)
+            .unwrap();
         <span class="kw">if </span><span class="self">self</span>.reserved_quote_as_base_highest_bid != <span class="number">0 </span>{
             <span class="self">self</span>.reserved_base
                 + reserved_quote_as_base_oracle.min(<span class="self">self</span>.reserved_quote_as_base_highest_bid)
@@ -2126,8 +2131,9 @@
     ) -&gt; I80F48 {
         <span class="kw">let </span>base_asset = base_info.prices.asset(health_type);
         <span class="kw">let </span>quote_liab = quote_info.prices.liab(health_type);
-        <span class="comment">// OPTIMIZATION: These divisions can be extremely expensive (up to 5k CU each)
-        </span><span class="kw">let </span>reserved_base_as_quote_oracle = <span class="self">self</span>.reserved_base * base_asset / quote_liab;
+        <span class="kw">let </span>reserved_base_as_quote_oracle = (<span class="self">self</span>.reserved_base * base_asset)
+            .checked_div_f64_precision(quote_liab)
+            .unwrap();
         <span class="kw">if </span><span class="self">self</span>.reserved_base_as_quote_lowest_ask != <span class="number">0 </span>{
             <span class="self">self</span>.reserved_quote
                 + reserved_base_as_quote_oracle.min(<span class="self">self</span>.reserved_base_as_quote_lowest_ask)
