@@ -77,7 +77,7 @@ async fn test_health_compute_tokens() -> Result<(), TransportError> {
 #[tokio::test]
 async fn test_health_compute_serum() -> Result<(), TransportError> {
     let mut test_builder = TestContextBuilder::new();
-    test_builder.test().set_compute_max_units(150_000);
+    test_builder.test().set_compute_max_units(130_000);
     let context = test_builder.start_default().await;
     let solana = &context.solana.clone();
 
@@ -244,7 +244,7 @@ async fn test_health_compute_serum() -> Result<(), TransportError> {
     let avg_cu_increase = cu_measurements.windows(2).map(|p| p[1] - p[0]).sum::<u64>()
         / (cu_measurements.len() - 1) as u64;
     println!("average cu increase: {avg_cu_increase}");
-    assert!(avg_cu_increase < 10000);
+    assert!(avg_cu_increase < 7000);
 
     Ok(())
 }
