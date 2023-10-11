@@ -8,6 +8,7 @@ import {
   PublicKey,
   SYSVAR_RENT_PUBKEY,
   SystemProgram,
+  TransactionInstruction,
 } from '@solana/web3.js';
 import fs from 'fs';
 import { TokenIndex } from '../src/accounts/bank';
@@ -381,15 +382,46 @@ async function createMangoAccount(): Promise<void> {
   console.log(await serializeInstructionToBase64(ix));
 }
 
+async function idlResize(): Promise<void> {
+  // anchor constant for all idl-specific instructions
+  const idlIxBytes = [0x40, 0xf4, 0xbc, 0x78, 0xa7, 0xe9, 0x69, 0x0a];
+  const idlIxNum = 6; // resize
+  const newSize = new BN(19000);
+  const ix = new TransactionInstruction({
+    keys: [
+      {
+        pubkey: new PublicKey('3foqXduY5PabCn6LjNrLo3waNf3Hy6vQgqavoVUCsUN9'), // idl account
+        isSigner: false,
+        isWritable: true,
+      },
+      {
+        pubkey: new PublicKey('FP4PxqHTVzeG2c6eZd7974F9WvKUSdBeduUK3rjYyvBw'), // authority
+        isSigner: true,
+        isWritable: true,
+      },
+      {
+        pubkey: new PublicKey('11111111111111111111111111111111'), // system program
+        isSigner: false,
+        isWritable: false,
+      },
+    ],
+    programId: MANGO_V4_ID['mainnet-beta'],
+    data: Buffer.from(idlIxBytes.concat([idlIxNum], newSize.toArray('le', 8))),
+  });
+
+  console.log(await serializeInstructionToBase64(ix));
+}
+
 async function main(): Promise<void> {
   try {
     // await tokenRegister();
     // await tokenEdit();
     // await perpCreate();
-    await perpEdit();
+    // await perpEdit();
     // await serum3Register();
     // await ixDisable();
     // await createMangoAccount();
+    await idlResize();
   } catch (error) {
     console.log(error);
   }
