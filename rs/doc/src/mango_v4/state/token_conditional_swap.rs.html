@@ -377,6 +377,7 @@
 <a href="#377" id="377">377</a>
 <a href="#378" id="378">378</a>
 <a href="#379" id="379">379</a>
+<a href="#380" id="380">380</a>
 </pre><pre class="rust"><code><span class="kw">use </span>anchor_lang::prelude::<span class="kw-2">*</span>;
 
 <span class="kw">use </span>derivative::Derivative;
@@ -586,7 +587,8 @@
         <span class="self">self</span>.start_timestamp &gt; <span class="number">0 </span>&amp;&amp; now_ts &gt;= <span class="self">self</span>.start_timestamp
     }
 
-    <span class="kw">pub fn </span>has_incentive_for_starting(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool {
+    <span class="doccomment">/// Does this tcs type support an explicit tcs_start instruction call?
+    </span><span class="kw">pub fn </span>is_startable_type(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool {
         <span class="self">self</span>.tcs_type() == TokenConditionalSwapType::PremiumAuction
     }
 
@@ -674,7 +676,8 @@
         price &gt;= <span class="self">self</span>.price_lower_limit &amp;&amp; price &lt;= <span class="self">self</span>.price_upper_limit
     }
 
-    <span class="kw">pub fn </span>check_startable(<span class="kw-2">&amp;</span><span class="self">self</span>, price: f64, now_ts: u64) -&gt; <span class="prelude-ty">Result</span>&lt;()&gt; {
+    <span class="doccomment">/// Do the current conditions and tcs type allow starting?
+    </span><span class="kw">pub fn </span>check_startable(<span class="kw-2">&amp;</span><span class="self">self</span>, price: f64, now_ts: u64) -&gt; <span class="prelude-ty">Result</span>&lt;()&gt; {
         <span class="macro">require!</span>(
             !<span class="self">self</span>.is_expired(now_ts),
             MangoError::TokenConditionalSwapExpired
@@ -683,15 +686,14 @@
             <span class="self">self</span>.start_timestamp == <span class="number">0</span>,
             MangoError::TokenConditionalSwapAlreadyStarted
         );
-        <span class="kw">match </span><span class="self">self</span>.tcs_type() {
-            TokenConditionalSwapType::FixedPremium | TokenConditionalSwapType::PremiumAuction =&gt; {
-                <span class="macro">require!</span>(
-                    <span class="self">self</span>.price_in_range(price),
-                    MangoError::TokenConditionalSwapPriceNotInRange
-                );
-            }
-            TokenConditionalSwapType::LinearAuction =&gt; {}
-        };
+        <span class="macro">require!</span>(
+            <span class="self">self</span>.is_startable_type(),
+            MangoError::TokenConditionalSwapTypeNotStartable
+        );
+        <span class="macro">require!</span>(
+            <span class="self">self</span>.price_in_range(price),
+            MangoError::TokenConditionalSwapPriceNotInRange
+        );
         <span class="prelude-val">Ok</span>(())
     }
 

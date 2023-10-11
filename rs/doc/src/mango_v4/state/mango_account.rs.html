@@ -2626,7 +2626,7 @@
 //       The MangoAccount struct below describes v1 to make sure reading by IDL works for all live
 //       accounts.
 // - v2: Introduced in v0.18.0 to add token conditional swaps at the end. Users using account
-//       resizing will migrate to this version.
+//       resizing before v0.20.0 would migrate to this version.
 // - v3: Introduced in v0.20.0 to add 64 zero bytes at the end for future expansion.
 //       Users will migrate to this version when resizing their accounts. Also the
 //       AccountSizeMigration instruction is intended to be used to bring all accounts to

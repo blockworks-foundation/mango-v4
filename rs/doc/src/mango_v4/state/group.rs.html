@@ -228,6 +228,8 @@
 <a href="#228" id="228">228</a>
 <a href="#229" id="229">229</a>
 <a href="#230" id="230">230</a>
+<a href="#231" id="231">231</a>
+<a href="#232" id="232">232</a>
 </pre><pre class="rust"><code><span class="kw">use </span>anchor_lang::prelude::<span class="kw-2">*</span>;
 <span class="kw">use </span>static_assertions::const_assert_eq;
 <span class="kw">use </span>std::mem::size_of;
@@ -441,6 +443,8 @@
     AdminPerpWithdrawFees = <span class="number">66</span>,
     AccountSizeMigration = <span class="number">67</span>,
     TokenConditionalSwapStart = <span class="number">68</span>,
+    TokenConditionalSwapCreatePremiumAuction = <span class="number">69</span>,
+    TokenConditionalSwapCreateLinearAuction = <span class="number">70</span>,
     <span class="comment">// NOTE: Adding new variants requires matching changes in ts and the ix_gate_set instruction.
 </span>}
 

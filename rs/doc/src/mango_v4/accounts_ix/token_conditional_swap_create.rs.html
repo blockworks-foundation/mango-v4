@@ -25,17 +25,13 @@
 <a href="#25" id="25">25</a>
 <a href="#26" id="26">26</a>
 <a href="#27" id="27">27</a>
-<a href="#28" id="28">28</a>
-<a href="#29" id="29">29</a>
 </pre><pre class="rust"><code><span class="kw">use </span><span class="kw">crate</span>::error::<span class="kw-2">*</span>;
 <span class="kw">use </span><span class="kw">crate</span>::state::<span class="kw-2">*</span>;
 <span class="kw">use </span>anchor_lang::prelude::<span class="kw-2">*</span>;
 
 <span class="attr">#[derive(Accounts)]
 </span><span class="kw">pub struct </span>TokenConditionalSwapCreate&lt;<span class="lifetime">&#39;info</span>&gt; {
-    <span class="attr">#[account(
-        constraint = group.load()<span class="question-mark">?</span>.is_ix_enabled(IxGate::TokenConditionalSwapCreate) @ MangoError::IxIsDisabled,
-    )]
+    <span class="comment">// The ix gate is checked in individual instructions
     </span><span class="kw">pub </span>group: AccountLoader&lt;<span class="lifetime">&#39;info</span>, Group&gt;,
 
     <span class="attr">#[account(
