@@ -407,55 +407,57 @@ async function placeAuction(): Promise<void> {
 
   await client.tokenConditionalSwapCancelAll(group, mangoAccount!);
 
+  for (let i = 0; i < 3; i += 1) {
+    await client.tokenConditionalSwapCreateLinearAuction(
+      group,
+      mangoAccount!,
+      usdcBank,
+      solBank,
+      20.0,
+      24.0,
+      0.1,
+      Number.MAX_SAFE_INTEGER,
+      true,
+      false,
+      true,
+      Math.floor(Date.now() / 1000) + 10,
+      180000,
+      null,
+    );
+  }
   // await client.tokenConditionalSwapCreateLinearAuction(
   //   group,
   //   mangoAccount!,
-  //   usdcBank,
-  //   solBank,
-  //   18.0,
-  //   22.0,
-  //   2.0,
-  //   Number.MAX_SAFE_INTEGER,
-  //   true,
-  //   false,
-  //   true,
-  //   Math.floor(Date.now() / 1000) + 30,
-  //   180,
-  //   null,
-  // );
-  // await client.tokenConditionalSwapCreateLinearAuction(
-  //   group,
-  //   mangoAccount!,
   //   solBank,
   //   usdcBank,
-  //   1 / 20.0,
+  //   1 / 24.0,
   //   1 / 19.0,
   //   2.0,
   //   Number.MAX_SAFE_INTEGER,
   //   true,
   //   false,
   //   true,
-  //   Math.floor(Date.now() / 1000) + 30,
+  //   Math.floor(Date.now() / 1000) + 300,
   //   180,
   //   null,
   // );
-  await client.tokenConditionalSwapCreatePremiumAuction(
-    group,
-    mangoAccount!,
-    usdcBank,
-    solBank,
-    22.0,
-    26.0,
-    2.0,
-    Number.MAX_SAFE_INTEGER,
-    null,
-    1, // in percent, eww
-    true,
-    false,
-    null,
-    true,
-    300,
-  );
+  // await client.tokenConditionalSwapCreatePremiumAuction(
+  //   group,
+  //   mangoAccount!,
+  //   usdcBank,
+  //   solBank,
+  //   20.0,
+  //   26.0,
+  //   2.0,
+  //   Number.MAX_SAFE_INTEGER,
+  //   null,
+  //   1, // in percent, eww
+  //   true,
+  //   false,
+  //   null,
+  //   true,
+  //   300,
+  // );
 }
 
 async function main(): Promise<void> {

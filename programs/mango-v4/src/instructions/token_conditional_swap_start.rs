@@ -43,8 +43,8 @@ pub fn token_conditional_swap_start(
     let sell_token_index = tcs.sell_token_index;
     let now_ts: u64 = Clock::get()?.unix_timestamp.try_into().unwrap();
     require!(
-        tcs.has_incentive_for_starting(),
-        MangoError::TokenConditionalSwapCantPayIncentive
+        tcs.is_startable_type(),
+        MangoError::TokenConditionalSwapTypeNotStartable
     );
 
     let mut health_cache = new_health_cache(&account.borrow(), &account_retriever)
@@ -78,11 +78,11 @@ pub fn token_conditional_swap_start(
     let (caller_sell_token, caller_sell_raw_index, _) =
         caller.ensure_token_position(sell_token_index)?;
 
-    sell_bank.deposit(caller_sell_token, I80F48::from(incentive), now_ts)?;
+    sell_bank.deposit(caller_sell_token, incentive, now_ts)?;
 
     // This withdraw might be a borrow, so can fail due to net borrows or reduce-only
     let account_sell_pre_balance = account_sell_token.native(sell_bank);
-    sell_bank.withdraw_with_fee(account_sell_token, I80F48::from(incentive), now_ts)?;
+    sell_bank.withdraw_with_fee(account_sell_token, incentive, now_ts)?;
     let account_sell_post_balance = account_sell_token.native(sell_bank);
     if account_sell_post_balance < 0 {
         require!(

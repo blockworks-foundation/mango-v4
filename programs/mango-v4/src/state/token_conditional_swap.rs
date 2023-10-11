@@ -207,7 +207,8 @@ impl TokenConditionalSwap {
         self.start_timestamp > 0 && now_ts >= self.start_timestamp
     }
 
-    pub fn has_incentive_for_starting(&self) -> bool {
+    /// Does this tcs type support an explicit tcs_start instruction call?
+    pub fn is_startable_type(&self) -> bool {
         self.tcs_type() == TokenConditionalSwapType::PremiumAuction
     }
 
@@ -295,6 +296,7 @@ impl TokenConditionalSwap {
         price >= self.price_lower_limit && price <= self.price_upper_limit
     }
 
+    /// Do the current conditions and tcs type allow starting?
     pub fn check_startable(&self, price: f64, now_ts: u64) -> Result<()> {
         require!(
             !self.is_expired(now_ts),
@@ -304,15 +306,14 @@ impl TokenConditionalSwap {
             self.start_timestamp == 0,
             MangoError::TokenConditionalSwapAlreadyStarted
         );
-        match self.tcs_type() {
-            TokenConditionalSwapType::FixedPremium | TokenConditionalSwapType::PremiumAuction => {
-                require!(
-                    self.price_in_range(price),
-                    MangoError::TokenConditionalSwapPriceNotInRange
-                );
-            }
-            TokenConditionalSwapType::LinearAuction => {}
-        };
+        require!(
+            self.is_startable_type(),
+            MangoError::TokenConditionalSwapTypeNotStartable
+        );
+        require!(
+            self.price_in_range(price),
+            MangoError::TokenConditionalSwapPriceNotInRange
+        );
         Ok(())
     }
 
