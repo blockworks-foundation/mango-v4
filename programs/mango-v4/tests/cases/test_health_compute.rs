@@ -1,6 +1,29 @@
 use super::*;
 use mango_v4::accounts_ix::{Serum3OrderType, Serum3SelfTradeBehavior, Serum3Side};
 
+async fn deposit_cu_datapoint(
+    solana: &SolanaCookie,
+    account: Pubkey,
+    owner: TestKeypair,
+    token_account: Pubkey,
+) -> u64 {
+    let result = send_tx_get_metadata(
+        solana,
+        TokenDepositInstruction {
+            amount: 10,
+            reduce_only: false,
+            account,
+            owner,
+            token_account,
+            token_authority: owner,
+            bank_index: 0,
+        },
+    )
+    .await
+    .unwrap();
+    result.metadata.unwrap().compute_units_consumed
+}
+
 // Try to reach compute limits in health checks by having many different tokens in an account
 #[tokio::test]
 async fn test_health_compute_tokens() -> Result<(), TransportError> {
@@ -29,22 +52,8 @@ async fn test_health_compute_tokens() -> Result<(), TransportError> {
         create_funded_account(&solana, group, owner, 0, &context.users[1], &[], 1000, 0).await;
 
     let mut cu_measurements = vec![];
-    for payer_account in &context.users[1].token_accounts[..mints.len()] {
-        let result = send_tx_get_metadata(
-            solana,
-            TokenDepositInstruction {
-                amount: 10,
-                reduce_only: false,
-                account,
-                owner,
-                token_account: *payer_account,
-                token_authority: payer.clone(),
-                bank_index: 0,
-            },
-        )
-        .await
-        .unwrap();
-        cu_measurements.push(result.metadata.unwrap().compute_units_consumed);
+    for token_account in &context.users[0].token_accounts[..mints.len()] {
+        cu_measurements.push(deposit_cu_datapoint(solana, account, owner, *token_account).await);
     }
 
     for (i, pair) in cu_measurements.windows(2).enumerate() {
@@ -76,7 +85,7 @@ async fn test_health_compute_serum() -> Result<(), TransportError> {
     let owner = context.users[0].key;
     let payer = context.users[1].key;
     let mints = &context.mints[0..5];
-    let payer_mint_accounts = &context.users[1].token_accounts[0..mints.len()];
+    let token_account = context.users[0].token_accounts[0];
 
     //
     // SETUP: Create a group and an account
@@ -163,21 +172,7 @@ async fn test_health_compute_serum() -> Result<(), TransportError> {
     let mut cu_measurements = vec![];
 
     // Get the baseline cost of a deposit without an active serum3 oo
-    let result = send_tx_get_metadata(
-        solana,
-        TokenDepositInstruction {
-            amount: 10,
-            reduce_only: false,
-            account,
-            owner,
-            token_account: payer_mint_accounts[0],
-            token_authority: payer.clone(),
-            bank_index: 0,
-        },
-    )
-    .await
-    .unwrap();
-    cu_measurements.push(result.metadata.unwrap().compute_units_consumed);
+    cu_measurements.push(deposit_cu_datapoint(solana, account, owner, token_account).await);
 
     //
     // TEST: Create open orders and trigger a Deposit to check health
@@ -234,21 +229,7 @@ async fn test_health_compute_serum() -> Result<(), TransportError> {
         .unwrap();
 
         // Simple deposit: it's cost is what we use as reference for health compute cost
-        let result = send_tx_get_metadata(
-            solana,
-            TokenDepositInstruction {
-                amount: 10,
-                reduce_only: false,
-                account,
-                owner,
-                token_account: payer_mint_accounts[0],
-                token_authority: payer.clone(),
-                bank_index: 0,
-            },
-        )
-        .await
-        .unwrap();
-        cu_measurements.push(result.metadata.unwrap().compute_units_consumed);
+        cu_measurements.push(deposit_cu_datapoint(solana, account, owner, token_account).await);
     }
 
     for (i, pair) in cu_measurements.windows(2).enumerate() {
@@ -280,7 +261,7 @@ async fn test_health_compute_perp() -> Result<(), TransportError> {
     let owner = context.users[0].key;
     let payer = context.users[1].key;
     let mints = &context.mints[0..5];
-    let payer_mint_accounts = &context.users[1].token_accounts[0..mints.len()];
+    let token_account = context.users[0].token_accounts[0];
 
     //
     // SETUP: Create a group and an account
@@ -347,21 +328,7 @@ async fn test_health_compute_perp() -> Result<(), TransportError> {
     let mut cu_measurements = vec![];
 
     // Get the baseline cost of a deposit without an active serum3 oo
-    let result = send_tx_get_metadata(
-        solana,
-        TokenDepositInstruction {
-            amount: 10,
-            reduce_only: false,
-            account,
-            owner,
-            token_account: payer_mint_accounts[0],
-            token_authority: payer.clone(),
-            bank_index: 0,
-        },
-    )
-    .await
-    .unwrap();
-    cu_measurements.push(result.metadata.unwrap().compute_units_consumed);
+    cu_measurements.push(deposit_cu_datapoint(solana, account, owner, token_account).await);
 
     //
     // TEST: Create a perp order for each market
@@ -383,21 +350,7 @@ async fn test_health_compute_perp() -> Result<(), TransportError> {
         .await
         .unwrap();
 
-        let result = send_tx_get_metadata(
-            solana,
-            TokenDepositInstruction {
-                amount: 10,
-                reduce_only: false,
-                account,
-                owner,
-                token_account: payer_mint_accounts[0],
-                token_authority: payer.clone(),
-                bank_index: 0,
-            },
-        )
-        .await
-        .unwrap();
-        cu_measurements.push(result.metadata.unwrap().compute_units_consumed);
+        cu_measurements.push(deposit_cu_datapoint(solana, account, owner, token_account).await);
     }
 
     for (i, pair) in cu_measurements.windows(2).enumerate() {
