@@ -177,7 +177,7 @@ impl State {
         tcs: &TokenConditionalSwap,
         now_ts: u64,
     ) -> anyhow::Result<bool> {
-        if !tcs.has_incentive_for_starting() || tcs.is_expired(now_ts) || tcs.passed_start(now_ts) {
+        if !tcs.is_startable_type() || tcs.is_expired(now_ts) || tcs.passed_start(now_ts) {
             return Ok(false);
         }
 

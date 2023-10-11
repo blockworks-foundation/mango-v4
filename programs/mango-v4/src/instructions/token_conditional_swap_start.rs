@@ -43,8 +43,8 @@ pub fn token_conditional_swap_start(
     let sell_token_index = tcs.sell_token_index;
     let now_ts: u64 = Clock::get()?.unix_timestamp.try_into().unwrap();
     require!(
-        tcs.has_incentive_for_starting(),
-        MangoError::TokenConditionalSwapCantPayIncentive
+        tcs.is_startable_type(),
+        MangoError::TokenConditionalSwapTypeNotStartable
     );
 
     let mut health_cache = new_health_cache(&account.borrow(), &account_retriever)
