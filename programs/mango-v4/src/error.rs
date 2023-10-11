@@ -123,6 +123,8 @@ pub enum MangoError {
     TokenConditionalSwapIndexIdMismatch,
     #[msg("token conditional swap volume is too small compared to the cost of starting it")]
     TokenConditionalSwapTooSmallForStartIncentive,
+    #[msg("token conditional swap type cannot be started")]
+    TokenConditionalSwapTypeNotStartable,
 }
 
 impl MangoError {

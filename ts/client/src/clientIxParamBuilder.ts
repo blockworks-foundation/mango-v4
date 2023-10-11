@@ -262,6 +262,8 @@ export interface IxGateParams {
   AdminPerpWithdrawFees: boolean;
   AccountSizeMigration: boolean;
   TokenConditionalSwapStart: boolean;
+  TokenConditionalSwapCreatePremiumAuction: boolean;
+  TokenConditionalSwapCreateLinearAuction: boolean;
 }
 
 // Default with all ixs enabled, use with buildIxGate
@@ -338,6 +340,8 @@ export const TrueIxGateParams: IxGateParams = {
   AdminPerpWithdrawFees: true,
   AccountSizeMigration: true,
   TokenConditionalSwapStart: true,
+  TokenConditionalSwapCreatePremiumAuction: true,
+  TokenConditionalSwapCreateLinearAuction: true,
 };
 
 // build ix gate e.g. buildIxGate(Builder(TrueIxGateParams).TokenDeposit(false).build()).toNumber(),
@@ -424,6 +428,8 @@ export function buildIxGate(p: IxGateParams): BN {
   toggleIx(ixGate, p, 'AdminPerpWithdrawFees', 66);
   toggleIx(ixGate, p, 'AccountSizeMigration', 67);
   toggleIx(ixGate, p, 'TokenConditionalSwapStart', 68);
+  toggleIx(ixGate, p, 'TokenConditionalSwapCreatePremiumAuction', 69);
+  toggleIx(ixGate, p, 'TokenConditionalSwapCreateLinearAuction', 70);
 
   return ixGate;
 }

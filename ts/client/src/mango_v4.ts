@@ -2031,6 +2031,64 @@ export type MangoV4 = {
       ]
     },
     {
+      "name": "flashLoanSwapBegin",
+      "docs": [
+        "A version of flash_loan_begin that's specialized for swaps and needs fewer",
+        "bytes in the transaction"
+      ],
+      "accounts": [
+        {
+          "name": "account",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "owner",
+          "isMut": true,
+          "isSigner": true
+        },
+        {
+          "name": "inputMint",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "outputMint",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "tokenProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "associatedTokenProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "instructions",
+          "isMut": false,
+          "isSigner": false,
+          "docs": [
+            "Instructions Sysvar for instruction introspection"
+          ]
+        }
+      ],
+      "args": [
+        {
+          "name": "loanAmount",
+          "type": "u64"
+        }
+      ]
+    },
+    {
       "name": "flashLoanEnd",
       "accounts": [
         {
@@ -5514,7 +5572,7 @@ export type MangoV4 = {
         },
         {
           "name": "minTakerPrice",
-          "type": "f64"
+          "type": "f32"
         }
       ]
     },
@@ -9598,7 +9656,10 @@ export type MangoV4 = {
             "type": "u16"
           },
           {
-            "name": "hasData",
+            "name": "isConfigured",
+            "docs": [
+              "If this struct is in use. (tcs are stored in a static-length array)"
+            ],
             "type": "u8"
           },
           {
@@ -10093,6 +10154,12 @@ export type MangoV4 = {
           },
           {
             "name": "TokenConditionalSwapStart"
+          },
+          {
+            "name": "TokenConditionalSwapCreatePremiumAuction"
+          },
+          {
+            "name": "TokenConditionalSwapCreateLinearAuction"
           }
         ]
       }
@@ -12923,6 +12990,16 @@ export type MangoV4 = {
       "code": 6057,
       "name": "TokenConditionalSwapIndexIdMismatch",
       "msg": "token conditional swap index and id don't match"
+    },
+    {
+      "code": 6058,
+      "name": "TokenConditionalSwapTooSmallForStartIncentive",
+      "msg": "token conditional swap volume is too small compared to the cost of starting it"
+    },
+    {
+      "code": 6059,
+      "name": "TokenConditionalSwapTypeNotStartable",
+      "msg": "token conditional swap type cannot be started"
     }
   ]
 };
@@ -14960,6 +15037,64 @@ export const IDL: MangoV4 = {
       ]
     },
     {
+      "name": "flashLoanSwapBegin",
+      "docs": [
+        "A version of flash_loan_begin that's specialized for swaps and needs fewer",
+        "bytes in the transaction"
+      ],
+      "accounts": [
+        {
+          "name": "account",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "owner",
+          "isMut": true,
+          "isSigner": true
+        },
+        {
+          "name": "inputMint",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "outputMint",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "tokenProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "associatedTokenProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "instructions",
+          "isMut": false,
+          "isSigner": false,
+          "docs": [
+            "Instructions Sysvar for instruction introspection"
+          ]
+        }
+      ],
+      "args": [
+        {
+          "name": "loanAmount",
+          "type": "u64"
+        }
+      ]
+    },
+    {
       "name": "flashLoanEnd",
       "accounts": [
         {
@@ -18443,7 +18578,7 @@ export const IDL: MangoV4 = {
         },
         {
           "name": "minTakerPrice",
-          "type": "f64"
+          "type": "f32"
         }
       ]
     },
@@ -22527,7 +22662,10 @@ export const IDL: MangoV4 = {
             "type": "u16"
           },
           {
-            "name": "hasData",
+            "name": "isConfigured",
+            "docs": [
+              "If this struct is in use. (tcs are stored in a static-length array)"
+            ],
             "type": "u8"
           },
           {
@@ -23022,6 +23160,12 @@ export const IDL: MangoV4 = {
           },
           {
             "name": "TokenConditionalSwapStart"
+          },
+          {
+            "name": "TokenConditionalSwapCreatePremiumAuction"
+          },
+          {
+            "name": "TokenConditionalSwapCreateLinearAuction"
           }
         ]
       }
@@ -25852,6 +25996,16 @@ export const IDL: MangoV4 = {
       "code": 6057,
       "name": "TokenConditionalSwapIndexIdMismatch",
       "msg": "token conditional swap index and id don't match"
+    },
+    {
+      "code": 6058,
+      "name": "TokenConditionalSwapTooSmallForStartIncentive",
+      "msg": "token conditional swap volume is too small compared to the cost of starting it"
+    },
+    {
+      "code": 6059,
+      "name": "TokenConditionalSwapTypeNotStartable",
+      "msg": "token conditional swap type cannot be started"
     }
   ]
 };

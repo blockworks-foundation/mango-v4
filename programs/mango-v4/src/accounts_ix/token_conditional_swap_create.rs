@@ -4,9 +4,7 @@ use anchor_lang::prelude::*;
 
 #[derive(Accounts)]
 pub struct TokenConditionalSwapCreate<'info> {
-    #[account(
-        constraint = group.load()?.is_ix_enabled(IxGate::TokenConditionalSwapCreate) @ MangoError::IxIsDisabled,
-    )]
+    // The ix gate is checked in individual instructions
     pub group: AccountLoader<'info, Group>,
 
     #[account(
