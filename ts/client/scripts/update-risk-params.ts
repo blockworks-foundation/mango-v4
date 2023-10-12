@@ -266,7 +266,7 @@ async function updateTokenParams(): Promise<void> {
       walletSigner,
       MANGO_DAO_WALLET_GOVERNANCE,
       tokenOwnerRecord,
-      PROPOSAL_TITLE ? PROPOSAL_TITLE : 'Update risk paramaters for tokens',
+      PROPOSAL_TITLE ? PROPOSAL_TITLE : 'Update risk parameters for tokens',
       '',
       Object.values(proposals).length,
       instructions,
