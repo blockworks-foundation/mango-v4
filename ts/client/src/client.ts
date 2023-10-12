@@ -409,7 +409,7 @@ export class MangoClient {
         params.reduceOnly,
         params.tokenConditionalSwapTakerFeeRate,
         params.tokenConditionalSwapMakerFeeRate,
-        params.flashLoanDepositFeeRate,
+        params.flashLoanSwapFeeRate,
       )
       .accounts({
         group: group.publicKey,
@@ -484,7 +484,7 @@ export class MangoClient {
         params.forceClose,
         params.tokenConditionalSwapTakerFeeRate,
         params.tokenConditionalSwapMakerFeeRate,
-        params.flashLoanDepositFeeRate,
+        params.flashLoanSwapFeeRate,
       )
       .accounts({
         group: group.publicKey,

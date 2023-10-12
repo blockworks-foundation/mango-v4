@@ -594,7 +594,7 @@
           "type": "f32"
         },
         {
-          "name": "flashLoanDepositFeeRate",
+          "name": "flashLoanSwapFeeRate",
           "type": "f32"
         }
       ]
@@ -926,7 +926,7 @@
           }
         },
         {
-          "name": "flashLoanDepositFeeRateOpt",
+          "name": "flashLoanSwapFeeRateOpt",
           "type": {
             "option": "f32"
           }
@@ -7030,7 +7030,7 @@
             "type": "f32"
           },
           {
-            "name": "flashLoanDepositFeeRate",
+            "name": "flashLoanSwapFeeRate",
             "type": "f32"
           },
           {
@@ -8343,9 +8343,9 @@
             "type": "i128"
           },
           {
-            "name": "depositFee",
+            "name": "swapFee",
             "docs": [
-              "Deposit fee paid for positive change_amount.",
+              "Swap fee paid on the in token of a swap.",
               "",
               "Not factored into change_amount."
             ],

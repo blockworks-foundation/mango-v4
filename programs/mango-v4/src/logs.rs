@@ -80,10 +80,10 @@ pub struct FlashLoanTokenDetailV2 {
     pub borrow_index: i128,
     pub price: i128,
 
-    /// Deposit fee paid for positive change_amount.
+    /// Swap fee paid on the in token of a swap.
     ///
     /// Not factored into change_amount.
-    pub deposit_fee: i128,
+    pub swap_fee: i128,
 
     /// The amount that was transfered out to the user
     pub approved_amount: u64,

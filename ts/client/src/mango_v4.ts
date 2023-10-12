@@ -594,7 +594,7 @@ export type MangoV4 = {
           "type": "f32"
         },
         {
-          "name": "flashLoanDepositFeeRate",
+          "name": "flashLoanSwapFeeRate",
           "type": "f32"
         }
       ]
@@ -926,7 +926,7 @@ export type MangoV4 = {
           }
         },
         {
-          "name": "flashLoanDepositFeeRateOpt",
+          "name": "flashLoanSwapFeeRateOpt",
           "type": {
             "option": "f32"
           }
@@ -7030,7 +7030,7 @@ export type MangoV4 = {
             "type": "f32"
           },
           {
-            "name": "flashLoanDepositFeeRate",
+            "name": "flashLoanSwapFeeRate",
             "type": "f32"
           },
           {
@@ -8343,9 +8343,9 @@ export type MangoV4 = {
             "type": "i128"
           },
           {
-            "name": "depositFee",
+            "name": "swapFee",
             "docs": [
-              "Deposit fee paid for positive change_amount.",
+              "Swap fee paid on the in token of a swap.",
               "",
               "Not factored into change_amount."
             ],
@@ -13600,7 +13600,7 @@ export const IDL: MangoV4 = {
           "type": "f32"
         },
         {
-          "name": "flashLoanDepositFeeRate",
+          "name": "flashLoanSwapFeeRate",
           "type": "f32"
         }
       ]
@@ -13932,7 +13932,7 @@ export const IDL: MangoV4 = {
           }
         },
         {
-          "name": "flashLoanDepositFeeRateOpt",
+          "name": "flashLoanSwapFeeRateOpt",
           "type": {
             "option": "f32"
           }
@@ -20036,7 +20036,7 @@ export const IDL: MangoV4 = {
             "type": "f32"
           },
           {
-            "name": "flashLoanDepositFeeRate",
+            "name": "flashLoanSwapFeeRate",
             "type": "f32"
           },
           {
@@ -21349,9 +21349,9 @@ export const IDL: MangoV4 = {
             "type": "i128"
           },
           {
-            "name": "depositFee",
+            "name": "swapFee",
             "docs": [
-              "Deposit fee paid for positive change_amount.",
+              "Swap fee paid on the in token of a swap.",
               "",
               "Not factored into change_amount."
             ],
