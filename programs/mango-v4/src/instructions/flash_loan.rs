@@ -3,7 +3,7 @@ use crate::accounts_zerocopy::*;
 use crate::error::*;
 use crate::group_seeds;
 use crate::health::{new_fixed_order_account_retriever, new_health_cache, AccountRetriever};
-use crate::logs::{FlashLoanLogV2, FlashLoanTokenDetailV2, TokenBalanceLog};
+use crate::logs::{FlashLoanLogV3, FlashLoanTokenDetailV3, TokenBalanceLog};
 use crate::state::*;
 
 use anchor_lang::prelude::*;
@@ -469,7 +469,7 @@ pub fn flash_loan_end<'key, 'accounts, 'remaining, 'info>(
         bank.flash_loan_approved_amount = 0;
         bank.flash_loan_token_account_initial = u64::MAX;
 
-        token_loan_details.push(FlashLoanTokenDetailV2 {
+        token_loan_details.push(FlashLoanTokenDetailV3 {
             token_index: position.token_index,
             change_amount: change.amount.to_bits(),
             loan: loan.to_bits(),
@@ -491,7 +491,7 @@ pub fn flash_loan_end<'key, 'accounts, 'remaining, 'info>(
         });
     }
 
-    emit!(FlashLoanLogV2 {
+    emit!(FlashLoanLogV3 {
         mango_group: group.key(),
         mango_account: ctx.accounts.account.key(),
         flash_loan_type,
