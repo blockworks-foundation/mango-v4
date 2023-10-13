@@ -242,7 +242,7 @@ async fn test_margin_trade() -> Result<(), BanksClientError> {
 }
 
 #[tokio::test]
-async fn test_flash_loan_deposit_fee() -> Result<(), BanksClientError> {
+async fn test_flash_loan_swap_fee() -> Result<(), BanksClientError> {
     let mut test_builder = TestContextBuilder::new();
     test_builder.test().set_compute_max_units(100_000);
     let context = test_builder.start_default().await;
@@ -271,7 +271,7 @@ async fn test_flash_loan_deposit_fee() -> Result<(), BanksClientError> {
     .create(solana)
     .await;
 
-    let deposit_fee_rate = 0.042f64;
+    let swap_fee_rate = 0.042f64;
     send_tx(
         solana,
         TokenEdit {
@@ -279,7 +279,7 @@ async fn test_flash_loan_deposit_fee() -> Result<(), BanksClientError> {
             admin,
             mint: tokens[1].mint.pubkey,
             options: mango_v4::instruction::TokenEdit {
-                flash_loan_deposit_fee_rate_opt: Some(deposit_fee_rate as f32),
+                flash_loan_swap_fee_rate_opt: Some(swap_fee_rate as f32),
                 ..token_edit_instruction_default()
             },
         },
@@ -415,14 +415,11 @@ async fn test_flash_loan_deposit_fee() -> Result<(), BanksClientError> {
     let mango_withdraw_amount = account_position_f64(solana, account, tokens[0].bank).await;
     assert!(balance_f64eq(
         mango_withdraw_amount,
-        (initial_deposit - withdraw_amount) as f64
+        initial_deposit as f64 - withdraw_amount as f64 * (1.0 + swap_fee_rate)
     ));
 
     let mango_deposit_amount = account_position_f64(solana, account, tokens[1].bank).await;
-    assert!(balance_f64eq(
-        mango_deposit_amount,
-        deposit_amount as f64 * (1.0 - deposit_fee_rate)
-    ));
+    assert!(balance_f64eq(mango_deposit_amount, deposit_amount as f64));
 
     Ok(())
 }
