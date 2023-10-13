@@ -1315,7 +1315,7 @@
     </span><span class="kw">pub </span>token_conditional_swap_taker_fee_rate: f32,
     <span class="kw">pub </span>token_conditional_swap_maker_fee_rate: f32,
 
-    <span class="kw">pub </span>flash_loan_deposit_fee_rate: f32,
+    <span class="kw">pub </span>flash_loan_swap_fee_rate: f32,
 
     <span class="attr">#[derivative(Debug = <span class="string">&quot;ignore&quot;</span>)]
     </span><span class="kw">pub </span>reserved: [u8; <span class="number">2092</span>],
@@ -1428,7 +1428,7 @@
             fees_withdrawn: <span class="number">0</span>,
             token_conditional_swap_taker_fee_rate: <span class="number">0.0</span>,
             token_conditional_swap_maker_fee_rate: <span class="number">0.0</span>,
-            flash_loan_deposit_fee_rate: <span class="number">0.0</span>,
+            flash_loan_swap_fee_rate: <span class="number">0.0</span>,
             reserved: [<span class="number">0</span>; <span class="number">2092</span>],
         }
     }
@@ -1454,7 +1454,7 @@
         <span class="macro">require_gte!</span>(<span class="number">2</span>, <span class="self">self</span>.reduce_only);
         <span class="macro">require_gte!</span>(<span class="self">self</span>.token_conditional_swap_taker_fee_rate, <span class="number">0.0</span>);
         <span class="macro">require_gte!</span>(<span class="self">self</span>.token_conditional_swap_maker_fee_rate, <span class="number">0.0</span>);
-        <span class="macro">require_gte!</span>(<span class="self">self</span>.flash_loan_deposit_fee_rate, <span class="number">0.0</span>);
+        <span class="macro">require_gte!</span>(<span class="self">self</span>.flash_loan_swap_fee_rate, <span class="number">0.0</span>);
         <span class="prelude-val">Ok</span>(())
     }
 
