@@ -147,7 +147,7 @@ pub mod mango_v4 {
         reduce_only: u8,
         token_conditional_swap_taker_fee_rate: f32,
         token_conditional_swap_maker_fee_rate: f32,
-        flash_loan_deposit_fee_rate: f32,
+        flash_loan_swap_fee_rate: f32,
     ) -> Result<()> {
         #[cfg(feature = "enable-gpl")]
         instructions::token_register(
@@ -174,7 +174,7 @@ pub mod mango_v4 {
             reduce_only,
             token_conditional_swap_taker_fee_rate,
             token_conditional_swap_maker_fee_rate,
-            flash_loan_deposit_fee_rate,
+            flash_loan_swap_fee_rate,
         )?;
         Ok(())
     }
@@ -218,7 +218,7 @@ pub mod mango_v4 {
         force_close_opt: Option<bool>,
         token_conditional_swap_taker_fee_rate_opt: Option<f32>,
         token_conditional_swap_maker_fee_rate_opt: Option<f32>,
-        flash_loan_deposit_fee_rate_opt: Option<f32>,
+        flash_loan_swap_fee_rate_opt: Option<f32>,
     ) -> Result<()> {
         #[cfg(feature = "enable-gpl")]
         instructions::token_edit(
@@ -249,7 +249,7 @@ pub mod mango_v4 {
             force_close_opt,
             token_conditional_swap_taker_fee_rate_opt,
             token_conditional_swap_maker_fee_rate_opt,
-            flash_loan_deposit_fee_rate_opt,
+            flash_loan_swap_fee_rate_opt,
         )?;
         Ok(())
     }

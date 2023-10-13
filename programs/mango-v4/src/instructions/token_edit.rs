@@ -41,7 +41,7 @@ pub fn token_edit(
     force_close_opt: Option<bool>,
     token_conditional_swap_taker_fee_rate_opt: Option<f32>,
     token_conditional_swap_maker_fee_rate_opt: Option<f32>,
-    flash_loan_deposit_fee_rate_opt: Option<f32>,
+    flash_loan_swap_fee_rate_opt: Option<f32>,
 ) -> Result<()> {
     let group = ctx.accounts.group.load()?;
 
@@ -329,14 +329,14 @@ pub fn token_edit(
             require_group_admin = true;
         }
 
-        if let Some(fee_rate) = flash_loan_deposit_fee_rate_opt {
+        if let Some(fee_rate) = flash_loan_swap_fee_rate_opt {
             msg!(
                 "Flash loan swap fee fraction old {:?}, new {:?}",
-                bank.flash_loan_deposit_fee_rate,
+                bank.flash_loan_swap_fee_rate,
                 fee_rate
             );
             require_gte!(fee_rate, 0.0); // values <0 are not currently supported
-            bank.flash_loan_deposit_fee_rate = fee_rate;
+            bank.flash_loan_swap_fee_rate = fee_rate;
             require_group_admin = true;
         }
     }
