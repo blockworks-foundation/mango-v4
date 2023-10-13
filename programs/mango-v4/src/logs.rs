@@ -301,6 +301,20 @@ pub struct UpdateRateLog {
 }
 
 #[event]
+pub struct UpdateRateLogV2 {
+    pub mango_group: Pubkey,
+    pub token_index: u16,
+    // contrary to v1 these do not have curve_scaling factored in!
+    pub rate0: i128,    // I80F48
+    pub util0: i128,    // I80F48
+    pub rate1: i128,    // I80F48
+    pub util1: i128,    // I80F48
+    pub max_rate: i128, // I80F48
+    pub curve_scaling: f64,
+    pub target_utilization: f32,
+}
+
+#[event]
 pub struct TokenLiqWithTokenLog {
     pub mango_group: Pubkey,
     pub liqee: Pubkey,
