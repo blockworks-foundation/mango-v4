@@ -38,3 +38,5 @@ grep -rl 'SlippageToleranceExceeded' err-txs/processed | xargs rm
 grep -rl 'InvalidCalculation' err-txs/processed | xargs rm
 grep -rl 'RaydiumSwapExactOutput' err-txs/processed | xargs rm
 grep -rl 'OracleStale' err-txs/processed | xargs rm
+
+find err-txs/processed/ -size 0 -print -delete
