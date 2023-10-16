@@ -72,3 +72,34 @@ pub async fn run(client: &Client, group: Pubkey) -> anyhow::Result<()> {
         }
     }
 }
+
+pub async fn read_and_print(client: &Client, oracle: Pubkey) -> anyhow::Result<()> {
+    let rpc_async = client.rpc_async();
+
+    let response = rpc_async
+        .get_account_with_commitment(&oracle, CommitmentConfig::processed())
+        .await;
+    if response.is_err() {
+        anyhow::bail!("could not fetch oracle");
+    }
+    let response = response.unwrap();
+    let account = response.value;
+    if account.is_none() {
+        anyhow::bail!("oracle pubkey has no account data");
+    }
+
+    let keyed_account = KeyedAccount {
+        key: oracle,
+        account: account.unwrap(),
+    };
+
+    // Passing quote decimals as base decimals means not adjusting the ui price
+    let quote_decimals = 6;
+
+    let state = mango_v4::state::oracle_state_unchecked(&keyed_account, quote_decimals)?;
+
+    println!("ui price: {}", state.price);
+    println!("ui deviation: {}", state.deviation);
+    println!("confidence: {}%", state.deviation / state.price * 100);
+    Ok(())
+}

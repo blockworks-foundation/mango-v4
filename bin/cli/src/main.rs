@@ -117,6 +117,13 @@ enum Command {
         #[clap(flatten)]
         rpc: Rpc,
     },
+    ReadOracle {
+        #[clap(short, long)]
+        oracle: String,
+
+        #[clap(flatten)]
+        rpc: Rpc,
+    },
 }
 
 impl Rpc {
@@ -227,6 +234,11 @@ async fn main() -> Result<(), anyhow::Error> {
             let client = rpc.client(None)?;
             let group = pubkey_from_cli(&group);
             test_oracles::run(&client, group).await?;
+        }
+        Command::ReadOracle { oracle, rpc } => {
+            let client = rpc.client(None)?;
+            let oracle = pubkey_from_cli(&oracle);
+            test_oracles::read_and_print(&client, oracle).await?;
         }
     };
 
