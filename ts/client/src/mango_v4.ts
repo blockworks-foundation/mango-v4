@@ -271,6 +271,12 @@ export type MangoV4 = {
           "type": {
             "option": "u64"
           }
+        },
+        {
+          "name": "allowedFastListingsPerIntervalOpt",
+          "type": {
+            "option": "u16"
+          }
         }
       ]
     },
@@ -604,7 +610,7 @@ export type MangoV4 = {
       "accounts": [
         {
           "name": "group",
-          "isMut": false,
+          "isMut": true,
           "isSigner": false
         },
         {
@@ -7145,11 +7151,27 @@ export type MangoV4 = {
             "type": "u64"
           },
           {
+            "name": "fastListingIntervalStart",
+            "docs": [
+              "Fast-listings are limited per week, this is the start of the current fast-listing interval",
+              "in seconds since epoch"
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "fastListingsInInterval",
+            "type": "u16"
+          },
+          {
+            "name": "allowedFastListingsPerInterval",
+            "type": "u16"
+          },
+          {
             "name": "reserved",
             "type": {
               "array": [
                 "u8",
-                1824
+                1812
               ]
             }
           }
@@ -13374,6 +13396,12 @@ export const IDL: MangoV4 = {
           "type": {
             "option": "u64"
           }
+        },
+        {
+          "name": "allowedFastListingsPerIntervalOpt",
+          "type": {
+            "option": "u16"
+          }
         }
       ]
     },
@@ -13707,7 +13735,7 @@ export const IDL: MangoV4 = {
       "accounts": [
         {
           "name": "group",
-          "isMut": false,
+          "isMut": true,
           "isSigner": false
         },
         {
@@ -20248,11 +20276,27 @@ export const IDL: MangoV4 = {
             "type": "u64"
           },
           {
+            "name": "fastListingIntervalStart",
+            "docs": [
+              "Fast-listings are limited per week, this is the start of the current fast-listing interval",
+              "in seconds since epoch"
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "fastListingsInInterval",
+            "type": "u16"
+          },
+          {
+            "name": "allowedFastListingsPerInterval",
+            "type": "u16"
+          },
+          {
             "name": "reserved",
             "type": {
               "array": [
                 "u8",
-                1824
+                1812
               ]
             }
           }
