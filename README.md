@@ -154,7 +154,7 @@ No solution yet! Please open an issue if you know how to fix this.
 As of now the problem can be ignored as long as the method is not called.
 
 
-#### Syscall lib binding failes for invalid solana version combinations
+#### Syscall lib binding fails for invalid solana version combinations
 
 *Solution*:
 Make sure the Solana version of the program is compatible with the validator version.
@@ -207,7 +207,7 @@ cargo +sbf build-sbf
 cargo +solana build-sbf
 ```
 
-Make sure the toolcain is installed on your system:
+Make sure the toolchain is installed on your system:
 ```
 rustup toolchain list -v
 ```
