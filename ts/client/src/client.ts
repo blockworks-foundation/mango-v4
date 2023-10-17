@@ -261,6 +261,7 @@ export class MangoClient {
     feesSwapMangoAccount?: PublicKey,
     feesMngoTokenIndex?: TokenIndex,
     feesExpiryInterval?: BN,
+    allowedFastListingsPerInterval?: number,
   ): Promise<MangoSignatureStatus> {
     const ix = await this.program.methods
       .groupEdit(
@@ -275,6 +276,7 @@ export class MangoClient {
         feesSwapMangoAccount ?? null,
         feesMngoTokenIndex ?? null,
         feesExpiryInterval ?? null,
+        allowedFastListingsPerInterval ?? null,
       )
       .accounts({
         group: group.publicKey,

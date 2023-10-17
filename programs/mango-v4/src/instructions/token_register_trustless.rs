@@ -20,8 +20,22 @@ pub fn token_register_trustless(
     require_neq!(token_index, QUOTE_TOKEN_INDEX);
     require_neq!(token_index, TokenIndex::MAX);
 
-    let net_borrow_limit_window_size_ts = 24 * 60 * 60u64;
     let now_ts: u64 = Clock::get()?.unix_timestamp.try_into().unwrap();
+    {
+        let mut group = ctx.accounts.group.load_mut()?;
+        let week = 7 * 24 * 60 * 60;
+        if now_ts >= group.fast_listing_interval_start + week {
+            group.fast_listing_interval_start = now_ts / week * week;
+            group.fast_listings_in_interval = 0;
+        }
+        group.fast_listings_in_interval += 1;
+        require_gte!(
+            group.allowed_fast_listings_per_interval,
+            group.fast_listings_in_interval
+        );
+    }
+
+    let net_borrow_limit_window_size_ts = 24 * 60 * 60u64;
 
     let mut bank = ctx.accounts.bank.load_init()?;
     *bank = Bank {
