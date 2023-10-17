@@ -18,6 +18,7 @@ pub fn group_edit(
     buyback_fees_swap_mango_account_opt: Option<Pubkey>,
     mngo_token_index_opt: Option<TokenIndex>,
     buyback_fees_expiry_interval_opt: Option<u64>,
+    allowed_fast_listings_per_interval_opt: Option<u16>,
 ) -> Result<()> {
     let mut group = ctx.accounts.group.load_mut()?;
 
@@ -104,6 +105,15 @@ pub fn group_edit(
             buyback_fees_expiry_interval
         );
         group.buyback_fees_expiry_interval = buyback_fees_expiry_interval;
+    }
+
+    if let Some(allowed_fast_listings_per_interval) = allowed_fast_listings_per_interval_opt {
+        msg!(
+            "Allowed fast listings per week old {:?}, new {:?}",
+            group.allowed_fast_listings_per_interval,
+            allowed_fast_listings_per_interval
+        );
+        group.allowed_fast_listings_per_interval = allowed_fast_listings_per_interval;
     }
 
     Ok(())
