@@ -57,6 +57,7 @@
 <a href="#57" id="57">57</a>
 <a href="#58" id="58">58</a>
 <a href="#59" id="59">59</a>
+<a href="#60" id="60">60</a>
 </pre><pre class="rust"><code><span class="kw">use </span><span class="kw">crate</span>::error::<span class="kw-2">*</span>;
 <span class="kw">use </span><span class="kw">crate</span>::state::<span class="kw-2">*</span>;
 <span class="kw">use </span>anchor_lang::prelude::<span class="kw-2">*</span>;
@@ -68,7 +69,8 @@
 #[instruction(token_index: TokenIndex)]
 </span><span class="kw">pub struct </span>TokenRegisterTrustless&lt;<span class="lifetime">&#39;info</span>&gt; {
     <span class="attr">#[account(
-        constraint = group.load()<span class="question-mark">?</span>.admin == admin.key() || group.load()<span class="question-mark">?</span>.fast_listing_admin == admin.key() ,
+        <span class="kw-2">mut</span>,
+        constraint = group.load()<span class="question-mark">?</span>.admin == admin.key() || group.load()<span class="question-mark">?</span>.fast_listing_admin == admin.key(),
         constraint = group.load()<span class="question-mark">?</span>.is_ix_enabled(IxGate::TokenRegisterTrustless) @ MangoError::IxIsDisabled,
     )]
     </span><span class="kw">pub </span>group: AccountLoader&lt;<span class="lifetime">&#39;info</span>, Group&gt;,

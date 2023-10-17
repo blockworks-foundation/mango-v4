@@ -1674,6 +1674,8 @@
 <a href="#1674" id="1674">1674</a>
 <a href="#1675" id="1675">1675</a>
 <a href="#1676" id="1676">1676</a>
+<a href="#1677" id="1677">1677</a>
+<a href="#1678" id="1678">1678</a>
 </pre><pre class="rust"><code><span class="attr">#![allow(unused_variables)]
 
 </span><span class="kw">use </span>fixed::types::I80F48;
@@ -1758,6 +1760,7 @@
         buyback_fees_swap_mango_account_opt: <span class="prelude-ty">Option</span>&lt;Pubkey&gt;,
         mngo_token_index_opt: <span class="prelude-ty">Option</span>&lt;TokenIndex&gt;,
         buyback_fees_expiry_interval_opt: <span class="prelude-ty">Option</span>&lt;u64&gt;,
+        allowed_fast_listings_per_interval_opt: <span class="prelude-ty">Option</span>&lt;u16&gt;,
     ) -&gt; <span class="prelude-ty">Result</span>&lt;()&gt; {
         <span class="attr">#[cfg(feature = <span class="string">&quot;enable-gpl&quot;</span>)]
         </span>instructions::group_edit(
@@ -1773,6 +1776,7 @@
             buyback_fees_swap_mango_account_opt,
             mngo_token_index_opt,
             buyback_fees_expiry_interval_opt,
+            allowed_fast_listings_per_interval_opt,
         )<span class="question-mark">?</span>;
         <span class="prelude-val">Ok</span>(())
     }
