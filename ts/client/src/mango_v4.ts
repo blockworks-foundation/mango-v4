@@ -596,6 +596,14 @@ export type MangoV4 = {
         {
           "name": "flashLoanSwapFeeRate",
           "type": "f32"
+        },
+        {
+          "name": "interestCurveScaling",
+          "type": "f32"
+        },
+        {
+          "name": "interestTargetUtilization",
+          "type": "f32"
         }
       ]
     },
@@ -927,6 +935,18 @@ export type MangoV4 = {
         },
         {
           "name": "flashLoanSwapFeeRateOpt",
+          "type": {
+            "option": "f32"
+          }
+        },
+        {
+          "name": "interestCurveScalingOpt",
+          "type": {
+            "option": "f32"
+          }
+        },
+        {
+          "name": "interestTargetUtilizationOpt",
           "type": {
             "option": "f32"
           }
@@ -7034,11 +7054,28 @@ export type MangoV4 = {
             "type": "f32"
           },
           {
+            "name": "interestTargetUtilization",
+            "docs": [
+              "Target utilization: If actual utilization is higher, scale up interest.",
+              "If it's lower, scale down interest (if possible)"
+            ],
+            "type": "f32"
+          },
+          {
+            "name": "interestCurveScaling",
+            "docs": [
+              "Current interest curve scaling, always >= 1.0",
+              "",
+              "Except when first migrating to having this field, then 0.0"
+            ],
+            "type": "f64"
+          },
+          {
             "name": "reserved",
             "type": {
               "array": [
                 "u8",
-                2092
+                2080
               ]
             }
           }
@@ -11331,6 +11368,56 @@ export type MangoV4 = {
         {
           "name": "maxRate",
           "type": "i128",
+          "index": false
+        }
+      ]
+    },
+    {
+      "name": "UpdateRateLogV2",
+      "fields": [
+        {
+          "name": "mangoGroup",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "tokenIndex",
+          "type": "u16",
+          "index": false
+        },
+        {
+          "name": "rate0",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "util0",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "rate1",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "util1",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "maxRate",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "curveScaling",
+          "type": "f64",
+          "index": false
+        },
+        {
+          "name": "targetUtilization",
+          "type": "f32",
           "index": false
         }
       ]
@@ -13699,6 +13786,14 @@ export const IDL: MangoV4 = {
         {
           "name": "flashLoanSwapFeeRate",
           "type": "f32"
+        },
+        {
+          "name": "interestCurveScaling",
+          "type": "f32"
+        },
+        {
+          "name": "interestTargetUtilization",
+          "type": "f32"
         }
       ]
     },
@@ -14030,6 +14125,18 @@ export const IDL: MangoV4 = {
         },
         {
           "name": "flashLoanSwapFeeRateOpt",
+          "type": {
+            "option": "f32"
+          }
+        },
+        {
+          "name": "interestCurveScalingOpt",
+          "type": {
+            "option": "f32"
+          }
+        },
+        {
+          "name": "interestTargetUtilizationOpt",
           "type": {
             "option": "f32"
           }
@@ -20137,11 +20244,28 @@ export const IDL: MangoV4 = {
             "type": "f32"
           },
           {
+            "name": "interestTargetUtilization",
+            "docs": [
+              "Target utilization: If actual utilization is higher, scale up interest.",
+              "If it's lower, scale down interest (if possible)"
+            ],
+            "type": "f32"
+          },
+          {
+            "name": "interestCurveScaling",
+            "docs": [
+              "Current interest curve scaling, always >= 1.0",
+              "",
+              "Except when first migrating to having this field, then 0.0"
+            ],
+            "type": "f64"
+          },
+          {
             "name": "reserved",
             "type": {
               "array": [
                 "u8",
-                2092
+                2080
               ]
             }
           }
@@ -24434,6 +24558,56 @@ export const IDL: MangoV4 = {
         {
           "name": "maxRate",
           "type": "i128",
+          "index": false
+        }
+      ]
+    },
+    {
+      "name": "UpdateRateLogV2",
+      "fields": [
+        {
+          "name": "mangoGroup",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "tokenIndex",
+          "type": "u16",
+          "index": false
+        },
+        {
+          "name": "rate0",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "util0",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "rate1",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "util1",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "maxRate",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "curveScaling",
+          "type": "f64",
+          "index": false
+        },
+        {
+          "name": "targetUtilization",
+          "type": "f32",
           "index": false
         }
       ]

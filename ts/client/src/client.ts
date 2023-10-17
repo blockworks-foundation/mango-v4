@@ -410,6 +410,8 @@ export class MangoClient {
         params.tokenConditionalSwapTakerFeeRate,
         params.tokenConditionalSwapMakerFeeRate,
         params.flashLoanSwapFeeRate,
+        params.interestCurveScaling,
+        params.interestTargetUtilization,
       )
       .accounts({
         group: group.publicKey,
@@ -485,6 +487,8 @@ export class MangoClient {
         params.tokenConditionalSwapTakerFeeRate,
         params.tokenConditionalSwapMakerFeeRate,
         params.flashLoanSwapFeeRate,
+        params.interestCurveScaling,
+        params.interestTargetUtilization,
       )
       .accounts({
         group: group.publicKey,

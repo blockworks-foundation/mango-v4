@@ -46,10 +46,10 @@ pub fn token_register_trustless(
         // 10% daily adjustment at 0% or 100% utilization
         adjustment_factor: I80F48::from_num(0.004),
         util0: I80F48::from_num(0.5),
-        rate0: I80F48::from_num(0.072),
+        rate0: I80F48::from_num(0.018),
         util1: I80F48::from_num(0.8),
-        rate1: I80F48::from_num(0.2),
-        max_rate: I80F48::from_num(2.0),
+        rate1: I80F48::from_num(0.05),
+        max_rate: I80F48::from_num(0.5),
         collected_fees_native: I80F48::ZERO,
         loan_origination_fee_rate: I80F48::from_num(0.0005),
         loan_fee_rate: I80F48::from_num(0.005),
@@ -80,9 +80,10 @@ pub fn token_register_trustless(
         token_conditional_swap_taker_fee_rate: 0.0005,
         token_conditional_swap_maker_fee_rate: 0.0005,
         flash_loan_swap_fee_rate: 0.0005,
-        reserved: [0; 2092],
+        interest_target_utilization: 0.5,
+        interest_curve_scaling: 4.0,
+        reserved: [0; 2080],
     };
-    require_gt!(bank.max_rate, MINIMUM_MAX_RATE);
 
     if let Ok(oracle_price) =
         bank.oracle_price(&AccountInfoRef::borrow(ctx.accounts.oracle.as_ref())?, None)
