@@ -690,6 +690,20 @@
 <a href="#690" id="690">690</a>
 <a href="#691" id="691">691</a>
 <a href="#692" id="692">692</a>
+<a href="#693" id="693">693</a>
+<a href="#694" id="694">694</a>
+<a href="#695" id="695">695</a>
+<a href="#696" id="696">696</a>
+<a href="#697" id="697">697</a>
+<a href="#698" id="698">698</a>
+<a href="#699" id="699">699</a>
+<a href="#700" id="700">700</a>
+<a href="#701" id="701">701</a>
+<a href="#702" id="702">702</a>
+<a href="#703" id="703">703</a>
+<a href="#704" id="704">704</a>
+<a href="#705" id="705">705</a>
+<a href="#706" id="706">706</a>
 </pre><pre class="rust"><code><span class="kw">use crate</span>::{
     accounts_ix::FlashLoanType,
     state::{OracleType, PerpMarket, PerpPosition},
@@ -991,6 +1005,20 @@
     </span><span class="kw">pub </span>rate1: i128,    <span class="comment">// I80F48
     </span><span class="kw">pub </span>max_rate: i128, <span class="comment">// I80F48
 </span>}
+
+<span class="attr">#[event]
+</span><span class="kw">pub struct </span>UpdateRateLogV2 {
+    <span class="kw">pub </span>mango_group: Pubkey,
+    <span class="kw">pub </span>token_index: u16,
+    <span class="comment">// contrary to v1 these do not have curve_scaling factored in!
+    </span><span class="kw">pub </span>rate0: i128,    <span class="comment">// I80F48
+    </span><span class="kw">pub </span>util0: i128,    <span class="comment">// I80F48
+    </span><span class="kw">pub </span>rate1: i128,    <span class="comment">// I80F48
+    </span><span class="kw">pub </span>util1: i128,    <span class="comment">// I80F48
+    </span><span class="kw">pub </span>max_rate: i128, <span class="comment">// I80F48
+    </span><span class="kw">pub </span>curve_scaling: f64,
+    <span class="kw">pub </span>target_utilization: f32,
+}
 
 <span class="attr">#[event]
 </span><span class="kw">pub struct </span>TokenLiqWithTokenLog {

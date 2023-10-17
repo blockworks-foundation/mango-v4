@@ -1167,6 +1167,19 @@
 <a href="#1167" id="1167">1167</a>
 <a href="#1168" id="1168">1168</a>
 <a href="#1169" id="1169">1169</a>
+<a href="#1170" id="1170">1170</a>
+<a href="#1171" id="1171">1171</a>
+<a href="#1172" id="1172">1172</a>
+<a href="#1173" id="1173">1173</a>
+<a href="#1174" id="1174">1174</a>
+<a href="#1175" id="1175">1175</a>
+<a href="#1176" id="1176">1176</a>
+<a href="#1177" id="1177">1177</a>
+<a href="#1178" id="1178">1178</a>
+<a href="#1179" id="1179">1179</a>
+<a href="#1180" id="1180">1180</a>
+<a href="#1181" id="1181">1181</a>
+<a href="#1182" id="1182">1182</a>
 </pre><pre class="rust"><code><span class="kw">use super</span>::{OracleConfig, TokenIndex, TokenPosition};
 <span class="kw">use </span><span class="kw">crate</span>::accounts_zerocopy::KeyedAccountReader;
 <span class="kw">use </span><span class="kw">crate</span>::error::<span class="kw-2">*</span>;
@@ -1187,7 +1200,6 @@
 <span class="kw">pub const </span>DAY_I80F48: I80F48 = I80F48::from_bits(<span class="number">86_400 </span>* I80F48::ONE.to_bits());
 <span class="kw">pub const </span>ONE_BPS: I80F48 = I80F48::from_bits(<span class="number">28147497671</span>);
 <span class="kw">pub const </span>YEAR_I80F48: I80F48 = I80F48::from_bits(<span class="number">31_536_000 </span>* I80F48::ONE.to_bits());
-<span class="kw">pub const </span>MINIMUM_MAX_RATE: I80F48 = I80F48::from_bits(I80F48::ONE.to_bits() / <span class="number">2</span>);
 
 <span class="attr">#[derive(Derivative)]
 #[derivative(Debug)]
@@ -1317,8 +1329,17 @@
 
     <span class="kw">pub </span>flash_loan_swap_fee_rate: f32,
 
+    <span class="doccomment">/// Target utilization: If actual utilization is higher, scale up interest.
+    /// If it&#39;s lower, scale down interest (if possible)
+    </span><span class="kw">pub </span>interest_target_utilization: f32,
+
+    <span class="doccomment">/// Current interest curve scaling, always &gt;= 1.0
+    ///
+    /// Except when first migrating to having this field, then 0.0
+    </span><span class="kw">pub </span>interest_curve_scaling: f64,
+
     <span class="attr">#[derivative(Debug = <span class="string">&quot;ignore&quot;</span>)]
-    </span><span class="kw">pub </span>reserved: [u8; <span class="number">2092</span>],
+    </span><span class="kw">pub </span>reserved: [u8; <span class="number">2080</span>],
 }
 <span class="macro">const_assert_eq!</span>(
     size_of::&lt;Bank&gt;(),
@@ -1349,8 +1370,9 @@
         </span>+ <span class="number">1
         </span>+ <span class="number">6
         </span>+ <span class="number">8
-        </span>+ <span class="number">3 </span>* <span class="number">4
-        </span>+ <span class="number">2092
+        </span>+ <span class="number">4 </span>* <span class="number">4
+        </span>+ <span class="number">8
+        </span>+ <span class="number">2080
 </span>);
 <span class="macro">const_assert_eq!</span>(size_of::&lt;Bank&gt;(), <span class="number">3064</span>);
 <span class="macro">const_assert_eq!</span>(size_of::&lt;Bank&gt;() % <span class="number">8</span>, <span class="number">0</span>);
@@ -1380,9 +1402,11 @@
             indexed_deposits: I80F48::ZERO,
             indexed_borrows: I80F48::ZERO,
             collected_fees_native: I80F48::ZERO,
+            fees_withdrawn: <span class="number">0</span>,
             dust: I80F48::ZERO,
             flash_loan_approved_amount: <span class="number">0</span>,
             flash_loan_token_account_initial: u64::MAX,
+            net_borrows_in_window: <span class="number">0</span>,
             bump,
             bank_num,
 
@@ -1414,22 +1438,24 @@
             token_index: existing_bank.token_index,
             mint_decimals: existing_bank.mint_decimals,
             oracle_config: existing_bank.oracle_config,
-            stable_price_model: StablePriceModel::default(),
+            stable_price_model: existing_bank.stable_price_model,
             min_vault_to_deposits_ratio: existing_bank.min_vault_to_deposits_ratio,
             net_borrow_limit_per_window_quote: existing_bank.net_borrow_limit_per_window_quote,
             net_borrow_limit_window_size_ts: existing_bank.net_borrow_limit_window_size_ts,
             last_net_borrows_window_start_ts: existing_bank.last_net_borrows_window_start_ts,
-            net_borrows_in_window: <span class="number">0</span>,
-            borrow_weight_scale_start_quote: f64::MAX,
-            deposit_weight_scale_start_quote: f64::MAX,
-            reduce_only: <span class="number">0</span>,
-            force_close: <span class="number">0</span>,
+            borrow_weight_scale_start_quote: existing_bank.borrow_weight_scale_start_quote,
+            deposit_weight_scale_start_quote: existing_bank.deposit_weight_scale_start_quote,
+            reduce_only: existing_bank.reduce_only,
+            force_close: existing_bank.force_close,
             padding: [<span class="number">0</span>; <span class="number">6</span>],
-            fees_withdrawn: <span class="number">0</span>,
-            token_conditional_swap_taker_fee_rate: <span class="number">0.0</span>,
-            token_conditional_swap_maker_fee_rate: <span class="number">0.0</span>,
-            flash_loan_swap_fee_rate: <span class="number">0.0</span>,
-            reserved: [<span class="number">0</span>; <span class="number">2092</span>],
+            token_conditional_swap_taker_fee_rate: existing_bank
+                .token_conditional_swap_taker_fee_rate,
+            token_conditional_swap_maker_fee_rate: existing_bank
+                .token_conditional_swap_maker_fee_rate,
+            flash_loan_swap_fee_rate: existing_bank.flash_loan_swap_fee_rate,
+            interest_target_utilization: existing_bank.interest_target_utilization,
+            interest_curve_scaling: existing_bank.interest_curve_scaling,
+            reserved: [<span class="number">0</span>; <span class="number">2080</span>],
         }
     }
 
@@ -1439,7 +1465,7 @@
         <span class="macro">require_gte!</span>(<span class="self">self</span>.rate0, I80F48::ZERO);
         <span class="macro">require_gte!</span>(<span class="self">self</span>.util1, I80F48::ZERO);
         <span class="macro">require_gte!</span>(<span class="self">self</span>.rate1, I80F48::ZERO);
-        <span class="macro">require_gte!</span>(<span class="self">self</span>.max_rate, MINIMUM_MAX_RATE);
+        <span class="macro">require_gte!</span>(<span class="self">self</span>.max_rate, I80F48::ZERO);
         <span class="macro">require_gte!</span>(<span class="self">self</span>.loan_fee_rate, <span class="number">0.0</span>);
         <span class="macro">require_gte!</span>(<span class="self">self</span>.loan_origination_fee_rate, <span class="number">0.0</span>);
         <span class="macro">require_gte!</span>(<span class="self">self</span>.maint_asset_weight, <span class="number">0.0</span>);
@@ -1455,6 +1481,8 @@
         <span class="macro">require_gte!</span>(<span class="self">self</span>.token_conditional_swap_taker_fee_rate, <span class="number">0.0</span>);
         <span class="macro">require_gte!</span>(<span class="self">self</span>.token_conditional_swap_maker_fee_rate, <span class="number">0.0</span>);
         <span class="macro">require_gte!</span>(<span class="self">self</span>.flash_loan_swap_fee_rate, <span class="number">0.0</span>);
+        <span class="macro">require_gte!</span>(<span class="self">self</span>.interest_curve_scaling, <span class="number">1.0</span>);
+        <span class="macro">require_gte!</span>(<span class="self">self</span>.interest_target_utilization, <span class="number">0.0</span>);
         <span class="prelude-val">Ok</span>(())
     }
 
@@ -1964,6 +1992,7 @@
             <span class="self">self</span>.util1,
             <span class="self">self</span>.rate1,
             <span class="self">self</span>.max_rate,
+            <span class="self">self</span>.interest_curve_scaling,
         )
     }
 
@@ -1977,8 +2006,9 @@
         util1: I80F48,
         rate1: I80F48,
         max_rate: I80F48,
+        scaling: f64,
     ) -&gt; I80F48 {
-        <span class="kw">if </span>utilization &lt;= util0 {
+        <span class="kw">let </span>v = <span class="kw">if </span>utilization &lt;= util0 {
             <span class="kw">let </span>slope = rate0 / util0;
             slope * utilization
         } <span class="kw">else if </span>utilization &lt;= util1 {
@@ -1989,6 +2019,13 @@
             <span class="kw">let </span>extra_util = utilization - util1;
             <span class="kw">let </span>slope = (max_rate - rate1) / (I80F48::ONE - util1);
             rate1 + slope * extra_util
+        };
+
+        <span class="comment">// scaling will be 0 when it&#39;s introduced
+        </span><span class="kw">if </span>scaling == <span class="number">0.0 </span>{
+            v
+        } <span class="kw">else </span>{
+            v * I80F48::from_num(scaling)
         }
     }
 
@@ -2024,34 +2061,23 @@
     }
 
     <span class="comment">// computes new optimal rates and max rate
-    </span><span class="kw">pub fn </span>compute_rates(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; (I80F48, I80F48, I80F48) {
-        <span class="comment">// interest rate legs 2 and 3 are seen as punitive legs, encouraging utilization to move towards optimal utilization
-        // lets choose util0 as optimal utilization and 0 to utli0 as the leg where we want the utlization to preferably be
-        </span><span class="kw">let </span>optimal_util = <span class="self">self</span>.util0;
+    </span><span class="kw">pub fn </span>update_interest_rate_scaling(<span class="kw-2">&amp;mut </span><span class="self">self</span>) {
+        <span class="comment">// Interest increases above target_util, decreases below
+        </span><span class="kw">let </span>target_util = <span class="self">self</span>.interest_target_utilization <span class="kw">as </span>f64;
+
         <span class="comment">// use avg_utilization and not instantaneous_utilization so that rates cannot be manipulated easily
-        </span><span class="kw">let </span>avg_util = <span class="self">self</span>.avg_utilization;
+        </span><span class="kw">let </span>avg_util = <span class="self">self</span>.avg_utilization.to_num::&lt;f64&gt;();
+
         <span class="comment">// move rates up when utilization is above optimal utilization, and vice versa
         // util factor is between -1 (avg util = 0) and +1 (avg util = 100%)
-        </span><span class="kw">let </span>util_factor = <span class="kw">if </span>avg_util &gt; optimal_util {
-            (avg_util - optimal_util) / (I80F48::ONE - optimal_util)
+        </span><span class="kw">let </span>util_factor = <span class="kw">if </span>avg_util &gt; target_util {
+            (avg_util - target_util) / (<span class="number">1.0 </span>- target_util)
         } <span class="kw">else </span>{
-            (avg_util - optimal_util) / optimal_util
+            (avg_util - target_util) / target_util
         };
-        <span class="kw">let </span>adjustment = I80F48::ONE + <span class="self">self</span>.adjustment_factor * util_factor;
+        <span class="kw">let </span>adjustment = <span class="number">1.0 </span>+ <span class="self">self</span>.adjustment_factor.to_num::&lt;f64&gt;() * util_factor;
 
-        <span class="comment">// 1. irrespective of which leg current utilization is in, update all rates
-        // 2. only update rates as long as new adjusted rates are above MINIMUM_MAX_RATE,
-        //  since we don&#39;t want to fall to such low rates that it would take a long time to
-        //  recover to high rates if utilization suddently increases to a high value
-        </span><span class="kw">if </span>(<span class="self">self</span>.max_rate * adjustment) &gt; MINIMUM_MAX_RATE {
-            (
-                (<span class="self">self</span>.rate0 * adjustment),
-                (<span class="self">self</span>.rate1 * adjustment),
-                (<span class="self">self</span>.max_rate * adjustment),
-            )
-        } <span class="kw">else </span>{
-            (<span class="self">self</span>.rate0, <span class="self">self</span>.rate1, <span class="self">self</span>.max_rate)
-        }
+        <span class="self">self</span>.interest_curve_scaling = (<span class="self">self</span>.interest_curve_scaling * adjustment).max(<span class="number">1.0</span>)
     }
 
     <span class="kw">pub fn </span>oracle_price(

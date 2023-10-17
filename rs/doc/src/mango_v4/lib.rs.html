@@ -1666,6 +1666,14 @@
 <a href="#1666" id="1666">1666</a>
 <a href="#1667" id="1667">1667</a>
 <a href="#1668" id="1668">1668</a>
+<a href="#1669" id="1669">1669</a>
+<a href="#1670" id="1670">1670</a>
+<a href="#1671" id="1671">1671</a>
+<a href="#1672" id="1672">1672</a>
+<a href="#1673" id="1673">1673</a>
+<a href="#1674" id="1674">1674</a>
+<a href="#1675" id="1675">1675</a>
+<a href="#1676" id="1676">1676</a>
 </pre><pre class="rust"><code><span class="attr">#![allow(unused_variables)]
 
 </span><span class="kw">use </span>fixed::types::I80F48;
@@ -1816,6 +1824,8 @@
         token_conditional_swap_taker_fee_rate: f32,
         token_conditional_swap_maker_fee_rate: f32,
         flash_loan_swap_fee_rate: f32,
+        interest_curve_scaling: f32,
+        interest_target_utilization: f32,
     ) -&gt; <span class="prelude-ty">Result</span>&lt;()&gt; {
         <span class="attr">#[cfg(feature = <span class="string">&quot;enable-gpl&quot;</span>)]
         </span>instructions::token_register(
@@ -1843,6 +1853,8 @@
             token_conditional_swap_taker_fee_rate,
             token_conditional_swap_maker_fee_rate,
             flash_loan_swap_fee_rate,
+            interest_curve_scaling,
+            interest_target_utilization,
         )<span class="question-mark">?</span>;
         <span class="prelude-val">Ok</span>(())
     }
@@ -1887,6 +1899,8 @@
         token_conditional_swap_taker_fee_rate_opt: <span class="prelude-ty">Option</span>&lt;f32&gt;,
         token_conditional_swap_maker_fee_rate_opt: <span class="prelude-ty">Option</span>&lt;f32&gt;,
         flash_loan_swap_fee_rate_opt: <span class="prelude-ty">Option</span>&lt;f32&gt;,
+        interest_curve_scaling_opt: <span class="prelude-ty">Option</span>&lt;f32&gt;,
+        interest_target_utilization_opt: <span class="prelude-ty">Option</span>&lt;f32&gt;,
     ) -&gt; <span class="prelude-ty">Result</span>&lt;()&gt; {
         <span class="attr">#[cfg(feature = <span class="string">&quot;enable-gpl&quot;</span>)]
         </span>instructions::token_edit(
@@ -1918,6 +1932,8 @@
             token_conditional_swap_taker_fee_rate_opt,
             token_conditional_swap_maker_fee_rate_opt,
             flash_loan_swap_fee_rate_opt,
+            interest_curve_scaling_opt,
+            interest_target_utilization_opt,
         )<span class="question-mark">?</span>;
         <span class="prelude-val">Ok</span>(())
     }
