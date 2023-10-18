@@ -53,7 +53,7 @@ note: the UI currently uses code directly from github, pointing to the ts-client
 #### Not enough CU
 *(CU: Compute Unit)*
 
-Although you want to keep an eye on the CU limit to make sure the program does not consume to many CUs, program integration test will fail unexpectedly if limit is too low when developing.
+Although you want to keep an eye on the CU limit to make sure the program does not consume too many CUs, program integration test will fail unexpectedly if limit is too low when developing.
 
 Use this method to change the CU limit:
 ```rust
@@ -63,29 +63,16 @@ test.set_compute_max_units(500_000);
 
 #### Wrong Rust version
 
+The Rust version requirements for *Solana* and *Mango V4* can be found in the respective `rust-toolchain.toml` file.
 
-| Rust Version                        | Compatibility | Solana Version |
-|-------------------------------------|---------------|---------------:|
-| 1.69-x86_64-apple-darwin            | works         |         1.16.x |
-| 1.66.1-x86_64-apple-darwin          | works         |         1.14.x |
-| stable-x86_64-apple-darwin (1.69.0) | broken        |         1.14.x |
-| 1.68.2-x86_64-apple-darwin          | broken        |         1.14.x |
-| 1.67.1-x86_64-apple-darwin          | broken        |         1.14.x |
+On *MacOS* its also required to use the x86 toolchain.
 
-Check/set the version:
 ```
-rustup override list
-# WRONG:
-# /Users/username/code/mango-v4               1.69-aarch64-apple-darwin
-
 rustup override set 1.69-x86_64
 # CORRECT:
 # /Users/username/code/mango-v4               1.69-x86_64
 ```
 
-The Rust version requirements for *Solana* and *Mango V4* can be found in the respective `rust-toolchain.toml` file.
-
-On *MacOS* its also required to use the x86 toolchain.
 
 #### Failed to create BPF VM: syscall #4389198304 was not registered before bind
 This error results from wrong Rust version!
@@ -143,7 +130,7 @@ For Solana programs you must use `msg!` for logging and ***not*** `info!`/`debug
 #### Program failed to complete: Invoked an instruction with data that is too large (12884928151 > 10240)
 
 *Solution*:
-Fix the Solana version (1.15.2 worked).
+Use the Solana version 1.16.x or later.
 
 
 #### Error: Function _ZN86_$LT$switchboard_v2..aggregator..AggregatorAccountData$u20$as$u20$core..fmt..Debug$GT$3fmt17h22734c1ad9ed3ea8E Stack offset of 4128 exceeded max offset of 4096 by 32 bytes, please minimize large stack variables
@@ -179,6 +166,8 @@ Software Version                    Feature Set   Stake     RPC
 
 
 #### Large Cpi Contexts (e.g. Serum) will eventually overflow the stack
+Calls from one program to another program (i.e. CPI) requires a context data object to be prepared and passed as parameter.
+This context object is very large for Serum and will eventually overflow the stack.
 No real solution yet!
 
 *Workaround*: Try to make method bodies smaller by extracting code into separate methods.
@@ -186,7 +175,9 @@ No real solution yet!
 
 #### No log output or too noisy log output
 
-*Solution*: Configure the log filter:
+*Solution*: Configure the log filter.
+
+Start with this filter using the `RUST_LOG` environment variable:
 ```
 solana_rbpf=trace, solana_runtime::message_processor=debug, solana_runtime::system_instruction_processor=info, solana_program_test=debug, test_all=debug
 ```
@@ -204,7 +195,7 @@ cargo +bpf build-bpf
 # 1.15.x
 cargo +sbf build-sbf
 # 1.16.x
-cargo +solana build-sbf
+cargo +solana build-sbf # or just `cargo build-sbf`
 ```
 
 Make sure the toolchain is installed on your system:
