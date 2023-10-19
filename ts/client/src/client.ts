@@ -2570,7 +2570,16 @@ export class MangoClient {
       limit,
     );
 
-    return await this.sendAndConfirmTransactionForGroup(group, [ix]);
+    const computeLimit =
+      150_000 +
+      (mangoAccount.perpActive.length +
+        mangoAccount.tokensActive.length +
+        mangoAccount.serum3Active.length) *
+        10_000;
+
+    return await this.sendAndConfirmTransactionForGroup(group, [ComputeBudgetProgram.setComputeUnitLimit({
+      units: computeLimit,
+    }), ix]);
   }
 
   public async perpPlaceOrderIx(
