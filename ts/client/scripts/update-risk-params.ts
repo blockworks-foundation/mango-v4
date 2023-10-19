@@ -140,7 +140,7 @@ async function updateTokenParams(): Promise<void> {
         const priceImpact = tokenToPriceImpact[getApiTokenName(bank.name)];
         const suggestedTier = getProposedTier(
           PRESETS,
-          priceImpact.target_amount,
+          priceImpact?.target_amount,
           bank.oracleProvider === OracleProvider.Pyth,
         );
         newWeightScaleQuote =
