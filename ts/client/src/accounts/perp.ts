@@ -1097,7 +1097,7 @@ export interface OutEvent extends Event {
 }
 
 export interface FillEvent extends Event {
-  takerSide: PerpOrderType;
+  takerSide: 0 | 1; // 0 = bid, 1 = ask
   makerOut: boolean;
   makerSlot: number;
   timestamp: BN;
