@@ -23,7 +23,7 @@ pub struct Config {
 
 fn perp_markets_and_prices(
     mango_client: &MangoClient,
-    account_fetcher: &chain_data_fetcher::AccountFetcherDelegate,
+    account_fetcher: &chain_data_fetcher::ClientChainDataAccountFetcher,
 ) -> HashMap<PerpMarketIndex, (PerpMarket, I80F48)> {
     mango_client
         .context
@@ -53,7 +53,7 @@ fn perp_markets_and_prices(
 
 pub struct SettlementState {
     pub mango_client: Arc<MangoClient>,
-    pub account_fetcher: Arc<chain_data_fetcher::AccountFetcherDelegate>,
+    pub account_fetcher: Arc<chain_data_fetcher::ClientChainDataAccountFetcher>,
     pub config: Config,
 
     pub recently_settled: HashMap<Pubkey, Instant>,
@@ -238,7 +238,7 @@ impl SettlementState {
 
 struct SettleBatchProcessor<'a> {
     mango_client: &'a MangoClient,
-    account_fetcher: &'a chain_data_fetcher::AccountFetcherDelegate,
+    account_fetcher: &'a chain_data_fetcher::ClientChainDataAccountFetcher,
     perp_market_index: PerpMarketIndex,
     instructions: Vec<Instruction>,
     max_batch_size: usize,

@@ -347,7 +347,7 @@ struct PreparationResult {
 #[derive(Clone)]
 pub struct Context {
     pub mango_client: Arc<MangoClient>,
-    pub account_fetcher: Arc<chain_data_fetcher::AccountFetcherDelegate>,
+    pub account_fetcher: Arc<chain_data_fetcher::ClientChainDataAccountFetcher>,
 
     /// Information about current token prices is used to reject tcs early
     /// that are very likely to not be executable profitably.

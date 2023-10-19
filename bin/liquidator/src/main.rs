@@ -177,7 +177,7 @@ async fn main() -> anyhow::Result<()> {
     let chain_data = Arc::new(RwLock::new(chain_data::ChainData::new()));
     // Reading accounts from chain_data
 
-    let account_fetcher = Arc::new(chain_data_fetcher::AccountFetcherDelegate {
+    let account_fetcher = Arc::new(chain_data_fetcher::ClientChainDataAccountFetcher {
         base_fetcher: FeedsAccountFetcher {
             chain_data: chain_data.clone()
         },
@@ -556,7 +556,7 @@ struct SharedState {
 
 struct LiquidationState {
     mango_client: Arc<MangoClient>,
-    account_fetcher: Arc<chain_data_fetcher::AccountFetcherDelegate>,
+    account_fetcher: Arc<chain_data_fetcher::ClientChainDataAccountFetcher>,
     rebalancer: Arc<rebalance::Rebalancer>,
     token_swap_info: Arc<token_swap_info::TokenSwapInfoUpdater>,
     liquidation_config: liquidate::Config,

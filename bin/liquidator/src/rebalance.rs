@@ -27,14 +27,14 @@ pub struct Config {
 
 fn token_bank(
     token: &TokenContext,
-    account_fetcher: &chain_data_fetcher::AccountFetcherDelegate,
+    account_fetcher: &chain_data_fetcher::ClientChainDataAccountFetcher,
 ) -> anyhow::Result<Bank> {
     account_fetcher.fetch::<Bank>(&token.mint_info.first_bank())
 }
 
 pub struct Rebalancer {
     pub mango_client: Arc<MangoClient>,
-    pub account_fetcher: Arc<chain_data_fetcher::AccountFetcherDelegate>,
+    pub account_fetcher: Arc<chain_data_fetcher::ClientChainDataAccountFetcher>,
     pub mango_account_address: Pubkey,
     pub config: Config,
 }

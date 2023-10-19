@@ -40,7 +40,7 @@ pub fn is_perp_market<'a>(
 /// Convenience wrapper for getting max swap amounts for a token pair
 pub async fn max_swap_source(
     client: &MangoClient,
-    account_fetcher: &chain_data_fetcher::AccountFetcherDelegate,
+    account_fetcher: &chain_data_fetcher::ClientChainDataAccountFetcher,
     account: &MangoAccountValue,
     source: TokenIndex,
     target: TokenIndex,
@@ -81,7 +81,7 @@ pub async fn max_swap_source(
 /// Convenience wrapper for getting max swap amounts for a token pair
 pub async fn max_swap_source_ignore_net_borrows(
     client: &MangoClient,
-    account_fetcher: &chain_data_fetcher::AccountFetcherDelegate,
+    account_fetcher: &chain_data_fetcher::ClientChainDataAccountFetcher,
     account: &MangoAccountValue,
     source: TokenIndex,
     target: TokenIndex,

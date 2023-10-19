@@ -1,4 +1,5 @@
-use mango_feeds_connector::account_fetchers::{AccountFetcherFeeds, CachedAccountFetcher, RpcAccountFetcher};
+use mango_feeds_connector::account_fetcher::AccountFetcherFeeds;
+use mango_feeds_connector::account_fetchers::{CachedAccountFetcher, RpcAccountFetcher};
 use solana_sdk::account::AccountSharedData;
 use solana_sdk::pubkey::Pubkey;
 

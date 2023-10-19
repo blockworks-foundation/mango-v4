@@ -16,7 +16,7 @@ use solana_sdk::commitment_config::CommitmentConfig;
 use solana_sdk::pubkey::Pubkey;
 use std::collections::HashSet;
 use mango_v4_client::chain_data::FeedsAccountFetcher;
-use mango_v4_client::chain_data_fetcher::AccountFetcherDelegate;
+use mango_v4_client::chain_data_fetcher::ClientChainDataAccountFetcher;
 
 pub mod metrics;
 pub mod settle;
@@ -112,7 +112,7 @@ async fn main() -> anyhow::Result<()> {
     // The representation of current on-chain account data
     let chain_data = Arc::new(RwLock::new(chain_data::ChainData::new()));
     // Reading accounts from chain_data
-    let account_fetcher = Arc::new(AccountFetcherDelegate {
+    let account_fetcher = Arc::new(ClientChainDataAccountFetcher {
         base_fetcher: FeedsAccountFetcher {
             chain_data: chain_data.clone()
         },

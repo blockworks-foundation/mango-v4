@@ -163,7 +163,7 @@ use mango_feeds_connector::{
     grpc_plugin_source, metrics, EntityFilter, FilterConfig, MetricsConfig, SourceConfig,
 };
 use mango_feeds_connector::feeds_chain_data_fetcher::FeedsAccountFetcher;
-use mango_v4_client::chain_data_fetcher::AccountFetcherDelegate;
+use mango_v4_client::chain_data_fetcher::ClientChainDataAccountFetcher;
 
 fn start_jsonrpc_server(
     config: JsonRpcConfig,
@@ -274,7 +274,7 @@ async fn main() -> anyhow::Result<()> {
         .await?,
     );
     let chain_data = Arc::new(RwLock::new(chain_data::ChainData::new()));
-    let account_fetcher = Arc::new(AccountFetcherDelegate {
+    let account_fetcher = Arc::new(ClientChainDataAccountFetcher {
         base_fetcher: FeedsAccountFetcher { chain_data: chain_data.clone() },
         rpc: client.rpc_async(),
     });

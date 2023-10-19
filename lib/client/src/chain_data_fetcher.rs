@@ -26,12 +26,12 @@ use solana_sdk::signature::Signature;
 ///
 /// Also, there's functions for fetching up to date data via rpc.
 
-pub struct AccountFetcherDelegate {
+pub struct ClientChainDataAccountFetcher {
     pub base_fetcher: FeedsAccountFetcher,
     pub rpc: RpcClientAsync,
 }
 
-impl AccountFetcherDelegate {
+impl ClientChainDataAccountFetcher {
     // loads from ChainData
 
 
@@ -182,7 +182,7 @@ impl AccountFetcherDelegate {
 }
 
 #[async_trait::async_trait]
-impl crate::AccountFetcher for AccountFetcherDelegate {
+impl crate::AccountFetcher for ClientChainDataAccountFetcher {
     async fn fetch_raw_account(
         &self,
         address: &Pubkey,

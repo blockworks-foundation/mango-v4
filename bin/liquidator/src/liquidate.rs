@@ -23,7 +23,7 @@ pub struct Config {
 
 struct LiquidateHelper<'a> {
     client: &'a MangoClient,
-    account_fetcher: &'a chain_data_fetcher::AccountFetcherDelegate,
+    account_fetcher: &'a chain_data_fetcher::ClientChainDataAccountFetcher,
     pubkey: &'a Pubkey,
     liqee: &'a MangoAccountValue,
     health_cache: &'a HealthCache,
@@ -537,7 +537,7 @@ impl<'a> LiquidateHelper<'a> {
 #[allow(clippy::too_many_arguments)]
 pub async fn maybe_liquidate_account(
     mango_client: &MangoClient,
-    account_fetcher: &chain_data_fetcher::AccountFetcherDelegate,
+    account_fetcher: &chain_data_fetcher::ClientChainDataAccountFetcher,
     pubkey: &Pubkey,
     config: &Config,
 ) -> anyhow::Result<bool> {

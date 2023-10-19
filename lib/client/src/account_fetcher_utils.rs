@@ -1,3 +1,4 @@
+use anchor_client::ClientError;
 use anchor_lang::AccountDeserialize;
 use anyhow::Context;
 use solana_sdk::account::ReadableAccount;
@@ -26,4 +27,14 @@ pub async fn account_fetcher_fetch_anchor_account<T: AccountDeserialize>(
     let mut data: &[u8] = &account.data();
     T::try_deserialize(&mut data)
         .with_context(|| format!("deserializing anchor account {}", address))
+}
+
+
+#[test]
+fn err() {
+    let err = ClientError::AccountNotFound;
+    let intoo: anyhow::Error = err.into();
+
+    println!("intoo {:?}", intoo);
+
 }

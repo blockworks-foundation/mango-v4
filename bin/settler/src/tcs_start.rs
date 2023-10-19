@@ -17,7 +17,7 @@ pub struct Config {
 
 pub struct State {
     pub mango_client: Arc<MangoClient>,
-    pub account_fetcher: Arc<chain_data_fetcher::AccountFetcherDelegate>,
+    pub account_fetcher: Arc<chain_data_fetcher::ClientChainDataAccountFetcher>,
     pub config: Config,
 
     pub errors: ErrorTracking,
