@@ -1,5 +1,6 @@
 import { AnchorProvider } from '@coral-xyz/anchor';
 import NodeWallet from '@coral-xyz/anchor/dist/cjs/nodewallet';
+import { u8 } from '@solana/buffer-layout';
 import {
   AddressLookupTableAccount,
   ComputeBudgetProgram,
@@ -11,6 +12,7 @@ import {
   TransactionSignature,
   VersionedTransaction,
 } from '@solana/web3.js';
+import { COMPUTE_BUDGET_PROGRAM_ID } from '../constants';
 
 export interface MangoSignatureStatus {
   slot: number;
@@ -37,6 +39,32 @@ export async function sendTransaction(
 
   const payer = (provider as AnchorProvider).wallet;
 
+  //
+  // setComputeUnitLimit, hard code to a higher minimum, this is needed so that we dont fail simple UI interactions
+  //
+  // https://github.com/solana-labs/solana-web3.js/blob/master/packages/library-legacy/src/programs/compute-budget.ts#L202
+  const computeUnitLimitIxFound = ixs.some(
+    (ix) =>
+      ix.programId.equals(COMPUTE_BUDGET_PROGRAM_ID) &&
+      u8().decode(ix.data.subarray(0, 1)) == 2,
+  );
+
+  if (!computeUnitLimitIxFound) {
+    const totalUserIntendedIxs = ixs.filter(
+      (ix) => !ix.programId.equals(COMPUTE_BUDGET_PROGRAM_ID),
+    ).length;
+    const requestCu = Math.min(totalUserIntendedIxs * 250_000, 1_600_000);
+    ixs = [
+      ComputeBudgetProgram.setComputeUnitLimit({
+        units: requestCu,
+      }),
+      ...ixs,
+    ];
+  }
+
+  //
+  // setComputeUnitPrice
+  //
   if (opts.prioritizationFee) {
     ixs = [createComputeBudgetIx(opts.prioritizationFee), ...ixs];
   }

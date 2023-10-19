@@ -74,9 +74,7 @@ async fn main() -> anyhow::Result<()> {
         CommitmentConfig::processed(),
         Arc::new(Keypair::new()),
         Some(rpc_timeout),
-        TransactionBuilderConfig {
-            prioritization_micro_lamports: None,
-        },
+        TransactionBuilderConfig::default(),
     );
     let group_pk = Pubkey::from_str(&config.mango_group).unwrap();
     let group_context =

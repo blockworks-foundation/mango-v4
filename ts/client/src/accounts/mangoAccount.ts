@@ -182,6 +182,17 @@ export class MangoAccount {
     return this.frozenUntil.lt(new BN(Date.now() / 1000));
   }
 
+  public async tokenPositionsForNotConfidentOrStaleOracles(
+    client: MangoClient,
+    group: Group,
+  ): Promise<Bank[]> {
+    const nowSlot = await client.connection.getSlot();
+
+    return this.tokensActive()
+      .map((tp) => group.getFirstBankByTokenIndex(tp.tokenIndex))
+      .filter((bank) => bank.isOracleStaleOrUnconfident(nowSlot));
+  }
+
   public tokensActive(): TokenPosition[] {
     return this.tokens.filter((token) => token.isActive());
   }
@@ -1250,6 +1261,8 @@ export class Serum3Orders {
       dto.marketIndex as MarketIndex,
       dto.baseTokenIndex as TokenIndex,
       dto.quoteTokenIndex as TokenIndex,
+      dto.highestPlacedBidInv,
+      dto.lowestPlacedAsk,
     );
   }
 
@@ -1258,6 +1271,8 @@ export class Serum3Orders {
     public marketIndex: MarketIndex,
     public baseTokenIndex: TokenIndex,
     public quoteTokenIndex: TokenIndex,
+    public highestPlacedBidInv: number,
+    public lowestPlacedAsk: number,
   ) {}
 
   public isActive(): boolean {
@@ -1273,6 +1288,8 @@ export class Serum3PositionDto {
     public quoteBorrowsWithoutFee: BN,
     public baseTokenIndex: number,
     public quoteTokenIndex: number,
+    public highestPlacedBidInv: number,
+    public lowestPlacedAsk: number,
     public reserved: number[],
   ) {}
 }
@@ -1807,15 +1824,24 @@ export class PerpOoDto {
   ) {}
 }
 
-export class TokenConditionalSwapDisplayPriceStyle {
-  static sellTokenPerBuyToken = { sellTokenPerBuyToken: {} };
-  static buyTokenPerSellToken = { buyTokenPerSellToken: {} };
+export type TokenConditionalSwapDisplayPriceStyle =
+  | { sellTokenPerBuyToken: Record<string, never> }
+  | { buyTokenPerSellToken: Record<string, never> };
+// eslint-disable-next-line @typescript-eslint/no-namespace
+export namespace TokenConditionalSwapDisplayPriceStyle {
+  export const sellTokenPerBuyToken = { sellTokenPerBuyToken: {} };
+  export const buyTokenPerSellToken = { buyTokenPerSellToken: {} };
 }
 
-export class TokenConditionalSwapIntention {
-  static unknown = { unknown: {} };
-  static stopLoss = { stopLoss: {} };
-  static takeProfit = { takeProfit: {} };
+export type TokenConditionalSwapIntention =
+  | { unknown: Record<string, never> }
+  | { stopLoss: Record<string, never> }
+  | { takeProfit: Record<string, never> };
+// eslint-disable-next-line @typescript-eslint/no-namespace
+export namespace TokenConditionalSwapIntention {
+  export const unknown = { unknown: {} };
+  export const stopLoss = { stopLoss: {} };
+  export const takeProfit = { takeProfit: {} };
 }
 
 function tokenConditionalSwapIntentionFromDto(
@@ -1854,7 +1880,7 @@ export class TokenConditionalSwap {
       dto.hasData == 1,
       dto.allowCreatingDeposits == 1,
       dto.allowCreatingBorrows == 1,
-      dto.priceDisplayStyle == 0
+      dto.displayPriceStyle == 0
         ? TokenConditionalSwapDisplayPriceStyle.sellTokenPerBuyToken
         : TokenConditionalSwapDisplayPriceStyle.buyTokenPerSellToken,
       tokenConditionalSwapIntentionFromDto(dto.intention),
@@ -1906,26 +1932,6 @@ export class TokenConditionalSwap {
     return this.expiryTimestamp.toNumber();
   }
 
-  // TODO: will be replaced by onchain enum in next release
-  private getTokenConditionalSwapDisplayPriceStyle(group: Group): boolean {
-    const buyBank = this.getBuyToken(group);
-    const sellBank = this.getSellToken(group);
-
-    // If we are tp/sl'ing SOL borrow, then price is stored in sol/usdc
-    // then don't flip
-    if (sellBank.tokenIndex == 0) {
-      return true;
-    }
-
-    // E.g.
-    // If we are tp/sl'ing SOL deposit, then price is stored in usdc/sol
-    if (this.maxSell.eq(U64_MAX_BN)) {
-      true; // dont flip, i.e. continue using sellTokenPerBuyTokenUi price
-    }
-    // Flip the price if we know we are selling an exact amount of SOL
-    return false; // flip, i.e. use buyTokenPerSellTokenUi price
-  }
-
   private priceLimitToUi(
     group: Group,
     sellTokenPerBuyTokenNative: number,
@@ -1943,7 +1949,10 @@ export class TokenConditionalSwap {
     // buytoken/selltoken or selltoken/buytoken
 
     // Buy limit / close short
-    if (this.getTokenConditionalSwapDisplayPriceStyle(group)) {
+    if (
+      this.priceDisplayStyle ==
+      TokenConditionalSwapDisplayPriceStyle.sellTokenPerBuyToken
+    ) {
       return roundTo5(sellTokenPerBuyTokenUi);
     }
 
@@ -1990,7 +1999,10 @@ export class TokenConditionalSwap {
     // buytoken/selltoken or selltoken/buytoken
 
     // Buy limit / close short
-    if (this.getTokenConditionalSwapDisplayPriceStyle(group)) {
+    if (
+      this.priceDisplayStyle ==
+      TokenConditionalSwapDisplayPriceStyle.sellTokenPerBuyToken
+    ) {
       return roundTo5(sellTokenPerBuyTokenUi);
     }
 
@@ -2002,6 +2014,62 @@ export class TokenConditionalSwap {
   // in percent
   getPricePremium(): number {
     return this.pricePremiumRate * 100;
+  }
+
+  getCurrentlySuggestedPremium(group: Group): number {
+    const buyBank = this.getBuyToken(group);
+    const sellBank = this.getSellToken(group);
+    return TokenConditionalSwap.computePremium(
+      group,
+      buyBank,
+      sellBank,
+      this.maxBuy,
+      this.maxSell,
+      this.getMaxBuyUi(group),
+      this.getMaxSellUi(group),
+    );
+  }
+
+  static computePremium(
+    group: Group,
+    buyBank: Bank,
+    sellBank: Bank,
+    maxBuy: BN,
+    maxSell: BN,
+    maxBuyUi: number,
+    maxSellUi: number,
+  ): number {
+    const buyAmountInUsd =
+      maxBuy != U64_MAX_BN
+        ? maxBuyUi * buyBank.uiPrice
+        : Number.MAX_SAFE_INTEGER;
+    const sellAmountInUsd =
+      maxSell != U64_MAX_BN
+        ? maxSellUi * sellBank.uiPrice
+        : Number.MAX_SAFE_INTEGER;
+
+    // Used for computing optimal premium
+    let liqorTcsChunkSizeInUsd = Math.min(buyAmountInUsd, sellAmountInUsd);
+    if (liqorTcsChunkSizeInUsd > 5000) {
+      liqorTcsChunkSizeInUsd = 5000;
+    }
+    // For small TCS swaps, reduce chunk size to 1000 USD
+    else {
+      liqorTcsChunkSizeInUsd = 1000;
+    }
+
+    const buyTokenPriceImpact = group.getPriceImpactByTokenIndex(
+      buyBank.tokenIndex,
+      liqorTcsChunkSizeInUsd,
+    );
+    const sellTokenPriceImpact = group.getPriceImpactByTokenIndex(
+      sellBank.tokenIndex,
+      liqorTcsChunkSizeInUsd,
+    );
+    return (
+      ((1 + buyTokenPriceImpact / 100) * (1 + sellTokenPriceImpact / 100) - 1) *
+      100
+    );
   }
 
   getBuyToken(group: Group): Bank {
@@ -2059,7 +2127,7 @@ export class TokenConditionalSwapDto {
     public hasData: number,
     public allowCreatingDeposits: number,
     public allowCreatingBorrows: number,
-    public priceDisplayStyle: number,
+    public displayPriceStyle: number,
     public intention: number,
   ) {}
 }

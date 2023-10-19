@@ -1,6 +1,7 @@
 import { Magic as PythMagic } from '@pythnetwork/client';
 import { AccountInfo, Connection, PublicKey } from '@solana/web3.js';
 import SwitchboardProgram from '@switchboard-xyz/sbv2-lite';
+import Big from 'big.js';
 import BN from 'bn.js';
 import { I80F48, I80F48Dto } from '../numbers/I80F48';
 
@@ -63,26 +64,47 @@ export class StubOracle {
 export function parseSwitchboardOracleV1(accountInfo: AccountInfo<Buffer>): {
   price: number;
   lastUpdatedSlot: number;
+  uiDeviation: number;
 } {
   const price = accountInfo.data.readDoubleLE(1 + 32 + 4 + 4);
   const lastUpdatedSlot = parseInt(
     accountInfo.data.readBigUInt64LE(1 + 32 + 4 + 4 + 8).toString(),
   );
-  return { price, lastUpdatedSlot };
+  const minResponse = accountInfo.data.readDoubleLE(1 + 32 + 4 + 4 + 8 + 8 + 8);
+  const maxResponse = accountInfo.data.readDoubleLE(
+    1 + 32 + 4 + 4 + 8 + 8 + 8 + 8,
+  );
+  return { price, lastUpdatedSlot, uiDeviation: maxResponse - minResponse };
+}
+
+export function switchboardDecimalToBig(sbDecimal: {
+  mantissa: BN;
+  scale: number;
+}): Big {
+  const mantissa = new Big(sbDecimal.mantissa.toString());
+  const scale = sbDecimal.scale;
+  const oldDp = Big.DP;
+  Big.DP = 20;
+  const result: Big = mantissa.div(new Big(10).pow(scale));
+  Big.DP = oldDp;
+  return result;
 }
 
 export function parseSwitchboardOracleV2(
   program: SwitchboardProgram,
   accountInfo: AccountInfo<Buffer>,
-): { price: number; lastUpdatedSlot: number } {
+): { price: number; lastUpdatedSlot: number; uiDeviation: number } {
   const price = program.decodeLatestAggregatorValue(accountInfo)!.toNumber();
   const lastUpdatedSlot = program
     .decodeAggregator(accountInfo)
     .latestConfirmedRound!.roundOpenSlot!.toNumber();
+  const stdDeviation = switchboardDecimalToBig(
+    program.decodeAggregator(accountInfo).latestConfirmedRound.stdDeviation,
+  );
 
   if (!price || !lastUpdatedSlot)
     throw new Error('Unable to parse Switchboard Oracle V2');
-  return { price, lastUpdatedSlot };
+  return { price, lastUpdatedSlot, uiDeviation: stdDeviation.toNumber() };
 }
 
 /**
@@ -93,7 +115,7 @@ export function parseSwitchboardOracleV2(
 export async function parseSwitchboardOracle(
   accountInfo: AccountInfo<Buffer>,
   connection: Connection,
-): Promise<{ price: number; lastUpdatedSlot: number }> {
+): Promise<{ price: number; lastUpdatedSlot: number; uiDeviation: number }> {
   if (accountInfo.owner.equals(SwitchboardProgram.devnetPid)) {
     if (!sbv2DevnetProgram) {
       sbv2DevnetProgram = await SwitchboardProgram.loadDevnet(connection);
@@ -132,4 +154,27 @@ export function isSwitchboardOracle(accountInfo: AccountInfo<Buffer>): boolean {
 
 export function isPythOracle(accountInfo: AccountInfo<Buffer>): boolean {
   return accountInfo.data.readUInt32LE(0) === PythMagic;
+}
+
+export function isOracleStaleOrUnconfident(
+  nowSlot: number,
+  maxStalenessSlots: number,
+  oracleLastUpdatedSlot: number | undefined,
+  deviation: I80F48 | undefined,
+  confFilter: I80F48,
+  price: I80F48,
+): boolean {
+  if (
+    maxStalenessSlots >= 0 &&
+    oracleLastUpdatedSlot &&
+    nowSlot > oracleLastUpdatedSlot + maxStalenessSlots
+  ) {
+    return true;
+  }
+
+  if (deviation && deviation.gt(confFilter.mul(price))) {
+    return true;
+  }
+
+  return false;
 }

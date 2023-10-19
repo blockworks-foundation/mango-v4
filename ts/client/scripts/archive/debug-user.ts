@@ -284,21 +284,7 @@ async function main(): Promise<void> {
   mangoAccounts.sort((a, b) => b.getEquity(group).cmp(a.getEquity(group)));
 
   for (const mangoAccount of mangoAccounts) {
-    if (
-      true &&
-      (MANGO_ACCOUNT_PK!.equals(PublicKey.default) ||
-        // For specific account
-        mangoAccount.publicKey.equals(new PublicKey(MANGO_ACCOUNT_PK!))) &&
-      // Only interesting perp liq price candidates
-      mangoAccount.perpActive().length > 0 &&
-      mangoAccount
-        .perpActive()
-        .filter((pp) =>
-          pp
-            .getBasePosition(group.getPerpMarketByMarketIndex(pp.marketIndex))
-            .gt(ZERO_I80F48()),
-        ).length > 0
-    ) {
+    if (mangoAccount.publicKey.equals(new PublicKey(MANGO_ACCOUNT_PK!))) {
       console.log(
         `account https://app.mango.markets/?address=${mangoAccount.publicKey}`,
       );

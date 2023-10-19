@@ -606,7 +606,7 @@ async function makeMarketUpdateInstructions(
       );
       moveOrders = openOrders.length < 2 || openOrders.length > 2;
       for (const o of openOrders) {
-        const refPrice = o.side === 'buy' ? bookAdjBid : bookAdjAsk;
+        const refPrice = o.side === PerpOrderSide.bid ? bookAdjBid : bookAdjAsk;
         moveOrders =
           moveOrders ||
           Math.abs(o.priceLots.toNumber() / refPrice.toNumber() - 1) >
