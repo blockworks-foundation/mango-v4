@@ -44,6 +44,7 @@ use solana_sdk::instruction::{AccountMeta, Instruction};
 use solana_sdk::signature::{Keypair, Signature};
 use solana_sdk::sysvar;
 use solana_sdk::{commitment_config::CommitmentConfig, pubkey::Pubkey, signer::Signer};
+use crate::mango_account_fetchers::account_fetcher_fetch_mango_account;
 
 pub const MAX_ACCOUNTS_PER_TRANSACTION: usize = 64;
 
