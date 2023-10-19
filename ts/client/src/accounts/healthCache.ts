@@ -1090,6 +1090,10 @@ export class HealthCache {
     const base = healthCacheClone.tokenInfos[baseIndex];
     const quote = healthCacheClone.tokenInfos[quoteIndex];
 
+    const res = healthCacheClone.computeSerum3Reservations(HealthType.init);
+    const baseReserved = res.tokenMaxReserved[baseIndex].maxSerumReserved;
+    const quoteReserved = res.tokenMaxReserved[quoteIndex].maxSerumReserved;
+
     // Binary search between current health (0 sized new order) and
     // an amount to trade which will bring health to 0.
 
@@ -1104,8 +1108,9 @@ export class HealthCache {
     // console.log(`getMaxSerum3OrderForHealthRatio`);
 
     // Amount which would bring health to 0
+    // amount = M + (init_health + M * (B_init_liab - A_init_asset) + R) / (A_init_liab - B_init_asset);
     // where M = max(A_deposits, B_borrows)
-    // amount = M + (init_health + M * (B_init_liab - A_init_asset)) / (A_init_liab - B_init_asset);
+    // and R = reserved serum A amount (because they might offset A borrows)
     // A is what we would be essentially swapping for B
     // So when its an ask, then base->quote,
     // and when its a bid, then quote->bid
@@ -1114,12 +1119,11 @@ export class HealthCache {
       const quoteBorrows = quote.balanceSpot.lt(ZERO_I80F48())
         ? quote.balanceSpot.abs().mul(quote.prices.liab(HealthType.init))
         : ZERO_I80F48();
-      const max = base.balanceSpot
-        .mul(base.prices.asset(HealthType.init))
-        .max(quoteBorrows);
+      const max = base.balanceSpot.mul(base.prices.oracle).max(quoteBorrows);
       zeroAmount = max.add(
         initialHealth
           .add(max.mul(quote.initLiabWeight.sub(base.initAssetWeight)))
+          .add(baseReserved.mul(base.prices.liab(HealthType.init)))
           .div(
             base
               .liabWeight(HealthType.init)
@@ -1132,12 +1136,11 @@ export class HealthCache {
       const baseBorrows = base.balanceSpot.lt(ZERO_I80F48())
         ? base.balanceSpot.abs().mul(base.prices.liab(HealthType.init))
         : ZERO_I80F48();
-      const max = quote.balanceSpot
-        .mul(quote.prices.asset(HealthType.init))
-        .max(baseBorrows);
+      const max = quote.balanceSpot.mul(quote.prices.oracle).max(baseBorrows);
       zeroAmount = max.add(
         initialHealth
           .add(max.mul(base.initLiabWeight.sub(quote.initAssetWeight)))
+          .add(quoteReserved.mul(quote.prices.liab(HealthType.init)))
           .div(
             quote
               .liabWeight(HealthType.init)
