@@ -3247,8 +3247,6 @@ dependencies = [
 [[package]]
 name = "mango-feeds-connector"
 version = "0.2.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3c51f9dd65f5c5ce13a41aa099c7fd6f2462ad9bc0184333a348a4b683139f9d"
 dependencies = [
  "anyhow",
  "async-channel",

@@ -32,7 +32,8 @@ use solana_sdk::hash::Hash;
 use solana_sdk::signer::keypair;
 use solana_sdk::transaction::TransactionError;
 
-use crate::account_fetcher::*;
+use crate::account_fetcher_trait::*;
+use crate::account_fetchers::*;
 use crate::context::MangoGroupContext;
 use crate::gpa::{fetch_anchor_account, fetch_mango_accounts};
 use crate::{jupiter, util};
