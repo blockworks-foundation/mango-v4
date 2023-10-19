@@ -6,7 +6,7 @@ use solana_sdk::account::ReadableAccount;
 use crate::*;
 use mango_v4::accounts_zerocopy::KeyedAccountSharedData;
 use mango_v4::state::*;
-use crate::account_fetchers::account_fetcher_fetch_anchor_account;
+use crate::account_fetcher_utils::account_fetcher_fetch_anchor_account;
 
 #[derive(Debug, PartialEq)]
 pub enum Direction {

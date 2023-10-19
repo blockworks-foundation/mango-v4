@@ -14,20 +14,17 @@ use anchor_lang::AccountDeserialize;
 use solana_client::nonblocking::rpc_client::RpcClient as RpcClientAsync;
 use solana_sdk::account::{AccountSharedData, ReadableAccount};
 use solana_sdk::pubkey::Pubkey;
-
-use mango_v4::state::MangoAccountValue;
 use crate::AccountFetcher;
 
 
-// Can't be in the trait, since then it would no longer be object-safe...
-pub async fn account_fetcher_fetch_anchor_account<T: AccountDeserialize>(
-    fetcher: &dyn AccountFetcher,
-    address: &Pubkey,
-) -> anyhow::Result<T> {
-    let account = fetcher.fetch_raw_account(address).await?;
-    let mut data: &[u8] = &account.data();
-    T::try_deserialize(&mut data)
-        .with_context(|| format!("deserializing anchor account {}", address))
+#[async_trait::async_trait]
+pub trait AccountFetcherFeeds: Sync + Send {
+    async fn feeds_fetch_raw_account(&self, address: &Pubkey) -> anyhow::Result<AccountSharedData>;
+    async fn feeds_fetch_program_accounts(
+        &self,
+        program: &Pubkey,
+        discriminator: [u8; 8],
+    ) -> anyhow::Result<Vec<(Pubkey, AccountSharedData)>>;
 }
 
 
@@ -36,8 +33,8 @@ pub struct RpcAccountFetcher {
 }
 
 #[async_trait::async_trait]
-impl AccountFetcher for RpcAccountFetcher {
-    async fn fetch_raw_account(&self, address: &Pubkey) -> anyhow::Result<AccountSharedData> {
+impl AccountFetcherFeeds for RpcAccountFetcher {
+    async fn feeds_fetch_raw_account(&self, address: &Pubkey) -> anyhow::Result<AccountSharedData> {
         self.rpc
             .get_account_with_commitment(address, self.rpc.commitment())
             .await
@@ -48,7 +45,7 @@ impl AccountFetcher for RpcAccountFetcher {
             .map(Into::into)
     }
 
-    async fn fetch_program_accounts(
+    async fn feeds_fetch_program_accounts(
         &self,
         program: &Pubkey,
         discriminator: [u8; 8],
@@ -127,12 +124,12 @@ impl AccountCache {
     }
 }
 
-pub struct CachedAccountFetcher<T: AccountFetcher> {
+pub struct CachedAccountFetcher<T: AccountFetcherFeeds> {
     fetcher: Arc<T>,
     cache: Arc<Mutex<AccountCache>>,
 }
 
-impl<T: AccountFetcher> Clone for CachedAccountFetcher<T> {
+impl<T: AccountFetcherFeeds> Clone for CachedAccountFetcher<T> {
     fn clone(&self) -> Self {
         Self {
             fetcher: self.fetcher.clone(),
@@ -141,7 +138,7 @@ impl<T: AccountFetcher> Clone for CachedAccountFetcher<T> {
     }
 }
 
-impl<T: AccountFetcher> CachedAccountFetcher<T> {
+impl<T: AccountFetcherFeeds> CachedAccountFetcher<T> {
     pub fn new(fetcher: Arc<T>) -> Self {
         Self {
             fetcher,
@@ -156,8 +153,8 @@ impl<T: AccountFetcher> CachedAccountFetcher<T> {
 }
 
 #[async_trait::async_trait]
-impl<T: AccountFetcher + 'static> AccountFetcher for CachedAccountFetcher<T> {
-    async fn fetch_raw_account(&self, address: &Pubkey) -> anyhow::Result<AccountSharedData> {
+impl<T: AccountFetcherFeeds + 'static> AccountFetcherFeeds for CachedAccountFetcher<T> {
+    async fn feeds_fetch_raw_account(&self, address: &Pubkey) -> anyhow::Result<AccountSharedData> {
         let fetch_job = {
             let mut cache = self.cache.lock().unwrap();
             if let Some(acc) = cache.accounts.get(address) {
@@ -168,7 +165,7 @@ impl<T: AccountFetcher + 'static> AccountFetcher for CachedAccountFetcher<T> {
             let self_copy = self.clone();
             let address_copy = address.clone();
             cache.account_jobs.run_coalesced(*address, async move {
-                let result = self_copy.fetcher.fetch_raw_account(&address_copy).await;
+                let result = self_copy.fetcher.feeds_fetch_raw_account(&address_copy).await;
                 let mut cache = self_copy.cache.lock().unwrap();
 
                 // remove the job from the job list, so it can be redone if it errored
@@ -192,7 +189,7 @@ impl<T: AccountFetcher + 'static> AccountFetcher for CachedAccountFetcher<T> {
         }
     }
 
-    async fn fetch_program_accounts(
+    async fn feeds_fetch_program_accounts(
         &self,
         program: &Pubkey,
         discriminator: [u8; 8],
@@ -214,7 +211,7 @@ impl<T: AccountFetcher + 'static> AccountFetcher for CachedAccountFetcher<T> {
                 .run_coalesced(cache_key.clone(), async move {
                     let result = self_copy
                         .fetcher
-                        .fetch_program_accounts(&program_copy, discriminator)
+                        .feeds_fetch_program_accounts(&program_copy, discriminator)
                         .await;
                     let mut cache = self_copy.cache.lock().unwrap();
                     cache.program_accounts_jobs.remove(&cache_key);
