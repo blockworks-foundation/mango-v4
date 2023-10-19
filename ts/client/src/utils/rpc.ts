@@ -53,7 +53,7 @@ export async function sendTransaction(
     const totalUserIntendedIxs = ixs.filter(
       (ix) => !ix.programId.equals(COMPUTE_BUDGET_PROGRAM_ID),
     ).length;
-    const requestCu = Math.min(totalUserIntendedIxs * 300_000, 1_600_000);
+    const requestCu = Math.min(totalUserIntendedIxs * 250_000, 1_600_000);
     ixs = [
       ComputeBudgetProgram.setComputeUnitLimit({
         units: requestCu,

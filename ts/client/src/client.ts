@@ -2577,9 +2577,12 @@ export class MangoClient {
         mangoAccount.serum3Active.length) *
         10_000;
 
-    return await this.sendAndConfirmTransactionForGroup(group, [ComputeBudgetProgram.setComputeUnitLimit({
-      units: computeLimit,
-    }), ix]);
+    return await this.sendAndConfirmTransactionForGroup(group, [
+      ComputeBudgetProgram.setComputeUnitLimit({
+        units: computeLimit,
+      }),
+      ix,
+    ]);
   }
 
   public async perpPlaceOrderIx(
