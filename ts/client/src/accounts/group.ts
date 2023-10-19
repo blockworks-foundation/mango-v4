@@ -13,7 +13,7 @@ import merge from 'lodash/merge';
 import { MangoClient } from '../client';
 import { OPENBOOK_PROGRAM_ID } from '../constants';
 import { Id } from '../ids';
-import { I80F48, ONE_I80F48 } from '../numbers/I80F48';
+import { I80F48 } from '../numbers/I80F48';
 import { PriceImpact, computePriceImpactOnJup } from '../risk';
 import { buildFetch, toNative, toNativeI80F48, toUiDecimals } from '../utils';
 import { Bank, MintInfo, TokenIndex } from './bank';
@@ -389,27 +389,23 @@ export class Group {
     const coder = new BorshAccountsCoder(client.program.idl);
     for (const [index, ai] of ais.entries()) {
       for (const bank of banks[index]) {
-        if (bank.name === 'USDC') {
-          bank._price = ONE_I80F48();
-          bank._uiPrice = 1;
-        } else {
-          if (!ai)
-            throw new Error(
-              `Undefined accountInfo object in reloadBankOraclePrices for ${bank.oracle}!`,
-            );
-          const { price, uiPrice, lastUpdatedSlot, provider } =
-            await this.decodePriceFromOracleAi(
-              coder,
-              bank.oracle,
-              ai,
-              this.getMintDecimals(bank.mint),
-              client,
-            );
-          bank._price = price;
-          bank._uiPrice = uiPrice;
-          bank._oracleLastUpdatedSlot = lastUpdatedSlot;
-          bank._oracleProvider = provider;
-        }
+        if (!ai)
+          throw new Error(
+            `Undefined accountInfo object in reloadBankOraclePrices for ${bank.oracle}!`,
+          );
+        const { price, uiPrice, lastUpdatedSlot, provider, deviation } =
+          await this.decodePriceFromOracleAi(
+            coder,
+            bank.oracle,
+            ai,
+            this.getMintDecimals(bank.mint),
+            client,
+          );
+        bank._price = price;
+        bank._uiPrice = uiPrice;
+        bank._oracleLastUpdatedSlot = lastUpdatedSlot;
+        bank._oracleProvider = provider;
+        bank._oracleLastKnownDeviation = deviation;
       }
     }
   }
@@ -433,7 +429,7 @@ export class Group {
             `Undefined ai object in reloadPerpMarketOraclePrices for ${perpMarket.oracle}!`,
           );
 
-        const { price, uiPrice, lastUpdatedSlot, provider } =
+        const { price, uiPrice, lastUpdatedSlot, provider, deviation } =
           await this.decodePriceFromOracleAi(
             coder,
             perpMarket.oracle,
@@ -445,6 +441,7 @@ export class Group {
         perpMarket._uiPrice = uiPrice;
         perpMarket._oracleLastUpdatedSlot = lastUpdatedSlot;
         perpMarket._oracleProvider = provider;
+        perpMarket._oracleLastKnownDeviation = deviation;
       }),
     );
   }
@@ -460,8 +457,9 @@ export class Group {
     uiPrice: number;
     lastUpdatedSlot: number;
     provider: OracleProvider;
+    deviation: I80F48;
   }> {
-    let price, uiPrice, lastUpdatedSlot, provider;
+    let price, uiPrice, lastUpdatedSlot, provider, deviation;
     if (
       !BorshAccountsCoder.accountDiscriminator('stubOracle').compare(
         ai.data.slice(0, 8),
@@ -472,11 +470,17 @@ export class Group {
       uiPrice = this.toUiPrice(price, baseDecimals);
       lastUpdatedSlot = stubOracle.lastUpdateSlot.toNumber();
       provider = OracleProvider.Stub;
+      deviation = stubOracle.deviation;
     } else if (isPythOracle(ai)) {
       const priceData = parsePriceData(ai.data);
       uiPrice = priceData.previousPrice;
       price = this.toNativePrice(uiPrice, baseDecimals);
       lastUpdatedSlot = parseInt(priceData.lastSlot.toString());
+      deviation =
+        priceData.previousConfidence !== undefined
+          ? this.toNativePrice(priceData.previousConfidence, baseDecimals)
+          : undefined;
+
       provider = OracleProvider.Pyth;
     } else if (isSwitchboardOracle(ai)) {
       const priceData = await parseSwitchboardOracle(
@@ -486,13 +490,14 @@ export class Group {
       uiPrice = priceData.price;
       price = this.toNativePrice(uiPrice, baseDecimals);
       lastUpdatedSlot = priceData.lastUpdatedSlot;
+      deviation = this.toNativePrice(priceData.uiDeviation, baseDecimals);
       provider = OracleProvider.Switchboard;
     } else {
       throw new Error(
         `Unknown oracle provider (parsing not implemented) for oracle ${oracle}, with owner ${ai.owner}!`,
       );
     }
-    return { price, uiPrice, lastUpdatedSlot, provider };
+    return { price, uiPrice, lastUpdatedSlot, provider, deviation };
   }
 
   public async reloadVaults(client: MangoClient): Promise<void> {

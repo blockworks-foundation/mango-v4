@@ -3,7 +3,7 @@ import { utf8 } from '@coral-xyz/anchor/dist/cjs/utils/bytes';
 import { PublicKey } from '@solana/web3.js';
 import { I80F48, I80F48Dto, ONE_I80F48, ZERO_I80F48 } from '../numbers/I80F48';
 import { As, toUiDecimals } from '../utils';
-import { OracleProvider } from './oracle';
+import { OracleProvider, isOracleStaleOrUnconfident } from './oracle';
 
 export type TokenIndex = number & As<'token-index'>;
 
@@ -64,6 +64,7 @@ export class Bank implements BankForHealth {
   public _price: I80F48 | undefined;
   public _uiPrice: number | undefined;
   public _oracleLastUpdatedSlot: number | undefined;
+  public _oracleLastKnownDeviation: I80F48 | undefined;
   public _oracleProvider: OracleProvider | undefined;
   public collectedFeesNative: I80F48;
   public loanFeeRate: I80F48;
@@ -330,6 +331,17 @@ export class Bank implements BankForHealth {
     );
   }
 
+  isOracleStaleOrUnconfident(nowSlot: number): boolean {
+    return isOracleStaleOrUnconfident(
+      nowSlot,
+      this.oracleConfig.maxStalenessSlots.toNumber(),
+      this.oracleLastUpdatedSlot,
+      this._oracleLastKnownDeviation,
+      this.oracleConfig.confFilter,
+      this.price,
+    );
+  }
+
   areDepositsReduceOnly(): boolean {
     return this.reduceOnly == 1;
   }
@@ -533,9 +545,10 @@ export class Bank implements BankForHealth {
   }
 
   getTimeToNextBorrowLimitWindowStartsTs(): number {
-    return this.netBorrowLimitWindowSizeTs
+    const timeToNextBorrowLimitWindowStartsTs = this.netBorrowLimitWindowSizeTs
       .sub(new BN(Date.now() / 1000).sub(this.lastNetBorrowsWindowStartTs))
       .toNumber();
+    return Math.max(timeToNextBorrowLimitWindowStartsTs, 0);
   }
 }
 

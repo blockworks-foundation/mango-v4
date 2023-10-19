@@ -262,9 +262,7 @@ async fn main() -> anyhow::Result<()> {
         commitment,
         Arc::new(Keypair::new()),
         Some(rpc_timeout),
-        TransactionBuilderConfig {
-            prioritization_micro_lamports: None,
-        },
+        TransactionBuilderConfig::default(),
     );
     let group_context = Arc::new(
         MangoGroupContext::new_from_rpc(
