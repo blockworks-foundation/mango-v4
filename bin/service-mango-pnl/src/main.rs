@@ -162,6 +162,8 @@ use jsonrpsee::http_server::HttpServerHandle;
 use mango_feeds_connector::{
     grpc_plugin_source, metrics, EntityFilter, FilterConfig, MetricsConfig, SourceConfig,
 };
+use mango_feeds_connector::feeds_chain_data_fetcher::FeedsAccountFetcher;
+use mango_v4_client::chain_data_fetcher::AccountFetcherDelegate;
 
 fn start_jsonrpc_server(
     config: JsonRpcConfig,
@@ -272,8 +274,8 @@ async fn main() -> anyhow::Result<()> {
         .await?,
     );
     let chain_data = Arc::new(RwLock::new(chain_data::ChainData::new()));
-    let account_fetcher = Arc::new(chain_data_fetcher::AccountFetcherDelegate {
-        chain_data: chain_data.clone(),
+    let account_fetcher = Arc::new(AccountFetcherDelegate {
+        base_fetcher: FeedsAccountFetcher { chain_data: chain_data.clone() },
         rpc: client.rpc_async(),
     });
 
