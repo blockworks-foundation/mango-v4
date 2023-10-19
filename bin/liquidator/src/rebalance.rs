@@ -3,10 +3,7 @@ use mango_v4::accounts_zerocopy::KeyedAccountSharedData;
 use mango_v4::state::{
     Bank, BookSide, MangoAccountValue, PerpPosition, PlaceOrderType, Side, QUOTE_TOKEN_INDEX,
 };
-use mango_v4_client::{
-    chain_data, jupiter, perp_pnl, MangoClient, PerpMarketContext, TokenContext,
-    TransactionBuilder, TransactionSize,
-};
+use mango_v4_client::{chain_data, jupiter, perp_pnl, MangoClient, PerpMarketContext, TokenContext, TransactionBuilder, TransactionSize, chain_data_fetcher};
 
 use {fixed::types::I80F48, solana_sdk::pubkey::Pubkey};
 
@@ -30,14 +27,14 @@ pub struct Config {
 
 fn token_bank(
     token: &TokenContext,
-    account_fetcher: &chain_data::AccountFetcher,
+    account_fetcher: &chain_data_fetcher::AccountFetcherDelegate,
 ) -> anyhow::Result<Bank> {
     account_fetcher.fetch::<Bank>(&token.mint_info.first_bank())
 }
 
 pub struct Rebalancer {
     pub mango_client: Arc<MangoClient>,
-    pub account_fetcher: Arc<chain_data::AccountFetcher>,
+    pub account_fetcher: Arc<chain_data_fetcher::AccountFetcherDelegate>,
     pub mango_account_address: Pubkey,
     pub config: Config,
 }

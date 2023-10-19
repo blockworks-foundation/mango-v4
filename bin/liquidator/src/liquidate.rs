@@ -4,7 +4,7 @@ use std::time::Duration;
 use itertools::Itertools;
 use mango_v4::health::{HealthCache, HealthType};
 use mango_v4::state::{MangoAccountValue, PerpMarketIndex, Side, TokenIndex, QUOTE_TOKEN_INDEX};
-use mango_v4_client::{chain_data, health_cache, MangoClient};
+use mango_v4_client::{chain_data, chain_data_fetcher, health_cache, MangoClient};
 use solana_sdk::signature::Signature;
 
 use futures::{stream, StreamExt, TryStreamExt};
@@ -23,7 +23,7 @@ pub struct Config {
 
 struct LiquidateHelper<'a> {
     client: &'a MangoClient,
-    account_fetcher: &'a chain_data::AccountFetcher,
+    account_fetcher: &'a chain_data_fetcher::AccountFetcherDelegate,
     pubkey: &'a Pubkey,
     liqee: &'a MangoAccountValue,
     health_cache: &'a HealthCache,
@@ -321,7 +321,7 @@ impl<'a> LiquidateHelper<'a> {
             target,
             price,
             self.liqor_min_health_ratio,
-        )
+        ).await
     }
 
     async fn token_liq(&self) -> anyhow::Result<Option<Signature>> {
@@ -537,7 +537,7 @@ impl<'a> LiquidateHelper<'a> {
 #[allow(clippy::too_many_arguments)]
 pub async fn maybe_liquidate_account(
     mango_client: &MangoClient,
-    account_fetcher: &chain_data::AccountFetcher,
+    account_fetcher: &chain_data_fetcher::AccountFetcherDelegate,
     pubkey: &Pubkey,
     config: &Config,
 ) -> anyhow::Result<bool> {

@@ -11,7 +11,7 @@ use mango_v4::{
     i80f48::ClampToInt,
     state::{Bank, MangoAccountValue, TokenConditionalSwap, TokenIndex},
 };
-use mango_v4_client::{chain_data, health_cache, jupiter, MangoClient, TransactionBuilder};
+use mango_v4_client::{chain_data, chain_data_fetcher, health_cache, jupiter, MangoClient, TransactionBuilder};
 
 use anyhow::Context as AnyhowContext;
 use solana_sdk::{signature::Signature, signer::Signer};
@@ -347,7 +347,7 @@ struct PreparationResult {
 #[derive(Clone)]
 pub struct Context {
     pub mango_client: Arc<MangoClient>,
-    pub account_fetcher: Arc<chain_data::AccountFetcher>,
+    pub account_fetcher: Arc<chain_data_fetcher::AccountFetcherDelegate>,
 
     /// Information about current token prices is used to reject tcs early
     /// that are very likely to not be executable profitably.
@@ -419,7 +419,7 @@ impl Context {
     }
 
     /// Returns the maximum execution size of a tcs order in quote units
-    pub fn tcs_max_volume(
+    pub async fn tcs_max_volume(
         &self,
         account: &MangoAccountValue,
         tcs: &TokenConditionalSwap,
@@ -427,7 +427,7 @@ impl Context {
         let (_, buy_token_price, _) = self.token_bank_price_mint(tcs.buy_token_index)?;
         let (_, sell_token_price, _) = self.token_bank_price_mint(tcs.sell_token_index)?;
 
-        let (max_buy, max_sell) = match self.tcs_max_liqee_execution(account, tcs)? {
+        let (max_buy, max_sell) = match self.tcs_max_liqee_execution(account, tcs).await? {
             Some(v) => v,
             None => return Ok(None),
         };
@@ -448,7 +448,7 @@ impl Context {
     ///
     /// Returns Some((native buy amount, native sell amount)) if execution is sensible
     /// Returns None if the execution should be skipped (due to net borrow limits...)
-    pub fn tcs_max_liqee_execution(
+    pub async fn tcs_max_liqee_execution(
         &self,
         account: &MangoAccountValue,
         tcs: &TokenConditionalSwap,
@@ -479,7 +479,7 @@ impl Context {
             tcs.buy_token_index,
             swap_price,
             I80F48::ZERO,
-        )?
+        ).await?
         .floor()
         .to_num::<u64>()
         .min(tcs.max_sell_for_position(sell_position, &sell_bank));
@@ -546,33 +546,35 @@ impl Context {
         Ok(Some((max_buy, max_sell)))
     }
 
-    pub fn find_interesting_tcs_for_account(
+    pub async fn find_interesting_tcs_for_account(
         &self,
         pubkey: &Pubkey,
     ) -> anyhow::Result<Vec<anyhow::Result<(Pubkey, u64, u64)>>> {
         let liqee = self.account_fetcher.fetch_mango_account(pubkey)?;
 
-        let interesting_tcs = liqee
-            .active_token_conditional_swaps()
-            .filter_map(|tcs| {
-                match self.tcs_is_interesting(tcs) {
-                    Ok(true) => {
-                        // Filter out Ok(None) resuts of tcs that shouldn't be executed right now
-                        match self.tcs_max_volume(&liqee, tcs) {
-                            Ok(Some(v)) => Some(Ok((*pubkey, tcs.id, v))),
-                            Ok(None) => None,
-                            Err(e) => Some(Err(e)),
-                        }
-                    }
-                    Ok(false) => None,
-                    Err(e) => Some(Err(e)),
-                }
-            })
-            .collect_vec();
-        if !interesting_tcs.is_empty() {
-            trace!(%pubkey, interesting_tcs_count=interesting_tcs.len(), "found interesting tcs");
-        }
-        Ok(interesting_tcs)
+        // TODO - FIXME
+        // let interesting_tcs = liqee
+        //     .active_token_conditional_swaps()
+        //     .filter_map(async move |tcs| {
+        //         match self.tcs_is_interesting(tcs) {
+        //             Ok(true) => {
+        //                 // Filter out Ok(None) resuts of tcs that shouldn't be executed right now
+        //                 match self.tcs_max_volume(&liqee, tcs).await {
+        //                     Ok(Some(v)) => Some(Ok((*pubkey, tcs.id, v))),
+        //                     Ok(None) => None,
+        //                     Err(e) => Some(Err(e)),
+        //                 }
+        //             }
+        //             Ok(false) => None,
+        //             Err(e) => Some(Err(e)),
+        //         }
+        //     })
+        //     .collect_vec();
+        // if !interesting_tcs.is_empty() {
+        //     trace!(%pubkey, interesting_tcs_count=interesting_tcs.len(), "found interesting tcs");
+        // }
+        // Ok(interesting_tcs)
+        todo!();
     }
 
     #[allow(clippy::too_many_arguments)]
@@ -669,7 +671,7 @@ impl Context {
 
         let max_take_quote = I80F48::from(self.config.max_trigger_quote_amount);
 
-        let (liqee_max_buy, liqee_max_sell) = match self.tcs_max_liqee_execution(liqee, tcs)? {
+        let (liqee_max_buy, liqee_max_sell) = match self.tcs_max_liqee_execution(liqee, tcs).await? {
             Some(v) => v,
             None => {
                 trace!("no liqee execution possible");
@@ -726,7 +728,7 @@ impl Context {
                 tcs.sell_token_index,
                 taker_price,
                 liqor_min_health_ratio,
-            )?,
+            ).await?,
             Mode::SwapCollateralIntoBuy => {
                 // The transaction will be net-positive, but how much buy token can
                 // the collateral be swapped into?
@@ -745,7 +747,7 @@ impl Context {
                         tcs.buy_token_index,
                         buy_per_collateral_price,
                         liqor_min_health_ratio,
-                    )?;
+                    ).await?;
 
                     collateral_amount * buy_per_collateral_price
                 }
@@ -762,7 +764,7 @@ impl Context {
                     tcs.buy_token_index,
                     buy_per_sell_price,
                     liqor_min_health_ratio,
-                )?;
+                ).await?;
                 max_sell * buy_per_sell_price
             }
         };

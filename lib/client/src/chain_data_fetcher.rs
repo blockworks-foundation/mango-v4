@@ -17,33 +17,37 @@ use solana_sdk::account::{AccountSharedData, ReadableAccount};
 use solana_sdk::clock::Slot;
 use solana_sdk::pubkey::Pubkey;
 use solana_sdk::signature::Signature;
+use crate::feeds_chain_data_fetcher::FeedsAccountFetcher;
 
 /// A complex account fetcher that mostly depends on an external job keeping
 /// the chain_data up to date.
 ///
 /// In addition to the usual async fetching interface, it also has synchronous
-/// functions to access some kinds of data with less overhead.
+/// functions to access some kinds of data with less overhead. - TODO check
 ///
 /// Also, there's functions for fetching up to date data via rpc.
-pub struct AccountFetcher {
-    pub chain_data: Arc<RwLock<ChainData>>,
+
+pub struct AccountFetcherDelegate {
+    pub base_fetcher: FeedsAccountFetcher,
     pub rpc: RpcClientAsync,
 }
 
-impl AccountFetcher {
+impl AccountFetcherDelegate {
     // loads from ChainData
+
+
     pub fn fetch<T: anchor_lang::ZeroCopy + anchor_lang::Owner>(
         &self,
         address: &Pubkey,
     ) -> anyhow::Result<T> {
-        Ok(*self
-            .fetch_raw(address)?
+        Ok(*self.base_fetcher
+            .feeds_fetch_raw(address)?
             .load::<T>()
             .with_context(|| format!("loading account {}", address))?)
     }
 
     pub fn fetch_mango_account(&self, address: &Pubkey) -> anyhow::Result<MangoAccountValue> {
-        let acc = self.fetch_raw(address)?;
+        let acc = self.base_fetcher.feeds_fetch_raw(address)?;
 
         let data = acc.data();
         if data.len() < 8 {
@@ -64,7 +68,7 @@ impl AccountFetcher {
 
     pub fn fetch_bank_and_price(&self, bank: &Pubkey) -> anyhow::Result<(Bank, I80F48)> {
         let bank: Bank = self.fetch(bank)?;
-        let oracle = self.fetch_raw(&bank.oracle)?;
+        let oracle = self.base_fetcher.feeds_fetch_raw(&bank.oracle)?;
         let price = bank.oracle_price(&KeyedAccountSharedData::new(bank.oracle, oracle), None)?;
         Ok((bank, price))
     }
@@ -90,12 +94,16 @@ impl AccountFetcher {
         self.fetch_mango_account(address)
     }
 
+    // move to feeds - renamed to feeds_fetch_raw
+    // pub fn fetch_raw(&self, address: &Pubkey) -> anyhow::Result<AccountSharedData> {
+    //     let chain_data = self.chain_data.read().unwrap();
+    //     Ok(chain_data
+    //         .account(address)
+    //         .map(|d| d.account.clone())
+    //         .with_context(|| format!("fetch account {} via chain_data", address))?)
+    // }
     pub fn fetch_raw(&self, address: &Pubkey) -> anyhow::Result<AccountSharedData> {
-        let chain_data = self.chain_data.read().unwrap();
-        Ok(chain_data
-            .account(address)
-            .map(|d| d.account.clone())
-            .with_context(|| format!("fetch account {} via chain_data", address))?)
+        self.base_fetcher.feeds_fetch_raw(address)
     }
 
     pub async fn refresh_account_via_rpc(&self, address: &Pubkey) -> anyhow::Result<Slot> {
@@ -110,7 +118,7 @@ impl AccountFetcher {
             .ok_or(anchor_client::ClientError::AccountNotFound)
             .with_context(|| format!("refresh account {} via rpc", address))?;
 
-        let mut chain_data = self.chain_data.write().unwrap();
+        let mut chain_data = self.base_fetcher.chain_data.write().unwrap();
         let best_chain_slot = chain_data.best_chain_slot();
 
         // The RPC can get information for slots that haven't been seen yet on chaindata. That means
@@ -175,12 +183,12 @@ impl AccountFetcher {
 }
 
 #[async_trait::async_trait]
-impl crate::AccountFetcher for AccountFetcher {
+impl crate::AccountFetcher for AccountFetcherDelegate {
     async fn fetch_raw_account(
         &self,
         address: &Pubkey,
     ) -> anyhow::Result<solana_sdk::account::AccountSharedData> {
-        self.fetch_raw(address)
+        self.base_fetcher.feeds_fetch_raw(address)
     }
 
     async fn fetch_raw_account_lookup_table(
@@ -189,11 +197,11 @@ impl crate::AccountFetcher for AccountFetcher {
     ) -> anyhow::Result<AccountSharedData> {
         // Fetch data via RPC if missing: the chain data updater doesn't know about all the
         // lookup talbes we may need.
-        if let Ok(alt) = self.fetch_raw(address) {
+        if let Ok(alt) = self.base_fetcher.feeds_fetch_raw(address) {
             return Ok(alt);
         }
         self.refresh_account_via_rpc(address).await?;
-        self.fetch_raw(address)
+        self.base_fetcher.feeds_fetch_raw(address)
     }
 
     async fn fetch_program_accounts(
@@ -201,7 +209,7 @@ impl crate::AccountFetcher for AccountFetcher {
         program: &Pubkey,
         discriminator: [u8; 8],
     ) -> anyhow::Result<Vec<(Pubkey, AccountSharedData)>> {
-        let chain_data = self.chain_data.read().unwrap();
+        let chain_data = self.base_fetcher.chain_data.read().unwrap();
         Ok(chain_data
             .iter_accounts()
             .filter_map(|(pk, data)| {

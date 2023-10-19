@@ -4,7 +4,7 @@ use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 use itertools::Itertools;
 use mango_v4::error::{IsAnchorErrorWithCode, MangoError};
 use mango_v4::state::*;
-use mango_v4_client::{chain_data, error_tracking::ErrorTracking, MangoClient};
+use mango_v4_client::{chain_data, chain_data_fetcher, error_tracking::ErrorTracking, MangoClient};
 use solana_sdk::instruction::Instruction;
 
 use tracing::*;
@@ -17,7 +17,7 @@ pub struct Config {
 
 pub struct State {
     pub mango_client: Arc<MangoClient>,
-    pub account_fetcher: Arc<chain_data::AccountFetcher>,
+    pub account_fetcher: Arc<chain_data_fetcher::AccountFetcherDelegate>,
     pub config: Config,
 
     pub errors: ErrorTracking,

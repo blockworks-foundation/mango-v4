@@ -8,7 +8,7 @@ use solana_sdk::account::AccountSharedData;
 use solana_sdk::pubkey::Pubkey;
 
 pub use mango_v4_client::snapshot_source::is_mango_account;
-use mango_v4_client::{chain_data, MangoClient};
+use mango_v4_client::{chain_data, chain_data_fetcher, MangoClient};
 
 pub fn is_mango_bank<'a>(account: &'a AccountSharedData, group_id: &Pubkey) -> Option<&'a Bank> {
     let bank = account.load::<Bank>().ok()?;
@@ -38,9 +38,9 @@ pub fn is_perp_market<'a>(
 }
 
 /// Convenience wrapper for getting max swap amounts for a token pair
-pub fn max_swap_source(
+pub async fn max_swap_source(
     client: &MangoClient,
-    account_fetcher: &chain_data::AccountFetcher,
+    account_fetcher: &chain_data_fetcher::AccountFetcherDelegate,
     account: &MangoAccountValue,
     source: TokenIndex,
     target: TokenIndex,
@@ -55,7 +55,7 @@ pub fn max_swap_source(
     account.ensure_token_position(target)?;
 
     let health_cache =
-        mango_v4_client::health_cache::new_sync(&client.context, account_fetcher, &account)
+        mango_v4_client::health_cache::new(&client.context, account_fetcher, &account).await
             .expect("always ok");
 
     let source_bank: Bank =
@@ -79,9 +79,9 @@ pub fn max_swap_source(
 }
 
 /// Convenience wrapper for getting max swap amounts for a token pair
-pub fn max_swap_source_ignore_net_borrows(
+pub async fn max_swap_source_ignore_net_borrows(
     client: &MangoClient,
-    account_fetcher: &chain_data::AccountFetcher,
+    account_fetcher: &chain_data_fetcher::AccountFetcherDelegate,
     account: &MangoAccountValue,
     source: TokenIndex,
     target: TokenIndex,
@@ -96,8 +96,8 @@ pub fn max_swap_source_ignore_net_borrows(
     account.ensure_token_position(target)?;
 
     let health_cache =
-        mango_v4_client::health_cache::new_sync(&client.context, account_fetcher, &account)
-            .expect("always ok");
+        mango_v4_client::health_cache::new(&client.context, account_fetcher, &account)
+            .await.expect("always ok");
 
     let mut source_bank: Bank =
         account_fetcher.fetch(&client.context.mint_info(source).first_bank())?;

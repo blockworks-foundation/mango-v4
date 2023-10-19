@@ -272,7 +272,7 @@ async fn main() -> anyhow::Result<()> {
         .await?,
     );
     let chain_data = Arc::new(RwLock::new(chain_data::ChainData::new()));
-    let account_fetcher = Arc::new(chain_data::AccountFetcher {
+    let account_fetcher = Arc::new(chain_data_fetcher::AccountFetcherDelegate {
         chain_data: chain_data.clone(),
         rpc: client.rpc_async(),
     });

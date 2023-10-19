@@ -6,16 +6,13 @@ use std::time::{Duration, Instant};
 use anchor_client::Cluster;
 use clap::Parser;
 use mango_v4::state::{PerpMarketIndex, TokenIndex};
-use mango_v4_client::{
-    account_update_stream, chain_data, error_tracking::ErrorTracking, jupiter, keypair_from_cli,
-    snapshot_source, websocket_source, Client, MangoClient, MangoClientError, MangoGroupContext,
-    TransactionBuilderConfig,
-};
+use mango_v4_client::{account_update_stream, chain_data, error_tracking::ErrorTracking, jupiter, keypair_from_cli, snapshot_source, websocket_source, Client, MangoClient, MangoClientError, MangoGroupContext, TransactionBuilderConfig, chain_data_fetcher};
 
 use itertools::Itertools;
 use solana_sdk::commitment_config::CommitmentConfig;
 use solana_sdk::pubkey::Pubkey;
 use tracing::*;
+use mango_v4_client::chain_data::FeedsAccountFetcher;
 
 pub mod liquidate;
 pub mod metrics;
@@ -179,8 +176,11 @@ async fn main() -> anyhow::Result<()> {
     // The representation of current on-chain account data
     let chain_data = Arc::new(RwLock::new(chain_data::ChainData::new()));
     // Reading accounts from chain_data
-    let account_fetcher = Arc::new(chain_data::AccountFetcher {
-        chain_data: chain_data.clone(),
+
+    let account_fetcher = Arc::new(chain_data_fetcher::AccountFetcherDelegate {
+        base_fetcher: FeedsAccountFetcher {
+            chain_data: chain_data.clone()
+        },
         rpc: client.rpc_async(),
     });
 
@@ -556,7 +556,7 @@ struct SharedState {
 
 struct LiquidationState {
     mango_client: Arc<MangoClient>,
-    account_fetcher: Arc<chain_data::AccountFetcher>,
+    account_fetcher: Arc<chain_data_fetcher::AccountFetcherDelegate>,
     rebalancer: Arc<rebalance::Rebalancer>,
     token_swap_info: Arc<token_swap_info::TokenSwapInfoUpdater>,
     liquidation_config: liquidate::Config,
@@ -688,7 +688,7 @@ impl LiquidationState {
                 continue;
             }
 
-            match tcs_context.find_interesting_tcs_for_account(pubkey) {
+            match tcs_context.find_interesting_tcs_for_account(pubkey).await {
                 Ok(v) => {
                     self.tcs_collection_hard_errors.clear_errors(pubkey);
                     if v.is_empty() {
