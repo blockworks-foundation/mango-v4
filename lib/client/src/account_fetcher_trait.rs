@@ -1,6 +1,6 @@
+use mango_feeds_connector::account_fetchers::{AccountFetcherFeeds, CachedAccountFetcher, RpcAccountFetcher};
 use solana_sdk::account::AccountSharedData;
 use solana_sdk::pubkey::Pubkey;
-use crate::account_fetchers::{AccountFetcherFeeds, CachedAccountFetcher, RpcAccountFetcher};
 
 
 #[async_trait::async_trait]

@@ -33,12 +33,12 @@ use solana_sdk::signer::keypair;
 use solana_sdk::transaction::TransactionError;
 
 use crate::account_fetcher_trait::*;
-use crate::account_fetchers::*;
 use crate::context::MangoGroupContext;
 use crate::gpa::{fetch_anchor_account, fetch_mango_accounts};
 use crate::{jupiter, util};
 
 use anyhow::Context;
+use mango_feeds_connector::account_fetchers::{CachedAccountFetcher, RpcAccountFetcher};
 use solana_sdk::account::ReadableAccount;
 use solana_sdk::instruction::{AccountMeta, Instruction};
 use solana_sdk::signature::{Keypair, Signature};

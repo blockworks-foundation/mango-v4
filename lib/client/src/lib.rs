@@ -4,7 +4,6 @@ pub use context::*;
 pub use util::*;
 
 mod account_fetcher_trait;
-mod account_fetchers;
 mod account_fetcher_utils;
 pub mod account_update_stream;
 pub mod chain_data;
