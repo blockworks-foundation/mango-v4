@@ -6,7 +6,7 @@ use std::sync::Mutex;
 
 use async_once_cell::unpin::Lazy;
 
-use anyhow::Context;
+use anyhow::{Context, Error};
 
 use anchor_client::ClientError;
 use anchor_lang::AccountDeserialize;
@@ -35,14 +35,15 @@ pub struct RpcAccountFetcher {
 #[async_trait::async_trait]
 impl AccountFetcherFeeds for RpcAccountFetcher {
     async fn feeds_fetch_raw_account(&self, address: &Pubkey) -> anyhow::Result<AccountSharedData> {
-        self.rpc
+        let sdfs: Result<AccountSharedData, Error> = self.rpc
             .get_account_with_commitment(address, self.rpc.commitment())
             .await
             .with_context(|| format!("fetch account {}", *address))?
             .value
             .ok_or(ClientError::AccountNotFound)
             .with_context(|| format!("fetch account {}", *address))
-            .map(Into::into)
+            .map(Into::into);
+        sdfs
     }
 
     async fn feeds_fetch_program_accounts(
@@ -236,4 +237,14 @@ impl<T: AccountFetcherFeeds + 'static> AccountFetcherFeeds for CachedAccountFetc
             )),
         }
     }
+}
+
+
+#[test]
+fn errors() {
+    let foo  = ClientError::AccountNotFound;
+
+    let err: anyhow::Error = foo.into();
+
+
 }

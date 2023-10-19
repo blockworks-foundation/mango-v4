@@ -17,7 +17,6 @@ use solana_sdk::account::{AccountSharedData, ReadableAccount};
 use solana_sdk::clock::Slot;
 use solana_sdk::pubkey::Pubkey;
 use solana_sdk::signature::Signature;
-use crate::feeds_chain_data_fetcher::FeedsAccountFetcher;
 
 /// A complex account fetcher that mostly depends on an external job keeping
 /// the chain_data up to date.
