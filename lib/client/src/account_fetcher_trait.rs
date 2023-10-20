@@ -23,15 +23,17 @@ pub trait AccountFetcher: Sync + Send {
 #[async_trait::async_trait]
 impl AccountFetcher for RpcAccountFetcher {
     async fn fetch_raw_account(&self, address: &Pubkey) -> anyhow::Result<AccountSharedData> {
-        self.fetch_raw_account(address).await
+        self.feeds_fetch_raw_account(address).await
+            .map(|(acc, _slot)| acc)
     }
 
     async fn fetch_raw_account_lookup_table(&self, address: &Pubkey) -> anyhow::Result<AccountSharedData> {
-        self.fetch_raw_account_lookup_table(address).await
+        self.fetch_raw_account(address).await
     }
 
     async fn fetch_program_accounts(&self, program: &Pubkey, discriminator: [u8; 8]) -> anyhow::Result<Vec<(Pubkey, AccountSharedData)>> {
-        self.fetch_program_accounts(program, discriminator).await
+        self.feeds_fetch_program_accounts(program, discriminator).await
+            .map(|(accs, _slot)| accs)
     }
 }
 
