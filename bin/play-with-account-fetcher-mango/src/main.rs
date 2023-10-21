@@ -3,11 +3,14 @@ use std::str::FromStr;
 use std::sync::{Arc, RwLock};
 use std::sync::atomic::{AtomicBool, AtomicU32, AtomicU64, Ordering};
 use anchor_lang::Key;
+use anchor_lang::solana_program::clock::Slot;
+use anyhow::anyhow;
 use chrono::{TimeZone, Utc};
 use futures_util::TryFutureExt;
-use mango_feeds_connector::{account_fetcher, chain_data, chain_data_fetcher};
-use mango_feeds_connector::account_fetcher::{CachedAccountFetcher, RpcAccountFetcher};
-use mango_feeds_connector::account_fetcher_trait::AccountFetcher;
+use mango_feeds_connector::{account_fetcher, chain_data};
+use mango_feeds_connector::account_fetcher::{AccountFetcherFeeds};
+use mango_feeds_connector::account_fetchers::{CachedAccountFetcher, RpcAccountFetcher};
+use mango_feeds_connector::feeds_chain_data_fetcher::FeedsAccountFetcher;
 use tracing::{info, trace};
 use solana_client::nonblocking::rpc_client::{RpcClient as RpcClientAsync, RpcClient};
 use solana_sdk::account::{AccountSharedData, ReadableAccount};
@@ -16,7 +19,8 @@ use solana_sdk::clock::UnixTimestamp;
 use solana_sdk::epoch_info::EpochInfo;
 use solana_sdk::pubkey::Pubkey;
 use mango_v4::state::{MangoAccountValue, PerpMarket};
-use mango_v4_client::mango_account_fetcher;
+use mango_v4_client::account_fetcher_utils::{account_fetcher_fetch_anchor_account, account_fetcher_fetch_mango_account};
+use mango_v4_client::{AccountFetcher, chain_data_fetcher};
 
 
 #[tokio::main]
@@ -49,12 +53,17 @@ async fn chain_data_fetcher(rpc_url: String) {
     let rpc_client = RpcClientAsync::new(rpc_url);
 
     let chain_data = Arc::new(RwLock::new(chain_data::ChainData::new()));
-    let account_fetcher = Arc::new(chain_data_fetcher::ChainDataFetcher {
-        chain_data: chain_data.clone(),
+    let account_fetcher = Arc::new(chain_data_fetcher::ClientChainDataAccountFetcher {
+        base_fetcher: FeedsAccountFetcher {
+            chain_data: chain_data.clone()
+        },
         rpc: rpc_client,
     });
 
-    let account_key = Pubkey::from_str("J6MsZiJUU6bjKSCkbfQsiHkd8gvJoddG2hsdSFsZQEZV").unwrap();
+    let account_key = Pubkey::from_str("phxBcughCYKiYJxx9kYEkyqoAUL2RD3vyxSaL1gZRNG").unwrap();
+
+    account_fetcher.refresh_account_via_rpc(&account_key).await.unwrap();
+
     let price: anyhow::Result<AccountSharedData> = account_fetcher.fetch_raw_account(&account_key).await;
     println!("price: {:?}", price);
 }
@@ -65,8 +74,10 @@ async fn chain_data_fetcher_bank(rpc_url: String) {
     let rpc_client = RpcClientAsync::new(rpc_url);
 
     let chain_data = Arc::new(RwLock::new(chain_data::ChainData::new()));
-    let account_fetcher = Arc::new(chain_data_fetcher::ChainDataFetcher {
-        chain_data: chain_data.clone(),
+    let account_fetcher = Arc::new(chain_data_fetcher::ClientChainDataAccountFetcher {
+        base_fetcher: FeedsAccountFetcher {
+            chain_data: chain_data.clone()
+        },
         rpc: rpc_client,
     });
     let bank = Pubkey::from_str("J6MsZiJUU6bjKSCkbfQsiHkd8gvJoddG2hsdSFsZQEZV").unwrap();
@@ -98,20 +109,15 @@ impl MockExampleFetcher {
 }
 
 #[async_trait::async_trait]
-impl AccountFetcher for MockExampleFetcher {
-    async fn fetch_raw_account(&self, address: &Pubkey) -> anyhow::Result<AccountSharedData> {
-        panic!()
+impl AccountFetcherFeeds for MockExampleFetcher {
+    async fn feeds_fetch_raw_account(&self, address: &Pubkey) -> anyhow::Result<(AccountSharedData, Slot)> {
+        self.fetched_mango_calls.fetch_add(1, Ordering::Relaxed);
+        return Err(anyhow!("ignore return value please!"));
     }
 
-    async fn fetch_raw_account_lookup_table(&self, address: &Pubkey) -> anyhow::Result<AccountSharedData> {
-        panic!()
-    }
-
-    async fn fetch_program_accounts(&self, program: &Pubkey, discriminator: [u8; 8]) -> anyhow::Result<Vec<(Pubkey, AccountSharedData)>> {
-        let call_count = self.fetched_mango_calls.fetch_add(1, Ordering::SeqCst) + 1;
-        info!("Call to mocked fetch_program_accounts... {}", call_count);
-
-        Ok(vec![])
+    async fn feeds_fetch_program_accounts(&self, program: &Pubkey, discriminator: [u8; 8]) -> anyhow::Result<(Vec<(Pubkey, AccountSharedData)>, Slot)> {
+        self.fetched_mango_calls.fetch_add(1, Ordering::Relaxed);
+        return Err(anyhow!("ignore return value please!"));
     }
 }
 
@@ -122,17 +128,18 @@ async fn call_cache_with_mock(account: Pubkey,) {
 
     let mut mock = Arc::new(MockExampleFetcher::new());
 
-    let mock_fetcher = CachedAccountFetcher::new(mock.clone());
+    let cache = CachedAccountFetcher::new(mock.clone());
     mock.assert_call_count(0);
 
-    let first_call = mock_fetcher.fetch_program_accounts(&account, [0; 8]).await.unwrap();
+    let _first_call = cache.fetch_raw_account(&account).await;
     mock.assert_call_count(1);
 
-    let second_call_cached = mock_fetcher.fetch_program_accounts(&account, [0; 8]).await.unwrap();
+    // must load from cache
+    let _second_call_cached = cache.fetch_raw_account(&account).await;
     mock.assert_call_count(1);
 
-    mock_fetcher.clear_cache();
-    let third_call_cached = mock_fetcher.fetch_program_accounts(&account, [0; 8]).await.unwrap();
+    cache.clear_cache();
+    let _third_call_cached = cache.fetch_raw_account(&account).await;;
     mock.assert_call_count(2);
 }
 
@@ -147,7 +154,7 @@ pub async fn load_mango_account_cached(
         rpc: rpc_client,
     })));
     let _mango_account: MangoAccountValue =
-        mango_account_fetcher::account_fetcher_fetch_mango_account(&*cachedaccount_fetcher, &account).await.unwrap();
+        account_fetcher_fetch_mango_account(&*cachedaccount_fetcher, &account).await.unwrap();
     info!("mango account loaded cached");
 }
 
@@ -162,7 +169,7 @@ pub async fn load_mango_account(
         rpc: rpc_client,
     });
     let _mango_account: MangoAccountValue =
-        mango_account_fetcher::account_fetcher_fetch_mango_account(&*account_fetcher, &account).await.unwrap();
+        account_fetcher_fetch_mango_account(&*account_fetcher, &account).await.unwrap();
     info!("mango account loaded");
 }
 
@@ -172,11 +179,18 @@ pub async fn load_anchor_account(
 ) {
     let rpc_client = RpcClientAsync::new(rpc_url);
 
-    let account_fetcher = Arc::new(CachedAccountFetcher::new(Arc::new(RpcAccountFetcher {
+    let chain_data = Arc::new(RwLock::new(chain_data::ChainData::new()));
+    let account_fetcher = Arc::new(chain_data_fetcher::ClientChainDataAccountFetcher {
+        base_fetcher: FeedsAccountFetcher {
+            chain_data: chain_data.clone()
+        },
         rpc: rpc_client,
-    })));
+    });
+
+    account_fetcher.refresh_account_via_rpc(&account).await.unwrap();
+
     let perp_market: PerpMarket =
-        account_fetcher::account_fetcher_fetch_anchor_account::<PerpMarket>(&*account_fetcher, &account).await.unwrap();
+        account_fetcher_fetch_anchor_account::<PerpMarket>(&*account_fetcher, &account).await.unwrap();
     info!("perp account loaded: base_decimals={}", perp_market.base_decimals);
 }
 

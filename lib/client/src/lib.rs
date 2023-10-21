@@ -3,8 +3,8 @@ pub use client::*;
 pub use context::*;
 pub use util::*;
 
-mod account_fetcher_trait;
-mod account_fetcher_utils;
+pub mod account_fetcher_trait;
+pub mod account_fetcher_utils;
 pub mod account_update_stream;
 pub mod chain_data;
 pub mod chain_data_fetcher;
