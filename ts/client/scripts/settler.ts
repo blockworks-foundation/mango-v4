@@ -10,9 +10,7 @@ const CLUSTER_URL =
   process.env.CLUSTER_URL_OVERRIDE || process.env.MB_CLUSTER_URL;
 const USER_KEYPAIR =
   process.env.USER_KEYPAIR_OVERRIDE || process.env.MB_PAYER_KEYPAIR;
-const MANGO_ACCOUNT_PK = new PublicKey(
-  process.env.MANGO_ACCOUNT_PK || PublicKey.default.toBase58(),
-);
+const MANGO_ACCOUNT_PK = process.env.MANGO_ACCOUNT_PK;
 const CLUSTER: Cluster =
   (process.env.CLUSTER_OVERRIDE as Cluster) || 'mainnet-beta';
 
