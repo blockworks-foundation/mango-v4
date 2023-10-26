@@ -1,6 +1,8 @@
 import { AnchorProvider, Wallet } from '@coral-xyz/anchor';
 import { Cluster, Connection, Keypair, PublicKey } from '@solana/web3.js';
 import fs from 'fs';
+import { Group } from '../src/accounts/group';
+import { MangoAccount } from '../src/accounts/mangoAccount';
 import { MangoClient } from '../src/client';
 import { MANGO_V4_ID } from '../src/constants';
 
@@ -13,6 +15,55 @@ const MANGO_ACCOUNT_PK = new PublicKey(
 );
 const CLUSTER: Cluster =
   (process.env.CLUSTER_OVERRIDE as Cluster) || 'mainnet-beta';
+
+async function settlePnlForMangoAccount(
+  client: MangoClient,
+  group: Group,
+  mangoAccount: MangoAccount,
+  settler: MangoAccount,
+): Promise<void> {
+  for (const pp of mangoAccount.perpActive()) {
+    // settle only a specific market
+    // if (pp.marketIndex != 2) continue;
+    const pm = group.getPerpMarketByMarketIndex(pp.marketIndex);
+    const upnlUi = pp.getUnsettledPnlUi(pm);
+    if (upnlUi > 0) {
+      const c = await pm.getSettlePnlCandidates(
+        client,
+        group,
+        undefined,
+        'negative',
+      );
+      const sig = await client.perpSettlePnl(
+        group,
+        mangoAccount,
+        c[0].account,
+        settler!,
+        pm.perpMarketIndex,
+      );
+      console.log(
+        `Settled ${mangoAccount.publicKey}'s pnl for ${pm.name} at ${sig}`,
+      );
+    } else {
+      const c = await pm.getSettlePnlCandidates(
+        client,
+        group,
+        undefined,
+        'positive',
+      );
+      const sig = await client.perpSettlePnl(
+        group,
+        c[0].account,
+        mangoAccount,
+        settler!,
+        pm.perpMarketIndex,
+      );
+      console.log(
+        `Settled ${mangoAccount.publicKey}'s pnl for ${pm.name} at ${sig}`,
+      );
+    }
+  }
+}
 
 async function main(): Promise<void> {
   const options = AnchorProvider.defaultOptions();
@@ -43,68 +94,32 @@ async function main(): Promise<void> {
     const mangoAccount = await client.getMangoAccount(
       new PublicKey(MANGO_ACCOUNT_PK),
     );
-
-    for (const pp of mangoAccount.perpActive()) {
-      // settle only a specific market
-      // if (pp.marketIndex != 2) continue;
-
-      const pm = group.getPerpMarketByMarketIndex(pp.marketIndex);
-      const upnlUi = pp.getUnsettledPnlUi(pm);
-      if (upnlUi > 0) {
-        const c = await pm.getSettlePnlCandidates(
-          client,
-          group,
-          mangoAccounts,
-          'negative',
-        );
-        const sig = await client.perpSettlePnl(
-          group,
-          mangoAccount,
-          c[0].account,
-          settler!,
-          pm.perpMarketIndex,
-        );
-        console.log(sig);
-      } else {
-        const c = await pm.getSettlePnlCandidates(
-          client,
-          group,
-          mangoAccounts,
-          'positive',
-        );
-        const sig = await client.perpSettlePnl(
-          group,
-          c[0].account,
-          mangoAccount,
-          settler!,
-          pm.perpMarketIndex,
-        );
-        console.log(sig);
-      }
-    }
+    await settlePnlForMangoAccount(client, group, mangoAccount, settler!);
 
     process.exit();
   }
 
-  // TODO settle perp pnl for all positions which have been closed but not deactivated
-  // console.log(mangoAccounts.length);
-  // mangoAccounts = mangoAccounts.filter(
-  //   (a) =>
-  //     a.perpActive().length > 0 &&
-  //     a
-  //       .perpActive()
-  //       .some(
-  //         (pp) =>
-  //           pp.getBasePositionUi(
-  //             group.getPerpMarketByMarketIndex(pp.marketIndex),
-  //           ) == 0 &&
-  //           Math.abs(
-  //             pp.getUnsettledFundingUi(
-  //               group.getPerpMarketByMarketIndex(pp.marketIndex),
-  //             ),
-  //           ) > 0,
-  //       ) === true,
-  // );
+  mangoAccounts = mangoAccounts.filter(
+    (a) =>
+      a.perpActive().length > 0 &&
+      a
+        .perpActive()
+        .some(
+          (pp) =>
+            pp.getBasePositionUi(
+              group.getPerpMarketByMarketIndex(pp.marketIndex),
+            ) == 0 &&
+            Math.abs(
+              pp.getUnsettledFundingUi(
+                group.getPerpMarketByMarketIndex(pp.marketIndex),
+              ),
+            ) > 0,
+        ) === true,
+  );
+
+  for (const mangoAccount of mangoAccounts) {
+    await settlePnlForMangoAccount(client, group, mangoAccount, settler!);
+  }
 
   process.exit();
 }
