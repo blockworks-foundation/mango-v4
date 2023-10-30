@@ -278,11 +278,12 @@ fn action(
 
     let sell_token_amount =
         (I80F48::from(buy_token_amount) * I80F48::from_num(premium_price)).floor();
-    let maker_fee = tcs.maker_fee(sell_token_amount);
+    let sell_token_amount_u64 = sell_token_amount.to_num::<u64>();
+    let maker_fee = sell_token_amount_with_maker_fee - sell_token_amount_u64;
     let taker_fee = tcs.taker_fee(sell_token_amount);
 
     let sell_token_amount_from_liqee = sell_token_amount_with_maker_fee;
-    let sell_token_amount_to_liqor = sell_token_amount_with_maker_fee - maker_fee - taker_fee;
+    let sell_token_amount_to_liqor = sell_token_amount_u64 - taker_fee;
 
     // do the token transfer between liqee and liqor
     let buy_token_amount_i80f48 = I80F48::from(buy_token_amount);
