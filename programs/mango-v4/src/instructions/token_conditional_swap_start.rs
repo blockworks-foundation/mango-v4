@@ -16,21 +16,18 @@ pub fn token_conditional_swap_start(
     token_conditional_swap_id: u64,
 ) -> Result<()> {
     let group_pk = &ctx.accounts.group.key();
-    let account_key = ctx.accounts.account.key();
-    let caller_key = ctx.accounts.caller.key();
+    let liqee_key = ctx.accounts.liqee.key();
+    let liqor_key = ctx.accounts.liqor.key();
 
-    let mut account = ctx.accounts.account.load_full_mut()?;
-    require!(
-        !account.fixed.being_liquidated(),
-        MangoError::BeingLiquidated,
-    );
+    let mut liqee = ctx.accounts.liqee.load_full_mut()?;
+    require!(!liqee.fixed.being_liquidated(), MangoError::BeingLiquidated,);
 
-    let mut caller = ctx.accounts.caller.load_full_mut()?;
+    let mut liqor = ctx.accounts.liqor.load_full_mut()?;
 
     let mut account_retriever = ScanningAccountRetriever::new(ctx.remaining_accounts, group_pk)
         .context("create account retriever")?;
 
-    let tcs = account
+    let tcs = liqee
         .token_conditional_swap_by_index(token_conditional_swap_index)?
         .clone();
     require!(tcs.is_configured(), MangoError::TokenConditionalSwapNotSet);
@@ -47,9 +44,9 @@ pub fn token_conditional_swap_start(
         MangoError::TokenConditionalSwapTypeNotStartable
     );
 
-    let mut health_cache = new_health_cache(&account.borrow(), &account_retriever)
+    let mut health_cache = new_health_cache(&liqee.borrow(), &account_retriever)
         .context("create liqee health cache")?;
-    let pre_init_health = account.check_health_pre(&health_cache)?;
+    let pre_init_health = liqee.check_health_pre(&health_cache)?;
 
     let (sell_bank, sell_oracle_price, buy_bank_and_oracle_opt) =
         account_retriever.banks_mut_and_oracles(sell_token_index, buy_token_index)?;
@@ -73,18 +70,17 @@ pub fn token_conditional_swap_start(
     // not accounting the incentive fee perfectly.
     let incentive_native = incentive.clamp_to_u64();
 
-    let (account_sell_token, account_sell_raw_index) =
-        account.token_position_mut(sell_token_index)?;
-    let (caller_sell_token, caller_sell_raw_index, _) =
-        caller.ensure_token_position(sell_token_index)?;
+    let (liqee_sell_token, liqee_sell_raw_index) = liqee.token_position_mut(sell_token_index)?;
+    let (liqor_sell_token, liqor_sell_raw_index, _) =
+        liqor.ensure_token_position(sell_token_index)?;
 
-    sell_bank.deposit(caller_sell_token, incentive, now_ts)?;
+    sell_bank.deposit(liqor_sell_token, incentive, now_ts)?;
 
     // This withdraw might be a borrow, so can fail due to net borrows or reduce-only
-    let account_sell_pre_balance = account_sell_token.native(sell_bank);
-    sell_bank.withdraw_with_fee(account_sell_token, incentive, now_ts)?;
-    let account_sell_post_balance = account_sell_token.native(sell_bank);
-    if account_sell_post_balance < 0 {
+    let liqee_sell_pre_balance = liqee_sell_token.native(sell_bank);
+    sell_bank.withdraw_with_fee(liqee_sell_token, incentive, now_ts)?;
+    let liqee_sell_post_balance = liqee_sell_token.native(sell_bank);
+    if liqee_sell_post_balance < 0 {
         require!(
             tcs.allow_creating_borrows(),
             MangoError::TokenConditionalSwapCantPayIncentive
@@ -96,31 +92,29 @@ pub fn token_conditional_swap_start(
         sell_bank.check_net_borrows(sell_oracle_price)?;
     }
 
-    health_cache.adjust_token_balance(
-        sell_bank,
-        account_sell_post_balance - account_sell_pre_balance,
-    )?;
+    health_cache
+        .adjust_token_balance(sell_bank, liqee_sell_post_balance - liqee_sell_pre_balance)?;
 
     emit!(TokenBalanceLog {
         mango_group: *group_pk,
-        mango_account: account_key,
+        mango_account: liqee_key,
         token_index: sell_token_index,
-        indexed_position: account_sell_token.indexed_position.to_bits(),
+        indexed_position: liqee_sell_token.indexed_position.to_bits(),
         deposit_index: sell_bank.deposit_index.to_bits(),
         borrow_index: sell_bank.borrow_index.to_bits(),
     });
     emit!(TokenBalanceLog {
         mango_group: *group_pk,
-        mango_account: caller_key,
+        mango_account: liqor_key,
         token_index: sell_token_index,
-        indexed_position: caller_sell_token.indexed_position.to_bits(),
+        indexed_position: liqor_sell_token.indexed_position.to_bits(),
         deposit_index: sell_bank.deposit_index.to_bits(),
         borrow_index: sell_bank.borrow_index.to_bits(),
     });
     emit!(TokenConditionalSwapStartLog {
         mango_group: *group_pk,
-        mango_account: account_key,
-        caller: caller_key,
+        mango_account: liqee_key,
+        caller: liqor_key,
         token_conditional_swap_id: tcs.id,
         incentive_token_index: sell_token_index,
         incentive_amount: incentive_native,
@@ -129,12 +123,12 @@ pub fn token_conditional_swap_start(
     //
     // Start the tcs
     //
-    let tcs = account.token_conditional_swap_mut_by_index(token_conditional_swap_index)?;
+    let tcs = liqee.token_conditional_swap_mut_by_index(token_conditional_swap_index)?;
     tcs.start_timestamp = now_ts;
     tcs.sold += incentive_native;
     assert!(tcs.passed_start(now_ts));
 
-    account.check_health_post(&health_cache, pre_init_health)?;
+    liqee.check_health_post(&health_cache, pre_init_health)?;
 
     Ok(())
 }

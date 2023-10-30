@@ -4779,9 +4779,9 @@ impl ClientInstruction for TokenConditionalSwapTriggerInstruction {
 
 #[derive(Clone)]
 pub struct TokenConditionalSwapStartInstruction {
-    pub account: Pubkey,
-    pub caller: Pubkey,
-    pub caller_owner: TestKeypair,
+    pub liqee: Pubkey,
+    pub liqor: Pubkey,
+    pub liqor_owner: TestKeypair,
     pub index: u8,
 }
 #[async_trait::async_trait(?Send)]
@@ -4794,18 +4794,18 @@ impl ClientInstruction for TokenConditionalSwapStartInstruction {
     ) -> (Self::Accounts, instruction::Instruction) {
         let program_id = mango_v4::id();
 
-        let account = account_loader
-            .load_mango_account(&self.account)
+        let liqee = account_loader
+            .load_mango_account(&self.liqee)
             .await
             .unwrap();
 
-        let tcs = account
+        let tcs = liqee
             .token_conditional_swap_by_index(self.index.into())
             .unwrap()
             .clone();
 
         let sell_mint_info =
-            get_mint_info_by_token_index(&account_loader, &account, tcs.sell_token_index).await;
+            get_mint_info_by_token_index(&account_loader, &liqee, tcs.sell_token_index).await;
 
         let instruction = Self::Instruction {
             token_conditional_swap_index: self.index,
@@ -4814,7 +4814,7 @@ impl ClientInstruction for TokenConditionalSwapStartInstruction {
 
         let health_check_metas = derive_health_check_remaining_account_metas(
             &account_loader,
-            &account,
+            &liqee,
             Some(sell_mint_info.first_bank()),
             true,
             None,
@@ -4822,10 +4822,10 @@ impl ClientInstruction for TokenConditionalSwapStartInstruction {
         .await;
 
         let accounts = Self::Accounts {
-            group: account.fixed.group,
-            account: self.account,
-            caller: self.caller,
-            caller_authority: self.caller_owner.pubkey(),
+            group: liqee.fixed.group,
+            liqee: self.liqee,
+            liqor: self.liqor,
+            liqor_authority: self.liqor_owner.pubkey(),
         };
 
         let mut instruction = make_instruction(program_id, &accounts, &instruction);
@@ -4834,6 +4834,6 @@ impl ClientInstruction for TokenConditionalSwapStartInstruction {
     }
 
     fn signers(&self) -> Vec<TestKeypair> {
-        vec![self.caller_owner]
+        vec![self.liqor_owner]
     }
 }
