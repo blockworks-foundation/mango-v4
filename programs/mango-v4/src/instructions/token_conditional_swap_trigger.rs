@@ -289,7 +289,7 @@ fn action(
 
     let (liqee_buy_token, liqee_buy_raw_index) = liqee.token_position_mut(tcs.buy_token_index)?;
     let (liqor_buy_token, liqor_buy_raw_index) = liqor.token_position_mut(tcs.buy_token_index)?;
-    let liqee_buy_active = buy_bank.deposit(liqee_buy_token, buy_token_amount_i80f48, now_ts)?;
+    buy_bank.deposit(liqee_buy_token, buy_token_amount_i80f48, now_ts)?;
     let liqor_buy_withdraw =
         buy_bank.withdraw_with_fee(liqor_buy_token, buy_token_amount_i80f48, now_ts)?;
 
@@ -329,13 +329,8 @@ fn action(
     let liqee_sell_indexed_position = liqee_sell_token.indexed_position;
     let liqor_sell_indexed_position = liqor_sell_token.indexed_position;
 
-    // With a scanning account retriever, it's safe to deactivate inactive token positions immediately
-    if !liqee_buy_active {
-        liqee.deactivate_token_position_and_log(liqee_buy_raw_index, liqee_key);
-    }
-    if !liqee_sell_withdraw.position_is_active {
-        liqee.deactivate_token_position_and_log(liqee_sell_raw_index, liqee_key);
-    }
+    // With a scanning account retriever, it's safe to deactivate inactive token positions immediately.
+    // Liqee positions can only be deactivated if the tcs is closed (see below).
     if !liqor_buy_withdraw.position_is_active {
         liqor.deactivate_token_position_and_log(liqor_buy_raw_index, liqor_key);
     }
