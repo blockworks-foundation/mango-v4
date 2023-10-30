@@ -125,8 +125,10 @@ pub fn token_conditional_swap_start(
     //
     let tcs = liqee.token_conditional_swap_mut_by_index(token_conditional_swap_index)?;
     tcs.start_timestamp = now_ts;
-    tcs.sold += incentive_native;
     assert!(tcs.passed_start(now_ts));
+
+    tcs.sold += incentive_native;
+    assert!(tcs.sold <= tcs.max_sell);
 
     liqee.check_health_post(&health_cache, pre_init_health)?;
 
