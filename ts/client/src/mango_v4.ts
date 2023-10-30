@@ -5611,7 +5611,7 @@ export type MangoV4 = {
           "isSigner": false
         },
         {
-          "name": "account",
+          "name": "liqee",
           "isMut": true,
           "isSigner": false,
           "relations": [
@@ -5619,7 +5619,7 @@ export type MangoV4 = {
           ]
         },
         {
-          "name": "caller",
+          "name": "liqor",
           "isMut": true,
           "isSigner": false,
           "relations": [
@@ -5627,7 +5627,7 @@ export type MangoV4 = {
           ]
         },
         {
-          "name": "callerAuthority",
+          "name": "liqorAuthority",
           "isMut": false,
           "isSigner": true
         }
@@ -18823,7 +18823,7 @@ export const IDL: MangoV4 = {
           "isSigner": false
         },
         {
-          "name": "account",
+          "name": "liqee",
           "isMut": true,
           "isSigner": false,
           "relations": [
@@ -18831,7 +18831,7 @@ export const IDL: MangoV4 = {
           ]
         },
         {
-          "name": "caller",
+          "name": "liqor",
           "isMut": true,
           "isSigner": false,
           "relations": [
@@ -18839,7 +18839,7 @@ export const IDL: MangoV4 = {
           ]
         },
         {
-          "name": "callerAuthority",
+          "name": "liqorAuthority",
           "isMut": false,
           "isSigner": true
         }

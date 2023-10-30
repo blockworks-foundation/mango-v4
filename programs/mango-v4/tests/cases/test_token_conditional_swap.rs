@@ -740,9 +740,9 @@ async fn test_token_conditional_swap_premium_auction() -> Result<(), TransportEr
     let res = send_tx(
         solana,
         TokenConditionalSwapStartInstruction {
-            account,
-            caller: liqor,
-            caller_owner: owner,
+            liqee: account,
+            liqor,
+            liqor_owner: owner,
             index: 0,
         },
     )
@@ -780,9 +780,9 @@ async fn test_token_conditional_swap_premium_auction() -> Result<(), TransportEr
     send_tx(
         solana,
         TokenConditionalSwapStartInstruction {
-            account,
-            caller: liqor,
-            caller_owner: owner,
+            liqee: account,
+            liqor,
+            liqor_owner: owner,
             index: 0,
         },
     )
@@ -952,9 +952,9 @@ async fn test_token_conditional_swap_premium_auction() -> Result<(), TransportEr
     let res = send_tx(
         solana,
         TokenConditionalSwapStartInstruction {
-            account,
-            caller: liqor,
-            caller_owner: owner,
+            liqee: account,
+            liqor,
+            liqor_owner: owner,
             index: 1,
         },
     )
@@ -973,9 +973,9 @@ async fn test_token_conditional_swap_premium_auction() -> Result<(), TransportEr
     send_tx(
         solana,
         TokenConditionalSwapStartInstruction {
-            account,
-            caller: liqor,
-            caller_owner: owner,
+            liqee: account,
+            liqor,
+            liqor_owner: owner,
             index: 1,
         },
     )
@@ -996,9 +996,9 @@ async fn test_token_conditional_swap_premium_auction() -> Result<(), TransportEr
     let res = send_tx(
         solana,
         TokenConditionalSwapStartInstruction {
-            account,
-            caller: liqor,
-            caller_owner: owner,
+            liqee: account,
+            liqor,
+            liqor_owner: owner,
             index: 1,
         },
     )

@@ -1355,9 +1355,9 @@ impl MangoClient {
                 let mut ams = anchor_lang::ToAccountMetas::to_account_metas(
                     &mango_v4::accounts::TokenConditionalSwapStart {
                         group: self.group(),
-                        account: *account.0,
-                        caller: self.mango_account_address,
-                        caller_authority: self.owner(),
+                        liqee: *account.0,
+                        liqor: self.mango_account_address,
+                        liqor_authority: self.owner(),
                     },
                     None,
                 );

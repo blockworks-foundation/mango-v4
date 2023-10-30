@@ -12,17 +12,17 @@ pub struct TokenConditionalSwapStart<'info> {
     #[account(
         mut,
         has_one = group,
-        constraint = account.load()?.is_operational() @ MangoError::AccountIsFrozen
+        constraint = liqee.load()?.is_operational() @ MangoError::AccountIsFrozen
     )]
-    pub account: AccountLoader<'info, MangoAccountFixed>,
+    pub liqee: AccountLoader<'info, MangoAccountFixed>,
 
     #[account(
         mut,
         has_one = group,
-        constraint = caller.load()?.is_operational() @ MangoError::AccountIsFrozen,
-        constraint = caller.load()?.is_owner_or_delegate(caller_authority.key()),
-        constraint = caller.key() != account.key(),
+        constraint = liqor.load()?.is_operational() @ MangoError::AccountIsFrozen,
+        constraint = liqor.load()?.is_owner_or_delegate(liqor_authority.key()),
+        constraint = liqor.key() != liqee.key(),
     )]
-    pub caller: AccountLoader<'info, MangoAccountFixed>,
-    pub caller_authority: Signer<'info>,
+    pub liqor: AccountLoader<'info, MangoAccountFixed>,
+    pub liqor_authority: Signer<'info>,
 }
