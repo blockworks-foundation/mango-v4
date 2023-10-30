@@ -59,9 +59,7 @@ pub fn token_conditional_swap_trigger(
 
     // Possibly wipe the tcs and exit, if it's already expired
     if tcs_is_expired {
-        if min_buy_token > 0 {
-            require!(!tcs_is_expired, MangoError::TokenConditionalSwapExpired);
-        }
+        require!(min_buy_token == 0, MangoError::TokenConditionalSwapExpired);
 
         let (buy_bank, _buy_token_price, sell_bank_and_oracle_opt) =
             account_retriever.banks_mut_and_oracles(buy_token_index, sell_token_index)?;
