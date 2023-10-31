@@ -59,9 +59,7 @@ pub fn token_conditional_swap_trigger(
 
     // Possibly wipe the tcs and exit, if it's already expired
     if tcs_is_expired {
-        if min_buy_token > 0 {
-            require!(!tcs_is_expired, MangoError::TokenConditionalSwapExpired);
-        }
+        require!(min_buy_token == 0, MangoError::TokenConditionalSwapExpired);
 
         let (buy_bank, _buy_token_price, sell_bank_and_oracle_opt) =
             account_retriever.banks_mut_and_oracles(buy_token_index, sell_token_index)?;
@@ -280,18 +278,19 @@ fn action(
 
     let sell_token_amount =
         (I80F48::from(buy_token_amount) * I80F48::from_num(premium_price)).floor();
-    let maker_fee = tcs.maker_fee(sell_token_amount);
+    let sell_token_amount_u64 = sell_token_amount.to_num::<u64>();
+    let maker_fee = sell_token_amount_with_maker_fee - sell_token_amount_u64;
     let taker_fee = tcs.taker_fee(sell_token_amount);
 
     let sell_token_amount_from_liqee = sell_token_amount_with_maker_fee;
-    let sell_token_amount_to_liqor = sell_token_amount_with_maker_fee - maker_fee - taker_fee;
+    let sell_token_amount_to_liqor = sell_token_amount_u64 - taker_fee;
 
     // do the token transfer between liqee and liqor
     let buy_token_amount_i80f48 = I80F48::from(buy_token_amount);
 
     let (liqee_buy_token, liqee_buy_raw_index) = liqee.token_position_mut(tcs.buy_token_index)?;
     let (liqor_buy_token, liqor_buy_raw_index) = liqor.token_position_mut(tcs.buy_token_index)?;
-    let liqee_buy_active = buy_bank.deposit(liqee_buy_token, buy_token_amount_i80f48, now_ts)?;
+    buy_bank.deposit(liqee_buy_token, buy_token_amount_i80f48, now_ts)?;
     let liqor_buy_withdraw =
         buy_bank.withdraw_with_fee(liqor_buy_token, buy_token_amount_i80f48, now_ts)?;
 
@@ -331,13 +330,8 @@ fn action(
     let liqee_sell_indexed_position = liqee_sell_token.indexed_position;
     let liqor_sell_indexed_position = liqor_sell_token.indexed_position;
 
-    // With a scanning account retriever, it's safe to deactivate inactive token positions immediately
-    if !liqee_buy_active {
-        liqee.deactivate_token_position_and_log(liqee_buy_raw_index, liqee_key);
-    }
-    if !liqee_sell_withdraw.position_is_active {
-        liqee.deactivate_token_position_and_log(liqee_sell_raw_index, liqee_key);
-    }
+    // With a scanning account retriever, it's safe to deactivate inactive token positions immediately.
+    // Liqee positions can only be deactivated if the tcs is closed (see below).
     if !liqor_buy_withdraw.position_is_active {
         liqor.deactivate_token_position_and_log(liqor_buy_raw_index, liqor_key);
     }

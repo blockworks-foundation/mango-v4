@@ -740,9 +740,9 @@ async fn test_token_conditional_swap_premium_auction() -> Result<(), TransportEr
     let res = send_tx(
         solana,
         TokenConditionalSwapStartInstruction {
-            account,
-            caller: liqor,
-            caller_owner: owner,
+            liqee: account,
+            liqor,
+            liqor_owner: owner,
             index: 0,
         },
     )
@@ -780,9 +780,9 @@ async fn test_token_conditional_swap_premium_auction() -> Result<(), TransportEr
     send_tx(
         solana,
         TokenConditionalSwapStartInstruction {
-            account,
-            caller: liqor,
-            caller_owner: owner,
+            liqee: account,
+            liqor,
+            liqor_owner: owner,
             index: 0,
         },
     )
@@ -846,8 +846,9 @@ async fn test_token_conditional_swap_premium_auction() -> Result<(), TransportEr
             liqor,
             liqor_owner: owner,
             index: 0,
-            max_buy_token_to_liqee: 10000,
-            max_sell_token_to_liqor: 11055, // expected price of 1.0+0.5% premium sell per buy, with 10% maker fee
+            max_buy_token_to_liqee: 90000,
+            // expected price of 1.0+0.5% premium sell per buy, with 10% maker fee, so buy token transfer of 10k
+            max_sell_token_to_liqor: 11055,
             min_buy_token: 1,
             min_taker_price: 0.0,
         },
@@ -858,7 +859,7 @@ async fn test_token_conditional_swap_premium_auction() -> Result<(), TransportEr
     account_quote_expected += 10000.0;
     account_base_expected += -11055.0;
     liqor_quote_expected += -10000.0;
-    liqor_base_expected += 9549.0; // roughly 10000 * 1 * 1.005 premium * 0.95 taker fee
+    liqor_base_expected += 9547.0; // 10000 * 1 * 1.005 premium * 0.95 taker fee
 
     let account_quote = account_position_f64(solana, account, quote_token.bank).await;
     let account_base = account_position_f64(solana, account, base_token.bank).await;
@@ -890,7 +891,8 @@ async fn test_token_conditional_swap_premium_auction() -> Result<(), TransportEr
             liqor_owner: owner,
             index: 0,
             max_buy_token_to_liqee: 10000,
-            max_sell_token_to_liqor: 11110, // expected price of 1.0+1% premium sell per buy, with 10% maker fee
+            // expected price of 1.0+1% premium sell per buy, with 10% maker fee, so sell token transfer of 11110
+            max_sell_token_to_liqor: 90000,
             min_buy_token: 1,
             min_taker_price: 0.0,
         },
@@ -901,7 +903,7 @@ async fn test_token_conditional_swap_premium_auction() -> Result<(), TransportEr
     account_quote_expected += 10000.0;
     account_base_expected += -11110.0;
     liqor_quote_expected += -10000.0;
-    liqor_base_expected += 9595.0; // roughly 10000 * 1 * 1.01 premium * 0.95 taker fee
+    liqor_base_expected += 9595.0; // 10000 * 1 * 1.01 premium * 0.95 taker fee
 
     let account_quote = account_position_f64(solana, account, quote_token.bank).await;
     let account_base = account_position_f64(solana, account, base_token.bank).await;
@@ -952,9 +954,9 @@ async fn test_token_conditional_swap_premium_auction() -> Result<(), TransportEr
     let res = send_tx(
         solana,
         TokenConditionalSwapStartInstruction {
-            account,
-            caller: liqor,
-            caller_owner: owner,
+            liqee: account,
+            liqor,
+            liqor_owner: owner,
             index: 1,
         },
     )
@@ -973,9 +975,9 @@ async fn test_token_conditional_swap_premium_auction() -> Result<(), TransportEr
     send_tx(
         solana,
         TokenConditionalSwapStartInstruction {
-            account,
-            caller: liqor,
-            caller_owner: owner,
+            liqee: account,
+            liqor,
+            liqor_owner: owner,
             index: 1,
         },
     )
@@ -996,9 +998,9 @@ async fn test_token_conditional_swap_premium_auction() -> Result<(), TransportEr
     let res = send_tx(
         solana,
         TokenConditionalSwapStartInstruction {
-            account,
-            caller: liqor,
-            caller_owner: owner,
+            liqee: account,
+            liqor,
+            liqor_owner: owner,
             index: 1,
         },
     )

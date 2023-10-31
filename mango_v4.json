@@ -5611,7 +5611,7 @@
           "isSigner": false
         },
         {
-          "name": "account",
+          "name": "liqee",
           "isMut": true,
           "isSigner": false,
           "relations": [
@@ -5619,7 +5619,7 @@
           ]
         },
         {
-          "name": "caller",
+          "name": "liqor",
           "isMut": true,
           "isSigner": false,
           "relations": [
@@ -5627,7 +5627,7 @@
           ]
         },
         {
-          "name": "callerAuthority",
+          "name": "liqorAuthority",
           "isMut": false,
           "isSigner": true
         }
