@@ -3164,9 +3164,9 @@
                 <span class="kw">let </span><span class="kw-2">mut </span>ams = anchor_lang::ToAccountMetas::to_account_metas(
                     <span class="kw-2">&amp;</span>mango_v4::accounts::TokenConditionalSwapStart {
                         group: <span class="self">self</span>.group(),
-                        account: <span class="kw-2">*</span>account.<span class="number">0</span>,
-                        caller: <span class="self">self</span>.mango_account_address,
-                        caller_authority: <span class="self">self</span>.owner(),
+                        liqee: <span class="kw-2">*</span>account.<span class="number">0</span>,
+                        liqor: <span class="self">self</span>.mango_account_address,
+                        liqor_authority: <span class="self">self</span>.owner(),
                     },
                     <span class="prelude-val">None</span>,
                 );
