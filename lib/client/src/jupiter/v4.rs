@@ -249,7 +249,7 @@ impl<'a> JupiterV4<'a> {
         let num_loans: u8 = loan_amounts.len().try_into().unwrap();
 
         // This relies on the fact that health account banks will be identical to the first_bank above!
-        let health_ams = self
+        let (health_ams, _health_cu) = self
             .mango_client
             .derive_health_check_remaining_account_metas(
                 vec![source_token.token_index, target_token.token_index],

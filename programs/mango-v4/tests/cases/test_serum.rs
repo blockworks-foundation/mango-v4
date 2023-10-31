@@ -138,10 +138,11 @@ impl SerumOrderPlacer {
         let open_orders = self.serum.load_open_orders(self.open_orders).await;
         let orders = open_orders.orders;
         for (idx, order_id) in orders.iter().enumerate() {
-            if *order_id == 0 {
+            let mask = 1u128 << idx;
+            if open_orders.free_slot_bits & mask != 0 {
                 continue;
             }
-            let side = if open_orders.is_bid_bits & (1u128 << idx) == 0 {
+            let side = if open_orders.is_bid_bits & mask == 0 {
                 Serum3Side::Ask
             } else {
                 Serum3Side::Bid
@@ -1252,6 +1253,128 @@ async fn test_serum_track_bid_ask() -> Result<(), TransportError> {
         order_placer.mango_serum_orders().await.lowest_placed_ask,
         9.0
     );
+
+    Ok(())
+}
+
+#[tokio::test]
+async fn test_serum_compute() -> Result<(), TransportError> {
+    let mut test_builder = TestContextBuilder::new();
+    test_builder.test().set_compute_max_units(150_000); // Serum3PlaceOrder needs lots
+    let context = test_builder.start_default().await;
+    let solana = &context.solana;
+
+    //
+    // SETUP: Create a group, accounts, market etc
+    //
+    let deposit_amount = 100000;
+    let CommonSetup {
+        serum_market_cookie,
+        mut order_placer,
+        order_placer2,
+        ..
+    } = common_setup(&context, deposit_amount).await;
+
+    //
+    // TEST: check compute per serum match
+    //
+
+    for limit in 1..6 {
+        order_placer.bid_maker(1.0, 100).await.unwrap();
+        order_placer.bid_maker(1.1, 100).await.unwrap();
+        order_placer.bid_maker(1.2, 100).await.unwrap();
+        order_placer.bid_maker(1.3, 100).await.unwrap();
+        order_placer.bid_maker(1.4, 100).await.unwrap();
+
+        let result = send_tx_get_metadata(
+            solana,
+            Serum3PlaceOrderInstruction {
+                side: Serum3Side::Ask,
+                limit_price: (1.0 * 100.0 / 10.0) as u64, // in quote_lot (10) per base lot (100)
+                max_base_qty: 500 / 100,                  // in base lot (100)
+                max_native_quote_qty_including_fees: (1.0 * (500 as f64)) as u64,
+                self_trade_behavior: Serum3SelfTradeBehavior::AbortTransaction,
+                order_type: Serum3OrderType::Limit,
+                client_order_id: 0,
+                limit,
+                account: order_placer2.account,
+                owner: order_placer2.owner,
+                serum_market: order_placer2.serum_market,
+            },
+        )
+        .await
+        .unwrap();
+        println!(
+            "CU for serum_place_order matching {limit} orders in sequence: {}",
+            result.metadata.unwrap().compute_units_consumed
+        );
+
+        // many events need processing
+        context
+            .serum
+            .consume_spot_events(
+                &serum_market_cookie,
+                &[order_placer.open_orders, order_placer2.open_orders],
+            )
+            .await;
+        context
+            .serum
+            .consume_spot_events(
+                &serum_market_cookie,
+                &[order_placer.open_orders, order_placer2.open_orders],
+            )
+            .await;
+        context
+            .serum
+            .consume_spot_events(
+                &serum_market_cookie,
+                &[order_placer.open_orders, order_placer2.open_orders],
+            )
+            .await;
+        order_placer.cancel_all().await;
+        order_placer2.cancel_all().await;
+        context
+            .serum
+            .consume_spot_events(
+                &serum_market_cookie,
+                &[order_placer.open_orders, order_placer2.open_orders],
+            )
+            .await;
+    }
+
+    //
+    // TEST: check compute per serum cancel
+    //
+
+    for limit in 1..6 {
+        for i in 0..limit {
+            order_placer.bid_maker(1.0 + i as f64, 100).await.unwrap();
+        }
+
+        let result = send_tx_get_metadata(
+            solana,
+            Serum3CancelAllOrdersInstruction {
+                account: order_placer.account,
+                owner: order_placer.owner,
+                serum_market: order_placer.serum_market,
+                limit: 10,
+            },
+        )
+        .await
+        .unwrap();
+        println!(
+            "CU for serum_cancel_all_order for {limit} orders: {}",
+            result.metadata.unwrap().compute_units_consumed
+        );
+
+        context
+            .serum
+            .consume_spot_events(
+                &serum_market_cookie,
+                &[order_placer.open_orders, order_placer2.open_orders],
+            )
+            .await;
+    }
 
     Ok(())
 }

@@ -6,11 +6,11 @@ use mango_v4::accounts_zerocopy::KeyedAccountSharedData;
 use mango_v4::health::HealthType;
 use mango_v4::state::{PerpMarket, PerpMarketIndex};
 use mango_v4_client::{
-    chain_data, health_cache, prettify_solana_client_error, MangoClient, TransactionBuilder,
+    chain_data, health_cache, prettify_solana_client_error, MangoClient, PreparedInstructions,
+    TransactionBuilder,
 };
 use solana_sdk::address_lookup_table_account::AddressLookupTableAccount;
 use solana_sdk::commitment_config::CommitmentConfig;
-use solana_sdk::instruction::Instruction;
 use solana_sdk::signature::Signature;
 
 use solana_sdk::signer::Signer;
@@ -180,7 +180,7 @@ impl SettlementState {
                 mango_client,
                 account_fetcher,
                 perp_market_index,
-                instructions: Vec::new(),
+                instructions: PreparedInstructions::new(),
                 max_batch_size: 8, // the 1.4M max CU limit if we assume settle ix can be up to around 150k
                 blockhash: mango_client
                     .client
@@ -242,7 +242,7 @@ struct SettleBatchProcessor<'a> {
     mango_client: &'a MangoClient,
     account_fetcher: &'a chain_data::AccountFetcher,
     perp_market_index: PerpMarketIndex,
-    instructions: Vec<Instruction>,
+    instructions: PreparedInstructions,
     max_batch_size: usize,
     blockhash: solana_sdk::hash::Hash,
     address_lookup_tables: &'a Vec<AddressLookupTableAccount>,
@@ -254,7 +254,7 @@ impl<'a> SettleBatchProcessor<'a> {
         let fee_payer = client.fee_payer.clone();
 
         TransactionBuilder {
-            instructions: self.instructions.clone(),
+            instructions: self.instructions.clone().to_instructions(),
             address_lookup_tables: self.address_lookup_tables.clone(),
             payer: fee_payer.pubkey(),
             signers: vec![fee_payer],
@@ -296,15 +296,19 @@ impl<'a> SettleBatchProcessor<'a> {
     ) -> anyhow::Result<Option<Signature>> {
         let a_value = self.account_fetcher.fetch_mango_account(&account_a)?;
         let b_value = self.account_fetcher.fetch_mango_account(&account_b)?;
-        let ix = self.mango_client.perp_settle_pnl_instruction(
+        let new_ixs = self.mango_client.perp_settle_pnl_instruction(
             self.perp_market_index,
             (&account_a, &a_value),
             (&account_b, &b_value),
         )?;
-        self.instructions.push(ix);
+        let previous = self.instructions.clone();
+        self.instructions.append(new_ixs.clone());
 
         // if we exceed the batch limit or tx size limit, send a batch without the new ix
-        let needs_send = if self.instructions.len() > self.max_batch_size {
+        let max_cu_per_tx = 1_400_000;
+        let needs_send = if self.instructions.len() > self.max_batch_size
+            || self.instructions.cu >= max_cu_per_tx
+        {
             true
         } else {
             let tx = self.transaction()?;
@@ -321,9 +325,9 @@ impl<'a> SettleBatchProcessor<'a> {
             too_big
         };
         if needs_send {
-            let ix = self.instructions.pop().unwrap();
+            self.instructions = previous;
             let txsig = self.send().await?;
-            self.instructions.push(ix);
+            self.instructions.append(new_ixs);
             return Ok(txsig);
         }
 

@@ -1,6 +1,8 @@
 use solana_client::{
     client_error::Result as ClientResult, rpc_client::RpcClient, rpc_request::RpcError,
 };
+use solana_sdk::compute_budget::ComputeBudgetInstruction;
+use solana_sdk::instruction::Instruction;
 use solana_sdk::transaction::Transaction;
 use solana_sdk::{
     clock::Slot, commitment_config::CommitmentConfig, signature::Signature,
@@ -141,5 +143,60 @@ pub fn to_writable_account_meta(pubkey: Pubkey) -> AccountMeta {
         pubkey,
         is_writable: true,
         is_signer: false,
+    }
+}
+
+#[derive(Default, Clone)]
+pub struct PreparedInstructions {
+    pub instructions: Vec<Instruction>,
+    pub cu: u32,
+}
+
+impl PreparedInstructions {
+    pub fn new() -> Self {
+        Self {
+            instructions: vec![],
+            cu: 0,
+        }
+    }
+
+    pub fn from_vec(instructions: Vec<Instruction>, cu: u32) -> Self {
+        Self { instructions, cu }
+    }
+
+    pub fn from_single(instruction: Instruction, cu: u32) -> Self {
+        Self {
+            instructions: vec![instruction],
+            cu,
+        }
+    }
+
+    pub fn push(&mut self, ix: Instruction, cu: u32) {
+        self.instructions.push(ix);
+        self.cu += cu;
+    }
+
+    pub fn append(&mut self, mut other: Self) {
+        self.instructions.append(&mut other.instructions);
+        self.cu += other.cu;
+    }
+
+    pub fn to_instructions(self) -> Vec<Instruction> {
+        let mut ixs = self.instructions;
+        ixs.insert(0, ComputeBudgetInstruction::set_compute_unit_limit(self.cu));
+        ixs
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.instructions.is_empty()
+    }
+
+    pub fn clear(&mut self) {
+        self.instructions.clear();
+        self.cu = 0;
+    }
+
+    pub fn len(&self) -> usize {
+        self.instructions.len()
     }
 }
