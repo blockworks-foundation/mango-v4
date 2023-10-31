@@ -95,7 +95,7 @@ import { MangoSignatureStatus, sendTransaction } from './utils/rpc';
 import { NATIVE_MINT, TOKEN_PROGRAM_ID } from './utils/spl';
 
 export const DEFAULT_TOKEN_CONDITIONAL_SWAP_COUNT = 8;
-export const PERP_SETTLE_PNL_CU_LIMIT = 250000;
+export const PERP_SETTLE_PNL_CU_LIMIT = 400000;
 export const PERP_SETTLE_FEES_CU_LIMIT = 20000;
 export const SERUM_SETTLE_FUNDS_CU_LIMIT = 65000;
 
