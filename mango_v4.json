@@ -7040,11 +7040,32 @@
             "type": "f32"
           },
           {
+            "name": "interestTargetUtilization",
+            "docs": [
+              "Target utilization: If actual utilization is higher, scale up interest.",
+              "If it's lower, scale down interest (if possible)"
+            ],
+            "type": "f32"
+          },
+          {
+            "name": "interestCurveScaling",
+            "docs": [
+              "Current interest curve scaling, always >= 1.0",
+              "",
+              "Except when first migrating to having this field, then 0.0"
+            ],
+            "type": "f64"
+          },
+          {
+            "name": "depositsInSerum",
+            "type": "i64"
+          },
+          {
             "name": "reserved",
             "type": {
               "array": [
                 "u8",
-                2092
+                2072
               ]
             }
           }
@@ -8581,11 +8602,26 @@
             "type": "f64"
           },
           {
+            "name": "baseDepositsReserved",
+            "docs": [
+              "Tracks the amount of deposits that flowed into the serum open orders account.",
+              "",
+              "The bank still considers these amounts user deposits (see deposits_in_serum)",
+              "and they need to be deducted from there when they flow back into the bank",
+              "as real tokens."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "quoteDepositsReserved",
+            "type": "u64"
+          },
+          {
             "name": "reserved",
             "type": {
               "array": [
                 "u8",
-                48
+                32
               ]
             }
           }
