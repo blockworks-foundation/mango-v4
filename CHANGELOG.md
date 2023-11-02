@@ -6,7 +6,7 @@ Update this for each program release and mainnet deployment.
 
 ### v0.20.0, 2023-10-
 
-- Token conditional swaps: Add two auction mechanisms (#717)
+- Token conditional swaps: Add two auction mechanisms (#717, #751)
 
   The trigger orders that are used to implement stop loss and take profit orders
   currently require users to set a fixed premium - an incentive for the order
@@ -42,9 +42,12 @@ Update this for each program release and mainnet deployment.
 - Update dependencies to Anchor v0.28.0 and Solana v1.16.14 (#718)
 - Flash loan: Introduce specialized FlashLoanSwapBegin to save tx bytes (#744)
 - Flash loan: Whitelist Jupiter v6 program for delegates (#737)
+- Flash loan: Replace deposit fee by input fee for swaps only (#754)
 - Token deposit: Require a valid oracle when opening a new token position (#722)
 - Fix computing maximum allowed amount when swapping zero asset-weight tokens (#699)
 - Fix too-strict validation of max rate on token edit (#734)
+- Update fast-listing token interest, leverage, reduce-only flags (#760, #770)
+- Limit number of fast-listing tokens per week (#756)
 
 ## mainnet
 
