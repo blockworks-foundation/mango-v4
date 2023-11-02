@@ -32,17 +32,19 @@ use solana_sdk::hash::Hash;
 use solana_sdk::signer::keypair;
 use solana_sdk::transaction::TransactionError;
 
-use crate::account_fetcher::*;
+use crate::account_fetcher_trait::*;
 use crate::context::MangoGroupContext;
 use crate::gpa::{fetch_anchor_account, fetch_mango_accounts};
 use crate::{jupiter, util};
 
 use anyhow::Context;
+use mango_feeds_connector::account_fetchers::{CachedAccountFetcher, RpcAccountFetcher};
 use solana_sdk::account::ReadableAccount;
 use solana_sdk::instruction::{AccountMeta, Instruction};
 use solana_sdk::signature::{Keypair, Signature};
 use solana_sdk::sysvar;
 use solana_sdk::{commitment_config::CommitmentConfig, pubkey::Pubkey, signer::Signer};
+use crate::account_fetcher_utils::{account_fetcher_fetch_anchor_account, account_fetcher_fetch_mango_account};
 
 pub const MAX_ACCOUNTS_PER_TRANSACTION: usize = 64;
 

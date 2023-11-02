@@ -1,12 +1,13 @@
-pub use account_fetcher::*;
+pub use account_fetcher_trait::*;
 pub use client::*;
 pub use context::*;
 pub use util::*;
 
-mod account_fetcher;
+pub mod account_fetcher_trait;
+pub mod account_fetcher_utils;
 pub mod account_update_stream;
 pub mod chain_data;
-mod chain_data_fetcher;
+pub mod chain_data_fetcher;
 mod client;
 mod context;
 pub mod error_tracking;
