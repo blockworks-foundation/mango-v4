@@ -1454,6 +1454,7 @@ mod tests {
         borrows: u64,
         deposit_weight_scale_start_quote: u64,
         borrow_weight_scale_start_quote: u64,
+        deposits_in_serum: i64,
     }
 
     #[derive(Default)]
@@ -1509,6 +1510,7 @@ mod tests {
             let bank = bank.data();
             bank.indexed_deposits = I80F48::from(settings.deposits) / bank.deposit_index;
             bank.indexed_borrows = I80F48::from(settings.borrows) / bank.borrow_index;
+            bank.deposits_in_serum = settings.deposits_in_serum;
             if settings.deposit_weight_scale_start_quote > 0 {
                 bank.deposit_weight_scale_start_quote =
                     settings.deposit_weight_scale_start_quote as f64;
@@ -1805,6 +1807,55 @@ mod tests {
                     let s3 = account.serum3_orders_mut(3).unwrap();
                     s3.highest_placed_bid_inv = 1.0 / 9.0;
                 }),
+                ..Default::default()
+            },
+            TestHealth1Case {
+                // 16, base case for 17
+                token1: 100,
+                token2: 100,
+                token3: 100,
+                oo_1_2: (0, 100),
+                oo_1_3: (0, 100),
+                expected_health:
+                    // tokens
+                    100.0 * 0.8 + 100.0 * 5.0 * 0.5 + 100.0 * 10.0 * 0.5
+                    // oo_1_2 (-> token2)
+                    + 100.0 * 5.0 * 0.5
+                    // oo_1_3 (-> token1)
+                    + 100.0 * 10.0 * 0.5,
+                ..Default::default()
+            },
+            TestHealth1Case {
+                // 17, deposits_in_serum counts for deposit weight scaling
+                token1: 100,
+                token2: 100,
+                token3: 100,
+                oo_1_2: (0, 100),
+                oo_1_3: (0, 100),
+                bank_settings: [
+                    BankSettings {
+                        ..BankSettings::default()
+                    },
+                    BankSettings {
+                        deposits: 100,
+                        deposit_weight_scale_start_quote: 100 * 5,
+                        deposits_in_serum: 100,
+                        ..BankSettings::default()
+                    },
+                    BankSettings {
+                        deposits: 600,
+                        deposit_weight_scale_start_quote: 500 * 10,
+                        deposits_in_serum: 100,
+                        ..BankSettings::default()
+                    },
+                ],
+                expected_health:
+                    // tokens
+                    100.0 * 0.8 + 100.0 * 5.0 * 0.5 * (100.0 / 200.0) + 100.0 * 10.0 * 0.5 * (500.0 / 700.0)
+                    // oo_1_2 (-> token2)
+                    + 100.0 * 5.0 * 0.5 * (100.0 / 200.0)
+                    // oo_1_3 (-> token1)
+                    + 100.0 * 10.0 * 0.5 * (500.0 / 700.0),
                 ..Default::default()
             },
         ];
