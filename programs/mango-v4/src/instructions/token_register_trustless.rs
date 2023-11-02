@@ -96,7 +96,8 @@ pub fn token_register_trustless(
         flash_loan_swap_fee_rate: 0.0005,
         interest_target_utilization: 0.5,
         interest_curve_scaling: 4.0,
-        reserved: [0; 2080],
+        deposits_in_serum: 0,
+        reserved: [0; 2072],
     };
 
     if let Ok(oracle_price) =

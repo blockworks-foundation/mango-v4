@@ -341,6 +341,13 @@ async fn test_serum_basics() -> Result<(), TransportError> {
     let serum_orders = account_data.serum3_orders_by_raw_index(0).unwrap();
     assert_eq!(serum_orders.base_borrows_without_fee, 0);
     assert_eq!(serum_orders.quote_borrows_without_fee, 0);
+    assert_eq!(serum_orders.base_deposits_reserved, 0);
+    assert_eq!(serum_orders.quote_deposits_reserved, 100);
+
+    let base_bank = solana.get_account::<Bank>(base_token.bank).await;
+    assert_eq!(base_bank.deposits_in_serum, 0);
+    let quote_bank = solana.get_account::<Bank>(quote_token.bank).await;
+    assert_eq!(quote_bank.deposits_in_serum, 100);
 
     assert!(order_id != 0);
 
@@ -358,6 +365,18 @@ async fn test_serum_basics() -> Result<(), TransportError> {
     let native1 = account_position(solana, account, quote_token.bank).await;
     assert_eq!(native0, 1000);
     assert_eq!(native1, 1000);
+
+    let account_data = get_mango_account(solana, account).await;
+    let serum_orders = account_data.serum3_orders_by_raw_index(0).unwrap();
+    assert_eq!(serum_orders.base_borrows_without_fee, 0);
+    assert_eq!(serum_orders.quote_borrows_without_fee, 0);
+    assert_eq!(serum_orders.base_deposits_reserved, 0);
+    assert_eq!(serum_orders.quote_deposits_reserved, 0);
+
+    let base_bank = solana.get_account::<Bank>(base_token.bank).await;
+    assert_eq!(base_bank.deposits_in_serum, 0);
+    let quote_bank = solana.get_account::<Bank>(quote_token.bank).await;
+    assert_eq!(quote_bank.deposits_in_serum, 0);
 
     // Process events such that the OutEvent deactivates the closed order on open_orders
     context
@@ -1252,6 +1271,89 @@ async fn test_serum_track_bid_ask() -> Result<(), TransportError> {
         order_placer.mango_serum_orders().await.lowest_placed_ask,
         9.0
     );
+
+    Ok(())
+}
+
+#[tokio::test]
+async fn test_serum_track_reserved_deposits() -> Result<(), TransportError> {
+    let mut test_builder = TestContextBuilder::new();
+    test_builder.test().set_compute_max_units(150_000); // Serum3PlaceOrder needs lots
+    let context = test_builder.start_default().await;
+
+    //
+    // SETUP: Create a group, accounts, market etc
+    //
+    let deposit_amount = 100000;
+    let CommonSetup {
+        serum_market_cookie,
+        quote_token,
+        base_token,
+        mut order_placer,
+        mut order_placer2,
+        ..
+    } = common_setup(&context, deposit_amount).await;
+    let solana = &context.solana.clone();
+    let quote_bank = quote_token.bank;
+    let base_bank = base_token.bank;
+    let account = order_placer.account;
+
+    let get_vals = |solana| async move {
+        let account_data = get_mango_account(solana, account).await;
+        let orders = account_data.all_serum3_orders().next().unwrap();
+        let base_bank = solana.get_account::<Bank>(base_bank).await;
+        let quote_bank = solana.get_account::<Bank>(quote_bank).await;
+        (
+            orders.base_deposits_reserved,
+            base_bank.deposits_in_serum,
+            orders.quote_deposits_reserved,
+            quote_bank.deposits_in_serum,
+        )
+    };
+
+    //
+    // TEST: place a bid and ask and observe tracking
+    //
+
+    order_placer.bid_maker(0.8, 2000).await.unwrap();
+    order_placer.ask(1.2, 2000).await.unwrap();
+    assert_eq!(get_vals(solana).await, (2000, 2000, 1600, 1600));
+
+    //
+    // TEST: match partially on both sides, increasing the on-bank reserved amounts
+    // because order_placer2 puts funds into the serum oo
+    //
+
+    order_placer2.bid_taker(1.2, 1000).await.unwrap();
+    context
+        .serum
+        .consume_spot_events(
+            &serum_market_cookie,
+            &[order_placer.open_orders, order_placer2.open_orders],
+        )
+        .await;
+    assert_eq!(get_vals(solana).await, (2000, 2000, 1600, 2801));
+    order_placer2.settle_v2(false).await;
+    assert_eq!(get_vals(solana).await, (2000, 2000, 1600, 1600));
+
+    order_placer2.ask(0.8, 1000).await.unwrap();
+    context
+        .serum
+        .consume_spot_events(
+            &serum_market_cookie,
+            &[order_placer.open_orders, order_placer2.open_orders],
+        )
+        .await;
+    assert_eq!(get_vals(solana).await, (2000, 3000, 1600, 1600));
+    order_placer2.settle_v2(false).await;
+    assert_eq!(get_vals(solana).await, (2000, 2000, 1600, 1600));
+
+    //
+    // TEST: Settlement updates the values
+    //
+
+    order_placer.settle_v2(false).await;
+    assert_eq!(get_vals(solana).await, (1000, 1000, 800, 800));
 
     Ok(())
 }
