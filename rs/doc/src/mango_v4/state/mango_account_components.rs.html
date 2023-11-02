@@ -1450,6 +1450,16 @@
 <a href="#1450" id="1450">1450</a>
 <a href="#1451" id="1451">1451</a>
 <a href="#1452" id="1452">1452</a>
+<a href="#1453" id="1453">1453</a>
+<a href="#1454" id="1454">1454</a>
+<a href="#1455" id="1455">1455</a>
+<a href="#1456" id="1456">1456</a>
+<a href="#1457" id="1457">1457</a>
+<a href="#1458" id="1458">1458</a>
+<a href="#1459" id="1459">1459</a>
+<a href="#1460" id="1460">1460</a>
+<a href="#1461" id="1461">1461</a>
+<a href="#1462" id="1462">1462</a>
 </pre><pre class="rust"><code><span class="kw">use </span>anchor_lang::prelude::<span class="kw-2">*</span>;
 
 <span class="kw">use </span>derivative::Derivative;
@@ -1597,12 +1607,20 @@
     </span><span class="kw">pub </span>highest_placed_bid_inv: f64,
     <span class="kw">pub </span>lowest_placed_ask: f64,
 
+    <span class="doccomment">/// Tracks the amount of deposits that flowed into the serum open orders account.
+    ///
+    /// The bank still considers these amounts user deposits (see deposits_in_serum)
+    /// and they need to be deducted from there when they flow back into the bank
+    /// as real tokens.
+    </span><span class="kw">pub </span>base_deposits_reserved: u64,
+    <span class="kw">pub </span>quote_deposits_reserved: u64,
+
     <span class="attr">#[derivative(Debug = <span class="string">&quot;ignore&quot;</span>)]
-    </span><span class="kw">pub </span>reserved: [u8; <span class="number">48</span>],
+    </span><span class="kw">pub </span>reserved: [u8; <span class="number">32</span>],
 }
 <span class="macro">const_assert_eq!</span>(
     size_of::&lt;Serum3Orders&gt;(),
-    <span class="number">32 </span>+ <span class="number">8 </span>* <span class="number">2 </span>+ <span class="number">2 </span>* <span class="number">3 </span>+ <span class="number">2 </span>+ <span class="number">2 </span>* <span class="number">8 </span>+ <span class="number">48
+    <span class="number">32 </span>+ <span class="number">8 </span>* <span class="number">2 </span>+ <span class="number">2 </span>* <span class="number">3 </span>+ <span class="number">2 </span>+ <span class="number">4 </span>* <span class="number">8 </span>+ <span class="number">32
 </span>);
 <span class="macro">const_assert_eq!</span>(size_of::&lt;Serum3Orders&gt;(), <span class="number">120</span>);
 <span class="macro">const_assert_eq!</span>(size_of::&lt;Serum3Orders&gt;() % <span class="number">8</span>, <span class="number">0</span>);
@@ -1629,7 +1647,9 @@
             quote_borrows_without_fee: <span class="number">0</span>,
             highest_placed_bid_inv: <span class="number">0.0</span>,
             lowest_placed_ask: <span class="number">0.0</span>,
-            reserved: [<span class="number">0</span>; <span class="number">48</span>],
+            base_deposits_reserved: <span class="number">0</span>,
+            quote_deposits_reserved: <span class="number">0</span>,
+            reserved: [<span class="number">0</span>; <span class="number">32</span>],
         }
     }
 }

@@ -1180,6 +1180,11 @@
 <a href="#1180" id="1180">1180</a>
 <a href="#1181" id="1181">1181</a>
 <a href="#1182" id="1182">1182</a>
+<a href="#1183" id="1183">1183</a>
+<a href="#1184" id="1184">1184</a>
+<a href="#1185" id="1185">1185</a>
+<a href="#1186" id="1186">1186</a>
+<a href="#1187" id="1187">1187</a>
 </pre><pre class="rust"><code><span class="kw">use super</span>::{OracleConfig, TokenIndex, TokenPosition};
 <span class="kw">use </span><span class="kw">crate</span>::accounts_zerocopy::KeyedAccountReader;
 <span class="kw">use </span><span class="kw">crate</span>::error::<span class="kw-2">*</span>;
@@ -1317,7 +1322,8 @@
     </span><span class="kw">pub </span>reduce_only: u8,
     <span class="kw">pub </span>force_close: u8,
 
-    <span class="kw">pub </span>padding: [u8; <span class="number">6</span>],
+    <span class="attr">#[derivative(Debug = <span class="string">&quot;ignore&quot;</span>)]
+    </span><span class="kw">pub </span>padding: [u8; <span class="number">6</span>],
 
     <span class="comment">// Do separate bookkeping for how many tokens were withdrawn
     // This ensures that collected_fees_native is strictly increasing for stats gathering purposes
@@ -1338,8 +1344,12 @@
     /// Except when first migrating to having this field, then 0.0
     </span><span class="kw">pub </span>interest_curve_scaling: f64,
 
+    <span class="comment">// user deposits that were moved into serum open orders
+    // can be negative due to multibank, then it&#39;d need to be balanced in the keeper
+    </span><span class="kw">pub </span>deposits_in_serum: i64,
+
     <span class="attr">#[derivative(Debug = <span class="string">&quot;ignore&quot;</span>)]
-    </span><span class="kw">pub </span>reserved: [u8; <span class="number">2080</span>],
+    </span><span class="kw">pub </span>reserved: [u8; <span class="number">2072</span>],
 }
 <span class="macro">const_assert_eq!</span>(
     size_of::&lt;Bank&gt;(),
@@ -1371,8 +1381,8 @@
         </span>+ <span class="number">6
         </span>+ <span class="number">8
         </span>+ <span class="number">4 </span>* <span class="number">4
-        </span>+ <span class="number">8
-        </span>+ <span class="number">2080
+        </span>+ <span class="number">8 </span>* <span class="number">2
+        </span>+ <span class="number">2072
 </span>);
 <span class="macro">const_assert_eq!</span>(size_of::&lt;Bank&gt;(), <span class="number">3064</span>);
 <span class="macro">const_assert_eq!</span>(size_of::&lt;Bank&gt;() % <span class="number">8</span>, <span class="number">0</span>);
@@ -1407,6 +1417,7 @@
             flash_loan_approved_amount: <span class="number">0</span>,
             flash_loan_token_account_initial: u64::MAX,
             net_borrows_in_window: <span class="number">0</span>,
+            deposits_in_serum: <span class="number">0</span>,
             bump,
             bank_num,
 
@@ -1455,7 +1466,7 @@
             flash_loan_swap_fee_rate: existing_bank.flash_loan_swap_fee_rate,
             interest_target_utilization: existing_bank.interest_target_utilization,
             interest_curve_scaling: existing_bank.interest_curve_scaling,
-            reserved: [<span class="number">0</span>; <span class="number">2080</span>],
+            reserved: [<span class="number">0</span>; <span class="number">2072</span>],
         }
     }
 
@@ -2109,8 +2120,8 @@
         <span class="kw">if </span><span class="self">self</span>.deposit_weight_scale_start_quote == f64::MAX {
             <span class="kw">return </span><span class="self">self</span>.init_asset_weight;
         }
-        <span class="comment">// The next line is around 500 CU
-        </span><span class="kw">let </span>deposits_quote = <span class="self">self</span>.native_deposits().to_num::&lt;f64&gt;() * price.to_num::&lt;f64&gt;();
+        <span class="kw">let </span>all_deposits = <span class="self">self</span>.native_deposits().to_num::&lt;f64&gt;() + <span class="self">self</span>.deposits_in_serum <span class="kw">as </span>f64;
+        <span class="kw">let </span>deposits_quote = all_deposits * price.to_num::&lt;f64&gt;();
         <span class="kw">if </span>deposits_quote &lt;= <span class="self">self</span>.deposit_weight_scale_start_quote {
             <span class="self">self</span>.init_asset_weight
         } <span class="kw">else </span>{
@@ -2125,8 +2136,7 @@
         <span class="kw">if </span><span class="self">self</span>.borrow_weight_scale_start_quote == f64::MAX {
             <span class="kw">return </span><span class="self">self</span>.init_liab_weight;
         }
-        <span class="comment">// The next line is around 500 CU
-        </span><span class="kw">let </span>borrows_quote = <span class="self">self</span>.native_borrows().to_num::&lt;f64&gt;() * price.to_num::&lt;f64&gt;();
+        <span class="kw">let </span>borrows_quote = <span class="self">self</span>.native_borrows().to_num::&lt;f64&gt;() * price.to_num::&lt;f64&gt;();
         <span class="kw">if </span>borrows_quote &lt;= <span class="self">self</span>.borrow_weight_scale_start_quote {
             <span class="self">self</span>.init_liab_weight
         } <span class="kw">else if </span><span class="self">self</span>.borrow_weight_scale_start_quote == <span class="number">0.0 </span>{
