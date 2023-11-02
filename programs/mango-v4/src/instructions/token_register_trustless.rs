@@ -99,7 +99,6 @@ pub fn token_register_trustless(
         deposits_in_serum: 0,
         reserved: [0; 2072],
     };
-    require_gt!(bank.max_rate, MINIMUM_MAX_RATE);
 
     if let Ok(oracle_price) =
         bank.oracle_price(&AccountInfoRef::borrow(ctx.accounts.oracle.as_ref())?, None)
