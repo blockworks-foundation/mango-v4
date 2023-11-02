@@ -136,6 +136,7 @@ pub struct Bank {
     pub reduce_only: u8,
     pub force_close: u8,
 
+    #[derivative(Debug = "ignore")]
     pub padding: [u8; 6],
 
     // Do separate bookkeping for how many tokens were withdrawn
@@ -148,8 +149,21 @@ pub struct Bank {
 
     pub flash_loan_swap_fee_rate: f32,
 
+    /// Target utilization: If actual utilization is higher, scale up interest.
+    /// If it's lower, scale down interest (if possible)
+    pub interest_target_utilization: f32, // unused in v0.20.0
+
+    /// Current interest curve scaling, always >= 1.0
+    ///
+    /// Except when first migrating to having this field, then 0.0
+    pub interest_curve_scaling: f64, // unused in v0.20.0
+
+    // user deposits that were moved into serum open orders
+    // can be negative due to multibank, then it'd need to be balanced in the keeper
+    pub deposits_in_serum: i64,
+
     #[derivative(Debug = "ignore")]
-    pub reserved: [u8; 2092],
+    pub reserved: [u8; 2072],
 }
 const_assert_eq!(
     size_of::<Bank>(),
@@ -180,8 +194,9 @@ const_assert_eq!(
         + 1
         + 6
         + 8
-        + 3 * 4
-        + 2092
+        + 4 * 4
+        + 8 * 2
+        + 2072
 );
 const_assert_eq!(size_of::<Bank>(), 3064);
 const_assert_eq!(size_of::<Bank>() % 8, 0);
@@ -211,9 +226,12 @@ impl Bank {
             indexed_deposits: I80F48::ZERO,
             indexed_borrows: I80F48::ZERO,
             collected_fees_native: I80F48::ZERO,
+            fees_withdrawn: 0,
             dust: I80F48::ZERO,
             flash_loan_approved_amount: 0,
             flash_loan_token_account_initial: u64::MAX,
+            net_borrows_in_window: 0,
+            deposits_in_serum: 0,
             bump,
             bank_num,
 
@@ -250,17 +268,19 @@ impl Bank {
             net_borrow_limit_per_window_quote: existing_bank.net_borrow_limit_per_window_quote,
             net_borrow_limit_window_size_ts: existing_bank.net_borrow_limit_window_size_ts,
             last_net_borrows_window_start_ts: existing_bank.last_net_borrows_window_start_ts,
-            net_borrows_in_window: 0,
             borrow_weight_scale_start_quote: f64::MAX,
             deposit_weight_scale_start_quote: f64::MAX,
             reduce_only: 0,
             force_close: 0,
             padding: [0; 6],
-            fees_withdrawn: 0,
-            token_conditional_swap_taker_fee_rate: 0.0,
-            token_conditional_swap_maker_fee_rate: 0.0,
-            flash_loan_swap_fee_rate: 0.0,
-            reserved: [0; 2092],
+            token_conditional_swap_taker_fee_rate: existing_bank
+                .token_conditional_swap_taker_fee_rate,
+            token_conditional_swap_maker_fee_rate: existing_bank
+                .token_conditional_swap_maker_fee_rate,
+            flash_loan_swap_fee_rate: existing_bank.flash_loan_swap_fee_rate,
+            interest_target_utilization: existing_bank.interest_target_utilization,
+            interest_curve_scaling: existing_bank.interest_curve_scaling,
+            reserved: [0; 2072],
         }
     }
 
@@ -914,8 +934,8 @@ impl Bank {
         if self.deposit_weight_scale_start_quote == f64::MAX {
             return self.init_asset_weight;
         }
-        // The next line is around 500 CU
-        let deposits_quote = self.native_deposits().to_num::<f64>() * price.to_num::<f64>();
+        let all_deposits = self.native_deposits().to_num::<f64>() + self.deposits_in_serum as f64;
+        let deposits_quote = all_deposits * price.to_num::<f64>();
         if deposits_quote <= self.deposit_weight_scale_start_quote {
             self.init_asset_weight
         } else {
@@ -930,7 +950,6 @@ impl Bank {
         if self.borrow_weight_scale_start_quote == f64::MAX {
             return self.init_liab_weight;
         }
-        // The next line is around 500 CU
         let borrows_quote = self.native_borrows().to_num::<f64>() * price.to_num::<f64>();
         if borrows_quote <= self.borrow_weight_scale_start_quote {
             self.init_liab_weight

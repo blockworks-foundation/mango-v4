@@ -372,27 +372,39 @@ fn apply_vault_difference(
     }
     let native_after = position.native(bank);
     let native_change = native_after - native_before;
+    // amount of tokens transfered to serum3 reserved that were borrowed
     let new_borrows = native_change
         .max(native_after)
         .min(I80F48::ZERO)
         .abs()
         .to_num::<u64>();
+    // amount of tokens transferred to serum3 reserved that were taken from deposits
+    let used_deposits = native_before
+        .min(-needed_change)
+        .max(I80F48::ZERO)
+        .to_num::<u64>();
 
     let indexed_position = position.indexed_position;
     let market = account.serum3_orders_mut(serum_market_index).unwrap();
-    let borrows_without_fee = if bank.token_index == market.base_token_index {
-        &mut market.base_borrows_without_fee
+    let borrows_without_fee;
+    let deposits_reserved;
+    if bank.token_index == market.base_token_index {
+        borrows_without_fee = &mut market.base_borrows_without_fee;
+        deposits_reserved = &mut market.base_deposits_reserved;
     } else if bank.token_index == market.quote_token_index {
-        &mut market.quote_borrows_without_fee
+        borrows_without_fee = &mut market.quote_borrows_without_fee;
+        deposits_reserved = &mut market.quote_deposits_reserved;
     } else {
         return Err(error_msg!(
             "assert failed: apply_vault_difference called with bad token index"
         ));
     };
 
-    // Only for place: Add to potential borrow amount
-    let old_value = *borrows_without_fee;
-    *borrows_without_fee = old_value + new_borrows;
+    // Only for place: Add to potential borrow amount and reserved deposits
+    *borrows_without_fee += new_borrows;
+    *deposits_reserved += used_deposits;
+    let used_deposits_signed: i64 = used_deposits.try_into().unwrap();
+    bank.deposits_in_serum += used_deposits_signed;
 
     // Only for settle/liq_force_cancel: Reduce the potential borrow amounts
     if needed_change > 0 {
@@ -484,6 +496,28 @@ pub fn apply_settle_changes(
         after_quote_vault_adjusted,
         before_quote_vault,
     )?;
+
+    // Tokens were moved from open orders into banks again: also update the tracking
+    // for deposits_in_serum on the banks.
+    {
+        let serum_orders = account.serum3_orders_mut(serum_market.market_index)?;
+
+        let after_base_reserved = after_oo.native_base_reserved();
+        if after_base_reserved < serum_orders.base_deposits_reserved {
+            let diff = serum_orders.base_deposits_reserved - after_base_reserved;
+            serum_orders.base_deposits_reserved = after_base_reserved;
+            let diff_signed: i64 = diff.try_into().unwrap();
+            base_bank.deposits_in_serum -= diff_signed;
+        }
+
+        let after_quote_reserved = after_oo.native_quote_reserved();
+        if after_quote_reserved < serum_orders.quote_deposits_reserved {
+            let diff = serum_orders.quote_deposits_reserved - after_quote_reserved;
+            serum_orders.quote_deposits_reserved = after_quote_reserved;
+            let diff_signed: i64 = diff.try_into().unwrap();
+            quote_bank.deposits_in_serum -= diff_signed;
+        }
+    }
 
     if let Some(health_cache) = health_cache {
         base_difference.adjust_health_cache_token_balance(health_cache, &base_bank)?;
