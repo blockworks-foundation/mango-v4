@@ -135,11 +135,12 @@ pub struct PerpMarket {
 
     // Settling incentives
     /// In native units of settlement token, given to each settle call above the
-    /// settle_fee_amount_threshold.
+    /// settle_fee_amount_threshold if settling at least 1% of perp base pos value.
     pub settle_fee_flat: f32,
     /// Pnl settlement amount needed to be eligible for the flat fee.
     pub settle_fee_amount_threshold: f32,
     /// Fraction of pnl to pay out as fee if +pnl account has low health.
+    /// (limited to 2x settle_fee_flat)
     pub settle_fee_fraction_low_health: f32,
 
     // Pnl settling limits
@@ -398,14 +399,27 @@ impl PerpMarket {
         Ok(socialized_loss)
     }
 
-    /// Returns the fee for settling `settlement` when the negative-pnl side has the given
-    /// health values.
+    /// Returns the fee for settling `settlement` when the account with positive unsettled pnl
+    /// has the given source pnl/position/health values.
     pub fn compute_settle_fee(
         &self,
         settlement: I80F48,
+        source_pnl_value: I80F48,
+        source_position_value: I80F48,
         source_liq_end_health: I80F48,
         source_maint_health: I80F48,
     ) -> Result<I80F48> {
+        // Only incentivize if pnl is at least 1% of position.
+        //
+        // This avoids large positions being settled all the time when tiny price
+        // movements can bring the settlement amount over the settle_fee_amount_threshold.
+        //
+        // Always true when the source position is closed.
+        let pnl_at_least_one_percent = I80F48::from(100) * source_pnl_value > source_position_value;
+        if !pnl_at_least_one_percent {
+            return Ok(I80F48::ZERO);
+        }
+
         assert!(source_maint_health >= source_liq_end_health);
 
         // A percentage fee is paid to the settler when the source account's health is low.
@@ -424,15 +438,18 @@ impl PerpMarket {
             I80F48::ZERO
         };
 
-        // The settler receives a flat fee
-        let flat_fee = if settlement >= self.settle_fee_amount_threshold {
-            I80F48::from_num(self.settle_fee_flat)
+        let flat_fee = I80F48::from_num(self.settle_fee_flat);
+
+        let mut fee = if settlement >= self.settle_fee_amount_threshold {
+            // If the settlement is big enough: give the flat fee
+            flat_fee
         } else {
-            I80F48::ZERO
+            // Else give the low-health fee, but never more than twice flat fee
+            low_health_fee.min(flat_fee * I80F48::from(2))
         };
 
-        // Fees only apply when the settlement is large enough
-        let fee = (low_health_fee + flat_fee).min(settlement);
+        // Fee can't exceed the settlement (just for safety)
+        fee = fee.min(settlement);
 
         // Safety check to prevent any accidental negative transfer
         require!(fee >= 0, MangoError::SettlementAmountMustBePositive);
