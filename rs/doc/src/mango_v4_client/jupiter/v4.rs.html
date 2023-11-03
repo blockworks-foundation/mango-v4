@@ -618,7 +618,7 @@
         <span class="kw">let </span>num_loans: u8 = loan_amounts.len().try_into().unwrap();
 
         <span class="comment">// This relies on the fact that health account banks will be identical to the first_bank above!
-        </span><span class="kw">let </span>health_ams = <span class="self">self
+        </span><span class="kw">let </span>(health_ams, _health_cu) = <span class="self">self
             </span>.mango_client
             .derive_health_check_remaining_account_metas(
                 <span class="macro">vec!</span>[source_token.token_index, target_token.token_index],

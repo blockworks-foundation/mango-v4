@@ -81,7 +81,7 @@
     <span class="kw">let </span>active_token_len = account.active_token_positions().count();
     <span class="kw">let </span>active_perp_len = account.active_perp_positions().count();
 
-    <span class="kw">let </span>metas =
+    <span class="kw">let </span>(metas, _health_cu) =
         context.derive_health_check_remaining_account_metas(account, <span class="macro">vec!</span>[], <span class="macro">vec!</span>[], <span class="macro">vec!</span>[])<span class="question-mark">?</span>;
     <span class="kw">let </span>accounts: anyhow::Result&lt;Vec&lt;KeyedAccountSharedData&gt;&gt; = stream::iter(metas.iter())
         .then(|meta| <span class="kw">async </span>{
@@ -112,7 +112,7 @@
     <span class="kw">let </span>active_token_len = account.active_token_positions().count();
     <span class="kw">let </span>active_perp_len = account.active_perp_positions().count();
 
-    <span class="kw">let </span>metas =
+    <span class="kw">let </span>(metas, _health_cu) =
         context.derive_health_check_remaining_account_metas(account, <span class="macro">vec!</span>[], <span class="macro">vec!</span>[], <span class="macro">vec!</span>[])<span class="question-mark">?</span>;
     <span class="kw">let </span>accounts = metas
         .iter()

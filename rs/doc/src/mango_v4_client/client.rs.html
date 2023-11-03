@@ -1807,6 +1807,87 @@
 <a href="#1807" id="1807">1807</a>
 <a href="#1808" id="1808">1808</a>
 <a href="#1809" id="1809">1809</a>
+<a href="#1810" id="1810">1810</a>
+<a href="#1811" id="1811">1811</a>
+<a href="#1812" id="1812">1812</a>
+<a href="#1813" id="1813">1813</a>
+<a href="#1814" id="1814">1814</a>
+<a href="#1815" id="1815">1815</a>
+<a href="#1816" id="1816">1816</a>
+<a href="#1817" id="1817">1817</a>
+<a href="#1818" id="1818">1818</a>
+<a href="#1819" id="1819">1819</a>
+<a href="#1820" id="1820">1820</a>
+<a href="#1821" id="1821">1821</a>
+<a href="#1822" id="1822">1822</a>
+<a href="#1823" id="1823">1823</a>
+<a href="#1824" id="1824">1824</a>
+<a href="#1825" id="1825">1825</a>
+<a href="#1826" id="1826">1826</a>
+<a href="#1827" id="1827">1827</a>
+<a href="#1828" id="1828">1828</a>
+<a href="#1829" id="1829">1829</a>
+<a href="#1830" id="1830">1830</a>
+<a href="#1831" id="1831">1831</a>
+<a href="#1832" id="1832">1832</a>
+<a href="#1833" id="1833">1833</a>
+<a href="#1834" id="1834">1834</a>
+<a href="#1835" id="1835">1835</a>
+<a href="#1836" id="1836">1836</a>
+<a href="#1837" id="1837">1837</a>
+<a href="#1838" id="1838">1838</a>
+<a href="#1839" id="1839">1839</a>
+<a href="#1840" id="1840">1840</a>
+<a href="#1841" id="1841">1841</a>
+<a href="#1842" id="1842">1842</a>
+<a href="#1843" id="1843">1843</a>
+<a href="#1844" id="1844">1844</a>
+<a href="#1845" id="1845">1845</a>
+<a href="#1846" id="1846">1846</a>
+<a href="#1847" id="1847">1847</a>
+<a href="#1848" id="1848">1848</a>
+<a href="#1849" id="1849">1849</a>
+<a href="#1850" id="1850">1850</a>
+<a href="#1851" id="1851">1851</a>
+<a href="#1852" id="1852">1852</a>
+<a href="#1853" id="1853">1853</a>
+<a href="#1854" id="1854">1854</a>
+<a href="#1855" id="1855">1855</a>
+<a href="#1856" id="1856">1856</a>
+<a href="#1857" id="1857">1857</a>
+<a href="#1858" id="1858">1858</a>
+<a href="#1859" id="1859">1859</a>
+<a href="#1860" id="1860">1860</a>
+<a href="#1861" id="1861">1861</a>
+<a href="#1862" id="1862">1862</a>
+<a href="#1863" id="1863">1863</a>
+<a href="#1864" id="1864">1864</a>
+<a href="#1865" id="1865">1865</a>
+<a href="#1866" id="1866">1866</a>
+<a href="#1867" id="1867">1867</a>
+<a href="#1868" id="1868">1868</a>
+<a href="#1869" id="1869">1869</a>
+<a href="#1870" id="1870">1870</a>
+<a href="#1871" id="1871">1871</a>
+<a href="#1872" id="1872">1872</a>
+<a href="#1873" id="1873">1873</a>
+<a href="#1874" id="1874">1874</a>
+<a href="#1875" id="1875">1875</a>
+<a href="#1876" id="1876">1876</a>
+<a href="#1877" id="1877">1877</a>
+<a href="#1878" id="1878">1878</a>
+<a href="#1879" id="1879">1879</a>
+<a href="#1880" id="1880">1880</a>
+<a href="#1881" id="1881">1881</a>
+<a href="#1882" id="1882">1882</a>
+<a href="#1883" id="1883">1883</a>
+<a href="#1884" id="1884">1884</a>
+<a href="#1885" id="1885">1885</a>
+<a href="#1886" id="1886">1886</a>
+<a href="#1887" id="1887">1887</a>
+<a href="#1888" id="1888">1888</a>
+<a href="#1889" id="1889">1889</a>
+<a href="#1890" id="1890">1890</a>
 </pre><pre class="rust"><code><span class="kw">use </span>std::ops::Deref;
 <span class="kw">use </span>std::str::FromStr;
 <span class="kw">use </span>std::sync::Arc;
@@ -1837,6 +1918,7 @@
 <span class="kw">use </span>solana_client::rpc_response::RpcSimulateTransactionResult;
 <span class="kw">use </span>solana_sdk::address_lookup_table_account::AddressLookupTableAccount;
 <span class="kw">use </span>solana_sdk::commitment_config::CommitmentLevel;
+<span class="kw">use </span>solana_sdk::compute_budget::ComputeBudgetInstruction;
 <span class="kw">use </span>solana_sdk::hash::Hash;
 <span class="kw">use </span>solana_sdk::signer::keypair;
 <span class="kw">use </span>solana_sdk::transaction::TransactionError;
@@ -1844,6 +1926,7 @@
 <span class="kw">use </span><span class="kw">crate</span>::account_fetcher::<span class="kw-2">*</span>;
 <span class="kw">use </span><span class="kw">crate</span>::context::MangoGroupContext;
 <span class="kw">use </span><span class="kw">crate</span>::gpa::{fetch_anchor_account, fetch_mango_accounts};
+<span class="kw">use </span><span class="kw">crate</span>::util::PreparedInstructions;
 <span class="kw">use crate</span>::{jupiter, util};
 
 <span class="kw">use </span>anyhow::Context;
@@ -2111,7 +2194,7 @@
         affected_tokens: Vec&lt;TokenIndex&gt;,
         writable_banks: Vec&lt;TokenIndex&gt;,
         affected_perp_markets: Vec&lt;PerpMarketIndex&gt;,
-    ) -&gt; anyhow::Result&lt;Vec&lt;AccountMeta&gt;&gt; {
+    ) -&gt; anyhow::Result&lt;(Vec&lt;AccountMeta&gt;, u32)&gt; {
         <span class="kw">let </span>account = <span class="self">self</span>.mango_account().<span class="kw">await</span><span class="question-mark">?</span>;
         <span class="self">self</span>.context.derive_health_check_remaining_account_metas(
             <span class="kw-2">&amp;</span>account,
@@ -2126,7 +2209,7 @@
         liqee: <span class="kw-2">&amp;</span>MangoAccountValue,
         affected_tokens: <span class="kw-2">&amp;</span>[TokenIndex],
         writable_banks: <span class="kw-2">&amp;</span>[TokenIndex],
-    ) -&gt; anyhow::Result&lt;Vec&lt;AccountMeta&gt;&gt; {
+    ) -&gt; anyhow::Result&lt;(Vec&lt;AccountMeta&gt;, u32)&gt; {
         <span class="kw">let </span>account = <span class="self">self</span>.mango_account().<span class="kw">await</span><span class="question-mark">?</span>;
         <span class="self">self</span>.context
             .derive_health_check_remaining_account_metas_two_accounts(
@@ -2147,36 +2230,42 @@
         <span class="kw">let </span>token_index = token.token_index;
         <span class="kw">let </span>mint_info = token.mint_info;
 
-        <span class="kw">let </span>health_check_metas = <span class="self">self
+        <span class="kw">let </span>(health_check_metas, health_cu) = <span class="self">self
             </span>.derive_health_check_remaining_account_metas(<span class="macro">vec!</span>[token_index], <span class="macro">vec!</span>[], <span class="macro">vec!</span>[])
             .<span class="kw">await</span><span class="question-mark">?</span>;
 
-        <span class="kw">let </span>ix = Instruction {
-            program_id: mango_v4::id(),
-            accounts: {
-                <span class="kw">let </span><span class="kw-2">mut </span>ams = anchor_lang::ToAccountMetas::to_account_metas(
-                    <span class="kw-2">&amp;</span>mango_v4::accounts::TokenDeposit {
-                        group: <span class="self">self</span>.group(),
-                        account: <span class="self">self</span>.mango_account_address,
-                        owner: <span class="self">self</span>.owner(),
-                        bank: mint_info.first_bank(),
-                        vault: mint_info.first_vault(),
-                        oracle: mint_info.oracle,
-                        token_account: get_associated_token_address(<span class="kw-2">&amp;</span><span class="self">self</span>.owner(), <span class="kw-2">&amp;</span>mint_info.mint),
-                        token_authority: <span class="self">self</span>.owner(),
-                        token_program: Token::id(),
-                    },
-                    <span class="prelude-val">None</span>,
-                );
-                ams.extend(health_check_metas.into_iter());
-                ams
+        <span class="kw">let </span>ixs = PreparedInstructions::from_single(
+            Instruction {
+                program_id: mango_v4::id(),
+                accounts: {
+                    <span class="kw">let </span><span class="kw-2">mut </span>ams = anchor_lang::ToAccountMetas::to_account_metas(
+                        <span class="kw-2">&amp;</span>mango_v4::accounts::TokenDeposit {
+                            group: <span class="self">self</span>.group(),
+                            account: <span class="self">self</span>.mango_account_address,
+                            owner: <span class="self">self</span>.owner(),
+                            bank: mint_info.first_bank(),
+                            vault: mint_info.first_vault(),
+                            oracle: mint_info.oracle,
+                            token_account: get_associated_token_address(
+                                <span class="kw-2">&amp;</span><span class="self">self</span>.owner(),
+                                <span class="kw-2">&amp;</span>mint_info.mint,
+                            ),
+                            token_authority: <span class="self">self</span>.owner(),
+                            token_program: Token::id(),
+                        },
+                        <span class="prelude-val">None</span>,
+                    );
+                    ams.extend(health_check_metas.into_iter());
+                    ams
+                },
+                data: anchor_lang::InstructionData::data(<span class="kw-2">&amp;</span>mango_v4::instruction::TokenDeposit {
+                    amount,
+                    reduce_only,
+                }),
             },
-            data: anchor_lang::InstructionData::data(<span class="kw-2">&amp;</span>mango_v4::instruction::TokenDeposit {
-                amount,
-                reduce_only,
-            }),
-        };
-        <span class="self">self</span>.send_and_confirm_owner_tx(<span class="macro">vec!</span>[ix]).<span class="kw">await
+            <span class="self">self</span>.instruction_cu(health_cu),
+        );
+        <span class="self">self</span>.send_and_confirm_owner_tx(ixs.to_instructions()).<span class="kw">await
     </span>}
 
     <span class="doccomment">/// Creates token withdraw instructions for the MangoClient&#39;s account/owner.
@@ -2188,19 +2277,21 @@
         mint: Pubkey,
         amount: u64,
         allow_borrow: bool,
-    ) -&gt; anyhow::Result&lt;Vec&lt;Instruction&gt;&gt; {
+    ) -&gt; anyhow::Result&lt;PreparedInstructions&gt; {
         <span class="kw">let </span>token = <span class="self">self</span>.context.token_by_mint(<span class="kw-2">&amp;</span>mint)<span class="question-mark">?</span>;
         <span class="kw">let </span>token_index = token.token_index;
         <span class="kw">let </span>mint_info = token.mint_info;
 
-        <span class="kw">let </span>health_check_metas = <span class="self">self</span>.context.derive_health_check_remaining_account_metas(
-            account,
-            <span class="macro">vec!</span>[token_index],
-            <span class="macro">vec!</span>[],
-            <span class="macro">vec!</span>[],
-        )<span class="question-mark">?</span>;
+        <span class="kw">let </span>(health_check_metas, health_cu) =
+            <span class="self">self</span>.context.derive_health_check_remaining_account_metas(
+                account,
+                <span class="macro">vec!</span>[token_index],
+                <span class="macro">vec!</span>[],
+                <span class="macro">vec!</span>[],
+            )<span class="question-mark">?</span>;
 
-        <span class="prelude-val">Ok</span>(<span class="macro">vec!</span>[
+        <span class="kw">let </span>ixs = PreparedInstructions::from_vec(
+            <span class="macro">vec!</span>[
             spl_associated_token_account::instruction::create_associated_token_account_idempotent(
                 <span class="kw-2">&amp;</span><span class="self">self</span>.owner(),
                 <span class="kw-2">&amp;</span><span class="self">self</span>.owner(),
@@ -2234,7 +2325,10 @@
                     allow_borrow,
                 }),
             },
-        ])
+        ],
+            <span class="self">self</span>.instruction_cu(health_cu),
+        );
+        <span class="prelude-val">Ok</span>(ixs)
     }
 
     <span class="kw">pub async fn </span>token_withdraw(
@@ -2245,7 +2339,7 @@
     ) -&gt; anyhow::Result&lt;Signature&gt; {
         <span class="kw">let </span>account = <span class="self">self</span>.mango_account().<span class="kw">await</span><span class="question-mark">?</span>;
         <span class="kw">let </span>ixs = <span class="self">self</span>.token_withdraw_instructions(<span class="kw-2">&amp;</span>account, mint, amount, allow_borrow)<span class="question-mark">?</span>;
-        <span class="self">self</span>.send_and_confirm_owner_tx(ixs).<span class="kw">await
+        <span class="self">self</span>.send_and_confirm_owner_tx(ixs.to_instructions()).<span class="kw">await
     </span>}
 
     <span class="kw">pub async fn </span>bank_oracle_price(<span class="kw-2">&amp;</span><span class="self">self</span>, token_index: TokenIndex) -&gt; anyhow::Result&lt;I80F48&gt; {
@@ -2341,7 +2435,7 @@
         order_type: Serum3OrderType,
         client_order_id: u64,
         limit: u16,
-    ) -&gt; anyhow::Result&lt;Instruction&gt; {
+    ) -&gt; anyhow::Result&lt;PreparedInstructions&gt; {
         <span class="kw">let </span>s3 = <span class="self">self</span>.context.serum3(market_index);
         <span class="kw">let </span>base = <span class="self">self</span>.context.serum3_base_token(market_index);
         <span class="kw">let </span>quote = <span class="self">self</span>.context.serum3_quote_token(market_index);
@@ -2350,60 +2444,63 @@
             .expect(<span class="string">&quot;oo is created&quot;</span>)
             .open_orders;
 
-        <span class="kw">let </span>health_check_metas = <span class="self">self</span>.context.derive_health_check_remaining_account_metas(
-            account,
-            <span class="macro">vec!</span>[],
-            <span class="macro">vec!</span>[],
-            <span class="macro">vec!</span>[],
-        )<span class="question-mark">?</span>;
+        <span class="kw">let </span>(health_check_metas, health_cu) = <span class="self">self
+            </span>.context
+            .derive_health_check_remaining_account_metas(account, <span class="macro">vec!</span>[], <span class="macro">vec!</span>[], <span class="macro">vec!</span>[])<span class="question-mark">?</span>;
 
         <span class="kw">let </span>payer_mint_info = <span class="kw">match </span>side {
             Serum3Side::Bid =&gt; quote.mint_info,
             Serum3Side::Ask =&gt; base.mint_info,
         };
 
-        <span class="kw">let </span>ix = Instruction {
-            program_id: mango_v4::id(),
-            accounts: {
-                <span class="kw">let </span><span class="kw-2">mut </span>ams = anchor_lang::ToAccountMetas::to_account_metas(
-                    <span class="kw-2">&amp;</span>mango_v4::accounts::Serum3PlaceOrder {
-                        group: <span class="self">self</span>.group(),
-                        account: <span class="self">self</span>.mango_account_address,
-                        open_orders,
-                        payer_bank: payer_mint_info.first_bank(),
-                        payer_vault: payer_mint_info.first_vault(),
-                        payer_oracle: payer_mint_info.oracle,
-                        serum_market: s3.address,
-                        serum_program: s3.market.serum_program,
-                        serum_market_external: s3.market.serum_market_external,
-                        market_bids: s3.bids,
-                        market_asks: s3.asks,
-                        market_event_queue: s3.event_q,
-                        market_request_queue: s3.req_q,
-                        market_base_vault: s3.coin_vault,
-                        market_quote_vault: s3.pc_vault,
-                        market_vault_signer: s3.vault_signer,
-                        owner: <span class="self">self</span>.owner(),
-                        token_program: Token::id(),
+        <span class="kw">let </span>ixs = PreparedInstructions::from_single(
+            Instruction {
+                program_id: mango_v4::id(),
+                accounts: {
+                    <span class="kw">let </span><span class="kw-2">mut </span>ams = anchor_lang::ToAccountMetas::to_account_metas(
+                        <span class="kw-2">&amp;</span>mango_v4::accounts::Serum3PlaceOrder {
+                            group: <span class="self">self</span>.group(),
+                            account: <span class="self">self</span>.mango_account_address,
+                            open_orders,
+                            payer_bank: payer_mint_info.first_bank(),
+                            payer_vault: payer_mint_info.first_vault(),
+                            payer_oracle: payer_mint_info.oracle,
+                            serum_market: s3.address,
+                            serum_program: s3.market.serum_program,
+                            serum_market_external: s3.market.serum_market_external,
+                            market_bids: s3.bids,
+                            market_asks: s3.asks,
+                            market_event_queue: s3.event_q,
+                            market_request_queue: s3.req_q,
+                            market_base_vault: s3.coin_vault,
+                            market_quote_vault: s3.pc_vault,
+                            market_vault_signer: s3.vault_signer,
+                            owner: <span class="self">self</span>.owner(),
+                            token_program: Token::id(),
+                        },
+                        <span class="prelude-val">None</span>,
+                    );
+                    ams.extend(health_check_metas.into_iter());
+                    ams
+                },
+                data: anchor_lang::InstructionData::data(
+                    <span class="kw-2">&amp;</span>mango_v4::instruction::Serum3PlaceOrder {
+                        side,
+                        limit_price,
+                        max_base_qty,
+                        max_native_quote_qty_including_fees,
+                        self_trade_behavior,
+                        order_type,
+                        client_order_id,
+                        limit,
                     },
-                    <span class="prelude-val">None</span>,
-                );
-                ams.extend(health_check_metas.into_iter());
-                ams
+                ),
             },
-            data: anchor_lang::InstructionData::data(<span class="kw-2">&amp;</span>mango_v4::instruction::Serum3PlaceOrder {
-                side,
-                limit_price,
-                max_base_qty,
-                max_native_quote_qty_including_fees,
-                self_trade_behavior,
-                order_type,
-                client_order_id,
-                limit,
-            }),
-        };
+            <span class="self">self</span>.instruction_cu(health_cu)
+                + <span class="self">self</span>.context.compute_estimates.cu_per_serum3_order_match * limit <span class="kw">as </span>u32,
+        );
 
-        <span class="prelude-val">Ok</span>(ix)
+        <span class="prelude-val">Ok</span>(ixs)
     }
 
     <span class="attr">#[allow(clippy::too_many_arguments)]
@@ -2421,7 +2518,7 @@
     ) -&gt; anyhow::Result&lt;Signature&gt; {
         <span class="kw">let </span>account = <span class="self">self</span>.mango_account().<span class="kw">await</span><span class="question-mark">?</span>;
         <span class="kw">let </span>market_index = <span class="self">self</span>.context.serum3_market_index(name);
-        <span class="kw">let </span>ix = <span class="self">self</span>.serum3_place_order_instruction(
+        <span class="kw">let </span>ixs = <span class="self">self</span>.serum3_place_order_instruction(
             <span class="kw-2">&amp;</span>account,
             market_index,
             side,
@@ -2433,7 +2530,7 @@
             client_order_id,
             limit,
         )<span class="question-mark">?</span>;
-        <span class="self">self</span>.send_and_confirm_owner_tx(<span class="macro">vec!</span>[ix]).<span class="kw">await
+        <span class="self">self</span>.send_and_confirm_owner_tx(ixs.to_instructions()).<span class="kw">await
     </span>}
 
     <span class="kw">pub async fn </span>serum3_settle_funds(<span class="kw-2">&amp;</span><span class="self">self</span>, name: <span class="kw-2">&amp;</span>str) -&gt; anyhow::Result&lt;Signature&gt; {
@@ -2485,33 +2582,37 @@
         account: <span class="kw-2">&amp;</span>MangoAccountValue,
         market_index: Serum3MarketIndex,
         limit: u8,
-    ) -&gt; anyhow::Result&lt;Instruction&gt; {
+    ) -&gt; anyhow::Result&lt;PreparedInstructions&gt; {
         <span class="kw">let </span>s3 = <span class="self">self</span>.context.serum3(market_index);
         <span class="kw">let </span>open_orders = account.serum3_orders(market_index)<span class="question-mark">?</span>.open_orders;
 
-        <span class="kw">let </span>ix = Instruction {
-            program_id: mango_v4::id(),
-            accounts: anchor_lang::ToAccountMetas::to_account_metas(
-                <span class="kw-2">&amp;</span>mango_v4::accounts::Serum3CancelAllOrders {
-                    group: <span class="self">self</span>.group(),
-                    account: <span class="self">self</span>.mango_account_address,
-                    open_orders,
-                    market_bids: s3.bids,
-                    market_asks: s3.asks,
-                    market_event_queue: s3.event_q,
-                    serum_market: s3.address,
-                    serum_program: s3.market.serum_program,
-                    serum_market_external: s3.market.serum_market_external,
-                    owner: <span class="self">self</span>.owner(),
-                },
-                <span class="prelude-val">None</span>,
-            ),
-            data: anchor_lang::InstructionData::data(
-                <span class="kw-2">&amp;</span>mango_v4::instruction::Serum3CancelAllOrders { limit },
-            ),
-        };
+        <span class="kw">let </span>ixs = PreparedInstructions::from_single(
+            Instruction {
+                program_id: mango_v4::id(),
+                accounts: anchor_lang::ToAccountMetas::to_account_metas(
+                    <span class="kw-2">&amp;</span>mango_v4::accounts::Serum3CancelAllOrders {
+                        group: <span class="self">self</span>.group(),
+                        account: <span class="self">self</span>.mango_account_address,
+                        open_orders,
+                        market_bids: s3.bids,
+                        market_asks: s3.asks,
+                        market_event_queue: s3.event_q,
+                        serum_market: s3.address,
+                        serum_program: s3.market.serum_program,
+                        serum_market_external: s3.market.serum_market_external,
+                        owner: <span class="self">self</span>.owner(),
+                    },
+                    <span class="prelude-val">None</span>,
+                ),
+                data: anchor_lang::InstructionData::data(
+                    <span class="kw-2">&amp;</span>mango_v4::instruction::Serum3CancelAllOrders { limit },
+                ),
+            },
+            <span class="self">self</span>.instruction_cu(<span class="number">0</span>)
+                + <span class="self">self</span>.context.compute_estimates.cu_per_serum3_order_cancel * limit <span class="kw">as </span>u32,
+        );
 
-        <span class="prelude-val">Ok</span>(ix)
+        <span class="prelude-val">Ok</span>(ixs)
     }
 
     <span class="kw">pub async fn </span>serum3_cancel_all_orders(
@@ -2555,44 +2656,50 @@
         <span class="kw">let </span>base = <span class="self">self</span>.context.serum3_base_token(market_index);
         <span class="kw">let </span>quote = <span class="self">self</span>.context.serum3_quote_token(market_index);
 
-        <span class="kw">let </span>health_remaining_ams = <span class="self">self
+        <span class="kw">let </span>(health_remaining_ams, health_cu) = <span class="self">self
             </span>.context
             .derive_health_check_remaining_account_metas(liqee.<span class="number">1</span>, <span class="macro">vec!</span>[], <span class="macro">vec!</span>[], <span class="macro">vec!</span>[])
             .unwrap();
 
-        <span class="kw">let </span>ix = Instruction {
-            program_id: mango_v4::id(),
-            accounts: {
-                <span class="kw">let </span><span class="kw-2">mut </span>ams = anchor_lang::ToAccountMetas::to_account_metas(
-                    <span class="kw-2">&amp;</span>mango_v4::accounts::Serum3LiqForceCancelOrders {
-                        group: <span class="self">self</span>.group(),
-                        account: <span class="kw-2">*</span>liqee.<span class="number">0</span>,
-                        open_orders: <span class="kw-2">*</span>open_orders,
-                        serum_market: s3.address,
-                        serum_program: s3.market.serum_program,
-                        serum_market_external: s3.market.serum_market_external,
-                        market_bids: s3.bids,
-                        market_asks: s3.asks,
-                        market_event_queue: s3.event_q,
-                        market_base_vault: s3.coin_vault,
-                        market_quote_vault: s3.pc_vault,
-                        market_vault_signer: s3.vault_signer,
-                        quote_bank: quote.mint_info.first_bank(),
-                        quote_vault: quote.mint_info.first_vault(),
-                        base_bank: base.mint_info.first_bank(),
-                        base_vault: base.mint_info.first_vault(),
-                        token_program: Token::id(),
-                    },
-                    <span class="prelude-val">None</span>,
-                );
-                ams.extend(health_remaining_ams.into_iter());
-                ams
+        <span class="kw">let </span>limit = <span class="number">5</span>;
+        <span class="kw">let </span>ixs = PreparedInstructions::from_single(
+            Instruction {
+                program_id: mango_v4::id(),
+                accounts: {
+                    <span class="kw">let </span><span class="kw-2">mut </span>ams = anchor_lang::ToAccountMetas::to_account_metas(
+                        <span class="kw-2">&amp;</span>mango_v4::accounts::Serum3LiqForceCancelOrders {
+                            group: <span class="self">self</span>.group(),
+                            account: <span class="kw-2">*</span>liqee.<span class="number">0</span>,
+                            open_orders: <span class="kw-2">*</span>open_orders,
+                            serum_market: s3.address,
+                            serum_program: s3.market.serum_program,
+                            serum_market_external: s3.market.serum_market_external,
+                            market_bids: s3.bids,
+                            market_asks: s3.asks,
+                            market_event_queue: s3.event_q,
+                            market_base_vault: s3.coin_vault,
+                            market_quote_vault: s3.pc_vault,
+                            market_vault_signer: s3.vault_signer,
+                            quote_bank: quote.mint_info.first_bank(),
+                            quote_vault: quote.mint_info.first_vault(),
+                            base_bank: base.mint_info.first_bank(),
+                            base_vault: base.mint_info.first_vault(),
+                            token_program: Token::id(),
+                        },
+                        <span class="prelude-val">None</span>,
+                    );
+                    ams.extend(health_remaining_ams.into_iter());
+                    ams
+                },
+                data: anchor_lang::InstructionData::data(
+                    <span class="kw-2">&amp;</span>mango_v4::instruction::Serum3LiqForceCancelOrders { limit },
+                ),
             },
-            data: anchor_lang::InstructionData::data(
-                <span class="kw-2">&amp;</span>mango_v4::instruction::Serum3LiqForceCancelOrders { limit: <span class="number">5 </span>},
-            ),
-        };
-        <span class="self">self</span>.send_and_confirm_permissionless_tx(<span class="macro">vec!</span>[ix]).<span class="kw">await
+            <span class="self">self</span>.instruction_cu(health_cu)
+                + <span class="self">self</span>.context.compute_estimates.cu_per_serum3_order_cancel * limit <span class="kw">as </span>u32,
+        );
+        <span class="self">self</span>.send_and_confirm_permissionless_tx(ixs.to_instructions())
+            .<span class="kw">await
     </span>}
 
     <span class="kw">pub async fn </span>serum3_cancel_order(
@@ -2653,49 +2760,56 @@
         expiry_timestamp: u64,
         limit: u8,
         self_trade_behavior: SelfTradeBehavior,
-    ) -&gt; anyhow::Result&lt;Instruction&gt; {
+    ) -&gt; anyhow::Result&lt;PreparedInstructions&gt; {
         <span class="kw">let </span>perp = <span class="self">self</span>.context.perp(market_index);
-        <span class="kw">let </span>health_remaining_metas = <span class="self">self</span>.context.derive_health_check_remaining_account_metas(
-            account,
-            <span class="macro">vec!</span>[],
-            <span class="macro">vec!</span>[],
-            <span class="macro">vec!</span>[market_index],
-        )<span class="question-mark">?</span>;
+        <span class="kw">let </span>(health_remaining_metas, health_cu) =
+            <span class="self">self</span>.context.derive_health_check_remaining_account_metas(
+                account,
+                <span class="macro">vec!</span>[],
+                <span class="macro">vec!</span>[],
+                <span class="macro">vec!</span>[market_index],
+            )<span class="question-mark">?</span>;
 
-        <span class="kw">let </span>ix = Instruction {
-            program_id: mango_v4::id(),
-            accounts: {
-                <span class="kw">let </span><span class="kw-2">mut </span>ams = anchor_lang::ToAccountMetas::to_account_metas(
-                    <span class="kw-2">&amp;</span>mango_v4::accounts::PerpPlaceOrder {
-                        group: <span class="self">self</span>.group(),
-                        account: <span class="self">self</span>.mango_account_address,
-                        owner: <span class="self">self</span>.owner(),
-                        perp_market: perp.address,
-                        bids: perp.market.bids,
-                        asks: perp.market.asks,
-                        event_queue: perp.market.event_queue,
-                        oracle: perp.market.oracle,
+        <span class="kw">let </span>ixs = PreparedInstructions::from_single(
+            Instruction {
+                program_id: mango_v4::id(),
+                accounts: {
+                    <span class="kw">let </span><span class="kw-2">mut </span>ams = anchor_lang::ToAccountMetas::to_account_metas(
+                        <span class="kw-2">&amp;</span>mango_v4::accounts::PerpPlaceOrder {
+                            group: <span class="self">self</span>.group(),
+                            account: <span class="self">self</span>.mango_account_address,
+                            owner: <span class="self">self</span>.owner(),
+                            perp_market: perp.address,
+                            bids: perp.market.bids,
+                            asks: perp.market.asks,
+                            event_queue: perp.market.event_queue,
+                            oracle: perp.market.oracle,
+                        },
+                        <span class="prelude-val">None</span>,
+                    );
+                    ams.extend(health_remaining_metas.into_iter());
+                    ams
+                },
+                data: anchor_lang::InstructionData::data(
+                    <span class="kw-2">&amp;</span>mango_v4::instruction::PerpPlaceOrderV2 {
+                        side,
+                        price_lots,
+                        max_base_lots,
+                        max_quote_lots,
+                        client_order_id,
+                        order_type,
+                        reduce_only,
+                        expiry_timestamp,
+                        limit,
+                        self_trade_behavior,
                     },
-                    <span class="prelude-val">None</span>,
-                );
-                ams.extend(health_remaining_metas.into_iter());
-                ams
+                ),
             },
-            data: anchor_lang::InstructionData::data(<span class="kw-2">&amp;</span>mango_v4::instruction::PerpPlaceOrderV2 {
-                side,
-                price_lots,
-                max_base_lots,
-                max_quote_lots,
-                client_order_id,
-                order_type,
-                reduce_only,
-                expiry_timestamp,
-                limit,
-                self_trade_behavior,
-            }),
-        };
+            <span class="self">self</span>.instruction_cu(health_cu)
+                + <span class="self">self</span>.context.compute_estimates.cu_per_perp_order_match * limit <span class="kw">as </span>u32,
+        );
 
-        <span class="prelude-val">Ok</span>(ix)
+        <span class="prelude-val">Ok</span>(ixs)
     }
 
     <span class="attr">#[allow(clippy::too_many_arguments)]
@@ -2714,7 +2828,7 @@
         self_trade_behavior: SelfTradeBehavior,
     ) -&gt; anyhow::Result&lt;Signature&gt; {
         <span class="kw">let </span>account = <span class="self">self</span>.mango_account().<span class="kw">await</span><span class="question-mark">?</span>;
-        <span class="kw">let </span>ix = <span class="self">self</span>.perp_place_order_instruction(
+        <span class="kw">let </span>ixs = <span class="self">self</span>.perp_place_order_instruction(
             <span class="kw-2">&amp;</span>account,
             market_index,
             side,
@@ -2728,36 +2842,40 @@
             limit,
             self_trade_behavior,
         )<span class="question-mark">?</span>;
-        <span class="self">self</span>.send_and_confirm_owner_tx(<span class="macro">vec!</span>[ix]).<span class="kw">await
+        <span class="self">self</span>.send_and_confirm_owner_tx(ixs.to_instructions()).<span class="kw">await
     </span>}
 
     <span class="kw">pub fn </span>perp_cancel_all_orders_instruction(
         <span class="kw-2">&amp;</span><span class="self">self</span>,
         market_index: PerpMarketIndex,
         limit: u8,
-    ) -&gt; anyhow::Result&lt;Instruction&gt; {
+    ) -&gt; anyhow::Result&lt;PreparedInstructions&gt; {
         <span class="kw">let </span>perp = <span class="self">self</span>.context.perp(market_index);
 
-        <span class="kw">let </span>ix = Instruction {
-            program_id: mango_v4::id(),
-            accounts: {
-                anchor_lang::ToAccountMetas::to_account_metas(
-                    <span class="kw-2">&amp;</span>mango_v4::accounts::PerpCancelAllOrders {
-                        group: <span class="self">self</span>.group(),
-                        account: <span class="self">self</span>.mango_account_address,
-                        owner: <span class="self">self</span>.owner(),
-                        perp_market: perp.address,
-                        bids: perp.market.bids,
-                        asks: perp.market.asks,
-                    },
-                    <span class="prelude-val">None</span>,
-                )
+        <span class="kw">let </span>ixs = PreparedInstructions::from_single(
+            Instruction {
+                program_id: mango_v4::id(),
+                accounts: {
+                    anchor_lang::ToAccountMetas::to_account_metas(
+                        <span class="kw-2">&amp;</span>mango_v4::accounts::PerpCancelAllOrders {
+                            group: <span class="self">self</span>.group(),
+                            account: <span class="self">self</span>.mango_account_address,
+                            owner: <span class="self">self</span>.owner(),
+                            perp_market: perp.address,
+                            bids: perp.market.bids,
+                            asks: perp.market.asks,
+                        },
+                        <span class="prelude-val">None</span>,
+                    )
+                },
+                data: anchor_lang::InstructionData::data(
+                    <span class="kw-2">&amp;</span>mango_v4::instruction::PerpCancelAllOrders { limit },
+                ),
             },
-            data: anchor_lang::InstructionData::data(<span class="kw-2">&amp;</span>mango_v4::instruction::PerpCancelAllOrders {
-                limit,
-            }),
-        };
-        <span class="prelude-val">Ok</span>(ix)
+            <span class="self">self</span>.instruction_cu(<span class="number">0</span>)
+                + <span class="self">self</span>.context.compute_estimates.cu_per_perp_order_cancel * limit <span class="kw">as </span>u32,
+        );
+        <span class="prelude-val">Ok</span>(ixs)
     }
 
     <span class="kw">pub async fn </span>perp_deactivate_position(
@@ -2766,30 +2884,33 @@
     ) -&gt; anyhow::Result&lt;Signature&gt; {
         <span class="kw">let </span>perp = <span class="self">self</span>.context.perp(market_index);
 
-        <span class="kw">let </span>health_check_metas = <span class="self">self
+        <span class="kw">let </span>(health_check_metas, health_cu) = <span class="self">self
             </span>.derive_health_check_remaining_account_metas(<span class="macro">vec!</span>[], <span class="macro">vec!</span>[], <span class="macro">vec!</span>[])
             .<span class="kw">await</span><span class="question-mark">?</span>;
 
-        <span class="kw">let </span>ix = Instruction {
-            program_id: mango_v4::id(),
-            accounts: {
-                <span class="kw">let </span><span class="kw-2">mut </span>ams = anchor_lang::ToAccountMetas::to_account_metas(
-                    <span class="kw-2">&amp;</span>mango_v4::accounts::PerpDeactivatePosition {
-                        group: <span class="self">self</span>.group(),
-                        account: <span class="self">self</span>.mango_account_address,
-                        owner: <span class="self">self</span>.owner(),
-                        perp_market: perp.address,
-                    },
-                    <span class="prelude-val">None</span>,
-                );
-                ams.extend(health_check_metas.into_iter());
-                ams
+        <span class="kw">let </span>ixs = PreparedInstructions::from_single(
+            Instruction {
+                program_id: mango_v4::id(),
+                accounts: {
+                    <span class="kw">let </span><span class="kw-2">mut </span>ams = anchor_lang::ToAccountMetas::to_account_metas(
+                        <span class="kw-2">&amp;</span>mango_v4::accounts::PerpDeactivatePosition {
+                            group: <span class="self">self</span>.group(),
+                            account: <span class="self">self</span>.mango_account_address,
+                            owner: <span class="self">self</span>.owner(),
+                            perp_market: perp.address,
+                        },
+                        <span class="prelude-val">None</span>,
+                    );
+                    ams.extend(health_check_metas.into_iter());
+                    ams
+                },
+                data: anchor_lang::InstructionData::data(
+                    <span class="kw-2">&amp;</span>mango_v4::instruction::PerpDeactivatePosition {},
+                ),
             },
-            data: anchor_lang::InstructionData::data(
-                <span class="kw-2">&amp;</span>mango_v4::instruction::PerpDeactivatePosition {},
-            ),
-        };
-        <span class="self">self</span>.send_and_confirm_owner_tx(<span class="macro">vec!</span>[ix]).<span class="kw">await
+            <span class="self">self</span>.instruction_cu(health_cu),
+        );
+        <span class="self">self</span>.send_and_confirm_owner_tx(ixs.to_instructions()).<span class="kw">await
     </span>}
 
     <span class="kw">pub fn </span>perp_settle_pnl_instruction(
@@ -2797,11 +2918,11 @@
         market_index: PerpMarketIndex,
         account_a: (<span class="kw-2">&amp;</span>Pubkey, <span class="kw-2">&amp;</span>MangoAccountValue),
         account_b: (<span class="kw-2">&amp;</span>Pubkey, <span class="kw-2">&amp;</span>MangoAccountValue),
-    ) -&gt; anyhow::Result&lt;Instruction&gt; {
+    ) -&gt; anyhow::Result&lt;PreparedInstructions&gt; {
         <span class="kw">let </span>perp = <span class="self">self</span>.context.perp(market_index);
         <span class="kw">let </span>settlement_token = <span class="self">self</span>.context.token(perp.market.settle_token_index);
 
-        <span class="kw">let </span>health_remaining_ams = <span class="self">self
+        <span class="kw">let </span>(health_remaining_ams, health_cu) = <span class="self">self
             </span>.context
             .derive_health_check_remaining_account_metas_two_accounts(
                 account_a.<span class="number">1</span>,
@@ -2811,28 +2932,32 @@
             )
             .unwrap();
 
-        <span class="prelude-val">Ok</span>(Instruction {
-            program_id: mango_v4::id(),
-            accounts: {
-                <span class="kw">let </span><span class="kw-2">mut </span>ams = anchor_lang::ToAccountMetas::to_account_metas(
-                    <span class="kw-2">&amp;</span>mango_v4::accounts::PerpSettlePnl {
-                        group: <span class="self">self</span>.group(),
-                        settler: <span class="self">self</span>.mango_account_address,
-                        settler_owner: <span class="self">self</span>.owner(),
-                        perp_market: perp.address,
-                        account_a: <span class="kw-2">*</span>account_a.<span class="number">0</span>,
-                        account_b: <span class="kw-2">*</span>account_b.<span class="number">0</span>,
-                        oracle: perp.market.oracle,
-                        settle_bank: settlement_token.mint_info.first_bank(),
-                        settle_oracle: settlement_token.mint_info.oracle,
-                    },
-                    <span class="prelude-val">None</span>,
-                );
-                ams.extend(health_remaining_ams.into_iter());
-                ams
+        <span class="kw">let </span>ixs = PreparedInstructions::from_single(
+            Instruction {
+                program_id: mango_v4::id(),
+                accounts: {
+                    <span class="kw">let </span><span class="kw-2">mut </span>ams = anchor_lang::ToAccountMetas::to_account_metas(
+                        <span class="kw-2">&amp;</span>mango_v4::accounts::PerpSettlePnl {
+                            group: <span class="self">self</span>.group(),
+                            settler: <span class="self">self</span>.mango_account_address,
+                            settler_owner: <span class="self">self</span>.owner(),
+                            perp_market: perp.address,
+                            account_a: <span class="kw-2">*</span>account_a.<span class="number">0</span>,
+                            account_b: <span class="kw-2">*</span>account_b.<span class="number">0</span>,
+                            oracle: perp.market.oracle,
+                            settle_bank: settlement_token.mint_info.first_bank(),
+                            settle_oracle: settlement_token.mint_info.oracle,
+                        },
+                        <span class="prelude-val">None</span>,
+                    );
+                    ams.extend(health_remaining_ams.into_iter());
+                    ams
+                },
+                data: anchor_lang::InstructionData::data(<span class="kw-2">&amp;</span>mango_v4::instruction::PerpSettlePnl {}),
             },
-            data: anchor_lang::InstructionData::data(<span class="kw-2">&amp;</span>mango_v4::instruction::PerpSettlePnl {}),
-        })
+            <span class="self">self</span>.instruction_cu(health_cu),
+        );
+        <span class="prelude-val">Ok</span>(ixs)
     }
 
     <span class="kw">pub async fn </span>perp_settle_pnl(
@@ -2841,8 +2966,9 @@
         account_a: (<span class="kw-2">&amp;</span>Pubkey, <span class="kw-2">&amp;</span>MangoAccountValue),
         account_b: (<span class="kw-2">&amp;</span>Pubkey, <span class="kw-2">&amp;</span>MangoAccountValue),
     ) -&gt; anyhow::Result&lt;Signature&gt; {
-        <span class="kw">let </span>ix = <span class="self">self</span>.perp_settle_pnl_instruction(market_index, account_a, account_b)<span class="question-mark">?</span>;
-        <span class="self">self</span>.send_and_confirm_permissionless_tx(<span class="macro">vec!</span>[ix]).<span class="kw">await
+        <span class="kw">let </span>ixs = <span class="self">self</span>.perp_settle_pnl_instruction(market_index, account_a, account_b)<span class="question-mark">?</span>;
+        <span class="self">self</span>.send_and_confirm_permissionless_tx(ixs.to_instructions())
+            .<span class="kw">await
     </span>}
 
     <span class="kw">pub async fn </span>perp_liq_force_cancel_orders(
@@ -2852,32 +2978,38 @@
     ) -&gt; anyhow::Result&lt;Signature&gt; {
         <span class="kw">let </span>perp = <span class="self">self</span>.context.perp(market_index);
 
-        <span class="kw">let </span>health_remaining_ams = <span class="self">self
+        <span class="kw">let </span>(health_remaining_ams, health_cu) = <span class="self">self
             </span>.context
             .derive_health_check_remaining_account_metas(liqee.<span class="number">1</span>, <span class="macro">vec!</span>[], <span class="macro">vec!</span>[], <span class="macro">vec!</span>[])
             .unwrap();
 
-        <span class="kw">let </span>ix = Instruction {
-            program_id: mango_v4::id(),
-            accounts: {
-                <span class="kw">let </span><span class="kw-2">mut </span>ams = anchor_lang::ToAccountMetas::to_account_metas(
-                    <span class="kw-2">&amp;</span>mango_v4::accounts::PerpLiqForceCancelOrders {
-                        group: <span class="self">self</span>.group(),
-                        account: <span class="kw-2">*</span>liqee.<span class="number">0</span>,
-                        perp_market: perp.address,
-                        bids: perp.market.bids,
-                        asks: perp.market.asks,
-                    },
-                    <span class="prelude-val">None</span>,
-                );
-                ams.extend(health_remaining_ams.into_iter());
-                ams
+        <span class="kw">let </span>limit = <span class="number">5</span>;
+        <span class="kw">let </span>ixs = PreparedInstructions::from_single(
+            Instruction {
+                program_id: mango_v4::id(),
+                accounts: {
+                    <span class="kw">let </span><span class="kw-2">mut </span>ams = anchor_lang::ToAccountMetas::to_account_metas(
+                        <span class="kw-2">&amp;</span>mango_v4::accounts::PerpLiqForceCancelOrders {
+                            group: <span class="self">self</span>.group(),
+                            account: <span class="kw-2">*</span>liqee.<span class="number">0</span>,
+                            perp_market: perp.address,
+                            bids: perp.market.bids,
+                            asks: perp.market.asks,
+                        },
+                        <span class="prelude-val">None</span>,
+                    );
+                    ams.extend(health_remaining_ams.into_iter());
+                    ams
+                },
+                data: anchor_lang::InstructionData::data(
+                    <span class="kw-2">&amp;</span>mango_v4::instruction::PerpLiqForceCancelOrders { limit },
+                ),
             },
-            data: anchor_lang::InstructionData::data(
-                <span class="kw-2">&amp;</span>mango_v4::instruction::PerpLiqForceCancelOrders { limit: <span class="number">5 </span>},
-            ),
-        };
-        <span class="self">self</span>.send_and_confirm_permissionless_tx(<span class="macro">vec!</span>[ix]).<span class="kw">await
+            <span class="self">self</span>.instruction_cu(health_cu)
+                + <span class="self">self</span>.context.compute_estimates.cu_per_perp_order_cancel * limit <span class="kw">as </span>u32,
+        );
+        <span class="self">self</span>.send_and_confirm_permissionless_tx(ixs.to_instructions())
+            .<span class="kw">await
     </span>}
 
     <span class="kw">pub async fn </span>perp_liq_base_or_positive_pnl_instruction(
@@ -2886,11 +3018,11 @@
         market_index: PerpMarketIndex,
         max_base_transfer: i64,
         max_pnl_transfer: u64,
-    ) -&gt; anyhow::Result&lt;Instruction&gt; {
+    ) -&gt; anyhow::Result&lt;PreparedInstructions&gt; {
         <span class="kw">let </span>perp = <span class="self">self</span>.context.perp(market_index);
         <span class="kw">let </span>settle_token_info = <span class="self">self</span>.context.token(perp.market.settle_token_index);
 
-        <span class="kw">let </span>health_remaining_ams = <span class="self">self
+        <span class="kw">let </span>(health_remaining_ams, health_cu) = <span class="self">self
             </span>.derive_liquidation_health_check_remaining_account_metas(liqee.<span class="number">1</span>, <span class="kw-2">&amp;</span>[], <span class="kw-2">&amp;</span>[])
             .<span class="kw">await
             </span>.unwrap();
@@ -2922,7 +3054,10 @@
                 },
             ),
         };
-        <span class="prelude-val">Ok</span>(ix)
+        <span class="prelude-val">Ok</span>(PreparedInstructions::from_single(
+            ix,
+            <span class="self">self</span>.instruction_cu(health_cu),
+        ))
     }
 
     <span class="kw">pub async fn </span>perp_liq_negative_pnl_or_bankruptcy_instruction(
@@ -2930,7 +3065,7 @@
         liqee: (<span class="kw-2">&amp;</span>Pubkey, <span class="kw-2">&amp;</span>MangoAccountValue),
         market_index: PerpMarketIndex,
         max_liab_transfer: u64,
-    ) -&gt; anyhow::Result&lt;Instruction&gt; {
+    ) -&gt; anyhow::Result&lt;PreparedInstructions&gt; {
         <span class="kw">let </span>group = account_fetcher_fetch_anchor_account::&lt;Group&gt;(
             <span class="kw-2">&amp;*</span><span class="self">self</span>.account_fetcher,
             <span class="kw-2">&amp;</span><span class="self">self</span>.context.group,
@@ -2941,7 +3076,7 @@
         <span class="kw">let </span>settle_token_info = <span class="self">self</span>.context.token(perp.market.settle_token_index);
         <span class="kw">let </span>insurance_token_info = <span class="self">self</span>.context.token(INSURANCE_TOKEN_INDEX);
 
-        <span class="kw">let </span>health_remaining_ams = <span class="self">self
+        <span class="kw">let </span>(health_remaining_ams, health_cu) = <span class="self">self
             </span>.derive_liquidation_health_check_remaining_account_metas(
                 liqee.<span class="number">1</span>,
                 <span class="kw-2">&amp;</span>[INSURANCE_TOKEN_INDEX],
@@ -2979,7 +3114,10 @@
                 <span class="kw-2">&amp;</span>mango_v4::instruction::PerpLiqNegativePnlOrBankruptcyV2 { max_liab_transfer },
             ),
         };
-        <span class="prelude-val">Ok</span>(ix)
+        <span class="prelude-val">Ok</span>(PreparedInstructions::from_single(
+            ix,
+            <span class="self">self</span>.instruction_cu(health_cu),
+        ))
     }
 
     <span class="comment">//
@@ -2992,8 +3130,8 @@
         asset_token_index: TokenIndex,
         liab_token_index: TokenIndex,
         max_liab_transfer: I80F48,
-    ) -&gt; anyhow::Result&lt;Instruction&gt; {
-        <span class="kw">let </span>health_remaining_ams = <span class="self">self
+    ) -&gt; anyhow::Result&lt;PreparedInstructions&gt; {
+        <span class="kw">let </span>(health_remaining_ams, health_cu) = <span class="self">self
             </span>.derive_liquidation_health_check_remaining_account_metas(
                 liqee.<span class="number">1</span>,
                 <span class="kw-2">&amp;</span>[],
@@ -3023,7 +3161,10 @@
                 max_liab_transfer,
             }),
         };
-        <span class="prelude-val">Ok</span>(ix)
+        <span class="prelude-val">Ok</span>(PreparedInstructions::from_single(
+            ix,
+            <span class="self">self</span>.instruction_cu(health_cu),
+        ))
     }
 
     <span class="kw">pub async fn </span>token_liq_bankruptcy_instruction(
@@ -3031,7 +3172,7 @@
         liqee: (<span class="kw-2">&amp;</span>Pubkey, <span class="kw-2">&amp;</span>MangoAccountValue),
         liab_token_index: TokenIndex,
         max_liab_transfer: I80F48,
-    ) -&gt; anyhow::Result&lt;Instruction&gt; {
+    ) -&gt; anyhow::Result&lt;PreparedInstructions&gt; {
         <span class="kw">let </span>quote_token_index = <span class="number">0</span>;
 
         <span class="kw">let </span>quote_info = <span class="self">self</span>.context.token(quote_token_index);
@@ -3044,7 +3185,7 @@
             .map(|bank_pubkey| util::to_writable_account_meta(<span class="kw-2">*</span>bank_pubkey))
             .collect::&lt;Vec&lt;<span class="kw">_</span>&gt;&gt;();
 
-        <span class="kw">let </span>health_remaining_ams = <span class="self">self
+        <span class="kw">let </span>(health_remaining_ams, health_cu) = <span class="self">self
             </span>.derive_liquidation_health_check_remaining_account_metas(
                 liqee.<span class="number">1</span>,
                 <span class="kw-2">&amp;</span>[INSURANCE_TOKEN_INDEX],
@@ -3083,7 +3224,10 @@
                 max_liab_transfer,
             }),
         };
-        <span class="prelude-val">Ok</span>(ix)
+        <span class="prelude-val">Ok</span>(PreparedInstructions::from_single(
+            ix,
+            <span class="self">self</span>.instruction_cu(health_cu),
+        ))
     }
 
     <span class="kw">pub async fn </span>token_conditional_swap_trigger_instruction(
@@ -3095,7 +3239,7 @@
         min_buy_token: u64,
         min_taker_price: f32,
         extra_affected_tokens: <span class="kw-2">&amp;</span>[TokenIndex],
-    ) -&gt; anyhow::Result&lt;Instruction&gt; {
+    ) -&gt; anyhow::Result&lt;PreparedInstructions&gt; {
         <span class="kw">let </span>(tcs_index, tcs) = liqee
             .<span class="number">1
             </span>.token_conditional_swap_by_id(token_conditional_swap_id)<span class="question-mark">?</span>;
@@ -3105,7 +3249,7 @@
             .chain(<span class="kw-2">&amp;</span>[tcs.buy_token_index, tcs.sell_token_index])
             .copied()
             .collect_vec();
-        <span class="kw">let </span>health_remaining_ams = <span class="self">self
+        <span class="kw">let </span>(health_remaining_ams, health_cu) = <span class="self">self
             </span>.derive_liquidation_health_check_remaining_account_metas(
                 liqee.<span class="number">1</span>,
                 <span class="kw-2">&amp;</span>affected_tokens,
@@ -3140,20 +3284,23 @@
                 },
             ),
         };
-        <span class="prelude-val">Ok</span>(ix)
+        <span class="prelude-val">Ok</span>(PreparedInstructions::from_single(
+            ix,
+            <span class="self">self</span>.instruction_cu(health_cu),
+        ))
     }
 
     <span class="kw">pub async fn </span>token_conditional_swap_start_instruction(
         <span class="kw-2">&amp;</span><span class="self">self</span>,
         account: (<span class="kw-2">&amp;</span>Pubkey, <span class="kw-2">&amp;</span>MangoAccountValue),
         token_conditional_swap_id: u64,
-    ) -&gt; anyhow::Result&lt;Instruction&gt; {
+    ) -&gt; anyhow::Result&lt;PreparedInstructions&gt; {
         <span class="kw">let </span>(tcs_index, tcs) = account
             .<span class="number">1
             </span>.token_conditional_swap_by_id(token_conditional_swap_id)<span class="question-mark">?</span>;
 
         <span class="kw">let </span>affected_tokens = <span class="macro">vec!</span>[tcs.buy_token_index, tcs.sell_token_index];
-        <span class="kw">let </span>health_remaining_ams = <span class="self">self
+        <span class="kw">let </span>(health_remaining_ams, health_cu) = <span class="self">self
             </span>.derive_health_check_remaining_account_metas(<span class="macro">vec!</span>[], affected_tokens, <span class="macro">vec!</span>[])
             .<span class="kw">await
             </span>.unwrap();
@@ -3180,7 +3327,10 @@
                 },
             ),
         };
-        <span class="prelude-val">Ok</span>(ix)
+        <span class="prelude-val">Ok</span>(PreparedInstructions::from_single(
+            ix,
+            <span class="self">self</span>.instruction_cu(health_cu),
+        ))
     }
 
     <span class="comment">// health region
@@ -3191,13 +3341,14 @@
         affected_tokens: Vec&lt;TokenIndex&gt;,
         writable_banks: Vec&lt;TokenIndex&gt;,
         affected_perp_markets: Vec&lt;PerpMarketIndex&gt;,
-    ) -&gt; anyhow::Result&lt;Instruction&gt; {
-        <span class="kw">let </span>health_remaining_metas = <span class="self">self</span>.context.derive_health_check_remaining_account_metas(
-            account,
-            affected_tokens,
-            writable_banks,
-            affected_perp_markets,
-        )<span class="question-mark">?</span>;
+    ) -&gt; anyhow::Result&lt;PreparedInstructions&gt; {
+        <span class="kw">let </span>(health_remaining_metas, _health_cu) =
+            <span class="self">self</span>.context.derive_health_check_remaining_account_metas(
+                account,
+                affected_tokens,
+                writable_banks,
+                affected_perp_markets,
+            )<span class="question-mark">?</span>;
 
         <span class="kw">let </span>ix = Instruction {
             program_id: mango_v4::id(),
@@ -3216,7 +3367,11 @@
             data: anchor_lang::InstructionData::data(<span class="kw-2">&amp;</span>mango_v4::instruction::HealthRegionBegin {}),
         };
 
-        <span class="prelude-val">Ok</span>(ix)
+        <span class="comment">// There&#39;s only a single health computation in End
+        </span><span class="prelude-val">Ok</span>(PreparedInstructions::from_single(
+            ix,
+            <span class="self">self</span>.instruction_cu(<span class="number">0</span>),
+        ))
     }
 
     <span class="kw">pub fn </span>health_region_end_instruction(
@@ -3225,13 +3380,14 @@
         affected_tokens: Vec&lt;TokenIndex&gt;,
         writable_banks: Vec&lt;TokenIndex&gt;,
         affected_perp_markets: Vec&lt;PerpMarketIndex&gt;,
-    ) -&gt; anyhow::Result&lt;Instruction&gt; {
-        <span class="kw">let </span>health_remaining_metas = <span class="self">self</span>.context.derive_health_check_remaining_account_metas(
-            account,
-            affected_tokens,
-            writable_banks,
-            affected_perp_markets,
-        )<span class="question-mark">?</span>;
+    ) -&gt; anyhow::Result&lt;PreparedInstructions&gt; {
+        <span class="kw">let </span>(health_remaining_metas, health_cu) =
+            <span class="self">self</span>.context.derive_health_check_remaining_account_metas(
+                account,
+                affected_tokens,
+                writable_banks,
+                affected_perp_markets,
+            )<span class="question-mark">?</span>;
 
         <span class="kw">let </span>ix = Instruction {
             program_id: mango_v4::id(),
@@ -3248,7 +3404,10 @@
             data: anchor_lang::InstructionData::data(<span class="kw-2">&amp;</span>mango_v4::instruction::HealthRegionEnd {}),
         };
 
-        <span class="prelude-val">Ok</span>(ix)
+        <span class="prelude-val">Ok</span>(PreparedInstructions::from_single(
+            ix,
+            <span class="self">self</span>.instruction_cu(health_cu),
+        ))
     }
 
     <span class="comment">// jupiter
@@ -3345,6 +3504,10 @@
             .collect();
 
         <span class="prelude-val">Ok</span>((compiled_ix, address_lookup_tables))
+    }
+
+    <span class="kw">fn </span>instruction_cu(<span class="kw-2">&amp;</span><span class="self">self</span>, health_cu: u32) -&gt; u32 {
+        <span class="self">self</span>.context.compute_estimates.cu_per_mango_instruction + health_cu
     }
 
     <span class="kw">pub async fn </span>send_and_confirm_owner_tx(
@@ -3453,14 +3616,13 @@
     }
 
     <span class="kw">fn </span>instructions_with_cu_budget(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; Vec&lt;Instruction&gt; {
-        <span class="kw">use </span>solana_sdk::compute_budget::{<span class="self">self</span>, ComputeBudgetInstruction};
         <span class="kw">let </span><span class="kw-2">mut </span>ixs = <span class="self">self</span>.instructions.clone();
 
         <span class="kw">let </span><span class="kw-2">mut </span>has_compute_unit_price = <span class="bool-val">false</span>;
         <span class="kw">let </span><span class="kw-2">mut </span>has_compute_unit_limit = <span class="bool-val">false</span>;
         <span class="kw">let </span><span class="kw-2">mut </span>cu_instructions = <span class="number">0</span>;
         <span class="kw">for </span>ix <span class="kw">in </span>ixs.iter() {
-            <span class="kw">if </span>ix.program_id != compute_budget::id() {
+            <span class="kw">if </span>ix.program_id != solana_sdk::compute_budget::id() {
                 <span class="kw">continue</span>;
             }
             cu_instructions += <span class="number">1</span>;
