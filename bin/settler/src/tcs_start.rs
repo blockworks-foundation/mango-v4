@@ -4,8 +4,8 @@ use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 use itertools::Itertools;
 use mango_v4::error::{IsAnchorErrorWithCode, MangoError};
 use mango_v4::state::*;
+use mango_v4_client::PreparedInstructions;
 use mango_v4_client::{chain_data, error_tracking::ErrorTracking, MangoClient};
-use solana_sdk::instruction::Instruction;
 
 use tracing::*;
 use {fixed::types::I80F48, solana_sdk::pubkey::Pubkey};
@@ -93,11 +93,11 @@ impl State {
         }
 
         for startable_chunk in startable.chunks(8) {
-            let mut instructions = vec![];
+            let mut instructions = PreparedInstructions::new();
             let mut ix_targets = vec![];
             let mut liqor_account = mango_client.mango_account().await?;
             for (pubkey, tcs_id, incentive_token_index) in startable_chunk {
-                let ix = match self.make_start_ix(pubkey, *tcs_id).await {
+                let ixs = match self.make_start_ix(pubkey, *tcs_id).await {
                     Ok(v) => v,
                     Err(e) => {
                         self.errors.record_error(
@@ -108,7 +108,7 @@ impl State {
                         continue;
                     }
                 };
-                instructions.push(ix);
+                instructions.append(ixs);
                 ix_targets.push((*pubkey, *tcs_id));
                 liqor_account.ensure_token_position(*incentive_token_index)?;
             }
@@ -116,7 +116,7 @@ impl State {
             // Clear newly created token positions, so the liqor account is mostly empty
             for token_index in startable_chunk.iter().map(|(_, _, ti)| *ti).unique() {
                 let mint = mango_client.context.token(token_index).mint_info.mint;
-                instructions.append(&mut mango_client.token_withdraw_instructions(
+                instructions.append(mango_client.token_withdraw_instructions(
                     &liqor_account,
                     mint,
                     u64::MAX,
@@ -124,7 +124,10 @@ impl State {
                 )?);
             }
 
-            let txsig = match mango_client.send_and_confirm_owner_tx(instructions).await {
+            let txsig = match mango_client
+                .send_and_confirm_owner_tx(instructions.to_instructions())
+                .await
+            {
                 Ok(v) => v,
                 Err(e) => {
                     warn!("error sending transaction: {e:?}");
@@ -154,7 +157,11 @@ impl State {
         Ok(())
     }
 
-    async fn make_start_ix(&self, pubkey: &Pubkey, tcs_id: u64) -> anyhow::Result<Instruction> {
+    async fn make_start_ix(
+        &self,
+        pubkey: &Pubkey,
+        tcs_id: u64,
+    ) -> anyhow::Result<PreparedInstructions> {
         let account = self.account_fetcher.fetch_mango_account(pubkey).unwrap();
         self.mango_client
             .token_conditional_swap_start_instruction((pubkey, &account), tcs_id)

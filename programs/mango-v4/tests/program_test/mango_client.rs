@@ -3506,6 +3506,7 @@ pub struct PerpPlaceOrderInstruction {
     pub reduce_only: bool,
     pub client_order_id: u64,
     pub self_trade_behavior: SelfTradeBehavior,
+    pub limit: u8,
 }
 impl Default for PerpPlaceOrderInstruction {
     fn default() -> Self {
@@ -3520,6 +3521,7 @@ impl Default for PerpPlaceOrderInstruction {
             reduce_only: false,
             client_order_id: 0,
             self_trade_behavior: SelfTradeBehavior::DecrementTake,
+            limit: 10,
         }
     }
 }
@@ -3542,7 +3544,7 @@ impl ClientInstruction for PerpPlaceOrderInstruction {
             self_trade_behavior: self.self_trade_behavior,
             reduce_only: self.reduce_only,
             expiry_timestamp: 0,
-            limit: 10,
+            limit: self.limit,
         };
 
         let perp_market: PerpMarket = account_loader.load(&self.perp_market).await.unwrap();
@@ -3728,6 +3730,7 @@ pub struct PerpCancelAllOrdersInstruction {
     pub account: Pubkey,
     pub perp_market: Pubkey,
     pub owner: TestKeypair,
+    pub limit: u8,
 }
 #[async_trait::async_trait(?Send)]
 impl ClientInstruction for PerpCancelAllOrdersInstruction {
@@ -3738,7 +3741,7 @@ impl ClientInstruction for PerpCancelAllOrdersInstruction {
         account_loader: impl ClientAccountLoader + 'async_trait,
     ) -> (Self::Accounts, instruction::Instruction) {
         let program_id = mango_v4::id();
-        let instruction = Self::Instruction { limit: 5 };
+        let instruction = Self::Instruction { limit: self.limit };
         let perp_market: PerpMarket = account_loader.load(&self.perp_market).await.unwrap();
         let accounts = Self::Accounts {
             group: perp_market.group,

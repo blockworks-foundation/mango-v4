@@ -1122,7 +1122,7 @@ impl Context {
         };
 
         let liqee = self.account_fetcher.fetch_mango_account(&pending.pubkey)?;
-        let trigger_ix = self
+        let mut trigger_ixs = self
             .mango_client
             .token_conditional_swap_trigger_instruction(
                 (&pending.pubkey, &liqee),
@@ -1134,7 +1134,9 @@ impl Context {
                 &allowed_tokens,
             )
             .await?;
-        tx_builder.instructions.push(trigger_ix);
+        tx_builder
+            .instructions
+            .append(&mut trigger_ixs.instructions);
 
         let txsig = tx_builder
             .send_and_confirm(&self.mango_client.client)
