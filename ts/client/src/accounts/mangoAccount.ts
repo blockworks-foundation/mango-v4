@@ -1475,6 +1475,24 @@ export class PerpPosition {
     };
   }
 
+  /**
+   * @returns perp position cumulative funding.
+   * If the user paid $1 in funding for a short position, this would be -1e6.
+   * Caveat: This will only return cumulative interest since the perp position was last opened.
+   */
+  public getCumulativeFundingUi(perpMarket: PerpMarket): number {
+    if (perpMarket.perpMarketIndex !== this.marketIndex) {
+      throw new Error("PerpPosition doesn't belong to the given market!");
+    }
+    const cumulativeFunding = this.getCumulativeFunding(perpMarket);
+    // can't be long and short at the same time
+    if (cumulativeFunding.cumulativeLongFunding !== 0) {
+      return -1 * toUiDecimalsForQuote(cumulativeFunding.cumulativeLongFunding);
+    } else {
+      return toUiDecimalsForQuote(cumulativeFunding.cumulativeShortFunding);
+    }
+  }
+
   public getEquity(perpMarket: PerpMarket): I80F48 {
     if (perpMarket.perpMarketIndex !== this.marketIndex) {
       throw new Error("PerpPosition doesn't belong to the given market!");
