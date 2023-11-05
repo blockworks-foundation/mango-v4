@@ -1477,7 +1477,6 @@ export class PerpPosition {
 
   /**
    * @returns perp position cumulative funding.
-   * If the user paid $1 in funding for a short position, this would be -1e6.
    * Caveat: This will only return cumulative interest since the perp position was last opened.
    */
   public getCumulativeFundingUi(perpMarket: PerpMarket): number {
