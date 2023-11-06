@@ -31,3 +31,4 @@ overflow-checks = true
 [patch.crates-io]
 # for gzip encoded responses
 jsonrpc-core-client = { git = "https://github.com/ckamm/jsonrpc.git", branch = "ckamm/http-with-gzip" }
+mango-feeds-connector = { path = "../mango-feeds/connector" }

@@ -12,6 +12,8 @@ anchor-client = { workspace = true }
 anchor-lang = { workspace = true }
 anchor-spl = { workspace = true }
 anyhow = "1.0"
+async-channel = "1.6"
+base64 = "0.21"
 clap = { version = "3.1.8", features = ["derive", "env"] }
 dotenv = "0.15.0"
 fixed = { workspace = true, features = ["serde", "borsh"] }
@@ -19,6 +21,7 @@ futures = "0.3.21"
 mango-v4 = { path = "../../programs/mango-v4", features = ["client"] }
 mango-v4-client = { path = "../../lib/client" }
 pyth-sdk-solana = { workspace = true }
+serde_json = "1.0"
 serum_dex = { workspace = true, features = ["no-entrypoint", "program"] }
 solana-client = { workspace = true }
 solana-sdk = { workspace = true }

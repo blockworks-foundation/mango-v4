@@ -4,6 +4,7 @@ use std::mem::size_of;
 use anchor_lang::prelude::*;
 use anchor_lang::Discriminator;
 use arrayref::array_ref;
+use derivative::Derivative;
 
 use fixed::types::I80F48;
 
@@ -13,6 +14,7 @@ use static_assertions::const_assert_eq;
 use crate::error::*;
 use crate::health::{HealthCache, HealthType};
 use crate::logs::{DeactivatePerpPositionLog, DeactivateTokenPositionLog};
+use crate::util;
 
 use super::BookSideOrderTree;
 use super::FillEvent;
@@ -83,6 +85,8 @@ impl MangoAccountPdaSeeds {
 // MangoAccount binary data is backwards compatible: when ignoring trailing bytes, a v2 account can
 // be read as a v1 account and a v3 account can be read as v1 or v2 etc.
 #[account]
+#[derive(Derivative)]
+#[derivative(Debug)]
 pub struct MangoAccount {
     // fixed
     // note: keep MangoAccountFixed in sync with changes here
@@ -92,6 +96,7 @@ pub struct MangoAccount {
     // ABI: Clients rely on this being at offset 40
     pub owner: Pubkey,
 
+    #[derivative(Debug(format_with = "util::format_zero_terminated_utf8_bytes"))]
     pub name: [u8; 32],
 
     // Alternative authority/signer of transactions for a mango account
@@ -117,6 +122,7 @@ pub struct MangoAccount {
 
     pub bump: u8,
 
+    #[derivative(Debug = "ignore")]
     pub padding: [u8; 1],
 
     // (Display only)
@@ -144,22 +150,28 @@ pub struct MangoAccount {
     /// Next id to use when adding a token condition swap
     pub next_token_conditional_swap_id: u64,
 
+    #[derivative(Debug = "ignore")]
     pub reserved: [u8; 200],
 
     // dynamic
     pub header_version: u8,
+    #[derivative(Debug = "ignore")]
     pub padding3: [u8; 7],
     // note: padding is required for TokenPosition, etc. to be aligned
+    #[derivative(Debug = "ignore")]
     pub padding4: u32,
     // Maps token_index -> deposit/borrow account for each token
     // that is active on this MangoAccount.
     pub tokens: Vec<TokenPosition>,
+    #[derivative(Debug = "ignore")]
     pub padding5: u32,
     // Maps serum_market_index -> open orders for each serum market
     // that is active on this MangoAccount.
     pub serum3: Vec<Serum3Orders>,
+    #[derivative(Debug = "ignore")]
     pub padding6: u32,
     pub perps: Vec<PerpPosition>,
+    #[derivative(Debug = "ignore")]
     pub padding7: u32,
     pub perp_open_orders: Vec<PerpOpenOrder>,
     // WARNING: This does not have further fields, like tcs, intentionally:
