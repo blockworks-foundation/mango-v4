@@ -552,29 +552,28 @@ impl Context {
     ) -> anyhow::Result<Vec<anyhow::Result<(Pubkey, u64, u64)>>> {
         let liqee = self.account_fetcher.fetch_mango_account(pubkey)?;
 
-        // TODO - FIXME
-        // let interesting_tcs = liqee
-        //     .active_token_conditional_swaps()
-        //     .filter_map(async move |tcs| {
-        //         match self.tcs_is_interesting(tcs) {
-        //             Ok(true) => {
-        //                 // Filter out Ok(None) resuts of tcs that shouldn't be executed right now
-        //                 match self.tcs_max_volume(&liqee, tcs).await {
-        //                     Ok(Some(v)) => Some(Ok((*pubkey, tcs.id, v))),
-        //                     Ok(None) => None,
-        //                     Err(e) => Some(Err(e)),
-        //                 }
-        //             }
-        //             Ok(false) => None,
-        //             Err(e) => Some(Err(e)),
-        //         }
-        //     })
-        //     .collect_vec();
-        // if !interesting_tcs.is_empty() {
-        //     trace!(%pubkey, interesting_tcs_count=interesting_tcs.len(), "found interesting tcs");
-        // }
-        // Ok(interesting_tcs)
-        todo!();
+        let interesting_tcs = futures::stream::iter(liqee.active_token_conditional_swaps())
+            .filter_map(|tcs| async {
+                match self.tcs_is_interesting(tcs) {
+                    Ok(true) => {
+                        // Filter out Ok(None) results of tcs that shouldn't be executed right now
+                        match self.tcs_max_volume(&liqee, tcs).await {
+                            Ok(Some(v)) => Some(Ok((*pubkey, tcs.id, v))),
+                            Ok(None) => None,
+                            Err(e) => Some(Err(e)),
+                        }
+                    }
+                    Ok(false) => None,
+                    Err(e) => Some(Err(e)),
+                }
+            })
+            .collect_vec()
+            .await;
+
+        if !interesting_tcs.is_empty() {
+            trace!(%pubkey, interesting_tcs_count=interesting_tcs.len(), "found interesting tcs");
+        }
+        Ok(interesting_tcs)
     }
 
     #[allow(clippy::too_many_arguments)]
