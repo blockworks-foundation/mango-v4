@@ -107,6 +107,10 @@ struct Cli {
     #[clap(long, env, default_value = "100")]
     rebalance_slippage_bps: u64,
 
+    /// tokens to not rebalance (in addition to USDC); use a comma separated list of names
+    #[clap(long, env, default_value = "")]
+    rebalance_skip_tokens: String,
+
     /// if taking tcs orders is enabled
     ///
     /// typically only disabled for tests where swaps are unavailable
@@ -312,6 +316,12 @@ async fn main() -> anyhow::Result<()> {
         borrow_settle_excess: 1.05,
         refresh_timeout: Duration::from_secs(30),
         jupiter_version: cli.jupiter_version.into(),
+        skip_tokens: cli
+            .rebalance_skip_tokens
+            .split(",")
+            .filter(|v| !v.is_empty())
+            .map(|name| mango_client.context.token_by_name(name).token_index)
+            .collect(),
     };
 
     let rebalancer = Arc::new(rebalance::Rebalancer {
