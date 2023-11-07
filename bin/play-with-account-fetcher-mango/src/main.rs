@@ -120,23 +120,34 @@ impl MockExampleFetcher {
 
 #[async_trait::async_trait]
 impl AccountFetcherFeeds for MockExampleFetcher {
-    async fn feeds_fetch_raw_account(&self, _address: &Pubkey) -> anyhow::Result<(AccountSharedData, Slot)> {
+    async fn feeds_fetch_raw_account(
+        &self, _address: &Pubkey,
+    ) -> anyhow::Result<(AccountSharedData, Slot)> {
+
+        self.inc_call();
+
         match self.scenario {
+
             Scenario::Happy => {
-                self.inc_call();
-                let account_owner = Pubkey::from_str("66fEFnKyCPUWzxKeB9GngcvZDakjvFCVnYLRtcBk9t5D").unwrap();
+                let account_owner =
+                    Pubkey::from_str("66fEFnKyCPUWzxKeB9GngcvZDakjvFCVnYLRtcBk9t5D").unwrap();
                 let acc = AccountSharedData::new(420000, 0, &account_owner);
                 return Ok((acc, 2409999333));
             }
+
             Scenario::Error => {
-                self.inc_call();
                 return Err(anyhow::anyhow!("simulated error in mock fetcher"));
             }
+
         }
 
     }
 
-    async fn feeds_fetch_program_accounts(&self, _program: &Pubkey, discriminator: [u8; 8]) -> anyhow::Result<(Vec<(Pubkey, AccountSharedData)>, Slot)> {
+    async fn feeds_fetch_program_accounts(
+        &self,
+        _program: &Pubkey,
+        _discriminator: [u8; 8],
+    ) -> anyhow::Result<(Vec<(Pubkey, AccountSharedData)>, Slot)> {
         unreachable!("program accounts not mocked")
     }
 
