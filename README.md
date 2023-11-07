@@ -21,7 +21,7 @@ available under GPL.
 
 ## Development
 
-See DEVELOPING.md
+See DEVELOPING.md and FAQ-DEV.md
 
 ### Dependencies
 
