@@ -43,6 +43,8 @@ async fn main() {
 
     call_cache_with_mock(mango_account_pk).await;
 
+    call_cache_with_mock_error(mango_account_pk).await;
+
 }
 
 async fn chain_data_fetcher(rpc_url: String) {
@@ -87,30 +89,51 @@ async fn chain_data_fetcher_bank(rpc_url: String) {
 }
 
 struct MockExampleFetcher {
-    pub fetched_mango_calls: AtomicU32,
+    fetched_mango_calls: AtomicU32,
+    scenario: Scenario,
+}
+
+#[derive(Clone, Copy)]
+enum Scenario {
+    Happy,
+    Error,
 }
 
 impl MockExampleFetcher {
 
-    pub fn new() -> Self {
-        Self {
+
+    pub fn new(scenario: Scenario) -> Self {
+            Self {
             fetched_mango_calls: AtomicU32::new(0),
+            scenario,
         }
     }
 
     pub fn assert_call_count(&self, expected: u32) {
-        assert_eq!(self.fetched_mango_calls.load(Ordering::SeqCst), expected);
+        assert_eq!(self.fetched_mango_calls.load(Ordering::Acquire), expected);
     }
 
+    fn inc_call(&self) {
+        self.fetched_mango_calls.fetch_add(1, Ordering::Release);
+    }
 }
 
 #[async_trait::async_trait]
 impl AccountFetcherFeeds for MockExampleFetcher {
     async fn feeds_fetch_raw_account(&self, _address: &Pubkey) -> anyhow::Result<(AccountSharedData, Slot)> {
-        self.fetched_mango_calls.fetch_add(1, Ordering::Relaxed);
-        let account_owner = Pubkey::from_str("66fEFnKyCPUWzxKeB9GngcvZDakjvFCVnYLRtcBk9t5D").unwrap();
-        let acc = AccountSharedData::new(420000, 0, &account_owner);
-        return Ok((acc, 2409999333));
+        match self.scenario {
+            Scenario::Happy => {
+                self.inc_call();
+                let account_owner = Pubkey::from_str("66fEFnKyCPUWzxKeB9GngcvZDakjvFCVnYLRtcBk9t5D").unwrap();
+                let acc = AccountSharedData::new(420000, 0, &account_owner);
+                return Ok((acc, 2409999333));
+            }
+            Scenario::Error => {
+                self.inc_call();
+                return Err(anyhow::anyhow!("simulated error in mock fetcher"));
+            }
+        }
+
     }
 
     async fn feeds_fetch_program_accounts(&self, _program: &Pubkey, discriminator: [u8; 8]) -> anyhow::Result<(Vec<(Pubkey, AccountSharedData)>, Slot)> {
@@ -122,7 +145,7 @@ impl AccountFetcherFeeds for MockExampleFetcher {
 
 async fn call_cache_with_mock(account: Pubkey,) {
 
-    let mut mock = Arc::new(MockExampleFetcher::new());
+    let mut mock = Arc::new(MockExampleFetcher::new(Scenario::Happy));
 
     let cache = CachedAccountFetcher::new(mock.clone());
     mock.assert_call_count(0);
@@ -138,6 +161,24 @@ async fn call_cache_with_mock(account: Pubkey,) {
     let _third_call_cached = cache.fetch_raw_account(&account).await;;
     mock.assert_call_count(2);
 }
+
+
+async fn call_cache_with_mock_error(account: Pubkey,) {
+
+    let mut mock = Arc::new(MockExampleFetcher::new(Scenario::Error));
+
+    let cache = CachedAccountFetcher::new(mock.clone());
+    mock.assert_call_count(0);
+
+    let _first_call = cache.fetch_raw_account(&account).await;
+    mock.assert_call_count(1);
+
+    // must hit wrapped fetcher again on error
+    let _second_call_cached = cache.fetch_raw_account(&account).await;
+    mock.assert_call_count(2);
+
+}
+
 
 
 pub async fn load_mango_account_cached(
