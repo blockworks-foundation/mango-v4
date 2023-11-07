@@ -457,6 +457,11 @@ pub fn flash_loan_end<'key, 'accounts, 'remaining, 'info>(
             deactivated_token_positions.push(change.raw_token_index);
         }
 
+        let increased_deposits = native_after_change > 0 && native_after_change > native;
+        if increased_deposits {
+            bank.check_deposit_limit(*oracle_price)?;
+        }
+
         if change_amount < 0 && native_after_change < 0 {
             let vault_ai = vaults
                 .iter()

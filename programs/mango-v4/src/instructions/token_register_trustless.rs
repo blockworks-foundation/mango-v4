@@ -97,7 +97,8 @@ pub fn token_register_trustless(
         interest_target_utilization: 0.5,
         interest_curve_scaling: 4.0,
         deposits_in_serum: 0,
-        reserved: [0; 2072],
+        deposit_limit_quote: 0.0, // disabled
+        reserved: [0; 2064],
     };
 
     if let Ok(oracle_price) =

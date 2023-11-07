@@ -125,6 +125,8 @@ pub enum MangoError {
     TokenConditionalSwapTooSmallForStartIncentive,
     #[msg("token conditional swap type cannot be started")]
     TokenConditionalSwapTypeNotStartable,
+    #[msg("bank deposit limit has been reached")]
+    BankDepositLimitReached,
 }
 
 impl MangoError {

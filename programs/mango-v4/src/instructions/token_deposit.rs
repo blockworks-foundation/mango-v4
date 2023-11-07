@@ -74,6 +74,7 @@ impl<'a, 'info> DepositCommon<'a, 'info> {
         let mut account = self.account.load_full_mut()?;
 
         let (position, raw_token_index) = account.token_position_mut(token_index)?;
+        let indexed_position_before = position.indexed_position;
 
         let position_is_active = {
             bank.deposit(
@@ -86,15 +87,26 @@ impl<'a, 'info> DepositCommon<'a, 'info> {
         // Transfer the actual tokens
         token::transfer(self.transfer_ctx(), amount_i80f48.to_num::<u64>())?;
 
-        let indexed_position = position.indexed_position;
-
         // Get the oracle price, even if stale or unconfident: We want to allow users
         // to deposit to close borrows or do other fixes even if the oracle is bad.
-        let unsafe_oracle_price = oracle_state_unchecked(
+        let unchecked_oracle_state = oracle_state_unchecked(
             &AccountInfoRef::borrow(self.oracle.as_ref())?,
             bank.mint_decimals,
-        )?
-        .price;
+        )?;
+        let unsafe_oracle_price = unchecked_oracle_state.price;
+
+        // If the deposits increased (not just closing borrows), validate the oracle, check deposit limits.
+        let indexed_position = position.indexed_position;
+        let increased_deposits = indexed_position > 0 && indexed_position > indexed_position_before;
+        if increased_deposits {
+            let now_ts: u64 = Clock::get()?.unix_timestamp.try_into().unwrap();
+            unchecked_oracle_state.check_confidence_and_maybe_staleness(
+                self.oracle.key,
+                &bank.oracle_config,
+                Some(now_ts),
+            )?;
+            bank.check_deposit_limit(unsafe_oracle_price)?;
+        }
 
         // Update the net deposits - adjust by price so different tokens are on the same basis (in USD terms)
         let amount_usd = (amount_i80f48 * unsafe_oracle_price).to_num::<i64>();

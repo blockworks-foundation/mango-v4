@@ -157,12 +157,21 @@ pub struct Bank {
     /// Except when first migrating to having this field, then 0.0
     pub interest_curve_scaling: f64,
 
-    // user deposits that were moved into serum open orders
-    // can be negative due to multibank, then it'd need to be balanced in the keeper
+    /// user deposits that were moved into serum open orders
+    /// can be negative due to multibank, then it'd need to be balanced in the keeper
     pub deposits_in_serum: i64,
 
+    /// Deposit limit in quote units
+    ///
+    /// Applies to user actions that increase deposits like deposit, flash loan, tcs execution.
+    /// Since we limit in quote units, price changes can make the actual deposited value
+    /// exceed the limit.
+    ///
+    /// A zero value means no limit (migration default).
+    pub deposit_limit_quote: f64,
+
     #[derivative(Debug = "ignore")]
-    pub reserved: [u8; 2072],
+    pub reserved: [u8; 2064],
 }
 const_assert_eq!(
     size_of::<Bank>(),
@@ -194,8 +203,8 @@ const_assert_eq!(
         + 6
         + 8
         + 4 * 4
-        + 8 * 2
-        + 2072
+        + 8 * 3
+        + 2064
 );
 const_assert_eq!(size_of::<Bank>(), 3064);
 const_assert_eq!(size_of::<Bank>() % 8, 0);
@@ -279,7 +288,8 @@ impl Bank {
             flash_loan_swap_fee_rate: existing_bank.flash_loan_swap_fee_rate,
             interest_target_utilization: existing_bank.interest_target_utilization,
             interest_curve_scaling: existing_bank.interest_curve_scaling,
-            reserved: [0; 2072],
+            deposit_limit_quote: existing_bank.deposit_limit_quote,
+            reserved: [0; 2064],
         }
     }
 
@@ -307,6 +317,7 @@ impl Bank {
         require_gte!(self.flash_loan_swap_fee_rate, 0.0);
         require_gte!(self.interest_curve_scaling, 1.0);
         require_gte!(self.interest_target_utilization, 0.0);
+        require_gte!(self.deposit_limit_quote, 0.0);
         Ok(())
     }
 
@@ -730,6 +741,20 @@ impl Bank {
             ));
         }
 
+        Ok(())
+    }
+
+    pub fn check_deposit_limit(&self, oracle_price: I80F48) -> Result<()> {
+        if self.deposit_limit_quote == 0.0 {
+            return Ok(());
+        }
+        let all_deposits = self.native_deposits().to_num::<f64>() + self.deposits_in_serum as f64;
+        let deposits_quote = all_deposits * oracle_price.to_num::<f64>();
+        require_gte!(
+            self.deposit_limit_quote,
+            deposits_quote,
+            MangoError::BankDepositLimitReached
+        );
         Ok(())
     }
 
