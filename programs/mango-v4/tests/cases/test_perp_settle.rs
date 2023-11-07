@@ -582,7 +582,7 @@ async fn test_perp_settle_pnl_fees() -> Result<(), TransportError> {
     // SETUP: Create a perp market
     //
     let flat_fee = 1000;
-    let fee_low_health = 0.05;
+    let fee_low_health = 0.10;
     let mango_v4::accounts::PerpCreateMarket { perp_market, .. } = send_tx(
         solana,
         PerpCreateMarketInstruction {
@@ -600,7 +600,7 @@ async fn test_perp_settle_pnl_fees() -> Result<(), TransportError> {
             maker_fee: 0.0,
             taker_fee: 0.0,
             settle_fee_flat: flat_fee as f32,
-            settle_fee_amount_threshold: 2000.0,
+            settle_fee_amount_threshold: 4000.0,
             settle_fee_fraction_low_health: fee_low_health,
             settle_pnl_limit_factor: 0.2,
             settle_pnl_limit_window_size_ts: 24 * 60 * 60,
@@ -742,11 +742,11 @@ async fn test_perp_settle_pnl_fees() -> Result<(), TransportError> {
     set_bank_stub_oracle_price(solana, group, &tokens[2], admin, 10700.0).await;
 
     //
-    // TEST: Settle (health is low)
+    // TEST: Settle (health is low), percent fee
     //
-    set_perp_stub_oracle_price(solana, group, perp_market, &tokens[1], admin, 1100.0).await;
+    set_perp_stub_oracle_price(solana, group, perp_market, &tokens[1], admin, 1070.0).await;
 
-    let expected_pnl = 5000;
+    let expected_pnl = 2000;
 
     send_tx(
         solana,
@@ -762,9 +762,55 @@ async fn test_perp_settle_pnl_fees() -> Result<(), TransportError> {
     .unwrap();
 
     total_settled_pnl += expected_pnl;
-    total_fees_paid += flat_fee
-        + (expected_pnl as f64 * fee_low_health as f64 * 980.0 / (1160.0 + 980.0)) as i64
-        + 1;
+    total_fees_paid +=
+        (expected_pnl as f64 * fee_low_health as f64 * 980.0 / (1160.0 + 980.0)) as i64 + 1;
+    {
+        let mango_account_0 = solana.get_account::<MangoAccount>(account_0).await;
+        let mango_account_1 = solana.get_account::<MangoAccount>(account_1).await;
+        assert_eq!(
+            mango_account_0.perps[0].quote_position_native().round(),
+            I80F48::from(-100_000 - total_settled_pnl)
+        );
+        assert_eq!(
+            mango_account_1.perps[0].quote_position_native().round(),
+            I80F48::from(100_000 + total_settled_pnl),
+        );
+        assert_eq!(
+            account_position(solana, account_0, settle_bank).await,
+            initial_token_deposit as i64 + total_settled_pnl - total_fees_paid
+        );
+        assert_eq!(
+            account_position(solana, account_1, settle_bank).await,
+            initial_token_deposit as i64 - total_settled_pnl
+        );
+        assert_eq!(
+            account_position(solana, settler, settle_bank).await,
+            total_fees_paid
+        );
+    }
+
+    //
+    // TEST: Settle (health is low), no fee because pnl too small
+    //
+    set_perp_stub_oracle_price(solana, group, perp_market, &tokens[1], admin, 1071.0).await;
+
+    let expected_pnl = 100;
+
+    send_tx(
+        solana,
+        PerpSettlePnlInstruction {
+            settler,
+            settler_owner,
+            account_a: account_0,
+            account_b: account_1,
+            perp_market,
+        },
+    )
+    .await
+    .unwrap();
+
+    total_settled_pnl += expected_pnl;
+    total_fees_paid += 0;
     {
         let mango_account_0 = solana.get_account::<MangoAccount>(account_0).await;
         let mango_account_1 = solana.get_account::<MangoAccount>(account_1).await;

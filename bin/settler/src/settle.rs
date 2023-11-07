@@ -26,30 +26,36 @@ pub struct Config {
 fn perp_markets_and_prices(
     mango_client: &MangoClient,
     account_fetcher: &chain_data::AccountFetcher,
-) -> HashMap<PerpMarketIndex, (PerpMarket, I80F48)> {
+) -> HashMap<PerpMarketIndex, (PerpMarket, I80F48, I80F48)> {
     mango_client
         .context
         .perp_markets
         .iter()
         .map(|(market_index, perp)| {
             let perp_market = account_fetcher.fetch::<PerpMarket>(&perp.address)?;
+
             let oracle_acc = account_fetcher.fetch_raw(&perp_market.oracle)?;
             let oracle_price = perp_market.oracle_price(
                 &KeyedAccountSharedData::new(perp_market.oracle, oracle_acc),
                 None,
             )?;
 
-            Ok((*market_index, (perp_market, oracle_price)))
+            let settle_token = mango_client.context.token(perp_market.settle_token_index);
+            let settle_token_price =
+                account_fetcher.fetch_bank_price(&settle_token.mint_info.first_bank())?;
+
+            Ok((
+                *market_index,
+                (perp_market, oracle_price, settle_token_price),
+            ))
         })
-        .filter_map(
-            |v: anyhow::Result<(PerpMarketIndex, (PerpMarket, I80F48))>| match v {
-                Ok(v) => Some(v),
-                Err(err) => {
-                    error!("error while retriving perp market and price: {:?}", err);
-                    None
-                }
-            },
-        )
+        .filter_map(|v: anyhow::Result<_>| match v {
+            Ok(v) => Some(v),
+            Err(err) => {
+                error!("error while retriving perp market and price: {:?}", err);
+                None
+            }
+        })
         .collect()
 }
 
@@ -118,10 +124,11 @@ impl SettlementState {
             let liq_end_health = health_cache.health(HealthType::LiquidationEnd);
 
             for perp_market_index in perp_indexes {
-                let (perp_market, price) = match perp_market_info.get(&perp_market_index) {
-                    Some(v) => v,
-                    None => continue, // skip accounts with perp positions where we couldn't get the price and market
-                };
+                let (perp_market, perp_price, settle_token_price) =
+                    match perp_market_info.get(&perp_market_index) {
+                        Some(v) => v,
+                        None => continue, // skip accounts with perp positions where we couldn't get the price and market
+                    };
                 let perp_max_settle =
                     health_cache.perp_max_settle(perp_market.settle_token_index)?;
 
@@ -129,7 +136,7 @@ impl SettlementState {
                 perp_position.settle_funding(perp_market);
                 perp_position.update_settle_limit(perp_market, now_ts);
 
-                let unsettled = perp_position.unsettled_pnl(perp_market, *price)?;
+                let unsettled = perp_position.unsettled_pnl(perp_market, *perp_price)?;
                 let limited = perp_position.apply_pnl_settle_limit(perp_market, unsettled);
                 let settleable = if limited >= 0 {
                     limited
@@ -145,10 +152,22 @@ impl SettlementState {
                         liq_end_health
                     };
 
+                    let pnl_value = unsettled * settle_token_price;
+                    let position_value =
+                        perp_position.base_position_native(perp_market) * perp_price;
                     let fee = perp_market
-                        .compute_settle_fee(settleable, liq_end_health, maint_health)
+                        .compute_settle_fee(
+                            settleable,
+                            pnl_value,
+                            position_value,
+                            liq_end_health,
+                            maint_health,
+                        )
                         .unwrap();
-                    if fee <= 0 {
+
+                    // Assume that settle_fee_flat is near the tx fee, and if we can't possibly
+                    // make up for the tx fee even with multiple settle ix in one tx, skip.
+                    if fee <= perp_market.settle_fee_flat / 10.0 {
                         continue;
                     }
 
@@ -168,7 +187,7 @@ impl SettlementState {
         let address_lookup_tables = mango_client.mango_address_lookup_tables().await?;
 
         for (perp_market_index, mut positive_settleable) in all_positive_settleable {
-            let (perp_market, _) = perp_market_info.get(&perp_market_index).unwrap();
+            let (perp_market, _, _) = perp_market_info.get(&perp_market_index).unwrap();
             let negative_settleable = match all_negative_settleable.get_mut(&perp_market_index) {
                 None => continue,
                 Some(v) => v,
