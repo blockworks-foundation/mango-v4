@@ -11,6 +11,7 @@ use crate::error::MangoError;
 use crate::logs::PerpUpdateFundingLogV2;
 use crate::state::orderbook::Side;
 use crate::state::{oracle, TokenIndex};
+use crate::util;
 
 use super::{orderbook, OracleConfig, OracleState, Orderbook, StablePriceModel, DAY_I80F48};
 
@@ -48,6 +49,7 @@ pub struct PerpMarket {
     pub base_decimals: u8,
 
     /// Name. Trailing zero bytes are ignored.
+    #[derivative(Debug(format_with = "util::format_zero_terminated_utf8_bytes"))]
     pub name: [u8; 16],
 
     /// Address of the BookSide account for bids
