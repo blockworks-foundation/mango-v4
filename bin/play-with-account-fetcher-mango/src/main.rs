@@ -1,20 +1,16 @@
 
 use std::str::FromStr;
 use std::sync::{Arc, RwLock};
-use std::sync::atomic::{AtomicBool, AtomicU32, AtomicU64, Ordering};
+use std::sync::atomic::{AtomicU32, Ordering};
 use anchor_lang::Key;
 use anchor_lang::solana_program::clock::Slot;
-use anyhow::anyhow;
-use chrono::{TimeZone, Utc};
-use futures_util::TryFutureExt;
-use mango_feeds_connector::{account_fetcher, chain_data};
+use mango_feeds_connector::chain_data;
 use mango_feeds_connector::account_fetcher::{AccountFetcherFeeds};
 use mango_feeds_connector::account_fetchers::{CachedAccountFetcher, RpcAccountFetcher};
 use mango_feeds_connector::feeds_chain_data_fetcher::FeedsAccountFetcher;
-use tracing::{info, trace};
+use tracing::info;
 use solana_client::nonblocking::rpc_client::{RpcClient as RpcClientAsync, RpcClient};
 use solana_sdk::account::{AccountSharedData, ReadableAccount};
-use solana_sdk::clock;
 use solana_sdk::clock::UnixTimestamp;
 use solana_sdk::epoch_info::EpochInfo;
 use solana_sdk::pubkey::Pubkey;
@@ -110,18 +106,18 @@ impl MockExampleFetcher {
 
 #[async_trait::async_trait]
 impl AccountFetcherFeeds for MockExampleFetcher {
-    async fn feeds_fetch_raw_account(&self, address: &Pubkey) -> anyhow::Result<(AccountSharedData, Slot)> {
+    async fn feeds_fetch_raw_account(&self, _address: &Pubkey) -> anyhow::Result<(AccountSharedData, Slot)> {
         self.fetched_mango_calls.fetch_add(1, Ordering::Relaxed);
-        return Err(anyhow!("ignore return value please!"));
+        let account_owner = Pubkey::from_str("66fEFnKyCPUWzxKeB9GngcvZDakjvFCVnYLRtcBk9t5D").unwrap();
+        let acc = AccountSharedData::new(420000, 0, &account_owner);
+        return Ok((acc, 2409999333));
     }
 
-    async fn feeds_fetch_program_accounts(&self, program: &Pubkey, discriminator: [u8; 8]) -> anyhow::Result<(Vec<(Pubkey, AccountSharedData)>, Slot)> {
-        self.fetched_mango_calls.fetch_add(1, Ordering::Relaxed);
-        return Err(anyhow!("ignore return value please!"));
+    async fn feeds_fetch_program_accounts(&self, _program: &Pubkey, discriminator: [u8; 8]) -> anyhow::Result<(Vec<(Pubkey, AccountSharedData)>, Slot)> {
+        unreachable!("program accounts not mocked")
     }
+
 }
-
-
 
 
 async fn call_cache_with_mock(account: Pubkey,) {
