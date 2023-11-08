@@ -136,8 +136,8 @@
     <span class="attr">#[account(
         <span class="kw-2">mut</span>,
         has_one = group,
-        has_one = owner,
-        constraint = account.load()<span class="question-mark">?</span>.is_operational() @ MangoError::AccountIsFrozen
+        constraint = account.load()<span class="question-mark">?</span>.is_operational() @ MangoError::AccountIsFrozen,
+        constraint = account.load()<span class="question-mark">?</span>.is_owner_or_delegate(owner.key()),
     )]
     </span><span class="kw">pub </span>account: AccountLoader&lt;<span class="lifetime">&#39;info</span>, MangoAccountFixed&gt;,
     <span class="kw">pub </span>owner: Signer&lt;<span class="lifetime">&#39;info</span>&gt;,
