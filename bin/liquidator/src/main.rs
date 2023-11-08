@@ -661,8 +661,7 @@ impl LiquidationState {
         let now = Instant::now();
         let now_ts: u64 = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)?
-            .as_secs()
-            .try_into()?;
+            .as_secs();
 
         let tcs_context = trigger_tcs::Context {
             mango_client: self.mango_client.clone(),

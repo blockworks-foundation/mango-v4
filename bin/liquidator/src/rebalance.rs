@@ -429,8 +429,7 @@ impl Rebalancer {
     ) -> anyhow::Result<bool> {
         let now_ts: u64 = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)?
-            .as_secs()
-            .try_into()?;
+            .as_secs();
 
         let base_lots = perp_position.base_position_lots();
         let effective_lots = perp_position.effective_base_position_lots();

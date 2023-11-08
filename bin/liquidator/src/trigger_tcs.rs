@@ -259,14 +259,12 @@ impl JupiterQuoteCache {
         // if those break the specified limit
         let cached_collateral_to_buy = self.cached_price(collateral_mint, buy_mint).await;
         let cached_sell_to_collateral = self.cached_price(sell_mint, collateral_mint).await;
-        match (cached_collateral_to_buy, cached_sell_to_collateral) {
-            (Some(c_to_b), Some(s_to_c)) => {
-                let s_to_b = s_to_c * c_to_b;
-                if s_to_b > max_sell_per_buy_price {
-                    return Ok(JupiterQuoteCacheResult::BadPrice(s_to_b));
-                }
+        if let (Some(c_to_b), Some(s_to_c)) = (cached_collateral_to_buy, cached_sell_to_collateral)
+        {
+            let s_to_b = s_to_c * c_to_b;
+            if s_to_b > max_sell_per_buy_price {
+                return Ok(JupiterQuoteCacheResult::BadPrice(s_to_b));
             }
-            _ => {}
         }
 
         // Get fresh quotes
@@ -380,7 +378,7 @@ impl Context {
         base_price: f64,
     ) -> anyhow::Result<bool> {
         // The premium the taker receives needs to take taker fees into account
-        let taker_price = tcs.taker_price(tcs.premium_price(base_price, self.now_ts)) as f64;
+        let taker_price = tcs.taker_price(tcs.premium_price(base_price, self.now_ts));
 
         // Never take tcs where the fee exceeds the premium and the triggerer exchanges
         // tokens at below oracle price.
@@ -474,7 +472,7 @@ impl Context {
         let max_sell_ignoring_net_borrows = util::max_swap_source_ignore_net_borrows(
             &self.mango_client,
             &self.account_fetcher,
-            &account,
+            account,
             tcs.sell_token_index,
             tcs.buy_token_index,
             swap_price,
@@ -584,8 +582,7 @@ impl Context {
     ) -> anyhow::Result<Option<PreparedExecution>> {
         let now_ts: u64 = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)?
-            .as_secs()
-            .try_into()?;
+            .as_secs();
         let liqee = self.account_fetcher.fetch_mango_account(pubkey)?;
         let tcs = liqee.token_conditional_swap_by_id(tcs_id)?.1;
 
@@ -617,7 +614,7 @@ impl Context {
         tcs_id: u64,
     ) -> anyhow::Result<Option<PreparedExecution>> {
         let fetcher = self.account_fetcher.as_ref();
-        let health_cache = health_cache::new(&self.mango_client.context, fetcher, &liqee_old)
+        let health_cache = health_cache::new(&self.mango_client.context, fetcher, liqee_old)
             .await
             .context("creating health cache 1")?;
         if health_cache.is_liquidatable() {
@@ -705,7 +702,7 @@ impl Context {
                     Mode::SwapSellIntoBuy
                 }
             }
-            m @ _ => m,
+            m => m,
         };
 
         let jupiter_slippage_fraction = 1.0 - self.config.jupiter_slippage_bps as f64 * 0.0001;
@@ -912,7 +909,7 @@ impl Context {
     /// Returns a list of transaction signatures as well as the pubkeys of liqees.
     pub async fn execute_tcs(
         &self,
-        tcs: &mut Vec<(Pubkey, u64, u64)>,
+        tcs: &mut [(Pubkey, u64, u64)],
         error_tracking: &mut ErrorTracking,
     ) -> anyhow::Result<(Vec<Signature>, Vec<Pubkey>)> {
         use rand::distributions::{Distribution, WeightedError, WeightedIndex};
@@ -1016,8 +1013,7 @@ impl Context {
         let mut liqor = self.mango_client.mango_account().await?;
         let allowed_tokens = prepared_executions
             .iter()
-            .map(|v| &v.token_indexes)
-            .flatten()
+            .flat_map(|v| &v.token_indexes)
             .copied()
             .unique()
             .filter(|&idx| liqor.ensure_token_position(idx).is_ok())
@@ -1068,7 +1064,7 @@ impl Context {
         }
 
         let context = self.clone();
-        let pubkey = pubkey.clone();
+        let pubkey = *pubkey;
         let job = async move {
             PreparationResult {
                 pubkey,
