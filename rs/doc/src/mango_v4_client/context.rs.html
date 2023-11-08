@@ -468,6 +468,18 @@
 <a href="#468" id="468">468</a>
 <a href="#469" id="469">469</a>
 <a href="#470" id="470">470</a>
+<a href="#471" id="471">471</a>
+<a href="#472" id="472">472</a>
+<a href="#473" id="473">473</a>
+<a href="#474" id="474">474</a>
+<a href="#475" id="475">475</a>
+<a href="#476" id="476">476</a>
+<a href="#477" id="477">477</a>
+<a href="#478" id="478">478</a>
+<a href="#479" id="479">479</a>
+<a href="#480" id="480">480</a>
+<a href="#481" id="481">481</a>
+<a href="#482" id="482">482</a>
 </pre><pre class="rust"><code><span class="kw">use </span>std::collections::HashMap;
 
 <span class="kw">use </span>anchor_client::ClientError;
@@ -632,9 +644,21 @@
 
     <span class="kw">pub fn </span>token_by_mint(<span class="kw-2">&amp;</span><span class="self">self</span>, mint: <span class="kw-2">&amp;</span>Pubkey) -&gt; anyhow::Result&lt;<span class="kw-2">&amp;</span>TokenContext&gt; {
         <span class="self">self</span>.tokens
-            .iter()
-            .find_map(|(<span class="kw">_</span>, tc)| (tc.mint_info.mint == <span class="kw-2">*</span>mint).then(|| tc))
+            .values()
+            .find(|tc| tc.mint_info.mint == <span class="kw-2">*</span>mint)
             .ok_or_else(|| <span class="macro">anyhow::anyhow!</span>(<span class="string">&quot;no token for mint {}&quot;</span>, mint))
+    }
+
+    <span class="kw">pub fn </span>token_by_name(<span class="kw-2">&amp;</span><span class="self">self</span>, name: <span class="kw-2">&amp;</span>str) -&gt; <span class="kw-2">&amp;</span>TokenContext {
+        <span class="kw">let </span><span class="kw-2">mut </span>tc_iter = <span class="self">self</span>.tokens.values().filter(|tc| tc.name == name);
+        <span class="kw">let </span>tc = tc_iter.next();
+        <span class="macro">assert!</span>(
+            tc.is_some(),
+            <span class="string">&quot;token {name} not found; names {:?}&quot;</span>,
+            <span class="self">self</span>.tokens.values().map(|tc| tc.name.clone()).collect_vec()
+        );
+        <span class="macro">assert!</span>(tc_iter.next().is_none(), <span class="string">&quot;multiple token {name} found&quot;</span>);
+        tc.unwrap()
     }
 
     <span class="kw">pub async fn </span>new_from_rpc(rpc: <span class="kw-2">&amp;</span>RpcClientAsync, group: Pubkey) -&gt; anyhow::Result&lt;<span class="self">Self</span>&gt; {
