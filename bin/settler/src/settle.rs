@@ -87,11 +87,8 @@ impl SettlementState {
         });
     }
 
-    async fn run_settles(&mut self, accounts: &Vec<Pubkey>) -> anyhow::Result<()> {
-        let now_ts: u64 = SystemTime::now()
-            .duration_since(UNIX_EPOCH)?
-            .as_secs()
-            .try_into()?;
+    async fn run_settles(&mut self, accounts: &[Pubkey]) -> anyhow::Result<()> {
+        let now_ts: u64 = SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs();
 
         let mango_client = &*self.mango_client;
         let account_fetcher = &*self.account_fetcher;
@@ -296,7 +293,7 @@ impl<'a> SettleBatchProcessor<'a> {
             .rpc_async()
             .send_transaction_with_config(&tx, self.mango_client.client.rpc_send_transaction_config)
             .await
-            .map_err(|e| prettify_solana_client_error(e));
+            .map_err(prettify_solana_client_error);
 
         if let Err(err) = send_result {
             info!("error while sending settle batch: {}", err);

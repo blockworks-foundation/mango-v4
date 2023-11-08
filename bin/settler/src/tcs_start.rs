@@ -50,11 +50,8 @@ impl State {
         self.errors.log_persistent_errors("start_tcs", min_duration);
     }
 
-    async fn run_pass_inner(&mut self, accounts: &Vec<Pubkey>) -> anyhow::Result<()> {
-        let now_ts: u64 = SystemTime::now()
-            .duration_since(UNIX_EPOCH)?
-            .as_secs()
-            .try_into()?;
+    async fn run_pass_inner(&mut self, accounts: &[Pubkey]) -> anyhow::Result<()> {
+        let now_ts: u64 = SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs();
         let now = Instant::now();
 
         let mango_client = &*self.mango_client;
