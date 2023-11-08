@@ -14,13 +14,27 @@ pub struct Config {
     pub jupiter_version: jupiter::Version,
 }
 
-#[derive(Clone, Default)]
+#[derive(Clone)]
 pub struct TokenSwapInfo {
+    pub last_update: std::time::SystemTime,
+
+    // in USDC per token, not the literal oracle price (which is in USD per token)
+    pub quote_per_token_oracle: f64,
+    pub quote_per_token_buy: f64,
+    pub quote_per_token_sell: f64,
+}
+
+impl TokenSwapInfo {
     /// multiplier to the oracle price for executing a buy, so 1.5 would mean buying 50% over oracle price
-    pub buy_over_oracle: f64,
+    pub fn buy_over_oracle(&self) -> f64 {
+        self.quote_per_token_buy / self.quote_per_token_oracle
+    }
+
     /// multiplier to the oracle price for executing a sell,
     /// but with the price inverted, so values > 1 mean a worse deal than oracle price
-    pub sell_over_oracle: f64,
+    pub fn sell_over_oracle(&self) -> f64 {
+        self.quote_per_token_oracle / self.quote_per_token_sell
+    }
 }
 
 /// Track the buy/sell slippage for tokens
@@ -48,8 +62,7 @@ impl TokenSwapInfoUpdater {
 
     fn update(&self, token_index: TokenIndex, slippage: TokenSwapInfo) {
         let mut lock = self.swap_infos.write().unwrap();
-        let entry = lock.entry(token_index).or_default();
-        *entry = slippage;
+        lock.insert(token_index, slippage);
     }
 
     pub fn swap_info(&self, token_index: TokenIndex) -> Option<TokenSwapInfo> {
@@ -57,12 +70,10 @@ impl TokenSwapInfoUpdater {
         lock.get(&token_index).cloned()
     }
 
-    /// oracle price is how many "in" tokens to pay for one "out" token
-    fn price_over_oracle(oracle_price: f64, route: &jupiter::Quote) -> anyhow::Result<f64> {
+    fn in_per_out_price(route: &jupiter::Quote) -> f64 {
         let in_amount = route.in_amount as f64;
         let out_amount = route.out_amount as f64;
-        let actual_price = in_amount / out_amount;
-        Ok(actual_price / oracle_price)
+        in_amount / out_amount
     }
 
     pub async fn update_one(&self, token_index: TokenIndex) -> anyhow::Result<()> {
@@ -71,7 +82,15 @@ impl TokenSwapInfoUpdater {
 
         let quote_index = self.config.quote_index;
         if token_index == quote_index {
-            self.update(quote_index, TokenSwapInfo::default());
+            self.update(
+                quote_index,
+                TokenSwapInfo {
+                    last_update: std::time::SystemTime::now(),
+                    quote_per_token_oracle: 1.0,
+                    quote_per_token_buy: 1.0,
+                    quote_per_token_sell: 1.0,
+                },
+            );
             return Ok(());
         }
 
@@ -91,10 +110,10 @@ impl TokenSwapInfoUpdater {
             .to_num::<f64>();
 
         // prices for the pair
-        let quote_per_token_price = token_price / quote_price;
-        let token_per_quote_price = quote_price / token_price;
+        let quote_per_token_oracle = token_price / quote_price;
+        let token_per_quote_oracle = quote_price / token_price;
 
-        let token_amount = (self.config.quote_amount as f64 * token_per_quote_price) as u64;
+        let token_amount = (self.config.quote_amount as f64 * token_per_quote_oracle) as u64;
         let sell_route = self
             .mango_client
             .jupiter()
@@ -120,14 +139,16 @@ impl TokenSwapInfoUpdater {
             )
             .await?;
 
-        let buy_over_oracle = Self::price_over_oracle(quote_per_token_price, &buy_route)?;
-        let sell_over_oracle = Self::price_over_oracle(token_per_quote_price, &sell_route)?;
+        let quote_per_token_buy = Self::in_per_out_price(&buy_route);
+        let token_per_quote_sell = Self::in_per_out_price(&sell_route);
 
         self.update(
             token_index,
             TokenSwapInfo {
-                buy_over_oracle,
-                sell_over_oracle,
+                last_update: std::time::SystemTime::now(),
+                quote_per_token_oracle,
+                quote_per_token_buy,
+                quote_per_token_sell: 1.0 / token_per_quote_sell,
             },
         );
         Ok(())
@@ -150,8 +171,10 @@ impl TokenSwapInfoUpdater {
                 .get(&token_index)
                 .map(|info| {
                     format!(
-                        "buy {}, sell {}",
-                        info.buy_over_oracle, info.sell_over_oracle
+                        "oracle {}, buy {}, sell {}",
+                        info.quote_per_token_oracle,
+                        info.quote_per_token_buy,
+                        info.quote_per_token_sell
                     )
                 })
                 .unwrap_or_else(|| "no data".into());

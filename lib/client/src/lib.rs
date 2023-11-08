@@ -9,6 +9,7 @@ pub mod chain_data;
 mod chain_data_fetcher;
 mod client;
 mod context;
+pub mod error_tracking;
 mod gpa;
 pub mod health_cache;
 pub mod jupiter;

@@ -1,0 +1,23 @@
+app = "mango-fills"
+kill_signal = "SIGTERM"
+kill_timeout = 30
+
+[build]
+  dockerfile = "../Dockerfile"
+
+[experimental]
+  cmd = ["service-mango-fills", "fills-config.toml"]
+
+[[services]]
+  internal_port = 8080
+  processes = ["app"]
+  protocol = "tcp"
+
+  [services.concurrency]
+    hard_limit = 1024
+    soft_limit = 1024
+    type = "connections"
+
+[metrics]
+  path = "/metrics"
+  port = 9091

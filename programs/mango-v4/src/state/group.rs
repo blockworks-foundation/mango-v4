@@ -88,11 +88,18 @@ pub struct Group {
     /// When set to 0, there's no expiry of buyback fees.
     pub buyback_fees_expiry_interval: u64,
 
-    pub reserved: [u8; 1824],
+    /// Fast-listings are limited per week, this is the start of the current fast-listing interval
+    /// in seconds since epoch
+    pub fast_listing_interval_start: u64,
+
+    pub fast_listings_in_interval: u16,
+    pub allowed_fast_listings_per_interval: u16,
+
+    pub reserved: [u8; 1812],
 }
 const_assert_eq!(
     size_of::<Group>(),
-    32 + 4 + 32 * 2 + 4 + 32 * 2 + 4 + 4 + 20 * 32 + 32 + 8 + 16 + 32 + 8 + 1824
+    32 + 4 + 32 * 2 + 4 + 32 * 2 + 4 + 4 + 20 * 32 + 32 + 8 + 16 + 32 + 8 + 8 + 2 * 2 + 1812
 );
 const_assert_eq!(size_of::<Group>(), 2736);
 const_assert_eq!(size_of::<Group>() % 8, 0);
@@ -209,6 +216,10 @@ pub enum IxGate {
     OpenbookV2SettleFunds = 64,
     AdminTokenWithdrawFees = 65,
     AdminPerpWithdrawFees = 66,
+    AccountSizeMigration = 67,
+    TokenConditionalSwapStart = 68,
+    TokenConditionalSwapCreatePremiumAuction = 69,
+    TokenConditionalSwapCreateLinearAuction = 70,
     // NOTE: Adding new variants requires matching changes in ts and the ix_gate_set instruction.
 }
 

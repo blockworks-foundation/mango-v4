@@ -1,4 +1,5 @@
 use anchor_lang::prelude::*;
+use derivative::Derivative;
 use static_assertions::const_assert_eq;
 use std::mem::size_of;
 
@@ -13,7 +14,8 @@ pub const MAX_BANKS: usize = 6;
 // can load this account to figure out which address maps to use when calling
 // instructions that need banks/oracles for all active positions.
 #[account(zero_copy)]
-#[derive(Debug)]
+#[derive(Derivative)]
+#[derivative(Debug)]
 pub struct MintInfo {
     // ABI: Clients rely on this being at offset 8
     pub group: Pubkey,
@@ -22,6 +24,7 @@ pub struct MintInfo {
     pub token_index: TokenIndex,
 
     pub group_insurance_fund: u8,
+    #[derivative(Debug = "ignore")]
     pub padding1: [u8; 5],
     pub mint: Pubkey,
     pub banks: [Pubkey; MAX_BANKS],
@@ -30,6 +33,7 @@ pub struct MintInfo {
 
     pub registration_time: u64,
 
+    #[derivative(Debug = "ignore")]
     pub reserved: [u8; 2560],
 }
 const_assert_eq!(

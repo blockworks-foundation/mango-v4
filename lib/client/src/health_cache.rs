@@ -13,7 +13,7 @@ pub async fn new(
     let active_token_len = account.active_token_positions().count();
     let active_perp_len = account.active_perp_positions().count();
 
-    let metas =
+    let (metas, _health_cu) =
         context.derive_health_check_remaining_account_metas(account, vec![], vec![], vec![])?;
     let accounts: anyhow::Result<Vec<KeyedAccountSharedData>> = stream::iter(metas.iter())
         .then(|meta| async {
@@ -44,7 +44,7 @@ pub fn new_sync(
     let active_token_len = account.active_token_positions().count();
     let active_perp_len = account.active_perp_positions().count();
 
-    let metas =
+    let (metas, _health_cu) =
         context.derive_health_check_remaining_account_metas(account, vec![], vec![], vec![])?;
     let accounts = metas
         .iter()

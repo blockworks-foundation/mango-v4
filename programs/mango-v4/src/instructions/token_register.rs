@@ -37,7 +37,9 @@ pub fn token_register(
     reduce_only: u8,
     token_conditional_swap_taker_fee_rate: f32,
     token_conditional_swap_maker_fee_rate: f32,
-    flash_loan_deposit_fee_rate: f32,
+    flash_loan_swap_fee_rate: f32,
+    interest_curve_scaling: f32,
+    interest_target_utilization: f32,
 ) -> Result<()> {
     // Require token 0 to be in the insurance token
     if token_index == INSURANCE_TOKEN_INDEX {
@@ -107,8 +109,11 @@ pub fn token_register(
         fees_withdrawn: 0,
         token_conditional_swap_taker_fee_rate,
         token_conditional_swap_maker_fee_rate,
-        flash_loan_deposit_fee_rate,
-        reserved: [0; 2092],
+        flash_loan_swap_fee_rate: flash_loan_swap_fee_rate,
+        interest_target_utilization,
+        interest_curve_scaling: interest_curve_scaling.into(),
+        deposits_in_serum: 0,
+        reserved: [0; 2072],
     };
 
     if let Ok(oracle_price) =

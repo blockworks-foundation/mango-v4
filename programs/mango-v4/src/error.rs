@@ -103,8 +103,28 @@ pub enum MangoError {
     InvalidHealthAccountCount,
     #[msg("would self trade")]
     WouldSelfTrade,
-    #[msg("conditional token swap price is not in execution range")]
+    #[msg("token conditional swap oracle price is not in execution range")]
     TokenConditionalSwapPriceNotInRange,
+    #[msg("token conditional swap is expired")]
+    TokenConditionalSwapExpired,
+    #[msg("token conditional swap is not available yet")]
+    TokenConditionalSwapNotStarted,
+    #[msg("token conditional swap was already started")]
+    TokenConditionalSwapAlreadyStarted,
+    #[msg("token conditional swap it not set")]
+    TokenConditionalSwapNotSet,
+    #[msg("token conditional swap trigger did not reach min_buy_token")]
+    TokenConditionalSwapMinBuyTokenNotReached,
+    #[msg("token conditional swap cannot pay incentive")]
+    TokenConditionalSwapCantPayIncentive,
+    #[msg("token conditional swap taker price is too low")]
+    TokenConditionalSwapTakerPriceTooLow,
+    #[msg("token conditional swap index and id don't match")]
+    TokenConditionalSwapIndexIdMismatch,
+    #[msg("token conditional swap volume is too small compared to the cost of starting it")]
+    TokenConditionalSwapTooSmallForStartIncentive,
+    #[msg("token conditional swap type cannot be started")]
+    TokenConditionalSwapTypeNotStartable,
 }
 
 impl MangoError {

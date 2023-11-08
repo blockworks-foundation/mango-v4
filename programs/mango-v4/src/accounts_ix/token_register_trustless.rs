@@ -9,7 +9,8 @@ const FIRST_BANK_NUM: u32 = 0;
 #[instruction(token_index: TokenIndex)]
 pub struct TokenRegisterTrustless<'info> {
     #[account(
-        constraint = group.load()?.admin == admin.key() || group.load()?.fast_listing_admin == admin.key() ,
+        mut,
+        constraint = group.load()?.admin == admin.key() || group.load()?.fast_listing_admin == admin.key(),
         constraint = group.load()?.is_ix_enabled(IxGate::TokenRegisterTrustless) @ MangoError::IxIsDisabled,
     )]
     pub group: AccountLoader<'info, Group>,

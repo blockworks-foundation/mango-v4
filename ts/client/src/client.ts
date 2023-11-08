@@ -265,6 +265,7 @@ export class MangoClient {
     feesSwapMangoAccount?: PublicKey,
     feesMngoTokenIndex?: TokenIndex,
     feesExpiryInterval?: BN,
+    allowedFastListingsPerInterval?: number,
   ): Promise<MangoSignatureStatus> {
     const ix = await this.program.methods
       .groupEdit(
@@ -279,6 +280,7 @@ export class MangoClient {
         feesSwapMangoAccount ?? null,
         feesMngoTokenIndex ?? null,
         feesExpiryInterval ?? null,
+        allowedFastListingsPerInterval ?? null,
       )
       .accounts({
         group: group.publicKey,
@@ -413,7 +415,9 @@ export class MangoClient {
         params.reduceOnly,
         params.tokenConditionalSwapTakerFeeRate,
         params.tokenConditionalSwapMakerFeeRate,
-        params.flashLoanDepositFeeRate,
+        params.flashLoanSwapFeeRate,
+        params.interestCurveScaling,
+        params.interestTargetUtilization,
       )
       .accounts({
         group: group.publicKey,
@@ -488,7 +492,9 @@ export class MangoClient {
         params.forceClose,
         params.tokenConditionalSwapTakerFeeRate,
         params.tokenConditionalSwapMakerFeeRate,
-        params.flashLoanDepositFeeRate,
+        params.flashLoanSwapFeeRate,
+        params.interestCurveScaling,
+        params.interestTargetUtilization,
       )
       .accounts({
         group: group.publicKey,
@@ -855,30 +861,6 @@ export class MangoClient {
     return await this.sendAndConfirmTransactionForGroup(group, [ix]);
   }
 
-  public async computeAccountData(
-    group: Group,
-    mangoAccount: MangoAccount,
-  ): Promise<MangoSignatureStatus> {
-    const healthRemainingAccounts: PublicKey[] =
-      this.buildHealthRemainingAccounts(group, [mangoAccount], [], []);
-
-    const ix = await this.program.methods
-      .computeAccountData()
-      .accounts({
-        group: group.publicKey,
-        account: mangoAccount.publicKey,
-      })
-      .remainingAccounts(
-        healthRemainingAccounts.map(
-          (pk) =>
-            ({ pubkey: pk, isWritable: false, isSigner: false } as AccountMeta),
-        ),
-      )
-      .instruction();
-
-    return await this.sendAndConfirmTransactionForGroup(group, [ix]);
-  }
-
   public async toggleMangoAccountFreeze(
     group: Group,
     mangoAccount: MangoAccount,
@@ -945,11 +927,10 @@ export class MangoClient {
               ),
             )
             .decode(
-              ai.data.subarray(
-                v1Len +
-                  // This is the padding before tokenConditionalSwaps
-                  4,
-              ),
+              ai.data,
+              v1Len +
+                // This is the padding before tokenConditionalSwaps
+                4,
             ) as TokenConditionalSwapDto[])
         : new Array<TokenConditionalSwapDto>();
 
@@ -3776,6 +3757,222 @@ export class MangoClient {
         : TokenConditionalSwapDisplayPriceStyle.buyTokenPerSellToken,
       intention,
     );
+  }
+
+  public async tokenConditionalSwapCreateLinearAuction(
+    group: Group,
+    account: MangoAccount,
+    sellBank: Bank,
+    buyBank: Bank,
+    priceStart: number,
+    priceEnd: number,
+    maxBuy: number,
+    maxSell: number,
+    allowCreatingDeposits: boolean,
+    allowCreatingBorrows: boolean,
+    displayPriceInSellTokenPerBuyToken: boolean,
+    startTimestamp: number,
+    durationSeconds: number,
+    expiryTimestamp: number | null,
+  ): Promise<MangoSignatureStatus> {
+    let maxBuyNative, maxSellNative;
+    if (maxBuy == Number.MAX_SAFE_INTEGER) {
+      maxBuyNative = U64_MAX_BN;
+    } else {
+      maxBuyNative = toNative(maxBuy, buyBank.mintDecimals);
+    }
+    if (maxSell == Number.MAX_SAFE_INTEGER) {
+      maxSellNative = U64_MAX_BN;
+    } else {
+      maxSellNative = toNative(maxSell, sellBank.mintDecimals);
+    }
+
+    const priceStartNative = toNativeSellPerBuyTokenPrice(
+      priceStart,
+      sellBank,
+      buyBank,
+    );
+    const priceEndNative = toNativeSellPerBuyTokenPrice(
+      priceEnd,
+      sellBank,
+      buyBank,
+    );
+
+    const tcsIx = await this.program.methods
+      .tokenConditionalSwapCreateLinearAuction(
+        maxBuyNative,
+        maxSellNative,
+        expiryTimestamp !== null ? new BN(expiryTimestamp) : U64_MAX_BN,
+        priceStartNative,
+        priceEndNative,
+        allowCreatingDeposits,
+        allowCreatingBorrows,
+        displayPriceInSellTokenPerBuyToken
+          ? TokenConditionalSwapDisplayPriceStyle.sellTokenPerBuyToken
+          : TokenConditionalSwapDisplayPriceStyle.buyTokenPerSellToken,
+        new BN(startTimestamp),
+        new BN(durationSeconds),
+      )
+      .accounts({
+        group: group.publicKey,
+        account: account.publicKey,
+        authority: (this.program.provider as AnchorProvider).wallet.publicKey,
+        buyBank: buyBank.publicKey,
+        sellBank: sellBank.publicKey,
+      })
+      .instruction();
+
+    const ixs: TransactionInstruction[] = [];
+    if (account.tokenConditionalSwaps.length == 0) {
+      ixs.push(
+        await this.accountExpandV2Ix(
+          group,
+          account,
+          account.tokens.length,
+          account.serum3.length,
+          account.perps.length,
+          account.perpOpenOrders.length,
+          DEFAULT_TOKEN_CONDITIONAL_SWAP_COUNT,
+        ),
+      );
+    }
+    ixs.push(tcsIx);
+
+    return await this.sendAndConfirmTransactionForGroup(group, ixs);
+  }
+
+  public async tokenConditionalSwapCreatePremiumAuction(
+    group: Group,
+    account: MangoAccount,
+    sellBank: Bank,
+    buyBank: Bank,
+    lowerLimit: number,
+    upperLimit: number,
+    maxBuy: number,
+    maxSell: number,
+    tcsIntention:
+      | 'TakeProfitOnDeposit'
+      | 'StopLossOnDeposit'
+      | 'TakeProfitOnBorrow'
+      | 'StopLossOnBorrow'
+      | null,
+    maxPricePremiumPercent: number | null,
+    allowCreatingDeposits: boolean,
+    allowCreatingBorrows: boolean,
+    expiryTimestamp: number | null,
+    displayPriceInSellTokenPerBuyToken: boolean,
+    durationSeconds: number,
+  ): Promise<MangoSignatureStatus> {
+    const lowerLimitNative = toNativeSellPerBuyTokenPrice(
+      lowerLimit,
+      sellBank,
+      buyBank,
+    );
+    const upperLimitNative = toNativeSellPerBuyTokenPrice(
+      upperLimit,
+      sellBank,
+      buyBank,
+    );
+
+    let maxBuyNative, maxSellNative, buyAmountInUsd, sellAmountInUsd;
+    if (maxBuy == Number.MAX_SAFE_INTEGER) {
+      maxBuyNative = U64_MAX_BN;
+    } else {
+      buyAmountInUsd = maxBuy * buyBank.uiPrice;
+      maxBuyNative = toNative(maxBuy, buyBank.mintDecimals);
+    }
+    if (maxSell == Number.MAX_SAFE_INTEGER) {
+      maxSellNative = U64_MAX_BN;
+    } else {
+      sellAmountInUsd = maxSell * sellBank.uiPrice;
+      maxSellNative = toNative(maxSell, sellBank.mintDecimals);
+    }
+
+    // Used for computing optimal premium
+    let liqorTcsChunkSizeInUsd = Math.min(buyAmountInUsd, sellAmountInUsd);
+    if (liqorTcsChunkSizeInUsd > 5000) {
+      liqorTcsChunkSizeInUsd = 5000;
+    }
+    // For small TCS swaps, reduce chunk size to 1000 USD
+    else {
+      liqorTcsChunkSizeInUsd = 1000;
+    }
+
+    // TODO: The max premium should likely be computed differently
+    if (!maxPricePremiumPercent) {
+      const buyTokenPriceImpact = group.getPriceImpactByTokenIndex(
+        buyBank.tokenIndex,
+        liqorTcsChunkSizeInUsd,
+      );
+      const sellTokenPriceImpact = group.getPriceImpactByTokenIndex(
+        sellBank.tokenIndex,
+        liqorTcsChunkSizeInUsd,
+      );
+      maxPricePremiumPercent =
+        ((1 + buyTokenPriceImpact / 100) * (1 + sellTokenPriceImpact / 100) -
+          1) *
+        100;
+    }
+    const maxPricePremiumRate =
+      maxPricePremiumPercent > 0 ? maxPricePremiumPercent / 100 : 0.03;
+
+    let intention: TokenConditionalSwapIntention;
+    switch (tcsIntention) {
+      case 'StopLossOnBorrow':
+      case 'StopLossOnDeposit':
+        intention = TokenConditionalSwapIntention.stopLoss;
+        break;
+      case 'TakeProfitOnBorrow':
+      case 'TakeProfitOnDeposit':
+        intention = TokenConditionalSwapIntention.takeProfit;
+        break;
+      default:
+        intention = TokenConditionalSwapIntention.unknown;
+        break;
+    }
+
+    const tcsIx = await this.program.methods
+      .tokenConditionalSwapCreatePremiumAuction(
+        maxBuyNative,
+        maxSellNative,
+        expiryTimestamp !== null ? new BN(expiryTimestamp) : U64_MAX_BN,
+        lowerLimitNative,
+        upperLimitNative,
+        maxPricePremiumRate,
+        allowCreatingDeposits,
+        allowCreatingBorrows,
+        displayPriceInSellTokenPerBuyToken
+          ? TokenConditionalSwapDisplayPriceStyle.sellTokenPerBuyToken
+          : TokenConditionalSwapDisplayPriceStyle.buyTokenPerSellToken,
+        intention,
+        new BN(durationSeconds),
+      )
+      .accounts({
+        group: group.publicKey,
+        account: account.publicKey,
+        authority: (this.program.provider as AnchorProvider).wallet.publicKey,
+        buyBank: buyBank.publicKey,
+        sellBank: sellBank.publicKey,
+      })
+      .instruction();
+
+    const ixs: TransactionInstruction[] = [];
+    if (account.tokenConditionalSwaps.length == 0) {
+      ixs.push(
+        await this.accountExpandV2Ix(
+          group,
+          account,
+          account.tokens.length,
+          account.serum3.length,
+          account.perps.length,
+          account.perpOpenOrders.length,
+          DEFAULT_TOKEN_CONDITIONAL_SWAP_COUNT,
+        ),
+      );
+    }
+    ixs.push(tcsIx);
+
+    return await this.sendAndConfirmTransactionForGroup(group, ixs);
   }
 
   public async tokenConditionalSwapCreateRaw(

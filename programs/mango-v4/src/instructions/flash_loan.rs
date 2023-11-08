@@ -3,7 +3,7 @@ use crate::accounts_zerocopy::*;
 use crate::error::*;
 use crate::group_seeds;
 use crate::health::{new_fixed_order_account_retriever, new_health_cache, AccountRetriever};
-use crate::logs::{FlashLoanLogV2, FlashLoanTokenDetailV2, TokenBalanceLog};
+use crate::logs::{FlashLoanLogV3, FlashLoanTokenDetailV3, TokenBalanceLog};
 use crate::state::*;
 
 use anchor_lang::prelude::*;
@@ -16,7 +16,12 @@ use fixed::types::I80F48;
 /// The `loan_amounts` argument lists the amount to be loaned from each bank/vault and
 /// the order matches the order of bank accounts.
 pub fn flash_loan_begin<'key, 'accounts, 'remaining, 'info>(
-    ctx: Context<'key, 'accounts, 'remaining, 'info, FlashLoanBegin<'info>>,
+    program_id: &Pubkey,
+    account_ai: &AccountLoader<'info, MangoAccountFixed>,
+    owner_pk: &Pubkey,
+    instructions_ai: &AccountInfo<'info>,
+    token_program_ai: &AccountInfo<'info>,
+    remaining_accounts: &[AccountInfo<'info>],
     loan_amounts: Vec<u64>,
 ) -> Result<()> {
     let num_loans = loan_amounts.len();
@@ -25,19 +30,19 @@ pub fn flash_loan_begin<'key, 'accounts, 'remaining, 'info>(
     // Loans of 0 are acceptable and common: Users often want to loan some of token A,
     // nothing of token B, swap A to B and then deposit the gains.
 
-    let account = ctx.accounts.account.load_full_mut()?;
+    let account = account_ai.load_full_mut()?;
 
     // account constraint #1
     require!(
-        account.fixed.is_owner_or_delegate(ctx.accounts.owner.key()),
+        account.fixed.is_owner_or_delegate(*owner_pk),
         MangoError::SomeError
     );
 
-    require_eq!(ctx.remaining_accounts.len(), 3 * num_loans + 1);
-    let banks = &ctx.remaining_accounts[..num_loans];
-    let vaults = &ctx.remaining_accounts[num_loans..2 * num_loans];
-    let token_accounts = &ctx.remaining_accounts[2 * num_loans..3 * num_loans];
-    let group_ai = &ctx.remaining_accounts[3 * num_loans];
+    require_eq!(remaining_accounts.len(), 3 * num_loans + 1);
+    let banks = &remaining_accounts[..num_loans];
+    let vaults = &remaining_accounts[num_loans..2 * num_loans];
+    let token_accounts = &remaining_accounts[2 * num_loans..3 * num_loans];
+    let group_ai = &remaining_accounts[3 * num_loans];
 
     let group_al = AccountLoader::<Group>::try_from(group_ai)?;
     let group = group_al.load()?;
@@ -98,7 +103,7 @@ pub fn flash_loan_begin<'key, 'accounts, 'remaining, 'info>(
             }
 
             let transfer_ctx = CpiContext::new(
-                ctx.accounts.token_program.to_account_info(),
+                token_program_ai.clone(),
                 token::Transfer {
                     from: vault_ai.clone(),
                     to: token_account_ai.clone(),
@@ -112,13 +117,13 @@ pub fn flash_loan_begin<'key, 'accounts, 'remaining, 'info>(
 
     // Check if the other instructions in the transactions are compatible
     {
-        let ixs = ctx.accounts.instructions.as_ref();
+        let ixs = instructions_ai;
         let current_index = tx_instructions::load_current_index_checked(ixs)? as usize;
 
         // Forbid FlashLoanBegin to be called from CPI (it does not have to be the first instruction)
         let current_ix = tx_instructions::load_instruction_at_checked(current_index, ixs)?;
         require_msg!(
-            current_ix.program_id == *ctx.program_id,
+            &current_ix.program_id == program_id,
             "FlashLoanBegin must be a top-level instruction"
         );
 
@@ -133,14 +138,15 @@ pub fn flash_loan_begin<'key, 'accounts, 'remaining, 'info>(
                 Err(e) => return Err(e.into()),
             };
 
-            if account.fixed.is_delegate(ctx.accounts.owner.key()) {
+            if account.fixed.is_delegate(*owner_pk) {
                 require_msg!(
                     ix.program_id == AssociatedToken::id()
                         || ix.program_id == jupiter_mainnet_3::ID
                         || ix.program_id == jupiter_mainnet_4::ID
+                        || ix.program_id == jupiter_mainnet_6::ID
                         || ix.program_id == compute_budget::ID
                         || ix.program_id == crate::id(),
-                    "delegate is only allowed to pass in ixs to ATA or Jupiter v3 or v4 programs, passed ({})", ix.program_id
+                    "delegate is only allowed to pass in ixs to ATA or Jupiter v3/v4/v6 programs, passed ({})", ix.program_id
                 );
             }
 
@@ -155,12 +161,12 @@ pub fn flash_loan_begin<'key, 'accounts, 'remaining, 'info>(
                 require_eq!(ix.data[8] as usize, num_loans);
 
                 require_msg!(
-                    ctx.accounts.account.key() == ix.accounts[0].pubkey,
+                    account_ai.key() == ix.accounts[0].pubkey,
                     "the mango account passed to FlashLoanBegin and End must match"
                 );
 
                 // check that the same vaults and token accounts are passed
-                let begin_accounts = &ctx.remaining_accounts[num_loans..];
+                let begin_accounts = &remaining_accounts[num_loans..];
                 let end_accounts = &ix.accounts[ix.accounts.len() - begin_accounts.len()..];
                 for (begin_account, end_account) in begin_accounts.iter().zip(end_accounts.iter()) {
                     require_msg!(*begin_account.key == end_account.pubkey, "the trailing vault, token and group accounts passed to FlashLoanBegin and End must match, found {} on begin and {} on end", begin_account.key, end_account.pubkey);
@@ -187,6 +193,61 @@ pub fn flash_loan_begin<'key, 'accounts, 'remaining, 'info>(
         );
     }
 
+    Ok(())
+}
+
+pub fn flash_loan_swap_begin<'key, 'accounts, 'remaining, 'info>(
+    ctx: Context<'key, 'accounts, 'remaining, 'info, FlashLoanSwapBegin<'info>>,
+    loan_amount: u64,
+) -> Result<()> {
+    // Create missing token accounts if needed. We do this here because
+    // it uses up fewer tx bytes than emitting the two create-idempotent instructions
+    // separately. Primarily because top-level ix program addresses can't be in
+    // an address lookup table.
+
+    // Remaining accounts are banks, vaults, token accounts, group
+    let rlen = ctx.remaining_accounts.len();
+    require_eq!(rlen, 2 + 2 + 2 + 1);
+    {
+        let input_account = &ctx.remaining_accounts[rlen - 3];
+        let ctx = CpiContext::new(
+            ctx.accounts.associated_token_program.to_account_info(),
+            anchor_spl::associated_token::Create {
+                payer: ctx.accounts.owner.to_account_info(),
+                associated_token: input_account.clone(),
+                authority: ctx.accounts.owner.to_account_info(),
+                mint: ctx.accounts.input_mint.to_account_info(),
+                system_program: ctx.accounts.system_program.to_account_info(),
+                token_program: ctx.accounts.token_program.to_account_info(),
+            },
+        );
+        anchor_spl::associated_token::create_idempotent(ctx)?;
+    }
+    {
+        let output_account = &ctx.remaining_accounts[rlen - 2];
+        let ctx = CpiContext::new(
+            ctx.accounts.associated_token_program.to_account_info(),
+            anchor_spl::associated_token::Create {
+                payer: ctx.accounts.owner.to_account_info(),
+                associated_token: output_account.clone(),
+                authority: ctx.accounts.owner.to_account_info(),
+                mint: ctx.accounts.output_mint.to_account_info(),
+                system_program: ctx.accounts.system_program.to_account_info(),
+                token_program: ctx.accounts.token_program.to_account_info(),
+            },
+        );
+        anchor_spl::associated_token::create_idempotent(ctx)?;
+    }
+
+    flash_loan_begin(
+        ctx.program_id,
+        &ctx.accounts.account,
+        ctx.accounts.owner.key,
+        &ctx.accounts.instructions,
+        &ctx.accounts.token_program,
+        ctx.remaining_accounts,
+        vec![loan_amount, 0],
+    )?;
     Ok(())
 }
 
@@ -235,8 +296,8 @@ pub fn flash_loan_end<'key, 'accounts, 'remaining, 'info>(
     // Verify that each mentioned vault has a bank in the health accounts
     let mut vaults_with_banks = vec![false; vaults.len()];
 
-    // Biggest flash_loan_deposit_fee_rate over all involved banks
-    let mut max_deposit_fee_rate = 0.0f32;
+    // Biggest flash_loan_swap_fee_rate over all involved banks
+    let mut max_swap_fee_rate = 0.0f32;
 
     // Loop over the banks, finding matching vaults
     // TODO: must be moved into health.rs, because it assumes something about the health accounts structure
@@ -295,7 +356,7 @@ pub fn flash_loan_end<'key, 'accounts, 'remaining, 'info>(
             change += repay;
         }
 
-        max_deposit_fee_rate = max_deposit_fee_rate.max(bank.flash_loan_deposit_fee_rate);
+        max_swap_fee_rate = max_swap_fee_rate.max(bank.flash_loan_swap_fee_rate);
 
         changes.push(TokenVaultChange {
             token_index: bank.token_index,
@@ -365,14 +426,14 @@ pub fn flash_loan_end<'key, 'accounts, 'remaining, 'info>(
         let loan_origination_fee = loan * bank.loan_origination_fee_rate;
         bank.collected_fees_native += loan_origination_fee;
 
-        let deposit_fee = if change.amount > 0 {
-            change.amount * I80F48::from_num(max_deposit_fee_rate)
+        let swap_fee = if change.amount < 0 && flash_loan_type == FlashLoanType::Swap {
+            -change.amount * I80F48::from_num(max_swap_fee_rate)
         } else {
             I80F48::ZERO
         };
-        bank.collected_fees_native += deposit_fee;
+        bank.collected_fees_native += swap_fee;
 
-        let change_amount = change.amount - loan_origination_fee - deposit_fee;
+        let change_amount = change.amount - loan_origination_fee - swap_fee;
         let native_after_change = native + change_amount;
         if bank.are_deposits_reduce_only() {
             require!(
@@ -408,7 +469,7 @@ pub fn flash_loan_end<'key, 'accounts, 'remaining, 'info>(
         bank.flash_loan_approved_amount = 0;
         bank.flash_loan_token_account_initial = u64::MAX;
 
-        token_loan_details.push(FlashLoanTokenDetailV2 {
+        token_loan_details.push(FlashLoanTokenDetailV3 {
             token_index: position.token_index,
             change_amount: change.amount.to_bits(),
             loan: loan.to_bits(),
@@ -416,7 +477,7 @@ pub fn flash_loan_end<'key, 'accounts, 'remaining, 'info>(
             deposit_index: bank.deposit_index.to_bits(),
             borrow_index: bank.borrow_index.to_bits(),
             price: oracle_price.to_bits(),
-            deposit_fee: deposit_fee.to_bits(),
+            swap_fee: swap_fee.to_bits(),
             approved_amount: approved_amount_u64,
         });
 
@@ -430,7 +491,7 @@ pub fn flash_loan_end<'key, 'accounts, 'remaining, 'info>(
         });
     }
 
-    emit!(FlashLoanLogV2 {
+    emit!(FlashLoanLogV3 {
         mango_group: group.key(),
         mango_account: ctx.accounts.account.key(),
         flash_loan_type,

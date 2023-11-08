@@ -7,6 +7,14 @@ import {
 } from '@coral-xyz/anchor/dist/cjs/idl';
 import fs from 'fs';
 
+const ignoredIx = ['tokenRegister', 'groupEdit', 'tokenEdit'];
+
+const emptyFieldPrefixes = ['padding', 'reserved'];
+
+function isEmptyField(name: string): boolean {
+  return emptyFieldPrefixes.some((s) => name.startsWith(s));
+}
+
 function main(): void {
   let hasError = false;
 
@@ -15,8 +23,26 @@ function main(): void {
 
   // Old instructions still exist
   for (const oldIx of oldIdl.instructions) {
-    if (!newIdl.instructions.find((x) => x.name == oldIx.name)) {
+    const newIx = newIdl.instructions.find((x) => x.name == oldIx.name);
+    if (!newIx) {
       console.log(`Error: instruction '${oldIx.name}' was removed`);
+      hasError = true;
+      continue;
+    }
+
+    if (ignoredIx.includes(oldIx.name)) {
+      continue;
+    }
+
+    if (
+      fieldsHaveErrorIx(
+        oldIx.args,
+        newIx.args,
+        `instruction ${oldIx.name}`,
+        oldIdl,
+        newIdl,
+      )
+    ) {
       hasError = true;
     }
   }
@@ -121,16 +147,26 @@ function fieldsHaveError(
 ): boolean {
   let hasError = false;
   for (const oldField of oldFields) {
-    const newField = newFields.find((x) => x.name == oldField.name);
+    let newField = newFields.find((x) => x.name == oldField.name);
 
-    if (
-      oldField.name.startsWith('reserved') ||
-      oldField.name.startsWith('padding')
-    ) {
+    if (isEmptyField(oldField.name)) {
       continue;
     }
 
     // Old fields may be renamed / deprecated
+    const oldOffset = fieldOffset(oldFields, oldField, oldIdl);
+    if (!newField) {
+      // Try to find it by offset
+      for (const field of newFields) {
+        const offset = fieldOffset(newFields, field, newIdl);
+        if (offset == oldOffset && !isEmptyField(field.name)) {
+          console.log(
+            `Warning: field '${oldField.name}' in ${context} was renamed(?) to ${field.name}`,
+          );
+          newField = field;
+        }
+      }
+    }
     if (!newField) {
       console.log(
         `Warning: field '${oldField.name}' in ${context} was removed`,
@@ -149,7 +185,6 @@ function fieldsHaveError(
     }
 
     // Fields may not change offset
-    const oldOffset = fieldOffset(oldFields, oldField, oldIdl);
     const newOffset = fieldOffset(newFields, newField, newIdl);
     if (oldOffset != newOffset) {
       console.log(
@@ -158,6 +193,71 @@ function fieldsHaveError(
       hasError = true;
     }
   }
+
+  return hasError;
+}
+
+function fieldsHaveErrorIx(
+  oldFields: IdlField[],
+  newFields: IdlField[],
+  context: string,
+  oldIdl: Idl,
+  newIdl: Idl,
+): boolean {
+  let hasError = false;
+  const renameTargets: string[] = [];
+  for (const oldField of oldFields) {
+    let newField = newFields.find((x) => x.name == oldField.name);
+
+    // Old fields may not be removed, but could be renamed
+    const oldOffset = fieldOffset(oldFields, oldField, oldIdl);
+    if (!newField) {
+      // Try to find it by offset
+      for (const field of newFields) {
+        const offset = fieldOffset(newFields, field, newIdl);
+        if (offset == oldOffset) {
+          console.log(
+            `Warning: field '${oldField.name}' in ${context} was renamed(?) to ${field.name}`,
+          );
+          renameTargets.push(field.name);
+          newField = field;
+        }
+      }
+    }
+    if (!newField) {
+      console.log(`Error: field '${oldField.name}' in ${context} was removed`);
+      continue;
+    }
+
+    // Fields may not change size
+    const oldSize = typeSize(oldIdl, oldField.type);
+    const newSize = typeSize(newIdl, newField.type);
+    if (oldSize != newSize) {
+      console.log(
+        `Error: field '${oldField.name}' in ${context} has changed size`,
+      );
+      hasError = true;
+    }
+
+    // Fields may not change offset
+    const newOffset = fieldOffset(newFields, newField, newIdl);
+    if (oldOffset != newOffset) {
+      console.log(
+        `Error: field '${oldField.name}' in ${context} has changed offset`,
+      );
+      hasError = true;
+    }
+  }
+
+  for (const newField of newFields) {
+    const oldField = oldFields.find((x) => x.name == newField.name);
+
+    if (!oldField && !renameTargets.includes(newField.name)) {
+      console.log(`Error: field '${newField.name}' in ${context} was added`);
+      continue;
+    }
+  }
+
   return hasError;
 }
 

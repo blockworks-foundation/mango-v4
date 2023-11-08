@@ -19,6 +19,7 @@ use anchor_lang::prelude::*;
 use fixed::types::I80F48;
 
 use crate::error::*;
+use crate::i80f48::LowPrecisionDivision;
 use crate::serum3_cpi::{OpenOrdersAmounts, OpenOrdersSlim};
 use crate::state::{
     Bank, MangoAccountRef, PerpMarket, PerpMarketIndex, PerpPosition, Serum3MarketIndex,
@@ -28,7 +29,7 @@ use crate::state::{
 use super::*;
 
 /// Information about prices for a bank or perp market.
-#[derive(Clone, AnchorDeserialize, AnchorSerialize, Debug)]
+#[derive(Clone, Debug)]
 pub struct Prices {
     /// The current oracle price
     pub oracle: I80F48, // native/native
@@ -156,7 +157,7 @@ pub fn spot_amount_given_for_health_zero(
     )
 }
 
-#[derive(Clone, AnchorDeserialize, AnchorSerialize, Debug)]
+#[derive(Clone, Debug)]
 pub struct TokenInfo {
     pub token_index: TokenIndex,
     pub maint_asset_weight: I80F48,
@@ -233,7 +234,7 @@ impl TokenInfo {
 /// to the token info. This is only about dealing with the reserved funds
 /// that might end up as base OR quote tokens, depending on whether the
 /// open orders execute on not.
-#[derive(Clone, AnchorDeserialize, AnchorSerialize, Debug)]
+#[derive(Clone, Debug)]
 pub struct Serum3Info {
     // reserved amounts as stored on the open orders
     pub reserved_base: I80F48,
@@ -293,8 +294,9 @@ impl Serum3Info {
     ) -> I80F48 {
         let quote_asset = quote_info.prices.asset(health_type);
         let base_liab = base_info.prices.liab(health_type);
-        // OPTIMIZATION: These divisions can be extremely expensive (up to 5k CU each)
-        let reserved_quote_as_base_oracle = self.reserved_quote * quote_asset / base_liab;
+        let reserved_quote_as_base_oracle = (self.reserved_quote * quote_asset)
+            .checked_div_f64_precision(base_liab)
+            .unwrap();
         if self.reserved_quote_as_base_highest_bid != 0 {
             self.reserved_base
                 + reserved_quote_as_base_oracle.min(self.reserved_quote_as_base_highest_bid)
@@ -312,8 +314,9 @@ impl Serum3Info {
     ) -> I80F48 {
         let base_asset = base_info.prices.asset(health_type);
         let quote_liab = quote_info.prices.liab(health_type);
-        // OPTIMIZATION: These divisions can be extremely expensive (up to 5k CU each)
-        let reserved_base_as_quote_oracle = self.reserved_base * base_asset / quote_liab;
+        let reserved_base_as_quote_oracle = (self.reserved_base * base_asset)
+            .checked_div_f64_precision(quote_liab)
+            .unwrap();
         if self.reserved_base_as_quote_lowest_ask != 0 {
             self.reserved_quote
                 + reserved_base_as_quote_oracle.min(self.reserved_base_as_quote_lowest_ask)
@@ -420,7 +423,7 @@ pub(crate) struct Serum3Reserved {
 ///
 /// Perp markets affect account health indirectly, though the token balance in the
 /// perp market's settle token. See `effective_token_balances()`.
-#[derive(Clone, AnchorDeserialize, AnchorSerialize, Debug)]
+#[derive(Clone, Debug)]
 pub struct PerpInfo {
     pub perp_market_index: PerpMarketIndex,
     pub settle_token_index: TokenIndex,
@@ -582,11 +585,13 @@ impl PerpInfo {
 ///
 /// However, there's a real risk of getting the adjustments wrong and computing an
 /// inconsistent result, so particular care needs to be taken when this is done.
-#[derive(Clone, AnchorDeserialize, AnchorSerialize, Debug)]
+#[allow(unused)]
+#[derive(Clone, Debug)]
 pub struct HealthCache {
     pub(crate) token_infos: Vec<TokenInfo>,
     pub(crate) serum3_infos: Vec<Serum3Info>,
     pub(crate) perp_infos: Vec<PerpInfo>,
+    #[allow(unused)]
     pub(crate) being_liquidated: bool,
 }
 
@@ -1449,6 +1454,7 @@ mod tests {
         borrows: u64,
         deposit_weight_scale_start_quote: u64,
         borrow_weight_scale_start_quote: u64,
+        deposits_in_serum: i64,
     }
 
     #[derive(Default)]
@@ -1504,6 +1510,7 @@ mod tests {
             let bank = bank.data();
             bank.indexed_deposits = I80F48::from(settings.deposits) / bank.deposit_index;
             bank.indexed_borrows = I80F48::from(settings.borrows) / bank.borrow_index;
+            bank.deposits_in_serum = settings.deposits_in_serum;
             if settings.deposit_weight_scale_start_quote > 0 {
                 bank.deposit_weight_scale_start_quote =
                     settings.deposit_weight_scale_start_quote as f64;
@@ -1800,6 +1807,55 @@ mod tests {
                     let s3 = account.serum3_orders_mut(3).unwrap();
                     s3.highest_placed_bid_inv = 1.0 / 9.0;
                 }),
+                ..Default::default()
+            },
+            TestHealth1Case {
+                // 16, base case for 17
+                token1: 100,
+                token2: 100,
+                token3: 100,
+                oo_1_2: (0, 100),
+                oo_1_3: (0, 100),
+                expected_health:
+                    // tokens
+                    100.0 * 0.8 + 100.0 * 5.0 * 0.5 + 100.0 * 10.0 * 0.5
+                    // oo_1_2 (-> token2)
+                    + 100.0 * 5.0 * 0.5
+                    // oo_1_3 (-> token1)
+                    + 100.0 * 10.0 * 0.5,
+                ..Default::default()
+            },
+            TestHealth1Case {
+                // 17, deposits_in_serum counts for deposit weight scaling
+                token1: 100,
+                token2: 100,
+                token3: 100,
+                oo_1_2: (0, 100),
+                oo_1_3: (0, 100),
+                bank_settings: [
+                    BankSettings {
+                        ..BankSettings::default()
+                    },
+                    BankSettings {
+                        deposits: 100,
+                        deposit_weight_scale_start_quote: 100 * 5,
+                        deposits_in_serum: 100,
+                        ..BankSettings::default()
+                    },
+                    BankSettings {
+                        deposits: 600,
+                        deposit_weight_scale_start_quote: 500 * 10,
+                        deposits_in_serum: 100,
+                        ..BankSettings::default()
+                    },
+                ],
+                expected_health:
+                    // tokens
+                    100.0 * 0.8 + 100.0 * 5.0 * 0.5 * (100.0 / 200.0) + 100.0 * 10.0 * 0.5 * (500.0 / 700.0)
+                    // oo_1_2 (-> token2)
+                    + 100.0 * 5.0 * 0.5 * (100.0 / 200.0)
+                    // oo_1_3 (-> token1)
+                    + 100.0 * 10.0 * 0.5 * (500.0 / 700.0),
                 ..Default::default()
             },
         ];

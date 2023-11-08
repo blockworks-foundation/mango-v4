@@ -6,11 +6,11 @@ use mango_v4::accounts_zerocopy::KeyedAccountSharedData;
 use mango_v4::health::HealthType;
 use mango_v4::state::{PerpMarket, PerpMarketIndex};
 use mango_v4_client::{
-    chain_data, health_cache, prettify_solana_client_error, MangoClient, TransactionBuilder,
+    chain_data, health_cache, prettify_solana_client_error, MangoClient, PreparedInstructions,
+    TransactionBuilder,
 };
 use solana_sdk::address_lookup_table_account::AddressLookupTableAccount;
 use solana_sdk::commitment_config::CommitmentConfig;
-use solana_sdk::instruction::Instruction;
 use solana_sdk::signature::Signature;
 
 use solana_sdk::signer::Signer;
@@ -26,30 +26,36 @@ pub struct Config {
 fn perp_markets_and_prices(
     mango_client: &MangoClient,
     account_fetcher: &chain_data::AccountFetcher,
-) -> HashMap<PerpMarketIndex, (PerpMarket, I80F48)> {
+) -> HashMap<PerpMarketIndex, (PerpMarket, I80F48, I80F48)> {
     mango_client
         .context
         .perp_markets
         .iter()
         .map(|(market_index, perp)| {
             let perp_market = account_fetcher.fetch::<PerpMarket>(&perp.address)?;
+
             let oracle_acc = account_fetcher.fetch_raw(&perp_market.oracle)?;
             let oracle_price = perp_market.oracle_price(
                 &KeyedAccountSharedData::new(perp_market.oracle, oracle_acc),
                 None,
             )?;
 
-            Ok((*market_index, (perp_market, oracle_price)))
+            let settle_token = mango_client.context.token(perp_market.settle_token_index);
+            let settle_token_price =
+                account_fetcher.fetch_bank_price(&settle_token.mint_info.first_bank())?;
+
+            Ok((
+                *market_index,
+                (perp_market, oracle_price, settle_token_price),
+            ))
         })
-        .filter_map(
-            |v: anyhow::Result<(PerpMarketIndex, (PerpMarket, I80F48))>| match v {
-                Ok(v) => Some(v),
-                Err(err) => {
-                    error!("error while retriving perp market and price: {:?}", err);
-                    None
-                }
-            },
-        )
+        .filter_map(|v: anyhow::Result<_>| match v {
+            Ok(v) => Some(v),
+            Err(err) => {
+                error!("error while retriving perp market and price: {:?}", err);
+                None
+            }
+        })
         .collect()
 }
 
@@ -81,11 +87,8 @@ impl SettlementState {
         });
     }
 
-    async fn run_settles(&mut self, accounts: &Vec<Pubkey>) -> anyhow::Result<()> {
-        let now_ts: u64 = SystemTime::now()
-            .duration_since(UNIX_EPOCH)?
-            .as_secs()
-            .try_into()?;
+    async fn run_settles(&mut self, accounts: &[Pubkey]) -> anyhow::Result<()> {
+        let now_ts: u64 = SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs();
 
         let mango_client = &*self.mango_client;
         let account_fetcher = &*self.account_fetcher;
@@ -118,10 +121,11 @@ impl SettlementState {
             let liq_end_health = health_cache.health(HealthType::LiquidationEnd);
 
             for perp_market_index in perp_indexes {
-                let (perp_market, price) = match perp_market_info.get(&perp_market_index) {
-                    Some(v) => v,
-                    None => continue, // skip accounts with perp positions where we couldn't get the price and market
-                };
+                let (perp_market, perp_price, settle_token_price) =
+                    match perp_market_info.get(&perp_market_index) {
+                        Some(v) => v,
+                        None => continue, // skip accounts with perp positions where we couldn't get the price and market
+                    };
                 let perp_max_settle =
                     health_cache.perp_max_settle(perp_market.settle_token_index)?;
 
@@ -129,7 +133,7 @@ impl SettlementState {
                 perp_position.settle_funding(perp_market);
                 perp_position.update_settle_limit(perp_market, now_ts);
 
-                let unsettled = perp_position.unsettled_pnl(perp_market, *price)?;
+                let unsettled = perp_position.unsettled_pnl(perp_market, *perp_price)?;
                 let limited = perp_position.apply_pnl_settle_limit(perp_market, unsettled);
                 let settleable = if limited >= 0 {
                     limited
@@ -145,10 +149,22 @@ impl SettlementState {
                         liq_end_health
                     };
 
+                    let pnl_value = unsettled * settle_token_price;
+                    let position_value =
+                        perp_position.base_position_native(perp_market) * perp_price;
                     let fee = perp_market
-                        .compute_settle_fee(settleable, liq_end_health, maint_health)
+                        .compute_settle_fee(
+                            settleable,
+                            pnl_value,
+                            position_value,
+                            liq_end_health,
+                            maint_health,
+                        )
                         .unwrap();
-                    if fee <= 0 {
+
+                    // Assume that settle_fee_flat is near the tx fee, and if we can't possibly
+                    // make up for the tx fee even with multiple settle ix in one tx, skip.
+                    if fee <= perp_market.settle_fee_flat / 10.0 {
                         continue;
                     }
 
@@ -168,7 +184,7 @@ impl SettlementState {
         let address_lookup_tables = mango_client.mango_address_lookup_tables().await?;
 
         for (perp_market_index, mut positive_settleable) in all_positive_settleable {
-            let (perp_market, _) = perp_market_info.get(&perp_market_index).unwrap();
+            let (perp_market, _, _) = perp_market_info.get(&perp_market_index).unwrap();
             let negative_settleable = match all_negative_settleable.get_mut(&perp_market_index) {
                 None => continue,
                 Some(v) => v,
@@ -180,7 +196,7 @@ impl SettlementState {
                 mango_client,
                 account_fetcher,
                 perp_market_index,
-                instructions: Vec::new(),
+                instructions: PreparedInstructions::new(),
                 max_batch_size: 8, // the 1.4M max CU limit if we assume settle ix can be up to around 150k
                 blockhash: mango_client
                     .client
@@ -242,7 +258,7 @@ struct SettleBatchProcessor<'a> {
     mango_client: &'a MangoClient,
     account_fetcher: &'a chain_data::AccountFetcher,
     perp_market_index: PerpMarketIndex,
-    instructions: Vec<Instruction>,
+    instructions: PreparedInstructions,
     max_batch_size: usize,
     blockhash: solana_sdk::hash::Hash,
     address_lookup_tables: &'a Vec<AddressLookupTableAccount>,
@@ -254,7 +270,7 @@ impl<'a> SettleBatchProcessor<'a> {
         let fee_payer = client.fee_payer.clone();
 
         TransactionBuilder {
-            instructions: self.instructions.clone(),
+            instructions: self.instructions.clone().to_instructions(),
             address_lookup_tables: self.address_lookup_tables.clone(),
             payer: fee_payer.pubkey(),
             signers: vec![fee_payer],
@@ -277,7 +293,7 @@ impl<'a> SettleBatchProcessor<'a> {
             .rpc_async()
             .send_transaction_with_config(&tx, self.mango_client.client.rpc_send_transaction_config)
             .await
-            .map_err(|e| prettify_solana_client_error(e));
+            .map_err(prettify_solana_client_error);
 
         if let Err(err) = send_result {
             info!("error while sending settle batch: {}", err);
@@ -296,15 +312,19 @@ impl<'a> SettleBatchProcessor<'a> {
     ) -> anyhow::Result<Option<Signature>> {
         let a_value = self.account_fetcher.fetch_mango_account(&account_a)?;
         let b_value = self.account_fetcher.fetch_mango_account(&account_b)?;
-        let ix = self.mango_client.perp_settle_pnl_instruction(
+        let new_ixs = self.mango_client.perp_settle_pnl_instruction(
             self.perp_market_index,
             (&account_a, &a_value),
             (&account_b, &b_value),
         )?;
-        self.instructions.push(ix);
+        let previous = self.instructions.clone();
+        self.instructions.append(new_ixs.clone());
 
         // if we exceed the batch limit or tx size limit, send a batch without the new ix
-        let needs_send = if self.instructions.len() > self.max_batch_size {
+        let max_cu_per_tx = 1_400_000;
+        let needs_send = if self.instructions.len() > self.max_batch_size
+            || self.instructions.cu >= max_cu_per_tx
+        {
             true
         } else {
             let tx = self.transaction()?;
@@ -321,9 +341,9 @@ impl<'a> SettleBatchProcessor<'a> {
             too_big
         };
         if needs_send {
-            let ix = self.instructions.pop().unwrap();
+            self.instructions = previous;
             let txsig = self.send().await?;
-            self.instructions.push(ix);
+            self.instructions.append(new_ixs);
             return Ok(txsig);
         }
 

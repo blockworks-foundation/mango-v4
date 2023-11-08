@@ -1,7 +1,6 @@
 #![allow(dead_code)]
 
 use std::cell::RefCell;
-use std::sync::{Arc, RwLock};
 
 use super::utils::TestKeypair;
 use anchor_lang::AccountDeserialize;
@@ -20,8 +19,6 @@ use spl_token::*;
 pub struct SolanaCookie {
     pub context: RefCell<ProgramTestContext>,
     pub rent: Rent,
-    pub logger_capture: Arc<RwLock<Vec<String>>>,
-    pub logger_lock: Arc<RwLock<()>>,
     pub last_transaction_log: RefCell<Vec<String>>,
 }
 
@@ -30,18 +27,9 @@ impl SolanaCookie {
         &self,
         instructions: &[Instruction],
         signers: Option<&[TestKeypair]>,
-    ) -> Result<(), BanksClientError> {
-        // The locking in this function is convoluted:
-        // We capture the program log output by overriding the global logger and capturing
-        // messages there. This logger is potentially shared among multiple tests that run
-        // concurrently.
-        // To allow each independent SolanaCookie to capture only the logs from the transaction
-        // passed to process_transaction, wo globally hold the "program_log_lock" for the
-        // duration that the tx needs to process. So only a single one can run at a time.
-        let tx_log_lock = Arc::new(self.logger_lock.write().unwrap());
-        self.logger_capture.write().unwrap().clear();
-
+    ) -> Result<BanksTransactionResultWithMetadata, BanksClientError> {
         let mut context = self.context.borrow_mut();
+        let blockhash = context.get_new_latest_blockhash().await?;
 
         let mut transaction =
             Transaction::new_with_payer(&instructions, Some(&context.payer.pubkey()));
@@ -57,32 +45,26 @@ impl SolanaCookie {
             all_signers.extend(signer_keypair_refs.iter());
         }
 
-        // This fails when warping is involved - https://gitmemory.com/issue/solana-labs/solana/18201/868325078
-        // let recent_blockhash = self.context.banks_client.get_recent_blockhash().await.unwrap();
-
-        transaction.sign(&all_signers, context.last_blockhash);
+        transaction.sign(&all_signers, blockhash);
 
         let result = context
             .banks_client
-            .process_transaction_with_commitment(
-                transaction,
-                solana_sdk::commitment_config::CommitmentLevel::Processed,
-            )
+            .process_transaction_with_metadata(transaction)
             .await;
 
-        *self.last_transaction_log.borrow_mut() = self.logger_capture.read().unwrap().clone();
+        *self.last_transaction_log.borrow_mut() = result
+            .as_ref()
+            .ok()
+            .and_then(|r| r.metadata.as_ref())
+            .map(|v| v.log_messages.clone())
+            .unwrap_or_default();
 
-        drop(tx_log_lock);
         drop(context);
-
-        // This makes sure every transaction gets a new blockhash, avoiding issues where sending
-        // the same transaction again would lead to it being skipped.
-        self.advance_by_slots(1).await;
 
         result
     }
 
-    pub async fn get_clock(&self) -> solana_program::clock::Clock {
+    pub async fn clock(&self) -> solana_program::clock::Clock {
         self.context
             .borrow_mut()
             .banks_client
@@ -91,8 +73,22 @@ impl SolanaCookie {
             .unwrap()
     }
 
+    pub fn set_clock(&self, clock: &solana_program::clock::Clock) {
+        self.context.borrow_mut().set_sysvar(clock);
+    }
+
+    pub async fn clock_timestamp(&self) -> u64 {
+        self.clock().await.unix_timestamp.try_into().unwrap()
+    }
+
+    pub async fn set_clock_timestamp(&self, timestamp: u64) {
+        let mut clock = self.clock().await;
+        clock.unix_timestamp = timestamp.try_into().unwrap();
+        self.set_clock(&clock);
+    }
+
     pub async fn advance_by_slots(&self, slots: u64) {
-        let clock = self.get_clock().await;
+        let clock = self.clock().await;
         self.context
             .borrow_mut()
             .warp_to_slot(clock.slot + slots + 1)
@@ -100,7 +96,7 @@ impl SolanaCookie {
     }
 
     pub async fn advance_clock_to(&self, target: i64) {
-        let mut clock = self.get_clock().await;
+        let mut clock = self.clock().await;
 
         // just advance enough to ensure we get changes over last_updated in various ix
         // if this gets too slow for our tests, remove and replace with manual time offset
@@ -110,17 +106,17 @@ impl SolanaCookie {
                 .borrow_mut()
                 .warp_to_slot(clock.slot + 50)
                 .unwrap();
-            clock = self.get_clock().await;
+            clock = self.clock().await;
         }
     }
 
     pub async fn advance_clock_to_next_multiple(&self, window: i64) {
-        let ts = self.get_clock().await.unix_timestamp;
+        let ts = self.clock().await.unix_timestamp;
         self.advance_clock_to(ts / window * window + window).await
     }
 
     pub async fn advance_clock(&self) {
-        let clock = self.get_clock().await;
+        let clock = self.clock().await;
         self.advance_clock_to(clock.unix_timestamp + 1).await
     }
 
@@ -256,11 +252,15 @@ impl SolanaCookie {
         self.program_log()
             .iter()
             .filter_map(|data| {
-                let bytes = base64::decode(data).ok()?;
-                if bytes[0..8] != T::discriminator() {
-                    return None;
+                if let Some(event) = data.strip_prefix("Program data: ") {
+                    let bytes = base64::decode(event).ok()?;
+                    if bytes[0..8] != T::discriminator() {
+                        return None;
+                    }
+                    T::try_from_slice(&bytes[8..]).ok()
+                } else {
+                    None
                 }
-                T::try_from_slice(&bytes[8..]).ok()
             })
             .collect()
     }

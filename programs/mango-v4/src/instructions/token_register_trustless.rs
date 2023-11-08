@@ -20,8 +20,22 @@ pub fn token_register_trustless(
     require_neq!(token_index, QUOTE_TOKEN_INDEX);
     require_neq!(token_index, TokenIndex::MAX);
 
-    let net_borrow_limit_window_size_ts = 24 * 60 * 60u64;
     let now_ts: u64 = Clock::get()?.unix_timestamp.try_into().unwrap();
+    {
+        let mut group = ctx.accounts.group.load_mut()?;
+        let week = 7 * 24 * 60 * 60;
+        if now_ts >= group.fast_listing_interval_start + week {
+            group.fast_listing_interval_start = now_ts / week * week;
+            group.fast_listings_in_interval = 0;
+        }
+        group.fast_listings_in_interval += 1;
+        require_gte!(
+            group.allowed_fast_listings_per_interval,
+            group.fast_listings_in_interval
+        );
+    }
+
+    let net_borrow_limit_window_size_ts = 24 * 60 * 60u64;
 
     let mut bank = ctx.accounts.bank.load_init()?;
     *bank = Bank {
@@ -46,18 +60,18 @@ pub fn token_register_trustless(
         // 10% daily adjustment at 0% or 100% utilization
         adjustment_factor: I80F48::from_num(0.004),
         util0: I80F48::from_num(0.5),
-        rate0: I80F48::from_num(0.072),
-        util1: I80F48::from_num(0.8),
-        rate1: I80F48::from_num(0.2),
-        max_rate: I80F48::from_num(2.0),
+        rate0: I80F48::from_num(0.018),
+        util1: I80F48::from_num(0.75),
+        rate1: I80F48::from_num(0.05),
+        max_rate: I80F48::from_num(0.5),
         collected_fees_native: I80F48::ZERO,
-        loan_origination_fee_rate: I80F48::from_num(0.0005),
+        loan_origination_fee_rate: I80F48::from_num(0.0020),
         loan_fee_rate: I80F48::from_num(0.005),
-        maint_asset_weight: I80F48::from_num(0),
-        init_asset_weight: I80F48::from_num(0),
-        maint_liab_weight: I80F48::from_num(1.4), // 2.5x
-        init_liab_weight: I80F48::from_num(1.8),  // 1.25x
-        liquidation_fee: I80F48::from_num(0.2),
+        maint_asset_weight: I80F48::from_num(0.75), // 4x leverage
+        init_asset_weight: I80F48::from_num(0.5),   // 2x leverage
+        maint_liab_weight: I80F48::from_num(1.25),  // 4x leverage
+        init_liab_weight: I80F48::from_num(1.5),    // 2x leverage
+        liquidation_fee: I80F48::from_num(0.125),
         dust: I80F48::ZERO,
         flash_loan_token_account_initial: u64::MAX,
         flash_loan_approved_amount: 0,
@@ -73,16 +87,18 @@ pub fn token_register_trustless(
         net_borrows_in_window: 0,
         borrow_weight_scale_start_quote: 5_000_000_000.0, // $5k
         deposit_weight_scale_start_quote: 5_000_000_000.0, // $5k
-        reduce_only: 2,                                   // deposit-only
+        reduce_only: 0,                                   // allow both deposits and borrows
         force_close: 0,
         padding: Default::default(),
         fees_withdrawn: 0,
         token_conditional_swap_taker_fee_rate: 0.0005,
         token_conditional_swap_maker_fee_rate: 0.0005,
-        flash_loan_deposit_fee_rate: 0.0005,
-        reserved: [0; 2092],
+        flash_loan_swap_fee_rate: 0.0,
+        interest_target_utilization: 0.5,
+        interest_curve_scaling: 4.0,
+        deposits_in_serum: 0,
+        reserved: [0; 2072],
     };
-    require_gt!(bank.max_rate, MINIMUM_MAX_RATE);
 
     if let Ok(oracle_price) =
         bank.oracle_price(&AccountInfoRef::borrow(ctx.accounts.oracle.as_ref())?, None)

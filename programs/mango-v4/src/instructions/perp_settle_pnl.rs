@@ -140,8 +140,6 @@ pub fn perp_settle_pnl(ctx: Context<PerpSettlePnl>) -> Result<()> {
         b_max_settle,
     );
 
-    let fee = perp_market.compute_settle_fee(settlement, a_liq_end_health, a_maint_health)?;
-
     a_perp_position.record_settle(settlement);
     b_perp_position.record_settle(-settlement);
     emit_perp_balances(
@@ -156,6 +154,17 @@ pub fn perp_settle_pnl(ctx: Context<PerpSettlePnl>) -> Result<()> {
         b_perp_position,
         &perp_market,
     );
+
+    // Compute fee
+    let a_position_value = a_perp_position.base_position_native(&perp_market).abs() * oracle_price;
+    let a_pnl_value = a_pnl * settle_token_oracle_price;
+    let fee = perp_market.compute_settle_fee(
+        settlement,
+        a_pnl_value,
+        a_position_value,
+        a_liq_end_health,
+        a_maint_health,
+    )?;
 
     // Update the accounts' perp_spot_transfer statistics.
     //

@@ -123,7 +123,7 @@ impl<'a> Jupiter<'a> {
         input_mint: Pubkey,
         output_mint: Pubkey,
         amount: u64,
-        slippage: u64,
+        slippage_bps: u64,
         only_direct_routes: bool,
         version: Version,
     ) -> anyhow::Result<Quote> {
@@ -138,7 +138,7 @@ impl<'a> Jupiter<'a> {
                         input_mint,
                         output_mint,
                         amount,
-                        slippage,
+                        slippage_bps,
                         JupiterSwapMode::ExactIn,
                         only_direct_routes,
                     )
@@ -151,7 +151,7 @@ impl<'a> Jupiter<'a> {
                         input_mint,
                         output_mint,
                         amount,
-                        slippage,
+                        slippage_bps,
                         only_direct_routes,
                     )
                     .await?,

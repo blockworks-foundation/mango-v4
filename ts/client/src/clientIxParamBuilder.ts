@@ -24,7 +24,9 @@ export interface TokenRegisterParams {
   reduceOnly: number;
   tokenConditionalSwapTakerFeeRate: number;
   tokenConditionalSwapMakerFeeRate: number;
-  flashLoanDepositFeeRate: number;
+  flashLoanSwapFeeRate: number;
+  interestCurveScaling: number;
+  interestTargetUtilization: number;
 }
 
 export const DefaultTokenRegisterParams: TokenRegisterParams = {
@@ -35,10 +37,10 @@ export const DefaultTokenRegisterParams: TokenRegisterParams = {
   groupInsuranceFund: false,
   interestRateParams: {
     util0: 0.5,
-    rate0: 0.072,
+    rate0: 0.018,
     util1: 0.8,
-    rate1: 0.2,
-    maxRate: 2,
+    rate1: 0.05,
+    maxRate: 0.5,
     adjustmentFactor: 0.004,
   },
   loanFeeRate: 0.0005,
@@ -59,7 +61,9 @@ export const DefaultTokenRegisterParams: TokenRegisterParams = {
   reduceOnly: 0,
   tokenConditionalSwapTakerFeeRate: 0.0005,
   tokenConditionalSwapMakerFeeRate: 0.0005,
-  flashLoanDepositFeeRate: 0.0005,
+  flashLoanSwapFeeRate: 0.0005,
+  interestCurveScaling: 4.0,
+  interestTargetUtilization: 0.5,
 };
 
 export interface TokenEditParams {
@@ -89,7 +93,9 @@ export interface TokenEditParams {
   forceClose: boolean | null;
   tokenConditionalSwapTakerFeeRate: number | null;
   tokenConditionalSwapMakerFeeRate: number | null;
-  flashLoanDepositFeeRate: number | null;
+  flashLoanSwapFeeRate: number | null;
+  interestCurveScaling: number | null;
+  interestTargetUtilization: number | null;
 }
 
 export const NullTokenEditParams: TokenEditParams = {
@@ -119,7 +125,9 @@ export const NullTokenEditParams: TokenEditParams = {
   forceClose: null,
   tokenConditionalSwapTakerFeeRate: null,
   tokenConditionalSwapMakerFeeRate: null,
-  flashLoanDepositFeeRate: null,
+  flashLoanSwapFeeRate: null,
+  interestCurveScaling: null,
+  interestTargetUtilization: null,
 };
 
 export interface PerpEditParams {
@@ -260,6 +268,10 @@ export interface IxGateParams {
   OpenbookV2SettleFunds: boolean;
   AdminTokenWithdrawFees: boolean;
   AdminPerpWithdrawFees: boolean;
+  AccountSizeMigration: boolean;
+  TokenConditionalSwapStart: boolean;
+  TokenConditionalSwapCreatePremiumAuction: boolean;
+  TokenConditionalSwapCreateLinearAuction: boolean;
 }
 
 // Default with all ixs enabled, use with buildIxGate
@@ -334,6 +346,10 @@ export const TrueIxGateParams: IxGateParams = {
   OpenbookV2SettleFunds: true,
   AdminTokenWithdrawFees: true,
   AdminPerpWithdrawFees: true,
+  AccountSizeMigration: true,
+  TokenConditionalSwapStart: true,
+  TokenConditionalSwapCreatePremiumAuction: true,
+  TokenConditionalSwapCreateLinearAuction: true,
 };
 
 // build ix gate e.g. buildIxGate(Builder(TrueIxGateParams).TokenDeposit(false).build()).toNumber(),
@@ -418,6 +434,10 @@ export function buildIxGate(p: IxGateParams): BN {
   toggleIx(ixGate, p, 'OpenbookV2SettleFunds', 63);
   toggleIx(ixGate, p, 'AdminTokenWithdrawFees', 65);
   toggleIx(ixGate, p, 'AdminPerpWithdrawFees', 66);
+  toggleIx(ixGate, p, 'AccountSizeMigration', 67);
+  toggleIx(ixGate, p, 'TokenConditionalSwapStart', 68);
+  toggleIx(ixGate, p, 'TokenConditionalSwapCreatePremiumAuction', 69);
+  toggleIx(ixGate, p, 'TokenConditionalSwapCreateLinearAuction', 70);
 
   return ixGate;
 }

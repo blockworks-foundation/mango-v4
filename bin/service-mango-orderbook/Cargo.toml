@@ -1,0 +1,45 @@
+[package]
+name = "service-mango-orderbook"
+version = "0.1.0"
+authors = ["Riordan Panayides <riordan@panayid.es>"]
+edition = "2021"
+license = "AGPL-3.0-or-later"
+
+[dependencies]
+mango-feeds-lib = { path = "../../lib/mango-feeds-lib" }
+mango-feeds-connector = { workspace = true }
+
+solana-client = { workspace = true }
+solana-logger = { workspace = true }
+solana-sdk = { workspace = true }
+
+anchor-lang = { workspace = true }
+anchor-client = { workspace = true }
+
+mango-v4 = { path = "../../programs/mango-v4", features = ["client"] }
+mango-v4-client = { path = "../../lib/client" }
+
+# note: we use a patched version of serum-dex to expose iterators - the mango program still uses the version 0.5.10+updates (commit c85e56d)
+# 'groovie/v0.5.10-updates-expose-things' is a merge between https://github.com/jup-ag/openbook-program/tree/feat/expose-things and commit c85e56d
+serum_dex = { git = "https://github.com/grooviegermanikus/program.git", branch = "groovie/v0.5.10-updates-expose-things" }
+
+fixed = { workspace = true, features = ["serde"] }
+
+bs58 = "0.3.1"
+log = "0.4"
+anyhow = "1.0"
+toml = "0.5"
+
+serde = "1.0.130"
+serde_derive = "1.0.130"
+serde_json = "1.0.68"
+futures-channel = "0.3"
+futures-util = "0.3"
+ws = "^0.9.2"
+async-channel = "1.6"
+async-trait = "0.1"
+bytemuck = "^1.7.2"
+itertools = "0.10.3"
+
+tokio = { version = "1", features = ["full"] }
+tokio-tungstenite = "0.17"

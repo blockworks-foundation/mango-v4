@@ -1,7 +1,8 @@
 use itertools::Itertools;
 use mango_v4::accounts_zerocopy::KeyedAccountSharedData;
 use mango_v4::state::{
-    Bank, BookSide, MangoAccountValue, PerpPosition, PlaceOrderType, Side, QUOTE_TOKEN_INDEX,
+    Bank, BookSide, MangoAccountValue, PerpPosition, PlaceOrderType, Side, TokenIndex,
+    QUOTE_TOKEN_INDEX,
 };
 use mango_v4_client::{
     chain_data, jupiter, perp_pnl, MangoClient, PerpMarketContext, TokenContext,
@@ -26,6 +27,7 @@ pub struct Config {
     pub borrow_settle_excess: f64,
     pub refresh_timeout: Duration,
     pub jupiter_version: jupiter::Version,
+    pub skip_tokens: Vec<TokenIndex>,
 }
 
 fn token_bank(
@@ -298,7 +300,9 @@ impl Rebalancer {
         for token_position in account.active_token_positions() {
             let token_index = token_position.token_index;
             let token = self.mango_client.context.token(token_index);
-            if token_index == quote_token.token_index {
+            if token_index == quote_token.token_index
+                || self.config.skip_tokens.contains(&token_index)
+            {
                 continue;
             }
             let token_mint = token.mint_info.mint;
@@ -429,8 +433,7 @@ impl Rebalancer {
     ) -> anyhow::Result<bool> {
         let now_ts: u64 = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)?
-            .as_secs()
-            .try_into()?;
+            .as_secs();
 
         let base_lots = perp_position.base_position_lots();
         let effective_lots = perp_position.effective_base_position_lots();

@@ -1,0 +1,35 @@
+bind_ws_addr = "0.0.0.0:8080"
+rpc_http_url = "http://mango.rpcpool.com/<token>"
+mango_group = "78b8f4cGCwmZ9ysPFMWLaLTkkaYnUjwMJYStWe5RTSSX"
+
+[metrics]
+output_stdout = true
+output_http = true
+
+# [postgres]
+# connection_string = "$PG_CONNECTION_STRING"
+# connection_count = 1
+# max_batch_size = 1
+# max_queue_size = 50000
+# retry_query_max_count = 10
+# retry_query_sleep_secs = 2
+# retry_connection_sleep_secs = 10
+# fatal_connection_timeout_secs = 30
+# allow_invalid_certs = true
+
+# # [postgres.tls]
+# # ca_cert_path = "$PG_CA_CERT"
+# # client_key_path = "$PG_CLIENT_KEY"
+
+[source]
+dedup_queue_size = 50000
+rpc_ws_url = "wss://mango.rpcpool.com/<token>"
+
+[[source.grpc_sources]]
+name = "accountsdb-client"
+connection_string = "http://tyo64.rpcpool.com/"
+retry_connection_sleep_secs = 30
+
+[source.snapshot]
+rpc_http_url = "http://mango.rpcpool.com/<token>"
+program_id = "4MangoMjqJ2firMokCjjGgoK8d4MXcrgL7XJaL3w6fVg"

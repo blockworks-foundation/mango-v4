@@ -57,6 +57,55 @@ pub struct PerpMarketContext {
     pub market: PerpMarket,
 }
 
+pub struct ComputeEstimates {
+    pub cu_per_mango_instruction: u32,
+    pub health_cu_per_token: u32,
+    pub health_cu_per_perp: u32,
+    pub health_cu_per_serum: u32,
+    pub cu_per_serum3_order_match: u32,
+    pub cu_per_serum3_order_cancel: u32,
+    pub cu_per_perp_order_match: u32,
+    pub cu_per_perp_order_cancel: u32,
+}
+
+impl Default for ComputeEstimates {
+    fn default() -> Self {
+        Self {
+            cu_per_mango_instruction: 100_000,
+            health_cu_per_token: 5000,
+            health_cu_per_perp: 8000,
+            health_cu_per_serum: 6000,
+            // measured around 1.5k, see test_serum_compute
+            cu_per_serum3_order_match: 3_000,
+            // measured around 11k, see test_serum_compute
+            cu_per_serum3_order_cancel: 20_000,
+            // measured around 3.5k, see test_perp_compute
+            cu_per_perp_order_match: 7_000,
+            // measured around 3.5k, see test_perp_compute
+            cu_per_perp_order_cancel: 7_000,
+        }
+    }
+}
+
+impl ComputeEstimates {
+    pub fn health_for_counts(&self, tokens: usize, perps: usize, serums: usize) -> u32 {
+        let tokens: u32 = tokens.try_into().unwrap();
+        let perps: u32 = perps.try_into().unwrap();
+        let serums: u32 = serums.try_into().unwrap();
+        tokens * self.health_cu_per_token
+            + perps * self.health_cu_per_perp
+            + serums * self.health_cu_per_serum
+    }
+
+    pub fn health_for_account(&self, account: &MangoAccountValue) -> u32 {
+        self.health_for_counts(
+            account.active_token_positions().count(),
+            account.active_perp_positions().count(),
+            account.active_serum3_orders().count(),
+        )
+    }
+}
+
 pub struct MangoGroupContext {
     pub group: Pubkey,
 
@@ -70,6 +119,8 @@ pub struct MangoGroupContext {
     pub perp_market_indexes_by_name: HashMap<String, PerpMarketIndex>,
 
     pub address_lookup_tables: Vec<Pubkey>,
+
+    pub compute_estimates: ComputeEstimates,
 }
 
 impl MangoGroupContext {
@@ -111,9 +162,21 @@ impl MangoGroupContext {
 
     pub fn token_by_mint(&self, mint: &Pubkey) -> anyhow::Result<&TokenContext> {
         self.tokens
-            .iter()
-            .find_map(|(_, tc)| (tc.mint_info.mint == *mint).then(|| tc))
+            .values()
+            .find(|tc| tc.mint_info.mint == *mint)
             .ok_or_else(|| anyhow::anyhow!("no token for mint {}", mint))
+    }
+
+    pub fn token_by_name(&self, name: &str) -> &TokenContext {
+        let mut tc_iter = self.tokens.values().filter(|tc| tc.name == name);
+        let tc = tc_iter.next();
+        assert!(
+            tc.is_some(),
+            "token {name} not found; names {:?}",
+            self.tokens.values().map(|tc| tc.name.clone()).collect_vec()
+        );
+        assert!(tc_iter.next().is_none(), "multiple token {name} found");
+        tc.unwrap()
     }
 
     pub async fn new_from_rpc(rpc: &RpcClientAsync, group: Pubkey) -> anyhow::Result<Self> {
@@ -235,6 +298,7 @@ impl MangoGroupContext {
             perp_markets,
             perp_market_indexes_by_name,
             address_lookup_tables,
+            compute_estimates: ComputeEstimates::default(),
         })
     }
 
@@ -244,10 +308,10 @@ impl MangoGroupContext {
         affected_tokens: Vec<TokenIndex>,
         writable_banks: Vec<TokenIndex>,
         affected_perp_markets: Vec<PerpMarketIndex>,
-    ) -> anyhow::Result<Vec<AccountMeta>> {
+    ) -> anyhow::Result<(Vec<AccountMeta>, u32)> {
         let mut account = account.clone();
-        for affected_token_index in affected_tokens {
-            account.ensure_token_position(affected_token_index)?;
+        for affected_token_index in affected_tokens.iter().chain(writable_banks.iter()) {
+            account.ensure_token_position(*affected_token_index)?;
         }
         for affected_perp_market_index in affected_perp_markets {
             let settle_token_index = self
@@ -283,7 +347,7 @@ impl MangoGroupContext {
             is_signer: false,
         };
 
-        Ok(banks
+        let accounts = banks
             .iter()
             .map(|&(pubkey, is_writable)| AccountMeta {
                 pubkey,
@@ -294,7 +358,11 @@ impl MangoGroupContext {
             .chain(perp_markets.map(to_account_meta))
             .chain(perp_oracles.map(to_account_meta))
             .chain(serum_oos.map(to_account_meta))
-            .collect())
+            .collect();
+
+        let cu = self.compute_estimates.health_for_account(&account);
+
+        Ok((accounts, cu))
     }
 
     pub fn derive_health_check_remaining_account_metas_two_accounts(
@@ -303,7 +371,7 @@ impl MangoGroupContext {
         account2: &MangoAccountValue,
         affected_tokens: &[TokenIndex],
         writable_banks: &[TokenIndex],
-    ) -> anyhow::Result<Vec<AccountMeta>> {
+    ) -> anyhow::Result<(Vec<AccountMeta>, u32)> {
         // figure out all the banks/oracles that need to be passed for the health check
         let mut banks = vec![];
         let mut oracles = vec![];
@@ -345,7 +413,7 @@ impl MangoGroupContext {
             is_signer: false,
         };
 
-        Ok(banks
+        let accounts = banks
             .iter()
             .map(|(pubkey, is_writable)| AccountMeta {
                 pubkey: *pubkey,
@@ -356,7 +424,33 @@ impl MangoGroupContext {
             .chain(perp_markets.map(to_account_meta))
             .chain(perp_oracles.map(to_account_meta))
             .chain(serum_oos.map(to_account_meta))
-            .collect())
+            .collect();
+
+        // Since health is likely to be computed separately for both accounts, we don't use the
+        // unique'd counts to estimate health cu cost.
+        let account1_token_count = account1
+            .active_token_positions()
+            .map(|ta| ta.token_index)
+            .chain(affected_tokens.iter().copied())
+            .unique()
+            .count();
+        let account2_token_count = account2
+            .active_token_positions()
+            .map(|ta| ta.token_index)
+            .chain(affected_tokens.iter().copied())
+            .unique()
+            .count();
+        let cu = self.compute_estimates.health_for_counts(
+            account1_token_count,
+            account1.active_perp_positions().count(),
+            account1.active_serum3_orders().count(),
+        ) + self.compute_estimates.health_for_counts(
+            account2_token_count,
+            account2.active_perp_positions().count(),
+            account2.active_serum3_orders().count(),
+        );
+
+        Ok((accounts, cu))
     }
 
     pub async fn new_tokens_listed(&self, rpc: &RpcClientAsync) -> anyhow::Result<bool> {

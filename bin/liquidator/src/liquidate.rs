@@ -67,7 +67,7 @@ impl<'a> LiquidateHelper<'a> {
         let txsig = self
             .client
             .serum3_liq_force_cancel_orders(
-                (self.pubkey, &self.liqee),
+                (self.pubkey, self.liqee),
                 serum_orders.market_index,
                 &serum_orders.open_orders,
             )
@@ -84,7 +84,7 @@ impl<'a> LiquidateHelper<'a> {
         let perp_force_cancels = self
             .liqee
             .active_perp_positions()
-            .filter_map(|pp| pp.has_open_orders().then(|| pp.market_index))
+            .filter_map(|pp| pp.has_open_orders().then_some(pp.market_index))
             .collect::<Vec<PerpMarketIndex>>();
         if perp_force_cancels.is_empty() {
             return Ok(None);
@@ -94,7 +94,7 @@ impl<'a> LiquidateHelper<'a> {
         let perp_market_index = *perp_force_cancels.choose(&mut rand::thread_rng()).unwrap();
         let txsig = self
             .client
-            .perp_liq_force_cancel_orders((self.pubkey, &self.liqee), perp_market_index)
+            .perp_liq_force_cancel_orders((self.pubkey, self.liqee), perp_market_index)
             .await?;
         info!(
             perp_market_index,
@@ -102,12 +102,6 @@ impl<'a> LiquidateHelper<'a> {
             "Force cancelled perp orders",
         );
         Ok(Some(txsig))
-    }
-
-    fn liq_compute_limit_instruction(&self) -> solana_sdk::instruction::Instruction {
-        solana_sdk::compute_budget::ComputeBudgetInstruction::set_compute_unit_limit(
-            self.config.compute_limit_for_liq_ix,
-        )
     }
 
     async fn perp_liq_base_or_positive_pnl(&self) -> anyhow::Result<Option<Signature>> {
@@ -132,7 +126,7 @@ impl<'a> LiquidateHelper<'a> {
             .await;
         let mut perp_base_positions = all_perp_base_positions?
             .into_iter()
-            .filter_map(|x| x)
+            .flatten()
             .collect::<Vec<_>>();
         perp_base_positions.sort_by(|a, b| a.3.cmp(&b.3));
 
@@ -208,19 +202,20 @@ impl<'a> LiquidateHelper<'a> {
             "computed transfer maximums"
         );
 
-        let liq_ix = self
+        let mut liq_ixs = self
             .client
             .perp_liq_base_or_positive_pnl_instruction(
-                (self.pubkey, &self.liqee),
+                (self.pubkey, self.liqee),
                 *perp_market_index,
                 side_signum * max_base_transfer_abs,
                 max_pnl_transfer,
             )
             .await
             .context("creating perp_liq_base_or_positive_pnl_instruction")?;
+        liq_ixs.cu = liq_ixs.cu.max(self.config.compute_limit_for_liq_ix);
         let txsig = self
             .client
-            .send_and_confirm_owner_tx(vec![self.liq_compute_limit_instruction(), liq_ix])
+            .send_and_confirm_owner_tx(liq_ixs.to_instructions())
             .await
             .context("sending perp_liq_base_or_positive_pnl_instruction")?;
         info!(
@@ -253,19 +248,20 @@ impl<'a> LiquidateHelper<'a> {
         }
         let (perp_market_index, _) = perp_negative_pnl.first().unwrap();
 
-        let liq_ix = self
+        let mut liq_ixs = self
             .client
             .perp_liq_negative_pnl_or_bankruptcy_instruction(
-                (self.pubkey, &self.liqee),
+                (self.pubkey, self.liqee),
                 *perp_market_index,
                 // Always use the max amount, since the health effect is >= 0
                 u64::MAX,
             )
             .await
             .context("creating perp_liq_negative_pnl_or_bankruptcy_instruction")?;
+        liq_ixs.cu = liq_ixs.cu.max(self.config.compute_limit_for_liq_ix);
         let txsig = self
             .client
-            .send_and_confirm_owner_tx(vec![self.liq_compute_limit_instruction(), liq_ix])
+            .send_and_confirm_owner_tx(liq_ixs.to_instructions())
             .await
             .context("sending perp_liq_negative_pnl_or_bankruptcy_instruction")?;
         info!(
@@ -374,19 +370,20 @@ impl<'a> LiquidateHelper<'a> {
         // TODO: log liqor's assets in UI form
         // TODO: log liquee's liab_needed, need to refactor program code to be able to be accessed from client side
         //
-        let liq_ix = self
+        let mut liq_ixs = self
             .client
             .token_liq_with_token_instruction(
-                (self.pubkey, &self.liqee),
+                (self.pubkey, self.liqee),
                 asset_token_index,
                 liab_token_index,
                 max_liab_transfer,
             )
             .await
             .context("creating liq_token_with_token ix")?;
+        liq_ixs.cu = liq_ixs.cu.max(self.config.compute_limit_for_liq_ix);
         let txsig = self
             .client
-            .send_and_confirm_owner_tx(vec![self.liq_compute_limit_instruction(), liq_ix])
+            .send_and_confirm_owner_tx(liq_ixs.to_instructions())
             .await
             .context("sending liq_token_with_token")?;
         info!(
@@ -433,18 +430,19 @@ impl<'a> LiquidateHelper<'a> {
             .max_token_liab_transfer(liab_token_index, quote_token_index)
             .await?;
 
-        let liq_ix = self
+        let mut liq_ixs = self
             .client
             .token_liq_bankruptcy_instruction(
-                (self.pubkey, &self.liqee),
+                (self.pubkey, self.liqee),
                 liab_token_index,
                 max_liab_transfer,
             )
             .await
             .context("creating liq_token_bankruptcy")?;
+        liq_ixs.cu = liq_ixs.cu.max(self.config.compute_limit_for_liq_ix);
         let txsig = self
             .client
-            .send_and_confirm_owner_tx(vec![self.liq_compute_limit_instruction(), liq_ix])
+            .send_and_confirm_owner_tx(liq_ixs.to_instructions())
             .await
             .context("sending liq_token_with_token")?;
         info!(

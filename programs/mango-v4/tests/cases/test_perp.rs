@@ -217,6 +217,7 @@ async fn test_perp_fixed() -> Result<(), TransportError> {
             account: account_0,
             perp_market,
             owner,
+            limit: 10,
         },
     )
     .await
@@ -268,6 +269,7 @@ async fn test_perp_fixed() -> Result<(), TransportError> {
             account: account_0,
             perp_market,
             owner,
+            limit: 10,
         },
     )
     .await
@@ -314,7 +316,6 @@ async fn test_perp_fixed() -> Result<(), TransportError> {
     )
     .await
     .is_err());
-    solana.advance_by_slots(1).await;
 
     // Trade again to bring base_position_lots to 0
     send_tx(
@@ -1209,6 +1210,231 @@ async fn test_perp_reducing_when_liquidatable() -> Result<(), TransportError> {
     )
     .await;
     assert!(err.is_err());
+
+    Ok(())
+}
+
+#[tokio::test]
+async fn test_perp_compute() -> Result<(), TransportError> {
+    let context = TestContext::new().await;
+    let solana = &context.solana.clone();
+
+    let admin = TestKeypair::new();
+    let owner = context.users[0].key;
+    let payer = context.users[1].key;
+    let mints = &context.mints[0..2];
+
+    //
+    // SETUP: Create a group and an account
+    //
+
+    let GroupWithTokens { group, tokens, .. } = GroupWithTokensConfig {
+        admin,
+        payer,
+        mints: mints.to_vec(),
+        ..GroupWithTokensConfig::default()
+    }
+    .create(solana)
+    .await;
+
+    let deposit_amount = 100_000;
+    let account_0 = create_funded_account(
+        &solana,
+        group,
+        owner,
+        0,
+        &context.users[1],
+        mints,
+        deposit_amount,
+        0,
+    )
+    .await;
+    let account_1 = create_funded_account(
+        &solana,
+        group,
+        owner,
+        1,
+        &context.users[1],
+        mints,
+        deposit_amount,
+        0,
+    )
+    .await;
+
+    //
+    // TEST: Create a perp market
+    //
+    let mango_v4::accounts::PerpCreateMarket { perp_market, .. } = send_tx(
+        solana,
+        PerpCreateMarketInstruction {
+            group,
+            admin,
+            payer,
+            perp_market_index: 0,
+            quote_lot_size: 10,
+            base_lot_size: 100,
+            maint_base_asset_weight: 0.975,
+            init_base_asset_weight: 0.95,
+            maint_base_liab_weight: 1.025,
+            init_base_liab_weight: 1.05,
+            base_liquidation_fee: 0.012,
+            maker_fee: 0.0000,
+            taker_fee: 0.0000,
+            settle_pnl_limit_factor: -1.0,
+            settle_pnl_limit_window_size_ts: 24 * 60 * 60,
+            ..PerpCreateMarketInstruction::with_new_book_and_queue(&solana, &tokens[1]).await
+        },
+    )
+    .await
+    .unwrap();
+
+    let perp_market_data = solana.get_account::<PerpMarket>(perp_market).await;
+    let price_lots = perp_market_data.native_price_to_lot(I80F48::from(1000));
+    set_perp_stub_oracle_price(solana, group, perp_market, &tokens[1], admin, 1000.0).await;
+
+    //
+    // TEST: check compute per order match
+    //
+
+    for limit in 1..6 {
+        for bid in price_lots..price_lots + 6 {
+            send_tx(
+                solana,
+                PerpPlaceOrderInstruction {
+                    account: account_0,
+                    perp_market,
+                    owner,
+                    side: Side::Bid,
+                    price_lots: bid,
+                    max_base_lots: 1,
+                    client_order_id: 5,
+                    ..PerpPlaceOrderInstruction::default()
+                },
+            )
+            .await
+            .unwrap();
+        }
+        let result = send_tx_get_metadata(
+            solana,
+            PerpPlaceOrderInstruction {
+                account: account_1,
+                perp_market,
+                owner,
+                side: Side::Ask,
+                price_lots,
+                max_base_lots: 10,
+                client_order_id: 6,
+                limit,
+                ..PerpPlaceOrderInstruction::default()
+            },
+        )
+        .await
+        .unwrap();
+        println!(
+            "CU for perp_place_order matching {limit} orders in sequence: {}",
+            result.metadata.unwrap().compute_units_consumed
+        );
+
+        send_tx(
+            solana,
+            PerpCancelAllOrdersInstruction {
+                account: account_0,
+                perp_market,
+                owner,
+                limit: 10,
+            },
+        )
+        .await
+        .unwrap();
+        send_tx(
+            solana,
+            PerpCancelAllOrdersInstruction {
+                account: account_1,
+                perp_market,
+                owner,
+                limit: 10,
+            },
+        )
+        .await
+        .unwrap();
+
+        send_tx(
+            solana,
+            PerpConsumeEventsInstruction {
+                perp_market,
+                mango_accounts: vec![account_0, account_1],
+            },
+        )
+        .await
+        .unwrap();
+        send_tx(
+            solana,
+            PerpConsumeEventsInstruction {
+                perp_market,
+                mango_accounts: vec![account_0, account_1],
+            },
+        )
+        .await
+        .unwrap();
+        send_tx(
+            solana,
+            PerpConsumeEventsInstruction {
+                perp_market,
+                mango_accounts: vec![account_0, account_1],
+            },
+        )
+        .await
+        .unwrap();
+    }
+
+    //
+    // TEST: check compute per order cancel
+    //
+
+    for count in 1..6 {
+        for bid in price_lots..price_lots + count {
+            send_tx(
+                solana,
+                PerpPlaceOrderInstruction {
+                    account: account_0,
+                    perp_market,
+                    owner,
+                    side: Side::Bid,
+                    price_lots: bid,
+                    max_base_lots: 1,
+                    client_order_id: 5,
+                    ..PerpPlaceOrderInstruction::default()
+                },
+            )
+            .await
+            .unwrap();
+        }
+        let result = send_tx_get_metadata(
+            solana,
+            PerpCancelAllOrdersInstruction {
+                account: account_0,
+                perp_market,
+                owner,
+                limit: 10,
+            },
+        )
+        .await
+        .unwrap();
+        println!(
+            "CU for perp_cancel_all_orders matching {count} orders: {}",
+            result.metadata.unwrap().compute_units_consumed
+        );
+
+        send_tx(
+            solana,
+            PerpConsumeEventsInstruction {
+                perp_market,
+                mango_accounts: vec![account_0],
+            },
+        )
+        .await
+        .unwrap();
+    }
 
     Ok(())
 }

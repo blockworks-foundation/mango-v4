@@ -2,6 +2,7 @@ use std::mem::size_of;
 
 use anchor_lang::prelude::*;
 use anchor_lang::Discriminator;
+use derivative::Derivative;
 use fixed::types::I80F48;
 
 use static_assertions::const_assert_eq;
@@ -57,10 +58,12 @@ pub mod switchboard_v2_mainnet_oracle {
 }
 
 #[zero_copy]
-#[derive(AnchorDeserialize, AnchorSerialize, Debug)]
+#[derive(AnchorDeserialize, AnchorSerialize, Derivative)]
+#[derivative(Debug)]
 pub struct OracleConfig {
     pub conf_filter: I80F48,
     pub max_staleness_slots: i64,
+    #[derivative(Debug = "ignore")]
     pub reserved: [u8; 72],
 }
 const_assert_eq!(size_of::<OracleConfig>(), 16 + 8 + 72);

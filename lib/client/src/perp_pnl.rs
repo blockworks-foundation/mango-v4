@@ -23,10 +23,7 @@ pub async fn fetch_top(
     count: usize,
 ) -> anyhow::Result<Vec<(Pubkey, MangoAccountValue, I80F48)>> {
     use std::time::{SystemTime, UNIX_EPOCH};
-    let now_ts: u64 = SystemTime::now()
-        .duration_since(UNIX_EPOCH)?
-        .as_secs()
-        .try_into()?;
+    let now_ts: u64 = SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs();
 
     let perp = context.perp(perp_market_index);
     let perp_market =

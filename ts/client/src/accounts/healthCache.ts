@@ -740,7 +740,11 @@ export class HealthCache {
     throw new Error('Could not find amount that led to health ratio <=0');
   }
 
-  /// This is not a generic function. It assumes there is a unique maximum between left and right.
+  /// This is not a generic function. It assumes there is a almost-unique maximum between left and right,
+  /// in the sense that `fun` might be constant on the maximum value for a while, but there won't be
+  /// distinct maximums with non-maximal values between them.
+  ///
+  /// If the maximum isn't just a single point, it returns the rightmost value.
   private static findMaximum(
     left: I80F48,
     right: I80F48,
@@ -753,7 +757,7 @@ export class HealthCache {
     let rightValue = fun(right);
     let midValue = fun(mid);
     while (right.sub(left).gt(minStep)) {
-      if (leftValue.gte(midValue)) {
+      if (leftValue.gt(midValue)) {
         // max must be between left and mid
         right = mid;
         rightValue = midValue;
@@ -769,7 +773,7 @@ export class HealthCache {
         // mid is larger than both left and right, max could be on either side
         const leftmid = half.mul(left.add(mid));
         const leftMidValue = fun(leftmid);
-        if (leftMidValue.gte(midValue)) {
+        if (leftMidValue.gt(midValue)) {
           // max between left and mid
           right = mid;
           rightValue = midValue;
@@ -797,9 +801,9 @@ export class HealthCache {
       }
     }
 
-    if (leftValue.gte(midValue)) {
+    if (leftValue.gt(midValue)) {
       return [left, leftValue];
-    } else if (midValue.gte(rightValue)) {
+    } else if (midValue.gt(rightValue)) {
       return [mid, midValue];
     } else {
       return [right, rightValue];
@@ -1041,7 +1045,9 @@ export class HealthCache {
     const healthAtMaxValue = cacheAfterSwap(amountForMaxValue).health(
       HealthType.init,
     );
-    if (healthAtMaxValue.lte(ZERO_I80F48())) {
+    if (healthAtMaxValue.eq(ZERO_I80F48())) {
+      return amountForMaxValue;
+    } else if (healthAtMaxValue.lt(ZERO_I80F48())) {
       return ZERO_I80F48();
     }
     const zeroHealthEstimate = amountForMaxValue.sub(

@@ -89,6 +89,37 @@ pub struct FlashLoanTokenDetailV2 {
     pub approved_amount: u64,
 }
 
+#[derive(AnchorSerialize, AnchorDeserialize)]
+pub struct FlashLoanTokenDetailV3 {
+    pub token_index: u16,
+
+    /// The amount by which the user's token position changed at the end
+    ///
+    /// So if the user repaid the approved_amount in full, it'd be 0.
+    ///
+    /// Does NOT include the loan_origination_fee or deposit_fee, so the true
+    /// change is `change_amount - loan_origination_fee - deposit_fee`.
+    pub change_amount: i128,
+
+    /// The amount that was a loan (<= approved_amount, depends on user's deposits)
+    pub loan: i128,
+
+    /// The fee paid on the loan, not included in `loan` or `change_amount`
+    pub loan_origination_fee: i128,
+
+    pub deposit_index: i128,
+    pub borrow_index: i128,
+    pub price: i128,
+
+    /// Swap fee paid on the in token of a swap.
+    ///
+    /// Not factored into change_amount.
+    pub swap_fee: i128,
+
+    /// The amount that was transfered out to the user
+    pub approved_amount: u64,
+}
+
 #[event]
 pub struct FlashLoanLog {
     pub mango_group: Pubkey,
@@ -102,6 +133,14 @@ pub struct FlashLoanLogV2 {
     pub mango_group: Pubkey,
     pub mango_account: Pubkey,
     pub token_loan_details: Vec<FlashLoanTokenDetailV2>,
+    pub flash_loan_type: FlashLoanType,
+}
+
+#[event]
+pub struct FlashLoanLogV3 {
+    pub mango_group: Pubkey,
+    pub mango_account: Pubkey,
+    pub token_loan_details: Vec<FlashLoanTokenDetailV3>,
     pub flash_loan_type: FlashLoanType,
 }
 
@@ -259,6 +298,20 @@ pub struct UpdateRateLog {
     pub rate0: i128,    // I80F48
     pub rate1: i128,    // I80F48
     pub max_rate: i128, // I80F48
+}
+
+#[event]
+pub struct UpdateRateLogV2 {
+    pub mango_group: Pubkey,
+    pub token_index: u16,
+    // contrary to v1 these do not have curve_scaling factored in!
+    pub rate0: i128,    // I80F48
+    pub util0: i128,    // I80F48
+    pub rate1: i128,    // I80F48
+    pub util1: i128,    // I80F48
+    pub max_rate: i128, // I80F48
+    pub curve_scaling: f64,
+    pub target_utilization: f32,
 }
 
 #[event]
@@ -555,6 +608,30 @@ pub struct TokenConditionalSwapCreateLogV2 {
 }
 
 #[event]
+pub struct TokenConditionalSwapCreateLogV3 {
+    pub mango_group: Pubkey,
+    pub mango_account: Pubkey,
+    pub id: u64,
+    pub max_buy: u64,
+    pub max_sell: u64,
+    pub expiry_timestamp: u64,
+    pub price_lower_limit: f64,
+    pub price_upper_limit: f64,
+    pub price_premium_rate: f64,
+    pub taker_fee_rate: f32,
+    pub maker_fee_rate: f32,
+    pub buy_token_index: u16,
+    pub sell_token_index: u16,
+    pub allow_creating_deposits: bool,
+    pub allow_creating_borrows: bool,
+    pub display_price_style: u8,
+    pub intention: u8,
+    pub tcs_type: u8,
+    pub start_timestamp: u64,
+    pub duration_seconds: u64,
+}
+
+#[event]
 pub struct TokenConditionalSwapTriggerLog {
     pub mango_group: Pubkey,
     pub liqee: Pubkey,
@@ -591,8 +668,39 @@ pub struct TokenConditionalSwapTriggerLogV2 {
 }
 
 #[event]
+pub struct TokenConditionalSwapTriggerLogV3 {
+    pub mango_group: Pubkey,
+    pub liqee: Pubkey,
+    pub liqor: Pubkey,
+    pub token_conditional_swap_id: u64,
+    pub buy_token_index: u16,
+    pub sell_token_index: u16,
+    pub buy_amount: u64,        // amount the liqee got
+    pub sell_amount: u64,       // amount the liqee paid (including fees)
+    pub maker_fee: u64,         // in native units of sell token (included in sell amount)
+    pub taker_fee: u64, // in native units of sell token (deducted from the sell amount the liqor received)
+    pub buy_token_price: i128, // I80F48
+    pub sell_token_price: i128, // I80F48
+    pub closed: bool,
+    pub display_price_style: u8,
+    pub intention: u8,
+    pub tcs_type: u8,
+    pub start_timestamp: u64,
+}
+
+#[event]
 pub struct TokenConditionalSwapCancelLog {
     pub mango_group: Pubkey,
     pub mango_account: Pubkey,
     pub id: u64,
+}
+
+#[event]
+pub struct TokenConditionalSwapStartLog {
+    pub mango_group: Pubkey,
+    pub mango_account: Pubkey,
+    pub caller: Pubkey,
+    pub token_conditional_swap_id: u64,
+    pub incentive_token_index: u16,
+    pub incentive_amount: u64,
 }

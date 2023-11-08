@@ -1,5 +1,3 @@
-cargo-features = ["workspace-inheritance"]
-
 [package]
 name = "mango-v4-keeper"
 version = "0.3.0"
@@ -22,7 +20,7 @@ itertools = "0.10.3"
 mango-v4 = { path = "../../programs/mango-v4", features = ["client"] }
 mango-v4-client = { path = "../../lib/client" }
 pyth-sdk-solana = { workspace = true }
-serum_dex = { workspace = true, default-features=false,features = ["no-entrypoint", "program"] }
+serum_dex = { workspace = true, features = ["no-entrypoint", "program"] }
 solana-client = { workspace = true }
 solana-sdk = { workspace = true }
 tokio = { version = "1.14.1", features = ["rt-multi-thread", "time", "macros", "sync"] }
