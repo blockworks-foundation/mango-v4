@@ -824,14 +824,23 @@ impl PerpPosition {
 }
 
 #[zero_copy]
-#[derive(AnchorSerialize, AnchorDeserialize, Debug)]
+#[derive(AnchorSerialize, AnchorDeserialize, Derivative)]
+#[derivative(Debug)]
 pub struct PerpOpenOrder {
     pub side_and_tree: u8, // SideAndOrderTree -- enums aren't POD
+
+    #[derivative(Debug = "ignore")]
     pub padding1: [u8; 1],
+
     pub market: PerpMarketIndex,
+
+    #[derivative(Debug = "ignore")]
     pub padding2: [u8; 4],
+
     pub client_id: u64,
     pub id: u128,
+
+    #[derivative(Debug = "ignore")]
     pub reserved: [u8; 64],
 }
 const_assert_eq!(size_of::<PerpOpenOrder>(), 1 + 1 + 2 + 4 + 8 + 16 + 64);

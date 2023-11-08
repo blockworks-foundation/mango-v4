@@ -1,6 +1,7 @@
 use std::mem::size_of;
 
 use anchor_lang::prelude::*;
+use derivative::Derivative;
 use fixed::types::I80F48;
 
 use static_assertions::const_assert_eq;
@@ -10,13 +11,15 @@ use crate::error::MangoError;
 use crate::logs::PerpUpdateFundingLogV2;
 use crate::state::orderbook::Side;
 use crate::state::{oracle, TokenIndex};
+use crate::util;
 
 use super::{orderbook, OracleConfig, OracleState, Orderbook, StablePriceModel, DAY_I80F48};
 
 pub type PerpMarketIndex = u16;
 
 #[account(zero_copy)]
-#[derive(Debug)]
+#[derive(Derivative)]
+#[derivative(Debug)]
 pub struct PerpMarket {
     // ABI: Clients rely on this being at offset 8
     pub group: Pubkey,
@@ -46,6 +49,7 @@ pub struct PerpMarket {
     pub base_decimals: u8,
 
     /// Name. Trailing zero bytes are ignored.
+    #[derivative(Debug(format_with = "util::format_zero_terminated_utf8_bytes"))]
     pub name: [u8; 16],
 
     /// Address of the BookSide account for bids
@@ -156,7 +160,10 @@ pub struct PerpMarket {
     ///
     /// See also PerpPosition::settle_pnl_limit_realized_trade
     pub settle_pnl_limit_factor: f32,
+
+    #[derivative(Debug = "ignore")]
     pub padding3: [u8; 4],
+
     /// Window size in seconds for the perp settlement limit
     pub settle_pnl_limit_window_size_ts: u64,
 
@@ -165,6 +172,7 @@ pub struct PerpMarket {
     pub reduce_only: u8,
     pub force_close: u8,
 
+    #[derivative(Debug = "ignore")]
     pub padding4: [u8; 6],
 
     /// Weights for full perp market health, if positive
@@ -177,6 +185,7 @@ pub struct PerpMarket {
     // This ensures that fees_settled is strictly increasing for stats gathering purposes
     pub fees_withdrawn: u64,
 
+    #[derivative(Debug = "ignore")]
     pub reserved: [u8; 1880],
 }
 

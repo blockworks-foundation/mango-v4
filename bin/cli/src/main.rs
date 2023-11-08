@@ -6,6 +6,7 @@ use solana_sdk::pubkey::Pubkey;
 use std::str::FromStr;
 use std::sync::Arc;
 
+mod save_snapshot;
 mod test_oracles;
 
 #[derive(Parser, Debug, Clone)]
@@ -116,6 +117,16 @@ enum Command {
 
         #[clap(flatten)]
         rpc: Rpc,
+    },
+    SaveSnapshot {
+        #[clap(short, long)]
+        group: String,
+
+        #[clap(flatten)]
+        rpc: Rpc,
+
+        #[clap(short, long)]
+        output: String,
     },
 }
 
@@ -228,6 +239,11 @@ async fn main() -> Result<(), anyhow::Error> {
             let client = rpc.client(None)?;
             let group = pubkey_from_cli(&group);
             test_oracles::run(&client, group).await?;
+        }
+        Command::SaveSnapshot { group, rpc, output } => {
+            let mango_group = pubkey_from_cli(&group);
+            let client = rpc.client(None)?;
+            save_snapshot::save_snapshot(mango_group, client, output).await?
         }
     };
 
