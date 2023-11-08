@@ -318,7 +318,7 @@ async fn main() -> anyhow::Result<()> {
         jupiter_version: cli.jupiter_version.into(),
         skip_tokens: cli
             .rebalance_skip_tokens
-            .split(",")
+            .split(',')
             .filter(|v| !v.is_empty())
             .map(|name| mango_client.context.token_by_name(name).token_index)
             .collect(),
