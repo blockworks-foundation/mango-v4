@@ -134,7 +134,6 @@ async fn feed_data(
             },
             message = serum3_oo_sub_map.next() => {
                 if let Some(data) = message {
-                    info!("got serum message");
                     let response = data.1.map_err_anyhow()?;
                     sender.send(Message::Account(AccountUpdate::from_rpc(response)?)).await.expect("sending must succeed");
                 } else {
