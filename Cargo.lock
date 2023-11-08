@@ -3321,6 +3321,7 @@ dependencies = [
  "num 0.4.1",
  "num_enum 0.5.11",
  "openbook-v2",
+ "oracle-poc",
  "pyth-sdk-solana",
  "rand 0.8.5",
  "regex",
@@ -4258,6 +4259,16 @@ dependencies = [
  "pin-project",
  "rand 0.8.5",
  "thiserror",
+]
+
+[[package]]
+name = "oracle-poc"
+version = "0.1.0"
+dependencies = [
+ "anchor-lang",
+ "anchor-spl",
+ "static_assertions",
+ "switchboard-solana",
 ]
 
 [[package]]

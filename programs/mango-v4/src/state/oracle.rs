@@ -89,6 +89,7 @@ pub enum OracleType {
     Stub,
     SwitchboardV1,
     SwitchboardV2,
+    SwitchboardFunction
 }
 
 pub struct OracleState {
@@ -324,6 +325,14 @@ pub fn oracle_state_unchecked(
                 last_update_slot,
                 deviation,
                 oracle_type: OracleType::SwitchboardV1,
+            }
+        }
+        OracleType::SwitchboardFunction => {
+            OracleState {
+                price: I80F48::MIN,
+                last_update_slot: 0,
+                deviation: I80F48::MIN,
+                oracle_type: OracleType::SwitchboardFunction,
             }
         }
     })

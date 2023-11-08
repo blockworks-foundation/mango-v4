@@ -44,10 +44,11 @@ static_assertions = "1.1"
 
 # note: switchboard-common 0.8.19 is broken - use 0.8.18 instead
 switchboard-program = "0.2"
-switchboard-v2 = { package = "switchboard-solana", version = "0.28" }
+switchboard-v2 = { package = "switchboard-solana", version = "0.28.27" }
 
 
 openbook-v2 = { git = "https://github.com/openbook-dex/openbook-v2.git", features = ["no-entrypoint"] }
+oracle-poc = { path = "../../../switchboard-oracle-poc/programs/oracle-poc" }
 
 
 [dev-dependencies]
