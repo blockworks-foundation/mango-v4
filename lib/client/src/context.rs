@@ -162,9 +162,21 @@ impl MangoGroupContext {
 
     pub fn token_by_mint(&self, mint: &Pubkey) -> anyhow::Result<&TokenContext> {
         self.tokens
-            .iter()
-            .find_map(|(_, tc)| (tc.mint_info.mint == *mint).then(|| tc))
+            .values()
+            .find(|tc| tc.mint_info.mint == *mint)
             .ok_or_else(|| anyhow::anyhow!("no token for mint {}", mint))
+    }
+
+    pub fn token_by_name(&self, name: &str) -> &TokenContext {
+        let mut tc_iter = self.tokens.values().filter(|tc| tc.name == name);
+        let tc = tc_iter.next();
+        assert!(
+            tc.is_some(),
+            "token {name} not found; names {:?}",
+            self.tokens.values().map(|tc| tc.name.clone()).collect_vec()
+        );
+        assert!(tc_iter.next().is_none(), "multiple token {name} found");
+        tc.unwrap()
     }
 
     pub async fn new_from_rpc(rpc: &RpcClientAsync, group: Pubkey) -> anyhow::Result<Self> {
