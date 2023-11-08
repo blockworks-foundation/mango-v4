@@ -54,11 +54,9 @@ pub struct TokenDeposit<'info> {
         mut,
         has_one = group,
         constraint = account.load()?.is_operational() @ MangoError::AccountIsFrozen,
-        constraint = account.load()?.is_owner_or_delegate(token_authority.key()),
+        constraint = account.load()?.is_owner_or_delegate(owner.key()),
     )]
     pub account: AccountLoader<'info, MangoAccountFixed>,
-    // Unused, check is now on the token authority instead
-    // we want to support even delegates opening new token positions
     pub owner: Signer<'info>,
 
     #[account(
