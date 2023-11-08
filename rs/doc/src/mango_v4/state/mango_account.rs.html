@@ -2552,12 +2552,25 @@
 <a href="#2552" id="2552">2552</a>
 <a href="#2553" id="2553">2553</a>
 <a href="#2554" id="2554">2554</a>
+<a href="#2555" id="2555">2555</a>
+<a href="#2556" id="2556">2556</a>
+<a href="#2557" id="2557">2557</a>
+<a href="#2558" id="2558">2558</a>
+<a href="#2559" id="2559">2559</a>
+<a href="#2560" id="2560">2560</a>
+<a href="#2561" id="2561">2561</a>
+<a href="#2562" id="2562">2562</a>
+<a href="#2563" id="2563">2563</a>
+<a href="#2564" id="2564">2564</a>
+<a href="#2565" id="2565">2565</a>
+<a href="#2566" id="2566">2566</a>
 </pre><pre class="rust"><code><span class="kw">use </span>std::cell::{Ref, RefMut};
 <span class="kw">use </span>std::mem::size_of;
 
 <span class="kw">use </span>anchor_lang::prelude::<span class="kw-2">*</span>;
 <span class="kw">use </span>anchor_lang::Discriminator;
 <span class="kw">use </span>arrayref::array_ref;
+<span class="kw">use </span>derivative::Derivative;
 
 <span class="kw">use </span>fixed::types::I80F48;
 
@@ -2567,6 +2580,7 @@
 <span class="kw">use </span><span class="kw">crate</span>::error::<span class="kw-2">*</span>;
 <span class="kw">use </span><span class="kw">crate</span>::health::{HealthCache, HealthType};
 <span class="kw">use </span><span class="kw">crate</span>::logs::{DeactivatePerpPositionLog, DeactivateTokenPositionLog};
+<span class="kw">use </span><span class="kw">crate</span>::util;
 
 <span class="kw">use </span><span class="kw">super</span>::BookSideOrderTree;
 <span class="kw">use </span><span class="kw">super</span>::FillEvent;
@@ -2637,6 +2651,8 @@
 // MangoAccount binary data is backwards compatible: when ignoring trailing bytes, a v2 account can
 // be read as a v1 account and a v3 account can be read as v1 or v2 etc.
 </span><span class="attr">#[account]
+#[derive(Derivative)]
+#[derivative(Debug)]
 </span><span class="kw">pub struct </span>MangoAccount {
     <span class="comment">// fixed
     // note: keep MangoAccountFixed in sync with changes here
@@ -2646,7 +2662,8 @@
     <span class="comment">// ABI: Clients rely on this being at offset 40
     </span><span class="kw">pub </span>owner: Pubkey,
 
-    <span class="kw">pub </span>name: [u8; <span class="number">32</span>],
+    <span class="attr">#[derivative(Debug(format_with = <span class="string">&quot;util::format_zero_terminated_utf8_bytes&quot;</span>))]
+    </span><span class="kw">pub </span>name: [u8; <span class="number">32</span>],
 
     <span class="comment">// Alternative authority/signer of transactions for a mango account
     </span><span class="kw">pub </span>delegate: Pubkey,
@@ -2671,7 +2688,8 @@
 
     <span class="kw">pub </span>bump: u8,
 
-    <span class="kw">pub </span>padding: [u8; <span class="number">1</span>],
+    <span class="attr">#[derivative(Debug = <span class="string">&quot;ignore&quot;</span>)]
+    </span><span class="kw">pub </span>padding: [u8; <span class="number">1</span>],
 
     <span class="comment">// (Display only)
     // Cumulative (deposits - withdraws)
@@ -2698,23 +2716,29 @@
     <span class="doccomment">/// Next id to use when adding a token condition swap
     </span><span class="kw">pub </span>next_token_conditional_swap_id: u64,
 
-    <span class="kw">pub </span>reserved: [u8; <span class="number">200</span>],
+    <span class="attr">#[derivative(Debug = <span class="string">&quot;ignore&quot;</span>)]
+    </span><span class="kw">pub </span>reserved: [u8; <span class="number">200</span>],
 
     <span class="comment">// dynamic
     </span><span class="kw">pub </span>header_version: u8,
-    <span class="kw">pub </span>padding3: [u8; <span class="number">7</span>],
+    <span class="attr">#[derivative(Debug = <span class="string">&quot;ignore&quot;</span>)]
+    </span><span class="kw">pub </span>padding3: [u8; <span class="number">7</span>],
     <span class="comment">// note: padding is required for TokenPosition, etc. to be aligned
+    </span><span class="attr">#[derivative(Debug = <span class="string">&quot;ignore&quot;</span>)]
     </span><span class="kw">pub </span>padding4: u32,
     <span class="comment">// Maps token_index -&gt; deposit/borrow account for each token
     // that is active on this MangoAccount.
     </span><span class="kw">pub </span>tokens: Vec&lt;TokenPosition&gt;,
-    <span class="kw">pub </span>padding5: u32,
+    <span class="attr">#[derivative(Debug = <span class="string">&quot;ignore&quot;</span>)]
+    </span><span class="kw">pub </span>padding5: u32,
     <span class="comment">// Maps serum_market_index -&gt; open orders for each serum market
     // that is active on this MangoAccount.
     </span><span class="kw">pub </span>serum3: Vec&lt;Serum3Orders&gt;,
-    <span class="kw">pub </span>padding6: u32,
+    <span class="attr">#[derivative(Debug = <span class="string">&quot;ignore&quot;</span>)]
+    </span><span class="kw">pub </span>padding6: u32,
     <span class="kw">pub </span>perps: Vec&lt;PerpPosition&gt;,
-    <span class="kw">pub </span>padding7: u32,
+    <span class="attr">#[derivative(Debug = <span class="string">&quot;ignore&quot;</span>)]
+    </span><span class="kw">pub </span>padding7: u32,
     <span class="kw">pub </span>perp_open_orders: Vec&lt;PerpOpenOrder&gt;,
     <span class="comment">// WARNING: This does not have further fields, like tcs, intentionally:
     // There are existing accounts that don&#39;t have them and adding them here

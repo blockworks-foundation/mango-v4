@@ -299,6 +299,7 @@
 <a href="#299" id="299">299</a>
 <a href="#300" id="300">300</a>
 <a href="#301" id="301">301</a>
+<a href="#302" id="302">302</a>
 </pre><pre class="rust"><code><span class="kw">use </span>anchor_lang::prelude::<span class="kw-2">*</span>;
 <span class="kw">use </span>derivative::Derivative;
 <span class="kw">use </span>static_assertions::const_assert_eq;
@@ -316,7 +317,8 @@
 /// price over every `delay_interval_seconds` (assume 1h) and then applying the
 /// `delay_growth_limit` between intervals.
 </span><span class="attr">#[zero_copy]
-#[derive(Derivative, Debug)]
+#[derive(Derivative)]
+#[derivative(Debug)]
 </span><span class="kw">pub struct </span>StablePriceModel {
     <span class="doccomment">/// Current stable price to use in health
     </span><span class="kw">pub </span>stable_price: f64,

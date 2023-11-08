@@ -74,7 +74,12 @@
 <a href="#74" id="74">74</a>
 <a href="#75" id="75">75</a>
 <a href="#76" id="76">76</a>
+<a href="#77" id="77">77</a>
+<a href="#78" id="78">78</a>
+<a href="#79" id="79">79</a>
+<a href="#80" id="80">80</a>
 </pre><pre class="rust"><code><span class="kw">use </span>anchor_lang::prelude::<span class="kw-2">*</span>;
+<span class="kw">use </span>derivative::Derivative;
 <span class="kw">use </span>static_assertions::const_assert_eq;
 <span class="kw">use </span>std::mem::size_of;
 
@@ -89,7 +94,8 @@
 // can load this account to figure out which address maps to use when calling
 // instructions that need banks/oracles for all active positions.
 </span><span class="attr">#[account(zero_copy)]
-#[derive(Debug)]
+#[derive(Derivative)]
+#[derivative(Debug)]
 </span><span class="kw">pub struct </span>MintInfo {
     <span class="comment">// ABI: Clients rely on this being at offset 8
     </span><span class="kw">pub </span>group: Pubkey,
@@ -98,7 +104,8 @@
     </span><span class="kw">pub </span>token_index: TokenIndex,
 
     <span class="kw">pub </span>group_insurance_fund: u8,
-    <span class="kw">pub </span>padding1: [u8; <span class="number">5</span>],
+    <span class="attr">#[derivative(Debug = <span class="string">&quot;ignore&quot;</span>)]
+    </span><span class="kw">pub </span>padding1: [u8; <span class="number">5</span>],
     <span class="kw">pub </span>mint: Pubkey,
     <span class="kw">pub </span>banks: [Pubkey; MAX_BANKS],
     <span class="kw">pub </span>vaults: [Pubkey; MAX_BANKS],
@@ -106,7 +113,8 @@
 
     <span class="kw">pub </span>registration_time: u64,
 
-    <span class="kw">pub </span>reserved: [u8; <span class="number">2560</span>],
+    <span class="attr">#[derivative(Debug = <span class="string">&quot;ignore&quot;</span>)]
+    </span><span class="kw">pub </span>reserved: [u8; <span class="number">2560</span>],
 }
 <span class="macro">const_assert_eq!</span>(
     size_of::&lt;MintInfo&gt;(),

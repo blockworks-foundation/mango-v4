@@ -1460,6 +1460,15 @@
 <a href="#1460" id="1460">1460</a>
 <a href="#1461" id="1461">1461</a>
 <a href="#1462" id="1462">1462</a>
+<a href="#1463" id="1463">1463</a>
+<a href="#1464" id="1464">1464</a>
+<a href="#1465" id="1465">1465</a>
+<a href="#1466" id="1466">1466</a>
+<a href="#1467" id="1467">1467</a>
+<a href="#1468" id="1468">1468</a>
+<a href="#1469" id="1469">1469</a>
+<a href="#1470" id="1470">1470</a>
+<a href="#1471" id="1471">1471</a>
 </pre><pre class="rust"><code><span class="kw">use </span>anchor_lang::prelude::<span class="kw-2">*</span>;
 
 <span class="kw">use </span>derivative::Derivative;
@@ -2286,15 +2295,24 @@
 }
 
 <span class="attr">#[zero_copy]
-#[derive(AnchorSerialize, AnchorDeserialize, Debug)]
+#[derive(AnchorSerialize, AnchorDeserialize, Derivative)]
+#[derivative(Debug)]
 </span><span class="kw">pub struct </span>PerpOpenOrder {
     <span class="kw">pub </span>side_and_tree: u8, <span class="comment">// SideAndOrderTree -- enums aren&#39;t POD
+
+    </span><span class="attr">#[derivative(Debug = <span class="string">&quot;ignore&quot;</span>)]
     </span><span class="kw">pub </span>padding1: [u8; <span class="number">1</span>],
+
     <span class="kw">pub </span>market: PerpMarketIndex,
-    <span class="kw">pub </span>padding2: [u8; <span class="number">4</span>],
+
+    <span class="attr">#[derivative(Debug = <span class="string">&quot;ignore&quot;</span>)]
+    </span><span class="kw">pub </span>padding2: [u8; <span class="number">4</span>],
+
     <span class="kw">pub </span>client_id: u64,
     <span class="kw">pub </span>id: u128,
-    <span class="kw">pub </span>reserved: [u8; <span class="number">64</span>],
+
+    <span class="attr">#[derivative(Debug = <span class="string">&quot;ignore&quot;</span>)]
+    </span><span class="kw">pub </span>reserved: [u8; <span class="number">64</span>],
 }
 <span class="macro">const_assert_eq!</span>(size_of::&lt;PerpOpenOrder&gt;(), <span class="number">1 </span>+ <span class="number">1 </span>+ <span class="number">2 </span>+ <span class="number">4 </span>+ <span class="number">8 </span>+ <span class="number">16 </span>+ <span class="number">64</span>);
 <span class="macro">const_assert_eq!</span>(size_of::&lt;PerpOpenOrder&gt;(), <span class="number">96</span>);
