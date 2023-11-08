@@ -198,7 +198,9 @@ async function updateTokenParams(): Promise<void> {
           params.forceClose,
           params.tokenConditionalSwapTakerFeeRate,
           params.tokenConditionalSwapMakerFeeRate,
-          params.flashLoanDepositFeeRate,
+          params.flashLoanSwapFeeRate,
+          params.interestCurveScaling,
+          params.interestTargetUtilization,
         )
         .accounts({
           group: group.publicKey,
