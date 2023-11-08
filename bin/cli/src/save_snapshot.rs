@@ -21,7 +21,7 @@ pub async fn save_snapshot(
     if out_path.exists() {
         anyhow::bail!("path {output} exists already");
     }
-    fs::create_dir_all(&out_path).unwrap();
+    fs::create_dir_all(out_path).unwrap();
 
     let rpc_url = client.cluster.url().to_string();
     let ws_url = client.cluster.ws_url().to_string();
@@ -126,7 +126,7 @@ pub async fn save_snapshot(
             "debug": debug,
         })
         .to_string();
-        fs::write(out_path.join(format!("{}.json", pk.to_string())), data)?;
+        fs::write(out_path.join(format!("{}.json", pk)), data)?;
     }
 
     Ok(())
