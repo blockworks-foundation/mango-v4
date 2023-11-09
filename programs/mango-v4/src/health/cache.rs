@@ -1462,7 +1462,7 @@ mod tests {
         borrows: u64,
         deposit_weight_scale_start_quote: u64,
         borrow_weight_scale_start_quote: u64,
-        deposits_in_serum: i64,
+        potential_serum_tokens: u64,
     }
 
     #[derive(Default)]
@@ -1518,7 +1518,7 @@ mod tests {
             let bank = bank.data();
             bank.indexed_deposits = I80F48::from(settings.deposits) / bank.deposit_index;
             bank.indexed_borrows = I80F48::from(settings.borrows) / bank.borrow_index;
-            bank.deposits_in_serum = settings.deposits_in_serum;
+            bank.potential_serum_tokens = settings.potential_serum_tokens;
             if settings.deposit_weight_scale_start_quote > 0 {
                 bank.deposit_weight_scale_start_quote =
                     settings.deposit_weight_scale_start_quote as f64;
@@ -1834,7 +1834,7 @@ mod tests {
                 ..Default::default()
             },
             TestHealth1Case {
-                // 17, deposits_in_serum counts for deposit weight scaling
+                // 17, potential_serum_tokens counts for deposit weight scaling
                 token1: 100,
                 token2: 100,
                 token3: 100,
@@ -1847,13 +1847,13 @@ mod tests {
                     BankSettings {
                         deposits: 100,
                         deposit_weight_scale_start_quote: 100 * 5,
-                        deposits_in_serum: 100,
+                        potential_serum_tokens: 100,
                         ..BankSettings::default()
                     },
                     BankSettings {
                         deposits: 600,
                         deposit_weight_scale_start_quote: 500 * 10,
-                        deposits_in_serum: 100,
+                        potential_serum_tokens: 100,
                         ..BankSettings::default()
                     },
                 ],

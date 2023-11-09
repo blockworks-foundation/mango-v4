@@ -113,7 +113,7 @@ pub fn token_register(
         flash_loan_swap_fee_rate: flash_loan_swap_fee_rate,
         interest_target_utilization,
         interest_curve_scaling: interest_curve_scaling.into(),
-        deposits_in_serum: 0,
+        potential_serum_tokens: 0,
         maint_weight_shift_start: 0,
         maint_weight_shift_end: 0,
         maint_weight_shift_duration_inv: I80F48::ZERO,

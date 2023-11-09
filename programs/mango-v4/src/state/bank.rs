@@ -158,9 +158,9 @@ pub struct Bank {
     /// Except when first migrating to having this field, then 0.0
     pub interest_curve_scaling: f64,
 
-    // user deposits that were moved into serum open orders
-    // can be negative due to multibank, then it'd need to be balanced in the keeper
-    pub deposits_in_serum: i64,
+    /// Largest amount of tokens that might be added the the bank based on
+    /// serum open order execution.
+    pub potential_serum_tokens: u64,
 
     pub maint_weight_shift_start: u64,
     pub maint_weight_shift_end: u64,
@@ -241,7 +241,7 @@ impl Bank {
             flash_loan_approved_amount: 0,
             flash_loan_token_account_initial: u64::MAX,
             net_borrows_in_window: 0,
-            deposits_in_serum: 0,
+            potential_serum_tokens: 0,
             bump,
             bank_num,
 
@@ -1011,7 +1011,8 @@ impl Bank {
         if self.deposit_weight_scale_start_quote == f64::MAX {
             return self.init_asset_weight;
         }
-        let all_deposits = self.native_deposits().to_num::<f64>() + self.deposits_in_serum as f64;
+        let all_deposits =
+            self.native_deposits().to_num::<f64>() + self.potential_serum_tokens as f64;
         let deposits_quote = all_deposits * price.to_num::<f64>();
         if deposits_quote <= self.deposit_weight_scale_start_quote {
             self.init_asset_weight
@@ -1038,6 +1039,16 @@ impl Bank {
             // The next line is around 500 CU
             let scale = borrows_quote / self.borrow_weight_scale_start_quote;
             self.init_liab_weight * I80F48::from_num(scale)
+        }
+    }
+
+    /// Grows potential_serum_tokens if new > old, shrinks it otherwise
+    #[inline(always)]
+    pub fn update_potential_serum_tokens(&mut self, old: u64, new: u64) {
+        if new >= old {
+            self.potential_serum_tokens += new - old;
+        } else {
+            self.potential_serum_tokens = self.potential_serum_tokens.saturating_sub(old - new);
         }
     }
 }

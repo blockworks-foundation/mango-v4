@@ -282,6 +282,7 @@ export interface IxGateParams {
   TokenConditionalSwapStart: boolean;
   TokenConditionalSwapCreatePremiumAuction: boolean;
   TokenConditionalSwapCreateLinearAuction: boolean;
+  Serum3PlaceOrderV2: boolean;
 }
 
 // Default with all ixs enabled, use with buildIxGate
@@ -360,6 +361,7 @@ export const TrueIxGateParams: IxGateParams = {
   TokenConditionalSwapStart: true,
   TokenConditionalSwapCreatePremiumAuction: true,
   TokenConditionalSwapCreateLinearAuction: true,
+  Serum3PlaceOrderV2: true,
 };
 
 // build ix gate e.g. buildIxGate(Builder(TrueIxGateParams).TokenDeposit(false).build()).toNumber(),
@@ -448,6 +450,7 @@ export function buildIxGate(p: IxGateParams): BN {
   toggleIx(ixGate, p, 'TokenConditionalSwapStart', 68);
   toggleIx(ixGate, p, 'TokenConditionalSwapCreatePremiumAuction', 69);
   toggleIx(ixGate, p, 'TokenConditionalSwapCreateLinearAuction', 70);
+  toggleIx(ixGate, p, 'Serum3PlaceOrderV2', 71);
 
   return ixGate;
 }

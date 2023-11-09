@@ -23,6 +23,7 @@ pub fn health_region_begin<'key, 'accounts, 'remaining, 'info>(
         crate::instruction::Serum3CancelAllOrders::discriminator(),
         crate::instruction::Serum3CancelOrder::discriminator(),
         crate::instruction::Serum3PlaceOrder::discriminator(),
+        crate::instruction::Serum3PlaceOrderV2::discriminator(),
         crate::instruction::Serum3SettleFunds::discriminator(),
         crate::instruction::Serum3SettleFundsV2::discriminator(),
     ];
