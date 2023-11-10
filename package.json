@@ -1,6 +1,6 @@
 {
   "name": "@blockworks-foundation/mango-v4",
-  "version": "0.19.43",
+  "version": "0.19.44",
   "description": "Typescript Client for mango-v4 program.",
   "repository": "https://github.com/blockworks-foundation/mango-v4",
   "author": {
@@ -27,6 +27,7 @@
     "lint": "eslint ./ts/client/src --ext ts --ext tsx --ext js --quiet",
     "typecheck": "tsc --noEmit --pretty",
     "prepublishOnly": "yarn validate && yarn build",
+    "deduplicate": "npx yarn-deduplicate --list --fail",
     "validate": "yarn lint && yarn format"
   },
   "devDependencies": {

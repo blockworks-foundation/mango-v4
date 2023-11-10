@@ -4,6 +4,7 @@ import { MangoClient } from './client';
 import { MANGO_V4_ID } from './constants';
 
 export * from './accounts/bank';
+export * from './accounts/oracle';
 export * from './accounts/mangoAccount';
 export * from './accounts/perp';
 export {
