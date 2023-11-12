@@ -1,9 +1,6 @@
 import {
-  LISTING_PRESETS,
-  LISTING_PRESETS_PYTH,
   MidPriceImpact,
   getMidPriceImpacts,
-  getProposedTier,
 } from '@blockworks-foundation/mango-v4-settings/lib/helpers/listingTools';
 import { AnchorProvider, Wallet } from '@coral-xyz/anchor';
 import { BN } from '@project-serum/anchor';
@@ -21,12 +18,12 @@ import {
   TransactionInstruction,
 } from '@solana/web3.js';
 import fs from 'fs';
-import { OracleProvider } from '../src/accounts/oracle';
 import { Builder } from '../src/builder';
 import { MangoClient } from '../src/client';
 import { NullTokenEditParams } from '../src/clientIxParamBuilder';
 import { MANGO_V4_MAIN_GROUP as MANGO_V4_PRIMARY_GROUP } from '../src/constants';
-import { toUiDecimalsForQuote } from '../src/utils';
+import { getEquityForMangoAccounts } from '../src/risk';
+import { buildFetch } from '../src/utils';
 import {
   MANGO_DAO_WALLET_GOVERNANCE,
   MANGO_GOVERNANCE_PROGRAM,
@@ -84,86 +81,68 @@ async function updateTokenParams(): Promise<void> {
   const group = await client.getGroup(MANGO_V4_PRIMARY_GROUP);
 
   const instructions: TransactionInstruction[] = [];
+
+  let mangoAccounts = await client.getAllMangoAccounts(group, true);
+  let liqors: PublicKey[];
+  liqors = (
+    await (
+      await (
+        await buildFetch()
+      )(
+        `https://api.mngo.cloud/data/v4/stats/liqors-over_period?over_period=1MONTH`,
+        {
+          mode: 'cors',
+          headers: {
+            'Content-Type': 'application/json',
+            'Access-Control-Allow-Origin': '*',
+          },
+        },
+      )
+    ).json()
+  ).map((data) => new PublicKey(data['liqor']));
+  const ttlLiqorEquity = (
+    await getEquityForMangoAccounts(client, group, liqors, mangoAccounts)
+  ).reduce((partialSum, ae) => partialSum + ae.Equity.val, 0);
+
   const midPriceImpacts = getMidPriceImpacts(group.pis);
 
   Array.from(group.banksMapByTokenIndex.values())
     .map((banks) => banks[0])
     .filter(
       (bank) =>
-        bank.mint.toBase58() == 'So11111111111111111111111111111111111111112' ||
-        bank.name.toLocaleLowerCase().indexOf('usdc') > -1 ||
-        bank.name.toLocaleLowerCase().indexOf('stsol') > -1,
+        // bank.name.includes('bSOL') ||
+        // bank.name.includes('JitoSOL') ||
+        bank.name.includes('MSOL'),
+      // ||
+      // bank.name.includes('SOL') ||
+      // bank.name.includes('USDT'),
     )
     .forEach(async (bank) => {
-      // Limit borrows to 1/3rd of deposit, rounded to 1000, only update if more than 10% different
-      const depositsInUsd = bank.nativeDeposits().mul(bank.price);
-      let newNetBorrowLimitPerWindowQuote: number | null =
-        depositsInUsd.toNumber() / 3;
-      newNetBorrowLimitPerWindowQuote =
-        Math.round(newNetBorrowLimitPerWindowQuote / 1_000_000_000) *
-        1_000_000_000;
-      newNetBorrowLimitPerWindowQuote =
-        Math.abs(
-          (newNetBorrowLimitPerWindowQuote -
-            bank.netBorrowLimitPerWindowQuote.toNumber()) /
-            bank.netBorrowLimitPerWindowQuote.toNumber(),
-        ) > 0.1
-          ? newNetBorrowLimitPerWindowQuote
-          : null;
-
-      // Kick in weight scaling as late as possible until liquidation fee remains reasonable
-      // Only update if more than 10% different
-      let newWeightScaleQuote: number | null = null;
-      if (
-        bank.tokenIndex != 0 && // USDC
-        bank.mint.toBase58() != 'So11111111111111111111111111111111111111112' // SOL
-      ) {
-        const PRESETS =
-          bank?.oracleProvider === OracleProvider.Pyth
-            ? LISTING_PRESETS_PYTH
-            : LISTING_PRESETS;
-
-        const tokenToPriceImpact = midPriceImpacts
-          .filter((x) => x.avg_price_impact_percent < 1)
-          .reduce(
-            (acc: { [key: string]: MidPriceImpact }, val: MidPriceImpact) => {
-              if (
-                !acc[val.symbol] ||
-                val.target_amount > acc[val.symbol].target_amount
-              ) {
-                acc[val.symbol] = val;
-              }
-              return acc;
-            },
-            {},
-          );
-        const priceImpact = tokenToPriceImpact[getApiTokenName(bank.name)];
-        const suggestedTier = getProposedTier(
-          PRESETS,
-          priceImpact?.target_amount,
-          bank.oracleProvider === OracleProvider.Pyth,
+      const tokenToPriceImpact = midPriceImpacts
+        .filter((x) => x.avg_price_impact_percent < 1)
+        .reduce(
+          (acc: { [key: string]: MidPriceImpact }, val: MidPriceImpact) => {
+            if (
+              !acc[val.symbol] ||
+              val.target_amount > acc[val.symbol].target_amount
+            ) {
+              acc[val.symbol] = val;
+            }
+            return acc;
+          },
+          {},
         );
-        newWeightScaleQuote =
-          PRESETS[suggestedTier].borrowWeightScaleStartQuote;
-
-        newWeightScaleQuote =
-          bank.depositWeightScaleStartQuote !== newWeightScaleQuote ||
-          bank.borrowWeightScaleStartQuote !== newWeightScaleQuote
-            ? newWeightScaleQuote
-            : null;
-      }
-
-      if (
-        newNetBorrowLimitPerWindowQuote == null &&
-        newWeightScaleQuote == null
-      ) {
-        return;
-      }
+      const priceImpact = tokenToPriceImpact[getApiTokenName(bank.name)];
+      const newSscaleStartQuote = Math.min(
+        // 50 * ttlLiqorEquity,
+        4 * priceImpact.target_amount,
+        4 * priceImpact.target_amount,
+      );
+      console.log(`${bank.name} ${newSscaleStartQuote}`);
 
       const params = Builder(NullTokenEditParams)
-        .netBorrowLimitPerWindowQuote(newNetBorrowLimitPerWindowQuote)
-        .borrowWeightScaleStartQuote(newWeightScaleQuote)
-        .depositWeightScaleStartQuote(newWeightScaleQuote)
+        // .borrowWeightScaleStartQuote(priceImpact)
+        // .depositWeightScaleStartQuote(priceImpact)
         .build();
 
       const ix = await client.program.methods
@@ -226,21 +205,6 @@ async function updateTokenParams(): Promise<void> {
         throw simulated.value.logs;
       }
 
-      console.log(`Bank ${bank.name}`);
-      console.log(
-        `- netBorrowLimitPerWindowQuote UI old ${toUiDecimalsForQuote(
-          bank.netBorrowLimitPerWindowQuote.toNumber(),
-        ).toLocaleString()} new ${toUiDecimalsForQuote(
-          newNetBorrowLimitPerWindowQuote!,
-        ).toLocaleString()}`,
-      );
-      console.log(
-        `- WeightScaleQuote UI old ${toUiDecimalsForQuote(
-          bank.depositWeightScaleStartQuote,
-        ).toLocaleString()} new ${toUiDecimalsForQuote(
-          newWeightScaleQuote!,
-        ).toLocaleString()}`,
-      );
       instructions.push(ix);
     });
 
