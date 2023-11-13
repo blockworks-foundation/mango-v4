@@ -189,7 +189,7 @@ impl BookSide {
         quantity: i64,
         now_ts: u64,
         oracle_price_lots: i64,
-    ) -> Option<I80F48> {
+    ) -> Option<i64> {
         if (quantity <= 0) {
             return None;
         }
