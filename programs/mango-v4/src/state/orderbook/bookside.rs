@@ -182,9 +182,9 @@ impl BookSide {
         None
     }
 
-    /// Walk up the book `quantity` units and return the average price in lots an order would
+    /// Walk up the book `quantity` units and return the amount in quote lots an order would
     /// be filled at. If `quantity` units not on book, return None
-    pub fn average_price_lots(
+    pub fn matched_amount(
         &self,
         quantity: i64,
         now_ts: u64,
@@ -199,8 +199,8 @@ impl BookSide {
             sum_qty += order.node.quantity;
             sum_amt += order.node.quantity * order.price_lots;
             if sum_qty >= quantity {
-                sum_amt -= (sum_qty - quantity) * order.price_lots;
-                return Some(I80F48::from(sum_amt) / I80F48::from(quantity));
+                sum_amt -= (sum_qty - quantity);
+                return Some(sum_amt)
             }
         }
         None
