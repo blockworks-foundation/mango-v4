@@ -27,6 +27,7 @@
     "lint": "eslint ./ts/client/src --ext ts --ext tsx --ext js --quiet",
     "typecheck": "tsc --noEmit --pretty",
     "prepublishOnly": "yarn validate && yarn build",
+    "deduplicate": "npx yarn-deduplicate --list --fail",
     "validate": "yarn lint && yarn format"
   },
   "devDependencies": {
