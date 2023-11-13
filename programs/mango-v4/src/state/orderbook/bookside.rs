@@ -1,4 +1,5 @@
 use anchor_lang::prelude::*;
+use fixed::types::I80F48;
 use num_enum::{IntoPrimitive, TryFromPrimitive};
 use static_assertions::const_assert_eq;
 
@@ -176,6 +177,30 @@ impl BookSide {
             sum += order.node.quantity;
             if sum >= quantity {
                 return Some(order.price_lots);
+            }
+        }
+        None
+    }
+
+    /// Walk up the book `quantity` units and return the average price in lots an order would
+    /// be filled at. If `quantity` units not on book, return None
+    pub fn average_price_lots(
+        &self,
+        quantity: i64,
+        now_ts: u64,
+        oracle_price_lots: i64,
+    ) -> Option<I80F48> {
+        if (quantity <= 0) {
+            return None;
+        }
+        let mut sum_qty: i64 = 0;
+        let mut sum_amt: i64 = 0;
+        for order in self.iter_valid(now_ts, oracle_price_lots) {
+            sum_qty += order.node.quantity;
+            sum_amt += order.node.quantity * order.price_lots;
+            if sum_qty >= quantity {
+                sum_amt -= (sum_qty - quantity) * order.price_lots;
+                return Some(I80F48::from(sum_amt) / I80F48::from(quantity));
             }
         }
         None
