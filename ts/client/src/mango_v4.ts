@@ -602,14 +602,6 @@ export type MangoV4 = {
         {
           "name": "flashLoanSwapFeeRate",
           "type": "f32"
-        },
-        {
-          "name": "interestCurveScaling",
-          "type": "f32"
-        },
-        {
-          "name": "interestTargetUtilization",
-          "type": "f32"
         }
       ]
     },
@@ -941,18 +933,6 @@ export type MangoV4 = {
         },
         {
           "name": "flashLoanSwapFeeRateOpt",
-          "type": {
-            "option": "f32"
-          }
-        },
-        {
-          "name": "interestCurveScalingOpt",
-          "type": {
-            "option": "f32"
-          }
-        },
-        {
-          "name": "interestTargetUtilizationOpt",
           "type": {
             "option": "f32"
           }
@@ -1837,7 +1817,8 @@ export type MangoV4 = {
           "isMut": true,
           "isSigner": false,
           "relations": [
-            "group"
+            "group",
+            "owner"
           ]
         },
         {
@@ -8009,7 +7990,7 @@ export type MangoV4 = {
             "name": "settleFeeFlat",
             "docs": [
               "In native units of settlement token, given to each settle call above the",
-              "settle_fee_amount_threshold if settling at least 1% of perp base pos value."
+              "settle_fee_amount_threshold."
             ],
             "type": "f32"
           },
@@ -8023,8 +8004,7 @@ export type MangoV4 = {
           {
             "name": "settleFeeFractionLowHealth",
             "docs": [
-              "Fraction of pnl to pay out as fee if +pnl account has low health.",
-              "(limited to 2x settle_fee_flat)"
+              "Fraction of pnl to pay out as fee if +pnl account has low health."
             ],
             "type": "f32"
           },
@@ -11409,56 +11389,6 @@ export type MangoV4 = {
         {
           "name": "maxRate",
           "type": "i128",
-          "index": false
-        }
-      ]
-    },
-    {
-      "name": "UpdateRateLogV2",
-      "fields": [
-        {
-          "name": "mangoGroup",
-          "type": "publicKey",
-          "index": false
-        },
-        {
-          "name": "tokenIndex",
-          "type": "u16",
-          "index": false
-        },
-        {
-          "name": "rate0",
-          "type": "i128",
-          "index": false
-        },
-        {
-          "name": "util0",
-          "type": "i128",
-          "index": false
-        },
-        {
-          "name": "rate1",
-          "type": "i128",
-          "index": false
-        },
-        {
-          "name": "util1",
-          "type": "i128",
-          "index": false
-        },
-        {
-          "name": "maxRate",
-          "type": "i128",
-          "index": false
-        },
-        {
-          "name": "curveScaling",
-          "type": "f64",
-          "index": false
-        },
-        {
-          "name": "targetUtilization",
-          "type": "f32",
           "index": false
         }
       ]
@@ -13833,14 +13763,6 @@ export const IDL: MangoV4 = {
         {
           "name": "flashLoanSwapFeeRate",
           "type": "f32"
-        },
-        {
-          "name": "interestCurveScaling",
-          "type": "f32"
-        },
-        {
-          "name": "interestTargetUtilization",
-          "type": "f32"
         }
       ]
     },
@@ -14172,18 +14094,6 @@ export const IDL: MangoV4 = {
         },
         {
           "name": "flashLoanSwapFeeRateOpt",
-          "type": {
-            "option": "f32"
-          }
-        },
-        {
-          "name": "interestCurveScalingOpt",
-          "type": {
-            "option": "f32"
-          }
-        },
-        {
-          "name": "interestTargetUtilizationOpt",
           "type": {
             "option": "f32"
           }
@@ -15068,7 +14978,8 @@ export const IDL: MangoV4 = {
           "isMut": true,
           "isSigner": false,
           "relations": [
-            "group"
+            "group",
+            "owner"
           ]
         },
         {
@@ -21240,7 +21151,7 @@ export const IDL: MangoV4 = {
             "name": "settleFeeFlat",
             "docs": [
               "In native units of settlement token, given to each settle call above the",
-              "settle_fee_amount_threshold if settling at least 1% of perp base pos value."
+              "settle_fee_amount_threshold."
             ],
             "type": "f32"
           },
@@ -21254,8 +21165,7 @@ export const IDL: MangoV4 = {
           {
             "name": "settleFeeFractionLowHealth",
             "docs": [
-              "Fraction of pnl to pay out as fee if +pnl account has low health.",
-              "(limited to 2x settle_fee_flat)"
+              "Fraction of pnl to pay out as fee if +pnl account has low health."
             ],
             "type": "f32"
           },
@@ -24640,56 +24550,6 @@ export const IDL: MangoV4 = {
         {
           "name": "maxRate",
           "type": "i128",
-          "index": false
-        }
-      ]
-    },
-    {
-      "name": "UpdateRateLogV2",
-      "fields": [
-        {
-          "name": "mangoGroup",
-          "type": "publicKey",
-          "index": false
-        },
-        {
-          "name": "tokenIndex",
-          "type": "u16",
-          "index": false
-        },
-        {
-          "name": "rate0",
-          "type": "i128",
-          "index": false
-        },
-        {
-          "name": "util0",
-          "type": "i128",
-          "index": false
-        },
-        {
-          "name": "rate1",
-          "type": "i128",
-          "index": false
-        },
-        {
-          "name": "util1",
-          "type": "i128",
-          "index": false
-        },
-        {
-          "name": "maxRate",
-          "type": "i128",
-          "index": false
-        },
-        {
-          "name": "curveScaling",
-          "type": "f64",
-          "index": false
-        },
-        {
-          "name": "targetUtilization",
-          "type": "f32",
           "index": false
         }
       ]
