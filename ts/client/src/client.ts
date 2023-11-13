@@ -3400,7 +3400,7 @@ export class MangoClient {
       [
         ...preInstructions,
         flashLoanBeginIx,
-        ...userDefinedInstructions.filter((ix) => ix.keys.length > 2),
+        ...userDefinedInstructions,
         flashLoanEndIx,
       ],
       { alts: [...group.addressLookupTablesList, ...userDefinedAlts] },
