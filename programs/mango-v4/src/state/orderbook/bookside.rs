@@ -205,6 +205,29 @@ impl BookSide {
         }
         None
     }
+
+    pub fn matched_quantity(
+        &self,
+        amount: i64,
+        now_ts: u64,
+        oracle_price_lots: i64,
+    ) -> Option<i64> {
+        if (amount <= 0) {
+            return None;
+        }
+        let mut sum_qty: i64 = 0;
+        let mut sum_amt: i64 = 0;
+        for order in self.iter_valid(now_ts, oracle_price_lots) {
+            sum_qty += order.node.quantity;
+            sum_amt += order.node.quantity * order.price_lots;
+            if sum_amt >= amount {
+                let extra_amt = (sum_amt - amount);
+                sum_qty -= (extra_amt + oracle_price_lots - 1) / order.price_lots;
+                return Some(sum_amt)
+            }
+        }
+        None
+    }
 }
 
 #[cfg(test)]
