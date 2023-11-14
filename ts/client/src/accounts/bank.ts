@@ -42,6 +42,7 @@ export interface BankForHealth {
   scaledInitLiabWeight(price: I80F48): I80F48;
   nativeDeposits(): I80F48;
   nativeBorrows(): I80F48;
+  maintWeights(): [I80F48, I80F48];
 
   depositWeightScaleStartQuote: number;
   borrowWeightScaleStartQuote: number;
@@ -75,6 +76,9 @@ export class Bank implements BankForHealth {
   public maintLiabWeight: I80F48;
   public liquidationFee: I80F48;
   public dust: I80F48;
+  public maintWeightShiftDurationInv: I80F48;
+  public maintWeightShiftAssetTarget: I80F48;
+  public maintWeightShiftLiabTarget: I80F48;
 
   static from(
     publicKey: PublicKey,
@@ -126,6 +130,14 @@ export class Bank implements BankForHealth {
       tokenConditionalSwapTakerFeeRate: number;
       tokenConditionalSwapMakerFeeRate: number;
       flashLoanSwapFeeRate: number;
+      interestTargetUtilization: number;
+      interestCurveScaling: number;
+      depositsInSerum: BN;
+      maintWeightShiftStart: BN;
+      maintWeightShiftEnd: BN;
+      maintWeightShiftDurationInv: I80F48Dto;
+      maintWeightShiftAssetTarget: I80F48Dto;
+      maintWeightShiftLiabTarget: I80F48Dto;
     },
   ): Bank {
     return new Bank(
@@ -177,6 +189,14 @@ export class Bank implements BankForHealth {
       obj.tokenConditionalSwapTakerFeeRate,
       obj.tokenConditionalSwapMakerFeeRate,
       obj.flashLoanSwapFeeRate,
+      obj.interestTargetUtilization,
+      obj.interestCurveScaling,
+      obj.depositsInSerum,
+      obj.maintWeightShiftStart,
+      obj.maintWeightShiftEnd,
+      obj.maintWeightShiftDurationInv,
+      obj.maintWeightShiftAssetTarget,
+      obj.maintWeightShiftLiabTarget,
     );
   }
 
@@ -229,6 +249,14 @@ export class Bank implements BankForHealth {
     public tokenConditionalSwapTakerFeeRate: number,
     public tokenConditionalSwapMakerFeeRate: number,
     public flashLoanSwapFeeRate: number,
+    public interestTargetUtilization: number,
+    public interestCurveScaling: number,
+    public depositsInSerum: BN,
+    public maintWeightShiftStart: BN,
+    public maintWeightShiftEnd: BN,
+    maintWeightShiftDurationInv: I80F48Dto,
+    maintWeightShiftAssetTarget: I80F48Dto,
+    maintWeightShiftLiabTarget: I80F48Dto,
   ) {
     this.name = utf8.decode(new Uint8Array(name)).split('\x00')[0];
     this.oracleConfig = {
@@ -255,6 +283,9 @@ export class Bank implements BankForHealth {
     this.initLiabWeight = I80F48.from(initLiabWeight);
     this.liquidationFee = I80F48.from(liquidationFee);
     this.dust = I80F48.from(dust);
+    this.maintWeightShiftDurationInv = I80F48.from(maintWeightShiftDurationInv);
+    this.maintWeightShiftAssetTarget = I80F48.from(maintWeightShiftAssetTarget);
+    this.maintWeightShiftLiabTarget = I80F48.from(maintWeightShiftLiabTarget);
     this._price = undefined;
     this._uiPrice = undefined;
     this._oracleLastUpdatedSlot = undefined;
@@ -376,6 +407,32 @@ export class Bank implements BankForHealth {
     );
   }
 
+  maintWeights(): [I80F48, I80F48] {
+    const nowTs = new BN(Date.now() / 1000);
+    if (
+      this.maintWeightShiftDurationInv.isZero() ||
+      nowTs.lte(this.maintWeightShiftStart)
+    ) {
+      return [this.maintAssetWeight, this.maintLiabWeight];
+    } else if (nowTs.gte(this.maintWeightShiftEnd)) {
+      return [
+        this.maintWeightShiftAssetTarget,
+        this.maintWeightShiftLiabTarget,
+      ];
+    } else {
+      const scale = I80F48.fromU64(nowTs.sub(this.maintWeightShiftStart)).mul(
+        this.maintWeightShiftDurationInv,
+      );
+      const asset = this.maintAssetWeight.add(
+        this.maintWeightShiftAssetTarget.sub(this.maintAssetWeight).mul(scale),
+      );
+      const liab = this.maintLiabWeight.add(
+        this.maintWeightShiftLiabTarget.sub(this.maintLiabWeight).mul(scale),
+      );
+      return [asset, liab];
+    }
+  }
+
   getAssetPrice(): I80F48 {
     return this.price.min(I80F48.fromNumber(this.stablePriceModel.stablePrice));
   }
@@ -449,19 +506,22 @@ export class Bank implements BankForHealth {
     }
 
     const utilization = totalBorrows.div(totalDeposits);
+    const scaling = I80F48.fromNumber(
+      this.interestCurveScaling == 0.0 ? 1.0 : this.interestCurveScaling,
+    );
     if (utilization.lt(this.util0)) {
       const slope = this.rate0.div(this.util0);
-      return slope.mul(utilization);
+      return slope.mul(utilization).mul(scaling);
     } else if (utilization.lt(this.util1)) {
       const extraUtil = utilization.sub(this.util0);
       const slope = this.rate1.sub(this.rate0).div(this.util1.sub(this.util0));
-      return this.rate0.add(slope.mul(extraUtil));
+      return this.rate0.add(slope.mul(extraUtil)).mul(scaling);
     } else {
       const extraUtil = utilization.sub(this.util1);
       const slope = this.maxRate
         .sub(this.rate1)
         .div(I80F48.fromNumber(1).sub(this.util1));
-      return this.rate1.add(slope.mul(extraUtil));
+      return this.rate1.add(slope.mul(extraUtil)).mul(scaling);
     }
   }
 

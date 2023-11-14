@@ -57,6 +57,7 @@ function mockBankAndOracle(
     },
     nativeDeposits: () => I80F48.fromNumber(deposits),
     nativeBorrows: () => I80F48.fromNumber(borrows),
+    maintWeights: () => [I80F48.fromNumber(1 - maintWeight), I80F48.fromNumber(1 + maintWeight)],
     borrowWeightScaleStartQuote: borrowWeightScaleStartQuote,
     depositWeightScaleStartQuote: depositWeightScaleStartQuote,
   };

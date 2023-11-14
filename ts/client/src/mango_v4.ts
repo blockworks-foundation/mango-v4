@@ -956,6 +956,34 @@ export type MangoV4 = {
           "type": {
             "option": "f32"
           }
+        },
+        {
+          "name": "maintWeightShiftStartOpt",
+          "type": {
+            "option": "u64"
+          }
+        },
+        {
+          "name": "maintWeightShiftEndOpt",
+          "type": {
+            "option": "u64"
+          }
+        },
+        {
+          "name": "maintWeightShiftAssetTargetOpt",
+          "type": {
+            "option": "f32"
+          }
+        },
+        {
+          "name": "maintWeightShiftLiabTargetOpt",
+          "type": {
+            "option": "f32"
+          }
+        },
+        {
+          "name": "maintWeightShiftAbort",
+          "type": "bool"
         }
       ]
     },
@@ -7080,11 +7108,37 @@ export type MangoV4 = {
             "type": "i64"
           },
           {
+            "name": "maintWeightShiftStart",
+            "type": "u64"
+          },
+          {
+            "name": "maintWeightShiftEnd",
+            "type": "u64"
+          },
+          {
+            "name": "maintWeightShiftDurationInv",
+            "type": {
+              "defined": "I80F48"
+            }
+          },
+          {
+            "name": "maintWeightShiftAssetTarget",
+            "type": {
+              "defined": "I80F48"
+            }
+          },
+          {
+            "name": "maintWeightShiftLiabTarget",
+            "type": {
+              "defined": "I80F48"
+            }
+          },
+          {
             "name": "reserved",
             "type": {
               "array": [
                 "u8",
-                2072
+                2008
               ]
             }
           }
@@ -14187,6 +14241,34 @@ export const IDL: MangoV4 = {
           "type": {
             "option": "f32"
           }
+        },
+        {
+          "name": "maintWeightShiftStartOpt",
+          "type": {
+            "option": "u64"
+          }
+        },
+        {
+          "name": "maintWeightShiftEndOpt",
+          "type": {
+            "option": "u64"
+          }
+        },
+        {
+          "name": "maintWeightShiftAssetTargetOpt",
+          "type": {
+            "option": "f32"
+          }
+        },
+        {
+          "name": "maintWeightShiftLiabTargetOpt",
+          "type": {
+            "option": "f32"
+          }
+        },
+        {
+          "name": "maintWeightShiftAbort",
+          "type": "bool"
         }
       ]
     },
@@ -20311,11 +20393,37 @@ export const IDL: MangoV4 = {
             "type": "i64"
           },
           {
+            "name": "maintWeightShiftStart",
+            "type": "u64"
+          },
+          {
+            "name": "maintWeightShiftEnd",
+            "type": "u64"
+          },
+          {
+            "name": "maintWeightShiftDurationInv",
+            "type": {
+              "defined": "I80F48"
+            }
+          },
+          {
+            "name": "maintWeightShiftAssetTarget",
+            "type": {
+              "defined": "I80F48"
+            }
+          },
+          {
+            "name": "maintWeightShiftLiabTarget",
+            "type": {
+              "defined": "I80F48"
+            }
+          },
+          {
             "name": "reserved",
             "type": {
               "array": [
                 "u8",
-                2072
+                2008
               ]
             }
           }

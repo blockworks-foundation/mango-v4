@@ -96,6 +96,11 @@ export interface TokenEditParams {
   flashLoanSwapFeeRate: number | null;
   interestCurveScaling: number | null;
   interestTargetUtilization: number | null;
+  maintWeightShiftStart: BN | null;
+  maintWeightShiftEnd: BN | null;
+  maintWeightShiftAssetTarget: number | null;
+  maintWeightShiftLiabTarget: number | null;
+  maintWeightShiftAbort: boolean | null;
 }
 
 export const NullTokenEditParams: TokenEditParams = {
@@ -128,6 +133,11 @@ export const NullTokenEditParams: TokenEditParams = {
   flashLoanSwapFeeRate: null,
   interestCurveScaling: null,
   interestTargetUtilization: null,
+  maintWeightShiftStart: null,
+  maintWeightShiftEnd: null,
+  maintWeightShiftAssetTarget: null,
+  maintWeightShiftLiabTarget: null,
+  maintWeightShiftAbort: null,
 };
 
 export interface PerpEditParams {
