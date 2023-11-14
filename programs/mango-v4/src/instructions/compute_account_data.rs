@@ -13,7 +13,8 @@ pub fn compute_account_data(ctx: Context<ComputeAccountData>) -> Result<()> {
 
     let account_retriever = ScanningAccountRetriever::new(ctx.remaining_accounts, &group_pk)?;
 
-    let health_cache = new_health_cache(&account.borrow(), &account_retriever)?;
+    let now_ts: u64 = Clock::get()?.unix_timestamp.try_into().unwrap();
+    let health_cache = new_health_cache(&account.borrow(), &account_retriever, now_ts)?;
     let init_health = health_cache.health(HealthType::Init);
     let maint_health = health_cache.health(HealthType::Maint);
 

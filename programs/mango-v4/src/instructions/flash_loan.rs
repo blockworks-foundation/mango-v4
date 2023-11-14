@@ -388,7 +388,8 @@ pub fn flash_loan_end<'key, 'accounts, 'remaining, 'info>(
 
     // Check health before balance adjustments
     let retriever = new_fixed_order_account_retriever(health_ais, &account.borrow())?;
-    let health_cache = new_health_cache(&account.borrow(), &retriever)?;
+    let now_ts: u64 = Clock::get()?.unix_timestamp.try_into().unwrap();
+    let health_cache = new_health_cache(&account.borrow(), &retriever, now_ts)?;
     let pre_init_health = account.check_health_pre(&health_cache)?;
 
     // Prices for logging and net borrow checks
@@ -500,7 +501,7 @@ pub fn flash_loan_end<'key, 'accounts, 'remaining, 'info>(
 
     // Check health after account position changes
     let retriever = new_fixed_order_account_retriever(health_ais, &account.borrow())?;
-    let health_cache = new_health_cache(&account.borrow(), &retriever)?;
+    let health_cache = new_health_cache(&account.borrow(), &retriever, now_ts)?;
     account.check_health_post(&health_cache, pre_init_health)?;
 
     // Deactivate inactive token accounts after health check

@@ -71,7 +71,7 @@ pub fn perp_liq_negative_pnl_or_bankruptcy(
 
     let retriever = ScanningAccountRetriever::new(ctx.remaining_accounts, &mango_group)
         .context("create account retriever")?;
-    let mut liqee_health_cache = new_health_cache(&liqee.borrow(), &retriever)?;
+    let mut liqee_health_cache = new_health_cache(&liqee.borrow(), &retriever, now_ts)?;
     drop(retriever);
     let liqee_liq_end_health = liqee_health_cache.health(HealthType::LiquidationEnd);
 
@@ -197,8 +197,13 @@ pub fn perp_liq_negative_pnl_or_bankruptcy(
     if !liqor.fixed.is_in_health_region() {
         let account_retriever =
             ScanningAccountRetriever::new(ctx.remaining_accounts, &mango_group)?;
-        let liqor_health = compute_health(&liqor.borrow(), HealthType::Init, &account_retriever)
-            .context("compute liqor health")?;
+        let liqor_health = compute_health(
+            &liqor.borrow(),
+            HealthType::Init,
+            &account_retriever,
+            now_ts,
+        )
+        .context("compute liqor health")?;
         require!(liqor_health >= 0, MangoError::HealthMustBePositive);
     }
 
@@ -509,7 +514,7 @@ mod tests {
                     ScanningAccountRetriever::new_with_staleness(&ais, &setup.group, None).unwrap();
 
                 liqee_health_cache =
-                    health::new_health_cache(&setup.liqee.borrow(), &retriever).unwrap();
+                    health::new_health_cache(&setup.liqee.borrow(), &retriever, 0).unwrap();
                 liqee_liq_end_health = liqee_health_cache.health(HealthType::LiquidationEnd);
             }
 

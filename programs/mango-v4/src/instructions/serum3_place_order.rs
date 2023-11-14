@@ -76,8 +76,9 @@ pub fn serum3_place_order(
     //
     let mut account = ctx.accounts.account.load_full_mut()?;
     let retriever = new_fixed_order_account_retriever(ctx.remaining_accounts, &account.borrow())?;
-    let mut health_cache =
-        new_health_cache(&account.borrow(), &retriever).context("pre-withdraw init health")?;
+    let now_ts: u64 = Clock::get()?.unix_timestamp.try_into().unwrap();
+    let mut health_cache = new_health_cache(&account.borrow(), &retriever, now_ts)
+        .context("pre-withdraw init health")?;
     let pre_health_opt = if !account.fixed.is_in_health_region() {
         let pre_init_health = account.check_health_pre(&health_cache)?;
         Some(pre_init_health)

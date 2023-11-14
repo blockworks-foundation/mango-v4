@@ -386,6 +386,17 @@ pub async fn account_init_health(solana: &SolanaCookie, account: Pubkey) -> f64 
     health_data.init_health.to_num::<f64>()
 }
 
+pub async fn account_maint_health(solana: &SolanaCookie, account: Pubkey) -> f64 {
+    send_tx(solana, ComputeAccountDataInstruction { account })
+        .await
+        .unwrap();
+    let health_data = solana
+        .program_log_events::<mango_v4::events::MangoAccountData>()
+        .pop()
+        .unwrap();
+    health_data.maint_health.to_num::<f64>()
+}
+
 // Verifies that the "post_health: ..." log emitted by the previous instruction
 // matches the init health of the account.
 pub async fn check_prev_instruction_post_health(solana: &SolanaCookie, account: Pubkey) {
@@ -1245,6 +1256,11 @@ pub fn token_edit_instruction_default() -> mango_v4::instruction::TokenEdit {
         flash_loan_swap_fee_rate_opt: None,
         interest_curve_scaling_opt: None,
         interest_target_utilization_opt: None,
+        maint_weight_shift_start_opt: None,
+        maint_weight_shift_end_opt: None,
+        maint_weight_shift_asset_target_opt: None,
+        maint_weight_shift_liab_target_opt: None,
+        maint_weight_shift_abort: false,
     }
 }
 

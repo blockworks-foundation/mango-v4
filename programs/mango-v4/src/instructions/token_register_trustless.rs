@@ -97,7 +97,12 @@ pub fn token_register_trustless(
         interest_target_utilization: 0.5,
         interest_curve_scaling: 4.0,
         deposits_in_serum: 0,
-        reserved: [0; 2072],
+        maint_weight_shift_start: 0,
+        maint_weight_shift_end: 0,
+        maint_weight_shift_duration_inv: I80F48::ZERO,
+        maint_weight_shift_asset_target: I80F48::ZERO,
+        maint_weight_shift_liab_target: I80F48::ZERO,
+        reserved: [0; 2008],
     };
 
     if let Ok(oracle_price) =

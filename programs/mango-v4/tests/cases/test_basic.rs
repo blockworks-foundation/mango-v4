@@ -414,3 +414,100 @@ async fn test_account_size_migration() -> Result<(), TransportError> {
 
     Ok(())
 }
+
+#[tokio::test]
+async fn test_bank_maint_weight_shift() -> Result<(), TransportError> {
+    let context = TestContext::new().await;
+    let solana = &context.solana.clone();
+
+    let admin = TestKeypair::new();
+    let owner = context.users[0].key;
+    let payer = context.users[1].key;
+    let mints = &context.mints[0..1];
+
+    let mango_setup::GroupWithTokens { group, tokens, .. } = mango_setup::GroupWithTokensConfig {
+        admin,
+        payer,
+        mints: mints.to_vec(),
+        zero_token_is_quote: true,
+        ..mango_setup::GroupWithTokensConfig::default()
+    }
+    .create(solana)
+    .await;
+
+    let funding_amount = 1000;
+    let account = create_funded_account(
+        &solana,
+        group,
+        owner,
+        1,
+        &context.users[1],
+        mints,
+        funding_amount,
+        0,
+    )
+    .await;
+
+    let maint_health = account_maint_health(solana, account).await;
+    assert!(assert_equal_f64_f64(maint_health, 1000.0, 1e-2));
+
+    let start_time = solana.clock_timestamp().await;
+
+    send_tx(
+        solana,
+        TokenEdit {
+            group,
+            admin,
+            mint: mints[0].pubkey,
+            options: mango_v4::instruction::TokenEdit {
+                maint_weight_shift_start_opt: Some(start_time + 1000),
+                maint_weight_shift_end_opt: Some(start_time + 2000),
+                maint_weight_shift_asset_target_opt: Some(0.5),
+                maint_weight_shift_liab_target_opt: Some(1.5),
+                ..token_edit_instruction_default()
+            },
+        },
+    )
+    .await
+    .unwrap();
+
+    let maint_health = account_maint_health(solana, account).await;
+    assert!(assert_equal_f64_f64(maint_health, 1000.0, 1e-2));
+
+    solana.set_clock_timestamp(start_time + 1500).await;
+
+    let maint_health = account_maint_health(solana, account).await;
+    assert!(assert_equal_f64_f64(maint_health, 750.0, 1e-2));
+
+    solana.set_clock_timestamp(start_time + 3000).await;
+
+    let maint_health = account_maint_health(solana, account).await;
+    assert!(assert_equal_f64_f64(maint_health, 500.0, 1e-2));
+
+    solana.set_clock_timestamp(start_time + 1600).await;
+
+    send_tx(
+        solana,
+        TokenEdit {
+            group,
+            admin,
+            mint: mints[0].pubkey,
+            options: mango_v4::instruction::TokenEdit {
+                maint_weight_shift_abort: true,
+                ..token_edit_instruction_default()
+            },
+        },
+    )
+    .await
+    .unwrap();
+
+    let maint_health = account_maint_health(solana, account).await;
+    assert!(assert_equal_f64_f64(maint_health, 700.0, 1e-2));
+
+    let bank: Bank = solana.get_account(tokens[0].bank).await;
+    assert!(assert_equal_fixed_f64(bank.maint_asset_weight, 0.7, 1e-4));
+    assert!(assert_equal_fixed_f64(bank.maint_liab_weight, 1.3, 1e-4));
+    assert_eq!(bank.maint_weight_shift_duration_inv, I80F48::ZERO);
+
+    Ok(())
+}

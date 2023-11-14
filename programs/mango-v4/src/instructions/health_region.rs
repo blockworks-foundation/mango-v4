@@ -87,7 +87,8 @@ pub fn health_region_begin<'key, 'accounts, 'remaining, 'info>(
         .context("create account retriever")?;
 
     // Compute pre-health and store it on the account
-    let health_cache = new_health_cache(&account.borrow(), &account_retriever)?;
+    let now_ts: u64 = Clock::get()?.unix_timestamp.try_into().unwrap();
+    let health_cache = new_health_cache(&account.borrow(), &account_retriever, now_ts)?;
     let pre_init_health = account.check_health_pre(&health_cache)?;
     account.fixed.health_region_begin_init_health = pre_init_health.ceil().to_num();
 
@@ -107,7 +108,8 @@ pub fn health_region_end<'key, 'accounts, 'remaining, 'info>(
     let group = account.fixed.group;
     let account_retriever = ScanningAccountRetriever::new(ctx.remaining_accounts, &group)
         .context("create account retriever")?;
-    let health_cache = new_health_cache(&account.borrow(), &account_retriever)?;
+    let now_ts: u64 = Clock::get()?.unix_timestamp.try_into().unwrap();
+    let health_cache = new_health_cache(&account.borrow(), &account_retriever, now_ts)?;
 
     let pre_init_health = I80F48::from(account.fixed.health_region_begin_init_health);
     account.check_health_post(&health_cache, pre_init_health)?;

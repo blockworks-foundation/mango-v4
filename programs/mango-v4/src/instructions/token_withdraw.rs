@@ -14,6 +14,7 @@ pub fn token_withdraw(ctx: Context<TokenWithdraw>, amount: u64, allow_borrow: bo
 
     let group = ctx.accounts.group.load()?;
     let token_index = ctx.accounts.bank.load()?.token_index;
+    let now_ts: u64 = Clock::get()?.unix_timestamp.try_into().unwrap();
 
     // Create the account's position for that token index
     let mut account = ctx.accounts.account.load_full_mut()?;
@@ -23,8 +24,8 @@ pub fn token_withdraw(ctx: Context<TokenWithdraw>, amount: u64, allow_borrow: bo
     let pre_health_opt = if !account.fixed.is_in_health_region() {
         let retriever =
             new_fixed_order_account_retriever(ctx.remaining_accounts, &account.borrow())?;
-        let hc_result =
-            new_health_cache(&account.borrow(), &retriever).context("pre-withdraw health cache");
+        let hc_result = new_health_cache(&account.borrow(), &retriever, now_ts)
+            .context("pre-withdraw health cache");
         if hc_result.is_oracle_error() {
             // We allow NOT checking the pre init health. That means later on the health
             // check will be stricter (post_init > 0, without the post_init >= pre_init option)
@@ -132,8 +133,9 @@ pub fn token_withdraw(ctx: Context<TokenWithdraw>, amount: u64, allow_borrow: bo
             // Note that this must include the normal pre and post health checks.
             let retriever =
                 new_fixed_order_account_retriever(ctx.remaining_accounts, &account.borrow())?;
-            let health_cache = new_health_cache_skipping_bad_oracles(&account.borrow(), &retriever)
-                .context("special post-withdraw health-cache")?;
+            let health_cache =
+                new_health_cache_skipping_bad_oracles(&account.borrow(), &retriever, now_ts)
+                    .context("special post-withdraw health-cache")?;
             let post_init_health = health_cache.health(HealthType::Init);
             account.check_health_pre_checks(&health_cache, post_init_health)?;
             account.check_health_post_checks(I80F48::MAX, post_init_health)?;

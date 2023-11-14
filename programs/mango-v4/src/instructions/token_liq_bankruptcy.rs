@@ -42,9 +42,10 @@ pub fn token_liq_bankruptcy(
     );
 
     let mut account_retriever = ScanningAccountRetriever::new(health_ais, group_pk)?;
+    let now_ts: u64 = Clock::get()?.unix_timestamp.try_into().unwrap();
 
     let mut liqee = ctx.accounts.liqee.load_full_mut()?;
-    let mut liqee_health_cache = new_health_cache(&liqee.borrow(), &account_retriever)
+    let mut liqee_health_cache = new_health_cache(&liqee.borrow(), &account_retriever, now_ts)
         .context("create liqee health cache")?;
     liqee_health_cache.require_after_phase2_liquidation()?;
     liqee.fixed.set_being_liquidated(true);
@@ -105,8 +106,6 @@ pub fn token_liq_bankruptcy(
     // liquidators to exploit the insurance fund for 1 native token each call.
     let liab_transfer = insurance_transfer_i80f48 / liab_to_quote_with_fee;
 
-    let now_ts: u64 = Clock::get()?.unix_timestamp.try_into().unwrap();
-
     let mut liqee_liab_active = true;
     if insurance_transfer > 0 {
         // liqee gets liab assets (enable dusting to prevent a case where the position is brought
@@ -165,8 +164,12 @@ pub fn token_liq_bankruptcy(
 
             // Check liqor's health
             if !liqor.fixed.is_in_health_region() {
-                let liqor_health =
-                    compute_health(&liqor.borrow(), HealthType::Init, &account_retriever)?;
+                let liqor_health = compute_health(
+                    &liqor.borrow(),
+                    HealthType::Init,
+                    &account_retriever,
+                    now_ts,
+                )?;
                 require!(liqor_health >= 0, MangoError::HealthMustBePositive);
             }
 

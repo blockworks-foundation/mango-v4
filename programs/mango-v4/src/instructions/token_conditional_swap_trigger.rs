@@ -87,7 +87,7 @@ pub fn token_conditional_swap_trigger(
     // changes when the tcs was created.
     liqee.ensure_token_position(buy_token_index)?;
     liqee.ensure_token_position(sell_token_index)?;
-    let mut liqee_health_cache = new_health_cache(&liqee.borrow(), &account_retriever)
+    let mut liqee_health_cache = new_health_cache(&liqee.borrow(), &account_retriever, now_ts)
         .context("create liqee health cache")?;
 
     let (buy_bank, buy_token_price, sell_bank_and_oracle_opt) =
@@ -118,8 +118,13 @@ pub fn token_conditional_swap_trigger(
     );
 
     // Check liqor health, liqee health is checked inside (has to be, since tcs closure depends on it)
-    let liqor_health = compute_health(&liqor.borrow(), HealthType::Init, &account_retriever)
-        .context("compute liqor health")?;
+    let liqor_health = compute_health(
+        &liqor.borrow(),
+        HealthType::Init,
+        &account_retriever,
+        now_ts,
+    )
+    .context("compute liqor health")?;
     require!(liqor_health >= 0, MangoError::HealthMustBePositive);
 
     Ok(())
@@ -797,7 +802,7 @@ mod tests {
             let retriever =
                 ScanningAccountRetriever::new_with_staleness(&ais, &setup.group, None).unwrap();
             let mut liqee_health_cache =
-                crate::health::new_health_cache(&setup.liqee.borrow(), &retriever).unwrap();
+                crate::health::new_health_cache(&setup.liqee.borrow(), &retriever, 0).unwrap();
 
             action(
                 &mut self.liqor.borrow_mut(),

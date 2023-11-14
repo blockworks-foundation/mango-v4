@@ -11,10 +11,11 @@ pub fn perp_liq_force_cancel_orders(
 ) -> Result<()> {
     let mut account = ctx.accounts.account.load_full_mut()?;
 
+    let now_ts: u64 = Clock::get()?.unix_timestamp.try_into().unwrap();
     let mut health_cache = {
         let retriever =
             new_fixed_order_account_retriever(ctx.remaining_accounts, &account.borrow())?;
-        new_health_cache(&account.borrow(), &retriever).context("create health cache")?
+        new_health_cache(&account.borrow(), &retriever, now_ts).context("create health cache")?
     };
 
     let mut perp_market = ctx.accounts.perp_market.load_mut()?;

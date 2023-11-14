@@ -113,7 +113,12 @@ pub fn token_register(
         interest_target_utilization,
         interest_curve_scaling: interest_curve_scaling.into(),
         deposits_in_serum: 0,
-        reserved: [0; 2072],
+        maint_weight_shift_start: 0,
+        maint_weight_shift_end: 0,
+        maint_weight_shift_duration_inv: I80F48::ZERO,
+        maint_weight_shift_asset_target: I80F48::ZERO,
+        maint_weight_shift_liab_target: I80F48::ZERO,
+        reserved: [0; 2008],
     };
 
     if let Ok(oracle_price) =

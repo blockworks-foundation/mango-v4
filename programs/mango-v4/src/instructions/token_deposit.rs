@@ -114,11 +114,12 @@ impl<'a, 'info> DepositCommon<'a, 'info> {
         // Health computation
         //
         let retriever = new_fixed_order_account_retriever(remaining_accounts, &account.borrow())?;
+        let now_ts: u64 = Clock::get()?.unix_timestamp.try_into().unwrap();
 
         // We only compute health to check if the account leaves the being_liquidated state.
         // So it's ok to possibly skip token positions for bad oracles and compute a health
         // value that is too low.
-        let cache = new_health_cache_skipping_bad_oracles(&account.borrow(), &retriever)?;
+        let cache = new_health_cache_skipping_bad_oracles(&account.borrow(), &retriever, now_ts)?;
 
         // Since depositing can only increase health, we can skip the usual pre-health computation.
         // Also, TokenDeposit is one of the rare instructions that is allowed even during being_liquidated.

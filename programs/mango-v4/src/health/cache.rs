@@ -94,9 +94,10 @@ pub fn compute_health_from_fixed_accounts(
     account: &MangoAccountRef,
     health_type: HealthType,
     ais: &[AccountInfo],
+    now_ts: u64,
 ) -> Result<I80F48> {
     let retriever = new_fixed_order_account_retriever(ais, account)?;
-    Ok(new_health_cache(account, &retriever)?.health(health_type))
+    Ok(new_health_cache(account, &retriever, now_ts)?.health(health_type))
 }
 
 /// Compute health with an arbitrary AccountRetriever
@@ -104,8 +105,9 @@ pub fn compute_health(
     account: &MangoAccountRef,
     health_type: HealthType,
     retriever: &impl AccountRetriever,
+    now_ts: u64,
 ) -> Result<I80F48> {
-    Ok(new_health_cache(account, retriever)?.health(health_type))
+    Ok(new_health_cache(account, retriever, now_ts)?.health(health_type))
 }
 
 /// How much of a token can be taken away before health decreases to zero?
@@ -1221,8 +1223,9 @@ pub(crate) fn find_token_info_index(infos: &[TokenInfo], token_index: TokenIndex
 pub fn new_health_cache(
     account: &MangoAccountRef,
     retriever: &impl AccountRetriever,
+    now_ts: u64,
 ) -> Result<HealthCache> {
-    new_health_cache_impl(account, retriever, false)
+    new_health_cache_impl(account, retriever, now_ts, false)
 }
 
 /// Generate a special HealthCache for an account and its health accounts
@@ -1233,13 +1236,15 @@ pub fn new_health_cache(
 pub fn new_health_cache_skipping_bad_oracles(
     account: &MangoAccountRef,
     retriever: &impl AccountRetriever,
+    now_ts: u64,
 ) -> Result<HealthCache> {
-    new_health_cache_impl(account, retriever, true)
+    new_health_cache_impl(account, retriever, now_ts, true)
 }
 
 fn new_health_cache_impl(
     account: &MangoAccountRef,
     retriever: &impl AccountRetriever,
+    now_ts: u64,
     // If an oracle is stale or inconfident and the health contribution would
     // not be negative, skip it. This decreases health, but maybe overall it's
     // still positive?
@@ -1268,12 +1273,15 @@ fn new_health_cache_impl(
         // Use the liab price for computing weight scaling, because it's pessimistic and
         // causes the most unfavorable scaling.
         let liab_price = prices.liab(HealthType::Init);
+
+        let (maint_asset_weight, maint_liab_weight) = bank.maint_weights(now_ts);
+
         token_infos.push(TokenInfo {
             token_index: bank.token_index,
-            maint_asset_weight: bank.maint_asset_weight,
+            maint_asset_weight,
             init_asset_weight: bank.init_asset_weight,
             init_scaled_asset_weight: bank.scaled_init_asset_weight(liab_price),
-            maint_liab_weight: bank.maint_liab_weight,
+            maint_liab_weight,
             init_liab_weight: bank.init_liab_weight,
             init_scaled_liab_weight: bank.scaled_init_liab_weight(liab_price),
             prices,
@@ -1443,7 +1451,7 @@ mod tests {
         // for bank2/oracle2
         let health2 = (-10.0 + 3.0) * 5.0 * 1.5;
         assert!(health_eq(
-            compute_health(&account.borrow(), HealthType::Init, &retriever).unwrap(),
+            compute_health(&account.borrow(), HealthType::Init, &retriever, 0).unwrap(),
             health1 + health2
         ));
     }
@@ -1568,7 +1576,7 @@ mod tests {
         let retriever = ScanningAccountRetriever::new_with_staleness(&ais, &group, None).unwrap();
 
         assert!(health_eq(
-            compute_health(&account.borrow(), HealthType::Init, &retriever).unwrap(),
+            compute_health(&account.borrow(), HealthType::Init, &retriever, 0).unwrap(),
             testcase.expected_health
         ));
     }
