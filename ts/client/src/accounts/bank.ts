@@ -126,6 +126,9 @@ export class Bank implements BankForHealth {
       tokenConditionalSwapTakerFeeRate: number;
       tokenConditionalSwapMakerFeeRate: number;
       flashLoanSwapFeeRate: number;
+      interestTargetUtilization: number;
+      interestCurveScaling: number;
+      depositsInSerum: BN;
     },
   ): Bank {
     return new Bank(
@@ -177,6 +180,9 @@ export class Bank implements BankForHealth {
       obj.tokenConditionalSwapTakerFeeRate,
       obj.tokenConditionalSwapMakerFeeRate,
       obj.flashLoanSwapFeeRate,
+      obj.interestTargetUtilization,
+      obj.interestCurveScaling,
+      // obj.depositsInSerum,
     );
   }
 
@@ -229,6 +235,8 @@ export class Bank implements BankForHealth {
     public tokenConditionalSwapTakerFeeRate: number,
     public tokenConditionalSwapMakerFeeRate: number,
     public flashLoanSwapFeeRate: number,
+    public interestTargetUtilization: number,
+    public interestCurveScaling: number, // public depositsInSerum: BN,
   ) {
     this.name = utf8.decode(new Uint8Array(name)).split('\x00')[0];
     this.oracleConfig = {
