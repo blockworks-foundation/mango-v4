@@ -1866,6 +1866,14 @@
 <a href="#1866" id="1866">1866</a>
 <a href="#1867" id="1867">1867</a>
 <a href="#1868" id="1868">1868</a>
+<a href="#1869" id="1869">1869</a>
+<a href="#1870" id="1870">1870</a>
+<a href="#1871" id="1871">1871</a>
+<a href="#1872" id="1872">1872</a>
+<a href="#1873" id="1873">1873</a>
+<a href="#1874" id="1874">1874</a>
+<a href="#1875" id="1875">1875</a>
+<a href="#1876" id="1876">1876</a>
 </pre><pre class="rust"><code><span class="doccomment">/*!
  * This module deals with computing different types of health for a mango account.
  *
@@ -1962,9 +1970,10 @@
     account: <span class="kw-2">&amp;</span>MangoAccountRef,
     health_type: HealthType,
     ais: <span class="kw-2">&amp;</span>[AccountInfo],
+    now_ts: u64,
 ) -&gt; <span class="prelude-ty">Result</span>&lt;I80F48&gt; {
     <span class="kw">let </span>retriever = new_fixed_order_account_retriever(ais, account)<span class="question-mark">?</span>;
-    <span class="prelude-val">Ok</span>(new_health_cache(account, <span class="kw-2">&amp;</span>retriever)<span class="question-mark">?</span>.health(health_type))
+    <span class="prelude-val">Ok</span>(new_health_cache(account, <span class="kw-2">&amp;</span>retriever, now_ts)<span class="question-mark">?</span>.health(health_type))
 }
 
 <span class="doccomment">/// Compute health with an arbitrary AccountRetriever
@@ -1972,8 +1981,9 @@
     account: <span class="kw-2">&amp;</span>MangoAccountRef,
     health_type: HealthType,
     retriever: <span class="kw-2">&amp;</span><span class="kw">impl </span>AccountRetriever,
+    now_ts: u64,
 ) -&gt; <span class="prelude-ty">Result</span>&lt;I80F48&gt; {
-    <span class="prelude-val">Ok</span>(new_health_cache(account, retriever)<span class="question-mark">?</span>.health(health_type))
+    <span class="prelude-val">Ok</span>(new_health_cache(account, retriever, now_ts)<span class="question-mark">?</span>.health(health_type))
 }
 
 <span class="doccomment">/// How much of a token can be taken away before health decreases to zero?
@@ -3089,8 +3099,9 @@
 </span><span class="kw">pub fn </span>new_health_cache(
     account: <span class="kw-2">&amp;</span>MangoAccountRef,
     retriever: <span class="kw-2">&amp;</span><span class="kw">impl </span>AccountRetriever,
+    now_ts: u64,
 ) -&gt; <span class="prelude-ty">Result</span>&lt;HealthCache&gt; {
-    new_health_cache_impl(account, retriever, <span class="bool-val">false</span>)
+    new_health_cache_impl(account, retriever, now_ts, <span class="bool-val">false</span>)
 }
 
 <span class="doccomment">/// Generate a special HealthCache for an account and its health accounts
@@ -3101,13 +3112,15 @@
 </span><span class="kw">pub fn </span>new_health_cache_skipping_bad_oracles(
     account: <span class="kw-2">&amp;</span>MangoAccountRef,
     retriever: <span class="kw-2">&amp;</span><span class="kw">impl </span>AccountRetriever,
+    now_ts: u64,
 ) -&gt; <span class="prelude-ty">Result</span>&lt;HealthCache&gt; {
-    new_health_cache_impl(account, retriever, <span class="bool-val">true</span>)
+    new_health_cache_impl(account, retriever, now_ts, <span class="bool-val">true</span>)
 }
 
 <span class="kw">fn </span>new_health_cache_impl(
     account: <span class="kw-2">&amp;</span>MangoAccountRef,
     retriever: <span class="kw-2">&amp;</span><span class="kw">impl </span>AccountRetriever,
+    now_ts: u64,
     <span class="comment">// If an oracle is stale or inconfident and the health contribution would
     // not be negative, skip it. This decreases health, but maybe overall it&#39;s
     // still positive?
@@ -3136,12 +3149,15 @@
         <span class="comment">// Use the liab price for computing weight scaling, because it&#39;s pessimistic and
         // causes the most unfavorable scaling.
         </span><span class="kw">let </span>liab_price = prices.liab(HealthType::Init);
+
+        <span class="kw">let </span>(maint_asset_weight, maint_liab_weight) = bank.maint_weights(now_ts);
+
         token_infos.push(TokenInfo {
             token_index: bank.token_index,
-            maint_asset_weight: bank.maint_asset_weight,
+            maint_asset_weight,
             init_asset_weight: bank.init_asset_weight,
             init_scaled_asset_weight: bank.scaled_init_asset_weight(liab_price),
-            maint_liab_weight: bank.maint_liab_weight,
+            maint_liab_weight,
             init_liab_weight: bank.init_liab_weight,
             init_scaled_liab_weight: bank.scaled_init_liab_weight(liab_price),
             prices,
@@ -3311,7 +3327,7 @@
         <span class="comment">// for bank2/oracle2
         </span><span class="kw">let </span>health2 = (-<span class="number">10.0 </span>+ <span class="number">3.0</span>) * <span class="number">5.0 </span>* <span class="number">1.5</span>;
         <span class="macro">assert!</span>(health_eq(
-            compute_health(<span class="kw-2">&amp;</span>account.borrow(), HealthType::Init, <span class="kw-2">&amp;</span>retriever).unwrap(),
+            compute_health(<span class="kw-2">&amp;</span>account.borrow(), HealthType::Init, <span class="kw-2">&amp;</span>retriever, <span class="number">0</span>).unwrap(),
             health1 + health2
         ));
     }
@@ -3436,7 +3452,7 @@
         <span class="kw">let </span>retriever = ScanningAccountRetriever::new_with_staleness(<span class="kw-2">&amp;</span>ais, <span class="kw-2">&amp;</span>group, <span class="prelude-val">None</span>).unwrap();
 
         <span class="macro">assert!</span>(health_eq(
-            compute_health(<span class="kw-2">&amp;</span>account.borrow(), HealthType::Init, <span class="kw-2">&amp;</span>retriever).unwrap(),
+            compute_health(<span class="kw-2">&amp;</span>account.borrow(), HealthType::Init, <span class="kw-2">&amp;</span>retriever, <span class="number">0</span>).unwrap(),
             testcase.expected_health
         ));
     }

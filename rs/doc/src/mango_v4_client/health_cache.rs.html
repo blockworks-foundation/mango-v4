@@ -66,12 +66,20 @@
 <a href="#66" id="66">66</a>
 <a href="#67" id="67">67</a>
 <a href="#68" id="68">68</a>
+<a href="#69" id="69">69</a>
+<a href="#70" id="70">70</a>
+<a href="#71" id="71">71</a>
+<a href="#72" id="72">72</a>
+<a href="#73" id="73">73</a>
+<a href="#74" id="74">74</a>
 </pre><pre class="rust"><code><span class="kw">use crate</span>::{AccountFetcher, MangoGroupContext};
 <span class="kw">use </span>anyhow::Context;
 <span class="kw">use </span>futures::{stream, StreamExt, TryStreamExt};
 <span class="kw">use </span>mango_v4::accounts_zerocopy::KeyedAccountSharedData;
 <span class="kw">use </span>mango_v4::health::{FixedOrderAccountRetriever, HealthCache};
 <span class="kw">use </span>mango_v4::state::MangoAccountValue;
+
+<span class="kw">use </span>std::time::{SystemTime, UNIX_EPOCH};
 
 <span class="kw">pub async fn </span>new(
     context: <span class="kw-2">&amp;</span>MangoGroupContext,
@@ -101,7 +109,9 @@
         begin_serum3: active_token_len * <span class="number">2 </span>+ active_perp_len * <span class="number">2</span>,
         staleness_slot: <span class="prelude-val">None</span>,
     };
-    mango_v4::health::new_health_cache(<span class="kw-2">&amp;</span>account.borrow(), <span class="kw-2">&amp;</span>retriever).context(<span class="string">&quot;make health cache&quot;</span>)
+    <span class="kw">let </span>now_ts = SystemTime::now().duration_since(UNIX_EPOCH)<span class="question-mark">?</span>.as_secs();
+    mango_v4::health::new_health_cache(<span class="kw-2">&amp;</span>account.borrow(), <span class="kw-2">&amp;</span>retriever, now_ts)
+        .context(<span class="string">&quot;make health cache&quot;</span>)
 }
 
 <span class="kw">pub fn </span>new_sync(
@@ -132,7 +142,9 @@
         begin_serum3: active_token_len * <span class="number">2 </span>+ active_perp_len * <span class="number">2</span>,
         staleness_slot: <span class="prelude-val">None</span>,
     };
-    mango_v4::health::new_health_cache(<span class="kw-2">&amp;</span>account.borrow(), <span class="kw-2">&amp;</span>retriever).context(<span class="string">&quot;make health cache&quot;</span>)
+    <span class="kw">let </span>now_ts = SystemTime::now().duration_since(UNIX_EPOCH)<span class="question-mark">?</span>.as_secs();
+    mango_v4::health::new_health_cache(<span class="kw-2">&amp;</span>account.borrow(), <span class="kw-2">&amp;</span>retriever, now_ts)
+        .context(<span class="string">&quot;make health cache&quot;</span>)
 }
 </code></pre></div>
 </section></main><div id="rustdoc-vars" data-root-path="../../" data-static-root-path="../../static.files/" data-current-crate="mango_v4_client" data-themes="" data-resource-suffix="" data-rustdoc-version="1.69.0 (84c898d65 2023-04-16)" data-search-js="search-8a59a8356673ec1f.js" data-settings-js="settings-f0c5c39777a9a2f6.js" data-settings-css="settings-0bcba95ff279c1db.css" ></div></body></html>

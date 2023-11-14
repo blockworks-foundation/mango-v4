@@ -2891,7 +2891,7 @@
         <span class="kw">let </span>retriever = ScanningAccountRetriever::new_with_staleness(<span class="kw-2">&amp;</span>ais, <span class="kw-2">&amp;</span>group, <span class="prelude-val">None</span>).unwrap();
 
         <span class="macro">assert!</span>(health_eq(
-            compute_health(<span class="kw-2">&amp;</span>account.borrow(), HealthType::Init, <span class="kw-2">&amp;</span>retriever).unwrap(),
+            compute_health(<span class="kw-2">&amp;</span>account.borrow(), HealthType::Init, <span class="kw-2">&amp;</span>retriever, <span class="number">0</span>).unwrap(),
             <span class="comment">// token
             </span><span class="number">0.8 </span>* (<span class="number">100.0
             </span><span class="comment">// perp base
@@ -2980,27 +2980,27 @@
         <span class="kw">let </span>retriever = ScanningAccountRetriever::new_with_staleness(<span class="kw-2">&amp;</span>ais, <span class="kw-2">&amp;</span>group, <span class="prelude-val">None</span>).unwrap();
 
         <span class="macro">assert!</span>(health_eq(
-            compute_health(<span class="kw-2">&amp;</span>account.borrow(), HealthType::Init, <span class="kw-2">&amp;</span>retriever).unwrap(),
+            compute_health(<span class="kw-2">&amp;</span>account.borrow(), HealthType::Init, <span class="kw-2">&amp;</span>retriever, <span class="number">0</span>).unwrap(),
             <span class="number">0.8 </span>* <span class="number">0.5 </span>* <span class="number">100.0
         </span>));
         <span class="macro">assert!</span>(health_eq(
-            compute_health(<span class="kw-2">&amp;</span>account.borrow(), HealthType::Maint, <span class="kw-2">&amp;</span>retriever).unwrap(),
+            compute_health(<span class="kw-2">&amp;</span>account.borrow(), HealthType::Maint, <span class="kw-2">&amp;</span>retriever, <span class="number">0</span>).unwrap(),
             <span class="number">0.9 </span>* <span class="number">1.0 </span>* <span class="number">100.0
         </span>));
         <span class="macro">assert!</span>(health_eq(
-            compute_health(<span class="kw-2">&amp;</span>account2.borrow(), HealthType::Init, <span class="kw-2">&amp;</span>retriever).unwrap(),
+            compute_health(<span class="kw-2">&amp;</span>account2.borrow(), HealthType::Init, <span class="kw-2">&amp;</span>retriever, <span class="number">0</span>).unwrap(),
             -<span class="number">1.2 </span>* <span class="number">1.0 </span>* <span class="number">100.0
         </span>));
         <span class="macro">assert!</span>(health_eq(
-            compute_health(<span class="kw-2">&amp;</span>account2.borrow(), HealthType::Maint, <span class="kw-2">&amp;</span>retriever).unwrap(),
+            compute_health(<span class="kw-2">&amp;</span>account2.borrow(), HealthType::Maint, <span class="kw-2">&amp;</span>retriever, <span class="number">0</span>).unwrap(),
             -<span class="number">1.1 </span>* <span class="number">1.0 </span>* <span class="number">100.0
         </span>));
         <span class="macro">assert!</span>(health_eq(
-            compute_health(<span class="kw-2">&amp;</span>account3.borrow(), HealthType::Init, <span class="kw-2">&amp;</span>retriever).unwrap(),
+            compute_health(<span class="kw-2">&amp;</span>account3.borrow(), HealthType::Init, <span class="kw-2">&amp;</span>retriever, <span class="number">0</span>).unwrap(),
             <span class="number">1.2 </span>* (<span class="number">0.8 </span>* <span class="number">0.5 </span>* <span class="number">10.0 </span>* <span class="number">10.0 </span>- <span class="number">100.0</span>)
         ));
         <span class="macro">assert!</span>(health_eq(
-            compute_health(<span class="kw-2">&amp;</span>account3.borrow(), HealthType::Maint, <span class="kw-2">&amp;</span>retriever).unwrap(),
+            compute_health(<span class="kw-2">&amp;</span>account3.borrow(), HealthType::Maint, <span class="kw-2">&amp;</span>retriever, <span class="number">0</span>).unwrap(),
             <span class="number">1.1 </span>* (<span class="number">0.9 </span>* <span class="number">1.0 </span>* <span class="number">10.0 </span>* <span class="number">10.0 </span>- <span class="number">100.0</span>)
         ));
     }

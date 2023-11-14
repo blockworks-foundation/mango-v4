@@ -1676,6 +1676,16 @@
 <a href="#1676" id="1676">1676</a>
 <a href="#1677" id="1677">1677</a>
 <a href="#1678" id="1678">1678</a>
+<a href="#1679" id="1679">1679</a>
+<a href="#1680" id="1680">1680</a>
+<a href="#1681" id="1681">1681</a>
+<a href="#1682" id="1682">1682</a>
+<a href="#1683" id="1683">1683</a>
+<a href="#1684" id="1684">1684</a>
+<a href="#1685" id="1685">1685</a>
+<a href="#1686" id="1686">1686</a>
+<a href="#1687" id="1687">1687</a>
+<a href="#1688" id="1688">1688</a>
 </pre><pre class="rust"><code><span class="attr">#![allow(unused_variables)]
 
 </span><span class="kw">use </span>fixed::types::I80F48;
@@ -1905,6 +1915,11 @@
         flash_loan_swap_fee_rate_opt: <span class="prelude-ty">Option</span>&lt;f32&gt;,
         interest_curve_scaling_opt: <span class="prelude-ty">Option</span>&lt;f32&gt;,
         interest_target_utilization_opt: <span class="prelude-ty">Option</span>&lt;f32&gt;,
+        maint_weight_shift_start_opt: <span class="prelude-ty">Option</span>&lt;u64&gt;,
+        maint_weight_shift_end_opt: <span class="prelude-ty">Option</span>&lt;u64&gt;,
+        maint_weight_shift_asset_target_opt: <span class="prelude-ty">Option</span>&lt;f32&gt;,
+        maint_weight_shift_liab_target_opt: <span class="prelude-ty">Option</span>&lt;f32&gt;,
+        maint_weight_shift_abort: bool,
     ) -&gt; <span class="prelude-ty">Result</span>&lt;()&gt; {
         <span class="attr">#[cfg(feature = <span class="string">&quot;enable-gpl&quot;</span>)]
         </span>instructions::token_edit(
@@ -1938,6 +1953,11 @@
             flash_loan_swap_fee_rate_opt,
             interest_curve_scaling_opt,
             interest_target_utilization_opt,
+            maint_weight_shift_start_opt,
+            maint_weight_shift_end_opt,
+            maint_weight_shift_asset_target_opt,
+            maint_weight_shift_liab_target_opt,
+            maint_weight_shift_abort,
         )<span class="question-mark">?</span>;
         <span class="prelude-val">Ok</span>(())
     }
