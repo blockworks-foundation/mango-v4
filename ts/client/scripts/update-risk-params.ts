@@ -18,6 +18,8 @@ import {
   TransactionInstruction,
 } from '@solana/web3.js';
 import fs from 'fs';
+import { Bank } from '../src/accounts/bank';
+import { Group } from '../src/accounts/group';
 import { Builder } from '../src/builder';
 import { MangoClient } from '../src/client';
 import { NullTokenEditParams } from '../src/clientIxParamBuilder';
@@ -74,17 +76,12 @@ async function setupVsr(
   return vsrClient;
 }
 
-async function updateTokenParams(): Promise<void> {
-  const [client, wallet] = await Promise.all([buildClient(), setupWallet()]);
-  const vsrClient = await setupVsr(client.connection, wallet);
-
-  const group = await client.getGroup(MANGO_V4_PRIMARY_GROUP);
-
-  const instructions: TransactionInstruction[] = [];
-
-  let mangoAccounts = await client.getAllMangoAccounts(group, true);
-  let liqors: PublicKey[];
-  liqors = (
+async function getTotalLiqorEquity(
+  client: MangoClient,
+  group: Group,
+  mangoAccounts: import('/Users/mc/repos/mango-v4/ts/client/src/accounts/mangoAccount').MangoAccount[],
+): Promise<number> {
+  const liqors = (
     await (
       await (
         await buildFetch()
@@ -103,6 +100,42 @@ async function updateTokenParams(): Promise<void> {
   const ttlLiqorEquity = (
     await getEquityForMangoAccounts(client, group, liqors, mangoAccounts)
   ).reduce((partialSum, ae) => partialSum + ae.Equity.val, 0);
+  return ttlLiqorEquity;
+}
+
+function getPriceImpactForBank(
+  midPriceImpacts: MidPriceImpact[],
+  bank: Bank,
+): MidPriceImpact {
+  const tokenToPriceImpact = midPriceImpacts
+    .filter((x) => x.avg_price_impact_percent < 1)
+    .reduce((acc: { [key: string]: MidPriceImpact }, val: MidPriceImpact) => {
+      if (
+        !acc[val.symbol] ||
+        val.target_amount > acc[val.symbol].target_amount
+      ) {
+        acc[val.symbol] = val;
+      }
+      return acc;
+    }, {});
+  const priceImpact = tokenToPriceImpact[getApiTokenName(bank.name)];
+  return priceImpact;
+}
+
+async function updateTokenParams(): Promise<void> {
+  const [client, wallet] = await Promise.all([buildClient(), setupWallet()]);
+  const vsrClient = await setupVsr(client.connection, wallet);
+
+  const group = await client.getGroup(MANGO_V4_PRIMARY_GROUP);
+
+  const instructions: TransactionInstruction[] = [];
+
+  const mangoAccounts = await client.getAllMangoAccounts(group, true);
+  const ttlLiqorEquityUi = await getTotalLiqorEquity(
+    client,
+    group,
+    mangoAccounts,
+  );
 
   const midPriceImpacts = getMidPriceImpacts(group.pis);
 
@@ -110,40 +143,51 @@ async function updateTokenParams(): Promise<void> {
     .map((banks) => banks[0])
     .filter(
       (bank) =>
-        // bank.name.includes('bSOL') ||
-        // bank.name.includes('JitoSOL') ||
-        bank.name.includes('MSOL'),
-      // ||
-      // bank.name.includes('SOL') ||
-      // bank.name.includes('USDT'),
+        // // low low liquidity
+        // bank.name.includes('DUAL') ||
+        // bank.name.includes('MNGO') ||
+        // // low liquidity
+        // bank.name.includes('ALL') ||
+        // bank.name.includes('CROWN') ||
+        // bank.name.includes('GUAC') ||
+        // bank.name.includes('HNT') ||
+        // bank.name.includes('KIN') ||
+        // bank.name.includes('OPOS') ||
+        // bank.name.includes('RLB') ||
+        // bank.name.includes('USDH') ||
+        // better liquidity
+        bank.name.includes('BONK') ||
+        bank.name.includes('bSOL') ||
+        bank.name.includes('CHAI') ||
+        bank.name.includes('DAI') ||
+        bank.name.includes('ETH (Portal)') ||
+        bank.name.includes('JitoSOL') ||
+        bank.name.includes('LDO') ||
+        bank.name.includes('MSOL') ||
+        bank.name.includes('ORCA') ||
+        bank.name.includes('RAY') ||
+        bank.name.includes('SOL') ||
+        bank.name.includes('stSOL') ||
+        bank.name.includes('TBTC') ||
+        bank.name.includes('USDC') ||
+        bank.name.includes('wBTC (Portal)') ||
+        bank.name.includes('USDT'),
     )
     .forEach(async (bank) => {
-      const tokenToPriceImpact = midPriceImpacts
-        .filter((x) => x.avg_price_impact_percent < 1)
-        .reduce(
-          (acc: { [key: string]: MidPriceImpact }, val: MidPriceImpact) => {
-            if (
-              !acc[val.symbol] ||
-              val.target_amount > acc[val.symbol].target_amount
-            ) {
-              acc[val.symbol] = val;
-            }
-            return acc;
-          },
-          {},
-        );
-      const priceImpact = tokenToPriceImpact[getApiTokenName(bank.name)];
-      const newSscaleStartQuote = Math.min(
-        // 50 * ttlLiqorEquity,
-        4 * priceImpact.target_amount,
+      const priceImpact = getPriceImpactForBank(midPriceImpacts, bank);
+
+      const scaleStartQuoteUi = Math.min(
+        50 * ttlLiqorEquityUi,
         4 * priceImpact.target_amount,
       );
-      console.log(`${bank.name} ${newSscaleStartQuote}`);
 
-      const params = Builder(NullTokenEditParams)
-        // .borrowWeightScaleStartQuote(priceImpact)
-        // .depositWeightScaleStartQuote(priceImpact)
-        .build();
+      const newNetDepositsUi = Math.max(
+        10_000,
+        Math.min(bank.uiDeposits(), 300_000) / 3 +
+          Math.max(0, bank.uiDeposits() - 300_000) / 5,
+      );
+
+      const params = Builder(NullTokenEditParams).build();
 
       const ix = await client.program.methods
         .tokenEdit(
