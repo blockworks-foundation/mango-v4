@@ -122,7 +122,8 @@ pub fn perp_settle_fees(ctx: Context<PerpSettleFees>, max_settle_amount: u64) ->
 
     // Verify that the result of settling did not violate the health of the account that lost money
     let retriever = new_fixed_order_account_retriever(ctx.remaining_accounts, &account.borrow())?;
-    let health = compute_health(&account.borrow(), HealthType::Init, &retriever)?;
+    let now_ts: u64 = Clock::get()?.unix_timestamp.try_into().unwrap();
+    let health = compute_health(&account.borrow(), HealthType::Init, &retriever, now_ts)?;
     require!(health >= 0, MangoError::HealthMustBePositive);
 
     msg!("settled fees = {}", settlement);

@@ -36,6 +36,8 @@ pub fn perp_settle_pnl(ctx: Context<PerpSettlePnl>) -> Result<()> {
         account_b.token_position(settle_token_index)?;
     }
 
+    let now_ts: u64 = Clock::get()?.unix_timestamp.try_into().unwrap();
+
     let a_liq_end_health;
     let a_maint_health;
     let b_max_settle;
@@ -43,9 +45,9 @@ pub fn perp_settle_pnl(ctx: Context<PerpSettlePnl>) -> Result<()> {
         let retriever =
             ScanningAccountRetriever::new(ctx.remaining_accounts, &ctx.accounts.group.key())
                 .context("create account retriever")?;
-        b_max_settle = new_health_cache(&account_b.borrow(), &retriever)?
+        b_max_settle = new_health_cache(&account_b.borrow(), &retriever, now_ts)?
             .perp_max_settle(settle_token_index)?;
-        let a_cache = new_health_cache(&account_a.borrow(), &retriever)?;
+        let a_cache = new_health_cache(&account_a.borrow(), &retriever, now_ts)?;
         a_liq_end_health = a_cache.health(HealthType::LiquidationEnd);
         a_maint_health = a_cache.health(HealthType::Maint);
     };
@@ -93,7 +95,6 @@ pub fn perp_settle_pnl(ctx: Context<PerpSettlePnl>) -> Result<()> {
     );
 
     // Apply pnl settle limits
-    let now_ts: u64 = Clock::get()?.unix_timestamp.try_into().unwrap();
     a_perp_position.update_settle_limit(&perp_market, now_ts);
     let a_settleable_pnl = a_perp_position.apply_pnl_settle_limit(&perp_market, a_pnl);
     b_perp_position.update_settle_limit(&perp_market, now_ts);

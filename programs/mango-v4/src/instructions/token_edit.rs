@@ -44,6 +44,11 @@ pub fn token_edit(
     flash_loan_swap_fee_rate_opt: Option<f32>,
     interest_curve_scaling_opt: Option<f32>,
     interest_target_utilization_opt: Option<f32>,
+    maint_weight_shift_start_opt: Option<u64>,
+    maint_weight_shift_end_opt: Option<u64>,
+    maint_weight_shift_asset_target_opt: Option<f32>,
+    maint_weight_shift_liab_target_opt: Option<f32>,
+    maint_weight_shift_abort: bool,
 ) -> Result<()> {
     let group = ctx.accounts.group.load()?;
 
@@ -361,6 +366,75 @@ pub fn token_edit(
             require_gte!(interest_target_utilization, 0.0);
             bank.interest_target_utilization = interest_target_utilization;
             require_group_admin = true;
+        }
+
+        if maint_weight_shift_abort {
+            let now_ts: u64 = Clock::get()?.unix_timestamp.try_into().unwrap();
+            let (maint_asset_weight, maint_liab_weight) = bank.maint_weights(now_ts);
+            bank.maint_asset_weight = maint_asset_weight;
+            bank.maint_liab_weight = maint_liab_weight;
+            bank.maint_weight_shift_start = 0;
+            bank.maint_weight_shift_end = 0;
+            bank.maint_weight_shift_duration_inv = I80F48::ZERO;
+            bank.maint_weight_shift_asset_target = I80F48::ZERO;
+            bank.maint_weight_shift_liab_target = I80F48::ZERO;
+            msg!(
+                "Maint weight shift aborted, current maint weights asset {} liab {}",
+                maint_asset_weight,
+                maint_liab_weight,
+            );
+            // Allow execution by group admin or security admin
+        }
+        if let Some(maint_weight_shift_start) = maint_weight_shift_start_opt {
+            msg!(
+                "Maint weight shift start old {:?}, new {:?}",
+                bank.maint_weight_shift_start,
+                maint_weight_shift_start
+            );
+            bank.maint_weight_shift_start = maint_weight_shift_start;
+            require_group_admin = true;
+        }
+        if let Some(maint_weight_shift_end) = maint_weight_shift_end_opt {
+            msg!(
+                "Maint weight shift end old {:?}, new {:?}",
+                bank.maint_weight_shift_end,
+                maint_weight_shift_end
+            );
+            bank.maint_weight_shift_end = maint_weight_shift_end;
+            require_group_admin = true;
+        }
+        if let Some(maint_weight_shift_asset_target) = maint_weight_shift_asset_target_opt {
+            msg!(
+                "Maint weight shift asset target old {:?}, new {:?}",
+                bank.maint_weight_shift_asset_target,
+                maint_weight_shift_asset_target
+            );
+            bank.maint_weight_shift_asset_target =
+                I80F48::from_num(maint_weight_shift_asset_target);
+            require_group_admin = true;
+        }
+        if let Some(maint_weight_shift_liab_target) = maint_weight_shift_liab_target_opt {
+            msg!(
+                "Maint weight shift liab target old {:?}, new {:?}",
+                bank.maint_weight_shift_liab_target,
+                maint_weight_shift_liab_target
+            );
+            bank.maint_weight_shift_liab_target = I80F48::from_num(maint_weight_shift_liab_target);
+            require_group_admin = true;
+        }
+        if maint_weight_shift_start_opt.is_some() || maint_weight_shift_end_opt.is_some() {
+            let was_enabled = bank.maint_weight_shift_duration_inv.is_positive();
+            if bank.maint_weight_shift_end <= bank.maint_weight_shift_start {
+                bank.maint_weight_shift_duration_inv = I80F48::ZERO;
+            } else {
+                bank.maint_weight_shift_duration_inv = I80F48::ONE
+                    / I80F48::from(bank.maint_weight_shift_end - bank.maint_weight_shift_start);
+            }
+            msg!(
+                "Maint weight shift enabled old {}, new {}",
+                was_enabled,
+                bank.maint_weight_shift_duration_inv.is_positive(),
+            );
         }
     }
 

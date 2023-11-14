@@ -44,7 +44,7 @@ pub fn token_conditional_swap_start(
         MangoError::TokenConditionalSwapTypeNotStartable
     );
 
-    let mut health_cache = new_health_cache(&liqee.borrow(), &account_retriever)
+    let mut health_cache = new_health_cache(&liqee.borrow(), &account_retriever, now_ts)
         .context("create liqee health cache")?;
     let pre_init_health = liqee.check_health_pre(&health_cache)?;
 

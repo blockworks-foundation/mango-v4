@@ -5,6 +5,8 @@ use mango_v4::accounts_zerocopy::KeyedAccountSharedData;
 use mango_v4::health::{FixedOrderAccountRetriever, HealthCache};
 use mango_v4::state::MangoAccountValue;
 
+use std::time::{SystemTime, UNIX_EPOCH};
+
 pub async fn new(
     context: &MangoGroupContext,
     account_fetcher: &impl AccountFetcher,
@@ -33,7 +35,9 @@ pub async fn new(
         begin_serum3: active_token_len * 2 + active_perp_len * 2,
         staleness_slot: None,
     };
-    mango_v4::health::new_health_cache(&account.borrow(), &retriever).context("make health cache")
+    let now_ts = SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs();
+    mango_v4::health::new_health_cache(&account.borrow(), &retriever, now_ts)
+        .context("make health cache")
 }
 
 pub fn new_sync(
@@ -64,5 +68,7 @@ pub fn new_sync(
         begin_serum3: active_token_len * 2 + active_perp_len * 2,
         staleness_slot: None,
     };
-    mango_v4::health::new_health_cache(&account.borrow(), &retriever).context("make health cache")
+    let now_ts = SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs();
+    mango_v4::health::new_health_cache(&account.borrow(), &retriever, now_ts)
+        .context("make health cache")
 }

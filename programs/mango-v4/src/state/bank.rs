@@ -161,8 +161,14 @@ pub struct Bank {
     // can be negative due to multibank, then it'd need to be balanced in the keeper
     pub deposits_in_serum: i64,
 
+    pub maint_weight_shift_start: u64,
+    pub maint_weight_shift_end: u64,
+    pub maint_weight_shift_duration_inv: I80F48,
+    pub maint_weight_shift_asset_target: I80F48,
+    pub maint_weight_shift_liab_target: I80F48,
+
     #[derivative(Debug = "ignore")]
-    pub reserved: [u8; 2072],
+    pub reserved: [u8; 2008],
 }
 const_assert_eq!(
     size_of::<Bank>(),
@@ -195,7 +201,9 @@ const_assert_eq!(
         + 8
         + 4 * 4
         + 8 * 2
-        + 2072
+        + 8 * 2
+        + 16 * 3
+        + 2008
 );
 const_assert_eq!(size_of::<Bank>(), 3064);
 const_assert_eq!(size_of::<Bank>() % 8, 0);
@@ -279,7 +287,12 @@ impl Bank {
             flash_loan_swap_fee_rate: existing_bank.flash_loan_swap_fee_rate,
             interest_target_utilization: existing_bank.interest_target_utilization,
             interest_curve_scaling: existing_bank.interest_curve_scaling,
-            reserved: [0; 2072],
+            maint_weight_shift_start: existing_bank.maint_weight_shift_start,
+            maint_weight_shift_end: existing_bank.maint_weight_shift_end,
+            maint_weight_shift_duration_inv: existing_bank.maint_weight_shift_duration_inv,
+            maint_weight_shift_asset_target: existing_bank.maint_weight_shift_asset_target,
+            maint_weight_shift_liab_target: existing_bank.maint_weight_shift_liab_target,
+            reserved: [0; 2008],
         }
     }
 
@@ -307,6 +320,9 @@ impl Bank {
         require_gte!(self.flash_loan_swap_fee_rate, 0.0);
         require_gte!(self.interest_curve_scaling, 1.0);
         require_gte!(self.interest_target_utilization, 0.0);
+        require_gte!(self.maint_weight_shift_duration_inv, 0.0);
+        require_gte!(self.maint_weight_shift_asset_target, 0.0);
+        require_gte!(self.maint_weight_shift_liab_target, 0.0);
         Ok(())
     }
 
@@ -336,6 +352,26 @@ impl Bank {
     #[inline(always)]
     pub fn native_deposits(&self) -> I80F48 {
         self.deposit_index * self.indexed_deposits
+    }
+
+    pub fn maint_weights(&self, now_ts: u64) -> (I80F48, I80F48) {
+        if self.maint_weight_shift_duration_inv.is_zero() || now_ts <= self.maint_weight_shift_start
+        {
+            (self.maint_asset_weight, self.maint_liab_weight)
+        } else if now_ts >= self.maint_weight_shift_end {
+            (
+                self.maint_weight_shift_asset_target,
+                self.maint_weight_shift_liab_target,
+            )
+        } else {
+            let scale = I80F48::from(now_ts - self.maint_weight_shift_start)
+                * self.maint_weight_shift_duration_inv;
+            let asset = self.maint_asset_weight
+                + scale * (self.maint_weight_shift_asset_target - self.maint_asset_weight);
+            let liab = self.maint_liab_weight
+                + scale * (self.maint_weight_shift_liab_target - self.maint_liab_weight);
+            (asset, liab)
+        }
     }
 
     /// Prevent borrowing away the full bank vault.
@@ -1181,6 +1217,50 @@ mod tests {
             .unwrap();
         bank.change_without_fee(&mut account, I80F48::from(-50), 101)
             .unwrap();
+
+        Ok(())
+    }
+
+    #[test]
+    pub fn test_bank_maint_weight_shift() -> Result<()> {
+        let mut bank = Bank::zeroed();
+        bank.maint_asset_weight = I80F48::ONE;
+        bank.maint_liab_weight = I80F48::ZERO;
+        bank.maint_weight_shift_start = 100;
+        bank.maint_weight_shift_end = 1100;
+        bank.maint_weight_shift_duration_inv = I80F48::ONE / I80F48::from(1000);
+        bank.maint_weight_shift_asset_target = I80F48::from(2);
+        bank.maint_weight_shift_liab_target = I80F48::from(10);
+
+        let (a, l) = bank.maint_weights(0);
+        assert_eq!(a, 1.0);
+        assert_eq!(l, 0.0);
+
+        let (a, l) = bank.maint_weights(100);
+        assert_eq!(a, 1.0);
+        assert_eq!(l, 0.0);
+
+        let (a, l) = bank.maint_weights(1100);
+        assert_eq!(a, 2.0);
+        assert_eq!(l, 10.0);
+
+        let (a, l) = bank.maint_weights(2000);
+        assert_eq!(a, 2.0);
+        assert_eq!(l, 10.0);
+
+        let abs_diff = |x: I80F48, y: f64| (x.to_num::<f64>() - y).abs();
+
+        let (a, l) = bank.maint_weights(600);
+        assert!(abs_diff(a, 1.5) < 1e-8);
+        assert!(abs_diff(l, 5.0) < 1e-8);
+
+        let (a, l) = bank.maint_weights(200);
+        assert!(abs_diff(a, 1.1) < 1e-8);
+        assert!(abs_diff(l, 1.0) < 1e-8);
+
+        let (a, l) = bank.maint_weights(1000);
+        assert!(abs_diff(a, 1.9) < 1e-8);
+        assert!(abs_diff(l, 9.0) < 1e-8);
 
         Ok(())
     }

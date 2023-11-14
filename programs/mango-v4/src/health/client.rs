@@ -1264,7 +1264,7 @@ mod tests {
         let retriever = ScanningAccountRetriever::new_with_staleness(&ais, &group, None).unwrap();
 
         assert!(health_eq(
-            compute_health(&account.borrow(), HealthType::Init, &retriever).unwrap(),
+            compute_health(&account.borrow(), HealthType::Init, &retriever, 0).unwrap(),
             // token
             0.8 * (100.0
             // perp base
@@ -1353,27 +1353,27 @@ mod tests {
         let retriever = ScanningAccountRetriever::new_with_staleness(&ais, &group, None).unwrap();
 
         assert!(health_eq(
-            compute_health(&account.borrow(), HealthType::Init, &retriever).unwrap(),
+            compute_health(&account.borrow(), HealthType::Init, &retriever, 0).unwrap(),
             0.8 * 0.5 * 100.0
         ));
         assert!(health_eq(
-            compute_health(&account.borrow(), HealthType::Maint, &retriever).unwrap(),
+            compute_health(&account.borrow(), HealthType::Maint, &retriever, 0).unwrap(),
             0.9 * 1.0 * 100.0
         ));
         assert!(health_eq(
-            compute_health(&account2.borrow(), HealthType::Init, &retriever).unwrap(),
+            compute_health(&account2.borrow(), HealthType::Init, &retriever, 0).unwrap(),
             -1.2 * 1.0 * 100.0
         ));
         assert!(health_eq(
-            compute_health(&account2.borrow(), HealthType::Maint, &retriever).unwrap(),
+            compute_health(&account2.borrow(), HealthType::Maint, &retriever, 0).unwrap(),
             -1.1 * 1.0 * 100.0
         ));
         assert!(health_eq(
-            compute_health(&account3.borrow(), HealthType::Init, &retriever).unwrap(),
+            compute_health(&account3.borrow(), HealthType::Init, &retriever, 0).unwrap(),
             1.2 * (0.8 * 0.5 * 10.0 * 10.0 - 100.0)
         ));
         assert!(health_eq(
-            compute_health(&account3.borrow(), HealthType::Maint, &retriever).unwrap(),
+            compute_health(&account3.borrow(), HealthType::Maint, &retriever, 0).unwrap(),
             1.1 * (0.9 * 1.0 * 10.0 * 10.0 - 100.0)
         ));
     }

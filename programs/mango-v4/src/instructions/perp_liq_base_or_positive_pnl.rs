@@ -29,6 +29,7 @@ pub fn perp_liq_base_or_positive_pnl(
     max_base_transfer = max_base_transfer.max(i64::MIN + 1);
 
     let group_pk = &ctx.accounts.group.key();
+    let now_ts: u64 = Clock::get()?.unix_timestamp.try_into().unwrap();
 
     require_keys_neq!(ctx.accounts.liqor.key(), ctx.accounts.liqee.key());
     let mut liqor = ctx.accounts.liqor.load_full_mut()?;
@@ -51,7 +52,7 @@ pub fn perp_liq_base_or_positive_pnl(
     let mut liqee_health_cache = {
         let account_retriever = ScanningAccountRetriever::new(ctx.remaining_accounts, group_pk)
             .context("create account retriever")?;
-        new_health_cache(&liqee.borrow(), &account_retriever)
+        new_health_cache(&liqee.borrow(), &account_retriever, now_ts)
             .context("create liqee health cache")?
     };
     let liqee_liq_end_health = liqee_health_cache.health(HealthType::LiquidationEnd);
@@ -87,7 +88,6 @@ pub fn perp_liq_base_or_positive_pnl(
     // Settle funding, update limit
     liqee_perp_position.settle_funding(&perp_market);
     liqor_perp_position.settle_funding(&perp_market);
-    let now_ts: u64 = Clock::get()?.unix_timestamp.try_into().unwrap();
     liqee_perp_position.update_settle_limit(&perp_market, now_ts);
 
     //
@@ -183,8 +183,13 @@ pub fn perp_liq_base_or_positive_pnl(
     if !liqor.fixed.is_in_health_region() {
         let account_retriever = ScanningAccountRetriever::new(ctx.remaining_accounts, group_pk)
             .context("create account retriever end")?;
-        let liqor_health = compute_health(&liqor.borrow(), HealthType::Init, &account_retriever)
-            .context("compute liqor health")?;
+        let liqor_health = compute_health(
+            &liqor.borrow(),
+            HealthType::Init,
+            &account_retriever,
+            now_ts,
+        )
+        .context("compute liqor health")?;
         require!(liqor_health >= 0, MangoError::HealthMustBePositive);
     }
 
@@ -675,7 +680,7 @@ mod tests {
             let retriever =
                 ScanningAccountRetriever::new_with_staleness(&ais, &setup.group, None).unwrap();
 
-            health::new_health_cache(&setup.liqee.borrow(), &retriever).unwrap()
+            health::new_health_cache(&setup.liqee.borrow(), &retriever, 0).unwrap()
         }
 
         fn run(&self, max_base: i64, max_pnl: u64) -> Result<Self> {

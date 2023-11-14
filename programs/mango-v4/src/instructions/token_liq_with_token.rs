@@ -20,6 +20,7 @@ pub fn token_liq_with_token(
     require!(asset_token_index != liab_token_index, MangoError::SomeError);
     let mut account_retriever = ScanningAccountRetriever::new(ctx.remaining_accounts, group_pk)
         .context("create account retriever")?;
+    let now_ts: u64 = Clock::get()?.unix_timestamp.try_into().unwrap();
 
     require_keys_neq!(ctx.accounts.liqor.key(), ctx.accounts.liqee.key());
     let mut liqor = ctx.accounts.liqor.load_full_mut()?;
@@ -39,7 +40,7 @@ pub fn token_liq_with_token(
     let mut liqee = ctx.accounts.liqee.load_full_mut()?;
 
     // Initial liqee health check
-    let mut liqee_health_cache = new_health_cache(&liqee.borrow(), &account_retriever)
+    let mut liqee_health_cache = new_health_cache(&liqee.borrow(), &account_retriever, now_ts)
         .context("create liqee health cache")?;
     let liqee_liq_end_health = liqee_health_cache.health(HealthType::LiquidationEnd);
     liqee_health_cache.require_after_phase1_liquidation()?;
@@ -52,7 +53,6 @@ pub fn token_liq_with_token(
     // Transfer some liab_token from liqor to liqee and
     // transfer some asset_token from liqee to liqor.
     //
-    let now_ts = Clock::get()?.unix_timestamp.try_into().unwrap();
     liquidation_action(
         &mut account_retriever,
         liab_token_index,
@@ -69,8 +69,13 @@ pub fn token_liq_with_token(
 
     // Check liqor's health
     if !liqor.fixed.is_in_health_region() {
-        let liqor_health = compute_health(&liqor.borrow(), HealthType::Init, &account_retriever)
-            .context("compute liqor health")?;
+        let liqor_health = compute_health(
+            &liqor.borrow(),
+            HealthType::Init,
+            &account_retriever,
+            now_ts,
+        )
+        .context("compute liqor health")?;
         require!(liqor_health >= 0, MangoError::HealthMustBePositive);
     }
 
@@ -446,7 +451,7 @@ mod tests {
             let retriever =
                 ScanningAccountRetriever::new_with_staleness(&ais, &setup.group, None).unwrap();
 
-            health::new_health_cache(&setup.liqee.borrow(), &retriever).unwrap()
+            health::new_health_cache(&setup.liqee.borrow(), &retriever, 0).unwrap()
         }
 
         fn run(&self, max_liab_transfer: I80F48) -> Result<Self> {
@@ -468,7 +473,7 @@ mod tests {
                 ScanningAccountRetriever::new_with_staleness(&ais, &setup.group, None).unwrap();
 
             let mut liqee_health_cache =
-                health::new_health_cache(&setup.liqee.borrow(), &retriever).unwrap();
+                health::new_health_cache(&setup.liqee.borrow(), &retriever, 0).unwrap();
             let liqee_liq_end_health = liqee_health_cache.health(HealthType::LiquidationEnd);
 
             liquidation_action(

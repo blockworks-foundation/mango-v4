@@ -73,6 +73,75 @@ async fn test_health_compute_tokens() -> Result<(), TransportError> {
     Ok(())
 }
 
+#[tokio::test]
+async fn test_health_compute_tokens_during_maint_weight_shift() -> Result<(), TransportError> {
+    let context = TestContext::new().await;
+    let solana = &context.solana.clone();
+
+    let admin = TestKeypair::new();
+    let owner = context.users[0].key;
+    let payer = context.users[1].key;
+    let mints = &context.mints[0..8];
+
+    //
+    // SETUP: Create a group and an account
+    //
+
+    let GroupWithTokens { group, .. } = GroupWithTokensConfig {
+        admin,
+        payer,
+        mints: mints.to_vec(),
+        ..GroupWithTokensConfig::default()
+    }
+    .create(solana)
+    .await;
+
+    let account =
+        create_funded_account(&solana, group, owner, 0, &context.users[1], &[], 1000, 0).await;
+
+    let now = solana.clock_timestamp().await;
+    for mint in mints {
+        send_tx(
+            solana,
+            TokenEdit {
+                group,
+                admin,
+                mint: mint.pubkey,
+                options: mango_v4::instruction::TokenEdit {
+                    maint_weight_shift_start_opt: Some(now - 1000),
+                    maint_weight_shift_end_opt: Some(now + 1000),
+                    maint_weight_shift_asset_target_opt: Some(0.1),
+                    maint_weight_shift_liab_target_opt: Some(1.1),
+                    ..token_edit_instruction_default()
+                },
+            },
+        )
+        .await
+        .unwrap();
+    }
+
+    let mut cu_measurements = vec![];
+    for token_account in &context.users[0].token_accounts[..mints.len()] {
+        cu_measurements.push(deposit_cu_datapoint(solana, account, owner, *token_account).await);
+    }
+
+    for (i, pair) in cu_measurements.windows(2).enumerate() {
+        println!(
+            "after adding token {}: {} (+{})",
+            i,
+            pair[1],
+            pair[1] - pair[0]
+        );
+    }
+
+    let avg_cu_increase = cu_measurements.windows(2).map(|p| p[1] - p[0]).sum::<u64>()
+        / (cu_measurements.len() - 1) as u64;
+    println!("average cu increase: {avg_cu_increase}");
+    assert!(avg_cu_increase < 4200);
+
+    Ok(())
+}
+
 // Try to reach compute limits in health checks by having many serum markets in an account
 #[tokio::test]
 async fn test_health_compute_serum() -> Result<(), TransportError> {

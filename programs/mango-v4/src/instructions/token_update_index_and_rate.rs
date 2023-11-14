@@ -99,6 +99,11 @@ pub fn token_update_index_and_rate(ctx: Context<TokenUpdateIndexAndRate>) -> Res
             .update(now_ts as u64, price.to_num());
         let stable_price_model = some_bank.stable_price_model;
 
+        // If a maint weight shift is done, copy the target into the normal values
+        // and clear the transition parameters.
+        let maint_shift_done = some_bank.maint_weight_shift_duration_inv.is_positive()
+            && now_ts >= some_bank.maint_weight_shift_end;
+
         emit!(UpdateIndexLog {
             mango_group: mint_info.group.key(),
             token_index: mint_info.token_index,
@@ -135,6 +140,16 @@ pub fn token_update_index_and_rate(ctx: Context<TokenUpdateIndexAndRate>) -> Res
             bank.avg_utilization = new_avg_utilization;
 
             bank.stable_price_model = stable_price_model;
+
+            if maint_shift_done {
+                bank.maint_asset_weight = bank.maint_weight_shift_asset_target;
+                bank.maint_liab_weight = bank.maint_weight_shift_liab_target;
+                bank.maint_weight_shift_duration_inv = I80F48::ZERO;
+                bank.maint_weight_shift_asset_target = I80F48::ZERO;
+                bank.maint_weight_shift_liab_target = I80F48::ZERO;
+                bank.maint_weight_shift_start = 0;
+                bank.maint_weight_shift_end = 0;
+            }
         }
     }
 

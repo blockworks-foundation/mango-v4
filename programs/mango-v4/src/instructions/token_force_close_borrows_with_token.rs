@@ -186,7 +186,8 @@ pub fn token_force_close_borrows_with_token(
             MangoError::SomeError
         );
 
-        let liqee_health_cache = new_health_cache(&liqee.borrow(), &mut account_retriever)
+        let now_ts: u64 = Clock::get()?.unix_timestamp.try_into().unwrap();
+        let liqee_health_cache = new_health_cache(&liqee.borrow(), &mut account_retriever, now_ts)
             .context("create liqee health cache")?;
         let liqee_liq_end_health = liqee_health_cache.health(HealthType::LiquidationEnd);
         liqee
@@ -211,8 +212,13 @@ pub fn token_force_close_borrows_with_token(
     // Check liqor's health
     // This should always improve liqor health, since we decrease the zero-asset-weight
     // liab token and gain some asset token, this check is just for denfensive measure
-    let liqor_health = compute_health(&liqor.borrow(), HealthType::Init, &mut account_retriever)
-        .context("compute liqor health")?;
+    let liqor_health = compute_health(
+        &liqor.borrow(),
+        HealthType::Init,
+        &mut account_retriever,
+        now_ts,
+    )
+    .context("compute liqor health")?;
     require!(liqor_health >= 0, MangoError::HealthMustBePositive);
 
     // TODO log
