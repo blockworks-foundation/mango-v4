@@ -1274,9 +1274,8 @@ export class Serum3Orders {
     public baseTokenIndex: TokenIndex,
     public quoteTokenIndex: TokenIndex,
     public highestPlacedBidInv: number,
-    public lowestPlacedAsk: number, // public baseDepositsReserved: number,
-  ) // public quoteDepositsReserved: number,
-  {}
+    public lowestPlacedAsk: number, // public baseDepositsReserved: number, // public quoteDepositsReserved: number,
+  ) {}
 
   public isActive(): boolean {
     return this.marketIndex !== Serum3Orders.Serum3MarketIndexUnset;
