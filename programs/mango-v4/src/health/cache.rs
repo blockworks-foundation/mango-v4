@@ -695,7 +695,8 @@ impl HealthCache {
             }
         };
 
-        for token_info in self.token_infos.iter() {
+        let mut token_extra_info = vec![TokenExtraInfo::default(); self.token_infos.len()];
+        for (token_info, token_extra) in self.token_infos.iter().zip(token_extra_info.iter_mut()) {
             // For each token, health only considers the effective token position. But for
             // this function we want to distinguish the contribution from token deposits from
             // contributions by perp markets.
@@ -747,11 +748,11 @@ impl HealthCache {
                 }
             }
 
-            // TODO: update token_extra_info somehow!
+            token_extra.spot_and_perp_health =
+                token_info.health_contribution(health_type, asset_balance - liab_balance);
         }
 
         let token_balances = self.effective_token_balances(health_type);
-        let mut token_extra_info = vec![TokenExtraInfo::default(); self.token_infos.len()];
         let serum3_reserved = self.compute_serum3_reservations(health_type, &mut token_extra_info);
         for (serum3_info, reserved) in self.serum3_infos.iter().zip(serum3_reserved.iter()) {
             let contrib = serum3_info.health_contribution(
