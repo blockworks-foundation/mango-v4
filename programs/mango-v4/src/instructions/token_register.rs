@@ -40,6 +40,7 @@ pub fn token_register(
     flash_loan_swap_fee_rate: f32,
     interest_curve_scaling: f32,
     interest_target_utilization: f32,
+    group_insurance_fund: bool,
 ) -> Result<()> {
     // Require token 0 to be in the insurance token
     if token_index == INSURANCE_TOKEN_INDEX {
@@ -136,7 +137,7 @@ pub fn token_register(
     *mint_info = MintInfo {
         group: ctx.accounts.group.key(),
         token_index,
-        group_insurance_fund: 1,
+        group_insurance_fund: if group_insurance_fund { 1 } else { 0 },
         padding1: Default::default(),
         mint: ctx.accounts.mint.key(),
         banks: Default::default(),

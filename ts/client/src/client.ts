@@ -418,6 +418,7 @@ export class MangoClient {
         params.flashLoanSwapFeeRate,
         params.interestCurveScaling,
         params.interestTargetUtilization,
+        params.groupInsuranceFund,
       )
       .accounts({
         group: group.publicKey,
