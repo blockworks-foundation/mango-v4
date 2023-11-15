@@ -167,8 +167,10 @@ pub struct Bank {
     pub maint_weight_shift_asset_target: I80F48,
     pub maint_weight_shift_liab_target: I80F48,
 
+    pub maint_max_health_per_account: I80F48,
+
     #[derivative(Debug = "ignore")]
-    pub reserved: [u8; 2008],
+    pub reserved: [u8; 1992],
 }
 const_assert_eq!(
     size_of::<Bank>(),
@@ -202,8 +204,8 @@ const_assert_eq!(
         + 4 * 4
         + 8 * 2
         + 8 * 2
-        + 16 * 3
-        + 2008
+        + 16 * 4
+        + 1992
 );
 const_assert_eq!(size_of::<Bank>(), 3064);
 const_assert_eq!(size_of::<Bank>() % 8, 0);
@@ -292,7 +294,8 @@ impl Bank {
             maint_weight_shift_duration_inv: existing_bank.maint_weight_shift_duration_inv,
             maint_weight_shift_asset_target: existing_bank.maint_weight_shift_asset_target,
             maint_weight_shift_liab_target: existing_bank.maint_weight_shift_liab_target,
-            reserved: [0; 2008],
+            maint_max_health_per_account: existing_bank.maint_max_health_per_account,
+            reserved: [0; 1992],
         }
     }
 
@@ -342,6 +345,14 @@ impl Bank {
 
     pub fn is_force_close(&self) -> bool {
         self.force_close == 1
+    }
+
+    pub fn maint_max_health_per_account(&self) -> I80F48 {
+        if self.maint_max_health_per_account.is_zero() {
+            I80F48::MAX
+        } else {
+            self.maint_max_health_per_account
+        }
     }
 
     #[inline(always)]

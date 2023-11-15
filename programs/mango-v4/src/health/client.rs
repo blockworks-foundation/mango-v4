@@ -133,9 +133,10 @@ impl HealthCache {
         let source = &self.token_infos[source_index];
         let target = &self.token_infos[target_index];
 
-        let (tokens_max_reserved, _) = self.compute_serum3_reservations(health_type);
-        let source_reserved = tokens_max_reserved[source_index].max_serum_reserved;
-        let target_reserved = tokens_max_reserved[target_index].max_serum_reserved;
+        let mut token_extra_info = vec![TokenExtraInfo::default(); self.token_infos.len()];
+        self.compute_serum3_reservations(health_type, &mut token_extra_info);
+        let source_reserved = token_extra_info[source_index].max_serum_reserved;
+        let target_reserved = token_extra_info[target_index].max_serum_reserved;
 
         let token_balances = self.effective_token_balances(health_type);
         let source_balance = token_balances[source_index].spot_and_perp;
@@ -640,6 +641,7 @@ mod tests {
             init_liab_weight: I80F48::from_num(1.0 + x),
             init_scaled_liab_weight: I80F48::from_num(1.0 + x),
             prices: Prices::new_single_price(I80F48::from_num(price)),
+            maint_max_health: I80F48::MAX,
             balance_spot: I80F48::ZERO,
         }
     }

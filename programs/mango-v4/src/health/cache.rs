@@ -169,6 +169,7 @@ pub struct TokenInfo {
     pub init_liab_weight: I80F48,
     pub init_scaled_liab_weight: I80F48,
     pub prices: Prices,
+    pub maint_max_health: I80F48,
 
     /// Freely available spot balance for the token.
     ///
@@ -185,9 +186,10 @@ pub struct TokenBalance {
 }
 
 #[derive(Clone, Default)]
-pub struct TokenMaxReserved {
+pub struct TokenExtraInfo {
     /// The sum of serum-reserved amounts over all markets
     pub max_serum_reserved: I80F48,
+    pub spot_and_perp_health: I80F48,
 }
 
 impl TokenInfo {
@@ -226,7 +228,12 @@ impl TokenInfo {
         } else {
             self.asset_weighted_price(health_type)
         };
-        balance * weighted_price
+        let health = balance * weighted_price;
+        if health_type == HealthType::Maint {
+            health.min(self.maint_max_health)
+        } else {
+            health
+        }
     }
 }
 
@@ -357,7 +364,7 @@ impl Serum3Info {
         health_type: HealthType,
         token_infos: &[TokenInfo],
         token_balances: &[TokenBalance],
-        token_max_reserved: &[TokenMaxReserved],
+        token_extra_infos: &[TokenExtraInfo],
         market_reserved: &Serum3Reserved,
     ) -> I80F48 {
         if market_reserved.all_reserved_as_base.is_zero()
@@ -366,18 +373,15 @@ impl Serum3Info {
             return I80F48::ZERO;
         }
 
-        let base_info = &token_infos[self.base_info_index];
-        let quote_info = &token_infos[self.quote_info_index];
-
         // How much would health increase if the reserved balance were applied to the passed
         // token info?
         let compute_health_effect = |token_info: &TokenInfo,
                                      balance: &TokenBalance,
-                                     max_reserved: &TokenMaxReserved,
+                                     extra_info: &TokenExtraInfo,
                                      market_reserved: I80F48| {
             // This balance includes all possible reserved funds from markets that relate to the
             // token, including this market itself: `market_reserved` is already included in `max_serum_reserved`.
-            let max_balance = balance.spot_and_perp + max_reserved.max_serum_reserved;
+            let max_balance = balance.spot_and_perp + extra_info.max_serum_reserved;
 
             // For simplicity, we assume that `market_reserved` was added to `max_balance` last
             // (it underestimates health because that gives the smallest effects): how much did
@@ -390,23 +394,42 @@ impl Serum3Info {
                 (max_balance, market_reserved - max_balance)
             };
 
-            let asset_weight = token_info.asset_weight(health_type);
-            let liab_weight = token_info.liab_weight(health_type);
-            let asset_price = token_info.prices.asset(health_type);
-            let liab_price = token_info.prices.liab(health_type);
-            asset_part * asset_weight * asset_price + liab_part * liab_weight * liab_price
+            let mut health = I80F48::ZERO;
+            if asset_part.is_positive() {
+                let asset_weight = token_info.asset_weight(health_type);
+                let asset_price = token_info.prices.asset(health_type);
+                let asset_health = asset_part * asset_weight * asset_price;
+                let asset_health_limited = if health_type == HealthType::Maint {
+                    asset_health
+                        .min(
+                            token_info.maint_max_health
+                                - extra_info.spot_and_perp_health.max(I80F48::ZERO),
+                        )
+                        .max(I80F48::ZERO)
+                } else {
+                    asset_health
+                };
+                health += asset_health_limited;
+            }
+            if liab_part.is_positive() {
+                let liab_weight = token_info.liab_weight(health_type);
+                let liab_price = token_info.prices.liab(health_type);
+                let liab_health = liab_part * liab_weight * liab_price;
+                health += liab_health;
+            }
+            health
         };
 
         let health_base = compute_health_effect(
-            base_info,
+            &token_infos[self.base_info_index],
             &token_balances[self.base_info_index],
-            &token_max_reserved[self.base_info_index],
+            &token_extra_infos[self.base_info_index],
             market_reserved.all_reserved_as_base,
         );
         let health_quote = compute_health_effect(
-            quote_info,
+            &token_infos[self.quote_info_index],
             &token_balances[self.quote_info_index],
-            &token_max_reserved[self.quote_info_index],
+            &token_extra_infos[self.quote_info_index],
             market_reserved.all_reserved_as_quote,
         );
         health_base.min(health_quote)
@@ -723,16 +746,19 @@ impl HealthCache {
                     total_assets += asset_balance * liab_weighted_price;
                 }
             }
+
+            // TODO: update token_extra_info somehow!
         }
 
         let token_balances = self.effective_token_balances(health_type);
-        let (token_max_reserved, serum3_reserved) = self.compute_serum3_reservations(health_type);
+        let mut token_extra_info = vec![TokenExtraInfo::default(); self.token_infos.len()];
+        let serum3_reserved = self.compute_serum3_reservations(health_type, &mut token_extra_info);
         for (serum3_info, reserved) in self.serum3_infos.iter().zip(serum3_reserved.iter()) {
             let contrib = serum3_info.health_contribution(
                 health_type,
                 &self.token_infos,
                 &token_balances,
-                &token_max_reserved,
+                &token_extra_info,
                 reserved,
             );
             add(&mut total_assets, &mut total_liabs, contrib);
@@ -1035,9 +1061,8 @@ impl HealthCache {
     pub(crate) fn compute_serum3_reservations(
         &self,
         health_type: HealthType,
-    ) -> (Vec<TokenMaxReserved>, Vec<Serum3Reserved>) {
-        let mut token_max_reserved = vec![TokenMaxReserved::default(); self.token_infos.len()];
-
+        token_extra_info: &mut [TokenExtraInfo],
+    ) -> Vec<Serum3Reserved> {
         // For each serum market, compute what happened if reserved_base was converted to quote
         // or reserved_quote was converted to base.
         let mut serum3_reserved = Vec::with_capacity(self.serum3_infos.len());
@@ -1051,8 +1076,8 @@ impl HealthCache {
             let all_reserved_as_quote =
                 info.all_reserved_as_quote(health_type, quote_info, base_info);
 
-            token_max_reserved[info.base_info_index].max_serum_reserved += all_reserved_as_base;
-            token_max_reserved[info.quote_info_index].max_serum_reserved += all_reserved_as_quote;
+            token_extra_info[info.base_info_index].max_serum_reserved += all_reserved_as_base;
+            token_extra_info[info.quote_info_index].max_serum_reserved += all_reserved_as_quote;
 
             serum3_reserved.push(Serum3Reserved {
                 all_reserved_as_base,
@@ -1060,7 +1085,7 @@ impl HealthCache {
             });
         }
 
-        (token_max_reserved, serum3_reserved)
+        serum3_reserved
     }
 
     /// Returns token balances that account for spot and perp contributions
@@ -1109,18 +1134,26 @@ impl HealthCache {
         mut action: impl FnMut(I80F48),
         token_balances: &[TokenBalance],
     ) {
-        for (token_info, token_balance) in self.token_infos.iter().zip(token_balances.iter()) {
+        let mut token_extra_infos = vec![TokenExtraInfo::default(); self.token_infos.len()];
+
+        for ((token_info, token_balance), token_extra) in self
+            .token_infos
+            .iter()
+            .zip(token_balances.iter())
+            .zip(token_extra_infos.iter_mut())
+        {
             let contrib = token_info.health_contribution(health_type, token_balance.spot_and_perp);
+            token_extra.spot_and_perp_health = contrib;
             action(contrib);
         }
 
-        let (token_max_reserved, serum3_reserved) = self.compute_serum3_reservations(health_type);
+        let serum3_reserved = self.compute_serum3_reservations(health_type, &mut token_extra_infos);
         for (serum3_info, reserved) in self.serum3_infos.iter().zip(serum3_reserved.iter()) {
             let contrib = serum3_info.health_contribution(
                 health_type,
                 &self.token_infos,
                 &token_balances,
-                &token_max_reserved,
+                &token_extra_infos,
                 reserved,
             );
             action(contrib);
@@ -1285,6 +1318,7 @@ fn new_health_cache_impl(
             init_liab_weight: bank.init_liab_weight,
             init_scaled_liab_weight: bank.scaled_init_liab_weight(liab_price),
             prices,
+            maint_max_health: bank.maint_max_health_per_account(),
             balance_spot: native,
         });
     }
@@ -1463,6 +1497,7 @@ mod tests {
         deposit_weight_scale_start_quote: u64,
         borrow_weight_scale_start_quote: u64,
         deposits_in_serum: i64,
+        maint_max_health: u64,
     }
 
     #[derive(Default)]
@@ -1473,6 +1508,7 @@ mod tests {
         oo_1_2: (u64, u64),
         oo_1_3: (u64, u64),
         perp1: (i64, i64, i64, i64),
+        health_type: u8,
         expected_health: f64,
         bank_settings: [BankSettings; 3],
         extra: Option<fn(&mut MangoAccountValue)>,
@@ -1519,6 +1555,7 @@ mod tests {
             bank.indexed_deposits = I80F48::from(settings.deposits) / bank.deposit_index;
             bank.indexed_borrows = I80F48::from(settings.borrows) / bank.borrow_index;
             bank.deposits_in_serum = settings.deposits_in_serum;
+            bank.maint_max_health_per_account = I80F48::from(settings.maint_max_health);
             if settings.deposit_weight_scale_start_quote > 0 {
                 bank.deposit_weight_scale_start_quote =
                     settings.deposit_weight_scale_start_quote as f64;
@@ -1575,8 +1612,13 @@ mod tests {
 
         let retriever = ScanningAccountRetriever::new_with_staleness(&ais, &group, None).unwrap();
 
+        let health_type = if testcase.health_type == 0 {
+            HealthType::Init
+        } else {
+            HealthType::Maint
+        };
         assert!(health_eq(
-            compute_health(&account.borrow(), HealthType::Init, &retriever, 0).unwrap(),
+            compute_health(&account.borrow(), health_type, &retriever, 0).unwrap(),
             testcase.expected_health
         ));
     }
@@ -1864,6 +1906,92 @@ mod tests {
                     + 100.0 * 5.0 * 0.5 * (100.0 / 200.0)
                     // oo_1_3 (-> token1)
                     + 100.0 * 10.0 * 0.5 * (500.0 / 700.0),
+                ..Default::default()
+            },
+            TestHealth1Case {
+                // 18, maint health max for pure token pos
+                health_type: 1, // maint
+                token1: 100,
+                token2: 100,
+                token3: 100,
+                bank_settings: [
+                    BankSettings {
+                        maint_max_health: 50,
+                        ..BankSettings::default()
+                    },
+                    BankSettings {
+                        maint_max_health: 1000,
+                        ..BankSettings::default()
+                    },
+                    BankSettings {
+                        maint_max_health: 400,
+                        ..BankSettings::default()
+                    },
+                ],
+                expected_health:
+                    // tokens
+                    50.0 + 100.0 * 5.0 * 0.7 + 400.0,
+                ..Default::default()
+            },
+            TestHealth1Case {
+                // 19, maint health max including serum (first)
+                health_type: 1, // maint
+                token1: 5,
+                token2: 10,
+                token3: 10,
+                oo_1_2: (0, 100),
+                oo_1_3: (0, 100),
+                bank_settings: [
+                    BankSettings {
+                        maint_max_health: 50,
+                        ..BankSettings::default()
+                    },
+                    BankSettings {
+                        maint_max_health: 10,
+                        ..BankSettings::default()
+                    },
+                    BankSettings {
+                        maint_max_health: 400,
+                        ..BankSettings::default()
+                    },
+                ],
+                expected_health:
+                    // tokens
+                    5.0 * 0.9 + 10.0 + 10.0 * 10.0 * 0.7
+                    // serum 1_2
+                    + 0.0 // worst case it's all token2 and that's exhausted
+                    // serum 1_3
+                    + 45.5, // worst case it's token1, filling up the remaining allowance
+                ..Default::default()
+            },
+            TestHealth1Case {
+                // 20, maint health max including serum (second)
+                health_type: 1, // maint
+                token1: 10,
+                token2: 10,
+                token3: 10,
+                oo_1_2: (10000, 0),
+                oo_1_3: (100, 0),
+                bank_settings: [
+                    BankSettings {
+                        ..BankSettings::default()
+                    },
+                    BankSettings {
+                        maint_max_health: 100,
+                        ..BankSettings::default()
+                    },
+                    BankSettings {
+                        maint_max_health: 150,
+                        ..BankSettings::default()
+                    },
+                ],
+                expected_health:
+                    // tokens
+                    10.0 * 0.9 + 10.0 * 5.0 * 0.7 + 10.0 * 10.0 * 0.7
+                    // serum 1_2
+                    + 65.0 // exhaust remaining token2
+                    // serum 1_3
+                    + 100.0 * 0.7, // under the limit
                 ..Default::default()
             },
         ];

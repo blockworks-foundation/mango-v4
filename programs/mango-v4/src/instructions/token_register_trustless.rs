@@ -102,7 +102,8 @@ pub fn token_register_trustless(
         maint_weight_shift_duration_inv: I80F48::ZERO,
         maint_weight_shift_asset_target: I80F48::ZERO,
         maint_weight_shift_liab_target: I80F48::ZERO,
-        reserved: [0; 2008],
+        maint_max_health_per_account: I80F48::ZERO,
+        reserved: [0; 1992],
     };
 
     if let Ok(oracle_price) =
