@@ -418,6 +418,7 @@ export class MangoClient {
         params.flashLoanSwapFeeRate,
         params.interestCurveScaling,
         params.interestTargetUtilization,
+        params.maintMaxHealthPerAccount,
       )
       .accounts({
         group: group.publicKey,
@@ -500,6 +501,7 @@ export class MangoClient {
         params.maintWeightShiftAssetTarget,
         params.maintWeightShiftLiabTarget,
         params.maintWeightShiftAbort ?? false,
+        params.maintMaxHealthPerAccount,
       )
       .accounts({
         group: group.publicKey,

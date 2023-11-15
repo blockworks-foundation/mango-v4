@@ -1010,6 +1010,7 @@ impl ClientInstruction for TokenRegisterInstruction {
             flash_loan_swap_fee_rate: 0.0,
             interest_curve_scaling: 1.0,
             interest_target_utilization: 0.5,
+            maint_max_health_per_account: 0.0, // disabled
         };
 
         let bank = Pubkey::find_program_address(
@@ -1261,6 +1262,7 @@ pub fn token_edit_instruction_default() -> mango_v4::instruction::TokenEdit {
         maint_weight_shift_asset_target_opt: None,
         maint_weight_shift_liab_target_opt: None,
         maint_weight_shift_abort: false,
+        maint_max_health_per_account_opt: None,
     }
 }
 

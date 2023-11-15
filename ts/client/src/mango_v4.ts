@@ -610,6 +610,10 @@ export type MangoV4 = {
         {
           "name": "interestTargetUtilization",
           "type": "f32"
+        },
+        {
+          "name": "maintMaxHealthPerAccount",
+          "type": "f64"
         }
       ]
     },
@@ -984,6 +988,12 @@ export type MangoV4 = {
         {
           "name": "maintWeightShiftAbort",
           "type": "bool"
+        },
+        {
+          "name": "maintMaxHealthPerAccountOpt",
+          "type": {
+            "option": "f64"
+          }
         }
       ]
     },
@@ -13901,6 +13911,10 @@ export const IDL: MangoV4 = {
         {
           "name": "interestTargetUtilization",
           "type": "f32"
+        },
+        {
+          "name": "maintMaxHealthPerAccount",
+          "type": "f64"
         }
       ]
     },
@@ -14275,6 +14289,12 @@ export const IDL: MangoV4 = {
         {
           "name": "maintWeightShiftAbort",
           "type": "bool"
+        },
+        {
+          "name": "maintMaxHealthPerAccountOpt",
+          "type": {
+            "option": "f64"
+          }
         }
       ]
     },

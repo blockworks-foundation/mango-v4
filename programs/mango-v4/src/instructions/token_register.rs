@@ -40,6 +40,7 @@ pub fn token_register(
     flash_loan_swap_fee_rate: f32,
     interest_curve_scaling: f32,
     interest_target_utilization: f32,
+    maint_max_health_per_account: f64,
 ) -> Result<()> {
     // Require token 0 to be in the insurance token
     if token_index == INSURANCE_TOKEN_INDEX {
@@ -118,7 +119,7 @@ pub fn token_register(
         maint_weight_shift_duration_inv: I80F48::ZERO,
         maint_weight_shift_asset_target: I80F48::ZERO,
         maint_weight_shift_liab_target: I80F48::ZERO,
-        maint_max_health_per_account: I80F48::ZERO,
+        maint_max_health_per_account: I80F48::from_num(maint_max_health_per_account),
         reserved: [0; 1992],
     };
 

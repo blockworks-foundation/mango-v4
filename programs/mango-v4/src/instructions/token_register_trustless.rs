@@ -102,7 +102,7 @@ pub fn token_register_trustless(
         maint_weight_shift_duration_inv: I80F48::ZERO,
         maint_weight_shift_asset_target: I80F48::ZERO,
         maint_weight_shift_liab_target: I80F48::ZERO,
-        maint_max_health_per_account: I80F48::ZERO,
+        maint_max_health_per_account: I80F48::from(5_000_000_000i64), // $5k
         reserved: [0; 1992],
     };
 

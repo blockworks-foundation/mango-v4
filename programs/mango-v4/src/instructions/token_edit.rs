@@ -49,6 +49,7 @@ pub fn token_edit(
     maint_weight_shift_asset_target_opt: Option<f32>,
     maint_weight_shift_liab_target_opt: Option<f32>,
     maint_weight_shift_abort: bool,
+    maint_max_health_per_account_opt: Option<f64>,
 ) -> Result<()> {
     let group = ctx.accounts.group.load()?;
 
@@ -435,6 +436,16 @@ pub fn token_edit(
                 was_enabled,
                 bank.maint_weight_shift_duration_inv.is_positive(),
             );
+        }
+
+        if let Some(maint_max_health_per_account) = maint_max_health_per_account_opt {
+            msg!(
+                "Maint max health per account old {:?}, new {:?}",
+                bank.maint_max_health_per_account,
+                maint_max_health_per_account
+            );
+            bank.maint_max_health_per_account = I80F48::from_num(maint_max_health_per_account);
+            require_group_admin = true;
         }
     }
 

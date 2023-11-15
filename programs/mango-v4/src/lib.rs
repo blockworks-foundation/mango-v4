@@ -152,6 +152,7 @@ pub mod mango_v4 {
         flash_loan_swap_fee_rate: f32,
         interest_curve_scaling: f32,
         interest_target_utilization: f32,
+        maint_max_health_per_account: f64,
     ) -> Result<()> {
         #[cfg(feature = "enable-gpl")]
         instructions::token_register(
@@ -181,6 +182,7 @@ pub mod mango_v4 {
             flash_loan_swap_fee_rate,
             interest_curve_scaling,
             interest_target_utilization,
+            maint_max_health_per_account,
         )?;
         Ok(())
     }
@@ -232,6 +234,7 @@ pub mod mango_v4 {
         maint_weight_shift_asset_target_opt: Option<f32>,
         maint_weight_shift_liab_target_opt: Option<f32>,
         maint_weight_shift_abort: bool,
+        maint_max_health_per_account_opt: Option<f64>,
     ) -> Result<()> {
         #[cfg(feature = "enable-gpl")]
         instructions::token_edit(
@@ -270,6 +273,7 @@ pub mod mango_v4 {
             maint_weight_shift_asset_target_opt,
             maint_weight_shift_liab_target_opt,
             maint_weight_shift_abort,
+            maint_max_health_per_account_opt,
         )?;
         Ok(())
     }
