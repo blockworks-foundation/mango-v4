@@ -1,7 +1,13 @@
 import { BN } from '@coral-xyz/anchor';
 import { utf8 } from '@coral-xyz/anchor/dist/cjs/utils/bytes';
 import { PublicKey } from '@solana/web3.js';
-import { I80F48, I80F48Dto, ONE_I80F48, ZERO_I80F48 } from '../numbers/I80F48';
+import {
+  I80F48,
+  I80F48Dto,
+  MAX_I80F48,
+  ONE_I80F48,
+  ZERO_I80F48,
+} from '../numbers/I80F48';
 import { As, toUiDecimals } from '../utils';
 import { OracleProvider, isOracleStaleOrUnconfident } from './oracle';
 
@@ -43,6 +49,7 @@ export interface BankForHealth {
   nativeDeposits(): I80F48;
   nativeBorrows(): I80F48;
   maintWeights(): [I80F48, I80F48];
+  maintMaxHealthPerAccount(): I80F48;
 
   depositWeightScaleStartQuote: number;
   borrowWeightScaleStartQuote: number;
@@ -79,6 +86,7 @@ export class Bank implements BankForHealth {
   public maintWeightShiftDurationInv: I80F48;
   public maintWeightShiftAssetTarget: I80F48;
   public maintWeightShiftLiabTarget: I80F48;
+  _maintMaxHealthPerAccount: I80F48;
 
   static from(
     publicKey: PublicKey,
@@ -138,6 +146,7 @@ export class Bank implements BankForHealth {
       maintWeightShiftDurationInv: I80F48Dto;
       maintWeightShiftAssetTarget: I80F48Dto;
       maintWeightShiftLiabTarget: I80F48Dto;
+      maintMaxHealthPerAccount: I80F48Dto;
     },
   ): Bank {
     return new Bank(
@@ -197,6 +206,7 @@ export class Bank implements BankForHealth {
       obj.maintWeightShiftDurationInv,
       obj.maintWeightShiftAssetTarget,
       obj.maintWeightShiftLiabTarget,
+      obj.maintMaxHealthPerAccount,
     );
   }
 
@@ -257,6 +267,7 @@ export class Bank implements BankForHealth {
     maintWeightShiftDurationInv: I80F48Dto,
     maintWeightShiftAssetTarget: I80F48Dto,
     maintWeightShiftLiabTarget: I80F48Dto,
+    maintMaxHealthPerAccount: I80F48Dto,
   ) {
     this.name = utf8.decode(new Uint8Array(name)).split('\x00')[0];
     this.oracleConfig = {
@@ -286,6 +297,7 @@ export class Bank implements BankForHealth {
     this.maintWeightShiftDurationInv = I80F48.from(maintWeightShiftDurationInv);
     this.maintWeightShiftAssetTarget = I80F48.from(maintWeightShiftAssetTarget);
     this.maintWeightShiftLiabTarget = I80F48.from(maintWeightShiftLiabTarget);
+    this._maintMaxHealthPerAccount = I80F48.from(maintMaxHealthPerAccount);
     this._price = undefined;
     this._uiPrice = undefined;
     this._oracleLastUpdatedSlot = undefined;
@@ -379,6 +391,14 @@ export class Bank implements BankForHealth {
 
   areBorrowsReduceOnly(): boolean {
     return this.reduceOnly == 1 || this.reduceOnly == 2;
+  }
+
+  maintMaxHealthPerAccount(): I80F48 {
+    if (this._maintMaxHealthPerAccount.isZero()) {
+      return MAX_I80F48();
+    } else {
+      return this._maintMaxHealthPerAccount;
+    }
   }
 
   scaledInitAssetWeight(price: I80F48): I80F48 {

@@ -152,15 +152,10 @@ export class HealthCache {
     return new HealthCache(tokenInfos, serum3Infos, perpInfos);
   }
 
-  computeSerum3Reservations(healthType: HealthType | undefined): {
-    tokenMaxReserved: TokenMaxReserved[];
-    serum3Reserved: Serum3Reserved[];
-  } {
-    // For each token, compute the sum of serum-reserved amounts over all markets.
-    const tokenMaxReserved = new Array(this.tokenInfos.length)
-      .fill(null)
-      .map((ignored) => new TokenMaxReserved(ZERO_I80F48()));
-
+  computeSerum3Reservations(
+    healthType: HealthType | undefined,
+    tokenExtraInfos: TokenExtraInfo[],
+  ): Serum3Reserved[] {
     // For each serum market, compute what happened if reserved_base was converted to quote
     // or reserved_quote was converted to base.
     const serum3Reserved: Serum3Reserved[] = [];
@@ -200,9 +195,9 @@ export class HealthCache {
         allReservedAsQuote = reservedQuote.add(reservedBaseAsQuoteOracle);
       }
 
-      const baseMaxReserved = tokenMaxReserved[info.baseInfoIndex];
+      const baseMaxReserved = tokenExtraInfos[info.baseInfoIndex];
       baseMaxReserved.maxSerumReserved.iadd(allReservedAsBase);
-      const quoteMaxReserved = tokenMaxReserved[info.quoteInfoIndex];
+      const quoteMaxReserved = tokenExtraInfos[info.quoteInfoIndex];
       quoteMaxReserved.maxSerumReserved.iadd(allReservedAsQuote);
 
       serum3Reserved.push(
@@ -210,10 +205,7 @@ export class HealthCache {
       );
     }
 
-    return {
-      tokenMaxReserved: tokenMaxReserved,
-      serum3Reserved: serum3Reserved,
-    };
+    return serum3Reserved;
   }
 
   effectiveTokenBalances(healthType: HealthType | undefined): TokenBalance[] {
@@ -292,24 +284,32 @@ export class HealthCache {
 
   healthSum(healthType: HealthType, tokenBalances: TokenBalance[]): I80F48 {
     const health = ZERO_I80F48();
+    const tokenExtraInfos = new Array(this.tokenInfos.length)
+      .fill(null)
+      .map((ignored) => new TokenExtraInfo());
     for (const index of this.tokenInfos.keys()) {
       const tokenInfo = this.tokenInfos[index];
       const tokenBalance = tokenBalances[index];
+      const tokenExtra = tokenExtraInfos[index];
       const contrib = tokenInfo.healthContribution(
         healthType,
         tokenBalance.spotAndPerp,
       );
+      tokenExtra.spotAndPerpHealth = contrib;
       // console.log(` - ti ${contrib}`);
       health.iadd(contrib);
     }
-    const res = this.computeSerum3Reservations(healthType);
+    const serum3Reserved = this.computeSerum3Reservations(
+      healthType,
+      tokenExtraInfos,
+    );
     for (const [index, serum3Info] of this.serum3Infos.entries()) {
       const contrib = serum3Info.healthContribution(
         healthType,
         this.tokenInfos,
         tokenBalances,
-        res.tokenMaxReserved,
-        res.serum3Reserved[index],
+        tokenExtraInfos,
+        serum3Reserved[index],
       );
       // console.log(` - si ${contrib}`);
       health.iadd(contrib);
@@ -346,6 +346,9 @@ export class HealthCache {
           }
         | undefined;
     }>();
+    const tokenExtraInfos = new Array(this.tokenInfos.length)
+      .fill(null)
+      .map((ignored) => new TokenExtraInfo());
     for (const index of this.tokenInfos.keys()) {
       const tokenInfo = this.tokenInfos[index];
       const tokenBalance = tokenBalancesDisplay[index];
@@ -353,6 +356,7 @@ export class HealthCache {
         healthType,
         tokenBalance.spotAndPerp,
       );
+      tokenExtraInfos[index].spotAndPerpHealth = contrib;
       ret.push({
         asset: group.getFirstBankByTokenIndex(tokenInfo.tokenIndex).name,
         contribution: toUiDecimalsForQuote(contrib),
@@ -362,14 +366,17 @@ export class HealthCache {
         },
       });
     }
-    const res = this.computeSerum3Reservations(healthType);
+    const serum3Reserved = this.computeSerum3Reservations(
+      healthType,
+      tokenExtraInfos,
+    );
     for (const [index, serum3Info] of this.serum3Infos.entries()) {
       const contrib = serum3Info.healthContribution(
         healthType,
         this.tokenInfos,
         tokenBalancesDisplay,
-        res.tokenMaxReserved,
-        res.serum3Reserved[index],
+        tokenExtraInfos,
+        serum3Reserved[index],
       );
       ret.push({
         asset: group.getSerum3MarketByMarketIndex(serum3Info.marketIndex).name,
@@ -423,7 +430,12 @@ export class HealthCache {
   ): { assets: I80F48; liabs: I80F48 } {
     const totalAssets = ZERO_I80F48();
     const totalLiabs = ZERO_I80F48();
-    for (const tokenInfo of this.tokenInfos) {
+
+    const tokenExtraInfos = new Array(this.tokenInfos.length)
+      .fill(null)
+      .map((ignored) => new TokenExtraInfo());
+    for (const index of this.tokenInfos.keys()) {
+      const tokenInfo = this.tokenInfos[index];
       const assetBalance = ZERO_I80F48();
       const liabBalance = ZERO_I80F48();
 
@@ -470,17 +482,25 @@ export class HealthCache {
           totalAssets.iadd(assetBalance.mul(liabWeightedPrice));
         }
       }
+
+      tokenExtraInfos[index].spotAndPerpHealth = tokenInfo.healthContribution(
+        healthType,
+        assetBalance.sub(liabBalance),
+      );
     }
 
     const tokenBalances = this.effectiveTokenBalances(healthType);
-    const res = this.computeSerum3Reservations(healthType);
+    const serum3Reserved = this.computeSerum3Reservations(
+      healthType,
+      tokenExtraInfos,
+    );
     for (const [index, serum3Info] of this.serum3Infos.entries()) {
       const contrib = serum3Info.healthContribution(
         healthType,
         this.tokenInfos,
         tokenBalances,
-        res.tokenMaxReserved,
-        res.serum3Reserved[index],
+        tokenExtraInfos,
+        serum3Reserved[index],
       );
       if (contrib.isPos()) {
         totalAssets.iadd(contrib);
@@ -945,9 +965,15 @@ export class HealthCache {
     const source = healthCacheClone.tokenInfos[sourceIndex];
     const target = healthCacheClone.tokenInfos[targetIndex];
 
-    const res = healthCacheClone.computeSerum3Reservations(HealthType.init);
-    const sourceReserved = res.tokenMaxReserved[sourceIndex].maxSerumReserved;
-    const targetReserved = res.tokenMaxReserved[targetIndex].maxSerumReserved;
+    const tokenExtraInfos = new Array(this.tokenInfos.length)
+      .fill(null)
+      .map((ignored) => new TokenExtraInfo());
+    healthCacheClone.computeSerum3Reservations(
+      HealthType.init,
+      tokenExtraInfos,
+    );
+    const sourceReserved = tokenExtraInfos[sourceIndex].maxSerumReserved;
+    const targetReserved = tokenExtraInfos[targetIndex].maxSerumReserved;
 
     const tokenBalances = healthCacheClone.effectiveTokenBalances(
       HealthType.init,
@@ -1082,9 +1108,15 @@ export class HealthCache {
     const base = healthCacheClone.tokenInfos[baseIndex];
     const quote = healthCacheClone.tokenInfos[quoteIndex];
 
-    const res = healthCacheClone.computeSerum3Reservations(HealthType.init);
-    const baseReserved = res.tokenMaxReserved[baseIndex].maxSerumReserved;
-    const quoteReserved = res.tokenMaxReserved[quoteIndex].maxSerumReserved;
+    const tokenExtraInfos = new Array(this.tokenInfos.length)
+      .fill(null)
+      .map((ignored) => new TokenExtraInfo());
+    healthCacheClone.computeSerum3Reservations(
+      HealthType.init,
+      tokenExtraInfos,
+    );
+    const baseReserved = tokenExtraInfos[baseIndex].maxSerumReserved;
+    const quoteReserved = tokenExtraInfos[quoteIndex].maxSerumReserved;
 
     // Binary search between current health (0 sized new order) and
     // an amount to trade which will bring health to 0.
@@ -1420,6 +1452,7 @@ export class TokenInfo {
     public initLiabWeight: I80F48,
     public initScaledLiabWeight: I80F48,
     public prices: Prices,
+    public maintMaxHealth: I80F48,
     public balanceSpot: I80F48,
   ) {}
 
@@ -1443,6 +1476,7 @@ export class TokenInfo {
       bank.initLiabWeight,
       bank.scaledInitLiabWeight(liabPrice),
       p,
+      bank.maintMaxHealthPerAccount(),
       nativeBalance ? nativeBalance : ZERO_I80F48(),
     );
   }
@@ -1490,6 +1524,7 @@ export class TokenInfo {
     return balance.isNeg()
       ? balance.mul(this.liabWeightedPrice(healthType))
       : balance.mul(this.assetWeightedPrice(healthType));
+    // ### TODO limit
   }
 
   toString(balance: I80F48): string {
@@ -1514,8 +1549,13 @@ class TokenBalanceDisplay {
   ) {}
 }
 
-class TokenMaxReserved {
-  constructor(public maxSerumReserved: I80F48) {}
+class TokenExtraInfo {
+  public maxSerumReserved: I80F48;
+  public spotAndPerpHealth: I80F48;
+  constructor() {
+    this.maxSerumReserved = ZERO_I80F48();
+    this.spotAndPerpHealth = ZERO_I80F48();
+  }
 }
 
 export class Serum3Reserved {
@@ -1598,7 +1638,7 @@ export class Serum3Info {
     healthType: HealthType | undefined,
     tokenInfos: TokenInfo[],
     tokenBalances: TokenBalance[],
-    tokenMaxReserved: TokenMaxReserved[],
+    tokenExtraInfos: TokenExtraInfo[],
     marketReserved: Serum3Reserved,
   ): I80F48 {
     if (
@@ -1608,22 +1648,17 @@ export class Serum3Info {
       return ZERO_I80F48();
     }
 
-    const baseInfo = tokenInfos[this.baseInfoIndex];
-    const quoteInfo = tokenInfos[this.quoteInfoIndex];
-    const baseMaxReserved = tokenMaxReserved[this.baseInfoIndex];
-    const quoteMaxReserved = tokenMaxReserved[this.quoteInfoIndex];
-
     // How much the health would increase if the reserved balance were applied to the passed
     // token info?
     const computeHealthEffect = function (
       tokenInfo: TokenInfo,
       balance: TokenBalance,
-      maxReserved: TokenMaxReserved,
+      extraInfo: TokenExtraInfo,
       marketReserved: I80F48,
     ): I80F48 {
       // This balance includes all possible reserved funds from markets that relate to the
       // token, including this market itself: `tokenMaxReserved` is already included in `maxBalance`.
-      const maxBalance = balance.spotAndPerp.add(maxReserved.maxSerumReserved);
+      const maxBalance = balance.spotAndPerp.add(extraInfo.maxSerumReserved);
 
       // Assuming `reserved` was added to `max_balance` last (because that gives the smallest
       // health effects): how much did health change because of it?
@@ -1645,27 +1680,39 @@ export class Serum3Info {
           .add(liabPart.mul(tokenInfo.prices.oracle));
       }
 
-      const assetWeight = tokenInfo.assetWeight(healthType);
-      const liabWeight = tokenInfo.liabWeight(healthType);
-      const assetPrice = tokenInfo.prices.asset(healthType);
-      const liabPrice = tokenInfo.prices.liab(healthType);
+      const health = ZERO_I80F48();
+      if (assetPart.isPos()) {
+        const assetWeight = tokenInfo.assetWeight(healthType);
+        const assetPrice = tokenInfo.prices.asset(healthType);
+        const assetHealth = assetWeight.mul(assetPart).mul(assetPrice);
+        let assetHealthLimited;
+        if (healthType === HealthType.maint) {
+          assetHealthLimited = assetHealth; // ### TODO
+        } else {
+          assetHealthLimited = assetHealth;
+        }
+        health.iadd(assetHealthLimited);
+      }
+      if (liabPart.isPos()) {
+        const liabWeight = tokenInfo.liabWeight(healthType);
+        const liabPrice = tokenInfo.prices.liab(healthType);
+        const liabHealth = liabWeight.mul(liabPart).mul(liabPrice);
+        health.iadd(liabHealth);
+      }
 
-      return assetWeight
-        .mul(assetPart)
-        .mul(assetPrice)
-        .add(liabWeight.mul(liabPart).mul(liabPrice));
+      return health;
     };
 
     const healthBase = computeHealthEffect(
-      baseInfo,
+      tokenInfos[this.baseInfoIndex],
       tokenBalances[this.baseInfoIndex],
-      tokenMaxReserved[this.baseInfoIndex],
+      tokenExtraInfos[this.baseInfoIndex],
       marketReserved.allReservedAsBase,
     );
     const healthQuote = computeHealthEffect(
-      quoteInfo,
+      tokenInfos[this.quoteInfoIndex],
       tokenBalances[this.quoteInfoIndex],
-      tokenMaxReserved[this.quoteInfoIndex],
+      tokenExtraInfos[this.quoteInfoIndex],
       marketReserved.allReservedAsQuote,
     );
 
@@ -1678,7 +1725,7 @@ export class Serum3Info {
   toString(
     tokenInfos: TokenInfo[],
     tokenBalances: TokenBalance[],
-    tokenMaxReserved: TokenMaxReserved[],
+    tokenMaxReserved: TokenExtraInfo[],
     marketReserved: Serum3Reserved,
   ): string {
     return `  marketIndex: ${this.marketIndex}, baseInfoIndex: ${

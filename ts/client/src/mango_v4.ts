@@ -7134,11 +7134,17 @@ export type MangoV4 = {
             }
           },
           {
+            "name": "maintMaxHealthPerAccount",
+            "type": {
+              "defined": "I80F48"
+            }
+          },
+          {
             "name": "reserved",
             "type": {
               "array": [
                 "u8",
-                2008
+                1992
               ]
             }
           }
@@ -20419,11 +20425,17 @@ export const IDL: MangoV4 = {
             }
           },
           {
+            "name": "maintMaxHealthPerAccount",
+            "type": {
+              "defined": "I80F48"
+            }
+          },
+          {
             "name": "reserved",
             "type": {
               "array": [
                 "u8",
-                2008
+                1992
               ]
             }
           }

@@ -7134,11 +7134,17 @@
             }
           },
           {
+            "name": "maintMaxHealthPerAccount",
+            "type": {
+              "defined": "I80F48"
+            }
+          },
+          {
             "name": "reserved",
             "type": {
               "array": [
                 "u8",
-                2008
+                1992
               ]
             }
           }

@@ -5,7 +5,7 @@ import cloneDeep from 'lodash/cloneDeep';
 import range from 'lodash/range';
 
 import { PublicKey } from '@solana/web3.js';
-import { I80F48, ONE_I80F48, ZERO_I80F48 } from '../numbers/I80F48';
+import { I80F48, MAX_I80F48, ONE_I80F48, ZERO_I80F48 } from '../numbers/I80F48';
 import { BankForHealth, StablePriceModel, TokenIndex } from './bank';
 import { HealthCache, PerpInfo, Serum3Info, TokenInfo } from './healthCache';
 import { HealthType, PerpPosition, Serum3Orders } from './mangoAccount';
@@ -61,6 +61,7 @@ function mockBankAndOracle(
       I80F48.fromNumber(1 - maintWeight),
       I80F48.fromNumber(1 + maintWeight),
     ],
+    maintMaxHealthPerAccount: () => MAX_I80F48(),
     borrowWeightScaleStartQuote: borrowWeightScaleStartQuote,
     depositWeightScaleStartQuote: depositWeightScaleStartQuote,
   };
