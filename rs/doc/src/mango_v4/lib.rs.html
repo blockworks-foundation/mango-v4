@@ -1686,6 +1686,8 @@
 <a href="#1686" id="1686">1686</a>
 <a href="#1687" id="1687">1687</a>
 <a href="#1688" id="1688">1688</a>
+<a href="#1689" id="1689">1689</a>
+<a href="#1690" id="1690">1690</a>
 </pre><pre class="rust"><code><span class="attr">#![allow(unused_variables)]
 
 </span><span class="kw">use </span>fixed::types::I80F48;
@@ -1840,6 +1842,7 @@
         flash_loan_swap_fee_rate: f32,
         interest_curve_scaling: f32,
         interest_target_utilization: f32,
+        group_insurance_fund: bool,
     ) -&gt; <span class="prelude-ty">Result</span>&lt;()&gt; {
         <span class="attr">#[cfg(feature = <span class="string">&quot;enable-gpl&quot;</span>)]
         </span>instructions::token_register(
@@ -1869,6 +1872,7 @@
             flash_loan_swap_fee_rate,
             interest_curve_scaling,
             interest_target_utilization,
+            group_insurance_fund,
         )<span class="question-mark">?</span>;
         <span class="prelude-val">Ok</span>(())
     }
