@@ -1010,6 +1010,7 @@ impl ClientInstruction for TokenRegisterInstruction {
             flash_loan_swap_fee_rate: 0.0,
             interest_curve_scaling: 1.0,
             interest_target_utilization: 0.5,
+            group_insurance_fund: true,
         };
 
         let bank = Pubkey::find_program_address(
