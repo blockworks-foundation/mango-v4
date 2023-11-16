@@ -610,6 +610,10 @@ export type MangoV4 = {
         {
           "name": "interestTargetUtilization",
           "type": "f32"
+        },
+        {
+          "name": "groupInsuranceFund",
+          "type": "bool"
         }
       ]
     },
@@ -13895,6 +13899,10 @@ export const IDL: MangoV4 = {
         {
           "name": "interestTargetUtilization",
           "type": "f32"
+        },
+        {
+          "name": "groupInsuranceFund",
+          "type": "bool"
         }
       ]
     },

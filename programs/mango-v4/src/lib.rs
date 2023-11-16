@@ -152,6 +152,7 @@ pub mod mango_v4 {
         flash_loan_swap_fee_rate: f32,
         interest_curve_scaling: f32,
         interest_target_utilization: f32,
+        group_insurance_fund: bool,
     ) -> Result<()> {
         #[cfg(feature = "enable-gpl")]
         instructions::token_register(
@@ -181,6 +182,7 @@ pub mod mango_v4 {
             flash_loan_swap_fee_rate,
             interest_curve_scaling,
             interest_target_utilization,
+            group_insurance_fund,
         )?;
         Ok(())
     }
