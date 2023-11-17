@@ -49,8 +49,8 @@ export class MangoAccount {
       serum3: unknown;
       perps: unknown;
       perpOpenOrders: unknown;
+      tokenConditionalSwaps: unknown;
     },
-    tokenConditionalSwaps: TokenConditionalSwapDto[],
   ): MangoAccount {
     return new MangoAccount(
       publicKey,
@@ -73,7 +73,7 @@ export class MangoAccount {
       obj.serum3 as Serum3PositionDto[],
       obj.perps as PerpPositionDto[],
       obj.perpOpenOrders as PerpOoDto[],
-      tokenConditionalSwaps,
+      obj.tokenConditionalSwaps as TokenConditionalSwapDto[],
       new Map(), // serum3OosMapByMarketIndex
     );
   }

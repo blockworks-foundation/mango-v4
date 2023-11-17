@@ -7460,6 +7460,27 @@
                 "defined": "PerpOpenOrder"
               }
             }
+          },
+          {
+            "name": "padding8",
+            "type": "u32"
+          },
+          {
+            "name": "tokenConditionalSwaps",
+            "type": {
+              "vec": {
+                "defined": "TokenConditionalSwap"
+              }
+            }
+          },
+          {
+            "name": "reservedDynamic",
+            "type": {
+              "array": [
+                "u8",
+                64
+              ]
+            }
           }
         ]
       }

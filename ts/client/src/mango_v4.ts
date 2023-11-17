@@ -7460,6 +7460,27 @@ export type MangoV4 = {
                 "defined": "PerpOpenOrder"
               }
             }
+          },
+          {
+            "name": "padding8",
+            "type": "u32"
+          },
+          {
+            "name": "tokenConditionalSwaps",
+            "type": {
+              "vec": {
+                "defined": "TokenConditionalSwap"
+              }
+            }
+          },
+          {
+            "name": "reservedDynamic",
+            "type": {
+              "array": [
+                "u8",
+                64
+              ]
+            }
           }
         ]
       }
@@ -20748,6 +20769,27 @@ export const IDL: MangoV4 = {
               "vec": {
                 "defined": "PerpOpenOrder"
               }
+            }
+          },
+          {
+            "name": "padding8",
+            "type": "u32"
+          },
+          {
+            "name": "tokenConditionalSwaps",
+            "type": {
+              "vec": {
+                "defined": "TokenConditionalSwap"
+              }
+            }
+          },
+          {
+            "name": "reservedDynamic",
+            "type": {
+              "array": [
+                "u8",
+                64
+              ]
             }
           }
         ]
