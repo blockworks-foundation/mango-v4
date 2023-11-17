@@ -997,8 +997,6 @@ impl ClientInstruction for TokenRegisterInstruction {
             token_conditional_swap_taker_fee_rate: 0.0,
             token_conditional_swap_maker_fee_rate: 0.0,
             flash_loan_swap_fee_rate: 0.0,
-            interest_curve_scaling: 1.0,
-            interest_target_utilization: 0.5,
         };
 
         let bank = Pubkey::find_program_address(
@@ -1243,8 +1241,6 @@ pub fn token_edit_instruction_default() -> mango_v4::instruction::TokenEdit {
         token_conditional_swap_taker_fee_rate_opt: None,
         token_conditional_swap_maker_fee_rate_opt: None,
         flash_loan_swap_fee_rate_opt: None,
-        interest_curve_scaling_opt: None,
-        interest_target_utilization_opt: None,
     }
 }
 

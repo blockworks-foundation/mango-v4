@@ -2,7 +2,7 @@ use anchor_lang::prelude::*;
 
 use crate::accounts_ix::*;
 use crate::error::MangoError;
-use crate::logs::{UpdateIndexLog, UpdateRateLogV2};
+use crate::logs::{UpdateIndexLog, UpdateRateLog};
 use crate::state::HOUR;
 use crate::{
     accounts_zerocopy::{AccountInfoRef, LoadMutZeroCopyRef, LoadZeroCopyRef},
@@ -140,54 +140,32 @@ pub fn token_update_index_and_rate(ctx: Context<TokenUpdateIndexAndRate>) -> Res
 
     // compute optimal rates, and max rate and set them on the bank
     {
-        let mut some_bank = ctx.remaining_accounts[0].load_mut::<Bank>()?;
+        let some_bank = ctx.remaining_accounts[0].load::<Bank>()?;
 
         let diff_ts = I80F48::from_num(now_ts - some_bank.bank_rate_last_updated);
 
         // update each hour
         if diff_ts > HOUR {
-            // First setup when new parameters are introduced
-            if some_bank.interest_curve_scaling == 0.0 {
-                let old_max_rate = 0.5;
-                some_bank.interest_curve_scaling =
-                    some_bank.max_rate.to_num::<f64>() / old_max_rate;
-                some_bank.interest_target_utilization = some_bank.util0.to_num();
+            let (rate0, rate1, max_rate) = some_bank.compute_rates();
 
-                let descale_factor = I80F48::from_num(1.0 / some_bank.interest_curve_scaling);
-                some_bank.rate0 *= descale_factor;
-                some_bank.rate1 *= descale_factor;
-                some_bank.max_rate *= descale_factor;
-            }
-
-            some_bank.update_interest_rate_scaling();
-
-            let rate0 = some_bank.rate0;
-            let rate1 = some_bank.rate1;
-            let max_rate = some_bank.max_rate;
-            let scaling = some_bank.interest_curve_scaling;
-            let target_util = some_bank.interest_target_utilization;
-
-            emit!(UpdateRateLogV2 {
+            emit!(UpdateRateLog {
                 mango_group: mint_info.group.key(),
                 token_index: mint_info.token_index,
                 rate0: rate0.to_bits(),
-                util0: some_bank.util0.to_bits(),
                 rate1: rate1.to_bits(),
-                util1: some_bank.util1.to_bits(),
                 max_rate: max_rate.to_bits(),
-                curve_scaling: some_bank.interest_curve_scaling,
-                target_utilization: some_bank.interest_target_utilization,
             });
 
             drop(some_bank);
 
-            // Apply the new parameters to all banks
+            msg!("rate0 {}", rate0);
+            msg!("rate1 {}", rate1);
+            msg!("max_rate {}", max_rate);
+
             for ai in ctx.remaining_accounts.iter() {
                 let mut bank = ai.load_mut::<Bank>()?;
 
                 bank.bank_rate_last_updated = now_ts;
-                bank.interest_curve_scaling = scaling;
-                bank.interest_target_utilization = target_util;
                 bank.rate0 = rate0;
                 bank.rate1 = rate1;
                 bank.max_rate = max_rate;

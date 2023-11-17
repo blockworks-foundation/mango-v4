@@ -94,8 +94,8 @@ pub fn token_register_trustless(
         token_conditional_swap_taker_fee_rate: 0.0005,
         token_conditional_swap_maker_fee_rate: 0.0005,
         flash_loan_swap_fee_rate: 0.0,
-        interest_target_utilization: 0.5,
-        interest_curve_scaling: 4.0,
+        interest_target_utilization: 0.0, // unused in v0.20.0
+        interest_curve_scaling: 0.0,      // unused in v0.20.0
         deposits_in_serum: 0,
         reserved: [0; 2072],
     };

@@ -42,8 +42,6 @@ pub fn token_edit(
     token_conditional_swap_taker_fee_rate_opt: Option<f32>,
     token_conditional_swap_maker_fee_rate_opt: Option<f32>,
     flash_loan_swap_fee_rate_opt: Option<f32>,
-    interest_curve_scaling_opt: Option<f32>,
-    interest_target_utilization_opt: Option<f32>,
 ) -> Result<()> {
     let group = ctx.accounts.group.load()?;
 
@@ -339,27 +337,6 @@ pub fn token_edit(
             );
             require_gte!(fee_rate, 0.0); // values <0 are not currently supported
             bank.flash_loan_swap_fee_rate = fee_rate;
-            require_group_admin = true;
-        }
-
-        if let Some(interest_curve_scaling) = interest_curve_scaling_opt {
-            msg!(
-                "Interest curve scaling old {:?}, new {:?}",
-                bank.interest_curve_scaling,
-                interest_curve_scaling
-            );
-            require_gte!(interest_curve_scaling, 1.0);
-            bank.interest_curve_scaling = interest_curve_scaling.into();
-            require_group_admin = true;
-        }
-        if let Some(interest_target_utilization) = interest_target_utilization_opt {
-            msg!(
-                "Interest target utilization old {:?}, new {:?}",
-                bank.interest_target_utilization,
-                interest_target_utilization
-            );
-            require_gte!(interest_target_utilization, 0.0);
-            bank.interest_target_utilization = interest_target_utilization;
             require_group_admin = true;
         }
     }

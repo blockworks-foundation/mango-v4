@@ -18,6 +18,7 @@ pub const DAY: i64 = 86400;
 pub const DAY_I80F48: I80F48 = I80F48::from_bits(86_400 * I80F48::ONE.to_bits());
 pub const ONE_BPS: I80F48 = I80F48::from_bits(28147497671);
 pub const YEAR_I80F48: I80F48 = I80F48::from_bits(31_536_000 * I80F48::ONE.to_bits());
+pub const MINIMUM_MAX_RATE: I80F48 = I80F48::from_bits(I80F48::ONE.to_bits() / 2);
 
 #[derive(Derivative)]
 #[derivative(Debug)]
@@ -150,12 +151,12 @@ pub struct Bank {
 
     /// Target utilization: If actual utilization is higher, scale up interest.
     /// If it's lower, scale down interest (if possible)
-    pub interest_target_utilization: f32,
+    pub interest_target_utilization: f32, // unused in v0.20.0
 
     /// Current interest curve scaling, always >= 1.0
     ///
     /// Except when first migrating to having this field, then 0.0
-    pub interest_curve_scaling: f64,
+    pub interest_curve_scaling: f64, // unused in v0.20.0
 
     // user deposits that were moved into serum open orders
     // can be negative due to multibank, then it'd need to be balanced in the keeper
@@ -262,15 +263,15 @@ impl Bank {
             token_index: existing_bank.token_index,
             mint_decimals: existing_bank.mint_decimals,
             oracle_config: existing_bank.oracle_config,
-            stable_price_model: existing_bank.stable_price_model,
+            stable_price_model: StablePriceModel::default(),
             min_vault_to_deposits_ratio: existing_bank.min_vault_to_deposits_ratio,
             net_borrow_limit_per_window_quote: existing_bank.net_borrow_limit_per_window_quote,
             net_borrow_limit_window_size_ts: existing_bank.net_borrow_limit_window_size_ts,
             last_net_borrows_window_start_ts: existing_bank.last_net_borrows_window_start_ts,
-            borrow_weight_scale_start_quote: existing_bank.borrow_weight_scale_start_quote,
-            deposit_weight_scale_start_quote: existing_bank.deposit_weight_scale_start_quote,
-            reduce_only: existing_bank.reduce_only,
-            force_close: existing_bank.force_close,
+            borrow_weight_scale_start_quote: f64::MAX,
+            deposit_weight_scale_start_quote: f64::MAX,
+            reduce_only: 0,
+            force_close: 0,
             padding: [0; 6],
             token_conditional_swap_taker_fee_rate: existing_bank
                 .token_conditional_swap_taker_fee_rate,
@@ -289,7 +290,7 @@ impl Bank {
         require_gte!(self.rate0, I80F48::ZERO);
         require_gte!(self.util1, I80F48::ZERO);
         require_gte!(self.rate1, I80F48::ZERO);
-        require_gte!(self.max_rate, I80F48::ZERO);
+        require_gte!(self.max_rate, MINIMUM_MAX_RATE);
         require_gte!(self.loan_fee_rate, 0.0);
         require_gte!(self.loan_origination_fee_rate, 0.0);
         require_gte!(self.maint_asset_weight, 0.0);
@@ -305,8 +306,6 @@ impl Bank {
         require_gte!(self.token_conditional_swap_taker_fee_rate, 0.0);
         require_gte!(self.token_conditional_swap_maker_fee_rate, 0.0);
         require_gte!(self.flash_loan_swap_fee_rate, 0.0);
-        require_gte!(self.interest_curve_scaling, 1.0);
-        require_gte!(self.interest_target_utilization, 0.0);
         Ok(())
     }
 
@@ -816,7 +815,6 @@ impl Bank {
             self.util1,
             self.rate1,
             self.max_rate,
-            self.interest_curve_scaling,
         )
     }
 
@@ -830,9 +828,8 @@ impl Bank {
         util1: I80F48,
         rate1: I80F48,
         max_rate: I80F48,
-        scaling: f64,
     ) -> I80F48 {
-        let v = if utilization <= util0 {
+        if utilization <= util0 {
             let slope = rate0 / util0;
             slope * utilization
         } else if utilization <= util1 {
@@ -843,13 +840,6 @@ impl Bank {
             let extra_util = utilization - util1;
             let slope = (max_rate - rate1) / (I80F48::ONE - util1);
             rate1 + slope * extra_util
-        };
-
-        // scaling will be 0 when it's introduced
-        if scaling == 0.0 {
-            v
-        } else {
-            v * I80F48::from_num(scaling)
         }
     }
 
@@ -885,23 +875,34 @@ impl Bank {
     }
 
     // computes new optimal rates and max rate
-    pub fn update_interest_rate_scaling(&mut self) {
-        // Interest increases above target_util, decreases below
-        let target_util = self.interest_target_utilization as f64;
-
+    pub fn compute_rates(&self) -> (I80F48, I80F48, I80F48) {
+        // interest rate legs 2 and 3 are seen as punitive legs, encouraging utilization to move towards optimal utilization
+        // lets choose util0 as optimal utilization and 0 to utli0 as the leg where we want the utlization to preferably be
+        let optimal_util = self.util0;
         // use avg_utilization and not instantaneous_utilization so that rates cannot be manipulated easily
-        let avg_util = self.avg_utilization.to_num::<f64>();
-
+        let avg_util = self.avg_utilization;
         // move rates up when utilization is above optimal utilization, and vice versa
         // util factor is between -1 (avg util = 0) and +1 (avg util = 100%)
-        let util_factor = if avg_util > target_util {
-            (avg_util - target_util) / (1.0 - target_util)
+        let util_factor = if avg_util > optimal_util {
+            (avg_util - optimal_util) / (I80F48::ONE - optimal_util)
         } else {
-            (avg_util - target_util) / target_util
+            (avg_util - optimal_util) / optimal_util
         };
-        let adjustment = 1.0 + self.adjustment_factor.to_num::<f64>() * util_factor;
+        let adjustment = I80F48::ONE + self.adjustment_factor * util_factor;
 
-        self.interest_curve_scaling = (self.interest_curve_scaling * adjustment).max(1.0)
+        // 1. irrespective of which leg current utilization is in, update all rates
+        // 2. only update rates as long as new adjusted rates are above MINIMUM_MAX_RATE,
+        //  since we don't want to fall to such low rates that it would take a long time to
+        //  recover to high rates if utilization suddently increases to a high value
+        if (self.max_rate * adjustment) > MINIMUM_MAX_RATE {
+            (
+                (self.rate0 * adjustment),
+                (self.rate1 * adjustment),
+                (self.max_rate * adjustment),
+            )
+        } else {
+            (self.rate0, self.rate1, self.max_rate)
+        }
     }
 
     pub fn oracle_price(

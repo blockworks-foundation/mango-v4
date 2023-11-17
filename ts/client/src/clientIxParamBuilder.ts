@@ -25,8 +25,6 @@ export interface TokenRegisterParams {
   tokenConditionalSwapTakerFeeRate: number;
   tokenConditionalSwapMakerFeeRate: number;
   flashLoanSwapFeeRate: number;
-  interestCurveScaling: number;
-  interestTargetUtilization: number;
 }
 
 export const DefaultTokenRegisterParams: TokenRegisterParams = {
@@ -37,10 +35,10 @@ export const DefaultTokenRegisterParams: TokenRegisterParams = {
   groupInsuranceFund: false,
   interestRateParams: {
     util0: 0.5,
-    rate0: 0.018,
+    rate0: 0.072,
     util1: 0.8,
-    rate1: 0.05,
-    maxRate: 0.5,
+    rate1: 0.2,
+    maxRate: 2,
     adjustmentFactor: 0.004,
   },
   loanFeeRate: 0.0005,
@@ -62,8 +60,6 @@ export const DefaultTokenRegisterParams: TokenRegisterParams = {
   tokenConditionalSwapTakerFeeRate: 0.0005,
   tokenConditionalSwapMakerFeeRate: 0.0005,
   flashLoanSwapFeeRate: 0.0005,
-  interestCurveScaling: 4.0,
-  interestTargetUtilization: 0.5,
 };
 
 export interface TokenEditParams {
@@ -94,8 +90,6 @@ export interface TokenEditParams {
   tokenConditionalSwapTakerFeeRate: number | null;
   tokenConditionalSwapMakerFeeRate: number | null;
   flashLoanSwapFeeRate: number | null;
-  interestCurveScaling: number | null;
-  interestTargetUtilization: number | null;
 }
 
 export const NullTokenEditParams: TokenEditParams = {
@@ -126,8 +120,6 @@ export const NullTokenEditParams: TokenEditParams = {
   tokenConditionalSwapTakerFeeRate: null,
   tokenConditionalSwapMakerFeeRate: null,
   flashLoanSwapFeeRate: null,
-  interestCurveScaling: null,
-  interestTargetUtilization: null,
 };
 
 export interface PerpEditParams {
