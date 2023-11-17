@@ -37,7 +37,7 @@ async fn test_token_update_index_and_rate() -> Result<(), TransportError> {
     )
     .await;
 
-    send_tx(
+    mango_client::send_tx(
         solana,
         TokenWithdrawInstruction {
             amount: 5000,
@@ -57,7 +57,7 @@ async fn test_token_update_index_and_rate() -> Result<(), TransportError> {
     solana.advance_clock().await;
     let time_after = solana.clock().await.unix_timestamp;
 
-    send_tx(
+    mango_client::send_tx(
         solana,
         TokenUpdateIndexAndRateInstruction {
             mint_info: tokens[0].mint_info,

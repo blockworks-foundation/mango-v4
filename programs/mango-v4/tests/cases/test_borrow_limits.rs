@@ -57,7 +57,7 @@ async fn test_bank_utilization_based_borrow_limit() -> Result<(), TransportError
 
         // account_1 tries to borrow all existing deposits on mint_0
         // should fail because borrow limit would be reached
-        let res = send_tx(
+        let res = mango_client::send_tx(
             solana,
             TokenWithdrawInstruction {
                 amount: deposit_amount,
@@ -74,7 +74,7 @@ async fn test_bank_utilization_based_borrow_limit() -> Result<(), TransportError
 
         // account_1 tries to borrow < limit on mint_0
         // should succeed because borrow limit won't be reached
-        send_tx(
+        mango_client::send_tx(
             solana,
             TokenWithdrawInstruction {
                 amount: deposit_amount / 10 * 7,
@@ -91,7 +91,7 @@ async fn test_bank_utilization_based_borrow_limit() -> Result<(), TransportError
 
         // account_0 tries to withdraw all remaining on mint_0
         // should succeed because withdraws without borrows are not limited
-        send_tx(
+        mango_client::send_tx(
             solana,
             TokenWithdrawInstruction {
                 amount: deposit_amount / 10 * 3,
@@ -136,7 +136,7 @@ async fn test_bank_net_borrows_based_borrow_limit() -> Result<(), TransportError
     let reset_net_borrows = || {
         let mint = tokens[0].mint.pubkey;
         async move {
-            send_tx(
+            mango_client::send_tx(
                 solana,
                 TokenResetNetBorrows {
                     group,
@@ -190,7 +190,7 @@ async fn test_bank_net_borrows_based_borrow_limit() -> Result<(), TransportError
 
     {
         // succeeds because borrow is less than net borrow limit
-        send_tx(
+        mango_client::send_tx(
             solana,
             TokenWithdrawInstruction {
                 amount: 5000,
@@ -207,7 +207,7 @@ async fn test_bank_net_borrows_based_borrow_limit() -> Result<(), TransportError
 
         // fails because borrow is greater than remaining margin in net borrow limit
         // (requires the test to be quick enough to avoid accidentally going to the next borrow limit window!)
-        let res = send_tx(
+        let res = mango_client::send_tx(
             solana,
             TokenWithdrawInstruction {
                 amount: 4000,
@@ -226,7 +226,7 @@ async fn test_bank_net_borrows_based_borrow_limit() -> Result<(), TransportError
         );
 
         // succeeds because is not a borrow
-        send_tx(
+        mango_client::send_tx(
             solana,
             TokenWithdrawInstruction {
                 amount: 4000,
@@ -241,7 +241,7 @@ async fn test_bank_net_borrows_based_borrow_limit() -> Result<(), TransportError
         .unwrap();
 
         // depositing reduces usage, but only the repayment part
-        send_tx(
+        mango_client::send_tx(
             solana,
             TokenDepositInstruction {
                 amount: 7000,
@@ -258,7 +258,7 @@ async fn test_bank_net_borrows_based_borrow_limit() -> Result<(), TransportError
         assert_eq!(bank_borrow_used().await, 1); // due to rounding
 
         // give account1 a negative token0 balance again
-        send_tx(
+        mango_client::send_tx(
             solana,
             TokenWithdrawInstruction {
                 amount: 5000,
@@ -281,7 +281,7 @@ async fn test_bank_net_borrows_based_borrow_limit() -> Result<(), TransportError
     {
         // succeeds because borrow is less than net borrow limit in a fresh window
         {
-            send_tx(
+            mango_client::send_tx(
                 solana,
                 TokenWithdrawInstruction {
                     amount: 999, // borrow limit increases more due to loan fees + ceil
@@ -300,7 +300,7 @@ async fn test_bank_net_borrows_based_borrow_limit() -> Result<(), TransportError
         set_bank_stub_oracle_price(solana, group, &tokens[0], admin, 10.0).await;
 
         // cannot borrow anything: net borrowed 1002 * price 10.0 > limit 6000
-        let res = send_tx(
+        let res = mango_client::send_tx(
             solana,
             TokenWithdrawInstruction {
                 amount: 1,
@@ -319,7 +319,7 @@ async fn test_bank_net_borrows_based_borrow_limit() -> Result<(), TransportError
         );
 
         // can still withdraw
-        send_tx(
+        mango_client::send_tx(
             solana,
             TokenWithdrawInstruction {
                 amount: 4000,
@@ -336,7 +336,7 @@ async fn test_bank_net_borrows_based_borrow_limit() -> Result<(), TransportError
         set_bank_stub_oracle_price(solana, group, &tokens[0], admin, 5.0).await;
 
         // cannot borrow this much: (net borrowed 1000 + new borrow 201) * price 5.0 > limit 6000
-        let res = send_tx(
+        let res = mango_client::send_tx(
             solana,
             TokenWithdrawInstruction {
                 amount: 200,
@@ -355,7 +355,7 @@ async fn test_bank_net_borrows_based_borrow_limit() -> Result<(), TransportError
         );
 
         // can borrow smaller amounts: (net borrowed 1000 + new borrow 199) * price 5.0 < limit 6000
-        send_tx(
+        mango_client::send_tx(
             solana,
             TokenWithdrawInstruction {
                 amount: 198,

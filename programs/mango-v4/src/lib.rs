@@ -320,6 +320,7 @@ pub mod mango_v4 {
             perp_count,
             perp_oo_count,
             0,
+            0,
             name,
         )?;
         Ok(())
@@ -347,6 +348,36 @@ pub mod mango_v4 {
             perp_count,
             perp_oo_count,
             token_conditional_swap_count,
+            0,
+            name,
+        )?;
+        Ok(())
+    }
+
+    pub fn account_create_v3(
+        ctx: Context<AccountCreateV3>,
+        account_num: u32,
+        token_count: u8,
+        serum3_count: u8,
+        perp_count: u8,
+        perp_oo_count: u8,
+        token_conditional_swap_count: u8,
+        openbook_v2_count: u8,
+        name: String,
+    ) -> Result<()> {
+        #[cfg(feature = "enable-gpl")]
+        instructions::account_create(
+            &ctx.accounts.account,
+            *ctx.bumps.get("account").ok_or(MangoError::SomeError)?,
+            ctx.accounts.group.key(),
+            ctx.accounts.owner.key(),
+            account_num,
+            token_count,
+            serum3_count,
+            perp_count,
+            perp_oo_count,
+            token_conditional_swap_count,
+            openbook_v2_count,
             name,
         )?;
         Ok(())
@@ -360,7 +391,15 @@ pub mod mango_v4 {
         perp_oo_count: u8,
     ) -> Result<()> {
         #[cfg(feature = "enable-gpl")]
-        instructions::account_expand(ctx, token_count, serum3_count, perp_count, perp_oo_count, 0)?;
+        instructions::account_expand(
+            ctx,
+            token_count,
+            serum3_count,
+            perp_count,
+            perp_oo_count,
+            0,
+            0,
+        )?;
         Ok(())
     }
 
@@ -380,6 +419,29 @@ pub mod mango_v4 {
             perp_count,
             perp_oo_count,
             token_conditional_swap_count,
+            0,
+        )?;
+        Ok(())
+    }
+
+    pub fn account_expand_v3(
+        ctx: Context<AccountExpand>,
+        token_count: u8,
+        serum3_count: u8,
+        perp_count: u8,
+        perp_oo_count: u8,
+        token_conditional_swap_count: u8,
+        openbook_v2_count: u8,
+    ) -> Result<()> {
+        #[cfg(feature = "enable-gpl")]
+        instructions::account_expand(
+            ctx,
+            token_count,
+            serum3_count,
+            perp_count,
+            perp_oo_count,
+            token_conditional_swap_count,
+            openbook_v2_count,
         )?;
         Ok(())
     }
@@ -1569,6 +1631,8 @@ pub mod mango_v4 {
         market_index: OpenbookV2MarketIndex,
         name: String,
     ) -> Result<()> {
+        #[cfg(feature = "enable-gpl")]
+        instructions::openbook_v2_register_market(ctx, market_index, name)?;
         Ok(())
     }
 
@@ -1584,10 +1648,8 @@ pub mod mango_v4 {
         Ok(())
     }
 
-    pub fn openbook_v2_create_open_orders(
-        ctx: Context<OpenbookV2CreateOpenOrders>,
-        account_num: u32,
-    ) -> Result<()> {
+    pub fn openbook_v2_create_open_orders(ctx: Context<OpenbookV2CreateOpenOrders>) -> Result<()> {
+        instructions::openbook_v2_create_open_orders(ctx)?;
         Ok(())
     }
 

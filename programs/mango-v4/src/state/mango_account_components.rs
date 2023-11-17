@@ -195,6 +195,89 @@ impl Default for Serum3Orders {
 #[zero_copy]
 #[derive(AnchorSerialize, AnchorDeserialize, Derivative)]
 #[derivative(Debug)]
+pub struct OpenbookV2Orders {
+    pub open_orders: Pubkey,
+
+    /// Tracks the amount of borrows that have flowed into the open orders account.
+    /// These borrows did not have the loan origination fee applied, and that may happen
+    /// later (in openbook_v2_settle_funds) if we can guarantee that the funds were used.
+    /// In particular a place-on-book, cancel, settle should not cost fees.
+    pub base_borrows_without_fee: u64,
+    pub quote_borrows_without_fee: u64,
+
+    pub market_index: OpenbookV2MarketIndex,
+
+    /// Store the base/quote token index, so health computations don't need
+    /// to get passed the static SerumMarket to find which tokens a market
+    /// uses and look up the correct oracles.
+    pub base_token_index: TokenIndex,
+    pub quote_token_index: TokenIndex,
+
+    #[derivative(Debug = "ignore")]
+    pub padding: [u8; 2],
+
+    /// Track something like the highest open bid / lowest open ask, in native/native units.
+    ///
+    /// Tracking it exactly isn't possible since we don't see fills. So instead track
+    /// the min/max of the _placed_ bids and asks.
+    ///
+    /// The value is reset in serum3_place_order when a new order is placed without an
+    /// existing one on the book.
+    ///
+    /// 0 is a special "unset" state.
+    pub highest_placed_bid_inv: f64,
+    pub lowest_placed_ask: f64,
+
+    /// Tracks the amount of deposits that flowed into the serum open orders account.
+    ///
+    /// The bank still considers these amounts user deposits (see deposits_in_serum)
+    /// and they need to be deducted from there when they flow back into the bank
+    /// as real tokens.
+    pub base_deposits_reserved: u64,
+    pub quote_deposits_reserved: u64,
+
+    #[derivative(Debug = "ignore")]
+    pub reserved: [u8; 32],
+}
+const_assert_eq!(
+    size_of::<OpenbookV2Orders>(),
+    32 + 8 * 2 + 2 * 3 + 2 + 4 * 8 + 32
+);
+const_assert_eq!(size_of::<OpenbookV2Orders>(), 120);
+const_assert_eq!(size_of::<OpenbookV2Orders>() % 8, 0);
+
+impl OpenbookV2Orders {
+    pub fn is_active(&self) -> bool {
+        self.market_index != OpenbookV2MarketIndex::MAX
+    }
+
+    pub fn is_active_for_market(&self, market_index: OpenbookV2MarketIndex) -> bool {
+        self.market_index == market_index
+    }
+}
+
+impl Default for OpenbookV2Orders {
+    fn default() -> Self {
+        Self {
+            open_orders: Pubkey::default(),
+            market_index: OpenbookV2MarketIndex::MAX,
+            base_token_index: TokenIndex::MAX,
+            quote_token_index: TokenIndex::MAX,
+            padding: Default::default(),
+            base_borrows_without_fee: 0,
+            quote_borrows_without_fee: 0,
+            highest_placed_bid_inv: 0.0,
+            lowest_placed_ask: 0.0,
+            base_deposits_reserved: 0,
+            quote_deposits_reserved: 0,
+            reserved: [0; 32],
+        }
+    }
+}
+
+#[zero_copy]
+#[derive(AnchorSerialize, AnchorDeserialize, Derivative)]
+#[derivative(Debug)]
 pub struct PerpPosition {
     pub market_index: PerpMarketIndex,
 

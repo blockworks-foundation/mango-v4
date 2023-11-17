@@ -457,6 +457,17 @@ pub struct Serum3RegisterMarketLog {
 }
 
 #[event]
+pub struct OpenbookV2RegisterMarketLog {
+    pub mango_group: Pubkey,
+    pub openbook_market: Pubkey,
+    pub market_index: u16,
+    pub base_token_index: u16,
+    pub quote_token_index: u16,
+    pub openbook_program: Pubkey,
+    pub openbook_market_external: Pubkey,
+}
+
+#[event]
 pub struct PerpLiqBaseOrPositivePnlLog {
     pub mango_group: Pubkey,
     pub perp_market_index: u16,

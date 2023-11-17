@@ -7,7 +7,7 @@ async fn deposit_cu_datapoint(
     owner: TestKeypair,
     token_account: Pubkey,
 ) -> u64 {
-    let result = send_tx_get_metadata(
+    let result = mango_client::send_tx_get_metadata(
         solana,
         TokenDepositInstruction {
             amount: 10,
@@ -101,7 +101,7 @@ async fn test_health_compute_tokens_during_maint_weight_shift() -> Result<(), Tr
 
     let now = solana.clock_timestamp().await;
     for mint in mints {
-        send_tx(
+        mango_client::send_tx(
             solana,
             TokenEdit {
                 group,
@@ -183,7 +183,7 @@ async fn test_health_compute_serum() -> Result<(), TransportError> {
     .await;
 
     // Allow 8 tokens + 8 serum
-    send_tx(
+    mango_client::send_tx(
         solana,
         AccountExpandInstruction {
             account_num: 0,
@@ -219,7 +219,7 @@ async fn test_health_compute_serum() -> Result<(), TransportError> {
     let mut serum_markets = vec![];
     for (base_token, spot) in serum_market_cookies {
         serum_markets.push(
-            send_tx(
+            mango_client::send_tx(
                 solana,
                 Serum3RegisterMarketInstruction {
                     group,
@@ -247,7 +247,7 @@ async fn test_health_compute_serum() -> Result<(), TransportError> {
     // TEST: Create open orders and trigger a Deposit to check health
     //
     for &serum_market in serum_markets.iter() {
-        send_tx(
+        mango_client::send_tx(
             solana,
             Serum3CreateOpenOrdersInstruction {
                 account,
@@ -260,7 +260,7 @@ async fn test_health_compute_serum() -> Result<(), TransportError> {
         .unwrap();
 
         // Place a bid and ask to make the health computation use more compute
-        send_tx(
+        mango_client::send_tx(
             solana,
             Serum3PlaceOrderInstruction {
                 side: Serum3Side::Bid,
@@ -278,7 +278,7 @@ async fn test_health_compute_serum() -> Result<(), TransportError> {
         )
         .await
         .unwrap();
-        send_tx(
+        mango_client::send_tx(
             solana,
             Serum3PlaceOrderInstruction {
                 side: Serum3Side::Ask,
@@ -362,7 +362,7 @@ async fn test_health_compute_perp() -> Result<(), TransportError> {
     //
     let mut perp_markets = vec![];
     for (perp_market_index, token) in tokens[1..].iter().enumerate() {
-        let mango_v4::accounts::PerpCreateMarket { perp_market, .. } = send_tx(
+        let mango_v4::accounts::PerpCreateMarket { perp_market, .. } = mango_client::send_tx(
             solana,
             PerpCreateMarketInstruction {
                 group,
@@ -404,7 +404,7 @@ async fn test_health_compute_perp() -> Result<(), TransportError> {
     //
     for (i, &perp_market) in perp_markets.iter().enumerate() {
         println!("adding market {}", i);
-        send_tx(
+        mango_client::send_tx(
             solana,
             PerpPlaceOrderInstruction {
                 account,

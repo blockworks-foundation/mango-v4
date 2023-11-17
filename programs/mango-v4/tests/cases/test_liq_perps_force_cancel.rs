@@ -33,7 +33,7 @@ async fn test_liq_perps_force_cancel() -> Result<(), TransportError> {
     //
     // TEST: Create a perp market
     //
-    let mango_v4::accounts::PerpCreateMarket { perp_market, .. } = send_tx(
+    let mango_v4::accounts::PerpCreateMarket { perp_market, .. } = mango_client::send_tx(
         solana,
         PerpCreateMarketInstruction {
             group,
@@ -78,7 +78,7 @@ async fn test_liq_perps_force_cancel() -> Result<(), TransportError> {
     )
     .await;
 
-    send_tx(
+    mango_client::send_tx(
         solana,
         TokenDepositInstruction {
             amount: 1,
@@ -96,7 +96,7 @@ async fn test_liq_perps_force_cancel() -> Result<(), TransportError> {
     //
     // SETUP: Place a perp order
     //
-    send_tx(
+    mango_client::send_tx(
         solana,
         PerpPlaceOrderInstruction {
             account,
@@ -118,7 +118,7 @@ async fn test_liq_perps_force_cancel() -> Result<(), TransportError> {
     set_bank_stub_oracle_price(solana, group, base_token, admin, 10.0).await;
 
     // verify health is bad: can't withdraw
-    assert!(send_tx(
+    assert!(mango_client::send_tx(
         solana,
         TokenWithdrawInstruction {
             amount: 1,
@@ -135,7 +135,7 @@ async fn test_liq_perps_force_cancel() -> Result<(), TransportError> {
     //
     // TEST: force cancel orders, making the account healthy again
     //
-    send_tx(
+    mango_client::send_tx(
         solana,
         PerpLiqForceCancelOrdersInstruction {
             account,
@@ -146,7 +146,7 @@ async fn test_liq_perps_force_cancel() -> Result<(), TransportError> {
     .unwrap();
 
     // can withdraw again
-    send_tx(
+    mango_client::send_tx(
         solana,
         TokenWithdrawInstruction {
             amount: 1,

@@ -8,7 +8,7 @@ async fn test_benchmark() -> Result<(), TransportError> {
     let context = TestContext::new().await;
     let solana = &context.solana.clone();
 
-    let result = send_tx_get_metadata(solana, BenchmarkInstruction {})
+    let result = mango_client::send_tx_get_metadata(solana, BenchmarkInstruction {})
         .await
         .unwrap();
     let meta = result.metadata.unwrap();

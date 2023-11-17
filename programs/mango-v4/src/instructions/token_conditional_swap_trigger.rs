@@ -736,7 +736,7 @@ mod tests {
             liqee_buffer.extend_from_slice(&[0u8; 512]);
             let mut liqee = MangoAccountValue::from_bytes(&liqee_buffer).unwrap();
             {
-                liqee.resize_dynamic_content(3, 5, 4, 6, 1).unwrap();
+                liqee.resize_dynamic_content(3, 5, 4, 6, 1, 0).unwrap();
                 liqee.ensure_token_position(0).unwrap();
                 liqee.ensure_token_position(1).unwrap();
             }

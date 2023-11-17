@@ -32,7 +32,7 @@ async fn test_liq_perps_bankruptcy() -> Result<(), TransportError> {
     .create(solana)
     .await;
 
-    send_tx(
+    mango_client::send_tx(
         solana,
         TokenEditWeights {
             group,
@@ -48,7 +48,7 @@ async fn test_liq_perps_bankruptcy() -> Result<(), TransportError> {
     .unwrap();
 
     let fund_insurance = |amount: u64| async move {
-        let mut tx = ClientTransaction::new(solana);
+        let mut tx = mango_client::ClientTransaction::new(solana);
         tx.add_instruction_direct(
             spl_token::instruction::transfer(
                 &spl_token::ID,
@@ -94,7 +94,7 @@ async fn test_liq_perps_bankruptcy() -> Result<(), TransportError> {
         )
         .await;
 
-        let mango_v4::accounts::PerpCreateMarket { perp_market, .. } = send_tx(
+        let mango_v4::accounts::PerpCreateMarket { perp_market, .. } = mango_client::send_tx(
             solana,
             PerpCreateMarketInstruction {
                 group,
@@ -153,7 +153,7 @@ async fn test_liq_perps_bankruptcy() -> Result<(), TransportError> {
         //
         // SETUP: Trade perps between accounts twice to generate pnl, settle_limit
         //
-        let mut tx = ClientTransaction::new(solana);
+        let mut tx = mango_client::ClientTransaction::new(solana);
         tx.add_instruction(PerpPlaceOrderInstruction {
             account: helper_account,
             perp_market,
@@ -182,7 +182,7 @@ async fn test_liq_perps_bankruptcy() -> Result<(), TransportError> {
         tx.send().await.unwrap();
 
         set_perp_stub_oracle_price(solana, group, perp_market, &base_token, admin, adj_price).await;
-        let mut tx = ClientTransaction::new(solana);
+        let mut tx = mango_client::ClientTransaction::new(solana);
         tx.add_instruction(PerpPlaceOrderInstruction {
             account: helper_account,
             perp_market,
@@ -280,7 +280,7 @@ async fn test_liq_perps_bankruptcy() -> Result<(), TransportError> {
         let (perp_market, account, liqor) = setup_perp(-28, -50, -10).await;
         let liqor_quote_before = account_position(solana, liqor, quote_token.bank).await;
 
-        send_tx(
+        mango_client::send_tx(
             solana,
             PerpLiqNegativePnlOrBankruptcyInstruction {
                 liqor,
@@ -314,7 +314,7 @@ async fn test_liq_perps_bankruptcy() -> Result<(), TransportError> {
         fund_insurance(2).await;
         let liqor_quote_before = account_position(solana, liqor, quote_token.bank).await;
 
-        send_tx(
+        mango_client::send_tx(
             solana,
             PerpLiqNegativePnlOrBankruptcyInstruction {
                 liqor,
@@ -351,7 +351,7 @@ async fn test_liq_perps_bankruptcy() -> Result<(), TransportError> {
         let (perp_market, account, liqor) = setup_perp(-28, -50, -10).await;
         fund_insurance(5).await;
 
-        send_tx(
+        mango_client::send_tx(
             solana,
             PerpLiqNegativePnlOrBankruptcyInstruction {
                 liqor,
@@ -373,7 +373,7 @@ async fn test_liq_perps_bankruptcy() -> Result<(), TransportError> {
     {
         let (perp_market, account, liqor) = setup_perp(-28, -50, -10).await;
 
-        send_tx(
+        mango_client::send_tx(
             solana,
             PerpLiqNegativePnlOrBankruptcyInstruction {
                 liqor,
@@ -393,7 +393,7 @@ async fn test_liq_perps_bankruptcy() -> Result<(), TransportError> {
         let (perp_market, account, liqor) = setup_perp(-200, -50, -10).await;
         fund_insurance(5).await;
 
-        send_tx(
+        mango_client::send_tx(
             solana,
             PerpLiqNegativePnlOrBankruptcyInstruction {
                 liqor,
@@ -413,7 +413,7 @@ async fn test_liq_perps_bankruptcy() -> Result<(), TransportError> {
         let (perp_market, account, liqor) = setup_perp(-40, -50, 0).await;
         // no insurance
 
-        send_tx(
+        mango_client::send_tx(
             solana,
             PerpLiqNegativePnlOrBankruptcyInstruction {
                 liqor,
@@ -433,7 +433,7 @@ async fn test_liq_perps_bankruptcy() -> Result<(), TransportError> {
         let (perp_market, account, liqor) = setup_perp(-40, -50, -5).await;
         fund_insurance(42).await;
 
-        send_tx(
+        mango_client::send_tx(
             solana,
             PerpLiqNegativePnlOrBankruptcyInstruction {
                 liqor,

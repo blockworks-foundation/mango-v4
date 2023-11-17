@@ -50,7 +50,7 @@ async fn test_token_conditional_swap_basic() -> Result<(), TransportError> {
         0,
     )
     .await;
-    let no_tcs_account = send_tx(
+    let no_tcs_account = mango_client::send_tx(
         solana,
         AccountCreateInstruction {
             account_num: 2,
@@ -65,7 +65,7 @@ async fn test_token_conditional_swap_basic() -> Result<(), TransportError> {
     .unwrap()
     .account;
 
-    send_tx(
+    mango_client::send_tx(
         solana,
         TokenEdit {
             group,
@@ -84,7 +84,7 @@ async fn test_token_conditional_swap_basic() -> Result<(), TransportError> {
     //
     // TEST: Trying to add a tcs on an account without space will fail
     //
-    let tx_result = send_tx(
+    let tx_result = mango_client::send_tx(
         solana,
         TokenConditionalSwapCreateInstruction {
             account: no_tcs_account,
@@ -106,7 +106,7 @@ async fn test_token_conditional_swap_basic() -> Result<(), TransportError> {
     //
     // TEST: Extending an account to have space for tcs works
     //
-    send_tx(
+    mango_client::send_tx(
         solana,
         AccountExpandInstruction {
             account_num: 0,
@@ -142,7 +142,7 @@ async fn test_token_conditional_swap_basic() -> Result<(), TransportError> {
         allow_creating_deposits: true,
         allow_creating_borrows: true,
     };
-    send_tx(
+    mango_client::send_tx(
         solana,
         TokenConditionalSwapCreateInstruction {
             max_buy: 101,
@@ -151,7 +151,7 @@ async fn test_token_conditional_swap_basic() -> Result<(), TransportError> {
     )
     .await
     .unwrap();
-    send_tx(
+    mango_client::send_tx(
         solana,
         TokenConditionalSwapCreateInstruction {
             max_buy: 102,
@@ -161,7 +161,7 @@ async fn test_token_conditional_swap_basic() -> Result<(), TransportError> {
     )
     .await
     .unwrap();
-    let tx_result = send_tx(solana, tcs_ix.clone()).await;
+    let tx_result = mango_client::send_tx(solana, tcs_ix.clone()).await;
     assert!(tx_result.is_err());
 
     let account_data = get_mango_account(solana, account).await;
@@ -183,7 +183,7 @@ async fn test_token_conditional_swap_basic() -> Result<(), TransportError> {
     //
     // TEST: Can cancel, and then readd a new one
     //
-    send_tx(
+    mango_client::send_tx(
         solana,
         TokenConditionalSwapCancelInstruction {
             account,
@@ -194,7 +194,7 @@ async fn test_token_conditional_swap_basic() -> Result<(), TransportError> {
     )
     .await
     .unwrap();
-    send_tx(
+    mango_client::send_tx(
         solana,
         TokenConditionalSwapCreateInstruction {
             max_buy: 103,
@@ -203,7 +203,7 @@ async fn test_token_conditional_swap_basic() -> Result<(), TransportError> {
     )
     .await
     .unwrap();
-    let tx_result = send_tx(solana, tcs_ix.clone()).await;
+    let tx_result = mango_client::send_tx(solana, tcs_ix.clone()).await;
     assert!(tx_result.is_err());
 
     let account_data = get_mango_account(solana, account).await;
@@ -225,7 +225,7 @@ async fn test_token_conditional_swap_basic() -> Result<(), TransportError> {
     //
     // TEST: can't trigger if price threshold not reached
     //
-    let tx_result = send_tx(
+    let tx_result = mango_client::send_tx(
         solana,
         TokenConditionalSwapTriggerInstruction {
             liqee: account,
@@ -244,7 +244,7 @@ async fn test_token_conditional_swap_basic() -> Result<(), TransportError> {
     //
     // TEST: trigger partially
     //
-    send_tx(
+    mango_client::send_tx(
         solana,
         TokenConditionalSwapTriggerInstruction {
             liqee: account,
@@ -277,7 +277,7 @@ async fn test_token_conditional_swap_basic() -> Result<(), TransportError> {
     //
     // TEST: requiring a too-high min buy token execution makes it fail
     //
-    let r = send_tx(
+    let r = mango_client::send_tx(
         solana,
         TokenConditionalSwapTriggerInstruction {
             liqee: account,
@@ -296,7 +296,7 @@ async fn test_token_conditional_swap_basic() -> Result<(), TransportError> {
     //
     // TEST: trigger fully
     //
-    send_tx(
+    mango_client::send_tx(
         solana,
         TokenConditionalSwapTriggerInstruction {
             liqee: account,
@@ -382,7 +382,7 @@ async fn test_token_conditional_swap_linear_auction() -> Result<(), TransportErr
     )
     .await;
 
-    send_tx(
+    mango_client::send_tx(
         solana,
         TokenEdit {
             group,
@@ -401,7 +401,7 @@ async fn test_token_conditional_swap_linear_auction() -> Result<(), TransportErr
     //
     // SETUP: Extending an account to have space for tcs works
     //
-    send_tx(
+    mango_client::send_tx(
         solana,
         AccountExpandInstruction {
             account_num: 0,
@@ -425,7 +425,7 @@ async fn test_token_conditional_swap_linear_auction() -> Result<(), TransportErr
     // TEST: Can create tcs auction
     //
     let initial_time = solana.clock_timestamp().await;
-    send_tx(
+    mango_client::send_tx(
         solana,
         TokenConditionalSwapCreateLinearAuctionInstruction {
             account,
@@ -458,7 +458,7 @@ async fn test_token_conditional_swap_linear_auction() -> Result<(), TransportErr
     // TEST: Can't take an auction at any price when it's not started yet
     //
 
-    let res = send_tx(
+    let res = mango_client::send_tx(
         solana,
         TokenConditionalSwapTriggerInstruction {
             liqee: account,
@@ -482,7 +482,7 @@ async fn test_token_conditional_swap_linear_auction() -> Result<(), TransportErr
     // TEST: Check the auction price in the middle
     //
     solana.set_clock_timestamp(initial_time + 7).await;
-    send_tx(
+    mango_client::send_tx(
         solana,
         TokenConditionalSwapTriggerInstruction {
             liqee: account,
@@ -525,7 +525,7 @@ async fn test_token_conditional_swap_linear_auction() -> Result<(), TransportErr
     // TEST: Stays at end price after end and before expiry
     //
     solana.set_clock_timestamp(initial_time + 17).await;
-    send_tx(
+    mango_client::send_tx(
         solana,
         TokenConditionalSwapTriggerInstruction {
             liqee: account,
@@ -568,7 +568,7 @@ async fn test_token_conditional_swap_linear_auction() -> Result<(), TransportErr
     // TEST: Can't take when expired
     //
     solana.set_clock_timestamp(initial_time + 22).await;
-    let res = send_tx(
+    let res = mango_client::send_tx(
         solana,
         TokenConditionalSwapTriggerInstruction {
             liqee: account,
@@ -642,7 +642,7 @@ async fn test_token_conditional_swap_premium_auction() -> Result<(), TransportEr
     )
     .await;
 
-    send_tx(
+    mango_client::send_tx(
         solana,
         TokenEdit {
             group,
@@ -661,7 +661,7 @@ async fn test_token_conditional_swap_premium_auction() -> Result<(), TransportEr
     //
     // SETUP: Extending an account to have space for tcs works
     //
-    send_tx(
+    mango_client::send_tx(
         solana,
         AccountExpandInstruction {
             account_num: 0,
@@ -684,7 +684,7 @@ async fn test_token_conditional_swap_premium_auction() -> Result<(), TransportEr
     //
     // TEST: Can create premium auction
     //
-    send_tx(
+    mango_client::send_tx(
         solana,
         TokenConditionalSwapCreatePremiumAuctionInstruction {
             account,
@@ -717,7 +717,7 @@ async fn test_token_conditional_swap_premium_auction() -> Result<(), TransportEr
     //
 
     set_bank_stub_oracle_price(solana, group, &base_token, admin, 10.0).await;
-    let res = send_tx(
+    let res = mango_client::send_tx(
         solana,
         TokenConditionalSwapTriggerInstruction {
             liqee: account,
@@ -737,7 +737,7 @@ async fn test_token_conditional_swap_premium_auction() -> Result<(), TransportEr
         "not started yet".to_string(),
     );
 
-    let res = send_tx(
+    let res = mango_client::send_tx(
         solana,
         TokenConditionalSwapStartInstruction {
             liqee: account,
@@ -757,7 +757,7 @@ async fn test_token_conditional_swap_premium_auction() -> Result<(), TransportEr
     // TEST: Cannot trigger without start
     //
     set_bank_stub_oracle_price(solana, group, &base_token, admin, 1.0).await;
-    let res = send_tx(
+    let res = mango_client::send_tx(
         solana,
         TokenConditionalSwapTriggerInstruction {
             liqee: account,
@@ -777,7 +777,7 @@ async fn test_token_conditional_swap_premium_auction() -> Result<(), TransportEr
         "not started yet".to_string(),
     );
 
-    send_tx(
+    mango_client::send_tx(
         solana,
         TokenConditionalSwapStartInstruction {
             liqee: account,
@@ -788,7 +788,7 @@ async fn test_token_conditional_swap_premium_auction() -> Result<(), TransportEr
     )
     .await
     .unwrap();
-    send_tx(
+    mango_client::send_tx(
         solana,
         TokenConditionalSwapTriggerInstruction {
             liqee: account,
@@ -839,7 +839,7 @@ async fn test_token_conditional_swap_premium_auction() -> Result<(), TransportEr
     // TEST: Premium increases
     //
     solana.set_clock_timestamp(tcs.start_timestamp + 5).await;
-    send_tx(
+    mango_client::send_tx(
         solana,
         TokenConditionalSwapTriggerInstruction {
             liqee: account,
@@ -883,7 +883,7 @@ async fn test_token_conditional_swap_premium_auction() -> Result<(), TransportEr
     // TEST: Premium stops at max increases
     //
     solana.set_clock_timestamp(tcs.start_timestamp + 50).await;
-    send_tx(
+    mango_client::send_tx(
         solana,
         TokenConditionalSwapTriggerInstruction {
             liqee: account,
@@ -927,7 +927,7 @@ async fn test_token_conditional_swap_premium_auction() -> Result<(), TransportEr
     // SETUP: make another premium auction to test starting
     //
 
-    send_tx(
+    mango_client::send_tx(
         solana,
         TokenConditionalSwapCreatePremiumAuctionInstruction {
             account,
@@ -951,7 +951,7 @@ async fn test_token_conditional_swap_premium_auction() -> Result<(), TransportEr
     // TEST: Can't start if oracle not in range
     //
 
-    let res = send_tx(
+    let res = mango_client::send_tx(
         solana,
         TokenConditionalSwapStartInstruction {
             liqee: account,
@@ -972,7 +972,7 @@ async fn test_token_conditional_swap_premium_auction() -> Result<(), TransportEr
     //
 
     set_bank_stub_oracle_price(solana, group, &base_token, admin, 0.5).await;
-    send_tx(
+    mango_client::send_tx(
         solana,
         TokenConditionalSwapStartInstruction {
             liqee: account,
@@ -995,7 +995,7 @@ async fn test_token_conditional_swap_premium_auction() -> Result<(), TransportEr
     // TEST: Can't start a second time
     //
 
-    let res = send_tx(
+    let res = mango_client::send_tx(
         solana,
         TokenConditionalSwapStartInstruction {
             liqee: account,

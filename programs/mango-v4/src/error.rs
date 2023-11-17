@@ -125,6 +125,10 @@ pub enum MangoError {
     TokenConditionalSwapTooSmallForStartIncentive,
     #[msg("token conditional swap type cannot be started")]
     TokenConditionalSwapTypeNotStartable,
+    #[msg("no free openbook v2 open orders index")]
+    NoFreeOpenbookV2OpenOrdersIndex,
+    #[msg("openbook v2 open orders exist already")]
+    OpenbookV2OpenOrdersExistAlready,
 }
 
 impl MangoError {

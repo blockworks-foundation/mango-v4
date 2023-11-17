@@ -46,7 +46,7 @@ async fn test_bankrupt_tokens_socialize_loss() -> Result<(), TransportError> {
 
     // Also add a tiny amount to bank0 for borrow_token1, so we can test multi-bank socialized loss.
     // It must be enough to not trip the borrow limits on the bank.
-    send_tx(
+    mango_client::send_tx(
         solana,
         TokenDepositInstruction {
             amount: 20,
@@ -64,7 +64,7 @@ async fn test_bankrupt_tokens_socialize_loss() -> Result<(), TransportError> {
     //
     // SETUP: Make an account with some collateral and some borrows
     //
-    let account = send_tx(
+    let account = mango_client::send_tx(
         solana,
         AccountCreateInstruction {
             account_num: 0,
@@ -80,7 +80,7 @@ async fn test_bankrupt_tokens_socialize_loss() -> Result<(), TransportError> {
 
     let deposit1_amount = 1000;
     let deposit2_amount = 20;
-    send_tx(
+    mango_client::send_tx(
         solana,
         TokenDepositInstruction {
             amount: deposit1_amount,
@@ -94,7 +94,7 @@ async fn test_bankrupt_tokens_socialize_loss() -> Result<(), TransportError> {
     )
     .await
     .unwrap();
-    send_tx(
+    mango_client::send_tx(
         solana,
         TokenDepositInstruction {
             amount: deposit2_amount,
@@ -113,7 +113,7 @@ async fn test_bankrupt_tokens_socialize_loss() -> Result<(), TransportError> {
     let borrow1_amount_bank0 = 10;
     let borrow1_amount_bank1 = borrow1_amount - borrow1_amount_bank0;
     let borrow2_amount = 50;
-    send_tx(
+    mango_client::send_tx(
         solana,
         TokenWithdrawInstruction {
             amount: borrow1_amount_bank1,
@@ -126,7 +126,7 @@ async fn test_bankrupt_tokens_socialize_loss() -> Result<(), TransportError> {
     )
     .await
     .unwrap();
-    send_tx(
+    mango_client::send_tx(
         solana,
         TokenWithdrawInstruction {
             amount: borrow1_amount_bank0,
@@ -139,7 +139,7 @@ async fn test_bankrupt_tokens_socialize_loss() -> Result<(), TransportError> {
     )
     .await
     .unwrap();
-    send_tx(
+    mango_client::send_tx(
         solana,
         TokenWithdrawInstruction {
             amount: borrow2_amount,
@@ -163,7 +163,7 @@ async fn test_bankrupt_tokens_socialize_loss() -> Result<(), TransportError> {
     //
 
     // eat collateral1
-    send_tx(
+    mango_client::send_tx(
         solana,
         TokenLiqWithTokenInstruction {
             liqee: account,
@@ -187,7 +187,7 @@ async fn test_bankrupt_tokens_socialize_loss() -> Result<(), TransportError> {
     assert!(liqee.being_liquidated());
 
     // eat collateral2, leaving the account bankrupt
-    send_tx(
+    mango_client::send_tx(
         solana,
         TokenLiqWithTokenInstruction {
             liqee: account,
@@ -216,7 +216,7 @@ async fn test_bankrupt_tokens_socialize_loss() -> Result<(), TransportError> {
     //
 
     let vault_before = account_position(solana, vault_account, borrow_token1.bank).await;
-    send_tx(
+    mango_client::send_tx(
         solana,
         TokenLiqBankruptcyInstruction {
             liqee: account,
@@ -241,7 +241,7 @@ async fn test_bankrupt_tokens_socialize_loss() -> Result<(), TransportError> {
     assert_eq!(borrow1_bank0.native_borrows(), 0);
     assert_eq!(borrow1_bank1.native_borrows(), 0);
 
-    send_tx(
+    mango_client::send_tx(
         solana,
         TokenLiqBankruptcyInstruction {
             liqee: account,
@@ -301,7 +301,7 @@ async fn test_bankrupt_tokens_insurance_fund() -> Result<(), TransportError> {
 
     // fund the insurance vault
     {
-        let mut tx = ClientTransaction::new(solana);
+        let mut tx = mango_client::ClientTransaction::new(solana);
         tx.add_instruction_direct(
             spl_token::instruction::transfer(
                 &spl_token::ID,
@@ -318,7 +318,7 @@ async fn test_bankrupt_tokens_insurance_fund() -> Result<(), TransportError> {
     }
 
     // deposit some funds, to the vaults aren't empty
-    let vault_account = send_tx(
+    let vault_account = mango_client::send_tx(
         solana,
         AccountCreateInstruction {
             account_num: 2,
@@ -333,7 +333,7 @@ async fn test_bankrupt_tokens_insurance_fund() -> Result<(), TransportError> {
     .account;
     let vault_amount = 100000;
     for &token_account in payer_mint_accounts {
-        send_tx(
+        mango_client::send_tx(
             solana,
             TokenDepositInstruction {
                 amount: vault_amount,
@@ -351,7 +351,7 @@ async fn test_bankrupt_tokens_insurance_fund() -> Result<(), TransportError> {
 
     // Also add a tiny amount to bank0 for borrow_token1, so we can test multi-bank socialized loss.
     // It must be enough to not trip the borrow limits on the bank.
-    send_tx(
+    mango_client::send_tx(
         solana,
         TokenDepositInstruction {
             amount: 20,
@@ -369,7 +369,7 @@ async fn test_bankrupt_tokens_insurance_fund() -> Result<(), TransportError> {
     //
     // SETUP: Make an account with some collateral and some borrows
     //
-    let account = send_tx(
+    let account = mango_client::send_tx(
         solana,
         AccountCreateInstruction {
             account_num: 0,
@@ -385,7 +385,7 @@ async fn test_bankrupt_tokens_insurance_fund() -> Result<(), TransportError> {
 
     let deposit1_amount = 20;
     let deposit2_amount = 1000;
-    send_tx(
+    mango_client::send_tx(
         solana,
         TokenDepositInstruction {
             amount: deposit1_amount,
@@ -399,7 +399,7 @@ async fn test_bankrupt_tokens_insurance_fund() -> Result<(), TransportError> {
     )
     .await
     .unwrap();
-    send_tx(
+    mango_client::send_tx(
         solana,
         TokenDepositInstruction {
             amount: deposit2_amount,
@@ -418,7 +418,7 @@ async fn test_bankrupt_tokens_insurance_fund() -> Result<(), TransportError> {
     let borrow1_amount_bank0 = 10;
     let borrow1_amount_bank1 = borrow1_amount - borrow1_amount_bank0;
     let borrow2_amount = 350;
-    send_tx(
+    mango_client::send_tx(
         solana,
         TokenWithdrawInstruction {
             amount: borrow1_amount_bank1,
@@ -431,7 +431,7 @@ async fn test_bankrupt_tokens_insurance_fund() -> Result<(), TransportError> {
     )
     .await
     .unwrap();
-    send_tx(
+    mango_client::send_tx(
         solana,
         TokenWithdrawInstruction {
             amount: borrow1_amount_bank0,
@@ -444,7 +444,7 @@ async fn test_bankrupt_tokens_insurance_fund() -> Result<(), TransportError> {
     )
     .await
     .unwrap();
-    send_tx(
+    mango_client::send_tx(
         solana,
         TokenWithdrawInstruction {
             amount: borrow2_amount,
@@ -468,7 +468,7 @@ async fn test_bankrupt_tokens_insurance_fund() -> Result<(), TransportError> {
     //
 
     // eat collateral1
-    send_tx(
+    mango_client::send_tx(
         solana,
         TokenLiqWithTokenInstruction {
             liqee: account,
@@ -488,7 +488,7 @@ async fn test_bankrupt_tokens_insurance_fund() -> Result<(), TransportError> {
     assert!(liqee.being_liquidated());
 
     // eat collateral2, leaving the account bankrupt
-    send_tx(
+    mango_client::send_tx(
         solana,
         TokenLiqWithTokenInstruction {
             liqee: account,
@@ -519,7 +519,7 @@ async fn test_bankrupt_tokens_insurance_fund() -> Result<(), TransportError> {
     // the liqor is uninvolved
     let insurance_vault_before = solana.token_account_balance(insurance_vault).await;
     let liqor_before = account_position(solana, vault_account, borrow_token1.bank).await;
-    send_tx(
+    mango_client::send_tx(
         solana,
         TokenLiqBankruptcyInstruction {
             liqee: account,
@@ -551,7 +551,7 @@ async fn test_bankrupt_tokens_insurance_fund() -> Result<(), TransportError> {
     let liqor_before = account_position(solana, vault_account, borrow_token1.bank).await;
     let usdc_to_liab = 2.0 / 20.0;
     let liab_transfer: f64 = 500.0 * usdc_to_liab;
-    send_tx(
+    mango_client::send_tx(
         solana,
         TokenLiqBankruptcyInstruction {
             liqee: account,
@@ -584,7 +584,7 @@ async fn test_bankrupt_tokens_insurance_fund() -> Result<(), TransportError> {
     // liquidating fully and then doing socialized loss because the insurance fund is exhausted
     let insurance_vault_before = solana.token_account_balance(insurance_vault).await;
     let liqor_before = account_position(solana, vault_account, borrow_token1.bank).await;
-    send_tx(
+    mango_client::send_tx(
         solana,
         TokenLiqBankruptcyInstruction {
             liqee: account,

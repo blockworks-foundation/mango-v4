@@ -16,7 +16,6 @@ use crate::health::{HealthCache, HealthType};
 use crate::logs::{DeactivatePerpPositionLog, DeactivateTokenPositionLog};
 use crate::util;
 
-use super::BookSideOrderTree;
 use super::FillEvent;
 use super::LeafNode;
 use super::PerpMarket;
@@ -27,6 +26,7 @@ use super::TokenConditionalSwap;
 use super::TokenIndex;
 use super::FREE_ORDER_SLOT;
 use super::{dynamic_account::*, Group};
+use super::{BookSideOrderTree, OpenbookV2MarketIndex, OpenbookV2Orders};
 use super::{PerpPosition, Serum3Orders, TokenPosition};
 use super::{Side, SideAndOrderTree};
 
@@ -220,6 +220,7 @@ impl MangoAccount {
         perp_count: u8,
         perp_oo_count: u8,
         token_conditional_swap_count: u8,
+        openbook_v2_count: u8,
     ) -> usize {
         8 + size_of::<MangoAccountFixed>()
             + Self::dynamic_size(
@@ -228,6 +229,7 @@ impl MangoAccount {
                 perp_count,
                 perp_oo_count,
                 token_conditional_swap_count,
+                openbook_v2_count,
             )
     }
 
@@ -265,7 +267,7 @@ impl MangoAccount {
             + BORSH_VEC_PADDING_BYTES
     }
 
-    pub fn dynamic_reserved_bytes_offset(
+    pub fn dynamic_openbook_v2_vec_offset(
         token_count: u8,
         serum3_count: u8,
         perp_count: u8,
@@ -279,6 +281,24 @@ impl MangoAccount {
             perp_oo_count,
         ) + (BORSH_VEC_SIZE_BYTES
             + size_of::<TokenConditionalSwap>() * usize::from(token_conditional_swap_count))
+            + BORSH_VEC_PADDING_BYTES
+    }
+
+    pub fn dynamic_reserved_bytes_offset(
+        token_count: u8,
+        serum3_count: u8,
+        perp_count: u8,
+        perp_oo_count: u8,
+        token_conditional_swap_count: u8,
+        openbook_v2_count: u8,
+    ) -> usize {
+        Self::dynamic_openbook_v2_vec_offset(
+            token_count,
+            serum3_count,
+            perp_count,
+            perp_oo_count,
+            token_conditional_swap_count,
+        ) + (BORSH_VEC_SIZE_BYTES + size_of::<OpenbookV2Orders>() * usize::from(openbook_v2_count))
     }
 
     pub fn dynamic_size(
@@ -287,6 +307,7 @@ impl MangoAccount {
         perp_count: u8,
         perp_oo_count: u8,
         token_conditional_swap_count: u8,
+        openbook_v2_count: u8,
     ) -> usize {
         Self::dynamic_reserved_bytes_offset(
             token_count,
@@ -294,6 +315,7 @@ impl MangoAccount {
             perp_count,
             perp_oo_count,
             token_conditional_swap_count,
+            openbook_v2_count,
         ) + DYNAMIC_RESERVED_BYTES
     }
 }
@@ -456,6 +478,7 @@ pub struct MangoAccountDynamicHeader {
     pub perp_count: u8,
     pub perp_oo_count: u8,
     pub token_conditional_swap_count: u8,
+    pub openbook_v2_count: u8,
 }
 
 impl DynamicHeader for MangoAccountDynamicHeader {
@@ -512,12 +535,32 @@ impl DynamicHeader for MangoAccountDynamicHeader {
                     0
                 };
 
+                let openbook_v2_vec_offset = MangoAccount::dynamic_openbook_v2_vec_offset(
+                    token_count,
+                    serum3_count,
+                    perp_count,
+                    perp_oo_count,
+                    token_conditional_swap_count,
+                );
+                let openbook_v2_count =
+                    if dynamic_data.len() > openbook_v2_vec_offset + BORSH_VEC_SIZE_BYTES {
+                        u8::try_from(BorshVecLength::from_le_bytes(*array_ref![
+                            dynamic_data,
+                            openbook_v2_vec_offset,
+                            BORSH_VEC_SIZE_BYTES
+                        ]))
+                        .unwrap()
+                    } else {
+                        0
+                    };
+
                 Ok(Self {
                     token_count,
                     serum3_count,
                     perp_count,
                     perp_oo_count,
                     token_conditional_swap_count,
+                    openbook_v2_count,
                 })
             }
             _ => err!(MangoError::NotImplementedError).context("unexpected header version number"),
@@ -547,6 +590,7 @@ impl MangoAccountDynamicHeader {
             self.perp_count,
             self.perp_oo_count,
             self.token_conditional_swap_count,
+            self.openbook_v2_count,
         )
     }
 
@@ -592,6 +636,17 @@ impl MangoAccountDynamicHeader {
             + raw_index * size_of::<TokenConditionalSwap>()
     }
 
+    fn openbook_v2_offset(&self, raw_index: usize) -> usize {
+        MangoAccount::dynamic_openbook_v2_vec_offset(
+            self.token_count,
+            self.serum3_count,
+            self.perp_count,
+            self.perp_oo_count,
+            self.token_conditional_swap_count,
+        ) + BORSH_VEC_SIZE_BYTES
+            + raw_index * size_of::<OpenbookV2Orders>()
+    }
+
     fn reserved_bytes_offset(&self) -> usize {
         MangoAccount::dynamic_reserved_bytes_offset(
             self.token_count,
@@ -599,6 +654,7 @@ impl MangoAccountDynamicHeader {
             self.perp_count,
             self.perp_oo_count,
             self.token_conditional_swap_count,
+            self.openbook_v2_count,
         )
     }
 
@@ -617,6 +673,9 @@ impl MangoAccountDynamicHeader {
     pub fn token_conditional_swap_count(&self) -> usize {
         self.token_conditional_swap_count.into()
     }
+    pub fn openbook_v2_count(&self) -> usize {
+        self.openbook_v2_count.into()
+    }
 
     pub fn zero() -> Self {
         Self {
@@ -625,6 +684,7 @@ impl MangoAccountDynamicHeader {
             perp_count: 0,
             perp_oo_count: 0,
             token_conditional_swap_count: 0,
+            openbook_v2_count: 0,
         }
     }
 
@@ -897,6 +957,42 @@ impl<
             .ok_or_else(|| error_msg!("no free token conditional swap index"))
     }
 
+    pub fn openbook_v2_orders(
+        &self,
+        market_index: OpenbookV2MarketIndex,
+    ) -> Result<&OpenbookV2Orders> {
+        self.all_openbook_v2_orders()
+            .find(|p| p.is_active_for_market(market_index))
+            .ok_or_else(|| {
+                error_msg!(
+                    "openbook v2 orders for market index {} not found",
+                    market_index
+                )
+            })
+    }
+
+    pub(crate) fn openbook_v2_orders_by_raw_index_unchecked(
+        &self,
+        raw_index: usize,
+    ) -> &OpenbookV2Orders {
+        get_helper(self.dynamic(), self.header().openbook_v2_offset(raw_index))
+    }
+
+    pub fn openbook_v2_orders_by_raw_index(&self, raw_index: usize) -> Result<&OpenbookV2Orders> {
+        require_gt!(self.header().openbook_v2_count(), raw_index);
+        Ok(self.openbook_v2_orders_by_raw_index_unchecked(raw_index))
+    }
+
+    pub fn all_openbook_v2_orders(&self) -> impl Iterator<Item = &OpenbookV2Orders> + '_ {
+        (0..self.header().openbook_v2_count())
+            .map(|i| self.openbook_v2_orders_by_raw_index_unchecked(i))
+    }
+
+    pub fn active_openbook_v2_orders(&self) -> impl Iterator<Item = &OpenbookV2Orders> + '_ {
+        self.all_openbook_v2_orders()
+            .filter(|openbook_v2_order| openbook_v2_order.is_active())
+    }
+
     pub fn borrow(&self) -> MangoAccountRef {
         MangoAccountRef {
             header: self.header(),
@@ -1095,6 +1191,67 @@ impl<
         raw_index_opt
             .map(|raw_index| self.serum3_orders_mut_by_raw_index(raw_index))
             .ok_or_else(|| error_msg!("serum3 orders for market index {} not found", market_index))
+    }
+
+    // get mut OpenbookV2Orders at raw_index
+    pub fn openbook_v2_orders_mut_by_raw_index(
+        &mut self,
+        raw_index: usize,
+    ) -> &mut OpenbookV2Orders {
+        let offset = self.header().openbook_v2_offset(raw_index);
+        get_helper_mut(self.dynamic_mut(), offset)
+    }
+
+    pub fn create_openbook_v2_orders(
+        &mut self,
+        market_index: OpenbookV2MarketIndex,
+    ) -> Result<&mut OpenbookV2Orders> {
+        if self.openbook_v2_orders(market_index).is_ok() {
+            return err!(MangoError::OpenbookV2OpenOrdersExistAlready);
+        }
+
+        let raw_index_opt = self.all_openbook_v2_orders().position(|p| !p.is_active());
+        if let Some(raw_index) = raw_index_opt {
+            *(self.openbook_v2_orders_mut_by_raw_index(raw_index)) = OpenbookV2Orders {
+                market_index: market_index as OpenbookV2MarketIndex,
+                ..OpenbookV2Orders::default()
+            };
+            Ok(self.openbook_v2_orders_mut_by_raw_index(raw_index))
+        } else {
+            err!(MangoError::NoFreeOpenbookV2OpenOrdersIndex)
+        }
+    }
+
+    pub fn deactivate_openbook_v2_orders(
+        &mut self,
+        market_index: OpenbookV2MarketIndex,
+    ) -> Result<()> {
+        let raw_index = self
+            .all_openbook_v2_orders()
+            .position(|p| p.is_active_for_market(market_index))
+            .ok_or_else(|| {
+                error_msg!("openbook v2 open orders index {} not found", market_index)
+            })?;
+        self.openbook_v2_orders_mut_by_raw_index(raw_index)
+            .market_index = OpenbookV2MarketIndex::MAX;
+        Ok(())
+    }
+
+    pub fn openbook_v2_orders_mut(
+        &mut self,
+        market_index: OpenbookV2MarketIndex,
+    ) -> Result<&mut OpenbookV2Orders> {
+        let raw_index_opt = self
+            .all_openbook_v2_orders()
+            .position(|p| p.is_active_for_market(market_index));
+        raw_index_opt
+            .map(|raw_index| self.openbook_v2_orders_mut_by_raw_index(raw_index))
+            .ok_or_else(|| {
+                error_msg!(
+                    "openbook v2 orders for market index {} not found",
+                    market_index
+                )
+            })
     }
 
     // get mut PerpPosition at raw_index
@@ -1450,6 +1607,12 @@ impl<
         self.write_borsh_vec_length_and_padding(offset, count)
     }
 
+    fn write_openbook_v2_length(&mut self) {
+        let offset = self.header().openbook_v2_offset(0);
+        let count = self.header().openbook_v2_count;
+        self.write_borsh_vec_length_and_padding(offset, count)
+    }
+
     pub fn resize_dynamic_content(
         &mut self,
         new_token_count: u8,
@@ -1457,6 +1620,7 @@ impl<
         new_perp_count: u8,
         new_perp_oo_count: u8,
         new_token_conditional_swap_count: u8,
+        new_openbook_v2_count: u8,
     ) -> Result<()> {
         let new_header = MangoAccountDynamicHeader {
             token_count: new_token_count,
@@ -1464,6 +1628,7 @@ impl<
             perp_count: new_perp_count,
             perp_oo_count: new_perp_oo_count,
             token_conditional_swap_count: new_token_conditional_swap_count,
+            openbook_v2_count: new_openbook_v2_count,
         };
         let old_header = self.header().clone();
 
@@ -1584,12 +1749,33 @@ impl<
             active_tcs += 1;
         }
 
+        let mut active_openbook_v2_orders = 0;
+        for i in 0..old_header.openbook_v2_count() {
+            let src = old_header.openbook_v2_offset(i);
+            let pos: &OpenbookV2Orders = get_helper(dynamic, src);
+            if !pos.is_active() {
+                continue;
+            }
+            if i != active_openbook_v2_orders {
+                let dst = old_header.openbook_v2_offset(active_openbook_v2_orders);
+                unsafe {
+                    sol_memmove(
+                        &mut dynamic[dst],
+                        &mut dynamic[src],
+                        size_of::<OpenbookV2Orders>(),
+                    );
+                }
+            }
+            active_openbook_v2_orders += 1;
+        }
+
         // Check that the new allocations can fit the existing data
         require_gte!(new_header.token_count(), active_token_positions);
         require_gte!(new_header.serum3_count(), active_serum3_orders);
         require_gte!(new_header.perp_count(), active_perp_positions);
         require_gte!(new_header.perp_oo_count(), blocked_perp_oo);
         require_gte!(new_header.token_conditional_swap_count(), active_tcs);
+        require_gte!(new_header.openbook_v2_count(), active_openbook_v2_orders);
 
         // First move pass: go left-to-right and move any blocks that need to be moved
         // to the left. This will never overwrite other data, because:
@@ -1647,6 +1833,18 @@ impl<
                     );
                 }
             }
+
+            let old_openbook_v2_start = old_header.openbook_v2_offset(0);
+            let new_openbook_v2_start = new_header.openbook_v2_offset(0);
+            if new_openbook_v2_start < old_openbook_v2_start && active_openbook_v2_orders > 0 {
+                unsafe {
+                    sol_memmove(
+                        &mut dynamic[new_openbook_v2_start],
+                        &mut dynamic[old_openbook_v2_start],
+                        size_of::<OpenbookV2Orders>() * active_openbook_v2_orders,
+                    );
+                }
+            }
         }
 
         // Second move pass: Go right-to-left and move everything to the right if needed.
@@ -1656,6 +1854,18 @@ impl<
         // - if the block to the right was moved to the left, we know that its start will
         //   be >= our block's end
         {
+            let old_openbook_v2_start = old_header.openbook_v2_offset(0);
+            let new_openbook_v2_start = new_header.openbook_v2_offset(0);
+            if new_openbook_v2_start > old_openbook_v2_start && active_openbook_v2_orders > 0 {
+                unsafe {
+                    sol_memmove(
+                        &mut dynamic[new_openbook_v2_start],
+                        &mut dynamic[old_openbook_v2_start],
+                        size_of::<OpenbookV2Orders>() * active_openbook_v2_orders,
+                    );
+                }
+            }
+
             let old_tcs_start = old_header.token_conditional_swap_offset(0);
             let new_tcs_start = new_header.token_conditional_swap_offset(0);
             if new_tcs_start > old_tcs_start && active_tcs > 0 {
@@ -1725,6 +1935,10 @@ impl<
                 *get_helper_mut(dynamic, new_header.token_conditional_swap_offset(i)) =
                     TokenConditionalSwap::default();
             }
+            for i in active_openbook_v2_orders..new_header.openbook_v2_count() {
+                *get_helper_mut(dynamic, new_header.openbook_v2_offset(i)) =
+                    OpenbookV2Orders::default();
+            }
         }
         {
             let offset = new_header.reserved_bytes_offset();
@@ -1741,6 +1955,7 @@ impl<
         self.write_perp_length();
         self.write_perp_oo_length();
         self.write_token_conditional_swap_length();
+        self.write_openbook_v2_length();
 
         Ok(())
     }
@@ -1817,12 +2032,14 @@ mod tests {
 
         // The MangoAccount struct is missing some dynamic fields, add space for them
         let tcs_length = 2;
+        let obv2_length = 5;
         let expected_space = MangoAccount::space(
             account.tokens.len() as u8,
             account.serum3.len() as u8,
             account.perps.len() as u8,
             account.perp_open_orders.len() as u8,
             tcs_length,
+            obv2_length,
         );
         bytes.extend(vec![0u8; expected_space - bytes.len()]);
 
@@ -1830,14 +2047,21 @@ mod tests {
         let (fixed, dynamic) = bytes.split_at_mut(size_of::<MangoAccountFixed>());
         let mut header = MangoAccountDynamicHeader::from_bytes(dynamic).unwrap();
         header.token_conditional_swap_count = tcs_length;
+        header.openbook_v2_count = obv2_length;
         let mut account = MangoAccountRefMut {
             header: &mut header,
             fixed: bytemuck::from_bytes_mut(fixed),
             dynamic,
         };
         account.write_token_conditional_swap_length();
+        account.write_openbook_v2_length();
+        let mut account = MangoAccountValue::from_bytes(&bytes).unwrap();
+        // Initialize the openbook orders with defaults as they would be in the program
+        for i in 0..header.openbook_v2_count() {
+            *account.openbook_v2_orders_mut_by_raw_index(i) = OpenbookV2Orders::default();
+        }
 
-        MangoAccountValue::from_bytes(&bytes).unwrap()
+        account
     }
 
     #[test]
@@ -1864,18 +2088,26 @@ mod tests {
         account.perp_open_orders.resize(8, PerpOpenOrder::default());
         account.next_token_conditional_swap_id = 13;
 
-        let account_bytes_without_tcs_and_reserved = AnchorSerialize::try_to_vec(&account).unwrap();
+        let account_bytes_without_tcs_and_obv2_and_reserved =
+            AnchorSerialize::try_to_vec(&account).unwrap();
         let account_bytes = {
-            let mut b = account_bytes_without_tcs_and_reserved.clone();
+            let mut b = account_bytes_without_tcs_and_obv2_and_reserved.clone();
             // tcs adds 4 bytes of padding and 4 bytes of Vec size
+            b.extend([0u8; 8]);
+            // openbook v2 probably adds some shit too?
+            b.extend([0u8; 8]);
             // plus 64 bytes of reserved space at the end
-            b.extend([0u8; 8 + 64]);
+            b.extend([0u8; 64]);
             b
         };
-        assert_eq!(8 + account_bytes.len(), MangoAccount::space(8, 8, 4, 8, 0));
+        assert_eq!(
+            8 + account_bytes.len(),
+            MangoAccount::space(8, 8, 4, 8, 0, 0)
+        );
 
         let account2 =
-            MangoAccountValue::from_bytes(&account_bytes_without_tcs_and_reserved).unwrap();
+            MangoAccountValue::from_bytes(&account_bytes_without_tcs_and_obv2_and_reserved)
+                .unwrap();
         assert_eq!(account.group, account2.fixed.group);
         assert_eq!(account.owner, account2.fixed.owner);
         assert_eq!(account.name, account2.fixed.name);
@@ -2212,6 +2444,62 @@ mod tests {
         assert_eq!(tcs.id, 123); // old data
     }
 
+    #[test]
+    fn test_openbook_v2_orders() {
+        let mut account = make_test_account();
+        assert!(account.openbook_v2_orders(1).is_err());
+        assert!(account.openbook_v2_orders_mut(3).is_err());
+
+        // When we make the test account we zero init the dynamic section.
+        // This would never happen outside of tests. If it did we would incorrectly think the orders slot is active.
+        // assert_eq!(
+        //     account.openbook_v2_orders_by_raw_index_unchecked(0).market_index,
+        //     OpenbookV2MarketIndex::MAX
+        // );
+
+        assert_eq!(
+            account.create_openbook_v2_orders(1).unwrap().market_index,
+            1
+        );
+        assert_eq!(
+            account.create_openbook_v2_orders(7).unwrap().market_index,
+            7
+        );
+        assert_eq!(
+            account.create_openbook_v2_orders(42).unwrap().market_index,
+            42
+        );
+        assert!(account.create_openbook_v2_orders(7).is_err());
+        assert_eq!(account.active_openbook_v2_orders().count(), 3);
+
+        assert!(account.deactivate_openbook_v2_orders(7).is_ok());
+        assert_eq!(
+            account
+                .openbook_v2_orders_by_raw_index_unchecked(1)
+                .market_index,
+            OpenbookV2MarketIndex::MAX
+        );
+        assert!(account.create_openbook_v2_orders(8).is_ok());
+        assert_eq!(
+            account
+                .openbook_v2_orders_by_raw_index_unchecked(1)
+                .market_index,
+            8
+        );
+
+        assert_eq!(account.active_openbook_v2_orders().count(), 3);
+        assert!(account.deactivate_openbook_v2_orders(1).is_ok());
+        assert!(account.openbook_v2_orders(1).is_err());
+        assert!(account.openbook_v2_orders_mut(1).is_err());
+        assert!(account.openbook_v2_orders(8).is_ok());
+        assert!(account.openbook_v2_orders(42).is_ok());
+        assert_eq!(account.active_openbook_v2_orders().count(), 2);
+
+        assert_eq!(account.openbook_v2_orders_mut(42).unwrap().market_index, 42);
+        assert_eq!(account.openbook_v2_orders_mut(8).unwrap().market_index, 8);
+        assert!(account.openbook_v2_orders_mut(7).is_err());
+    }
+
     fn make_resize_test_account(header: &MangoAccountDynamicHeader) -> MangoAccountValue {
         let mut account = MangoAccount::default_for_tests();
         account
@@ -2236,14 +2524,23 @@ mod tests {
         let (fixed, dynamic) = bytes.split_at_mut(size_of::<MangoAccountFixed>());
         let mut out_header = MangoAccountDynamicHeader::from_bytes(dynamic).unwrap();
         out_header.token_conditional_swap_count = header.token_conditional_swap_count;
+        out_header.openbook_v2_count = header.openbook_v2_count;
         let mut account = MangoAccountRefMut {
             header: &mut out_header,
             fixed: bytemuck::from_bytes_mut(fixed),
             dynamic,
         };
         account.write_token_conditional_swap_length();
+        account.write_openbook_v2_length();
 
-        MangoAccountValue::from_bytes(&bytes).unwrap()
+        let mut account = MangoAccountValue::from_bytes(&bytes).unwrap();
+
+        // Initialize the openbook orders with defaults as they would be in the program
+        for i in 0..header.openbook_v2_count() {
+            *account.openbook_v2_orders_mut_by_raw_index(i) = OpenbookV2Orders::default();
+        }
+
+        account
     }
 
     fn check_account_active_and_order(
@@ -2359,6 +2656,7 @@ mod tests {
             perp_count: 6,
             perp_oo_count: 7,
             token_conditional_swap_count: 8,
+            openbook_v2_count: 5,
         };
         let mut account = make_resize_test_account(&header);
 
@@ -2397,12 +2695,18 @@ mod tests {
         make_tcs(2, 0);
         make_tcs(4, 1);
 
+        account.create_openbook_v2_orders(0)?;
+        account.create_openbook_v2_orders(7)?;
+        account.create_openbook_v2_orders(1)?;
+        *account.openbook_v2_orders_mut_by_raw_index(1) = OpenbookV2Orders::default();
+
         let active = MangoAccountDynamicHeader {
             token_count: 2,
             serum3_count: 2,
             perp_count: 4,
             perp_oo_count: 5,
             token_conditional_swap_count: 2,
+            openbook_v2_count: 2,
         };
 
         // Resizing to the same size just removes the empty spaces
@@ -2414,6 +2718,7 @@ mod tests {
                 header.perp_count,
                 header.perp_oo_count,
                 header.token_conditional_swap_count,
+                header.openbook_v2_count,
             )?;
             check_account_active_and_order(&ta, &active)?;
         }
@@ -2427,6 +2732,7 @@ mod tests {
                 active.perp_count,
                 active.perp_oo_count,
                 active.token_conditional_swap_count,
+                active.openbook_v2_count,
             )?;
             check_account_active_and_order(&ta, &active)?;
         }
@@ -2440,6 +2746,7 @@ mod tests {
                 active.perp_count,
                 active.perp_oo_count,
                 active.token_conditional_swap_count,
+                active.openbook_v2_count,
             )
             .unwrap_err();
             ta.resize_dynamic_content(
@@ -2448,6 +2755,7 @@ mod tests {
                 active.perp_count,
                 active.perp_oo_count,
                 active.token_conditional_swap_count,
+                active.openbook_v2_count,
             )
             .unwrap_err();
             ta.resize_dynamic_content(
@@ -2456,6 +2764,7 @@ mod tests {
                 active.perp_count - 1,
                 active.perp_oo_count,
                 active.token_conditional_swap_count,
+                active.openbook_v2_count,
             )
             .unwrap_err();
             ta.resize_dynamic_content(
@@ -2464,6 +2773,7 @@ mod tests {
                 active.perp_count,
                 active.perp_oo_count - 1,
                 active.token_conditional_swap_count,
+                active.openbook_v2_count,
             )
             .unwrap_err();
             ta.resize_dynamic_content(
@@ -2472,6 +2782,16 @@ mod tests {
                 active.perp_count,
                 active.perp_oo_count,
                 active.token_conditional_swap_count - 1,
+                active.openbook_v2_count,
+            )
+            .unwrap_err();
+            ta.resize_dynamic_content(
+                active.token_count,
+                active.serum3_count,
+                active.perp_count,
+                active.perp_oo_count,
+                active.token_conditional_swap_count,
+                active.openbook_v2_count - 1,
             )
             .unwrap_err();
         }
@@ -2490,6 +2810,7 @@ mod tests {
                 perp_count: 4,
                 perp_oo_count: 8,
                 token_conditional_swap_count: 4,
+                openbook_v2_count: 4,
             };
             let mut account = make_resize_test_account(&header);
 
@@ -2500,6 +2821,7 @@ mod tests {
                 perp_oo_count: rng.gen_range(0..header.perp_oo_count + 1),
                 token_conditional_swap_count: rng
                     .gen_range(0..header.token_conditional_swap_count + 1),
+                openbook_v2_count: rng.gen_range(0..header.openbook_v2_count + 1),
             };
 
             let options = (0..header.token_count()).collect_vec();
@@ -2534,12 +2856,21 @@ mod tests {
                 tcs.id = i as u64;
             }
 
+            let options = (0..header.openbook_v2_count()).collect_vec();
+            let selected = options.choose_multiple(&mut rng, active.openbook_v2_count());
+            for (i, index) in selected.sorted().enumerate() {
+                account
+                    .openbook_v2_orders_mut_by_raw_index(*index)
+                    .market_index = i as OpenbookV2MarketIndex;
+            }
+
             let target = MangoAccountDynamicHeader {
                 token_count: rng.gen_range(active.token_count..6),
                 serum3_count: rng.gen_range(active.serum3_count..7),
                 perp_count: rng.gen_range(active.perp_count..6),
                 perp_oo_count: rng.gen_range(active.perp_oo_count..16),
                 token_conditional_swap_count: rng.gen_range(active.token_conditional_swap_count..8),
+                openbook_v2_count: rng.gen_range(active.openbook_v2_count..7),
             };
 
             let target_size = target.account_size();
@@ -2556,6 +2887,7 @@ mod tests {
                     target.perp_count,
                     target.perp_oo_count,
                     target.token_conditional_swap_count,
+                    target.openbook_v2_count,
                 )
                 .unwrap();
 
@@ -2564,3 +2896,17 @@ mod tests {
         Ok(())
     }
 }
+
+#[macro_export]
+macro_rules! mango_account_seeds {
+    ( $account:expr ) => {
+        &[
+            b"MangoAccount".as_ref(),
+            $account.group.as_ref(),
+            $account.owner.as_ref(),
+            &$account.account_num.to_le_bytes(),
+            &[$account.bump],
+        ]
+    };
+}
+pub use mango_account_seeds;

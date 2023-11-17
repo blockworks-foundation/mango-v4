@@ -33,7 +33,7 @@ async fn test_delegate() -> Result<(), TransportError> {
     // TEST: Edit account - Set delegate
     //
     {
-        send_tx(
+        mango_client::send_tx(
             solana,
             AccountEditInstruction {
                 delegate: delegate.pubkey(),
@@ -51,7 +51,7 @@ async fn test_delegate() -> Result<(), TransportError> {
     // TEST: Edit account as delegate - should fail
     //
     {
-        let res = send_tx(
+        let res = mango_client::send_tx(
             solana,
             AccountEditInstruction {
                 delegate: delegate.pubkey(),
@@ -70,7 +70,7 @@ async fn test_delegate() -> Result<(), TransportError> {
     //
     {
         let withdraw_amount = 50;
-        let res = send_tx(
+        let res = mango_client::send_tx(
             solana,
             TokenWithdrawInstruction {
                 amount: withdraw_amount,
@@ -90,7 +90,7 @@ async fn test_delegate() -> Result<(), TransportError> {
     //
     {
         let bank_data: Bank = solana.get_account(bank).await;
-        send_tx(
+        mango_client::send_tx(
             solana,
             TokenWithdrawInstruction {
                 amount: bank_data.native_deposits().to_num(),
@@ -103,7 +103,7 @@ async fn test_delegate() -> Result<(), TransportError> {
         )
         .await
         .unwrap();
-        let res = send_tx(
+        let res = mango_client::send_tx(
             solana,
             AccountCloseInstruction {
                 group,

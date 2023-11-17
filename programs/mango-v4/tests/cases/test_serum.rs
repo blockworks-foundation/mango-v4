@@ -43,7 +43,7 @@ impl SerumOrderPlacer {
     ) -> Result<mango_v4::accounts::Serum3PlaceOrder, TransportError> {
         let client_order_id = self.inc_client_order_id();
         let fees = if taker { 0.0004 } else { 0.0 };
-        send_tx(
+        mango_client::send_tx(
             &self.solana,
             Serum3PlaceOrderInstruction {
                 side: Serum3Side::Bid,
@@ -84,7 +84,7 @@ impl SerumOrderPlacer {
         max_base: u64,
     ) -> Result<mango_v4::accounts::Serum3PlaceOrder, TransportError> {
         let client_order_id = self.inc_client_order_id();
-        send_tx(
+        mango_client::send_tx(
             &self.solana,
             Serum3PlaceOrderInstruction {
                 side: Serum3Side::Ask,
@@ -120,7 +120,7 @@ impl SerumOrderPlacer {
                 Serum3Side::Bid
             }
         };
-        send_tx(
+        mango_client::send_tx(
             &self.solana,
             Serum3CancelOrderInstruction {
                 side,
@@ -148,7 +148,7 @@ impl SerumOrderPlacer {
                 Serum3Side::Bid
             };
 
-            send_tx(
+            mango_client::send_tx(
                 &self.solana,
                 Serum3CancelOrderInstruction {
                     side,
@@ -168,7 +168,7 @@ impl SerumOrderPlacer {
     }
 
     async fn settle_v2(&self, fees_to_dao: bool) {
-        send_tx(
+        mango_client::send_tx(
             &self.solana,
             Serum3SettleFundsV2Instruction {
                 account: self.account,
@@ -238,7 +238,7 @@ async fn test_serum_basics() -> Result<(), TransportError> {
     //
     // TEST: Register a serum market
     //
-    let serum_market = send_tx(
+    let serum_market = mango_client::send_tx(
         solana,
         Serum3RegisterMarketInstruction {
             group,
@@ -274,7 +274,7 @@ async fn test_serum_basics() -> Result<(), TransportError> {
     //
     // TEST: Create an open orders account
     //
-    let open_orders = send_tx(
+    let open_orders = mango_client::send_tx(
         solana,
         Serum3CreateOpenOrdersInstruction {
             account,
@@ -386,7 +386,7 @@ async fn test_serum_basics() -> Result<(), TransportError> {
         .await;
 
     // close oo account
-    send_tx(
+    mango_client::send_tx(
         solana,
         Serum3CloseOpenOrdersInstruction {
             account,
@@ -415,7 +415,7 @@ async fn test_serum_basics() -> Result<(), TransportError> {
     );
 
     // deregister serum3 market
-    send_tx(
+    mango_client::send_tx(
         solana,
         Serum3DeregisterMarketInstruction {
             group,
@@ -922,7 +922,7 @@ async fn test_serum_reduce_only_borrows() -> Result<(), TransportError> {
         ..
     } = common_setup(&context, deposit_amount).await;
 
-    send_tx(
+    mango_client::send_tx(
         solana,
         TokenMakeReduceOnly {
             group: group_with_tokens.group,
@@ -974,7 +974,7 @@ async fn test_serum_reduce_only_deposits1() -> Result<(), TransportError> {
         ..
     } = common_setup(&context, deposit_amount).await;
 
-    send_tx(
+    mango_client::send_tx(
         solana,
         TokenMakeReduceOnly {
             group: group_with_tokens.group,
@@ -1023,7 +1023,7 @@ async fn test_serum_reduce_only_deposits2() -> Result<(), TransportError> {
     } = common_setup(&context, deposit_amount).await;
 
     // Give account some base token borrows (-500)
-    send_tx(
+    mango_client::send_tx(
         solana,
         TokenWithdrawInstruction {
             amount: 1500,
@@ -1040,7 +1040,7 @@ async fn test_serum_reduce_only_deposits2() -> Result<(), TransportError> {
     //
     // TEST: Cannot buy tokens when deposits are already >0
     //
-    send_tx(
+    mango_client::send_tx(
         solana,
         TokenMakeReduceOnly {
             group: group_with_tokens.group,
@@ -1090,7 +1090,7 @@ async fn test_serum_place_reducing_when_liquidatable() -> Result<(), TransportEr
     } = common_setup(&context, deposit_amount).await;
 
     // Give account some base token borrows (-500)
-    send_tx(
+    mango_client::send_tx(
         solana,
         TokenWithdrawInstruction {
             amount: 1500,
@@ -1388,7 +1388,7 @@ async fn test_serum_compute() -> Result<(), TransportError> {
         order_placer.bid_maker(1.3, 100).await.unwrap();
         order_placer.bid_maker(1.4, 100).await.unwrap();
 
-        let result = send_tx_get_metadata(
+        let result = mango_client::send_tx_get_metadata(
             solana,
             Serum3PlaceOrderInstruction {
                 side: Serum3Side::Ask,
@@ -1453,7 +1453,7 @@ async fn test_serum_compute() -> Result<(), TransportError> {
             order_placer.bid_maker(1.0 + i as f64, 100).await.unwrap();
         }
 
-        let result = send_tx_get_metadata(
+        let result = mango_client::send_tx_get_metadata(
             solana,
             Serum3CancelAllOrdersInstruction {
                 account: order_placer.account,
@@ -1483,7 +1483,7 @@ async fn test_serum_compute() -> Result<(), TransportError> {
 
 struct CommonSetup {
     group_with_tokens: GroupWithTokens,
-    serum_market_cookie: SpotMarketCookie,
+    serum_market_cookie: SerumMarketCookie,
     quote_token: crate::program_test::mango_setup::Token,
     base_token: crate::program_test::mango_setup::Token,
     order_placer: SerumOrderPlacer,
@@ -1522,7 +1522,7 @@ async fn common_setup(context: &TestContext, deposit_amount: u64) -> CommonSetup
     //
     // SETUP: Register a serum market
     //
-    let serum_market = send_tx(
+    let serum_market = mango_client::send_tx(
         solana,
         Serum3RegisterMarketInstruction {
             group,
@@ -1577,7 +1577,7 @@ async fn common_setup(context: &TestContext, deposit_amount: u64) -> CommonSetup
     )
     .await;
 
-    let open_orders = send_tx(
+    let open_orders = mango_client::send_tx(
         solana,
         Serum3CreateOpenOrdersInstruction {
             account,
@@ -1590,7 +1590,7 @@ async fn common_setup(context: &TestContext, deposit_amount: u64) -> CommonSetup
     .unwrap()
     .open_orders;
 
-    let open_orders2 = send_tx(
+    let open_orders2 = mango_client::send_tx(
         solana,
         Serum3CreateOpenOrdersInstruction {
             account: account2,

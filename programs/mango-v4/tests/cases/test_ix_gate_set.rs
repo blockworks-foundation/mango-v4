@@ -26,7 +26,7 @@ async fn test_ix_gate_set() -> Result<(), TransportError> {
     .create(solana)
     .await;
 
-    send_tx(
+    mango_client::send_tx(
         solana,
         GroupEdit {
             group,
@@ -58,7 +58,7 @@ async fn test_ix_gate_set() -> Result<(), TransportError> {
     let group_data: Group = solana.get_account(group).await;
     assert!(group_data.is_ix_enabled(IxGate::TokenDeposit));
 
-    send_tx(
+    mango_client::send_tx(
         solana,
         IxGateSetInstruction {
             group,
@@ -76,7 +76,7 @@ async fn test_ix_gate_set() -> Result<(), TransportError> {
     let group_data: Group = solana.get_account(group).await;
     assert!(!group_data.is_ix_enabled(IxGate::TokenDeposit));
 
-    let res = send_tx(
+    let res = mango_client::send_tx(
         solana,
         TokenDepositInstruction {
             amount: 10,
@@ -91,7 +91,7 @@ async fn test_ix_gate_set() -> Result<(), TransportError> {
     .await;
     assert!(res.is_err());
 
-    send_tx(
+    mango_client::send_tx(
         solana,
         TokenWithdrawInstruction {
             amount: 10,
@@ -108,7 +108,7 @@ async fn test_ix_gate_set() -> Result<(), TransportError> {
     //
     // TEST: re-enabling is not allowed for security admin
     //
-    let result = send_tx(
+    let result = mango_client::send_tx(
         solana,
         IxGateSetInstruction {
             group,
@@ -124,7 +124,7 @@ async fn test_ix_gate_set() -> Result<(), TransportError> {
     //
     // TEST: security admin can disable
     //
-    send_tx(
+    mango_client::send_tx(
         solana,
         IxGateSetInstruction {
             group,
@@ -146,7 +146,7 @@ async fn test_ix_gate_set() -> Result<(), TransportError> {
     //
     // TEST: admin can re-enable
     //
-    send_tx(
+    mango_client::send_tx(
         solana,
         IxGateSetInstruction {
             group,
@@ -163,7 +163,7 @@ async fn test_ix_gate_set() -> Result<(), TransportError> {
     //
     // test cu budget, ix has a lot of logging
     // e.g. Program 4MangoMjqJ2firMokCjjGgoK8d4MXcrgL7XJaL3w6fVg consumed 66986 of 75000 compute units
-    send_tx(
+    mango_client::send_tx(
         solana,
         IxGateSetInstruction {
             group,
@@ -173,7 +173,7 @@ async fn test_ix_gate_set() -> Result<(), TransportError> {
     )
     .await
     .unwrap();
-    send_tx(
+    mango_client::send_tx(
         solana,
         IxGateSetInstruction {
             group,

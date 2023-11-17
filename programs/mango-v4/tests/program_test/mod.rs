@@ -11,6 +11,8 @@ use spl_token::{state::*, *};
 
 pub use cookies::*;
 pub use mango_client::*;
+pub use openbook_client::*;
+pub use openbook_setup::*;
 pub use serum::*;
 pub use solana::*;
 pub use utils::*;
@@ -18,6 +20,8 @@ pub use utils::*;
 pub mod cookies;
 pub mod mango_client;
 pub mod mango_setup;
+pub mod openbook_client;
+pub mod openbook_setup;
 pub mod serum;
 pub mod solana;
 pub mod utils;
@@ -184,6 +188,14 @@ impl TestContextBuilder {
         serum_program_id
     }
 
+    pub fn add_openbook_v2_program(&mut self) -> Pubkey {
+        let openbook_v2_program_id =
+            Pubkey::from_str("opnb2LAfJYbRMAHHvqjCwQxanZn7ReEHp1k81EohpZb").unwrap();
+        self.test
+            .add_program("openbook_v2", openbook_v2_program_id, None);
+        openbook_v2_program_id
+    }
+
     pub fn add_margin_trade_program(&mut self) -> MarginTradeCookie {
         let program = Pubkey::from_str("J83w4HKfqxwcq3BEMMkPFSppX3gqekLyLJBexebFVkix").unwrap();
         let token_account = TestKeypair::new();
@@ -218,6 +230,7 @@ impl TestContextBuilder {
         let mints = self.create_mints();
         let users = self.create_users(&mints);
         let serum_program_id = self.add_serum_program();
+        let openbook_v2_program_id = self.add_openbook_v2_program();
 
         let solana = self.start().await;
 
@@ -226,11 +239,17 @@ impl TestContextBuilder {
             program_id: serum_program_id,
         });
 
+        let openbook = Arc::new(OpenbookV2Cookie {
+            solana: solana.clone(),
+            program_id: openbook_v2_program_id,
+        });
+
         TestContext {
             solana: solana.clone(),
             mints,
             users,
             serum,
+            openbook,
         }
     }
 
@@ -253,6 +272,7 @@ pub struct TestContext {
     pub mints: Vec<MintCookie>,
     pub users: Vec<UserCookie>,
     pub serum: Arc<SerumCookie>,
+    pub openbook: Arc<OpenbookV2Cookie>,
 }
 
 impl TestContext {

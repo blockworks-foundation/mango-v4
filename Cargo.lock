@@ -906,7 +906,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4114279215a005bc675e386011e594e1d9b800918cea18fcadadcce864a2046b"
 dependencies = [
  "borsh-derive 0.10.3",
- "hashbrown 0.13.2",
+ "hashbrown 0.12.3",
 ]
 
 [[package]]
@@ -2017,19 +2017,6 @@ source = "git+https://github.com/blockworks-foundation/fixed.git?branch=v1.11.0-
 dependencies = [
  "az",
  "borsh 0.10.3",
- "bytemuck",
- "half",
- "serde",
- "typenum",
-]
-
-[[package]]
-name = "fixed"
-version = "1.11.0"
-source = "git+https://github.com/openbook-dex/openbook-v2.git#deb70f66c3294f4f8942f12f46ef40730f5d23c6"
-dependencies = [
- "az",
- "borsh 0.9.3",
  "bytemuck",
  "half",
  "serde",
@@ -3284,7 +3271,7 @@ dependencies = [
  "bytemuck",
  "bytes 1.5.0",
  "chrono",
- "fixed 1.11.0 (git+https://github.com/blockworks-foundation/fixed.git?branch=v1.11.0-borsh0_10-mango)",
+ "fixed",
  "futures 0.3.28",
  "futures-core",
  "itertools",
@@ -3314,7 +3301,7 @@ dependencies = [
  "default-env",
  "derivative",
  "env_logger",
- "fixed 1.11.0 (git+https://github.com/blockworks-foundation/fixed.git?branch=v1.11.0-borsh0_10-mango)",
+ "fixed",
  "itertools",
  "lazy_static",
  "log 0.4.20",
@@ -3351,7 +3338,7 @@ dependencies = [
  "base64 0.21.4",
  "clap 3.2.25",
  "dotenv",
- "fixed 1.11.0 (git+https://github.com/blockworks-foundation/fixed.git?branch=v1.11.0-borsh0_10-mango)",
+ "fixed",
  "futures 0.3.28",
  "itertools",
  "mango-v4",
@@ -3379,7 +3366,7 @@ dependencies = [
  "atty",
  "base64 0.13.1",
  "bincode",
- "fixed 1.11.0 (git+https://github.com/blockworks-foundation/fixed.git?branch=v1.11.0-borsh0_10-mango)",
+ "fixed",
  "futures 0.3.28",
  "itertools",
  "jsonrpc-core 18.0.0 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -3415,7 +3402,7 @@ dependencies = [
  "anyhow",
  "clap 3.2.25",
  "dotenv",
- "fixed 1.11.0 (git+https://github.com/blockworks-foundation/fixed.git?branch=v1.11.0-borsh0_10-mango)",
+ "fixed",
  "futures 0.3.28",
  "itertools",
  "lazy_static",
@@ -3448,7 +3435,7 @@ dependencies = [
  "chrono",
  "clap 3.2.25",
  "dotenv",
- "fixed 1.11.0 (git+https://github.com/blockworks-foundation/fixed.git?branch=v1.11.0-borsh0_10-mango)",
+ "fixed",
  "futures 0.3.28",
  "futures-core",
  "futures-util",
@@ -3494,7 +3481,7 @@ dependencies = [
  "bytes 1.5.0",
  "clap 3.2.25",
  "dotenv",
- "fixed 1.11.0 (git+https://github.com/blockworks-foundation/fixed.git?branch=v1.11.0-borsh0_10-mango)",
+ "fixed",
  "futures 0.3.28",
  "futures-core",
  "futures-util",
@@ -4172,14 +4159,14 @@ checksum = "624a8340c38c1b80fd549087862da4ba43e08858af025b236e509b6649fc13d5"
 [[package]]
 name = "openbook-v2"
 version = "0.1.0"
-source = "git+https://github.com/openbook-dex/openbook-v2.git#deb70f66c3294f4f8942f12f46ef40730f5d23c6"
+source = "git+https://github.com/openbook-dex/openbook-v2.git#b70cac715febb50fa41e8d75eab95acacac7657a"
 dependencies = [
  "anchor-lang",
  "anchor-spl",
  "arrayref",
  "bytemuck",
  "derivative",
- "fixed 1.11.0 (git+https://github.com/openbook-dex/openbook-v2.git)",
+ "fixed",
  "itertools",
  "num_enum 0.5.11",
  "pyth-sdk-solana",
@@ -5162,7 +5149,7 @@ dependencies = [
 [[package]]
 name = "raydium-amm-v3"
 version = "0.1.0"
-source = "git+https://github.com/raydium-io/raydium-clmm.git#6e4639f7133a8852068d2d473c263f907b69cd4a"
+source = "git+https://github.com/raydium-io/raydium-clmm.git#cea4d49ef5acc643cb04fb4db96af6d73a5f0a1d"
 dependencies = [
  "anchor-lang",
  "anchor-spl",
@@ -5170,6 +5157,7 @@ dependencies = [
  "bytemuck",
  "mpl-token-metadata",
  "solana-program",
+ "spl-memo 4.0.0",
  "uint",
 ]
 
@@ -5937,7 +5925,7 @@ dependencies = [
  "async-trait",
  "bs58 0.3.1",
  "bytemuck",
- "fixed 1.11.0 (git+https://github.com/blockworks-foundation/fixed.git?branch=v1.11.0-borsh0_10-mango)",
+ "fixed",
  "futures-channel",
  "futures-util",
  "itertools",
@@ -5969,7 +5957,7 @@ dependencies = [
  "async-channel",
  "async-trait",
  "bs58 0.3.1",
- "fixed 1.11.0 (git+https://github.com/blockworks-foundation/fixed.git?branch=v1.11.0-borsh0_10-mango)",
+ "fixed",
  "jsonrpsee",
  "log 0.4.20",
  "mango-feeds-connector",

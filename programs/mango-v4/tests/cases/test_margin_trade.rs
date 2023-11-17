@@ -54,7 +54,7 @@ async fn test_margin_trade() -> Result<(), BanksClientError> {
     // create the test user account
     //
 
-    let account = send_tx(
+    let account = mango_client::send_tx(
         solana,
         AccountCreateInstruction {
             account_num: 0,
@@ -75,7 +75,7 @@ async fn test_margin_trade() -> Result<(), BanksClientError> {
     {
         let start_balance = solana.token_account_balance(payer_mint0_account).await;
 
-        send_tx(
+        mango_client::send_tx(
             solana,
             TokenDepositInstruction {
                 amount: deposit_amount_initial,
@@ -113,7 +113,7 @@ async fn test_margin_trade() -> Result<(), BanksClientError> {
     let withdraw_amount = 2;
     let deposit_amount = 1;
     let send_flash_loan_tx = |solana, withdraw_amount, deposit_amount| async move {
-        let mut tx = ClientTransaction::new(solana);
+        let mut tx = mango_client::ClientTransaction::new(solana);
         let loans = vec![FlashLoanPart {
             bank,
             token_account: target_token_account,
@@ -272,7 +272,7 @@ async fn test_flash_loan_swap_fee() -> Result<(), BanksClientError> {
     .await;
 
     let swap_fee_rate = 0.042f64;
-    send_tx(
+    mango_client::send_tx(
         solana,
         TokenEdit {
             group,
@@ -331,7 +331,7 @@ async fn test_flash_loan_swap_fee() -> Result<(), BanksClientError> {
     let withdraw_amount = 1000;
     let deposit_amount = 1000;
     {
-        let mut tx = ClientTransaction::new(solana);
+        let mut tx = mango_client::ClientTransaction::new(solana);
         let loans = vec![
             FlashLoanPart {
                 bank: tokens[0].bank,
@@ -472,7 +472,7 @@ async fn test_flash_loan_creates_ata_accounts() -> Result<(), BanksClientError> 
     //
     // create the test user account
     //
-    let account = send_tx(
+    let account = mango_client::send_tx(
         solana,
         AccountCreateInstruction {
             account_num: 0,
@@ -493,7 +493,7 @@ async fn test_flash_loan_creates_ata_accounts() -> Result<(), BanksClientError> 
     {
         let start_balance = solana.token_account_balance(payer_mint0_account).await;
 
-        send_tx(
+        mango_client::send_tx(
             solana,
             TokenDepositInstruction {
                 amount: deposit_amount_initial,
@@ -546,7 +546,7 @@ async fn test_flash_loan_creates_ata_accounts() -> Result<(), BanksClientError> 
     let withdraw_amount = 2;
     let deposit_amount = 1;
     let send_flash_loan_tx = |solana, withdraw_amount, deposit_amount| async move {
-        let mut tx = ClientTransaction::new(solana);
+        let mut tx = mango_client::ClientTransaction::new(solana);
         tx.add_instruction(FlashLoanSwapBeginInstruction {
             account,
             owner,

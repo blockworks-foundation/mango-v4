@@ -61,7 +61,7 @@ async fn test_fees_buyback_with_mngo() -> Result<(), TransportError> {
     //
     // Create a perp market
     //
-    let mango_v4::accounts::PerpCreateMarket { perp_market, .. } = send_tx(
+    let mango_v4::accounts::PerpCreateMarket { perp_market, .. } = mango_client::send_tx(
         solana,
         PerpCreateMarketInstruction {
             group,
@@ -93,7 +93,7 @@ async fn test_fees_buyback_with_mngo() -> Result<(), TransportError> {
     //
     // Place a bid, corresponding ask, and consume event
     //
-    send_tx(
+    mango_client::send_tx(
         solana,
         PerpPlaceOrderInstruction {
             account: account_0,
@@ -109,7 +109,7 @@ async fn test_fees_buyback_with_mngo() -> Result<(), TransportError> {
     .await
     .unwrap();
 
-    send_tx(
+    mango_client::send_tx(
         solana,
         PerpPlaceOrderInstruction {
             account: account_1,
@@ -125,7 +125,7 @@ async fn test_fees_buyback_with_mngo() -> Result<(), TransportError> {
     .await
     .unwrap();
 
-    send_tx(
+    mango_client::send_tx(
         solana,
         PerpConsumeEventsInstruction {
             perp_market,
@@ -142,7 +142,7 @@ async fn test_fees_buyback_with_mngo() -> Result<(), TransportError> {
     //
     // Test: Account buyback fees accrued with mngo
     //
-    send_tx(
+    mango_client::send_tx(
         solana,
         GroupEditFeeParameters {
             group,
@@ -161,7 +161,7 @@ async fn test_fees_buyback_with_mngo() -> Result<(), TransportError> {
         mango_account_1.tokens[0].native(&solana.get_account::<Bank>(tokens[0].bank).await);
     let mngo_token_position_before =
         mango_account_1.tokens[1].native(&solana.get_account::<Bank>(tokens[1].bank).await);
-    send_tx(
+    mango_client::send_tx(
         solana,
         AccountBuybackFeesWithMngo {
             owner,
