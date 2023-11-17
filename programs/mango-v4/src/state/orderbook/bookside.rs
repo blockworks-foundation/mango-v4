@@ -222,7 +222,7 @@ impl BookSide {
             sum_amt += order.node.quantity * order.price_lots;
             if sum_amt >= amount {
                 let extra_amt = (sum_amt - amount);
-                sum_qty -= (extra_amt + oracle_price_lots - 1) / order.price_lots;
+                sum_qty -= (extra_amt + order.price_lots - 1) / order.price_lots;
                 return Some(sum_amt)
             }
         }
