@@ -451,6 +451,17 @@ pub struct TokenMetaDataLog {
 }
 
 #[event]
+pub struct TokenMetaDataLogV2 {
+    pub mango_group: Pubkey,
+    pub mint: Pubkey,
+    pub token_index: u16,
+    pub mint_decimals: u8,
+    pub oracle: Pubkey,
+    pub fallback_oracle: Pubkey,
+    pub mint_info: Pubkey,
+}
+
+#[event]
 pub struct PerpMarketMetaDataLog {
     pub mango_group: Pubkey,
     pub perp_market: Pubkey,

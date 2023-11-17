@@ -167,8 +167,10 @@ pub struct Bank {
     pub maint_weight_shift_asset_target: I80F48,
     pub maint_weight_shift_liab_target: I80F48,
 
+    pub fallback_oracle: Pubkey,
+
     #[derivative(Debug = "ignore")]
-    pub reserved: [u8; 2008],
+    pub reserved: [u8; 1976],
 }
 const_assert_eq!(
     size_of::<Bank>(),
@@ -292,7 +294,8 @@ impl Bank {
             maint_weight_shift_duration_inv: existing_bank.maint_weight_shift_duration_inv,
             maint_weight_shift_asset_target: existing_bank.maint_weight_shift_asset_target,
             maint_weight_shift_liab_target: existing_bank.maint_weight_shift_liab_target,
-            reserved: [0; 2008],
+            fallback_oracle: existing_bank.oracle, // bongo
+            reserved: [0; 1976],
         }
     }
 

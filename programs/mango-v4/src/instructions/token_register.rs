@@ -6,7 +6,7 @@ use crate::error::*;
 use crate::state::*;
 use crate::util::fill_from_str;
 
-use crate::logs::{emit_stack, TokenMetaDataLog};
+use crate::logs::{emit_stack, TokenMetaDataLogV2};
 
 pub const INDEX_START: I80F48 = I80F48::from_bits(1_000_000 * I80F48::ONE.to_bits());
 
@@ -119,7 +119,8 @@ pub fn token_register(
         maint_weight_shift_duration_inv: I80F48::ZERO,
         maint_weight_shift_asset_target: I80F48::ZERO,
         maint_weight_shift_liab_target: I80F48::ZERO,
-        reserved: [0; 2008],
+        fallback_oracle: ctx.accounts.fallback_oracle.key(),
+        reserved: [0; 1976],
     };
 
     if let Ok(oracle_price) =
@@ -143,19 +144,21 @@ pub fn token_register(
         banks: Default::default(),
         vaults: Default::default(),
         oracle: ctx.accounts.oracle.key(),
+        fallback_oracle: ctx.accounts.fallback_oracle.key(),
         registration_time: Clock::get()?.unix_timestamp.try_into().unwrap(),
-        reserved: [0; 2560],
+        reserved: [0; 2528],
     };
 
     mint_info.banks[0] = ctx.accounts.bank.key();
     mint_info.vaults[0] = ctx.accounts.vault.key();
 
-    emit_stack(TokenMetaDataLog {
+    emit_stack!(TokenMetaDataLogV2 {
         mango_group: ctx.accounts.group.key(),
         mint: ctx.accounts.mint.key(),
         token_index,
         mint_decimals: ctx.accounts.mint.decimals,
         oracle: ctx.accounts.oracle.key(),
+        fallback_oracle: ctx.accounts.fallback_oracle.key(),
         mint_info: ctx.accounts.mint_info.key(),
     });
 
