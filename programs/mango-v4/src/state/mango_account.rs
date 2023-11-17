@@ -77,13 +77,14 @@ impl MangoAccountPdaSeeds {
 //       resizing before v0.20.0 would migrate to this version.
 // - v3: Introduced in v0.20.0 to add 64 zero bytes at the end for future expansion.
 //       Users will migrate to this version when resizing their accounts. Also the
-//       AccountSizeMigration instruction is intended to be used to bring all accounts to
-//       this version after v0.20.0 is deployed.
+//       AccountSizeMigration instruction was used to bring all accounts to
+//       this version after v0.20.0 was deployed.
 //
-// Version v0.21.0 will likely drop support for v1 and v2 accounts.
+// Version v0.22.0 drops idl support for v1 and v2 accounts by extending the MangoAccount idl with the
+// new fields.
 //
-// MangoAccount binary data is backwards compatible: when ignoring trailing bytes, a v2 account can
-// be read as a v1 account and a v3 account can be read as v1 or v2 etc.
+// When not reading via idl, MangoAccount binary data is backwards compatible: when ignoring trailing bytes,
+// a v2 account can be read as a v1 account and a v3 account can be read as v1 or v2 etc.
 #[account]
 #[derive(Derivative)]
 #[derivative(Debug)]
