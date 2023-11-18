@@ -198,8 +198,9 @@ impl BookSide {
         for order in self.iter_valid(now_ts, oracle_price_lots) {
             sum_qty += order.node.quantity;
             sum_amt += order.node.quantity * order.price_lots;
-            if sum_qty >= quantity {
-                sum_amt -= sum_qty - quantity;
+            let extra_qty = sum_qty - quantity;
+            if extra_qty > 0 {
+                sum_amt -= extra_qty * order.price_lots;
                 return Some(sum_amt)
             }
         }
@@ -220,8 +221,9 @@ impl BookSide {
         for order in self.iter_valid(now_ts, oracle_price_lots) {
             sum_qty += order.node.quantity;
             sum_amt += order.node.quantity * order.price_lots;
-            if sum_amt >= amount {
-                let extra_amt = sum_amt - amount;
+            let extra_amt = sum_amt - amount;
+            if extra_amt >= 0 {
+                // adding n-1 before dividing through n to force rounding up
                 sum_qty -= (extra_amt + order.price_lots - 1) / order.price_lots;
                 return Some(sum_qty)
             }
