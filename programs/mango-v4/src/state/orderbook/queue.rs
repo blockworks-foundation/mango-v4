@@ -197,7 +197,7 @@ pub struct FillEvent {
     pub padding4: [u8; 16],
 
     pub price: i64,
-    pub quantity: i64, // number of quote lots
+    pub quantity: i64, // number of base lots
     pub maker_client_order_id: u64,
     pub maker_fee: f32,
     pub taker_fee: f32,
