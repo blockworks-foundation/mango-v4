@@ -949,6 +949,14 @@ impl Bank {
         staleness_slot: Option<u64>,
     ) -> Result<I80F48> {
         require_keys_eq!(self.oracle, *oracle_acc.key());
+        self.oracle_price_inner(oracle_acc, staleness_slot)
+    }
+
+    fn oracle_price_inner(
+        &self,
+        oracle_acc: &impl KeyedAccountReader,
+        staleness_slot: Option<u64>,
+    ) -> Result<I80F48> {
         let state = oracle::oracle_state_unchecked(oracle_acc, self.mint_decimals)?;
         state.check_confidence_and_maybe_staleness(
             &self.oracle,
@@ -956,6 +964,23 @@ impl Bank {
             staleness_slot,
         )?;
         Ok(state.price)
+    }
+
+    /// Tries to return the primary oracle price, and if there is a confidence or staleness issue returns the fallback oracle price.
+    pub fn oracle_price_with_fallback(
+        &self,
+        oracle_acc: &impl KeyedAccountReader,
+        fallback_oracle_acc_opt: Option<&impl KeyedAccountReader>,
+        staleness_slot: Option<u64>,
+    ) -> Result<I80F48> {
+        let primary_price = self.oracle_price(oracle_acc, staleness_slot);
+        if primary_price.is_ok() || fallback_oracle_acc_opt.is_none() {
+            primary_price
+        } else {
+            let fallback_oracle_acc = fallback_oracle_acc_opt.unwrap();
+            require_keys_eq!(self.fallback_oracle, *fallback_oracle_acc.key());
+            self.oracle_price_inner(fallback_oracle_acc, staleness_slot)
+        }
     }
 
     pub fn stable_price(&self) -> I80F48 {

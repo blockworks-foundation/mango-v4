@@ -47,6 +47,7 @@ pub trait AccountRetriever {
 /// 3. PerpMarket accounts, in the order of account.perps.iter_active_accounts()
 /// 4. PerpMarket oracle accounts, in the order of the perp market accounts
 /// 5. serum3 OpenOrders accounts, in the order of account.serum3.iter_active()
+/// 6. fallback oracle accounts, order and existence of accounts is not guaranteed
 pub struct FixedOrderAccountRetriever<T: KeyedAccountReader> {
     pub ais: Vec<T>,
     pub n_banks: usize,
@@ -54,6 +55,7 @@ pub struct FixedOrderAccountRetriever<T: KeyedAccountReader> {
     pub begin_perp: usize,
     pub begin_serum3: usize,
     pub staleness_slot: Option<u64>,
+    pub fallback_oracle_ais: Vec<T>,
 }
 
 pub fn new_fixed_order_account_retriever<'a, 'info>(
@@ -66,19 +68,22 @@ pub fn new_fixed_order_account_retriever<'a, 'info>(
     let expected_ais = active_token_len * 2 // banks + oracles
         + active_perp_len * 2 // PerpMarkets + Oracles
         + active_serum3_len; // open_orders
-    require_msg_typed!(ais.len() == expected_ais, MangoError::InvalidHealthAccountCount,
+    require_msg_typed!(ais.len() >= expected_ais, MangoError::InvalidHealthAccountCount,
         "received {} accounts but expected {} ({} banks, {} bank oracles, {} perp markets, {} perp oracles, {} serum3 oos)",
         ais.len(), expected_ais,
         active_token_len, active_token_len, active_perp_len, active_perp_len, active_serum3_len
     );
+    let fixed_ais = AccountInfoRef::borrow_slice(&ais[..expected_ais])?;
+    let fallback_oracle_ais = AccountInfoRef::borrow_slice(&ais[expected_ais..])?;
 
     Ok(FixedOrderAccountRetriever {
-        ais: AccountInfoRef::borrow_slice(ais)?,
+        ais: fixed_ais,
         n_banks: active_token_len,
         n_perps: active_perp_len,
         begin_perp: active_token_len * 2,
         begin_serum3: active_token_len * 2 + active_perp_len * 2,
         staleness_slot: Some(Clock::get()?.slot),
+        fallback_oracle_ais,
     })
 }
 
@@ -101,11 +106,6 @@ impl<T: KeyedAccountReader> FixedOrderAccountRetriever<T> {
         require_keys_eq!(market.group, *group);
         require_eq!(market.perp_market_index, perp_market_index);
         Ok(market)
-    }
-
-    fn oracle_price_bank(&self, account_index: usize, bank: &Bank) -> Result<I80F48> {
-        let oracle = &self.ais[account_index];
-        bank.oracle_price(oracle, self.staleness_slot)
     }
 
     fn oracle_price_perp(&self, account_index: usize, perp_market: &PerpMarket) -> Result<I80F48> {
@@ -134,7 +134,14 @@ impl<T: KeyedAccountReader> AccountRetriever for FixedOrderAccountRetriever<T> {
             })?;
 
         let oracle_index = self.n_banks + active_token_position_index;
-        let oracle_price = self.oracle_price_bank(oracle_index, bank).with_context(|| {
+        let oracle = &self.ais[oracle_index];
+        let fallback_opt = self
+            .fallback_oracle_ais
+            .iter()
+            .find(|ai| ai.key() == &bank.fallback_oracle);
+        let oracle_price_result =
+            bank.oracle_price_with_fallback(oracle, fallback_opt, self.staleness_slot);
+        let oracle_price = oracle_price_result.with_context(|| {
             format!(
                 "getting oracle for bank with health account index {} and token index {}, passed account {}",
                 bank_account_index,
