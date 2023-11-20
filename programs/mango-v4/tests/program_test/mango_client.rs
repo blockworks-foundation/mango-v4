@@ -41,7 +41,7 @@ impl ClientAccountLoader for &SolanaCookie {
     }
 }
 
-// This fill return a failure if the tx resulted in an error
+// This will return a failure if the tx resulted in an error
 pub async fn send_tx<CI: ClientInstruction>(
     solana: &SolanaCookie,
     ix: CI,
@@ -50,6 +50,23 @@ pub async fn send_tx<CI: ClientInstruction>(
     let signers = ix.signers();
     let instructions = vec![instruction.clone()];
     println!("IX    IX: {:?}", instruction);
+    let result = solana
+        .process_transaction(&instructions, Some(&signers[..]))
+        .await?;
+    result.result?;
+    Ok(accounts)
+}
+
+// This will return a failure if the tx resulted in an error
+pub async fn send_tx_with_extra_accounts<CI: ClientInstruction>(
+    solana: &SolanaCookie,
+    ix: CI,
+    account_metas: Vec<AccountMeta>,
+) -> std::result::Result<CI::Accounts, TransportError> {
+    let (accounts, mut instruction) = ix.to_instruction(solana).await;
+    instruction.accounts.extend(account_metas);
+    let signers = ix.signers();
+    let instructions = vec![instruction.clone()];
     let result = solana
         .process_transaction(&instructions, Some(&signers[..]))
         .await?;
@@ -724,6 +741,7 @@ impl ClientInstruction for FlashLoanEndInstruction {
     }
 }
 
+#[derive(Clone)]
 pub struct TokenWithdrawInstruction {
     pub amount: u64,
     pub allow_borrow: bool,
@@ -795,6 +813,7 @@ impl ClientInstruction for TokenWithdrawInstruction {
     }
 }
 
+#[derive(Clone)]
 pub struct TokenDepositInstruction {
     pub amount: u64,
     pub reduce_only: bool,
@@ -1670,6 +1689,7 @@ impl ClientInstruction for StubOracleCreate {
 }
 
 pub struct StubOracleCloseInstruction {
+    pub oracle: Pubkey,
     pub group: Pubkey,
     pub mint: Pubkey,
     pub admin: TestKeypair,
@@ -1687,20 +1707,10 @@ impl ClientInstruction for StubOracleCloseInstruction {
         let program_id = mango_v4::id();
         let instruction = Self::Instruction {};
 
-        let oracle = Pubkey::find_program_address(
-            &[
-                b"StubOracle".as_ref(),
-                self.group.as_ref(),
-                self.mint.as_ref(),
-            ],
-            &program_id,
-        )
-        .0;
-
         let accounts = Self::Accounts {
             group: self.group,
             admin: self.admin.pubkey(),
-            oracle,
+            oracle: self.oracle,
             sol_destination: self.sol_destination,
             token_program: Token::id(),
         };

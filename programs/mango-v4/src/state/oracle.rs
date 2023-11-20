@@ -228,7 +228,7 @@ fn pyth_get_price(
 
 /// Returns the price of one native base token, in native quote tokens
 ///
-/// Example: The for SOL at 40 USDC/SOL it would return 0.04 (the unit is USDC-native/SOL-native)
+/// Example: The price for SOL at 40 USDC/SOL it would return 0.04 (the unit is USDC-native/SOL-native)
 ///
 /// This currently assumes that quote decimals (i.e. decimals for USD) is 6, like for USDC.
 ///

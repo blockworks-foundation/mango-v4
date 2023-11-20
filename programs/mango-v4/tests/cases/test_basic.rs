@@ -286,6 +286,7 @@ async fn test_basic() -> Result<(), TransportError> {
     send_tx(
         solana,
         StubOracleCloseInstruction {
+            oracle: tokens[0].oracle,
             group,
             mint: bank_data.mint,
             admin,

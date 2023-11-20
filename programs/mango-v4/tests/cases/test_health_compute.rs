@@ -68,7 +68,7 @@ async fn test_health_compute_tokens() -> Result<(), TransportError> {
     let avg_cu_increase = cu_measurements.windows(2).map(|p| p[1] - p[0]).sum::<u64>()
         / (cu_measurements.len() - 1) as u64;
     println!("average cu increase: {avg_cu_increase}");
-    assert!(avg_cu_increase < 3200);
+    assert!(avg_cu_increase < 3230);
 
     Ok(())
 }

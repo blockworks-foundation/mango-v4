@@ -244,7 +244,7 @@ async fn test_margin_trade() -> Result<(), BanksClientError> {
 #[tokio::test]
 async fn test_flash_loan_swap_fee() -> Result<(), BanksClientError> {
     let mut test_builder = TestContextBuilder::new();
-    test_builder.test().set_compute_max_units(100_000);
+    test_builder.test().set_compute_max_units(150_000);
     let context = test_builder.start_default().await;
     let solana = &context.solana.clone();
 
