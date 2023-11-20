@@ -131,10 +131,7 @@ impl<'a, 'info> DepositCommon<'a, 'info> {
             // Only compute health and check for recovery if not already being liquidated
 
             let recovered = account.fixed.maybe_recover_from_being_liquidated(health);
-            require!(
-                !was_being_liquidated || recovered,
-                MangoError::DepositsIntoLiquidatingMustRecover
-            );
+            require!(recovered, MangoError::DepositsIntoLiquidatingMustRecover);
         }
 
         // Group level deposit limit on account
