@@ -52,7 +52,7 @@ async function extendTable(
     return;
   }
   const extendIx = AddressLookupTableProgram.extendLookupTable({
-    lookupTable: group.addressLookupTables[0],
+    lookupTable: alt.value!.key,
     payer: payer.publicKey,
     authority: payer.publicKey,
     addresses,
