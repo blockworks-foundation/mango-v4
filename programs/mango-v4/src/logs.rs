@@ -13,10 +13,9 @@ pub fn emit_stack<T: anchor_lang::Event>(e: T) {
     let mut buffer = [0u8; 3000];
 
     let mut cursor = Cursor::new(&mut buffer[..]);
-    cursor
-        .write(&T::DISCRIMINATOR)
+    cursor.write(&T::DISCRIMINATOR).unwrap();
+    e.serialize(&mut cursor)
         .expect("event must fit into stack buffer");
-    e.serialize(&mut cursor).unwrap();
 
     let pos = cursor.position() as usize;
     anchor_lang::solana_program::log::sol_log_data(&[&buffer[..pos]]);
