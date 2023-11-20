@@ -95,13 +95,15 @@ async function main(): Promise<void> {
     );
     const vault = I80F48.fromNumber(Number(account.amount));
 
-    const error = vault.sub(
-      bank.indexedDeposits
-        .mul(bank.depositIndex)
-        .sub(bank.indexedBorrows.mul(bank.borrowIndex))
-        .sub(bank.collectedFeesNative)
-        .sub(bank.dust),
-    );
+    const error = vault
+      .sub(
+        bank.indexedDeposits
+          .mul(bank.depositIndex)
+          .sub(bank.indexedBorrows.mul(bank.borrowIndex)),
+      )
+      .sub(bank.collectedFeesNative)
+      .sub(bank.dust)
+      .add(I80F48.fromU64(bank.feesWithdrawn));
     let res = `${bank.name}`;
     res =
       res +
@@ -115,6 +117,10 @@ async function main(): Promise<void> {
       ).toLocaleString()}` +
       `\n ${'collected fees'.padEnd(40)} ${toUiDecimals(
         bank.collectedFeesNative,
+        bank.mintDecimals,
+      ).toLocaleString()}` +
+      `\n ${'fees withdrawn'.padEnd(40)} ${toUiDecimals(
+        bank.feesWithdrawn,
         bank.mintDecimals,
       ).toLocaleString()}` +
       `\n ${'deposits'.padEnd(40)} ${toUiDecimals(
