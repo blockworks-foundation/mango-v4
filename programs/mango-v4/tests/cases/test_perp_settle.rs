@@ -975,6 +975,7 @@ async fn test_perp_pnl_settle_limit() -> Result<(), TransportError> {
     send_tx(
         solana,
         StubOracleSetInstruction {
+            oracle: tokens[0].oracle,
             group,
             admin,
             mint: mints[1].pubkey,

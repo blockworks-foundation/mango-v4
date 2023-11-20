@@ -17,7 +17,7 @@ async fn test_stale_oracle_deposit_withdraw() -> Result<(), TransportError> {
     // SETUP: Create a group, account, register tokens
     //
 
-    let mango_setup::GroupWithTokens { group, .. } = mango_setup::GroupWithTokensConfig {
+    let mango_setup::GroupWithTokens { group, tokens, .. } = mango_setup::GroupWithTokensConfig {
         admin,
         payer,
         mints: mints.to_vec(),
@@ -71,6 +71,7 @@ async fn test_stale_oracle_deposit_withdraw() -> Result<(), TransportError> {
     send_tx(
         solana,
         StubOracleSetTestInstruction {
+            oracle: tokens[0].oracle,
             group,
             mint: mints[0].pubkey,
             admin,
@@ -84,6 +85,7 @@ async fn test_stale_oracle_deposit_withdraw() -> Result<(), TransportError> {
     send_tx(
         solana,
         StubOracleSetTestInstruction {
+            oracle: tokens[1].oracle,
             group,
             mint: mints[1].pubkey,
             admin,
@@ -97,6 +99,7 @@ async fn test_stale_oracle_deposit_withdraw() -> Result<(), TransportError> {
     send_tx(
         solana,
         StubOracleSetTestInstruction {
+            oracle: tokens[2].oracle,
             group,
             mint: mints[2].pubkey,
             admin,
@@ -171,4 +174,3 @@ async fn test_stale_oracle_deposit_withdraw() -> Result<(), TransportError> {
     .unwrap();
 
     Ok(())
-}
