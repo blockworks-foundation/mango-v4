@@ -3127,7 +3127,7 @@
     </span>skip_bad_oracles: bool,
 ) -&gt; <span class="prelude-ty">Result</span>&lt;HealthCache&gt; {
     <span class="comment">// token contribution from token accounts
-    </span><span class="kw">let </span><span class="kw-2">mut </span>token_infos = <span class="macro">vec!</span>[];
+    </span><span class="kw">let </span><span class="kw-2">mut </span>token_infos = Vec::with_capacity(account.active_token_positions().count());
 
     <span class="kw">for </span>(i, position) <span class="kw">in </span>account.active_token_positions().enumerate() {
         <span class="kw">let </span>bank_oracle_result =
@@ -3166,7 +3166,7 @@
     }
 
     <span class="comment">// Fill the TokenInfo balance with free funds in serum3 oo accounts and build Serum3Infos.
-    </span><span class="kw">let </span><span class="kw-2">mut </span>serum3_infos = <span class="macro">vec!</span>[];
+    </span><span class="kw">let </span><span class="kw-2">mut </span>serum3_infos = Vec::with_capacity(account.active_serum3_orders().count());
     <span class="kw">for </span>(i, serum_account) <span class="kw">in </span>account.active_serum3_orders().enumerate() {
         <span class="kw">let </span>oo = retriever.serum_oo(i, <span class="kw-2">&amp;</span>serum_account.open_orders)<span class="question-mark">?</span>;
 
