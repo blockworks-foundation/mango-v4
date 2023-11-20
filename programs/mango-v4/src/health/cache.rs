@@ -1251,7 +1251,7 @@ fn new_health_cache_impl(
     skip_bad_oracles: bool,
 ) -> Result<HealthCache> {
     // token contribution from token accounts
-    let mut token_infos = vec![];
+    let mut token_infos = Vec::with_capacity(account.active_token_positions().count());
 
     for (i, position) in account.active_token_positions().enumerate() {
         let bank_oracle_result =
@@ -1290,7 +1290,7 @@ fn new_health_cache_impl(
     }
 
     // Fill the TokenInfo balance with free funds in serum3 oo accounts and build Serum3Infos.
-    let mut serum3_infos = vec![];
+    let mut serum3_infos = Vec::with_capacity(account.active_serum3_orders().count());
     for (i, serum_account) in account.active_serum3_orders().enumerate() {
         let oo = retriever.serum_oo(i, &serum_account.open_orders)?;
 
