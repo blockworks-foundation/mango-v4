@@ -10,7 +10,6 @@ import {
   Keypair,
   PublicKey,
   SYSVAR_INSTRUCTIONS_PUBKEY,
-  SYSVAR_RENT_PUBKEY,
   SystemProgram,
 } from '@solana/web3.js';
 import fs from 'fs';
@@ -37,8 +36,8 @@ async function extendTable(
   addresses = addresses.filter(
     (newAddress) =>
       alt.value?.state.addresses &&
-      alt.value?.state.addresses.findIndex((addressInALt) =>
-        addressInALt.equals(newAddress),
+      alt.value?.state.addresses.findIndex((addressInAlt) =>
+        addressInAlt.equals(newAddress),
       ) === -1,
   );
   if (addresses.length === 0) {
@@ -63,10 +62,10 @@ async function extendTable(
     client.program.provider as AnchorProvider,
     [extendIx],
   );
-  //   const sig = await client.program.provider.connection.sendTransaction(
-  //     extendTx,
-  //   );
-  //   console.log(`https://explorer.solana.com/tx/${sig}`);
+  const sig = await client.program.provider.connection.sendTransaction(
+    extendTx,
+  );
+  console.log(`https://explorer.solana.com/tx/${sig}`);
 }
 
 async function run(): Promise<void> {
@@ -137,7 +136,6 @@ async function run(): Promise<void> {
   await extendTable(client, group, payer, 'well known addresses', altAddress0, [
     // Solana specific
     SystemProgram.programId,
-    SYSVAR_RENT_PUBKEY,
     TOKEN_PROGRAM_ID,
     ASSOCIATED_TOKEN_PROGRAM_ID,
     NATIVE_MINT,
