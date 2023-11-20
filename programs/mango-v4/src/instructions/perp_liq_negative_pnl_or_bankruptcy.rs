@@ -10,7 +10,8 @@ use crate::accounts_zerocopy::AccountInfoRef;
 use crate::error::*;
 use crate::health::*;
 use crate::logs::{
-    emit_perp_balances, PerpLiqBankruptcyLog, PerpLiqNegativePnlOrBankruptcyLog, TokenBalanceLog,
+    emit_perp_balances, emit_stack, PerpLiqBankruptcyLog, PerpLiqNegativePnlOrBankruptcyLog,
+    TokenBalanceLog,
 };
 use crate::state::*;
 
@@ -136,7 +137,7 @@ pub fn perp_liq_negative_pnl_or_bankruptcy(
     if settlement > 0 {
         let settle_bank = ctx.accounts.settle_bank.load()?;
         let liqor_token_position = liqor.token_position(settle_token_index)?;
-        emit!(TokenBalanceLog {
+        emit_stack(TokenBalanceLog {
             mango_group,
             mango_account: ctx.accounts.liqor.key(),
             token_index: settle_token_index,
@@ -146,7 +147,7 @@ pub fn perp_liq_negative_pnl_or_bankruptcy(
         });
 
         let liqee_token_position = liqee.token_position(settle_token_index)?;
-        emit!(TokenBalanceLog {
+        emit_stack(TokenBalanceLog {
             mango_group,
             mango_account: ctx.accounts.liqee.key(),
             token_index: settle_token_index,
@@ -159,7 +160,7 @@ pub fn perp_liq_negative_pnl_or_bankruptcy(
     if insurance_transfer > 0 {
         let insurance_bank = ctx.accounts.insurance_bank.load()?;
         let liqor_token_position = liqor.token_position(insurance_bank.token_index)?;
-        emit!(TokenBalanceLog {
+        emit_stack(TokenBalanceLog {
             mango_group,
             mango_account: ctx.accounts.liqor.key(),
             token_index: insurance_bank.token_index,
@@ -281,7 +282,7 @@ pub(crate) fn liquidation_action(
             settle_bank.withdraw_without_fee(liqee_token_position, settlement, now_ts)?;
             liqee_health_cache.adjust_token_balance(&settle_bank, -settlement)?;
 
-            emit!(PerpLiqNegativePnlOrBankruptcyLog {
+            emit_stack(PerpLiqNegativePnlOrBankruptcyLog {
                 mango_group: group_key,
                 liqee: liqee_key,
                 liqor: liqor_key,
@@ -402,7 +403,7 @@ pub(crate) fn liquidation_action(
             msg!("socialized loss: {}", socialized_loss);
         }
 
-        emit!(PerpLiqBankruptcyLog {
+        emit_stack(PerpLiqBankruptcyLog {
             mango_group: group_key,
             liqee: liqee_key,
             liqor: liqor_key,

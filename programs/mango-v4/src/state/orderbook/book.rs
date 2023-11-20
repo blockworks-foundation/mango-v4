@@ -1,9 +1,6 @@
-use crate::logs::{FilledPerpOrderLog, PerpTakerTradeLog};
-use crate::state::MangoAccountRefMut;
-use crate::{
-    error::*,
-    state::{orderbook::bookside::*, EventQueue, PerpMarket},
-};
+use crate::error::*;
+use crate::logs::{emit_stack, FilledPerpOrderLog, PerpTakerTradeLog};
+use crate::state::{orderbook::bookside::*, EventQueue, MangoAccountRefMut, PerpMarket};
 use anchor_lang::prelude::*;
 use bytemuck::cast;
 use fixed::types::I80F48;
@@ -205,7 +202,7 @@ impl<'a> Orderbook<'a> {
             event_queue.push_back(cast(fill)).unwrap();
             limit -= 1;
 
-            emit!(FilledPerpOrderLog {
+            emit_stack(FilledPerpOrderLog {
                 mango_group: market.group.key(),
                 perp_market_index: market.perp_market_index,
                 seq_num,
@@ -226,7 +223,7 @@ impl<'a> Orderbook<'a> {
                 mango_account,
                 total_quote_lots_taken - decremented_quote_lots,
             )?;
-            emit!(PerpTakerTradeLog {
+            emit_stack(PerpTakerTradeLog {
                 mango_group: market.group.key(),
                 mango_account: *mango_account_pk,
                 perp_market_index: market.perp_market_index,

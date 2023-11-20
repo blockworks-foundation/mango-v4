@@ -7,7 +7,7 @@ use crate::state::*;
 use crate::util::fill_from_str;
 
 use crate::accounts_ix::*;
-use crate::logs::PerpMarketMetaDataLog;
+use crate::logs::{emit_stack, PerpMarketMetaDataLog};
 
 #[allow(clippy::too_many_arguments)]
 pub fn perp_create_market(
@@ -111,7 +111,7 @@ pub fn perp_create_market(
     };
     orderbook.init();
 
-    emit!(PerpMarketMetaDataLog {
+    emit_stack(PerpMarketMetaDataLog {
         mango_group: ctx.accounts.group.key(),
         perp_market: ctx.accounts.perp_market.key(),
         perp_market_index,

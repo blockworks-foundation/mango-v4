@@ -5,13 +5,30 @@ use crate::{
 use anchor_lang::prelude::*;
 use borsh::BorshSerialize;
 
+#[inline(never)] // ensure fresh stack frame
+pub fn emit_stack<T: anchor_lang::Event>(e: T) {
+    use std::io::{Cursor, Write};
+
+    // stack buffer, stack frames are 4kb
+    let mut buffer = [0u8; 3000];
+
+    let mut cursor = Cursor::new(&mut buffer[..]);
+    cursor
+        .write(&T::DISCRIMINATOR)
+        .expect("event must fit into stack buffer");
+    e.serialize(&mut cursor).unwrap();
+
+    let pos = cursor.position() as usize;
+    anchor_lang::solana_program::log::sol_log_data(&[&buffer[..pos]]);
+}
+
 pub fn emit_perp_balances(
     mango_group: Pubkey,
     mango_account: Pubkey,
     pp: &PerpPosition,
     pm: &PerpMarket,
 ) {
-    emit!(PerpBalanceLog {
+    emit_stack(PerpBalanceLog {
         mango_group,
         mango_account,
         market_index: pm.perp_market_index,

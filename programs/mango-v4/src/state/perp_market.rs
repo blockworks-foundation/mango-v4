@@ -8,7 +8,7 @@ use static_assertions::const_assert_eq;
 
 use crate::accounts_zerocopy::KeyedAccountReader;
 use crate::error::MangoError;
-use crate::logs::PerpUpdateFundingLogV2;
+use crate::logs::{emit_stack, PerpUpdateFundingLogV2};
 use crate::state::orderbook::Side;
 use crate::state::{oracle, TokenIndex};
 use crate::util;
@@ -343,7 +343,7 @@ impl PerpMarket {
         self.stable_price_model
             .update(now_ts, oracle_price.to_num());
 
-        emit!(PerpUpdateFundingLogV2 {
+        emit_stack(PerpUpdateFundingLogV2 {
             mango_group: self.group,
             market_index: self.perp_market_index,
             long_funding: self.long_funding.to_bits(),

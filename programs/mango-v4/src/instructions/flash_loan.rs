@@ -3,7 +3,7 @@ use crate::accounts_zerocopy::*;
 use crate::error::*;
 use crate::group_seeds;
 use crate::health::{new_fixed_order_account_retriever, new_health_cache, AccountRetriever};
-use crate::logs::{FlashLoanLogV3, FlashLoanTokenDetailV3, TokenBalanceLog};
+use crate::logs::{emit_stack, FlashLoanLogV3, FlashLoanTokenDetailV3, TokenBalanceLog};
 use crate::state::*;
 
 use anchor_lang::prelude::*;
@@ -482,7 +482,7 @@ pub fn flash_loan_end<'key, 'accounts, 'remaining, 'info>(
             approved_amount: approved_amount_u64,
         });
 
-        emit!(TokenBalanceLog {
+        emit_stack(TokenBalanceLog {
             mango_group: group.key(),
             mango_account: ctx.accounts.account.key(),
             token_index: bank.token_index as u16,
@@ -492,11 +492,11 @@ pub fn flash_loan_end<'key, 'accounts, 'remaining, 'info>(
         });
     }
 
-    emit!(FlashLoanLogV3 {
+    emit_stack(FlashLoanLogV3 {
         mango_group: group.key(),
         mango_account: ctx.accounts.account.key(),
         flash_loan_type,
-        token_loan_details
+        token_loan_details,
     });
 
     // Check health after account position changes

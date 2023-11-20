@@ -10,7 +10,7 @@ use crate::health::*;
 use crate::state::*;
 
 use crate::accounts_ix::*;
-use crate::logs::{DepositLog, TokenBalanceLog};
+use crate::logs::*;
 
 struct DepositCommon<'a, 'info> {
     pub group: &'a AccountLoader<'info, Group>,
@@ -100,7 +100,7 @@ impl<'a, 'info> DepositCommon<'a, 'info> {
         let amount_usd = (amount_i80f48 * unsafe_oracle_price).to_num::<i64>();
         account.fixed.net_deposits += amount_usd;
 
-        emit!(TokenBalanceLog {
+        emit_stack(TokenBalanceLog {
             mango_group: self.group.key(),
             mango_account: self.account.key(),
             token_index,
@@ -163,7 +163,20 @@ impl<'a, 'info> DepositCommon<'a, 'info> {
             account.deactivate_token_position_and_log(raw_token_index, self.account.key());
         }
 
-        emit!(DepositLog {
+        unsafe {
+            const POS_PTR: *mut usize = 0x300000000 as usize as *mut usize;
+            msg!("heap {}", *POS_PTR);
+        }
+
+        // emit_stack(DepositLog {
+        //     mango_group: self.group.key(),
+        //     mango_account: self.account.key(),
+        //     signer: self.token_authority.key(),
+        //     token_index,
+        //     quantity: amount_i80f48.to_num::<u64>(),
+        //     price: unsafe_oracle_price.to_bits(),
+        // });
+        emit_stack(DepositLog {
             mango_group: self.group.key(),
             mango_account: self.account.key(),
             signer: self.token_authority.key(),
@@ -171,6 +184,11 @@ impl<'a, 'info> DepositCommon<'a, 'info> {
             quantity: amount_i80f48.to_num::<u64>(),
             price: unsafe_oracle_price.to_bits(),
         });
+
+        unsafe {
+            const POS_PTR: *mut usize = 0x300000000 as usize as *mut usize;
+            msg!("heap {}", *POS_PTR);
+        }
 
         Ok(())
     }

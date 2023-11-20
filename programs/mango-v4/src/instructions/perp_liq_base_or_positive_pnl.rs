@@ -8,7 +8,7 @@ use crate::health::*;
 use crate::state::*;
 
 use crate::accounts_ix::*;
-use crate::logs::{emit_perp_balances, PerpLiqBaseOrPositivePnlLog, TokenBalanceLog};
+use crate::logs::{emit_perp_balances, emit_stack, PerpLiqBaseOrPositivePnlLog, TokenBalanceLog};
 
 /// This instruction deals with increasing health by:
 /// - reducing the liqee's base position
@@ -131,7 +131,7 @@ pub fn perp_liq_base_or_positive_pnl(
         let liqee_token_position = liqee.token_position(settle_token_index)?;
         let liqor_token_position = liqor.token_position(settle_token_index)?;
 
-        emit!(TokenBalanceLog {
+        emit_stack(TokenBalanceLog {
             mango_group: ctx.accounts.group.key(),
             mango_account: ctx.accounts.liqee.key(),
             token_index: settle_token_index,
@@ -140,7 +140,7 @@ pub fn perp_liq_base_or_positive_pnl(
             borrow_index: settle_bank.borrow_index.to_bits(),
         });
 
-        emit!(TokenBalanceLog {
+        emit_stack(TokenBalanceLog {
             mango_group: ctx.accounts.group.key(),
             mango_account: ctx.accounts.liqor.key(),
             token_index: settle_token_index,
@@ -151,7 +151,7 @@ pub fn perp_liq_base_or_positive_pnl(
     }
 
     if base_transfer != 0 || pnl_transfer != 0 {
-        emit!(PerpLiqBaseOrPositivePnlLog {
+        emit_stack(PerpLiqBaseOrPositivePnlLog {
             mango_group: ctx.accounts.group.key(),
             perp_market_index: perp_market.perp_market_index,
             liqor: ctx.accounts.liqor.key(),

@@ -6,7 +6,7 @@ use crate::accounts_ix::*;
 use crate::accounts_zerocopy::*;
 use crate::error::*;
 use crate::health::{new_health_cache, HealthType, ScanningAccountRetriever};
-use crate::logs::{emit_perp_balances, PerpSettlePnlLog, TokenBalanceLog};
+use crate::logs::{emit_perp_balances, emit_stack, PerpSettlePnlLog, TokenBalanceLog};
 use crate::state::*;
 
 pub fn perp_settle_pnl(ctx: Context<PerpSettlePnl>) -> Result<()> {
@@ -189,7 +189,7 @@ pub fn perp_settle_pnl(ctx: Context<PerpSettlePnl>) -> Result<()> {
     // settled back and forth repeatedly.
     settle_bank.withdraw_without_fee(b_token_position, settlement, now_ts)?;
 
-    emit!(TokenBalanceLog {
+    emit_stack(TokenBalanceLog {
         mango_group: ctx.accounts.group.key(),
         mango_account: ctx.accounts.account_a.key(),
         token_index: settle_token_index,
@@ -198,7 +198,7 @@ pub fn perp_settle_pnl(ctx: Context<PerpSettlePnl>) -> Result<()> {
         borrow_index: settle_bank.borrow_index.to_bits(),
     });
 
-    emit!(TokenBalanceLog {
+    emit_stack(TokenBalanceLog {
         mango_group: ctx.accounts.group.key(),
         mango_account: ctx.accounts.account_b.key(),
         token_index: settle_token_index,
@@ -224,7 +224,7 @@ pub fn perp_settle_pnl(ctx: Context<PerpSettlePnl>) -> Result<()> {
         settler.ensure_token_position(settle_token_index)?;
     let settler_token_position_active = settle_bank.deposit(settler_token_position, fee, now_ts)?;
 
-    emit!(TokenBalanceLog {
+    emit_stack(TokenBalanceLog {
         mango_group: ctx.accounts.group.key(),
         mango_account: ctx.accounts.settler.key(),
         token_index: settler_token_position.token_index,
@@ -238,7 +238,7 @@ pub fn perp_settle_pnl(ctx: Context<PerpSettlePnl>) -> Result<()> {
             .deactivate_token_position_and_log(settler_token_raw_index, ctx.accounts.settler.key());
     }
 
-    emit!(PerpSettlePnlLog {
+    emit_stack(PerpSettlePnlLog {
         mango_group: ctx.accounts.group.key(),
         mango_account_a: ctx.accounts.account_a.key(),
         mango_account_b: ctx.accounts.account_b.key(),

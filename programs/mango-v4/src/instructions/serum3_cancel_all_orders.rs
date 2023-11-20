@@ -2,7 +2,7 @@ use anchor_lang::prelude::*;
 
 use crate::accounts_ix::*;
 use crate::error::*;
-use crate::logs::Serum3OpenOrdersBalanceLogV2;
+use crate::logs::{emit_stack, Serum3OpenOrdersBalanceLogV2};
 use crate::serum3_cpi::{load_open_orders_ref, OpenOrdersAmounts, OpenOrdersSlim};
 use crate::state::*;
 
@@ -39,7 +39,7 @@ pub fn serum3_cancel_all_orders(ctx: Context<Serum3CancelAllOrders>, limit: u8) 
     let oo_ai = &ctx.accounts.open_orders.as_ref();
     let open_orders = load_open_orders_ref(oo_ai)?;
     let after_oo = OpenOrdersSlim::from_oo(&open_orders);
-    emit!(Serum3OpenOrdersBalanceLogV2 {
+    emit_stack(Serum3OpenOrdersBalanceLogV2 {
         mango_group: ctx.accounts.group.key(),
         mango_account: ctx.accounts.account.key(),
         market_index: serum_market.market_index,
