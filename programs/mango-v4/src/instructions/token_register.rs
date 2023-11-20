@@ -41,6 +41,7 @@ pub fn token_register(
     interest_curve_scaling: f32,
     interest_target_utilization: f32,
     group_insurance_fund: bool,
+    deposit_limit: u64,
 ) -> Result<()> {
     // Require token 0 to be in the insurance token
     if token_index == INSURANCE_TOKEN_INDEX {
@@ -120,7 +121,8 @@ pub fn token_register(
         maint_weight_shift_asset_target: I80F48::ZERO,
         maint_weight_shift_liab_target: I80F48::ZERO,
         fallback_oracle: ctx.accounts.fallback_oracle.key(),
-        reserved: [0; 1976],
+        deposit_limit,
+        reserved: [0; 1968],
     };
 
     if let Ok(oracle_price) =

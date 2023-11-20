@@ -42,7 +42,6 @@ impl HealthCache {
 
         let mut source_bank = source_bank.clone();
         source_bank.withdraw_with_fee(&mut source_position, amount, now_ts)?;
-        source_bank.check_net_borrows(source_oracle_price)?;
         let mut target_bank = target_bank.clone();
         target_bank.deposit(&mut target_position, target_amount, now_ts)?;
 
@@ -52,7 +51,40 @@ impl HealthCache {
         Ok(resulting_cache)
     }
 
-    pub fn max_swap_source_for_health_ratio(
+    fn apply_limits_to_swap(
+        account: &MangoAccountValue,
+        source_bank: &Bank,
+        source_oracle_price: I80F48,
+        target_bank: &Bank,
+        price: I80F48,
+        source_unlimited: I80F48,
+    ) -> Result<I80F48> {
+        let source_pos = account
+            .token_position(source_bank.token_index)?
+            .native(source_bank);
+        let target_pos = account
+            .token_position(target_bank.token_index)?
+            .native(target_bank);
+
+        // net borrow limit on source
+        let available_net_borrows = source_bank
+            .remaining_net_borrows_quote(source_oracle_price)
+            .saturating_div(source_oracle_price);
+        let potential_source = source_unlimited
+            .min(available_net_borrows.saturating_add(source_pos.max(I80F48::ZERO)));
+
+        // deposit limit on target
+        let available_deposits = target_bank.remaining_deposits_until_limit();
+        let potential_target_unlimited = potential_source.saturating_mul(price);
+        let potential_target = potential_target_unlimited
+            .min(available_deposits.saturating_add(-target_pos.min(I80F48::ZERO)));
+
+        let source = potential_source.min(potential_target.saturating_div(price));
+        Ok(source)
+    }
+
+    /// Verifies neither the net borrow or deposit limits
+    pub fn max_swap_source_for_health_ratio_ignoring_limits(
         &self,
         account: &MangoAccountValue,
         source_bank: &Bank,
@@ -72,7 +104,7 @@ impl HealthCache {
         )
     }
 
-    pub fn max_swap_source_for_health(
+    pub fn max_swap_source_for_health_ratio_with_limits(
         &self,
         account: &MangoAccountValue,
         source_bank: &Bank,
@@ -81,14 +113,23 @@ impl HealthCache {
         price: I80F48,
         min_ratio: I80F48,
     ) -> Result<I80F48> {
-        self.max_swap_source_for_health_fn(
+        let source_unlimited = self.max_swap_source_for_health_fn(
             account,
             source_bank,
             source_oracle_price,
             target_bank,
             price,
             min_ratio,
-            |cache| cache.health(HealthType::Init),
+            |cache| cache.health_ratio(HealthType::Init),
+        )?;
+
+        Self::apply_limits_to_swap(
+            account,
+            source_bank,
+            source_oracle_price,
+            target_bank,
+            price,
+            source_unlimited,
         )
     }
 
@@ -707,7 +748,7 @@ mod tests {
         assert_eq!(health_cache.health_ratio(HealthType::Init), I80F48::MAX);
         assert_eq!(
             health_cache
-                .max_swap_source_for_health_ratio(
+                .max_swap_source_for_health_ratio_with_limits(
                     &account,
                     &banks[0],
                     I80F48::from(1),
@@ -748,7 +789,7 @@ mod tests {
 
             let swap_price =
                 I80F48::from_num(price_factor) * source_price.oracle / target_price.oracle;
-            let source_amount = c
+            let source_unlimited = c
                 .max_swap_source_for_health_fn(
                     &account,
                     &source_bank,
@@ -759,6 +800,15 @@ mod tests {
                     max_swap_fn,
                 )
                 .unwrap();
+            let source_amount = HealthCache::apply_limits_to_swap(
+                &account,
+                &source_bank,
+                source_price.oracle,
+                &target_bank,
+                swap_price,
+                source_unlimited,
+            )
+            .unwrap();
             if source_amount == I80F48::MAX {
                 return (f64::MAX, f64::MAX, f64::MAX, f64::MAX);
             }
@@ -865,10 +915,7 @@ mod tests {
                 }
 
                 // At this unlikely price it's healthy to swap infinitely
-                assert_eq!(
-                    find_max_swap(&health_cache, 0, 1, 50.0, 1.5, banks).0,
-                    f64::MAX
-                );
+                assert!(find_max_swap(&health_cache, 0, 1, 50.0, 1.5, banks).0 > 1e16);
             }
 
             {

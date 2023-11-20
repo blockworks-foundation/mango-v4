@@ -27,6 +27,7 @@ export interface TokenRegisterParams {
   flashLoanSwapFeeRate: number;
   interestCurveScaling: number;
   interestTargetUtilization: number;
+  depositLimit: BN;
 }
 
 export const DefaultTokenRegisterParams: TokenRegisterParams = {
@@ -64,6 +65,7 @@ export const DefaultTokenRegisterParams: TokenRegisterParams = {
   flashLoanSwapFeeRate: 0.0005,
   interestCurveScaling: 4.0,
   interestTargetUtilization: 0.5,
+  depositLimit: new BN(0),
 };
 
 export interface TokenEditParams {
@@ -101,6 +103,7 @@ export interface TokenEditParams {
   maintWeightShiftAssetTarget: number | null;
   maintWeightShiftLiabTarget: number | null;
   maintWeightShiftAbort: boolean | null;
+  depositLimit: BN | null;
 }
 
 export const NullTokenEditParams: TokenEditParams = {
@@ -138,6 +141,7 @@ export const NullTokenEditParams: TokenEditParams = {
   maintWeightShiftAssetTarget: null,
   maintWeightShiftLiabTarget: null,
   maintWeightShiftAbort: null,
+  depositLimit: null,
 };
 
 export interface PerpEditParams {

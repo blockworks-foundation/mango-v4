@@ -90,11 +90,16 @@ impl<'a, 'info> DepositCommon<'a, 'info> {
 
         // Get the oracle price, even if stale or unconfident: We want to allow users
         // to deposit to close borrows or do other fixes even if the oracle is bad.
-        let unsafe_oracle_price = oracle_state_unchecked(
+        let unsafe_oracle_state = oracle_state_unchecked(
             &AccountInfoRef::borrow(self.oracle.as_ref())?,
             bank.mint_decimals,
-        )?
-        .price;
+        )?;
+        let unsafe_oracle_price = unsafe_oracle_state.price;
+
+        // If increasing total deposits, check deposit limits
+        if indexed_position > 0 {
+            bank.check_deposit_and_oo_limit()?;
+        }
 
         // Update the net deposits - adjust by price so different tokens are on the same basis (in USD terms)
         let amount_usd = (amount_i80f48 * unsafe_oracle_price).to_num::<i64>();

@@ -467,6 +467,10 @@ pub fn flash_loan_end<'key, 'accounts, 'remaining, 'info>(
             bank.check_net_borrows(*oracle_price)?;
         }
 
+        if change_amount > 0 && native_after_change > 0 {
+            bank.check_deposit_and_oo_limit()?;
+        }
+
         bank.flash_loan_approved_amount = 0;
         bank.flash_loan_token_account_initial = u64::MAX;
 

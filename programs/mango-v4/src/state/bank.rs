@@ -170,8 +170,11 @@ pub struct Bank {
 
     pub fallback_oracle: Pubkey,
 
+    /// zero means none, in token native
+    pub deposit_limit: u64,
+
     #[derivative(Debug = "ignore")]
-    pub reserved: [u8; 1976],
+    pub reserved: [u8; 1968],
 }
 const_assert_eq!(
     size_of::<Bank>(),
@@ -206,7 +209,9 @@ const_assert_eq!(
         + 8 * 2
         + 8 * 2
         + 16 * 3
-        + 2008
+        + 32
+        + 8
+        + 1968
 );
 const_assert_eq!(size_of::<Bank>(), 3064);
 const_assert_eq!(size_of::<Bank>() % 8, 0);
@@ -218,6 +223,19 @@ pub struct WithdrawResult {
 }
 
 impl WithdrawResult {
+    pub fn has_loan(&self) -> bool {
+        self.loan_amount.is_positive()
+    }
+}
+
+pub struct TransferResult {
+    pub source_is_active: bool,
+    pub target_is_active: bool,
+    pub loan_origination_fee: I80F48,
+    pub loan_amount: I80F48,
+}
+
+impl TransferResult {
     pub fn has_loan(&self) -> bool {
         self.loan_amount.is_positive()
     }
@@ -296,7 +314,8 @@ impl Bank {
             maint_weight_shift_asset_target: existing_bank.maint_weight_shift_asset_target,
             maint_weight_shift_liab_target: existing_bank.maint_weight_shift_liab_target,
             fallback_oracle: existing_bank.oracle,
-            reserved: [0; 1976],
+            deposit_limit: existing_bank.deposit_limit,
+            reserved: [0; 1968],
         }
     }
 
@@ -728,6 +747,64 @@ impl Bank {
         }
     }
 
+    /// Generic "transfer" from source to target.
+    ///
+    /// Amounts for source and target can differ and can be zero.
+    /// Checks reduce-only, net borrow limits and deposit limits.
+    pub fn checked_transfer_with_fee(
+        &mut self,
+        source: &mut TokenPosition,
+        source_amount: I80F48,
+        target: &mut TokenPosition,
+        target_amount: I80F48,
+        now_ts: u64,
+        oracle_price: I80F48,
+    ) -> Result<TransferResult> {
+        let before_borrows = self.indexed_borrows;
+        let before_deposits = self.indexed_deposits;
+
+        let withdraw_result = if !source_amount.is_zero() {
+            let withdraw_result = self.withdraw_with_fee(source, source_amount, now_ts)?;
+            require!(
+                source.indexed_position >= 0 || !self.are_borrows_reduce_only(),
+                MangoError::TokenInReduceOnlyMode
+            );
+            withdraw_result
+        } else {
+            WithdrawResult {
+                position_is_active: true,
+                loan_amount: I80F48::ZERO,
+                loan_origination_fee: I80F48::ZERO,
+            }
+        };
+
+        let target_is_active = if !target_amount.is_zero() {
+            let active = self.deposit(target, target_amount, now_ts)?;
+            require!(
+                target.indexed_position <= 0 || !self.are_deposits_reduce_only(),
+                MangoError::TokenInReduceOnlyMode
+            );
+            active
+        } else {
+            true
+        };
+
+        // Adding DELTA here covers the case where we add slightly more than we withdraw
+        if self.indexed_borrows > before_borrows + I80F48::DELTA {
+            self.check_net_borrows(oracle_price)?;
+        }
+        if self.indexed_deposits > before_deposits + I80F48::DELTA {
+            self.check_deposit_and_oo_limit()?;
+        }
+
+        Ok(TransferResult {
+            source_is_active: withdraw_result.position_is_active,
+            target_is_active,
+            loan_origination_fee: withdraw_result.loan_origination_fee,
+            loan_amount: withdraw_result.loan_amount,
+        })
+    }
+
     /// Update the bank's net_borrows fields.
     ///
     /// If oracle_price is set, also do a net borrows check and error if the threshold is exceeded.
@@ -767,6 +844,49 @@ impl Bank {
                     "net_borrows_in_window: {:?}, remaining quote: {:?}, net_borrow_limit_per_window_quote: {:?}, last_net_borrows_window_start_ts: {:?}",
                     self.net_borrows_in_window, remaining_quote, self.net_borrow_limit_per_window_quote, self.last_net_borrows_window_start_ts
 
+            ));
+        }
+
+        Ok(())
+    }
+
+    pub fn remaining_deposits_until_limit(&self) -> I80F48 {
+        if self.deposit_limit == 0 {
+            return I80F48::MAX;
+        }
+
+        // Assuming slightly higher deposits than true allows the returned value
+        // to be deposit()ed safely into this bank without triggering limits.
+        // (because deposit() will round up in favor of the user)
+        let deposits = self.deposit_index * (self.indexed_deposits + I80F48::DELTA);
+
+        let serum = I80F48::from(self.potential_serum_tokens);
+        let total = deposits + serum;
+
+        I80F48::from(self.deposit_limit) - total
+    }
+
+    pub fn check_deposit_and_oo_limit(&self) -> Result<()> {
+        if self.deposit_limit == 0 {
+            return Ok(());
+        }
+
+        // Intentionally does not use remaining_deposits_until_limit(): That function
+        // returns slightly less than the true limit to make sure depositing that amount
+        // will not cause a limit overrun.
+        let deposits = self.native_deposits();
+        let serum = I80F48::from(self.potential_serum_tokens);
+        let total = deposits + serum;
+        let remaining = I80F48::from(self.deposit_limit) - total;
+        if remaining < 0 {
+            return Err(error_msg_typed!(
+                MangoError::BankDepositLimit,
+                "deposit limit exceeded: remaining: {}, total: {}, limit: {}, deposits: {}, serum: {}",
+                remaining,
+                total,
+                self.deposit_limit,
+                deposits,
+                serum,
             ));
         }
 
@@ -1217,6 +1337,148 @@ mod tests {
             }
         }
         Ok(())
+    }
+
+    #[test]
+    fn bank_transfer() {
+        //
+        // SETUP
+        //
+
+        let mut bank_proto = Bank::zeroed();
+        bank_proto.net_borrow_limit_window_size_ts = 1; // dummy
+        bank_proto.net_borrow_limit_per_window_quote = i64::MAX; // max since we don't want this to interfere
+        bank_proto.deposit_index = I80F48::from(1_234_567);
+        bank_proto.borrow_index = I80F48::from(1_234_567);
+        bank_proto.loan_origination_fee_rate = I80F48::from_num(0.1);
+
+        let account_proto = TokenPosition {
+            indexed_position: I80F48::ZERO,
+            token_index: 0,
+            in_use_count: 1,
+            cumulative_deposit_interest: 0.0,
+            cumulative_borrow_interest: 0.0,
+            previous_index: I80F48::ZERO,
+            padding: Default::default(),
+            reserved: [0; 128],
+        };
+
+        //
+        // TESTS
+        //
+
+        // simple transfer
+        {
+            let mut bank = bank_proto.clone();
+            let mut a1 = account_proto.clone();
+            let mut a2 = account_proto.clone();
+
+            let amount = I80F48::from(100);
+            bank.deposit(&mut a1, amount, 0).unwrap();
+            let damount = a1.native(&bank);
+            let r = bank
+                .checked_transfer_with_fee(&mut a1, amount, &mut a2, amount, 0, I80F48::ONE)
+                .unwrap();
+            assert_eq!(a2.native(&bank), damount);
+            assert!(r.source_is_active);
+            assert!(r.target_is_active);
+        }
+
+        // borrow limits
+        {
+            let mut bank = bank_proto.clone();
+            bank.net_borrow_limit_per_window_quote = 100;
+            bank.loan_origination_fee_rate = I80F48::ZERO;
+            let mut a1 = account_proto.clone();
+            let mut a2 = account_proto.clone();
+
+            {
+                let mut b = bank.clone();
+                let amount = I80F48::from(101);
+                assert!(b
+                    .checked_transfer_with_fee(&mut a1, amount, &mut a2, amount, 0, I80F48::ONE)
+                    .is_err());
+            }
+
+            {
+                let mut b = bank.clone();
+                let amount = I80F48::from(100);
+                b.checked_transfer_with_fee(&mut a1, amount, &mut a2, amount, 0, I80F48::ONE)
+                    .unwrap();
+            }
+
+            {
+                let mut b = bank.clone();
+                let amount = b.remaining_net_borrows_quote(I80F48::ONE);
+                b.checked_transfer_with_fee(&mut a1, amount, &mut a2, amount, 0, I80F48::ONE)
+                    .unwrap();
+            }
+        }
+
+        // deposit limits
+        {
+            let mut bank = bank_proto.clone();
+            bank.deposit_limit = 100;
+            let mut a1 = account_proto.clone();
+            let mut a2 = account_proto.clone();
+
+            {
+                let mut b = bank.clone();
+                let amount = I80F48::from(101);
+                assert!(b
+                    .checked_transfer_with_fee(&mut a1, amount, &mut a2, amount, 0, I80F48::ONE)
+                    .is_err());
+            }
+
+            {
+                // still bad because deposit() adds DELTA more than requested
+                let mut b = bank.clone();
+                let amount = I80F48::from(100);
+                assert!(b
+                    .checked_transfer_with_fee(&mut a1, amount, &mut a2, amount, 0, I80F48::ONE)
+                    .is_err());
+            }
+
+            {
+                let mut b = bank.clone();
+                let amount = I80F48::from_num(99.999);
+                b.checked_transfer_with_fee(&mut a1, amount, &mut a2, amount, 0, I80F48::ONE)
+                    .unwrap();
+            }
+
+            {
+                let mut b = bank.clone();
+                let amount = b.remaining_deposits_until_limit();
+                b.checked_transfer_with_fee(&mut a1, amount, &mut a2, amount, 0, I80F48::ONE)
+                    .unwrap();
+            }
+        }
+
+        // reducing transfer while limits exceeded
+        {
+            let mut bank = bank_proto.clone();
+            bank.loan_origination_fee_rate = I80F48::ZERO;
+
+            let amount = I80F48::from(100);
+            let mut a1 = account_proto.clone();
+            bank.deposit(&mut a1, amount, 0).unwrap();
+            let mut a2 = account_proto.clone();
+            bank.withdraw_with_fee(&mut a2, amount, 0).unwrap();
+
+            bank.net_borrow_limit_per_window_quote = 100;
+            bank.net_borrows_in_window = 200;
+            bank.deposit_limit = 100;
+            bank.potential_serum_tokens = 200;
+
+            let half = I80F48::from(50);
+            bank.checked_transfer_with_fee(&mut a1, half, &mut a2, half, 0, I80F48::ONE)
+                .unwrap();
+            bank.checked_transfer_with_fee(&mut a1, half, &mut a2, half, 0, I80F48::ONE)
+                .unwrap();
+            assert!(bank
+                .checked_transfer_with_fee(&mut a1, half, &mut a2, half, 0, I80F48::ONE)
+                .is_err());
+        }
     }
 
     #[test]

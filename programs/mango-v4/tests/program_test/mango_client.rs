@@ -84,6 +84,27 @@ pub async fn send_tx_get_metadata<CI: ClientInstruction>(
         .await
 }
 
+#[macro_export]
+macro_rules! send_tx_expect_error {
+    ($solana:expr, $ix:expr, $err:expr $(,)?) => {
+        let result = send_tx($solana, $ix).await;
+        let expected_err: u32 = $err.into();
+        match result {
+            Ok(_) => assert!(false, "no error returned"),
+            Err(TransportError::TransactionError(
+                solana_sdk::transaction::TransactionError::InstructionError(
+                    _,
+                    solana_program::instruction::InstructionError::Custom(err_num),
+                ),
+            )) => {
+                assert_eq!(err_num, expected_err, "wrong error code");
+            }
+            _ => assert!(false, "not a mango error"),
+        }
+    };
+}
+pub use send_tx_expect_error;
+
 /// Build a transaction from multiple instructions
 pub struct ClientTransaction {
     solana: Arc<SolanaCookie>,
@@ -123,6 +144,28 @@ impl<'a> ClientTransaction {
             .process_transaction(&self.instructions, Some(&self.signers))
             .await?;
         tx_result.result?;
+        Ok(())
+    }
+
+    pub async fn send_expect_error(
+        &self,
+        error: mango_v4::error::MangoError,
+    ) -> std::result::Result<(), BanksClientError> {
+        let tx_result = self
+            .solana
+            .process_transaction(&self.instructions, Some(&self.signers))
+            .await?;
+        match tx_result.result {
+            Ok(_) => assert!(false, "no error returned"),
+            Err(solana_sdk::transaction::TransactionError::InstructionError(
+                _,
+                solana_program::instruction::InstructionError::Custom(err_num),
+            )) => {
+                let expected_err: u32 = error.into();
+                assert_eq!(err_num, expected_err, "wrong error code");
+            }
+            _ => assert!(false, "not a mango error"),
+        }
         Ok(())
     }
 
@@ -1030,6 +1073,7 @@ impl ClientInstruction for TokenRegisterInstruction {
             interest_curve_scaling: 1.0,
             interest_target_utilization: 0.5,
             group_insurance_fund: true,
+            deposit_limit: 0,
         };
 
         let bank = Pubkey::find_program_address(
@@ -1274,6 +1318,7 @@ pub fn token_edit_instruction_default() -> mango_v4::instruction::TokenEdit {
         maint_weight_shift_liab_target_opt: None,
         maint_weight_shift_abort: false,
         set_fallback_oracle: false,
+        deposit_limit_opt: None,
     }
 }
 
