@@ -15,6 +15,7 @@ import {
   SystemProgram,
 } from '@solana/web3.js';
 import fs from 'fs';
+import chunk from 'lodash/chunk';
 import { Group } from '../src/accounts/group';
 import { MangoClient } from '../src/client';
 import {
@@ -51,13 +52,6 @@ async function extendTable(
   if (addresses.length === 0) {
     return;
   }
-  const extendIx = AddressLookupTableProgram.extendLookupTable({
-    lookupTable: alt.value!.key,
-    payer: payer.publicKey,
-    authority: payer.publicKey,
-    addresses,
-  });
-
   console.log(
     `Extending ${altAddress} with ${nick} ${
       addresses.length
@@ -68,14 +62,22 @@ async function extendTable(
     return;
   }
 
-  const extendTx = await buildVersionedTx(
-    client.program.provider as AnchorProvider,
-    [extendIx],
-  );
-  const sig = await client.program.provider.connection.sendTransaction(
-    extendTx,
-  );
-  console.log(`https://explorer.solana.com/tx/${sig}`);
+  for (const chunk_ of chunk(addresses, 20)) {
+    const extendIx = AddressLookupTableProgram.extendLookupTable({
+      lookupTable: alt.value!.key,
+      payer: payer.publicKey,
+      authority: payer.publicKey,
+      addresses: chunk_,
+    });
+    const extendTx = await buildVersionedTx(
+      client.program.provider as AnchorProvider,
+      [extendIx],
+    );
+    const sig = await client.program.provider.connection.sendTransaction(
+      extendTx,
+    );
+    console.log(`https://explorer.solana.com/tx/${sig}`);
+  }
 }
 
 async function run(): Promise<void> {
