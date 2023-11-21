@@ -594,7 +594,7 @@ impl Bank {
         require_gte!(native_amount, 0);
         let native_position = position.native(self);
 
-        if native_position.is_positive() {
+        if native_position.is_positive() || native_position.is_zero() {
             let new_native_position = native_position - native_amount;
             if !new_native_position.is_negative() {
                 // withdraw deposits only
