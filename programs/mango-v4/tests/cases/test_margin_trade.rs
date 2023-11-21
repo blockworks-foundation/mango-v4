@@ -278,6 +278,7 @@ async fn test_flash_loan_swap_fee() -> Result<(), BanksClientError> {
             group,
             admin,
             mint: tokens[1].mint.pubkey,
+            fallback_oracle: Pubkey::default(),
             options: mango_v4::instruction::TokenEdit {
                 flash_loan_swap_fee_rate_opt: Some(swap_fee_rate as f32),
                 ..token_edit_instruction_default()

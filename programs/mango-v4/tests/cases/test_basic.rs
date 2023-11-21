@@ -460,6 +460,7 @@ async fn test_bank_maint_weight_shift() -> Result<(), TransportError> {
             group,
             admin,
             mint: mints[0].pubkey,
+            fallback_oracle: Pubkey::default(),
             options: mango_v4::instruction::TokenEdit {
                 maint_weight_shift_start_opt: Some(start_time + 1000),
                 maint_weight_shift_end_opt: Some(start_time + 2000),
@@ -493,6 +494,7 @@ async fn test_bank_maint_weight_shift() -> Result<(), TransportError> {
             group,
             admin,
             mint: mints[0].pubkey,
+            fallback_oracle: Pubkey::default(),
             options: mango_v4::instruction::TokenEdit {
                 maint_weight_shift_abort: true,
                 ..token_edit_instruction_default()

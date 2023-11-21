@@ -107,6 +107,7 @@ async fn test_health_compute_tokens_during_maint_weight_shift() -> Result<(), Tr
                 group,
                 admin,
                 mint: mint.pubkey,
+                fallback_oracle: Pubkey::default(),
                 options: mango_v4::instruction::TokenEdit {
                     maint_weight_shift_start_opt: Some(now - 1000),
                     maint_weight_shift_end_opt: Some(now + 1000),

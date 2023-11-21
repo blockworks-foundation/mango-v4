@@ -49,7 +49,7 @@ pub fn token_edit(
     maint_weight_shift_asset_target_opt: Option<f32>,
     maint_weight_shift_liab_target_opt: Option<f32>,
     maint_weight_shift_abort: bool,
-    fallback_oracle_opt: Option<Pubkey>,
+    set_fallback_oracle: bool,
 ) -> Result<()> {
     let group = ctx.accounts.group.load()?;
 
@@ -77,14 +77,14 @@ pub fn token_edit(
             mint_info.oracle = oracle;
             require_group_admin = true;
         }
-        if let Some(fallback_oracle) = fallback_oracle_opt {
+        if set_fallback_oracle {
             msg!(
                 "Fallback oracle old {:?}, new {:?}",
                 bank.fallback_oracle,
-                fallback_oracle
+                ctx.accounts.fallback_oracle.key()
             );
-            bank.fallback_oracle = fallback_oracle;
-            mint_info.fallback_oracle = fallback_oracle;
+            bank.fallback_oracle = ctx.accounts.fallback_oracle.key();
+            mint_info.fallback_oracle = ctx.accounts.fallback_oracle.key();
             require_group_admin = true;
         }
         if reset_stable_price {

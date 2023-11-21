@@ -294,7 +294,7 @@ impl Bank {
             maint_weight_shift_duration_inv: existing_bank.maint_weight_shift_duration_inv,
             maint_weight_shift_asset_target: existing_bank.maint_weight_shift_asset_target,
             maint_weight_shift_liab_target: existing_bank.maint_weight_shift_liab_target,
-            fallback_oracle: existing_bank.oracle, // bongo
+            fallback_oracle: existing_bank.oracle,
             reserved: [0; 1976],
         }
     }

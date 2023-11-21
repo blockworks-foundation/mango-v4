@@ -1276,7 +1276,7 @@ pub fn token_edit_instruction_default() -> mango_v4::instruction::TokenEdit {
         maint_weight_shift_asset_target_opt: None,
         maint_weight_shift_liab_target_opt: None,
         maint_weight_shift_abort: false,
-        fallback_oracle_opt: None,
+        set_fallback_oracle: false,
     }
 }
 
@@ -1284,6 +1284,7 @@ pub struct TokenEdit {
     pub group: Pubkey,
     pub admin: TestKeypair,
     pub mint: Pubkey,
+    pub fallback_oracle: Pubkey,
     pub options: mango_v4::instruction::TokenEdit,
 }
 #[async_trait::async_trait(?Send)]
@@ -1312,7 +1313,7 @@ impl ClientInstruction for TokenEdit {
             admin: self.admin.pubkey(),
             mint_info: mint_info_key,
             oracle: mint_info.oracle,
-            fallback_oracle: mint_info.fallback_oracle,
+            fallback_oracle: self.fallback_oracle,
         };
 
         let mut instruction = make_instruction(program_id, &accounts, &self.options);

@@ -192,10 +192,6 @@ async fn test_fallback_oracle_withdraw() -> Result<(), TransportError> {
     let mints = &context.mints[0..3];
     let payer_token_accounts = &context.users[1].token_accounts[0..3];
 
-    //
-    // SETUP: Create a group, account, register tokens
-    //Foracle_
-
     let mango_setup::GroupWithTokens { group, tokens, .. } = mango_setup::GroupWithTokensConfig {
         admin,
         payer,
@@ -226,8 +222,9 @@ async fn test_fallback_oracle_withdraw() -> Result<(), TransportError> {
             group,
             admin,
             mint: mints[2].pubkey,
+            fallback_oracle,
             options: mango_v4::instruction::TokenEdit {
-                fallback_oracle_opt: Some(fallback_oracle),
+                set_fallback_oracle: true,
                 ..token_edit_instruction_default()
             },
         },
