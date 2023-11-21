@@ -37,6 +37,7 @@ import {
   DEFAULT_VSR_ID,
   VsrClient,
 } from './governanceInstructions/voteStakeRegistryClient';
+import { MangoAccount } from '../src/accounts/mangoAccount';
 
 const {
   MB_CLUSTER_URL,
@@ -79,7 +80,7 @@ async function setupVsr(
 async function getTotalLiqorEquity(
   client: MangoClient,
   group: Group,
-  mangoAccounts: import('/Users/mc/repos/mango-v4/ts/client/src/accounts/mangoAccount').MangoAccount[],
+  mangoAccounts: MangoAccount[],
 ): Promise<number> {
   const liqors = (
     await (
