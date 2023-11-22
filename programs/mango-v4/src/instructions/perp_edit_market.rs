@@ -4,7 +4,7 @@ use anchor_lang::prelude::*;
 use fixed::types::I80F48;
 
 use crate::accounts_ix::*;
-use crate::logs::PerpMarketMetaDataLog;
+use crate::logs::{emit_stack, PerpMarketMetaDataLog};
 
 #[allow(clippy::too_many_arguments)]
 pub fn perp_edit_market(
@@ -358,7 +358,7 @@ pub fn perp_edit_market(
         );
     }
 
-    emit!(PerpMarketMetaDataLog {
+    emit_stack(PerpMarketMetaDataLog {
         mango_group: ctx.accounts.group.key(),
         perp_market: ctx.accounts.perp_market.key(),
         perp_market_index: perp_market.perp_market_index,

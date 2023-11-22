@@ -5,7 +5,8 @@ use crate::accounts_ix::*;
 use crate::error::*;
 use crate::health::*;
 use crate::logs::{
-    LoanOriginationFeeInstruction, TokenBalanceLog, TokenLiqWithTokenLog, WithdrawLoanLog,
+    emit_stack, LoanOriginationFeeInstruction, TokenBalanceLog, TokenLiqWithTokenLog,
+    WithdrawLoanLog,
 };
 use crate::state::*;
 
@@ -257,7 +258,7 @@ pub(crate) fn liquidation_action(
     );
 
     // liqee asset
-    emit!(TokenBalanceLog {
+    emit_stack(TokenBalanceLog {
         mango_group: liqee.fixed.group,
         mango_account: liqee_key,
         token_index: asset_token_index,
@@ -266,7 +267,7 @@ pub(crate) fn liquidation_action(
         borrow_index: asset_bank.borrow_index.to_bits(),
     });
     // liqee liab
-    emit!(TokenBalanceLog {
+    emit_stack(TokenBalanceLog {
         mango_group: liqee.fixed.group,
         mango_account: liqee_key,
         token_index: liab_token_index,
@@ -275,7 +276,7 @@ pub(crate) fn liquidation_action(
         borrow_index: liab_bank.borrow_index.to_bits(),
     });
     // liqor asset
-    emit!(TokenBalanceLog {
+    emit_stack(TokenBalanceLog {
         mango_group: liqee.fixed.group,
         mango_account: liqor_key,
         token_index: asset_token_index,
@@ -284,7 +285,7 @@ pub(crate) fn liquidation_action(
         borrow_index: asset_bank.borrow_index.to_bits(),
     });
     // liqor liab
-    emit!(TokenBalanceLog {
+    emit_stack(TokenBalanceLog {
         mango_group: liqee.fixed.group,
         mango_account: liqor_key,
         token_index: liab_token_index,
@@ -297,14 +298,14 @@ pub(crate) fn liquidation_action(
         .loan_origination_fee
         .is_positive()
     {
-        emit!(WithdrawLoanLog {
+        emit_stack(WithdrawLoanLog {
             mango_group: liqee.fixed.group,
             mango_account: liqor_key,
             token_index: liab_token_index,
             loan_amount: liqor_liab_withdraw_result.loan_amount.to_bits(),
             loan_origination_fee: liqor_liab_withdraw_result.loan_origination_fee.to_bits(),
             instruction: LoanOriginationFeeInstruction::LiqTokenWithToken,
-            price: Some(liab_oracle_price.to_bits())
+            price: Some(liab_oracle_price.to_bits()),
         });
     }
 
@@ -328,7 +329,7 @@ pub(crate) fn liquidation_action(
         .fixed
         .maybe_recover_from_being_liquidated(liqee_liq_end_health);
 
-    emit!(TokenLiqWithTokenLog {
+    emit_stack(TokenLiqWithTokenLog {
         mango_group: liqee.fixed.group,
         liqee: liqee_key,
         liqor: liqor_key,
@@ -339,7 +340,7 @@ pub(crate) fn liquidation_action(
         asset_price: asset_oracle_price.to_bits(),
         liab_price: liab_oracle_price.to_bits(),
         bankruptcy: !liqee_health_cache.has_phase2_liquidatable()
-            & liqee_liq_end_health.is_negative()
+            & liqee_liq_end_health.is_negative(),
     });
 
     Ok(())

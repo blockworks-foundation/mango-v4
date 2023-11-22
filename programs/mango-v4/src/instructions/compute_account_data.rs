@@ -20,6 +20,7 @@ pub fn compute_account_data(ctx: Context<ComputeAccountData>) -> Result<()> {
 
     let equity = compute_equity(&account.borrow(), &account_retriever)?;
 
+    // Potentially too big for the stack!
     emit!(MangoAccountData {
         init_health,
         maint_health,

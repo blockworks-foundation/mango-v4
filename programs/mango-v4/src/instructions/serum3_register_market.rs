@@ -6,7 +6,7 @@ use crate::state::*;
 use crate::util::fill_from_str;
 
 use crate::accounts_ix::*;
-use crate::logs::Serum3RegisterMarketLog;
+use crate::logs::{emit_stack, Serum3RegisterMarketLog};
 
 pub fn serum3_register_market(
     ctx: Context<Serum3RegisterMarket>,
@@ -55,7 +55,7 @@ pub fn serum3_register_market(
         reserved: [0; 38],
     };
 
-    emit!(Serum3RegisterMarketLog {
+    emit_stack(Serum3RegisterMarketLog {
         mango_group: ctx.accounts.group.key(),
         serum_market: ctx.accounts.serum_market.key(),
         market_index,

@@ -5,10 +5,9 @@ use crate::accounts_ix::*;
 use crate::error::*;
 use crate::health::*;
 use crate::i80f48::ClampToInt;
-use crate::logs::TokenConditionalSwapCancelLog;
 use crate::logs::{
-    LoanOriginationFeeInstruction, TokenBalanceLog, TokenConditionalSwapTriggerLogV3,
-    WithdrawLoanLog,
+    emit_stack, LoanOriginationFeeInstruction, TokenBalanceLog, TokenConditionalSwapCancelLog,
+    TokenConditionalSwapTriggerLogV3, WithdrawLoanLog,
 };
 use crate::state::*;
 
@@ -73,7 +72,7 @@ pub fn token_conditional_swap_trigger(
         liqee.token_decrement_dust_deactivate(sell_bank, now_ts, liqee_key)?;
 
         msg!("TokenConditionalSwap is expired, removing");
-        emit!(TokenConditionalSwapCancelLog {
+        emit_stack(TokenConditionalSwapCancelLog {
             mango_group: ctx.accounts.group.key(),
             mango_account: ctx.accounts.liqee.key(),
             id: token_conditional_swap_id,
@@ -347,7 +346,7 @@ fn action(
     // Log info
 
     // liqee buy token
-    emit!(TokenBalanceLog {
+    emit_stack(TokenBalanceLog {
         mango_group: liqee.fixed.group,
         mango_account: liqee_key,
         token_index: tcs.buy_token_index,
@@ -356,7 +355,7 @@ fn action(
         borrow_index: buy_bank.borrow_index.to_bits(),
     });
     // liqee sell token
-    emit!(TokenBalanceLog {
+    emit_stack(TokenBalanceLog {
         mango_group: liqee.fixed.group,
         mango_account: liqee_key,
         token_index: tcs.sell_token_index,
@@ -365,7 +364,7 @@ fn action(
         borrow_index: sell_bank.borrow_index.to_bits(),
     });
     // liqor buy token
-    emit!(TokenBalanceLog {
+    emit_stack(TokenBalanceLog {
         mango_group: liqee.fixed.group,
         mango_account: liqor_key,
         token_index: tcs.buy_token_index,
@@ -374,7 +373,7 @@ fn action(
         borrow_index: buy_bank.borrow_index.to_bits(),
     });
     // liqor sell token
-    emit!(TokenBalanceLog {
+    emit_stack(TokenBalanceLog {
         mango_group: liqee.fixed.group,
         mango_account: liqor_key,
         token_index: tcs.sell_token_index,
@@ -384,7 +383,7 @@ fn action(
     });
 
     if liqor_buy_withdraw.has_loan() {
-        emit!(WithdrawLoanLog {
+        emit_stack(WithdrawLoanLog {
             mango_group: liqee.fixed.group,
             mango_account: liqor_key,
             token_index: tcs.buy_token_index,
@@ -395,7 +394,7 @@ fn action(
         });
     }
     if liqee_sell_withdraw.has_loan() {
-        emit!(WithdrawLoanLog {
+        emit_stack(WithdrawLoanLog {
             mango_group: liqee.fixed.group,
             mango_account: liqee_key,
             token_index: tcs.sell_token_index,
@@ -488,7 +487,7 @@ fn action(
         liqee.token_decrement_dust_deactivate(sell_bank, now_ts, liqee_key)?;
     }
 
-    emit!(TokenConditionalSwapTriggerLogV3 {
+    emit_stack(TokenConditionalSwapTriggerLogV3 {
         mango_group: liqee.fixed.group,
         liqee: liqee_key,
         liqor: liqor_key,

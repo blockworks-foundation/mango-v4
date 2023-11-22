@@ -7,7 +7,9 @@ use anchor_spl::token;
 use fixed::types::I80F48;
 
 use crate::accounts_ix::*;
-use crate::logs::{LoanOriginationFeeInstruction, TokenBalanceLog, WithdrawLoanLog, WithdrawLog};
+use crate::logs::{
+    emit_stack, LoanOriginationFeeInstruction, TokenBalanceLog, WithdrawLoanLog, WithdrawLog,
+};
 
 pub fn token_withdraw(ctx: Context<TokenWithdraw>, amount: u64, allow_borrow: bool) -> Result<()> {
     require_msg!(amount > 0, "withdraw amount must be positive");
@@ -103,7 +105,7 @@ pub fn token_withdraw(ctx: Context<TokenWithdraw>, amount: u64, allow_borrow: bo
 
     let native_position_after = position.native(&bank);
 
-    emit!(TokenBalanceLog {
+    emit_stack(TokenBalanceLog {
         mango_group: ctx.accounts.group.key(),
         mango_account: ctx.accounts.account.key(),
         token_index,
@@ -151,7 +153,7 @@ pub fn token_withdraw(ctx: Context<TokenWithdraw>, amount: u64, allow_borrow: bo
         account.deactivate_token_position_and_log(raw_token_index, ctx.accounts.account.key());
     }
 
-    emit!(WithdrawLog {
+    emit_stack(WithdrawLog {
         mango_group: ctx.accounts.group.key(),
         mango_account: ctx.accounts.account.key(),
         signer: ctx.accounts.owner.key(),
@@ -161,7 +163,7 @@ pub fn token_withdraw(ctx: Context<TokenWithdraw>, amount: u64, allow_borrow: bo
     });
 
     if withdraw_result.loan_origination_fee.is_positive() {
-        emit!(WithdrawLoanLog {
+        emit_stack(WithdrawLoanLog {
             mango_group: ctx.accounts.group.key(),
             mango_account: ctx.accounts.account.key(),
             token_index,

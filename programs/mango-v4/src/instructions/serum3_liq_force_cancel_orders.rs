@@ -5,7 +5,7 @@ use crate::error::*;
 use crate::health::*;
 use crate::instructions::apply_settle_changes;
 use crate::instructions::charge_loan_origination_fees;
-use crate::logs::Serum3OpenOrdersBalanceLogV2;
+use crate::logs::{emit_stack, Serum3OpenOrdersBalanceLogV2};
 use crate::serum3_cpi::{load_open_orders_ref, OpenOrdersAmounts, OpenOrdersSlim};
 use crate::state::*;
 
@@ -117,7 +117,7 @@ pub fn serum3_liq_force_cancel_orders(
         let open_orders = load_open_orders_ref(oo_ai)?;
         after_oo = OpenOrdersSlim::from_oo(&open_orders);
 
-        emit!(Serum3OpenOrdersBalanceLogV2 {
+        emit_stack(Serum3OpenOrdersBalanceLogV2 {
             mango_group: ctx.accounts.group.key(),
             mango_account: ctx.accounts.account.key(),
             market_index: serum_market.market_index,

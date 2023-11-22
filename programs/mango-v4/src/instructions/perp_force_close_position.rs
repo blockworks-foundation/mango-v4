@@ -4,7 +4,7 @@ use crate::accounts_ix::*;
 
 use crate::accounts_zerocopy::AccountInfoRef;
 use crate::error::MangoError;
-use crate::logs::{emit_perp_balances, PerpForceClosePositionLog};
+use crate::logs::{emit_perp_balances, emit_stack, PerpForceClosePositionLog};
 use crate::state::*;
 use fixed::types::I80F48;
 
@@ -56,7 +56,7 @@ pub fn perp_force_close_position(ctx: Context<PerpForceClosePosition>) -> Result
         &perp_market,
     );
 
-    emit!(PerpForceClosePositionLog {
+    emit_stack(PerpForceClosePositionLog {
         mango_group: ctx.accounts.group.key(),
         perp_market_index: perp_market.perp_market_index,
         account_a: ctx.accounts.account_a.key(),

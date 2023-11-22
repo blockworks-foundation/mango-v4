@@ -7,7 +7,7 @@ use crate::instructions::INDEX_START;
 use crate::state::*;
 use crate::util::fill_from_str;
 
-use crate::logs::TokenMetaDataLog;
+use crate::logs::{emit_stack, TokenMetaDataLog};
 
 use crate::accounts_ix::*;
 
@@ -133,7 +133,7 @@ pub fn token_register_trustless(
     mint_info.banks[0] = ctx.accounts.bank.key();
     mint_info.vaults[0] = ctx.accounts.vault.key();
 
-    emit!(TokenMetaDataLog {
+    emit_stack(TokenMetaDataLog {
         mango_group: ctx.accounts.group.key(),
         mint: ctx.accounts.mint.key(),
         token_index,

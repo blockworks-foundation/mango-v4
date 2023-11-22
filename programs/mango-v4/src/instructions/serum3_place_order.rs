@@ -5,7 +5,7 @@ use crate::i80f48::ClampToInt;
 use crate::state::*;
 
 use crate::accounts_ix::*;
-use crate::logs::{Serum3OpenOrdersBalanceLogV2, TokenBalanceLog};
+use crate::logs::{emit_stack, Serum3OpenOrdersBalanceLogV2, TokenBalanceLog};
 use crate::serum3_cpi::{
     load_market_state, load_open_orders_ref, OpenOrdersAmounts, OpenOrdersSlim,
 };
@@ -216,7 +216,7 @@ pub fn serum3_place_order(
         }
     }
 
-    emit!(Serum3OpenOrdersBalanceLogV2 {
+    emit_stack(Serum3OpenOrdersBalanceLogV2 {
         mango_group: ctx.accounts.group.key(),
         mango_account: ctx.accounts.account.key(),
         market_index: serum_market.market_index,
@@ -412,7 +412,7 @@ fn apply_vault_difference(
         *borrows_without_fee = (*borrows_without_fee).saturating_sub(needed_change.to_num::<u64>());
     }
 
-    emit!(TokenBalanceLog {
+    emit_stack(TokenBalanceLog {
         mango_group: bank.group,
         mango_account: account_pk,
         token_index: bank.token_index,

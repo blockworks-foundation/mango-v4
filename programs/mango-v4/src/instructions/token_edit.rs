@@ -8,7 +8,7 @@ use crate::error::MangoError;
 use crate::state::*;
 
 use crate::accounts_ix::*;
-use crate::logs::TokenMetaDataLog;
+use crate::logs::{emit_stack, TokenMetaDataLog};
 use crate::util::fill_from_str;
 
 #[allow(unused_variables)]
@@ -456,7 +456,7 @@ pub fn token_edit(
     let bank = ctx.remaining_accounts.first().unwrap().load_mut::<Bank>()?;
     bank.verify()?;
 
-    emit!(TokenMetaDataLog {
+    emit_stack(TokenMetaDataLog {
         mango_group: ctx.accounts.group.key(),
         mint: mint_info.mint.key(),
         token_index: bank.token_index,
