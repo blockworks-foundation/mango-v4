@@ -594,7 +594,7 @@ impl Bank {
         require_gte!(native_amount, 0);
         let native_position = position.native(self);
 
-        if native_position.is_positive() {
+        if !native_position.is_negative() {
             let new_native_position = native_position - native_amount;
             if !new_native_position.is_negative() {
                 // withdraw deposits only
@@ -1022,9 +1022,108 @@ mod tests {
 
     use super::*;
 
-    #[test]
-    pub fn change() -> Result<()> {
+    fn bank_change_runner(start: f64, change: i32, is_in_use: bool, use_withdraw: bool) {
+        println!(
+            "testing: in use: {is_in_use}, start: {start}, change: {change}, use_withdraw: {use_withdraw}",
+        );
+
         let epsilon = I80F48::from_bits(1);
+
+        //
+        // SETUP
+        //
+
+        let mut bank = Bank::zeroed();
+        bank.net_borrow_limit_window_size_ts = 1; // dummy
+        bank.net_borrow_limit_per_window_quote = i64::MAX; // max since we don't want this to interfere
+        bank.deposit_index = I80F48::from_num(100.0);
+        bank.borrow_index = I80F48::from_num(10.0);
+        bank.loan_origination_fee_rate = I80F48::from_num(0.1);
+        let indexed = |v: I80F48, b: &Bank| {
+            if v > 0 {
+                let i = v / b.deposit_index;
+                if i * b.deposit_index < v {
+                    i + I80F48::DELTA
+                } else {
+                    i
+                }
+            } else {
+                v / b.borrow_index
+            }
+        };
+
+        let mut account = TokenPosition {
+            indexed_position: I80F48::ZERO,
+            token_index: 0,
+            in_use_count: u16::from(is_in_use),
+            cumulative_deposit_interest: 0.0,
+            cumulative_borrow_interest: 0.0,
+            previous_index: I80F48::ZERO,
+            padding: Default::default(),
+            reserved: [0; 128],
+        };
+
+        account.indexed_position = indexed(I80F48::from_num(start), &bank);
+        if start >= 0.0 {
+            bank.indexed_deposits = account.indexed_position;
+        } else {
+            bank.indexed_borrows = -account.indexed_position;
+        }
+
+        // get the rounded start value
+        let start_native = account.native(&bank);
+
+        //
+        // TEST
+        //
+
+        let change = I80F48::from(change);
+        let dummy_now_ts = 1 as u64;
+        let dummy_price = I80F48::ZERO;
+        let is_active = if use_withdraw {
+            bank.withdraw_with_fee(&mut account, change, dummy_now_ts)
+                .unwrap()
+                .position_is_active
+        } else {
+            bank.change_with_fee(&mut account, change, dummy_now_ts)
+                .unwrap()
+                .position_is_active
+        };
+
+        let mut expected_native = start_native + change;
+        let is_deposit_into_nonnegative = start >= 0.0 && change >= 0 && !use_withdraw;
+        if expected_native >= 0.0
+            && expected_native < 1.0
+            && !is_in_use
+            && !is_deposit_into_nonnegative
+        {
+            assert!(!is_active);
+            assert_eq!(bank.dust, expected_native);
+            expected_native = I80F48::ZERO;
+        } else {
+            assert!(is_active);
+            assert_eq!(bank.dust, I80F48::ZERO);
+        }
+        if change < 0 && expected_native < 0 {
+            let new_borrow = -(expected_native - min(start_native, I80F48::ZERO));
+            expected_native -= new_borrow * bank.loan_origination_fee_rate;
+        }
+        let expected_indexed = indexed(expected_native, &bank);
+
+        // at most one epsilon error in the resulting indexed value
+        assert!((account.indexed_position - expected_indexed).abs() <= epsilon);
+
+        if account.indexed_position.is_positive() {
+            assert_eq!(bank.indexed_deposits, account.indexed_position);
+            assert_eq!(bank.indexed_borrows, I80F48::ZERO);
+        } else {
+            assert_eq!(bank.indexed_deposits, I80F48::ZERO);
+            assert_eq!(bank.indexed_borrows, -account.indexed_position);
+        }
+    }
+
+    #[test]
+    pub fn bank_change() -> Result<()> {
         let cases = [
             (-10.1, 1),
             (-10.1, 10),
@@ -1048,89 +1147,19 @@ mod tests {
             (0.0, -1),
             (-0.1, -1),
             (-1.1, -10),
+            (10.0, 0),
+            (1.0, 0),
+            (0.1, 0),
+            (0.0, 0),
+            (-0.1, 0),
         ];
 
         for is_in_use in [false, true] {
             for (start, change) in cases {
-                println!(
-                    "testing: in use: {}, start: {}, change: {}",
-                    is_in_use, start, change
-                );
-
-                //
-                // SETUP
-                //
-
-                let mut bank = Bank::zeroed();
-                bank.net_borrow_limit_window_size_ts = 1; // dummy
-                bank.net_borrow_limit_per_window_quote = i64::MAX; // max since we don't want this to interfere
-                bank.deposit_index = I80F48::from_num(100.0);
-                bank.borrow_index = I80F48::from_num(10.0);
-                bank.loan_origination_fee_rate = I80F48::from_num(0.1);
-                let indexed = |v: I80F48, b: &Bank| {
-                    if v > 0 {
-                        v / b.deposit_index
-                    } else {
-                        v / b.borrow_index
-                    }
-                };
-
-                let mut account = TokenPosition {
-                    indexed_position: I80F48::ZERO,
-                    token_index: 0,
-                    in_use_count: u16::from(is_in_use),
-                    cumulative_deposit_interest: 0.0,
-                    cumulative_borrow_interest: 0.0,
-                    previous_index: I80F48::ZERO,
-                    padding: Default::default(),
-                    reserved: [0; 128],
-                };
-
-                account.indexed_position = indexed(I80F48::from_num(start), &bank);
-                if start >= 0.0 {
-                    bank.indexed_deposits = account.indexed_position;
-                } else {
-                    bank.indexed_borrows = -account.indexed_position;
-                }
-
-                // get the rounded start value
-                let start_native = account.native(&bank);
-
-                //
-                // TEST
-                //
-
-                let change = I80F48::from(change);
-                let dummy_now_ts = 1 as u64;
-                let dummy_price = I80F48::ZERO;
-                let is_active = bank
-                    .change_with_fee(&mut account, change, dummy_now_ts)?
-                    .position_is_active;
-
-                let mut expected_native = start_native + change;
-                if expected_native >= 0.0 && expected_native < 1.0 && !is_in_use {
-                    assert!(!is_active);
-                    assert_eq!(bank.dust, expected_native);
-                    expected_native = I80F48::ZERO;
-                } else {
-                    assert!(is_active);
-                    assert_eq!(bank.dust, I80F48::ZERO);
-                }
-                if change < 0 && expected_native < 0 {
-                    let new_borrow = -(expected_native - min(start_native, I80F48::ZERO));
-                    expected_native -= new_borrow * bank.loan_origination_fee_rate;
-                }
-                let expected_indexed = indexed(expected_native, &bank);
-
-                // at most one epsilon error in the resulting indexed value
-                assert!((account.indexed_position - expected_indexed).abs() <= epsilon);
-
-                if account.indexed_position.is_positive() {
-                    assert_eq!(bank.indexed_deposits, account.indexed_position);
-                    assert_eq!(bank.indexed_borrows, I80F48::ZERO);
-                } else {
-                    assert_eq!(bank.indexed_deposits, I80F48::ZERO);
-                    assert_eq!(bank.indexed_borrows, -account.indexed_position);
+                bank_change_runner(start, change, is_in_use, false);
+                if change == 0 {
+                    // check withdrawing 0
+                    bank_change_runner(start, change, is_in_use, true);
                 }
             }
         }
