@@ -467,15 +467,9 @@
 <a href="#467" id="467">467</a>
 <a href="#468" id="468">468</a>
 <a href="#469" id="469">469</a>
-<a href="#470" id="470">470</a>
-<a href="#471" id="471">471</a>
-<a href="#472" id="472">472</a>
-</pre><pre class="rust"><code><span class="kw">use </span><span class="kw">crate</span>::logs::{FilledPerpOrderLog, PerpTakerTradeLog};
-<span class="kw">use </span><span class="kw">crate</span>::state::MangoAccountRefMut;
-<span class="kw">use crate</span>::{
-    error::<span class="kw-2">*</span>,
-    state::{orderbook::bookside::<span class="kw-2">*</span>, EventQueue, PerpMarket},
-};
+</pre><pre class="rust"><code><span class="kw">use </span><span class="kw">crate</span>::error::<span class="kw-2">*</span>;
+<span class="kw">use </span><span class="kw">crate</span>::logs::{emit_stack, FilledPerpOrderLog, PerpTakerTradeLog};
+<span class="kw">use </span><span class="kw">crate</span>::state::{orderbook::bookside::<span class="kw-2">*</span>, EventQueue, MangoAccountRefMut, PerpMarket};
 <span class="kw">use </span>anchor_lang::prelude::<span class="kw-2">*</span>;
 <span class="kw">use </span>bytemuck::cast;
 <span class="kw">use </span>fixed::types::I80F48;
@@ -677,7 +671,7 @@
             event_queue.push_back(cast(fill)).unwrap();
             limit -= <span class="number">1</span>;
 
-            <span class="macro">emit!</span>(FilledPerpOrderLog {
+            emit_stack(FilledPerpOrderLog {
                 mango_group: market.group.key(),
                 perp_market_index: market.perp_market_index,
                 seq_num,
@@ -698,7 +692,7 @@
                 mango_account,
                 total_quote_lots_taken - decremented_quote_lots,
             )<span class="question-mark">?</span>;
-            <span class="macro">emit!</span>(PerpTakerTradeLog {
+            emit_stack(PerpTakerTradeLog {
                 mango_group: market.group.key(),
                 mango_account: <span class="kw-2">*</span>mango_account_pk,
                 perp_market_index: market.perp_market_index,

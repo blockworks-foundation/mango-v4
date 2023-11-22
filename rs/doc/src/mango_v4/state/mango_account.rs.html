@@ -2579,7 +2579,7 @@
 
 <span class="kw">use </span><span class="kw">crate</span>::error::<span class="kw-2">*</span>;
 <span class="kw">use </span><span class="kw">crate</span>::health::{HealthCache, HealthType};
-<span class="kw">use </span><span class="kw">crate</span>::logs::{DeactivatePerpPositionLog, DeactivateTokenPositionLog};
+<span class="kw">use </span><span class="kw">crate</span>::logs::{emit_stack, DeactivatePerpPositionLog, DeactivateTokenPositionLog};
 <span class="kw">use </span><span class="kw">crate</span>::util;
 
 <span class="kw">use </span><span class="kw">super</span>::BookSideOrderTree;
@@ -3580,7 +3580,7 @@
         <span class="kw">let </span>mango_group = <span class="self">self</span>.fixed().group;
         <span class="kw">let </span>token_position = <span class="self">self</span>.token_position_mut_by_raw_index(raw_index);
         <span class="macro">assert!</span>(token_position.in_use_count == <span class="number">0</span>);
-        <span class="macro">emit!</span>(DeactivateTokenPositionLog {
+        emit_stack(DeactivateTokenPositionLog {
             mango_group,
             mango_account: mango_account_pubkey,
             token_index: token_position.token_index,
@@ -3734,7 +3734,7 @@
         <span class="kw">let </span>mango_group = <span class="self">self</span>.fixed().group;
         <span class="kw">let </span>perp_position = <span class="self">self</span>.perp_position_mut(perp_market_index)<span class="question-mark">?</span>;
 
-        <span class="macro">emit!</span>(DeactivatePerpPositionLog {
+        emit_stack(DeactivatePerpPositionLog {
             mango_group,
             mango_account: mango_account_pubkey,
             market_index: perp_market_index,

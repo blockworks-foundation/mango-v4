@@ -535,7 +535,7 @@
 
 <span class="kw">use </span><span class="kw">crate</span>::accounts_zerocopy::KeyedAccountReader;
 <span class="kw">use </span><span class="kw">crate</span>::error::MangoError;
-<span class="kw">use </span><span class="kw">crate</span>::logs::PerpUpdateFundingLogV2;
+<span class="kw">use </span><span class="kw">crate</span>::logs::{emit_stack, PerpUpdateFundingLogV2};
 <span class="kw">use </span><span class="kw">crate</span>::state::orderbook::Side;
 <span class="kw">use </span><span class="kw">crate</span>::state::{oracle, TokenIndex};
 <span class="kw">use </span><span class="kw">crate</span>::util;
@@ -870,7 +870,7 @@
         <span class="self">self</span>.stable_price_model
             .update(now_ts, oracle_price.to_num());
 
-        <span class="macro">emit!</span>(PerpUpdateFundingLogV2 {
+        emit_stack(PerpUpdateFundingLogV2 {
             mango_group: <span class="self">self</span>.group,
             market_index: <span class="self">self</span>.perp_market_index,
             long_funding: <span class="self">self</span>.long_funding.to_bits(),
