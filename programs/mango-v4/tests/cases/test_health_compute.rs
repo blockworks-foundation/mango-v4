@@ -1,4 +1,5 @@
 use super::*;
+use anchor_lang::prelude::AccountMeta;
 use mango_v4::accounts_ix::{Serum3OrderType, Serum3SelfTradeBehavior, Serum3Side};
 
 async fn deposit_cu_datapoint(
@@ -18,6 +19,31 @@ async fn deposit_cu_datapoint(
             token_authority: owner,
             bank_index: 0,
         },
+    )
+    .await
+    .unwrap();
+    result.metadata.unwrap().compute_units_consumed
+}
+
+async fn deposit_cu_fallbacks_datapoint(
+    solana: &SolanaCookie,
+    account: Pubkey,
+    owner: TestKeypair,
+    token_account: Pubkey,
+    remaining_accounts: Vec<AccountMeta>,
+) -> u64 {
+    let result = send_tx_with_extra_accounts(
+        solana,
+        TokenDepositInstruction {
+            amount: 10,
+            reduce_only: false,
+            account,
+            owner,
+            token_account,
+            token_authority: owner,
+            bank_index: 0,
+        },
+        remaining_accounts,
     )
     .await
     .unwrap();
@@ -139,6 +165,145 @@ async fn test_health_compute_tokens_during_maint_weight_shift() -> Result<(), Tr
         / (cu_measurements.len() - 1) as u64;
     println!("average cu increase: {avg_cu_increase}");
     assert!(avg_cu_increase < 4200);
+
+    Ok(())
+}
+
+// Try to reach compute limits in health checks by having many different tokens in an account and using fallback oracles for them
+#[tokio::test]
+async fn test_health_compute_tokens_fallback_oracles() -> Result<(), TransportError> {
+    let mut test_builder = TestContextBuilder::new();
+    test_builder.test().set_compute_max_units(450_000);
+    let context = test_builder.start_default().await;
+    let solana = &context.solana.clone();
+
+    let num_tokens = 8;
+
+    let admin = TestKeypair::new();
+    let owner = context.users[0].key;
+    let payer = context.users[1].key;
+    let mints = &context.mints[0..num_tokens];
+
+    let mut fallback_oracle_kps = Vec::with_capacity(num_tokens);
+    for _ in 0..num_tokens {
+        fallback_oracle_kps.push(TestKeypair::new());
+    }
+    let fallback_metas: Vec<AccountMeta> = fallback_oracle_kps
+        .iter()
+        .map(|x| AccountMeta {
+            pubkey: x.pubkey(),
+            is_signer: false,
+            is_writable: false,
+        })
+        .collect();
+
+    // let fallback_metas = vec![];
+
+    //
+    // SETUP: Create a group and an account
+    //
+
+    let GroupWithTokens { group, tokens, .. } = GroupWithTokensConfig {
+        admin,
+        payer,
+        mints: mints.to_vec(),
+        ..GroupWithTokensConfig::default()
+    }
+    .create(solana)
+    .await;
+
+    let account =
+        create_funded_account(&solana, group, owner, 0, &context.users[1], &[], 1000, 0).await;
+
+    let mut cu_measurements = vec![];
+    for token_account in &context.users[0].token_accounts[..mints.len()] {
+        deposit_cu_datapoint(solana, account, owner, *token_account).await;
+    }
+
+    //
+    // SETUP: Create and register fallback oracles for each token
+    //
+    for (i, _token_account) in context.users[0].token_accounts[..mints.len()]
+        .iter()
+        .enumerate()
+    {
+        send_tx(
+            solana,
+            StubOracleCreate {
+                oracle: fallback_oracle_kps[i],
+                group,
+                mint: mints[i].pubkey,
+                admin,
+                payer,
+            },
+        )
+        .await
+        .unwrap();
+
+        send_tx(
+            solana,
+            TokenEdit {
+                group,
+                admin,
+                mint: mints[i].pubkey,
+                fallback_oracle: fallback_oracle_kps[i].pubkey(),
+                options: mango_v4::instruction::TokenEdit {
+                    set_fallback_oracle: true,
+                    ..token_edit_instruction_default()
+                },
+            },
+        )
+        .await
+        .unwrap();
+    }
+
+    //
+    // TEST: Progressively make each oracle invalid so that the fallback is used
+    //
+    for (i, token_account) in context.users[0].token_accounts[..mints.len()]
+        .iter()
+        .enumerate()
+    {
+        send_tx(
+            solana,
+            StubOracleSetTestInstruction {
+                oracle: tokens[i].oracle,
+                group,
+                mint: mints[i].pubkey,
+                admin,
+                price: 1.0,
+                last_update_slot: 0,
+                deviation: 100.0,
+            },
+        )
+        .await
+        .unwrap();
+
+        cu_measurements.push(
+            deposit_cu_fallbacks_datapoint(
+                solana,
+                account,
+                owner,
+                *token_account,
+                fallback_metas.clone(),
+            )
+            .await,
+        );
+    }
+
+    for (i, pair) in cu_measurements.windows(2).enumerate() {
+        println!(
+            "after adding token {}: {} (+{})",
+            i,
+            pair[1],
+            pair[1] - pair[0]
+        );
+    }
+
+    let avg_cu_increase = cu_measurements.windows(2).map(|p| p[1] - p[0]).sum::<u64>()
+        / (cu_measurements.len() - 1) as u64;
+    println!("average cu increase: {avg_cu_increase}");
+    assert!(avg_cu_increase < 16_600);
 
     Ok(())
 }

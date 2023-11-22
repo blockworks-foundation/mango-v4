@@ -62,16 +62,14 @@ pub async fn send_tx_with_extra_accounts<CI: ClientInstruction>(
     solana: &SolanaCookie,
     ix: CI,
     account_metas: Vec<AccountMeta>,
-) -> std::result::Result<CI::Accounts, TransportError> {
-    let (accounts, mut instruction) = ix.to_instruction(solana).await;
+) -> std::result::Result<BanksTransactionResultWithMetadata, BanksClientError> {
+    let (_, mut instruction) = ix.to_instruction(solana).await;
     instruction.accounts.extend(account_metas);
     let signers = ix.signers();
     let instructions = vec![instruction.clone()];
-    let result = solana
+    solana
         .process_transaction(&instructions, Some(&signers[..]))
-        .await?;
-    result.result?;
-    Ok(accounts)
+        .await
 }
 
 // This will return success even if the tx failed to finish
