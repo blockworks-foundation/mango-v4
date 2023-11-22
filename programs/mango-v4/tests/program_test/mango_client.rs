@@ -1317,7 +1317,6 @@ pub fn token_edit_instruction_default() -> mango_v4::instruction::TokenEdit {
         flash_loan_swap_fee_rate_opt: None,
         interest_curve_scaling_opt: None,
         interest_target_utilization_opt: None,
-        maint_weight_shift_start_opt: None,
         maint_weight_shift_end_opt: None,
         maint_weight_shift_asset_target_opt: None,
         maint_weight_shift_liab_target_opt: None,
@@ -1330,7 +1329,6 @@ pub fn token_edit_instruction_default() -> mango_v4::instruction::TokenEdit {
         collateral_fee_per_day_opt: None,
     }
 }
-
 pub struct TokenEdit {
     pub group: Pubkey,
     pub admin: TestKeypair,

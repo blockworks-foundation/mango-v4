@@ -77,7 +77,9 @@ where
     ErrorType: Copy + std::hash::Hash + std::cmp::Eq + std::fmt::Display,
 {
     pub fn builder() -> ErrorTrackingBuilder<Key, ErrorType> {
-        ErrorTrackingBuilder::default()
+        let mut builder = ErrorTrackingBuilder::default();
+        builder.errors_by_type = Some(HashMap::new());
+        builder
     }
 
     fn should_skip(

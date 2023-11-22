@@ -5,6 +5,7 @@ use mango_v4::serum3_cpi::{load_open_orders_bytes, OpenOrdersSlim};
 use mango_v4_client::{
     account_update_stream, chain_data, snapshot_source, websocket_source, Client, MangoGroupContext,
 };
+use solana_client::nonblocking::rpc_client::RpcClient;
 use solana_sdk::account::{AccountSharedData, ReadableAccount};
 use solana_sdk::pubkey::Pubkey;
 
@@ -23,8 +24,8 @@ pub async fn save_snapshot(
     }
     fs::create_dir_all(out_path).unwrap();
 
-    let rpc_url = client.config().cluster.url().to_string();
-    let ws_url = client.config().cluster.ws_url().to_string();
+    let rpc_url = client.cluster.url().to_string();
+    //let ws_url = client.cluster.ws_url().to_string();
 
     let group_context = MangoGroupContext::new_from_rpc(client.rpc_async(), mango_group).await?;
 
@@ -48,22 +49,7 @@ pub async fn save_snapshot(
     let (account_update_sender, account_update_receiver) =
         async_channel::unbounded::<account_update_stream::Message>();
 
-    // Sourcing account and slot data from solana via websockets
-    websocket_source::start(
-        websocket_source::Config {
-            rpc_ws_url: ws_url.clone(),
-            serum_programs,
-            open_orders_authority: mango_group,
-        },
-        oracles_and_vaults.clone(),
-        account_update_sender.clone(),
-    );
-
-    let first_websocket_slot = websocket_source::get_next_create_bank_slot(
-        account_update_receiver.clone(),
-        Duration::from_secs(10),
-    )
-    .await?;
+    let first_websocket_slot = RpcClient::new(rpc_url.clone()).get_slot().await?;
 
     // Getting solana account snapshots via jsonrpc
     snapshot_source::start(

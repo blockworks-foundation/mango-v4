@@ -472,6 +472,9 @@ impl Context {
             .unwrap_or(I80F48::ZERO);
 
         // this is in "buy token received per sell token given" units
+        if maker_price == 0.0 {
+            anyhow::bail!("Maker price is 0")
+        }
         let swap_price = I80F48::from_num((1.0 - SLIPPAGE_BUFFER) / maker_price);
         let max_sell_ignoring_limits = util::max_swap_source_ignoring_limits(
             &self.mango_client,

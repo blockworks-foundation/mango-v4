@@ -33,9 +33,11 @@ use crate::priority_fees::{FixedPriorityFeeProvider, PriorityFeeProvider};
 use crate::util::PreparedInstructions;
 use crate::{jupiter, util};
 use solana_address_lookup_table_program::state::AddressLookupTable;
+use solana_client::client_error::ClientError;
 use solana_client::nonblocking::rpc_client::RpcClient as RpcClientAsync;
 use solana_client::rpc_client::SerializableTransaction;
 use solana_client::rpc_config::RpcSendTransactionConfig;
+use solana_client::rpc_request::RpcError;
 use solana_client::rpc_response::RpcSimulateTransactionResult;
 use solana_sdk::address_lookup_table_account::AddressLookupTableAccount;
 use solana_sdk::commitment_config::CommitmentLevel;
@@ -43,6 +45,7 @@ use solana_sdk::compute_budget::ComputeBudgetInstruction;
 use solana_sdk::hash::Hash;
 use solana_sdk::signer::keypair;
 use solana_sdk::transaction::TransactionError;
+use tokio::time::sleep;
 
 use anyhow::Context;
 use mango_v4::error::{IsAnchorErrorWithCode, MangoError};
@@ -198,6 +201,12 @@ impl Client {
             self.config.timeout,
             self.config.commitment,
         )
+    pub fn lite_rpc(&self) -> RpcClientAsync {
+        RpcClientAsync::new("https://api.mngo.cloud/lite-rpc/v1/".to_string())
+    }
+
+    pub fn local_lite_rpc(&self) -> RpcClientAsync {
+        RpcClientAsync::new("http://127.0.0.1:8890".to_string())
     }
 
     // TODO: this function here is awkward, since it (intentionally) doesn't use MangoClient::account_fetcher
@@ -2163,7 +2172,23 @@ impl TransactionBuilder {
     pub async fn send(&self, client: &Client) -> anyhow::Result<Signature> {
         let rpc = client.rpc_async();
         let tx = self.transaction(&rpc).await?;
-        client.send_transaction(&tx).await
+        let sig = tx.signatures[0];
+
+        let lrpc_task = {
+            let lrpc = client.lite_rpc();
+            let tx = tx.clone();
+            tokio::spawn(async move { lrpc.send_transaction(&tx).await })
+        };
+        let local_lrpc_taks = {
+            let lrpc = client.local_lite_rpc();
+            let tx = tx.clone();
+            tokio::spawn(async move { lrpc.send_transaction(&tx).await })
+        };
+        let config = client.rpc_send_transaction_config;
+        let rpc_task =
+            tokio::spawn(async move { rpc.send_transaction_with_config(&tx, config).await });
+        futures::future::join_all([lrpc_task, local_lrpc_taks, rpc_task]).await;
+        Ok(sig)
     }
 
     pub async fn simulate(&self, client: &Client) -> anyhow::Result<SimulateTransactionResponse> {
@@ -2172,11 +2197,86 @@ impl TransactionBuilder {
         Ok(rpc.simulate_transaction(&tx).await?)
     }
 
+    pub async fn send_and_confirm_transaction(
+        rpc_client: RpcClientAsync,
+        transaction: &impl SerializableTransaction,
+    ) -> std::result::Result<Signature, ClientError> {
+        const SEND_RETRIES: usize = 1;
+        const GET_STATUS_RETRIES: usize = usize::MAX;
+
+        'sending: for _ in 0..SEND_RETRIES {
+            let signature = rpc_client
+                .send_transaction_with_config(
+                    transaction,
+                    RpcSendTransactionConfig {
+                        skip_preflight: true,
+                        preflight_commitment: None,
+                        encoding: None,
+                        max_retries: Some(10),
+                        min_context_slot: None,
+                    },
+                )
+                .await?;
+
+            let recent_blockhash = if transaction.uses_durable_nonce() {
+                let (recent_blockhash, ..) = rpc_client
+                    .get_latest_blockhash_with_commitment(CommitmentConfig::processed())
+                    .await?;
+                recent_blockhash
+            } else {
+                *transaction.get_recent_blockhash()
+            };
+
+            for status_retry in 0..GET_STATUS_RETRIES {
+                match rpc_client.get_signature_status(&signature).await? {
+                    Some(Ok(_)) => return Ok(signature),
+                    Some(Err(e)) => return Err(e.into()),
+                    None => {
+                        if !rpc_client
+                            .is_blockhash_valid(&recent_blockhash, CommitmentConfig::processed())
+                            .await?
+                        {
+                            // Block hash is not found by some reason
+                            break 'sending;
+                        } else if cfg!(not(test))
+                            // Ignore sleep at last step.
+                            && status_retry < GET_STATUS_RETRIES
+                        {
+                            // Retry twice a second
+                            sleep(Duration::from_millis(500)).await;
+                            continue;
+                        }
+                    }
+                }
+            }
+        }
+
+        Err(RpcError::ForUser(
+            "unable to confirm transaction. \
+             This can happen in situations such as transaction expiration \
+             and insufficient fee-payer funds"
+                .to_string(),
+        )
+        .into())
+    }
+
     pub async fn send_and_confirm(&self, client: &Client) -> anyhow::Result<Signature> {
         let rpc = client.rpc_async();
         let tx = self.transaction(&rpc).await?;
         let recent_blockhash = tx.message.recent_blockhash();
         let signature = client.send_transaction(&tx).await?;
+        {
+            let lrpc = client.lite_rpc();
+            let tx = tx.clone();
+            //let tx2 = tx.clone();
+            // tokio::spawn(async move {
+            //     let c = RpcClientAsync::new("http://127.0.0.1:8890".to_string());
+            //     let _ = c.send_transaction(&tx2).await;
+            // });
+            tokio::spawn(async move {
+                let _ = lrpc.send_transaction(&tx).await;
+            });
+        }
         wait_for_transaction_confirmation(
             &rpc,
             &signature,
@@ -2222,7 +2322,7 @@ pub fn prettify_solana_client_error(
     err: solana_client::client_error::ClientError,
 ) -> anyhow::Error {
     use solana_client::client_error::ClientErrorKind;
-    use solana_client::rpc_request::{RpcError, RpcResponseErrorData};
+    use solana_client::rpc_request::RpcResponseErrorData;
     match err.kind() {
         ClientErrorKind::RpcError(RpcError::RpcResponseError { data, .. }) => match data {
             RpcResponseErrorData::SendTransactionPreflightFailure(s) => {

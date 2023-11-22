@@ -96,7 +96,6 @@ async fn feed_snapshots(
     sender: &async_channel::Sender<Message>,
 ) -> anyhow::Result<()> {
     // TODO replace the following with mango-feeds connector's snapshot.rs
-
     // note: with solana 1.15 the gPA (get_program_accounts) rpc call was moved to a new mod rpc_client_scan
     let rpc_client_data =
         http::connect_with_options::<AccountsDataClient>(&config.rpc_http_url, true)
@@ -125,7 +124,7 @@ async fn feed_snapshots(
     let mut snapshot = AccountSnapshot::default();
 
     // Get all accounts of the mango program
-    let response = rpc_client_scan
+    let response: OptionalContext<Vec<RpcKeyedAccount>> = rpc_client_scan
         .get_program_accounts(
             mango_v4::id().to_string(),
             Some(all_accounts_config.clone()),
@@ -133,6 +132,7 @@ async fn feed_snapshots(
         .await
         .map_err_anyhow()
         .context("error during getProgamAccounts for mango program")?;
+
     if let OptionalContext::Context(account_snapshot_response) = response {
         snapshot.extend_from_gpa_rpc(account_snapshot_response)?;
     } else {
@@ -229,7 +229,6 @@ pub fn start(config: Config, mango_oracles: Vec<Pubkey>, sender: async_channel::
         let rpc_client = http::connect_with_options::<MinimalClient>(&config.rpc_http_url, true)
             .await
             .expect("always Ok");
-
         // Wait for slot to exceed min_slot
         loop {
             poll_wait_first_snapshot.tick().await;

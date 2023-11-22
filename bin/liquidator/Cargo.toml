@@ -28,6 +28,8 @@ futures-util = "0.3"
 itertools = "0.10.3"
 jemallocator = "0.3.2"
 jsonrpc-core = "18.0.0"
+jsonrpc-derive = "18.0.0"
+jsonrpc-pubsub = "18.0.0"
 jsonrpc-core-client = { version = "18.0.0", features = ["ws", "http", "tls"] }
 mango-v4 = { path = "../../programs/mango-v4", features = ["client"] }
 mango-v4-client = { path = "../../lib/client" }
@@ -48,3 +50,5 @@ tokio = { version = "1", features = ["full"] }
 tokio-stream = { version = "0.1.9"}
 tokio-tungstenite = "0.16.1"
 tracing = "0.1"
+yellowstone-grpc-client = "1.9.0"
+yellowstone-grpc-proto = "1.9.0"

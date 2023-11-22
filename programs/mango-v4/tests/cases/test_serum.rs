@@ -1029,7 +1029,7 @@ async fn test_serum_reduce_only_deposits1() -> Result<(), TransportError> {
 #[tokio::test]
 async fn test_serum_reduce_only_deposits2() -> Result<(), TransportError> {
     let mut test_builder = TestContextBuilder::new();
-    test_builder.test().set_compute_max_units(95_000); // Serum3PlaceOrder needs 92.8k
+    test_builder.test().set_compute_max_units(97_000); // Serum3PlaceOrder needs 95.1k
     let context = test_builder.start_default().await;
     let solana = &context.solana.clone();
 

@@ -1,13 +1,17 @@
 use std::collections::HashMap;
 use std::collections::HashSet;
+use std::sync::atomic::AtomicU64;
 use std::sync::{Arc, RwLock};
 use std::time::{Duration, Instant};
 
 use anchor_client::Cluster;
 use anyhow::Context;
 use clap::Parser;
+use futures_util::StreamExt;
 use mango_v4::state::{PerpMarketIndex, TokenIndex};
 use mango_v4_client::priority_fees_cli;
+use mango_v4_client::AsyncChannelSendUnlessFull;
+use mango_v4_client::account_update_stream::AccountUpdate;
 use mango_v4_client::AsyncChannelSendUnlessFull;
 use mango_v4_client::{
     account_update_stream, chain_data, error_tracking::ErrorTracking, jupiter, keypair_from_cli,
@@ -16,10 +20,20 @@ use mango_v4_client::{
 };
 
 use itertools::Itertools;
+use solana_client::nonblocking::rpc_client::RpcClient;
+use solana_sdk::account::AccountSharedData;
 use solana_sdk::commitment_config::CommitmentConfig;
 use solana_sdk::pubkey::Pubkey;
 use solana_sdk::signer::Signer;
 use tracing::*;
+use yellowstone_grpc_client::GeyserGrpcClient;
+use yellowstone_grpc_proto::geyser::subscribe_request_filter_accounts_filter;
+use yellowstone_grpc_proto::geyser::subscribe_request_filter_accounts_filter_memcmp;
+use yellowstone_grpc_proto::geyser::subscribe_update::UpdateOneof;
+use yellowstone_grpc_proto::geyser::SubscribeRequestFilterAccounts;
+use yellowstone_grpc_proto::geyser::SubscribeRequestFilterAccountsFilter;
+use yellowstone_grpc_proto::geyser::SubscribeRequestFilterAccountsFilterMemcmp;
+use yellowstone_grpc_proto::geyser::SubscribeRequestFilterSlots;
 
 pub mod liquidate;
 pub mod metrics;
@@ -103,14 +117,14 @@ struct Cli {
     #[clap(long, env)]
     liqor_owner: String,
 
-    #[clap(long, env, default_value = "1000")]
+    #[clap(long, env, default_value = "100")]
     check_interval_ms: u64,
 
     #[clap(long, env, default_value = "300")]
     snapshot_interval_secs: u64,
 
     /// how many getMultipleAccounts requests to send in parallel
-    #[clap(long, env, default_value = "10")]
+    #[clap(long, env, default_value = "100")]
     parallel_rpc_requests: usize,
 
     /// typically 100 is the max number of accounts getMultipleAccounts will retrieve at once
@@ -118,7 +132,7 @@ struct Cli {
     get_multiple_accounts_count: usize,
 
     /// liquidator health ratio should not fall below this value
-    #[clap(long, env, default_value = "50")]
+    #[clap(long, env, default_value = "20")]
     min_health_ratio: f64,
 
     /// if rebalancing is enabled
@@ -153,15 +167,16 @@ struct Cli {
     #[clap(long, env, default_value = "1000.0")]
     tcs_max_trigger_amount: f64,
 
-    #[clap(flatten)]
-    prioritization_fee_cli: priority_fees_cli::PriorityFeeArgs,
-
     /// url to the lite-rpc websocket, optional
     #[clap(long, env, default_value = "")]
     lite_rpc_url: String,
+    
+    /// prioritize each transaction with this many microlamports/cu
+    #[clap(long, env, default_value = "500000")]
+    prioritization_micro_lamports: u64,
 
     /// compute limit requested for liquidation instructions
-    #[clap(long, env, default_value = "250000")]
+    #[clap(long, env, default_value = "200000")]
     compute_limit_for_liquidation: u32,
 
     /// compute limit requested for tcs trigger instructions
@@ -196,6 +211,238 @@ struct Cli {
 
 pub fn encode_address(addr: &Pubkey) -> String {
     bs58::encode(&addr.to_bytes()).into_string()
+}
+
+#[derive(Default, Clone)]
+struct GeyserMetrics {
+    pub accounts_fetched: Arc<AtomicU64>,
+    pub slots_fetched: Arc<AtomicU64>,
+}
+
+fn grpc_update_accounts(
+    mango_oracles: Vec<Pubkey>,
+    serum_programs: Vec<Pubkey>,
+    open_orders_authority: Pubkey,
+    sender: async_channel::Sender<account_update_stream::Message>,
+    metrics: GeyserMetrics,
+) {
+    tokio::spawn(async move {
+        loop {
+            let grpc_url = "http://202.8.8.12:10000";
+            let mut client =
+                GeyserGrpcClient::connect(grpc_url, None::<String>, None).expect("Should connect");
+            let mut accounts_map = HashMap::new();
+            accounts_map.insert(
+                "oracle_accounts".to_string(),
+                SubscribeRequestFilterAccounts {
+                    account: mango_oracles.iter().map(|x| x.to_string()).collect_vec(),
+                    filters: vec![],
+                    owner: vec![],
+                },
+            );
+
+            // all amngo accounts
+            accounts_map.insert(
+                "mango_accounts".to_string(),
+                SubscribeRequestFilterAccounts {
+                    account: vec![],
+                    filters: vec![],
+                    owner: vec![mango_v4::id().to_string()],
+                },
+            );
+
+            let filter_open_accounts = SubscribeRequestFilterAccountsFilterMemcmp {
+                offset: 0,
+                data: Some(
+                    subscribe_request_filter_accounts_filter_memcmp::Data::Bytes(
+                        [0x73, 0x65, 0x72, 0x75, 0x6d, 5, 0, 0, 0, 0, 0, 0, 0].to_vec(),
+                    ),
+                ),
+            };
+
+            let filter_authority = SubscribeRequestFilterAccountsFilterMemcmp {
+                offset: 45,
+                data: Some(
+                    subscribe_request_filter_accounts_filter_memcmp::Data::Bytes(
+                        open_orders_authority.to_bytes().to_vec(),
+                    ),
+                ),
+            };
+
+            let f0 = SubscribeRequestFilterAccountsFilter {
+                filter: Some(subscribe_request_filter_accounts_filter::Filter::Datasize(
+                    3228,
+                )),
+            };
+            let f1 = SubscribeRequestFilterAccountsFilter {
+                filter: Some(subscribe_request_filter_accounts_filter::Filter::Memcmp(
+                    filter_open_accounts,
+                )),
+            };
+            let f2 = SubscribeRequestFilterAccountsFilter {
+                filter: Some(subscribe_request_filter_accounts_filter::Filter::Memcmp(
+                    filter_authority,
+                )),
+            };
+
+            accounts_map.insert(
+                "serum_open_orders".to_string(),
+                SubscribeRequestFilterAccounts {
+                    account: vec![],
+                    filters: vec![f0, f1, f2],
+                    owner: serum_programs.iter().map(|x| x.to_string()).collect_vec(),
+                },
+            );
+
+            let mut slots = HashMap::new();
+            slots.insert("mango_slot".to_string(), SubscribeRequestFilterSlots {});
+
+            let mut stream = client
+                .subscribe_once(
+                    slots,
+                    accounts_map,
+                    HashMap::new(),
+                    Default::default(),
+                    Default::default(),
+                    Default::default(),
+                    Some(yellowstone_grpc_proto::geyser::CommitmentLevel::Processed),
+                    Default::default(),
+                )
+                .await
+                .expect("Should be able to subscribe");
+
+            let mut account_updates: usize = 0;
+            let mut slot_updates: usize = 0;
+            let mut time_interval = tokio::time::interval(Duration::from_secs(60));
+            time_interval.tick().await;
+            loop {
+                tokio::select! {
+                    message = stream.next() => {
+                        if let Some(Ok(message)) = message {
+                            let Some(update) = message.update_oneof else {
+                                continue;
+                            };
+                            match update {
+                                UpdateOneof::Account(acc) => {
+                                    account_updates+=1;
+                                    if let Some(account) = acc.account {
+                                        let pubkey =
+                                            Pubkey::new_from_array(account.pubkey[0..32].try_into().unwrap());
+                                        let owner =
+                                            Pubkey::new_from_array(account.owner[0..32].try_into().unwrap());
+                                        let mut shared_account = AccountSharedData::new(
+                                            account.lamports,
+                                            account.data.len(),
+                                            &owner,
+                                        );
+                                        shared_account.set_data(account.data);
+                                        metrics.accounts_fetched.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                                        if let Err(e) = sender
+                                            .send(account_update_stream::Message::Account(AccountUpdate {
+                                                pubkey,
+                                                slot: acc.slot,
+                                                account: shared_account,
+                                            }))
+                                            .await
+                                        {
+                                            log::error!("error sending account info {e:?}");
+                                        }
+                                    }
+                                }
+                                UpdateOneof::Slot(s) => {
+                                    slot_updates+=1;
+                                    let slot_data = match s.status {
+                                        0 => {
+                                            //processed
+                                            solana_client::rpc_response::SlotUpdate::CreatedBank {
+                                                parent: s.parent.unwrap_or_default(),
+                                                slot: s.slot,
+                                                timestamp: 0,
+                                            }
+                                        }
+                                        1 => {
+                                            // confirmed
+                                            solana_client::rpc_response::SlotUpdate::OptimisticConfirmation {
+                                                slot: s.slot,
+                                                timestamp: 0,
+                                            }
+                                        }
+                                        2 => {
+                                            //finalized
+                                            solana_client::rpc_response::SlotUpdate::Root {
+                                                slot: s.slot,
+                                                timestamp: 0,
+                                            }
+                                        }
+                                        _ => {
+                                            log::error!("unknown slot status");
+                                            //should not happen
+                                            continue;
+                                        }
+                                    };
+                                    metrics.slots_fetched.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                                    sender
+                                        .send(account_update_stream::Message::Slot(Arc::new(slot_data)))
+                                        .await
+                                        .expect("sending must succeed");
+                                }
+                                _ => {
+                                    //log::info!("another account")
+                                }
+                            }
+                        }
+                    },
+                    _ = time_interval.tick() => {
+                        if account_updates == 0 || slot_updates == 0{
+                            log::error!("Restarting grpc connection");
+                            break;
+                        }
+                        account_updates = 0;
+                        slot_updates = 0;
+                    }
+                }
+            }
+        }
+    });
+}
+
+fn force_update_oracle_accounts(
+    rpc_url: String,
+    mango_oracles: Vec<Pubkey>,
+    sender: async_channel::Sender<account_update_stream::Message>,
+) {
+    tokio::spawn(async move {
+        let mut rpc_client = RpcClient::new(rpc_url.clone());
+        let mut interval = tokio::time::interval(Duration::from_millis(400));
+        loop {
+            interval.tick().await;
+            let resp = rpc_client
+                .get_multiple_accounts_with_commitment(
+                    mango_oracles.as_slice(),
+                    CommitmentConfig::processed(),
+                )
+                .await;
+            match resp {
+                Ok(resp) => {
+                    for (i, account) in resp.value.iter().enumerate() {
+                        if let Some(account) = account {
+                            let _ = sender
+                                .send(account_update_stream::Message::Account(AccountUpdate {
+                                    slot: resp.context.slot,
+                                    account: AccountSharedData::from(account.clone()),
+                                    pubkey: mango_oracles[i],
+                                }))
+                                .await;
+                        }
+                    }
+                }
+                Err(e) => {
+                    log::error!("error fetching oracle accounts {}", e);
+                    rpc_client = RpcClient::new(rpc_url.clone());
+                }
+            }
+        }
+    });
 }
 
 #[tokio::main]
@@ -294,27 +541,37 @@ async fn main() -> anyhow::Result<()> {
     info!("startup");
 
     let metrics = metrics::start();
+    let geyser_metrics = GeyserMetrics::default();
 
     let (account_update_sender, account_update_receiver) =
         async_channel::unbounded::<account_update_stream::Message>();
 
     // Sourcing account and slot data from solana via websockets
     // FUTURE: websocket feed should take which accounts to listen to as an input
-    websocket_source::start(
-        websocket_source::Config {
-            rpc_ws_url: ws_url.clone(),
-            serum_programs,
-            open_orders_authority: mango_group,
-        },
+    // websocket_source::start(
+    //     websocket_source::Config {
+    //         rpc_ws_url: ws_url.clone(),
+    //         serum_programs,
+    //         open_orders_authority: mango_group,
+    //     },
+    //     mango_oracles.clone(),
+    //     account_update_sender.clone(),
+    // );
+    grpc_update_accounts(
+        mango_oracles.clone(),
+        serum_programs,
+        mango_group,
+        account_update_sender.clone(),
+        geyser_metrics.clone(),
+    );
+
+    let first_grpc_slot = RpcClient::new(rpc_url.clone()).get_slot().await?;
+
+    force_update_oracle_accounts(
+        rpc_url.clone(),
         mango_oracles.clone(),
         account_update_sender.clone(),
     );
-
-    let first_websocket_slot = websocket_source::get_next_create_bank_slot(
-        account_update_receiver.clone(),
-        Duration::from_secs(10),
-    )
-    .await?;
 
     // Getting solana account snapshots via jsonrpc
     // FUTURE: of what to fetch a snapshot - should probably take as an input
@@ -324,14 +581,14 @@ async fn main() -> anyhow::Result<()> {
             mango_group,
             get_multiple_accounts_count: cli.get_multiple_accounts_count,
             parallel_rpc_requests: cli.parallel_rpc_requests,
-            snapshot_interval: Duration::from_secs(cli.snapshot_interval_secs),
-            min_slot: first_websocket_slot + 10,
+            snapshot_interval: Duration::from_secs(300),
+            min_slot: first_grpc_slot + 10,
         },
-        mango_oracles,
-        account_update_sender,
+        mango_oracles.clone(),
+        account_update_sender.clone(),
     );
 
-    start_chain_data_metrics(chain_data.clone(), &metrics);
+    start_chain_data_metrics(chain_data.clone(), &metrics, geyser_metrics);
 
     let shared_state = Arc::new(RwLock::new(SharedState::default()));
 
@@ -841,13 +1098,19 @@ impl LiquidationState {
     }
 }
 
-fn start_chain_data_metrics(chain: Arc<RwLock<chain_data::ChainData>>, metrics: &metrics::Metrics) {
-    let mut interval = mango_v4_client::delay_interval(Duration::from_secs(600));
+fn start_chain_data_metrics(
+    chain: Arc<RwLock<chain_data::ChainData>>,
+    metrics: &metrics::Metrics,
+    geyser_metrics: GeyserMetrics,
+) {
+    let mut interval = mango_v4_client::delay_interval(Duration::from_secs(60));
 
     let mut metric_slots_count = metrics.register_u64("chain_data_slots_count".into());
     let mut metric_accounts_count = metrics.register_u64("chain_data_accounts_count".into());
     let mut metric_account_write_count =
         metrics.register_u64("chain_data_account_write_count".into());
+    let mut metric_account_geyser_count = metrics.register_u64("geyser_account_fetched".into());
+    let mut metric_slot_geyser_count = metrics.register_u64("geyser_slots_fetched".into());
 
     tokio::spawn(async move {
         loop {
@@ -856,6 +1119,16 @@ fn start_chain_data_metrics(chain: Arc<RwLock<chain_data::ChainData>>, metrics: 
             metric_slots_count.set(chain_lock.slots_count() as u64);
             metric_accounts_count.set(chain_lock.accounts_count() as u64);
             metric_account_write_count.set(chain_lock.account_writes_count() as u64);
+            metric_account_geyser_count.set(
+                geyser_metrics
+                    .accounts_fetched
+                    .load(std::sync::atomic::Ordering::Relaxed),
+            );
+            metric_slot_geyser_count.set(
+                geyser_metrics
+                    .slots_fetched
+                    .load(std::sync::atomic::Ordering::Relaxed),
+            );
         }
     });
 }
