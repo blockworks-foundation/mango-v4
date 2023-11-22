@@ -467,7 +467,7 @@ pub fn token_edit(
     let bank = ctx.remaining_accounts.first().unwrap().load_mut::<Bank>()?;
     bank.verify()?;
 
-    emit_stack!(TokenMetaDataLogV2 {
+    emit_stack(TokenMetaDataLogV2 {
         mango_group: ctx.accounts.group.key(),
         mint: mint_info.mint.key(),
         token_index: bank.token_index,

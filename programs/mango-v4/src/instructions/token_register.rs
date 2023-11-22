@@ -152,7 +152,7 @@ pub fn token_register(
     mint_info.banks[0] = ctx.accounts.bank.key();
     mint_info.vaults[0] = ctx.accounts.vault.key();
 
-    emit_stack!(TokenMetaDataLogV2 {
+    emit_stack(TokenMetaDataLogV2 {
         mango_group: ctx.accounts.group.key(),
         mint: ctx.accounts.mint.key(),
         token_index,

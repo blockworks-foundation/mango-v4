@@ -974,12 +974,12 @@ impl Bank {
         staleness_slot: Option<u64>,
     ) -> Result<I80F48> {
         let primary_price = self.oracle_price(oracle_acc, staleness_slot);
-        if primary_price.is_ok() || fallback_oracle_acc_opt.is_none() {
-            primary_price
-        } else {
+        if primary_price.is_oracle_error() && fallback_oracle_acc_opt.is_some() {
             let fallback_oracle_acc = fallback_oracle_acc_opt.unwrap();
             require_keys_eq!(self.fallback_oracle, *fallback_oracle_acc.key());
             self.oracle_price_inner(fallback_oracle_acc, staleness_slot)
+        } else {
+            primary_price
         }
     }
 
