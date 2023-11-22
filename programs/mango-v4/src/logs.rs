@@ -13,7 +13,7 @@ pub fn emit_stack<T: anchor_lang::Event>(e: T) {
     let mut buffer = [0u8; 3000];
 
     let mut cursor = Cursor::new(&mut buffer[..]);
-    cursor.write(&T::DISCRIMINATOR).unwrap();
+    cursor.write_all(&T::DISCRIMINATOR).unwrap();
     e.serialize(&mut cursor)
         .expect("event must fit into stack buffer");
 
