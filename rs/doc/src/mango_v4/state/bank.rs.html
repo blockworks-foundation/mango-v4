@@ -1265,6 +1265,35 @@
 <a href="#1265" id="1265">1265</a>
 <a href="#1266" id="1266">1266</a>
 <a href="#1267" id="1267">1267</a>
+<a href="#1268" id="1268">1268</a>
+<a href="#1269" id="1269">1269</a>
+<a href="#1270" id="1270">1270</a>
+<a href="#1271" id="1271">1271</a>
+<a href="#1272" id="1272">1272</a>
+<a href="#1273" id="1273">1273</a>
+<a href="#1274" id="1274">1274</a>
+<a href="#1275" id="1275">1275</a>
+<a href="#1276" id="1276">1276</a>
+<a href="#1277" id="1277">1277</a>
+<a href="#1278" id="1278">1278</a>
+<a href="#1279" id="1279">1279</a>
+<a href="#1280" id="1280">1280</a>
+<a href="#1281" id="1281">1281</a>
+<a href="#1282" id="1282">1282</a>
+<a href="#1283" id="1283">1283</a>
+<a href="#1284" id="1284">1284</a>
+<a href="#1285" id="1285">1285</a>
+<a href="#1286" id="1286">1286</a>
+<a href="#1287" id="1287">1287</a>
+<a href="#1288" id="1288">1288</a>
+<a href="#1289" id="1289">1289</a>
+<a href="#1290" id="1290">1290</a>
+<a href="#1291" id="1291">1291</a>
+<a href="#1292" id="1292">1292</a>
+<a href="#1293" id="1293">1293</a>
+<a href="#1294" id="1294">1294</a>
+<a href="#1295" id="1295">1295</a>
+<a href="#1296" id="1296">1296</a>
 </pre><pre class="rust"><code><span class="kw">use super</span>::{OracleConfig, TokenIndex, TokenPosition};
 <span class="kw">use </span><span class="kw">crate</span>::accounts_zerocopy::KeyedAccountReader;
 <span class="kw">use </span><span class="kw">crate</span>::error::<span class="kw-2">*</span>;
@@ -1861,7 +1890,7 @@
         <span class="macro">require_gte!</span>(native_amount, <span class="number">0</span>);
         <span class="kw">let </span>native_position = position.native(<span class="self">self</span>);
 
-        <span class="kw">if </span>native_position.is_positive() {
+        <span class="kw">if </span>!native_position.is_negative() {
             <span class="kw">let </span>new_native_position = native_position - native_amount;
             <span class="kw">if </span>!new_native_position.is_negative() {
                 <span class="comment">// withdraw deposits only
@@ -2289,9 +2318,108 @@
 
     <span class="kw">use super</span>::<span class="kw-2">*</span>;
 
-    <span class="attr">#[test]
-    </span><span class="kw">pub fn </span>change() -&gt; <span class="prelude-ty">Result</span>&lt;()&gt; {
+    <span class="kw">fn </span>bank_change_runner(start: f64, change: i32, is_in_use: bool, use_withdraw: bool) {
+        <span class="macro">println!</span>(
+            <span class="string">&quot;testing: in use: {is_in_use}, start: {start}, change: {change}, use_withdraw: {use_withdraw}&quot;</span>,
+        );
+
         <span class="kw">let </span>epsilon = I80F48::from_bits(<span class="number">1</span>);
+
+        <span class="comment">//
+        // SETUP
+        //
+
+        </span><span class="kw">let </span><span class="kw-2">mut </span>bank = Bank::zeroed();
+        bank.net_borrow_limit_window_size_ts = <span class="number">1</span>; <span class="comment">// dummy
+        </span>bank.net_borrow_limit_per_window_quote = i64::MAX; <span class="comment">// max since we don&#39;t want this to interfere
+        </span>bank.deposit_index = I80F48::from_num(<span class="number">100.0</span>);
+        bank.borrow_index = I80F48::from_num(<span class="number">10.0</span>);
+        bank.loan_origination_fee_rate = I80F48::from_num(<span class="number">0.1</span>);
+        <span class="kw">let </span>indexed = |v: I80F48, b: <span class="kw-2">&amp;</span>Bank| {
+            <span class="kw">if </span>v &gt; <span class="number">0 </span>{
+                <span class="kw">let </span>i = v / b.deposit_index;
+                <span class="kw">if </span>i * b.deposit_index &lt; v {
+                    i + I80F48::DELTA
+                } <span class="kw">else </span>{
+                    i
+                }
+            } <span class="kw">else </span>{
+                v / b.borrow_index
+            }
+        };
+
+        <span class="kw">let </span><span class="kw-2">mut </span>account = TokenPosition {
+            indexed_position: I80F48::ZERO,
+            token_index: <span class="number">0</span>,
+            in_use_count: u16::from(is_in_use),
+            cumulative_deposit_interest: <span class="number">0.0</span>,
+            cumulative_borrow_interest: <span class="number">0.0</span>,
+            previous_index: I80F48::ZERO,
+            padding: Default::default(),
+            reserved: [<span class="number">0</span>; <span class="number">128</span>],
+        };
+
+        account.indexed_position = indexed(I80F48::from_num(start), <span class="kw-2">&amp;</span>bank);
+        <span class="kw">if </span>start &gt;= <span class="number">0.0 </span>{
+            bank.indexed_deposits = account.indexed_position;
+        } <span class="kw">else </span>{
+            bank.indexed_borrows = -account.indexed_position;
+        }
+
+        <span class="comment">// get the rounded start value
+        </span><span class="kw">let </span>start_native = account.native(<span class="kw-2">&amp;</span>bank);
+
+        <span class="comment">//
+        // TEST
+        //
+
+        </span><span class="kw">let </span>change = I80F48::from(change);
+        <span class="kw">let </span>dummy_now_ts = <span class="number">1 </span><span class="kw">as </span>u64;
+        <span class="kw">let </span>dummy_price = I80F48::ZERO;
+        <span class="kw">let </span>is_active = <span class="kw">if </span>use_withdraw {
+            bank.withdraw_with_fee(<span class="kw-2">&amp;mut </span>account, change, dummy_now_ts)
+                .unwrap()
+                .position_is_active
+        } <span class="kw">else </span>{
+            bank.change_with_fee(<span class="kw-2">&amp;mut </span>account, change, dummy_now_ts)
+                .unwrap()
+                .position_is_active
+        };
+
+        <span class="kw">let </span><span class="kw-2">mut </span>expected_native = start_native + change;
+        <span class="kw">let </span>is_deposit_into_nonnegative = start &gt;= <span class="number">0.0 </span>&amp;&amp; change &gt;= <span class="number">0 </span>&amp;&amp; !use_withdraw;
+        <span class="kw">if </span>expected_native &gt;= <span class="number">0.0
+            </span>&amp;&amp; expected_native &lt; <span class="number">1.0
+            </span>&amp;&amp; !is_in_use
+            &amp;&amp; !is_deposit_into_nonnegative
+        {
+            <span class="macro">assert!</span>(!is_active);
+            <span class="macro">assert_eq!</span>(bank.dust, expected_native);
+            expected_native = I80F48::ZERO;
+        } <span class="kw">else </span>{
+            <span class="macro">assert!</span>(is_active);
+            <span class="macro">assert_eq!</span>(bank.dust, I80F48::ZERO);
+        }
+        <span class="kw">if </span>change &lt; <span class="number">0 </span>&amp;&amp; expected_native &lt; <span class="number">0 </span>{
+            <span class="kw">let </span>new_borrow = -(expected_native - min(start_native, I80F48::ZERO));
+            expected_native -= new_borrow * bank.loan_origination_fee_rate;
+        }
+        <span class="kw">let </span>expected_indexed = indexed(expected_native, <span class="kw-2">&amp;</span>bank);
+
+        <span class="comment">// at most one epsilon error in the resulting indexed value
+        </span><span class="macro">assert!</span>((account.indexed_position - expected_indexed).abs() &lt;= epsilon);
+
+        <span class="kw">if </span>account.indexed_position.is_positive() {
+            <span class="macro">assert_eq!</span>(bank.indexed_deposits, account.indexed_position);
+            <span class="macro">assert_eq!</span>(bank.indexed_borrows, I80F48::ZERO);
+        } <span class="kw">else </span>{
+            <span class="macro">assert_eq!</span>(bank.indexed_deposits, I80F48::ZERO);
+            <span class="macro">assert_eq!</span>(bank.indexed_borrows, -account.indexed_position);
+        }
+    }
+
+    <span class="attr">#[test]
+    </span><span class="kw">pub fn </span>bank_change() -&gt; <span class="prelude-ty">Result</span>&lt;()&gt; {
         <span class="kw">let </span>cases = [
             (-<span class="number">10.1</span>, <span class="number">1</span>),
             (-<span class="number">10.1</span>, <span class="number">10</span>),
@@ -2315,89 +2443,19 @@
             (<span class="number">0.0</span>, -<span class="number">1</span>),
             (-<span class="number">0.1</span>, -<span class="number">1</span>),
             (-<span class="number">1.1</span>, -<span class="number">10</span>),
+            (<span class="number">10.0</span>, <span class="number">0</span>),
+            (<span class="number">1.0</span>, <span class="number">0</span>),
+            (<span class="number">0.1</span>, <span class="number">0</span>),
+            (<span class="number">0.0</span>, <span class="number">0</span>),
+            (-<span class="number">0.1</span>, <span class="number">0</span>),
         ];
 
         <span class="kw">for </span>is_in_use <span class="kw">in </span>[<span class="bool-val">false</span>, <span class="bool-val">true</span>] {
             <span class="kw">for </span>(start, change) <span class="kw">in </span>cases {
-                <span class="macro">println!</span>(
-                    <span class="string">&quot;testing: in use: {}, start: {}, change: {}&quot;</span>,
-                    is_in_use, start, change
-                );
-
-                <span class="comment">//
-                // SETUP
-                //
-
-                </span><span class="kw">let </span><span class="kw-2">mut </span>bank = Bank::zeroed();
-                bank.net_borrow_limit_window_size_ts = <span class="number">1</span>; <span class="comment">// dummy
-                </span>bank.net_borrow_limit_per_window_quote = i64::MAX; <span class="comment">// max since we don&#39;t want this to interfere
-                </span>bank.deposit_index = I80F48::from_num(<span class="number">100.0</span>);
-                bank.borrow_index = I80F48::from_num(<span class="number">10.0</span>);
-                bank.loan_origination_fee_rate = I80F48::from_num(<span class="number">0.1</span>);
-                <span class="kw">let </span>indexed = |v: I80F48, b: <span class="kw-2">&amp;</span>Bank| {
-                    <span class="kw">if </span>v &gt; <span class="number">0 </span>{
-                        v / b.deposit_index
-                    } <span class="kw">else </span>{
-                        v / b.borrow_index
-                    }
-                };
-
-                <span class="kw">let </span><span class="kw-2">mut </span>account = TokenPosition {
-                    indexed_position: I80F48::ZERO,
-                    token_index: <span class="number">0</span>,
-                    in_use_count: u16::from(is_in_use),
-                    cumulative_deposit_interest: <span class="number">0.0</span>,
-                    cumulative_borrow_interest: <span class="number">0.0</span>,
-                    previous_index: I80F48::ZERO,
-                    padding: Default::default(),
-                    reserved: [<span class="number">0</span>; <span class="number">128</span>],
-                };
-
-                account.indexed_position = indexed(I80F48::from_num(start), <span class="kw-2">&amp;</span>bank);
-                <span class="kw">if </span>start &gt;= <span class="number">0.0 </span>{
-                    bank.indexed_deposits = account.indexed_position;
-                } <span class="kw">else </span>{
-                    bank.indexed_borrows = -account.indexed_position;
-                }
-
-                <span class="comment">// get the rounded start value
-                </span><span class="kw">let </span>start_native = account.native(<span class="kw-2">&amp;</span>bank);
-
-                <span class="comment">//
-                // TEST
-                //
-
-                </span><span class="kw">let </span>change = I80F48::from(change);
-                <span class="kw">let </span>dummy_now_ts = <span class="number">1 </span><span class="kw">as </span>u64;
-                <span class="kw">let </span>dummy_price = I80F48::ZERO;
-                <span class="kw">let </span>is_active = bank
-                    .change_with_fee(<span class="kw-2">&amp;mut </span>account, change, dummy_now_ts)<span class="question-mark">?
-                    </span>.position_is_active;
-
-                <span class="kw">let </span><span class="kw-2">mut </span>expected_native = start_native + change;
-                <span class="kw">if </span>expected_native &gt;= <span class="number">0.0 </span>&amp;&amp; expected_native &lt; <span class="number">1.0 </span>&amp;&amp; !is_in_use {
-                    <span class="macro">assert!</span>(!is_active);
-                    <span class="macro">assert_eq!</span>(bank.dust, expected_native);
-                    expected_native = I80F48::ZERO;
-                } <span class="kw">else </span>{
-                    <span class="macro">assert!</span>(is_active);
-                    <span class="macro">assert_eq!</span>(bank.dust, I80F48::ZERO);
-                }
-                <span class="kw">if </span>change &lt; <span class="number">0 </span>&amp;&amp; expected_native &lt; <span class="number">0 </span>{
-                    <span class="kw">let </span>new_borrow = -(expected_native - min(start_native, I80F48::ZERO));
-                    expected_native -= new_borrow * bank.loan_origination_fee_rate;
-                }
-                <span class="kw">let </span>expected_indexed = indexed(expected_native, <span class="kw-2">&amp;</span>bank);
-
-                <span class="comment">// at most one epsilon error in the resulting indexed value
-                </span><span class="macro">assert!</span>((account.indexed_position - expected_indexed).abs() &lt;= epsilon);
-
-                <span class="kw">if </span>account.indexed_position.is_positive() {
-                    <span class="macro">assert_eq!</span>(bank.indexed_deposits, account.indexed_position);
-                    <span class="macro">assert_eq!</span>(bank.indexed_borrows, I80F48::ZERO);
-                } <span class="kw">else </span>{
-                    <span class="macro">assert_eq!</span>(bank.indexed_deposits, I80F48::ZERO);
-                    <span class="macro">assert_eq!</span>(bank.indexed_borrows, -account.indexed_position);
+                bank_change_runner(start, change, is_in_use, <span class="bool-val">false</span>);
+                <span class="kw">if </span>change == <span class="number">0 </span>{
+                    <span class="comment">// check withdrawing 0
+                    </span>bank_change_runner(start, change, is_in_use, <span class="bool-val">true</span>);
                 }
             }
         }
