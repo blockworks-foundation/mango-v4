@@ -6,7 +6,7 @@ import {
   Wallet,
 } from '@coral-xyz/anchor';
 import * as borsh from '@coral-xyz/borsh';
-import { OpenOrders } from '@project-serum/serum';
+import { OpenOrders, decodeEventQueue } from '@project-serum/serum';
 import {
   createCloseAccountInstruction,
   createInitializeAccount3Instruction,
@@ -1582,6 +1582,28 @@ export class MangoClient {
       })
       .instruction();
     return await this.sendAndConfirmTransactionForGroup(group, [ix]);
+  }
+
+  public async serum3ConsumeEvents(
+    group: Group,
+    serum3MarketExternalPk: PublicKey,
+  ): Promise<MangoSignatureStatus> {
+    const serum3MarketExternal = group.serum3ExternalMarketsMap.get(
+      serum3MarketExternalPk.toBase58(),
+    )!;
+    const ai = await this.program.provider.connection.getAccountInfo(
+      serum3MarketExternal.decoded.eventQueue,
+    );
+    const eq = decodeEventQueue(ai!.data);
+    const orderedAccounts: PublicKey[] = eq
+      .map((e) => e.openOrders)
+      .sort((a, b) => a.toBuffer().swap64().compare(b.toBuffer().swap64()));
+    if (orderedAccounts.length == 0) {
+      throw new Error(`Event queue is empty!`);
+    }
+    return this.sendAndConfirmTransactionForGroup(group, [
+      serum3MarketExternal.makeConsumeEventsInstruction(orderedAccounts, 65535),
+    ]);
   }
 
   public async serum3EditMarket(
