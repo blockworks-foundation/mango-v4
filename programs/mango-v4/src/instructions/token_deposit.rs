@@ -124,16 +124,14 @@ impl<'a, 'info> DepositCommon<'a, 'info> {
         // Since depositing can only increase health, we can skip the usual pre-health computation.
         // Also, TokenDeposit is one of the rare instructions that is allowed even during being_liquidated.
         // Being in a health region always means being_liquidated is false, so it's safe to gate the check.
-        if !account.fixed.is_in_health_region() {
+        let was_being_liquidated = account.being_liquidated();
+        if !account.fixed.is_in_health_region() && was_being_liquidated {
             let health = cache.health(HealthType::LiquidationEnd);
             msg!("health: {}", health);
+            // Only compute health and check for recovery if not already being liquidated
 
-            let was_being_liquidated = account.being_liquidated();
             let recovered = account.fixed.maybe_recover_from_being_liquidated(health);
-            require!(
-                !was_being_liquidated || recovered,
-                MangoError::DepositsIntoLiquidatingMustRecover
-            );
+            require!(recovered, MangoError::DepositsIntoLiquidatingMustRecover);
         }
 
         // Group level deposit limit on account
