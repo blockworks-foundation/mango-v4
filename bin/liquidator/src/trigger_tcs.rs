@@ -66,7 +66,7 @@ pub struct Config {
     pub profit_fraction: f64,
 
     /// Minimum fraction of max_buy to buy for success when triggering,
-    /// useful in conjuction with jupiter swaps in same tx to avoid over-buying.
+    /// useful in conjunction with jupiter swaps in same tx to avoid over-buying.
     ///
     /// Can be set to 0 to allow executions of any size.
     pub min_buy_fraction: f64,
