@@ -499,11 +499,11 @@ async fn main() -> anyhow::Result<()> {
     let token_swap_info_job = tokio::spawn({
         // TODO: configurable interval
         let mut interval = tokio::time::interval(Duration::from_secs(60));
-        let mut min_delay = tokio::time::interval(Duration::from_secs(1));
+        let mut startup_wait = tokio::time::interval(Duration::from_secs(1));
         let shared_state = shared_state.clone();
         async move {
             loop {
-                min_delay.tick().await;
+                startup_wait.tick().await;
                 if !shared_state.read().unwrap().one_snapshot_done {
                     continue;
                 }
@@ -512,10 +512,11 @@ async fn main() -> anyhow::Result<()> {
                 let token_indexes = token_swap_info_updater
                     .mango_client()
                     .context
-                    .token_indexes_by_name
-                    .values()
+                    .tokens
+                    .keys()
                     .copied()
                     .collect_vec();
+                let mut min_delay = tokio::time::interval(Duration::from_secs(1));
                 for token_index in token_indexes {
                     min_delay.tick().await;
                     match token_swap_info_updater.update_one(token_index).await {
