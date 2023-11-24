@@ -13,7 +13,7 @@ const emptyFieldPrefixes = ['padding', 'reserved'];
 
 const skippedErrors = [
   // The account data layout moved from (v1 or v2) to the v3 layout for all accounts
-  ['AccountSize', 'MangoAccount', 440, 512]
+  ['AccountSize', 'MangoAccount', 440, 512],
 ];
 
 function isAllowedError(errorTuple): boolean {
