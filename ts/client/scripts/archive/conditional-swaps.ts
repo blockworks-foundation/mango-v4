@@ -44,7 +44,7 @@ async function main(): Promise<void> {
 
     await Promise.all(
       account.tokenConditionalSwaps.map((tcs, i) => {
-        if (!tcs.hasData) {
+        if (!tcs.isConfigured) {
           return Promise.resolve();
         }
         client.tokenConditionalSwapCancel(group, account, tcs.id);
