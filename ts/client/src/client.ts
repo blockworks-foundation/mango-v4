@@ -4101,7 +4101,7 @@ export class MangoClient {
   ): Promise<MangoSignatureStatus> {
     const ixs = await Promise.all(
       account.tokenConditionalSwaps
-        .filter((tcs) => tcs.hasData)
+        .filter((tcs) => tcs.isConfigured)
         .map(async (tcs, i) => {
           const buyBank = group.banksMapByTokenIndex.get(tcs.buyTokenIndex)![0];
           const sellBank = group.banksMapByTokenIndex.get(

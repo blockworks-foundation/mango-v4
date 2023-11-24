@@ -202,7 +202,7 @@ export class MangoAccount {
   }
 
   public tokenConditionalSwapsActive(): TokenConditionalSwap[] {
-    return this.tokenConditionalSwaps.filter((tcs) => tcs.hasData);
+    return this.tokenConditionalSwaps.filter((tcs) => tcs.isConfigured);
   }
 
   public perpPositionExistsForMarket(perpMarket: PerpMarket): boolean {
@@ -1894,7 +1894,7 @@ export class TokenConditionalSwap {
       dto.makerFeeRate,
       dto.buyTokenIndex as TokenIndex,
       dto.sellTokenIndex as TokenIndex,
-      dto.hasData == 1,
+      dto.isConfigured == 1,
       dto.allowCreatingDeposits == 1,
       dto.allowCreatingBorrows == 1,
       dto.displayPriceStyle == 0
@@ -1918,7 +1918,7 @@ export class TokenConditionalSwap {
     public makerFeeRate: number,
     public buyTokenIndex: TokenIndex,
     public sellTokenIndex: TokenIndex,
-    public hasData: boolean,
+    public isConfigured: boolean,
     public allowCreatingDeposits: boolean,
     public allowCreatingBorrows: boolean,
     public priceDisplayStyle: TokenConditionalSwapDisplayPriceStyle,
@@ -2141,7 +2141,7 @@ export class TokenConditionalSwapDto {
     public makerFeeRate: number,
     public buyTokenIndex: number,
     public sellTokenIndex: number,
-    public hasData: number,
+    public isConfigured: number,
     public allowCreatingDeposits: number,
     public allowCreatingBorrows: number,
     public displayPriceStyle: number,
