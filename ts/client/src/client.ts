@@ -1,6 +1,8 @@
 import {
   AnchorProvider,
   BN,
+  IdlAccounts,
+  IdlTypes,
   Program,
   Provider,
   Wallet,
@@ -43,7 +45,6 @@ import {
   Serum3Orders,
   TokenConditionalSwap,
   TokenConditionalSwapDisplayPriceStyle,
-  TokenConditionalSwapDto,
   TokenConditionalSwapIntention,
   TokenPosition,
 } from './accounts/mangoAccount';
@@ -321,7 +322,10 @@ export class MangoClient {
 
   public async getGroup(groupPk: PublicKey): Promise<Group> {
     const groupAccount = await this.program.account.group.fetch(groupPk);
-    const group = Group.from(groupPk, groupAccount);
+    const group = Group.from(
+      groupPk,
+      groupAccount as IdlAccounts<MangoV4>['group'],
+    );
     await group.reloadAll(this);
     return group;
   }
@@ -337,7 +341,11 @@ export class MangoClient {
     ];
 
     const groups = (await this.program.account.group.all(filters)).map(
-      (tuple) => Group.from(tuple.publicKey, tuple.account),
+      (tuple) =>
+        Group.from(
+          tuple.publicKey,
+          tuple.account as IdlAccounts<MangoV4>['group'],
+        ),
     );
     groups.forEach((group) => group.reloadAll(this));
     return groups;
@@ -364,7 +372,11 @@ export class MangoClient {
       },
     ];
     const groups = (await this.program.account.group.all(filters)).map(
-      (tuple) => Group.from(tuple.publicKey, tuple.account),
+      (tuple) =>
+        Group.from(
+          tuple.publicKey,
+          tuple.account as IdlAccounts<MangoV4>['group'],
+        ),
     );
     await groups[0].reloadAll(this);
     return groups[0];
@@ -613,7 +625,9 @@ export class MangoClient {
           },
         },
       ])
-    ).map((tuple) => Bank.from(tuple.publicKey, tuple.account));
+    ).map((tuple) =>
+      Bank.from(tuple.publicKey, tuple.account as IdlAccounts<MangoV4>['bank']),
+    );
   }
 
   public async getMintInfosForGroup(group: Group): Promise<MintInfo[]> {
@@ -627,7 +641,10 @@ export class MangoClient {
         },
       ])
     ).map((tuple) => {
-      return MintInfo.from(tuple.publicKey, tuple.account);
+      return MintInfo.from(
+        tuple.publicKey,
+        tuple.account as IdlAccounts<MangoV4>['mintInfo'],
+      );
     });
   }
 
@@ -653,7 +670,10 @@ export class MangoClient {
         },
       ])
     ).map((tuple) => {
-      return MintInfo.from(tuple.publicKey, tuple.account);
+      return MintInfo.from(
+        tuple.publicKey,
+        tuple.account as IdlAccounts<MangoV4>['mintInfo'],
+      );
     });
   }
 
@@ -731,7 +751,10 @@ export class MangoClient {
     }
 
     return (await this.program.account.stubOracle.all(filters)).map((pa) =>
-      StubOracle.from(pa.publicKey, pa.account),
+      StubOracle.from(
+        pa.publicKey,
+        pa.account as IdlAccounts<MangoV4>['stubOracle'],
+      ),
     );
   }
 
@@ -927,12 +950,12 @@ export class MangoClient {
               v1Len +
                 // This is the padding before tokenConditionalSwaps
                 4,
-            ) as TokenConditionalSwapDto[])
-        : new Array<TokenConditionalSwapDto>();
+            ) as Array<IdlTypes<MangoV4>['TokenConditionalSwap']>)
+        : new Array<IdlTypes<MangoV4>['TokenConditionalSwap']>();
 
     return MangoAccount.from(
       mangoAccountPk,
-      decodedMangoAccount,
+      decodedMangoAccount as IdlAccounts<MangoV4>['mangoAccount'],
       tokenConditionalSwaps,
     );
   }
@@ -1662,7 +1685,10 @@ export class MangoClient {
     }
 
     return (await this.program.account.serum3Market.all(filters)).map((tuple) =>
-      Serum3Market.from(tuple.publicKey, tuple.account),
+      Serum3Market.from(
+        tuple.publicKey,
+        tuple.account as IdlAccounts<MangoV4>['serum3Market'],
+      ),
     );
   }
 
@@ -2422,7 +2448,10 @@ export class MangoClient {
     ];
 
     return (await this.program.account.perpMarket.all(filters)).map((tuple) =>
-      PerpMarket.from(tuple.publicKey, tuple.account),
+      PerpMarket.from(
+        tuple.publicKey,
+        tuple.account as IdlAccounts<MangoV4>['perpMarket'],
+      ),
     );
   }
 
