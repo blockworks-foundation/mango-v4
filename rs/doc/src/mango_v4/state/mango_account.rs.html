@@ -2562,8 +2562,6 @@
 <a href="#2562" id="2562">2562</a>
 <a href="#2563" id="2563">2563</a>
 <a href="#2564" id="2564">2564</a>
-<a href="#2565" id="2565">2565</a>
-<a href="#2566" id="2566">2566</a>
 </pre><pre class="rust"><code><span class="kw">use </span>std::cell::{Ref, RefMut};
 <span class="kw">use </span>std::mem::size_of;
 
@@ -2643,13 +2641,14 @@
 //       resizing before v0.20.0 would migrate to this version.
 // - v3: Introduced in v0.20.0 to add 64 zero bytes at the end for future expansion.
 //       Users will migrate to this version when resizing their accounts. Also the
-//       AccountSizeMigration instruction is intended to be used to bring all accounts to
-//       this version after v0.20.0 is deployed.
+//       AccountSizeMigration instruction was used to bring all accounts to
+//       this version after v0.20.0 was deployed.
 //
-// Version v0.21.0 will likely drop support for v1 and v2 accounts.
+// Version v0.22.0 drops idl support for v1 and v2 accounts by extending the MangoAccount idl with the
+// new fields.
 //
-// MangoAccount binary data is backwards compatible: when ignoring trailing bytes, a v2 account can
-// be read as a v1 account and a v3 account can be read as v1 or v2 etc.
+// When not reading via idl, MangoAccount binary data is backwards compatible: when ignoring trailing bytes,
+// a v2 account can be read as a v1 account and a v3 account can be read as v1 or v2 etc.
 </span><span class="attr">#[account]
 #[derive(Derivative)]
 #[derivative(Debug)]
@@ -2740,10 +2739,13 @@
     <span class="attr">#[derivative(Debug = <span class="string">&quot;ignore&quot;</span>)]
     </span><span class="kw">pub </span>padding7: u32,
     <span class="kw">pub </span>perp_open_orders: Vec&lt;PerpOpenOrder&gt;,
-    <span class="comment">// WARNING: This does not have further fields, like tcs, intentionally:
-    // There are existing accounts that don&#39;t have them and adding them here
-    // would break backwards compatibility.
-</span>}
+    <span class="attr">#[derivative(Debug = <span class="string">&quot;ignore&quot;</span>)]
+    </span><span class="kw">pub </span>padding8: u32,
+    <span class="kw">pub </span>token_conditional_swaps: Vec&lt;TokenConditionalSwap&gt;,
+
+    <span class="attr">#[derivative(Debug = <span class="string">&quot;ignore&quot;</span>)]
+    </span><span class="kw">pub </span>reserved_dynamic: [u8; <span class="number">64</span>],
+}
 
 <span class="kw">impl </span>MangoAccount {
     <span class="kw">pub fn </span>default_for_tests() -&gt; <span class="self">Self </span>{
@@ -2758,6 +2760,7 @@
             bump: <span class="number">0</span>,
             padding: Default::default(),
             net_deposits: <span class="number">0</span>,
+            perp_spot_transfers: <span class="number">0</span>,
             health_region_begin_init_health: <span class="number">0</span>,
             frozen_until: <span class="number">0</span>,
             buyback_fees_accrued_current: <span class="number">0</span>,
@@ -2775,7 +2778,9 @@
             perps: <span class="macro">vec!</span>[PerpPosition::default(); <span class="number">4</span>],
             padding7: Default::default(),
             perp_open_orders: <span class="macro">vec!</span>[PerpOpenOrder::default(); <span class="number">6</span>],
-            perp_spot_transfers: <span class="number">0</span>,
+            padding8: Default::default(),
+            token_conditional_swaps: <span class="macro">vec!</span>[TokenConditionalSwap::default(); <span class="number">2</span>],
+            reserved_dynamic: [<span class="number">0</span>; <span class="number">64</span>],
         }
     }
 
@@ -4379,29 +4384,17 @@
 
     <span class="kw">fn </span>make_test_account() -&gt; MangoAccountValue {
         <span class="kw">let </span>account = MangoAccount::default_for_tests();
-        <span class="kw">let </span><span class="kw-2">mut </span>bytes = AnchorSerialize::try_to_vec(<span class="kw-2">&amp;</span>account).unwrap();
+        <span class="kw">let </span>bytes = AnchorSerialize::try_to_vec(<span class="kw-2">&amp;</span>account).unwrap();
 
-        <span class="comment">// The MangoAccount struct is missing some dynamic fields, add space for them
-        </span><span class="kw">let </span>tcs_length = <span class="number">2</span>;
-        <span class="kw">let </span>expected_space = MangoAccount::space(
+        <span class="comment">// Verify that the size is as expected
+        </span><span class="kw">let </span>expected_space = MangoAccount::space(
             account.tokens.len() <span class="kw">as </span>u8,
             account.serum3.len() <span class="kw">as </span>u8,
             account.perps.len() <span class="kw">as </span>u8,
             account.perp_open_orders.len() <span class="kw">as </span>u8,
-            tcs_length,
+            account.token_conditional_swaps.len() <span class="kw">as </span>u8,
         );
-        bytes.extend(<span class="macro">vec!</span>[<span class="number">0u8</span>; expected_space - bytes.len()]);
-
-        <span class="comment">// Set the length of these dynamic parts
-        </span><span class="kw">let </span>(fixed, dynamic) = bytes.split_at_mut(size_of::&lt;MangoAccountFixed&gt;());
-        <span class="kw">let </span><span class="kw-2">mut </span>header = MangoAccountDynamicHeader::from_bytes(dynamic).unwrap();
-        header.token_conditional_swap_count = tcs_length;
-        <span class="kw">let </span><span class="kw-2">mut </span>account = MangoAccountRefMut {
-            header: <span class="kw-2">&amp;mut </span>header,
-            fixed: bytemuck::from_bytes_mut(fixed),
-            dynamic,
-        };
-        account.write_token_conditional_swap_length();
+        <span class="macro">assert_eq!</span>(expected_space, <span class="number">8 </span>+ bytes.len());
 
         MangoAccountValue::from_bytes(<span class="kw-2">&amp;</span>bytes).unwrap()
     }
@@ -4429,19 +4422,15 @@
         account.perps[<span class="number">0</span>].market_index = <span class="number">9</span>;
         account.perp_open_orders.resize(<span class="number">8</span>, PerpOpenOrder::default());
         account.next_token_conditional_swap_id = <span class="number">13</span>;
+        account
+            .token_conditional_swaps
+            .resize(<span class="number">12</span>, TokenConditionalSwap::default());
+        account.token_conditional_swaps[<span class="number">0</span>].buy_token_index = <span class="number">14</span>;
 
-        <span class="kw">let </span>account_bytes_without_tcs_and_reserved = AnchorSerialize::try_to_vec(<span class="kw-2">&amp;</span>account).unwrap();
-        <span class="kw">let </span>account_bytes = {
-            <span class="kw">let </span><span class="kw-2">mut </span>b = account_bytes_without_tcs_and_reserved.clone();
-            <span class="comment">// tcs adds 4 bytes of padding and 4 bytes of Vec size
-            // plus 64 bytes of reserved space at the end
-            </span>b.extend([<span class="number">0u8</span>; <span class="number">8 </span>+ <span class="number">64</span>]);
-            b
-        };
-        <span class="macro">assert_eq!</span>(<span class="number">8 </span>+ account_bytes.len(), MangoAccount::space(<span class="number">8</span>, <span class="number">8</span>, <span class="number">4</span>, <span class="number">8</span>, <span class="number">0</span>));
+        <span class="kw">let </span>account_bytes = AnchorSerialize::try_to_vec(<span class="kw-2">&amp;</span>account).unwrap();
+        <span class="macro">assert_eq!</span>(<span class="number">8 </span>+ account_bytes.len(), MangoAccount::space(<span class="number">8</span>, <span class="number">8</span>, <span class="number">4</span>, <span class="number">8</span>, <span class="number">12</span>));
 
-        <span class="kw">let </span>account2 =
-            MangoAccountValue::from_bytes(<span class="kw-2">&amp;</span>account_bytes_without_tcs_and_reserved).unwrap();
+        <span class="kw">let </span>account2 = MangoAccountValue::from_bytes(<span class="kw-2">&amp;</span>account_bytes).unwrap();
         <span class="macro">assert_eq!</span>(account.group, account2.fixed.group);
         <span class="macro">assert_eq!</span>(account.owner, account2.fixed.owner);
         <span class="macro">assert_eq!</span>(account.name, account2.fixed.name);
@@ -4491,10 +4480,17 @@
                 .perp_position_by_raw_index_unchecked(<span class="number">0</span>)
                 .market_index
         );
-        <span class="macro">assert_eq!</span>(account2.all_token_conditional_swaps().count(), <span class="number">0</span>);
-
-        <span class="kw">let </span>account3 = MangoAccountValue::from_bytes(<span class="kw-2">&amp;</span>account_bytes).unwrap();
-        <span class="macro">assert_eq!</span>(account3.all_token_conditional_swaps().count(), <span class="number">0</span>);
+        <span class="macro">assert_eq!</span>(
+            account.token_conditional_swaps.len(),
+            account2.all_token_conditional_swaps().count()
+        );
+        <span class="macro">assert_eq!</span>(
+            account.token_conditional_swaps[<span class="number">0</span>].buy_token_index,
+            account2
+                .token_conditional_swap_by_index(<span class="number">0</span>)
+                .unwrap()
+                .buy_token_index
+        );
     }
 
     <span class="attr">#[test]
