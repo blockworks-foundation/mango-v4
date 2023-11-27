@@ -2192,7 +2192,6 @@ export class MangoClient {
     group: Group,
     mangoAccount: MangoAccount,
     externalMarketPk: PublicKey,
-    side: Serum3Side,
     clientOrderId: BN,
   ): Promise<TransactionInstruction> {
     const serum3Market = group.serum3MarketsMapByExternal.get(
@@ -2204,7 +2203,7 @@ export class MangoClient {
     )!;
 
     const ix = await this.program.methods
-      .serum3CancelOrderByClientOrderId(side, clientOrderId)
+      .serum3CancelOrderByClientOrderId(clientOrderId)
       .accounts({
         group: group.publicKey,
         account: mangoAccount.publicKey,
@@ -2226,7 +2225,6 @@ export class MangoClient {
     group: Group,
     mangoAccount: MangoAccount,
     externalMarketPk: PublicKey,
-    side: Serum3Side,
     clientOrderId: BN,
   ): Promise<MangoSignatureStatus> {
     const ixs = await Promise.all([
@@ -2234,7 +2232,6 @@ export class MangoClient {
         group,
         mangoAccount,
         externalMarketPk,
-        side,
         clientOrderId,
       ),
       this.serum3SettleFundsV2Ix(group, mangoAccount, externalMarketPk),
