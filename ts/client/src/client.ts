@@ -964,37 +964,7 @@ export class MangoClient {
       ai.data,
     );
 
-    // Re-encode decoded mango account with v1 layout, this will help identifying
-    // if account is of type v1 or v2
-    // Do whole encoding manually, since anchor uses a buffer of a constant length which is too small
-    const mangoAccountV1Buffer = Buffer.alloc(ai.data.length);
-    const layout =
-      this.program.coder.accounts['accountLayouts'].get('mangoAccount');
-    const discriminatorLen = 8;
-    const v1DataLen = layout.encode(decodedMangoAccount, mangoAccountV1Buffer);
-    const v1Len = discriminatorLen + v1DataLen;
-
-    const tokenConditionalSwaps =
-      ai.data.length > v1Len
-        ? (borsh
-            .vec(
-              (this.program as any)._coder.types.typeLayouts.get(
-                'TokenConditionalSwap',
-              ),
-            )
-            .decode(
-              ai.data,
-              v1Len +
-                // This is the padding before tokenConditionalSwaps
-                4,
-            ) as TokenConditionalSwapDto[])
-        : new Array<TokenConditionalSwapDto>();
-
-    return MangoAccount.from(
-      mangoAccountPk,
-      decodedMangoAccount,
-      tokenConditionalSwaps,
-    );
+    return MangoAccount.from(mangoAccountPk, decodedMangoAccount);
   }
 
   public async getMangoAccountWithSlot(

@@ -77,13 +77,14 @@ impl MangoAccountPdaSeeds {
 //       resizing before v0.20.0 would migrate to this version.
 // - v3: Introduced in v0.20.0 to add 64 zero bytes at the end for future expansion.
 //       Users will migrate to this version when resizing their accounts. Also the
-//       AccountSizeMigration instruction is intended to be used to bring all accounts to
-//       this version after v0.20.0 is deployed.
+//       AccountSizeMigration instruction was used to bring all accounts to
+//       this version after v0.20.0 was deployed.
 //
-// Version v0.21.0 will likely drop support for v1 and v2 accounts.
+// Version v0.22.0 drops idl support for v1 and v2 accounts by extending the MangoAccount idl with the
+// new fields.
 //
-// MangoAccount binary data is backwards compatible: when ignoring trailing bytes, a v2 account can
-// be read as a v1 account and a v3 account can be read as v1 or v2 etc.
+// When not reading via idl, MangoAccount binary data is backwards compatible: when ignoring trailing bytes,
+// a v2 account can be read as a v1 account and a v3 account can be read as v1 or v2 etc.
 #[account]
 #[derive(Derivative)]
 #[derivative(Debug)]
@@ -174,9 +175,12 @@ pub struct MangoAccount {
     #[derivative(Debug = "ignore")]
     pub padding7: u32,
     pub perp_open_orders: Vec<PerpOpenOrder>,
-    // WARNING: This does not have further fields, like tcs, intentionally:
-    // There are existing accounts that don't have them and adding them here
-    // would break backwards compatibility.
+    #[derivative(Debug = "ignore")]
+    pub padding8: u32,
+    pub token_conditional_swaps: Vec<TokenConditionalSwap>,
+
+    #[derivative(Debug = "ignore")]
+    pub reserved_dynamic: [u8; 64],
 }
 
 impl MangoAccount {
@@ -192,6 +196,7 @@ impl MangoAccount {
             bump: 0,
             padding: Default::default(),
             net_deposits: 0,
+            perp_spot_transfers: 0,
             health_region_begin_init_health: 0,
             frozen_until: 0,
             buyback_fees_accrued_current: 0,
@@ -209,7 +214,9 @@ impl MangoAccount {
             perps: vec![PerpPosition::default(); 4],
             padding7: Default::default(),
             perp_open_orders: vec![PerpOpenOrder::default(); 6],
-            perp_spot_transfers: 0,
+            padding8: Default::default(),
+            token_conditional_swaps: vec![TokenConditionalSwap::default(); 2],
+            reserved_dynamic: [0; 64],
         }
     }
 
@@ -1813,29 +1820,17 @@ mod tests {
 
     fn make_test_account() -> MangoAccountValue {
         let account = MangoAccount::default_for_tests();
-        let mut bytes = AnchorSerialize::try_to_vec(&account).unwrap();
+        let bytes = AnchorSerialize::try_to_vec(&account).unwrap();
 
-        // The MangoAccount struct is missing some dynamic fields, add space for them
-        let tcs_length = 2;
+        // Verify that the size is as expected
         let expected_space = MangoAccount::space(
             account.tokens.len() as u8,
             account.serum3.len() as u8,
             account.perps.len() as u8,
             account.perp_open_orders.len() as u8,
-            tcs_length,
+            account.token_conditional_swaps.len() as u8,
         );
-        bytes.extend(vec![0u8; expected_space - bytes.len()]);
-
-        // Set the length of these dynamic parts
-        let (fixed, dynamic) = bytes.split_at_mut(size_of::<MangoAccountFixed>());
-        let mut header = MangoAccountDynamicHeader::from_bytes(dynamic).unwrap();
-        header.token_conditional_swap_count = tcs_length;
-        let mut account = MangoAccountRefMut {
-            header: &mut header,
-            fixed: bytemuck::from_bytes_mut(fixed),
-            dynamic,
-        };
-        account.write_token_conditional_swap_length();
+        assert_eq!(expected_space, 8 + bytes.len());
 
         MangoAccountValue::from_bytes(&bytes).unwrap()
     }
@@ -1863,19 +1858,15 @@ mod tests {
         account.perps[0].market_index = 9;
         account.perp_open_orders.resize(8, PerpOpenOrder::default());
         account.next_token_conditional_swap_id = 13;
+        account
+            .token_conditional_swaps
+            .resize(12, TokenConditionalSwap::default());
+        account.token_conditional_swaps[0].buy_token_index = 14;
 
-        let account_bytes_without_tcs_and_reserved = AnchorSerialize::try_to_vec(&account).unwrap();
-        let account_bytes = {
-            let mut b = account_bytes_without_tcs_and_reserved.clone();
-            // tcs adds 4 bytes of padding and 4 bytes of Vec size
-            // plus 64 bytes of reserved space at the end
-            b.extend([0u8; 8 + 64]);
-            b
-        };
-        assert_eq!(8 + account_bytes.len(), MangoAccount::space(8, 8, 4, 8, 0));
+        let account_bytes = AnchorSerialize::try_to_vec(&account).unwrap();
+        assert_eq!(8 + account_bytes.len(), MangoAccount::space(8, 8, 4, 8, 12));
 
-        let account2 =
-            MangoAccountValue::from_bytes(&account_bytes_without_tcs_and_reserved).unwrap();
+        let account2 = MangoAccountValue::from_bytes(&account_bytes).unwrap();
         assert_eq!(account.group, account2.fixed.group);
         assert_eq!(account.owner, account2.fixed.owner);
         assert_eq!(account.name, account2.fixed.name);
@@ -1925,10 +1916,17 @@ mod tests {
                 .perp_position_by_raw_index_unchecked(0)
                 .market_index
         );
-        assert_eq!(account2.all_token_conditional_swaps().count(), 0);
-
-        let account3 = MangoAccountValue::from_bytes(&account_bytes).unwrap();
-        assert_eq!(account3.all_token_conditional_swaps().count(), 0);
+        assert_eq!(
+            account.token_conditional_swaps.len(),
+            account2.all_token_conditional_swaps().count()
+        );
+        assert_eq!(
+            account.token_conditional_swaps[0].buy_token_index,
+            account2
+                .token_conditional_swap_by_index(0)
+                .unwrap()
+                .buy_token_index
+        );
     }
 
     #[test]
