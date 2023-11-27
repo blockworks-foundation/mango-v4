@@ -637,6 +637,15 @@ pub mod mango_v4 {
         Ok(())
     }
 
+    pub fn serum3_cancel_order_by_client_order_id(
+        ctx: Context<Serum3CancelOrderByClientOrderId>,
+        client_order_id: u64,
+    ) -> Result<()> {
+        #[cfg(feature = "enable-gpl")]
+        instructions::serum3_cancel_order_by_client_order_id(ctx, client_order_id)?;
+        Ok(())
+    }
+
     pub fn serum3_cancel_all_orders(ctx: Context<Serum3CancelAllOrders>, limit: u8) -> Result<()> {
         #[cfg(feature = "enable-gpl")]
         instructions::serum3_cancel_all_orders(ctx, limit)?;

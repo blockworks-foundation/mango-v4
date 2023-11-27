@@ -2188,6 +2188,61 @@ export class MangoClient {
     return await this.sendAndConfirmTransactionForGroup(group, ixs);
   }
 
+  public async serum3CancelOrderByClientIdIx(
+    group: Group,
+    mangoAccount: MangoAccount,
+    externalMarketPk: PublicKey,
+    side: Serum3Side,
+    clientOrderId: BN,
+  ): Promise<TransactionInstruction> {
+    const serum3Market = group.serum3MarketsMapByExternal.get(
+      externalMarketPk.toBase58(),
+    )!;
+
+    const serum3MarketExternal = group.serum3ExternalMarketsMap.get(
+      externalMarketPk.toBase58(),
+    )!;
+
+    const ix = await this.program.methods
+      .serum3CancelOrderByClientOrderId(side, clientOrderId)
+      .accounts({
+        group: group.publicKey,
+        account: mangoAccount.publicKey,
+        openOrders: mangoAccount.getSerum3Account(serum3Market.marketIndex)
+          ?.openOrders,
+        serumMarket: serum3Market.publicKey,
+        serumProgram: OPENBOOK_PROGRAM_ID[this.cluster],
+        serumMarketExternal: serum3Market.serumMarketExternal,
+        marketBids: serum3MarketExternal.bidsAddress,
+        marketAsks: serum3MarketExternal.asksAddress,
+        marketEventQueue: serum3MarketExternal.decoded.eventQueue,
+      })
+      .instruction();
+
+    return ix;
+  }
+
+  public async serum3CancelOrderByClientId(
+    group: Group,
+    mangoAccount: MangoAccount,
+    externalMarketPk: PublicKey,
+    side: Serum3Side,
+    clientOrderId: BN,
+  ): Promise<MangoSignatureStatus> {
+    const ixs = await Promise.all([
+      this.serum3CancelOrderByClientIdIx(
+        group,
+        mangoAccount,
+        externalMarketPk,
+        side,
+        clientOrderId,
+      ),
+      this.serum3SettleFundsV2Ix(group, mangoAccount, externalMarketPk),
+    ]);
+
+    return await this.sendAndConfirmTransactionForGroup(group, ixs);
+  }
+
   /// perps
 
   public async perpCreateMarket(

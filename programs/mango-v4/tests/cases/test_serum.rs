@@ -134,6 +134,20 @@ impl SerumOrderPlacer {
         .unwrap();
     }
 
+    async fn cancel_by_client_order_id(&self, client_order_id: u64) {
+        send_tx(
+            &self.solana,
+            Serum3CancelOrderByClientOrderIdInstruction {
+                client_order_id,
+                account: self.account,
+                owner: self.owner,
+                serum_market: self.serum_market,
+            },
+        )
+        .await
+        .unwrap();
+    }
+
     async fn cancel_all(&self) {
         let open_orders = self.serum.load_open_orders(self.open_orders).await;
         let orders = open_orders.orders;
@@ -356,6 +370,12 @@ async fn test_serum_basics() -> Result<(), TransportError> {
     // TEST: Cancel the order
     //
     order_placer.cancel(order_id).await;
+
+    //
+    // TEST: Cancel order by client order id
+    //
+    let (_, _) = order_placer.bid_maker(1.0, 100).await.unwrap();
+    order_placer.cancel_by_client_order_id(order_placer.next_client_order_id - 1).await;
 
     //
     // TEST: Settle, moving the freed up funds back
