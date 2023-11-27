@@ -375,7 +375,9 @@ async fn test_serum_basics() -> Result<(), TransportError> {
     // TEST: Cancel order by client order id
     //
     let (_, _) = order_placer.bid_maker(1.0, 100).await.unwrap();
-    order_placer.cancel_by_client_order_id(order_placer.next_client_order_id - 1).await;
+    order_placer
+        .cancel_by_client_order_id(order_placer.next_client_order_id - 1)
+        .await;
 
     //
     // TEST: Settle, moving the freed up funds back

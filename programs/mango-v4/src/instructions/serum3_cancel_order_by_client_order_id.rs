@@ -58,7 +58,10 @@ pub fn serum3_cancel_order_by_client_order_id(
     Ok(())
 }
 
-fn cpi_cancel_order_by_client_order_id(ctx: &Serum3CancelOrderByClientOrderId, client_order_id: u64) -> Result<()> {
+fn cpi_cancel_order_by_client_order_id(
+    ctx: &Serum3CancelOrderByClientOrderId,
+    client_order_id: u64,
+) -> Result<()> {
     use crate::serum3_cpi;
     let group = ctx.group.load()?;
     serum3_cpi::CancelOrder {

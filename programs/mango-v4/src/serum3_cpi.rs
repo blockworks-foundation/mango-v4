@@ -485,12 +485,10 @@ impl<'a> CancelOrder<'a> {
         Ok(())
     }
 
-    pub fn cancel_one_by_client_order_id(
-        self,
-        group: &Group,
-        client_order_id: u64,
-    ) -> Result<()> {
-        let data = serum_dex::instruction::MarketInstruction::CancelOrderByClientIdV2(client_order_id).pack();
+    pub fn cancel_one_by_client_order_id(self, group: &Group, client_order_id: u64) -> Result<()> {
+        let data =
+            serum_dex::instruction::MarketInstruction::CancelOrderByClientIdV2(client_order_id)
+                .pack();
         let instruction = solana_program::instruction::Instruction {
             program_id: *self.program.key,
             data,
