@@ -248,6 +248,21 @@ async function run(): Promise<void> {
         .flat()
         .map((serum3ExternalMarket) => serum3ExternalMarket.asksAddress),
     );
+    await extendTable(
+      client,
+      group,
+      payer,
+      'perp market event queues, bids, and asks',
+      altAddress1,
+      Array.from(group.perpMarketsMapByMarketIndex.values())
+        .flat()
+        .map((perpMarket) => [
+          perpMarket.eventQueue,
+          perpMarket.bids,
+          perpMarket.asks,
+        ])
+        .flat(),
+    );
   } catch (error) {
     console.log(error);
   }
