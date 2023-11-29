@@ -87,6 +87,7 @@ mod group_withdraw_insurance_fund;
 mod health_region;
 mod ix_gate_set;
 mod openbook_v2_create_open_orders;
+mod openbook_v2_place_order;
 mod openbook_v2_register_market;
 mod perp_cancel_all_orders;
 mod perp_cancel_all_orders_by_side;

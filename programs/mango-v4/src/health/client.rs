@@ -133,9 +133,9 @@ impl HealthCache {
         let source = &self.token_infos[source_index];
         let target = &self.token_infos[target_index];
 
-        let (tokens_max_reserved, _) = self.compute_serum3_reservations(health_type);
-        let source_reserved = tokens_max_reserved[source_index].max_serum_reserved;
-        let target_reserved = tokens_max_reserved[target_index].max_serum_reserved;
+        let (tokens_max_reserved, _) = self.compute_spot_reservations(health_type);
+        let source_reserved = tokens_max_reserved[source_index].max_spot_reserved;
+        let target_reserved = tokens_max_reserved[target_index].max_spot_reserved;
 
         let token_balances = self.effective_token_balances(health_type);
         let source_balance = token_balances[source_index].spot_and_perp;
@@ -173,7 +173,7 @@ impl HealthCache {
 
         // The function we're looking at has a unique maximum.
         //
-        // If we discount serum3 reservations, there are two key slope changes:
+        // If we discount spot reservations, there are two key slope changes:
         // Assume source.balance > 0 and target.balance < 0.
         // When these values flip sign, the health slope decreases, but could still be positive.
         //
@@ -204,7 +204,7 @@ impl HealthCache {
             //              - source_liab_weight * source_liab_price * a
             //              + target_asset_weight * target_asset_price * price * a = 0.
             // where a is the source token native amount.
-            // Note that this is just an estimate. Swapping can increase the amount that serum3
+            // Note that this is just an estimate. Swapping can increase the amount that spot
             // reserved contributions offset, moving the actual zero point further to the right.
             let health_at_max_value = cache_after_swap(amount_for_max_value)?
                 .map(|c| c.health(health_type))
@@ -698,7 +698,7 @@ mod tests {
                     ..default_token_info(0.3, 4.0)
                 },
             ],
-            serum3_infos: vec![],
+            spot_infos: vec![],
             perp_infos: vec![],
             being_liquidated: false,
         };
@@ -946,10 +946,10 @@ mod tests {
             }
 
             {
-                // check with serum reserved
+                // check with spot reserved
                 println!("test 6 {test_name}");
                 let mut health_cache = health_cache.clone();
-                health_cache.serum3_infos = vec![Serum3Info {
+                health_cache.spot_infos = vec![SpotInfo {
                     base_info_index: 1,
                     quote_info_index: 0,
                     market_index: 0,
@@ -1111,7 +1111,7 @@ mod tests {
                     ..default_token_info(0.2, 1.5)
                 },
             ],
-            serum3_infos: vec![],
+            spot_infos: vec![],
             perp_infos: vec![PerpInfo {
                 perp_market_index: 0,
                 settle_token_index: 1,
@@ -1400,7 +1400,7 @@ mod tests {
                     ..default_token_info(0.2, 2.0)
                 },
             ],
-            serum3_infos: vec![],
+            spot_infos: vec![],
             perp_infos: vec![],
             being_liquidated: false,
         };
@@ -1489,7 +1489,7 @@ mod tests {
                     ..default_token_info(0.2, 2.0)
                 },
             ],
-            serum3_infos: vec![],
+            spot_infos: vec![],
             perp_infos: vec![PerpInfo {
                 perp_market_index: 0,
                 settle_token_index: 0,
@@ -1542,7 +1542,7 @@ mod tests {
                     ..default_token_info(0.2, 2.0)
                 },
             ],
-            serum3_infos: vec![],
+            spot_infos: vec![],
             perp_infos: vec![],
             being_liquidated: false,
         };
@@ -1562,7 +1562,7 @@ mod tests {
                     ..default_token_info(0.2, 2.0)
                 },
             ],
-            serum3_infos: vec![],
+            spot_infos: vec![],
             perp_infos: vec![],
             being_liquidated: false,
         };
@@ -1582,7 +1582,7 @@ mod tests {
                     ..default_token_info(0.2, 2.0)
                 },
             ],
-            serum3_infos: vec![],
+            spot_infos: vec![],
             perp_infos: vec![PerpInfo {
                 perp_market_index: 0,
                 base_lot_size: 3,
@@ -1608,7 +1608,7 @@ mod tests {
                     ..default_token_info(0.2, 2.0)
                 },
             ],
-            serum3_infos: vec![Serum3Info {
+            spot_infos: vec![SpotInfo {
                 reserved_base: I80F48::ONE,
                 reserved_quote: I80F48::ZERO,
                 reserved_base_as_quote_lowest_ask: I80F48::ONE,

@@ -22,7 +22,7 @@ pub struct OpenbookV2PlaceOrder<'info> {
     pub authority: Signer<'info>,
 
     #[account(mut)]
-    /// CHECK: Validated inline by checking against the pubkey stored in the account at #2
+    /// CHECK: Validated inline by checking against the pubkey stored in the account at #2 
     pub open_orders: UncheckedAccount<'info>,
 
     pub openbook_v2_market: AccountLoader<'info, OpenbookV2Market>,
@@ -50,12 +50,8 @@ pub struct OpenbookV2PlaceOrder<'info> {
     pub event_heap: UncheckedAccount<'info>,
 
     #[account(mut)]
-    /// CHECK: base vault will be checked by openbook_v2
-    pub market_base_vault: Box<Account<'info, TokenAccount>>,
-
-    #[account(mut)]
-    /// CHECK: quote vault will be checked by openbook_v2
-    pub market_quote_vault: Box<Account<'info, TokenAccount>>,
+    /// CHECK: vault will be checked by openbook_v2
+    pub market_vault: Box<Account<'info, TokenAccount>>,
 
     /// CHECK: Validated by the openbook_v2 cpi call
     pub market_vault_signer: UncheckedAccount<'info>,
@@ -63,14 +59,14 @@ pub struct OpenbookV2PlaceOrder<'info> {
     /// The bank that pays for the order, if necessary
     // token_index and payer_bank.vault == payer_vault is validated inline at #3
     #[account(mut, has_one = group)]
-    pub payer_bank: AccountLoader<'info, Bank>,
+    pub bank: AccountLoader<'info, Bank>,
     /// The bank vault that pays for the order, if necessary
     #[account(mut)]
-    pub payer_vault: Box<Account<'info, TokenAccount>>,
+    pub vault: Box<Account<'info, TokenAccount>>,
 
     /// CHECK: The oracle can be one of several different account types
-    #[account(address = payer_bank.load()?.oracle)]
-    pub payer_oracle: UncheckedAccount<'info>,
+    #[account(address = bank.load()?.oracle)]
+    pub oracle: UncheckedAccount<'info>,
 
     pub token_program: Program<'info, Token>,
 }

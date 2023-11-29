@@ -33,6 +33,7 @@ pub async fn new(
         n_perps: active_perp_len,
         begin_perp: active_token_len * 2,
         begin_serum3: active_token_len * 2 + active_perp_len * 2,
+        begin_openbook_v2: 0, // todo-pan: FIX
         staleness_slot: None,
     };
     let now_ts = SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs();
@@ -66,6 +67,7 @@ pub fn new_sync(
         n_perps: active_perp_len,
         begin_perp: active_token_len * 2,
         begin_serum3: active_token_len * 2 + active_perp_len * 2,
+        begin_openbook_v2: 0, // todo-pan: FIX
         staleness_slot: None,
     };
     let now_ts = SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs();

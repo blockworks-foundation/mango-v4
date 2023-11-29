@@ -91,7 +91,7 @@ fn cpi_init_open_orders_account(
     let cpi_accounts = CreateOpenOrdersAccount {
         payer: ctx.payer.to_account_info(),
         owner: ctx.account.to_account_info(),
-        delegate_account: Some(ctx.group.to_account_info()),
+        delegate_account: None,
         open_orders_indexer: ctx.open_orders_indexer.to_account_info(),
         open_orders_account: ctx.open_orders_account.to_account_info(),
         market: ctx.openbook_v2_market_external.to_account_info(),
