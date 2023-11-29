@@ -17,3 +17,6 @@ pub mod perp_pnl;
 pub mod snapshot_source;
 mod util;
 pub mod websocket_source;
+
+#[macro_use]
+extern crate derive_builder;
