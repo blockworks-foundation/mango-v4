@@ -75,6 +75,9 @@ pub struct Client {
     /// Defaults to a preflight check at processed commitment
     #[builder(default = "ClientBuilder::default_rpc_send_transaction_config()")]
     pub rpc_send_transaction_config: RpcSendTransactionConfig,
+
+    #[builder(default = "\"https://quote-api.jup.ag\".into()")]
+    pub jupiter_url: String,
 }
 
 impl ClientBuilder {
@@ -91,6 +94,7 @@ impl Client {
         ClientBuilder::default()
     }
 
+    /// Prefer using the builder()
     pub fn new(
         cluster: Cluster,
         commitment: CommitmentConfig,
