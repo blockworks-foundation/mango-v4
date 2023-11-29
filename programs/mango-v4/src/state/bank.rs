@@ -9,6 +9,7 @@ use anchor_lang::prelude::*;
 use anchor_spl::token::TokenAccount;
 use derivative::Derivative;
 use fixed::types::I80F48;
+use oracle::oracle_log_context;
 use static_assertions::const_assert_eq;
 
 use std::mem::size_of;
@@ -949,20 +950,10 @@ impl Bank {
         staleness_slot: Option<u64>,
     ) -> Result<I80F48> {
         require_keys_eq!(self.oracle, *oracle_acc.key());
-        self.oracle_price_inner(oracle_acc, staleness_slot)
-    }
-
-    fn oracle_price_inner(
-        &self,
-        oracle_acc: &impl KeyedAccountReader,
-        staleness_slot: Option<u64>,
-    ) -> Result<I80F48> {
         let state = oracle::oracle_state_unchecked(oracle_acc, self.mint_decimals)?;
-        state.check_confidence_and_maybe_staleness(
-            &self.oracle,
-            &self.oracle_config,
-            staleness_slot,
-        )?;
+        state
+            .check_confidence_and_maybe_staleness(&self.name(), &self.oracle_config, staleness_slot)
+            .with_context(|| oracle_log_context(&state, &self.oracle_config, staleness_slot))?;
         Ok(state.price)
     }
 
@@ -973,13 +964,32 @@ impl Bank {
         fallback_oracle_acc_opt: Option<&impl KeyedAccountReader>,
         staleness_slot: Option<u64>,
     ) -> Result<I80F48> {
-        let primary_price = self.oracle_price(oracle_acc, staleness_slot);
-        if primary_price.is_oracle_error() && fallback_oracle_acc_opt.is_some() {
+        require_keys_eq!(self.oracle, *oracle_acc.key());
+        let primary_state = oracle::oracle_state_unchecked(oracle_acc, self.mint_decimals)?;
+        let primary_ok = primary_state.check_confidence_and_maybe_staleness(
+            &self.name(),
+            &self.oracle_config,
+            staleness_slot,
+        );
+        if primary_ok.is_oracle_error() && fallback_oracle_acc_opt.is_some() {
             let fallback_oracle_acc = fallback_oracle_acc_opt.unwrap();
             require_keys_eq!(self.fallback_oracle, *fallback_oracle_acc.key());
-            self.oracle_price_inner(fallback_oracle_acc, staleness_slot)
+            let fallback_state =
+                oracle::oracle_state_unchecked(fallback_oracle_acc, self.mint_decimals)?;
+            let fallback_ok = fallback_state.check_confidence_and_maybe_staleness(
+                &self.name(),
+                &self.oracle_config,
+                staleness_slot,
+            );
+            fallback_ok.with_context(|| {
+                oracle_log_context(&fallback_state, &self.oracle_config, staleness_slot)
+            })?;
+            Ok(fallback_state.price)
         } else {
-            primary_price
+            primary_ok.with_context(|| {
+                oracle_log_context(&primary_state, &self.oracle_config, staleness_slot)
+            })?;
+            Ok(primary_state.price)
         }
     }
 

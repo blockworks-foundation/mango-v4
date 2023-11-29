@@ -94,7 +94,7 @@ async fn test_health_compute_tokens() -> Result<(), TransportError> {
     let avg_cu_increase = cu_measurements.windows(2).map(|p| p[1] - p[0]).sum::<u64>()
         / (cu_measurements.len() - 1) as u64;
     println!("average cu increase: {avg_cu_increase}");
-    assert!(avg_cu_increase < 3230);
+    assert!(avg_cu_increase < 3350);
 
     Ok(())
 }
@@ -164,7 +164,7 @@ async fn test_health_compute_tokens_during_maint_weight_shift() -> Result<(), Tr
     let avg_cu_increase = cu_measurements.windows(2).map(|p| p[1] - p[0]).sum::<u64>()
         / (cu_measurements.len() - 1) as u64;
     println!("average cu increase: {avg_cu_increase}");
-    assert!(avg_cu_increase < 4200);
+    assert!(avg_cu_increase < 4300);
 
     Ok(())
 }
@@ -188,7 +188,7 @@ async fn test_health_compute_tokens_fallback_oracles() -> Result<(), TransportEr
     for _ in 0..num_tokens {
         fallback_oracle_kps.push(TestKeypair::new());
     }
-    let fallback_metas: Vec<AccountMeta> = fallback_oracle_kps
+    let success_metas: Vec<AccountMeta> = fallback_oracle_kps
         .iter()
         .map(|x| AccountMeta {
             pubkey: x.pubkey(),
@@ -197,7 +197,7 @@ async fn test_health_compute_tokens_fallback_oracles() -> Result<(), TransportEr
         })
         .collect();
 
-    // let fallback_metas = vec![];
+    let failure_metas = vec![];
 
     //
     // SETUP: Create a group and an account
@@ -215,7 +215,8 @@ async fn test_health_compute_tokens_fallback_oracles() -> Result<(), TransportEr
     let account =
         create_funded_account(&solana, group, owner, 0, &context.users[1], &[], 1000, 0).await;
 
-    let mut cu_measurements = vec![];
+    let mut success_measurements = vec![];
+    let mut failure_measurements = vec![];
     for token_account in &context.users[0].token_accounts[..mints.len()] {
         deposit_cu_datapoint(solana, account, owner, *token_account).await;
     }
@@ -279,19 +280,39 @@ async fn test_health_compute_tokens_fallback_oracles() -> Result<(), TransportEr
         .await
         .unwrap();
 
-        cu_measurements.push(
+        success_measurements.push(
             deposit_cu_fallbacks_datapoint(
                 solana,
                 account,
                 owner,
                 *token_account,
-                fallback_metas.clone(),
+                success_metas.clone(),
+            )
+            .await,
+        );
+
+        failure_measurements.push(
+            deposit_cu_fallbacks_datapoint(
+                solana,
+                account,
+                owner,
+                *token_account,
+                failure_metas.clone(),
             )
             .await,
         );
     }
-
-    for (i, pair) in cu_measurements.windows(2).enumerate() {
+    println!("successful fallbacks:");
+    for (i, pair) in success_measurements.windows(2).enumerate() {
+        println!(
+            "after adding token {}: {} (+{})",
+            i,
+            pair[1],
+            pair[1] - pair[0]
+        );
+    }
+    println!("failed fallbacks:");
+    for (i, pair) in failure_measurements.windows(2).enumerate() {
         println!(
             "after adding token {}: {} (+{})",
             i,
@@ -300,10 +321,21 @@ async fn test_health_compute_tokens_fallback_oracles() -> Result<(), TransportEr
         );
     }
 
-    let avg_cu_increase = cu_measurements.windows(2).map(|p| p[1] - p[0]).sum::<u64>()
-        / (cu_measurements.len() - 1) as u64;
-    println!("average cu increase: {avg_cu_increase}");
-    assert!(avg_cu_increase < 16_600);
+    let avg_success_increase = success_measurements
+        .windows(2)
+        .map(|p| p[1] - p[0])
+        .sum::<u64>()
+        / (success_measurements.len() - 1) as u64;
+
+    let avg_failure_increase = failure_measurements
+        .windows(2)
+        .map(|p| p[1] - p[0])
+        .sum::<u64>()
+        / (failure_measurements.len() - 1) as u64;
+    println!("average success increase: {avg_success_increase}");
+    println!("average failure increase: {avg_failure_increase}");
+    assert!(avg_success_increase < 2_050);
+    assert!(avg_success_increase < 18_500);
 
     Ok(())
 }

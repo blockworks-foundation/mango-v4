@@ -22,8 +22,8 @@ pub struct TokenEdit<'info> {
     /// CHECK: The oracle can be one of several different account types
     pub oracle: UncheckedAccount<'info>,
 
-    /// The oracle account is optional and only used when reset_stable_price is set.
+    /// The fallback oracle account is optional and only used when set_fallback_oracle is true.
     ///
-    /// CHECK: The oracle can be one of several different account types
+    /// CHECK: The fallback oracle can be one of several different account types
     pub fallback_oracle: UncheckedAccount<'info>,
 }

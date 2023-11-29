@@ -1491,26 +1491,27 @@ async fn test_fallback_oracle_serum() -> Result<(), TransportError> {
 
     let fallback_oracle_kp = TestKeypair::new();
     let fallback_oracle = fallback_oracle_kp.pubkey();
-    let admin = TestKeypair::new();
     let owner = context.users[0].key;
     let payer = context.users[1].key;
-    let mints = &context.mints[0..3];
     let payer_token_accounts = &context.users[1].token_accounts[0..3];
 
     //
     // SETUP: Create a group and an account
     //
-
-    let GroupWithTokens { group, tokens, .. } = GroupWithTokensConfig {
+    let deposit_amount = 1_000;
+    let CommonSetup {
+        group_with_tokens,
+        quote_token,
+        base_token,
+        mut order_placer,
+        ..
+    } = common_setup(&context, deposit_amount).await;
+    let GroupWithTokens {
+        group,
         admin,
-        payer,
-        mints: mints.to_vec(),
-        ..GroupWithTokensConfig::default()
-    }
-    .create(solana)
-    .await;
-    let base_token = &tokens[0];
-    let quote_token = &tokens[1];
+        tokens,
+        ..
+    } = group_with_tokens;
 
     //
     // SETUP: Create a fallback oracle
@@ -1520,7 +1521,7 @@ async fn test_fallback_oracle_serum() -> Result<(), TransportError> {
         StubOracleCreate {
             oracle: fallback_oracle_kp,
             group,
-            mint: mints[2].pubkey,
+            mint: tokens[2].mint.pubkey,
             admin,
             payer,
         },
@@ -1536,7 +1537,7 @@ async fn test_fallback_oracle_serum() -> Result<(), TransportError> {
         TokenEdit {
             group,
             admin,
-            mint: mints[2].pubkey,
+            mint: tokens[2].mint.pubkey,
             fallback_oracle,
             options: mango_v4::instruction::TokenEdit {
                 set_fallback_oracle: true,
@@ -1550,41 +1551,13 @@ async fn test_fallback_oracle_serum() -> Result<(), TransportError> {
     let bank_data: Bank = solana.get_account(tokens[2].bank).await;
     assert!(bank_data.fallback_oracle == fallback_oracle);
 
-    // fill vaults, so we can borrow
-    let _vault_account = create_funded_account(
-        &solana,
-        group,
-        owner,
-        2,
-        &context.users[1],
-        mints,
-        100_000,
-        0,
-    )
-    .await;
-
-    //
-    // SETUP: Create account
-    //
-    let account = create_funded_account(
-        &solana,
-        group,
-        owner,
-        0,
-        &context.users[1],
-        &[mints[1]],
-        1_000,
-        0,
-    )
-    .await;
-
     // Create some token1 borrows
     send_tx(
         solana,
         TokenWithdrawInstruction {
-            amount: 300,
+            amount: 1_500,
             allow_borrow: true,
-            account,
+            account: order_placer.account,
             owner,
             token_account: payer_token_accounts[2],
             bank_index: 0,
@@ -1593,76 +1566,13 @@ async fn test_fallback_oracle_serum() -> Result<(), TransportError> {
     .await
     .unwrap();
 
-    //
-    // SETUP: Create serum market
-    //
-    let serum_market_cookie = context
-        .serum
-        .list_spot_market(&base_token.mint, &quote_token.mint)
-        .await;
-
-    //
-    // TEST: Register a serum market
-    //
-    let serum_market = send_tx(
-        solana,
-        Serum3RegisterMarketInstruction {
-            group,
-            admin,
-            serum_program: context.serum.program_id,
-            serum_market_external: serum_market_cookie.market,
-            market_index: 0,
-            base_bank: base_token.bank,
-            quote_bank: quote_token.bank,
-            payer,
-        },
-    )
-    .await
-    .unwrap()
-    .serum_market;
-
-    //
-    // TEST: Create an open orders account
-    //
-    let open_orders = send_tx(
-        solana,
-        Serum3CreateOpenOrdersInstruction {
-            account,
-            serum_market,
-            owner,
-            payer,
-        },
-    )
-    .await
-    .unwrap()
-    .open_orders;
-
-    let account_data = get_mango_account(solana, account).await;
-    assert_eq!(
-        account_data
-            .active_serum3_orders()
-            .map(|v| (v.open_orders, v.market_index))
-            .collect::<Vec<_>>(),
-        [(open_orders, 0)]
-    );
-
-    let mut order_placer = SerumOrderPlacer {
-        solana: solana.clone(),
-        serum: context.serum.clone(),
-        account,
-        owner: owner.clone(),
-        serum_market,
-        open_orders,
-        next_client_order_id: 0,
-    };
-
     // Make oracle invalid by increasing deviation
     send_tx(
         solana,
         StubOracleSetTestInstruction {
             oracle: tokens[2].oracle,
             group,
-            mint: mints[2].pubkey,
+            mint: tokens[2].mint.pubkey,
             admin,
             price: 1.0,
             last_update_slot: 0,
@@ -1713,7 +1623,7 @@ async fn test_fallback_oracle_serum() -> Result<(), TransportError> {
         .unwrap();
     result.result.unwrap();
 
-    let account_data = get_mango_account(solana, account).await;
+    let account_data = get_mango_account(solana, order_placer.account).await;
     assert_eq!(
         account_data
             .token_position_by_raw_index(0)
@@ -1726,14 +1636,14 @@ async fn test_fallback_oracle_serum() -> Result<(), TransportError> {
             .token_position_by_raw_index(1)
             .unwrap()
             .in_use_count,
-        0
+        1
     );
     assert_eq!(
         account_data
             .token_position_by_raw_index(2)
             .unwrap()
             .in_use_count,
-        1
+        0
     );
     let serum_orders = account_data.serum3_orders_by_raw_index(0).unwrap();
     assert_eq!(serum_orders.base_borrows_without_fee, 0);
