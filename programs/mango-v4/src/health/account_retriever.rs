@@ -200,7 +200,7 @@ impl<T: KeyedAccountReader> AccountRetriever for FixedOrderAccountRetriever<T> {
 pub struct ScannedBanksAndOracles<'a, 'info> {
     banks: Vec<AccountInfoRefMut<'a, 'info>>,
     oracles: Vec<AccountInfoRef<'a, 'info>>,
-    fallback_oracles: HashMap<Pubkey, AccountInfoRef<'a, 'info>>,
+    fallback_oracles: Vec<AccountInfoRef<'a, 'info>>,
     index_map: HashMap<TokenIndex, usize>,
     staleness_slot: Option<u64>,
 }
@@ -227,7 +227,10 @@ impl<'a, 'info> ScannedBanksAndOracles<'a, 'info> {
             let index = self.bank_index(token_index1)?;
             let bank = self.banks[index].load_mut_fully_unchecked::<Bank>()?;
             let oracle = &self.oracles[index];
-            let fallback_oracle_opt = self.fallback_oracles.get(&bank.fallback_oracle);
+            let fallback_oracle_opt = self
+                .fallback_oracles
+                .iter()
+                .find(|ai| ai.key() == &bank.fallback_oracle);
             let price =
                 bank.oracle_price_with_fallback(oracle, fallback_oracle_opt, self.staleness_slot)?;
             return Ok((bank, price, None));
@@ -247,8 +250,14 @@ impl<'a, 'info> ScannedBanksAndOracles<'a, 'info> {
         let bank2 = second_bank_part[second - (first + 1)].load_mut_fully_unchecked::<Bank>()?;
         let oracle1 = &self.oracles[first];
         let oracle2 = &self.oracles[second];
-        let fallback_oracle_opt1 = self.fallback_oracles.get(&bank1.fallback_oracle);
-        let fallback_oracle_opt2 = self.fallback_oracles.get(&bank2.fallback_oracle);
+        let fallback_oracle_opt1 = self
+            .fallback_oracles
+            .iter()
+            .find(|ai| ai.key() == &bank1.fallback_oracle);
+        let fallback_oracle_opt2 = self
+            .fallback_oracles
+            .iter()
+            .find(|ai| ai.key() == &bank2.fallback_oracle);
         let price1 =
             bank1.oracle_price_with_fallback(oracle1, fallback_oracle_opt1, self.staleness_slot)?;
         let price2 =
@@ -265,7 +274,10 @@ impl<'a, 'info> ScannedBanksAndOracles<'a, 'info> {
         // The account was already loaded successfully during construction
         let bank = self.banks[index].load_fully_unchecked::<Bank>()?;
         let oracle = &self.oracles[index];
-        let fallback_oracle_opt = self.fallback_oracles.get(&bank.fallback_oracle);
+        let fallback_oracle_opt = self
+            .fallback_oracles
+            .iter()
+            .find(|ai| ai.key() == &bank.fallback_oracle);
         let price =
             bank.oracle_price_with_fallback(oracle, fallback_oracle_opt, self.staleness_slot)?;
 
@@ -367,25 +379,21 @@ impl<'a, 'info> ScanningAccountRetriever<'a, 'info> {
         let serum3_start = perp_oracles_start + n_perps;
         let n_serum3 = ais[serum3_start..]
             .iter()
-            .filter(|x| serum3_cpi::load_open_orders_ref(x).is_ok())
+            .filter(|x| x.data_len() == std::mem::size_of::<serum_dex::state::OpenOrders>() + 12)
             .count();
         let fallback_oracles_start = serum3_start + n_serum3;
-        let fallback_oracles: HashMap<Pubkey, AccountInfoRef> = ais[fallback_oracles_start..]
-            .into_iter()
-            .map(|ai| (ai.key(), AccountInfoRef::borrow(ai).unwrap()))
-            .collect();
 
         Ok(Self {
             banks_and_oracles: ScannedBanksAndOracles {
                 banks: AccountInfoRefMut::borrow_slice(&ais[..n_banks])?,
                 oracles: AccountInfoRef::borrow_slice(&ais[n_banks..perps_start])?,
-                fallback_oracles,
+                fallback_oracles: AccountInfoRef::borrow_slice(&ais[fallback_oracles_start..])?,
                 index_map: token_index_map,
                 staleness_slot,
             },
             perp_markets: AccountInfoRef::borrow_slice(&ais[perps_start..perp_oracles_start])?,
             perp_oracles: AccountInfoRef::borrow_slice(&ais[perp_oracles_start..serum3_start])?,
-            serum3_oos: AccountInfoRef::borrow_slice(&ais[serum3_start..])?,
+            serum3_oos: AccountInfoRef::borrow_slice(&ais[serum3_start..fallback_oracles_start])?,
             perp_index_map,
         })
     }
