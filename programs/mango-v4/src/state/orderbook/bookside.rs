@@ -199,7 +199,7 @@ impl BookSide {
             sum_qty += order.node.quantity;
             sum_amt += order.node.quantity * order.price_lots;
             let extra_qty = sum_qty - quantity;
-            if extra_qty > 0 {
+            if extra_qty >= 0 {
                 sum_amt -= extra_qty * order.price_lots;
                 return Some(sum_amt)
             }
