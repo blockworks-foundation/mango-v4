@@ -379,7 +379,10 @@ impl<'a, 'info> ScanningAccountRetriever<'a, 'info> {
         let serum3_start = perp_oracles_start + n_perps;
         let n_serum3 = ais[serum3_start..]
             .iter()
-            .filter(|x| x.data_len() == std::mem::size_of::<serum_dex::state::OpenOrders>() + 12)
+            .take_while(|x| {
+                x.data_len() == std::mem::size_of::<serum_dex::state::OpenOrders>() + 12
+                    && serum3_cpi::has_serum_header(&x.data.borrow())
+            })
             .count();
         let fallback_oracles_start = serum3_start + n_serum3;
 
