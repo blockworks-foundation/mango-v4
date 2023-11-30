@@ -76,8 +76,11 @@ pub struct Client {
     #[builder(default = "ClientBuilder::default_rpc_send_transaction_config()")]
     pub rpc_send_transaction_config: RpcSendTransactionConfig,
 
-    #[builder(default = "\"https://quote-api.jup.ag\".into()")]
-    pub jupiter_url: String,
+    #[builder(default = "\"https://quote-api.jup.ag/v4\".into()")]
+    pub jupiter_v4_url: String,
+
+    #[builder(default = "\"https://quote-api.jup.ag/v6\".into()")]
+    pub jupiter_v6_url: String,
 }
 
 impl ClientBuilder {
