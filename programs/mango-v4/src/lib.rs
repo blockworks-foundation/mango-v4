@@ -638,7 +638,7 @@ pub mod mango_v4 {
     }
 
     pub fn serum3_cancel_order_by_client_order_id(
-        ctx: Context<Serum3CancelOrderByClientOrderId>,
+        ctx: Context<Serum3CancelOrder>,
         client_order_id: u64,
     ) -> Result<()> {
         #[cfg(feature = "enable-gpl")]

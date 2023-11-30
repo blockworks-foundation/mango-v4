@@ -8,7 +8,7 @@ use crate::logs::{emit_stack, Serum3OpenOrdersBalanceLogV2};
 use crate::serum3_cpi::{load_open_orders_ref, OpenOrdersAmounts, OpenOrdersSlim};
 
 pub fn serum3_cancel_order_by_client_order_id(
-    ctx: Context<Serum3CancelOrderByClientOrderId>,
+    ctx: Context<Serum3CancelOrder>,
     client_order_id: u64,
 ) -> Result<()> {
     let serum_market = ctx.accounts.serum_market.load()?;
@@ -59,7 +59,7 @@ pub fn serum3_cancel_order_by_client_order_id(
 }
 
 fn cpi_cancel_order_by_client_order_id(
-    ctx: &Serum3CancelOrderByClientOrderId,
+    ctx: &Serum3CancelOrder,
     client_order_id: u64,
 ) -> Result<()> {
     use crate::serum3_cpi;
