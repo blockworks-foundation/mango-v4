@@ -15,6 +15,7 @@ use accounts_ix::*;
 pub mod accounts_ix;
 pub mod accounts_zerocopy;
 pub mod address_lookup_table_program;
+mod allocator;
 pub mod error;
 pub mod events;
 pub mod health;
