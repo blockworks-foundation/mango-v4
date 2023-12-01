@@ -485,6 +485,38 @@ impl<'a> CancelOrder<'a> {
         Ok(())
     }
 
+    pub fn cancel_one_by_client_order_id(self, group: &Group, client_order_id: u64) -> Result<()> {
+        let data =
+            serum_dex::instruction::MarketInstruction::CancelOrderByClientIdV2(client_order_id)
+                .pack();
+        let instruction = solana_program::instruction::Instruction {
+            program_id: *self.program.key,
+            data,
+            accounts: vec![
+                AccountMeta::new(*self.market.key, false),
+                AccountMeta::new(*self.bids.key, false),
+                AccountMeta::new(*self.asks.key, false),
+                AccountMeta::new(*self.open_orders.key, false),
+                AccountMeta::new_readonly(*self.open_orders_authority.key, true),
+                AccountMeta::new(*self.event_queue.key, false),
+            ],
+        };
+        let account_infos = [
+            self.program,
+            self.market,
+            self.bids,
+            self.asks,
+            self.open_orders,
+            self.open_orders_authority,
+            self.event_queue,
+        ];
+
+        let seeds = group_seeds!(group);
+        solana_program::program::invoke_signed_unchecked(&instruction, &account_infos, &[seeds])?;
+
+        Ok(())
+    }
+
     pub fn cancel_all(self, group: &Group, mut limit: u8) -> Result<()> {
         // find all cancels by scanning open_orders/bids/asks
         let mut cancels = vec![];

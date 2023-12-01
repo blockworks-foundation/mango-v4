@@ -2660,6 +2660,71 @@ impl ClientInstruction for Serum3CancelOrderInstruction {
     }
 }
 
+pub struct Serum3CancelOrderByClientOrderIdInstruction {
+    pub client_order_id: u64,
+
+    pub account: Pubkey,
+    pub owner: TestKeypair,
+
+    pub serum_market: Pubkey,
+}
+#[async_trait::async_trait(?Send)]
+impl ClientInstruction for Serum3CancelOrderByClientOrderIdInstruction {
+    type Accounts = mango_v4::accounts::Serum3CancelOrder;
+    type Instruction = mango_v4::instruction::Serum3CancelOrderByClientOrderId;
+    async fn to_instruction(
+        &self,
+        account_loader: impl ClientAccountLoader + 'async_trait,
+    ) -> (Self::Accounts, instruction::Instruction) {
+        let program_id = mango_v4::id();
+        let instruction = Self::Instruction {
+            client_order_id: self.client_order_id,
+        };
+
+        let account = account_loader
+            .load_mango_account(&self.account)
+            .await
+            .unwrap();
+        let serum_market: Serum3Market = account_loader.load(&self.serum_market).await.unwrap();
+        let open_orders = account
+            .serum3_orders(serum_market.market_index)
+            .unwrap()
+            .open_orders;
+
+        let market_external_bytes = account_loader
+            .load_bytes(&serum_market.serum_market_external)
+            .await
+            .unwrap();
+        let market_external: &serum_dex::state::MarketState = bytemuck::from_bytes(
+            &market_external_bytes[5..5 + std::mem::size_of::<serum_dex::state::MarketState>()],
+        );
+        // unpack the data, to avoid unaligned references
+        let bids = market_external.bids;
+        let asks = market_external.asks;
+        let event_q = market_external.event_q;
+
+        let accounts = Self::Accounts {
+            group: account.fixed.group,
+            account: self.account,
+            open_orders,
+            serum_market: self.serum_market,
+            serum_program: serum_market.serum_program,
+            serum_market_external: serum_market.serum_market_external,
+            market_bids: from_serum_style_pubkey(&bids),
+            market_asks: from_serum_style_pubkey(&asks),
+            market_event_queue: from_serum_style_pubkey(&event_q),
+            owner: self.owner.pubkey(),
+        };
+
+        let instruction = make_instruction(program_id, &accounts, &instruction);
+        (accounts, instruction)
+    }
+
+    fn signers(&self) -> Vec<TestKeypair> {
+        vec![self.owner]
+    }
+}
+
 pub struct Serum3CancelAllOrdersInstruction {
     pub limit: u8,
     pub account: Pubkey,
