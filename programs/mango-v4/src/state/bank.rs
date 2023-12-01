@@ -982,7 +982,11 @@ impl Bank {
                 staleness_slot,
             );
             fallback_ok.with_context(|| {
-                oracle_log_context(&fallback_state, &self.oracle_config, staleness_slot)
+                format!(
+                    "{} {}",
+                    oracle_log_context(&primary_state, &self.oracle_config, staleness_slot),
+                    oracle_log_context(&fallback_state, &self.oracle_config, staleness_slot)
+                )
             })?;
             Ok(fallback_state.price)
         } else {

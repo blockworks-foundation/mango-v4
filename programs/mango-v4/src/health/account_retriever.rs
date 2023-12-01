@@ -227,10 +227,8 @@ impl<'a, 'info> ScannedBanksAndOracles<'a, 'info> {
             let index = self.bank_index(token_index1)?;
             let bank = self.banks[index].load_mut_fully_unchecked::<Bank>()?;
             let oracle = &self.oracles[index];
-            let fallback_oracle_opt = self
-                .fallback_oracles
-                .iter()
-                .find(|ai| ai.key() == &bank.fallback_oracle);
+            let fallback_oracle_opt =
+                fetch_fallback_oracle(&self.fallback_oracles, &bank.fallback_oracle);
             let price =
                 bank.oracle_price_with_fallback(oracle, fallback_oracle_opt, self.staleness_slot)?;
             return Ok((bank, price, None));
@@ -250,14 +248,10 @@ impl<'a, 'info> ScannedBanksAndOracles<'a, 'info> {
         let bank2 = second_bank_part[second - (first + 1)].load_mut_fully_unchecked::<Bank>()?;
         let oracle1 = &self.oracles[first];
         let oracle2 = &self.oracles[second];
-        let fallback_oracle_opt1 = self
-            .fallback_oracles
-            .iter()
-            .find(|ai| ai.key() == &bank1.fallback_oracle);
-        let fallback_oracle_opt2 = self
-            .fallback_oracles
-            .iter()
-            .find(|ai| ai.key() == &bank2.fallback_oracle);
+        let fallback_oracle_opt1 =
+            fetch_fallback_oracle(&self.fallback_oracles, &bank1.fallback_oracle);
+        let fallback_oracle_opt2 =
+            fetch_fallback_oracle(&self.fallback_oracles, &bank2.fallback_oracle);
         let price1 =
             bank1.oracle_price_with_fallback(oracle1, fallback_oracle_opt1, self.staleness_slot)?;
         let price2 =
@@ -274,10 +268,8 @@ impl<'a, 'info> ScannedBanksAndOracles<'a, 'info> {
         // The account was already loaded successfully during construction
         let bank = self.banks[index].load_fully_unchecked::<Bank>()?;
         let oracle = &self.oracles[index];
-        let fallback_oracle_opt = self
-            .fallback_oracles
-            .iter()
-            .find(|ai| ai.key() == &bank.fallback_oracle);
+        let fallback_oracle_opt =
+            fetch_fallback_oracle(&self.fallback_oracles, &bank.fallback_oracle);
         let price =
             bank.oracle_price_with_fallback(oracle, fallback_oracle_opt, self.staleness_slot)?;
 
@@ -471,6 +463,14 @@ impl<'a, 'info> AccountRetriever for ScanningAccountRetriever<'a, 'info> {
     fn serum_oo(&self, _account_index: usize, key: &Pubkey) -> Result<&OpenOrders> {
         self.scanned_serum_oo(key)
     }
+}
+
+#[inline(always)]
+fn fetch_fallback_oracle<'a, 'info>(
+    fallback_oracles: &'a Vec<AccountInfoRef<'a, 'info>>,
+    fallback_key: &Pubkey,
+) -> Option<&'a AccountInfoRef<'a, 'info>> {
+    fallback_oracles.iter().find(|ai| ai.key() == fallback_key)
 }
 
 #[cfg(test)]
