@@ -69,6 +69,19 @@ pub async fn send_tx_get_metadata<CI: ClientInstruction>(
         .await
 }
 
+pub async fn send_tx_with_extra_ix<CI: ClientInstruction>(
+    solana: &SolanaCookie,
+    ix: CI,
+    extra_ix: Instruction,
+) -> std::result::Result<BanksTransactionResultWithMetadata, BanksClientError> {
+    let (_, mut instruction) = ix.to_instruction(solana).await;
+    let signers = ix.signers();
+    let instructions = vec![extra_ix, instruction.clone()];
+    solana
+        .process_transaction(&instructions, Some(&signers[..]))
+        .await
+}
+
 /// Build a transaction from multiple instructions
 pub struct ClientTransaction {
     solana: Arc<SolanaCookie>,
@@ -4194,6 +4207,30 @@ impl ClientInstruction for PerpLiqNegativePnlOrBankruptcyInstruction {
 
     fn signers(&self) -> Vec<TestKeypair> {
         vec![self.liqor_owner]
+    }
+}
+
+pub struct OverAllocInstruction {}
+#[async_trait::async_trait(?Send)]
+impl ClientInstruction for OverAllocInstruction {
+    type Accounts = mango_v4::accounts::OverAlloc;
+    type Instruction = mango_v4::instruction::OverAlloc;
+    async fn to_instruction(
+        &self,
+        _loader: impl ClientAccountLoader + 'async_trait,
+    ) -> (Self::Accounts, instruction::Instruction) {
+        let program_id = mango_v4::id();
+        let instruction = Self::Instruction {};
+        let accounts = Self::Accounts {
+            dummy: Pubkey::new_unique(),
+        };
+
+        let instruction = make_instruction(program_id, &accounts, &instruction);
+        (accounts, instruction)
+    }
+
+    fn signers(&self) -> Vec<TestKeypair> {
+        vec![]
     }
 }
 

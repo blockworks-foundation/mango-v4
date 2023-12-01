@@ -12,6 +12,7 @@ pub use super::program_test;
 
 pub use utils::assert_equal_fixed_f64 as assert_equal;
 
+mod test_allocator;
 mod test_alt;
 mod test_bankrupt_tokens;
 mod test_basic;

@@ -52,6 +52,13 @@ pub mod mango_v4 {
         Ok(())
     }
 
+
+    pub fn over_alloc(ctx: Context<OverAlloc>) -> Result<()> {
+        #[cfg(feature = "enable-gpl")]
+        instructions::over_alloc(ctx)?;
+        Ok(())
+    }
+
     pub fn admin_perp_withdraw_fees(ctx: Context<AdminPerpWithdrawFees>) -> Result<()> {
         #[cfg(feature = "enable-gpl")]
         instructions::admin_perp_withdraw_fees(ctx)?;
