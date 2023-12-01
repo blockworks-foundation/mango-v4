@@ -4,9 +4,7 @@ use std::alloc::{GlobalAlloc, Layout};
 
 #[cfg(not(feature = "no-entrypoint"))]
 #[global_allocator]
-pub static ALLOCATOR: BumpAllocator = BumpAllocator {
-    start: solana_program::entrypoint::HEAP_START_ADDRESS as usize,
-};
+pub static ALLOCATOR: BumpAllocator = BumpAllocator {};
 
 pub fn heap_used() -> usize {
     #[cfg(not(feature = "no-entrypoint"))]
@@ -24,25 +22,27 @@ pub fn heap_used() -> usize {
 ///
 /// This implementation starts at HEAP_START and grows upward, producing
 /// a segfault once out of available heap memory.
-pub struct BumpAllocator {
-    pub start: usize,
-}
+pub struct BumpAllocator {}
 
 unsafe impl GlobalAlloc for BumpAllocator {
     #[inline]
     unsafe fn alloc(&self, layout: Layout) -> *mut u8 {
-        let pos_ptr = self.start as *mut usize;
+        let heap_start = solana_program::entrypoint::HEAP_START_ADDRESS as usize;
+        let pos_ptr = heap_start as *mut usize;
 
         let mut pos = *pos_ptr;
         if pos == 0 {
-            // First time, set starting position
-            pos = self.start + 8;
+            // First time, override the current position to be just past the location
+            // where the current heap position is stored.
+            pos = heap_start + 8;
         }
 
-        // Align pos to create the address for the allocation
-        let a = layout.align().wrapping_sub(1);
-        let mut begin = pos.checked_add(a).unwrap();
-        begin &= !a;
+        // The result address needs to be aligned to layout.align(),
+        // which is guaranteed to be a power of two.
+        // Find the first address >=pos that has the required alignment.
+        // Wrapping ops are used for performance.
+        let mask = layout.align().wrapping_sub(1);
+        let begin = pos.wrapping_add(mask) & (!mask);
 
         // Update allocator state
         let end = begin.checked_add(layout.size()).unwrap();
@@ -63,14 +63,15 @@ unsafe impl GlobalAlloc for BumpAllocator {
 impl BumpAllocator {
     #[inline]
     pub fn used(&self) -> usize {
+        let heap_start = solana_program::entrypoint::HEAP_START_ADDRESS as usize;
         unsafe {
-            let pos_ptr = self.start as *mut usize;
+            let pos_ptr = heap_start as *mut usize;
 
             let pos = *pos_ptr;
             if pos == 0 {
                 return 0;
             }
-            return pos - self.start;
+            return pos - heap_start;
         }
     }
 }
