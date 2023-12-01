@@ -4,10 +4,11 @@ use anchor_lang::prelude::*;
 use derivative::Derivative;
 use fixed::types::I80F48;
 
+use oracle::oracle_log_context;
 use static_assertions::const_assert_eq;
 
 use crate::accounts_zerocopy::KeyedAccountReader;
-use crate::error::MangoError;
+use crate::error::{Contextable, MangoError};
 use crate::logs::{emit_stack, PerpUpdateFundingLogV2};
 use crate::state::orderbook::Side;
 use crate::state::{oracle, TokenIndex};
@@ -275,11 +276,9 @@ impl PerpMarket {
     ) -> Result<OracleState> {
         require_keys_eq!(self.oracle, *oracle_acc.key());
         let state = oracle::oracle_state_unchecked(oracle_acc, self.base_decimals)?;
-        state.check_confidence_and_maybe_staleness(
-            &self.oracle,
-            &self.oracle_config,
-            staleness_slot,
-        )?;
+        state
+            .check_confidence_and_maybe_staleness(&self.name(), &self.oracle_config, staleness_slot)
+            .with_context(|| oracle_log_context(&state, &self.oracle_config, staleness_slot))?;
         Ok(state)
     }
 

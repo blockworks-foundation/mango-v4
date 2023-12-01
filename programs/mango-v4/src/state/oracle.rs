@@ -105,19 +105,19 @@ impl OracleState {
     #[inline]
     pub fn check_confidence_and_maybe_staleness(
         &self,
-        oracle_pk: &Pubkey,
+        oracle_name: &str,
         config: &OracleConfig,
         staleness_slot: Option<u64>,
     ) -> Result<()> {
         if let Some(now_slot) = staleness_slot {
-            self.check_staleness(oracle_pk, config, now_slot)?;
+            self.check_staleness(oracle_name, config, now_slot)?;
         }
-        self.check_confidence(oracle_pk, config)
+        self.check_confidence(oracle_name, config)
     }
 
     pub fn check_staleness(
         &self,
-        oracle_pk: &Pubkey,
+        oracle_name: &str,
         config: &OracleConfig,
         now_slot: u64,
     ) -> Result<()> {
@@ -127,27 +127,15 @@ impl OracleState {
                 .saturating_add(config.max_staleness_slots as u64)
                 < now_slot
         {
-            msg!(
-                "Oracle is stale; pubkey {}, price: {}, last_update_slot: {}, now_slot: {}",
-                oracle_pk,
-                self.price.to_num::<f64>(),
-                self.last_update_slot,
-                now_slot,
-            );
+            msg!("Oracle is stale: {}", oracle_name);
             return Err(MangoError::OracleStale.into());
         }
         Ok(())
     }
 
-    pub fn check_confidence(&self, oracle_pk: &Pubkey, config: &OracleConfig) -> Result<()> {
+    pub fn check_confidence(&self, oracle_name: &str, config: &OracleConfig) -> Result<()> {
         if self.deviation > config.conf_filter * self.price {
-            msg!(
-                "Oracle confidence not good enough: pubkey {}, price: {}, deviation: {}, conf_filter: {}",
-                oracle_pk,
-                self.price.to_num::<f64>(),
-                self.deviation.to_num::<f64>(),
-                config.conf_filter.to_num::<f32>(),
-            );
+            msg!("Oracle confidence not good enough: {}", oracle_name);
             return Err(MangoError::OracleConfidence.into());
         }
         Ok(())
@@ -228,7 +216,7 @@ fn pyth_get_price(
 
 /// Returns the price of one native base token, in native quote tokens
 ///
-/// Example: The for SOL at 40 USDC/SOL it would return 0.04 (the unit is USDC-native/SOL-native)
+/// Example: The price for SOL at 40 USDC/SOL it would return 0.04 (the unit is USDC-native/SOL-native)
 ///
 /// This currently assumes that quote decimals (i.e. decimals for USD) is 6, like for USDC.
 ///
@@ -330,6 +318,21 @@ pub fn oracle_state_unchecked(
             }
         }
     })
+}
+
+pub fn oracle_log_context(
+    state: &OracleState,
+    oracle_config: &OracleConfig,
+    staleness_slot: Option<u64>,
+) -> String {
+    format!(
+        "price: {}, deviation: {}, last_update_slot: {}, now_slot: {}, conf_filter: {:#?}",
+        state.price.to_num::<f64>(),
+        state.deviation.to_num::<f64>(),
+        state.last_update_slot,
+        staleness_slot.unwrap_or_else(|| u64::MAX),
+        oracle_config.conf_filter.to_num::<f32>(),
+    )
 }
 
 #[cfg(test)]

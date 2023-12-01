@@ -71,6 +71,7 @@ async fn test_token_conditional_swap_basic() -> Result<(), TransportError> {
             group,
             admin,
             mint: quote_token.mint.pubkey,
+            fallback_oracle: Pubkey::default(),
             options: mango_v4::instruction::TokenEdit {
                 token_conditional_swap_taker_fee_rate_opt: Some(0.05),
                 token_conditional_swap_maker_fee_rate_opt: Some(0.1),
@@ -388,6 +389,7 @@ async fn test_token_conditional_swap_linear_auction() -> Result<(), TransportErr
             group,
             admin,
             mint: quote_token.mint.pubkey,
+            fallback_oracle: Pubkey::default(),
             options: mango_v4::instruction::TokenEdit {
                 token_conditional_swap_taker_fee_rate_opt: Some(0.05),
                 token_conditional_swap_maker_fee_rate_opt: Some(0.1),
@@ -648,6 +650,7 @@ async fn test_token_conditional_swap_premium_auction() -> Result<(), TransportEr
             group,
             admin,
             mint: quote_token.mint.pubkey,
+            fallback_oracle: Pubkey::default(),
             options: mango_v4::instruction::TokenEdit {
                 token_conditional_swap_taker_fee_rate_opt: Some(0.05),
                 token_conditional_swap_maker_fee_rate_opt: Some(0.1),

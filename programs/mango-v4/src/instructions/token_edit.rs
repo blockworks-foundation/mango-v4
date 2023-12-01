@@ -8,7 +8,7 @@ use crate::error::MangoError;
 use crate::state::*;
 
 use crate::accounts_ix::*;
-use crate::logs::{emit_stack, TokenMetaDataLog};
+use crate::logs::{emit_stack, TokenMetaDataLogV2};
 use crate::util::fill_from_str;
 
 #[allow(unused_variables)]
@@ -49,6 +49,7 @@ pub fn token_edit(
     maint_weight_shift_asset_target_opt: Option<f32>,
     maint_weight_shift_liab_target_opt: Option<f32>,
     maint_weight_shift_abort: bool,
+    set_fallback_oracle: bool,
 ) -> Result<()> {
     let group = ctx.accounts.group.load()?;
 
@@ -74,6 +75,16 @@ pub fn token_edit(
             msg!("Oracle: old - {:?}, new - {:?}", bank.oracle, oracle,);
             bank.oracle = oracle;
             mint_info.oracle = oracle;
+            require_group_admin = true;
+        }
+        if set_fallback_oracle {
+            msg!(
+                "Fallback oracle old {:?}, new {:?}",
+                bank.fallback_oracle,
+                ctx.accounts.fallback_oracle.key()
+            );
+            bank.fallback_oracle = ctx.accounts.fallback_oracle.key();
+            mint_info.fallback_oracle = ctx.accounts.fallback_oracle.key();
             require_group_admin = true;
         }
         if reset_stable_price {
@@ -456,12 +467,13 @@ pub fn token_edit(
     let bank = ctx.remaining_accounts.first().unwrap().load_mut::<Bank>()?;
     bank.verify()?;
 
-    emit_stack(TokenMetaDataLog {
+    emit_stack(TokenMetaDataLogV2 {
         mango_group: ctx.accounts.group.key(),
         mint: mint_info.mint.key(),
         token_index: bank.token_index,
         mint_decimals: bank.mint_decimals,
         oracle: mint_info.oracle.key(),
+        fallback_oracle: ctx.accounts.fallback_oracle.key(),
         mint_info: ctx.accounts.mint_info.key(),
     });
 

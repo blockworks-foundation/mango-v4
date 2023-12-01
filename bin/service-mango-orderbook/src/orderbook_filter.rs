@@ -373,7 +373,7 @@ pub async fn init(
                             {
                                 if unchecked_oracle_state
                                     .check_confidence_and_maybe_staleness(
-                                        &oracle_pk,
+                                        &mkt.1.name,
                                         &oracle_config.to_oracle_config(),
                                         None, // force this to always return a price no matter how stale
                                     )

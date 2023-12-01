@@ -234,6 +234,7 @@ pub mod mango_v4 {
         maint_weight_shift_asset_target_opt: Option<f32>,
         maint_weight_shift_liab_target_opt: Option<f32>,
         maint_weight_shift_abort: bool,
+        set_fallback_oracle: bool,
     ) -> Result<()> {
         #[cfg(feature = "enable-gpl")]
         instructions::token_edit(
@@ -272,6 +273,7 @@ pub mod mango_v4 {
             maint_weight_shift_asset_target_opt,
             maint_weight_shift_liab_target_opt,
             maint_weight_shift_abort,
+            set_fallback_oracle,
         )?;
         Ok(())
     }

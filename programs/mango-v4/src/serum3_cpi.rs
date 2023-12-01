@@ -1,5 +1,5 @@
 use anchor_lang::prelude::*;
-use serum_dex::state::{OpenOrders, ToAlignedBytes};
+use serum_dex::state::{OpenOrders, ToAlignedBytes, ACCOUNT_HEAD_PADDING};
 
 use std::cell::{Ref, RefMut};
 use std::cmp::min;
@@ -47,6 +47,14 @@ fn strip_data_header_mut<H: bytemuck::Pod, D: bytemuck::Pod>(
         let inner = remove_slop_mut(inner_bytes);
         (header, inner)
     }))
+}
+
+pub fn has_serum_header(data: &[u8]) -> bool {
+    if data.len() < 5 {
+        return false;
+    }
+    let head = &data[..5];
+    head == ACCOUNT_HEAD_PADDING
 }
 
 pub fn load_market_state<'a>(

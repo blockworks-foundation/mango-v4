@@ -47,6 +47,7 @@ pub trait AccountRetriever {
 /// 3. PerpMarket accounts, in the order of account.perps.iter_active_accounts()
 /// 4. PerpMarket oracle accounts, in the order of the perp market accounts
 /// 5. serum3 OpenOrders accounts, in the order of account.serum3.iter_active()
+/// 6. fallback oracle accounts, order and existence of accounts is not guaranteed
 pub struct FixedOrderAccountRetriever<T: KeyedAccountReader> {
     pub ais: Vec<T>,
     pub n_banks: usize,
@@ -54,6 +55,7 @@ pub struct FixedOrderAccountRetriever<T: KeyedAccountReader> {
     pub begin_perp: usize,
     pub begin_serum3: usize,
     pub staleness_slot: Option<u64>,
+    pub begin_fallback_oracles: usize,
 }
 
 pub fn new_fixed_order_account_retriever<'a, 'info>(
@@ -66,7 +68,7 @@ pub fn new_fixed_order_account_retriever<'a, 'info>(
     let expected_ais = active_token_len * 2 // banks + oracles
         + active_perp_len * 2 // PerpMarkets + Oracles
         + active_serum3_len; // open_orders
-    require_msg_typed!(ais.len() == expected_ais, MangoError::InvalidHealthAccountCount,
+    require_msg_typed!(ais.len() >= expected_ais, MangoError::InvalidHealthAccountCount,
         "received {} accounts but expected {} ({} banks, {} bank oracles, {} perp markets, {} perp oracles, {} serum3 oos)",
         ais.len(), expected_ais,
         active_token_len, active_token_len, active_perp_len, active_perp_len, active_serum3_len
@@ -79,6 +81,7 @@ pub fn new_fixed_order_account_retriever<'a, 'info>(
         begin_perp: active_token_len * 2,
         begin_serum3: active_token_len * 2 + active_perp_len * 2,
         staleness_slot: Some(Clock::get()?.slot),
+        begin_fallback_oracles: expected_ais,
     })
 }
 
@@ -101,11 +104,6 @@ impl<T: KeyedAccountReader> FixedOrderAccountRetriever<T> {
         require_keys_eq!(market.group, *group);
         require_eq!(market.perp_market_index, perp_market_index);
         Ok(market)
-    }
-
-    fn oracle_price_bank(&self, account_index: usize, bank: &Bank) -> Result<I80F48> {
-        let oracle = &self.ais[account_index];
-        bank.oracle_price(oracle, self.staleness_slot)
     }
 
     fn oracle_price_perp(&self, account_index: usize, perp_market: &PerpMarket) -> Result<I80F48> {
@@ -134,7 +132,13 @@ impl<T: KeyedAccountReader> AccountRetriever for FixedOrderAccountRetriever<T> {
             })?;
 
         let oracle_index = self.n_banks + active_token_position_index;
-        let oracle_price = self.oracle_price_bank(oracle_index, bank).with_context(|| {
+        let oracle = &self.ais[oracle_index];
+        let fallback_opt = self.ais[self.begin_fallback_oracles..]
+            .iter()
+            .find(|ai| ai.key() == &bank.fallback_oracle);
+        let oracle_price_result =
+            bank.oracle_price_with_fallback(oracle, fallback_opt, self.staleness_slot);
+        let oracle_price = oracle_price_result.with_context(|| {
             format!(
                 "getting oracle for bank with health account index {} and token index {}, passed account {}",
                 bank_account_index,
@@ -196,6 +200,7 @@ impl<T: KeyedAccountReader> AccountRetriever for FixedOrderAccountRetriever<T> {
 pub struct ScannedBanksAndOracles<'a, 'info> {
     banks: Vec<AccountInfoRefMut<'a, 'info>>,
     oracles: Vec<AccountInfoRef<'a, 'info>>,
+    fallback_oracles: Vec<AccountInfoRef<'a, 'info>>,
     index_map: HashMap<TokenIndex, usize>,
     staleness_slot: Option<u64>,
 }
@@ -222,7 +227,10 @@ impl<'a, 'info> ScannedBanksAndOracles<'a, 'info> {
             let index = self.bank_index(token_index1)?;
             let bank = self.banks[index].load_mut_fully_unchecked::<Bank>()?;
             let oracle = &self.oracles[index];
-            let price = bank.oracle_price(oracle, self.staleness_slot)?;
+            let fallback_oracle_opt =
+                fetch_fallback_oracle(&self.fallback_oracles, &bank.fallback_oracle);
+            let price =
+                bank.oracle_price_with_fallback(oracle, fallback_oracle_opt, self.staleness_slot)?;
             return Ok((bank, price, None));
         }
         let index1 = self.bank_index(token_index1)?;
@@ -240,8 +248,14 @@ impl<'a, 'info> ScannedBanksAndOracles<'a, 'info> {
         let bank2 = second_bank_part[second - (first + 1)].load_mut_fully_unchecked::<Bank>()?;
         let oracle1 = &self.oracles[first];
         let oracle2 = &self.oracles[second];
-        let price1 = bank1.oracle_price(oracle1, self.staleness_slot)?;
-        let price2 = bank2.oracle_price(oracle2, self.staleness_slot)?;
+        let fallback_oracle_opt1 =
+            fetch_fallback_oracle(&self.fallback_oracles, &bank1.fallback_oracle);
+        let fallback_oracle_opt2 =
+            fetch_fallback_oracle(&self.fallback_oracles, &bank2.fallback_oracle);
+        let price1 =
+            bank1.oracle_price_with_fallback(oracle1, fallback_oracle_opt1, self.staleness_slot)?;
+        let price2 =
+            bank2.oracle_price_with_fallback(oracle2, fallback_oracle_opt2, self.staleness_slot)?;
         if swap {
             Ok((bank2, price2, Some((bank1, price1))))
         } else {
@@ -254,7 +268,11 @@ impl<'a, 'info> ScannedBanksAndOracles<'a, 'info> {
         // The account was already loaded successfully during construction
         let bank = self.banks[index].load_fully_unchecked::<Bank>()?;
         let oracle = &self.oracles[index];
-        let price = bank.oracle_price(oracle, self.staleness_slot)?;
+        let fallback_oracle_opt =
+            fetch_fallback_oracle(&self.fallback_oracles, &bank.fallback_oracle);
+        let price =
+            bank.oracle_price_with_fallback(oracle, fallback_oracle_opt, self.staleness_slot)?;
+
         Ok((bank, price))
     }
 }
@@ -265,6 +283,7 @@ impl<'a, 'info> ScannedBanksAndOracles<'a, 'info> {
 /// - an unknown number of PerpMarket accounts
 /// - the same number of oracles in the same order as the perp markets
 /// - an unknown number of serum3 OpenOrders accounts
+/// - an unknown number of fallback oracle accounts
 /// and retrieves accounts needed for the health computation by doing a linear
 /// scan for each request.
 pub struct ScanningAccountRetriever<'a, 'info> {
@@ -350,17 +369,26 @@ impl<'a, 'info> ScanningAccountRetriever<'a, 'info> {
         let n_perps = perp_index_map.len();
         let perp_oracles_start = perps_start + n_perps;
         let serum3_start = perp_oracles_start + n_perps;
+        let n_serum3 = ais[serum3_start..]
+            .iter()
+            .take_while(|x| {
+                x.data_len() == std::mem::size_of::<serum_dex::state::OpenOrders>() + 12
+                    && serum3_cpi::has_serum_header(&x.data.borrow())
+            })
+            .count();
+        let fallback_oracles_start = serum3_start + n_serum3;
 
         Ok(Self {
             banks_and_oracles: ScannedBanksAndOracles {
                 banks: AccountInfoRefMut::borrow_slice(&ais[..n_banks])?,
                 oracles: AccountInfoRef::borrow_slice(&ais[n_banks..perps_start])?,
+                fallback_oracles: AccountInfoRef::borrow_slice(&ais[fallback_oracles_start..])?,
                 index_map: token_index_map,
                 staleness_slot,
             },
             perp_markets: AccountInfoRef::borrow_slice(&ais[perps_start..perp_oracles_start])?,
             perp_oracles: AccountInfoRef::borrow_slice(&ais[perp_oracles_start..serum3_start])?,
-            serum3_oos: AccountInfoRef::borrow_slice(&ais[serum3_start..])?,
+            serum3_oos: AccountInfoRef::borrow_slice(&ais[serum3_start..fallback_oracles_start])?,
             perp_index_map,
         })
     }
@@ -435,6 +463,14 @@ impl<'a, 'info> AccountRetriever for ScanningAccountRetriever<'a, 'info> {
     fn serum_oo(&self, _account_index: usize, key: &Pubkey) -> Result<&OpenOrders> {
         self.scanned_serum_oo(key)
     }
+}
+
+#[inline(always)]
+fn fetch_fallback_oracle<'a, 'info>(
+    fallback_oracles: &'a Vec<AccountInfoRef<'a, 'info>>,
+    fallback_key: &Pubkey,
+) -> Option<&'a AccountInfoRef<'a, 'info>> {
+    fallback_oracles.iter().find(|ai| ai.key() == fallback_key)
 }
 
 #[cfg(test)]

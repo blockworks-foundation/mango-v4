@@ -9,6 +9,7 @@ use anchor_lang::prelude::*;
 use anchor_spl::token::TokenAccount;
 use derivative::Derivative;
 use fixed::types::I80F48;
+use oracle::oracle_log_context;
 use static_assertions::const_assert_eq;
 
 use std::mem::size_of;
@@ -167,8 +168,10 @@ pub struct Bank {
     pub maint_weight_shift_asset_target: I80F48,
     pub maint_weight_shift_liab_target: I80F48,
 
+    pub fallback_oracle: Pubkey,
+
     #[derivative(Debug = "ignore")]
-    pub reserved: [u8; 2008],
+    pub reserved: [u8; 1976],
 }
 const_assert_eq!(
     size_of::<Bank>(),
@@ -292,7 +295,8 @@ impl Bank {
             maint_weight_shift_duration_inv: existing_bank.maint_weight_shift_duration_inv,
             maint_weight_shift_asset_target: existing_bank.maint_weight_shift_asset_target,
             maint_weight_shift_liab_target: existing_bank.maint_weight_shift_liab_target,
-            reserved: [0; 2008],
+            fallback_oracle: existing_bank.oracle,
+            reserved: [0; 1976],
         }
     }
 
@@ -947,12 +951,50 @@ impl Bank {
     ) -> Result<I80F48> {
         require_keys_eq!(self.oracle, *oracle_acc.key());
         let state = oracle::oracle_state_unchecked(oracle_acc, self.mint_decimals)?;
-        state.check_confidence_and_maybe_staleness(
-            &self.oracle,
+        state
+            .check_confidence_and_maybe_staleness(&self.name(), &self.oracle_config, staleness_slot)
+            .with_context(|| oracle_log_context(&state, &self.oracle_config, staleness_slot))?;
+        Ok(state.price)
+    }
+
+    /// Tries to return the primary oracle price, and if there is a confidence or staleness issue returns the fallback oracle price.
+    pub fn oracle_price_with_fallback(
+        &self,
+        oracle_acc: &impl KeyedAccountReader,
+        fallback_oracle_acc_opt: Option<&impl KeyedAccountReader>,
+        staleness_slot: Option<u64>,
+    ) -> Result<I80F48> {
+        require_keys_eq!(self.oracle, *oracle_acc.key());
+        let primary_state = oracle::oracle_state_unchecked(oracle_acc, self.mint_decimals)?;
+        let primary_ok = primary_state.check_confidence_and_maybe_staleness(
+            &self.name(),
             &self.oracle_config,
             staleness_slot,
-        )?;
-        Ok(state.price)
+        );
+        if primary_ok.is_oracle_error() && fallback_oracle_acc_opt.is_some() {
+            let fallback_oracle_acc = fallback_oracle_acc_opt.unwrap();
+            require_keys_eq!(self.fallback_oracle, *fallback_oracle_acc.key());
+            let fallback_state =
+                oracle::oracle_state_unchecked(fallback_oracle_acc, self.mint_decimals)?;
+            let fallback_ok = fallback_state.check_confidence_and_maybe_staleness(
+                &self.name(),
+                &self.oracle_config,
+                staleness_slot,
+            );
+            fallback_ok.with_context(|| {
+                format!(
+                    "{} {}",
+                    oracle_log_context(&primary_state, &self.oracle_config, staleness_slot),
+                    oracle_log_context(&fallback_state, &self.oracle_config, staleness_slot)
+                )
+            })?;
+            Ok(fallback_state.price)
+        } else {
+            primary_ok.with_context(|| {
+                oracle_log_context(&primary_state, &self.oracle_config, staleness_slot)
+            })?;
+            Ok(primary_state.price)
+        }
     }
 
     pub fn stable_price(&self) -> I80F48 {

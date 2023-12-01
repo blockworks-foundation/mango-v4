@@ -1,6 +1,7 @@
 #![allow(dead_code)]
 use super::*;
 
+use anchor_lang::prelude::AccountMeta;
 use mango_v4::accounts_ix::{Serum3OrderType, Serum3SelfTradeBehavior, Serum3Side};
 use mango_v4::serum3_cpi::{load_open_orders_bytes, OpenOrdersSlim};
 use std::sync::Arc;
@@ -1500,6 +1501,182 @@ async fn test_serum_compute() -> Result<(), TransportError> {
             .await;
     }
 
+    Ok(())
+}
+
+#[tokio::test]
+async fn test_fallback_oracle_serum() -> Result<(), TransportError> {
+    let mut test_builder = TestContextBuilder::new();
+    test_builder.test().set_compute_max_units(150_000);
+    let context = test_builder.start_default().await;
+    let solana = &context.solana.clone();
+
+    let fallback_oracle_kp = TestKeypair::new();
+    let fallback_oracle = fallback_oracle_kp.pubkey();
+    let owner = context.users[0].key;
+    let payer = context.users[1].key;
+    let payer_token_accounts = &context.users[1].token_accounts[0..3];
+
+    //
+    // SETUP: Create a group and an account
+    //
+    let deposit_amount = 1_000;
+    let CommonSetup {
+        group_with_tokens,
+        quote_token,
+        base_token,
+        mut order_placer,
+        ..
+    } = common_setup(&context, deposit_amount).await;
+    let GroupWithTokens {
+        group,
+        admin,
+        tokens,
+        ..
+    } = group_with_tokens;
+
+    //
+    // SETUP: Create a fallback oracle
+    //
+    send_tx(
+        solana,
+        StubOracleCreate {
+            oracle: fallback_oracle_kp,
+            group,
+            mint: tokens[2].mint.pubkey,
+            admin,
+            payer,
+        },
+    )
+    .await
+    .unwrap();
+
+    //
+    // SETUP: Add a fallback oracle
+    //
+    send_tx(
+        solana,
+        TokenEdit {
+            group,
+            admin,
+            mint: tokens[2].mint.pubkey,
+            fallback_oracle,
+            options: mango_v4::instruction::TokenEdit {
+                set_fallback_oracle: true,
+                ..token_edit_instruction_default()
+            },
+        },
+    )
+    .await
+    .unwrap();
+
+    let bank_data: Bank = solana.get_account(tokens[2].bank).await;
+    assert!(bank_data.fallback_oracle == fallback_oracle);
+
+    // Create some token1 borrows
+    send_tx(
+        solana,
+        TokenWithdrawInstruction {
+            amount: 1_500,
+            allow_borrow: true,
+            account: order_placer.account,
+            owner,
+            token_account: payer_token_accounts[2],
+            bank_index: 0,
+        },
+    )
+    .await
+    .unwrap();
+
+    // Make oracle invalid by increasing deviation
+    send_tx(
+        solana,
+        StubOracleSetTestInstruction {
+            oracle: tokens[2].oracle,
+            group,
+            mint: tokens[2].mint.pubkey,
+            admin,
+            price: 1.0,
+            last_update_slot: 0,
+            deviation: 100.0,
+        },
+    )
+    .await
+    .unwrap();
+
+    //
+    // TEST: Place a failing order
+    //
+    let limit_price = 1.0;
+    let max_base = 100;
+    let order_fut = order_placer.try_bid(limit_price, max_base, false).await;
+    assert_mango_error(
+        &order_fut,
+        6023,
+        "an oracle does not reach the confidence threshold".to_string(),
+    );
+
+    // now send txn with a fallback oracle in the remaining accounts
+    let fallback_oracle_meta = AccountMeta {
+        pubkey: fallback_oracle,
+        is_writable: false,
+        is_signer: false,
+    };
+
+    let client_order_id = order_placer.inc_client_order_id();
+    let place_ix = Serum3PlaceOrderInstruction {
+        side: Serum3Side::Bid,
+        limit_price: (limit_price * 100.0 / 10.0) as u64, // in quote_lot (10) per base lot (100)
+        max_base_qty: max_base / 100,                     // in base lot (100)
+        // 4 bps taker fees added in
+        max_native_quote_qty_including_fees: (limit_price * (max_base as f64) * (1.0)).ceil()
+            as u64,
+        self_trade_behavior: Serum3SelfTradeBehavior::AbortTransaction,
+        order_type: Serum3OrderType::Limit,
+        client_order_id,
+        limit: 10,
+        account: order_placer.account,
+        owner: order_placer.owner,
+        serum_market: order_placer.serum_market,
+    };
+
+    let result = send_tx_with_extra_accounts(solana, place_ix, vec![fallback_oracle_meta])
+        .await
+        .unwrap();
+    result.result.unwrap();
+
+    let account_data = get_mango_account(solana, order_placer.account).await;
+    assert_eq!(
+        account_data
+            .token_position_by_raw_index(0)
+            .unwrap()
+            .in_use_count,
+        1
+    );
+    assert_eq!(
+        account_data
+            .token_position_by_raw_index(1)
+            .unwrap()
+            .in_use_count,
+        1
+    );
+    assert_eq!(
+        account_data
+            .token_position_by_raw_index(2)
+            .unwrap()
+            .in_use_count,
+        0
+    );
+    let serum_orders = account_data.serum3_orders_by_raw_index(0).unwrap();
+    assert_eq!(serum_orders.base_borrows_without_fee, 0);
+    assert_eq!(serum_orders.quote_borrows_without_fee, 0);
+    assert_eq!(serum_orders.base_deposits_reserved, 0);
+    assert_eq!(serum_orders.quote_deposits_reserved, 100);
+
+    let base_bank = solana.get_account::<Bank>(base_token.bank).await;
+    assert_eq!(base_bank.deposits_in_serum, 0);
+    let quote_bank = solana.get_account::<Bank>(quote_token.bank).await;
+    assert_eq!(quote_bank.deposits_in_serum, 100);
     Ok(())
 }
 

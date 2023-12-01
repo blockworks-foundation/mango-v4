@@ -244,7 +244,7 @@ async fn test_margin_trade() -> Result<(), BanksClientError> {
 #[tokio::test]
 async fn test_flash_loan_swap_fee() -> Result<(), BanksClientError> {
     let mut test_builder = TestContextBuilder::new();
-    test_builder.test().set_compute_max_units(100_000);
+    test_builder.test().set_compute_max_units(150_000);
     let context = test_builder.start_default().await;
     let solana = &context.solana.clone();
 
@@ -278,6 +278,7 @@ async fn test_flash_loan_swap_fee() -> Result<(), BanksClientError> {
             group,
             admin,
             mint: tokens[1].mint.pubkey,
+            fallback_oracle: Pubkey::default(),
             options: mango_v4::instruction::TokenEdit {
                 flash_loan_swap_fee_rate_opt: Some(swap_fee_rate as f32),
                 ..token_edit_instruction_default()
