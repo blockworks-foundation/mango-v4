@@ -112,7 +112,7 @@ impl State {
 
             // Clear newly created token positions, so the liqor account is mostly empty
             for token_index in startable_chunk.iter().map(|(_, _, ti)| *ti).unique() {
-                let mint = mango_client.context.token(token_index).mint_info.mint;
+                let mint = mango_client.context.token(token_index).mint;
                 instructions.append(mango_client.token_withdraw_instructions(
                     &liqor_account,
                     mint,
@@ -166,12 +166,7 @@ impl State {
     }
 
     fn oracle_for_token(&self, token_index: TokenIndex) -> anyhow::Result<I80F48> {
-        let bank_pk = self
-            .mango_client
-            .context
-            .token(token_index)
-            .mint_info
-            .first_bank();
+        let bank_pk = self.mango_client.context.token(token_index).first_bank();
         self.account_fetcher.fetch_bank_price(&bank_pk)
     }
 
@@ -201,7 +196,6 @@ impl State {
             .mango_client
             .context
             .token(tcs.sell_token_index)
-            .mint_info
             .first_bank();
         let mut sell_bank: Bank = self.account_fetcher.fetch(&sell_bank_pk)?;
         let sell_pos = account.token_position(tcs.sell_token_index)?;

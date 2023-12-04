@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use itertools::Itertools;
 use mango_v4::accounts_zerocopy::KeyedAccount;
 use mango_v4_client::{Client, MangoGroupContext};
@@ -11,10 +13,22 @@ pub async fn run(client: &Client, group: Pubkey) -> anyhow::Result<()> {
     let oracles = context
         .tokens
         .values()
-        .map(|t| t.mint_info.oracle)
-        .chain(context.perp_markets.values().map(|p| p.market.oracle))
+        .map(|t| t.oracle)
+        .chain(context.perp_markets.values().map(|p| p.oracle))
         .unique()
         .collect_vec();
+
+    let banks: HashMap<_, _> = mango_v4_client::gpa::fetch_banks(&rpc_async, mango_v4::id(), group)
+        .await?
+        .iter()
+        .map(|(_, b)| (b.oracle, *b))
+        .collect();
+    let perp_markets: HashMap<_, _> =
+        mango_v4_client::gpa::fetch_perp_markets(&rpc_async, mango_v4::id(), group)
+            .await?
+            .iter()
+            .map(|(_, p)| (p.oracle, *p))
+            .collect();
 
     let mut interval = tokio::time::interval(std::time::Duration::from_secs(5));
     loop {
@@ -41,25 +55,19 @@ pub async fn run(client: &Client, group: Pubkey) -> anyhow::Result<()> {
                 account: account_opt.unwrap(),
             };
 
-            let tc_opt = context
-                .tokens
-                .values()
-                .find(|t| t.mint_info.oracle == *pubkey);
-            let pc_opt = context
-                .perp_markets
-                .values()
-                .find(|p| p.market.oracle == *pubkey);
+            let bank_opt = banks.get(pubkey);
+            let perp_opt = perp_markets.get(pubkey);
             let mut price = None;
-            if let Some(tc) = tc_opt {
-                match tc.bank.oracle_price(&keyed_account, Some(slot)) {
+            if let Some(bank) = bank_opt {
+                match bank.oracle_price(&keyed_account, Some(slot)) {
                     Ok(p) => price = Some(p),
                     Err(e) => {
                         error!("could not read bank oracle {}: {e:?}", keyed_account.key);
                     }
                 }
             }
-            if let Some(pc) = pc_opt {
-                match pc.market.oracle_price(&keyed_account, Some(slot)) {
+            if let Some(perp) = perp_opt {
+                match perp.oracle_price(&keyed_account, Some(slot)) {
                     Ok(p) => price = Some(p),
                     Err(e) => {
                         error!("could not read perp oracle {}: {e:?}", keyed_account.key);

@@ -178,7 +178,6 @@ impl<'a> LiquidateHelper<'a> {
             let max_perp_unsettled_leverage = I80F48::from_num(0.95);
             let perp_unsettled_cost = I80F48::ONE
                 - perp
-                    .market
                     .init_overall_asset_weight
                     .min(max_perp_unsettled_leverage);
             let max_pnl_transfer = allowed_usdc_borrow / perp_unsettled_cost;
@@ -334,7 +333,7 @@ impl<'a> LiquidateHelper<'a> {
                 asset_usdc_equivalent.is_positive()
                     && self
                         .allowed_asset_tokens
-                        .contains(&self.client.context.token(*asset_token_index).mint_info.mint)
+                        .contains(&self.client.context.token(*asset_token_index).mint)
             })
             .ok_or_else(|| {
                 anyhow::anyhow!(
@@ -350,7 +349,7 @@ impl<'a> LiquidateHelper<'a> {
                 liab_usdc_equivalent.is_negative()
                     && self
                         .allowed_liab_tokens
-                        .contains(&self.client.context.token(*liab_token_index).mint_info.mint)
+                        .contains(&self.client.context.token(*liab_token_index).mint)
             })
             .ok_or_else(|| {
                 anyhow::anyhow!(
@@ -414,7 +413,7 @@ impl<'a> LiquidateHelper<'a> {
                 liab_usdc_equivalent.is_negative()
                     && self
                         .allowed_liab_tokens
-                        .contains(&self.client.context.token(*liab_token_index).mint_info.mint)
+                        .contains(&self.client.context.token(*liab_token_index).mint)
             })
             .ok_or_else(|| {
                 anyhow::anyhow!(
@@ -569,13 +568,7 @@ pub async fn maybe_liquidate_account(
 
     let maint_health = health_cache.health(HealthType::Maint);
 
-    let all_token_mints = HashSet::from_iter(
-        mango_client
-            .context
-            .tokens
-            .values()
-            .map(|c| c.mint_info.mint),
-    );
+    let all_token_mints = HashSet::from_iter(mango_client.context.tokens.values().map(|c| c.mint));
 
     // try liquidating
     let maybe_txsig = LiquidateHelper {

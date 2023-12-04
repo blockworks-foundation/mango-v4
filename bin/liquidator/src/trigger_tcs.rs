@@ -365,7 +365,7 @@ impl Context {
         &self,
         token_index: TokenIndex,
     ) -> anyhow::Result<(Bank, I80F48, Pubkey)> {
-        let info = self.mango_client.context.mint_info(token_index);
+        let info = self.mango_client.context.token(token_index);
         let (bank, price) = self
             .account_fetcher
             .fetch_bank_and_price(&info.first_bank())?;

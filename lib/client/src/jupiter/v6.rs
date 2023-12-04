@@ -220,25 +220,19 @@ impl<'a> JupiterV6<'a> {
         let source_token = self.mango_client.context.token_by_mint(&input_mint)?;
         let target_token = self.mango_client.context.token_by_mint(&output_mint)?;
 
-        let bank_ams = [
-            source_token.mint_info.first_bank(),
-            target_token.mint_info.first_bank(),
-        ]
-        .into_iter()
-        .map(util::to_writable_account_meta)
-        .collect::<Vec<_>>();
+        let bank_ams = [source_token.first_bank(), target_token.first_bank()]
+            .into_iter()
+            .map(util::to_writable_account_meta)
+            .collect::<Vec<_>>();
 
-        let vault_ams = [
-            source_token.mint_info.first_vault(),
-            target_token.mint_info.first_vault(),
-        ]
-        .into_iter()
-        .map(util::to_writable_account_meta)
-        .collect::<Vec<_>>();
+        let vault_ams = [source_token.first_vault(), target_token.first_vault()]
+            .into_iter()
+            .map(util::to_writable_account_meta)
+            .collect::<Vec<_>>();
 
         let owner = self.mango_client.owner();
 
-        let token_ams = [source_token.mint_info.mint, target_token.mint_info.mint]
+        let token_ams = [source_token.mint, target_token.mint]
             .into_iter()
             .map(|mint| {
                 util::to_writable_account_meta(
@@ -303,7 +297,7 @@ impl<'a> JupiterV6<'a> {
             spl_associated_token_account::instruction::create_associated_token_account_idempotent(
                 &owner,
                 &owner,
-                &source_token.mint_info.mint,
+                &source_token.mint,
                 &Token::id(),
             ),
         );

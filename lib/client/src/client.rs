@@ -18,7 +18,7 @@ use itertools::Itertools;
 use mango_v4::accounts_ix::{Serum3OrderType, Serum3SelfTradeBehavior, Serum3Side};
 use mango_v4::accounts_zerocopy::KeyedAccountSharedData;
 use mango_v4::state::{
-    Bank, Group, MangoAccountValue, PerpMarketIndex, PlaceOrderType, SelfTradeBehavior,
+    Bank, Group, MangoAccountValue, PerpMarket, PerpMarketIndex, PlaceOrderType, SelfTradeBehavior,
     Serum3MarketIndex, Side, TokenIndex, INSURANCE_TOKEN_INDEX,
 };
 
@@ -295,7 +295,7 @@ impl MangoClient {
     }
 
     pub async fn first_bank(&self, token_index: TokenIndex) -> anyhow::Result<Bank> {
-        let bank_address = self.context.mint_info(token_index).first_bank();
+        let bank_address = self.context.token(token_index).first_bank();
         account_fetcher_fetch_anchor_account(&*self.account_fetcher, &bank_address).await
     }
 
@@ -338,7 +338,6 @@ impl MangoClient {
     ) -> anyhow::Result<Signature> {
         let token = self.context.token_by_mint(&mint)?;
         let token_index = token.token_index;
-        let mint_info = token.mint_info;
 
         let (health_check_metas, health_cu) = self
             .derive_health_check_remaining_account_metas(vec![token_index], vec![], vec![])
@@ -353,13 +352,10 @@ impl MangoClient {
                             group: self.group(),
                             account: self.mango_account_address,
                             owner: self.owner(),
-                            bank: mint_info.first_bank(),
-                            vault: mint_info.first_vault(),
-                            oracle: mint_info.oracle,
-                            token_account: get_associated_token_address(
-                                &self.owner(),
-                                &mint_info.mint,
-                            ),
+                            bank: token.first_bank(),
+                            vault: token.first_vault(),
+                            oracle: token.oracle,
+                            token_account: get_associated_token_address(&self.owner(), &token.mint),
                             token_authority: self.owner(),
                             token_program: Token::id(),
                         },
@@ -390,7 +386,6 @@ impl MangoClient {
     ) -> anyhow::Result<PreparedInstructions> {
         let token = self.context.token_by_mint(&mint)?;
         let token_index = token.token_index;
-        let mint_info = token.mint_info;
 
         let (health_check_metas, health_cu) =
             self.context.derive_health_check_remaining_account_metas(
@@ -416,12 +411,12 @@ impl MangoClient {
                             group: self.group(),
                             account: self.mango_account_address,
                             owner: self.owner(),
-                            bank: mint_info.first_bank(),
-                            vault: mint_info.first_vault(),
-                            oracle: mint_info.oracle,
+                            bank: token.first_bank(),
+                            vault: token.first_vault(),
+                            oracle: token.oracle,
                             token_account: get_associated_token_address(
                                 &self.owner(),
-                                &mint_info.mint,
+                                &token.mint,
                             ),
                             token_program: Token::id(),
                         },
@@ -454,7 +449,7 @@ impl MangoClient {
 
     pub async fn bank_oracle_price(&self, token_index: TokenIndex) -> anyhow::Result<I80F48> {
         let bank = self.first_bank(token_index).await?;
-        let mint_info = self.context.mint_info(token_index);
+        let mint_info = self.context.token(token_index);
         let oracle = self
             .account_fetcher
             .fetch_raw_account(&mint_info.oracle)
@@ -471,12 +466,11 @@ impl MangoClient {
         perp_market_index: PerpMarketIndex,
     ) -> anyhow::Result<I80F48> {
         let perp = self.context.perp(perp_market_index);
-        let oracle = self
-            .account_fetcher
-            .fetch_raw_account(&perp.market.oracle)
-            .await?;
-        let price = perp.market.oracle_price(
-            &KeyedAccountSharedData::new(perp.market.oracle, oracle.into()),
+        let perp_market: PerpMarket =
+            account_fetcher_fetch_anchor_account(&*self.account_fetcher, &perp.address).await?;
+        let oracle = self.account_fetcher.fetch_raw_account(&perp.oracle).await?;
+        let price = perp_market.oracle_price(
+            &KeyedAccountSharedData::new(perp.oracle, oracle.into()),
             None,
         )?;
         Ok(price)
@@ -510,8 +504,8 @@ impl MangoClient {
                     group: self.group(),
                     account: account_pubkey,
                     serum_market: s3.address,
-                    serum_program: s3.market.serum_program,
-                    serum_market_external: s3.market.serum_market_external,
+                    serum_program: s3.serum_program,
+                    serum_market_external: s3.serum_market_external,
                     open_orders,
                     owner: self.owner(),
                     payer: self.owner(),
@@ -558,9 +552,9 @@ impl MangoClient {
             .context
             .derive_health_check_remaining_account_metas(account, vec![], vec![], vec![])?;
 
-        let payer_mint_info = match side {
-            Serum3Side::Bid => quote.mint_info,
-            Serum3Side::Ask => base.mint_info,
+        let payer_token = match side {
+            Serum3Side::Bid => &quote,
+            Serum3Side::Ask => &base,
         };
 
         let ixs = PreparedInstructions::from_single(
@@ -572,12 +566,12 @@ impl MangoClient {
                             group: self.group(),
                             account: self.mango_account_address,
                             open_orders,
-                            payer_bank: payer_mint_info.first_bank(),
-                            payer_vault: payer_mint_info.first_vault(),
-                            payer_oracle: payer_mint_info.oracle,
+                            payer_bank: payer_token.first_bank(),
+                            payer_vault: payer_token.first_vault(),
+                            payer_oracle: payer_token.oracle,
                             serum_market: s3.address,
-                            serum_program: s3.market.serum_program,
-                            serum_market_external: s3.market.serum_market_external,
+                            serum_program: s3.serum_program,
+                            serum_market_external: s3.serum_market_external,
                             market_bids: s3.bids,
                             market_asks: s3.asks,
                             market_event_queue: s3.event_q,
@@ -660,13 +654,13 @@ impl MangoClient {
                         group: self.group(),
                         account: self.mango_account_address,
                         open_orders,
-                        quote_bank: quote.mint_info.first_bank(),
-                        quote_vault: quote.mint_info.first_vault(),
-                        base_bank: base.mint_info.first_bank(),
-                        base_vault: base.mint_info.first_vault(),
+                        quote_bank: quote.first_bank(),
+                        quote_vault: quote.first_vault(),
+                        base_bank: base.first_bank(),
+                        base_vault: base.first_vault(),
                         serum_market: s3.address,
-                        serum_program: s3.market.serum_program,
-                        serum_market_external: s3.market.serum_market_external,
+                        serum_program: s3.serum_program,
+                        serum_market_external: s3.serum_market_external,
                         market_base_vault: s3.coin_vault,
                         market_quote_vault: s3.pc_vault,
                         market_vault_signer: s3.vault_signer,
@@ -674,8 +668,8 @@ impl MangoClient {
                         token_program: Token::id(),
                     },
                     v2: mango_v4::accounts::Serum3SettleFundsV2Extra {
-                        quote_oracle: quote.mint_info.oracle,
-                        base_oracle: base.mint_info.oracle,
+                        quote_oracle: quote.oracle,
+                        base_oracle: base.oracle,
                     },
                 },
                 None,
@@ -708,8 +702,8 @@ impl MangoClient {
                         market_asks: s3.asks,
                         market_event_queue: s3.event_q,
                         serum_market: s3.address,
-                        serum_program: s3.market.serum_program,
-                        serum_market_external: s3.market.serum_market_external,
+                        serum_program: s3.serum_program,
+                        serum_market_external: s3.serum_market_external,
                         owner: self.owner(),
                     },
                     None,
@@ -782,18 +776,18 @@ impl MangoClient {
                             account: *liqee.0,
                             open_orders: *open_orders,
                             serum_market: s3.address,
-                            serum_program: s3.market.serum_program,
-                            serum_market_external: s3.market.serum_market_external,
+                            serum_program: s3.serum_program,
+                            serum_market_external: s3.serum_market_external,
                             market_bids: s3.bids,
                             market_asks: s3.asks,
                             market_event_queue: s3.event_q,
                             market_base_vault: s3.coin_vault,
                             market_quote_vault: s3.pc_vault,
                             market_vault_signer: s3.vault_signer,
-                            quote_bank: quote.mint_info.first_bank(),
-                            quote_vault: quote.mint_info.first_vault(),
-                            base_bank: base.mint_info.first_bank(),
-                            base_vault: base.mint_info.first_vault(),
+                            quote_bank: quote.first_bank(),
+                            quote_vault: quote.first_vault(),
+                            base_bank: base.first_bank(),
+                            base_vault: base.first_vault(),
                             token_program: Token::id(),
                         },
                         None,
@@ -832,8 +826,8 @@ impl MangoClient {
                         group: self.group(),
                         account: self.mango_account_address,
                         serum_market: s3.address,
-                        serum_program: s3.market.serum_program,
-                        serum_market_external: s3.market.serum_market_external,
+                        serum_program: s3.serum_program,
+                        serum_market_external: s3.serum_market_external,
                         open_orders,
                         market_bids: s3.bids,
                         market_asks: s3.asks,
@@ -890,10 +884,10 @@ impl MangoClient {
                             account: self.mango_account_address,
                             owner: self.owner(),
                             perp_market: perp.address,
-                            bids: perp.market.bids,
-                            asks: perp.market.asks,
-                            event_queue: perp.market.event_queue,
-                            oracle: perp.market.oracle,
+                            bids: perp.bids,
+                            asks: perp.asks,
+                            event_queue: perp.event_queue,
+                            oracle: perp.oracle,
                         },
                         None,
                     );
@@ -972,8 +966,8 @@ impl MangoClient {
                             account: self.mango_account_address,
                             owner: self.owner(),
                             perp_market: perp.address,
-                            bids: perp.market.bids,
-                            asks: perp.market.asks,
+                            bids: perp.bids,
+                            asks: perp.asks,
                         },
                         None,
                     )
@@ -1030,7 +1024,7 @@ impl MangoClient {
         account_b: (&Pubkey, &MangoAccountValue),
     ) -> anyhow::Result<PreparedInstructions> {
         let perp = self.context.perp(market_index);
-        let settlement_token = self.context.token(perp.market.settle_token_index);
+        let settlement_token = self.context.token(perp.settle_token_index);
 
         let (health_remaining_ams, health_cu) = self
             .context
@@ -1054,9 +1048,9 @@ impl MangoClient {
                             perp_market: perp.address,
                             account_a: *account_a.0,
                             account_b: *account_b.0,
-                            oracle: perp.market.oracle,
-                            settle_bank: settlement_token.mint_info.first_bank(),
-                            settle_oracle: settlement_token.mint_info.oracle,
+                            oracle: perp.oracle,
+                            settle_bank: settlement_token.first_bank(),
+                            settle_oracle: settlement_token.oracle,
                         },
                         None,
                     );
@@ -1103,8 +1097,8 @@ impl MangoClient {
                             group: self.group(),
                             account: *liqee.0,
                             perp_market: perp.address,
-                            bids: perp.market.bids,
-                            asks: perp.market.asks,
+                            bids: perp.bids,
+                            asks: perp.asks,
                         },
                         None,
                     );
@@ -1130,7 +1124,7 @@ impl MangoClient {
         max_pnl_transfer: u64,
     ) -> anyhow::Result<PreparedInstructions> {
         let perp = self.context.perp(market_index);
-        let settle_token_info = self.context.token(perp.market.settle_token_index);
+        let settle_token_info = self.context.token(perp.settle_token_index);
 
         let (health_remaining_ams, health_cu) = self
             .derive_liquidation_health_check_remaining_account_metas(liqee.1, &[], &[])
@@ -1144,13 +1138,13 @@ impl MangoClient {
                     &mango_v4::accounts::PerpLiqBaseOrPositivePnl {
                         group: self.group(),
                         perp_market: perp.address,
-                        oracle: perp.market.oracle,
+                        oracle: perp.oracle,
                         liqor: self.mango_account_address,
                         liqor_owner: self.owner(),
                         liqee: *liqee.0,
-                        settle_bank: settle_token_info.mint_info.first_bank(),
-                        settle_vault: settle_token_info.mint_info.first_vault(),
-                        settle_oracle: settle_token_info.mint_info.oracle,
+                        settle_bank: settle_token_info.first_bank(),
+                        settle_vault: settle_token_info.first_vault(),
+                        settle_oracle: settle_token_info.oracle,
                     },
                     None,
                 );
@@ -1183,7 +1177,7 @@ impl MangoClient {
         .await?;
 
         let perp = self.context.perp(market_index);
-        let settle_token_info = self.context.token(perp.market.settle_token_index);
+        let settle_token_info = self.context.token(perp.settle_token_index);
         let insurance_token_info = self.context.token(INSURANCE_TOKEN_INDEX);
 
         let (health_remaining_ams, health_cu) = self
@@ -1202,17 +1196,17 @@ impl MangoClient {
                     &mango_v4::accounts::PerpLiqNegativePnlOrBankruptcyV2 {
                         group: self.group(),
                         perp_market: perp.address,
-                        oracle: perp.market.oracle,
+                        oracle: perp.oracle,
                         liqor: self.mango_account_address,
                         liqor_owner: self.owner(),
                         liqee: *liqee.0,
-                        settle_bank: settle_token_info.mint_info.first_bank(),
-                        settle_vault: settle_token_info.mint_info.first_vault(),
-                        settle_oracle: settle_token_info.mint_info.oracle,
+                        settle_bank: settle_token_info.first_bank(),
+                        settle_vault: settle_token_info.first_vault(),
+                        settle_oracle: settle_token_info.oracle,
                         insurance_vault: group.insurance_vault,
-                        insurance_bank: insurance_token_info.mint_info.first_bank(),
-                        insurance_bank_vault: insurance_token_info.mint_info.first_vault(),
-                        insurance_oracle: insurance_token_info.mint_info.oracle,
+                        insurance_bank: insurance_token_info.first_bank(),
+                        insurance_bank_vault: insurance_token_info.first_vault(),
+                        insurance_oracle: insurance_token_info.oracle,
                         token_program: Token::id(),
                     },
                     None,
@@ -1289,7 +1283,6 @@ impl MangoClient {
         let liab_info = self.context.token(liab_token_index);
 
         let bank_remaining_ams = liab_info
-            .mint_info
             .banks()
             .iter()
             .map(|bank_pubkey| util::to_writable_account_meta(*bank_pubkey))
@@ -1320,7 +1313,7 @@ impl MangoClient {
                         liqor: self.mango_account_address,
                         liqor_owner: self.owner(),
                         liab_mint_info: liab_info.mint_info_address,
-                        quote_vault: quote_info.mint_info.first_vault(),
+                        quote_vault: quote_info.first_vault(),
                         insurance_vault: group.insurance_vault,
                         token_program: Token::id(),
                     },
@@ -1663,6 +1656,30 @@ impl MangoClient {
         }
         .simulate(&self.client)
         .await
+    }
+
+    pub async fn loop_check_for_context_changes_and_abort(
+        mango_client: Arc<MangoClient>,
+        interval: Duration,
+    ) {
+        let mut delay = tokio::time::interval(interval);
+        let rpc_async = mango_client.client.rpc_async();
+        loop {
+            delay.tick().await;
+
+            let new_context =
+                match MangoGroupContext::new_from_rpc(&rpc_async, mango_client.group()).await {
+                    Ok(v) => v,
+                    Err(e) => {
+                        tracing::warn!("could not fetch context to check for changes: {e:?}");
+                        continue;
+                    }
+                };
+
+            if mango_client.context.changed_significantly(&new_context) {
+                std::process::abort();
+            }
+        }
     }
 }
 

@@ -94,8 +94,8 @@ impl TokenSwapInfoUpdater {
             return Ok(());
         }
 
-        let token_mint = self.mango_client.context.mint_info(token_index).mint;
-        let quote_mint = self.mango_client.context.mint_info(quote_index).mint;
+        let token_mint = self.mango_client.context.token(token_index).mint;
+        let quote_mint = self.mango_client.context.token(quote_index).mint;
 
         // these prices are in USD, which doesn't exist on chain
         let token_price = self
