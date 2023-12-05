@@ -49,7 +49,6 @@ pub async fn send_tx<CI: ClientInstruction>(
     let (accounts, instruction) = ix.to_instruction(solana).await;
     let signers = ix.signers();
     let instructions = vec![instruction.clone()];
-    println!("IX    IX: {:?}", instruction);
     let result = solana
         .process_transaction(&instructions, Some(&signers[..]))
         .await?;
