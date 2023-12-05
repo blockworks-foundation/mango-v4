@@ -2258,6 +2258,7 @@ impl ClientInstruction for Serum3RegisterMarketInstruction {
         let instruction = Self::Instruction {
             market_index: self.market_index,
             name: "UUU/usdc".to_string(),
+            oracle_price_band: f32::MAX,
         };
 
         let serum_market = Pubkey::find_program_address(
@@ -2299,6 +2300,46 @@ impl ClientInstruction for Serum3RegisterMarketInstruction {
 
     fn signers(&self) -> Vec<TestKeypair> {
         vec![self.admin, self.payer]
+    }
+}
+
+pub fn serum3_edit_market_instruction_default() -> mango_v4::instruction::Serum3EditMarket {
+    mango_v4::instruction::Serum3EditMarket {
+        reduce_only_opt: None,
+        force_close_opt: None,
+        name_opt: None,
+        oracle_price_band_opt: None,
+    }
+}
+
+pub struct Serum3EditMarketInstruction {
+    pub group: Pubkey,
+    pub admin: TestKeypair,
+    pub market: Pubkey,
+    pub options: mango_v4::instruction::Serum3EditMarket,
+}
+#[async_trait::async_trait(?Send)]
+impl ClientInstruction for Serum3EditMarketInstruction {
+    type Accounts = mango_v4::accounts::Serum3EditMarket;
+    type Instruction = mango_v4::instruction::Serum3EditMarket;
+    async fn to_instruction(
+        &self,
+        _account_loader: impl ClientAccountLoader + 'async_trait,
+    ) -> (Self::Accounts, instruction::Instruction) {
+        let program_id = mango_v4::id();
+
+        let accounts = Self::Accounts {
+            group: self.group,
+            admin: self.admin.pubkey(),
+            market: self.market,
+        };
+
+        let instruction = make_instruction(program_id, &accounts, &self.options);
+        (accounts, instruction)
+    }
+
+    fn signers(&self) -> Vec<TestKeypair> {
+        vec![self.admin]
     }
 }
 
@@ -2476,7 +2517,7 @@ pub struct Serum3PlaceOrderInstruction {
 #[async_trait::async_trait(?Send)]
 impl ClientInstruction for Serum3PlaceOrderInstruction {
     type Accounts = mango_v4::accounts::Serum3PlaceOrder;
-    type Instruction = mango_v4::instruction::Serum3PlaceOrder;
+    type Instruction = mango_v4::instruction::Serum3PlaceOrderV2;
     async fn to_instruction(
         &self,
         account_loader: impl ClientAccountLoader + 'async_trait,
@@ -2530,7 +2571,7 @@ impl ClientInstruction for Serum3PlaceOrderInstruction {
         )
         .unwrap();
 
-        let health_check_metas = derive_health_check_remaining_account_metas(
+        let mut health_check_metas = derive_health_check_remaining_account_metas(
             &account_loader,
             &account,
             None,
@@ -2539,10 +2580,16 @@ impl ClientInstruction for Serum3PlaceOrderInstruction {
         )
         .await;
 
-        let payer_info = &match self.side {
-            Serum3Side::Bid => &quote_info,
-            Serum3Side::Ask => &base_info,
+        let (payer_info, receiver_info) = &match self.side {
+            Serum3Side::Bid => (&quote_info, &base_info),
+            Serum3Side::Ask => (&base_info, &quote_info),
         };
+
+        let receiver_active_index = account
+            .active_token_positions()
+            .position(|tp| tp.token_index == receiver_info.token_index)
+            .unwrap();
+        health_check_metas[receiver_active_index].is_writable = true;
 
         let accounts = Self::Accounts {
             group: account.fixed.group,

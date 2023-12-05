@@ -125,6 +125,10 @@ pub enum MangoError {
     TokenConditionalSwapTooSmallForStartIncentive,
     #[msg("token conditional swap type cannot be started")]
     TokenConditionalSwapTypeNotStartable,
+    #[msg("a bank in the health account list should be writable but is not")]
+    HealthAccountBankNotWritable,
+    #[msg("the market does not allow limit orders too far from the current oracle value")]
+    Serum3PriceBandExceeded,
 }
 
 impl MangoError {
