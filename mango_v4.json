@@ -1,5 +1,5 @@
 {
-  "version": "0.20.0",
+  "version": "0.21.0",
   "name": "mango_v4",
   "instructions": [
     {
@@ -991,6 +991,10 @@
         },
         {
           "name": "maintWeightShiftAbort",
+          "type": "bool"
+        },
+        {
+          "name": "setFallbackOracle",
           "type": "bool"
         },
         {
@@ -7320,6 +7324,10 @@
             }
           },
           {
+            "name": "fallbackOracle",
+            "type": "publicKey"
+          },
+          {
             "name": "depositLimit",
             "docs": [
               "zero means none, in token native"
@@ -7331,7 +7339,7 @@
             "type": {
               "array": [
                 "u8",
-                2000
+                1968
               ]
             }
           }

@@ -1,5 +1,5 @@
 export type MangoV4 = {
-  "version": "0.20.0",
+  "version": "0.21.0",
   "name": "mango_v4",
   "instructions": [
     {
@@ -991,6 +991,10 @@ export type MangoV4 = {
         },
         {
           "name": "maintWeightShiftAbort",
+          "type": "bool"
+        },
+        {
+          "name": "setFallbackOracle",
           "type": "bool"
         },
         {
@@ -7320,6 +7324,10 @@ export type MangoV4 = {
             }
           },
           {
+            "name": "fallbackOracle",
+            "type": "publicKey"
+          },
+          {
             "name": "depositLimit",
             "docs": [
               "zero means none, in token native"
@@ -7331,7 +7339,7 @@ export type MangoV4 = {
             "type": {
               "array": [
                 "u8",
-                2000
+                1968
               ]
             }
           }
@@ -13520,7 +13528,7 @@ export type MangoV4 = {
 };
 
 export const IDL: MangoV4 = {
-  "version": "0.20.0",
+  "version": "0.21.0",
   "name": "mango_v4",
   "instructions": [
     {
@@ -14512,6 +14520,10 @@ export const IDL: MangoV4 = {
         },
         {
           "name": "maintWeightShiftAbort",
+          "type": "bool"
+        },
+        {
+          "name": "setFallbackOracle",
           "type": "bool"
         },
         {
@@ -20841,6 +20853,10 @@ export const IDL: MangoV4 = {
             }
           },
           {
+            "name": "fallbackOracle",
+            "type": "publicKey"
+          },
+          {
             "name": "depositLimit",
             "docs": [
               "zero means none, in token native"
@@ -20852,7 +20868,7 @@ export const IDL: MangoV4 = {
             "type": {
               "array": [
                 "u8",
-                2000
+                1968
               ]
             }
           }
