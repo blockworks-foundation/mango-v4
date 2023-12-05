@@ -10,7 +10,12 @@ pub struct TokenAddBank<'info> {
     #[account(
         has_one = admin,
         constraint = group.load()?.is_ix_enabled(IxGate::TokenAddBank) @ MangoError::IxIsDisabled,
-        constraint = group.load()?.multiple_banks_supported()
+        constraint = group.load()?.multiple_banks_supported(),
+        // Concerns are:
+        // - general reaudit
+        // - client support
+        // - potential_serum_tokens
+        constraint = group.load()?.is_testing(),
     )]
     pub group: AccountLoader<'info, Group>,
     pub admin: Signer<'info>,
