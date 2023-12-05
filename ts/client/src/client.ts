@@ -104,6 +104,17 @@ export enum AccountRetriever {
   Fixed,
 }
 
+export enum FallbackOracleMode {
+  None,
+  Fixed,
+  AllAvailable,
+}
+
+export type FallbackOracleOptions = {
+  mode: FallbackOracleMode,
+  fixedOracles: PublicKey[]
+}
+
 export type IdsSource = 'api' | 'static' | 'get-program-accounts';
 
 export type MangoClientOptions = {
@@ -114,6 +125,7 @@ export type MangoClientOptions = {
   txConfirmationCommitment?: Commitment;
   openbookFeesToDao?: boolean;
   prependedGlobalAdditionalInstructions?: TransactionInstruction[];
+  fallbackOracleOptions?: FallbackOracleOptions;
 };
 
 export class MangoClient {
@@ -124,6 +136,10 @@ export class MangoClient {
   private txConfirmationCommitment: Commitment;
   private openbookFeesToDao: boolean;
   private prependedGlobalAdditionalInstructions: TransactionInstruction[] = [];
+  private fallbackOracleOptions: FallbackOracleOptions = {
+    mode: FallbackOracleMode.None, 
+    fixedOracles: []
+  };
 
   constructor(
     public program: Program<MangoV4>,
@@ -4665,6 +4681,16 @@ export class MangoClient {
         .map((serumPosition) => serumPosition.openOrders),
     );
 
+    switch (this.fallbackOracleOptions.mode) {
+      case FallbackOracleMode.None:
+        break;
+      case FallbackOracleMode.Fixed:
+        healthRemainingAccounts.push(...this.fallbackOracleOptions.fixedOracles)
+      case FallbackOracleMode.AllAvailable:
+        healthRemainingAccounts.push(
+        ...mintInfos.filter((mintInfo) => mintInfo.fallbackOracle.toBase58() != PublicKey.default.toBase58()).map(m => m.fallbackOracle))
+    }
+
     return healthRemainingAccounts;
   }
 
@@ -4800,5 +4826,20 @@ export class MangoClient {
           2;
 
     return Math.max(1, Math.ceil(medianFee));
+  }
+
+  /**
+   * Checks all oracles and returns the PublicKeys of any configured fallback oracles if the primary oracle is stale or outside the confidence interval.
+   * This function assumes that the group has Banks.
+   *
+  */
+  public async fetchFallbacksForStaleOracles(group: Group): Promise<PublicKey[]> {
+    await group.reloadBankOraclePrices(this)
+    const banks: Bank[][] = Array.from(
+      group.banksMapByMint,
+      ([, value]) => value,
+    );
+    const staleBanks = banks.filter((b) => b[0].isOracleStaleOrUnconfident).map((s) => s[0].fallbackOracle);
+    return staleBanks
   }
 }

@@ -614,12 +614,12 @@ impl MangoGroupContext {
         for acc in oracle_accounts {
             let bank = banks_by_oracle.get(acc.key()).unwrap();
             let state = oracle_state_unchecked(&acc, bank.mint_decimals)?;
-            if state
+            if (state
                 .check_confidence(bank.name(), &bank.oracle_config)
                 .is_err()
                 || state
                     .check_staleness(bank.name(), &bank.oracle_config, now_slot)
-                    .is_err()
+                    .is_err()) && bank.fallback_oracle != Pubkey::default()
             {
                 fallbacks.push(bank.fallback_oracle);
             }

@@ -79,6 +79,7 @@ export class Bank implements BankForHealth {
   public maintWeightShiftDurationInv: I80F48;
   public maintWeightShiftAssetTarget: I80F48;
   public maintWeightShiftLiabTarget: I80F48;
+  public fallbackOracle: PublicKey;
 
   static from(
     publicKey: PublicKey,
@@ -139,6 +140,7 @@ export class Bank implements BankForHealth {
       maintWeightShiftAssetTarget: I80F48Dto;
       maintWeightShiftLiabTarget: I80F48Dto;
       depositLimit: BN;
+      fallbackOracle: PublicKey;
     },
   ): Bank {
     return new Bank(
@@ -199,6 +201,7 @@ export class Bank implements BankForHealth {
       obj.maintWeightShiftAssetTarget,
       obj.maintWeightShiftLiabTarget,
       obj.depositLimit,
+      obj.fallbackOracle
     );
   }
 
@@ -260,6 +263,7 @@ export class Bank implements BankForHealth {
     maintWeightShiftAssetTarget: I80F48Dto,
     maintWeightShiftLiabTarget: I80F48Dto,
     public depositLimit: BN,
+    public fallbackOracle: PublicKey,
   ) {
     this.name = utf8.decode(new Uint8Array(name)).split('\x00')[0];
     this.oracleConfig = {
@@ -310,6 +314,8 @@ export class Bank implements BankForHealth {
       this.mintDecimals +
       '\n oracle - ' +
       this.oracle.toBase58() +
+      '\n fallback oracle - ' +
+      this.fallbackOracle.toBase58() +
       '\n price - ' +
       this._price?.toString() +
       '\n uiPrice - ' +
@@ -625,6 +631,7 @@ export class MintInfo {
       banks: PublicKey[];
       vaults: PublicKey[];
       oracle: PublicKey;
+      fallbackOracle: PublicKey;
       registrationTime: BN;
       groupInsuranceFund: number;
     },
@@ -637,6 +644,7 @@ export class MintInfo {
       obj.banks,
       obj.vaults,
       obj.oracle,
+      obj.fallbackOracle,
       obj.registrationTime,
       obj.groupInsuranceFund == 1,
     );
@@ -650,6 +658,7 @@ export class MintInfo {
     public banks: PublicKey[],
     public vaults: PublicKey[],
     public oracle: PublicKey,
+    public fallbackOracle: PublicKey,
     public registrationTime: BN,
     public groupInsuranceFund: boolean,
   ) {}
@@ -667,6 +676,8 @@ export class MintInfo {
       this.mint.toBase58() +
       '\n oracle ' +
       this.oracle.toBase58() +
+      '\n fallback oracle - ' +
+      this.fallbackOracle.toBase58() +
       '\n banks ' +
       this.banks
         .filter((pk) => pk.toBase58() !== PublicKey.default.toBase58())
