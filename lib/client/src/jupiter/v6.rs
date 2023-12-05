@@ -183,7 +183,7 @@ impl<'a> JupiterV6<'a> {
         let response = self
             .mango_client
             .http_client
-            .get("https://quote-api.jup.ag/v6/quote")
+            .get(format!("{}/quote", self.mango_client.client.jupiter_v6_url))
             .query(&[
                 ("inputMint", input_mint.to_string()),
                 ("outputMint", output_mint.to_string()),
@@ -263,7 +263,10 @@ impl<'a> JupiterV6<'a> {
         let swap_response = self
             .mango_client
             .http_client
-            .post("https://quote-api.jup.ag/v6/swap-instructions")
+            .post(format!(
+                "{}/swap-instructions",
+                self.mango_client.client.jupiter_v6_url
+            ))
             .json(&SwapRequest {
                 user_public_key: owner.to_string(),
                 wrap_and_unwrap_sol: false,
