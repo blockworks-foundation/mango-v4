@@ -560,9 +560,10 @@ pub mod mango_v4 {
         ctx: Context<Serum3RegisterMarket>,
         market_index: Serum3MarketIndex,
         name: String,
+        oracle_price_band: f32,
     ) -> Result<()> {
         #[cfg(feature = "enable-gpl")]
-        instructions::serum3_register_market(ctx, market_index, name)?;
+        instructions::serum3_register_market(ctx, market_index, name, oracle_price_band)?;
         Ok(())
     }
 
@@ -571,9 +572,16 @@ pub mod mango_v4 {
         reduce_only_opt: Option<bool>,
         force_close_opt: Option<bool>,
         name_opt: Option<String>,
+        oracle_price_band_opt: Option<f32>,
     ) -> Result<()> {
         #[cfg(feature = "enable-gpl")]
-        instructions::serum3_edit_market(ctx, reduce_only_opt, force_close_opt, name_opt)?;
+        instructions::serum3_edit_market(
+            ctx,
+            reduce_only_opt,
+            force_close_opt,
+            name_opt,
+            oracle_price_band_opt,
+        )?;
         Ok(())
     }
 
@@ -623,6 +631,35 @@ pub mod mango_v4 {
             order_type,
             client_order_id,
             limit,
+            false,
+        )?;
+        Ok(())
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    pub fn serum3_place_order_v2(
+        ctx: Context<Serum3PlaceOrder>,
+        side: Serum3Side,
+        limit_price: u64,
+        max_base_qty: u64,
+        max_native_quote_qty_including_fees: u64,
+        self_trade_behavior: Serum3SelfTradeBehavior,
+        order_type: Serum3OrderType,
+        client_order_id: u64,
+        limit: u16,
+    ) -> Result<()> {
+        #[cfg(feature = "enable-gpl")]
+        instructions::serum3_place_order(
+            ctx,
+            side,
+            limit_price,
+            max_base_qty,
+            max_native_quote_qty_including_fees,
+            self_trade_behavior,
+            order_type,
+            client_order_id,
+            limit,
+            true,
         )?;
         Ok(())
     }

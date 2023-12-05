@@ -2741,6 +2741,161 @@
       ]
     },
     {
+      "name": "serum3PlaceOrderV2",
+      "accounts": [
+        {
+          "name": "group",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "account",
+          "isMut": true,
+          "isSigner": false,
+          "relations": [
+            "group"
+          ]
+        },
+        {
+          "name": "owner",
+          "isMut": false,
+          "isSigner": true
+        },
+        {
+          "name": "openOrders",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "serumMarket",
+          "isMut": false,
+          "isSigner": false,
+          "relations": [
+            "group",
+            "serum_program",
+            "serum_market_external"
+          ]
+        },
+        {
+          "name": "serumProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "serumMarketExternal",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "marketBids",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "marketAsks",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "marketEventQueue",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "marketRequestQueue",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "marketBaseVault",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "marketQuoteVault",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "marketVaultSigner",
+          "isMut": false,
+          "isSigner": false,
+          "docs": [
+            "needed for the automatic settle_funds call"
+          ]
+        },
+        {
+          "name": "payerBank",
+          "isMut": true,
+          "isSigner": false,
+          "docs": [
+            "The bank that pays for the order, if necessary"
+          ],
+          "relations": [
+            "group"
+          ]
+        },
+        {
+          "name": "payerVault",
+          "isMut": true,
+          "isSigner": false,
+          "docs": [
+            "The bank vault that pays for the order, if necessary"
+          ]
+        },
+        {
+          "name": "payerOracle",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "tokenProgram",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "side",
+          "type": {
+            "defined": "Serum3Side"
+          }
+        },
+        {
+          "name": "limitPrice",
+          "type": "u64"
+        },
+        {
+          "name": "maxBaseQty",
+          "type": "u64"
+        },
+        {
+          "name": "maxNativeQuoteQtyIncludingFees",
+          "type": "u64"
+        },
+        {
+          "name": "selfTradeBehavior",
+          "type": {
+            "defined": "Serum3SelfTradeBehavior"
+          }
+        },
+        {
+          "name": "orderType",
+          "type": {
+            "defined": "Serum3OrderType"
+          }
+        },
+        {
+          "name": "clientOrderId",
+          "type": "u64"
+        },
+        {
+          "name": "limit",
+          "type": "u16"
+        }
+      ]
+    },
+    {
       "name": "serum3CancelOrder",
       "accounts": [
         {
@@ -7108,7 +7263,13 @@
             "type": "f64"
           },
           {
-            "name": "depositsInSerum",
+            "name": "potentialSerumTokens",
+            "docs": [
+              "Largest amount of tokens that might be added the the bank based on",
+              "serum open order execution.",
+              "",
+              "Can be negative with multiple banks, then it'd need to be balanced in the keeper."
+            ],
             "type": "i64"
           },
           {
@@ -8680,26 +8841,41 @@
             "type": "f64"
           },
           {
-            "name": "baseDepositsReserved",
+            "name": "potentialBaseTokens",
             "docs": [
-              "Tracks the amount of deposits that flowed into the serum open orders account.",
+              "An overestimate of the amount of tokens that might flow out of the open orders account.",
               "",
-              "The bank still considers these amounts user deposits (see deposits_in_serum)",
-              "and they need to be deducted from there when they flow back into the bank",
-              "as real tokens."
+              "The bank still considers these amounts user deposits (see Bank::potential_serum_tokens)",
+              "and that value needs to be updated in conjunction with these numbers.",
+              "",
+              "This estimation is based on the amount of tokens in the open orders account",
+              "(see update_bank_potential_tokens() in serum3_place_order and settle)"
             ],
             "type": "u64"
           },
           {
-            "name": "quoteDepositsReserved",
+            "name": "potentialQuoteTokens",
             "type": "u64"
+          },
+          {
+            "name": "lowestPlacedBidInv",
+            "docs": [
+              "Track lowest bid/highest ask, same way as for highest bid/lowest ask.",
+              "",
+              "0 is a special \"unset\" state."
+            ],
+            "type": "f64"
+          },
+          {
+            "name": "highestPlacedAsk",
+            "type": "f64"
           },
           {
             "name": "reserved",
             "type": {
               "array": [
                 "u8",
-                32
+                16
               ]
             }
           }
@@ -10362,6 +10538,9 @@
           },
           {
             "name": "TokenConditionalSwapCreateLinearAuction"
+          },
+          {
+            "name": "Serum3PlaceOrderV2"
           }
         ]
       }
@@ -13283,6 +13462,11 @@
       "code": 6059,
       "name": "TokenConditionalSwapTypeNotStartable",
       "msg": "token conditional swap type cannot be started"
+    },
+    {
+      "code": 6060,
+      "name": "HealthAccountBankNotWritable",
+      "msg": "a bank in the health account list should be writable but is not"
     }
   ]
 }

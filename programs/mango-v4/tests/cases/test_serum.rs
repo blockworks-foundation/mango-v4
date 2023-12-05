@@ -309,13 +309,13 @@ async fn test_serum_basics() -> Result<(), TransportError> {
     //
     // TEST: Place an order
     //
-    let (order_id, _) = order_placer.bid_maker(1.0, 100).await.unwrap();
+    let (order_id, _) = order_placer.bid_maker(0.9, 100).await.unwrap();
     check_prev_instruction_post_health(&solana, account).await;
 
     let native0 = account_position(solana, account, base_token.bank).await;
     let native1 = account_position(solana, account, quote_token.bank).await;
     assert_eq!(native0, 1000);
-    assert_eq!(native1, 900);
+    assert_eq!(native1, 910);
 
     let account_data = get_mango_account(solana, account).await;
     assert_eq!(
@@ -342,13 +342,13 @@ async fn test_serum_basics() -> Result<(), TransportError> {
     let serum_orders = account_data.serum3_orders_by_raw_index(0).unwrap();
     assert_eq!(serum_orders.base_borrows_without_fee, 0);
     assert_eq!(serum_orders.quote_borrows_without_fee, 0);
-    assert_eq!(serum_orders.base_deposits_reserved, 0);
-    assert_eq!(serum_orders.quote_deposits_reserved, 100);
+    assert_eq!(serum_orders.potential_base_tokens, 100);
+    assert_eq!(serum_orders.potential_quote_tokens, 90);
 
     let base_bank = solana.get_account::<Bank>(base_token.bank).await;
-    assert_eq!(base_bank.deposits_in_serum, 0);
+    assert_eq!(base_bank.potential_serum_tokens, 100);
     let quote_bank = solana.get_account::<Bank>(quote_token.bank).await;
-    assert_eq!(quote_bank.deposits_in_serum, 100);
+    assert_eq!(quote_bank.potential_serum_tokens, 90);
 
     assert!(order_id != 0);
 
@@ -371,13 +371,13 @@ async fn test_serum_basics() -> Result<(), TransportError> {
     let serum_orders = account_data.serum3_orders_by_raw_index(0).unwrap();
     assert_eq!(serum_orders.base_borrows_without_fee, 0);
     assert_eq!(serum_orders.quote_borrows_without_fee, 0);
-    assert_eq!(serum_orders.base_deposits_reserved, 0);
-    assert_eq!(serum_orders.quote_deposits_reserved, 0);
+    assert_eq!(serum_orders.potential_base_tokens, 0);
+    assert_eq!(serum_orders.potential_quote_tokens, 0);
 
     let base_bank = solana.get_account::<Bank>(base_token.bank).await;
-    assert_eq!(base_bank.deposits_in_serum, 0);
+    assert_eq!(base_bank.potential_serum_tokens, 0);
     let quote_bank = solana.get_account::<Bank>(quote_token.bank).await;
-    assert_eq!(quote_bank.deposits_in_serum, 0);
+    assert_eq!(quote_bank.potential_serum_tokens, 0);
 
     // Process events such that the OutEvent deactivates the closed order on open_orders
     context
@@ -1150,89 +1150,72 @@ async fn test_serum_track_bid_ask() -> Result<(), TransportError> {
     // TEST: highest bid/lowest ask updating
     //
 
-    assert_eq!(
-        order_placer
-            .mango_serum_orders()
-            .await
-            .highest_placed_bid_inv,
-        0.0
-    );
-    assert_eq!(
-        order_placer.mango_serum_orders().await.lowest_placed_ask,
-        0.0
-    );
+    let srm = order_placer.mango_serum_orders().await;
+    assert_eq!(srm.highest_placed_bid_inv, 0.0);
+    assert_eq!(srm.lowest_placed_bid_inv, 0.0);
+    assert_eq!(srm.highest_placed_ask, 0.0);
+    assert_eq!(srm.lowest_placed_ask, 0.0);
 
     order_placer.bid_maker(10.0, 100).await.unwrap();
-    assert_eq!(
-        order_placer
-            .mango_serum_orders()
-            .await
-            .highest_placed_bid_inv,
-        1.0 / 10.0
-    );
+
+    let srm = order_placer.mango_serum_orders().await;
+    assert_eq!(srm.highest_placed_bid_inv, 1.0 / 10.0);
+    assert_eq!(srm.lowest_placed_bid_inv, 1.0 / 10.0);
+    assert_eq!(srm.highest_placed_ask, 0.0);
+    assert_eq!(srm.lowest_placed_ask, 0.0);
 
     order_placer.bid_maker(9.0, 100).await.unwrap();
-    assert_eq!(
-        order_placer
-            .mango_serum_orders()
-            .await
-            .highest_placed_bid_inv,
-        1.0 / 10.0
-    );
+
+    let srm = order_placer.mango_serum_orders().await;
+    assert_eq!(srm.highest_placed_bid_inv, 1.0 / 10.0);
+    assert_eq!(srm.lowest_placed_bid_inv, 1.0 / 9.0);
+    assert_eq!(srm.highest_placed_ask, 0.0);
+    assert_eq!(srm.lowest_placed_ask, 0.0);
 
     order_placer.bid_maker(11.0, 100).await.unwrap();
-    assert_eq!(
-        order_placer
-            .mango_serum_orders()
-            .await
-            .highest_placed_bid_inv,
-        1.0 / 11.0
-    );
 
-    assert_eq!(
-        order_placer.mango_serum_orders().await.lowest_placed_ask,
-        0.0
-    );
+    let srm = order_placer.mango_serum_orders().await;
+    assert_eq!(srm.highest_placed_bid_inv, 1.0 / 11.0);
+    assert_eq!(srm.lowest_placed_bid_inv, 1.0 / 9.0);
+    assert_eq!(srm.highest_placed_ask, 0.0);
+    assert_eq!(srm.lowest_placed_ask, 0.0);
+
     order_placer.ask(20.0, 100).await.unwrap();
-    assert_eq!(
-        order_placer.mango_serum_orders().await.lowest_placed_ask,
-        20.0
-    );
-    order_placer.ask(19.0, 100).await.unwrap();
-    assert_eq!(
-        order_placer.mango_serum_orders().await.lowest_placed_ask,
-        19.0
-    );
-    order_placer.ask(21.0, 100).await.unwrap();
-    assert_eq!(
-        order_placer.mango_serum_orders().await.lowest_placed_ask,
-        19.0
-    );
 
-    assert_eq!(
-        order_placer
-            .mango_serum_orders()
-            .await
-            .highest_placed_bid_inv,
-        1.0 / 11.0
-    );
+    let srm = order_placer.mango_serum_orders().await;
+    assert_eq!(srm.highest_placed_bid_inv, 1.0 / 11.0);
+    assert_eq!(srm.lowest_placed_bid_inv, 1.0 / 9.0);
+    assert_eq!(srm.highest_placed_ask, 20.0);
+    assert_eq!(srm.lowest_placed_ask, 20.0);
+
+    order_placer.ask(19.0, 100).await.unwrap();
+
+    let srm = order_placer.mango_serum_orders().await;
+    assert_eq!(srm.highest_placed_bid_inv, 1.0 / 11.0);
+    assert_eq!(srm.lowest_placed_bid_inv, 1.0 / 9.0);
+    assert_eq!(srm.highest_placed_ask, 20.0);
+    assert_eq!(srm.lowest_placed_ask, 19.0);
+
+    order_placer.ask(21.0, 100).await.unwrap();
+
+    let srm = order_placer.mango_serum_orders().await;
+    assert_eq!(srm.highest_placed_bid_inv, 1.0 / 11.0);
+    assert_eq!(srm.lowest_placed_bid_inv, 1.0 / 9.0);
+    assert_eq!(srm.highest_placed_ask, 21.0);
+    assert_eq!(srm.lowest_placed_ask, 19.0);
 
     //
     // TEST: cancellation allows for resets
     //
 
     order_placer.cancel_all().await;
-    assert_eq!(
-        order_placer.mango_serum_orders().await.lowest_placed_ask,
-        19.0
-    );
-    assert_eq!(
-        order_placer
-            .mango_serum_orders()
-            .await
-            .highest_placed_bid_inv,
-        1.0 / 11.0
-    );
+
+    // no immediate change
+    let srm = order_placer.mango_serum_orders().await;
+    assert_eq!(srm.highest_placed_bid_inv, 1.0 / 11.0);
+    assert_eq!(srm.lowest_placed_bid_inv, 1.0 / 9.0);
+    assert_eq!(srm.highest_placed_ask, 21.0);
+    assert_eq!(srm.lowest_placed_ask, 19.0);
 
     // Process events such that the OutEvent deactivates the closed order on open_orders
     context
@@ -1242,36 +1225,36 @@ async fn test_serum_track_bid_ask() -> Result<(), TransportError> {
 
     // takes new value for bid, resets ask
     order_placer.bid_maker(1.0, 100).await.unwrap();
-    assert_eq!(
-        order_placer.mango_serum_orders().await.lowest_placed_ask,
-        0.0
-    );
-    assert_eq!(
-        order_placer
-            .mango_serum_orders()
-            .await
-            .highest_placed_bid_inv,
-        1.0
-    );
+
+    let srm = order_placer.mango_serum_orders().await;
+    assert_eq!(srm.highest_placed_bid_inv, 1.0);
+    assert_eq!(srm.lowest_placed_bid_inv, 1.0);
+    assert_eq!(srm.highest_placed_ask, 0.0);
+    assert_eq!(srm.lowest_placed_ask, 0.0);
 
     //
     // TEST: can reset even when there's still an order on the other side
     //
     let (oid, _) = order_placer.ask(10.0, 100).await.unwrap();
-    assert_eq!(
-        order_placer.mango_serum_orders().await.lowest_placed_ask,
-        10.0
-    );
+
+    let srm = order_placer.mango_serum_orders().await;
+    assert_eq!(srm.highest_placed_bid_inv, 1.0);
+    assert_eq!(srm.lowest_placed_bid_inv, 1.0);
+    assert_eq!(srm.highest_placed_ask, 10.0);
+    assert_eq!(srm.lowest_placed_ask, 10.0);
+
     order_placer.cancel(oid).await;
     context
         .serum
         .consume_spot_events(&serum_market_cookie, &[order_placer.open_orders])
         .await;
     order_placer.ask(9.0, 100).await.unwrap();
-    assert_eq!(
-        order_placer.mango_serum_orders().await.lowest_placed_ask,
-        9.0
-    );
+
+    let srm = order_placer.mango_serum_orders().await;
+    assert_eq!(srm.highest_placed_bid_inv, 1.0);
+    assert_eq!(srm.lowest_placed_bid_inv, 1.0);
+    assert_eq!(srm.highest_placed_ask, 9.0);
+    assert_eq!(srm.lowest_placed_ask, 9.0);
 
     Ok(())
 }
@@ -1305,10 +1288,10 @@ async fn test_serum_track_reserved_deposits() -> Result<(), TransportError> {
         let base_bank = solana.get_account::<Bank>(base_bank).await;
         let quote_bank = solana.get_account::<Bank>(quote_bank).await;
         (
-            orders.base_deposits_reserved,
-            base_bank.deposits_in_serum,
-            orders.quote_deposits_reserved,
-            quote_bank.deposits_in_serum,
+            orders.potential_base_tokens,
+            base_bank.potential_serum_tokens,
+            orders.potential_quote_tokens,
+            quote_bank.potential_serum_tokens,
         )
     };
 
@@ -1317,8 +1300,13 @@ async fn test_serum_track_reserved_deposits() -> Result<(), TransportError> {
     //
 
     order_placer.bid_maker(0.8, 2000).await.unwrap();
-    order_placer.ask(1.2, 2000).await.unwrap();
     assert_eq!(get_vals(solana).await, (2000, 2000, 1600, 1600));
+
+    order_placer.ask(1.2, 2000).await.unwrap();
+    assert_eq!(
+        get_vals(solana).await,
+        (2 * 2000, 2 * 2000, 1600 + 2400, 1600 + 2400)
+    );
 
     //
     // TEST: match partially on both sides, increasing the on-bank reserved amounts
@@ -1333,9 +1321,12 @@ async fn test_serum_track_reserved_deposits() -> Result<(), TransportError> {
             &[order_placer.open_orders, order_placer2.open_orders],
         )
         .await;
-    assert_eq!(get_vals(solana).await, (2000, 2000, 1600, 2801));
+    // taker order directly converted to base, no change to quote
+    assert_eq!(get_vals(solana).await, (4000, 4000 + 1000, 4000, 4000));
+
+    // takes out 1000 base
     order_placer2.settle_v2(false).await;
-    assert_eq!(get_vals(solana).await, (2000, 2000, 1600, 1600));
+    assert_eq!(get_vals(solana).await, (4000, 4000, 4000, 4000));
 
     order_placer2.ask(0.8, 1000).await.unwrap();
     context
@@ -1345,16 +1336,19 @@ async fn test_serum_track_reserved_deposits() -> Result<(), TransportError> {
             &[order_placer.open_orders, order_placer2.open_orders],
         )
         .await;
-    assert_eq!(get_vals(solana).await, (2000, 3000, 1600, 1600));
+    // taker order directly converted to quote
+    assert_eq!(get_vals(solana).await, (4000, 4000, 4000, 4000 + 799));
+
     order_placer2.settle_v2(false).await;
-    assert_eq!(get_vals(solana).await, (2000, 2000, 1600, 1600));
+    assert_eq!(get_vals(solana).await, (4000, 4000, 4000, 4000));
 
     //
     // TEST: Settlement updates the values
     //
 
     order_placer.settle_v2(false).await;
-    assert_eq!(get_vals(solana).await, (1000, 1000, 800, 800));
+    // remaining is bid 1000 @ 0.8; ask 1000 @ 1.2
+    assert_eq!(get_vals(solana).await, (2000, 2000, 2000, 2000));
 
     Ok(())
 }
@@ -1477,6 +1471,82 @@ async fn test_serum_compute() -> Result<(), TransportError> {
             )
             .await;
     }
+
+    Ok(())
+}
+
+#[tokio::test]
+async fn test_serum_bands() -> Result<(), TransportError> {
+    let mut test_builder = TestContextBuilder::new();
+    test_builder.test().set_compute_max_units(150_000); // Serum3PlaceOrder needs lots
+    let context = test_builder.start_default().await;
+    let solana = &context.solana.clone();
+
+    //
+    // SETUP: Create a group, accounts, market etc
+    //
+    let deposit_amount = 10000;
+    let CommonSetup {
+        group_with_tokens,
+        mut order_placer,
+        quote_token,
+        base_token,
+        ..
+    } = common_setup(&context, deposit_amount).await;
+
+    //
+    // SETUP: Set oracle price for market to 100
+    //
+    set_bank_stub_oracle_price(
+        solana,
+        group_with_tokens.group,
+        &base_token,
+        group_with_tokens.admin,
+        200.0,
+    )
+    .await;
+    set_bank_stub_oracle_price(
+        solana,
+        group_with_tokens.group,
+        &quote_token,
+        group_with_tokens.admin,
+        2.0,
+    )
+    .await;
+
+    //
+    // TEST: can place way over/under oracle
+    //
+
+    order_placer.bid_maker(1.0, 100).await.unwrap();
+    order_placer.ask(200.0, 100).await.unwrap();
+    order_placer.cancel_all().await;
+
+    //
+    // TEST: Can't when bands are enabled
+    //
+    send_tx(
+        solana,
+        Serum3EditMarketInstruction {
+            group: group_with_tokens.group,
+            admin: group_with_tokens.admin,
+            market: order_placer.serum_market,
+            options: mango_v4::instruction::Serum3EditMarket {
+                oracle_price_band_opt: Some(0.5),
+                ..serum3_edit_market_instruction_default()
+            },
+        },
+    )
+    .await
+    .unwrap();
+
+    let r = order_placer.try_bid(65.0, 100, false).await;
+    assert!(r.is_err());
+    let r = order_placer.try_ask(151.0, 100).await;
+    assert!(r.is_err());
+
+    order_placer.try_bid(67.0, 100, false).await.unwrap();
+    order_placer.try_ask(149.0, 100).await.unwrap();
 
     Ok(())
 }

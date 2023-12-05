@@ -96,7 +96,7 @@ pub fn token_register_trustless(
         flash_loan_swap_fee_rate: 0.0,
         interest_target_utilization: 0.5,
         interest_curve_scaling: 4.0,
-        deposits_in_serum: 0,
+        potential_serum_tokens: 0,
         maint_weight_shift_start: 0,
         maint_weight_shift_end: 0,
         maint_weight_shift_duration_inv: I80F48::ZERO,
