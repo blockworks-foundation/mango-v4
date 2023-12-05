@@ -25,7 +25,7 @@ pub async fn runner(
 
     let mut price_arcs = HashMap::new();
     for s3_market in mango_client.context.serum3_markets.values() {
-        let base_token_index = s3_market.market.base_token_index;
+        let base_token_index = s3_market.base_token_index;
         let price = mango_client
             .bank_oracle_price(base_token_index)
             .await
@@ -47,11 +47,8 @@ pub async fn runner(
         .map(|s3_market| {
             loop_blocking_orders(
                 mango_client.clone(),
-                s3_market.market.name().to_string(),
-                price_arcs
-                    .get(&s3_market.market.base_token_index)
-                    .unwrap()
-                    .clone(),
+                s3_market.name.clone(),
+                price_arcs.get(&s3_market.base_token_index).unwrap().clone(),
             )
         })
         .collect::<Vec<_>>();
@@ -70,7 +67,7 @@ async fn ensure_oo(mango_client: &Arc<MangoClient>) -> Result<(), anyhow::Error>
     for (market_index, serum3_market) in mango_client.context.serum3_markets.iter() {
         if account.serum3_orders(*market_index).is_err() {
             mango_client
-                .serum3_create_open_orders(serum3_market.market.name())
+                .serum3_create_open_orders(&serum3_market.name)
                 .await?;
         }
     }

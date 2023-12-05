@@ -5,7 +5,8 @@ use itertools::Itertools;
 
 use anchor_lang::{__private::bytemuck::cast_ref, solana_program};
 use futures::Future;
-use mango_v4::state::{EventQueue, EventType, FillEvent, OutEvent, PerpMarket, TokenIndex};
+use mango_v4::state::{EventQueue, EventType, FillEvent, OutEvent, TokenIndex};
+use mango_v4_client::PerpMarketContext;
 use prometheus::{register_histogram, Encoder, Histogram, IntCounter, Registry};
 use solana_sdk::{
     instruction::{AccountMeta, Instruction},
@@ -79,7 +80,7 @@ pub async fn runner(
     interval_update_banks: u64,
     interval_consume_events: u64,
     interval_update_funding: u64,
-    interval_check_new_listings_and_abort: u64,
+    interval_check_for_changes_and_abort: u64,
 ) -> Result<(), anyhow::Error> {
     let handles1 = mango_client
         .context
@@ -106,12 +107,12 @@ pub async fn runner(
         .values()
         .filter(|perp|
             // MNGO-PERP-OLD
-            perp.market.perp_market_index != 1)
+            perp.perp_market_index != 1)
         .map(|perp| {
             loop_consume_events(
                 mango_client.clone(),
                 perp.address,
-                perp.market,
+                perp,
                 interval_consume_events,
             )
         })
@@ -123,12 +124,12 @@ pub async fn runner(
         .values()
         .filter(|perp|
             // MNGO-PERP-OLD
-            perp.market.perp_market_index != 1)
+            perp.perp_market_index != 1)
         .map(|perp| {
             loop_update_funding(
                 mango_client.clone(),
                 perp.address,
-                perp.market,
+                perp,
                 interval_update_funding,
             )
         })
@@ -138,36 +139,15 @@ pub async fn runner(
         futures::future::join_all(handles1),
         futures::future::join_all(handles2),
         futures::future::join_all(handles3),
-        loop_check_new_listings_and_abort(
+        MangoClient::loop_check_for_context_changes_and_abort(
             mango_client.clone(),
-            interval_check_new_listings_and_abort
+            Duration::from_secs(interval_check_for_changes_and_abort),
         ),
         serve_metrics(),
         debugging_handle,
     );
 
     Ok(())
-}
-
-pub async fn loop_check_new_listings_and_abort(mango_client: Arc<MangoClient>, interval: u64) {
-    let mut interval = time::interval(Duration::from_secs(interval));
-    loop {
-        if mango_client
-            .context
-            .new_tokens_listed(&mango_client.client.rpc_async())
-            .await
-            .unwrap()
-            || mango_client
-                .context
-                .new_perp_markets_listed(&mango_client.client.rpc_async())
-                .await
-                .unwrap()
-        {
-            std::process::abort();
-        }
-
-        interval.tick().await;
-    }
 }
 
 pub async fn loop_update_index_and_rate(
@@ -191,14 +171,14 @@ pub async fn loop_update_index_and_rate(
         let mut instructions = vec![];
         for token_index in token_indices_clone.iter() {
             let token = client.context.token(*token_index);
-            let banks_for_a_token = token.mint_info.banks();
-            let oracle = token.mint_info.oracle;
+            let banks_for_a_token = token.banks();
+            let oracle = token.oracle;
 
             let mut ix = Instruction {
                 program_id: mango_v4::id(),
                 accounts: anchor_lang::ToAccountMetas::to_account_metas(
                     &mango_v4::accounts::TokenUpdateIndexAndRate {
-                        group: token.mint_info.group,
+                        group: token.group,
                         mint_info: token.mint_info_address,
                         oracle,
                         instructions: solana_program::sysvar::instructions::id(),
@@ -264,7 +244,7 @@ pub async fn loop_update_index_and_rate(
 pub async fn loop_consume_events(
     mango_client: Arc<MangoClient>,
     pk: Pubkey,
-    perp_market: PerpMarket,
+    perp_market: &PerpMarketContext,
     interval: u64,
 ) {
     let mut interval = time::interval(Duration::from_secs(interval));
@@ -362,7 +342,7 @@ pub async fn loop_consume_events(
             METRIC_CONSUME_EVENTS_FAILURE.inc();
             info!(
                 "metricName=ConsumeEventsV4Failure market={} durationMs={} consumed={} error={}",
-                perp_market.name(),
+                perp_market.name,
                 confirmation_time,
                 num_of_events,
                 e.to_string()
@@ -372,9 +352,7 @@ pub async fn loop_consume_events(
             METRIC_CONSUME_EVENTS_SUCCESS.inc();
             info!(
                 "metricName=ConsumeEventsV4Success market={} durationMs={} consumed={}",
-                perp_market.name(),
-                confirmation_time,
-                num_of_events,
+                perp_market.name, confirmation_time, num_of_events,
             );
             info!("{:?}", sig_result);
         }
@@ -384,7 +362,7 @@ pub async fn loop_consume_events(
 pub async fn loop_update_funding(
     mango_client: Arc<MangoClient>,
     pk: Pubkey,
-    perp_market: PerpMarket,
+    perp_market: &PerpMarketContext,
     interval: u64,
 ) {
     let mut interval = time::interval(Duration::from_secs(interval));
@@ -417,7 +395,7 @@ pub async fn loop_update_funding(
             METRIC_UPDATE_FUNDING_FAILURE.inc();
             error!(
                 "metricName=UpdateFundingV4Error market={} durationMs={} error={}",
-                perp_market.name(),
+                perp_market.name,
                 confirmation_time,
                 e.to_string()
             );
@@ -426,8 +404,7 @@ pub async fn loop_update_funding(
             METRIC_UPDATE_FUNDING_SUCCESS.inc();
             info!(
                 "metricName=UpdateFundingV4Success market={} durationMs={}",
-                perp_market.name(),
-                confirmation_time,
+                perp_market.name, confirmation_time,
             );
             info!("{:?}", sig_result);
         }

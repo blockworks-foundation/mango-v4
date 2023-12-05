@@ -42,7 +42,7 @@ fn perp_markets_and_prices(
 
             let settle_token = mango_client.context.token(perp_market.settle_token_index);
             let settle_token_price =
-                account_fetcher.fetch_bank_price(&settle_token.mint_info.first_bank())?;
+                account_fetcher.fetch_bank_price(&settle_token.first_bank())?;
 
             Ok((
                 *market_index,
