@@ -2745,7 +2745,7 @@ pub struct Serum3CancelOrderByClientOrderIdInstruction {
 }
 #[async_trait::async_trait(?Send)]
 impl ClientInstruction for Serum3CancelOrderByClientOrderIdInstruction {
-    type Accounts = mango_v4::accounts::Serum3CancelOrder;
+    type Accounts = mango_v4::accounts::Serum3CancelOrderV2;
     type Instruction = mango_v4::instruction::Serum3CancelOrderByClientOrderId;
     async fn to_instruction(
         &self,
@@ -2766,6 +2766,13 @@ impl ClientInstruction for Serum3CancelOrderByClientOrderIdInstruction {
             .unwrap()
             .open_orders;
 
+        let quote_info =
+            get_mint_info_by_token_index(&account_loader, &account, serum_market.quote_token_index)
+                .await;
+        let base_info =
+            get_mint_info_by_token_index(&account_loader, &account, serum_market.base_token_index)
+                .await;
+
         let market_external_bytes = account_loader
             .load_bytes(&serum_market.serum_market_external)
             .await
@@ -2779,16 +2786,24 @@ impl ClientInstruction for Serum3CancelOrderByClientOrderIdInstruction {
         let event_q = market_external.event_q;
 
         let accounts = Self::Accounts {
-            group: account.fixed.group,
-            account: self.account,
-            open_orders,
-            serum_market: self.serum_market,
-            serum_program: serum_market.serum_program,
-            serum_market_external: serum_market.serum_market_external,
-            market_bids: from_serum_style_pubkey(&bids),
-            market_asks: from_serum_style_pubkey(&asks),
-            market_event_queue: from_serum_style_pubkey(&event_q),
-            owner: self.owner.pubkey(),
+            v1: mango_v4::accounts::Serum3CancelOrder {
+                group: account.fixed.group,
+                account: self.account,
+                open_orders,
+                serum_market: self.serum_market,
+                serum_program: serum_market.serum_program,
+                serum_market_external: serum_market.serum_market_external,
+                market_bids: from_serum_style_pubkey(&bids),
+                market_asks: from_serum_style_pubkey(&asks),
+                market_event_queue: from_serum_style_pubkey(&event_q),
+                owner: self.owner.pubkey(),
+            },
+            v2: mango_v4::accounts::Serum3CancelOrderV2Extra {
+                base_bank: base_info.first_bank(),
+                base_oracle: base_info.oracle,
+                quote_bank: quote_info.first_bank(),
+                quote_oracle: quote_info.oracle,
+            },
         };
 
         let instruction = make_instruction(program_id, &accounts, &instruction);

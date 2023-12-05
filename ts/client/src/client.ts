@@ -2490,53 +2490,6 @@ export class MangoClient {
     externalMarketPk: PublicKey,
     clientOrderId: BN,
   ): Promise<TransactionInstruction> {
-    return await this.serum3CancelOrderByClientIdV2Ix(
-      group,
-      mangoAccount,
-      externalMarketPk,
-      clientOrderId,
-    );
-  }
-
-  public async serum3CancelOrderByClientIdV1Ix(
-    group: Group,
-    mangoAccount: MangoAccount,
-    externalMarketPk: PublicKey,
-    clientOrderId: BN,
-  ): Promise<TransactionInstruction> {
-    const serum3Market = group.serum3MarketsMapByExternal.get(
-      externalMarketPk.toBase58(),
-    )!;
-
-    const serum3MarketExternal = group.serum3ExternalMarketsMap.get(
-      externalMarketPk.toBase58(),
-    )!;
-
-    const ix = await this.program.methods
-      .serum3CancelOrderByClientOrderId(clientOrderId)
-      .accounts({
-        group: group.publicKey,
-        account: mangoAccount.publicKey,
-        openOrders: mangoAccount.getSerum3Account(serum3Market.marketIndex)
-          ?.openOrders,
-        serumMarket: serum3Market.publicKey,
-        serumProgram: OPENBOOK_PROGRAM_ID[this.cluster],
-        serumMarketExternal: serum3Market.serumMarketExternal,
-        marketBids: serum3MarketExternal.bidsAddress,
-        marketAsks: serum3MarketExternal.asksAddress,
-        marketEventQueue: serum3MarketExternal.decoded.eventQueue,
-      })
-      .instruction();
-
-    return ix;
-  }
-
-  public async serum3CancelOrderByClientIdV2Ix(
-    group: Group,
-    mangoAccount: MangoAccount,
-    externalMarketPk: PublicKey,
-    clientOrderId: BN,
-  ): Promise<TransactionInstruction> {
     const serum3Market = group.serum3MarketsMapByExternal.get(
       externalMarketPk.toBase58(),
     )!;
@@ -2553,7 +2506,7 @@ export class MangoClient {
     );
 
     const ix = await this.program.methods
-      .serum3CancelOrderByClientOrderIdV2(clientOrderId)
+      .serum3CancelOrderByClientOrderId(clientOrderId)
       .accounts({
         v1: {
           group: group.publicKey,

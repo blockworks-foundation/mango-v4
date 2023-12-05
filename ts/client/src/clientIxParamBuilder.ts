@@ -460,7 +460,6 @@ export function buildIxGate(p: IxGateParams): BN {
   toggleIx(ixGate, p, 'Serum3CancelAllOrdersV2', 72);
   toggleIx(ixGate, p, 'Serum3CancelOrderV2', 73);
   toggleIx(ixGate, p, 'Serum3CancelOrderByClientOrderId', 74);
-  toggleIx(ixGate, p, 'Serum3CancelOrderByClientOrderIdV2', 75);
 
   return ixGate;
 }
