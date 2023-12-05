@@ -38,7 +38,9 @@ pub fn is_perp_market<'a>(
 }
 
 /// Convenience wrapper for getting max swap amounts for a token pair
-pub fn max_swap_source(
+///
+/// This applies net borrow and deposit limits, which is useful for true swaps.
+pub fn max_swap_source_with_limits(
     client: &MangoClient,
     account_fetcher: &chain_data::AccountFetcher,
     account: &MangoAccountValue,
@@ -66,7 +68,7 @@ pub fn max_swap_source(
     let source_price = health_cache.token_info(source).unwrap().prices.oracle;
 
     let amount = health_cache
-        .max_swap_source_for_health_ratio(
+        .max_swap_source_for_health_ratio_with_limits(
             &account,
             &source_bank,
             source_price,
@@ -79,7 +81,10 @@ pub fn max_swap_source(
 }
 
 /// Convenience wrapper for getting max swap amounts for a token pair
-pub fn max_swap_source_ignore_net_borrows(
+///
+/// This is useful for liquidations, which don't increase deposits or net borrows.
+/// Tcs execution can also increase deposits/net borrows.
+pub fn max_swap_source_ignoring_limits(
     client: &MangoClient,
     account_fetcher: &chain_data::AccountFetcher,
     account: &MangoAccountValue,
@@ -99,17 +104,15 @@ pub fn max_swap_source_ignore_net_borrows(
         mango_v4_client::health_cache::new_sync(&client.context, account_fetcher, &account)
             .expect("always ok");
 
-    let mut source_bank: Bank =
+    let source_bank: Bank =
         account_fetcher.fetch(&client.context.mint_info(source).first_bank())?;
-    source_bank.net_borrow_limit_per_window_quote = -1;
-    let mut target_bank: Bank =
+    let target_bank: Bank =
         account_fetcher.fetch(&client.context.mint_info(target).first_bank())?;
-    target_bank.net_borrow_limit_per_window_quote = -1;
 
     let source_price = health_cache.token_info(source).unwrap().prices.oracle;
 
     let amount = health_cache
-        .max_swap_source_for_health_ratio(
+        .max_swap_source_for_health_ratio_ignoring_limits(
             &account,
             &source_bank,
             source_price,

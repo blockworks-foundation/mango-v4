@@ -1551,6 +1551,166 @@ async fn test_serum_bands() -> Result<(), TransportError> {
     Ok(())
 }
 
+#[tokio::test]
+async fn test_serum_deposit_limits() -> Result<(), TransportError> {
+    let mut test_builder = TestContextBuilder::new();
+    test_builder.test().set_compute_max_units(150_000); // Serum3PlaceOrder needs lots
+    let context = test_builder.start_default().await;
+    let solana = &context.solana.clone();
+
+    //
+    // SETUP: Create a group, accounts, market etc
+    //
+    let deposit_amount = 5000; // for 10k tokens over both order_placers
+    let CommonSetup {
+        group_with_tokens,
+        mut order_placer,
+        quote_token,
+        base_token,
+        ..
+    } = common_setup2(&context, deposit_amount, 0).await;
+
+    //
+    // SETUP: Set oracle price for market to 2
+    //
+    set_bank_stub_oracle_price(
+        solana,
+        group_with_tokens.group,
+        &base_token,
+        group_with_tokens.admin,
+        4.0,
+    )
+    .await;
+    set_bank_stub_oracle_price(
+        solana,
+        group_with_tokens.group,
+        &quote_token,
+        group_with_tokens.admin,
+        2.0,
+    )
+    .await;
+
+    //
+    // SETUP: Base token: add deposit limit
+    //
+    send_tx(
+        solana,
+        TokenEdit {
+            group: group_with_tokens.group,
+            admin: group_with_tokens.admin,
+            mint: base_token.mint.pubkey,
+            fallback_oracle: Pubkey::default(),
+            options: mango_v4::instruction::TokenEdit {
+                deposit_limit_opt: Some(13000),
+                ..token_edit_instruction_default()
+            },
+        },
+    )
+    .await
+    .unwrap();
+
+    let solana2 = context.solana.clone();
+    let base_bank = base_token.bank;
+    let remaining_base = {
+        || async {
+            let b: Bank = solana2.get_account(base_bank).await;
+            b.remaining_deposits_until_limit().round().to_num::<u64>()
+        }
+    };
+
+    //
+    // TEST: even when placing all base tokens into an ask, they still count
+    //
+
+    order_placer.ask(2.0, 5000).await.unwrap();
+    assert_eq!(remaining_base().await, 3000);
+
+    //
+    // TEST: if we bid to buy more base, the limit reduces
+    //
+
+    order_placer.bid_maker(1.5, 1000).await.unwrap();
+    assert_eq!(remaining_base().await, 2000);
+
+    //
+    // TEST: if we bid too much for the limit, the order does not go through
+    //
+
+    let r = order_placer.try_bid(1.5, 2001, false).await;
+    assert_mango_error(&r, MangoError::BankDepositLimit.into(), "dep limit".into());
+    order_placer.try_bid(1.5, 1999, false).await.unwrap(); // not 2000 due to rounding
+
+    //
+    // SETUP: Switch deposit limit to quote token
+    //
+
+    send_tx(
+        solana,
+        TokenEdit {
+            group: group_with_tokens.group,
+            admin: group_with_tokens.admin,
+            mint: base_token.mint.pubkey,
+            fallback_oracle: Pubkey::default(),
+            options: mango_v4::instruction::TokenEdit {
+                deposit_limit_opt: Some(0),
+                ..token_edit_instruction_default()
+            },
+        },
+    )
+    .await
+    .unwrap();
+    send_tx(
+        solana,
+        TokenEdit {
+            group: group_with_tokens.group,
+            admin: group_with_tokens.admin,
+            mint: quote_token.mint.pubkey,
+            fallback_oracle: Pubkey::default(),
+            options: mango_v4::instruction::TokenEdit {
+                deposit_limit_opt: Some(13000),
+                ..token_edit_instruction_default()
+            },
+        },
+    )
+    .await
+    .unwrap();
+
+    let solana2 = context.solana.clone();
+    let quote_bank = quote_token.bank;
+    let remaining_quote = {
+        || async {
+            let b: Bank = solana2.get_account(quote_bank).await;
+            b.remaining_deposits_until_limit().round().to_num::<u64>()
+        }
+    };
+
+    order_placer.cancel_all().await;
+
+    //
+    // TEST: even when placing all quote tokens into a bid, they still count
+    //
+
+    order_placer.bid_maker(2.0, 2500).await.unwrap();
+    assert_eq!(remaining_quote().await, 3000);
+
+    //
+    // TEST: if we ask to get more quote, the limit reduces
+    //
+
+    order_placer.ask(5.0, 200).await.unwrap();
+    assert_eq!(remaining_quote().await, 2000);
+
+    //
+    // TEST: if we bid too much for the limit, the order does not go through
+    //
+
+    let r = order_placer.try_ask(5.0, 401).await;
+    assert_mango_error(&r, MangoError::BankDepositLimit.into(), "dep limit".into());
+    order_placer.try_ask(5.0, 399).await.unwrap(); // not 400 due to rounding
+
+    Ok(())
+}
+
 struct CommonSetup {
     group_with_tokens: GroupWithTokens,
     serum_market_cookie: SpotMarketCookie,
@@ -1561,6 +1721,14 @@ struct CommonSetup {
 }
 
 async fn common_setup(context: &TestContext, deposit_amount: u64) -> CommonSetup {
+    common_setup2(context, deposit_amount, 10000000).await
+}
+
+async fn common_setup2(
+    context: &TestContext,
+    deposit_amount: u64,
+    vault_funding: u64,
+) -> CommonSetup {
     let admin = TestKeypair::new();
     let owner = context.users[0].key;
     let payer = context.users[1].key;
@@ -1635,17 +1803,19 @@ async fn common_setup(context: &TestContext, deposit_amount: u64) -> CommonSetup
     )
     .await;
     // to have enough funds in the vaults
-    create_funded_account(
-        &solana,
-        group,
-        owner,
-        3,
-        &context.users[1],
-        mints,
-        10000000,
-        0,
-    )
-    .await;
+    if vault_funding > 0 {
+        create_funded_account(
+            &solana,
+            group,
+            owner,
+            3,
+            &context.users[1],
+            mints,
+            10000000,
+            0,
+        )
+        .await;
+    }
 
     let open_orders = send_tx(
         solana,

@@ -49,6 +49,8 @@ pub fn token_edit(
     maint_weight_shift_asset_target_opt: Option<f32>,
     maint_weight_shift_liab_target_opt: Option<f32>,
     maint_weight_shift_abort: bool,
+    set_fallback_oracle: bool, // unused, introduced in v0.22
+    deposit_limit_opt: Option<u64>,
 ) -> Result<()> {
     let group = ctx.accounts.group.load()?;
 
@@ -435,6 +437,16 @@ pub fn token_edit(
                 was_enabled,
                 bank.maint_weight_shift_duration_inv.is_positive(),
             );
+        }
+
+        if let Some(deposit_limit) = deposit_limit_opt {
+            msg!(
+                "Deposit limit old {:?}, new {:?}",
+                bank.deposit_limit,
+                deposit_limit
+            );
+            bank.deposit_limit = deposit_limit;
+            require_group_admin = true;
         }
     }
 

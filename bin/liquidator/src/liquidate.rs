@@ -309,7 +309,7 @@ impl<'a> LiquidateHelper<'a> {
         // TODO: This is where we could multiply in the liquidation fee factors
         let price = source_price / target_price;
 
-        util::max_swap_source(
+        util::max_swap_source_ignoring_limits(
             self.client,
             self.account_fetcher,
             &liqor,

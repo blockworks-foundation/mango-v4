@@ -419,6 +419,7 @@ export class MangoClient {
         params.interestCurveScaling,
         params.interestTargetUtilization,
         params.groupInsuranceFund,
+        params.depositLimit,
       )
       .accounts({
         group: group.publicKey,
@@ -501,6 +502,8 @@ export class MangoClient {
         params.maintWeightShiftAssetTarget,
         params.maintWeightShiftLiabTarget,
         params.maintWeightShiftAbort ?? false,
+        false, // setFallbackOracle, unused
+        params.depositLimit,
       )
       .accounts({
         group: group.publicKey,
@@ -1568,9 +1571,10 @@ export class MangoClient {
     quoteBank: Bank,
     marketIndex: number,
     name: string,
+    oraclePriceBand: number,
   ): Promise<MangoSignatureStatus> {
     const ix = await this.program.methods
-      .serum3RegisterMarket(marketIndex, name)
+      .serum3RegisterMarket(marketIndex, name, oraclePriceBand)
       .accounts({
         group: group.publicKey,
         admin: (this.program.provider as AnchorProvider).wallet.publicKey,
@@ -1590,11 +1594,12 @@ export class MangoClient {
     reduceOnly: boolean | null,
     forceClose: boolean | null,
     name: string | null,
+    oraclePriceBand: number | null,
   ): Promise<MangoSignatureStatus> {
     const serum3Market =
       group.serum3MarketsMapByMarketIndex.get(serum3MarketIndex);
     const ix = await this.program.methods
-      .serum3EditMarket(reduceOnly, forceClose, name)
+      .serum3EditMarket(reduceOnly, forceClose, name, oraclePriceBand)
       .accounts({
         group: group.publicKey,
         admin: (this.program.provider as AnchorProvider).wallet.publicKey,

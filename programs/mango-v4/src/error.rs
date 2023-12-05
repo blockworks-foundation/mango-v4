@@ -129,6 +129,8 @@ pub enum MangoError {
     HealthAccountBankNotWritable,
     #[msg("the market does not allow limit orders too far from the current oracle value")]
     Serum3PriceBandExceeded,
+    #[msg("deposit crosses the token's deposit limit")]
+    BankDepositLimit,
 }
 
 impl MangoError {

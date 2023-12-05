@@ -614,6 +614,10 @@ export type MangoV4 = {
         {
           "name": "groupInsuranceFund",
           "type": "bool"
+        },
+        {
+          "name": "depositLimit",
+          "type": "u64"
         }
       ]
     },
@@ -988,6 +992,12 @@ export type MangoV4 = {
         {
           "name": "maintWeightShiftAbort",
           "type": "bool"
+        },
+        {
+          "name": "depositLimitOpt",
+          "type": {
+            "option": "u64"
+          }
         }
       ]
     },
@@ -2357,6 +2367,10 @@ export type MangoV4 = {
         {
           "name": "name",
           "type": "string"
+        },
+        {
+          "name": "oraclePriceBand",
+          "type": "f32"
         }
       ]
     },
@@ -2399,6 +2413,12 @@ export type MangoV4 = {
           "name": "nameOpt",
           "type": {
             "option": "string"
+          }
+        },
+        {
+          "name": "oraclePriceBandOpt",
+          "type": {
+            "option": "f32"
           }
         }
       ]
@@ -2742,6 +2762,9 @@ export type MangoV4 = {
     },
     {
       "name": "serum3PlaceOrderV2",
+      "docs": [
+        "requires the receiver_bank in the health account list to be writable"
+      ],
       "accounts": [
         {
           "name": "group",
@@ -7266,11 +7289,9 @@ export type MangoV4 = {
             "name": "potentialSerumTokens",
             "docs": [
               "Largest amount of tokens that might be added the the bank based on",
-              "serum open order execution.",
-              "",
-              "Can be negative with multiple banks, then it'd need to be balanced in the keeper."
+              "serum open order execution."
             ],
-            "type": "i64"
+            "type": "u64"
           },
           {
             "name": "maintWeightShiftStart",
@@ -7299,11 +7320,18 @@ export type MangoV4 = {
             }
           },
           {
+            "name": "depositLimit",
+            "docs": [
+              "zero means none, in token native"
+            ],
+            "type": "u64"
+          },
+          {
             "name": "reserved",
             "type": {
               "array": [
                 "u8",
-                2008
+                2000
               ]
             }
           }
@@ -8402,9 +8430,19 @@ export type MangoV4 = {
             "type": {
               "array": [
                 "u8",
-                5
+                1
               ]
             }
+          },
+          {
+            "name": "oraclePriceBand",
+            "docs": [
+              "Limit orders must be <= oracle * (1+band) and >= oracle / (1+band)",
+              "",
+              "Zero value is the default due to migration and disables the limit,",
+              "same as f32::MAX."
+            ],
+            "type": "f32"
           },
           {
             "name": "registrationTime",
@@ -13467,6 +13505,16 @@ export type MangoV4 = {
       "code": 6060,
       "name": "HealthAccountBankNotWritable",
       "msg": "a bank in the health account list should be writable but is not"
+    },
+    {
+      "code": 6061,
+      "name": "Serum3PriceBandExceeded",
+      "msg": "the market does not allow limit orders too far from the current oracle value"
+    },
+    {
+      "code": 6062,
+      "name": "BankDepositLimit",
+      "msg": "deposit crosses the token's deposit limit"
     }
   ]
 };
@@ -14087,6 +14135,10 @@ export const IDL: MangoV4 = {
         {
           "name": "groupInsuranceFund",
           "type": "bool"
+        },
+        {
+          "name": "depositLimit",
+          "type": "u64"
         }
       ]
     },
@@ -14461,6 +14513,12 @@ export const IDL: MangoV4 = {
         {
           "name": "maintWeightShiftAbort",
           "type": "bool"
+        },
+        {
+          "name": "depositLimitOpt",
+          "type": {
+            "option": "u64"
+          }
         }
       ]
     },
@@ -15830,6 +15888,10 @@ export const IDL: MangoV4 = {
         {
           "name": "name",
           "type": "string"
+        },
+        {
+          "name": "oraclePriceBand",
+          "type": "f32"
         }
       ]
     },
@@ -15872,6 +15934,12 @@ export const IDL: MangoV4 = {
           "name": "nameOpt",
           "type": {
             "option": "string"
+          }
+        },
+        {
+          "name": "oraclePriceBandOpt",
+          "type": {
+            "option": "f32"
           }
         }
       ]
@@ -16215,6 +16283,9 @@ export const IDL: MangoV4 = {
     },
     {
       "name": "serum3PlaceOrderV2",
+      "docs": [
+        "requires the receiver_bank in the health account list to be writable"
+      ],
       "accounts": [
         {
           "name": "group",
@@ -20739,11 +20810,9 @@ export const IDL: MangoV4 = {
             "name": "potentialSerumTokens",
             "docs": [
               "Largest amount of tokens that might be added the the bank based on",
-              "serum open order execution.",
-              "",
-              "Can be negative with multiple banks, then it'd need to be balanced in the keeper."
+              "serum open order execution."
             ],
-            "type": "i64"
+            "type": "u64"
           },
           {
             "name": "maintWeightShiftStart",
@@ -20772,11 +20841,18 @@ export const IDL: MangoV4 = {
             }
           },
           {
+            "name": "depositLimit",
+            "docs": [
+              "zero means none, in token native"
+            ],
+            "type": "u64"
+          },
+          {
             "name": "reserved",
             "type": {
               "array": [
                 "u8",
-                2008
+                2000
               ]
             }
           }
@@ -21875,9 +21951,19 @@ export const IDL: MangoV4 = {
             "type": {
               "array": [
                 "u8",
-                5
+                1
               ]
             }
+          },
+          {
+            "name": "oraclePriceBand",
+            "docs": [
+              "Limit orders must be <= oracle * (1+band) and >= oracle / (1+band)",
+              "",
+              "Zero value is the default due to migration and disables the limit,",
+              "same as f32::MAX."
+            ],
+            "type": "f32"
           },
           {
             "name": "registrationTime",
@@ -26940,6 +27026,16 @@ export const IDL: MangoV4 = {
       "code": 6060,
       "name": "HealthAccountBankNotWritable",
       "msg": "a bank in the health account list should be writable but is not"
+    },
+    {
+      "code": 6061,
+      "name": "Serum3PriceBandExceeded",
+      "msg": "the market does not allow limit orders too far from the current oracle value"
+    },
+    {
+      "code": 6062,
+      "name": "BankDepositLimit",
+      "msg": "deposit crosses the token's deposit limit"
     }
   ]
 };

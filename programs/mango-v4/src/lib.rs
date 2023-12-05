@@ -153,6 +153,7 @@ pub mod mango_v4 {
         interest_curve_scaling: f32,
         interest_target_utilization: f32,
         group_insurance_fund: bool,
+        deposit_limit: u64,
     ) -> Result<()> {
         #[cfg(feature = "enable-gpl")]
         instructions::token_register(
@@ -183,6 +184,7 @@ pub mod mango_v4 {
             interest_curve_scaling,
             interest_target_utilization,
             group_insurance_fund,
+            deposit_limit,
         )?;
         Ok(())
     }
@@ -234,6 +236,8 @@ pub mod mango_v4 {
         maint_weight_shift_asset_target_opt: Option<f32>,
         maint_weight_shift_liab_target_opt: Option<f32>,
         maint_weight_shift_abort: bool,
+        set_fallback_oracle: bool, // unused, introduced in v0.22
+        deposit_limit_opt: Option<u64>,
     ) -> Result<()> {
         #[cfg(feature = "enable-gpl")]
         instructions::token_edit(
@@ -272,6 +276,8 @@ pub mod mango_v4 {
             maint_weight_shift_asset_target_opt,
             maint_weight_shift_liab_target_opt,
             maint_weight_shift_abort,
+            set_fallback_oracle,
+            deposit_limit_opt,
         )?;
         Ok(())
     }
@@ -636,6 +642,7 @@ pub mod mango_v4 {
         Ok(())
     }
 
+    /// requires the receiver_bank in the health account list to be writable
     #[allow(clippy::too_many_arguments)]
     pub fn serum3_place_order_v2(
         ctx: Context<Serum3PlaceOrder>,

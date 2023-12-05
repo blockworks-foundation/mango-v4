@@ -511,3 +511,174 @@ async fn test_bank_maint_weight_shift() -> Result<(), TransportError> {
 
     Ok(())
 }
+
+#[tokio::test]
+async fn test_bank_deposit_limit() -> Result<(), TransportError> {
+    let context = TestContext::new().await;
+    let solana = &context.solana.clone();
+
+    let admin = TestKeypair::new();
+    let owner = context.users[0].key;
+    let payer = context.users[1].key;
+    let payer_token_account = context.users[1].token_accounts[0];
+    let mints = &context.mints[0..1];
+
+    let mango_setup::GroupWithTokens { group, .. } = mango_setup::GroupWithTokensConfig {
+        admin,
+        payer,
+        mints: mints.to_vec(),
+        zero_token_is_quote: true,
+        ..mango_setup::GroupWithTokensConfig::default()
+    }
+    .create(solana)
+    .await;
+
+    let funding_amount = 0;
+    let account1 = create_funded_account(
+        &solana,
+        group,
+        owner,
+        1,
+        &context.users[1],
+        &mints[0..0],
+        funding_amount,
+        0,
+    )
+    .await;
+    let account2 = create_funded_account(
+        &solana,
+        group,
+        owner,
+        2,
+        &context.users[1],
+        &mints[0..0],
+        funding_amount,
+        0,
+    )
+    .await;
+
+    send_tx(
+        solana,
+        TokenEdit {
+            group,
+            admin,
+            mint: mints[0].pubkey,
+            fallback_oracle: Pubkey::default(),
+            options: mango_v4::instruction::TokenEdit {
+                deposit_limit_opt: Some(2000),
+                ..token_edit_instruction_default()
+            },
+        },
+    )
+    .await
+    .unwrap();
+
+    let default_deposit_ix = TokenDepositInstruction {
+        amount: 0,
+        reduce_only: false,
+        account: Pubkey::default(),
+        owner,
+        token_account: payer_token_account,
+        token_authority: payer,
+        bank_index: 0,
+    };
+
+    send_tx_expect_error!(
+        solana,
+        TokenDepositInstruction {
+            amount: 2001,
+            account: account1,
+            ..default_deposit_ix
+        },
+        MangoError::BankDepositLimit
+    );
+
+    send_tx(
+        solana,
+        TokenDepositInstruction {
+            amount: 1001,
+            account: account1,
+            ..default_deposit_ix
+        },
+    )
+    .await
+    .unwrap();
+
+    send_tx_expect_error!(
+        solana,
+        TokenDepositInstruction {
+            amount: 1000,
+            account: account1,
+            ..default_deposit_ix
+        },
+        MangoError::BankDepositLimit
+    );
+
+    send_tx_expect_error!(
+        solana,
+        TokenDepositInstruction {
+            amount: 1000,
+            account: account2,
+            ..default_deposit_ix
+        },
+        MangoError::BankDepositLimit
+    );
+
+    send_tx(
+        solana,
+        TokenDepositInstruction {
+            amount: 998, // 999 does not work due to rounding
+            account: account2,
+            ..default_deposit_ix
+        },
+    )
+    .await
+    .unwrap();
+
+    send_tx_expect_error!(
+        solana,
+        TokenDepositInstruction {
+            amount: 1,
+            account: account2,
+            ..default_deposit_ix
+        },
+        MangoError::BankDepositLimit
+    );
+
+    send_tx(
+        solana,
+        TokenWithdrawInstruction {
+            amount: 5,
+            allow_borrow: false,
+            account: account2,
+            owner,
+            token_account: payer_token_account,
+            bank_index: 0,
+        },
+    )
+    .await
+    .unwrap();
+
+    send_tx_expect_error!(
+        solana,
+        TokenDepositInstruction {
+            amount: 6,
+            account: account2,
+            ..default_deposit_ix
+        },
+        MangoError::BankDepositLimit
+    );
+
+    send_tx(
+        solana,
+        TokenDepositInstruction {
+            amount: 5,
+            account: account2,
+            ..default_deposit_ix
+        },
+    )
+    .await
+    .unwrap();
+
+    Ok(())
+}

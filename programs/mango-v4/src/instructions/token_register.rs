@@ -41,6 +41,7 @@ pub fn token_register(
     interest_curve_scaling: f32,
     interest_target_utilization: f32,
     group_insurance_fund: bool,
+    deposit_limit: u64,
 ) -> Result<()> {
     // Require token 0 to be in the insurance token
     if token_index == INSURANCE_TOKEN_INDEX {
@@ -119,7 +120,9 @@ pub fn token_register(
         maint_weight_shift_duration_inv: I80F48::ZERO,
         maint_weight_shift_asset_target: I80F48::ZERO,
         maint_weight_shift_liab_target: I80F48::ZERO,
-        reserved: [0; 2008],
+        fallback_oracle: Pubkey::default(), // unused, introduced in v0.22
+        deposit_limit,
+        reserved: [0; 1968],
     };
 
     if let Ok(oracle_price) =

@@ -132,12 +132,13 @@ export class Bank implements BankForHealth {
       flashLoanSwapFeeRate: number;
       interestTargetUtilization: number;
       interestCurveScaling: number;
-      depositsInSerum: BN;
+      potentialSerumTokens: BN;
       maintWeightShiftStart: BN;
       maintWeightShiftEnd: BN;
       maintWeightShiftDurationInv: I80F48Dto;
       maintWeightShiftAssetTarget: I80F48Dto;
       maintWeightShiftLiabTarget: I80F48Dto;
+      depositLimit: BN;
     },
   ): Bank {
     return new Bank(
@@ -191,12 +192,13 @@ export class Bank implements BankForHealth {
       obj.flashLoanSwapFeeRate,
       obj.interestTargetUtilization,
       obj.interestCurveScaling,
-      obj.depositsInSerum,
+      obj.potentialSerumTokens,
       obj.maintWeightShiftStart,
       obj.maintWeightShiftEnd,
       obj.maintWeightShiftDurationInv,
       obj.maintWeightShiftAssetTarget,
       obj.maintWeightShiftLiabTarget,
+      obj.depositLimit,
     );
   }
 
@@ -251,12 +253,13 @@ export class Bank implements BankForHealth {
     public flashLoanSwapFeeRate: number,
     public interestTargetUtilization: number,
     public interestCurveScaling: number,
-    public depositsInSerum: BN,
+    public potentialSerumTokens: BN,
     public maintWeightShiftStart: BN,
     public maintWeightShiftEnd: BN,
     maintWeightShiftDurationInv: I80F48Dto,
     maintWeightShiftAssetTarget: I80F48Dto,
     maintWeightShiftLiabTarget: I80F48Dto,
+    public depositLimit: BN,
   ) {
     this.name = utf8.decode(new Uint8Array(name)).split('\x00')[0];
     this.oracleConfig = {
