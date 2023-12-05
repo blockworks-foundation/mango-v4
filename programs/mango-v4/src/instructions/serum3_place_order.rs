@@ -284,7 +284,8 @@ pub fn serum3_place_order(
 
     let mut payer_bank = ctx.accounts.payer_bank.load_mut()?;
 
-    // Update the tracking in banks
+    // Update the potential token tracking in banks
+    // (for init weight scaling, deposit limit checks)
     if is_v2_instruction {
         let mut receiver_bank = receiver_bank_ai.load_mut::<Bank>()?;
         let (base_bank, quote_bank) = match side {
@@ -296,14 +297,14 @@ pub fn serum3_place_order(
         update_bank_potential_tokens_payer_only(serum, &mut payer_bank, &after_oo);
     }
 
-    // Enforce min vault to deposits ratio
-    let withdrawn_from_vault = I80F48::from(before_vault - after_vault);
-    let position_native = account
+    // Track position before withdraw happens
+    let before_position_native = account
         .token_position_mut(payer_bank.token_index)?
         .0
         .native(&payer_bank);
 
     // Charge the difference in vault balance to the user's account
+    // (must be done before limit checks like deposit limit)
     let vault_difference = {
         apply_vault_difference(
             ctx.accounts.account.key(),
@@ -315,10 +316,25 @@ pub fn serum3_place_order(
         )?
     };
 
+    // Deposit limit check: Placing an order can increase deposit limit use on both
+    // the payer and receiver bank. Imagine placing a bid for 500 base @ 0.5: it would
+    // use up 1000 quote and 500 base because either could be deposit on cancel/fill.
+    // This is why this must happen after update_bank_potential_tokens() and any withdraws.
+    {
+        let receiver_bank = receiver_bank_ai.load::<Bank>()?;
+        receiver_bank
+            .check_deposit_and_oo_limit()
+            .with_context(|| std::format!("on {}", receiver_bank.name()))?;
+        payer_bank
+            .check_deposit_and_oo_limit()
+            .with_context(|| std::format!("on {}", payer_bank.name()))?;
+    }
+
     // Payer bank safety checks like reduce-only, net borrows, vault-to-deposits ratio
     let payer_bank_oracle =
         payer_bank.oracle_price(&AccountInfoRef::borrow(&ctx.accounts.payer_oracle)?, None)?;
-    if withdrawn_from_vault > position_native {
+    let withdrawn_from_vault = I80F48::from(before_vault - after_vault);
+    if withdrawn_from_vault > before_position_native {
         require_msg_typed!(
             !payer_bank.are_borrows_reduce_only(),
             MangoError::TokenInReduceOnlyMode,

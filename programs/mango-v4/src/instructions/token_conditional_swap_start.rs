@@ -64,8 +64,13 @@ pub fn token_conditional_swap_start(
     // We allow the incentive to be < 1 native token because of tokens like BTC, where 1 native token
     // far exceeds the incentive value.
     let incentive = (I80F48::from(TCS_START_INCENTIVE) / sell_oracle_price)
-        .min(I80F48::from(tcs.remaining_sell()));
-    // However, the tcs tracking is in u64 units. We need to live with the fact of
+        .min(I80F48::from(tcs.remaining_sell()))
+        // Limiting to remaining deposits is too strict, since this could be a deposit
+        // to deposit transfer, but this is good enough to make the incentive deposit
+        // guaranteed to not exceed the limit.
+        .min(sell_bank.remaining_deposits_until_limit())
+        .max(I80F48::ZERO);
+    // The tcs tracking is in u64 units. We need to live with the fact of
     // not accounting the incentive fee perfectly.
     let incentive_native = incentive.clamp_to_u64();
 
@@ -73,22 +78,21 @@ pub fn token_conditional_swap_start(
     let (liqor_sell_token, liqor_sell_raw_index, _) =
         liqor.ensure_token_position(sell_token_index)?;
 
-    sell_bank.deposit(liqor_sell_token, incentive, now_ts)?;
-
-    // This withdraw might be a borrow, so can fail due to net borrows or reduce-only
     let liqee_sell_pre_balance = liqee_sell_token.native(sell_bank);
-    sell_bank.withdraw_with_fee(liqee_sell_token, incentive, now_ts)?;
+    sell_bank.checked_transfer_with_fee(
+        liqee_sell_token,
+        incentive,
+        liqor_sell_token,
+        incentive,
+        now_ts,
+        sell_oracle_price,
+    )?;
     let liqee_sell_post_balance = liqee_sell_token.native(sell_bank);
     if liqee_sell_post_balance < 0 {
         require!(
             tcs.allow_creating_borrows(),
             MangoError::TokenConditionalSwapCantPayIncentive
         );
-        require!(
-            !sell_bank.are_borrows_reduce_only(),
-            MangoError::TokenInReduceOnlyMode
-        );
-        sell_bank.check_net_borrows(sell_oracle_price)?;
     }
 
     health_cache
