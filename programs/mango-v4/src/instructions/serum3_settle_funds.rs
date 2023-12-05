@@ -100,11 +100,9 @@ pub fn serum3_settle_funds<'info>(
     //
     // After-settle tracking
     //
-    let after_oo = {
-        let oo_ai = &accounts.open_orders.as_ref();
-        let open_orders = load_open_orders_ref(oo_ai)?;
-        OpenOrdersSlim::from_oo(&open_orders)
-    };
+    let oo_ai = &accounts.open_orders.as_ref();
+    let open_orders = load_open_orders_ref(oo_ai)?;
+    let after_oo = OpenOrdersSlim::from_oo(&open_orders);
 
     accounts.base_vault.reload()?;
     accounts.quote_vault.reload()?;

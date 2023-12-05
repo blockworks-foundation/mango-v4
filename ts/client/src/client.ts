@@ -502,6 +502,7 @@ export class MangoClient {
         params.maintWeightShiftAssetTarget,
         params.maintWeightShiftLiabTarget,
         params.maintWeightShiftAbort ?? false,
+        params.setFallbackOracle ?? false,
         params.depositLimit,
       )
       .accounts({
@@ -2163,6 +2164,20 @@ export class MangoClient {
     externalMarketPk: PublicKey,
     limit?: number,
   ): Promise<TransactionInstruction> {
+    return await this.serum3CancelAllOrdersV2Ix(
+      group,
+      mangoAccount,
+      externalMarketPk,
+      limit,
+    );
+  }
+
+  public async serum3CancelAllOrdersV1Ix(
+    group: Group,
+    mangoAccount: MangoAccount,
+    externalMarketPk: PublicKey,
+    limit?: number,
+  ): Promise<TransactionInstruction> {
     const serum3Market = group.serum3MarketsMapByExternal.get(
       externalMarketPk.toBase58(),
     )!;
@@ -2187,6 +2202,55 @@ export class MangoClient {
         marketBids: serum3MarketExternal.bidsAddress,
         marketAsks: serum3MarketExternal.asksAddress,
         marketEventQueue: serum3MarketExternal.decoded.eventQueue,
+      })
+      .instruction();
+  }
+
+  public async serum3CancelAllOrdersV2Ix(
+    group: Group,
+    mangoAccount: MangoAccount,
+    externalMarketPk: PublicKey,
+    limit?: number,
+  ): Promise<TransactionInstruction> {
+    const serum3Market = group.serum3MarketsMapByExternal.get(
+      externalMarketPk.toBase58(),
+    )!;
+
+    const serum3MarketExternal = group.serum3ExternalMarketsMap.get(
+      externalMarketPk.toBase58(),
+    )!;
+
+    const baseBank = group.getFirstBankByTokenIndex(
+      serum3Market.baseTokenIndex,
+    );
+    const quoteBank = group.getFirstBankByTokenIndex(
+      serum3Market.quoteTokenIndex,
+    );
+
+    return await this.program.methods
+      .serum3CancelAllOrdersV2(limit ? limit : 10)
+      .accounts({
+        v1: {
+          group: group.publicKey,
+          account: mangoAccount.publicKey,
+          owner: (this.program.provider as AnchorProvider).wallet.publicKey,
+          openOrders: await serum3Market.findOoPda(
+            this.programId,
+            mangoAccount.publicKey,
+          ),
+          serumMarket: serum3Market.publicKey,
+          serumProgram: OPENBOOK_PROGRAM_ID[this.cluster],
+          serumMarketExternal: serum3Market.serumMarketExternal,
+          marketBids: serum3MarketExternal.bidsAddress,
+          marketAsks: serum3MarketExternal.asksAddress,
+          marketEventQueue: serum3MarketExternal.decoded.eventQueue,
+        },
+        v2: {
+          baseBank: baseBank.publicKey,
+          baseOracle: baseBank.oracle,
+          quoteBank: quoteBank.publicKey,
+          quoteOracle: quoteBank.oracle,
+        },
       })
       .instruction();
   }
@@ -2307,6 +2371,22 @@ export class MangoClient {
     side: Serum3Side,
     orderId: BN,
   ): Promise<TransactionInstruction> {
+    return await this.serum3CancelOrderV2Ix(
+      group,
+      mangoAccount,
+      externalMarketPk,
+      side,
+      orderId,
+    );
+  }
+
+  public async serum3CancelOrderV1Ix(
+    group: Group,
+    mangoAccount: MangoAccount,
+    externalMarketPk: PublicKey,
+    side: Serum3Side,
+    orderId: BN,
+  ): Promise<TransactionInstruction> {
     const serum3Market = group.serum3MarketsMapByExternal.get(
       externalMarketPk.toBase58(),
     )!;
@@ -2328,6 +2408,55 @@ export class MangoClient {
         marketBids: serum3MarketExternal.bidsAddress,
         marketAsks: serum3MarketExternal.asksAddress,
         marketEventQueue: serum3MarketExternal.decoded.eventQueue,
+      })
+      .instruction();
+
+    return ix;
+  }
+
+  public async serum3CancelOrderV2Ix(
+    group: Group,
+    mangoAccount: MangoAccount,
+    externalMarketPk: PublicKey,
+    side: Serum3Side,
+    orderId: BN,
+  ): Promise<TransactionInstruction> {
+    const serum3Market = group.serum3MarketsMapByExternal.get(
+      externalMarketPk.toBase58(),
+    )!;
+
+    const serum3MarketExternal = group.serum3ExternalMarketsMap.get(
+      externalMarketPk.toBase58(),
+    )!;
+
+    const baseBank = group.getFirstBankByTokenIndex(
+      serum3Market.baseTokenIndex,
+    );
+    const quoteBank = group.getFirstBankByTokenIndex(
+      serum3Market.quoteTokenIndex,
+    );
+
+    const ix = await this.program.methods
+      .serum3CancelOrderV2(side, orderId)
+      .accounts({
+        v1: {
+          group: group.publicKey,
+          account: mangoAccount.publicKey,
+          openOrders: mangoAccount.getSerum3Account(serum3Market.marketIndex)
+            ?.openOrders,
+          serumMarket: serum3Market.publicKey,
+          serumProgram: OPENBOOK_PROGRAM_ID[this.cluster],
+          serumMarketExternal: serum3Market.serumMarketExternal,
+          marketBids: serum3MarketExternal.bidsAddress,
+          marketAsks: serum3MarketExternal.asksAddress,
+          marketEventQueue: serum3MarketExternal.decoded.eventQueue,
+        },
+        v2: {
+          baseBank: baseBank.publicKey,
+          baseOracle: baseBank.oracle,
+          quoteBank: quoteBank.publicKey,
+          quoteOracle: quoteBank.oracle,
+        },
       })
       .instruction();
 
@@ -2361,6 +2490,20 @@ export class MangoClient {
     externalMarketPk: PublicKey,
     clientOrderId: BN,
   ): Promise<TransactionInstruction> {
+    return await this.serum3CancelOrderByClientIdV2Ix(
+      group,
+      mangoAccount,
+      externalMarketPk,
+      clientOrderId,
+    );
+  }
+
+  public async serum3CancelOrderByClientIdV1Ix(
+    group: Group,
+    mangoAccount: MangoAccount,
+    externalMarketPk: PublicKey,
+    clientOrderId: BN,
+  ): Promise<TransactionInstruction> {
     const serum3Market = group.serum3MarketsMapByExternal.get(
       externalMarketPk.toBase58(),
     )!;
@@ -2382,6 +2525,54 @@ export class MangoClient {
         marketBids: serum3MarketExternal.bidsAddress,
         marketAsks: serum3MarketExternal.asksAddress,
         marketEventQueue: serum3MarketExternal.decoded.eventQueue,
+      })
+      .instruction();
+
+    return ix;
+  }
+
+  public async serum3CancelOrderByClientIdV2Ix(
+    group: Group,
+    mangoAccount: MangoAccount,
+    externalMarketPk: PublicKey,
+    clientOrderId: BN,
+  ): Promise<TransactionInstruction> {
+    const serum3Market = group.serum3MarketsMapByExternal.get(
+      externalMarketPk.toBase58(),
+    )!;
+
+    const serum3MarketExternal = group.serum3ExternalMarketsMap.get(
+      externalMarketPk.toBase58(),
+    )!;
+
+    const baseBank = group.getFirstBankByTokenIndex(
+      serum3Market.baseTokenIndex,
+    );
+    const quoteBank = group.getFirstBankByTokenIndex(
+      serum3Market.quoteTokenIndex,
+    );
+
+    const ix = await this.program.methods
+      .serum3CancelOrderByClientOrderIdV2(clientOrderId)
+      .accounts({
+        v1: {
+          group: group.publicKey,
+          account: mangoAccount.publicKey,
+          openOrders: mangoAccount.getSerum3Account(serum3Market.marketIndex)
+            ?.openOrders,
+          serumMarket: serum3Market.publicKey,
+          serumProgram: OPENBOOK_PROGRAM_ID[this.cluster],
+          serumMarketExternal: serum3Market.serumMarketExternal,
+          marketBids: serum3MarketExternal.bidsAddress,
+          marketAsks: serum3MarketExternal.asksAddress,
+          marketEventQueue: serum3MarketExternal.decoded.eventQueue,
+        },
+        v2: {
+          baseBank: baseBank.publicKey,
+          baseOracle: baseBank.oracle,
+          quoteBank: quoteBank.publicKey,
+          quoteOracle: quoteBank.oracle,
+        },
       })
       .instruction();
 

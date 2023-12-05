@@ -1,5 +1,5 @@
 export type MangoV4 = {
-  "version": "0.20.0",
+  "version": "0.22.0",
   "name": "mango_v4",
   "instructions": [
     {
@@ -486,6 +486,11 @@ export type MangoV4 = {
           "isSigner": false
         },
         {
+          "name": "fallbackOracle",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
           "name": "payer",
           "isMut": true,
           "isSigner": true
@@ -728,6 +733,11 @@ export type MangoV4 = {
           "isSigner": false
         },
         {
+          "name": "fallbackOracle",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
           "name": "payer",
           "isMut": true,
           "isSigner": true
@@ -786,6 +796,15 @@ export type MangoV4 = {
           "isSigner": false,
           "docs": [
             "The oracle account is optional and only used when reset_stable_price is set.",
+            ""
+          ]
+        },
+        {
+          "name": "fallbackOracle",
+          "isMut": false,
+          "isSigner": false,
+          "docs": [
+            "The fallback oracle account is optional and only used when set_fallback_oracle is true.",
             ""
           ]
         }
@@ -991,6 +1010,10 @@ export type MangoV4 = {
         },
         {
           "name": "maintWeightShiftAbort",
+          "type": "bool"
+        },
+        {
+          "name": "setFallbackOracle",
           "type": "bool"
         },
         {
@@ -1699,27 +1722,7 @@ export type MangoV4 = {
         {
           "name": "oracle",
           "isMut": true,
-          "isSigner": false,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "type": "string",
-                "value": "StubOracle"
-              },
-              {
-                "kind": "account",
-                "type": "publicKey",
-                "path": "group"
-              },
-              {
-                "kind": "account",
-                "type": "publicKey",
-                "account": "Mint",
-                "path": "mint"
-              }
-            ]
-          }
+          "isSigner": true
         },
         {
           "name": "admin",
@@ -2994,6 +2997,111 @@ export type MangoV4 = {
       ]
     },
     {
+      "name": "serum3CancelOrderV2",
+      "accounts": [
+        {
+          "name": "v1",
+          "accounts": [
+            {
+              "name": "group",
+              "isMut": false,
+              "isSigner": false
+            },
+            {
+              "name": "account",
+              "isMut": true,
+              "isSigner": false,
+              "relations": [
+                "group"
+              ]
+            },
+            {
+              "name": "owner",
+              "isMut": false,
+              "isSigner": true
+            },
+            {
+              "name": "openOrders",
+              "isMut": true,
+              "isSigner": false
+            },
+            {
+              "name": "serumMarket",
+              "isMut": false,
+              "isSigner": false,
+              "relations": [
+                "group",
+                "serum_program",
+                "serum_market_external"
+              ]
+            },
+            {
+              "name": "serumProgram",
+              "isMut": false,
+              "isSigner": false
+            },
+            {
+              "name": "serumMarketExternal",
+              "isMut": true,
+              "isSigner": false
+            },
+            {
+              "name": "marketBids",
+              "isMut": true,
+              "isSigner": false
+            },
+            {
+              "name": "marketAsks",
+              "isMut": true,
+              "isSigner": false
+            },
+            {
+              "name": "marketEventQueue",
+              "isMut": true,
+              "isSigner": false
+            }
+          ]
+        },
+        {
+          "name": "v2",
+          "accounts": [
+            {
+              "name": "quoteBank",
+              "isMut": true,
+              "isSigner": false
+            },
+            {
+              "name": "quoteOracle",
+              "isMut": false,
+              "isSigner": false
+            },
+            {
+              "name": "baseBank",
+              "isMut": true,
+              "isSigner": false
+            },
+            {
+              "name": "baseOracle",
+              "isMut": false,
+              "isSigner": false
+            }
+          ]
+        }
+      ],
+      "args": [
+        {
+          "name": "side",
+          "type": {
+            "defined": "Serum3Side"
+          }
+        },
+        {
+          "name": "orderId",
+          "type": "u128"
+        }
+      ]
+    },
+    {
       "name": "serum3CancelOrderByClientOrderId",
       "accounts": [
         {
@@ -3063,6 +3171,105 @@ export type MangoV4 = {
       ]
     },
     {
+      "name": "serum3CancelOrderByClientOrderIdV2",
+      "accounts": [
+        {
+          "name": "v1",
+          "accounts": [
+            {
+              "name": "group",
+              "isMut": false,
+              "isSigner": false
+            },
+            {
+              "name": "account",
+              "isMut": true,
+              "isSigner": false,
+              "relations": [
+                "group"
+              ]
+            },
+            {
+              "name": "owner",
+              "isMut": false,
+              "isSigner": true
+            },
+            {
+              "name": "openOrders",
+              "isMut": true,
+              "isSigner": false
+            },
+            {
+              "name": "serumMarket",
+              "isMut": false,
+              "isSigner": false,
+              "relations": [
+                "group",
+                "serum_program",
+                "serum_market_external"
+              ]
+            },
+            {
+              "name": "serumProgram",
+              "isMut": false,
+              "isSigner": false
+            },
+            {
+              "name": "serumMarketExternal",
+              "isMut": true,
+              "isSigner": false
+            },
+            {
+              "name": "marketBids",
+              "isMut": true,
+              "isSigner": false
+            },
+            {
+              "name": "marketAsks",
+              "isMut": true,
+              "isSigner": false
+            },
+            {
+              "name": "marketEventQueue",
+              "isMut": true,
+              "isSigner": false
+            }
+          ]
+        },
+        {
+          "name": "v2",
+          "accounts": [
+            {
+              "name": "quoteBank",
+              "isMut": true,
+              "isSigner": false
+            },
+            {
+              "name": "quoteOracle",
+              "isMut": false,
+              "isSigner": false
+            },
+            {
+              "name": "baseBank",
+              "isMut": true,
+              "isSigner": false
+            },
+            {
+              "name": "baseOracle",
+              "isMut": false,
+              "isSigner": false
+            }
+          ]
+        }
+      ],
+      "args": [
+        {
+          "name": "clientOrderId",
+          "type": "u64"
+        }
+      ]
+    },
+    {
       "name": "serum3CancelAllOrders",
       "accounts": [
         {
@@ -3072,7 +3279,7 @@ export type MangoV4 = {
         },
         {
           "name": "account",
-          "isMut": false,
+          "isMut": true,
           "isSigner": false,
           "relations": [
             "group"
@@ -3122,6 +3329,105 @@ export type MangoV4 = {
           "name": "marketEventQueue",
           "isMut": true,
           "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "limit",
+          "type": "u8"
+        }
+      ]
+    },
+    {
+      "name": "serum3CancelAllOrdersV2",
+      "accounts": [
+        {
+          "name": "v1",
+          "accounts": [
+            {
+              "name": "group",
+              "isMut": false,
+              "isSigner": false
+            },
+            {
+              "name": "account",
+              "isMut": true,
+              "isSigner": false,
+              "relations": [
+                "group"
+              ]
+            },
+            {
+              "name": "owner",
+              "isMut": false,
+              "isSigner": true
+            },
+            {
+              "name": "openOrders",
+              "isMut": true,
+              "isSigner": false
+            },
+            {
+              "name": "serumMarket",
+              "isMut": false,
+              "isSigner": false,
+              "relations": [
+                "group",
+                "serum_program",
+                "serum_market_external"
+              ]
+            },
+            {
+              "name": "serumProgram",
+              "isMut": false,
+              "isSigner": false
+            },
+            {
+              "name": "serumMarketExternal",
+              "isMut": true,
+              "isSigner": false
+            },
+            {
+              "name": "marketBids",
+              "isMut": true,
+              "isSigner": false
+            },
+            {
+              "name": "marketAsks",
+              "isMut": true,
+              "isSigner": false
+            },
+            {
+              "name": "marketEventQueue",
+              "isMut": true,
+              "isSigner": false
+            }
+          ]
+        },
+        {
+          "name": "v2",
+          "accounts": [
+            {
+              "name": "quoteBank",
+              "isMut": true,
+              "isSigner": false
+            },
+            {
+              "name": "quoteOracle",
+              "isMut": false,
+              "isSigner": false
+            },
+            {
+              "name": "baseBank",
+              "isMut": true,
+              "isSigner": false
+            },
+            {
+              "name": "baseOracle",
+              "isMut": false,
+              "isSigner": false
+            }
+          ]
         }
       ],
       "args": [
@@ -7389,6 +7695,10 @@ export type MangoV4 = {
             }
           },
           {
+            "name": "fallbackOracle",
+            "type": "publicKey"
+          },
+          {
             "name": "depositLimit",
             "docs": [
               "zero means none, in token native"
@@ -7400,7 +7710,7 @@ export type MangoV4 = {
             "type": {
               "array": [
                 "u8",
-                2000
+                1968
               ]
             }
           }
@@ -7800,11 +8110,15 @@ export type MangoV4 = {
             "type": "u64"
           },
           {
+            "name": "fallbackOracle",
+            "type": "publicKey"
+          },
+          {
             "name": "reserved",
             "type": {
               "array": [
                 "u8",
-                2560
+                2528
               ]
             }
           }
@@ -10669,6 +10983,18 @@ export type MangoV4 = {
           },
           {
             "name": "Serum3PlaceOrderV2"
+          },
+          {
+            "name": "Serum3CancelAllOrdersV2"
+          },
+          {
+            "name": "Serum3CancelOrderV2"
+          },
+          {
+            "name": "Serum3CancelOrderByClientOrderId"
+          },
+          {
+            "name": "Serum3CancelOrderByClientOrderIdV2"
           }
         ]
       }
@@ -12224,6 +12550,46 @@ export type MangoV4 = {
         },
         {
           "name": "oracle",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "mintInfo",
+          "type": "publicKey",
+          "index": false
+        }
+      ]
+    },
+    {
+      "name": "TokenMetaDataLogV2",
+      "fields": [
+        {
+          "name": "mangoGroup",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "mint",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "tokenIndex",
+          "type": "u16",
+          "index": false
+        },
+        {
+          "name": "mintDecimals",
+          "type": "u8",
+          "index": false
+        },
+        {
+          "name": "oracle",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "fallbackOracle",
           "type": "publicKey",
           "index": false
         },
@@ -13610,7 +13976,7 @@ export type MangoV4 = {
 };
 
 export const IDL: MangoV4 = {
-  "version": "0.20.0",
+  "version": "0.22.0",
   "name": "mango_v4",
   "instructions": [
     {
@@ -14097,6 +14463,11 @@ export const IDL: MangoV4 = {
           "isSigner": false
         },
         {
+          "name": "fallbackOracle",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
           "name": "payer",
           "isMut": true,
           "isSigner": true
@@ -14339,6 +14710,11 @@ export const IDL: MangoV4 = {
           "isSigner": false
         },
         {
+          "name": "fallbackOracle",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
           "name": "payer",
           "isMut": true,
           "isSigner": true
@@ -14397,6 +14773,15 @@ export const IDL: MangoV4 = {
           "isSigner": false,
           "docs": [
             "The oracle account is optional and only used when reset_stable_price is set.",
+            ""
+          ]
+        },
+        {
+          "name": "fallbackOracle",
+          "isMut": false,
+          "isSigner": false,
+          "docs": [
+            "The fallback oracle account is optional and only used when set_fallback_oracle is true.",
             ""
           ]
         }
@@ -14602,6 +14987,10 @@ export const IDL: MangoV4 = {
         },
         {
           "name": "maintWeightShiftAbort",
+          "type": "bool"
+        },
+        {
+          "name": "setFallbackOracle",
           "type": "bool"
         },
         {
@@ -15310,27 +15699,7 @@ export const IDL: MangoV4 = {
         {
           "name": "oracle",
           "isMut": true,
-          "isSigner": false,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "type": "string",
-                "value": "StubOracle"
-              },
-              {
-                "kind": "account",
-                "type": "publicKey",
-                "path": "group"
-              },
-              {
-                "kind": "account",
-                "type": "publicKey",
-                "account": "Mint",
-                "path": "mint"
-              }
-            ]
-          }
+          "isSigner": true
         },
         {
           "name": "admin",
@@ -16605,7 +16974,112 @@ export const IDL: MangoV4 = {
       ]
     },
     {
-      "name": "serum3CancelAllOrders",
+      "name": "serum3CancelOrderV2",
+      "accounts": [
+        {
+          "name": "v1",
+          "accounts": [
+            {
+              "name": "group",
+              "isMut": false,
+              "isSigner": false
+            },
+            {
+              "name": "account",
+              "isMut": true,
+              "isSigner": false,
+              "relations": [
+                "group"
+              ]
+            },
+            {
+              "name": "owner",
+              "isMut": false,
+              "isSigner": true
+            },
+            {
+              "name": "openOrders",
+              "isMut": true,
+              "isSigner": false
+            },
+            {
+              "name": "serumMarket",
+              "isMut": false,
+              "isSigner": false,
+              "relations": [
+                "group",
+                "serum_program",
+                "serum_market_external"
+              ]
+            },
+            {
+              "name": "serumProgram",
+              "isMut": false,
+              "isSigner": false
+            },
+            {
+              "name": "serumMarketExternal",
+              "isMut": true,
+              "isSigner": false
+            },
+            {
+              "name": "marketBids",
+              "isMut": true,
+              "isSigner": false
+            },
+            {
+              "name": "marketAsks",
+              "isMut": true,
+              "isSigner": false
+            },
+            {
+              "name": "marketEventQueue",
+              "isMut": true,
+              "isSigner": false
+            }
+          ]
+        },
+        {
+          "name": "v2",
+          "accounts": [
+            {
+              "name": "quoteBank",
+              "isMut": true,
+              "isSigner": false
+            },
+            {
+              "name": "quoteOracle",
+              "isMut": false,
+              "isSigner": false
+            },
+            {
+              "name": "baseBank",
+              "isMut": true,
+              "isSigner": false
+            },
+            {
+              "name": "baseOracle",
+              "isMut": false,
+              "isSigner": false
+            }
+          ]
+        }
+      ],
+      "args": [
+        {
+          "name": "side",
+          "type": {
+            "defined": "Serum3Side"
+          }
+        },
+        {
+          "name": "orderId",
+          "type": "u128"
+        }
+      ]
+    },
+    {
+      "name": "serum3CancelOrderByClientOrderId",
       "accounts": [
         {
           "name": "group",
@@ -16614,7 +17088,7 @@ export const IDL: MangoV4 = {
         },
         {
           "name": "account",
-          "isMut": false,
+          "isMut": true,
           "isSigner": false,
           "relations": [
             "group"
@@ -16664,6 +17138,273 @@ export const IDL: MangoV4 = {
           "name": "marketEventQueue",
           "isMut": true,
           "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "clientOrderId",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "serum3CancelOrderByClientOrderIdV2",
+      "accounts": [
+        {
+          "name": "v1",
+          "accounts": [
+            {
+              "name": "group",
+              "isMut": false,
+              "isSigner": false
+            },
+            {
+              "name": "account",
+              "isMut": true,
+              "isSigner": false,
+              "relations": [
+                "group"
+              ]
+            },
+            {
+              "name": "owner",
+              "isMut": false,
+              "isSigner": true
+            },
+            {
+              "name": "openOrders",
+              "isMut": true,
+              "isSigner": false
+            },
+            {
+              "name": "serumMarket",
+              "isMut": false,
+              "isSigner": false,
+              "relations": [
+                "group",
+                "serum_program",
+                "serum_market_external"
+              ]
+            },
+            {
+              "name": "serumProgram",
+              "isMut": false,
+              "isSigner": false
+            },
+            {
+              "name": "serumMarketExternal",
+              "isMut": true,
+              "isSigner": false
+            },
+            {
+              "name": "marketBids",
+              "isMut": true,
+              "isSigner": false
+            },
+            {
+              "name": "marketAsks",
+              "isMut": true,
+              "isSigner": false
+            },
+            {
+              "name": "marketEventQueue",
+              "isMut": true,
+              "isSigner": false
+            }
+          ]
+        },
+        {
+          "name": "v2",
+          "accounts": [
+            {
+              "name": "quoteBank",
+              "isMut": true,
+              "isSigner": false
+            },
+            {
+              "name": "quoteOracle",
+              "isMut": false,
+              "isSigner": false
+            },
+            {
+              "name": "baseBank",
+              "isMut": true,
+              "isSigner": false
+            },
+            {
+              "name": "baseOracle",
+              "isMut": false,
+              "isSigner": false
+            }
+          ]
+        }
+      ],
+      "args": [
+        {
+          "name": "clientOrderId",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "serum3CancelAllOrders",
+      "accounts": [
+        {
+          "name": "group",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "account",
+          "isMut": true,
+          "isSigner": false,
+          "relations": [
+            "group"
+          ]
+        },
+        {
+          "name": "owner",
+          "isMut": false,
+          "isSigner": true
+        },
+        {
+          "name": "openOrders",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "serumMarket",
+          "isMut": false,
+          "isSigner": false,
+          "relations": [
+            "group",
+            "serum_program",
+            "serum_market_external"
+          ]
+        },
+        {
+          "name": "serumProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "serumMarketExternal",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "marketBids",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "marketAsks",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "marketEventQueue",
+          "isMut": true,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "limit",
+          "type": "u8"
+        }
+      ]
+    },
+    {
+      "name": "serum3CancelAllOrdersV2",
+      "accounts": [
+        {
+          "name": "v1",
+          "accounts": [
+            {
+              "name": "group",
+              "isMut": false,
+              "isSigner": false
+            },
+            {
+              "name": "account",
+              "isMut": true,
+              "isSigner": false,
+              "relations": [
+                "group"
+              ]
+            },
+            {
+              "name": "owner",
+              "isMut": false,
+              "isSigner": true
+            },
+            {
+              "name": "openOrders",
+              "isMut": true,
+              "isSigner": false
+            },
+            {
+              "name": "serumMarket",
+              "isMut": false,
+              "isSigner": false,
+              "relations": [
+                "group",
+                "serum_program",
+                "serum_market_external"
+              ]
+            },
+            {
+              "name": "serumProgram",
+              "isMut": false,
+              "isSigner": false
+            },
+            {
+              "name": "serumMarketExternal",
+              "isMut": true,
+              "isSigner": false
+            },
+            {
+              "name": "marketBids",
+              "isMut": true,
+              "isSigner": false
+            },
+            {
+              "name": "marketAsks",
+              "isMut": true,
+              "isSigner": false
+            },
+            {
+              "name": "marketEventQueue",
+              "isMut": true,
+              "isSigner": false
+            }
+          ]
+        },
+        {
+          "name": "v2",
+          "accounts": [
+            {
+              "name": "quoteBank",
+              "isMut": true,
+              "isSigner": false
+            },
+            {
+              "name": "quoteOracle",
+              "isMut": false,
+              "isSigner": false
+            },
+            {
+              "name": "baseBank",
+              "isMut": true,
+              "isSigner": false
+            },
+            {
+              "name": "baseOracle",
+              "isMut": false,
+              "isSigner": false
+            }
+          ]
         }
       ],
       "args": [
@@ -20931,6 +21672,10 @@ export const IDL: MangoV4 = {
             }
           },
           {
+            "name": "fallbackOracle",
+            "type": "publicKey"
+          },
+          {
             "name": "depositLimit",
             "docs": [
               "zero means none, in token native"
@@ -20942,7 +21687,7 @@ export const IDL: MangoV4 = {
             "type": {
               "array": [
                 "u8",
-                2000
+                1968
               ]
             }
           }
@@ -21342,11 +22087,15 @@ export const IDL: MangoV4 = {
             "type": "u64"
           },
           {
+            "name": "fallbackOracle",
+            "type": "publicKey"
+          },
+          {
             "name": "reserved",
             "type": {
               "array": [
                 "u8",
-                2560
+                2528
               ]
             }
           }
@@ -24211,6 +24960,18 @@ export const IDL: MangoV4 = {
           },
           {
             "name": "Serum3PlaceOrderV2"
+          },
+          {
+            "name": "Serum3CancelAllOrdersV2"
+          },
+          {
+            "name": "Serum3CancelOrderV2"
+          },
+          {
+            "name": "Serum3CancelOrderByClientOrderId"
+          },
+          {
+            "name": "Serum3CancelOrderByClientOrderIdV2"
           }
         ]
       }
@@ -25766,6 +26527,46 @@ export const IDL: MangoV4 = {
         },
         {
           "name": "oracle",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "mintInfo",
+          "type": "publicKey",
+          "index": false
+        }
+      ]
+    },
+    {
+      "name": "TokenMetaDataLogV2",
+      "fields": [
+        {
+          "name": "mangoGroup",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "mint",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "tokenIndex",
+          "type": "u16",
+          "index": false
+        },
+        {
+          "name": "mintDecimals",
+          "type": "u8",
+          "index": false
+        },
+        {
+          "name": "oracle",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "fallbackOracle",
           "type": "publicKey",
           "index": false
         },

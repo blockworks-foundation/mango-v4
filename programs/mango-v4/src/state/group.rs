@@ -221,6 +221,10 @@ pub enum IxGate {
     TokenConditionalSwapCreatePremiumAuction = 69,
     TokenConditionalSwapCreateLinearAuction = 70,
     Serum3PlaceOrderV2 = 71,
+    Serum3CancelAllOrdersV2 = 72,
+    Serum3CancelOrderV2 = 73,
+    Serum3CancelOrderByClientOrderId = 74,
+    Serum3CancelOrderByClientOrderIdV2 = 75,
     // NOTE: Adding new variants requires matching changes in ts and the ix_gate_set instruction.
 }
 

@@ -672,27 +672,69 @@ pub mod mango_v4 {
     }
 
     pub fn serum3_cancel_order(
-        ctx: Context<Serum3CancelOrder>,
+        mut ctx: Context<Serum3CancelOrder>,
         side: Serum3Side,
         order_id: u128,
     ) -> Result<()> {
         #[cfg(feature = "enable-gpl")]
-        instructions::serum3_cancel_order(ctx, side, order_id)?;
+        instructions::serum3_cancel_order(&mut ctx.accounts, None, side, order_id)?;
+        Ok(())
+    }
+
+    pub fn serum3_cancel_order_v2(
+        ctx: Context<Serum3CancelOrderV2>,
+        side: Serum3Side,
+        order_id: u128,
+    ) -> Result<()> {
+        #[cfg(feature = "enable-gpl")]
+        instructions::serum3_cancel_order(
+            &mut ctx.accounts.v1,
+            Some(&mut ctx.accounts.v2),
+            side,
+            order_id,
+        )?;
         Ok(())
     }
 
     pub fn serum3_cancel_order_by_client_order_id(
-        ctx: Context<Serum3CancelOrder>,
+        mut ctx: Context<Serum3CancelOrder>,
         client_order_id: u64,
     ) -> Result<()> {
         #[cfg(feature = "enable-gpl")]
-        instructions::serum3_cancel_order_by_client_order_id(ctx, client_order_id)?;
+        instructions::serum3_cancel_order_by_client_order_id(
+            &mut ctx.accounts,
+            None,
+            client_order_id,
+        )?;
         Ok(())
     }
 
-    pub fn serum3_cancel_all_orders(ctx: Context<Serum3CancelAllOrders>, limit: u8) -> Result<()> {
+    pub fn serum3_cancel_order_by_client_order_id_v2(
+        ctx: Context<Serum3CancelOrderV2>,
+        client_order_id: u64,
+    ) -> Result<()> {
         #[cfg(feature = "enable-gpl")]
-        instructions::serum3_cancel_all_orders(ctx, limit)?;
+        instructions::serum3_cancel_order_by_client_order_id(
+            &mut ctx.accounts.v1,
+            Some(&mut ctx.accounts.v2),
+            client_order_id,
+        )?;
+        Ok(())
+    }
+
+    pub fn serum3_cancel_all_orders(mut ctx: Context<Serum3CancelOrder>, limit: u8) -> Result<()> {
+        #[cfg(feature = "enable-gpl")]
+        instructions::serum3_cancel_all_orders(&mut ctx.accounts, None, limit)?;
+        Ok(())
+    }
+
+    pub fn serum3_cancel_all_orders_v2(ctx: Context<Serum3CancelOrderV2>, limit: u8) -> Result<()> {
+        #[cfg(feature = "enable-gpl")]
+        instructions::serum3_cancel_all_orders(
+            &mut ctx.accounts.v1,
+            Some(&mut ctx.accounts.v2),
+            limit,
+        )?;
         Ok(())
     }
 

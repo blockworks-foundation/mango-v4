@@ -2808,7 +2808,7 @@ pub struct Serum3CancelAllOrdersInstruction {
 }
 #[async_trait::async_trait(?Send)]
 impl ClientInstruction for Serum3CancelAllOrdersInstruction {
-    type Accounts = mango_v4::accounts::Serum3CancelAllOrders;
+    type Accounts = mango_v4::accounts::Serum3CancelOrder;
     type Instruction = mango_v4::instruction::Serum3CancelAllOrders;
     async fn to_instruction(
         &self,

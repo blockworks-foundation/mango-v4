@@ -144,6 +144,8 @@ pub struct OpenOrdersSlim {
     native_pc_free: u64,
     native_pc_total: u64,
     referrer_rebates_accrued: u64,
+    pub has_any_bids: bool,
+    pub has_any_asks: bool,
 }
 impl OpenOrdersSlim {
     pub fn from_oo(oo: &OpenOrders) -> Self {
@@ -153,6 +155,8 @@ impl OpenOrdersSlim {
             native_pc_free: oo.native_pc_free,
             native_pc_total: oo.native_pc_total,
             referrer_rebates_accrued: oo.referrer_rebates_accrued,
+            has_any_asks: (!oo.free_slot_bits & !oo.is_bid_bits) != 0,
+            has_any_bids: (!oo.free_slot_bits & oo.is_bid_bits) != 0,
         }
     }
 }

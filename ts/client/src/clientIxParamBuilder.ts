@@ -103,6 +103,7 @@ export interface TokenEditParams {
   maintWeightShiftAssetTarget: number | null;
   maintWeightShiftLiabTarget: number | null;
   maintWeightShiftAbort: boolean | null;
+  setFallbackOracle: boolean | null;
   depositLimit: BN | null;
 }
 
@@ -141,6 +142,7 @@ export const NullTokenEditParams: TokenEditParams = {
   maintWeightShiftAssetTarget: null,
   maintWeightShiftLiabTarget: null,
   maintWeightShiftAbort: null,
+  setFallbackOracle: null,
   depositLimit: null,
 };
 
@@ -455,6 +457,10 @@ export function buildIxGate(p: IxGateParams): BN {
   toggleIx(ixGate, p, 'TokenConditionalSwapCreatePremiumAuction', 69);
   toggleIx(ixGate, p, 'TokenConditionalSwapCreateLinearAuction', 70);
   toggleIx(ixGate, p, 'Serum3PlaceOrderV2', 71);
+  toggleIx(ixGate, p, 'Serum3CancelAllOrdersV2', 72);
+  toggleIx(ixGate, p, 'Serum3CancelOrderV2', 73);
+  toggleIx(ixGate, p, 'Serum3CancelOrderByClientOrderId', 74);
+  toggleIx(ixGate, p, 'Serum3CancelOrderByClientOrderIdV2', 75);
 
   return ixGate;
 }

@@ -95,6 +95,10 @@ pub fn ix_gate_set(ctx: Context<IxGateSet>, ix_gate: u128) -> Result<()> {
         IxGate::TokenConditionalSwapCreateLinearAuction,
     );
     log_if_changed(&group, ix_gate, IxGate::Serum3PlaceOrderV2);
+    log_if_changed(&group, ix_gate, IxGate::Serum3CancelAllOrdersV2);
+    log_if_changed(&group, ix_gate, IxGate::Serum3CancelOrderV2);
+    log_if_changed(&group, ix_gate, IxGate::Serum3CancelOrderByClientOrderId);
+    log_if_changed(&group, ix_gate, IxGate::Serum3CancelOrderByClientOrderIdV2);
 
     group.ix_gate = ix_gate;
 

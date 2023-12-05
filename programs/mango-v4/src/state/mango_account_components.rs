@@ -179,6 +179,17 @@ impl Serum3Orders {
     pub fn is_active_for_market(&self, market_index: Serum3MarketIndex) -> bool {
         self.market_index == market_index
     }
+
+    pub fn reset_to_no_bids(&mut self) {
+        // The 0 state means uninitialized/no value
+        self.highest_placed_bid_inv = 0.0;
+        self.lowest_placed_bid_inv = 0.0;
+    }
+
+    pub fn reset_to_no_asks(&mut self) {
+        self.lowest_placed_ask = 0.0;
+        self.highest_placed_ask = 0.0;
+    }
 }
 
 impl Default for Serum3Orders {

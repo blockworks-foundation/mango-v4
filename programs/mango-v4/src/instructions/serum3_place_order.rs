@@ -141,14 +141,10 @@ pub fn serum3_place_order(
     let before_vault = ctx.accounts.payer_vault.amount;
 
     let before_oo_free_slots;
-    let before_had_bids;
-    let before_had_asks;
     let before_oo = {
         let oo_ai = &ctx.accounts.open_orders.as_ref();
         let open_orders = load_open_orders_ref(oo_ai)?;
         before_oo_free_slots = open_orders.free_slot_bits;
-        before_had_bids = (!open_orders.free_slot_bits & open_orders.is_bid_bits) != 0;
-        before_had_asks = (!open_orders.free_slot_bits & !open_orders.is_bid_bits) != 0;
         OpenOrdersSlim::from_oo(&open_orders)
     };
 
@@ -217,15 +213,10 @@ pub fn serum3_place_order(
     // when they cross the oracle
     //
     let serum = account.serum3_orders_mut(serum_market.market_index)?;
-    if !before_had_bids {
-        // The 0 state means uninitialized/no value
-        serum.highest_placed_bid_inv = 0.0;
-        serum.lowest_placed_bid_inv = 0.0;
-    }
-    if !before_had_asks {
-        serum.lowest_placed_ask = 0.0;
-        serum.highest_placed_ask = 0.0;
-    }
+
+    // if there were no bids or asks before, reset
+    update_order_tracking(serum, &before_oo);
+
     // in the normal quote per base units
     let limit_price = limit_price_lots as f64 * quote_lot_size as f64 / base_lot_size as f64;
 
@@ -611,6 +602,7 @@ pub fn apply_settle_changes(
     // for potential_serum_tokens on the banks.
     {
         let serum_orders = account.serum3_orders_mut(serum_market.market_index)?;
+        update_order_tracking(serum_orders, after_oo);
         update_bank_potential_tokens(serum_orders, base_bank, quote_bank, after_oo);
     }
 
@@ -654,7 +646,8 @@ fn update_bank_potential_tokens_payer_only(
     }
 }
 
-fn update_bank_potential_tokens(
+/// Update the Bank's potential serum tokens for current reserved amounts
+pub fn update_bank_potential_tokens(
     serum_orders: &mut Serum3Orders,
     base_bank: &mut Bank,
     quote_bank: &mut Bank,
@@ -679,6 +672,17 @@ fn update_bank_potential_tokens(
 
     serum_orders.potential_base_tokens = new_base;
     serum_orders.potential_quote_tokens = new_quote;
+}
+
+/// Used to reset serum_orders order price tracking if no bids/asks are left
+#[inline(always)]
+pub fn update_order_tracking(serum_orders: &mut Serum3Orders, open_orders: &OpenOrdersSlim) {
+    if !open_orders.has_any_bids {
+        serum_orders.reset_to_no_bids();
+    }
+    if !open_orders.has_any_asks {
+        serum_orders.reset_to_no_asks();
+    }
 }
 
 fn cpi_place_order(ctx: &Serum3PlaceOrder, order: NewOrderInstructionV3) -> Result<()> {
