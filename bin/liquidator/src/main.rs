@@ -219,15 +219,15 @@ async fn main() -> anyhow::Result<()> {
     let mango_oracles = group_context
         .tokens
         .values()
-        .map(|value| value.mint_info.oracle)
-        .chain(group_context.perp_markets.values().map(|p| p.market.oracle))
+        .map(|value| value.oracle)
+        .chain(group_context.perp_markets.values().map(|p| p.oracle))
         .unique()
         .collect::<Vec<Pubkey>>();
 
     let serum_programs = group_context
         .serum3_markets
         .values()
-        .map(|s3| s3.market.serum_program)
+        .map(|s3| s3.serum_program)
         .unique()
         .collect_vec();
 
@@ -553,6 +553,12 @@ async fn main() -> anyhow::Result<()> {
         }
     });
 
+    let check_changes_for_abort_job =
+        tokio::spawn(MangoClient::loop_check_for_context_changes_and_abort(
+            mango_client.clone(),
+            Duration::from_secs(300),
+        ));
+
     if cli.telemetry == BoolArg::True {
         tokio::spawn(telemetry::report_regularly(
             mango_client,
@@ -566,6 +572,7 @@ async fn main() -> anyhow::Result<()> {
         rebalance_job,
         liquidation_job,
         token_swap_info_job,
+        check_changes_for_abort_job,
     ]
     .into_iter()
     .collect();

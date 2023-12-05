@@ -65,7 +65,6 @@ async fn compute_pnl(
                 .perp_markets
                 .get(&pp.market_index)
                 .unwrap()
-                .market
                 .settle_token_index;
             let perp_settle_health = health_cache.perp_max_settle(settle_token_index).unwrap();
             let settleable_pnl = if pnl > 0 {

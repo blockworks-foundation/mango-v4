@@ -58,10 +58,8 @@ pub fn max_swap_source(
         mango_v4_client::health_cache::new_sync(&client.context, account_fetcher, &account)
             .expect("always ok");
 
-    let source_bank: Bank =
-        account_fetcher.fetch(&client.context.mint_info(source).first_bank())?;
-    let target_bank: Bank =
-        account_fetcher.fetch(&client.context.mint_info(target).first_bank())?;
+    let source_bank: Bank = account_fetcher.fetch(&client.context.token(source).first_bank())?;
+    let target_bank: Bank = account_fetcher.fetch(&client.context.token(target).first_bank())?;
 
     let source_price = health_cache.token_info(source).unwrap().prices.oracle;
 
@@ -100,10 +98,10 @@ pub fn max_swap_source_ignore_net_borrows(
             .expect("always ok");
 
     let mut source_bank: Bank =
-        account_fetcher.fetch(&client.context.mint_info(source).first_bank())?;
+        account_fetcher.fetch(&client.context.token(source).first_bank())?;
     source_bank.net_borrow_limit_per_window_quote = -1;
     let mut target_bank: Bank =
-        account_fetcher.fetch(&client.context.mint_info(target).first_bank())?;
+        account_fetcher.fetch(&client.context.token(target).first_bank())?;
     target_bank.net_borrow_limit_per_window_quote = -1;
 
     let source_price = health_cache.token_info(source).unwrap().prices.oracle;

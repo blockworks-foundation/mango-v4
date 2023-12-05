@@ -2,11 +2,10 @@ use std::collections::HashMap;
 
 use anchor_client::ClientError;
 
-use anchor_lang::__private::bytemuck::{self, Zeroable};
+use anchor_lang::__private::bytemuck;
 
 use mango_v4::state::{
-    Bank, Group, MangoAccountValue, MintInfo, PerpMarket, PerpMarketIndex, Serum3Market,
-    Serum3MarketIndex, TokenIndex,
+    Group, MangoAccountValue, PerpMarketIndex, Serum3MarketIndex, TokenIndex, MAX_BANKS,
 };
 
 use fixed::types::I80F48;
@@ -20,26 +19,51 @@ use solana_sdk::account::Account;
 use solana_sdk::instruction::AccountMeta;
 use solana_sdk::pubkey::Pubkey;
 
-#[derive(Clone)]
+#[derive(Clone, PartialEq, Eq)]
 pub struct TokenContext {
+    pub group: Pubkey,
     pub token_index: TokenIndex,
     pub name: String,
-    pub mint_info: MintInfo,
+    pub mint: Pubkey,
+    pub oracle: Pubkey,
+    pub banks: [Pubkey; MAX_BANKS],
+    pub vaults: [Pubkey; MAX_BANKS],
+    pub fallback_oracle: Pubkey,
     pub mint_info_address: Pubkey,
     pub decimals: u8,
-    /// Bank snapshot is never updated, only use static parts!
-    pub bank: Bank,
 }
 
 impl TokenContext {
     pub fn native_to_ui(&self, native: I80F48) -> f64 {
         (native / I80F48::from(10u64.pow(self.decimals.into()))).to_num()
     }
+
+    pub fn first_bank(&self) -> Pubkey {
+        self.banks[0]
+    }
+
+    pub fn first_vault(&self) -> Pubkey {
+        self.vaults[0]
+    }
+
+    pub fn banks(&self) -> &[Pubkey] {
+        let n_banks = self
+            .banks
+            .iter()
+            .position(|&b| b == Pubkey::default())
+            .unwrap_or(MAX_BANKS);
+        &self.banks[..n_banks]
+    }
 }
 
+#[derive(Clone, PartialEq, Eq)]
 pub struct Serum3MarketContext {
     pub address: Pubkey,
-    pub market: Serum3Market,
+    pub name: String,
+    pub serum_program: Pubkey,
+    pub serum_market_external: Pubkey,
+    pub base_token_index: TokenIndex,
+    pub quote_token_index: TokenIndex,
     pub bids: Pubkey,
     pub asks: Pubkey,
     pub event_q: Pubkey,
@@ -51,10 +75,21 @@ pub struct Serum3MarketContext {
     pub pc_lot_size: u64,
 }
 
+#[derive(Clone, PartialEq, Eq)]
 pub struct PerpMarketContext {
+    pub group: Pubkey,
+    pub perp_market_index: PerpMarketIndex,
+    pub settle_token_index: TokenIndex,
     pub address: Pubkey,
-    /// PerpMarket snapshot is never updated, only use static parts!
-    pub market: PerpMarket,
+    pub name: String,
+    pub bids: Pubkey,
+    pub asks: Pubkey,
+    pub event_queue: Pubkey,
+    pub oracle: Pubkey,
+    pub base_lot_size: i64,
+    pub quote_lot_size: i64,
+    pub base_decimals: u8,
+    pub init_overall_asset_weight: I80F48,
 }
 
 pub struct ComputeEstimates {
@@ -128,10 +163,6 @@ impl MangoGroupContext {
         self.token(token_index).mint_info_address
     }
 
-    pub fn mint_info(&self, token_index: TokenIndex) -> MintInfo {
-        self.token(token_index).mint_info
-    }
-
     pub fn perp(&self, perp_market_index: PerpMarketIndex) -> &PerpMarketContext {
         self.perp_markets.get(&perp_market_index).unwrap()
     }
@@ -149,11 +180,11 @@ impl MangoGroupContext {
     }
 
     pub fn serum3_base_token(&self, market_index: Serum3MarketIndex) -> &TokenContext {
-        self.token(self.serum3(market_index).market.base_token_index)
+        self.token(self.serum3(market_index).base_token_index)
     }
 
     pub fn serum3_quote_token(&self, market_index: Serum3MarketIndex) -> &TokenContext {
-        self.token(self.serum3(market_index).market.quote_token_index)
+        self.token(self.serum3(market_index).quote_token_index)
     }
 
     pub fn token(&self, token_index: TokenIndex) -> &TokenContext {
@@ -163,7 +194,7 @@ impl MangoGroupContext {
     pub fn token_by_mint(&self, mint: &Pubkey) -> anyhow::Result<&TokenContext> {
         self.tokens
             .values()
-            .find(|tc| tc.mint_info.mint == *mint)
+            .find(|tc| tc.mint == *mint)
             .ok_or_else(|| anyhow::anyhow!("no token for mint {}", mint))
     }
 
@@ -192,10 +223,14 @@ impl MangoGroupContext {
                     TokenContext {
                         token_index: mi.token_index,
                         name: String::new(),
-                        mint_info: *mi,
                         mint_info_address: *pk,
                         decimals: u8::MAX,
-                        bank: Bank::zeroed(),
+                        banks: mi.banks,
+                        vaults: mi.vaults,
+                        fallback_oracle: mi.fallback_oracle,
+                        oracle: mi.oracle,
+                        group: mi.group,
+                        mint: mi.mint,
                     },
                 )
             })
@@ -209,7 +244,6 @@ impl MangoGroupContext {
             let token = tokens.get_mut(&bank.token_index).unwrap();
             token.name = bank.name().into();
             token.decimals = bank.mint_decimals;
-            token.bank = bank.clone();
         }
         assert!(tokens.values().all(|t| t.decimals != u8::MAX));
 
@@ -237,7 +271,11 @@ impl MangoGroupContext {
                     s.market_index,
                     Serum3MarketContext {
                         address: *pk,
-                        market: *s,
+                        base_token_index: s.base_token_index,
+                        quote_token_index: s.quote_token_index,
+                        name: s.name().to_string(),
+                        serum_program: s.serum_program,
+                        serum_market_external: s.serum_market_external,
                         bids: from_serum_style_pubkey(market_external.bids),
                         asks: from_serum_style_pubkey(market_external.asks),
                         event_q: from_serum_style_pubkey(market_external.event_q),
@@ -261,7 +299,18 @@ impl MangoGroupContext {
                     pm.perp_market_index,
                     PerpMarketContext {
                         address: *pk,
-                        market: *pm,
+                        group: pm.group,
+                        oracle: pm.oracle,
+                        perp_market_index: pm.perp_market_index,
+                        settle_token_index: pm.settle_token_index,
+                        asks: pm.asks,
+                        bids: pm.bids,
+                        event_queue: pm.event_queue,
+                        base_decimals: pm.base_decimals,
+                        base_lot_size: pm.base_lot_size,
+                        quote_lot_size: pm.quote_lot_size,
+                        init_overall_asset_weight: pm.init_overall_asset_weight,
+                        name: pm.name().to_string(),
                     },
                 )
             })
@@ -274,11 +323,11 @@ impl MangoGroupContext {
             .collect::<HashMap<_, _>>();
         let serum3_market_indexes_by_name = serum3_markets
             .iter()
-            .map(|(i, s)| (s.market.name().to_string(), *i))
+            .map(|(i, s)| (s.name.clone(), *i))
             .collect::<HashMap<_, _>>();
         let perp_market_indexes_by_name = perp_markets
             .iter()
-            .map(|(i, p)| (p.market.name().to_string(), *i))
+            .map(|(i, p)| (p.name.clone(), *i))
             .collect::<HashMap<_, _>>();
 
         let group_data = fetch_anchor_account::<Group>(rpc, &group).await?;
@@ -314,10 +363,7 @@ impl MangoGroupContext {
             account.ensure_token_position(*affected_token_index)?;
         }
         for affected_perp_market_index in affected_perp_markets {
-            let settle_token_index = self
-                .perp(affected_perp_market_index)
-                .market
-                .settle_token_index;
+            let settle_token_index = self.perp(affected_perp_market_index).settle_token_index;
             account.ensure_perp_position(affected_perp_market_index, settle_token_index)?;
         }
 
@@ -325,12 +371,12 @@ impl MangoGroupContext {
         let mut banks = vec![];
         let mut oracles = vec![];
         for position in account.active_token_positions() {
-            let mint_info = self.mint_info(position.token_index);
+            let token = self.token(position.token_index);
             banks.push((
-                mint_info.first_bank(),
+                token.first_bank(),
                 writable_banks.iter().any(|&ti| ti == position.token_index),
             ));
-            oracles.push(mint_info.oracle);
+            oracles.push(token.oracle);
         }
 
         let serum_oos = account.active_serum3_orders().map(|&s| s.open_orders);
@@ -339,7 +385,7 @@ impl MangoGroupContext {
             .map(|&pa| self.perp_market_address(pa.market_index));
         let perp_oracles = account
             .active_perp_positions()
-            .map(|&pa| self.perp(pa.market_index).market.oracle);
+            .map(|&pa| self.perp(pa.market_index).oracle);
 
         let to_account_meta = |pubkey| AccountMeta {
             pubkey,
@@ -384,10 +430,10 @@ impl MangoGroupContext {
             .unique();
 
         for token_index in token_indexes {
-            let mint_info = self.mint_info(token_index);
+            let token = self.token(token_index);
             let writable_bank = writable_banks.iter().contains(&token_index);
-            banks.push((mint_info.first_bank(), writable_bank));
-            oracles.push(mint_info.oracle);
+            banks.push((token.first_bank(), writable_bank));
+            oracles.push(token.oracle);
         }
 
         let serum_oos = account2
@@ -405,7 +451,7 @@ impl MangoGroupContext {
             .map(|&index| self.perp_market_address(index));
         let perp_oracles = perp_market_indexes
             .iter()
-            .map(|&index| self.perp(index).market.oracle);
+            .map(|&index| self.perp(index).oracle);
 
         let to_account_meta = |pubkey| AccountMeta {
             pubkey,
@@ -451,6 +497,47 @@ impl MangoGroupContext {
         );
 
         Ok((accounts, cu))
+    }
+
+    /// Returns true if the on-chain context changed significantly, this currently means:
+    /// - new listings (token, serum, perp)
+    /// - oracle pubkey or config changes
+    /// - other config changes visible through the context
+    /// This is done because those would affect the pubkeys the websocket streams need to listen to,
+    /// or change limits, oracle staleness or other relevant configuration.
+    pub fn changed_significantly(&self, other: &Self) -> bool {
+        if other.tokens.len() != self.tokens.len() {
+            return true;
+        }
+        for (&ti, old) in self.tokens.iter() {
+            if old != other.token(ti) {
+                return true;
+            }
+        }
+
+        if other.serum3_markets.len() != self.serum3_markets.len() {
+            return true;
+        }
+        for (&mi, old) in self.serum3_markets.iter() {
+            if old != other.serum3(mi) {
+                return true;
+            }
+        }
+
+        if other.perp_markets.len() != self.perp_markets.len() {
+            return true;
+        }
+        for (&pi, old) in self.perp_markets.iter() {
+            if old != other.perp(pi) {
+                return true;
+            }
+        }
+
+        if other.address_lookup_tables != self.address_lookup_tables {
+            return true;
+        }
+
+        false
     }
 
     pub async fn new_tokens_listed(&self, rpc: &RpcClientAsync) -> anyhow::Result<bool> {

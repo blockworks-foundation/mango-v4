@@ -83,14 +83,14 @@ async fn main() -> anyhow::Result<()> {
     let perp_queue_pks: Vec<_> = group_context
         .perp_markets
         .values()
-        .map(|context| (context.address, context.market.event_queue))
+        .map(|context| (context.address, context.event_queue))
         .collect();
 
     // fetch all serum/openbook markets to find their event queues
     let serum_market_pks: Vec<_> = group_context
         .serum3_markets
         .values()
-        .map(|context| context.market.serum_market_external)
+        .map(|context| context.serum_market_external)
         .collect();
 
     let serum_market_ais = client

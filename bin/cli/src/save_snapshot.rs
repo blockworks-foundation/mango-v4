@@ -31,14 +31,9 @@ pub async fn save_snapshot(
     let oracles_and_vaults = group_context
         .tokens
         .values()
-        .map(|value| value.mint_info.oracle)
-        .chain(group_context.perp_markets.values().map(|p| p.market.oracle))
-        .chain(
-            group_context
-                .tokens
-                .values()
-                .flat_map(|value| value.mint_info.vaults),
-        )
+        .map(|value| value.oracle)
+        .chain(group_context.perp_markets.values().map(|p| p.oracle))
+        .chain(group_context.tokens.values().flat_map(|value| value.vaults))
         .unique()
         .filter(|pk| *pk != Pubkey::default())
         .collect::<Vec<Pubkey>>();
@@ -46,7 +41,7 @@ pub async fn save_snapshot(
     let serum_programs = group_context
         .serum3_markets
         .values()
-        .map(|s3| s3.market.serum_program)
+        .map(|s3| s3.serum_program)
         .unique()
         .collect_vec();
 

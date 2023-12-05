@@ -368,23 +368,22 @@ async fn main() -> anyhow::Result<()> {
         .perp_markets
         .values()
         .map(|context| {
-            let quote_decimals = match group_context.tokens.get(&context.market.settle_token_index)
-            {
+            let quote_decimals = match group_context.tokens.get(&context.settle_token_index) {
                 Some(token) => token.decimals,
                 None => panic!("token not found for market"), // todo: default to 6 for usdc?
             };
             (
                 context.address,
                 MarketConfig {
-                    name: context.market.name().to_owned(),
-                    bids: context.market.bids,
-                    asks: context.market.asks,
-                    event_queue: context.market.event_queue,
-                    oracle: context.market.oracle,
-                    base_decimals: context.market.base_decimals,
+                    name: context.name.clone(),
+                    bids: context.bids,
+                    asks: context.asks,
+                    event_queue: context.event_queue,
+                    oracle: context.oracle,
+                    base_decimals: context.base_decimals,
                     quote_decimals,
-                    base_lot_size: context.market.base_lot_size,
-                    quote_lot_size: context.market.quote_lot_size,
+                    base_lot_size: context.base_lot_size,
+                    quote_lot_size: context.quote_lot_size,
                 },
             )
         })
@@ -394,18 +393,18 @@ async fn main() -> anyhow::Result<()> {
         .serum3_markets
         .values()
         .map(|context| {
-            let base_decimals = match group_context.tokens.get(&context.market.base_token_index) {
+            let base_decimals = match group_context.tokens.get(&context.base_token_index) {
                 Some(token) => token.decimals,
                 None => panic!("token not found for market"), // todo: default?
             };
-            let quote_decimals = match group_context.tokens.get(&context.market.quote_token_index) {
+            let quote_decimals = match group_context.tokens.get(&context.quote_token_index) {
                 Some(token) => token.decimals,
                 None => panic!("token not found for market"), // todo: default to 6 for usdc?
             };
             (
-                context.market.serum_market_external,
+                context.serum_market_external,
                 MarketConfig {
-                    name: context.market.name().to_owned(),
+                    name: context.name.clone(),
                     bids: context.bids,
                     asks: context.asks,
                     event_queue: context.event_q,
