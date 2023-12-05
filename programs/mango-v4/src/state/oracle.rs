@@ -9,6 +9,8 @@ use static_assertions::const_assert_eq;
 use switchboard_program::FastRoundResultAccountData;
 use switchboard_v2::AggregatorAccountData;
 
+use whirlpool::state::Whirlpool;
+
 use crate::accounts_zerocopy::*;
 
 use crate::error::*;
@@ -92,6 +94,7 @@ pub enum OracleType {
     Stub,
     SwitchboardV1,
     SwitchboardV2,
+    Orca
 }
 
 pub struct OracleState {
@@ -168,6 +171,8 @@ pub fn determine_oracle_type(acc_info: &impl KeyedAccountReader) -> Result<Oracl
         || acc_info.owner() == &switchboard_v2_mainnet_oracle::ID
     {
         return Ok(OracleType::SwitchboardV1);
+    } else if 1 ==1 {
+        return Ok(OracleType::Orca);
     }
 
     Err(MangoError::UnknownOracleType.into())
@@ -307,6 +312,17 @@ pub fn oracle_state_unchecked(
                 last_update_slot,
                 deviation,
                 oracle_type: OracleType::SwitchboardV1,
+            }
+        }
+        OracleType::Orca => {
+            let whirlpool = bytemuck::from_bytes::<Whirlpool>(&data[8..]);
+
+            
+            OracleState {
+                price: I80F48::ZERO,
+                last_update_slot: 0,
+                deviation: I80F48::ZERO,
+                oracle_type: OracleType::Orca,
             }
         }
     })
