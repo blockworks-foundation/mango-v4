@@ -158,6 +158,14 @@ struct Cli {
     #[clap(long, env, value_enum, default_value = "v6")]
     jupiter_version: JupiterVersionArg,
 
+    /// override the url to jupiter v4
+    #[clap(long, env, default_value = "https://quote-api.jup.ag/v4")]
+    jupiter_v4_url: String,
+
+    /// override the url to jupiter v6
+    #[clap(long, env, default_value = "https://quote-api.jup.ag/v6")]
+    jupiter_v6_url: String,
+
     /// report liquidator's existence and pubkey
     #[clap(long, env, value_enum, default_value = "true")]
     telemetry: BoolArg,
@@ -188,18 +196,21 @@ async fn main() -> anyhow::Result<()> {
     let rpc_timeout = Duration::from_secs(10);
     let cluster = Cluster::Custom(rpc_url.clone(), ws_url.clone());
     let commitment = CommitmentConfig::processed();
-    let client = Client::new(
-        cluster.clone(),
-        commitment,
-        liqor_owner.clone(),
-        Some(rpc_timeout),
-        TransactionBuilderConfig {
+    let client = Client::builder()
+        .cluster(cluster.clone())
+        .commitment(commitment)
+        .fee_payer(Some(liqor_owner.clone()))
+        .timeout(Some(rpc_timeout))
+        .jupiter_v4_url(cli.jupiter_v4_url)
+        .jupiter_v6_url(cli.jupiter_v6_url)
+        .transaction_builder_config(TransactionBuilderConfig {
             prioritization_micro_lamports: (cli.prioritization_micro_lamports > 0)
                 .then_some(cli.prioritization_micro_lamports),
             // Liquidation and tcs triggers set their own budgets, this is a default for other tx
             compute_budget_per_instruction: Some(250_000),
-        },
-    );
+        })
+        .build()
+        .unwrap();
 
     // The representation of current on-chain account data
     let chain_data = Arc::new(RwLock::new(chain_data::ChainData::new()));

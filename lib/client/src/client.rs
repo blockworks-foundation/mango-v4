@@ -49,17 +49,55 @@ use solana_sdk::{commitment_config::CommitmentConfig, pubkey::Pubkey, signer::Si
 pub const MAX_ACCOUNTS_PER_TRANSACTION: usize = 64;
 
 // very close to anchor_client::Client, which unfortunately has no accessors or Clone
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Builder)]
 pub struct Client {
+    /// RPC url
+    ///
+    /// Defaults to Cluster::Mainnet, using the public crowded mainnet-beta rpc endpoint.
+    /// Should usually be overridden with a custom rpc endpoint.
+    #[builder(default = "Cluster::Mainnet")]
     pub cluster: Cluster,
-    pub fee_payer: Arc<Keypair>,
+
+    /// Transaction fee payer. Needs to be set to send transactions.
+    pub fee_payer: Option<Arc<Keypair>>,
+
+    /// Commitment for interacting with the chain. Defaults to processed.
+    #[builder(default = "CommitmentConfig::processed()")]
     pub commitment: CommitmentConfig,
+
+    /// Timeout, defaults to 60s
+    #[builder(default = "Some(Duration::from_secs(60))")]
     pub timeout: Option<Duration>,
+
+    #[builder(default)]
     pub transaction_builder_config: TransactionBuilderConfig,
+
+    /// Defaults to a preflight check at processed commitment
+    #[builder(default = "ClientBuilder::default_rpc_send_transaction_config()")]
     pub rpc_send_transaction_config: RpcSendTransactionConfig,
+
+    #[builder(default = "\"https://quote-api.jup.ag/v4\".into()")]
+    pub jupiter_v4_url: String,
+
+    #[builder(default = "\"https://quote-api.jup.ag/v6\".into()")]
+    pub jupiter_v6_url: String,
+}
+
+impl ClientBuilder {
+    pub fn default_rpc_send_transaction_config() -> RpcSendTransactionConfig {
+        RpcSendTransactionConfig {
+            preflight_commitment: Some(CommitmentLevel::Processed),
+            ..Default::default()
+        }
+    }
 }
 
 impl Client {
+    pub fn builder() -> ClientBuilder {
+        ClientBuilder::default()
+    }
+
+    /// Prefer using the builder()
     pub fn new(
         cluster: Cluster,
         commitment: CommitmentConfig,
@@ -67,17 +105,14 @@ impl Client {
         timeout: Option<Duration>,
         transaction_builder_config: TransactionBuilderConfig,
     ) -> Self {
-        Self {
-            cluster,
-            fee_payer,
-            commitment,
-            timeout,
-            transaction_builder_config,
-            rpc_send_transaction_config: RpcSendTransactionConfig {
-                preflight_commitment: Some(CommitmentLevel::Processed),
-                ..Default::default()
-            },
-        }
+        Self::builder()
+            .cluster(cluster)
+            .commitment(commitment)
+            .fee_payer(Some(fee_payer))
+            .timeout(timeout)
+            .transaction_builder_config(transaction_builder_config)
+            .build()
+            .unwrap()
     }
 
     pub fn rpc_async(&self) -> RpcClientAsync {
@@ -95,6 +130,13 @@ impl Client {
         address: &Pubkey,
     ) -> anyhow::Result<T> {
         fetch_anchor_account(&self.rpc_async(), address).await
+    }
+
+    pub fn fee_payer(&self) -> Arc<Keypair> {
+        self.fee_payer
+            .as_ref()
+            .expect("fee payer must be set")
+            .clone()
     }
 }
 
@@ -1617,11 +1659,12 @@ impl MangoClient {
         &self,
         instructions: Vec<Instruction>,
     ) -> anyhow::Result<Signature> {
+        let fee_payer = self.client.fee_payer();
         TransactionBuilder {
             instructions,
             address_lookup_tables: self.mango_address_lookup_tables().await?,
-            payer: self.client.fee_payer.pubkey(),
-            signers: vec![self.owner.clone(), self.client.fee_payer.clone()],
+            payer: fee_payer.pubkey(),
+            signers: vec![self.owner.clone(), fee_payer],
             config: self.client.transaction_builder_config,
         }
         .send_and_confirm(&self.client)
@@ -1632,11 +1675,12 @@ impl MangoClient {
         &self,
         instructions: Vec<Instruction>,
     ) -> anyhow::Result<Signature> {
+        let fee_payer = self.client.fee_payer();
         TransactionBuilder {
             instructions,
             address_lookup_tables: self.mango_address_lookup_tables().await?,
-            payer: self.client.fee_payer.pubkey(),
-            signers: vec![self.client.fee_payer.clone()],
+            payer: fee_payer.pubkey(),
+            signers: vec![fee_payer],
             config: self.client.transaction_builder_config,
         }
         .send_and_confirm(&self.client)
@@ -1647,11 +1691,12 @@ impl MangoClient {
         &self,
         instructions: Vec<Instruction>,
     ) -> anyhow::Result<SimulateTransactionResponse> {
+        let fee_payer = self.client.fee_payer();
         TransactionBuilder {
             instructions,
             address_lookup_tables: vec![],
-            payer: self.client.fee_payer.pubkey(),
-            signers: vec![self.client.fee_payer.clone()],
+            payer: fee_payer.pubkey(),
+            signers: vec![fee_payer],
             config: self.client.transaction_builder_config,
         }
         .simulate(&self.client)

@@ -267,7 +267,7 @@ struct SettleBatchProcessor<'a> {
 impl<'a> SettleBatchProcessor<'a> {
     fn transaction(&self) -> anyhow::Result<VersionedTransaction> {
         let client = &self.mango_client.client;
-        let fee_payer = client.fee_payer.clone();
+        let fee_payer = client.fee_payer();
 
         TransactionBuilder {
             instructions: self.instructions.clone().to_instructions(),

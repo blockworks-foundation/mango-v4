@@ -1105,14 +1105,12 @@ impl Context {
                 solana_sdk::compute_budget::ComputeBudgetInstruction::set_compute_unit_limit(
                     self.config.compute_limit_for_trigger,
                 );
+            let fee_payer = self.mango_client.client.fee_payer();
             TransactionBuilder {
                 instructions: vec![compute_ix],
                 address_lookup_tables: vec![],
-                payer: self.mango_client.client.fee_payer.pubkey(),
-                signers: vec![
-                    self.mango_client.owner.clone(),
-                    self.mango_client.client.fee_payer.clone(),
-                ],
+                payer: fee_payer.pubkey(),
+                signers: vec![self.mango_client.owner.clone(), fee_payer],
                 config: self.mango_client.client.transaction_builder_config,
             }
         };
