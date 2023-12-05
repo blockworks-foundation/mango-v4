@@ -67,11 +67,11 @@ pub fn token_register_trustless(
         collected_fees_native: I80F48::ZERO,
         loan_origination_fee_rate: I80F48::from_num(0.0020),
         loan_fee_rate: I80F48::from_num(0.005),
-        maint_asset_weight: I80F48::from_num(0.75), // 4x leverage
-        init_asset_weight: I80F48::from_num(0.5),   // 2x leverage
-        maint_liab_weight: I80F48::from_num(1.25),  // 4x leverage
-        init_liab_weight: I80F48::from_num(1.5),    // 2x leverage
-        liquidation_fee: I80F48::from_num(0.125),
+        maint_asset_weight: I80F48::from_num(0),
+        init_asset_weight: I80F48::from_num(0),
+        maint_liab_weight: I80F48::from_num(1.4), // 2.5x
+        init_liab_weight: I80F48::from_num(1.8),  // 1.25x
+        liquidation_fee: I80F48::from_num(0.2),
         dust: I80F48::ZERO,
         flash_loan_token_account_initial: u64::MAX,
         flash_loan_approved_amount: 0,
@@ -87,7 +87,7 @@ pub fn token_register_trustless(
         net_borrows_in_window: 0,
         borrow_weight_scale_start_quote: 5_000_000_000.0, // $5k
         deposit_weight_scale_start_quote: 5_000_000_000.0, // $5k
-        reduce_only: 0,                                   // allow both deposits and borrows
+        reduce_only: 2,                                   // deposit-only
         force_close: 0,
         padding: Default::default(),
         fees_withdrawn: 0,
