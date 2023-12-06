@@ -1,19 +1,19 @@
 use std::mem::size_of;
 
 use anchor_lang::prelude::*;
-use anchor_lang::Discriminator;
+use anchor_lang::{AnchorDeserialize, Discriminator};
 use derivative::Derivative;
-use fixed::types::I80F48;
+use fixed::types::{I80F48, U64F64};
 
 use static_assertions::const_assert_eq;
 use switchboard_program::FastRoundResultAccountData;
 use switchboard_v2::AggregatorAccountData;
 
-use whirlpool::state::Whirlpool;
-
 use crate::accounts_zerocopy::*;
 
 use crate::error::*;
+
+use super::{Whirlpool, ORCA_ID};
 
 const DECIMAL_CONSTANT_ZERO_INDEX: i8 = 12;
 const DECIMAL_CONSTANTS: [I80F48; 25] = [
@@ -94,7 +94,7 @@ pub enum OracleType {
     Stub,
     SwitchboardV1,
     SwitchboardV2,
-    Orca
+    OrcaCLMM,
 }
 
 pub struct OracleState {
@@ -171,8 +171,8 @@ pub fn determine_oracle_type(acc_info: &impl KeyedAccountReader) -> Result<Oracl
         || acc_info.owner() == &switchboard_v2_mainnet_oracle::ID
     {
         return Ok(OracleType::SwitchboardV1);
-    } else if 1 ==1 {
-        return Ok(OracleType::Orca);
+    } else if acc_info.owner() == &ORCA_ID {
+        return Ok(OracleType::OrcaCLMM);
     }
 
     Err(MangoError::UnknownOracleType.into())
@@ -314,15 +314,19 @@ pub fn oracle_state_unchecked(
                 oracle_type: OracleType::SwitchboardV1,
             }
         }
-        OracleType::Orca => {
-            let whirlpool = bytemuck::from_bytes::<Whirlpool>(&data[8..]);
+        OracleType::OrcaCLMM => {
+            let whirlpool = Whirlpool::try_deserialize(&mut &data[8..]).unwrap();
+            let decimals = QUOTE_DECIMALS - (base_decimals as i8);
+            let decimal_adj = power_of_ten(decimals);
 
-            
+            let sqrt_price = U64F64::from_bits(whirlpool.sqrt_price);
+            let price = I80F48::from_num(sqrt_price * sqrt_price) * decimal_adj;
+            let last_update_slot = Clock::get().unwrap().slot;
             OracleState {
-                price: I80F48::ZERO,
-                last_update_slot: 0,
+                price,
+                last_update_slot,
                 deviation: I80F48::ZERO,
-                oracle_type: OracleType::Orca,
+                oracle_type: OracleType::OrcaCLMM,
             }
         }
     })

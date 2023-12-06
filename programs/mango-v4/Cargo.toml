@@ -47,8 +47,6 @@ static_assertions = "1.1"
 switchboard-program = "0.2"
 switchboard-v2 = { package = "switchboard-solana", version = "0.28" }
 
-whirlpool = { git = "https://github.com/orca-so/whirlpools", tag = "0.11.3", package = "whirlpool", features = ["cpi"] }
-
 openbook-v2 = { git = "https://github.com/openbook-dex/openbook-v2.git", features = ["no-entrypoint"] }
 
 
