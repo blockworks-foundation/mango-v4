@@ -4,7 +4,60 @@ Update this for each program release and mainnet deployment.
 
 ## not on mainnet
 
-### v0.20.0, 2023-10-
+### v0.21.0, 2023-12-
+
+- Introduce deposit limits (#806)
+
+  The DAO can now configure hard deposit limits per token. They can be used in
+  conjunction with the previous soft limits to restrict how much of a token can
+  be on the platform providing collateral weight.
+
+- Improve OpenBook order tracking and price bands (#805)
+
+  In order for hard deposit limits to work, OpenBook orders need to be tracked
+  and potentially restricted. The DAO can now configure a band around the oracle
+  price and new bids and asks that don't fall within this band will be rejected.
+
+- SerumPlaceOrderV2 breaking change (#805)
+
+  A new instruction for placing orders on OpenBook markets is introduced. The
+  old instruction should be disabled shortly after release.
+
+- Changing token maint weights over time (#780)
+
+  The DAO can now trigger a gradual change in token maint weights. This allows
+  it to make maint weights less favorable without potentially causing many
+  liquidations at the same time.
+
+- Changed perp settlement incentives (#771)
+
+  The incentives were too high when the user account was close to liquidation.
+  The DAO had previously reduced the percentage amount as a mitigation.
+
+  With this change:
+  - low-health settlement incentives are capped at 2x the flat fee, removing
+    unlimited percentual incentive fees entirely
+  - incentives are only paid if at least 1% of position value is settled,
+    avoiding the incentive to settle accounts with large positions very frequently
+
+- More configurable token interest rate curve (#755)
+
+  The scaling factor and target utilization are now stored separately, giving the
+  DAO more flexibility for configuration.
+
+- Delegates can now deposit even when a new token position needs to be created (#775)
+- TokenRegister: Add argument for insurance (#782)
+- Close zero token positions when user asks to withdraw everything (#793)
+- Fix default parameters for fast listing tokens (#804)
+- Disable TokenAddBank instruction, which was unused (#803)
+- Significantly reduce program heap use (#787, #785)
+- Reduce compute use of OpenBook health computations (#750)
+
+## mainnet
+
+### v0.20.0, 2023-11-8
+
+Deployment: Nov 8, 2023 at 10:44:24 Central European Standard Time, https://explorer.solana.com/tx/4LM5NJAa71tjjKT4a7MXVVsautU1DNvszbXp2ufeps9gMrksRh9pURRiacoyCEgW9gdBYJb1W3TL6o7dzDcUVmVH
 
 - Token conditional swaps: Add two auction mechanisms (#717)
 
@@ -45,8 +98,6 @@ Update this for each program release and mainnet deployment.
 - Token deposit: Require a valid oracle when opening a new token position (#722)
 - Fix computing maximum allowed amount when swapping zero asset-weight tokens (#699)
 - Fix too-strict validation of max rate on token edit (#734)
-
-## mainnet
 
 ### v0.19.1, 2023-9-16
 
