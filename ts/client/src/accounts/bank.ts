@@ -200,7 +200,7 @@ export class Bank implements BankForHealth {
       obj.maintWeightShiftAssetTarget,
       obj.maintWeightShiftLiabTarget,
       obj.depositLimit,
-      obj.fallbackOracle
+      obj.fallbackOracle,
     );
   }
 

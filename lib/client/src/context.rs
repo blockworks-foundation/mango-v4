@@ -619,7 +619,8 @@ impl MangoGroupContext {
                 .is_err()
                 || state
                     .check_staleness(bank.name(), &bank.oracle_config, now_slot)
-                    .is_err()) && bank.fallback_oracle != Pubkey::default()
+                    .is_err())
+                && bank.fallback_oracle != Pubkey::default()
             {
                 fallbacks.push(bank.fallback_oracle);
             }
