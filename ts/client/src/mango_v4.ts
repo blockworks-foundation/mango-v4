@@ -1,5 +1,5 @@
 export type MangoV4 = {
-  "version": "0.20.0",
+  "version": "0.22.0",
   "name": "mango_v4",
   "instructions": [
     {
@@ -486,6 +486,11 @@ export type MangoV4 = {
           "isSigner": false
         },
         {
+          "name": "fallbackOracle",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
           "name": "payer",
           "isMut": true,
           "isSigner": true
@@ -728,6 +733,11 @@ export type MangoV4 = {
           "isSigner": false
         },
         {
+          "name": "fallbackOracle",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
           "name": "payer",
           "isMut": true,
           "isSigner": true
@@ -786,6 +796,15 @@ export type MangoV4 = {
           "isSigner": false,
           "docs": [
             "The oracle account is optional and only used when reset_stable_price is set.",
+            ""
+          ]
+        },
+        {
+          "name": "fallbackOracle",
+          "isMut": false,
+          "isSigner": false,
+          "docs": [
+            "The fallback oracle account is optional and only used when set_fallback_oracle is true.",
             ""
           ]
         }
@@ -991,6 +1010,10 @@ export type MangoV4 = {
         },
         {
           "name": "maintWeightShiftAbort",
+          "type": "bool"
+        },
+        {
+          "name": "setFallbackOracle",
           "type": "bool"
         },
         {
@@ -1699,27 +1722,7 @@ export type MangoV4 = {
         {
           "name": "oracle",
           "isMut": true,
-          "isSigner": false,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "type": "string",
-                "value": "StubOracle"
-              },
-              {
-                "kind": "account",
-                "type": "publicKey",
-                "path": "group"
-              },
-              {
-                "kind": "account",
-                "type": "publicKey",
-                "account": "Mint",
-                "path": "mint"
-              }
-            ]
-          }
+          "isSigner": true
         },
         {
           "name": "admin",
@@ -7389,6 +7392,10 @@ export type MangoV4 = {
             }
           },
           {
+            "name": "fallbackOracle",
+            "type": "publicKey"
+          },
+          {
             "name": "depositLimit",
             "docs": [
               "zero means none, in token native"
@@ -7400,7 +7407,7 @@ export type MangoV4 = {
             "type": {
               "array": [
                 "u8",
-                2000
+                1968
               ]
             }
           }
@@ -7800,11 +7807,15 @@ export type MangoV4 = {
             "type": "u64"
           },
           {
+            "name": "fallbackOracle",
+            "type": "publicKey"
+          },
+          {
             "name": "reserved",
             "type": {
               "array": [
                 "u8",
-                2560
+                2528
               ]
             }
           }
@@ -10875,7 +10886,7 @@ export type MangoV4 = {
             "name": "ImmediateOrCancel",
             "fields": [
               {
-                "name": "price_lots",
+                "name": "priceLots",
                 "type": "i64"
               }
             ]
@@ -10884,11 +10895,11 @@ export type MangoV4 = {
             "name": "Fixed",
             "fields": [
               {
-                "name": "price_lots",
+                "name": "priceLots",
                 "type": "i64"
               },
               {
-                "name": "order_type",
+                "name": "orderType",
                 "type": {
                   "defined": "PostOrderType"
                 }
@@ -10899,21 +10910,21 @@ export type MangoV4 = {
             "name": "OraclePegged",
             "fields": [
               {
-                "name": "price_offset_lots",
+                "name": "priceOffsetLots",
                 "type": "i64"
               },
               {
-                "name": "order_type",
+                "name": "orderType",
                 "type": {
                   "defined": "PostOrderType"
                 }
               },
               {
-                "name": "peg_limit",
+                "name": "pegLimit",
                 "type": "i64"
               },
               {
-                "name": "max_oracle_staleness_slots",
+                "name": "maxOracleStalenessSlots",
                 "type": "i32"
               }
             ]
@@ -10998,6 +11009,53 @@ export type MangoV4 = {
             "name": "LinearAuction"
           }
         ]
+      }
+    },
+    {
+      "name": "TokenIndex",
+      "type": {
+        "kind": "alias",
+        "value": "u16"
+      }
+    },
+    {
+      "name": "MangoAccountValue",
+      "docs": [
+        "Fully owned MangoAccount, useful for tests"
+      ],
+      "type": {
+        "kind": "alias",
+        "value": {
+          "defined": "DynamicAccount<MangoAccountDynamicHeader,MangoAccountFixed,Vec<u8>>"
+        }
+      }
+    },
+    {
+      "name": "OpenbookV2MarketIndex",
+      "type": {
+        "kind": "alias",
+        "value": "u16"
+      }
+    },
+    {
+      "name": "NodeHandle",
+      "type": {
+        "kind": "alias",
+        "value": "u32"
+      }
+    },
+    {
+      "name": "PerpMarketIndex",
+      "type": {
+        "kind": "alias",
+        "value": "u16"
+      }
+    },
+    {
+      "name": "Serum3MarketIndex",
+      "type": {
+        "kind": "alias",
+        "value": "u16"
       }
     }
   ],
@@ -12224,6 +12282,46 @@ export type MangoV4 = {
         },
         {
           "name": "oracle",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "mintInfo",
+          "type": "publicKey",
+          "index": false
+        }
+      ]
+    },
+    {
+      "name": "TokenMetaDataLogV2",
+      "fields": [
+        {
+          "name": "mangoGroup",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "mint",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "tokenIndex",
+          "type": "u16",
+          "index": false
+        },
+        {
+          "name": "mintDecimals",
+          "type": "u8",
+          "index": false
+        },
+        {
+          "name": "oracle",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "fallbackOracle",
           "type": "publicKey",
           "index": false
         },
@@ -13610,7 +13708,7 @@ export type MangoV4 = {
 };
 
 export const IDL: MangoV4 = {
-  "version": "0.20.0",
+  "version": "0.22.0",
   "name": "mango_v4",
   "instructions": [
     {
@@ -14097,6 +14195,11 @@ export const IDL: MangoV4 = {
           "isSigner": false
         },
         {
+          "name": "fallbackOracle",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
           "name": "payer",
           "isMut": true,
           "isSigner": true
@@ -14339,6 +14442,11 @@ export const IDL: MangoV4 = {
           "isSigner": false
         },
         {
+          "name": "fallbackOracle",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
           "name": "payer",
           "isMut": true,
           "isSigner": true
@@ -14397,6 +14505,15 @@ export const IDL: MangoV4 = {
           "isSigner": false,
           "docs": [
             "The oracle account is optional and only used when reset_stable_price is set.",
+            ""
+          ]
+        },
+        {
+          "name": "fallbackOracle",
+          "isMut": false,
+          "isSigner": false,
+          "docs": [
+            "The fallback oracle account is optional and only used when set_fallback_oracle is true.",
             ""
           ]
         }
@@ -14602,6 +14719,10 @@ export const IDL: MangoV4 = {
         },
         {
           "name": "maintWeightShiftAbort",
+          "type": "bool"
+        },
+        {
+          "name": "setFallbackOracle",
           "type": "bool"
         },
         {
@@ -15310,27 +15431,7 @@ export const IDL: MangoV4 = {
         {
           "name": "oracle",
           "isMut": true,
-          "isSigner": false,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "type": "string",
-                "value": "StubOracle"
-              },
-              {
-                "kind": "account",
-                "type": "publicKey",
-                "path": "group"
-              },
-              {
-                "kind": "account",
-                "type": "publicKey",
-                "account": "Mint",
-                "path": "mint"
-              }
-            ]
-          }
+          "isSigner": true
         },
         {
           "name": "admin",
@@ -16601,6 +16702,75 @@ export const IDL: MangoV4 = {
         {
           "name": "orderId",
           "type": "u128"
+        }
+      ]
+    },
+    {
+      "name": "serum3CancelOrderByClientOrderId",
+      "accounts": [
+        {
+          "name": "group",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "account",
+          "isMut": true,
+          "isSigner": false,
+          "relations": [
+            "group"
+          ]
+        },
+        {
+          "name": "owner",
+          "isMut": false,
+          "isSigner": true
+        },
+        {
+          "name": "openOrders",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "serumMarket",
+          "isMut": false,
+          "isSigner": false,
+          "relations": [
+            "group",
+            "serum_program",
+            "serum_market_external"
+          ]
+        },
+        {
+          "name": "serumProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "serumMarketExternal",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "marketBids",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "marketAsks",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "marketEventQueue",
+          "isMut": true,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "clientOrderId",
+          "type": "u64"
         }
       ]
     },
@@ -20931,6 +21101,10 @@ export const IDL: MangoV4 = {
             }
           },
           {
+            "name": "fallbackOracle",
+            "type": "publicKey"
+          },
+          {
             "name": "depositLimit",
             "docs": [
               "zero means none, in token native"
@@ -20942,7 +21116,7 @@ export const IDL: MangoV4 = {
             "type": {
               "array": [
                 "u8",
-                2000
+                1968
               ]
             }
           }
@@ -21342,11 +21516,15 @@ export const IDL: MangoV4 = {
             "type": "u64"
           },
           {
+            "name": "fallbackOracle",
+            "type": "publicKey"
+          },
+          {
             "name": "reserved",
             "type": {
               "array": [
                 "u8",
-                2560
+                2528
               ]
             }
           }
@@ -24417,7 +24595,7 @@ export const IDL: MangoV4 = {
             "name": "ImmediateOrCancel",
             "fields": [
               {
-                "name": "price_lots",
+                "name": "priceLots",
                 "type": "i64"
               }
             ]
@@ -24426,11 +24604,11 @@ export const IDL: MangoV4 = {
             "name": "Fixed",
             "fields": [
               {
-                "name": "price_lots",
+                "name": "priceLots",
                 "type": "i64"
               },
               {
-                "name": "order_type",
+                "name": "orderType",
                 "type": {
                   "defined": "PostOrderType"
                 }
@@ -24441,21 +24619,21 @@ export const IDL: MangoV4 = {
             "name": "OraclePegged",
             "fields": [
               {
-                "name": "price_offset_lots",
+                "name": "priceOffsetLots",
                 "type": "i64"
               },
               {
-                "name": "order_type",
+                "name": "orderType",
                 "type": {
                   "defined": "PostOrderType"
                 }
               },
               {
-                "name": "peg_limit",
+                "name": "pegLimit",
                 "type": "i64"
               },
               {
-                "name": "max_oracle_staleness_slots",
+                "name": "maxOracleStalenessSlots",
                 "type": "i32"
               }
             ]
@@ -24540,6 +24718,53 @@ export const IDL: MangoV4 = {
             "name": "LinearAuction"
           }
         ]
+      }
+    },
+    {
+      "name": "TokenIndex",
+      "type": {
+        "kind": "alias",
+        "value": "u16"
+      }
+    },
+    {
+      "name": "MangoAccountValue",
+      "docs": [
+        "Fully owned MangoAccount, useful for tests"
+      ],
+      "type": {
+        "kind": "alias",
+        "value": {
+          "defined": "DynamicAccount<MangoAccountDynamicHeader,MangoAccountFixed,Vec<u8>>"
+        }
+      }
+    },
+    {
+      "name": "OpenbookV2MarketIndex",
+      "type": {
+        "kind": "alias",
+        "value": "u16"
+      }
+    },
+    {
+      "name": "NodeHandle",
+      "type": {
+        "kind": "alias",
+        "value": "u32"
+      }
+    },
+    {
+      "name": "PerpMarketIndex",
+      "type": {
+        "kind": "alias",
+        "value": "u16"
+      }
+    },
+    {
+      "name": "Serum3MarketIndex",
+      "type": {
+        "kind": "alias",
+        "value": "u16"
       }
     }
   ],
@@ -25766,6 +25991,46 @@ export const IDL: MangoV4 = {
         },
         {
           "name": "oracle",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "mintInfo",
+          "type": "publicKey",
+          "index": false
+        }
+      ]
+    },
+    {
+      "name": "TokenMetaDataLogV2",
+      "fields": [
+        {
+          "name": "mangoGroup",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "mint",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "tokenIndex",
+          "type": "u16",
+          "index": false
+        },
+        {
+          "name": "mintDecimals",
+          "type": "u8",
+          "index": false
+        },
+        {
+          "name": "oracle",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "fallbackOracle",
           "type": "publicKey",
           "index": false
         },

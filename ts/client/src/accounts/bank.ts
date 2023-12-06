@@ -79,7 +79,6 @@ export class Bank implements BankForHealth {
   public maintWeightShiftDurationInv: I80F48;
   public maintWeightShiftAssetTarget: I80F48;
   public maintWeightShiftLiabTarget: I80F48;
-  public fallbackOracle: PublicKey;
 
   static from(
     publicKey: PublicKey,

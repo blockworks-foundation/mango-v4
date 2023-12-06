@@ -518,6 +518,7 @@ export class MangoClient {
         params.maintWeightShiftAssetTarget,
         params.maintWeightShiftLiabTarget,
         params.maintWeightShiftAbort ?? false,
+        params.setFallbackOracle ?? false,
         params.depositLimit,
       )
       .accounts({
