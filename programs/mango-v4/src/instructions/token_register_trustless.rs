@@ -45,8 +45,8 @@ pub fn token_register_trustless(
         vault: ctx.accounts.vault.key(),
         oracle: ctx.accounts.oracle.key(),
         oracle_config: OracleConfig {
-            conf_filter: I80F48::from_num(0.10),
-            max_staleness_slots: 10000,
+            conf_filter: I80F48::from_num(1000.0), // effectively disabled
+            max_staleness_slots: -1,
             reserved: [0; 72],
         },
         stable_price_model: StablePriceModel::default(),
@@ -91,8 +91,8 @@ pub fn token_register_trustless(
         force_close: 0,
         padding: Default::default(),
         fees_withdrawn: 0,
-        token_conditional_swap_taker_fee_rate: 0.0005,
-        token_conditional_swap_maker_fee_rate: 0.0005,
+        token_conditional_swap_taker_fee_rate: 0.0,
+        token_conditional_swap_maker_fee_rate: 0.0,
         flash_loan_swap_fee_rate: 0.0,
         interest_target_utilization: 0.5,
         interest_curve_scaling: 4.0,
