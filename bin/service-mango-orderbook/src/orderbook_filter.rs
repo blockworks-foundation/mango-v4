@@ -369,9 +369,11 @@ pub async fn init(
                                 max_staleness_slots: None, // don't check oracle staleness to get an orderbook
                             };
 
-                            if let Ok(unchecked_oracle_state) =
-                                oracle_state_unchecked(&keyed_account, EMPTY_KEYED_READER_OPT, mkt.1.base_decimals)
-                            {
+                            if let Ok(unchecked_oracle_state) = oracle_state_unchecked(
+                                &keyed_account,
+                                EMPTY_KEYED_READER_OPT,
+                                mkt.1.base_decimals,
+                            ) {
                                 if unchecked_oracle_state
                                     .check_confidence_and_maybe_staleness(
                                         &oracle_config.to_oracle_config(),

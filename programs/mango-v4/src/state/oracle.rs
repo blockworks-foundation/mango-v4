@@ -460,6 +460,56 @@ mod tests {
         let mut d = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
         d.push("resources/test");
 
+        let fixtures = vec![
+            (
+                "83v8iPyZihDEjDdY8RdZddyZNyUtXngz69Lgo9Kt5d6d",
+                OracleType::OrcaCLMM,
+                orca_mainnet_whirlpool::ID,
+                9, // SOL/USDC pool
+            ),
+            (
+                "Gnt27xtC473ZT2Mw5u8wZ68Z3gULkSTb5DuxJy7eJotD",
+                OracleType::Pyth,
+                Pubkey::default(),
+                6,
+            ),
+        ];
+
+        let clmm_file = format!("resources/test/{}.bin", fixtures[0].0);
+        let mut clmm_data = read_file(find_file(&clmm_file).unwrap());
+        let data = RefCell::new(&mut clmm_data[..]);
+        let ai = &AccountInfoRef {
+            key: &Pubkey::from_str(fixtures[0].0).unwrap(),
+            owner: &fixtures[0].2,
+            data: data.borrow(),
+        };
+
+        let pyth_file = format!("resources/test/{}.bin", fixtures[1].0);
+        let mut pyth_data = read_file(find_file(&pyth_file).unwrap());
+        let pyth_data_cell = RefCell::new(&mut pyth_data[..]);
+        let usdc_ai = &AccountInfoRef {
+            key: &Pubkey::from_str(fixtures[1].0).unwrap(),
+            owner: &fixtures[1].2,
+            data: pyth_data_cell.borrow(),
+        };
+        let base_decimals = fixtures[0].3;
+        let usdc_decimals = fixtures[1].3;
+
+        let usdc = oracle_state_unchecked(usdc_ai, EMPTY_KEYED_READER_OPT, usdc_decimals).unwrap();
+        let orca = oracle_state_unchecked(ai, Some(usdc_ai), base_decimals).unwrap();
+        assert!(usdc.price == I80F48::from_num(1.00000758274099));
+        // 63.006792786538313 * 1.00000758274099
+        assert!(orca.price == I80F48::from_num(63.00727055072872));
+
+        Ok(())
+    }
+
+    #[test]
+    pub fn test_clmm_price_missing_usdc() -> Result<()> {
+        // add ability to find fixtures
+        let mut d = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        d.push("resources/test");
+
         let fixtures = vec![(
             "83v8iPyZihDEjDdY8RdZddyZNyUtXngz69Lgo9Kt5d6d",
             OracleType::OrcaCLMM,
@@ -480,9 +530,7 @@ mod tests {
             assert!(determine_oracle_type(ai).unwrap() == fixture.1);
             assert!(
                 oracle_state_unchecked(ai, EMPTY_KEYED_READER_OPT, base_decimals)
-                    .unwrap()
-                    .price
-                    == I80F48::from_num(63.006792786538313)
+                    .is_anchor_error_with_code(6064)
             );
         }
 
