@@ -98,13 +98,6 @@ export async function sendTransaction(
     skipPreflight: true, // mergedOpts.skipPreflight,
   });
 
-  // const signature = await connection.sendTransactionss(
-  //   vtx as any as VersionedTransaction,
-  //   {
-  //     skipPreflight: true,
-  //   },
-  // );
-
   if (opts.postSendTxCallback) {
     try {
       opts.postSendTxCallback({ txid: signature });
