@@ -1086,7 +1086,6 @@ async fn test_token_conditional_swap_deposit_limit() -> Result<(), TransportErro
             group,
             admin,
             mint: base_token.mint.pubkey,
-            fallback_oracle: Pubkey::default(),
             options: mango_v4::instruction::TokenEdit {
                 deposit_limit_opt: Some(2500),
                 ..token_edit_instruction_default()

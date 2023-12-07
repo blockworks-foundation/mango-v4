@@ -650,7 +650,6 @@ async fn test_margin_trade_deposit_limit() -> Result<(), BanksClientError> {
             group,
             admin,
             mint: tokens[0].mint.pubkey,
-            fallback_oracle: Pubkey::default(),
             options: mango_v4::instruction::TokenEdit {
                 deposit_limit_opt: Some(1000),
                 ..token_edit_instruction_default()

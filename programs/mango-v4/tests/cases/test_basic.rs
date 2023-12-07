@@ -563,7 +563,6 @@ async fn test_bank_deposit_limit() -> Result<(), TransportError> {
             group,
             admin,
             mint: mints[0].pubkey,
-            fallback_oracle: Pubkey::default(),
             options: mango_v4::instruction::TokenEdit {
                 deposit_limit_opt: Some(2000),
                 ..token_edit_instruction_default()
