@@ -10,6 +10,7 @@ use std::collections::HashMap;
 use crate::accounts_zerocopy::*;
 use crate::error::*;
 use crate::serum3_cpi;
+use crate::state::pyth_mainnet_usdc_oracle;
 use crate::state::{Bank, MangoAccountRef, PerpMarket, PerpMarketIndex, TokenIndex};
 
 /// This trait abstracts how to find accounts needed for the health computation.
@@ -48,8 +49,8 @@ pub trait AccountRetriever {
 /// 4. PerpMarket oracle accounts, in the order of the perp market accounts
 /// 5. serum3 OpenOrders accounts, in the order of account.serum3.iter_active()
 /// 6. fallback oracle accounts, order and existence of accounts is not guaranteed
-pub struct FixedOrderAccountRetriever<T: KeyedAccountReader> {
-    pub ais: Vec<T>,
+pub struct FixedOrderAccountRetriever<'a, 'info> {
+    pub ais: Vec<AccountInfoRef<'a, 'info>>,
     pub n_banks: usize,
     pub n_perps: usize,
     pub begin_perp: usize,
@@ -61,7 +62,7 @@ pub struct FixedOrderAccountRetriever<T: KeyedAccountReader> {
 pub fn new_fixed_order_account_retriever<'a, 'info>(
     ais: &'a [AccountInfo<'info>],
     account: &MangoAccountRef,
-) -> Result<FixedOrderAccountRetriever<AccountInfoRef<'a, 'info>>> {
+) -> Result<FixedOrderAccountRetriever<'a, 'info>> {
     let active_token_len = account.active_token_positions().count();
     let active_serum3_len = account.active_serum3_orders().count();
     let active_perp_len = account.active_perp_positions().count();
@@ -85,7 +86,7 @@ pub fn new_fixed_order_account_retriever<'a, 'info>(
     })
 }
 
-impl<T: KeyedAccountReader> FixedOrderAccountRetriever<T> {
+impl FixedOrderAccountRetriever<'_, '_> {
     fn bank(&self, group: &Pubkey, account_index: usize, token_index: TokenIndex) -> Result<&Bank> {
         let bank = self.ais[account_index].load::<Bank>()?;
         require_keys_eq!(bank.group, *group);
@@ -112,7 +113,7 @@ impl<T: KeyedAccountReader> FixedOrderAccountRetriever<T> {
     }
 }
 
-impl<T: KeyedAccountReader> AccountRetriever for FixedOrderAccountRetriever<T> {
+impl AccountRetriever for FixedOrderAccountRetriever<'_, '_> {
     fn bank_and_oracle(
         &self,
         group: &Pubkey,
@@ -133,11 +134,12 @@ impl<T: KeyedAccountReader> AccountRetriever for FixedOrderAccountRetriever<T> {
 
         let oracle_index = self.n_banks + active_token_position_index;
         let oracle = &self.ais[oracle_index];
-        let fallback_opt = self.ais[self.begin_fallback_oracles..]
-            .iter()
-            .find(|ai| ai.key() == &bank.fallback_oracle);
+        let fallback_infos = fetch_fallback_oracle_infos(
+            &self.ais[self.begin_fallback_oracles..],
+            &bank.fallback_oracle,
+        );
         let oracle_price_result =
-            bank.oracle_price_with_fallback(oracle, fallback_opt, self.staleness_slot);
+            bank.oracle_price_with_fallback(oracle, fallback_infos, self.staleness_slot);
         let oracle_price = oracle_price_result.with_context(|| {
             format!(
                 "getting oracle for bank with health account index {} and token index {}, passed account {}",
@@ -227,10 +229,10 @@ impl<'a, 'info> ScannedBanksAndOracles<'a, 'info> {
             let index = self.bank_index(token_index1)?;
             let bank = self.banks[index].load_mut_fully_unchecked::<Bank>()?;
             let oracle = &self.oracles[index];
-            let fallback_oracle_opt =
-                fetch_fallback_oracle(&self.fallback_oracles, &bank.fallback_oracle);
+            let fallback_infos =
+                fetch_fallback_oracle_infos(&self.fallback_oracles, &bank.fallback_oracle);
             let price =
-                bank.oracle_price_with_fallback(oracle, fallback_oracle_opt, self.staleness_slot)?;
+                bank.oracle_price_with_fallback(oracle, fallback_infos, self.staleness_slot)?;
             return Ok((bank, price, None));
         }
         let index1 = self.bank_index(token_index1)?;
@@ -248,14 +250,14 @@ impl<'a, 'info> ScannedBanksAndOracles<'a, 'info> {
         let bank2 = second_bank_part[second - (first + 1)].load_mut_fully_unchecked::<Bank>()?;
         let oracle1 = &self.oracles[first];
         let oracle2 = &self.oracles[second];
-        let fallback_oracle_opt1 =
-            fetch_fallback_oracle(&self.fallback_oracles, &bank1.fallback_oracle);
-        let fallback_oracle_opt2 =
-            fetch_fallback_oracle(&self.fallback_oracles, &bank2.fallback_oracle);
+        let fallback_infos_1 =
+            fetch_fallback_oracle_infos(&self.fallback_oracles, &bank1.fallback_oracle);
+        let fallback_infos_2 =
+            fetch_fallback_oracle_infos(&self.fallback_oracles, &bank2.fallback_oracle);
         let price1 =
-            bank1.oracle_price_with_fallback(oracle1, fallback_oracle_opt1, self.staleness_slot)?;
+            bank1.oracle_price_with_fallback(oracle1, fallback_infos_1, self.staleness_slot)?;
         let price2 =
-            bank2.oracle_price_with_fallback(oracle2, fallback_oracle_opt2, self.staleness_slot)?;
+            bank2.oracle_price_with_fallback(oracle2, fallback_infos_2, self.staleness_slot)?;
         if swap {
             Ok((bank2, price2, Some((bank1, price1))))
         } else {
@@ -268,10 +270,10 @@ impl<'a, 'info> ScannedBanksAndOracles<'a, 'info> {
         // The account was already loaded successfully during construction
         let bank = self.banks[index].load_fully_unchecked::<Bank>()?;
         let oracle = &self.oracles[index];
-        let fallback_oracle_opt =
-            fetch_fallback_oracle(&self.fallback_oracles, &bank.fallback_oracle);
+        let fallback_infos_1 =
+            fetch_fallback_oracle_infos(&self.fallback_oracles[..], &bank.fallback_oracle);
         let price =
-            bank.oracle_price_with_fallback(oracle, fallback_oracle_opt, self.staleness_slot)?;
+            bank.oracle_price_with_fallback(oracle, fallback_infos_1, self.staleness_slot)?;
 
         Ok((bank, price))
     }
@@ -465,12 +467,25 @@ impl<'a, 'info> AccountRetriever for ScanningAccountRetriever<'a, 'info> {
     }
 }
 
+/// Contains options for a fallback oracle and the Pyth USDC oracle if they were provided in the remaining accounts.
+/// The Pyth USDC oracle is only used if the fallback oracle type is a CLMM
+pub type FallbackOracleInfos<'a, 'info> = (
+    Option<&'a AccountInfoRef<'a, 'info>>,
+    Option<&'a AccountInfoRef<'a, 'info>>,
+);
+
+pub const EMPTY_KEYED_READER_OPT: Option<&dyn KeyedAccountReader> = None;
+
 #[inline(always)]
-fn fetch_fallback_oracle<'a, 'info>(
-    fallback_oracles: &'a Vec<AccountInfoRef<'a, 'info>>,
+fn fetch_fallback_oracle_infos<'a, 'info>(
+    fallback_oracles: &'a [AccountInfoRef<'a, 'info>],
     fallback_key: &Pubkey,
-) -> Option<&'a AccountInfoRef<'a, 'info>> {
-    fallback_oracles.iter().find(|ai| ai.key() == fallback_key)
+) -> FallbackOracleInfos<'a, 'info> {
+    let fallback_opt = fallback_oracles.iter().find(|ai| ai.key() == fallback_key);
+    let usdc_opt = fallback_oracles
+        .iter()
+        .find(|ai| ai.key() == &pyth_mainnet_usdc_oracle::ID);
+    (fallback_opt, usdc_opt)
 }
 
 #[cfg(test)]

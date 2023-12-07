@@ -137,6 +137,10 @@ pub enum MangoError {
     DelegateWithdrawMustClosePosition,
     #[msg("delegates can only withdraw small amounts")]
     DelegateWithdrawSmall,
+    #[msg("invalid usdc/usd feed provided for the CLMM oracle")]
+    InvalidFeedForCLMMOracle,
+    #[msg("Pyth USDC/USD feed not found (required by CLMM oracle)")]
+    MissingFeedForCLMMOracle,
 }
 
 impl MangoError {

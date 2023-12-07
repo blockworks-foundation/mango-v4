@@ -9,6 +9,7 @@ use static_assertions::const_assert_eq;
 
 use crate::accounts_zerocopy::KeyedAccountReader;
 use crate::error::{Contextable, MangoError};
+use crate::health::EMPTY_KEYED_READER_OPT;
 use crate::logs::{emit_stack, PerpUpdateFundingLogV2};
 use crate::state::orderbook::Side;
 use crate::state::{oracle, TokenIndex};
@@ -275,7 +276,8 @@ impl PerpMarket {
         staleness_slot: Option<u64>,
     ) -> Result<OracleState> {
         require_keys_eq!(self.oracle, *oracle_acc.key());
-        let state = oracle::oracle_state_unchecked(oracle_acc, self.base_decimals)?;
+        let state =
+            oracle::oracle_state_unchecked(oracle_acc, EMPTY_KEYED_READER_OPT, self.base_decimals)?;
         state
             .check_confidence_and_maybe_staleness(&self.oracle_config, staleness_slot)
             .with_context(|| {

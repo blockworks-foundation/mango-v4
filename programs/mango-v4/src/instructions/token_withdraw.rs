@@ -75,6 +75,7 @@ pub fn token_withdraw(ctx: Context<TokenWithdraw>, amount: u64, allow_borrow: bo
     // to withdraw deposits (while staying healthy otherwise) if the oracle is bad.
     let unsafe_oracle_state = oracle_state_unchecked(
         &AccountInfoRef::borrow(ctx.accounts.oracle.as_ref())?,
+        EMPTY_KEYED_READER_OPT,
         bank.mint_decimals,
     )?;
 

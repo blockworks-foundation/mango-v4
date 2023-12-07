@@ -13,7 +13,7 @@ use crate::accounts_zerocopy::*;
 
 use crate::error::*;
 
-use super::{Whirlpool, ORCA_ID};
+use super::{orca_mainnet_whirlpool, Whirlpool};
 
 const DECIMAL_CONSTANT_ZERO_INDEX: i8 = 12;
 const DECIMAL_CONSTANTS: [I80F48; 25] = [
@@ -57,6 +57,11 @@ pub mod switchboard_v1_devnet_oracle {
 pub mod switchboard_v2_mainnet_oracle {
     use solana_program::declare_id;
     declare_id!("DtmE9D2CSB4L5D6A15mraeEjrGMm6auWVzgaD8hK2tZM");
+}
+
+pub mod pyth_mainnet_usdc_oracle {
+    use solana_program::declare_id;
+    declare_id!("Gnt27xtC473ZT2Mw5u8wZ68Z3gULkSTb5DuxJy7eJotD");
 }
 
 #[zero_copy]
@@ -171,7 +176,7 @@ pub fn determine_oracle_type(acc_info: &impl KeyedAccountReader) -> Result<Oracl
         || acc_info.owner() == &switchboard_v2_mainnet_oracle::ID
     {
         return Ok(OracleType::SwitchboardV1);
-    } else if acc_info.owner() == &ORCA_ID {
+    } else if acc_info.owner() == &orca_mainnet_whirlpool::ID {
         return Ok(OracleType::OrcaCLMM);
     }
 
@@ -211,6 +216,27 @@ fn pyth_get_price(
     }
 }
 
+fn get_pyth_state(
+    acc_info: &(impl KeyedAccountReader + ?Sized),
+    base_decimals: u8,
+) -> Result<OracleState> {
+    let data = &acc_info.data();
+    let price_account = pyth_sdk_solana::state::load_price_account(data).unwrap();
+    let (price_data, last_update_slot) = pyth_get_price(acc_info.key(), price_account);
+
+    let decimals = (price_account.expo as i8) + QUOTE_DECIMALS - (base_decimals as i8);
+    let decimal_adj = power_of_ten(decimals);
+    let price = I80F48::from_num(price_data.price) * decimal_adj;
+    let deviation = I80F48::from_num(price_data.conf) * decimal_adj;
+    require_gte!(price, 0);
+    Ok(OracleState {
+        price,
+        last_update_slot,
+        deviation,
+        oracle_type: OracleType::Pyth,
+    })
+}
+
 /// Returns the price of one native base token, in native quote tokens
 ///
 /// Example: The price for SOL at 40 USDC/SOL it would return 0.04 (the unit is USDC-native/SOL-native)
@@ -221,6 +247,7 @@ fn pyth_get_price(
 /// OracleState to validate them if needed. That's why this function is called _unchecked.
 pub fn oracle_state_unchecked(
     acc_info: &impl KeyedAccountReader,
+    usd_feed_opt: Option<&(impl KeyedAccountReader + ?Sized)>,
     base_decimals: u8,
 ) -> Result<OracleState> {
     let data = &acc_info.data();
@@ -248,22 +275,7 @@ pub fn oracle_state_unchecked(
                 oracle_type: OracleType::Stub,
             }
         }
-        OracleType::Pyth => {
-            let price_account = pyth_sdk_solana::state::load_price_account(data).unwrap();
-            let (price_data, last_update_slot) = pyth_get_price(acc_info.key(), price_account);
-
-            let decimals = (price_account.expo as i8) + QUOTE_DECIMALS - (base_decimals as i8);
-            let decimal_adj = power_of_ten(decimals);
-            let price = I80F48::from_num(price_data.price) * decimal_adj;
-            let deviation = I80F48::from_num(price_data.conf) * decimal_adj;
-            require_gte!(price, 0);
-            OracleState {
-                price,
-                last_update_slot,
-                deviation,
-                oracle_type: OracleType::Pyth,
-            }
-        }
+        OracleType::Pyth => get_pyth_state(acc_info, base_decimals)?,
         OracleType::SwitchboardV2 => {
             fn from_foreign_error(e: impl std::fmt::Display) -> Error {
                 error_msg!("{}", e)
@@ -315,20 +327,39 @@ pub fn oracle_state_unchecked(
             }
         }
         OracleType::OrcaCLMM => {
+            let usd_state = usdc_state_unchecked(usd_feed_opt)?;
+
             let whirlpool = Whirlpool::try_deserialize(&mut &data[..]).unwrap();
             let decimals = (base_decimals as i8) - QUOTE_DECIMALS; // tokenMintA - tokenMintB
             let decimal_adj = power_of_ten(decimals);
 
             let sqrt_price = U64F64::from_bits(whirlpool.sqrt_price);
-            let price = I80F48::from_num(sqrt_price * sqrt_price) * decimal_adj;
+            let clmm_price = I80F48::from_num(sqrt_price * sqrt_price) * decimal_adj;
+
+            let price = clmm_price * usd_state.price;
             OracleState {
                 price,
-                last_update_slot: u64::MAX,
+                last_update_slot: u64::MAX, // REVIEW: should we inherit pyth feed confidence metrics?
                 deviation: I80F48::ZERO,
                 oracle_type: OracleType::OrcaCLMM,
             }
         }
     })
+}
+
+#[inline(always)]
+fn usdc_state_unchecked(
+    usd_feed_opt: Option<&(impl KeyedAccountReader + ?Sized)>,
+) -> Result<OracleState> {
+    if usd_feed_opt.is_none() {
+        return Err(MangoError::MissingFeedForCLMMOracle.into());
+    }
+    let usd_feed = usd_feed_opt.unwrap();
+    if usd_feed.key() != &pyth_mainnet_usdc_oracle::ID {
+        return Err(MangoError::InvalidFeedForCLMMOracle.into());
+    }
+    let usd_state = get_pyth_state(usd_feed, QUOTE_DECIMALS as u8)?;
+    Ok(usd_state)
 }
 
 pub fn oracle_log_context(
@@ -350,6 +381,8 @@ pub fn oracle_log_context(
 
 #[cfg(test)]
 mod tests {
+    use crate::health::EMPTY_KEYED_READER_OPT;
+
     use super::*;
     use solana_program_test::{find_file, read_file};
     use std::{cell::RefCell, path::PathBuf, str::FromStr};
@@ -379,7 +412,7 @@ mod tests {
             (
                 "83v8iPyZihDEjDdY8RdZddyZNyUtXngz69Lgo9Kt5d6d",
                 OracleType::OrcaCLMM,
-                ORCA_ID,
+                orca_mainnet_whirlpool::ID,
             ),
         ];
 
@@ -430,7 +463,7 @@ mod tests {
         let fixtures = vec![(
             "83v8iPyZihDEjDdY8RdZddyZNyUtXngz69Lgo9Kt5d6d",
             OracleType::OrcaCLMM,
-            ORCA_ID,
+            orca_mainnet_whirlpool::ID,
             9, // SOL/USDC pool
         )];
 
@@ -446,7 +479,9 @@ mod tests {
             let base_decimals = fixture.3;
             assert!(determine_oracle_type(ai).unwrap() == fixture.1);
             assert!(
-                oracle_state_unchecked(ai, base_decimals).unwrap().price
+                oracle_state_unchecked(ai, EMPTY_KEYED_READER_OPT, base_decimals)
+                    .unwrap()
+                    .price
                     == I80F48::from_num(63.006792786538313)
             );
         }

@@ -13,6 +13,7 @@ use mango_feeds_lib::{
     OrderbookSide,
 };
 use mango_v4::accounts_zerocopy::{AccountReader, KeyedAccountReader};
+use mango_v4::health::EMPTY_KEYED_READER_OPT;
 use mango_v4::state::oracle_state_unchecked;
 use mango_v4::state::OracleConfigParams;
 use mango_v4::{
@@ -369,7 +370,7 @@ pub async fn init(
                             };
 
                             if let Ok(unchecked_oracle_state) =
-                                oracle_state_unchecked(&keyed_account, mkt.1.base_decimals)
+                                oracle_state_unchecked(&keyed_account, EMPTY_KEYED_READER_OPT, mkt.1.base_decimals)
                             {
                                 if unchecked_oracle_state
                                     .check_confidence_and_maybe_staleness(

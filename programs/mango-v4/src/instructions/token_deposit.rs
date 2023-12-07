@@ -92,6 +92,7 @@ impl<'a, 'info> DepositCommon<'a, 'info> {
         // to deposit to close borrows or do other fixes even if the oracle is bad.
         let unsafe_oracle_state = oracle_state_unchecked(
             &AccountInfoRef::borrow(self.oracle.as_ref())?,
+            EMPTY_KEYED_READER_OPT,
             bank.mint_decimals,
         )?;
         let unsafe_oracle_price = unsafe_oracle_state.price;

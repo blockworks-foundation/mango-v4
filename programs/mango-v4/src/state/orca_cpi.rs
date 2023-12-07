@@ -1,7 +1,10 @@
 use anchor_lang::prelude::*;
-use solana_program::{pubkey, pubkey::Pubkey};
+use solana_program::pubkey::Pubkey;
 
-pub static ORCA_ID: Pubkey = pubkey!("whirLbMiicVdio4qvUfM5KAg6Ct8VwpYzGff3uctyCc");
+pub mod orca_mainnet_whirlpool {
+    use solana_program::declare_id;
+    declare_id!("whirLbMiicVdio4qvUfM5KAg6Ct8VwpYzGff3uctyCc");
+}
 
 #[account]
 pub struct Whirlpool {
