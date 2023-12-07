@@ -1,7 +1,7 @@
 use anchor_lang::prelude::*;
-use solana_sdk::pubkey;
+use solana_program::{pubkey, pubkey::Pubkey};
 
-pub const ORCA_ID: Pubkey = pubkey!("whirLbMiicVdio4qvUfM5KAg6Ct8VwpYzGff3uctyCc");
+pub static ORCA_ID: Pubkey = pubkey!("whirLbMiicVdio4qvUfM5KAg6Ct8VwpYzGff3uctyCc");
 
 #[account]
 pub struct Whirlpool {

@@ -315,16 +315,15 @@ pub fn oracle_state_unchecked(
             }
         }
         OracleType::OrcaCLMM => {
-            let whirlpool = Whirlpool::try_deserialize(&mut &data[8..]).unwrap();
-            let decimals = QUOTE_DECIMALS - (base_decimals as i8);
+            let whirlpool = Whirlpool::try_deserialize(&mut &data[..]).unwrap();
+            let decimals = (base_decimals as i8) - QUOTE_DECIMALS; // tokenMintA - tokenMintB
             let decimal_adj = power_of_ten(decimals);
 
             let sqrt_price = U64F64::from_bits(whirlpool.sqrt_price);
             let price = I80F48::from_num(sqrt_price * sqrt_price) * decimal_adj;
-            let last_update_slot = Clock::get().unwrap().slot;
             OracleState {
                 price,
-                last_update_slot,
+                last_update_slot: u64::MAX,
                 deviation: I80F48::ZERO,
                 oracle_type: OracleType::OrcaCLMM,
             }
@@ -377,6 +376,11 @@ mod tests {
                 OracleType::SwitchboardV2,
                 Pubkey::default(),
             ),
+            (
+                "83v8iPyZihDEjDdY8RdZddyZNyUtXngz69Lgo9Kt5d6d",
+                OracleType::OrcaCLMM,
+                ORCA_ID,
+            ),
         ];
 
         for fixture in fixtures {
@@ -415,5 +419,38 @@ mod tests {
                 I80F48::from_str(&format!("1{}", str::repeat("0", idx.abs() as usize))).unwrap()
             )
         }
+    }
+
+    #[test]
+    pub fn test_clmm_price() -> Result<()> {
+        // add ability to find fixtures
+        let mut d = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        d.push("resources/test");
+
+        let fixtures = vec![(
+            "83v8iPyZihDEjDdY8RdZddyZNyUtXngz69Lgo9Kt5d6d",
+            OracleType::OrcaCLMM,
+            ORCA_ID,
+            9, // SOL/USDC pool
+        )];
+
+        for fixture in fixtures {
+            let filename = format!("resources/test/{}.bin", fixture.0);
+            let mut clmm_data = read_file(find_file(&filename).unwrap());
+            let data = RefCell::new(&mut clmm_data[..]);
+            let ai = &AccountInfoRef {
+                key: &Pubkey::from_str(fixture.0).unwrap(),
+                owner: &fixture.2,
+                data: data.borrow(),
+            };
+            let base_decimals = fixture.3;
+            assert!(determine_oracle_type(ai).unwrap() == fixture.1);
+            assert!(
+                oracle_state_unchecked(ai, base_decimals).unwrap().price
+                    == I80F48::from_num(63.006792786538313)
+            );
+        }
+
+        Ok(())
     }
 }
