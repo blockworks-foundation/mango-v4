@@ -1128,7 +1128,7 @@ export class HealthCache {
       const max = base.balanceSpot.mul(base.prices.oracle).max(quoteBorrows);
       zeroAmount = max.add(
         initialHealth
-          .add(max.mul(quote.initLiabWeight.sub(base.initAssetWeight)))
+          .add(max.mul(quote.initLiabWeight.sub(base.initScaledAssetWeight)))
           .add(baseReserved.mul(base.prices.liab(HealthType.init)))
           .div(
             base
@@ -1145,7 +1145,7 @@ export class HealthCache {
       const max = quote.balanceSpot.mul(quote.prices.oracle).max(baseBorrows);
       zeroAmount = max.add(
         initialHealth
-          .add(max.mul(base.initLiabWeight.sub(quote.initAssetWeight)))
+          .add(max.mul(base.initLiabWeight.sub(quote.initScaledAssetWeight)))
           .add(quoteReserved.mul(quote.prices.liab(HealthType.init)))
           .div(
             quote
