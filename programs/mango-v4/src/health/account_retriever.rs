@@ -49,8 +49,8 @@ pub trait AccountRetriever {
 /// 4. PerpMarket oracle accounts, in the order of the perp market accounts
 /// 5. serum3 OpenOrders accounts, in the order of account.serum3.iter_active()
 /// 6. fallback oracle accounts, order and existence of accounts is not guaranteed
-pub struct FixedOrderAccountRetriever<'a, 'info> {
-    pub ais: Vec<AccountInfoRef<'a, 'info>>,
+pub struct FixedOrderAccountRetriever<T: KeyedAccountReader> {
+    pub ais: Vec<T>,
     pub n_banks: usize,
     pub n_perps: usize,
     pub begin_perp: usize,
@@ -62,7 +62,7 @@ pub struct FixedOrderAccountRetriever<'a, 'info> {
 pub fn new_fixed_order_account_retriever<'a, 'info>(
     ais: &'a [AccountInfo<'info>],
     account: &MangoAccountRef,
-) -> Result<FixedOrderAccountRetriever<'a, 'info>> {
+) -> Result<FixedOrderAccountRetriever<AccountInfoRef<'a, 'info>>> {
     let active_token_len = account.active_token_positions().count();
     let active_serum3_len = account.active_serum3_orders().count();
     let active_perp_len = account.active_perp_positions().count();
@@ -86,7 +86,7 @@ pub fn new_fixed_order_account_retriever<'a, 'info>(
     })
 }
 
-impl FixedOrderAccountRetriever<'_, '_> {
+impl<T: KeyedAccountReader> FixedOrderAccountRetriever<T> {
     fn bank(&self, group: &Pubkey, account_index: usize, token_index: TokenIndex) -> Result<&Bank> {
         let bank = self.ais[account_index].load::<Bank>()?;
         require_keys_eq!(bank.group, *group);
@@ -113,7 +113,7 @@ impl FixedOrderAccountRetriever<'_, '_> {
     }
 }
 
-impl AccountRetriever for FixedOrderAccountRetriever<'_, '_> {
+impl<T: KeyedAccountReader> AccountRetriever for FixedOrderAccountRetriever<T> {
     fn bank_and_oracle(
         &self,
         group: &Pubkey,
@@ -469,18 +469,15 @@ impl<'a, 'info> AccountRetriever for ScanningAccountRetriever<'a, 'info> {
 
 /// Contains options for a fallback oracle and the Pyth USDC oracle if they were provided in the remaining accounts.
 /// The Pyth USDC oracle is only used if the fallback oracle type is a CLMM
-pub type FallbackOracleInfos<'a, 'info> = (
-    Option<&'a AccountInfoRef<'a, 'info>>,
-    Option<&'a AccountInfoRef<'a, 'info>>,
-);
+pub type FallbackOracleInfos<'a, T> = (Option<&'a T>, Option<&'a T>);
 
 pub const EMPTY_KEYED_READER_OPT: Option<&dyn KeyedAccountReader> = None;
 
 #[inline(always)]
-fn fetch_fallback_oracle_infos<'a, 'info>(
-    fallback_oracles: &'a [AccountInfoRef<'a, 'info>],
+fn fetch_fallback_oracle_infos<'a, T: KeyedAccountReader>(
+    fallback_oracles: &'a [T],
     fallback_key: &Pubkey,
-) -> FallbackOracleInfos<'a, 'info> {
+) -> FallbackOracleInfos<'a, T> {
     let fallback_opt = fallback_oracles.iter().find(|ai| ai.key() == fallback_key);
     let usdc_opt = fallback_oracles
         .iter()

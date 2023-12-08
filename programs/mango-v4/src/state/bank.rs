@@ -1112,10 +1112,10 @@ impl Bank {
     }
 
     /// Tries to return the primary oracle price, and if there is a confidence or staleness issue returns the fallback oracle price.
-    pub fn oracle_price_with_fallback(
+    pub fn oracle_price_with_fallback<T: KeyedAccountReader>(
         &self,
         oracle_acc: &impl KeyedAccountReader,
-        fallback_oracle_infos: FallbackOracleInfos,
+        fallback_oracle_infos: FallbackOracleInfos<T>,
         staleness_slot: Option<u64>,
     ) -> Result<I80F48> {
         require_keys_eq!(self.oracle, *oracle_acc.key());
