@@ -1136,8 +1136,8 @@ export class HealthCache {
               .sub(quote.assetWeight(HealthType.init)),
           ),
       );
-      // console.log(` - quoteBorrows ${quoteBorrows.toLocaleString()}`);
-      // console.log(` - max ${max.toLocaleString()}`);
+      console.log(` - quoteBorrows ${quoteBorrows.toLocaleString()}`);
+      console.log(` - max ${max.toLocaleString()}`);
     } else {
       const baseBorrows = base.balanceSpot.lt(ZERO_I80F48())
         ? base.balanceSpot.abs().mul(base.prices.liab(HealthType.init))
@@ -1153,8 +1153,13 @@ export class HealthCache {
               .sub(base.assetWeight(HealthType.init)),
           ),
       );
-      // console.log(` - baseBorrows ${baseBorrows.toLocaleString()}`);
-      // console.log(` - max ${max.toLocaleString()}`);
+      console.log(
+        ` - base.assetWeight(HealthType.init) ${base
+          .assetWeight(HealthType.init)
+          .toLocaleString()}`,
+      );
+      console.log(` - baseBorrows ${baseBorrows.toLocaleString()}`);
+      console.log(` - max ${max.toLocaleString()}`);
     }
 
     const cache = cacheAfterPlacingOrder(zeroAmount);
@@ -1162,9 +1167,10 @@ export class HealthCache {
     const zeroAmountHealth = cache.health(HealthType.init);
     const zeroAmountRatio = cache.healthRatio(HealthType.init);
 
-    // console.log(` - zeroAmount ${zeroAmount.toLocaleString()}`);
-    // console.log(` - zeroAmountHealth ${zeroAmountHealth.toLocaleString()}`);
-    // console.log(` - zeroAmountRatio ${zeroAmountRatio.toLocaleString()}`);
+    console.log(` - initialHealth ${initialHealth.toLocaleString()}`);
+    console.log(` - zeroAmount ${zeroAmount.toLocaleString()}`);
+    console.log(` - zeroAmountHealth ${zeroAmountHealth.toLocaleString()}`);
+    console.log(` - zeroAmountRatio ${zeroAmountRatio.toLocaleString()}`);
 
     function cacheAfterPlacingOrder(amount: I80F48): HealthCache {
       const adjustedCache: HealthCache = cloneDeep(healthCacheClone);
