@@ -103,6 +103,7 @@ export interface TokenEditParams {
   maintWeightShiftAssetTarget: number | null;
   maintWeightShiftLiabTarget: number | null;
   maintWeightShiftAbort: boolean | null;
+  setFallbackOracle: boolean | null;
   depositLimit: BN | null;
 }
 
@@ -141,6 +142,7 @@ export const NullTokenEditParams: TokenEditParams = {
   maintWeightShiftAssetTarget: null,
   maintWeightShiftLiabTarget: null,
   maintWeightShiftAbort: null,
+  setFallbackOracle: null,
   depositLimit: null,
 };
 
