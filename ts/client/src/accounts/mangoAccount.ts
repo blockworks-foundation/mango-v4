@@ -1263,6 +1263,8 @@ export class Serum3Orders {
       dto.quoteTokenIndex as TokenIndex,
       dto.highestPlacedBidInv,
       dto.lowestPlacedAsk,
+      // dto.baseDepositsReserved.toNumber(),
+      // dto.quoteDepositsReserved.toNumber(),
     );
   }
 
@@ -1272,7 +1274,7 @@ export class Serum3Orders {
     public baseTokenIndex: TokenIndex,
     public quoteTokenIndex: TokenIndex,
     public highestPlacedBidInv: number,
-    public lowestPlacedAsk: number,
+    public lowestPlacedAsk: number, // public baseDepositsReserved: number, // public quoteDepositsReserved: number,
   ) {}
 
   public isActive(): boolean {
@@ -1290,6 +1292,8 @@ export class Serum3PositionDto {
     public quoteTokenIndex: number,
     public highestPlacedBidInv: number,
     public lowestPlacedAsk: number,
+    // public baseDepositsReserved: BN,
+    // public quoteDepositsReserved: BN,
     public reserved: number[],
   ) {}
 }

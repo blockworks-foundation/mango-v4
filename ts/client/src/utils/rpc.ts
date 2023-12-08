@@ -5,6 +5,8 @@ import {
   AddressLookupTableAccount,
   ComputeBudgetProgram,
   MessageV0,
+  RpcResponseAndContext,
+  SignatureResult,
   Signer,
   TransactionConfirmationStatus,
   TransactionError,
@@ -15,11 +17,11 @@ import {
 import { COMPUTE_BUDGET_PROGRAM_ID } from '../constants';
 
 export interface MangoSignatureStatus {
-  slot: number;
-  confirmations: number | null;
-  err: TransactionError | null;
+  confirmations?: number | null;
   confirmationStatus?: TransactionConfirmationStatus;
+  err: TransactionError | null;
   signature: TransactionSignature;
+  slot: number;
 }
 
 export async function sendTransaction(
@@ -96,13 +98,6 @@ export async function sendTransaction(
     skipPreflight: true, // mergedOpts.skipPreflight,
   });
 
-  // const signature = await connection.sendTransactionss(
-  //   vtx as any as VersionedTransaction,
-  //   {
-  //     skipPreflight: true,
-  //   },
-  // );
-
   if (opts.postSendTxCallback) {
     try {
       opts.postSendTxCallback({ txid: signature });
@@ -112,28 +107,27 @@ export async function sendTransaction(
   }
 
   const txConfirmationCommitment = opts.txConfirmationCommitment ?? 'processed';
-  let status: any;
+  let status: RpcResponseAndContext<SignatureResult>;
   if (
     latestBlockhash.blockhash != null &&
     latestBlockhash.lastValidBlockHeight != null
   ) {
-    status = (
-      await connection.confirmTransaction(
-        {
-          signature: signature,
-          blockhash: latestBlockhash.blockhash,
-          lastValidBlockHeight: latestBlockhash.lastValidBlockHeight,
-        },
-        txConfirmationCommitment,
-      )
-    ).value;
+    status = await connection.confirmTransaction(
+      {
+        signature: signature,
+        blockhash: latestBlockhash.blockhash,
+        lastValidBlockHeight: latestBlockhash.lastValidBlockHeight,
+      },
+      txConfirmationCommitment,
+    );
   } else {
-    status = (
-      await connection.confirmTransaction(signature, txConfirmationCommitment)
-    ).value;
+    status = await connection.confirmTransaction(
+      signature,
+      txConfirmationCommitment,
+    );
   }
-
-  if (status.err) {
+  const signatureResult = status.value;
+  if (signatureResult.err) {
     console.warn('Tx status: ', status);
     throw new MangoError({
       txid: signature,
@@ -141,7 +135,7 @@ export async function sendTransaction(
     });
   }
 
-  return { signature, ...status };
+  return { signature, slot: status.context.slot, ...signatureResult };
 }
 
 export const createComputeBudgetIx = (
