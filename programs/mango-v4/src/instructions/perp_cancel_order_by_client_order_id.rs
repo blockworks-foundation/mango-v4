@@ -31,7 +31,7 @@ pub fn perp_cancel_order_by_client_order_id(
     let order_id = oo.id;
     let order_side_and_tree = oo.side_and_tree();
 
-    book.cancel_order(
+    book.cancel_order_by_id(
         &mut account.borrow_mut(),
         order_id,
         order_side_and_tree,

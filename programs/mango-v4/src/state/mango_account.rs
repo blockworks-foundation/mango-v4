@@ -1201,51 +1201,39 @@ impl<
         order_tree: BookSideOrderTree,
         order: &LeafNode,
         client_order_id: u64,
+        quantity: i64,
     ) -> Result<()> {
-        let mut perp_account = self.perp_position_mut(perp_market_index)?;
-        match side {
-            Side::Bid => {
-                perp_account.bids_base_lots += order.quantity;
-            }
-            Side::Ask => {
-                perp_account.asks_base_lots += order.quantity;
-            }
-        };
+        let perp_account = self.perp_position_mut(perp_market_index)?;
+        perp_account.adjust_maker_lots(side, order.quantity);
         let slot = order.owner_slot as usize;
 
-        let mut oo = self.perp_order_mut_by_raw_index(slot);
+        let oo = self.perp_order_mut_by_raw_index(slot);
         oo.market = perp_market_index;
         oo.side_and_tree = SideAndOrderTree::new(side, order_tree).into();
         oo.id = order.key;
         oo.client_id = client_order_id;
+        oo.quantity = quantity;
         Ok(())
     }
 
+    /// Removes the perp order and updates the maker bids/asks tracking
+    ///
+    /// The passed in `quantity` may differ from the quantity stored on the
+    /// perp open order slot, because maybe we're cancelling an order slot
+    /// for quantity 10 where 3 are in-flight in a FillEvent and 7 were left
+    /// on the book.
     pub fn remove_perp_order(&mut self, slot: usize, quantity: i64) -> Result<()> {
-        {
-            let oo = self.perp_order_mut_by_raw_index(slot);
-            require_neq!(oo.market, FREE_ORDER_SLOT);
-            let order_side = oo.side_and_tree().side();
-            let perp_market_index = oo.market;
-            let perp_account = self.perp_position_mut(perp_market_index)?;
+        let oo = self.perp_order_by_raw_index(slot)?;
+        require_neq!(oo.market, FREE_ORDER_SLOT);
+        let perp_market_index = oo.market;
+        let order_side = oo.side_and_tree().side();
 
-            // accounting
-            match order_side {
-                Side::Bid => {
-                    perp_account.bids_base_lots -= quantity;
-                }
-                Side::Ask => {
-                    perp_account.asks_base_lots -= quantity;
-                }
-            }
-        }
+        let perp_account = self.perp_position_mut(perp_market_index)?;
+        perp_account.adjust_maker_lots(order_side, -quantity);
 
-        // release space
         let oo = self.perp_order_mut_by_raw_index(slot);
-        oo.market = FREE_ORDER_SLOT;
-        oo.side_and_tree = SideAndOrderTree::BidFixed.into();
-        oo.id = 0;
-        oo.client_id = 0;
+        oo.clear();
+
         Ok(())
     }
 
@@ -1273,19 +1261,34 @@ impl<
 
         pa.maker_volume += quote.abs().to_num::<u64>();
 
-        if fill.maker_out() {
-            self.remove_perp_order(fill.maker_slot as usize, base_change.abs())
-        } else {
-            match side {
-                Side::Bid => {
-                    pa.bids_base_lots -= base_change.abs();
-                }
-                Side::Ask => {
-                    pa.asks_base_lots -= base_change.abs();
-                }
+        let quantity_filled = base_change.abs();
+        let maker_slot = fill.maker_slot as usize;
+
+        // Always adjust the bids/asks_base_lots for the filled amount.
+        // Because any early cancels only adjust it for the amount that was on the book,
+        // so even fill events that come after the slot was freed still need to clear
+        // the pending maker lots.
+        pa.adjust_maker_lots(side, -quantity_filled);
+
+        let oo = self.perp_order_mut_by_raw_index(maker_slot);
+        let is_active = oo.is_active_for_market(perp_market_index);
+
+        // Old fill events have no maker order id and match against any order.
+        // (this works safely because we don't allow old order's slots to be
+        // prematurely freed - and new orders can only have new fill events)
+        let is_old_fill = fill.maker_order_id == 0;
+        let order_id_match = is_old_fill || oo.id == fill.maker_order_id;
+
+        if is_active && order_id_match {
+            // Old orders have quantity=0
+            oo.quantity = (oo.quantity - quantity_filled).max(0);
+
+            if fill.maker_out() {
+                oo.clear();
             }
-            Ok(())
         }
+
+        Ok(())
     }
 
     pub fn execute_perp_taker(
@@ -1305,6 +1308,37 @@ impl<
         pa.record_trade(perp_market, base_change, quote_change_native);
 
         pa.taker_volume += quote_change_native.abs().to_num::<u64>();
+
+        Ok(())
+    }
+
+    pub fn execute_perp_out_event(
+        &mut self,
+        perp_market_index: PerpMarketIndex,
+        side: Side,
+        slot: usize,
+        quantity: i64,
+        order_id: u128,
+    ) -> Result<()> {
+        // Always free up the maker lots tracking, regardless of whether the
+        // order slot is still on the account or not
+        let pa = self.perp_position_mut(perp_market_index)?;
+        pa.adjust_maker_lots(side, -quantity);
+
+        let oo = self.perp_order_mut_by_raw_index(slot);
+        let is_active = oo.is_active_for_market(perp_market_index);
+
+        // Old events have no order id and match against any order.
+        // (this works safely because we don't allow old order's slots to be
+        // prematurely freed - and new orders can only have new events)
+        let is_old_event = order_id == 0;
+        let order_id_match = is_old_event || oo.id == order_id;
+
+        // This may be a delayed out event (slot may be empty or reused), so make
+        // sure it's the right one before canceling.
+        if is_active && order_id_match {
+            oo.clear();
+        }
 
         Ok(())
     }

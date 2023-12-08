@@ -6,7 +6,7 @@ use num_enum::{IntoPrimitive, TryFromPrimitive};
 use static_assertions::const_assert_eq;
 use std::mem::size_of;
 
-use super::Side;
+use super::{LeafNode, Side};
 
 pub const MAX_NUM_EVENTS: u32 = 488;
 
@@ -159,7 +159,7 @@ const EVENT_SIZE: usize = 208;
 #[derive(Debug)]
 pub struct AnyEvent {
     pub event_type: u8,
-    pub padding: [u8; 207],
+    pub padding: [u8; EVENT_SIZE - 1],
 }
 
 const_assert_eq!(size_of::<AnyEvent>(), EVENT_SIZE);
@@ -194,7 +194,7 @@ pub struct FillEvent {
     pub taker: Pubkey,
     pub padding3: [u8; 16],
     pub taker_client_order_id: u64,
-    pub padding4: [u8; 16],
+    pub maker_order_id: u128,
 
     pub price: i64,
     pub quantity: i64, // number of quote lots
@@ -215,6 +215,7 @@ impl FillEvent {
         timestamp: u64,
         seq_num: u64,
         maker: Pubkey,
+        maker_order_id: u128,
         maker_client_order_id: u64,
         maker_fee: I80F48,
         maker_timestamp: u64,
@@ -232,6 +233,7 @@ impl FillEvent {
             timestamp,
             seq_num,
             maker,
+            maker_order_id,
             maker_client_order_id,
             maker_fee: maker_fee.to_num::<f32>(),
             maker_timestamp,
@@ -243,7 +245,6 @@ impl FillEvent {
             padding: Default::default(),
             padding2: Default::default(),
             padding3: Default::default(),
-            padding4: Default::default(),
             reserved: [0; 8],
         }
     }
@@ -306,7 +307,8 @@ pub struct OutEvent {
     pub seq_num: u64,
     pub owner: Pubkey,
     pub quantity: i64,
-    padding1: [u8; 144],
+    pub order_id: u128,
+    padding1: [u8; 128],
 }
 const_assert_eq!(size_of::<OutEvent>() % 8, 0);
 const_assert_eq!(size_of::<OutEvent>(), EVENT_SIZE);
@@ -319,6 +321,7 @@ impl OutEvent {
         seq_num: u64,
         owner: Pubkey,
         quantity: i64,
+        order_id: u128,
     ) -> Self {
         Self {
             event_type: EventType::Out.into(),
@@ -329,8 +332,21 @@ impl OutEvent {
             seq_num,
             owner,
             quantity,
-            padding1: [0; EVENT_SIZE - 64],
+            order_id,
+            padding1: [0; 128],
         }
+    }
+
+    pub fn from_leaf_node(side: Side, timestamp: u64, seq_num: u64, node: &LeafNode) -> Self {
+        Self::new(
+            side,
+            node.owner_slot,
+            timestamp,
+            seq_num,
+            node.owner,
+            node.quantity,
+            node.key,
+        )
     }
 
     pub fn side(&self) -> Side {

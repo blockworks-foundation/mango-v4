@@ -155,7 +155,13 @@ pub fn perp_consume_events(ctx: Context<PerpConsumeEvents>, limit: usize) -> Res
             EventType::Out => {
                 let out: &OutEvent = cast_ref(event);
                 load_mango_account!(owner, out.owner, mango_account_ais, group, event_queue);
-                owner.remove_perp_order(out.owner_slot as usize, out.quantity)?;
+                owner.execute_perp_out_event(
+                    perp_market_index,
+                    out.side(),
+                    out.owner_slot as usize,
+                    out.quantity,
+                    out.order_id,
+                )?;
             }
             EventType::Liquidate => {
                 // This is purely for record keeping. Can be removed if program logs are superior
