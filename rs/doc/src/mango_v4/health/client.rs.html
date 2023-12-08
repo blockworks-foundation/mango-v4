@@ -1625,6 +1625,53 @@
 <a href="#1625" id="1625">1625</a>
 <a href="#1626" id="1626">1626</a>
 <a href="#1627" id="1627">1627</a>
+<a href="#1628" id="1628">1628</a>
+<a href="#1629" id="1629">1629</a>
+<a href="#1630" id="1630">1630</a>
+<a href="#1631" id="1631">1631</a>
+<a href="#1632" id="1632">1632</a>
+<a href="#1633" id="1633">1633</a>
+<a href="#1634" id="1634">1634</a>
+<a href="#1635" id="1635">1635</a>
+<a href="#1636" id="1636">1636</a>
+<a href="#1637" id="1637">1637</a>
+<a href="#1638" id="1638">1638</a>
+<a href="#1639" id="1639">1639</a>
+<a href="#1640" id="1640">1640</a>
+<a href="#1641" id="1641">1641</a>
+<a href="#1642" id="1642">1642</a>
+<a href="#1643" id="1643">1643</a>
+<a href="#1644" id="1644">1644</a>
+<a href="#1645" id="1645">1645</a>
+<a href="#1646" id="1646">1646</a>
+<a href="#1647" id="1647">1647</a>
+<a href="#1648" id="1648">1648</a>
+<a href="#1649" id="1649">1649</a>
+<a href="#1650" id="1650">1650</a>
+<a href="#1651" id="1651">1651</a>
+<a href="#1652" id="1652">1652</a>
+<a href="#1653" id="1653">1653</a>
+<a href="#1654" id="1654">1654</a>
+<a href="#1655" id="1655">1655</a>
+<a href="#1656" id="1656">1656</a>
+<a href="#1657" id="1657">1657</a>
+<a href="#1658" id="1658">1658</a>
+<a href="#1659" id="1659">1659</a>
+<a href="#1660" id="1660">1660</a>
+<a href="#1661" id="1661">1661</a>
+<a href="#1662" id="1662">1662</a>
+<a href="#1663" id="1663">1663</a>
+<a href="#1664" id="1664">1664</a>
+<a href="#1665" id="1665">1665</a>
+<a href="#1666" id="1666">1666</a>
+<a href="#1667" id="1667">1667</a>
+<a href="#1668" id="1668">1668</a>
+<a href="#1669" id="1669">1669</a>
+<a href="#1670" id="1670">1670</a>
+<a href="#1671" id="1671">1671</a>
+<a href="#1672" id="1672">1672</a>
+<a href="#1673" id="1673">1673</a>
+<a href="#1674" id="1674">1674</a>
 </pre><pre class="rust"><code><span class="attr">#![cfg(feature = <span class="string">&quot;client&quot;</span>)]
 
 </span><span class="kw">use </span>anchor_lang::prelude::<span class="kw-2">*</span>;
@@ -1669,7 +1716,6 @@
 
         <span class="kw">let </span><span class="kw-2">mut </span>source_bank = source_bank.clone();
         source_bank.withdraw_with_fee(<span class="kw-2">&amp;mut </span>source_position, amount, now_ts)<span class="question-mark">?</span>;
-        source_bank.check_net_borrows(source_oracle_price)<span class="question-mark">?</span>;
         <span class="kw">let </span><span class="kw-2">mut </span>target_bank = target_bank.clone();
         target_bank.deposit(<span class="kw-2">&amp;mut </span>target_position, target_amount, now_ts)<span class="question-mark">?</span>;
 
@@ -1679,7 +1725,40 @@
         <span class="prelude-val">Ok</span>(resulting_cache)
     }
 
-    <span class="kw">pub fn </span>max_swap_source_for_health_ratio(
+    <span class="kw">fn </span>apply_limits_to_swap(
+        account: <span class="kw-2">&amp;</span>MangoAccountValue,
+        source_bank: <span class="kw-2">&amp;</span>Bank,
+        source_oracle_price: I80F48,
+        target_bank: <span class="kw-2">&amp;</span>Bank,
+        price: I80F48,
+        source_unlimited: I80F48,
+    ) -&gt; <span class="prelude-ty">Result</span>&lt;I80F48&gt; {
+        <span class="kw">let </span>source_pos = account
+            .token_position(source_bank.token_index)<span class="question-mark">?
+            </span>.native(source_bank);
+        <span class="kw">let </span>target_pos = account
+            .token_position(target_bank.token_index)<span class="question-mark">?
+            </span>.native(target_bank);
+
+        <span class="comment">// net borrow limit on source
+        </span><span class="kw">let </span>available_net_borrows = source_bank
+            .remaining_net_borrows_quote(source_oracle_price)
+            .saturating_div(source_oracle_price);
+        <span class="kw">let </span>potential_source = source_unlimited
+            .min(available_net_borrows.saturating_add(source_pos.max(I80F48::ZERO)));
+
+        <span class="comment">// deposit limit on target
+        </span><span class="kw">let </span>available_deposits = target_bank.remaining_deposits_until_limit();
+        <span class="kw">let </span>potential_target_unlimited = potential_source.saturating_mul(price);
+        <span class="kw">let </span>potential_target = potential_target_unlimited
+            .min(available_deposits.saturating_add(-target_pos.min(I80F48::ZERO)));
+
+        <span class="kw">let </span>source = potential_source.min(potential_target.saturating_div(price));
+        <span class="prelude-val">Ok</span>(source)
+    }
+
+    <span class="doccomment">/// Verifies neither the net borrow or deposit limits
+    </span><span class="kw">pub fn </span>max_swap_source_for_health_ratio_ignoring_limits(
         <span class="kw-2">&amp;</span><span class="self">self</span>,
         account: <span class="kw-2">&amp;</span>MangoAccountValue,
         source_bank: <span class="kw-2">&amp;</span>Bank,
@@ -1699,7 +1778,7 @@
         )
     }
 
-    <span class="kw">pub fn </span>max_swap_source_for_health(
+    <span class="kw">pub fn </span>max_swap_source_for_health_ratio_with_limits(
         <span class="kw-2">&amp;</span><span class="self">self</span>,
         account: <span class="kw-2">&amp;</span>MangoAccountValue,
         source_bank: <span class="kw-2">&amp;</span>Bank,
@@ -1708,14 +1787,23 @@
         price: I80F48,
         min_ratio: I80F48,
     ) -&gt; <span class="prelude-ty">Result</span>&lt;I80F48&gt; {
-        <span class="self">self</span>.max_swap_source_for_health_fn(
+        <span class="kw">let </span>source_unlimited = <span class="self">self</span>.max_swap_source_for_health_fn(
             account,
             source_bank,
             source_oracle_price,
             target_bank,
             price,
             min_ratio,
-            |cache| cache.health(HealthType::Init),
+            |cache| cache.health_ratio(HealthType::Init),
+        )<span class="question-mark">?</span>;
+
+        <span class="self">Self</span>::apply_limits_to_swap(
+            account,
+            source_bank,
+            source_oracle_price,
+            target_bank,
+            price,
+            source_unlimited,
         )
     }
 
@@ -2334,7 +2422,7 @@
         <span class="macro">assert_eq!</span>(health_cache.health_ratio(HealthType::Init), I80F48::MAX);
         <span class="macro">assert_eq!</span>(
             health_cache
-                .max_swap_source_for_health_ratio(
+                .max_swap_source_for_health_ratio_with_limits(
                     <span class="kw-2">&amp;</span>account,
                     <span class="kw-2">&amp;</span>banks[<span class="number">0</span>],
                     I80F48::from(<span class="number">1</span>),
@@ -2375,7 +2463,7 @@
 
             <span class="kw">let </span>swap_price =
                 I80F48::from_num(price_factor) * source_price.oracle / target_price.oracle;
-            <span class="kw">let </span>source_amount = c
+            <span class="kw">let </span>source_unlimited = c
                 .max_swap_source_for_health_fn(
                     <span class="kw-2">&amp;</span>account,
                     <span class="kw-2">&amp;</span>source_bank,
@@ -2386,6 +2474,15 @@
                     max_swap_fn,
                 )
                 .unwrap();
+            <span class="kw">let </span>source_amount = HealthCache::apply_limits_to_swap(
+                <span class="kw-2">&amp;</span>account,
+                <span class="kw-2">&amp;</span>source_bank,
+                source_price.oracle,
+                <span class="kw-2">&amp;</span>target_bank,
+                swap_price,
+                source_unlimited,
+            )
+            .unwrap();
             <span class="kw">if </span>source_amount == I80F48::MAX {
                 <span class="kw">return </span>(f64::MAX, f64::MAX, f64::MAX, f64::MAX);
             }
@@ -2492,10 +2589,7 @@
                 }
 
                 <span class="comment">// At this unlikely price it&#39;s healthy to swap infinitely
-                </span><span class="macro">assert_eq!</span>(
-                    find_max_swap(<span class="kw-2">&amp;</span>health_cache, <span class="number">0</span>, <span class="number">1</span>, <span class="number">50.0</span>, <span class="number">1.5</span>, banks).<span class="number">0</span>,
-                    f64::MAX
-                );
+                </span><span class="macro">assert!</span>(find_max_swap(<span class="kw-2">&amp;</span>health_cache, <span class="number">0</span>, <span class="number">1</span>, <span class="number">50.0</span>, <span class="number">1.5</span>, banks).<span class="number">0 </span>&gt; <span class="number">1e16</span>);
             }
 
             {

@@ -560,6 +560,42 @@
 <a href="#560" id="560">560</a>
 <a href="#561" id="561">561</a>
 <a href="#562" id="562">562</a>
+<a href="#563" id="563">563</a>
+<a href="#564" id="564">564</a>
+<a href="#565" id="565">565</a>
+<a href="#566" id="566">566</a>
+<a href="#567" id="567">567</a>
+<a href="#568" id="568">568</a>
+<a href="#569" id="569">569</a>
+<a href="#570" id="570">570</a>
+<a href="#571" id="571">571</a>
+<a href="#572" id="572">572</a>
+<a href="#573" id="573">573</a>
+<a href="#574" id="574">574</a>
+<a href="#575" id="575">575</a>
+<a href="#576" id="576">576</a>
+<a href="#577" id="577">577</a>
+<a href="#578" id="578">578</a>
+<a href="#579" id="579">579</a>
+<a href="#580" id="580">580</a>
+<a href="#581" id="581">581</a>
+<a href="#582" id="582">582</a>
+<a href="#583" id="583">583</a>
+<a href="#584" id="584">584</a>
+<a href="#585" id="585">585</a>
+<a href="#586" id="586">586</a>
+<a href="#587" id="587">587</a>
+<a href="#588" id="588">588</a>
+<a href="#589" id="589">589</a>
+<a href="#590" id="590">590</a>
+<a href="#591" id="591">591</a>
+<a href="#592" id="592">592</a>
+<a href="#593" id="593">593</a>
+<a href="#594" id="594">594</a>
+<a href="#595" id="595">595</a>
+<a href="#596" id="596">596</a>
+<a href="#597" id="597">597</a>
+<a href="#598" id="598">598</a>
 </pre><pre class="rust"><code><span class="kw">use </span>anchor_lang::prelude::<span class="kw-2">*</span>;
 <span class="kw">use </span>anchor_lang::ZeroCopy;
 
@@ -609,6 +645,7 @@
 /// 3. PerpMarket accounts, in the order of account.perps.iter_active_accounts()
 /// 4. PerpMarket oracle accounts, in the order of the perp market accounts
 /// 5. serum3 OpenOrders accounts, in the order of account.serum3.iter_active()
+/// 6. fallback oracle accounts, order and existence of accounts is not guaranteed
 </span><span class="kw">pub struct </span>FixedOrderAccountRetriever&lt;T: KeyedAccountReader&gt; {
     <span class="kw">pub </span>ais: Vec&lt;T&gt;,
     <span class="kw">pub </span>n_banks: usize,
@@ -616,6 +653,7 @@
     <span class="kw">pub </span>begin_perp: usize,
     <span class="kw">pub </span>begin_serum3: usize,
     <span class="kw">pub </span>staleness_slot: <span class="prelude-ty">Option</span>&lt;u64&gt;,
+    <span class="kw">pub </span>begin_fallback_oracles: usize,
 }
 
 <span class="kw">pub fn </span>new_fixed_order_account_retriever&lt;<span class="lifetime">&#39;a</span>, <span class="lifetime">&#39;info</span>&gt;(
@@ -628,7 +666,7 @@
     <span class="kw">let </span>expected_ais = active_token_len * <span class="number">2 </span><span class="comment">// banks + oracles
         </span>+ active_perp_len * <span class="number">2 </span><span class="comment">// PerpMarkets + Oracles
         </span>+ active_serum3_len; <span class="comment">// open_orders
-    </span><span class="macro">require_msg_typed!</span>(ais.len() == expected_ais, MangoError::InvalidHealthAccountCount,
+    </span><span class="macro">require_msg_typed!</span>(ais.len() &gt;= expected_ais, MangoError::InvalidHealthAccountCount,
         <span class="string">&quot;received {} accounts but expected {} ({} banks, {} bank oracles, {} perp markets, {} perp oracles, {} serum3 oos)&quot;</span>,
         ais.len(), expected_ais,
         active_token_len, active_token_len, active_perp_len, active_perp_len, active_serum3_len
@@ -641,6 +679,7 @@
         begin_perp: active_token_len * <span class="number">2</span>,
         begin_serum3: active_token_len * <span class="number">2 </span>+ active_perp_len * <span class="number">2</span>,
         staleness_slot: <span class="prelude-val">Some</span>(Clock::get()<span class="question-mark">?</span>.slot),
+        begin_fallback_oracles: expected_ais,
     })
 }
 
@@ -663,11 +702,6 @@
         <span class="macro">require_keys_eq!</span>(market.group, <span class="kw-2">*</span>group);
         <span class="macro">require_eq!</span>(market.perp_market_index, perp_market_index);
         <span class="prelude-val">Ok</span>(market)
-    }
-
-    <span class="kw">fn </span>oracle_price_bank(<span class="kw-2">&amp;</span><span class="self">self</span>, account_index: usize, bank: <span class="kw-2">&amp;</span>Bank) -&gt; <span class="prelude-ty">Result</span>&lt;I80F48&gt; {
-        <span class="kw">let </span>oracle = <span class="kw-2">&amp;</span><span class="self">self</span>.ais[account_index];
-        bank.oracle_price(oracle, <span class="self">self</span>.staleness_slot)
     }
 
     <span class="kw">fn </span>oracle_price_perp(<span class="kw-2">&amp;</span><span class="self">self</span>, account_index: usize, perp_market: <span class="kw-2">&amp;</span>PerpMarket) -&gt; <span class="prelude-ty">Result</span>&lt;I80F48&gt; {
@@ -696,7 +730,13 @@
             })<span class="question-mark">?</span>;
 
         <span class="kw">let </span>oracle_index = <span class="self">self</span>.n_banks + active_token_position_index;
-        <span class="kw">let </span>oracle_price = <span class="self">self</span>.oracle_price_bank(oracle_index, bank).with_context(|| {
+        <span class="kw">let </span>oracle = <span class="kw-2">&amp;</span><span class="self">self</span>.ais[oracle_index];
+        <span class="kw">let </span>fallback_opt = <span class="self">self</span>.ais[<span class="self">self</span>.begin_fallback_oracles..]
+            .iter()
+            .find(|ai| ai.key() == <span class="kw-2">&amp;</span>bank.fallback_oracle);
+        <span class="kw">let </span>oracle_price_result =
+            bank.oracle_price_with_fallback(oracle, fallback_opt, <span class="self">self</span>.staleness_slot);
+        <span class="kw">let </span>oracle_price = oracle_price_result.with_context(|| {
             <span class="macro">format!</span>(
                 <span class="string">&quot;getting oracle for bank with health account index {} and token index {}, passed account {}&quot;</span>,
                 bank_account_index,
@@ -758,6 +798,7 @@
 <span class="kw">pub struct </span>ScannedBanksAndOracles&lt;<span class="lifetime">&#39;a</span>, <span class="lifetime">&#39;info</span>&gt; {
     banks: Vec&lt;AccountInfoRefMut&lt;<span class="lifetime">&#39;a</span>, <span class="lifetime">&#39;info</span>&gt;&gt;,
     oracles: Vec&lt;AccountInfoRef&lt;<span class="lifetime">&#39;a</span>, <span class="lifetime">&#39;info</span>&gt;&gt;,
+    fallback_oracles: Vec&lt;AccountInfoRef&lt;<span class="lifetime">&#39;a</span>, <span class="lifetime">&#39;info</span>&gt;&gt;,
     index_map: HashMap&lt;TokenIndex, usize&gt;,
     staleness_slot: <span class="prelude-ty">Option</span>&lt;u64&gt;,
 }
@@ -784,7 +825,10 @@
             <span class="kw">let </span>index = <span class="self">self</span>.bank_index(token_index1)<span class="question-mark">?</span>;
             <span class="kw">let </span>bank = <span class="self">self</span>.banks[index].load_mut_fully_unchecked::&lt;Bank&gt;()<span class="question-mark">?</span>;
             <span class="kw">let </span>oracle = <span class="kw-2">&amp;</span><span class="self">self</span>.oracles[index];
-            <span class="kw">let </span>price = bank.oracle_price(oracle, <span class="self">self</span>.staleness_slot)<span class="question-mark">?</span>;
+            <span class="kw">let </span>fallback_oracle_opt =
+                fetch_fallback_oracle(<span class="kw-2">&amp;</span><span class="self">self</span>.fallback_oracles, <span class="kw-2">&amp;</span>bank.fallback_oracle);
+            <span class="kw">let </span>price =
+                bank.oracle_price_with_fallback(oracle, fallback_oracle_opt, <span class="self">self</span>.staleness_slot)<span class="question-mark">?</span>;
             <span class="kw">return </span><span class="prelude-val">Ok</span>((bank, price, <span class="prelude-val">None</span>));
         }
         <span class="kw">let </span>index1 = <span class="self">self</span>.bank_index(token_index1)<span class="question-mark">?</span>;
@@ -802,8 +846,14 @@
         <span class="kw">let </span>bank2 = second_bank_part[second - (first + <span class="number">1</span>)].load_mut_fully_unchecked::&lt;Bank&gt;()<span class="question-mark">?</span>;
         <span class="kw">let </span>oracle1 = <span class="kw-2">&amp;</span><span class="self">self</span>.oracles[first];
         <span class="kw">let </span>oracle2 = <span class="kw-2">&amp;</span><span class="self">self</span>.oracles[second];
-        <span class="kw">let </span>price1 = bank1.oracle_price(oracle1, <span class="self">self</span>.staleness_slot)<span class="question-mark">?</span>;
-        <span class="kw">let </span>price2 = bank2.oracle_price(oracle2, <span class="self">self</span>.staleness_slot)<span class="question-mark">?</span>;
+        <span class="kw">let </span>fallback_oracle_opt1 =
+            fetch_fallback_oracle(<span class="kw-2">&amp;</span><span class="self">self</span>.fallback_oracles, <span class="kw-2">&amp;</span>bank1.fallback_oracle);
+        <span class="kw">let </span>fallback_oracle_opt2 =
+            fetch_fallback_oracle(<span class="kw-2">&amp;</span><span class="self">self</span>.fallback_oracles, <span class="kw-2">&amp;</span>bank2.fallback_oracle);
+        <span class="kw">let </span>price1 =
+            bank1.oracle_price_with_fallback(oracle1, fallback_oracle_opt1, <span class="self">self</span>.staleness_slot)<span class="question-mark">?</span>;
+        <span class="kw">let </span>price2 =
+            bank2.oracle_price_with_fallback(oracle2, fallback_oracle_opt2, <span class="self">self</span>.staleness_slot)<span class="question-mark">?</span>;
         <span class="kw">if </span>swap {
             <span class="prelude-val">Ok</span>((bank2, price2, <span class="prelude-val">Some</span>((bank1, price1))))
         } <span class="kw">else </span>{
@@ -816,7 +866,11 @@
         <span class="comment">// The account was already loaded successfully during construction
         </span><span class="kw">let </span>bank = <span class="self">self</span>.banks[index].load_fully_unchecked::&lt;Bank&gt;()<span class="question-mark">?</span>;
         <span class="kw">let </span>oracle = <span class="kw-2">&amp;</span><span class="self">self</span>.oracles[index];
-        <span class="kw">let </span>price = bank.oracle_price(oracle, <span class="self">self</span>.staleness_slot)<span class="question-mark">?</span>;
+        <span class="kw">let </span>fallback_oracle_opt =
+            fetch_fallback_oracle(<span class="kw-2">&amp;</span><span class="self">self</span>.fallback_oracles, <span class="kw-2">&amp;</span>bank.fallback_oracle);
+        <span class="kw">let </span>price =
+            bank.oracle_price_with_fallback(oracle, fallback_oracle_opt, <span class="self">self</span>.staleness_slot)<span class="question-mark">?</span>;
+
         <span class="prelude-val">Ok</span>((bank, price))
     }
 }
@@ -827,6 +881,7 @@
 /// - an unknown number of PerpMarket accounts
 /// - the same number of oracles in the same order as the perp markets
 /// - an unknown number of serum3 OpenOrders accounts
+/// - an unknown number of fallback oracle accounts
 /// and retrieves accounts needed for the health computation by doing a linear
 /// scan for each request.
 </span><span class="kw">pub struct </span>ScanningAccountRetriever&lt;<span class="lifetime">&#39;a</span>, <span class="lifetime">&#39;info</span>&gt; {
@@ -912,17 +967,26 @@
         <span class="kw">let </span>n_perps = perp_index_map.len();
         <span class="kw">let </span>perp_oracles_start = perps_start + n_perps;
         <span class="kw">let </span>serum3_start = perp_oracles_start + n_perps;
+        <span class="kw">let </span>n_serum3 = ais[serum3_start..]
+            .iter()
+            .take_while(|x| {
+                x.data_len() == std::mem::size_of::&lt;serum_dex::state::OpenOrders&gt;() + <span class="number">12
+                    </span>&amp;&amp; serum3_cpi::has_serum_header(<span class="kw-2">&amp;</span>x.data.borrow())
+            })
+            .count();
+        <span class="kw">let </span>fallback_oracles_start = serum3_start + n_serum3;
 
         <span class="prelude-val">Ok</span>(<span class="self">Self </span>{
             banks_and_oracles: ScannedBanksAndOracles {
                 banks: AccountInfoRefMut::borrow_slice(<span class="kw-2">&amp;</span>ais[..n_banks])<span class="question-mark">?</span>,
                 oracles: AccountInfoRef::borrow_slice(<span class="kw-2">&amp;</span>ais[n_banks..perps_start])<span class="question-mark">?</span>,
+                fallback_oracles: AccountInfoRef::borrow_slice(<span class="kw-2">&amp;</span>ais[fallback_oracles_start..])<span class="question-mark">?</span>,
                 index_map: token_index_map,
                 staleness_slot,
             },
             perp_markets: AccountInfoRef::borrow_slice(<span class="kw-2">&amp;</span>ais[perps_start..perp_oracles_start])<span class="question-mark">?</span>,
             perp_oracles: AccountInfoRef::borrow_slice(<span class="kw-2">&amp;</span>ais[perp_oracles_start..serum3_start])<span class="question-mark">?</span>,
-            serum3_oos: AccountInfoRef::borrow_slice(<span class="kw-2">&amp;</span>ais[serum3_start..])<span class="question-mark">?</span>,
+            serum3_oos: AccountInfoRef::borrow_slice(<span class="kw-2">&amp;</span>ais[serum3_start..fallback_oracles_start])<span class="question-mark">?</span>,
             perp_index_map,
         })
     }
@@ -997,6 +1061,14 @@
     <span class="kw">fn </span>serum_oo(<span class="kw-2">&amp;</span><span class="self">self</span>, _account_index: usize, key: <span class="kw-2">&amp;</span>Pubkey) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="kw-2">&amp;</span>OpenOrders&gt; {
         <span class="self">self</span>.scanned_serum_oo(key)
     }
+}
+
+<span class="attr">#[inline(always)]
+</span><span class="kw">fn </span>fetch_fallback_oracle&lt;<span class="lifetime">&#39;a</span>, <span class="lifetime">&#39;info</span>&gt;(
+    fallback_oracles: <span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span>Vec&lt;AccountInfoRef&lt;<span class="lifetime">&#39;a</span>, <span class="lifetime">&#39;info</span>&gt;&gt;,
+    fallback_key: <span class="kw-2">&amp;</span>Pubkey,
+) -&gt; <span class="prelude-ty">Option</span>&lt;<span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span>AccountInfoRef&lt;<span class="lifetime">&#39;a</span>, <span class="lifetime">&#39;info</span>&gt;&gt; {
+    fallback_oracles.iter().find(|ai| ai.key() == fallback_key)
 }
 
 <span class="attr">#[cfg(test)]

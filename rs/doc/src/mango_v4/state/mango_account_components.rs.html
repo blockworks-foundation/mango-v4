@@ -1469,6 +1469,16 @@
 <a href="#1469" id="1469">1469</a>
 <a href="#1470" id="1470">1470</a>
 <a href="#1471" id="1471">1471</a>
+<a href="#1472" id="1472">1472</a>
+<a href="#1473" id="1473">1473</a>
+<a href="#1474" id="1474">1474</a>
+<a href="#1475" id="1475">1475</a>
+<a href="#1476" id="1476">1476</a>
+<a href="#1477" id="1477">1477</a>
+<a href="#1478" id="1478">1478</a>
+<a href="#1479" id="1479">1479</a>
+<a href="#1480" id="1480">1480</a>
+<a href="#1481" id="1481">1481</a>
 </pre><pre class="rust"><code><span class="kw">use </span>anchor_lang::prelude::<span class="kw-2">*</span>;
 
 <span class="kw">use </span>derivative::Derivative;
@@ -1616,20 +1626,28 @@
     </span><span class="kw">pub </span>highest_placed_bid_inv: f64,
     <span class="kw">pub </span>lowest_placed_ask: f64,
 
-    <span class="doccomment">/// Tracks the amount of deposits that flowed into the serum open orders account.
+    <span class="doccomment">/// An overestimate of the amount of tokens that might flow out of the open orders account.
     ///
-    /// The bank still considers these amounts user deposits (see deposits_in_serum)
-    /// and they need to be deducted from there when they flow back into the bank
-    /// as real tokens.
-    </span><span class="kw">pub </span>base_deposits_reserved: u64,
-    <span class="kw">pub </span>quote_deposits_reserved: u64,
+    /// The bank still considers these amounts user deposits (see Bank::potential_serum_tokens)
+    /// and that value needs to be updated in conjunction with these numbers.
+    ///
+    /// This estimation is based on the amount of tokens in the open orders account
+    /// (see update_bank_potential_tokens() in serum3_place_order and settle)
+    </span><span class="kw">pub </span>potential_base_tokens: u64,
+    <span class="kw">pub </span>potential_quote_tokens: u64,
+
+    <span class="doccomment">/// Track lowest bid/highest ask, same way as for highest bid/lowest ask.
+    ///
+    /// 0 is a special &quot;unset&quot; state.
+    </span><span class="kw">pub </span>lowest_placed_bid_inv: f64,
+    <span class="kw">pub </span>highest_placed_ask: f64,
 
     <span class="attr">#[derivative(Debug = <span class="string">&quot;ignore&quot;</span>)]
-    </span><span class="kw">pub </span>reserved: [u8; <span class="number">32</span>],
+    </span><span class="kw">pub </span>reserved: [u8; <span class="number">16</span>],
 }
 <span class="macro">const_assert_eq!</span>(
     size_of::&lt;Serum3Orders&gt;(),
-    <span class="number">32 </span>+ <span class="number">8 </span>* <span class="number">2 </span>+ <span class="number">2 </span>* <span class="number">3 </span>+ <span class="number">2 </span>+ <span class="number">4 </span>* <span class="number">8 </span>+ <span class="number">32
+    <span class="number">32 </span>+ <span class="number">8 </span>* <span class="number">2 </span>+ <span class="number">2 </span>* <span class="number">3 </span>+ <span class="number">2 </span>+ <span class="number">6 </span>* <span class="number">8 </span>+ <span class="number">16
 </span>);
 <span class="macro">const_assert_eq!</span>(size_of::&lt;Serum3Orders&gt;(), <span class="number">120</span>);
 <span class="macro">const_assert_eq!</span>(size_of::&lt;Serum3Orders&gt;() % <span class="number">8</span>, <span class="number">0</span>);
@@ -1656,9 +1674,11 @@
             quote_borrows_without_fee: <span class="number">0</span>,
             highest_placed_bid_inv: <span class="number">0.0</span>,
             lowest_placed_ask: <span class="number">0.0</span>,
-            base_deposits_reserved: <span class="number">0</span>,
-            quote_deposits_reserved: <span class="number">0</span>,
-            reserved: [<span class="number">0</span>; <span class="number">32</span>],
+            potential_base_tokens: <span class="number">0</span>,
+            potential_quote_tokens: <span class="number">0</span>,
+            lowest_placed_bid_inv: <span class="number">0.0</span>,
+            highest_placed_ask: <span class="number">0.0</span>,
+            reserved: [<span class="number">0</span>; <span class="number">16</span>],
         }
     }
 }

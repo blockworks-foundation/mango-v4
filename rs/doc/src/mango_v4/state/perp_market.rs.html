@@ -524,17 +524,17 @@
 <a href="#524" id="524">524</a>
 <a href="#525" id="525">525</a>
 <a href="#526" id="526">526</a>
-<a href="#527" id="527">527</a>
 </pre><pre class="rust"><code><span class="kw">use </span>std::mem::size_of;
 
 <span class="kw">use </span>anchor_lang::prelude::<span class="kw-2">*</span>;
 <span class="kw">use </span>derivative::Derivative;
 <span class="kw">use </span>fixed::types::I80F48;
 
+<span class="kw">use </span>oracle::oracle_log_context;
 <span class="kw">use </span>static_assertions::const_assert_eq;
 
 <span class="kw">use </span><span class="kw">crate</span>::accounts_zerocopy::KeyedAccountReader;
-<span class="kw">use </span><span class="kw">crate</span>::error::MangoError;
+<span class="kw">use </span><span class="kw">crate</span>::error::{Contextable, MangoError};
 <span class="kw">use </span><span class="kw">crate</span>::logs::{emit_stack, PerpUpdateFundingLogV2};
 <span class="kw">use </span><span class="kw">crate</span>::state::orderbook::Side;
 <span class="kw">use </span><span class="kw">crate</span>::state::{oracle, TokenIndex};
@@ -802,11 +802,9 @@
     ) -&gt; <span class="prelude-ty">Result</span>&lt;OracleState&gt; {
         <span class="macro">require_keys_eq!</span>(<span class="self">self</span>.oracle, <span class="kw-2">*</span>oracle_acc.key());
         <span class="kw">let </span>state = oracle::oracle_state_unchecked(oracle_acc, <span class="self">self</span>.base_decimals)<span class="question-mark">?</span>;
-        state.check_confidence_and_maybe_staleness(
-            <span class="kw-2">&amp;</span><span class="self">self</span>.oracle,
-            <span class="kw-2">&amp;</span><span class="self">self</span>.oracle_config,
-            staleness_slot,
-        )<span class="question-mark">?</span>;
+        state
+            .check_confidence_and_maybe_staleness(<span class="kw-2">&amp;</span><span class="self">self</span>.name(), <span class="kw-2">&amp;</span><span class="self">self</span>.oracle_config, staleness_slot)
+            .with_context(|| oracle_log_context(<span class="kw-2">&amp;</span>state, <span class="kw-2">&amp;</span><span class="self">self</span>.oracle_config, staleness_slot))<span class="question-mark">?</span>;
         <span class="prelude-val">Ok</span>(state)
     }
 

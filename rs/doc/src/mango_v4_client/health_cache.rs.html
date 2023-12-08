@@ -72,6 +72,8 @@
 <a href="#72" id="72">72</a>
 <a href="#73" id="73">73</a>
 <a href="#74" id="74">74</a>
+<a href="#75" id="75">75</a>
+<a href="#76" id="76">76</a>
 </pre><pre class="rust"><code><span class="kw">use crate</span>::{AccountFetcher, MangoGroupContext};
 <span class="kw">use </span>anyhow::Context;
 <span class="kw">use </span>futures::{stream, StreamExt, TryStreamExt};
@@ -108,7 +110,8 @@
         begin_perp: active_token_len * <span class="number">2</span>,
         begin_serum3: active_token_len * <span class="number">2 </span>+ active_perp_len * <span class="number">2</span>,
         staleness_slot: <span class="prelude-val">None</span>,
-    };
+        begin_fallback_oracles: metas.len(), <span class="comment">// TODO: add support for fallback oracle accounts
+    </span>};
     <span class="kw">let </span>now_ts = SystemTime::now().duration_since(UNIX_EPOCH)<span class="question-mark">?</span>.as_secs();
     mango_v4::health::new_health_cache(<span class="kw-2">&amp;</span>account.borrow(), <span class="kw-2">&amp;</span>retriever, now_ts)
         .context(<span class="string">&quot;make health cache&quot;</span>)
@@ -141,7 +144,8 @@
         begin_perp: active_token_len * <span class="number">2</span>,
         begin_serum3: active_token_len * <span class="number">2 </span>+ active_perp_len * <span class="number">2</span>,
         staleness_slot: <span class="prelude-val">None</span>,
-    };
+        begin_fallback_oracles: metas.len(), <span class="comment">// TODO: add support for fallback oracle accounts
+    </span>};
     <span class="kw">let </span>now_ts = SystemTime::now().duration_since(UNIX_EPOCH)<span class="question-mark">?</span>.as_secs();
     mango_v4::health::new_health_cache(<span class="kw-2">&amp;</span>account.borrow(), <span class="kw-2">&amp;</span>retriever, now_ts)
         .context(<span class="string">&quot;make health cache&quot;</span>)

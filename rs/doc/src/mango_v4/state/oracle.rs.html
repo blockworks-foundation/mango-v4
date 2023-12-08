@@ -400,6 +400,9 @@
 <a href="#400" id="400">400</a>
 <a href="#401" id="401">401</a>
 <a href="#402" id="402">402</a>
+<a href="#403" id="403">403</a>
+<a href="#404" id="404">404</a>
+<a href="#405" id="405">405</a>
 </pre><pre class="rust"><code><span class="kw">use </span>std::mem::size_of;
 
 <span class="kw">use </span>anchor_lang::prelude::<span class="kw-2">*</span>;
@@ -507,19 +510,19 @@
     <span class="attr">#[inline]
     </span><span class="kw">pub fn </span>check_confidence_and_maybe_staleness(
         <span class="kw-2">&amp;</span><span class="self">self</span>,
-        oracle_pk: <span class="kw-2">&amp;</span>Pubkey,
+        oracle_name: <span class="kw-2">&amp;</span>str,
         config: <span class="kw-2">&amp;</span>OracleConfig,
         staleness_slot: <span class="prelude-ty">Option</span>&lt;u64&gt;,
     ) -&gt; <span class="prelude-ty">Result</span>&lt;()&gt; {
         <span class="kw">if let </span><span class="prelude-val">Some</span>(now_slot) = staleness_slot {
-            <span class="self">self</span>.check_staleness(oracle_pk, config, now_slot)<span class="question-mark">?</span>;
+            <span class="self">self</span>.check_staleness(oracle_name, config, now_slot)<span class="question-mark">?</span>;
         }
-        <span class="self">self</span>.check_confidence(oracle_pk, config)
+        <span class="self">self</span>.check_confidence(oracle_name, config)
     }
 
     <span class="kw">pub fn </span>check_staleness(
         <span class="kw-2">&amp;</span><span class="self">self</span>,
-        oracle_pk: <span class="kw-2">&amp;</span>Pubkey,
+        oracle_name: <span class="kw-2">&amp;</span>str,
         config: <span class="kw-2">&amp;</span>OracleConfig,
         now_slot: u64,
     ) -&gt; <span class="prelude-ty">Result</span>&lt;()&gt; {
@@ -529,27 +532,15 @@
                 .saturating_add(config.max_staleness_slots <span class="kw">as </span>u64)
                 &lt; now_slot
         {
-            <span class="macro">msg!</span>(
-                <span class="string">&quot;Oracle is stale; pubkey {}, price: {}, last_update_slot: {}, now_slot: {}&quot;</span>,
-                oracle_pk,
-                <span class="self">self</span>.price.to_num::&lt;f64&gt;(),
-                <span class="self">self</span>.last_update_slot,
-                now_slot,
-            );
+            <span class="macro">msg!</span>(<span class="string">&quot;Oracle is stale: {}&quot;</span>, oracle_name);
             <span class="kw">return </span><span class="prelude-val">Err</span>(MangoError::OracleStale.into());
         }
         <span class="prelude-val">Ok</span>(())
     }
 
-    <span class="kw">pub fn </span>check_confidence(<span class="kw-2">&amp;</span><span class="self">self</span>, oracle_pk: <span class="kw-2">&amp;</span>Pubkey, config: <span class="kw-2">&amp;</span>OracleConfig) -&gt; <span class="prelude-ty">Result</span>&lt;()&gt; {
+    <span class="kw">pub fn </span>check_confidence(<span class="kw-2">&amp;</span><span class="self">self</span>, oracle_name: <span class="kw-2">&amp;</span>str, config: <span class="kw-2">&amp;</span>OracleConfig) -&gt; <span class="prelude-ty">Result</span>&lt;()&gt; {
         <span class="kw">if </span><span class="self">self</span>.deviation &gt; config.conf_filter * <span class="self">self</span>.price {
-            <span class="macro">msg!</span>(
-                <span class="string">&quot;Oracle confidence not good enough: pubkey {}, price: {}, deviation: {}, conf_filter: {}&quot;</span>,
-                oracle_pk,
-                <span class="self">self</span>.price.to_num::&lt;f64&gt;(),
-                <span class="self">self</span>.deviation.to_num::&lt;f64&gt;(),
-                config.conf_filter.to_num::&lt;f32&gt;(),
-            );
+            <span class="macro">msg!</span>(<span class="string">&quot;Oracle confidence not good enough: {}&quot;</span>, oracle_name);
             <span class="kw">return </span><span class="prelude-val">Err</span>(MangoError::OracleConfidence.into());
         }
         <span class="prelude-val">Ok</span>(())
@@ -630,7 +621,7 @@
 
 <span class="doccomment">/// Returns the price of one native base token, in native quote tokens
 ///
-/// Example: The for SOL at 40 USDC/SOL it would return 0.04 (the unit is USDC-native/SOL-native)
+/// Example: The price for SOL at 40 USDC/SOL it would return 0.04 (the unit is USDC-native/SOL-native)
 ///
 /// This currently assumes that quote decimals (i.e. decimals for USD) is 6, like for USDC.
 ///
@@ -732,6 +723,21 @@
             }
         }
     })
+}
+
+<span class="kw">pub fn </span>oracle_log_context(
+    state: <span class="kw-2">&amp;</span>OracleState,
+    oracle_config: <span class="kw-2">&amp;</span>OracleConfig,
+    staleness_slot: <span class="prelude-ty">Option</span>&lt;u64&gt;,
+) -&gt; String {
+    <span class="macro">format!</span>(
+        <span class="string">&quot;price: {}, deviation: {}, last_update_slot: {}, now_slot: {}, conf_filter: {:#?}&quot;</span>,
+        state.price.to_num::&lt;f64&gt;(),
+        state.deviation.to_num::&lt;f64&gt;(),
+        state.last_update_slot,
+        staleness_slot.unwrap_or_else(|| u64::MAX),
+        oracle_config.conf_filter.to_num::&lt;f32&gt;(),
+    )
 }
 
 <span class="attr">#[cfg(test)]

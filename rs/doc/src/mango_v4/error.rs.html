@@ -264,6 +264,12 @@
 <a href="#264" id="264">264</a>
 <a href="#265" id="265">265</a>
 <a href="#266" id="266">266</a>
+<a href="#267" id="267">267</a>
+<a href="#268" id="268">268</a>
+<a href="#269" id="269">269</a>
+<a href="#270" id="270">270</a>
+<a href="#271" id="271">271</a>
+<a href="#272" id="272">272</a>
 </pre><pre class="rust"><code><span class="kw">use </span>anchor_lang::prelude::<span class="kw-2">*</span>;
 <span class="kw">use </span>core::fmt::Display;
 
@@ -391,6 +397,12 @@
     </span>TokenConditionalSwapTooSmallForStartIncentive,
     <span class="attr">#[msg(<span class="string">&quot;token conditional swap type cannot be started&quot;</span>)]
     </span>TokenConditionalSwapTypeNotStartable,
+    <span class="attr">#[msg(<span class="string">&quot;a bank in the health account list should be writable but is not&quot;</span>)]
+    </span>HealthAccountBankNotWritable,
+    <span class="attr">#[msg(<span class="string">&quot;the market does not allow limit orders too far from the current oracle value&quot;</span>)]
+    </span>Serum3PriceBandExceeded,
+    <span class="attr">#[msg(<span class="string">&quot;deposit crosses the token&#39;s deposit limit&quot;</span>)]
+    </span>BankDepositLimit,
 }
 
 <span class="kw">impl </span>MangoError {

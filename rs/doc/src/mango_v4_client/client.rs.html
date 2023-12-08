@@ -1888,6 +1888,68 @@
 <a href="#1888" id="1888">1888</a>
 <a href="#1889" id="1889">1889</a>
 <a href="#1890" id="1890">1890</a>
+<a href="#1891" id="1891">1891</a>
+<a href="#1892" id="1892">1892</a>
+<a href="#1893" id="1893">1893</a>
+<a href="#1894" id="1894">1894</a>
+<a href="#1895" id="1895">1895</a>
+<a href="#1896" id="1896">1896</a>
+<a href="#1897" id="1897">1897</a>
+<a href="#1898" id="1898">1898</a>
+<a href="#1899" id="1899">1899</a>
+<a href="#1900" id="1900">1900</a>
+<a href="#1901" id="1901">1901</a>
+<a href="#1902" id="1902">1902</a>
+<a href="#1903" id="1903">1903</a>
+<a href="#1904" id="1904">1904</a>
+<a href="#1905" id="1905">1905</a>
+<a href="#1906" id="1906">1906</a>
+<a href="#1907" id="1907">1907</a>
+<a href="#1908" id="1908">1908</a>
+<a href="#1909" id="1909">1909</a>
+<a href="#1910" id="1910">1910</a>
+<a href="#1911" id="1911">1911</a>
+<a href="#1912" id="1912">1912</a>
+<a href="#1913" id="1913">1913</a>
+<a href="#1914" id="1914">1914</a>
+<a href="#1915" id="1915">1915</a>
+<a href="#1916" id="1916">1916</a>
+<a href="#1917" id="1917">1917</a>
+<a href="#1918" id="1918">1918</a>
+<a href="#1919" id="1919">1919</a>
+<a href="#1920" id="1920">1920</a>
+<a href="#1921" id="1921">1921</a>
+<a href="#1922" id="1922">1922</a>
+<a href="#1923" id="1923">1923</a>
+<a href="#1924" id="1924">1924</a>
+<a href="#1925" id="1925">1925</a>
+<a href="#1926" id="1926">1926</a>
+<a href="#1927" id="1927">1927</a>
+<a href="#1928" id="1928">1928</a>
+<a href="#1929" id="1929">1929</a>
+<a href="#1930" id="1930">1930</a>
+<a href="#1931" id="1931">1931</a>
+<a href="#1932" id="1932">1932</a>
+<a href="#1933" id="1933">1933</a>
+<a href="#1934" id="1934">1934</a>
+<a href="#1935" id="1935">1935</a>
+<a href="#1936" id="1936">1936</a>
+<a href="#1937" id="1937">1937</a>
+<a href="#1938" id="1938">1938</a>
+<a href="#1939" id="1939">1939</a>
+<a href="#1940" id="1940">1940</a>
+<a href="#1941" id="1941">1941</a>
+<a href="#1942" id="1942">1942</a>
+<a href="#1943" id="1943">1943</a>
+<a href="#1944" id="1944">1944</a>
+<a href="#1945" id="1945">1945</a>
+<a href="#1946" id="1946">1946</a>
+<a href="#1947" id="1947">1947</a>
+<a href="#1948" id="1948">1948</a>
+<a href="#1949" id="1949">1949</a>
+<a href="#1950" id="1950">1950</a>
+<a href="#1951" id="1951">1951</a>
+<a href="#1952" id="1952">1952</a>
 </pre><pre class="rust"><code><span class="kw">use </span>std::ops::Deref;
 <span class="kw">use </span>std::str::FromStr;
 <span class="kw">use </span>std::sync::Arc;
@@ -1908,7 +1970,7 @@
 <span class="kw">use </span>mango_v4::accounts_ix::{Serum3OrderType, Serum3SelfTradeBehavior, Serum3Side};
 <span class="kw">use </span>mango_v4::accounts_zerocopy::KeyedAccountSharedData;
 <span class="kw">use </span>mango_v4::state::{
-    Bank, Group, MangoAccountValue, PerpMarketIndex, PlaceOrderType, SelfTradeBehavior,
+    Bank, Group, MangoAccountValue, PerpMarket, PerpMarketIndex, PlaceOrderType, SelfTradeBehavior,
     Serum3MarketIndex, Side, TokenIndex, INSURANCE_TOKEN_INDEX,
 };
 
@@ -1939,35 +2001,70 @@
 <span class="kw">pub const </span>MAX_ACCOUNTS_PER_TRANSACTION: usize = <span class="number">64</span>;
 
 <span class="comment">// very close to anchor_client::Client, which unfortunately has no accessors or Clone
-</span><span class="attr">#[derive(Clone, Debug)]
+</span><span class="attr">#[derive(Clone, Debug, Builder)]
 </span><span class="kw">pub struct </span>Client {
-    <span class="kw">pub </span>cluster: Cluster,
-    <span class="kw">pub </span>fee_payer: Arc&lt;Keypair&gt;,
-    <span class="kw">pub </span>commitment: CommitmentConfig,
-    <span class="kw">pub </span>timeout: <span class="prelude-ty">Option</span>&lt;Duration&gt;,
-    <span class="kw">pub </span>transaction_builder_config: TransactionBuilderConfig,
-    <span class="kw">pub </span>rpc_send_transaction_config: RpcSendTransactionConfig,
+    <span class="doccomment">/// RPC url
+    ///
+    /// Defaults to Cluster::Mainnet, using the public crowded mainnet-beta rpc endpoint.
+    /// Should usually be overridden with a custom rpc endpoint.
+    </span><span class="attr">#[builder(default = <span class="string">&quot;Cluster::Mainnet&quot;</span>)]
+    </span><span class="kw">pub </span>cluster: Cluster,
+
+    <span class="doccomment">/// Transaction fee payer. Needs to be set to send transactions.
+    </span><span class="kw">pub </span>fee_payer: <span class="prelude-ty">Option</span>&lt;Arc&lt;Keypair&gt;&gt;,
+
+    <span class="doccomment">/// Commitment for interacting with the chain. Defaults to processed.
+    </span><span class="attr">#[builder(default = <span class="string">&quot;CommitmentConfig::processed()&quot;</span>)]
+    </span><span class="kw">pub </span>commitment: CommitmentConfig,
+
+    <span class="doccomment">/// Timeout, defaults to 60s
+    </span><span class="attr">#[builder(default = <span class="string">&quot;Some(Duration::from_secs(60))&quot;</span>)]
+    </span><span class="kw">pub </span>timeout: <span class="prelude-ty">Option</span>&lt;Duration&gt;,
+
+    <span class="attr">#[builder(default)]
+    </span><span class="kw">pub </span>transaction_builder_config: TransactionBuilderConfig,
+
+    <span class="doccomment">/// Defaults to a preflight check at processed commitment
+    </span><span class="attr">#[builder(default = <span class="string">&quot;ClientBuilder::default_rpc_send_transaction_config()&quot;</span>)]
+    </span><span class="kw">pub </span>rpc_send_transaction_config: RpcSendTransactionConfig,
+
+    <span class="attr">#[builder(default = <span class="string">&quot;\&quot;https://quote-api.jup.ag/v4\&quot;.into()&quot;</span>)]
+    </span><span class="kw">pub </span>jupiter_v4_url: String,
+
+    <span class="attr">#[builder(default = <span class="string">&quot;\&quot;https://quote-api.jup.ag/v6\&quot;.into()&quot;</span>)]
+    </span><span class="kw">pub </span>jupiter_v6_url: String,
+}
+
+<span class="kw">impl </span>ClientBuilder {
+    <span class="kw">pub fn </span>default_rpc_send_transaction_config() -&gt; RpcSendTransactionConfig {
+        RpcSendTransactionConfig {
+            preflight_commitment: <span class="prelude-val">Some</span>(CommitmentLevel::Processed),
+            ..Default::default()
+        }
+    }
 }
 
 <span class="kw">impl </span>Client {
-    <span class="kw">pub fn </span>new(
+    <span class="kw">pub fn </span>builder() -&gt; ClientBuilder {
+        ClientBuilder::default()
+    }
+
+    <span class="doccomment">/// Prefer using the builder()
+    </span><span class="kw">pub fn </span>new(
         cluster: Cluster,
         commitment: CommitmentConfig,
         fee_payer: Arc&lt;Keypair&gt;,
         timeout: <span class="prelude-ty">Option</span>&lt;Duration&gt;,
         transaction_builder_config: TransactionBuilderConfig,
     ) -&gt; <span class="self">Self </span>{
-        <span class="self">Self </span>{
-            cluster,
-            fee_payer,
-            commitment,
-            timeout,
-            transaction_builder_config,
-            rpc_send_transaction_config: RpcSendTransactionConfig {
-                preflight_commitment: <span class="prelude-val">Some</span>(CommitmentLevel::Processed),
-                ..Default::default()
-            },
-        }
+        <span class="self">Self</span>::builder()
+            .cluster(cluster)
+            .commitment(commitment)
+            .fee_payer(<span class="prelude-val">Some</span>(fee_payer))
+            .timeout(timeout)
+            .transaction_builder_config(transaction_builder_config)
+            .build()
+            .unwrap()
     }
 
     <span class="kw">pub fn </span>rpc_async(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; RpcClientAsync {
@@ -1986,6 +2083,13 @@
     ) -&gt; anyhow::Result&lt;T&gt; {
         fetch_anchor_account(<span class="kw-2">&amp;</span><span class="self">self</span>.rpc_async(), address).<span class="kw">await
     </span>}
+
+    <span class="kw">pub fn </span>fee_payer(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; Arc&lt;Keypair&gt; {
+        <span class="self">self</span>.fee_payer
+            .as_ref()
+            .expect(<span class="string">&quot;fee payer must be set&quot;</span>)
+            .clone()
+    }
 }
 
 <span class="comment">// todo: might want to integrate geyser, websockets, or simple http polling for keeping data fresh
@@ -2185,7 +2289,7 @@
     </span>}
 
     <span class="kw">pub async fn </span>first_bank(<span class="kw-2">&amp;</span><span class="self">self</span>, token_index: TokenIndex) -&gt; anyhow::Result&lt;Bank&gt; {
-        <span class="kw">let </span>bank_address = <span class="self">self</span>.context.mint_info(token_index).first_bank();
+        <span class="kw">let </span>bank_address = <span class="self">self</span>.context.token(token_index).first_bank();
         account_fetcher_fetch_anchor_account(<span class="kw-2">&amp;*</span><span class="self">self</span>.account_fetcher, <span class="kw-2">&amp;</span>bank_address).<span class="kw">await
     </span>}
 
@@ -2228,7 +2332,6 @@
     ) -&gt; anyhow::Result&lt;Signature&gt; {
         <span class="kw">let </span>token = <span class="self">self</span>.context.token_by_mint(<span class="kw-2">&amp;</span>mint)<span class="question-mark">?</span>;
         <span class="kw">let </span>token_index = token.token_index;
-        <span class="kw">let </span>mint_info = token.mint_info;
 
         <span class="kw">let </span>(health_check_metas, health_cu) = <span class="self">self
             </span>.derive_health_check_remaining_account_metas(<span class="macro">vec!</span>[token_index], <span class="macro">vec!</span>[], <span class="macro">vec!</span>[])
@@ -2243,13 +2346,10 @@
                             group: <span class="self">self</span>.group(),
                             account: <span class="self">self</span>.mango_account_address,
                             owner: <span class="self">self</span>.owner(),
-                            bank: mint_info.first_bank(),
-                            vault: mint_info.first_vault(),
-                            oracle: mint_info.oracle,
-                            token_account: get_associated_token_address(
-                                <span class="kw-2">&amp;</span><span class="self">self</span>.owner(),
-                                <span class="kw-2">&amp;</span>mint_info.mint,
-                            ),
+                            bank: token.first_bank(),
+                            vault: token.first_vault(),
+                            oracle: token.oracle,
+                            token_account: get_associated_token_address(<span class="kw-2">&amp;</span><span class="self">self</span>.owner(), <span class="kw-2">&amp;</span>token.mint),
                             token_authority: <span class="self">self</span>.owner(),
                             token_program: Token::id(),
                         },
@@ -2280,7 +2380,6 @@
     ) -&gt; anyhow::Result&lt;PreparedInstructions&gt; {
         <span class="kw">let </span>token = <span class="self">self</span>.context.token_by_mint(<span class="kw-2">&amp;</span>mint)<span class="question-mark">?</span>;
         <span class="kw">let </span>token_index = token.token_index;
-        <span class="kw">let </span>mint_info = token.mint_info;
 
         <span class="kw">let </span>(health_check_metas, health_cu) =
             <span class="self">self</span>.context.derive_health_check_remaining_account_metas(
@@ -2306,12 +2405,12 @@
                             group: <span class="self">self</span>.group(),
                             account: <span class="self">self</span>.mango_account_address,
                             owner: <span class="self">self</span>.owner(),
-                            bank: mint_info.first_bank(),
-                            vault: mint_info.first_vault(),
-                            oracle: mint_info.oracle,
+                            bank: token.first_bank(),
+                            vault: token.first_vault(),
+                            oracle: token.oracle,
                             token_account: get_associated_token_address(
                                 <span class="kw-2">&amp;</span><span class="self">self</span>.owner(),
-                                <span class="kw-2">&amp;</span>mint_info.mint,
+                                <span class="kw-2">&amp;</span>token.mint,
                             ),
                             token_program: Token::id(),
                         },
@@ -2344,7 +2443,7 @@
 
     <span class="kw">pub async fn </span>bank_oracle_price(<span class="kw-2">&amp;</span><span class="self">self</span>, token_index: TokenIndex) -&gt; anyhow::Result&lt;I80F48&gt; {
         <span class="kw">let </span>bank = <span class="self">self</span>.first_bank(token_index).<span class="kw">await</span><span class="question-mark">?</span>;
-        <span class="kw">let </span>mint_info = <span class="self">self</span>.context.mint_info(token_index);
+        <span class="kw">let </span>mint_info = <span class="self">self</span>.context.token(token_index);
         <span class="kw">let </span>oracle = <span class="self">self
             </span>.account_fetcher
             .fetch_raw_account(<span class="kw-2">&amp;</span>mint_info.oracle)
@@ -2361,12 +2460,11 @@
         perp_market_index: PerpMarketIndex,
     ) -&gt; anyhow::Result&lt;I80F48&gt; {
         <span class="kw">let </span>perp = <span class="self">self</span>.context.perp(perp_market_index);
-        <span class="kw">let </span>oracle = <span class="self">self
-            </span>.account_fetcher
-            .fetch_raw_account(<span class="kw-2">&amp;</span>perp.market.oracle)
-            .<span class="kw">await</span><span class="question-mark">?</span>;
-        <span class="kw">let </span>price = perp.market.oracle_price(
-            <span class="kw-2">&amp;</span>KeyedAccountSharedData::new(perp.market.oracle, oracle.into()),
+        <span class="kw">let </span>perp_market: PerpMarket =
+            account_fetcher_fetch_anchor_account(<span class="kw-2">&amp;*</span><span class="self">self</span>.account_fetcher, <span class="kw-2">&amp;</span>perp.address).<span class="kw">await</span><span class="question-mark">?</span>;
+        <span class="kw">let </span>oracle = <span class="self">self</span>.account_fetcher.fetch_raw_account(<span class="kw-2">&amp;</span>perp.oracle).<span class="kw">await</span><span class="question-mark">?</span>;
+        <span class="kw">let </span>price = perp_market.oracle_price(
+            <span class="kw-2">&amp;</span>KeyedAccountSharedData::new(perp.oracle, oracle.into()),
             <span class="prelude-val">None</span>,
         )<span class="question-mark">?</span>;
         <span class="prelude-val">Ok</span>(price)
@@ -2400,8 +2498,8 @@
                     group: <span class="self">self</span>.group(),
                     account: account_pubkey,
                     serum_market: s3.address,
-                    serum_program: s3.market.serum_program,
-                    serum_market_external: s3.market.serum_market_external,
+                    serum_program: s3.serum_program,
+                    serum_market_external: s3.serum_market_external,
                     open_orders,
                     owner: <span class="self">self</span>.owner(),
                     payer: <span class="self">self</span>.owner(),
@@ -2448,9 +2546,9 @@
             </span>.context
             .derive_health_check_remaining_account_metas(account, <span class="macro">vec!</span>[], <span class="macro">vec!</span>[], <span class="macro">vec!</span>[])<span class="question-mark">?</span>;
 
-        <span class="kw">let </span>payer_mint_info = <span class="kw">match </span>side {
-            Serum3Side::Bid =&gt; quote.mint_info,
-            Serum3Side::Ask =&gt; base.mint_info,
+        <span class="kw">let </span>payer_token = <span class="kw">match </span>side {
+            Serum3Side::Bid =&gt; <span class="kw-2">&amp;</span>quote,
+            Serum3Side::Ask =&gt; <span class="kw-2">&amp;</span>base,
         };
 
         <span class="kw">let </span>ixs = PreparedInstructions::from_single(
@@ -2462,12 +2560,12 @@
                             group: <span class="self">self</span>.group(),
                             account: <span class="self">self</span>.mango_account_address,
                             open_orders,
-                            payer_bank: payer_mint_info.first_bank(),
-                            payer_vault: payer_mint_info.first_vault(),
-                            payer_oracle: payer_mint_info.oracle,
+                            payer_bank: payer_token.first_bank(),
+                            payer_vault: payer_token.first_vault(),
+                            payer_oracle: payer_token.oracle,
                             serum_market: s3.address,
-                            serum_program: s3.market.serum_program,
-                            serum_market_external: s3.market.serum_market_external,
+                            serum_program: s3.serum_program,
+                            serum_market_external: s3.serum_market_external,
                             market_bids: s3.bids,
                             market_asks: s3.asks,
                             market_event_queue: s3.event_q,
@@ -2550,13 +2648,13 @@
                         group: <span class="self">self</span>.group(),
                         account: <span class="self">self</span>.mango_account_address,
                         open_orders,
-                        quote_bank: quote.mint_info.first_bank(),
-                        quote_vault: quote.mint_info.first_vault(),
-                        base_bank: base.mint_info.first_bank(),
-                        base_vault: base.mint_info.first_vault(),
+                        quote_bank: quote.first_bank(),
+                        quote_vault: quote.first_vault(),
+                        base_bank: base.first_bank(),
+                        base_vault: base.first_vault(),
                         serum_market: s3.address,
-                        serum_program: s3.market.serum_program,
-                        serum_market_external: s3.market.serum_market_external,
+                        serum_program: s3.serum_program,
+                        serum_market_external: s3.serum_market_external,
                         market_base_vault: s3.coin_vault,
                         market_quote_vault: s3.pc_vault,
                         market_vault_signer: s3.vault_signer,
@@ -2564,8 +2662,8 @@
                         token_program: Token::id(),
                     },
                     v2: mango_v4::accounts::Serum3SettleFundsV2Extra {
-                        quote_oracle: quote.mint_info.oracle,
-                        base_oracle: base.mint_info.oracle,
+                        quote_oracle: quote.oracle,
+                        base_oracle: base.oracle,
                     },
                 },
                 <span class="prelude-val">None</span>,
@@ -2598,8 +2696,8 @@
                         market_asks: s3.asks,
                         market_event_queue: s3.event_q,
                         serum_market: s3.address,
-                        serum_program: s3.market.serum_program,
-                        serum_market_external: s3.market.serum_market_external,
+                        serum_program: s3.serum_program,
+                        serum_market_external: s3.serum_market_external,
                         owner: <span class="self">self</span>.owner(),
                     },
                     <span class="prelude-val">None</span>,
@@ -2672,18 +2770,18 @@
                             account: <span class="kw-2">*</span>liqee.<span class="number">0</span>,
                             open_orders: <span class="kw-2">*</span>open_orders,
                             serum_market: s3.address,
-                            serum_program: s3.market.serum_program,
-                            serum_market_external: s3.market.serum_market_external,
+                            serum_program: s3.serum_program,
+                            serum_market_external: s3.serum_market_external,
                             market_bids: s3.bids,
                             market_asks: s3.asks,
                             market_event_queue: s3.event_q,
                             market_base_vault: s3.coin_vault,
                             market_quote_vault: s3.pc_vault,
                             market_vault_signer: s3.vault_signer,
-                            quote_bank: quote.mint_info.first_bank(),
-                            quote_vault: quote.mint_info.first_vault(),
-                            base_bank: base.mint_info.first_bank(),
-                            base_vault: base.mint_info.first_vault(),
+                            quote_bank: quote.first_bank(),
+                            quote_vault: quote.first_vault(),
+                            base_bank: base.first_bank(),
+                            base_vault: base.first_vault(),
                             token_program: Token::id(),
                         },
                         <span class="prelude-val">None</span>,
@@ -2722,8 +2820,8 @@
                         group: <span class="self">self</span>.group(),
                         account: <span class="self">self</span>.mango_account_address,
                         serum_market: s3.address,
-                        serum_program: s3.market.serum_program,
-                        serum_market_external: s3.market.serum_market_external,
+                        serum_program: s3.serum_program,
+                        serum_market_external: s3.serum_market_external,
                         open_orders,
                         market_bids: s3.bids,
                         market_asks: s3.asks,
@@ -2780,10 +2878,10 @@
                             account: <span class="self">self</span>.mango_account_address,
                             owner: <span class="self">self</span>.owner(),
                             perp_market: perp.address,
-                            bids: perp.market.bids,
-                            asks: perp.market.asks,
-                            event_queue: perp.market.event_queue,
-                            oracle: perp.market.oracle,
+                            bids: perp.bids,
+                            asks: perp.asks,
+                            event_queue: perp.event_queue,
+                            oracle: perp.oracle,
                         },
                         <span class="prelude-val">None</span>,
                     );
@@ -2862,8 +2960,8 @@
                             account: <span class="self">self</span>.mango_account_address,
                             owner: <span class="self">self</span>.owner(),
                             perp_market: perp.address,
-                            bids: perp.market.bids,
-                            asks: perp.market.asks,
+                            bids: perp.bids,
+                            asks: perp.asks,
                         },
                         <span class="prelude-val">None</span>,
                     )
@@ -2920,7 +3018,7 @@
         account_b: (<span class="kw-2">&amp;</span>Pubkey, <span class="kw-2">&amp;</span>MangoAccountValue),
     ) -&gt; anyhow::Result&lt;PreparedInstructions&gt; {
         <span class="kw">let </span>perp = <span class="self">self</span>.context.perp(market_index);
-        <span class="kw">let </span>settlement_token = <span class="self">self</span>.context.token(perp.market.settle_token_index);
+        <span class="kw">let </span>settlement_token = <span class="self">self</span>.context.token(perp.settle_token_index);
 
         <span class="kw">let </span>(health_remaining_ams, health_cu) = <span class="self">self
             </span>.context
@@ -2944,9 +3042,9 @@
                             perp_market: perp.address,
                             account_a: <span class="kw-2">*</span>account_a.<span class="number">0</span>,
                             account_b: <span class="kw-2">*</span>account_b.<span class="number">0</span>,
-                            oracle: perp.market.oracle,
-                            settle_bank: settlement_token.mint_info.first_bank(),
-                            settle_oracle: settlement_token.mint_info.oracle,
+                            oracle: perp.oracle,
+                            settle_bank: settlement_token.first_bank(),
+                            settle_oracle: settlement_token.oracle,
                         },
                         <span class="prelude-val">None</span>,
                     );
@@ -2993,8 +3091,8 @@
                             group: <span class="self">self</span>.group(),
                             account: <span class="kw-2">*</span>liqee.<span class="number">0</span>,
                             perp_market: perp.address,
-                            bids: perp.market.bids,
-                            asks: perp.market.asks,
+                            bids: perp.bids,
+                            asks: perp.asks,
                         },
                         <span class="prelude-val">None</span>,
                     );
@@ -3020,7 +3118,7 @@
         max_pnl_transfer: u64,
     ) -&gt; anyhow::Result&lt;PreparedInstructions&gt; {
         <span class="kw">let </span>perp = <span class="self">self</span>.context.perp(market_index);
-        <span class="kw">let </span>settle_token_info = <span class="self">self</span>.context.token(perp.market.settle_token_index);
+        <span class="kw">let </span>settle_token_info = <span class="self">self</span>.context.token(perp.settle_token_index);
 
         <span class="kw">let </span>(health_remaining_ams, health_cu) = <span class="self">self
             </span>.derive_liquidation_health_check_remaining_account_metas(liqee.<span class="number">1</span>, <span class="kw-2">&amp;</span>[], <span class="kw-2">&amp;</span>[])
@@ -3034,13 +3132,13 @@
                     <span class="kw-2">&amp;</span>mango_v4::accounts::PerpLiqBaseOrPositivePnl {
                         group: <span class="self">self</span>.group(),
                         perp_market: perp.address,
-                        oracle: perp.market.oracle,
+                        oracle: perp.oracle,
                         liqor: <span class="self">self</span>.mango_account_address,
                         liqor_owner: <span class="self">self</span>.owner(),
                         liqee: <span class="kw-2">*</span>liqee.<span class="number">0</span>,
-                        settle_bank: settle_token_info.mint_info.first_bank(),
-                        settle_vault: settle_token_info.mint_info.first_vault(),
-                        settle_oracle: settle_token_info.mint_info.oracle,
+                        settle_bank: settle_token_info.first_bank(),
+                        settle_vault: settle_token_info.first_vault(),
+                        settle_oracle: settle_token_info.oracle,
                     },
                     <span class="prelude-val">None</span>,
                 );
@@ -3073,7 +3171,7 @@
         .<span class="kw">await</span><span class="question-mark">?</span>;
 
         <span class="kw">let </span>perp = <span class="self">self</span>.context.perp(market_index);
-        <span class="kw">let </span>settle_token_info = <span class="self">self</span>.context.token(perp.market.settle_token_index);
+        <span class="kw">let </span>settle_token_info = <span class="self">self</span>.context.token(perp.settle_token_index);
         <span class="kw">let </span>insurance_token_info = <span class="self">self</span>.context.token(INSURANCE_TOKEN_INDEX);
 
         <span class="kw">let </span>(health_remaining_ams, health_cu) = <span class="self">self
@@ -3092,17 +3190,17 @@
                     <span class="kw-2">&amp;</span>mango_v4::accounts::PerpLiqNegativePnlOrBankruptcyV2 {
                         group: <span class="self">self</span>.group(),
                         perp_market: perp.address,
-                        oracle: perp.market.oracle,
+                        oracle: perp.oracle,
                         liqor: <span class="self">self</span>.mango_account_address,
                         liqor_owner: <span class="self">self</span>.owner(),
                         liqee: <span class="kw-2">*</span>liqee.<span class="number">0</span>,
-                        settle_bank: settle_token_info.mint_info.first_bank(),
-                        settle_vault: settle_token_info.mint_info.first_vault(),
-                        settle_oracle: settle_token_info.mint_info.oracle,
+                        settle_bank: settle_token_info.first_bank(),
+                        settle_vault: settle_token_info.first_vault(),
+                        settle_oracle: settle_token_info.oracle,
                         insurance_vault: group.insurance_vault,
-                        insurance_bank: insurance_token_info.mint_info.first_bank(),
-                        insurance_bank_vault: insurance_token_info.mint_info.first_vault(),
-                        insurance_oracle: insurance_token_info.mint_info.oracle,
+                        insurance_bank: insurance_token_info.first_bank(),
+                        insurance_bank_vault: insurance_token_info.first_vault(),
+                        insurance_oracle: insurance_token_info.oracle,
                         token_program: Token::id(),
                     },
                     <span class="prelude-val">None</span>,
@@ -3179,7 +3277,6 @@
         <span class="kw">let </span>liab_info = <span class="self">self</span>.context.token(liab_token_index);
 
         <span class="kw">let </span>bank_remaining_ams = liab_info
-            .mint_info
             .banks()
             .iter()
             .map(|bank_pubkey| util::to_writable_account_meta(<span class="kw-2">*</span>bank_pubkey))
@@ -3210,7 +3307,7 @@
                         liqor: <span class="self">self</span>.mango_account_address,
                         liqor_owner: <span class="self">self</span>.owner(),
                         liab_mint_info: liab_info.mint_info_address,
-                        quote_vault: quote_info.mint_info.first_vault(),
+                        quote_vault: quote_info.first_vault(),
                         insurance_vault: group.insurance_vault,
                         token_program: Token::id(),
                     },
@@ -3514,11 +3611,12 @@
         <span class="kw-2">&amp;</span><span class="self">self</span>,
         instructions: Vec&lt;Instruction&gt;,
     ) -&gt; anyhow::Result&lt;Signature&gt; {
+        <span class="kw">let </span>fee_payer = <span class="self">self</span>.client.fee_payer();
         TransactionBuilder {
             instructions,
             address_lookup_tables: <span class="self">self</span>.mango_address_lookup_tables().<span class="kw">await</span><span class="question-mark">?</span>,
-            payer: <span class="self">self</span>.client.fee_payer.pubkey(),
-            signers: <span class="macro">vec!</span>[<span class="self">self</span>.owner.clone(), <span class="self">self</span>.client.fee_payer.clone()],
+            payer: fee_payer.pubkey(),
+            signers: <span class="macro">vec!</span>[<span class="self">self</span>.owner.clone(), fee_payer],
             config: <span class="self">self</span>.client.transaction_builder_config,
         }
         .send_and_confirm(<span class="kw-2">&amp;</span><span class="self">self</span>.client)
@@ -3529,11 +3627,12 @@
         <span class="kw-2">&amp;</span><span class="self">self</span>,
         instructions: Vec&lt;Instruction&gt;,
     ) -&gt; anyhow::Result&lt;Signature&gt; {
+        <span class="kw">let </span>fee_payer = <span class="self">self</span>.client.fee_payer();
         TransactionBuilder {
             instructions,
             address_lookup_tables: <span class="self">self</span>.mango_address_lookup_tables().<span class="kw">await</span><span class="question-mark">?</span>,
-            payer: <span class="self">self</span>.client.fee_payer.pubkey(),
-            signers: <span class="macro">vec!</span>[<span class="self">self</span>.client.fee_payer.clone()],
+            payer: fee_payer.pubkey(),
+            signers: <span class="macro">vec!</span>[fee_payer],
             config: <span class="self">self</span>.client.transaction_builder_config,
         }
         .send_and_confirm(<span class="kw-2">&amp;</span><span class="self">self</span>.client)
@@ -3544,16 +3643,41 @@
         <span class="kw-2">&amp;</span><span class="self">self</span>,
         instructions: Vec&lt;Instruction&gt;,
     ) -&gt; anyhow::Result&lt;SimulateTransactionResponse&gt; {
+        <span class="kw">let </span>fee_payer = <span class="self">self</span>.client.fee_payer();
         TransactionBuilder {
             instructions,
             address_lookup_tables: <span class="macro">vec!</span>[],
-            payer: <span class="self">self</span>.client.fee_payer.pubkey(),
-            signers: <span class="macro">vec!</span>[<span class="self">self</span>.client.fee_payer.clone()],
+            payer: fee_payer.pubkey(),
+            signers: <span class="macro">vec!</span>[fee_payer],
             config: <span class="self">self</span>.client.transaction_builder_config,
         }
         .simulate(<span class="kw-2">&amp;</span><span class="self">self</span>.client)
         .<span class="kw">await
     </span>}
+
+    <span class="kw">pub async fn </span>loop_check_for_context_changes_and_abort(
+        mango_client: Arc&lt;MangoClient&gt;,
+        interval: Duration,
+    ) {
+        <span class="kw">let </span><span class="kw-2">mut </span>delay = tokio::time::interval(interval);
+        <span class="kw">let </span>rpc_async = mango_client.client.rpc_async();
+        <span class="kw">loop </span>{
+            delay.tick().<span class="kw">await</span>;
+
+            <span class="kw">let </span>new_context =
+                <span class="kw">match </span>MangoGroupContext::new_from_rpc(<span class="kw-2">&amp;</span>rpc_async, mango_client.group()).<span class="kw">await </span>{
+                    <span class="prelude-val">Ok</span>(v) =&gt; v,
+                    <span class="prelude-val">Err</span>(e) =&gt; {
+                        <span class="macro">tracing::warn!</span>(<span class="string">&quot;could not fetch context to check for changes: {e:?}&quot;</span>);
+                        <span class="kw">continue</span>;
+                    }
+                };
+
+            <span class="kw">if </span>mango_client.context.changed_significantly(<span class="kw-2">&amp;</span>new_context) {
+                std::process::abort();
+            }
+        }
+    }
 }
 
 <span class="attr">#[derive(Debug, thiserror::Error)]

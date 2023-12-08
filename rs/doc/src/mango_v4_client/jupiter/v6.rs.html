@@ -403,9 +403,6 @@
 <a href="#403" id="403">403</a>
 <a href="#404" id="404">404</a>
 <a href="#405" id="405">405</a>
-<a href="#406" id="406">406</a>
-<a href="#407" id="407">407</a>
-<a href="#408" id="408">408</a>
 </pre><pre class="rust"><code><span class="kw">use </span>std::str::FromStr;
 
 <span class="kw">use </span>anchor_lang::prelude::Pubkey;
@@ -591,7 +588,7 @@
         <span class="kw">let </span>response = <span class="self">self
             </span>.mango_client
             .http_client
-            .get(<span class="string">&quot;https://quote-api.jup.ag/v6/quote&quot;</span>)
+            .get(<span class="macro">format!</span>(<span class="string">&quot;{}/quote&quot;</span>, <span class="self">self</span>.mango_client.client.jupiter_v6_url))
             .query(<span class="kw-2">&amp;</span>[
                 (<span class="string">&quot;inputMint&quot;</span>, input_mint.to_string()),
                 (<span class="string">&quot;outputMint&quot;</span>, output_mint.to_string()),
@@ -628,25 +625,19 @@
         <span class="kw">let </span>source_token = <span class="self">self</span>.mango_client.context.token_by_mint(<span class="kw-2">&amp;</span>input_mint)<span class="question-mark">?</span>;
         <span class="kw">let </span>target_token = <span class="self">self</span>.mango_client.context.token_by_mint(<span class="kw-2">&amp;</span>output_mint)<span class="question-mark">?</span>;
 
-        <span class="kw">let </span>bank_ams = [
-            source_token.mint_info.first_bank(),
-            target_token.mint_info.first_bank(),
-        ]
-        .into_iter()
-        .map(util::to_writable_account_meta)
-        .collect::&lt;Vec&lt;<span class="kw">_</span>&gt;&gt;();
+        <span class="kw">let </span>bank_ams = [source_token.first_bank(), target_token.first_bank()]
+            .into_iter()
+            .map(util::to_writable_account_meta)
+            .collect::&lt;Vec&lt;<span class="kw">_</span>&gt;&gt;();
 
-        <span class="kw">let </span>vault_ams = [
-            source_token.mint_info.first_vault(),
-            target_token.mint_info.first_vault(),
-        ]
-        .into_iter()
-        .map(util::to_writable_account_meta)
-        .collect::&lt;Vec&lt;<span class="kw">_</span>&gt;&gt;();
+        <span class="kw">let </span>vault_ams = [source_token.first_vault(), target_token.first_vault()]
+            .into_iter()
+            .map(util::to_writable_account_meta)
+            .collect::&lt;Vec&lt;<span class="kw">_</span>&gt;&gt;();
 
         <span class="kw">let </span>owner = <span class="self">self</span>.mango_client.owner();
 
-        <span class="kw">let </span>token_ams = [source_token.mint_info.mint, target_token.mint_info.mint]
+        <span class="kw">let </span>token_ams = [source_token.mint, target_token.mint]
             .into_iter()
             .map(|mint| {
                 util::to_writable_account_meta(
@@ -677,7 +668,10 @@
         <span class="kw">let </span>swap_response = <span class="self">self
             </span>.mango_client
             .http_client
-            .post(<span class="string">&quot;https://quote-api.jup.ag/v6/swap-instructions&quot;</span>)
+            .post(<span class="macro">format!</span>(
+                <span class="string">&quot;{}/swap-instructions&quot;</span>,
+                <span class="self">self</span>.mango_client.client.jupiter_v6_url
+            ))
             .json(<span class="kw-2">&amp;</span>SwapRequest {
                 user_public_key: owner.to_string(),
                 wrap_and_unwrap_sol: <span class="bool-val">false</span>,
@@ -711,7 +705,7 @@
             spl_associated_token_account::instruction::create_associated_token_account_idempotent(
                 <span class="kw-2">&amp;</span>owner,
                 <span class="kw-2">&amp;</span>owner,
-                <span class="kw-2">&amp;</span>source_token.mint_info.mint,
+                <span class="kw-2">&amp;</span>source_token.mint,
                 <span class="kw-2">&amp;</span>Token::id(),
             ),
         );

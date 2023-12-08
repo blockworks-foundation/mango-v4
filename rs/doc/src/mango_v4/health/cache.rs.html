@@ -3338,7 +3338,7 @@
         borrows: u64,
         deposit_weight_scale_start_quote: u64,
         borrow_weight_scale_start_quote: u64,
-        deposits_in_serum: i64,
+        potential_serum_tokens: u64,
     }
 
     <span class="attr">#[derive(Default)]
@@ -3394,7 +3394,7 @@
             <span class="kw">let </span>bank = bank.data();
             bank.indexed_deposits = I80F48::from(settings.deposits) / bank.deposit_index;
             bank.indexed_borrows = I80F48::from(settings.borrows) / bank.borrow_index;
-            bank.deposits_in_serum = settings.deposits_in_serum;
+            bank.potential_serum_tokens = settings.potential_serum_tokens;
             <span class="kw">if </span>settings.deposit_weight_scale_start_quote &gt; <span class="number">0 </span>{
                 bank.deposit_weight_scale_start_quote =
                     settings.deposit_weight_scale_start_quote <span class="kw">as </span>f64;
@@ -3710,7 +3710,7 @@
                 ..Default::default()
             },
             TestHealth1Case {
-                <span class="comment">// 17, deposits_in_serum counts for deposit weight scaling
+                <span class="comment">// 17, potential_serum_tokens counts for deposit weight scaling
                 </span>token1: <span class="number">100</span>,
                 token2: <span class="number">100</span>,
                 token3: <span class="number">100</span>,
@@ -3723,13 +3723,13 @@
                     BankSettings {
                         deposits: <span class="number">100</span>,
                         deposit_weight_scale_start_quote: <span class="number">100 </span>* <span class="number">5</span>,
-                        deposits_in_serum: <span class="number">100</span>,
+                        potential_serum_tokens: <span class="number">100</span>,
                         ..BankSettings::default()
                     },
                     BankSettings {
                         deposits: <span class="number">600</span>,
                         deposit_weight_scale_start_quote: <span class="number">500 </span>* <span class="number">10</span>,
-                        deposits_in_serum: <span class="number">100</span>,
+                        potential_serum_tokens: <span class="number">100</span>,
                         ..BankSettings::default()
                     },
                 ],
