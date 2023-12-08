@@ -1,7 +1,7 @@
 use crate::accounts_ix::*;
 use crate::error::*;
 use crate::health::*;
-use crate::logs::{TokenBalanceLog, TokenForceCloseBorrowsWithTokenLog};
+use crate::logs::{emit_stack, TokenBalanceLog, TokenForceCloseBorrowsWithTokenLog};
 use crate::state::*;
 use anchor_lang::prelude::*;
 use fixed::types::I80F48;
@@ -131,7 +131,7 @@ pub fn token_force_close_borrows_with_token(
         );
 
         // liqee asset
-        emit!(TokenBalanceLog {
+        emit_stack(TokenBalanceLog {
             mango_group: liqee.fixed.group,
             mango_account: liqee_key,
             token_index: asset_token_index,
@@ -140,7 +140,7 @@ pub fn token_force_close_borrows_with_token(
             borrow_index: asset_bank.borrow_index.to_bits(),
         });
         // liqee liab
-        emit!(TokenBalanceLog {
+        emit_stack(TokenBalanceLog {
             mango_group: liqee.fixed.group,
             mango_account: liqee_key,
             token_index: liab_token_index,
@@ -149,7 +149,7 @@ pub fn token_force_close_borrows_with_token(
             borrow_index: liab_bank.borrow_index.to_bits(),
         });
         // liqor asset
-        emit!(TokenBalanceLog {
+        emit_stack(TokenBalanceLog {
             mango_group: liqee.fixed.group,
             mango_account: liqor_key,
             token_index: asset_token_index,
@@ -158,7 +158,7 @@ pub fn token_force_close_borrows_with_token(
             borrow_index: asset_bank.borrow_index.to_bits(),
         });
         // liqor liab
-        emit!(TokenBalanceLog {
+        emit_stack(TokenBalanceLog {
             mango_group: liqee.fixed.group,
             mango_account: liqor_key,
             token_index: liab_token_index,
@@ -167,7 +167,7 @@ pub fn token_force_close_borrows_with_token(
             borrow_index: liab_bank.borrow_index.to_bits(),
         });
 
-        emit!(TokenForceCloseBorrowsWithTokenLog {
+        emit_stack(TokenForceCloseBorrowsWithTokenLog {
             mango_group: liqee.fixed.group,
             liqee: liqee_key,
             liqor: liqor_key,
@@ -186,7 +186,8 @@ pub fn token_force_close_borrows_with_token(
             MangoError::SomeError
         );
 
-        let liqee_health_cache = new_health_cache(&liqee.borrow(), &mut account_retriever)
+        let now_ts: u64 = Clock::get()?.unix_timestamp.try_into().unwrap();
+        let liqee_health_cache = new_health_cache(&liqee.borrow(), &mut account_retriever, now_ts)
             .context("create liqee health cache")?;
         let liqee_liq_end_health = liqee_health_cache.health(HealthType::LiquidationEnd);
         liqee
@@ -211,12 +212,17 @@ pub fn token_force_close_borrows_with_token(
     // Check liqor's health
     // This should always improve liqor health, since we decrease the zero-asset-weight
     // liab token and gain some asset token, this check is just for denfensive measure
-    let liqor_health = compute_health(&liqor.borrow(), HealthType::Init, &mut account_retriever)
-        .context("compute liqor health")?;
+    let liqor_health = compute_health(
+        &liqor.borrow(),
+        HealthType::Init,
+        &mut account_retriever,
+        now_ts,
+    )
+    .context("compute liqor health")?;
     require!(liqor_health >= 0, MangoError::HealthMustBePositive);
 
     // TODO log
-    // emit!(TokenForceCloseBorrowWithToken
+    // emit_stack(TokenForceCloseBorrowWithToken
 
     Ok(())
 }

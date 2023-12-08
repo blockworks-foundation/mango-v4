@@ -5,7 +5,7 @@ use crate::error::MangoError;
 use crate::state::*;
 
 use crate::accounts_ix::*;
-use crate::logs::{emit_perp_balances, FillLogV3};
+use crate::logs::{emit_perp_balances, emit_stack, FillLogV3};
 
 /// Load a mango account by key from the list of account infos.
 ///
@@ -131,7 +131,7 @@ pub fn perp_consume_events(ctx: Context<PerpConsumeEvents>, limit: usize) -> Res
                     let taker_closed_pnl = taker_after_pnl - taker_before_pnl;
                     (maker_closed_pnl, taker_closed_pnl)
                 };
-                emit!(FillLogV3 {
+                emit_stack(FillLogV3 {
                     mango_group: group_key,
                     market_index: perp_market_index,
                     taker_side: fill.taker_side as u8,
@@ -149,7 +149,7 @@ pub fn perp_consume_events(ctx: Context<PerpConsumeEvents>, limit: usize) -> Res
                     price: fill.price,
                     quantity: fill.quantity,
                     maker_closed_pnl: maker_closed_pnl.to_num(),
-                    taker_closed_pnl: taker_closed_pnl.to_num()
+                    taker_closed_pnl: taker_closed_pnl.to_num(),
                 });
             }
             EventType::Out => {

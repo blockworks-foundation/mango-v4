@@ -7,7 +7,7 @@ use crate::state::*;
 
 use crate::accounts_ix::*;
 
-use crate::logs::{AccountBuybackFeesWithMngoLog, TokenBalanceLog};
+use crate::logs::{emit_stack, AccountBuybackFeesWithMngoLog, TokenBalanceLog};
 
 pub fn account_buyback_fees_with_mngo(
     ctx: Context<AccountBuybackFeesWithMngo>,
@@ -105,7 +105,7 @@ pub fn account_buyback_fees_with_mngo(
     );
     let in_use =
         mngo_bank.withdraw_without_fee(account_mngo_token_position, max_buyback_mngo, now_ts)?;
-    emit!(TokenBalanceLog {
+    emit_stack(TokenBalanceLog {
         mango_group: ctx.accounts.group.key(),
         mango_account: ctx.accounts.account.key(),
         token_index: mngo_bank.token_index,
@@ -137,7 +137,7 @@ pub fn account_buyback_fees_with_mngo(
         );
     }
     let in_use = fees_bank.deposit(account_fees_token_position, max_buyback_fees, now_ts)?;
-    emit!(TokenBalanceLog {
+    emit_stack(TokenBalanceLog {
         mango_group: ctx.accounts.group.key(),
         mango_account: ctx.accounts.account.key(),
         token_index: fees_bank.token_index,
@@ -162,7 +162,7 @@ pub fn account_buyback_fees_with_mngo(
         max_buyback_fees,
     );
 
-    emit!(AccountBuybackFeesWithMngoLog {
+    emit_stack(AccountBuybackFeesWithMngoLog {
         mango_group: ctx.accounts.group.key(),
         mango_account: ctx.accounts.account.key(),
         buyback_fees: max_buyback_fees.to_bits(),

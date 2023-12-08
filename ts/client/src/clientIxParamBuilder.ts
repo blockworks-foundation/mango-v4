@@ -25,6 +25,9 @@ export interface TokenRegisterParams {
   tokenConditionalSwapTakerFeeRate: number;
   tokenConditionalSwapMakerFeeRate: number;
   flashLoanSwapFeeRate: number;
+  interestCurveScaling: number;
+  interestTargetUtilization: number;
+  depositLimit: BN;
 }
 
 export const DefaultTokenRegisterParams: TokenRegisterParams = {
@@ -35,10 +38,10 @@ export const DefaultTokenRegisterParams: TokenRegisterParams = {
   groupInsuranceFund: false,
   interestRateParams: {
     util0: 0.5,
-    rate0: 0.072,
+    rate0: 0.018,
     util1: 0.8,
-    rate1: 0.2,
-    maxRate: 2,
+    rate1: 0.05,
+    maxRate: 0.5,
     adjustmentFactor: 0.004,
   },
   loanFeeRate: 0.0005,
@@ -60,6 +63,9 @@ export const DefaultTokenRegisterParams: TokenRegisterParams = {
   tokenConditionalSwapTakerFeeRate: 0.0005,
   tokenConditionalSwapMakerFeeRate: 0.0005,
   flashLoanSwapFeeRate: 0.0005,
+  interestCurveScaling: 4.0,
+  interestTargetUtilization: 0.5,
+  depositLimit: new BN(0),
 };
 
 export interface TokenEditParams {
@@ -90,6 +96,14 @@ export interface TokenEditParams {
   tokenConditionalSwapTakerFeeRate: number | null;
   tokenConditionalSwapMakerFeeRate: number | null;
   flashLoanSwapFeeRate: number | null;
+  interestCurveScaling: number | null;
+  interestTargetUtilization: number | null;
+  maintWeightShiftStart: BN | null;
+  maintWeightShiftEnd: BN | null;
+  maintWeightShiftAssetTarget: number | null;
+  maintWeightShiftLiabTarget: number | null;
+  maintWeightShiftAbort: boolean | null;
+  depositLimit: BN | null;
 }
 
 export const NullTokenEditParams: TokenEditParams = {
@@ -120,6 +134,14 @@ export const NullTokenEditParams: TokenEditParams = {
   tokenConditionalSwapTakerFeeRate: null,
   tokenConditionalSwapMakerFeeRate: null,
   flashLoanSwapFeeRate: null,
+  interestCurveScaling: null,
+  interestTargetUtilization: null,
+  maintWeightShiftStart: null,
+  maintWeightShiftEnd: null,
+  maintWeightShiftAssetTarget: null,
+  maintWeightShiftLiabTarget: null,
+  maintWeightShiftAbort: null,
+  depositLimit: null,
 };
 
 export interface PerpEditParams {
@@ -264,6 +286,7 @@ export interface IxGateParams {
   TokenConditionalSwapStart: boolean;
   TokenConditionalSwapCreatePremiumAuction: boolean;
   TokenConditionalSwapCreateLinearAuction: boolean;
+  Serum3PlaceOrderV2: boolean;
 }
 
 // Default with all ixs enabled, use with buildIxGate
@@ -342,6 +365,7 @@ export const TrueIxGateParams: IxGateParams = {
   TokenConditionalSwapStart: true,
   TokenConditionalSwapCreatePremiumAuction: true,
   TokenConditionalSwapCreateLinearAuction: true,
+  Serum3PlaceOrderV2: true,
 };
 
 // build ix gate e.g. buildIxGate(Builder(TrueIxGateParams).TokenDeposit(false).build()).toNumber(),
@@ -430,6 +454,7 @@ export function buildIxGate(p: IxGateParams): BN {
   toggleIx(ixGate, p, 'TokenConditionalSwapStart', 68);
   toggleIx(ixGate, p, 'TokenConditionalSwapCreatePremiumAuction', 69);
   toggleIx(ixGate, p, 'TokenConditionalSwapCreateLinearAuction', 70);
+  toggleIx(ixGate, p, 'Serum3PlaceOrderV2', 71);
 
   return ixGate;
 }

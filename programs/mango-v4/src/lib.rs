@@ -150,6 +150,10 @@ pub mod mango_v4 {
         token_conditional_swap_taker_fee_rate: f32,
         token_conditional_swap_maker_fee_rate: f32,
         flash_loan_swap_fee_rate: f32,
+        interest_curve_scaling: f32,
+        interest_target_utilization: f32,
+        group_insurance_fund: bool,
+        deposit_limit: u64,
     ) -> Result<()> {
         #[cfg(feature = "enable-gpl")]
         instructions::token_register(
@@ -177,6 +181,10 @@ pub mod mango_v4 {
             token_conditional_swap_taker_fee_rate,
             token_conditional_swap_maker_fee_rate,
             flash_loan_swap_fee_rate,
+            interest_curve_scaling,
+            interest_target_utilization,
+            group_insurance_fund,
+            deposit_limit,
         )?;
         Ok(())
     }
@@ -221,6 +229,15 @@ pub mod mango_v4 {
         token_conditional_swap_taker_fee_rate_opt: Option<f32>,
         token_conditional_swap_maker_fee_rate_opt: Option<f32>,
         flash_loan_swap_fee_rate_opt: Option<f32>,
+        interest_curve_scaling_opt: Option<f32>,
+        interest_target_utilization_opt: Option<f32>,
+        maint_weight_shift_start_opt: Option<u64>,
+        maint_weight_shift_end_opt: Option<u64>,
+        maint_weight_shift_asset_target_opt: Option<f32>,
+        maint_weight_shift_liab_target_opt: Option<f32>,
+        maint_weight_shift_abort: bool,
+        set_fallback_oracle: bool, // unused, introduced in v0.22
+        deposit_limit_opt: Option<u64>,
     ) -> Result<()> {
         #[cfg(feature = "enable-gpl")]
         instructions::token_edit(
@@ -252,6 +269,15 @@ pub mod mango_v4 {
             token_conditional_swap_taker_fee_rate_opt,
             token_conditional_swap_maker_fee_rate_opt,
             flash_loan_swap_fee_rate_opt,
+            interest_curve_scaling_opt,
+            interest_target_utilization_opt,
+            maint_weight_shift_start_opt,
+            maint_weight_shift_end_opt,
+            maint_weight_shift_asset_target_opt,
+            maint_weight_shift_liab_target_opt,
+            maint_weight_shift_abort,
+            set_fallback_oracle,
+            deposit_limit_opt,
         )?;
         Ok(())
     }
@@ -540,9 +566,10 @@ pub mod mango_v4 {
         ctx: Context<Serum3RegisterMarket>,
         market_index: Serum3MarketIndex,
         name: String,
+        oracle_price_band: f32,
     ) -> Result<()> {
         #[cfg(feature = "enable-gpl")]
-        instructions::serum3_register_market(ctx, market_index, name)?;
+        instructions::serum3_register_market(ctx, market_index, name, oracle_price_band)?;
         Ok(())
     }
 
@@ -551,9 +578,16 @@ pub mod mango_v4 {
         reduce_only_opt: Option<bool>,
         force_close_opt: Option<bool>,
         name_opt: Option<String>,
+        oracle_price_band_opt: Option<f32>,
     ) -> Result<()> {
         #[cfg(feature = "enable-gpl")]
-        instructions::serum3_edit_market(ctx, reduce_only_opt, force_close_opt, name_opt)?;
+        instructions::serum3_edit_market(
+            ctx,
+            reduce_only_opt,
+            force_close_opt,
+            name_opt,
+            oracle_price_band_opt,
+        )?;
         Ok(())
     }
 
@@ -603,6 +637,36 @@ pub mod mango_v4 {
             order_type,
             client_order_id,
             limit,
+            false,
+        )?;
+        Ok(())
+    }
+
+    /// requires the receiver_bank in the health account list to be writable
+    #[allow(clippy::too_many_arguments)]
+    pub fn serum3_place_order_v2(
+        ctx: Context<Serum3PlaceOrder>,
+        side: Serum3Side,
+        limit_price: u64,
+        max_base_qty: u64,
+        max_native_quote_qty_including_fees: u64,
+        self_trade_behavior: Serum3SelfTradeBehavior,
+        order_type: Serum3OrderType,
+        client_order_id: u64,
+        limit: u16,
+    ) -> Result<()> {
+        #[cfg(feature = "enable-gpl")]
+        instructions::serum3_place_order(
+            ctx,
+            side,
+            limit_price,
+            max_base_qty,
+            max_native_quote_qty_including_fees,
+            self_trade_behavior,
+            order_type,
+            client_order_id,
+            limit,
+            true,
         )?;
         Ok(())
     }

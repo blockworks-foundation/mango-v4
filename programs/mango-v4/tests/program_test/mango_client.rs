@@ -69,6 +69,27 @@ pub async fn send_tx_get_metadata<CI: ClientInstruction>(
         .await
 }
 
+#[macro_export]
+macro_rules! send_tx_expect_error {
+    ($solana:expr, $ix:expr, $err:expr $(,)?) => {
+        let result = send_tx($solana, $ix).await;
+        let expected_err: u32 = $err.into();
+        match result {
+            Ok(_) => assert!(false, "no error returned"),
+            Err(TransportError::TransactionError(
+                solana_sdk::transaction::TransactionError::InstructionError(
+                    _,
+                    solana_program::instruction::InstructionError::Custom(err_num),
+                ),
+            )) => {
+                assert_eq!(err_num, expected_err, "wrong error code");
+            }
+            _ => assert!(false, "not a mango error"),
+        }
+    };
+}
+pub use send_tx_expect_error;
+
 /// Build a transaction from multiple instructions
 pub struct ClientTransaction {
     solana: Arc<SolanaCookie>,
@@ -108,6 +129,28 @@ impl<'a> ClientTransaction {
             .process_transaction(&self.instructions, Some(&self.signers))
             .await?;
         tx_result.result?;
+        Ok(())
+    }
+
+    pub async fn send_expect_error(
+        &self,
+        error: mango_v4::error::MangoError,
+    ) -> std::result::Result<(), BanksClientError> {
+        let tx_result = self
+            .solana
+            .process_transaction(&self.instructions, Some(&self.signers))
+            .await?;
+        match tx_result.result {
+            Ok(_) => assert!(false, "no error returned"),
+            Err(solana_sdk::transaction::TransactionError::InstructionError(
+                _,
+                solana_program::instruction::InstructionError::Custom(err_num),
+            )) => {
+                let expected_err: u32 = error.into();
+                assert_eq!(err_num, expected_err, "wrong error code");
+            }
+            _ => assert!(false, "not a mango error"),
+        }
         Ok(())
     }
 
@@ -384,6 +427,17 @@ pub async fn account_init_health(solana: &SolanaCookie, account: Pubkey) -> f64 
         .pop()
         .unwrap();
     health_data.init_health.to_num::<f64>()
+}
+
+pub async fn account_maint_health(solana: &SolanaCookie, account: Pubkey) -> f64 {
+    send_tx(solana, ComputeAccountDataInstruction { account })
+        .await
+        .unwrap();
+    let health_data = solana
+        .program_log_events::<mango_v4::events::MangoAccountData>()
+        .pop()
+        .unwrap();
+    health_data.maint_health.to_num::<f64>()
 }
 
 // Verifies that the "post_health: ..." log emitted by the previous instruction
@@ -997,6 +1051,10 @@ impl ClientInstruction for TokenRegisterInstruction {
             token_conditional_swap_taker_fee_rate: 0.0,
             token_conditional_swap_maker_fee_rate: 0.0,
             flash_loan_swap_fee_rate: 0.0,
+            interest_curve_scaling: 1.0,
+            interest_target_utilization: 0.5,
+            group_insurance_fund: true,
+            deposit_limit: 0,
         };
 
         let bank = Pubkey::find_program_address(
@@ -1241,6 +1299,15 @@ pub fn token_edit_instruction_default() -> mango_v4::instruction::TokenEdit {
         token_conditional_swap_taker_fee_rate_opt: None,
         token_conditional_swap_maker_fee_rate_opt: None,
         flash_loan_swap_fee_rate_opt: None,
+        interest_curve_scaling_opt: None,
+        interest_target_utilization_opt: None,
+        maint_weight_shift_start_opt: None,
+        maint_weight_shift_end_opt: None,
+        maint_weight_shift_asset_target_opt: None,
+        maint_weight_shift_liab_target_opt: None,
+        maint_weight_shift_abort: false,
+        set_fallback_oracle: false,
+        deposit_limit_opt: None,
     }
 }
 
@@ -2254,6 +2321,7 @@ impl ClientInstruction for Serum3RegisterMarketInstruction {
         let instruction = Self::Instruction {
             market_index: self.market_index,
             name: "UUU/usdc".to_string(),
+            oracle_price_band: f32::MAX,
         };
 
         let serum_market = Pubkey::find_program_address(
@@ -2295,6 +2363,46 @@ impl ClientInstruction for Serum3RegisterMarketInstruction {
 
     fn signers(&self) -> Vec<TestKeypair> {
         vec![self.admin, self.payer]
+    }
+}
+
+pub fn serum3_edit_market_instruction_default() -> mango_v4::instruction::Serum3EditMarket {
+    mango_v4::instruction::Serum3EditMarket {
+        reduce_only_opt: None,
+        force_close_opt: None,
+        name_opt: None,
+        oracle_price_band_opt: None,
+    }
+}
+
+pub struct Serum3EditMarketInstruction {
+    pub group: Pubkey,
+    pub admin: TestKeypair,
+    pub market: Pubkey,
+    pub options: mango_v4::instruction::Serum3EditMarket,
+}
+#[async_trait::async_trait(?Send)]
+impl ClientInstruction for Serum3EditMarketInstruction {
+    type Accounts = mango_v4::accounts::Serum3EditMarket;
+    type Instruction = mango_v4::instruction::Serum3EditMarket;
+    async fn to_instruction(
+        &self,
+        _account_loader: impl ClientAccountLoader + 'async_trait,
+    ) -> (Self::Accounts, instruction::Instruction) {
+        let program_id = mango_v4::id();
+
+        let accounts = Self::Accounts {
+            group: self.group,
+            admin: self.admin.pubkey(),
+            market: self.market,
+        };
+
+        let instruction = make_instruction(program_id, &accounts, &self.options);
+        (accounts, instruction)
+    }
+
+    fn signers(&self) -> Vec<TestKeypair> {
+        vec![self.admin]
     }
 }
 
@@ -2472,7 +2580,7 @@ pub struct Serum3PlaceOrderInstruction {
 #[async_trait::async_trait(?Send)]
 impl ClientInstruction for Serum3PlaceOrderInstruction {
     type Accounts = mango_v4::accounts::Serum3PlaceOrder;
-    type Instruction = mango_v4::instruction::Serum3PlaceOrder;
+    type Instruction = mango_v4::instruction::Serum3PlaceOrderV2;
     async fn to_instruction(
         &self,
         account_loader: impl ClientAccountLoader + 'async_trait,
@@ -2526,7 +2634,7 @@ impl ClientInstruction for Serum3PlaceOrderInstruction {
         )
         .unwrap();
 
-        let health_check_metas = derive_health_check_remaining_account_metas(
+        let mut health_check_metas = derive_health_check_remaining_account_metas(
             &account_loader,
             &account,
             None,
@@ -2535,10 +2643,16 @@ impl ClientInstruction for Serum3PlaceOrderInstruction {
         )
         .await;
 
-        let payer_info = &match self.side {
-            Serum3Side::Bid => &quote_info,
-            Serum3Side::Ask => &base_info,
+        let (payer_info, receiver_info) = &match self.side {
+            Serum3Side::Bid => (&quote_info, &base_info),
+            Serum3Side::Ask => (&base_info, &quote_info),
         };
+
+        let receiver_active_index = account
+            .active_token_positions()
+            .position(|tp| tp.token_index == receiver_info.token_index)
+            .unwrap();
+        health_check_metas[receiver_active_index].is_writable = true;
 
         let accounts = Self::Accounts {
             group: account.fixed.group,

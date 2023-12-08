@@ -67,8 +67,8 @@ pub fn perp_place_order(
     let pre_health_opt = if !account.fixed.is_in_health_region() {
         let retriever =
             new_fixed_order_account_retriever(ctx.remaining_accounts, &account.borrow())?;
-        let health_cache =
-            new_health_cache(&account.borrow(), &retriever).context("pre-withdraw init health")?;
+        let health_cache = new_health_cache(&account.borrow(), &retriever, now_ts)
+            .context("pre-withdraw init health")?;
         let pre_init_health = account.check_health_pre(&health_cache)?;
         Some((health_cache, pre_init_health))
     } else {

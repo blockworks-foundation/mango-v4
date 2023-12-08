@@ -7,7 +7,7 @@ use crate::instructions::INDEX_START;
 use crate::state::*;
 use crate::util::fill_from_str;
 
-use crate::logs::TokenMetaDataLog;
+use crate::logs::{emit_stack, TokenMetaDataLog};
 
 use crate::accounts_ix::*;
 
@@ -45,8 +45,8 @@ pub fn token_register_trustless(
         vault: ctx.accounts.vault.key(),
         oracle: ctx.accounts.oracle.key(),
         oracle_config: OracleConfig {
-            conf_filter: I80F48::from_num(0.10),
-            max_staleness_slots: 10000,
+            conf_filter: I80F48::from_num(1000.0), // effectively disabled
+            max_staleness_slots: -1,
             reserved: [0; 72],
         },
         stable_price_model: StablePriceModel::default(),
@@ -67,11 +67,11 @@ pub fn token_register_trustless(
         collected_fees_native: I80F48::ZERO,
         loan_origination_fee_rate: I80F48::from_num(0.0020),
         loan_fee_rate: I80F48::from_num(0.005),
-        maint_asset_weight: I80F48::from_num(0.75), // 4x leverage
-        init_asset_weight: I80F48::from_num(0.5),   // 2x leverage
-        maint_liab_weight: I80F48::from_num(1.25),  // 4x leverage
-        init_liab_weight: I80F48::from_num(1.5),    // 2x leverage
-        liquidation_fee: I80F48::from_num(0.125),
+        maint_asset_weight: I80F48::from_num(0),
+        init_asset_weight: I80F48::from_num(0),
+        maint_liab_weight: I80F48::from_num(1.4), // 2.5x
+        init_liab_weight: I80F48::from_num(1.8),  // 1.25x
+        liquidation_fee: I80F48::from_num(0.2),
         dust: I80F48::ZERO,
         flash_loan_token_account_initial: u64::MAX,
         flash_loan_approved_amount: 0,
@@ -87,17 +87,24 @@ pub fn token_register_trustless(
         net_borrows_in_window: 0,
         borrow_weight_scale_start_quote: 5_000_000_000.0, // $5k
         deposit_weight_scale_start_quote: 5_000_000_000.0, // $5k
-        reduce_only: 0,                                   // allow both deposits and borrows
+        reduce_only: 2,                                   // deposit-only
         force_close: 0,
         padding: Default::default(),
         fees_withdrawn: 0,
-        token_conditional_swap_taker_fee_rate: 0.0005,
-        token_conditional_swap_maker_fee_rate: 0.0005,
+        token_conditional_swap_taker_fee_rate: 0.0,
+        token_conditional_swap_maker_fee_rate: 0.0,
         flash_loan_swap_fee_rate: 0.0,
-        interest_target_utilization: 0.0, // unused in v0.20.0
-        interest_curve_scaling: 0.0,      // unused in v0.20.0
-        deposits_in_serum: 0,
-        reserved: [0; 2072],
+        interest_target_utilization: 0.5,
+        interest_curve_scaling: 4.0,
+        potential_serum_tokens: 0,
+        maint_weight_shift_start: 0,
+        maint_weight_shift_end: 0,
+        maint_weight_shift_duration_inv: I80F48::ZERO,
+        maint_weight_shift_asset_target: I80F48::ZERO,
+        maint_weight_shift_liab_target: I80F48::ZERO,
+        fallback_oracle: Pubkey::default(), // unused, introduced in v0.22
+        deposit_limit: 0,
+        reserved: [0; 1968],
     };
 
     if let Ok(oracle_price) =
@@ -128,7 +135,7 @@ pub fn token_register_trustless(
     mint_info.banks[0] = ctx.accounts.bank.key();
     mint_info.vaults[0] = ctx.accounts.vault.key();
 
-    emit!(TokenMetaDataLog {
+    emit_stack(TokenMetaDataLog {
         mango_group: ctx.accounts.group.key(),
         mint: ctx.accounts.mint.key(),
         token_index,

@@ -10,7 +10,7 @@ use crate::health::*;
 use crate::state::*;
 
 use crate::accounts_ix::*;
-use crate::logs::{DepositLog, TokenBalanceLog};
+use crate::logs::*;
 
 struct DepositCommon<'a, 'info> {
     pub group: &'a AccountLoader<'info, Group>,
@@ -90,17 +90,22 @@ impl<'a, 'info> DepositCommon<'a, 'info> {
 
         // Get the oracle price, even if stale or unconfident: We want to allow users
         // to deposit to close borrows or do other fixes even if the oracle is bad.
-        let unsafe_oracle_price = oracle_state_unchecked(
+        let unsafe_oracle_state = oracle_state_unchecked(
             &AccountInfoRef::borrow(self.oracle.as_ref())?,
             bank.mint_decimals,
-        )?
-        .price;
+        )?;
+        let unsafe_oracle_price = unsafe_oracle_state.price;
+
+        // If increasing total deposits, check deposit limits
+        if indexed_position > 0 {
+            bank.check_deposit_and_oo_limit()?;
+        }
 
         // Update the net deposits - adjust by price so different tokens are on the same basis (in USD terms)
         let amount_usd = (amount_i80f48 * unsafe_oracle_price).to_num::<i64>();
         account.fixed.net_deposits += amount_usd;
 
-        emit!(TokenBalanceLog {
+        emit_stack(TokenBalanceLog {
             mango_group: self.group.key(),
             mango_account: self.account.key(),
             token_index,
@@ -114,11 +119,12 @@ impl<'a, 'info> DepositCommon<'a, 'info> {
         // Health computation
         //
         let retriever = new_fixed_order_account_retriever(remaining_accounts, &account.borrow())?;
+        let now_ts: u64 = Clock::get()?.unix_timestamp.try_into().unwrap();
 
         // We only compute health to check if the account leaves the being_liquidated state.
         // So it's ok to possibly skip token positions for bad oracles and compute a health
         // value that is too low.
-        let cache = new_health_cache_skipping_bad_oracles(&account.borrow(), &retriever)?;
+        let cache = new_health_cache_skipping_bad_oracles(&account.borrow(), &retriever, now_ts)?;
 
         // Since depositing can only increase health, we can skip the usual pre-health computation.
         // Also, TokenDeposit is one of the rare instructions that is allowed even during being_liquidated.
@@ -162,7 +168,20 @@ impl<'a, 'info> DepositCommon<'a, 'info> {
             account.deactivate_token_position_and_log(raw_token_index, self.account.key());
         }
 
-        emit!(DepositLog {
+        unsafe {
+            const POS_PTR: *mut usize = 0x300000000 as usize as *mut usize;
+            msg!("heap {}", *POS_PTR);
+        }
+
+        // emit_stack(DepositLog {
+        //     mango_group: self.group.key(),
+        //     mango_account: self.account.key(),
+        //     signer: self.token_authority.key(),
+        //     token_index,
+        //     quantity: amount_i80f48.to_num::<u64>(),
+        //     price: unsafe_oracle_price.to_bits(),
+        // });
+        emit_stack(DepositLog {
             mango_group: self.group.key(),
             mango_account: self.account.key(),
             signer: self.token_authority.key(),
@@ -170,6 +189,11 @@ impl<'a, 'info> DepositCommon<'a, 'info> {
             quantity: amount_i80f48.to_num::<u64>(),
             price: unsafe_oracle_price.to_bits(),
         });
+
+        unsafe {
+            const POS_PTR: *mut usize = 0x300000000 as usize as *mut usize;
+            msg!("heap {}", *POS_PTR);
+        }
 
         Ok(())
     }

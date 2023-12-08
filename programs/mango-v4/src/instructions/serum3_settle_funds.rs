@@ -7,8 +7,9 @@ use crate::state::*;
 
 use super::apply_settle_changes;
 use crate::accounts_ix::*;
-use crate::logs::Serum3OpenOrdersBalanceLogV2;
-use crate::logs::{LoanOriginationFeeInstruction, WithdrawLoanLog};
+use crate::logs::{
+    emit_stack, LoanOriginationFeeInstruction, Serum3OpenOrdersBalanceLogV2, WithdrawLoanLog,
+};
 
 use crate::accounts_zerocopy::AccountInfoRef;
 
@@ -132,7 +133,7 @@ pub fn serum3_settle_funds<'info>(
         v2.map(|d| d.quote_oracle.as_ref()),
     )?;
 
-    emit!(Serum3OpenOrdersBalanceLogV2 {
+    emit_stack(Serum3OpenOrdersBalanceLogV2 {
         mango_group: accounts.group.key(),
         mango_account: accounts.account.key(),
         market_index: serum_market.market_index,
@@ -188,14 +189,14 @@ pub fn charge_loan_origination_fees(
             })
             .transpose()?;
 
-        emit!(WithdrawLoanLog {
+        emit_stack(WithdrawLoanLog {
             mango_group: *group_pubkey,
             mango_account: *account_pubkey,
             token_index: base_bank.token_index,
             loan_amount: withdraw_result.loan_amount.to_bits(),
             loan_origination_fee: withdraw_result.loan_origination_fee.to_bits(),
             instruction: LoanOriginationFeeInstruction::Serum3SettleFunds,
-            price: base_oracle_price.map(|p| p.to_bits())
+            price: base_oracle_price.map(|p| p.to_bits()),
         });
     }
 
@@ -224,14 +225,14 @@ pub fn charge_loan_origination_fees(
             })
             .transpose()?;
 
-        emit!(WithdrawLoanLog {
+        emit_stack(WithdrawLoanLog {
             mango_group: *group_pubkey,
             mango_account: *account_pubkey,
             token_index: quote_bank.token_index,
             loan_amount: withdraw_result.loan_amount.to_bits(),
             loan_origination_fee: withdraw_result.loan_origination_fee.to_bits(),
             instruction: LoanOriginationFeeInstruction::Serum3SettleFunds,
-            price: quote_oracle_price.map(|p| p.to_bits())
+            price: quote_oracle_price.map(|p| p.to_bits()),
         });
     }
 
