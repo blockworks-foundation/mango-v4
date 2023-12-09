@@ -64,6 +64,11 @@ pub mod pyth_mainnet_usdc_oracle {
     declare_id!("Gnt27xtC473ZT2Mw5u8wZ68Z3gULkSTb5DuxJy7eJotD");
 }
 
+pub mod usdc_mint_mainnet {
+    use solana_program::declare_id;
+    declare_id!("EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v");
+}
+
 #[zero_copy]
 #[derive(AnchorDeserialize, AnchorSerialize, Derivative)]
 #[derivative(Debug)]
@@ -181,6 +186,23 @@ pub fn determine_oracle_type(acc_info: &impl KeyedAccountReader) -> Result<Oracl
     }
 
     Err(MangoError::UnknownOracleType.into())
+}
+
+pub fn check_is_valid_fallback_oracle(acc_info: &impl KeyedAccountReader) -> Result<()> {
+    if acc_info.key() == &Pubkey::default() {
+        return Ok(());
+    };
+    let oracle_type = determine_oracle_type(acc_info)?;
+    if oracle_type == OracleType::OrcaCLMM {
+        let data = &acc_info.data();
+        let whirlpool = Whirlpool::try_deserialize(&mut &data[..]).unwrap();
+        require!(
+            whirlpool.token_mint_a == usdc_mint_mainnet::ID
+                || whirlpool.token_mint_b == usdc_mint_mainnet::ID,
+            MangoError::InvalidCLMMOracle
+        );
+    }
+    Ok(())
 }
 
 /// Get the pyth agg price if it's available, otherwise take the prev price.
@@ -330,11 +352,22 @@ pub fn oracle_state_unchecked(
             let usd_state = usdc_state_unchecked(usd_feed_opt)?;
 
             let whirlpool = Whirlpool::try_deserialize(&mut &data[..]).unwrap();
-            let decimals = (base_decimals as i8) - QUOTE_DECIMALS; // tokenMintA - tokenMintB
-            let decimal_adj = power_of_ten(decimals);
 
             let sqrt_price = U64F64::from_bits(whirlpool.sqrt_price);
-            let clmm_price = I80F48::from_num(sqrt_price * sqrt_price) * decimal_adj;
+
+            let clmm_price = if whirlpool.token_mint_a == usdc_mint_mainnet::ID {
+                // inverted
+                let decimals = QUOTE_DECIMALS - (base_decimals as i8); // tokenMintB - tokenMintA
+                let decimal_adj = power_of_ten(decimals);
+                let inv_price = I80F48::from_num(sqrt_price * sqrt_price) * decimal_adj;
+                Ok(I80F48::ONE.checked_div(inv_price).unwrap())
+            } else if whirlpool.token_mint_b == usdc_mint_mainnet::ID {
+                let decimals = (base_decimals as i8) - QUOTE_DECIMALS; // tokenMintA - tokenMintB
+                let decimal_adj = power_of_ten(decimals);
+                Ok(I80F48::from_num(sqrt_price * sqrt_price) * decimal_adj)
+            } else {
+                Err(MangoError::InvalidCLMMOracle)
+            }?;
 
             let price = clmm_price * usd_state.price;
             OracleState {
@@ -530,7 +563,7 @@ mod tests {
             assert!(determine_oracle_type(ai).unwrap() == fixture.1);
             assert!(
                 oracle_state_unchecked(ai, EMPTY_KEYED_READER_OPT, base_decimals)
-                    .is_anchor_error_with_code(6064)
+                    .is_anchor_error_with_code(6065)
             );
         }
 
