@@ -135,6 +135,9 @@ pub fn token_register(
     }
 
     bank.verify()?;
+    check_is_valid_fallback_oracle(&AccountInfoRef::borrow(
+        ctx.accounts.fallback_oracle.as_ref(),
+    )?)?;
 
     let mut mint_info = ctx.accounts.mint_info.load_init()?;
     *mint_info = MintInfo {

@@ -84,6 +84,9 @@ pub fn token_edit(
                 bank.fallback_oracle,
                 ctx.accounts.fallback_oracle.key()
             );
+            check_is_valid_fallback_oracle(&AccountInfoRef::borrow(
+                ctx.accounts.fallback_oracle.as_ref(),
+            )?)?;
             bank.fallback_oracle = ctx.accounts.fallback_oracle.key();
             mint_info.fallback_oracle = ctx.accounts.fallback_oracle.key();
             require_group_admin = true;
