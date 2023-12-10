@@ -1,4 +1,4 @@
-import { BorshAccountsCoder } from '@coral-xyz/anchor';
+import { BorshAccountsCoder, IdlAccounts } from '@coral-xyz/anchor';
 import { Market, Orderbook } from '@project-serum/serum';
 import { parsePriceData } from '@pythnetwork/client';
 import { TOKEN_PROGRAM_ID, unpackAccount } from '@solana/spl-token';
@@ -13,6 +13,7 @@ import merge from 'lodash/merge';
 import { MangoClient } from '../client';
 import { OPENBOOK_PROGRAM_ID } from '../constants';
 import { Id } from '../ids';
+import { MangoV4 } from '../mango_v4';
 import { I80F48 } from '../numbers/I80F48';
 import { PriceImpact, computePriceImpactOnJup } from '../risk';
 import { buildFetch, toNative, toNativeI80F48, toUiDecimals } from '../utils';
@@ -197,7 +198,10 @@ export class Group {
       banks = (
         await client.program.account.bank.fetchMultiple(ids.getBanks())
       ).map((account, index) =>
-        Bank.from(ids.getBanks()[index], account as any),
+        Bank.from(
+          ids.getBanks()[index],
+          account as IdlAccounts<MangoV4>['bank'],
+        ),
       );
     } else {
       banks = await client.getBanksForGroup(this);
@@ -233,7 +237,10 @@ export class Group {
       mintInfos = (
         await client.program.account.mintInfo.fetchMultiple(ids.getMintInfos())
       ).map((account, index) =>
-        MintInfo.from(ids.getMintInfos()[index], account as any),
+        MintInfo.from(
+          ids.getMintInfos()[index],
+          account as IdlAccounts<MangoV4>['mintInfo'],
+        ),
       );
     } else {
       mintInfos = await client.getMintInfosForGroup(this);
@@ -263,7 +270,10 @@ export class Group {
           ids.getSerum3Markets(),
         )
       ).map((account, index) =>
-        Serum3Market.from(ids.getSerum3Markets()[index], account as any),
+        Serum3Market.from(
+          ids.getSerum3Markets()[index],
+          account as IdlAccounts<MangoV4>['serum3Market'],
+        ),
       );
     } else {
       serum3Markets = await client.serum3GetMarkets(this);
@@ -353,7 +363,10 @@ export class Group {
           ids.getPerpMarkets(),
         )
       ).map((account, index) =>
-        PerpMarket.from(ids.getPerpMarkets()[index], account as any),
+        PerpMarket.from(
+          ids.getPerpMarkets()[index],
+          account as IdlAccounts<MangoV4>['perpMarket'],
+        ),
       );
     } else {
       perpMarkets = await client.perpGetMarkets(this);
