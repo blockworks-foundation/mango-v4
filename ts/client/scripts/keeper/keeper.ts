@@ -48,7 +48,7 @@ async function updateBanks(client: MangoClient, group: Group): Promise<void> {
           client.program.provider as AnchorProvider,
           ixs,
           group.addressLookupTablesList,
-          { prioritizationFee: true },
+          { prioritizationFee: true, preflightCommitment: 'confirmed' },
         );
 
         console.log(
