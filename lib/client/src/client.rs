@@ -1721,7 +1721,9 @@ impl TransactionBuilder {
         &self,
         rpc: &RpcClientAsync,
     ) -> anyhow::Result<solana_sdk::transaction::VersionedTransaction> {
-        let latest_blockhash = rpc.get_latest_blockhash().await?;
+        let (latest_blockhash, _) = rpc
+            .get_latest_blockhash_with_commitment(CommitmentConfig::confirmed())
+            .await?;
         self.transaction_with_blockhash(latest_blockhash)
     }
 
