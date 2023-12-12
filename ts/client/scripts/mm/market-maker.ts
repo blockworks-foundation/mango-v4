@@ -377,13 +377,10 @@ async function fullMarketMaker() {
             )
           : 0;
         if (basePos !== 0) {
-          const posSizeToClose = Math.abs(
-            Math.max(
-              basePos / 10,
-              toUiDecimalsForQuote(mangoAccount.getEquity(group)) /
-                (100 * mc.perpMarket.uiPrice),
-            ),
-          );
+          const equityBy100 =
+            toUiDecimalsForQuote(mangoAccount.getEquity(group)) /
+            (100 * mc.perpMarket.uiPrice);
+          const posSizeToClose = Math.abs(Math.max(basePos / 10, equityBy100));
           const sig = await client.perpPlaceOrder(
             group,
             mangoAccount,
@@ -397,7 +394,7 @@ async function fullMarketMaker() {
             true,
           );
           console.log(
-            `Twap closing position (current ${basePos}, closing ${posSizeToClose}), sig https://explorer.solana.com/tx/${
+            `Twap closing position (current ${basePos}, equityBy100 ${equityBy100}, closing ${posSizeToClose}), sig https://explorer.solana.com/tx/${
               sig.signature
             }?cluster=${CLUSTER == 'devnet' ? 'devnet' : ''}`,
           );
