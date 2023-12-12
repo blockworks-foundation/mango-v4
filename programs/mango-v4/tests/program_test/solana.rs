@@ -1,6 +1,7 @@
 #![allow(dead_code)]
 
 use std::cell::RefCell;
+use std::io::{Cursor, Write};
 
 use super::utils::TestKeypair;
 use anchor_lang::AccountDeserialize;
@@ -236,6 +237,29 @@ impl SolanaCookie {
 
     pub async fn get_account<T: AccountDeserialize>(&self, address: Pubkey) -> T {
         self.get_account_opt(address).await.unwrap()
+    }
+
+    pub async fn set_account<T: anchor_lang::Discriminator + anchor_lang::ZeroCopy>(
+        &self,
+        address: Pubkey,
+        data: &T,
+    ) {
+        let mut buffer = Cursor::new(Vec::new());
+        buffer.write_all(&T::DISCRIMINATOR).unwrap();
+        buffer.write_all(bytemuck::bytes_of(data)).unwrap();
+
+        let mut account = self
+            .context
+            .borrow_mut()
+            .banks_client
+            .get_account(address)
+            .await
+            .unwrap()
+            .unwrap();
+        account.data = buffer.into_inner();
+        self.context
+            .borrow_mut()
+            .set_account(&address, &account.into());
     }
 
     pub async fn token_account_balance(&self, address: Pubkey) -> u64 {
