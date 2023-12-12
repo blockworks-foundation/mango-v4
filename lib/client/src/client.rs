@@ -92,6 +92,11 @@ pub struct Client {
 
     #[builder(default = "\"\".into()")]
     pub jupiter_token: String,
+
+    /// If set, don't use `cluster` for sending transactions and send to all
+    /// addresses configured here instead.
+    #[builder(default = "None")]
+    pub override_send_transaction_urls: Option<Vec<String>>,
 }
 
 impl ClientBuilder {
@@ -1775,9 +1780,9 @@ impl TransactionSize {
 
 #[derive(Copy, Clone, Debug, Default)]
 pub struct TransactionBuilderConfig {
-    // adds a SetComputeUnitPrice instruction in front if none exists
+    /// adds a SetComputeUnitPrice instruction in front if none exists
     pub prioritization_micro_lamports: Option<u64>,
-    // adds a SetComputeUnitBudget instruction if none exists
+    /// adds a SetComputeUnitBudget instruction if none exists
     pub compute_budget_per_instruction: Option<u32>,
 }
 
