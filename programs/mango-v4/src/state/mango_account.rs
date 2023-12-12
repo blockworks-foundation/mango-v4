@@ -1200,8 +1200,6 @@ impl<
         side: Side,
         order_tree: BookSideOrderTree,
         order: &LeafNode,
-        client_order_id: u64,
-        quantity: i64,
     ) -> Result<()> {
         let perp_account = self.perp_position_mut(perp_market_index)?;
         perp_account.adjust_maker_lots(side, order.quantity);
@@ -1211,8 +1209,8 @@ impl<
         oo.market = perp_market_index;
         oo.side_and_tree = SideAndOrderTree::new(side, order_tree).into();
         oo.id = order.key;
-        oo.client_id = client_order_id;
-        oo.quantity = quantity;
+        oo.client_id = order.client_order_id;
+        oo.quantity = order.quantity;
         Ok(())
     }
 
@@ -1848,7 +1846,10 @@ impl<'a, 'info: 'a> MangoAccountLoader<'a> for &'a AccountLoader<'info, MangoAcc
 
 #[cfg(test)]
 mod tests {
+    use bytemuck::Zeroable;
     use itertools::Itertools;
+
+    use crate::state::PostOrderType;
 
     use super::*;
 
@@ -2593,6 +2594,214 @@ mod tests {
 
             check_account_active_and_order(&account, &active).unwrap();
         }
+        Ok(())
+    }
+
+    #[test]
+    fn test_perp_order_events() -> Result<()> {
+        let group = Group::zeroed();
+
+        let perp_market_index = 0;
+        let mut perp_market = PerpMarket::zeroed();
+
+        let mut account = make_test_account();
+        account.ensure_token_position(0)?;
+        account.ensure_perp_position(perp_market_index, 0)?;
+
+        let owner = Pubkey::new_unique();
+        let slot = account.perp_next_order_slot()?;
+        let order_id = 127;
+        let quantity = 42;
+        let order = LeafNode::new(
+            slot as u8,
+            order_id,
+            owner,
+            quantity,
+            1,
+            PostOrderType::Limit,
+            0,
+            0,
+            0,
+        );
+        let side = Side::Bid;
+        account.add_perp_order(0, side, BookSideOrderTree::Fixed, &order)?;
+
+        let make_fill = |quantity, out, order_id| {
+            FillEvent::new(
+                side.invert_side(),
+                out,
+                slot as u8,
+                0,
+                0,
+                owner,
+                order_id,
+                0,
+                I80F48::ZERO,
+                0,
+                owner,
+                0,
+                I80F48::ZERO,
+                1,
+                quantity,
+            )
+        };
+
+        let pp = |a: &MangoAccountValue| a.perp_position(perp_market_index).unwrap().clone();
+
+        {
+            // full fill
+            let mut account = account.clone();
+
+            let fill = make_fill(quantity, true, order_id);
+            account.execute_perp_maker(perp_market_index, &mut perp_market, &fill, &group)?;
+            assert_eq!(pp(&account).bids_base_lots, 0);
+            assert_eq!(pp(&account).asks_base_lots, 0);
+            assert!(!account.perp_order_by_raw_index(0)?.is_active());
+        }
+
+        {
+            // full fill, no order id
+            let mut account = account.clone();
+
+            let fill = make_fill(quantity, true, 0);
+            account.execute_perp_maker(perp_market_index, &mut perp_market, &fill, &group)?;
+            assert_eq!(pp(&account).bids_base_lots, 0);
+            assert_eq!(pp(&account).asks_base_lots, 0);
+            assert!(!account.perp_order_by_raw_index(0)?.is_active());
+        }
+
+        {
+            // out event
+            let mut account = account.clone();
+
+            account.execute_perp_out_event(perp_market_index, side, slot, quantity, order_id)?;
+            assert_eq!(pp(&account).bids_base_lots, 0);
+            assert_eq!(pp(&account).asks_base_lots, 0);
+            assert!(!account.perp_order_by_raw_index(0)?.is_active());
+        }
+
+        {
+            // out event, no order id
+            let mut account = account.clone();
+
+            account.execute_perp_out_event(perp_market_index, side, slot, quantity, 0)?;
+            assert_eq!(pp(&account).bids_base_lots, 0);
+            assert_eq!(pp(&account).asks_base_lots, 0);
+            assert!(!account.perp_order_by_raw_index(0)?.is_active());
+        }
+
+        {
+            // cancel
+            let mut account = account.clone();
+
+            account.remove_perp_order(slot, quantity)?;
+            assert_eq!(pp(&account).bids_base_lots, 0);
+            assert_eq!(pp(&account).asks_base_lots, 0);
+            assert!(!account.perp_order_by_raw_index(0)?.is_active());
+        }
+
+        {
+            // partial fill event, user closes rest, following out event has no effect
+            let mut account = account.clone();
+
+            let fill = make_fill(quantity - 10, false, order_id);
+            account.execute_perp_maker(perp_market_index, &mut perp_market, &fill, &group)?;
+            assert_eq!(pp(&account).bids_base_lots, 10);
+            assert_eq!(pp(&account).asks_base_lots, 0);
+            assert_eq!(account.perp_order_by_raw_index(slot)?.quantity, 10);
+
+            // out event happens but is delayed
+
+            account.remove_perp_order(slot, 0)?;
+            assert_eq!(pp(&account).bids_base_lots, 10);
+            assert_eq!(pp(&account).asks_base_lots, 0);
+            assert!(!account.perp_order_by_raw_index(0)?.is_active());
+
+            account.execute_perp_out_event(perp_market_index, side, slot, 10, order_id)?;
+            assert_eq!(pp(&account).bids_base_lots, 0);
+            assert_eq!(pp(&account).asks_base_lots, 0);
+        }
+
+        {
+            // partial fill and out are delayed, user closes first
+            let mut account = account.clone();
+
+            account.remove_perp_order(slot, 0)?;
+            assert_eq!(pp(&account).bids_base_lots, quantity);
+            assert_eq!(pp(&account).asks_base_lots, 0);
+            assert!(!account.perp_order_by_raw_index(0)?.is_active());
+
+            let fill = make_fill(quantity - 10, false, order_id);
+            account.execute_perp_maker(perp_market_index, &mut perp_market, &fill, &group)?;
+            assert_eq!(pp(&account).bids_base_lots, 10);
+            assert_eq!(pp(&account).asks_base_lots, 0);
+
+            account.execute_perp_out_event(perp_market_index, side, slot, 10, order_id)?;
+            assert_eq!(pp(&account).bids_base_lots, 0);
+            assert_eq!(pp(&account).asks_base_lots, 0);
+        }
+
+        {
+            // partial fill and cancel, cancel before outevent
+            let mut account = account.clone();
+
+            account.remove_perp_order(slot, 10)?;
+            assert_eq!(pp(&account).bids_base_lots, quantity - 10);
+            assert_eq!(pp(&account).asks_base_lots, 0);
+            assert!(!account.perp_order_by_raw_index(0)?.is_active());
+
+            let fill = make_fill(quantity - 10, false, order_id);
+            account.execute_perp_maker(perp_market_index, &mut perp_market, &fill, &group)?;
+            assert_eq!(pp(&account).bids_base_lots, 0);
+            assert_eq!(pp(&account).asks_base_lots, 0);
+        }
+
+        {
+            // several fills
+            let mut account = account.clone();
+
+            let fill = make_fill(10, false, order_id);
+            account.execute_perp_maker(perp_market_index, &mut perp_market, &fill, &group)?;
+            assert_eq!(pp(&account).bids_base_lots, quantity - 10);
+            assert_eq!(pp(&account).asks_base_lots, 0);
+            assert_eq!(
+                account.perp_order_by_raw_index(slot)?.quantity,
+                quantity - 10
+            );
+
+            let fill = make_fill(10, false, order_id);
+            account.execute_perp_maker(perp_market_index, &mut perp_market, &fill, &group)?;
+            assert_eq!(pp(&account).bids_base_lots, quantity - 20);
+            assert_eq!(pp(&account).asks_base_lots, 0);
+            assert_eq!(
+                account.perp_order_by_raw_index(slot)?.quantity,
+                quantity - 20
+            );
+
+            let fill = make_fill(quantity - 20, true, order_id);
+            account.execute_perp_maker(perp_market_index, &mut perp_market, &fill, &group)?;
+            assert_eq!(pp(&account).bids_base_lots, 0);
+            assert_eq!(pp(&account).asks_base_lots, 0);
+            assert!(!account.perp_order_by_raw_index(0)?.is_active());
+        }
+
+        {
+            // mismatched fill and out
+            let mut account = account.clone();
+
+            let mut fill = make_fill(10, false, order_id);
+            fill.maker_order_id = 1;
+            account.execute_perp_maker(perp_market_index, &mut perp_market, &fill, &group)?;
+            assert_eq!(pp(&account).bids_base_lots, quantity - 10);
+            assert_eq!(pp(&account).asks_base_lots, 0);
+            assert_eq!(account.perp_order_by_raw_index(slot)?.quantity, quantity);
+
+            account.execute_perp_out_event(perp_market_index, side, slot, 10, 1)?;
+            assert_eq!(pp(&account).bids_base_lots, quantity - 20);
+            assert_eq!(pp(&account).asks_base_lots, 0);
+            assert_eq!(account.perp_order_by_raw_index(slot)?.quantity, quantity);
+        }
+
         Ok(())
     }
 }

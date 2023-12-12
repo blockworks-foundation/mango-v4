@@ -329,8 +329,6 @@ impl<'a> Orderbook<'a> {
                 side,
                 order_tree_target,
                 &new_order,
-                order.client_order_id,
-                book_base_quantity,
             )?;
         }
 
