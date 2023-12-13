@@ -395,7 +395,7 @@ impl<'a> Orderbook<'a> {
 
     /// Cancels an order in an open order slot, removing it from open orders list
     /// and from the orderbook (unless already filled/expired)
-    fn cancel_order_by_slot(
+    pub fn cancel_order_by_slot(
         &mut self,
         mango_account: &mut MangoAccountRefMut,
         mango_account_pk: &Pubkey,

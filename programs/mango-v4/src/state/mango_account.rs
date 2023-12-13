@@ -850,18 +850,20 @@ impl<
         &self,
         market_index: PerpMarketIndex,
         client_order_id: u64,
-    ) -> Option<&PerpOpenOrder> {
-        self.all_perp_orders()
-            .find(|&oo| oo.is_active_for_market(market_index) && oo.client_id == client_order_id)
+    ) -> Option<(usize, &PerpOpenOrder)> {
+        self.all_perp_orders().enumerate().find(|(_, &oo)| {
+            oo.is_active_for_market(market_index) && oo.client_id == client_order_id
+        })
     }
 
     pub fn perp_find_order_with_order_id(
         &self,
         market_index: PerpMarketIndex,
         order_id: u128,
-    ) -> Option<&PerpOpenOrder> {
+    ) -> Option<(usize, &PerpOpenOrder)> {
         self.all_perp_orders()
-            .find(|&oo| oo.is_active_for_market(market_index) && oo.id == order_id)
+            .enumerate()
+            .find(|(_, &oo)| oo.is_active_for_market(market_index) && oo.id == order_id)
     }
 
     pub fn being_liquidated(&self) -> bool {
