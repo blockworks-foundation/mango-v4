@@ -13,7 +13,7 @@ use static_assertions::const_assert_eq;
 
 use crate::error::*;
 use crate::health::{HealthCache, HealthType};
-use crate::logs::{DeactivatePerpPositionLog, DeactivateTokenPositionLog};
+use crate::logs::{emit_stack, DeactivatePerpPositionLog, DeactivateTokenPositionLog};
 use crate::util;
 
 use super::BookSideOrderTree;
@@ -1014,7 +1014,7 @@ impl<
         let mango_group = self.fixed().group;
         let token_position = self.token_position_mut_by_raw_index(raw_index);
         assert!(token_position.in_use_count == 0);
-        emit!(DeactivateTokenPositionLog {
+        emit_stack(DeactivateTokenPositionLog {
             mango_group,
             mango_account: mango_account_pubkey,
             token_index: token_position.token_index,
@@ -1168,7 +1168,7 @@ impl<
         let mango_group = self.fixed().group;
         let perp_position = self.perp_position_mut(perp_market_index)?;
 
-        emit!(DeactivatePerpPositionLog {
+        emit_stack(DeactivatePerpPositionLog {
             mango_group,
             mango_account: mango_account_pubkey,
             market_index: perp_market_index,

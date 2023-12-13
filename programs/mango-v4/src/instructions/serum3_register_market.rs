@@ -6,12 +6,13 @@ use crate::state::*;
 use crate::util::fill_from_str;
 
 use crate::accounts_ix::*;
-use crate::logs::Serum3RegisterMarketLog;
+use crate::logs::{emit_stack, Serum3RegisterMarketLog};
 
 pub fn serum3_register_market(
     ctx: Context<Serum3RegisterMarket>,
     market_index: Serum3MarketIndex,
     name: String,
+    oracle_price_band: f32,
 ) -> Result<()> {
     // TODO: must guard against accidentally using the same market_index twice!
 
@@ -44,6 +45,7 @@ pub fn serum3_register_market(
         market_index,
         bump: *ctx.bumps.get("serum_market").ok_or(MangoError::SomeError)?,
         padding2: Default::default(),
+        oracle_price_band,
         registration_time: Clock::get()?.unix_timestamp.try_into().unwrap(),
         reserved: [0; 128],
     };
@@ -55,7 +57,7 @@ pub fn serum3_register_market(
         reserved: [0; 38],
     };
 
-    emit!(Serum3RegisterMarketLog {
+    emit_stack(Serum3RegisterMarketLog {
         mango_group: ctx.accounts.group.key(),
         serum_market: ctx.accounts.serum_market.key(),
         market_index,

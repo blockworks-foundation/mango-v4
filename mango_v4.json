@@ -1,5 +1,5 @@
 {
-  "version": "0.20.0",
+  "version": "0.21.0",
   "name": "mango_v4",
   "instructions": [
     {
@@ -602,6 +602,22 @@
         {
           "name": "flashLoanSwapFeeRate",
           "type": "f32"
+        },
+        {
+          "name": "interestCurveScaling",
+          "type": "f32"
+        },
+        {
+          "name": "interestTargetUtilization",
+          "type": "f32"
+        },
+        {
+          "name": "groupInsuranceFund",
+          "type": "bool"
+        },
+        {
+          "name": "depositLimit",
+          "type": "u64"
         }
       ]
     },
@@ -935,6 +951,56 @@
           "name": "flashLoanSwapFeeRateOpt",
           "type": {
             "option": "f32"
+          }
+        },
+        {
+          "name": "interestCurveScalingOpt",
+          "type": {
+            "option": "f32"
+          }
+        },
+        {
+          "name": "interestTargetUtilizationOpt",
+          "type": {
+            "option": "f32"
+          }
+        },
+        {
+          "name": "maintWeightShiftStartOpt",
+          "type": {
+            "option": "u64"
+          }
+        },
+        {
+          "name": "maintWeightShiftEndOpt",
+          "type": {
+            "option": "u64"
+          }
+        },
+        {
+          "name": "maintWeightShiftAssetTargetOpt",
+          "type": {
+            "option": "f32"
+          }
+        },
+        {
+          "name": "maintWeightShiftLiabTargetOpt",
+          "type": {
+            "option": "f32"
+          }
+        },
+        {
+          "name": "maintWeightShiftAbort",
+          "type": "bool"
+        },
+        {
+          "name": "setFallbackOracle",
+          "type": "bool"
+        },
+        {
+          "name": "depositLimitOpt",
+          "type": {
+            "option": "u64"
           }
         }
       ]
@@ -1817,8 +1883,7 @@
           "isMut": true,
           "isSigner": false,
           "relations": [
-            "group",
-            "owner"
+            "group"
           ]
         },
         {
@@ -2306,6 +2371,10 @@
         {
           "name": "name",
           "type": "string"
+        },
+        {
+          "name": "oraclePriceBand",
+          "type": "f32"
         }
       ]
     },
@@ -2348,6 +2417,12 @@
           "name": "nameOpt",
           "type": {
             "option": "string"
+          }
+        },
+        {
+          "name": "oraclePriceBandOpt",
+          "type": {
+            "option": "f32"
           }
         }
       ]
@@ -2536,6 +2611,164 @@
     },
     {
       "name": "serum3PlaceOrder",
+      "accounts": [
+        {
+          "name": "group",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "account",
+          "isMut": true,
+          "isSigner": false,
+          "relations": [
+            "group"
+          ]
+        },
+        {
+          "name": "owner",
+          "isMut": false,
+          "isSigner": true
+        },
+        {
+          "name": "openOrders",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "serumMarket",
+          "isMut": false,
+          "isSigner": false,
+          "relations": [
+            "group",
+            "serum_program",
+            "serum_market_external"
+          ]
+        },
+        {
+          "name": "serumProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "serumMarketExternal",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "marketBids",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "marketAsks",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "marketEventQueue",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "marketRequestQueue",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "marketBaseVault",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "marketQuoteVault",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "marketVaultSigner",
+          "isMut": false,
+          "isSigner": false,
+          "docs": [
+            "needed for the automatic settle_funds call"
+          ]
+        },
+        {
+          "name": "payerBank",
+          "isMut": true,
+          "isSigner": false,
+          "docs": [
+            "The bank that pays for the order, if necessary"
+          ],
+          "relations": [
+            "group"
+          ]
+        },
+        {
+          "name": "payerVault",
+          "isMut": true,
+          "isSigner": false,
+          "docs": [
+            "The bank vault that pays for the order, if necessary"
+          ]
+        },
+        {
+          "name": "payerOracle",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "tokenProgram",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "side",
+          "type": {
+            "defined": "Serum3Side"
+          }
+        },
+        {
+          "name": "limitPrice",
+          "type": "u64"
+        },
+        {
+          "name": "maxBaseQty",
+          "type": "u64"
+        },
+        {
+          "name": "maxNativeQuoteQtyIncludingFees",
+          "type": "u64"
+        },
+        {
+          "name": "selfTradeBehavior",
+          "type": {
+            "defined": "Serum3SelfTradeBehavior"
+          }
+        },
+        {
+          "name": "orderType",
+          "type": {
+            "defined": "Serum3OrderType"
+          }
+        },
+        {
+          "name": "clientOrderId",
+          "type": "u64"
+        },
+        {
+          "name": "limit",
+          "type": "u16"
+        }
+      ]
+    },
+    {
+      "name": "serum3PlaceOrderV2",
+      "docs": [
+        "requires the receiver_bank in the health account list to be writable"
+      ],
       "accounts": [
         {
           "name": "group",
@@ -7057,15 +7290,56 @@
             "type": "f64"
           },
           {
-            "name": "depositsInSerum",
-            "type": "i64"
+            "name": "potentialSerumTokens",
+            "docs": [
+              "Largest amount of tokens that might be added the the bank based on",
+              "serum open order execution."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "maintWeightShiftStart",
+            "type": "u64"
+          },
+          {
+            "name": "maintWeightShiftEnd",
+            "type": "u64"
+          },
+          {
+            "name": "maintWeightShiftDurationInv",
+            "type": {
+              "defined": "I80F48"
+            }
+          },
+          {
+            "name": "maintWeightShiftAssetTarget",
+            "type": {
+              "defined": "I80F48"
+            }
+          },
+          {
+            "name": "maintWeightShiftLiabTarget",
+            "type": {
+              "defined": "I80F48"
+            }
+          },
+          {
+            "name": "fallbackOracle",
+            "type": "publicKey"
+          },
+          {
+            "name": "depositLimit",
+            "docs": [
+              "zero means none, in token native"
+            ],
+            "type": "u64"
           },
           {
             "name": "reserved",
             "type": {
               "array": [
                 "u8",
-                2072
+                1968
               ]
             }
           }
@@ -7990,7 +8264,7 @@
             "name": "settleFeeFlat",
             "docs": [
               "In native units of settlement token, given to each settle call above the",
-              "settle_fee_amount_threshold."
+              "settle_fee_amount_threshold if settling at least 1% of perp base pos value."
             ],
             "type": "f32"
           },
@@ -8004,7 +8278,8 @@
           {
             "name": "settleFeeFractionLowHealth",
             "docs": [
-              "Fraction of pnl to pay out as fee if +pnl account has low health."
+              "Fraction of pnl to pay out as fee if +pnl account has low health.",
+              "(limited to 2x settle_fee_flat)"
             ],
             "type": "f32"
           },
@@ -8163,9 +8438,19 @@
             "type": {
               "array": [
                 "u8",
-                5
+                1
               ]
             }
+          },
+          {
+            "name": "oraclePriceBand",
+            "docs": [
+              "Limit orders must be <= oracle * (1+band) and >= oracle / (1+band)",
+              "",
+              "Zero value is the default due to migration and disables the limit,",
+              "same as f32::MAX."
+            ],
+            "type": "f32"
           },
           {
             "name": "registrationTime",
@@ -8602,26 +8887,41 @@
             "type": "f64"
           },
           {
-            "name": "baseDepositsReserved",
+            "name": "potentialBaseTokens",
             "docs": [
-              "Tracks the amount of deposits that flowed into the serum open orders account.",
+              "An overestimate of the amount of tokens that might flow out of the open orders account.",
               "",
-              "The bank still considers these amounts user deposits (see deposits_in_serum)",
-              "and they need to be deducted from there when they flow back into the bank",
-              "as real tokens."
+              "The bank still considers these amounts user deposits (see Bank::potential_serum_tokens)",
+              "and that value needs to be updated in conjunction with these numbers.",
+              "",
+              "This estimation is based on the amount of tokens in the open orders account",
+              "(see update_bank_potential_tokens() in serum3_place_order and settle)"
             ],
             "type": "u64"
           },
           {
-            "name": "quoteDepositsReserved",
+            "name": "potentialQuoteTokens",
             "type": "u64"
+          },
+          {
+            "name": "lowestPlacedBidInv",
+            "docs": [
+              "Track lowest bid/highest ask, same way as for highest bid/lowest ask.",
+              "",
+              "0 is a special \"unset\" state."
+            ],
+            "type": "f64"
+          },
+          {
+            "name": "highestPlacedAsk",
+            "type": "f64"
           },
           {
             "name": "reserved",
             "type": {
               "array": [
                 "u8",
-                32
+                16
               ]
             }
           }
@@ -10284,6 +10584,9 @@
           },
           {
             "name": "TokenConditionalSwapCreateLinearAuction"
+          },
+          {
+            "name": "Serum3PlaceOrderV2"
           }
         ]
       }
@@ -11389,6 +11692,56 @@
         {
           "name": "maxRate",
           "type": "i128",
+          "index": false
+        }
+      ]
+    },
+    {
+      "name": "UpdateRateLogV2",
+      "fields": [
+        {
+          "name": "mangoGroup",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "tokenIndex",
+          "type": "u16",
+          "index": false
+        },
+        {
+          "name": "rate0",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "util0",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "rate1",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "util1",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "maxRate",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "curveScaling",
+          "type": "f64",
+          "index": false
+        },
+        {
+          "name": "targetUtilization",
+          "type": "f32",
           "index": false
         }
       ]
@@ -13155,6 +13508,21 @@
       "code": 6059,
       "name": "TokenConditionalSwapTypeNotStartable",
       "msg": "token conditional swap type cannot be started"
+    },
+    {
+      "code": 6060,
+      "name": "HealthAccountBankNotWritable",
+      "msg": "a bank in the health account list should be writable but is not"
+    },
+    {
+      "code": 6061,
+      "name": "Serum3PriceBandExceeded",
+      "msg": "the market does not allow limit orders too far from the current oracle value"
+    },
+    {
+      "code": 6062,
+      "name": "BankDepositLimit",
+      "msg": "deposit crosses the token's deposit limit"
     }
   ]
 }

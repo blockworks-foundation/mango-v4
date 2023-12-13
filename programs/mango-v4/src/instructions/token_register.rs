@@ -6,7 +6,7 @@ use crate::error::*;
 use crate::state::*;
 use crate::util::fill_from_str;
 
-use crate::logs::TokenMetaDataLog;
+use crate::logs::{emit_stack, TokenMetaDataLog};
 
 pub const INDEX_START: I80F48 = I80F48::from_bits(1_000_000 * I80F48::ONE.to_bits());
 
@@ -38,6 +38,10 @@ pub fn token_register(
     token_conditional_swap_taker_fee_rate: f32,
     token_conditional_swap_maker_fee_rate: f32,
     flash_loan_swap_fee_rate: f32,
+    interest_curve_scaling: f32,
+    interest_target_utilization: f32,
+    group_insurance_fund: bool,
+    deposit_limit: u64,
 ) -> Result<()> {
     // Require token 0 to be in the insurance token
     if token_index == INSURANCE_TOKEN_INDEX {
@@ -107,11 +111,18 @@ pub fn token_register(
         fees_withdrawn: 0,
         token_conditional_swap_taker_fee_rate,
         token_conditional_swap_maker_fee_rate,
-        flash_loan_swap_fee_rate,
-        interest_target_utilization: 0.0, // unused in v0.20.0
-        interest_curve_scaling: 0.0,      // unused in v0.20.0
-        deposits_in_serum: 0,
-        reserved: [0; 2072],
+        flash_loan_swap_fee_rate: flash_loan_swap_fee_rate,
+        interest_target_utilization,
+        interest_curve_scaling: interest_curve_scaling.into(),
+        potential_serum_tokens: 0,
+        maint_weight_shift_start: 0,
+        maint_weight_shift_end: 0,
+        maint_weight_shift_duration_inv: I80F48::ZERO,
+        maint_weight_shift_asset_target: I80F48::ZERO,
+        maint_weight_shift_liab_target: I80F48::ZERO,
+        fallback_oracle: Pubkey::default(), // unused, introduced in v0.22
+        deposit_limit,
+        reserved: [0; 1968],
     };
 
     if let Ok(oracle_price) =
@@ -129,7 +140,7 @@ pub fn token_register(
     *mint_info = MintInfo {
         group: ctx.accounts.group.key(),
         token_index,
-        group_insurance_fund: 1,
+        group_insurance_fund: if group_insurance_fund { 1 } else { 0 },
         padding1: Default::default(),
         mint: ctx.accounts.mint.key(),
         banks: Default::default(),
@@ -142,7 +153,7 @@ pub fn token_register(
     mint_info.banks[0] = ctx.accounts.bank.key();
     mint_info.vaults[0] = ctx.accounts.vault.key();
 
-    emit!(TokenMetaDataLog {
+    emit_stack(TokenMetaDataLog {
         mango_group: ctx.accounts.group.key(),
         mint: ctx.accounts.mint.key(),
         token_index,

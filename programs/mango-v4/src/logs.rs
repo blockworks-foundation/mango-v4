@@ -5,13 +5,29 @@ use crate::{
 use anchor_lang::prelude::*;
 use borsh::BorshSerialize;
 
+#[inline(never)] // ensure fresh stack frame
+pub fn emit_stack<T: anchor_lang::Event>(e: T) {
+    use std::io::{Cursor, Write};
+
+    // stack buffer, stack frames are 4kb
+    let mut buffer = [0u8; 3000];
+
+    let mut cursor = Cursor::new(&mut buffer[..]);
+    cursor.write_all(&T::DISCRIMINATOR).unwrap();
+    e.serialize(&mut cursor)
+        .expect("event must fit into stack buffer");
+
+    let pos = cursor.position() as usize;
+    anchor_lang::solana_program::log::sol_log_data(&[&buffer[..pos]]);
+}
+
 pub fn emit_perp_balances(
     mango_group: Pubkey,
     mango_account: Pubkey,
     pp: &PerpPosition,
     pm: &PerpMarket,
 ) {
-    emit!(PerpBalanceLog {
+    emit_stack(PerpBalanceLog {
         mango_group,
         mango_account,
         market_index: pm.perp_market_index,
@@ -298,6 +314,20 @@ pub struct UpdateRateLog {
     pub rate0: i128,    // I80F48
     pub rate1: i128,    // I80F48
     pub max_rate: i128, // I80F48
+}
+
+#[event]
+pub struct UpdateRateLogV2 {
+    pub mango_group: Pubkey,
+    pub token_index: u16,
+    // contrary to v1 these do not have curve_scaling factored in!
+    pub rate0: i128,    // I80F48
+    pub util0: i128,    // I80F48
+    pub rate1: i128,    // I80F48
+    pub util1: i128,    // I80F48
+    pub max_rate: i128, // I80F48
+    pub curve_scaling: f64,
+    pub target_utilization: f32,
 }
 
 #[event]

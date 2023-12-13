@@ -2,13 +2,7 @@ import { BN } from '@coral-xyz/anchor';
 import { OpenOrders } from '@project-serum/serum';
 import { PublicKey } from '@solana/web3.js';
 import cloneDeep from 'lodash/cloneDeep';
-import {
-  I80F48,
-  I80F48Dto,
-  MAX_I80F48,
-  ONE_I80F48,
-  ZERO_I80F48,
-} from '../numbers/I80F48';
+import { I80F48, MAX_I80F48, ONE_I80F48, ZERO_I80F48 } from '../numbers/I80F48';
 import {
   toNativeI80F48ForQuote,
   toUiDecimals,
@@ -156,14 +150,6 @@ export class HealthCache {
     });
 
     return new HealthCache(tokenInfos, serum3Infos, perpInfos);
-  }
-
-  static fromDto(dto): HealthCache {
-    return new HealthCache(
-      dto.tokenInfos.map((dto) => TokenInfo.fromDto(dto)),
-      dto.serum3Infos.map((dto) => Serum3Info.fromDto(dto)),
-      dto.perpInfos.map((dto) => PerpInfo.fromDto(dto)),
-    );
   }
 
   computeSerum3Reservations(healthType: HealthType | undefined): {
@@ -1437,23 +1423,6 @@ export class TokenInfo {
     public balanceSpot: I80F48,
   ) {}
 
-  static fromDto(dto: TokenInfoDto): TokenInfo {
-    return new TokenInfo(
-      dto.tokenIndex as TokenIndex,
-      I80F48.from(dto.maintAssetWeight),
-      I80F48.from(dto.initAssetWeight),
-      I80F48.from(dto.initScaledAssetWeight),
-      I80F48.from(dto.maintLiabWeight),
-      I80F48.from(dto.initLiabWeight),
-      I80F48.from(dto.initScaledLiabWeight),
-      new Prices(
-        I80F48.from(dto.prices.oracle),
-        I80F48.from(dto.prices.stable),
-      ),
-      I80F48.from(dto.balanceSpot),
-    );
-  }
-
   static fromBank(bank: BankForHealth, nativeBalance?: I80F48): TokenInfo {
     const p = new Prices(
       bank.price,
@@ -1462,12 +1431,15 @@ export class TokenInfo {
     // Use the liab price for computing weight scaling, because it's pessimistic and
     // causes the most unfavorable scaling.
     const liabPrice = p.liab(HealthType.init);
+
+    const [maintAssetWeight, maintLiabWeight] = bank.maintWeights();
+
     return new TokenInfo(
       bank.tokenIndex,
-      bank.maintAssetWeight,
+      maintAssetWeight,
       bank.initAssetWeight,
       bank.scaledInitAssetWeight(liabPrice),
-      bank.maintLiabWeight,
+      maintLiabWeight,
       bank.initLiabWeight,
       bank.scaledInitLiabWeight(liabPrice),
       p,
@@ -1563,18 +1535,6 @@ export class Serum3Info {
     public quoteInfoIndex: number,
     public marketIndex: MarketIndex,
   ) {}
-
-  static fromDto(dto: Serum3InfoDto): Serum3Info {
-    return new Serum3Info(
-      I80F48.from(dto.reservedBase),
-      I80F48.from(dto.reservedQuote),
-      I80F48.from(dto.reservedBaseAsQuoteLowestAsk),
-      I80F48.from(dto.reservedQuoteAsBaseHighestBid),
-      dto.baseInfoIndex,
-      dto.quoteInfoIndex,
-      dto.marketIndex as MarketIndex,
-    );
-  }
 
   static emptyFromSerum3Market(
     serum3Market: Serum3Market,
@@ -1755,29 +1715,6 @@ export class PerpInfo {
     public basePrices: Prices,
     public hasOpenOrders: boolean,
   ) {}
-
-  static fromDto(dto: PerpInfoDto): PerpInfo {
-    return new PerpInfo(
-      dto.perpMarketIndex,
-      dto.settleTokenIndex as TokenIndex,
-      I80F48.from(dto.maintBaseAssetWeight),
-      I80F48.from(dto.initBaseAssetWeight),
-      I80F48.from(dto.maintBaseLiabWeight),
-      I80F48.from(dto.initBaseLiabWeight),
-      I80F48.from(dto.maintOverallAssetWeight),
-      I80F48.from(dto.initOverallAssetWeight),
-      dto.baseLotSize,
-      dto.baseLots,
-      dto.bidsBaseLots,
-      dto.asksBaseLots,
-      I80F48.from(dto.quote),
-      new Prices(
-        I80F48.from(dto.prices.oracle),
-        I80F48.from(dto.prices.stable),
-      ),
-      dto.hasOpenOrders,
-    );
-  }
 
   static fromPerpPosition(
     perpMarket: PerpMarket,
@@ -1971,83 +1908,4 @@ export class PerpInfo {
       HealthType.init,
     )}`;
   }
-}
-
-export class HealthCacheDto {
-  tokenInfos: TokenInfoDto[];
-  serum3Infos: Serum3InfoDto[];
-  perpInfos: PerpInfoDto[];
-}
-export class TokenInfoDto {
-  tokenIndex: number;
-  maintAssetWeight: I80F48Dto;
-  initAssetWeight: I80F48Dto;
-  initScaledAssetWeight: I80F48Dto;
-  maintLiabWeight: I80F48Dto;
-  initLiabWeight: I80F48Dto;
-  initScaledLiabWeight: I80F48Dto;
-  prices: { oracle: I80F48Dto; stable: I80F48Dto };
-  balanceSpot: I80F48Dto;
-
-  constructor(
-    tokenIndex: number,
-    maintAssetWeight: I80F48Dto,
-    initAssetWeight: I80F48Dto,
-    initScaledAssetWeight: I80F48Dto,
-    maintLiabWeight: I80F48Dto,
-    initLiabWeight: I80F48Dto,
-    initScaledLiabWeight: I80F48Dto,
-    prices: { oracle: I80F48Dto; stable: I80F48Dto },
-    balanceNative: I80F48Dto,
-  ) {
-    this.tokenIndex = tokenIndex;
-    this.maintAssetWeight = maintAssetWeight;
-    this.initAssetWeight = initAssetWeight;
-    this.initScaledAssetWeight = initScaledAssetWeight;
-    this.maintLiabWeight = maintLiabWeight;
-    this.initLiabWeight = initLiabWeight;
-    this.initScaledLiabWeight = initScaledLiabWeight;
-    this.prices = prices;
-    this.balanceSpot = balanceNative;
-  }
-}
-
-export class Serum3InfoDto {
-  reservedBase: I80F48Dto;
-  reservedQuote: I80F48Dto;
-  reservedBaseAsQuoteLowestAsk: I80F48Dto;
-  reservedQuoteAsBaseHighestBid: I80F48Dto;
-  baseInfoIndex: number;
-  quoteInfoIndex: number;
-  marketIndex: number;
-
-  constructor(
-    reservedBase: I80F48Dto,
-    reservedQuote: I80F48Dto,
-    baseInfoIndex: number,
-    quoteInfoIndex: number,
-  ) {
-    this.reservedBase = reservedBase;
-    this.reservedQuote = reservedQuote;
-    this.baseInfoIndex = baseInfoIndex;
-    this.quoteInfoIndex = quoteInfoIndex;
-  }
-}
-
-export class PerpInfoDto {
-  perpMarketIndex: number;
-  settleTokenIndex: number;
-  maintBaseAssetWeight: I80F48Dto;
-  initBaseAssetWeight: I80F48Dto;
-  maintBaseLiabWeight: I80F48Dto;
-  initBaseLiabWeight: I80F48Dto;
-  maintOverallAssetWeight: I80F48Dto;
-  initOverallAssetWeight: I80F48Dto;
-  public baseLotSize: BN;
-  public baseLots: BN;
-  public bidsBaseLots: BN;
-  public asksBaseLots: BN;
-  quote: I80F48Dto;
-  prices: { oracle: I80F48Dto; stable: I80F48Dto };
-  hasOpenOrders: boolean;
 }

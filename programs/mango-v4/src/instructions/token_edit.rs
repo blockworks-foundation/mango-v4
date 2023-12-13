@@ -8,7 +8,7 @@ use crate::error::MangoError;
 use crate::state::*;
 
 use crate::accounts_ix::*;
-use crate::logs::TokenMetaDataLog;
+use crate::logs::{emit_stack, TokenMetaDataLog};
 use crate::util::fill_from_str;
 
 #[allow(unused_variables)]
@@ -42,6 +42,15 @@ pub fn token_edit(
     token_conditional_swap_taker_fee_rate_opt: Option<f32>,
     token_conditional_swap_maker_fee_rate_opt: Option<f32>,
     flash_loan_swap_fee_rate_opt: Option<f32>,
+    interest_curve_scaling_opt: Option<f32>,
+    interest_target_utilization_opt: Option<f32>,
+    maint_weight_shift_start_opt: Option<u64>,
+    maint_weight_shift_end_opt: Option<u64>,
+    maint_weight_shift_asset_target_opt: Option<f32>,
+    maint_weight_shift_liab_target_opt: Option<f32>,
+    maint_weight_shift_abort: bool,
+    set_fallback_oracle: bool, // unused, introduced in v0.22
+    deposit_limit_opt: Option<u64>,
 ) -> Result<()> {
     let group = ctx.accounts.group.load()?;
 
@@ -339,6 +348,106 @@ pub fn token_edit(
             bank.flash_loan_swap_fee_rate = fee_rate;
             require_group_admin = true;
         }
+
+        if let Some(interest_curve_scaling) = interest_curve_scaling_opt {
+            msg!(
+                "Interest curve scaling old {:?}, new {:?}",
+                bank.interest_curve_scaling,
+                interest_curve_scaling
+            );
+            require_gte!(interest_curve_scaling, 1.0);
+            bank.interest_curve_scaling = interest_curve_scaling.into();
+            require_group_admin = true;
+        }
+        if let Some(interest_target_utilization) = interest_target_utilization_opt {
+            msg!(
+                "Interest target utilization old {:?}, new {:?}",
+                bank.interest_target_utilization,
+                interest_target_utilization
+            );
+            require_gte!(interest_target_utilization, 0.0);
+            bank.interest_target_utilization = interest_target_utilization;
+            require_group_admin = true;
+        }
+
+        if maint_weight_shift_abort {
+            let now_ts: u64 = Clock::get()?.unix_timestamp.try_into().unwrap();
+            let (maint_asset_weight, maint_liab_weight) = bank.maint_weights(now_ts);
+            bank.maint_asset_weight = maint_asset_weight;
+            bank.maint_liab_weight = maint_liab_weight;
+            bank.maint_weight_shift_start = 0;
+            bank.maint_weight_shift_end = 0;
+            bank.maint_weight_shift_duration_inv = I80F48::ZERO;
+            bank.maint_weight_shift_asset_target = I80F48::ZERO;
+            bank.maint_weight_shift_liab_target = I80F48::ZERO;
+            msg!(
+                "Maint weight shift aborted, current maint weights asset {} liab {}",
+                maint_asset_weight,
+                maint_liab_weight,
+            );
+            // Allow execution by group admin or security admin
+        }
+        if let Some(maint_weight_shift_start) = maint_weight_shift_start_opt {
+            msg!(
+                "Maint weight shift start old {:?}, new {:?}",
+                bank.maint_weight_shift_start,
+                maint_weight_shift_start
+            );
+            bank.maint_weight_shift_start = maint_weight_shift_start;
+            require_group_admin = true;
+        }
+        if let Some(maint_weight_shift_end) = maint_weight_shift_end_opt {
+            msg!(
+                "Maint weight shift end old {:?}, new {:?}",
+                bank.maint_weight_shift_end,
+                maint_weight_shift_end
+            );
+            bank.maint_weight_shift_end = maint_weight_shift_end;
+            require_group_admin = true;
+        }
+        if let Some(maint_weight_shift_asset_target) = maint_weight_shift_asset_target_opt {
+            msg!(
+                "Maint weight shift asset target old {:?}, new {:?}",
+                bank.maint_weight_shift_asset_target,
+                maint_weight_shift_asset_target
+            );
+            bank.maint_weight_shift_asset_target =
+                I80F48::from_num(maint_weight_shift_asset_target);
+            require_group_admin = true;
+        }
+        if let Some(maint_weight_shift_liab_target) = maint_weight_shift_liab_target_opt {
+            msg!(
+                "Maint weight shift liab target old {:?}, new {:?}",
+                bank.maint_weight_shift_liab_target,
+                maint_weight_shift_liab_target
+            );
+            bank.maint_weight_shift_liab_target = I80F48::from_num(maint_weight_shift_liab_target);
+            require_group_admin = true;
+        }
+        if maint_weight_shift_start_opt.is_some() || maint_weight_shift_end_opt.is_some() {
+            let was_enabled = bank.maint_weight_shift_duration_inv.is_positive();
+            if bank.maint_weight_shift_end <= bank.maint_weight_shift_start {
+                bank.maint_weight_shift_duration_inv = I80F48::ZERO;
+            } else {
+                bank.maint_weight_shift_duration_inv = I80F48::ONE
+                    / I80F48::from(bank.maint_weight_shift_end - bank.maint_weight_shift_start);
+            }
+            msg!(
+                "Maint weight shift enabled old {}, new {}",
+                was_enabled,
+                bank.maint_weight_shift_duration_inv.is_positive(),
+            );
+        }
+
+        if let Some(deposit_limit) = deposit_limit_opt {
+            msg!(
+                "Deposit limit old {:?}, new {:?}",
+                bank.deposit_limit,
+                deposit_limit
+            );
+            bank.deposit_limit = deposit_limit;
+            require_group_admin = true;
+        }
     }
 
     // account constraint #1
@@ -359,7 +468,7 @@ pub fn token_edit(
     let bank = ctx.remaining_accounts.first().unwrap().load_mut::<Bank>()?;
     bank.verify()?;
 
-    emit!(TokenMetaDataLog {
+    emit_stack(TokenMetaDataLog {
         mango_group: ctx.accounts.group.key(),
         mint: mint_info.mint.key(),
         token_index: bank.token_index,

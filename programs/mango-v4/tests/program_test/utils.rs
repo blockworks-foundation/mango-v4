@@ -87,15 +87,12 @@ pub fn assert_mango_error<T>(
 ) {
     match result {
         Ok(_) => assert!(false, "No error returned"),
-        Err(TransportError::TransactionError(tx_err)) => match tx_err {
-            TransactionError::InstructionError(_, err) => match err {
-                InstructionError::Custom(err_num) => {
-                    assert_eq!(*err_num, expected_error, "{}", comment);
-                }
-                _ => assert!(false, "Not a mango error"),
-            },
-            _ => assert!(false, "Not a mango error"),
-        },
+        Err(TransportError::TransactionError(TransactionError::InstructionError(
+            _,
+            InstructionError::Custom(err_num),
+        ))) => {
+            assert_eq!(*err_num, expected_error, "{}", comment);
+        }
         _ => assert!(false, "Not a mango error"),
     }
 }

@@ -3,7 +3,7 @@ use crate::accounts_zerocopy::*;
 use crate::error::*;
 use crate::group_seeds;
 use crate::health::{new_fixed_order_account_retriever, new_health_cache, AccountRetriever};
-use crate::logs::{FlashLoanLogV3, FlashLoanTokenDetailV3, TokenBalanceLog};
+use crate::logs::{emit_stack, FlashLoanLogV3, FlashLoanTokenDetailV3, TokenBalanceLog};
 use crate::state::*;
 
 use anchor_lang::prelude::*;
@@ -388,7 +388,8 @@ pub fn flash_loan_end<'key, 'accounts, 'remaining, 'info>(
 
     // Check health before balance adjustments
     let retriever = new_fixed_order_account_retriever(health_ais, &account.borrow())?;
-    let health_cache = new_health_cache(&account.borrow(), &retriever)?;
+    let now_ts: u64 = Clock::get()?.unix_timestamp.try_into().unwrap();
+    let health_cache = new_health_cache(&account.borrow(), &retriever, now_ts)?;
     let pre_init_health = account.check_health_pre(&health_cache)?;
 
     // Prices for logging and net borrow checks
@@ -466,6 +467,10 @@ pub fn flash_loan_end<'key, 'accounts, 'remaining, 'info>(
             bank.check_net_borrows(*oracle_price)?;
         }
 
+        if change_amount > 0 && native_after_change > 0 {
+            bank.check_deposit_and_oo_limit()?;
+        }
+
         bank.flash_loan_approved_amount = 0;
         bank.flash_loan_token_account_initial = u64::MAX;
 
@@ -481,7 +486,7 @@ pub fn flash_loan_end<'key, 'accounts, 'remaining, 'info>(
             approved_amount: approved_amount_u64,
         });
 
-        emit!(TokenBalanceLog {
+        emit_stack(TokenBalanceLog {
             mango_group: group.key(),
             mango_account: ctx.accounts.account.key(),
             token_index: bank.token_index as u16,
@@ -491,16 +496,16 @@ pub fn flash_loan_end<'key, 'accounts, 'remaining, 'info>(
         });
     }
 
-    emit!(FlashLoanLogV3 {
+    emit_stack(FlashLoanLogV3 {
         mango_group: group.key(),
         mango_account: ctx.accounts.account.key(),
         flash_loan_type,
-        token_loan_details
+        token_loan_details,
     });
 
     // Check health after account position changes
     let retriever = new_fixed_order_account_retriever(health_ais, &account.borrow())?;
-    let health_cache = new_health_cache(&account.borrow(), &retriever)?;
+    let health_cache = new_health_cache(&account.borrow(), &retriever, now_ts)?;
     account.check_health_post(&health_cache, pre_init_health)?;
 
     // Deactivate inactive token accounts after health check

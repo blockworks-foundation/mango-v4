@@ -2,7 +2,7 @@ use anchor_lang::prelude::*;
 
 use crate::accounts_ix::*;
 use crate::error::MangoError;
-use crate::logs::TokenConditionalSwapCancelLog;
+use crate::logs::{emit_stack, TokenConditionalSwapCancelLog};
 use crate::state::*;
 
 #[allow(clippy::too_many_arguments)]
@@ -31,7 +31,7 @@ pub fn token_conditional_swap_cancel(
     );
     *tcs = TokenConditionalSwap::default();
 
-    emit!(TokenConditionalSwapCancelLog {
+    emit_stack(TokenConditionalSwapCancelLog {
         mango_group: ctx.accounts.group.key(),
         mango_account: ctx.accounts.account.key(),
         id: token_conditional_swap_id,

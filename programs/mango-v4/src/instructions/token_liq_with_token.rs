@@ -5,7 +5,8 @@ use crate::accounts_ix::*;
 use crate::error::*;
 use crate::health::*;
 use crate::logs::{
-    LoanOriginationFeeInstruction, TokenBalanceLog, TokenLiqWithTokenLog, WithdrawLoanLog,
+    emit_stack, LoanOriginationFeeInstruction, TokenBalanceLog, TokenLiqWithTokenLog,
+    WithdrawLoanLog,
 };
 use crate::state::*;
 
@@ -20,6 +21,7 @@ pub fn token_liq_with_token(
     require!(asset_token_index != liab_token_index, MangoError::SomeError);
     let mut account_retriever = ScanningAccountRetriever::new(ctx.remaining_accounts, group_pk)
         .context("create account retriever")?;
+    let now_ts: u64 = Clock::get()?.unix_timestamp.try_into().unwrap();
 
     require_keys_neq!(ctx.accounts.liqor.key(), ctx.accounts.liqee.key());
     let mut liqor = ctx.accounts.liqor.load_full_mut()?;
@@ -39,7 +41,7 @@ pub fn token_liq_with_token(
     let mut liqee = ctx.accounts.liqee.load_full_mut()?;
 
     // Initial liqee health check
-    let mut liqee_health_cache = new_health_cache(&liqee.borrow(), &account_retriever)
+    let mut liqee_health_cache = new_health_cache(&liqee.borrow(), &account_retriever, now_ts)
         .context("create liqee health cache")?;
     let liqee_liq_end_health = liqee_health_cache.health(HealthType::LiquidationEnd);
     liqee_health_cache.require_after_phase1_liquidation()?;
@@ -52,7 +54,6 @@ pub fn token_liq_with_token(
     // Transfer some liab_token from liqor to liqee and
     // transfer some asset_token from liqee to liqor.
     //
-    let now_ts = Clock::get()?.unix_timestamp.try_into().unwrap();
     liquidation_action(
         &mut account_retriever,
         liab_token_index,
@@ -69,8 +70,13 @@ pub fn token_liq_with_token(
 
     // Check liqor's health
     if !liqor.fixed.is_in_health_region() {
-        let liqor_health = compute_health(&liqor.borrow(), HealthType::Init, &account_retriever)
-            .context("compute liqor health")?;
+        let liqor_health = compute_health(
+            &liqor.borrow(),
+            HealthType::Init,
+            &account_retriever,
+            now_ts,
+        )
+        .context("compute liqor health")?;
         require!(liqor_health >= 0, MangoError::HealthMustBePositive);
     }
 
@@ -252,7 +258,7 @@ pub(crate) fn liquidation_action(
     );
 
     // liqee asset
-    emit!(TokenBalanceLog {
+    emit_stack(TokenBalanceLog {
         mango_group: liqee.fixed.group,
         mango_account: liqee_key,
         token_index: asset_token_index,
@@ -261,7 +267,7 @@ pub(crate) fn liquidation_action(
         borrow_index: asset_bank.borrow_index.to_bits(),
     });
     // liqee liab
-    emit!(TokenBalanceLog {
+    emit_stack(TokenBalanceLog {
         mango_group: liqee.fixed.group,
         mango_account: liqee_key,
         token_index: liab_token_index,
@@ -270,7 +276,7 @@ pub(crate) fn liquidation_action(
         borrow_index: liab_bank.borrow_index.to_bits(),
     });
     // liqor asset
-    emit!(TokenBalanceLog {
+    emit_stack(TokenBalanceLog {
         mango_group: liqee.fixed.group,
         mango_account: liqor_key,
         token_index: asset_token_index,
@@ -279,7 +285,7 @@ pub(crate) fn liquidation_action(
         borrow_index: asset_bank.borrow_index.to_bits(),
     });
     // liqor liab
-    emit!(TokenBalanceLog {
+    emit_stack(TokenBalanceLog {
         mango_group: liqee.fixed.group,
         mango_account: liqor_key,
         token_index: liab_token_index,
@@ -292,14 +298,14 @@ pub(crate) fn liquidation_action(
         .loan_origination_fee
         .is_positive()
     {
-        emit!(WithdrawLoanLog {
+        emit_stack(WithdrawLoanLog {
             mango_group: liqee.fixed.group,
             mango_account: liqor_key,
             token_index: liab_token_index,
             loan_amount: liqor_liab_withdraw_result.loan_amount.to_bits(),
             loan_origination_fee: liqor_liab_withdraw_result.loan_origination_fee.to_bits(),
             instruction: LoanOriginationFeeInstruction::LiqTokenWithToken,
-            price: Some(liab_oracle_price.to_bits())
+            price: Some(liab_oracle_price.to_bits()),
         });
     }
 
@@ -323,7 +329,7 @@ pub(crate) fn liquidation_action(
         .fixed
         .maybe_recover_from_being_liquidated(liqee_liq_end_health);
 
-    emit!(TokenLiqWithTokenLog {
+    emit_stack(TokenLiqWithTokenLog {
         mango_group: liqee.fixed.group,
         liqee: liqee_key,
         liqor: liqor_key,
@@ -334,7 +340,7 @@ pub(crate) fn liquidation_action(
         asset_price: asset_oracle_price.to_bits(),
         liab_price: liab_oracle_price.to_bits(),
         bankruptcy: !liqee_health_cache.has_phase2_liquidatable()
-            & liqee_liq_end_health.is_negative()
+            & liqee_liq_end_health.is_negative(),
     });
 
     Ok(())
@@ -446,7 +452,7 @@ mod tests {
             let retriever =
                 ScanningAccountRetriever::new_with_staleness(&ais, &setup.group, None).unwrap();
 
-            health::new_health_cache(&setup.liqee.borrow(), &retriever).unwrap()
+            health::new_health_cache(&setup.liqee.borrow(), &retriever, 0).unwrap()
         }
 
         fn run(&self, max_liab_transfer: I80F48) -> Result<Self> {
@@ -468,7 +474,7 @@ mod tests {
                 ScanningAccountRetriever::new_with_staleness(&ais, &setup.group, None).unwrap();
 
             let mut liqee_health_cache =
-                health::new_health_cache(&setup.liqee.borrow(), &retriever).unwrap();
+                health::new_health_cache(&setup.liqee.borrow(), &retriever, 0).unwrap();
             let liqee_liq_end_health = liqee_health_cache.health(HealthType::LiquidationEnd);
 
             liquidation_action(
