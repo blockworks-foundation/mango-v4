@@ -1608,4 +1608,54 @@ mod tests {
 
         Ok(())
     }
+
+    #[test]
+    pub fn test_bank_interest() -> Result<()> {
+        let index_start = I80F48::from(1_000_000);
+
+        let mut bank = Bank::zeroed();
+        bank.util0 = I80F48::from_num(0.5);
+        bank.rate0 = I80F48::from_num(0.02);
+        bank.util1 = I80F48::from_num(0.75);
+        bank.rate1 = I80F48::from_num(0.05);
+        bank.max_rate = I80F48::from_num(0.5);
+        bank.interest_curve_scaling = 4.0;
+        bank.deposit_index = index_start;
+        bank.borrow_index = index_start;
+        bank.net_borrow_limit_window_size_ts = 1;
+
+        let mut position0 = TokenPosition::default();
+        let mut position1 = TokenPosition::default();
+
+        // create 100% utilization, meaning 0.5 * 4 = 200% interest
+        bank.deposit(&mut position0, I80F48::from(1_000_000_000), 0)
+            .unwrap();
+        bank.withdraw_without_fee(&mut position1, I80F48::from(1_000_000_000), 0)
+            .unwrap();
+
+        // accumulate interest for a day at 5s intervals
+        let interval = 5;
+        for i in 0..24 * 60 * 60 / interval {
+            let (deposit_index, borrow_index, borrow_fees, borrow_rate, deposit_rate) = bank
+                .compute_index(
+                    bank.indexed_deposits,
+                    bank.indexed_borrows,
+                    I80F48::from(interval),
+                )
+                .unwrap();
+            bank.deposit_index = deposit_index;
+            bank.borrow_index = borrow_index;
+        }
+
+        // the 5s rate is 2/(365*24*60*60/5), so
+        // expected is (1+five_sec_rate)^(24*60*60/5)
+        assert!(
+            ((bank.deposit_index / index_start).to_num::<f64>() - 1.0054944908).abs() < 0.0000001
+        );
+        assert!(
+            ((bank.borrow_index / index_start).to_num::<f64>() - 1.0054944908).abs() < 0.0000001
+        );
+
+        Ok(())
+    }
 }
