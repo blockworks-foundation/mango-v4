@@ -52,20 +52,6 @@ pub struct Whirlpool {
 // Number of rewards supported by Whirlpools
 pub const NUM_REWARDS: usize = 3;
 
-impl Whirlpool {
-    pub const LEN: usize = 8 + 261 + 384;
-    pub fn seeds(&self) -> [&[u8]; 6] {
-        [
-            &b"whirlpool"[..],
-            self.whirlpools_config.as_ref(),
-            self.token_mint_a.as_ref(),
-            self.token_mint_b.as_ref(),
-            self.tick_spacing_seed.as_ref(),
-            self.whirlpool_bump.as_ref(),
-        ]
-    }
-}
-
 /// Stores the state relevant for tracking liquidity mining rewards at the `Whirlpool` level.
 /// These values are used in conjunction with `PositionRewardInfo`, `Tick.reward_growths_outside`,
 /// and `Whirlpool.reward_last_updated_timestamp` to determine how many rewards are earned by open

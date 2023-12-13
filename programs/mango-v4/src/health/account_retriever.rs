@@ -271,7 +271,7 @@ impl<'a, 'info> ScannedBanksAndOracles<'a, 'info> {
         let bank = self.banks[index].load_fully_unchecked::<Bank>()?;
         let oracle = &self.oracles[index];
         let fallback_infos_1 =
-            fetch_fallback_oracle_infos(&self.fallback_oracles[..], &bank.fallback_oracle);
+            fetch_fallback_oracle_infos(&self.fallback_oracles, &bank.fallback_oracle);
         let price =
             bank.oracle_price_with_fallback(oracle, fallback_infos_1, self.staleness_slot)?;
 
