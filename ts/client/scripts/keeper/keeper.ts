@@ -1,5 +1,12 @@
 import { AnchorProvider, Wallet } from '@coral-xyz/anchor';
-import { Cluster, Connection, Keypair, PublicKey } from '@solana/web3.js';
+import {
+  Cluster,
+  Connection,
+  Keypair,
+  PublicKey,
+  Transaction,
+  TransactionInstruction,
+} from '@solana/web3.js';
 import fs from 'fs';
 import chunk from 'lodash/chunk';
 import range from 'lodash/range';
@@ -35,14 +42,18 @@ async function updateBanks(client: MangoClient, group: Group): Promise<void> {
     const tokenIndices = Array.from(group.banksMapByTokenIndex.keys());
     const tokenIndicesByChunks = chunk(tokenIndices, 10);
     tokenIndicesByChunks.map(async (tokenIndices) => {
-      const ixs = await Promise.all(
-        tokenIndices.map((ti) =>
-          client.tokenUpdateIndexAndRateIx(
-            group,
-            group.getFirstBankByTokenIndex(ti).mint,
-          ),
-        ),
-      );
+      const ixs: TransactionInstruction[] = [];
+
+      for (const tokenIndex of tokenIndices) {
+        const ix = await client.tokenUpdateIndexAndRateIx(
+          group,
+          group.getFirstBankByTokenIndex(tokenIndex).mint,
+        );
+        await client.connection
+          .simulateTransaction(new Transaction().add(ix))
+          .then((d) => ixs.push(ix));
+      }
+
       try {
         const sig = await sendTransaction(
           client.program.provider as AnchorProvider,
