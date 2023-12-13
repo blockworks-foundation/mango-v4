@@ -20,6 +20,7 @@ import {
 import fs from 'fs';
 import { Bank } from '../src/accounts/bank';
 import { Group } from '../src/accounts/group';
+import { MangoAccount } from '../src/accounts/mangoAccount';
 import { Builder } from '../src/builder';
 import { MangoClient } from '../src/client';
 import { NullTokenEditParams } from '../src/clientIxParamBuilder';
@@ -37,7 +38,6 @@ import {
   DEFAULT_VSR_ID,
   VsrClient,
 } from './governanceInstructions/voteStakeRegistryClient';
-import { MangoAccount } from '../src/accounts/mangoAccount';
 
 const {
   MB_CLUSTER_URL,
@@ -223,6 +223,15 @@ async function updateTokenParams(): Promise<void> {
           params.tokenConditionalSwapTakerFeeRate,
           params.tokenConditionalSwapMakerFeeRate,
           params.flashLoanSwapFeeRate,
+          params.interestCurveScaling,
+          params.interestTargetUtilization,
+          params.maintWeightShiftStart,
+          params.maintWeightShiftEnd,
+          params.maintWeightShiftAssetTarget,
+          params.maintWeightShiftLiabTarget,
+          params.maintWeightShiftAbort ?? false,
+          false, // setFallbackOracle, unused
+          params.depositLimit,
         )
         .accounts({
           group: group.publicKey,
