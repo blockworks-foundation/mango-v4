@@ -42,6 +42,7 @@ import {
 const {
   MB_CLUSTER_URL,
   PROPOSAL_TITLE,
+  PROPOSAL_LINK,
   VSR_DELEGATE_KEYPAIR,
   VSR_DELEGATE_FROM_PK,
   DRY_RUN,
@@ -285,10 +286,11 @@ async function updateTokenParams(): Promise<void> {
       MANGO_DAO_WALLET_GOVERNANCE,
       tokenOwnerRecord,
       PROPOSAL_TITLE ? PROPOSAL_TITLE : 'Update risk parameters for tokens',
-      '',
+      PROPOSAL_LINK ?? '',
       Object.values(proposals).length,
       instructions,
       vsrClient!,
+      false,
     );
     console.log(proposalAddress.toBase58());
   }

@@ -1,6 +1,7 @@
 import {
   AnchorProvider,
   BN,
+  Instruction,
   Program,
   Provider,
   Wallet,
@@ -1634,6 +1635,28 @@ export class MangoClient {
     return await this.sendAndConfirmTransactionForGroup(group, [ix]);
   }
 
+  public async serum3EditMarketIx(
+    group: Group,
+    serum3MarketIndex: MarketIndex,
+    admin: PublicKey,
+    reduceOnly: boolean | null,
+    forceClose: boolean | null,
+    name: string | null,
+    oraclePriceBand: number | null,
+  ): Promise<TransactionInstruction> {
+    const serum3Market =
+      group.serum3MarketsMapByMarketIndex.get(serum3MarketIndex);
+    const ix = await this.program.methods
+      .serum3EditMarket(reduceOnly, forceClose, name, oraclePriceBand)
+      .accounts({
+        group: group.publicKey,
+        admin: admin,
+        market: serum3Market?.publicKey,
+      })
+      .instruction();
+    return ix;
+  }
+
   public async serum3EditMarket(
     group: Group,
     serum3MarketIndex: MarketIndex,
@@ -1642,16 +1665,16 @@ export class MangoClient {
     name: string | null,
     oraclePriceBand: number | null,
   ): Promise<MangoSignatureStatus> {
-    const serum3Market =
-      group.serum3MarketsMapByMarketIndex.get(serum3MarketIndex);
-    const ix = await this.program.methods
-      .serum3EditMarket(reduceOnly, forceClose, name, oraclePriceBand)
-      .accounts({
-        group: group.publicKey,
-        admin: (this.program.provider as AnchorProvider).wallet.publicKey,
-        market: serum3Market?.publicKey,
-      })
-      .instruction();
+    const admin = (this.program.provider as AnchorProvider).wallet.publicKey;
+    const ix = await this.serum3EditMarketIx(
+      group,
+      serum3MarketIndex,
+      admin,
+      reduceOnly,
+      forceClose,
+      name,
+      oraclePriceBand,
+    );
     return await this.sendAndConfirmTransactionForGroup(group, [ix]);
   }
 
