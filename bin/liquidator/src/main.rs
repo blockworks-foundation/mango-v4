@@ -722,6 +722,9 @@ impl LiquidationState {
         let (txsigs, mut changed_pubkeys) = tcs_context
             .execute_tcs(&mut interesting_tcs, &mut self.tcs_execution_errors)
             .await?;
+        if txsigs.is_empty() {
+            return Ok(false);
+        }
         changed_pubkeys.push(self.mango_client.mango_account_address);
 
         // Force a refresh of affected accounts
