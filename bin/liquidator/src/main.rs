@@ -4,6 +4,7 @@ use std::sync::{Arc, RwLock};
 use std::time::{Duration, Instant};
 
 use anchor_client::Cluster;
+use anyhow::Context;
 use clap::Parser;
 use mango_v4::state::{PerpMarketIndex, TokenIndex};
 use mango_v4_client::{
@@ -463,15 +464,20 @@ async fn main() -> anyhow::Result<()> {
 
                 let liquidated = liquidation
                     .maybe_liquidate_one(account_addresses.iter())
-                    .await
-                    .unwrap();
+                    .await;
 
                 let mut took_tcs = false;
                 if !liquidated && cli.take_tcs == BoolArg::True {
-                    took_tcs = liquidation
+                    took_tcs = match liquidation
                         .maybe_take_token_conditional_swap(account_addresses.iter())
                         .await
-                        .unwrap();
+                    {
+                        Ok(v) => v,
+                        Err(err) => {
+                            error!("error during maybe_take_token_conditional_swap: {err}");
+                            false
+                        }
+                    }
                 }
 
                 must_rebalance = must_rebalance || liquidated || took_tcs;
@@ -577,7 +583,7 @@ impl LiquidationState {
     async fn maybe_liquidate_one<'b>(
         &mut self,
         accounts_iter: impl Iterator<Item = &'b Pubkey>,
-    ) -> anyhow::Result<bool> {
+    ) -> bool {
         use rand::seq::SliceRandom;
 
         let mut accounts = accounts_iter.collect::<Vec<&Pubkey>>();
@@ -592,11 +598,11 @@ impl LiquidationState {
                 .await
                 .unwrap_or(false)
             {
-                return Ok(true);
+                return true;
             }
         }
 
-        Ok(false)
+        false
     }
 
     async fn maybe_liquidate_and_log_error(&mut self, pubkey: &Pubkey) -> anyhow::Result<bool> {
@@ -652,9 +658,9 @@ impl LiquidationState {
         result
     }
 
-    async fn maybe_take_token_conditional_swap<'b>(
+    async fn maybe_take_token_conditional_swap(
         &mut self,
-        accounts_iter: impl Iterator<Item = &'b Pubkey>,
+        accounts_iter: impl Iterator<Item = &Pubkey>,
     ) -> anyhow::Result<bool> {
         let accounts = accounts_iter.collect::<Vec<&Pubkey>>();
 
@@ -721,14 +727,19 @@ impl LiquidationState {
 
         let (txsigs, mut changed_pubkeys) = tcs_context
             .execute_tcs(&mut interesting_tcs, &mut self.tcs_execution_errors)
-            .await?;
+            .await
+            .context("execute_tcs")?;
         if txsigs.is_empty() {
             return Ok(false);
         }
         changed_pubkeys.push(self.mango_client.mango_account_address);
 
         // Force a refresh of affected accounts
-        let slot = self.account_fetcher.transaction_max_slot(&txsigs).await?;
+        let slot = self
+            .account_fetcher
+            .transaction_max_slot(&txsigs)
+            .await
+            .context("transaction_max_slot")?;
         if let Err(e) = self
             .account_fetcher
             .refresh_accounts_via_rpc_until_slot(
