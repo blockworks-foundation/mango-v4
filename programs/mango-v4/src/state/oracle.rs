@@ -356,15 +356,10 @@ pub fn oracle_state_unchecked(
             let sqrt_price = U64F64::from_bits(whirlpool.sqrt_price);
 
             let clmm_price = if whirlpool.token_mint_a == usdc_mint_mainnet::ID {
-                // inverted
-                let decimals = QUOTE_DECIMALS - (base_decimals as i8); // tokenMintB - tokenMintA
-                let decimal_adj = power_of_ten(decimals);
-                let inv_price = I80F48::from_num(sqrt_price * sqrt_price) * decimal_adj;
-                Ok(I80F48::ONE.checked_div(inv_price).unwrap())
+                let inverted_price = I80F48::from_num(sqrt_price * sqrt_price);
+                Ok(I80F48::ONE.checked_div(inverted_price).unwrap())
             } else if whirlpool.token_mint_b == usdc_mint_mainnet::ID {
-                let decimals = (base_decimals as i8) - QUOTE_DECIMALS; // tokenMintA - tokenMintB
-                let decimal_adj = power_of_ten(decimals);
-                Ok(I80F48::from_num(sqrt_price * sqrt_price) * decimal_adj)
+                Ok(I80F48::from_num(sqrt_price * sqrt_price))
             } else {
                 Err(MangoError::InvalidCLMMOracle)
             }?;
@@ -372,7 +367,7 @@ pub fn oracle_state_unchecked(
             let price = clmm_price * usd_state.price;
             OracleState {
                 price,
-                last_update_slot: u64::MAX, // REVIEW: should we inherit pyth feed confidence metrics?
+                last_update_slot: usd_state.last_update_slot,
                 deviation: I80F48::ZERO,
                 oracle_type: OracleType::OrcaCLMM,
             }
@@ -531,8 +526,8 @@ mod tests {
         let usdc = oracle_state_unchecked(usdc_ai, EMPTY_KEYED_READER_OPT, usdc_decimals).unwrap();
         let orca = oracle_state_unchecked(ai, Some(usdc_ai), base_decimals).unwrap();
         assert!(usdc.price == I80F48::from_num(1.00000758274099));
-        // 63.006792786538313 * 1.00000758274099
-        assert!(orca.price == I80F48::from_num(63.00727055072872));
+        // 63.006792786538313 * 1.00000758274099 (but in native/native)
+        assert!(orca.price == I80F48::from_num(0.06300727055072872));
 
         Ok(())
     }
