@@ -12,8 +12,9 @@ use switchboard_v2::AggregatorAccountData;
 use crate::accounts_zerocopy::*;
 
 use crate::error::*;
+use crate::state::load_whirlpool_state;
 
-use super::{orca_mainnet_whirlpool, Whirlpool};
+use super::orca_mainnet_whirlpool;
 
 const DECIMAL_CONSTANT_ZERO_INDEX: i8 = 12;
 const DECIMAL_CONSTANTS: [I80F48; 25] = [
@@ -194,8 +195,7 @@ pub fn check_is_valid_fallback_oracle(acc_info: &impl KeyedAccountReader) -> Res
     };
     let oracle_type = determine_oracle_type(acc_info)?;
     if oracle_type == OracleType::OrcaCLMM {
-        let data = &acc_info.data();
-        let whirlpool = Whirlpool::try_deserialize(&mut &data[..]).unwrap();
+        let whirlpool = load_whirlpool_state(acc_info)?;
         require!(
             whirlpool.token_mint_a == usdc_mint_mainnet::ID
                 || whirlpool.token_mint_b == usdc_mint_mainnet::ID,
@@ -351,7 +351,7 @@ pub fn oracle_state_unchecked(
         OracleType::OrcaCLMM => {
             let usd_state = usdc_state_unchecked(usd_feed_opt)?;
 
-            let whirlpool = Whirlpool::try_deserialize(&mut &data[..]).unwrap();
+            let whirlpool = load_whirlpool_state(acc_info)?;
 
             let sqrt_price = U64F64::from_bits(whirlpool.sqrt_price);
 
