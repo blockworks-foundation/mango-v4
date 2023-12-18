@@ -162,12 +162,21 @@ pub struct Bank {
     /// serum open order execution.
     pub potential_serum_tokens: u64,
 
+    /// Start timestamp in seconds at which maint weights should start to change away
+    /// from maint_asset_weight, maint_liab_weight towards _asset_target and _liab_target.
+    /// If _start and _end and _duration_inv are 0, no shift is configured.
     pub maint_weight_shift_start: u64,
+    /// End timestamp in seconds until which the maint weights should reach the configured targets.
     pub maint_weight_shift_end: u64,
+    /// Cache of the inverse of maint_weight_shift_end - maint_weight_shift_start,
+    /// or zero if no shift is configured
     pub maint_weight_shift_duration_inv: I80F48,
+    /// Maint asset weight to reach at _shift_end.
     pub maint_weight_shift_asset_target: I80F48,
     pub maint_weight_shift_liab_target: I80F48,
 
+    /// Oracle that may be used if the main oracle is stale or not confident enough.
+    /// If this is Pubkey::default(), no fallback is available.
     pub fallback_oracle: Pubkey,
 
     /// zero means none, in token native
