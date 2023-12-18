@@ -65,8 +65,9 @@ pub fn perp_edit_market(
     if reset_stable_price {
         msg!("Stable price reset");
         require_keys_eq!(perp_market.oracle, ctx.accounts.oracle.key());
-        let oracle_price = perp_market
-            .oracle_price(&AccountInfoRef::borrow(ctx.accounts.oracle.as_ref())?, None)?;
+        let oracle_ref = &AccountInfoRef::borrow(ctx.accounts.oracle.as_ref())?;
+        let oracle_price =
+            perp_market.oracle_price(&oracle_acc_infos_from_ref(oracle_ref), None)?;
         perp_market.stable_price_model.reset_to_price(
             oracle_price.to_num(),
             Clock::get()?.unix_timestamp.try_into().unwrap(),

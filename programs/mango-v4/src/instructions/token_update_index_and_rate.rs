@@ -3,7 +3,7 @@ use anchor_lang::prelude::*;
 use crate::accounts_ix::*;
 use crate::error::MangoError;
 use crate::logs::{emit_stack, UpdateIndexLog, UpdateRateLogV2};
-use crate::state::HOUR;
+use crate::state::{oracle_acc_infos_from_ref, HOUR};
 use crate::{
     accounts_zerocopy::{AccountInfoRef, LoadMutZeroCopyRef, LoadZeroCopyRef},
     state::Bank,
@@ -89,10 +89,9 @@ pub fn token_update_index_and_rate(ctx: Context<TokenUpdateIndexAndRate>) -> Res
             now_ts,
         );
 
-        let price = some_bank.oracle_price(
-            &AccountInfoRef::borrow(ctx.accounts.oracle.as_ref())?,
-            Some(clock.slot),
-        )?;
+        let oracle_ref = &AccountInfoRef::borrow(ctx.accounts.oracle.as_ref())?;
+        let price =
+            some_bank.oracle_price(&oracle_acc_infos_from_ref(oracle_ref), Some(clock.slot))?;
 
         some_bank
             .stable_price_model

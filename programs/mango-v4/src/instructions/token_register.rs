@@ -125,9 +125,8 @@ pub fn token_register(
         reserved: [0; 1968],
     };
 
-    if let Ok(oracle_price) =
-        bank.oracle_price(&AccountInfoRef::borrow(ctx.accounts.oracle.as_ref())?, None)
-    {
+    let oracle_ref = &AccountInfoRef::borrow(ctx.accounts.oracle.as_ref())?;
+    if let Ok(oracle_price) = bank.oracle_price(&oracle_acc_infos_from_ref(oracle_ref), None) {
         bank.stable_price_model
             .reset_to_price(oracle_price.to_num(), now_ts);
     } else {

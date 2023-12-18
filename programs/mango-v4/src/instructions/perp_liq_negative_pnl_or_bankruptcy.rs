@@ -33,23 +33,24 @@ pub fn perp_liq_negative_pnl_or_bankruptcy(
         let perp_market = ctx.accounts.perp_market.load()?;
         perp_market_index = perp_market.perp_market_index;
         settle_token_index = perp_market.settle_token_index;
-        perp_oracle_price = perp_market.oracle_price(
-            &AccountInfoRef::borrow(&ctx.accounts.oracle)?,
-            Some(now_slot),
-        )?;
+        let oracle_ref = &AccountInfoRef::borrow(ctx.accounts.oracle.as_ref())?;
+        perp_oracle_price =
+            perp_market.oracle_price(&oracle_acc_infos_from_ref(oracle_ref), Some(now_slot))?;
 
         let settle_bank = ctx.accounts.settle_bank.load()?;
+        let settle_oracle_ref = &AccountInfoRef::borrow(ctx.accounts.settle_oracle.as_ref())?;
         settle_token_oracle_price = settle_bank.oracle_price(
-            &AccountInfoRef::borrow(&ctx.accounts.settle_oracle)?,
+            &oracle_acc_infos_from_ref(settle_oracle_ref),
             Some(now_slot),
         )?;
         drop(settle_bank); // could be the same as insurance_bank
 
         let insurance_bank = ctx.accounts.insurance_bank.load()?;
+        let insurance_oracle_ref = &AccountInfoRef::borrow(ctx.accounts.settle_oracle.as_ref())?;
         // We're not getting the insurance token price from the HealthCache because
         // the liqee isn't guaranteed to have an insurance fund token position.
         insurance_token_oracle_price = insurance_bank.oracle_price(
-            &AccountInfoRef::borrow(&ctx.accounts.insurance_oracle)?,
+            &oracle_acc_infos_from_ref(insurance_oracle_ref),
             Some(now_slot),
         )?;
     }
@@ -523,20 +524,23 @@ mod tests {
             let settle_oracle_ai = setup.settle_oracle.as_account_info();
             let perp_oracle_ai = setup.perp_oracle.as_account_info();
 
+            let insurance_oracle_ref = &AccountInfoRef::borrow(&insurance_oracle_ai)?;
             let insurance_price = setup
                 .insurance_bank
                 .data()
-                .oracle_price(&AccountInfoRef::borrow(&insurance_oracle_ai).unwrap(), None)
+                .oracle_price(&oracle_acc_infos_from_ref(&insurance_oracle_ref), None)
                 .unwrap();
+            let settle_oracle_ref = &AccountInfoRef::borrow(&settle_oracle_ai)?;
             let settle_price = setup
                 .settle_bank
                 .data()
-                .oracle_price(&AccountInfoRef::borrow(&settle_oracle_ai).unwrap(), None)
+                .oracle_price(&oracle_acc_infos_from_ref(&settle_oracle_ref), None)
                 .unwrap();
+            let perp_oracle_ref = &AccountInfoRef::borrow(&settle_oracle_ai)?;
             let perp_price = setup
                 .perp_market
                 .data()
-                .oracle_price(&AccountInfoRef::borrow(&perp_oracle_ai).unwrap(), None)
+                .oracle_price(&oracle_acc_infos_from_ref(&perp_oracle_ai), None)
                 .unwrap();
 
             // There's no way to construct a TokenAccount directly...

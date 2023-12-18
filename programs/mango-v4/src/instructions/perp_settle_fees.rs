@@ -29,12 +29,14 @@ pub fn perp_settle_fees(ctx: Context<PerpSettleFees>, max_settle_amount: u64) ->
     );
 
     // Get oracle prices
+    let oracle_ref = &AccountInfoRef::borrow(ctx.accounts.oracle.as_ref())?;
     let oracle_price = perp_market.oracle_price(
-        &AccountInfoRef::borrow(ctx.accounts.oracle.as_ref())?,
+        &oracle_acc_infos_from_ref(oracle_ref),
         None, // staleness checked in health
     )?;
+    let settle_oracle_ref = &AccountInfoRef::borrow(ctx.accounts.oracle.as_ref())?;
     let settle_token_oracle_price = settle_bank.oracle_price(
-        &AccountInfoRef::borrow(ctx.accounts.settle_oracle.as_ref())?,
+        &oracle_acc_infos_from_ref(oracle_ref),
         None, // staleness checked in health
     )?;
 

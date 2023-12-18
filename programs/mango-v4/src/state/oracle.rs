@@ -65,6 +65,11 @@ pub mod pyth_mainnet_usdc_oracle {
     declare_id!("Gnt27xtC473ZT2Mw5u8wZ68Z3gULkSTb5DuxJy7eJotD");
 }
 
+pub mod pyth_mainnet_sol_oracle {
+    use solana_program::declare_id;
+    declare_id!("H6ARHf6YXhGYeQfUzQNGk6rDNnLBQKrenN712K4AQJEG");
+}
+
 pub mod usdc_mint_mainnet {
     use solana_program::declare_id;
     declare_id!("EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v");
@@ -196,9 +201,14 @@ pub fn check_is_valid_fallback_oracle(acc_info: &impl KeyedAccountReader) -> Res
     let oracle_type = determine_oracle_type(acc_info)?;
     if oracle_type == OracleType::OrcaCLMM {
         let whirlpool = load_whirlpool_state(acc_info)?;
+
+        let has_usdc_token = whirlpool.token_mint_a == usdc_mint_mainnet::ID
+            || whirlpool.token_mint_b == usdc_mint_mainnet::ID;
+        let has_sol_token = false;
+        //  whirlpool.token_mint_a == ::ID
+        //     || whirlpool.token_mint_b == usdc_mint_mainnet::ID;
         require!(
-            whirlpool.token_mint_a == usdc_mint_mainnet::ID
-                || whirlpool.token_mint_b == usdc_mint_mainnet::ID,
+            has_usdc_token || has_sol_token,
             MangoError::InvalidCLMMOracle
         );
     }
@@ -259,6 +269,25 @@ fn get_pyth_state(
     })
 }
 
+/// TODO: comments
+pub struct OracleAccountInfos<'a, T> {
+    pub oracle: &'a T,
+    pub fallback_opt: Option<&'a T>,
+    pub usd_opt: Option<&'a T>,
+    pub sol_opt: Option<&'a T>,
+}
+
+pub fn oracle_acc_infos_from_ref<'a, 'info>(
+    ai_ref: &'a AccountInfoRef<'_, 'info>,
+) -> OracleAccountInfos<'a, AccountInfoRef<'a, 'info>> {
+    OracleAccountInfos {
+        oracle: ai_ref,
+        fallback_opt: None,
+        usd_opt: None,
+        sol_opt: None,
+    }
+}
+
 /// Returns the price of one native base token, in native quote tokens
 ///
 /// Example: The price for SOL at 40 USDC/SOL it would return 0.04 (the unit is USDC-native/SOL-native)
@@ -267,17 +296,17 @@ fn get_pyth_state(
 ///
 /// The staleness and confidence of the oracle is not checked. Use the functions on
 /// OracleState to validate them if needed. That's why this function is called _unchecked.
-pub fn oracle_state_unchecked(
-    acc_info: &impl KeyedAccountReader,
-    usd_feed_opt: Option<&(impl KeyedAccountReader + ?Sized)>,
+pub fn oracle_state_unchecked<T: KeyedAccountReader>(
+    acc_infos: &OracleAccountInfos<T>,
     base_decimals: u8,
 ) -> Result<OracleState> {
-    let data = &acc_info.data();
-    let oracle_type = determine_oracle_type(acc_info)?;
+    let oracle_info = acc_infos.oracle;
+    let data = &oracle_info.data();
+    let oracle_type = determine_oracle_type(oracle_info)?;
 
     Ok(match oracle_type {
         OracleType::Stub => {
-            let stub = acc_info.load::<StubOracle>()?;
+            let stub = oracle_info.load::<StubOracle>()?;
             let deviation = if stub.deviation == 0 {
                 // allows the confidence check to pass even for negative prices
                 I80F48::MIN
@@ -297,7 +326,7 @@ pub fn oracle_state_unchecked(
                 oracle_type: OracleType::Stub,
             }
         }
-        OracleType::Pyth => get_pyth_state(acc_info, base_decimals)?,
+        OracleType::Pyth => get_pyth_state(oracle_info, base_decimals)?,
         OracleType::SwitchboardV2 => {
             fn from_foreign_error(e: impl std::fmt::Display) -> Error {
                 error_msg!("{}", e)
@@ -349,9 +378,9 @@ pub fn oracle_state_unchecked(
             }
         }
         OracleType::OrcaCLMM => {
-            let usd_state = usdc_state_unchecked(usd_feed_opt)?;
+            let usd_state = usd_state_unchecked(acc_infos)?;
 
-            let whirlpool = load_whirlpool_state(acc_info)?;
+            let whirlpool = load_whirlpool_state(oracle_info)?;
 
             let sqrt_price = U64F64::from_bits(whirlpool.sqrt_price);
 
@@ -376,13 +405,16 @@ pub fn oracle_state_unchecked(
 }
 
 #[inline(always)]
-fn usdc_state_unchecked(
-    usd_feed_opt: Option<&(impl KeyedAccountReader + ?Sized)>,
+fn usd_state_unchecked<T: KeyedAccountReader>(
+    acc_infos: &OracleAccountInfos<T>,
 ) -> Result<OracleState> {
-    if usd_feed_opt.is_none() {
+    if acc_infos.usd_opt.is_none() && acc_infos.sol_opt.is_none() {
         return Err(MangoError::MissingFeedForCLMMOracle.into());
     }
-    let usd_feed = usd_feed_opt.unwrap();
+
+    // TODO: what to do if we haveboth??
+
+    let usd_feed = acc_infos.usd_opt.unwrap();
     if usd_feed.key() != &pyth_mainnet_usdc_oracle::ID {
         return Err(MangoError::InvalidFeedForCLMMOracle.into());
     }
@@ -409,8 +441,6 @@ pub fn oracle_log_context(
 
 #[cfg(test)]
 mod tests {
-    use crate::health::EMPTY_KEYED_READER_OPT;
-
     use super::*;
     use solana_program_test::{find_file, read_file};
     use std::{cell::RefCell, path::PathBuf, str::FromStr};
@@ -523,7 +553,7 @@ mod tests {
         let base_decimals = fixtures[0].3;
         let usdc_decimals = fixtures[1].3;
 
-        let usdc = oracle_state_unchecked(usdc_ai, EMPTY_KEYED_READER_OPT, usdc_decimals).unwrap();
+        let usdc = oracle_state_unchecked(usdc_ai, usdc_decimals).unwrap();
         let orca = oracle_state_unchecked(ai, Some(usdc_ai), base_decimals).unwrap();
         assert!(usdc.price == I80F48::from_num(1.00000758274099));
         // 63.006792786538313 * 1.00000758274099 (but in native/native)
@@ -556,10 +586,7 @@ mod tests {
             };
             let base_decimals = fixture.3;
             assert!(determine_oracle_type(ai).unwrap() == fixture.1);
-            assert!(
-                oracle_state_unchecked(ai, EMPTY_KEYED_READER_OPT, base_decimals)
-                    .is_anchor_error_with_code(6065)
-            );
+            assert!(oracle_state_unchecked(ai, base_decimals).is_anchor_error_with_code(6065));
         }
 
         Ok(())
