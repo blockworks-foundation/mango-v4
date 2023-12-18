@@ -238,6 +238,9 @@
 <a href="#238" id="238">238</a>
 <a href="#239" id="239">239</a>
 <a href="#240" id="240">240</a>
+<a href="#241" id="241">241</a>
+<a href="#242" id="242">242</a>
+<a href="#243" id="243">243</a>
 </pre><pre class="rust"><code><span class="kw">use </span>anchor_lang::prelude::<span class="kw-2">*</span>;
 <span class="kw">use </span>static_assertions::const_assert_eq;
 <span class="kw">use </span>std::mem::size_of;
@@ -332,8 +335,11 @@
     /// in seconds since epoch
     </span><span class="kw">pub </span>fast_listing_interval_start: u64,
 
-    <span class="kw">pub </span>fast_listings_in_interval: u16,
-    <span class="kw">pub </span>allowed_fast_listings_per_interval: u16,
+    <span class="doccomment">/// Number of fast listings that happened this interval
+    </span><span class="kw">pub </span>fast_listings_in_interval: u16,
+
+    <span class="doccomment">/// Number of fast listings that are allowed per interval
+    </span><span class="kw">pub </span>allowed_fast_listings_per_interval: u16,
 
     <span class="kw">pub </span>reserved: [u8; <span class="number">1812</span>],
 }

@@ -1609,6 +1609,15 @@
 <a href="#1609" id="1609">1609</a>
 <a href="#1610" id="1610">1610</a>
 <a href="#1611" id="1611">1611</a>
+<a href="#1612" id="1612">1612</a>
+<a href="#1613" id="1613">1613</a>
+<a href="#1614" id="1614">1614</a>
+<a href="#1615" id="1615">1615</a>
+<a href="#1616" id="1616">1616</a>
+<a href="#1617" id="1617">1617</a>
+<a href="#1618" id="1618">1618</a>
+<a href="#1619" id="1619">1619</a>
+<a href="#1620" id="1620">1620</a>
 </pre><pre class="rust"><code><span class="kw">use super</span>::{OracleConfig, TokenIndex, TokenPosition};
 <span class="kw">use </span><span class="kw">crate</span>::accounts_zerocopy::KeyedAccountReader;
 <span class="kw">use </span><span class="kw">crate</span>::error::<span class="kw-2">*</span>;
@@ -1773,13 +1782,22 @@
     /// serum open order execution.
     </span><span class="kw">pub </span>potential_serum_tokens: u64,
 
-    <span class="kw">pub </span>maint_weight_shift_start: u64,
-    <span class="kw">pub </span>maint_weight_shift_end: u64,
-    <span class="kw">pub </span>maint_weight_shift_duration_inv: I80F48,
-    <span class="kw">pub </span>maint_weight_shift_asset_target: I80F48,
+    <span class="doccomment">/// Start timestamp in seconds at which maint weights should start to change away
+    /// from maint_asset_weight, maint_liab_weight towards _asset_target and _liab_target.
+    /// If _start and _end and _duration_inv are 0, no shift is configured.
+    </span><span class="kw">pub </span>maint_weight_shift_start: u64,
+    <span class="doccomment">/// End timestamp in seconds until which the maint weights should reach the configured targets.
+    </span><span class="kw">pub </span>maint_weight_shift_end: u64,
+    <span class="doccomment">/// Cache of the inverse of maint_weight_shift_end - maint_weight_shift_start,
+    /// or zero if no shift is configured
+    </span><span class="kw">pub </span>maint_weight_shift_duration_inv: I80F48,
+    <span class="doccomment">/// Maint asset weight to reach at _shift_end.
+    </span><span class="kw">pub </span>maint_weight_shift_asset_target: I80F48,
     <span class="kw">pub </span>maint_weight_shift_liab_target: I80F48,
 
-    <span class="kw">pub </span>fallback_oracle: Pubkey,
+    <span class="doccomment">/// Oracle that may be used if the main oracle is stale or not confident enough.
+    /// If this is Pubkey::default(), no fallback is available.
+    </span><span class="kw">pub </span>fallback_oracle: Pubkey,
 
     <span class="doccomment">/// zero means none, in token native
     </span><span class="kw">pub </span>deposit_limit: u64,
