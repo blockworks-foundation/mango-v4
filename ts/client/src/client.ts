@@ -195,7 +195,7 @@ export class MangoClient {
     let prioritizationFee: number;
     if (opts.prioritizationFee) {
       prioritizationFee = opts.prioritizationFee;
-    } else if (this.estimateFee) {
+    } else if (this.estimateFee || opts.estimateFee) {
       prioritizationFee = await this.estimatePrioritizationFee(ixs);
     } else {
       prioritizationFee = this.prioritizationFee;
@@ -2797,11 +2797,13 @@ export class MangoClient {
     );
     const hrix2 = await this.healthRegionEndIx(group, mangoAccount);
 
-    return await this.sendAndConfirmTransactionForGroup(group, [
-      hrix1,
-      ...ixs,
-      hrix2,
-    ]);
+    return await this.sendAndConfirmTransactionForGroup(
+      group,
+      [hrix1, ...ixs, hrix2],
+      {
+        estimateFee: true,
+      },
+    );
   }
 
   // perpPlaceOrder ix returns an optional, custom order id,
@@ -3271,16 +3273,22 @@ export class MangoClient {
       );
     }
 
-    return await this.sendAndConfirmTransactionForGroup(group, [
-      ComputeBudgetProgram.setComputeUnitLimit({
-        units:
-          mangoAccount.perpActive().length *
-            (PERP_SETTLE_PNL_CU_LIMIT + PERP_SETTLE_FEES_CU_LIMIT) +
-          mangoAccount.serum3Active().length * SERUM_SETTLE_FUNDS_CU_LIMIT,
-      }),
-      ...ixs1,
-      ...ixs2,
-    ]);
+    return await this.sendAndConfirmTransactionForGroup(
+      group,
+      [
+        ComputeBudgetProgram.setComputeUnitLimit({
+          units:
+            mangoAccount.perpActive().length *
+              (PERP_SETTLE_PNL_CU_LIMIT + PERP_SETTLE_FEES_CU_LIMIT) +
+            mangoAccount.serum3Active().length * SERUM_SETTLE_FUNDS_CU_LIMIT,
+        }),
+        ...ixs1,
+        ...ixs2,
+      ],
+      {
+        estimateFee: true,
+      },
+    );
   }
 
   async perpSettlePnlAndFees(

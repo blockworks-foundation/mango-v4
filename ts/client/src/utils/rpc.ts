@@ -38,6 +38,7 @@ export type SendTransactionOpts = Partial<{
     lastValidBlockHeight: number;
   }>;
   prioritizationFee: number;
+  estimateFee: boolean;
   additionalSigners: Keypair[];
   postSendTxCallback: ({ txid }: { txid: string }) => void;
   postTxConfirmationCallback: ({ txid }: { txid: string }) => void;
