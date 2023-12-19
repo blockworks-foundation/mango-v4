@@ -368,29 +368,11 @@ async fn main() -> anyhow::Result<()> {
         trigger_tcs_config: tcs_config,
         rebalancer: rebalancer.clone(),
         token_swap_info: token_swap_info_updater.clone(),
-        liq_errors: ErrorTracking {
-            skip_threshold: 5,
-            skip_duration: Duration::from_secs(120),
-            ..ErrorTracking::default()
-        },
-        tcs_collection_hard_errors: ErrorTracking {
-            skip_threshold: 2,
-            skip_duration: Duration::from_secs(120),
-            ..ErrorTracking::default()
-        },
-        tcs_collection_partial_errors: ErrorTracking {
-            skip_threshold: 2,
-            skip_duration: Duration::from_secs(120),
-            ..ErrorTracking::default()
-        },
-        tcs_execution_errors: ErrorTracking {
-            skip_threshold: 2,
-            skip_duration: Duration::from_secs(120),
-            ..ErrorTracking::default()
-        },
-        persistent_error_report_interval: Duration::from_secs(300),
-        persistent_error_min_duration: Duration::from_secs(300),
-        last_persistent_error_report: Instant::now(),
+        errors: ErrorTracking::builder()
+            .skip_threshold(2)
+            .skip_threshold_for_type(LiqErrorType::Liq, 5)
+            .skip_duration(Duration::from_secs(120))
+            .build()?,
     });
 
     info!("main loop");
@@ -482,6 +464,8 @@ async fn main() -> anyhow::Result<()> {
                     state.mango_accounts.iter().cloned().collect_vec()
                 };
 
+                liquidation.errors.update();
+
                 if must_rebalance || last_rebalance.elapsed() > rebalance_delay {
                     if let Err(err) = liquidation.rebalancer.zero_all_non_quote().await {
                         error!("failed to rebalance liqor: {:?}", err);
@@ -489,8 +473,6 @@ async fn main() -> anyhow::Result<()> {
                     must_rebalance = false;
                     last_rebalance = Instant::now();
                 }
-
-                liquidation.log_persistent_errors();
 
                 let liquidated = liquidation
                     .maybe_liquidate_one(account_addresses.iter())
@@ -585,6 +567,27 @@ struct SharedState {
     one_snapshot_done: bool,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum LiqErrorType {
+    Liq,
+    /// Errors that suggest we maybe should skip trying to collect tcs for that pubkey
+    TcsCollectionHard,
+    /// Recording errors when some tcs have errors during collection but others don't
+    TcsCollectionPartial,
+    TcsExecution,
+}
+
+impl std::fmt::Display for LiqErrorType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Liq => write!(f, "liq"),
+            Self::TcsCollectionHard => write!(f, "tcs-collection-hard"),
+            Self::TcsCollectionPartial => write!(f, "tcs-collection-partial"),
+            Self::TcsExecution => write!(f, "tcs-execution"),
+        }
+    }
+}
+
 struct LiquidationState {
     mango_client: Arc<MangoClient>,
     account_fetcher: Arc<chain_data::AccountFetcher>,
@@ -593,15 +596,7 @@ struct LiquidationState {
     liquidation_config: liquidate::Config,
     trigger_tcs_config: trigger_tcs::Config,
 
-    liq_errors: ErrorTracking,
-    /// Errors that suggest we maybe should skip trying to collect tcs for that pubkey
-    tcs_collection_hard_errors: ErrorTracking,
-    /// Recording errors when some tcs have errors during collection but others don't
-    tcs_collection_partial_errors: ErrorTracking,
-    tcs_execution_errors: ErrorTracking,
-    persistent_error_report_interval: Duration,
-    last_persistent_error_report: Instant,
-    persistent_error_min_duration: Duration,
+    errors: ErrorTracking<Pubkey, LiqErrorType>,
 }
 
 impl LiquidationState {
@@ -632,10 +627,12 @@ impl LiquidationState {
 
     async fn maybe_liquidate_and_log_error(&mut self, pubkey: &Pubkey) -> anyhow::Result<bool> {
         let now = Instant::now();
-        let error_tracking = &mut self.liq_errors;
+        let error_tracking = &mut self.errors;
 
         // Skip a pubkey if there've been too many errors recently
-        if let Some(error_entry) = error_tracking.had_too_many_errors(pubkey, now) {
+        if let Some(error_entry) =
+            error_tracking.had_too_many_errors(LiqErrorType::Liq, pubkey, now)
+        {
             trace!(
                 %pubkey,
                 error_entry.count,
@@ -654,7 +651,7 @@ impl LiquidationState {
 
         if let Err(err) = result.as_ref() {
             // Keep track of pubkeys that had errors
-            error_tracking.record_error(pubkey, now, err.to_string());
+            error_tracking.record(LiqErrorType::Liq, pubkey, err.to_string());
 
             // Not all errors need to be raised to the user's attention.
             let mut is_error = true;
@@ -677,7 +674,7 @@ impl LiquidationState {
                 trace!("liquidating account {}: {:?}", pubkey, err);
             }
         } else {
-            error_tracking.clear_errors(pubkey);
+            error_tracking.clear(LiqErrorType::Liq, pubkey);
         }
 
         result
@@ -706,9 +703,9 @@ impl LiquidationState {
         // Find interesting (pubkey, tcsid, volume)
         let mut interesting_tcs = Vec::with_capacity(accounts.len());
         for pubkey in accounts.iter() {
-            if let Some(error_entry) = self
-                .tcs_collection_hard_errors
-                .had_too_many_errors(pubkey, now)
+            if let Some(error_entry) =
+                self.errors
+                    .had_too_many_errors(LiqErrorType::TcsCollectionHard, pubkey, now)
             {
                 trace!(
                     %pubkey,
@@ -720,19 +717,20 @@ impl LiquidationState {
 
             match tcs_context.find_interesting_tcs_for_account(pubkey) {
                 Ok(v) => {
-                    self.tcs_collection_hard_errors.clear_errors(pubkey);
+                    self.errors.clear(LiqErrorType::TcsCollectionHard, pubkey);
                     if v.is_empty() {
-                        self.tcs_collection_partial_errors.clear_errors(pubkey);
-                        self.tcs_execution_errors.clear_errors(pubkey);
+                        self.errors
+                            .clear(LiqErrorType::TcsCollectionPartial, pubkey);
+                        self.errors.clear(LiqErrorType::TcsExecution, pubkey);
                     } else if v.iter().all(|it| it.is_ok()) {
-                        self.tcs_collection_partial_errors.clear_errors(pubkey);
+                        self.errors
+                            .clear(LiqErrorType::TcsCollectionPartial, pubkey);
                     } else {
                         for it in v.iter() {
                             if let Err(e) = it {
-                                info!("error on tcs find_interesting: {:?}", e);
-                                self.tcs_collection_partial_errors.record_error(
+                                self.errors.record(
+                                    LiqErrorType::TcsCollectionPartial,
                                     pubkey,
-                                    now,
                                     e.to_string(),
                                 );
                             }
@@ -741,8 +739,8 @@ impl LiquidationState {
                     interesting_tcs.extend(v.iter().filter_map(|it| it.as_ref().ok()));
                 }
                 Err(e) => {
-                    self.tcs_collection_hard_errors
-                        .record_error(pubkey, now, e.to_string());
+                    self.errors
+                        .record(LiqErrorType::TcsCollectionHard, pubkey, e.to_string());
                 }
             }
         }
@@ -751,8 +749,11 @@ impl LiquidationState {
         }
 
         let (txsigs, mut changed_pubkeys) = tcs_context
-            .execute_tcs(&mut interesting_tcs, &mut self.tcs_execution_errors)
+            .execute_tcs(&mut interesting_tcs, &mut self.errors)
             .await?;
+        for pubkey in changed_pubkeys.iter() {
+            self.errors.clear(LiqErrorType::TcsExecution, pubkey);
+        }
         changed_pubkeys.push(self.mango_client.mango_account_address);
 
         // Force a refresh of affected accounts
@@ -770,26 +771,6 @@ impl LiquidationState {
         }
 
         Ok(true)
-    }
-
-    fn log_persistent_errors(&mut self) {
-        let now = Instant::now();
-        if now.duration_since(self.last_persistent_error_report)
-            < self.persistent_error_report_interval
-        {
-            return;
-        }
-        self.last_persistent_error_report = now;
-
-        let min_duration = self.persistent_error_min_duration;
-        self.liq_errors
-            .log_persistent_errors("liquidation", min_duration);
-        self.tcs_execution_errors
-            .log_persistent_errors("tcs execution", min_duration);
-        self.tcs_collection_hard_errors
-            .log_persistent_errors("tcs collection hard", min_duration);
-        self.tcs_collection_partial_errors
-            .log_persistent_errors("tcs collection partial", min_duration);
     }
 }
 
