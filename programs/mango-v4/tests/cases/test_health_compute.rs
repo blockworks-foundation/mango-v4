@@ -344,7 +344,7 @@ async fn test_health_compute_tokens_fallback_oracles() -> Result<(), TransportEr
 #[tokio::test]
 async fn test_health_compute_serum() -> Result<(), TransportError> {
     let mut test_builder = TestContextBuilder::new();
-    test_builder.test().set_compute_max_units(130_000);
+    test_builder.test().set_compute_max_units(130_500);
     let context = test_builder.start_default().await;
     let solana = &context.solana.clone();
 

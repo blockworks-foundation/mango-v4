@@ -49,6 +49,7 @@ pub const fn power_of_ten(decimals: i8) -> I80F48 {
 }
 
 pub const QUOTE_DECIMALS: i8 = 6;
+pub const SOL_DECIMALS: i8 = 9;
 pub const QUOTE_NATIVE_TO_UI: I80F48 = power_of_ten(-QUOTE_DECIMALS);
 
 pub mod switchboard_v1_devnet_oracle {
@@ -209,9 +210,8 @@ pub fn check_is_valid_fallback_oracle(acc_info: &impl KeyedAccountReader) -> Res
 
         let has_usdc_token = whirlpool.token_mint_a == usdc_mint_mainnet::ID
             || whirlpool.token_mint_b == usdc_mint_mainnet::ID;
-        let has_sol_token = false;
-        //  whirlpool.token_mint_a == ::ID
-        //     || whirlpool.token_mint_b == usdc_mint_mainnet::ID;
+        let has_sol_token = whirlpool.token_mint_a == sol_mint_mainnet::ID
+            || whirlpool.token_mint_b == sol_mint_mainnet::ID;
         require!(
             has_usdc_token || has_sol_token,
             MangoError::InvalidCLMMOracle
@@ -449,7 +449,7 @@ fn quote_state_unchecked<T: KeyedAccountReader>(
         let sol_feed = acc_infos
             .sol_opt
             .ok_or_else(|| error!(MangoError::MissingFeedForCLMMOracle))?;
-        let sol_state = get_pyth_state(sol_feed, QUOTE_DECIMALS as u8)?;
+        let sol_state = get_pyth_state(sol_feed, SOL_DECIMALS as u8)?;
         return Ok(sol_state);
     } else {
         return Err(MangoError::MissingFeedForCLMMOracle.into());

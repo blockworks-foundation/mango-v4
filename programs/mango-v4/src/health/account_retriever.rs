@@ -78,10 +78,10 @@ pub fn new_fixed_order_account_retriever<'a, 'info>(
         ais.len(), expected_ais,
         active_token_len, active_token_len, active_perp_len, active_perp_len, active_serum3_len
     );
-    let usd_oracle_index = ais[expected_ais..]
+    let usd_oracle_index = ais[..]
         .iter()
         .position(|o| o.key == &pyth_mainnet_usdc_oracle::ID);
-    let sol_oracle_index = ais[expected_ais..]
+    let sol_oracle_index = ais[..]
         .iter()
         .position(|o| o.key == &pyth_mainnet_sol_oracle::ID);
 

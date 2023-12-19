@@ -526,10 +526,7 @@ mod tests {
                 setup
                     .insurance_bank
                     .data()
-                    .oracle_price(
-                        &OracleAccountInfos::from_reader(insurance_oracle_ref),
-                        None,
-                    )
+                    .oracle_price(&OracleAccountInfos::from_reader(insurance_oracle_ref), None)
                     .unwrap()
             };
             let settle_price = {

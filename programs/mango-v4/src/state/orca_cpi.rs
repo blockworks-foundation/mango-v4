@@ -9,6 +9,7 @@ pub mod orca_mainnet_whirlpool {
 }
 
 pub const ORCA_WHIRLPOOL_LEN: usize = 653;
+pub const ORCA_WHIRLPOOL_DISCRIMINATOR: [u8; 8] = [63, 149, 209, 12, 225, 128, 99, 9];
 
 pub struct WhirlpoolState {
     // Q64.64
@@ -19,7 +20,10 @@ pub struct WhirlpoolState {
 
 pub fn load_whirlpool_state(acc_info: &impl KeyedAccountReader) -> Result<WhirlpoolState> {
     let data = &acc_info.data();
-    // TODO: assert discriminator
+    require!(
+        data[0..8] == ORCA_WHIRLPOOL_DISCRIMINATOR[..],
+        MangoError::InvalidCLMMOracle
+    );
     require!(
         data.len() == ORCA_WHIRLPOOL_LEN,
         MangoError::InvalidCLMMOracle
