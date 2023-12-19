@@ -282,6 +282,17 @@ pub struct OracleAccountInfos<'a, T> {
     pub sol_opt: Option<&'a T>,
 }
 
+impl<'a, T> OracleAccountInfos<'a, T> {
+    pub fn from_reader(acc_reader: &'a T) -> Self {
+        OracleAccountInfos {
+            oracle: acc_reader,
+            fallback_opt: None,
+            usd_opt: None,
+            sol_opt: None,
+        }
+    }
+}
+
 pub fn oracle_acc_infos_from_ref<'a, 'info>(
     ai_ref: &'a AccountInfoRef<'_, 'info>,
 ) -> OracleAccountInfos<'a, AccountInfoRef<'a, 'info>> {
