@@ -333,7 +333,7 @@ pub fn serum3_place_order(
     // Payer bank safety checks like reduce-only, net borrows, vault-to-deposits ratio
     let payer_oracle_ref = &AccountInfoRef::borrow(&ctx.accounts.payer_oracle)?;
     let payer_bank_oracle =
-        payer_bank.oracle_price(&oracle_acc_infos_from_ref(payer_oracle_ref), None)?;
+        payer_bank.oracle_price(&OracleAccountInfos::from_reader(payer_oracle_ref), None)?;
     let withdrawn_from_vault = I80F48::from(before_vault - after_vault);
     if withdrawn_from_vault > before_position_native {
         require_msg_typed!(
@@ -573,7 +573,7 @@ pub fn apply_settle_changes(
 
             let quote_oracle_ref = &AccountInfoRef::borrow(quote_oracle_ai)?;
             let quote_oracle_price = quote_bank.oracle_price(
-                &oracle_acc_infos_from_ref(quote_oracle_ref),
+                &OracleAccountInfos::from_reader(quote_oracle_ref),
                 Some(clock.slot),
             )?;
             let quote_asset_price = quote_oracle_price.min(quote_bank.stable_price());

@@ -186,7 +186,10 @@ pub fn charge_loan_origination_fees(
         let base_oracle_price = base_oracle
             .map(|ai| {
                 let ai_ref = &AccountInfoRef::borrow(ai)?;
-                base_bank.oracle_price(&oracle_acc_infos_from_ref(ai_ref), Some(Clock::get()?.slot))
+                base_bank.oracle_price(
+                    &OracleAccountInfos::from_reader(ai_ref),
+                    Some(Clock::get()?.slot),
+                )
             })
             .transpose()?;
 
@@ -223,8 +226,10 @@ pub fn charge_loan_origination_fees(
         let quote_oracle_price = quote_oracle
             .map(|ai| {
                 let ai_ref = &AccountInfoRef::borrow(ai)?;
-                quote_bank
-                    .oracle_price(&oracle_acc_infos_from_ref(ai_ref), Some(Clock::get()?.slot))
+                quote_bank.oracle_price(
+                    &OracleAccountInfos::from_reader(ai_ref),
+                    Some(Clock::get()?.slot),
+                )
             })
             .transpose()?;
 

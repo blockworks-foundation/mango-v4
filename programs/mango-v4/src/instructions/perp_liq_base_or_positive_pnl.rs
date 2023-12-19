@@ -71,7 +71,7 @@ pub fn perp_liq_base_or_positive_pnl(
     // Get oracle price for market. Price is validated inside
     let oracle_ref = &AccountInfoRef::borrow(ctx.accounts.oracle.as_ref())?;
     let oracle_price = perp_market.oracle_price(
-        &oracle_acc_infos_from_ref(oracle_ref),
+        &OracleAccountInfos::from_reader(oracle_ref),
         None, // checked in health
     )?;
 

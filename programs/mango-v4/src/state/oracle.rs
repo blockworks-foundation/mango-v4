@@ -274,15 +274,15 @@ fn get_pyth_state(
     })
 }
 
-/// TODO: comments
-pub struct OracleAccountInfos<'a, T> {
+/// Contains all oracle account infos that could be used to read price
+pub struct OracleAccountInfos<'a, T: KeyedAccountReader> {
     pub oracle: &'a T,
     pub fallback_opt: Option<&'a T>,
     pub usd_opt: Option<&'a T>,
     pub sol_opt: Option<&'a T>,
 }
 
-impl<'a, T> OracleAccountInfos<'a, T> {
+impl<'a, T: KeyedAccountReader> OracleAccountInfos<'a, T> {
     pub fn from_reader(acc_reader: &'a T) -> Self {
         OracleAccountInfos {
             oracle: acc_reader,
@@ -290,17 +290,6 @@ impl<'a, T> OracleAccountInfos<'a, T> {
             usd_opt: None,
             sol_opt: None,
         }
-    }
-}
-
-pub fn oracle_acc_infos_from_ref<'a, 'info>(
-    ai_ref: &'a AccountInfoRef<'_, 'info>,
-) -> OracleAccountInfos<'a, AccountInfoRef<'a, 'info>> {
-    OracleAccountInfos {
-        oracle: ai_ref,
-        fallback_opt: None,
-        usd_opt: None,
-        sol_opt: None,
     }
 }
 
@@ -326,7 +315,7 @@ pub fn fallback_oracle_state_unchecked<T: KeyedAccountReader>(
     oracle_state_unchecked_inner(acc_infos, base_decimals, true)
 }
 
-pub fn oracle_state_unchecked_inner<T: KeyedAccountReader>(
+fn oracle_state_unchecked_inner<T: KeyedAccountReader>(
     acc_infos: &OracleAccountInfos<T>,
     base_decimals: u8,
     use_fallback: bool,

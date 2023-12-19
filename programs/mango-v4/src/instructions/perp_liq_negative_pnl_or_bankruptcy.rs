@@ -34,13 +34,13 @@ pub fn perp_liq_negative_pnl_or_bankruptcy(
         perp_market_index = perp_market.perp_market_index;
         settle_token_index = perp_market.settle_token_index;
         let oracle_ref = &AccountInfoRef::borrow(ctx.accounts.oracle.as_ref())?;
-        perp_oracle_price =
-            perp_market.oracle_price(&oracle_acc_infos_from_ref(oracle_ref), Some(now_slot))?;
+        perp_oracle_price = perp_market
+            .oracle_price(&OracleAccountInfos::from_reader(oracle_ref), Some(now_slot))?;
 
         let settle_bank = ctx.accounts.settle_bank.load()?;
         let settle_oracle_ref = &AccountInfoRef::borrow(ctx.accounts.settle_oracle.as_ref())?;
         settle_token_oracle_price = settle_bank.oracle_price(
-            &oracle_acc_infos_from_ref(settle_oracle_ref),
+            &OracleAccountInfos::from_reader(settle_oracle_ref),
             Some(now_slot),
         )?;
         drop(settle_bank); // could be the same as insurance_bank
@@ -50,7 +50,7 @@ pub fn perp_liq_negative_pnl_or_bankruptcy(
         // We're not getting the insurance token price from the HealthCache because
         // the liqee isn't guaranteed to have an insurance fund token position.
         insurance_token_oracle_price = insurance_bank.oracle_price(
-            &oracle_acc_infos_from_ref(insurance_oracle_ref),
+            &OracleAccountInfos::from_reader(insurance_oracle_ref),
             Some(now_slot),
         )?;
     }
@@ -526,7 +526,10 @@ mod tests {
                 setup
                     .insurance_bank
                     .data()
-                    .oracle_price(&oracle_acc_infos_from_ref(&insurance_oracle_ref), None)
+                    .oracle_price(
+                        &OracleAccountInfos::from_reader(insurance_oracle_ref),
+                        None,
+                    )
                     .unwrap()
             };
             let settle_price = {
@@ -535,7 +538,7 @@ mod tests {
                 setup
                     .settle_bank
                     .data()
-                    .oracle_price(&oracle_acc_infos_from_ref(&settle_oracle_ref), None)
+                    .oracle_price(&OracleAccountInfos::from_reader(settle_oracle_ref), None)
                     .unwrap()
             };
             let perp_price = {
@@ -544,7 +547,7 @@ mod tests {
                 setup
                     .perp_market
                     .data()
-                    .oracle_price(&oracle_acc_infos_from_ref(&perp_oracle_ref), None)
+                    .oracle_price(&OracleAccountInfos::from_reader(perp_oracle_ref), None)
                     .unwrap()
             };
 
