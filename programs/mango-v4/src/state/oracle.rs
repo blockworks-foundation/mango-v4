@@ -75,6 +75,11 @@ pub mod usdc_mint_mainnet {
     declare_id!("EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v");
 }
 
+pub mod sol_mint_mainnet {
+    use solana_program::declare_id;
+    declare_id!("So11111111111111111111111111111111111111112");
+}
+
 #[zero_copy]
 #[derive(AnchorDeserialize, AnchorSerialize, Derivative)]
 #[derivative(Debug)]
@@ -300,7 +305,28 @@ pub fn oracle_state_unchecked<T: KeyedAccountReader>(
     acc_infos: &OracleAccountInfos<T>,
     base_decimals: u8,
 ) -> Result<OracleState> {
-    let oracle_info = acc_infos.oracle;
+    oracle_state_unchecked_inner(acc_infos, base_decimals, false)
+}
+
+pub fn fallback_oracle_state_unchecked<T: KeyedAccountReader>(
+    acc_infos: &OracleAccountInfos<T>,
+    base_decimals: u8,
+) -> Result<OracleState> {
+    oracle_state_unchecked_inner(acc_infos, base_decimals, true)
+}
+
+pub fn oracle_state_unchecked_inner<T: KeyedAccountReader>(
+    acc_infos: &OracleAccountInfos<T>,
+    base_decimals: u8,
+    use_fallback: bool,
+) -> Result<OracleState> {
+    let oracle_info = if use_fallback {
+        acc_infos
+            .fallback_opt
+            .ok_or_else(|| error!(MangoError::UnknownOracleType))?
+    } else {
+        acc_infos.oracle
+    };
     let data = &oracle_info.data();
     let oracle_type = determine_oracle_type(oracle_info)?;
 
@@ -378,25 +404,29 @@ pub fn oracle_state_unchecked<T: KeyedAccountReader>(
             }
         }
         OracleType::OrcaCLMM => {
-            let usd_state = usd_state_unchecked(acc_infos)?;
-
             let whirlpool = load_whirlpool_state(oracle_info)?;
-
             let sqrt_price = U64F64::from_bits(whirlpool.sqrt_price);
 
-            let clmm_price = if whirlpool.token_mint_a == usdc_mint_mainnet::ID {
-                let inverted_price = I80F48::from_num(sqrt_price * sqrt_price);
-                Ok(I80F48::ONE.checked_div(inverted_price).unwrap())
-            } else if whirlpool.token_mint_b == usdc_mint_mainnet::ID {
-                Ok(I80F48::from_num(sqrt_price * sqrt_price))
+            let inverted = whirlpool.token_mint_a == usdc_mint_mainnet::ID
+                || (whirlpool.token_mint_a == sol_mint_mainnet::ID
+                    && whirlpool.token_mint_b != usdc_mint_mainnet::ID);
+            let quote_state = if inverted {
+                quote_state_unchecked(acc_infos, &whirlpool.token_mint_a)?
             } else {
-                Err(MangoError::InvalidCLMMOracle)
-            }?;
+                quote_state_unchecked(acc_infos, &whirlpool.token_mint_b)?
+            };
 
-            let price = clmm_price * usd_state.price;
+            let clmm_price = if inverted {
+                let inverted_price = I80F48::from_num(sqrt_price * sqrt_price);
+                I80F48::ONE.checked_div(inverted_price).unwrap()
+            } else {
+                I80F48::from_num(sqrt_price * sqrt_price)
+            };
+
+            let price = clmm_price * quote_state.price;
             OracleState {
                 price,
-                last_update_slot: usd_state.last_update_slot,
+                last_update_slot: quote_state.last_update_slot,
                 deviation: I80F48::ZERO,
                 oracle_type: OracleType::OrcaCLMM,
             }
@@ -405,21 +435,25 @@ pub fn oracle_state_unchecked<T: KeyedAccountReader>(
 }
 
 #[inline(always)]
-fn usd_state_unchecked<T: KeyedAccountReader>(
+fn quote_state_unchecked<T: KeyedAccountReader>(
     acc_infos: &OracleAccountInfos<T>,
+    quote_mint: &Pubkey,
 ) -> Result<OracleState> {
-    if acc_infos.usd_opt.is_none() && acc_infos.sol_opt.is_none() {
+    if quote_mint == &usdc_mint_mainnet::ID {
+        let usd_feed = acc_infos
+            .usd_opt
+            .ok_or_else(|| error!(MangoError::MissingFeedForCLMMOracle))?;
+        let usd_state = get_pyth_state(usd_feed, QUOTE_DECIMALS as u8)?;
+        return Ok(usd_state);
+    } else if quote_mint == &sol_mint_mainnet::ID {
+        let sol_feed = acc_infos
+            .sol_opt
+            .ok_or_else(|| error!(MangoError::MissingFeedForCLMMOracle))?;
+        let sol_state = get_pyth_state(sol_feed, QUOTE_DECIMALS as u8)?;
+        return Ok(sol_state);
+    } else {
         return Err(MangoError::MissingFeedForCLMMOracle.into());
     }
-
-    // TODO: what to do if we haveboth??
-
-    let usd_feed = acc_infos.usd_opt.unwrap();
-    if usd_feed.key() != &pyth_mainnet_usdc_oracle::ID {
-        return Err(MangoError::InvalidFeedForCLMMOracle.into());
-    }
-    let usd_state = get_pyth_state(usd_feed, QUOTE_DECIMALS as u8)?;
-    Ok(usd_state)
 }
 
 pub fn oracle_log_context(
@@ -553,8 +587,20 @@ mod tests {
         let base_decimals = fixtures[0].3;
         let usdc_decimals = fixtures[1].3;
 
-        let usdc = oracle_state_unchecked(usdc_ai, usdc_decimals).unwrap();
-        let orca = oracle_state_unchecked(ai, Some(usdc_ai), base_decimals).unwrap();
+        let usdc_ais = OracleAccountInfos {
+            oracle: usdc_ai,
+            fallback_opt: None,
+            usd_opt: None,
+            sol_opt: None,
+        };
+        let orca_ais = OracleAccountInfos {
+            oracle: ai,
+            fallback_opt: None,
+            usd_opt: Some(usdc_ai),
+            sol_opt: None,
+        };
+        let usdc = oracle_state_unchecked(&usdc_ais, usdc_decimals).unwrap();
+        let orca = oracle_state_unchecked(&orca_ais, base_decimals).unwrap();
         assert!(usdc.price == I80F48::from_num(1.00000758274099));
         // 63.006792786538313 * 1.00000758274099 (but in native/native)
         assert!(orca.price == I80F48::from_num(0.06300727055072872));
@@ -586,7 +632,14 @@ mod tests {
             };
             let base_decimals = fixture.3;
             assert!(determine_oracle_type(ai).unwrap() == fixture.1);
-            assert!(oracle_state_unchecked(ai, base_decimals).is_anchor_error_with_code(6065));
+            let oracle_infos = OracleAccountInfos {
+                oracle: ai,
+                fallback_opt: None,
+                usd_opt: None,
+                sol_opt: None,
+            };
+            assert!(oracle_state_unchecked(&oracle_infos, base_decimals)
+                .is_anchor_error_with_code(6065));
         }
 
         Ok(())

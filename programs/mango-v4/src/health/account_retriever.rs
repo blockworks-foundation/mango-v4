@@ -286,7 +286,7 @@ impl<'a, 'info> ScannedBanksAndOracles<'a, 'info> {
             let bank1 = first_bank_part[first].load_fully_unchecked::<Bank>()?;
             let bank2 = second_bank_part[second - (first + 1)].load_fully_unchecked::<Bank>()?;
             let oracle_infos_1 = self.create_oracle_infos(first, &bank1.fallback_oracle);
-            let oracle_infos_2 = self.create_oracle_infos(first, &bank2.fallback_oracle);
+            let oracle_infos_2 = self.create_oracle_infos(second, &bank2.fallback_oracle);
             let price1 = bank1.oracle_price_with_fallback(&oracle_infos_1, self.staleness_slot)?;
             let price2 = bank2.oracle_price_with_fallback(&oracle_infos_2, self.staleness_slot)?;
             (price1, price2)

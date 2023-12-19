@@ -67,9 +67,9 @@ pub fn perp_settle_pnl(ctx: Context<PerpSettlePnl>) -> Result<()> {
         &oracle_acc_infos_from_ref(oracle_ref),
         None, // staleness checked in health
     )?;
-    let settle_oracle_ref = &AccountInfoRef::borrow(ctx.accounts.oracle.as_ref())?;
+    let settle_oracle_ref = &AccountInfoRef::borrow(ctx.accounts.settle_oracle.as_ref())?;
     let settle_token_oracle_price = settle_bank.oracle_price(
-        &oracle_acc_infos_from_ref(oracle_ref),
+        &oracle_acc_infos_from_ref(settle_oracle_ref),
         None, // staleness checked in health
     )?;
 

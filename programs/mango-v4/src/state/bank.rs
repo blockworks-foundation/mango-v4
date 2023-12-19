@@ -1126,7 +1126,7 @@ impl Bank {
             let fallback_oracle_acc = oracle_acc_infos.fallback_opt.unwrap();
             require_keys_eq!(self.fallback_oracle, *fallback_oracle_acc.key());
             let fallback_state =
-                oracle::oracle_state_unchecked(&oracle_acc_infos, self.mint_decimals)?;
+                oracle::fallback_oracle_state_unchecked(&oracle_acc_infos, self.mint_decimals)?;
             let fallback_ok = fallback_state.check_confidence_and_maybe_staleness(
                 &self.name(),
                 &self.oracle_config,
