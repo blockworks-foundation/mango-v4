@@ -28,6 +28,7 @@ import {
   SYSVAR_RENT_PUBKEY,
   SystemProgram,
   TransactionInstruction,
+  TransactionSignature,
 } from '@solana/web3.js';
 import bs58 from 'bs58';
 import chunk from 'lodash/chunk';
@@ -92,7 +93,12 @@ import {
   toNative,
   toNativeSellPerBuyTokenPrice,
 } from './utils';
-import { MangoSignatureStatus, sendTransaction } from './utils/rpc';
+import {
+  MangoSignature,
+  MangoSignatureStatus,
+  SendTransactionOpts,
+  sendTransaction,
+} from './utils/rpc';
 import { NATIVE_MINT, TOKEN_PROGRAM_ID } from './utils/spl';
 
 export const DEFAULT_TOKEN_CONDITIONAL_SWAP_COUNT = 8;
@@ -110,6 +116,7 @@ export type IdsSource = 'api' | 'static' | 'get-program-accounts';
 export type MangoClientOptions = {
   idsSource?: IdsSource;
   postSendTxCallback?: ({ txid }: { txid: string }) => void;
+  postTxConfirmationCallback?: ({ txid }: { txid: string }) => void;
   prioritizationFee?: number;
   estimateFee?: boolean;
   txConfirmationCommitment?: Commitment;
@@ -120,7 +127,8 @@ export type MangoClientOptions = {
 
 export class MangoClient {
   private idsSource: IdsSource;
-  private postSendTxCallback?: ({ txid }) => void;
+  private postSendTxCallback?: ({ txid }: { txid: string }) => void;
+  postTxConfirmationCallback?: ({ txid }: { txid: string }) => void;
   private prioritizationFee: number;
   private estimateFee: boolean;
   private txConfirmationCommitment: Commitment;
@@ -138,6 +146,7 @@ export class MangoClient {
     this.prioritizationFee = opts?.prioritizationFee || 0;
     this.estimateFee = opts?.estimateFee || false;
     this.postSendTxCallback = opts?.postSendTxCallback;
+    this.postTxConfirmationCallback = opts?.postTxConfirmationCallback;
     this.openbookFeesToDao = opts?.openbookFeesToDao ?? true;
     this.prependedGlobalAdditionalInstructions =
       opts.prependedGlobalAdditionalInstructions ?? [];
@@ -168,10 +177,20 @@ export class MangoClient {
     return (this.program.provider as AnchorProvider).wallet.publicKey;
   }
 
+  public async sendAndConfirmTransaction(
+    ixs: TransactionInstruction[],
+    opts?: SendTransactionOpts,
+  ): Promise<MangoSignatureStatus>;
+
+  public async sendAndConfirmTransaction(
+    ixs: TransactionInstruction[],
+    opts?: { confirmInBackground: true } & SendTransactionOpts,
+  ): Promise<MangoSignature>;
+
   /// Transactions
   public async sendAndConfirmTransaction(
     ixs: TransactionInstruction[],
-    opts: any = {},
+    opts: SendTransactionOpts = {},
   ): Promise<MangoSignatureStatus> {
     let prioritizationFee: number;
     if (opts.prioritizationFee) {
@@ -193,6 +212,7 @@ export class MangoClient {
           opts.alts ?? [],
           {
             postSendTxCallback: this.postSendTxCallback,
+            postTxConfirmationCallback: this.postTxConfirmationCallback,
             prioritizationFee,
             txConfirmationCommitment: this.txConfirmationCommitment,
             ...opts,
@@ -205,7 +225,7 @@ export class MangoClient {
 
   public async sendAndConfirmTransactionSingle(
     ixs: TransactionInstruction[],
-    opts: any = {},
+    opts: SendTransactionOpts = {},
   ): Promise<MangoSignatureStatus> {
     let prioritizationFee: number;
     if (opts.prioritizationFee) {
@@ -221,6 +241,7 @@ export class MangoClient {
       opts.alts ?? [],
       {
         postSendTxCallback: this.postSendTxCallback,
+        postTxConfirmationCallback: this.postTxConfirmationCallback,
         prioritizationFee,
         txConfirmationCommitment: this.txConfirmationCommitment,
         ...opts,
@@ -232,8 +253,20 @@ export class MangoClient {
   public async sendAndConfirmTransactionForGroup(
     group: Group,
     ixs: TransactionInstruction[],
-    opts: any = {},
-  ): Promise<MangoSignatureStatus> {
+    opts?: SendTransactionOpts,
+  ): Promise<MangoSignatureStatus>;
+
+  public async sendAndConfirmTransactionForGroup(
+    group: Group,
+    ixs: TransactionInstruction[],
+    opts?: { confirmInBackground: true } & SendTransactionOpts,
+  ): Promise<MangoSignature>;
+
+  public async sendAndConfirmTransactionForGroup(
+    group: Group,
+    ixs: TransactionInstruction[],
+    opts: SendTransactionOpts = {},
+  ): Promise<MangoSignatureStatus | MangoSignature> {
     return await this.sendAndConfirmTransaction(ixs, {
       alts: group.addressLookupTablesList,
       ...opts,
@@ -1323,8 +1356,27 @@ export class MangoClient {
     mangoAccount: MangoAccount,
     mintPk: PublicKey,
     amount: number,
+    reduceOnly?: boolean,
+    confirmInBackground?: boolean,
+  ): Promise<MangoSignatureStatus>;
+
+  public async tokenDeposit(
+    group: Group,
+    mangoAccount: MangoAccount,
+    mintPk: PublicKey,
+    amount: number,
+    reduceOnly?: boolean,
+    confirmInBackground?: true & boolean,
+  ): Promise<MangoSignature>;
+
+  public async tokenDeposit(
+    group: Group,
+    mangoAccount: MangoAccount,
+    mintPk: PublicKey,
+    amount: number,
     reduceOnly = false,
-  ): Promise<MangoSignatureStatus> {
+    confirmInBackground = false,
+  ): Promise<MangoSignatureStatus | MangoSignature> {
     const decimals = group.getMintDecimals(mintPk);
     const nativeAmount = toNative(amount, decimals);
     return await this.tokenDepositNative(
@@ -1333,6 +1385,7 @@ export class MangoClient {
       mintPk,
       nativeAmount,
       reduceOnly,
+      confirmInBackground,
     );
   }
 
@@ -1341,8 +1394,27 @@ export class MangoClient {
     mangoAccount: MangoAccount,
     mintPk: PublicKey,
     nativeAmount: BN,
+    reduceOnly?: boolean,
+    confirmInBackground?: boolean,
+  ): Promise<MangoSignatureStatus>;
+
+  public async tokenDepositNative(
+    group: Group,
+    mangoAccount: MangoAccount,
+    mintPk: PublicKey,
+    nativeAmount: BN,
+    reduceOnly?: boolean,
+    confirmInBackground?: true & boolean,
+  ): Promise<MangoSignature>;
+
+  public async tokenDepositNative(
+    group: Group,
+    mangoAccount: MangoAccount,
+    mintPk: PublicKey,
+    nativeAmount: BN,
     reduceOnly = false,
-  ): Promise<MangoSignatureStatus> {
+    confirmInBackground = false,
+  ): Promise<MangoSignatureStatus | MangoSignature> {
     const bank = group.getFirstBankByMint(mintPk);
 
     const tokenAccountPk = await getAssociatedTokenAddress(
@@ -1413,11 +1485,13 @@ export class MangoClient {
       )
       .instruction();
 
-    return await this.sendAndConfirmTransactionForGroup(group, [
-      ...preInstructions,
-      ix,
-      ...postInstructions,
-    ]);
+    return await this.sendAndConfirmTransactionForGroup(
+      group,
+      [...preInstructions, ix, ...postInstructions],
+      {
+        confirmInBackground: confirmInBackground,
+      },
+    );
   }
 
   public async tokenWithdrawAllDepositForAllUnconfidentOrStaleOracles(
@@ -1813,6 +1887,7 @@ export class MangoClient {
       group.addressLookupTablesList,
       {
         postSendTxCallback: this.postSendTxCallback,
+        postTxConfirmationCallback: this.postTxConfirmationCallback,
       },
     );
   }
@@ -2722,13 +2797,11 @@ export class MangoClient {
     );
     const hrix2 = await this.healthRegionEndIx(group, mangoAccount);
 
-    return await this.sendAndConfirmTransactionForGroup(
-      group,
-      [hrix1, ...ixs, hrix2],
-      {
-        prioritizationFee: true,
-      },
-    );
+    return await this.sendAndConfirmTransactionForGroup(group, [
+      hrix1,
+      ...ixs,
+      hrix2,
+    ]);
   }
 
   // perpPlaceOrder ix returns an optional, custom order id,
@@ -3198,22 +3271,16 @@ export class MangoClient {
       );
     }
 
-    return await this.sendAndConfirmTransactionForGroup(
-      group,
-      [
-        ComputeBudgetProgram.setComputeUnitLimit({
-          units:
-            mangoAccount.perpActive().length *
-              (PERP_SETTLE_PNL_CU_LIMIT + PERP_SETTLE_FEES_CU_LIMIT) +
-            mangoAccount.serum3Active().length * SERUM_SETTLE_FUNDS_CU_LIMIT,
-        }),
-        ...ixs1,
-        ...ixs2,
-      ],
-      {
-        prioritizationFee: true,
-      },
-    );
+    return await this.sendAndConfirmTransactionForGroup(group, [
+      ComputeBudgetProgram.setComputeUnitLimit({
+        units:
+          mangoAccount.perpActive().length *
+            (PERP_SETTLE_PNL_CU_LIMIT + PERP_SETTLE_FEES_CU_LIMIT) +
+          mangoAccount.serum3Active().length * SERUM_SETTLE_FUNDS_CU_LIMIT,
+      }),
+      ...ixs1,
+      ...ixs2,
+    ]);
   }
 
   async perpSettlePnlAndFees(
