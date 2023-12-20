@@ -427,14 +427,13 @@ fn oracle_state_unchecked_inner<T: KeyedAccountReader>(
             OracleState {
                 price,
                 last_update_slot: quote_state.last_update_slot,
-                deviation: I80F48::ZERO,
+                deviation: quote_state.deviation,
                 oracle_type: OracleType::OrcaCLMM,
             }
         }
     })
 }
 
-#[inline(always)]
 fn quote_state_unchecked<T: KeyedAccountReader>(
     acc_infos: &OracleAccountInfos<T>,
     quote_mint: &Pubkey,
