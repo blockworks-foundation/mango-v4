@@ -515,14 +515,7 @@ async fn main() -> anyhow::Result<()> {
                 let mut min_delay = tokio::time::interval(Duration::from_secs(1));
                 for token_index in token_indexes {
                     min_delay.tick().await;
-                    match token_swap_info_updater.update_one(token_index).await {
-                        Ok(()) => {}
-                        Err(err) => {
-                            warn!(
-                                "failed to update token swap info for token {token_index}: {err:?}",
-                            );
-                        }
-                    }
+                    token_swap_info_updater.update_one(token_index).await;
                 }
                 token_swap_info_updater.log_all();
             }
