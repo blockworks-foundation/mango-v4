@@ -131,6 +131,12 @@ pub enum MangoError {
     Serum3PriceBandExceeded,
     #[msg("deposit crosses the token's deposit limit")]
     BankDepositLimit,
+    #[msg("delegates can only withdraw to the owner's associated token account")]
+    DelegateWithdrawOnlyToOwnerAta,
+    #[msg("delegates can only withdraw if they close the token position")]
+    DelegateWithdrawMustClosePosition,
+    #[msg("delegates can only withdraw small amounts")]
+    DelegateWithdrawSmall,
 }
 
 impl MangoError {

@@ -3,6 +3,7 @@ use crate::error::*;
 use crate::health::*;
 use crate::state::*;
 use anchor_lang::prelude::*;
+use anchor_spl::associated_token;
 use anchor_spl::token;
 use fixed::types::I80F48;
 
@@ -10,6 +11,8 @@ use crate::accounts_ix::*;
 use crate::logs::{
     emit_stack, LoanOriginationFeeInstruction, TokenBalanceLog, WithdrawLoanLog, WithdrawLog,
 };
+
+const DELEGATE_WITHDRAW_MAX: i64 = 100_000; // $0.1
 
 pub fn token_withdraw(ctx: Context<TokenWithdraw>, amount: u64, allow_borrow: bool) -> Result<()> {
     require_msg!(amount > 0, "withdraw amount must be positive");
@@ -81,6 +84,7 @@ pub fn token_withdraw(ctx: Context<TokenWithdraw>, amount: u64, allow_borrow: bo
         amount_i80f48,
         Clock::get()?.unix_timestamp.try_into().unwrap(),
     )?;
+    let native_position_after = position.native(&bank);
 
     // Avoid getting in trouble because of the mutable bank account borrow later
     drop(bank);
@@ -103,8 +107,6 @@ pub fn token_withdraw(ctx: Context<TokenWithdraw>, amount: u64, allow_borrow: bo
         amount,
     )?;
 
-    let native_position_after = position.native(&bank);
-
     emit_stack(TokenBalanceLog {
         mango_group: ctx.accounts.group.key(),
         mango_account: ctx.accounts.account.key(),
@@ -117,6 +119,33 @@ pub fn token_withdraw(ctx: Context<TokenWithdraw>, amount: u64, allow_borrow: bo
     // Update the net deposits - adjust by price so different tokens are on the same basis (in USD terms)
     let amount_usd = (amount_i80f48 * unsafe_oracle_state.price).to_num::<i64>();
     account.fixed.net_deposits -= amount_usd;
+
+    // Delegates have heavy restrictions on withdraws. #1
+    if account.fixed.is_delegate(ctx.accounts.owner.key()) {
+        // Delegates can only withdrawing into the actual owner's ATA
+        let owner_ata = associated_token::get_associated_token_address(
+            &account.fixed.owner,
+            &ctx.accounts.vault.mint,
+        );
+        require_keys_eq!(
+            ctx.accounts.token_account.key(),
+            owner_ata,
+            MangoError::DelegateWithdrawOnlyToOwnerAta
+        );
+
+        // Delegates must close the token position
+        require!(
+            !withdraw_result.position_is_active,
+            MangoError::DelegateWithdrawMustClosePosition
+        );
+
+        // Delegates can't withdraw too much
+        require_gte!(
+            DELEGATE_WITHDRAW_MAX,
+            amount_usd,
+            MangoError::DelegateWithdrawSmall
+        );
+    }
 
     //
     // Health check

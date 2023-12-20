@@ -524,16 +524,19 @@ async fn test_flash_loan_creates_ata_accounts() -> Result<(), BanksClientError> 
     }
 
     //
-    // SETUP: Verify atas are empty
+    // SETUP: Wipe owner ATAs that are set up by default
     //
-    let owner_token0_ata = anchor_spl::associated_token::get_associated_token_address(
-        &owner.pubkey(),
-        &mints[0].pubkey,
-    );
-    let owner_token1_ata = anchor_spl::associated_token::get_associated_token_address(
-        &owner.pubkey(),
-        &mints[1].pubkey,
-    );
+    use solana_sdk::account::AccountSharedData;
+    let owner_token0_ata = context.users[0].token_accounts[0];
+    let owner_token1_ata = context.users[0].token_accounts[1];
+    solana
+        .context
+        .borrow_mut()
+        .set_account(&owner_token0_ata, &AccountSharedData::default());
+    solana
+        .context
+        .borrow_mut()
+        .set_account(&owner_token1_ata, &AccountSharedData::default());
     assert!(solana.get_account_data(owner_token0_ata).await.is_none());
     assert!(solana.get_account_data(owner_token1_ata).await.is_none());
 

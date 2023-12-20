@@ -16,8 +16,12 @@ pub struct TokenWithdraw<'info> {
     #[account(
         mut,
         has_one = group,
-        has_one = owner,
-        constraint = account.load()?.is_operational() @ MangoError::AccountIsFrozen
+        constraint = account.load()?.is_operational() @ MangoError::AccountIsFrozen,
+
+        // Delegates are allowed to call this instruction, but only with significant constraints,
+        // like "must close position", "tiny amount" and "token_account is a owner ATA"
+        // which allows delegated liquidators to close their token positions. See #1
+        constraint = account.load()?.is_owner_or_delegate(owner.key()),
     )]
     pub account: AccountLoader<'info, MangoAccountFixed>,
     pub owner: Signer<'info>,
