@@ -121,12 +121,7 @@ impl<T: KeyedAccountReader> FixedOrderAccountRetriever<T> {
 
     fn oracle_price_perp(&self, account_index: usize, perp_market: &PerpMarket) -> Result<I80F48> {
         let oracle = &self.ais[account_index];
-        let oracle_acc_infos = OracleAccountInfos {
-            oracle,
-            fallback_opt: None,
-            usd_opt: None,
-            sol_opt: None,
-        };
+        let oracle_acc_infos = OracleAccountInfos::from_reader(oracle);
         perp_market.oracle_price(&oracle_acc_infos, self.staleness_slot)
     }
 
@@ -151,7 +146,7 @@ impl<T: KeyedAccountReader> FixedOrderAccountRetriever<T> {
 }
 
 impl<T: KeyedAccountReader> AccountRetriever for FixedOrderAccountRetriever<T> {
-    fn bank_and_oracle<'a>(
+    fn bank_and_oracle(
         &self,
         group: &Pubkey,
         active_token_position_index: usize,
@@ -266,7 +261,7 @@ impl<'a, 'info> ScannedBanksAndOracles<'a, 'info> {
             let index = self.bank_index(token_index1)?;
             let price = {
                 let bank = self.banks[index].load_fully_unchecked::<Bank>()?;
-                let oracle_acc_infos = self.create_oracle_infos(index, &bank.fallback_oracle);
+                let oracle_acc_infos = self.create_oracle_infos(index, Some(&bank.fallback_oracle));
                 bank.oracle_price_with_fallback(&oracle_acc_infos, self.staleness_slot)?
             };
 
@@ -285,8 +280,8 @@ impl<'a, 'info> ScannedBanksAndOracles<'a, 'info> {
             let (first_bank_part, second_bank_part) = self.banks.split_at(first + 1);
             let bank1 = first_bank_part[first].load_fully_unchecked::<Bank>()?;
             let bank2 = second_bank_part[second - (first + 1)].load_fully_unchecked::<Bank>()?;
-            let oracle_infos_1 = self.create_oracle_infos(first, &bank1.fallback_oracle);
-            let oracle_infos_2 = self.create_oracle_infos(second, &bank2.fallback_oracle);
+            let oracle_infos_1 = self.create_oracle_infos(first, Some(&bank1.fallback_oracle));
+            let oracle_infos_2 = self.create_oracle_infos(second, Some(&bank2.fallback_oracle));
             let price1 = bank1.oracle_price_with_fallback(&oracle_infos_1, self.staleness_slot)?;
             let price2 = bank2.oracle_price_with_fallback(&oracle_infos_2, self.staleness_slot)?;
             (price1, price2)
@@ -308,7 +303,7 @@ impl<'a, 'info> ScannedBanksAndOracles<'a, 'info> {
         let index = self.bank_index(token_index)?;
         // The account was already loaded successfully during construction
         let bank = self.banks[index].load_fully_unchecked::<Bank>()?;
-        let oracle_acc_infos = self.create_oracle_infos(index, &bank.fallback_oracle);
+        let oracle_acc_infos = self.create_oracle_infos(index, Some(&bank.fallback_oracle));
         let price = bank.oracle_price_with_fallback(&oracle_acc_infos, self.staleness_slot)?;
 
         Ok((bank, price))
@@ -318,14 +313,13 @@ impl<'a, 'info> ScannedBanksAndOracles<'a, 'info> {
     fn create_oracle_infos(
         &self,
         oracle_index: usize,
-        fallback_key: &Pubkey,
+        fallback_key: Option<&Pubkey>,
     ) -> OracleAccountInfos<AccountInfoRef> {
         let oracle = &self.oracles[oracle_index];
-        let fallback_opt = self
-            .fallback_oracles
-            .iter()
-            .find(|ai| ai.key() == fallback_key);
-
+        let fallback_opt = match fallback_key {
+            Some(k) => self.fallback_oracles.iter().find(|ai| ai.key == k),
+            None => None,
+        };
         OracleAccountInfos {
             oracle,
             fallback_opt,
@@ -489,12 +483,7 @@ impl<'a, 'info> ScanningAccountRetriever<'a, 'info> {
         // The account was already loaded successfully during construction
         let perp_market = self.perp_markets[index].load_fully_unchecked::<PerpMarket>()?;
         let oracle_acc = &self.perp_oracles[index];
-        let oracle_acc_infos = OracleAccountInfos {
-            oracle: oracle_acc,
-            fallback_opt: None,
-            usd_opt: None,
-            sol_opt: None,
-        };
+        let oracle_acc_infos = OracleAccountInfos::from_reader(oracle_acc);
         let price =
             perp_market.oracle_price(&oracle_acc_infos, self.banks_and_oracles.staleness_slot)?;
         Ok((perp_market, price))

@@ -47,6 +47,7 @@ static_assertions = "1.1"
 switchboard-program = "0.2"
 switchboard-v2 = { package = "switchboard-solana", version = "0.28" }
 
+
 openbook-v2 = { git = "https://github.com/openbook-dex/openbook-v2.git", features = ["no-entrypoint"] }
 
 
