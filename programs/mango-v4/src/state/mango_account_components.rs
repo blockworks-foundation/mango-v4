@@ -376,6 +376,17 @@ impl PerpPosition {
         self.taker_quote_lots -= quote_change;
     }
 
+    pub fn adjust_maker_lots(&mut self, side: Side, base_lots: i64) {
+        match side {
+            Side::Bid => {
+                self.bids_base_lots += base_lots;
+            }
+            Side::Ask => {
+                self.asks_base_lots += base_lots;
+            }
+        };
+    }
+
     pub fn is_active(&self) -> bool {
         self.market_index != PerpMarketIndex::MAX
     }
@@ -850,10 +861,13 @@ pub struct PerpOpenOrder {
     pub client_id: u64,
     pub id: u128,
 
+    pub quantity: i64,
+
+    // WARNING: When adding fields, take care of updating the clear() function
     #[derivative(Debug = "ignore")]
-    pub reserved: [u8; 64],
+    pub reserved: [u8; 56],
 }
-const_assert_eq!(size_of::<PerpOpenOrder>(), 1 + 1 + 2 + 4 + 8 + 16 + 64);
+const_assert_eq!(size_of::<PerpOpenOrder>(), 1 + 1 + 2 + 4 + 8 + 16 + 8 + 56);
 const_assert_eq!(size_of::<PerpOpenOrder>(), 96);
 const_assert_eq!(size_of::<PerpOpenOrder>() % 8, 0);
 
@@ -866,7 +880,8 @@ impl Default for PerpOpenOrder {
             padding2: Default::default(),
             client_id: 0,
             id: 0,
-            reserved: [0; 64],
+            quantity: 0,
+            reserved: [0; 56],
         }
     }
 }
@@ -882,6 +897,14 @@ impl PerpOpenOrder {
 
     pub fn is_active(&self) -> bool {
         self.market != FREE_ORDER_SLOT
+    }
+
+    pub fn clear(&mut self) {
+        self.market = FREE_ORDER_SLOT;
+        self.side_and_tree = SideAndOrderTree::BidFixed.into();
+        self.id = 0;
+        self.client_id = 0;
+        self.quantity = 0;
     }
 }
 

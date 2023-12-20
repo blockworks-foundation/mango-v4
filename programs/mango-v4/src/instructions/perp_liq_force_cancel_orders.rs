@@ -40,7 +40,13 @@ pub fn perp_liq_force_cancel_orders(
             asks: ctx.accounts.asks.load_mut()?,
         };
 
-        book.cancel_all_orders(&mut account.borrow_mut(), &mut perp_market, limit, None)?;
+        book.cancel_all_orders(
+            &mut account.borrow_mut(),
+            ctx.accounts.account.as_ref().key,
+            &mut perp_market,
+            limit,
+            None,
+        )?;
 
         let perp_position = account.perp_position(perp_market.perp_market_index)?;
         health_cache.recompute_perp_info(perp_position, &perp_market)?;

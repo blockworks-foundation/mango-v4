@@ -18,19 +18,17 @@ pub fn perp_cancel_order(ctx: Context<PerpCancelOrder>, order_id: u128) -> Resul
         asks: ctx.accounts.asks.load_mut()?,
     };
 
-    let oo = account
+    let (slot, _) = account
         .perp_find_order_with_order_id(perp_market.perp_market_index, order_id)
         .ok_or_else(|| {
             error_msg!("could not find perp order with id {order_id} in user account")
         })?;
-    let order_id = oo.id;
-    let order_side_and_tree = oo.side_and_tree();
 
-    book.cancel_order(
+    book.cancel_order_by_slot(
         &mut account.borrow_mut(),
-        order_id,
-        order_side_and_tree,
-        Some(ctx.accounts.account.key()),
+        ctx.accounts.account.as_ref().key,
+        slot,
+        perp_market.perp_market_index,
     )?;
 
     Ok(())

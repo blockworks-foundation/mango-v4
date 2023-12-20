@@ -18,7 +18,13 @@ pub fn perp_cancel_all_orders(ctx: Context<PerpCancelAllOrders>, limit: u8) -> R
         asks: ctx.accounts.asks.load_mut()?,
     };
 
-    book.cancel_all_orders(&mut account.borrow_mut(), &mut perp_market, limit, None)?;
+    book.cancel_all_orders(
+        &mut account.borrow_mut(),
+        ctx.accounts.account.as_ref().key,
+        &mut perp_market,
+        limit,
+        None,
+    )?;
 
     Ok(())
 }

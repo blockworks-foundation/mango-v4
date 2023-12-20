@@ -24,6 +24,7 @@ pub fn perp_cancel_all_orders_by_side(
 
     book.cancel_all_orders(
         &mut account.borrow_mut(),
+        ctx.accounts.account.as_ref().key,
         &mut perp_market,
         limit,
         side_option,
