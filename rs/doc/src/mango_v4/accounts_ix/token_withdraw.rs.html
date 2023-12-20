@@ -55,6 +55,10 @@
 <a href="#55" id="55">55</a>
 <a href="#56" id="56">56</a>
 <a href="#57" id="57">57</a>
+<a href="#58" id="58">58</a>
+<a href="#59" id="59">59</a>
+<a href="#60" id="60">60</a>
+<a href="#61" id="61">61</a>
 </pre><pre class="rust"><code><span class="kw">use </span>anchor_lang::prelude::<span class="kw-2">*</span>;
 <span class="kw">use </span>anchor_spl::token;
 <span class="kw">use </span>anchor_spl::token::Token;
@@ -73,8 +77,12 @@
     <span class="attr">#[account(
         <span class="kw-2">mut</span>,
         has_one = group,
-        has_one = owner,
-        constraint = account.load()<span class="question-mark">?</span>.is_operational() @ MangoError::AccountIsFrozen
+        constraint = account.load()<span class="question-mark">?</span>.is_operational() @ MangoError::AccountIsFrozen,
+
+        <span class="comment">// Delegates are allowed to call this instruction, but only with significant constraints,
+        // like &quot;must close position&quot;, &quot;tiny amount&quot; and &quot;token_account is a owner ATA&quot;
+        // which allows delegated liquidators to close their token positions. See #1
+        </span>constraint = account.load()<span class="question-mark">?</span>.is_owner_or_delegate(owner.key()),
     )]
     </span><span class="kw">pub </span>account: AccountLoader&lt;<span class="lifetime">&#39;info</span>, MangoAccountFixed&gt;,
     <span class="kw">pub </span>owner: Signer&lt;<span class="lifetime">&#39;info</span>&gt;,
