@@ -367,6 +367,22 @@
 <a href="#367" id="367">367</a>
 <a href="#368" id="368">368</a>
 <a href="#369" id="369">369</a>
+<a href="#370" id="370">370</a>
+<a href="#371" id="371">371</a>
+<a href="#372" id="372">372</a>
+<a href="#373" id="373">373</a>
+<a href="#374" id="374">374</a>
+<a href="#375" id="375">375</a>
+<a href="#376" id="376">376</a>
+<a href="#377" id="377">377</a>
+<a href="#378" id="378">378</a>
+<a href="#379" id="379">379</a>
+<a href="#380" id="380">380</a>
+<a href="#381" id="381">381</a>
+<a href="#382" id="382">382</a>
+<a href="#383" id="383">383</a>
+<a href="#384" id="384">384</a>
+<a href="#385" id="385">385</a>
 </pre><pre class="rust"><code><span class="kw">use crate</span>::{error::Contextable, error::MangoError, error_msg};
 <span class="kw">use </span>anchor_lang::prelude::<span class="kw-2">*</span>;
 <span class="kw">use </span>bytemuck::cast_ref;
@@ -375,7 +391,7 @@
 <span class="kw">use </span>static_assertions::const_assert_eq;
 <span class="kw">use </span>std::mem::size_of;
 
-<span class="kw">use </span><span class="kw">super</span>::Side;
+<span class="kw">use super</span>::{LeafNode, Side};
 
 <span class="kw">pub const </span>MAX_NUM_EVENTS: u32 = <span class="number">488</span>;
 
@@ -528,7 +544,7 @@
 #[derive(Debug)]
 </span><span class="kw">pub struct </span>AnyEvent {
     <span class="kw">pub </span>event_type: u8,
-    <span class="kw">pub </span>padding: [u8; <span class="number">207</span>],
+    <span class="kw">pub </span>padding: [u8; EVENT_SIZE - <span class="number">1</span>],
 }
 
 <span class="macro">const_assert_eq!</span>(size_of::&lt;AnyEvent&gt;(), EVENT_SIZE);
@@ -563,7 +579,7 @@
     <span class="kw">pub </span>taker: Pubkey,
     <span class="kw">pub </span>padding3: [u8; <span class="number">16</span>],
     <span class="kw">pub </span>taker_client_order_id: u64,
-    <span class="kw">pub </span>padding4: [u8; <span class="number">16</span>],
+    <span class="kw">pub </span>maker_order_id: u128,
 
     <span class="kw">pub </span>price: i64,
     <span class="kw">pub </span>quantity: i64, <span class="comment">// number of quote lots
@@ -584,6 +600,7 @@
         timestamp: u64,
         seq_num: u64,
         maker: Pubkey,
+        maker_order_id: u128,
         maker_client_order_id: u64,
         maker_fee: I80F48,
         maker_timestamp: u64,
@@ -601,6 +618,7 @@
             timestamp,
             seq_num,
             maker,
+            maker_order_id,
             maker_client_order_id,
             maker_fee: maker_fee.to_num::&lt;f32&gt;(),
             maker_timestamp,
@@ -612,7 +630,6 @@
             padding: Default::default(),
             padding2: Default::default(),
             padding3: Default::default(),
-            padding4: Default::default(),
             reserved: [<span class="number">0</span>; <span class="number">8</span>],
         }
     }
@@ -675,7 +692,8 @@
     <span class="kw">pub </span>seq_num: u64,
     <span class="kw">pub </span>owner: Pubkey,
     <span class="kw">pub </span>quantity: i64,
-    padding1: [u8; <span class="number">144</span>],
+    <span class="kw">pub </span>order_id: u128,
+    padding1: [u8; <span class="number">128</span>],
 }
 <span class="macro">const_assert_eq!</span>(size_of::&lt;OutEvent&gt;() % <span class="number">8</span>, <span class="number">0</span>);
 <span class="macro">const_assert_eq!</span>(size_of::&lt;OutEvent&gt;(), EVENT_SIZE);
@@ -688,6 +706,7 @@
         seq_num: u64,
         owner: Pubkey,
         quantity: i64,
+        order_id: u128,
     ) -&gt; <span class="self">Self </span>{
         <span class="self">Self </span>{
             event_type: EventType::Out.into(),
@@ -698,8 +717,21 @@
             seq_num,
             owner,
             quantity,
-            padding1: [<span class="number">0</span>; EVENT_SIZE - <span class="number">64</span>],
+            order_id,
+            padding1: [<span class="number">0</span>; <span class="number">128</span>],
         }
+    }
+
+    <span class="kw">pub fn </span>from_leaf_node(side: Side, timestamp: u64, seq_num: u64, node: <span class="kw-2">&amp;</span>LeafNode) -&gt; <span class="self">Self </span>{
+        <span class="self">Self</span>::new(
+            side,
+            node.owner_slot,
+            timestamp,
+            seq_num,
+            node.owner,
+            node.quantity,
+            node.key,
+        )
     }
 
     <span class="kw">pub fn </span>side(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; Side {
