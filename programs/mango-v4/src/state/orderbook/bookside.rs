@@ -1,5 +1,4 @@
 use anchor_lang::prelude::*;
-use fixed::types::I80F48;
 use num_enum::{IntoPrimitive, TryFromPrimitive};
 use static_assertions::const_assert_eq;
 
