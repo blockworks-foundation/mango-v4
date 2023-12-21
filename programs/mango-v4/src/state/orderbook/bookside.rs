@@ -201,7 +201,7 @@ impl BookSide {
             let extra_qty = sum_qty - quantity;
             if extra_qty >= 0 {
                 sum_amt -= extra_qty * order.price_lots;
-                return Some(sum_amt)
+                return Some(sum_amt);
             }
         }
         None
@@ -228,7 +228,7 @@ impl BookSide {
             if extra_amt >= 0 {
                 // adding n-1 before dividing through n to force rounding up
                 sum_qty -= (extra_amt + order.price_lots - 1) / order.price_lots;
-                return Some(sum_qty)
+                return Some(sum_qty);
             }
         }
         None
