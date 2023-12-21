@@ -182,8 +182,8 @@ impl BookSide {
         None
     }
 
-    /// Walk up the book `quantity` units and return the amount in quote lots an order would
-    /// be filled at. If `quantity` units not on book, return None
+    /// Walk up the book given base units and return the amount in quote lots an order would
+    /// be filled at. If not enough liquidity is on book, return None
     pub fn matched_amount(
         &self,
         quantity: i64,
@@ -207,6 +207,9 @@ impl BookSide {
         None
     }
 
+    /// Walk up the book given quote units and return the quantity in base lots
+    /// an order would need to consume to match at least the requested amount.
+    /// If not enough liquidity is on book, return None
     pub fn matched_quantity(
         &self,
         amount: i64,
