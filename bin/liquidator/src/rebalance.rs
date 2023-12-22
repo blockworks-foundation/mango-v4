@@ -408,10 +408,9 @@ impl Rebalancer {
                     return Ok(());
                 }
             } else if amount > dust_threshold {
-                anyhow::bail!(
+                warn!(
                     "unexpected {} position after rebalance swap: {} native",
-                    token.name,
-                    amount
+                    token.name, amount
                 );
             }
         }
