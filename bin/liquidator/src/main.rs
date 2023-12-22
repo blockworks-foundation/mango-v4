@@ -16,6 +16,7 @@ use mango_v4_client::{
 use itertools::Itertools;
 use solana_sdk::commitment_config::CommitmentConfig;
 use solana_sdk::pubkey::Pubkey;
+use solana_sdk::signer::Signer;
 use tracing::*;
 
 pub mod liquidate;
@@ -194,6 +195,11 @@ async fn main() -> anyhow::Result<()> {
         .await?;
     let mango_group = mango_account.fixed.group;
 
+    let signer_is_owner = mango_account.fixed.owner == liqor_owner.pubkey();
+    if cli.rebalance == BoolArg::True && !signer_is_owner {
+        warn!("rebalancing on delegated accounts will be unable to free token positions reliably, withdraw dust manually");
+    }
+
     let group_context = MangoGroupContext::new_from_rpc(&client.rpc_async(), mango_group).await?;
 
     let mango_oracles = group_context
@@ -322,6 +328,7 @@ async fn main() -> anyhow::Result<()> {
             .filter(|v| !v.is_empty())
             .map(|name| mango_client.context.token_by_name(name).token_index)
             .collect(),
+        allow_withdraws: signer_is_owner,
     };
 
     let rebalancer = Arc::new(rebalance::Rebalancer {
