@@ -58,7 +58,7 @@ pub fn max_swap_source_with_limits(
 
     let health_cache =
         mango_v4_client::health_cache::new_sync(&client.context, account_fetcher, &account)
-            .expect("always ok");
+            .context("health cache")?;
 
     let source_bank: Bank = account_fetcher.fetch(&client.context.token(source).first_bank())?;
     let target_bank: Bank = account_fetcher.fetch(&client.context.token(target).first_bank())?;
@@ -100,7 +100,7 @@ pub fn max_swap_source_ignoring_limits(
 
     let health_cache =
         mango_v4_client::health_cache::new_sync(&client.context, account_fetcher, &account)
-            .expect("always ok");
+            .context("health cache")?;
 
     let source_bank: Bank = account_fetcher.fetch(&client.context.token(source).first_bank())?;
     let target_bank: Bank = account_fetcher.fetch(&client.context.token(target).first_bank())?;

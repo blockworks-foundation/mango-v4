@@ -7,6 +7,7 @@ use anchor_client::Cluster;
 use anyhow::Context;
 use clap::Parser;
 use mango_v4::state::{PerpMarketIndex, TokenIndex};
+use mango_v4_client::AsyncChannelSendUnlessFull;
 use mango_v4_client::{
     account_update_stream, chain_data, error_tracking::ErrorTracking, jupiter, keypair_from_cli,
     snapshot_source, websocket_source, Client, MangoClient, MangoClientError, MangoGroupContext,
@@ -16,6 +17,7 @@ use mango_v4_client::{
 use itertools::Itertools;
 use solana_sdk::commitment_config::CommitmentConfig;
 use solana_sdk::pubkey::Pubkey;
+use solana_sdk::signer::Signer;
 use tracing::*;
 
 pub mod liquidate;
@@ -194,6 +196,11 @@ async fn main() -> anyhow::Result<()> {
         .await?;
     let mango_group = mango_account.fixed.group;
 
+    let signer_is_owner = mango_account.fixed.owner == liqor_owner.pubkey();
+    if cli.rebalance == BoolArg::True && !signer_is_owner {
+        warn!("rebalancing on delegated accounts will be unable to free token positions reliably, withdraw dust manually");
+    }
+
     let group_context = MangoGroupContext::new_from_rpc(&client.rpc_async(), mango_group).await?;
 
     let mango_oracles = group_context
@@ -309,6 +316,8 @@ async fn main() -> anyhow::Result<()> {
         min_buy_fraction: 0.7,
     };
 
+    let mut rebalance_interval = tokio::time::interval(Duration::from_secs(30));
+    let (rebalance_trigger_sender, rebalance_trigger_receiver) = async_channel::bounded::<()>(1);
     let rebalance_config = rebalance::Config {
         enabled: cli.rebalance == BoolArg::True,
         slippage_bps: cli.rebalance_slippage_bps,
@@ -322,6 +331,7 @@ async fn main() -> anyhow::Result<()> {
             .filter(|v| !v.is_empty())
             .map(|name| mango_client.context.token_by_name(name).token_index)
             .collect(),
+        allow_withdraws: signer_is_owner,
     };
 
     let rebalancer = Arc::new(rebalance::Rebalancer {
@@ -336,7 +346,6 @@ async fn main() -> anyhow::Result<()> {
         account_fetcher,
         liquidation_config: liq_config,
         trigger_tcs_config: tcs_config,
-        rebalancer: rebalancer.clone(),
         token_swap_info: token_swap_info_updater.clone(),
         liq_errors: ErrorTracking {
             skip_threshold: 5,
@@ -434,13 +443,33 @@ async fn main() -> anyhow::Result<()> {
     // Could be refactored to only start the below jobs when the first snapshot is done.
     // But need to take care to abort if the above job aborts beforehand.
 
+    let rebalance_job = tokio::spawn({
+        let shared_state = shared_state.clone();
+        async move {
+            loop {
+                tokio::select! {
+                    _ = rebalance_interval.tick() => {}
+                    _ = rebalance_trigger_receiver.recv() => {}
+                }
+                if !shared_state.read().unwrap().one_snapshot_done {
+                    continue;
+                }
+                if let Err(err) = rebalancer.zero_all_non_quote().await {
+                    error!("failed to rebalance liqor: {:?}", err);
+
+                    // Workaround: We really need a sequence enforcer in the liquidator since we don't want to
+                    // accidentally send a similar tx again when we incorrectly believe an earlier one got forked
+                    // off. For now, hard sleep on error to avoid the most frequent error cases.
+                    tokio::time::sleep(Duration::from_secs(10)).await;
+                }
+            }
+        }
+    });
+
     let liquidation_job = tokio::spawn({
         let mut interval = tokio::time::interval(Duration::from_millis(cli.check_interval_ms));
         let shared_state = shared_state.clone();
         async move {
-            let mut must_rebalance = true;
-            let rebalance_delay = Duration::from_secs(5);
-            let mut last_rebalance = Instant::now();
             loop {
                 interval.tick().await;
 
@@ -451,14 +480,6 @@ async fn main() -> anyhow::Result<()> {
                     }
                     state.mango_accounts.iter().cloned().collect_vec()
                 };
-
-                if must_rebalance || last_rebalance.elapsed() > rebalance_delay {
-                    if let Err(err) = liquidation.rebalancer.zero_all_non_quote().await {
-                        error!("failed to rebalance liqor: {:?}", err);
-                    }
-                    must_rebalance = false;
-                    last_rebalance = Instant::now();
-                }
 
                 liquidation.log_persistent_errors();
 
@@ -480,7 +501,9 @@ async fn main() -> anyhow::Result<()> {
                     }
                 }
 
-                must_rebalance = must_rebalance || liquidated || took_tcs;
+                if liquidated || took_tcs {
+                    rebalance_trigger_sender.send_unless_full(()).unwrap();
+                }
             }
         }
     });
@@ -538,6 +561,7 @@ async fn main() -> anyhow::Result<()> {
     use futures::StreamExt;
     let mut jobs: futures::stream::FuturesUnordered<_> = vec![
         data_job,
+        rebalance_job,
         liquidation_job,
         token_swap_info_job,
         check_changes_for_abort_job,
@@ -563,7 +587,6 @@ struct SharedState {
 struct LiquidationState {
     mango_client: Arc<MangoClient>,
     account_fetcher: Arc<chain_data::AccountFetcher>,
-    rebalancer: Arc<rebalance::Rebalancer>,
     token_swap_info: Arc<token_swap_info::TokenSwapInfoUpdater>,
     liquidation_config: liquidate::Config,
     trigger_tcs_config: trigger_tcs::Config,

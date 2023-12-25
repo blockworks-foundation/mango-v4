@@ -158,7 +158,7 @@ impl<'a> LiquidateHelper<'a> {
             let mut health_cache =
                 health_cache::new(&self.client.context, self.account_fetcher, &liqor)
                     .await
-                    .expect("always ok");
+                    .context("health cache")?;
             let quote_bank = self
                 .client
                 .first_bank(QUOTE_TOKEN_INDEX)
