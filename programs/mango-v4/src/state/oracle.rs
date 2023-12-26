@@ -3,6 +3,7 @@ use std::mem::size_of;
 use anchor_lang::prelude::*;
 use anchor_lang::{AnchorDeserialize, Discriminator};
 use derivative::Derivative;
+use fixed::traits::FromFixed;
 use fixed::types::{I80F48, U64F64};
 
 use static_assertions::const_assert_eq;
@@ -405,7 +406,6 @@ fn oracle_state_unchecked_inner<T: KeyedAccountReader>(
         }
         OracleType::OrcaCLMM => {
             let whirlpool = load_whirlpool_state(oracle_info)?;
-            let sqrt_price = U64F64::from_bits(whirlpool.sqrt_price);
 
             let inverted = whirlpool.token_mint_a == usdc_mint_mainnet::ID
                 || (whirlpool.token_mint_a == sol_mint_mainnet::ID
@@ -417,9 +417,11 @@ fn oracle_state_unchecked_inner<T: KeyedAccountReader>(
             };
 
             let clmm_price = if inverted {
-                let inverted_price = I80F48::from_num(sqrt_price * sqrt_price);
-                I80F48::ONE.checked_div(inverted_price).unwrap()
+                let sqrt_price = f64::from_fixed(U64F64::from_bits(whirlpool.sqrt_price));
+                let inverted_price = sqrt_price * sqrt_price;
+                I80F48::from_num(1.0f64 / inverted_price)
             } else {
+                let sqrt_price = U64F64::from_bits(whirlpool.sqrt_price);
                 I80F48::from_num(sqrt_price * sqrt_price)
             };
 
@@ -638,7 +640,7 @@ mod tests {
                 sol_opt: None,
             };
             assert!(oracle_state_unchecked(&oracle_infos, base_decimals)
-                .is_anchor_error_with_code(6065));
+                .is_anchor_error_with_code(6068));
         }
 
         Ok(())

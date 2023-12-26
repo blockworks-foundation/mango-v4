@@ -141,7 +141,7 @@ pub enum MangoError {
     InvalidCLMMOracle,
     #[msg("invalid usdc/usd feed provided for the CLMM oracle")]
     InvalidFeedForCLMMOracle,
-    #[msg("Pyth USDC/USD feed not found (required by CLMM oracle)")]
+    #[msg("Pyth USDC/USD or SOL/USD feed not found (required by CLMM oracle)")]
     MissingFeedForCLMMOracle,
 }
 
