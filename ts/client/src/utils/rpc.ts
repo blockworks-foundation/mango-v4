@@ -147,7 +147,7 @@ export const createComputeBudgetIx = (
   return computeBudgetIx;
 };
 
-class MangoError extends Error {
+export class MangoError extends Error {
   message: string;
   txid: string;
 
