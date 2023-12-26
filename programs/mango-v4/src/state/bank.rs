@@ -1094,23 +1094,8 @@ impl Bank {
         self.interest_curve_scaling = (self.interest_curve_scaling * adjustment).max(1.0)
     }
 
+    /// Tries to return the primary oracle price, and if there is a confidence or staleness issue returns the fallback oracle price if possible.
     pub fn oracle_price<T: KeyedAccountReader>(
-        &self,
-        oracle_acc_infos: &OracleAccountInfos<T>,
-        staleness_slot: Option<u64>,
-    ) -> Result<I80F48> {
-        require_keys_eq!(self.oracle, *oracle_acc_infos.oracle.key());
-        let state = oracle::oracle_state_unchecked(oracle_acc_infos, self.mint_decimals)?;
-        state
-            .check_confidence_and_maybe_staleness(&self.oracle_config, staleness_slot)
-            .with_context(|| {
-                oracle_log_context(self.name(), &state, &self.oracle_config, staleness_slot)
-            })?;
-        Ok(state.price)
-    }
-
-    /// Tries to return the primary oracle price, and if there is a confidence or staleness issue returns the fallback oracle price.
-    pub fn oracle_price_with_fallback<T: KeyedAccountReader>(
         &self,
         oracle_acc_infos: &OracleAccountInfos<T>,
         staleness_slot: Option<u64>,
@@ -1118,7 +1103,6 @@ impl Bank {
         require_keys_eq!(self.oracle, *oracle_acc_infos.oracle.key());
         let primary_state = oracle::oracle_state_unchecked(oracle_acc_infos, self.mint_decimals)?;
         let primary_ok = primary_state.check_confidence_and_maybe_staleness(
-            &self.name(),
             &self.oracle_config,
             staleness_slot,
         );
@@ -1128,7 +1112,6 @@ impl Bank {
             let fallback_state =
                 oracle::fallback_oracle_state_unchecked(&oracle_acc_infos, self.mint_decimals)?;
             let fallback_ok = fallback_state.check_confidence_and_maybe_staleness(
-                &self.name(),
                 &self.oracle_config,
                 staleness_slot,
             );

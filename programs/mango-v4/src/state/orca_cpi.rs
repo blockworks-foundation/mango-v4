@@ -33,7 +33,8 @@ pub fn load_whirlpool_state(acc_info: &impl KeyedAccountReader) -> Result<Whirlp
         MangoError::InvalidCLMMOracle
     );
 
-    let sqrt_price = u128::try_from_slice(&data[65..81])?;
+    let price_bytes: &[u8; 16] = &data[65..81].try_into().unwrap();
+    let sqrt_price = u128::from_le_bytes(*price_bytes);
     let a: &[u8; 32] = &(&data[101..133]).try_into().unwrap();
     let b: &[u8; 32] = &(&data[181..213]).try_into().unwrap();
     let mint_a = Pubkey::from(*a);
