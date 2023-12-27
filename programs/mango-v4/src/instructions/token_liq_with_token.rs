@@ -118,16 +118,22 @@ pub(crate) fn liquidation_action(
     let liqee_liab_native = liqee_liab_position.native(liab_bank);
     require_gt!(0, liqee_liab_native);
 
-    // Liquidation fees work by giving the liqor more assets than the oracle price would
-    // indicate. Specifically we choose
+    // The liqor will likely close the borrow by buying liab tokens somewhere and get rid of the
+    // asset tokens by selling them. Both transactions may incur slippage, so to make sure liqors
+    // are willing to perform the liquidation, they receive a liquidation fee.
+    //
+    // Liquidation fees work by giving the liqor more assets than the oracle price would indicate.
+    //
+    // Specifically we choose
     //   assets =
-    //     liabs * liab_oracle_price/asset_oracle_price * (1 + liab_liq_fee)
-    // Which means that we use a increased liab oracle price for the conversion.
+    //     liabs * liab_oracle_price/asset_oracle_price * (1 + liab_liq_fee) * (1 + asset_liq_fee)
+    // Which is equivalent to using an increased liab oracle price for the conversion.
     // For simplicity we write
     //   assets = liabs * liab_oracle_price / asset_oracle_price * fee_factor
     //   assets = liabs * liab_oracle_price_adjusted / asset_oracle_price
     //          = liabs * lopa / aop
-    let fee_factor = I80F48::ONE + liab_bank.liquidation_fee;
+    let fee_factor =
+        (I80F48::ONE + liab_bank.liquidation_fee) * (I80F48::ONE + asset_bank.liquidation_fee);
     let liab_oracle_price_adjusted = liab_oracle_price * fee_factor;
 
     let init_asset_weight = asset_bank.init_asset_weight;
