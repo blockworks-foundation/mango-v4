@@ -148,6 +148,10 @@ struct Cli {
     #[clap(long, env, default_value = "https://quote-api.jup.ag/v6")]
     jupiter_v6_url: String,
 
+    /// provide a jupiter token, currently only for jup v6
+    #[clap(long, env, default_value = "")]
+    jupiter_token: String,
+
     /// report liquidator's existence and pubkey
     #[clap(long, env, value_enum, default_value = "true")]
     telemetry: BoolArg,
@@ -185,6 +189,7 @@ async fn main() -> anyhow::Result<()> {
         .timeout(Some(rpc_timeout))
         .jupiter_v4_url(cli.jupiter_v4_url)
         .jupiter_v6_url(cli.jupiter_v6_url)
+        .jupiter_token(cli.jupiter_token)
         .transaction_builder_config(TransactionBuilderConfig {
             prioritization_micro_lamports: (cli.prioritization_micro_lamports > 0)
                 .then_some(cli.prioritization_micro_lamports),

@@ -81,6 +81,9 @@ pub struct Client {
 
     #[builder(default = "\"https://quote-api.jup.ag/v6\".into()")]
     pub jupiter_v6_url: String,
+
+    #[builder(default = "\"\".into()")]
+    pub jupiter_token: String,
 }
 
 impl ClientBuilder {
