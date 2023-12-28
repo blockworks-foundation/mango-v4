@@ -95,7 +95,8 @@ pub fn token_force_close_borrows_with_token(
             .max(I80F48::ZERO);
 
         // The amount of asset native tokens we will give up for them
-        let fee_factor = I80F48::ONE + liab_bank.liquidation_fee;
+        let fee_factor =
+            (I80F48::ONE + liab_bank.liquidation_fee) * (I80F48::ONE + asset_bank.liquidation_fee);
         let liab_oracle_price_adjusted = liab_oracle_price * fee_factor;
         let asset_transfer = liab_transfer * liab_oracle_price_adjusted / asset_oracle_price;
 
