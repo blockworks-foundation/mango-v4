@@ -105,37 +105,29 @@ impl OracleState {
     #[inline]
     pub fn check_confidence_and_maybe_staleness(
         &self,
-        oracle_name: &str,
         config: &OracleConfig,
         staleness_slot: Option<u64>,
     ) -> Result<()> {
         if let Some(now_slot) = staleness_slot {
-            self.check_staleness(oracle_name, config, now_slot)?;
+            self.check_staleness(config, now_slot)?;
         }
-        self.check_confidence(oracle_name, config)
+        self.check_confidence(config)
     }
 
-    pub fn check_staleness(
-        &self,
-        oracle_name: &str,
-        config: &OracleConfig,
-        now_slot: u64,
-    ) -> Result<()> {
+    pub fn check_staleness(&self, config: &OracleConfig, now_slot: u64) -> Result<()> {
         if config.max_staleness_slots >= 0
             && self
                 .last_update_slot
                 .saturating_add(config.max_staleness_slots as u64)
                 < now_slot
         {
-            msg!("Oracle is stale: {}", oracle_name);
             return Err(MangoError::OracleStale.into());
         }
         Ok(())
     }
 
-    pub fn check_confidence(&self, oracle_name: &str, config: &OracleConfig) -> Result<()> {
+    pub fn check_confidence(&self, config: &OracleConfig) -> Result<()> {
         if self.deviation > config.conf_filter * self.price {
-            msg!("Oracle confidence not good enough: {}", oracle_name);
             return Err(MangoError::OracleConfidence.into());
         }
         Ok(())
@@ -321,12 +313,14 @@ pub fn oracle_state_unchecked(
 }
 
 pub fn oracle_log_context(
+    name: &str,
     state: &OracleState,
     oracle_config: &OracleConfig,
     staleness_slot: Option<u64>,
 ) -> String {
     format!(
-        "price: {}, deviation: {}, last_update_slot: {}, now_slot: {}, conf_filter: {:#?}",
+        "name: {}, price: {}, deviation: {}, last_update_slot: {}, now_slot: {}, conf_filter: {:#?}",
+        name,
         state.price.to_num::<f64>(),
         state.deviation.to_num::<f64>(),
         state.last_update_slot,
