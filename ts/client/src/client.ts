@@ -92,7 +92,11 @@ import {
   toNative,
   toNativeSellPerBuyTokenPrice,
 } from './utils';
-import { MangoSignatureStatus, sendTransaction } from './utils/rpc';
+import {
+  MangoSignatureStatus,
+  sendTransaction,
+  SendTransactionOptions,
+} from './utils/rpc';
 import { NATIVE_MINT, TOKEN_PROGRAM_ID } from './utils/spl';
 
 export const DEFAULT_TOKEN_CONDITIONAL_SWAP_COUNT = 8;
@@ -126,7 +130,7 @@ export class MangoClient {
   private txConfirmationCommitment: Commitment;
   private openbookFeesToDao: boolean;
   private prependedGlobalAdditionalInstructions: TransactionInstruction[] = [];
-  private multipleProviders: AnchorProvider[] = [];
+  multipleConnections: Connection[] = [];
 
   constructor(
     public program: Program<MangoV4>,
@@ -147,16 +151,7 @@ export class MangoClient {
       'processed';
     // TODO: evil side effect, but limited backtraces are a nightmare
     Error.stackTraceLimit = 1000;
-    this.multipleProviders = opts?.multipleConnections
-      ? opts.multipleConnections.map(
-          (c) =>
-            new AnchorProvider(
-              c,
-              new Wallet(new Keypair()),
-              (program.provider as AnchorProvider).opts,
-            ),
-        )
-      : [];
+    this.multipleConnections = opts?.multipleConnections ?? [];
   }
 
   /// Convenience accessors
@@ -171,7 +166,7 @@ export class MangoClient {
   /// Transactions
   public async sendAndConfirmTransaction(
     ixs: TransactionInstruction[],
-    opts: any = {},
+    opts: SendTransactionOptions = {},
   ): Promise<MangoSignatureStatus> {
     let prioritizationFee: number;
     if (opts.prioritizationFee) {
@@ -181,40 +176,7 @@ export class MangoClient {
     } else {
       prioritizationFee = this.prioritizationFee;
     }
-    const providers = [
-      this.program.provider as AnchorProvider,
-      ...this.multipleProviders,
-    ];
-    const status = await Promise.race(
-      providers.map((p) =>
-        sendTransaction(
-          p,
-          [...this.prependedGlobalAdditionalInstructions, ...ixs],
-          opts.alts ?? [],
-          {
-            postSendTxCallback: this.postSendTxCallback,
-            prioritizationFee,
-            txConfirmationCommitment: this.txConfirmationCommitment,
-            ...opts,
-          },
-        ),
-      ),
-    );
-    return status;
-  }
 
-  public async sendAndConfirmTransactionSingle(
-    ixs: TransactionInstruction[],
-    opts: any = {},
-  ): Promise<MangoSignatureStatus> {
-    let prioritizationFee: number;
-    if (opts.prioritizationFee) {
-      prioritizationFee = opts.prioritizationFee;
-    } else if (this.estimateFee) {
-      prioritizationFee = await this.estimatePrioritizationFee(ixs);
-    } else {
-      prioritizationFee = this.prioritizationFee;
-    }
     const status = await sendTransaction(
       this.program.provider as AnchorProvider,
       [...this.prependedGlobalAdditionalInstructions, ...ixs],
@@ -223,6 +185,7 @@ export class MangoClient {
         postSendTxCallback: this.postSendTxCallback,
         prioritizationFee,
         txConfirmationCommitment: this.txConfirmationCommitment,
+        multipleConnections: this.multipleConnections,
         ...opts,
       },
     );

@@ -59,7 +59,7 @@ async function updateBanks(client: MangoClient, group: Group): Promise<void> {
           client.program.provider as AnchorProvider,
           ixs,
           group.addressLookupTablesList,
-          { prioritizationFee: true, preflightCommitment: 'confirmed' },
+          { prioritizationFee: 1, preflightCommitment: 'confirmed' },
         );
 
         console.log(
@@ -111,7 +111,7 @@ async function consumeEvents(client: MangoClient, group: Group): Promise<void> {
               ),
             ],
             group.addressLookupTablesList,
-            { prioritizationFee: true },
+            { prioritizationFee: 1 },
           );
 
           console.log(
@@ -146,7 +146,7 @@ async function updateFunding(client: MangoClient, group: Group): Promise<void> {
             ),
           ],
           group.addressLookupTablesList,
-          { prioritizationFee: true },
+          { prioritizationFee: 1 },
         );
 
         console.log(

@@ -3,7 +3,9 @@ import NodeWallet from '@coral-xyz/anchor/dist/cjs/nodewallet';
 import { u8 } from '@solana/buffer-layout';
 import {
   AddressLookupTableAccount,
+  Commitment,
   ComputeBudgetProgram,
+  Connection,
   MessageV0,
   RpcResponseAndContext,
   SignatureResult,
@@ -14,6 +16,7 @@ import {
   TransactionSignature,
   VersionedTransaction,
 } from '@solana/web3.js';
+import { Tracing } from 'trace_events';
 import { COMPUTE_BUDGET_PROGRAM_ID } from '../constants';
 
 export interface MangoSignatureStatus {
@@ -24,11 +27,25 @@ export interface MangoSignatureStatus {
   slot: number;
 }
 
+export type SendTransactionOptions = {
+  alts?: AddressLookupTableAccount[];
+  postSendTxCallback?: ({ txid }: { txid: string }) => void;
+  prioritizationFee?: number;
+  latestBlockhash?: {
+    blockhash: string;
+    lastValidBlockHeight: number;
+  };
+  txConfirmationCommitment?: Commitment;
+  preflightCommitment?: Commitment;
+  additionalSigners?: Signer[];
+  multipleConnections?: Connection[];
+};
+
 export async function sendTransaction(
   provider: AnchorProvider,
   ixs: TransactionInstruction[],
   alts: AddressLookupTableAccount[],
-  opts: any = {},
+  opts: SendTransactionOptions = {},
 ): Promise<MangoSignatureStatus> {
   const connection = provider.connection;
   const latestBlockhash =
@@ -94,9 +111,22 @@ export async function sendTransaction(
     vtx.sign([(payer as any).payer as Signer]);
   }
 
-  const signature = await connection.sendRawTransaction(vtx.serialize(), {
-    skipPreflight: true, // mergedOpts.skipPreflight,
-  });
+  // if configured, send the transaction using multiple connections
+  let signature: string;
+  if (opts?.multipleConnections?.length ?? 0 > 0) {
+    const allConnections = [connection, ...opts.multipleConnections!];
+    signature = await Promise.any(
+      allConnections.map((c) => {
+        return c.sendRawTransaction(vtx.serialize(), {
+          skipPreflight: true, // mergedOpts.skipPreflight,
+        });
+      }),
+    );
+  } else {
+    signature = await connection.sendRawTransaction(vtx.serialize(), {
+      skipPreflight: true, // mergedOpts.skipPreflight,
+    });
+  }
 
   if (opts.postSendTxCallback) {
     try {
