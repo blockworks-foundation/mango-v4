@@ -105,6 +105,21 @@ export class HealthCache {
       return TokenInfo.fromBank(bank, tokenPosition.balance(bank));
     });
 
+    // if no usdc position is found, insert it nonetheless, this is required for simulating
+    // 1st max perp trade
+    if (
+      !tokenInfos.find(
+        (ti) =>
+          ti.tokenIndex == group.getFirstBankForPerpSettlement().tokenIndex,
+      )
+    ) {
+      tokenInfos.push(
+        TokenInfo.fromBank(
+          group.getFirstBankForPerpSettlement(),
+          ZERO_I80F48(),
+        ),
+      );
+    }
     // Fill the TokenInfo balance with free funds in serum3 oo accounts, and fill
     // the serum3MaxReserved with their reserved funds. Also build Serum3Infos.
     const serum3Infos = mangoAccount.serum3Active().map((serum3) => {
