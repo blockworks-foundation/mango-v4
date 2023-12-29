@@ -104,6 +104,9 @@ export class HealthCache {
       const bank = group.getFirstBankByTokenIndex(tokenPosition.tokenIndex);
       return TokenInfo.fromBank(bank, tokenPosition.balance(bank));
     });
+
+    // if no usdc position is found, insert it nonetheless, this is required for simulating
+    // 1st max perp trade
     if (
       !tokenInfos.find(
         (ti) =>
