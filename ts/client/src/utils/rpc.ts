@@ -46,6 +46,7 @@ export type SendTransactionOpts = Partial<{
   txConfirmationCommitment: Commitment;
   confirmInBackground: boolean;
   alts: AddressLookupTableAccount[];
+  multipleConnections: Connection[];
 }>;
 
 export function sendTransaction(

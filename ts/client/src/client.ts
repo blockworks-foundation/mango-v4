@@ -191,25 +191,19 @@ export class MangoClient {
     } else {
       prioritizationFee = this.prioritizationFee;
     }
-    const providers = [
+
+    const status = await sendTransaction(
       this.program.provider as AnchorProvider,
-      ...this.multipleProviders,
-    ];
-    const status = await Promise.race(
-      providers.map((p) =>
-        sendTransaction(
-          p,
-          [...this.prependedGlobalAdditionalInstructions, ...ixs],
-          opts.alts ?? [],
-          {
-            postSendTxCallback: this.postSendTxCallback,
-            postTxConfirmationCallback: this.postTxConfirmationCallback,
-            prioritizationFee,
-            txConfirmationCommitment: this.txConfirmationCommitment,
-            ...opts,
-          },
-        ),
-      ),
+      [...this.prependedGlobalAdditionalInstructions, ...ixs],
+      opts.alts ?? [],
+      {
+        postSendTxCallback: this.postSendTxCallback,
+        postTxConfirmationCallback: this.postTxConfirmationCallback,
+        prioritizationFee,
+        txConfirmationCommitment: this.txConfirmationCommitment,
+        multipleConnections: this.multipleConnections,
+        ...opts,
+      },
     );
     return status;
   }
