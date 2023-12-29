@@ -208,34 +208,6 @@ export class MangoClient {
     return status;
   }
 
-  public async sendAndConfirmTransactionSingle(
-    ixs: TransactionInstruction[],
-    opts: SendTransactionOpts = {},
-  ): Promise<MangoSignatureStatus> {
-    let prioritizationFee: number;
-    if (opts.prioritizationFee) {
-      prioritizationFee = opts.prioritizationFee;
-    } else if (this.estimateFee) {
-      prioritizationFee = await this.estimatePrioritizationFee(ixs);
-    } else {
-      prioritizationFee = this.prioritizationFee;
-    }
-    const status = await sendTransaction(
-      this.program.provider as AnchorProvider,
-      [...this.prependedGlobalAdditionalInstructions, ...ixs],
-      opts.alts ?? [],
-      {
-        postSendTxCallback: this.postSendTxCallback,
-        postTxConfirmationCallback: this.postTxConfirmationCallback,
-        prioritizationFee,
-        txConfirmationCommitment: this.txConfirmationCommitment,
-        multipleConnections: this.multipleConnections,
-        ...opts,
-      },
-    );
-    return status;
-  }
-
   public async sendAndConfirmTransactionForGroup(
     group: Group,
     ixs: TransactionInstruction[],
