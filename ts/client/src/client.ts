@@ -28,7 +28,6 @@ import {
   SYSVAR_RENT_PUBKEY,
   SystemProgram,
   TransactionInstruction,
-  TransactionSignature,
 } from '@solana/web3.js';
 import bs58 from 'bs58';
 import chunk from 'lodash/chunk';
@@ -45,7 +44,6 @@ import {
   Serum3Orders,
   TokenConditionalSwap,
   TokenConditionalSwapDisplayPriceStyle,
-  TokenConditionalSwapDto,
   TokenConditionalSwapIntention,
   TokenPosition,
 } from './accounts/mangoAccount';
@@ -96,8 +94,8 @@ import {
 import {
   MangoSignature,
   MangoSignatureStatus,
-  SendTransactionOpts,
   sendTransaction,
+  SendTransactionOpts,
 } from './utils/rpc';
 import { NATIVE_MINT, TOKEN_PROGRAM_ID } from './utils/spl';
 
@@ -134,7 +132,7 @@ export class MangoClient {
   private txConfirmationCommitment: Commitment;
   private openbookFeesToDao: boolean;
   private prependedGlobalAdditionalInstructions: TransactionInstruction[] = [];
-  private multipleProviders: AnchorProvider[] = [];
+  multipleConnections: Connection[] = [];
 
   constructor(
     public program: Program<MangoV4>,
@@ -156,16 +154,7 @@ export class MangoClient {
       'processed';
     // TODO: evil side effect, but limited backtraces are a nightmare
     Error.stackTraceLimit = 1000;
-    this.multipleProviders = opts?.multipleConnections
-      ? opts.multipleConnections.map(
-          (c) =>
-            new AnchorProvider(
-              c,
-              new Wallet(new Keypair()),
-              (program.provider as AnchorProvider).opts,
-            ),
-        )
-      : [];
+    this.multipleConnections = opts?.multipleConnections ?? [];
   }
 
   /// Convenience accessors
@@ -200,25 +189,18 @@ export class MangoClient {
     } else {
       prioritizationFee = this.prioritizationFee;
     }
-    const providers = [
+    const status = await sendTransaction(
       this.program.provider as AnchorProvider,
-      ...this.multipleProviders,
-    ];
-    const status = await Promise.race(
-      providers.map((p) =>
-        sendTransaction(
-          p,
-          [...this.prependedGlobalAdditionalInstructions, ...ixs],
-          opts.alts ?? [],
-          {
-            postSendTxCallback: this.postSendTxCallback,
-            postTxConfirmationCallback: this.postTxConfirmationCallback,
-            prioritizationFee,
-            txConfirmationCommitment: this.txConfirmationCommitment,
-            ...opts,
-          },
-        ),
-      ),
+      [...this.prependedGlobalAdditionalInstructions, ...ixs],
+      opts.alts ?? [],
+      {
+        postSendTxCallback: this.postSendTxCallback,
+        postTxConfirmationCallback: this.postTxConfirmationCallback,
+        prioritizationFee,
+        txConfirmationCommitment: this.txConfirmationCommitment,
+        multipleConnections: this.multipleConnections,
+        ...opts,
+      },
     );
     return status;
   }
@@ -244,6 +226,7 @@ export class MangoClient {
         postTxConfirmationCallback: this.postTxConfirmationCallback,
         prioritizationFee,
         txConfirmationCommitment: this.txConfirmationCommitment,
+        multipleConnections: this.multipleConnections,
         ...opts,
       },
     );
@@ -1356,26 +1339,7 @@ export class MangoClient {
     mangoAccount: MangoAccount,
     mintPk: PublicKey,
     amount: number,
-    reduceOnly?: boolean,
-    confirmInBackground?: boolean,
-  ): Promise<MangoSignatureStatus>;
-
-  public async tokenDeposit(
-    group: Group,
-    mangoAccount: MangoAccount,
-    mintPk: PublicKey,
-    amount: number,
-    reduceOnly?: boolean,
-    confirmInBackground?: true & boolean,
-  ): Promise<MangoSignature>;
-
-  public async tokenDeposit(
-    group: Group,
-    mangoAccount: MangoAccount,
-    mintPk: PublicKey,
-    amount: number,
     reduceOnly = false,
-    confirmInBackground = false,
   ): Promise<MangoSignatureStatus | MangoSignature> {
     const decimals = group.getMintDecimals(mintPk);
     const nativeAmount = toNative(amount, decimals);
@@ -1385,7 +1349,6 @@ export class MangoClient {
       mintPk,
       nativeAmount,
       reduceOnly,
-      confirmInBackground,
     );
   }
 
@@ -1394,26 +1357,7 @@ export class MangoClient {
     mangoAccount: MangoAccount,
     mintPk: PublicKey,
     nativeAmount: BN,
-    reduceOnly?: boolean,
-    confirmInBackground?: boolean,
-  ): Promise<MangoSignatureStatus>;
-
-  public async tokenDepositNative(
-    group: Group,
-    mangoAccount: MangoAccount,
-    mintPk: PublicKey,
-    nativeAmount: BN,
-    reduceOnly?: boolean,
-    confirmInBackground?: true & boolean,
-  ): Promise<MangoSignature>;
-
-  public async tokenDepositNative(
-    group: Group,
-    mangoAccount: MangoAccount,
-    mintPk: PublicKey,
-    nativeAmount: BN,
     reduceOnly = false,
-    confirmInBackground = false,
   ): Promise<MangoSignatureStatus | MangoSignature> {
     const bank = group.getFirstBankByMint(mintPk);
 
@@ -1485,13 +1429,11 @@ export class MangoClient {
       )
       .instruction();
 
-    return await this.sendAndConfirmTransactionForGroup(
-      group,
-      [...preInstructions, ix, ...postInstructions],
-      {
-        confirmInBackground: confirmInBackground,
-      },
-    );
+    return await this.sendAndConfirmTransactionForGroup(group, [
+      ...preInstructions,
+      ix,
+      ...postInstructions,
+    ]);
   }
 
   public async tokenWithdrawAllDepositForAllUnconfidentOrStaleOracles(

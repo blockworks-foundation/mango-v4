@@ -17,6 +17,7 @@ import {
   TransactionSignature,
   VersionedTransaction,
 } from '@solana/web3.js';
+import { Tracing } from 'trace_events';
 import { COMPUTE_BUDGET_PROGRAM_ID } from '../constants';
 
 export interface MangoSignatureStatus {
@@ -45,6 +46,7 @@ export type SendTransactionOpts = Partial<{
   txConfirmationCommitment: Commitment;
   confirmInBackground: boolean;
   alts: AddressLookupTableAccount[];
+  multipleConnections: Connection[];
 }>;
 
 export function sendTransaction(
@@ -131,9 +133,22 @@ export async function sendTransaction(
     vtx.sign([(payer as any).payer as Signer]);
   }
 
-  const signature = await connection.sendRawTransaction(vtx.serialize(), {
-    skipPreflight: true, // mergedOpts.skipPreflight,
-  });
+  // if configured, send the transaction using multiple connections
+  let signature: string;
+  if (opts?.multipleConnections?.length ?? 0 > 0) {
+    const allConnections = [connection, ...opts.multipleConnections!];
+    signature = await Promise.any(
+      allConnections.map((c) => {
+        return c.sendRawTransaction(vtx.serialize(), {
+          skipPreflight: true, // mergedOpts.skipPreflight,
+        });
+      }),
+    );
+  } else {
+    signature = await connection.sendRawTransaction(vtx.serialize(), {
+      skipPreflight: true, // mergedOpts.skipPreflight,
+    });
+  }
 
   if (opts.postSendTxCallback) {
     try {
@@ -212,7 +227,7 @@ export const createComputeBudgetIx = (
   return computeBudgetIx;
 };
 
-class MangoError extends Error {
+export class MangoError extends Error {
   message: string;
   txid: string;
 
