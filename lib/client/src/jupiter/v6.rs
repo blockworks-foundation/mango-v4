@@ -180,24 +180,30 @@ impl<'a> JupiterV6<'a> {
         let buffer_accounts = 6;
         let flash_loan_account_num = health_account_num + extra_accounts + buffer_accounts;
 
+        let mut query_args = vec![
+            ("inputMint", input_mint.to_string()),
+            ("outputMint", output_mint.to_string()),
+            ("amount", format!("{}", amount)),
+            ("slippageBps", format!("{}", slippage_bps)),
+            ("onlyDirectRoutes", only_direct_routes.to_string()),
+            (
+                "maxAccounts",
+                format!(
+                    "{}",
+                    crate::MAX_ACCOUNTS_PER_TRANSACTION - flash_loan_account_num
+                ),
+            ),
+        ];
+        let client = &self.mango_client.client;
+        if !client.jupiter_token.is_empty() {
+            query_args.push(("token", client.jupiter_token.clone()));
+        }
+
         let response = self
             .mango_client
             .http_client
-            .get("https://quote-api.jup.ag/v6/quote")
-            .query(&[
-                ("inputMint", input_mint.to_string()),
-                ("outputMint", output_mint.to_string()),
-                ("amount", format!("{}", amount)),
-                ("slippageBps", format!("{}", slippage_bps)),
-                ("onlyDirectRoutes", only_direct_routes.to_string()),
-                (
-                    "maxAccounts",
-                    format!(
-                        "{}",
-                        crate::MAX_ACCOUNTS_PER_TRANSACTION - flash_loan_account_num
-                    ),
-                ),
-            ])
+            .get(format!("{}/quote", client.jupiter_v6_url))
+            .query(&query_args)
             .send()
             .await
             .context("quote request to jupiter")?;
@@ -260,10 +266,17 @@ impl<'a> JupiterV6<'a> {
             .await
             .context("building health accounts")?;
 
+        let mut query_args = vec![];
+        let client = &self.mango_client.client;
+        if !client.jupiter_token.is_empty() {
+            query_args.push(("token", client.jupiter_token.clone()));
+        }
+
         let swap_response = self
             .mango_client
             .http_client
-            .post("https://quote-api.jup.ag/v6/swap-instructions")
+            .post(format!("{}/swap-instructions", client.jupiter_v6_url))
+            .query(&query_args)
             .json(&SwapRequest {
                 user_public_key: owner.to_string(),
                 wrap_and_unwrap_sol: false,

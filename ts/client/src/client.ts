@@ -134,7 +134,7 @@ export class MangoClient {
   private txConfirmationCommitment: Commitment;
   private openbookFeesToDao: boolean;
   private prependedGlobalAdditionalInstructions: TransactionInstruction[] = [];
-  private multipleProviders: AnchorProvider[] = [];
+  multipleConnections: Connection[] = [];
 
   constructor(
     public program: Program<MangoV4>,
@@ -156,16 +156,7 @@ export class MangoClient {
       'processed';
     // TODO: evil side effect, but limited backtraces are a nightmare
     Error.stackTraceLimit = 1000;
-    this.multipleProviders = opts?.multipleConnections
-      ? opts.multipleConnections.map(
-          (c) =>
-            new AnchorProvider(
-              c,
-              new Wallet(new Keypair()),
-              (program.provider as AnchorProvider).opts,
-            ),
-        )
-      : [];
+    this.multipleConnections = opts?.multipleConnections ?? [];
   }
 
   /// Convenience accessors
@@ -244,6 +235,7 @@ export class MangoClient {
         postTxConfirmationCallback: this.postTxConfirmationCallback,
         prioritizationFee,
         txConfirmationCommitment: this.txConfirmationCommitment,
+        multipleConnections: this.multipleConnections,
         ...opts,
       },
     );
