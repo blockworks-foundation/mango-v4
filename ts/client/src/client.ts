@@ -1314,27 +1314,8 @@ export class MangoClient {
     mangoAccount: MangoAccount,
     mintPk: PublicKey,
     amount: number,
-    reduceOnly?: boolean,
-    confirmInBackground?: boolean,
-  ): Promise<MangoSignatureStatus>;
-
-  public async tokenDeposit(
-    group: Group,
-    mangoAccount: MangoAccount,
-    mintPk: PublicKey,
-    amount: number,
-    reduceOnly?: boolean,
-    confirmInBackground?: true & boolean,
-  ): Promise<MangoSignature>;
-
-  public async tokenDeposit(
-    group: Group,
-    mangoAccount: MangoAccount,
-    mintPk: PublicKey,
-    amount: number,
     reduceOnly = false,
-    confirmInBackground = false,
-  ): Promise<MangoSignatureStatus | MangoSignature> {
+  ): Promise<MangoSignature> {
     const decimals = group.getMintDecimals(mintPk);
     const nativeAmount = toNative(amount, decimals);
     return await this.tokenDepositNative(
@@ -1343,7 +1324,6 @@ export class MangoClient {
       mintPk,
       nativeAmount,
       reduceOnly,
-      confirmInBackground,
     );
   }
 
@@ -1352,27 +1332,8 @@ export class MangoClient {
     mangoAccount: MangoAccount,
     mintPk: PublicKey,
     nativeAmount: BN,
-    reduceOnly?: boolean,
-    confirmInBackground?: boolean,
-  ): Promise<MangoSignatureStatus>;
-
-  public async tokenDepositNative(
-    group: Group,
-    mangoAccount: MangoAccount,
-    mintPk: PublicKey,
-    nativeAmount: BN,
-    reduceOnly?: boolean,
-    confirmInBackground?: true & boolean,
-  ): Promise<MangoSignature>;
-
-  public async tokenDepositNative(
-    group: Group,
-    mangoAccount: MangoAccount,
-    mintPk: PublicKey,
-    nativeAmount: BN,
     reduceOnly = false,
-    confirmInBackground = false,
-  ): Promise<MangoSignatureStatus | MangoSignature> {
+  ): Promise<MangoSignature> {
     const bank = group.getFirstBankByMint(mintPk);
 
     const tokenAccountPk = await getAssociatedTokenAddress(
@@ -1443,13 +1404,11 @@ export class MangoClient {
       )
       .instruction();
 
-    return await this.sendAndConfirmTransactionForGroup(
-      group,
-      [...preInstructions, ix, ...postInstructions],
-      {
-        confirmInBackground: confirmInBackground,
-      },
-    );
+    return await this.sendAndConfirmTransactionForGroup(group, [
+      ...preInstructions,
+      ix,
+      ...postInstructions,
+    ]);
   }
 
   public async tokenWithdrawAllDepositForAllUnconfidentOrStaleOracles(
