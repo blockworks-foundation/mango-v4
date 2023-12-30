@@ -459,12 +459,10 @@ pub fn flash_loan_end<'key, 'accounts, 'remaining, 'info>(
         }
 
         if change_amount < 0 && native_after_change < 0 {
-            let vault_ai = vaults
-                .iter()
-                .find(|vault_ai| vault_ai.key == &bank.vault)
-                .unwrap();
-            bank.enforce_min_vault_to_deposits_ratio(vault_ai)?;
+            bank.enforce_max_utilization_on_borrow()?;
             bank.check_net_borrows(*oracle_price)?;
+        } else {
+            bank.enforce_borrows_lte_deposits()?;
         }
 
         if change_amount > 0 && native_after_change > 0 {

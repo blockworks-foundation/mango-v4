@@ -90,11 +90,25 @@ async fn test_bank_utilization_based_borrow_limit() -> Result<(), TransportError
         solana.advance_clock().await;
 
         // account_0 tries to withdraw all remaining on mint_0
-        // should succeed because withdraws without borrows are not limited
+        // doesn't work because a borrow fee was paid above
+        let res = send_tx(
+            solana,
+            TokenWithdrawInstruction {
+                amount: 2997,
+                allow_borrow: false,
+                account: account_0,
+                owner,
+                token_account: payer_mint_accounts[0],
+                bank_index: 0,
+            },
+        )
+        .await;
+        assert!(res.is_err());
+
         send_tx(
             solana,
             TokenWithdrawInstruction {
-                amount: deposit_amount / 10 * 3,
+                amount: 2996,
                 allow_borrow: false,
                 account: account_0,
                 owner,

@@ -205,8 +205,7 @@ pub fn token_withdraw(ctx: Context<TokenWithdraw>, amount: u64, allow_borrow: bo
 
     // Enforce min vault to deposits ratio and net borrow limits
     if is_borrow {
-        ctx.accounts.vault.reload()?;
-        bank.enforce_min_vault_to_deposits_ratio(ctx.accounts.vault.as_ref())?;
+        bank.enforce_max_utilization_on_borrow()?;
 
         // When borrowing the price has be trustworthy, so we can do a reasonable
         // net borrow check.
@@ -217,6 +216,8 @@ pub fn token_withdraw(ctx: Context<TokenWithdraw>, amount: u64, allow_borrow: bo
                 oracle_log_context(&unsafe_oracle_state, &bank.oracle_config, slot_opt)
             })?;
         bank.check_net_borrows(unsafe_oracle_state.price)?;
+    } else {
+        bank.enforce_borrows_lte_deposits()?;
     }
 
     Ok(())
