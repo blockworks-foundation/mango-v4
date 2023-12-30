@@ -3,7 +3,6 @@ use std::mem::size_of;
 use anchor_lang::prelude::*;
 use anchor_lang::{AnchorDeserialize, Discriminator};
 use derivative::Derivative;
-use fixed::traits::FromFixed;
 use fixed::types::{I80F48, U64F64};
 
 use static_assertions::const_assert_eq;
@@ -417,7 +416,7 @@ fn oracle_state_unchecked_inner<T: KeyedAccountReader>(
             };
 
             let clmm_price = if inverted {
-                let sqrt_price = f64::from_fixed(U64F64::from_bits(whirlpool.sqrt_price));
+                let sqrt_price = U64F64::from_bits(whirlpool.sqrt_price).to_num::<f64>();
                 let inverted_price = sqrt_price * sqrt_price;
                 I80F48::from_num(1.0f64 / inverted_price)
             } else {
