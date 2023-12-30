@@ -6,7 +6,6 @@ use crate::state::{oracle, StablePriceModel};
 use crate::util;
 
 use anchor_lang::prelude::*;
-use anchor_spl::token::TokenAccount;
 use derivative::Derivative;
 use fixed::types::I80F48;
 use static_assertions::const_assert_eq;
@@ -98,7 +97,8 @@ pub struct Bank {
 
     pub bank_num: u32,
 
-    /// Min fraction of deposits that must remain in the vault when borrowing.
+    /// The maximum utilization allowed when borrowing is 1-this value
+    /// WARNING: Outdated name, kept for IDL compatibility
     pub min_vault_to_deposits_ratio: f64,
 
     /// Size in seconds of a net borrows window
@@ -395,26 +395,33 @@ impl Bank {
         }
     }
 
+    pub fn enforce_borrows_lte_deposits(&self) -> Result<()> {
+        self.enforce_max_utilization(I80F48::ONE)
+    }
+
     /// Prevent borrowing away the full bank vault.
     /// Keep some in reserve to satisfy non-borrow withdraws.
-    pub fn enforce_min_vault_to_deposits_ratio(&self, vault_ai: &AccountInfo) -> Result<()> {
-        require_keys_eq!(self.vault, vault_ai.key());
+    pub fn enforce_max_utilization_on_borrow(&self) -> Result<()> {
+        self.enforce_max_utilization(
+            I80F48::ONE - I80F48::from_num(self.min_vault_to_deposits_ratio),
+        )
+    }
 
-        let vault = Account::<TokenAccount>::try_from(vault_ai)?;
-        let vault_amount = vault.amount as f64;
-
+    /// Prevent borrowing away the full bank vault.
+    /// Keep some in reserve to satisfy non-borrow withdraws.
+    fn enforce_max_utilization(&self, max_utilization: I80F48) -> Result<()> {
         let bank_native_deposits = self.native_deposits();
-        if bank_native_deposits != I80F48::ZERO {
-            let bank_native_deposits: f64 = bank_native_deposits.to_num();
-            if vault_amount < self.min_vault_to_deposits_ratio * bank_native_deposits {
-                return err!(MangoError::BankBorrowLimitReached).with_context(|| {
+        let bank_native_borrows = self.native_borrows();
+
+        if bank_native_borrows > max_utilization * bank_native_deposits {
+            return err!(MangoError::BankBorrowLimitReached).with_context(|| {
                 format!(
-                    "vault_amount ({:?}) below min_vault_to_deposits_ratio * bank_native_deposits ({:?})",
-                    vault_amount, self.min_vault_to_deposits_ratio * bank_native_deposits,
+                    "deposits {}, borrows {}, max utilization {}",
+                    bank_native_deposits, bank_native_borrows, max_utilization,
                 )
             });
-            }
-        }
+        };
+
         Ok(())
     }
 
