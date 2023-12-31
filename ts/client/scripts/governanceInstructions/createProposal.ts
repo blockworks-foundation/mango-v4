@@ -142,7 +142,7 @@ export const createProposal = async (
   for (const chunk of txChunks) {
     const latestBlockhash = await connection.getLatestBlockhash('confirmed');
     const tx = new Transaction();
-    tx.add(createComputeBudgetIx(5000));
+    tx.add(createComputeBudgetIx(500));
     tx.add(...chunk);
     tx.lastValidBlockHeight = latestBlockhash.lastValidBlockHeight;
     tx.recentBlockhash = latestBlockhash.blockhash;
