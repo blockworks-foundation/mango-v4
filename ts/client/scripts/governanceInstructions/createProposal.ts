@@ -21,6 +21,7 @@ import {
 import chunk from 'lodash/chunk';
 import { updateVoterWeightRecord } from './updateVoteWeightRecord';
 import { VsrClient } from './voteStakeRegistryClient';
+import { createComputeBudgetIx } from '../../src/utils/rpc';
 
 export const MANGO_MINT = 'MangoCzJ36AjZyKwVj3VnYU4GTonjfVEnJmvvWaxLac';
 export const MANGO_REALM_PK = new PublicKey(
@@ -97,6 +98,7 @@ export const createProposal = async (
   );
 
   const insertInstructions: TransactionInstruction[] = [];
+
   for (const i in proposalInstructions) {
     const instruction = getInstructionDataFromBase64(
       serializeInstructionToBase64(proposalInstructions[i]),
@@ -137,28 +139,26 @@ export const createProposal = async (
 
   const txChunks = chunk([...instructions, ...insertInstructions], 2);
 
-  const transactions: Transaction[] = [];
-  const latestBlockhash = await connection.getLatestBlockhash('confirmed');
   for (const chunk of txChunks) {
+    const latestBlockhash = await connection.getLatestBlockhash('confirmed');
     const tx = new Transaction();
+    tx.add(createComputeBudgetIx(5000));
     tx.add(...chunk);
     tx.lastValidBlockHeight = latestBlockhash.lastValidBlockHeight;
     tx.recentBlockhash = latestBlockhash.blockhash;
     tx.feePayer = payer;
-    transactions.push(tx);
-  }
-
-  const signedTransactions = await wallet.signAllTransactions(transactions);
-  for (const tx of signedTransactions) {
-    const rawTransaction = tx.serialize();
+    const signedTransaction = await wallet.signTransaction(tx);
+    const rawTransaction = signedTransaction.serialize();
     const address = await connection.sendRawTransaction(rawTransaction, {
       skipPreflight: true,
     });
-    await connection.confirmTransaction({
+    const confirmation = await connection.confirmTransaction({
       blockhash: latestBlockhash.blockhash,
       lastValidBlockHeight: latestBlockhash.lastValidBlockHeight,
       signature: address,
     });
+    console.log(confirmation, address);
   }
+
   return proposalAddress;
 };
