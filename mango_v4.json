@@ -1,5 +1,5 @@
 {
-  "version": "0.21.0",
+  "version": "0.21.1",
   "name": "mango_v4",
   "instructions": [
     {
@@ -7179,7 +7179,8 @@
           {
             "name": "minVaultToDepositsRatio",
             "docs": [
-              "Min fraction of deposits that must remain in the vault when borrowing."
+              "The maximum utilization allowed when borrowing is 1-this value",
+              "WARNING: Outdated name, kept for IDL compatibility"
             ],
             "type": "f64"
           },

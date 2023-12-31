@@ -4,6 +4,10 @@ Update this for each program release and mainnet deployment.
 
 ## not on mainnet
 
+### v0.21.1, 2024-1-
+
+- Fix extreme interest rates for tokens with borrows but nearly no deposits.
+
 ### v0.21.0, 2023-12-
 
 - Introduce deposit limits (#806)

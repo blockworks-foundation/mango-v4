@@ -1,5 +1,5 @@
 export type MangoV4 = {
-  "version": "0.21.0",
+  "version": "0.21.1",
   "name": "mango_v4",
   "instructions": [
     {
@@ -7179,7 +7179,8 @@ export type MangoV4 = {
           {
             "name": "minVaultToDepositsRatio",
             "docs": [
-              "Min fraction of deposits that must remain in the vault when borrowing."
+              "The maximum utilization allowed when borrowing is 1-this value",
+              "WARNING: Outdated name, kept for IDL compatibility"
             ],
             "type": "f64"
           },
@@ -13528,7 +13529,7 @@ export type MangoV4 = {
 };
 
 export const IDL: MangoV4 = {
-  "version": "0.21.0",
+  "version": "0.21.1",
   "name": "mango_v4",
   "instructions": [
     {
@@ -20708,7 +20709,8 @@ export const IDL: MangoV4 = {
           {
             "name": "minVaultToDepositsRatio",
             "docs": [
-              "Min fraction of deposits that must remain in the vault when borrowing."
+              "The maximum utilization allowed when borrowing is 1-this value",
+              "WARNING: Outdated name, kept for IDL compatibility"
             ],
             "type": "f64"
           },
