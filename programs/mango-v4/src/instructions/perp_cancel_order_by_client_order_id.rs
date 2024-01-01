@@ -24,7 +24,8 @@ pub fn perp_cancel_order_by_client_order_id(
     let (slot, _) = account
         .perp_find_order_with_client_order_id(perp_market.perp_market_index, client_order_id)
         .ok_or_else(|| {
-            error_msg!(
+            error_msg_typed!(
+                MangoError::PerpOrderIdNotFound,
                 "could not find perp order with client order id {client_order_id} in user account"
             )
         })?;
