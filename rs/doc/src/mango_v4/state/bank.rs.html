@@ -1668,6 +1668,27 @@
 <a href="#1668" id="1668">1668</a>
 <a href="#1669" id="1669">1669</a>
 <a href="#1670" id="1670">1670</a>
+<a href="#1671" id="1671">1671</a>
+<a href="#1672" id="1672">1672</a>
+<a href="#1673" id="1673">1673</a>
+<a href="#1674" id="1674">1674</a>
+<a href="#1675" id="1675">1675</a>
+<a href="#1676" id="1676">1676</a>
+<a href="#1677" id="1677">1677</a>
+<a href="#1678" id="1678">1678</a>
+<a href="#1679" id="1679">1679</a>
+<a href="#1680" id="1680">1680</a>
+<a href="#1681" id="1681">1681</a>
+<a href="#1682" id="1682">1682</a>
+<a href="#1683" id="1683">1683</a>
+<a href="#1684" id="1684">1684</a>
+<a href="#1685" id="1685">1685</a>
+<a href="#1686" id="1686">1686</a>
+<a href="#1687" id="1687">1687</a>
+<a href="#1688" id="1688">1688</a>
+<a href="#1689" id="1689">1689</a>
+<a href="#1690" id="1690">1690</a>
+<a href="#1691" id="1691">1691</a>
 </pre><pre class="rust"><code><span class="kw">use super</span>::{OracleConfig, TokenIndex, TokenPosition};
 <span class="kw">use </span><span class="kw">crate</span>::accounts_zerocopy::KeyedAccountReader;
 <span class="kw">use </span><span class="kw">crate</span>::error::<span class="kw-2">*</span>;
@@ -1676,7 +1697,6 @@
 <span class="kw">use </span><span class="kw">crate</span>::util;
 
 <span class="kw">use </span>anchor_lang::prelude::<span class="kw-2">*</span>;
-<span class="kw">use </span>anchor_spl::token::TokenAccount;
 <span class="kw">use </span>derivative::Derivative;
 <span class="kw">use </span>fixed::types::I80F48;
 <span class="kw">use </span>oracle::oracle_log_context;
@@ -1769,7 +1789,8 @@
 
     <span class="kw">pub </span>bank_num: u32,
 
-    <span class="doccomment">/// Min fraction of deposits that must remain in the vault when borrowing.
+    <span class="doccomment">/// The maximum utilization allowed when borrowing is 1-this value
+    /// WARNING: Outdated name, kept for IDL compatibility
     </span><span class="kw">pub </span>min_vault_to_deposits_ratio: f64,
 
     <span class="doccomment">/// Size in seconds of a net borrows window
@@ -2076,26 +2097,33 @@
         }
     }
 
+    <span class="kw">pub fn </span>enforce_borrows_lte_deposits(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Result</span>&lt;()&gt; {
+        <span class="self">self</span>.enforce_max_utilization(I80F48::ONE)
+    }
+
     <span class="doccomment">/// Prevent borrowing away the full bank vault.
     /// Keep some in reserve to satisfy non-borrow withdraws.
-    </span><span class="kw">pub fn </span>enforce_min_vault_to_deposits_ratio(<span class="kw-2">&amp;</span><span class="self">self</span>, vault_ai: <span class="kw-2">&amp;</span>AccountInfo) -&gt; <span class="prelude-ty">Result</span>&lt;()&gt; {
-        <span class="macro">require_keys_eq!</span>(<span class="self">self</span>.vault, vault_ai.key());
+    </span><span class="kw">pub fn </span>enforce_max_utilization_on_borrow(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Result</span>&lt;()&gt; {
+        <span class="self">self</span>.enforce_max_utilization(
+            I80F48::ONE - I80F48::from_num(<span class="self">self</span>.min_vault_to_deposits_ratio),
+        )
+    }
 
-        <span class="kw">let </span>vault = Account::&lt;TokenAccount&gt;::try_from(vault_ai)<span class="question-mark">?</span>;
-        <span class="kw">let </span>vault_amount = vault.amount <span class="kw">as </span>f64;
-
+    <span class="doccomment">/// Prevent borrowing away the full bank vault.
+    /// Keep some in reserve to satisfy non-borrow withdraws.
+    </span><span class="kw">fn </span>enforce_max_utilization(<span class="kw-2">&amp;</span><span class="self">self</span>, max_utilization: I80F48) -&gt; <span class="prelude-ty">Result</span>&lt;()&gt; {
         <span class="kw">let </span>bank_native_deposits = <span class="self">self</span>.native_deposits();
-        <span class="kw">if </span>bank_native_deposits != I80F48::ZERO {
-            <span class="kw">let </span>bank_native_deposits: f64 = bank_native_deposits.to_num();
-            <span class="kw">if </span>vault_amount &lt; <span class="self">self</span>.min_vault_to_deposits_ratio * bank_native_deposits {
-                <span class="kw">return </span><span class="macro">err!</span>(MangoError::BankBorrowLimitReached).with_context(|| {
+        <span class="kw">let </span>bank_native_borrows = <span class="self">self</span>.native_borrows();
+
+        <span class="kw">if </span>bank_native_borrows &gt; max_utilization * bank_native_deposits {
+            <span class="kw">return </span><span class="macro">err!</span>(MangoError::BankBorrowLimitReached).with_context(|| {
                 <span class="macro">format!</span>(
-                    <span class="string">&quot;vault_amount ({:?}) below min_vault_to_deposits_ratio * bank_native_deposits ({:?})&quot;</span>,
-                    vault_amount, <span class="self">self</span>.min_vault_to_deposits_ratio * bank_native_deposits,
+                    <span class="string">&quot;deposits {}, borrows {}, max utilization {}&quot;</span>,
+                    bank_native_deposits, bank_native_borrows, max_utilization,
                 )
             });
-            }
-        }
+        };
+
         <span class="prelude-val">Ok</span>(())
     }
 
@@ -2606,12 +2634,8 @@
         </span><span class="kw">let </span>native_total_deposits = <span class="self">self</span>.deposit_index * indexed_total_deposits;
         <span class="kw">let </span>native_total_borrows = <span class="self">self</span>.borrow_index * indexed_total_borrows;
 
-        <span class="comment">// This will be &gt;= 0, but can also be &gt; 1
-        </span><span class="kw">let </span>instantaneous_utilization = <span class="kw">if </span>native_total_deposits == I80F48::ZERO {
-            I80F48::ZERO
-        } <span class="kw">else </span>{
-            native_total_borrows / native_total_deposits
-        };
+        <span class="kw">let </span>instantaneous_utilization =
+            <span class="self">Self</span>::instantaneous_utilization(native_total_deposits, native_total_borrows);
 
         <span class="kw">let </span>borrow_rate = <span class="self">self</span>.compute_interest_rate(instantaneous_utilization);
 
@@ -2645,6 +2669,23 @@
         ))
     }
 
+    <span class="doccomment">/// Current utilization, clamped to 0..1
+    ///
+    /// Above 100% utilization can happen natually when utilization is 100% and interest is paid out,
+    /// increasing borrows more than deposits.
+    </span><span class="kw">fn </span>instantaneous_utilization(
+        native_total_deposits: I80F48,
+        native_total_borrows: I80F48,
+    ) -&gt; I80F48 {
+        <span class="kw">if </span>native_total_deposits == I80F48::ZERO {
+            I80F48::ZERO
+        } <span class="kw">else </span>{
+            (native_total_borrows / native_total_deposits)
+                .max(I80F48::ZERO)
+                .min(I80F48::ONE)
+        }
+    }
+
     <span class="doccomment">/// returns the current interest rate in APR
     </span><span class="attr">#[inline(always)]
     </span><span class="kw">pub fn </span>compute_interest_rate(<span class="kw-2">&amp;</span><span class="self">self</span>, utilization: I80F48) -&gt; I80F48 {
@@ -2671,6 +2712,9 @@
         max_rate: I80F48,
         scaling: f64,
     ) -&gt; I80F48 {
+        <span class="comment">// Clamp to avoid negative or extremely high interest
+        </span><span class="kw">let </span>utilization = utilization.max(I80F48::ZERO).min(I80F48::ONE);
+
         <span class="kw">let </span>v = <span class="kw">if </span>utilization &lt;= util0 {
             <span class="kw">let </span>slope = rate0 / util0;
             slope * utilization
@@ -2705,11 +2749,8 @@
 
         <span class="kw">let </span>native_total_deposits = <span class="self">self</span>.deposit_index * indexed_total_deposits;
         <span class="kw">let </span>native_total_borrows = <span class="self">self</span>.borrow_index * indexed_total_borrows;
-        <span class="kw">let </span>instantaneous_utilization = <span class="kw">if </span>native_total_deposits == I80F48::ZERO {
-            I80F48::ZERO
-        } <span class="kw">else </span>{
-            native_total_borrows / native_total_deposits
-        };
+        <span class="kw">let </span>instantaneous_utilization =
+            <span class="self">Self</span>::instantaneous_utilization(native_total_deposits, native_total_borrows);
 
         <span class="comment">// Compute a time-weighted average since bank_rate_last_updated.
         </span><span class="kw">let </span>previous_avg_time =
@@ -2729,7 +2770,8 @@
         </span><span class="kw">let </span>target_util = <span class="self">self</span>.interest_target_utilization <span class="kw">as </span>f64;
 
         <span class="comment">// use avg_utilization and not instantaneous_utilization so that rates cannot be manipulated easily
-        </span><span class="kw">let </span>avg_util = <span class="self">self</span>.avg_utilization.to_num::&lt;f64&gt;();
+        // also clamp to avoid unusually quick interest rate curve changes
+        </span><span class="kw">let </span>avg_util = <span class="self">self</span>.avg_utilization.to_num::&lt;f64&gt;().max(<span class="number">0.0</span>).min(<span class="number">1.0</span>);
 
         <span class="comment">// move rates up when utilization is above optimal utilization, and vice versa
         // util factor is between -1 (avg util = 0) and +1 (avg util = 100%)
