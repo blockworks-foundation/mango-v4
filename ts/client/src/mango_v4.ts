@@ -2013,8 +2013,7 @@ export type MangoV4 = {
           "isMut": true,
           "isSigner": false,
           "relations": [
-            "group",
-            "owner"
+            "group"
           ]
         },
         {
@@ -7247,7 +7246,8 @@ export type MangoV4 = {
           {
             "name": "minVaultToDepositsRatio",
             "docs": [
-              "Min fraction of deposits that must remain in the vault when borrowing."
+              "The maximum utilization allowed when borrowing is 1-this value",
+              "WARNING: Outdated name, kept for IDL compatibility"
             ],
             "type": "f64"
           },
@@ -7367,20 +7367,35 @@ export type MangoV4 = {
           },
           {
             "name": "maintWeightShiftStart",
+            "docs": [
+              "Start timestamp in seconds at which maint weights should start to change away",
+              "from maint_asset_weight, maint_liab_weight towards _asset_target and _liab_target.",
+              "If _start and _end and _duration_inv are 0, no shift is configured."
+            ],
             "type": "u64"
           },
           {
             "name": "maintWeightShiftEnd",
+            "docs": [
+              "End timestamp in seconds until which the maint weights should reach the configured targets."
+            ],
             "type": "u64"
           },
           {
             "name": "maintWeightShiftDurationInv",
+            "docs": [
+              "Cache of the inverse of maint_weight_shift_end - maint_weight_shift_start,",
+              "or zero if no shift is configured"
+            ],
             "type": {
               "defined": "I80F48"
             }
           },
           {
             "name": "maintWeightShiftAssetTarget",
+            "docs": [
+              "Maint asset weight to reach at _shift_end."
+            ],
             "type": {
               "defined": "I80F48"
             }
@@ -7393,6 +7408,10 @@ export type MangoV4 = {
           },
           {
             "name": "fallbackOracle",
+            "docs": [
+              "Oracle that may be used if the main oracle is stale or not confident enough.",
+              "If this is Pubkey::default(), no fallback is available."
+            ],
             "type": "publicKey"
           },
           {
@@ -7523,10 +7542,16 @@ export type MangoV4 = {
           },
           {
             "name": "fastListingsInInterval",
+            "docs": [
+              "Number of fast listings that happened this interval"
+            ],
             "type": "u16"
           },
           {
             "name": "allowedFastListingsPerInterval",
+            "docs": [
+              "Number of fast listings that are allowed per interval"
+            ],
             "type": "u16"
           },
           {
@@ -9296,11 +9321,15 @@ export type MangoV4 = {
             "type": "u128"
           },
           {
+            "name": "quantity",
+            "type": "i64"
+          },
+          {
             "name": "reserved",
             "type": {
               "array": [
                 "u8",
-                64
+                56
               ]
             }
           }
@@ -9855,13 +9884,8 @@ export type MangoV4 = {
             "type": "u64"
           },
           {
-            "name": "padding4",
-            "type": {
-              "array": [
-                "u8",
-                16
-              ]
-            }
+            "name": "makerOrderId",
+            "type": "u128"
           },
           {
             "name": "price",
@@ -9938,11 +9962,15 @@ export type MangoV4 = {
             "type": "i64"
           },
           {
+            "name": "orderId",
+            "type": "u128"
+          },
+          {
             "name": "padding1",
             "type": {
               "array": [
                 "u8",
-                144
+                128
               ]
             }
           }
@@ -13656,6 +13684,21 @@ export type MangoV4 = {
       "code": 6062,
       "name": "BankDepositLimit",
       "msg": "deposit crosses the token's deposit limit"
+    },
+    {
+      "code": 6063,
+      "name": "DelegateWithdrawOnlyToOwnerAta",
+      "msg": "delegates can only withdraw to the owner's associated token account"
+    },
+    {
+      "code": 6064,
+      "name": "DelegateWithdrawMustClosePosition",
+      "msg": "delegates can only withdraw if they close the token position"
+    },
+    {
+      "code": 6065,
+      "name": "DelegateWithdrawSmall",
+      "msg": "delegates can only withdraw small amounts"
     }
   ]
 };
@@ -15675,8 +15718,7 @@ export const IDL: MangoV4 = {
           "isMut": true,
           "isSigner": false,
           "relations": [
-            "group",
-            "owner"
+            "group"
           ]
         },
         {
@@ -20909,7 +20951,8 @@ export const IDL: MangoV4 = {
           {
             "name": "minVaultToDepositsRatio",
             "docs": [
-              "Min fraction of deposits that must remain in the vault when borrowing."
+              "The maximum utilization allowed when borrowing is 1-this value",
+              "WARNING: Outdated name, kept for IDL compatibility"
             ],
             "type": "f64"
           },
@@ -21029,20 +21072,35 @@ export const IDL: MangoV4 = {
           },
           {
             "name": "maintWeightShiftStart",
+            "docs": [
+              "Start timestamp in seconds at which maint weights should start to change away",
+              "from maint_asset_weight, maint_liab_weight towards _asset_target and _liab_target.",
+              "If _start and _end and _duration_inv are 0, no shift is configured."
+            ],
             "type": "u64"
           },
           {
             "name": "maintWeightShiftEnd",
+            "docs": [
+              "End timestamp in seconds until which the maint weights should reach the configured targets."
+            ],
             "type": "u64"
           },
           {
             "name": "maintWeightShiftDurationInv",
+            "docs": [
+              "Cache of the inverse of maint_weight_shift_end - maint_weight_shift_start,",
+              "or zero if no shift is configured"
+            ],
             "type": {
               "defined": "I80F48"
             }
           },
           {
             "name": "maintWeightShiftAssetTarget",
+            "docs": [
+              "Maint asset weight to reach at _shift_end."
+            ],
             "type": {
               "defined": "I80F48"
             }
@@ -21055,6 +21113,10 @@ export const IDL: MangoV4 = {
           },
           {
             "name": "fallbackOracle",
+            "docs": [
+              "Oracle that may be used if the main oracle is stale or not confident enough.",
+              "If this is Pubkey::default(), no fallback is available."
+            ],
             "type": "publicKey"
           },
           {
@@ -21185,10 +21247,16 @@ export const IDL: MangoV4 = {
           },
           {
             "name": "fastListingsInInterval",
+            "docs": [
+              "Number of fast listings that happened this interval"
+            ],
             "type": "u16"
           },
           {
             "name": "allowedFastListingsPerInterval",
+            "docs": [
+              "Number of fast listings that are allowed per interval"
+            ],
             "type": "u16"
           },
           {
@@ -22958,11 +23026,15 @@ export const IDL: MangoV4 = {
             "type": "u128"
           },
           {
+            "name": "quantity",
+            "type": "i64"
+          },
+          {
             "name": "reserved",
             "type": {
               "array": [
                 "u8",
-                64
+                56
               ]
             }
           }
@@ -23517,13 +23589,8 @@ export const IDL: MangoV4 = {
             "type": "u64"
           },
           {
-            "name": "padding4",
-            "type": {
-              "array": [
-                "u8",
-                16
-              ]
-            }
+            "name": "makerOrderId",
+            "type": "u128"
           },
           {
             "name": "price",
@@ -23600,11 +23667,15 @@ export const IDL: MangoV4 = {
             "type": "i64"
           },
           {
+            "name": "orderId",
+            "type": "u128"
+          },
+          {
             "name": "padding1",
             "type": {
               "array": [
                 "u8",
-                144
+                128
               ]
             }
           }
@@ -27318,6 +27389,21 @@ export const IDL: MangoV4 = {
       "code": 6062,
       "name": "BankDepositLimit",
       "msg": "deposit crosses the token's deposit limit"
+    },
+    {
+      "code": 6063,
+      "name": "DelegateWithdrawOnlyToOwnerAta",
+      "msg": "delegates can only withdraw to the owner's associated token account"
+    },
+    {
+      "code": 6064,
+      "name": "DelegateWithdrawMustClosePosition",
+      "msg": "delegates can only withdraw if they close the token position"
+    },
+    {
+      "code": 6065,
+      "name": "DelegateWithdrawSmall",
+      "msg": "delegates can only withdraw small amounts"
     }
   ]
 };

@@ -154,12 +154,14 @@ impl QueueHeader for EventQueueHeader {
     }
 }
 
+#[allow(dead_code)]
 const EVENT_SIZE: usize = 208;
+
 #[zero_copy]
 #[derive(Debug)]
 pub struct AnyEvent {
     pub event_type: u8,
-    pub padding: [u8; EVENT_SIZE - 1],
+    pub padding: [u8; 207],
 }
 
 const_assert_eq!(size_of::<AnyEvent>(), EVENT_SIZE);
