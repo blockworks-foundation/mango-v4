@@ -26,7 +26,7 @@ import { MangoClient } from '../src/client';
 import { NullTokenEditParams } from '../src/clientIxParamBuilder';
 import { MANGO_V4_MAIN_GROUP as MANGO_V4_PRIMARY_GROUP } from '../src/constants';
 import { getEquityForMangoAccounts } from '../src/risk';
-import { buildFetch } from '../src/utils';
+import { buildFetch, toNativeI80F48ForQuote } from '../src/utils';
 import {
   MANGO_DAO_WALLET_GOVERNANCE,
   MANGO_GOVERNANCE_PROGRAM,
@@ -143,53 +143,57 @@ async function updateTokenParams(): Promise<void> {
 
   Array.from(group.banksMapByTokenIndex.values())
     .map((banks) => banks[0])
-    .filter(
-      (bank) =>
-        // // low low liquidity
-        // bank.name.includes('DUAL') ||
-        // bank.name.includes('MNGO') ||
-        // // low liquidity
-        // bank.name.includes('ALL') ||
-        // bank.name.includes('CROWN') ||
-        // bank.name.includes('GUAC') ||
-        // bank.name.includes('HNT') ||
-        // bank.name.includes('KIN') ||
-        // bank.name.includes('OPOS') ||
-        // bank.name.includes('RLB') ||
-        // bank.name.includes('USDH') ||
-        // better liquidity
-        bank.name.includes('BONK') ||
-        bank.name.includes('bSOL') ||
-        bank.name.includes('CHAI') ||
-        bank.name.includes('DAI') ||
-        bank.name.includes('ETH (Portal)') ||
-        bank.name.includes('JitoSOL') ||
-        bank.name.includes('LDO') ||
-        bank.name.includes('MSOL') ||
-        bank.name.includes('ORCA') ||
-        bank.name.includes('RAY') ||
-        bank.name.includes('SOL') ||
-        bank.name.includes('stSOL') ||
-        bank.name.includes('TBTC') ||
-        bank.name.includes('USDC') ||
-        bank.name.includes('wBTC (Portal)') ||
-        bank.name.includes('USDT'),
-    )
+    .filter((bank) => !bank.areBorrowsReduceOnly())
+    // .filter(
+    //   (bank) =>
+    //     // // low low liquidity
+    //     bank.name.includes('DUAL') ||
+    //     bank.name.includes('MNGO') ||
+    //     // // low liquidity
+    //     bank.name.includes('ALL') ||
+    //     bank.name.includes('CROWN') ||
+    //     bank.name.includes('GUAC') ||
+    //     bank.name.includes('HNT') ||
+    //     bank.name.includes('KIN') ||
+    //     bank.name.includes('OPOS') ||
+    //     bank.name.includes('RLB') ||
+    //     bank.name.includes('USDH') ||
+    //     // better liquidity
+    //     bank.name.includes('BONK') ||
+    //     bank.name.includes('bSOL') ||
+    //     bank.name.includes('CHAI') ||
+    //     bank.name.includes('DAI') ||
+    //     bank.name.includes('ETH (Portal)') ||
+    //     bank.name.includes('JitoSOL') ||
+    //     bank.name.includes('LDO') ||
+    //     bank.name.includes('MSOL') ||
+    //     bank.name.includes('ORCA') ||
+    //     bank.name.includes('RAY') ||
+    //     bank.name.includes('SOL') ||
+    //     bank.name.includes('stSOL') ||
+    //     bank.name.includes('TBTC') ||
+    //     bank.name.includes('USDC') ||
+    //     bank.name.includes('wBTC (Portal)') ||
+    //     bank.name.includes('USDT'),
+    // )
     .forEach(async (bank) => {
       const priceImpact = getPriceImpactForBank(midPriceImpacts, bank);
 
+      // https://www.notion.so/mango-markets/Mango-v4-Risk-parameter-recommendations-d309cdf5faac4aeea7560356e68532ab
       const scaleStartQuoteUi = Math.min(
         50 * ttlLiqorEquityUi,
         4 * priceImpact.target_amount,
       );
-
-      const newNetDepositsUi = Math.max(
+      const netBorrowLimitPerWindowQuote = Math.max(
         10_000,
         Math.min(bank.uiDeposits(), 300_000) / 3 +
           Math.max(0, bank.uiDeposits() - 300_000) / 5,
       );
-
-      const params = Builder(NullTokenEditParams).build();
+      const params = Builder(NullTokenEditParams)
+        .netBorrowLimitPerWindowQuote(
+          toNativeI80F48ForQuote(netBorrowLimitPerWindowQuote).toNumber(),
+        )
+        .build();
 
       const ix = await client.program.methods
         .tokenEdit(
