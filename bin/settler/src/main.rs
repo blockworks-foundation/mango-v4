@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
-use std::time::{Duration, Instant};
+use std::time::Duration;
 
 use anchor_client::Cluster;
 use clap::Parser;
@@ -216,15 +216,12 @@ async fn main() -> anyhow::Result<()> {
         mango_client: mango_client.clone(),
         account_fetcher: account_fetcher.clone(),
         config: tcs_start::Config {
-            persistent_error_min_duration: Duration::from_secs(300),
             persistent_error_report_interval: Duration::from_secs(300),
         },
-        errors: mango_v4_client::error_tracking::ErrorTracking {
-            skip_threshold: 2,
-            skip_duration: Duration::from_secs(60),
-            ..Default::default()
-        },
-        last_persistent_error_report: Instant::now(),
+        errors: mango_v4_client::error_tracking::ErrorTracking::builder()
+            .skip_threshold(2)
+            .skip_duration(Duration::from_secs(60))
+            .build()?,
     };
 
     info!("main loop");
