@@ -2,7 +2,7 @@ use crate::error::*;
 use crate::state::*;
 use anchor_lang::prelude::*;
 use anchor_spl::token::{Token, TokenAccount};
-use openbook_v2::{program::OpenbookV2, state::Market};
+use openbook_v2::{program::OpenbookV2, state::{Market, OpenOrdersAccount}};
 
 #[derive(Accounts)]
 pub struct OpenbookV2PlaceOrder<'info> {
@@ -22,8 +22,7 @@ pub struct OpenbookV2PlaceOrder<'info> {
     pub authority: Signer<'info>,
 
     #[account(mut)]
-    /// CHECK: Validated inline by checking against the pubkey stored in the account at #2 
-    pub open_orders: UncheckedAccount<'info>,
+    pub open_orders: AccountLoader<'info, OpenOrdersAccount>,
 
     pub openbook_v2_market: AccountLoader<'info, OpenbookV2Market>,
 

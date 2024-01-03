@@ -12,8 +12,6 @@ use std::collections::HashMap;
 use crate::accounts_zerocopy::*;
 use crate::error::*;
 use crate::serum3_cpi;
-use crate::serum3_cpi::load_open_orders;
-use openbook_v2::cpi;
 use crate::state::{Bank, MangoAccountRef, PerpMarket, PerpMarketIndex, TokenIndex};
 
 /// This trait abstracts how to find accounts needed for the health computation.

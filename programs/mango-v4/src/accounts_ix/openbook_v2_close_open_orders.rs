@@ -33,10 +33,16 @@ pub struct OpenbookV2CloseOpenOrders<'info> {
     pub openbook_v2_market_external: AccountLoader<'info, Market>,
 
     #[account(mut)]
+    /// CHECK: Will be checked against seeds and will be initiated by openbook v2
+    pub open_orders_indexer: UncheckedAccount<'info>,
+
+    #[account(mut)]
     /// CHECK: Validated inline by checking against the pubkey stored in the account at #2
-    pub open_orders: UncheckedAccount<'info>,
+    pub open_orders_account: UncheckedAccount<'info>,
 
     #[account(mut)]
     /// CHECK: target for account rent needs no checks
     pub sol_destination: UncheckedAccount<'info>,
+
+    pub system_program: Program<'info, System>,
 }

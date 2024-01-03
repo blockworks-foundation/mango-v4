@@ -366,6 +366,8 @@ pub enum LoanOriginationFeeInstruction {
     Serum3SettleFunds,
     TokenWithdraw,
     TokenConditionalSwapTrigger,
+    OpenbookV2PlaceOrder,
+    OpenbookV2SettleFunds,
 }
 
 #[event]

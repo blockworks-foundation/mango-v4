@@ -331,6 +331,20 @@ impl OODifference {
             self.free_quote_change,
         )
     }
+
+    pub fn recompute_health_cache_openbook_v2_state(
+        &self,
+        health_cache: &mut HealthCache,
+        openbook_account: &OpenbookV2Orders,
+        open_orders: &openbook_v2::state::OpenOrdersAccount,
+    ) -> Result<()> {
+        health_cache.recompute_openbook_v2_info(
+            openbook_account,
+            open_orders,
+            self.free_base_change,
+            self.free_quote_change,
+        )
+    }
 }
 
 pub struct VaultDifference {
@@ -353,7 +367,7 @@ impl VaultDifference {
 /// Called in apply_settle_changes() and place_order to adjust token positions after
 /// changing the vault balances
 /// Also logs changes to token balances
-fn apply_vault_difference(
+pub fn apply_vault_difference(
     account_pk: Pubkey,
     account: &mut MangoAccountRefMut,
     serum_market_index: Serum3MarketIndex,

@@ -167,8 +167,12 @@ pub struct Bank {
     pub maint_weight_shift_asset_target: I80F48,
     pub maint_weight_shift_liab_target: I80F48,
 
+    // user deposits that were moved into openbook v2 open orders
+    // can be negative due to multibank, then it'd need to be balanced in the keeper
+    pub deposits_in_openbook: i64,
+
     #[derivative(Debug = "ignore")]
-    pub reserved: [u8; 2008],
+    pub reserved: [u8; 2000],
 }
 const_assert_eq!(
     size_of::<Bank>(),
@@ -203,7 +207,8 @@ const_assert_eq!(
         + 8 * 2
         + 8 * 2
         + 16 * 3
-        + 2008
+        + 8
+        + 2000
 );
 const_assert_eq!(size_of::<Bank>(), 3064);
 const_assert_eq!(size_of::<Bank>() % 8, 0);
@@ -239,6 +244,7 @@ impl Bank {
             flash_loan_token_account_initial: u64::MAX,
             net_borrows_in_window: 0,
             deposits_in_serum: 0,
+            deposits_in_openbook: 0,
             bump,
             bank_num,
 
@@ -292,7 +298,7 @@ impl Bank {
             maint_weight_shift_duration_inv: existing_bank.maint_weight_shift_duration_inv,
             maint_weight_shift_asset_target: existing_bank.maint_weight_shift_asset_target,
             maint_weight_shift_liab_target: existing_bank.maint_weight_shift_liab_target,
-            reserved: [0; 2008],
+            reserved: [0; 2000],
         }
     }
 

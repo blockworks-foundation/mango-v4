@@ -1,5 +1,6 @@
 use anchor_lang::prelude::*;
 use anchor_spl::token::{Token, TokenAccount};
+use openbook_v2::state::OpenOrdersAccount;
 
 use crate::error::*;
 use crate::state::*;
@@ -19,9 +20,11 @@ pub struct OpenbookV2LiqForceCancelOrders<'info> {
     )]
     pub account: AccountLoader<'info, MangoAccountFixed>,
 
+    pub payer: Signer<'info>,
+
     #[account(mut)]
     /// CHECK: Validated inline by checking against the pubkey stored in the account at #2
-    pub open_orders: UncheckedAccount<'info>,
+    pub open_orders: AccountLoader<'info, OpenOrdersAccount>,
 
     #[account(
         has_one = group,
@@ -71,4 +74,5 @@ pub struct OpenbookV2LiqForceCancelOrders<'info> {
     pub base_vault: Box<Account<'info, TokenAccount>>,
 
     pub token_program: Program<'info, Token>,
+    pub system_program: Program<'info, System>,
 }

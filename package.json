@@ -63,6 +63,7 @@
   "dependencies": {
     "@blockworks-foundation/mango-v4-settings": "^0.2.16",
     "@coral-xyz/anchor": "^0.28.1-beta.2",
+    "@openbook-dex/openbook-v2": "^0.1.2",
     "@project-serum/serum": "0.13.65",
     "@pythnetwork/client": "~2.14.0",
     "@solana/spl-token": "0.3.7",

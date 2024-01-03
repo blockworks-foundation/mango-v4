@@ -1,5 +1,6 @@
 use anchor_lang::prelude::*;
 use serum_dex::state::{OpenOrders, ToAlignedBytes};
+use openbook_v2::state::OpenOrdersAccount as OpenOrdersV2;
 
 use std::cell::{Ref, RefMut};
 use std::cmp::min;
@@ -145,6 +146,15 @@ impl OpenOrdersSlim {
             native_pc_free: oo.native_pc_free,
             native_pc_total: oo.native_pc_total,
             referrer_rebates_accrued: oo.referrer_rebates_accrued,
+        }
+    }
+    pub fn from_oo_v2(oo: &OpenOrdersV2) -> Self {
+        Self {
+            native_coin_free: oo.position.base_free_native,
+            native_coin_total: 0, // can't get locked or total from obv2 oo, not used anyway except for logging
+            native_pc_free: oo.position.quote_free_native,
+            native_pc_total: 0, // we track it in mango so maybe pass the OpenOrdersV2 in as well?
+            referrer_rebates_accrued: oo.position.referrer_rebates_available,
         }
     }
 }
