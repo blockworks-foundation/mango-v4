@@ -277,8 +277,10 @@ impl PerpMarket {
         require_keys_eq!(self.oracle, *oracle_acc.key());
         let state = oracle::oracle_state_unchecked(oracle_acc, self.base_decimals)?;
         state
-            .check_confidence_and_maybe_staleness(&self.name(), &self.oracle_config, staleness_slot)
-            .with_context(|| oracle_log_context(&state, &self.oracle_config, staleness_slot))?;
+            .check_confidence_and_maybe_staleness(&self.oracle_config, staleness_slot)
+            .with_context(|| {
+                oracle_log_context(self.name(), &state, &self.oracle_config, staleness_slot)
+            })?;
         Ok(state)
     }
 
