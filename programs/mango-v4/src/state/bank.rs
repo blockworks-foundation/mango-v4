@@ -1102,19 +1102,15 @@ impl Bank {
     ) -> Result<I80F48> {
         require_keys_eq!(self.oracle, *oracle_acc_infos.oracle.key());
         let primary_state = oracle::oracle_state_unchecked(oracle_acc_infos, self.mint_decimals)?;
-        let primary_ok = primary_state.check_confidence_and_maybe_staleness(
-            &self.oracle_config,
-            staleness_slot,
-        );
+        let primary_ok =
+            primary_state.check_confidence_and_maybe_staleness(&self.oracle_config, staleness_slot);
         if primary_ok.is_oracle_error() && oracle_acc_infos.fallback_opt.is_some() {
             let fallback_oracle_acc = oracle_acc_infos.fallback_opt.unwrap();
             require_keys_eq!(self.fallback_oracle, *fallback_oracle_acc.key());
             let fallback_state =
                 oracle::fallback_oracle_state_unchecked(&oracle_acc_infos, self.mint_decimals)?;
-            let fallback_ok = fallback_state.check_confidence_and_maybe_staleness(
-                &self.oracle_config,
-                staleness_slot,
-            );
+            let fallback_ok = fallback_state
+                .check_confidence_and_maybe_staleness(&self.oracle_config, staleness_slot);
             fallback_ok.with_context(|| {
                 format!(
                     "{} {}",
