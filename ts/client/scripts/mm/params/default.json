@@ -39,7 +39,7 @@
         "krakenCode": "XETHZUSD"
       }
     },
-    "RNDR": {
+    "RENDER": {
       "perp": {
         "sizePerc": 0.5,
         "leanCoeff": 0.00025,
