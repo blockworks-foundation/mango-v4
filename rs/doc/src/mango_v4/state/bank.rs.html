@@ -1689,6 +1689,17 @@
 <a href="#1689" id="1689">1689</a>
 <a href="#1690" id="1690">1690</a>
 <a href="#1691" id="1691">1691</a>
+<a href="#1692" id="1692">1692</a>
+<a href="#1693" id="1693">1693</a>
+<a href="#1694" id="1694">1694</a>
+<a href="#1695" id="1695">1695</a>
+<a href="#1696" id="1696">1696</a>
+<a href="#1697" id="1697">1697</a>
+<a href="#1698" id="1698">1698</a>
+<a href="#1699" id="1699">1699</a>
+<a href="#1700" id="1700">1700</a>
+<a href="#1701" id="1701">1701</a>
+<a href="#1702" id="1702">1702</a>
 </pre><pre class="rust"><code><span class="kw">use super</span>::{OracleConfig, TokenIndex, TokenPosition};
 <span class="kw">use </span><span class="kw">crate</span>::accounts_zerocopy::KeyedAccountReader;
 <span class="kw">use </span><span class="kw">crate</span>::error::<span class="kw-2">*</span>;
@@ -2793,8 +2804,10 @@
         <span class="macro">require_keys_eq!</span>(<span class="self">self</span>.oracle, <span class="kw-2">*</span>oracle_acc.key());
         <span class="kw">let </span>state = oracle::oracle_state_unchecked(oracle_acc, <span class="self">self</span>.mint_decimals)<span class="question-mark">?</span>;
         state
-            .check_confidence_and_maybe_staleness(<span class="kw-2">&amp;</span><span class="self">self</span>.name(), <span class="kw-2">&amp;</span><span class="self">self</span>.oracle_config, staleness_slot)
-            .with_context(|| oracle_log_context(<span class="kw-2">&amp;</span>state, <span class="kw-2">&amp;</span><span class="self">self</span>.oracle_config, staleness_slot))<span class="question-mark">?</span>;
+            .check_confidence_and_maybe_staleness(<span class="kw-2">&amp;</span><span class="self">self</span>.oracle_config, staleness_slot)
+            .with_context(|| {
+                oracle_log_context(<span class="self">self</span>.name(), <span class="kw-2">&amp;</span>state, <span class="kw-2">&amp;</span><span class="self">self</span>.oracle_config, staleness_slot)
+            })<span class="question-mark">?</span>;
         <span class="prelude-val">Ok</span>(state.price)
     }
 
@@ -2807,32 +2820,41 @@
     ) -&gt; <span class="prelude-ty">Result</span>&lt;I80F48&gt; {
         <span class="macro">require_keys_eq!</span>(<span class="self">self</span>.oracle, <span class="kw-2">*</span>oracle_acc.key());
         <span class="kw">let </span>primary_state = oracle::oracle_state_unchecked(oracle_acc, <span class="self">self</span>.mint_decimals)<span class="question-mark">?</span>;
-        <span class="kw">let </span>primary_ok = primary_state.check_confidence_and_maybe_staleness(
-            <span class="kw-2">&amp;</span><span class="self">self</span>.name(),
-            <span class="kw-2">&amp;</span><span class="self">self</span>.oracle_config,
-            staleness_slot,
-        );
+        <span class="kw">let </span>primary_ok =
+            primary_state.check_confidence_and_maybe_staleness(<span class="kw-2">&amp;</span><span class="self">self</span>.oracle_config, staleness_slot);
         <span class="kw">if </span>primary_ok.is_oracle_error() &amp;&amp; fallback_oracle_acc_opt.is_some() {
             <span class="kw">let </span>fallback_oracle_acc = fallback_oracle_acc_opt.unwrap();
             <span class="macro">require_keys_eq!</span>(<span class="self">self</span>.fallback_oracle, <span class="kw-2">*</span>fallback_oracle_acc.key());
             <span class="kw">let </span>fallback_state =
                 oracle::oracle_state_unchecked(fallback_oracle_acc, <span class="self">self</span>.mint_decimals)<span class="question-mark">?</span>;
-            <span class="kw">let </span>fallback_ok = fallback_state.check_confidence_and_maybe_staleness(
-                <span class="kw-2">&amp;</span><span class="self">self</span>.name(),
-                <span class="kw-2">&amp;</span><span class="self">self</span>.oracle_config,
-                staleness_slot,
-            );
+            <span class="kw">let </span>fallback_ok = fallback_state
+                .check_confidence_and_maybe_staleness(<span class="kw-2">&amp;</span><span class="self">self</span>.oracle_config, staleness_slot);
             fallback_ok.with_context(|| {
                 <span class="macro">format!</span>(
                     <span class="string">&quot;{} {}&quot;</span>,
-                    oracle_log_context(<span class="kw-2">&amp;</span>primary_state, <span class="kw-2">&amp;</span><span class="self">self</span>.oracle_config, staleness_slot),
-                    oracle_log_context(<span class="kw-2">&amp;</span>fallback_state, <span class="kw-2">&amp;</span><span class="self">self</span>.oracle_config, staleness_slot)
+                    oracle_log_context(
+                        <span class="self">self</span>.name(),
+                        <span class="kw-2">&amp;</span>primary_state,
+                        <span class="kw-2">&amp;</span><span class="self">self</span>.oracle_config,
+                        staleness_slot
+                    ),
+                    oracle_log_context(
+                        <span class="self">self</span>.name(),
+                        <span class="kw-2">&amp;</span>fallback_state,
+                        <span class="kw-2">&amp;</span><span class="self">self</span>.oracle_config,
+                        staleness_slot
+                    )
                 )
             })<span class="question-mark">?</span>;
             <span class="prelude-val">Ok</span>(fallback_state.price)
         } <span class="kw">else </span>{
             primary_ok.with_context(|| {
-                oracle_log_context(<span class="kw-2">&amp;</span>primary_state, <span class="kw-2">&amp;</span><span class="self">self</span>.oracle_config, staleness_slot)
+                oracle_log_context(
+                    <span class="self">self</span>.name(),
+                    <span class="kw-2">&amp;</span>primary_state,
+                    <span class="kw-2">&amp;</span><span class="self">self</span>.oracle_config,
+                    staleness_slot,
+                )
             })<span class="question-mark">?</span>;
             <span class="prelude-val">Ok</span>(primary_state.price)
         }
