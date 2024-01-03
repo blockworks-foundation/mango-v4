@@ -1353,6 +1353,94 @@ export type MangoV4 = {
       ]
     },
     {
+      "name": "accountCreateV3",
+      "accounts": [
+        {
+          "name": "group",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "account",
+          "isMut": true,
+          "isSigner": false,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "type": "string",
+                "value": "MangoAccount"
+              },
+              {
+                "kind": "account",
+                "type": "publicKey",
+                "path": "group"
+              },
+              {
+                "kind": "account",
+                "type": "publicKey",
+                "path": "owner"
+              },
+              {
+                "kind": "arg",
+                "type": "u32",
+                "path": "account_num"
+              }
+            ]
+          }
+        },
+        {
+          "name": "owner",
+          "isMut": false,
+          "isSigner": true
+        },
+        {
+          "name": "payer",
+          "isMut": true,
+          "isSigner": true
+        },
+        {
+          "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "accountNum",
+          "type": "u32"
+        },
+        {
+          "name": "tokenCount",
+          "type": "u8"
+        },
+        {
+          "name": "serum3Count",
+          "type": "u8"
+        },
+        {
+          "name": "perpCount",
+          "type": "u8"
+        },
+        {
+          "name": "perpOoCount",
+          "type": "u8"
+        },
+        {
+          "name": "tokenConditionalSwapCount",
+          "type": "u8"
+        },
+        {
+          "name": "openbookV2Count",
+          "type": "u8"
+        },
+        {
+          "name": "name",
+          "type": "string"
+        }
+      ]
+    },
+    {
       "name": "accountExpand",
       "accounts": [
         {
@@ -1456,6 +1544,66 @@ export type MangoV4 = {
         },
         {
           "name": "tokenConditionalSwapCount",
+          "type": "u8"
+        }
+      ]
+    },
+    {
+      "name": "accountExpandV3",
+      "accounts": [
+        {
+          "name": "group",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "account",
+          "isMut": true,
+          "isSigner": false,
+          "relations": [
+            "group",
+            "owner"
+          ]
+        },
+        {
+          "name": "owner",
+          "isMut": false,
+          "isSigner": true
+        },
+        {
+          "name": "payer",
+          "isMut": true,
+          "isSigner": true
+        },
+        {
+          "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "tokenCount",
+          "type": "u8"
+        },
+        {
+          "name": "serum3Count",
+          "type": "u8"
+        },
+        {
+          "name": "perpCount",
+          "type": "u8"
+        },
+        {
+          "name": "perpOoCount",
+          "type": "u8"
+        },
+        {
+          "name": "tokenConditionalSwapCount",
+          "type": "u8"
+        },
+        {
+          "name": "openbookV2Count",
           "type": "u8"
         }
       ]
@@ -5977,11 +6125,6 @@ export type MangoV4 = {
           ]
         },
         {
-          "name": "authority",
-          "isMut": false,
-          "isSigner": true
-        },
-        {
           "name": "openbookV2Market",
           "isMut": false,
           "isSigner": false,
@@ -6002,38 +6145,14 @@ export type MangoV4 = {
           "isSigner": false
         },
         {
-          "name": "openOrders",
+          "name": "openOrdersIndexer",
           "isMut": true,
-          "isSigner": false,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "type": "string",
-                "value": "OpenOrders"
-              },
-              {
-                "kind": "account",
-                "type": "publicKey",
-                "path": "openbook_v2_market"
-              },
-              {
-                "kind": "account",
-                "type": "publicKey",
-                "path": "openbook_v2_market_external"
-              },
-              {
-                "kind": "arg",
-                "type": "u32",
-                "path": "account_num"
-              }
-            ],
-            "programId": {
-              "kind": "account",
-              "type": "publicKey",
-              "path": "openbook_v2_program"
-            }
-          }
+          "isSigner": false
+        },
+        {
+          "name": "openOrdersAccount",
+          "isMut": true,
+          "isSigner": false
         },
         {
           "name": "payer",
@@ -6051,12 +6170,7 @@ export type MangoV4 = {
           "isSigner": false
         }
       ],
-      "args": [
-        {
-          "name": "accountNum",
-          "type": "u32"
-        }
-      ]
+      "args": []
     },
     {
       "name": "openbookV2CloseOpenOrders",
@@ -6174,12 +6288,7 @@ export type MangoV4 = {
           "isSigner": false
         },
         {
-          "name": "marketBaseVault",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "marketQuoteVault",
+          "name": "marketVault",
           "isMut": true,
           "isSigner": false
         },
@@ -6189,7 +6298,7 @@ export type MangoV4 = {
           "isSigner": false
         },
         {
-          "name": "payerBank",
+          "name": "bank",
           "isMut": true,
           "isSigner": false,
           "docs": [
@@ -6200,7 +6309,7 @@ export type MangoV4 = {
           ]
         },
         {
-          "name": "payerVault",
+          "name": "vault",
           "isMut": true,
           "isSigner": false,
           "docs": [
@@ -6208,7 +6317,7 @@ export type MangoV4 = {
           ]
         },
         {
-          "name": "payerOracle",
+          "name": "oracle",
           "isMut": false,
           "isSigner": false
         },
@@ -8703,6 +8812,101 @@ export type MangoV4 = {
       }
     },
     {
+      "name": "OpenbookV2Orders",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "openOrders",
+            "type": "publicKey"
+          },
+          {
+            "name": "baseBorrowsWithoutFee",
+            "docs": [
+              "Tracks the amount of borrows that have flowed into the open orders account.",
+              "These borrows did not have the loan origination fee applied, and that may happen",
+              "later (in openbook_v2_settle_funds) if we can guarantee that the funds were used.",
+              "In particular a place-on-book, cancel, settle should not cost fees."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "quoteBorrowsWithoutFee",
+            "type": "u64"
+          },
+          {
+            "name": "marketIndex",
+            "type": "u16"
+          },
+          {
+            "name": "baseTokenIndex",
+            "docs": [
+              "Store the base/quote token index, so health computations don't need",
+              "to get passed the static SerumMarket to find which tokens a market",
+              "uses and look up the correct oracles."
+            ],
+            "type": "u16"
+          },
+          {
+            "name": "quoteTokenIndex",
+            "type": "u16"
+          },
+          {
+            "name": "padding",
+            "type": {
+              "array": [
+                "u8",
+                2
+              ]
+            }
+          },
+          {
+            "name": "highestPlacedBidInv",
+            "docs": [
+              "Track something like the highest open bid / lowest open ask, in native/native units.",
+              "",
+              "Tracking it exactly isn't possible since we don't see fills. So instead track",
+              "the min/max of the _placed_ bids and asks.",
+              "",
+              "The value is reset in serum3_place_order when a new order is placed without an",
+              "existing one on the book.",
+              "",
+              "0 is a special \"unset\" state."
+            ],
+            "type": "f64"
+          },
+          {
+            "name": "lowestPlacedAsk",
+            "type": "f64"
+          },
+          {
+            "name": "baseDepositsReserved",
+            "docs": [
+              "Tracks the amount of deposits that flowed into the serum open orders account.",
+              "",
+              "The bank still considers these amounts user deposits (see deposits_in_serum)",
+              "and they need to be deducted from there when they flow back into the bank",
+              "as real tokens."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "quoteDepositsReserved",
+            "type": "u64"
+          },
+          {
+            "name": "reserved",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
       "name": "PerpPosition",
       "type": {
         "kind": "struct",
@@ -10564,7 +10768,7 @@ export type MangoV4 = {
             "name": "ImmediateOrCancel",
             "fields": [
               {
-                "name": "price_lots",
+                "name": "priceLots",
                 "type": "i64"
               }
             ]
@@ -10573,11 +10777,11 @@ export type MangoV4 = {
             "name": "Fixed",
             "fields": [
               {
-                "name": "price_lots",
+                "name": "priceLots",
                 "type": "i64"
               },
               {
-                "name": "order_type",
+                "name": "orderType",
                 "type": {
                   "defined": "PostOrderType"
                 }
@@ -10588,21 +10792,21 @@ export type MangoV4 = {
             "name": "OraclePegged",
             "fields": [
               {
-                "name": "price_offset_lots",
+                "name": "priceOffsetLots",
                 "type": "i64"
               },
               {
-                "name": "order_type",
+                "name": "orderType",
                 "type": {
                   "defined": "PostOrderType"
                 }
               },
               {
-                "name": "peg_limit",
+                "name": "pegLimit",
                 "type": "i64"
               },
               {
-                "name": "max_oracle_staleness_slots",
+                "name": "maxOracleStalenessSlots",
                 "type": "i32"
               }
             ]
@@ -12004,6 +12208,46 @@ export type MangoV4 = {
       ]
     },
     {
+      "name": "OpenbookV2RegisterMarketLog",
+      "fields": [
+        {
+          "name": "mangoGroup",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "openbookMarket",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "marketIndex",
+          "type": "u16",
+          "index": false
+        },
+        {
+          "name": "baseTokenIndex",
+          "type": "u16",
+          "index": false
+        },
+        {
+          "name": "quoteTokenIndex",
+          "type": "u16",
+          "index": false
+        },
+        {
+          "name": "openbookProgram",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "openbookMarketExternal",
+          "type": "publicKey",
+          "index": false
+        }
+      ]
+    },
+    {
       "name": "PerpLiqBaseOrPositivePnlLog",
       "fields": [
         {
@@ -13279,6 +13523,16 @@ export type MangoV4 = {
       "code": 6059,
       "name": "TokenConditionalSwapTypeNotStartable",
       "msg": "token conditional swap type cannot be started"
+    },
+    {
+      "code": 6060,
+      "name": "NoFreeOpenbookV2OpenOrdersIndex",
+      "msg": "no free openbook v2 open orders index"
+    },
+    {
+      "code": 6061,
+      "name": "OpenbookV2OpenOrdersExistAlready",
+      "msg": "openbook v2 open orders exist already"
     }
   ]
 };
@@ -14638,6 +14892,94 @@ export const IDL: MangoV4 = {
       ]
     },
     {
+      "name": "accountCreateV3",
+      "accounts": [
+        {
+          "name": "group",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "account",
+          "isMut": true,
+          "isSigner": false,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "type": "string",
+                "value": "MangoAccount"
+              },
+              {
+                "kind": "account",
+                "type": "publicKey",
+                "path": "group"
+              },
+              {
+                "kind": "account",
+                "type": "publicKey",
+                "path": "owner"
+              },
+              {
+                "kind": "arg",
+                "type": "u32",
+                "path": "account_num"
+              }
+            ]
+          }
+        },
+        {
+          "name": "owner",
+          "isMut": false,
+          "isSigner": true
+        },
+        {
+          "name": "payer",
+          "isMut": true,
+          "isSigner": true
+        },
+        {
+          "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "accountNum",
+          "type": "u32"
+        },
+        {
+          "name": "tokenCount",
+          "type": "u8"
+        },
+        {
+          "name": "serum3Count",
+          "type": "u8"
+        },
+        {
+          "name": "perpCount",
+          "type": "u8"
+        },
+        {
+          "name": "perpOoCount",
+          "type": "u8"
+        },
+        {
+          "name": "tokenConditionalSwapCount",
+          "type": "u8"
+        },
+        {
+          "name": "openbookV2Count",
+          "type": "u8"
+        },
+        {
+          "name": "name",
+          "type": "string"
+        }
+      ]
+    },
+    {
       "name": "accountExpand",
       "accounts": [
         {
@@ -14741,6 +15083,66 @@ export const IDL: MangoV4 = {
         },
         {
           "name": "tokenConditionalSwapCount",
+          "type": "u8"
+        }
+      ]
+    },
+    {
+      "name": "accountExpandV3",
+      "accounts": [
+        {
+          "name": "group",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "account",
+          "isMut": true,
+          "isSigner": false,
+          "relations": [
+            "group",
+            "owner"
+          ]
+        },
+        {
+          "name": "owner",
+          "isMut": false,
+          "isSigner": true
+        },
+        {
+          "name": "payer",
+          "isMut": true,
+          "isSigner": true
+        },
+        {
+          "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "tokenCount",
+          "type": "u8"
+        },
+        {
+          "name": "serum3Count",
+          "type": "u8"
+        },
+        {
+          "name": "perpCount",
+          "type": "u8"
+        },
+        {
+          "name": "perpOoCount",
+          "type": "u8"
+        },
+        {
+          "name": "tokenConditionalSwapCount",
+          "type": "u8"
+        },
+        {
+          "name": "openbookV2Count",
           "type": "u8"
         }
       ]
@@ -19262,11 +19664,6 @@ export const IDL: MangoV4 = {
           ]
         },
         {
-          "name": "authority",
-          "isMut": false,
-          "isSigner": true
-        },
-        {
           "name": "openbookV2Market",
           "isMut": false,
           "isSigner": false,
@@ -19287,38 +19684,14 @@ export const IDL: MangoV4 = {
           "isSigner": false
         },
         {
-          "name": "openOrders",
+          "name": "openOrdersIndexer",
           "isMut": true,
-          "isSigner": false,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "type": "string",
-                "value": "OpenOrders"
-              },
-              {
-                "kind": "account",
-                "type": "publicKey",
-                "path": "openbook_v2_market"
-              },
-              {
-                "kind": "account",
-                "type": "publicKey",
-                "path": "openbook_v2_market_external"
-              },
-              {
-                "kind": "arg",
-                "type": "u32",
-                "path": "account_num"
-              }
-            ],
-            "programId": {
-              "kind": "account",
-              "type": "publicKey",
-              "path": "openbook_v2_program"
-            }
-          }
+          "isSigner": false
+        },
+        {
+          "name": "openOrdersAccount",
+          "isMut": true,
+          "isSigner": false
         },
         {
           "name": "payer",
@@ -19336,12 +19709,7 @@ export const IDL: MangoV4 = {
           "isSigner": false
         }
       ],
-      "args": [
-        {
-          "name": "accountNum",
-          "type": "u32"
-        }
-      ]
+      "args": []
     },
     {
       "name": "openbookV2CloseOpenOrders",
@@ -19459,12 +19827,7 @@ export const IDL: MangoV4 = {
           "isSigner": false
         },
         {
-          "name": "marketBaseVault",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "marketQuoteVault",
+          "name": "marketVault",
           "isMut": true,
           "isSigner": false
         },
@@ -19474,7 +19837,7 @@ export const IDL: MangoV4 = {
           "isSigner": false
         },
         {
-          "name": "payerBank",
+          "name": "bank",
           "isMut": true,
           "isSigner": false,
           "docs": [
@@ -19485,7 +19848,7 @@ export const IDL: MangoV4 = {
           ]
         },
         {
-          "name": "payerVault",
+          "name": "vault",
           "isMut": true,
           "isSigner": false,
           "docs": [
@@ -19493,7 +19856,7 @@ export const IDL: MangoV4 = {
           ]
         },
         {
-          "name": "payerOracle",
+          "name": "oracle",
           "isMut": false,
           "isSigner": false
         },
@@ -21988,6 +22351,101 @@ export const IDL: MangoV4 = {
       }
     },
     {
+      "name": "OpenbookV2Orders",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "openOrders",
+            "type": "publicKey"
+          },
+          {
+            "name": "baseBorrowsWithoutFee",
+            "docs": [
+              "Tracks the amount of borrows that have flowed into the open orders account.",
+              "These borrows did not have the loan origination fee applied, and that may happen",
+              "later (in openbook_v2_settle_funds) if we can guarantee that the funds were used.",
+              "In particular a place-on-book, cancel, settle should not cost fees."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "quoteBorrowsWithoutFee",
+            "type": "u64"
+          },
+          {
+            "name": "marketIndex",
+            "type": "u16"
+          },
+          {
+            "name": "baseTokenIndex",
+            "docs": [
+              "Store the base/quote token index, so health computations don't need",
+              "to get passed the static SerumMarket to find which tokens a market",
+              "uses and look up the correct oracles."
+            ],
+            "type": "u16"
+          },
+          {
+            "name": "quoteTokenIndex",
+            "type": "u16"
+          },
+          {
+            "name": "padding",
+            "type": {
+              "array": [
+                "u8",
+                2
+              ]
+            }
+          },
+          {
+            "name": "highestPlacedBidInv",
+            "docs": [
+              "Track something like the highest open bid / lowest open ask, in native/native units.",
+              "",
+              "Tracking it exactly isn't possible since we don't see fills. So instead track",
+              "the min/max of the _placed_ bids and asks.",
+              "",
+              "The value is reset in serum3_place_order when a new order is placed without an",
+              "existing one on the book.",
+              "",
+              "0 is a special \"unset\" state."
+            ],
+            "type": "f64"
+          },
+          {
+            "name": "lowestPlacedAsk",
+            "type": "f64"
+          },
+          {
+            "name": "baseDepositsReserved",
+            "docs": [
+              "Tracks the amount of deposits that flowed into the serum open orders account.",
+              "",
+              "The bank still considers these amounts user deposits (see deposits_in_serum)",
+              "and they need to be deducted from there when they flow back into the bank",
+              "as real tokens."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "quoteDepositsReserved",
+            "type": "u64"
+          },
+          {
+            "name": "reserved",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
       "name": "PerpPosition",
       "type": {
         "kind": "struct",
@@ -23849,7 +24307,7 @@ export const IDL: MangoV4 = {
             "name": "ImmediateOrCancel",
             "fields": [
               {
-                "name": "price_lots",
+                "name": "priceLots",
                 "type": "i64"
               }
             ]
@@ -23858,11 +24316,11 @@ export const IDL: MangoV4 = {
             "name": "Fixed",
             "fields": [
               {
-                "name": "price_lots",
+                "name": "priceLots",
                 "type": "i64"
               },
               {
-                "name": "order_type",
+                "name": "orderType",
                 "type": {
                   "defined": "PostOrderType"
                 }
@@ -23873,21 +24331,21 @@ export const IDL: MangoV4 = {
             "name": "OraclePegged",
             "fields": [
               {
-                "name": "price_offset_lots",
+                "name": "priceOffsetLots",
                 "type": "i64"
               },
               {
-                "name": "order_type",
+                "name": "orderType",
                 "type": {
                   "defined": "PostOrderType"
                 }
               },
               {
-                "name": "peg_limit",
+                "name": "pegLimit",
                 "type": "i64"
               },
               {
-                "name": "max_oracle_staleness_slots",
+                "name": "maxOracleStalenessSlots",
                 "type": "i32"
               }
             ]
@@ -25289,6 +25747,46 @@ export const IDL: MangoV4 = {
       ]
     },
     {
+      "name": "OpenbookV2RegisterMarketLog",
+      "fields": [
+        {
+          "name": "mangoGroup",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "openbookMarket",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "marketIndex",
+          "type": "u16",
+          "index": false
+        },
+        {
+          "name": "baseTokenIndex",
+          "type": "u16",
+          "index": false
+        },
+        {
+          "name": "quoteTokenIndex",
+          "type": "u16",
+          "index": false
+        },
+        {
+          "name": "openbookProgram",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "openbookMarketExternal",
+          "type": "publicKey",
+          "index": false
+        }
+      ]
+    },
+    {
       "name": "PerpLiqBaseOrPositivePnlLog",
       "fields": [
         {
@@ -26564,6 +27062,16 @@ export const IDL: MangoV4 = {
       "code": 6059,
       "name": "TokenConditionalSwapTypeNotStartable",
       "msg": "token conditional swap type cannot be started"
+    },
+    {
+      "code": 6060,
+      "name": "NoFreeOpenbookV2OpenOrdersIndex",
+      "msg": "no free openbook v2 open orders index"
+    },
+    {
+      "code": 6061,
+      "name": "OpenbookV2OpenOrdersExistAlready",
+      "msg": "openbook v2 open orders exist already"
     }
   ]
 };

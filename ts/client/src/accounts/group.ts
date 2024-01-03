@@ -1,10 +1,12 @@
-import { BorshAccountsCoder } from '@coral-xyz/anchor';
+import { AnchorProvider, BorshAccountsCoder, Wallet } from '@coral-xyz/anchor';
 import { Market, Orderbook } from '@project-serum/serum';
+import { MarketAccount, BookSideAccount, OpenBookV2Client } from '@openbook-dex/openbook-v2';
 import { parsePriceData } from '@pythnetwork/client';
 import { TOKEN_PROGRAM_ID, unpackAccount } from '@solana/spl-token';
 import {
   AccountInfo,
   AddressLookupTableAccount,
+  Keypair,
   PublicKey,
 } from '@solana/web3.js';
 import BN from 'bn.js';
@@ -15,7 +17,7 @@ import { OPENBOOK_PROGRAM_ID } from '../constants';
 import { Id } from '../ids';
 import { I80F48 } from '../numbers/I80F48';
 import { PriceImpact, computePriceImpactOnJup } from '../risk';
-import { buildFetch, toNative, toNativeI80F48, toUiDecimals } from '../utils';
+import { EmptyWallet, buildFetch, toNative, toNativeI80F48, toUiDecimals } from '../utils';
 import { Bank, MintInfo, TokenIndex } from './bank';
 import {
   OracleProvider,
@@ -25,6 +27,8 @@ import {
 } from './oracle';
 import { BookSide, PerpMarket, PerpMarketIndex } from './perp';
 import { MarketIndex, Serum3Market } from './serum3';
+import { OpenbookV2MarketIndex, OpenbookV2Market } from './openbookV2';
+import NodeWallet from '@coral-xyz/anchor/dist/cjs/nodewallet';
 
 export class Group {
   static from(
@@ -75,6 +79,9 @@ export class Group {
       new Map(), // serum3MarketsMapByExternal
       new Map(), // serum3MarketsMapByMarketIndex
       new Map(), // serum3MarketExternalsMap
+      new Map(), // openbookV2MarketsMapByExternal
+      new Map(), // openbookV2MarketsMapByMarketIndex
+      new Map(), // openbookV2MarketExternalsMap
       new Map(), // perpMarketsMapByOracle
       new Map(), // perpMarketsMapByMarketIndex
       new Map(), // perpMarketsMapByName
@@ -111,6 +118,12 @@ export class Group {
     public serum3MarketsMapByExternal: Map<string, Serum3Market>,
     public serum3MarketsMapByMarketIndex: Map<MarketIndex, Serum3Market>,
     public serum3ExternalMarketsMap: Map<string, Market>,
+    public openbookV2MarketsMapByExternal: Map<string, OpenbookV2Market>,
+    public openbookV2MarketsMapByMarketIndex: Map<
+      MarketIndex,
+      OpenbookV2Market
+    >,
+    public openbookV2ExternalMarketsMap: Map<string, MarketAccount>,
     public perpMarketsMapByOracle: Map<string, PerpMarket>,
     public perpMarketsMapByMarketIndex: Map<PerpMarketIndex, PerpMarket>,
     public perpMarketsMapByName: Map<string, PerpMarket>,
@@ -139,6 +152,9 @@ export class Group {
       this.reloadMintInfos(client, ids),
       this.reloadSerum3Markets(client, ids).then(() =>
         this.reloadSerum3ExternalMarkets(client, ids),
+      ),
+      this.reloadOpenbookV2Markets(client, ids).then(() =>
+        this.reloadOpenbookV2ExternalMarkets(client, ids),
       ),
     ]);
     // console.timeEnd('group.reload');
@@ -274,6 +290,40 @@ export class Group {
     );
   }
 
+  public async reloadOpenbookV2Markets(
+    client: MangoClient,
+    ids?: Id,
+  ): Promise<void> {
+    let openbookV2Markets: OpenbookV2Market[];
+    if (ids && ids.getOpenbookV2Markets().length) {
+      openbookV2Markets = (
+        await client.program.account.openbookV2Market.fetchMultiple(
+          ids.getOpenbookV2Markets(),
+        )
+      ).map((account, index) =>
+        OpenbookV2Market.from(
+          ids.getOpenbookV2Markets()[index],
+          account as any,
+        ),
+      );
+    } else {
+      openbookV2Markets = await client.openbookV2GetMarkets(this);
+    }
+
+    this.openbookV2MarketsMapByExternal = new Map(
+      openbookV2Markets.map((openbookV2Market) => [
+        openbookV2Market.openbookMarketExternal.toBase58(),
+        openbookV2Market,
+      ]),
+    );
+    this.openbookV2MarketsMapByMarketIndex = new Map(
+      openbookV2Markets.map((openbookV2Market) => [
+        openbookV2Market.marketIndex,
+        openbookV2Market,
+      ]),
+    );
+  }
+
   public async reloadSerum3ExternalMarkets(
     client: MangoClient,
     ids?: Id,
@@ -330,6 +380,55 @@ export class Group {
       Array.from(this.serum3MarketsMapByExternal.values()).map(
         (serum3Market, index) => [
           serum3Market.serumMarketExternal.toBase58(),
+          markets[index],
+        ],
+      ),
+    );
+  }
+
+  public async reloadOpenbookV2ExternalMarkets(
+    client: MangoClient,
+    ids?: Id,
+  ): Promise<void> {
+    
+    const openbookClient = new OpenBookV2Client(
+      new AnchorProvider(client.connection, new EmptyWallet(Keypair.generate()), {
+        commitment: client.connection.commitment,
+      }),
+    ); // readonly client for deserializing accounts
+    let markets: MarketAccount[] = [];
+    const externalMarketIds = ids?.getOpenbookV2ExternalMarkets();
+
+    if (ids && externalMarketIds && externalMarketIds.length) {
+      markets = await Promise.all(
+        (
+          await client.program.provider.connection.getMultipleAccountsInfo(
+            externalMarketIds,
+          )
+        ).map((account, index) => {
+          if (!account) {
+            throw new Error(
+              `Undefined AI for openbook market ${externalMarketIds[index]}!`,
+            );
+          }
+          return openbookClient.decodeMarket(account?.data);
+        }),
+      );
+    } else {
+      markets = await Promise.all(
+        Array.from(this.openbookV2MarketsMapByExternal.values()).map(
+          (openbookV2Market) =>
+            openbookClient.program.account.market.fetch(
+              openbookV2Market.openbookMarketExternal,
+            ),
+        ),
+      );
+    }
+
+    this.openbookV2ExternalMarketsMap = new Map(
+      Array.from(this.openbookV2MarketsMapByExternal.values()).map(
+        (openbookV2Market, index) => [
+          openbookV2Market.openbookMarketExternal.toBase58(),
           markets[index],
         ],
       ),
@@ -609,6 +708,19 @@ export class Group {
     return serum3Market;
   }
 
+  public getOpenbookV2MarketByMarketIndex(
+    marketIndex: MarketIndex,
+  ): OpenbookV2Market {
+    const openbookV2Market =
+      this.openbookV2MarketsMapByMarketIndex.get(marketIndex);
+    if (!openbookV2Market) {
+      throw new Error(
+        `No openbookV2Market found for marketIndex ${marketIndex}!`,
+      );
+    }
+    return openbookV2Market;
+  }
+
   public getSerum3MarketByName(name: string): Serum3Market {
     const serum3Market = Array.from(
       this.serum3MarketsMapByExternal.values(),
@@ -617,6 +729,16 @@ export class Group {
       throw new Error(`No serum3Market found by name ${name}!`);
     }
     return serum3Market;
+  }
+
+  public getOpenbookV2MarketByName(name: string): OpenbookV2Market {
+    const openbookV2Market = Array.from(
+      this.openbookV2MarketsMapByExternal.values(),
+    ).find((openbookV2Market) => openbookV2Market.name === name);
+    if (!openbookV2Market) {
+      throw new Error(`No openbookV2Market found by name ${name}!`);
+    }
+    return openbookV2Market;
   }
 
   public getSerum3MarketByExternalMarket(
@@ -635,6 +757,22 @@ export class Group {
     return serum3Market;
   }
 
+  public getOpenbookV2MarketByExternalMarket(
+    externalMarketPk: PublicKey,
+  ): OpenbookV2Market {
+    const openbookV2Market = Array.from(
+      this.openbookV2MarketsMapByExternal.values(),
+    ).find((openbookV2Market) =>
+      openbookV2Market.openbookMarketExternal.equals(externalMarketPk),
+    );
+    if (!openbookV2Market) {
+      throw new Error(
+        `No openbookV2Market found for external openbookV2 market ${externalMarketPk.toString()}!`,
+      );
+    }
+    return openbookV2Market;
+  }
+
   public getSerum3ExternalMarket(externalMarketPk: PublicKey): Market {
     const market = this.serum3ExternalMarketsMap.get(
       externalMarketPk.toBase58(),
@@ -642,6 +780,18 @@ export class Group {
     if (!market) {
       throw new Error(
         `No external market found for pk ${externalMarketPk.toString()}!`,
+      );
+    }
+    return market;
+  }
+
+  public getOpenbookV2ExternalMarket(externalMarketPk: PublicKey): MarketAccount {
+    const market = this.openbookV2ExternalMarketsMap.get(
+      externalMarketPk.toBase58(),
+    );
+    if (!market) {
+      throw new Error(
+        `No openbookV2 external market found for pk ${externalMarketPk.toString()}!`,
       );
     }
     return market;
@@ -661,6 +811,22 @@ export class Group {
   ): Promise<Orderbook> {
     const serum3Market = this.getSerum3MarketByExternalMarket(externalMarketPk);
     return await serum3Market.loadAsks(client, this);
+  }
+
+  public async loadOpenbookV2BidsForMarket(
+    client: MangoClient,
+    externalMarketPk: PublicKey,
+  ): Promise<BookSideAccount> {
+    const openbookV2Market = this.getOpenbookV2MarketByExternalMarket(externalMarketPk);
+    return await openbookV2Market.loadBids(client, this);
+  }
+
+  public async loadOpenbookV2AsksForMarket(
+    client: MangoClient,
+    externalMarketPk: PublicKey,
+  ): Promise<BookSideAccount> {
+    const openbookV2Market = this.getOpenbookV2MarketByExternalMarket(externalMarketPk);
+    return await openbookV2Market.loadAsks(client, this);
   }
 
   public findPerpMarket(marketIndex: PerpMarketIndex): PerpMarket {

@@ -1,10 +1,12 @@
-import { AnchorProvider } from '@coral-xyz/anchor';
+import { AnchorProvider, Wallet } from '@coral-xyz/anchor';
 import {
   AddressLookupTableAccount,
+  Keypair,
   MessageV0,
   PublicKey,
   Signer,
   SystemProgram,
+  Transaction,
   TransactionInstruction,
   VersionedTransaction,
 } from '@solana/web3.js';
@@ -207,6 +209,25 @@ export async function buildVersionedTx(
     ...additionalSigners,
   ]);
   return vTx;
+}
+
+export class EmptyWallet implements Wallet {
+  constructor(readonly payer: Keypair) {}
+
+  async signTransaction<T extends Transaction | VersionedTransaction>(
+    tx: T,
+  ): Promise<T> {
+    return tx
+  }
+  async signAllTransactions<T extends Transaction | VersionedTransaction>(
+    txs: T[],
+  ): Promise<T[]> {
+    return txs
+  }
+
+  get publicKey(): PublicKey {
+    return this.payer.publicKey
+  }
 }
 
 ///
