@@ -1341,13 +1341,12 @@ export class MangoClient {
     mintPk: PublicKey,
     nativeAmount: BN,
     reduceOnly = false,
+    intoExisting = false,
   ): Promise<MangoSignatureStatus> {
     const bank = group.getFirstBankByMint(mintPk);
 
-    const tokenAccountPk = await getAssociatedTokenAddress(
-      mintPk,
-      mangoAccount.owner,
-    );
+    const walletPk = this.walletPk;
+    const tokenAccountPk = await getAssociatedTokenAddress(mintPk, walletPk);
 
     let wrappedSolAccount: PublicKey | undefined;
     let preInstructions: TransactionInstruction[] = [];
@@ -1355,9 +1354,9 @@ export class MangoClient {
     if (mintPk.equals(NATIVE_MINT)) {
       // Generate a random seed for wrappedSolAccount.
       const seed = Keypair.generate().publicKey.toBase58().slice(0, 32);
-      // Calculate a publicKey that will be controlled by the `mangoAccount.owner`.
+      // Calculate a publicKey that will be controlled by the current wallet.
       wrappedSolAccount = await PublicKey.createWithSeed(
-        mangoAccount.owner,
+        walletPk,
         seed,
         TOKEN_PROGRAM_ID,
       );
@@ -1366,8 +1365,8 @@ export class MangoClient {
 
       preInstructions = [
         SystemProgram.createAccountWithSeed({
-          fromPubkey: mangoAccount.owner,
-          basePubkey: mangoAccount.owner,
+          fromPubkey: walletPk,
+          basePubkey: walletPk,
           seed,
           newAccountPubkey: wrappedSolAccount,
           lamports: lamports.toNumber(),
@@ -1377,33 +1376,42 @@ export class MangoClient {
         createInitializeAccount3Instruction(
           wrappedSolAccount,
           NATIVE_MINT,
-          mangoAccount.owner,
+          walletPk,
         ),
       ];
       postInstructions = [
-        createCloseAccountInstruction(
-          wrappedSolAccount,
-          mangoAccount.owner,
-          mangoAccount.owner,
-        ),
+        createCloseAccountInstruction(wrappedSolAccount, walletPk, walletPk),
       ];
     }
 
     const healthRemainingAccounts: PublicKey[] =
       this.buildHealthRemainingAccounts(group, [mangoAccount], [bank], []);
 
-    const ix = await this.program.methods
-      .tokenDeposit(new BN(nativeAmount), reduceOnly)
-      .accounts({
-        group: group.publicKey,
-        account: mangoAccount.publicKey,
-        owner: mangoAccount.owner,
-        bank: bank.publicKey,
-        vault: bank.vault,
-        oracle: bank.oracle,
-        tokenAccount: wrappedSolAccount ?? tokenAccountPk,
-        tokenAuthority: mangoAccount.owner,
-      })
+    const sharedAccounts = {
+      group: group.publicKey,
+      account: mangoAccount.publicKey,
+      bank: bank.publicKey,
+      vault: bank.vault,
+      oracle: bank.oracle,
+      tokenAccount: wrappedSolAccount ?? tokenAccountPk,
+      tokenAuthority: walletPk,
+    };
+
+    let ixBase;
+    if (!intoExisting) {
+      ixBase = this.program.methods
+        .tokenDeposit(new BN(nativeAmount), reduceOnly)
+        .accounts({
+          owner: mangoAccount.owner,
+          ...sharedAccounts,
+        });
+    } else {
+      ixBase = this.program.methods
+        .tokenDepositIntoExisting(new BN(nativeAmount), reduceOnly)
+        .accounts(sharedAccounts);
+    }
+
+    const ix = await ixBase
       .remainingAccounts(
         healthRemainingAccounts.map(
           (pk) =>
