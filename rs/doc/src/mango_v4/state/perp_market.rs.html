@@ -526,6 +526,9 @@
 <a href="#526" id="526">526</a>
 <a href="#527" id="527">527</a>
 <a href="#528" id="528">528</a>
+<a href="#529" id="529">529</a>
+<a href="#530" id="530">530</a>
+<a href="#531" id="531">531</a>
 </pre><pre class="rust"><code><span class="kw">use </span>std::mem::size_of;
 
 <span class="kw">use </span>anchor_lang::prelude::<span class="kw-2">*</span>;
@@ -542,7 +545,10 @@
 <span class="kw">use </span><span class="kw">crate</span>::state::{oracle, TokenIndex};
 <span class="kw">use </span><span class="kw">crate</span>::util;
 
-<span class="kw">use super</span>::{orderbook, OracleConfig, OracleState, Orderbook, StablePriceModel, DAY_I80F48};
+<span class="kw">use super</span>::{
+    orderbook, OracleAccountInfos, OracleConfig, OracleState, Orderbook, StablePriceModel,
+    DAY_I80F48,
+};
 
 <span class="kw">pub type </span>PerpMarketIndex = u16;
 
@@ -789,21 +795,21 @@
         orderbook::new_node_key(side, price_data, <span class="self">self</span>.seq_num)
     }
 
-    <span class="kw">pub fn </span>oracle_price(
+    <span class="kw">pub fn </span>oracle_price&lt;T: KeyedAccountReader&gt;(
         <span class="kw-2">&amp;</span><span class="self">self</span>,
-        oracle_acc: <span class="kw-2">&amp;</span><span class="kw">impl </span>KeyedAccountReader,
+        oracle_acc_infos: <span class="kw-2">&amp;</span>OracleAccountInfos&lt;T&gt;,
         staleness_slot: <span class="prelude-ty">Option</span>&lt;u64&gt;,
     ) -&gt; <span class="prelude-ty">Result</span>&lt;I80F48&gt; {
-        <span class="prelude-val">Ok</span>(<span class="self">self</span>.oracle_state(oracle_acc, staleness_slot)<span class="question-mark">?</span>.price)
+        <span class="prelude-val">Ok</span>(<span class="self">self</span>.oracle_state(oracle_acc_infos, staleness_slot)<span class="question-mark">?</span>.price)
     }
 
-    <span class="kw">pub fn </span>oracle_state(
+    <span class="kw">pub fn </span>oracle_state&lt;T: KeyedAccountReader&gt;(
         <span class="kw-2">&amp;</span><span class="self">self</span>,
-        oracle_acc: <span class="kw-2">&amp;</span><span class="kw">impl </span>KeyedAccountReader,
+        oracle_acc_infos: <span class="kw-2">&amp;</span>OracleAccountInfos&lt;T&gt;,
         staleness_slot: <span class="prelude-ty">Option</span>&lt;u64&gt;,
     ) -&gt; <span class="prelude-ty">Result</span>&lt;OracleState&gt; {
-        <span class="macro">require_keys_eq!</span>(<span class="self">self</span>.oracle, <span class="kw-2">*</span>oracle_acc.key());
-        <span class="kw">let </span>state = oracle::oracle_state_unchecked(oracle_acc, <span class="self">self</span>.base_decimals)<span class="question-mark">?</span>;
+        <span class="macro">require_keys_eq!</span>(<span class="self">self</span>.oracle, <span class="kw-2">*</span>oracle_acc_infos.oracle.key());
+        <span class="kw">let </span>state = oracle::oracle_state_unchecked(oracle_acc_infos, <span class="self">self</span>.base_decimals)<span class="question-mark">?</span>;
         state
             .check_confidence_and_maybe_staleness(<span class="kw-2">&amp;</span><span class="self">self</span>.oracle_config, staleness_slot)
             .with_context(|| {

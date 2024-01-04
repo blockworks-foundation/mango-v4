@@ -1946,10 +1946,6 @@
 <a href="#1946" id="1946">1946</a>
 <a href="#1947" id="1947">1947</a>
 <a href="#1948" id="1948">1948</a>
-<a href="#1949" id="1949">1949</a>
-<a href="#1950" id="1950">1950</a>
-<a href="#1951" id="1951">1951</a>
-<a href="#1952" id="1952">1952</a>
 </pre><pre class="rust"><code><span class="kw">use </span>std::ops::Deref;
 <span class="kw">use </span>std::str::FromStr;
 <span class="kw">use </span>std::sync::Arc;
@@ -1970,8 +1966,8 @@
 <span class="kw">use </span>mango_v4::accounts_ix::{Serum3OrderType, Serum3SelfTradeBehavior, Serum3Side};
 <span class="kw">use </span>mango_v4::accounts_zerocopy::KeyedAccountSharedData;
 <span class="kw">use </span>mango_v4::state::{
-    Bank, Group, MangoAccountValue, PerpMarket, PerpMarketIndex, PlaceOrderType, SelfTradeBehavior,
-    Serum3MarketIndex, Side, TokenIndex, INSURANCE_TOKEN_INDEX,
+    Bank, Group, MangoAccountValue, OracleAccountInfos, PerpMarket, PerpMarketIndex,
+    PlaceOrderType, SelfTradeBehavior, Serum3MarketIndex, Side, TokenIndex, INSURANCE_TOKEN_INDEX,
 };
 
 <span class="kw">use </span>solana_address_lookup_table_program::state::AddressLookupTable;
@@ -2448,10 +2444,8 @@
             </span>.account_fetcher
             .fetch_raw_account(<span class="kw-2">&amp;</span>mint_info.oracle)
             .<span class="kw">await</span><span class="question-mark">?</span>;
-        <span class="kw">let </span>price = bank.oracle_price(
-            <span class="kw-2">&amp;</span>KeyedAccountSharedData::new(mint_info.oracle, oracle.into()),
-            <span class="prelude-val">None</span>,
-        )<span class="question-mark">?</span>;
+        <span class="kw">let </span>oracle_acc = <span class="kw-2">&amp;</span>KeyedAccountSharedData::new(mint_info.oracle, oracle.into());
+        <span class="kw">let </span>price = bank.oracle_price(<span class="kw-2">&amp;</span>OracleAccountInfos::from_reader(oracle_acc), <span class="prelude-val">None</span>)<span class="question-mark">?</span>;
         <span class="prelude-val">Ok</span>(price)
     }
 
@@ -2463,10 +2457,8 @@
         <span class="kw">let </span>perp_market: PerpMarket =
             account_fetcher_fetch_anchor_account(<span class="kw-2">&amp;*</span><span class="self">self</span>.account_fetcher, <span class="kw-2">&amp;</span>perp.address).<span class="kw">await</span><span class="question-mark">?</span>;
         <span class="kw">let </span>oracle = <span class="self">self</span>.account_fetcher.fetch_raw_account(<span class="kw-2">&amp;</span>perp.oracle).<span class="kw">await</span><span class="question-mark">?</span>;
-        <span class="kw">let </span>price = perp_market.oracle_price(
-            <span class="kw-2">&amp;</span>KeyedAccountSharedData::new(perp.oracle, oracle.into()),
-            <span class="prelude-val">None</span>,
-        )<span class="question-mark">?</span>;
+        <span class="kw">let </span>oracle_acc = <span class="kw-2">&amp;</span>KeyedAccountSharedData::new(perp.oracle, oracle.into());
+        <span class="kw">let </span>price = perp_market.oracle_price(<span class="kw-2">&amp;</span>OracleAccountInfos::from_reader(oracle_acc), <span class="prelude-val">None</span>)<span class="question-mark">?</span>;
         <span class="prelude-val">Ok</span>(price)
     }
 

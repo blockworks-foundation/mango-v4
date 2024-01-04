@@ -217,6 +217,7 @@
 <a href="#217" id="217">217</a>
 <a href="#218" id="218">218</a>
 <a href="#219" id="219">219</a>
+<a href="#220" id="220">220</a>
 </pre><pre class="rust"><code><span class="kw">use </span>std::sync::{Arc, RwLock};
 <span class="kw">use </span>std::thread;
 <span class="kw">use </span>std::time::{Duration, Instant};
@@ -227,7 +228,7 @@
 
 <span class="kw">use </span>fixed::types::I80F48;
 <span class="kw">use </span>mango_v4::accounts_zerocopy::{KeyedAccountSharedData, LoadZeroCopy};
-<span class="kw">use </span>mango_v4::state::{Bank, MangoAccount, MangoAccountValue};
+<span class="kw">use </span>mango_v4::state::{Bank, MangoAccount, MangoAccountValue, OracleAccountInfos};
 
 <span class="kw">use </span>anyhow::Context;
 
@@ -284,7 +285,8 @@
     <span class="kw">pub fn </span>fetch_bank_and_price(<span class="kw-2">&amp;</span><span class="self">self</span>, bank: <span class="kw-2">&amp;</span>Pubkey) -&gt; anyhow::Result&lt;(Bank, I80F48)&gt; {
         <span class="kw">let </span>bank: Bank = <span class="self">self</span>.fetch(bank)<span class="question-mark">?</span>;
         <span class="kw">let </span>oracle = <span class="self">self</span>.fetch_raw(<span class="kw-2">&amp;</span>bank.oracle)<span class="question-mark">?</span>;
-        <span class="kw">let </span>price = bank.oracle_price(<span class="kw-2">&amp;</span>KeyedAccountSharedData::new(bank.oracle, oracle), <span class="prelude-val">None</span>)<span class="question-mark">?</span>;
+        <span class="kw">let </span>oracle_acc = <span class="kw-2">&amp;</span>KeyedAccountSharedData::new(bank.oracle, oracle.into());
+        <span class="kw">let </span>price = bank.oracle_price(<span class="kw-2">&amp;</span>OracleAccountInfos::from_reader(oracle_acc), <span class="prelude-val">None</span>)<span class="question-mark">?</span>;
         <span class="prelude-val">Ok</span>((bank, price))
     }
 
