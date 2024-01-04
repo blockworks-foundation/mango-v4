@@ -1,8 +1,8 @@
 use itertools::Itertools;
 use mango_v4::accounts_zerocopy::KeyedAccountSharedData;
 use mango_v4::state::{
-    Bank, BookSide, MangoAccountValue, PerpMarket, PerpPosition, PlaceOrderType, Side, TokenIndex,
-    QUOTE_TOKEN_INDEX,
+    Bank, BookSide, MangoAccountValue, OracleAccountInfos, PerpMarket, PerpPosition,
+    PlaceOrderType, Side, TokenIndex, QUOTE_TOKEN_INDEX,
 };
 use mango_v4_client::{
     chain_data, jupiter, perp_pnl, MangoClient, PerpMarketContext, TokenContext,
@@ -442,7 +442,8 @@ impl Rebalancer {
             // send an ioc order to reduce the base position
             let oracle_account_data = self.account_fetcher.fetch_raw(&perp.oracle)?;
             let oracle_account = KeyedAccountSharedData::new(perp.oracle, oracle_account_data);
-            let oracle_price = perp_market.oracle_price(&oracle_account, None)?;
+            let oracle_price = perp_market
+                .oracle_price(&OracleAccountInfos::from_reader(&oracle_account), None)?;
             let oracle_price_lots = perp_market.native_price_to_lot(oracle_price);
             let (side, order_price, oo_lots) = if effective_lots > 0 {
                 (

@@ -13,8 +13,8 @@ use mango_feeds_lib::{
     OrderbookSide,
 };
 use mango_v4::accounts_zerocopy::{AccountReader, KeyedAccountReader};
-use mango_v4::state::oracle_state_unchecked;
 use mango_v4::state::OracleConfigParams;
+use mango_v4::state::{oracle_state_unchecked, OracleAccountInfos};
 use mango_v4::{
     serum3_cpi::OrderBookStateHeader,
     state::{BookSide, OrderTreeType},
@@ -368,9 +368,10 @@ pub async fn init(
                                 max_staleness_slots: None, // don't check oracle staleness to get an orderbook
                             };
 
-                            if let Ok(unchecked_oracle_state) =
-                                oracle_state_unchecked(&keyed_account, mkt.1.base_decimals)
-                            {
+                            if let Ok(unchecked_oracle_state) = oracle_state_unchecked(
+                                &OracleAccountInfos::from_reader(&keyed_account),
+                                mkt.1.base_decimals,
+                            ) {
                                 if unchecked_oracle_state
                                     .check_confidence_and_maybe_staleness(
                                         &oracle_config.to_oracle_config(),

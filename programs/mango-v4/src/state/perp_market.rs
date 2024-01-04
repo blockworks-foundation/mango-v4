@@ -14,7 +14,10 @@ use crate::state::orderbook::Side;
 use crate::state::{oracle, TokenIndex};
 use crate::util;
 
-use super::{orderbook, OracleConfig, OracleState, Orderbook, StablePriceModel, DAY_I80F48};
+use super::{
+    orderbook, OracleAccountInfos, OracleConfig, OracleState, Orderbook, StablePriceModel,
+    DAY_I80F48,
+};
 
 pub type PerpMarketIndex = u16;
 
@@ -261,21 +264,21 @@ impl PerpMarket {
         orderbook::new_node_key(side, price_data, self.seq_num)
     }
 
-    pub fn oracle_price(
+    pub fn oracle_price<T: KeyedAccountReader>(
         &self,
-        oracle_acc: &impl KeyedAccountReader,
+        oracle_acc_infos: &OracleAccountInfos<T>,
         staleness_slot: Option<u64>,
     ) -> Result<I80F48> {
-        Ok(self.oracle_state(oracle_acc, staleness_slot)?.price)
+        Ok(self.oracle_state(oracle_acc_infos, staleness_slot)?.price)
     }
 
-    pub fn oracle_state(
+    pub fn oracle_state<T: KeyedAccountReader>(
         &self,
-        oracle_acc: &impl KeyedAccountReader,
+        oracle_acc_infos: &OracleAccountInfos<T>,
         staleness_slot: Option<u64>,
     ) -> Result<OracleState> {
-        require_keys_eq!(self.oracle, *oracle_acc.key());
-        let state = oracle::oracle_state_unchecked(oracle_acc, self.base_decimals)?;
+        require_keys_eq!(self.oracle, *oracle_acc_infos.oracle.key());
+        let state = oracle::oracle_state_unchecked(oracle_acc_infos, self.base_decimals)?;
         state
             .check_confidence_and_maybe_staleness(&self.oracle_config, staleness_slot)
             .with_context(|| {

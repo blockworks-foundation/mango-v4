@@ -84,6 +84,9 @@ pub fn token_edit(
                 bank.fallback_oracle,
                 ctx.accounts.fallback_oracle.key()
             );
+            check_is_valid_fallback_oracle(&AccountInfoRef::borrow(
+                ctx.accounts.fallback_oracle.as_ref(),
+            )?)?;
             bank.fallback_oracle = ctx.accounts.fallback_oracle.key();
             mint_info.fallback_oracle = ctx.accounts.fallback_oracle.key();
             require_group_admin = true;
@@ -91,8 +94,9 @@ pub fn token_edit(
         if reset_stable_price {
             msg!("Stable price reset");
             require_keys_eq!(bank.oracle, ctx.accounts.oracle.key());
+            let oracle_ref = &AccountInfoRef::borrow(ctx.accounts.oracle.as_ref())?;
             let oracle_price =
-                bank.oracle_price(&AccountInfoRef::borrow(ctx.accounts.oracle.as_ref())?, None)?;
+                bank.oracle_price(&OracleAccountInfos::from_reader(oracle_ref), None)?;
             bank.stable_price_model.reset_to_price(
                 oracle_price.to_num(),
                 Clock::get()?.unix_timestamp.try_into().unwrap(),

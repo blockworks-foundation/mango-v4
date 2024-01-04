@@ -69,8 +69,9 @@ pub fn perp_liq_base_or_positive_pnl(
     let mut settle_bank = ctx.accounts.settle_bank.load_mut()?;
 
     // Get oracle price for market. Price is validated inside
+    let oracle_ref = &AccountInfoRef::borrow(ctx.accounts.oracle.as_ref())?;
     let oracle_price = perp_market.oracle_price(
-        &AccountInfoRef::borrow(ctx.accounts.oracle.as_ref())?,
+        &OracleAccountInfos::from_reader(oracle_ref),
         None, // checked in health
     )?;
 

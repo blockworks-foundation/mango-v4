@@ -90,8 +90,9 @@ impl<'a, 'info> DepositCommon<'a, 'info> {
 
         // Get the oracle price, even if stale or unconfident: We want to allow users
         // to deposit to close borrows or do other fixes even if the oracle is bad.
+        let oracle_ref = &AccountInfoRef::borrow(self.oracle.as_ref())?;
         let unsafe_oracle_state = oracle_state_unchecked(
-            &AccountInfoRef::borrow(self.oracle.as_ref())?,
+            &OracleAccountInfos::from_reader(oracle_ref),
             bank.mint_decimals,
         )?;
         let unsafe_oracle_price = unsafe_oracle_state.price;
@@ -194,10 +195,9 @@ pub fn token_deposit(ctx: Context<TokenDeposit>, amount: u64, reduce_only: bool)
             let now_slot = Clock::get()?.slot;
             let bank = ctx.accounts.bank.load()?;
 
-            let oracle_result = bank.oracle_price(
-                &AccountInfoRef::borrow(ctx.accounts.oracle.as_ref())?,
-                Some(now_slot),
-            );
+            let oracle_ref = &AccountInfoRef::borrow(ctx.accounts.oracle.as_ref())?;
+            let oracle_result =
+                bank.oracle_price(&OracleAccountInfos::from_reader(oracle_ref), Some(now_slot));
             if let Err(e) = oracle_result {
                 msg!("oracle must be valid when creating a new token position");
                 return Err(e);

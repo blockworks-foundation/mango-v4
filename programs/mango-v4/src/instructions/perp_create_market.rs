@@ -95,8 +95,9 @@ pub fn perp_create_market(
         reserved: [0; 1880],
     };
 
+    let oracle_ref = &AccountInfoRef::borrow(ctx.accounts.oracle.as_ref())?;
     if let Ok(oracle_price) =
-        perp_market.oracle_price(&AccountInfoRef::borrow(ctx.accounts.oracle.as_ref())?, None)
+        perp_market.oracle_price(&OracleAccountInfos::from_reader(oracle_ref), None)
     {
         perp_market
             .stable_price_model

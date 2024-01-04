@@ -73,8 +73,9 @@ pub fn token_withdraw(ctx: Context<TokenWithdraw>, amount: u64, allow_borrow: bo
 
     // Get the oracle price, even if stale or unconfident: We want to allow users
     // to withdraw deposits (while staying healthy otherwise) if the oracle is bad.
+    let oracle_ref = &AccountInfoRef::borrow(ctx.accounts.oracle.as_ref())?;
     let unsafe_oracle_state = oracle_state_unchecked(
-        &AccountInfoRef::borrow(ctx.accounts.oracle.as_ref())?,
+        &OracleAccountInfos::from_reader(oracle_ref),
         bank.mint_decimals,
     )?;
 

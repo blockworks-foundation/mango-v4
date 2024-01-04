@@ -106,9 +106,8 @@ pub fn token_register_trustless(
         deposit_limit: 0,
         reserved: [0; 1968],
     };
-
-    if let Ok(oracle_price) =
-        bank.oracle_price(&AccountInfoRef::borrow(ctx.accounts.oracle.as_ref())?, None)
+    let oracle_ref = &AccountInfoRef::borrow(ctx.accounts.oracle.as_ref())?;
+    if let Ok(oracle_price) = bank.oracle_price(&OracleAccountInfos::from_reader(oracle_ref), None)
     {
         bank.stable_price_model
             .reset_to_price(oracle_price.to_num(), now_ts);
@@ -117,6 +116,9 @@ pub fn token_register_trustless(
     }
 
     bank.verify()?;
+    check_is_valid_fallback_oracle(&AccountInfoRef::borrow(
+        ctx.accounts.fallback_oracle.as_ref(),
+    )?)?;
 
     let mut mint_info = ctx.accounts.mint_info.load_init()?;
     *mint_info = MintInfo {

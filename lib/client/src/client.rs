@@ -18,8 +18,8 @@ use itertools::Itertools;
 use mango_v4::accounts_ix::{Serum3OrderType, Serum3SelfTradeBehavior, Serum3Side};
 use mango_v4::accounts_zerocopy::KeyedAccountSharedData;
 use mango_v4::state::{
-    Bank, Group, MangoAccountValue, PerpMarket, PerpMarketIndex, PlaceOrderType, SelfTradeBehavior,
-    Serum3MarketIndex, Side, TokenIndex, INSURANCE_TOKEN_INDEX,
+    Bank, Group, MangoAccountValue, OracleAccountInfos, PerpMarket, PerpMarketIndex,
+    PlaceOrderType, SelfTradeBehavior, Serum3MarketIndex, Side, TokenIndex, INSURANCE_TOKEN_INDEX,
 };
 
 use solana_address_lookup_table_program::state::AddressLookupTable;
@@ -496,10 +496,8 @@ impl MangoClient {
             .account_fetcher
             .fetch_raw_account(&mint_info.oracle)
             .await?;
-        let price = bank.oracle_price(
-            &KeyedAccountSharedData::new(mint_info.oracle, oracle.into()),
-            None,
-        )?;
+        let oracle_acc = &KeyedAccountSharedData::new(mint_info.oracle, oracle.into());
+        let price = bank.oracle_price(&OracleAccountInfos::from_reader(oracle_acc), None)?;
         Ok(price)
     }
 
@@ -511,10 +509,8 @@ impl MangoClient {
         let perp_market: PerpMarket =
             account_fetcher_fetch_anchor_account(&*self.account_fetcher, &perp.address).await?;
         let oracle = self.account_fetcher.fetch_raw_account(&perp.oracle).await?;
-        let price = perp_market.oracle_price(
-            &KeyedAccountSharedData::new(perp.oracle, oracle.into()),
-            None,
-        )?;
+        let oracle_acc = &KeyedAccountSharedData::new(perp.oracle, oracle.into());
+        let price = perp_market.oracle_price(&OracleAccountInfos::from_reader(oracle_acc), None)?;
         Ok(price)
     }
 
