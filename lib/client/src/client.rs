@@ -84,6 +84,10 @@ pub struct Client {
 
     #[builder(default = "\"\".into()")]
     pub jupiter_token: String,
+    
+    /// Determines how fallback oracle accounts are provided to instructions. Defaults to Dynamic.
+    #[builder(default = "FallbackOracleConfig::Dynamic")]
+    pub fallback_oracle_config: FallbackOracleConfig,
 }
 
 impl ClientBuilder {
@@ -1755,6 +1759,23 @@ impl TransactionSize {
             accounts: MAX_ACCOUNTS_PER_TRANSACTION,
             length: solana_sdk::packet::PACKET_DATA_SIZE,
         }
+    }
+}
+
+#[derive(Clone, Debug)]
+pub enum FallbackOracleConfig {
+    /// No fallback oracles
+    None,
+    /// Only provided fallback oracles are used
+    Fixed(Vec<Pubkey>),
+    /// The account_fetcher checks for stale oracles and uses fallbacks only for stale oracles
+    Dynamic,
+    /// Every possible fallback oracle (may cause serious issues with the 64 accounts-per-tx limit)
+    All,
+}
+impl Default for FallbackOracleConfig {
+    fn default() -> Self {
+        FallbackOracleConfig::Dynamic
     }
 }
 

@@ -29,6 +29,8 @@ pub trait AccountFetcher: Sync + Send {
         program: &Pubkey,
         discriminator: [u8; 8],
     ) -> anyhow::Result<Vec<(Pubkey, AccountSharedData)>>;
+
+    fn rpc(&self) -> &RpcClientAsync;
 }
 
 // Can't be in the trait, since then it would no longer be object-safe...
@@ -99,6 +101,10 @@ impl AccountFetcher for RpcAccountFetcher {
             .into_iter()
             .map(|(pk, acc)| (pk, acc.into()))
             .collect::<Vec<_>>())
+    }
+
+    fn rpc(&self) -> &RpcClientAsync {
+        &self.rpc
     }
 }
 
@@ -260,5 +266,9 @@ impl<T: AccountFetcher + 'static> AccountFetcher for CachedAccountFetcher<T> {
                 err
             )),
         }
+    }
+
+    fn rpc(&self) -> &RpcClientAsync {
+        self.fetcher.rpc()
     }
 }

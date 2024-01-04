@@ -242,4 +242,8 @@ impl crate::AccountFetcher for AccountFetcher {
             })
             .collect::<Vec<_>>())
     }
+
+    fn rpc(&self) -> &RpcClientAsync {
+        &self.rpc
+    }
 }

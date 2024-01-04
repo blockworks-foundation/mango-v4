@@ -139,7 +139,7 @@ impl<T: KeyedAccountReader> FixedOrderAccountRetriever<T> {
         OracleAccountInfos {
             oracle,
             fallback_opt,
-            usd_opt: self.usd_oracle_index.map(|i| &self.ais[i]),
+            usdc_opt: self.usd_oracle_index.map(|i| &self.ais[i]),
             sol_opt: self.sol_oracle_index.map(|i| &self.ais[i]),
         }
     }
@@ -324,7 +324,7 @@ impl<'a, 'info> ScannedBanksAndOracles<'a, 'info> {
         OracleAccountInfos {
             oracle,
             fallback_opt,
-            usd_opt: self.usd_oracle_index.map(|i| &self.fallback_oracles[i]),
+            usdc_opt: self.usd_oracle_index.map(|i| &self.fallback_oracles[i]),
             sol_opt: self.sol_oracle_index.map(|i| &self.fallback_oracles[i]),
         }
     }

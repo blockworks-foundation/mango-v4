@@ -4,15 +4,19 @@ use anchor_client::ClientError;
 
 use anchor_lang::__private::bytemuck;
 
-use mango_v4::state::{
-    Group, MangoAccountValue, PerpMarketIndex, Serum3MarketIndex, TokenIndex, MAX_BANKS,
+use mango_v4::{
+    accounts_zerocopy::KeyedAccountReader,
+    state::{
+        oracle_state_unchecked, Group, MangoAccountValue, OracleAccountInfos, OracleConfig,
+        OracleConfigParams, PerpMarketIndex, Serum3MarketIndex, TokenIndex, MAX_BANKS,
+    },
 };
 
 use fixed::types::I80F48;
 use futures::{stream, StreamExt, TryStreamExt};
 use itertools::Itertools;
 
-use crate::gpa::*;
+use crate::{gpa::*, FallbackOracleConfig};
 
 use solana_client::nonblocking::rpc_client::RpcClient as RpcClientAsync;
 use solana_sdk::account::Account;
@@ -31,6 +35,7 @@ pub struct TokenContext {
     pub fallback_oracle: Pubkey,
     pub mint_info_address: Pubkey,
     pub decimals: u8,
+    pub oracle_config: OracleConfig,
 }
 
 impl TokenContext {
@@ -227,8 +232,9 @@ impl MangoGroupContext {
                         decimals: u8::MAX,
                         banks: mi.banks,
                         vaults: mi.vaults,
-                        fallback_oracle: mi.fallback_oracle,
                         oracle: mi.oracle,
+                        fallback_oracle: mi.fallback_oracle,
+                        oracle_config: OracleConfigParams::default().to_oracle_config(),
                         group: mi.group,
                         mint: mi.mint,
                     },
@@ -236,7 +242,7 @@ impl MangoGroupContext {
             })
             .collect::<HashMap<_, _>>();
 
-        // reading the banks is only needed for the token names and decimals
+        // reading the banks is only needed for the token names, decimals and oracle configs
         // FUTURE: either store the names on MintInfo as well, or maybe don't store them at all
         //         because they are in metaplex?
         let bank_tuples = fetch_banks(rpc, program, group).await?;
@@ -244,6 +250,7 @@ impl MangoGroupContext {
             let token = tokens.get_mut(&bank.token_index).unwrap();
             token.name = bank.name().into();
             token.decimals = bank.mint_decimals;
+            token.oracle_config = bank.oracle_config
         }
         assert!(tokens.values().all(|t| t.decimals != u8::MAX));
 
@@ -553,6 +560,48 @@ impl MangoGroupContext {
     pub async fn new_perp_markets_listed(&self, rpc: &RpcClientAsync) -> anyhow::Result<bool> {
         let new_perp_markets = fetch_perp_markets(rpc, mango_v4::id(), self.group).await?;
         Ok(new_perp_markets.len() > self.perp_markets.len())
+    }
+
+    pub async fn derive_fallback_oracle_keys(
+        &self,
+        rpc: &RpcClientAsync,
+        fallback_oracle_config: &FallbackOracleConfig,
+    ) -> anyhow::Result<Vec<Pubkey>> {
+        let fallbacks = match fallback_oracle_config {
+            FallbackOracleConfig::None => vec![],
+            FallbackOracleConfig::Fixed(keys) => keys.clone(),
+            FallbackOracleConfig::Dynamic => {
+                let tokens_by_oracle: HashMap<Pubkey, &TokenContext> =
+                    self.tokens.iter().map(|t| (t.1.oracle, t.1)).collect();
+                let oracle_keys: Vec<Pubkey> =
+                    tokens_by_oracle.values().map(|b| b.oracle).collect();
+                let oracle_accounts = fetch_multiple_accounts(rpc, &oracle_keys).await?;
+                let now_slot = rpc.get_slot().await?;
+
+                let mut fallbacks = vec![];
+                for acc in oracle_accounts {
+                    let token = tokens_by_oracle.get(acc.key()).unwrap();
+                    let state = oracle_state_unchecked(
+                        &OracleAccountInfos::from_reader(&acc),
+                        token.decimals,
+                    )?;
+                    let oracle_is_valid = state
+                        .check_confidence_and_maybe_staleness(&token.oracle_config, Some(now_slot));
+                    if oracle_is_valid.is_err() {
+                        fallbacks.push(acc.key)
+                    }
+                }
+                fallbacks
+            }
+            FallbackOracleConfig::All => self
+                .tokens
+                .iter()
+                .filter(|t| t.1.fallback_oracle != Pubkey::default())
+                .map(|t| t.1.fallback_oracle)
+                .collect(),
+        };
+
+        Ok(fallbacks)
     }
 }
 

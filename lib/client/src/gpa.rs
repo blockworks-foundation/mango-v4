@@ -1,5 +1,6 @@
 use anchor_lang::{AccountDeserialize, Discriminator};
 
+use mango_v4::accounts_zerocopy::KeyedAccountSharedData;
 use mango_v4::state::{Bank, MangoAccount, MangoAccountValue, MintInfo, PerpMarket, Serum3Market};
 
 use solana_account_decoder::UiAccountEncoding;
@@ -128,4 +129,23 @@ pub async fn fetch_perp_markets(
         ))],
     )
     .await
+}
+
+pub async fn fetch_multiple_accounts(
+    rpc: &RpcClientAsync,
+    keys: &[Pubkey],
+) -> anyhow::Result<Vec<KeyedAccountSharedData>> {
+    let config = RpcAccountInfoConfig {
+        encoding: Some(UiAccountEncoding::Base64),
+        ..RpcAccountInfoConfig::default()
+    };
+    Ok(rpc
+        .get_multiple_accounts_with_config(keys, config)
+        .await?
+        .value
+        .into_iter()
+        .zip(keys.iter())
+        .filter(|(maybe_acc, _)| maybe_acc.is_some())
+        .map(|(acc, key)| KeyedAccountSharedData::new(*key, acc.unwrap().into()))
+        .collect())
 }
