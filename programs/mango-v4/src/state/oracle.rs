@@ -278,7 +278,7 @@ fn get_pyth_state(
 pub struct OracleAccountInfos<'a, T: KeyedAccountReader> {
     pub oracle: &'a T,
     pub fallback_opt: Option<&'a T>,
-    pub usd_opt: Option<&'a T>,
+    pub usdc_opt: Option<&'a T>,
     pub sol_opt: Option<&'a T>,
 }
 
@@ -287,7 +287,7 @@ impl<'a, T: KeyedAccountReader> OracleAccountInfos<'a, T> {
         OracleAccountInfos {
             oracle: acc_reader,
             fallback_opt: None,
-            usd_opt: None,
+            usdc_opt: None,
             sol_opt: None,
         }
     }
@@ -441,7 +441,7 @@ fn quote_state_unchecked<T: KeyedAccountReader>(
 ) -> Result<OracleState> {
     if quote_mint == &usdc_mint_mainnet::ID {
         let usd_feed = acc_infos
-            .usd_opt
+            .usdc_opt
             .ok_or_else(|| error!(MangoError::MissingFeedForCLMMOracle))?;
         let usd_state = get_pyth_state(usd_feed, QUOTE_DECIMALS as u8)?;
         return Ok(usd_state);
@@ -590,13 +590,13 @@ mod tests {
         let usdc_ais = OracleAccountInfos {
             oracle: usdc_ai,
             fallback_opt: None,
-            usd_opt: None,
+            usdc_opt: None,
             sol_opt: None,
         };
         let orca_ais = OracleAccountInfos {
             oracle: ai,
             fallback_opt: None,
-            usd_opt: Some(usdc_ai),
+            usdc_opt: Some(usdc_ai),
             sol_opt: None,
         };
         let usdc = oracle_state_unchecked(&usdc_ais, usdc_decimals).unwrap();
@@ -635,7 +635,7 @@ mod tests {
             let oracle_infos = OracleAccountInfos {
                 oracle: ai,
                 fallback_opt: None,
-                usd_opt: None,
+                usdc_opt: None,
                 sol_opt: None,
             };
             assert!(oracle_state_unchecked(&oracle_infos, base_decimals)
