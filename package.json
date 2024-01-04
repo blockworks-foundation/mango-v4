@@ -27,7 +27,8 @@
     "lint": "eslint ./ts/client/src --ext ts --ext tsx --ext js --quiet",
     "typecheck": "tsc --noEmit --pretty",
     "prepublishOnly": "yarn validate && yarn build",
-    "validate": "yarn lint && yarn format"
+    "validate": "yarn lint && yarn format",
+    "prepare": "yarn build"
   },
   "devDependencies": {
     "@solana/spl-governance": "^0.3.25",
