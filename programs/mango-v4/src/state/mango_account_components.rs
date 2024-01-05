@@ -237,11 +237,11 @@ pub struct OpenbookV2Orders {
     pub quote_deposits_reserved: u64,
 
     #[derivative(Debug = "ignore")]
-    pub reserved: [u8; 32],
+    pub reserved: [u8; 192],
 }
 const_assert_eq!(
     size_of::<OpenbookV2Orders>(),
-    32 + 8 * 2 + 2 * 3 + 2 + 4 * 8 + 32
+    32 + 8 * 2 + 2 * 3 + 2 + 4 * 8 + 192
 );
 const_assert_eq!(size_of::<OpenbookV2Orders>(), 120);
 const_assert_eq!(size_of::<OpenbookV2Orders>() % 8, 0);
