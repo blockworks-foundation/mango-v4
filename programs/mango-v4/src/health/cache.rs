@@ -187,7 +187,7 @@ pub struct TokenBalance {
 
 #[derive(Clone, Default)]
 pub struct TokenMaxReserved {
-    /// The sum of serum-reserved amounts over all markets
+    /// The sum of reserved amounts over all serum3 and openbookV2 markets
     pub max_spot_reserved: I80F48,
 }
 
