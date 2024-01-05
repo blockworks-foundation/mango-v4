@@ -1366,7 +1366,7 @@ export class Serum3Orders {
 }
 
 export class OpenbookV2Orders {
-  static OopenbookV2MarketIndexUnset = 65535;
+  static OpenbookV2MarketIndexUnset = 65535;
   static from(dto: OpenbookV2PositionDto): Serum3Orders {
     return new OpenbookV2Orders(
       dto.openOrders,

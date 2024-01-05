@@ -39,6 +39,7 @@ import { Bank, MintInfo, TokenIndex } from './accounts/bank';
 import { Group } from './accounts/group';
 import {
   MangoAccount,
+  OpenbookV2Orders,
   PerpPosition,
   Serum3Orders,
   TokenConditionalSwap,
@@ -94,7 +95,7 @@ import {
 } from './utils';
 import { MangoSignatureStatus, sendTransaction } from './utils/rpc';
 import { NATIVE_MINT, TOKEN_PROGRAM_ID } from './utils/spl';
-import { OpenbookV2Market } from './accounts/openbookV2';
+import { OpenbookV2Market, OpenbookV2OrderType, OpenbookV2SelfTradeBehavior, OpenbookV2Side, baseSizeNumberToLots, generateOpenbookV2MarketExternalVaultSignerAddress, priceNumberToLots } from './accounts/openbookV2';
 import { OpenBookV2Client } from '@openbook-dex/openbook-v2';
 
 export const DEFAULT_TOKEN_CONDITIONAL_SWAP_COUNT = 8;
@@ -2510,449 +2511,450 @@ export class MangoClient {
       .instruction();
   }
 
-  // public async openbookV2CloseOpenOrders(
-  //   group: Group,
-  //   mangoAccount: MangoAccount,
-  //   externalMarketPk: PublicKey,
-  // ): Promise<MangoSignatureStatus> {
-  //   const ix = await this.openbookV2CloseOpenOrdersIx(
-  //     group,
-  //     mangoAccount,
-  //     externalMarketPk,
-  //   );
+  public async openbookV2CloseOpenOrders(
+    group: Group,
+    mangoAccount: MangoAccount,
+    externalMarketPk: PublicKey,
+  ): Promise<MangoSignatureStatus> {
+    const ix = await this.openbookV2CloseOpenOrdersIx(
+      group,
+      mangoAccount,
+      externalMarketPk,
+    );
 
-  //   return await sendTransaction(
-  //     this.program.provider as AnchorProvider,
-  //     [ix],
-  //     group.addressLookupTablesList,
-  //     {
-  //       postSendTxCallback: this.postSendTxCallback,
-  //     },
-  //   );
-  // }
+    return await sendTransaction(
+      this.program.provider as AnchorProvider,
+      [ix],
+      group.addressLookupTablesList,
+      {
+        postSendTxCallback: this.postSendTxCallback,
+      },
+    );
+  }
 
-  // public async openbookV2LiqForceCancelOrders(
-  //   group: Group,
-  //   mangoAccount: MangoAccount,
-  //   externalMarketPk: PublicKey,
-  //   limit?: number,
-  // ): Promise<MangoSignatureStatus> {
-  //   const openbookV2Market = group.openbookV2MarketsMapByExternal.get(
-  //     externalMarketPk.toBase58(),
-  //   )!;
-  //   const openbookV2MarketExternal = group.openbookV2ExternalMarketsMap.get(
-  //     externalMarketPk.toBase58(),
-  //   )!;
-  //   const openOrders = await openbookV2Market.findOoPda(
-  //     this.programId,
-  //     mangoAccount.publicKey,
-  //   );
+  public async openbookV2LiqForceCancelOrders(
+    group: Group,
+    mangoAccount: MangoAccount,
+    externalMarketPk: PublicKey,
+    limit?: number,
+  ): Promise<MangoSignatureStatus> {
+    const openbookV2Market = group.openbookV2MarketsMapByExternal.get(
+      externalMarketPk.toBase58(),
+    )!;
+    const openbookV2MarketExternal = group.openbookV2ExternalMarketsMap.get(
+      externalMarketPk.toBase58(),
+    )!;
+    const openOrders = await openbookV2Market.findOoPda(
+      this.programId,
+      mangoAccount.publicKey,
+    );
 
-  //   const healthRemainingAccounts: PublicKey[] =
-  //     this.buildHealthRemainingAccounts(
-  //       group,
-  //       [mangoAccount],
-  //       [],
-  //       [],
-  //       [[openbookV2Market, openOrders]],
-  //     );
+    const healthRemainingAccounts: PublicKey[] =
+      this.buildHealthRemainingAccounts(
+        group,
+        [mangoAccount],
+        [],
+        [],
+        [],
+        [[openbookV2Market, openOrders]],
+      );
 
-  //   const ix = await this.program.methods
-  //     .openbookV2LiqForceCancelOrders(limit ?? 10)
-  //     .accounts({
-  //       group: group.publicKey,
-  //       account: mangoAccount.publicKey,
-  //       openOrders,
-  //       serumMarket: openbookV2Market.publicKey,
-  //       serumProgram: OPENBOOK_PROGRAM_ID[this.cluster],
-  //       serumMarketExternal: openbookV2Market.serumMarketExternal,
-  //       marketBids: openbookV2MarketExternal.bidsAddress,
-  //       marketAsks: openbookV2MarketExternal.asksAddress,
-  //       marketEventQueue: openbookV2MarketExternal.decoded.eventQueue,
-  //       marketBaseVault: openbookV2MarketExternal.decoded.baseVault,
-  //       marketQuoteVault: openbookV2MarketExternal.decoded.quoteVault,
-  //       marketVaultSigner: await generateSerum3MarketExternalVaultSignerAddress(
-  //         this.cluster,
-  //         openbookV2Market,
-  //         openbookV2MarketExternal,
-  //       ),
-  //       quoteBank: group.getFirstBankByTokenIndex(openbookV2Market.quoteTokenIndex)
-  //         .publicKey,
-  //       quoteVault: group.getFirstBankByTokenIndex(openbookV2Market.quoteTokenIndex)
-  //         .vault,
-  //       baseBank: group.getFirstBankByTokenIndex(openbookV2Market.baseTokenIndex)
-  //         .publicKey,
-  //       baseVault: group.getFirstBankByTokenIndex(openbookV2Market.baseTokenIndex)
-  //         .vault,
-  //     })
-  //     .remainingAccounts(
-  //       healthRemainingAccounts.map(
-  //         (pk) =>
-  //           ({ pubkey: pk, isWritable: false, isSigner: false } as AccountMeta),
-  //       ),
-  //     )
-  //     .instruction();
+    const ix = await this.program.methods
+      .openbookV2LiqForceCancelOrders(limit ?? 10)
+      .accounts({
+        group: group.publicKey,
+        account: mangoAccount.publicKey,
+        openOrders,
+        openbookV2Market: openbookV2Market.publicKey,
+        openbookV2Program: OPENBOOK_PROGRAM_ID[this.cluster],
+        openbookV2MarketExternal: openbookV2Market.openbookMarketExternal,
+        bids: openbookV2MarketExternal.bids,
+        asks: openbookV2MarketExternal.asks,
+        eventHeap: openbookV2MarketExternal.eventHeap,
+        marketBaseVault: openbookV2MarketExternal.marketBaseVault,
+        marketQuoteVault: openbookV2MarketExternal.marketQuoteVault,
+        marketVaultSigner: await generateOpenbookV2MarketExternalVaultSignerAddress(
+          this.cluster,
+          openbookV2Market,
+          openbookV2MarketExternal,
+        ),
+        quoteBank: group.getFirstBankByTokenIndex(openbookV2Market.quoteTokenIndex)
+          .publicKey,
+        quoteVault: group.getFirstBankByTokenIndex(openbookV2Market.quoteTokenIndex)
+          .vault,
+        baseBank: group.getFirstBankByTokenIndex(openbookV2Market.baseTokenIndex)
+          .publicKey,
+        baseVault: group.getFirstBankByTokenIndex(openbookV2Market.baseTokenIndex)
+          .vault,
+      })
+      .remainingAccounts(
+        healthRemainingAccounts.map(
+          (pk) =>
+            ({ pubkey: pk, isWritable: false, isSigner: false } as AccountMeta),
+        ),
+      )
+      .instruction();
 
-  //   return await this.sendAndConfirmTransactionForGroup(group, [ix]);
-  // }
+    return await this.sendAndConfirmTransactionForGroup(group, [ix]);
+  }
 
-  // public async openbookV2PlaceOrderIx(
-  //   group: Group,
-  //   mangoAccount: MangoAccount,
-  //   externalMarketPk: PublicKey,
-  //   side: Serum3Side,
-  //   price: number,
-  //   size: number,
-  //   selfTradeBehavior: Serum3SelfTradeBehavior,
-  //   orderType: Serum3OrderType,
-  //   clientOrderId: number,
-  //   limit: number,
-  // ): Promise<TransactionInstruction[]> {
-  //   const ixs: TransactionInstruction[] = [];
-  //   const openbookV2Market = group.openbookV2MarketsMapByExternal.get(
-  //     externalMarketPk.toBase58(),
-  //   )!;
+  public async openbookV2PlaceOrderIx(
+    group: Group,
+    mangoAccount: MangoAccount,
+    externalMarketPk: PublicKey,
+    side: OpenbookV2Side,
+    price: number,
+    size: number,
+    selfTradeBehavior: OpenbookV2SelfTradeBehavior,
+    orderType: OpenbookV2OrderType,
+    clientOrderId: number,
+    limit: number,
+  ): Promise<TransactionInstruction[]> {
+    const ixs: TransactionInstruction[] = [];
+    const openbookV2Market = group.openbookV2MarketsMapByExternal.get(
+      externalMarketPk.toBase58(),
+    )!;
 
-  //   let openOrderPk: PublicKey | undefined = undefined;
-  //   const banks: Bank[] = [];
-  //   const openOrdersForMarket: [OpenbookV2Market, PublicKey][] = [];
-  //   if (!mangoAccount.getOpenbookV2Account(openbookV2Market.marketIndex)) {
-  //     const ix = await this.openbookV2CreateOpenOrdersIx(
-  //       group,
-  //       mangoAccount,
-  //       openbookV2Market.openbookMarketExternal,
-  //     );
-  //     ixs.push(ix);
-  //     openOrderPk = await openbookV2Market.findOoPda(
-  //       this.program.programId,
-  //       mangoAccount.publicKey,
-  //     );
-  //     openOrdersForMarket.push([openbookV2Market, openOrderPk]);
-  //     const baseTokenIndex = openbookV2Market.baseTokenIndex;
-  //     const quoteTokenIndex = openbookV2Market.quoteTokenIndex;
-  //     // only include banks if no deposit has been previously made for same token
-  //     banks.push(group.getFirstBankByTokenIndex(quoteTokenIndex));
-  //     banks.push(group.getFirstBankByTokenIndex(baseTokenIndex));
-  //   }
+    let openOrderPk: PublicKey | undefined = undefined;
+    const banks: Bank[] = [];
+    const openOrdersForMarket: [OpenbookV2Market, PublicKey][] = [];
+    if (!mangoAccount.getOpenbookV2Account(openbookV2Market.marketIndex)) {
+      const ix = await this.openbookV2CreateOpenOrdersIx(
+        group,
+        mangoAccount,
+        openbookV2Market.openbookMarketExternal,
+      );
+      ixs.push(ix);
+      openOrderPk = await openbookV2Market.findOoPda(
+        this.program.programId,
+        mangoAccount.publicKey,
+      );
+      openOrdersForMarket.push([openbookV2Market, openOrderPk]);
+      const baseTokenIndex = openbookV2Market.baseTokenIndex;
+      const quoteTokenIndex = openbookV2Market.quoteTokenIndex;
+      // only include banks if no deposit has been previously made for same token
+      banks.push(group.getFirstBankByTokenIndex(quoteTokenIndex));
+      banks.push(group.getFirstBankByTokenIndex(baseTokenIndex));
+    }
 
-  //   const healthRemainingAccounts: PublicKey[] =
-  //     this.buildHealthRemainingAccounts(
-  //       group,
-  //       [mangoAccount],
-  //       banks,
-  //       [],
-  //       openOrdersForMarket,
-  //     );
+    const healthRemainingAccounts: PublicKey[] =
+      this.buildHealthRemainingAccounts(
+        group,
+        [mangoAccount],
+        banks,
+        [],
+        [],
+        openOrdersForMarket,
+      );
 
-  //   const openbookV2MarketExternal = group.openbookV2ExternalMarketsMap.get(
-  //     externalMarketPk.toBase58(),
-  //   )!;
-  //   const openbookV2MarketExternalVaultSigner =
-  //     await generateOpenbookV2MarketExternalVaultSignerAddress(
-  //       this.cluster,
-  //       openbookV2Market,
-  //       openbookV2MarketExternal,
-  //     );
+    const openbookV2MarketExternal = group.openbookV2ExternalMarketsMap.get(
+      externalMarketPk.toBase58(),
+    )!;
+    const openbookV2MarketExternalVaultSigner =
+      await generateOpenbookV2MarketExternalVaultSignerAddress(
+        this.cluster,
+        openbookV2Market,
+        openbookV2MarketExternal,
+      );
 
-  //   const limitPrice = openbookV2MarketExternal.priceNumberToLots(price);
-  //   const maxBaseQuantity = openbookV2MarketExternal.baseSizeNumberToLots(size);
-  //   const isTaker = orderType !== Serum3OrderType.postOnly;
-  //   const maxQuoteQuantity = new BN(
-  //     Math.ceil(
-  //       openbookV2MarketExternal.decoded.quoteLotSize.toNumber() *
-  //         (1 + Math.max(openbookV2Market.getFeeRates(isTaker), 0)) *
-  //         openbookV2MarketExternal.baseSizeNumberToLots(size).toNumber() *
-  //         openbookV2MarketExternal.priceNumberToLots(price).toNumber(),
-  //     ),
-  //   );
+    const limitPrice = priceNumberToLots(price, openbookV2MarketExternal);
+    const maxBaseQuantity = baseSizeNumberToLots(size, openbookV2MarketExternal);
+    const isTaker = orderType !== OpenbookV2OrderType.postOnly;
+    const maxQuoteQuantity = new BN(
+      Math.ceil(
+        openbookV2MarketExternal.quoteLotSize.toNumber() *
+          (1 + Math.max(openbookV2Market.getFeeRates(isTaker), 0)) *
+          baseSizeNumberToLots(size, openbookV2MarketExternal).toNumber() *
+          priceNumberToLots(price, openbookV2MarketExternal).toNumber(),
+      ),
+    );
 
-  //   const payerTokenIndex = ((): TokenIndex => {
-  //     if (side == Serum3Side.bid) {
-  //       return openbookV2Market.quoteTokenIndex;
-  //     } else {
-  //       return openbookV2Market.baseTokenIndex;
-  //     }
-  //   })();
+    const payerTokenIndex = ((): TokenIndex => {
+      if (side == OpenbookV2Side.bid) {
+        return openbookV2Market.quoteTokenIndex;
+      } else {
+        return openbookV2Market.baseTokenIndex;
+      }
+    })();
 
-  //   const payerBank = group.getFirstBankByTokenIndex(payerTokenIndex);
-  //   const ix = await this.program.methods
-  //     .openbookV2PlaceOrder(
-  //       side,
-  //       limitPrice,
-  //       maxBaseQuantity,
-  //       maxQuoteQuantity,
-  //       selfTradeBehavior,
-  //       orderType,
-  //       new BN(clientOrderId),
-  //       limit,
-  //     )
-  //     .accounts({
-  //       group: group.publicKey,
-  //       account: mangoAccount.publicKey,
-  //       owner: (this.program.provider as AnchorProvider).wallet.publicKey,
-  //       openOrders:
-  //         openOrderPk ||
-  //         mangoAccount.getSerum3Account(openbookV2Market.marketIndex)?.openOrders,
-  //       serumMarket: openbookV2Market.publicKey,
-  //       serumProgram: OPENBOOK_PROGRAM_ID[this.cluster],
-  //       serumMarketExternal: openbookV2Market.serumMarketExternal,
-  //       marketBids: openbookV2MarketExternal.bidsAddress,
-  //       marketAsks: openbookV2MarketExternal.asksAddress,
-  //       marketEventQueue: openbookV2MarketExternal.decoded.eventQueue,
-  //       marketRequestQueue: openbookV2MarketExternal.decoded.requestQueue,
-  //       marketBaseVault: openbookV2MarketExternal.decoded.baseVault,
-  //       marketQuoteVault: openbookV2MarketExternal.decoded.quoteVault,
-  //       marketVaultSigner: openbookV2MarketExternalVaultSigner,
-  //       payerBank: payerBank.publicKey,
-  //       payerVault: payerBank.vault,
-  //       payerOracle: payerBank.oracle,
-  //     })
-  //     .remainingAccounts(
-  //       healthRemainingAccounts.map(
-  //         (pk) =>
-  //           ({ pubkey: pk, isWritable: false, isSigner: false } as AccountMeta),
-  //       ),
-  //     )
-  //     .instruction();
+    const payerBank = group.getFirstBankByTokenIndex(payerTokenIndex);
+    const ix = await this.program.methods
+      .openbookV2PlaceOrder(
+        side,
+        limitPrice,
+        maxBaseQuantity,
+        maxQuoteQuantity,
+        new BN(clientOrderId),
+        orderType,
+        false, // reduceOnly
+        new BN(0), // expiryTimestamp
+        limit,
+      )
+      .accounts({
+        group: group.publicKey,
+        account: mangoAccount.publicKey,
+        authority: (this.program.provider as AnchorProvider).wallet.publicKey,
+        openOrders:
+          openOrderPk ||
+          mangoAccount.getOpenbookV2Account(openbookV2Market.marketIndex)?.openOrders,
+        openbookV2Market: openbookV2Market.publicKey,
+        openbookV2Program: OPENBOOK_PROGRAM_ID[this.cluster],
+        openbookV2MarketExternal: openbookV2Market.openbookMarketExternal,
+        bids: openbookV2MarketExternal.bids,
+        asks: openbookV2MarketExternal.asks,
+        eventHeap: openbookV2MarketExternal.eventHeap,
+        marketVault: side == OpenbookV2Side.bid ? openbookV2MarketExternal.marketQuoteVault : openbookV2MarketExternal.marketBaseVault,
+        marketVaultSigner: openbookV2MarketExternalVaultSigner,
+        bank: payerBank.publicKey,
+        vault: payerBank.vault,
+        oracle: payerBank.oracle,
+      })
+      .remainingAccounts(
+        healthRemainingAccounts.map(
+          (pk) =>
+            ({ pubkey: pk, isWritable: false, isSigner: false } as AccountMeta),
+        ),
+      )
+      .instruction();
 
-  //   ixs.push(ix);
+    ixs.push(ix);
 
-  //   return ixs;
-  // }
+    return ixs;
+  }
 
-  // public async openbookV2PlaceOrder(
-  //   group: Group,
-  //   mangoAccount: MangoAccount,
-  //   externalMarketPk: PublicKey,
-  //   side: Serum3Side,
-  //   price: number,
-  //   size: number,
-  //   selfTradeBehavior: Serum3SelfTradeBehavior,
-  //   orderType: Serum3OrderType,
-  //   clientOrderId: number,
-  //   limit: number,
-  // ): Promise<MangoSignatureStatus> {
-  //   const placeOrderIxs = await this.openbookV2PlaceOrderIx(
-  //     group,
-  //     mangoAccount,
-  //     externalMarketPk,
-  //     side,
-  //     price,
-  //     size,
-  //     selfTradeBehavior,
-  //     orderType,
-  //     clientOrderId,
-  //     limit,
-  //   );
+  public async openbookV2PlaceOrder(
+    group: Group,
+    mangoAccount: MangoAccount,
+    externalMarketPk: PublicKey,
+    side: Serum3Side,
+    price: number,
+    size: number,
+    selfTradeBehavior: Serum3SelfTradeBehavior,
+    orderType: Serum3OrderType,
+    clientOrderId: number,
+    limit: number,
+  ): Promise<MangoSignatureStatus> {
+    const placeOrderIxs = await this.openbookV2PlaceOrderIx(
+      group,
+      mangoAccount,
+      externalMarketPk,
+      side,
+      price,
+      size,
+      selfTradeBehavior,
+      orderType,
+      clientOrderId,
+      limit,
+    );
 
-  //   const settleIx = await this.openbookV2SettleFundsIx(
-  //     group,
-  //     mangoAccount,
-  //     externalMarketPk,
-  //   );
+    const settleIx = await this.openbookV2SettleFundsIx(
+      group,
+      mangoAccount,
+      externalMarketPk,
+    );
 
-  //   const ixs = [...placeOrderIxs, settleIx];
+    const ixs = [...placeOrderIxs, settleIx];
 
-  //   return await this.sendAndConfirmTransactionForGroup(group, ixs);
-  // }
+    return await this.sendAndConfirmTransactionForGroup(group, ixs);
+  }
 
-  // public async openbookV2CancelAllOrdersIx(
-  //   group: Group,
-  //   mangoAccount: MangoAccount,
-  //   externalMarketPk: PublicKey,
-  //   limit?: number,
-  // ): Promise<TransactionInstruction> {
-  //   const openbookV2Market = group.openbookV2MarketsMapByExternal.get(
-  //     externalMarketPk.toBase58(),
-  //   )!;
+  public async openbookV2CancelAllOrdersIx(
+    group: Group,
+    mangoAccount: MangoAccount,
+    externalMarketPk: PublicKey,
+    limit?: number,
+  ): Promise<TransactionInstruction> {
+    const openbookV2Market = group.openbookV2MarketsMapByExternal.get(
+      externalMarketPk.toBase58(),
+    )!;
 
-  //   const openbookV2MarketExternal = group.openbookV2ExternalMarketsMap.get(
-  //     externalMarketPk.toBase58(),
-  //   )!;
+    const openbookV2MarketExternal = group.openbookV2ExternalMarketsMap.get(
+      externalMarketPk.toBase58(),
+    )!;
 
-  //   return await this.program.methods
-  //     .openbookV2CancelAllOrders(limit ? limit : 10)
-  //     .accounts({
-  //       group: group.publicKey,
-  //       account: mangoAccount.publicKey,
-  //       owner: (this.program.provider as AnchorProvider).wallet.publicKey,
-  //       openOrders: await openbookV2Market.findOoPda(
-  //         this.programId,
-  //         mangoAccount.publicKey,
-  //       ),
-  //       serumMarket: openbookV2Market.publicKey,
-  //       serumProgram: OPENBOOK_PROGRAM_ID[this.cluster],
-  //       serumMarketExternal: openbookV2Market.serumMarketExternal,
-  //       marketBids: openbookV2MarketExternal.bidsAddress,
-  //       marketAsks: openbookV2MarketExternal.asksAddress,
-  //       marketEventQueue: openbookV2MarketExternal.decoded.eventQueue,
-  //     })
-  //     .instruction();
-  // }
+    return await this.program.methods
+      .openbookV2CancelAllOrders(limit ? limit : 10)
+      .accounts({
+        group: group.publicKey,
+        account: mangoAccount.publicKey,
+        owner: (this.program.provider as AnchorProvider).wallet.publicKey,
+        openOrders: await openbookV2Market.findOoPda(
+          this.programId,
+          mangoAccount.publicKey,
+        ),
+        serumMarket: openbookV2Market.publicKey,
+        serumProgram: OPENBOOK_PROGRAM_ID[this.cluster],
+        serumMarketExternal: openbookV2Market.serumMarketExternal,
+        marketBids: openbookV2MarketExternal.bidsAddress,
+        marketAsks: openbookV2MarketExternal.asksAddress,
+        marketEventQueue: openbookV2MarketExternal.decoded.eventQueue,
+      })
+      .instruction();
+  }
 
-  // public async openbookV2CancelAllOrders(
-  //   group: Group,
-  //   mangoAccount: MangoAccount,
-  //   externalMarketPk: PublicKey,
-  //   limit?: number,
-  // ): Promise<MangoSignatureStatus> {
-  //   return await this.sendAndConfirmTransactionForGroup(group, [
-  //     await this.openbookV2CancelAllOrdersIx(
-  //       group,
-  //       mangoAccount,
-  //       externalMarketPk,
-  //       limit,
-  //     ),
-  //   ]);
-  // }
+  public async openbookV2CancelAllOrders(
+    group: Group,
+    mangoAccount: MangoAccount,
+    externalMarketPk: PublicKey,
+    limit?: number,
+  ): Promise<MangoSignatureStatus> {
+    return await this.sendAndConfirmTransactionForGroup(group, [
+      await this.openbookV2CancelAllOrdersIx(
+        group,
+        mangoAccount,
+        externalMarketPk,
+        limit,
+      ),
+    ]);
+  }
 
-  // public async openbookV2SettleFundsIx(
-  //   group: Group,
-  //   mangoAccount: MangoAccount,
-  //   externalMarketPk: PublicKey,
-  // ): Promise<TransactionInstruction> {
-  //   if (this.openbookFeesToDao == false) {
-  //     throw new Error(
-  //       `openbookFeesToDao is set to false, please use openbookV2SettleFundsV2Ix`,
-  //     );
-  //   }
+  public async openbookV2SettleFundsIx(
+    group: Group,
+    mangoAccount: MangoAccount,
+    externalMarketPk: PublicKey,
+  ): Promise<TransactionInstruction> {
+    if (this.openbookFeesToDao == false) {
+      throw new Error(
+        `openbookFeesToDao is set to false, please use openbookV2SettleFundsV2Ix`,
+      );
+    }
 
-  //   return await this.openbookV2SettleFundsV2Ix(
-  //     group,
-  //     mangoAccount,
-  //     externalMarketPk,
-  //   );
-  // }
+    return await this.openbookV2SettleFundsV2Ix(
+      group,
+      mangoAccount,
+      externalMarketPk,
+    );
+  }
 
-  // public async openbookV2SettleFundsV2Ix(
-  //   group: Group,
-  //   mangoAccount: MangoAccount,
-  //   externalMarketPk: PublicKey,
-  // ): Promise<TransactionInstruction> {
-  //   const openbookV2Market = group.openbookV2MarketsMapByExternal.get(
-  //     externalMarketPk.toBase58(),
-  //   )!;
-  //   const openbookV2MarketExternal = group.openbookV2ExternalMarketsMap.get(
-  //     externalMarketPk.toBase58(),
-  //   )!;
+  public async openbookV2SettleFundsV2Ix(
+    group: Group,
+    mangoAccount: MangoAccount,
+    externalMarketPk: PublicKey,
+  ): Promise<TransactionInstruction> {
+    const openbookV2Market = group.openbookV2MarketsMapByExternal.get(
+      externalMarketPk.toBase58(),
+    )!;
+    const openbookV2MarketExternal = group.openbookV2ExternalMarketsMap.get(
+      externalMarketPk.toBase58(),
+    )!;
 
-  //   const [openbookV2MarketExternalVaultSigner, openOrderPublicKey] =
-  //     await Promise.all([
-  //       generateSerum3MarketExternalVaultSignerAddress(
-  //         this.cluster,
-  //         openbookV2Market,
-  //         openbookV2MarketExternal,
-  //       ),
-  //       openbookV2Market.findOoPda(this.program.programId, mangoAccount.publicKey),
-  //     ]);
+    const [openbookV2MarketExternalVaultSigner, openOrderPublicKey] =
+      await Promise.all([
+        generateSerum3MarketExternalVaultSignerAddress(
+          this.cluster,
+          openbookV2Market,
+          openbookV2MarketExternal,
+        ),
+        openbookV2Market.findOoPda(this.program.programId, mangoAccount.publicKey),
+      ]);
 
-  //   const ix = await this.program.methods
-  //     .openbookV2SettleFundsV2(this.openbookFeesToDao)
-  //     .accounts({
-  //       v1: {
-  //         group: group.publicKey,
-  //         account: mangoAccount.publicKey,
-  //         owner: (this.program.provider as AnchorProvider).wallet.publicKey,
-  //         openOrders: openOrderPublicKey,
-  //         serumMarket: openbookV2Market.publicKey,
-  //         serumProgram: OPENBOOK_PROGRAM_ID[this.cluster],
-  //         serumMarketExternal: openbookV2Market.serumMarketExternal,
-  //         marketBaseVault: openbookV2MarketExternal.decoded.baseVault,
-  //         marketQuoteVault: openbookV2MarketExternal.decoded.quoteVault,
-  //         marketVaultSigner: openbookV2MarketExternalVaultSigner,
-  //         quoteBank: group.getFirstBankByTokenIndex(
-  //           openbookV2Market.quoteTokenIndex,
-  //         ).publicKey,
-  //         quoteVault: group.getFirstBankByTokenIndex(
-  //           openbookV2Market.quoteTokenIndex,
-  //         ).vault,
-  //         baseBank: group.getFirstBankByTokenIndex(openbookV2Market.baseTokenIndex)
-  //           .publicKey,
-  //         baseVault: group.getFirstBankByTokenIndex(openbookV2Market.baseTokenIndex)
-  //           .vault,
-  //       },
-  //       v2: {
-  //         quoteOracle: group.getFirstBankByTokenIndex(
-  //           openbookV2Market.quoteTokenIndex,
-  //         ).oracle,
-  //         baseOracle: group.getFirstBankByTokenIndex(
-  //           openbookV2Market.baseTokenIndex,
-  //         ).oracle,
-  //       },
-  //     })
-  //     .instruction();
+    const ix = await this.program.methods
+      .openbookV2SettleFundsV2(this.openbookFeesToDao)
+      .accounts({
+        v1: {
+          group: group.publicKey,
+          account: mangoAccount.publicKey,
+          owner: (this.program.provider as AnchorProvider).wallet.publicKey,
+          openOrders: openOrderPublicKey,
+          serumMarket: openbookV2Market.publicKey,
+          serumProgram: OPENBOOK_PROGRAM_ID[this.cluster],
+          serumMarketExternal: openbookV2Market.serumMarketExternal,
+          marketBaseVault: openbookV2MarketExternal.decoded.baseVault,
+          marketQuoteVault: openbookV2MarketExternal.decoded.quoteVault,
+          marketVaultSigner: openbookV2MarketExternalVaultSigner,
+          quoteBank: group.getFirstBankByTokenIndex(
+            openbookV2Market.quoteTokenIndex,
+          ).publicKey,
+          quoteVault: group.getFirstBankByTokenIndex(
+            openbookV2Market.quoteTokenIndex,
+          ).vault,
+          baseBank: group.getFirstBankByTokenIndex(openbookV2Market.baseTokenIndex)
+            .publicKey,
+          baseVault: group.getFirstBankByTokenIndex(openbookV2Market.baseTokenIndex)
+            .vault,
+        },
+        v2: {
+          quoteOracle: group.getFirstBankByTokenIndex(
+            openbookV2Market.quoteTokenIndex,
+          ).oracle,
+          baseOracle: group.getFirstBankByTokenIndex(
+            openbookV2Market.baseTokenIndex,
+          ).oracle,
+        },
+      })
+      .instruction();
 
-  //   return ix;
-  // }
+    return ix;
+  }
 
-  // public async openbookV2SettleFunds(
-  //   group: Group,
-  //   mangoAccount: MangoAccount,
-  //   externalMarketPk: PublicKey,
-  // ): Promise<MangoSignatureStatus> {
-  //   const ix = await this.openbookV2SettleFundsV2Ix(
-  //     group,
-  //     mangoAccount,
-  //     externalMarketPk,
-  //   );
+  public async openbookV2SettleFunds(
+    group: Group,
+    mangoAccount: MangoAccount,
+    externalMarketPk: PublicKey,
+  ): Promise<MangoSignatureStatus> {
+    const ix = await this.openbookV2SettleFundsV2Ix(
+      group,
+      mangoAccount,
+      externalMarketPk,
+    );
 
-  //   return await this.sendAndConfirmTransactionForGroup(group, [ix]);
-  // }
+    return await this.sendAndConfirmTransactionForGroup(group, [ix]);
+  }
 
-  // public async openbookV2CancelOrderIx(
-  //   group: Group,
-  //   mangoAccount: MangoAccount,
-  //   externalMarketPk: PublicKey,
-  //   side: Serum3Side,
-  //   orderId: BN,
-  // ): Promise<TransactionInstruction> {
-  //   const openbookV2Market = group.openbookV2MarketsMapByExternal.get(
-  //     externalMarketPk.toBase58(),
-  //   )!;
+  public async openbookV2CancelOrderIx(
+    group: Group,
+    mangoAccount: MangoAccount,
+    externalMarketPk: PublicKey,
+    side: Serum3Side,
+    orderId: BN,
+  ): Promise<TransactionInstruction> {
+    const openbookV2Market = group.openbookV2MarketsMapByExternal.get(
+      externalMarketPk.toBase58(),
+    )!;
 
-  //   const openbookV2MarketExternal = group.openbookV2ExternalMarketsMap.get(
-  //     externalMarketPk.toBase58(),
-  //   )!;
+    const openbookV2MarketExternal = group.openbookV2ExternalMarketsMap.get(
+      externalMarketPk.toBase58(),
+    )!;
 
-  //   const ix = await this.program.methods
-  //     .openbookV2CancelOrder(side, orderId)
-  //     .accounts({
-  //       group: group.publicKey,
-  //       account: mangoAccount.publicKey,
-  //       openOrders: mangoAccount.getSerum3Account(openbookV2Market.marketIndex)
-  //         ?.openOrders,
-  //       serumMarket: openbookV2Market.publicKey,
-  //       serumProgram: OPENBOOK_PROGRAM_ID[this.cluster],
-  //       serumMarketExternal: openbookV2Market.serumMarketExternal,
-  //       marketBids: openbookV2MarketExternal.bidsAddress,
-  //       marketAsks: openbookV2MarketExternal.asksAddress,
-  //       marketEventQueue: openbookV2MarketExternal.decoded.eventQueue,
-  //     })
-  //     .instruction();
+    const ix = await this.program.methods
+      .openbookV2CancelOrder(side, orderId)
+      .accounts({
+        group: group.publicKey,
+        account: mangoAccount.publicKey,
+        openOrders: mangoAccount.getSerum3Account(openbookV2Market.marketIndex)
+          ?.openOrders,
+        serumMarket: openbookV2Market.publicKey,
+        serumProgram: OPENBOOK_PROGRAM_ID[this.cluster],
+        serumMarketExternal: openbookV2Market.serumMarketExternal,
+        marketBids: openbookV2MarketExternal.bidsAddress,
+        marketAsks: openbookV2MarketExternal.asksAddress,
+        marketEventQueue: openbookV2MarketExternal.decoded.eventQueue,
+      })
+      .instruction();
 
-  //   return ix;
-  // }
+    return ix;
+  }
 
-  // public async openbookV2CancelOrder(
-  //   group: Group,
-  //   mangoAccount: MangoAccount,
-  //   externalMarketPk: PublicKey,
-  //   side: Serum3Side,
-  //   orderId: BN,
-  // ): Promise<MangoSignatureStatus> {
-  //   const ixs = await Promise.all([
-  //     this.openbookV2CancelOrderIx(
-  //       group,
-  //       mangoAccount,
-  //       externalMarketPk,
-  //       side,
-  //       orderId,
-  //     ),
-  //     this.openbookV2SettleFundsV2Ix(group, mangoAccount, externalMarketPk),
-  //   ]);
+  public async openbookV2CancelOrder(
+    group: Group,
+    mangoAccount: MangoAccount,
+    externalMarketPk: PublicKey,
+    side: Serum3Side,
+    orderId: BN,
+  ): Promise<MangoSignatureStatus> {
+    const ixs = await Promise.all([
+      this.openbookV2CancelOrderIx(
+        group,
+        mangoAccount,
+        externalMarketPk,
+        side,
+        orderId,
+      ),
+      this.openbookV2SettleFundsV2Ix(group, mangoAccount, externalMarketPk),
+    ]);
 
-  //   return await this.sendAndConfirmTransactionForGroup(group, ixs);
-  // }
+    return await this.sendAndConfirmTransactionForGroup(group, ixs);
+  }
 
   /// perps
 
@@ -5106,7 +5108,8 @@ export class MangoClient {
     // but user would potentially open new positions.
     banks: Bank[] = [],
     perpMarkets: PerpMarket[] = [],
-    openOrdersForMarket: [Serum3Market, PublicKey][] = [],
+    serumOpenOrdersForMarket: [Serum3Market, PublicKey][] = [],
+    openbookOpenOrdersForMarket: [OpenbookV2Market, PublicKey][] = [],
   ): PublicKey[] {
     const healthRemainingAccounts: PublicKey[] = [];
 
@@ -5175,7 +5178,7 @@ export class MangoClient {
     );
     healthRemainingAccounts.push(...allPerpMarkets.map((perp) => perp.oracle));
 
-    // Insert any extra open orders accounts in the cooresponding free serum market slot
+    // Insert any extra serum open orders accounts in the cooresponding free serum market slot
     const serumPositionMarketIndices = mangoAccounts
       .map((mangoAccount) =>
         mangoAccount.serum3.map((s) => ({
@@ -5184,7 +5187,7 @@ export class MangoClient {
         })),
       )
       .flat();
-    for (const [serum3Market, openOrderPk] of openOrdersForMarket) {
+    for (const [serum3Market, openOrderPk] of serumOpenOrdersForMarket) {
       const ooPositionExists =
         serumPositionMarketIndices.findIndex(
           (i) => i.marketIndex === serum3Market.marketIndex,
@@ -5203,6 +5206,34 @@ export class MangoClient {
       }
     }
 
+    // Insert any extra openbook open orders accounts in the cooresponding free openbook market slot
+    const openbookPositionMarketIndices = mangoAccounts
+      .map((mangoAccount) =>
+        mangoAccount.openbookV2.map((s) => ({
+          marketIndex: s.marketIndex,
+          openOrders: s.openOrders,
+        })),
+      )
+      .flat();
+    for (const [openbookV2Market, openOrderPk] of openbookOpenOrdersForMarket) {
+      const ooPositionExists =
+        serumPositionMarketIndices.findIndex(
+          (i) => i.marketIndex === openbookV2Market.marketIndex,
+        ) > -1;
+      if (!ooPositionExists) {
+        const inactiveOpenbookPosition = openbookPositionMarketIndices.findIndex(
+          (serumPos) =>
+            serumPos.marketIndex === OpenbookV2Orders.OpenbookV2MarketIndexUnset,
+        );
+        if (inactiveOpenbookPosition != -1) {
+          openbookPositionMarketIndices[inactiveOpenbookPosition].marketIndex =
+            openbookV2Market.marketIndex;
+          openbookPositionMarketIndices[inactiveOpenbookPosition].openOrders =
+            openOrderPk;
+        }
+      }
+    }
+
     healthRemainingAccounts.push(
       ...serumPositionMarketIndices
         .filter(
@@ -5210,6 +5241,15 @@ export class MangoClient {
             serumPosition.marketIndex !== Serum3Orders.Serum3MarketIndexUnset,
         )
         .map((serumPosition) => serumPosition.openOrders),
+    );
+
+    healthRemainingAccounts.push(
+      ...openbookPositionMarketIndices
+        .filter(
+          (openbookPosition) =>
+            openbookPosition.marketIndex !== OpenbookV2Orders.OpenbookV2MarketIndexUnset,
+        )
+        .map((openbookPosition) => openbookPosition.openOrders),
     );
 
     return healthRemainingAccounts;
