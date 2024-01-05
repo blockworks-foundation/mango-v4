@@ -5,7 +5,6 @@ use fixed::types::I80F48;
 use openbook_v2::state::OpenOrdersAccount;
 use serum_dex::state::OpenOrders;
 
-use std::borrow::BorrowMut;
 use std::cell::Ref;
 use std::collections::HashMap;
 
@@ -33,7 +32,7 @@ pub trait AccountRetriever {
     ) -> Result<(&Bank, I80F48)>;
 
     fn serum_oo(&self, active_serum_oo_index: usize, key: &Pubkey) -> Result<&OpenOrders>;
-    fn openbook_oo(&self, active_openbook_oo_index: usize, key: &Pubkey) -> Result<openbook_v2::state::OpenOrdersAccount>;
+    fn openbook_oo(&self, active_openbook_oo_index: usize, key: &Pubkey) -> Result<&OpenOrdersAccount>;
 
     fn perp_market_and_oracle_price(
         &self,
@@ -199,23 +198,21 @@ impl<T: KeyedAccountReader> AccountRetriever for FixedOrderAccountRetriever<T> {
         })
     }
 
-    fn openbook_oo(&self, active_openbook_oo_index: usize, key: &Pubkey) -> Result<OpenOrdersAccount> {
+    fn openbook_oo(&self, active_openbook_oo_index: usize, key: &Pubkey) -> Result<&OpenOrdersAccount> {
         let openbook_oo_index = self.begin_openbook_v2 + active_openbook_oo_index;
         let ai = &self.ais[openbook_oo_index];
-        let loaded = OpenOrdersAccount::try_deserialize(ai.data().borrow_mut())?;
-        Ok(loaded)
-        // (|| {
-        //     require_keys_eq!(*key, *ai.key());
-        //     let loaded = OpenOrdersAccount::try_deserialize(ai.data().borrow_mut())?;
-        //     Ok(&loaded)
-        // })()
-        // .with_context(|| {
-        //     format!(
-        //         "loading openbook open orders with health account index {}, passed account {}",
-        //         openbook_oo_index,
-        //         ai.key(),
-        //     )
-        // })
+        (|| {
+            require_keys_eq!(*key, *ai.key());
+            let loaded = ai.load::<OpenOrdersAccount>()?;
+            Ok(loaded)
+        })()
+        .with_context(|| {
+            format!(
+                "loading openbook open orders with health account index {}, passed account {}",
+                openbook_oo_index,
+                ai.key(),
+            )
+        })
     }
 }
 
@@ -435,13 +432,13 @@ impl<'a, 'info> ScanningAccountRetriever<'a, 'info> {
         serum3_cpi::load_open_orders(oo)
     }
 
-    pub fn scanned_openbook_oo(&self, key: &Pubkey) -> Result<OpenOrdersAccount> {
+    pub fn scanned_openbook_oo(&self, key: &Pubkey) -> Result<&OpenOrdersAccount> {
         let oo = self
             .spot_oos
             .iter()
             .find(|ai| ai.key == key)
             .ok_or_else(|| error_msg!("no openbook open orders for key {}", key))?;
-        let loaded = OpenOrdersAccount::try_deserialize(oo.data().borrow_mut())?;
+        let loaded = oo.load::<OpenOrdersAccount>()?;
         Ok(loaded)
     }
 
@@ -473,7 +470,7 @@ impl<'a, 'info> AccountRetriever for ScanningAccountRetriever<'a, 'info> {
         self.scanned_serum_oo(key)
     }
 
-    fn openbook_oo(&self, _account_index: usize, key: &Pubkey) -> Result<OpenOrdersAccount> {
+    fn openbook_oo(&self, _account_index: usize, key: &Pubkey) -> Result<&OpenOrdersAccount> {
         self.scanned_openbook_oo(key)
     }
 }
