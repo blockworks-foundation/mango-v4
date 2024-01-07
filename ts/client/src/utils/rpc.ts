@@ -6,6 +6,7 @@ import {
   Commitment,
   ComputeBudgetProgram,
   Connection,
+  Keypair,
   MessageV0,
   RpcResponseAndContext,
   SignatureResult,
@@ -27,26 +28,47 @@ export interface MangoSignatureStatus {
   slot: number;
 }
 
-export type SendTransactionOptions = {
-  alts?: AddressLookupTableAccount[];
-  postSendTxCallback?: ({ txid }: { txid: string }) => void;
-  prioritizationFee?: number;
-  latestBlockhash?: {
+export interface MangoSignature {
+  signature: TransactionSignature;
+}
+
+export type SendTransactionOpts = Partial<{
+  preflightCommitment: Commitment;
+  latestBlockhash: Readonly<{
     blockhash: string;
     lastValidBlockHeight: number;
-  };
-  txConfirmationCommitment?: Commitment;
-  preflightCommitment?: Commitment;
-  additionalSigners?: Signer[];
-  multipleConnections?: Connection[];
-};
+  }>;
+  prioritizationFee: number;
+  estimateFee: boolean;
+  additionalSigners: Keypair[];
+  postSendTxCallback: ({ txid }: { txid: string }) => void;
+  postTxConfirmationCallback: ({ txid }: { txid: string }) => void;
+  txConfirmationCommitment: Commitment;
+  confirmInBackground: boolean;
+  alts: AddressLookupTableAccount[];
+  multipleConnections: Connection[];
+}>;
+
+export function sendTransaction(
+  provider: AnchorProvider,
+  ixs: TransactionInstruction[],
+  alts: AddressLookupTableAccount[],
+  opts?: { confirmInBackground: true } & SendTransactionOpts,
+): Promise<MangoSignature>;
+
+export function sendTransaction(
+  provider: AnchorProvider,
+  ixs: TransactionInstruction[],
+  alts: AddressLookupTableAccount[],
+  opts?: SendTransactionOpts,
+): Promise<MangoSignatureStatus>;
 
 export async function sendTransaction(
   provider: AnchorProvider,
   ixs: TransactionInstruction[],
   alts: AddressLookupTableAccount[],
-  opts: SendTransactionOptions = {},
-): Promise<MangoSignatureStatus> {
+  opts: SendTransactionOpts = {},
+): Promise<MangoSignatureStatus | MangoSignature> {
   const connection = provider.connection;
   const latestBlockhash =
     opts.latestBlockhash ??
@@ -136,6 +158,28 @@ export async function sendTransaction(
     }
   }
 
+  if (!opts.confirmInBackground) {
+    return await confirmTransaction(
+      connection,
+      opts,
+      latestBlockhash,
+      signature,
+    );
+  } else {
+    confirmTransaction(connection, opts, latestBlockhash, signature);
+    return { signature };
+  }
+}
+
+const confirmTransaction = async (
+  connection: Connection,
+  opts: Partial<SendTransactionOpts> = {},
+  latestBlockhash: Readonly<{
+    blockhash: string;
+    lastValidBlockHeight: number;
+  }>,
+  signature: string,
+): Promise<MangoSignatureStatus> => {
   const txConfirmationCommitment = opts.txConfirmationCommitment ?? 'processed';
   let status: RpcResponseAndContext<SignatureResult>;
   if (
@@ -164,9 +208,15 @@ export async function sendTransaction(
       message: `${JSON.stringify(status)}`,
     });
   }
-
+  if (opts.postTxConfirmationCallback) {
+    try {
+      opts.postTxConfirmationCallback({ txid: signature });
+    } catch (e) {
+      console.warn(`postTxConfirmationCallback error ${e}`);
+    }
+  }
   return { signature, slot: status.context.slot, ...signatureResult };
-}
+};
 
 export const createComputeBudgetIx = (
   microLamports: number,
