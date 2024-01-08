@@ -1,6 +1,6 @@
 use anchor_lang::prelude::*;
-use serum_dex::state::{OpenOrders, ToAlignedBytes, ACCOUNT_HEAD_PADDING};
 use openbook_v2::state::OpenOrdersAccount as OpenOrdersV2;
+use serum_dex::state::{OpenOrders, ToAlignedBytes, ACCOUNT_HEAD_PADDING};
 
 use std::cell::{Ref, RefMut};
 use std::cmp::min;
@@ -129,7 +129,7 @@ pub fn load_open_orders(acc: &impl AccountReader) -> Result<&serum_dex::state::O
 }
 
 pub fn load_open_orders_bytes(bytes: &[u8]) -> Result<&serum_dex::state::OpenOrders> {
-    Ok(bytemuck::try_from_bytes(strip_dex_padding(bytes)?).map_err(|_| { MangoError::SomeError })?)
+    Ok(bytemuck::try_from_bytes(strip_dex_padding(bytes)?).map_err(|_| MangoError::SomeError)?)
 }
 
 pub fn pubkey_from_u64_array(d: [u64; 4]) -> Pubkey {

@@ -13,7 +13,9 @@ pub fn openbook_v2_close_open_orders(ctx: Context<OpenbookV2CloseOpenOrders>) ->
     let mut account = ctx.accounts.account.load_full_mut()?;
     // account constraint #1
     require!(
-        account.fixed.is_owner_or_delegate(ctx.accounts.authority.key()),
+        account
+            .fixed
+            .is_owner_or_delegate(ctx.accounts.authority.key()),
         MangoError::SomeError
     );
 

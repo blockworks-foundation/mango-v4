@@ -23,8 +23,8 @@ use crate::error::*;
 use crate::i80f48::LowPrecisionDivision;
 use crate::serum3_cpi::{OpenOrdersAmounts, OpenOrdersSlim};
 use crate::state::{
-    Bank, MangoAccountRef, OpenbookV2Orders, PerpMarket, PerpMarketIndex,
-    PerpPosition, Serum3MarketIndex, Serum3Orders, TokenIndex,
+    Bank, MangoAccountRef, OpenbookV2Orders, PerpMarket, PerpMarketIndex, PerpPosition,
+    Serum3MarketIndex, Serum3Orders, TokenIndex,
 };
 
 use super::*;
@@ -404,7 +404,10 @@ impl SpotInfo {
                                      max_reserved: &TokenMaxReserved,
                                      market_reserved: I80F48| {
             println!("computing hgealth effect {}", token_info.token_index);
-            println!("spot_and_perp {} max_spot_reserved {}", balance.spot_and_perp, max_reserved.max_spot_reserved);
+            println!(
+                "spot_and_perp {} max_spot_reserved {}",
+                balance.spot_and_perp, max_reserved.max_spot_reserved
+            );
             // This balance includes all possible reserved funds from markets that relate to the
             // token, including this market itself: `market_reserved` is already included in `max_spot_reserved`.
             let max_balance = balance.spot_and_perp + max_reserved.max_spot_reserved;
@@ -425,7 +428,10 @@ impl SpotInfo {
             let liab_weight = token_info.liab_weight(health_type);
             let asset_price = token_info.prices.asset(health_type);
             let liab_price = token_info.prices.liab(health_type);
-            println!("asset weight {} asset price {} liab_weight {} liab_price {}", asset_weight, asset_price, liab_weight, liab_price);
+            println!(
+                "asset weight {} asset price {} liab_weight {} liab_price {}",
+                asset_weight, asset_price, liab_weight, liab_price
+            );
             asset_part * asset_weight * asset_price + liab_part * liab_weight * liab_price
         };
 
@@ -1183,7 +1189,12 @@ impl HealthCache {
     ) {
         for (token_info, token_balance) in self.token_infos.iter().zip(token_balances.iter()) {
             let contrib = token_info.health_contribution(health_type, token_balance.spot_and_perp);
-            msg!("token info {} balance {} contribution {}", token_info.token_index, token_balance.spot_and_perp, contrib);
+            msg!(
+                "token info {} balance {} contribution {}",
+                token_info.token_index,
+                token_balance.spot_and_perp,
+                contrib
+            );
             action(contrib);
         }
 
@@ -1196,7 +1207,11 @@ impl HealthCache {
                 &token_max_reserved,
                 reserved,
             );
-            msg!("spot info {} contribution {}", spot_info.market_index, contrib);
+            msg!(
+                "spot info {} contribution {}",
+                spot_info.market_index,
+                contrib
+            );
             action(contrib);
         }
     }
@@ -1364,7 +1379,9 @@ fn new_health_cache_impl(
     }
 
     // Fill the TokenInfo balance with free funds in serum3 and openbook v2 oo accounts and build Spot3Infos.
-    let mut spot_infos = Vec::with_capacity(account.active_serum3_orders().count() + account.active_openbook_v2_orders().count());
+    let mut spot_infos = Vec::with_capacity(
+        account.active_serum3_orders().count() + account.active_openbook_v2_orders().count(),
+    );
     for (i, serum_account) in account.active_serum3_orders().enumerate() {
         let oo = retriever.serum_oo(i, &serum_account.open_orders)?;
 
@@ -1524,7 +1541,7 @@ mod tests {
                 DUMMY_NOW_TS,
             )
             .unwrap();
-            // 100 quote -10 base
+        // 100 quote -10 base
         let mut oo1 = TestAccount::<OpenOrders>::new_zeroed();
         let serum3account = account.create_serum3_orders(2).unwrap();
         serum3account.open_orders = oo1.pubkey;

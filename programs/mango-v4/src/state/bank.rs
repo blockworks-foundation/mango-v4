@@ -1165,8 +1165,9 @@ impl Bank {
         if self.deposit_weight_scale_start_quote == f64::MAX {
             return self.init_asset_weight;
         }
-        let all_deposits =
-            self.native_deposits().to_num::<f64>() + self.potential_serum_tokens as f64 + self.potential_openbook_tokens as f64;
+        let all_deposits = self.native_deposits().to_num::<f64>()
+            + self.potential_serum_tokens as f64
+            + self.potential_openbook_tokens as f64;
         let deposits_quote = all_deposits * price.to_num::<f64>();
         if deposits_quote <= self.deposit_weight_scale_start_quote {
             self.init_asset_weight
@@ -1212,7 +1213,8 @@ impl Bank {
         if new >= old {
             self.potential_openbook_tokens += new - old;
         } else {
-            self.potential_openbook_tokens = self.potential_openbook_tokens.saturating_sub(old - new);
+            self.potential_openbook_tokens =
+                self.potential_openbook_tokens.saturating_sub(old - new);
         }
     }
 }

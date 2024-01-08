@@ -470,7 +470,7 @@ pub fn apply_settle_changes_v2(
     // for potential_serum_tokens on the banks.
     {
         let openbook_orders = account.openbook_v2_orders_mut(openbook_market.market_index)?;
-        
+
         update_bank_potential_tokens_v2(openbook_orders, base_bank, quote_bank, after_oo);
     }
 

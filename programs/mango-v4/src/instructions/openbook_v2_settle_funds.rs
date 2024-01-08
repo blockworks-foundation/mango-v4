@@ -8,7 +8,7 @@ use openbook_v2::cpi::accounts::SettleFunds;
 
 use super::apply_settle_changes_v2;
 use crate::accounts_ix::*;
-use crate::logs::{LoanOriginationFeeInstruction, WithdrawLoanLog, emit_stack};
+use crate::logs::{emit_stack, LoanOriginationFeeInstruction, WithdrawLoanLog};
 
 use crate::accounts_zerocopy::AccountInfoRef;
 
@@ -132,7 +132,7 @@ pub fn openbook_v2_settle_funds<'info>(
         None,
         fees_to_dao,
         Some(&ctx.accounts.quote_oracle.to_account_info()),
-        &open_orders
+        &open_orders,
     )?;
 
     // emit!(OpenbookV2OpenOrdersBalanceLog {
@@ -202,7 +202,7 @@ pub fn charge_loan_origination_fees_v2(
             loan_amount: withdraw_result.loan_amount.to_bits(),
             loan_origination_fee: withdraw_result.loan_origination_fee.to_bits(),
             instruction: LoanOriginationFeeInstruction::Serum3SettleFunds,
-            price: base_oracle_price.map(|p| p.to_bits())
+            price: base_oracle_price.map(|p| p.to_bits()),
         });
     }
 
@@ -242,7 +242,7 @@ pub fn charge_loan_origination_fees_v2(
             loan_amount: withdraw_result.loan_amount.to_bits(),
             loan_origination_fee: withdraw_result.loan_origination_fee.to_bits(),
             instruction: LoanOriginationFeeInstruction::OpenbookV2SettleFunds,
-            price: quote_oracle_price.map(|p| p.to_bits())
+            price: quote_oracle_price.map(|p| p.to_bits()),
         });
     }
 

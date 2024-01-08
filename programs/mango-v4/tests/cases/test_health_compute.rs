@@ -1,7 +1,7 @@
 use super::*;
 use anchor_lang::prelude::AccountMeta;
-use mango_v4::accounts_ix::{Serum3OrderType, Serum3SelfTradeBehavior, Serum3Side};
 use mango_client::StubOracleCreate;
+use mango_v4::accounts_ix::{Serum3OrderType, Serum3SelfTradeBehavior, Serum3Side};
 
 async fn deposit_cu_datapoint(
     solana: &SolanaCookie,

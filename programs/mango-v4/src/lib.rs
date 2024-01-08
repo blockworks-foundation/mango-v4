@@ -1735,7 +1735,7 @@ pub mod mango_v4 {
         expiry_timestamp: u64,
         limit: u16,
     ) -> Result<()> {
-        use openbook_v2::state::{Order, OrderParams, SelfTradeBehavior, PlaceOrderType};
+        use openbook_v2::state::{Order, OrderParams, PlaceOrderType, SelfTradeBehavior};
         let time_in_force = match Order::tif_from_expiry(expiry_timestamp) {
             Some(t) => t,
             None => {

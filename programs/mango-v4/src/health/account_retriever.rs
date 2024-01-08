@@ -35,7 +35,11 @@ pub trait AccountRetriever {
     ) -> Result<(&Bank, I80F48)>;
 
     fn serum_oo(&self, active_serum_oo_index: usize, key: &Pubkey) -> Result<&OpenOrders>;
-    fn openbook_oo(&self, active_openbook_oo_index: usize, key: &Pubkey) -> Result<&OpenOrdersAccount>;
+    fn openbook_oo(
+        &self,
+        active_openbook_oo_index: usize,
+        key: &Pubkey,
+    ) -> Result<&OpenOrdersAccount>;
 
     fn perp_market_and_oracle_price(
         &self,
@@ -231,7 +235,11 @@ impl<T: KeyedAccountReader> AccountRetriever for FixedOrderAccountRetriever<T> {
         })
     }
 
-    fn openbook_oo(&self, active_openbook_oo_index: usize, key: &Pubkey) -> Result<&OpenOrdersAccount> {
+    fn openbook_oo(
+        &self,
+        active_openbook_oo_index: usize,
+        key: &Pubkey,
+    ) -> Result<&OpenOrdersAccount> {
         let openbook_oo_index = self.begin_openbook_v2 + active_openbook_oo_index;
         let ai = &self.ais[openbook_oo_index];
         (|| {
@@ -455,11 +463,11 @@ impl<'a, 'info> ScanningAccountRetriever<'a, 'info> {
             .count();
         let openbook_v2_start = serum3_start + n_serum3;
         let n_openbook_v2 = ais[openbook_v2_start..]
-        .iter()
-        .take_while(|x| {
-            x.data_len() == std::mem::size_of::<openbook_v2::state::OpenOrdersAccount>() + 8
-        })
-        .count();
+            .iter()
+            .take_while(|x| {
+                x.data_len() == std::mem::size_of::<openbook_v2::state::OpenOrdersAccount>() + 8
+            })
+            .count();
         let fallback_oracles_start = openbook_v2_start + n_openbook_v2;
         let usd_oracle_index = ais[fallback_oracles_start..]
             .iter()
@@ -577,8 +585,8 @@ impl<'a, 'info> AccountRetriever for ScanningAccountRetriever<'a, 'info> {
 mod tests {
     use super::super::test::*;
     use super::*;
-    use serum_dex::state::OpenOrders;
     use openbook_v2::state::OpenOrdersAccount;
+    use serum_dex::state::OpenOrders;
     use std::convert::identity;
 
     #[test]
@@ -691,7 +699,10 @@ mod tests {
         assert!(retriever.openbook_oo(1, &Pubkey::default()).is_err());
 
         // check retrieval fails when using the wrong function for the account type
-        retriever.serum_oo(0, &oo2key).map(|_| {"should fail to load serum3 oo"}).unwrap_err();
+        retriever
+            .serum_oo(0, &oo2key)
+            .map(|_| "should fail to load serum3 oo")
+            .unwrap_err();
         retriever.openbook_oo(0, &oo1key).unwrap_err();
 
         let (perp, oracle_price) = retriever

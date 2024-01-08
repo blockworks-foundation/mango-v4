@@ -13,7 +13,9 @@ pub fn openbook_v2_cancel_all_orders(ctx: Context<OpenbookV2CancelOrder>, limit:
         let account = ctx.accounts.account.load_full()?;
         // account constraint #1
         require!(
-            account.fixed.is_owner_or_delegate(ctx.accounts.authority.key()),
+            account
+                .fixed
+                .is_owner_or_delegate(ctx.accounts.authority.key()),
             MangoError::SomeError
         );
 

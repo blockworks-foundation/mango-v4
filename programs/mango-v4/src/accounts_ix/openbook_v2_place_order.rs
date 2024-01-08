@@ -2,7 +2,10 @@ use crate::error::*;
 use crate::state::*;
 use anchor_lang::prelude::*;
 use anchor_spl::token::{Token, TokenAccount};
-use openbook_v2::{program::OpenbookV2, state::{Market, OpenOrdersAccount}};
+use openbook_v2::{
+    program::OpenbookV2,
+    state::{Market, OpenOrdersAccount},
+};
 
 #[derive(Accounts)]
 pub struct OpenbookV2PlaceOrder<'info> {
