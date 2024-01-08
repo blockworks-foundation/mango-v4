@@ -45,7 +45,7 @@ impl OpenbookV2Cookie {
         let close_market_admin = TestKeypair::new();
         let market = TestKeypair::new();
 
-        let res = openbook_client::send_tx(
+        let res = openbook_client::send_openbook_tx(
             self.solana.as_ref(),
             CreateMarketInstruction {
                 collect_fee_admin: collect_fee_admin.pubkey(),

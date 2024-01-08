@@ -5,6 +5,7 @@ use anchor_lang::prelude::AccountMeta;
 use mango_v4::accounts_ix::{Serum3OrderType, Serum3SelfTradeBehavior, Serum3Side};
 use mango_v4::serum3_cpi::{load_open_orders_bytes, OpenOrdersSlim};
 use std::sync::Arc;
+use mango_client::StubOracleCreate;
 
 struct SerumOrderPlacer {
     solana: Arc<SolanaCookie>,

@@ -1,4 +1,5 @@
 use super::*;
+use mango_client::StubOracleSetInstruction;
 
 #[tokio::test]
 async fn test_perp_settle_pnl_basic() -> Result<(), TransportError> {

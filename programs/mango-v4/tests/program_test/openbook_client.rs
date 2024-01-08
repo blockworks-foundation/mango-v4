@@ -29,7 +29,7 @@ impl ClientAccountLoader for &SolanaCookie {
 }
 
 // TODO: report error outwards etc
-pub async fn send_tx<CI: ClientInstruction>(
+pub async fn send_openbook_tx<CI: OpenbookClientInstruction>(
     solana: &SolanaCookie,
     ix: CI,
 ) -> std::result::Result<CI::Accounts, TransportError> {
@@ -43,13 +43,13 @@ pub async fn send_tx<CI: ClientInstruction>(
 }
 
 /// Build a transaction from multiple instructions
-pub struct ClientTransaction {
+pub struct OpenbookClientTransaction {
     solana: Arc<SolanaCookie>,
     instructions: Vec<instruction::Instruction>,
     signers: Vec<TestKeypair>,
 }
 
-impl<'a> ClientTransaction {
+impl<'a> OpenbookClientTransaction {
     pub fn new(solana: &Arc<SolanaCookie>) -> Self {
         Self {
             solana: solana.clone(),
@@ -58,7 +58,7 @@ impl<'a> ClientTransaction {
         }
     }
 
-    pub async fn add_instruction<CI: ClientInstruction>(&mut self, ix: CI) -> CI::Accounts {
+    pub async fn add_instruction<CI: OpenbookClientInstruction>(&mut self, ix: CI) -> CI::Accounts {
         let solana: &SolanaCookie = &self.solana;
         let (accounts, instruction) = ix.to_instruction(solana).await;
         self.instructions.push(instruction);
@@ -84,7 +84,7 @@ impl<'a> ClientTransaction {
 }
 
 #[async_trait::async_trait(?Send)]
-pub trait ClientInstruction {
+pub trait OpenbookClientInstruction {
     type Accounts: anchor_lang::ToAccountMetas;
     type Instruction: anchor_lang::InstructionData;
 
@@ -121,7 +121,7 @@ pub struct CreateOpenOrdersIndexerInstruction {
     pub payer: TestKeypair,
 }
 #[async_trait::async_trait(?Send)]
-impl ClientInstruction for CreateOpenOrdersIndexerInstruction {
+impl OpenbookClientInstruction for CreateOpenOrdersIndexerInstruction {
     type Accounts = openbook_v2::accounts::CreateOpenOrdersIndexer;
     type Instruction = openbook_v2::instruction::CreateOpenOrdersIndexer;
     async fn to_instruction(
@@ -161,7 +161,7 @@ pub struct CreateOpenOrdersAccountInstruction {
     pub delegate: Option<Pubkey>,
 }
 #[async_trait::async_trait(?Send)]
-impl ClientInstruction for CreateOpenOrdersAccountInstruction {
+impl OpenbookClientInstruction for CreateOpenOrdersAccountInstruction {
     type Accounts = openbook_v2::accounts::CreateOpenOrdersAccount;
     type Instruction = openbook_v2::instruction::CreateOpenOrdersAccount;
     async fn to_instruction(
@@ -216,7 +216,7 @@ pub struct CloseOpenOrdersAccountInstruction {
     pub sol_destination: Pubkey,
 }
 #[async_trait::async_trait(?Send)]
-impl ClientInstruction for CloseOpenOrdersAccountInstruction {
+impl OpenbookClientInstruction for CloseOpenOrdersAccountInstruction {
     type Accounts = openbook_v2::accounts::CloseOpenOrdersAccount;
     type Instruction = openbook_v2::instruction::CloseOpenOrdersAccount;
     async fn to_instruction(
@@ -309,7 +309,7 @@ impl CreateMarketInstruction {
 }
 
 #[async_trait::async_trait(?Send)]
-impl ClientInstruction for CreateMarketInstruction {
+impl OpenbookClientInstruction for CreateMarketInstruction {
     type Accounts = openbook_v2::accounts::CreateMarket;
     type Instruction = openbook_v2::instruction::CreateMarket;
     async fn to_instruction(
@@ -401,7 +401,7 @@ pub struct PlaceOrderInstruction {
 }
 
 #[async_trait::async_trait(?Send)]
-impl ClientInstruction for PlaceOrderInstruction {
+impl OpenbookClientInstruction for PlaceOrderInstruction {
     type Accounts = openbook_v2::accounts::PlaceOrder;
     type Instruction = openbook_v2::instruction::PlaceOrder;
     async fn to_instruction(
@@ -477,7 +477,7 @@ pub struct PlaceOrderPeggedInstruction {
     pub peg_limit: i64,
 }
 #[async_trait::async_trait(?Send)]
-impl ClientInstruction for PlaceOrderPeggedInstruction {
+impl OpenbookClientInstruction for PlaceOrderPeggedInstruction {
     type Accounts = openbook_v2::accounts::PlaceOrder;
     type Instruction = openbook_v2::instruction::PlaceOrderPegged;
     async fn to_instruction(
@@ -541,7 +541,7 @@ pub struct PlaceTakeOrderInstruction {
     pub referrer_account: Option<Pubkey>,
 }
 #[async_trait::async_trait(?Send)]
-impl ClientInstruction for PlaceTakeOrderInstruction {
+impl OpenbookClientInstruction for PlaceTakeOrderInstruction {
     type Accounts = openbook_v2::accounts::PlaceTakeOrder;
     type Instruction = openbook_v2::instruction::PlaceTakeOrder;
     async fn to_instruction(
@@ -603,7 +603,7 @@ pub struct CancelOrderInstruction {
     pub order_id: u128,
 }
 #[async_trait::async_trait(?Send)]
-impl ClientInstruction for CancelOrderInstruction {
+impl OpenbookClientInstruction for CancelOrderInstruction {
     type Accounts = openbook_v2::accounts::CancelOrder;
     type Instruction = openbook_v2::instruction::CancelOrder;
     async fn to_instruction(
@@ -639,7 +639,7 @@ pub struct CancelOrderByClientOrderIdInstruction {
     pub client_order_id: u64,
 }
 #[async_trait::async_trait(?Send)]
-impl ClientInstruction for CancelOrderByClientOrderIdInstruction {
+impl OpenbookClientInstruction for CancelOrderByClientOrderIdInstruction {
     type Accounts = openbook_v2::accounts::CancelOrder;
     type Instruction = openbook_v2::instruction::CancelOrderByClientOrderId;
     async fn to_instruction(
@@ -675,7 +675,7 @@ pub struct CancelAllOrdersInstruction {
     pub signer: TestKeypair,
 }
 #[async_trait::async_trait(?Send)]
-impl ClientInstruction for CancelAllOrdersInstruction {
+impl OpenbookClientInstruction for CancelAllOrdersInstruction {
     type Accounts = openbook_v2::accounts::CancelOrder;
     type Instruction = openbook_v2::instruction::CancelAllOrders;
     async fn to_instruction(
@@ -712,7 +712,7 @@ pub struct ConsumeEventsInstruction {
     pub open_orders_accounts: Vec<Pubkey>,
 }
 #[async_trait::async_trait(?Send)]
-impl ClientInstruction for ConsumeEventsInstruction {
+impl OpenbookClientInstruction for ConsumeEventsInstruction {
     type Accounts = openbook_v2::accounts::ConsumeEvents;
     type Instruction = openbook_v2::instruction::ConsumeEvents;
     async fn to_instruction(
@@ -755,7 +755,7 @@ pub struct ConsumeGivenEventsInstruction {
     pub slots: Vec<usize>,
 }
 #[async_trait::async_trait(?Send)]
-impl ClientInstruction for ConsumeGivenEventsInstruction {
+impl OpenbookClientInstruction for ConsumeGivenEventsInstruction {
     type Accounts = openbook_v2::accounts::ConsumeEvents;
     type Instruction = openbook_v2::instruction::ConsumeGivenEvents;
     async fn to_instruction(
@@ -805,7 +805,7 @@ pub struct SettleFundsInstruction {
     pub referrer_account: Option<Pubkey>,
 }
 #[async_trait::async_trait(?Send)]
-impl ClientInstruction for SettleFundsInstruction {
+impl OpenbookClientInstruction for SettleFundsInstruction {
     type Accounts = openbook_v2::accounts::SettleFunds;
     type Instruction = openbook_v2::instruction::SettleFunds;
     async fn to_instruction(
@@ -852,7 +852,7 @@ pub struct SettleFundsExpiredInstruction {
     pub referrer_account: Option<Pubkey>,
 }
 #[async_trait::async_trait(?Send)]
-impl ClientInstruction for SettleFundsExpiredInstruction {
+impl OpenbookClientInstruction for SettleFundsExpiredInstruction {
     type Accounts = openbook_v2::accounts::SettleFundsExpired;
     type Instruction = openbook_v2::instruction::SettleFundsExpired;
     async fn to_instruction(
@@ -894,7 +894,7 @@ pub struct SweepFeesInstruction {
     pub token_receiver_account: Pubkey,
 }
 #[async_trait::async_trait(?Send)]
-impl ClientInstruction for SweepFeesInstruction {
+impl OpenbookClientInstruction for SweepFeesInstruction {
     type Accounts = openbook_v2::accounts::SweepFees;
     type Instruction = openbook_v2::instruction::SweepFees;
     async fn to_instruction(
@@ -935,7 +935,7 @@ pub struct DepositInstruction {
     pub quote_amount: u64,
 }
 #[async_trait::async_trait(?Send)]
-impl ClientInstruction for DepositInstruction {
+impl OpenbookClientInstruction for DepositInstruction {
     type Accounts = openbook_v2::accounts::Deposit;
     type Instruction = openbook_v2::instruction::Deposit;
     async fn to_instruction(
@@ -974,7 +974,7 @@ pub struct StubOracleSetInstruction {
     pub price: f64,
 }
 #[async_trait::async_trait(?Send)]
-impl ClientInstruction for StubOracleSetInstruction {
+impl OpenbookClientInstruction for StubOracleSetInstruction {
     type Accounts = openbook_v2::accounts::StubOracleSet;
     type Instruction = openbook_v2::instruction::StubOracleSet;
 
@@ -1015,7 +1015,7 @@ pub struct StubOracleCreate {
     pub payer: TestKeypair,
 }
 #[async_trait::async_trait(?Send)]
-impl ClientInstruction for StubOracleCreate {
+impl OpenbookClientInstruction for StubOracleCreate {
     type Accounts = openbook_v2::accounts::StubOracleCreate;
     type Instruction = openbook_v2::instruction::StubOracleCreate;
 
@@ -1059,7 +1059,7 @@ pub struct StubOracleCloseInstruction {
     pub sol_destination: Pubkey,
 }
 #[async_trait::async_trait(?Send)]
-impl ClientInstruction for StubOracleCloseInstruction {
+impl OpenbookClientInstruction for StubOracleCloseInstruction {
     type Accounts = openbook_v2::accounts::StubOracleClose;
     type Instruction = openbook_v2::instruction::StubOracleClose;
 
@@ -1103,7 +1103,7 @@ pub struct CloseMarketInstruction {
     pub sol_destination: Pubkey,
 }
 #[async_trait::async_trait(?Send)]
-impl ClientInstruction for CloseMarketInstruction {
+impl OpenbookClientInstruction for CloseMarketInstruction {
     type Accounts = openbook_v2::accounts::CloseMarket;
     type Instruction = openbook_v2::instruction::CloseMarket;
     async fn to_instruction(
@@ -1138,7 +1138,7 @@ pub struct SetMarketExpiredInstruction {
     pub market: Pubkey,
 }
 #[async_trait::async_trait(?Send)]
-impl ClientInstruction for SetMarketExpiredInstruction {
+impl OpenbookClientInstruction for SetMarketExpiredInstruction {
     type Accounts = openbook_v2::accounts::SetMarketExpired;
     type Instruction = openbook_v2::instruction::SetMarketExpired;
     async fn to_instruction(
@@ -1168,7 +1168,7 @@ pub struct PruneOrdersInstruction {
     pub open_orders_account: Pubkey,
 }
 #[async_trait::async_trait(?Send)]
-impl ClientInstruction for PruneOrdersInstruction {
+impl OpenbookClientInstruction for PruneOrdersInstruction {
     type Accounts = openbook_v2::accounts::PruneOrders;
     type Instruction = openbook_v2::instruction::PruneOrders;
     async fn to_instruction(
@@ -1202,7 +1202,7 @@ pub struct SetDelegateInstruction {
     pub open_orders_account: Pubkey,
 }
 #[async_trait::async_trait(?Send)]
-impl ClientInstruction for SetDelegateInstruction {
+impl OpenbookClientInstruction for SetDelegateInstruction {
     type Accounts = openbook_v2::accounts::SetDelegate;
     type Instruction = openbook_v2::instruction::SetDelegate;
     async fn to_instruction(
@@ -1248,7 +1248,7 @@ pub struct EditOrderInstruction {
 }
 
 #[async_trait::async_trait(?Send)]
-impl ClientInstruction for EditOrderInstruction {
+impl OpenbookClientInstruction for EditOrderInstruction {
     type Accounts = openbook_v2::accounts::PlaceOrder;
     type Instruction = openbook_v2::instruction::EditOrder;
     async fn to_instruction(

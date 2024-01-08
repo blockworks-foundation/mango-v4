@@ -1,5 +1,5 @@
 use super::*;
-
+use mango_client::StubOracleCloseInstruction;
 // This is an unspecific happy-case test that just runs a few instructions to check
 // that they work in principle. It should be split up / renamed.
 #[tokio::test]
@@ -38,6 +38,7 @@ async fn test_basic() -> Result<(), TransportError> {
             perp_count: 3,
             perp_oo_count: 3,
             token_conditional_swap_count: 3,
+            openbook_v2_count: 3,
             group,
             owner,
             payer,
@@ -339,6 +340,7 @@ async fn test_account_size_migration() -> Result<(), TransportError> {
             perp_count: 3,
             perp_oo_count: 3,
             token_conditional_swap_count: 3,
+            openbook_v2_count: 3,
             group,
             owner,
             payer,
