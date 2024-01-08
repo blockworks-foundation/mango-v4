@@ -72,7 +72,7 @@ async fn test_liq_perps_positive_pnl() -> Result<(), TransportError> {
     //
     // SETUP: Create a perp market
     //
-    let mango_v4::accounts::PerpCreateMarket { perp_market, .. } = mango_client::send_tx(
+    let mango_v4::accounts::PerpCreateMarket { perp_market, .. } = send_tx(
         solana,
         PerpCreateMarketInstruction {
             group,
@@ -134,7 +134,7 @@ async fn test_liq_perps_positive_pnl() -> Result<(), TransportError> {
     // SETUP: Borrow some spot on account_0, so we can later make it liquidatable that way
     // (actually borrowing 1000.5 due to loan origination!)
     //
-    mango_client::send_tx(
+    send_tx(
         solana,
         TokenWithdrawInstruction {
             amount: 1000,
@@ -151,7 +151,7 @@ async fn test_liq_perps_positive_pnl() -> Result<(), TransportError> {
     //
     // SETUP: Trade perps between accounts
     //
-    mango_client::send_tx(
+    send_tx(
         solana,
         PerpPlaceOrderInstruction {
             account: account_0,
@@ -165,7 +165,7 @@ async fn test_liq_perps_positive_pnl() -> Result<(), TransportError> {
     )
     .await
     .unwrap();
-    mango_client::send_tx(
+    send_tx(
         solana,
         PerpPlaceOrderInstruction {
             account: account_1,
@@ -179,7 +179,7 @@ async fn test_liq_perps_positive_pnl() -> Result<(), TransportError> {
     )
     .await
     .unwrap();
-    mango_client::send_tx(
+    send_tx(
         solana,
         PerpConsumeEventsInstruction {
             perp_market,
@@ -226,7 +226,7 @@ async fn test_liq_perps_positive_pnl() -> Result<(), TransportError> {
     //
     // TEST: Can't liquidate base if health wouldn't go up: no effect
     //
-    mango_client::send_tx(
+    send_tx(
         solana,
         PerpLiqBaseOrPositivePnlInstruction {
             liqor,
@@ -249,7 +249,7 @@ async fn test_liq_perps_positive_pnl() -> Result<(), TransportError> {
     //
     // TEST: Can take over existing positive pnl without eating base position
     //
-    mango_client::send_tx(
+    send_tx(
         solana,
         PerpLiqBaseOrPositivePnlInstruction {
             liqor,
@@ -281,7 +281,7 @@ async fn test_liq_perps_positive_pnl() -> Result<(), TransportError> {
     //
     // TEST: Being willing to take over more positive pnl can trigger more base liquidation
     //
-    mango_client::send_tx(
+    send_tx(
         solana,
         PerpLiqBaseOrPositivePnlInstruction {
             liqor,
@@ -327,7 +327,7 @@ async fn test_liq_perps_positive_pnl() -> Result<(), TransportError> {
     // this makes the perp health contribution negative!
     set_perp_stub_oracle_price(solana, group, perp_market, &base_token, admin, 19.0).await;
 
-    mango_client::send_tx(
+    send_tx(
         solana,
         PerpLiqBaseOrPositivePnlInstruction {
             liqor,
@@ -351,7 +351,7 @@ async fn test_liq_perps_positive_pnl() -> Result<(), TransportError> {
     // TEST: if overall perp health weight is >0, we can liquidate the base position further
     //
 
-    mango_client::send_tx(
+    send_tx(
         solana,
         PerpChangeWeights {
             group,
@@ -364,7 +364,7 @@ async fn test_liq_perps_positive_pnl() -> Result<(), TransportError> {
     .await
     .unwrap();
 
-    mango_client::send_tx(
+    send_tx(
         solana,
         PerpLiqBaseOrPositivePnlInstruction {
             liqor,
@@ -387,7 +387,7 @@ async fn test_liq_perps_positive_pnl() -> Result<(), TransportError> {
     // TEST: can bring the account to just above >0 health if desired
     //
 
-    mango_client::send_tx(
+    send_tx(
         solana,
         PerpLiqBaseOrPositivePnlInstruction {
             liqor,

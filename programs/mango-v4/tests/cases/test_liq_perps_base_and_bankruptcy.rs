@@ -74,7 +74,7 @@ async fn test_liq_perps_base_and_bankruptcy() -> Result<(), TransportError> {
     //
     // TEST: Create a perp market
     //
-    let mango_v4::accounts::PerpCreateMarket { perp_market, .. } = mango_client::send_tx(
+    let mango_v4::accounts::PerpCreateMarket { perp_market, .. } = send_tx(
         solana,
         PerpCreateMarketInstruction {
             group,
@@ -131,7 +131,7 @@ async fn test_liq_perps_base_and_bankruptcy() -> Result<(), TransportError> {
     //
     // SETUP: Trade perps between accounts
     //
-    mango_client::send_tx(
+    send_tx(
         solana,
         PerpPlaceOrderInstruction {
             account: account_0,
@@ -145,7 +145,7 @@ async fn test_liq_perps_base_and_bankruptcy() -> Result<(), TransportError> {
     )
     .await
     .unwrap();
-    mango_client::send_tx(
+    send_tx(
         solana,
         PerpPlaceOrderInstruction {
             account: account_1,
@@ -159,7 +159,7 @@ async fn test_liq_perps_base_and_bankruptcy() -> Result<(), TransportError> {
     )
     .await
     .unwrap();
-    mango_client::send_tx(
+    send_tx(
         solana,
         PerpConsumeEventsInstruction {
             perp_market,
@@ -196,7 +196,7 @@ async fn test_liq_perps_base_and_bankruptcy() -> Result<(), TransportError> {
     //
     // TEST: Liquidate base position with limit
     //
-    mango_client::send_tx(
+    send_tx(
         solana,
         PerpLiqBaseOrPositivePnlInstruction {
             liqor,
@@ -236,7 +236,7 @@ async fn test_liq_perps_base_and_bankruptcy() -> Result<(), TransportError> {
     //
     // TEST: Liquidate base position max
     //
-    mango_client::send_tx(
+    send_tx(
         solana,
         PerpLiqBaseOrPositivePnlInstruction {
             liqor,
@@ -267,7 +267,7 @@ async fn test_liq_perps_base_and_bankruptcy() -> Result<(), TransportError> {
     ));
 
     // verify health is good again
-    mango_client::send_tx(
+    send_tx(
         solana,
         TokenWithdrawInstruction {
             amount: 1,
@@ -287,7 +287,7 @@ async fn test_liq_perps_base_and_bankruptcy() -> Result<(), TransportError> {
     set_bank_stub_oracle_price(solana, group, base_token, admin, 1.32).await;
 
     // verify health is bad: can't withdraw
-    assert!(mango_client::send_tx(
+    assert!(send_tx(
         solana,
         TokenWithdrawInstruction {
             amount: 1,
@@ -304,7 +304,7 @@ async fn test_liq_perps_base_and_bankruptcy() -> Result<(), TransportError> {
     //
     // TEST: Liquidate base position
     //
-    mango_client::send_tx(
+    send_tx(
         solana,
         PerpLiqBaseOrPositivePnlInstruction {
             liqor,
@@ -337,7 +337,7 @@ async fn test_liq_perps_base_and_bankruptcy() -> Result<(), TransportError> {
     //
     // TEST: Liquidate base position max
     //
-    mango_client::send_tx(
+    send_tx(
         solana,
         PerpLiqBaseOrPositivePnlInstruction {
             liqor,
@@ -368,7 +368,7 @@ async fn test_liq_perps_base_and_bankruptcy() -> Result<(), TransportError> {
     ));
 
     // verify health is good again
-    mango_client::send_tx(
+    send_tx(
         solana,
         TokenWithdrawInstruction {
             amount: 1,
@@ -391,7 +391,7 @@ async fn test_liq_perps_base_and_bankruptcy() -> Result<(), TransportError> {
     //
     // TEST: Liquidate base position max
     //
-    mango_client::send_tx(
+    send_tx(
         solana,
         PerpLiqBaseOrPositivePnlInstruction {
             liqor,
@@ -430,7 +430,7 @@ async fn test_liq_perps_base_and_bankruptcy() -> Result<(), TransportError> {
         .available_settle_limit(&perp_market_data)
         .1;
 
-    mango_client::send_tx(
+    send_tx(
         solana,
         PerpSettlePnlInstruction {
             settler,
@@ -471,7 +471,7 @@ async fn test_liq_perps_base_and_bankruptcy() -> Result<(), TransportError> {
     set_bank_stub_oracle_price(solana, group, quote_token, admin, 10.0).await;
 
     // clear the negative settle token position, to avoid the liquidatable token position
-    mango_client::send_tx(
+    send_tx(
         solana,
         TokenDepositInstruction {
             amount: u64::MAX,
@@ -487,7 +487,7 @@ async fn test_liq_perps_base_and_bankruptcy() -> Result<(), TransportError> {
     .unwrap();
 
     // reduce the quote position so we still are liquidatable
-    mango_client::send_tx(
+    send_tx(
         solana,
         TokenWithdrawInstruction {
             amount: liqee_quote_deposits_before as u64 - 100,
@@ -512,7 +512,7 @@ async fn test_liq_perps_base_and_bankruptcy() -> Result<(), TransportError> {
     let liqee_settle_limit_before = liqee_before.perps[0]
         .available_settle_limit(&perp_market_data)
         .0;
-    mango_client::send_tx(
+    send_tx(
         solana,
         PerpLiqNegativePnlOrBankruptcyInstruction {
             liqor,

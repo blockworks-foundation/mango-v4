@@ -54,7 +54,7 @@ async fn test_margin_trade() -> Result<(), BanksClientError> {
     // create the test user account
     //
 
-    let account = mango_client::send_tx(
+    let account = send_tx(
         solana,
         AccountCreateInstruction {
             account_num: 0,
@@ -75,7 +75,7 @@ async fn test_margin_trade() -> Result<(), BanksClientError> {
     {
         let start_balance = solana.token_account_balance(payer_mint0_account).await;
 
-        mango_client::send_tx(
+        send_tx(
             solana,
             TokenDepositInstruction {
                 amount: deposit_amount_initial,
@@ -272,7 +272,7 @@ async fn test_flash_loan_swap_fee() -> Result<(), BanksClientError> {
     .await;
 
     let swap_fee_rate = 0.042f64;
-    mango_client::send_tx(
+    send_tx(
         solana,
         TokenEdit {
             group,
@@ -473,7 +473,7 @@ async fn test_flash_loan_creates_ata_accounts() -> Result<(), BanksClientError> 
     //
     // create the test user account
     //
-    let account = mango_client::send_tx(
+    let account = send_tx(
         solana,
         AccountCreateInstruction {
             account_num: 0,
@@ -494,7 +494,7 @@ async fn test_flash_loan_creates_ata_accounts() -> Result<(), BanksClientError> 
     {
         let start_balance = solana.token_account_balance(payer_mint0_account).await;
 
-        mango_client::send_tx(
+        send_tx(
             solana,
             TokenDepositInstruction {
                 amount: deposit_amount_initial,

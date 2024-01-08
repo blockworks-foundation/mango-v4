@@ -55,7 +55,7 @@ async fn test_perp_fixed() -> Result<(), TransportError> {
     //
     let mango_v4::accounts::PerpCreateMarket {
         perp_market, bids, ..
-    } = mango_client::send_tx(
+    } = send_tx(
         solana,
         PerpCreateMarketInstruction {
             group,
@@ -87,7 +87,7 @@ async fn test_perp_fixed() -> Result<(), TransportError> {
     //
     // Place and cancel order with order_id
     //
-    mango_client::send_tx(
+    send_tx(
         solana,
         PerpPlaceOrderInstruction {
             account: account_0,
@@ -110,7 +110,7 @@ async fn test_perp_fixed() -> Result<(), TransportError> {
         .await
         .perp_open_orders[0]
         .id;
-    mango_client::send_tx(
+    send_tx(
         solana,
         PerpCancelOrderInstruction {
             account: account_0,
@@ -127,7 +127,7 @@ async fn test_perp_fixed() -> Result<(), TransportError> {
     //
     // Place and cancel order with client_order_id
     //
-    mango_client::send_tx(
+    send_tx(
         solana,
         PerpPlaceOrderInstruction {
             account: account_0,
@@ -144,7 +144,7 @@ async fn test_perp_fixed() -> Result<(), TransportError> {
     .unwrap();
     check_prev_instruction_post_health(&solana, account_0).await;
 
-    mango_client::send_tx(
+    send_tx(
         solana,
         PerpCancelOrderByClientOrderIdInstruction {
             account: account_0,
@@ -161,7 +161,7 @@ async fn test_perp_fixed() -> Result<(), TransportError> {
     //
     // Place and cancel all orders
     //
-    mango_client::send_tx(
+    send_tx(
         solana,
         PerpPlaceOrderInstruction {
             account: account_0,
@@ -177,7 +177,7 @@ async fn test_perp_fixed() -> Result<(), TransportError> {
     .await
     .unwrap();
     check_prev_instruction_post_health(&solana, account_0).await;
-    mango_client::send_tx(
+    send_tx(
         solana,
         PerpPlaceOrderPeggedInstruction {
             account: account_0,
@@ -194,7 +194,7 @@ async fn test_perp_fixed() -> Result<(), TransportError> {
     .await
     .unwrap();
     check_prev_instruction_post_health(&solana, account_0).await;
-    mango_client::send_tx(
+    send_tx(
         solana,
         PerpPlaceOrderInstruction {
             account: account_0,
@@ -211,7 +211,7 @@ async fn test_perp_fixed() -> Result<(), TransportError> {
     .unwrap();
     check_prev_instruction_post_health(&solana, account_0).await;
 
-    mango_client::send_tx(
+    send_tx(
         solana,
         PerpCancelAllOrdersInstruction {
             account: account_0,
@@ -228,7 +228,7 @@ async fn test_perp_fixed() -> Result<(), TransportError> {
     //
     // Place a bid, corresponding ask, and consume event
     //
-    mango_client::send_tx(
+    send_tx(
         solana,
         PerpPlaceOrderInstruction {
             account: account_0,
@@ -245,7 +245,7 @@ async fn test_perp_fixed() -> Result<(), TransportError> {
     .unwrap();
     check_prev_instruction_post_health(&solana, account_0).await;
 
-    mango_client::send_tx(
+    send_tx(
         solana,
         PerpPlaceOrderInstruction {
             account: account_1,
@@ -263,7 +263,7 @@ async fn test_perp_fixed() -> Result<(), TransportError> {
     check_prev_instruction_post_health(&solana, account_1).await;
 
     // Trying to cancel-all after the order was already taken: has no effect but succeeds
-    mango_client::send_tx(
+    send_tx(
         solana,
         PerpCancelAllOrdersInstruction {
             account: account_0,
@@ -275,7 +275,7 @@ async fn test_perp_fixed() -> Result<(), TransportError> {
     .await
     .unwrap();
 
-    mango_client::send_tx(
+    send_tx(
         solana,
         PerpConsumeEventsInstruction {
             perp_market,
@@ -306,7 +306,7 @@ async fn test_perp_fixed() -> Result<(), TransportError> {
     //
 
     // Can't close yet, active positions
-    assert!(mango_client::send_tx(
+    assert!(send_tx(
         solana,
         PerpDeactivatePositionInstruction {
             account: account_0,
@@ -318,7 +318,7 @@ async fn test_perp_fixed() -> Result<(), TransportError> {
     .is_err());
 
     // Trade again to bring base_position_lots to 0
-    mango_client::send_tx(
+    send_tx(
         solana,
         PerpPlaceOrderInstruction {
             account: account_0,
@@ -335,7 +335,7 @@ async fn test_perp_fixed() -> Result<(), TransportError> {
     .unwrap();
     check_prev_instruction_post_health(&solana, account_0).await;
 
-    mango_client::send_tx(
+    send_tx(
         solana,
         PerpPlaceOrderInstruction {
             account: account_1,
@@ -352,7 +352,7 @@ async fn test_perp_fixed() -> Result<(), TransportError> {
     .unwrap();
     check_prev_instruction_post_health(&solana, account_1).await;
 
-    mango_client::send_tx(
+    send_tx(
         solana,
         PerpConsumeEventsInstruction {
             perp_market,
@@ -379,7 +379,7 @@ async fn test_perp_fixed() -> Result<(), TransportError> {
     ));
 
     // settle pnl and fees to bring quote_position_native fully to 0
-    mango_client::send_tx(
+    send_tx(
         solana,
         PerpSettlePnlInstruction {
             settler,
@@ -391,7 +391,7 @@ async fn test_perp_fixed() -> Result<(), TransportError> {
     )
     .await
     .unwrap();
-    mango_client::send_tx(
+    send_tx(
         solana,
         PerpSettleFeesInstruction {
             account: account_1,
@@ -406,7 +406,7 @@ async fn test_perp_fixed() -> Result<(), TransportError> {
     assert_eq!(mango_account_0.perps[0].quote_position_native(), 0);
 
     // Now closing works!
-    mango_client::send_tx(
+    send_tx(
         solana,
         PerpDeactivatePositionInstruction {
             account: account_0,
@@ -416,7 +416,7 @@ async fn test_perp_fixed() -> Result<(), TransportError> {
     )
     .await
     .unwrap();
-    mango_client::send_tx(
+    send_tx(
         solana,
         PerpDeactivatePositionInstruction {
             account: account_1,
@@ -435,7 +435,7 @@ async fn test_perp_fixed() -> Result<(), TransportError> {
     //
     // TEST: market closing (testing only)
     //
-    mango_client::send_tx(
+    send_tx(
         solana,
         PerpCloseMarketInstruction {
             admin,
@@ -501,7 +501,7 @@ async fn test_perp_oracle_peg() -> Result<(), TransportError> {
     //
     let mango_v4::accounts::PerpCreateMarket {
         perp_market, bids, ..
-    } = mango_client::send_tx(
+    } = send_tx(
         solana,
         PerpCreateMarketInstruction {
             group,
@@ -534,7 +534,7 @@ async fn test_perp_oracle_peg() -> Result<(), TransportError> {
     //
     // TEST: Place and cancel order with order_id
     //
-    mango_client::send_tx(
+    send_tx(
         solana,
         PerpPlaceOrderPeggedInstruction {
             account: account_0,
@@ -562,7 +562,7 @@ async fn test_perp_oracle_peg() -> Result<(), TransportError> {
         perp_order.side_and_tree(),
         SideAndOrderTree::BidOraclePegged
     );
-    mango_client::send_tx(
+    send_tx(
         solana,
         PerpCancelOrderInstruction {
             account: account_0,
@@ -579,7 +579,7 @@ async fn test_perp_oracle_peg() -> Result<(), TransportError> {
     //
     // TEST: Place a pegged bid, take it with a direct and pegged ask, and consume events
     //
-    mango_client::send_tx(
+    send_tx(
         solana,
         PerpPlaceOrderPeggedInstruction {
             account: account_0,
@@ -597,7 +597,7 @@ async fn test_perp_oracle_peg() -> Result<(), TransportError> {
     .unwrap();
     check_prev_instruction_post_health(&solana, account_0).await;
 
-    mango_client::send_tx(
+    send_tx(
         solana,
         PerpPlaceOrderInstruction {
             account: account_1,
@@ -614,7 +614,7 @@ async fn test_perp_oracle_peg() -> Result<(), TransportError> {
     .unwrap();
     check_prev_instruction_post_health(&solana, account_1).await;
 
-    mango_client::send_tx(
+    send_tx(
         solana,
         PerpPlaceOrderPeggedInstruction {
             account: account_1,
@@ -632,7 +632,7 @@ async fn test_perp_oracle_peg() -> Result<(), TransportError> {
     .unwrap();
     check_prev_instruction_post_health(&solana, account_1).await;
 
-    mango_client::send_tx(
+    send_tx(
         solana,
         PerpConsumeEventsInstruction {
             perp_market,
@@ -661,7 +661,7 @@ async fn test_perp_oracle_peg() -> Result<(), TransportError> {
     //
     // TEST: Place a pegged order and check how it behaves with oracle changes
     //
-    mango_client::send_tx(
+    send_tx(
         solana,
         PerpPlaceOrderPeggedInstruction {
             account: account_0,
@@ -679,7 +679,7 @@ async fn test_perp_oracle_peg() -> Result<(), TransportError> {
     .unwrap();
 
     // TEST: an ask at current oracle price does not match
-    mango_client::send_tx(
+    send_tx(
         solana,
         PerpPlaceOrderInstruction {
             account: account_1,
@@ -694,7 +694,7 @@ async fn test_perp_oracle_peg() -> Result<(), TransportError> {
     )
     .await
     .unwrap();
-    mango_client::send_tx(
+    send_tx(
         solana,
         PerpCancelOrderByClientOrderIdInstruction {
             account: account_1,
@@ -708,7 +708,7 @@ async fn test_perp_oracle_peg() -> Result<(), TransportError> {
 
     // TEST: Change the oracle, now the ask matches
     set_perp_stub_oracle_price(solana, group, perp_market, &tokens[0], admin, 1.002).await;
-    mango_client::send_tx(
+    send_tx(
         solana,
         PerpPlaceOrderInstruction {
             account: account_1,
@@ -723,7 +723,7 @@ async fn test_perp_oracle_peg() -> Result<(), TransportError> {
     )
     .await
     .unwrap();
-    mango_client::send_tx(
+    send_tx(
         solana,
         PerpConsumeEventsInstruction {
             perp_market,
@@ -740,7 +740,7 @@ async fn test_perp_oracle_peg() -> Result<(), TransportError> {
     //
     // TEST: order is cancelled when the price exceeds the peg limit
     //
-    mango_client::send_tx(
+    send_tx(
         solana,
         PerpPlaceOrderPeggedInstruction {
             account: account_0,
@@ -759,7 +759,7 @@ async fn test_perp_oracle_peg() -> Result<(), TransportError> {
 
     // order is still matchable when exactly at the peg limit
     set_perp_stub_oracle_price(solana, group, perp_market, &tokens[0], admin, 1.003).await;
-    mango_client::send_tx(
+    send_tx(
         solana,
         PerpPlaceOrderInstruction {
             account: account_1,
@@ -774,7 +774,7 @@ async fn test_perp_oracle_peg() -> Result<(), TransportError> {
     )
     .await
     .unwrap();
-    assert!(mango_client::send_tx(
+    assert!(send_tx(
         solana,
         PerpCancelOrderByClientOrderIdInstruction {
             account: account_1,
@@ -788,7 +788,7 @@ async fn test_perp_oracle_peg() -> Result<(), TransportError> {
 
     // but once the adjusted price is > the peg limit, it's gone
     set_perp_stub_oracle_price(solana, group, perp_market, &tokens[0], admin, 1.004).await;
-    mango_client::send_tx(
+    send_tx(
         solana,
         PerpPlaceOrderInstruction {
             account: account_1,
@@ -803,7 +803,7 @@ async fn test_perp_oracle_peg() -> Result<(), TransportError> {
     )
     .await
     .unwrap();
-    mango_client::send_tx(
+    send_tx(
         solana,
         PerpCancelOrderByClientOrderIdInstruction {
             account: account_1,
@@ -814,7 +814,7 @@ async fn test_perp_oracle_peg() -> Result<(), TransportError> {
     )
     .await
     .unwrap();
-    mango_client::send_tx(
+    send_tx(
         solana,
         PerpConsumeEventsInstruction {
             perp_market,
@@ -878,7 +878,7 @@ async fn test_perp_realize_partially() -> Result<(), TransportError> {
     //
     // TEST: Create a perp market
     //
-    let mango_v4::accounts::PerpCreateMarket { perp_market, .. } = mango_client::send_tx(
+    let mango_v4::accounts::PerpCreateMarket { perp_market, .. } = send_tx(
         solana,
         PerpCreateMarketInstruction {
             group,
@@ -909,7 +909,7 @@ async fn test_perp_realize_partially() -> Result<(), TransportError> {
     //
     // SETUP: Place a bid, corresponding ask, and consume event
     //
-    mango_client::send_tx(
+    send_tx(
         solana,
         PerpPlaceOrderInstruction {
             account: account_0,
@@ -925,7 +925,7 @@ async fn test_perp_realize_partially() -> Result<(), TransportError> {
     .await
     .unwrap();
 
-    mango_client::send_tx(
+    send_tx(
         solana,
         PerpPlaceOrderInstruction {
             account: account_1,
@@ -941,7 +941,7 @@ async fn test_perp_realize_partially() -> Result<(), TransportError> {
     .await
     .unwrap();
 
-    mango_client::send_tx(
+    send_tx(
         solana,
         PerpConsumeEventsInstruction {
             perp_market,
@@ -963,7 +963,7 @@ async fn test_perp_realize_partially() -> Result<(), TransportError> {
     // SETUP: Sell one lot again at increased price
     //
     set_perp_stub_oracle_price(solana, group, perp_market, &tokens[1], admin, 1500.0).await;
-    mango_client::send_tx(
+    send_tx(
         solana,
         PerpPlaceOrderInstruction {
             account: account_0,
@@ -979,7 +979,7 @@ async fn test_perp_realize_partially() -> Result<(), TransportError> {
     .await
     .unwrap();
 
-    mango_client::send_tx(
+    send_tx(
         solana,
         PerpPlaceOrderInstruction {
             account: account_1,
@@ -995,7 +995,7 @@ async fn test_perp_realize_partially() -> Result<(), TransportError> {
     .await
     .unwrap();
 
-    mango_client::send_tx(
+    send_tx(
         solana,
         PerpConsumeEventsInstruction {
             perp_market,
@@ -1086,7 +1086,7 @@ async fn test_perp_reducing_when_liquidatable() -> Result<(), TransportError> {
     //
     // TEST: Create a perp market
     //
-    let mango_v4::accounts::PerpCreateMarket { perp_market, .. } = mango_client::send_tx(
+    let mango_v4::accounts::PerpCreateMarket { perp_market, .. } = send_tx(
         solana,
         PerpCreateMarketInstruction {
             group,
@@ -1117,7 +1117,7 @@ async fn test_perp_reducing_when_liquidatable() -> Result<(), TransportError> {
     //
     // SETUP: Place a bid, corresponding ask, and consume event
     //
-    mango_client::send_tx(
+    send_tx(
         solana,
         PerpPlaceOrderInstruction {
             account: account_0,
@@ -1133,7 +1133,7 @@ async fn test_perp_reducing_when_liquidatable() -> Result<(), TransportError> {
     .await
     .unwrap();
 
-    mango_client::send_tx(
+    send_tx(
         solana,
         PerpPlaceOrderInstruction {
             account: account_1,
@@ -1149,7 +1149,7 @@ async fn test_perp_reducing_when_liquidatable() -> Result<(), TransportError> {
     .await
     .unwrap();
 
-    mango_client::send_tx(
+    send_tx(
         solana,
         PerpConsumeEventsInstruction {
             perp_market,
@@ -1176,7 +1176,7 @@ async fn test_perp_reducing_when_liquidatable() -> Result<(), TransportError> {
     //
     // TEST: Can place an order that reduces the position anyway
     //
-    mango_client::send_tx(
+    send_tx(
         solana,
         PerpPlaceOrderInstruction {
             account: account_1,
@@ -1195,7 +1195,7 @@ async fn test_perp_reducing_when_liquidatable() -> Result<(), TransportError> {
     //
     // TEST: Can NOT place an order that goes too far
     //
-    let err = mango_client::send_tx(
+    let err = send_tx(
         solana,
         PerpPlaceOrderInstruction {
             account: account_1,
@@ -1264,7 +1264,7 @@ async fn test_perp_compute() -> Result<(), TransportError> {
     //
     // TEST: Create a perp market
     //
-    let mango_v4::accounts::PerpCreateMarket { perp_market, .. } = mango_client::send_tx(
+    let mango_v4::accounts::PerpCreateMarket { perp_market, .. } = send_tx(
         solana,
         PerpCreateMarketInstruction {
             group,
@@ -1298,7 +1298,7 @@ async fn test_perp_compute() -> Result<(), TransportError> {
 
     for limit in 1..6 {
         for bid in price_lots..price_lots + 6 {
-            mango_client::send_tx(
+            send_tx(
                 solana,
                 PerpPlaceOrderInstruction {
                     account: account_0,
@@ -1314,7 +1314,7 @@ async fn test_perp_compute() -> Result<(), TransportError> {
             .await
             .unwrap();
         }
-        let result = mango_client::send_tx_get_metadata(
+        let result = send_tx_get_metadata(
             solana,
             PerpPlaceOrderInstruction {
                 account: account_1,
@@ -1335,7 +1335,7 @@ async fn test_perp_compute() -> Result<(), TransportError> {
             result.metadata.unwrap().compute_units_consumed
         );
 
-        mango_client::send_tx(
+        send_tx(
             solana,
             PerpCancelAllOrdersInstruction {
                 account: account_0,
@@ -1346,7 +1346,7 @@ async fn test_perp_compute() -> Result<(), TransportError> {
         )
         .await
         .unwrap();
-        mango_client::send_tx(
+        send_tx(
             solana,
             PerpCancelAllOrdersInstruction {
                 account: account_1,
@@ -1358,7 +1358,7 @@ async fn test_perp_compute() -> Result<(), TransportError> {
         .await
         .unwrap();
 
-        mango_client::send_tx(
+        send_tx(
             solana,
             PerpConsumeEventsInstruction {
                 perp_market,
@@ -1367,7 +1367,7 @@ async fn test_perp_compute() -> Result<(), TransportError> {
         )
         .await
         .unwrap();
-        mango_client::send_tx(
+        send_tx(
             solana,
             PerpConsumeEventsInstruction {
                 perp_market,
@@ -1376,7 +1376,7 @@ async fn test_perp_compute() -> Result<(), TransportError> {
         )
         .await
         .unwrap();
-        mango_client::send_tx(
+        send_tx(
             solana,
             PerpConsumeEventsInstruction {
                 perp_market,
@@ -1393,7 +1393,7 @@ async fn test_perp_compute() -> Result<(), TransportError> {
 
     for count in 1..6 {
         for bid in price_lots..price_lots + count {
-            mango_client::send_tx(
+            send_tx(
                 solana,
                 PerpPlaceOrderInstruction {
                     account: account_0,
@@ -1409,7 +1409,7 @@ async fn test_perp_compute() -> Result<(), TransportError> {
             .await
             .unwrap();
         }
-        let result = mango_client::send_tx_get_metadata(
+        let result = send_tx_get_metadata(
             solana,
             PerpCancelAllOrdersInstruction {
                 account: account_0,
@@ -1425,7 +1425,7 @@ async fn test_perp_compute() -> Result<(), TransportError> {
             result.metadata.unwrap().compute_units_consumed
         );
 
-        mango_client::send_tx(
+        send_tx(
             solana,
             PerpConsumeEventsInstruction {
                 perp_market,

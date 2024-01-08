@@ -41,7 +41,7 @@ async fn test_liq_tokens_force_cancel() -> Result<(), TransportError> {
         .list_spot_market(&base_token.mint, &quote_token.mint)
         .await;
 
-    let serum_market = mango_client::send_tx(
+    let serum_market = send_tx(
         solana,
         Serum3RegisterMarketInstruction {
             group,
@@ -77,7 +77,7 @@ async fn test_liq_tokens_force_cancel() -> Result<(), TransportError> {
     //
     // SETUP: Create an open orders account and an order
     //
-    let _open_orders = mango_client::send_tx(
+    let _open_orders = send_tx(
         solana,
         Serum3CreateOpenOrdersInstruction {
             account,
@@ -91,7 +91,7 @@ async fn test_liq_tokens_force_cancel() -> Result<(), TransportError> {
     .open_orders;
 
     // short some base
-    mango_client::send_tx(
+    send_tx(
         solana,
         Serum3PlaceOrderInstruction {
             side: Serum3Side::Ask,
@@ -116,7 +116,7 @@ async fn test_liq_tokens_force_cancel() -> Result<(), TransportError> {
     set_bank_stub_oracle_price(solana, group, base_token, admin, 10.0).await;
 
     // can't withdraw
-    assert!(mango_client::send_tx(
+    assert!(send_tx(
         solana,
         TokenWithdrawInstruction {
             amount: 1,
@@ -133,7 +133,7 @@ async fn test_liq_tokens_force_cancel() -> Result<(), TransportError> {
     //
     // TEST: force cancel orders, making the account healthy again
     //
-    mango_client::send_tx(
+    send_tx(
         solana,
         Serum3LiqForceCancelOrdersInstruction {
             account,
@@ -145,7 +145,7 @@ async fn test_liq_tokens_force_cancel() -> Result<(), TransportError> {
     .unwrap();
 
     // can withdraw again
-    mango_client::send_tx(
+    send_tx(
         solana,
         TokenWithdrawInstruction {
             amount: 2,
@@ -193,7 +193,7 @@ async fn test_liq_tokens_with_token() -> Result<(), TransportError> {
     let collateral_token2 = &tokens[3];
 
     // deposit some funds, to the vaults aren't empty
-    let vault_account = mango_client::send_tx(
+    let vault_account = send_tx(
         solana,
         AccountCreateInstruction {
             account_num: 2,
@@ -207,7 +207,7 @@ async fn test_liq_tokens_with_token() -> Result<(), TransportError> {
     .unwrap()
     .account;
     for &token_account in payer_mint_accounts {
-        mango_client::send_tx(
+        send_tx(
             solana,
             TokenDepositInstruction {
                 amount: 100000,
@@ -226,7 +226,7 @@ async fn test_liq_tokens_with_token() -> Result<(), TransportError> {
     //
     // SETUP: Make an account with some collateral and some borrows
     //
-    let account = mango_client::send_tx(
+    let account = send_tx(
         solana,
         AccountCreateInstruction {
             account_num: 0,
@@ -242,7 +242,7 @@ async fn test_liq_tokens_with_token() -> Result<(), TransportError> {
 
     let deposit1_amount = 1000;
     let deposit2_amount = 20;
-    mango_client::send_tx(
+    send_tx(
         solana,
         TokenDepositInstruction {
             amount: deposit1_amount,
@@ -256,7 +256,7 @@ async fn test_liq_tokens_with_token() -> Result<(), TransportError> {
     )
     .await
     .unwrap();
-    mango_client::send_tx(
+    send_tx(
         solana,
         TokenDepositInstruction {
             amount: deposit2_amount,
@@ -273,7 +273,7 @@ async fn test_liq_tokens_with_token() -> Result<(), TransportError> {
 
     let borrow1_amount = 350;
     let borrow2_amount = 50;
-    mango_client::send_tx(
+    send_tx(
         solana,
         TokenWithdrawInstruction {
             amount: borrow1_amount,
@@ -286,7 +286,7 @@ async fn test_liq_tokens_with_token() -> Result<(), TransportError> {
     )
     .await
     .unwrap();
-    mango_client::send_tx(
+    send_tx(
         solana,
         TokenWithdrawInstruction {
             amount: borrow2_amount,
@@ -309,7 +309,7 @@ async fn test_liq_tokens_with_token() -> Result<(), TransportError> {
     // TEST: liquidate borrow2 against too little collateral2
     //
 
-    mango_client::send_tx(
+    send_tx(
         solana,
         TokenLiqWithTokenInstruction {
             liqee: account,
@@ -339,7 +339,7 @@ async fn test_liq_tokens_with_token() -> Result<(), TransportError> {
     // TEST: liquidate the remaining borrow2 against collateral1,
     // bringing the borrow2 balance to 0 but keeping account health negative
     //
-    mango_client::send_tx(
+    send_tx(
         solana,
         TokenLiqWithTokenInstruction {
             liqee: account,
@@ -367,7 +367,7 @@ async fn test_liq_tokens_with_token() -> Result<(), TransportError> {
     //
     // TEST: liquidate borrow1 with collateral1, but place a limit
     //
-    mango_client::send_tx(
+    send_tx(
         solana,
         TokenLiqWithTokenInstruction {
             liqee: account,
@@ -398,7 +398,7 @@ async fn test_liq_tokens_with_token() -> Result<(), TransportError> {
     //
     // TEST: liquidate borrow1 with collateral1, making the account healthy again
     //
-    mango_client::send_tx(
+    send_tx(
         solana,
         TokenLiqWithTokenInstruction {
             liqee: account,
@@ -461,7 +461,7 @@ async fn test_liq_tokens_with_token() -> Result<(), TransportError> {
     // Setup: reduce collateral value to trigger liquidatability
     set_bank_stub_oracle_price(solana, group, collateral_token1, admin, 75.0).await;
 
-    mango_client::send_tx(
+    send_tx(
         solana,
         TokenLiqWithTokenInstruction {
             liqee: account,

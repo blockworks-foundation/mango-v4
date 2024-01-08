@@ -35,7 +35,7 @@ async fn test_health_wrap() -> Result<(), TransportError> {
         .serum
         .list_spot_market(&base_token.mint, &quote_token.mint)
         .await;
-    let serum_market = mango_client::send_tx(
+    let serum_market = send_tx(
         solana,
         Serum3RegisterMarketInstruction {
             group,
@@ -78,7 +78,7 @@ async fn test_health_wrap() -> Result<(), TransportError> {
     )
     .await;
 
-    mango_client::send_tx(
+    send_tx(
         solana,
         Serum3CreateOpenOrdersInstruction {
             account,

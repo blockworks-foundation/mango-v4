@@ -29,7 +29,7 @@ async fn test_basic() -> Result<(), TransportError> {
     let bank = tokens[0].bank;
     let vault = tokens[0].vault;
 
-    let account = mango_client::send_tx(
+    let account = send_tx(
         solana,
         AccountCreateInstruction {
             account_num: 0,
@@ -61,7 +61,7 @@ async fn test_basic() -> Result<(), TransportError> {
     assert_eq!(account_data.perps.len(), 3);
     assert_eq!(account_data.perp_open_orders.len(), 3);
 
-    mango_client::send_tx(
+    send_tx(
         solana,
         AccountExpandInstruction {
             account_num: 0,
@@ -93,7 +93,7 @@ async fn test_basic() -> Result<(), TransportError> {
     assert_eq!(account_data.perps.len(), 1);
     assert_eq!(account_data.perp_open_orders.len(), 1);
 
-    mango_client::send_tx(
+    send_tx(
         solana,
         AccountExpandInstruction {
             account_num: 0,
@@ -132,7 +132,7 @@ async fn test_basic() -> Result<(), TransportError> {
         let deposit_amount = 100;
         let start_balance = solana.token_account_balance(payer_mint0_account).await;
 
-        mango_client::send_tx(
+        send_tx(
             solana,
             TokenDepositInstruction {
                 amount: deposit_amount,
@@ -177,7 +177,7 @@ async fn test_basic() -> Result<(), TransportError> {
         let withdraw_amount = 50;
         let start_balance = solana.token_account_balance(payer_mint0_account).await;
 
-        mango_client::send_tx(
+        send_tx(
             solana,
             TokenWithdrawInstruction {
                 amount: withdraw_amount,
@@ -221,7 +221,7 @@ async fn test_basic() -> Result<(), TransportError> {
     //
 
     // withdraw whatever is remaining, can't close bank vault without this
-    mango_client::send_tx(
+    send_tx(
         solana,
         TokenUpdateIndexAndRateInstruction {
             mint_info: tokens[0].mint_info,
@@ -230,7 +230,7 @@ async fn test_basic() -> Result<(), TransportError> {
     .await
     .unwrap();
     let bank_data: Bank = solana.get_account(bank).await;
-    mango_client::send_tx(
+    send_tx(
         solana,
         TokenWithdrawInstruction {
             amount: bank_data.native_deposits().to_num(),
@@ -245,7 +245,7 @@ async fn test_basic() -> Result<(), TransportError> {
     .unwrap();
 
     // close account
-    mango_client::send_tx(
+    send_tx(
         solana,
         AccountCloseInstruction {
             group,
@@ -259,7 +259,7 @@ async fn test_basic() -> Result<(), TransportError> {
 
     // deregister bank - closes bank, mint info, and bank vault
     let bank_data: Bank = solana.get_account(bank).await;
-    mango_client::send_tx(
+    send_tx(
         solana,
         TokenDeregisterInstruction {
             admin,
@@ -283,7 +283,7 @@ async fn test_basic() -> Result<(), TransportError> {
     .unwrap();
 
     // close stub oracle
-    mango_client::send_tx(
+    send_tx(
         solana,
         StubOracleCloseInstruction {
             oracle: tokens[0].oracle,
@@ -297,7 +297,7 @@ async fn test_basic() -> Result<(), TransportError> {
     .unwrap();
 
     // close group
-    mango_client::send_tx(
+    send_tx(
         solana,
         GroupCloseInstruction {
             group,
@@ -330,7 +330,7 @@ async fn test_account_size_migration() -> Result<(), TransportError> {
     .create(solana)
     .await;
 
-    let account = mango_client::send_tx(
+    let account = send_tx(
         solana,
         AccountCreateInstruction {
             account_num: 0,
@@ -389,7 +389,7 @@ async fn test_account_size_migration() -> Result<(), TransportError> {
     );
     assert_eq!(new_mango_account.header.perp_count, 13);
 
-    mango_client::send_tx(solana, AccountSizeMigrationInstruction { account, payer })
+    send_tx(solana, AccountSizeMigrationInstruction { account, payer })
         .await
         .unwrap();
 
@@ -407,7 +407,7 @@ async fn test_account_size_migration() -> Result<(), TransportError> {
     //
 
     let before_bytes = solana.get_account_data(account).await;
-    mango_client::send_tx(solana, AccountSizeMigrationInstruction { account, payer })
+    send_tx(solana, AccountSizeMigrationInstruction { account, payer })
         .await
         .unwrap();
     let after_bytes = solana.get_account_data(account).await;
@@ -454,7 +454,7 @@ async fn test_bank_maint_weight_shift() -> Result<(), TransportError> {
 
     let start_time = solana.clock_timestamp().await;
 
-    mango_client::send_tx(
+    send_tx(
         solana,
         TokenEdit {
             group,
@@ -488,7 +488,7 @@ async fn test_bank_maint_weight_shift() -> Result<(), TransportError> {
 
     solana.set_clock_timestamp(start_time + 1600).await;
 
-    mango_client::send_tx(
+    send_tx(
         solana,
         TokenEdit {
             group,

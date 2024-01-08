@@ -57,7 +57,7 @@ async fn test_stale_oracle_deposit_withdraw() -> Result<(), TransportError> {
     .await;
 
     // Create some token1 borrows
-    mango_client::send_tx(
+    send_tx(
         solana,
         TokenWithdrawInstruction {
             amount: 10,
@@ -72,7 +72,7 @@ async fn test_stale_oracle_deposit_withdraw() -> Result<(), TransportError> {
     .unwrap();
 
     // Make oracles invalid by increasing deviation
-    mango_client::send_tx(
+    send_tx(
         solana,
         StubOracleSetTestInstruction {
             oracle: tokens[0].oracle,
@@ -86,7 +86,7 @@ async fn test_stale_oracle_deposit_withdraw() -> Result<(), TransportError> {
     )
     .await
     .unwrap();
-    mango_client::send_tx(
+    send_tx(
         solana,
         StubOracleSetTestInstruction {
             oracle: tokens[1].oracle,
@@ -100,7 +100,7 @@ async fn test_stale_oracle_deposit_withdraw() -> Result<(), TransportError> {
     )
     .await
     .unwrap();
-    mango_client::send_tx(
+    send_tx(
         solana,
         StubOracleSetTestInstruction {
             oracle: tokens[2].oracle,
@@ -116,7 +116,7 @@ async fn test_stale_oracle_deposit_withdraw() -> Result<(), TransportError> {
     .unwrap();
 
     // Can't activate a token position for a bad oracle
-    assert!(mango_client::send_tx(
+    assert!(send_tx(
         solana,
         TokenDepositInstruction {
             amount: 11,
@@ -132,7 +132,7 @@ async fn test_stale_oracle_deposit_withdraw() -> Result<(), TransportError> {
     .is_err());
 
     // Verify that creating a new borrow won't work
-    assert!(mango_client::send_tx(
+    assert!(send_tx(
         solana,
         TokenWithdrawInstruction {
             amount: 1,
@@ -147,7 +147,7 @@ async fn test_stale_oracle_deposit_withdraw() -> Result<(), TransportError> {
     .is_err());
 
     // Repay token1 borrows
-    mango_client::send_tx(
+    send_tx(
         solana,
         TokenDepositInstruction {
             amount: 11,
@@ -163,7 +163,7 @@ async fn test_stale_oracle_deposit_withdraw() -> Result<(), TransportError> {
     .unwrap();
 
     // Withdraw token0 deposits
-    mango_client::send_tx(
+    send_tx(
         solana,
         TokenWithdrawInstruction {
             amount: 100,

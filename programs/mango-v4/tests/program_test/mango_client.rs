@@ -5057,6 +5057,7 @@ impl ClientInstruction for OpenbookV2RegisterMarketInstruction {
         let instruction = Self::Instruction {
             market_index: self.market_index,
             name: "UUU/usdc".to_string(),
+            oracle_price_band: f32::MAX,
         };
 
         let openbook_v2_market = Pubkey::find_program_address(

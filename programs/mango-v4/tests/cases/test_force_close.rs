@@ -27,7 +27,7 @@ async fn test_force_close_token() -> Result<(), TransportError> {
     let collateral_token = &tokens[0];
     let borrow_token = &tokens[1];
 
-    mango_client::send_tx(
+    send_tx(
         solana,
         TokenEditWeights {
             group,
@@ -84,7 +84,7 @@ async fn test_force_close_token() -> Result<(), TransportError> {
     .await;
 
     let borrow1_amount = 10;
-    mango_client::send_tx(
+    send_tx(
         solana,
         TokenWithdrawInstruction {
             amount: borrow1_amount,
@@ -101,7 +101,7 @@ async fn test_force_close_token() -> Result<(), TransportError> {
     //
     // test force close is enabled
     //
-    assert!(mango_client::send_tx(
+    assert!(send_tx(
         solana,
         TokenForceCloseBorrowsWithTokenInstruction {
             liqee: liqee,
@@ -118,7 +118,7 @@ async fn test_force_close_token() -> Result<(), TransportError> {
     .is_err());
 
     // set force close, and reduce only to 1
-    mango_client::send_tx(
+    send_tx(
         solana,
         TokenMakeReduceOnly {
             admin,
@@ -134,7 +134,7 @@ async fn test_force_close_token() -> Result<(), TransportError> {
     //
     // test liqor needs deposits to be gte than the borrows it wants to liquidate
     //
-    assert!(mango_client::send_tx(
+    assert!(send_tx(
         solana,
         TokenForceCloseBorrowsWithTokenInstruction {
             liqee: liqee,
@@ -154,7 +154,7 @@ async fn test_force_close_token() -> Result<(), TransportError> {
     // test deposit with reduce only set to 1
     //
     let deposit1_amount = 11;
-    assert!(mango_client::send_tx(
+    assert!(send_tx(
         solana,
         TokenDepositInstruction {
             amount: deposit1_amount,
@@ -170,7 +170,7 @@ async fn test_force_close_token() -> Result<(), TransportError> {
     .is_err());
 
     // set force close, and reduce only to 2
-    mango_client::send_tx(
+    send_tx(
         solana,
         TokenMakeReduceOnly {
             admin,
@@ -186,7 +186,7 @@ async fn test_force_close_token() -> Result<(), TransportError> {
     //
     // test deposit with reduce only set to 2
     //
-    mango_client::send_tx(
+    send_tx(
         solana,
         TokenDepositInstruction {
             amount: deposit1_amount,
@@ -204,7 +204,7 @@ async fn test_force_close_token() -> Result<(), TransportError> {
     //
     // test force close borrows
     //
-    mango_client::send_tx(
+    send_tx(
         solana,
         TokenForceCloseBorrowsWithTokenInstruction {
             liqee: liqee,
@@ -279,7 +279,7 @@ async fn test_force_close_perp() -> Result<(), TransportError> {
     //
     // TEST: Create a perp market
     //
-    let mango_v4::accounts::PerpCreateMarket { perp_market, .. } = mango_client::send_tx(
+    let mango_v4::accounts::PerpCreateMarket { perp_market, .. } = send_tx(
         solana,
         PerpCreateMarketInstruction {
             group,
@@ -311,7 +311,7 @@ async fn test_force_close_perp() -> Result<(), TransportError> {
     //
     // Place a bid, corresponding ask, and consume event
     //
-    mango_client::send_tx(
+    send_tx(
         solana,
         PerpPlaceOrderInstruction {
             account: account_0,
@@ -328,7 +328,7 @@ async fn test_force_close_perp() -> Result<(), TransportError> {
     .unwrap();
     check_prev_instruction_post_health(&solana, account_0).await;
 
-    mango_client::send_tx(
+    send_tx(
         solana,
         PerpPlaceOrderInstruction {
             account: account_1,
@@ -345,7 +345,7 @@ async fn test_force_close_perp() -> Result<(), TransportError> {
     .unwrap();
     check_prev_instruction_post_health(&solana, account_1).await;
 
-    mango_client::send_tx(
+    send_tx(
         solana,
         PerpConsumeEventsInstruction {
             perp_market,
@@ -371,7 +371,7 @@ async fn test_force_close_perp() -> Result<(), TransportError> {
     ));
 
     // Market needs to be in force close
-    assert!(mango_client::send_tx(
+    assert!(send_tx(
         solana,
         PerpForceClosePositionInstruction {
             account_a: account_0,
@@ -385,7 +385,7 @@ async fn test_force_close_perp() -> Result<(), TransportError> {
     //
     // Set force close and force close position and verify that base position is 0
     //
-    mango_client::send_tx(
+    send_tx(
         solana,
         PerpMakeReduceOnly {
             admin,
@@ -399,7 +399,7 @@ async fn test_force_close_perp() -> Result<(), TransportError> {
     .unwrap();
 
     // account_a needs to be long, and account_b needs to be short
-    assert!(mango_client::send_tx(
+    assert!(send_tx(
         solana,
         PerpForceClosePositionInstruction {
             account_a: account_1,
@@ -410,7 +410,7 @@ async fn test_force_close_perp() -> Result<(), TransportError> {
     .await
     .is_err());
 
-    mango_client::send_tx(
+    send_tx(
         solana,
         PerpForceClosePositionInstruction {
             account_a: account_0,

@@ -26,7 +26,7 @@ async fn test_position_lifetime() -> Result<(), TransportError> {
     .create(solana)
     .await;
 
-    let account = mango_client::send_tx(
+    let account = send_tx(
         solana,
         AccountCreateInstruction {
             account_num: 0,
@@ -62,7 +62,7 @@ async fn test_position_lifetime() -> Result<(), TransportError> {
         let deposit_amount = 100;
 
         // cannot deposit_into_existing if no token deposit exists
-        assert!(mango_client::send_tx(
+        assert!(send_tx(
             solana,
             TokenDepositIntoExistingInstruction {
                 amount: deposit_amount,
@@ -78,7 +78,7 @@ async fn test_position_lifetime() -> Result<(), TransportError> {
 
         // this activates the positions
         for &payer_token in payer_mint_accounts {
-            mango_client::send_tx(
+            send_tx(
                 solana,
                 TokenDepositInstruction {
                     amount: deposit_amount,
@@ -95,7 +95,7 @@ async fn test_position_lifetime() -> Result<(), TransportError> {
         }
 
         // now depositing into an active account works
-        mango_client::send_tx(
+        send_tx(
             solana,
             TokenDepositIntoExistingInstruction {
                 amount: deposit_amount,
@@ -111,7 +111,7 @@ async fn test_position_lifetime() -> Result<(), TransportError> {
 
         // this closes the positions
         for &payer_token in payer_mint_accounts {
-            mango_client::send_tx(
+            send_tx(
                 solana,
                 TokenWithdrawInstruction {
                     amount: u64::MAX,
@@ -147,7 +147,7 @@ async fn test_position_lifetime() -> Result<(), TransportError> {
 
         // collateral for the incoming borrow
         let collateral_amount = 1000;
-        mango_client::send_tx(
+        send_tx(
             solana,
             TokenDepositInstruction {
                 amount: collateral_amount,
@@ -164,7 +164,7 @@ async fn test_position_lifetime() -> Result<(), TransportError> {
 
         // borrow some of mint1, activating the position
         let borrow_amount = 10;
-        mango_client::send_tx(
+        send_tx(
             solana,
             TokenWithdrawInstruction {
                 amount: borrow_amount,
@@ -184,7 +184,7 @@ async fn test_position_lifetime() -> Result<(), TransportError> {
 
         // give it back, closing the position
         {
-            mango_client::send_tx(
+            send_tx(
                 solana,
                 TokenDepositInstruction {
                     // deposit withdraw amount + some more to cover loan origination fees
@@ -199,7 +199,7 @@ async fn test_position_lifetime() -> Result<(), TransportError> {
             )
             .await
             .unwrap();
-            mango_client::send_tx(
+            send_tx(
                 solana,
                 TokenWithdrawInstruction {
                     // withdraw residual amount left
@@ -216,7 +216,7 @@ async fn test_position_lifetime() -> Result<(), TransportError> {
         }
 
         // withdraw the collateral, closing the position
-        mango_client::send_tx(
+        send_tx(
             solana,
             TokenWithdrawInstruction {
                 amount: collateral_amount,

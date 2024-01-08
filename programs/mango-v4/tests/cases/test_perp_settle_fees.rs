@@ -57,7 +57,7 @@ async fn test_perp_settle_fees() -> Result<(), TransportError> {
     //
     // TEST: Create a perp market
     //
-    let mango_v4::accounts::PerpCreateMarket { perp_market, .. } = mango_client::send_tx(
+    let mango_v4::accounts::PerpCreateMarket { perp_market, .. } = send_tx(
         solana,
         PerpCreateMarketInstruction {
             group,
@@ -88,7 +88,7 @@ async fn test_perp_settle_fees() -> Result<(), TransportError> {
     let mango_v4::accounts::PerpCreateMarket {
         perp_market: perp_market_2,
         ..
-    } = mango_client::send_tx(
+    } = send_tx(
         solana,
         PerpCreateMarketInstruction {
             group,
@@ -124,7 +124,7 @@ async fn test_perp_settle_fees() -> Result<(), TransportError> {
     //
     // Place orders and create a position
     //
-    mango_client::send_tx(
+    send_tx(
         solana,
         PerpPlaceOrderInstruction {
             account: account_0,
@@ -139,7 +139,7 @@ async fn test_perp_settle_fees() -> Result<(), TransportError> {
     .await
     .unwrap();
 
-    mango_client::send_tx(
+    send_tx(
         solana,
         PerpPlaceOrderInstruction {
             account: account_1,
@@ -154,7 +154,7 @@ async fn test_perp_settle_fees() -> Result<(), TransportError> {
     .await
     .unwrap();
 
-    mango_client::send_tx(
+    send_tx(
         solana,
         PerpConsumeEventsInstruction {
             perp_market,
@@ -181,7 +181,7 @@ async fn test_perp_settle_fees() -> Result<(), TransportError> {
     ));
 
     // Cannot settle position that does not exist
-    let result = mango_client::send_tx(
+    let result = send_tx(
         solana,
         PerpSettleFeesInstruction {
             account: account_1,
@@ -198,7 +198,7 @@ async fn test_perp_settle_fees() -> Result<(), TransportError> {
     );
 
     // max_settle_amount must be greater than zero
-    let result = mango_client::send_tx(
+    let result = send_tx(
         solana,
         PerpSettleFeesInstruction {
             account: account_1,
@@ -234,7 +234,7 @@ async fn test_perp_settle_fees() -> Result<(), TransportError> {
     set_bank_stub_oracle_price(solana, group, base_token0, admin, 1200.0).await;
 
     // Account must have a loss, should not settle anything and instead return early
-    mango_client::send_tx(
+    send_tx(
         solana,
         PerpSettleFeesInstruction {
             account: account_0,
@@ -264,7 +264,7 @@ async fn test_perp_settle_fees() -> Result<(), TransportError> {
     }
 
     // TODO: Difficult to test health due to fees being so small. Need alternative
-    // let result = mango_client::send_tx(
+    // let result = send_tx(
     //     solana,
     //     PerpSettleFeesInstruction {
     //         group,
@@ -323,7 +323,7 @@ async fn test_perp_settle_fees() -> Result<(), TransportError> {
 
     // Partially execute the settle
     let partial_settle_amount = 10;
-    mango_client::send_tx(
+    send_tx(
         solana,
         PerpSettleFeesInstruction {
             account: account_1,
@@ -376,7 +376,7 @@ async fn test_perp_settle_fees() -> Result<(), TransportError> {
     }
 
     // Fully execute the settle
-    mango_client::send_tx(
+    send_tx(
         solana,
         PerpSettleFeesInstruction {
             account: account_1,

@@ -30,7 +30,7 @@ async fn test_alt() -> Result<(), TransportError> {
 
     let address_lookup_table = solana.create_address_lookup_table(payer, payer).await;
 
-    mango_client::send_tx(
+    send_tx(
         solana,
         AltSetInstruction {
             group,
@@ -53,7 +53,7 @@ async fn test_alt() -> Result<(), TransportError> {
     assert_eq!(address_lookup_table_program::addresses(&solana.get_account_data(address_lookup_table).await.unwrap()).len(), 0);
 
     let new_addresses = vec![Pubkey::new_unique(), Pubkey::new_unique()];
-    mango_client::send_tx(solana, AltExtendInstruction {
+    send_tx(solana, AltExtendInstruction {
         group,
         admin,
         payer,

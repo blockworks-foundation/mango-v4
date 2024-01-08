@@ -54,7 +54,7 @@ async fn test_reduce_only_token() -> Result<(), TransportError> {
     .await;
 
     // make token reduce only
-    mango_client::send_tx(
+    send_tx(
         solana,
         TokenMakeReduceOnly {
             admin,
@@ -72,7 +72,7 @@ async fn test_reduce_only_token() -> Result<(), TransportError> {
     //
 
     // deposit without reduce_only should fail
-    let res = mango_client::send_tx(
+    let res = send_tx(
         solana,
         TokenDepositInstruction {
             amount: 10,
@@ -88,7 +88,7 @@ async fn test_reduce_only_token() -> Result<(), TransportError> {
     assert!(res.is_err());
 
     // deposit with reduce_only should pass with no effect
-    mango_client::send_tx(
+    send_tx(
         solana,
         TokenDepositInstruction {
             amount: 10,
@@ -108,7 +108,7 @@ async fn test_reduce_only_token() -> Result<(), TransportError> {
     assert_eq!(native.to_num::<u64>(), initial_token_deposit);
 
     // withdraw all should pass
-    mango_client::send_tx(
+    send_tx(
         solana,
         TokenWithdrawInstruction {
             amount: initial_token_deposit,
@@ -123,7 +123,7 @@ async fn test_reduce_only_token() -> Result<(), TransportError> {
     .unwrap();
 
     // borrowing should fail
-    let res = mango_client::send_tx(
+    let res = send_tx(
         solana,
         TokenWithdrawInstruction {
             amount: 1,
@@ -140,7 +140,7 @@ async fn test_reduce_only_token() -> Result<(), TransportError> {
     //
     // Repay borrows
     //
-    mango_client::send_tx(
+    send_tx(
         solana,
         TokenWithdrawInstruction {
             amount: initial_token_deposit / 2,
@@ -155,7 +155,7 @@ async fn test_reduce_only_token() -> Result<(), TransportError> {
     .unwrap();
 
     // make token reduce only
-    mango_client::send_tx(
+    send_tx(
         solana,
         TokenMakeReduceOnly {
             admin,
@@ -168,7 +168,7 @@ async fn test_reduce_only_token() -> Result<(), TransportError> {
     .await
     .unwrap();
 
-    mango_client::send_tx(
+    send_tx(
         solana,
         TokenDepositInstruction {
             amount: initial_token_deposit,
@@ -237,7 +237,7 @@ async fn test_perp_reduce_only() -> Result<(), TransportError> {
     //
     // TEST: Create a perp market
     //
-    let mango_v4::accounts::PerpCreateMarket { perp_market, .. } = mango_client::send_tx(
+    let mango_v4::accounts::PerpCreateMarket { perp_market, .. } = send_tx(
         solana,
         PerpCreateMarketInstruction {
             group,
@@ -272,7 +272,7 @@ async fn test_perp_reduce_only() -> Result<(), TransportError> {
     //
     // Place orders and create a position
     //
-    mango_client::send_tx(
+    send_tx(
         solana,
         PerpPlaceOrderInstruction {
             account: account_0,
@@ -287,7 +287,7 @@ async fn test_perp_reduce_only() -> Result<(), TransportError> {
     .await
     .unwrap();
 
-    mango_client::send_tx(
+    send_tx(
         solana,
         PerpPlaceOrderInstruction {
             account: account_1,
@@ -302,7 +302,7 @@ async fn test_perp_reduce_only() -> Result<(), TransportError> {
     .await
     .unwrap();
 
-    mango_client::send_tx(
+    send_tx(
         solana,
         PerpConsumeEventsInstruction {
             perp_market,
@@ -315,7 +315,7 @@ async fn test_perp_reduce_only() -> Result<(), TransportError> {
     // account_0 - place a new bid
     // when user has a long, and market is in reduce only,
     // to reduce incoming asks to reduce position, we ignore existing bids
-    mango_client::send_tx(
+    send_tx(
         solana,
         PerpPlaceOrderInstruction {
             account: account_0,
@@ -332,7 +332,7 @@ async fn test_perp_reduce_only() -> Result<(), TransportError> {
     // account_1 - place a new ask
     // when user has a short, and market is in reduce only,
     // to reduce incoming bids to reduce position, we ignore existing asks
-    mango_client::send_tx(
+    send_tx(
         solana,
         PerpPlaceOrderInstruction {
             account: account_1,
@@ -350,7 +350,7 @@ async fn test_perp_reduce_only() -> Result<(), TransportError> {
     //
     // Make market reduce only
     //
-    mango_client::send_tx(
+    send_tx(
         solana,
         PerpMakeReduceOnly {
             group,
@@ -364,7 +364,7 @@ async fn test_perp_reduce_only() -> Result<(), TransportError> {
     .unwrap();
 
     // account_0 - place a new bid with reduce only false should fail
-    let res = mango_client::send_tx(
+    let res = send_tx(
         solana,
         PerpPlaceOrderInstruction {
             account: account_0,
@@ -380,7 +380,7 @@ async fn test_perp_reduce_only() -> Result<(), TransportError> {
     assert!(res.is_err());
 
     // account_0 - place a new bid with reduce only true should do nothing
-    mango_client::send_tx(
+    send_tx(
         solana,
         PerpPlaceOrderInstruction {
             account: account_0,
@@ -399,7 +399,7 @@ async fn test_perp_reduce_only() -> Result<(), TransportError> {
     assert_eq!(mango_account_0.perps[0].bids_base_lots, 1);
 
     // account_0 - place a new ask should pass
-    mango_client::send_tx(
+    send_tx(
         solana,
         PerpPlaceOrderInstruction {
             account: account_0,
@@ -417,7 +417,7 @@ async fn test_perp_reduce_only() -> Result<(), TransportError> {
     assert_eq!(mango_account_0.perps[0].asks_base_lots, 1);
 
     // account_0 - place a new ask should pass
-    mango_client::send_tx(
+    send_tx(
         solana,
         PerpPlaceOrderInstruction {
             account: account_0,
@@ -436,7 +436,7 @@ async fn test_perp_reduce_only() -> Result<(), TransportError> {
     assert_eq!(mango_account_0.perps[0].asks_base_lots, 2);
 
     // account_0 - place a new ask should fail if not reduce_only
-    let res = mango_client::send_tx(
+    let res = send_tx(
         solana,
         PerpPlaceOrderInstruction {
             account: account_0,
@@ -452,7 +452,7 @@ async fn test_perp_reduce_only() -> Result<(), TransportError> {
     assert!(res.is_err());
 
     // account_0 - place a new ask should pass but have no effect
-    mango_client::send_tx(
+    send_tx(
         solana,
         PerpPlaceOrderInstruction {
             account: account_0,
@@ -471,7 +471,7 @@ async fn test_perp_reduce_only() -> Result<(), TransportError> {
     assert_eq!(mango_account_0.perps[0].asks_base_lots, 2);
 
     // account_1 - place a new ask with reduce only false should fail
-    let res = mango_client::send_tx(
+    let res = send_tx(
         solana,
         PerpPlaceOrderInstruction {
             account: account_1,
@@ -487,7 +487,7 @@ async fn test_perp_reduce_only() -> Result<(), TransportError> {
     assert!(res.is_err());
 
     // account_1 - place a new ask with reduce only true should pass
-    mango_client::send_tx(
+    send_tx(
         solana,
         PerpPlaceOrderInstruction {
             account: account_1,
@@ -506,7 +506,7 @@ async fn test_perp_reduce_only() -> Result<(), TransportError> {
     assert_eq!(mango_account_1.perps[0].asks_base_lots, 1);
 
     // account_1 - place a new bid should pass
-    mango_client::send_tx(
+    send_tx(
         solana,
         PerpPlaceOrderInstruction {
             account: account_1,
@@ -524,7 +524,7 @@ async fn test_perp_reduce_only() -> Result<(), TransportError> {
     assert_eq!(mango_account_1.perps[0].bids_base_lots, 1);
 
     // account_1 - place a new bid should pass
-    mango_client::send_tx(
+    send_tx(
         solana,
         PerpPlaceOrderInstruction {
             account: account_1,
@@ -542,7 +542,7 @@ async fn test_perp_reduce_only() -> Result<(), TransportError> {
     assert_eq!(mango_account_1.perps[0].bids_base_lots, 2);
 
     // account_1 - place a new bid should fail if reduce only is false
-    let res = mango_client::send_tx(
+    let res = send_tx(
         solana,
         PerpPlaceOrderInstruction {
             account: account_1,
@@ -558,7 +558,7 @@ async fn test_perp_reduce_only() -> Result<(), TransportError> {
     assert!(res.is_err());
 
     // account_1 - place a new bid should pass but have no effect
-    mango_client::send_tx(
+    send_tx(
         solana,
         PerpPlaceOrderInstruction {
             account: account_1,

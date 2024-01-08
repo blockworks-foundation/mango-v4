@@ -57,7 +57,7 @@ async fn test_perp_settle_pnl_basic() -> Result<(), TransportError> {
     //
     // TEST: Create a perp market
     //
-    let mango_v4::accounts::PerpCreateMarket { perp_market, .. } = mango_client::send_tx(
+    let mango_v4::accounts::PerpCreateMarket { perp_market, .. } = send_tx(
         solana,
         PerpCreateMarketInstruction {
             group,
@@ -87,7 +87,7 @@ async fn test_perp_settle_pnl_basic() -> Result<(), TransportError> {
     let mango_v4::accounts::PerpCreateMarket {
         perp_market: perp_market_2,
         ..
-    } = mango_client::send_tx(
+    } = send_tx(
         solana,
         PerpCreateMarketInstruction {
             group,
@@ -122,7 +122,7 @@ async fn test_perp_settle_pnl_basic() -> Result<(), TransportError> {
     //
     // Place orders and create a position
     //
-    mango_client::send_tx(
+    send_tx(
         solana,
         PerpPlaceOrderInstruction {
             account: account_0,
@@ -137,7 +137,7 @@ async fn test_perp_settle_pnl_basic() -> Result<(), TransportError> {
     .await
     .unwrap();
 
-    mango_client::send_tx(
+    send_tx(
         solana,
         PerpPlaceOrderInstruction {
             account: account_1,
@@ -152,7 +152,7 @@ async fn test_perp_settle_pnl_basic() -> Result<(), TransportError> {
     .await
     .unwrap();
 
-    mango_client::send_tx(
+    send_tx(
         solana,
         PerpConsumeEventsInstruction {
             perp_market,
@@ -176,7 +176,7 @@ async fn test_perp_settle_pnl_basic() -> Result<(), TransportError> {
     }
 
     // Cannot settle with yourself
-    let result = mango_client::send_tx(
+    let result = send_tx(
         solana,
         PerpSettlePnlInstruction {
             settler,
@@ -195,7 +195,7 @@ async fn test_perp_settle_pnl_basic() -> Result<(), TransportError> {
     );
 
     // Cannot settle position that does not exist
-    let result = mango_client::send_tx(
+    let result = send_tx(
         solana,
         PerpSettlePnlInstruction {
             settler,
@@ -235,7 +235,7 @@ async fn test_perp_settle_pnl_basic() -> Result<(), TransportError> {
     set_perp_stub_oracle_price(solana, group, perp_market, &tokens[1], admin, 1200.0).await;
 
     // Account a must be the profitable one
-    let result = mango_client::send_tx(
+    let result = send_tx(
         solana,
         PerpSettlePnlInstruction {
             settler,
@@ -306,7 +306,7 @@ async fn test_perp_settle_pnl_basic() -> Result<(), TransportError> {
     //
     // SETUP: Add some non-settle token, so the account's health has more contributions
     //
-    mango_client::send_tx(
+    send_tx(
         solana,
         TokenDepositInstruction {
             amount: 1001,
@@ -326,7 +326,7 @@ async fn test_perp_settle_pnl_basic() -> Result<(), TransportError> {
     // meaning we can bring it to zero by settling 10000 * 0.8 / 0.8 + 1001 * 0.8 / 1.2 = 10667.333
     // because then we'd be left with -667.333 * 1.2 + 0.8 * 1000 = 0
     let expected_total_settle = I80F48::from(10667);
-    mango_client::send_tx(
+    send_tx(
         solana,
         PerpSettlePnlInstruction {
             settler,
@@ -423,7 +423,7 @@ async fn test_perp_settle_pnl_basic() -> Result<(), TransportError> {
 
     // Fully execute the settle
     let expected_total_settle = expected_total_settle - expected_pnl_1;
-    mango_client::send_tx(
+    send_tx(
         solana,
         PerpSettlePnlInstruction {
             settler,
@@ -583,7 +583,7 @@ async fn test_perp_settle_pnl_fees() -> Result<(), TransportError> {
     //
     let flat_fee = 1000;
     let fee_low_health = 0.10;
-    let mango_v4::accounts::PerpCreateMarket { perp_market, .. } = mango_client::send_tx(
+    let mango_v4::accounts::PerpCreateMarket { perp_market, .. } = send_tx(
         solana,
         PerpCreateMarketInstruction {
             group,
@@ -621,7 +621,7 @@ async fn test_perp_settle_pnl_fees() -> Result<(), TransportError> {
     //
     // SETUP: Create a perp base position
     //
-    mango_client::send_tx(
+    send_tx(
         solana,
         PerpPlaceOrderInstruction {
             account: account_0,
@@ -636,7 +636,7 @@ async fn test_perp_settle_pnl_fees() -> Result<(), TransportError> {
     .await
     .unwrap();
 
-    mango_client::send_tx(
+    send_tx(
         solana,
         PerpPlaceOrderInstruction {
             account: account_1,
@@ -651,7 +651,7 @@ async fn test_perp_settle_pnl_fees() -> Result<(), TransportError> {
     .await
     .unwrap();
 
-    mango_client::send_tx(
+    send_tx(
         solana,
         PerpConsumeEventsInstruction {
             perp_market,
@@ -681,7 +681,7 @@ async fn test_perp_settle_pnl_fees() -> Result<(), TransportError> {
 
     let expected_pnl = 5000;
 
-    mango_client::send_tx(
+    send_tx(
         solana,
         PerpSettlePnlInstruction {
             settler,
@@ -726,7 +726,7 @@ async fn test_perp_settle_pnl_fees() -> Result<(), TransportError> {
     // init_health = 14000 - 1.4 * 1 * 10700 = -980
     // maint_health = 14000 - 1.2 * 1 * 10700 = 1160
     //
-    mango_client::send_tx(
+    send_tx(
         solana,
         TokenWithdrawInstruction {
             account: account_0,
@@ -748,7 +748,7 @@ async fn test_perp_settle_pnl_fees() -> Result<(), TransportError> {
 
     let expected_pnl = 2000;
 
-    mango_client::send_tx(
+    send_tx(
         solana,
         PerpSettlePnlInstruction {
             settler,
@@ -796,7 +796,7 @@ async fn test_perp_settle_pnl_fees() -> Result<(), TransportError> {
 
     let expected_pnl = 100;
 
-    mango_client::send_tx(
+    send_tx(
         solana,
         PerpSettlePnlInstruction {
             settler,
@@ -895,7 +895,7 @@ async fn test_perp_pnl_settle_limit() -> Result<(), TransportError> {
     // TEST: Create a perp market
     //
     let settle_pnl_limit_factor = 0.8;
-    let mango_v4::accounts::PerpCreateMarket { perp_market, .. } = mango_client::send_tx(
+    let mango_v4::accounts::PerpCreateMarket { perp_market, .. } = send_tx(
         solana,
         PerpCreateMarketInstruction {
             group,
@@ -930,7 +930,7 @@ async fn test_perp_pnl_settle_limit() -> Result<(), TransportError> {
     //
     // Place orders and create a position
     //
-    mango_client::send_tx(
+    send_tx(
         solana,
         PerpPlaceOrderInstruction {
             account: account_0,
@@ -945,7 +945,7 @@ async fn test_perp_pnl_settle_limit() -> Result<(), TransportError> {
     .await
     .unwrap();
 
-    mango_client::send_tx(
+    send_tx(
         solana,
         PerpPlaceOrderInstruction {
             account: account_1,
@@ -960,7 +960,7 @@ async fn test_perp_pnl_settle_limit() -> Result<(), TransportError> {
     .await
     .unwrap();
 
-    mango_client::send_tx(
+    send_tx(
         solana,
         PerpConsumeEventsInstruction {
             perp_market,
@@ -972,7 +972,7 @@ async fn test_perp_pnl_settle_limit() -> Result<(), TransportError> {
 
     // Manipulate the price (without adjusting stable price)
     let price_factor = 3;
-    mango_client::send_tx(
+    send_tx(
         solana,
         StubOracleSetInstruction {
             oracle: tokens[1].oracle,
@@ -1006,7 +1006,7 @@ async fn test_perp_pnl_settle_limit() -> Result<(), TransportError> {
     );
     let mango_account_1_expected_qpn_after_settle =
         mango_account_1.perps[0].quote_position_native() + account_1_settle_limit.round();
-    mango_client::send_tx(
+    send_tx(
         solana,
         PerpSettlePnlInstruction {
             settler,
@@ -1038,7 +1038,7 @@ async fn test_perp_pnl_settle_limit() -> Result<(), TransportError> {
     // Test 2: Once the settle limit is exhausted, we can't settle more
     //
     // we are in the same window, and we settled max. possible in previous attempt
-    let result = mango_client::send_tx(
+    let result = send_tx(
         solana,
         PerpSettlePnlInstruction {
             settler,
@@ -1058,7 +1058,7 @@ async fn test_perp_pnl_settle_limit() -> Result<(), TransportError> {
     //
     // Test 3: realizing the pnl does not allow further settling
     //
-    mango_client::send_tx(
+    send_tx(
         solana,
         PerpPlaceOrderInstruction {
             account: account_1,
@@ -1073,7 +1073,7 @@ async fn test_perp_pnl_settle_limit() -> Result<(), TransportError> {
     .await
     .unwrap();
 
-    mango_client::send_tx(
+    send_tx(
         solana,
         PerpPlaceOrderInstruction {
             account: account_0,
@@ -1088,7 +1088,7 @@ async fn test_perp_pnl_settle_limit() -> Result<(), TransportError> {
     .await
     .unwrap();
 
-    mango_client::send_tx(
+    send_tx(
         solana,
         PerpConsumeEventsInstruction {
             perp_market,
@@ -1125,7 +1125,7 @@ async fn test_perp_pnl_settle_limit() -> Result<(), TransportError> {
 
     // settle 1
     let account_1_quote_before = mango_account_1.perps[0].quote_position_native();
-    mango_client::send_tx(
+    send_tx(
         solana,
         PerpSettlePnlInstruction {
             settler,
@@ -1154,7 +1154,7 @@ async fn test_perp_pnl_settle_limit() -> Result<(), TransportError> {
     let account_1_quote_before = mango_account_1.perps[0].quote_position_native();
     let account_0_realized_limit = mango_account_0.perps[0].settle_pnl_limit_realized_trade;
 
-    mango_client::send_tx(
+    send_tx(
         solana,
         PerpSetSettleLimitWindow {
             group,
@@ -1166,7 +1166,7 @@ async fn test_perp_pnl_settle_limit() -> Result<(), TransportError> {
     .await
     .unwrap();
 
-    mango_client::send_tx(
+    send_tx(
         solana,
         PerpSettlePnlInstruction {
             settler,
@@ -1195,7 +1195,7 @@ async fn test_perp_pnl_settle_limit() -> Result<(), TransportError> {
     );
 
     // can't settle again
-    assert!(mango_client::send_tx(
+    assert!(send_tx(
         solana,
         PerpSettlePnlInstruction {
             settler,
@@ -1215,7 +1215,7 @@ async fn test_perp_pnl_settle_limit() -> Result<(), TransportError> {
     let account_1_quote_before = mango_account_1.perps[0].quote_position_native();
     let account_0_realized_limit = mango_account_0.perps[0].settle_pnl_limit_realized_trade;
 
-    mango_client::send_tx(
+    send_tx(
         solana,
         PerpSetSettleLimitWindow {
             group,
@@ -1227,7 +1227,7 @@ async fn test_perp_pnl_settle_limit() -> Result<(), TransportError> {
     .await
     .unwrap();
 
-    mango_client::send_tx(
+    send_tx(
         solana,
         PerpSettlePnlInstruction {
             settler,
