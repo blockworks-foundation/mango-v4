@@ -447,7 +447,8 @@ async fn main() -> anyhow::Result<()> {
     // But need to take care to abort if the above job aborts beforehand.
 
     let liquidation_job = tokio::spawn({
-        let mut interval = tokio::time::interval(Duration::from_millis(cli.check_interval_ms));
+        let mut interval =
+            mango_v4_client::delay_interval(Duration::from_millis(cli.check_interval_ms));
         let shared_state = shared_state.clone();
         async move {
             let mut must_rebalance = true;
@@ -494,8 +495,8 @@ async fn main() -> anyhow::Result<()> {
 
     let token_swap_info_job = tokio::spawn({
         // TODO: configurable interval
-        let mut interval = tokio::time::interval(Duration::from_secs(60));
-        let mut startup_wait = tokio::time::interval(Duration::from_secs(1));
+        let mut interval = mango_v4_client::delay_interval(Duration::from_secs(60));
+        let mut startup_wait = mango_v4_client::delay_interval(Duration::from_secs(1));
         let shared_state = shared_state.clone();
         async move {
             loop {
@@ -512,7 +513,7 @@ async fn main() -> anyhow::Result<()> {
                     .keys()
                     .copied()
                     .collect_vec();
-                let mut min_delay = tokio::time::interval(Duration::from_secs(1));
+                let mut min_delay = mango_v4_client::delay_interval(Duration::from_secs(1));
                 for token_index in token_indexes {
                     min_delay.tick().await;
                     token_swap_info_updater.update_one(token_index).await;
@@ -768,7 +769,7 @@ impl LiquidationState {
 }
 
 fn start_chain_data_metrics(chain: Arc<RwLock<chain_data::ChainData>>, metrics: &metrics::Metrics) {
-    let mut interval = tokio::time::interval(Duration::from_secs(600));
+    let mut interval = mango_v4_client::delay_interval(Duration::from_secs(600));
 
     let mut metric_slots_count = metrics.register_u64("chain_data_slots_count".into());
     let mut metric_accounts_count = metrics.register_u64("chain_data_accounts_count".into());

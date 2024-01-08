@@ -31,7 +31,7 @@ pub async fn run(client: &Client, group: Pubkey) -> anyhow::Result<()> {
             .map(|(_, p)| (p.oracle, *p))
             .collect();
 
-    let mut interval = tokio::time::interval(std::time::Duration::from_secs(5));
+    let mut interval = mango_v4_client::delay_interval(std::time::Duration::from_secs(5));
     loop {
         interval.tick().await;
 

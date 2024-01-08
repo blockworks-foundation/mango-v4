@@ -293,7 +293,7 @@ async fn main() -> anyhow::Result<()> {
     });
 
     let settle_job = tokio::spawn({
-        let mut interval = tokio::time::interval(Duration::from_millis(100));
+        let mut interval = mango_v4_client::delay_interval(Duration::from_millis(100));
         let shared_state = shared_state.clone();
         async move {
             loop {
@@ -314,7 +314,7 @@ async fn main() -> anyhow::Result<()> {
     });
 
     let tcs_start_job = tokio::spawn({
-        let mut interval = tokio::time::interval(Duration::from_millis(100));
+        let mut interval = mango_v4_client::delay_interval(Duration::from_millis(100));
         let shared_state = shared_state.clone();
         async move {
             loop {
@@ -366,7 +366,7 @@ struct SharedState {
 }
 
 fn start_chain_data_metrics(chain: Arc<RwLock<chain_data::ChainData>>, metrics: &metrics::Metrics) {
-    let mut interval = tokio::time::interval(std::time::Duration::from_secs(600));
+    let mut interval = mango_v4_client::delay_interval(std::time::Duration::from_secs(600));
 
     let mut metric_slots_count = metrics.register_u64("chain_data_slots_count".into());
     let mut metric_accounts_count = metrics.register_u64("chain_data_accounts_count".into());

@@ -1703,7 +1703,7 @@ impl MangoClient {
         mango_client: Arc<MangoClient>,
         interval: Duration,
     ) {
-        let mut delay = tokio::time::interval(interval);
+        let mut delay = crate::delay_interval(interval);
         let rpc_async = mango_client.client.rpc_async();
         loop {
             delay.tick().await;

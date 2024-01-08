@@ -12,7 +12,6 @@ use solana_sdk::{
     instruction::{AccountMeta, Instruction},
     pubkey::Pubkey,
 };
-use tokio::time;
 use tracing::*;
 use warp::Filter;
 
@@ -155,7 +154,7 @@ pub async fn loop_update_index_and_rate(
     token_indices: Vec<TokenIndex>,
     interval: u64,
 ) {
-    let mut interval = time::interval(Duration::from_secs(interval));
+    let mut interval = mango_v4_client::delay_interval(Duration::from_secs(interval));
     loop {
         interval.tick().await;
 
@@ -247,7 +246,7 @@ pub async fn loop_consume_events(
     perp_market: &PerpMarketContext,
     interval: u64,
 ) {
-    let mut interval = time::interval(Duration::from_secs(interval));
+    let mut interval = mango_v4_client::delay_interval(Duration::from_secs(interval));
     loop {
         interval.tick().await;
 
@@ -365,7 +364,7 @@ pub async fn loop_update_funding(
     perp_market: &PerpMarketContext,
     interval: u64,
 ) {
-    let mut interval = time::interval(Duration::from_secs(interval));
+    let mut interval = mango_v4_client::delay_interval(Duration::from_secs(interval));
     loop {
         interval.tick().await;
 
