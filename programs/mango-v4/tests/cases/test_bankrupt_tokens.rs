@@ -303,7 +303,7 @@ async fn test_bankrupt_tokens_insurance_fund() -> Result<(), TransportError> {
 
     // fund the insurance vault
     {
-        let mut tx = mango_client::ClientTransaction::new(solana);
+        let mut tx = ClientTransaction::new(solana);
         tx.add_instruction_direct(
             spl_token::instruction::transfer(
                 &spl_token::ID,

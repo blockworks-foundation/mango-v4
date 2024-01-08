@@ -92,7 +92,7 @@ async fn test_health_wrap() -> Result<(), TransportError> {
 
     let send_test_tx = |limit_price, order_size, cancel| {
         async move {
-            let mut tx = mango_client::ClientTransaction::new(solana);
+            let mut tx = ClientTransaction::new(solana);
             tx.add_instruction(HealthRegionBeginInstruction { account })
                 .await;
             tx.add_instruction(Serum3PlaceOrderInstruction {
@@ -171,7 +171,7 @@ async fn test_health_wrap() -> Result<(), TransportError> {
     // TEST: Try using withdraw in a health region
     //
     {
-        let mut tx = mango_client::ClientTransaction::new(solana);
+        let mut tx = ClientTransaction::new(solana);
         tx.add_instruction(HealthRegionBeginInstruction { account })
             .await;
         tx.add_instruction(TokenWithdrawInstruction {
@@ -195,7 +195,7 @@ async fn test_health_wrap() -> Result<(), TransportError> {
     // TEST: Try using a different program in a health region
     //
     {
-        let mut tx = mango_client::ClientTransaction::new(solana);
+        let mut tx = ClientTransaction::new(solana);
         tx.add_instruction(HealthRegionBeginInstruction { account })
             .await;
         tx.add_instruction_direct(

@@ -113,7 +113,7 @@ async fn test_margin_trade() -> Result<(), BanksClientError> {
     let withdraw_amount = 2;
     let deposit_amount = 1;
     let send_flash_loan_tx = |solana, withdraw_amount, deposit_amount| async move {
-        let mut tx = mango_client::ClientTransaction::new(solana);
+        let mut tx = ClientTransaction::new(solana);
         let loans = vec![FlashLoanPart {
             bank,
             token_account: target_token_account,
@@ -332,7 +332,7 @@ async fn test_flash_loan_swap_fee() -> Result<(), BanksClientError> {
     let withdraw_amount = 1000;
     let deposit_amount = 1000;
     {
-        let mut tx = mango_client::ClientTransaction::new(solana);
+        let mut tx = ClientTransaction::new(solana);
         let loans = vec![
             FlashLoanPart {
                 bank: tokens[0].bank,
@@ -550,7 +550,7 @@ async fn test_flash_loan_creates_ata_accounts() -> Result<(), BanksClientError> 
     let withdraw_amount = 2;
     let deposit_amount = 1;
     let send_flash_loan_tx = |solana, withdraw_amount, deposit_amount| async move {
-        let mut tx = mango_client::ClientTransaction::new(solana);
+        let mut tx = ClientTransaction::new(solana);
         tx.add_instruction(FlashLoanSwapBeginInstruction {
             account,
             owner,

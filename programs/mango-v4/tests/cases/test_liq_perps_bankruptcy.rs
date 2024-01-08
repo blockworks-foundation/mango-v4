@@ -48,7 +48,7 @@ async fn test_liq_perps_bankruptcy() -> Result<(), TransportError> {
     .unwrap();
 
     let fund_insurance = |amount: u64| async move {
-        let mut tx = mango_client::ClientTransaction::new(solana);
+        let mut tx = ClientTransaction::new(solana);
         tx.add_instruction_direct(
             spl_token::instruction::transfer(
                 &spl_token::ID,
@@ -153,7 +153,7 @@ async fn test_liq_perps_bankruptcy() -> Result<(), TransportError> {
         //
         // SETUP: Trade perps between accounts twice to generate pnl, settle_limit
         //
-        let mut tx = mango_client::ClientTransaction::new(solana);
+        let mut tx = ClientTransaction::new(solana);
         tx.add_instruction(PerpPlaceOrderInstruction {
             account: helper_account,
             perp_market,
@@ -182,7 +182,7 @@ async fn test_liq_perps_bankruptcy() -> Result<(), TransportError> {
         tx.send().await.unwrap();
 
         set_perp_stub_oracle_price(solana, group, perp_market, &base_token, admin, adj_price).await;
-        let mut tx = mango_client::ClientTransaction::new(solana);
+        let mut tx = ClientTransaction::new(solana);
         tx.add_instruction(PerpPlaceOrderInstruction {
             account: helper_account,
             perp_market,

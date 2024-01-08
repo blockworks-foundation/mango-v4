@@ -35,7 +35,7 @@ async fn test_liq_perps_base_and_bankruptcy() -> Result<(), TransportError> {
     // fund the insurance vault
     let insurance_vault_funding = 100;
     {
-        let mut tx = mango_client::ClientTransaction::new(solana);
+        let mut tx = ClientTransaction::new(solana);
         tx.add_instruction_direct(
             spl_token::instruction::transfer(
                 &spl_token::ID,
