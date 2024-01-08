@@ -1,6 +1,6 @@
 [package]
 name = "mango-v4"
-version = "0.20.0"
+version = "0.22.0"
 description = "Created with Anchor"
 edition = "2021"
 
@@ -14,11 +14,12 @@ no-entrypoint = []
 no-idl = []
 no-log-ix-name = []
 cpi = ["no-entrypoint"]
-default = []
+default = ["custom-heap"]
 test-bpf = ["client"]
 client = ["solana-sdk", "no-entrypoint"]
 # Enables GPL-licensed parts of the code. See LICENSE file.
 enable-gpl = ["openbook-v2/enable-gpl"]
+custom-heap = []
 
 [dependencies]
 # todo: when to fix, when to use caret? need a regular chore to bump dependencies

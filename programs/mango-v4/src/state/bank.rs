@@ -1,4 +1,4 @@
-use super::{OracleConfig, TokenIndex, TokenPosition};
+use super::{OracleAccountInfos, OracleConfig, TokenIndex, TokenPosition};
 use crate::accounts_zerocopy::KeyedAccountReader;
 use crate::error::*;
 use crate::i80f48::ClampToInt;
@@ -6,9 +6,9 @@ use crate::state::{oracle, StablePriceModel};
 use crate::util;
 
 use anchor_lang::prelude::*;
-use anchor_spl::token::TokenAccount;
 use derivative::Derivative;
 use fixed::types::I80F48;
+use oracle::oracle_log_context;
 use static_assertions::const_assert_eq;
 
 use std::mem::size_of;
@@ -98,7 +98,8 @@ pub struct Bank {
 
     pub bank_num: u32,
 
-    /// Min fraction of deposits that must remain in the vault when borrowing.
+    /// The maximum utilization allowed when borrowing is 1-this value
+    /// WARNING: Outdated name, kept for IDL compatibility
     pub min_vault_to_deposits_ratio: f64,
 
     /// Size in seconds of a net borrows window
@@ -157,22 +158,36 @@ pub struct Bank {
     /// Except when first migrating to having this field, then 0.0
     pub interest_curve_scaling: f64,
 
-    // user deposits that were moved into serum open orders
-    // can be negative due to multibank, then it'd need to be balanced in the keeper
-    pub deposits_in_serum: i64,
+    /// Largest amount of tokens that might be added the the bank based on
+    /// serum open order execution.
+    pub potential_serum_tokens: u64,
 
+    /// Start timestamp in seconds at which maint weights should start to change away
+    /// from maint_asset_weight, maint_liab_weight towards _asset_target and _liab_target.
+    /// If _start and _end and _duration_inv are 0, no shift is configured.
     pub maint_weight_shift_start: u64,
+    /// End timestamp in seconds until which the maint weights should reach the configured targets.
     pub maint_weight_shift_end: u64,
+    /// Cache of the inverse of maint_weight_shift_end - maint_weight_shift_start,
+    /// or zero if no shift is configured
     pub maint_weight_shift_duration_inv: I80F48,
+    /// Maint asset weight to reach at _shift_end.
     pub maint_weight_shift_asset_target: I80F48,
     pub maint_weight_shift_liab_target: I80F48,
 
-    // user deposits that were moved into openbook v2 open orders
-    // can be negative due to multibank, then it'd need to be balanced in the keeper
-    pub deposits_in_openbook: i64,
+    /// Oracle that may be used if the main oracle is stale or not confident enough.
+    /// If this is Pubkey::default(), no fallback is available.
+    pub fallback_oracle: Pubkey,
+
+    /// zero means none, in token native
+    pub deposit_limit: u64,
+
+    /// Largest amount of tokens that might be added the the bank based on
+    /// oenbook open order execution.
+    pub potential_openbook_tokens: u64,
 
     #[derivative(Debug = "ignore")]
-    pub reserved: [u8; 2000],
+    pub reserved: [u8; 1960],
 }
 const_assert_eq!(
     size_of::<Bank>(),
@@ -208,7 +223,9 @@ const_assert_eq!(
         + 8 * 2
         + 16 * 3
         + 8
-        + 2000
+        + 32
+        + 8
+        + 1960
 );
 const_assert_eq!(size_of::<Bank>(), 3064);
 const_assert_eq!(size_of::<Bank>() % 8, 0);
@@ -220,6 +237,19 @@ pub struct WithdrawResult {
 }
 
 impl WithdrawResult {
+    pub fn has_loan(&self) -> bool {
+        self.loan_amount.is_positive()
+    }
+}
+
+pub struct TransferResult {
+    pub source_is_active: bool,
+    pub target_is_active: bool,
+    pub loan_origination_fee: I80F48,
+    pub loan_amount: I80F48,
+}
+
+impl TransferResult {
     pub fn has_loan(&self) -> bool {
         self.loan_amount.is_positive()
     }
@@ -243,8 +273,8 @@ impl Bank {
             flash_loan_approved_amount: 0,
             flash_loan_token_account_initial: u64::MAX,
             net_borrows_in_window: 0,
-            deposits_in_serum: 0,
-            deposits_in_openbook: 0,
+            potential_serum_tokens: 0,
+            potential_openbook_tokens: 0,
             bump,
             bank_num,
 
@@ -298,7 +328,9 @@ impl Bank {
             maint_weight_shift_duration_inv: existing_bank.maint_weight_shift_duration_inv,
             maint_weight_shift_asset_target: existing_bank.maint_weight_shift_asset_target,
             maint_weight_shift_liab_target: existing_bank.maint_weight_shift_liab_target,
-            reserved: [0; 2000],
+            fallback_oracle: existing_bank.oracle,
+            deposit_limit: existing_bank.deposit_limit,
+            reserved: [0; 1960],
         }
     }
 
@@ -380,26 +412,33 @@ impl Bank {
         }
     }
 
+    pub fn enforce_borrows_lte_deposits(&self) -> Result<()> {
+        self.enforce_max_utilization(I80F48::ONE)
+    }
+
     /// Prevent borrowing away the full bank vault.
     /// Keep some in reserve to satisfy non-borrow withdraws.
-    pub fn enforce_min_vault_to_deposits_ratio(&self, vault_ai: &AccountInfo) -> Result<()> {
-        require_keys_eq!(self.vault, vault_ai.key());
+    pub fn enforce_max_utilization_on_borrow(&self) -> Result<()> {
+        self.enforce_max_utilization(
+            I80F48::ONE - I80F48::from_num(self.min_vault_to_deposits_ratio),
+        )
+    }
 
-        let vault = Account::<TokenAccount>::try_from(vault_ai)?;
-        let vault_amount = vault.amount as f64;
-
+    /// Prevent borrowing away the full bank vault.
+    /// Keep some in reserve to satisfy non-borrow withdraws.
+    fn enforce_max_utilization(&self, max_utilization: I80F48) -> Result<()> {
         let bank_native_deposits = self.native_deposits();
-        if bank_native_deposits != I80F48::ZERO {
-            let bank_native_deposits: f64 = bank_native_deposits.to_num();
-            if vault_amount < self.min_vault_to_deposits_ratio * bank_native_deposits {
-                return err!(MangoError::BankBorrowLimitReached).with_context(|| {
+        let bank_native_borrows = self.native_borrows();
+
+        if bank_native_borrows > max_utilization * bank_native_deposits {
+            return err!(MangoError::BankBorrowLimitReached).with_context(|| {
                 format!(
-                    "vault_amount ({:?}) below min_vault_to_deposits_ratio * bank_native_deposits ({:?})",
-                    vault_amount, self.min_vault_to_deposits_ratio * bank_native_deposits,
+                    "deposits {}, borrows {}, max utilization {}",
+                    bank_native_deposits, bank_native_borrows, max_utilization,
                 )
             });
-            }
-        }
+        };
+
         Ok(())
     }
 
@@ -600,7 +639,7 @@ impl Bank {
         require_gte!(native_amount, 0);
         let native_position = position.native(self);
 
-        if native_position.is_positive() {
+        if !native_position.is_negative() {
             let new_native_position = native_position - native_amount;
             if !new_native_position.is_negative() {
                 // withdraw deposits only
@@ -730,6 +769,64 @@ impl Bank {
         }
     }
 
+    /// Generic "transfer" from source to target.
+    ///
+    /// Amounts for source and target can differ and can be zero.
+    /// Checks reduce-only, net borrow limits and deposit limits.
+    pub fn checked_transfer_with_fee(
+        &mut self,
+        source: &mut TokenPosition,
+        source_amount: I80F48,
+        target: &mut TokenPosition,
+        target_amount: I80F48,
+        now_ts: u64,
+        oracle_price: I80F48,
+    ) -> Result<TransferResult> {
+        let before_borrows = self.indexed_borrows;
+        let before_deposits = self.indexed_deposits;
+
+        let withdraw_result = if !source_amount.is_zero() {
+            let withdraw_result = self.withdraw_with_fee(source, source_amount, now_ts)?;
+            require!(
+                source.indexed_position >= 0 || !self.are_borrows_reduce_only(),
+                MangoError::TokenInReduceOnlyMode
+            );
+            withdraw_result
+        } else {
+            WithdrawResult {
+                position_is_active: true,
+                loan_amount: I80F48::ZERO,
+                loan_origination_fee: I80F48::ZERO,
+            }
+        };
+
+        let target_is_active = if !target_amount.is_zero() {
+            let active = self.deposit(target, target_amount, now_ts)?;
+            require!(
+                target.indexed_position <= 0 || !self.are_deposits_reduce_only(),
+                MangoError::TokenInReduceOnlyMode
+            );
+            active
+        } else {
+            true
+        };
+
+        // Adding DELTA here covers the case where we add slightly more than we withdraw
+        if self.indexed_borrows > before_borrows + I80F48::DELTA {
+            self.check_net_borrows(oracle_price)?;
+        }
+        if self.indexed_deposits > before_deposits + I80F48::DELTA {
+            self.check_deposit_and_oo_limit()?;
+        }
+
+        Ok(TransferResult {
+            source_is_active: withdraw_result.position_is_active,
+            target_is_active,
+            loan_origination_fee: withdraw_result.loan_origination_fee,
+            loan_amount: withdraw_result.loan_amount,
+        })
+    }
+
     /// Update the bank's net_borrows fields.
     ///
     /// If oracle_price is set, also do a net borrows check and error if the threshold is exceeded.
@@ -775,6 +872,52 @@ impl Bank {
         Ok(())
     }
 
+    pub fn remaining_deposits_until_limit(&self) -> I80F48 {
+        if self.deposit_limit == 0 {
+            return I80F48::MAX;
+        }
+
+        // Assuming slightly higher deposits than true allows the returned value
+        // to be deposit()ed safely into this bank without triggering limits.
+        // (because deposit() will round up in favor of the user)
+        let deposits = self.deposit_index * (self.indexed_deposits + I80F48::DELTA);
+
+        let serum = I80F48::from(self.potential_serum_tokens);
+        let openbook = I80F48::from(self.potential_openbook_tokens);
+        let total = deposits + serum + openbook;
+
+        I80F48::from(self.deposit_limit) - total
+    }
+
+    pub fn check_deposit_and_oo_limit(&self) -> Result<()> {
+        if self.deposit_limit == 0 {
+            return Ok(());
+        }
+
+        // Intentionally does not use remaining_deposits_until_limit(): That function
+        // returns slightly less than the true limit to make sure depositing that amount
+        // will not cause a limit overrun.
+        let deposits = self.native_deposits();
+        let serum = I80F48::from(self.potential_serum_tokens);
+        let openbook = I80F48::from(self.potential_openbook_tokens);
+        let total = deposits + serum + openbook;
+        let remaining = I80F48::from(self.deposit_limit) - total;
+        if remaining < 0 {
+            return Err(error_msg_typed!(
+                MangoError::BankDepositLimit,
+                "deposit limit exceeded: remaining: {}, total: {}, limit: {}, deposits: {}, serum: {}, openbook: {}",
+                remaining,
+                total,
+                self.deposit_limit,
+                deposits,
+                serum,
+                openbook,
+            ));
+        }
+
+        Ok(())
+    }
+
     pub fn update_cumulative_interest(
         &self,
         position: &mut TokenPosition,
@@ -809,12 +952,8 @@ impl Bank {
         let native_total_deposits = self.deposit_index * indexed_total_deposits;
         let native_total_borrows = self.borrow_index * indexed_total_borrows;
 
-        // This will be >= 0, but can also be > 1
-        let instantaneous_utilization = if native_total_deposits == I80F48::ZERO {
-            I80F48::ZERO
-        } else {
-            native_total_borrows / native_total_deposits
-        };
+        let instantaneous_utilization =
+            Self::instantaneous_utilization(native_total_deposits, native_total_borrows);
 
         let borrow_rate = self.compute_interest_rate(instantaneous_utilization);
 
@@ -848,6 +987,23 @@ impl Bank {
         ))
     }
 
+    /// Current utilization, clamped to 0..1
+    ///
+    /// Above 100% utilization can happen natually when utilization is 100% and interest is paid out,
+    /// increasing borrows more than deposits.
+    fn instantaneous_utilization(
+        native_total_deposits: I80F48,
+        native_total_borrows: I80F48,
+    ) -> I80F48 {
+        if native_total_deposits == I80F48::ZERO {
+            I80F48::ZERO
+        } else {
+            (native_total_borrows / native_total_deposits)
+                .max(I80F48::ZERO)
+                .min(I80F48::ONE)
+        }
+    }
+
     /// returns the current interest rate in APR
     #[inline(always)]
     pub fn compute_interest_rate(&self, utilization: I80F48) -> I80F48 {
@@ -874,6 +1030,9 @@ impl Bank {
         max_rate: I80F48,
         scaling: f64,
     ) -> I80F48 {
+        // Clamp to avoid negative or extremely high interest
+        let utilization = utilization.max(I80F48::ZERO).min(I80F48::ONE);
+
         let v = if utilization <= util0 {
             let slope = rate0 / util0;
             slope * utilization
@@ -908,11 +1067,8 @@ impl Bank {
 
         let native_total_deposits = self.deposit_index * indexed_total_deposits;
         let native_total_borrows = self.borrow_index * indexed_total_borrows;
-        let instantaneous_utilization = if native_total_deposits == I80F48::ZERO {
-            I80F48::ZERO
-        } else {
-            native_total_borrows / native_total_deposits
-        };
+        let instantaneous_utilization =
+            Self::instantaneous_utilization(native_total_deposits, native_total_borrows);
 
         // Compute a time-weighted average since bank_rate_last_updated.
         let previous_avg_time =
@@ -932,7 +1088,8 @@ impl Bank {
         let target_util = self.interest_target_utilization as f64;
 
         // use avg_utilization and not instantaneous_utilization so that rates cannot be manipulated easily
-        let avg_util = self.avg_utilization.to_num::<f64>();
+        // also clamp to avoid unusually quick interest rate curve changes
+        let avg_util = self.avg_utilization.to_num::<f64>().max(0.0).min(1.0);
 
         // move rates up when utilization is above optimal utilization, and vice versa
         // util factor is between -1 (avg util = 0) and +1 (avg util = 100%)
@@ -946,19 +1103,52 @@ impl Bank {
         self.interest_curve_scaling = (self.interest_curve_scaling * adjustment).max(1.0)
     }
 
-    pub fn oracle_price(
+    /// Tries to return the primary oracle price, and if there is a confidence or staleness issue returns the fallback oracle price if possible.
+    pub fn oracle_price<T: KeyedAccountReader>(
         &self,
-        oracle_acc: &impl KeyedAccountReader,
+        oracle_acc_infos: &OracleAccountInfos<T>,
         staleness_slot: Option<u64>,
     ) -> Result<I80F48> {
-        require_keys_eq!(self.oracle, *oracle_acc.key());
-        let state = oracle::oracle_state_unchecked(oracle_acc, self.mint_decimals)?;
-        state.check_confidence_and_maybe_staleness(
-            &self.oracle,
-            &self.oracle_config,
-            staleness_slot,
-        )?;
-        Ok(state.price)
+        require_keys_eq!(self.oracle, *oracle_acc_infos.oracle.key());
+        let primary_state = oracle::oracle_state_unchecked(oracle_acc_infos, self.mint_decimals)?;
+        let primary_ok =
+            primary_state.check_confidence_and_maybe_staleness(&self.oracle_config, staleness_slot);
+        if primary_ok.is_oracle_error() && oracle_acc_infos.fallback_opt.is_some() {
+            let fallback_oracle_acc = oracle_acc_infos.fallback_opt.unwrap();
+            require_keys_eq!(self.fallback_oracle, *fallback_oracle_acc.key());
+            let fallback_state =
+                oracle::fallback_oracle_state_unchecked(&oracle_acc_infos, self.mint_decimals)?;
+            let fallback_ok = fallback_state
+                .check_confidence_and_maybe_staleness(&self.oracle_config, staleness_slot);
+            fallback_ok.with_context(|| {
+                format!(
+                    "{} {}",
+                    oracle_log_context(
+                        self.name(),
+                        &primary_state,
+                        &self.oracle_config,
+                        staleness_slot
+                    ),
+                    oracle_log_context(
+                        self.name(),
+                        &fallback_state,
+                        &self.oracle_config,
+                        staleness_slot
+                    )
+                )
+            })?;
+            Ok(fallback_state.price)
+        } else {
+            primary_ok.with_context(|| {
+                oracle_log_context(
+                    self.name(),
+                    &primary_state,
+                    &self.oracle_config,
+                    staleness_slot,
+                )
+            })?;
+            Ok(primary_state.price)
+        }
     }
 
     pub fn stable_price(&self) -> I80F48 {
@@ -975,7 +1165,8 @@ impl Bank {
         if self.deposit_weight_scale_start_quote == f64::MAX {
             return self.init_asset_weight;
         }
-        let all_deposits = self.native_deposits().to_num::<f64>() + self.deposits_in_serum as f64;
+        let all_deposits =
+            self.native_deposits().to_num::<f64>() + self.potential_serum_tokens as f64 + self.potential_openbook_tokens as f64;
         let deposits_quote = all_deposits * price.to_num::<f64>();
         if deposits_quote <= self.deposit_weight_scale_start_quote {
             self.init_asset_weight
@@ -1004,6 +1195,26 @@ impl Bank {
             self.init_liab_weight * I80F48::from_num(scale)
         }
     }
+
+    /// Grows potential_serum_tokens if new > old, shrinks it otherwise
+    #[inline(always)]
+    pub fn update_potential_serum_tokens(&mut self, old: u64, new: u64) {
+        if new >= old {
+            self.potential_serum_tokens += new - old;
+        } else {
+            self.potential_serum_tokens = self.potential_serum_tokens.saturating_sub(old - new);
+        }
+    }
+
+    /// Grows potential_openbook_tokens if new > old, shrinks it otherwise
+    #[inline(always)]
+    pub fn update_potential_openbook_tokens(&mut self, old: u64, new: u64) {
+        if new >= old {
+            self.potential_openbook_tokens += new - old;
+        } else {
+            self.potential_openbook_tokens = self.potential_openbook_tokens.saturating_sub(old - new);
+        }
+    }
 }
 
 #[macro_export]
@@ -1028,9 +1239,108 @@ mod tests {
 
     use super::*;
 
-    #[test]
-    pub fn change() -> Result<()> {
+    fn bank_change_runner(start: f64, change: i32, is_in_use: bool, use_withdraw: bool) {
+        println!(
+            "testing: in use: {is_in_use}, start: {start}, change: {change}, use_withdraw: {use_withdraw}",
+        );
+
         let epsilon = I80F48::from_bits(1);
+
+        //
+        // SETUP
+        //
+
+        let mut bank = Bank::zeroed();
+        bank.net_borrow_limit_window_size_ts = 1; // dummy
+        bank.net_borrow_limit_per_window_quote = i64::MAX; // max since we don't want this to interfere
+        bank.deposit_index = I80F48::from_num(100.0);
+        bank.borrow_index = I80F48::from_num(10.0);
+        bank.loan_origination_fee_rate = I80F48::from_num(0.1);
+        let indexed = |v: I80F48, b: &Bank| {
+            if v > 0 {
+                let i = v / b.deposit_index;
+                if i * b.deposit_index < v {
+                    i + I80F48::DELTA
+                } else {
+                    i
+                }
+            } else {
+                v / b.borrow_index
+            }
+        };
+
+        let mut account = TokenPosition {
+            indexed_position: I80F48::ZERO,
+            token_index: 0,
+            in_use_count: u16::from(is_in_use),
+            cumulative_deposit_interest: 0.0,
+            cumulative_borrow_interest: 0.0,
+            previous_index: I80F48::ZERO,
+            padding: Default::default(),
+            reserved: [0; 128],
+        };
+
+        account.indexed_position = indexed(I80F48::from_num(start), &bank);
+        if start >= 0.0 {
+            bank.indexed_deposits = account.indexed_position;
+        } else {
+            bank.indexed_borrows = -account.indexed_position;
+        }
+
+        // get the rounded start value
+        let start_native = account.native(&bank);
+
+        //
+        // TEST
+        //
+
+        let change = I80F48::from(change);
+        let dummy_now_ts = 1 as u64;
+        let dummy_price = I80F48::ZERO;
+        let is_active = if use_withdraw {
+            bank.withdraw_with_fee(&mut account, change, dummy_now_ts)
+                .unwrap()
+                .position_is_active
+        } else {
+            bank.change_with_fee(&mut account, change, dummy_now_ts)
+                .unwrap()
+                .position_is_active
+        };
+
+        let mut expected_native = start_native + change;
+        let is_deposit_into_nonnegative = start >= 0.0 && change >= 0 && !use_withdraw;
+        if expected_native >= 0.0
+            && expected_native < 1.0
+            && !is_in_use
+            && !is_deposit_into_nonnegative
+        {
+            assert!(!is_active);
+            assert_eq!(bank.dust, expected_native);
+            expected_native = I80F48::ZERO;
+        } else {
+            assert!(is_active);
+            assert_eq!(bank.dust, I80F48::ZERO);
+        }
+        if change < 0 && expected_native < 0 {
+            let new_borrow = -(expected_native - min(start_native, I80F48::ZERO));
+            expected_native -= new_borrow * bank.loan_origination_fee_rate;
+        }
+        let expected_indexed = indexed(expected_native, &bank);
+
+        // at most one epsilon error in the resulting indexed value
+        assert!((account.indexed_position - expected_indexed).abs() <= epsilon);
+
+        if account.indexed_position.is_positive() {
+            assert_eq!(bank.indexed_deposits, account.indexed_position);
+            assert_eq!(bank.indexed_borrows, I80F48::ZERO);
+        } else {
+            assert_eq!(bank.indexed_deposits, I80F48::ZERO);
+            assert_eq!(bank.indexed_borrows, -account.indexed_position);
+        }
+    }
+
+    #[test]
+    pub fn bank_change() -> Result<()> {
         let cases = [
             (-10.1, 1),
             (-10.1, 10),
@@ -1054,93 +1364,166 @@ mod tests {
             (0.0, -1),
             (-0.1, -1),
             (-1.1, -10),
+            (10.0, 0),
+            (1.0, 0),
+            (0.1, 0),
+            (0.0, 0),
+            (-0.1, 0),
         ];
 
         for is_in_use in [false, true] {
             for (start, change) in cases {
-                println!(
-                    "testing: in use: {}, start: {}, change: {}",
-                    is_in_use, start, change
-                );
-
-                //
-                // SETUP
-                //
-
-                let mut bank = Bank::zeroed();
-                bank.net_borrow_limit_window_size_ts = 1; // dummy
-                bank.net_borrow_limit_per_window_quote = i64::MAX; // max since we don't want this to interfere
-                bank.deposit_index = I80F48::from_num(100.0);
-                bank.borrow_index = I80F48::from_num(10.0);
-                bank.loan_origination_fee_rate = I80F48::from_num(0.1);
-                let indexed = |v: I80F48, b: &Bank| {
-                    if v > 0 {
-                        v / b.deposit_index
-                    } else {
-                        v / b.borrow_index
-                    }
-                };
-
-                let mut account = TokenPosition {
-                    indexed_position: I80F48::ZERO,
-                    token_index: 0,
-                    in_use_count: u16::from(is_in_use),
-                    cumulative_deposit_interest: 0.0,
-                    cumulative_borrow_interest: 0.0,
-                    previous_index: I80F48::ZERO,
-                    padding: Default::default(),
-                    reserved: [0; 128],
-                };
-
-                account.indexed_position = indexed(I80F48::from_num(start), &bank);
-                if start >= 0.0 {
-                    bank.indexed_deposits = account.indexed_position;
-                } else {
-                    bank.indexed_borrows = -account.indexed_position;
-                }
-
-                // get the rounded start value
-                let start_native = account.native(&bank);
-
-                //
-                // TEST
-                //
-
-                let change = I80F48::from(change);
-                let dummy_now_ts = 1 as u64;
-                let dummy_price = I80F48::ZERO;
-                let is_active = bank
-                    .change_with_fee(&mut account, change, dummy_now_ts)?
-                    .position_is_active;
-
-                let mut expected_native = start_native + change;
-                if expected_native >= 0.0 && expected_native < 1.0 && !is_in_use {
-                    assert!(!is_active);
-                    assert_eq!(bank.dust, expected_native);
-                    expected_native = I80F48::ZERO;
-                } else {
-                    assert!(is_active);
-                    assert_eq!(bank.dust, I80F48::ZERO);
-                }
-                if change < 0 && expected_native < 0 {
-                    let new_borrow = -(expected_native - min(start_native, I80F48::ZERO));
-                    expected_native -= new_borrow * bank.loan_origination_fee_rate;
-                }
-                let expected_indexed = indexed(expected_native, &bank);
-
-                // at most one epsilon error in the resulting indexed value
-                assert!((account.indexed_position - expected_indexed).abs() <= epsilon);
-
-                if account.indexed_position.is_positive() {
-                    assert_eq!(bank.indexed_deposits, account.indexed_position);
-                    assert_eq!(bank.indexed_borrows, I80F48::ZERO);
-                } else {
-                    assert_eq!(bank.indexed_deposits, I80F48::ZERO);
-                    assert_eq!(bank.indexed_borrows, -account.indexed_position);
+                bank_change_runner(start, change, is_in_use, false);
+                if change == 0 {
+                    // check withdrawing 0
+                    bank_change_runner(start, change, is_in_use, true);
                 }
             }
         }
         Ok(())
+    }
+
+    #[test]
+    fn bank_transfer() {
+        //
+        // SETUP
+        //
+
+        let mut bank_proto = Bank::zeroed();
+        bank_proto.net_borrow_limit_window_size_ts = 1; // dummy
+        bank_proto.net_borrow_limit_per_window_quote = i64::MAX; // max since we don't want this to interfere
+        bank_proto.deposit_index = I80F48::from(1_234_567);
+        bank_proto.borrow_index = I80F48::from(1_234_567);
+        bank_proto.loan_origination_fee_rate = I80F48::from_num(0.1);
+
+        let account_proto = TokenPosition {
+            indexed_position: I80F48::ZERO,
+            token_index: 0,
+            in_use_count: 1,
+            cumulative_deposit_interest: 0.0,
+            cumulative_borrow_interest: 0.0,
+            previous_index: I80F48::ZERO,
+            padding: Default::default(),
+            reserved: [0; 128],
+        };
+
+        //
+        // TESTS
+        //
+
+        // simple transfer
+        {
+            let mut bank = bank_proto.clone();
+            let mut a1 = account_proto.clone();
+            let mut a2 = account_proto.clone();
+
+            let amount = I80F48::from(100);
+            bank.deposit(&mut a1, amount, 0).unwrap();
+            let damount = a1.native(&bank);
+            let r = bank
+                .checked_transfer_with_fee(&mut a1, amount, &mut a2, amount, 0, I80F48::ONE)
+                .unwrap();
+            assert_eq!(a2.native(&bank), damount);
+            assert!(r.source_is_active);
+            assert!(r.target_is_active);
+        }
+
+        // borrow limits
+        {
+            let mut bank = bank_proto.clone();
+            bank.net_borrow_limit_per_window_quote = 100;
+            bank.loan_origination_fee_rate = I80F48::ZERO;
+            let mut a1 = account_proto.clone();
+            let mut a2 = account_proto.clone();
+
+            {
+                let mut b = bank.clone();
+                let amount = I80F48::from(101);
+                assert!(b
+                    .checked_transfer_with_fee(&mut a1, amount, &mut a2, amount, 0, I80F48::ONE)
+                    .is_err());
+            }
+
+            {
+                let mut b = bank.clone();
+                let amount = I80F48::from(100);
+                b.checked_transfer_with_fee(&mut a1, amount, &mut a2, amount, 0, I80F48::ONE)
+                    .unwrap();
+            }
+
+            {
+                let mut b = bank.clone();
+                let amount = b.remaining_net_borrows_quote(I80F48::ONE);
+                b.checked_transfer_with_fee(&mut a1, amount, &mut a2, amount, 0, I80F48::ONE)
+                    .unwrap();
+            }
+        }
+
+        // deposit limits
+        {
+            let mut bank = bank_proto.clone();
+            bank.deposit_limit = 100;
+            let mut a1 = account_proto.clone();
+            let mut a2 = account_proto.clone();
+
+            {
+                let mut b = bank.clone();
+                let amount = I80F48::from(101);
+                assert!(b
+                    .checked_transfer_with_fee(&mut a1, amount, &mut a2, amount, 0, I80F48::ONE)
+                    .is_err());
+            }
+
+            {
+                // still bad because deposit() adds DELTA more than requested
+                let mut b = bank.clone();
+                let amount = I80F48::from(100);
+                assert!(b
+                    .checked_transfer_with_fee(&mut a1, amount, &mut a2, amount, 0, I80F48::ONE)
+                    .is_err());
+            }
+
+            {
+                let mut b = bank.clone();
+                let amount = I80F48::from_num(99.999);
+                b.checked_transfer_with_fee(&mut a1, amount, &mut a2, amount, 0, I80F48::ONE)
+                    .unwrap();
+            }
+
+            {
+                let mut b = bank.clone();
+                let amount = b.remaining_deposits_until_limit();
+                b.checked_transfer_with_fee(&mut a1, amount, &mut a2, amount, 0, I80F48::ONE)
+                    .unwrap();
+            }
+        }
+
+        // reducing transfer while limits exceeded
+        {
+            let mut bank = bank_proto.clone();
+            bank.loan_origination_fee_rate = I80F48::ZERO;
+
+            let amount = I80F48::from(100);
+            let mut a1 = account_proto.clone();
+            bank.deposit(&mut a1, amount, 0).unwrap();
+            let mut a2 = account_proto.clone();
+            bank.withdraw_with_fee(&mut a2, amount, 0).unwrap();
+
+            bank.net_borrow_limit_per_window_quote = 100;
+            bank.net_borrows_in_window = 200;
+            bank.deposit_limit = 100;
+            bank.potential_serum_tokens = 100;
+            bank.potential_openbook_tokens = 100;
+
+            let half = I80F48::from(50);
+            bank.checked_transfer_with_fee(&mut a1, half, &mut a2, half, 0, I80F48::ONE)
+                .unwrap();
+            bank.checked_transfer_with_fee(&mut a1, half, &mut a2, half, 0, I80F48::ONE)
+                .unwrap();
+            assert!(bank
+                .checked_transfer_with_fee(&mut a1, half, &mut a2, half, 0, I80F48::ONE)
+                .is_err());
+        }
     }
 
     #[test]
@@ -1267,6 +1650,56 @@ mod tests {
         let (a, l) = bank.maint_weights(1000);
         assert!(abs_diff(a, 1.9) < 1e-8);
         assert!(abs_diff(l, 9.0) < 1e-8);
+
+        Ok(())
+    }
+
+    #[test]
+    pub fn test_bank_interest() -> Result<()> {
+        let index_start = I80F48::from(1_000_000);
+
+        let mut bank = Bank::zeroed();
+        bank.util0 = I80F48::from_num(0.5);
+        bank.rate0 = I80F48::from_num(0.02);
+        bank.util1 = I80F48::from_num(0.75);
+        bank.rate1 = I80F48::from_num(0.05);
+        bank.max_rate = I80F48::from_num(0.5);
+        bank.interest_curve_scaling = 4.0;
+        bank.deposit_index = index_start;
+        bank.borrow_index = index_start;
+        bank.net_borrow_limit_window_size_ts = 1;
+
+        let mut position0 = TokenPosition::default();
+        let mut position1 = TokenPosition::default();
+
+        // create 100% utilization, meaning 0.5 * 4 = 200% interest
+        bank.deposit(&mut position0, I80F48::from(1_000_000_000), 0)
+            .unwrap();
+        bank.withdraw_without_fee(&mut position1, I80F48::from(1_000_000_000), 0)
+            .unwrap();
+
+        // accumulate interest for a day at 5s intervals
+        let interval = 5;
+        for i in 0..24 * 60 * 60 / interval {
+            let (deposit_index, borrow_index, borrow_fees, borrow_rate, deposit_rate) = bank
+                .compute_index(
+                    bank.indexed_deposits,
+                    bank.indexed_borrows,
+                    I80F48::from(interval),
+                )
+                .unwrap();
+            bank.deposit_index = deposit_index;
+            bank.borrow_index = borrow_index;
+        }
+
+        // the 5s rate is 2/(365*24*60*60/5), so
+        // expected is (1+five_sec_rate)^(24*60*60/5)
+        assert!(
+            ((bank.deposit_index / index_start).to_num::<f64>() - 1.0054944908).abs() < 0.0000001
+        );
+        assert!(
+            ((bank.borrow_index / index_start).to_num::<f64>() - 1.0054944908).abs() < 0.0000001
+        );
 
         Ok(())
     }

@@ -3,10 +3,10 @@ import { getAccount } from '@solana/spl-token';
 import { Cluster, Connection, Keypair } from '@solana/web3.js';
 import * as dotenv from 'dotenv';
 import fs from 'fs';
-import { MangoClient } from '../../src/client';
-import { MANGO_V4_ID } from '../../src/constants';
-import { I80F48, ZERO_I80F48 } from '../../src/numbers/I80F48';
-import { toUiDecimals } from '../../src/utils';
+import { MangoClient } from '../src/client';
+import { MANGO_V4_ID } from '../src/constants';
+import { I80F48, ZERO_I80F48 } from '../src/numbers/I80F48';
+import { toUiDecimals } from '../src/utils';
 dotenv.config();
 
 const CLUSTER_URL =
@@ -42,13 +42,14 @@ async function main(): Promise<void> {
     banks.map((bank) => {
       (bank as any).indexedDepositsByMangoAccounts = ZERO_I80F48();
       (bank as any).indexedBorrowsByMangoAccounts = ZERO_I80F48();
+      (bank as any).serum3Total = ZERO_I80F48();
       return [bank.tokenIndex, bank];
     }),
   );
 
-  const mangoAccounts = await client.getAllMangoAccounts(group);
+  const mangoAccounts = await client.getAllMangoAccounts(group, true);
 
-  mangoAccounts.map((mangoAccount) =>
+  mangoAccounts.map((mangoAccount) => {
     mangoAccount.tokensActive().forEach((token) => {
       const bank = banksMapUsingTokenIndex.get(token.tokenIndex);
       if (token.indexedPosition.isPos()) {
@@ -69,8 +70,21 @@ async function main(): Promise<void> {
             .mul(banksMapUsingTokenIndex.get(token.tokenIndex)!.borrowIndex),
         );
       }
-    }),
-  );
+    });
+
+    mangoAccount.serum3Active().map((s3a) => {
+      const baseBank = group.getFirstBankByTokenIndex(s3a.baseTokenIndex);
+      const quoteBank = group.getFirstBankByTokenIndex(s3a.quoteTokenIndex);
+
+      const oo = mangoAccount.serum3OosMapByMarketIndex.get(s3a.marketIndex);
+      (baseBank as any).serum3Total = (baseBank as any).serum3Total.add(
+        I80F48.fromU64(oo!.baseTokenTotal),
+      );
+      (quoteBank as any).serum3Total = (quoteBank as any).serum3Total.add(
+        I80F48.fromU64(oo!.quoteTokenTotal),
+      );
+    });
+  });
 
   for (const bank of await Array.from(banksMapUsingTokenIndex.values()).sort(
     (a, b) => a.tokenIndex - b.tokenIndex,
@@ -81,67 +95,60 @@ async function main(): Promise<void> {
     );
     const vault = I80F48.fromNumber(Number(account.amount));
 
-    const error = vault.sub(
-      (bank as any).indexedDepositsByMangoAccounts
-        .sub((bank as any).indexedBorrowsByMangoAccounts)
-        .add(bank.collectedFeesNative)
-        .add(bank.dust),
-    );
-
+    const error = vault
+      .sub(
+        bank.indexedDeposits
+          .mul(bank.depositIndex)
+          .sub(bank.indexedBorrows.mul(bank.borrowIndex)),
+      )
+      .sub(bank.collectedFeesNative)
+      .sub(bank.dust)
+      .add(I80F48.fromU64(bank.feesWithdrawn));
     let res = `${bank.name}`;
     res =
       res +
-      `\n ${'tokenIndex'.padEnd(40)} ${bank.tokenIndex}` +
-      `\n ${'bank'.padEnd(40)} ${bank.publicKey}` +
-      `\n ${'vault'.padEnd(40)} ${bank.vault}` +
-      `\n ${'oracle'.padEnd(40)} ${bank.oracle}` +
-      `\n ${'mint'.padEnd(40)} ${bank.mint}` +
-      `\n ${'price'.padEnd(40)} ${bank.price?.toNumber()}` +
-      `\n ${'uiPrice'.padEnd(40)} ${bank.uiPrice}` +
-      `\n ${'error'.padEnd(40)} ${error}` +
-      `\n ${'collectedFeesNative'.padEnd(40)} ${bank.collectedFeesNative}` +
-      `\n ${'dust'.padEnd(40)} ${bank.dust}` +
-      `\n ${'vault balance'.padEnd(40)} ${toUiDecimals(
+      `\n ${'error'.padEnd(40)} ${toUiDecimals(
+        error,
+        bank.mintDecimals,
+      ).toLocaleString()}` +
+      `\n ${'vault'.padEnd(40)} ${toUiDecimals(
         vault,
         bank.mintDecimals,
-      )}, ${vault} native` +
-      `\n ${'deposits'.padEnd(40)} ${bank.indexedDeposits.mul(
-        bank.depositIndex,
-      )}` +
-      `\n ${'deposits (sum over all mango accounts)'.padEnd(40)} ${
-        (bank as any).indexedDepositsByMangoAccounts
-      }` +
-      `\n ${'borrows'.padEnd(40)} ${bank.indexedBorrows.mul(
-        bank.borrowIndex,
-      )}` +
-      `\n ${'borrows (sum over all mango accounts)'.padEnd(40)} ${
-        (bank as any).indexedBorrowsByMangoAccounts
-      }` +
-      `\n ${'avgUtilization since last rate update'.padEnd(40)} ${(
-        100 * bank.avgUtilization.toNumber()
-      ).toFixed(1)}%` +
-      `\n ${'rate parameters'.padEnd(40)} ${(
-        100 * bank.rate0.toNumber()
-      ).toFixed()}% @ ${(100 * bank.util0.toNumber()).toFixed()}% util, ${(
-        100 * bank.rate1.toNumber()
-      ).toFixed()}% @${(100 * bank.util1.toNumber()).toFixed()}% util, ${(
-        100 * bank.maxRate.toNumber()
-      ).toFixed()}% @ 100% util` +
-      `\n ${'depositRate'.padEnd(40)} ${(
-        100 * bank.getDepositRate().toNumber()
-      ).toFixed(2)}%` +
-      `\n ${'borrowRate'.padEnd(40)} ${(
-        100 * bank.getBorrowRate().toNumber()
-      ).toFixed(2)}%` +
-      `\n ${'last index update'.padEnd(40)} ${new Date(
-        1000 * bank.indexLastUpdated.toNumber(),
-      )}` +
-      `\n ${'last rates update'.padEnd(40)} ${new Date(
-        1000 * bank.bankRateLastUpdated.toNumber(),
-      )}` +
-      `\n ${'net borrows in window'.padEnd(
-        40,
-      )} ${bank.netBorrowsInWindow.toNumber()} / ${bank.netBorrowLimitPerWindowQuote.toNumber()}`;
+      ).toLocaleString()}` +
+      `\n ${'collected fees'.padEnd(40)} ${toUiDecimals(
+        bank.collectedFeesNative,
+        bank.mintDecimals,
+      ).toLocaleString()}` +
+      `\n ${'fees withdrawn'.padEnd(40)} ${toUiDecimals(
+        bank.feesWithdrawn,
+        bank.mintDecimals,
+      ).toLocaleString()}` +
+      `\n ${'deposits'.padEnd(40)} ${toUiDecimals(
+        bank.indexedDeposits.mul(bank.depositIndex),
+        bank.mintDecimals,
+      ).toLocaleString()}` +
+      `\n ${'deposits (sum over all mango accounts)'.padEnd(40)} ${toUiDecimals(
+        (bank as any).indexedDepositsByMangoAccounts,
+        bank.mintDecimals,
+      ).toLocaleString()}` +
+      `\n ${'borrows'.padEnd(40)} ${toUiDecimals(
+        bank.indexedBorrows.mul(bank.borrowIndex),
+        bank.mintDecimals,
+      ).toLocaleString()}` +
+      `\n ${'borrows (sum over all mango accounts)'.padEnd(40)} ${toUiDecimals(
+        (bank as any).indexedBorrowsByMangoAccounts,
+        bank.mintDecimals,
+      ).toLocaleString()}` +
+      `\n ${'deposits - borrows'.padEnd(40)} ${toUiDecimals(
+        bank.indexedDeposits
+          .mul(bank.depositIndex)
+          .sub(bank.indexedBorrows.mul(bank.borrowIndex)),
+        bank.mintDecimals,
+      ).toLocaleString()}` +
+      `\n ${`serum3 total`.padEnd(40)} ${toUiDecimals(
+        (bank as any).serum3Total,
+        bank.mintDecimals,
+      ).toLocaleString()}`;
 
     console.log(`${res}`);
   }

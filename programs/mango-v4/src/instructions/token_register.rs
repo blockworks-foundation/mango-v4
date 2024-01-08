@@ -6,7 +6,7 @@ use crate::error::*;
 use crate::state::*;
 use crate::util::fill_from_str;
 
-use crate::logs::TokenMetaDataLog;
+use crate::logs::{emit_stack, TokenMetaDataLogV2};
 
 pub const INDEX_START: I80F48 = I80F48::from_bits(1_000_000 * I80F48::ONE.to_bits());
 
@@ -40,6 +40,8 @@ pub fn token_register(
     flash_loan_swap_fee_rate: f32,
     interest_curve_scaling: f32,
     interest_target_utilization: f32,
+    group_insurance_fund: bool,
+    deposit_limit: u64,
 ) -> Result<()> {
     // Require token 0 to be in the insurance token
     if token_index == INSURANCE_TOKEN_INDEX {
@@ -112,18 +114,20 @@ pub fn token_register(
         flash_loan_swap_fee_rate: flash_loan_swap_fee_rate,
         interest_target_utilization,
         interest_curve_scaling: interest_curve_scaling.into(),
-        deposits_in_serum: 0,
-        deposits_in_openbook: 0,
+        potential_serum_tokens: 0,
+        potential_openbook_tokens: 0,
         maint_weight_shift_start: 0,
         maint_weight_shift_end: 0,
         maint_weight_shift_duration_inv: I80F48::ZERO,
         maint_weight_shift_asset_target: I80F48::ZERO,
         maint_weight_shift_liab_target: I80F48::ZERO,
-        reserved: [0; 2000],
+        fallback_oracle: ctx.accounts.fallback_oracle.key(),
+        deposit_limit,
+        reserved: [0; 1960],
     };
 
-    if let Ok(oracle_price) =
-        bank.oracle_price(&AccountInfoRef::borrow(ctx.accounts.oracle.as_ref())?, None)
+    let oracle_ref = &AccountInfoRef::borrow(ctx.accounts.oracle.as_ref())?;
+    if let Ok(oracle_price) = bank.oracle_price(&OracleAccountInfos::from_reader(oracle_ref), None)
     {
         bank.stable_price_model
             .reset_to_price(oracle_price.to_num(), now_ts);
@@ -132,30 +136,35 @@ pub fn token_register(
     }
 
     bank.verify()?;
+    check_is_valid_fallback_oracle(&AccountInfoRef::borrow(
+        ctx.accounts.fallback_oracle.as_ref(),
+    )?)?;
 
     let mut mint_info = ctx.accounts.mint_info.load_init()?;
     *mint_info = MintInfo {
         group: ctx.accounts.group.key(),
         token_index,
-        group_insurance_fund: 1,
+        group_insurance_fund: if group_insurance_fund { 1 } else { 0 },
         padding1: Default::default(),
         mint: ctx.accounts.mint.key(),
         banks: Default::default(),
         vaults: Default::default(),
         oracle: ctx.accounts.oracle.key(),
+        fallback_oracle: ctx.accounts.fallback_oracle.key(),
         registration_time: Clock::get()?.unix_timestamp.try_into().unwrap(),
-        reserved: [0; 2560],
+        reserved: [0; 2528],
     };
 
     mint_info.banks[0] = ctx.accounts.bank.key();
     mint_info.vaults[0] = ctx.accounts.vault.key();
 
-    emit!(TokenMetaDataLog {
+    emit_stack(TokenMetaDataLogV2 {
         mango_group: ctx.accounts.group.key(),
         mint: ctx.accounts.mint.key(),
         token_index,
         mint_decimals: ctx.accounts.mint.decimals,
         oracle: ctx.accounts.oracle.key(),
+        fallback_oracle: ctx.accounts.fallback_oracle.key(),
         mint_info: ctx.accounts.mint_info.key(),
     });
 

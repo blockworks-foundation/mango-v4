@@ -30,8 +30,9 @@ pub fn perp_place_order(
             asks: ctx.accounts.asks.load_mut()?,
         };
 
+        let oracle_ref = &AccountInfoRef::borrow(ctx.accounts.oracle.as_ref())?;
         let oracle_state = perp_market.oracle_state(
-            &AccountInfoRef::borrow(ctx.accounts.oracle.as_ref())?,
+            &OracleAccountInfos::from_reader(oracle_ref),
             None, // staleness checked in health
         )?;
         oracle_price = oracle_state.price;

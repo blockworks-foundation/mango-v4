@@ -1,5 +1,5 @@
 export type MangoV4 = {
-  "version": "0.20.0",
+  "version": "0.22.0",
   "name": "mango_v4",
   "instructions": [
     {
@@ -486,6 +486,11 @@ export type MangoV4 = {
           "isSigner": false
         },
         {
+          "name": "fallbackOracle",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
           "name": "payer",
           "isMut": true,
           "isSigner": true
@@ -610,6 +615,14 @@ export type MangoV4 = {
         {
           "name": "interestTargetUtilization",
           "type": "f32"
+        },
+        {
+          "name": "groupInsuranceFund",
+          "type": "bool"
+        },
+        {
+          "name": "depositLimit",
+          "type": "u64"
         }
       ]
     },
@@ -720,6 +733,11 @@ export type MangoV4 = {
           "isSigner": false
         },
         {
+          "name": "fallbackOracle",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
           "name": "payer",
           "isMut": true,
           "isSigner": true
@@ -778,6 +796,15 @@ export type MangoV4 = {
           "isSigner": false,
           "docs": [
             "The oracle account is optional and only used when reset_stable_price is set.",
+            ""
+          ]
+        },
+        {
+          "name": "fallbackOracle",
+          "isMut": false,
+          "isSigner": false,
+          "docs": [
+            "The fallback oracle account is optional and only used when set_fallback_oracle is true.",
             ""
           ]
         }
@@ -984,6 +1011,16 @@ export type MangoV4 = {
         {
           "name": "maintWeightShiftAbort",
           "type": "bool"
+        },
+        {
+          "name": "setFallbackOracle",
+          "type": "bool"
+        },
+        {
+          "name": "depositLimitOpt",
+          "type": {
+            "option": "u64"
+          }
         }
       ]
     },
@@ -1833,27 +1870,7 @@ export type MangoV4 = {
         {
           "name": "oracle",
           "isMut": true,
-          "isSigner": false,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "type": "string",
-                "value": "StubOracle"
-              },
-              {
-                "kind": "account",
-                "type": "publicKey",
-                "path": "group"
-              },
-              {
-                "kind": "account",
-                "type": "publicKey",
-                "account": "Mint",
-                "path": "mint"
-              }
-            ]
-          }
+          "isSigner": true
         },
         {
           "name": "admin",
@@ -2144,8 +2161,7 @@ export type MangoV4 = {
           "isMut": true,
           "isSigner": false,
           "relations": [
-            "group",
-            "owner"
+            "group"
           ]
         },
         {
@@ -2501,6 +2517,10 @@ export type MangoV4 = {
         {
           "name": "name",
           "type": "string"
+        },
+        {
+          "name": "oraclePriceBand",
+          "type": "f32"
         }
       ]
     },
@@ -2543,6 +2563,12 @@ export type MangoV4 = {
           "name": "nameOpt",
           "type": {
             "option": "string"
+          }
+        },
+        {
+          "name": "oraclePriceBandOpt",
+          "type": {
+            "option": "f32"
           }
         }
       ]
@@ -2885,6 +2911,164 @@ export type MangoV4 = {
       ]
     },
     {
+      "name": "serum3PlaceOrderV2",
+      "docs": [
+        "requires the receiver_bank in the health account list to be writable"
+      ],
+      "accounts": [
+        {
+          "name": "group",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "account",
+          "isMut": true,
+          "isSigner": false,
+          "relations": [
+            "group"
+          ]
+        },
+        {
+          "name": "owner",
+          "isMut": false,
+          "isSigner": true
+        },
+        {
+          "name": "openOrders",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "serumMarket",
+          "isMut": false,
+          "isSigner": false,
+          "relations": [
+            "group",
+            "serum_program",
+            "serum_market_external"
+          ]
+        },
+        {
+          "name": "serumProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "serumMarketExternal",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "marketBids",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "marketAsks",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "marketEventQueue",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "marketRequestQueue",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "marketBaseVault",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "marketQuoteVault",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "marketVaultSigner",
+          "isMut": false,
+          "isSigner": false,
+          "docs": [
+            "needed for the automatic settle_funds call"
+          ]
+        },
+        {
+          "name": "payerBank",
+          "isMut": true,
+          "isSigner": false,
+          "docs": [
+            "The bank that pays for the order, if necessary"
+          ],
+          "relations": [
+            "group"
+          ]
+        },
+        {
+          "name": "payerVault",
+          "isMut": true,
+          "isSigner": false,
+          "docs": [
+            "The bank vault that pays for the order, if necessary"
+          ]
+        },
+        {
+          "name": "payerOracle",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "tokenProgram",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "side",
+          "type": {
+            "defined": "Serum3Side"
+          }
+        },
+        {
+          "name": "limitPrice",
+          "type": "u64"
+        },
+        {
+          "name": "maxBaseQty",
+          "type": "u64"
+        },
+        {
+          "name": "maxNativeQuoteQtyIncludingFees",
+          "type": "u64"
+        },
+        {
+          "name": "selfTradeBehavior",
+          "type": {
+            "defined": "Serum3SelfTradeBehavior"
+          }
+        },
+        {
+          "name": "orderType",
+          "type": {
+            "defined": "Serum3OrderType"
+          }
+        },
+        {
+          "name": "clientOrderId",
+          "type": "u64"
+        },
+        {
+          "name": "limit",
+          "type": "u16"
+        }
+      ]
+    },
+    {
       "name": "serum3CancelOrder",
       "accounts": [
         {
@@ -2956,6 +3140,75 @@ export type MangoV4 = {
         {
           "name": "orderId",
           "type": "u128"
+        }
+      ]
+    },
+    {
+      "name": "serum3CancelOrderByClientOrderId",
+      "accounts": [
+        {
+          "name": "group",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "account",
+          "isMut": true,
+          "isSigner": false,
+          "relations": [
+            "group"
+          ]
+        },
+        {
+          "name": "owner",
+          "isMut": false,
+          "isSigner": true
+        },
+        {
+          "name": "openOrders",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "serumMarket",
+          "isMut": false,
+          "isSigner": false,
+          "relations": [
+            "group",
+            "serum_program",
+            "serum_market_external"
+          ]
+        },
+        {
+          "name": "serumProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "serumMarketExternal",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "marketBids",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "marketAsks",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "marketEventQueue",
+          "isMut": true,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "clientOrderId",
+          "type": "u64"
         }
       ]
     },
@@ -6023,6 +6276,10 @@ export type MangoV4 = {
         {
           "name": "name",
           "type": "string"
+        },
+        {
+          "name": "oraclePriceBand",
+          "type": "f32"
         }
       ]
     },
@@ -7001,7 +7258,8 @@ export type MangoV4 = {
           {
             "name": "minVaultToDepositsRatio",
             "docs": [
-              "Min fraction of deposits that must remain in the vault when borrowing."
+              "The maximum utilization allowed when borrowing is 1-this value",
+              "WARNING: Outdated name, kept for IDL compatibility"
             ],
             "type": "f64"
           },
@@ -7112,25 +7370,44 @@ export type MangoV4 = {
             "type": "f64"
           },
           {
-            "name": "depositsInSerum",
-            "type": "i64"
+            "name": "potentialSerumTokens",
+            "docs": [
+              "Largest amount of tokens that might be added the the bank based on",
+              "serum open order execution."
+            ],
+            "type": "u64"
           },
           {
             "name": "maintWeightShiftStart",
+            "docs": [
+              "Start timestamp in seconds at which maint weights should start to change away",
+              "from maint_asset_weight, maint_liab_weight towards _asset_target and _liab_target.",
+              "If _start and _end and _duration_inv are 0, no shift is configured."
+            ],
             "type": "u64"
           },
           {
             "name": "maintWeightShiftEnd",
+            "docs": [
+              "End timestamp in seconds until which the maint weights should reach the configured targets."
+            ],
             "type": "u64"
           },
           {
             "name": "maintWeightShiftDurationInv",
+            "docs": [
+              "Cache of the inverse of maint_weight_shift_end - maint_weight_shift_start,",
+              "or zero if no shift is configured"
+            ],
             "type": {
               "defined": "I80F48"
             }
           },
           {
             "name": "maintWeightShiftAssetTarget",
+            "docs": [
+              "Maint asset weight to reach at _shift_end."
+            ],
             "type": {
               "defined": "I80F48"
             }
@@ -7142,15 +7419,34 @@ export type MangoV4 = {
             }
           },
           {
-            "name": "depositsInOpenbook",
-            "type": "i64"
+            "name": "fallbackOracle",
+            "docs": [
+              "Oracle that may be used if the main oracle is stale or not confident enough.",
+              "If this is Pubkey::default(), no fallback is available."
+            ],
+            "type": "publicKey"
+          },
+          {
+            "name": "depositLimit",
+            "docs": [
+              "zero means none, in token native"
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "potentialOpenbookTokens",
+            "docs": [
+              "Largest amount of tokens that might be added the the bank based on",
+              "oenbook open order execution."
+            ],
+            "type": "u64"
           },
           {
             "name": "reserved",
             "type": {
               "array": [
                 "u8",
-                2000
+                1960
               ]
             }
           }
@@ -7266,10 +7562,16 @@ export type MangoV4 = {
           },
           {
             "name": "fastListingsInInterval",
+            "docs": [
+              "Number of fast listings that happened this interval"
+            ],
             "type": "u16"
           },
           {
             "name": "allowedFastListingsPerInterval",
+            "docs": [
+              "Number of fast listings that are allowed per interval"
+            ],
             "type": "u16"
           },
           {
@@ -7468,6 +7770,27 @@ export type MangoV4 = {
                 "defined": "PerpOpenOrder"
               }
             }
+          },
+          {
+            "name": "padding8",
+            "type": "u32"
+          },
+          {
+            "name": "tokenConditionalSwaps",
+            "type": {
+              "vec": {
+                "defined": "TokenConditionalSwap"
+              }
+            }
+          },
+          {
+            "name": "reservedDynamic",
+            "type": {
+              "array": [
+                "u8",
+                64
+              ]
+            }
           }
         ]
       }
@@ -7529,11 +7852,15 @@ export type MangoV4 = {
             "type": "u64"
           },
           {
+            "name": "fallbackOracle",
+            "type": "publicKey"
+          },
+          {
             "name": "reserved",
             "type": {
               "array": [
                 "u8",
-                2560
+                2528
               ]
             }
           }
@@ -7604,9 +7931,19 @@ export type MangoV4 = {
             "type": {
               "array": [
                 "u8",
-                5
+                1
               ]
             }
+          },
+          {
+            "name": "oraclePriceBand",
+            "docs": [
+              "Limit orders must be <= oracle * (1+band) and >= oracle / (1+band)",
+              "",
+              "Zero value is the default due to migration and disables the limit,",
+              "same as f32::MAX."
+            ],
+            "type": "f32"
           },
           {
             "name": "registrationTime",
@@ -8249,9 +8586,19 @@ export type MangoV4 = {
             "type": {
               "array": [
                 "u8",
-                5
+                1
               ]
             }
+          },
+          {
+            "name": "oraclePriceBand",
+            "docs": [
+              "Limit orders must be <= oracle * (1+band) and >= oracle / (1+band)",
+              "",
+              "Zero value is the default due to migration and disables the limit,",
+              "same as f32::MAX."
+            ],
+            "type": "f32"
           },
           {
             "name": "registrationTime",
@@ -8688,26 +9035,41 @@ export type MangoV4 = {
             "type": "f64"
           },
           {
-            "name": "baseDepositsReserved",
+            "name": "potentialBaseTokens",
             "docs": [
-              "Tracks the amount of deposits that flowed into the serum open orders account.",
+              "An overestimate of the amount of tokens that might flow out of the open orders account.",
               "",
-              "The bank still considers these amounts user deposits (see deposits_in_serum)",
-              "and they need to be deducted from there when they flow back into the bank",
-              "as real tokens."
+              "The bank still considers these amounts user deposits (see Bank::potential_serum_tokens)",
+              "and that value needs to be updated in conjunction with these numbers.",
+              "",
+              "This estimation is based on the amount of tokens in the open orders account",
+              "(see update_bank_potential_tokens() in serum3_place_order and settle)"
             ],
             "type": "u64"
           },
           {
-            "name": "quoteDepositsReserved",
+            "name": "potentialQuoteTokens",
             "type": "u64"
+          },
+          {
+            "name": "lowestPlacedBidInv",
+            "docs": [
+              "Track lowest bid/highest ask, same way as for highest bid/lowest ask.",
+              "",
+              "0 is a special \"unset\" state."
+            ],
+            "type": "f64"
+          },
+          {
+            "name": "highestPlacedAsk",
+            "type": "f64"
           },
           {
             "name": "reserved",
             "type": {
               "array": [
                 "u8",
-                32
+                16
               ]
             }
           }
@@ -8771,7 +9133,7 @@ export type MangoV4 = {
               "Tracking it exactly isn't possible since we don't see fills. So instead track",
               "the min/max of the _placed_ bids and asks.",
               "",
-              "The value is reset in serum3_place_order when a new order is placed without an",
+              "The value is reset in openbook_v2_place_order when a new order is placed without an",
               "existing one on the book.",
               "",
               "0 is a special \"unset\" state."
@@ -8783,26 +9145,41 @@ export type MangoV4 = {
             "type": "f64"
           },
           {
-            "name": "baseDepositsReserved",
+            "name": "potentialBaseTokens",
             "docs": [
-              "Tracks the amount of deposits that flowed into the serum open orders account.",
+              "An overestimate of the amount of tokens that might flow out of the open orders account.",
               "",
-              "The bank still considers these amounts user deposits (see deposits_in_serum)",
-              "and they need to be deducted from there when they flow back into the bank",
-              "as real tokens."
+              "The bank still considers these amounts user deposits (see Bank::potential_openbook_tokens)",
+              "and that value needs to be updated in conjunction with these numbers.",
+              "",
+              "This estimation is based on the amount of tokens in the open orders account",
+              "(see update_bank_potential_tokens() in openbook_v2_place_order and settle)"
             ],
             "type": "u64"
           },
           {
-            "name": "quoteDepositsReserved",
+            "name": "potentialQuoteTokens",
             "type": "u64"
+          },
+          {
+            "name": "lowestPlacedBidInv",
+            "docs": [
+              "Track lowest bid/highest ask, same way as for highest bid/lowest ask.",
+              "",
+              "0 is a special \"unset\" state."
+            ],
+            "type": "f64"
+          },
+          {
+            "name": "highestPlacedAsk",
+            "type": "f64"
           },
           {
             "name": "reserved",
             "type": {
               "array": [
                 "u8",
-                32
+                176
               ]
             }
           }
@@ -9084,11 +9461,15 @@ export type MangoV4 = {
             "type": "u128"
           },
           {
+            "name": "quantity",
+            "type": "i64"
+          },
+          {
             "name": "reserved",
             "type": {
               "array": [
                 "u8",
-                64
+                56
               ]
             }
           }
@@ -9643,13 +10024,8 @@ export type MangoV4 = {
             "type": "u64"
           },
           {
-            "name": "padding4",
-            "type": {
-              "array": [
-                "u8",
-                16
-              ]
-            }
+            "name": "makerOrderId",
+            "type": "u128"
           },
           {
             "name": "price",
@@ -9726,11 +10102,15 @@ export type MangoV4 = {
             "type": "i64"
           },
           {
+            "name": "orderId",
+            "type": "u128"
+          },
+          {
             "name": "padding1",
             "type": {
               "array": [
                 "u8",
-                144
+                128
               ]
             }
           }
@@ -10471,6 +10851,9 @@ export type MangoV4 = {
           },
           {
             "name": "TokenConditionalSwapCreateLinearAuction"
+          },
+          {
+            "name": "Serum3PlaceOrderV2"
           }
         ]
       }
@@ -10508,6 +10891,9 @@ export type MangoV4 = {
           },
           {
             "name": "SwitchboardV2"
+          },
+          {
+            "name": "OrcaCLMM"
           }
         ]
       }
@@ -12084,6 +12470,46 @@ export type MangoV4 = {
       ]
     },
     {
+      "name": "TokenMetaDataLogV2",
+      "fields": [
+        {
+          "name": "mangoGroup",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "mint",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "tokenIndex",
+          "type": "u16",
+          "index": false
+        },
+        {
+          "name": "mintDecimals",
+          "type": "u8",
+          "index": false
+        },
+        {
+          "name": "oracle",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "fallbackOracle",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "mintInfo",
+          "type": "publicKey",
+          "index": false
+        }
+      ]
+    },
+    {
       "name": "PerpMarketMetaDataLog",
       "fields": [
         {
@@ -13482,11 +13908,56 @@ export type MangoV4 = {
     },
     {
       "code": 6060,
+      "name": "HealthAccountBankNotWritable",
+      "msg": "a bank in the health account list should be writable but is not"
+    },
+    {
+      "code": 6061,
+      "name": "Serum3PriceBandExceeded",
+      "msg": "the market does not allow limit orders too far from the current oracle value"
+    },
+    {
+      "code": 6062,
+      "name": "BankDepositLimit",
+      "msg": "deposit crosses the token's deposit limit"
+    },
+    {
+      "code": 6063,
+      "name": "DelegateWithdrawOnlyToOwnerAta",
+      "msg": "delegates can only withdraw to the owner's associated token account"
+    },
+    {
+      "code": 6064,
+      "name": "DelegateWithdrawMustClosePosition",
+      "msg": "delegates can only withdraw if they close the token position"
+    },
+    {
+      "code": 6065,
+      "name": "DelegateWithdrawSmall",
+      "msg": "delegates can only withdraw small amounts"
+    },
+    {
+      "code": 6066,
+      "name": "InvalidCLMMOracle",
+      "msg": "The provided CLMM oracle is not valid"
+    },
+    {
+      "code": 6067,
+      "name": "InvalidFeedForCLMMOracle",
+      "msg": "invalid usdc/usd feed provided for the CLMM oracle"
+    },
+    {
+      "code": 6068,
+      "name": "MissingFeedForCLMMOracle",
+      "msg": "Pyth USDC/USD or SOL/USD feed not found (required by CLMM oracle)"
+    },
+    {
+      "code": 6069,
       "name": "NoFreeOpenbookV2OpenOrdersIndex",
       "msg": "no free openbook v2 open orders index"
     },
     {
-      "code": 6061,
+      "code": 6070,
       "name": "OpenbookV2OpenOrdersExistAlready",
       "msg": "openbook v2 open orders exist already"
     }
@@ -13494,7 +13965,7 @@ export type MangoV4 = {
 };
 
 export const IDL: MangoV4 = {
-  "version": "0.20.0",
+  "version": "0.22.0",
   "name": "mango_v4",
   "instructions": [
     {
@@ -13981,6 +14452,11 @@ export const IDL: MangoV4 = {
           "isSigner": false
         },
         {
+          "name": "fallbackOracle",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
           "name": "payer",
           "isMut": true,
           "isSigner": true
@@ -14105,6 +14581,14 @@ export const IDL: MangoV4 = {
         {
           "name": "interestTargetUtilization",
           "type": "f32"
+        },
+        {
+          "name": "groupInsuranceFund",
+          "type": "bool"
+        },
+        {
+          "name": "depositLimit",
+          "type": "u64"
         }
       ]
     },
@@ -14215,6 +14699,11 @@ export const IDL: MangoV4 = {
           "isSigner": false
         },
         {
+          "name": "fallbackOracle",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
           "name": "payer",
           "isMut": true,
           "isSigner": true
@@ -14273,6 +14762,15 @@ export const IDL: MangoV4 = {
           "isSigner": false,
           "docs": [
             "The oracle account is optional and only used when reset_stable_price is set.",
+            ""
+          ]
+        },
+        {
+          "name": "fallbackOracle",
+          "isMut": false,
+          "isSigner": false,
+          "docs": [
+            "The fallback oracle account is optional and only used when set_fallback_oracle is true.",
             ""
           ]
         }
@@ -14479,6 +14977,16 @@ export const IDL: MangoV4 = {
         {
           "name": "maintWeightShiftAbort",
           "type": "bool"
+        },
+        {
+          "name": "setFallbackOracle",
+          "type": "bool"
+        },
+        {
+          "name": "depositLimitOpt",
+          "type": {
+            "option": "u64"
+          }
         }
       ]
     },
@@ -15328,27 +15836,7 @@ export const IDL: MangoV4 = {
         {
           "name": "oracle",
           "isMut": true,
-          "isSigner": false,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "type": "string",
-                "value": "StubOracle"
-              },
-              {
-                "kind": "account",
-                "type": "publicKey",
-                "path": "group"
-              },
-              {
-                "kind": "account",
-                "type": "publicKey",
-                "account": "Mint",
-                "path": "mint"
-              }
-            ]
-          }
+          "isSigner": true
         },
         {
           "name": "admin",
@@ -15639,8 +16127,7 @@ export const IDL: MangoV4 = {
           "isMut": true,
           "isSigner": false,
           "relations": [
-            "group",
-            "owner"
+            "group"
           ]
         },
         {
@@ -15996,6 +16483,10 @@ export const IDL: MangoV4 = {
         {
           "name": "name",
           "type": "string"
+        },
+        {
+          "name": "oraclePriceBand",
+          "type": "f32"
         }
       ]
     },
@@ -16038,6 +16529,12 @@ export const IDL: MangoV4 = {
           "name": "nameOpt",
           "type": {
             "option": "string"
+          }
+        },
+        {
+          "name": "oraclePriceBandOpt",
+          "type": {
+            "option": "f32"
           }
         }
       ]
@@ -16380,6 +16877,164 @@ export const IDL: MangoV4 = {
       ]
     },
     {
+      "name": "serum3PlaceOrderV2",
+      "docs": [
+        "requires the receiver_bank in the health account list to be writable"
+      ],
+      "accounts": [
+        {
+          "name": "group",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "account",
+          "isMut": true,
+          "isSigner": false,
+          "relations": [
+            "group"
+          ]
+        },
+        {
+          "name": "owner",
+          "isMut": false,
+          "isSigner": true
+        },
+        {
+          "name": "openOrders",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "serumMarket",
+          "isMut": false,
+          "isSigner": false,
+          "relations": [
+            "group",
+            "serum_program",
+            "serum_market_external"
+          ]
+        },
+        {
+          "name": "serumProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "serumMarketExternal",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "marketBids",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "marketAsks",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "marketEventQueue",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "marketRequestQueue",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "marketBaseVault",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "marketQuoteVault",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "marketVaultSigner",
+          "isMut": false,
+          "isSigner": false,
+          "docs": [
+            "needed for the automatic settle_funds call"
+          ]
+        },
+        {
+          "name": "payerBank",
+          "isMut": true,
+          "isSigner": false,
+          "docs": [
+            "The bank that pays for the order, if necessary"
+          ],
+          "relations": [
+            "group"
+          ]
+        },
+        {
+          "name": "payerVault",
+          "isMut": true,
+          "isSigner": false,
+          "docs": [
+            "The bank vault that pays for the order, if necessary"
+          ]
+        },
+        {
+          "name": "payerOracle",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "tokenProgram",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "side",
+          "type": {
+            "defined": "Serum3Side"
+          }
+        },
+        {
+          "name": "limitPrice",
+          "type": "u64"
+        },
+        {
+          "name": "maxBaseQty",
+          "type": "u64"
+        },
+        {
+          "name": "maxNativeQuoteQtyIncludingFees",
+          "type": "u64"
+        },
+        {
+          "name": "selfTradeBehavior",
+          "type": {
+            "defined": "Serum3SelfTradeBehavior"
+          }
+        },
+        {
+          "name": "orderType",
+          "type": {
+            "defined": "Serum3OrderType"
+          }
+        },
+        {
+          "name": "clientOrderId",
+          "type": "u64"
+        },
+        {
+          "name": "limit",
+          "type": "u16"
+        }
+      ]
+    },
+    {
       "name": "serum3CancelOrder",
       "accounts": [
         {
@@ -16451,6 +17106,75 @@ export const IDL: MangoV4 = {
         {
           "name": "orderId",
           "type": "u128"
+        }
+      ]
+    },
+    {
+      "name": "serum3CancelOrderByClientOrderId",
+      "accounts": [
+        {
+          "name": "group",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "account",
+          "isMut": true,
+          "isSigner": false,
+          "relations": [
+            "group"
+          ]
+        },
+        {
+          "name": "owner",
+          "isMut": false,
+          "isSigner": true
+        },
+        {
+          "name": "openOrders",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "serumMarket",
+          "isMut": false,
+          "isSigner": false,
+          "relations": [
+            "group",
+            "serum_program",
+            "serum_market_external"
+          ]
+        },
+        {
+          "name": "serumProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "serumMarketExternal",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "marketBids",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "marketAsks",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "marketEventQueue",
+          "isMut": true,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "clientOrderId",
+          "type": "u64"
         }
       ]
     },
@@ -19518,6 +20242,10 @@ export const IDL: MangoV4 = {
         {
           "name": "name",
           "type": "string"
+        },
+        {
+          "name": "oraclePriceBand",
+          "type": "f32"
         }
       ]
     },
@@ -20496,7 +21224,8 @@ export const IDL: MangoV4 = {
           {
             "name": "minVaultToDepositsRatio",
             "docs": [
-              "Min fraction of deposits that must remain in the vault when borrowing."
+              "The maximum utilization allowed when borrowing is 1-this value",
+              "WARNING: Outdated name, kept for IDL compatibility"
             ],
             "type": "f64"
           },
@@ -20607,25 +21336,44 @@ export const IDL: MangoV4 = {
             "type": "f64"
           },
           {
-            "name": "depositsInSerum",
-            "type": "i64"
+            "name": "potentialSerumTokens",
+            "docs": [
+              "Largest amount of tokens that might be added the the bank based on",
+              "serum open order execution."
+            ],
+            "type": "u64"
           },
           {
             "name": "maintWeightShiftStart",
+            "docs": [
+              "Start timestamp in seconds at which maint weights should start to change away",
+              "from maint_asset_weight, maint_liab_weight towards _asset_target and _liab_target.",
+              "If _start and _end and _duration_inv are 0, no shift is configured."
+            ],
             "type": "u64"
           },
           {
             "name": "maintWeightShiftEnd",
+            "docs": [
+              "End timestamp in seconds until which the maint weights should reach the configured targets."
+            ],
             "type": "u64"
           },
           {
             "name": "maintWeightShiftDurationInv",
+            "docs": [
+              "Cache of the inverse of maint_weight_shift_end - maint_weight_shift_start,",
+              "or zero if no shift is configured"
+            ],
             "type": {
               "defined": "I80F48"
             }
           },
           {
             "name": "maintWeightShiftAssetTarget",
+            "docs": [
+              "Maint asset weight to reach at _shift_end."
+            ],
             "type": {
               "defined": "I80F48"
             }
@@ -20637,15 +21385,34 @@ export const IDL: MangoV4 = {
             }
           },
           {
-            "name": "depositsInOpenbook",
-            "type": "i64"
+            "name": "fallbackOracle",
+            "docs": [
+              "Oracle that may be used if the main oracle is stale or not confident enough.",
+              "If this is Pubkey::default(), no fallback is available."
+            ],
+            "type": "publicKey"
+          },
+          {
+            "name": "depositLimit",
+            "docs": [
+              "zero means none, in token native"
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "potentialOpenbookTokens",
+            "docs": [
+              "Largest amount of tokens that might be added the the bank based on",
+              "oenbook open order execution."
+            ],
+            "type": "u64"
           },
           {
             "name": "reserved",
             "type": {
               "array": [
                 "u8",
-                2000
+                1960
               ]
             }
           }
@@ -20761,10 +21528,16 @@ export const IDL: MangoV4 = {
           },
           {
             "name": "fastListingsInInterval",
+            "docs": [
+              "Number of fast listings that happened this interval"
+            ],
             "type": "u16"
           },
           {
             "name": "allowedFastListingsPerInterval",
+            "docs": [
+              "Number of fast listings that are allowed per interval"
+            ],
             "type": "u16"
           },
           {
@@ -20963,6 +21736,27 @@ export const IDL: MangoV4 = {
                 "defined": "PerpOpenOrder"
               }
             }
+          },
+          {
+            "name": "padding8",
+            "type": "u32"
+          },
+          {
+            "name": "tokenConditionalSwaps",
+            "type": {
+              "vec": {
+                "defined": "TokenConditionalSwap"
+              }
+            }
+          },
+          {
+            "name": "reservedDynamic",
+            "type": {
+              "array": [
+                "u8",
+                64
+              ]
+            }
           }
         ]
       }
@@ -21024,11 +21818,15 @@ export const IDL: MangoV4 = {
             "type": "u64"
           },
           {
+            "name": "fallbackOracle",
+            "type": "publicKey"
+          },
+          {
             "name": "reserved",
             "type": {
               "array": [
                 "u8",
-                2560
+                2528
               ]
             }
           }
@@ -21099,9 +21897,19 @@ export const IDL: MangoV4 = {
             "type": {
               "array": [
                 "u8",
-                5
+                1
               ]
             }
+          },
+          {
+            "name": "oraclePriceBand",
+            "docs": [
+              "Limit orders must be <= oracle * (1+band) and >= oracle / (1+band)",
+              "",
+              "Zero value is the default due to migration and disables the limit,",
+              "same as f32::MAX."
+            ],
+            "type": "f32"
           },
           {
             "name": "registrationTime",
@@ -21744,9 +22552,19 @@ export const IDL: MangoV4 = {
             "type": {
               "array": [
                 "u8",
-                5
+                1
               ]
             }
+          },
+          {
+            "name": "oraclePriceBand",
+            "docs": [
+              "Limit orders must be <= oracle * (1+band) and >= oracle / (1+band)",
+              "",
+              "Zero value is the default due to migration and disables the limit,",
+              "same as f32::MAX."
+            ],
+            "type": "f32"
           },
           {
             "name": "registrationTime",
@@ -22183,26 +23001,41 @@ export const IDL: MangoV4 = {
             "type": "f64"
           },
           {
-            "name": "baseDepositsReserved",
+            "name": "potentialBaseTokens",
             "docs": [
-              "Tracks the amount of deposits that flowed into the serum open orders account.",
+              "An overestimate of the amount of tokens that might flow out of the open orders account.",
               "",
-              "The bank still considers these amounts user deposits (see deposits_in_serum)",
-              "and they need to be deducted from there when they flow back into the bank",
-              "as real tokens."
+              "The bank still considers these amounts user deposits (see Bank::potential_serum_tokens)",
+              "and that value needs to be updated in conjunction with these numbers.",
+              "",
+              "This estimation is based on the amount of tokens in the open orders account",
+              "(see update_bank_potential_tokens() in serum3_place_order and settle)"
             ],
             "type": "u64"
           },
           {
-            "name": "quoteDepositsReserved",
+            "name": "potentialQuoteTokens",
             "type": "u64"
+          },
+          {
+            "name": "lowestPlacedBidInv",
+            "docs": [
+              "Track lowest bid/highest ask, same way as for highest bid/lowest ask.",
+              "",
+              "0 is a special \"unset\" state."
+            ],
+            "type": "f64"
+          },
+          {
+            "name": "highestPlacedAsk",
+            "type": "f64"
           },
           {
             "name": "reserved",
             "type": {
               "array": [
                 "u8",
-                32
+                16
               ]
             }
           }
@@ -22266,7 +23099,7 @@ export const IDL: MangoV4 = {
               "Tracking it exactly isn't possible since we don't see fills. So instead track",
               "the min/max of the _placed_ bids and asks.",
               "",
-              "The value is reset in serum3_place_order when a new order is placed without an",
+              "The value is reset in openbook_v2_place_order when a new order is placed without an",
               "existing one on the book.",
               "",
               "0 is a special \"unset\" state."
@@ -22278,26 +23111,41 @@ export const IDL: MangoV4 = {
             "type": "f64"
           },
           {
-            "name": "baseDepositsReserved",
+            "name": "potentialBaseTokens",
             "docs": [
-              "Tracks the amount of deposits that flowed into the serum open orders account.",
+              "An overestimate of the amount of tokens that might flow out of the open orders account.",
               "",
-              "The bank still considers these amounts user deposits (see deposits_in_serum)",
-              "and they need to be deducted from there when they flow back into the bank",
-              "as real tokens."
+              "The bank still considers these amounts user deposits (see Bank::potential_openbook_tokens)",
+              "and that value needs to be updated in conjunction with these numbers.",
+              "",
+              "This estimation is based on the amount of tokens in the open orders account",
+              "(see update_bank_potential_tokens() in openbook_v2_place_order and settle)"
             ],
             "type": "u64"
           },
           {
-            "name": "quoteDepositsReserved",
+            "name": "potentialQuoteTokens",
             "type": "u64"
+          },
+          {
+            "name": "lowestPlacedBidInv",
+            "docs": [
+              "Track lowest bid/highest ask, same way as for highest bid/lowest ask.",
+              "",
+              "0 is a special \"unset\" state."
+            ],
+            "type": "f64"
+          },
+          {
+            "name": "highestPlacedAsk",
+            "type": "f64"
           },
           {
             "name": "reserved",
             "type": {
               "array": [
                 "u8",
-                32
+                176
               ]
             }
           }
@@ -22579,11 +23427,15 @@ export const IDL: MangoV4 = {
             "type": "u128"
           },
           {
+            "name": "quantity",
+            "type": "i64"
+          },
+          {
             "name": "reserved",
             "type": {
               "array": [
                 "u8",
-                64
+                56
               ]
             }
           }
@@ -23138,13 +23990,8 @@ export const IDL: MangoV4 = {
             "type": "u64"
           },
           {
-            "name": "padding4",
-            "type": {
-              "array": [
-                "u8",
-                16
-              ]
-            }
+            "name": "makerOrderId",
+            "type": "u128"
           },
           {
             "name": "price",
@@ -23221,11 +24068,15 @@ export const IDL: MangoV4 = {
             "type": "i64"
           },
           {
+            "name": "orderId",
+            "type": "u128"
+          },
+          {
             "name": "padding1",
             "type": {
               "array": [
                 "u8",
-                144
+                128
               ]
             }
           }
@@ -23966,6 +24817,9 @@ export const IDL: MangoV4 = {
           },
           {
             "name": "TokenConditionalSwapCreateLinearAuction"
+          },
+          {
+            "name": "Serum3PlaceOrderV2"
           }
         ]
       }
@@ -24003,6 +24857,9 @@ export const IDL: MangoV4 = {
           },
           {
             "name": "SwitchboardV2"
+          },
+          {
+            "name": "OrcaCLMM"
           }
         ]
       }
@@ -25579,6 +26436,46 @@ export const IDL: MangoV4 = {
       ]
     },
     {
+      "name": "TokenMetaDataLogV2",
+      "fields": [
+        {
+          "name": "mangoGroup",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "mint",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "tokenIndex",
+          "type": "u16",
+          "index": false
+        },
+        {
+          "name": "mintDecimals",
+          "type": "u8",
+          "index": false
+        },
+        {
+          "name": "oracle",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "fallbackOracle",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "mintInfo",
+          "type": "publicKey",
+          "index": false
+        }
+      ]
+    },
+    {
       "name": "PerpMarketMetaDataLog",
       "fields": [
         {
@@ -26977,11 +27874,56 @@ export const IDL: MangoV4 = {
     },
     {
       "code": 6060,
+      "name": "HealthAccountBankNotWritable",
+      "msg": "a bank in the health account list should be writable but is not"
+    },
+    {
+      "code": 6061,
+      "name": "Serum3PriceBandExceeded",
+      "msg": "the market does not allow limit orders too far from the current oracle value"
+    },
+    {
+      "code": 6062,
+      "name": "BankDepositLimit",
+      "msg": "deposit crosses the token's deposit limit"
+    },
+    {
+      "code": 6063,
+      "name": "DelegateWithdrawOnlyToOwnerAta",
+      "msg": "delegates can only withdraw to the owner's associated token account"
+    },
+    {
+      "code": 6064,
+      "name": "DelegateWithdrawMustClosePosition",
+      "msg": "delegates can only withdraw if they close the token position"
+    },
+    {
+      "code": 6065,
+      "name": "DelegateWithdrawSmall",
+      "msg": "delegates can only withdraw small amounts"
+    },
+    {
+      "code": 6066,
+      "name": "InvalidCLMMOracle",
+      "msg": "The provided CLMM oracle is not valid"
+    },
+    {
+      "code": 6067,
+      "name": "InvalidFeedForCLMMOracle",
+      "msg": "invalid usdc/usd feed provided for the CLMM oracle"
+    },
+    {
+      "code": 6068,
+      "name": "MissingFeedForCLMMOracle",
+      "msg": "Pyth USDC/USD or SOL/USD feed not found (required by CLMM oracle)"
+    },
+    {
+      "code": 6069,
       "name": "NoFreeOpenbookV2OpenOrdersIndex",
       "msg": "no free openbook v2 open orders index"
     },
     {
-      "code": 6061,
+      "code": 6070,
       "name": "OpenbookV2OpenOrdersExistAlready",
       "msg": "openbook v2 open orders exist already"
     }

@@ -18,7 +18,7 @@ use solana_sdk::{signature::Signature, signer::Signer};
 use tracing::*;
 use {fixed::types::I80F48, solana_sdk::pubkey::Pubkey};
 
-use crate::{token_swap_info, util, ErrorTracking};
+use crate::{token_swap_info, util, ErrorTracking, LiqErrorType};
 
 /// When computing the max possible swap for a liqee, assume the price is this fraction worse for them.
 ///
@@ -26,10 +26,9 @@ use crate::{token_swap_info, util, ErrorTracking};
 /// making the whole execution fail.
 const SLIPPAGE_BUFFER: f64 = 0.01; // 1%
 
-/// If a tcs gets limited due to exhausted net borrows, don't trigger execution if
-/// the possible value is below this amount. This avoids spamming executions when net
-/// borrows are exhausted.
-const NET_BORROW_EXECUTION_THRESHOLD: u64 = 1_000_000; // 1 USD
+/// If a tcs gets limited due to exhausted net borrows or deposit limits, don't trigger execution if
+/// the possible value is below this amount. This avoids spamming executions when limits are exhausted.
+const EXECUTION_THRESHOLD: u64 = 1_000_000; // 1 USD
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Mode {
@@ -66,7 +65,7 @@ pub struct Config {
     pub profit_fraction: f64,
 
     /// Minimum fraction of max_buy to buy for success when triggering,
-    /// useful in conjuction with jupiter swaps in same tx to avoid over-buying.
+    /// useful in conjunction with jupiter swaps in same tx to avoid over-buying.
     ///
     /// Can be set to 0 to allow executions of any size.
     pub min_buy_fraction: f64,
@@ -365,7 +364,7 @@ impl Context {
         &self,
         token_index: TokenIndex,
     ) -> anyhow::Result<(Bank, I80F48, Pubkey)> {
-        let info = self.mango_client.context.mint_info(token_index);
+        let info = self.mango_client.context.token(token_index);
         let (bank, price) = self
             .account_fetcher
             .fetch_bank_and_price(&info.first_bank())?;
@@ -440,12 +439,17 @@ impl Context {
     /// This includes
     /// - tcs restrictions (remaining buy/sell, create borrows/deposits)
     /// - reduce only banks
-    /// - net borrow limits on BOTH sides, even though the buy side is technically
-    ///   a liqor limitation: the liqor could acquire the token before trying the
-    ///   execution... but in practice the liqor will work on margin
+    /// - net borrow limits:
+    ///   - the account may borrow the sell token (and the liqor side may not be a repay)
+    ///   - the liqor may borrow the buy token (and the account side may not be a repay)
+    ///     this is technically a liqor limitation: the liqor could acquire the token before trying the
+    ///     execution... but in practice the liqor may work on margin
+    /// - deposit limits:
+    ///   - the account may deposit the buy token (while the liqor borrowed it)
+    ///   - the liqor may deposit the sell token (while the account borrowed it)
     ///
     /// Returns Some((native buy amount, native sell amount)) if execution is sensible
-    /// Returns None if the execution should be skipped (due to net borrow limits...)
+    /// Returns None if the execution should be skipped (due to limits)
     pub fn tcs_max_liqee_execution(
         &self,
         account: &MangoAccountValue,
@@ -458,18 +462,18 @@ impl Context {
         let premium_price = tcs.premium_price(base_price.to_num(), self.now_ts);
         let maker_price = tcs.maker_price(premium_price);
 
-        let buy_position = account
+        let liqee_buy_position = account
             .token_position(tcs.buy_token_index)
             .map(|p| p.native(&buy_bank))
             .unwrap_or(I80F48::ZERO);
-        let sell_position = account
+        let liqee_sell_position = account
             .token_position(tcs.sell_token_index)
             .map(|p| p.native(&sell_bank))
             .unwrap_or(I80F48::ZERO);
 
         // this is in "buy token received per sell token given" units
         let swap_price = I80F48::from_num((1.0 - SLIPPAGE_BUFFER) / maker_price);
-        let max_sell_ignoring_net_borrows = util::max_swap_source_ignore_net_borrows(
+        let max_sell_ignoring_limits = util::max_swap_source_ignoring_limits(
             &self.mango_client,
             &self.account_fetcher,
             account,
@@ -480,41 +484,31 @@ impl Context {
         )?
         .floor()
         .to_num::<u64>()
-        .min(tcs.max_sell_for_position(sell_position, &sell_bank));
+        .min(tcs.max_sell_for_position(liqee_sell_position, &sell_bank));
 
-        let max_buy_ignoring_net_borrows = tcs.max_buy_for_position(buy_position, &buy_bank);
+        let max_buy_ignoring_limits = tcs.max_buy_for_position(liqee_buy_position, &buy_bank);
 
-        // What follows is a complex manual handling of net borrow limits, for the following reason:
+        // What follows is a complex manual handling of net borrow/deposit limits, for
+        // the following reason:
         // Usually, we want to execute tcs even for small amounts because that will close the
         // tcs order: either due to full execution or due to the health threshold being reached.
         //
-        // However, when the net borrow limits are hit, it will not closed when no further execution
-        // is possible, because net borrow limit issues are considered transient. Furthermore, we
-        // don't even want to send a tiny tcs trigger transactions, because there's a good chance we
-        // would then be sending lot of those as oracle prices fluctuate.
+        // However, when the limits are hit, it will not closed when no further execution
+        // is possible, because limit issues are transient. Furthermore, we don't want to send
+        // tiny tcs trigger transactions, because there's a good chance we would then be sending
+        // lot of those as oracle prices fluctuate.
         //
         // Thus, we need to detect if the possible execution amount is tiny _because_ of the
-        // net borrow limits. Then skip. If it's tiny for other reasons we can proceed.
+        // limits. Then skip. If it's tiny for other reasons we can proceed.
 
-        fn available_borrows(bank: &Bank, price: I80F48) -> u64 {
-            (bank.remaining_net_borrows_quote(price) / price).clamp_to_u64()
-        }
-        let available_buy_borrows = available_borrows(&buy_bank, buy_token_price);
-        let available_sell_borrows = available_borrows(&sell_bank, sell_token_price);
-
-        // New borrows if max_sell_ignoring_net_borrows was withdrawn on the liqee
-        let sell_borrows = (I80F48::from(max_sell_ignoring_net_borrows)
-            - sell_position.max(I80F48::ZERO))
-        .clamp_to_u64();
-
-        // On the buy side, the liqor might need to borrow
-        let buy_borrows = match self.config.mode {
+        // Do the liqor buy tokens come from deposits or are they borrowed?
+        let mut liqor_buy_borrows = match self.config.mode {
             Mode::BorrowBuyToken => {
                 // Assume that the liqor has enough buy token if it's collateral
                 if tcs.buy_token_index == self.config.collateral_token_index {
                     0
                 } else {
-                    max_buy_ignoring_net_borrows
+                    max_buy_ignoring_limits
                 }
             }
             Mode::SwapCollateralIntoBuy { .. } => 0,
@@ -525,19 +519,77 @@ impl Context {
             }
         };
 
-        // New maximums adjusted for net borrow limits
-        let max_sell =
-            max_sell_ignoring_net_borrows - sell_borrows + sell_borrows.min(available_sell_borrows);
-        let max_buy =
-            max_buy_ignoring_net_borrows - buy_borrows + buy_borrows.min(available_buy_borrows);
+        // First, net borrow limits
+        let max_sell_net_borrows;
+        let max_buy_net_borrows;
+        {
+            fn available_borrows(bank: &Bank, price: I80F48) -> u64 {
+                bank.remaining_net_borrows_quote(price)
+                    .saturating_div(price)
+                    .clamp_to_u64()
+            }
+            let available_buy_borrows = available_borrows(&buy_bank, buy_token_price);
+            let available_sell_borrows = available_borrows(&sell_bank, sell_token_price);
 
-        let tiny_due_to_net_borrows = {
-            let buy_threshold = I80F48::from(NET_BORROW_EXECUTION_THRESHOLD) / buy_token_price;
-            let sell_threshold = I80F48::from(NET_BORROW_EXECUTION_THRESHOLD) / sell_token_price;
-            max_buy < buy_threshold && max_buy_ignoring_net_borrows > buy_threshold
-                || max_sell < sell_threshold && max_sell_ignoring_net_borrows > sell_threshold
+            // New borrows if max_sell_ignoring_limits was withdrawn on the liqee
+            // We assume that on the liqor side the position is >= 0, so these are true
+            // new borrows.
+            let sell_borrows = (I80F48::from(max_sell_ignoring_limits)
+                - liqee_sell_position.max(I80F48::ZERO))
+            .ceil()
+            .clamp_to_u64();
+
+            // On the buy side, the liqor might need to borrow, see liqor_buy_borrows.
+            // On the liqee side, the bought tokens may repay a borrow, reducing net borrows again
+            let buy_borrows = (I80F48::from(liqor_buy_borrows)
+                + liqee_buy_position.min(I80F48::ZERO))
+            .ceil()
+            .clamp_to_u64();
+
+            // New maximums adjusted for net borrow limits
+            max_sell_net_borrows = max_sell_ignoring_limits
+                - (sell_borrows - sell_borrows.min(available_sell_borrows));
+            max_buy_net_borrows =
+                max_buy_ignoring_limits - (buy_borrows - buy_borrows.min(available_buy_borrows));
+            liqor_buy_borrows = liqor_buy_borrows.min(max_buy_net_borrows);
+        }
+
+        // Second, deposit limits
+        let max_sell;
+        let max_buy;
+        {
+            let available_buy_deposits = buy_bank.remaining_deposits_until_limit().clamp_to_u64();
+            let available_sell_deposits = sell_bank.remaining_deposits_until_limit().clamp_to_u64();
+
+            // New deposits on the liqee side (reduced by repaid borrows)
+            let liqee_buy_deposits = (I80F48::from(max_buy_net_borrows)
+                + liqee_buy_position.min(I80F48::ZERO))
+            .ceil()
+            .clamp_to_u64();
+            // the net new deposits can only be as big as the liqor borrows
+            // (assume no borrows, then deposits only move from liqor to liqee)
+            let buy_deposits = liqee_buy_deposits.min(liqor_buy_borrows);
+
+            // We assume the liqor position is always >= 0, meaning there are new sell token deposits if
+            // the sell token gets borrowed on the liqee side.
+            let sell_deposits = (I80F48::from(max_sell_net_borrows)
+                - liqee_sell_position.max(I80F48::ZERO))
+            .ceil()
+            .clamp_to_u64();
+
+            max_sell =
+                max_sell_net_borrows - (sell_deposits - sell_deposits.min(available_sell_deposits));
+            max_buy =
+                max_buy_net_borrows - (buy_deposits - buy_deposits.min(available_buy_deposits));
+        }
+
+        let tiny_due_to_limits = {
+            let buy_threshold = I80F48::from(EXECUTION_THRESHOLD) / buy_token_price;
+            let sell_threshold = I80F48::from(EXECUTION_THRESHOLD) / sell_token_price;
+            max_buy < buy_threshold && max_buy_ignoring_limits > buy_threshold
+                || max_sell < sell_threshold && max_sell_ignoring_limits > sell_threshold
         };
-        if tiny_due_to_net_borrows {
+        if tiny_due_to_limits {
             return Ok(None);
         }
 
@@ -715,7 +767,7 @@ impl Context {
             .0
             .native(&buy_bank);
         let liqor_available_buy_token = match mode {
-            Mode::BorrowBuyToken => util::max_swap_source(
+            Mode::BorrowBuyToken => util::max_swap_source_with_limits(
                 &self.mango_client,
                 &self.account_fetcher,
                 &liqor,
@@ -734,7 +786,7 @@ impl Context {
                         self.token_bank_price_mint(collateral_token_index)?;
                     let buy_per_collateral_price = (collateral_price / buy_token_price)
                         * I80F48::from_num(jupiter_slippage_fraction);
-                    let collateral_amount = util::max_swap_source(
+                    let collateral_amount = util::max_swap_source_with_limits(
                         &self.mango_client,
                         &self.account_fetcher,
                         &liqor,
@@ -751,7 +803,7 @@ impl Context {
                 // How big can the sell -> buy swap be?
                 let buy_per_sell_price =
                     (I80F48::from(1) / taker_price) * I80F48::from_num(jupiter_slippage_fraction);
-                let max_sell = util::max_swap_source(
+                let max_sell = util::max_swap_source_with_limits(
                     &self.mango_client,
                     &self.account_fetcher,
                     &liqor,
@@ -910,10 +962,9 @@ impl Context {
     pub async fn execute_tcs(
         &self,
         tcs: &mut [(Pubkey, u64, u64)],
-        error_tracking: &mut ErrorTracking,
+        error_tracking: &mut ErrorTracking<Pubkey, LiqErrorType>,
     ) -> anyhow::Result<(Vec<Signature>, Vec<Pubkey>)> {
         use rand::distributions::{Distribution, WeightedError, WeightedIndex};
-        let now = Instant::now();
 
         let max_volume = self.config.max_trigger_quote_amount;
         let mut pending_volume = 0;
@@ -960,7 +1011,11 @@ impl Context {
                     }
                     Err(e) => {
                         trace!(%result.pubkey, "preparation error {:?}", e);
-                        error_tracking.record_error(&result.pubkey, now, e.to_string());
+                        error_tracking.record(
+                            LiqErrorType::TcsExecution,
+                            &result.pubkey,
+                            e.to_string(),
+                        );
                     }
                 }
                 no_new_job = false;
@@ -1037,7 +1092,7 @@ impl Context {
                 Ok(v) => Some((pubkey, v)),
                 Err(err) => {
                     trace!(%pubkey, "execution error {:?}", err);
-                    error_tracking.record_error(&pubkey, Instant::now(), err.to_string());
+                    error_tracking.record(LiqErrorType::TcsExecution, &pubkey, err.to_string());
                     None
                 }
             });
@@ -1052,10 +1107,12 @@ impl Context {
         pubkey: &Pubkey,
         tcs_id: u64,
         volume: u64,
-        error_tracking: &ErrorTracking,
+        error_tracking: &ErrorTracking<Pubkey, LiqErrorType>,
     ) -> Option<Pin<Box<dyn Future<Output = PreparationResult> + Send>>> {
         // Skip a pubkey if there've been too many errors recently
-        if let Some(error_entry) = error_tracking.had_too_many_errors(pubkey, Instant::now()) {
+        if let Some(error_entry) =
+            error_tracking.had_too_many_errors(LiqErrorType::TcsExecution, pubkey, Instant::now())
+        {
             trace!(
                 "skip checking for tcs on account {pubkey}, had {} errors recently",
                 error_entry.count
@@ -1105,14 +1162,12 @@ impl Context {
                 solana_sdk::compute_budget::ComputeBudgetInstruction::set_compute_unit_limit(
                     self.config.compute_limit_for_trigger,
                 );
+            let fee_payer = self.mango_client.client.fee_payer();
             TransactionBuilder {
                 instructions: vec![compute_ix],
                 address_lookup_tables: vec![],
-                payer: self.mango_client.client.fee_payer.pubkey(),
-                signers: vec![
-                    self.mango_client.owner.clone(),
-                    self.mango_client.client.fee_payer.clone(),
-                ],
+                payer: fee_payer.pubkey(),
+                signers: vec![self.mango_client.owner.clone(), fee_payer],
                 config: self.mango_client.client.transaction_builder_config,
             }
         };

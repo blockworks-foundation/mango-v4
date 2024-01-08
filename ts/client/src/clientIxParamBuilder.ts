@@ -27,6 +27,7 @@ export interface TokenRegisterParams {
   flashLoanSwapFeeRate: number;
   interestCurveScaling: number;
   interestTargetUtilization: number;
+  depositLimit: BN;
 }
 
 export const DefaultTokenRegisterParams: TokenRegisterParams = {
@@ -64,6 +65,7 @@ export const DefaultTokenRegisterParams: TokenRegisterParams = {
   flashLoanSwapFeeRate: 0.0005,
   interestCurveScaling: 4.0,
   interestTargetUtilization: 0.5,
+  depositLimit: new BN(0),
 };
 
 export interface TokenEditParams {
@@ -101,6 +103,8 @@ export interface TokenEditParams {
   maintWeightShiftAssetTarget: number | null;
   maintWeightShiftLiabTarget: number | null;
   maintWeightShiftAbort: boolean | null;
+  setFallbackOracle: boolean | null;
+  depositLimit: BN | null;
 }
 
 export const NullTokenEditParams: TokenEditParams = {
@@ -138,6 +142,8 @@ export const NullTokenEditParams: TokenEditParams = {
   maintWeightShiftAssetTarget: null,
   maintWeightShiftLiabTarget: null,
   maintWeightShiftAbort: null,
+  setFallbackOracle: null,
+  depositLimit: null,
 };
 
 export interface PerpEditParams {
@@ -282,6 +288,7 @@ export interface IxGateParams {
   TokenConditionalSwapStart: boolean;
   TokenConditionalSwapCreatePremiumAuction: boolean;
   TokenConditionalSwapCreateLinearAuction: boolean;
+  Serum3PlaceOrderV2: boolean;
 }
 
 // Default with all ixs enabled, use with buildIxGate
@@ -360,6 +367,7 @@ export const TrueIxGateParams: IxGateParams = {
   TokenConditionalSwapStart: true,
   TokenConditionalSwapCreatePremiumAuction: true,
   TokenConditionalSwapCreateLinearAuction: true,
+  Serum3PlaceOrderV2: true,
 };
 
 // build ix gate e.g. buildIxGate(Builder(TrueIxGateParams).TokenDeposit(false).build()).toNumber(),
@@ -448,6 +456,7 @@ export function buildIxGate(p: IxGateParams): BN {
   toggleIx(ixGate, p, 'TokenConditionalSwapStart', 68);
   toggleIx(ixGate, p, 'TokenConditionalSwapCreatePremiumAuction', 69);
   toggleIx(ixGate, p, 'TokenConditionalSwapCreateLinearAuction', 70);
+  toggleIx(ixGate, p, 'Serum3PlaceOrderV2', 71);
 
   return ixGate;
 }

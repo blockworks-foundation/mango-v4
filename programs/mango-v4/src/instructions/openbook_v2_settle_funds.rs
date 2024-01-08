@@ -8,7 +8,7 @@ use openbook_v2::cpi::accounts::SettleFunds;
 
 use super::apply_settle_changes_v2;
 use crate::accounts_ix::*;
-use crate::logs::{LoanOriginationFeeInstruction, WithdrawLoanLog};
+use crate::logs::{LoanOriginationFeeInstruction, WithdrawLoanLog, emit_stack};
 
 use crate::accounts_zerocopy::AccountInfoRef;
 
@@ -187,11 +187,15 @@ pub fn charge_loan_origination_fees_v2(
 
         let base_oracle_price = base_oracle
             .map(|ai| {
-                base_bank.oracle_price(&AccountInfoRef::borrow(ai)?, Some(Clock::get()?.slot))
+                let ai_ref = &AccountInfoRef::borrow(ai)?;
+                base_bank.oracle_price(
+                    &OracleAccountInfos::from_reader(ai_ref),
+                    Some(Clock::get()?.slot),
+                )
             })
             .transpose()?;
 
-        emit!(WithdrawLoanLog {
+        emit_stack(WithdrawLoanLog {
             mango_group: *group_pubkey,
             mango_account: *account_pubkey,
             token_index: base_bank.token_index,
@@ -202,15 +206,15 @@ pub fn charge_loan_origination_fees_v2(
         });
     }
 
-    let serum3_account = account.serum3_orders_mut(market_index).unwrap();
+    let openbook_v2_account = account.openbook_v2_orders_mut(market_index).unwrap();
     let oo_quote_total = before_oo.native_quote_total();
     let actualized_quote_loan = I80F48::from_num::<u64>(
-        serum3_account
+        openbook_v2_account
             .quote_borrows_without_fee
             .saturating_sub(oo_quote_total),
     );
     if actualized_quote_loan > 0 {
-        serum3_account.quote_borrows_without_fee = oo_quote_total;
+        openbook_v2_account.quote_borrows_without_fee = oo_quote_total;
 
         // now that the loan is actually materialized, charge the loan origination fee
         // note: the withdraw has already happened while placing the order
@@ -223,11 +227,15 @@ pub fn charge_loan_origination_fees_v2(
 
         let quote_oracle_price = quote_oracle
             .map(|ai| {
-                quote_bank.oracle_price(&AccountInfoRef::borrow(ai)?, Some(Clock::get()?.slot))
+                let ai_ref = &AccountInfoRef::borrow(ai)?;
+                quote_bank.oracle_price(
+                    &OracleAccountInfos::from_reader(ai_ref),
+                    Some(Clock::get()?.slot),
+                )
             })
             .transpose()?;
 
-        emit!(WithdrawLoanLog {
+        emit_stack(WithdrawLoanLog {
             mango_group: *group_pubkey,
             mango_account: *account_pubkey,
             token_index: quote_bank.token_index,

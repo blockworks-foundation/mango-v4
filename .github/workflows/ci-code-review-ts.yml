@@ -59,11 +59,8 @@ jobs:
           node-version: '16'
           cache: 'yarn'
 
-      - name: Install dependencies
-        run: yarn install --frozen-lockfile
-
       - name: Duplicates check
-        run: yarn deduplicate
+        run: npx yarn-deduplicate --list --fail
 
   test:
     name: Test
@@ -87,23 +84,27 @@ jobs:
   sast:
     name: Security Scan
     runs-on: ubuntu-latest
-    container:
-      image: returntocorp/semgrep
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
+
+    strategy:
+      fail-fast: false
+      matrix:
+        language: ['javascript']
 
     steps:
-      - name: Checkout code
+      - name: Checkout repository
         uses: actions/checkout@v3
 
-      - name: Run semgrep
-        run: semgrep ci --sarif --output=semgrep-results.sarif
-        env:
-          SEMGREP_RULES: p/typescript
-
-      - name: Upload output
-        uses: github/codeql-action/upload-sarif@v2
-        if: always()
+      - name: Initialise CodeQL
+        uses: github/codeql-action/init@v2
         with:
-          sarif_file: semgrep-results.sarif
+          languages: ${{ matrix.language }}
+
+      - name: Run CodeQL
+        uses: github/codeql-action/analyze@v2
 
   sca:
     name: Dependency Scan
@@ -111,17 +112,6 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
-
-      # Report all vulnerabilities in security tab
-      - name: Report on all vulnerabilities
-        uses: aquasecurity/trivy-action@master
-        with:
-          scan-type: 'fs'
-          scan-ref: 'yarn.lock'
-          ignore-unfixed: true
-          hide-progress: true
-          format: 'sarif'
-          output: 'trivy-results.sarif'
 
       # Fail the job on critical vulnerabiliies with fix available
       - name: Fail on critical vulnerabilities
@@ -135,15 +125,9 @@ jobs:
           severity: 'CRITICAL'
           exit-code: '1'
 
-      - name: Upload output
-        uses: github/codeql-action/upload-sarif@v2
-        if: always()
-        with:
-          sarif_file: 'trivy-results.sarif'
-
-  yarn-pass:
-    name: Yarn tests pass
-    needs: ['format', 'lint', 'test']
+  ts-pass:
+    name: TS tests pass
+    needs: ['format', 'lint', 'test', 'depcheck']
     runs-on: ubuntu-latest
     steps:
       - run: echo ok
@@ -157,7 +141,7 @@ jobs:
 
   all-pass:
     name: All tests pass 🚀
-    needs: ['yarn-pass', 'security-pass']
+    needs: ['ts-pass', 'security-pass']
     runs-on: ubuntu-latest
     steps:
       - run: echo ok

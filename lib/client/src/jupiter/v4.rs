@@ -107,7 +107,7 @@ impl<'a> JupiterV4<'a> {
         let response = self
             .mango_client
             .http_client
-            .get("https://quote-api.jup.ag/v4/quote")
+            .get(format!("{}/quote", self.mango_client.client.jupiter_v4_url))
             .query(&[
                 ("inputMint", input_mint.to_string()),
                 ("outputMint", output_mint.to_string()),
@@ -158,7 +158,7 @@ impl<'a> JupiterV4<'a> {
         let swap_response = self
             .mango_client
             .http_client
-            .post("https://quote-api.jup.ag/v4/swap")
+            .post(format!("{}/swap", self.mango_client.client.jupiter_v4_url))
             .json(&SwapRequest {
                 route: route.clone(),
                 user_public_key: self.mango_client.owner.pubkey().to_string(),
@@ -211,25 +211,19 @@ impl<'a> JupiterV4<'a> {
                 .position(|ix| !is_setup_ix(ix.program_id))
                 .unwrap();
 
-        let bank_ams = [
-            source_token.mint_info.first_bank(),
-            target_token.mint_info.first_bank(),
-        ]
-        .into_iter()
-        .map(util::to_writable_account_meta)
-        .collect::<Vec<_>>();
+        let bank_ams = [source_token.first_bank(), target_token.first_bank()]
+            .into_iter()
+            .map(util::to_writable_account_meta)
+            .collect::<Vec<_>>();
 
-        let vault_ams = [
-            source_token.mint_info.first_vault(),
-            target_token.mint_info.first_vault(),
-        ]
-        .into_iter()
-        .map(util::to_writable_account_meta)
-        .collect::<Vec<_>>();
+        let vault_ams = [source_token.first_vault(), target_token.first_vault()]
+            .into_iter()
+            .map(util::to_writable_account_meta)
+            .collect::<Vec<_>>();
 
         let owner = self.mango_client.owner();
 
-        let token_ams = [source_token.mint_info.mint, target_token.mint_info.mint]
+        let token_ams = [source_token.mint, target_token.mint]
             .into_iter()
             .map(|mint| {
                 util::to_writable_account_meta(
@@ -270,7 +264,7 @@ impl<'a> JupiterV4<'a> {
             spl_associated_token_account::instruction::create_associated_token_account_idempotent(
                 &owner,
                 &owner,
-                &source_token.mint_info.mint,
+                &source_token.mint,
                 &Token::id(),
             ),
         );

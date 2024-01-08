@@ -461,20 +461,25 @@ export async function getRiskStats(
         .map((bank) => bank.mint.toString()),
     ),
   ];
-  const prices = await getOnChainPriceForMints([
-    ...new Set(
-      Array.from(group.banksMapByTokenIndex.values())
-        .flat()
-        .map((bank) => bank.mint.toString()),
-    ),
-  ]);
-  const onChainPrices = Object.fromEntries(
-    prices.map((price, i) => [mints[i], price]),
-  );
+
+  // Note:
+  // Disable for now
+  // Getting rate limited
+  // const prices = await getOnChainPriceForMints([
+  //   ...new Set(
+  //     Array.from(group.banksMapByTokenIndex.values())
+  //       .flat()
+  //       .map((bank) => bank.mint.toString()),
+  //   ),
+  // ]);
+  // const onChainPrices = Object.fromEntries(
+  //   prices.map((price, i) => [mints[i], price]),
+  // );
+
   Array.from(group.banksMapByTokenIndex.values())
     .flat()
     .forEach((b) => {
-      b['onChainPrice'] = onChainPrices[b.mint.toBase58()];
+      b['onChainPrice'] = b.uiPrice;
     });
 
   // Clone group, and simulate change % price drop for all assets except stables

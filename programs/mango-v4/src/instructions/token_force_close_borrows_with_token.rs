@@ -1,7 +1,7 @@
 use crate::accounts_ix::*;
 use crate::error::*;
 use crate::health::*;
-use crate::logs::{TokenBalanceLog, TokenForceCloseBorrowsWithTokenLog};
+use crate::logs::{emit_stack, TokenBalanceLog, TokenForceCloseBorrowsWithTokenLog};
 use crate::state::*;
 use anchor_lang::prelude::*;
 use fixed::types::I80F48;
@@ -95,7 +95,8 @@ pub fn token_force_close_borrows_with_token(
             .max(I80F48::ZERO);
 
         // The amount of asset native tokens we will give up for them
-        let fee_factor = I80F48::ONE + liab_bank.liquidation_fee;
+        let fee_factor =
+            (I80F48::ONE + liab_bank.liquidation_fee) * (I80F48::ONE + asset_bank.liquidation_fee);
         let liab_oracle_price_adjusted = liab_oracle_price * fee_factor;
         let asset_transfer = liab_transfer * liab_oracle_price_adjusted / asset_oracle_price;
 
@@ -131,7 +132,7 @@ pub fn token_force_close_borrows_with_token(
         );
 
         // liqee asset
-        emit!(TokenBalanceLog {
+        emit_stack(TokenBalanceLog {
             mango_group: liqee.fixed.group,
             mango_account: liqee_key,
             token_index: asset_token_index,
@@ -140,7 +141,7 @@ pub fn token_force_close_borrows_with_token(
             borrow_index: asset_bank.borrow_index.to_bits(),
         });
         // liqee liab
-        emit!(TokenBalanceLog {
+        emit_stack(TokenBalanceLog {
             mango_group: liqee.fixed.group,
             mango_account: liqee_key,
             token_index: liab_token_index,
@@ -149,7 +150,7 @@ pub fn token_force_close_borrows_with_token(
             borrow_index: liab_bank.borrow_index.to_bits(),
         });
         // liqor asset
-        emit!(TokenBalanceLog {
+        emit_stack(TokenBalanceLog {
             mango_group: liqee.fixed.group,
             mango_account: liqor_key,
             token_index: asset_token_index,
@@ -158,7 +159,7 @@ pub fn token_force_close_borrows_with_token(
             borrow_index: asset_bank.borrow_index.to_bits(),
         });
         // liqor liab
-        emit!(TokenBalanceLog {
+        emit_stack(TokenBalanceLog {
             mango_group: liqee.fixed.group,
             mango_account: liqor_key,
             token_index: liab_token_index,
@@ -167,7 +168,7 @@ pub fn token_force_close_borrows_with_token(
             borrow_index: liab_bank.borrow_index.to_bits(),
         });
 
-        emit!(TokenForceCloseBorrowsWithTokenLog {
+        emit_stack(TokenForceCloseBorrowsWithTokenLog {
             mango_group: liqee.fixed.group,
             liqee: liqee_key,
             liqor: liqor_key,
@@ -222,7 +223,7 @@ pub fn token_force_close_borrows_with_token(
     require!(liqor_health >= 0, MangoError::HealthMustBePositive);
 
     // TODO log
-    // emit!(TokenForceCloseBorrowWithToken
+    // emit_stack(TokenForceCloseBorrowWithToken
 
     Ok(())
 }

@@ -145,20 +145,28 @@ pub struct Serum3Orders {
     pub highest_placed_bid_inv: f64,
     pub lowest_placed_ask: f64,
 
-    /// Tracks the amount of deposits that flowed into the serum open orders account.
+    /// An overestimate of the amount of tokens that might flow out of the open orders account.
     ///
-    /// The bank still considers these amounts user deposits (see deposits_in_serum)
-    /// and they need to be deducted from there when they flow back into the bank
-    /// as real tokens.
-    pub base_deposits_reserved: u64,
-    pub quote_deposits_reserved: u64,
+    /// The bank still considers these amounts user deposits (see Bank::potential_serum_tokens)
+    /// and that value needs to be updated in conjunction with these numbers.
+    ///
+    /// This estimation is based on the amount of tokens in the open orders account
+    /// (see update_bank_potential_tokens() in serum3_place_order and settle)
+    pub potential_base_tokens: u64,
+    pub potential_quote_tokens: u64,
+
+    /// Track lowest bid/highest ask, same way as for highest bid/lowest ask.
+    ///
+    /// 0 is a special "unset" state.
+    pub lowest_placed_bid_inv: f64,
+    pub highest_placed_ask: f64,
 
     #[derivative(Debug = "ignore")]
-    pub reserved: [u8; 32],
+    pub reserved: [u8; 16],
 }
 const_assert_eq!(
     size_of::<Serum3Orders>(),
-    32 + 8 * 2 + 2 * 3 + 2 + 4 * 8 + 32
+    32 + 8 * 2 + 2 * 3 + 2 + 6 * 8 + 16
 );
 const_assert_eq!(size_of::<Serum3Orders>(), 120);
 const_assert_eq!(size_of::<Serum3Orders>() % 8, 0);
@@ -185,9 +193,11 @@ impl Default for Serum3Orders {
             quote_borrows_without_fee: 0,
             highest_placed_bid_inv: 0.0,
             lowest_placed_ask: 0.0,
-            base_deposits_reserved: 0,
-            quote_deposits_reserved: 0,
-            reserved: [0; 32],
+            potential_base_tokens: 0,
+            potential_quote_tokens: 0,
+            lowest_placed_bid_inv: 0.0,
+            highest_placed_ask: 0.0,
+            reserved: [0; 16],
         }
     }
 }
@@ -221,29 +231,37 @@ pub struct OpenbookV2Orders {
     /// Tracking it exactly isn't possible since we don't see fills. So instead track
     /// the min/max of the _placed_ bids and asks.
     ///
-    /// The value is reset in serum3_place_order when a new order is placed without an
+    /// The value is reset in openbook_v2_place_order when a new order is placed without an
     /// existing one on the book.
     ///
     /// 0 is a special "unset" state.
     pub highest_placed_bid_inv: f64,
     pub lowest_placed_ask: f64,
 
-    /// Tracks the amount of deposits that flowed into the serum open orders account.
+    /// An overestimate of the amount of tokens that might flow out of the open orders account.
     ///
-    /// The bank still considers these amounts user deposits (see deposits_in_serum)
-    /// and they need to be deducted from there when they flow back into the bank
-    /// as real tokens.
-    pub base_deposits_reserved: u64,
-    pub quote_deposits_reserved: u64,
+    /// The bank still considers these amounts user deposits (see Bank::potential_openbook_tokens)
+    /// and that value needs to be updated in conjunction with these numbers.
+    ///
+    /// This estimation is based on the amount of tokens in the open orders account
+    /// (see update_bank_potential_tokens() in openbook_v2_place_order and settle)
+    pub potential_base_tokens: u64,
+    pub potential_quote_tokens: u64,
+
+    /// Track lowest bid/highest ask, same way as for highest bid/lowest ask.
+    ///
+    /// 0 is a special "unset" state.
+    pub lowest_placed_bid_inv: f64,
+    pub highest_placed_ask: f64,
 
     #[derivative(Debug = "ignore")]
-    pub reserved: [u8; 192],
+    pub reserved: [u8; 176],
 }
 const_assert_eq!(
     size_of::<OpenbookV2Orders>(),
-    32 + 8 * 2 + 2 * 3 + 2 + 4 * 8 + 192
+    32 + 8 * 2 + 2 * 3 + 2 + 4 * 8 + 8 + 8 + 176
 );
-const_assert_eq!(size_of::<OpenbookV2Orders>(), 120);
+const_assert_eq!(size_of::<OpenbookV2Orders>(), 280);
 const_assert_eq!(size_of::<OpenbookV2Orders>() % 8, 0);
 
 impl OpenbookV2Orders {
@@ -267,10 +285,12 @@ impl Default for OpenbookV2Orders {
             base_borrows_without_fee: 0,
             quote_borrows_without_fee: 0,
             highest_placed_bid_inv: 0.0,
+            lowest_placed_bid_inv: 0.0,
+            highest_placed_ask: 0.0,
             lowest_placed_ask: 0.0,
-            base_deposits_reserved: 0,
-            quote_deposits_reserved: 0,
-            reserved: [0; 32],
+            potential_base_tokens: 0,
+            potential_quote_tokens: 0,
+            reserved: [0; 176],
         }
     }
 }
@@ -447,6 +467,17 @@ impl PerpPosition {
     pub fn remove_taker_trade(&mut self, base_change: i64, quote_change: i64) {
         self.taker_base_lots -= base_change;
         self.taker_quote_lots -= quote_change;
+    }
+
+    pub fn adjust_maker_lots(&mut self, side: Side, base_lots: i64) {
+        match side {
+            Side::Bid => {
+                self.bids_base_lots += base_lots;
+            }
+            Side::Ask => {
+                self.asks_base_lots += base_lots;
+            }
+        };
     }
 
     pub fn is_active(&self) -> bool {
@@ -923,10 +954,13 @@ pub struct PerpOpenOrder {
     pub client_id: u64,
     pub id: u128,
 
+    pub quantity: i64,
+
+    // WARNING: When adding fields, take care of updating the clear() function
     #[derivative(Debug = "ignore")]
-    pub reserved: [u8; 64],
+    pub reserved: [u8; 56],
 }
-const_assert_eq!(size_of::<PerpOpenOrder>(), 1 + 1 + 2 + 4 + 8 + 16 + 64);
+const_assert_eq!(size_of::<PerpOpenOrder>(), 1 + 1 + 2 + 4 + 8 + 16 + 8 + 56);
 const_assert_eq!(size_of::<PerpOpenOrder>(), 96);
 const_assert_eq!(size_of::<PerpOpenOrder>() % 8, 0);
 
@@ -939,7 +973,8 @@ impl Default for PerpOpenOrder {
             padding2: Default::default(),
             client_id: 0,
             id: 0,
-            reserved: [0; 64],
+            quantity: 0,
+            reserved: [0; 56],
         }
     }
 }
@@ -955,6 +990,14 @@ impl PerpOpenOrder {
 
     pub fn is_active(&self) -> bool {
         self.market != FREE_ORDER_SLOT
+    }
+
+    pub fn clear(&mut self) {
+        self.market = FREE_ORDER_SLOT;
+        self.side_and_tree = SideAndOrderTree::BidFixed.into();
+        self.id = 0;
+        self.client_id = 0;
+        self.quantity = 0;
     }
 }
 

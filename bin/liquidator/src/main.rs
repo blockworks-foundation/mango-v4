@@ -67,6 +67,23 @@ impl From<JupiterVersionArg> for jupiter::Version {
     }
 }
 
+#[derive(clap::ValueEnum, Clone, Copy, Debug, PartialEq, Eq)]
+enum TcsMode {
+    BorrowBuy,
+    SwapSellIntoBuy,
+    SwapCollateralIntoBuy,
+}
+
+impl From<TcsMode> for trigger_tcs::Mode {
+    fn from(a: TcsMode) -> Self {
+        match a {
+            TcsMode::BorrowBuy => trigger_tcs::Mode::BorrowBuyToken,
+            TcsMode::SwapSellIntoBuy => trigger_tcs::Mode::SwapSellIntoBuy,
+            TcsMode::SwapCollateralIntoBuy => trigger_tcs::Mode::SwapCollateralIntoBuy,
+        }
+    }
+}
+
 #[derive(Parser)]
 #[clap()]
 struct Cli {
@@ -121,6 +138,10 @@ struct Cli {
     #[clap(long, env, default_value = "0.0005")]
     tcs_profit_fraction: f64,
 
+    /// control how tcs triggering provides buy tokens
+    #[clap(long, env, value_enum, default_value = "swap-sell-into-buy")]
+    tcs_mode: TcsMode,
+
     /// prioritize each transaction with this many microlamports/cu
     #[clap(long, env, default_value = "0")]
     prioritization_micro_lamports: u64,
@@ -136,6 +157,14 @@ struct Cli {
     /// control which version of jupiter to use
     #[clap(long, env, value_enum, default_value = "v6")]
     jupiter_version: JupiterVersionArg,
+
+    /// override the url to jupiter v4
+    #[clap(long, env, default_value = "https://quote-api.jup.ag/v4")]
+    jupiter_v4_url: String,
+
+    /// override the url to jupiter v6
+    #[clap(long, env, default_value = "https://quote-api.jup.ag/v6")]
+    jupiter_v6_url: String,
 
     /// report liquidator's existence and pubkey
     #[clap(long, env, value_enum, default_value = "true")]
@@ -167,18 +196,21 @@ async fn main() -> anyhow::Result<()> {
     let rpc_timeout = Duration::from_secs(10);
     let cluster = Cluster::Custom(rpc_url.clone(), ws_url.clone());
     let commitment = CommitmentConfig::processed();
-    let client = Client::new(
-        cluster.clone(),
-        commitment,
-        liqor_owner.clone(),
-        Some(rpc_timeout),
-        TransactionBuilderConfig {
+    let client = Client::builder()
+        .cluster(cluster.clone())
+        .commitment(commitment)
+        .fee_payer(Some(liqor_owner.clone()))
+        .timeout(Some(rpc_timeout))
+        .jupiter_v4_url(cli.jupiter_v4_url)
+        .jupiter_v6_url(cli.jupiter_v6_url)
+        .transaction_builder_config(TransactionBuilderConfig {
             prioritization_micro_lamports: (cli.prioritization_micro_lamports > 0)
                 .then_some(cli.prioritization_micro_lamports),
             // Liquidation and tcs triggers set their own budgets, this is a default for other tx
             compute_budget_per_instruction: Some(250_000),
-        },
-    );
+        })
+        .build()
+        .unwrap();
 
     // The representation of current on-chain account data
     let chain_data = Arc::new(RwLock::new(chain_data::ChainData::new()));
@@ -198,15 +230,15 @@ async fn main() -> anyhow::Result<()> {
     let mango_oracles = group_context
         .tokens
         .values()
-        .map(|value| value.mint_info.oracle)
-        .chain(group_context.perp_markets.values().map(|p| p.market.oracle))
+        .map(|value| value.oracle)
+        .chain(group_context.perp_markets.values().map(|p| p.oracle))
         .unique()
         .collect::<Vec<Pubkey>>();
 
     let serum_programs = group_context
         .serum3_markets
         .values()
-        .map(|s3| s3.market.serum_program)
+        .map(|s3| s3.serum_program)
         .unique()
         .collect_vec();
 
@@ -303,12 +335,10 @@ async fn main() -> anyhow::Result<()> {
         jupiter_version: cli.jupiter_version.into(),
         jupiter_slippage_bps: cli.rebalance_slippage_bps,
 
-        // TODO: configurable
-        mode: trigger_tcs::Mode::SwapSellIntoBuy,
+        mode: cli.tcs_mode.into(),
         min_buy_fraction: 0.7,
     };
 
-    let mut rebalance_interval = tokio::time::interval(Duration::from_secs(5));
     let rebalance_config = rebalance::Config {
         enabled: cli.rebalance == BoolArg::True,
         slippage_bps: cli.rebalance_slippage_bps,
@@ -338,29 +368,11 @@ async fn main() -> anyhow::Result<()> {
         trigger_tcs_config: tcs_config,
         rebalancer: rebalancer.clone(),
         token_swap_info: token_swap_info_updater.clone(),
-        liq_errors: ErrorTracking {
-            skip_threshold: 5,
-            skip_duration: Duration::from_secs(120),
-            ..ErrorTracking::default()
-        },
-        tcs_collection_hard_errors: ErrorTracking {
-            skip_threshold: 2,
-            skip_duration: Duration::from_secs(120),
-            ..ErrorTracking::default()
-        },
-        tcs_collection_partial_errors: ErrorTracking {
-            skip_threshold: 2,
-            skip_duration: Duration::from_secs(120),
-            ..ErrorTracking::default()
-        },
-        tcs_execution_errors: ErrorTracking {
-            skip_threshold: 2,
-            skip_duration: Duration::from_secs(120),
-            ..ErrorTracking::default()
-        },
-        persistent_error_report_interval: Duration::from_secs(300),
-        persistent_error_min_duration: Duration::from_secs(300),
-        last_persistent_error_report: Instant::now(),
+        errors: ErrorTracking::builder()
+            .skip_threshold(2)
+            .skip_threshold_for_type(LiqErrorType::Liq, 5)
+            .skip_duration(Duration::from_secs(120))
+            .build()?,
     });
 
     info!("main loop");
@@ -434,30 +446,13 @@ async fn main() -> anyhow::Result<()> {
     // Could be refactored to only start the below jobs when the first snapshot is done.
     // But need to take care to abort if the above job aborts beforehand.
 
-    let rebalance_job = tokio::spawn({
-        let shared_state = shared_state.clone();
-        async move {
-            loop {
-                rebalance_interval.tick().await;
-                if !shared_state.read().unwrap().one_snapshot_done {
-                    continue;
-                }
-                if let Err(err) = rebalancer.zero_all_non_quote().await {
-                    error!("failed to rebalance liqor: {:?}", err);
-
-                    // Workaround: We really need a sequence enforcer in the liquidator since we don't want to
-                    // accidentally send a similar tx again when we incorrectly believe an earlier one got forked
-                    // off. For now, hard sleep on error to avoid the most frequent error cases.
-                    tokio::time::sleep(Duration::from_secs(10)).await;
-                }
-            }
-        }
-    });
-
     let liquidation_job = tokio::spawn({
         let mut interval = tokio::time::interval(Duration::from_millis(cli.check_interval_ms));
         let shared_state = shared_state.clone();
         async move {
+            let mut must_rebalance = true;
+            let rebalance_delay = Duration::from_secs(5);
+            let mut last_rebalance = Instant::now();
             loop {
                 interval.tick().await;
 
@@ -469,7 +464,15 @@ async fn main() -> anyhow::Result<()> {
                     state.mango_accounts.iter().cloned().collect_vec()
                 };
 
-                liquidation.log_persistent_errors();
+                liquidation.errors.update();
+
+                if must_rebalance || last_rebalance.elapsed() > rebalance_delay {
+                    if let Err(err) = liquidation.rebalancer.zero_all_non_quote().await {
+                        error!("failed to rebalance liqor: {:?}", err);
+                    }
+                    must_rebalance = false;
+                    last_rebalance = Instant::now();
+                }
 
                 let liquidated = liquidation
                     .maybe_liquidate_one(account_addresses.iter())
@@ -484,14 +487,7 @@ async fn main() -> anyhow::Result<()> {
                         .unwrap();
                 }
 
-                if liquidated || took_tcs {
-                    // It's awkward that this rebalance can run in parallel with the one
-                    // from the rebalance_job. Ideally we'd get only one at a time/in quick succession.
-                    // However, we do want to rebalance after a liquidation before liquidating further.
-                    if let Err(err) = liquidation.rebalancer.zero_all_non_quote().await {
-                        error!("failed to rebalance liqor: {:?}", err);
-                    }
-                }
+                must_rebalance = must_rebalance || liquidated || took_tcs;
             }
         }
     });
@@ -499,11 +495,11 @@ async fn main() -> anyhow::Result<()> {
     let token_swap_info_job = tokio::spawn({
         // TODO: configurable interval
         let mut interval = tokio::time::interval(Duration::from_secs(60));
-        let mut min_delay = tokio::time::interval(Duration::from_secs(1));
+        let mut startup_wait = tokio::time::interval(Duration::from_secs(1));
         let shared_state = shared_state.clone();
         async move {
             loop {
-                min_delay.tick().await;
+                startup_wait.tick().await;
                 if !shared_state.read().unwrap().one_snapshot_done {
                     continue;
                 }
@@ -512,25 +508,25 @@ async fn main() -> anyhow::Result<()> {
                 let token_indexes = token_swap_info_updater
                     .mango_client()
                     .context
-                    .token_indexes_by_name
-                    .values()
+                    .tokens
+                    .keys()
                     .copied()
                     .collect_vec();
+                let mut min_delay = tokio::time::interval(Duration::from_secs(1));
                 for token_index in token_indexes {
                     min_delay.tick().await;
-                    match token_swap_info_updater.update_one(token_index).await {
-                        Ok(()) => {}
-                        Err(err) => {
-                            warn!(
-                                "failed to update token swap info for token {token_index}: {err:?}",
-                            );
-                        }
-                    }
+                    token_swap_info_updater.update_one(token_index).await;
                 }
                 token_swap_info_updater.log_all();
             }
         }
     });
+
+    let check_changes_for_abort_job =
+        tokio::spawn(MangoClient::loop_check_for_context_changes_and_abort(
+            mango_client.clone(),
+            Duration::from_secs(300),
+        ));
 
     if cli.telemetry == BoolArg::True {
         tokio::spawn(telemetry::report_regularly(
@@ -542,9 +538,9 @@ async fn main() -> anyhow::Result<()> {
     use futures::StreamExt;
     let mut jobs: futures::stream::FuturesUnordered<_> = vec![
         data_job,
-        rebalance_job,
         liquidation_job,
         token_swap_info_job,
+        check_changes_for_abort_job,
     ]
     .into_iter()
     .collect();
@@ -564,6 +560,27 @@ struct SharedState {
     one_snapshot_done: bool,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum LiqErrorType {
+    Liq,
+    /// Errors that suggest we maybe should skip trying to collect tcs for that pubkey
+    TcsCollectionHard,
+    /// Recording errors when some tcs have errors during collection but others don't
+    TcsCollectionPartial,
+    TcsExecution,
+}
+
+impl std::fmt::Display for LiqErrorType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Liq => write!(f, "liq"),
+            Self::TcsCollectionHard => write!(f, "tcs-collection-hard"),
+            Self::TcsCollectionPartial => write!(f, "tcs-collection-partial"),
+            Self::TcsExecution => write!(f, "tcs-execution"),
+        }
+    }
+}
+
 struct LiquidationState {
     mango_client: Arc<MangoClient>,
     account_fetcher: Arc<chain_data::AccountFetcher>,
@@ -572,15 +589,7 @@ struct LiquidationState {
     liquidation_config: liquidate::Config,
     trigger_tcs_config: trigger_tcs::Config,
 
-    liq_errors: ErrorTracking,
-    /// Errors that suggest we maybe should skip trying to collect tcs for that pubkey
-    tcs_collection_hard_errors: ErrorTracking,
-    /// Recording errors when some tcs have errors during collection but others don't
-    tcs_collection_partial_errors: ErrorTracking,
-    tcs_execution_errors: ErrorTracking,
-    persistent_error_report_interval: Duration,
-    last_persistent_error_report: Instant,
-    persistent_error_min_duration: Duration,
+    errors: ErrorTracking<Pubkey, LiqErrorType>,
 }
 
 impl LiquidationState {
@@ -611,10 +620,12 @@ impl LiquidationState {
 
     async fn maybe_liquidate_and_log_error(&mut self, pubkey: &Pubkey) -> anyhow::Result<bool> {
         let now = Instant::now();
-        let error_tracking = &mut self.liq_errors;
+        let error_tracking = &mut self.errors;
 
         // Skip a pubkey if there've been too many errors recently
-        if let Some(error_entry) = error_tracking.had_too_many_errors(pubkey, now) {
+        if let Some(error_entry) =
+            error_tracking.had_too_many_errors(LiqErrorType::Liq, pubkey, now)
+        {
             trace!(
                 %pubkey,
                 error_entry.count,
@@ -633,7 +644,7 @@ impl LiquidationState {
 
         if let Err(err) = result.as_ref() {
             // Keep track of pubkeys that had errors
-            error_tracking.record_error(pubkey, now, err.to_string());
+            error_tracking.record(LiqErrorType::Liq, pubkey, err.to_string());
 
             // Not all errors need to be raised to the user's attention.
             let mut is_error = true;
@@ -656,7 +667,7 @@ impl LiquidationState {
                 trace!("liquidating account {}: {:?}", pubkey, err);
             }
         } else {
-            error_tracking.clear_errors(pubkey);
+            error_tracking.clear(LiqErrorType::Liq, pubkey);
         }
 
         result
@@ -685,9 +696,9 @@ impl LiquidationState {
         // Find interesting (pubkey, tcsid, volume)
         let mut interesting_tcs = Vec::with_capacity(accounts.len());
         for pubkey in accounts.iter() {
-            if let Some(error_entry) = self
-                .tcs_collection_hard_errors
-                .had_too_many_errors(pubkey, now)
+            if let Some(error_entry) =
+                self.errors
+                    .had_too_many_errors(LiqErrorType::TcsCollectionHard, pubkey, now)
             {
                 trace!(
                     %pubkey,
@@ -699,19 +710,20 @@ impl LiquidationState {
 
             match tcs_context.find_interesting_tcs_for_account(pubkey) {
                 Ok(v) => {
-                    self.tcs_collection_hard_errors.clear_errors(pubkey);
+                    self.errors.clear(LiqErrorType::TcsCollectionHard, pubkey);
                     if v.is_empty() {
-                        self.tcs_collection_partial_errors.clear_errors(pubkey);
-                        self.tcs_execution_errors.clear_errors(pubkey);
+                        self.errors
+                            .clear(LiqErrorType::TcsCollectionPartial, pubkey);
+                        self.errors.clear(LiqErrorType::TcsExecution, pubkey);
                     } else if v.iter().all(|it| it.is_ok()) {
-                        self.tcs_collection_partial_errors.clear_errors(pubkey);
+                        self.errors
+                            .clear(LiqErrorType::TcsCollectionPartial, pubkey);
                     } else {
                         for it in v.iter() {
                             if let Err(e) = it {
-                                info!("error on tcs find_interesting: {:?}", e);
-                                self.tcs_collection_partial_errors.record_error(
+                                self.errors.record(
+                                    LiqErrorType::TcsCollectionPartial,
                                     pubkey,
-                                    now,
                                     e.to_string(),
                                 );
                             }
@@ -720,8 +732,8 @@ impl LiquidationState {
                     interesting_tcs.extend(v.iter().filter_map(|it| it.as_ref().ok()));
                 }
                 Err(e) => {
-                    self.tcs_collection_hard_errors
-                        .record_error(pubkey, now, e.to_string());
+                    self.errors
+                        .record(LiqErrorType::TcsCollectionHard, pubkey, e.to_string());
                 }
             }
         }
@@ -730,8 +742,11 @@ impl LiquidationState {
         }
 
         let (txsigs, mut changed_pubkeys) = tcs_context
-            .execute_tcs(&mut interesting_tcs, &mut self.tcs_execution_errors)
+            .execute_tcs(&mut interesting_tcs, &mut self.errors)
             .await?;
+        for pubkey in changed_pubkeys.iter() {
+            self.errors.clear(LiqErrorType::TcsExecution, pubkey);
+        }
         changed_pubkeys.push(self.mango_client.mango_account_address);
 
         // Force a refresh of affected accounts
@@ -749,26 +764,6 @@ impl LiquidationState {
         }
 
         Ok(true)
-    }
-
-    fn log_persistent_errors(&mut self) {
-        let now = Instant::now();
-        if now.duration_since(self.last_persistent_error_report)
-            < self.persistent_error_report_interval
-        {
-            return;
-        }
-        self.last_persistent_error_report = now;
-
-        let min_duration = self.persistent_error_min_duration;
-        self.liq_errors
-            .log_persistent_errors("liquidation", min_duration);
-        self.tcs_execution_errors
-            .log_persistent_errors("tcs execution", min_duration);
-        self.tcs_collection_hard_errors
-            .log_persistent_errors("tcs collection hard", min_duration);
-        self.tcs_collection_partial_errors
-            .log_persistent_errors("tcs collection partial", min_duration);
     }
 }
 

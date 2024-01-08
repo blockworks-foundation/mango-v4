@@ -41,19 +41,34 @@ impl ClientAccountLoader for &SolanaCookie {
     }
 }
 
-// This fill return a failure if the tx resulted in an error
+// This will return a failure if the tx resulted in an error
 pub async fn send_tx<CI: ClientInstruction>(
     solana: &SolanaCookie,
     ix: CI,
 ) -> std::result::Result<CI::Accounts, TransportError> {
     let (accounts, instruction) = ix.to_instruction(solana).await;
     let signers = ix.signers();
-    let instructions = vec![instruction];
+    let instructions = vec![instruction.clone()];
     let result = solana
         .process_transaction(&instructions, Some(&signers[..]))
         .await?;
     result.result?;
     Ok(accounts)
+}
+
+// This will return a failure if the tx resulted in an error
+pub async fn send_tx_with_extra_accounts<CI: ClientInstruction>(
+    solana: &SolanaCookie,
+    ix: CI,
+    account_metas: Vec<AccountMeta>,
+) -> std::result::Result<BanksTransactionResultWithMetadata, BanksClientError> {
+    let (_, mut instruction) = ix.to_instruction(solana).await;
+    instruction.accounts.extend(account_metas);
+    let signers = ix.signers();
+    let instructions = vec![instruction.clone()];
+    solana
+        .process_transaction(&instructions, Some(&signers[..]))
+        .await
 }
 
 // This will return success even if the tx failed to finish
@@ -68,6 +83,27 @@ pub async fn send_tx_get_metadata<CI: ClientInstruction>(
         .process_transaction(&instructions, Some(&signers[..]))
         .await
 }
+
+#[macro_export]
+macro_rules! send_tx_expect_error {
+    ($solana:expr, $ix:expr, $err:expr $(,)?) => {
+        let result = send_tx($solana, $ix).await;
+        let expected_err: u32 = $err.into();
+        match result {
+            Ok(_) => assert!(false, "no error returned"),
+            Err(TransportError::TransactionError(
+                solana_sdk::transaction::TransactionError::InstructionError(
+                    _,
+                    solana_program::instruction::InstructionError::Custom(err_num),
+                ),
+            )) => {
+                assert_eq!(err_num, expected_err, "wrong error code");
+            }
+            _ => assert!(false, "not a mango error"),
+        }
+    };
+}
+pub use send_tx_expect_error;
 
 /// Build a transaction from multiple instructions
 pub struct ClientTransaction {
@@ -108,6 +144,28 @@ impl<'a> ClientTransaction {
             .process_transaction(&self.instructions, Some(&self.signers))
             .await?;
         tx_result.result?;
+        Ok(())
+    }
+
+    pub async fn send_expect_error(
+        &self,
+        error: mango_v4::error::MangoError,
+    ) -> std::result::Result<(), BanksClientError> {
+        let tx_result = self
+            .solana
+            .process_transaction(&self.instructions, Some(&self.signers))
+            .await?;
+        match tx_result.result {
+            Ok(_) => assert!(false, "no error returned"),
+            Err(solana_sdk::transaction::TransactionError::InstructionError(
+                _,
+                solana_program::instruction::InstructionError::Custom(err_num),
+            )) => {
+                let expected_err: u32 = error.into();
+                assert_eq!(err_num, expected_err, "wrong error code");
+            }
+            _ => assert!(false, "not a mango error"),
+        }
         Ok(())
     }
 
@@ -428,6 +486,7 @@ pub async fn set_bank_stub_oracle_price(
     send_tx(
         solana,
         StubOracleSetInstruction {
+            oracle: token.oracle,
             group,
             admin,
             mint: token.mint.pubkey,
@@ -722,6 +781,7 @@ impl ClientInstruction for FlashLoanEndInstruction {
     }
 }
 
+#[derive(Clone)]
 pub struct TokenWithdrawInstruction {
     pub amount: u64,
     pub allow_borrow: bool,
@@ -793,6 +853,7 @@ impl ClientInstruction for TokenWithdrawInstruction {
     }
 }
 
+#[derive(Clone)]
 pub struct TokenDepositInstruction {
     pub amount: u64,
     pub reduce_only: bool,
@@ -959,6 +1020,7 @@ pub struct TokenRegisterInstruction {
     pub group: Pubkey,
     pub admin: TestKeypair,
     pub mint: Pubkey,
+    pub oracle: Pubkey,
     pub payer: TestKeypair,
 }
 #[async_trait::async_trait(?Send)]
@@ -1010,6 +1072,8 @@ impl ClientInstruction for TokenRegisterInstruction {
             flash_loan_swap_fee_rate: 0.0,
             interest_curve_scaling: 1.0,
             interest_target_utilization: 0.5,
+            group_insurance_fund: true,
+            deposit_limit: 0,
         };
 
         let bank = Pubkey::find_program_address(
@@ -1041,16 +1105,7 @@ impl ClientInstruction for TokenRegisterInstruction {
             &program_id,
         )
         .0;
-        // TODO: remove copy pasta of pda derivation, use reference
-        let oracle = Pubkey::find_program_address(
-            &[
-                b"StubOracle".as_ref(),
-                self.group.as_ref(),
-                self.mint.as_ref(),
-            ],
-            &program_id,
-        )
-        .0;
+        let fallback_oracle = Pubkey::default();
 
         let accounts = Self::Accounts {
             group: self.group,
@@ -1059,7 +1114,8 @@ impl ClientInstruction for TokenRegisterInstruction {
             bank,
             vault,
             mint_info,
-            oracle,
+            oracle: self.oracle,
+            fallback_oracle,
             payer: self.payer.pubkey(),
             token_program: Token::id(),
             system_program: System::id(),
@@ -1261,6 +1317,8 @@ pub fn token_edit_instruction_default() -> mango_v4::instruction::TokenEdit {
         maint_weight_shift_asset_target_opt: None,
         maint_weight_shift_liab_target_opt: None,
         maint_weight_shift_abort: false,
+        set_fallback_oracle: false,
+        deposit_limit_opt: None,
     }
 }
 
@@ -1268,6 +1326,7 @@ pub struct TokenEdit {
     pub group: Pubkey,
     pub admin: TestKeypair,
     pub mint: Pubkey,
+    pub fallback_oracle: Pubkey,
     pub options: mango_v4::instruction::TokenEdit,
 }
 #[async_trait::async_trait(?Send)]
@@ -1296,6 +1355,7 @@ impl ClientInstruction for TokenEdit {
             admin: self.admin.pubkey(),
             mint_info: mint_info_key,
             oracle: mint_info.oracle,
+            fallback_oracle: self.fallback_oracle,
         };
 
         let mut instruction = make_instruction(program_id, &accounts, &self.options);
@@ -1359,6 +1419,7 @@ impl ClientInstruction for TokenEditWeights {
             admin: self.admin.pubkey(),
             mint_info: mint_info_key,
             oracle: mint_info.oracle,
+            fallback_oracle: mint_info.fallback_oracle,
         };
 
         let mut instruction = make_instruction(program_id, &accounts, &instruction);
@@ -1415,6 +1476,7 @@ impl ClientInstruction for TokenResetStablePriceModel {
             admin: self.admin.pubkey(),
             mint_info: mint_info_key,
             oracle: mint_info.oracle,
+            fallback_oracle: mint_info.fallback_oracle,
         };
 
         let mut instruction = make_instruction(program_id, &accounts, &instruction);
@@ -1476,6 +1538,7 @@ impl ClientInstruction for TokenResetNetBorrows {
             admin: self.admin.pubkey(),
             mint_info: mint_info_key,
             oracle: mint_info.oracle,
+            fallback_oracle: mint_info.fallback_oracle,
         };
 
         let mut instruction = make_instruction(program_id, &accounts, &instruction);
@@ -1534,6 +1597,7 @@ impl ClientInstruction for TokenMakeReduceOnly {
             admin: self.admin.pubkey(),
             mint_info: mint_info_key,
             oracle: mint_info.oracle,
+            fallback_oracle: mint_info.fallback_oracle,
         };
 
         let mut instruction = make_instruction(program_id, &accounts, &instruction);
@@ -1557,6 +1621,7 @@ pub struct StubOracleSetInstruction {
     pub group: Pubkey,
     pub admin: TestKeypair,
     pub price: f64,
+    pub oracle: Pubkey,
 }
 #[async_trait::async_trait(?Send)]
 impl ClientInstruction for StubOracleSetInstruction {
@@ -1571,19 +1636,9 @@ impl ClientInstruction for StubOracleSetInstruction {
         let instruction = Self::Instruction {
             price: I80F48::from_num(self.price),
         };
-        // TODO: remove copy pasta of pda derivation, use reference
-        let oracle = Pubkey::find_program_address(
-            &[
-                b"StubOracle".as_ref(),
-                self.group.as_ref(),
-                self.mint.as_ref(),
-            ],
-            &program_id,
-        )
-        .0;
 
         let accounts = Self::Accounts {
-            oracle,
+            oracle: self.oracle,
             group: self.group,
             admin: self.admin.pubkey(),
         };
@@ -1598,6 +1653,7 @@ impl ClientInstruction for StubOracleSetInstruction {
 }
 
 pub struct StubOracleSetTestInstruction {
+    pub oracle: Pubkey,
     pub mint: Pubkey,
     pub group: Pubkey,
     pub admin: TestKeypair,
@@ -1620,18 +1676,9 @@ impl ClientInstruction for StubOracleSetTestInstruction {
             last_update_slot: self.last_update_slot,
             deviation: I80F48::from_num(self.deviation),
         };
-        let oracle = Pubkey::find_program_address(
-            &[
-                b"StubOracle".as_ref(),
-                self.group.as_ref(),
-                self.mint.as_ref(),
-            ],
-            &program_id,
-        )
-        .0;
 
         let accounts = Self::Accounts {
-            oracle,
+            oracle: self.oracle,
             group: self.group,
             admin: self.admin.pubkey(),
         };
@@ -1646,10 +1693,11 @@ impl ClientInstruction for StubOracleSetTestInstruction {
 }
 
 pub struct StubOracleCreate {
-    pub group: Pubkey,
-    pub mint: Pubkey,
+    pub oracle: TestKeypair,
     pub admin: TestKeypair,
     pub payer: TestKeypair,
+    pub group: Pubkey,
+    pub mint: Pubkey,
 }
 #[async_trait::async_trait(?Send)]
 impl ClientInstruction for StubOracleCreate {
@@ -1665,19 +1713,9 @@ impl ClientInstruction for StubOracleCreate {
             price: I80F48::from_num(1.0),
         };
 
-        let oracle = Pubkey::find_program_address(
-            &[
-                b"StubOracle".as_ref(),
-                self.group.as_ref(),
-                self.mint.as_ref(),
-            ],
-            &program_id,
-        )
-        .0;
-
         let accounts = Self::Accounts {
             group: self.group,
-            oracle,
+            oracle: self.oracle.pubkey(),
             mint: self.mint,
             admin: self.admin.pubkey(),
             payer: self.payer.pubkey(),
@@ -1689,11 +1727,12 @@ impl ClientInstruction for StubOracleCreate {
     }
 
     fn signers(&self) -> Vec<TestKeypair> {
-        vec![self.payer, self.admin]
+        vec![self.payer, self.admin, self.oracle]
     }
 }
 
 pub struct StubOracleCloseInstruction {
+    pub oracle: Pubkey,
     pub group: Pubkey,
     pub mint: Pubkey,
     pub admin: TestKeypair,
@@ -1711,20 +1750,10 @@ impl ClientInstruction for StubOracleCloseInstruction {
         let program_id = mango_v4::id();
         let instruction = Self::Instruction {};
 
-        let oracle = Pubkey::find_program_address(
-            &[
-                b"StubOracle".as_ref(),
-                self.group.as_ref(),
-                self.mint.as_ref(),
-            ],
-            &program_id,
-        )
-        .0;
-
         let accounts = Self::Accounts {
             group: self.group,
             admin: self.admin.pubkey(),
-            oracle,
+            oracle: self.oracle,
             sol_destination: self.sol_destination,
             token_program: Token::id(),
         };
@@ -2277,6 +2306,7 @@ impl ClientInstruction for Serum3RegisterMarketInstruction {
         let instruction = Self::Instruction {
             market_index: self.market_index,
             name: "UUU/usdc".to_string(),
+            oracle_price_band: f32::MAX,
         };
 
         let serum_market = Pubkey::find_program_address(
@@ -2318,6 +2348,46 @@ impl ClientInstruction for Serum3RegisterMarketInstruction {
 
     fn signers(&self) -> Vec<TestKeypair> {
         vec![self.admin, self.payer]
+    }
+}
+
+pub fn serum3_edit_market_instruction_default() -> mango_v4::instruction::Serum3EditMarket {
+    mango_v4::instruction::Serum3EditMarket {
+        reduce_only_opt: None,
+        force_close_opt: None,
+        name_opt: None,
+        oracle_price_band_opt: None,
+    }
+}
+
+pub struct Serum3EditMarketInstruction {
+    pub group: Pubkey,
+    pub admin: TestKeypair,
+    pub market: Pubkey,
+    pub options: mango_v4::instruction::Serum3EditMarket,
+}
+#[async_trait::async_trait(?Send)]
+impl ClientInstruction for Serum3EditMarketInstruction {
+    type Accounts = mango_v4::accounts::Serum3EditMarket;
+    type Instruction = mango_v4::instruction::Serum3EditMarket;
+    async fn to_instruction(
+        &self,
+        _account_loader: impl ClientAccountLoader + 'async_trait,
+    ) -> (Self::Accounts, instruction::Instruction) {
+        let program_id = mango_v4::id();
+
+        let accounts = Self::Accounts {
+            group: self.group,
+            admin: self.admin.pubkey(),
+            market: self.market,
+        };
+
+        let instruction = make_instruction(program_id, &accounts, &self.options);
+        (accounts, instruction)
+    }
+
+    fn signers(&self) -> Vec<TestKeypair> {
+        vec![self.admin]
     }
 }
 
@@ -2495,7 +2565,7 @@ pub struct Serum3PlaceOrderInstruction {
 #[async_trait::async_trait(?Send)]
 impl ClientInstruction for Serum3PlaceOrderInstruction {
     type Accounts = mango_v4::accounts::Serum3PlaceOrder;
-    type Instruction = mango_v4::instruction::Serum3PlaceOrder;
+    type Instruction = mango_v4::instruction::Serum3PlaceOrderV2;
     async fn to_instruction(
         &self,
         account_loader: impl ClientAccountLoader + 'async_trait,
@@ -2549,7 +2619,7 @@ impl ClientInstruction for Serum3PlaceOrderInstruction {
         )
         .unwrap();
 
-        let health_check_metas = derive_health_check_remaining_account_metas(
+        let mut health_check_metas = derive_health_check_remaining_account_metas(
             &account_loader,
             &account,
             None,
@@ -2558,10 +2628,16 @@ impl ClientInstruction for Serum3PlaceOrderInstruction {
         )
         .await;
 
-        let payer_info = &match self.side {
-            Serum3Side::Bid => &quote_info,
-            Serum3Side::Ask => &base_info,
+        let (payer_info, receiver_info) = &match self.side {
+            Serum3Side::Bid => (&quote_info, &base_info),
+            Serum3Side::Ask => (&base_info, &quote_info),
         };
+
+        let receiver_active_index = account
+            .active_token_positions()
+            .position(|tp| tp.token_index == receiver_info.token_index)
+            .unwrap();
+        health_check_metas[receiver_active_index].is_writable = true;
 
         let accounts = Self::Accounts {
             group: account.fixed.group,
@@ -2616,6 +2692,71 @@ impl ClientInstruction for Serum3CancelOrderInstruction {
         let instruction = Self::Instruction {
             side: self.side,
             order_id: self.order_id,
+        };
+
+        let account = account_loader
+            .load_mango_account(&self.account)
+            .await
+            .unwrap();
+        let serum_market: Serum3Market = account_loader.load(&self.serum_market).await.unwrap();
+        let open_orders = account
+            .serum3_orders(serum_market.market_index)
+            .unwrap()
+            .open_orders;
+
+        let market_external_bytes = account_loader
+            .load_bytes(&serum_market.serum_market_external)
+            .await
+            .unwrap();
+        let market_external: &serum_dex::state::MarketState = bytemuck::from_bytes(
+            &market_external_bytes[5..5 + std::mem::size_of::<serum_dex::state::MarketState>()],
+        );
+        // unpack the data, to avoid unaligned references
+        let bids = market_external.bids;
+        let asks = market_external.asks;
+        let event_q = market_external.event_q;
+
+        let accounts = Self::Accounts {
+            group: account.fixed.group,
+            account: self.account,
+            open_orders,
+            serum_market: self.serum_market,
+            serum_program: serum_market.serum_program,
+            serum_market_external: serum_market.serum_market_external,
+            market_bids: from_serum_style_pubkey(&bids),
+            market_asks: from_serum_style_pubkey(&asks),
+            market_event_queue: from_serum_style_pubkey(&event_q),
+            owner: self.owner.pubkey(),
+        };
+
+        let instruction = make_instruction(program_id, &accounts, &instruction);
+        (accounts, instruction)
+    }
+
+    fn signers(&self) -> Vec<TestKeypair> {
+        vec![self.owner]
+    }
+}
+
+pub struct Serum3CancelOrderByClientOrderIdInstruction {
+    pub client_order_id: u64,
+
+    pub account: Pubkey,
+    pub owner: TestKeypair,
+
+    pub serum_market: Pubkey,
+}
+#[async_trait::async_trait(?Send)]
+impl ClientInstruction for Serum3CancelOrderByClientOrderIdInstruction {
+    type Accounts = mango_v4::accounts::Serum3CancelOrder;
+    type Instruction = mango_v4::instruction::Serum3CancelOrderByClientOrderId;
+    async fn to_instruction(
+        &self,
+        account_loader: impl ClientAccountLoader + 'async_trait,
+    ) -> (Self::Accounts, instruction::Instruction) {
+        let program_id = mango_v4::id();
+        let instruction = Self::Instruction {
+            client_order_id: self.client_order_id,
         };
 
         let account = account_loader

@@ -1,4 +1,6 @@
 use crate::accounts_zerocopy::AccountInfoRef;
+use crate::accounts_zerocopy::LoadMutZeroCopyRef;
+use crate::accounts_zerocopy::LoadZeroCopyRef;
 use crate::error::*;
 use crate::health::*;
 use crate::i80f48::ClampToInt;
@@ -21,6 +23,9 @@ pub fn openbook_v2_place_order(
     order: OpenbookV2Order,
     limit: u16,
 ) -> Result<()> {
+    require_gte!(order.max_base_lots, 0);
+    require_gte!(order.max_quote_lots_including_fees, 0);
+
     let openbook_market = ctx.accounts.openbook_v2_market.load()?;
     require!(
         !openbook_market.is_reduce_only(),
@@ -81,17 +86,30 @@ pub fn openbook_v2_place_order(
     };
 
     // Check if the bank for the token whose balance is increased is in reduce-only mode
-    let receiver_bank_reduce_only = {
+    let receiver_bank_ai;
+    let receiver_bank_oracle;
+    let receiver_bank_reduce_only;
+    {
         // The token position already exists, but we need the active_index.
         let (_, _, active_index) = account.ensure_token_position(receiver_token_index)?;
         let group_key = ctx.accounts.group.key();
-        let receiver_bank = retriever
-            .bank_and_oracle(&group_key, active_index, receiver_token_index)?
-            .0;
-        receiver_bank.are_deposits_reduce_only()
-    };
+        let (receiver_bank, oracle) =
+            retriever.bank_and_oracle(&group_key, active_index, receiver_token_index)?;
+        receiver_bank_oracle = oracle;
+        receiver_bank_reduce_only = receiver_bank.are_deposits_reduce_only();
+
+        // The fixed_order account retriever can't give us mut references, so use the above
+        // call to .bank_and_oracle() as validation and then copy out the matching AccountInfo.
+        receiver_bank_ai = ctx.remaining_accounts[active_index].clone();
+        // Double-check that we got the right account
+        let receiver_bank2 = receiver_bank_ai.load::<Bank>()?;
+        assert_eq!(receiver_bank2.group, group_key);
+        assert_eq!(receiver_bank2.token_index, receiver_token_index);
+    }
 
     drop(retriever);
+
+    // No version check required, bank writable from v1
 
     //
     // Before-order tracking
@@ -124,12 +142,10 @@ pub fn openbook_v2_place_order(
 
         // todo-pan: why i64? hope the cast doesnt fuck anything up
         let needed_amount = match order.side {
-            OpenbookV2Side::Ask => {
-                (order.max_base_lots as u64 * base_lot_size as u64).saturating_sub(before_oo.native_base_free())
-            }
-            OpenbookV2Side::Bid => {
-                (order.max_quote_lots_including_fees as u64).saturating_sub(before_oo.native_quote_free())
-            }
+            OpenbookV2Side::Ask => (order.max_base_lots as u64 * base_lot_size as u64)
+                .saturating_sub(before_oo.native_base_free()),
+            OpenbookV2Side::Bid => (order.max_quote_lots_including_fees as u64)
+                .saturating_sub(before_oo.native_quote_free()),
         };
         if before_vault < needed_amount {
             return err!(MangoError::InsufficentBankVaultFunds).with_context(|| {
@@ -145,14 +161,19 @@ pub fn openbook_v2_place_order(
     // CPI to place order
     //
     let account_seeds = mango_account_seeds!(account.fixed);
-    cpi_place_order(ctx.accounts, &[account_seeds], &order, limit.try_into().unwrap())?;
+    cpi_place_order(
+        ctx.accounts,
+        &[account_seeds],
+        &order,
+        limit.try_into().unwrap(),
+    )?;
 
     //
     // After-order tracking
     //
+    let open_orders = ctx.accounts.open_orders.load()?;
     let after_oo_free_slots;
     let after_oo = {
-        let open_orders = ctx.accounts.open_orders.load()?;
         after_oo_free_slots = MAX_OPEN_ORDERS
             - open_orders
                 .all_orders_in_use()
@@ -170,33 +191,46 @@ pub fn openbook_v2_place_order(
     if !before_had_bids {
         // The 0 state means uninitialized/no value
         openbook.highest_placed_bid_inv = 0.0;
+        openbook.lowest_placed_bid_inv = 0.0
     }
     if !before_had_asks {
         openbook.lowest_placed_ask = 0.0;
+        openbook.highest_placed_ask = 0.0;
     }
+    // in the normal quote per base units
+    let limit_price =
+        order.max_quote_lots_including_fees as f64 * quote_lot_size as f64 / base_lot_size as f64;
+
     let new_order_on_book = after_oo_free_slots != before_oo_free_slots;
     if new_order_on_book {
         match order.side {
             OpenbookV2Side::Ask => {
-                // in the normal quote per base units
-                let limit_price = order.max_quote_lots_including_fees as f64 * quote_lot_size as f64
-                    / base_lot_size as f64;
                 openbook.lowest_placed_ask = if openbook.lowest_placed_ask == 0.0 {
                     limit_price
                 } else {
                     openbook.lowest_placed_ask.min(limit_price)
                 };
+                openbook.highest_placed_ask = if openbook.highest_placed_ask == 0.0 {
+                    limit_price
+                } else {
+                    openbook.highest_placed_ask.max(limit_price)
+                }
             }
             OpenbookV2Side::Bid => {
                 // in base per quote units, to avoid a division in health
-                let limit_price_inv = base_lot_size as f64
-                    / (order.max_quote_lots_including_fees as f64 * quote_lot_size as f64);
+                let limit_price_inv = 1.0 / limit_price;
                 openbook.highest_placed_bid_inv = if openbook.highest_placed_bid_inv == 0.0 {
                     limit_price_inv
                 } else {
                     // the highest bid has the lowest _inv value
                     openbook.highest_placed_bid_inv.min(limit_price_inv)
                 };
+                openbook.lowest_placed_bid_inv = if openbook.lowest_placed_bid_inv == 0.0 {
+                    limit_price_inv
+                } else {
+                    // lowest bid has max _inv value
+                    openbook.lowest_placed_bid_inv.max(limit_price_inv)
+                }
             }
         }
     }
@@ -222,10 +256,15 @@ pub fn openbook_v2_place_order(
     require_gte!(before_vault, after_vault);
 
     let mut payer_bank = ctx.accounts.bank.load_mut()?;
+    let mut receiver_bank = receiver_bank_ai.load_mut::<Bank>()?;
+    let (base_bank, quote_bank) = match order.side {
+        OpenbookV2Side::Bid => (&mut receiver_bank, &mut payer_bank),
+        OpenbookV2Side::Ask => (&mut payer_bank, &mut receiver_bank),
+    };
+    update_bank_potential_tokens_v2(openbook, base_bank, quote_bank, &after_oo);
 
-    // Enforce min vault to deposits ratio
-    let withdrawn_from_vault = I80F48::from(before_vault - after_vault);
-    let position_native = account
+    // Track position before withdraw happens
+    let before_position_native = account
         .token_position_mut(payer_bank.token_index)?
         .0
         .native(&payer_bank);
@@ -242,32 +281,94 @@ pub fn openbook_v2_place_order(
         )?
     };
 
-    if withdrawn_from_vault > position_native {
+    // Deposit limit check: Placing an order can increase deposit limit use on both
+    // the payer and receiver bank. Imagine placing a bid for 500 base @ 0.5: it would
+    // use up 1000 quote and 500 base because either could be deposit on cancel/fill.
+    // This is why this must happen after update_bank_potential_tokens() and any withdraws.
+    {
+        let receiver_bank = receiver_bank_ai.load::<Bank>()?;
+        receiver_bank
+            .check_deposit_and_oo_limit()
+            .with_context(|| std::format!("on {}", receiver_bank.name()))?;
+        payer_bank
+            .check_deposit_and_oo_limit()
+            .with_context(|| std::format!("on {}", payer_bank.name()))?;
+    }
+
+    // Payer bank safety checks like reduce-only, net borrows, vault-to-deposits ratio
+    let payer_oracle_ref = &AccountInfoRef::borrow(&ctx.accounts.oracle)?;
+    let payer_bank_oracle =
+        payer_bank.oracle_price(&OracleAccountInfos::from_reader(payer_oracle_ref), None)?;
+    let withdrawn_from_vault = I80F48::from(before_vault - after_vault);
+    if withdrawn_from_vault > before_position_native {
         require_msg_typed!(
             !payer_bank.are_borrows_reduce_only(),
             MangoError::TokenInReduceOnlyMode,
             "the payer tokens cannot be borrowed"
         );
-        let oracle_price =
-            payer_bank.oracle_price(&AccountInfoRef::borrow(&ctx.accounts.oracle)?, None)?;
-        payer_bank.enforce_min_vault_to_deposits_ratio((*ctx.accounts.vault).as_ref())?;
-        payer_bank.check_net_borrows(oracle_price)?;
+        payer_bank.enforce_max_utilization_on_borrow()?;
+        payer_bank.check_net_borrows(payer_bank_oracle)?;
+    } else {
+        payer_bank.enforce_borrows_lte_deposits()?;
     }
 
-    vault_difference.adjust_health_cache_token_balance(&mut health_cache, &payer_bank)?;
+    // Limit order price bands: If the order ends up on the book, ensure
+    // - a bid isn't too far below oracle
+    // - an ask isn't too far above oracle
+    // because placing orders that are guaranteed to never be hit can be bothersome:
+    // For example placing a very large bid near zero would make the potential_base_tokens
+    // value go through the roof, reducing available init margin for other users.
+    let band_threshold = openbook_market.oracle_price_band();
+    if new_order_on_book && band_threshold != f32::MAX {
+        let (base_oracle, quote_oracle) = match order.side {
+            OpenbookV2Side::Bid => (&receiver_bank_oracle, &payer_bank_oracle),
+            OpenbookV2Side::Ask => (&payer_bank_oracle, &receiver_bank_oracle),
+        };
+        let base_oracle_f64 = base_oracle.to_num::<f64>();
+        let quote_oracle_f64 = quote_oracle.to_num::<f64>();
+        // this has the same units as base_oracle: USD per BASE; limit_price is in QUOTE per BASE
+        let limit_price_in_dollar = limit_price * quote_oracle_f64;
+        let band_factor = 1.0 + band_threshold as f64;
+        match order.side {
+            OpenbookV2Side::Bid => {
+                require_msg_typed!(
+                    limit_price_in_dollar * band_factor >= base_oracle_f64,
+                    MangoError::Serum3PriceBandExceeded,
+                    "bid price {} must be larger than {} ({}% of oracle)",
+                    limit_price,
+                    base_oracle_f64 / (quote_oracle_f64 * band_factor),
+                    (100.0 / band_factor) as u64,
+                );
+            }
+            OpenbookV2Side::Ask => {
+                require_msg_typed!(
+                    limit_price_in_dollar <= base_oracle_f64 * band_factor,
+                    MangoError::Serum3PriceBandExceeded,
+                    "ask price {} must be smaller than {} ({}% of oracle)",
+                    limit_price,
+                    base_oracle_f64 * band_factor / quote_oracle_f64,
+                    (100.0 * band_factor) as u64,
+                );
+            }
+        }
+    }
 
-    let openbook_orders = account.openbook_v2_orders(openbook_market.market_index)?;
-    let open_orders_account = ctx.accounts.open_orders.load()?;
+    // Health cache updates for the changed account state
+    let receiver_bank = receiver_bank_ai.load::<Bank>()?;
+    // update scaled weights for receiver bank
+    health_cache.adjust_token_balance(&receiver_bank, I80F48::ZERO)?;
+    vault_difference.adjust_health_cache_token_balance(&mut health_cache, &payer_bank)?;
+    let openbook_account = account.openbook_v2_orders(openbook_market.market_index)?;
     oo_difference.recompute_health_cache_openbook_v2_state(
         &mut health_cache,
-        &openbook_orders,
-        &*open_orders_account, // todo-pan : absolutely disgusting
+        &openbook_account,
+        &open_orders,
     )?;
 
     // Check the receiver's reduce only flag.
     //
     // Note that all orders on the book executing can still cause a net deposit. That's because
-    // the total serum3 potential amount assumes all reserved amounts convert at the current
+    // the total openbook_v2 potential amount assumes all reserved amounts convert at the current
     // oracle price.
     if receiver_bank_reduce_only {
         let balance = health_cache.token_info(receiver_token_index)?.balance_spot;
@@ -323,8 +424,11 @@ pub fn apply_settle_changes_v2(
             let clock = Clock::get()?;
             let now_ts = clock.unix_timestamp.try_into().unwrap();
 
-            let quote_oracle_price = quote_bank
-                .oracle_price(&AccountInfoRef::borrow(quote_oracle_ai)?, Some(clock.slot))?;
+            let quote_oracle_ref = &AccountInfoRef::borrow(quote_oracle_ai)?;
+            let quote_oracle_price = quote_bank.oracle_price(
+                &OracleAccountInfos::from_reader(quote_oracle_ref),
+                Some(clock.slot),
+            )?;
             let quote_asset_price = quote_oracle_price.min(quote_bank.stable_price());
             account
                 .fixed
@@ -363,25 +467,11 @@ pub fn apply_settle_changes_v2(
     )?;
 
     // Tokens were moved from open orders into banks again: also update the tracking
-    // for deposits_in_openbook on the banks.
+    // for potential_serum_tokens on the banks.
     {
-        let openbook_orders = account.serum3_orders_mut(openbook_market.market_index)?;
-
-        let after_base_reserved = after_oo.native_base_reserved();
-        if after_base_reserved < openbook_orders.base_deposits_reserved {
-            let diff = openbook_orders.base_deposits_reserved - after_base_reserved;
-            openbook_orders.base_deposits_reserved = after_base_reserved;
-            let diff_signed: i64 = diff.try_into().unwrap();
-            base_bank.deposits_in_openbook -= diff_signed;
-        }
-
-        let after_quote_reserved = after_oo.native_quote_reserved();
-        if after_quote_reserved < openbook_orders.quote_deposits_reserved {
-            let diff = openbook_orders.quote_deposits_reserved - after_quote_reserved;
-            openbook_orders.quote_deposits_reserved = after_quote_reserved;
-            let diff_signed: i64 = diff.try_into().unwrap();
-            quote_bank.deposits_in_openbook -= diff_signed;
-        }
+        let openbook_orders = account.openbook_v2_orders_mut(openbook_market.market_index)?;
+        
+        update_bank_potential_tokens_v2(openbook_orders, base_bank, quote_bank, after_oo);
     }
 
     if let Some(health_cache) = health_cache {
@@ -397,6 +487,33 @@ pub fn apply_settle_changes_v2(
     }
 
     Ok(())
+}
+
+fn update_bank_potential_tokens_v2(
+    openbook_orders: &mut OpenbookV2Orders,
+    base_bank: &mut Bank,
+    quote_bank: &mut Bank,
+    oo: &OpenOrdersSlim,
+) {
+    assert_eq!(openbook_orders.base_token_index, base_bank.token_index);
+    assert_eq!(openbook_orders.quote_token_index, quote_bank.token_index);
+
+    // Potential tokens are all tokens on the side, plus reserved on the other side
+    // converted at favorable price. This creates an overestimation of the potential
+    // base and quote tokens flowing out of this open orders account.
+    let new_base = oo.native_base_total()
+        + (oo.native_quote_reserved() as f64 * openbook_orders.lowest_placed_bid_inv) as u64;
+    let new_quote = oo.native_quote_total()
+        + (oo.native_base_reserved() as f64 * openbook_orders.highest_placed_ask) as u64;
+
+    let old_base = openbook_orders.potential_base_tokens;
+    let old_quote = openbook_orders.potential_quote_tokens;
+
+    base_bank.update_potential_openbook_tokens(old_base, new_base);
+    quote_bank.update_potential_openbook_tokens(old_quote, new_quote);
+
+    openbook_orders.potential_base_tokens = new_base;
+    openbook_orders.potential_quote_tokens = new_quote;
 }
 
 fn cpi_place_order(

@@ -974,7 +974,8 @@ async fn test_perp_pnl_settle_limit() -> Result<(), TransportError> {
     let price_factor = 3;
     mango_client::send_tx(
         solana,
-        mango_client::StubOracleSetInstruction {
+        StubOracleSetInstruction {
+            oracle: tokens[1].oracle,
             group,
             admin,
             mint: mints[1].pubkey,

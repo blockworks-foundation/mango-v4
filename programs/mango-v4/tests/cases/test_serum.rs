@@ -1,6 +1,7 @@
 #![allow(dead_code)]
 use super::*;
 
+use anchor_lang::prelude::AccountMeta;
 use mango_v4::accounts_ix::{Serum3OrderType, Serum3SelfTradeBehavior, Serum3Side};
 use mango_v4::serum3_cpi::{load_open_orders_bytes, OpenOrdersSlim};
 use std::sync::Arc;
@@ -125,6 +126,20 @@ impl SerumOrderPlacer {
             Serum3CancelOrderInstruction {
                 side,
                 order_id,
+                account: self.account,
+                owner: self.owner,
+                serum_market: self.serum_market,
+            },
+        )
+        .await
+        .unwrap();
+    }
+
+    async fn cancel_by_client_order_id(&self, client_order_id: u64) {
+        send_tx(
+            &self.solana,
+            Serum3CancelOrderByClientOrderIdInstruction {
+                client_order_id,
                 account: self.account,
                 owner: self.owner,
                 serum_market: self.serum_market,
@@ -309,13 +324,13 @@ async fn test_serum_basics() -> Result<(), TransportError> {
     //
     // TEST: Place an order
     //
-    let (order_id, _) = order_placer.bid_maker(1.0, 100).await.unwrap();
+    let (order_id, _) = order_placer.bid_maker(0.9, 100).await.unwrap();
     check_prev_instruction_post_health(&solana, account).await;
 
     let native0 = account_position(solana, account, base_token.bank).await;
     let native1 = account_position(solana, account, quote_token.bank).await;
     assert_eq!(native0, 1000);
-    assert_eq!(native1, 900);
+    assert_eq!(native1, 910);
 
     let account_data = get_mango_account(solana, account).await;
     assert_eq!(
@@ -342,13 +357,13 @@ async fn test_serum_basics() -> Result<(), TransportError> {
     let serum_orders = account_data.serum3_orders_by_raw_index(0).unwrap();
     assert_eq!(serum_orders.base_borrows_without_fee, 0);
     assert_eq!(serum_orders.quote_borrows_without_fee, 0);
-    assert_eq!(serum_orders.base_deposits_reserved, 0);
-    assert_eq!(serum_orders.quote_deposits_reserved, 100);
+    assert_eq!(serum_orders.potential_base_tokens, 100);
+    assert_eq!(serum_orders.potential_quote_tokens, 90);
 
     let base_bank = solana.get_account::<Bank>(base_token.bank).await;
-    assert_eq!(base_bank.deposits_in_serum, 0);
+    assert_eq!(base_bank.potential_serum_tokens, 100);
     let quote_bank = solana.get_account::<Bank>(quote_token.bank).await;
-    assert_eq!(quote_bank.deposits_in_serum, 100);
+    assert_eq!(quote_bank.potential_serum_tokens, 90);
 
     assert!(order_id != 0);
 
@@ -356,6 +371,14 @@ async fn test_serum_basics() -> Result<(), TransportError> {
     // TEST: Cancel the order
     //
     order_placer.cancel(order_id).await;
+
+    //
+    // TEST: Cancel order by client order id
+    //
+    let (_, _) = order_placer.bid_maker(1.0, 100).await.unwrap();
+    order_placer
+        .cancel_by_client_order_id(order_placer.next_client_order_id - 1)
+        .await;
 
     //
     // TEST: Settle, moving the freed up funds back
@@ -371,13 +394,13 @@ async fn test_serum_basics() -> Result<(), TransportError> {
     let serum_orders = account_data.serum3_orders_by_raw_index(0).unwrap();
     assert_eq!(serum_orders.base_borrows_without_fee, 0);
     assert_eq!(serum_orders.quote_borrows_without_fee, 0);
-    assert_eq!(serum_orders.base_deposits_reserved, 0);
-    assert_eq!(serum_orders.quote_deposits_reserved, 0);
+    assert_eq!(serum_orders.potential_base_tokens, 0);
+    assert_eq!(serum_orders.potential_quote_tokens, 0);
 
     let base_bank = solana.get_account::<Bank>(base_token.bank).await;
-    assert_eq!(base_bank.deposits_in_serum, 0);
+    assert_eq!(base_bank.potential_serum_tokens, 0);
     let quote_bank = solana.get_account::<Bank>(quote_token.bank).await;
-    assert_eq!(quote_bank.deposits_in_serum, 0);
+    assert_eq!(quote_bank.potential_serum_tokens, 0);
 
     // Process events such that the OutEvent deactivates the closed order on open_orders
     context
@@ -1150,89 +1173,72 @@ async fn test_serum_track_bid_ask() -> Result<(), TransportError> {
     // TEST: highest bid/lowest ask updating
     //
 
-    assert_eq!(
-        order_placer
-            .mango_serum_orders()
-            .await
-            .highest_placed_bid_inv,
-        0.0
-    );
-    assert_eq!(
-        order_placer.mango_serum_orders().await.lowest_placed_ask,
-        0.0
-    );
+    let srm = order_placer.mango_serum_orders().await;
+    assert_eq!(srm.highest_placed_bid_inv, 0.0);
+    assert_eq!(srm.lowest_placed_bid_inv, 0.0);
+    assert_eq!(srm.highest_placed_ask, 0.0);
+    assert_eq!(srm.lowest_placed_ask, 0.0);
 
     order_placer.bid_maker(10.0, 100).await.unwrap();
-    assert_eq!(
-        order_placer
-            .mango_serum_orders()
-            .await
-            .highest_placed_bid_inv,
-        1.0 / 10.0
-    );
+
+    let srm = order_placer.mango_serum_orders().await;
+    assert_eq!(srm.highest_placed_bid_inv, 1.0 / 10.0);
+    assert_eq!(srm.lowest_placed_bid_inv, 1.0 / 10.0);
+    assert_eq!(srm.highest_placed_ask, 0.0);
+    assert_eq!(srm.lowest_placed_ask, 0.0);
 
     order_placer.bid_maker(9.0, 100).await.unwrap();
-    assert_eq!(
-        order_placer
-            .mango_serum_orders()
-            .await
-            .highest_placed_bid_inv,
-        1.0 / 10.0
-    );
+
+    let srm = order_placer.mango_serum_orders().await;
+    assert_eq!(srm.highest_placed_bid_inv, 1.0 / 10.0);
+    assert_eq!(srm.lowest_placed_bid_inv, 1.0 / 9.0);
+    assert_eq!(srm.highest_placed_ask, 0.0);
+    assert_eq!(srm.lowest_placed_ask, 0.0);
 
     order_placer.bid_maker(11.0, 100).await.unwrap();
-    assert_eq!(
-        order_placer
-            .mango_serum_orders()
-            .await
-            .highest_placed_bid_inv,
-        1.0 / 11.0
-    );
 
-    assert_eq!(
-        order_placer.mango_serum_orders().await.lowest_placed_ask,
-        0.0
-    );
+    let srm = order_placer.mango_serum_orders().await;
+    assert_eq!(srm.highest_placed_bid_inv, 1.0 / 11.0);
+    assert_eq!(srm.lowest_placed_bid_inv, 1.0 / 9.0);
+    assert_eq!(srm.highest_placed_ask, 0.0);
+    assert_eq!(srm.lowest_placed_ask, 0.0);
+
     order_placer.ask(20.0, 100).await.unwrap();
-    assert_eq!(
-        order_placer.mango_serum_orders().await.lowest_placed_ask,
-        20.0
-    );
-    order_placer.ask(19.0, 100).await.unwrap();
-    assert_eq!(
-        order_placer.mango_serum_orders().await.lowest_placed_ask,
-        19.0
-    );
-    order_placer.ask(21.0, 100).await.unwrap();
-    assert_eq!(
-        order_placer.mango_serum_orders().await.lowest_placed_ask,
-        19.0
-    );
 
-    assert_eq!(
-        order_placer
-            .mango_serum_orders()
-            .await
-            .highest_placed_bid_inv,
-        1.0 / 11.0
-    );
+    let srm = order_placer.mango_serum_orders().await;
+    assert_eq!(srm.highest_placed_bid_inv, 1.0 / 11.0);
+    assert_eq!(srm.lowest_placed_bid_inv, 1.0 / 9.0);
+    assert_eq!(srm.highest_placed_ask, 20.0);
+    assert_eq!(srm.lowest_placed_ask, 20.0);
+
+    order_placer.ask(19.0, 100).await.unwrap();
+
+    let srm = order_placer.mango_serum_orders().await;
+    assert_eq!(srm.highest_placed_bid_inv, 1.0 / 11.0);
+    assert_eq!(srm.lowest_placed_bid_inv, 1.0 / 9.0);
+    assert_eq!(srm.highest_placed_ask, 20.0);
+    assert_eq!(srm.lowest_placed_ask, 19.0);
+
+    order_placer.ask(21.0, 100).await.unwrap();
+
+    let srm = order_placer.mango_serum_orders().await;
+    assert_eq!(srm.highest_placed_bid_inv, 1.0 / 11.0);
+    assert_eq!(srm.lowest_placed_bid_inv, 1.0 / 9.0);
+    assert_eq!(srm.highest_placed_ask, 21.0);
+    assert_eq!(srm.lowest_placed_ask, 19.0);
 
     //
     // TEST: cancellation allows for resets
     //
 
     order_placer.cancel_all().await;
-    assert_eq!(
-        order_placer.mango_serum_orders().await.lowest_placed_ask,
-        19.0
-    );
-    assert_eq!(
-        order_placer
-            .mango_serum_orders()
-            .await
-            .highest_placed_bid_inv,
-        1.0 / 11.0
-    );
+
+    // no immediate change
+    let srm = order_placer.mango_serum_orders().await;
+    assert_eq!(srm.highest_placed_bid_inv, 1.0 / 11.0);
+    assert_eq!(srm.lowest_placed_bid_inv, 1.0 / 9.0);
+    assert_eq!(srm.highest_placed_ask, 21.0);
+    assert_eq!(srm.lowest_placed_ask, 19.0);
 
     // Process events such that the OutEvent deactivates the closed order on open_orders
     context
@@ -1242,36 +1248,36 @@ async fn test_serum_track_bid_ask() -> Result<(), TransportError> {
 
     // takes new value for bid, resets ask
     order_placer.bid_maker(1.0, 100).await.unwrap();
-    assert_eq!(
-        order_placer.mango_serum_orders().await.lowest_placed_ask,
-        0.0
-    );
-    assert_eq!(
-        order_placer
-            .mango_serum_orders()
-            .await
-            .highest_placed_bid_inv,
-        1.0
-    );
+
+    let srm = order_placer.mango_serum_orders().await;
+    assert_eq!(srm.highest_placed_bid_inv, 1.0);
+    assert_eq!(srm.lowest_placed_bid_inv, 1.0);
+    assert_eq!(srm.highest_placed_ask, 0.0);
+    assert_eq!(srm.lowest_placed_ask, 0.0);
 
     //
     // TEST: can reset even when there's still an order on the other side
     //
     let (oid, _) = order_placer.ask(10.0, 100).await.unwrap();
-    assert_eq!(
-        order_placer.mango_serum_orders().await.lowest_placed_ask,
-        10.0
-    );
+
+    let srm = order_placer.mango_serum_orders().await;
+    assert_eq!(srm.highest_placed_bid_inv, 1.0);
+    assert_eq!(srm.lowest_placed_bid_inv, 1.0);
+    assert_eq!(srm.highest_placed_ask, 10.0);
+    assert_eq!(srm.lowest_placed_ask, 10.0);
+
     order_placer.cancel(oid).await;
     context
         .serum
         .consume_spot_events(&serum_market_cookie, &[order_placer.open_orders])
         .await;
     order_placer.ask(9.0, 100).await.unwrap();
-    assert_eq!(
-        order_placer.mango_serum_orders().await.lowest_placed_ask,
-        9.0
-    );
+
+    let srm = order_placer.mango_serum_orders().await;
+    assert_eq!(srm.highest_placed_bid_inv, 1.0);
+    assert_eq!(srm.lowest_placed_bid_inv, 1.0);
+    assert_eq!(srm.highest_placed_ask, 9.0);
+    assert_eq!(srm.lowest_placed_ask, 9.0);
 
     Ok(())
 }
@@ -1305,10 +1311,10 @@ async fn test_serum_track_reserved_deposits() -> Result<(), TransportError> {
         let base_bank = solana.get_account::<Bank>(base_bank).await;
         let quote_bank = solana.get_account::<Bank>(quote_bank).await;
         (
-            orders.base_deposits_reserved,
-            base_bank.deposits_in_serum,
-            orders.quote_deposits_reserved,
-            quote_bank.deposits_in_serum,
+            orders.potential_base_tokens,
+            base_bank.potential_serum_tokens,
+            orders.potential_quote_tokens,
+            quote_bank.potential_serum_tokens,
         )
     };
 
@@ -1317,8 +1323,13 @@ async fn test_serum_track_reserved_deposits() -> Result<(), TransportError> {
     //
 
     order_placer.bid_maker(0.8, 2000).await.unwrap();
-    order_placer.ask(1.2, 2000).await.unwrap();
     assert_eq!(get_vals(solana).await, (2000, 2000, 1600, 1600));
+
+    order_placer.ask(1.2, 2000).await.unwrap();
+    assert_eq!(
+        get_vals(solana).await,
+        (2 * 2000, 2 * 2000, 1600 + 2400, 1600 + 2400)
+    );
 
     //
     // TEST: match partially on both sides, increasing the on-bank reserved amounts
@@ -1333,9 +1344,12 @@ async fn test_serum_track_reserved_deposits() -> Result<(), TransportError> {
             &[order_placer.open_orders, order_placer2.open_orders],
         )
         .await;
-    assert_eq!(get_vals(solana).await, (2000, 2000, 1600, 2801));
+    // taker order directly converted to base, no change to quote
+    assert_eq!(get_vals(solana).await, (4000, 4000 + 1000, 4000, 4000));
+
+    // takes out 1000 base
     order_placer2.settle_v2(false).await;
-    assert_eq!(get_vals(solana).await, (2000, 2000, 1600, 1600));
+    assert_eq!(get_vals(solana).await, (4000, 4000, 4000, 4000));
 
     order_placer2.ask(0.8, 1000).await.unwrap();
     context
@@ -1345,16 +1359,19 @@ async fn test_serum_track_reserved_deposits() -> Result<(), TransportError> {
             &[order_placer.open_orders, order_placer2.open_orders],
         )
         .await;
-    assert_eq!(get_vals(solana).await, (2000, 3000, 1600, 1600));
+    // taker order directly converted to quote
+    assert_eq!(get_vals(solana).await, (4000, 4000, 4000, 4000 + 799));
+
     order_placer2.settle_v2(false).await;
-    assert_eq!(get_vals(solana).await, (2000, 2000, 1600, 1600));
+    assert_eq!(get_vals(solana).await, (4000, 4000, 4000, 4000));
 
     //
     // TEST: Settlement updates the values
     //
 
     order_placer.settle_v2(false).await;
-    assert_eq!(get_vals(solana).await, (1000, 1000, 800, 800));
+    // remaining is bid 1000 @ 0.8; ask 1000 @ 1.2
+    assert_eq!(get_vals(solana).await, (2000, 2000, 2000, 2000));
 
     Ok(())
 }
@@ -1481,6 +1498,418 @@ async fn test_serum_compute() -> Result<(), TransportError> {
     Ok(())
 }
 
+#[tokio::test]
+async fn test_fallback_oracle_serum() -> Result<(), TransportError> {
+    let mut test_builder = TestContextBuilder::new();
+    test_builder.test().set_compute_max_units(150_000);
+    let context = test_builder.start_default().await;
+    let solana = &context.solana.clone();
+
+    let fallback_oracle_kp = TestKeypair::new();
+    let fallback_oracle = fallback_oracle_kp.pubkey();
+    let owner = context.users[0].key;
+    let payer = context.users[1].key;
+    let payer_token_accounts = &context.users[1].token_accounts[0..3];
+
+    //
+    // SETUP: Create a group and an account
+    //
+    let deposit_amount = 1_000;
+    let CommonSetup {
+        group_with_tokens,
+        quote_token,
+        base_token,
+        mut order_placer,
+        ..
+    } = common_setup(&context, deposit_amount).await;
+    let GroupWithTokens {
+        group,
+        admin,
+        tokens,
+        ..
+    } = group_with_tokens;
+
+    //
+    // SETUP: Create a fallback oracle
+    //
+    send_tx(
+        solana,
+        StubOracleCreate {
+            oracle: fallback_oracle_kp,
+            group,
+            mint: tokens[2].mint.pubkey,
+            admin,
+            payer,
+        },
+    )
+    .await
+    .unwrap();
+
+    //
+    // SETUP: Add a fallback oracle
+    //
+    send_tx(
+        solana,
+        TokenEdit {
+            group,
+            admin,
+            mint: tokens[2].mint.pubkey,
+            fallback_oracle,
+            options: mango_v4::instruction::TokenEdit {
+                set_fallback_oracle: true,
+                ..token_edit_instruction_default()
+            },
+        },
+    )
+    .await
+    .unwrap();
+
+    let bank_data: Bank = solana.get_account(tokens[2].bank).await;
+    assert!(bank_data.fallback_oracle == fallback_oracle);
+
+    // Create some token1 borrows
+    send_tx(
+        solana,
+        TokenWithdrawInstruction {
+            amount: 1_500,
+            allow_borrow: true,
+            account: order_placer.account,
+            owner,
+            token_account: payer_token_accounts[2],
+            bank_index: 0,
+        },
+    )
+    .await
+    .unwrap();
+
+    // Make oracle invalid by increasing deviation
+    send_tx(
+        solana,
+        StubOracleSetTestInstruction {
+            oracle: tokens[2].oracle,
+            group,
+            mint: tokens[2].mint.pubkey,
+            admin,
+            price: 1.0,
+            last_update_slot: 0,
+            deviation: 100.0,
+        },
+    )
+    .await
+    .unwrap();
+
+    //
+    // TEST: Place a failing order
+    //
+    let limit_price = 1.0;
+    let max_base = 100;
+    let order_fut = order_placer.try_bid(limit_price, max_base, false).await;
+    assert_mango_error(
+        &order_fut,
+        6023,
+        "an oracle does not reach the confidence threshold".to_string(),
+    );
+
+    // now send txn with a fallback oracle in the remaining accounts
+    let fallback_oracle_meta = AccountMeta {
+        pubkey: fallback_oracle,
+        is_writable: false,
+        is_signer: false,
+    };
+
+    let client_order_id = order_placer.inc_client_order_id();
+    let place_ix = Serum3PlaceOrderInstruction {
+        side: Serum3Side::Bid,
+        limit_price: (limit_price * 100.0 / 10.0) as u64, // in quote_lot (10) per base lot (100)
+        max_base_qty: max_base / 100,                     // in base lot (100)
+        // 4 bps taker fees added in
+        max_native_quote_qty_including_fees: (limit_price * (max_base as f64) * (1.0)).ceil()
+            as u64,
+        self_trade_behavior: Serum3SelfTradeBehavior::AbortTransaction,
+        order_type: Serum3OrderType::Limit,
+        client_order_id,
+        limit: 10,
+        account: order_placer.account,
+        owner: order_placer.owner,
+        serum_market: order_placer.serum_market,
+    };
+
+    let result = send_tx_with_extra_accounts(solana, place_ix, vec![fallback_oracle_meta])
+        .await
+        .unwrap();
+    result.result.unwrap();
+
+    let account_data = get_mango_account(solana, order_placer.account).await;
+    assert_eq!(
+        account_data
+            .token_position_by_raw_index(0)
+            .unwrap()
+            .in_use_count,
+        1
+    );
+    assert_eq!(
+        account_data
+            .token_position_by_raw_index(1)
+            .unwrap()
+            .in_use_count,
+        1
+    );
+    assert_eq!(
+        account_data
+            .token_position_by_raw_index(2)
+            .unwrap()
+            .in_use_count,
+        0
+    );
+    let serum_orders = account_data.serum3_orders_by_raw_index(0).unwrap();
+    assert_eq!(serum_orders.base_borrows_without_fee, 0);
+    assert_eq!(serum_orders.quote_borrows_without_fee, 0);
+    assert_eq!(serum_orders.potential_base_tokens, 100);
+    assert_eq!(serum_orders.potential_quote_tokens, 100);
+
+    let base_bank = solana.get_account::<Bank>(base_token.bank).await;
+    assert_eq!(base_bank.potential_serum_tokens, 100);
+    let quote_bank = solana.get_account::<Bank>(quote_token.bank).await;
+    assert_eq!(quote_bank.potential_serum_tokens, 100);
+    Ok(())
+}
+
+#[tokio::test]
+async fn test_serum_bands() -> Result<(), TransportError> {
+    let mut test_builder = TestContextBuilder::new();
+    test_builder.test().set_compute_max_units(150_000); // Serum3PlaceOrder needs lots
+    let context = test_builder.start_default().await;
+    let solana = &context.solana.clone();
+
+    //
+    // SETUP: Create a group, accounts, market etc
+    //
+    let deposit_amount = 10000;
+    let CommonSetup {
+        group_with_tokens,
+        mut order_placer,
+        quote_token,
+        base_token,
+        ..
+    } = common_setup(&context, deposit_amount).await;
+
+    //
+    // SETUP: Set oracle price for market to 100
+    //
+    set_bank_stub_oracle_price(
+        solana,
+        group_with_tokens.group,
+        &base_token,
+        group_with_tokens.admin,
+        200.0,
+    )
+    .await;
+    set_bank_stub_oracle_price(
+        solana,
+        group_with_tokens.group,
+        &quote_token,
+        group_with_tokens.admin,
+        2.0,
+    )
+    .await;
+
+    //
+    // TEST: can place way over/under oracle
+    //
+
+    order_placer.bid_maker(1.0, 100).await.unwrap();
+    order_placer.ask(200.0, 100).await.unwrap();
+    order_placer.cancel_all().await;
+
+    //
+    // TEST: Can't when bands are enabled
+    //
+    send_tx(
+        solana,
+        Serum3EditMarketInstruction {
+            group: group_with_tokens.group,
+            admin: group_with_tokens.admin,
+            market: order_placer.serum_market,
+            options: mango_v4::instruction::Serum3EditMarket {
+                oracle_price_band_opt: Some(0.5),
+                ..serum3_edit_market_instruction_default()
+            },
+        },
+    )
+    .await
+    .unwrap();
+
+    let r = order_placer.try_bid(65.0, 100, false).await;
+    assert!(r.is_err());
+    let r = order_placer.try_ask(151.0, 100).await;
+    assert!(r.is_err());
+
+    order_placer.try_bid(67.0, 100, false).await.unwrap();
+    order_placer.try_ask(149.0, 100).await.unwrap();
+
+    Ok(())
+}
+
+#[tokio::test]
+async fn test_serum_deposit_limits() -> Result<(), TransportError> {
+    let mut test_builder = TestContextBuilder::new();
+    test_builder.test().set_compute_max_units(150_000); // Serum3PlaceOrder needs lots
+    let context = test_builder.start_default().await;
+    let solana = &context.solana.clone();
+
+    //
+    // SETUP: Create a group, accounts, market etc
+    //
+    let deposit_amount = 5000; // for 10k tokens over both order_placers
+    let CommonSetup {
+        group_with_tokens,
+        mut order_placer,
+        quote_token,
+        base_token,
+        ..
+    } = common_setup2(&context, deposit_amount, 0).await;
+
+    //
+    // SETUP: Set oracle price for market to 2
+    //
+    set_bank_stub_oracle_price(
+        solana,
+        group_with_tokens.group,
+        &base_token,
+        group_with_tokens.admin,
+        4.0,
+    )
+    .await;
+    set_bank_stub_oracle_price(
+        solana,
+        group_with_tokens.group,
+        &quote_token,
+        group_with_tokens.admin,
+        2.0,
+    )
+    .await;
+
+    //
+    // SETUP: Base token: add deposit limit
+    //
+    send_tx(
+        solana,
+        TokenEdit {
+            group: group_with_tokens.group,
+            admin: group_with_tokens.admin,
+            mint: base_token.mint.pubkey,
+            fallback_oracle: Pubkey::default(),
+            options: mango_v4::instruction::TokenEdit {
+                deposit_limit_opt: Some(13000),
+                ..token_edit_instruction_default()
+            },
+        },
+    )
+    .await
+    .unwrap();
+
+    let solana2 = context.solana.clone();
+    let base_bank = base_token.bank;
+    let remaining_base = {
+        || async {
+            let b: Bank = solana2.get_account(base_bank).await;
+            b.remaining_deposits_until_limit().round().to_num::<u64>()
+        }
+    };
+
+    //
+    // TEST: even when placing all base tokens into an ask, they still count
+    //
+
+    order_placer.ask(2.0, 5000).await.unwrap();
+    assert_eq!(remaining_base().await, 3000);
+
+    //
+    // TEST: if we bid to buy more base, the limit reduces
+    //
+
+    order_placer.bid_maker(1.5, 1000).await.unwrap();
+    assert_eq!(remaining_base().await, 2000);
+
+    //
+    // TEST: if we bid too much for the limit, the order does not go through
+    //
+
+    let r = order_placer.try_bid(1.5, 2001, false).await;
+    assert_mango_error(&r, MangoError::BankDepositLimit.into(), "dep limit".into());
+    order_placer.try_bid(1.5, 1999, false).await.unwrap(); // not 2000 due to rounding
+
+    //
+    // SETUP: Switch deposit limit to quote token
+    //
+
+    send_tx(
+        solana,
+        TokenEdit {
+            group: group_with_tokens.group,
+            admin: group_with_tokens.admin,
+            mint: base_token.mint.pubkey,
+            fallback_oracle: Pubkey::default(),
+            options: mango_v4::instruction::TokenEdit {
+                deposit_limit_opt: Some(0),
+                ..token_edit_instruction_default()
+            },
+        },
+    )
+    .await
+    .unwrap();
+    send_tx(
+        solana,
+        TokenEdit {
+            group: group_with_tokens.group,
+            admin: group_with_tokens.admin,
+            mint: quote_token.mint.pubkey,
+            fallback_oracle: Pubkey::default(),
+            options: mango_v4::instruction::TokenEdit {
+                deposit_limit_opt: Some(13000),
+                ..token_edit_instruction_default()
+            },
+        },
+    )
+    .await
+    .unwrap();
+
+    let solana2 = context.solana.clone();
+    let quote_bank = quote_token.bank;
+    let remaining_quote = {
+        || async {
+            let b: Bank = solana2.get_account(quote_bank).await;
+            b.remaining_deposits_until_limit().round().to_num::<u64>()
+        }
+    };
+
+    order_placer.cancel_all().await;
+
+    //
+    // TEST: even when placing all quote tokens into a bid, they still count
+    //
+
+    order_placer.bid_maker(2.0, 2500).await.unwrap();
+    assert_eq!(remaining_quote().await, 3000);
+
+    //
+    // TEST: if we ask to get more quote, the limit reduces
+    //
+
+    order_placer.ask(5.0, 200).await.unwrap();
+    assert_eq!(remaining_quote().await, 2000);
+
+    //
+    // TEST: if we bid too much for the limit, the order does not go through
+    //
+
+    let r = order_placer.try_ask(5.0, 401).await;
+    assert_mango_error(&r, MangoError::BankDepositLimit.into(), "dep limit".into());
+    order_placer.try_ask(5.0, 399).await.unwrap(); // not 400 due to rounding
+
+    Ok(())
+}
+
 struct CommonSetup {
     group_with_tokens: GroupWithTokens,
     serum_market_cookie: SerumMarketCookie,
@@ -1491,6 +1920,14 @@ struct CommonSetup {
 }
 
 async fn common_setup(context: &TestContext, deposit_amount: u64) -> CommonSetup {
+    common_setup2(context, deposit_amount, 10000000).await
+}
+
+async fn common_setup2(
+    context: &TestContext,
+    deposit_amount: u64,
+    vault_funding: u64,
+) -> CommonSetup {
     let admin = TestKeypair::new();
     let owner = context.users[0].key;
     let payer = context.users[1].key;
@@ -1565,17 +2002,19 @@ async fn common_setup(context: &TestContext, deposit_amount: u64) -> CommonSetup
     )
     .await;
     // to have enough funds in the vaults
-    create_funded_account(
-        &solana,
-        group,
-        owner,
-        3,
-        &context.users[1],
-        mints,
-        10000000,
-        0,
-    )
-    .await;
+    if vault_funding > 0 {
+        create_funded_account(
+            &solana,
+            group,
+            owner,
+            3,
+            &context.users[1],
+            mints,
+            10000000,
+            0,
+        )
+        .await;
+    }
 
     let open_orders = mango_client::send_tx(
         solana,

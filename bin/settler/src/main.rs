@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
-use std::time::{Duration, Instant};
+use std::time::Duration;
 
 use anchor_client::Cluster;
 use clap::Parser;
@@ -125,15 +125,15 @@ async fn main() -> anyhow::Result<()> {
     let mango_oracles = group_context
         .tokens
         .values()
-        .map(|value| value.mint_info.oracle)
-        .chain(group_context.perp_markets.values().map(|p| p.market.oracle))
+        .map(|value| value.oracle)
+        .chain(group_context.perp_markets.values().map(|p| p.oracle))
         .unique()
         .collect::<Vec<Pubkey>>();
 
     let serum_programs = group_context
         .serum3_markets
         .values()
-        .map(|s3| s3.market.serum_program)
+        .map(|s3| s3.serum_program)
         .unique()
         .collect_vec();
 
@@ -216,15 +216,12 @@ async fn main() -> anyhow::Result<()> {
         mango_client: mango_client.clone(),
         account_fetcher: account_fetcher.clone(),
         config: tcs_start::Config {
-            persistent_error_min_duration: Duration::from_secs(300),
             persistent_error_report_interval: Duration::from_secs(300),
         },
-        errors: mango_v4_client::error_tracking::ErrorTracking {
-            skip_threshold: 2,
-            skip_duration: Duration::from_secs(60),
-            ..Default::default()
-        },
-        last_persistent_error_report: Instant::now(),
+        errors: mango_v4_client::error_tracking::ErrorTracking::builder()
+            .skip_threshold(2)
+            .skip_duration(Duration::from_secs(60))
+            .build()?,
     };
 
     info!("main loop");
@@ -337,10 +334,21 @@ async fn main() -> anyhow::Result<()> {
         }
     });
 
+    let check_changes_for_abort_job =
+        tokio::spawn(MangoClient::loop_check_for_context_changes_and_abort(
+            mango_client.clone(),
+            Duration::from_secs(300),
+        ));
+
     use futures::StreamExt;
-    let mut jobs: futures::stream::FuturesUnordered<_> = vec![data_job, settle_job, tcs_start_job]
-        .into_iter()
-        .collect();
+    let mut jobs: futures::stream::FuturesUnordered<_> = vec![
+        data_job,
+        settle_job,
+        tcs_start_job,
+        check_changes_for_abort_job,
+    ]
+    .into_iter()
+    .collect();
     jobs.next().await;
 
     error!("a critical job aborted, exiting");

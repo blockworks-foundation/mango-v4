@@ -5,7 +5,7 @@ use crate::error::MangoError;
 use crate::state::*;
 
 use crate::accounts_ix::*;
-use crate::logs::{emit_perp_balances, FillLogV3};
+use crate::logs::{emit_perp_balances, emit_stack, FillLogV3};
 
 /// Load a mango account by key from the list of account infos.
 ///
@@ -131,7 +131,7 @@ pub fn perp_consume_events(ctx: Context<PerpConsumeEvents>, limit: usize) -> Res
                     let taker_closed_pnl = taker_after_pnl - taker_before_pnl;
                     (maker_closed_pnl, taker_closed_pnl)
                 };
-                emit!(FillLogV3 {
+                emit_stack(FillLogV3 {
                     mango_group: group_key,
                     market_index: perp_market_index,
                     taker_side: fill.taker_side as u8,
@@ -149,13 +149,19 @@ pub fn perp_consume_events(ctx: Context<PerpConsumeEvents>, limit: usize) -> Res
                     price: fill.price,
                     quantity: fill.quantity,
                     maker_closed_pnl: maker_closed_pnl.to_num(),
-                    taker_closed_pnl: taker_closed_pnl.to_num()
+                    taker_closed_pnl: taker_closed_pnl.to_num(),
                 });
             }
             EventType::Out => {
                 let out: &OutEvent = cast_ref(event);
                 load_mango_account!(owner, out.owner, mango_account_ais, group, event_queue);
-                owner.remove_perp_order(out.owner_slot as usize, out.quantity)?;
+                owner.execute_perp_out_event(
+                    perp_market_index,
+                    out.side(),
+                    out.owner_slot as usize,
+                    out.quantity,
+                    out.order_id,
+                )?;
             }
             EventType::Liquidate => {
                 // This is purely for record keeping. Can be removed if program logs are superior

@@ -7,7 +7,7 @@ use crate::state::*;
 use crate::util::fill_from_str;
 
 use crate::accounts_ix::*;
-use crate::logs::PerpMarketMetaDataLog;
+use crate::logs::{emit_stack, PerpMarketMetaDataLog};
 
 #[allow(clippy::too_many_arguments)]
 pub fn perp_create_market(
@@ -95,8 +95,9 @@ pub fn perp_create_market(
         reserved: [0; 1880],
     };
 
+    let oracle_ref = &AccountInfoRef::borrow(ctx.accounts.oracle.as_ref())?;
     if let Ok(oracle_price) =
-        perp_market.oracle_price(&AccountInfoRef::borrow(ctx.accounts.oracle.as_ref())?, None)
+        perp_market.oracle_price(&OracleAccountInfos::from_reader(oracle_ref), None)
     {
         perp_market
             .stable_price_model
@@ -111,7 +112,7 @@ pub fn perp_create_market(
     };
     orderbook.init();
 
-    emit!(PerpMarketMetaDataLog {
+    emit_stack(PerpMarketMetaDataLog {
         mango_group: ctx.accounts.group.key(),
         perp_market: ctx.accounts.perp_market.key(),
         perp_market_index,

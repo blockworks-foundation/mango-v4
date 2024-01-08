@@ -11,6 +11,19 @@ const ignoredIx = ['tokenRegister', 'groupEdit', 'tokenEdit'];
 
 const emptyFieldPrefixes = ['padding', 'reserved'];
 
+const skippedErrors = [
+  // The account data layout moved from (v1 or v2) to the v3 layout for all accounts
+  ['AccountSize', 'MangoAccount', 440, 512],
+];
+
+function isAllowedError(errorTuple): boolean {
+  return !skippedErrors.some(
+    (a) =>
+      a.length == errorTuple.length &&
+      a.every((value, index) => value === errorTuple[index]),
+  );
+}
+
 function isEmptyField(name: string): boolean {
   return emptyFieldPrefixes.some((s) => name.startsWith(s));
 }
@@ -115,7 +128,10 @@ function main(): void {
 
     const oldSize = accountSize(oldIdl, oldAcc);
     const newSize = accountSize(newIdl, newAcc);
-    if (oldSize != newSize) {
+    if (
+      oldSize != newSize &&
+      isAllowedError(['AccountSize', oldAcc.name, oldSize, newSize])
+    ) {
       console.log(`Error: account '${oldAcc.name}' has changed size`);
       hasError = true;
     }
@@ -343,7 +359,7 @@ function typeSize(idl: Idl, ty: IdlType): number {
       return 32;
     default:
       if ('vec' in ty) {
-        return 1;
+        return 4;
       }
       if ('option' in ty) {
         return 1 + typeSize(idl, ty.option);

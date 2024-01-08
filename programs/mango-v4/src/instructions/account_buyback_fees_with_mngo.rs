@@ -7,7 +7,7 @@ use crate::state::*;
 
 use crate::accounts_ix::*;
 
-use crate::logs::{AccountBuybackFeesWithMngoLog, TokenBalanceLog};
+use crate::logs::{emit_stack, AccountBuybackFeesWithMngoLog, TokenBalanceLog};
 
 pub fn account_buyback_fees_with_mngo(
     ctx: Context<AccountBuybackFeesWithMngo>,
@@ -38,14 +38,16 @@ pub fn account_buyback_fees_with_mngo(
     let now_ts = clock.unix_timestamp.try_into().unwrap();
     let slot = clock.slot;
 
+    let mngo_oracle_ref = &AccountInfoRef::borrow(&ctx.accounts.mngo_oracle.as_ref())?;
     let mngo_oracle_price = mngo_bank.oracle_price(
-        &AccountInfoRef::borrow(&ctx.accounts.mngo_oracle.as_ref())?,
+        &OracleAccountInfos::from_reader(mngo_oracle_ref),
         Some(slot),
     )?;
     let mngo_asset_price = mngo_oracle_price.min(mngo_bank.stable_price());
 
+    let fees_oracle_ref = &AccountInfoRef::borrow(&ctx.accounts.fees_oracle.as_ref())?;
     let fees_oracle_price = fees_bank.oracle_price(
-        &AccountInfoRef::borrow(&ctx.accounts.fees_oracle.as_ref())?,
+        &OracleAccountInfos::from_reader(fees_oracle_ref),
         Some(slot),
     )?;
     let fees_liab_price = fees_oracle_price.max(fees_bank.stable_price());
@@ -105,7 +107,7 @@ pub fn account_buyback_fees_with_mngo(
     );
     let in_use =
         mngo_bank.withdraw_without_fee(account_mngo_token_position, max_buyback_mngo, now_ts)?;
-    emit!(TokenBalanceLog {
+    emit_stack(TokenBalanceLog {
         mango_group: ctx.accounts.group.key(),
         mango_account: ctx.accounts.account.key(),
         token_index: mngo_bank.token_index,
@@ -137,7 +139,7 @@ pub fn account_buyback_fees_with_mngo(
         );
     }
     let in_use = fees_bank.deposit(account_fees_token_position, max_buyback_fees, now_ts)?;
-    emit!(TokenBalanceLog {
+    emit_stack(TokenBalanceLog {
         mango_group: ctx.accounts.group.key(),
         mango_account: ctx.accounts.account.key(),
         token_index: fees_bank.token_index,
@@ -162,7 +164,7 @@ pub fn account_buyback_fees_with_mngo(
         max_buyback_fees,
     );
 
-    emit!(AccountBuybackFeesWithMngoLog {
+    emit_stack(AccountBuybackFeesWithMngoLog {
         mango_group: ctx.accounts.group.key(),
         mango_account: ctx.accounts.account.key(),
         buyback_fees: max_buyback_fees.to_bits(),

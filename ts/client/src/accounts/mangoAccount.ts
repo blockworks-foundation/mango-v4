@@ -52,8 +52,8 @@ export class MangoAccount {
       openbookV2: unknown;
       perps: unknown;
       perpOpenOrders: unknown;
+      tokenConditionalSwaps: unknown;
     },
-    tokenConditionalSwaps: TokenConditionalSwapDto[],
   ): MangoAccount {
     return new MangoAccount(
       publicKey,
@@ -77,7 +77,7 @@ export class MangoAccount {
       obj.openbookV2 as OpenbookV2PositionDto[],
       obj.perps as PerpPositionDto[],
       obj.perpOpenOrders as PerpOoDto[],
-      tokenConditionalSwaps,
+      obj.tokenConditionalSwaps as TokenConditionalSwapDto[],
       new Map(), // serum3OosMapByMarketIndex
       new Map(), // openbookV2OosMapByMarketIndex
     );
@@ -259,7 +259,7 @@ export class MangoAccount {
   }
 
   public tokenConditionalSwapsActive(): TokenConditionalSwap[] {
-    return this.tokenConditionalSwaps.filter((tcs) => tcs.hasData);
+    return this.tokenConditionalSwaps.filter((tcs) => tcs.isConfigured);
   }
 
   public perpPositionExistsForMarket(perpMarket: PerpMarket): boolean {
@@ -1348,6 +1348,8 @@ export class Serum3Orders {
       dto.quoteTokenIndex as TokenIndex,
       dto.highestPlacedBidInv,
       dto.lowestPlacedAsk,
+      // dto.baseDepositsReserved.toNumber(),
+      // dto.quoteDepositsReserved.toNumber(),
     );
   }
 
@@ -1357,7 +1359,7 @@ export class Serum3Orders {
     public baseTokenIndex: TokenIndex,
     public quoteTokenIndex: TokenIndex,
     public highestPlacedBidInv: number,
-    public lowestPlacedAsk: number,
+    public lowestPlacedAsk: number, // public baseDepositsReserved: number, // public quoteDepositsReserved: number,
   ) {}
 
   public isActive(): boolean {
@@ -1402,6 +1404,8 @@ export class Serum3PositionDto {
     public quoteTokenIndex: number,
     public highestPlacedBidInv: number,
     public lowestPlacedAsk: number,
+    // public baseDepositsReserved: BN,
+    // public quoteDepositsReserved: BN,
     public reserved: number[],
   ) {}
 }
@@ -2020,7 +2024,7 @@ export class TokenConditionalSwap {
       dto.makerFeeRate,
       dto.buyTokenIndex as TokenIndex,
       dto.sellTokenIndex as TokenIndex,
-      dto.hasData == 1,
+      dto.isConfigured == 1,
       dto.allowCreatingDeposits == 1,
       dto.allowCreatingBorrows == 1,
       dto.displayPriceStyle == 0
@@ -2044,7 +2048,7 @@ export class TokenConditionalSwap {
     public makerFeeRate: number,
     public buyTokenIndex: TokenIndex,
     public sellTokenIndex: TokenIndex,
-    public hasData: boolean,
+    public isConfigured: boolean,
     public allowCreatingDeposits: boolean,
     public allowCreatingBorrows: boolean,
     public priceDisplayStyle: TokenConditionalSwapDisplayPriceStyle,
@@ -2267,7 +2271,7 @@ export class TokenConditionalSwapDto {
     public makerFeeRate: number,
     public buyTokenIndex: number,
     public sellTokenIndex: number,
-    public hasData: number,
+    public isConfigured: number,
     public allowCreatingDeposits: number,
     public allowCreatingBorrows: number,
     public displayPriceStyle: number,

@@ -52,7 +52,7 @@ async function updateBanks(client: MangoClient, group: Group): Promise<void> {
         );
 
         console.log(
-          ` - Token update index and rate success, tokenIndices - ${tokenIndices}, sig https://explorer.solana.com/tx/${sig}`,
+          ` - Token update index and rate success, tokenIndices - ${tokenIndices}, sig https://explorer.solana.com/tx/${sig.signature}`,
         );
       } catch (e) {
         console.log(
@@ -104,7 +104,7 @@ async function consumeEvents(client: MangoClient, group: Group): Promise<void> {
           );
 
           console.log(
-            ` - Consume events success, perpMarketIndex - ${perpMarketIndex}, sig https://explorer.solana.com/tx/${sig}`,
+            ` - Consume events success, perpMarketIndex - ${perpMarketIndex}, sig https://explorer.solana.com/tx/${sig.signature}`,
           );
         } catch (e) {
           console.log(
@@ -126,7 +126,7 @@ async function updateFunding(client: MangoClient, group: Group): Promise<void> {
     );
     for (const perpMarketIndex of perpMarketIndices) {
       try {
-        const sig = await sendTransaction(
+        const status = await sendTransaction(
           client.program.provider as AnchorProvider,
           [
             await client.perpUpdateFundingIx(
@@ -139,7 +139,7 @@ async function updateFunding(client: MangoClient, group: Group): Promise<void> {
         );
 
         console.log(
-          ` - Update funding success, perpMarketIndex - ${perpMarketIndex}, sig https://explorer.solana.com/tx/${sig}`,
+          ` - Update funding success, perpMarketIndex - ${perpMarketIndex}, sig https://explorer.solana.com/tx/${status.signature}`,
         );
       } catch (e) {
         console.log(

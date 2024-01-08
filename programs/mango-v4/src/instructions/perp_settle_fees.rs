@@ -8,7 +8,7 @@ use crate::health::{compute_health, new_fixed_order_account_retriever, HealthTyp
 use crate::state::*;
 
 use crate::accounts_ix::*;
-use crate::logs::{emit_perp_balances, PerpSettleFeesLog, TokenBalanceLog};
+use crate::logs::{emit_perp_balances, emit_stack, PerpSettleFeesLog, TokenBalanceLog};
 
 pub fn perp_settle_fees(ctx: Context<PerpSettleFees>, max_settle_amount: u64) -> Result<()> {
     // max_settle_amount must greater than zero
@@ -29,12 +29,14 @@ pub fn perp_settle_fees(ctx: Context<PerpSettleFees>, max_settle_amount: u64) ->
     );
 
     // Get oracle prices
+    let oracle_ref = &AccountInfoRef::borrow(ctx.accounts.oracle.as_ref())?;
     let oracle_price = perp_market.oracle_price(
-        &AccountInfoRef::borrow(ctx.accounts.oracle.as_ref())?,
+        &OracleAccountInfos::from_reader(oracle_ref),
         None, // staleness checked in health
     )?;
+    let settle_oracle_ref = &AccountInfoRef::borrow(ctx.accounts.settle_oracle.as_ref())?;
     let settle_token_oracle_price = settle_bank.oracle_price(
-        &AccountInfoRef::borrow(ctx.accounts.settle_oracle.as_ref())?,
+        &OracleAccountInfos::from_reader(settle_oracle_ref),
         None, // staleness checked in health
     )?;
 
@@ -100,7 +102,7 @@ pub fn perp_settle_fees(ctx: Context<PerpSettleFees>, max_settle_amount: u64) ->
     // Update the settled balance on the market itself
     perp_market.fees_settled += settlement;
 
-    emit!(TokenBalanceLog {
+    emit_stack(TokenBalanceLog {
         mango_group: ctx.accounts.group.key(),
         mango_account: ctx.accounts.account.key(),
         token_index: perp_market.settle_token_index,
@@ -109,7 +111,7 @@ pub fn perp_settle_fees(ctx: Context<PerpSettleFees>, max_settle_amount: u64) ->
         borrow_index: settle_bank.borrow_index.to_bits(),
     });
 
-    emit!(PerpSettleFeesLog {
+    emit_stack(PerpSettleFeesLog {
         mango_group: ctx.accounts.group.key(),
         mango_account: ctx.accounts.account.key(),
         perp_market_index: perp_market.perp_market_index,

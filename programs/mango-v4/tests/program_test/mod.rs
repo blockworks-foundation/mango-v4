@@ -157,12 +157,16 @@ impl TestContextBuilder {
             // ~~ 1 trillion in case of 6 decimals
             let mut token_accounts = Vec::new();
             for mint_index in 0..mints.len() {
-                let token_key = Pubkey::new_unique();
+                let mint = mints[mint_index].pubkey;
+                let token_key = anchor_spl::associated_token::get_associated_token_address(
+                    &user_key.pubkey(),
+                    &mint,
+                );
                 self.test.add_packable_account(
                     token_key,
                     u32::MAX as u64,
                     &spl_token::state::Account {
-                        mint: mints[mint_index].pubkey,
+                        mint,
                         owner: user_key.pubkey(),
                         amount: 1_000_000_000_000_000_000,
                         state: spl_token::state::AccountState::Initialized,

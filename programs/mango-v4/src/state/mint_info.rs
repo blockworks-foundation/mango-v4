@@ -33,8 +33,10 @@ pub struct MintInfo {
 
     pub registration_time: u64,
 
+    pub fallback_oracle: Pubkey,
+
     #[derivative(Debug = "ignore")]
-    pub reserved: [u8; 2560],
+    pub reserved: [u8; 2528],
 }
 const_assert_eq!(
     size_of::<MintInfo>(),

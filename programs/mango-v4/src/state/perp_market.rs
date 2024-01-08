@@ -4,16 +4,20 @@ use anchor_lang::prelude::*;
 use derivative::Derivative;
 use fixed::types::I80F48;
 
+use oracle::oracle_log_context;
 use static_assertions::const_assert_eq;
 
 use crate::accounts_zerocopy::KeyedAccountReader;
-use crate::error::MangoError;
-use crate::logs::PerpUpdateFundingLogV2;
+use crate::error::{Contextable, MangoError};
+use crate::logs::{emit_stack, PerpUpdateFundingLogV2};
 use crate::state::orderbook::Side;
 use crate::state::{oracle, TokenIndex};
 use crate::util;
 
-use super::{orderbook, OracleConfig, OracleState, Orderbook, StablePriceModel, DAY_I80F48};
+use super::{
+    orderbook, OracleAccountInfos, OracleConfig, OracleState, Orderbook, StablePriceModel,
+    DAY_I80F48,
+};
 
 pub type PerpMarketIndex = u16;
 
@@ -260,26 +264,26 @@ impl PerpMarket {
         orderbook::new_node_key(side, price_data, self.seq_num)
     }
 
-    pub fn oracle_price(
+    pub fn oracle_price<T: KeyedAccountReader>(
         &self,
-        oracle_acc: &impl KeyedAccountReader,
+        oracle_acc_infos: &OracleAccountInfos<T>,
         staleness_slot: Option<u64>,
     ) -> Result<I80F48> {
-        Ok(self.oracle_state(oracle_acc, staleness_slot)?.price)
+        Ok(self.oracle_state(oracle_acc_infos, staleness_slot)?.price)
     }
 
-    pub fn oracle_state(
+    pub fn oracle_state<T: KeyedAccountReader>(
         &self,
-        oracle_acc: &impl KeyedAccountReader,
+        oracle_acc_infos: &OracleAccountInfos<T>,
         staleness_slot: Option<u64>,
     ) -> Result<OracleState> {
-        require_keys_eq!(self.oracle, *oracle_acc.key());
-        let state = oracle::oracle_state_unchecked(oracle_acc, self.base_decimals)?;
-        state.check_confidence_and_maybe_staleness(
-            &self.oracle,
-            &self.oracle_config,
-            staleness_slot,
-        )?;
+        require_keys_eq!(self.oracle, *oracle_acc_infos.oracle.key());
+        let state = oracle::oracle_state_unchecked(oracle_acc_infos, self.base_decimals)?;
+        state
+            .check_confidence_and_maybe_staleness(&self.oracle_config, staleness_slot)
+            .with_context(|| {
+                oracle_log_context(self.name(), &state, &self.oracle_config, staleness_slot)
+            })?;
         Ok(state)
     }
 
@@ -343,7 +347,7 @@ impl PerpMarket {
         self.stable_price_model
             .update(now_ts, oracle_price.to_num());
 
-        emit!(PerpUpdateFundingLogV2 {
+        emit_stack(PerpUpdateFundingLogV2 {
             mango_group: self.group,
             market_index: self.perp_market_index,
             long_funding: self.long_funding.to_bits(),

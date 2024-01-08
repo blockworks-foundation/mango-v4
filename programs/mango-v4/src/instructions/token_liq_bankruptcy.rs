@@ -9,7 +9,8 @@ use crate::state::*;
 
 use crate::accounts_ix::*;
 use crate::logs::{
-    LoanOriginationFeeInstruction, TokenBalanceLog, TokenLiqBankruptcyLog, WithdrawLoanLog,
+    emit_stack, LoanOriginationFeeInstruction, TokenBalanceLog, TokenLiqBankruptcyLog,
+    WithdrawLoanLog,
 };
 
 pub fn token_liq_bankruptcy(
@@ -137,7 +138,7 @@ pub fn token_liq_bankruptcy(
                 quote_bank.deposit(liqor_quote, insurance_transfer_i80f48, now_ts)?;
 
             // liqor quote
-            emit!(TokenBalanceLog {
+            emit_stack(TokenBalanceLog {
                 mango_group: ctx.accounts.group.key(),
                 mango_account: ctx.accounts.liqor.key(),
                 token_index: INSURANCE_TOKEN_INDEX,
@@ -153,7 +154,7 @@ pub fn token_liq_bankruptcy(
                 liab_bank.withdraw_with_fee(liqor_liab, liab_transfer, now_ts)?;
 
             // liqor liab
-            emit!(TokenBalanceLog {
+            emit_stack(TokenBalanceLog {
                 mango_group: ctx.accounts.group.key(),
                 mango_account: ctx.accounts.liqor.key(),
                 token_index: liab_token_index,
@@ -177,14 +178,14 @@ pub fn token_liq_bankruptcy(
                 .loan_origination_fee
                 .is_positive()
             {
-                emit!(WithdrawLoanLog {
+                emit_stack(WithdrawLoanLog {
                     mango_group: ctx.accounts.group.key(),
                     mango_account: ctx.accounts.liqor.key(),
                     token_index: liab_token_index,
                     loan_amount: liqor_liab_withdraw_result.loan_amount.to_bits(),
                     loan_origination_fee: liqor_liab_withdraw_result.loan_origination_fee.to_bits(),
                     instruction: LoanOriginationFeeInstruction::LiqTokenBankruptcy,
-                    price: Some(liab_oracle_price.to_bits())
+                    price: Some(liab_oracle_price.to_bits()),
                 });
             }
 
@@ -256,7 +257,7 @@ pub fn token_liq_bankruptcy(
     }
 
     // liqee liab
-    emit!(TokenBalanceLog {
+    emit_stack(TokenBalanceLog {
         mango_group: ctx.accounts.group.key(),
         mango_account: ctx.accounts.liqee.key(),
         token_index: liab_token_index,
@@ -279,7 +280,7 @@ pub fn token_liq_bankruptcy(
         liqee.deactivate_token_position_and_log(liqee_raw_token_index, ctx.accounts.liqee.key());
     }
 
-    emit!(TokenLiqBankruptcyLog {
+    emit_stack(TokenLiqBankruptcyLog {
         mango_group: ctx.accounts.group.key(),
         liqee: ctx.accounts.liqee.key(),
         liqor: ctx.accounts.liqor.key(),
@@ -290,7 +291,7 @@ pub fn token_liq_bankruptcy(
         insurance_transfer: insurance_transfer_i80f48.to_bits(),
         socialized_loss: socialized_loss.to_bits(),
         starting_liab_deposit_index: starting_deposit_index.to_bits(),
-        ending_liab_deposit_index: liab_deposit_index.to_bits()
+        ending_liab_deposit_index: liab_deposit_index.to_bits(),
     });
 
     Ok(())

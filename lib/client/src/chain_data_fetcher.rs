@@ -8,7 +8,7 @@ use anchor_lang::Discriminator;
 
 use fixed::types::I80F48;
 use mango_v4::accounts_zerocopy::{KeyedAccountSharedData, LoadZeroCopy};
-use mango_v4::state::{Bank, MangoAccount, MangoAccountValue};
+use mango_v4::state::{Bank, MangoAccount, MangoAccountValue, OracleAccountInfos};
 
 use anyhow::Context;
 
@@ -65,7 +65,8 @@ impl AccountFetcher {
     pub fn fetch_bank_and_price(&self, bank: &Pubkey) -> anyhow::Result<(Bank, I80F48)> {
         let bank: Bank = self.fetch(bank)?;
         let oracle = self.fetch_raw(&bank.oracle)?;
-        let price = bank.oracle_price(&KeyedAccountSharedData::new(bank.oracle, oracle), None)?;
+        let oracle_acc = &KeyedAccountSharedData::new(bank.oracle, oracle.into());
+        let price = bank.oracle_price(&OracleAccountInfos::from_reader(oracle_acc), None)?;
         Ok((bank, price))
     }
 

@@ -10,10 +10,13 @@ mod chain_data_fetcher;
 mod client;
 mod context;
 pub mod error_tracking;
-mod gpa;
+pub mod gpa;
 pub mod health_cache;
 pub mod jupiter;
 pub mod perp_pnl;
 pub mod snapshot_source;
 mod util;
 pub mod websocket_source;
+
+#[macro_use]
+extern crate derive_builder;

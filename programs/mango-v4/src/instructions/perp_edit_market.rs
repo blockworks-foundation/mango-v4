@@ -4,7 +4,7 @@ use anchor_lang::prelude::*;
 use fixed::types::I80F48;
 
 use crate::accounts_ix::*;
-use crate::logs::PerpMarketMetaDataLog;
+use crate::logs::{emit_stack, PerpMarketMetaDataLog};
 
 #[allow(clippy::too_many_arguments)]
 pub fn perp_edit_market(
@@ -65,8 +65,9 @@ pub fn perp_edit_market(
     if reset_stable_price {
         msg!("Stable price reset");
         require_keys_eq!(perp_market.oracle, ctx.accounts.oracle.key());
-        let oracle_price = perp_market
-            .oracle_price(&AccountInfoRef::borrow(ctx.accounts.oracle.as_ref())?, None)?;
+        let oracle_ref = &AccountInfoRef::borrow(ctx.accounts.oracle.as_ref())?;
+        let oracle_price =
+            perp_market.oracle_price(&OracleAccountInfos::from_reader(oracle_ref), None)?;
         perp_market.stable_price_model.reset_to_price(
             oracle_price.to_num(),
             Clock::get()?.unix_timestamp.try_into().unwrap(),
@@ -358,7 +359,7 @@ pub fn perp_edit_market(
         );
     }
 
-    emit!(PerpMarketMetaDataLog {
+    emit_stack(PerpMarketMetaDataLog {
         mango_group: ctx.accounts.group.key(),
         perp_market: ctx.accounts.perp_market.key(),
         perp_market_index: perp_market.perp_market_index,

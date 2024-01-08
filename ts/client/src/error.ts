@@ -2,6 +2,9 @@ import { Connection } from '@solana/web3.js';
 import { JUPITER } from './constants';
 
 export enum TransactionErrors {
+  MangoNoFreeTokenPositionIndex,
+  MangoNoFreeSerum3OpenOrdersIndex,
+  MangoNoFreePerpPositionIndex,
   // Slippage incurred was higher than user expected
   JupiterSlippageToleranceExceeded,
   Unknown,
@@ -25,6 +28,25 @@ export async function parseTxForKnownErrors(
   });
 
   if (tx && tx.meta && tx.meta.logMessages) {
+    if (
+      tx.meta.logMessages.some((msg) =>
+        msg.includes('NoFreeTokenPositionIndex'),
+      )
+    ) {
+      return TransactionErrors.MangoNoFreeTokenPositionIndex;
+    }
+    if (
+      tx.meta.logMessages.some((msg) =>
+        msg.includes('NoFreeSerum3OpenOrdersIndex'),
+      )
+    ) {
+      return TransactionErrors.MangoNoFreeSerum3OpenOrdersIndex;
+    }
+    if (
+      tx.meta.logMessages.some((msg) => msg.includes('NoFreePerpPositionIndex'))
+    ) {
+      return TransactionErrors.MangoNoFreePerpPositionIndex;
+    }
     if (
       tx.meta.logMessages.some((msg) =>
         msg.includes('SlippageToleranceExceeded'),

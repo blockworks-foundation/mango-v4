@@ -31,11 +31,10 @@ pub enum Serum3Side {
     Ask = 1,
 }
 
+// Used for Serum3PlaceOrder v1 and v2
 #[derive(Accounts)]
 pub struct Serum3PlaceOrder<'info> {
-    #[account(
-        constraint = group.load()?.is_ix_enabled(IxGate::Serum3PlaceOrder) @ MangoError::IxIsDisabled,
-    )]
+    // ix gate check is done at #4
     pub group: AccountLoader<'info, Group>,
 
     #[account(

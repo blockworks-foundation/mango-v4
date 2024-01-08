@@ -295,8 +295,8 @@ impl SpotInfo {
         quote_info_index: usize,
     ) -> Self {
         // track the reserved amounts
-        let reserved_base = I80F48::from(open_orders.base_deposits_reserved);
-        let reserved_quote = I80F48::from(open_orders.quote_deposits_reserved);
+        let reserved_base = I80F48::from(open_orders.potential_base_tokens);
+        let reserved_quote = I80F48::from(open_orders.potential_quote_tokens);
 
         let reserved_base_as_quote_lowest_ask =
             reserved_base * I80F48::from_num(open_orders.lowest_placed_ask);
@@ -1325,7 +1325,7 @@ fn new_health_cache_impl(
     skip_bad_oracles: bool,
 ) -> Result<HealthCache> {
     // token contribution from token accounts
-    let mut token_infos = vec![];
+    let mut token_infos = Vec::with_capacity(account.active_token_positions().count());
 
     for (i, position) in account.active_token_positions().enumerate() {
         let bank_oracle_result =
@@ -1364,7 +1364,7 @@ fn new_health_cache_impl(
     }
 
     // Fill the TokenInfo balance with free funds in serum3 and openbook v2 oo accounts and build Spot3Infos.
-    let mut spot_infos = vec![];
+    let mut spot_infos = Vec::with_capacity(account.active_serum3_orders().count() + account.active_openbook_v2_orders().count());
     for (i, serum_account) in account.active_serum3_orders().enumerate() {
         let oo = retriever.serum_oo(i, &serum_account.open_orders)?;
 
@@ -1389,15 +1389,6 @@ fn new_health_cache_impl(
         ));
     }
     for (i, open_orders_account) in account.active_openbook_v2_orders().enumerate() {
-        println!(
-            "active oboo {} {} {} {} {} {}",
-            i,
-            open_orders_account.market_index,
-            open_orders_account.base_deposits_reserved,
-            open_orders_account.quote_deposits_reserved,
-            open_orders_account.lowest_placed_ask,
-            open_orders_account.highest_placed_bid_inv,
-        );
         let oo = retriever.openbook_oo(i, &open_orders_account.open_orders)?;
 
         // find the TokenInfos for the market's base and quote tokens
@@ -1550,8 +1541,8 @@ mod tests {
         openbookv2account.open_orders = oo2.pubkey;
         openbookv2account.base_token_index = 4;
         openbookv2account.quote_token_index = 0;
-        openbookv2account.quote_deposits_reserved = 20;
-        openbookv2account.base_deposits_reserved = 15;
+        openbookv2account.potential_quote_tokens = 20;
+        openbookv2account.potential_base_tokens = 15;
         openbookv2account.market_index = 2;
         oo2.data().position.quote_free_native = 1;
         oo2.data().position.base_free_native = 3;
@@ -1602,7 +1593,7 @@ mod tests {
         borrows: u64,
         deposit_weight_scale_start_quote: u64,
         borrow_weight_scale_start_quote: u64,
-        deposits_in_serum: i64,
+        potential_serum_tokens: u64,
     }
 
     #[derive(Default)]
@@ -1658,7 +1649,7 @@ mod tests {
             let bank = bank.data();
             bank.indexed_deposits = I80F48::from(settings.deposits) / bank.deposit_index;
             bank.indexed_borrows = I80F48::from(settings.borrows) / bank.borrow_index;
-            bank.deposits_in_serum = settings.deposits_in_serum;
+            bank.potential_serum_tokens = settings.potential_serum_tokens;
             if settings.deposit_weight_scale_start_quote > 0 {
                 bank.deposit_weight_scale_start_quote =
                     settings.deposit_weight_scale_start_quote as f64;
@@ -1974,7 +1965,7 @@ mod tests {
                 ..Default::default()
             },
             TestHealth1Case {
-                // 17, deposits_in_serum counts for deposit weight scaling
+                // 17, potential_serum_tokens counts for deposit weight scaling
                 token1: 100,
                 token2: 100,
                 token3: 100,
@@ -1987,13 +1978,13 @@ mod tests {
                     BankSettings {
                         deposits: 100,
                         deposit_weight_scale_start_quote: 100 * 5,
-                        deposits_in_serum: 100,
+                        potential_serum_tokens: 100,
                         ..BankSettings::default()
                     },
                     BankSettings {
                         deposits: 600,
                         deposit_weight_scale_start_quote: 500 * 10,
-                        deposits_in_serum: 100,
+                        potential_serum_tokens: 100,
                         ..BankSettings::default()
                     },
                 ],

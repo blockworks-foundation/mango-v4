@@ -1439,6 +1439,160 @@ async fn test_perp_compute() -> Result<(), TransportError> {
     Ok(())
 }
 
+#[tokio::test]
+async fn test_perp_cancel_with_in_flight_events() -> Result<(), TransportError> {
+    let context = TestContext::new().await;
+    let solana = &context.solana.clone();
+
+    let admin = TestKeypair::new();
+    let owner = context.users[0].key;
+    let payer = context.users[1].key;
+    let mints = &context.mints[0..2];
+
+    //
+    // SETUP: Create a group and an account
+    //
+
+    let GroupWithTokens { group, tokens, .. } = GroupWithTokensConfig {
+        admin,
+        payer,
+        mints: mints.to_vec(),
+        ..GroupWithTokensConfig::default()
+    }
+    .create(solana)
+    .await;
+
+    let deposit_amount = 1000;
+    let account_0 = create_funded_account(
+        &solana,
+        group,
+        owner,
+        0,
+        &context.users[1],
+        mints,
+        deposit_amount,
+        0,
+    )
+    .await;
+    let account_1 = create_funded_account(
+        &solana,
+        group,
+        owner,
+        1,
+        &context.users[1],
+        mints,
+        deposit_amount,
+        0,
+    )
+    .await;
+
+    //
+    // SETUP: Create a perp market
+    //
+    let mango_v4::accounts::PerpCreateMarket { perp_market, .. } = send_tx(
+        solana,
+        PerpCreateMarketInstruction {
+            group,
+            admin,
+            payer,
+            perp_market_index: 0,
+            quote_lot_size: 10,
+            base_lot_size: 100,
+            maint_base_asset_weight: 0.975,
+            init_base_asset_weight: 0.95,
+            maint_base_liab_weight: 1.025,
+            init_base_liab_weight: 1.05,
+            base_liquidation_fee: 0.012,
+            maker_fee: 0.0000,
+            taker_fee: 0.0000,
+            settle_pnl_limit_factor: -1.0,
+            settle_pnl_limit_window_size_ts: 24 * 60 * 60,
+            ..PerpCreateMarketInstruction::with_new_book_and_queue(&solana, &tokens[1]).await
+        },
+    )
+    .await
+    .unwrap();
+
+    let perp_market_data = solana.get_account::<PerpMarket>(perp_market).await;
+    let price_lots = perp_market_data.native_price_to_lot(I80F48::from(1));
+
+    //
+    // SETUP: Place a bid, a matching ask, generating a closing fill event
+    //
+    send_tx(
+        solana,
+        PerpPlaceOrderInstruction {
+            account: account_0,
+            perp_market,
+            owner,
+            side: Side::Bid,
+            price_lots,
+            max_base_lots: 2,
+            client_order_id: 5,
+            ..PerpPlaceOrderInstruction::default()
+        },
+    )
+    .await
+    .unwrap();
+
+    send_tx(
+        solana,
+        PerpPlaceOrderInstruction {
+            account: account_1,
+            perp_market,
+            owner,
+            side: Side::Ask,
+            price_lots,
+            max_base_lots: 2,
+            client_order_id: 6,
+            ..PerpPlaceOrderInstruction::default()
+        },
+    )
+    .await
+    .unwrap();
+
+    //
+    // TEST: it's possible to cancel, freeing up the user's oo slot
+    //
+
+    send_tx(
+        solana,
+        PerpCancelAllOrdersInstruction {
+            account: account_0,
+            perp_market,
+            owner,
+            limit: 10,
+        },
+    )
+    .await
+    .unwrap();
+
+    let mango_account_0 = solana.get_account::<MangoAccount>(account_0).await;
+    let perp_0 = mango_account_0.perps[0];
+    assert_eq!(perp_0.bids_base_lots, 2);
+    assert!(!mango_account_0.perp_open_orders[0].is_active());
+
+    //
+    // TEST: consuming the event updates the perp account state
+    //
+
+    send_tx(
+        solana,
+        PerpConsumeEventsInstruction {
+            perp_market,
+            mango_accounts: vec![account_0, account_1],
+        },
+    )
+    .await
+    .unwrap();
+
+    let mango_account_0 = solana.get_account::<MangoAccount>(account_0).await;
+    let perp_0 = mango_account_0.perps[0];
+    assert_eq!(perp_0.bids_base_lots, 0);
+
+    Ok(())
+}
+
 async fn assert_no_perp_orders(solana: &SolanaCookie, account_0: Pubkey) {
     let mango_account_0 = solana.get_account::<MangoAccount>(account_0).await;
 

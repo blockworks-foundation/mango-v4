@@ -28,13 +28,12 @@ pub async fn fetch_top(
     let perp = context.perp(perp_market_index);
     let perp_market =
         account_fetcher_fetch_anchor_account::<PerpMarket>(account_fetcher, &perp.address).await?;
-    let oracle_acc = account_fetcher
+    let oracle = account_fetcher
         .fetch_raw_account(&perp_market.oracle)
         .await?;
-    let oracle_price = perp_market.oracle_price(
-        &KeyedAccountSharedData::new(perp_market.oracle, oracle_acc),
-        None,
-    )?;
+    let oracle_acc = &KeyedAccountSharedData::new(perp.oracle, oracle.into());
+    let oracle_price =
+        perp_market.oracle_price(&&OracleAccountInfos::from_reader(oracle_acc), None)?;
 
     let accounts = account_fetcher
         .fetch_program_accounts(&mango_v4::id(), MangoAccount::discriminator())

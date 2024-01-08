@@ -1,11 +1,11 @@
-use crate::accounts_zerocopy::AccountInfoRef;
+use crate::accounts_zerocopy::*;
 use crate::error::*;
 use crate::health::*;
 use crate::i80f48::ClampToInt;
 use crate::state::*;
 
 use crate::accounts_ix::*;
-use crate::logs::{Serum3OpenOrdersBalanceLogV2, TokenBalanceLog};
+use crate::logs::{emit_stack, Serum3OpenOrdersBalanceLogV2, TokenBalanceLog};
 use crate::serum3_cpi::{
     load_market_state, load_open_orders_ref, OpenOrdersAmounts, OpenOrdersSlim,
 };
@@ -25,6 +25,7 @@ pub fn serum3_place_order(
     order_type: Serum3OrderType,
     client_order_id: u64,
     limit: u16,
+    require_v2: bool,
 ) -> Result<()> {
     // Also required by serum3's place order
     require_gt!(limit_price_lots, 0);
@@ -87,17 +88,51 @@ pub fn serum3_place_order(
     };
 
     // Check if the bank for the token whose balance is increased is in reduce-only mode
-    let receiver_bank_reduce_only = {
+    let receiver_bank_ai;
+    let receiver_bank_oracle;
+    let receiver_bank_reduce_only;
+    {
         // The token position already exists, but we need the active_index.
         let (_, _, active_index) = account.ensure_token_position(receiver_token_index)?;
         let group_key = ctx.accounts.group.key();
-        let receiver_bank = retriever
-            .bank_and_oracle(&group_key, active_index, receiver_token_index)?
-            .0;
-        receiver_bank.are_deposits_reduce_only()
-    };
+        let (receiver_bank, oracle) =
+            retriever.bank_and_oracle(&group_key, active_index, receiver_token_index)?;
+        receiver_bank_oracle = oracle;
+        receiver_bank_reduce_only = receiver_bank.are_deposits_reduce_only();
+
+        // The fixed_order account retriever can't give us mut references, so use the above
+        // call to .bank_and_oracle() as validation and then copy out the matching AccountInfo.
+        receiver_bank_ai = ctx.remaining_accounts[active_index].clone();
+        // Double-check that we got the right account
+        let receiver_bank2 = receiver_bank_ai.load::<Bank>()?;
+        assert_eq!(receiver_bank2.group, group_key);
+        assert_eq!(receiver_bank2.token_index, receiver_token_index);
+    }
 
     drop(retriever);
+
+    //
+    // Instruction version checking #4
+    //
+    let is_v2_instruction;
+    {
+        let group = ctx.accounts.group.load()?;
+        let v1_available = group.is_ix_enabled(IxGate::Serum3PlaceOrder);
+        let v2_available = group.is_ix_enabled(IxGate::Serum3PlaceOrderV2);
+        is_v2_instruction =
+            require_v2 || !v1_available || (receiver_bank_ai.is_writable && v2_available);
+        if is_v2_instruction {
+            require!(v2_available, MangoError::IxIsDisabled);
+            require_msg_typed!(
+                receiver_bank_ai.is_writable,
+                MangoError::HealthAccountBankNotWritable,
+                "the receiver bank (token index {}) in the health account list must be writable",
+                receiver_token_index
+            );
+        } else {
+            require!(v1_available, MangoError::IxIsDisabled);
+        }
+    }
 
     //
     // Before-order tracking
@@ -185,38 +220,50 @@ pub fn serum3_place_order(
     if !before_had_bids {
         // The 0 state means uninitialized/no value
         serum.highest_placed_bid_inv = 0.0;
+        serum.lowest_placed_bid_inv = 0.0;
     }
     if !before_had_asks {
         serum.lowest_placed_ask = 0.0;
+        serum.highest_placed_ask = 0.0;
     }
+    // in the normal quote per base units
+    let limit_price = limit_price_lots as f64 * quote_lot_size as f64 / base_lot_size as f64;
+
     let new_order_on_book = after_oo_free_slots != before_oo_free_slots;
     if new_order_on_book {
         match side {
             Serum3Side::Ask => {
-                // in the normal quote per base units
-                let limit_price =
-                    limit_price_lots as f64 * quote_lot_size as f64 / base_lot_size as f64;
                 serum.lowest_placed_ask = if serum.lowest_placed_ask == 0.0 {
                     limit_price
                 } else {
                     serum.lowest_placed_ask.min(limit_price)
                 };
+                serum.highest_placed_ask = if serum.highest_placed_ask == 0.0 {
+                    limit_price
+                } else {
+                    serum.highest_placed_ask.max(limit_price)
+                }
             }
             Serum3Side::Bid => {
                 // in base per quote units, to avoid a division in health
-                let limit_price_inv =
-                    base_lot_size as f64 / (limit_price_lots as f64 * quote_lot_size as f64);
+                let limit_price_inv = 1.0 / limit_price;
                 serum.highest_placed_bid_inv = if serum.highest_placed_bid_inv == 0.0 {
                     limit_price_inv
                 } else {
                     // the highest bid has the lowest _inv value
                     serum.highest_placed_bid_inv.min(limit_price_inv)
                 };
+                serum.lowest_placed_bid_inv = if serum.lowest_placed_bid_inv == 0.0 {
+                    limit_price_inv
+                } else {
+                    // lowest bid has max _inv value
+                    serum.lowest_placed_bid_inv.max(limit_price_inv)
+                }
             }
         }
     }
 
-    emit!(Serum3OpenOrdersBalanceLogV2 {
+    emit_stack(Serum3OpenOrdersBalanceLogV2 {
         mango_group: ctx.accounts.group.key(),
         mango_account: ctx.accounts.account.key(),
         market_index: serum_market.market_index,
@@ -237,14 +284,27 @@ pub fn serum3_place_order(
 
     let mut payer_bank = ctx.accounts.payer_bank.load_mut()?;
 
-    // Enforce min vault to deposits ratio
-    let withdrawn_from_vault = I80F48::from(before_vault - after_vault);
-    let position_native = account
+    // Update the potential token tracking in banks
+    // (for init weight scaling, deposit limit checks)
+    if is_v2_instruction {
+        let mut receiver_bank = receiver_bank_ai.load_mut::<Bank>()?;
+        let (base_bank, quote_bank) = match side {
+            Serum3Side::Bid => (&mut receiver_bank, &mut payer_bank),
+            Serum3Side::Ask => (&mut payer_bank, &mut receiver_bank),
+        };
+        update_bank_potential_tokens(serum, base_bank, quote_bank, &after_oo);
+    } else {
+        update_bank_potential_tokens_payer_only(serum, &mut payer_bank, &after_oo);
+    }
+
+    // Track position before withdraw happens
+    let before_position_native = account
         .token_position_mut(payer_bank.token_index)?
         .0
         .native(&payer_bank);
 
     // Charge the difference in vault balance to the user's account
+    // (must be done before limit checks like deposit limit)
     let vault_difference = {
         apply_vault_difference(
             ctx.accounts.account.key(),
@@ -256,20 +316,83 @@ pub fn serum3_place_order(
         )?
     };
 
-    if withdrawn_from_vault > position_native {
+    // Deposit limit check: Placing an order can increase deposit limit use on both
+    // the payer and receiver bank. Imagine placing a bid for 500 base @ 0.5: it would
+    // use up 1000 quote and 500 base because either could be deposit on cancel/fill.
+    // This is why this must happen after update_bank_potential_tokens() and any withdraws.
+    {
+        let receiver_bank = receiver_bank_ai.load::<Bank>()?;
+        receiver_bank
+            .check_deposit_and_oo_limit()
+            .with_context(|| std::format!("on {}", receiver_bank.name()))?;
+        payer_bank
+            .check_deposit_and_oo_limit()
+            .with_context(|| std::format!("on {}", payer_bank.name()))?;
+    }
+
+    // Payer bank safety checks like reduce-only, net borrows, vault-to-deposits ratio
+    let payer_oracle_ref = &AccountInfoRef::borrow(&ctx.accounts.payer_oracle)?;
+    let payer_bank_oracle =
+        payer_bank.oracle_price(&OracleAccountInfos::from_reader(payer_oracle_ref), None)?;
+    let withdrawn_from_vault = I80F48::from(before_vault - after_vault);
+    if withdrawn_from_vault > before_position_native {
         require_msg_typed!(
             !payer_bank.are_borrows_reduce_only(),
             MangoError::TokenInReduceOnlyMode,
             "the payer tokens cannot be borrowed"
         );
-        let oracle_price =
-            payer_bank.oracle_price(&AccountInfoRef::borrow(&ctx.accounts.payer_oracle)?, None)?;
-        payer_bank.enforce_min_vault_to_deposits_ratio((*ctx.accounts.payer_vault).as_ref())?;
-        payer_bank.check_net_borrows(oracle_price)?;
+        payer_bank.enforce_max_utilization_on_borrow()?;
+        payer_bank.check_net_borrows(payer_bank_oracle)?;
+    } else {
+        payer_bank.enforce_borrows_lte_deposits()?;
     }
 
-    vault_difference.adjust_health_cache_token_balance(&mut health_cache, &payer_bank)?;
+    // Limit order price bands: If the order ends up on the book, ensure
+    // - a bid isn't too far below oracle
+    // - an ask isn't too far above oracle
+    // because placing orders that are guaranteed to never be hit can be bothersome:
+    // For example placing a very large bid near zero would make the potential_base_tokens
+    // value go through the roof, reducing available init margin for other users.
+    let band_threshold = serum_market.oracle_price_band();
+    if new_order_on_book && band_threshold != f32::MAX {
+        let (base_oracle, quote_oracle) = match side {
+            Serum3Side::Bid => (&receiver_bank_oracle, &payer_bank_oracle),
+            Serum3Side::Ask => (&payer_bank_oracle, &receiver_bank_oracle),
+        };
+        let base_oracle_f64 = base_oracle.to_num::<f64>();
+        let quote_oracle_f64 = quote_oracle.to_num::<f64>();
+        // this has the same units as base_oracle: USD per BASE; limit_price is in QUOTE per BASE
+        let limit_price_in_dollar = limit_price * quote_oracle_f64;
+        let band_factor = 1.0 + band_threshold as f64;
+        match side {
+            Serum3Side::Bid => {
+                require_msg_typed!(
+                    limit_price_in_dollar * band_factor >= base_oracle_f64,
+                    MangoError::Serum3PriceBandExceeded,
+                    "bid price {} must be larger than {} ({}% of oracle)",
+                    limit_price,
+                    base_oracle_f64 / (quote_oracle_f64 * band_factor),
+                    (100.0 / band_factor) as u64,
+                );
+            }
+            Serum3Side::Ask => {
+                require_msg_typed!(
+                    limit_price_in_dollar <= base_oracle_f64 * band_factor,
+                    MangoError::Serum3PriceBandExceeded,
+                    "ask price {} must be smaller than {} ({}% of oracle)",
+                    limit_price,
+                    base_oracle_f64 * band_factor / quote_oracle_f64,
+                    (100.0 * band_factor) as u64,
+                );
+            }
+        }
+    }
 
+    // Health cache updates for the changed account state
+    let receiver_bank = receiver_bank_ai.load::<Bank>()?;
+    // update scaled weights for receiver bank
+    health_cache.adjust_token_balance(&receiver_bank, I80F48::ZERO)?;
+    vault_difference.adjust_health_cache_token_balance(&mut health_cache, &payer_bank)?;
     let serum_account = account.serum3_orders(serum_market.market_index)?;
     oo_difference.recompute_health_cache_serum3_state(
         &mut health_cache,
@@ -393,40 +516,29 @@ pub fn apply_vault_difference(
         .min(I80F48::ZERO)
         .abs()
         .to_num::<u64>();
-    // amount of tokens transferred to serum3 reserved that were taken from deposits
-    let used_deposits = native_before
-        .min(-needed_change)
-        .max(I80F48::ZERO)
-        .to_num::<u64>();
 
     let indexed_position = position.indexed_position;
     let market = account.serum3_orders_mut(serum_market_index).unwrap();
     let borrows_without_fee;
-    let deposits_reserved;
     if bank.token_index == market.base_token_index {
         borrows_without_fee = &mut market.base_borrows_without_fee;
-        deposits_reserved = &mut market.base_deposits_reserved;
     } else if bank.token_index == market.quote_token_index {
         borrows_without_fee = &mut market.quote_borrows_without_fee;
-        deposits_reserved = &mut market.quote_deposits_reserved;
     } else {
         return Err(error_msg!(
             "assert failed: apply_vault_difference called with bad token index"
         ));
     };
 
-    // Only for place: Add to potential borrow amount and reserved deposits
+    // Only for place: Add to potential borrow amount
     *borrows_without_fee += new_borrows;
-    *deposits_reserved += used_deposits;
-    let used_deposits_signed: i64 = used_deposits.try_into().unwrap();
-    bank.deposits_in_serum += used_deposits_signed;
 
     // Only for settle/liq_force_cancel: Reduce the potential borrow amounts
     if needed_change > 0 {
         *borrows_without_fee = (*borrows_without_fee).saturating_sub(needed_change.to_num::<u64>());
     }
 
-    emit!(TokenBalanceLog {
+    emit_stack(TokenBalanceLog {
         mango_group: bank.group,
         mango_account: account_pk,
         token_index: bank.token_index,
@@ -473,8 +585,11 @@ pub fn apply_settle_changes(
             let clock = Clock::get()?;
             let now_ts = clock.unix_timestamp.try_into().unwrap();
 
-            let quote_oracle_price = quote_bank
-                .oracle_price(&AccountInfoRef::borrow(quote_oracle_ai)?, Some(clock.slot))?;
+            let quote_oracle_ref = &AccountInfoRef::borrow(quote_oracle_ai)?;
+            let quote_oracle_price = quote_bank.oracle_price(
+                &OracleAccountInfos::from_reader(quote_oracle_ref),
+                Some(clock.slot),
+            )?;
             let quote_asset_price = quote_oracle_price.min(quote_bank.stable_price());
             account
                 .fixed
@@ -513,25 +628,10 @@ pub fn apply_settle_changes(
     )?;
 
     // Tokens were moved from open orders into banks again: also update the tracking
-    // for deposits_in_serum on the banks.
+    // for potential_serum_tokens on the banks.
     {
         let serum_orders = account.serum3_orders_mut(serum_market.market_index)?;
-
-        let after_base_reserved = after_oo.native_base_reserved();
-        if after_base_reserved < serum_orders.base_deposits_reserved {
-            let diff = serum_orders.base_deposits_reserved - after_base_reserved;
-            serum_orders.base_deposits_reserved = after_base_reserved;
-            let diff_signed: i64 = diff.try_into().unwrap();
-            base_bank.deposits_in_serum -= diff_signed;
-        }
-
-        let after_quote_reserved = after_oo.native_quote_reserved();
-        if after_quote_reserved < serum_orders.quote_deposits_reserved {
-            let diff = serum_orders.quote_deposits_reserved - after_quote_reserved;
-            serum_orders.quote_deposits_reserved = after_quote_reserved;
-            let diff_signed: i64 = diff.try_into().unwrap();
-            quote_bank.deposits_in_serum -= diff_signed;
-        }
+        update_bank_potential_tokens(serum_orders, base_bank, quote_bank, after_oo);
     }
 
     if let Some(health_cache) = health_cache {
@@ -547,6 +647,58 @@ pub fn apply_settle_changes(
     }
 
     Ok(())
+}
+
+fn update_bank_potential_tokens_payer_only(
+    serum_orders: &mut Serum3Orders,
+    payer_bank: &mut Bank,
+    oo: &OpenOrdersSlim,
+) {
+    // Do the tracking for the avaliable bank
+    if serum_orders.base_token_index == payer_bank.token_index {
+        let new_base = oo.native_base_total()
+            + (oo.native_quote_reserved() as f64 * serum_orders.lowest_placed_bid_inv) as u64;
+        let old_base = serum_orders.potential_base_tokens;
+
+        payer_bank.update_potential_serum_tokens(old_base, new_base);
+        serum_orders.potential_base_tokens = new_base;
+    } else {
+        assert_eq!(serum_orders.quote_token_index, payer_bank.token_index);
+
+        let new_quote = oo.native_quote_total()
+            + (oo.native_base_reserved() as f64 * serum_orders.highest_placed_ask) as u64;
+        let old_quote = serum_orders.potential_quote_tokens;
+
+        payer_bank.update_potential_serum_tokens(old_quote, new_quote);
+        serum_orders.potential_quote_tokens = new_quote;
+    }
+}
+
+fn update_bank_potential_tokens(
+    serum_orders: &mut Serum3Orders,
+    base_bank: &mut Bank,
+    quote_bank: &mut Bank,
+    oo: &OpenOrdersSlim,
+) {
+    assert_eq!(serum_orders.base_token_index, base_bank.token_index);
+    assert_eq!(serum_orders.quote_token_index, quote_bank.token_index);
+
+    // Potential tokens are all tokens on the side, plus reserved on the other side
+    // converted at favorable price. This creates an overestimation of the potential
+    // base and quote tokens flowing out of this open orders account.
+    let new_base = oo.native_base_total()
+        + (oo.native_quote_reserved() as f64 * serum_orders.lowest_placed_bid_inv) as u64;
+    let new_quote = oo.native_quote_total()
+        + (oo.native_base_reserved() as f64 * serum_orders.highest_placed_ask) as u64;
+
+    let old_base = serum_orders.potential_base_tokens;
+    let old_quote = serum_orders.potential_quote_tokens;
+
+    base_bank.update_potential_serum_tokens(old_base, new_base);
+    quote_bank.update_potential_serum_tokens(old_quote, new_quote);
+
+    serum_orders.potential_base_tokens = new_base;
+    serum_orders.potential_quote_tokens = new_quote;
 }
 
 fn cpi_place_order(ctx: &Serum3PlaceOrder, order: NewOrderInstructionV3) -> Result<()> {

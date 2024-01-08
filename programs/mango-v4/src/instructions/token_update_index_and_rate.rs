@@ -2,8 +2,8 @@ use anchor_lang::prelude::*;
 
 use crate::accounts_ix::*;
 use crate::error::MangoError;
-use crate::logs::{UpdateIndexLog, UpdateRateLogV2};
-use crate::state::HOUR;
+use crate::logs::{emit_stack, UpdateIndexLog, UpdateRateLogV2};
+use crate::state::{OracleAccountInfos, HOUR};
 use crate::{
     accounts_zerocopy::{AccountInfoRef, LoadMutZeroCopyRef, LoadZeroCopyRef},
     state::Bank,
@@ -89,8 +89,9 @@ pub fn token_update_index_and_rate(ctx: Context<TokenUpdateIndexAndRate>) -> Res
             now_ts,
         );
 
+        let oracle_ref = &AccountInfoRef::borrow(ctx.accounts.oracle.as_ref())?;
         let price = some_bank.oracle_price(
-            &AccountInfoRef::borrow(ctx.accounts.oracle.as_ref())?,
+            &OracleAccountInfos::from_reader(oracle_ref),
             Some(clock.slot),
         )?;
 
@@ -104,7 +105,7 @@ pub fn token_update_index_and_rate(ctx: Context<TokenUpdateIndexAndRate>) -> Res
         let maint_shift_done = some_bank.maint_weight_shift_duration_inv.is_positive()
             && now_ts >= some_bank.maint_weight_shift_end;
 
-        emit!(UpdateIndexLog {
+        emit_stack(UpdateIndexLog {
             mango_group: mint_info.group.key(),
             token_index: mint_info.token_index,
             deposit_index: deposit_index.to_bits(),
@@ -182,7 +183,7 @@ pub fn token_update_index_and_rate(ctx: Context<TokenUpdateIndexAndRate>) -> Res
             let scaling = some_bank.interest_curve_scaling;
             let target_util = some_bank.interest_target_utilization;
 
-            emit!(UpdateRateLogV2 {
+            emit_stack(UpdateRateLogV2 {
                 mango_group: mint_info.group.key(),
                 token_index: mint_info.token_index,
                 rate0: rate0.to_bits(),

@@ -1,9 +1,9 @@
 use std::mem::size_of;
 
 use anchor_lang::prelude::*;
-use anchor_lang::Discriminator;
+use anchor_lang::{AnchorDeserialize, Discriminator};
 use derivative::Derivative;
-use fixed::types::I80F48;
+use fixed::types::{I80F48, U64F64};
 
 use static_assertions::const_assert_eq;
 use switchboard_program::FastRoundResultAccountData;
@@ -12,6 +12,9 @@ use switchboard_v2::AggregatorAccountData;
 use crate::accounts_zerocopy::*;
 
 use crate::error::*;
+use crate::state::load_whirlpool_state;
+
+use super::orca_mainnet_whirlpool;
 
 const DECIMAL_CONSTANT_ZERO_INDEX: i8 = 12;
 const DECIMAL_CONSTANTS: [I80F48; 25] = [
@@ -46,6 +49,7 @@ pub const fn power_of_ten(decimals: i8) -> I80F48 {
 }
 
 pub const QUOTE_DECIMALS: i8 = 6;
+pub const SOL_DECIMALS: i8 = 9;
 pub const QUOTE_NATIVE_TO_UI: I80F48 = power_of_ten(-QUOTE_DECIMALS);
 
 pub mod switchboard_v1_devnet_oracle {
@@ -55,6 +59,26 @@ pub mod switchboard_v1_devnet_oracle {
 pub mod switchboard_v2_mainnet_oracle {
     use solana_program::declare_id;
     declare_id!("DtmE9D2CSB4L5D6A15mraeEjrGMm6auWVzgaD8hK2tZM");
+}
+
+pub mod pyth_mainnet_usdc_oracle {
+    use solana_program::declare_id;
+    declare_id!("Gnt27xtC473ZT2Mw5u8wZ68Z3gULkSTb5DuxJy7eJotD");
+}
+
+pub mod pyth_mainnet_sol_oracle {
+    use solana_program::declare_id;
+    declare_id!("H6ARHf6YXhGYeQfUzQNGk6rDNnLBQKrenN712K4AQJEG");
+}
+
+pub mod usdc_mint_mainnet {
+    use solana_program::declare_id;
+    declare_id!("EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v");
+}
+
+pub mod sol_mint_mainnet {
+    use solana_program::declare_id;
+    declare_id!("So11111111111111111111111111111111111111112");
 }
 
 #[zero_copy]
@@ -92,6 +116,7 @@ pub enum OracleType {
     Stub,
     SwitchboardV1,
     SwitchboardV2,
+    OrcaCLMM,
 }
 
 pub struct OracleState {
@@ -105,49 +130,29 @@ impl OracleState {
     #[inline]
     pub fn check_confidence_and_maybe_staleness(
         &self,
-        oracle_pk: &Pubkey,
         config: &OracleConfig,
         staleness_slot: Option<u64>,
     ) -> Result<()> {
         if let Some(now_slot) = staleness_slot {
-            self.check_staleness(oracle_pk, config, now_slot)?;
+            self.check_staleness(config, now_slot)?;
         }
-        self.check_confidence(oracle_pk, config)
+        self.check_confidence(config)
     }
 
-    pub fn check_staleness(
-        &self,
-        oracle_pk: &Pubkey,
-        config: &OracleConfig,
-        now_slot: u64,
-    ) -> Result<()> {
+    pub fn check_staleness(&self, config: &OracleConfig, now_slot: u64) -> Result<()> {
         if config.max_staleness_slots >= 0
             && self
                 .last_update_slot
                 .saturating_add(config.max_staleness_slots as u64)
                 < now_slot
         {
-            msg!(
-                "Oracle is stale; pubkey {}, price: {}, last_update_slot: {}, now_slot: {}",
-                oracle_pk,
-                self.price.to_num::<f64>(),
-                self.last_update_slot,
-                now_slot,
-            );
             return Err(MangoError::OracleStale.into());
         }
         Ok(())
     }
 
-    pub fn check_confidence(&self, oracle_pk: &Pubkey, config: &OracleConfig) -> Result<()> {
+    pub fn check_confidence(&self, config: &OracleConfig) -> Result<()> {
         if self.deviation > config.conf_filter * self.price {
-            msg!(
-                "Oracle confidence not good enough: pubkey {}, price: {}, deviation: {}, conf_filter: {}",
-                oracle_pk,
-                self.price.to_num::<f64>(),
-                self.deviation.to_num::<f64>(),
-                config.conf_filter.to_num::<f32>(),
-            );
             return Err(MangoError::OracleConfidence.into());
         }
         Ok(())
@@ -188,9 +193,31 @@ pub fn determine_oracle_type(acc_info: &impl KeyedAccountReader) -> Result<Oracl
         || acc_info.owner() == &switchboard_v2_mainnet_oracle::ID
     {
         return Ok(OracleType::SwitchboardV1);
+    } else if acc_info.owner() == &orca_mainnet_whirlpool::ID {
+        return Ok(OracleType::OrcaCLMM);
     }
 
     Err(MangoError::UnknownOracleType.into())
+}
+
+pub fn check_is_valid_fallback_oracle(acc_info: &impl KeyedAccountReader) -> Result<()> {
+    if acc_info.key() == &Pubkey::default() {
+        return Ok(());
+    };
+    let oracle_type = determine_oracle_type(acc_info)?;
+    if oracle_type == OracleType::OrcaCLMM {
+        let whirlpool = load_whirlpool_state(acc_info)?;
+
+        let has_usdc_token = whirlpool.token_mint_a == usdc_mint_mainnet::ID
+            || whirlpool.token_mint_b == usdc_mint_mainnet::ID;
+        let has_sol_token = whirlpool.token_mint_a == sol_mint_mainnet::ID
+            || whirlpool.token_mint_b == sol_mint_mainnet::ID;
+        require!(
+            has_usdc_token || has_sol_token,
+            MangoError::InvalidCLMMOracle
+        );
+    }
+    Ok(())
 }
 
 /// Get the pyth agg price if it's available, otherwise take the prev price.
@@ -226,24 +253,86 @@ fn pyth_get_price(
     }
 }
 
+fn get_pyth_state(
+    acc_info: &(impl KeyedAccountReader + ?Sized),
+    base_decimals: u8,
+) -> Result<OracleState> {
+    let data = &acc_info.data();
+    let price_account = pyth_sdk_solana::state::load_price_account(data).unwrap();
+    let (price_data, last_update_slot) = pyth_get_price(acc_info.key(), price_account);
+
+    let decimals = (price_account.expo as i8) + QUOTE_DECIMALS - (base_decimals as i8);
+    let decimal_adj = power_of_ten(decimals);
+    let price = I80F48::from_num(price_data.price) * decimal_adj;
+    let deviation = I80F48::from_num(price_data.conf) * decimal_adj;
+    require_gte!(price, 0);
+    Ok(OracleState {
+        price,
+        last_update_slot,
+        deviation,
+        oracle_type: OracleType::Pyth,
+    })
+}
+
+/// Contains all oracle account infos that could be used to read price
+pub struct OracleAccountInfos<'a, T: KeyedAccountReader> {
+    pub oracle: &'a T,
+    pub fallback_opt: Option<&'a T>,
+    pub usd_opt: Option<&'a T>,
+    pub sol_opt: Option<&'a T>,
+}
+
+impl<'a, T: KeyedAccountReader> OracleAccountInfos<'a, T> {
+    pub fn from_reader(acc_reader: &'a T) -> Self {
+        OracleAccountInfos {
+            oracle: acc_reader,
+            fallback_opt: None,
+            usd_opt: None,
+            sol_opt: None,
+        }
+    }
+}
+
 /// Returns the price of one native base token, in native quote tokens
 ///
-/// Example: The for SOL at 40 USDC/SOL it would return 0.04 (the unit is USDC-native/SOL-native)
+/// Example: The price for SOL at 40 USDC/SOL it would return 0.04 (the unit is USDC-native/SOL-native)
 ///
 /// This currently assumes that quote decimals (i.e. decimals for USD) is 6, like for USDC.
 ///
 /// The staleness and confidence of the oracle is not checked. Use the functions on
 /// OracleState to validate them if needed. That's why this function is called _unchecked.
-pub fn oracle_state_unchecked(
-    acc_info: &impl KeyedAccountReader,
+pub fn oracle_state_unchecked<T: KeyedAccountReader>(
+    acc_infos: &OracleAccountInfos<T>,
     base_decimals: u8,
 ) -> Result<OracleState> {
-    let data = &acc_info.data();
-    let oracle_type = determine_oracle_type(acc_info)?;
+    oracle_state_unchecked_inner(acc_infos, base_decimals, false)
+}
+
+pub fn fallback_oracle_state_unchecked<T: KeyedAccountReader>(
+    acc_infos: &OracleAccountInfos<T>,
+    base_decimals: u8,
+) -> Result<OracleState> {
+    oracle_state_unchecked_inner(acc_infos, base_decimals, true)
+}
+
+fn oracle_state_unchecked_inner<T: KeyedAccountReader>(
+    acc_infos: &OracleAccountInfos<T>,
+    base_decimals: u8,
+    use_fallback: bool,
+) -> Result<OracleState> {
+    let oracle_info = if use_fallback {
+        acc_infos
+            .fallback_opt
+            .ok_or_else(|| error!(MangoError::UnknownOracleType))?
+    } else {
+        acc_infos.oracle
+    };
+    let data = &oracle_info.data();
+    let oracle_type = determine_oracle_type(oracle_info)?;
 
     Ok(match oracle_type {
         OracleType::Stub => {
-            let stub = acc_info.load::<StubOracle>()?;
+            let stub = oracle_info.load::<StubOracle>()?;
             let deviation = if stub.deviation == 0 {
                 // allows the confidence check to pass even for negative prices
                 I80F48::MIN
@@ -263,22 +352,7 @@ pub fn oracle_state_unchecked(
                 oracle_type: OracleType::Stub,
             }
         }
-        OracleType::Pyth => {
-            let price_account = pyth_sdk_solana::state::load_price_account(data).unwrap();
-            let (price_data, last_update_slot) = pyth_get_price(acc_info.key(), price_account);
-
-            let decimals = (price_account.expo as i8) + QUOTE_DECIMALS - (base_decimals as i8);
-            let decimal_adj = power_of_ten(decimals);
-            let price = I80F48::from_num(price_data.price) * decimal_adj;
-            let deviation = I80F48::from_num(price_data.conf) * decimal_adj;
-            require_gte!(price, 0);
-            OracleState {
-                price,
-                last_update_slot,
-                deviation,
-                oracle_type: OracleType::Pyth,
-            }
-        }
+        OracleType::Pyth => get_pyth_state(oracle_info, base_decimals)?,
         OracleType::SwitchboardV2 => {
             fn from_foreign_error(e: impl std::fmt::Display) -> Error {
                 error_msg!("{}", e)
@@ -329,7 +403,74 @@ pub fn oracle_state_unchecked(
                 oracle_type: OracleType::SwitchboardV1,
             }
         }
+        OracleType::OrcaCLMM => {
+            let whirlpool = load_whirlpool_state(oracle_info)?;
+
+            let inverted = whirlpool.token_mint_a == usdc_mint_mainnet::ID
+                || (whirlpool.token_mint_a == sol_mint_mainnet::ID
+                    && whirlpool.token_mint_b != usdc_mint_mainnet::ID);
+            let quote_state = if inverted {
+                quote_state_unchecked(acc_infos, &whirlpool.token_mint_a)?
+            } else {
+                quote_state_unchecked(acc_infos, &whirlpool.token_mint_b)?
+            };
+
+            let clmm_price = if inverted {
+                let sqrt_price = U64F64::from_bits(whirlpool.sqrt_price).to_num::<f64>();
+                let inverted_price = sqrt_price * sqrt_price;
+                I80F48::from_num(1.0f64 / inverted_price)
+            } else {
+                let sqrt_price = U64F64::from_bits(whirlpool.sqrt_price);
+                I80F48::from_num(sqrt_price * sqrt_price)
+            };
+
+            let price = clmm_price * quote_state.price;
+            OracleState {
+                price,
+                last_update_slot: quote_state.last_update_slot,
+                deviation: quote_state.deviation,
+                oracle_type: OracleType::OrcaCLMM,
+            }
+        }
     })
+}
+
+fn quote_state_unchecked<T: KeyedAccountReader>(
+    acc_infos: &OracleAccountInfos<T>,
+    quote_mint: &Pubkey,
+) -> Result<OracleState> {
+    if quote_mint == &usdc_mint_mainnet::ID {
+        let usd_feed = acc_infos
+            .usd_opt
+            .ok_or_else(|| error!(MangoError::MissingFeedForCLMMOracle))?;
+        let usd_state = get_pyth_state(usd_feed, QUOTE_DECIMALS as u8)?;
+        return Ok(usd_state);
+    } else if quote_mint == &sol_mint_mainnet::ID {
+        let sol_feed = acc_infos
+            .sol_opt
+            .ok_or_else(|| error!(MangoError::MissingFeedForCLMMOracle))?;
+        let sol_state = get_pyth_state(sol_feed, SOL_DECIMALS as u8)?;
+        return Ok(sol_state);
+    } else {
+        return Err(MangoError::MissingFeedForCLMMOracle.into());
+    }
+}
+
+pub fn oracle_log_context(
+    name: &str,
+    state: &OracleState,
+    oracle_config: &OracleConfig,
+    staleness_slot: Option<u64>,
+) -> String {
+    format!(
+        "name: {}, price: {}, deviation: {}, last_update_slot: {}, now_slot: {}, conf_filter: {:#?}",
+        name,
+        state.price.to_num::<f64>(),
+        state.deviation.to_num::<f64>(),
+        state.last_update_slot,
+        staleness_slot.unwrap_or_else(|| u64::MAX),
+        oracle_config.conf_filter.to_num::<f32>(),
+    )
 }
 
 #[cfg(test)]
@@ -359,6 +500,11 @@ mod tests {
                 "GvDMxPzN1sCj7L26YDK2HnMRXEQmQ2aemov8YBtPS7vR",
                 OracleType::SwitchboardV2,
                 Pubkey::default(),
+            ),
+            (
+                "83v8iPyZihDEjDdY8RdZddyZNyUtXngz69Lgo9Kt5d6d",
+                OracleType::OrcaCLMM,
+                orca_mainnet_whirlpool::ID,
             ),
         ];
 
@@ -398,5 +544,104 @@ mod tests {
                 I80F48::from_str(&format!("1{}", str::repeat("0", idx.abs() as usize))).unwrap()
             )
         }
+    }
+
+    #[test]
+    pub fn test_clmm_price() -> Result<()> {
+        // add ability to find fixtures
+        let mut d = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        d.push("resources/test");
+
+        let fixtures = vec![
+            (
+                "83v8iPyZihDEjDdY8RdZddyZNyUtXngz69Lgo9Kt5d6d",
+                OracleType::OrcaCLMM,
+                orca_mainnet_whirlpool::ID,
+                9, // SOL/USDC pool
+            ),
+            (
+                "Gnt27xtC473ZT2Mw5u8wZ68Z3gULkSTb5DuxJy7eJotD",
+                OracleType::Pyth,
+                Pubkey::default(),
+                6,
+            ),
+        ];
+
+        let clmm_file = format!("resources/test/{}.bin", fixtures[0].0);
+        let mut clmm_data = read_file(find_file(&clmm_file).unwrap());
+        let data = RefCell::new(&mut clmm_data[..]);
+        let ai = &AccountInfoRef {
+            key: &Pubkey::from_str(fixtures[0].0).unwrap(),
+            owner: &fixtures[0].2,
+            data: data.borrow(),
+        };
+
+        let pyth_file = format!("resources/test/{}.bin", fixtures[1].0);
+        let mut pyth_data = read_file(find_file(&pyth_file).unwrap());
+        let pyth_data_cell = RefCell::new(&mut pyth_data[..]);
+        let usdc_ai = &AccountInfoRef {
+            key: &Pubkey::from_str(fixtures[1].0).unwrap(),
+            owner: &fixtures[1].2,
+            data: pyth_data_cell.borrow(),
+        };
+        let base_decimals = fixtures[0].3;
+        let usdc_decimals = fixtures[1].3;
+
+        let usdc_ais = OracleAccountInfos {
+            oracle: usdc_ai,
+            fallback_opt: None,
+            usd_opt: None,
+            sol_opt: None,
+        };
+        let orca_ais = OracleAccountInfos {
+            oracle: ai,
+            fallback_opt: None,
+            usd_opt: Some(usdc_ai),
+            sol_opt: None,
+        };
+        let usdc = oracle_state_unchecked(&usdc_ais, usdc_decimals).unwrap();
+        let orca = oracle_state_unchecked(&orca_ais, base_decimals).unwrap();
+        assert!(usdc.price == I80F48::from_num(1.00000758274099));
+        // 63.006792786538313 * 1.00000758274099 (but in native/native)
+        assert!(orca.price == I80F48::from_num(0.06300727055072872));
+
+        Ok(())
+    }
+
+    #[test]
+    pub fn test_clmm_price_missing_usdc() -> Result<()> {
+        // add ability to find fixtures
+        let mut d = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        d.push("resources/test");
+
+        let fixtures = vec![(
+            "83v8iPyZihDEjDdY8RdZddyZNyUtXngz69Lgo9Kt5d6d",
+            OracleType::OrcaCLMM,
+            orca_mainnet_whirlpool::ID,
+            9, // SOL/USDC pool
+        )];
+
+        for fixture in fixtures {
+            let filename = format!("resources/test/{}.bin", fixture.0);
+            let mut clmm_data = read_file(find_file(&filename).unwrap());
+            let data = RefCell::new(&mut clmm_data[..]);
+            let ai = &AccountInfoRef {
+                key: &Pubkey::from_str(fixture.0).unwrap(),
+                owner: &fixture.2,
+                data: data.borrow(),
+            };
+            let base_decimals = fixture.3;
+            assert!(determine_oracle_type(ai).unwrap() == fixture.1);
+            let oracle_infos = OracleAccountInfos {
+                oracle: ai,
+                fallback_opt: None,
+                usd_opt: None,
+                sol_opt: None,
+            };
+            assert!(oracle_state_unchecked(&oracle_infos, base_decimals)
+                .is_anchor_error_with_code(6068));
+        }
+
+        Ok(())
     }
 }

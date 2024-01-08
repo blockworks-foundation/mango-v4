@@ -6,7 +6,7 @@ import {
   Wallet,
 } from '@coral-xyz/anchor';
 import * as borsh from '@coral-xyz/borsh';
-import { OpenOrders } from '@project-serum/serum';
+import { OpenOrders, decodeEventQueue } from '@project-serum/serum';
 import {
   createCloseAccountInstruction,
   createInitializeAccount3Instruction,
@@ -118,6 +118,7 @@ export type MangoClientOptions = {
   txConfirmationCommitment?: Commitment;
   openbookFeesToDao?: boolean;
   prependedGlobalAdditionalInstructions?: TransactionInstruction[];
+  multipleConnections?: Connection[];
 };
 
 export class MangoClient {
@@ -128,6 +129,7 @@ export class MangoClient {
   private txConfirmationCommitment: Commitment;
   private openbookFeesToDao: boolean;
   private prependedGlobalAdditionalInstructions: TransactionInstruction[] = [];
+  private multipleProviders: AnchorProvider[] = [];
 
   constructor(
     public program: Program<MangoV4>,
@@ -148,6 +150,16 @@ export class MangoClient {
       'processed';
     // TODO: evil side effect, but limited backtraces are a nightmare
     Error.stackTraceLimit = 1000;
+    this.multipleProviders = opts?.multipleConnections
+      ? opts.multipleConnections.map(
+          (c) =>
+            new AnchorProvider(
+              c,
+              new Wallet(new Keypair()),
+              (program.provider as AnchorProvider).opts,
+            ),
+        )
+      : [];
   }
 
   /// Convenience accessors
@@ -161,6 +173,40 @@ export class MangoClient {
 
   /// Transactions
   public async sendAndConfirmTransaction(
+    ixs: TransactionInstruction[],
+    opts: any = {},
+  ): Promise<MangoSignatureStatus> {
+    let prioritizationFee: number;
+    if (opts.prioritizationFee) {
+      prioritizationFee = opts.prioritizationFee;
+    } else if (this.estimateFee) {
+      prioritizationFee = await this.estimatePrioritizationFee(ixs);
+    } else {
+      prioritizationFee = this.prioritizationFee;
+    }
+    const providers = [
+      this.program.provider as AnchorProvider,
+      ...this.multipleProviders,
+    ];
+    const status = await Promise.race(
+      providers.map((p) =>
+        sendTransaction(
+          p,
+          [...this.prependedGlobalAdditionalInstructions, ...ixs],
+          opts.alts ?? [],
+          {
+            postSendTxCallback: this.postSendTxCallback,
+            prioritizationFee,
+            txConfirmationCommitment: this.txConfirmationCommitment,
+            ...opts,
+          },
+        ),
+      ),
+    );
+    return status;
+  }
+
+  public async sendAndConfirmTransactionSingle(
     ixs: TransactionInstruction[],
     opts: any = {},
   ): Promise<MangoSignatureStatus> {
@@ -422,6 +468,8 @@ export class MangoClient {
         params.flashLoanSwapFeeRate,
         params.interestCurveScaling,
         params.interestTargetUtilization,
+        params.groupInsuranceFund,
+        params.depositLimit,
       )
       .accounts({
         group: group.publicKey,
@@ -504,6 +552,8 @@ export class MangoClient {
         params.maintWeightShiftAssetTarget,
         params.maintWeightShiftLiabTarget,
         params.maintWeightShiftAbort ?? false,
+        params.setFallbackOracle ?? false,
+        params.depositLimit,
       )
       .accounts({
         group: group.publicKey,
@@ -972,37 +1022,7 @@ export class MangoClient {
       ai.data,
     );
 
-    // Re-encode decoded mango account with v1 layout, this will help identifying
-    // if account is of type v1 or v2
-    // Do whole encoding manually, since anchor uses a buffer of a constant length which is too small
-    const mangoAccountV1Buffer = Buffer.alloc(ai.data.length);
-    const layout =
-      this.program.coder.accounts['accountLayouts'].get('mangoAccount');
-    const discriminatorLen = 8;
-    const v1DataLen = layout.encode(decodedMangoAccount, mangoAccountV1Buffer);
-    const v1Len = discriminatorLen + v1DataLen;
-
-    const tokenConditionalSwaps =
-      ai.data.length > v1Len
-        ? (borsh
-            .vec(
-              (this.program as any)._coder.types.typeLayouts.get(
-                'TokenConditionalSwap',
-              ),
-            )
-            .decode(
-              ai.data,
-              v1Len +
-                // This is the padding before tokenConditionalSwaps
-                4,
-            ) as TokenConditionalSwapDto[])
-        : new Array<TokenConditionalSwapDto>();
-
-    return MangoAccount.from(
-      mangoAccountPk,
-      decodedMangoAccount,
-      tokenConditionalSwaps,
-    );
+    return MangoAccount.from(mangoAccountPk, decodedMangoAccount);
   }
 
   public async getMangoAccountWithSlot(
@@ -1444,13 +1464,12 @@ export class MangoClient {
     mintPk: PublicKey,
     nativeAmount: BN,
     reduceOnly = false,
+    intoExisting = false,
   ): Promise<MangoSignatureStatus> {
     const bank = group.getFirstBankByMint(mintPk);
 
-    const tokenAccountPk = await getAssociatedTokenAddress(
-      mintPk,
-      mangoAccount.owner,
-    );
+    const walletPk = this.walletPk;
+    const tokenAccountPk = await getAssociatedTokenAddress(mintPk, walletPk);
 
     let wrappedSolAccount: PublicKey | undefined;
     let preInstructions: TransactionInstruction[] = [];
@@ -1458,9 +1477,9 @@ export class MangoClient {
     if (mintPk.equals(NATIVE_MINT)) {
       // Generate a random seed for wrappedSolAccount.
       const seed = Keypair.generate().publicKey.toBase58().slice(0, 32);
-      // Calculate a publicKey that will be controlled by the `mangoAccount.owner`.
+      // Calculate a publicKey that will be controlled by the current wallet.
       wrappedSolAccount = await PublicKey.createWithSeed(
-        mangoAccount.owner,
+        walletPk,
         seed,
         TOKEN_PROGRAM_ID,
       );
@@ -1469,8 +1488,8 @@ export class MangoClient {
 
       preInstructions = [
         SystemProgram.createAccountWithSeed({
-          fromPubkey: mangoAccount.owner,
-          basePubkey: mangoAccount.owner,
+          fromPubkey: walletPk,
+          basePubkey: walletPk,
           seed,
           newAccountPubkey: wrappedSolAccount,
           lamports: lamports.toNumber(),
@@ -1480,33 +1499,42 @@ export class MangoClient {
         createInitializeAccount3Instruction(
           wrappedSolAccount,
           NATIVE_MINT,
-          mangoAccount.owner,
+          walletPk,
         ),
       ];
       postInstructions = [
-        createCloseAccountInstruction(
-          wrappedSolAccount,
-          mangoAccount.owner,
-          mangoAccount.owner,
-        ),
+        createCloseAccountInstruction(wrappedSolAccount, walletPk, walletPk),
       ];
     }
 
     const healthRemainingAccounts: PublicKey[] =
       this.buildHealthRemainingAccounts(group, [mangoAccount], [bank], []);
 
-    const ix = await this.program.methods
-      .tokenDeposit(new BN(nativeAmount), reduceOnly)
-      .accounts({
-        group: group.publicKey,
-        account: mangoAccount.publicKey,
-        owner: mangoAccount.owner,
-        bank: bank.publicKey,
-        vault: bank.vault,
-        oracle: bank.oracle,
-        tokenAccount: wrappedSolAccount ?? tokenAccountPk,
-        tokenAuthority: mangoAccount.owner,
-      })
+    const sharedAccounts = {
+      group: group.publicKey,
+      account: mangoAccount.publicKey,
+      bank: bank.publicKey,
+      vault: bank.vault,
+      oracle: bank.oracle,
+      tokenAccount: wrappedSolAccount ?? tokenAccountPk,
+      tokenAuthority: walletPk,
+    };
+
+    let ixBase;
+    if (!intoExisting) {
+      ixBase = this.program.methods
+        .tokenDeposit(new BN(nativeAmount), reduceOnly)
+        .accounts({
+          owner: mangoAccount.owner,
+          ...sharedAccounts,
+        });
+    } else {
+      ixBase = this.program.methods
+        .tokenDepositIntoExisting(new BN(nativeAmount), reduceOnly)
+        .accounts(sharedAccounts);
+    }
+
+    const ix = await ixBase
       .remainingAccounts(
         healthRemainingAccounts.map(
           (pk) =>
@@ -1690,9 +1718,10 @@ export class MangoClient {
     quoteBank: Bank,
     marketIndex: number,
     name: string,
+    oraclePriceBand: number,
   ): Promise<MangoSignatureStatus> {
     const ix = await this.program.methods
-      .serum3RegisterMarket(marketIndex, name)
+      .serum3RegisterMarket(marketIndex, name, oraclePriceBand)
       .accounts({
         group: group.publicKey,
         admin: (this.program.provider as AnchorProvider).wallet.publicKey,
@@ -1706,17 +1735,40 @@ export class MangoClient {
     return await this.sendAndConfirmTransactionForGroup(group, [ix]);
   }
 
+  public async serum3ConsumeEvents(
+    group: Group,
+    serum3MarketExternalPk: PublicKey,
+  ): Promise<MangoSignatureStatus> {
+    const serum3MarketExternal = group.serum3ExternalMarketsMap.get(
+      serum3MarketExternalPk.toBase58(),
+    )!;
+    const ai = await this.program.provider.connection.getAccountInfo(
+      serum3MarketExternal.decoded.eventQueue,
+    );
+    const eq = decodeEventQueue(ai!.data);
+    const orderedAccounts: PublicKey[] = eq
+      .map((e) => e.openOrders)
+      .sort((a, b) => a.toBuffer().swap64().compare(b.toBuffer().swap64()));
+    if (orderedAccounts.length == 0) {
+      throw new Error(`Event queue is empty!`);
+    }
+    return this.sendAndConfirmTransactionForGroup(group, [
+      serum3MarketExternal.makeConsumeEventsInstruction(orderedAccounts, 65535),
+    ]);
+  }
+
   public async serum3EditMarket(
     group: Group,
     serum3MarketIndex: MarketIndex,
     reduceOnly: boolean | null,
     forceClose: boolean | null,
     name: string | null,
+    oraclePriceBand: number | null,
   ): Promise<MangoSignatureStatus> {
     const serum3Market =
       group.serum3MarketsMapByMarketIndex.get(serum3MarketIndex);
     const ix = await this.program.methods
-      .serum3EditMarket(reduceOnly, forceClose, name)
+      .serum3EditMarket(reduceOnly, forceClose, name, oraclePriceBand)
       .accounts({
         group: group.publicKey,
         admin: (this.program.provider as AnchorProvider).wallet.publicKey,
@@ -1972,6 +2024,32 @@ export class MangoClient {
     clientOrderId: number,
     limit: number,
   ): Promise<TransactionInstruction[]> {
+    return await this.serum3PlaceOrderV2Ix(
+      group,
+      mangoAccount,
+      externalMarketPk,
+      side,
+      price,
+      size,
+      selfTradeBehavior,
+      orderType,
+      clientOrderId,
+      limit,
+    );
+  }
+
+  public async serum3PlaceOrderV1Ix(
+    group: Group,
+    mangoAccount: MangoAccount,
+    externalMarketPk: PublicKey,
+    side: Serum3Side,
+    price: number,
+    size: number,
+    selfTradeBehavior: Serum3SelfTradeBehavior,
+    orderType: Serum3OrderType,
+    clientOrderId: number,
+    limit: number,
+  ): Promise<TransactionInstruction[]> {
     const ixs: TransactionInstruction[] = [];
     const serum3Market = group.serum3MarketsMapByExternal.get(
       externalMarketPk.toBase58(),
@@ -2084,6 +2162,143 @@ export class MangoClient {
     return ixs;
   }
 
+  public async serum3PlaceOrderV2Ix(
+    group: Group,
+    mangoAccount: MangoAccount,
+    externalMarketPk: PublicKey,
+    side: Serum3Side,
+    price: number,
+    size: number,
+    selfTradeBehavior: Serum3SelfTradeBehavior,
+    orderType: Serum3OrderType,
+    clientOrderId: number,
+    limit: number,
+  ): Promise<TransactionInstruction[]> {
+    const ixs: TransactionInstruction[] = [];
+    const serum3Market = group.serum3MarketsMapByExternal.get(
+      externalMarketPk.toBase58(),
+    )!;
+
+    let openOrderPk: PublicKey | undefined = undefined;
+    const banks: Bank[] = [];
+    const openOrdersForMarket: [Serum3Market, PublicKey][] = [];
+    if (!mangoAccount.getSerum3Account(serum3Market.marketIndex)) {
+      const ix = await this.serum3CreateOpenOrdersIx(
+        group,
+        mangoAccount,
+        serum3Market.serumMarketExternal,
+      );
+      ixs.push(ix);
+      openOrderPk = await serum3Market.findOoPda(
+        this.program.programId,
+        mangoAccount.publicKey,
+      );
+      openOrdersForMarket.push([serum3Market, openOrderPk]);
+      const baseTokenIndex = serum3Market.baseTokenIndex;
+      const quoteTokenIndex = serum3Market.quoteTokenIndex;
+      // only include banks if no deposit has been previously made for same token
+      banks.push(group.getFirstBankByTokenIndex(quoteTokenIndex));
+      banks.push(group.getFirstBankByTokenIndex(baseTokenIndex));
+    }
+
+    const healthRemainingAccounts: PublicKey[] =
+      this.buildHealthRemainingAccounts(
+        group,
+        [mangoAccount],
+        banks,
+        [],
+        openOrdersForMarket,
+      );
+
+    const serum3MarketExternal = group.serum3ExternalMarketsMap.get(
+      externalMarketPk.toBase58(),
+    )!;
+    const serum3MarketExternalVaultSigner =
+      await generateSerum3MarketExternalVaultSignerAddress(
+        this.cluster,
+        serum3Market,
+        serum3MarketExternal,
+      );
+
+    const limitPrice = serum3MarketExternal.priceNumberToLots(price);
+    const maxBaseQuantity = serum3MarketExternal.baseSizeNumberToLots(size);
+    const isTaker = orderType !== Serum3OrderType.postOnly;
+    const maxQuoteQuantity = new BN(
+      Math.ceil(
+        serum3MarketExternal.decoded.quoteLotSize.toNumber() *
+          (1 + Math.max(serum3Market.getFeeRates(isTaker), 0)) *
+          serum3MarketExternal.baseSizeNumberToLots(size).toNumber() *
+          serum3MarketExternal.priceNumberToLots(price).toNumber(),
+      ),
+    );
+
+    const payerTokenIndex = ((): TokenIndex => {
+      if (side == Serum3Side.bid) {
+        return serum3Market.quoteTokenIndex;
+      } else {
+        return serum3Market.baseTokenIndex;
+      }
+    })();
+
+    const receiverTokenIndex = ((): TokenIndex => {
+      if (side == Serum3Side.bid) {
+        return serum3Market.baseTokenIndex;
+      } else {
+        return serum3Market.quoteTokenIndex;
+      }
+    })();
+
+    const payerBank = group.getFirstBankByTokenIndex(payerTokenIndex);
+    const receiverBank = group.getFirstBankByTokenIndex(receiverTokenIndex);
+    const ix = await this.program.methods
+      .serum3PlaceOrderV2(
+        side,
+        limitPrice,
+        maxBaseQuantity,
+        maxQuoteQuantity,
+        selfTradeBehavior,
+        orderType,
+        new BN(clientOrderId),
+        limit,
+      )
+      .accounts({
+        group: group.publicKey,
+        account: mangoAccount.publicKey,
+        owner: (this.program.provider as AnchorProvider).wallet.publicKey,
+        openOrders:
+          openOrderPk ||
+          mangoAccount.getSerum3Account(serum3Market.marketIndex)?.openOrders,
+        serumMarket: serum3Market.publicKey,
+        serumProgram: OPENBOOK_PROGRAM_ID[this.cluster],
+        serumMarketExternal: serum3Market.serumMarketExternal,
+        marketBids: serum3MarketExternal.bidsAddress,
+        marketAsks: serum3MarketExternal.asksAddress,
+        marketEventQueue: serum3MarketExternal.decoded.eventQueue,
+        marketRequestQueue: serum3MarketExternal.decoded.requestQueue,
+        marketBaseVault: serum3MarketExternal.decoded.baseVault,
+        marketQuoteVault: serum3MarketExternal.decoded.quoteVault,
+        marketVaultSigner: serum3MarketExternalVaultSigner,
+        payerBank: payerBank.publicKey,
+        payerVault: payerBank.vault,
+        payerOracle: payerBank.oracle,
+      })
+      .remainingAccounts(
+        healthRemainingAccounts.map(
+          (pk) =>
+            ({
+              pubkey: pk,
+              isWritable: receiverBank.publicKey.equals(pk) ? true : false,
+              isSigner: false,
+            } as AccountMeta),
+        ),
+      )
+      .instruction();
+
+    ixs.push(ix);
+
+    return ixs;
+  }
+
   public async serum3PlaceOrder(
     group: Group,
     mangoAccount: MangoAccount,
@@ -2096,7 +2311,7 @@ export class MangoClient {
     clientOrderId: number,
     limit: number,
   ): Promise<MangoSignatureStatus> {
-    const placeOrderIxs = await this.serum3PlaceOrderIx(
+    const placeOrderIxs = await this.serum3PlaceOrderV2Ix(
       group,
       mangoAccount,
       externalMarketPk,
@@ -2318,6 +2533,58 @@ export class MangoClient {
     return await this.sendAndConfirmTransactionForGroup(group, ixs);
   }
 
+  public async serum3CancelOrderByClientIdIx(
+    group: Group,
+    mangoAccount: MangoAccount,
+    externalMarketPk: PublicKey,
+    clientOrderId: BN,
+  ): Promise<TransactionInstruction> {
+    const serum3Market = group.serum3MarketsMapByExternal.get(
+      externalMarketPk.toBase58(),
+    )!;
+
+    const serum3MarketExternal = group.serum3ExternalMarketsMap.get(
+      externalMarketPk.toBase58(),
+    )!;
+
+    const ix = await this.program.methods
+      .serum3CancelOrderByClientOrderId(clientOrderId)
+      .accounts({
+        group: group.publicKey,
+        account: mangoAccount.publicKey,
+        openOrders: mangoAccount.getSerum3Account(serum3Market.marketIndex)
+          ?.openOrders,
+        serumMarket: serum3Market.publicKey,
+        serumProgram: OPENBOOK_PROGRAM_ID[this.cluster],
+        serumMarketExternal: serum3Market.serumMarketExternal,
+        marketBids: serum3MarketExternal.bidsAddress,
+        marketAsks: serum3MarketExternal.asksAddress,
+        marketEventQueue: serum3MarketExternal.decoded.eventQueue,
+      })
+      .instruction();
+
+    return ix;
+  }
+
+  public async serum3CancelOrderByClientId(
+    group: Group,
+    mangoAccount: MangoAccount,
+    externalMarketPk: PublicKey,
+    clientOrderId: BN,
+  ): Promise<MangoSignatureStatus> {
+    const ixs = await Promise.all([
+      this.serum3CancelOrderByClientIdIx(
+        group,
+        mangoAccount,
+        externalMarketPk,
+        clientOrderId,
+      ),
+      this.serum3SettleFundsV2Ix(group, mangoAccount, externalMarketPk),
+    ]);
+
+    return await this.sendAndConfirmTransactionForGroup(group, ixs);
+  }
+
   // openbook v2
 
   public async openbookV2RegisterMarket(
@@ -2353,7 +2620,7 @@ export class MangoClient {
     const openbookV2Market =
       group.openbookV2MarketsMapByMarketIndex.get(openbookV2MarketIndex);
     const ix = await this.program.methods
-      .openbookV2EditMarket(reduceOnly, forceClose)
+      .openbookV2EditMarket(reduceOnly, forceClose, name)
       .accounts({
         group: group.publicKey,
         admin: (this.program.provider as AnchorProvider).wallet.publicKey,
@@ -4166,7 +4433,7 @@ export class MangoClient {
       [
         ...preInstructions,
         flashLoanBeginIx,
-        ...userDefinedInstructions.filter((ix) => ix.keys.length > 2),
+        ...userDefinedInstructions,
         flashLoanEndIx,
       ],
       { alts: [...group.addressLookupTablesList, ...userDefinedAlts] },
@@ -4267,6 +4534,31 @@ export class MangoClient {
     pricePremium: number | null,
     expiryTimestamp: number | null,
   ): Promise<MangoSignatureStatus> {
+    const ixs = await this.tcsTakeProfitOnDepositIx(
+      group,
+      account,
+      sellBank,
+      buyBank,
+      thresholdPrice,
+      thresholdPriceInSellPerBuyToken,
+      maxSell,
+      pricePremium,
+      expiryTimestamp,
+    );
+    return await this.sendAndConfirmTransactionForGroup(group, ixs);
+  }
+
+  public async tcsTakeProfitOnDepositIx(
+    group: Group,
+    account: MangoAccount,
+    sellBank: Bank,
+    buyBank: Bank,
+    thresholdPrice: number,
+    thresholdPriceInSellPerBuyToken: boolean,
+    maxSell: number | null,
+    pricePremium: number | null,
+    expiryTimestamp: number | null,
+  ): Promise<TransactionInstruction[]> {
     if (account.getTokenBalanceUi(sellBank) < 0) {
       throw new Error(
         `Only allowed to take profits on deposits! Current balance ${account.getTokenBalanceUi(
@@ -4286,7 +4578,7 @@ export class MangoClient {
     const lowerLimit = 0;
     const upperLimit = thresholdPriceNativeNative;
 
-    return await this.tokenConditionalSwapCreate(
+    return await this.tokenConditionalSwapCreateIx(
       group,
       account,
       sellBank,
@@ -4315,6 +4607,31 @@ export class MangoClient {
     pricePremium: number | null,
     expiryTimestamp: number | null,
   ): Promise<MangoSignatureStatus> {
+    const ixs = await this.tcsStopLossOnDepositIx(
+      group,
+      account,
+      sellBank,
+      buyBank,
+      thresholdPrice,
+      thresholdPriceInSellPerBuyToken,
+      maxSell,
+      pricePremium,
+      expiryTimestamp,
+    );
+    return await this.sendAndConfirmTransactionForGroup(group, ixs);
+  }
+
+  public async tcsStopLossOnDepositIx(
+    group: Group,
+    account: MangoAccount,
+    sellBank: Bank,
+    buyBank: Bank,
+    thresholdPrice: number,
+    thresholdPriceInSellPerBuyToken: boolean,
+    maxSell: number | null,
+    pricePremium: number | null,
+    expiryTimestamp: number | null,
+  ): Promise<TransactionInstruction[]> {
     if (account.getTokenBalanceUi(sellBank) < 0) {
       throw new Error(
         `Only allowed to set a stop loss on deposits! Current balance ${account.getTokenBalanceUi(
@@ -4334,7 +4651,7 @@ export class MangoClient {
     const lowerLimit = thresholdPriceNativeNative;
     const upperLimit = Number.MAX_SAFE_INTEGER;
 
-    return await this.tokenConditionalSwapCreate(
+    return await this.tokenConditionalSwapCreateIx(
       group,
       account,
       sellBank,
@@ -4364,6 +4681,33 @@ export class MangoClient {
     allowMargin: boolean | null,
     expiryTimestamp: number | null,
   ): Promise<MangoSignatureStatus> {
+    const ixs = await this.tcsTakeProfitOnBorrowIx(
+      group,
+      account,
+      sellBank,
+      buyBank,
+      thresholdPrice,
+      thresholdPriceInSellPerBuyToken,
+      maxBuyUi,
+      pricePremium,
+      allowMargin,
+      expiryTimestamp,
+    );
+    return await this.sendAndConfirmTransactionForGroup(group, ixs);
+  }
+
+  public async tcsTakeProfitOnBorrowIx(
+    group: Group,
+    account: MangoAccount,
+    sellBank: Bank,
+    buyBank: Bank,
+    thresholdPrice: number,
+    thresholdPriceInSellPerBuyToken: boolean,
+    maxBuyUi: number | null,
+    pricePremium: number | null,
+    allowMargin: boolean | null,
+    expiryTimestamp: number | null,
+  ): Promise<TransactionInstruction[]> {
     if (account.getTokenBalanceUi(buyBank) > 0) {
       throw new Error(
         `Only allowed to take profits on borrows! Current balance ${account.getTokenBalanceUi(
@@ -4383,7 +4727,7 @@ export class MangoClient {
     const lowerLimit = 0;
     const upperLimit = thresholdPriceNativeNative;
 
-    return await this.tokenConditionalSwapCreate(
+    return await this.tokenConditionalSwapCreateIx(
       group,
       account,
       sellBank,
@@ -4413,6 +4757,33 @@ export class MangoClient {
     allowMargin: boolean | null,
     expiryTimestamp: number | null,
   ): Promise<MangoSignatureStatus> {
+    const ixs = await this.tcsStopLossOnBorrowIx(
+      group,
+      account,
+      sellBank,
+      buyBank,
+      thresholdPrice,
+      thresholdPriceInSellPerBuyToken,
+      maxBuyUi,
+      pricePremium,
+      allowMargin,
+      expiryTimestamp,
+    );
+    return await this.sendAndConfirmTransactionForGroup(group, ixs);
+  }
+
+  public async tcsStopLossOnBorrowIx(
+    group: Group,
+    account: MangoAccount,
+    sellBank: Bank,
+    buyBank: Bank,
+    thresholdPrice: number,
+    thresholdPriceInSellPerBuyToken: boolean,
+    maxBuyUi: number | null,
+    pricePremium: number | null,
+    allowMargin: boolean | null,
+    expiryTimestamp: number | null,
+  ): Promise<TransactionInstruction[]> {
     if (account.getTokenBalanceUi(buyBank) > 0) {
       throw new Error(
         `Only allowed to set stop loss on borrows! Current balance ${account.getTokenBalanceUi(
@@ -4432,7 +4803,7 @@ export class MangoClient {
     const lowerLimit = thresholdPriceNativeNative;
     const upperLimit = Number.MAX_SAFE_INTEGER;
 
-    return await this.tokenConditionalSwapCreate(
+    return await this.tokenConditionalSwapCreateIx(
       group,
       account,
       sellBank,
@@ -4447,6 +4818,81 @@ export class MangoClient {
       allowMargin ?? false,
       expiryTimestamp,
       thresholdPriceInSellPerBuyToken,
+    );
+  }
+
+  public async tokenConditionalSwapCreateIx(
+    group: Group,
+    account: MangoAccount,
+    sellBank: Bank,
+    buyBank: Bank,
+    lowerLimitNativeNative: number,
+    upperLimitNativeNative: number,
+    maxBuy: number,
+    maxSell: number,
+    tcsIntention:
+      | 'TakeProfitOnDeposit'
+      | 'StopLossOnDeposit'
+      | 'TakeProfitOnBorrow'
+      | 'StopLossOnBorrow'
+      | null,
+    pricePremium: number | null,
+    allowCreatingDeposits: boolean,
+    allowCreatingBorrows: boolean,
+    expiryTimestamp: number | null,
+    displayPriceInSellTokenPerBuyToken: boolean,
+  ): Promise<TransactionInstruction[]> {
+    const maxBuyNative =
+      maxBuy == Number.MAX_SAFE_INTEGER
+        ? U64_MAX_BN
+        : toNative(maxBuy, buyBank.mintDecimals);
+    const maxSellNative =
+      maxSell == Number.MAX_SAFE_INTEGER
+        ? U64_MAX_BN
+        : toNative(maxSell, sellBank.mintDecimals);
+    pricePremium = TokenConditionalSwap.computePremium(
+      group,
+      buyBank,
+      sellBank,
+      maxBuyNative,
+      maxSellNative,
+      maxBuy,
+      maxSell,
+    );
+    const pricePremiumRate = pricePremium > 0 ? pricePremium / 100 : 0.03;
+
+    let intention: TokenConditionalSwapIntention;
+    switch (tcsIntention) {
+      case 'StopLossOnBorrow':
+      case 'StopLossOnDeposit':
+        intention = TokenConditionalSwapIntention.stopLoss;
+        break;
+      case 'TakeProfitOnBorrow':
+      case 'TakeProfitOnDeposit':
+        intention = TokenConditionalSwapIntention.takeProfit;
+        break;
+      default:
+        intention = TokenConditionalSwapIntention.unknown;
+        break;
+    }
+
+    return await this.tokenConditionalSwapCreateRawIx(
+      group,
+      account,
+      buyBank.mint,
+      sellBank.mint,
+      maxBuyNative,
+      maxSellNative,
+      expiryTimestamp,
+      lowerLimitNativeNative,
+      upperLimitNativeNative,
+      pricePremiumRate,
+      allowCreatingDeposits,
+      allowCreatingBorrows,
+      displayPriceInSellTokenPerBuyToken
+        ? TokenConditionalSwapDisplayPriceStyle.sellTokenPerBuyToken
+        : TokenConditionalSwapDisplayPriceStyle.buyTokenPerSellToken,
+      intention,
     );
   }
 
@@ -4525,7 +4971,7 @@ export class MangoClient {
     );
   }
 
-  public async tokenConditionalSwapCreateLinearAuction(
+  public async tokenConditionalSwapCreateLinearAuctionIx(
     group: Group,
     account: MangoAccount,
     sellBank: Bank,
@@ -4540,7 +4986,7 @@ export class MangoClient {
     startTimestamp: number,
     durationSeconds: number,
     expiryTimestamp: number | null,
-  ): Promise<MangoSignatureStatus> {
+  ): Promise<TransactionInstruction[]> {
     let maxBuyNative, maxSellNative;
     if (maxBuy == Number.MAX_SAFE_INTEGER) {
       maxBuyNative = U64_MAX_BN;
@@ -4604,10 +5050,45 @@ export class MangoClient {
     }
     ixs.push(tcsIx);
 
+    return ixs;
+  }
+
+  public async tokenConditionalSwapCreateLinearAuction(
+    group: Group,
+    account: MangoAccount,
+    sellBank: Bank,
+    buyBank: Bank,
+    priceStart: number,
+    priceEnd: number,
+    maxBuy: number,
+    maxSell: number,
+    allowCreatingDeposits: boolean,
+    allowCreatingBorrows: boolean,
+    displayPriceInSellTokenPerBuyToken: boolean,
+    startTimestamp: number,
+    durationSeconds: number,
+    expiryTimestamp: number | null,
+  ): Promise<MangoSignatureStatus> {
+    const ixs = await this.tokenConditionalSwapCreateLinearAuctionIx(
+      group,
+      account,
+      sellBank,
+      buyBank,
+      priceStart,
+      priceEnd,
+      maxBuy,
+      maxSell,
+      allowCreatingDeposits,
+      allowCreatingBorrows,
+      displayPriceInSellTokenPerBuyToken,
+      startTimestamp,
+      durationSeconds,
+      expiryTimestamp,
+    );
     return await this.sendAndConfirmTransactionForGroup(group, ixs);
   }
 
-  public async tokenConditionalSwapCreatePremiumAuction(
+  public async tokenConditionalSwapCreatePremiumAuctionIx(
     group: Group,
     account: MangoAccount,
     sellBank: Bank,
@@ -4628,7 +5109,7 @@ export class MangoClient {
     expiryTimestamp: number | null,
     displayPriceInSellTokenPerBuyToken: boolean,
     durationSeconds: number,
-  ): Promise<MangoSignatureStatus> {
+  ): Promise<TransactionInstruction[]> {
     const lowerLimitNative = toNativeSellPerBuyTokenPrice(
       lowerLimit,
       sellBank,
@@ -4738,6 +5219,47 @@ export class MangoClient {
     }
     ixs.push(tcsIx);
 
+    return ixs;
+  }
+  public async tokenConditionalSwapCreatePremiumAuction(
+    group: Group,
+    account: MangoAccount,
+    sellBank: Bank,
+    buyBank: Bank,
+    lowerLimit: number,
+    upperLimit: number,
+    maxBuy: number,
+    maxSell: number,
+    tcsIntention:
+      | 'TakeProfitOnDeposit'
+      | 'StopLossOnDeposit'
+      | 'TakeProfitOnBorrow'
+      | 'StopLossOnBorrow'
+      | null,
+    maxPricePremiumPercent: number | null,
+    allowCreatingDeposits: boolean,
+    allowCreatingBorrows: boolean,
+    expiryTimestamp: number | null,
+    displayPriceInSellTokenPerBuyToken: boolean,
+    durationSeconds: number,
+  ): Promise<MangoSignatureStatus> {
+    const ixs = await this.tokenConditionalSwapCreatePremiumAuctionIx(
+      group,
+      account,
+      sellBank,
+      buyBank,
+      lowerLimit,
+      upperLimit,
+      maxBuy,
+      maxSell,
+      tcsIntention,
+      maxPricePremiumPercent,
+      allowCreatingDeposits,
+      allowCreatingBorrows,
+      expiryTimestamp,
+      displayPriceInSellTokenPerBuyToken,
+      durationSeconds,
+    );
     return await this.sendAndConfirmTransactionForGroup(group, ixs);
   }
 
@@ -4757,6 +5279,41 @@ export class MangoClient {
     priceDisplayStyle: TokenConditionalSwapDisplayPriceStyle,
     intention: TokenConditionalSwapIntention,
   ): Promise<MangoSignatureStatus> {
+    const ixs = await this.tokenConditionalSwapCreateRawIx(
+      group,
+      account,
+      buyMintPk,
+      sellMintPk,
+      maxBuy,
+      maxSell,
+      expiryTimestamp,
+      priceLowerLimit,
+      priceUpperLimit,
+      pricePremiumRate,
+      allowCreatingDeposits,
+      allowCreatingBorrows,
+      priceDisplayStyle,
+      intention,
+    );
+    return await this.sendAndConfirmTransactionForGroup(group, ixs);
+  }
+
+  public async tokenConditionalSwapCreateRawIx(
+    group: Group,
+    account: MangoAccount,
+    buyMintPk: PublicKey,
+    sellMintPk: PublicKey,
+    maxBuy: BN,
+    maxSell: BN,
+    expiryTimestamp: number | null,
+    priceLowerLimit: number,
+    priceUpperLimit: number,
+    pricePremiumRate: number,
+    allowCreatingDeposits: boolean,
+    allowCreatingBorrows: boolean,
+    priceDisplayStyle: TokenConditionalSwapDisplayPriceStyle,
+    intention: TokenConditionalSwapIntention,
+  ): Promise<TransactionInstruction[]> {
     const buyBank: Bank = group.getFirstBankByMint(buyMintPk);
     const sellBank: Bank = group.getFirstBankByMint(sellMintPk);
     const tcsIx = await this.program.methods
@@ -4797,14 +5354,14 @@ export class MangoClient {
     }
     ixs.push(tcsIx);
 
-    return await this.sendAndConfirmTransactionForGroup(group, ixs);
+    return ixs;
   }
 
-  public async tokenConditionalSwapCancel(
+  public async tokenConditionalSwapCancelIx(
     group: Group,
     account: MangoAccount,
     tokenConditionalSwapId: BN,
-  ): Promise<MangoSignatureStatus> {
+  ): Promise<TransactionInstruction> {
     const tokenConditionalSwapIndex = account.tokenConditionalSwaps.findIndex(
       (tcs) => tcs.id.eq(tokenConditionalSwapId),
     );
@@ -4816,7 +5373,7 @@ export class MangoClient {
     const buyBank = group.banksMapByTokenIndex.get(tcs.buyTokenIndex)![0];
     const sellBank = group.banksMapByTokenIndex.get(tcs.sellTokenIndex)![0];
 
-    const ix = await this.program.methods
+    return this.program.methods
       .tokenConditionalSwapCancel(
         tokenConditionalSwapIndex,
         new BN(tokenConditionalSwapId),
@@ -4829,7 +5386,18 @@ export class MangoClient {
         sellBank: sellBank.publicKey,
       })
       .instruction();
+  }
 
+  public async tokenConditionalSwapCancel(
+    group: Group,
+    account: MangoAccount,
+    tokenConditionalSwapId: BN,
+  ): Promise<MangoSignatureStatus> {
+    const ix = await this.tokenConditionalSwapCancelIx(
+      group,
+      account,
+      tokenConditionalSwapId,
+    );
     return await this.sendAndConfirmTransactionForGroup(group, [ix]);
   }
 
@@ -4839,7 +5407,7 @@ export class MangoClient {
   ): Promise<MangoSignatureStatus> {
     const ixs = await Promise.all(
       account.tokenConditionalSwaps
-        .filter((tcs) => tcs.hasData)
+        .filter((tcs) => tcs.isConfigured)
         .map(async (tcs, i) => {
           const buyBank = group.banksMapByTokenIndex.get(tcs.buyTokenIndex)![0];
           const sellBank = group.banksMapByTokenIndex.get(
@@ -4870,6 +5438,26 @@ export class MangoClient {
     maxBuyTokenToLiqee: number,
     maxSellTokenToLiqor: number,
   ): Promise<MangoSignatureStatus> {
+    const ix = await this.tokenConditionalSwapTriggerIx(
+      group,
+      liqee,
+      liqor,
+      tokenConditionalSwapId,
+      maxBuyTokenToLiqee,
+      maxSellTokenToLiqor,
+    );
+
+    return await this.sendAndConfirmTransactionForGroup(group, [ix]);
+  }
+
+  public async tokenConditionalSwapTriggerIx(
+    group: Group,
+    liqee: MangoAccount,
+    liqor: MangoAccount,
+    tokenConditionalSwapId: BN,
+    maxBuyTokenToLiqee: number,
+    maxSellTokenToLiqor: number,
+  ): Promise<TransactionInstruction> {
     const tokenConditionalSwapIndex = liqee.tokenConditionalSwaps.findIndex(
       (tcs) => tcs.id.eq(tokenConditionalSwapId),
     );
@@ -4901,7 +5489,7 @@ export class MangoClient {
         } as AccountMeta),
     );
 
-    const ix = await this.program.methods
+    return this.program.methods
       .tokenConditionalSwapTrigger(
         tokenConditionalSwapIndex,
         new BN(tokenConditionalSwapId),
@@ -4917,8 +5505,6 @@ export class MangoClient {
       })
       .remainingAccounts(parsedHealthAccounts)
       .instruction();
-
-    return await this.sendAndConfirmTransactionForGroup(group, [ix]);
   }
 
   public async altSet(
@@ -5318,7 +5904,7 @@ export class MangoClient {
         orderId,
       ),
       this.serum3SettleFundsV2Ix(group, mangoAccount, externalMarketPk),
-      this.serum3PlaceOrderIx(
+      this.serum3PlaceOrderV2Ix(
         group,
         mangoAccount,
         externalMarketPk,

@@ -8,7 +8,7 @@ use crate::error::MangoError;
 use crate::state::*;
 
 use crate::accounts_ix::*;
-use crate::logs::TokenMetaDataLog;
+use crate::logs::{emit_stack, TokenMetaDataLogV2};
 use crate::util::fill_from_str;
 
 #[allow(unused_variables)]
@@ -49,6 +49,8 @@ pub fn token_edit(
     maint_weight_shift_asset_target_opt: Option<f32>,
     maint_weight_shift_liab_target_opt: Option<f32>,
     maint_weight_shift_abort: bool,
+    set_fallback_oracle: bool,
+    deposit_limit_opt: Option<u64>,
 ) -> Result<()> {
     let group = ctx.accounts.group.load()?;
 
@@ -76,11 +78,25 @@ pub fn token_edit(
             mint_info.oracle = oracle;
             require_group_admin = true;
         }
+        if set_fallback_oracle {
+            msg!(
+                "Fallback oracle old {:?}, new {:?}",
+                bank.fallback_oracle,
+                ctx.accounts.fallback_oracle.key()
+            );
+            check_is_valid_fallback_oracle(&AccountInfoRef::borrow(
+                ctx.accounts.fallback_oracle.as_ref(),
+            )?)?;
+            bank.fallback_oracle = ctx.accounts.fallback_oracle.key();
+            mint_info.fallback_oracle = ctx.accounts.fallback_oracle.key();
+            require_group_admin = true;
+        }
         if reset_stable_price {
             msg!("Stable price reset");
             require_keys_eq!(bank.oracle, ctx.accounts.oracle.key());
+            let oracle_ref = &AccountInfoRef::borrow(ctx.accounts.oracle.as_ref())?;
             let oracle_price =
-                bank.oracle_price(&AccountInfoRef::borrow(ctx.accounts.oracle.as_ref())?, None)?;
+                bank.oracle_price(&OracleAccountInfos::from_reader(oracle_ref), None)?;
             bank.stable_price_model.reset_to_price(
                 oracle_price.to_num(),
                 Clock::get()?.unix_timestamp.try_into().unwrap(),
@@ -436,6 +452,16 @@ pub fn token_edit(
                 bank.maint_weight_shift_duration_inv.is_positive(),
             );
         }
+
+        if let Some(deposit_limit) = deposit_limit_opt {
+            msg!(
+                "Deposit limit old {:?}, new {:?}",
+                bank.deposit_limit,
+                deposit_limit
+            );
+            bank.deposit_limit = deposit_limit;
+            require_group_admin = true;
+        }
     }
 
     // account constraint #1
@@ -456,12 +482,13 @@ pub fn token_edit(
     let bank = ctx.remaining_accounts.first().unwrap().load_mut::<Bank>()?;
     bank.verify()?;
 
-    emit!(TokenMetaDataLog {
+    emit_stack(TokenMetaDataLogV2 {
         mango_group: ctx.accounts.group.key(),
         mint: mint_info.mint.key(),
         token_index: bank.token_index,
         mint_decimals: bank.mint_decimals,
         oracle: mint_info.oracle.key(),
+        fallback_oracle: ctx.accounts.fallback_oracle.key(),
         mint_info: ctx.accounts.mint_info.key(),
     });
 

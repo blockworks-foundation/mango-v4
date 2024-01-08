@@ -92,7 +92,10 @@ pub struct Group {
     /// in seconds since epoch
     pub fast_listing_interval_start: u64,
 
+    /// Number of fast listings that happened this interval
     pub fast_listings_in_interval: u16,
+
+    /// Number of fast listings that are allowed per interval
     pub allowed_fast_listings_per_interval: u16,
 
     pub reserved: [u8; 1812],
@@ -220,6 +223,7 @@ pub enum IxGate {
     TokenConditionalSwapStart = 68,
     TokenConditionalSwapCreatePremiumAuction = 69,
     TokenConditionalSwapCreateLinearAuction = 70,
+    Serum3PlaceOrderV2 = 71,
     // NOTE: Adding new variants requires matching changes in ts and the ix_gate_set instruction.
 }
 

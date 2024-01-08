@@ -71,6 +71,7 @@ async fn test_token_conditional_swap_basic() -> Result<(), TransportError> {
             group,
             admin,
             mint: quote_token.mint.pubkey,
+            fallback_oracle: Pubkey::default(),
             options: mango_v4::instruction::TokenEdit {
                 token_conditional_swap_taker_fee_rate_opt: Some(0.05),
                 token_conditional_swap_maker_fee_rate_opt: Some(0.1),
@@ -388,6 +389,7 @@ async fn test_token_conditional_swap_linear_auction() -> Result<(), TransportErr
             group,
             admin,
             mint: quote_token.mint.pubkey,
+            fallback_oracle: Pubkey::default(),
             options: mango_v4::instruction::TokenEdit {
                 token_conditional_swap_taker_fee_rate_opt: Some(0.05),
                 token_conditional_swap_maker_fee_rate_opt: Some(0.1),
@@ -648,6 +650,7 @@ async fn test_token_conditional_swap_premium_auction() -> Result<(), TransportEr
             group,
             admin,
             mint: quote_token.mint.pubkey,
+            fallback_oracle: Pubkey::default(),
             options: mango_v4::instruction::TokenEdit {
                 token_conditional_swap_taker_fee_rate_opt: Some(0.05),
                 token_conditional_swap_maker_fee_rate_opt: Some(0.1),
@@ -1010,6 +1013,149 @@ async fn test_token_conditional_swap_premium_auction() -> Result<(), TransportEr
         MangoError::TokenConditionalSwapAlreadyStarted.into(),
         "already started".to_string(),
     );
+
+    Ok(())
+}
+
+#[tokio::test]
+async fn test_token_conditional_swap_deposit_limit() -> Result<(), TransportError> {
+    pub use utils::assert_equal_f64_f64 as assert_equal_f_f;
+
+    let context = TestContext::new().await;
+    let solana = &context.solana.clone();
+
+    let admin = TestKeypair::new();
+    let owner = context.users[0].key;
+    let payer = context.users[1].key;
+    let mints = &context.mints[0..2];
+
+    //
+    // SETUP: Create a group, account, tokens
+    //
+
+    let mango_setup::GroupWithTokens { group, tokens, .. } = mango_setup::GroupWithTokensConfig {
+        admin,
+        payer,
+        mints: mints.to_vec(),
+        ..mango_setup::GroupWithTokensConfig::default()
+    }
+    .create(solana)
+    .await;
+    let quote_token = &tokens[0];
+    let base_token = &tokens[1];
+
+    // total deposits on quote and base is 2x this value
+    let deposit_amount = 1_000f64;
+    let account = create_funded_account(
+        &solana,
+        group,
+        owner,
+        0,
+        &context.users[1],
+        &mints[..1],
+        deposit_amount as u64,
+        0,
+    )
+    .await;
+    let liqor = create_funded_account(
+        &solana,
+        group,
+        owner,
+        1,
+        &context.users[1],
+        mints,
+        deposit_amount as u64,
+        0,
+    )
+    .await;
+    create_funded_account(
+        &solana,
+        group,
+        owner,
+        99,
+        &context.users[1],
+        &mints[1..],
+        deposit_amount as u64,
+        0,
+    )
+    .await;
+
+    //
+    // SETUP: A base deposit limit
+    //
+    send_tx(
+        solana,
+        TokenEdit {
+            group,
+            admin,
+            mint: base_token.mint.pubkey,
+            fallback_oracle: Pubkey::default(),
+            options: mango_v4::instruction::TokenEdit {
+                deposit_limit_opt: Some(2500),
+                ..token_edit_instruction_default()
+            },
+        },
+    )
+    .await
+    .unwrap();
+
+    //
+    // SETUP: Sell base token from "account" creating borrows that are deposited into liqor,
+    // increasing the total deposits
+    //
+    send_tx(
+        solana,
+        TokenConditionalSwapCreateInstruction {
+            account,
+            owner,
+            buy_mint: quote_token.mint.pubkey,
+            sell_mint: base_token.mint.pubkey,
+            max_buy: 900,
+            max_sell: 900,
+            price_lower_limit: 0.0,
+            price_upper_limit: 10.0,
+            price_premium_rate: 0.01,
+            allow_creating_deposits: true,
+            allow_creating_borrows: true,
+        },
+    )
+    .await
+    .unwrap();
+
+    //
+    // TEST: Large execution fails, a bit smaller is ok
+    //
+
+    send_tx_expect_error!(
+        solana,
+        TokenConditionalSwapTriggerInstruction {
+            liqee: account,
+            liqor,
+            liqor_owner: owner,
+            index: 0,
+            max_buy_token_to_liqee: 100000,
+            max_sell_token_to_liqor: 501,
+            min_buy_token: 1,
+            min_taker_price: 0.0,
+        },
+        MangoError::BankDepositLimit,
+    );
+
+    send_tx(
+        solana,
+        TokenConditionalSwapTriggerInstruction {
+            liqee: account,
+            liqor,
+            liqor_owner: owner,
+            index: 0,
+            max_buy_token_to_liqee: 100000,
+            max_sell_token_to_liqor: 499,
+            min_buy_token: 1,
+            min_taker_price: 0.0,
+        },
+    )
+    .await
+    .unwrap();
 
     Ok(())
 }

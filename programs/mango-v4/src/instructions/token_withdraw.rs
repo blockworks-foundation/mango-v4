@@ -3,11 +3,16 @@ use crate::error::*;
 use crate::health::*;
 use crate::state::*;
 use anchor_lang::prelude::*;
+use anchor_spl::associated_token;
 use anchor_spl::token;
 use fixed::types::I80F48;
 
 use crate::accounts_ix::*;
-use crate::logs::{LoanOriginationFeeInstruction, TokenBalanceLog, WithdrawLoanLog, WithdrawLog};
+use crate::logs::{
+    emit_stack, LoanOriginationFeeInstruction, TokenBalanceLog, WithdrawLoanLog, WithdrawLog,
+};
+
+const DELEGATE_WITHDRAW_MAX: i64 = 100_000; // $0.1
 
 pub fn token_withdraw(ctx: Context<TokenWithdraw>, amount: u64, allow_borrow: bool) -> Result<()> {
     require_msg!(amount > 0, "withdraw amount must be positive");
@@ -68,8 +73,9 @@ pub fn token_withdraw(ctx: Context<TokenWithdraw>, amount: u64, allow_borrow: bo
 
     // Get the oracle price, even if stale or unconfident: We want to allow users
     // to withdraw deposits (while staying healthy otherwise) if the oracle is bad.
+    let oracle_ref = &AccountInfoRef::borrow(ctx.accounts.oracle.as_ref())?;
     let unsafe_oracle_state = oracle_state_unchecked(
-        &AccountInfoRef::borrow(ctx.accounts.oracle.as_ref())?,
+        &OracleAccountInfos::from_reader(oracle_ref),
         bank.mint_decimals,
     )?;
 
@@ -79,6 +85,7 @@ pub fn token_withdraw(ctx: Context<TokenWithdraw>, amount: u64, allow_borrow: bo
         amount_i80f48,
         Clock::get()?.unix_timestamp.try_into().unwrap(),
     )?;
+    let native_position_after = position.native(&bank);
 
     // Avoid getting in trouble because of the mutable bank account borrow later
     drop(bank);
@@ -101,9 +108,7 @@ pub fn token_withdraw(ctx: Context<TokenWithdraw>, amount: u64, allow_borrow: bo
         amount,
     )?;
 
-    let native_position_after = position.native(&bank);
-
-    emit!(TokenBalanceLog {
+    emit_stack(TokenBalanceLog {
         mango_group: ctx.accounts.group.key(),
         mango_account: ctx.accounts.account.key(),
         token_index,
@@ -115,6 +120,33 @@ pub fn token_withdraw(ctx: Context<TokenWithdraw>, amount: u64, allow_borrow: bo
     // Update the net deposits - adjust by price so different tokens are on the same basis (in USD terms)
     let amount_usd = (amount_i80f48 * unsafe_oracle_state.price).to_num::<i64>();
     account.fixed.net_deposits -= amount_usd;
+
+    // Delegates have heavy restrictions on withdraws. #1
+    if account.fixed.is_delegate(ctx.accounts.owner.key()) {
+        // Delegates can only withdrawing into the actual owner's ATA
+        let owner_ata = associated_token::get_associated_token_address(
+            &account.fixed.owner,
+            &ctx.accounts.vault.mint,
+        );
+        require_keys_eq!(
+            ctx.accounts.token_account.key(),
+            owner_ata,
+            MangoError::DelegateWithdrawOnlyToOwnerAta
+        );
+
+        // Delegates must close the token position
+        require!(
+            !withdraw_result.position_is_active,
+            MangoError::DelegateWithdrawMustClosePosition
+        );
+
+        // Delegates can't withdraw too much
+        require_gte!(
+            DELEGATE_WITHDRAW_MAX,
+            amount_usd,
+            MangoError::DelegateWithdrawSmall
+        );
+    }
 
     //
     // Health check
@@ -151,7 +183,7 @@ pub fn token_withdraw(ctx: Context<TokenWithdraw>, amount: u64, allow_borrow: bo
         account.deactivate_token_position_and_log(raw_token_index, ctx.accounts.account.key());
     }
 
-    emit!(WithdrawLog {
+    emit_stack(WithdrawLog {
         mango_group: ctx.accounts.group.key(),
         mango_account: ctx.accounts.account.key(),
         signer: ctx.accounts.owner.key(),
@@ -161,7 +193,7 @@ pub fn token_withdraw(ctx: Context<TokenWithdraw>, amount: u64, allow_borrow: bo
     });
 
     if withdraw_result.loan_origination_fee.is_positive() {
-        emit!(WithdrawLoanLog {
+        emit_stack(WithdrawLoanLog {
             mango_group: ctx.accounts.group.key(),
             mango_account: ctx.accounts.account.key(),
             token_index,
@@ -174,17 +206,24 @@ pub fn token_withdraw(ctx: Context<TokenWithdraw>, amount: u64, allow_borrow: bo
 
     // Enforce min vault to deposits ratio and net borrow limits
     if is_borrow {
-        ctx.accounts.vault.reload()?;
-        bank.enforce_min_vault_to_deposits_ratio(ctx.accounts.vault.as_ref())?;
+        bank.enforce_max_utilization_on_borrow()?;
 
         // When borrowing the price has be trustworthy, so we can do a reasonable
         // net borrow check.
-        unsafe_oracle_state.check_confidence_and_maybe_staleness(
-            &bank.oracle,
-            &bank.oracle_config,
-            Some(Clock::get()?.slot),
-        )?;
+        let slot_opt = Some(Clock::get()?.slot);
+        unsafe_oracle_state
+            .check_confidence_and_maybe_staleness(&bank.oracle_config, slot_opt)
+            .with_context(|| {
+                oracle_log_context(
+                    bank.name(),
+                    &unsafe_oracle_state,
+                    &bank.oracle_config,
+                    slot_opt,
+                )
+            })?;
         bank.check_net_borrows(unsafe_oracle_state.price)?;
+    } else {
+        bank.enforce_borrows_lte_deposits()?;
     }
 
     Ok(())

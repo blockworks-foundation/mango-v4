@@ -5,10 +5,9 @@ use crate::accounts_ix::*;
 use crate::error::*;
 use crate::health::*;
 use crate::i80f48::ClampToInt;
-use crate::logs::TokenConditionalSwapCancelLog;
 use crate::logs::{
-    LoanOriginationFeeInstruction, TokenBalanceLog, TokenConditionalSwapTriggerLogV3,
-    WithdrawLoanLog,
+    emit_stack, LoanOriginationFeeInstruction, TokenBalanceLog, TokenConditionalSwapCancelLog,
+    TokenConditionalSwapTriggerLogV3, WithdrawLoanLog,
 };
 use crate::state::*;
 
@@ -73,7 +72,7 @@ pub fn token_conditional_swap_trigger(
         liqee.token_decrement_dust_deactivate(sell_bank, now_ts, liqee_key)?;
 
         msg!("TokenConditionalSwap is expired, removing");
-        emit!(TokenConditionalSwapCancelLog {
+        emit_stack(TokenConditionalSwapCancelLog {
             mango_group: ctx.accounts.group.key(),
             mango_account: ctx.accounts.liqee.key(),
             id: token_conditional_swap_id,
@@ -295,9 +294,15 @@ fn action(
 
     let (liqee_buy_token, liqee_buy_raw_index) = liqee.token_position_mut(tcs.buy_token_index)?;
     let (liqor_buy_token, liqor_buy_raw_index) = liqor.token_position_mut(tcs.buy_token_index)?;
-    buy_bank.deposit(liqee_buy_token, buy_token_amount_i80f48, now_ts)?;
-    let liqor_buy_withdraw =
-        buy_bank.withdraw_with_fee(liqor_buy_token, buy_token_amount_i80f48, now_ts)?;
+    let buy_transfer = buy_bank.checked_transfer_with_fee(
+        liqor_buy_token,
+        buy_token_amount_i80f48,
+        liqee_buy_token,
+        buy_token_amount_i80f48,
+        now_ts,
+        buy_token_price,
+    )?;
+    let liqor_buy_active = buy_transfer.source_is_active;
 
     let post_liqee_buy_token = liqee_buy_token.native(&buy_bank);
     let post_liqor_buy_token = liqor_buy_token.native(&buy_bank);
@@ -308,27 +313,17 @@ fn action(
         liqee.token_position_mut(tcs.sell_token_index)?;
     let (liqor_sell_token, liqor_sell_raw_index) =
         liqor.token_position_mut(tcs.sell_token_index)?;
-    let liqor_sell_active = sell_bank.deposit(
+    let sell_transfer = sell_bank.checked_transfer_with_fee(
+        liqee_sell_token,
+        I80F48::from(sell_token_amount_from_liqee),
         liqor_sell_token,
         I80F48::from(sell_token_amount_to_liqor),
         now_ts,
+        sell_token_price,
     )?;
-    let liqee_sell_withdraw = sell_bank.withdraw_with_fee(
-        liqee_sell_token,
-        I80F48::from(sell_token_amount_from_liqee),
-        now_ts,
-    )?;
+    let liqor_sell_active = sell_transfer.target_is_active;
 
     sell_bank.collected_fees_native += I80F48::from(maker_fee + taker_fee);
-
-    // Check net borrows on both banks.
-    //
-    // While tcs triggering doesn't cause actual tokens to leave the platform, it can increase the amount
-    // of borrows. For instance, if someone with USDC has a tcs to buy SOL and sell BTC, execution would
-    // create BTC borrows (unless the executor had BTC borrows that get repaid by the execution, but
-    // most executors will work on margin)
-    buy_bank.check_net_borrows(buy_token_price)?;
-    sell_bank.check_net_borrows(sell_token_price)?;
 
     let post_liqee_sell_token = liqee_sell_token.native(&sell_bank);
     let post_liqor_sell_token = liqor_sell_token.native(&sell_bank);
@@ -337,7 +332,7 @@ fn action(
 
     // With a scanning account retriever, it's safe to deactivate inactive token positions immediately.
     // Liqee positions can only be deactivated if the tcs is closed (see below).
-    if !liqor_buy_withdraw.position_is_active {
+    if !liqor_buy_active {
         liqor.deactivate_token_position_and_log(liqor_buy_raw_index, liqor_key);
     }
     if !liqor_sell_active {
@@ -347,7 +342,7 @@ fn action(
     // Log info
 
     // liqee buy token
-    emit!(TokenBalanceLog {
+    emit_stack(TokenBalanceLog {
         mango_group: liqee.fixed.group,
         mango_account: liqee_key,
         token_index: tcs.buy_token_index,
@@ -356,7 +351,7 @@ fn action(
         borrow_index: buy_bank.borrow_index.to_bits(),
     });
     // liqee sell token
-    emit!(TokenBalanceLog {
+    emit_stack(TokenBalanceLog {
         mango_group: liqee.fixed.group,
         mango_account: liqee_key,
         token_index: tcs.sell_token_index,
@@ -365,7 +360,7 @@ fn action(
         borrow_index: sell_bank.borrow_index.to_bits(),
     });
     // liqor buy token
-    emit!(TokenBalanceLog {
+    emit_stack(TokenBalanceLog {
         mango_group: liqee.fixed.group,
         mango_account: liqor_key,
         token_index: tcs.buy_token_index,
@@ -374,7 +369,7 @@ fn action(
         borrow_index: buy_bank.borrow_index.to_bits(),
     });
     // liqor sell token
-    emit!(TokenBalanceLog {
+    emit_stack(TokenBalanceLog {
         mango_group: liqee.fixed.group,
         mango_account: liqor_key,
         token_index: tcs.sell_token_index,
@@ -383,24 +378,24 @@ fn action(
         borrow_index: sell_bank.borrow_index.to_bits(),
     });
 
-    if liqor_buy_withdraw.has_loan() {
-        emit!(WithdrawLoanLog {
+    if buy_transfer.has_loan() {
+        emit_stack(WithdrawLoanLog {
             mango_group: liqee.fixed.group,
             mango_account: liqor_key,
             token_index: tcs.buy_token_index,
-            loan_amount: liqor_buy_withdraw.loan_amount.to_bits(),
-            loan_origination_fee: liqor_buy_withdraw.loan_origination_fee.to_bits(),
+            loan_amount: buy_transfer.loan_amount.to_bits(),
+            loan_origination_fee: buy_transfer.loan_origination_fee.to_bits(),
             instruction: LoanOriginationFeeInstruction::TokenConditionalSwapTrigger,
             price: Some(buy_token_price.to_bits()),
         });
     }
-    if liqee_sell_withdraw.has_loan() {
-        emit!(WithdrawLoanLog {
+    if sell_transfer.has_loan() {
+        emit_stack(WithdrawLoanLog {
             mango_group: liqee.fixed.group,
             mango_account: liqee_key,
             token_index: tcs.sell_token_index,
-            loan_amount: liqee_sell_withdraw.loan_amount.to_bits(),
-            loan_origination_fee: liqee_sell_withdraw.loan_origination_fee.to_bits(),
+            loan_amount: sell_transfer.loan_amount.to_bits(),
+            loan_origination_fee: sell_transfer.loan_origination_fee.to_bits(),
             instruction: LoanOriginationFeeInstruction::TokenConditionalSwapTrigger,
             price: Some(sell_token_price.to_bits()),
         });
@@ -488,7 +483,7 @@ fn action(
         liqee.token_decrement_dust_deactivate(sell_bank, now_ts, liqee_key)?;
     }
 
-    emit!(TokenConditionalSwapTriggerLogV3 {
+    emit_stack(TokenConditionalSwapTriggerLogV3 {
         mango_group: liqee.fixed.group,
         liqee: liqee_key,
         liqor: liqor_key,

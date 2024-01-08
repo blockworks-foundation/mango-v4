@@ -1,7 +1,7 @@
 use anchor_lang::prelude::*;
 
 use crate::accounts_ix::*;
-use crate::logs::TokenConditionalSwapCreateLogV3;
+use crate::logs::{emit_stack, TokenConditionalSwapCreateLogV3};
 use crate::state::*;
 
 #[allow(clippy::too_many_arguments)]
@@ -56,7 +56,7 @@ pub fn token_conditional_swap_create(
     require_gte!(tcs.price_lower_limit, 0.0);
     require_gte!(tcs.price_upper_limit, 0.0);
 
-    emit!(TokenConditionalSwapCreateLogV3 {
+    emit_stack(TokenConditionalSwapCreateLogV3 {
         mango_group: ctx.accounts.group.key(),
         mango_account: ctx.accounts.account.key(),
         id,

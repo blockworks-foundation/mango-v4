@@ -16,7 +16,7 @@ async fn test_delegate() -> Result<(), TransportError> {
     // SETUP: Create a group, register a token (mint0), create an account
     //
 
-    let GroupWithTokens { group, tokens, .. } = GroupWithTokensConfig {
+    let GroupWithTokens { group, .. } = GroupWithTokensConfig {
         admin,
         payer,
         mints: mints.to_vec(),
@@ -24,7 +24,6 @@ async fn test_delegate() -> Result<(), TransportError> {
     }
     .create(solana)
     .await;
-    let bank = tokens[0].bank;
 
     let account =
         create_funded_account(&solana, group, owner, 0, &context.users[1], mints, 100, 0).await;
@@ -86,14 +85,14 @@ async fn test_delegate() -> Result<(), TransportError> {
     }
 
     //
-    // TEST: Close account as delegate should fail
+    // TEST: Withdrawing a tiny amount as delegate should be ok
     //
     {
-        let bank_data: Bank = solana.get_account(bank).await;
-        mango_client::send_tx(
+        // withdraw most
+        send_tx(
             solana,
             TokenWithdrawInstruction {
-                amount: bank_data.native_deposits().to_num(),
+                amount: 99,
                 allow_borrow: false,
                 account,
                 owner,
@@ -103,7 +102,27 @@ async fn test_delegate() -> Result<(), TransportError> {
         )
         .await
         .unwrap();
-        let res = mango_client::send_tx(
+
+        send_tx(
+            solana,
+            TokenWithdrawInstruction {
+                amount: u64::MAX,
+                allow_borrow: false,
+                account,
+                owner: delegate,
+                token_account: context.users[0].token_accounts[0],
+                bank_index: 0,
+            },
+        )
+        .await
+        .unwrap();
+    }
+
+    //
+    // TEST: Close account as delegate should fail
+    //
+    {
+        let res = send_tx(
             solana,
             AccountCloseInstruction {
                 group,

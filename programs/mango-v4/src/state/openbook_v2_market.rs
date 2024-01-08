@@ -26,7 +26,13 @@ pub struct OpenbookV2Market {
 
     pub bump: u8,
 
-    pub padding2: [u8; 5],
+    pub padding2: [u8; 1],
+
+    /// Limit orders must be <= oracle * (1+band) and >= oracle / (1+band)
+    ///
+    /// Zero value is the default due to migration and disables the limit,
+    /// same as f32::MAX.
+    pub oracle_price_band: f32,
 
     pub registration_time: u64,
 
@@ -52,6 +58,14 @@ impl OpenbookV2Market {
 
     pub fn is_force_close(&self) -> bool {
         self.force_close == 1
+    }
+
+    pub fn oracle_price_band(&self) -> f32 {
+        if self.oracle_price_band == 0.0 {
+            f32::MAX // default disabled
+        } else {
+            self.oracle_price_band
+        }
     }
 }
 

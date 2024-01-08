@@ -4,7 +4,7 @@ use crate::accounts_ix::*;
 
 use crate::accounts_zerocopy::AccountInfoRef;
 use crate::error::MangoError;
-use crate::logs::{emit_perp_balances, PerpForceClosePositionLog};
+use crate::logs::{emit_perp_balances, emit_stack, PerpForceClosePositionLog};
 use crate::state::*;
 use fixed::types::I80F48;
 
@@ -34,10 +34,9 @@ pub fn perp_force_close_position(ctx: Context<PerpForceClosePosition>) -> Result
         .min(account_b_perp_position.base_position_lots().abs())
         .max(0);
     let now_slot = Clock::get()?.slot;
-    let oracle_price = perp_market.oracle_price(
-        &AccountInfoRef::borrow(ctx.accounts.oracle.as_ref())?,
-        Some(now_slot),
-    )?;
+    let oracle_ref = &AccountInfoRef::borrow(ctx.accounts.oracle.as_ref())?;
+    let oracle_price =
+        perp_market.oracle_price(&OracleAccountInfos::from_reader(oracle_ref), Some(now_slot))?;
     let quote_transfer = I80F48::from(base_transfer * perp_market.base_lot_size) * oracle_price;
 
     account_a_perp_position.record_trade(&mut perp_market, -base_transfer, quote_transfer);
@@ -56,7 +55,7 @@ pub fn perp_force_close_position(ctx: Context<PerpForceClosePosition>) -> Result
         &perp_market,
     );
 
-    emit!(PerpForceClosePositionLog {
+    emit_stack(PerpForceClosePositionLog {
         mango_group: ctx.accounts.group.key(),
         perp_market_index: perp_market.perp_market_index,
         account_a: ctx.accounts.account_a.key(),

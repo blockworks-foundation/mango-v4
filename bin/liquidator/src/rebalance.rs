@@ -1,8 +1,8 @@
 use itertools::Itertools;
 use mango_v4::accounts_zerocopy::KeyedAccountSharedData;
 use mango_v4::state::{
-    Bank, BookSide, MangoAccountValue, PerpPosition, PlaceOrderType, Side, TokenIndex,
-    QUOTE_TOKEN_INDEX,
+    Bank, BookSide, MangoAccountValue, OracleAccountInfos, PerpMarket, PerpPosition,
+    PlaceOrderType, Side, TokenIndex, QUOTE_TOKEN_INDEX,
 };
 use mango_v4_client::{
     chain_data, jupiter, perp_pnl, MangoClient, PerpMarketContext, TokenContext,
@@ -34,7 +34,7 @@ fn token_bank(
     token: &TokenContext,
     account_fetcher: &chain_data::AccountFetcher,
 ) -> anyhow::Result<Bank> {
-    account_fetcher.fetch::<Bank>(&token.mint_info.first_bank())
+    account_fetcher.fetch::<Bank>(&token.first_bank())
 }
 
 pub struct Rebalancer {
@@ -121,8 +121,8 @@ impl Rebalancer {
                 .get("SOL") // TODO: better use mint
                 .unwrap(),
         );
-        let quote_mint = quote_token.mint_info.mint;
-        let sol_mint = sol_token.mint_info.mint;
+        let quote_mint = quote_token.mint;
+        let sol_mint = sol_token.mint;
         let jupiter_version = self.config.jupiter_version;
 
         let full_route_job = self.jupiter_quote(
@@ -143,7 +143,7 @@ impl Rebalancer {
         // For the SOL -> output route we need to adjust the in amount by the SOL price
         let sol_price = self
             .account_fetcher
-            .fetch_bank_price(&sol_token.mint_info.first_bank())?;
+            .fetch_bank_price(&sol_token.first_bank())?;
         let in_amount_sol = (I80F48::from(in_amount_quote) / sol_price)
             .ceil()
             .to_num::<u64>();
@@ -199,8 +199,8 @@ impl Rebalancer {
                 .get("SOL") // TODO: better use mint
                 .unwrap(),
         );
-        let quote_mint = quote_token.mint_info.mint;
-        let sol_mint = sol_token.mint_info.mint;
+        let quote_mint = quote_token.mint;
+        let sol_mint = sol_token.mint;
         let jupiter_version = self.config.jupiter_version;
 
         let full_route_job =
@@ -305,10 +305,8 @@ impl Rebalancer {
             {
                 continue;
             }
-            let token_mint = token.mint_info.mint;
-            let token_price = self
-                .account_fetcher
-                .fetch_bank_price(&token.mint_info.first_bank())?;
+            let token_mint = token.mint;
+            let token_price = self.account_fetcher.fetch_bank_price(&token.first_bank())?;
 
             // It's not always possible to bring the native balance to 0 through swaps:
             // Consider a price <1. You need to sell a bunch of tokens to get 1 USDC native and
@@ -419,7 +417,7 @@ impl Rebalancer {
     #[instrument(
         skip_all,
         fields(
-            perp_market_name = perp.market.name(),
+            perp_market_name = perp.name,
             base_lots = perp_position.base_position_lots(),
             effective_lots = perp_position.effective_base_position_lots(),
             quote_native = %perp_position.quote_position_native()
@@ -438,28 +436,29 @@ impl Rebalancer {
         let base_lots = perp_position.base_position_lots();
         let effective_lots = perp_position.effective_base_position_lots();
         let quote_native = perp_position.quote_position_native();
+        let perp_market: PerpMarket = self.account_fetcher.fetch(&perp.address)?;
 
         if effective_lots != 0 {
             // send an ioc order to reduce the base position
-            let oracle_account_data = self.account_fetcher.fetch_raw(&perp.market.oracle)?;
-            let oracle_account =
-                KeyedAccountSharedData::new(perp.market.oracle, oracle_account_data);
-            let oracle_price = perp.market.oracle_price(&oracle_account, None)?;
-            let oracle_price_lots = perp.market.native_price_to_lot(oracle_price);
+            let oracle_account_data = self.account_fetcher.fetch_raw(&perp.oracle)?;
+            let oracle_account = KeyedAccountSharedData::new(perp.oracle, oracle_account_data);
+            let oracle_price = perp_market
+                .oracle_price(&OracleAccountInfos::from_reader(&oracle_account), None)?;
+            let oracle_price_lots = perp_market.native_price_to_lot(oracle_price);
             let (side, order_price, oo_lots) = if effective_lots > 0 {
                 (
                     Side::Ask,
-                    oracle_price * (I80F48::ONE - perp.market.base_liquidation_fee),
+                    oracle_price * (I80F48::ONE - perp_market.base_liquidation_fee),
                     perp_position.asks_base_lots,
                 )
             } else {
                 (
                     Side::Bid,
-                    oracle_price * (I80F48::ONE + perp.market.base_liquidation_fee),
+                    oracle_price * (I80F48::ONE + perp_market.base_liquidation_fee),
                     perp_position.bids_base_lots,
                 )
             };
-            let price_lots = perp.market.native_price_to_lot(order_price);
+            let price_lots = perp_market.native_price_to_lot(order_price);
             let max_base_lots = effective_lots.abs() - oo_lots;
             if max_base_lots <= 0 {
                 warn!(?side, oo_lots, "cannot place reduce-only order",);
@@ -470,8 +469,8 @@ impl Rebalancer {
             // even match anything. That way we don't need to pay the tx fee and
             // ioc penalty fee unnecessarily.
             let opposite_side_key = match side.invert_side() {
-                Side::Bid => perp.market.bids,
-                Side::Ask => perp.market.asks,
+                Side::Bid => perp.bids,
+                Side::Ask => perp.asks,
             };
             let bookside = Box::new(self.account_fetcher.fetch::<BookSide>(&opposite_side_key)?);
             if bookside.quantity_at_price(price_lots, now_ts, oracle_price_lots) <= 0 {
