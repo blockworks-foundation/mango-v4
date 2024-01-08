@@ -406,9 +406,7 @@ fn oracle_state_unchecked_inner<T: KeyedAccountReader>(
         OracleType::OrcaCLMM => {
             let whirlpool = load_whirlpool_state(oracle_info)?;
 
-            let inverted = whirlpool.token_mint_a == usdc_mint_mainnet::ID
-                || (whirlpool.token_mint_a == sol_mint_mainnet::ID
-                    && whirlpool.token_mint_b != usdc_mint_mainnet::ID);
+            let inverted = whirlpool.is_inverted();
             let quote_state = if inverted {
                 quote_state_unchecked(acc_infos, &whirlpool.token_mint_a)?
             } else {

@@ -355,11 +355,19 @@ impl MangoClient {
         affected_perp_markets: Vec<PerpMarketIndex>,
     ) -> anyhow::Result<(Vec<AccountMeta>, u32)> {
         let account = self.mango_account().await?;
+        let fallback_contexts = self
+            .context
+            .derive_fallback_oracle_keys(
+                &self.client.fallback_oracle_config,
+                &self.client.rpc_async(),
+            )
+            .await?;
         self.context.derive_health_check_remaining_account_metas(
             &account,
             affected_tokens,
             writable_banks,
             affected_perp_markets,
+            fallback_contexts,
         )
     }
 
@@ -370,12 +378,20 @@ impl MangoClient {
         writable_banks: &[TokenIndex],
     ) -> anyhow::Result<(Vec<AccountMeta>, u32)> {
         let account = self.mango_account().await?;
+        let fallback_contexts = self
+            .context
+            .derive_fallback_oracle_keys(
+                &self.client.fallback_oracle_config,
+                &self.client.rpc_async(),
+            )
+            .await?;
         self.context
             .derive_health_check_remaining_account_metas_two_accounts(
                 &account,
                 liqee,
                 affected_tokens,
                 writable_banks,
+                fallback_contexts,
             )
     }
 
@@ -426,7 +442,7 @@ impl MangoClient {
     /// Creates token withdraw instructions for the MangoClient's account/owner.
     /// The `account` state is passed in separately so changes during the tx can be
     /// accounted for when deriving health accounts.
-    pub fn token_withdraw_instructions(
+    pub async fn token_withdraw_instructions(
         &self,
         account: &MangoAccountValue,
         mint: Pubkey,
@@ -435,6 +451,13 @@ impl MangoClient {
     ) -> anyhow::Result<PreparedInstructions> {
         let token = self.context.token_by_mint(&mint)?;
         let token_index = token.token_index;
+        let fallback_contexts = self
+            .context
+            .derive_fallback_oracle_keys(
+                &self.client.fallback_oracle_config,
+                &self.client.rpc_async(),
+            )
+            .await?;
 
         let (health_check_metas, health_cu) =
             self.context.derive_health_check_remaining_account_metas(
@@ -442,6 +465,7 @@ impl MangoClient {
                 vec![token_index],
                 vec![],
                 vec![],
+                fallback_contexts,
             )?;
 
         let ixs = PreparedInstructions::from_vec(
@@ -492,7 +516,9 @@ impl MangoClient {
         allow_borrow: bool,
     ) -> anyhow::Result<Signature> {
         let account = self.mango_account().await?;
-        let ixs = self.token_withdraw_instructions(&account, mint, amount, allow_borrow)?;
+        let ixs = self
+            .token_withdraw_instructions(&account, mint, amount, allow_borrow)
+            .await?;
         self.send_and_confirm_owner_tx(ixs.to_instructions()).await
     }
 
@@ -572,7 +598,7 @@ impl MangoClient {
     }
 
     #[allow(clippy::too_many_arguments)]
-    pub fn serum3_place_order_instruction(
+    pub async fn serum3_place_order_instruction(
         &self,
         account: &MangoAccountValue,
         market_index: Serum3MarketIndex,
@@ -593,9 +619,21 @@ impl MangoClient {
             .expect("oo is created")
             .open_orders;
 
-        let (health_check_metas, health_cu) = self
+        let fallback_contexts = self
             .context
-            .derive_health_check_remaining_account_metas(account, vec![], vec![], vec![])?;
+            .derive_fallback_oracle_keys(
+                &self.client.fallback_oracle_config,
+                &self.client.rpc_async(),
+            )
+            .await?;
+        let (health_check_metas, health_cu) =
+            self.context.derive_health_check_remaining_account_metas(
+                account,
+                vec![],
+                vec![],
+                vec![],
+                fallback_contexts,
+            )?;
 
         let payer_token = match side {
             Serum3Side::Bid => &quote,
@@ -667,18 +705,20 @@ impl MangoClient {
     ) -> anyhow::Result<Signature> {
         let account = self.mango_account().await?;
         let market_index = self.context.serum3_market_index(name);
-        let ixs = self.serum3_place_order_instruction(
-            &account,
-            market_index,
-            side,
-            limit_price,
-            max_base_qty,
-            max_native_quote_qty_including_fees,
-            self_trade_behavior,
-            order_type,
-            client_order_id,
-            limit,
-        )?;
+        let ixs = self
+            .serum3_place_order_instruction(
+                &account,
+                market_index,
+                side,
+                limit_price,
+                max_base_qty,
+                max_native_quote_qty_including_fees,
+                self_trade_behavior,
+                order_type,
+                client_order_id,
+                limit,
+            )
+            .await?;
         self.send_and_confirm_owner_tx(ixs.to_instructions()).await
     }
 
@@ -805,9 +845,22 @@ impl MangoClient {
         let base = self.context.serum3_base_token(market_index);
         let quote = self.context.serum3_quote_token(market_index);
 
+        let fallback_contexts = self
+            .context
+            .derive_fallback_oracle_keys(
+                &self.client.fallback_oracle_config,
+                &self.client.rpc_async(),
+            )
+            .await?;
         let (health_remaining_ams, health_cu) = self
             .context
-            .derive_health_check_remaining_account_metas(liqee.1, vec![], vec![], vec![])
+            .derive_health_check_remaining_account_metas(
+                liqee.1,
+                vec![],
+                vec![],
+                vec![],
+                fallback_contexts,
+            )
             .unwrap();
 
         let limit = 5;
@@ -895,7 +948,7 @@ impl MangoClient {
     //
 
     #[allow(clippy::too_many_arguments)]
-    pub fn perp_place_order_instruction(
+    pub async fn perp_place_order_instruction(
         &self,
         account: &MangoAccountValue,
         market_index: PerpMarketIndex,
@@ -911,12 +964,20 @@ impl MangoClient {
         self_trade_behavior: SelfTradeBehavior,
     ) -> anyhow::Result<PreparedInstructions> {
         let perp = self.context.perp(market_index);
+        let fallback_contexts = self
+            .context
+            .derive_fallback_oracle_keys(
+                &self.client.fallback_oracle_config,
+                &self.client.rpc_async(),
+            )
+            .await?;
         let (health_remaining_metas, health_cu) =
             self.context.derive_health_check_remaining_account_metas(
                 account,
                 vec![],
                 vec![],
                 vec![market_index],
+                fallback_contexts,
             )?;
 
         let ixs = PreparedInstructions::from_single(
@@ -977,20 +1038,22 @@ impl MangoClient {
         self_trade_behavior: SelfTradeBehavior,
     ) -> anyhow::Result<Signature> {
         let account = self.mango_account().await?;
-        let ixs = self.perp_place_order_instruction(
-            &account,
-            market_index,
-            side,
-            price_lots,
-            max_base_lots,
-            max_quote_lots,
-            client_order_id,
-            order_type,
-            reduce_only,
-            expiry_timestamp,
-            limit,
-            self_trade_behavior,
-        )?;
+        let ixs = self
+            .perp_place_order_instruction(
+                &account,
+                market_index,
+                side,
+                price_lots,
+                max_base_lots,
+                max_quote_lots,
+                client_order_id,
+                order_type,
+                reduce_only,
+                expiry_timestamp,
+                limit,
+                self_trade_behavior,
+            )
+            .await?;
         self.send_and_confirm_owner_tx(ixs.to_instructions()).await
     }
 
@@ -1062,7 +1125,7 @@ impl MangoClient {
         self.send_and_confirm_owner_tx(ixs.to_instructions()).await
     }
 
-    pub fn perp_settle_pnl_instruction(
+    pub async fn perp_settle_pnl_instruction(
         &self,
         market_index: PerpMarketIndex,
         account_a: (&Pubkey, &MangoAccountValue),
@@ -1070,6 +1133,13 @@ impl MangoClient {
     ) -> anyhow::Result<PreparedInstructions> {
         let perp = self.context.perp(market_index);
         let settlement_token = self.context.token(perp.settle_token_index);
+        let fallback_contexts = self
+            .context
+            .derive_fallback_oracle_keys(
+                &self.client.fallback_oracle_config,
+                &self.client.rpc_async(),
+            )
+            .await?;
 
         let (health_remaining_ams, health_cu) = self
             .context
@@ -1078,6 +1148,7 @@ impl MangoClient {
                 account_b.1,
                 &[],
                 &[],
+                fallback_contexts,
             )
             .unwrap();
 
@@ -1115,7 +1186,9 @@ impl MangoClient {
         account_a: (&Pubkey, &MangoAccountValue),
         account_b: (&Pubkey, &MangoAccountValue),
     ) -> anyhow::Result<Signature> {
-        let ixs = self.perp_settle_pnl_instruction(market_index, account_a, account_b)?;
+        let ixs = self
+            .perp_settle_pnl_instruction(market_index, account_a, account_b)
+            .await?;
         self.send_and_confirm_permissionless_tx(ixs.to_instructions())
             .await
     }
@@ -1126,10 +1199,23 @@ impl MangoClient {
         market_index: PerpMarketIndex,
     ) -> anyhow::Result<Signature> {
         let perp = self.context.perp(market_index);
+        let fallback_contexts = self
+            .context
+            .derive_fallback_oracle_keys(
+                &self.client.fallback_oracle_config,
+                &self.client.rpc_async(),
+            )
+            .await?;
 
         let (health_remaining_ams, health_cu) = self
             .context
-            .derive_health_check_remaining_account_metas(liqee.1, vec![], vec![], vec![])
+            .derive_health_check_remaining_account_metas(
+                liqee.1,
+                vec![],
+                vec![],
+                vec![],
+                fallback_contexts,
+            )
             .unwrap();
 
         let limit = 5;
@@ -1483,19 +1569,27 @@ impl MangoClient {
 
     // health region
 
-    pub fn health_region_begin_instruction(
+    pub async fn health_region_begin_instruction(
         &self,
         account: &MangoAccountValue,
         affected_tokens: Vec<TokenIndex>,
         writable_banks: Vec<TokenIndex>,
         affected_perp_markets: Vec<PerpMarketIndex>,
     ) -> anyhow::Result<PreparedInstructions> {
+        let fallback_contexts = self
+            .context
+            .derive_fallback_oracle_keys(
+                &self.client.fallback_oracle_config,
+                &self.client.rpc_async(),
+            )
+            .await?;
         let (health_remaining_metas, _health_cu) =
             self.context.derive_health_check_remaining_account_metas(
                 account,
                 affected_tokens,
                 writable_banks,
                 affected_perp_markets,
+                fallback_contexts,
             )?;
 
         let ix = Instruction {
@@ -1522,19 +1616,27 @@ impl MangoClient {
         ))
     }
 
-    pub fn health_region_end_instruction(
+    pub async fn health_region_end_instruction(
         &self,
         account: &MangoAccountValue,
         affected_tokens: Vec<TokenIndex>,
         writable_banks: Vec<TokenIndex>,
         affected_perp_markets: Vec<PerpMarketIndex>,
     ) -> anyhow::Result<PreparedInstructions> {
+        let fallback_contexts = self
+            .context
+            .derive_fallback_oracle_keys(
+                &self.client.fallback_oracle_config,
+                &self.client.rpc_async(),
+            )
+            .await?;
         let (health_remaining_metas, health_cu) =
             self.context.derive_health_check_remaining_account_metas(
                 account,
                 affected_tokens,
                 writable_banks,
                 affected_perp_markets,
+                fallback_contexts,
             )?;
 
         let ix = Instruction {
@@ -1762,7 +1864,7 @@ impl TransactionSize {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub enum FallbackOracleConfig {
     /// No fallback oracles
     None,
