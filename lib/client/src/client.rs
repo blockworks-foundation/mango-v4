@@ -110,6 +110,7 @@ impl Client {
         commitment: CommitmentConfig,
         fee_payer: Arc<Keypair>,
         timeout: Option<Duration>,
+        fallback_oracle_config: Option<FallbackOracleConfig>,
         transaction_builder_config: TransactionBuilderConfig,
     ) -> Self {
         Self::builder()
@@ -118,6 +119,7 @@ impl Client {
             .fee_payer(Some(fee_payer))
             .timeout(timeout)
             .transaction_builder_config(transaction_builder_config)
+            .fallback_oracle_config(fallback_oracle_config.unwrap_or_default())
             .build()
             .unwrap()
     }
@@ -1867,7 +1869,7 @@ impl TransactionSize {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum FallbackOracleConfig {
     /// No fallback oracles
-    None,
+    Never,
     /// Only provided fallback oracles are used
     Fixed(Vec<Pubkey>),
     /// The account_fetcher checks for stale oracles and uses fallbacks only for stale oracles

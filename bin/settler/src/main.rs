@@ -7,7 +7,7 @@ use clap::Parser;
 use mango_v4::state::{PerpMarketIndex, TokenIndex};
 use mango_v4_client::{
     account_update_stream, chain_data, keypair_from_cli, snapshot_source, websocket_source, Client,
-    MangoClient, MangoGroupContext, TransactionBuilderConfig,
+    MangoClient, MangoGroupContext, TransactionBuilderConfig, FallbackOracleConfig,
 };
 use tracing::*;
 
@@ -100,6 +100,7 @@ async fn main() -> anyhow::Result<()> {
         commitment,
         settler_owner.clone(),
         Some(rpc_timeout),
+        Some(FallbackOracleConfig::Never),
         TransactionBuilderConfig {
             prioritization_micro_lamports: (cli.prioritization_micro_lamports > 0)
                 .then_some(cli.prioritization_micro_lamports),

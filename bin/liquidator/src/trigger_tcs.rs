@@ -666,9 +666,14 @@ impl Context {
         tcs_id: u64,
     ) -> anyhow::Result<Option<PreparedExecution>> {
         let fetcher = self.account_fetcher.as_ref();
-        let health_cache = health_cache::new(&self.mango_client.context, fetcher, liqee_old)
-            .await
-            .context("creating health cache 1")?;
+        let health_cache = health_cache::new(
+            &self.mango_client.context,
+            &self.mango_client.client.fallback_oracle_config,
+            fetcher,
+            liqee_old,
+        )
+        .await
+        .context("creating health cache 1")?;
         if health_cache.is_liquidatable() {
             trace!("account is liquidatable (pre-fetch)");
             return Ok(None);
@@ -685,9 +690,14 @@ impl Context {
             return Ok(None);
         }
 
-        let health_cache = health_cache::new(&self.mango_client.context, fetcher, &liqee)
-            .await
-            .context("creating health cache 2")?;
+        let health_cache = health_cache::new(
+            &self.mango_client.context,
+            &self.mango_client.client.fallback_oracle_config,
+            fetcher,
+            &liqee,
+        )
+        .await
+        .context("creating health cache 2")?;
         if health_cache.is_liquidatable() {
             trace!("account is liquidatable (post-fetch)");
             return Ok(None);

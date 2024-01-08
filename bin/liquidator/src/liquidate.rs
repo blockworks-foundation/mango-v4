@@ -155,10 +155,14 @@ impl<'a> LiquidateHelper<'a> {
                 .await
                 .context("getting liquidator account")?;
             liqor.ensure_perp_position(*perp_market_index, QUOTE_TOKEN_INDEX)?;
-            let mut health_cache =
-                health_cache::new(&self.client.context, self.account_fetcher, &liqor)
-                    .await
-                    .context("health cache")?;
+            let mut health_cache = health_cache::new(
+                &self.client.context,
+                &self.client.client.fallback_oracle_config,
+                self.account_fetcher,
+                &liqor,
+            )
+            .await
+            .expect("always ok");
             let quote_bank = self
                 .client
                 .first_bank(QUOTE_TOKEN_INDEX)
@@ -589,9 +593,14 @@ pub async fn maybe_liquidate_account(
     let liqor_min_health_ratio = I80F48::from_num(config.min_health_ratio);
 
     let account = account_fetcher.fetch_mango_account(pubkey)?;
-    let health_cache = health_cache::new(&mango_client.context, account_fetcher, &account)
-        .await
-        .context("creating health cache 1")?;
+    let health_cache = health_cache::new(
+        &mango_client.context,
+        &mango_client.client.fallback_oracle_config,
+        account_fetcher,
+        &account,
+    )
+    .await
+    .context("creating health cache 1")?;
     let maint_health = health_cache.health(HealthType::Maint);
     if !health_cache.is_liquidatable() {
         return Ok(false);
@@ -607,9 +616,14 @@ pub async fn maybe_liquidate_account(
     // This is -- unfortunately -- needed because the websocket streams seem to not
     // be great at providing timely updates to the account data.
     let account = account_fetcher.fetch_fresh_mango_account(pubkey).await?;
-    let health_cache = health_cache::new(&mango_client.context, account_fetcher, &account)
-        .await
-        .context("creating health cache 2")?;
+    let health_cache = health_cache::new(
+        &mango_client.context,
+        &mango_client.client.fallback_oracle_config,
+        account_fetcher,
+        &account,
+    )
+    .await
+    .context("creating health cache 2")?;
     if !health_cache.is_liquidatable() {
         return Ok(false);
     }

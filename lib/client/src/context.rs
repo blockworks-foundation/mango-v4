@@ -637,7 +637,7 @@ impl MangoGroupContext {
     ) -> anyhow::Result<HashMap<Pubkey, FallbackOracleContext>> {
         // FUTURE: implement for perp oracles as well
         let fallbacks_by_oracle = match fallback_oracle_config {
-            FallbackOracleConfig::None => HashMap::new(),
+            FallbackOracleConfig::Never => HashMap::new(),
             FallbackOracleConfig::Fixed(keys) => self
                 .tokens
                 .iter()

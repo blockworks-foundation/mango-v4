@@ -520,6 +520,7 @@ impl Rebalancer {
             };
             let counters = perp_pnl::fetch_top(
                 &self.mango_client.context,
+                &self.mango_client.client.fallback_oracle_config,
                 self.account_fetcher.as_ref(),
                 perp_position.market_index,
                 direction,
