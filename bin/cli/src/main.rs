@@ -1,6 +1,7 @@
 use clap::{Args, Parser, Subcommand};
 use mango_v4_client::{
-    keypair_from_cli, pubkey_from_cli, Client, MangoClient, TransactionBuilderConfig,
+    keypair_from_cli, pubkey_from_cli, Client, FallbackOracleConfig, MangoClient,
+    TransactionBuilderConfig,
 };
 use solana_sdk::pubkey::Pubkey;
 use std::str::FromStr;
@@ -138,6 +139,7 @@ impl Rpc {
             solana_sdk::commitment_config::CommitmentConfig::confirmed(),
             Arc::new(fee_payer),
             None,
+            Some(FallbackOracleConfig::Never),
             TransactionBuilderConfig {
                 prioritization_micro_lamports: Some(5),
                 compute_budget_per_instruction: Some(250_000),

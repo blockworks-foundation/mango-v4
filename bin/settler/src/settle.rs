@@ -114,9 +114,14 @@ impl SettlementState {
                 continue;
             }
 
-            let health_cache = health_cache::new(&mango_client.context, account_fetcher, &account)
-                .await
-                .context("creating health cache")?;
+            let health_cache = health_cache::new(
+                &mango_client.context,
+                &mango_client.client.fallback_oracle_config,
+                account_fetcher,
+                &account,
+            )
+            .await
+            .context("creating health cache")?;
             let liq_end_health = health_cache.health(HealthType::LiquidationEnd);
 
             for perp_market_index in perp_indexes {
@@ -311,11 +316,14 @@ impl<'a> SettleBatchProcessor<'a> {
     ) -> anyhow::Result<Option<Signature>> {
         let a_value = self.account_fetcher.fetch_mango_account(&account_a)?;
         let b_value = self.account_fetcher.fetch_mango_account(&account_b)?;
-        let new_ixs = self.mango_client.perp_settle_pnl_instruction(
-            self.perp_market_index,
-            (&account_a, &a_value),
-            (&account_b, &b_value),
-        )?;
+        let new_ixs = self
+            .mango_client
+            .perp_settle_pnl_instruction(
+                self.perp_market_index,
+                (&account_a, &a_value),
+                (&account_b, &b_value),
+            )
+            .await?;
         let previous = self.instructions.clone();
         self.instructions.append(new_ixs.clone());
 

@@ -7,7 +7,7 @@ use clap::Parser;
 use mango_v4::state::{PerpMarketIndex, TokenIndex};
 use mango_v4_client::{
     account_update_stream, chain_data, keypair_from_cli, snapshot_source, websocket_source, Client,
-    MangoClient, MangoGroupContext, TransactionBuilderConfig, FallbackOracleConfig,
+    FallbackOracleConfig, MangoClient, MangoGroupContext, TransactionBuilderConfig,
 };
 use tracing::*;
 
