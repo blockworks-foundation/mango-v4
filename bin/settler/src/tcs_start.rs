@@ -115,9 +115,12 @@ impl State {
             // Clear newly created token positions, so the liqor account is mostly empty
             for token_index in startable_chunk.iter().map(|(_, _, ti)| *ti).unique() {
                 let mint = mango_client.context.token(token_index).mint;
-                let ix = mango_client
-                    .token_withdraw_instructions(&liqor_account, mint, u64::MAX, false)
-                    .await?; // sync as long as we are not using FallbackOracleConfig::Dynamic
+                let ix = mango_client.token_withdraw_instructions(
+                    &liqor_account,
+                    mint,
+                    u64::MAX,
+                    false,
+                )?;
 
                 instructions.append(ix)
             }

@@ -444,7 +444,7 @@ impl MangoClient {
     /// Creates token withdraw instructions for the MangoClient's account/owner.
     /// The `account` state is passed in separately so changes during the tx can be
     /// accounted for when deriving health accounts.
-    pub async fn token_withdraw_instructions(
+    pub fn token_withdraw_instructions(
         &self,
         account: &MangoAccountValue,
         mint: Pubkey,
@@ -455,11 +455,7 @@ impl MangoClient {
         let token_index = token.token_index;
         let fallback_contexts = self
             .context
-            .derive_fallback_oracle_keys(
-                &self.client.fallback_oracle_config,
-                &self.client.rpc_async(),
-            )
-            .await?;
+            .derive_fallback_oracle_keys_sync(&self.client.fallback_oracle_config)?;
 
         let (health_check_metas, health_cu) =
             self.context.derive_health_check_remaining_account_metas(
@@ -518,9 +514,7 @@ impl MangoClient {
         allow_borrow: bool,
     ) -> anyhow::Result<Signature> {
         let account = self.mango_account().await?;
-        let ixs = self
-            .token_withdraw_instructions(&account, mint, amount, allow_borrow)
-            .await?;
+        let ixs = self.token_withdraw_instructions(&account, mint, amount, allow_borrow)?;
         self.send_and_confirm_owner_tx(ixs.to_instructions()).await
     }
 
