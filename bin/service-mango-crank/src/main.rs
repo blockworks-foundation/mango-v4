@@ -7,7 +7,7 @@ mod transaction_sender;
 use anchor_client::Cluster;
 use bytemuck::bytes_of;
 use log::*;
-use mango_v4_client::{Client, MangoGroupContext, TransactionBuilderConfig};
+use mango_v4_client::{Client, FallbackOracleConfig, MangoGroupContext, TransactionBuilderConfig};
 use solana_client::nonblocking::rpc_client::RpcClient;
 use solana_sdk::commitment_config::CommitmentConfig;
 use solana_sdk::pubkey::Pubkey;
@@ -74,6 +74,7 @@ async fn main() -> anyhow::Result<()> {
         CommitmentConfig::processed(),
         Arc::new(Keypair::new()),
         Some(rpc_timeout),
+        Some(FallbackOracleConfig::Never),
         TransactionBuilderConfig::default(),
     );
     let group_pk = Pubkey::from_str(&config.mango_group).unwrap();
