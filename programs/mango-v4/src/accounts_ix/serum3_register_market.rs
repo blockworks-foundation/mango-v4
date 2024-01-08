@@ -7,11 +7,11 @@ use anchor_lang::prelude::*;
 pub struct Serum3RegisterMarket<'info> {
     #[account(
         mut,
-        has_one = admin,
         constraint = group.load()?.is_ix_enabled(IxGate::Serum3RegisterMarket) @ MangoError::IxIsDisabled,
         constraint = group.load()?.serum3_supported()
     )]
     pub group: AccountLoader<'info, Group>,
+    /// group admin or fast listing admin, checked at #1
     pub admin: Signer<'info>,
 
     /// CHECK: Can register a market for any serum program
