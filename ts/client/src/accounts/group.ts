@@ -8,7 +8,7 @@ import {
   PublicKey,
 } from '@solana/web3.js';
 import BN from 'bn.js';
-import cloneDeep from 'lodash/cloneDeep';
+import copy from 'fast-copy';
 import merge from 'lodash/merge';
 import { MangoClient } from '../client';
 import { OPENBOOK_PROGRAM_ID } from '../constants';
@@ -203,7 +203,7 @@ export class Group {
       banks = await client.getBanksForGroup(this);
     }
 
-    const oldbanksMapByTokenIndex = cloneDeep(this.banksMapByTokenIndex);
+    const oldbanksMapByTokenIndex = copy(this.banksMapByTokenIndex);
     this.banksMapByName = new Map();
     this.banksMapByMint = new Map();
     this.banksMapByTokenIndex = new Map();
@@ -360,9 +360,7 @@ export class Group {
     }
 
     // ensure that freshly fetched perp markets have valid price until we fetch oracles again
-    const oldPerpMarketByMarketIndex = cloneDeep(
-      this.perpMarketsMapByMarketIndex,
-    );
+    const oldPerpMarketByMarketIndex = copy(this.perpMarketsMapByMarketIndex);
     for (const perpMarket of perpMarkets) {
       const oldPerpMarket = oldPerpMarketByMarketIndex.get(
         perpMarket.perpMarketIndex,

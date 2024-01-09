@@ -32,7 +32,7 @@ import {
 } from '@solana/web3.js';
 import bs58 from 'bs58';
 import chunk from 'lodash/chunk';
-import cloneDeep from 'lodash/cloneDeep';
+import copy from 'fast-copy';
 import groupBy from 'lodash/groupBy';
 import mapValues from 'lodash/mapValues';
 import maxBy from 'lodash/maxBy';
@@ -1219,7 +1219,7 @@ export class MangoClient {
     // Work on a deep cloned mango account, since we would deactivating positions
     // before deactivation reaches on-chain state in order to simplify building a fresh list
     // of healthRemainingAccounts to each subsequent ix
-    const clonedMangoAccount = cloneDeep(mangoAccount);
+    const clonedMangoAccount = copy(mangoAccount);
     const instructions: TransactionInstruction[] = [];
 
     for (const serum3Account of clonedMangoAccount.serum3Active()) {

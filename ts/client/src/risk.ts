@@ -1,6 +1,6 @@
 import { PublicKey } from '@solana/web3.js';
 import BN from 'bn.js';
-import cloneDeep from 'lodash/cloneDeep';
+import copy from 'fast-copy';
 import { TokenIndex } from './accounts/bank';
 import { Group } from './accounts/group';
 import { HealthType, MangoAccount } from './accounts/mangoAccount';
@@ -507,7 +507,7 @@ export async function getRiskStats(
 
   // Clone group, and simulate change % price drop for all assets except stables
   const drop = 1 - change;
-  const groupDrop: Group = cloneDeep(group);
+  const groupDrop: Group = copy(group);
   Array.from(groupDrop.banksMapByTokenIndex.values())
     .flat()
     .filter((b) => !b.name.includes('USD'))
@@ -523,7 +523,7 @@ export async function getRiskStats(
   });
 
   // Clone group, and simulate change % price drop for usdc
-  const groupUsdcDepeg: Group = cloneDeep(group);
+  const groupUsdcDepeg: Group = copy(group);
   Array.from(groupUsdcDepeg.banksMapByTokenIndex.values())
     .flat()
     .filter((b) => b.name.includes('USDC'))
@@ -534,7 +534,7 @@ export async function getRiskStats(
     });
 
   // Clone group, and simulate change % price drop for usdt
-  const groupUsdtDepeg: Group = cloneDeep(group);
+  const groupUsdtDepeg: Group = copy(group);
   Array.from(groupUsdtDepeg.banksMapByTokenIndex.values())
     .flat()
     .filter((b) => b.name.includes('USDT'))
@@ -546,7 +546,7 @@ export async function getRiskStats(
 
   // Clone group, and simulate change % price rally for all assets except stables
   const rally = 1 + change;
-  const groupRally: Group = cloneDeep(group);
+  const groupRally: Group = copy(group);
   Array.from(groupRally.banksMapByTokenIndex.values())
     .flat()
     .filter((b) => !b.name.includes('USD'))
