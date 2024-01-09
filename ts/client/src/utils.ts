@@ -218,3 +218,36 @@ export declare abstract class As<Tag extends keyof never> {
   private static readonly $as$: unique symbol;
   private [As.$as$]: Record<Tag, true>;
 }
+
+export function deepClone<T>(obj: T, hash = new WeakMap()): T {
+  // Handle non-object types and functions
+  if (typeof obj !== 'object' || obj === null) return obj;
+
+  // Handle circular references
+  if (hash.has(obj)) return hash.get(obj) as T;
+
+  let result: any;
+
+  if (obj instanceof Map) {
+    result = new Map();
+    hash.set(obj, result);
+    obj.forEach((value, key) => {
+      result.set(deepClone(key, hash), deepClone(value, hash));
+    });
+  } else if (Array.isArray(obj)) {
+    result = [];
+    hash.set(obj, result);
+    obj.forEach((item, index) => {
+      result[index] = deepClone(item, hash);
+    });
+  } else {
+    const prototype = Object.getPrototypeOf(obj);
+    result = Object.create(prototype);
+    hash.set(obj, result);
+    for (const key of Object.keys(obj)) {
+      result[key] = deepClone((obj as any)[key], hash);
+    }
+  }
+
+  return result;
+}

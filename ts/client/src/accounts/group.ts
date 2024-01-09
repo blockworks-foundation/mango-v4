@@ -8,14 +8,19 @@ import {
   PublicKey,
 } from '@solana/web3.js';
 import BN from 'bn.js';
-import copy from 'fast-copy';
 import merge from 'lodash/merge';
 import { MangoClient } from '../client';
 import { OPENBOOK_PROGRAM_ID } from '../constants';
 import { Id } from '../ids';
 import { I80F48 } from '../numbers/I80F48';
 import { PriceImpact, computePriceImpactOnJup } from '../risk';
-import { buildFetch, toNative, toNativeI80F48, toUiDecimals } from '../utils';
+import {
+  buildFetch,
+  deepClone,
+  toNative,
+  toNativeI80F48,
+  toUiDecimals,
+} from '../utils';
 import { Bank, MintInfo, TokenIndex } from './bank';
 import {
   OracleProvider,
@@ -203,7 +208,7 @@ export class Group {
       banks = await client.getBanksForGroup(this);
     }
 
-    const oldbanksMapByTokenIndex = copy(this.banksMapByTokenIndex);
+    const oldbanksMapByTokenIndex = deepClone(this.banksMapByTokenIndex);
     this.banksMapByName = new Map();
     this.banksMapByMint = new Map();
     this.banksMapByTokenIndex = new Map();
@@ -360,7 +365,13 @@ export class Group {
     }
 
     // ensure that freshly fetched perp markets have valid price until we fetch oracles again
-    const oldPerpMarketByMarketIndex = copy(this.perpMarketsMapByMarketIndex);
+    const oldPerpMarketByMarketIndex = deepClone(
+      this.perpMarketsMapByMarketIndex,
+    );
+    console.log({
+      original: this.perpMarketsMapByMarketIndex,
+      copy: oldPerpMarketByMarketIndex,
+    });
     for (const perpMarket of perpMarkets) {
       const oldPerpMarket = oldPerpMarketByMarketIndex.get(
         perpMarket.perpMarketIndex,
