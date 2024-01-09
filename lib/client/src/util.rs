@@ -43,6 +43,20 @@ impl<T> AsyncChannelSendUnlessFull<T> for async_channel::Sender<T> {
     }
 }
 
+/// Like tokio::time::interval(), but with Delay as default MissedTickBehavior
+///
+/// The default (Burst) means that if the time between tick() calls is longer
+/// than `period` there'll be a burst of catch-up ticks.
+///
+/// This Interval guarantees that when tick() returns, at least `period` will have
+/// elapsed since the last return. That way it's more appropriate for jobs that
+/// don't need to catch up.
+pub fn delay_interval(period: std::time::Duration) -> tokio::time::Interval {
+    let mut interval = tokio::time::interval(period);
+    interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
+    interval
+}
+
 /// A copy of RpcClient::send_and_confirm_transaction that returns the slot the
 /// transaction confirmed in.
 pub fn send_and_confirm_transaction(
