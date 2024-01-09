@@ -3651,7 +3651,7 @@
         mango_client: Arc&lt;MangoClient&gt;,
         interval: Duration,
     ) {
-        <span class="kw">let </span><span class="kw-2">mut </span>delay = tokio::time::interval(interval);
+        <span class="kw">let </span><span class="kw-2">mut </span>delay = <span class="kw">crate</span>::delay_interval(interval);
         <span class="kw">let </span>rpc_async = mango_client.client.rpc_async();
         <span class="kw">loop </span>{
             delay.tick().<span class="kw">await</span>;
