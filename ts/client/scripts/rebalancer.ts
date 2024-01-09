@@ -147,7 +147,7 @@ async function rebalancer(): Promise<void> {
             ),
           ],
           group.addressLookupTablesList,
-          { prioritizationFee: true },
+          { prioritizationFee: 1 },
         );
 
         console.log(` -- sig https://explorer.solana.com/tx/${sig}`);
@@ -179,7 +179,7 @@ async function rebalancer(): Promise<void> {
           client.program.provider as AnchorProvider,
           ixs,
           group.addressLookupTablesList,
-          { prioritizationFee: true },
+          { prioritizationFee: 1 },
         );
         console.log(
           ` - closed all serum3 oo accounts, sig https://explorer.solana.com/tx/${sig}`,

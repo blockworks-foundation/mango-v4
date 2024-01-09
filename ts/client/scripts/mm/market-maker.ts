@@ -170,9 +170,9 @@ async function initSequenceEnforcerAccounts(
         [],
       );
       console.log(
-        `Sequence enforcer accounts created, sig https://explorer.solana.com/tx/${sig}?cluster=${
-          CLUSTER == 'devnet' ? 'devnet' : ''
-        }`,
+        `Sequence enforcer accounts created, sig https://explorer.solana.com/tx/${
+          sig.signature
+        }?cluster=${CLUSTER == 'devnet' ? 'devnet' : ''}`,
       );
     } catch (e) {
       console.log('Failed to initialize sequence enforcer accounts!');
@@ -369,27 +369,58 @@ async function fullMarketMaker() {
 
       // Update all orders on all markets
       for (const mc of Array.from(marketContexts.values())) {
-        const ixs = await makeMarketUpdateInstructions(
-          client,
-          group,
-          mangoAccount,
-          mc,
-          pfQuoteValue,
-        );
-        if (ixs.length === 0) {
-          continue;
-        }
+        const basePos = mangoAccount.perpPositionExistsForMarket(mc.perpMarket)
+          ? mangoAccount.getPerpPositionUi(
+              group,
+              mc.perpMarket.perpMarketIndex,
+              true,
+            )
+          : 0;
+        if (basePos !== 0) {
+          const equityBy100 =
+            toUiDecimalsForQuote(mangoAccount.getEquity(group)) /
+            (100 * mc.perpMarket.uiPrice);
+          const posSizeToClose = Math.abs(Math.max(basePos / 10, equityBy100));
+          const sig = await client.perpPlaceOrder(
+            group,
+            mangoAccount,
+            mc.perpMarket.perpMarketIndex,
+            basePos > 0 ? PerpOrderSide.ask : PerpOrderSide.bid,
+            mc.perpMarket.uiPrice * (basePos > 0 ? 1 - 0.01 : 1 + 0.01),
+            posSizeToClose,
+            undefined,
+            Date.now(),
+            PerpOrderType.immediateOrCancel,
+            true,
+          );
+          console.log(
+            `Twap closing position (current ${basePos}, equityBy100 ${equityBy100}, closing ${posSizeToClose}), sig https://explorer.solana.com/tx/${
+              sig.signature
+            }?cluster=${CLUSTER == 'devnet' ? 'devnet' : ''}`,
+          );
+        } else {
+          const ixs = await makeMarketUpdateInstructions(
+            client,
+            group,
+            mangoAccount,
+            mc,
+            pfQuoteValue,
+          );
+          if (ixs.length === 0) {
+            continue;
+          }
 
-        const sig = await sendTransaction(
-          client.program.provider as AnchorProvider,
-          ixs,
-          group.addressLookupTablesList,
-        );
-        console.log(
-          `Orders for market updated, sig https://explorer.solana.com/tx/${sig}?cluster=${
-            CLUSTER == 'devnet' ? 'devnet' : ''
-          }`,
-        );
+          const sig = await sendTransaction(
+            client.program.provider as AnchorProvider,
+            ixs,
+            group.addressLookupTablesList,
+          );
+          console.log(
+            `Orders for market updated, sig https://explorer.solana.com/tx/${
+              sig.signature
+            }?cluster=${CLUSTER == 'devnet' ? 'devnet' : ''}`,
+          );
+        }
       }
     } catch (e) {
       console.log(e);
@@ -484,8 +515,20 @@ async function makeMarketUpdateInstructions(
 
   // TODO: oracle pegged runs out of free perp open order slots on mango account
   if (params.oraclePegged) {
-    const uiOPegBidOffset = fairValue * (-charge + lean + bias + pfQuoteLean);
-    const uiOPegAskOffset = fairValue * (charge + lean + bias + pfQuoteLean);
+    const uiOPegBidOffset =
+      fairValue *
+      (-charge -
+        perpMarket.baseLiquidationFee.toNumber() * 0.9 +
+        +lean +
+        bias +
+        pfQuoteLean);
+    const uiOPegAskOffset =
+      fairValue *
+      (charge +
+        perpMarket.baseLiquidationFee.toNumber() * 0.9 +
+        lean +
+        bias +
+        pfQuoteLean);
 
     const modelBidOPegOffset = perpMarket.uiPriceToLots(uiOPegBidOffset);
     const modelAskOPegOffset = perpMarket.uiPriceToLots(uiOPegAskOffset);
@@ -582,8 +625,22 @@ async function makeMarketUpdateInstructions(
       mc.lastOrderUpdate = Date.now() / 1000;
     }
   } else {
-    const uiBidPrice = fairValue * (1 - charge + lean + bias + pfQuoteLean);
-    const uiAskPrice = fairValue * (1 + charge + lean + bias + pfQuoteLean);
+    const uiBidPrice =
+      fairValue *
+      (1 -
+        charge -
+        perpMarket.baseLiquidationFee.toNumber() * 0.9 +
+        lean +
+        bias +
+        pfQuoteLean);
+    const uiAskPrice =
+      fairValue *
+      (1 +
+        charge +
+        perpMarket.baseLiquidationFee.toNumber() * 0.9 +
+        lean +
+        bias +
+        pfQuoteLean);
 
     const modelBidPrice = perpMarket.uiPriceToLots(uiBidPrice);
     const modelAskPrice = perpMarket.uiPriceToLots(uiAskPrice);

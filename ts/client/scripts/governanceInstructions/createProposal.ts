@@ -40,6 +40,7 @@ export const createProposal = async (
   proposalIndex: number,
   proposalInstructions: TransactionInstruction[],
   client: VsrClient,
+  signOff: boolean,
 ) => {
   const instructions: TransactionInstruction[] = [];
   const walletPk = wallet.publicKey!;
@@ -95,11 +96,6 @@ export const createProposal = async (
     payer,
   );
 
-  const signatoryRecordAddress = await getSignatoryRecordAddress(
-    MANGO_GOVERNANCE_PROGRAM,
-    proposalAddress,
-    signatory,
-  );
   const insertInstructions: TransactionInstruction[] = [];
   for (const i in proposalInstructions) {
     const instruction = getInstructionDataFromBase64(
@@ -120,17 +116,24 @@ export const createProposal = async (
       payer,
     );
   }
-  withSignOffProposal(
-    insertInstructions, // SingOff proposal needs to be executed after inserting instructions hence we add it to insertInstructions
-    MANGO_GOVERNANCE_PROGRAM,
-    programVersion,
-    MANGO_REALM_PK,
-    governance,
-    proposalAddress,
-    signatory,
-    signatoryRecordAddress,
-    undefined,
-  );
+  if (signOff) {
+    const signatoryRecordAddress = await getSignatoryRecordAddress(
+      MANGO_GOVERNANCE_PROGRAM,
+      proposalAddress,
+      signatory,
+    );
+    withSignOffProposal(
+      insertInstructions, // SingOff proposal needs to be executed after inserting instructions hence we add it to insertInstructions
+      MANGO_GOVERNANCE_PROGRAM,
+      programVersion,
+      MANGO_REALM_PK,
+      governance,
+      proposalAddress,
+      signatory,
+      signatoryRecordAddress,
+      undefined,
+    );
+  }
 
   const txChunks = chunk([...instructions, ...insertInstructions], 2);
 

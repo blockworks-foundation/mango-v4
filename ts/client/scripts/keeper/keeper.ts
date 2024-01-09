@@ -1,5 +1,12 @@
 import { AnchorProvider, Wallet } from '@coral-xyz/anchor';
-import { Cluster, Connection, Keypair, PublicKey } from '@solana/web3.js';
+import {
+  Cluster,
+  Connection,
+  Keypair,
+  PublicKey,
+  Transaction,
+  TransactionInstruction,
+} from '@solana/web3.js';
 import fs from 'fs';
 import chunk from 'lodash/chunk';
 import range from 'lodash/range';
@@ -19,10 +26,10 @@ const USER_KEYPAIR =
 const MANGO_ACCOUNT_PK = process.env.MANGO_ACCOUNT_PK || '';
 const INTERVAL_UPDATE_BANKS = Number(process.env.INTERVAL_UPDATE_BANKS || 60);
 const INTERVAL_CONSUME_EVENTS = Number(
-  process.env.INTERVAL_CONSUME_EVENTS || 5,
+  process.env.INTERVAL_CONSUME_EVENTS || 60,
 );
 const INTERVAL_UPDATE_FUNDING = Number(
-  process.env.INTERVAL_UPDATE_FUNDING || 5,
+  process.env.INTERVAL_UPDATE_FUNDING || 60,
 );
 const INTERVAL_CHECK_NEW_LISTINGS_AND_ABORT = Number(
   process.env.INTERVAL_CHECK_NEW_LISTINGS_AND_ABORT || 120,
@@ -35,20 +42,24 @@ async function updateBanks(client: MangoClient, group: Group): Promise<void> {
     const tokenIndices = Array.from(group.banksMapByTokenIndex.keys());
     const tokenIndicesByChunks = chunk(tokenIndices, 10);
     tokenIndicesByChunks.map(async (tokenIndices) => {
-      const ixs = await Promise.all(
-        tokenIndices.map((ti) =>
-          client.tokenUpdateIndexAndRateIx(
-            group,
-            group.getFirstBankByTokenIndex(ti).mint,
-          ),
-        ),
-      );
+      const ixs: TransactionInstruction[] = [];
+
+      for (const tokenIndex of tokenIndices) {
+        const ix = await client.tokenUpdateIndexAndRateIx(
+          group,
+          group.getFirstBankByTokenIndex(tokenIndex).mint,
+        );
+        await client.connection
+          .simulateTransaction(new Transaction().add(ix))
+          .then((d) => ixs.push(ix));
+      }
+
       try {
         const sig = await sendTransaction(
           client.program.provider as AnchorProvider,
           ixs,
           group.addressLookupTablesList,
-          { prioritizationFee: true },
+          { prioritizationFee: 1, preflightCommitment: 'confirmed' },
         );
 
         console.log(
@@ -100,7 +111,7 @@ async function consumeEvents(client: MangoClient, group: Group): Promise<void> {
               ),
             ],
             group.addressLookupTablesList,
-            { prioritizationFee: true },
+            { prioritizationFee: 1 },
           );
 
           console.log(
@@ -135,7 +146,7 @@ async function updateFunding(client: MangoClient, group: Group): Promise<void> {
             ),
           ],
           group.addressLookupTablesList,
-          { prioritizationFee: true },
+          { prioritizationFee: 1 },
         );
 
         console.log(

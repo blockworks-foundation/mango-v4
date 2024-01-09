@@ -28,6 +28,7 @@ pub struct Config {
     pub refresh_timeout: Duration,
     pub jupiter_version: jupiter::Version,
     pub skip_tokens: Vec<TokenIndex>,
+    pub allow_withdraws: bool,
 }
 
 fn token_bank(
@@ -387,7 +388,11 @@ impl Rebalancer {
 
             // Any remainder that could not be sold just gets withdrawn to ensure the
             // TokenPosition is freed up
-            if amount > 0 && amount <= dust_threshold && !token_position.is_in_use() {
+            if amount > 0
+                && amount <= dust_threshold
+                && !token_position.is_in_use()
+                && self.config.allow_withdraws
+            {
                 let allow_borrow = false;
                 let txsig = self
                     .mango_client
@@ -403,10 +408,9 @@ impl Rebalancer {
                     return Ok(());
                 }
             } else if amount > dust_threshold {
-                anyhow::bail!(
+                warn!(
                     "unexpected {} position after rebalance swap: {} native",
-                    token.name,
-                    amount
+                    token.name, amount
                 );
             }
         }

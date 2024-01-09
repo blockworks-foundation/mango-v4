@@ -1,18 +1,20 @@
 import { AnchorProvider, Wallet } from '@coral-xyz/anchor';
-import { Connection, Keypair, PublicKey } from '@solana/web3.js';
+import {
+  AddressLookupTableProgram,
+  ComputeBudgetProgram,
+  Connection,
+  Keypair,
+  PublicKey,
+  SYSVAR_INSTRUCTIONS_PUBKEY,
+  SYSVAR_RENT_PUBKEY,
+  SystemProgram,
+} from '@solana/web3.js';
 import fs from 'fs';
 import { TokenIndex } from '../src/accounts/bank';
 import { Group } from '../src/accounts/group';
 import { MangoClient } from '../src/client';
 import { DefaultTokenRegisterParams } from '../src/clientIxParamBuilder';
 import { MANGO_V4_ID } from '../src/constants';
-import {
-  AddressLookupTableProgram,
-  ComputeBudgetProgram,
-  SYSVAR_INSTRUCTIONS_PUBKEY,
-  SYSVAR_RENT_PUBKEY,
-  SystemProgram,
-} from '@solana/web3.js';
 import { buildVersionedTx } from '../src/utils';
 import {
   ASSOCIATED_TOKEN_PROGRAM_ID,
@@ -172,6 +174,7 @@ async function registerSerum3Market(): Promise<void> {
     group.getFirstBankByTokenIndex(0 as TokenIndex),
     0,
     'SOL/USDC',
+    0.5,
   );
 }
 

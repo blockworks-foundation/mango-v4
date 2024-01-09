@@ -158,7 +158,7 @@ impl<'a> LiquidateHelper<'a> {
             let mut health_cache =
                 health_cache::new(&self.client.context, self.account_fetcher, &liqor)
                     .await
-                    .expect("always ok");
+                    .context("health cache")?;
             let quote_bank = self
                 .client
                 .first_bank(QUOTE_TOKEN_INDEX)
@@ -324,41 +324,89 @@ impl<'a> LiquidateHelper<'a> {
             return Ok(None);
         }
 
-        let tokens = self.tokens().await?;
+        let tokens = self
+            .health_cache
+            .token_infos
+            .iter()
+            .zip(
+                self.health_cache
+                    .effective_token_balances(HealthType::LiquidationEnd)
+                    .into_iter(),
+            )
+            .collect_vec();
 
-        let asset_token_index = tokens
+        //
+        // find a good asset
+        // TODO: use amount-weighted randomness for better robustness
+        //
+
+        let mut potential_assets = tokens
             .iter()
-            .rev()
-            .find(|(asset_token_index, _asset_price, asset_usdc_equivalent)| {
-                asset_usdc_equivalent.is_positive()
-                    && self
-                        .allowed_asset_tokens
-                        .contains(&self.client.context.token(*asset_token_index).mint)
+            .filter_map(|(ti, effective)| {
+                // check constraints for liquidatable assets, see also has_possible_spot_liquidations()
+                let tokens = ti.balance_spot.min(effective.spot_and_perp);
+                let is_valid_asset = tokens >= 1;
+                let quote_value = tokens * ti.prices.oracle;
+                // prefer to liquidate tokens with asset weight that have >$1 liquidatable
+                let is_preferred =
+                    ti.init_asset_weight > 0 && quote_value > I80F48::from(1_000_000);
+                is_valid_asset.then_some((ti.token_index, is_preferred, quote_value))
             })
-            .ok_or_else(|| {
-                anyhow::anyhow!(
-                    "mango account {}, has no asset tokens that are sellable for USDC: {:?}",
-                    self.pubkey,
-                    tokens
-                )
-            })?
-            .0;
-        let liab_token_index = tokens
+            .collect_vec();
+        // sort such that preferred tokens are at the end, and the one with the larget quote value is
+        // at the very end
+        potential_assets.sort_by_key(|(_, is_preferred, amount)| (*is_preferred, *amount));
+
+        // filter only allowed assets
+        let potential_allowed_assets = potential_assets.iter().filter_map(|(ti, _, _)| {
+            let is_allowed = self
+                .allowed_asset_tokens
+                .contains(&self.client.context.token(*ti).mint);
+            is_allowed.then_some(*ti)
+        });
+
+        let asset_token_index = match potential_allowed_assets.last() {
+            Some(token_index) => token_index,
+            None => anyhow::bail!(
+                "mango account {}, has no allowed asset tokens that are liquidatable: {:?}",
+                self.pubkey,
+                potential_assets,
+            ),
+        };
+
+        //
+        // find a good liab, same as for assets
+        //
+
+        let mut potential_liabs = tokens
             .iter()
-            .find(|(liab_token_index, _liab_price, liab_usdc_equivalent)| {
-                liab_usdc_equivalent.is_negative()
-                    && self
-                        .allowed_liab_tokens
-                        .contains(&self.client.context.token(*liab_token_index).mint)
+            .filter_map(|(ti, effective)| {
+                // check constraints for liquidatable liabs, see also has_possible_spot_liquidations()
+                let tokens = (-ti.balance_spot).min(-effective.spot_and_perp);
+                let is_valid_liab = tokens > 0;
+                let quote_value = tokens * ti.prices.oracle;
+                is_valid_liab.then_some((ti.token_index, quote_value))
             })
-            .ok_or_else(|| {
-                anyhow::anyhow!(
-                    "mango account {}, has no liab tokens that are purchasable for USDC: {:?}",
-                    self.pubkey,
-                    tokens
-                )
-            })?
-            .0;
+            .collect_vec();
+        // largest liquidatable liability at the end
+        potential_liabs.sort_by_key(|(_, amount)| *amount);
+
+        // filter only allowed liabs
+        let potential_allowed_liabs = potential_liabs.iter().filter_map(|(ti, _)| {
+            let is_allowed = self
+                .allowed_liab_tokens
+                .contains(&self.client.context.token(*ti).mint);
+            is_allowed.then_some(*ti)
+        });
+
+        let liab_token_index = match potential_allowed_liabs.last() {
+            Some(token_index) => token_index,
+            None => anyhow::bail!(
+                "mango account {}, has no liab tokens that are liquidatable: {:?}",
+                self.pubkey,
+                potential_liabs,
+            ),
+        };
 
         let max_liab_transfer = self
             .max_token_liab_transfer(liab_token_index, asset_token_index)

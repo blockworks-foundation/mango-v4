@@ -81,6 +81,9 @@ pub struct Client {
 
     #[builder(default = "\"https://quote-api.jup.ag/v6\".into()")]
     pub jupiter_v6_url: String,
+
+    #[builder(default = "\"\".into()")]
+    pub jupiter_token: String,
 }
 
 impl ClientBuilder {
@@ -1779,7 +1782,9 @@ impl TransactionBuilder {
         &self,
         rpc: &RpcClientAsync,
     ) -> anyhow::Result<solana_sdk::transaction::VersionedTransaction> {
-        let latest_blockhash = rpc.get_latest_blockhash().await?;
+        let (latest_blockhash, _) = rpc
+            .get_latest_blockhash_with_commitment(CommitmentConfig::finalized())
+            .await?;
         self.transaction_with_blockhash(latest_blockhash)
     }
 

@@ -26,6 +26,7 @@ export class Serum3Market {
       registrationTime: BN;
       reduceOnly: number;
       forceClose: number;
+      oraclePriceBand: number;
     },
   ): Serum3Market {
     return new Serum3Market(
@@ -40,6 +41,7 @@ export class Serum3Market {
       obj.registrationTime,
       obj.reduceOnly == 1,
       obj.forceClose == 1,
+      obj.oraclePriceBand,
     );
   }
 
@@ -55,6 +57,7 @@ export class Serum3Market {
     public registrationTime: BN,
     public reduceOnly: boolean,
     public forceClose: boolean,
+    public oraclePriceBand: number,
   ) {
     this.name = utf8.decode(new Uint8Array(name)).split('\x00')[0];
   }
