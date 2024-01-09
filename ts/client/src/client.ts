@@ -3619,6 +3619,174 @@ export class MangoClient {
 
   /// liquidations
 
+  public async perpLiqBaseOrPositivePnlIx(
+    group: Group,
+    liqeeMangoAccount: MangoAccount,
+    liqorMangoAccount: MangoAccount,
+    perpMarketIndex: PerpMarketIndex,
+    maxBaseTransfer: number,
+    maxPnlTransfer: number,
+  ): Promise<TransactionInstruction> {
+    const perpMarket = group.getPerpMarketByMarketIndex(perpMarketIndex);
+    const bank = group.getFirstBankByTokenIndex(perpMarket.settleTokenIndex);
+    const healthRemainingAccounts: PublicKey[] =
+      this.buildHealthRemainingAccounts(
+        group,
+        [liqeeMangoAccount],
+        [group.getFirstBankForPerpSettlement()],
+        [perpMarket],
+      );
+
+    return await this.program.methods
+      .perpLiqBaseOrPositivePnl(new BN(maxBaseTransfer), new BN(maxPnlTransfer))
+      .accounts({
+        group: group.publicKey,
+        perpMarket: perpMarket.publicKey,
+        oracle: perpMarket.oracle,
+        liqor: liqorMangoAccount.publicKey,
+        liqorOwner: (this.program.provider as AnchorProvider).wallet.publicKey,
+        liqee: liqeeMangoAccount.publicKey,
+        settleBank: bank.publicKey,
+        settleVault: bank.vault,
+        settleOracle: bank.oracle,
+      })
+      .remainingAccounts(
+        healthRemainingAccounts.map(
+          (pk) =>
+            ({ pubkey: pk, isWritable: false, isSigner: false } as AccountMeta),
+        ),
+      )
+      .instruction();
+  }
+
+  public async perpLiqNegativePnlOrBankruptcy(
+    group: Group,
+    liqeeMangoAccount: MangoAccount,
+    liqorMangoAccount: MangoAccount,
+    perpMarketIndex: PerpMarketIndex,
+  ): Promise<MangoSignatureStatus> {
+    return await this.sendAndConfirmTransactionForGroup(group, [
+      await this.perpLiqNegativePnlOrBankruptcyIx(
+        group,
+        liqeeMangoAccount,
+        liqorMangoAccount,
+        perpMarketIndex,
+      ),
+    ]);
+  }
+
+  public async perpLiqNegativePnlOrBankruptcyIx(
+    group: Group,
+    liqeeMangoAccount: MangoAccount,
+    liqorMangoAccount: MangoAccount,
+    perpMarketIndex: PerpMarketIndex,
+  ): Promise<TransactionInstruction> {
+    const perpMarket = group.getPerpMarketByMarketIndex(perpMarketIndex);
+    const bank = group.getFirstBankByTokenIndex(perpMarket.settleTokenIndex);
+    const healthRemainingAccounts: PublicKey[] =
+      this.buildHealthRemainingAccounts(
+        group,
+        [liqeeMangoAccount],
+        [group.getFirstBankForPerpSettlement()],
+        [perpMarket],
+      );
+
+    return await this.program.methods
+      .perpLiqNegativePnlOrBankruptcy(U64_MAX_BN)
+      .accounts({
+        group: group.publicKey,
+        perpMarket: perpMarket.publicKey,
+        oracle: perpMarket.oracle,
+        liqor: liqorMangoAccount.publicKey,
+        liqorOwner: (this.program.provider as AnchorProvider).wallet.publicKey,
+        liqee: liqeeMangoAccount.publicKey,
+        settleBank: bank.publicKey,
+        settleOracle: bank.oracle,
+        settleVault: bank.vault,
+        insuranceVault: group.insuranceVault,
+      })
+      .remainingAccounts(
+        healthRemainingAccounts.map(
+          (pk) =>
+            ({ pubkey: pk, isWritable: false, isSigner: false } as AccountMeta),
+        ),
+      )
+      .instruction();
+  }
+
+  public async perpLiqBaseOrPositivePnl(
+    group: Group,
+    liqeeMangoAccount: MangoAccount,
+    liqorMangoAccount: MangoAccount,
+    perpMarketIndex: PerpMarketIndex,
+    maxBaseTransfer: number,
+    maxPnlTransfer: number,
+  ): Promise<MangoSignatureStatus> {
+    return await this.sendAndConfirmTransactionForGroup(group, [
+      await this.perpLiqBaseOrPositivePnlIx(
+        group,
+        liqeeMangoAccount,
+        liqorMangoAccount,
+        perpMarketIndex,
+        maxBaseTransfer,
+        maxPnlTransfer,
+      ),
+    ]);
+  }
+
+  public async tokenLiqBankruptcyIx(
+    group: Group,
+    liqeeMangoAccount: MangoAccount,
+    liqorMangoAccount: MangoAccount,
+    assetMintPk: PublicKey,
+    liabMintPk: PublicKey,
+    maxLiabTransfer: I80F48,
+  ): Promise<TransactionInstruction> {
+    const quoteVault = group.getFirstBankByMint(assetMintPk).vault;
+    const liabMintInfo = group.mintInfosMapByMint.get(liabMintPk.toString())!;
+    const healthRemainingAccounts: PublicKey[] =
+      this.buildHealthRemainingAccounts(group, [liqeeMangoAccount], [], []);
+
+    return await this.program.methods
+      .tokenLiqBankruptcy({ val: maxLiabTransfer.getData() })
+      .accounts({
+        group: group.publicKey,
+        liqor: liqorMangoAccount.publicKey,
+        liqorOwner: (this.program.provider as AnchorProvider).wallet.publicKey,
+        liqee: liqeeMangoAccount.publicKey,
+        liabMintInfo: liabMintInfo.publicKey,
+        quoteVault: quoteVault,
+        insuranceVault: group.insuranceVault,
+      })
+      .remainingAccounts(
+        healthRemainingAccounts.map(
+          (pk) =>
+            ({ pubkey: pk, isWritable: false, isSigner: false } as AccountMeta),
+        ),
+      )
+      .instruction();
+  }
+
+  public async tokenLiqBankruptcy(
+    group: Group,
+    liqeeMangoAccount: MangoAccount,
+    liqorMangoAccount: MangoAccount,
+    assetMintPk: PublicKey,
+    liabMintPk: PublicKey,
+    maxLiabTransfer: I80F48,
+  ): Promise<MangoSignatureStatus> {
+    return await this.sendAndConfirmTransactionForGroup(group, [
+      await this.tokenLiqBankruptcyIx(
+        group,
+        liqeeMangoAccount,
+        liqorMangoAccount,
+        assetMintPk,
+        liabMintPk,
+        maxLiabTransfer,
+      ),
+    ]);
+  }
+
   public async liqTokenWithToken(
     group: Group,
     liqor: MangoAccount,
