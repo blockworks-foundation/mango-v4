@@ -45,7 +45,13 @@ export type SendTransactionOpts = Partial<{
   estimateFee: boolean;
   additionalSigners: Keypair[];
   postSendTxCallback: ({ txid }: { txid: string }) => void;
-  postTxConfirmationCallback: ({ txid }: { txid: string }) => void;
+  postTxConfirmationCallback: ({
+    txid,
+    txSignatureBlockHash,
+  }: {
+    txid: string;
+    txSignatureBlockHash: LatestBlockhash;
+  }) => void;
   txConfirmationCommitment: Commitment;
   confirmInBackground: boolean;
   alts: AddressLookupTableAccount[];
@@ -204,7 +210,10 @@ const confirmTransaction = async (
   }
   if (opts.postTxConfirmationCallback) {
     try {
-      opts.postTxConfirmationCallback({ txid: signature });
+      opts.postTxConfirmationCallback({
+        txid: signature,
+        txSignatureBlockHash: latestBlockhash,
+      });
     } catch (e) {
       console.warn(`postTxConfirmationCallback error ${e}`);
     }
