@@ -32,12 +32,15 @@ export interface MangoSignature {
   signature: TransactionSignature;
 }
 
+export interface LatestBlockhash {
+  slot: number;
+  blockhash: string;
+  lastValidBlockHeight: number;
+}
+
 export type SendTransactionOpts = Partial<{
   preflightCommitment: Commitment;
-  latestBlockhash: Readonly<{
-    blockhash: string;
-    lastValidBlockHeight: number;
-  }>;
+  latestBlockhash: Readonly<LatestBlockhash>;
   prioritizationFee: number;
   estimateFee: boolean;
   additionalSigners: Keypair[];
@@ -70,13 +73,7 @@ export async function sendTransaction(
   opts: SendTransactionOpts = {},
 ): Promise<MangoSignatureStatus | MangoSignature> {
   const connection = provider.connection;
-  const latestBlockhash =
-    opts.latestBlockhash ??
-    (await connection.getLatestBlockhash(
-      opts.preflightCommitment ??
-        provider.opts.preflightCommitment ??
-        'finalized',
-    ));
+  const latestBlockhash = await fetchLatestBlockHash(provider, opts);
 
   const payer = (provider as AnchorProvider).wallet;
 
@@ -174,10 +171,7 @@ export async function sendTransaction(
 const confirmTransaction = async (
   connection: Connection,
   opts: Partial<SendTransactionOpts> = {},
-  latestBlockhash: Readonly<{
-    blockhash: string;
-    lastValidBlockHeight: number;
-  }>,
+  latestBlockhash: Readonly<LatestBlockhash>,
   signature: string,
 ): Promise<MangoSignatureStatus> => {
   const txConfirmationCommitment = opts.txConfirmationCommitment ?? 'processed';
@@ -217,6 +211,26 @@ const confirmTransaction = async (
   }
   return { signature, slot: status.context.slot, ...signatureResult };
 };
+
+export async function fetchLatestBlockHash(
+  provider: AnchorProvider,
+  opts: SendTransactionOpts = {},
+): Promise<LatestBlockhash> {
+  if (opts.latestBlockhash) {
+    return opts.latestBlockhash;
+  }
+  const commitment =
+    opts.preflightCommitment ??
+    provider.opts.preflightCommitment ??
+    'finalized';
+  const blockhashRequest =
+    await provider.connection.getLatestBlockhashAndContext(commitment);
+  return {
+    slot: blockhashRequest.context.slot,
+    lastValidBlockHeight: blockhashRequest.value.lastValidBlockHeight,
+    blockhash: blockhashRequest.value.blockhash,
+  };
+}
 
 export const createComputeBudgetIx = (
   microLamports: number,
