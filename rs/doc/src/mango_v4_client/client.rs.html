@@ -1946,6 +1946,11 @@
 <a href="#1946" id="1946">1946</a>
 <a href="#1947" id="1947">1947</a>
 <a href="#1948" id="1948">1948</a>
+<a href="#1949" id="1949">1949</a>
+<a href="#1950" id="1950">1950</a>
+<a href="#1951" id="1951">1951</a>
+<a href="#1952" id="1952">1952</a>
+<a href="#1953" id="1953">1953</a>
 </pre><pre class="rust"><code><span class="kw">use </span>std::ops::Deref;
 <span class="kw">use </span>std::str::FromStr;
 <span class="kw">use </span>std::sync::Arc;
@@ -2029,6 +2034,9 @@
 
     <span class="attr">#[builder(default = <span class="string">&quot;\&quot;https://quote-api.jup.ag/v6\&quot;.into()&quot;</span>)]
     </span><span class="kw">pub </span>jupiter_v6_url: String,
+
+    <span class="attr">#[builder(default = <span class="string">&quot;\&quot;\&quot;.into()&quot;</span>)]
+    </span><span class="kw">pub </span>jupiter_token: String,
 }
 
 <span class="kw">impl </span>ClientBuilder {
@@ -3727,7 +3735,9 @@
         <span class="kw-2">&amp;</span><span class="self">self</span>,
         rpc: <span class="kw-2">&amp;</span>RpcClientAsync,
     ) -&gt; anyhow::Result&lt;solana_sdk::transaction::VersionedTransaction&gt; {
-        <span class="kw">let </span>latest_blockhash = rpc.get_latest_blockhash().<span class="kw">await</span><span class="question-mark">?</span>;
+        <span class="kw">let </span>(latest_blockhash, <span class="kw">_</span>) = rpc
+            .get_latest_blockhash_with_commitment(CommitmentConfig::finalized())
+            .<span class="kw">await</span><span class="question-mark">?</span>;
         <span class="self">self</span>.transaction_with_blockhash(latest_blockhash)
     }
 
