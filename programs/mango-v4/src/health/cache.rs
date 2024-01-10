@@ -1050,7 +1050,7 @@ impl HealthCache {
     pub fn require_after_phase1_liquidation(&self) -> Result<()> {
         require!(
             !self.has_spot_open_orders_funds(),
-            MangoError::HasOpenOrUnsettledSerum3Orders // todo-pan: change error?
+            MangoError::HasOpenOrUnsettledSpotOrders
         );
         require!(!self.has_perp_open_orders(), MangoError::HasOpenPerpOrders);
         Ok(())

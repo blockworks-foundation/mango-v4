@@ -73,8 +73,8 @@ pub enum MangoError {
     GroupIsHalted,
     #[msg("the perp position has non-zero base lots")]
     PerpHasBaseLots,
-    #[msg("there are open or unsettled serum3 orders")]
-    HasOpenOrUnsettledSerum3Orders,
+    #[msg("there are open or unsettled spot orders")]
+    HasOpenOrUnsettledSpotOrders,
     #[msg("has liquidatable token position")]
     HasLiquidatableTokenPosition,
     #[msg("has liquidatable perp base position")]
@@ -128,7 +128,7 @@ pub enum MangoError {
     #[msg("a bank in the health account list should be writable but is not")]
     HealthAccountBankNotWritable,
     #[msg("the market does not allow limit orders too far from the current oracle value")]
-    Serum3PriceBandExceeded,
+    SpotPriceBandExceeded,
     #[msg("deposit crosses the token's deposit limit")]
     BankDepositLimit,
     #[msg("delegates can only withdraw to the owner's associated token account")]

@@ -333,7 +333,7 @@ pub fn openbook_v2_place_order(
             OpenbookV2Side::Bid => {
                 require_msg_typed!(
                     limit_price_in_dollar * band_factor >= base_oracle_f64,
-                    MangoError::Serum3PriceBandExceeded,
+                    MangoError::SpotPriceBandExceeded,
                     "bid price {} must be larger than {} ({}% of oracle)",
                     limit_price,
                     base_oracle_f64 / (quote_oracle_f64 * band_factor),
@@ -343,7 +343,7 @@ pub fn openbook_v2_place_order(
             OpenbookV2Side::Ask => {
                 require_msg_typed!(
                     limit_price_in_dollar <= base_oracle_f64 * band_factor,
-                    MangoError::Serum3PriceBandExceeded,
+                    MangoError::SpotPriceBandExceeded,
                     "ask price {} must be smaller than {} ({}% of oracle)",
                     limit_price,
                     base_oracle_f64 * band_factor / quote_oracle_f64,
