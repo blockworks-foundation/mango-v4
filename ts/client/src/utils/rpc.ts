@@ -17,7 +17,6 @@ import {
   TransactionSignature,
   VersionedTransaction,
 } from '@solana/web3.js';
-import { Tracing } from 'trace_events';
 import { COMPUTE_BUDGET_PROGRAM_ID } from '../constants';
 
 export interface MangoSignatureStatus {
@@ -44,7 +43,13 @@ export type SendTransactionOpts = Partial<{
   prioritizationFee: number;
   estimateFee: boolean;
   additionalSigners: Keypair[];
-  postSendTxCallback: ({ txid }: { txid: string }) => void;
+  postSendTxCallback: ({
+    txid,
+    txSignatureBlockHash,
+  }: {
+    txid: string;
+    txSignatureBlockHash: LatestBlockhash;
+  }) => void;
   postTxConfirmationCallback: ({
     txid,
     txSignatureBlockHash,
@@ -155,7 +160,10 @@ export async function sendTransaction(
 
   if (opts.postSendTxCallback) {
     try {
-      opts.postSendTxCallback({ txid: signature });
+      opts.postSendTxCallback({
+        txid: signature,
+        txSignatureBlockHash: latestBlockhash,
+      });
     } catch (e) {
       console.warn(`postSendTxCallback error ${e}`);
     }
