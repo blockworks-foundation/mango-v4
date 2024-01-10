@@ -10,6 +10,7 @@ import { MarketIndex } from '../../src/accounts/serum3';
 import { MangoClient } from '../../src/client';
 import { MANGO_V4_ID } from '../../src/constants';
 import { I80F48, ONE_I80F48, ZERO_I80F48 } from '../../src/numbers/I80F48';
+import { toUiDecimalsForQuote } from '../../src/utils';
 import { MangoSignatureStatus } from '../../src/utils/rpc';
 
 const GROUP = new PublicKey('78b8f4cGCwmZ9ysPFMWLaLTkkaYnUjwMJYStWe5RTSSX');
@@ -39,7 +40,7 @@ const main = async (): Promise<void> => {
     CLUSTER as Cluster,
     MANGO_V4_ID[CLUSTER],
     {
-      idsSource: 'get-program-accounts',
+      idsSource: 'api',
       prioritizationFee: 100,
       txConfirmationCommitment: 'confirmed',
     },
@@ -54,29 +55,58 @@ const main = async (): Promise<void> => {
   if (!liquidatorMangoAccount) {
     throw new Error('liquidatorMangoAccount not found');
   }
-  const mangoAccounts = await client.getAllMangoAccounts(group, true);
 
-  // loop over all mangoAccounts and find liquidable ones
-  for (const mangoAccount of mangoAccounts) {
-    if (!isLiquidable(mangoAccount, group)) {
-      continue;
-    }
+  // eslint-disable-next-line no-constant-condition
+  while (true) {
+    console.log(``);
 
-    console.log(`Attempting to liquidate ${mangoAccount.publicKey.toBase58()}`);
+    await group.reloadAll(client);
+    let mangoAccounts = await client.getAllMangoAccounts(group, true);
 
-    try {
-      liquidateAccount(mangoAccount, liquidatorMangoAccount, group, client);
-    } catch (e) {
-      console.error(
-        `Error liquidating ${mangoAccount.publicKey.toBase58()}, ${e}`,
+    mangoAccounts = mangoAccounts.filter(
+      (a) => toUiDecimalsForQuote(a.getEquity(group)) > 0,
+    );
+
+    mangoAccounts.sort((a, b) =>
+      a.getHealth(group, 'maint').gt(b.getHealth(group, 'maint')) ? 1 : -1,
+    );
+
+    // loop over all mangoAccounts and find liquidable ones
+    for (const mangoAccount of mangoAccounts) {
+      if (!isLiquidable(mangoAccount, group)) {
+        continue;
+      }
+
+      console.log(
+        `Attempting to liquidate ${mangoAccount.publicKey.toBase58()}`,
       );
+
+      try {
+        await liquidateAccount(
+          mangoAccount,
+          liquidatorMangoAccount,
+          group,
+          client,
+        );
+      } catch (e) {
+        console.error(
+          `Error liquidating ${mangoAccount.publicKey.toBase58()}, ${e}`,
+        );
+      }
     }
+
+    await new Promise((r) => setTimeout(r, 500));
   }
 };
 
 main();
 
 function isLiquidable(mangoAccount: MangoAccount, group: Group): boolean {
+  // console.log(
+  //   ` ${mangoAccount.publicKey} ${toUiDecimalsForQuote(
+  //     mangoAccount.getHealth(group, 'Maint'),
+  //   )}`,
+  // );
   return (
     mangoAccount.getHealth(group, 'Init').isNeg() ||
     mangoAccount.getHealth(group, 'Maint').isNeg()
