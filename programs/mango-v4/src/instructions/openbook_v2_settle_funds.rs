@@ -39,7 +39,7 @@ pub fn openbook_v2_settle_funds<'info>(
         // Validate open_orders #2
         require!(
             account
-                .serum3_orders(openbook_market.market_index)?
+                .openbook_v2_orders(openbook_market.market_index)?
                 .open_orders
                 == ctx.accounts.open_orders.key(),
             MangoError::SomeError
