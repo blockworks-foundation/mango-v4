@@ -1,26 +1,24 @@
 import { AnchorProvider, Wallet } from '@coral-xyz/anchor';
 import { Cluster, Connection, Keypair, PublicKey } from '@solana/web3.js';
 import fs from 'fs';
+import { TokenIndex } from '../../src/accounts/bank';
+import { Group } from '../../src/accounts/group';
+import { HealthCache } from '../../src/accounts/healthCache';
+import { MangoAccount } from '../../src/accounts/mangoAccount';
+import { PerpMarketIndex, PerpOrderSide } from '../../src/accounts/perp';
+import { MarketIndex } from '../../src/accounts/serum3';
 import { MangoClient } from '../../src/client';
 import { MANGO_V4_ID } from '../../src/constants';
 import { I80F48, ONE_I80F48, ZERO_I80F48 } from '../../src/numbers/I80F48';
-import { MangoAccount } from '../../src/accounts/mangoAccount';
-import { Group } from '../../src/accounts/group';
-import { PerpMarketIndex, PerpOrderSide } from '../../src/accounts/perp';
-import { MarketIndex } from '../../src/accounts/serum3';
-import { HealthCache } from '../../src/accounts/healthCache';
 import { MangoSignatureStatus } from '../../src/utils/rpc';
-import { TokenIndex } from '../../src/accounts/bank';
-
-//
-// This script creates liquidation candidates
-//
 
 const GROUP = new PublicKey('78b8f4cGCwmZ9ysPFMWLaLTkkaYnUjwMJYStWe5RTSSX');
 const CLUSTER = process.env.CLUSTER || 'mainnet-beta';
-const RPC_URL = process.env.RPC_URL;
-const WALLET_KEYPAIR = process.env.KEYPAIR;
-const LIQUIDATOR_MANGO_ACCT_NUM = process.env.ACCT_NUM || '0';
+const CLUSTER_URL =
+  process.env.CLUSTER_URL_OVERRIDE || process.env.MB_CLUSTER_URL;
+const USER_KEYPAIR =
+  process.env.USER_KEYPAIR_OVERRIDE || process.env.MB_PAYER_KEYPAIR;
+const MANGO_ACCOUNT_PK = process.env.MANGO_ACCOUNT_PK || '';
 const LIAB_LIMIT = I80F48.fromNumber(
   Math.min(parseFloat(process.env.LIAB_LIMIT || '0.9'), 1),
 );
@@ -29,10 +27,10 @@ const main = async (): Promise<void> => {
   const options = AnchorProvider.defaultOptions();
   options.commitment = 'processed';
   options.preflightCommitment = 'finalized';
-  const connection = new Connection(RPC_URL!, options);
+  const connection = new Connection(CLUSTER_URL!, options);
 
   const keypair = Keypair.fromSecretKey(
-    Buffer.from(JSON.parse(fs.readFileSync(WALLET_KEYPAIR!, 'utf-8'))),
+    Buffer.from(JSON.parse(fs.readFileSync(USER_KEYPAIR!, 'utf-8'))),
   );
   const userWallet = new Wallet(keypair);
   const userProvider = new AnchorProvider(connection, userWallet, options);
@@ -50,10 +48,8 @@ const main = async (): Promise<void> => {
   // fetch group
   const group = await client.getGroup(GROUP);
   // liquidator's mango account
-  const liquidatorMangoAccount = await client.getMangoAccountForOwner(
-    group,
-    keypair.publicKey,
-    parseFloat(LIQUIDATOR_MANGO_ACCT_NUM),
+  const liquidatorMangoAccount = await client.getMangoAccount(
+    new PublicKey(MANGO_ACCOUNT_PK),
   );
   if (!liquidatorMangoAccount) {
     throw new Error('liquidatorMangoAccount not found');
