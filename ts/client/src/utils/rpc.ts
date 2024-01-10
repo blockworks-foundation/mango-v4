@@ -19,6 +19,7 @@ import {
 } from '@solana/web3.js';
 import { COMPUTE_BUDGET_PROGRAM_ID } from '../constants';
 import { TxCallbackOptions } from '../client';
+import { awaitTransactionSignatureConfirmation } from '@blockworks-foundation/mangolana/lib/transactions';
 
 export interface MangoSignatureStatus {
   confirmations?: number | null;
@@ -171,20 +172,47 @@ const confirmTransaction = async (
     latestBlockhash.blockhash != null &&
     latestBlockhash.lastValidBlockHeight != null
   ) {
-    status = await connection.confirmTransaction(
-      {
-        signature: signature,
-        blockhash: latestBlockhash.blockhash,
-        lastValidBlockHeight: latestBlockhash.lastValidBlockHeight,
-      },
-      txConfirmationCommitment,
-    );
+    status = await Promise.race([
+      connection.confirmTransaction(
+        {
+          signature: signature,
+          blockhash: latestBlockhash.blockhash,
+          lastValidBlockHeight: latestBlockhash.lastValidBlockHeight,
+        },
+        txConfirmationCommitment,
+      ),
+      awaitTransactionSignatureConfirmation({
+        txid: signature,
+        confirmLevel: 'processed',
+        connection,
+        config: { logFlowInfo: true },
+        timeoutStrategy: {
+          block: latestBlockhash,
+        },
+      }),
+    ]);
   } else {
-    status = await connection.confirmTransaction(
-      signature,
-      txConfirmationCommitment,
-    );
+    status = await Promise.race([
+      connection.confirmTransaction(
+        {
+          signature: signature,
+          blockhash: latestBlockhash.blockhash,
+          lastValidBlockHeight: latestBlockhash.lastValidBlockHeight,
+        },
+        txConfirmationCommitment,
+      ),
+      awaitTransactionSignatureConfirmation({
+        txid: signature,
+        confirmLevel: 'processed',
+        connection,
+        config: { logFlowInfo: true },
+        timeoutStrategy: {
+          block: latestBlockhash,
+        },
+      }),
+    ]);
   }
+
   const signatureResult = status.value;
   if (signatureResult.err) {
     console.warn('Tx status: ', status);
