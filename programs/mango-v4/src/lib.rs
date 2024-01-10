@@ -1698,9 +1698,16 @@ pub mod mango_v4 {
         reduce_only_opt: Option<bool>,
         force_close_opt: Option<bool>,
         name_opt: Option<String>,
+        oracle_price_band_opt: Option<f32>,
     ) -> Result<()> {
         #[cfg(feature = "enable-gpl")]
-        instructions::openbook_v2_edit_market(ctx, reduce_only_opt, force_close_opt, name_opt)?;
+        instructions::openbook_v2_edit_market(
+            ctx,
+            reduce_only_opt,
+            force_close_opt,
+            name_opt,
+            oracle_price_band_opt,
+        )?;
         Ok(())
     }
 

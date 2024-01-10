@@ -7,6 +7,7 @@ pub fn openbook_v2_edit_market(
     reduce_only_opt: Option<bool>,
     force_close_opt: Option<bool>,
     name_opt: Option<String>,
+    oracle_price_band_opt: Option<f32>,
 ) -> Result<()> {
     let mut openbook_market = ctx.accounts.market.load_mut()?;
 
@@ -43,6 +44,16 @@ pub fn openbook_v2_edit_market(
     if let Some(name) = name_opt.as_ref() {
         msg!("Name: old - {:?}, new - {:?}", openbook_market.name, name);
         openbook_market.name = fill_from_str(&name)?;
+        require_group_admin = true;
+    };
+
+    if let Some(oracle_price_band) = oracle_price_band_opt {
+        msg!(
+            "Oracle price band: old - {:?}, new - {:?}",
+            openbook_market.oracle_price_band,
+            oracle_price_band
+        );
+        openbook_market.oracle_price_band = oracle_price_band;
         require_group_admin = true;
     };
 
