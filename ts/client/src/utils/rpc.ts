@@ -22,13 +22,9 @@ import { COMPUTE_BUDGET_PROGRAM_ID } from '../constants';
 export interface MangoSignatureStatus {
   confirmations?: number | null;
   confirmationStatus?: TransactionConfirmationStatus;
-  err: TransactionError | null;
+  err?: TransactionError | null;
   signature: TransactionSignature;
-  slot: number;
-}
-
-export interface MangoSignature {
-  signature: TransactionSignature;
+  slot?: number;
 }
 
 export interface LatestBlockhash {
@@ -63,26 +59,12 @@ export type SendTransactionOpts = Partial<{
   multipleConnections: Connection[];
 }>;
 
-export function sendTransaction(
-  provider: AnchorProvider,
-  ixs: TransactionInstruction[],
-  alts: AddressLookupTableAccount[],
-  opts?: { confirmInBackground: true } & SendTransactionOpts,
-): Promise<MangoSignature>;
-
-export function sendTransaction(
-  provider: AnchorProvider,
-  ixs: TransactionInstruction[],
-  alts: AddressLookupTableAccount[],
-  opts?: SendTransactionOpts,
-): Promise<MangoSignatureStatus>;
-
 export async function sendTransaction(
   provider: AnchorProvider,
   ixs: TransactionInstruction[],
   alts: AddressLookupTableAccount[],
   opts: SendTransactionOpts = {},
-): Promise<MangoSignatureStatus | MangoSignature> {
+): Promise<MangoSignatureStatus> {
   const connection = provider.connection;
   const latestBlockhash = await fetchLatestBlockHash(provider, opts);
 

@@ -95,7 +95,6 @@ import {
 } from './utils';
 import {
   LatestBlockhash,
-  MangoSignature,
   MangoSignatureStatus,
   SendTransactionOpts,
   sendTransaction,
@@ -183,7 +182,7 @@ export class MangoClient {
   public async sendAndConfirmTransaction(
     ixs: TransactionInstruction[],
     opts?: { confirmInBackground: true } & SendTransactionOpts,
-  ): Promise<MangoSignature>;
+  ): Promise<MangoSignatureStatus>;
 
   /// Transactions
   public async sendAndConfirmTransaction(
@@ -225,13 +224,13 @@ export class MangoClient {
     group: Group,
     ixs: TransactionInstruction[],
     opts?: { confirmInBackground: true } & SendTransactionOpts,
-  ): Promise<MangoSignature>;
+  ): Promise<MangoSignatureStatus>;
 
   public async sendAndConfirmTransactionForGroup(
     group: Group,
     ixs: TransactionInstruction[],
     opts: SendTransactionOpts = {},
-  ): Promise<MangoSignatureStatus | MangoSignature> {
+  ): Promise<MangoSignatureStatus> {
     return await this.sendAndConfirmTransaction(ixs, {
       alts: group.addressLookupTablesList,
       ...opts,
@@ -1322,7 +1321,7 @@ export class MangoClient {
     mintPk: PublicKey,
     amount: number,
     reduceOnly = false,
-  ): Promise<MangoSignature> {
+  ): Promise<MangoSignatureStatus> {
     const decimals = group.getMintDecimals(mintPk);
     const nativeAmount = toNative(amount, decimals);
     return await this.tokenDepositNative(
@@ -1340,7 +1339,7 @@ export class MangoClient {
     mintPk: PublicKey,
     nativeAmount: BN,
     reduceOnly = false,
-  ): Promise<MangoSignature> {
+  ): Promise<MangoSignatureStatus> {
     const bank = group.getFirstBankByMint(mintPk);
 
     const tokenAccountPk = await getAssociatedTokenAddress(
