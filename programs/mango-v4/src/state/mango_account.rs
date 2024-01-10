@@ -311,6 +311,7 @@ impl MangoAccount {
             perp_oo_count,
             token_conditional_swap_count,
         ) + (BORSH_VEC_SIZE_BYTES + size_of::<OpenbookV2Orders>() * usize::from(openbook_v2_count))
+            + BORSH_VEC_PADDING_BYTES
     }
 
     pub fn dynamic_size(
