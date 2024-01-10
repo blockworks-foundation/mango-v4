@@ -34,7 +34,7 @@ type BorshVecLength = u32;
 const BORSH_VEC_PADDING_BYTES: usize = 4;
 const BORSH_VEC_SIZE_BYTES: usize = 4;
 const DEFAULT_MANGO_ACCOUNT_VERSION: u8 = 1;
-const DYNAMIC_RESERVED_BYTES: usize = 64;
+const DYNAMIC_RESERVED_BYTES: usize = 56;
 
 // Return variants for check_liquidatable method, should be wrapped in a Result
 // for a future possiblity of returning any error
@@ -178,9 +178,12 @@ pub struct MangoAccount {
     #[derivative(Debug = "ignore")]
     pub padding8: u32,
     pub token_conditional_swaps: Vec<TokenConditionalSwap>,
+    #[derivative(Debug = "ignore")]
+    pub padding9: u32,
+    pub openbook_v2: Vec<OpenbookV2Orders>,
 
     #[derivative(Debug = "ignore")]
-    pub reserved_dynamic: [u8; 64],
+    pub reserved_dynamic: [u8; 56],
 }
 
 impl MangoAccount {
@@ -216,7 +219,9 @@ impl MangoAccount {
             perp_open_orders: vec![PerpOpenOrder::default(); 6],
             padding8: Default::default(),
             token_conditional_swaps: vec![TokenConditionalSwap::default(); 2],
-            reserved_dynamic: [0; 64],
+            padding9: Default::default(),
+            openbook_v2: vec![OpenbookV2Orders::default(); 5],
+            reserved_dynamic: [0; 56],
         }
     }
 
@@ -2142,10 +2147,10 @@ mod tests {
             let mut b = account_bytes_without_tcs_and_obv2_and_reserved.clone();
             // tcs adds 4 bytes of padding and 4 bytes of Vec size
             b.extend([0u8; 8]);
-            // openbook v2 probably adds some shit too?
+            // openbook v2 probably adds a vec too
             b.extend([0u8; 8]);
-            // plus 64 bytes of reserved space at the end
-            b.extend([0u8; 64]);
+            // plus 56 bytes of reserved space at the end
+            b.extend([0u8; 56]);
             b
         };
         assert_eq!(
