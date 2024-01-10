@@ -1,4 +1,5 @@
 use anchor_lang::prelude::*;
+use anchor_lang::Discriminator;
 use anchor_lang::ZeroCopy;
 
 use fixed::types::I80F48;
@@ -466,6 +467,8 @@ impl<'a, 'info> ScanningAccountRetriever<'a, 'info> {
             .iter()
             .take_while(|x| {
                 x.data_len() == std::mem::size_of::<openbook_v2::state::OpenOrdersAccount>() + 8
+                    && x.data.borrow()[0..8]
+                        == openbook_v2::state::OpenOrdersAccount::discriminator()
             })
             .count();
         let fallback_oracles_start = openbook_v2_start + n_openbook_v2;
