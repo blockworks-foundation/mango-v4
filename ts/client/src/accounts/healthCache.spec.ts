@@ -1262,5 +1262,47 @@ describe('Health Cache', () => {
     done();
   });
 
+  it('Modify copy of health object leaving original object unchanged', (done) => {
+    const b0 = mockBankAndOracle(0 as TokenIndex, 0.1, 0.1, 2, 2);
+    const b1 = mockBankAndOracle(1 as TokenIndex, 0.2, 0.2, 3, 3);
+    const b2 = mockBankAndOracle(2 as TokenIndex, 0.3, 0.3, 4, 4);
+    const hc = new HealthCache(
+      [
+        TokenInfo.fromBank(b0, I80F48.fromNumber(0)),
+        TokenInfo.fromBank(b1, I80F48.fromNumber(0)),
+        TokenInfo.fromBank(b2, I80F48.fromNumber(0)),
+      ],
+      [],
+      [],
+    );
+    const clonedHc: HealthCache = deepClone(hc);
+    // mess up props
+    clonedHc.tokenInfos[0].balanceSpot.iadd(
+      I80F48.fromNumber(100).div(clonedHc.tokenInfos[0].prices.oracle),
+    );
+    clonedHc.tokenInfos[1].balanceSpot.iadd(
+      I80F48.fromNumber(-2).div(clonedHc.tokenInfos[1].prices.oracle),
+    );
+    clonedHc.tokenInfos[1].prices.oracle.iadd(new I80F48(new BN(333333)));
+
+    expect(hc.tokenInfos[0].balanceSpot.eq(clonedHc.tokenInfos[0].balanceSpot))
+      .to.be.false;
+    expect(hc.tokenInfos[1].balanceSpot.eq(clonedHc.tokenInfos[1].balanceSpot))
+      .to.be.false;
+    expect(
+      hc.tokenInfos[1].prices.oracle.eq(clonedHc.tokenInfos[1].prices.oracle),
+    ).to.be.false;
+    //one is unchanged
+    expect(hc.tokenInfos[2].balanceSpot.eq(clonedHc.tokenInfos[2].balanceSpot))
+      .to.be.true;
+
+    //do something stupid
+    clonedHc['addProp'] = '123';
+    expect(hc['addProp'] === undefined && clonedHc['addProp'] === '123').to.be
+      .true;
+
+    done();
+  });
+
   // TODO: test_assets_and_borrows
 });
