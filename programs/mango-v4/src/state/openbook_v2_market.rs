@@ -36,13 +36,13 @@ pub struct OpenbookV2Market {
 
     pub registration_time: u64,
 
-    pub reserved: [u8; 512],
+    pub reserved: [u8; 1024],
 }
 const_assert_eq!(
     size_of::<OpenbookV2Market>(),
-    32 + 2 + 2 + 1 + 3 + 16 + 2 * 32 + 2 + 1 + 5 + 8 + 512
+    32 + 2 + 2 + 1 + 3 + 16 + 2 * 32 + 2 + 1 + 5 + 8 + 1024
 );
-const_assert_eq!(size_of::<OpenbookV2Market>(), 648);
+const_assert_eq!(size_of::<OpenbookV2Market>(), 1160);
 const_assert_eq!(size_of::<OpenbookV2Market>() % 8, 0);
 
 impl OpenbookV2Market {

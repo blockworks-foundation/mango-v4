@@ -1,6 +1,6 @@
 use anchor_lang::prelude::*;
 
-use crate::error::MangoError;
+use crate::error::*;
 use crate::state::*;
 use crate::util::fill_from_str;
 
@@ -13,24 +13,49 @@ pub fn openbook_v2_register_market(
     name: String,
     oracle_price_band: f32,
 ) -> Result<()> {
-    // TODO: must guard against accidentally using the same market_index twice!
+    let is_fast_listing;
+    let group = ctx.accounts.group.load()?;
+    // checking the admin account (#1)
+    if ctx.accounts.admin.key() == group.admin {
+        is_fast_listing = false;
+    } else if ctx.accounts.admin.key() == group.fast_listing_admin {
+        is_fast_listing = true;
+    } else {
+        return Err(error_msg!(
+            "admin must be the group admin or group fast listing admin"
+        ));
+    }
 
     let base_bank = ctx.accounts.base_bank.load()?;
     let quote_bank = ctx.accounts.quote_bank.load()?;
     let market_external = ctx.accounts.openbook_v2_market_external.load()?;
-    require_eq!(
+    require_keys_eq!(
         market_external.quote_mint,
         quote_bank.mint,
         MangoError::SomeError
     );
-    require_eq!(
+    require_keys_eq!(
         market_external.base_mint,
         base_bank.mint,
         MangoError::SomeError
     );
 
-    let mut serum_market = ctx.accounts.openbook_v2_market.load_init()?;
-    *serum_market = OpenbookV2Market {
+    if is_fast_listing {
+        // C tier tokens (no borrows, no asset weight) allow wider bands if the quote token has
+        // no deposit limits
+        let base_c_tier =
+            base_bank.are_borrows_reduce_only() && base_bank.maint_asset_weight.is_zero();
+        let quote_has_no_deposit_limit = quote_bank.deposit_weight_scale_start_quote == f64::MAX
+            && quote_bank.deposit_limit == 0;
+        if base_c_tier && quote_has_no_deposit_limit {
+            require_eq!(oracle_price_band, 19.0);
+        } else {
+            require_eq!(oracle_price_band, 0.5);
+        }
+    }
+
+    let mut openbook_market = ctx.accounts.openbook_v2_market.load_init()?;
+    *openbook_market = OpenbookV2Market {
         group: ctx.accounts.group.key(),
         base_token_index: base_bank.token_index,
         quote_token_index: quote_bank.token_index,
@@ -48,7 +73,7 @@ pub fn openbook_v2_register_market(
         padding2: Default::default(),
         oracle_price_band,
         registration_time: Clock::get()?.unix_timestamp.try_into().unwrap(),
-        reserved: [0; 512],
+        reserved: [0; 1024],
     };
 
     let mut openbook_index_reservation = ctx.accounts.index_reservation.load_init()?;
