@@ -209,6 +209,7 @@ export class Group {
     }
 
     const oldbanksMapByTokenIndex = deepClone(this.banksMapByTokenIndex);
+
     this.banksMapByName = new Map();
     this.banksMapByMint = new Map();
     this.banksMapByTokenIndex = new Map();
@@ -368,10 +369,6 @@ export class Group {
     const oldPerpMarketByMarketIndex = deepClone(
       this.perpMarketsMapByMarketIndex,
     );
-    console.log({
-      original: this.perpMarketsMapByMarketIndex,
-      copy: oldPerpMarketByMarketIndex,
-    });
     for (const perpMarket of perpMarkets) {
       const oldPerpMarket = oldPerpMarketByMarketIndex.get(
         perpMarket.perpMarketIndex,
