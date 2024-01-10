@@ -95,7 +95,6 @@ import {
 } from './utils';
 import {
   LatestBlockhash,
-  MangoSignature,
   MangoSignatureStatus,
   SendTransactionOpts,
   sendTransaction,
@@ -116,14 +115,8 @@ export type IdsSource = 'api' | 'static' | 'get-program-accounts';
 
 export type MangoClientOptions = {
   idsSource?: IdsSource;
-  postSendTxCallback?: ({ txid }: { txid: string }) => void;
-  postTxConfirmationCallback?: ({
-    txid,
-    txSignatureBlockHash,
-  }: {
-    txid: string;
-    txSignatureBlockHash: LatestBlockhash;
-  }) => void;
+  postSendTxCallback?: (callbackOpts: TxCallbackOptions) => void;
+  postTxConfirmationCallback?: (callbackOpts: TxCallbackOptions) => void;
   prioritizationFee?: number;
   estimateFee?: boolean;
   txConfirmationCommitment?: Commitment;
@@ -132,10 +125,15 @@ export type MangoClientOptions = {
   multipleConnections?: Connection[];
 };
 
+export type TxCallbackOptions = {
+  txid: string;
+  txSignatureBlockHash: LatestBlockhash;
+};
+
 export class MangoClient {
   private idsSource: IdsSource;
-  private postSendTxCallback?: ({ txid }: { txid: string }) => void;
-  postTxConfirmationCallback?: ({ txid }: { txid: string }) => void;
+  private postSendTxCallback?: (callbackOpts: TxCallbackOptions) => void;
+  postTxConfirmationCallback?: (callbackOpts: TxCallbackOptions) => void;
   private prioritizationFee: number;
   private estimateFee: boolean;
   private txConfirmationCommitment: Commitment;
@@ -183,7 +181,7 @@ export class MangoClient {
   public async sendAndConfirmTransaction(
     ixs: TransactionInstruction[],
     opts?: { confirmInBackground: true } & SendTransactionOpts,
-  ): Promise<MangoSignature>;
+  ): Promise<MangoSignatureStatus>;
 
   /// Transactions
   public async sendAndConfirmTransaction(
@@ -225,13 +223,13 @@ export class MangoClient {
     group: Group,
     ixs: TransactionInstruction[],
     opts?: { confirmInBackground: true } & SendTransactionOpts,
-  ): Promise<MangoSignature>;
+  ): Promise<MangoSignatureStatus>;
 
   public async sendAndConfirmTransactionForGroup(
     group: Group,
     ixs: TransactionInstruction[],
     opts: SendTransactionOpts = {},
-  ): Promise<MangoSignatureStatus | MangoSignature> {
+  ): Promise<MangoSignatureStatus> {
     return await this.sendAndConfirmTransaction(ixs, {
       alts: group.addressLookupTablesList,
       ...opts,
@@ -1322,7 +1320,7 @@ export class MangoClient {
     mintPk: PublicKey,
     amount: number,
     reduceOnly = false,
-  ): Promise<MangoSignature> {
+  ): Promise<MangoSignatureStatus> {
     const decimals = group.getMintDecimals(mintPk);
     const nativeAmount = toNative(amount, decimals);
     return await this.tokenDepositNative(
@@ -1340,7 +1338,7 @@ export class MangoClient {
     mintPk: PublicKey,
     nativeAmount: BN,
     reduceOnly = false,
-  ): Promise<MangoSignature> {
+  ): Promise<MangoSignatureStatus> {
     const bank = group.getFirstBankByMint(mintPk);
 
     const tokenAccountPk = await getAssociatedTokenAddress(

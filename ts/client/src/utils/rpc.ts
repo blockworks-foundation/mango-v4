@@ -17,19 +17,21 @@ import {
   TransactionSignature,
   VersionedTransaction,
 } from '@solana/web3.js';
-import { Tracing } from 'trace_events';
 import { COMPUTE_BUDGET_PROGRAM_ID } from '../constants';
+import { TxCallbackOptions } from '../client';
 
 export interface MangoSignatureStatus {
   confirmations?: number | null;
   confirmationStatus?: TransactionConfirmationStatus;
-  err: TransactionError | null;
+  err?: TransactionError | null;
   signature: TransactionSignature;
-  slot: number;
+  slot?: number;
 }
 
-export interface MangoSignature {
-  signature: TransactionSignature;
+export interface LatestBlockhash {
+  slot: number;
+  blockhash: string;
+  lastValidBlockHeight: number;
 }
 
 export interface LatestBlockhash {
@@ -44,40 +46,20 @@ export type SendTransactionOpts = Partial<{
   prioritizationFee: number;
   estimateFee: boolean;
   additionalSigners: Keypair[];
-  postSendTxCallback: ({ txid }: { txid: string }) => void;
-  postTxConfirmationCallback: ({
-    txid,
-    txSignatureBlockHash,
-  }: {
-    txid: string;
-    txSignatureBlockHash: LatestBlockhash;
-  }) => void;
+  postSendTxCallback: (callbackOpts: TxCallbackOptions) => void;
+  postTxConfirmationCallback: (callbackOpts: TxCallbackOptions) => void;
   txConfirmationCommitment: Commitment;
   confirmInBackground: boolean;
   alts: AddressLookupTableAccount[];
   multipleConnections: Connection[];
 }>;
 
-export function sendTransaction(
-  provider: AnchorProvider,
-  ixs: TransactionInstruction[],
-  alts: AddressLookupTableAccount[],
-  opts?: { confirmInBackground: true } & SendTransactionOpts,
-): Promise<MangoSignature>;
-
-export function sendTransaction(
-  provider: AnchorProvider,
-  ixs: TransactionInstruction[],
-  alts: AddressLookupTableAccount[],
-  opts?: SendTransactionOpts,
-): Promise<MangoSignatureStatus>;
-
 export async function sendTransaction(
   provider: AnchorProvider,
   ixs: TransactionInstruction[],
   alts: AddressLookupTableAccount[],
   opts: SendTransactionOpts = {},
-): Promise<MangoSignatureStatus | MangoSignature> {
+): Promise<MangoSignatureStatus> {
   const connection = provider.connection;
   const latestBlockhash = await fetchLatestBlockHash(provider, opts);
 
@@ -155,7 +137,10 @@ export async function sendTransaction(
 
   if (opts.postSendTxCallback) {
     try {
-      opts.postSendTxCallback({ txid: signature });
+      opts.postSendTxCallback({
+        txid: signature,
+        txSignatureBlockHash: latestBlockhash,
+      });
     } catch (e) {
       console.warn(`postSendTxCallback error ${e}`);
     }
