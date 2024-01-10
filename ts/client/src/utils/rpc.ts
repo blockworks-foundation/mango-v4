@@ -34,6 +34,12 @@ export interface LatestBlockhash {
   lastValidBlockHeight: number;
 }
 
+export interface LatestBlockhash {
+  slot: number;
+  blockhash: string;
+  lastValidBlockHeight: number;
+}
+
 export type SendTransactionOpts = Partial<{
   preflightCommitment: Commitment;
   latestBlockhash: Readonly<LatestBlockhash>;
