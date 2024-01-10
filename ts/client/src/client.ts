@@ -115,14 +115,8 @@ export type IdsSource = 'api' | 'static' | 'get-program-accounts';
 
 export type MangoClientOptions = {
   idsSource?: IdsSource;
-  postSendTxCallback?: ({ txid }: { txid: string }) => void;
-  postTxConfirmationCallback?: ({
-    txid,
-    txSignatureBlockHash,
-  }: {
-    txid: string;
-    txSignatureBlockHash: LatestBlockhash;
-  }) => void;
+  postSendTxCallback?: (callbackOpts: TxCallbackOptions) => void;
+  postTxConfirmationCallback?: (callbackOpts: TxCallbackOptions) => void;
   prioritizationFee?: number;
   estimateFee?: boolean;
   txConfirmationCommitment?: Commitment;
@@ -131,10 +125,15 @@ export type MangoClientOptions = {
   multipleConnections?: Connection[];
 };
 
+export type TxCallbackOptions = {
+  txid: string;
+  txSignatureBlockHash: LatestBlockhash;
+};
+
 export class MangoClient {
   private idsSource: IdsSource;
-  private postSendTxCallback?: ({ txid }: { txid: string }) => void;
-  postTxConfirmationCallback?: ({ txid }: { txid: string }) => void;
+  private postSendTxCallback?: (callbackOpts: TxCallbackOptions) => void;
+  postTxConfirmationCallback?: (callbackOpts: TxCallbackOptions) => void;
   private prioritizationFee: number;
   private estimateFee: boolean;
   private txConfirmationCommitment: Commitment;

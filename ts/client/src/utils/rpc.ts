@@ -18,6 +18,7 @@ import {
   VersionedTransaction,
 } from '@solana/web3.js';
 import { COMPUTE_BUDGET_PROGRAM_ID } from '../constants';
+import { TxCallbackOptions } from '../client';
 
 export interface MangoSignatureStatus {
   confirmations?: number | null;
@@ -39,20 +40,8 @@ export type SendTransactionOpts = Partial<{
   prioritizationFee: number;
   estimateFee: boolean;
   additionalSigners: Keypair[];
-  postSendTxCallback: ({
-    txid,
-    txSignatureBlockHash,
-  }: {
-    txid: string;
-    txSignatureBlockHash: LatestBlockhash;
-  }) => void;
-  postTxConfirmationCallback: ({
-    txid,
-    txSignatureBlockHash,
-  }: {
-    txid: string;
-    txSignatureBlockHash: LatestBlockhash;
-  }) => void;
+  postSendTxCallback: (callbackOpts: TxCallbackOptions) => void;
+  postTxConfirmationCallback: (callbackOpts: TxCallbackOptions) => void;
   txConfirmationCommitment: Commitment;
   confirmInBackground: boolean;
   alts: AddressLookupTableAccount[];
