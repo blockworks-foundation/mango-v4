@@ -681,39 +681,6 @@ impl MangoGroupContext {
 
         Ok(fallbacks_by_oracle)
     }
-
-    /// Returns the a map of oracle pubkey -> (fallback_oracle_key, fallback_oracle_quote_key).
-    pub fn derive_fallback_oracle_keys_sync(
-        &self,
-        fallback_oracle_config: &FallbackOracleConfig,
-    ) -> anyhow::Result<HashMap<Pubkey, FallbackOracleContext>> {
-        // FUTURE: implement for perp oracles as well
-        let fallbacks_by_oracle = match fallback_oracle_config {
-            FallbackOracleConfig::Never => HashMap::new(),
-            FallbackOracleConfig::Fixed(keys) => self
-                .tokens
-                .iter()
-                .filter(|token| {
-                    token.1.fallback_context.key != Pubkey::default()
-                        && keys.contains(&token.1.fallback_context.key)
-                })
-                .map(|t| (t.1.oracle, t.1.fallback_context.clone()))
-                .collect(),
-            FallbackOracleConfig::All => self
-                .tokens
-                .iter()
-                .filter(|token| token.1.fallback_context.key != Pubkey::default())
-                .map(|t| (t.1.oracle, t.1.fallback_context.clone()))
-                .collect(),
-            FallbackOracleConfig::Dynamic => {
-                return Err(anyhow::anyhow!(
-                    "FallbackOracleConfig::Dynamic cannot be used synchronously"
-                ))
-            }
-        };
-
-        Ok(fallbacks_by_oracle)
-    }
 }
 
 fn from_serum_style_pubkey(d: [u64; 4]) -> Pubkey {
