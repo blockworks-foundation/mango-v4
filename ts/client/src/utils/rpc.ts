@@ -168,48 +168,61 @@ const confirmTransaction = async (
 ): Promise<MangoSignatureStatus> => {
   const txConfirmationCommitment = opts.txConfirmationCommitment ?? 'processed';
   let status: RpcResponseAndContext<SignatureResult>;
+  const allConnections = [connection];
+  if (opts.multipleConnections && opts.multipleConnections.length) {
+    allConnections.push(...opts.multipleConnections);
+  }
   if (
     latestBlockhash.blockhash != null &&
     latestBlockhash.lastValidBlockHeight != null
   ) {
     status = await Promise.race([
-      connection.confirmTransaction(
-        {
-          signature: signature,
-          blockhash: latestBlockhash.blockhash,
-          lastValidBlockHeight: latestBlockhash.lastValidBlockHeight,
-        },
-        txConfirmationCommitment,
+      Promise.any(
+        allConnections.map((connection) =>
+          connection.confirmTransaction(
+            {
+              signature: signature,
+              blockhash: latestBlockhash.blockhash,
+              lastValidBlockHeight: latestBlockhash.lastValidBlockHeight,
+            },
+            txConfirmationCommitment,
+          ),
+        ),
       ),
-      awaitTransactionSignatureConfirmation({
-        txid: signature,
-        confirmLevel: 'processed',
-        connection,
-        config: { logFlowInfo: true },
-        timeoutStrategy: {
-          block: latestBlockhash,
-        },
-      }),
+      Promise.any(
+        allConnections.map((connection) =>
+          awaitTransactionSignatureConfirmation({
+            txid: signature,
+            confirmLevel: 'processed',
+            connection,
+            config: { logFlowInfo: true },
+            timeoutStrategy: {
+              block: latestBlockhash,
+            },
+          }),
+        ),
+      ),
     ]);
   } else {
     status = await Promise.race([
-      connection.confirmTransaction(
-        {
-          signature: signature,
-          blockhash: latestBlockhash.blockhash,
-          lastValidBlockHeight: latestBlockhash.lastValidBlockHeight,
-        },
-        txConfirmationCommitment,
+      Promise.any(
+        allConnections.map((connection) =>
+          connection.confirmTransaction(signature, txConfirmationCommitment),
+        ),
       ),
-      awaitTransactionSignatureConfirmation({
-        txid: signature,
-        confirmLevel: 'processed',
-        connection,
-        config: { logFlowInfo: true },
-        timeoutStrategy: {
-          block: latestBlockhash,
-        },
-      }),
+      Promise.any(
+        allConnections.map((connection) =>
+          awaitTransactionSignatureConfirmation({
+            txid: signature,
+            confirmLevel: 'processed',
+            connection,
+            config: { logFlowInfo: true },
+            timeoutStrategy: {
+              timeout: 90,
+            },
+          }),
+        ),
+      ),
     ]);
   }
 
