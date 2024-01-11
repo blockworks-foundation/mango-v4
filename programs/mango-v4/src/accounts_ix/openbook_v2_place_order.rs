@@ -58,17 +58,29 @@ pub struct OpenbookV2PlaceOrder<'info> {
     /// CHECK: Validated by the openbook_v2 cpi call
     pub market_vault_signer: UncheckedAccount<'info>,
 
-    /// The bank that pays for the order, if necessary
+    /// The bank that pays for the order
     // token_index and payer_bank.vault == payer_vault is validated inline at #3
     #[account(mut, has_one = group)]
-    pub bank: AccountLoader<'info, Bank>,
-    /// The bank vault that pays for the order, if necessary
+    pub payer_bank: AccountLoader<'info, Bank>,
+    /// The bank vault that pays for the order
     #[account(mut)]
-    pub vault: Box<Account<'info, TokenAccount>>,
+    pub payer_vault: Box<Account<'info, TokenAccount>>,
+
+    /// The bank that receives the funds upon settlement
+    // token_index and payer_bank.vault == payer_vault is validated inline at #3
+    #[account(mut, has_one = group)]
+    pub receiver_bank: AccountLoader<'info, Bank>,
+    /// The bank vault that pays for the order
+    #[account(mut)]
+    pub receiver_vault: Box<Account<'info, TokenAccount>>,
 
     /// CHECK: The oracle can be one of several different account types
-    #[account(address = bank.load()?.oracle)]
-    pub oracle: UncheckedAccount<'info>,
+    #[account(address = payer_bank.load()?.oracle)]
+    pub payer_oracle: UncheckedAccount<'info>,
+
+    /// CHECK: The oracle can be one of several different account types
+    #[account(address = receiver_bank.load()?.oracle)]
+    pub receiver_oracle: UncheckedAccount<'info>,
 
     pub token_program: Program<'info, Token>,
 }
