@@ -17,7 +17,7 @@ use fixed::types::I80F48;
 use futures::{stream, StreamExt, TryStreamExt};
 use itertools::Itertools;
 
-use crate::{gpa::*, FallbackOracleConfig};
+use crate::{gpa::*, FallbackOracleConfig, AccountFetcher};
 
 use solana_client::nonblocking::rpc_client::RpcClient as RpcClientAsync;
 use solana_sdk::account::Account;
@@ -633,7 +633,7 @@ impl MangoGroupContext {
     pub async fn derive_fallback_oracle_keys(
         &self,
         fallback_oracle_config: &FallbackOracleConfig,
-        rpc: &RpcClientAsync,
+        account_fetcher: &dyn AccountFetcher,
     ) -> anyhow::Result<HashMap<Pubkey, FallbackOracleContext>> {
         // FUTURE: implement for perp oracles as well
         let fallbacks_by_oracle = match fallback_oracle_config {
@@ -658,14 +658,14 @@ impl MangoGroupContext {
                     self.tokens.iter().map(|t| (t.1.oracle, t.1)).collect();
                 let oracle_keys: Vec<Pubkey> =
                     tokens_by_oracle.values().map(|b| b.oracle).collect();
-                let oracle_accounts = fetch_multiple_accounts(rpc, &oracle_keys).await?;
+                let oracle_accounts = account_fetcher.fetch_multiple_accounts(&oracle_keys).await?;
                 let now_slot = rpc.get_slot().await?;
 
                 let mut stale_oracles_with_fallbacks = vec![];
                 for acc in oracle_accounts {
-                    let token = tokens_by_oracle.get(acc.key()).unwrap();
+                    let token = tokens_by_oracle.get(&acc.0).unwrap();
                     let state = oracle_state_unchecked(
-                        &OracleAccountInfos::from_reader(&acc),
+                        &OracleAccountInfos::from_reader(&acc.1),
                         token.decimals,
                     )?;
                     let oracle_is_valid = state

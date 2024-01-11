@@ -18,7 +18,7 @@ pub async fn new(
     let active_perp_len = account.active_perp_positions().count();
 
     let fallback_keys = context
-        .derive_fallback_oracle_keys(fallback_config, account_fetcher.rpc())
+        .derive_fallback_oracle_keys(fallback_config, account_fetcher)
         .await?;
     let (metas, _health_cu) = context.derive_health_check_remaining_account_metas(
         account,

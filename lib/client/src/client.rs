@@ -359,7 +359,7 @@ impl MangoClient {
             .context
             .derive_fallback_oracle_keys(
                 &self.client.fallback_oracle_config,
-                &self.client.rpc_async(),
+                &*self.account_fetcher,
             )
             .await?;
         self.context.derive_health_check_remaining_account_metas(
@@ -382,7 +382,7 @@ impl MangoClient {
             .context
             .derive_fallback_oracle_keys(
                 &self.client.fallback_oracle_config,
-                &self.client.rpc_async(),
+                &*self.account_fetcher,
             )
             .await?;
         self.context
@@ -455,7 +455,7 @@ impl MangoClient {
             .context
             .derive_fallback_oracle_keys(
                 &self.client.fallback_oracle_config,
-                &self.client.rpc_async(),
+                &*self.account_fetcher,
             )
             .await?;
 
@@ -623,7 +623,7 @@ impl MangoClient {
             .context
             .derive_fallback_oracle_keys(
                 &self.client.fallback_oracle_config,
-                &self.client.rpc_async(),
+                &*self.account_fetcher,
             )
             .await?;
         let (health_check_metas, health_cu) =
@@ -849,7 +849,7 @@ impl MangoClient {
             .context
             .derive_fallback_oracle_keys(
                 &self.client.fallback_oracle_config,
-                &self.client.rpc_async(),
+                &*self.account_fetcher,
             )
             .await?;
         let (health_remaining_ams, health_cu) = self
@@ -968,7 +968,7 @@ impl MangoClient {
             .context
             .derive_fallback_oracle_keys(
                 &self.client.fallback_oracle_config,
-                &self.client.rpc_async(),
+                &*self.account_fetcher,
             )
             .await?;
         let (health_remaining_metas, health_cu) =
@@ -1137,7 +1137,7 @@ impl MangoClient {
             .context
             .derive_fallback_oracle_keys(
                 &self.client.fallback_oracle_config,
-                &self.client.rpc_async(),
+                &*self.account_fetcher,
             )
             .await?;
 
@@ -1203,7 +1203,7 @@ impl MangoClient {
             .context
             .derive_fallback_oracle_keys(
                 &self.client.fallback_oracle_config,
-                &self.client.rpc_async(),
+                &*self.account_fetcher,
             )
             .await?;
 
@@ -1580,7 +1580,7 @@ impl MangoClient {
             .context
             .derive_fallback_oracle_keys(
                 &self.client.fallback_oracle_config,
-                &self.client.rpc_async(),
+                &*self.account_fetcher,
             )
             .await?;
         let (health_remaining_metas, _health_cu) =
@@ -1627,7 +1627,7 @@ impl MangoClient {
             .context
             .derive_fallback_oracle_keys(
                 &self.client.fallback_oracle_config,
-                &self.client.rpc_async(),
+                &*self.account_fetcher,
             )
             .await?;
         let (health_remaining_metas, health_cu) =
