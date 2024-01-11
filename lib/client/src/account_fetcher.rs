@@ -15,6 +15,8 @@ use solana_sdk::pubkey::Pubkey;
 
 use mango_v4::state::MangoAccountValue;
 
+use crate::gpa;
+
 #[async_trait::async_trait]
 pub trait AccountFetcher: Sync + Send {
     async fn fetch_raw_account(&self, address: &Pubkey) -> anyhow::Result<AccountSharedData>;
@@ -30,7 +32,10 @@ pub trait AccountFetcher: Sync + Send {
         discriminator: [u8; 8],
     ) -> anyhow::Result<Vec<(Pubkey, AccountSharedData)>>;
 
-    fn rpc(&self) -> &RpcClientAsync;
+    async fn fetch_multiple_accounts(
+        &self,
+        keys: &[Pubkey],
+    ) -> anyhow::Result<Vec<(Pubkey, AccountSharedData)>>;
 }
 
 // Can't be in the trait, since then it would no longer be object-safe...
@@ -103,8 +108,11 @@ impl AccountFetcher for RpcAccountFetcher {
             .collect::<Vec<_>>())
     }
 
-    fn rpc(&self) -> &RpcClientAsync {
-        &self.rpc
+    async fn fetch_multiple_accounts(
+        &self,
+        keys: &[Pubkey],
+    ) -> anyhow::Result<Vec<(Pubkey, AccountSharedData)>> {
+        gpa::fetch_multiple_accounts(&self.rpc, keys).await
     }
 }
 
@@ -268,7 +276,10 @@ impl<T: AccountFetcher + 'static> AccountFetcher for CachedAccountFetcher<T> {
         }
     }
 
-    fn rpc(&self) -> &RpcClientAsync {
-        self.fetcher.rpc()
+    async fn fetch_multiple_accounts(
+        &self,
+        keys: &[Pubkey],
+    ) -> anyhow::Result<Vec<(Pubkey, AccountSharedData)>> {
+        self.fetcher.fetch_multiple_accounts(keys).await
     }
 }

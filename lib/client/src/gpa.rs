@@ -7,6 +7,7 @@ use solana_account_decoder::UiAccountEncoding;
 use solana_client::nonblocking::rpc_client::RpcClient as RpcClientAsync;
 use solana_client::rpc_config::{RpcAccountInfoConfig, RpcProgramAccountsConfig};
 use solana_client::rpc_filter::{Memcmp, RpcFilterType};
+use solana_sdk::account::AccountSharedData;
 use solana_sdk::pubkey::Pubkey;
 
 pub async fn fetch_mango_accounts(
@@ -134,7 +135,7 @@ pub async fn fetch_perp_markets(
 pub async fn fetch_multiple_accounts(
     rpc: &RpcClientAsync,
     keys: &[Pubkey],
-) -> anyhow::Result<Vec<KeyedAccountSharedData>> {
+) -> anyhow::Result<Vec<(Pubkey, AccountSharedData)>> {
     let config = RpcAccountInfoConfig {
         encoding: Some(UiAccountEncoding::Base64),
         ..RpcAccountInfoConfig::default()
@@ -146,6 +147,6 @@ pub async fn fetch_multiple_accounts(
         .into_iter()
         .zip(keys.iter())
         .filter(|(maybe_acc, _)| maybe_acc.is_some())
-        .map(|(acc, key)| KeyedAccountSharedData::new(*key, acc.unwrap().into()))
+        .map(|(acc, key)| (*key, acc.unwrap().into()))
         .collect())
 }
