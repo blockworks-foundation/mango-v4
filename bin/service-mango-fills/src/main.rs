@@ -17,7 +17,7 @@ use mango_feeds_connector::{
 };
 use mango_feeds_lib::MarketConfig;
 use mango_feeds_lib::StatusResponse;
-use mango_v4_client::{Client, FallbackOracleConfig, MangoGroupContext, TransactionBuilderConfig};
+use mango_v4_client::{Client, MangoGroupContext, TransactionBuilderConfig};
 use service_mango_fills::{Command, FillCheckpoint, FillEventFilterMessage, FillEventType};
 use solana_sdk::commitment_config::CommitmentConfig;
 use solana_sdk::signature::Keypair;
@@ -369,7 +369,6 @@ async fn main() -> anyhow::Result<()> {
         CommitmentConfig::processed(),
         Arc::new(Keypair::new()),
         Some(rpc_timeout),
-        Some(FallbackOracleConfig::Never),
         TransactionBuilderConfig::default(),
     );
     let group_context = Arc::new(

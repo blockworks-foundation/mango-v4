@@ -85,7 +85,7 @@ pub struct Client {
 
     #[builder(default = "\"\".into()")]
     pub jupiter_token: String,
-    
+
     /// Determines how fallback oracle accounts are provided to instructions. Defaults to Dynamic.
     #[builder(default = "FallbackOracleConfig::Dynamic")]
     pub fallback_oracle_config: FallbackOracleConfig,

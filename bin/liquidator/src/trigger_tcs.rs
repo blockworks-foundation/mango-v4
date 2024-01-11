@@ -11,7 +11,7 @@ use mango_v4::{
     i80f48::ClampToInt,
     state::{Bank, MangoAccountValue, TokenConditionalSwap, TokenIndex},
 };
-use mango_v4_client::{chain_data, health_cache, jupiter, MangoClient, TransactionBuilder};
+use mango_v4_client::{chain_data, jupiter, MangoClient, TransactionBuilder};
 
 use anyhow::Context as AnyhowContext;
 use solana_sdk::{signature::Signature, signer::Signer};
@@ -666,12 +666,11 @@ impl Context {
         tcs_id: u64,
     ) -> anyhow::Result<Option<PreparedExecution>> {
         let fetcher = self.account_fetcher.as_ref();
-        let health_cache = self.mango_client.health_cache(
-            liqee_old,
-            fetcher,
-        )
-        .await
-        .context("creating health cache 1")?;
+        let health_cache = self
+            .mango_client
+            .health_cache(liqee_old, fetcher)
+            .await
+            .context("creating health cache 1")?;
         if health_cache.is_liquidatable() {
             trace!("account is liquidatable (pre-fetch)");
             return Ok(None);
@@ -688,12 +687,11 @@ impl Context {
             return Ok(None);
         }
 
-        let health_cache = self.mango_client.health_cache(
-            &liqee,
-            fetcher,
-        )
-        .await
-        .context("creating health cache 2")?;
+        let health_cache = self
+            .mango_client
+            .health_cache(&liqee, fetcher)
+            .await
+            .context("creating health cache 2")?;
         if health_cache.is_liquidatable() {
             trace!("account is liquidatable (post-fetch)");
             return Ok(None);

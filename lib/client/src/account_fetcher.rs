@@ -37,9 +37,7 @@ pub trait AccountFetcher: Sync + Send {
         keys: &[Pubkey],
     ) -> anyhow::Result<Vec<(Pubkey, AccountSharedData)>>;
 
-    async fn get_slot(
-        &self,
-    ) -> anyhow::Result<u64>;
+    async fn get_slot(&self) -> anyhow::Result<u64>;
 }
 
 // Can't be in the trait, since then it would no longer be object-safe...

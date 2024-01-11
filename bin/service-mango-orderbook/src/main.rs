@@ -8,7 +8,7 @@ use futures_util::{
 };
 use itertools::Itertools;
 use log::*;
-use mango_v4_client::{Client, FallbackOracleConfig, MangoGroupContext, TransactionBuilderConfig};
+use mango_v4_client::{Client, MangoGroupContext, TransactionBuilderConfig};
 use solana_sdk::commitment_config::CommitmentConfig;
 use solana_sdk::pubkey::Pubkey;
 use solana_sdk::signature::Keypair;
@@ -353,7 +353,6 @@ async fn main() -> anyhow::Result<()> {
         CommitmentConfig::processed(),
         Arc::new(Keypair::new()),
         Some(rpc_timeout),
-        Some(FallbackOracleConfig::Never),
         TransactionBuilderConfig::default(),
     );
     let group_context = Arc::new(

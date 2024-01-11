@@ -55,7 +55,7 @@ async fn compute_pnl(
 ) -> anyhow::Result<Vec<(PerpMarketIndex, I80F48)>> {
     let health_cache = health_cache::new(
         &context,
-        &FallbackOracleConfig::Never,
+        &FallbackOracleConfig::Dynamic,
         account_fetcher.as_ref(),
         account,
     )
@@ -268,7 +268,6 @@ async fn main() -> anyhow::Result<()> {
         commitment,
         Arc::new(Keypair::new()),
         Some(rpc_timeout),
-        Some(FallbackOracleConfig::Never),
         TransactionBuilderConfig::default(),
     );
     let group_context = Arc::new(

@@ -1,6 +1,4 @@
 use anchor_lang::{AccountDeserialize, Discriminator};
-
-use mango_v4::accounts_zerocopy::KeyedAccountSharedData;
 use mango_v4::state::{Bank, MangoAccount, MangoAccountValue, MintInfo, PerpMarket, Serum3Market};
 
 use solana_account_decoder::UiAccountEncoding;
