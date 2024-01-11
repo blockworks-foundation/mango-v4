@@ -1263,9 +1263,11 @@ describe('Health Cache', () => {
   });
 
   it('Modify copy of health object leaving original object unchanged', (done) => {
+    const baseLotSize = 100;
     const b0 = mockBankAndOracle(0 as TokenIndex, 0.1, 0.1, 2, 2);
     const b1 = mockBankAndOracle(1 as TokenIndex, 0.2, 0.2, 3, 3);
     const b2 = mockBankAndOracle(2 as TokenIndex, 0.3, 0.3, 4, 4);
+    const p0 = mockPerpMarket(0, 1, 0.3, 0.3, baseLotSize, 2);
     const hc = new HealthCache(
       [
         TokenInfo.fromBank(b0, I80F48.fromNumber(0)),
@@ -1273,7 +1275,7 @@ describe('Health Cache', () => {
         TokenInfo.fromBank(b2, I80F48.fromNumber(0)),
       ],
       [],
-      [],
+      [PerpInfo.emptyFromPerpMarket(p0)],
     );
     const clonedHc: HealthCache = deepClone(hc);
     // mess up props
@@ -1284,7 +1286,6 @@ describe('Health Cache', () => {
       I80F48.fromNumber(-2).div(clonedHc.tokenInfos[1].prices.oracle),
     );
     clonedHc.tokenInfos[1].prices.oracle.iadd(new I80F48(new BN(333333)));
-
     expect(hc.tokenInfos[0].balanceSpot.eq(clonedHc.tokenInfos[0].balanceSpot))
       .to.be.false;
     expect(hc.tokenInfos[1].balanceSpot.eq(clonedHc.tokenInfos[1].balanceSpot))
@@ -1300,6 +1301,22 @@ describe('Health Cache', () => {
     clonedHc['addProp'] = '123';
     expect(hc['addProp'] === undefined && clonedHc['addProp'] === '123').to.be
       .true;
+
+    clonedHc.adjustPerpInfo(
+      0,
+      new I80F48(new BN(100000)),
+      PerpOrderSide.ask,
+      new BN(100000),
+    );
+    //original object is unaffected by running method from inside the clonedObj
+    expect(
+      clonedHc.perpInfos[0].baseLots.eq(hc.perpInfos[0].baseLots) &&
+        clonedHc.perpInfos[0].quote.eq(hc.perpInfos[0].quote),
+    ).to.be.false;
+
+    expect(
+      clonedHc.healthRatio(HealthType.init).eq(hc.healthRatio(HealthType.init)),
+    ).to.be.false;
 
     done();
   });
