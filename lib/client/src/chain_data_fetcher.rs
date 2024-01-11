@@ -2,7 +2,7 @@ use std::sync::{Arc, RwLock};
 use std::thread;
 use std::time::{Duration, Instant};
 
-use crate::{chain_data::*, gpa};
+use crate::chain_data::*;
 
 use anchor_lang::Discriminator;
 
@@ -247,6 +247,20 @@ impl crate::AccountFetcher for AccountFetcher {
         &self,
         keys: &[Pubkey],
     ) -> anyhow::Result<Vec<(Pubkey, AccountSharedData)>> {
-        gpa::fetch_multiple_accounts(&self.rpc, keys).await
+        let chain_data = self.chain_data.read().unwrap();
+        Ok(chain_data
+            .iter_accounts()
+            .filter_map(|(pk, data)| {
+                if !keys.contains(pk) {
+                    return None;
+                }
+                Some((*pk, data.account.clone()))
+            })
+            .collect::<Vec<_>>())
+    }
+
+    async fn get_slot(&self) -> anyhow::Result<u64> {
+        let chain_data = self.chain_data.read().unwrap();
+        Ok(chain_data.newest_processed_slot())
     }
 }

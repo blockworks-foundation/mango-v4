@@ -36,6 +36,10 @@ pub trait AccountFetcher: Sync + Send {
         &self,
         keys: &[Pubkey],
     ) -> anyhow::Result<Vec<(Pubkey, AccountSharedData)>>;
+
+    async fn get_slot(
+        &self,
+    ) -> anyhow::Result<u64>;
 }
 
 // Can't be in the trait, since then it would no longer be object-safe...
@@ -113,6 +117,10 @@ impl AccountFetcher for RpcAccountFetcher {
         keys: &[Pubkey],
     ) -> anyhow::Result<Vec<(Pubkey, AccountSharedData)>> {
         gpa::fetch_multiple_accounts(&self.rpc, keys).await
+    }
+
+    async fn get_slot(&self) -> anyhow::Result<u64> {
+        Ok(self.rpc.get_slot().await?)
     }
 }
 
@@ -281,5 +289,9 @@ impl<T: AccountFetcher + 'static> AccountFetcher for CachedAccountFetcher<T> {
         keys: &[Pubkey],
     ) -> anyhow::Result<Vec<(Pubkey, AccountSharedData)>> {
         self.fetcher.fetch_multiple_accounts(keys).await
+    }
+
+    async fn get_slot(&self) -> anyhow::Result<u64> {
+        self.fetcher.get_slot().await
     }
 }

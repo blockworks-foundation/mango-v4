@@ -5,7 +5,7 @@ use anchor_client::ClientError;
 use anchor_lang::__private::bytemuck;
 
 use mango_v4::{
-    accounts_zerocopy::KeyedAccountReader,
+    accounts_zerocopy::{KeyedAccountReader, KeyedAccountSharedData},
     state::{
         determine_oracle_type, load_whirlpool_state, oracle_state_unchecked, Group,
         MangoAccountValue, OracleAccountInfos, OracleConfig, OracleConfigParams, OracleType,
@@ -284,8 +284,9 @@ impl MangoGroupContext {
             token.name = bank.name().into();
             token.decimals = bank.mint_decimals;
             token.oracle_config = bank.oracle_config;
+            let (key, acc_info) = fallback_oracle_accounts[index].clone();
             token.fallback_context.quote_key =
-                get_fallback_quote_key(&fallback_oracle_accounts[index]);
+                get_fallback_quote_key(&KeyedAccountSharedData::new(key, acc_info));
         }
         assert!(tokens.values().all(|t| t.decimals != u8::MAX));
 
@@ -661,13 +662,13 @@ impl MangoGroupContext {
                 let oracle_accounts = account_fetcher
                     .fetch_multiple_accounts(&oracle_keys)
                     .await?;
-                let now_slot = rpc.get_slot().await?;
+                let now_slot = account_fetcher.get_slot().await?;
 
                 let mut stale_oracles_with_fallbacks = vec![];
-                for acc in oracle_accounts {
-                    let token = tokens_by_oracle.get(&acc.0).unwrap();
+                for (key, acc) in oracle_accounts {
+                    let token = tokens_by_oracle.get(&key).unwrap();
                     let state = oracle_state_unchecked(
-                        &OracleAccountInfos::from_reader(&acc.1),
+                        &OracleAccountInfos::from_reader(&KeyedAccountSharedData::new(key, acc)),
                         token.decimals,
                     )?;
                     let oracle_is_valid = state
