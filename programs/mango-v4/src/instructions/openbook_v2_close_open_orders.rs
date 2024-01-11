@@ -43,7 +43,7 @@ pub fn openbook_v2_close_open_orders(ctx: Context<OpenbookV2CloseOpenOrders>) ->
     let (quote_position, _) = account.token_position_mut(openbook_market.quote_token_index)?;
     quote_position.decrement_in_use();
 
-    // Deactivate the serum open orders account itself
+    // Deactivate the open orders account itself
     account.deactivate_openbook_v2_orders(openbook_market.market_index)?;
 
     Ok(())

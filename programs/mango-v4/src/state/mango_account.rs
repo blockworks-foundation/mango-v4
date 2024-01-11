@@ -702,7 +702,10 @@ impl MangoAccountDynamicHeader {
     }
 
     pub fn expected_health_accounts(&self) -> usize {
-        self.token_count() * 2 + self.serum3_count() + self.perp_count() * 2
+        self.token_count() * 2
+            + self.serum3_count()
+            + self.perp_count() * 2
+            + self.openbook_v2_count() * 2
     }
 
     pub fn max_health_accounts() -> usize {
