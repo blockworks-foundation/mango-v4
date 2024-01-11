@@ -2,7 +2,7 @@ use std::sync::{Arc, RwLock};
 use std::thread;
 use std::time::{Duration, Instant};
 
-use crate::chain_data::*;
+use crate::{chain_data::*, gpa};
 
 use anchor_lang::Discriminator;
 
@@ -243,7 +243,10 @@ impl crate::AccountFetcher for AccountFetcher {
             .collect::<Vec<_>>())
     }
 
-    fn rpc(&self) -> &RpcClientAsync {
-        &self.rpc
+    async fn fetch_multiple_accounts(
+        &self,
+        keys: &[Pubkey],
+    ) -> anyhow::Result<Vec<(Pubkey, AccountSharedData)>> {
+        gpa::fetch_multiple_accounts(&self.rpc, keys).await
     }
 }

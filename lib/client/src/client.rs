@@ -350,11 +350,11 @@ impl MangoClient {
 
     pub async fn derive_health_check_remaining_account_metas(
         &self,
+        account: &MangoAccountValue,
         affected_tokens: Vec<TokenIndex>,
         writable_banks: Vec<TokenIndex>,
         affected_perp_markets: Vec<PerpMarketIndex>,
     ) -> anyhow::Result<(Vec<AccountMeta>, u32)> {
-        let account = self.mango_account().await?;
         let fallback_contexts = self
             .context
             .derive_fallback_oracle_keys(
@@ -371,13 +371,13 @@ impl MangoClient {
         )
     }
 
-    pub async fn derive_liquidation_health_check_remaining_account_metas(
+    pub async fn derive_health_check_remaining_account_metas_two_accounts(
         &self,
-        liqee: &MangoAccountValue,
+        account_1: &MangoAccountValue,
+        account_2: &MangoAccountValue,
         affected_tokens: &[TokenIndex],
         writable_banks: &[TokenIndex],
     ) -> anyhow::Result<(Vec<AccountMeta>, u32)> {
-        let account = self.mango_account().await?;
         let fallback_contexts = self
             .context
             .derive_fallback_oracle_keys(
@@ -385,10 +385,11 @@ impl MangoClient {
                 &*self.account_fetcher,
             )
             .await?;
+
         self.context
             .derive_health_check_remaining_account_metas_two_accounts(
-                &account,
-                liqee,
+                account_1,
+                account_2,
                 affected_tokens,
                 writable_banks,
                 fallback_contexts,
@@ -403,9 +404,15 @@ impl MangoClient {
     ) -> anyhow::Result<Signature> {
         let token = self.context.token_by_mint(&mint)?;
         let token_index = token.token_index;
+        let mango_account = &self.mango_account().await?;
 
         let (health_check_metas, health_cu) = self
-            .derive_health_check_remaining_account_metas(vec![token_index], vec![], vec![])
+            .derive_health_check_remaining_account_metas(
+                mango_account,
+                vec![token_index],
+                vec![],
+                vec![],
+            )
             .await?;
 
         let ixs = PreparedInstructions::from_single(
@@ -451,22 +458,10 @@ impl MangoClient {
     ) -> anyhow::Result<PreparedInstructions> {
         let token = self.context.token_by_mint(&mint)?;
         let token_index = token.token_index;
-        let fallback_contexts = self
-            .context
-            .derive_fallback_oracle_keys(
-                &self.client.fallback_oracle_config,
-                &*self.account_fetcher,
-            )
-            .await?;
 
-        let (health_check_metas, health_cu) =
-            self.context.derive_health_check_remaining_account_metas(
-                account,
-                vec![token_index],
-                vec![],
-                vec![],
-                fallback_contexts,
-            )?;
+        let (health_check_metas, health_cu) = self
+            .derive_health_check_remaining_account_metas(account, vec![token_index], vec![], vec![])
+            .await?;
 
         let ixs = PreparedInstructions::from_vec(
             vec![
@@ -619,21 +614,9 @@ impl MangoClient {
             .expect("oo is created")
             .open_orders;
 
-        let fallback_contexts = self
-            .context
-            .derive_fallback_oracle_keys(
-                &self.client.fallback_oracle_config,
-                &*self.account_fetcher,
-            )
+        let (health_check_metas, health_cu) = self
+            .derive_health_check_remaining_account_metas(account, vec![], vec![], vec![])
             .await?;
-        let (health_check_metas, health_cu) =
-            self.context.derive_health_check_remaining_account_metas(
-                account,
-                vec![],
-                vec![],
-                vec![],
-                fallback_contexts,
-            )?;
 
         let payer_token = match side {
             Serum3Side::Bid => &quote,
@@ -844,23 +827,9 @@ impl MangoClient {
         let s3 = self.context.serum3(market_index);
         let base = self.context.serum3_base_token(market_index);
         let quote = self.context.serum3_quote_token(market_index);
-
-        let fallback_contexts = self
-            .context
-            .derive_fallback_oracle_keys(
-                &self.client.fallback_oracle_config,
-                &*self.account_fetcher,
-            )
-            .await?;
         let (health_remaining_ams, health_cu) = self
-            .context
-            .derive_health_check_remaining_account_metas(
-                liqee.1,
-                vec![],
-                vec![],
-                vec![],
-                fallback_contexts,
-            )
+            .derive_health_check_remaining_account_metas(liqee.1, vec![], vec![], vec![])
+            .await
             .unwrap();
 
         let limit = 5;
@@ -964,21 +933,14 @@ impl MangoClient {
         self_trade_behavior: SelfTradeBehavior,
     ) -> anyhow::Result<PreparedInstructions> {
         let perp = self.context.perp(market_index);
-        let fallback_contexts = self
-            .context
-            .derive_fallback_oracle_keys(
-                &self.client.fallback_oracle_config,
-                &*self.account_fetcher,
-            )
-            .await?;
-        let (health_remaining_metas, health_cu) =
-            self.context.derive_health_check_remaining_account_metas(
+        let (health_remaining_metas, health_cu) = self
+            .derive_health_check_remaining_account_metas(
                 account,
                 vec![],
                 vec![],
                 vec![market_index],
-                fallback_contexts,
-            )?;
+            )
+            .await?;
 
         let ixs = PreparedInstructions::from_single(
             Instruction {
@@ -1095,9 +1057,10 @@ impl MangoClient {
         market_index: PerpMarketIndex,
     ) -> anyhow::Result<Signature> {
         let perp = self.context.perp(market_index);
+        let mango_account = &self.mango_account().await?;
 
         let (health_check_metas, health_cu) = self
-            .derive_health_check_remaining_account_metas(vec![], vec![], vec![])
+            .derive_health_check_remaining_account_metas(mango_account, vec![], vec![], vec![])
             .await?;
 
         let ixs = PreparedInstructions::from_single(
@@ -1133,23 +1096,15 @@ impl MangoClient {
     ) -> anyhow::Result<PreparedInstructions> {
         let perp = self.context.perp(market_index);
         let settlement_token = self.context.token(perp.settle_token_index);
-        let fallback_contexts = self
-            .context
-            .derive_fallback_oracle_keys(
-                &self.client.fallback_oracle_config,
-                &*self.account_fetcher,
-            )
-            .await?;
 
         let (health_remaining_ams, health_cu) = self
-            .context
             .derive_health_check_remaining_account_metas_two_accounts(
                 account_a.1,
                 account_b.1,
                 &[],
                 &[],
-                fallback_contexts,
             )
+            .await
             .unwrap();
 
         let ixs = PreparedInstructions::from_single(
@@ -1199,23 +1154,10 @@ impl MangoClient {
         market_index: PerpMarketIndex,
     ) -> anyhow::Result<Signature> {
         let perp = self.context.perp(market_index);
-        let fallback_contexts = self
-            .context
-            .derive_fallback_oracle_keys(
-                &self.client.fallback_oracle_config,
-                &*self.account_fetcher,
-            )
-            .await?;
 
         let (health_remaining_ams, health_cu) = self
-            .context
-            .derive_health_check_remaining_account_metas(
-                liqee.1,
-                vec![],
-                vec![],
-                vec![],
-                fallback_contexts,
-            )
+            .derive_health_check_remaining_account_metas(liqee.1, vec![], vec![], vec![])
+            .await
             .unwrap();
 
         let limit = 5;
@@ -1256,9 +1198,15 @@ impl MangoClient {
     ) -> anyhow::Result<PreparedInstructions> {
         let perp = self.context.perp(market_index);
         let settle_token_info = self.context.token(perp.settle_token_index);
+        let mango_account = &self.mango_account().await?;
 
         let (health_remaining_ams, health_cu) = self
-            .derive_liquidation_health_check_remaining_account_metas(liqee.1, &[], &[])
+            .derive_health_check_remaining_account_metas_two_accounts(
+                mango_account,
+                liqee.1,
+                &[],
+                &[],
+            )
             .await
             .unwrap();
 
@@ -1307,12 +1255,14 @@ impl MangoClient {
         )
         .await?;
 
+        let mango_account = &self.mango_account().await?;
         let perp = self.context.perp(market_index);
         let settle_token_info = self.context.token(perp.settle_token_index);
         let insurance_token_info = self.context.token(INSURANCE_TOKEN_INDEX);
 
         let (health_remaining_ams, health_cu) = self
-            .derive_liquidation_health_check_remaining_account_metas(
+            .derive_health_check_remaining_account_metas_two_accounts(
+                mango_account,
                 liqee.1,
                 &[INSURANCE_TOKEN_INDEX],
                 &[],
@@ -1366,8 +1316,10 @@ impl MangoClient {
         liab_token_index: TokenIndex,
         max_liab_transfer: I80F48,
     ) -> anyhow::Result<PreparedInstructions> {
+        let mango_account = &self.mango_account().await?;
         let (health_remaining_ams, health_cu) = self
-            .derive_liquidation_health_check_remaining_account_metas(
+            .derive_health_check_remaining_account_metas_two_accounts(
+                mango_account,
                 liqee.1,
                 &[],
                 &[asset_token_index, liab_token_index],
@@ -1408,6 +1360,7 @@ impl MangoClient {
         liab_token_index: TokenIndex,
         max_liab_transfer: I80F48,
     ) -> anyhow::Result<PreparedInstructions> {
+        let mango_account = &self.mango_account().await?;
         let quote_token_index = 0;
 
         let quote_info = self.context.token(quote_token_index);
@@ -1420,7 +1373,8 @@ impl MangoClient {
             .collect::<Vec<_>>();
 
         let (health_remaining_ams, health_cu) = self
-            .derive_liquidation_health_check_remaining_account_metas(
+            .derive_health_check_remaining_account_metas_two_accounts(
+                mango_account,
                 liqee.1,
                 &[INSURANCE_TOKEN_INDEX],
                 &[quote_token_index, liab_token_index],
@@ -1474,6 +1428,7 @@ impl MangoClient {
         min_taker_price: f32,
         extra_affected_tokens: &[TokenIndex],
     ) -> anyhow::Result<PreparedInstructions> {
+        let mango_account = &self.mango_account().await?;
         let (tcs_index, tcs) = liqee
             .1
             .token_conditional_swap_by_id(token_conditional_swap_id)?;
@@ -1484,7 +1439,8 @@ impl MangoClient {
             .copied()
             .collect_vec();
         let (health_remaining_ams, health_cu) = self
-            .derive_liquidation_health_check_remaining_account_metas(
+            .derive_health_check_remaining_account_metas_two_accounts(
+                mango_account,
                 liqee.1,
                 &affected_tokens,
                 &[tcs.buy_token_index, tcs.sell_token_index],
@@ -1529,13 +1485,19 @@ impl MangoClient {
         account: (&Pubkey, &MangoAccountValue),
         token_conditional_swap_id: u64,
     ) -> anyhow::Result<PreparedInstructions> {
+        let mango_account = &self.mango_account().await?;
         let (tcs_index, tcs) = account
             .1
             .token_conditional_swap_by_id(token_conditional_swap_id)?;
 
         let affected_tokens = vec![tcs.buy_token_index, tcs.sell_token_index];
         let (health_remaining_ams, health_cu) = self
-            .derive_health_check_remaining_account_metas(vec![], affected_tokens, vec![])
+            .derive_health_check_remaining_account_metas(
+                mango_account,
+                vec![],
+                affected_tokens,
+                vec![],
+            )
             .await
             .unwrap();
 
@@ -1576,21 +1538,14 @@ impl MangoClient {
         writable_banks: Vec<TokenIndex>,
         affected_perp_markets: Vec<PerpMarketIndex>,
     ) -> anyhow::Result<PreparedInstructions> {
-        let fallback_contexts = self
-            .context
-            .derive_fallback_oracle_keys(
-                &self.client.fallback_oracle_config,
-                &*self.account_fetcher,
-            )
-            .await?;
-        let (health_remaining_metas, _health_cu) =
-            self.context.derive_health_check_remaining_account_metas(
+        let (health_remaining_metas, _health_cu) = self
+            .derive_health_check_remaining_account_metas(
                 account,
                 affected_tokens,
                 writable_banks,
                 affected_perp_markets,
-                fallback_contexts,
-            )?;
+            )
+            .await?;
 
         let ix = Instruction {
             program_id: mango_v4::id(),
@@ -1623,21 +1578,14 @@ impl MangoClient {
         writable_banks: Vec<TokenIndex>,
         affected_perp_markets: Vec<PerpMarketIndex>,
     ) -> anyhow::Result<PreparedInstructions> {
-        let fallback_contexts = self
-            .context
-            .derive_fallback_oracle_keys(
-                &self.client.fallback_oracle_config,
-                &*self.account_fetcher,
-            )
-            .await?;
-        let (health_remaining_metas, health_cu) =
-            self.context.derive_health_check_remaining_account_metas(
+        let (health_remaining_metas, health_cu) = self
+            .derive_health_check_remaining_account_metas(
                 account,
                 affected_tokens,
                 writable_banks,
                 affected_perp_markets,
-                fallback_contexts,
-            )?;
+            )
+            .await?;
 
         let ix = Instruction {
             program_id: mango_v4::id(),
