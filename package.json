@@ -74,6 +74,7 @@
     "bs58": "^5.0.0",
     "cross-fetch": "^3.1.5",
     "dotenv": "^16.0.3",
+    "fast-copy": "^3.0.1",
     "lodash": "^4.17.21",
     "node-kraken-api": "^2.2.2"
   },
