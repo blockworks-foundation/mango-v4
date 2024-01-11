@@ -178,8 +178,8 @@ const confirmTransaction = async (
   ) {
     status = await Promise.race([
       Promise.any(
-        allConnections.map((connection) =>
-          connection.confirmTransaction(
+        allConnections.map((c) =>
+          c.confirmTransaction(
             {
               signature: signature,
               blockhash: latestBlockhash.blockhash,
@@ -190,11 +190,11 @@ const confirmTransaction = async (
         ),
       ),
       Promise.any(
-        allConnections.map((connection) =>
+        allConnections.map((c) =>
           awaitTransactionSignatureConfirmation({
             txid: signature,
             confirmLevel: 'processed',
-            connection,
+            connection: c,
             config: { logFlowInfo: true },
             timeoutStrategy: {
               block: latestBlockhash,
@@ -206,16 +206,16 @@ const confirmTransaction = async (
   } else {
     status = await Promise.race([
       Promise.any(
-        allConnections.map((connection) =>
-          connection.confirmTransaction(signature, txConfirmationCommitment),
+        allConnections.map((c) =>
+          c.confirmTransaction(signature, txConfirmationCommitment),
         ),
       ),
       Promise.any(
-        allConnections.map((connection) =>
+        allConnections.map((c) =>
           awaitTransactionSignatureConfirmation({
             txid: signature,
             confirmLevel: 'processed',
-            connection,
+            connection: c,
             config: { logFlowInfo: true },
             timeoutStrategy: {
               timeout: 90,
