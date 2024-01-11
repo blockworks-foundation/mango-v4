@@ -155,12 +155,7 @@ impl<'a> LiquidateHelper<'a> {
                 .await
                 .context("getting liquidator account")?;
             liqor.ensure_perp_position(*perp_market_index, QUOTE_TOKEN_INDEX)?;
-            let mut health_cache = health_cache::new(
-                &self.client.context,
-                &self.client.client.fallback_oracle_config,
-                self.account_fetcher,
-                &liqor,
-            )
+            let mut health_cache = self.client.health_cache(&liqor, self.account_fetcher)
             .await
             .expect("always ok");
             let quote_bank = self
@@ -593,11 +588,9 @@ pub async fn maybe_liquidate_account(
     let liqor_min_health_ratio = I80F48::from_num(config.min_health_ratio);
 
     let account = account_fetcher.fetch_mango_account(pubkey)?;
-    let health_cache = health_cache::new(
-        &mango_client.context,
-        &mango_client.client.fallback_oracle_config,
-        account_fetcher,
+    let health_cache = mango_client.health_cache(
         &account,
+        account_fetcher,
     )
     .await
     .context("creating health cache 1")?;
@@ -616,11 +609,9 @@ pub async fn maybe_liquidate_account(
     // This is -- unfortunately -- needed because the websocket streams seem to not
     // be great at providing timely updates to the account data.
     let account = account_fetcher.fetch_fresh_mango_account(pubkey).await?;
-    let health_cache = health_cache::new(
-        &mango_client.context,
-        &mango_client.client.fallback_oracle_config,
-        account_fetcher,
+    let health_cache = mango_client.health_cache(
         &account,
+        account_fetcher,
     )
     .await
     .context("creating health cache 2")?;

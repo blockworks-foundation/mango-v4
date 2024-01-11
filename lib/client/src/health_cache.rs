@@ -11,7 +11,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 pub async fn new(
     context: &MangoGroupContext,
     fallback_config: &FallbackOracleConfig,
-    account_fetcher: &impl AccountFetcher,
+    account_fetcher: &dyn AccountFetcher,
     account: &MangoAccountValue,
 ) -> anyhow::Result<HealthCache> {
     let active_token_len = account.active_token_positions().count();

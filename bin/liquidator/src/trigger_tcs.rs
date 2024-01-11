@@ -666,11 +666,9 @@ impl Context {
         tcs_id: u64,
     ) -> anyhow::Result<Option<PreparedExecution>> {
         let fetcher = self.account_fetcher.as_ref();
-        let health_cache = health_cache::new(
-            &self.mango_client.context,
-            &self.mango_client.client.fallback_oracle_config,
-            fetcher,
+        let health_cache = self.mango_client.health_cache(
             liqee_old,
+            fetcher,
         )
         .await
         .context("creating health cache 1")?;
@@ -690,11 +688,9 @@ impl Context {
             return Ok(None);
         }
 
-        let health_cache = health_cache::new(
-            &self.mango_client.context,
-            &self.mango_client.client.fallback_oracle_config,
-            fetcher,
+        let health_cache = self.mango_client.health_cache(
             &liqee,
+            fetcher,
         )
         .await
         .context("creating health cache 2")?;

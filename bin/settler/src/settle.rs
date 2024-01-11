@@ -114,11 +114,9 @@ impl SettlementState {
                 continue;
             }
 
-            let health_cache = health_cache::new(
-                &mango_client.context,
-                &mango_client.client.fallback_oracle_config,
-                account_fetcher,
+            let health_cache = mango_client.health_cache(
                 &account,
+                account_fetcher,
             )
             .await
             .context("creating health cache")?;

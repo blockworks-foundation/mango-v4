@@ -17,7 +17,7 @@ use fixed::types::I80F48;
 use futures::{stream, StreamExt, TryStreamExt};
 use itertools::Itertools;
 
-use crate::{gpa::*, FallbackOracleConfig, AccountFetcher};
+use crate::{gpa::*, AccountFetcher, FallbackOracleConfig};
 
 use solana_client::nonblocking::rpc_client::RpcClient as RpcClientAsync;
 use solana_sdk::account::Account;
@@ -658,7 +658,9 @@ impl MangoGroupContext {
                     self.tokens.iter().map(|t| (t.1.oracle, t.1)).collect();
                 let oracle_keys: Vec<Pubkey> =
                     tokens_by_oracle.values().map(|b| b.oracle).collect();
-                let oracle_accounts = account_fetcher.fetch_multiple_accounts(&oracle_keys).await?;
+                let oracle_accounts = account_fetcher
+                    .fetch_multiple_accounts(&oracle_keys)
+                    .await?;
                 let now_slot = rpc.get_slot().await?;
 
                 let mut stale_oracles_with_fallbacks = vec![];

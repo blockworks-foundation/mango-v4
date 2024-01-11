@@ -17,6 +17,7 @@ use itertools::Itertools;
 
 use mango_v4::accounts_ix::{Serum3OrderType, Serum3SelfTradeBehavior, Serum3Side};
 use mango_v4::accounts_zerocopy::KeyedAccountSharedData;
+use mango_v4::health::HealthCache;
 use mango_v4::state::{
     Bank, Group, MangoAccountValue, OracleAccountInfos, PerpMarket, PerpMarketIndex,
     PlaceOrderType, SelfTradeBehavior, Serum3MarketIndex, Side, TokenIndex, INSURANCE_TOKEN_INDEX,
@@ -33,10 +34,10 @@ use solana_sdk::hash::Hash;
 use solana_sdk::signer::keypair;
 use solana_sdk::transaction::TransactionError;
 
-use crate::account_fetcher::*;
 use crate::context::MangoGroupContext;
 use crate::gpa::{fetch_anchor_account, fetch_mango_accounts};
 use crate::util::PreparedInstructions;
+use crate::{account_fetcher::*, health_cache};
 use crate::{jupiter, util};
 
 use anyhow::Context;
@@ -394,6 +395,20 @@ impl MangoClient {
                 writable_banks,
                 fallback_contexts,
             )
+    }
+
+    pub async fn health_cache(
+        &self,
+        mango_account: &MangoAccountValue,
+        fetcher: &dyn AccountFetcher,
+    ) -> anyhow::Result<HealthCache> {
+        health_cache::new(
+            &self.context,
+            &self.client.fallback_oracle_config,
+            &*fetcher,
+            mango_account,
+        )
+        .await
     }
 
     pub async fn token_deposit(
