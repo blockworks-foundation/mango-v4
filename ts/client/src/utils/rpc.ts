@@ -19,7 +19,6 @@ import {
 } from '@solana/web3.js';
 import { COMPUTE_BUDGET_PROGRAM_ID } from '../constants';
 import { TxCallbackOptions } from '../client';
-import { awaitTransactionSignatureConfirmation } from '@blockworks-foundation/mangolana/lib/transactions';
 
 export interface MangoSignatureStatus {
   confirmations?: number | null;
@@ -168,64 +167,24 @@ const confirmTransaction = async (
 ): Promise<MangoSignatureStatus> => {
   const txConfirmationCommitment = opts.txConfirmationCommitment ?? 'processed';
   let status: RpcResponseAndContext<SignatureResult>;
-  const allConnections = [connection];
-  if (opts.multipleConnections && opts.multipleConnections.length) {
-    allConnections.push(...opts.multipleConnections);
-  }
   if (
     latestBlockhash.blockhash != null &&
     latestBlockhash.lastValidBlockHeight != null
   ) {
-    status = await Promise.race([
-      Promise.any(
-        allConnections.map((c) =>
-          c.confirmTransaction(
-            {
-              signature: signature,
-              blockhash: latestBlockhash.blockhash,
-              lastValidBlockHeight: latestBlockhash.lastValidBlockHeight,
-            },
-            txConfirmationCommitment,
-          ),
-        ),
-      ),
-      Promise.any(
-        allConnections.map((c) =>
-          awaitTransactionSignatureConfirmation({
-            txid: signature,
-            confirmLevel: 'processed',
-            connection: c,
-            config: { logFlowInfo: true },
-            timeoutStrategy: {
-              block: latestBlockhash,
-            },
-          }),
-        ),
-      ),
-    ]);
+    status = await connection.confirmTransaction(
+      {
+        signature: signature,
+        blockhash: latestBlockhash.blockhash,
+        lastValidBlockHeight: latestBlockhash.lastValidBlockHeight,
+      },
+      txConfirmationCommitment,
+    );
   } else {
-    status = await Promise.race([
-      Promise.any(
-        allConnections.map((c) =>
-          c.confirmTransaction(signature, txConfirmationCommitment),
-        ),
-      ),
-      Promise.any(
-        allConnections.map((c) =>
-          awaitTransactionSignatureConfirmation({
-            txid: signature,
-            confirmLevel: 'processed',
-            connection: c,
-            config: { logFlowInfo: true },
-            timeoutStrategy: {
-              timeout: 90,
-            },
-          }),
-        ),
-      ),
-    ]);
+    status = await connection.confirmTransaction(
+      signature,
+      txConfirmationCommitment,
+    );
   }
-
   const signatureResult = status.value;
   if (signatureResult.err) {
     console.warn('Tx status: ', status);
