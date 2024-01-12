@@ -1,6 +1,6 @@
 {
-  "name": "mango-v4-test-pack",
-  "version": "0.21.21",
+  "name": "@blockworks-foundation/mango-v4",
+  "version": "0.21.17",
   "description": "Typescript Client for mango-v4 program.",
   "repository": "https://github.com/blockworks-foundation/mango-v4",
   "author": {
