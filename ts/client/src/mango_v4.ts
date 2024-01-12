@@ -2266,15 +2266,15 @@ export type MangoV4 = {
         {
           "name": "group",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "admin"
-          ]
+          "isSigner": false
         },
         {
           "name": "admin",
           "isMut": false,
-          "isSigner": true
+          "isSigner": true,
+          "docs": [
+            "group admin or fast listing admin, checked at #1"
+          ]
         },
         {
           "name": "serumProgram",
@@ -10745,6 +10745,9 @@ export type MangoV4 = {
           },
           {
             "name": "SwitchboardV2"
+          },
+          {
+            "name": "OrcaCLMM"
           }
         ]
       }
@@ -13699,6 +13702,21 @@ export type MangoV4 = {
       "code": 6065,
       "name": "DelegateWithdrawSmall",
       "msg": "delegates can only withdraw small amounts"
+    },
+    {
+      "code": 6066,
+      "name": "InvalidCLMMOracle",
+      "msg": "The provided CLMM oracle is not valid"
+    },
+    {
+      "code": 6067,
+      "name": "InvalidFeedForCLMMOracle",
+      "msg": "invalid usdc/usd feed provided for the CLMM oracle"
+    },
+    {
+      "code": 6068,
+      "name": "MissingFeedForCLMMOracle",
+      "msg": "Pyth USDC/USD or SOL/USD feed not found (required by CLMM oracle)"
     }
   ]
 };
@@ -15971,15 +15989,15 @@ export const IDL: MangoV4 = {
         {
           "name": "group",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "admin"
-          ]
+          "isSigner": false
         },
         {
           "name": "admin",
           "isMut": false,
-          "isSigner": true
+          "isSigner": true,
+          "docs": [
+            "group admin or fast listing admin, checked at #1"
+          ]
         },
         {
           "name": "serumProgram",
@@ -24450,6 +24468,9 @@ export const IDL: MangoV4 = {
           },
           {
             "name": "SwitchboardV2"
+          },
+          {
+            "name": "OrcaCLMM"
           }
         ]
       }
@@ -27404,6 +27425,21 @@ export const IDL: MangoV4 = {
       "code": 6065,
       "name": "DelegateWithdrawSmall",
       "msg": "delegates can only withdraw small amounts"
+    },
+    {
+      "code": 6066,
+      "name": "InvalidCLMMOracle",
+      "msg": "The provided CLMM oracle is not valid"
+    },
+    {
+      "code": 6067,
+      "name": "InvalidFeedForCLMMOracle",
+      "msg": "invalid usdc/usd feed provided for the CLMM oracle"
+    },
+    {
+      "code": 6068,
+      "name": "MissingFeedForCLMMOracle",
+      "msg": "Pyth USDC/USD or SOL/USD feed not found (required by CLMM oracle)"
     }
   ]
 };
