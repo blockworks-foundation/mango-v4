@@ -458,6 +458,7 @@ export class MangoClient {
         params.interestTargetUtilization,
         params.groupInsuranceFund,
         params.depositLimit,
+        params.zeroUtilRate,
       )
       .accounts({
         group: group.publicKey,
@@ -542,6 +543,7 @@ export class MangoClient {
         params.maintWeightShiftAbort ?? false,
         params.setFallbackOracle ?? false,
         params.depositLimit,
+        params.zeroUtilRate,
       )
       .accounts({
         group: group.publicKey,
