@@ -232,7 +232,9 @@ const confirmTransaction = async (
       for (const individualError of e.errors) {
         throw new MangoError({
           txid: signature,
-          message: `${JSON.stringify(individualError)}`,
+          message: `${JSON.stringify(
+            individualError ? individualError : 'Unknown error',
+          )}`,
         });
       }
     }
