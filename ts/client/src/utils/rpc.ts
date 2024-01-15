@@ -247,7 +247,7 @@ const confirmTransaction = async (
       const stringifiedError = tryStringify(e?.value?.err);
       throw new MangoError({
         txid: signature,
-        message: `${stringifiedError ? stringifiedError : e}`,
+        message: `${stringifiedError ? stringifiedError : e?.value?.err}`,
       });
     }
     const stringifiedError = tryStringify(e);
