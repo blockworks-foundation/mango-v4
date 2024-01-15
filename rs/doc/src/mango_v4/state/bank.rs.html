@@ -1684,6 +1684,71 @@
 <a href="#1684" id="1684">1684</a>
 <a href="#1685" id="1685">1685</a>
 <a href="#1686" id="1686">1686</a>
+<a href="#1687" id="1687">1687</a>
+<a href="#1688" id="1688">1688</a>
+<a href="#1689" id="1689">1689</a>
+<a href="#1690" id="1690">1690</a>
+<a href="#1691" id="1691">1691</a>
+<a href="#1692" id="1692">1692</a>
+<a href="#1693" id="1693">1693</a>
+<a href="#1694" id="1694">1694</a>
+<a href="#1695" id="1695">1695</a>
+<a href="#1696" id="1696">1696</a>
+<a href="#1697" id="1697">1697</a>
+<a href="#1698" id="1698">1698</a>
+<a href="#1699" id="1699">1699</a>
+<a href="#1700" id="1700">1700</a>
+<a href="#1701" id="1701">1701</a>
+<a href="#1702" id="1702">1702</a>
+<a href="#1703" id="1703">1703</a>
+<a href="#1704" id="1704">1704</a>
+<a href="#1705" id="1705">1705</a>
+<a href="#1706" id="1706">1706</a>
+<a href="#1707" id="1707">1707</a>
+<a href="#1708" id="1708">1708</a>
+<a href="#1709" id="1709">1709</a>
+<a href="#1710" id="1710">1710</a>
+<a href="#1711" id="1711">1711</a>
+<a href="#1712" id="1712">1712</a>
+<a href="#1713" id="1713">1713</a>
+<a href="#1714" id="1714">1714</a>
+<a href="#1715" id="1715">1715</a>
+<a href="#1716" id="1716">1716</a>
+<a href="#1717" id="1717">1717</a>
+<a href="#1718" id="1718">1718</a>
+<a href="#1719" id="1719">1719</a>
+<a href="#1720" id="1720">1720</a>
+<a href="#1721" id="1721">1721</a>
+<a href="#1722" id="1722">1722</a>
+<a href="#1723" id="1723">1723</a>
+<a href="#1724" id="1724">1724</a>
+<a href="#1725" id="1725">1725</a>
+<a href="#1726" id="1726">1726</a>
+<a href="#1727" id="1727">1727</a>
+<a href="#1728" id="1728">1728</a>
+<a href="#1729" id="1729">1729</a>
+<a href="#1730" id="1730">1730</a>
+<a href="#1731" id="1731">1731</a>
+<a href="#1732" id="1732">1732</a>
+<a href="#1733" id="1733">1733</a>
+<a href="#1734" id="1734">1734</a>
+<a href="#1735" id="1735">1735</a>
+<a href="#1736" id="1736">1736</a>
+<a href="#1737" id="1737">1737</a>
+<a href="#1738" id="1738">1738</a>
+<a href="#1739" id="1739">1739</a>
+<a href="#1740" id="1740">1740</a>
+<a href="#1741" id="1741">1741</a>
+<a href="#1742" id="1742">1742</a>
+<a href="#1743" id="1743">1743</a>
+<a href="#1744" id="1744">1744</a>
+<a href="#1745" id="1745">1745</a>
+<a href="#1746" id="1746">1746</a>
+<a href="#1747" id="1747">1747</a>
+<a href="#1748" id="1748">1748</a>
+<a href="#1749" id="1749">1749</a>
+<a href="#1750" id="1750">1750</a>
+<a href="#1751" id="1751">1751</a>
 </pre><pre class="rust"><code><span class="kw">use super</span>::{OracleAccountInfos, OracleConfig, TokenIndex, TokenPosition};
 <span class="kw">use </span><span class="kw">crate</span>::accounts_zerocopy::KeyedAccountReader;
 <span class="kw">use </span><span class="kw">crate</span>::error::<span class="kw-2">*</span>;
@@ -1745,11 +1810,25 @@
     <span class="kw">pub </span>avg_utilization: I80F48,
 
     <span class="kw">pub </span>adjustment_factor: I80F48,
-    <span class="kw">pub </span>util0: I80F48,
+
+    <span class="doccomment">/// The unscaled borrow interest curve is defined as continuous piecewise linear with the points:
+    ///
+    /// - 0% util: zero_util_rate
+    /// - util0% util: rate0
+    /// - util1% util: rate1
+    /// - 100% util: max_rate
+    ///
+    /// The final rate is this unscaled curve multiplied by interest_curve_scaling.
+    </span><span class="kw">pub </span>util0: I80F48,
     <span class="kw">pub </span>rate0: I80F48,
     <span class="kw">pub </span>util1: I80F48,
     <span class="kw">pub </span>rate1: I80F48,
-    <span class="kw">pub </span>max_rate: I80F48,
+
+    <span class="doccomment">/// the 100% utilization rate
+    ///
+    /// This isn&#39;t the max_rate, since this still gets scaled by interest_curve_scaling,
+    /// which is &gt;=1.
+    </span><span class="kw">pub </span>max_rate: I80F48,
 
     <span class="comment">// TODO: add ix/logic to regular send this to DAO
     </span><span class="kw">pub </span>collected_fees_native: I80F48,
@@ -1868,8 +1947,13 @@
     <span class="doccomment">/// zero means none, in token native
     </span><span class="kw">pub </span>deposit_limit: u64,
 
+    <span class="doccomment">/// The unscaled borrow interest curve point for zero utilization.
+    ///
+    /// See util0, rate0, util1, rate1, max_rate
+    </span><span class="kw">pub </span>zero_util_rate: I80F48,
+
     <span class="attr">#[derivative(Debug = <span class="string">&quot;ignore&quot;</span>)]
-    </span><span class="kw">pub </span>reserved: [u8; <span class="number">1968</span>],
+    </span><span class="kw">pub </span>reserved: [u8; <span class="number">1952</span>],
 }
 <span class="macro">const_assert_eq!</span>(
     size_of::&lt;Bank&gt;(),
@@ -1906,7 +1990,8 @@
         </span>+ <span class="number">16 </span>* <span class="number">3
         </span>+ <span class="number">32
         </span>+ <span class="number">8
-        </span>+ <span class="number">1968
+        </span>+ <span class="number">16
+        </span>+ <span class="number">1952
 </span>);
 <span class="macro">const_assert_eq!</span>(size_of::&lt;Bank&gt;(), <span class="number">3064</span>);
 <span class="macro">const_assert_eq!</span>(size_of::&lt;Bank&gt;() % <span class="number">8</span>, <span class="number">0</span>);
@@ -2010,7 +2095,8 @@
             maint_weight_shift_liab_target: existing_bank.maint_weight_shift_liab_target,
             fallback_oracle: existing_bank.oracle,
             deposit_limit: existing_bank.deposit_limit,
-            reserved: [<span class="number">0</span>; <span class="number">1968</span>],
+            zero_util_rate: existing_bank.zero_util_rate,
+            reserved: [<span class="number">0</span>; <span class="number">1952</span>],
         }
     }
 
@@ -2041,6 +2127,7 @@
         <span class="macro">require_gte!</span>(<span class="self">self</span>.maint_weight_shift_duration_inv, <span class="number">0.0</span>);
         <span class="macro">require_gte!</span>(<span class="self">self</span>.maint_weight_shift_asset_target, <span class="number">0.0</span>);
         <span class="macro">require_gte!</span>(<span class="self">self</span>.maint_weight_shift_liab_target, <span class="number">0.0</span>);
+        <span class="macro">require_gte!</span>(<span class="self">self</span>.zero_util_rate, I80F48::ZERO);
         <span class="prelude-val">Ok</span>(())
     }
 
@@ -2686,6 +2773,7 @@
     </span><span class="kw">pub fn </span>compute_interest_rate(<span class="kw-2">&amp;</span><span class="self">self</span>, utilization: I80F48) -&gt; I80F48 {
         Bank::interest_rate_curve_calculator(
             utilization,
+            <span class="self">self</span>.zero_util_rate,
             <span class="self">self</span>.util0,
             <span class="self">self</span>.rate0,
             <span class="self">self</span>.util1,
@@ -2700,6 +2788,7 @@
     </span><span class="attr">#[inline(always)]
     </span><span class="kw">pub fn </span>interest_rate_curve_calculator(
         utilization: I80F48,
+        zero_util_rate: I80F48,
         util0: I80F48,
         rate0: I80F48,
         util1: I80F48,
@@ -2711,8 +2800,8 @@
         </span><span class="kw">let </span>utilization = utilization.max(I80F48::ZERO).min(I80F48::ONE);
 
         <span class="kw">let </span>v = <span class="kw">if </span>utilization &lt;= util0 {
-            <span class="kw">let </span>slope = rate0 / util0;
-            slope * utilization
+            <span class="kw">let </span>slope = (rate0 - zero_util_rate) / util0;
+            zero_util_rate + slope * utilization
         } <span class="kw">else if </span>utilization &lt;= util1 {
             <span class="kw">let </span>extra_util = utilization - util0;
             <span class="kw">let </span>slope = (rate1 - rate0) / (util1 - util0);
@@ -3368,6 +3457,47 @@
         </span>);
 
         <span class="prelude-val">Ok</span>(())
+    }
+
+    <span class="attr">#[test]
+    </span><span class="kw">fn </span>test_bank_interest_rate_curve() {
+        <span class="kw">let </span><span class="kw-2">mut </span>bank = Bank::zeroed();
+        bank.zero_util_rate = I80F48::from(<span class="number">1</span>);
+        bank.rate0 = I80F48::from(<span class="number">3</span>);
+        bank.rate1 = I80F48::from(<span class="number">7</span>);
+        bank.max_rate = I80F48::from(<span class="number">13</span>);
+
+        bank.util0 = I80F48::from_num(<span class="number">0.5</span>);
+        bank.util1 = I80F48::from_num(<span class="number">0.75</span>);
+
+        <span class="kw">let </span>interest = |v: f64| {
+            bank.compute_interest_rate(I80F48::from_num(v))
+                .to_num::&lt;f64&gt;()
+        };
+        <span class="kw">let </span>d = |a: f64, b: f64| (a - b).abs();
+
+        <span class="comment">// the points
+        </span><span class="kw">let </span>eps = <span class="number">0.0001</span>;
+        <span class="macro">assert!</span>(d(interest(-<span class="number">0.5</span>), <span class="number">1.0</span>) &lt;= eps);
+        <span class="macro">assert!</span>(d(interest(<span class="number">0.0</span>), <span class="number">1.0</span>) &lt;= eps);
+        <span class="macro">assert!</span>(d(interest(<span class="number">0.5</span>), <span class="number">3.0</span>) &lt;= eps);
+        <span class="macro">assert!</span>(d(interest(<span class="number">0.75</span>), <span class="number">7.0</span>) &lt;= eps);
+        <span class="macro">assert!</span>(d(interest(<span class="number">1.0</span>), <span class="number">13.0</span>) &lt;= eps);
+        <span class="macro">assert!</span>(d(interest(<span class="number">1.5</span>), <span class="number">13.0</span>) &lt;= eps);
+
+        <span class="comment">// midpoints
+        </span><span class="macro">assert!</span>(d(interest(<span class="number">0.25</span>), <span class="number">2.0</span>) &lt;= eps);
+        <span class="macro">assert!</span>(d(interest((<span class="number">0.5 </span>+ <span class="number">0.75</span>) / <span class="number">2.0</span>), <span class="number">5.0</span>) &lt;= eps);
+        <span class="macro">assert!</span>(d(interest((<span class="number">0.75 </span>+ <span class="number">1.0</span>) / <span class="number">2.0</span>), <span class="number">10.0</span>) &lt;= eps);
+
+        <span class="comment">// around the points
+        </span><span class="kw">let </span>delta = <span class="number">0.000001</span>;
+        <span class="macro">assert!</span>(d(interest(<span class="number">0.0 </span>+ delta), <span class="number">1.0</span>) &lt;= eps);
+        <span class="macro">assert!</span>(d(interest(<span class="number">0.5 </span>- delta), <span class="number">3.0</span>) &lt;= eps);
+        <span class="macro">assert!</span>(d(interest(<span class="number">0.5 </span>+ delta), <span class="number">3.0</span>) &lt;= eps);
+        <span class="macro">assert!</span>(d(interest(<span class="number">0.75 </span>- delta), <span class="number">7.0</span>) &lt;= eps);
+        <span class="macro">assert!</span>(d(interest(<span class="number">0.75 </span>+ delta), <span class="number">7.0</span>) &lt;= eps);
+        <span class="macro">assert!</span>(d(interest(<span class="number">1.0 </span>- delta), <span class="number">13.0</span>) &lt;= eps);
     }
 }
 </code></pre></div>

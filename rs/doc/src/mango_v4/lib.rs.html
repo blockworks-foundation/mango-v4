@@ -1742,6 +1742,10 @@
 <a href="#1742" id="1742">1742</a>
 <a href="#1743" id="1743">1743</a>
 <a href="#1744" id="1744">1744</a>
+<a href="#1745" id="1745">1745</a>
+<a href="#1746" id="1746">1746</a>
+<a href="#1747" id="1747">1747</a>
+<a href="#1748" id="1748">1748</a>
 </pre><pre class="rust"><code><span class="attr">#![allow(unused_variables)]
 
 </span><span class="kw">use </span>fixed::types::I80F48;
@@ -1899,6 +1903,7 @@
         interest_target_utilization: f32,
         group_insurance_fund: bool,
         deposit_limit: u64,
+        zero_util_rate: f32,
     ) -&gt; <span class="prelude-ty">Result</span>&lt;()&gt; {
         <span class="attr">#[cfg(feature = <span class="string">&quot;enable-gpl&quot;</span>)]
         </span>instructions::token_register(
@@ -1930,6 +1935,7 @@
             interest_target_utilization,
             group_insurance_fund,
             deposit_limit,
+            zero_util_rate,
         )<span class="question-mark">?</span>;
         <span class="prelude-val">Ok</span>(())
     }
@@ -1983,6 +1989,7 @@
         maint_weight_shift_abort: bool,
         set_fallback_oracle: bool,
         deposit_limit_opt: <span class="prelude-ty">Option</span>&lt;u64&gt;,
+        zero_util_rate_opt: <span class="prelude-ty">Option</span>&lt;f32&gt;,
     ) -&gt; <span class="prelude-ty">Result</span>&lt;()&gt; {
         <span class="attr">#[cfg(feature = <span class="string">&quot;enable-gpl&quot;</span>)]
         </span>instructions::token_edit(
@@ -2023,6 +2030,7 @@
             maint_weight_shift_abort,
             set_fallback_oracle,
             deposit_limit_opt,
+            zero_util_rate_opt,
         )<span class="question-mark">?</span>;
         <span class="prelude-val">Ok</span>(())
     }
