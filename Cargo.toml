@@ -16,14 +16,14 @@ serum_dex = { git = "https://github.com/openbook-dex/program.git", default-featu
 mango-feeds-connector = { git = "https://github.com/blockworks-foundation/mango-feeds.git", rev="5def8c9468c29a7e3b50bbc51946456de6dab52d"}
 
 # 1.16.7+ is required due to this: https://github.com/blockworks-foundation/mango-v4/issues/712
-solana-address-lookup-table-program = "~1.16.17"
-solana-account-decoder = "~1.16.17"
-solana-client = "~1.16.17"
-solana-logger = "~1.16.17"
-solana-program = "~1.16.17"
-solana-program-test = "~1.16.17"
-solana-rpc = "~1.16.17"
-solana-sdk = { version = "~1.16.17", default-features = false }
+solana-address-lookup-table-program = { git = "https://github.com/blockworks-foundation/solana.git", branch = "pan/v1.16.17-upgrade-tokio" }
+solana-account-decoder = { git = "https://github.com/blockworks-foundation/solana.git", branch = "pan/v1.16.17-upgrade-tokio" }
+solana-client = { git = "https://github.com/blockworks-foundation/solana.git", branch = "pan/v1.16.17-upgrade-tokio" }
+solana-logger = { git = "https://github.com/blockworks-foundation/solana.git", branch = "pan/v1.16.17-upgrade-tokio" }
+solana-program = { git = "https://github.com/blockworks-foundation/solana.git", branch = "pan/v1.16.17-upgrade-tokio" }
+solana-program-test = { git = "https://github.com/blockworks-foundation/solana.git", branch = "pan/v1.16.17-upgrade-tokio" }
+solana-rpc = { git = "https://github.com/blockworks-foundation/solana.git", branch = "pan/v1.16.17-upgrade-tokio" }
+solana-sdk = { git = "https://github.com/blockworks-foundation/solana.git", branch = "pan/v1.16.17-upgrade-tokio", default-features = false }
 
 [profile.release]
 overflow-checks = true
@@ -31,4 +31,3 @@ overflow-checks = true
 [patch.crates-io]
 # for gzip encoded responses
 jsonrpc-core-client = { git = "https://github.com/ckamm/jsonrpc.git", branch = "ckamm/http-with-gzip" }
-tokio = { git = "https://github.com/tokio-rs/tokio.git", tag = "tokio-1.29.1"}
