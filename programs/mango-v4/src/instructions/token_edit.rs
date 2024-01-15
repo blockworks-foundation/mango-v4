@@ -51,6 +51,7 @@ pub fn token_edit(
     maint_weight_shift_abort: bool,
     set_fallback_oracle: bool,
     deposit_limit_opt: Option<u64>,
+    zero_util_rate: Option<f32>,
 ) -> Result<()> {
     let group = ctx.accounts.group.load()?;
 
@@ -460,6 +461,16 @@ pub fn token_edit(
                 deposit_limit
             );
             bank.deposit_limit = deposit_limit;
+            require_group_admin = true;
+        }
+
+        if let Some(zero_util_rate) = zero_util_rate {
+            msg!(
+                "Zero utilization rate old {:?}, new {:?}",
+                bank.zero_util_rate,
+                zero_util_rate
+            );
+            bank.zero_util_rate = I80F48::from_num(zero_util_rate);
             require_group_admin = true;
         }
     }

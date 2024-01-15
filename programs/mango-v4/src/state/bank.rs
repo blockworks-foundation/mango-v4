@@ -59,10 +59,24 @@ pub struct Bank {
     pub avg_utilization: I80F48,
 
     pub adjustment_factor: I80F48,
+
+    /// The unscaled borrow interest curve is defined as continuous piecewise linear with the points:
+    ///
+    /// - 0% util: zero_util_rate
+    /// - util0% util: rate0
+    /// - util1% util: rate1
+    /// - 100% util: max_rate
+    ///
+    /// The final rate is this unscaled curve multiplied by interest_curve_scaling.
     pub util0: I80F48,
     pub rate0: I80F48,
     pub util1: I80F48,
     pub rate1: I80F48,
+
+    /// the 100% utilization rate
+    ///
+    /// This isn't the max_rate, since this still gets scaled by interest_curve_scaling,
+    /// which is >=1.
     pub max_rate: I80F48,
 
     // TODO: add ix/logic to regular send this to DAO
@@ -182,8 +196,13 @@ pub struct Bank {
     /// zero means none, in token native
     pub deposit_limit: u64,
 
+    /// The unscaled borrow interest curve point for zero utilization.
+    ///
+    /// See util0, rate0, util1, rate1, max_rate
+    pub zero_util_rate: I80F48,
+
     #[derivative(Debug = "ignore")]
-    pub reserved: [u8; 1968],
+    pub reserved: [u8; 1952],
 }
 const_assert_eq!(
     size_of::<Bank>(),
@@ -220,7 +239,8 @@ const_assert_eq!(
         + 16 * 3
         + 32
         + 8
-        + 1968
+        + 16
+        + 1952
 );
 const_assert_eq!(size_of::<Bank>(), 3064);
 const_assert_eq!(size_of::<Bank>() % 8, 0);
@@ -324,7 +344,8 @@ impl Bank {
             maint_weight_shift_liab_target: existing_bank.maint_weight_shift_liab_target,
             fallback_oracle: existing_bank.oracle,
             deposit_limit: existing_bank.deposit_limit,
-            reserved: [0; 1968],
+            zero_util_rate: existing_bank.zero_util_rate,
+            reserved: [0; 1952],
         }
     }
 
@@ -355,6 +376,7 @@ impl Bank {
         require_gte!(self.maint_weight_shift_duration_inv, 0.0);
         require_gte!(self.maint_weight_shift_asset_target, 0.0);
         require_gte!(self.maint_weight_shift_liab_target, 0.0);
+        require_gte!(self.zero_util_rate, I80F48::ZERO);
         Ok(())
     }
 
@@ -1000,6 +1022,7 @@ impl Bank {
     pub fn compute_interest_rate(&self, utilization: I80F48) -> I80F48 {
         Bank::interest_rate_curve_calculator(
             utilization,
+            self.zero_util_rate,
             self.util0,
             self.rate0,
             self.util1,
@@ -1014,6 +1037,7 @@ impl Bank {
     #[inline(always)]
     pub fn interest_rate_curve_calculator(
         utilization: I80F48,
+        zero_util_rate: I80F48,
         util0: I80F48,
         rate0: I80F48,
         util1: I80F48,
@@ -1025,8 +1049,8 @@ impl Bank {
         let utilization = utilization.max(I80F48::ZERO).min(I80F48::ONE);
 
         let v = if utilization <= util0 {
-            let slope = rate0 / util0;
-            slope * utilization
+            let slope = (rate0 - zero_util_rate) / util0;
+            zero_util_rate + slope * utilization
         } else if utilization <= util1 {
             let extra_util = utilization - util0;
             let slope = (rate1 - rate0) / (util1 - util0);
@@ -1682,5 +1706,46 @@ mod tests {
         );
 
         Ok(())
+    }
+
+    #[test]
+    fn test_bank_interest_rate_curve() {
+        let mut bank = Bank::zeroed();
+        bank.zero_util_rate = I80F48::from(1);
+        bank.rate0 = I80F48::from(3);
+        bank.rate1 = I80F48::from(7);
+        bank.max_rate = I80F48::from(13);
+
+        bank.util0 = I80F48::from_num(0.5);
+        bank.util1 = I80F48::from_num(0.75);
+
+        let interest = |v: f64| {
+            bank.compute_interest_rate(I80F48::from_num(v))
+                .to_num::<f64>()
+        };
+        let d = |a: f64, b: f64| (a - b).abs();
+
+        // the points
+        let eps = 0.0001;
+        assert!(d(interest(-0.5), 1.0) <= eps);
+        assert!(d(interest(0.0), 1.0) <= eps);
+        assert!(d(interest(0.5), 3.0) <= eps);
+        assert!(d(interest(0.75), 7.0) <= eps);
+        assert!(d(interest(1.0), 13.0) <= eps);
+        assert!(d(interest(1.5), 13.0) <= eps);
+
+        // midpoints
+        assert!(d(interest(0.25), 2.0) <= eps);
+        assert!(d(interest((0.5 + 0.75) / 2.0), 5.0) <= eps);
+        assert!(d(interest((0.75 + 1.0) / 2.0), 10.0) <= eps);
+
+        // around the points
+        let delta = 0.000001;
+        assert!(d(interest(0.0 + delta), 1.0) <= eps);
+        assert!(d(interest(0.5 - delta), 3.0) <= eps);
+        assert!(d(interest(0.5 + delta), 3.0) <= eps);
+        assert!(d(interest(0.75 - delta), 7.0) <= eps);
+        assert!(d(interest(0.75 + delta), 7.0) <= eps);
+        assert!(d(interest(1.0 - delta), 13.0) <= eps);
     }
 }

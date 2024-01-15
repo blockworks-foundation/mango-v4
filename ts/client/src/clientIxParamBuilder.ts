@@ -28,6 +28,7 @@ export interface TokenRegisterParams {
   interestCurveScaling: number;
   interestTargetUtilization: number;
   depositLimit: BN;
+  zeroUtilRate: number;
 }
 
 export const DefaultTokenRegisterParams: TokenRegisterParams = {
@@ -66,6 +67,7 @@ export const DefaultTokenRegisterParams: TokenRegisterParams = {
   interestCurveScaling: 4.0,
   interestTargetUtilization: 0.5,
   depositLimit: new BN(0),
+  zeroUtilRate: 0.0,
 };
 
 export interface TokenEditParams {
@@ -105,6 +107,7 @@ export interface TokenEditParams {
   maintWeightShiftAbort: boolean | null;
   setFallbackOracle: boolean | null;
   depositLimit: BN | null;
+  zeroUtilRate: number | null;
 }
 
 export const NullTokenEditParams: TokenEditParams = {
@@ -144,6 +147,7 @@ export const NullTokenEditParams: TokenEditParams = {
   maintWeightShiftAbort: null,
   setFallbackOracle: null,
   depositLimit: null,
+  zeroUtilRate: null,
 };
 
 export interface PerpEditParams {

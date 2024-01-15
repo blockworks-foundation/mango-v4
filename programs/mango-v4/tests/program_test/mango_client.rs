@@ -1074,6 +1074,7 @@ impl ClientInstruction for TokenRegisterInstruction {
             interest_target_utilization: 0.5,
             group_insurance_fund: true,
             deposit_limit: 0,
+            zero_util_rate: 0.0,
         };
 
         let bank = Pubkey::find_program_address(
@@ -1319,6 +1320,7 @@ pub fn token_edit_instruction_default() -> mango_v4::instruction::TokenEdit {
         maint_weight_shift_abort: false,
         set_fallback_oracle: false,
         deposit_limit_opt: None,
+        zero_util_rate_opt: None,
     }
 }
 
