@@ -20,7 +20,7 @@ import {
 import { COMPUTE_BUDGET_PROGRAM_ID } from '../constants';
 import { TxCallbackOptions } from '../client';
 import { awaitTransactionSignatureConfirmation } from '@blockworks-foundation/mangolana/lib/transactions';
-import { error } from 'console';
+import { tryStringify } from '../utils';
 
 export interface MangoSignatureStatus {
   confirmations?: number | null;
@@ -230,23 +230,30 @@ const confirmTransaction = async (
     abortController.abort();
     if (e instanceof AggregateError) {
       for (const individualError of e.errors) {
+        const stringifiedError = tryStringify(individualError);
         throw new MangoError({
           txid: signature,
-          message: `${JSON.stringify(
-            individualError ? individualError : 'Unknown error',
-          )}`,
+          message: `${
+            stringifiedError
+              ? stringifiedError
+              : individualError
+              ? individualError
+              : 'Unknown error'
+          }`,
         });
       }
     }
     if (isErrorWithSignatureResult(e)) {
+      const stringifiedError = tryStringify(e?.value?.err);
       throw new MangoError({
         txid: signature,
-        message: `${JSON.stringify(e.value.err)}`,
+        message: `${stringifiedError ? stringifiedError : e}`,
       });
     }
+    const stringifiedError = tryStringify(e);
     throw new MangoError({
       txid: signature,
-      message: `${JSON.stringify(e)}`,
+      message: `${stringifiedError ? stringifiedError : e}`,
     });
   }
 };
