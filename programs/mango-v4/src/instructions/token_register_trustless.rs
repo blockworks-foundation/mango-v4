@@ -104,7 +104,8 @@ pub fn token_register_trustless(
         maint_weight_shift_liab_target: I80F48::ZERO,
         fallback_oracle: ctx.accounts.fallback_oracle.key(),
         deposit_limit: 0,
-        reserved: [0; 1968],
+        zero_util_rate: I80F48::ZERO,
+        reserved: [0; 1952],
     };
     let oracle_ref = &AccountInfoRef::borrow(ctx.accounts.oracle.as_ref())?;
     if let Ok(oracle_price) = bank.oracle_price(&OracleAccountInfos::from_reader(oracle_ref), None)
