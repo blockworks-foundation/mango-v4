@@ -63,7 +63,7 @@
   },
   "dependencies": {
     "@blockworks-foundation/mango-v4-settings": "^0.2.16",
-    "@blockworks-foundation/mangolana": "0.0.9",
+    "@blockworks-foundation/mangolana": "0.0.10",
     "@coral-xyz/anchor": "^0.28.1-beta.2",
     "@project-serum/serum": "0.13.65",
     "@pythnetwork/client": "~2.14.0",
