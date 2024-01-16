@@ -26,7 +26,7 @@ use std::{
 use mango_feeds_connector::EntityFilter::FilterByAccountIds;
 use mango_feeds_connector::FilterConfig;
 use mango_feeds_connector::{
-    grpc_plugin_source, metrics, websocket_source, MetricsConfig, SourceConfig, TransactionUpdate
+    grpc_plugin_source, metrics, websocket_source, MetricsConfig, SourceConfig, TransactionUpdate,
 };
 use serde::Deserialize;
 

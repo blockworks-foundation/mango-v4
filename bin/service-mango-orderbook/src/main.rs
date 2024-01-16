@@ -33,7 +33,7 @@ use tokio_tungstenite::tungstenite::{protocol::Message, Error};
 
 use mango_feeds_connector::EntityFilter::FilterByAccountIds;
 use mango_feeds_connector::{
-    grpc_plugin_source, metrics, websocket_source, MetricsConfig, SourceConfig, TransactionUpdate
+    grpc_plugin_source, metrics, websocket_source, MetricsConfig, SourceConfig, TransactionUpdate,
 };
 use mango_feeds_connector::{
     metrics::{MetricType, MetricU64},
@@ -601,9 +601,7 @@ async fn main() -> anyhow::Result<()> {
         .unique()
         .collect_vec();
     info!("{} oracle pubkeys", oracle_pubkeys.len());
-    let relevant_pubkeys = [orderbook_pubkeys, oracle_pubkeys]
-        .concat()
-        .to_vec();
+    let relevant_pubkeys = [orderbook_pubkeys, oracle_pubkeys].concat().to_vec();
     let filter_config = FilterConfig {
         entity_filter: FilterByAccountIds(relevant_pubkeys),
     };

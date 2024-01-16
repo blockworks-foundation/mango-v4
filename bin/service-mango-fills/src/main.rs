@@ -13,7 +13,7 @@ use log::*;
 use mango_feeds_connector::{
     grpc_plugin_source, metrics,
     metrics::{MetricType, MetricU64},
-    websocket_source, EntityFilter, FilterConfig, MetricsConfig, SourceConfig, TransactionUpdate
+    websocket_source, EntityFilter, FilterConfig, MetricsConfig, SourceConfig, TransactionUpdate,
 };
 use mango_feeds_lib::MarketConfig;
 use mango_feeds_lib::StatusResponse;
