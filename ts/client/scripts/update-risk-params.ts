@@ -9,6 +9,8 @@ import {
   getTokenOwnerRecord,
   getTokenOwnerRecordAddress,
 } from '@solana/spl-governance';
+import cloneDeep from 'lodash/cloneDeep';
+
 import {
   AccountMeta,
   Connection,
@@ -25,9 +27,15 @@ import { Builder } from '../src/builder';
 import { MangoClient } from '../src/client';
 import { NullTokenEditParams } from '../src/clientIxParamBuilder';
 import { MANGO_V4_MAIN_GROUP as MANGO_V4_PRIMARY_GROUP } from '../src/constants';
-import { getEquityForMangoAccounts } from '../src/risk';
+import { I80F48 } from '../src/numbers/I80F48';
+import {
+  LiqorPriceImpact,
+  getEquityForMangoAccounts,
+  getPriceImpactForLiqor,
+} from '../src/risk';
 import {
   buildFetch,
+  toNative,
   toNativeI80F48ForQuote,
   toUiDecimalsForQuote,
 } from '../src/utils';
@@ -111,9 +119,10 @@ async function getTotalLiqorEquity(
 function getPriceImpactForBank(
   midPriceImpacts: MidPriceImpact[],
   bank: Bank,
+  priceImpactPercent = 1,
 ): MidPriceImpact {
   const tokenToPriceImpact = midPriceImpacts
-    .filter((x) => x.avg_price_impact_percent < 1)
+    .filter((x) => x.avg_price_impact_percent < priceImpactPercent)
     .reduce((acc: { [key: string]: MidPriceImpact }, val: MidPriceImpact) => {
       if (
         !acc[val.symbol] ||
@@ -127,6 +136,63 @@ function getPriceImpactForBank(
   return priceImpact;
 }
 
+function findLargestAssetBatchUi(
+  pisForLiqor: LiqorPriceImpact[][],
+  coin: string,
+  startFromChange = 99,
+  maxChange = 1,
+  stepSize = 1,
+): number[] {
+  let start = startFromChange;
+  let largestBatchUi = 0;
+  let largestBatchQuoteUi = 0;
+
+  // console.log(`___`);
+  // console.log(
+  //   `${'start'.padStart(3)}: ${'liq$'.padStart(10)}, ${`prev`.padStart(
+  //     3,
+  //   )}: ${'liq'.padStart(10)}, ${'largestBatchUi $'.padStart(15)}`,
+  // );
+
+  while (start > 0) {
+    const piForLiqor = pisForLiqor[start].filter(
+      (pi) => pi.Coin.val == coin,
+    )[0];
+
+    // Compare entry to another entry, with max change difference
+    const prev = Math.min(99, start + Math.round(start / maxChange));
+    const prevPiForLiqor = pisForLiqor[prev].filter(
+      (pi) => pi.Coin.val == coin,
+    )[0];
+
+    // Note: Assets.val is asset in $ amount that would need to be liquidated when price drops to a certain point
+    const changeQuoteUi = piForLiqor.Assets.val - prevPiForLiqor.Assets.val;
+    const changeUi =
+      piForLiqor.Assets.val / piForLiqor['Future Price'].val -
+      prevPiForLiqor.Assets.val / prevPiForLiqor['Future Price'].val;
+
+    // console.log(
+    //   `${start.toString().padStart(3)}: ${piForLiqor.Assets.val
+    //     .toLocaleString()
+    //     .padStart(10)}, ${prev
+    //     .toString()
+    //     .padStart(3)}: ${prevPiForLiqor.Assets.val
+    //     .toLocaleString()
+    //     .padStart(10)}, ${largestBatchQuoteUi.toLocaleString().padStart(15)}`,
+    // );
+
+    if (changeQuoteUi > largestBatchQuoteUi) {
+      largestBatchUi = changeUi;
+      largestBatchQuoteUi = changeQuoteUi;
+    }
+
+    start -= stepSize;
+  }
+  // console.log(`___`);
+
+  return [largestBatchQuoteUi, largestBatchUi];
+}
+
 async function updateTokenParams(): Promise<void> {
   const [client, wallet] = await Promise.all([buildClient(), setupWallet()]);
   const vsrClient = await setupVsr(client.connection, wallet);
@@ -136,6 +202,12 @@ async function updateTokenParams(): Promise<void> {
   const instructions: TransactionInstruction[] = [];
 
   const mangoAccounts = await client.getAllMangoAccounts(group, true);
+  const mangoAccountsSubset = mangoAccounts.filter(
+    (a) => toUiDecimalsForQuote(a.getEquity(group)) > 100,
+  );
+
+  const stepSize = 1;
+
   const ttlLiqorEquityUi = await getTotalLiqorEquity(
     client,
     group,
@@ -144,9 +216,80 @@ async function updateTokenParams(): Promise<void> {
 
   const midPriceImpacts = getMidPriceImpacts(group.pis);
 
+  let groups: Group[];
+  let pisForLiqor: LiqorPriceImpact[][];
+
+  {
+    let pis;
+    try {
+      pis = await (
+        await (
+          await buildFetch()
+        )(
+          `https://api.mngo.cloud/data/v4/risk/listed-tokens-one-week-price-impacts`,
+          {
+            mode: 'cors',
+            headers: {
+              'Content-Type': 'application/json',
+              'Access-Control-Allow-Origin': '*',
+            },
+          },
+        )
+      ).json();
+    } catch (error) {
+      pis = [];
+    }
+
+    // Build groups where price has changed from 0 to -99% for each (non stable coin) assets simultaneously
+    const groups = new Array(200);
+    let change = stepSize;
+    while (change < 101) {
+      groups[change] = cloneDeep(group);
+      const groupToModify: Group = groups[change.toString()];
+      const change_ = change / 100;
+      Array.from(groupToModify.banksMapByTokenIndex.values())
+        .flat()
+        .filter((b) => !b.name.includes('USD'))
+        .forEach((b) => {
+          b['oldUiPrice'] = b._uiPrice;
+          b._uiPrice = b._uiPrice! * change_;
+          b._price = b._price?.mul(I80F48.fromNumber(change_));
+        });
+      Array.from(groupToModify.perpMarketsMapByMarketIndex.values()).forEach(
+        (p) => {
+          p['oldUiPrice'] = p._uiPrice;
+          p._uiPrice = p._uiPrice! * change_;
+          p._price = p._price?.mul(I80F48.fromNumber(change_));
+        },
+      );
+      change += stepSize;
+    }
+
+    // Compute how much of an asset would need to be liquidated
+    // when group (i.e. asset prices) reach a specific state
+    pisForLiqor = await Promise.all(
+      groups.map((g) => getPriceImpactForLiqor(g, pis, mangoAccountsSubset)),
+    );
+  }
+
+  // Deposit limits header
+  console.log(
+    `${'name'.padStart(20)} ${'maxLiqBatchUi'.padStart(
+      15,
+    )} ${'maxLiqBatchUi'.padStart(15)} ${'sellImpact'.padStart(
+      12,
+    )}$ ${'pi %'.padStart(12)}% ${'aNDUi'.padStart(20)}${'aNDQuoteUi'.padStart(
+      20,
+    )} ${'uiDeposits'.padStart(12)} ${'uiDeposits'.padStart(
+      12,
+    )} ${'depositLimitsUi'.padStart(12)}`,
+  );
+
   Array.from(group.banksMapByTokenIndex.values())
     .map((banks) => banks[0])
+    // .filter((bank) => bank.name == 'MSOL')
     .forEach(async (bank) => {
+      let change = false;
       try {
         // formulas are sourced from here
         // https://www.notion.so/mango-markets/Mango-v4-Risk-parameter-recommendations-d309cdf5faac4aeea7560356e68532ab
@@ -159,7 +302,7 @@ async function updateTokenParams(): Promise<void> {
 
         const builder = Builder(NullTokenEditParams);
 
-        // if (true) {
+        // Net borrow limits
         if (!bank.areBorrowsReduceOnly()) {
           const netBorrowLimitPerWindowQuote = Math.max(
             10_000,
@@ -169,10 +312,11 @@ async function updateTokenParams(): Promise<void> {
           builder.netBorrowLimitPerWindowQuote(
             toNativeI80F48ForQuote(netBorrowLimitPerWindowQuote).toNumber(),
           );
+          change = true;
           if (
             netBorrowLimitPerWindowQuote !=
             toUiDecimalsForQuote(bank.netBorrowLimitPerWindowQuote)
-          )
+          ) {
             console.log(
               `${
                 bank.name
@@ -180,78 +324,163 @@ async function updateTokenParams(): Promise<void> {
                 bank.netBorrowLimitPerWindowQuote,
               ).toLocaleString()}`,
             );
-        }
+          }
 
-        const params = builder.build();
-
-        const ix = await client.program.methods
-          .tokenEdit(
-            params.oracle,
-            params.oracleConfig,
-            params.groupInsuranceFund,
-            params.interestRateParams,
-            params.loanFeeRate,
-            params.loanOriginationFeeRate,
-            params.maintAssetWeight,
-            params.initAssetWeight,
-            params.maintLiabWeight,
-            params.initLiabWeight,
-            params.liquidationFee,
-            params.stablePriceDelayIntervalSeconds,
-            params.stablePriceDelayGrowthLimit,
-            params.stablePriceGrowthLimit,
-            params.minVaultToDepositsRatio,
-            params.netBorrowLimitPerWindowQuote !== null
-              ? new BN(params.netBorrowLimitPerWindowQuote)
-              : null,
-            params.netBorrowLimitWindowSizeTs !== null
-              ? new BN(params.netBorrowLimitWindowSizeTs)
-              : null,
-            params.borrowWeightScaleStartQuote,
-            params.depositWeightScaleStartQuote,
-            params.resetStablePrice ?? false,
-            params.resetNetBorrowLimit ?? false,
-            params.reduceOnly,
-            params.name,
-            params.forceClose,
-            params.tokenConditionalSwapTakerFeeRate,
-            params.tokenConditionalSwapMakerFeeRate,
-            params.flashLoanSwapFeeRate,
-            params.interestCurveScaling,
-            params.interestTargetUtilization,
-            params.maintWeightShiftStart,
-            params.maintWeightShiftEnd,
-            params.maintWeightShiftAssetTarget,
-            params.maintWeightShiftLiabTarget,
-            params.maintWeightShiftAbort ?? false,
-            false, // setFallbackOracle, unused
-            params.depositLimit,
-          )
-          .accounts({
-            group: group.publicKey,
-            oracle: bank.oracle,
-            admin: group.admin,
-            mintInfo: group.mintInfosMapByTokenIndex.get(bank.tokenIndex)
-              ?.publicKey,
-          })
-          .remainingAccounts([
+          // Deposit limits
+          if (bank.maintAssetWeight.toNumber() > 0) {
             {
-              pubkey: bank.publicKey,
-              isWritable: true,
-              isSigner: false,
-            } as AccountMeta,
-          ])
-          .instruction();
+              // Find asset's largest batch in $ we would need to liquidate, batches are extreme points of a range of price drop,
+              // range is constrained by leverage provided
+              // i.e. how much volatility we expect
+              const r = findLargestAssetBatchUi(
+                pisForLiqor,
+                bank.name,
+                Math.round(bank.maintAssetWeight.toNumber() * 100),
+                100 - Math.round(bank.maintAssetWeight.toNumber() * 100),
+                stepSize,
+              );
 
-        const tx = new Transaction({ feePayer: wallet.publicKey }).add(ix);
-        const simulated = await client.connection.simulateTransaction(tx);
+              const maxLiqBatchQuoteUi = r[0];
+              const maxLiqBatchUi = r[1];
 
-        if (simulated.value.err) {
-          console.log('error', simulated.value.logs);
-          throw simulated.value.logs;
+              const sellImpact = getPriceImpactForBank(
+                midPriceImpacts,
+                bank,
+                (bank.liquidationFee.toNumber() * 100) / 2,
+              );
+
+              // Deposit limit = sell impact - largest batch
+              const allowedNewDepositsQuoteUi =
+                sellImpact.target_amount - maxLiqBatchQuoteUi;
+              const allowedNewDepositsUi =
+                sellImpact.target_amount / bank.uiPrice -
+                maxLiqBatchQuoteUi / bank.uiPrice;
+
+              let depositLimitUi = bank.uiDeposits() + allowedNewDepositsUi;
+
+              if (bank.name == 'JitoSOL') {
+                depositLimitUi = Math.min(depositLimitUi, 12_000);
+              }
+              if (bank.name == 'bSOL') {
+                depositLimitUi = Math.min(depositLimitUi, 6_000);
+              }
+              if (bank.name == 'MSOL') {
+                depositLimitUi = Math.min(depositLimitUi, 50_000);
+              }
+              if (bank.name == 'JLP') {
+                depositLimitUi = Math.min(depositLimitUi, 300_000);
+              }
+              if (bank.name == 'RAY') {
+                depositLimitUi = Math.min(depositLimitUi, 300_000);
+              }
+              if (bank.name == 'wBTC (Portal)') {
+                depositLimitUi = Math.max(depositLimitUi, 7.5);
+              }
+              if (bank.name == 'SOL') {
+                depositLimitUi = Math.max(depositLimitUi, 50_000);
+              }
+
+              console.log(
+                `${bank.name.padStart(20)} ${maxLiqBatchUi
+                  .toLocaleString()
+                  .padStart(15)} ${maxLiqBatchQuoteUi
+                  .toLocaleString()
+                  .padStart(15)}$ ${sellImpact.target_amount
+                  .toLocaleString()
+                  .padStart(12)}$ ${sellImpact.avg_price_impact_percent
+                  .toLocaleString()
+                  .padStart(12)}% ${allowedNewDepositsUi
+                  .toLocaleString()
+                  .padStart(20)}${allowedNewDepositsQuoteUi
+                  .toLocaleString()
+                  .padStart(20)}$ ${bank
+                  .uiDeposits()
+                  .toLocaleString()
+                  .padStart(12)} ${(bank.uiDeposits() * bank.uiPrice)
+                  .toLocaleString()
+                  .padStart(12)}$ ${depositLimitUi
+                  .toLocaleString()
+                  .padStart(12)}`,
+              );
+
+              builder.depositLimit(toNative(depositLimitUi, bank.mintDecimals));
+              change = true;
+            }
+          }
+
+          const params = builder.build();
+
+          const ix = await client.program.methods
+            .tokenEdit(
+              params.oracle,
+              params.oracleConfig,
+              params.groupInsuranceFund,
+              params.interestRateParams,
+              params.loanFeeRate,
+              params.loanOriginationFeeRate,
+              params.maintAssetWeight,
+              params.initAssetWeight,
+              params.maintLiabWeight,
+              params.initLiabWeight,
+              params.liquidationFee,
+              params.stablePriceDelayIntervalSeconds,
+              params.stablePriceDelayGrowthLimit,
+              params.stablePriceGrowthLimit,
+              params.minVaultToDepositsRatio,
+              params.netBorrowLimitPerWindowQuote !== null
+                ? new BN(params.netBorrowLimitPerWindowQuote)
+                : null,
+              params.netBorrowLimitWindowSizeTs !== null
+                ? new BN(params.netBorrowLimitWindowSizeTs)
+                : null,
+              params.borrowWeightScaleStartQuote,
+              params.depositWeightScaleStartQuote,
+              params.resetStablePrice ?? false,
+              params.resetNetBorrowLimit ?? false,
+              params.reduceOnly,
+              params.name,
+              params.forceClose,
+              params.tokenConditionalSwapTakerFeeRate,
+              params.tokenConditionalSwapMakerFeeRate,
+              params.flashLoanSwapFeeRate,
+              params.interestCurveScaling,
+              params.interestTargetUtilization,
+              params.maintWeightShiftStart,
+              params.maintWeightShiftEnd,
+              params.maintWeightShiftAssetTarget,
+              params.maintWeightShiftLiabTarget,
+              params.maintWeightShiftAbort ?? false,
+              false, // setFallbackOracle, unused
+              params.depositLimit,
+            )
+            .accounts({
+              group: group.publicKey,
+              oracle: bank.oracle,
+              admin: group.admin,
+              mintInfo: group.mintInfosMapByTokenIndex.get(bank.tokenIndex)
+                ?.publicKey,
+            })
+            .remainingAccounts([
+              {
+                pubkey: bank.publicKey,
+                isWritable: true,
+                isSigner: false,
+              } as AccountMeta,
+            ])
+            .instruction();
+
+          const tx = new Transaction({ feePayer: wallet.publicKey }).add(ix);
+          const simulated = await client.connection.simulateTransaction(tx);
+
+          if (simulated.value.err) {
+            console.log('error', simulated.value.logs);
+            throw simulated.value.logs;
+          }
+
+          if (change) {
+            instructions.push(ix);
+          }
         }
-
-        instructions.push(ix);
       } catch (error) {
         console.log(`....Skipping ${bank.name}, ${error}`);
       }
@@ -275,13 +504,15 @@ async function updateTokenParams(): Promise<void> {
 
   const walletSigner = wallet as never;
 
+  console.log(DRY_RUN);
+
   if (!DRY_RUN) {
     const proposalAddress = await createProposal(
       client.connection,
       walletSigner,
       MANGO_DAO_WALLET_GOVERNANCE,
       tokenOwnerRecord,
-      PROPOSAL_TITLE ? PROPOSAL_TITLE : 'Update risk parameters for tokens',
+      PROPOSAL_TITLE ? PROPOSAL_TITLE : 'Update deposit limits for tokens',
       PROPOSAL_LINK ?? '',
       Object.values(proposals).length,
       instructions,

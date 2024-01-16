@@ -110,7 +110,11 @@ export async function getPriceImpactForLiqor(
   pis: PriceImpact[],
   mangoAccounts: MangoAccount[],
 ): Promise<LiqorPriceImpact[]> {
-  const mangoAccountsWithHealth = mangoAccounts.map((a: MangoAccount) => {
+  const mangoAccounts_ = mangoAccounts.filter((a) =>
+    a.getHealth(group, HealthType.maint).lt(ZERO_I80F48()),
+  );
+
+  const mangoAccountsWithHealth = mangoAccounts_.map((a: MangoAccount) => {
     return {
       account: a,
       health: a.getHealth(group, HealthType.liquidationEnd),
@@ -124,6 +128,7 @@ export async function getPriceImpactForLiqor(
   return await Promise.all(
     Array.from(group.banksMapByMint.values())
       .sort((a, b) => a[0].name.localeCompare(b[0].name))
+      // .filter((banks) => banks[0].name == 'MSOL')
       .map(async (banks) => {
         const bank = banks[0];
 
