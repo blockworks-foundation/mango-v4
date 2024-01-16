@@ -588,23 +588,24 @@ async fn main() -> anyhow::Result<()> {
             .collect::<String>()
     );
 
-    let relevant_pubkeys = [market_configs.clone(), serum_market_configs.clone()]
+    let orderbook_pubkeys = [market_configs.clone(), serum_market_configs.clone()]
         .concat()
         .iter()
         .flat_map(|m| [m.1.bids, m.1.asks])
+        .unique()
         .collect_vec();
+    info!("{} orderbook pubkeys", orderbook_pubkeys.len());
+    let oracle_pubkeys = market_configs
+        .iter()
+        .map(|(_, mkt)| mkt.oracle)
+        .unique()
+        .collect_vec();
+    info!("{} oracle pubkeys", oracle_pubkeys.len());
+    let relevant_pubkeys = [orderbook_pubkeys, oracle_pubkeys]
+        .concat()
+        .to_vec();
     let filter_config = FilterConfig {
-        entity_filter: FilterByAccountIds(
-            [
-                relevant_pubkeys,
-                market_configs
-                    .iter()
-                    .map(|(_, mkt)| mkt.oracle)
-                    .collect_vec(),
-            ]
-            .concat()
-            .to_vec(),
-        ),
+        entity_filter: FilterByAccountIds(relevant_pubkeys),
     };
     let use_geyser = true;
     if use_geyser {

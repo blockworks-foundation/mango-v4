@@ -404,7 +404,7 @@ async fn main() -> anyhow::Result<()> {
             )
         })
         .collect();
-    info!("pmcs {:?}", perp_market_configs.clone());
+
     let spot_market_configs: Vec<(Pubkey, MarketConfig)> = group_context
         .serum3_markets
         .values()
@@ -456,7 +456,7 @@ async fn main() -> anyhow::Result<()> {
         .map(|context| (context.address.to_string(), context.name.clone()))
         .collect();
     let market_pubkey_strings: HashMap<String, String> = [b].concat().into_iter().collect();
-    //info!("a {:?} b {:?}", _a.clone(), b.clone());
+
     let postgres_update_sender = match config.postgres {
         Some(postgres_config) => Some(
             fill_event_postgres_target::init(&postgres_config, metrics_tx.clone(), exit.clone())
@@ -612,7 +612,7 @@ async fn main() -> anyhow::Result<()> {
     let use_geyser = true;
     let all_queue_pks = [perp_queue_pks.clone()].concat();
     let relevant_pubkeys = all_queue_pks.iter().map(|m| m.1).collect();
-    info!("{:?}", relevant_pubkeys);
+    info!("{} event queue pubkeys", relevant_pubkeys.len());
     let filter_config = FilterConfig {
         entity_filter: EntityFilter::FilterByAccountIds(relevant_pubkeys),
     };
