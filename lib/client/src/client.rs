@@ -102,7 +102,7 @@ pub struct ClientConfig {
 }
 
 pub struct Client {
-    pub config: ClientConfig,
+    config: ClientConfig,
     rpc_async: RpcClientAsync,
     override_send_transaction_rpc_asyncs: Option<Vec<RpcClientAsync>>,
 }
@@ -176,10 +176,15 @@ impl Client {
         }
     }
 
+    pub fn config(&self) -> &ClientConfig {
+        &self.config
+    }
+
     pub fn rpc_async(&self) -> &RpcClientAsync {
         &self.rpc_async
     }
 
+    /// Sometimes clients don't want to borrow the Client instance and just pass on RpcClientAsync
     pub fn new_rpc_async(&self) -> RpcClientAsync {
         let url = self.config.cluster.url().to_string();
         RpcClientAsync::new_with_timeout_and_commitment(
@@ -194,7 +199,7 @@ impl Client {
         &self,
         address: &Pubkey,
     ) -> anyhow::Result<T> {
-        fetch_anchor_account(&self.rpc_async(), address).await
+        fetch_anchor_account(self.rpc_async(), address).await
     }
 
     pub fn fee_payer(&self) -> Arc<Keypair> {
@@ -251,7 +256,7 @@ impl MangoClient {
         group: Pubkey,
         owner: &Keypair,
     ) -> anyhow::Result<Vec<(Pubkey, MangoAccountValue)>> {
-        fetch_mango_accounts(&client.new_rpc_async(), mango_v4::ID, group, owner.pubkey()).await
+        fetch_mango_accounts(client.rpc_async(), mango_v4::ID, group, owner.pubkey()).await
     }
 
     pub async fn find_or_create_account(
@@ -261,7 +266,7 @@ impl MangoClient {
         payer: Arc<Keypair>, // pays the SOL for the new account
         mango_account_name: &str,
     ) -> anyhow::Result<Pubkey> {
-        let rpc = client.new_rpc_async();
+        let rpc = client.rpc_async();
         let program = mango_v4::ID;
         let owner_pk = owner.pubkey();
 
@@ -374,7 +379,7 @@ impl MangoClient {
             );
         }
 
-        let rpc = client.new_rpc_async();
+        let rpc = client.rpc_async();
         let group_context = MangoGroupContext::new_from_rpc(&rpc, group).await?;
 
         Self::new_detail(client, account, owner, group_context, account_fetcher)
@@ -1780,7 +1785,7 @@ impl MangoClient {
         interval: Duration,
     ) {
         let mut delay = crate::delay_interval(interval);
-        let rpc_async = mango_client.client.new_rpc_async();
+        let rpc_async = mango_client.client.rpc_async();
         loop {
             delay.tick().await;
 
@@ -1926,7 +1931,7 @@ impl TransactionBuilder {
     // These two send() functions don't really belong into the transaction builder!
 
     pub async fn send(&self, client: &Client) -> anyhow::Result<Signature> {
-        let rpc = client.new_rpc_async();
+        let rpc = client.rpc_async();
         let tx = self.transaction(&rpc).await?;
         rpc.send_transaction_with_config(&tx, client.config.rpc_send_transaction_config)
             .await
@@ -1934,13 +1939,13 @@ impl TransactionBuilder {
     }
 
     pub async fn simulate(&self, client: &Client) -> anyhow::Result<SimulateTransactionResponse> {
-        let rpc = client.new_rpc_async();
+        let rpc = client.rpc_async();
         let tx = self.transaction(&rpc).await?;
         Ok(rpc.simulate_transaction(&tx).await?)
     }
 
     pub async fn send_and_confirm(&self, client: &Client) -> anyhow::Result<Signature> {
-        let rpc = client.new_rpc_async();
+        let rpc = client.rpc_async();
         let tx = self.transaction(&rpc).await?;
         let recent_blockhash = tx.message.recent_blockhash();
         let signature = rpc

@@ -194,7 +194,7 @@ impl<'a> JupiterV6<'a> {
                 ),
             ),
         ];
-        let config = &self.mango_client.client.config;
+        let config = self.mango_client.client.config();
         if !config.jupiter_token.is_empty() {
             query_args.push(("token", config.jupiter_token.clone()));
         }
@@ -267,7 +267,7 @@ impl<'a> JupiterV6<'a> {
             .context("building health accounts")?;
 
         let mut query_args = vec![];
-        let config = &self.mango_client.client.config;
+        let config = self.mango_client.client.config();
         if !config.jupiter_token.is_empty() {
             query_args.push(("token", config.jupiter_token.clone()));
         }
@@ -386,7 +386,7 @@ impl<'a> JupiterV6<'a> {
             address_lookup_tables,
             payer,
             signers: vec![self.mango_client.owner.clone()],
-            config: self.mango_client.client.config.transaction_builder_config,
+            config: self.mango_client.client.config().transaction_builder_config,
         })
     }
 

@@ -1168,7 +1168,7 @@ impl Context {
                 address_lookup_tables: vec![],
                 payer: fee_payer.pubkey(),
                 signers: vec![self.mango_client.owner.clone(), fee_payer],
-                config: self.mango_client.client.config.transaction_builder_config,
+                config: self.mango_client.client.config().transaction_builder_config,
             }
         };
 

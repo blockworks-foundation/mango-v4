@@ -109,7 +109,7 @@ impl<'a> JupiterV4<'a> {
             .http_client
             .get(format!(
                 "{}/quote",
-                self.mango_client.client.config.jupiter_v4_url
+                self.mango_client.client.config().jupiter_v4_url
             ))
             .query(&[
                 ("inputMint", input_mint.to_string()),
@@ -163,7 +163,7 @@ impl<'a> JupiterV4<'a> {
             .http_client
             .post(format!(
                 "{}/swap",
-                self.mango_client.client.config.jupiter_v4_url
+                self.mango_client.client.config().jupiter_v4_url
             ))
             .json(&SwapRequest {
                 route: route.clone(),
@@ -336,7 +336,7 @@ impl<'a> JupiterV4<'a> {
             address_lookup_tables,
             payer,
             signers: vec![self.mango_client.owner.clone()],
-            config: self.mango_client.client.config.transaction_builder_config,
+            config: self.mango_client.client.config().transaction_builder_config,
         })
     }
 

@@ -120,8 +120,7 @@ async fn main() -> anyhow::Result<()> {
         .await?;
     let mango_group = mango_account.fixed.group;
 
-    let group_context =
-        MangoGroupContext::new_from_rpc(&client.new_rpc_async(), mango_group).await?;
+    let group_context = MangoGroupContext::new_from_rpc(client.rpc_async(), mango_group).await?;
 
     let mango_oracles = group_context
         .tokens

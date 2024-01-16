@@ -238,8 +238,7 @@ async fn main() -> anyhow::Result<()> {
         warn!("rebalancing on delegated accounts will be unable to free token positions reliably, withdraw dust manually");
     }
 
-    let group_context =
-        MangoGroupContext::new_from_rpc(&client.new_rpc_async(), mango_group).await?;
+    let group_context = MangoGroupContext::new_from_rpc(client.rpc_async(), mango_group).await?;
 
     let mango_oracles = group_context
         .tokens
