@@ -78,7 +78,7 @@ async fn main() -> anyhow::Result<()> {
     );
     let group_pk = Pubkey::from_str(&config.mango_group).unwrap();
     let group_context =
-        Arc::new(MangoGroupContext::new_from_rpc(&client.rpc_async(), group_pk).await?);
+        Arc::new(MangoGroupContext::new_from_rpc(&client.new_rpc_async(), group_pk).await?);
 
     let perp_queue_pks: Vec<_> = group_context
         .perp_markets
@@ -94,7 +94,7 @@ async fn main() -> anyhow::Result<()> {
         .collect();
 
     let serum_market_ais = client
-        .rpc_async()
+        .new_rpc_async()
         .get_multiple_accounts(serum_market_pks.as_slice())
         .await?;
 

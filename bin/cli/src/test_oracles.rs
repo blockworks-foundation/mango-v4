@@ -9,7 +9,7 @@ use solana_sdk::pubkey::Pubkey;
 use tracing::*;
 
 pub async fn run(client: &Client, group: Pubkey) -> anyhow::Result<()> {
-    let rpc_async = client.rpc_async();
+    let rpc_async = client.new_rpc_async();
     let context = MangoGroupContext::new_from_rpc(&rpc_async, group).await?;
     let oracles = context
         .tokens

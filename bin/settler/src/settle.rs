@@ -199,7 +199,7 @@ impl SettlementState {
                 max_batch_size: 8, // the 1.4M max CU limit if we assume settle ix can be up to around 150k
                 blockhash: mango_client
                     .client
-                    .rpc_async()
+                    .new_rpc_async()
                     .get_latest_blockhash_with_commitment(CommitmentConfig::confirmed())
                     .await?
                     .0,
@@ -273,7 +273,7 @@ impl<'a> SettleBatchProcessor<'a> {
             address_lookup_tables: self.address_lookup_tables.clone(),
             payer: fee_payer.pubkey(),
             signers: vec![fee_payer],
-            config: client.transaction_builder_config,
+            config: client.config.transaction_builder_config,
         }
         .transaction_with_blockhash(self.blockhash)
     }
@@ -289,8 +289,11 @@ impl<'a> SettleBatchProcessor<'a> {
         let send_result = self
             .mango_client
             .client
-            .rpc_async()
-            .send_transaction_with_config(&tx, self.mango_client.client.rpc_send_transaction_config)
+            .new_rpc_async()
+            .send_transaction_with_config(
+                &tx,
+                self.mango_client.client.config.rpc_send_transaction_config,
+            )
             .await
             .map_err(prettify_solana_client_error);
 
