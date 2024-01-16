@@ -32,6 +32,14 @@ export interface AccountEquity {
   Equity: { val: number; highlight: boolean };
 }
 
+export interface LiquidationBatches {
+  start: number;
+  startAssets: number;
+  prev: number;
+  prevAssets: number;
+  largestBatchQuoteUi: number;
+}
+
 export interface Risk {
   assetRally: { title: string; data: LiqorPriceImpact[] };
   assetDrop: { title: string; data: LiqorPriceImpact[] };
@@ -397,6 +405,165 @@ export async function getEquityForMangoAccounts(
   });
   accountsWithEquity.sort((a, b) => b.Equity.val - a.Equity.val);
   return accountsWithEquity;
+}
+
+export function findLargestAssetBatchUi(
+  pisForLiqor: LiqorPriceImpact[][],
+  coin: string,
+  startFromChange = 99,
+  maxChange = 1,
+  stepSize = 1,
+): [number, number, LiquidationBatches[]] {
+  let start = startFromChange;
+  let largestBatchUi = 0;
+  let largestBatchQuoteUi = 0;
+
+  console.log(`___`);
+  console.log(
+    `${'start'.padStart(3)}: ${'liq$'.padStart(10)}, ${`prev`.padStart(
+      3,
+    )}: ${'liq'.padStart(10)}, ${'largestBatchUi $'.padStart(15)}`,
+  );
+
+  const liquidationBatches: LiquidationBatches[] = [];
+
+  while (start > 0) {
+    const piForLiqor = pisForLiqor[start].filter(
+      (pi) => pi.Coin.val == coin,
+    )[0];
+
+    // Compare entry to another entry, with max change difference
+    const prev = Math.min(99, start + Math.round(start / maxChange));
+    const prevPiForLiqor = pisForLiqor[prev].filter(
+      (pi) => pi.Coin.val == coin,
+    )[0];
+
+    // Note: Assets.val is asset in $ amount that would need to be liquidated when price drops to a certain point
+    const changeQuoteUi = piForLiqor.Assets.val - prevPiForLiqor.Assets.val;
+    const changeUi =
+      piForLiqor.Assets.val / piForLiqor['Future Price'].val -
+      prevPiForLiqor.Assets.val / prevPiForLiqor['Future Price'].val;
+
+    console.log(
+      `${start.toString().padStart(3)}: ${piForLiqor.Assets.val
+        .toLocaleString()
+        .padStart(10)}, ${prev
+        .toString()
+        .padStart(3)}: ${prevPiForLiqor.Assets.val
+        .toLocaleString()
+        .padStart(10)}, ${largestBatchQuoteUi.toLocaleString().padStart(15)}`,
+    );
+
+    liquidationBatches.push({
+      start: start,
+      startAssets: piForLiqor.Assets.val,
+      prev: prev,
+      prevAssets: prevPiForLiqor.Assets.val,
+      largestBatchQuoteUi: largestBatchQuoteUi,
+    });
+
+    if (changeQuoteUi > largestBatchQuoteUi) {
+      largestBatchUi = changeUi;
+      largestBatchQuoteUi = changeQuoteUi;
+    }
+
+    start -= stepSize;
+  }
+  console.log(`___`);
+
+  return [largestBatchQuoteUi, largestBatchUi, liquidationBatches];
+}
+
+export async function buildGroupGrid(
+  group: Group,
+  allMangoAccounts,
+  stepSize = 1,
+): Promise<LiqorPriceImpact[][]> {
+  const mangoAccountsSubset = allMangoAccounts.filter(
+    (a) => toUiDecimalsForQuote(a.getEquity(group)) > 100,
+  );
+
+  {
+    let pis;
+    try {
+      pis = await (
+        await (
+          await buildFetch()
+        )(
+          `https://api.mngo.cloud/data/v4/risk/listed-tokens-one-week-price-impacts`,
+          {
+            mode: 'cors',
+            headers: {
+              'Content-Type': 'application/json',
+              'Access-Control-Allow-Origin': '*',
+            },
+          },
+        )
+      ).json();
+    } catch (error) {
+      pis = [];
+    }
+
+    // Build groups where price has changed from 0 to -99% for each (non stable coin) assets simultaneously
+    const groups = new Array(200);
+    let change = stepSize;
+    while (change < 101) {
+      groups[change] = copy(group);
+      const groupToModify: Group = groups[change.toString()];
+      const change_ = change / 100;
+      Array.from(groupToModify.banksMapByTokenIndex.values())
+        .flat()
+        .filter((b) => !b.name.includes('USD'))
+        .forEach((b) => {
+          b['oldUiPrice'] = b._uiPrice;
+          b._uiPrice = b._uiPrice! * change_;
+          b._price = b._price?.mul(I80F48.fromNumber(change_));
+        });
+      Array.from(groupToModify.perpMarketsMapByMarketIndex.values()).forEach(
+        (p) => {
+          p['oldUiPrice'] = p._uiPrice;
+          p._uiPrice = p._uiPrice! * change_;
+          p._price = p._price?.mul(I80F48.fromNumber(change_));
+        },
+      );
+      change += stepSize;
+    }
+
+    // Compute how much of an asset would need to be liquidated
+    // when group (i.e. asset prices) reach a specific state
+    return await Promise.all(
+      groups.map((g) => getPriceImpactForLiqor(g, pis, mangoAccountsSubset)),
+    );
+  }
+}
+
+export async function getLiquidationBatches(
+  client: MangoClient,
+  group: Group,
+): Promise<{ token: TokenIndex; liquidationPoints: LiquidationBatches[] }[]> {
+  const allMangoAccounts = await client.getAllMangoAccounts(group, true);
+  const stepSize = 1;
+  const pisForLiqor: LiqorPriceImpact[][] = await buildGroupGrid(
+    group,
+    allMangoAccounts,
+    stepSize,
+  );
+
+  const r = Array.from(group.banksMapByTokenIndex.values())
+    .map((banks) => banks[0])
+    .map((bank) => {
+      return {
+        token: bank.tokenIndex,
+        liquidationPoints: findLargestAssetBatchUi(
+          pisForLiqor,
+          bank.name,
+          Math.round(bank.maintAssetWeight.toNumber() * 100),
+          100 - Math.round(bank.maintAssetWeight.toNumber() * 100),
+          stepSize,
+        )[2],
+      };
+    });
+  return r;
 }
 
 export async function getRiskStats(

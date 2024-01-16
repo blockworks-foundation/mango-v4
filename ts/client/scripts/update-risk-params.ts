@@ -9,7 +9,6 @@ import {
   getTokenOwnerRecord,
   getTokenOwnerRecordAddress,
 } from '@solana/spl-governance';
-import cloneDeep from 'lodash/cloneDeep';
 
 import {
   AccountMeta,
@@ -27,11 +26,11 @@ import { Builder } from '../src/builder';
 import { MangoClient } from '../src/client';
 import { NullTokenEditParams } from '../src/clientIxParamBuilder';
 import { MANGO_V4_MAIN_GROUP as MANGO_V4_PRIMARY_GROUP } from '../src/constants';
-import { I80F48 } from '../src/numbers/I80F48';
 import {
   LiqorPriceImpact,
+  buildGroupGrid,
+  findLargestAssetBatchUi,
   getEquityForMangoAccounts,
-  getPriceImpactForLiqor,
 } from '../src/risk';
 import {
   buildFetch,
@@ -136,63 +135,6 @@ function getPriceImpactForBank(
   return priceImpact;
 }
 
-function findLargestAssetBatchUi(
-  pisForLiqor: LiqorPriceImpact[][],
-  coin: string,
-  startFromChange = 99,
-  maxChange = 1,
-  stepSize = 1,
-): number[] {
-  let start = startFromChange;
-  let largestBatchUi = 0;
-  let largestBatchQuoteUi = 0;
-
-  // console.log(`___`);
-  // console.log(
-  //   `${'start'.padStart(3)}: ${'liq$'.padStart(10)}, ${`prev`.padStart(
-  //     3,
-  //   )}: ${'liq'.padStart(10)}, ${'largestBatchUi $'.padStart(15)}`,
-  // );
-
-  while (start > 0) {
-    const piForLiqor = pisForLiqor[start].filter(
-      (pi) => pi.Coin.val == coin,
-    )[0];
-
-    // Compare entry to another entry, with max change difference
-    const prev = Math.min(99, start + Math.round(start / maxChange));
-    const prevPiForLiqor = pisForLiqor[prev].filter(
-      (pi) => pi.Coin.val == coin,
-    )[0];
-
-    // Note: Assets.val is asset in $ amount that would need to be liquidated when price drops to a certain point
-    const changeQuoteUi = piForLiqor.Assets.val - prevPiForLiqor.Assets.val;
-    const changeUi =
-      piForLiqor.Assets.val / piForLiqor['Future Price'].val -
-      prevPiForLiqor.Assets.val / prevPiForLiqor['Future Price'].val;
-
-    // console.log(
-    //   `${start.toString().padStart(3)}: ${piForLiqor.Assets.val
-    //     .toLocaleString()
-    //     .padStart(10)}, ${prev
-    //     .toString()
-    //     .padStart(3)}: ${prevPiForLiqor.Assets.val
-    //     .toLocaleString()
-    //     .padStart(10)}, ${largestBatchQuoteUi.toLocaleString().padStart(15)}`,
-    // );
-
-    if (changeQuoteUi > largestBatchQuoteUi) {
-      largestBatchUi = changeUi;
-      largestBatchQuoteUi = changeQuoteUi;
-    }
-
-    start -= stepSize;
-  }
-  // console.log(`___`);
-
-  return [largestBatchQuoteUi, largestBatchUi];
-}
-
 async function updateTokenParams(): Promise<void> {
   const [client, wallet] = await Promise.all([buildClient(), setupWallet()]);
   const vsrClient = await setupVsr(client.connection, wallet);
@@ -201,76 +143,23 @@ async function updateTokenParams(): Promise<void> {
 
   const instructions: TransactionInstruction[] = [];
 
-  const mangoAccounts = await client.getAllMangoAccounts(group, true);
-  const mangoAccountsSubset = mangoAccounts.filter(
-    (a) => toUiDecimalsForQuote(a.getEquity(group)) > 100,
-  );
+  const allMangoAccounts = await client.getAllMangoAccounts(group, true);
 
   const stepSize = 1;
 
   const ttlLiqorEquityUi = await getTotalLiqorEquity(
     client,
     group,
-    mangoAccounts,
+    allMangoAccounts,
   );
 
   const midPriceImpacts = getMidPriceImpacts(group.pis);
 
-  let groups: Group[];
-  let pisForLiqor: LiqorPriceImpact[][];
-
-  {
-    let pis;
-    try {
-      pis = await (
-        await (
-          await buildFetch()
-        )(
-          `https://api.mngo.cloud/data/v4/risk/listed-tokens-one-week-price-impacts`,
-          {
-            mode: 'cors',
-            headers: {
-              'Content-Type': 'application/json',
-              'Access-Control-Allow-Origin': '*',
-            },
-          },
-        )
-      ).json();
-    } catch (error) {
-      pis = [];
-    }
-
-    // Build groups where price has changed from 0 to -99% for each (non stable coin) assets simultaneously
-    const groups = new Array(200);
-    let change = stepSize;
-    while (change < 101) {
-      groups[change] = cloneDeep(group);
-      const groupToModify: Group = groups[change.toString()];
-      const change_ = change / 100;
-      Array.from(groupToModify.banksMapByTokenIndex.values())
-        .flat()
-        .filter((b) => !b.name.includes('USD'))
-        .forEach((b) => {
-          b['oldUiPrice'] = b._uiPrice;
-          b._uiPrice = b._uiPrice! * change_;
-          b._price = b._price?.mul(I80F48.fromNumber(change_));
-        });
-      Array.from(groupToModify.perpMarketsMapByMarketIndex.values()).forEach(
-        (p) => {
-          p['oldUiPrice'] = p._uiPrice;
-          p._uiPrice = p._uiPrice! * change_;
-          p._price = p._price?.mul(I80F48.fromNumber(change_));
-        },
-      );
-      change += stepSize;
-    }
-
-    // Compute how much of an asset would need to be liquidated
-    // when group (i.e. asset prices) reach a specific state
-    pisForLiqor = await Promise.all(
-      groups.map((g) => getPriceImpactForLiqor(g, pis, mangoAccountsSubset)),
-    );
-  }
+  const pisForLiqor: LiqorPriceImpact[][] = await buildGroupGrid(
+    group,
+    allMangoAccounts,
+    stepSize,
+  );
 
   // Deposit limits header
   console.log(
