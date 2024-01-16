@@ -2,7 +2,7 @@ import { AnchorProvider, Wallet } from '@coral-xyz/anchor';
 import { Connection, Keypair, PublicKey } from '@solana/web3.js';
 import { MangoClient } from '../src/client';
 import { MANGO_V4_ID } from '../src/constants';
-import { getLiquidationBatches } from '../src/risk';
+import { getLiquidationBatches, getRiskStats } from '../src/risk';
 
 const { MB_CLUSTER_URL } = process.env;
 
