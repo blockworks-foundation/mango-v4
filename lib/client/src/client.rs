@@ -103,6 +103,8 @@ pub struct ClientConfig {
 
 pub struct Client {
     pub config: ClientConfig,
+    rpc_async: RpcClientAsync,
+    override_send_transaction_rpc_asyncs: Option<Vec<RpcClientAsync>>,
 }
 
 impl ClientBuilder {
@@ -150,7 +152,32 @@ impl Client {
     }
 
     pub fn new_from_config(config: ClientConfig) -> Self {
-        Self { config }
+        Self {
+            rpc_async: RpcClientAsync::new_with_timeout_and_commitment(
+                config.cluster.url().to_string(),
+                config.timeout,
+                config.commitment,
+            ),
+            override_send_transaction_rpc_asyncs: config
+                .override_send_transaction_urls
+                .as_ref()
+                .map(|urls| {
+                    urls.iter()
+                        .map(|url| {
+                            RpcClientAsync::new_with_timeout_and_commitment(
+                                url.clone(),
+                                config.timeout,
+                                config.commitment,
+                            )
+                        })
+                        .collect_vec()
+                }),
+            config,
+        }
+    }
+
+    pub fn rpc_async(&self) -> &RpcClientAsync {
+        &self.rpc_async
     }
 
     pub fn new_rpc_async(&self) -> RpcClientAsync {
@@ -167,7 +194,7 @@ impl Client {
         &self,
         address: &Pubkey,
     ) -> anyhow::Result<T> {
-        fetch_anchor_account(&self.new_rpc_async(), address).await
+        fetch_anchor_account(&self.rpc_async(), address).await
     }
 
     pub fn fee_payer(&self) -> Arc<Keypair> {
@@ -182,7 +209,7 @@ impl Client {
         &self,
         tx: &impl SerializableTransaction,
     ) -> anyhow::Result<Signature> {
-        let rpc = self.new_rpc_async();
+        let rpc = self.rpc_async();
         rpc.send_transaction_with_config(tx, self.config.rpc_send_transaction_config)
             .await
             .map_err(prettify_solana_client_error)
