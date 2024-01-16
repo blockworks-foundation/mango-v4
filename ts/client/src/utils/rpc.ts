@@ -19,6 +19,8 @@ import {
 } from '@solana/web3.js';
 import { COMPUTE_BUDGET_PROGRAM_ID } from '../constants';
 import { TxCallbackOptions } from '../client';
+import { awaitTransactionSignatureConfirmation } from '@blockworks-foundation/mangolana/lib/transactions';
+import { tryStringify } from '../utils';
 
 export interface MangoSignatureStatus {
   confirmations?: number | null;
@@ -145,7 +147,6 @@ export async function sendTransaction(
       console.warn(`postSendTxCallback error ${e}`);
     }
   }
-
   if (!opts.confirmInBackground) {
     return await confirmTransaction(
       connection,
@@ -165,45 +166,96 @@ const confirmTransaction = async (
   latestBlockhash: Readonly<LatestBlockhash>,
   signature: string,
 ): Promise<MangoSignatureStatus> => {
-  const txConfirmationCommitment = opts.txConfirmationCommitment ?? 'processed';
   let status: RpcResponseAndContext<SignatureResult>;
-  if (
-    latestBlockhash.blockhash != null &&
-    latestBlockhash.lastValidBlockHeight != null
-  ) {
-    status = await connection.confirmTransaction(
-      {
-        signature: signature,
-        blockhash: latestBlockhash.blockhash,
-        lastValidBlockHeight: latestBlockhash.lastValidBlockHeight,
-      },
-      txConfirmationCommitment,
-    );
-  } else {
-    status = await connection.confirmTransaction(
-      signature,
-      txConfirmationCommitment,
-    );
+  const allConnections = [connection];
+  if (opts.multipleConnections && opts.multipleConnections.length) {
+    allConnections.push(...opts.multipleConnections);
   }
-  const signatureResult = status.value;
-  if (signatureResult.err) {
-    console.warn('Tx status: ', status);
+  const abortController = new AbortController();
+  try {
+    if (
+      latestBlockhash.blockhash != null &&
+      latestBlockhash.lastValidBlockHeight != null
+    ) {
+      status = await Promise.any(
+        allConnections.map((c) =>
+          awaitTransactionSignatureConfirmation({
+            txid: signature,
+            confirmLevel: 'processed',
+            connection: c,
+            timeoutStrategy: {
+              block: latestBlockhash,
+            },
+            abortSignal: abortController.signal,
+          }),
+        ),
+      );
+    } else {
+      status = await Promise.any(
+        allConnections.map((c) =>
+          awaitTransactionSignatureConfirmation({
+            txid: signature,
+            confirmLevel: 'processed',
+            connection: c,
+            timeoutStrategy: {
+              timeout: 90,
+            },
+            abortSignal: abortController.signal,
+          }),
+        ),
+      );
+    }
+    abortController.abort();
+
+    const signatureResult = status.value;
+    if (signatureResult.err) {
+      console.warn('Tx status: ', status);
+      throw new MangoError({
+        txid: signature,
+        message: `${JSON.stringify(status)}`,
+      });
+    }
+    if (opts.postTxConfirmationCallback) {
+      try {
+        opts.postTxConfirmationCallback({
+          txid: signature,
+          txSignatureBlockHash: latestBlockhash,
+        });
+      } catch (e) {
+        console.warn(`postTxConfirmationCallback error ${e}`);
+      }
+    }
+    return { signature, slot: status.context.slot, ...signatureResult };
+  } catch (e) {
+    abortController.abort();
+    if (e instanceof AggregateError) {
+      for (const individualError of e.errors) {
+        const stringifiedError = tryStringify(individualError);
+        throw new MangoError({
+          txid: signature,
+          message: `${
+            stringifiedError
+              ? stringifiedError
+              : individualError
+              ? individualError
+              : 'Unknown error'
+          }`,
+        });
+      }
+    }
+    if (isErrorWithSignatureResult(e)) {
+      const stringifiedError = tryStringify(e?.value?.err);
+      throw new MangoError({
+        txid: signature,
+        message: `${stringifiedError ? stringifiedError : e?.value?.err}`,
+      });
+    }
+    const stringifiedError = tryStringify(e);
     throw new MangoError({
       txid: signature,
-      message: `${JSON.stringify(status)}`,
+      message: `${stringifiedError ? stringifiedError : e}`,
     });
   }
-  if (opts.postTxConfirmationCallback) {
-    try {
-      opts.postTxConfirmationCallback({
-        txid: signature,
-        txSignatureBlockHash: latestBlockhash,
-      });
-    } catch (e) {
-      console.warn(`postTxConfirmationCallback error ${e}`);
-    }
-  }
-  return { signature, slot: status.context.slot, ...signatureResult };
 };
 
 export async function fetchLatestBlockHash(
@@ -244,4 +296,10 @@ export class MangoError extends Error {
     this.message = message;
     this.txid = txid;
   }
+}
+
+function isErrorWithSignatureResult(
+  err: any,
+): err is RpcResponseAndContext<SignatureResult> {
+  return err && typeof err.value !== 'undefined';
 }

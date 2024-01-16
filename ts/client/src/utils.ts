@@ -251,3 +251,11 @@ export function deepClone<T>(obj: T, hash = new WeakMap()): T {
 
   return result;
 }
+
+export const tryStringify = (val: any): string | null => {
+  try {
+    return JSON.stringify(val);
+  } catch (e) {
+    return null;
+  }
+};
