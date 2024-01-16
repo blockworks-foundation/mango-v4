@@ -282,9 +282,9 @@ dependencies = [
  "futures 0.3.30",
  "regex",
  "serde",
- "solana-account-decoder 1.16.17 (registry+https://github.com/rust-lang/crates.io-index)",
- "solana-client 1.16.17 (registry+https://github.com/rust-lang/crates.io-index)",
- "solana-sdk 1.16.17 (registry+https://github.com/rust-lang/crates.io-index)",
+ "solana-account-decoder",
+ "solana-client",
+ "solana-sdk",
  "thiserror",
  "tokio",
  "url 2.5.0",
@@ -369,7 +369,7 @@ dependencies = [
  "borsh 0.10.3",
  "bytemuck",
  "getrandom 0.2.12",
- "solana-program 1.16.17 (registry+https://github.com/rust-lang/crates.io-index)",
+ "solana-program",
  "thiserror",
 ]
 
@@ -394,7 +394,7 @@ dependencies = [
  "borsh 0.10.3",
  "bytemuck",
  "getrandom 0.2.12",
- "solana-program 1.16.17 (registry+https://github.com/rust-lang/crates.io-index)",
+ "solana-program",
  "thiserror",
 ]
 
@@ -405,7 +405,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "78f860599da1c2354e7234c768783049eb42e2f54509ecfc942d2e0076a2da7b"
 dependencies = [
  "anchor-lang 0.28.0",
- "solana-program 1.16.17 (registry+https://github.com/rust-lang/crates.io-index)",
+ "solana-program",
  "spl-associated-token-account 1.1.3",
  "spl-token 3.5.0",
  "spl-token-2022 0.6.1",
@@ -419,7 +419,7 @@ checksum = "6c4fd6e43b2ca6220d2ef1641539e678bfc31b6cc393cf892b373b5997b6a39a"
 dependencies = [
  "anchor-lang 0.29.0",
  "mpl-token-metadata 3.2.3",
- "solana-program 1.16.17 (registry+https://github.com/rust-lang/crates.io-index)",
+ "solana-program",
  "spl-associated-token-account 2.2.0",
  "spl-token 4.0.0",
  "spl-token-2022 0.9.0",
@@ -3545,10 +3545,10 @@ dependencies = [
  "serde",
  "serde_derive",
  "serde_json",
- "solana-account-decoder 1.16.17 (registry+https://github.com/rust-lang/crates.io-index)",
- "solana-client 1.16.17 (registry+https://github.com/rust-lang/crates.io-index)",
- "solana-logger 1.16.17 (registry+https://github.com/rust-lang/crates.io-index)",
- "solana-sdk 1.16.17 (registry+https://github.com/rust-lang/crates.io-index)",
+ "solana-account-decoder",
+ "solana-client",
+ "solana-logger",
+ "solana-sdk",
  "tokio",
  "warp",
  "yellowstone-grpc-client",
@@ -3576,9 +3576,9 @@ dependencies = [
  "serde",
  "serde_derive",
  "serde_json",
- "solana-account-decoder 1.16.17 (registry+https://github.com/rust-lang/crates.io-index)",
- "solana-client 1.16.17 (registry+https://github.com/rust-lang/crates.io-index)",
- "solana-sdk 1.16.17 (registry+https://github.com/rust-lang/crates.io-index)",
+ "solana-account-decoder",
+ "solana-client",
+ "solana-sdk",
  "tonic-build 0.6.2",
 ]
 
@@ -3609,11 +3609,11 @@ dependencies = [
  "regex",
  "serde",
  "serum_dex 0.5.10 (git+https://github.com/openbook-dex/program.git)",
- "solana-address-lookup-table-program 1.16.17 (git+https://github.com/blockworks-foundation/solana.git?branch=pan/v1.16.17-upgrade-tokio)",
- "solana-logger 1.16.17 (git+https://github.com/blockworks-foundation/solana.git?branch=pan/v1.16.17-upgrade-tokio)",
- "solana-program 1.16.17 (git+https://github.com/blockworks-foundation/solana.git?branch=pan/v1.16.17-upgrade-tokio)",
+ "solana-address-lookup-table-program",
+ "solana-logger",
+ "solana-program",
  "solana-program-test",
- "solana-sdk 1.16.17 (git+https://github.com/blockworks-foundation/solana.git?branch=pan/v1.16.17-upgrade-tokio)",
+ "solana-sdk",
  "solana-security-txt",
  "spl-associated-token-account 1.1.3",
  "spl-token 3.5.0",
@@ -3642,8 +3642,8 @@ dependencies = [
  "pyth-sdk-solana",
  "serde_json",
  "serum_dex 0.5.10 (git+https://github.com/openbook-dex/program.git)",
- "solana-client 1.16.17 (git+https://github.com/blockworks-foundation/solana.git?branch=pan/v1.16.17-upgrade-tokio)",
- "solana-sdk 1.16.17 (git+https://github.com/blockworks-foundation/solana.git?branch=pan/v1.16.17-upgrade-tokio)",
+ "solana-client",
+ "solana-sdk",
  "tokio",
  "tracing",
 ]
@@ -3676,11 +3676,11 @@ dependencies = [
  "serde_json",
  "serum_dex 0.5.10 (git+https://github.com/openbook-dex/program.git)",
  "shellexpand",
- "solana-account-decoder 1.16.17 (git+https://github.com/blockworks-foundation/solana.git?branch=pan/v1.16.17-upgrade-tokio)",
- "solana-address-lookup-table-program 1.16.17 (git+https://github.com/blockworks-foundation/solana.git?branch=pan/v1.16.17-upgrade-tokio)",
- "solana-client 1.16.17 (git+https://github.com/blockworks-foundation/solana.git?branch=pan/v1.16.17-upgrade-tokio)",
+ "solana-account-decoder",
+ "solana-address-lookup-table-program",
+ "solana-client",
  "solana-rpc",
- "solana-sdk 1.16.17 (git+https://github.com/blockworks-foundation/solana.git?branch=pan/v1.16.17-upgrade-tokio)",
+ "solana-sdk",
  "spl-associated-token-account 1.1.3",
  "thiserror",
  "tokio",
@@ -3708,8 +3708,8 @@ dependencies = [
  "prometheus",
  "pyth-sdk-solana",
  "serum_dex 0.5.10 (git+https://github.com/openbook-dex/program.git)",
- "solana-client 1.16.17 (git+https://github.com/blockworks-foundation/solana.git?branch=pan/v1.16.17-upgrade-tokio)",
- "solana-sdk 1.16.17 (git+https://github.com/blockworks-foundation/solana.git?branch=pan/v1.16.17-upgrade-tokio)",
+ "solana-client",
+ "solana-sdk",
  "tokio",
  "tracing",
  "warp",
@@ -3750,11 +3750,11 @@ dependencies = [
  "serde_json",
  "serum_dex 0.5.10 (git+https://github.com/openbook-dex/program.git)",
  "shellexpand",
- "solana-account-decoder 1.16.17 (git+https://github.com/blockworks-foundation/solana.git?branch=pan/v1.16.17-upgrade-tokio)",
- "solana-client 1.16.17 (git+https://github.com/blockworks-foundation/solana.git?branch=pan/v1.16.17-upgrade-tokio)",
- "solana-logger 1.16.17 (git+https://github.com/blockworks-foundation/solana.git?branch=pan/v1.16.17-upgrade-tokio)",
+ "solana-account-decoder",
+ "solana-client",
+ "solana-logger",
  "solana-rpc",
- "solana-sdk 1.16.17 (git+https://github.com/blockworks-foundation/solana.git?branch=pan/v1.16.17-upgrade-tokio)",
+ "solana-sdk",
  "tokio",
  "tokio-stream",
  "tokio-tungstenite 0.16.1",
@@ -3797,11 +3797,11 @@ dependencies = [
  "serde_json",
  "serum_dex 0.5.10 (git+https://github.com/openbook-dex/program.git)",
  "shellexpand",
- "solana-account-decoder 1.16.17 (git+https://github.com/blockworks-foundation/solana.git?branch=pan/v1.16.17-upgrade-tokio)",
- "solana-client 1.16.17 (git+https://github.com/blockworks-foundation/solana.git?branch=pan/v1.16.17-upgrade-tokio)",
- "solana-logger 1.16.17 (git+https://github.com/blockworks-foundation/solana.git?branch=pan/v1.16.17-upgrade-tokio)",
+ "solana-account-decoder",
+ "solana-client",
+ "solana-logger",
  "solana-rpc",
- "solana-sdk 1.16.17 (git+https://github.com/blockworks-foundation/solana.git?branch=pan/v1.16.17-upgrade-tokio)",
+ "solana-sdk",
  "tokio",
  "tokio-stream",
  "tokio-tungstenite 0.16.1",
@@ -4029,7 +4029,7 @@ dependencies = [
  "rmp-serde",
  "serde",
  "shank",
- "solana-program 1.16.17 (registry+https://github.com/rust-lang/crates.io-index)",
+ "solana-program",
  "solana-zk-token-sdk 1.16.17 (registry+https://github.com/rust-lang/crates.io-index)",
  "thiserror",
 ]
@@ -4048,7 +4048,7 @@ dependencies = [
  "num-derive 0.3.3",
  "num-traits",
  "shank",
- "solana-program 1.16.17 (registry+https://github.com/rust-lang/crates.io-index)",
+ "solana-program",
  "spl-associated-token-account 2.2.0",
  "spl-token 4.0.0",
  "thiserror",
@@ -4063,7 +4063,7 @@ dependencies = [
  "borsh 0.10.3",
  "num-derive 0.3.3",
  "num-traits",
- "solana-program 1.16.17 (registry+https://github.com/rust-lang/crates.io-index)",
+ "solana-program",
  "thiserror",
 ]
 
@@ -4094,7 +4094,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3f2e4f92aec317d5853c0cc4c03c55f5178511c45bb3dbb441aea63117bf3dc9"
 dependencies = [
  "arrayref",
- "solana-program 1.16.17 (registry+https://github.com/rust-lang/crates.io-index)",
+ "solana-program",
  "spl-token-2022 0.6.1",
 ]
 
@@ -4471,7 +4471,7 @@ dependencies = [
  "num_enum 0.5.11",
  "pyth-sdk-solana",
  "raydium-amm-v3",
- "solana-program 1.16.17 (registry+https://github.com/rust-lang/crates.io-index)",
+ "solana-program",
  "solana-security-txt",
  "static_assertions",
  "switchboard-program",
@@ -5240,7 +5240,7 @@ dependencies = [
  "num-traits",
  "pyth-sdk",
  "serde",
- "solana-program 1.16.17 (registry+https://github.com/rust-lang/crates.io-index)",
+ "solana-program",
  "thiserror",
 ]
 
@@ -5526,7 +5526,7 @@ dependencies = [
  "arrayref",
  "bytemuck",
  "mpl-token-metadata 1.13.2",
- "solana-program 1.16.17 (registry+https://github.com/rust-lang/crates.io-index)",
+ "solana-program",
  "spl-memo 4.0.0",
  "uint",
 ]
@@ -6198,7 +6198,7 @@ dependencies = [
  "num_enum 0.5.11",
  "safe-transmute",
  "serde",
- "solana-program 1.16.17 (registry+https://github.com/rust-lang/crates.io-index)",
+ "solana-program",
  "solana-security-txt",
  "spl-token 3.5.0",
  "static_assertions",
@@ -6224,7 +6224,7 @@ dependencies = [
  "num_enum 0.5.11",
  "safe-transmute",
  "serde",
- "solana-program 1.16.17 (registry+https://github.com/rust-lang/crates.io-index)",
+ "solana-program",
  "solana-security-txt",
  "spl-token 3.5.0",
  "static_assertions",
@@ -6255,9 +6255,9 @@ dependencies = [
  "serde_derive",
  "serde_json",
  "serum_dex 0.5.10 (git+https://github.com/openbook-dex/program.git)",
- "solana-client 1.16.17 (git+https://github.com/blockworks-foundation/solana.git?branch=pan/v1.16.17-upgrade-tokio)",
- "solana-logger 1.16.17 (git+https://github.com/blockworks-foundation/solana.git?branch=pan/v1.16.17-upgrade-tokio)",
- "solana-sdk 1.16.17 (git+https://github.com/blockworks-foundation/solana.git?branch=pan/v1.16.17-upgrade-tokio)",
+ "solana-client",
+ "solana-logger",
+ "solana-sdk",
  "tokio",
  "tokio-tungstenite 0.17.2",
  "toml",
@@ -6297,9 +6297,9 @@ dependencies = [
  "serde_derive",
  "serde_json",
  "serum_dex 0.5.10 (git+https://github.com/openbook-dex/program.git)",
- "solana-client 1.16.17 (git+https://github.com/blockworks-foundation/solana.git?branch=pan/v1.16.17-upgrade-tokio)",
- "solana-logger 1.16.17 (git+https://github.com/blockworks-foundation/solana.git?branch=pan/v1.16.17-upgrade-tokio)",
- "solana-sdk 1.16.17 (git+https://github.com/blockworks-foundation/solana.git?branch=pan/v1.16.17-upgrade-tokio)",
+ "solana-client",
+ "solana-logger",
+ "solana-sdk",
  "tokio",
  "tokio-postgres",
  "tokio-postgres-rustls",
@@ -6332,9 +6332,9 @@ dependencies = [
  "serde_derive",
  "serde_json",
  "serum_dex 0.5.10 (git+https://github.com/grooviegermanikus/program.git?branch=groovie/v0.5.10-updates-expose-things)",
- "solana-client 1.16.17 (git+https://github.com/blockworks-foundation/solana.git?branch=pan/v1.16.17-upgrade-tokio)",
- "solana-logger 1.16.17 (git+https://github.com/blockworks-foundation/solana.git?branch=pan/v1.16.17-upgrade-tokio)",
- "solana-sdk 1.16.17 (git+https://github.com/blockworks-foundation/solana.git?branch=pan/v1.16.17-upgrade-tokio)",
+ "solana-client",
+ "solana-logger",
+ "solana-sdk",
  "tokio",
  "tokio-tungstenite 0.17.2",
  "toml",
@@ -6359,9 +6359,9 @@ dependencies = [
  "mango-v4-client",
  "serde",
  "serde_derive",
- "solana-client 1.16.17 (git+https://github.com/blockworks-foundation/solana.git?branch=pan/v1.16.17-upgrade-tokio)",
- "solana-logger 1.16.17 (git+https://github.com/blockworks-foundation/solana.git?branch=pan/v1.16.17-upgrade-tokio)",
- "solana-sdk 1.16.17 (git+https://github.com/blockworks-foundation/solana.git?branch=pan/v1.16.17-upgrade-tokio)",
+ "solana-client",
+ "solana-logger",
+ "solana-sdk",
  "tokio",
  "toml",
 ]
@@ -6647,31 +6647,6 @@ dependencies = [
 [[package]]
 name = "solana-account-decoder"
 version = "1.16.17"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "121e55656c2094950f374247e1303dd09517f1ed49c91bf60bf114760b286eb4"
-dependencies = [
- "Inflector",
- "base64 0.21.7",
- "bincode",
- "bs58 0.4.0",
- "bv",
- "lazy_static",
- "serde",
- "serde_derive",
- "serde_json",
- "solana-address-lookup-table-program 1.16.17 (registry+https://github.com/rust-lang/crates.io-index)",
- "solana-config-program 1.16.17 (registry+https://github.com/rust-lang/crates.io-index)",
- "solana-sdk 1.16.17 (registry+https://github.com/rust-lang/crates.io-index)",
- "spl-token 4.0.0",
- "spl-token-2022 0.9.0",
- "spl-token-metadata-interface",
- "thiserror",
- "zstd",
-]
-
-[[package]]
-name = "solana-account-decoder"
-version = "1.16.17"
 source = "git+https://github.com/blockworks-foundation/solana.git?branch=pan/v1.16.17-upgrade-tokio#0b395f463097112fc028522fa0081a4374dd2168"
 dependencies = [
  "Inflector",
@@ -6683,35 +6658,14 @@ dependencies = [
  "serde",
  "serde_derive",
  "serde_json",
- "solana-address-lookup-table-program 1.16.17 (git+https://github.com/blockworks-foundation/solana.git?branch=pan/v1.16.17-upgrade-tokio)",
- "solana-config-program 1.16.17 (git+https://github.com/blockworks-foundation/solana.git?branch=pan/v1.16.17-upgrade-tokio)",
- "solana-sdk 1.16.17 (git+https://github.com/blockworks-foundation/solana.git?branch=pan/v1.16.17-upgrade-tokio)",
+ "solana-address-lookup-table-program",
+ "solana-config-program",
+ "solana-sdk",
  "spl-token 4.0.0",
  "spl-token-2022 0.9.0",
  "spl-token-metadata-interface",
  "thiserror",
  "zstd",
-]
-
-[[package]]
-name = "solana-address-lookup-table-program"
-version = "1.16.17"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3ccb31f7f14d5876acd9ec38f5bf6097bfb4b350141d81c7ff2bf684db3ca815"
-dependencies = [
- "bincode",
- "bytemuck",
- "log 0.4.20",
- "num-derive 0.3.3",
- "num-traits",
- "rustc_version 0.4.0",
- "serde",
- "solana-frozen-abi 1.16.17 (registry+https://github.com/rust-lang/crates.io-index)",
- "solana-frozen-abi-macro 1.16.17 (registry+https://github.com/rust-lang/crates.io-index)",
- "solana-program 1.16.17 (registry+https://github.com/rust-lang/crates.io-index)",
- "solana-program-runtime 1.16.17 (registry+https://github.com/rust-lang/crates.io-index)",
- "solana-sdk 1.16.17 (registry+https://github.com/rust-lang/crates.io-index)",
- "thiserror",
 ]
 
 [[package]]
@@ -6726,11 +6680,11 @@ dependencies = [
  "num-traits",
  "rustc_version 0.4.0",
  "serde",
- "solana-frozen-abi 1.16.17 (git+https://github.com/blockworks-foundation/solana.git?branch=pan/v1.16.17-upgrade-tokio)",
- "solana-frozen-abi-macro 1.16.17 (git+https://github.com/blockworks-foundation/solana.git?branch=pan/v1.16.17-upgrade-tokio)",
- "solana-program 1.16.17 (git+https://github.com/blockworks-foundation/solana.git?branch=pan/v1.16.17-upgrade-tokio)",
- "solana-program-runtime 1.16.17 (git+https://github.com/blockworks-foundation/solana.git?branch=pan/v1.16.17-upgrade-tokio)",
- "solana-sdk 1.16.17 (git+https://github.com/blockworks-foundation/solana.git?branch=pan/v1.16.17-upgrade-tokio)",
+ "solana-frozen-abi",
+ "solana-frozen-abi-macro",
+ "solana-program",
+ "solana-program-runtime",
+ "solana-sdk",
  "thiserror",
 ]
 
@@ -6742,8 +6696,8 @@ dependencies = [
  "borsh 0.10.3",
  "futures 0.3.30",
  "solana-banks-interface",
- "solana-program 1.16.17 (git+https://github.com/blockworks-foundation/solana.git?branch=pan/v1.16.17-upgrade-tokio)",
- "solana-sdk 1.16.17 (git+https://github.com/blockworks-foundation/solana.git?branch=pan/v1.16.17-upgrade-tokio)",
+ "solana-program",
+ "solana-sdk",
  "tarpc",
  "thiserror",
  "tokio",
@@ -6756,7 +6710,7 @@ version = "1.16.17"
 source = "git+https://github.com/blockworks-foundation/solana.git?branch=pan/v1.16.17-upgrade-tokio#0b395f463097112fc028522fa0081a4374dd2168"
 dependencies = [
  "serde",
- "solana-sdk 1.16.17 (git+https://github.com/blockworks-foundation/solana.git?branch=pan/v1.16.17-upgrade-tokio)",
+ "solana-sdk",
  "tarpc",
 ]
 
@@ -6769,9 +6723,9 @@ dependencies = [
  "crossbeam-channel",
  "futures 0.3.30",
  "solana-banks-interface",
- "solana-client 1.16.17 (git+https://github.com/blockworks-foundation/solana.git?branch=pan/v1.16.17-upgrade-tokio)",
+ "solana-client",
  "solana-runtime",
- "solana-sdk 1.16.17 (git+https://github.com/blockworks-foundation/solana.git?branch=pan/v1.16.17-upgrade-tokio)",
+ "solana-sdk",
  "solana-send-transaction-service",
  "tarpc",
  "tokio",
@@ -6791,9 +6745,9 @@ dependencies = [
  "rustc_version 0.4.0",
  "serde",
  "serde_derive",
- "solana-frozen-abi 1.16.17 (git+https://github.com/blockworks-foundation/solana.git?branch=pan/v1.16.17-upgrade-tokio)",
- "solana-frozen-abi-macro 1.16.17 (git+https://github.com/blockworks-foundation/solana.git?branch=pan/v1.16.17-upgrade-tokio)",
- "solana-sdk 1.16.17 (git+https://github.com/blockworks-foundation/solana.git?branch=pan/v1.16.17-upgrade-tokio)",
+ "solana-frozen-abi",
+ "solana-frozen-abi-macro",
+ "solana-sdk",
 ]
 
 [[package]]
@@ -6806,9 +6760,9 @@ dependencies = [
  "libsecp256k1",
  "log 0.4.20",
  "rand 0.7.3",
- "solana-measure 1.16.17 (git+https://github.com/blockworks-foundation/solana.git?branch=pan/v1.16.17-upgrade-tokio)",
- "solana-program-runtime 1.16.17 (git+https://github.com/blockworks-foundation/solana.git?branch=pan/v1.16.17-upgrade-tokio)",
- "solana-sdk 1.16.17 (git+https://github.com/blockworks-foundation/solana.git?branch=pan/v1.16.17-upgrade-tokio)",
+ "solana-measure",
+ "solana-program-runtime",
+ "solana-sdk",
  "solana-zk-token-sdk 1.16.17 (git+https://github.com/blockworks-foundation/solana.git?branch=pan/v1.16.17-upgrade-tokio)",
  "solana_rbpf",
  "thiserror",
@@ -6825,27 +6779,9 @@ dependencies = [
  "modular-bitfield",
  "num_enum 0.6.1",
  "rand 0.7.3",
- "solana-measure 1.16.17 (git+https://github.com/blockworks-foundation/solana.git?branch=pan/v1.16.17-upgrade-tokio)",
- "solana-sdk 1.16.17 (git+https://github.com/blockworks-foundation/solana.git?branch=pan/v1.16.17-upgrade-tokio)",
+ "solana-measure",
+ "solana-sdk",
  "tempfile",
-]
-
-[[package]]
-name = "solana-clap-utils"
-version = "1.16.17"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "47a8150d4ff694d9587496a5976d33e6ebdb16cc61c6338bdfe3b2fc2c7c4986"
-dependencies = [
- "chrono",
- "clap 2.34.0",
- "rpassword",
- "solana-perf 1.16.17 (registry+https://github.com/rust-lang/crates.io-index)",
- "solana-remote-wallet 1.16.17 (registry+https://github.com/rust-lang/crates.io-index)",
- "solana-sdk 1.16.17 (registry+https://github.com/rust-lang/crates.io-index)",
- "thiserror",
- "tiny-bip39",
- "uriparse",
- "url 2.5.0",
 ]
 
 [[package]]
@@ -6856,9 +6792,9 @@ dependencies = [
  "chrono",
  "clap 2.34.0",
  "rpassword",
- "solana-perf 1.16.17 (git+https://github.com/blockworks-foundation/solana.git?branch=pan/v1.16.17-upgrade-tokio)",
- "solana-remote-wallet 1.16.17 (git+https://github.com/blockworks-foundation/solana.git?branch=pan/v1.16.17-upgrade-tokio)",
- "solana-sdk 1.16.17 (git+https://github.com/blockworks-foundation/solana.git?branch=pan/v1.16.17-upgrade-tokio)",
+ "solana-perf",
+ "solana-remote-wallet",
+ "solana-sdk",
  "thiserror",
  "tiny-bip39",
  "uriparse",
@@ -6875,42 +6811,9 @@ dependencies = [
  "serde",
  "serde_derive",
  "serde_yaml",
- "solana-clap-utils 1.16.17 (git+https://github.com/blockworks-foundation/solana.git?branch=pan/v1.16.17-upgrade-tokio)",
- "solana-sdk 1.16.17 (git+https://github.com/blockworks-foundation/solana.git?branch=pan/v1.16.17-upgrade-tokio)",
+ "solana-clap-utils",
+ "solana-sdk",
  "url 2.5.0",
-]
-
-[[package]]
-name = "solana-client"
-version = "1.16.17"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "35d7582847ab4d60652ff640ca574647789461c1630e8c7580ff770738c3d7f4"
-dependencies = [
- "async-trait",
- "bincode",
- "futures 0.3.30",
- "futures-util",
- "indexmap 1.9.3",
- "indicatif",
- "log 0.4.20",
- "quinn",
- "rand 0.7.3",
- "rayon",
- "solana-connection-cache 1.16.17 (registry+https://github.com/rust-lang/crates.io-index)",
- "solana-measure 1.16.17 (registry+https://github.com/rust-lang/crates.io-index)",
- "solana-metrics 1.16.17 (registry+https://github.com/rust-lang/crates.io-index)",
- "solana-pubsub-client 1.16.17 (registry+https://github.com/rust-lang/crates.io-index)",
- "solana-quic-client 1.16.17 (registry+https://github.com/rust-lang/crates.io-index)",
- "solana-rpc-client 1.16.17 (registry+https://github.com/rust-lang/crates.io-index)",
- "solana-rpc-client-api 1.16.17 (registry+https://github.com/rust-lang/crates.io-index)",
- "solana-rpc-client-nonce-utils 1.16.17 (registry+https://github.com/rust-lang/crates.io-index)",
- "solana-sdk 1.16.17 (registry+https://github.com/rust-lang/crates.io-index)",
- "solana-streamer 1.16.17 (registry+https://github.com/rust-lang/crates.io-index)",
- "solana-thin-client 1.16.17 (registry+https://github.com/rust-lang/crates.io-index)",
- "solana-tpu-client 1.16.17 (registry+https://github.com/rust-lang/crates.io-index)",
- "solana-udp-client 1.16.17 (registry+https://github.com/rust-lang/crates.io-index)",
- "thiserror",
- "tokio",
 ]
 
 [[package]]
@@ -6928,19 +6831,19 @@ dependencies = [
  "quinn",
  "rand 0.7.3",
  "rayon",
- "solana-connection-cache 1.16.17 (git+https://github.com/blockworks-foundation/solana.git?branch=pan/v1.16.17-upgrade-tokio)",
- "solana-measure 1.16.17 (git+https://github.com/blockworks-foundation/solana.git?branch=pan/v1.16.17-upgrade-tokio)",
- "solana-metrics 1.16.17 (git+https://github.com/blockworks-foundation/solana.git?branch=pan/v1.16.17-upgrade-tokio)",
- "solana-pubsub-client 1.16.17 (git+https://github.com/blockworks-foundation/solana.git?branch=pan/v1.16.17-upgrade-tokio)",
- "solana-quic-client 1.16.17 (git+https://github.com/blockworks-foundation/solana.git?branch=pan/v1.16.17-upgrade-tokio)",
- "solana-rpc-client 1.16.17 (git+https://github.com/blockworks-foundation/solana.git?branch=pan/v1.16.17-upgrade-tokio)",
- "solana-rpc-client-api 1.16.17 (git+https://github.com/blockworks-foundation/solana.git?branch=pan/v1.16.17-upgrade-tokio)",
- "solana-rpc-client-nonce-utils 1.16.17 (git+https://github.com/blockworks-foundation/solana.git?branch=pan/v1.16.17-upgrade-tokio)",
- "solana-sdk 1.16.17 (git+https://github.com/blockworks-foundation/solana.git?branch=pan/v1.16.17-upgrade-tokio)",
- "solana-streamer 1.16.17 (git+https://github.com/blockworks-foundation/solana.git?branch=pan/v1.16.17-upgrade-tokio)",
- "solana-thin-client 1.16.17 (git+https://github.com/blockworks-foundation/solana.git?branch=pan/v1.16.17-upgrade-tokio)",
- "solana-tpu-client 1.16.17 (git+https://github.com/blockworks-foundation/solana.git?branch=pan/v1.16.17-upgrade-tokio)",
- "solana-udp-client 1.16.17 (git+https://github.com/blockworks-foundation/solana.git?branch=pan/v1.16.17-upgrade-tokio)",
+ "solana-connection-cache",
+ "solana-measure",
+ "solana-metrics",
+ "solana-pubsub-client",
+ "solana-quic-client",
+ "solana-rpc-client",
+ "solana-rpc-client-api",
+ "solana-rpc-client-nonce-utils",
+ "solana-sdk",
+ "solana-streamer",
+ "solana-thin-client",
+ "solana-tpu-client",
+ "solana-udp-client",
  "thiserror",
  "tokio",
 ]
@@ -6950,22 +6853,8 @@ name = "solana-compute-budget-program"
 version = "1.16.17"
 source = "git+https://github.com/blockworks-foundation/solana.git?branch=pan/v1.16.17-upgrade-tokio#0b395f463097112fc028522fa0081a4374dd2168"
 dependencies = [
- "solana-program-runtime 1.16.17 (git+https://github.com/blockworks-foundation/solana.git?branch=pan/v1.16.17-upgrade-tokio)",
- "solana-sdk 1.16.17 (git+https://github.com/blockworks-foundation/solana.git?branch=pan/v1.16.17-upgrade-tokio)",
-]
-
-[[package]]
-name = "solana-config-program"
-version = "1.16.17"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "94dc0f4463daf1c6155f20eac948ea4ced705e5f5520546aef4e11e746a6d95d"
-dependencies = [
- "bincode",
- "chrono",
- "serde",
- "serde_derive",
- "solana-program-runtime 1.16.17 (registry+https://github.com/rust-lang/crates.io-index)",
- "solana-sdk 1.16.17 (registry+https://github.com/rust-lang/crates.io-index)",
+ "solana-program-runtime",
+ "solana-sdk",
 ]
 
 [[package]]
@@ -6977,29 +6866,8 @@ dependencies = [
  "chrono",
  "serde",
  "serde_derive",
- "solana-program-runtime 1.16.17 (git+https://github.com/blockworks-foundation/solana.git?branch=pan/v1.16.17-upgrade-tokio)",
- "solana-sdk 1.16.17 (git+https://github.com/blockworks-foundation/solana.git?branch=pan/v1.16.17-upgrade-tokio)",
-]
-
-[[package]]
-name = "solana-connection-cache"
-version = "1.16.17"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "758587d44e05a4abdf82b9514d1c8b7d35637ad65f7af7c3e3e02417aaae3c9e"
-dependencies = [
- "async-trait",
- "bincode",
- "futures-util",
- "indexmap 1.9.3",
- "log 0.4.20",
- "rand 0.7.3",
- "rayon",
- "rcgen",
- "solana-measure 1.16.17 (registry+https://github.com/rust-lang/crates.io-index)",
- "solana-metrics 1.16.17 (registry+https://github.com/rust-lang/crates.io-index)",
- "solana-sdk 1.16.17 (registry+https://github.com/rust-lang/crates.io-index)",
- "thiserror",
- "tokio",
+ "solana-program-runtime",
+ "solana-sdk",
 ]
 
 [[package]]
@@ -7015,9 +6883,9 @@ dependencies = [
  "rand 0.7.3",
  "rayon",
  "rcgen",
- "solana-measure 1.16.17 (git+https://github.com/blockworks-foundation/solana.git?branch=pan/v1.16.17-upgrade-tokio)",
- "solana-metrics 1.16.17 (git+https://github.com/blockworks-foundation/solana.git?branch=pan/v1.16.17-upgrade-tokio)",
- "solana-sdk 1.16.17 (git+https://github.com/blockworks-foundation/solana.git?branch=pan/v1.16.17-upgrade-tokio)",
+ "solana-measure",
+ "solana-metrics",
+ "solana-sdk",
  "thiserror",
  "tokio",
 ]
@@ -7036,12 +6904,12 @@ dependencies = [
  "rand 0.7.3",
  "rayon",
  "serde",
- "solana-measure 1.16.17 (git+https://github.com/blockworks-foundation/solana.git?branch=pan/v1.16.17-upgrade-tokio)",
+ "solana-measure",
  "solana-merkle-tree",
- "solana-metrics 1.16.17 (git+https://github.com/blockworks-foundation/solana.git?branch=pan/v1.16.17-upgrade-tokio)",
- "solana-perf 1.16.17 (git+https://github.com/blockworks-foundation/solana.git?branch=pan/v1.16.17-upgrade-tokio)",
- "solana-rayon-threadlimit 1.16.17 (git+https://github.com/blockworks-foundation/solana.git?branch=pan/v1.16.17-upgrade-tokio)",
- "solana-sdk 1.16.17 (git+https://github.com/blockworks-foundation/solana.git?branch=pan/v1.16.17-upgrade-tokio)",
+ "solana-metrics",
+ "solana-perf",
+ "solana-rayon-threadlimit",
+ "solana-sdk",
 ]
 
 [[package]]
@@ -7056,48 +6924,15 @@ dependencies = [
  "log 0.4.20",
  "serde",
  "serde_derive",
- "solana-clap-utils 1.16.17 (git+https://github.com/blockworks-foundation/solana.git?branch=pan/v1.16.17-upgrade-tokio)",
+ "solana-clap-utils",
  "solana-cli-config",
- "solana-logger 1.16.17 (git+https://github.com/blockworks-foundation/solana.git?branch=pan/v1.16.17-upgrade-tokio)",
- "solana-metrics 1.16.17 (git+https://github.com/blockworks-foundation/solana.git?branch=pan/v1.16.17-upgrade-tokio)",
- "solana-sdk 1.16.17 (git+https://github.com/blockworks-foundation/solana.git?branch=pan/v1.16.17-upgrade-tokio)",
- "solana-version 1.16.17 (git+https://github.com/blockworks-foundation/solana.git?branch=pan/v1.16.17-upgrade-tokio)",
+ "solana-logger",
+ "solana-metrics",
+ "solana-sdk",
+ "solana-version",
  "spl-memo 4.0.0",
  "thiserror",
  "tokio",
-]
-
-[[package]]
-name = "solana-frozen-abi"
-version = "1.16.17"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d266bf0311bb403d31206aa2904b8741f57c7f5e27580b6810ad5e22fc7c3282"
-dependencies = [
- "ahash 0.8.7",
- "blake3",
- "block-buffer 0.10.4",
- "bs58 0.4.0",
- "bv",
- "byteorder",
- "cc",
- "either",
- "generic-array 0.14.7",
- "getrandom 0.1.16",
- "im",
- "lazy_static",
- "log 0.4.20",
- "memmap2",
- "once_cell",
- "rand_core 0.6.4",
- "rustc_version 0.4.0",
- "serde",
- "serde_bytes",
- "serde_derive",
- "serde_json",
- "sha2 0.10.8",
- "solana-frozen-abi-macro 1.16.17 (registry+https://github.com/rust-lang/crates.io-index)",
- "subtle",
- "thiserror",
 ]
 
 [[package]]
@@ -7127,21 +6962,9 @@ dependencies = [
  "serde_derive",
  "serde_json",
  "sha2 0.10.8",
- "solana-frozen-abi-macro 1.16.17 (git+https://github.com/blockworks-foundation/solana.git?branch=pan/v1.16.17-upgrade-tokio)",
+ "solana-frozen-abi-macro",
  "subtle",
  "thiserror",
-]
-
-[[package]]
-name = "solana-frozen-abi-macro"
-version = "1.16.17"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6dfe18c5155015dcb494c6de84a03b725fcf90ec2006a047769018b94c2cf0de"
-dependencies = [
- "proc-macro2 1.0.76",
- "quote 1.0.35",
- "rustc_version 0.4.0",
- "syn 2.0.48",
 ]
 
 [[package]]
@@ -7179,25 +7002,25 @@ dependencies = [
  "serde_bytes",
  "serde_derive",
  "solana-bloom",
- "solana-clap-utils 1.16.17 (git+https://github.com/blockworks-foundation/solana.git?branch=pan/v1.16.17-upgrade-tokio)",
- "solana-client 1.16.17 (git+https://github.com/blockworks-foundation/solana.git?branch=pan/v1.16.17-upgrade-tokio)",
+ "solana-clap-utils",
+ "solana-client",
  "solana-entry",
- "solana-frozen-abi 1.16.17 (git+https://github.com/blockworks-foundation/solana.git?branch=pan/v1.16.17-upgrade-tokio)",
- "solana-frozen-abi-macro 1.16.17 (git+https://github.com/blockworks-foundation/solana.git?branch=pan/v1.16.17-upgrade-tokio)",
+ "solana-frozen-abi",
+ "solana-frozen-abi-macro",
  "solana-ledger",
- "solana-logger 1.16.17 (git+https://github.com/blockworks-foundation/solana.git?branch=pan/v1.16.17-upgrade-tokio)",
- "solana-measure 1.16.17 (git+https://github.com/blockworks-foundation/solana.git?branch=pan/v1.16.17-upgrade-tokio)",
- "solana-metrics 1.16.17 (git+https://github.com/blockworks-foundation/solana.git?branch=pan/v1.16.17-upgrade-tokio)",
- "solana-net-utils 1.16.17 (git+https://github.com/blockworks-foundation/solana.git?branch=pan/v1.16.17-upgrade-tokio)",
- "solana-perf 1.16.17 (git+https://github.com/blockworks-foundation/solana.git?branch=pan/v1.16.17-upgrade-tokio)",
- "solana-rayon-threadlimit 1.16.17 (git+https://github.com/blockworks-foundation/solana.git?branch=pan/v1.16.17-upgrade-tokio)",
+ "solana-logger",
+ "solana-measure",
+ "solana-metrics",
+ "solana-net-utils",
+ "solana-perf",
+ "solana-rayon-threadlimit",
  "solana-runtime",
- "solana-sdk 1.16.17 (git+https://github.com/blockworks-foundation/solana.git?branch=pan/v1.16.17-upgrade-tokio)",
- "solana-streamer 1.16.17 (git+https://github.com/blockworks-foundation/solana.git?branch=pan/v1.16.17-upgrade-tokio)",
- "solana-thin-client 1.16.17 (git+https://github.com/blockworks-foundation/solana.git?branch=pan/v1.16.17-upgrade-tokio)",
- "solana-tpu-client 1.16.17 (git+https://github.com/blockworks-foundation/solana.git?branch=pan/v1.16.17-upgrade-tokio)",
- "solana-version 1.16.17 (git+https://github.com/blockworks-foundation/solana.git?branch=pan/v1.16.17-upgrade-tokio)",
- "solana-vote-program 1.16.17 (git+https://github.com/blockworks-foundation/solana.git?branch=pan/v1.16.17-upgrade-tokio)",
+ "solana-sdk",
+ "solana-streamer",
+ "solana-thin-client",
+ "solana-tpu-client",
+ "solana-version",
+ "solana-vote-program",
  "static_assertions",
  "thiserror",
 ]
@@ -7235,23 +7058,23 @@ dependencies = [
  "serde",
  "serde_bytes",
  "sha2 0.10.8",
- "solana-account-decoder 1.16.17 (git+https://github.com/blockworks-foundation/solana.git?branch=pan/v1.16.17-upgrade-tokio)",
+ "solana-account-decoder",
  "solana-bpf-loader-program",
  "solana-entry",
- "solana-frozen-abi 1.16.17 (git+https://github.com/blockworks-foundation/solana.git?branch=pan/v1.16.17-upgrade-tokio)",
- "solana-frozen-abi-macro 1.16.17 (git+https://github.com/blockworks-foundation/solana.git?branch=pan/v1.16.17-upgrade-tokio)",
- "solana-measure 1.16.17 (git+https://github.com/blockworks-foundation/solana.git?branch=pan/v1.16.17-upgrade-tokio)",
- "solana-metrics 1.16.17 (git+https://github.com/blockworks-foundation/solana.git?branch=pan/v1.16.17-upgrade-tokio)",
- "solana-perf 1.16.17 (git+https://github.com/blockworks-foundation/solana.git?branch=pan/v1.16.17-upgrade-tokio)",
- "solana-program-runtime 1.16.17 (git+https://github.com/blockworks-foundation/solana.git?branch=pan/v1.16.17-upgrade-tokio)",
- "solana-rayon-threadlimit 1.16.17 (git+https://github.com/blockworks-foundation/solana.git?branch=pan/v1.16.17-upgrade-tokio)",
+ "solana-frozen-abi",
+ "solana-frozen-abi-macro",
+ "solana-measure",
+ "solana-metrics",
+ "solana-perf",
+ "solana-program-runtime",
+ "solana-rayon-threadlimit",
  "solana-runtime",
- "solana-sdk 1.16.17 (git+https://github.com/blockworks-foundation/solana.git?branch=pan/v1.16.17-upgrade-tokio)",
+ "solana-sdk",
  "solana-stake-program",
  "solana-storage-bigtable",
  "solana-storage-proto",
  "solana-transaction-status 1.16.17 (git+https://github.com/blockworks-foundation/solana.git?branch=pan/v1.16.17-upgrade-tokio)",
- "solana-vote-program 1.16.17 (git+https://github.com/blockworks-foundation/solana.git?branch=pan/v1.16.17-upgrade-tokio)",
+ "solana-vote-program",
  "spl-token 4.0.0",
  "spl-token-2022 0.9.0",
  "static_assertions",
@@ -7269,26 +7092,15 @@ source = "git+https://github.com/blockworks-foundation/solana.git?branch=pan/v1.
 dependencies = [
  "log 0.4.20",
  "rand 0.7.3",
- "solana-measure 1.16.17 (git+https://github.com/blockworks-foundation/solana.git?branch=pan/v1.16.17-upgrade-tokio)",
- "solana-program-runtime 1.16.17 (git+https://github.com/blockworks-foundation/solana.git?branch=pan/v1.16.17-upgrade-tokio)",
- "solana-sdk 1.16.17 (git+https://github.com/blockworks-foundation/solana.git?branch=pan/v1.16.17-upgrade-tokio)",
+ "solana-measure",
+ "solana-program-runtime",
+ "solana-sdk",
  "solana_rbpf",
 ]
 
 [[package]]
 name = "solana-logger"
 version = "1.16.17"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4f76fe25c2d06dcf621befd1e8d5655143e8a059c7e20fcb71736bc80ed779d6"
-dependencies = [
- "env_logger",
- "lazy_static",
- "log 0.4.20",
-]
-
-[[package]]
-name = "solana-logger"
-version = "1.16.17"
 source = "git+https://github.com/blockworks-foundation/solana.git?branch=pan/v1.16.17-upgrade-tokio#0b395f463097112fc028522fa0081a4374dd2168"
 dependencies = [
  "env_logger",
@@ -7299,20 +7111,10 @@ dependencies = [
 [[package]]
 name = "solana-measure"
 version = "1.16.17"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "db165b8a7f5d840abef011c78a18ffe63cad9192d676b07d94f469b6b5dc6cf6"
-dependencies = [
- "log 0.4.20",
- "solana-sdk 1.16.17 (registry+https://github.com/rust-lang/crates.io-index)",
-]
-
-[[package]]
-name = "solana-measure"
-version = "1.16.17"
 source = "git+https://github.com/blockworks-foundation/solana.git?branch=pan/v1.16.17-upgrade-tokio#0b395f463097112fc028522fa0081a4374dd2168"
 dependencies = [
  "log 0.4.20",
- "solana-sdk 1.16.17 (git+https://github.com/blockworks-foundation/solana.git?branch=pan/v1.16.17-upgrade-tokio)",
+ "solana-sdk",
 ]
 
 [[package]]
@@ -7322,21 +7124,7 @@ source = "git+https://github.com/blockworks-foundation/solana.git?branch=pan/v1.
 dependencies = [
  "fast-math",
  "matches",
- "solana-program 1.16.17 (git+https://github.com/blockworks-foundation/solana.git?branch=pan/v1.16.17-upgrade-tokio)",
-]
-
-[[package]]
-name = "solana-metrics"
-version = "1.16.17"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "aa01731bb3952904962d49a1ea1205db54e93f3a56f4006d32e02a7c85d60546"
-dependencies = [
- "crossbeam-channel",
- "gethostname",
- "lazy_static",
- "log 0.4.20",
- "reqwest",
- "solana-sdk 1.16.17 (registry+https://github.com/rust-lang/crates.io-index)",
+ "solana-program",
 ]
 
 [[package]]
@@ -7349,29 +7137,7 @@ dependencies = [
  "lazy_static",
  "log 0.4.20",
  "reqwest",
- "solana-sdk 1.16.17 (git+https://github.com/blockworks-foundation/solana.git?branch=pan/v1.16.17-upgrade-tokio)",
-]
-
-[[package]]
-name = "solana-net-utils"
-version = "1.16.17"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fd7ab67329dcebe4a40673fd0da27373282b1359ec7945e0fb81a9c594bcd057"
-dependencies = [
- "bincode",
- "clap 3.2.25",
- "crossbeam-channel",
- "log 0.4.20",
- "nix",
- "rand 0.7.3",
- "serde",
- "serde_derive",
- "socket2 0.4.10",
- "solana-logger 1.16.17 (registry+https://github.com/rust-lang/crates.io-index)",
- "solana-sdk 1.16.17 (registry+https://github.com/rust-lang/crates.io-index)",
- "solana-version 1.16.17 (registry+https://github.com/rust-lang/crates.io-index)",
- "tokio",
- "url 2.5.0",
+ "solana-sdk",
 ]
 
 [[package]]
@@ -7388,38 +7154,11 @@ dependencies = [
  "serde",
  "serde_derive",
  "socket2 0.4.10",
- "solana-logger 1.16.17 (git+https://github.com/blockworks-foundation/solana.git?branch=pan/v1.16.17-upgrade-tokio)",
- "solana-sdk 1.16.17 (git+https://github.com/blockworks-foundation/solana.git?branch=pan/v1.16.17-upgrade-tokio)",
- "solana-version 1.16.17 (git+https://github.com/blockworks-foundation/solana.git?branch=pan/v1.16.17-upgrade-tokio)",
+ "solana-logger",
+ "solana-sdk",
+ "solana-version",
  "tokio",
  "url 2.5.0",
-]
-
-[[package]]
-name = "solana-perf"
-version = "1.16.17"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f900c1015844087cd4f10ba9d2d26a9859f2f5ca07427865cc74942595abc0a7"
-dependencies = [
- "ahash 0.8.7",
- "bincode",
- "bv",
- "caps",
- "curve25519-dalek",
- "dlopen",
- "dlopen_derive",
- "fnv",
- "lazy_static",
- "libc",
- "log 0.4.20",
- "nix",
- "rand 0.7.3",
- "rayon",
- "serde",
- "solana-metrics 1.16.17 (registry+https://github.com/rust-lang/crates.io-index)",
- "solana-rayon-threadlimit 1.16.17 (registry+https://github.com/rust-lang/crates.io-index)",
- "solana-sdk 1.16.17 (registry+https://github.com/rust-lang/crates.io-index)",
- "solana-vote-program 1.16.17 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
@@ -7442,10 +7181,10 @@ dependencies = [
  "rand 0.7.3",
  "rayon",
  "serde",
- "solana-metrics 1.16.17 (git+https://github.com/blockworks-foundation/solana.git?branch=pan/v1.16.17-upgrade-tokio)",
- "solana-rayon-threadlimit 1.16.17 (git+https://github.com/blockworks-foundation/solana.git?branch=pan/v1.16.17-upgrade-tokio)",
- "solana-sdk 1.16.17 (git+https://github.com/blockworks-foundation/solana.git?branch=pan/v1.16.17-upgrade-tokio)",
- "solana-vote-program 1.16.17 (git+https://github.com/blockworks-foundation/solana.git?branch=pan/v1.16.17-upgrade-tokio)",
+ "solana-metrics",
+ "solana-rayon-threadlimit",
+ "solana-sdk",
+ "solana-vote-program",
 ]
 
 [[package]]
@@ -7458,66 +7197,11 @@ dependencies = [
  "log 0.4.20",
  "solana-entry",
  "solana-ledger",
- "solana-measure 1.16.17 (git+https://github.com/blockworks-foundation/solana.git?branch=pan/v1.16.17-upgrade-tokio)",
- "solana-metrics 1.16.17 (git+https://github.com/blockworks-foundation/solana.git?branch=pan/v1.16.17-upgrade-tokio)",
+ "solana-measure",
+ "solana-metrics",
  "solana-runtime",
- "solana-sdk 1.16.17 (git+https://github.com/blockworks-foundation/solana.git?branch=pan/v1.16.17-upgrade-tokio)",
+ "solana-sdk",
  "thiserror",
-]
-
-[[package]]
-name = "solana-program"
-version = "1.16.17"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1bb16998986492de307eef503ce47e84503d35baa92dc60832b22476948b1c16"
-dependencies = [
- "ark-bn254",
- "ark-ec",
- "ark-ff",
- "ark-serialize",
- "array-bytes",
- "base64 0.21.7",
- "bincode",
- "bitflags 1.3.2",
- "blake3",
- "borsh 0.10.3",
- "borsh 0.9.3",
- "bs58 0.4.0",
- "bv",
- "bytemuck",
- "cc",
- "console_error_panic_hook",
- "console_log",
- "curve25519-dalek",
- "getrandom 0.2.12",
- "itertools 0.10.5",
- "js-sys",
- "lazy_static",
- "libc",
- "libsecp256k1",
- "log 0.4.20",
- "memoffset 0.9.0",
- "num-bigint 0.4.4",
- "num-derive 0.3.3",
- "num-traits",
- "parking_lot 0.12.1",
- "rand 0.7.3",
- "rand_chacha 0.2.2",
- "rustc_version 0.4.0",
- "rustversion",
- "serde",
- "serde_bytes",
- "serde_derive",
- "serde_json",
- "sha2 0.10.8",
- "sha3 0.10.8",
- "solana-frozen-abi 1.16.17 (registry+https://github.com/rust-lang/crates.io-index)",
- "solana-frozen-abi-macro 1.16.17 (registry+https://github.com/rust-lang/crates.io-index)",
- "solana-sdk-macro 1.16.17 (registry+https://github.com/rust-lang/crates.io-index)",
- "thiserror",
- "tiny-bip39",
- "wasm-bindgen",
- "zeroize",
 ]
 
 [[package]]
@@ -7565,41 +7249,13 @@ dependencies = [
  "serde_json",
  "sha2 0.10.8",
  "sha3 0.10.8",
- "solana-frozen-abi 1.16.17 (git+https://github.com/blockworks-foundation/solana.git?branch=pan/v1.16.17-upgrade-tokio)",
- "solana-frozen-abi-macro 1.16.17 (git+https://github.com/blockworks-foundation/solana.git?branch=pan/v1.16.17-upgrade-tokio)",
- "solana-sdk-macro 1.16.17 (git+https://github.com/blockworks-foundation/solana.git?branch=pan/v1.16.17-upgrade-tokio)",
+ "solana-frozen-abi",
+ "solana-frozen-abi-macro",
+ "solana-sdk-macro",
  "thiserror",
  "tiny-bip39",
  "wasm-bindgen",
  "zeroize",
-]
-
-[[package]]
-name = "solana-program-runtime"
-version = "1.16.17"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "036d6ecf67a3a7c6dc74d4f7fa6ab321e7ce8feccb7c9dff8384a41d0a12345b"
-dependencies = [
- "base64 0.21.7",
- "bincode",
- "eager",
- "enum-iterator",
- "itertools 0.10.5",
- "libc",
- "log 0.4.20",
- "num-derive 0.3.3",
- "num-traits",
- "percentage",
- "rand 0.7.3",
- "rustc_version 0.4.0",
- "serde",
- "solana-frozen-abi 1.16.17 (registry+https://github.com/rust-lang/crates.io-index)",
- "solana-frozen-abi-macro 1.16.17 (registry+https://github.com/rust-lang/crates.io-index)",
- "solana-measure 1.16.17 (registry+https://github.com/rust-lang/crates.io-index)",
- "solana-metrics 1.16.17 (registry+https://github.com/rust-lang/crates.io-index)",
- "solana-sdk 1.16.17 (registry+https://github.com/rust-lang/crates.io-index)",
- "solana_rbpf",
- "thiserror",
 ]
 
 [[package]]
@@ -7620,11 +7276,11 @@ dependencies = [
  "rand 0.7.3",
  "rustc_version 0.4.0",
  "serde",
- "solana-frozen-abi 1.16.17 (git+https://github.com/blockworks-foundation/solana.git?branch=pan/v1.16.17-upgrade-tokio)",
- "solana-frozen-abi-macro 1.16.17 (git+https://github.com/blockworks-foundation/solana.git?branch=pan/v1.16.17-upgrade-tokio)",
- "solana-measure 1.16.17 (git+https://github.com/blockworks-foundation/solana.git?branch=pan/v1.16.17-upgrade-tokio)",
- "solana-metrics 1.16.17 (git+https://github.com/blockworks-foundation/solana.git?branch=pan/v1.16.17-upgrade-tokio)",
- "solana-sdk 1.16.17 (git+https://github.com/blockworks-foundation/solana.git?branch=pan/v1.16.17-upgrade-tokio)",
+ "solana-frozen-abi",
+ "solana-frozen-abi-macro",
+ "solana-measure",
+ "solana-metrics",
+ "solana-sdk",
  "solana_rbpf",
  "thiserror",
 ]
@@ -7646,38 +7302,13 @@ dependencies = [
  "solana-banks-interface",
  "solana-banks-server",
  "solana-bpf-loader-program",
- "solana-logger 1.16.17 (git+https://github.com/blockworks-foundation/solana.git?branch=pan/v1.16.17-upgrade-tokio)",
- "solana-program-runtime 1.16.17 (git+https://github.com/blockworks-foundation/solana.git?branch=pan/v1.16.17-upgrade-tokio)",
+ "solana-logger",
+ "solana-program-runtime",
  "solana-runtime",
- "solana-sdk 1.16.17 (git+https://github.com/blockworks-foundation/solana.git?branch=pan/v1.16.17-upgrade-tokio)",
- "solana-vote-program 1.16.17 (git+https://github.com/blockworks-foundation/solana.git?branch=pan/v1.16.17-upgrade-tokio)",
+ "solana-sdk",
+ "solana-vote-program",
  "thiserror",
  "tokio",
-]
-
-[[package]]
-name = "solana-pubsub-client"
-version = "1.16.17"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "70e318f46bedb39374e98f299266a155b2c81c9d920f3c90f761261267c275c1"
-dependencies = [
- "crossbeam-channel",
- "futures-util",
- "log 0.4.20",
- "reqwest",
- "semver 1.0.21",
- "serde",
- "serde_derive",
- "serde_json",
- "solana-account-decoder 1.16.17 (registry+https://github.com/rust-lang/crates.io-index)",
- "solana-rpc-client-api 1.16.17 (registry+https://github.com/rust-lang/crates.io-index)",
- "solana-sdk 1.16.17 (registry+https://github.com/rust-lang/crates.io-index)",
- "thiserror",
- "tokio",
- "tokio-stream",
- "tokio-tungstenite 0.17.2",
- "tungstenite 0.17.3",
- "url 2.5.0",
 ]
 
 [[package]]
@@ -7693,43 +7324,15 @@ dependencies = [
  "serde",
  "serde_derive",
  "serde_json",
- "solana-account-decoder 1.16.17 (git+https://github.com/blockworks-foundation/solana.git?branch=pan/v1.16.17-upgrade-tokio)",
- "solana-rpc-client-api 1.16.17 (git+https://github.com/blockworks-foundation/solana.git?branch=pan/v1.16.17-upgrade-tokio)",
- "solana-sdk 1.16.17 (git+https://github.com/blockworks-foundation/solana.git?branch=pan/v1.16.17-upgrade-tokio)",
+ "solana-account-decoder",
+ "solana-rpc-client-api",
+ "solana-sdk",
  "thiserror",
  "tokio",
  "tokio-stream",
  "tokio-tungstenite 0.17.2",
  "tungstenite 0.17.3",
  "url 2.5.0",
-]
-
-[[package]]
-name = "solana-quic-client"
-version = "1.16.17"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "61db18a804642f8eb37369e903774a85d7949a55bd204ec090ebe0742fd2fe32"
-dependencies = [
- "async-mutex",
- "async-trait",
- "futures 0.3.30",
- "itertools 0.10.5",
- "lazy_static",
- "log 0.4.20",
- "quinn",
- "quinn-proto",
- "quinn-udp",
- "rcgen",
- "rustls 0.20.9",
- "solana-connection-cache 1.16.17 (registry+https://github.com/rust-lang/crates.io-index)",
- "solana-measure 1.16.17 (registry+https://github.com/rust-lang/crates.io-index)",
- "solana-metrics 1.16.17 (registry+https://github.com/rust-lang/crates.io-index)",
- "solana-net-utils 1.16.17 (registry+https://github.com/rust-lang/crates.io-index)",
- "solana-rpc-client-api 1.16.17 (registry+https://github.com/rust-lang/crates.io-index)",
- "solana-sdk 1.16.17 (registry+https://github.com/rust-lang/crates.io-index)",
- "solana-streamer 1.16.17 (registry+https://github.com/rust-lang/crates.io-index)",
- "thiserror",
- "tokio",
 ]
 
 [[package]]
@@ -7748,13 +7351,13 @@ dependencies = [
  "quinn-udp",
  "rcgen",
  "rustls 0.20.9",
- "solana-connection-cache 1.16.17 (git+https://github.com/blockworks-foundation/solana.git?branch=pan/v1.16.17-upgrade-tokio)",
- "solana-measure 1.16.17 (git+https://github.com/blockworks-foundation/solana.git?branch=pan/v1.16.17-upgrade-tokio)",
- "solana-metrics 1.16.17 (git+https://github.com/blockworks-foundation/solana.git?branch=pan/v1.16.17-upgrade-tokio)",
- "solana-net-utils 1.16.17 (git+https://github.com/blockworks-foundation/solana.git?branch=pan/v1.16.17-upgrade-tokio)",
- "solana-rpc-client-api 1.16.17 (git+https://github.com/blockworks-foundation/solana.git?branch=pan/v1.16.17-upgrade-tokio)",
- "solana-sdk 1.16.17 (git+https://github.com/blockworks-foundation/solana.git?branch=pan/v1.16.17-upgrade-tokio)",
- "solana-streamer 1.16.17 (git+https://github.com/blockworks-foundation/solana.git?branch=pan/v1.16.17-upgrade-tokio)",
+ "solana-connection-cache",
+ "solana-measure",
+ "solana-metrics",
+ "solana-net-utils",
+ "solana-rpc-client-api",
+ "solana-sdk",
+ "solana-streamer",
  "thiserror",
  "tokio",
 ]
@@ -7762,39 +7365,10 @@ dependencies = [
 [[package]]
 name = "solana-rayon-threadlimit"
 version = "1.16.17"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "805377478f2d413f6cfcba6924c81ac4988ac0f96cdb045a8a9d81c430e6622a"
-dependencies = [
- "lazy_static",
- "num_cpus",
-]
-
-[[package]]
-name = "solana-rayon-threadlimit"
-version = "1.16.17"
 source = "git+https://github.com/blockworks-foundation/solana.git?branch=pan/v1.16.17-upgrade-tokio#0b395f463097112fc028522fa0081a4374dd2168"
 dependencies = [
  "lazy_static",
  "num_cpus",
-]
-
-[[package]]
-name = "solana-remote-wallet"
-version = "1.16.17"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7a1148dcd76f76ad0399c1d9abf05cb32a0e545c5bee47ebe6d3b3e800c7fa7c"
-dependencies = [
- "console",
- "dialoguer",
- "log 0.4.20",
- "num-derive 0.3.3",
- "num-traits",
- "parking_lot 0.12.1",
- "qstring",
- "semver 1.0.21",
- "solana-sdk 1.16.17 (registry+https://github.com/rust-lang/crates.io-index)",
- "thiserror",
- "uriparse",
 ]
 
 [[package]]
@@ -7810,7 +7384,7 @@ dependencies = [
  "parking_lot 0.12.1",
  "qstring",
  "semver 1.0.21",
- "solana-sdk 1.16.17 (git+https://github.com/blockworks-foundation/solana.git?branch=pan/v1.16.17-upgrade-tokio)",
+ "solana-sdk",
  "thiserror",
  "uriparse",
 ]
@@ -7839,28 +7413,28 @@ dependencies = [
  "serde_derive",
  "serde_json",
  "soketto",
- "solana-account-decoder 1.16.17 (git+https://github.com/blockworks-foundation/solana.git?branch=pan/v1.16.17-upgrade-tokio)",
- "solana-client 1.16.17 (git+https://github.com/blockworks-foundation/solana.git?branch=pan/v1.16.17-upgrade-tokio)",
+ "solana-account-decoder",
+ "solana-client",
  "solana-entry",
  "solana-faucet",
  "solana-gossip",
  "solana-ledger",
- "solana-measure 1.16.17 (git+https://github.com/blockworks-foundation/solana.git?branch=pan/v1.16.17-upgrade-tokio)",
- "solana-metrics 1.16.17 (git+https://github.com/blockworks-foundation/solana.git?branch=pan/v1.16.17-upgrade-tokio)",
- "solana-perf 1.16.17 (git+https://github.com/blockworks-foundation/solana.git?branch=pan/v1.16.17-upgrade-tokio)",
+ "solana-measure",
+ "solana-metrics",
+ "solana-perf",
  "solana-poh",
- "solana-rayon-threadlimit 1.16.17 (git+https://github.com/blockworks-foundation/solana.git?branch=pan/v1.16.17-upgrade-tokio)",
- "solana-rpc-client-api 1.16.17 (git+https://github.com/blockworks-foundation/solana.git?branch=pan/v1.16.17-upgrade-tokio)",
+ "solana-rayon-threadlimit",
+ "solana-rpc-client-api",
  "solana-runtime",
- "solana-sdk 1.16.17 (git+https://github.com/blockworks-foundation/solana.git?branch=pan/v1.16.17-upgrade-tokio)",
+ "solana-sdk",
  "solana-send-transaction-service",
  "solana-stake-program",
  "solana-storage-bigtable",
- "solana-streamer 1.16.17 (git+https://github.com/blockworks-foundation/solana.git?branch=pan/v1.16.17-upgrade-tokio)",
- "solana-tpu-client 1.16.17 (git+https://github.com/blockworks-foundation/solana.git?branch=pan/v1.16.17-upgrade-tokio)",
+ "solana-streamer",
+ "solana-tpu-client",
  "solana-transaction-status 1.16.17 (git+https://github.com/blockworks-foundation/solana.git?branch=pan/v1.16.17-upgrade-tokio)",
- "solana-version 1.16.17 (git+https://github.com/blockworks-foundation/solana.git?branch=pan/v1.16.17-upgrade-tokio)",
- "solana-vote-program 1.16.17 (git+https://github.com/blockworks-foundation/solana.git?branch=pan/v1.16.17-upgrade-tokio)",
+ "solana-version",
+ "solana-vote-program",
  "spl-token 4.0.0",
  "spl-token-2022 0.9.0",
  "stream-cancel",
@@ -7872,32 +7446,6 @@ dependencies = [
 [[package]]
 name = "solana-rpc-client"
 version = "1.16.17"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "dc51a85c6ff03bb4a3e1fde1e36dcb553b990f2b3e66aed941a31a6a7c20fa33"
-dependencies = [
- "async-trait",
- "base64 0.21.7",
- "bincode",
- "bs58 0.4.0",
- "indicatif",
- "log 0.4.20",
- "reqwest",
- "semver 1.0.21",
- "serde",
- "serde_derive",
- "serde_json",
- "solana-account-decoder 1.16.17 (registry+https://github.com/rust-lang/crates.io-index)",
- "solana-rpc-client-api 1.16.17 (registry+https://github.com/rust-lang/crates.io-index)",
- "solana-sdk 1.16.17 (registry+https://github.com/rust-lang/crates.io-index)",
- "solana-transaction-status 1.16.17 (registry+https://github.com/rust-lang/crates.io-index)",
- "solana-version 1.16.17 (registry+https://github.com/rust-lang/crates.io-index)",
- "solana-vote-program 1.16.17 (registry+https://github.com/rust-lang/crates.io-index)",
- "tokio",
-]
-
-[[package]]
-name = "solana-rpc-client"
-version = "1.16.17"
 source = "git+https://github.com/blockworks-foundation/solana.git?branch=pan/v1.16.17-upgrade-tokio#0b395f463097112fc028522fa0081a4374dd2168"
 dependencies = [
  "async-trait",
@@ -7911,35 +7459,13 @@ dependencies = [
  "serde",
  "serde_derive",
  "serde_json",
- "solana-account-decoder 1.16.17 (git+https://github.com/blockworks-foundation/solana.git?branch=pan/v1.16.17-upgrade-tokio)",
- "solana-rpc-client-api 1.16.17 (git+https://github.com/blockworks-foundation/solana.git?branch=pan/v1.16.17-upgrade-tokio)",
- "solana-sdk 1.16.17 (git+https://github.com/blockworks-foundation/solana.git?branch=pan/v1.16.17-upgrade-tokio)",
+ "solana-account-decoder",
+ "solana-rpc-client-api",
+ "solana-sdk",
  "solana-transaction-status 1.16.17 (git+https://github.com/blockworks-foundation/solana.git?branch=pan/v1.16.17-upgrade-tokio)",
- "solana-version 1.16.17 (git+https://github.com/blockworks-foundation/solana.git?branch=pan/v1.16.17-upgrade-tokio)",
- "solana-vote-program 1.16.17 (git+https://github.com/blockworks-foundation/solana.git?branch=pan/v1.16.17-upgrade-tokio)",
+ "solana-version",
+ "solana-vote-program",
  "tokio",
-]
-
-[[package]]
-name = "solana-rpc-client-api"
-version = "1.16.17"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6756a1f89f509154644a958869c7cc6c70cc622f44faddf9b94612d8d2d8eed5"
-dependencies = [
- "base64 0.21.7",
- "bs58 0.4.0",
- "jsonrpc-core 18.0.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "reqwest",
- "semver 1.0.21",
- "serde",
- "serde_derive",
- "serde_json",
- "solana-account-decoder 1.16.17 (registry+https://github.com/rust-lang/crates.io-index)",
- "solana-sdk 1.16.17 (registry+https://github.com/rust-lang/crates.io-index)",
- "solana-transaction-status 1.16.17 (registry+https://github.com/rust-lang/crates.io-index)",
- "solana-version 1.16.17 (registry+https://github.com/rust-lang/crates.io-index)",
- "spl-token-2022 0.9.0",
- "thiserror",
 ]
 
 [[package]]
@@ -7955,24 +7481,11 @@ dependencies = [
  "serde",
  "serde_derive",
  "serde_json",
- "solana-account-decoder 1.16.17 (git+https://github.com/blockworks-foundation/solana.git?branch=pan/v1.16.17-upgrade-tokio)",
- "solana-sdk 1.16.17 (git+https://github.com/blockworks-foundation/solana.git?branch=pan/v1.16.17-upgrade-tokio)",
+ "solana-account-decoder",
+ "solana-sdk",
  "solana-transaction-status 1.16.17 (git+https://github.com/blockworks-foundation/solana.git?branch=pan/v1.16.17-upgrade-tokio)",
- "solana-version 1.16.17 (git+https://github.com/blockworks-foundation/solana.git?branch=pan/v1.16.17-upgrade-tokio)",
+ "solana-version",
  "spl-token-2022 0.9.0",
- "thiserror",
-]
-
-[[package]]
-name = "solana-rpc-client-nonce-utils"
-version = "1.16.17"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4850e8db607525a36d330f073703e78e908a54ac66aa323a44cfc12c14c16699"
-dependencies = [
- "clap 2.34.0",
- "solana-clap-utils 1.16.17 (registry+https://github.com/rust-lang/crates.io-index)",
- "solana-rpc-client 1.16.17 (registry+https://github.com/rust-lang/crates.io-index)",
- "solana-sdk 1.16.17 (registry+https://github.com/rust-lang/crates.io-index)",
  "thiserror",
 ]
 
@@ -7982,9 +7495,9 @@ version = "1.16.17"
 source = "git+https://github.com/blockworks-foundation/solana.git?branch=pan/v1.16.17-upgrade-tokio#0b395f463097112fc028522fa0081a4374dd2168"
 dependencies = [
  "clap 2.34.0",
- "solana-clap-utils 1.16.17 (git+https://github.com/blockworks-foundation/solana.git?branch=pan/v1.16.17-upgrade-tokio)",
- "solana-rpc-client 1.16.17 (git+https://github.com/blockworks-foundation/solana.git?branch=pan/v1.16.17-upgrade-tokio)",
- "solana-sdk 1.16.17 (git+https://github.com/blockworks-foundation/solana.git?branch=pan/v1.16.17-upgrade-tokio)",
+ "solana-clap-utils",
+ "solana-rpc-client",
+ "solana-sdk",
  "thiserror",
 ]
 
@@ -8027,23 +7540,23 @@ dependencies = [
  "rustc_version 0.4.0",
  "serde",
  "serde_derive",
- "solana-address-lookup-table-program 1.16.17 (git+https://github.com/blockworks-foundation/solana.git?branch=pan/v1.16.17-upgrade-tokio)",
+ "solana-address-lookup-table-program",
  "solana-bpf-loader-program",
  "solana-bucket-map",
  "solana-compute-budget-program",
- "solana-config-program 1.16.17 (git+https://github.com/blockworks-foundation/solana.git?branch=pan/v1.16.17-upgrade-tokio)",
- "solana-frozen-abi 1.16.17 (git+https://github.com/blockworks-foundation/solana.git?branch=pan/v1.16.17-upgrade-tokio)",
- "solana-frozen-abi-macro 1.16.17 (git+https://github.com/blockworks-foundation/solana.git?branch=pan/v1.16.17-upgrade-tokio)",
+ "solana-config-program",
+ "solana-frozen-abi",
+ "solana-frozen-abi-macro",
  "solana-loader-v4-program",
- "solana-measure 1.16.17 (git+https://github.com/blockworks-foundation/solana.git?branch=pan/v1.16.17-upgrade-tokio)",
- "solana-metrics 1.16.17 (git+https://github.com/blockworks-foundation/solana.git?branch=pan/v1.16.17-upgrade-tokio)",
- "solana-perf 1.16.17 (git+https://github.com/blockworks-foundation/solana.git?branch=pan/v1.16.17-upgrade-tokio)",
- "solana-program-runtime 1.16.17 (git+https://github.com/blockworks-foundation/solana.git?branch=pan/v1.16.17-upgrade-tokio)",
- "solana-rayon-threadlimit 1.16.17 (git+https://github.com/blockworks-foundation/solana.git?branch=pan/v1.16.17-upgrade-tokio)",
- "solana-sdk 1.16.17 (git+https://github.com/blockworks-foundation/solana.git?branch=pan/v1.16.17-upgrade-tokio)",
+ "solana-measure",
+ "solana-metrics",
+ "solana-perf",
+ "solana-program-runtime",
+ "solana-rayon-threadlimit",
+ "solana-sdk",
  "solana-stake-program",
  "solana-system-program",
- "solana-vote-program 1.16.17 (git+https://github.com/blockworks-foundation/solana.git?branch=pan/v1.16.17-upgrade-tokio)",
+ "solana-vote-program",
  "solana-zk-token-proof-program",
  "solana-zk-token-sdk 1.16.17 (git+https://github.com/blockworks-foundation/solana.git?branch=pan/v1.16.17-upgrade-tokio)",
  "static_assertions",
@@ -8054,59 +7567,6 @@ dependencies = [
  "tempfile",
  "thiserror",
  "zstd",
-]
-
-[[package]]
-name = "solana-sdk"
-version = "1.16.17"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4106cda3d10833ba957dbd25fb841b50aeca7480ccf8f54859294716f54bcd4b"
-dependencies = [
- "assert_matches",
- "base64 0.21.7",
- "bincode",
- "bitflags 1.3.2",
- "borsh 0.10.3",
- "bs58 0.4.0",
- "bytemuck",
- "byteorder",
- "chrono",
- "derivation-path",
- "digest 0.10.7",
- "ed25519-dalek",
- "ed25519-dalek-bip32",
- "generic-array 0.14.7",
- "hmac 0.12.1",
- "itertools 0.10.5",
- "js-sys",
- "lazy_static",
- "libsecp256k1",
- "log 0.4.20",
- "memmap2",
- "num-derive 0.3.3",
- "num-traits",
- "num_enum 0.6.1",
- "pbkdf2 0.11.0",
- "qstring",
- "rand 0.7.3",
- "rand_chacha 0.2.2",
- "rustc_version 0.4.0",
- "rustversion",
- "serde",
- "serde_bytes",
- "serde_derive",
- "serde_json",
- "serde_with",
- "sha2 0.10.8",
- "sha3 0.10.8",
- "solana-frozen-abi 1.16.17 (registry+https://github.com/rust-lang/crates.io-index)",
- "solana-frozen-abi-macro 1.16.17 (registry+https://github.com/rust-lang/crates.io-index)",
- "solana-logger 1.16.17 (registry+https://github.com/rust-lang/crates.io-index)",
- "solana-program 1.16.17 (registry+https://github.com/rust-lang/crates.io-index)",
- "solana-sdk-macro 1.16.17 (registry+https://github.com/rust-lang/crates.io-index)",
- "thiserror",
- "uriparse",
- "wasm-bindgen",
 ]
 
 [[package]]
@@ -8151,27 +7611,14 @@ dependencies = [
  "serde_with",
  "sha2 0.10.8",
  "sha3 0.10.8",
- "solana-frozen-abi 1.16.17 (git+https://github.com/blockworks-foundation/solana.git?branch=pan/v1.16.17-upgrade-tokio)",
- "solana-frozen-abi-macro 1.16.17 (git+https://github.com/blockworks-foundation/solana.git?branch=pan/v1.16.17-upgrade-tokio)",
- "solana-logger 1.16.17 (git+https://github.com/blockworks-foundation/solana.git?branch=pan/v1.16.17-upgrade-tokio)",
- "solana-program 1.16.17 (git+https://github.com/blockworks-foundation/solana.git?branch=pan/v1.16.17-upgrade-tokio)",
- "solana-sdk-macro 1.16.17 (git+https://github.com/blockworks-foundation/solana.git?branch=pan/v1.16.17-upgrade-tokio)",
+ "solana-frozen-abi",
+ "solana-frozen-abi-macro",
+ "solana-logger",
+ "solana-program",
+ "solana-sdk-macro",
  "thiserror",
  "uriparse",
  "wasm-bindgen",
-]
-
-[[package]]
-name = "solana-sdk-macro"
-version = "1.16.17"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1e560806a3859717eb2220b26e2cd68bb757b63affa3e79c3f1d8d853b5ee78f"
-dependencies = [
- "bs58 0.4.0",
- "proc-macro2 1.0.76",
- "quote 1.0.35",
- "rustversion",
- "syn 2.0.48",
 ]
 
 [[package]]
@@ -8199,12 +7646,12 @@ source = "git+https://github.com/blockworks-foundation/solana.git?branch=pan/v1.
 dependencies = [
  "crossbeam-channel",
  "log 0.4.20",
- "solana-client 1.16.17 (git+https://github.com/blockworks-foundation/solana.git?branch=pan/v1.16.17-upgrade-tokio)",
- "solana-measure 1.16.17 (git+https://github.com/blockworks-foundation/solana.git?branch=pan/v1.16.17-upgrade-tokio)",
- "solana-metrics 1.16.17 (git+https://github.com/blockworks-foundation/solana.git?branch=pan/v1.16.17-upgrade-tokio)",
+ "solana-client",
+ "solana-measure",
+ "solana-metrics",
  "solana-runtime",
- "solana-sdk 1.16.17 (git+https://github.com/blockworks-foundation/solana.git?branch=pan/v1.16.17-upgrade-tokio)",
- "solana-tpu-client 1.16.17 (git+https://github.com/blockworks-foundation/solana.git?branch=pan/v1.16.17-upgrade-tokio)",
+ "solana-sdk",
+ "solana-tpu-client",
 ]
 
 [[package]]
@@ -8215,10 +7662,10 @@ dependencies = [
  "bincode",
  "log 0.4.20",
  "rustc_version 0.4.0",
- "solana-config-program 1.16.17 (git+https://github.com/blockworks-foundation/solana.git?branch=pan/v1.16.17-upgrade-tokio)",
- "solana-program-runtime 1.16.17 (git+https://github.com/blockworks-foundation/solana.git?branch=pan/v1.16.17-upgrade-tokio)",
- "solana-sdk 1.16.17 (git+https://github.com/blockworks-foundation/solana.git?branch=pan/v1.16.17-upgrade-tokio)",
- "solana-vote-program 1.16.17 (git+https://github.com/blockworks-foundation/solana.git?branch=pan/v1.16.17-upgrade-tokio)",
+ "solana-config-program",
+ "solana-program-runtime",
+ "solana-sdk",
+ "solana-vote-program",
 ]
 
 [[package]]
@@ -8244,8 +7691,8 @@ dependencies = [
  "serde",
  "serde_derive",
  "smpl_jwt",
- "solana-metrics 1.16.17 (git+https://github.com/blockworks-foundation/solana.git?branch=pan/v1.16.17-upgrade-tokio)",
- "solana-sdk 1.16.17 (git+https://github.com/blockworks-foundation/solana.git?branch=pan/v1.16.17-upgrade-tokio)",
+ "solana-metrics",
+ "solana-sdk",
  "solana-storage-proto",
  "solana-transaction-status 1.16.17 (git+https://github.com/blockworks-foundation/solana.git?branch=pan/v1.16.17-upgrade-tokio)",
  "thiserror",
@@ -8264,43 +7711,10 @@ dependencies = [
  "prost 0.11.9",
  "protobuf-src",
  "serde",
- "solana-account-decoder 1.16.17 (git+https://github.com/blockworks-foundation/solana.git?branch=pan/v1.16.17-upgrade-tokio)",
- "solana-sdk 1.16.17 (git+https://github.com/blockworks-foundation/solana.git?branch=pan/v1.16.17-upgrade-tokio)",
+ "solana-account-decoder",
+ "solana-sdk",
  "solana-transaction-status 1.16.17 (git+https://github.com/blockworks-foundation/solana.git?branch=pan/v1.16.17-upgrade-tokio)",
  "tonic-build 0.8.4",
-]
-
-[[package]]
-name = "solana-streamer"
-version = "1.16.17"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "78f142cbb497d257e70253c158a4c34037e310d24a055fae7dbc5c396b7611aa"
-dependencies = [
- "async-channel",
- "bytes 1.5.0",
- "crossbeam-channel",
- "futures-util",
- "histogram",
- "indexmap 1.9.3",
- "itertools 0.10.5",
- "libc",
- "log 0.4.20",
- "nix",
- "pem",
- "percentage",
- "pkcs8",
- "quinn",
- "quinn-proto",
- "quinn-udp",
- "rand 0.7.3",
- "rcgen",
- "rustls 0.20.9",
- "solana-metrics 1.16.17 (registry+https://github.com/rust-lang/crates.io-index)",
- "solana-perf 1.16.17 (registry+https://github.com/rust-lang/crates.io-index)",
- "solana-sdk 1.16.17 (registry+https://github.com/rust-lang/crates.io-index)",
- "thiserror",
- "tokio",
- "x509-parser",
 ]
 
 [[package]]
@@ -8327,9 +7741,9 @@ dependencies = [
  "rand 0.7.3",
  "rcgen",
  "rustls 0.20.9",
- "solana-metrics 1.16.17 (git+https://github.com/blockworks-foundation/solana.git?branch=pan/v1.16.17-upgrade-tokio)",
- "solana-perf 1.16.17 (git+https://github.com/blockworks-foundation/solana.git?branch=pan/v1.16.17-upgrade-tokio)",
- "solana-sdk 1.16.17 (git+https://github.com/blockworks-foundation/solana.git?branch=pan/v1.16.17-upgrade-tokio)",
+ "solana-metrics",
+ "solana-perf",
+ "solana-sdk",
  "thiserror",
  "tokio",
  "x509-parser",
@@ -8344,23 +7758,8 @@ dependencies = [
  "log 0.4.20",
  "serde",
  "serde_derive",
- "solana-program-runtime 1.16.17 (git+https://github.com/blockworks-foundation/solana.git?branch=pan/v1.16.17-upgrade-tokio)",
- "solana-sdk 1.16.17 (git+https://github.com/blockworks-foundation/solana.git?branch=pan/v1.16.17-upgrade-tokio)",
-]
-
-[[package]]
-name = "solana-thin-client"
-version = "1.16.17"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e0e41ce715b34749d2c0d3181dd910d2b99fa2142a0aaf3cd44926cb02edd60d"
-dependencies = [
- "bincode",
- "log 0.4.20",
- "rayon",
- "solana-connection-cache 1.16.17 (registry+https://github.com/rust-lang/crates.io-index)",
- "solana-rpc-client 1.16.17 (registry+https://github.com/rust-lang/crates.io-index)",
- "solana-rpc-client-api 1.16.17 (registry+https://github.com/rust-lang/crates.io-index)",
- "solana-sdk 1.16.17 (registry+https://github.com/rust-lang/crates.io-index)",
+ "solana-program-runtime",
+ "solana-sdk",
 ]
 
 [[package]]
@@ -8371,35 +7770,10 @@ dependencies = [
  "bincode",
  "log 0.4.20",
  "rayon",
- "solana-connection-cache 1.16.17 (git+https://github.com/blockworks-foundation/solana.git?branch=pan/v1.16.17-upgrade-tokio)",
- "solana-rpc-client 1.16.17 (git+https://github.com/blockworks-foundation/solana.git?branch=pan/v1.16.17-upgrade-tokio)",
- "solana-rpc-client-api 1.16.17 (git+https://github.com/blockworks-foundation/solana.git?branch=pan/v1.16.17-upgrade-tokio)",
- "solana-sdk 1.16.17 (git+https://github.com/blockworks-foundation/solana.git?branch=pan/v1.16.17-upgrade-tokio)",
-]
-
-[[package]]
-name = "solana-tpu-client"
-version = "1.16.17"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "84ec99361a39e17a2bffe2a59b97b3d20ddef323f9166929783ce49f340c200d"
-dependencies = [
- "async-trait",
- "bincode",
- "futures-util",
- "indexmap 1.9.3",
- "indicatif",
- "log 0.4.20",
- "rand 0.7.3",
- "rayon",
- "solana-connection-cache 1.16.17 (registry+https://github.com/rust-lang/crates.io-index)",
- "solana-measure 1.16.17 (registry+https://github.com/rust-lang/crates.io-index)",
- "solana-metrics 1.16.17 (registry+https://github.com/rust-lang/crates.io-index)",
- "solana-pubsub-client 1.16.17 (registry+https://github.com/rust-lang/crates.io-index)",
- "solana-rpc-client 1.16.17 (registry+https://github.com/rust-lang/crates.io-index)",
- "solana-rpc-client-api 1.16.17 (registry+https://github.com/rust-lang/crates.io-index)",
- "solana-sdk 1.16.17 (registry+https://github.com/rust-lang/crates.io-index)",
- "thiserror",
- "tokio",
+ "solana-connection-cache",
+ "solana-rpc-client",
+ "solana-rpc-client-api",
+ "solana-sdk",
 ]
 
 [[package]]
@@ -8415,13 +7789,13 @@ dependencies = [
  "log 0.4.20",
  "rand 0.7.3",
  "rayon",
- "solana-connection-cache 1.16.17 (git+https://github.com/blockworks-foundation/solana.git?branch=pan/v1.16.17-upgrade-tokio)",
- "solana-measure 1.16.17 (git+https://github.com/blockworks-foundation/solana.git?branch=pan/v1.16.17-upgrade-tokio)",
- "solana-metrics 1.16.17 (git+https://github.com/blockworks-foundation/solana.git?branch=pan/v1.16.17-upgrade-tokio)",
- "solana-pubsub-client 1.16.17 (git+https://github.com/blockworks-foundation/solana.git?branch=pan/v1.16.17-upgrade-tokio)",
- "solana-rpc-client 1.16.17 (git+https://github.com/blockworks-foundation/solana.git?branch=pan/v1.16.17-upgrade-tokio)",
- "solana-rpc-client-api 1.16.17 (git+https://github.com/blockworks-foundation/solana.git?branch=pan/v1.16.17-upgrade-tokio)",
- "solana-sdk 1.16.17 (git+https://github.com/blockworks-foundation/solana.git?branch=pan/v1.16.17-upgrade-tokio)",
+ "solana-connection-cache",
+ "solana-measure",
+ "solana-metrics",
+ "solana-pubsub-client",
+ "solana-rpc-client",
+ "solana-rpc-client-api",
+ "solana-sdk",
  "thiserror",
  "tokio",
 ]
@@ -8442,9 +7816,9 @@ dependencies = [
  "serde",
  "serde_derive",
  "serde_json",
- "solana-account-decoder 1.16.17 (registry+https://github.com/rust-lang/crates.io-index)",
- "solana-address-lookup-table-program 1.16.17 (registry+https://github.com/rust-lang/crates.io-index)",
- "solana-sdk 1.16.17 (registry+https://github.com/rust-lang/crates.io-index)",
+ "solana-account-decoder",
+ "solana-address-lookup-table-program",
+ "solana-sdk",
  "spl-associated-token-account 2.2.0",
  "spl-memo 4.0.0",
  "spl-token 4.0.0",
@@ -8467,9 +7841,9 @@ dependencies = [
  "serde",
  "serde_derive",
  "serde_json",
- "solana-account-decoder 1.16.17 (git+https://github.com/blockworks-foundation/solana.git?branch=pan/v1.16.17-upgrade-tokio)",
- "solana-address-lookup-table-program 1.16.17 (git+https://github.com/blockworks-foundation/solana.git?branch=pan/v1.16.17-upgrade-tokio)",
- "solana-sdk 1.16.17 (git+https://github.com/blockworks-foundation/solana.git?branch=pan/v1.16.17-upgrade-tokio)",
+ "solana-account-decoder",
+ "solana-address-lookup-table-program",
+ "solana-sdk",
  "spl-associated-token-account 2.2.0",
  "spl-memo 4.0.0",
  "spl-token 4.0.0",
@@ -8480,46 +7854,15 @@ dependencies = [
 [[package]]
 name = "solana-udp-client"
 version = "1.16.17"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "16b438036719e5c1201aba2336a5dc1caa8c8eefafd7110b7a3818ae199b54da"
-dependencies = [
- "async-trait",
- "solana-connection-cache 1.16.17 (registry+https://github.com/rust-lang/crates.io-index)",
- "solana-net-utils 1.16.17 (registry+https://github.com/rust-lang/crates.io-index)",
- "solana-sdk 1.16.17 (registry+https://github.com/rust-lang/crates.io-index)",
- "solana-streamer 1.16.17 (registry+https://github.com/rust-lang/crates.io-index)",
- "thiserror",
- "tokio",
-]
-
-[[package]]
-name = "solana-udp-client"
-version = "1.16.17"
 source = "git+https://github.com/blockworks-foundation/solana.git?branch=pan/v1.16.17-upgrade-tokio#0b395f463097112fc028522fa0081a4374dd2168"
 dependencies = [
  "async-trait",
- "solana-connection-cache 1.16.17 (git+https://github.com/blockworks-foundation/solana.git?branch=pan/v1.16.17-upgrade-tokio)",
- "solana-net-utils 1.16.17 (git+https://github.com/blockworks-foundation/solana.git?branch=pan/v1.16.17-upgrade-tokio)",
- "solana-sdk 1.16.17 (git+https://github.com/blockworks-foundation/solana.git?branch=pan/v1.16.17-upgrade-tokio)",
- "solana-streamer 1.16.17 (git+https://github.com/blockworks-foundation/solana.git?branch=pan/v1.16.17-upgrade-tokio)",
+ "solana-connection-cache",
+ "solana-net-utils",
+ "solana-sdk",
+ "solana-streamer",
  "thiserror",
  "tokio",
-]
-
-[[package]]
-name = "solana-version"
-version = "1.16.17"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "62847d7ef409e3b410f65e726bf7816d8f8d0330918e78537e940bdf1ca061ae"
-dependencies = [
- "log 0.4.20",
- "rustc_version 0.4.0",
- "semver 1.0.21",
- "serde",
- "serde_derive",
- "solana-frozen-abi 1.16.17 (registry+https://github.com/rust-lang/crates.io-index)",
- "solana-frozen-abi-macro 1.16.17 (registry+https://github.com/rust-lang/crates.io-index)",
- "solana-sdk 1.16.17 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
@@ -8532,31 +7875,9 @@ dependencies = [
  "semver 1.0.21",
  "serde",
  "serde_derive",
- "solana-frozen-abi 1.16.17 (git+https://github.com/blockworks-foundation/solana.git?branch=pan/v1.16.17-upgrade-tokio)",
- "solana-frozen-abi-macro 1.16.17 (git+https://github.com/blockworks-foundation/solana.git?branch=pan/v1.16.17-upgrade-tokio)",
- "solana-sdk 1.16.17 (git+https://github.com/blockworks-foundation/solana.git?branch=pan/v1.16.17-upgrade-tokio)",
-]
-
-[[package]]
-name = "solana-vote-program"
-version = "1.16.17"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fb0c3e5ee7bd03b249c6b80eead5620af62bc7ef1af8ea4f499b8054b00e9c7d"
-dependencies = [
- "bincode",
- "log 0.4.20",
- "num-derive 0.3.3",
- "num-traits",
- "rustc_version 0.4.0",
- "serde",
- "serde_derive",
- "solana-frozen-abi 1.16.17 (registry+https://github.com/rust-lang/crates.io-index)",
- "solana-frozen-abi-macro 1.16.17 (registry+https://github.com/rust-lang/crates.io-index)",
- "solana-metrics 1.16.17 (registry+https://github.com/rust-lang/crates.io-index)",
- "solana-program 1.16.17 (registry+https://github.com/rust-lang/crates.io-index)",
- "solana-program-runtime 1.16.17 (registry+https://github.com/rust-lang/crates.io-index)",
- "solana-sdk 1.16.17 (registry+https://github.com/rust-lang/crates.io-index)",
- "thiserror",
+ "solana-frozen-abi",
+ "solana-frozen-abi-macro",
+ "solana-sdk",
 ]
 
 [[package]]
@@ -8571,12 +7892,12 @@ dependencies = [
  "rustc_version 0.4.0",
  "serde",
  "serde_derive",
- "solana-frozen-abi 1.16.17 (git+https://github.com/blockworks-foundation/solana.git?branch=pan/v1.16.17-upgrade-tokio)",
- "solana-frozen-abi-macro 1.16.17 (git+https://github.com/blockworks-foundation/solana.git?branch=pan/v1.16.17-upgrade-tokio)",
- "solana-metrics 1.16.17 (git+https://github.com/blockworks-foundation/solana.git?branch=pan/v1.16.17-upgrade-tokio)",
- "solana-program 1.16.17 (git+https://github.com/blockworks-foundation/solana.git?branch=pan/v1.16.17-upgrade-tokio)",
- "solana-program-runtime 1.16.17 (git+https://github.com/blockworks-foundation/solana.git?branch=pan/v1.16.17-upgrade-tokio)",
- "solana-sdk 1.16.17 (git+https://github.com/blockworks-foundation/solana.git?branch=pan/v1.16.17-upgrade-tokio)",
+ "solana-frozen-abi",
+ "solana-frozen-abi-macro",
+ "solana-metrics",
+ "solana-program",
+ "solana-program-runtime",
+ "solana-sdk",
  "thiserror",
 ]
 
@@ -8589,8 +7910,8 @@ dependencies = [
  "getrandom 0.1.16",
  "num-derive 0.3.3",
  "num-traits",
- "solana-program-runtime 1.16.17 (git+https://github.com/blockworks-foundation/solana.git?branch=pan/v1.16.17-upgrade-tokio)",
- "solana-sdk 1.16.17 (git+https://github.com/blockworks-foundation/solana.git?branch=pan/v1.16.17-upgrade-tokio)",
+ "solana-program-runtime",
+ "solana-sdk",
  "solana-zk-token-sdk 1.16.17 (git+https://github.com/blockworks-foundation/solana.git?branch=pan/v1.16.17-upgrade-tokio)",
 ]
 
@@ -8616,8 +7937,8 @@ dependencies = [
  "serde",
  "serde_json",
  "sha3 0.9.1",
- "solana-program 1.16.17 (registry+https://github.com/rust-lang/crates.io-index)",
- "solana-sdk 1.16.17 (registry+https://github.com/rust-lang/crates.io-index)",
+ "solana-program",
+ "solana-sdk",
  "subtle",
  "thiserror",
  "zeroize",
@@ -8644,8 +7965,8 @@ dependencies = [
  "serde",
  "serde_json",
  "sha3 0.9.1",
- "solana-program 1.16.17 (git+https://github.com/blockworks-foundation/solana.git?branch=pan/v1.16.17-upgrade-tokio)",
- "solana-sdk 1.16.17 (git+https://github.com/blockworks-foundation/solana.git?branch=pan/v1.16.17-upgrade-tokio)",
+ "solana-program",
+ "solana-sdk",
  "subtle",
  "thiserror",
  "zeroize",
@@ -8702,7 +8023,7 @@ dependencies = [
  "borsh 0.9.3",
  "num-derive 0.3.3",
  "num-traits",
- "solana-program 1.16.17 (registry+https://github.com/rust-lang/crates.io-index)",
+ "solana-program",
  "spl-token 3.5.0",
  "spl-token-2022 0.6.1",
  "thiserror",
@@ -8718,7 +8039,7 @@ dependencies = [
  "borsh 0.10.3",
  "num-derive 0.4.1",
  "num-traits",
- "solana-program 1.16.17 (registry+https://github.com/rust-lang/crates.io-index)",
+ "solana-program",
  "spl-token 4.0.0",
  "spl-token-2022 0.9.0",
  "thiserror",
@@ -8731,7 +8052,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "cce5d563b58ef1bb2cdbbfe0dfb9ffdc24903b10ae6a4df2d8f425ece375033f"
 dependencies = [
  "bytemuck",
- "solana-program 1.16.17 (registry+https://github.com/rust-lang/crates.io-index)",
+ "solana-program",
  "spl-discriminator-derive",
 ]
 
@@ -8765,7 +8086,7 @@ version = "3.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "bd0dc6f70db6bacea7ff25870b016a65ba1d1b6013536f08e4fd79a8f9005325"
 dependencies = [
- "solana-program 1.16.17 (registry+https://github.com/rust-lang/crates.io-index)",
+ "solana-program",
 ]
 
 [[package]]
@@ -8774,7 +8095,7 @@ version = "4.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f0f180b03318c3dbab3ef4e1e4d46d5211ae3c780940dd0a28695aba4b59a75a"
 dependencies = [
- "solana-program 1.16.17 (registry+https://github.com/rust-lang/crates.io-index)",
+ "solana-program",
 ]
 
 [[package]]
@@ -8785,7 +8106,7 @@ checksum = "2881dddfca792737c0706fa0175345ab282b1b0879c7d877bad129645737c079"
 dependencies = [
  "borsh 0.10.3",
  "bytemuck",
- "solana-program 1.16.17 (registry+https://github.com/rust-lang/crates.io-index)",
+ "solana-program",
  "solana-zk-token-sdk 1.16.17 (registry+https://github.com/rust-lang/crates.io-index)",
  "spl-program-error",
 ]
@@ -8798,7 +8119,7 @@ checksum = "249e0318493b6bcf27ae9902600566c689b7dfba9f1bdff5893e92253374e78c"
 dependencies = [
  "num-derive 0.4.1",
  "num-traits",
- "solana-program 1.16.17 (registry+https://github.com/rust-lang/crates.io-index)",
+ "solana-program",
  "spl-program-error-derive",
  "thiserror",
 ]
@@ -8822,7 +8143,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "062e148d3eab7b165582757453632ffeef490c02c86a48bfdb4988f63eefb3b9"
 dependencies = [
  "bytemuck",
- "solana-program 1.16.17 (registry+https://github.com/rust-lang/crates.io-index)",
+ "solana-program",
  "spl-discriminator",
  "spl-pod",
  "spl-program-error",
@@ -8840,7 +8161,7 @@ dependencies = [
  "num-derive 0.3.3",
  "num-traits",
  "num_enum 0.5.11",
- "solana-program 1.16.17 (registry+https://github.com/rust-lang/crates.io-index)",
+ "solana-program",
  "thiserror",
 ]
 
@@ -8855,7 +8176,7 @@ dependencies = [
  "num-derive 0.3.3",
  "num-traits",
  "num_enum 0.6.1",
- "solana-program 1.16.17 (registry+https://github.com/rust-lang/crates.io-index)",
+ "solana-program",
  "thiserror",
 ]
 
@@ -8870,7 +8191,7 @@ dependencies = [
  "num-derive 0.3.3",
  "num-traits",
  "num_enum 0.5.11",
- "solana-program 1.16.17 (registry+https://github.com/rust-lang/crates.io-index)",
+ "solana-program",
  "solana-zk-token-sdk 1.16.17 (registry+https://github.com/rust-lang/crates.io-index)",
  "spl-memo 3.0.1",
  "spl-token 3.5.0",
@@ -8888,7 +8209,7 @@ dependencies = [
  "num-derive 0.4.1",
  "num-traits",
  "num_enum 0.7.2",
- "solana-program 1.16.17 (registry+https://github.com/rust-lang/crates.io-index)",
+ "solana-program",
  "solana-zk-token-sdk 1.16.17 (registry+https://github.com/rust-lang/crates.io-index)",
  "spl-memo 4.0.0",
  "spl-pod",
@@ -8906,7 +8227,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4c16ce3ba6979645fb7627aa1e435576172dd63088dc7848cb09aa331fa1fe4f"
 dependencies = [
  "borsh 0.10.3",
- "solana-program 1.16.17 (registry+https://github.com/rust-lang/crates.io-index)",
+ "solana-program",
  "spl-discriminator",
  "spl-pod",
  "spl-program-error",
@@ -8921,7 +8242,7 @@ checksum = "051d31803f873cabe71aec3c1b849f35248beae5d19a347d93a5c9cccc5d5a9b"
 dependencies = [
  "arrayref",
  "bytemuck",
- "solana-program 1.16.17 (registry+https://github.com/rust-lang/crates.io-index)",
+ "solana-program",
  "spl-discriminator",
  "spl-pod",
  "spl-program-error",
@@ -8936,7 +8257,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a468e6f6371f9c69aae760186ea9f1a01c2908351b06a5e0026d21cfc4d7ecac"
 dependencies = [
  "bytemuck",
- "solana-program 1.16.17 (registry+https://github.com/rust-lang/crates.io-index)",
+ "solana-program",
  "spl-discriminator",
  "spl-pod",
  "spl-program-error",
@@ -9125,7 +8446,7 @@ dependencies = [
  "bytemuck",
  "byteorder",
  "quick-protobuf",
- "solana-program 1.16.17 (registry+https://github.com/rust-lang/crates.io-index)",
+ "solana-program",
  "switchboard-protos",
  "switchboard-utils",
 ]
@@ -9166,10 +8487,10 @@ dependencies = [
  "serde_json",
  "sgx-quote",
  "sha2 0.10.8",
- "solana-account-decoder 1.16.17 (registry+https://github.com/rust-lang/crates.io-index)",
- "solana-address-lookup-table-program 1.16.17 (registry+https://github.com/rust-lang/crates.io-index)",
- "solana-client 1.16.17 (registry+https://github.com/rust-lang/crates.io-index)",
- "solana-program 1.16.17 (registry+https://github.com/rust-lang/crates.io-index)",
+ "solana-account-decoder",
+ "solana-address-lookup-table-program",
+ "solana-client",
+ "solana-program",
  "superslice",
  "switchboard-common",
  "tokio",
@@ -9189,7 +8510,7 @@ dependencies = [
  "quick-protobuf",
  "rust_decimal",
  "rust_decimal_macros",
- "solana-program 1.16.17 (registry+https://github.com/rust-lang/crates.io-index)",
+ "solana-program",
  "switchboard-protos",
 ]
 
@@ -9203,7 +8524,7 @@ dependencies = [
  "anchor-spl 0.28.0",
  "bytemuck",
  "rust_decimal",
- "solana-program 1.16.17 (registry+https://github.com/rust-lang/crates.io-index)",
+ "solana-program",
  "superslice",
 ]
 
@@ -10964,8 +10285,8 @@ dependencies = [
  "bincode",
  "prost 0.12.3",
  "protobuf-src",
- "solana-account-decoder 1.16.17 (registry+https://github.com/rust-lang/crates.io-index)",
- "solana-sdk 1.16.17 (registry+https://github.com/rust-lang/crates.io-index)",
+ "solana-account-decoder",
+ "solana-sdk",
  "solana-transaction-status 1.16.17 (registry+https://github.com/rust-lang/crates.io-index)",
  "tonic 0.10.2",
  "tonic-build 0.10.2",

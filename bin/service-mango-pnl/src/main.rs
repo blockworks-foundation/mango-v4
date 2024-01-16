@@ -19,6 +19,7 @@ use anchor_client::Cluster;
 use anchor_lang::Discriminator;
 use fixed::types::I80F48;
 use mango_feeds_connector::metrics::*;
+use mango_feeds_connector::TransactionUpdate;
 use mango_v4::state::{MangoAccount, MangoAccountValue, PerpMarketIndex};
 use mango_v4_client::{
     chain_data, health_cache, AccountFetcher, Client, MangoGroupContext, TransactionBuilderConfig,
@@ -307,6 +308,8 @@ async fn main() -> anyhow::Result<()> {
 
     // start filling chain_data from the grpc plugin source
     let (account_write_queue_sender, slot_queue_sender) = memory_target::init(chain_data).await?;
+    let (transaction_queue_sender, _transaction_queue_receiver) =
+        async_channel::unbounded::<TransactionUpdate>();
     let filter_config = FilterConfig {
         entity_filter: EntityFilter::filter_by_program_id(
             "4MangoMjqJ2firMokCjjGgoK8d4MXcrgL7XJaL3w6fVg",
@@ -317,6 +320,7 @@ async fn main() -> anyhow::Result<()> {
         &filter_config,
         account_write_queue_sender,
         slot_queue_sender,
+        transaction_queue_sender,
         metrics_tx.clone(),
         exit.clone(),
     )

@@ -10,9 +10,9 @@ license = "AGPL-3.0-or-later"
 
 [dependencies]
 
-solana-client = "~1.16.7"
-solana-account-decoder = "~1.16.7"
-solana-sdk = "~1.16.7"
+solana-client = "~1.16.17"
+solana-account-decoder = "~1.16.17"
+solana-sdk = "~1.16.17"
 
 
 fixed = { workspace = true }

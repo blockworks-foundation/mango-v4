@@ -26,7 +26,7 @@ use std::{
 use mango_feeds_connector::EntityFilter::FilterByAccountIds;
 use mango_feeds_connector::FilterConfig;
 use mango_feeds_connector::{
-    grpc_plugin_source, metrics, websocket_source, MetricsConfig, SourceConfig,
+    grpc_plugin_source, metrics, websocket_source, MetricsConfig, SourceConfig, TransactionUpdate
 };
 use serde::Deserialize;
 
@@ -137,6 +137,9 @@ async fn main() -> anyhow::Result<()> {
         Keypair::from_bytes(&config.keypair).expect("valid keyair in config"),
     );
 
+    let (transaction_queue_sender, _transaction_queue_receiver) =
+        async_channel::unbounded::<TransactionUpdate>();
+
     info!(
         "connect: {}",
         config
@@ -162,6 +165,7 @@ async fn main() -> anyhow::Result<()> {
             &filter_config,
             account_write_queue_sender,
             slot_queue_sender,
+            transaction_queue_sender,
             metrics_tx.clone(),
             exit.clone(),
         )
