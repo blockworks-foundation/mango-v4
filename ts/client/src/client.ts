@@ -1344,6 +1344,8 @@ export class MangoClient {
     const tokenAccountPk = await getAssociatedTokenAddress(
       mintPk,
       mangoAccount.owner,
+      // Allow ATA authority to be a PDA
+      true,
     );
 
     let wrappedSolAccount: PublicKey | undefined;
