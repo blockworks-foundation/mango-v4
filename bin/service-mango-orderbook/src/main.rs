@@ -33,7 +33,7 @@ use tokio_tungstenite::tungstenite::{protocol::Message, Error};
 
 use mango_feeds_connector::EntityFilter::FilterByAccountIds;
 use mango_feeds_connector::{
-    grpc_plugin_source, metrics, websocket_source, MetricsConfig, SourceConfig,
+    grpc_plugin_source, metrics, websocket_source, MetricsConfig, SourceConfig, TransactionUpdate,
 };
 use mango_feeds_connector::{
     metrics::{MetricType, MetricU64},
@@ -436,6 +436,9 @@ async fn main() -> anyhow::Result<()> {
         )
         .await?;
 
+    let (transaction_queue_sender, _transaction_queue_receiver) =
+        async_channel::unbounded::<TransactionUpdate>();
+
     let level_checkpoints = LevelCheckpointMap::new(Mutex::new(HashMap::new()));
     let book_checkpoints = BookCheckpointMap::new(Mutex::new(HashMap::new()));
     let peers = PeerMap::new(Mutex::new(HashMap::new()));
@@ -585,23 +588,22 @@ async fn main() -> anyhow::Result<()> {
             .collect::<String>()
     );
 
-    let relevant_pubkeys = [market_configs.clone(), serum_market_configs.clone()]
+    let orderbook_pubkeys = [market_configs.clone(), serum_market_configs.clone()]
         .concat()
         .iter()
         .flat_map(|m| [m.1.bids, m.1.asks])
+        .unique()
         .collect_vec();
+    info!("{} orderbook pubkeys", orderbook_pubkeys.len());
+    let oracle_pubkeys = market_configs
+        .iter()
+        .map(|(_, mkt)| mkt.oracle)
+        .unique()
+        .collect_vec();
+    info!("{} oracle pubkeys", oracle_pubkeys.len());
+    let relevant_pubkeys = [orderbook_pubkeys, oracle_pubkeys].concat().to_vec();
     let filter_config = FilterConfig {
-        entity_filter: FilterByAccountIds(
-            [
-                relevant_pubkeys,
-                market_configs
-                    .iter()
-                    .map(|(_, mkt)| mkt.oracle)
-                    .collect_vec(),
-            ]
-            .concat()
-            .to_vec(),
-        ),
+        entity_filter: FilterByAccountIds(relevant_pubkeys),
     };
     let use_geyser = true;
     if use_geyser {
@@ -610,6 +612,7 @@ async fn main() -> anyhow::Result<()> {
             &filter_config,
             account_write_queue_sender,
             slot_queue_sender,
+            transaction_queue_sender,
             metrics_tx.clone(),
             exit.clone(),
         )
