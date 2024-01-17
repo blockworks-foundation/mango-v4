@@ -3,11 +3,17 @@ import { utf8 } from '@coral-xyz/anchor/dist/cjs/utils/bytes';
 import { OpenOrders, Order, Orderbook } from '@project-serum/serum/lib/market';
 import { AccountInfo, PublicKey } from '@solana/web3.js';
 import { MangoClient } from '../client';
-import { OPENBOOK_PROGRAM_ID, RUST_I64_MAX, RUST_I64_MIN } from '../constants';
+import {
+  OPENBOOK_PROGRAM_ID,
+  RUST_I64_MAX,
+  RUST_I64_MIN,
+  USDC_MINT,
+} from '../constants';
 import { I80F48, I80F48Dto, ONE_I80F48, ZERO_I80F48 } from '../numbers/I80F48';
 import {
   U64_MAX_BN,
   roundTo5,
+  toNative,
   toNativeI80F48,
   toUiDecimals,
   toUiDecimalsForQuote,
@@ -622,6 +628,12 @@ export class MangoAccount {
     }
     const sourceBank = group.getFirstBankByMint(sourceMintPk);
     const targetBank = group.getFirstBankByMint(targetMintPk);
+    const targetDecimals = group.getMintDecimals(targetMintPk);
+    const sourceDecimals = group.getMintDecimals(sourceMintPk);
+
+    const targetRemainingDepositLimit =
+      group.getRemainingDepositLimitByMint(targetMintPk);
+
     const hc = HealthCache.fromMangoAccount(group, this);
     let maxSource = hc.getMaxSwapSource(
       sourceBank,
@@ -637,7 +649,20 @@ export class MangoAccount {
       group.getTokenVaultBalanceByMint(sourceBank.mint),
       sourceBalance,
     );
+
     maxSource = maxSource.min(maxWithdrawNative);
+
+    if (targetRemainingDepositLimit) {
+      const adjustedExchangeRate =
+        (targetBank.uiPrice / sourceBank.uiPrice) *
+        Math.pow(10, sourceDecimals - targetDecimals);
+
+      const equivalentSourceAmount =
+        targetRemainingDepositLimit.muln(adjustedExchangeRate);
+
+      maxSource = maxSource.min(I80F48.fromI64(equivalentSourceAmount));
+    }
+
     return toUiDecimals(maxSource, group.getMintDecimals(sourceMintPk));
   }
 

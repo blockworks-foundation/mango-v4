@@ -607,6 +607,27 @@ export class Group {
   /**
    *
    * @param mintPk
+   * @returns remaining deposit limit for mint, returns null if there is no limit for bank
+   */
+  public getRemainingDepositLimitByMint(mint: PublicKey): BN | null {
+    const bank = this.getFirstBankByMint(mint);
+    const vaultBalance = this.getTokenVaultBalanceByMint(mint);
+    const isNoLimit = bank.depositLimit.isZero();
+
+    const remainingDepositLimit = !isNoLimit
+      ? bank.depositLimit.sub(vaultBalance)
+      : null;
+
+    return remainingDepositLimit
+      ? remainingDepositLimit.isNeg()
+        ? new BN(0)
+        : remainingDepositLimit
+      : null;
+  }
+
+  /**
+   *
+   * @param mintPk
    * @returns sum of ui balances of vaults for all banks for a token
    */
   public getTokenVaultBalanceByMintUi(mintPk: PublicKey): number {
