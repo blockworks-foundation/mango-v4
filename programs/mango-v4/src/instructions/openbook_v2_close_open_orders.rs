@@ -1,6 +1,6 @@
 use anchor_lang::prelude::*;
 
-use openbook_v2::cpi::accounts::CloseOpenOrdersAccount;
+use openbook_v2::cpi::accounts::{CloseOpenOrdersAccount, CloseOpenOrdersIndexer};
 
 use crate::accounts_ix::*;
 use crate::error::MangoError;
@@ -57,7 +57,6 @@ pub fn openbook_v2_close_open_orders(ctx: Context<OpenbookV2CloseOpenOrders>) ->
 }
 
 fn cpi_close_open_orders(ctx: &OpenbookV2CloseOpenOrders, seeds: &[&[&[u8]]]) -> Result<()> {
-    // todo-pan: when do we clean up the indexer? new ix? can we tell here if nothing else is using it?
     let group = ctx.group.load()?;
     let cpi_accounts = CloseOpenOrdersAccount {
         payer: ctx.authority.to_account_info(),
@@ -74,5 +73,24 @@ fn cpi_close_open_orders(ctx: &OpenbookV2CloseOpenOrders, seeds: &[&[&[u8]]]) ->
         seeds,
     );
 
-    openbook_v2::cpi::close_open_orders_account(cpi_ctx)
+    openbook_v2::cpi::close_open_orders_account(cpi_ctx)?;
+
+    // close indexer too if it's empty, will be recreated if create_open_orders is called again
+    if !ctx.open_orders_indexer.has_active_open_orders_accounts() {
+        let cpi_accounts = CloseOpenOrdersIndexer {
+            owner: ctx.account.to_account_info(),
+            open_orders_indexer: ctx.open_orders_indexer.to_account_info(),
+            sol_destination: ctx.authority.to_account_info(),
+            token_program: ctx.token_program.to_account_info(),
+        };
+    
+        let cpi_ctx = CpiContext::new_with_signer(
+            ctx.openbook_v2_program.to_account_info(),
+            cpi_accounts,
+            seeds,
+        );
+        openbook_v2::cpi::close_open_orders_indexer(cpi_ctx)?;
+    }
+
+    Ok(())
 }

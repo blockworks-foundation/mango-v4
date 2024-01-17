@@ -1,8 +1,9 @@
 use anchor_lang::prelude::*;
+use anchor_spl::token::Token;
 
 use crate::error::MangoError;
 use crate::state::*;
-use openbook_v2::{program::OpenbookV2, state::Market};
+use openbook_v2::{program::OpenbookV2, state::{Market, OpenOrdersIndexer}};
 
 #[derive(Accounts)]
 pub struct OpenbookV2CloseOpenOrders<'info> {
@@ -34,7 +35,8 @@ pub struct OpenbookV2CloseOpenOrders<'info> {
 
     #[account(mut)]
     /// CHECK: Will be checked against seeds and will be initiated by openbook v2
-    pub open_orders_indexer: UncheckedAccount<'info>,
+    /// can't zerocopy this unfortunately
+    pub open_orders_indexer: Account<'info, OpenOrdersIndexer>,
 
     #[account(mut)]
     /// CHECK: Validated inline by checking against the pubkey stored in the account at #2
@@ -53,4 +55,5 @@ pub struct OpenbookV2CloseOpenOrders<'info> {
     pub quote_bank: AccountLoader<'info, Bank>,
 
     pub system_program: Program<'info, System>,
+    pub token_program: Program<'info, Token>,
 }
