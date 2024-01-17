@@ -311,7 +311,6 @@ impl MangoAccount {
             perp_oo_count,
             token_conditional_swap_count,
         ) + (BORSH_VEC_SIZE_BYTES + size_of::<OpenbookV2Orders>() * usize::from(openbook_v2_count))
-            + BORSH_VEC_PADDING_BYTES
     }
 
     pub fn dynamic_size(
@@ -705,7 +704,7 @@ impl MangoAccountDynamicHeader {
         self.token_count() * 2
             + self.serum3_count()
             + self.perp_count() * 2
-            + self.openbook_v2_count() * 2
+            + self.openbook_v2_count()
     }
 
     pub fn max_health_accounts() -> usize {
@@ -2081,10 +2080,8 @@ mod tests {
 
     fn make_test_account() -> MangoAccountValue {
         let account = MangoAccount::default_for_tests();
-        let mut bytes = AnchorSerialize::try_to_vec(&account).unwrap();
+        let bytes = AnchorSerialize::try_to_vec(&account).unwrap();
 
-        // The MangoAccount struct is missing some dynamic fields, add space for them
-        let obv2_length = 5;
         // Verify that the size is as expected
         let expected_space = MangoAccount::space(
             account.tokens.len() as u8,
@@ -2092,29 +2089,12 @@ mod tests {
             account.perps.len() as u8,
             account.perp_open_orders.len() as u8,
             account.token_conditional_swaps.len() as u8,
-            obv2_length,
+            account.openbook_v2.len() as u8,
         );
-        bytes.extend(vec![0u8; expected_space - bytes.len()]);
-        assert_eq!(expected_space, 8 + bytes.len());
-        // Set the length of these dynamic parts
-        let (fixed, dynamic) = bytes.split_at_mut(size_of::<MangoAccountFixed>());
-        let mut header = MangoAccountDynamicHeader::from_bytes(dynamic).unwrap();
-        header.token_conditional_swap_count = account.token_conditional_swaps.len() as u8;
-        header.openbook_v2_count = obv2_length;
-        let mut account = MangoAccountRefMut {
-            header: &mut header,
-            fixed: bytemuck::from_bytes_mut(fixed),
-            dynamic,
-        };
-        account.write_token_conditional_swap_length();
-        account.write_openbook_v2_length();
-        let mut account = MangoAccountValue::from_bytes(&bytes).unwrap();
-        // Initialize the openbook orders with defaults as they would be in the program
-        for i in 0..header.openbook_v2_count() {
-            *account.openbook_v2_orders_mut_by_raw_index(i) = OpenbookV2Orders::default();
-        }
 
-        account
+        assert_eq!(expected_space, 8 + bytes.len());
+
+        MangoAccountValue::from_bytes(&bytes).unwrap()
     }
 
     #[test]
@@ -2145,26 +2125,13 @@ mod tests {
             .resize(12, TokenConditionalSwap::default());
         account.token_conditional_swaps[0].buy_token_index = 14;
 
-        let account_bytes_without_tcs_and_obv2_and_reserved =
-            AnchorSerialize::try_to_vec(&account).unwrap();
-        let account_bytes = {
-            let mut b = account_bytes_without_tcs_and_obv2_and_reserved.clone();
-            // tcs adds 4 bytes of padding and 4 bytes of Vec size
-            b.extend([0u8; 8]);
-            // openbook v2 probably adds a vec too
-            b.extend([0u8; 8]);
-            // plus 56 bytes of reserved space at the end
-            b.extend([0u8; 56]);
-            b
-        };
+        let account_bytes = AnchorSerialize::try_to_vec(&account).unwrap();
         assert_eq!(
             8 + account_bytes.len(),
             MangoAccount::space(8, 8, 4, 8, 0, 0)
         );
 
-        let account2 =
-            MangoAccountValue::from_bytes(&account_bytes_without_tcs_and_obv2_and_reserved)
-                .unwrap();
+        let account2 = MangoAccountValue::from_bytes(&account_bytes).unwrap();
         assert_eq!(account.group, account2.fixed.group);
         assert_eq!(account.owner, account2.fixed.owner);
         assert_eq!(account.name, account2.fixed.name);
