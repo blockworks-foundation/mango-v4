@@ -24,6 +24,7 @@ solana-program = "~1.16.7"
 solana-program-test = "~1.16.7"
 solana-rpc = "~1.16.7"
 solana-sdk = { version = "~1.16.7", default-features = false }
+solana-transaction-status = { version = "~1.16.7" }
 
 [profile.release]
 overflow-checks = true
