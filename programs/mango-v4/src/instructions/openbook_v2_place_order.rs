@@ -76,7 +76,6 @@ pub fn openbook_v2_place_order(
         retriever.bank_and_oracle(&group_key, receiver_active_index, receiver_token_index)?;
 
     require_keys_eq!(payer_bank.vault, ctx.accounts.payer_vault.key());
-    require_keys_eq!(receiver_bank.vault, ctx.accounts.receiver_vault.key());
     require_eq!(payer_bank.token_index, payer_token_index);
     require_eq!(receiver_bank.token_index, receiver_token_index);
 
@@ -124,13 +123,14 @@ pub fn openbook_v2_place_order(
     {
         base_lot_size = openbook_market_external.base_lot_size;
         quote_lot_size = openbook_market_external.quote_lot_size;
+        let max_base_lots: u64 = order.max_base_lots.try_into().unwrap();
+        let max_quote_lots: u64 = order.max_quote_lots_including_fees.try_into().unwrap();
 
-        // todo-pan: why i64? hope the cast doesnt fuck anything up
         let needed_amount = match order.side {
-            OpenbookV2Side::Ask => (order.max_base_lots as u64 * base_lot_size as u64)
-                .saturating_sub(before_oo.native_base_free()),
-            OpenbookV2Side::Bid => (order.max_quote_lots_including_fees as u64)
-                .saturating_sub(before_oo.native_quote_free()),
+            OpenbookV2Side::Ask => {
+                (max_base_lots * base_lot_size as u64).saturating_sub(before_oo.native_base_free())
+            }
+            OpenbookV2Side::Bid => max_quote_lots.saturating_sub(before_oo.native_quote_free()),
         };
         if before_vault < needed_amount {
             return err!(MangoError::InsufficentBankVaultFunds).with_context(|| {
@@ -272,9 +272,6 @@ pub fn openbook_v2_place_order(
     }
 
     // Payer bank safety checks like reduce-only, net borrows, vault-to-deposits ratio
-    let payer_oracle_ref = &AccountInfoRef::borrow(&ctx.accounts.payer_oracle)?;
-    let payer_bank_oracle =
-        payer_bank.oracle_price(&OracleAccountInfos::from_reader(payer_oracle_ref), None)?;
     let withdrawn_from_vault = I80F48::from(before_vault - after_vault);
     if withdrawn_from_vault > before_position_native {
         require_msg_typed!(
